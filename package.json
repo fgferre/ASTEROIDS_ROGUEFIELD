@@ -1,0 +1,12 @@
+{
+  "name": "asteroids_roguefield",
+  "version": "1.0.0",
+  "description": "Jogo Roguelike inspirado nas mecânicas de Asteroids",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"No test specified\" && exit 0"
+  },
+  "devDependencies": {
+    "grunt": "^1.6.1"
+  }
+}
