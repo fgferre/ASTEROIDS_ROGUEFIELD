@@ -854,20 +854,27 @@ function createBullet(fromX, fromY, toX, toY) {
 }
 
 function updatePlayerMovement(deltaTime) {
+  let accelerating = false;
   const acceleration = gameState.player.acceleration * deltaTime;
-
+  
   let ax = 0, ay = 0;
-
-  // Identificar separadamente cada tecla direcional
-  const upPressed = gameState.input['w'] || gameState.input['arrowup'];
-  const downPressed = gameState.input['s'] || gameState.input['arrowdown'];
-  const leftPressed = gameState.input['a'] || gameState.input['arrowleft'];
-  const rightPressed = gameState.input['d'] || gameState.input['arrowright'];
-
-  if (upPressed) ay -= acceleration;
-  if (downPressed) ay += acceleration;
-  if (leftPressed) ax -= acceleration;
-  if (rightPressed) ax += acceleration;
+  
+  if (gameState.input['w'] || gameState.input['arrowup']) {
+    ay -= acceleration;
+    accelerating = true;
+  }
+  if (gameState.input['s'] || gameState.input['arrowdown']) {
+    ay += acceleration;
+    accelerating = true;
+  }
+  if (gameState.input['a'] || gameState.input['arrowleft']) {
+    ax -= acceleration;
+    accelerating = true;
+  }
+  if (gameState.input['d'] || gameState.input['arrowright']) {
+    ax += acceleration;
+    accelerating = true;
+  }
   
   gameState.player.vx += ax;
   gameState.player.vy += ay;
@@ -909,61 +916,22 @@ function updatePlayerMovement(deltaTime) {
   if (gameState.player.angularVelocity < -maxAng) gameState.player.angularVelocity = -maxAng;
   gameState.player.angle = wrapAngle(gameState.player.angle + gameState.player.angularVelocity * deltaTime);
   
-  // Efeito de propulsão para cada direção
-  if (upPressed) createThrusterEffect('bottom');
-  if (downPressed) createThrusterEffect('top');
-  if (leftPressed) createThrusterEffect('right');
-  if (rightPressed) createThrusterEffect('left');
+  // Efeito de propulsão
+  if (accelerating) {
+    createThrusterEffect();
+  }
 }
 
-function createThrusterEffect(direction = 'bottom') {
-  const angle = gameState.player.angle;
-  const forwardX = Math.cos(angle);
-  const forwardY = Math.sin(angle);
-  const rightX = Math.cos(angle + Math.PI / 2);
-  const rightY = Math.sin(angle + Math.PI / 2);
-
-  let offsetX = 0, offsetY = 0;
-  let dirX = 0, dirY = 0;
-
-  switch (direction) {
-    case 'left':
-      offsetX = -rightX * SHIP_SIZE * 0.8;
-      offsetY = -rightY * SHIP_SIZE * 0.8;
-      dirX = -rightX;
-      dirY = -rightY;
-      break;
-    case 'right':
-      offsetX = rightX * SHIP_SIZE * 0.8;
-      offsetY = rightY * SHIP_SIZE * 0.8;
-      dirX = rightX;
-      dirY = rightY;
-      break;
-    case 'top':
-      offsetX = forwardX * SHIP_SIZE * 0.8;
-      offsetY = forwardY * SHIP_SIZE * 0.8;
-      dirX = forwardX;
-      dirY = forwardY;
-      break;
-    case 'bottom':
-    default:
-      offsetX = -forwardX * SHIP_SIZE * 0.8;
-      offsetY = -forwardY * SHIP_SIZE * 0.8;
-      dirX = -forwardX;
-      dirY = -forwardY;
-      break;
-  }
-
-  const thrusterX = gameState.player.x + offsetX;
-  const thrusterY = gameState.player.y + offsetY;
-
+function createThrusterEffect() {
+  const thrusterX = gameState.player.x - Math.cos(gameState.player.angle) * SHIP_SIZE * 0.8;
+  const thrusterY = gameState.player.y - Math.sin(gameState.player.angle) * SHIP_SIZE * 0.8;
+  
   for (let i = 0; i < 2; i++) {
-    const speed = 80 + Math.random() * 40;
     const particle = new SpaceParticle(
       thrusterX + (Math.random() - 0.5) * 4,
       thrusterY + (Math.random() - 0.5) * 4,
-      dirX * speed + (Math.random() - 0.5) * 20,
-      dirY * speed + (Math.random() - 0.5) * 20,
+      -Math.cos(gameState.player.angle) * (80 + Math.random() * 40) + (Math.random() - 0.5) * 20,
+      -Math.sin(gameState.player.angle) * (80 + Math.random() * 40) + (Math.random() - 0.5) * 20,
       `hsl(${Math.random() * 60 + 15}, 100%, 70%)`,
       2 + Math.random() * 1.5,
       0.25 + Math.random() * 0.15,
