@@ -11,8 +11,11 @@ const TRAIL_LENGTH = 6;
 // Constantes de física - Otimizadas
 const SHIP_ACCELERATION = 280;
 const SHIP_MAX_SPEED = 220;
-const SHIP_FRICTION = 0.94;
+// Amortecimento dependente de dt (equivale a ~0.94/frame em 60 FPS)
+const SHIP_LINEAR_DAMPING = 3.9; // s^-1
 const SHIP_ROTATION_SPEED = 8; // Velocidade máxima de rotação (rad/s)
+const SHIP_ANGULAR_DAMPING = 8.0; // s^-1
+const SHIP_MASS = 60; // massa efetiva da nave para colisões
 // Ajuste: chaves em minúsculas para casar com o restante do código
 const ASTEROID_SPEEDS = { large: 25, medium: 45, small: 70 };
 const BULLET_SPEED = 450;
@@ -86,6 +89,7 @@ let gameState = {
     vy: 0,
     angle: 0,
     targetAngle: 0, // Ângulo alvo para rotação suave
+    angularVelocity: 0,
     health: 100,
     maxHealth: 100,
     level: 1,
@@ -93,9 +97,12 @@ let gameState = {
     xpToNext: 100,
     damage: 25,
     maxSpeed: SHIP_MAX_SPEED,
+    acceleration: SHIP_ACCELERATION,
+    rotationSpeed: SHIP_ROTATION_SPEED,
     armor: 0,
     multishot: 1,
-    magnetismRadius: MAGNETISM_RADIUS
+    magnetismRadius: MAGNETISM_RADIUS,
+    invulnerableTimer: 0
   },
   world: {
     asteroids: [],
@@ -141,6 +148,20 @@ function lerpAngle(from, to, factor) {
   while (diff < -Math.PI) diff += Math.PI * 2;
   
   return from + diff * factor;
+}
+
+// Utilitários angulares adicionais
+function wrapAngle(a) {
+  while (a > Math.PI) a -= Math.PI * 2;
+  while (a < -Math.PI) a += Math.PI * 2;
+  return a;
+}
+
+function angleDiff(from, to) {
+  let diff = to - from;
+  while (diff > Math.PI) diff -= Math.PI * 2;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  return diff;
 }
 
 // Sistema de áudio espacial robusto
@@ -359,6 +380,7 @@ class Asteroid {
     this.y = y;
     this.size = size;
     this.radius = ASTEROID_SIZES[size];
+    this.mass = this.radius * this.radius * 0.05; // massa proporcional à área
     this.health = size === 'large' ? 3 : size === 'medium' ? 2 : 1;
     this.maxHealth = this.health;
     
@@ -586,6 +608,7 @@ function resetPlayer() {
     vy: 0,
     angle: 0,
     targetAngle: 0,
+    angularVelocity: 0,
     health: 100,
     maxHealth: 100,
     level: 1,
@@ -593,9 +616,12 @@ function resetPlayer() {
     xpToNext: 100,
     damage: 25,
     maxSpeed: SHIP_MAX_SPEED,
+    acceleration: SHIP_ACCELERATION,
+    rotationSpeed: SHIP_ROTATION_SPEED,
     armor: 0,
     multishot: 1,
-    magnetismRadius: MAGNETISM_RADIUS
+    magnetismRadius: MAGNETISM_RADIUS,
+    invulnerableTimer: 0
   };
 }
 
@@ -763,7 +789,7 @@ function createBullet(fromX, fromY, toX, toY) {
 
 function updatePlayerMovement(deltaTime) {
   let accelerating = false;
-  const acceleration = SHIP_ACCELERATION * deltaTime;
+  const acceleration = gameState.player.acceleration * deltaTime;
   
   let ax = 0, ay = 0;
   
@@ -787,16 +813,17 @@ function updatePlayerMovement(deltaTime) {
   gameState.player.vx += ax;
   gameState.player.vy += ay;
   
+  // Aplicar amortecimento dependente de dt
+  const linearDamp = Math.exp(-SHIP_LINEAR_DAMPING * deltaTime);
+  gameState.player.vx *= linearDamp;
+  gameState.player.vy *= linearDamp;
+  
   // Limitar velocidade máxima
   const speed = Math.sqrt(gameState.player.vx ** 2 + gameState.player.vy ** 2);
   if (speed > gameState.player.maxSpeed) {
     gameState.player.vx = (gameState.player.vx / speed) * gameState.player.maxSpeed;
     gameState.player.vy = (gameState.player.vy / speed) * gameState.player.maxSpeed;
   }
-  
-  // Aplicar fricção
-  gameState.player.vx *= SHIP_FRICTION;
-  gameState.player.vy *= SHIP_FRICTION;
   
   // Atualizar posição
   gameState.player.x += gameState.player.vx * deltaTime;
@@ -808,14 +835,20 @@ function updatePlayerMovement(deltaTime) {
   if (gameState.player.y < 0) gameState.player.y = GAME_HEIGHT;
   if (gameState.player.y > GAME_HEIGHT) gameState.player.y = 0;
   
-  // CORREÇÃO BUG 2: Rotação suave baseada na velocidade
+  // Direção alvo baseada na velocidade
   if (Math.abs(gameState.player.vx) > 5 || Math.abs(gameState.player.vy) > 5) {
     gameState.player.targetAngle = Math.atan2(gameState.player.vy, gameState.player.vx);
   }
   
-  // Interpolar suavemente para o ângulo alvo
-  const rotationSpeed = SHIP_ROTATION_SPEED * deltaTime;
-  gameState.player.angle = lerpAngle(gameState.player.angle, gameState.player.targetAngle, rotationSpeed);
+  // Inércia angular: PD simples com amortecimento
+  const diff = angleDiff(gameState.player.angle, gameState.player.targetAngle);
+  const angAccel = (gameState.player.rotationSpeed * 6) * diff - (SHIP_ANGULAR_DAMPING * gameState.player.angularVelocity);
+  gameState.player.angularVelocity += angAccel * deltaTime;
+  // Clamp de velocidade angular
+  const maxAng = gameState.player.rotationSpeed;
+  if (gameState.player.angularVelocity > maxAng) gameState.player.angularVelocity = maxAng;
+  if (gameState.player.angularVelocity < -maxAng) gameState.player.angularVelocity = -maxAng;
+  gameState.player.angle = wrapAngle(gameState.player.angle + gameState.player.angularVelocity * deltaTime);
   
   // Efeito de propulsão
   if (accelerating) {
@@ -864,6 +897,11 @@ function gameLoop(currentTime) {
 
 function updateGame(deltaTime) {
   gameState.stats.time = (Date.now() - gameState.stats.startTime) / 1000;
+  // Atualizar i-frames do jogador
+  if (gameState.player.invulnerableTimer > 0) {
+    gameState.player.invulnerableTimer -= deltaTime;
+    if (gameState.player.invulnerableTimer < 0) gameState.player.invulnerableTimer = 0;
+  }
   
   updatePlayerMovement(deltaTime);
   updateTargeting(deltaTime);
@@ -912,7 +950,7 @@ function updateAsteroids(deltaTime) {
     }
   });
   
-  // Física de colisão entre asteroides otimizada
+  // Física de colisão entre asteroides (impulso com massa)
   for (let i = 0; i < gameState.world.asteroids.length - 1; i++) {
     const a1 = gameState.world.asteroids[i];
     if (a1.destroyed) continue;
@@ -927,25 +965,33 @@ function updateAsteroids(deltaTime) {
       const minDistance = a1.radius + a2.radius;
       
       if (distance < minDistance && distance > 0) {
-        // Separação
+        const nx = dx / distance;
+        const ny = dy / distance;
+        // Correção de penetração
         const overlap = minDistance - distance;
-        const separationX = (dx / distance) * (overlap / 2);
-        const separationY = (dy / distance) * (overlap / 2);
-        
-        a1.x -= separationX;
-        a1.y -= separationY;
-        a2.x += separationX;
-        a2.y += separationY;
-        
-        // Troca de momento
-        const v1x = a1.vx;
-        const v1y = a1.vy;
-        
-        a1.vx = a2.vx * COLLISION_BOUNCE;
-        a1.vy = a2.vy * COLLISION_BOUNCE;
-        a2.vx = v1x * COLLISION_BOUNCE;
-        a2.vy = v1y * COLLISION_BOUNCE;
-        
+        const percent = 0.5;
+        a1.x -= nx * overlap * percent;
+        a1.y -= ny * overlap * percent;
+        a2.x += nx * overlap * percent;
+        a2.y += ny * overlap * percent;
+
+        // Impulso elástico com massa e restituição
+        const rvx = a2.vx - a1.vx;
+        const rvy = a2.vy - a1.vy;
+        const velAlongNormal = rvx * nx + rvy * ny;
+        if (velAlongNormal < 0) {
+          const e = COLLISION_BOUNCE;
+          const invMass1 = 1 / a1.mass;
+          const invMass2 = 1 / a2.mass;
+          const j = -(1 + e) * velAlongNormal / (invMass1 + invMass2);
+          const jx = j * nx;
+          const jy = j * ny;
+          a1.vx -= jx * invMass1;
+          a1.vy -= jy * invMass1;
+          a2.vx += jx * invMass2;
+          a2.vy += jy * invMass2;
+        }
+
         a1.rotationSpeed += (Math.random() - 0.5) * 1.5;
         a2.rotationSpeed += (Math.random() - 0.5) * 1.5;
       }
@@ -1180,7 +1226,10 @@ function applyUpgrade(upgradeId) {
       gameState.player.damage = Math.floor(gameState.player.damage * 1.25);
       break;
     case 'propulsors':
+      // Aumenta velocidade máxima, aceleração e um pouco a rotação para melhor controle
       gameState.player.maxSpeed = Math.floor(gameState.player.maxSpeed * 1.2);
+      gameState.player.acceleration = Math.floor(gameState.player.acceleration * 1.2);
+      gameState.player.rotationSpeed = gameState.player.rotationSpeed * 1.1;
       break;
     case 'shield':
       gameState.player.maxHealth += 50;
@@ -1254,25 +1303,50 @@ function checkCollisions() {
     const distance = Math.sqrt(dx * dx + dy * dy);
     
     if (distance < SHIP_SIZE + asteroid.radius) {
-      const baseDamage = 20;
-      const damage = Math.max(3, baseDamage - gameState.player.armor);
-      gameState.player.health -= damage;
-      
-      audio.playShipHit();
-      addScreenShake(8, 0.3);
-      
-      // Empurrão
-      const pushForce = 120;
-      const pushDistance = Math.max(distance, 1);
-      
-      asteroid.vx += (asteroid.x - gameState.player.x) / pushDistance * pushForce;
-      asteroid.vy += (asteroid.y - gameState.player.y) / pushDistance * pushForce;
-      
-      gameState.player.vx -= (asteroid.x - gameState.player.x) / pushDistance * pushForce;
-      gameState.player.vy -= (asteroid.y - gameState.player.y) / pushDistance * pushForce;
-      
-      if (gameState.player.health <= 0) {
-        gameOver();
+      // Normal de colisão
+      const nx = dx / Math.max(distance, 1);
+      const ny = dy / Math.max(distance, 1);
+      // Correção de penetração
+      const overlap = (SHIP_SIZE + asteroid.radius) - distance;
+      if (overlap > 0) {
+        gameState.player.x += nx * overlap * 0.5;
+        gameState.player.y += ny * overlap * 0.5;
+        asteroid.x -= nx * overlap * 0.5;
+        asteroid.y -= ny * overlap * 0.5;
+      }
+      // Impulso baseado em massas
+      const rvx = asteroid.vx - gameState.player.vx;
+      const rvy = asteroid.vy - gameState.player.vy;
+      const velAlongNormal = rvx * nx + rvy * ny;
+      if (velAlongNormal < 0) {
+        const e = 0.2; // colisão menos elástica com a nave
+        const invMass1 = 1 / SHIP_MASS;
+        const invMass2 = 1 / asteroid.mass;
+        const j = -(1 + e) * velAlongNormal / (invMass1 + invMass2);
+        const jx = j * nx;
+        const jy = j * ny;
+        gameState.player.vx -= jx * invMass1;
+        gameState.player.vy -= jy * invMass1;
+        asteroid.vx += jx * invMass2;
+        asteroid.vy += jy * invMass2;
+      }
+
+      // Dano baseado em momento relativo (com i-frames)
+      if (gameState.player.invulnerableTimer <= 0) {
+        const relSpeed = Math.sqrt((asteroid.vx - gameState.player.vx) ** 2 + (asteroid.vy - gameState.player.vy) ** 2);
+        const baseDamage = 12;
+        const momentumFactor = (asteroid.mass * relSpeed) / 120;
+        const rawDamage = baseDamage + momentumFactor;
+        const damage = Math.max(3, Math.floor(rawDamage) - gameState.player.armor);
+        gameState.player.health -= damage;
+        gameState.player.invulnerableTimer = 0.5;
+        
+        audio.playShipHit();
+        addScreenShake(8, 0.3);
+        
+        if (gameState.player.health <= 0) {
+          gameOver();
+        }
       }
     }
   });
