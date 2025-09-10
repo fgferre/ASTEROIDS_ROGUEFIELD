@@ -856,19 +856,25 @@ function createBullet(fromX, fromY, toX, toY) {
 function updatePlayerMovement(deltaTime) {
   let accelerating = false;
   const acceleration = gameState.player.acceleration * deltaTime;
-
+  
   let ax = 0, ay = 0;
-
-  // Identificar separadamente cada tecla direcional
-  const upPressed = gameState.input['w'] || gameState.input['arrowup'];
-  const downPressed = gameState.input['s'] || gameState.input['arrowdown'];
-  const leftPressed = gameState.input['a'] || gameState.input['arrowleft'];
-  const rightPressed = gameState.input['d'] || gameState.input['arrowright'];
-
-  if (upPressed) ay -= acceleration;
-  if (downPressed) ay += acceleration;
-  if (leftPressed) ax -= acceleration;
-  if (rightPressed) ax += acceleration;
+  
+  if (gameState.input['w'] || gameState.input['arrowup']) {
+    ay -= acceleration;
+    accelerating = true;
+  }
+  if (gameState.input['s'] || gameState.input['arrowdown']) {
+    ay += acceleration;
+    accelerating = true;
+  }
+  if (gameState.input['a'] || gameState.input['arrowleft']) {
+    ax -= acceleration;
+    accelerating = true;
+  }
+  if (gameState.input['d'] || gameState.input['arrowright']) {
+    ax += acceleration;
+    accelerating = true;
+  }
   
   gameState.player.vx += ax;
   gameState.player.vy += ay;
@@ -911,11 +917,10 @@ function updatePlayerMovement(deltaTime) {
   if (gameState.player.angularVelocity < -maxAng) gameState.player.angularVelocity = -maxAng;
   gameState.player.angle = wrapAngle(gameState.player.angle + gameState.player.angularVelocity * deltaTime);
   
-  // Efeito de propulsão para cada direção
-  if (upPressed) createThrusterEffect('bottom');
-  if (downPressed) createThrusterEffect('top');
-  if (leftPressed) createThrusterEffect('right');
-  if (rightPressed) createThrusterEffect('left');
+  // Efeito de propulsão
+  if (accelerating) {
+    createThrusterEffect();
+  }
 }
 
 function createThrusterEffect() {
