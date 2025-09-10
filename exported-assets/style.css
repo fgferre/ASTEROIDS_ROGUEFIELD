@@ -829,6 +829,7 @@ body {
 /* Level Up Screen */
 #levelup-screen {
   background: rgba(0, 0, 0, 0.95);
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
 
@@ -904,6 +905,7 @@ body {
 /* Game Over Screen */
 #gameover-screen {
   background: var(--color-bg-4);
+  -webkit-backdrop-filter: blur(5px);
   backdrop-filter: blur(5px);
 }
 
@@ -974,6 +976,7 @@ body {
   color: var(--color-text);
   font-weight: var(--font-weight-medium);
   box-shadow: var(--shadow-sm);
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
 
@@ -1004,6 +1007,7 @@ body {
   border-radius: var(--radius-base);
   border: 1px solid var(--color-border);
   min-width: 250px;
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   box-shadow: var(--shadow-sm);
 }
@@ -1059,6 +1063,7 @@ body {
   border-radius: var(--radius-base);
   text-align: center;
   border: 2px solid var(--color-warning);
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
 
