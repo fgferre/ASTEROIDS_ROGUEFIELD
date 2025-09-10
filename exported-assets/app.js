@@ -856,70 +856,66 @@ function createBullet(fromX, fromY, toX, toY) {
 function updatePlayerMovement(deltaTime) {
   let accelerating = false;
   const acceleration = gameState.player.acceleration * deltaTime;
-  
+
   let ax = 0, ay = 0;
-  
-  if (gameState.input['w'] || gameState.input['arrowup']) {
-    ay -= acceleration;
-    accelerating = true;
-  }
-  if (gameState.input['s'] || gameState.input['arrowdown']) {
-    ay += acceleration;
-    accelerating = true;
-  }
-  if (gameState.input['a'] || gameState.input['arrowleft']) {
-    ax -= acceleration;
-    accelerating = true;
-  }
-  if (gameState.input['d'] || gameState.input['arrowright']) {
-    ax += acceleration;
-    accelerating = true;
-  }
+
+  // Identificar separadamente cada tecla direcional
+  const upPressed = gameState.input['w'] || gameState.input['arrowup'];
+  const downPressed = gameState.input['s'] || gameState.input['arrowdown'];
+  const leftPressed = gameState.input['a'] || gameState.input['arrowleft'];
+  const rightPressed = gameState.input['d'] || gameState.input['arrowright'];
+
+  if (upPressed) ay -= acceleration;
+  if (downPressed) ay += acceleration;
+  if (leftPressed) ax -= acceleration;
+  if (rightPressed) ax += acceleration;
   
   gameState.player.vx += ax;
   gameState.player.vy += ay;
-  
+
   // Aplicar amortecimento dependente de dt
   const linearDamp = Math.exp(-SHIP_LINEAR_DAMPING * deltaTime);
   gameState.player.vx *= linearDamp;
   gameState.player.vy *= linearDamp;
-  
+
   // Limitar velocidade máxima
   const speed = Math.sqrt(gameState.player.vx ** 2 + gameState.player.vy ** 2);
   if (speed > gameState.player.maxSpeed) {
     gameState.player.vx = (gameState.player.vx / speed) * gameState.player.maxSpeed;
     gameState.player.vy = (gameState.player.vy / speed) * gameState.player.maxSpeed;
   }
-  
+
   // Atualizar posição
   gameState.player.x += gameState.player.vx * deltaTime;
   gameState.player.y += gameState.player.vy * deltaTime;
-  
+
   // Wrap around screen
   if (gameState.player.x < 0) gameState.player.x = GAME_WIDTH;
   if (gameState.player.x > GAME_WIDTH) gameState.player.x = 0;
   if (gameState.player.y < 0) gameState.player.y = GAME_HEIGHT;
   if (gameState.player.y > GAME_HEIGHT) gameState.player.y = 0;
-  
-  // Direção alvo baseada na velocidade
-  if (Math.abs(gameState.player.vx) > 5 || Math.abs(gameState.player.vy) > 5) {
-    gameState.player.targetAngle = Math.atan2(gameState.player.vy, gameState.player.vx);
-  }
-  
-  // Inércia angular: PD simples com amortecimento
-  const diff = angleDiff(gameState.player.angle, gameState.player.targetAngle);
-  const angAccel = (gameState.player.rotationSpeed * 6) * diff - (SHIP_ANGULAR_DAMPING * gameState.player.angularVelocity);
-  gameState.player.angularVelocity += angAccel * deltaTime;
-  // Clamp de velocidade angular
+
+  // Controle de rotação
+  let angularAccel = 0;
+  if (rotateLeft) angularAccel -= rotationAccel;
+  if (rotateRight) angularAccel += rotationAccel;
+  gameState.player.angularVelocity += angularAccel;
+
+  // Amortecimento angular
+  const angularDamp = Math.exp(-SHIP_ANGULAR_DAMPING * deltaTime);
+  gameState.player.angularVelocity *= angularDamp;
+
+  // Limitar velocidade angular
   const maxAng = gameState.player.rotationSpeed;
   if (gameState.player.angularVelocity > maxAng) gameState.player.angularVelocity = maxAng;
   if (gameState.player.angularVelocity < -maxAng) gameState.player.angularVelocity = -maxAng;
   gameState.player.angle = wrapAngle(gameState.player.angle + gameState.player.angularVelocity * deltaTime);
   
-  // Efeito de propulsão
-  if (accelerating) {
-    createThrusterEffect();
-  }
+  // Efeito de propulsão para cada direção
+  if (upPressed) createThrusterEffect('bottom');
+  if (downPressed) createThrusterEffect('top');
+  if (leftPressed) createThrusterEffect('right');
+  if (rightPressed) createThrusterEffect('left');
 }
 
 function createThrusterEffect() {
