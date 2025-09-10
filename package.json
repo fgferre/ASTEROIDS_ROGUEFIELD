@@ -1,0 +1,8 @@
+{
+  "name": "asteroids_roguefield",
+  "version": "1.0.0",
+  "description": "Asteroids Roguefield game",
+  "scripts": {
+    "test": "node --check exported-assets/app.js"
+  }
+}
