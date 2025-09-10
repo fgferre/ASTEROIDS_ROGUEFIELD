@@ -136,6 +136,8 @@ let gameState = {
   canvas: null,
   ctx: null,
   screenShake: { intensity: 0, duration: 0, timer: 0 },
+  freezeFrame: { timer: 0, duration: 0, fade: 0 },
+  screenFlash: { timer: 0, duration: 0, color: '#FFFFFF', intensity: 0 },
   initialized: false
 };
 
@@ -245,6 +247,50 @@ class SpaceAudioSystem {
     });
   }
 
+  playBigExplosion() {
+    this.safePlay(() => {
+      // Oscilador de baixa frequência
+      const osc = this.context.createOscillator();
+      const oscGain = this.context.createGain();
+      osc.connect(oscGain);
+      oscGain.connect(this.masterGain);
+
+      // Ruído branco
+      const bufferSize = this.context.sampleRate * 0.5;
+      const noiseBuffer = this.context.createBuffer(1, bufferSize, this.context.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+      const noise = this.context.createBufferSource();
+      noise.buffer = noiseBuffer;
+      const noiseGain = this.context.createGain();
+      noise.connect(noiseGain);
+      noiseGain.connect(this.masterGain);
+
+      const now = this.context.currentTime;
+
+      // Configurações do oscilador
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(60, now);
+      osc.frequency.exponentialRampToValueAtTime(30, now + 0.5);
+
+      oscGain.gain.setValueAtTime(0.2, now);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+      // Envelope do ruído
+      noiseGain.gain.setValueAtTime(0.5, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
+      // Iniciar fontes
+      osc.start(now);
+      osc.stop(now + 0.5);
+
+      noise.start(now);
+      noise.stop(now + 0.4);
+    });
+  }
+
   playXPCollect() {
     this.safePlay(() => {
       const osc = this.context.createOscillator();
@@ -304,6 +350,26 @@ class SpaceAudioSystem {
       
       osc.start();
       osc.stop(this.context.currentTime + 0.3);
+    });
+  }
+
+  playBigExplosion() {
+    this.safePlay(() => {
+      const osc = this.context.createOscillator();
+      const gain = this.context.createGain();
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(60, this.context.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(20, this.context.currentTime + 0.5);
+
+      gain.gain.setValueAtTime(0.3, this.context.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 0.5);
+
+      osc.start();
+      osc.stop(this.context.currentTime + 0.5);
     });
   }
 }
@@ -911,10 +977,16 @@ let lastTime = 0;
 
 function gameLoop(currentTime) {
   if (!gameState.initialized) return;
-  
-  const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.016);
+
+  let deltaTime = Math.min((currentTime - lastTime) / 1000, 0.016);
   lastTime = currentTime;
-  
+
+  if (gameState.freezeFrame.timer > 0) {
+    gameState.freezeFrame.timer -= deltaTime;
+    if (gameState.freezeFrame.timer < 0) gameState.freezeFrame.timer = 0;
+    deltaTime *= gameState.freezeFrame.fade;
+  }
+
   try {
     if (gameState.screen === 'playing') {
       updateGame(deltaTime);
@@ -923,7 +995,7 @@ function gameLoop(currentTime) {
   } catch (error) {
     console.error('Erro no game loop:', error);
   }
-  
+
   requestAnimationFrame(gameLoop);
 }
 
@@ -944,7 +1016,8 @@ function updateGame(deltaTime) {
   updateParticles(deltaTime);
   updateWaveSystem(deltaTime);
   updateScreenShake(deltaTime);
-  
+  updateScreenFlash(deltaTime);
+
   checkCollisions();
   updateUI();
 }
@@ -1207,8 +1280,12 @@ function levelUp() {
   
   gameState.screen = 'levelup';
   showLevelUpScreen();
-  
+
   audio.playLevelUp();
+  addScreenShake(6, 0.4, 'celebration');
+  addFreezeFrame(0.2, 0.4);
+  createLevelUpExplosion();
+  addScreenFlash('#FFD700', 0.15, 0.2);
 }
 
 function showLevelUpScreen() {
@@ -1305,6 +1382,9 @@ function checkCollisions() {
           
           createAsteroidExplosion(asteroid);
           audio.playAsteroidBreak(asteroid.size);
+          if (asteroid.size === 'large') {
+            audio.playBigExplosion();
+          }
           
           // Fragmentação
           const fragments = asteroid.fragment();
@@ -1386,7 +1466,20 @@ function checkCollisions() {
 
 function createAsteroidExplosion(asteroid) {
   const particleCount = { large: 12, medium: 8, small: 5 }[asteroid.size];
-  
+
+  if (asteroid.size === 'small') {
+    addScreenShake(2, 0.1);
+  } else if (asteroid.size === 'medium') {
+    addScreenShake(4, 0.15);
+  } else if (asteroid.size === 'large') {
+    addScreenShake(8, 0.25, 'explosion');
+    addFreezeFrame(0.15, 0.2);
+    addScreenFlash('#FF6B6B', 0.2, 0.1);
+    if (typeof audio.playBigExplosion === 'function') {
+      audio.playBigExplosion();
+    }
+  }
+
   for (let i = 0; i < particleCount; i++) {
     const angle = Math.random() * Math.PI * 2;
     const speed = 40 + Math.random() * 80;
@@ -1435,10 +1528,41 @@ function createXPCollectEffect(x, y) {
   }
 }
 
+function createLevelUpExplosion() {
+  for (let i = 0; i < 20; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 60 + Math.random() * 120;
+    const particle = new SpaceParticle(
+      gameState.player.x,
+      gameState.player.y,
+      Math.cos(angle) * speed,
+      Math.sin(angle) * speed,
+      `hsl(${Math.random() * 40 + 40}, 100%, 60%)`,
+      2 + Math.random() * 2,
+      0.6 + Math.random() * 0.4,
+      'spark'
+    );
+    gameState.world.particles.push(particle);
+  }
+}
+
 function addScreenShake(intensity, duration) {
   gameState.screenShake.intensity = Math.max(gameState.screenShake.intensity, intensity);
   gameState.screenShake.duration = Math.max(gameState.screenShake.duration, duration);
   gameState.screenShake.timer = gameState.screenShake.duration;
+}
+
+function addFreezeFrame(duration, fade = 0) {
+  gameState.freezeFrame.timer = Math.max(gameState.freezeFrame.timer, duration);
+  gameState.freezeFrame.duration = Math.max(gameState.freezeFrame.duration, duration);
+  gameState.freezeFrame.fade = fade;
+}
+
+function addScreenFlash(color, duration, intensity) {
+  gameState.screenFlash.color = color;
+  gameState.screenFlash.duration = duration;
+  gameState.screenFlash.timer = duration;
+  gameState.screenFlash.intensity = intensity;
 }
 
 function updateScreenShake(deltaTime) {
@@ -1449,6 +1573,13 @@ function updateScreenShake(deltaTime) {
       gameState.screenShake.intensity = 0;
       gameState.screenShake.duration = 0;
     }
+  }
+}
+
+function updateScreenFlash(deltaTime) {
+  if (gameState.screenFlash.timer > 0) {
+    gameState.screenFlash.timer -= deltaTime;
+    if (gameState.screenFlash.timer < 0) gameState.screenFlash.timer = 0;
   }
 }
 
@@ -1660,7 +1791,15 @@ function renderGame() {
     ctx.lineTo(target.x, target.y);
     ctx.stroke();
   }
-  
+
+  if (gameState.screenFlash.timer > 0) {
+    const alpha = (gameState.screenFlash.timer / gameState.screenFlash.duration) * gameState.screenFlash.intensity;
+    ctx.fillStyle = gameState.screenFlash.color;
+    ctx.globalAlpha = alpha;
+    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    ctx.globalAlpha = 1;
+  }
+
   ctx.restore();
 }
 
