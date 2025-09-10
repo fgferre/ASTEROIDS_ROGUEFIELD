@@ -247,6 +247,50 @@ class SpaceAudioSystem {
     });
   }
 
+  playBigExplosion() {
+    this.safePlay(() => {
+      // Oscilador de baixa frequência
+      const osc = this.context.createOscillator();
+      const oscGain = this.context.createGain();
+      osc.connect(oscGain);
+      oscGain.connect(this.masterGain);
+
+      // Ruído branco
+      const bufferSize = this.context.sampleRate * 0.5;
+      const noiseBuffer = this.context.createBuffer(1, bufferSize, this.context.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+      const noise = this.context.createBufferSource();
+      noise.buffer = noiseBuffer;
+      const noiseGain = this.context.createGain();
+      noise.connect(noiseGain);
+      noiseGain.connect(this.masterGain);
+
+      const now = this.context.currentTime;
+
+      // Configurações do oscilador
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(60, now);
+      osc.frequency.exponentialRampToValueAtTime(30, now + 0.5);
+
+      oscGain.gain.setValueAtTime(0.2, now);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+      // Envelope do ruído
+      noiseGain.gain.setValueAtTime(0.5, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
+      // Iniciar fontes
+      osc.start(now);
+      osc.stop(now + 0.5);
+
+      noise.start(now);
+      noise.stop(now + 0.4);
+    });
+  }
+
   playXPCollect() {
     this.safePlay(() => {
       const osc = this.context.createOscillator();
@@ -1306,6 +1350,9 @@ function checkCollisions() {
           
           createAsteroidExplosion(asteroid);
           audio.playAsteroidBreak(asteroid.size);
+          if (asteroid.size === 'large') {
+            audio.playBigExplosion();
+          }
           
           // Fragmentação
           const fragments = asteroid.fragment();
