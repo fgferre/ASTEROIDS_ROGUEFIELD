@@ -2,7 +2,8 @@
 const GAME_WIDTH = 800;
 const GAME_HEIGHT = 600;
 const SHIP_SIZE = 15;
-const ASTEROID_SIZES = { LARGE: 35, MEDIUM: 22, SMALL: 12 };
+// Ajuste: chaves em minúsculas para casar com o restante do código
+const ASTEROID_SIZES = { large: 35, medium: 22, small: 12 };
 const BULLET_SIZE = 3;
 const XP_ORB_SIZE = 8;
 const TRAIL_LENGTH = 6;
@@ -12,7 +13,8 @@ const SHIP_ACCELERATION = 280;
 const SHIP_MAX_SPEED = 220;
 const SHIP_FRICTION = 0.94;
 const SHIP_ROTATION_SPEED = 8; // Velocidade máxima de rotação (rad/s)
-const ASTEROID_SPEEDS = { LARGE: 25, MEDIUM: 45, SMALL: 70 };
+// Ajuste: chaves em minúsculas para casar com o restante do código
+const ASTEROID_SPEEDS = { large: 25, medium: 45, small: 70 };
 const BULLET_SPEED = 450;
 const COLLISION_BOUNCE = 0.6;
 
