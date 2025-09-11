@@ -23,7 +23,7 @@
             "type": "msedge",
             "name": "Launch Microsoft Edge in headless mode",
             "request": "launch",
-            "runtimeArgs": [
+            "runtimeArgs": [ 
                 "--headless",
                 "--remote-debugging-port=9222"
             ],
