@@ -854,54 +854,49 @@ function createBullet(fromX, fromY, toX, toY) {
 }
 
 function updatePlayerMovement(deltaTime) {
-  let accelerating = false;
   const acceleration = gameState.player.acceleration * deltaTime;
-  
+  const rotationAccel = gameState.player.rotationSpeed * deltaTime;
+
+  // Controles
+  const forwardPressed = gameState.input['w'] || gameState.input['arrowup'];
+  const backwardPressed = gameState.input['s'] || gameState.input['arrowdown'];
+  const rotateLeft = gameState.input['a'] || gameState.input['arrowleft'];
+  const rotateRight = gameState.input['d'] || gameState.input['arrowright'];
+
+  // Vetor direcional da nave
+  const angle = gameState.player.angle;
+  const forwardX = Math.cos(angle);
+  const forwardY = Math.sin(angle);
+
+  // Aceleração ao longo da direção da nave
   let ax = 0, ay = 0;
-  
-  if (gameState.input['w'] || gameState.input['arrowup']) {
-    ay -= acceleration;
-    accelerating = true;
-  }
-  if (gameState.input['s'] || gameState.input['arrowdown']) {
-    ay += acceleration;
-    accelerating = true;
-  }
-  if (gameState.input['a'] || gameState.input['arrowleft']) {
-    ax -= acceleration;
-    accelerating = true;
-  }
-  if (gameState.input['d'] || gameState.input['arrowright']) {
-    ax += acceleration;
-    accelerating = true;
-  }
-  
+  if (forwardPressed) { ax += forwardX * acceleration; ay += forwardY * acceleration; }
+  if (backwardPressed) { ax -= forwardX * acceleration; ay -= forwardY * acceleration; }
+
   gameState.player.vx += ax;
   gameState.player.vy += ay;
 
-  // Aplicar amortecimento dependente de dt
+  // Amortecimento linear dependente de dt
   const linearDamp = Math.exp(-SHIP_LINEAR_DAMPING * deltaTime);
   gameState.player.vx *= linearDamp;
   gameState.player.vy *= linearDamp;
 
-  // Limitar velocidade máxima
+  // Limite de velocidade
   const speed = Math.sqrt(gameState.player.vx ** 2 + gameState.player.vy ** 2);
   if (speed > gameState.player.maxSpeed) {
     gameState.player.vx = (gameState.player.vx / speed) * gameState.player.maxSpeed;
     gameState.player.vy = (gameState.player.vy / speed) * gameState.player.maxSpeed;
   }
 
-  // Atualizar posição
+  // Atualizar posição + wrap
   gameState.player.x += gameState.player.vx * deltaTime;
   gameState.player.y += gameState.player.vy * deltaTime;
-
-  // Wrap around screen
   if (gameState.player.x < 0) gameState.player.x = GAME_WIDTH;
   if (gameState.player.x > GAME_WIDTH) gameState.player.x = 0;
   if (gameState.player.y < 0) gameState.player.y = GAME_HEIGHT;
   if (gameState.player.y > GAME_HEIGHT) gameState.player.y = 0;
 
-  // Controle de rotação
+  // Rotação
   let angularAccel = 0;
   if (rotateLeft) angularAccel -= rotationAccel;
   if (rotateRight) angularAccel += rotationAccel;
@@ -911,36 +906,52 @@ function updatePlayerMovement(deltaTime) {
   const angularDamp = Math.exp(-SHIP_ANGULAR_DAMPING * deltaTime);
   gameState.player.angularVelocity *= angularDamp;
 
-  // Limitar velocidade angular
+  // Clamp angular e aplicar
   const maxAng = gameState.player.rotationSpeed;
   if (gameState.player.angularVelocity > maxAng) gameState.player.angularVelocity = maxAng;
   if (gameState.player.angularVelocity < -maxAng) gameState.player.angularVelocity = -maxAng;
   gameState.player.angle = wrapAngle(gameState.player.angle + gameState.player.angularVelocity * deltaTime);
-  
-  // Efeito de propulsão
-  if (accelerating) {
-    createThrusterEffect();
-  }
+
+  // Efeito de propulsão direcional
+  if (forwardPressed) createThrusterEffect('bottom');
+  if (backwardPressed) createThrusterEffect('top');
+  if (rotateLeft) createThrusterEffect('right');
+  if (rotateRight) createThrusterEffect('left');
 }
 
-function createThrusterEffect() {
-  const thrusterX = gameState.player.x - Math.cos(gameState.player.angle) * SHIP_SIZE * 0.8;
-  const thrusterY = gameState.player.y - Math.sin(gameState.player.angle) * SHIP_SIZE * 0.8;
-  
+function createThrusterEffect(direction = 'bottom') {
+  const angle = gameState.player.angle;
+  const forwardX = Math.cos(angle), forwardY = Math.sin(angle);
+  const rightX = Math.cos(angle + Math.PI / 2), rightY = Math.sin(angle + Math.PI / 2);
+
+  let offsetX = 0, offsetY = 0, dirX = 0, dirY = 0;
+  switch (direction) {
+    case 'left':   offsetX = -rightX * SHIP_SIZE * 0.8; offsetY = -rightY * 0.8 * SHIP_SIZE; dirX = -rightX; dirY = -rightY; break;
+    case 'right':  offsetX =  rightX * SHIP_SIZE * 0.8; offsetY =  rightY * 0.8 * SHIP_SIZE; dirX =  rightX; dirY =  rightY; break;
+    case 'top':    offsetX =  forwardX * SHIP_SIZE * 0.8; offsetY =  forwardY * 0.8 * SHIP_SIZE; dirX =  forwardX; dirY =  forwardY; break;
+    case 'bottom':
+    default:       offsetX = -forwardX * SHIP_SIZE * 0.8; offsetY = -forwardY * 0.8 * SHIP_SIZE; dirX = -forwardX; dirY = -forwardY; break;
+  }
+
+  const thrusterX = gameState.player.x + offsetX;
+  const thrusterY = gameState.player.y + offsetY;
+
   for (let i = 0; i < 2; i++) {
-    const particle = new SpaceParticle(
+    const speed = 80 + Math.random() * 40;
+    const p = new SpaceParticle(
       thrusterX + (Math.random() - 0.5) * 4,
       thrusterY + (Math.random() - 0.5) * 4,
-      -Math.cos(gameState.player.angle) * (80 + Math.random() * 40) + (Math.random() - 0.5) * 20,
-      -Math.sin(gameState.player.angle) * (80 + Math.random() * 40) + (Math.random() - 0.5) * 20,
+      dirX * speed + (Math.random() - 0.5) * 20,
+      dirY * speed + (Math.random() - 0.5) * 20,
       `hsl(${Math.random() * 60 + 15}, 100%, 70%)`,
       2 + Math.random() * 1.5,
       0.25 + Math.random() * 0.15,
       'thruster'
     );
-    gameState.world.particles.push(particle);
+    gameState.world.particles.push(p);
   }
 }
+// Loop principal do jogo com tratamento de erros
 
 let lastTime = 0;
 
