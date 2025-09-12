@@ -1,0 +1,11 @@
+# Dependências
+node_modules
+
+# Arquivos de Build
+dist
+
+# Arquivos de Lock
+package-lock.json
+
+# Código legado que não deve ser modificado
+src/legacy/

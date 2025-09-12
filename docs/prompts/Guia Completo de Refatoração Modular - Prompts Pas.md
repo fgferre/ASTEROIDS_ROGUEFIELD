@@ -2,7 +2,7 @@
 
 **IMPORTANTE:** Este documento contém TODOS os prompts necessários para transformar seu jogo monolítico em uma arquitetura modular profissional. Execute na ordem exata apresentada.
 
-***
+---
 
 ## 📋 **FASE 0: PREPARAÇÃO INICIAL**
 
@@ -19,20 +19,19 @@ AÇÕES OBRIGATÓRIAS:
 
 projeto/
 ├── src/
-│   ├── core/
-│   ├── modules/
-│   ├── utils/
-│   └── legacy/
+│ ├── core/
+│ ├── modules/
+│ ├── utils/
+│ └── legacy/
 ├── docs/
-│   ├── prompts/
-│   └── validation/
+│ ├── prompts/
+│ └── validation/
 └── assets/
 
 ```
 
 3. Crie arquivo docs/validation/test-checklist.md:
 ```
-
 
 # Checklist de Testes do Jogo
 
@@ -50,7 +49,6 @@ projeto/
 - [ ] Audio funciona
 - [ ] Ondas progridem corretamente
 - [ ] Game over funciona
-
 
 ## Performance
 
@@ -71,7 +69,6 @@ VALIDAÇÃO CRÍTICA:
 Me confirme que TUDO foi criado e o jogo ainda funciona perfeitamente.
 ```
 
-
 ### **Prompt 0.2: Criar EventBus**
 
 ```
@@ -87,36 +84,36 @@ class EventBus {
         this.debug = true; // Para debug durante desenvolvimento
         console.log('[EventBus] Initialized');
     }
-    
+
     // Registrar listener para evento
     on(eventName, callback, context = null) {
         if (typeof eventName !== 'string') {
             console.error('[EventBus] Event name must be string:', eventName);
             return;
         }
-        
+
         if (typeof callback !== 'function') {
             console.error('[EventBus] Callback must be function:', callback);
             return;
         }
-        
+
         if (!this.events.has(eventName)) {
             this.events.set(eventName, []);
         }
-        
+
         this.events.get(eventName).push({ callback, context });
-        
+
         if (this.debug) {
             console.log(`[EventBus] Registered listener for: ${eventName}`);
         }
     }
-    
+
     // Disparar evento
     emit(eventName, data = null) {
         if (this.debug) {
             console.log(`[EventBus] Emitting: ${eventName}`, data);
         }
-        
+
         if (this.events.has(eventName)) {
             const listeners = this.events.get(eventName);
             listeners.forEach(({ callback, context }) => {
@@ -132,7 +129,7 @@ class EventBus {
             });
         }
     }
-    
+
     // Remover listener específico
     off(eventName, callback) {
         if (this.events.has(eventName)) {
@@ -146,7 +143,7 @@ class EventBus {
             }
         }
     }
-    
+
     // Remover todos os listeners de um evento
     clear(eventName) {
         if (this.events.has(eventName)) {
@@ -156,7 +153,7 @@ class EventBus {
             }
         }
     }
-    
+
     // Debug: listar todos os eventos
     listEvents() {
         const eventNames = Array.from(this.events.keys());
@@ -165,7 +162,7 @@ class EventBus {
             console.log(`  ${name}: ${this.events.get(name).length} listeners`);
         });
     }
-    
+
     // Limpar tudo
     destroy() {
         this.events.clear();
@@ -188,7 +185,7 @@ if (typeof window !== 'undefined') {
 
 VALIDAÇÃO OBRIGATÓRIA:
 1. Arquivo criado em src/core/EventBus.js
-2. Código colado exatamente como especificado  
+2. Código colado exatamente como especificado
 3. Abrir index.html no navegador
 4. Console deve mostrar: "[EventBus] Initialized"
 5. No Developer Tools, digite: gameEvents.listEvents()
@@ -196,7 +193,6 @@ VALIDAÇÃO OBRIGATÓRIA:
 
 Se algo der erro, me informe IMEDIATAMENTE o erro exato.
 ```
-
 
 ### **Prompt 0.3: Criar ServiceLocator**
 
@@ -213,32 +209,32 @@ class ServiceLocator {
         this.debug = true;
         console.log('[ServiceLocator] Initialized');
     }
-    
+
     // Registrar serviço
     register(name, service) {
         if (typeof name !== 'string') {
             console.error('[ServiceLocator] Service name must be string:', name);
             return false;
         }
-        
+
         if (!service) {
             console.error('[ServiceLocator] Service cannot be null/undefined');
             return false;
         }
-        
+
         if (this.services.has(name)) {
             console.warn(`[ServiceLocator] Service '${name}' already exists. Overwriting.`);
         }
-        
+
         this.services.set(name, service);
-        
+
         if (this.debug) {
             console.log(`[ServiceLocator] Registered service: ${name}`);
         }
-        
+
         return true;
     }
-    
+
     // Obter serviço
     get(name) {
         const service = this.services.get(name);
@@ -249,12 +245,12 @@ class ServiceLocator {
         }
         return service;
     }
-    
+
     // Verificar se serviço existe
     has(name) {
         return this.services.has(name);
     }
-    
+
     // Remover serviço
     unregister(name) {
         const existed = this.services.delete(name);
@@ -263,14 +259,14 @@ class ServiceLocator {
         }
         return existed;
     }
-    
+
     // Debug: listar serviços
     listServices() {
         const serviceNames = Array.from(this.services.keys());
         console.log('[ServiceLocator] Registered services:', serviceNames);
         return serviceNames;
     }
-    
+
     // Limpar todos os serviços
     clear() {
         this.services.clear();
@@ -301,7 +297,6 @@ VALIDAÇÃO OBRIGATÓRIA:
 
 Confirme que funciona antes de continuar.
 ```
-
 
 ### **Prompt 0.4: Arquivo de Constantes**
 
@@ -361,7 +356,7 @@ export const TARGET_UPDATE_INTERVAL = 0.15;
 export const ASTEROIDS_PER_WAVE_BASE = 4;
 export const ASTEROIDS_PER_WAVE_MULTIPLIER = 1.3;
 export const WAVE_DURATION = 60; // segundos
-export const WAVE_BREAK_TIME = 10; // segundos  
+export const WAVE_BREAK_TIME = 10; // segundos
 export const MAX_ASTEROIDS_ON_SCREEN = 20;
 
 // === UPGRADES ===
@@ -410,8 +405,7 @@ TESTE ESPECÍFICO:
 Confirme que TUDO funciona antes de continuar.
 ```
 
-
-***
+---
 
 ## 📋 **FASE 1: MÓDULOS FUNDAMENTAIS**
 
@@ -438,88 +432,88 @@ class InputSystem {
         this.mouseButtons = {};
         this.gamepadConnected = false;
         this.gamepad = null;
-        
+
         this.setupEventListeners();
-        
+
         // Registrar no ServiceLocator
         if (typeof gameServices !== 'undefined') {
             gameServices.register('input', this);
         }
-        
+
         console.log('[InputSystem] Initialized');
     }
-    
+
     setupEventListeners() {
         // Keyboard events
         document.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
             const wasPressed = this.keys[key];
             this.keys[key] = true;
-            
+
             // Emit event apenas na primeira pressão
             if (!wasPressed && typeof gameEvents !== 'undefined') {
                 gameEvents.emit('key-pressed', { key, type: 'down', event: e });
             }
         });
-        
+
         document.addEventListener('keyup', (e) => {
             const key = e.key.toLowerCase();
             this.keys[key] = false;
-            
+
             if (typeof gameEvents !== 'undefined') {
                 gameEvents.emit('key-pressed', { key, type: 'up', event: e });
             }
         });
-        
+
         // Mouse events
         document.addEventListener('mousemove', (e) => {
             this.mousePos.x = e.clientX;
             this.mousePos.y = e.clientY;
         });
-        
+
         document.addEventListener('mousedown', (e) => {
             this.mouseButtons[e.button] = true;
             if (typeof gameEvents !== 'undefined') {
                 gameEvents.emit('mouse-pressed', { button: e.button, type: 'down', pos: {...this.mousePos} });
             }
         });
-        
+
         document.addEventListener('mouseup', (e) => {
             this.mouseButtons[e.button] = false;
             if (typeof gameEvents !== 'undefined') {
                 gameEvents.emit('mouse-pressed', { button: e.button, type: 'up', pos: {...this.mousePos} });
             }
         });
-        
+
         // Gamepad support (futuro)
         window.addEventListener('gamepadconnected', (e) => {
             this.gamepadConnected = true;
             console.log('[InputSystem] Gamepad connected:', e.gamepad);
         });
-        
+
         window.addEventListener('gamepaddisconnected', (e) => {
             this.gamepadConnected = false;
             console.log('[InputSystem] Gamepad disconnected');
         });
     }
-    
+
     // === MÉTODOS PÚBLICOS ===
-    
+
     // Verificar se tecla está pressionada
     isKeyDown(key) {
         return !!this.keys[key.toLowerCase()];
     }
-    
+
     // Verificar múltiplas teclas (OR logic)
     areAnyKeysDown(keys) {
         return keys.some(key => this.isKeyDown(key));
     }
-    
+
     // Verificar todas as teclas (AND logic)
     areAllKeysDown(keys) {
         return keys.every(key => this.isKeyDown(key));
     }
-    
+
     // Obter input de movimento (compatível com código atual)
     getMovementInput() {
         return {
@@ -529,40 +523,40 @@ class InputSystem {
             right: this.isKeyDown('d') || this.isKeyDown('arrowright')
         };
     }
-    
+
     // Posição do mouse
     getMousePosition() {
         return { ...this.mousePos };
     }
-    
+
     // Estado do mouse
     isMouseButtonDown(button = 0) {
         return !!this.mouseButtons[button];
     }
-    
+
     // Debug: listar teclas pressionadas
     getActiveKeys() {
         return Object.keys(this.keys).filter(key => this.keys[key]);
     }
-    
+
     // Update (chamado pelo game loop)
     update(deltaTime) {
         // Input system é baseado em eventos, não precisa update por frame
         // Mas mantemos interface consistente para futuras expansões
-        
+
         // Futuro: gamepad polling aqui
         if (this.gamepadConnected) {
             this.updateGamepad();
         }
     }
-    
+
     updateGamepad() {
         const gamepads = navigator.getGamepads();
         this.gamepad = gamepads[^0]; // Primeiro gamepad
-        
+
         // Implementar lógica de gamepad no futuro
     }
-    
+
     // Cleanup
     destroy() {
         // Remove event listeners se necessário
@@ -582,7 +576,7 @@ if (typeof window !== 'undefined') {
 VALIDAÇÃO OBRIGATÓRIA:
 1. Arquivo criado em src/modules/InputSystem.js
 2. Recarregar página
-3. Console deve mostrar "[InputSystem] Initialized"  
+3. Console deve mostrar "[InputSystem] Initialized"
 4. No Developer Tools: gameServices.get('input')
 5. Deve retornar objeto InputSystem
 6. Testar: gameServices.get('input').getMovementInput()
@@ -593,7 +587,6 @@ O jogo deve continuar funcionando exatamente igual.
 
 Confirme que tudo funciona antes de continuar.
 ```
-
 
 ### **Prompt 1.2: Integrar InputSystem no App.js**
 
@@ -648,7 +641,6 @@ TESTE ESPECÍFICO:
 Confirme que TUDO funciona e você vê os logs de movement.
 ```
 
-
 ### **Prompt 1.3: Criar PlayerSystem**
 
 ```
@@ -673,23 +665,23 @@ class PlayerSystem {
         this.angle = 0;
         this.targetAngle = 0; // Para rotação suave (futuro)
         this.angularVelocity = 0;
-        
+
         // === CONFIGURAÇÕES DE MOVIMENTO ===
         // Usar constantes do arquivo separado
         this.maxSpeed = CONSTANTS.SHIP_MAX_SPEED;
-        this.acceleration = CONSTANTS.SHIP_ACCELERATION; 
+        this.acceleration = CONSTANTS.SHIP_ACCELERATION;
         this.rotationSpeed = CONSTANTS.SHIP_ROTATION_SPEED;
         this.linearDamping = CONSTANTS.SHIP_LINEAR_DAMPING;
         this.angularDamping = CONSTANTS.SHIP_ANGULAR_DAMPING;
-        
+
         // Registrar no ServiceLocator
         if (typeof gameServices !== 'undefined') {
             gameServices.register('player', this);
         }
-        
+
         console.log('[PlayerSystem] Initialized at', this.position);
     }
-    
+
     // === MÉTODO PRINCIPAL UPDATE ===
     update(deltaTime) {
         const inputSystem = gameServices.get('input');
@@ -697,11 +689,11 @@ class PlayerSystem {
             console.warn('[PlayerSystem] InputSystem not found');
             return;
         }
-        
+
         const movement = inputSystem.getMovementInput();
         this.updateMovement(deltaTime, movement);
         this.updatePosition(deltaTime);
-        
+
         // Emitir evento para outros sistemas
         if (typeof gameEvents !== 'undefined') {
             gameEvents.emit('player-moved', {
@@ -711,33 +703,33 @@ class PlayerSystem {
             });
         }
     }
-    
+
     // === LÓGICA DE MOVIMENTO (COPIADA DO ORIGINAL) ===
     updateMovement(deltaTime, input) {
         // COPIAR EXATAMENTE da função updatePlayerMovement() original
         const accelStep = this.acceleration * deltaTime;
-        const fwd = { 
-            x: Math.cos(this.angle), 
-            y: Math.sin(this.angle) 
+        const fwd = {
+            x: Math.cos(this.angle),
+            y: Math.sin(this.angle)
         };
-        
+
         // Thruster intensities (lógica do original)
         let thrMain = input.up ? 1 : 0;
         let thrAux = input.down ? 1 : 0;
         let thrSideR = input.left ? 1 : 0; // CCW torque
         let thrSideL = input.right ? 1 : 0; // CW torque
-        
+
         // Auto-brake quando não há input linear
         const noLinearInput = !input.up && !input.down;
         const speed = Math.hypot(this.velocity.vx, this.velocity.vy);
-        
+
         if (noLinearInput && speed > 2) {
             const proj = this.velocity.vx * fwd.x + this.velocity.vy * fwd.y;
             const k = Math.max(0.35, Math.min(1, Math.abs(proj) / (this.maxSpeed * 0.8)));
             if (proj > 0) thrAux = Math.max(thrAux, k);
             else if (proj < 0) thrMain = Math.max(thrMain, k);
         }
-        
+
         // Aplicar forças dos thrusters
         if (thrMain > 0) {
             this.velocity.vx += fwd.x * accelStep * thrMain;
@@ -747,12 +739,12 @@ class PlayerSystem {
             this.velocity.vx -= fwd.x * accelStep * thrAux;
             this.velocity.vy -= fwd.y * accelStep * thrAux;
         }
-        
+
         // Amortecimento ambiente
         const linearDamp = Math.exp(-this.linearDamping * deltaTime);
         this.velocity.vx *= linearDamp;
         this.velocity.vy *= linearDamp;
-        
+
         // Limitar velocidade máxima
         const currentSpeed = Math.hypot(this.velocity.vx, this.velocity.vy);
         if (currentSpeed > this.maxSpeed) {
@@ -760,21 +752,21 @@ class PlayerSystem {
             this.velocity.vx *= scale;
             this.velocity.vy *= scale;
         }
-        
+
         // === MOVIMENTO ANGULAR ===
         const inputTorque = (thrSideR ? -1 : 0) + (thrSideL ? 1 : 0);
         const ANGULAR_THRUST = this.rotationSpeed * 5.0; // rad/s^2
         const angAccel = inputTorque * ANGULAR_THRUST - this.angularDamping * this.angularVelocity;
-        
+
         this.angularVelocity += angAccel * deltaTime;
-        
+
         // Limitar velocidade angular
         const maxAng = this.rotationSpeed;
         if (this.angularVelocity > maxAng) this.angularVelocity = maxAng;
         if (this.angularVelocity < -maxAng) this.angularVelocity = -maxAng;
-        
+
         this.angle = this.wrapAngle(this.angle + this.angularVelocity * deltaTime);
-        
+
         // === EFEITOS DE THRUSTER ===
         // Emitir eventos para EffectsSystem
         if (thrMain > 0) {
@@ -786,7 +778,7 @@ class PlayerSystem {
                 type: 'main'
             });
         }
-        
+
         if (thrAux > 0) {
             const thrusterPos = this.getLocalToWorld(CONSTANTS.SHIP_SIZE * 0.8, 0);
             gameEvents.emit('thruster-effect', {
@@ -796,7 +788,7 @@ class PlayerSystem {
                 type: 'aux'
             });
         }
-        
+
         // Side thrusters
         if (thrSideL > 0) {
             const thrusterPos = this.getLocalToWorld(0, -CONSTANTS.SHIP_SIZE * 0.52);
@@ -808,7 +800,7 @@ class PlayerSystem {
                 type: 'side'
             });
         }
-        
+
         if (thrSideR > 0) {
             const thrusterPos = this.getLocalToWorld(0, CONSTANTS.SHIP_SIZE * 0.52);
             const dir = this.getLocalDirection(0, -1);
@@ -820,26 +812,26 @@ class PlayerSystem {
             });
         }
     }
-    
+
     updatePosition(deltaTime) {
         // Integrar posição
         this.position.x += this.velocity.vx * deltaTime;
         this.position.y += this.velocity.vy * deltaTime;
-        
+
         // Screen wrapping
         if (this.position.x < 0) this.position.x = CONSTANTS.GAME_WIDTH;
         if (this.position.x > CONSTANTS.GAME_WIDTH) this.position.x = 0;
         if (this.position.y < 0) this.position.y = CONSTANTS.GAME_HEIGHT;
         if (this.position.y > CONSTANTS.GAME_HEIGHT) this.position.y = 0;
     }
-    
+
     // === UTILITÁRIOS ===
     wrapAngle(angle) {
         while (angle > Math.PI) angle -= Math.PI * 2;
         while (angle < -Math.PI) angle += Math.PI * 2;
         return angle;
     }
-    
+
     // Transform local ship coordinates to world
     getLocalToWorld(localX, localY) {
         const cos = Math.cos(this.angle);
@@ -849,7 +841,7 @@ class PlayerSystem {
             y: this.position.y + (localX * sin + localY * cos)
         };
     }
-    
+
     // Transform local direction to world
     getLocalDirection(dx, dy) {
         const cos = Math.cos(this.angle);
@@ -859,37 +851,37 @@ class PlayerSystem {
             y: (dx * sin + dy * cos)
         };
     }
-    
+
     // === GETTERS PÚBLICOS ===
     getPosition() {
         return { ...this.position };
     }
-    
+
     getAngle() {
         return this.angle;
     }
-    
+
     getVelocity() {
         return { ...this.velocity };
     }
-    
+
     // === SETTERS (para reset, teleport, etc.) ===
     setPosition(x, y) {
         this.position.x = x;
         this.position.y = y;
     }
-    
+
     setAngle(angle) {
         this.angle = this.wrapAngle(angle);
     }
-    
+
     reset() {
         this.position = { x: CONSTANTS.GAME_WIDTH / 2, y: CONSTANTS.GAME_HEIGHT / 2 };
         this.velocity = { vx: 0, vy: 0 };
         this.angle = 0;
         this.angularVelocity = 0;
     }
-    
+
     destroy() {
         console.log('[PlayerSystem] Destroyed');
     }
@@ -919,7 +911,6 @@ Jogo deve funcionar exatamente igual ainda.
 Confirme que funciona.
 ```
 
-
 ### **Prompt 1.4: Integrar PlayerSystem no App.js**
 
 ```
@@ -946,7 +937,7 @@ const playerSystem = new PlayerSystem();
 const player = gameServices.get('player');
 if (player) {
     player.update(deltaTime);
-    
+
     // SINCRONIZAR com gameState antigo (temporário)
     gameState.player.x = player.position.x;
     gameState.player.y = player.position.y;
@@ -981,8 +972,7 @@ Se algo quebrar, me informe o erro EXATO.
 Confirme que movimento funciona perfeitamente.
 ```
 
-
-***
+---
 
 ## 📋 **FASE 2: MÓDULOS DE COMBATE**
 
@@ -1012,116 +1002,116 @@ class CombatSystem {
         this.targetUpdateTimer = 0;
         this.lastShotTime = 0;
         this.shootCooldown = 0.3;
-        
+
         // === CONFIGURAÇÕES ===
         this.targetingRange = 400;
         this.targetUpdateInterval = CONSTANTS.TARGET_UPDATE_INTERVAL;
         this.bulletSpeed = CONSTANTS.BULLET_SPEED;
         this.bulletLifetime = 1.8;
         this.trailLength = CONSTANTS.TRAIL_LENGTH;
-        
+
         // Registrar no ServiceLocator
         if (typeof gameServices !== 'undefined') {
             gameServices.register('combat', this);
         }
-        
+
         console.log('[CombatSystem] Initialized');
     }
-    
+
     // === UPDATE PRINCIPAL ===
     update(deltaTime) {
         this.updateTargeting(deltaTime);
         this.handleShooting(deltaTime);
         this.updateBullets(deltaTime);
     }
-    
+
     // === SISTEMA DE TARGETING ===
     updateTargeting(deltaTime) {
         this.targetUpdateTimer -= deltaTime;
-        
+
         if (this.targetUpdateTimer <= 0) {
             this.findBestTarget();
             this.targetUpdateTimer = this.targetUpdateInterval;
         }
-        
+
         // Verificar se target atual ainda é válido
         if (this.currentTarget && (this.currentTarget.destroyed || !this.isValidTarget(this.currentTarget))) {
             this.currentTarget = null;
         }
     }
-    
+
     findBestTarget() {
         const player = gameServices.get('player');
         if (!player) return;
-        
+
         const playerPos = player.getPosition();
         let bestTarget = null;
         let closestDistance = Infinity;
-        
+
         // Obter lista de asteroides do EnemySystem (quando existir)
         // Por enquanto, usar gameState temporariamente
         const enemies = gameState.world.asteroids || [];
-        
+
         enemies.forEach(enemy => {
             if (enemy.destroyed) return;
-            
+
             const dx = enemy.x - playerPos.x;
             const dy = enemy.y - playerPos.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            
+
             if (distance < this.targetingRange && distance < closestDistance) {
                 closestDistance = distance;
                 bestTarget = enemy;
             }
         });
-        
+
         this.currentTarget = bestTarget;
     }
-    
+
     isValidTarget(target) {
         if (!target || target.destroyed) return false;
-        
+
         const player = gameServices.get('player');
         if (!player) return false;
-        
+
         const playerPos = player.getPosition();
         const dx = target.x - playerPos.x;
         const dy = target.y - playerPos.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        
+
         return distance <= this.targetingRange;
     }
-    
+
     // === SISTEMA DE TIRO ===
     handleShooting(deltaTime) {
         this.lastShotTime += deltaTime;
-        
+
         if (!this.canShoot()) return;
-        
+
         const player = gameServices.get('player');
         if (!player) return;
-        
+
         const playerPos = player.getPosition();
         const targetPos = this.getPredictedTargetPosition();
-        
+
         if (targetPos) {
             // Obter configurações do player (damage, multishot, etc.)
             const playerStats = this.getPlayerCombatStats();
-            
+
             // Disparar múltiplos projéteis se multishot > 1
             for (let i = 0; i < playerStats.multishot; i++) {
                 let finalTargetPos = targetPos;
-                
+
                 // Aplicar spread se multishot > 1
                 if (playerStats.multishot > 1) {
                     finalTargetPos = this.applyMultishotSpread(playerPos, targetPos, i, playerStats.multishot);
                 }
-                
+
                 this.createBullet(playerPos, finalTargetPos, playerStats.damage);
             }
-            
+
             this.lastShotTime = 0;
-            
+
             // Emitir evento para audio e efeitos
             if (typeof gameEvents !== 'undefined') {
                 gameEvents.emit('weapon-fired', {
@@ -1132,16 +1122,16 @@ class CombatSystem {
             }
         }
     }
-    
+
     canShoot() {
-        return this.lastShotTime >= this.shootCooldown && 
-               this.currentTarget && 
+        return this.lastShotTime >= this.shootCooldown &&
+               this.currentTarget &&
                !this.currentTarget.destroyed;
     }
-    
+
     getPredictedTargetPosition() {
         if (!this.currentTarget) return null;
-        
+
         // Predição simples de movimento
         const predictTime = 0.5;
         return {
@@ -1149,7 +1139,7 @@ class CombatSystem {
             y: this.currentTarget.y + (this.currentTarget.vy || 0) * predictTime
         };
     }
-    
+
     getPlayerCombatStats() {
         // Por enquanto usar gameState, depois virá de PlayerStats module
         return {
@@ -1157,33 +1147,33 @@ class CombatSystem {
             multishot: gameState.player.multishot || 1
         };
     }
-    
+
     applyMultishotSpread(playerPos, targetPos, shotIndex, totalShots) {
         const spreadAngle = (shotIndex - (totalShots - 1) / 2) * 0.3;
-        
+
         const dx = targetPos.x - playerPos.x;
         const dy = targetPos.y - playerPos.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        
+
         if (distance === 0) return targetPos;
-        
+
         const baseAngle = Math.atan2(dy, dx);
         const finalAngle = baseAngle + spreadAngle;
-        
+
         return {
             x: playerPos.x + Math.cos(finalAngle) * distance,
             y: playerPos.y + Math.sin(finalAngle) * distance
         };
     }
-    
+
     // === SISTEMA DE PROJÉTEIS ===
     createBullet(fromPos, toPos, damage) {
         const dx = toPos.x - fromPos.x;
         const dy = toPos.y - fromPos.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        
+
         if (distance === 0) return;
-        
+
         const bullet = {
             id: Date.now() + Math.random(),
             x: fromPos.x,
@@ -1195,9 +1185,9 @@ class CombatSystem {
             trail: [],
             hit: false
         };
-        
+
         this.bullets.push(bullet);
-        
+
         // Emitir evento para efeitos
         if (typeof gameEvents !== 'undefined') {
             gameEvents.emit('bullet-created', {
@@ -1207,58 +1197,58 @@ class CombatSystem {
             });
         }
     }
-    
+
     updateBullets(deltaTime) {
         this.bullets.forEach(bullet => {
             if (bullet.hit) return;
-            
+
             // Atualizar trail
             bullet.trail.push({ x: bullet.x, y: bullet.y });
             if (bullet.trail.length > this.trailLength) {
                 bullet.trail.shift();
             }
-            
+
             // Atualizar posição
             bullet.x += bullet.vx * deltaTime;
             bullet.y += bullet.vy * deltaTime;
             bullet.life -= deltaTime;
-            
+
             // Screen wrapping
             if (bullet.x < 0) bullet.x = CONSTANTS.GAME_WIDTH;
             if (bullet.x > CONSTANTS.GAME_WIDTH) bullet.x = 0;
             if (bullet.y < 0) bullet.y = CONSTANTS.GAME_HEIGHT;
             if (bullet.y > CONSTANTS.GAME_HEIGHT) bullet.y = 0;
         });
-        
+
         // Remover bullets expirados
         const bulletCountBefore = this.bullets.length;
         this.bullets = this.bullets.filter(bullet => bullet.life > 0 && !bullet.hit);
-        
+
         if (this.bullets.length !== bulletCountBefore) {
             // Debug
             // console.log(`[CombatSystem] Bullets: ${bulletCountBefore} -> ${this.bullets.length}`);
         }
     }
-    
+
     // === DETECÇÃO DE COLISÃO ===
     checkBulletCollisions(enemies) {
         this.bullets.forEach(bullet => {
             if (bullet.hit) return;
-            
+
             enemies.forEach(enemy => {
                 if (enemy.destroyed) return;
-                
+
                 const dx = bullet.x - enemy.x;
                 const dy = bullet.y - enemy.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
-                
+
                 if (distance < (CONSTANTS.BULLET_SIZE + enemy.radius)) {
                     // Colisão detectada
                     bullet.hit = true;
-                    
+
                     // Aplicar dano
                     const killed = enemy.takeDamage(bullet.damage);
-                    
+
                     // Emitir eventos
                     if (typeof gameEvents !== 'undefined') {
                         gameEvents.emit('bullet-hit', {
@@ -1273,29 +1263,29 @@ class CombatSystem {
             });
         });
     }
-    
+
     // === GETTERS PÚBLICOS ===
     getBullets() {
         return [...this.bullets]; // Cópia para segurança
     }
-    
+
     getCurrentTarget() {
         return this.currentTarget;
     }
-    
+
     getBulletCount() {
         return this.bullets.length;
     }
-    
+
     // === CONFIGURAÇÃO ===
     setShootCooldown(cooldown) {
         this.shootCooldown = Math.max(0.1, cooldown);
     }
-    
+
     setTargetingRange(range) {
         this.targetingRange = Math.max(50, range);
     }
-    
+
     // === CLEANUP ===
     reset() {
         this.bullets = [];
@@ -1303,7 +1293,7 @@ class CombatSystem {
         this.lastShotTime = 0;
         console.log('[CombatSystem] Reset');
     }
-    
+
     destroy() {
         this.bullets = [];
         this.currentTarget = null;
@@ -1335,7 +1325,6 @@ Jogo deve funcionar exatamente igual ainda.
 Confirme que funciona.
 ```
 
-
 ### **Prompt 2.2: Integrar CombatSystem no App.js**
 
 ```
@@ -1351,7 +1340,7 @@ import CombatSystem from './src/modules/CombatSystem.js';
 2. MODIFICAR função init():
    Adicione DEPOIS da criação do playerSystem:
 
-// Inicializar CombatSystem  
+// Inicializar CombatSystem
 const combatSystem = new CombatSystem();
 
 3. MODIFICAR função updateGame():
@@ -1361,7 +1350,7 @@ const combatSystem = new CombatSystem();
 const combat = gameServices.get('combat');
 if (combat) {
     combat.update(deltaTime);
-    
+
     // SINCRONIZAR bullets com gameState antigo (temporário)
     gameState.world.bullets = combat.getBullets();
     gameState.world.currentTarget = combat.getCurrentTarget();
@@ -1408,7 +1397,6 @@ No console, verificar:
 Se algo quebrar, me informe o erro EXATO.
 ```
 
-
 ### **Prompt 2.3: Criar EnemySystem**
 
 ```
@@ -1438,7 +1426,7 @@ class Asteroid {
         this.mass = this.radius * this.radius * 0.05;
         this.health = size === 'large' ? 3 : size === 'medium' ? 2 : 1;
         this.maxHealth = this.health;
-        
+
         // Velocidade baseada no tamanho
         if (vx === 0 && vy === 0) {
             const speed = CONSTANTS.ASTEROID_SPEEDS[size] * (0.8 + Math.random() * 0.4);
@@ -1449,18 +1437,18 @@ class Asteroid {
             this.vx = vx;
             this.vy = vy;
         }
-        
+
         this.rotation = Math.random() * Math.PI * 2;
         this.rotationSpeed = (Math.random() - 0.5) * 1.5;
         this.lastDamageTime = 0;
         this.vertices = this.generateVertices();
         this.destroyed = false;
     }
-    
+
     generateVertices() {
         const vertices = [];
         const numVertices = 6 + Math.floor(Math.random() * 3);
-        
+
         for (let i = 0; i < numVertices; i++) {
             const angle = (i / numVertices) * Math.PI * 2;
             const radiusVariation = 0.8 + Math.random() * 0.4;
@@ -1472,29 +1460,29 @@ class Asteroid {
         }
         return vertices;
     }
-    
+
     update(deltaTime) {
         this.x += this.vx * deltaTime;
         this.y += this.vy * deltaTime;
         this.rotation += this.rotationSpeed * deltaTime;
-        
+
         // Screen wrapping
         const margin = this.radius;
         if (this.x < -margin) this.x = CONSTANTS.GAME_WIDTH + margin;
         if (this.x > CONSTANTS.GAME_WIDTH + margin) this.x = -margin;
         if (this.y < -margin) this.y = CONSTANTS.GAME_HEIGHT + margin;
         if (this.y > CONSTANTS.GAME_HEIGHT + margin) this.y = -margin;
-        
+
         if (this.lastDamageTime > 0) {
             this.lastDamageTime -= deltaTime;
         }
     }
-    
+
     draw(ctx) {
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(this.rotation);
-        
+
         // Efeito de dano
         if (this.lastDamageTime > 0) {
             ctx.fillStyle = '#FFFFFF';
@@ -1504,10 +1492,10 @@ class Asteroid {
             ctx.fillStyle = colors[this.size];
             ctx.strokeStyle = '#654321';
         }
-        
+
         ctx.lineWidth = 2;
         ctx.beginPath();
-        
+
         for (let i = 0; i < this.vertices.length; i++) {
             const vertex = this.vertices[i];
             if (i === 0) {
@@ -1516,11 +1504,11 @@ class Asteroid {
                 ctx.lineTo(vertex.x, vertex.y);
             }
         }
-        
+
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
-        
+
         // Detalhes internos
         ctx.strokeStyle = 'rgba(101, 67, 33, 0.4)';
         ctx.lineWidth = 1;
@@ -1532,27 +1520,27 @@ class Asteroid {
             ctx.lineTo(endVertex.x * 0.4, endVertex.y * 0.4);
             ctx.stroke();
         }
-        
+
         ctx.restore();
     }
-    
+
     takeDamage(damage) {
         this.health -= damage;
         this.lastDamageTime = 0.12;
         return this.health <= 0;
     }
-    
+
     fragment() {
         if (this.size === 'small') return [];
-        
+
         const newSize = this.size === 'large' ? 'medium' : 'small';
         const fragments = [];
         const fragmentCount = 2 + Math.floor(Math.random() * 2);
-        
+
         for (let i = 0; i < fragmentCount; i++) {
             const angle = (i / fragmentCount) * Math.PI * 2 + Math.random() * 0.4;
             const speed = CONSTANTS.ASTEROID_SPEEDS[newSize] * (0.8 + Math.random() * 0.4);
-            
+
             const fragment = new Asteroid(
                 this.x + Math.cos(angle) * 10,
                 this.y + Math.sin(angle) * 10,
@@ -1560,10 +1548,10 @@ class Asteroid {
                 Math.cos(angle) * speed,
                 Math.sin(angle) * speed
             );
-            
+
             fragments.push(fragment);
         }
-        
+
         return fragments;
     }
 }
@@ -1574,22 +1562,22 @@ class EnemySystem {
         this.asteroids = [];
         this.spawnTimer = 0;
         this.spawnDelay = 1.0;
-        
+
         // Registrar no ServiceLocator
         if (typeof gameServices !== 'undefined') {
             gameServices.register('enemies', this);
         }
-        
+
         console.log('[EnemySystem] Initialized');
     }
-    
+
     // === UPDATE PRINCIPAL ===
     update(deltaTime) {
         this.updateAsteroids(deltaTime);
         this.handleSpawning(deltaTime);
         this.cleanupDestroyed();
     }
-    
+
     // === GERENCIAMENTO DE ASTEROIDES ===
     updateAsteroids(deltaTime) {
         this.asteroids.forEach(asteroid => {
@@ -1597,35 +1585,35 @@ class EnemySystem {
                 asteroid.update(deltaTime);
             }
         });
-        
+
         // Física de colisão entre asteroides
         this.handleAsteroidCollisions();
     }
-    
+
     handleAsteroidCollisions() {
         for (let i = 0; i < this.asteroids.length - 1; i++) {
             const a1 = this.asteroids[i];
             if (a1.destroyed) continue;
-            
+
             for (let j = i + 1; j < this.asteroids.length; j++) {
                 const a2 = this.asteroids[j];
                 if (a2.destroyed) continue;
-                
+
                 this.checkAsteroidCollision(a1, a2);
             }
         }
     }
-    
+
     checkAsteroidCollision(a1, a2) {
         const dx = a2.x - a1.x;
         const dy = a2.y - a1.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         const minDistance = a1.radius + a2.radius;
-        
+
         if (distance < minDistance && distance > 0) {
             const nx = dx / distance;
             const ny = dy / distance;
-            
+
             // Correção de penetração
             const overlap = minDistance - distance;
             const percent = 0.5;
@@ -1633,60 +1621,60 @@ class EnemySystem {
             a1.y -= ny * overlap * percent;
             a2.x += nx * overlap * percent;
             a2.y += ny * overlap * percent;
-            
+
             // Impulso elástico com massa
             const rvx = a2.vx - a1.vx;
             const rvy = a2.vy - a1.vy;
             const velAlongNormal = rvx * nx + rvy * ny;
-            
+
             if (velAlongNormal < 0) {
                 const e = CONSTANTS.COLLISION_BOUNCE;
                 const invMass1 = 1 / a1.mass;
                 const invMass2 = 1 / a2.mass;
                 const j = -(1 + e) * velAlongNormal / (invMass1 + invMass2);
-                
+
                 const jx = j * nx;
                 const jy = j * ny;
-                
+
                 a1.vx -= jx * invMass1;
                 a1.vy -= jy * invMass1;
                 a2.vx += jx * invMass2;
                 a2.vy += jy * invMass2;
             }
-            
+
             // Rotação adicional
             a1.rotationSpeed += (Math.random() - 0.5) * 1.5;
             a2.rotationSpeed += (Math.random() - 0.5) * 1.5;
         }
     }
-    
+
     // === SISTEMA DE SPAWNING ===
     handleSpawning(deltaTime) {
         // Controle de spawn baseado no WaveSystem
         // Por enquanto, spawn simples para manter jogo funcionando
-        
+
         this.spawnTimer -= deltaTime;
-        
+
         if (this.shouldSpawn() && this.spawnTimer <= 0) {
             this.spawnAsteroid();
             this.spawnTimer = this.spawnDelay * (0.5 + Math.random() * 0.5);
         }
     }
-    
+
     shouldSpawn() {
         // Verificar se deve spawnar (baseado em wave system)
         const currentWave = gameState.wave; // Temporário
-        
-        return currentWave.isActive && 
+
+        return currentWave.isActive &&
                currentWave.asteroidsSpawned < currentWave.totalAsteroids &&
                this.asteroids.filter(a => !a.destroyed).length < CONSTANTS.MAX_ASTEROIDS_ON_SCREEN;
     }
-    
+
     spawnAsteroid() {
         const side = Math.floor(Math.random() * 4);
         let x, y;
         const margin = 80;
-        
+
         switch(side) {
             case 0: // Top
                 x = Math.random() * CONSTANTS.GAME_WIDTH;
@@ -1705,17 +1693,17 @@ class EnemySystem {
                 y = Math.random() * CONSTANTS.GAME_HEIGHT;
                 break;
         }
-        
+
         // Distribuição de tamanhos
         let size;
         const rand = Math.random();
         if (rand < 0.5) size = 'large';
         else if (rand < 0.8) size = 'medium';
         else size = 'small';
-        
+
         const asteroid = new Asteroid(x, y, size);
         this.asteroids.push(asteroid);
-        
+
         // Emitir evento
         if (typeof gameEvents !== 'undefined') {
             gameEvents.emit('enemy-spawned', {
@@ -1725,22 +1713,22 @@ class EnemySystem {
                 position: { x, y }
             });
         }
-        
+
         return asteroid;
     }
-    
+
     // === GERENCIAMENTO DE DESTRUIÇÃO ===
     destroyAsteroid(asteroid, createFragments = true) {
         if (asteroid.destroyed) return [];
-        
+
         asteroid.destroyed = true;
         const fragments = createFragments ? asteroid.fragment() : [];
-        
+
         // Adicionar fragmentos
         if (fragments.length > 0) {
             this.asteroids.push(...fragments);
         }
-        
+
         // Emitir eventos
         if (typeof gameEvents !== 'undefined') {
             gameEvents.emit('enemy-destroyed', {
@@ -1750,33 +1738,33 @@ class EnemySystem {
                 size: asteroid.size
             });
         }
-        
+
         return fragments;
     }
-    
+
     cleanupDestroyed() {
         const countBefore = this.asteroids.length;
         this.asteroids = this.asteroids.filter(asteroid => !asteroid.destroyed);
-        
+
         if (this.asteroids.length !== countBefore) {
             // Debug
             // console.log(`[EnemySystem] Cleaned up ${countBefore - this.asteroids.length} asteroids`);
         }
     }
-    
+
     // === GETTERS PÚBLICOS ===
     getAsteroids() {
         return this.asteroids.filter(asteroid => !asteroid.destroyed);
     }
-    
+
     getAllAsteroids() {
         return [...this.asteroids];
     }
-    
+
     getAsteroidCount() {
         return this.asteroids.filter(asteroid => !asteroid.destroyed).length;
     }
-    
+
     // === INTERFACE PARA OUTROS SISTEMAS ===
     spawnInitialAsteroids(count = 4) {
         for (let i = 0; i < count; i++) {
@@ -1784,14 +1772,14 @@ class EnemySystem {
         }
         console.log(`[EnemySystem] Spawned ${count} initial asteroids`);
     }
-    
+
     // === RESET E CLEANUP ===
     reset() {
         this.asteroids = [];
         this.spawnTimer = 0;
         console.log('[EnemySystem] Reset');
     }
-    
+
     destroy() {
         this.asteroids = [];
         console.log('[EnemySystem] Destroyed');
@@ -1823,7 +1811,6 @@ Jogo deve funcionar exatamente igual ainda.
 Confirme que funciona.
 ```
 
-
 ### **Prompt 2.4: Integrar EnemySystem no App.js**
 
 ```
@@ -1849,7 +1836,7 @@ const enemySystem = new EnemySystem();
 const enemies = gameServices.get('enemies');
 if (enemies) {
     enemies.update(deltaTime);
-    
+
     // SINCRONIZAR asteroids com gameState antigo (temporário)
     gameState.world.asteroids = enemies.getAllAsteroids();
 }
@@ -1895,11 +1882,11 @@ if (typeof gameEvents !== 'undefined') {
     gameEvents.on('enemy-destroyed', (data) => {
         // Criar XP orb
         createXPOrb(data.position.x, data.position.y, 10);
-        
+
         // Incrementar kills
         gameState.wave.asteroidsKilled++;
         gameState.stats.totalKills++;
-        
+
         // Tocar som de destruição
         if (typeof audio !== 'undefined') {
             audio.playAsteroidBreak(data.size);
@@ -1934,8 +1921,7 @@ No console:
 Se algo quebrar, me informe o erro EXATO.
 ```
 
-
-***
+---
 
 ## 📋 **FASE 3: MÓDULOS DE PROGRESSÃO**
 
@@ -1963,30 +1949,30 @@ class ProgressionSystem {
         this.experience = 0;
         this.experienceToNext = 100;
         this.totalExperience = 0;
-        
+
         // === XP ORBS ===
         this.xpOrbs = [];
         this.orbMagnetismRadius = CONSTANTS.MAGNETISM_RADIUS;
         this.magnetismForce = CONSTANTS.MAGNETISM_FORCE;
-        
+
         // === UPGRADES APLICADOS ===
         this.appliedUpgrades = new Map();
         this.availableUpgrades = [...CONSTANTS.SPACE_UPGRADES];
-        
+
         // === CONFIGURAÇÕES ===
         this.levelScaling = 1.2; // Multiplicador de XP por nível
-        
+
         // Registrar no ServiceLocator
         if (typeof gameServices !== 'undefined') {
             gameServices.register('progression', this);
         }
-        
+
         // Escutar eventos
         this.setupEventListeners();
-        
+
         console.log('[ProgressionSystem] Initialized - Level', this.level);
     }
-    
+
     setupEventListeners() {
         if (typeof gameEvents !== 'undefined') {
             // Quando inimigo morre, criar XP orb
@@ -1994,19 +1980,19 @@ class ProgressionSystem {
                 const xpValue = this.calculateXPReward(data.enemy, data.size);
                 this.createXPOrb(data.position.x, data.position.y, xpValue);
             });
-            
+
             // Quando bullet acerta inimigo (bonus XP futuro)
             gameEvents.on('bullet-hit', (data) => {
                 // Futuro: XP por hit, não só por kill
             });
         }
     }
-    
+
     // === UPDATE PRINCIPAL ===
     update(deltaTime) {
         this.updateXPOrbs(deltaTime);
     }
-    
+
     // === SISTEMA DE XP ORBS ===
     createXPOrb(x, y, value) {
         const orb = {
@@ -2018,9 +2004,9 @@ class ProgressionSystem {
             lifetime: 30, // 30 segundos antes de desaparecer
             age: 0
         };
-        
+
         this.xpOrbs.push(orb);
-        
+
         // Emitir evento para efeitos
         if (typeof gameEvents !== 'undefined') {
             gameEvents.emit('xp-orb-created', {
@@ -2029,46 +2015,46 @@ class ProgressionSystem {
                 value: value
             });
         }
-        
+
         return orb;
     }
-    
+
     updateXPOrbs(deltaTime) {
         const player = gameServices.get('player');
         if (!player) return;
-        
+
         const playerPos = player.getPosition();
-        
+
         this.xpOrbs.forEach(orb => {
             if (orb.collected) return;
-            
+
             orb.age += deltaTime;
-            
+
             // Remover orbs antigas
             if (orb.age > orb.lifetime) {
                 orb.collected = true;
                 return;
             }
-            
+
             const dx = playerPos.x - orb.x;
             const dy = playerPos.y - orb.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
-            
+
             // Magnetismo
             if (distance < this.orbMagnetismRadius && distance > 0) {
                 const force = this.magnetismForce / Math.max(distance, 1);
                 const normalizedDx = dx / distance;
                 const normalizedDy = dy / distance;
-                
+
                 orb.x += normalizedDx * force * deltaTime;
                 orb.y += normalizedDy * force * deltaTime;
             }
-            
+
             // Coleta
             if (distance < CONSTANTS.SHIP_SIZE + CONSTANTS.XP_ORB_SIZE) {
                 orb.collected = true;
                 this.collectXP(orb.value);
-                
+
                 // Efeitos
                 if (typeof gameEvents !== 'undefined') {
                     gameEvents.emit('xp-collected', {
@@ -2080,21 +2066,21 @@ class ProgressionSystem {
                 }
             }
         });
-        
+
         // Limpeza
         this.xpOrbs = this.xpOrbs.filter(orb => !orb.collected);
     }
-    
+
     // === SISTEMA DE EXPERIÊNCIA ===
     collectXP(amount) {
         this.experience += amount;
         this.totalExperience += amount;
-        
+
         // Verificar level up
         if (this.experience >= this.experienceToNext) {
             this.levelUp();
         }
-        
+
         // Emitir evento para UI
         if (typeof gameEvents !== 'undefined') {
             gameEvents.emit('experience-changed', {
@@ -2105,12 +2091,12 @@ class ProgressionSystem {
             });
         }
     }
-    
+
     levelUp() {
         this.level++;
         this.experience = 0;
         this.experienceToNext = Math.floor(this.experienceToNext * this.levelScaling);
-        
+
         // Emitir evento
         if (typeof gameEvents !== 'undefined') {
             gameEvents.emit('player-leveled-up', {
@@ -2118,43 +2104,43 @@ class ProgressionSystem {
                 availableUpgrades: this.getRandomUpgrades(3)
             });
         }
-        
+
         console.log('[ProgressionSystem] Level up! New level:', this.level);
     }
-    
+
     calculateXPReward(enemy, size) {
         // XP baseado no tamanho e nível atual
         const baseXP = {
             'large': 15,
-            'medium': 8, 
+            'medium': 8,
             'small': 5
         };
-        
+
         const xp = (baseXP[size] || 5) + Math.floor(this.level * 0.5);
         return xp;
     }
-    
+
     // === SISTEMA DE UPGRADES ===
     getRandomUpgrades(count = 3) {
         // Misturar upgrades disponíveis
         const shuffled = [...this.availableUpgrades].sort(() => Math.random() - 0.5);
         return shuffled.slice(0, count);
     }
-    
+
     applyUpgrade(upgradeId) {
         const upgrade = CONSTANTS.SPACE_UPGRADES.find(u => u.id === upgradeId);
         if (!upgrade) {
             console.error('[ProgressionSystem] Upgrade not found:', upgradeId);
             return false;
         }
-        
+
         // Aplicar efeito do upgrade
         this.applyUpgradeEffect(upgrade);
-        
+
         // Registrar upgrade aplicado
         const currentCount = this.appliedUpgrades.get(upgradeId) || 0;
         this.appliedUpgrades.set(upgradeId, currentCount + 1);
-        
+
         // Emitir evento
         if (typeof gameEvents !== 'undefined') {
             gameEvents.emit('upgrade-applied', {
@@ -2163,48 +2149,48 @@ class ProgressionSystem {
                 playerId: 'player'
             });
         }
-        
+
         console.log('[ProgressionSystem] Applied upgrade:', upgrade.name);
         return true;
     }
-    
+
     applyUpgradeEffect(upgrade) {
         // Por enquanto, emitir eventos para outros sistemas aplicarem
         // No futuro, PlayerStats system gerenciará isso
-        
+
         switch(upgrade.id) {
             case 'plasma':
                 gameEvents.emit('upgrade-damage-boost', { multiplier: 1.25 });
                 break;
-                
+
             case 'propulsors':
                 gameEvents.emit('upgrade-speed-boost', { multiplier: 1.20 });
                 break;
-                
+
             case 'shield':
                 gameEvents.emit('upgrade-health-boost', { bonus: 50 });
                 break;
-                
+
             case 'armor':
                 gameEvents.emit('upgrade-armor-boost', { multiplier: 1.25 });
                 break;
-                
+
             case 'multishot':
                 gameEvents.emit('upgrade-multishot', { bonus: 1 });
                 break;
-                
+
             case 'magfield':
                 this.orbMagnetismRadius *= 1.5;
                 gameEvents.emit('upgrade-magnetism', { multiplier: 1.5 });
                 break;
         }
     }
-    
+
     // === GETTERS PÚBLICOS ===
     getLevel() {
         return this.level;
     }
-    
+
     getExperience() {
         return {
             current: this.experience,
@@ -2213,24 +2199,24 @@ class ProgressionSystem {
             percentage: this.experience / this.experienceToNext
         };
     }
-    
+
     getXPOrbs() {
         return this.xpOrbs.filter(orb => !orb.collected);
     }
-    
+
     getUpgradeCount(upgradeId) {
         return this.appliedUpgrades.get(upgradeId) || 0;
     }
-    
+
     getAllUpgrades() {
         return new Map(this.appliedUpgrades);
     }
-    
+
     // === CONFIGURAÇÃO ===
     setMagnetismRadius(radius) {
         this.orbMagnetismRadius = Math.max(10, radius);
     }
-    
+
     // === RESET E SAVE ===
     reset() {
         this.level = 1;
@@ -2240,10 +2226,10 @@ class ProgressionSystem {
         this.xpOrbs = [];
         this.appliedUpgrades.clear();
         this.orbMagnetismRadius = CONSTANTS.MAGNETISM_RADIUS;
-        
+
         console.log('[ProgressionSystem] Reset');
     }
-    
+
     // Para salvar progresso (futuro)
     serialize() {
         return {
@@ -2255,7 +2241,7 @@ class ProgressionSystem {
             orbMagnetismRadius: this.orbMagnetismRadius
         };
     }
-    
+
     deserialize(data) {
         this.level = data.level || 1;
         this.experience = data.experience || 0;
@@ -2264,7 +2250,7 @@ class ProgressionSystem {
         this.appliedUpgrades = new Map(data.appliedUpgrades || []);
         this.orbMagnetismRadius = data.orbMagnetismRadius || CONSTANTS.MAGNETISM_RADIUS;
     }
-    
+
     destroy() {
         this.xpOrbs = [];
         this.appliedUpgrades.clear();
@@ -2296,7 +2282,6 @@ Jogo deve funcionar exatamente igual ainda.
 Confirme que funciona.
 ```
 
-
 ### **Prompt 3.2: Integrar ProgressionSystem no App.js**
 
 ```
@@ -2322,13 +2307,13 @@ const progressionSystem = new ProgressionSystem();
 const progression = gameServices.get('progression');
 if (progression) {
     progression.update(deltaTime);
-    
+
     // SINCRONIZAR com gameState antigo (temporário)
     gameState.player.level = progression.getLevel();
     const expData = progression.getExperience();
     gameState.player.xp = expData.current;
     gameState.player.xpToNext = expData.needed;
-    
+
     // Sincronizar XP orbs
     gameState.world.xpOrbs = progression.getXPOrbs();
 }
@@ -2374,12 +2359,12 @@ if (typeof gameEvents !== 'undefined') {
     gameEvents.on('player-leveled-up', (data) => {
         gameState.screen = 'levelup';
         showLevelUpScreen();
-        
+
         // Efeitos
         if (typeof audio !== 'undefined') {
             audio.playLevelUp();
         }
-        
+
         // Screen effects (se existirem)
         if (typeof addScreenShake !== 'undefined') {
             addScreenShake(6, 0.4, 'celebration');
@@ -2391,39 +2376,39 @@ if (typeof gameEvents !== 'undefined') {
             addScreenFlash('#FFD700', 0.15, 0.2);
         }
     });
-    
+
     // Quando XP é coletado
     gameEvents.on('xp-collected', (data) => {
         if (typeof audio !== 'undefined') {
             audio.playXPCollect();
         }
-        
+
         // Criar efeito de coleta (futuro EffectsSystem)
         // createXPCollectEffect(data.position.x, data.position.y);
     });
-    
+
     // Aplicar upgrades
     gameEvents.on('upgrade-damage-boost', (data) => {
         gameState.player.damage = Math.floor(gameState.player.damage * data.multiplier);
         console.log('[Upgrade] Damage boosted to:', gameState.player.damage);
     });
-    
+
     gameEvents.on('upgrade-speed-boost', (data) => {
         gameState.player.maxSpeed = Math.floor(gameState.player.maxSpeed * data.multiplier);
         console.log('[Upgrade] Speed boosted to:', gameState.player.maxSpeed);
     });
-    
+
     gameEvents.on('upgrade-health-boost', (data) => {
         gameState.player.maxHealth += data.bonus;
         gameState.player.health += data.bonus; // Heal também
         console.log('[Upgrade] Health boosted to:', gameState.player.maxHealth);
     });
-    
+
     gameEvents.on('upgrade-multishot', (data) => {
         gameState.player.multishot += data.bonus;
         console.log('[Upgrade] Multishot boosted to:', gameState.player.multishot);
     });
-    
+
     gameEvents.on('upgrade-magnetism', (data) => {
         gameState.player.magnetismRadius = Math.floor(gameState.player.magnetismRadius * data.multiplier);
         console.log('[Upgrade] Magnetism boosted to:', gameState.player.magnetismRadius);
@@ -2458,7 +2443,7 @@ VALIDAÇÃO OBRIGATÓRIA:
 
 TESTE ESPECÍFICO:
 - Matar asteroides → XP orbs aparecem
-- Coletar XP orbs → barra de XP aumenta  
+- Coletar XP orbs → barra de XP aumenta
 - Subir de nível → tela de upgrade aparece
 - Escolher upgrade → efeito é aplicado
 - Verificar se upgrade funciona (ex: mais dano)
@@ -2472,8 +2457,7 @@ No console:
 Se algo quebrar, me informe o erro EXATO.
 ```
 
-
-***
+---
 
 ## 📋 **FASE 4: MÓDULOS DE INTERFACE**
 
@@ -2502,29 +2486,29 @@ class UISystem {
             levelStat: null,
             killsStat: null,
             timeStat: null,
-            
+
             // XP Bar
             xpBar: null,
             xpText: null,
-            
+
             // Wave Info
             waveTitle: null,
             waveTimer: null,
             waveProgress: null,
             waveCountdown: null,
-            
+
             // Level Up Screen
             levelUpText: null,
             upgradesContainer: null,
-            
+
             // Game Over Screen
             gameOverStats: null
         };
-        
+
         this.initialized = false;
         this.lastUpdateTime = 0;
         this.updateInterval = 0.1; // Update UI 10 times per second
-        
+
         // Cache de dados para evitar updates desnecessários
         this.cache = {
             health: -1,
@@ -2535,111 +2519,111 @@ class UISystem {
             waveNumber: -1,
             waveTime: -1
         };
-        
+
         // Registrar no ServiceLocator
         if (typeof gameServices !== 'undefined') {
             gameServices.register('ui', this);
         }
-        
+
         this.initializeElements();
         this.setupEventListeners();
-        
+
         console.log('[UISystem] Initialized');
     }
-    
+
     initializeElements() {
         try {
             // Health stat
-            this.elements.healthStat = document.querySelector('.health .stat-value') || 
+            this.elements.healthStat = document.querySelector('.health .stat-value') ||
                                       document.getElementById('health-value');
-            
-            // Level stat  
+
+            // Level stat
             this.elements.levelStat = document.querySelector('.level .stat-value') ||
                                      document.getElementById('level-value');
-            
+
             // Kills stat
             this.elements.killsStat = document.querySelector('.kills .stat-value') ||
                                      document.getElementById('kills-value');
-            
+
             // Time stat
             this.elements.timeStat = document.querySelector('.time .stat-value') ||
                                     document.getElementById('time-value');
-            
+
             // XP Bar
             this.elements.xpBar = document.querySelector('.xp-progress') ||
                                  document.getElementById('xp-progress');
-            
+
             this.elements.xpText = document.querySelector('.xp-text') ||
                                   document.getElementById('xp-text');
-            
+
             // Wave Info
             this.elements.waveTitle = document.querySelector('.wave-info h3') ||
                                      document.getElementById('wave-title');
-            
+
             this.elements.waveTimer = document.querySelector('.timer-value') ||
                                      document.getElementById('wave-timer');
-            
+
             this.elements.waveProgress = document.querySelector('.wave-progress-bar') ||
                                         document.getElementById('wave-progress');
-            
+
             // Level Up Screen
             this.elements.levelUpText = document.getElementById('levelup-text');
             this.elements.upgradesContainer = document.getElementById('upgrades-container');
-            
-            // Game Over Screen  
+
+            // Game Over Screen
             this.elements.gameOverStats = document.querySelector('.stats') ||
                                          document.getElementById('gameover-stats');
-            
+
             this.initialized = true;
             console.log('[UISystem] DOM elements initialized');
-            
+
         } catch (error) {
             console.error('[UISystem] Error initializing elements:', error);
             this.initialized = false;
         }
     }
-    
+
     setupEventListeners() {
         if (typeof gameEvents !== 'undefined') {
             // Escutar mudanças de dados
             gameEvents.on('experience-changed', (data) => {
                 this.updateXPBar(data.percentage, data.current, data.needed);
             });
-            
+
             gameEvents.on('player-leveled-up', (data) => {
                 this.showLevelUpScreen(data.newLevel, data.availableUpgrades);
             });
-            
+
             gameEvents.on('player-died', () => {
                 this.showGameOverScreen();
             });
-            
+
             gameEvents.on('wave-changed', (data) => {
                 this.updateWaveInfo(data);
             });
         }
     }
-    
+
     // === UPDATE PRINCIPAL ===
     update(deltaTime) {
         if (!this.initialized) return;
-        
+
         this.lastUpdateTime += deltaTime;
-        
+
         // Throttle UI updates
         if (this.lastUpdateTime >= this.updateInterval) {
             this.updateGameUI();
             this.lastUpdateTime = 0;
         }
     }
-    
+
     updateGameUI() {
         // Obter dados dos sistemas
         const player = gameServices.get('player');
         const progression = gameServices.get('progression');
-        
+
         if (!player || !progression) return;
-        
+
         // Update stats apenas se mudaram
         this.updateHealthStat();
         this.updateLevelStat(progression.getLevel());
@@ -2647,61 +2631,61 @@ class UISystem {
         this.updateTimeStat();
         this.updateWaveUI();
     }
-    
+
     // === UPDATES ESPECÍFICOS ===
     updateHealthStat() {
         const health = gameState.player.health; // Por enquanto do gameState
         const maxHealth = gameState.player.maxHealth;
-        
+
         if (health !== this.cache.health && this.elements.healthStat) {
             this.elements.healthStat.textContent = `${health}/${maxHealth}`;
             this.cache.health = health;
         }
     }
-    
+
     updateLevelStat(level) {
         if (level !== this.cache.level && this.elements.levelStat) {
             this.elements.levelStat.textContent = level;
             this.cache.level = level;
         }
     }
-    
+
     updateKillsStat() {
         const kills = gameState.stats.totalKills;
-        
+
         if (kills !== this.cache.kills && this.elements.killsStat) {
             this.elements.killsStat.textContent = kills;
             this.cache.kills = kills;
         }
     }
-    
+
     updateTimeStat() {
         const time = Math.floor(gameState.stats.time);
-        
+
         if (time !== this.cache.time && this.elements.timeStat) {
             this.elements.timeStat.textContent = `${time}s`;
             this.cache.time = time;
         }
     }
-    
+
     updateXPBar(percentage, current, needed) {
         if (this.elements.xpBar) {
             this.elements.xpBar.style.width = `${Math.min(100, percentage * 100)}%`;
         }
-        
+
         if (this.elements.xpText) {
             this.elements.xpText.textContent = `XP: ${current}/${needed}`;
         }
     }
-    
+
     updateWaveUI() {
         const wave = gameState.wave;
-        
+
         if (this.elements.waveTitle && wave.current !== this.cache.waveNumber) {
             this.elements.waveTitle.textContent = `Onda ${wave.current}`;
             this.cache.waveNumber = wave.current;
         }
-        
+
         if (this.elements.waveTimer) {
             const timeRemaining = Math.max(0, Math.floor(wave.timeRemaining));
             if (timeRemaining !== this.cache.waveTime) {
@@ -2709,26 +2693,26 @@ class UISystem {
                 this.cache.waveTime = timeRemaining;
             }
         }
-        
+
         if (this.elements.waveProgress && wave.totalAsteroids > 0) {
             const progress = (wave.asteroidsKilled / wave.totalAsteroids) * 100;
             this.elements.waveProgress.style.width = `${Math.min(100, progress)}%`;
         }
     }
-    
+
     // === GERENCIAMENTO DE TELAS ===
     showScreen(screenName) {
         try {
             console.log('[UISystem] Showing screen:', screenName);
-            
+
             // Esconder todas as telas
             document.querySelectorAll('.screen').forEach(screen => {
                 screen.classList.add('hidden');
             });
-            
+
             const gameUI = document.getElementById('game-ui');
             if (gameUI) gameUI.classList.add('hidden');
-            
+
             // Mostrar tela específica
             if (screenName === 'playing' || screenName === 'game') {
                 if (gameUI) {
@@ -2742,38 +2726,38 @@ class UISystem {
                     console.warn(`[UISystem] Screen not found: ${screenName}-screen`);
                 }
             }
-            
+
         } catch (error) {
             console.error('[UISystem] Error showing screen:', error);
         }
     }
-    
+
     showGameUI() {
         this.showScreen('playing');
     }
-    
+
     showLevelUpScreen(level, availableUpgrades) {
         this.showScreen('levelup');
-        
+
         if (this.elements.levelUpText) {
             this.elements.levelUpText.textContent = `Level ${level} - Escolha sua tecnologia:`;
         }
-        
+
         if (this.elements.upgradesContainer && availableUpgrades) {
             this.renderUpgradeOptions(availableUpgrades);
         }
     }
-    
+
     renderUpgradeOptions(upgrades) {
         if (!this.elements.upgradesContainer) return;
-        
+
         this.elements.upgradesContainer.innerHTML = '';
-        
+
         upgrades.forEach(upgrade => {
             const button = document.createElement('button');
             button.className = 'upgrade-option';
             button.onclick = () => this.selectUpgrade(upgrade.id);
-            
+
             button.innerHTML = `
                 <div class="upgrade-icon" style="background-color: ${upgrade.color}">
                     ${upgrade.icon}
@@ -2783,87 +2767,87 @@ class UISystem {
                     <p>${upgrade.description}</p>
                 </div>
             `;
-            
+
             this.elements.upgradesContainer.appendChild(button);
         });
     }
-    
+
     selectUpgrade(upgradeId) {
         // Emitir evento para ProgressionSystem
         if (typeof gameEvents !== 'undefined') {
             gameEvents.emit('upgrade-selected', { upgradeId: upgradeId });
         }
-        
+
         // Voltar ao jogo
         this.showGameUI();
     }
-    
+
     showGameOverScreen() {
         this.showScreen('gameover');
         this.updateGameOverStats();
     }
-    
+
     updateGameOverStats() {
         if (!this.elements.gameOverStats) return;
-        
+
         const stats = gameState.stats;
         const progression = gameServices.get('progression');
         const level = progression ? progression.getLevel() : 1;
-        
+
         // Atualizar stats de game over
         const levelStat = this.elements.gameOverStats.querySelector('[data-stat="level"] .stat-value');
         if (levelStat) levelStat.textContent = level;
-        
+
         const killsStat = this.elements.gameOverStats.querySelector('[data-stat="kills"] .stat-value');
         if (killsStat) killsStat.textContent = stats.totalKills;
-        
+
         const wavesStat = this.elements.gameOverStats.querySelector('[data-stat="waves"] .stat-value');
         if (wavesStat) wavesStat.textContent = gameState.wave.completedWaves;
-        
+
         const timeStat = this.elements.gameOverStats.querySelector('[data-stat="time"] .stat-value');
         if (timeStat) timeStat.textContent = `${Math.floor(stats.time)}s`;
     }
-    
+
     // === UTILITÁRIOS ===
     formatTime(seconds) {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
-    
+
     // === ANIMAÇÕES E EFEITOS ===
     flashElement(element, color = '#FFD700', duration = 0.3) {
         if (!element) return;
-        
+
         element.style.transition = `background-color ${duration}s`;
         element.style.backgroundColor = color;
-        
+
         setTimeout(() => {
             element.style.backgroundColor = '';
         }, duration * 1000);
     }
-    
+
     pulseElement(element, duration = 0.5) {
         if (!element) return;
-        
+
         element.style.transition = `transform ${duration}s`;
         element.style.transform = 'scale(1.1)';
-        
+
         setTimeout(() => {
             element.style.transform = 'scale(1)';
         }, duration * 1000);
     }
-    
+
     // === RESET E CLEANUP ===
     reset() {
         // Limpar cache
         Object.keys(this.cache).forEach(key => {
             this.cache[key] = -1;
         });
-        
+
         console.log('[UISystem] Reset');
     }
-    
+
     destroy() {
         this.elements = {};
         console.log('[UISystem] Destroyed');
@@ -2893,7 +2877,6 @@ Interface deve funcionar exatamente igual.
 
 Confirme que funciona.
 ```
-
 
 ### **Prompt 4.2: Integrar UISystem no App.js**
 
@@ -2946,10 +2929,10 @@ function showScreen(screenName) {
             document.querySelectorAll('.screen').forEach(screen => {
                 screen.classList.add('hidden');
             });
-            
+
             const gameUI = document.getElementById('game-ui');
             if (gameUI) gameUI.classList.add('hidden');
-            
+
             if (screenName === 'playing' || screenName === 'game') {
                 if (gameUI) gameUI.classList.remove('hidden');
             } else {
@@ -2980,7 +2963,7 @@ function showGameUI() {
 function showLevelUpScreen() {
     const ui = gameServices.get('ui');
     const progression = gameServices.get('progression');
-    
+
     if (ui && progression) {
         // UISystem já escuta o evento 'player-leveled-up'
         // Esta função é chamada pelo evento, UI já está sendo mostrada
@@ -2988,17 +2971,17 @@ function showLevelUpScreen() {
     } else {
         // Fallback para código antigo
         showScreen('levelup');
-        
+
         // Código antigo de level up
         const levelText = document.getElementById('levelup-text');
         if (levelText) {
             levelText.textContent = `Level ${gameState.player.level} - Escolha sua tecnologia:`;
         }
-        
+
         const shuffled = [...SPACE_UPGRADES].sort(() => Math.random() - 0.5);
         const selected = shuffled.slice(0, 3);
         const container = document.getElementById('upgrades-container');
-        
+
         if (container) {
             container.innerHTML = '';
             selected.forEach(upgrade => {
@@ -3062,8 +3045,7 @@ No console verificar se aparecem mensagens:
 Se algo quebrar ou interface ficar diferente, me informe IMEDIATAMENTE.
 ```
 
-
-***
+---
 
 ## 📋 **FASE 5: MÓDULOS DE EFEITOS**
 
@@ -3101,29 +3083,29 @@ class SpaceParticle {
         this.rotation = Math.random() * Math.PI * 2;
         this.rotationSpeed = (Math.random() - 0.5) * 4;
     }
-    
+
     update(deltaTime) {
         this.x += this.vx * deltaTime;
         this.y += this.vy * deltaTime;
         this.life -= deltaTime;
         this.alpha = Math.max(0, this.life / this.maxLife);
         this.rotation += this.rotationSpeed * deltaTime;
-        
+
         const friction = this.type === 'thruster' ? 0.98 : 0.96;
         this.vx *= friction;
         this.vy *= friction;
-        
+
         return this.life > 0;
     }
-    
+
     draw(ctx) {
         if (this.alpha <= 0) return;
-        
+
         ctx.save();
         ctx.globalAlpha = this.alpha;
         ctx.translate(this.x, this.y);
         ctx.rotate(this.rotation);
-        
+
         if (this.type === 'spark') {
             ctx.strokeStyle = this.color;
             ctx.lineWidth = this.size * this.alpha;
@@ -3144,7 +3126,7 @@ class SpaceParticle {
             ctx.arc(0, 0, this.size * this.alpha, 0, Math.PI * 2);
             ctx.fill();
         }
-        
+
         ctx.restore();
     }
 }
@@ -3156,7 +3138,7 @@ class EffectsSystem {
         this.particles = [];
         this.maxParticles = 150;
         this.particlePool = []; // Object pooling futuro
-        
+
         // === SCREEN EFFECTS ===
         this.screenShake = {
             intensity: 0,
@@ -3165,34 +3147,34 @@ class EffectsSystem {
             x: 0,
             y: 0
         };
-        
+
         this.freezeFrame = {
             timer: 0,
             duration: 0,
             fade: 0
         };
-        
+
         this.screenFlash = {
             timer: 0,
             duration: 0,
             color: '#FFFFFF',
             intensity: 0
         };
-        
+
         // === CONFIGURAÇÕES ===
         this.particleCleanupInterval = 1.0; // Cleanup a cada 1 segundo
         this.lastCleanup = 0;
-        
+
         // Registrar no ServiceLocator
         if (typeof gameServices !== 'undefined') {
             gameServices.register('effects', this);
         }
-        
+
         this.setupEventListeners();
-        
+
         console.log('[EffectsSystem] Initialized');
     }
-    
+
     setupEventListeners() {
         if (typeof gameEvents !== 'undefined') {
             // Thruster effects
@@ -3203,22 +3185,22 @@ class EffectsSystem {
                     data.intensity, data.type
                 );
             });
-            
+
             // Bullet impact effects
             gameEvents.on('bullet-hit', (data) => {
                 this.createImpactEffect(data.position.x, data.position.y, 'bullet');
             });
-            
-            // Enemy destruction effects  
+
+            // Enemy destruction effects
             gameEvents.on('enemy-destroyed', (data) => {
                 this.createExplosionEffect(data.position.x, data.position.y, data.size);
             });
-            
+
             // XP collection effects
             gameEvents.on('xp-collected', (data) => {
                 this.createXPCollectEffect(data.position.x, data.position.y);
             });
-            
+
             // Level up effects
             gameEvents.on('player-leveled-up', (data) => {
                 this.createLevelUpExplosion();
@@ -3226,7 +3208,7 @@ class EffectsSystem {
                 this.addFreezeFrame(0.2, 0.4);
                 this.addScreenFlash('#FFD700', 0.15, 0.2);
             });
-            
+
             // Player damage effects
             gameEvents.on('player-damaged', (data) => {
                 this.addScreenShake(0.3, 0.2, 'damage');
@@ -3234,50 +3216,50 @@ class EffectsSystem {
             });
         }
     }
-    
+
     // === UPDATE PRINCIPAL ===
     update(deltaTime) {
         this.updateParticles(deltaTime);
         this.updateScreenEffects(deltaTime);
         this.cleanupParticles(deltaTime);
     }
-    
+
     // === SISTEMA DE PARTÍCULAS ===
     updateParticles(deltaTime) {
         this.particles = this.particles.filter(particle => particle.update(deltaTime));
-        
+
         // Limitar número de partículas para performance
         if (this.particles.length > this.maxParticles) {
             this.particles = this.particles.slice(-Math.floor(this.maxParticles * 0.8));
         }
     }
-    
+
     cleanupParticles(deltaTime) {
         this.lastCleanup += deltaTime;
-        
+
         if (this.lastCleanup >= this.particleCleanupInterval) {
             const countBefore = this.particles.length;
             this.particles = this.particles.filter(p => p.life > 0);
             this.lastCleanup = 0;
-            
+
             // Debug se houve limpeza significativa
             if (countBefore - this.particles.length > 10) {
                 console.log(`[EffectsSystem] Cleaned ${countBefore - this.particles.length} particles`);
             }
         }
     }
-    
+
     createParticle(x, y, vx, vy, color, size, life, type = 'normal') {
         const particle = new SpaceParticle(x, y, vx, vy, color, size, life, type);
         this.particles.push(particle);
         return particle;
     }
-    
+
     // === THRUSTER EFFECTS (COPIADO DO ORIGINAL) ===
     spawnThrusterVFX(worldX, worldY, dirX, dirY, intensity = 1, type = 'main') {
         const i = Math.max(0, Math.min(1, intensity));
         let baseCount, speedBase, sizeRange, lifeRange, colorFn;
-        
+
         switch (type) {
             case 'main':
                 baseCount = 3;
@@ -3300,9 +3282,9 @@ class EffectsSystem {
                 lifeRange = [0.16, 0.22];
                 colorFn = () => `hsl(${200 + Math.random()*25}, 100%, ${70 + Math.random()*18}%)`;
         }
-        
+
         const count = Math.max(1, Math.round(baseCount * (0.8 + i * 2.0)));
-        
+
         for (let c = 0; c < count; c++) {
             const jitter = (Math.random() - 0.5) * 0.35;
             const spd = speedBase * (0.8 + i * 1.6) * (0.85 + Math.random() * 0.3);
@@ -3310,13 +3292,13 @@ class EffectsSystem {
             const vy = (-dirY + jitter) * spd + (Math.random() - 0.5) * 20;
             const size = sizeRange[^0] + Math.random() * (sizeRange[^1] - sizeRange[^0]);
             const life = lifeRange[^0] + Math.random() * (lifeRange[^1] - lifeRange[^0]);
-            
+
             this.createParticle(
                 worldX + (Math.random() - 0.5) * 3,
                 worldY + (Math.random() - 0.5) * 3,
                 vx, vy, colorFn(), size, life, 'thruster'
             );
-            
+
             // Spark particles ocasionais
             if (Math.random() < 0.25) {
                 const sparkSpd = spd * (0.9 + Math.random() * 0.3);
@@ -3329,15 +3311,15 @@ class EffectsSystem {
             }
         }
     }
-    
+
     // === EFEITOS DE IMPACTO ===
     createImpactEffect(x, y, type = 'bullet') {
         const particleCount = type === 'bullet' ? 5 : 10;
-        
+
         for (let i = 0; i < particleCount; i++) {
             const angle = (Math.PI * 2 * i) / particleCount + Math.random() * 0.5;
             const speed = 50 + Math.random() * 30;
-            
+
             this.createParticle(
                 x, y,
                 Math.cos(angle) * speed,
@@ -3349,16 +3331,16 @@ class EffectsSystem {
             );
         }
     }
-    
+
     createExplosionEffect(x, y, size = 'medium') {
         const particleCount = size === 'large' ? 20 : size === 'medium' ? 15 : 10;
         const baseSpeed = size === 'large' ? 80 : size === 'medium' ? 60 : 40;
-        
+
         // Debris particles
         for (let i = 0; i < particleCount; i++) {
             const angle = Math.random() * Math.PI * 2;
             const speed = baseSpeed + Math.random() * 40;
-            
+
             this.createParticle(
                 x + (Math.random() - 0.5) * 10,
                 y + (Math.random() - 0.5) * 10,
@@ -3370,12 +3352,12 @@ class EffectsSystem {
                 'debris'
             );
         }
-        
+
         // Spark ring
         for (let i = 0; i < 8; i++) {
             const angle = (Math.PI * 2 * i) / 8;
             const speed = baseSpeed * 1.5;
-            
+
             this.createParticle(
                 x, y,
                 Math.cos(angle) * speed,
@@ -3387,13 +3369,13 @@ class EffectsSystem {
             );
         }
     }
-    
+
     createXPCollectEffect(x, y) {
         // Efeito de coleta de XP - partículas douradas
         for (let i = 0; i < 6; i++) {
             const angle = (Math.PI * 2 * i) / 6;
             const speed = 30 + Math.random() * 20;
-            
+
             this.createParticle(
                 x, y,
                 Math.cos(angle) * speed,
@@ -3405,18 +3387,18 @@ class EffectsSystem {
             );
         }
     }
-    
+
     createLevelUpExplosion() {
         const player = gameServices.get('player');
         if (!player) return;
-        
+
         const pos = player.getPosition();
-        
+
         // Explosão de partículas douradas
         for (let i = 0; i < 30; i++) {
             const angle = Math.random() * Math.PI * 2;
             const speed = 100 + Math.random() * 100;
-            
+
             this.createParticle(
                 pos.x, pos.y,
                 Math.cos(angle) * speed,
@@ -3428,40 +3410,40 @@ class EffectsSystem {
             );
         }
     }
-    
+
     // === SCREEN EFFECTS ===
     updateScreenEffects(deltaTime) {
         // Screen shake
         if (this.screenShake.timer > 0) {
             this.screenShake.timer -= deltaTime;
             if (this.screenShake.timer < 0) this.screenShake.timer = 0;
-            
+
             const progress = this.screenShake.timer / this.screenShake.duration;
             const currentIntensity = this.screenShake.intensity * progress;
-            
+
             this.screenShake.x = (Math.random() - 0.5) * currentIntensity * 2;
             this.screenShake.y = (Math.random() - 0.5) * currentIntensity * 2;
         } else {
             this.screenShake.x = 0;
             this.screenShake.y = 0;
         }
-        
+
         // Freeze frame
         if (this.freezeFrame.timer > 0) {
             this.freezeFrame.timer -= deltaTime;
             if (this.freezeFrame.timer < 0) this.freezeFrame.timer = 0;
         }
-        
+
         // Screen flash
         if (this.screenFlash.timer > 0) {
             this.screenFlash.timer -= deltaTime;
             if (this.screenFlash.timer < 0) this.screenFlash.timer = 0;
-            
+
             const progress = this.screenFlash.timer / this.screenFlash.duration;
             this.screenFlash.intensity = progress;
         }
     }
-    
+
     addScreenShake(intensity, duration, type = 'normal') {
         // Permitir shake cumulativo para efeitos múltiplos
         if (this.screenShake.timer > 0) {
@@ -3474,51 +3456,51 @@ class EffectsSystem {
             this.screenShake.timer = duration;
         }
     }
-    
+
     addFreezeFrame(duration, fadeAmount = 0.1) {
         this.freezeFrame.duration = duration;
         this.freezeFrame.timer = duration;
         this.freezeFrame.fade = fadeAmount;
     }
-    
+
     addScreenFlash(color = '#FFFFFF', intensity = 0.3, duration = 0.2) {
         this.screenFlash.color = color;
         this.screenFlash.intensity = intensity;
         this.screenFlash.duration = duration;
         this.screenFlash.timer = duration;
     }
-    
+
     // === GETTERS PÚBLICOS ===
     getParticles() {
         return [...this.particles]; // Cópia para segurança
     }
-    
+
     getParticleCount() {
         return this.particles.length;
     }
-    
+
     getScreenShake() {
         return { ...this.screenShake };
     }
-    
+
     getFreezeFrame() {
         return { ...this.freezeFrame };
     }
-    
+
     getScreenFlash() {
         return { ...this.screenFlash };
     }
-    
+
     // === RESET E CLEANUP ===
     reset() {
         this.particles = [];
         this.screenShake = { intensity: 0, duration: 0, timer: 0, x: 0, y: 0 };
         this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
         this.screenFlash = { timer: 0, duration: 0, color: '#FFFFFF', intensity: 0 };
-        
+
         console.log('[EffectsSystem] Reset');
     }
-    
+
     destroy() {
         this.particles = [];
         console.log('[EffectsSystem] Destroyed');
@@ -3550,7 +3532,6 @@ Efeitos visuais devem funcionar exatamente igual.
 Confirme que funciona.
 ```
 
-
 ### **Prompt 5.2: Integrar EffectsSystem no App.js**
 
 ```
@@ -3576,20 +3557,20 @@ const effectsSystem = new EffectsSystem();
 const effects = gameServices.get('effects');
 if (effects) {
     effects.update(deltaTime);
-    
+
     // SINCRONIZAR com gameState antigo (temporário)
     gameState.world.particles = effects.getParticles();
-    
+
     // Sincronizar screen effects
     const shake = effects.getScreenShake();
     gameState.screenShake.x = shake.x;
     gameState.screenShake.y = shake.y;
     gameState.screenShake.timer = shake.timer;
-    
+
     const freeze = effects.getFreezeFrame();
     gameState.freezeFrame.timer = freeze.timer;
     gameState.freezeFrame.fade = freeze.fade;
-    
+
     const flash = effects.getScreenFlash();
     gameState.screenFlash = flash;
 }
@@ -3719,14 +3700,13 @@ No console verificar:
 Se efeitos visuais ficarem diferentes ou performance piorar, me informe IMEDIATAMENTE.
 ```
 
-
-***
+---
 
 ## 📋 **FASE 6: LIMPEZA E FINALIZAÇÃO**
 
 ### **Prompt 6.1: Limpeza do Código Antigo - Parte 1**
 
-```
+````
 CONTEXTO: Todos os módulos criados e funcionando. Agora remover código duplicado.
 OBJETIVO: Remover funções antigas que foram substituídas por módulos, mantendo funcionamento.
 
@@ -3734,13 +3714,13 @@ AÇÕES DE LIMPEZA NO app.js:
 
 1. REMOVER funções antigas de UPDATE (que agora fazem console.log):
    Deletar completamente estas funções:
-   - updateParticles() 
+   - updateParticles()
    - updateScreenShake()
    - updateScreenFlash()
 
 2. REMOVER funções antigas de INPUT que não são mais usadas:
    Deletar ou comentar a seção setupEventListeners() APENAS as partes:
-   - document.addEventListener('keydown') 
+   - document.addEventListener('keydown')
    - document.addEventListener('keyup')
    (MANTER os click events para botões)
 
@@ -3762,3 +3742,4 @@ AÇÕES DE LIMPEZA NO app.js:
 [^2]: index.html
 [^3]: style.css```
 
+````

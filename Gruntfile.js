@@ -8,11 +8,11 @@ module.exports = function (grunt) {
             expand: true,
             cwd: 'src',
             src: ['**/*.html', '**/*.css', '**/*.js'],
-            dest: 'dist/'
-          }
-        ]
-      }
-    }
+            dest: 'dist/',
+          },
+        ],
+      },
+    },
   });
 
   grunt.loadNpmTasks('grunt-contrib-clean');

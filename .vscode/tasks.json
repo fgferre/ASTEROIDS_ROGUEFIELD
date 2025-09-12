@@ -1,18 +1,22 @@
 {
-    "version": "2.0.0",
-    "tasks": [
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start Vite Dev Server",
+      "type": "shell",
+      "command": "npm run dev",
+      "isBackground": true,
+      "problemMatcher": [
         {
-            "label": "Start Vite Dev Server",
-            "type": "shell",
-            "command": "npm run dev",
-            "isBackground": true,
-            "problemMatcher": [
-                {
-                    "owner": "vite",
-                    "pattern": { "regexp": "..." },
-                    "background": { "activeOnStart": true, "beginsPattern": "VITE v.* ready", "endsPattern": "build complete" }
-                }
-            ]
+          "owner": "vite",
+          "pattern": { "regexp": "..." },
+          "background": {
+            "activeOnStart": true,
+            "beginsPattern": "VITE v.* ready",
+            "endsPattern": "build complete"
+          }
         }
-    ]
+      ]
+    }
+  ]
 }
