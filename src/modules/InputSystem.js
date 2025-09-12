@@ -139,6 +139,8 @@ class InputSystem {
     }
 }
 
+export default InputSystem;
+
 // Compatibilidade
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = InputSystem;

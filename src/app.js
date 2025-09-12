@@ -1,5 +1,8 @@
 // Importar constantes
-import * as CONSTANTS from './core/GameConstants.js';
+import * as CONSTANTS from '/core/GameConstants.js';
+
+// Imports dos módulos
+import InputSystem from '/modules/InputSystem.js';
 
 // Destructuring das constantes mais usadas para compatibilidade
 const {
@@ -509,6 +512,9 @@ function init() {
     
     setupEventListeners();
     audio.init();
+
+    // Inicializar sistemas modulares
+    const inputSystem = new InputSystem();
     gameState.initialized = true;
     
     requestAnimationFrame(gameLoop);
@@ -893,6 +899,16 @@ function gameLoop(currentTime) {
 }
 
 function updateGame(deltaTime) {
+  // Teste InputSystem (temporário)
+  const input = gameServices.get('input');
+  if (input) {
+      const movement = input.getMovementInput();
+      // Log apenas se houver input (evitar spam)
+      if (movement.up || movement.down || movement.left || movement.right) {
+          console.log('[DEBUG] InputSystem movement:', movement);
+      }
+  }
+
   gameState.stats.time = (Date.now() - gameState.stats.startTime) / 1000;
   // Atualizar i-frames do jogador
   if (gameState.player.invulnerableTimer > 0) {
