@@ -1,61 +1,19 @@
 {
+    "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch Chrome",
+            "name": "Debug (Source)",
             "request": "launch",
             "type": "chrome",
-            "url": "${workspaceFolder}/exported-assets/index.html",
-            "webRoot": "${workspaceFolder}"
+            "url": "${workspaceFolder}/src/index.html",
+            "webRoot": "${workspaceFolder}/src"
         },
         {
-            "type": "msedge",
-            "name": "Launch Microsoft Edge",
+            "name": "Debug (Build)",
             "request": "launch",
-            "runtimeArgs": [
-                "--remote-debugging-port=9222"
-            ],
-            "url": "${workspaceFolder}/exported-assets/index.html",
-            "presentation": {
-                "hidden": true
-            }
-        },
-        {
-            "type": "msedge",
-            "name": "Launch Microsoft Edge in headless mode",
-            "request": "launch",
-            "runtimeArgs": [ 
-                "--headless",
-                "--remote-debugging-port=9222"
-            ],
-            "url": "${workspaceFolder}/exported-assets/index.html",
-            "presentation": {
-                "hidden": true
-            }
-        },
-        {
-            "type": "vscode-edge-devtools.debug",
-            "name": "Open Edge DevTools",
-            "request": "attach",
-            "url": "${workspaceFolder}/exported-assets/index.html",
-            "presentation": {
-                "hidden": true
-            }
-        }
-    ],
-    "compounds": [
-        {
-            "name": "Launch Edge Headless and attach DevTools",
-            "configurations": [
-                "Launch Microsoft Edge in headless mode",
-                "Open Edge DevTools"
-            ]
-        },
-        {
-            "name": "Launch Edge and attach DevTools",
-            "configurations": [
-                "Launch Microsoft Edge",
-                "Open Edge DevTools"
-            ]
+            "type": "chrome",
+            "url": "${workspaceFolder}/dist/index.html",
+            "webRoot": "${workspaceFolder}/dist"
         }
     ]
 }
