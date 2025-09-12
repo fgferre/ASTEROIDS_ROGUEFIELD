@@ -1,9 +1,24 @@
 module.exports = function (grunt) {
-  // Configurações (por enquanto, nada)
-  grunt.initConfig({});
+  grunt.initConfig({
+    clean: ['dist'],
+    copy: {
+      main: {
+        files: [
+          {
+            expand: true,
+            cwd: 'src',
+            src: ['**/*.html', '**/*.css', '**/*.js'],
+            dest: 'dist/'
+          }
+        ]
+      }
+    }
+  });
 
-  // Tarefas "de mentirinha" só para o robô ficar feliz
-  grunt.registerTask('build', []);   // npm run build -> passa
-  grunt.registerTask('test', []);    // npm test -> passa
+  grunt.loadNpmTasks('grunt-contrib-clean');
+  grunt.loadNpmTasks('grunt-contrib-copy');
+
+  grunt.registerTask('build', ['clean', 'copy']);
+  grunt.registerTask('test', []);
   grunt.registerTask('default', ['build']);
 };
