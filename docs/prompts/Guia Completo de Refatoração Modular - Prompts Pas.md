@@ -1,5 +1,3 @@
-<img src="https://r2cdn.perplexity.ai/pplx-full-logo-primary-dark%402x.png" style="height:64px;margin-right:32px"/>
-
 # Guia Completo de Refatoração Modular - Prompts Passo a Passo
 
 **IMPORTANTE:** Este documento contém TODOS os prompts necessários para transformar seu jogo monolítico em uma arquitetura modular profissional. Execute na ordem exata apresentada.

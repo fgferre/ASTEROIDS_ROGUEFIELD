@@ -2,18 +2,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug (Source)",
+            "name": "Debug com Vite",
             "request": "launch",
             "type": "chrome",
-            "url": "${workspaceFolder}/src/index.html",
-            "webRoot": "${workspaceFolder}/src"
-        },
-        {
-            "name": "Debug (Build)",
-            "request": "launch",
-            "type": "chrome",
-            "url": "${workspaceFolder}/dist/index.html",
-            "webRoot": "${workspaceFolder}/dist"
+            "url": "http://localhost:5500",
+            "webRoot": "${workspaceFolder}/src",
+            "preLaunchTask": "Start Vite Dev Server"
         }
     ]
 }
