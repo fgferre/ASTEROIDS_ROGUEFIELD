@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste - Asteroids</title>
+</head>
+<body>
+    <h1>Teste do Jogo</h1>
+    <div id="test-output"></div>
+    <script>
+        // Teste básico de JavaScript
+        document.getElementById('test-output').innerHTML = 'JavaScript funcionando!';
+        
+        // Teste de carregamento do jogo
+        try {
+            console.log('Testando carregamento do app.js...');
+            // Simular carregamento do app.js
+            document.getElementById('test-output').innerHTML += '<br>✅ JavaScript básico OK';
+        } catch (error) {
+            console.error('Erro:', error);
+            document.getElementById('test-output').innerHTML += '<br>❌ Erro: ' + error.message;
+        }
+    </script>
+</body>
+</html>

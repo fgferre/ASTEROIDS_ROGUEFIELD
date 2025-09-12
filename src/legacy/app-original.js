@@ -1170,7 +1170,8 @@ function spawnAsteroid() {
       break;
     case 3: // Left
       x = -margin;
-      y = Math.random() * GAME_HEIGHT;break;
+      y = Math.random() * GAME_HEIGHT;
+      break;
   }
   
   // Distribuição balanceada de tamanhos
