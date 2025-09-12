@@ -6,12 +6,31 @@ import InputSystem from '/modules/InputSystem.js';
 
 // Destructuring das constantes mais usadas para compatibilidade
 const {
-    GAME_WIDTH, GAME_HEIGHT, SHIP_SIZE, ASTEROID_SIZES, BULLET_SIZE, XP_ORB_SIZE,
-    TRAIL_LENGTH, SHIP_ACCELERATION, SHIP_MAX_SPEED, SHIP_LINEAR_DAMPING,
-    SHIP_ROTATION_SPEED, SHIP_ANGULAR_DAMPING, SHIP_MASS, ASTEROID_SPEEDS,
-    BULLET_SPEED, COLLISION_BOUNCE, MAGNETISM_RADIUS, MAGNETISM_FORCE,
-    TARGET_UPDATE_INTERVAL, ASTEROIDS_PER_WAVE_BASE, ASTEROIDS_PER_WAVE_MULTIPLIER,
-    WAVE_DURATION, WAVE_BREAK_TIME, MAX_ASTEROIDS_ON_SCREEN, SPACE_UPGRADES
+  GAME_WIDTH,
+  GAME_HEIGHT,
+  SHIP_SIZE,
+  ASTEROID_SIZES,
+  BULLET_SIZE,
+  XP_ORB_SIZE,
+  TRAIL_LENGTH,
+  SHIP_ACCELERATION,
+  SHIP_MAX_SPEED,
+  SHIP_LINEAR_DAMPING,
+  SHIP_ROTATION_SPEED,
+  SHIP_ANGULAR_DAMPING,
+  SHIP_MASS,
+  ASTEROID_SPEEDS,
+  BULLET_SPEED,
+  COLLISION_BOUNCE,
+  MAGNETISM_RADIUS,
+  MAGNETISM_FORCE,
+  TARGET_UPDATE_INTERVAL,
+  ASTEROIDS_PER_WAVE_BASE,
+  ASTEROIDS_PER_WAVE_MULTIPLIER,
+  WAVE_DURATION,
+  WAVE_BREAK_TIME,
+  MAX_ASTEROIDS_ON_SCREEN,
+  SPACE_UPGRADES,
 } = CONSTANTS;
 
 // Estado global do jogo - Estruturado
@@ -37,7 +56,7 @@ let gameState = {
     armor: 0,
     multishot: 1,
     magnetismRadius: MAGNETISM_RADIUS,
-    invulnerableTimer: 0
+    invulnerableTimer: 0,
   },
   world: {
     asteroids: [],
@@ -47,7 +66,7 @@ let gameState = {
     currentTarget: null,
     targetUpdateTimer: 0,
     lastShotTime: 0,
-    shootCooldown: 0.3
+    shootCooldown: 0.3,
   },
   wave: {
     current: 1,
@@ -60,12 +79,12 @@ let gameState = {
     timeRemaining: WAVE_DURATION, // Timer regressivo de 60 segundos
     spawnTimer: 0,
     spawnDelay: 1.0,
-    initialSpawnDone: false
+    initialSpawnDone: false,
   },
   stats: {
     totalKills: 0,
     time: 0,
-    startTime: 0
+    startTime: 0,
   },
   input: {},
   canvas: null,
@@ -73,17 +92,17 @@ let gameState = {
   screenShake: { intensity: 0, duration: 0, timer: 0 },
   freezeFrame: { timer: 0, duration: 0, fade: 0 },
   screenFlash: { timer: 0, duration: 0, color: '#FFFFFF', intensity: 0 },
-  initialized: false
+  initialized: false,
 };
 
 // Função para interpolação angular suave
 function lerpAngle(from, to, factor) {
   let diff = to - from;
-  
+
   // Normalizar a diferença para o menor caminho circular
   while (diff > Math.PI) diff -= Math.PI * 2;
   while (diff < -Math.PI) diff += Math.PI * 2;
-  
+
   return from + diff * factor;
 }
 
@@ -112,11 +131,11 @@ class SpaceAudioSystem {
 
   async init() {
     if (this.initialized) return;
-    
+
     try {
       this.context = new (window.AudioContext || window.webkitAudioContext)();
       await this.context.resume();
-      
+
       this.masterGain = this.context.createGain();
       this.masterGain.connect(this.context.destination);
       this.masterGain.gain.value = 0.25;
@@ -129,7 +148,7 @@ class SpaceAudioSystem {
 
   safePlay(soundFunction) {
     if (!this.initialized || !this.context) return;
-    
+
     try {
       if (this.context.state === 'suspended') {
         this.context.resume();
@@ -144,16 +163,22 @@ class SpaceAudioSystem {
     this.safePlay(() => {
       const osc = this.context.createOscillator();
       const gain = this.context.createGain();
-      
+
       osc.connect(gain);
       gain.connect(this.masterGain);
-      
+
       osc.frequency.setValueAtTime(800, this.context.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(150, this.context.currentTime + 0.08);
-      
+      osc.frequency.exponentialRampToValueAtTime(
+        150,
+        this.context.currentTime + 0.08
+      );
+
       gain.gain.setValueAtTime(0.12, this.context.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 0.08);
-      
+      gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        this.context.currentTime + 0.08
+      );
+
       osc.start();
       osc.stop(this.context.currentTime + 0.08);
     });
@@ -162,21 +187,28 @@ class SpaceAudioSystem {
   playAsteroidBreak(size) {
     this.safePlay(() => {
       const baseFreq = size === 'large' ? 70 : size === 'medium' ? 110 : 150;
-      const duration = size === 'large' ? 0.35 : size === 'medium' ? 0.25 : 0.18;
-      
+      const duration =
+        size === 'large' ? 0.35 : size === 'medium' ? 0.25 : 0.18;
+
       const osc = this.context.createOscillator();
       const gain = this.context.createGain();
-      
+
       osc.connect(gain);
       gain.connect(this.masterGain);
-      
+
       osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(baseFreq, this.context.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.4, this.context.currentTime + duration);
-      
+      osc.frequency.exponentialRampToValueAtTime(
+        baseFreq * 0.4,
+        this.context.currentTime + duration
+      );
+
       gain.gain.setValueAtTime(0.15, this.context.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + duration);
-      
+      gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        this.context.currentTime + duration
+      );
+
       osc.start();
       osc.stop(this.context.currentTime + duration);
     });
@@ -192,7 +224,11 @@ class SpaceAudioSystem {
 
       // Ruído branco
       const bufferSize = this.context.sampleRate * 0.5;
-      const noiseBuffer = this.context.createBuffer(1, bufferSize, this.context.sampleRate);
+      const noiseBuffer = this.context.createBuffer(
+        1,
+        bufferSize,
+        this.context.sampleRate
+      );
       const output = noiseBuffer.getChannelData(0);
       for (let i = 0; i < bufferSize; i++) {
         output[i] = Math.random() * 2 - 1;
@@ -230,16 +266,22 @@ class SpaceAudioSystem {
     this.safePlay(() => {
       const osc = this.context.createOscillator();
       const gain = this.context.createGain();
-      
+
       osc.connect(gain);
       gain.connect(this.masterGain);
-      
+
       osc.frequency.setValueAtTime(600, this.context.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(1200, this.context.currentTime + 0.12);
-      
+      osc.frequency.exponentialRampToValueAtTime(
+        1200,
+        this.context.currentTime + 0.12
+      );
+
       gain.gain.setValueAtTime(0.08, this.context.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 0.12);
-      
+      gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        this.context.currentTime + 0.12
+      );
+
       osc.start();
       osc.stop(this.context.currentTime + 0.12);
     });
@@ -251,17 +293,17 @@ class SpaceAudioSystem {
       frequencies.forEach((freq, index) => {
         const osc = this.context.createOscillator();
         const gain = this.context.createGain();
-        
+
         osc.connect(gain);
         gain.connect(this.masterGain);
-        
+
         const startTime = this.context.currentTime + index * 0.06;
         osc.frequency.setValueAtTime(freq, startTime);
-        
+
         gain.gain.setValueAtTime(0, startTime);
         gain.gain.linearRampToValueAtTime(0.1, startTime + 0.04);
         gain.gain.linearRampToValueAtTime(0, startTime + 0.18);
-        
+
         osc.start(startTime);
         osc.stop(startTime + 0.18);
       });
@@ -272,22 +314,27 @@ class SpaceAudioSystem {
     this.safePlay(() => {
       const osc = this.context.createOscillator();
       const gain = this.context.createGain();
-      
+
       osc.connect(gain);
       gain.connect(this.masterGain);
-      
+
       osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(180, this.context.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(40, this.context.currentTime + 0.3);
-      
+      osc.frequency.exponentialRampToValueAtTime(
+        40,
+        this.context.currentTime + 0.3
+      );
+
       gain.gain.setValueAtTime(0.2, this.context.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 0.3);
-      
+      gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        this.context.currentTime + 0.3
+      );
+
       osc.start();
       osc.stop(this.context.currentTime + 0.3);
     });
   }
-
 }
 
 // Sistema de partículas otimizado
@@ -313,22 +360,22 @@ class SpaceParticle {
     this.life -= deltaTime;
     this.alpha = Math.max(0, this.life / this.maxLife);
     this.rotation += this.rotationSpeed * deltaTime;
-    
+
     const friction = this.type === 'thruster' ? 0.98 : 0.96;
     this.vx *= friction;
     this.vy *= friction;
-    
+
     return this.life > 0;
   }
 
   draw(ctx) {
     if (this.alpha <= 0) return;
-    
+
     ctx.save();
     ctx.globalAlpha = this.alpha;
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rotation);
-    
+
     if (this.type === 'spark') {
       ctx.strokeStyle = this.color;
       ctx.lineWidth = this.size * this.alpha;
@@ -341,7 +388,7 @@ class SpaceParticle {
       ctx.fillStyle = this.color;
       ctx.beginPath();
       const s = this.size * this.alpha;
-      ctx.rect(-s/2, -s/2, s, s);
+      ctx.rect(-s / 2, -s / 2, s, s);
       ctx.fill();
     } else {
       ctx.fillStyle = this.color;
@@ -349,7 +396,7 @@ class SpaceParticle {
       ctx.arc(0, 0, this.size * this.alpha, 0, Math.PI * 2);
       ctx.fill();
     }
-    
+
     ctx.restore();
   }
 }
@@ -365,7 +412,7 @@ class Asteroid {
     this.mass = this.radius * this.radius * 0.05; // massa proporcional à área
     this.health = size === 'large' ? 3 : size === 'medium' ? 2 : 1;
     this.maxHealth = this.health;
-    
+
     // Velocidade balanceada baseada no tamanho
     if (vx === 0 && vy === 0) {
       const speed = ASTEROID_SPEEDS[size] * (0.8 + Math.random() * 0.4);
@@ -376,7 +423,7 @@ class Asteroid {
       this.vx = vx;
       this.vy = vy;
     }
-    
+
     this.rotation = Math.random() * Math.PI * 2;
     this.rotationSpeed = (Math.random() - 0.5) * 1.5;
     this.lastDamageTime = 0;
@@ -387,18 +434,18 @@ class Asteroid {
   generateVertices() {
     const vertices = [];
     const numVertices = 6 + Math.floor(Math.random() * 3);
-    
+
     for (let i = 0; i < numVertices; i++) {
       const angle = (i / numVertices) * Math.PI * 2;
       const radiusVariation = 0.8 + Math.random() * 0.4;
       const radius = this.radius * radiusVariation;
-      
+
       vertices.push({
         x: Math.cos(angle) * radius,
-        y: Math.sin(angle) * radius
+        y: Math.sin(angle) * radius,
       });
     }
-    
+
     return vertices;
   }
 
@@ -406,14 +453,14 @@ class Asteroid {
     this.x += this.vx * deltaTime;
     this.y += this.vy * deltaTime;
     this.rotation += this.rotationSpeed * deltaTime;
-    
+
     // Wrap around screen com margem
     const margin = this.radius;
     if (this.x < -margin) this.x = GAME_WIDTH + margin;
     if (this.x > GAME_WIDTH + margin) this.x = -margin;
     if (this.y < -margin) this.y = GAME_HEIGHT + margin;
     if (this.y > GAME_HEIGHT + margin) this.y = -margin;
-    
+
     if (this.lastDamageTime > 0) {
       this.lastDamageTime -= deltaTime;
     }
@@ -423,7 +470,7 @@ class Asteroid {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rotation);
-    
+
     // Efeito de dano
     if (this.lastDamageTime > 0) {
       ctx.fillStyle = '#FFFFFF';
@@ -433,10 +480,10 @@ class Asteroid {
       ctx.fillStyle = colors[this.size];
       ctx.strokeStyle = '#654321';
     }
-    
+
     ctx.lineWidth = 2;
     ctx.beginPath();
-    
+
     for (let i = 0; i < this.vertices.length; i++) {
       const vertex = this.vertices[i];
       if (i === 0) {
@@ -445,23 +492,25 @@ class Asteroid {
         ctx.lineTo(vertex.x, vertex.y);
       }
     }
-    
+
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    
+
     // Detalhes internos
     ctx.strokeStyle = 'rgba(101, 67, 33, 0.4)';
     ctx.lineWidth = 1;
     for (let i = 0; i < 2; i++) {
-      const startVertex = this.vertices[Math.floor(Math.random() * this.vertices.length)];
-      const endVertex = this.vertices[Math.floor(Math.random() * this.vertices.length)];
+      const startVertex =
+        this.vertices[Math.floor(Math.random() * this.vertices.length)];
+      const endVertex =
+        this.vertices[Math.floor(Math.random() * this.vertices.length)];
       ctx.beginPath();
       ctx.moveTo(startVertex.x * 0.4, startVertex.y * 0.4);
       ctx.lineTo(endVertex.x * 0.4, endVertex.y * 0.4);
       ctx.stroke();
     }
-    
+
     ctx.restore();
   }
 
@@ -473,11 +522,11 @@ class Asteroid {
 
   fragment() {
     if (this.size === 'small') return [];
-    
+
     const newSize = this.size === 'large' ? 'medium' : 'small';
     const fragments = [];
     const fragmentCount = 2 + Math.floor(Math.random() * 2);
-    
+
     for (let i = 0; i < fragmentCount; i++) {
       const angle = (i / fragmentCount) * Math.PI * 2 + Math.random() * 0.4;
       const speed = ASTEROID_SPEEDS[newSize] * (0.8 + Math.random() * 0.4);
@@ -490,7 +539,7 @@ class Asteroid {
       );
       fragments.push(fragment);
     }
-    
+
     return fragments;
   }
 }
@@ -504,19 +553,19 @@ function init() {
     if (!gameState.canvas) {
       throw new Error('Canvas não encontrado');
     }
-    
+
     gameState.ctx = gameState.canvas.getContext('2d');
     if (!gameState.ctx) {
       throw new Error('Contexto 2D não disponível');
     }
-    
+
     setupEventListeners();
     audio.init();
 
     // Inicializar sistemas modulares
     const inputSystem = new InputSystem();
     gameState.initialized = true;
-    
+
     requestAnimationFrame(gameLoop);
   } catch (error) {
     console.error('Erro na inicialização:', error);
@@ -531,17 +580,17 @@ function setupEventListeners() {
     if (e.key.toLowerCase() === 'escape' && gameState.screen === 'levelup') {
       e.preventDefault();
     }
-    
+
     // Inicializar áudio no primeiro input
     if (!audio.initialized) {
       audio.init();
     }
   });
-  
+
   document.addEventListener('keyup', (e) => {
     gameState.input[e.key.toLowerCase()] = false;
   });
-  
+
   // Button events - usando função de callback direta
   document.addEventListener('click', (e) => {
     if (e.target.id === 'start-game-btn') {
@@ -559,17 +608,17 @@ function startGame() {
     console.log('Iniciando jogo...');
     gameState.screen = 'playing';
     gameState.stats.startTime = Date.now();
-    
+
     resetPlayer();
     resetWorld();
     resetWave();
-    
+
     // CORREÇÃO BUG 1: Spawn garantido imediato de asteroides
     spawnInitialAsteroids();
-    
+
     showGameUI();
     audio.init();
-    
+
     console.log('Jogo iniciado com sucesso!');
   } catch (error) {
     console.error('Erro ao iniciar jogo:', error);
@@ -606,7 +655,7 @@ function resetPlayer() {
     armor: 0,
     multishot: 1,
     magnetismRadius: MAGNETISM_RADIUS,
-    invulnerableTimer: 0
+    invulnerableTimer: 0,
   };
 }
 
@@ -619,7 +668,7 @@ function resetWorld() {
     currentTarget: null,
     targetUpdateTimer: 0,
     lastShotTime: 0,
-    shootCooldown: 0.3
+    shootCooldown: 0.3,
   };
 }
 
@@ -635,28 +684,28 @@ function resetWave() {
     timeRemaining: WAVE_DURATION, // CORREÇÃO BUG 3: Timer regressivo de 60s
     spawnTimer: 0,
     spawnDelay: 1.0,
-    initialSpawnDone: false
+    initialSpawnDone: false,
   };
-  
+
   gameState.stats = {
     totalKills: 0,
     time: 0,
-    startTime: Date.now()
+    startTime: Date.now(),
   };
 }
 
 function showScreen(screenName) {
   try {
     console.log('Mudando para tela:', screenName);
-    
+
     // Esconder todas as telas
-    document.querySelectorAll('.screen').forEach(screen => {
+    document.querySelectorAll('.screen').forEach((screen) => {
       screen.classList.add('hidden');
     });
-    
+
     const gameUI = document.getElementById('game-ui');
     if (gameUI) gameUI.classList.add('hidden');
-    
+
     // Mostrar tela específica
     if (screenName === 'playing' || screenName === 'game') {
       if (gameUI) {
@@ -682,69 +731,75 @@ function showGameUI() {
 // Sistema de targeting aprimorado
 function updateTargeting(deltaTime) {
   gameState.world.targetUpdateTimer -= deltaTime;
-  
+
   if (gameState.world.targetUpdateTimer <= 0) {
     let newTarget = null;
     let closestDistance = Infinity;
-    
+
     // Encontrar asteroide mais próximo e válido
-    gameState.world.asteroids.forEach(asteroid => {
+    gameState.world.asteroids.forEach((asteroid) => {
       if (asteroid.destroyed) return;
-      
+
       const dx = asteroid.x - gameState.player.x;
       const dy = asteroid.y - gameState.player.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      if (distance < closestDistance && distance < 400) { // Limite de alcance
+
+      if (distance < closestDistance && distance < 400) {
+        // Limite de alcance
         closestDistance = distance;
         newTarget = asteroid;
       }
     });
-    
+
     gameState.world.currentTarget = newTarget;
     gameState.world.targetUpdateTimer = TARGET_UPDATE_INTERVAL;
   }
-  
+
   // Verificar se o alvo ainda é válido
-  if (gameState.world.currentTarget && 
-      (gameState.world.currentTarget.destroyed || 
-       !gameState.world.asteroids.find(a => a.id === gameState.world.currentTarget.id))) {
+  if (
+    gameState.world.currentTarget &&
+    (gameState.world.currentTarget.destroyed ||
+      !gameState.world.asteroids.find(
+        (a) => a.id === gameState.world.currentTarget.id
+      ))
+  ) {
     gameState.world.currentTarget = null;
   }
 }
 
 function handleShooting(deltaTime) {
   gameState.world.lastShotTime += deltaTime;
-  
-  if (gameState.world.lastShotTime >= gameState.world.shootCooldown && 
-      gameState.world.currentTarget && 
-      !gameState.world.currentTarget.destroyed) {
-    
+
+  if (
+    gameState.world.lastShotTime >= gameState.world.shootCooldown &&
+    gameState.world.currentTarget &&
+    !gameState.world.currentTarget.destroyed
+  ) {
     const target = gameState.world.currentTarget;
-    
+
     // Tiro com predição de movimento
     const predictTime = 0.5;
     const predictedX = target.x + target.vx * predictTime;
     const predictedY = target.y + target.vy * predictTime;
-    
+
     for (let i = 0; i < gameState.player.multishot; i++) {
       let targetX = predictedX;
       let targetY = predictedY;
-      
+
       if (gameState.player.multishot > 1) {
         const spreadAngle = (i - (gameState.player.multishot - 1) / 2) * 0.3;
         const dx = predictedX - gameState.player.x;
         const dy = predictedY - gameState.player.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         const angle = Math.atan2(dy, dx) + spreadAngle;
-        
+
         targetX = gameState.player.x + Math.cos(angle) * distance;
         targetY = gameState.player.y + Math.sin(angle) * distance;
       }
-      
+
       createBullet(gameState.player.x, gameState.player.y, targetX, targetY);
     }
-    
+
     gameState.world.lastShotTime = 0;
     audio.playLaserShot();
   }
@@ -754,9 +809,9 @@ function createBullet(fromX, fromY, toX, toY) {
   const dx = toX - fromX;
   const dy = toY - fromY;
   const distance = Math.sqrt(dx * dx + dy * dy);
-  
+
   if (distance === 0) return;
-  
+
   const bullet = {
     id: Date.now() + Math.random(),
     x: fromX,
@@ -766,9 +821,9 @@ function createBullet(fromX, fromY, toX, toY) {
     damage: gameState.player.damage,
     life: 1.8,
     trail: [],
-    hit: false
+    hit: false,
   };
-  
+
   gameState.world.bullets.push(bullet);
 }
 
@@ -788,9 +843,16 @@ function updatePlayerMovement(deltaTime) {
   const forwardY = Math.sin(angle);
 
   // Aceleração ao longo da direção da nave
-  let ax = 0, ay = 0;
-  if (forwardPressed) { ax += forwardX * acceleration; ay += forwardY * acceleration; }
-  if (backwardPressed) { ax -= forwardX * acceleration; ay -= forwardY * acceleration; }
+  let ax = 0,
+    ay = 0;
+  if (forwardPressed) {
+    ax += forwardX * acceleration;
+    ay += forwardY * acceleration;
+  }
+  if (backwardPressed) {
+    ax -= forwardX * acceleration;
+    ay -= forwardY * acceleration;
+  }
 
   gameState.player.vx += ax;
   gameState.player.vy += ay;
@@ -803,8 +865,10 @@ function updatePlayerMovement(deltaTime) {
   // Limite de velocidade
   const speed = Math.sqrt(gameState.player.vx ** 2 + gameState.player.vy ** 2);
   if (speed > gameState.player.maxSpeed) {
-    gameState.player.vx = (gameState.player.vx / speed) * gameState.player.maxSpeed;
-    gameState.player.vy = (gameState.player.vy / speed) * gameState.player.maxSpeed;
+    gameState.player.vx =
+      (gameState.player.vx / speed) * gameState.player.maxSpeed;
+    gameState.player.vy =
+      (gameState.player.vy / speed) * gameState.player.maxSpeed;
   }
 
   // Atualizar posição + wrap
@@ -827,9 +891,13 @@ function updatePlayerMovement(deltaTime) {
 
   // Clamp angular e aplicar
   const maxAng = gameState.player.rotationSpeed;
-  if (gameState.player.angularVelocity > maxAng) gameState.player.angularVelocity = maxAng;
-  if (gameState.player.angularVelocity < -maxAng) gameState.player.angularVelocity = -maxAng;
-  gameState.player.angle = wrapAngle(gameState.player.angle + gameState.player.angularVelocity * deltaTime);
+  if (gameState.player.angularVelocity > maxAng)
+    gameState.player.angularVelocity = maxAng;
+  if (gameState.player.angularVelocity < -maxAng)
+    gameState.player.angularVelocity = -maxAng;
+  gameState.player.angle = wrapAngle(
+    gameState.player.angle + gameState.player.angularVelocity * deltaTime
+  );
 
   // Efeito de propulsão direcional
   if (forwardPressed) createThrusterEffect('bottom');
@@ -840,16 +908,41 @@ function updatePlayerMovement(deltaTime) {
 
 function createThrusterEffect(direction = 'bottom') {
   const angle = gameState.player.angle;
-  const forwardX = Math.cos(angle), forwardY = Math.sin(angle);
-  const rightX = Math.cos(angle + Math.PI / 2), rightY = Math.sin(angle + Math.PI / 2);
+  const forwardX = Math.cos(angle),
+    forwardY = Math.sin(angle);
+  const rightX = Math.cos(angle + Math.PI / 2),
+    rightY = Math.sin(angle + Math.PI / 2);
 
-  let offsetX = 0, offsetY = 0, dirX = 0, dirY = 0;
+  let offsetX = 0,
+    offsetY = 0,
+    dirX = 0,
+    dirY = 0;
   switch (direction) {
-    case 'left':   offsetX = -rightX * SHIP_SIZE * 0.8; offsetY = -rightY * 0.8 * SHIP_SIZE; dirX = -rightX; dirY = -rightY; break;
-    case 'right':  offsetX =  rightX * SHIP_SIZE * 0.8; offsetY =  rightY * 0.8 * SHIP_SIZE; dirX =  rightX; dirY =  rightY; break;
-    case 'top':    offsetX =  forwardX * SHIP_SIZE * 0.8; offsetY =  forwardY * 0.8 * SHIP_SIZE; dirX =  forwardX; dirY =  forwardY; break;
+    case 'left':
+      offsetX = -rightX * SHIP_SIZE * 0.8;
+      offsetY = -rightY * 0.8 * SHIP_SIZE;
+      dirX = -rightX;
+      dirY = -rightY;
+      break;
+    case 'right':
+      offsetX = rightX * SHIP_SIZE * 0.8;
+      offsetY = rightY * 0.8 * SHIP_SIZE;
+      dirX = rightX;
+      dirY = rightY;
+      break;
+    case 'top':
+      offsetX = forwardX * SHIP_SIZE * 0.8;
+      offsetY = forwardY * 0.8 * SHIP_SIZE;
+      dirX = forwardX;
+      dirY = forwardY;
+      break;
     case 'bottom':
-    default:       offsetX = -forwardX * SHIP_SIZE * 0.8; offsetY = -forwardY * 0.8 * SHIP_SIZE; dirX = -forwardX; dirY = -forwardY; break;
+    default:
+      offsetX = -forwardX * SHIP_SIZE * 0.8;
+      offsetY = -forwardY * 0.8 * SHIP_SIZE;
+      dirX = -forwardX;
+      dirY = -forwardY;
+      break;
   }
 
   const thrusterX = gameState.player.x + offsetX;
@@ -902,20 +995,21 @@ function updateGame(deltaTime) {
   // Teste InputSystem (temporário)
   const input = gameServices.get('input');
   if (input) {
-      const movement = input.getMovementInput();
-      // Log apenas se houver input (evitar spam)
-      if (movement.up || movement.down || movement.left || movement.right) {
-          console.log('[DEBUG] InputSystem movement:', movement);
-      }
+    const movement = input.getMovementInput();
+    // Log apenas se houver input (evitar spam)
+    if (movement.up || movement.down || movement.left || movement.right) {
+      console.log('[DEBUG] InputSystem movement:', movement);
+    }
   }
 
   gameState.stats.time = (Date.now() - gameState.stats.startTime) / 1000;
   // Atualizar i-frames do jogador
   if (gameState.player.invulnerableTimer > 0) {
     gameState.player.invulnerableTimer -= deltaTime;
-    if (gameState.player.invulnerableTimer < 0) gameState.player.invulnerableTimer = 0;
+    if (gameState.player.invulnerableTimer < 0)
+      gameState.player.invulnerableTimer = 0;
   }
-  
+
   updatePlayerMovement(deltaTime);
   updateTargeting(deltaTime);
   handleShooting(deltaTime);
@@ -932,52 +1026,52 @@ function updateGame(deltaTime) {
 }
 
 function updateBullets(deltaTime) {
-  gameState.world.bullets.forEach(bullet => {
+  gameState.world.bullets.forEach((bullet) => {
     if (bullet.hit) return;
-    
+
     // Rastro da bala
     bullet.trail.push({ x: bullet.x, y: bullet.y });
     if (bullet.trail.length > TRAIL_LENGTH) {
       bullet.trail.shift();
     }
-    
+
     bullet.x += bullet.vx * deltaTime;
     bullet.y += bullet.vy * deltaTime;
     bullet.life -= deltaTime;
-    
+
     // Wrap around screen
     if (bullet.x < 0) bullet.x = GAME_WIDTH;
     if (bullet.x > GAME_WIDTH) bullet.x = 0;
     if (bullet.y < 0) bullet.y = GAME_HEIGHT;
     if (bullet.y > GAME_HEIGHT) bullet.y = 0;
   });
-  
-  gameState.world.bullets = gameState.world.bullets.filter(bullet => 
-    bullet.life > 0 && !bullet.hit
+
+  gameState.world.bullets = gameState.world.bullets.filter(
+    (bullet) => bullet.life > 0 && !bullet.hit
   );
 }
 
 function updateAsteroids(deltaTime) {
-  gameState.world.asteroids.forEach(asteroid => {
+  gameState.world.asteroids.forEach((asteroid) => {
     if (!asteroid.destroyed) {
       asteroid.update(deltaTime);
     }
   });
-  
+
   // Física de colisão entre asteroides (impulso com massa)
   for (let i = 0; i < gameState.world.asteroids.length - 1; i++) {
     const a1 = gameState.world.asteroids[i];
     if (a1.destroyed) continue;
-    
+
     for (let j = i + 1; j < gameState.world.asteroids.length; j++) {
       const a2 = gameState.world.asteroids[j];
       if (a2.destroyed) continue;
-      
+
       const dx = a2.x - a1.x;
       const dy = a2.y - a1.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
       const minDistance = a1.radius + a2.radius;
-      
+
       if (distance < minDistance && distance > 0) {
         const nx = dx / distance;
         const ny = dy / distance;
@@ -997,7 +1091,7 @@ function updateAsteroids(deltaTime) {
           const e = COLLISION_BOUNCE;
           const invMass1 = 1 / a1.mass;
           const invMass2 = 1 / a2.mass;
-          const j = -(1 + e) * velAlongNormal / (invMass1 + invMass2);
+          const j = (-(1 + e) * velAlongNormal) / (invMass1 + invMass2);
           const jx = j * nx;
           const jy = j * ny;
           a1.vx -= jx * invMass1;
@@ -1014,23 +1108,23 @@ function updateAsteroids(deltaTime) {
 }
 
 function updateXPOrbs(deltaTime) {
-  gameState.world.xpOrbs.forEach(orb => {
+  gameState.world.xpOrbs.forEach((orb) => {
     if (orb.collected) return;
-    
+
     const dx = gameState.player.x - orb.x;
     const dy = gameState.player.y - orb.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
-    
+
     // Magnetismo
     if (distance < gameState.player.magnetismRadius && distance > 0) {
       const force = MAGNETISM_FORCE / Math.max(distance, 1);
       const normalizedDx = dx / distance;
       const normalizedDy = dy / distance;
-      
+
       orb.x += normalizedDx * force * deltaTime;
       orb.y += normalizedDy * force * deltaTime;
     }
-    
+
     // Coleta
     if (distance < SHIP_SIZE + XP_ORB_SIZE) {
       orb.collected = true;
@@ -1039,15 +1133,17 @@ function updateXPOrbs(deltaTime) {
       createXPCollectEffect(orb.x, orb.y);
     }
   });
-  
-  gameState.world.xpOrbs = gameState.world.xpOrbs.filter(orb => !orb.collected);
+
+  gameState.world.xpOrbs = gameState.world.xpOrbs.filter(
+    (orb) => !orb.collected
+  );
 }
 
 function updateParticles(deltaTime) {
-  gameState.world.particles = gameState.world.particles.filter(particle => 
+  gameState.world.particles = gameState.world.particles.filter((particle) =>
     particle.update(deltaTime)
   );
-  
+
   // Limitar número de partículas para performance
   if (gameState.world.particles.length > 150) {
     gameState.world.particles = gameState.world.particles.slice(-100);
@@ -1059,31 +1155,34 @@ function updateWaveSystem(deltaTime) {
   if (gameState.wave.isActive) {
     // Reduzir timer da onda
     gameState.wave.timeRemaining -= deltaTime;
-    
+
     // Controlar spawn de asteroides
-    if (gameState.wave.asteroidsSpawned < gameState.wave.totalAsteroids &&
-        gameState.world.asteroids.length < MAX_ASTEROIDS_ON_SCREEN) {
-      
+    if (
+      gameState.wave.asteroidsSpawned < gameState.wave.totalAsteroids &&
+      gameState.world.asteroids.length < MAX_ASTEROIDS_ON_SCREEN
+    ) {
       gameState.wave.spawnTimer -= deltaTime;
-      
+
       if (gameState.wave.spawnTimer <= 0) {
         spawnAsteroid();
         gameState.wave.asteroidsSpawned++;
-        gameState.wave.spawnTimer = gameState.wave.spawnDelay * (0.5 + Math.random() * 0.5);
+        gameState.wave.spawnTimer =
+          gameState.wave.spawnDelay * (0.5 + Math.random() * 0.5);
       }
     }
-    
+
     // Verificar se onda foi completada (timer chegou a 0 OU todos asteroides eliminados)
-    const allAsteroidsKilled = gameState.wave.asteroidsKilled >= gameState.wave.totalAsteroids && 
-                              gameState.world.asteroids.filter(a => !a.destroyed).length === 0;
-    
+    const allAsteroidsKilled =
+      gameState.wave.asteroidsKilled >= gameState.wave.totalAsteroids &&
+      gameState.world.asteroids.filter((a) => !a.destroyed).length === 0;
+
     if (gameState.wave.timeRemaining <= 0 || allAsteroidsKilled) {
       completeWave();
     }
   } else {
     // Timer do intervalo entre ondas
     gameState.wave.breakTimer -= deltaTime;
-    
+
     if (gameState.wave.breakTimer <= 0) {
       startNextWave();
     }
@@ -1094,8 +1193,8 @@ function spawnAsteroid() {
   const side = Math.floor(Math.random() * 4);
   let x, y;
   const margin = 80;
-  
-  switch(side) {
+
+  switch (side) {
     case 0: // Top
       x = Math.random() * GAME_WIDTH;
       y = -margin;
@@ -1110,16 +1209,17 @@ function spawnAsteroid() {
       break;
     case 3: // Left
       x = -margin;
-      y = Math.random() * GAME_HEIGHT;break;
+      y = Math.random() * GAME_HEIGHT;
+      break;
   }
-  
+
   // Distribuição balanceada de tamanhos
   let size;
   const rand = Math.random();
   if (rand < 0.5) size = 'large';
   else if (rand < 0.8) size = 'medium';
   else size = 'small';
-  
+
   const asteroid = new Asteroid(x, y, size);
   gameState.world.asteroids.push(asteroid);
 }
@@ -1128,7 +1228,7 @@ function completeWave() {
   gameState.wave.isActive = false;
   gameState.wave.breakTimer = WAVE_BREAK_TIME;
   gameState.wave.completedWaves++;
-  
+
   // Recompensas de fim de onda
   const orbCount = 4 + Math.floor(gameState.wave.current / 2);
   for (let i = 0; i < orbCount; i++) {
@@ -1145,7 +1245,8 @@ function completeWave() {
 function startNextWave() {
   gameState.wave.current++;
   gameState.wave.totalAsteroids = Math.floor(
-    ASTEROIDS_PER_WAVE_BASE * Math.pow(ASTEROIDS_PER_WAVE_MULTIPLIER, gameState.wave.current - 1)
+    ASTEROIDS_PER_WAVE_BASE *
+      Math.pow(ASTEROIDS_PER_WAVE_MULTIPLIER, gameState.wave.current - 1)
   );
   gameState.wave.totalAsteroids = Math.min(gameState.wave.totalAsteroids, 25); // Limite máximo
   gameState.wave.asteroidsSpawned = 0;
@@ -1155,7 +1256,7 @@ function startNextWave() {
   gameState.wave.spawnTimer = 1.0;
   gameState.wave.spawnDelay = Math.max(0.8, 2.0 - gameState.wave.current * 0.1);
   gameState.wave.initialSpawnDone = false;
-  
+
   // CORREÇÃO BUG 1: Spawn imediato de asteroides na nova onda
   spawnInitialAsteroids();
 }
@@ -1166,19 +1267,19 @@ function createXPOrb(x, y, value) {
     x: x,
     y: y,
     value: value,
-    collected: false
+    collected: false,
   };
-  
+
   gameState.world.xpOrbs.push(orb);
 }
 
 function collectXP(amount) {
   gameState.player.xp += amount;
-  
+
   if (gameState.player.xp >= gameState.player.xpToNext) {
     levelUp();
   }
-  
+
   updateUI();
 }
 
@@ -1186,7 +1287,7 @@ function levelUp() {
   gameState.player.level++;
   gameState.player.xp = 0;
   gameState.player.xpToNext = Math.floor(gameState.player.xpToNext * 1.2);
-  
+
   gameState.screen = 'levelup';
   showLevelUpScreen();
 
@@ -1199,24 +1300,24 @@ function levelUp() {
 
 function showLevelUpScreen() {
   showScreen('levelup');
-  
+
   const levelText = document.getElementById('levelup-text');
   if (levelText) {
     levelText.textContent = `Level ${gameState.player.level} - Escolha sua tecnologia:`;
   }
-  
+
   const shuffled = [...SPACE_UPGRADES].sort(() => Math.random() - 0.5);
   const selected = shuffled.slice(0, 3);
-  
+
   const container = document.getElementById('upgrades-container');
   if (container) {
     container.innerHTML = '';
-    
-    selected.forEach(upgrade => {
+
+    selected.forEach((upgrade) => {
       const button = document.createElement('button');
       button.className = 'upgrade-option';
       button.onclick = () => selectUpgrade(upgrade.id);
-      
+
       button.innerHTML = `
         <div class="upgrade-icon" style="color: ${upgrade.color};">
           ${upgrade.icon}
@@ -1226,7 +1327,7 @@ function showLevelUpScreen() {
           <p>${upgrade.description}</p>
         </div>
       `;
-      
+
       container.appendChild(button);
     });
   }
@@ -1239,20 +1340,22 @@ function selectUpgrade(upgradeId) {
 }
 
 function applyUpgrade(upgradeId) {
-  switch(upgradeId) {
+  switch (upgradeId) {
     case 'plasma':
       gameState.player.damage = Math.floor(gameState.player.damage * 1.25);
       break;
     case 'propulsors':
       // Aumenta velocidade máxima, aceleração e um pouco a rotação para melhor controle
       gameState.player.maxSpeed = Math.floor(gameState.player.maxSpeed * 1.2);
-      gameState.player.acceleration = Math.floor(gameState.player.acceleration * 1.2);
+      gameState.player.acceleration = Math.floor(
+        gameState.player.acceleration * 1.2
+      );
       gameState.player.rotationSpeed = gameState.player.rotationSpeed * 1.1;
       break;
     case 'shield':
       gameState.player.maxHealth += 50;
       gameState.player.health = Math.min(
-        gameState.player.health + 50, 
+        gameState.player.health + 50,
         gameState.player.maxHealth
       );
       break;
@@ -1263,7 +1366,9 @@ function applyUpgrade(upgradeId) {
       gameState.player.multishot = Math.min(gameState.player.multishot + 1, 5);
       break;
     case 'magfield':
-      gameState.player.magnetismRadius = Math.floor(gameState.player.magnetismRadius * 1.5);
+      gameState.player.magnetismRadius = Math.floor(
+        gameState.player.magnetismRadius * 1.5
+      );
       break;
   }
 }
@@ -1271,64 +1376,68 @@ function applyUpgrade(upgradeId) {
 // Detecção de colisão melhorada
 function checkCollisions() {
   // Colisões bala-asteroide
-  gameState.world.bullets.forEach(bullet => {
+  gameState.world.bullets.forEach((bullet) => {
     if (bullet.hit) return;
-    
-    gameState.world.asteroids.forEach(asteroid => {
+
+    gameState.world.asteroids.forEach((asteroid) => {
       if (asteroid.destroyed) return;
-      
+
       const dx = bullet.x - asteroid.x;
       const dy = bullet.y - asteroid.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
-      
+
       if (distance < asteroid.radius + BULLET_SIZE) {
         bullet.hit = true;
-        
+
         if (asteroid.takeDamage(bullet.damage)) {
           asteroid.destroyed = true;
           gameState.stats.totalKills++;
           gameState.wave.asteroidsKilled++;
-          
+
           createAsteroidExplosion(asteroid);
           audio.playAsteroidBreak(asteroid.size);
           if (asteroid.size === 'large') {
             audio.playBigExplosion();
           }
-          
+
           // Fragmentação
           const fragments = asteroid.fragment();
           gameState.world.asteroids.push(...fragments);
-          
+
           // XP reward
           const xpValue = { large: 20, medium: 12, small: 8 }[asteroid.size];
           createXPOrb(
             asteroid.x + (Math.random() - 0.5) * 20,
-            asteroid.y + (Math.random() - 0.5) * 20, 
+            asteroid.y + (Math.random() - 0.5) * 20,
             xpValue + gameState.wave.current * 2
           );
         }
       }
     });
   });
-  
+
   // Remover balas destruídas
-  gameState.world.bullets = gameState.world.bullets.filter(bullet => !bullet.hit);
-  gameState.world.asteroids = gameState.world.asteroids.filter(asteroid => !asteroid.destroyed);
-  
+  gameState.world.bullets = gameState.world.bullets.filter(
+    (bullet) => !bullet.hit
+  );
+  gameState.world.asteroids = gameState.world.asteroids.filter(
+    (asteroid) => !asteroid.destroyed
+  );
+
   // Colisões nave-asteroide
-  gameState.world.asteroids.forEach(asteroid => {
+  gameState.world.asteroids.forEach((asteroid) => {
     if (asteroid.destroyed) return;
-    
+
     const dx = gameState.player.x - asteroid.x;
     const dy = gameState.player.y - asteroid.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
-    
+
     if (distance < SHIP_SIZE + asteroid.radius) {
       // Normal de colisão
       const nx = dx / Math.max(distance, 1);
       const ny = dy / Math.max(distance, 1);
       // Correção de penetração
-      const overlap = (SHIP_SIZE + asteroid.radius) - distance;
+      const overlap = SHIP_SIZE + asteroid.radius - distance;
       if (overlap > 0) {
         gameState.player.x += nx * overlap * 0.5;
         gameState.player.y += ny * overlap * 0.5;
@@ -1343,7 +1452,7 @@ function checkCollisions() {
         const e = 0.2; // colisão menos elástica com a nave
         const invMass1 = 1 / SHIP_MASS;
         const invMass2 = 1 / asteroid.mass;
-        const j = -(1 + e) * velAlongNormal / (invMass1 + invMass2);
+        const j = (-(1 + e) * velAlongNormal) / (invMass1 + invMass2);
         const jx = j * nx;
         const jy = j * ny;
         gameState.player.vx -= jx * invMass1;
@@ -1354,17 +1463,23 @@ function checkCollisions() {
 
       // Dano baseado em momento relativo (com i-frames)
       if (gameState.player.invulnerableTimer <= 0) {
-        const relSpeed = Math.sqrt((asteroid.vx - gameState.player.vx) ** 2 + (asteroid.vy - gameState.player.vy) ** 2);
+        const relSpeed = Math.sqrt(
+          (asteroid.vx - gameState.player.vx) ** 2 +
+            (asteroid.vy - gameState.player.vy) ** 2
+        );
         const baseDamage = 12;
         const momentumFactor = (asteroid.mass * relSpeed) / 120;
         const rawDamage = baseDamage + momentumFactor;
-        const damage = Math.max(3, Math.floor(rawDamage) - gameState.player.armor);
+        const damage = Math.max(
+          3,
+          Math.floor(rawDamage) - gameState.player.armor
+        );
         gameState.player.health -= damage;
         gameState.player.invulnerableTimer = 0.5;
-        
+
         audio.playShipHit();
         addScreenShake(8, 0.3);
-        
+
         if (gameState.player.health <= 0) {
           gameOver();
         }
@@ -1392,7 +1507,7 @@ function createAsteroidExplosion(asteroid) {
   for (let i = 0; i < particleCount; i++) {
     const angle = Math.random() * Math.PI * 2;
     const speed = 40 + Math.random() * 80;
-    
+
     // Debris
     const debris = new SpaceParticle(
       asteroid.x + (Math.random() - 0.5) * asteroid.radius,
@@ -1405,7 +1520,7 @@ function createAsteroidExplosion(asteroid) {
       'debris'
     );
     gameState.world.particles.push(debris);
-    
+
     // Sparks
     const spark = new SpaceParticle(
       asteroid.x,
@@ -1426,7 +1541,8 @@ function createXPCollectEffect(x, y) {
     const angle = Math.random() * Math.PI * 2;
     const speed = 25 + Math.random() * 40;
     const particle = new SpaceParticle(
-      x, y,
+      x,
+      y,
       Math.cos(angle) * speed,
       Math.sin(angle) * speed,
       '#00DDFF',
@@ -1456,14 +1572,23 @@ function createLevelUpExplosion() {
 }
 
 function addScreenShake(intensity, duration) {
-  gameState.screenShake.intensity = Math.max(gameState.screenShake.intensity, intensity);
-  gameState.screenShake.duration = Math.max(gameState.screenShake.duration, duration);
+  gameState.screenShake.intensity = Math.max(
+    gameState.screenShake.intensity,
+    intensity
+  );
+  gameState.screenShake.duration = Math.max(
+    gameState.screenShake.duration,
+    duration
+  );
   gameState.screenShake.timer = gameState.screenShake.duration;
 }
 
 function addFreezeFrame(duration, fade = 0) {
   gameState.freezeFrame.timer = Math.max(gameState.freezeFrame.timer, duration);
-  gameState.freezeFrame.duration = Math.max(gameState.freezeFrame.duration, duration);
+  gameState.freezeFrame.duration = Math.max(
+    gameState.freezeFrame.duration,
+    duration
+  );
   gameState.freezeFrame.fade = fade;
 }
 
@@ -1477,7 +1602,7 @@ function addScreenFlash(color, duration, intensity) {
 function updateScreenShake(deltaTime) {
   if (gameState.screenShake.timer > 0) {
     gameState.screenShake.timer -= deltaTime;
-    
+
     if (gameState.screenShake.timer <= 0) {
       gameState.screenShake.intensity = 0;
       gameState.screenShake.duration = 0;
@@ -1499,14 +1624,14 @@ function gameOver() {
 
 function showGameOverScreen() {
   showScreen('gameover');
-  
+
   const elements = [
     { id: 'final-level', value: gameState.player.level },
     { id: 'final-kills', value: gameState.stats.totalKills },
     { id: 'final-waves', value: gameState.wave.completedWaves },
-    { id: 'final-time', value: Math.floor(gameState.stats.time) + 's' }
+    { id: 'final-time', value: Math.floor(gameState.stats.time) + 's' },
   ];
-  
+
   elements.forEach(({ id, value }) => {
     const element = document.getElementById(id);
     if (element) element.textContent = value;
@@ -1515,174 +1640,202 @@ function showGameOverScreen() {
 
 function renderGame() {
   if (!gameState.ctx) return;
-  
+
   const ctx = gameState.ctx;
-  
+
   ctx.save();
-  
+
   // Screen shake
   if (gameState.screenShake.timer > 0) {
-    const shakeAmount = gameState.screenShake.intensity * 
+    const shakeAmount =
+      gameState.screenShake.intensity *
       (gameState.screenShake.timer / gameState.screenShake.duration);
     ctx.translate(
       (Math.random() - 0.5) * shakeAmount,
       (Math.random() - 0.5) * shakeAmount
     );
   }
-  
+
   // Background
   const gradient = ctx.createRadialGradient(
-    GAME_WIDTH/2, GAME_HEIGHT/2, 0, 
-    GAME_WIDTH/2, GAME_HEIGHT/2, Math.max(GAME_WIDTH, GAME_HEIGHT)
+    GAME_WIDTH / 2,
+    GAME_HEIGHT / 2,
+    0,
+    GAME_WIDTH / 2,
+    GAME_HEIGHT / 2,
+    Math.max(GAME_WIDTH, GAME_HEIGHT)
   );
   gradient.addColorStop(0, '#0a0a1a');
   gradient.addColorStop(0.6, '#000510');
   gradient.addColorStop(1, '#000000');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-  
+
   // Stars
   ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
   for (let i = 0; i < 80; i++) {
     const x = (i * 123.456) % GAME_WIDTH;
     const y = (i * 234.567) % GAME_HEIGHT;
-    const size = Math.floor((i % 3)) + 1;
+    const size = Math.floor(i % 3) + 1;
     ctx.fillRect(x, y, size, size);
   }
-  
+
   // Partículas
-  gameState.world.particles.forEach(particle => particle.draw(ctx));
-  
+  gameState.world.particles.forEach((particle) => particle.draw(ctx));
+
   // XP orbs
-  gameState.world.xpOrbs.forEach(orb => {
+  gameState.world.xpOrbs.forEach((orb) => {
     if (orb.collected) return;
-    
+
     // Glow effect
-    const gradient = ctx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, XP_ORB_SIZE * 2);
+    const gradient = ctx.createRadialGradient(
+      orb.x,
+      orb.y,
+      0,
+      orb.x,
+      orb.y,
+      XP_ORB_SIZE * 2
+    );
     gradient.addColorStop(0, '#00DDFF');
     gradient.addColorStop(0.7, 'rgba(0, 221, 255, 0.3)');
     gradient.addColorStop(1, 'transparent');
-    
+
     ctx.fillStyle = gradient;
     ctx.beginPath();
     ctx.arc(orb.x, orb.y, XP_ORB_SIZE * 2, 0, Math.PI * 2);
     ctx.fill();
-    
+
     // Core
     ctx.fillStyle = '#00DDFF';
     ctx.beginPath();
     ctx.arc(orb.x, orb.y, XP_ORB_SIZE, 0, Math.PI * 2);
     ctx.fill();
-    
+
     // Inner highlight
     ctx.fillStyle = '#FFFFFF';
     ctx.beginPath();
     ctx.arc(orb.x - 2, orb.y - 2, XP_ORB_SIZE * 0.3, 0, Math.PI * 2);
     ctx.fill();
   });
-  
+
   // Bullets with trail
-  gameState.world.bullets.forEach(bullet => {
+  gameState.world.bullets.forEach((bullet) => {
     if (bullet.hit) return;
-    
+
     // Trail
     if (bullet.trail.length > 1) {
       ctx.strokeStyle = '#FFFF00';
       ctx.lineWidth = 2;
       ctx.lineCap = 'round';
       ctx.globalAlpha = 0.6;
-      
+
       ctx.beginPath();
       ctx.moveTo(bullet.trail[0].x, bullet.trail[0].y);
       for (let i = 1; i < bullet.trail.length; i++) {
         ctx.lineTo(bullet.trail[i].x, bullet.trail[i].y);
       }
       ctx.stroke();
-      
+
       ctx.globalAlpha = 1;
     }
-    
+
     // Bullet glow
-    const gradient = ctx.createRadialGradient(bullet.x, bullet.y, 0, bullet.x, bullet.y, BULLET_SIZE * 3);
+    const gradient = ctx.createRadialGradient(
+      bullet.x,
+      bullet.y,
+      0,
+      bullet.x,
+      bullet.y,
+      BULLET_SIZE * 3
+    );
     gradient.addColorStop(0, '#FFFF00');
     gradient.addColorStop(0.5, 'rgba(255, 255, 0, 0.4)');
     gradient.addColorStop(1, 'transparent');
-    
+
     ctx.fillStyle = gradient;
     ctx.beginPath();
     ctx.arc(bullet.x, bullet.y, BULLET_SIZE * 3, 0, Math.PI * 2);
     ctx.fill();
-    
+
     // Bullet core
     ctx.fillStyle = '#FFFFFF';
     ctx.beginPath();
     ctx.arc(bullet.x, bullet.y, BULLET_SIZE, 0, Math.PI * 2);
     ctx.fill();
   });
-  
+
   // Asteroids
-  gameState.world.asteroids.forEach(asteroid => {
+  gameState.world.asteroids.forEach((asteroid) => {
     if (!asteroid.destroyed) {
       asteroid.draw(ctx);
     }
   });
-  
+
   // Ship
   ctx.save();
   ctx.translate(gameState.player.x, gameState.player.y);
   ctx.rotate(gameState.player.angle);
-  
+
   // Ship body (triangle)
   ctx.fillStyle = '#00FF88';
   ctx.strokeStyle = '#00DD77';
   ctx.lineWidth = 2;
-  
+
   ctx.beginPath();
   ctx.moveTo(SHIP_SIZE, 0);
-  ctx.lineTo(-SHIP_SIZE/2, -SHIP_SIZE/2);
-  ctx.lineTo(-SHIP_SIZE/3, 0);
-  ctx.lineTo(-SHIP_SIZE/2, SHIP_SIZE/2);
+  ctx.lineTo(-SHIP_SIZE / 2, -SHIP_SIZE / 2);
+  ctx.lineTo(-SHIP_SIZE / 3, 0);
+  ctx.lineTo(-SHIP_SIZE / 2, SHIP_SIZE / 2);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
-  
+
   // Wings
   ctx.fillStyle = '#0088DD';
   ctx.beginPath();
-  ctx.moveTo(-SHIP_SIZE/3, -SHIP_SIZE/3);
+  ctx.moveTo(-SHIP_SIZE / 3, -SHIP_SIZE / 3);
   ctx.lineTo(-SHIP_SIZE, -SHIP_SIZE);
-  ctx.lineTo(-SHIP_SIZE/2, -SHIP_SIZE/2);
+  ctx.lineTo(-SHIP_SIZE / 2, -SHIP_SIZE / 2);
   ctx.closePath();
   ctx.fill();
-  
+
   ctx.beginPath();
-  ctx.moveTo(-SHIP_SIZE/3, SHIP_SIZE/3);
+  ctx.moveTo(-SHIP_SIZE / 3, SHIP_SIZE / 3);
   ctx.lineTo(-SHIP_SIZE, SHIP_SIZE);
-  ctx.lineTo(-SHIP_SIZE/2, SHIP_SIZE/2);
+  ctx.lineTo(-SHIP_SIZE / 2, SHIP_SIZE / 2);
   ctx.closePath();
   ctx.fill();
-  
+
   // Cockpit
   ctx.fillStyle = '#FFFFFF';
   ctx.beginPath();
-  ctx.arc(SHIP_SIZE/3, 0, 3, 0, Math.PI * 2);
+  ctx.arc(SHIP_SIZE / 3, 0, 3, 0, Math.PI * 2);
   ctx.fill();
-  
+
   ctx.restore();
-  
+
   // Magnetism field indicator
-  if (gameState.world.xpOrbs.some(orb => !orb.collected)) {
+  if (gameState.world.xpOrbs.some((orb) => !orb.collected)) {
     ctx.strokeStyle = 'rgba(0, 221, 255, 0.25)';
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 3]);
     ctx.beginPath();
-    ctx.arc(gameState.player.x, gameState.player.y, gameState.player.magnetismRadius, 0, Math.PI * 2);
+    ctx.arc(
+      gameState.player.x,
+      gameState.player.y,
+      gameState.player.magnetismRadius,
+      0,
+      Math.PI * 2
+    );
     ctx.stroke();
     ctx.setLineDash([]);
   }
-  
+
   // Target indicator
-  if (gameState.world.currentTarget && !gameState.world.currentTarget.destroyed) {
+  if (
+    gameState.world.currentTarget &&
+    !gameState.world.currentTarget.destroyed
+  ) {
     const target = gameState.world.currentTarget;
     ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)';
     ctx.lineWidth = 2;
@@ -1691,7 +1844,7 @@ function renderGame() {
     ctx.arc(target.x, target.y, target.radius + 6, 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
-    
+
     // Target line
     ctx.strokeStyle = 'rgba(255, 255, 0, 0.3)';
     ctx.lineWidth = 1;
@@ -1702,7 +1855,9 @@ function renderGame() {
   }
 
   if (gameState.screenFlash.timer > 0) {
-    const alpha = (gameState.screenFlash.timer / gameState.screenFlash.duration) * gameState.screenFlash.intensity;
+    const alpha =
+      (gameState.screenFlash.timer / gameState.screenFlash.duration) *
+      gameState.screenFlash.intensity;
     ctx.fillStyle = gameState.screenFlash.color;
     ctx.globalAlpha = alpha;
     ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
@@ -1715,49 +1870,60 @@ function renderGame() {
 function updateUI() {
   try {
     const elements = [
-      { id: 'health-display', value: `${Math.max(0, Math.floor(gameState.player.health))}/${gameState.player.maxHealth}` },
+      {
+        id: 'health-display',
+        value: `${Math.max(0, Math.floor(gameState.player.health))}/${gameState.player.maxHealth}`,
+      },
       { id: 'level-display', value: `Level ${gameState.player.level}` },
-      { id: 'kills-display', value: `${gameState.stats.totalKills} asteroides` },
-      { id: 'time-display', value: `${Math.floor(gameState.stats.time)}s` }
+      {
+        id: 'kills-display',
+        value: `${gameState.stats.totalKills} asteroides`,
+      },
+      { id: 'time-display', value: `${Math.floor(gameState.stats.time)}s` },
     ];
-    
+
     elements.forEach(({ id, value }) => {
       const element = document.getElementById(id);
       if (element) element.textContent = value;
     });
-    
+
     // XP Bar
     const xpPercent = (gameState.player.xp / gameState.player.xpToNext) * 100;
     const xpProgress = document.getElementById('xp-progress');
     const xpText = document.getElementById('xp-text');
-    
+
     if (xpProgress) xpProgress.style.width = xpPercent + '%';
-    if (xpText) xpText.textContent = `XP: ${gameState.player.xp} / ${gameState.player.xpToNext}`;
-    
+    if (xpText)
+      xpText.textContent = `XP: ${gameState.player.xp} / ${gameState.player.xpToNext}`;
+
     // Wave info
     const waveTitle = document.getElementById('wave-title');
     const waveTimerDisplay = document.getElementById('wave-timer-display');
     const waveProgressBar = document.getElementById('wave-progress-bar');
     const waveEnemies = document.getElementById('wave-enemies');
     const waveCountdown = document.getElementById('wave-countdown');
-    
+
     if (waveTitle) waveTitle.textContent = `Setor ${gameState.wave.current}`;
-    
+
     if (gameState.wave.isActive) {
       // CORREÇÃO BUG 3: Mostrar timer regressivo
       const timeLeft = Math.max(0, Math.ceil(gameState.wave.timeRemaining));
       if (waveTimerDisplay) waveTimerDisplay.textContent = `${timeLeft}s`;
-      
-      const progress = Math.min((gameState.wave.asteroidsKilled / gameState.wave.totalAsteroids) * 100, 100);
-      
+
+      const progress = Math.min(
+        (gameState.wave.asteroidsKilled / gameState.wave.totalAsteroids) * 100,
+        100
+      );
+
       if (waveProgressBar) waveProgressBar.style.width = progress + '%';
-      if (waveEnemies) waveEnemies.textContent = `${gameState.wave.asteroidsKilled} asteroides eliminados`;
+      if (waveEnemies)
+        waveEnemies.textContent = `${gameState.wave.asteroidsKilled} asteroides eliminados`;
       if (waveCountdown) waveCountdown.classList.add('hidden');
     } else {
       if (waveTimerDisplay) waveTimerDisplay.textContent = '0s';
       if (waveProgressBar) waveProgressBar.style.width = '100%';
       if (waveEnemies) waveEnemies.textContent = 'Setor Limpo!';
-      
+
       const countdown = Math.ceil(gameState.wave.breakTimer);
       const countdownTimer = document.getElementById('countdown-timer');
       if (countdownTimer) countdownTimer.textContent = countdown;

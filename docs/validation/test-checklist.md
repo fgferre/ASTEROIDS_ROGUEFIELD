@@ -1,34 +1,33 @@
 Checklist de Testes do Jogo
 
 Funcionalidades Básicas
- Jogo carrega sem erros no console
+Jogo carrega sem erros no console
 
- Player move com WASD
+Player move com WASD
 
- Player rotaciona com A/D
+Player rotaciona com A/D
 
- Tiro automático funciona
+Tiro automático funciona
 
- Asteroides aparecem na tela
+Asteroides aparecem na tela
 
- Colisões funcionam (bullets vs asteroids)
+Colisões funcionam (bullets vs asteroids)
 
- XP orbs aparecem quando asteroide morre
+XP orbs aparecem quando asteroide morre
 
- Level up funciona
+Level up funciona
 
- Upgrades funcionam
+Upgrades funcionam
 
- Audio funciona
+Audio funciona
 
- Ondas progridem corretamente
+Ondas progridem corretamente
 
- Game over funciona
+Game over funciona
 
 Performance
- 60 FPS estável
+60 FPS estável
 
- Sem memory leaks
+Sem memory leaks
 
- Partículas não acumulam infinitamente
-
+Partículas não acumulam infinitamente
