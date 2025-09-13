@@ -2,7 +2,8 @@
 import * as CONSTANTS from '/core/GameConstants.js';
 
 // Imports dos módulos
-import InputSystem from '/modules/InputSystem.js';
+import InputSystem from './modules/InputSystem.js';
+import PlayerSystem from './modules/PlayerSystem.js';
 
 // Destructuring das constantes mais usadas para compatibilidade
 const {
@@ -564,6 +565,8 @@ function init() {
 
     // Inicializar sistemas modulares
     const inputSystem = new InputSystem();
+    // Inicializar PlayerSystem
+    const playerSystem = new PlayerSystem();
     gameState.initialized = true;
 
     requestAnimationFrame(gameLoop);
@@ -1002,6 +1005,19 @@ function updateGame(deltaTime) {
     }
   }
 
+  // Atualizar sistemas modulares
+  const player = gameServices.get('player');
+  if (player) {
+      player.update(deltaTime);
+  
+      // SINCRONIZAR com gameState antigo (temporário)
+      gameState.player.x = player.position.x;
+      gameState.player.y = player.position.y;
+      gameState.player.vx = player.velocity.vx;
+      gameState.player.vy = player.velocity.vy;
+      gameState.player.angle = player.angle;
+  }
+
   gameState.stats.time = (Date.now() - gameState.stats.startTime) / 1000;
   // Atualizar i-frames do jogador
   if (gameState.player.invulnerableTimer > 0) {
@@ -1010,7 +1026,7 @@ function updateGame(deltaTime) {
       gameState.player.invulnerableTimer = 0;
   }
 
-  updatePlayerMovement(deltaTime);
+  // updatePlayerMovement(deltaTime); // REMOVIDO - Agora controlado pelo PlayerSystem
   updateTargeting(deltaTime);
   handleShooting(deltaTime);
   updateBullets(deltaTime);
