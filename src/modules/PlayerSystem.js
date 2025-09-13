@@ -98,17 +98,22 @@ class PlayerSystem {
         }
 
         // === MOVIMENTO ANGULAR ===
-        const inputTorque = (thrSideR ? -1 : 0) + (thrSideL ? 1 : 0);
-        const ANGULAR_THRUST = this.rotationSpeed * 5.0; // rad/s^2
-        const angAccel = inputTorque * ANGULAR_THRUST - this.angularDamping * this.angularVelocity;
-
-        this.angularVelocity += angAccel * deltaTime;
-
-        // Limitar velocidade angular
+        // Restaurando a lógica de aceleração e amortecimento angular do app.js original
+        const rotationAccel = this.rotationSpeed * deltaTime;
+        let angularAccel = 0;
+        if (thrSideR) angularAccel -= rotationAccel; // 'a' ou 'arrowleft'
+        if (thrSideL) angularAccel += rotationAccel; // 'd' ou 'arrowright'
+        
+        this.angularVelocity += angularAccel;
+        
+        // Amortecimento angular
+        const angularDamp = Math.exp(-this.angularDamping * deltaTime);
+        this.angularVelocity *= angularDamp;
+        
+        // Limitar velocidade angular (clamp)
         const maxAng = this.rotationSpeed;
         if (this.angularVelocity > maxAng) this.angularVelocity = maxAng;
         if (this.angularVelocity < -maxAng) this.angularVelocity = -maxAng;
-
         this.angle = this.wrapAngle(this.angle + this.angularVelocity * deltaTime);
 
         // === EFEITOS DE THRUSTER ===
@@ -231,11 +236,9 @@ class PlayerSystem {
     }
 }
 
+export default PlayerSystem;
+
 // Export
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = PlayerSystem;
-}
-
-if (typeof window !== 'undefined') {
-    window.PlayerSystem = PlayerSystem;
 }
