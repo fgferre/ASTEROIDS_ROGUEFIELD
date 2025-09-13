@@ -39,8 +39,9 @@ class PlayerSystem {
         this.updatePosition(deltaTime);
 
         // Emitir evento para outros sistemas
+        // Usamos o método 'emitSilently' para não poluir o console a cada frame.
         if (typeof gameEvents !== 'undefined') {
-            gameEvents.emit('player-moved', {
+            gameEvents.emitSilently('player-moved', {
                 position: { ...this.position },
                 velocity: { ...this.velocity },
                 angle: this.angle

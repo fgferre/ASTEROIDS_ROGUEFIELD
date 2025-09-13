@@ -1,0 +1,98 @@
+*   0b79dcc Merge branch 'main' of https://github.com/fgferre/ASTEROIDS_ROGUEFIELD
+|\  
+| * 9e0f06a This commit makes the PlayerSystem the single source of truth for ship movement, successfully replacing the legacy logic within app.js.
+* | 83c3419 This commit makes the PlayerSystem the single source of truth for ship movement, successfully replacing the legacy logic within app.js.
+|/  
+* e2e6f7d feat(player): Create PlayerSystem module (Prompt 1.3)
+* 4e678ba feat(game): Integrate InputSystem into app.js (Prompt 1.2)
+* 5c313e6 alterações nos settings do vscode
+*   ce4f038 Merge branch 'codex/verify-necessity-of-exported-assets-folder' of https://github.com/fgferre/ASTEROIDS_ROGUEFIELD into codex/verify-necessity-of-exported-assets-folder
+|\  
+| * b19dc16 Entendendo o workflow do Git Actions, deletei o static que nao servia para nada.
+| * c38e7e3 chore(dev): Configura Prettier e formata todo o projeto Este commit introduz o Prettier, um formatador de código opinativo, para garantir um estilo de código consistente em todo o repositório.
+* | bb1ac35 chore(dev): Configura Prettier e formata todo o projeto Este commit introduz o Prettier, um formatador de código opinativo, para garantir um estilo de código consistente em todo o repositório.
+|/  
+* 20e0a1a feat(input): Create InputSystem module
+* 2c3a4e6 Introducao do Vite para Debug
+* 39d2ec1 feat(input): Create InputSystem module (Prompt 1.1)
+* 9dacdb4 Introduz o carregamento dos módulos core: EventBus.js e ServiceLocator.js no index.html para garantir que estejam disponíveis globalmente antes de outros scripts serem executados.
+* aa696ff A Etapa 0.4 do seu guia de refatoração está agora completa e correta.
+* e6c0b66 New file: "docs/prompts/Guia Completo de Refatoracao Modular .md"
+* 6a09a3f Ajuste no launch.json para permitir debug
+* 1dd72a2 build: add grunt copy build and remove exported-assets
+* 7b47791 Changes before Firebase Studio auto-run
+* e18d6c1 refactor: inline game constants in app.js and update GameConstants.js for CommonJS export
+*   8fcd3c3 Merge branch 'main' of https://github.com/fgferre/ASTEROIDS_ROGUEFIELD
+|\  
+| *   be41977 Merge pull request #8 from fgferre/codex/refactor-game-constants-to-separate-file
+| |\  
+| | * 3286570 refactor: centralize game constants
+| |/  
+* / c7add7e Merge pull request #8 from fgferre/codex/refactor-game-constants-to-separate-file
+|/  
+*   ed01446 Merge pull request #7 from fgferre/codex/create-servicelocator-for-service-management
+|\  
+| * d4bc732 feat: add service locator
+|/  
+* e56c77d Arquivo Agents.md introduzido.
+* d77327a corrigimos akguma alteração inesperada que ocorreu no arquivo app.js (tivemso que reescrever partes antigas do código que foram apagadas ou substituídas de forma inesperada.
+* 70b73ae pequena edição de espaço vazio no arquivo
+* 16a33c1 Pequena alteração no type edge
+* b19a1c0 Atualiza o arquivo launch.json para corrigir as configurações de inicialização do Microsoft Edge.
+*   7053649 Merge pull request #6 from fgferre/codex/create-eventbus-system
+|\  
+| * 7e67409 feat: add global EventBus
+|/  
+*   5c63cac Merge pull request #5 from fgferre/codex/create-backup-and-project-structure
+|\  
+| *   c034c09 Merge branch 'main' into codex/create-backup-and-project-structure
+| |\  
+| |/  
+|/|   
+* | 2e0bb0a Update package.json
+* | b4a2aa5 Update package.json
+* | e6ef68f Create Gruntfile.js
+| * c82209c fix: Gruntfile.js igual ao mainfix: Gruntfile.js igual ao mainUpdate Gruntfile.js
+| * c465d37 fix: corrigir scripts e devDependencies no package.jsonfix: corrigir scripts e devDependencies no package.jsonUpdate package.json
+| * a03ff6a Create Gruntfile.js
+| * 0fdc347 chore: backup original app and scaffold project
+|/  
+* eaa6158 Refine ship movement and rotation controls (merge conflict resolved)
+*   2d7e1e7 Merge branch 'main' of https://github.com/fgferre/ASTEROIDS_ROGUEFIELD
+|\  
+| *   8ffdde8 Merge pull request #4 from fgferre/codex/update-player-movement-and-rotation-controls
+| |\  
+| | * 9e32282 Refine ship movement and rotation controls
+| |/  
+* / a1b47c8 Revert "Merge pull request #3 from fgferre/codex/update-player-movement-and-thruster-effects"
+|/  
+*   1038a51 Merge pull request #3 from fgferre/codex/update-player-movement-and-thruster-effects
+|\  
+| * 968f996 Update package.json
+| *   c2da688 Merge branch 'main' into codex/update-player-movement-and-thruster-effects
+| |\  
+| |/  
+|/|   
+* | aa27184 Create package.json
+* |   054659d Merge pull request #2 from fgferre/codex/add-playbigexplosion-method-in-spaceaudiosystem
+|\ \  
+| * | 554d396 Add big explosion sound for large asteroids
+* | |   e9c6ba6 Merge pull request #1 from fgferre/codex/handle-asteroid-sizes-and-level-up-effects
+|\ \ \  
+| |/ /  
+|/| |   
+| * | 6bc473e Add dynamic effects for asteroid hits and level-up
+|/ /  
+| * 70d651a test: add npm script for syntax check
+|/  
+* d873668 Update GitHub Actions workflow for improved deployment process
+* ebeeb8c Add GitHub Actions workflows for deploying to GitHub Pages
+* af69203 Refactor player physics and collision handling for improved gameplay dynamics
+* f35a877 Fix launch.json to use 'pwa-msedge' type for Microsoft Edge configurations
+* 7b52d4c Refactor asteroid size constants to use lowercase keys for consistency
+* 8690af8 Add backdrop filter effects to level up and game over screens
+* 745fe11 Update launch configurations for Chrome and Microsoft Edge
+* 9bc854d Add launch configuration for Chrome and Microsoft Edge
+* 752d455 Create npm-grunt.yml
+* aefe499 Add files via upload
+* 533038a Initial commit

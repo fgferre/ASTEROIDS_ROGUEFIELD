@@ -54,6 +54,26 @@ class EventBus {
     }
   }
 
+    // Disparar evento sem logar no console (para eventos de alta frequência)
+    emitSilently(eventName, data = null) {
+        if (this.events.has(eventName)) {
+            const listeners = this.events.get(eventName);
+            listeners.forEach(({ callback, context }) => {
+                try {
+                    if (context) {
+                        callback.call(context, data);
+                    } else {
+                        callback(data);
+                    }
+                } catch (error) {
+                    console.error(
+                        `[EventBus] Error in listener for ${eventName}:`,
+                        error
+                    );
+                }
+            });
+        }
+    }
   // Remover listener específico
   off(eventName, callback) {
     if (this.events.has(eventName)) {

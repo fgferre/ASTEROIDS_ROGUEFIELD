@@ -4,6 +4,7 @@ import * as CONSTANTS from '/core/GameConstants.js';
 // Imports dos módulos
 import InputSystem from './modules/InputSystem.js';
 import PlayerSystem from './modules/PlayerSystem.js';
+import CombatSystem from './modules/CombatSystem.js';
 
 // Destructuring das constantes mais usadas para compatibilidade
 const {
@@ -567,6 +568,8 @@ function init() {
     const inputSystem = new InputSystem();
     // Inicializar PlayerSystem
     const playerSystem = new PlayerSystem();
+    // Inicializar CombatSystem
+    const combatSystem = new CombatSystem();
     gameState.initialized = true;
 
     requestAnimationFrame(gameLoop);
@@ -995,16 +998,6 @@ function gameLoop(currentTime) {
 }
 
 function updateGame(deltaTime) {
-  // Teste InputSystem (temporário)
-  const input = gameServices.get('input');
-  if (input) {
-    const movement = input.getMovementInput();
-    // Log apenas se houver input (evitar spam)
-    if (movement.up || movement.down || movement.left || movement.right) {
-      console.log('[DEBUG] InputSystem movement:', movement);
-    }
-  }
-
   // Atualizar sistemas modulares
   const player = gameServices.get('player');
   if (player) {
@@ -1016,6 +1009,15 @@ function updateGame(deltaTime) {
       gameState.player.vx = player.velocity.vx;
       gameState.player.vy = player.velocity.vy;
       gameState.player.angle = player.angle;
+  }
+  // Atualizar CombatSystem
+  const combat = gameServices.get('combat');
+  if (combat) {
+      combat.update(deltaTime);
+  
+      // SINCRONIZAR bullets com gameState antigo (temporário)
+      gameState.world.bullets = combat.getBullets();
+      gameState.world.currentTarget = combat.getCurrentTarget();
   }
 
   gameState.stats.time = (Date.now() - gameState.stats.startTime) / 1000;
@@ -1391,6 +1393,12 @@ function applyUpgrade(upgradeId) {
 
 // Detecção de colisão melhorada
 function checkCollisions() {
+  // Usar collision detection do CombatSystem
+  const combat = gameServices.get('combat');
+  if (combat) {
+      combat.checkBulletCollisions(gameState.world.asteroids);
+  }
+
   // Colisões bala-asteroide
   gameState.world.bullets.forEach((bullet) => {
     if (bullet.hit) return;
