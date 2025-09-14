@@ -7,6 +7,7 @@ import PlayerSystem from './modules/PlayerSystem.js';
 import CombatSystem from './modules/CombatSystem.js';
 import { EnemySystem } from './modules/EnemySystem.js';
 import ProgressionSystem from './modules/ProgressionSystem.js';
+import UISystem from './modules/UISystem.js';
 
 // Destructuring das constantes mais usadas para compatibilidade
 const {
@@ -34,7 +35,6 @@ const {
   WAVE_DURATION,
   WAVE_BREAK_TIME,
   MAX_ASTEROIDS_ON_SCREEN,
-  SPACE_UPGRADES,
 } = CONSTANTS;
 
 // Estado global do jogo - Estruturado
@@ -576,6 +576,8 @@ function init() {
     const enemySystem = new EnemySystem();
     // Inicializar ProgressionSystem
     const progressionSystem = new ProgressionSystem();
+    // Inicializar UISystem
+    const uiSystem = new UISystem();
 
     // Listener para quando uma bala atinge um inimigo
     if (typeof gameEvents !== 'undefined') {
@@ -612,9 +614,6 @@ function init() {
 
       // Listeners para sistema de progressão
       gameEvents.on('player-leveled-up', (data) => {
-        gameState.screen = 'levelup';
-        showLevelUpScreen();
-
         if (typeof audio !== 'undefined') {
           audio.playLevelUp();
         }
@@ -674,6 +673,10 @@ function init() {
           gameState.player.magnetismRadius
         );
       });
+      // Atualizar state de tela quando UI mudar
+      gameEvents.on('screen-changed', (data) => {
+        gameState.screen = data.screen;
+      });
     }
     gameState.initialized = true;
 
@@ -717,7 +720,6 @@ function setupEventListeners() {
 function startGame() {
   try {
     console.log('Iniciando jogo...');
-    gameState.screen = 'playing';
     gameState.stats.startTime = Date.now();
 
     resetPlayer();
@@ -727,7 +729,8 @@ function startGame() {
     // CORREÇÃO BUG 1: Spawn garantido imediato de asteroides
     spawnInitialAsteroids();
 
-    showGameUI();
+    const ui = gameServices.get('ui');
+    if (ui) ui.showGameUI();
     audio.init();
 
     console.log('Jogo iniciado com sucesso!');
@@ -817,39 +820,7 @@ function resetWave() {
   };
 }
 
-function showScreen(screenName) {
-  try {
-    console.log('Mudando para tela:', screenName);
-
-    // Esconder todas as telas
-    document.querySelectorAll('.screen').forEach((screen) => {
-      screen.classList.add('hidden');
-    });
-
-    const gameUI = document.getElementById('game-ui');
-    if (gameUI) gameUI.classList.add('hidden');
-
-    // Mostrar tela específica
-    if (screenName === 'playing' || screenName === 'game') {
-      if (gameUI) {
-        gameUI.classList.remove('hidden');
-        console.log('Game UI mostrada');
-      }
-    } else {
-      const screen = document.getElementById(`${screenName}-screen`);
-      if (screen) {
-        screen.classList.remove('hidden');
-        console.log(`Tela ${screenName} mostrada`);
-      }
-    }
-  } catch (error) {
-    console.error('Erro ao mostrar tela:', error);
-  }
-}
-
-function showGameUI() {
-  showScreen('playing');
-}
+// UI management moved to UISystem
 
 function createThrusterEffect(direction = 'bottom') {
   const angle = gameState.player.angle;
@@ -1002,7 +973,10 @@ function updateGame(deltaTime) {
   updateScreenFlash(deltaTime);
 
   checkCollisions();
-  updateUI();
+  const ui = gameServices.get('ui');
+  if (ui) {
+    ui.updateHUD(gameState);
+  }
 }
 
 function updateBullets(deltaTime) {
@@ -1211,66 +1185,9 @@ function collectXP(amount) {
   }
 }
 
-function levelUp() {
-  gameState.player.level++;
-  gameState.player.xp = 0;
-  gameState.player.xpToNext = Math.floor(gameState.player.xpToNext * 1.2);
+// Legacy levelUp function substituted by ProgressionSystem
 
-  gameState.screen = 'levelup';
-  showLevelUpScreen();
-
-  audio.playLevelUp();
-  addScreenShake(6, 0.4, 'celebration');
-  addFreezeFrame(0.2, 0.4);
-  createLevelUpExplosion();
-  addScreenFlash('#FFD700', 0.15, 0.2);
-}
-
-function showLevelUpScreen() {
-  showScreen('levelup');
-
-  const levelText = document.getElementById('levelup-text');
-  if (levelText) {
-    levelText.textContent = `Level ${gameState.player.level} - Escolha sua tecnologia:`;
-  }
-
-  const shuffled = [...SPACE_UPGRADES].sort(() => Math.random() - 0.5);
-  const selected = shuffled.slice(0, 3);
-
-  const container = document.getElementById('upgrades-container');
-  if (container) {
-    container.innerHTML = '';
-
-    selected.forEach((upgrade) => {
-      const button = document.createElement('button');
-      button.className = 'upgrade-option';
-      button.onclick = () => selectUpgrade(upgrade.id);
-
-      button.innerHTML = `
-        <div class="upgrade-icon" style="color: ${upgrade.color};">
-          ${upgrade.icon}
-        </div>
-        <div class="upgrade-info">
-          <h3>${upgrade.name}</h3>
-          <p>${upgrade.description}</p>
-        </div>
-      `;
-
-      container.appendChild(button);
-    });
-  }
-}
-
-function selectUpgrade(upgradeId) {
-  const progression = gameServices.get('progression');
-  if (progression) {
-    const success = progression.applyUpgrade(upgradeId);
-    if (success) {
-      gameState.screen = 'playing';
-      showGameUI();
-    }
-  }
-}
+// Level up UI handled by UISystem
 
 // Detecção de colisão melhorada
 function checkCollisions() {
@@ -1485,25 +1402,13 @@ function updateScreenFlash(deltaTime) {
 }
 
 function gameOver() {
-  gameState.screen = 'gameover';
-  showGameOverScreen();
+  const ui = gameServices.get('ui');
+  if (ui) {
+    ui.showGameOverScreen(gameState);
+  }
 }
 
-function showGameOverScreen() {
-  showScreen('gameover');
-
-  const elements = [
-    { id: 'final-level', value: gameState.player.level },
-    { id: 'final-kills', value: gameState.stats.totalKills },
-    { id: 'final-waves', value: gameState.wave.completedWaves },
-    { id: 'final-time', value: Math.floor(gameState.stats.time) + 's' },
-  ];
-
-  elements.forEach(({ id, value }) => {
-    const element = document.getElementById(id);
-    if (element) element.textContent = value;
-  });
-}
+// Game over UI handled por UISystem
 
 function renderGame() {
   if (!gameState.ctx) return;
@@ -1734,78 +1639,14 @@ function renderGame() {
   ctx.restore();
 }
 
-function updateUI() {
-  try {
-    const elements = [
-      {
-        id: 'health-display',
-        value: `${Math.max(0, Math.floor(gameState.player.health))}/${gameState.player.maxHealth}`,
-      },
-      { id: 'level-display', value: `Level ${gameState.player.level}` },
-      {
-        id: 'kills-display',
-        value: `${gameState.stats.totalKills} asteroides`,
-      },
-      { id: 'time-display', value: `${Math.floor(gameState.stats.time)}s` },
-    ];
-
-    elements.forEach(({ id, value }) => {
-      const element = document.getElementById(id);
-      if (element) element.textContent = value;
-    });
-
-    // XP Bar
-    const xpPercent = (gameState.player.xp / gameState.player.xpToNext) * 100;
-    const xpProgress = document.getElementById('xp-progress');
-    const xpText = document.getElementById('xp-text');
-
-    if (xpProgress) xpProgress.style.width = xpPercent + '%';
-    if (xpText)
-      xpText.textContent = `XP: ${gameState.player.xp} / ${gameState.player.xpToNext}`;
-
-    // Wave info
-    const waveTitle = document.getElementById('wave-title');
-    const waveTimerDisplay = document.getElementById('wave-timer-display');
-    const waveProgressBar = document.getElementById('wave-progress-bar');
-    const waveEnemies = document.getElementById('wave-enemies');
-    const waveCountdown = document.getElementById('wave-countdown');
-
-    if (waveTitle) waveTitle.textContent = `Setor ${gameState.wave.current}`;
-
-    if (gameState.wave.isActive) {
-      // CORREÇÃO BUG 3: Mostrar timer regressivo
-      const timeLeft = Math.max(0, Math.ceil(gameState.wave.timeRemaining));
-      if (waveTimerDisplay) waveTimerDisplay.textContent = `${timeLeft}s`;
-
-      const progress = Math.min(
-        (gameState.wave.asteroidsKilled / gameState.wave.totalAsteroids) * 100,
-        100
-      );
-
-      if (waveProgressBar) waveProgressBar.style.width = progress + '%';
-      if (waveEnemies)
-        waveEnemies.textContent = `${gameState.wave.asteroidsKilled} asteroides eliminados`;
-      if (waveCountdown) waveCountdown.classList.add('hidden');
-    } else {
-      if (waveTimerDisplay) waveTimerDisplay.textContent = '0s';
-      if (waveProgressBar) waveProgressBar.style.width = '100%';
-      if (waveEnemies) waveEnemies.textContent = 'Setor Limpo!';
-
-      const countdown = Math.ceil(gameState.wave.breakTimer);
-      const countdownTimer = document.getElementById('countdown-timer');
-      if (countdownTimer) countdownTimer.textContent = countdown;
-      if (waveCountdown) waveCountdown.classList.remove('hidden');
-    }
-  } catch (error) {
-    console.error('Erro ao atualizar UI:', error);
-  }
-}
+// HUD update handled by UISystem
 
 // Inicialização
 document.addEventListener('DOMContentLoaded', () => {
   try {
     init();
-    showScreen('menu');
+    const ui = gameServices.get('ui');
+    if (ui) ui.showScreen('menu');
     console.log('Aplicação inicializada com sucesso!');
   } catch (error) {
     console.error('Erro na inicialização:', error);
