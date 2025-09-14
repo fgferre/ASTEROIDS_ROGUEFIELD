@@ -5,6 +5,7 @@ import * as CONSTANTS from '/core/GameConstants.js';
 import InputSystem from './modules/InputSystem.js';
 import PlayerSystem from './modules/PlayerSystem.js';
 import CombatSystem from './modules/CombatSystem.js';
+import { EnemySystem } from './modules/EnemySystem.js';
 
 // Destructuring das constantes mais usadas para compatibilidade
 const {
@@ -570,6 +571,8 @@ function init() {
     const playerSystem = new PlayerSystem();
     // Inicializar CombatSystem
     const combatSystem = new CombatSystem();
+    // Inicializar EnemySystem
+    const enemySystem = new EnemySystem();
 
     // Listener para quando uma bala atinge um inimigo
     if (typeof gameEvents !== 'undefined') {
@@ -577,25 +580,35 @@ function init() {
         if (data.killed) {
           const asteroid = data.enemy;
           if (asteroid.destroyed) return; // Prevenir processamento duplo
-
-          asteroid.destroyed = true;
-          gameState.stats.totalKills++;
-          gameState.wave.asteroidsKilled++;
-
-          createAsteroidExplosion(asteroid);
-          audio.playAsteroidBreak(asteroid.size);
-          if (asteroid.size === 'large') {
+ 
+          const enemies = gameServices.get('enemies');
+          if (enemies) {
+            // O EnemySystem agora gerencia a destruição e fragmentação
+            enemies.destroyAsteroid(data.enemy);
+          }
+        }
+      });
+ 
+      // NOVO listener para quando inimigos morrem (lógica desacoplada)
+      gameEvents.on('enemy-destroyed', (data) => {
+        // Criar XP orb
+        const xpValue = { large: 20, medium: 12, small: 8 }[data.size];
+        createXPOrb(data.position.x, data.position.y, xpValue + gameState.wave.current * 2);
+ 
+        // Incrementar kills
+        gameState.wave.asteroidsKilled++;
+        gameState.stats.totalKills++;
+ 
+        // Tocar som de destruição
+        if (typeof audio !== 'undefined') {
+          audio.playAsteroidBreak(data.size);
+          if (data.size === 'large') {
             audio.playBigExplosion();
           }
-
-          // Fragmentação
-          const fragments = asteroid.fragment();
-          gameState.world.asteroids.push(...fragments);
-
-          // Recompensa de XP
-          const xpValue = { large: 20, medium: 12, small: 8 }[asteroid.size];
-          createXPOrb(asteroid.x, asteroid.y, xpValue + gameState.wave.current * 2);
         }
+ 
+        // Efeitos visuais (serão movidos para EffectsSystem depois)
+        createAsteroidExplosion(data.enemy);
       });
     }
     gameState.initialized = true;
@@ -660,10 +673,10 @@ function startGame() {
 }
 
 function spawnInitialAsteroids() {
-  // CORREÇÃO BUG 1: Spawn imediato de 4 asteroides no início da onda
-  for (let i = 0; i < 4; i++) {
-    spawnAsteroid();
-    gameState.wave.asteroidsSpawned++;
+  const enemies = gameServices.get('enemies');
+  if (enemies) {
+    enemies.spawnInitialAsteroids(4);
+    gameState.wave.asteroidsSpawned += 4;
   }
   gameState.wave.initialSpawnDone = true;
 }
@@ -704,6 +717,12 @@ function resetWorld() {
     lastShotTime: 0,
     shootCooldown: 0.3,
   };
+
+  // Reset EnemySystem
+  const enemies = gameServices.get('enemies');
+  if (enemies) {
+    enemies.reset();
+  }
 }
 
 function resetWave() {
@@ -1042,14 +1061,22 @@ function updateGame(deltaTime) {
   const combat = gameServices.get('combat');
   if (combat) {
       const playerStats = {
-          damage: gameState.player.damage,
-          multishot: gameState.player.multishot
+          damage: gameState.player.damage || 25,
+          multishot: gameState.player.multishot || 1
       };
-      combat.update(deltaTime, gameState.world.asteroids, playerStats);
+      combat.update(deltaTime, playerStats);
   
       // SINCRONIZAR bullets com gameState antigo (temporário)
       gameState.world.bullets = combat.getBullets();
       gameState.world.currentTarget = combat.getCurrentTarget();
+  }
+  // Atualizar EnemySystem
+  const enemies = gameServices.get('enemies');
+  if (enemies) {
+    enemies.update(deltaTime, gameState.wave);
+
+    // SINCRONIZAR asteroids com gameState antigo (temporário)
+    gameState.world.asteroids = enemies.getAllAsteroids();
   }
 
   gameState.stats.time = (Date.now() - gameState.stats.startTime) / 1000;
@@ -1061,9 +1088,9 @@ function updateGame(deltaTime) {
   }
 
   // updatePlayerMovement(deltaTime); // REMOVIDO - Agora controlado pelo PlayerSystem
-  updateTargeting(deltaTime);
-  handleShooting(deltaTime);
-  updateBullets(deltaTime);
+  // updateTargeting(deltaTime); // Movido para CombatSystem
+  // handleShooting(deltaTime); // Movido para CombatSystem
+  // updateBullets(deltaTime); // Movido para CombatSystem
   updateAsteroids(deltaTime);
   updateXPOrbs(deltaTime);
   updateParticles(deltaTime);
@@ -1240,38 +1267,16 @@ function updateWaveSystem(deltaTime) {
 }
 
 function spawnAsteroid() {
-  const side = Math.floor(Math.random() * 4);
-  let x, y;
-  const margin = 80;
-
-  switch (side) {
-    case 0: // Top
-      x = Math.random() * GAME_WIDTH;
-      y = -margin;
-      break;
-    case 1: // Right
-      x = GAME_WIDTH + margin;
-      y = Math.random() * GAME_HEIGHT;
-      break;
-    case 2: // Bottom
-      x = Math.random() * GAME_WIDTH;
-      y = GAME_HEIGHT + margin;
-      break;
-    case 3: // Left
-      x = -margin;
-      y = Math.random() * GAME_HEIGHT;
-      break;
+  const enemies = gameServices.get('enemies');
+  if (enemies) {
+    const asteroid = enemies.spawnAsteroid();
+    // Atualizar contador de spawn da wave
+    if (gameState.wave.isActive) {
+      gameState.wave.asteroidsSpawned++;
+    }
+    return asteroid;
   }
-
-  // Distribuição balanceada de tamanhos
-  let size;
-  const rand = Math.random();
-  if (rand < 0.5) size = 'large';
-  else if (rand < 0.8) size = 'medium';
-  else size = 'small';
-
-  const asteroid = new Asteroid(x, y, size);
-  gameState.world.asteroids.push(asteroid);
+  return null;
 }
 
 function completeWave() {
@@ -1435,12 +1440,12 @@ function checkCollisions() {
   // O código legado abaixo agora é redundante, mas o manteremos por enquanto
   // para limpar os arrays até que o EnemySystem assuma essa responsabilidade.
 
-  gameState.world.bullets = gameState.world.bullets.filter(
-    (bullet) => !bullet.hit
-  );
-  gameState.world.asteroids = gameState.world.asteroids.filter(
-    (asteroid) => !asteroid.destroyed
-  );
+  // gameState.world.bullets = gameState.world.bullets.filter(
+  //   (bullet) => !bullet.hit
+  // );
+  // gameState.world.asteroids = gameState.world.asteroids.filter(
+  //   (asteroid) => !asteroid.destroyed
+  // );
 
   // Colisões nave-asteroide
   gameState.world.asteroids.forEach((asteroid) => {

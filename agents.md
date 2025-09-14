@@ -11,6 +11,7 @@
 4. **Testabilidade como norte**: cada módulo com pontos de prova, estados observáveis e _fixtures_ simples.
 5. **Dados fora do código**: estatísticas/balanceamento em _data assets_ (config), sempre que viável.
 6. **Validação contínua**: cada entrega acompanha checklist objetivo de aceitação.
+7. **Módulos ES6 como padrão**: Utilizar `import`/`export` para consistência e compatibilidade com o ecossistema de build moderno (Vite). Evitar `require`/`module.exports` e exports globais (`window`).
 
 ## 2) Mapa de módulos (boundaries)
 
@@ -114,6 +115,7 @@
 
 - **Arquitetura**: **modular monolith** com _eventing_; considerar ECS apenas onde há muitas entidades homogêneas; DI/Service-Locator para dependências.
 - **Dados**: configurações de armas/itens/curvas fora do código.
+- **Sistema de Módulos**: Utilizar exclusivamente Módulos ES6 (`import`/`export`). Não misturar com CommonJS (`require`/`module.exports`) ou `window` globals para garantir a análise estática e o tree-shaking pelo Vite.
 - **Performance**: _pooling_ para projéteis/FX; _culling_ espacial simples; telemetria leve para gargalos.
 - **Evolução**: reavaliar arquitetura quando _pain points_ surgirem (ex.: dificuldade de teste, cascata de bugs, queda de _fps_ sob carga).
 

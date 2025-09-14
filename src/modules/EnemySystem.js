@@ -159,9 +159,9 @@ class EnemySystem {
     }
 
     // === UPDATE PRINCIPAL ===
-    update(deltaTime) {
+    update(deltaTime, waveState) {
         this.updateAsteroids(deltaTime);
-        this.handleSpawning(deltaTime);
+        this.handleSpawning(deltaTime, waveState);
         this.cleanupDestroyed();
     }
 
@@ -236,21 +236,21 @@ class EnemySystem {
     }
 
     // === SISTEMA DE SPAWNING ===
-    handleSpawning(deltaTime) {
+    handleSpawning(deltaTime, waveState) {
         // Controle de spawn baseado no WaveSystem
         // Por enquanto, spawn simples para manter jogo funcionando
 
         this.spawnTimer -= deltaTime;
 
-        if (this.shouldSpawn() && this.spawnTimer <= 0) {
+        if (this.shouldSpawn(waveState) && this.spawnTimer <= 0) {
             this.spawnAsteroid();
             this.spawnTimer = this.spawnDelay * (0.5 + Math.random() * 0.5);
         }
     }
 
-    shouldSpawn() {
+    shouldSpawn(waveState) {
         // Verificar se deve spawnar (baseado em wave system)
-        const currentWave = gameState.wave; // Temporário
+        const currentWave = waveState;
 
         return currentWave.isActive &&
                currentWave.asteroidsSpawned < currentWave.totalAsteroids &&
@@ -373,12 +373,4 @@ class EnemySystem {
     }
 }
 
-// Export
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { EnemySystem, Asteroid };
-}
-
-if (typeof window !== 'undefined') {
-    window.EnemySystem = EnemySystem;
-    window.Asteroid = Asteroid;
-}
+export { EnemySystem, Asteroid };

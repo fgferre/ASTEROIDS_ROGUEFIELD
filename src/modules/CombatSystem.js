@@ -26,28 +26,28 @@ class CombatSystem {
     }
 
     // === UPDATE PRINCIPAL ===
-    update(deltaTime, enemies, playerStats) {
-        this.updateTargeting(deltaTime, enemies);
+    update(deltaTime, playerStats) {
+        this.updateTargeting(deltaTime);
         this.handleShooting(deltaTime, playerStats);
         this.updateBullets(deltaTime);
     }
 
     // === SISTEMA DE TARGETING ===
-    updateTargeting(deltaTime, enemies) {
+    updateTargeting(deltaTime) {
         this.targetUpdateTimer -= deltaTime;
 
-        if (this.targetUpdateTimer <= 0) {
-            this.findBestTarget(enemies);
+        if (this.targetUpdateTimer <= 0) {            
+            this.findBestTarget();
             this.targetUpdateTimer = this.targetUpdateInterval;
         }
 
-        // Verificar se target atual ainda é válido
+        // Verificar se target atual ainda é válido        
         if (this.currentTarget && (this.currentTarget.destroyed || !this.isValidTarget(this.currentTarget))) {
             this.currentTarget = null;
         }
     }
 
-    findBestTarget(enemies) {
+    findBestTarget() {
         const player = gameServices.get('player');
         if (!player) return;
 
@@ -55,9 +55,10 @@ class CombatSystem {
         let bestTarget = null;
         let closestDistance = Infinity;
 
-        enemies.forEach(enemy => {
+        const enemies = gameServices.get('enemies');
+        if (!enemies) return;
+        enemies.getAsteroids().forEach(enemy => {
             if (enemy.destroyed) return;
-
             const dx = enemy.x - playerPos.x;
             const dy = enemy.y - playerPos.y;
             const distance = Math.sqrt(dx * dx + dy * dy);
@@ -98,7 +99,6 @@ class CombatSystem {
         const targetPos = this.getPredictedTargetPosition();
 
         if (targetPos) {
-            // Disparar múltiplos projéteis se multishot > 1
             for (let i = 0; i < playerStats.multishot; i++) {
                 let finalTargetPos = targetPos;
 
