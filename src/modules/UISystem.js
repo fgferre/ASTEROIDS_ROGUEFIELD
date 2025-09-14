@@ -178,7 +178,3 @@ class UISystem {
 }
 
 export default UISystem;
-
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = UISystem;
-}
