@@ -1,3 +1,5 @@
+* a0b7fbd feat(combat): Integrate CombatSystem and event-driven logic
+* c357b6f Ação: Criar CombatSystem (Prompt 2.1) FASE 2 do nosso plano de refatoração. Seguindo o guia, consiste em criar o CombatSystem. Este novo módulo será responsável por toda a lógica de combate: encontrar alvos, atirar e gerenciar os projéteis. Estou criando o arquivo src/modules/CombatSystem.js com o código exato especificado no guia.
 *   0b79dcc Merge branch 'main' of https://github.com/fgferre/ASTEROIDS_ROGUEFIELD
 |\  
 | * 9e0f06a This commit makes the PlayerSystem the single source of truth for ship movement, successfully replacing the legacy logic within app.js.
