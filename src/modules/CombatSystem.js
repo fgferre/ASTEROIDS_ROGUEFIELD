@@ -26,18 +26,18 @@ class CombatSystem {
     }
 
     // === UPDATE PRINCIPAL ===
-    update(deltaTime) {
-        this.updateTargeting(deltaTime);
-        this.handleShooting(deltaTime);
+    update(deltaTime, enemies, playerStats) {
+        this.updateTargeting(deltaTime, enemies);
+        this.handleShooting(deltaTime, playerStats);
         this.updateBullets(deltaTime);
     }
 
     // === SISTEMA DE TARGETING ===
-    updateTargeting(deltaTime) {
+    updateTargeting(deltaTime, enemies) {
         this.targetUpdateTimer -= deltaTime;
 
         if (this.targetUpdateTimer <= 0) {
-            this.findBestTarget();
+            this.findBestTarget(enemies);
             this.targetUpdateTimer = this.targetUpdateInterval;
         }
 
@@ -47,17 +47,13 @@ class CombatSystem {
         }
     }
 
-    findBestTarget() {
+    findBestTarget(enemies) {
         const player = gameServices.get('player');
         if (!player) return;
 
         const playerPos = player.getPosition();
         let bestTarget = null;
         let closestDistance = Infinity;
-
-        // Obter lista de asteroides do EnemySystem (quando existir)
-        // Por enquanto, usar gameState temporariamente
-        const enemies = gameState.world.asteroids || [];
 
         enemies.forEach(enemy => {
             if (enemy.destroyed) return;
@@ -90,7 +86,7 @@ class CombatSystem {
     }
 
     // === SISTEMA DE TIRO ===
-    handleShooting(deltaTime) {
+    handleShooting(deltaTime, playerStats) {
         this.lastShotTime += deltaTime;
 
         if (!this.canShoot()) return;
@@ -102,9 +98,6 @@ class CombatSystem {
         const targetPos = this.getPredictedTargetPosition();
 
         if (targetPos) {
-            // Obter configurações do player (damage, multishot, etc.)
-            const playerStats = this.getPlayerCombatStats();
-
             // Disparar múltiplos projéteis se multishot > 1
             for (let i = 0; i < playerStats.multishot; i++) {
                 let finalTargetPos = targetPos;
@@ -144,14 +137,6 @@ class CombatSystem {
         return {
             x: this.currentTarget.x + (this.currentTarget.vx || 0) * predictTime,
             y: this.currentTarget.y + (this.currentTarget.vy || 0) * predictTime
-        };
-    }
-
-    getPlayerCombatStats() {
-        // Por enquanto usar gameState, depois virá de PlayerStats module
-        return {
-            damage: gameState.player.damage || 25,
-            multishot: gameState.player.multishot || 1
         };
     }
 
@@ -302,11 +287,4 @@ class CombatSystem {
     }
 }
 
-// Export
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = CombatSystem;
-}
-
-if (typeof window !== 'undefined') {
-    window.CombatSystem = CombatSystem;
-}
+export default CombatSystem;
