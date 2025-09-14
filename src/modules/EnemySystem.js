@@ -159,9 +159,9 @@ class EnemySystem {
     }
 
     // === UPDATE PRINCIPAL ===
-    update(deltaTime, waveState) {
+    update(deltaTime, waveState) { // waveState é recebido aqui
         this.updateAsteroids(deltaTime);
-        this.handleSpawning(deltaTime, waveState);
+        this.handleSpawning(deltaTime, waveState); // E passado para a função de spawn
         this.cleanupDestroyed();
     }
 
@@ -250,7 +250,9 @@ class EnemySystem {
 
     shouldSpawn(waveState) {
         // Verificar se deve spawnar (baseado em wave system)
-        const currentWave = waveState;
+        if (!waveState) return false; // Guarda de segurança para evitar erros
+
+        const currentWave = waveState; // waveState é passado pelo update()
 
         return currentWave.isActive &&
                currentWave.asteroidsSpawned < currentWave.totalAsteroids &&

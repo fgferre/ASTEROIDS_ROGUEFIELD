@@ -26,9 +26,9 @@ class CombatSystem {
     }
 
     // === UPDATE PRINCIPAL ===
-    update(deltaTime, playerStats) {
+    update(deltaTime, playerStats) { // playerStats é recebido aqui
         this.updateTargeting(deltaTime);
-        this.handleShooting(deltaTime, playerStats);
+        this.handleShooting(deltaTime, playerStats); // E passado para a função de tiro
         this.updateBullets(deltaTime);
     }
 
@@ -99,6 +99,9 @@ class CombatSystem {
         const targetPos = this.getPredictedTargetPosition();
 
         if (targetPos) {
+            // playerStats agora vem como parâmetro, não é mais buscado internamente
+            if (!playerStats) return; // Guarda de segurança
+
             for (let i = 0; i < playerStats.multishot; i++) {
                 let finalTargetPos = targetPos;
 
@@ -106,7 +109,6 @@ class CombatSystem {
                 if (playerStats.multishot > 1) {
                     finalTargetPos = this.applyMultishotSpread(playerPos, targetPos, i, playerStats.multishot);
                 }
-
                 this.createBullet(playerPos, finalTargetPos, playerStats.damage);
             }
 

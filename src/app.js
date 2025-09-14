@@ -781,184 +781,6 @@ function showGameUI() {
   showScreen('playing');
 }
 
-// Sistema de targeting aprimorado
-function updateTargeting(deltaTime) {
-  gameState.world.targetUpdateTimer -= deltaTime;
-
-  if (gameState.world.targetUpdateTimer <= 0) {
-    let newTarget = null;
-    let closestDistance = Infinity;
-
-    // Encontrar asteroide mais próximo e válido
-    gameState.world.asteroids.forEach((asteroid) => {
-      if (asteroid.destroyed) return;
-
-      const dx = asteroid.x - gameState.player.x;
-      const dy = asteroid.y - gameState.player.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-
-      if (distance < closestDistance && distance < 400) {
-        // Limite de alcance
-        closestDistance = distance;
-        newTarget = asteroid;
-      }
-    });
-
-    gameState.world.currentTarget = newTarget;
-    gameState.world.targetUpdateTimer = TARGET_UPDATE_INTERVAL;
-  }
-
-  // Verificar se o alvo ainda é válido
-  if (
-    gameState.world.currentTarget &&
-    (gameState.world.currentTarget.destroyed ||
-      !gameState.world.asteroids.find(
-        (a) => a.id === gameState.world.currentTarget.id
-      ))
-  ) {
-    gameState.world.currentTarget = null;
-  }
-}
-
-function handleShooting(deltaTime) {
-  gameState.world.lastShotTime += deltaTime;
-
-  if (
-    gameState.world.lastShotTime >= gameState.world.shootCooldown &&
-    gameState.world.currentTarget &&
-    !gameState.world.currentTarget.destroyed
-  ) {
-    const target = gameState.world.currentTarget;
-
-    // Tiro com predição de movimento
-    const predictTime = 0.5;
-    const predictedX = target.x + target.vx * predictTime;
-    const predictedY = target.y + target.vy * predictTime;
-
-    for (let i = 0; i < gameState.player.multishot; i++) {
-      let targetX = predictedX;
-      let targetY = predictedY;
-
-      if (gameState.player.multishot > 1) {
-        const spreadAngle = (i - (gameState.player.multishot - 1) / 2) * 0.3;
-        const dx = predictedX - gameState.player.x;
-        const dy = predictedY - gameState.player.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const angle = Math.atan2(dy, dx) + spreadAngle;
-
-        targetX = gameState.player.x + Math.cos(angle) * distance;
-        targetY = gameState.player.y + Math.sin(angle) * distance;
-      }
-
-      createBullet(gameState.player.x, gameState.player.y, targetX, targetY);
-    }
-
-    gameState.world.lastShotTime = 0;
-    audio.playLaserShot();
-  }
-}
-
-function createBullet(fromX, fromY, toX, toY) {
-  const dx = toX - fromX;
-  const dy = toY - fromY;
-  const distance = Math.sqrt(dx * dx + dy * dy);
-
-  if (distance === 0) return;
-
-  const bullet = {
-    id: Date.now() + Math.random(),
-    x: fromX,
-    y: fromY,
-    vx: (dx / distance) * BULLET_SPEED,
-    vy: (dy / distance) * BULLET_SPEED,
-    damage: gameState.player.damage,
-    life: 1.8,
-    trail: [],
-    hit: false,
-  };
-
-  gameState.world.bullets.push(bullet);
-}
-
-function updatePlayerMovement(deltaTime) {
-  const acceleration = gameState.player.acceleration * deltaTime;
-  const rotationAccel = gameState.player.rotationSpeed * deltaTime;
-
-  // Controles
-  const forwardPressed = gameState.input['w'] || gameState.input['arrowup'];
-  const backwardPressed = gameState.input['s'] || gameState.input['arrowdown'];
-  const rotateLeft = gameState.input['a'] || gameState.input['arrowleft'];
-  const rotateRight = gameState.input['d'] || gameState.input['arrowright'];
-
-  // Vetor direcional da nave
-  const angle = gameState.player.angle;
-  const forwardX = Math.cos(angle);
-  const forwardY = Math.sin(angle);
-
-  // Aceleração ao longo da direção da nave
-  let ax = 0,
-    ay = 0;
-  if (forwardPressed) {
-    ax += forwardX * acceleration;
-    ay += forwardY * acceleration;
-  }
-  if (backwardPressed) {
-    ax -= forwardX * acceleration;
-    ay -= forwardY * acceleration;
-  }
-
-  gameState.player.vx += ax;
-  gameState.player.vy += ay;
-
-  // Amortecimento linear dependente de dt
-  const linearDamp = Math.exp(-SHIP_LINEAR_DAMPING * deltaTime);
-  gameState.player.vx *= linearDamp;
-  gameState.player.vy *= linearDamp;
-
-  // Limite de velocidade
-  const speed = Math.sqrt(gameState.player.vx ** 2 + gameState.player.vy ** 2);
-  if (speed > gameState.player.maxSpeed) {
-    gameState.player.vx =
-      (gameState.player.vx / speed) * gameState.player.maxSpeed;
-    gameState.player.vy =
-      (gameState.player.vy / speed) * gameState.player.maxSpeed;
-  }
-
-  // Atualizar posição + wrap
-  gameState.player.x += gameState.player.vx * deltaTime;
-  gameState.player.y += gameState.player.vy * deltaTime;
-  if (gameState.player.x < 0) gameState.player.x = GAME_WIDTH;
-  if (gameState.player.x > GAME_WIDTH) gameState.player.x = 0;
-  if (gameState.player.y < 0) gameState.player.y = GAME_HEIGHT;
-  if (gameState.player.y > GAME_HEIGHT) gameState.player.y = 0;
-
-  // Rotação
-  let angularAccel = 0;
-  if (rotateLeft) angularAccel -= rotationAccel;
-  if (rotateRight) angularAccel += rotationAccel;
-  gameState.player.angularVelocity += angularAccel;
-
-  // Amortecimento angular
-  const angularDamp = Math.exp(-SHIP_ANGULAR_DAMPING * deltaTime);
-  gameState.player.angularVelocity *= angularDamp;
-
-  // Clamp angular e aplicar
-  const maxAng = gameState.player.rotationSpeed;
-  if (gameState.player.angularVelocity > maxAng)
-    gameState.player.angularVelocity = maxAng;
-  if (gameState.player.angularVelocity < -maxAng)
-    gameState.player.angularVelocity = -maxAng;
-  gameState.player.angle = wrapAngle(
-    gameState.player.angle + gameState.player.angularVelocity * deltaTime
-  );
-
-  // Efeito de propulsão direcional
-  if (forwardPressed) createThrusterEffect('bottom');
-  if (backwardPressed) createThrusterEffect('top');
-  if (rotateLeft) createThrusterEffect('right');
-  if (rotateRight) createThrusterEffect('left');
-}
-
 function createThrusterEffect(direction = 'bottom') {
   const angle = gameState.player.angle;
   const forwardX = Math.cos(angle),
@@ -1087,10 +909,7 @@ function updateGame(deltaTime) {
       gameState.player.invulnerableTimer = 0;
   }
 
-  // updatePlayerMovement(deltaTime); // REMOVIDO - Agora controlado pelo PlayerSystem
-  // updateTargeting(deltaTime); // Movido para CombatSystem
-  // handleShooting(deltaTime); // Movido para CombatSystem
-  // updateBullets(deltaTime); // Movido para CombatSystem
+  // Funções legadas que ainda precisam ser limpas
   updateAsteroids(deltaTime);
   updateXPOrbs(deltaTime);
   updateParticles(deltaTime);
@@ -1103,39 +922,14 @@ function updateGame(deltaTime) {
 }
 
 function updateBullets(deltaTime) {
-  gameState.world.bullets.forEach((bullet) => {
-    if (bullet.hit) return;
-
-    // Rastro da bala
-    bullet.trail.push({ x: bullet.x, y: bullet.y });
-    if (bullet.trail.length > TRAIL_LENGTH) {
-      bullet.trail.shift();
-    }
-
-    bullet.x += bullet.vx * deltaTime;
-    bullet.y += bullet.vy * deltaTime;
-    bullet.life -= deltaTime;
-
-    // Wrap around screen
-    if (bullet.x < 0) bullet.x = GAME_WIDTH;
-    if (bullet.x > GAME_WIDTH) bullet.x = 0;
-    if (bullet.y < 0) bullet.y = GAME_HEIGHT;
-    if (bullet.y > GAME_HEIGHT) bullet.y = 0;
-  });
-
-  gameState.world.bullets = gameState.world.bullets.filter(
-    (bullet) => bullet.life > 0 && !bullet.hit
-  );
+  // Esta função agora é redundante. O CombatSystem gerencia os projéteis.
+  // A sincronização em updateGame() já atualiza o gameState.world.bullets.
 }
 
 function updateAsteroids(deltaTime) {
-  gameState.world.asteroids.forEach((asteroid) => {
-    if (!asteroid.destroyed) {
-      asteroid.update(deltaTime);
-    }
-  });
-
-  // Física de colisão entre asteroides (impulso com massa)
+  // Esta função agora é redundante. O EnemySystem gerencia os asteroides e suas colisões.
+  // A sincronização em updateGame() já atualiza o gameState.world.asteroids.
+  // A lógica de colisão abaixo também foi movida para o EnemySystem.
   for (let i = 0; i < gameState.world.asteroids.length - 1; i++) {
     const a1 = gameState.world.asteroids[i];
     if (a1.destroyed) continue;
