@@ -6,6 +6,7 @@ import InputSystem from './modules/InputSystem.js';
 import PlayerSystem from './modules/PlayerSystem.js';
 import CombatSystem from './modules/CombatSystem.js';
 import { EnemySystem } from './modules/EnemySystem.js';
+import ProgressionSystem from './modules/ProgressionSystem.js';
 
 // Destructuring das constantes mais usadas para compatibilidade
 const {
@@ -573,6 +574,8 @@ function init() {
     const combatSystem = new CombatSystem();
     // Inicializar EnemySystem
     const enemySystem = new EnemySystem();
+    // Inicializar ProgressionSystem
+    const progressionSystem = new ProgressionSystem();
 
     // Listener para quando uma bala atinge um inimigo
     if (typeof gameEvents !== 'undefined') {
@@ -580,7 +583,7 @@ function init() {
         if (data.killed) {
           const asteroid = data.enemy;
           if (asteroid.destroyed) return; // Prevenir processamento duplo
- 
+
           const enemies = gameServices.get('enemies');
           if (enemies) {
             // O EnemySystem agora gerencia a destruição e fragmentação
@@ -588,17 +591,13 @@ function init() {
           }
         }
       });
- 
+
       // NOVO listener para quando inimigos morrem (lógica desacoplada)
       gameEvents.on('enemy-destroyed', (data) => {
-        // Criar XP orb
-        const xpValue = { large: 20, medium: 12, small: 8 }[data.size];
-        createXPOrb(data.position.x, data.position.y, xpValue + gameState.wave.current * 2);
- 
         // Incrementar kills
         gameState.wave.asteroidsKilled++;
         gameState.stats.totalKills++;
- 
+
         // Tocar som de destruição
         if (typeof audio !== 'undefined') {
           audio.playAsteroidBreak(data.size);
@@ -606,9 +605,74 @@ function init() {
             audio.playBigExplosion();
           }
         }
- 
+
         // Efeitos visuais (serão movidos para EffectsSystem depois)
         createAsteroidExplosion(data.enemy);
+      });
+
+      // Listeners para sistema de progressão
+      gameEvents.on('player-leveled-up', (data) => {
+        gameState.screen = 'levelup';
+        showLevelUpScreen();
+
+        if (typeof audio !== 'undefined') {
+          audio.playLevelUp();
+        }
+        if (typeof addScreenShake !== 'undefined') {
+          addScreenShake(6, 0.4, 'celebration');
+        }
+        if (typeof addFreezeFrame !== 'undefined') {
+          addFreezeFrame(0.2, 0.4);
+        }
+        if (typeof addScreenFlash !== 'undefined') {
+          addScreenFlash('#FFD700', 0.15, 0.2);
+        }
+      });
+
+      gameEvents.on('xp-collected', (data) => {
+        if (typeof audio !== 'undefined') {
+          audio.playXPCollect();
+        }
+        // Criar efeito de coleta (futuro EffectsSystem)
+        // createXPCollectEffect(data.position.x, data.position.y);
+      });
+
+      gameEvents.on('upgrade-damage-boost', (data) => {
+        gameState.player.damage = Math.floor(
+          gameState.player.damage * data.multiplier
+        );
+        console.log('[Upgrade] Damage boosted to:', gameState.player.damage);
+      });
+
+      gameEvents.on('upgrade-speed-boost', (data) => {
+        gameState.player.maxSpeed = Math.floor(
+          gameState.player.maxSpeed * data.multiplier
+        );
+        console.log('[Upgrade] Speed boosted to:', gameState.player.maxSpeed);
+      });
+
+      gameEvents.on('upgrade-health-boost', (data) => {
+        gameState.player.maxHealth += data.bonus;
+        gameState.player.health += data.bonus; // Heal também
+        console.log('[Upgrade] Health boosted to:', gameState.player.maxHealth);
+      });
+
+      gameEvents.on('upgrade-multishot', (data) => {
+        gameState.player.multishot += data.bonus;
+        console.log(
+          '[Upgrade] Multishot boosted to:',
+          gameState.player.multishot
+        );
+      });
+
+      gameEvents.on('upgrade-magnetism', (data) => {
+        gameState.player.magnetismRadius = Math.floor(
+          gameState.player.magnetismRadius * data.multiplier
+        );
+        console.log(
+          '[Upgrade] Magnetism boosted to:',
+          gameState.player.magnetismRadius
+        );
       });
     }
     gameState.initialized = true;
@@ -704,6 +768,12 @@ function resetPlayer() {
     magnetismRadius: MAGNETISM_RADIUS,
     invulnerableTimer: 0,
   };
+
+  // Reset ProgressionSystem
+  const progression = gameServices.get('progression');
+  if (progression) {
+    progression.reset();
+  }
 }
 
 function resetWorld() {
@@ -870,27 +940,27 @@ function updateGame(deltaTime) {
   // Atualizar sistemas modulares
   const player = gameServices.get('player');
   if (player) {
-      player.update(deltaTime);
-  
-      // SINCRONIZAR com gameState antigo (temporário)
-      gameState.player.x = player.position.x;
-      gameState.player.y = player.position.y;
-      gameState.player.vx = player.velocity.vx;
-      gameState.player.vy = player.velocity.vy;
-      gameState.player.angle = player.angle;
+    player.update(deltaTime);
+
+    // SINCRONIZAR com gameState antigo (temporário)
+    gameState.player.x = player.position.x;
+    gameState.player.y = player.position.y;
+    gameState.player.vx = player.velocity.vx;
+    gameState.player.vy = player.velocity.vy;
+    gameState.player.angle = player.angle;
   }
   // Atualizar CombatSystem
   const combat = gameServices.get('combat');
   if (combat) {
-      const playerStats = {
-          damage: gameState.player.damage || 25,
-          multishot: gameState.player.multishot || 1
-      };
-      combat.update(deltaTime, playerStats);
-  
-      // SINCRONIZAR bullets com gameState antigo (temporário)
-      gameState.world.bullets = combat.getBullets();
-      gameState.world.currentTarget = combat.getCurrentTarget();
+    const playerStats = {
+      damage: gameState.player.damage || 25,
+      multishot: gameState.player.multishot || 1,
+    };
+    combat.update(deltaTime, playerStats);
+
+    // SINCRONIZAR bullets com gameState antigo (temporário)
+    gameState.world.bullets = combat.getBullets();
+    gameState.world.currentTarget = combat.getCurrentTarget();
   }
   // Atualizar EnemySystem
   const enemies = gameServices.get('enemies');
@@ -899,6 +969,21 @@ function updateGame(deltaTime) {
 
     // SINCRONIZAR asteroids com gameState antigo (temporário)
     gameState.world.asteroids = enemies.getAllAsteroids();
+  }
+
+  // Atualizar ProgressionSystem
+  const progression = gameServices.get('progression');
+  if (progression) {
+    progression.update(deltaTime);
+
+    // SINCRONIZAR com gameState antigo (temporário)
+    gameState.player.level = progression.getLevel();
+    const expData = progression.getExperience();
+    gameState.player.xp = expData.current;
+    gameState.player.xpToNext = expData.needed;
+
+    // Sincronizar XP orbs
+    gameState.world.xpOrbs = progression.getXPOrbs();
   }
 
   gameState.stats.time = (Date.now() - gameState.stats.startTime) / 1000;
@@ -911,7 +996,6 @@ function updateGame(deltaTime) {
 
   // Funções legadas que ainda precisam ser limpas
   updateAsteroids(deltaTime);
-  updateXPOrbs(deltaTime);
   updateParticles(deltaTime);
   updateWaveSystem(deltaTime);
   updateScreenShake(deltaTime);
@@ -1111,25 +1195,20 @@ function startNextWave() {
 }
 
 function createXPOrb(x, y, value) {
-  const orb = {
-    id: Date.now() + Math.random(),
-    x: x,
-    y: y,
-    value: value,
-    collected: false,
-  };
-
-  gameState.world.xpOrbs.push(orb);
+  const progression = gameServices.get('progression');
+  if (progression) {
+    return progression.createXPOrb(x, y, value);
+  }
+  return null;
 }
 
 function collectXP(amount) {
-  gameState.player.xp += amount;
-
-  if (gameState.player.xp >= gameState.player.xpToNext) {
-    levelUp();
+  const progression = gameServices.get('progression');
+  if (progression) {
+    // ProgressionSystem já gerencia tudo via events
+    // Função mantida para compatibilidade
+    console.log('[collectXP] Redirecting to ProgressionSystem');
   }
-
-  updateUI();
 }
 
 function levelUp() {
@@ -1183,42 +1262,13 @@ function showLevelUpScreen() {
 }
 
 function selectUpgrade(upgradeId) {
-  applyUpgrade(upgradeId);
-  gameState.screen = 'playing';
-  showGameUI();
-}
-
-function applyUpgrade(upgradeId) {
-  switch (upgradeId) {
-    case 'plasma':
-      gameState.player.damage = Math.floor(gameState.player.damage * 1.25);
-      break;
-    case 'propulsors':
-      // Aumenta velocidade máxima, aceleração e um pouco a rotação para melhor controle
-      gameState.player.maxSpeed = Math.floor(gameState.player.maxSpeed * 1.2);
-      gameState.player.acceleration = Math.floor(
-        gameState.player.acceleration * 1.2
-      );
-      gameState.player.rotationSpeed = gameState.player.rotationSpeed * 1.1;
-      break;
-    case 'shield':
-      gameState.player.maxHealth += 50;
-      gameState.player.health = Math.min(
-        gameState.player.health + 50,
-        gameState.player.maxHealth
-      );
-      break;
-    case 'armor':
-      gameState.player.armor = Math.min(gameState.player.armor + 25, 75);
-      break;
-    case 'multishot':
-      gameState.player.multishot = Math.min(gameState.player.multishot + 1, 5);
-      break;
-    case 'magfield':
-      gameState.player.magnetismRadius = Math.floor(
-        gameState.player.magnetismRadius * 1.5
-      );
-      break;
+  const progression = gameServices.get('progression');
+  if (progression) {
+    const success = progression.applyUpgrade(upgradeId);
+    if (success) {
+      gameState.screen = 'playing';
+      showGameUI();
+    }
   }
 }
 
@@ -1227,7 +1277,7 @@ function checkCollisions() {
   // Usar collision detection do CombatSystem
   const combat = gameServices.get('combat');
   if (combat) {
-      combat.checkBulletCollisions(gameState.world.asteroids);
+    combat.checkBulletCollisions(gameState.world.asteroids);
   }
 
   // A lógica de colisão de balas foi movida para um listener do evento 'bullet-hit'.
