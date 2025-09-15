@@ -1,3 +1,24 @@
+*   a680c15 Merge pull request #17 from fgferre/codex/corrige-erro-no-playersystem.js
+|\  
+| * 3792731 fix: reset player stats on restart
+|/  
+*   e3e308c Merge pull request #16 from fgferre/codex/add-properties-and-methods-to-playersystem
+|\  
+| * a001dfd feat: track player stats and upgrades
+|/  
+* 8485105 Deleting refactoring leftovers from app.js
+* e576dd4 Deleting legacy components from app.js pos refactoring
+* 7579fa4 Deleting old legacy components from the codebase app.js
+*   d903692 Merge branch 'main' of https://github.com/fgferre/ASTEROIDS_ROGUEFIELD
+|\  
+| *   0064bcd Merge pull request #15 from fgferre/codex/analyze-refactoring-progress-and-plan-next-phase
+| |\  
+| | * afcb6f1 chore(app): remove legacy input and particle hooks
+| |/  
+* | 2cb4f5a Excellent. I have read and understood the entire refactoring guide. The current "FASE 6" is incomplete. As requested, I will now create a new, detailed plan for the final phase of the refactoring and update the guide.
+* | e492e35 limpeza código legado do app.js após refatoração
+|/  
+* 7731cfc Update history source control
 *   3812255 Merge pull request #14 from fgferre/codex/analyze-project-refactoring-phase
 |\  
 | * bbe401b feat(effects): restore thruster vfx via events
