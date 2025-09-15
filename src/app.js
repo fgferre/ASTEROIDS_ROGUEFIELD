@@ -757,10 +757,10 @@ function resetWave() {
 
 // UI management moved to UISystem
 
-function createThrusterEffect(direction = 'bottom') {
+function spawnThrusterVFX(worldX, worldY, dirX, dirY, intensity, type) {
   const effects = gameServices.get('effects');
   if (effects) {
-    effects.createThrusterEffect(direction, gameState.player);
+    effects.spawnThrusterVFX(worldX, worldY, dirX, dirY, intensity, type);
   }
 }
 // Loop principal do jogo com tratamento de erros

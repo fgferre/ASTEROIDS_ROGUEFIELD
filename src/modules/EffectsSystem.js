@@ -69,13 +69,35 @@ export default class EffectsSystem {
     this.particles = [];
     this.screenShake = { intensity: 0, duration: 0, timer: 0 };
     this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
-    this.screenFlash = { timer: 0, duration: 0, color: '#FFFFFF', intensity: 0 };
+    this.screenFlash = {
+      timer: 0,
+      duration: 0,
+      color: '#FFFFFF',
+      intensity: 0,
+    };
 
     if (typeof gameServices !== 'undefined') {
       gameServices.register('effects', this);
     }
 
+    this.setupEventListeners();
+
     console.log('[EffectsSystem] Initialized');
+  }
+
+  setupEventListeners() {
+    if (typeof gameEvents === 'undefined') return;
+
+    gameEvents.on('thruster-effect', (data) => {
+      this.spawnThrusterVFX(
+        data.position.x,
+        data.position.y,
+        data.direction.x,
+        data.direction.y,
+        data.intensity,
+        data.type
+      );
+    });
   }
 
   update(deltaTime) {
@@ -137,7 +159,10 @@ export default class EffectsSystem {
   }
 
   addScreenShake(intensity, duration) {
-    this.screenShake.intensity = Math.max(this.screenShake.intensity, intensity);
+    this.screenShake.intensity = Math.max(
+      this.screenShake.intensity,
+      intensity
+    );
     this.screenShake.duration = Math.max(this.screenShake.duration, duration);
     this.screenShake.timer = this.screenShake.duration;
   }
@@ -155,61 +180,74 @@ export default class EffectsSystem {
     this.screenFlash.intensity = intensity;
   }
 
-  createThrusterEffect(direction, player) {
-    const angle = player.angle;
-    const forwardX = Math.cos(angle),
-      forwardY = Math.sin(angle);
-    const rightX = Math.cos(angle + Math.PI / 2),
-      rightY = Math.sin(angle + Math.PI / 2);
+  spawnThrusterVFX(worldX, worldY, dirX, dirY, intensity = 1, type = 'main') {
+    const i = Math.max(0, Math.min(1, intensity));
+    let baseCount, speedBase, sizeRange, lifeRange, colorFn;
 
-    let offsetX = 0,
-      offsetY = 0,
-      dirX = 0,
-      dirY = 0;
-    switch (direction) {
-      case 'left':
-        offsetX = -rightX * CONSTANTS.SHIP_SIZE * 0.8;
-        offsetY = -rightY * 0.8 * CONSTANTS.SHIP_SIZE;
-        dirX = -rightX;
-        dirY = -rightY;
+    switch (type) {
+      case 'main':
+        baseCount = 3;
+        speedBase = 120;
+        sizeRange = [2.0, 3.2];
+        lifeRange = [0.22, 0.28];
+        colorFn = () =>
+          `hsl(${18 + Math.random() * 22}, 100%, ${62 + Math.random() * 18}%)`;
         break;
-      case 'right':
-        offsetX = rightX * CONSTANTS.SHIP_SIZE * 0.8;
-        offsetY = rightY * 0.8 * CONSTANTS.SHIP_SIZE;
-        dirX = rightX;
-        dirY = rightY;
+      case 'aux':
+        baseCount = 2;
+        speedBase = 105;
+        sizeRange = [1.8, 2.6];
+        lifeRange = [0.18, 0.26];
+        colorFn = () =>
+          `hsl(${200 + Math.random() * 25}, 100%, ${68 + Math.random() * 18}%)`;
         break;
-      case 'top':
-        offsetX = forwardX * CONSTANTS.SHIP_SIZE * 0.8;
-        offsetY = forwardY * 0.8 * CONSTANTS.SHIP_SIZE;
-        dirX = forwardX;
-        dirY = forwardY;
-        break;
-      case 'bottom':
-      default:
-        offsetX = -forwardX * CONSTANTS.SHIP_SIZE * 0.8;
-        offsetY = -forwardY * 0.8 * CONSTANTS.SHIP_SIZE;
-        dirX = -forwardX;
-        dirY = -forwardY;
-        break;
+      default: // 'side'
+        baseCount = 2;
+        speedBase = 110;
+        sizeRange = [1.6, 2.2];
+        lifeRange = [0.16, 0.22];
+        colorFn = () =>
+          `hsl(${200 + Math.random() * 25}, 100%, ${70 + Math.random() * 18}%)`;
     }
 
-    const thrusterX = player.x + offsetX;
-    const thrusterY = player.y + offsetY;
+    const count = Math.max(1, Math.round(baseCount * (0.8 + i * 2.0)));
 
-    for (let i = 0; i < 2; i++) {
-      const speed = 80 + Math.random() * 40;
-      const p = new SpaceParticle(
-        thrusterX + (Math.random() - 0.5) * 4,
-        thrusterY + (Math.random() - 0.5) * 4,
-        dirX * speed + (Math.random() - 0.5) * 20,
-        dirY * speed + (Math.random() - 0.5) * 20,
-        `hsl(${Math.random() * 60 + 15}, 100%, 70%)`,
-        2 + Math.random() * 1.5,
-        0.25 + Math.random() * 0.15,
-        'thruster'
+    for (let c = 0; c < count; c++) {
+      const jitter = (Math.random() - 0.5) * 0.35;
+      const spd = speedBase * (0.8 + i * 1.6) * (0.85 + Math.random() * 0.3);
+      const vx = (-dirX + jitter) * spd + (Math.random() - 0.5) * 20;
+      const vy = (-dirY + jitter) * spd + (Math.random() - 0.5) * 20;
+      const size = sizeRange[0] + Math.random() * (sizeRange[1] - sizeRange[0]);
+      const life = lifeRange[0] + Math.random() * (lifeRange[1] - lifeRange[0]);
+
+      this.particles.push(
+        new SpaceParticle(
+          worldX + (Math.random() - 0.5) * 3,
+          worldY + (Math.random() - 0.5) * 3,
+          vx,
+          vy,
+          colorFn(),
+          size,
+          life,
+          'thruster'
+        )
       );
-      this.particles.push(p);
+
+      if (Math.random() < 0.25) {
+        const sparkSpd = spd * (0.9 + Math.random() * 0.3);
+        this.particles.push(
+          new SpaceParticle(
+            worldX,
+            worldY,
+            -dirX * sparkSpd,
+            -dirY * sparkSpd,
+            '#FFFFFF',
+            1.2 + Math.random() * 0.8,
+            0.08 + Math.random() * 0.06,
+            'spark'
+          )
+        );
+      }
     }
   }
 
