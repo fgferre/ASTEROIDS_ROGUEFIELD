@@ -1,4 +1,5 @@
 {
     "git.allowForcePush": true,
-    "git.useForcePushWithLease": false
+    "git.useForcePushWithLease": false,
+    "CodeGPT.apiKey": "LM Studio"
 }
