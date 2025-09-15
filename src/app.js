@@ -8,6 +8,7 @@ import CombatSystem from './modules/CombatSystem.js';
 import { EnemySystem } from './modules/EnemySystem.js';
 import ProgressionSystem from './modules/ProgressionSystem.js';
 import UISystem from './modules/UISystem.js';
+import EffectsSystem from './modules/EffectsSystem.js';
 
 // Destructuring das constantes mais usadas para compatibilidade
 const {
@@ -66,7 +67,6 @@ let gameState = {
     asteroids: [],
     bullets: [],
     xpOrbs: [],
-    particles: [],
     currentTarget: null,
     targetUpdateTimer: 0,
     lastShotTime: 0,
@@ -93,9 +93,6 @@ let gameState = {
   input: {},
   canvas: null,
   ctx: null,
-  screenShake: { intensity: 0, duration: 0, timer: 0 },
-  freezeFrame: { timer: 0, duration: 0, fade: 0 },
-  screenFlash: { timer: 0, duration: 0, color: '#FFFFFF', intensity: 0 },
   initialized: false,
 };
 
@@ -341,70 +338,6 @@ class SpaceAudioSystem {
   }
 }
 
-// Sistema de partículas otimizado
-class SpaceParticle {
-  constructor(x, y, vx, vy, color, size, life, type = 'normal') {
-    this.x = x;
-    this.y = y;
-    this.vx = vx;
-    this.vy = vy;
-    this.color = color;
-    this.size = size;
-    this.life = life;
-    this.maxLife = life;
-    this.alpha = 1;
-    this.type = type;
-    this.rotation = Math.random() * Math.PI * 2;
-    this.rotationSpeed = (Math.random() - 0.5) * 4;
-  }
-
-  update(deltaTime) {
-    this.x += this.vx * deltaTime;
-    this.y += this.vy * deltaTime;
-    this.life -= deltaTime;
-    this.alpha = Math.max(0, this.life / this.maxLife);
-    this.rotation += this.rotationSpeed * deltaTime;
-
-    const friction = this.type === 'thruster' ? 0.98 : 0.96;
-    this.vx *= friction;
-    this.vy *= friction;
-
-    return this.life > 0;
-  }
-
-  draw(ctx) {
-    if (this.alpha <= 0) return;
-
-    ctx.save();
-    ctx.globalAlpha = this.alpha;
-    ctx.translate(this.x, this.y);
-    ctx.rotate(this.rotation);
-
-    if (this.type === 'spark') {
-      ctx.strokeStyle = this.color;
-      ctx.lineWidth = this.size * this.alpha;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(-this.size, 0);
-      ctx.lineTo(this.size, 0);
-      ctx.stroke();
-    } else if (this.type === 'debris') {
-      ctx.fillStyle = this.color;
-      ctx.beginPath();
-      const s = this.size * this.alpha;
-      ctx.rect(-s / 2, -s / 2, s, s);
-      ctx.fill();
-    } else {
-      ctx.fillStyle = this.color;
-      ctx.beginPath();
-      ctx.arc(0, 0, this.size * this.alpha, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    ctx.restore();
-  }
-}
-
 // Classe para asteroides melhorada
 class Asteroid {
   constructor(x, y, size, vx = 0, vy = 0) {
@@ -578,6 +511,8 @@ function init() {
     const progressionSystem = new ProgressionSystem();
     // Inicializar UISystem
     const uiSystem = new UISystem();
+    // Inicializar EffectsSystem
+    const effectsSystem = new EffectsSystem(audio);
 
     // Listener para quando uma bala atinge um inimigo
     if (typeof gameEvents !== 'undefined') {
@@ -823,60 +758,9 @@ function resetWave() {
 // UI management moved to UISystem
 
 function createThrusterEffect(direction = 'bottom') {
-  const angle = gameState.player.angle;
-  const forwardX = Math.cos(angle),
-    forwardY = Math.sin(angle);
-  const rightX = Math.cos(angle + Math.PI / 2),
-    rightY = Math.sin(angle + Math.PI / 2);
-
-  let offsetX = 0,
-    offsetY = 0,
-    dirX = 0,
-    dirY = 0;
-  switch (direction) {
-    case 'left':
-      offsetX = -rightX * SHIP_SIZE * 0.8;
-      offsetY = -rightY * 0.8 * SHIP_SIZE;
-      dirX = -rightX;
-      dirY = -rightY;
-      break;
-    case 'right':
-      offsetX = rightX * SHIP_SIZE * 0.8;
-      offsetY = rightY * 0.8 * SHIP_SIZE;
-      dirX = rightX;
-      dirY = rightY;
-      break;
-    case 'top':
-      offsetX = forwardX * SHIP_SIZE * 0.8;
-      offsetY = forwardY * 0.8 * SHIP_SIZE;
-      dirX = forwardX;
-      dirY = forwardY;
-      break;
-    case 'bottom':
-    default:
-      offsetX = -forwardX * SHIP_SIZE * 0.8;
-      offsetY = -forwardY * 0.8 * SHIP_SIZE;
-      dirX = -forwardX;
-      dirY = -forwardY;
-      break;
-  }
-
-  const thrusterX = gameState.player.x + offsetX;
-  const thrusterY = gameState.player.y + offsetY;
-
-  for (let i = 0; i < 2; i++) {
-    const speed = 80 + Math.random() * 40;
-    const p = new SpaceParticle(
-      thrusterX + (Math.random() - 0.5) * 4,
-      thrusterY + (Math.random() - 0.5) * 4,
-      dirX * speed + (Math.random() - 0.5) * 20,
-      dirY * speed + (Math.random() - 0.5) * 20,
-      `hsl(${Math.random() * 60 + 15}, 100%, 70%)`,
-      2 + Math.random() * 1.5,
-      0.25 + Math.random() * 0.15,
-      'thruster'
-    );
-    gameState.world.particles.push(p);
+  const effects = gameServices.get('effects');
+  if (effects) {
+    effects.createThrusterEffect(direction, gameState.player);
   }
 }
 // Loop principal do jogo com tratamento de erros
@@ -889,10 +773,9 @@ function gameLoop(currentTime) {
   let deltaTime = Math.min((currentTime - lastTime) / 1000, 0.016);
   lastTime = currentTime;
 
-  if (gameState.freezeFrame.timer > 0) {
-    gameState.freezeFrame.timer -= deltaTime;
-    if (gameState.freezeFrame.timer < 0) gameState.freezeFrame.timer = 0;
-    deltaTime *= gameState.freezeFrame.fade;
+  const effects = gameServices.get('effects');
+  if (effects) {
+    deltaTime = effects.update(deltaTime);
   }
 
   try {
@@ -967,10 +850,7 @@ function updateGame(deltaTime) {
 
   // Funções legadas que ainda precisam ser limpas
   updateAsteroids(deltaTime);
-  updateParticles(deltaTime);
   updateWaveSystem(deltaTime);
-  updateScreenShake(deltaTime);
-  updateScreenFlash(deltaTime);
 
   checkCollisions();
   const ui = gameServices.get('ui');
@@ -1069,13 +949,9 @@ function updateXPOrbs(deltaTime) {
 }
 
 function updateParticles(deltaTime) {
-  gameState.world.particles = gameState.world.particles.filter((particle) =>
-    particle.update(deltaTime)
-  );
-
-  // Limitar número de partículas para performance
-  if (gameState.world.particles.length > 150) {
-    gameState.world.particles = gameState.world.particles.slice(-100);
+  const effects = gameServices.get('effects');
+  if (effects && typeof effects.updateParticles === 'function') {
+    effects.updateParticles(deltaTime);
   }
 }
 
@@ -1273,132 +1149,33 @@ function checkCollisions() {
 }
 
 function createAsteroidExplosion(asteroid) {
-  const particleCount = { large: 12, medium: 8, small: 5 }[asteroid.size];
-
-  if (asteroid.size === 'small') {
-    addScreenShake(2, 0.1);
-  } else if (asteroid.size === 'medium') {
-    addScreenShake(4, 0.15);
-  } else if (asteroid.size === 'large') {
-    addScreenShake(8, 0.25, 'explosion');
-    addFreezeFrame(0.15, 0.2);
-    addScreenFlash('#FF6B6B', 0.2, 0.1);
-    if (typeof audio.playBigExplosion === 'function') {
-      audio.playBigExplosion();
-    }
-  }
-
-  for (let i = 0; i < particleCount; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 40 + Math.random() * 80;
-
-    // Debris
-    const debris = new SpaceParticle(
-      asteroid.x + (Math.random() - 0.5) * asteroid.radius,
-      asteroid.y + (Math.random() - 0.5) * asteroid.radius,
-      Math.cos(angle) * speed,
-      Math.sin(angle) * speed,
-      '#8B4513',
-      2 + Math.random() * 3,
-      0.6 + Math.random() * 0.4,
-      'debris'
-    );
-    gameState.world.particles.push(debris);
-
-    // Sparks
-    const spark = new SpaceParticle(
-      asteroid.x,
-      asteroid.y,
-      Math.cos(angle) * speed * 1.3,
-      Math.sin(angle) * speed * 1.3,
-      `hsl(${Math.random() * 60 + 15}, 100%, 70%)`,
-      1.5 + Math.random() * 1.5,
-      0.3 + Math.random() * 0.2,
-      'spark'
-    );
-    gameState.world.particles.push(spark);
-  }
+  const effects = gameServices.get('effects');
+  if (effects) effects.createAsteroidExplosion(asteroid);
 }
 
 function createXPCollectEffect(x, y) {
-  for (let i = 0; i < 6; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 25 + Math.random() * 40;
-    const particle = new SpaceParticle(
-      x,
-      y,
-      Math.cos(angle) * speed,
-      Math.sin(angle) * speed,
-      '#00DDFF',
-      1.5 + Math.random() * 1.5,
-      0.3 + Math.random() * 0.2
-    );
-    gameState.world.particles.push(particle);
-  }
+  const effects = gameServices.get('effects');
+  if (effects) effects.createXPCollectEffect(x, y);
 }
 
 function createLevelUpExplosion() {
-  for (let i = 0; i < 20; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 60 + Math.random() * 120;
-    const particle = new SpaceParticle(
-      gameState.player.x,
-      gameState.player.y,
-      Math.cos(angle) * speed,
-      Math.sin(angle) * speed,
-      `hsl(${Math.random() * 40 + 40}, 100%, 60%)`,
-      2 + Math.random() * 2,
-      0.6 + Math.random() * 0.4,
-      'spark'
-    );
-    gameState.world.particles.push(particle);
-  }
+  const effects = gameServices.get('effects');
+  if (effects) effects.createLevelUpExplosion(gameState.player);
 }
 
 function addScreenShake(intensity, duration) {
-  gameState.screenShake.intensity = Math.max(
-    gameState.screenShake.intensity,
-    intensity
-  );
-  gameState.screenShake.duration = Math.max(
-    gameState.screenShake.duration,
-    duration
-  );
-  gameState.screenShake.timer = gameState.screenShake.duration;
+  const effects = gameServices.get('effects');
+  if (effects) effects.addScreenShake(intensity, duration);
 }
 
 function addFreezeFrame(duration, fade = 0) {
-  gameState.freezeFrame.timer = Math.max(gameState.freezeFrame.timer, duration);
-  gameState.freezeFrame.duration = Math.max(
-    gameState.freezeFrame.duration,
-    duration
-  );
-  gameState.freezeFrame.fade = fade;
+  const effects = gameServices.get('effects');
+  if (effects) effects.addFreezeFrame(duration, fade);
 }
 
 function addScreenFlash(color, duration, intensity) {
-  gameState.screenFlash.color = color;
-  gameState.screenFlash.duration = duration;
-  gameState.screenFlash.timer = duration;
-  gameState.screenFlash.intensity = intensity;
-}
-
-function updateScreenShake(deltaTime) {
-  if (gameState.screenShake.timer > 0) {
-    gameState.screenShake.timer -= deltaTime;
-
-    if (gameState.screenShake.timer <= 0) {
-      gameState.screenShake.intensity = 0;
-      gameState.screenShake.duration = 0;
-    }
-  }
-}
-
-function updateScreenFlash(deltaTime) {
-  if (gameState.screenFlash.timer > 0) {
-    gameState.screenFlash.timer -= deltaTime;
-    if (gameState.screenFlash.timer < 0) gameState.screenFlash.timer = 0;
-  }
+  const effects = gameServices.get('effects');
+  if (effects) effects.addScreenFlash(color, duration, intensity);
 }
 
 function gameOver() {
@@ -1417,15 +1194,9 @@ function renderGame() {
 
   ctx.save();
 
-  // Screen shake
-  if (gameState.screenShake.timer > 0) {
-    const shakeAmount =
-      gameState.screenShake.intensity *
-      (gameState.screenShake.timer / gameState.screenShake.duration);
-    ctx.translate(
-      (Math.random() - 0.5) * shakeAmount,
-      (Math.random() - 0.5) * shakeAmount
-    );
+  const effects = gameServices.get('effects');
+  if (effects) {
+    effects.applyScreenShake(ctx);
   }
 
   // Background
@@ -1451,9 +1222,6 @@ function renderGame() {
     const size = Math.floor(i % 3) + 1;
     ctx.fillRect(x, y, size, size);
   }
-
-  // Partículas
-  gameState.world.particles.forEach((particle) => particle.draw(ctx));
 
   // XP orbs
   gameState.world.xpOrbs.forEach((orb) => {
@@ -1626,14 +1394,8 @@ function renderGame() {
     ctx.stroke();
   }
 
-  if (gameState.screenFlash.timer > 0) {
-    const alpha =
-      (gameState.screenFlash.timer / gameState.screenFlash.duration) *
-      gameState.screenFlash.intensity;
-    ctx.fillStyle = gameState.screenFlash.color;
-    ctx.globalAlpha = alpha;
-    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-    ctx.globalAlpha = 1;
+  if (effects) {
+    effects.draw(ctx);
   }
 
   ctx.restore();
