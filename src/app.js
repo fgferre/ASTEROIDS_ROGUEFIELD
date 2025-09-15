@@ -95,30 +95,7 @@ let gameState = {
   initialized: false,
 };
 
-// Função para interpolação angular suave
-function lerpAngle(from, to, factor) {
-  let diff = to - from;
 
-  // Normalizar a diferença para o menor caminho circular
-  while (diff > Math.PI) diff -= Math.PI * 2;
-  while (diff < -Math.PI) diff += Math.PI * 2;
-
-  return from + diff * factor;
-}
-
-// Utilitários angulares adicionais
-function wrapAngle(a) {
-  while (a > Math.PI) a -= Math.PI * 2;
-  while (a < -Math.PI) a += Math.PI * 2;
-  return a;
-}
-
-function angleDiff(from, to) {
-  let diff = to - from;
-  while (diff > Math.PI) diff -= Math.PI * 2;
-  while (diff < -Math.PI) diff += Math.PI * 2;
-  return diff;
-}
 
 // Sistema de áudio espacial robusto
 class SpaceAudioSystem {
