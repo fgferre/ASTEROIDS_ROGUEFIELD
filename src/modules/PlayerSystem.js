@@ -2,244 +2,323 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 
 class PlayerSystem {
-    constructor(x = CONSTANTS.GAME_WIDTH / 2, y = CONSTANTS.GAME_HEIGHT / 2) {
-        // === APENAS MOVIMENTO E POSIÇÃO ===
-        this.position = { x, y };
-        this.velocity = { vx: 0, vy: 0 };
-        this.angle = 0;
-        this.targetAngle = 0; // Para rotação suave (futuro)
-        this.angularVelocity = 0;
+  constructor(x = CONSTANTS.GAME_WIDTH / 2, y = CONSTANTS.GAME_HEIGHT / 2) {
+    // === APENAS MOVIMENTO E POSIÇÃO ===
+    this.position = { x, y };
+    this.velocity = { vx: 0, vy: 0 };
+    this.angle = 0;
+    this.targetAngle = 0; // Para rotação suave (futuro)
+    this.angularVelocity = 0;
 
-        // === CONFIGURAÇÕES DE MOVIMENTO ===
-        // Usar constantes do arquivo separado
-        this.maxSpeed = CONSTANTS.SHIP_MAX_SPEED;
-        this.acceleration = CONSTANTS.SHIP_ACCELERATION;
-        this.rotationSpeed = CONSTANTS.SHIP_ROTATION_SPEED;
-        this.linearDamping = CONSTANTS.SHIP_LINEAR_DAMPING;
-        this.angularDamping = CONSTANTS.SHIP_ANGULAR_DAMPING;
+    // === CONFIGURAÇÕES DE MOVIMENTO ===
+    // Usar constantes do arquivo separado
+    this.maxSpeed = CONSTANTS.SHIP_MAX_SPEED;
+    this.acceleration = CONSTANTS.SHIP_ACCELERATION;
+    this.rotationSpeed = CONSTANTS.SHIP_ROTATION_SPEED;
+    this.linearDamping = CONSTANTS.SHIP_LINEAR_DAMPING;
+    this.angularDamping = CONSTANTS.SHIP_ANGULAR_DAMPING;
 
-        // Registrar no ServiceLocator
-        if (typeof gameServices !== 'undefined') {
-            gameServices.register('player', this);
-        }
+    // === STATS DO JOGADOR ===
+    this.health = 100;
+    this.maxHealth = 100;
+    this.damage = 25;
+    this.multishot = 1;
+    this.magnetismRadius = CONSTANTS.MAGNETISM_RADIUS;
 
-        console.log('[PlayerSystem] Initialized at', this.position);
+    // Registrar no ServiceLocator
+    if (typeof gameServices !== 'undefined') {
+      gameServices.register('player', this);
     }
 
-    // === MÉTODO PRINCIPAL UPDATE ===
-    update(deltaTime) {
-        const inputSystem = gameServices.get('input');
-        if (!inputSystem) {
-            console.warn('[PlayerSystem] InputSystem not found');
-            return;
-        }
+    // Escutar eventos de upgrade
+    this.setupEventListeners();
 
-        const movement = inputSystem.getMovementInput();
-        this.updateMovement(deltaTime, movement);
-        this.updatePosition(deltaTime);
+    console.log('[PlayerSystem] Initialized at', this.position);
+  }
 
-        // Emitir evento para outros sistemas
-        // Usamos o método 'emitSilently' para não poluir o console a cada frame.
-        if (typeof gameEvents !== 'undefined') {
-            gameEvents.emitSilently('player-moved', {
-                position: { ...this.position },
-                velocity: { ...this.velocity },
-                angle: this.angle
-            });
-        }
+  setupEventListeners() {
+    if (typeof gameEvents === 'undefined') return;
+
+    gameEvents.on('upgrade-damage-boost', (data) => {
+      this.damage = Math.floor(this.damage * data.multiplier);
+      console.log('[PlayerSystem] Damage boosted to', this.damage);
+    });
+
+    gameEvents.on('upgrade-speed-boost', (data) => {
+      this.maxSpeed = Math.floor(this.maxSpeed * data.multiplier);
+      console.log('[PlayerSystem] Speed boosted to', this.maxSpeed);
+    });
+
+    gameEvents.on('upgrade-health-boost', (data) => {
+      this.maxHealth += data.bonus;
+      this.health = Math.min(this.health + data.bonus, this.maxHealth);
+      console.log('[PlayerSystem] Health boosted to', this.maxHealth);
+    });
+
+    gameEvents.on('upgrade-multishot', (data) => {
+      this.multishot += data.bonus;
+      console.log('[PlayerSystem] Multishot boosted to', this.multishot);
+    });
+
+    gameEvents.on('upgrade-magnetism', (data) => {
+      this.magnetismRadius = Math.floor(this.magnetismRadius * data.multiplier);
+      console.log('[PlayerSystem] Magnetism boosted to', this.magnetismRadius);
+    });
+  }
+
+  // === MÉTODO PRINCIPAL UPDATE ===
+  update(deltaTime) {
+    const inputSystem = gameServices.get('input');
+    if (!inputSystem) {
+      console.warn('[PlayerSystem] InputSystem not found');
+      return;
     }
 
-    // === LÓGICA DE MOVIMENTO (COPIADA DO ORIGINAL) ===
-    updateMovement(deltaTime, input) {
-        // COPIAR EXATAMENTE da função updatePlayerMovement() original
-        const accelStep = this.acceleration * deltaTime;
-        const fwd = {
-            x: Math.cos(this.angle),
-            y: Math.sin(this.angle)
-        };
+    const movement = inputSystem.getMovementInput();
+    this.updateMovement(deltaTime, movement);
+    this.updatePosition(deltaTime);
 
-        // Thruster intensities (lógica do original)
-        let thrMain = input.up ? 1 : 0;
-        let thrAux = input.down ? 1 : 0;
-        let thrSideR = input.left ? 1 : 0; // CCW torque
-        let thrSideL = input.right ? 1 : 0; // CW torque
+    // Emitir evento para outros sistemas
+    // Usamos o método 'emitSilently' para não poluir o console a cada frame.
+    if (typeof gameEvents !== 'undefined') {
+      gameEvents.emitSilently('player-moved', {
+        position: { ...this.position },
+        velocity: { ...this.velocity },
+        angle: this.angle,
+      });
+    }
+  }
 
-        // Auto-brake quando não há input linear
-        const noLinearInput = !input.up && !input.down;
-        const speed = Math.hypot(this.velocity.vx, this.velocity.vy);
+  // === LÓGICA DE MOVIMENTO (COPIADA DO ORIGINAL) ===
+  updateMovement(deltaTime, input) {
+    // COPIAR EXATAMENTE da função updatePlayerMovement() original
+    const accelStep = this.acceleration * deltaTime;
+    const fwd = {
+      x: Math.cos(this.angle),
+      y: Math.sin(this.angle),
+    };
 
-        if (noLinearInput && speed > 2) {
-            const proj = this.velocity.vx * fwd.x + this.velocity.vy * fwd.y;
-            const k = Math.max(0.35, Math.min(1, Math.abs(proj) / (this.maxSpeed * 0.8)));
-            if (proj > 0) thrAux = Math.max(thrAux, k);
-            else if (proj < 0) thrMain = Math.max(thrMain, k);
-        }
+    // Thruster intensities (lógica do original)
+    let thrMain = input.up ? 1 : 0;
+    let thrAux = input.down ? 1 : 0;
+    let thrSideR = input.left ? 1 : 0; // CCW torque
+    let thrSideL = input.right ? 1 : 0; // CW torque
 
-        // Aplicar forças dos thrusters
-        if (thrMain > 0) {
-            this.velocity.vx += fwd.x * accelStep * thrMain;
-            this.velocity.vy += fwd.y * accelStep * thrMain;
-        }
-        if (thrAux > 0) {
-            this.velocity.vx -= fwd.x * accelStep * thrAux;
-            this.velocity.vy -= fwd.y * accelStep * thrAux;
-        }
+    // Auto-brake quando não há input linear
+    const noLinearInput = !input.up && !input.down;
+    const speed = Math.hypot(this.velocity.vx, this.velocity.vy);
 
-        // Amortecimento ambiente
-        const linearDamp = Math.exp(-this.linearDamping * deltaTime);
-        this.velocity.vx *= linearDamp;
-        this.velocity.vy *= linearDamp;
-
-        // Limitar velocidade máxima
-        const currentSpeed = Math.hypot(this.velocity.vx, this.velocity.vy);
-        if (currentSpeed > this.maxSpeed) {
-            const scale = this.maxSpeed / currentSpeed;
-            this.velocity.vx *= scale;
-            this.velocity.vy *= scale;
-        }
-
-        // === MOVIMENTO ANGULAR ===
-        // Restaurando a lógica de aceleração e amortecimento angular do app.js original
-        const rotationAccel = this.rotationSpeed * deltaTime;
-        let angularAccel = 0;
-        if (thrSideR) angularAccel -= rotationAccel; // 'a' ou 'arrowleft'
-        if (thrSideL) angularAccel += rotationAccel; // 'd' ou 'arrowright'
-        
-        this.angularVelocity += angularAccel;
-        
-        // Amortecimento angular
-        const angularDamp = Math.exp(-this.angularDamping * deltaTime);
-        this.angularVelocity *= angularDamp;
-        
-        // Limitar velocidade angular (clamp)
-        const maxAng = this.rotationSpeed;
-        if (this.angularVelocity > maxAng) this.angularVelocity = maxAng;
-        if (this.angularVelocity < -maxAng) this.angularVelocity = -maxAng;
-        this.angle = this.wrapAngle(this.angle + this.angularVelocity * deltaTime);
-
-        // === EFEITOS DE THRUSTER ===
-        // Emitir eventos para EffectsSystem
-        if (thrMain > 0) {
-            const thrusterPos = this.getLocalToWorld(-CONSTANTS.SHIP_SIZE * 0.8, 0);
-            gameEvents.emit('thruster-effect', {
-                position: thrusterPos,
-                direction: { x: fwd.x, y: fwd.y },
-                intensity: thrMain,
-                type: 'main'
-            });
-        }
-
-        if (thrAux > 0) {
-            const thrusterPos = this.getLocalToWorld(CONSTANTS.SHIP_SIZE * 0.8, 0);
-            gameEvents.emit('thruster-effect', {
-                position: thrusterPos,
-                direction: { x: -fwd.x, y: -fwd.y },
-                intensity: thrAux,
-                type: 'aux'
-            });
-        }
-
-        // Side thrusters
-        if (thrSideL > 0) {
-            const thrusterPos = this.getLocalToWorld(0, -CONSTANTS.SHIP_SIZE * 0.52);
-            const dir = this.getLocalDirection(0, 1);
-            gameEvents.emit('thruster-effect', {
-                position: thrusterPos,
-                direction: dir,
-                intensity: thrSideL,
-                type: 'side'
-            });
-        }
-
-        if (thrSideR > 0) {
-            const thrusterPos = this.getLocalToWorld(0, CONSTANTS.SHIP_SIZE * 0.52);
-            const dir = this.getLocalDirection(0, -1);
-            gameEvents.emit('thruster-effect', {
-                position: thrusterPos,
-                direction: dir,
-                intensity: thrSideR,
-                type: 'side'
-            });
-        }
+    if (noLinearInput && speed > 2) {
+      const proj = this.velocity.vx * fwd.x + this.velocity.vy * fwd.y;
+      const k = Math.max(
+        0.35,
+        Math.min(1, Math.abs(proj) / (this.maxSpeed * 0.8))
+      );
+      if (proj > 0) thrAux = Math.max(thrAux, k);
+      else if (proj < 0) thrMain = Math.max(thrMain, k);
     }
 
-    updatePosition(deltaTime) {
-        // Integrar posição
-        this.position.x += this.velocity.vx * deltaTime;
-        this.position.y += this.velocity.vy * deltaTime;
-
-        // Screen wrapping
-        if (this.position.x < 0) this.position.x = CONSTANTS.GAME_WIDTH;
-        if (this.position.x > CONSTANTS.GAME_WIDTH) this.position.x = 0;
-        if (this.position.y < 0) this.position.y = CONSTANTS.GAME_HEIGHT;
-        if (this.position.y > CONSTANTS.GAME_HEIGHT) this.position.y = 0;
+    // Aplicar forças dos thrusters
+    if (thrMain > 0) {
+      this.velocity.vx += fwd.x * accelStep * thrMain;
+      this.velocity.vy += fwd.y * accelStep * thrMain;
+    }
+    if (thrAux > 0) {
+      this.velocity.vx -= fwd.x * accelStep * thrAux;
+      this.velocity.vy -= fwd.y * accelStep * thrAux;
     }
 
-    // === UTILITÁRIOS ===
-    wrapAngle(angle) {
-        while (angle > Math.PI) angle -= Math.PI * 2;
-        while (angle < -Math.PI) angle += Math.PI * 2;
-        return angle;
+    // Amortecimento ambiente
+    const linearDamp = Math.exp(-this.linearDamping * deltaTime);
+    this.velocity.vx *= linearDamp;
+    this.velocity.vy *= linearDamp;
+
+    // Limitar velocidade máxima
+    const currentSpeed = Math.hypot(this.velocity.vx, this.velocity.vy);
+    if (currentSpeed > this.maxSpeed) {
+      const scale = this.maxSpeed / currentSpeed;
+      this.velocity.vx *= scale;
+      this.velocity.vy *= scale;
     }
 
-    // Transform local ship coordinates to world
-    getLocalToWorld(localX, localY) {
-        const cos = Math.cos(this.angle);
-        const sin = Math.sin(this.angle);
-        return {
-            x: this.position.x + (localX * cos - localY * sin),
-            y: this.position.y + (localX * sin + localY * cos)
-        };
+    // === MOVIMENTO ANGULAR ===
+    // Restaurando a lógica de aceleração e amortecimento angular do app.js original
+    const rotationAccel = this.rotationSpeed * deltaTime;
+    let angularAccel = 0;
+    if (thrSideR) angularAccel -= rotationAccel; // 'a' ou 'arrowleft'
+    if (thrSideL) angularAccel += rotationAccel; // 'd' ou 'arrowright'
+
+    this.angularVelocity += angularAccel;
+
+    // Amortecimento angular
+    const angularDamp = Math.exp(-this.angularDamping * deltaTime);
+    this.angularVelocity *= angularDamp;
+
+    // Limitar velocidade angular (clamp)
+    const maxAng = this.rotationSpeed;
+    if (this.angularVelocity > maxAng) this.angularVelocity = maxAng;
+    if (this.angularVelocity < -maxAng) this.angularVelocity = -maxAng;
+    this.angle = this.wrapAngle(this.angle + this.angularVelocity * deltaTime);
+
+    // === EFEITOS DE THRUSTER ===
+    // Emitir eventos para EffectsSystem
+    if (thrMain > 0) {
+      const thrusterPos = this.getLocalToWorld(-CONSTANTS.SHIP_SIZE * 0.8, 0);
+      gameEvents.emit('thruster-effect', {
+        position: thrusterPos,
+        direction: { x: fwd.x, y: fwd.y },
+        intensity: thrMain,
+        type: 'main',
+      });
     }
 
-    // Transform local direction to world
-    getLocalDirection(dx, dy) {
-        const cos = Math.cos(this.angle);
-        const sin = Math.sin(this.angle);
-        return {
-            x: (dx * cos - dy * sin),
-            y: (dx * sin + dy * cos)
-        };
+    if (thrAux > 0) {
+      const thrusterPos = this.getLocalToWorld(CONSTANTS.SHIP_SIZE * 0.8, 0);
+      gameEvents.emit('thruster-effect', {
+        position: thrusterPos,
+        direction: { x: -fwd.x, y: -fwd.y },
+        intensity: thrAux,
+        type: 'aux',
+      });
     }
 
-    // === GETTERS PÚBLICOS ===
-    getPosition() {
-        return { ...this.position };
+    // Side thrusters
+    if (thrSideL > 0) {
+      const thrusterPos = this.getLocalToWorld(0, -CONSTANTS.SHIP_SIZE * 0.52);
+      const dir = this.getLocalDirection(0, 1);
+      gameEvents.emit('thruster-effect', {
+        position: thrusterPos,
+        direction: dir,
+        intensity: thrSideL,
+        type: 'side',
+      });
     }
 
-    getAngle() {
-        return this.angle;
+    if (thrSideR > 0) {
+      const thrusterPos = this.getLocalToWorld(0, CONSTANTS.SHIP_SIZE * 0.52);
+      const dir = this.getLocalDirection(0, -1);
+      gameEvents.emit('thruster-effect', {
+        position: thrusterPos,
+        direction: dir,
+        intensity: thrSideR,
+        type: 'side',
+      });
     }
+  }
 
-    getVelocity() {
-        return { ...this.velocity };
-    }
+  updatePosition(deltaTime) {
+    // Integrar posição
+    this.position.x += this.velocity.vx * deltaTime;
+    this.position.y += this.velocity.vy * deltaTime;
 
-    // === SETTERS (para reset, teleport, etc.) ===
-    setPosition(x, y) {
-        this.position.x = x;
-        this.position.y = y;
-    }
+    // Screen wrapping
+    if (this.position.x < 0) this.position.x = CONSTANTS.GAME_WIDTH;
+    if (this.position.x > CONSTANTS.GAME_WIDTH) this.position.x = 0;
+    if (this.position.y < 0) this.position.y = CONSTANTS.GAME_HEIGHT;
+    if (this.position.y > CONSTANTS.GAME_HEIGHT) this.position.y = 0;
+  }
 
-    setAngle(angle) {
-        this.angle = this.wrapAngle(angle);
-    }
+  // === UTILITÁRIOS ===
+  wrapAngle(angle) {
+    while (angle > Math.PI) angle -= Math.PI * 2;
+    while (angle < -Math.PI) angle += Math.PI * 2;
+    return angle;
+  }
 
-    reset() {
-        this.position = { x: CONSTANTS.GAME_WIDTH / 2, y: CONSTANTS.GAME_HEIGHT / 2 };
-        this.velocity = { vx: 0, vy: 0 };
-        this.angle = 0;
-        this.angularVelocity = 0;
-    }
+  // Transform local ship coordinates to world
+  getLocalToWorld(localX, localY) {
+    const cos = Math.cos(this.angle);
+    const sin = Math.sin(this.angle);
+    return {
+      x: this.position.x + (localX * cos - localY * sin),
+      y: this.position.y + (localX * sin + localY * cos),
+    };
+  }
 
-    destroy() {
-        console.log('[PlayerSystem] Destroyed');
+  // Transform local direction to world
+  getLocalDirection(dx, dy) {
+    const cos = Math.cos(this.angle);
+    const sin = Math.sin(this.angle);
+    return {
+      x: dx * cos - dy * sin,
+      y: dx * sin + dy * cos,
+    };
+  }
+
+  // === GETTERS PÚBLICOS ===
+  getPosition() {
+    return { ...this.position };
+  }
+
+  getAngle() {
+    return this.angle;
+  }
+
+  getVelocity() {
+    return { ...this.velocity };
+  }
+
+  // === GERENCIAMENTO DE VIDA ===
+  takeDamage(amount) {
+    this.health = Math.max(0, this.health - Math.max(0, amount));
+    if (typeof gameEvents !== 'undefined') {
+      gameEvents.emit('player-health-changed', {
+        current: this.health,
+        max: this.maxHealth,
+      });
     }
+    return this.health;
+  }
+
+  heal(amount) {
+    this.health = Math.min(this.maxHealth, this.health + Math.max(0, amount));
+    if (typeof gameEvents !== 'undefined') {
+      gameEvents.emit('player-health-changed', {
+        current: this.health,
+        max: this.maxHealth,
+      });
+    }
+    return this.health;
+  }
+
+  getStats() {
+    return {
+      health: this.health,
+      maxHealth: this.maxHealth,
+      damage: this.damage,
+      multishot: this.multishot,
+      magnetismRadius: this.magnetismRadius,
+    };
+  }
+
+  // === SETTERS (para reset, teleport, etc.) ===
+  setPosition(x, y) {
+    this.position.x = x;
+    this.position.y = y;
+  }
+
+  setAngle(angle) {
+    this.angle = this.wrapAngle(angle);
+  }
+
+  reset() {
+    this.position = {
+      x: CONSTANTS.GAME_WIDTH / 2,
+      y: CONSTANTS.GAME_HEIGHT / 2,
+    };
+    this.velocity = { vx: 0, vy: 0 };
+    this.angle = 0;
+    this.angularVelocity = 0;
+  }
+
+  destroy() {
+    console.log('[PlayerSystem] Destroyed');
+  }
 }
 
 export default PlayerSystem;
 
 // Export
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = PlayerSystem;
+  module.exports = PlayerSystem;
 }
