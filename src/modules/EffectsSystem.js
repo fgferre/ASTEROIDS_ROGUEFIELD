@@ -1,4 +1,6 @@
+
 // Este sistema centraliza efeitos visuais e responde a eventos de jogo
+import * as CONSTANTS from '../core/GameConstants.js';
 
 class SpaceParticle {
   constructor(x, y, vx, vy, color, size, life, type = 'normal') {
@@ -93,6 +95,9 @@ export default class EffectsSystem {
         );
       });
     }
+  }
+
+    console.log('[EffectsSystem] Initialized');
   }
 
   update(deltaTime) {
@@ -237,6 +242,63 @@ export default class EffectsSystem {
           )
         );
       }
+
+  createThrusterEffect(direction, player) {
+    const angle = player.angle;
+    const forwardX = Math.cos(angle),
+      forwardY = Math.sin(angle);
+    const rightX = Math.cos(angle + Math.PI / 2),
+      rightY = Math.sin(angle + Math.PI / 2);
+
+    let offsetX = 0,
+      offsetY = 0,
+      dirX = 0,
+      dirY = 0;
+    switch (direction) {
+      case 'left':
+        offsetX = -rightX * CONSTANTS.SHIP_SIZE * 0.8;
+        offsetY = -rightY * 0.8 * CONSTANTS.SHIP_SIZE;
+        dirX = -rightX;
+        dirY = -rightY;
+        break;
+      case 'right':
+        offsetX = rightX * CONSTANTS.SHIP_SIZE * 0.8;
+        offsetY = rightY * 0.8 * CONSTANTS.SHIP_SIZE;
+        dirX = rightX;
+        dirY = rightY;
+        break;
+      case 'top':
+        offsetX = forwardX * CONSTANTS.SHIP_SIZE * 0.8;
+        offsetY = forwardY * 0.8 * CONSTANTS.SHIP_SIZE;
+        dirX = forwardX;
+        dirY = forwardY;
+        break;
+      case 'bottom':
+      default:
+        offsetX = -forwardX * CONSTANTS.SHIP_SIZE * 0.8;
+        offsetY = -forwardY * 0.8 * CONSTANTS.SHIP_SIZE;
+        dirX = -forwardX;
+        dirY = -forwardY;
+        break;
+    }
+
+    const thrusterX = player.x + offsetX;
+    const thrusterY = player.y + offsetY;
+
+    for (let i = 0; i < 2; i++) {
+      const speed = 80 + Math.random() * 40;
+      const p = new SpaceParticle(
+        thrusterX + (Math.random() - 0.5) * 4,
+        thrusterY + (Math.random() - 0.5) * 4,
+        dirX * speed + (Math.random() - 0.5) * 20,
+        dirY * speed + (Math.random() - 0.5) * 20,
+        `hsl(${Math.random() * 60 + 15}, 100%, 70%)`,
+        2 + Math.random() * 1.5,
+        0.25 + Math.random() * 0.15,
+        'thruster'
+      );
+      this.particles.push(p);
+
     }
   }
 

@@ -757,6 +757,14 @@ function resetWave() {
 
 // UI management moved to UISystem
 
+
+function createThrusterEffect(direction = 'bottom') {
+  const effects = gameServices.get('effects');
+  if (effects) {
+    effects.createThrusterEffect(direction, gameState.player);
+  }
+}
+
 // Loop principal do jogo com tratamento de erros
 
 let lastTime = 0;
@@ -940,6 +948,14 @@ function updateXPOrbs(deltaTime) {
   gameState.world.xpOrbs = gameState.world.xpOrbs.filter(
     (orb) => !orb.collected
   );
+}
+
+
+function updateParticles(deltaTime) {
+  const effects = gameServices.get('effects');
+  if (effects && typeof effects.updateParticles === 'function') {
+    effects.updateParticles(deltaTime);
+  }
 }
 
 // CORREÇÃO BUG 3: Sistema de ondas com timer regressivo de 60 segundos

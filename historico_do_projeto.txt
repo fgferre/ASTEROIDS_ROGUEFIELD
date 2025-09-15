@@ -1,5 +1,16 @@
-* f2b437c feat(ui): implement UISystem module
-* 41471db feat(ui): add UISystem module and integrate
+* 729b5e3 feat: introduce central EffectsSystem
+* 99e23d9 Commit: refactor(uisystem): remove CommonJS fallback; enforce ES modules Etapa do guia: atende “Padrões e escolhas técnicas → Sistema de Módulos (ES6 apenas)” e reforça “Princípios → Evoluir em passos curtos (refactor)” e “Validação contínua (Architecture rubric)”.
+*   0382876 Merge pull request #11 from fgferre/codex/analyze-next-steps-in-guide
+|\  
+| * 12393dd docs(history): record UISystem addition
+|/  
+*   db5cbf1 Merge pull request #10 from fgferre/codex/find-current-project-structure
+|\  
+| * 2eebc89 feat: add progression system
+|/  
+* 3d82225 feat(core): Complete Phase 2 by integrating combat and enemy systems
+* 573b06e feat(app): Integrate EnemySystem and event-driven destruction
+* 8c36323 feat(enemysystem): Create EnemySystem module for asteroid management
 * a0b7fbd feat(combat): Integrate CombatSystem and event-driven logic
 * c357b6f Ação: Criar CombatSystem (Prompt 2.1) FASE 2 do nosso plano de refatoração. Seguindo o guia, consiste em criar o CombatSystem. Este novo módulo será responsável por toda a lógica de combate: encontrar alvos, atirar e gerenciar os projéteis. Estou criando o arquivo src/modules/CombatSystem.js com o código exato especificado no guia.
 *   0b79dcc Merge branch 'main' of https://github.com/fgferre/ASTEROIDS_ROGUEFIELD
