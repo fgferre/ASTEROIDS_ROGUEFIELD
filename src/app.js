@@ -988,12 +988,7 @@ function checkCollisions() {
 
 
 
-function gameOver() {
-  const ui = gameServices.get('ui');
-  if (ui) {
-    ui.showGameOverScreen(gameState);
-  }
-}
+
 
 // Game over UI handled por UISystem
 
