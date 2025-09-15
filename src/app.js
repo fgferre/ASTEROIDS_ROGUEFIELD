@@ -41,28 +41,6 @@ const {
 // Estado global do jogo - Estruturado
 let gameState = {
   screen: 'menu',
-  player: {
-    x: GAME_WIDTH / 2,
-    y: GAME_HEIGHT / 2,
-    vx: 0,
-    vy: 0,
-    angle: 0,
-    targetAngle: 0, // Ângulo alvo para rotação suave
-    angularVelocity: 0,
-    health: 100,
-    maxHealth: 100,
-    level: 1,
-    xp: 0,
-    xpToNext: 100,
-    damage: 25,
-    maxSpeed: SHIP_MAX_SPEED,
-    acceleration: SHIP_ACCELERATION,
-    rotationSpeed: SHIP_ROTATION_SPEED,
-    armor: 0,
-    multishot: 1,
-    magnetismRadius: MAGNETISM_RADIUS,
-    invulnerableTimer: 0,
-  },
   world: {
     asteroids: [],
     bullets: [],
@@ -464,28 +442,6 @@ function resetPlayer() {
   if (playerSystem) {
     playerSystem.reset();
   }
-  gameState.player = {
-    x: GAME_WIDTH / 2,
-    y: GAME_HEIGHT / 2,
-    vx: 0,
-    vy: 0,
-    angle: 0,
-    targetAngle: 0,
-    angularVelocity: 0,
-    health: 100,
-    maxHealth: 100,
-    level: 1,
-    xp: 0,
-    xpToNext: 100,
-    damage: 25,
-    maxSpeed: SHIP_MAX_SPEED,
-    acceleration: SHIP_ACCELERATION,
-    rotationSpeed: SHIP_ROTATION_SPEED,
-    armor: 0,
-    multishot: 1,
-    magnetismRadius: MAGNETISM_RADIUS,
-    invulnerableTimer: 0,
-  };
 
   // Reset ProgressionSystem
   const progression = gameServices.get('progression');
@@ -570,18 +526,6 @@ function updateGame(deltaTime) {
   if (player) {
     player.update(deltaTime);
     playerStats = player.getStats();
-
-    // SINCRONIZAR com gameState antigo (temporário)
-    gameState.player.x = player.position.x;
-    gameState.player.y = player.position.y;
-    gameState.player.vx = player.velocity.vx;
-    gameState.player.vy = player.velocity.vy;
-    gameState.player.angle = player.angle;
-    gameState.player.health = playerStats.health;
-    gameState.player.maxHealth = playerStats.maxHealth;
-    gameState.player.damage = playerStats.damage;
-    gameState.player.multishot = playerStats.multishot;
-    gameState.player.magnetismRadius = playerStats.magnetismRadius;
   }
   // Atualizar CombatSystem
   const combat = gameServices.get('combat');
@@ -606,23 +550,11 @@ function updateGame(deltaTime) {
   if (progression) {
     progression.update(deltaTime);
 
-    // SINCRONIZAR com gameState antigo (temporário)
-    gameState.player.level = progression.getLevel();
-    const expData = progression.getExperience();
-    gameState.player.xp = expData.current;
-    gameState.player.xpToNext = expData.needed;
-
     // Sincronizar XP orbs
     gameState.world.xpOrbs = progression.getXPOrbs();
   }
 
   gameState.stats.time = (Date.now() - gameState.stats.startTime) / 1000;
-  // Atualizar i-frames do jogador
-  if (gameState.player.invulnerableTimer > 0) {
-    gameState.player.invulnerableTimer -= deltaTime;
-    if (gameState.player.invulnerableTimer < 0)
-      gameState.player.invulnerableTimer = 0;
-  }
 
   // Funções legadas que ainda precisam ser limpas
   updateAsteroids(deltaTime);
@@ -693,15 +625,18 @@ function updateAsteroids(deltaTime) {
 }
 
 function updateXPOrbs(deltaTime) {
+  const player = gameServices.get('player');
+  if (!player) return;
+
   gameState.world.xpOrbs.forEach((orb) => {
     if (orb.collected) return;
 
-    const dx = gameState.player.x - orb.x;
-    const dy = gameState.player.y - orb.y;
+    const dx = player.position.x - orb.x;
+    const dy = player.position.y - orb.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
     // Magnetismo
-    if (distance < gameState.player.magnetismRadius && distance > 0) {
+    if (distance < player.magnetismRadius && distance > 0) {
       const force = MAGNETISM_FORCE / Math.max(distance, 1);
       const normalizedDx = dx / distance;
       const normalizedDy = dy / distance;
@@ -783,14 +718,17 @@ function completeWave() {
 
   // Recompensas de fim de onda
   const orbCount = 4 + Math.floor(gameState.wave.current / 2);
+  const player = gameServices.get('player');
   for (let i = 0; i < orbCount; i++) {
     const angle = (i / orbCount) * Math.PI * 2;
     const distance = 100;
-    createXPOrb(
-      gameState.player.x + Math.cos(angle) * distance,
-      gameState.player.y + Math.sin(angle) * distance,
-      20 + gameState.wave.current * 5
-    );
+    if (player) {
+      createXPOrb(
+        player.position.x + Math.cos(angle) * distance,
+        player.position.y + Math.sin(angle) * distance,
+        20 + gameState.wave.current * 5
+      );
+    }
   }
 }
 
@@ -842,6 +780,9 @@ function checkCollisions() {
     combat.checkBulletCollisions(gameState.world.asteroids);
   }
 
+  const player = gameServices.get('player');
+  if (!player) return;
+
   // A lógica de colisão de balas foi movida para um listener do evento 'bullet-hit'.
   // O código legado abaixo agora é redundante, mas o manteremos por enquanto
   // para limpar os arrays até que o EnemySystem assuma essa responsabilidade.
@@ -857,25 +798,22 @@ function checkCollisions() {
   gameState.world.asteroids.forEach((asteroid) => {
     if (asteroid.destroyed) return;
 
-    const dx = gameState.player.x - asteroid.x;
-    const dy = gameState.player.y - asteroid.y;
+    const dx = player.position.x - asteroid.x;
+    const dy = player.position.y - asteroid.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
 
     if (distance < SHIP_SIZE + asteroid.radius) {
-      // Normal de colisão
       const nx = dx / Math.max(distance, 1);
       const ny = dy / Math.max(distance, 1);
-      // Correção de penetração
       const overlap = SHIP_SIZE + asteroid.radius - distance;
       if (overlap > 0) {
-        gameState.player.x += nx * overlap * 0.5;
-        gameState.player.y += ny * overlap * 0.5;
+        player.position.x += nx * overlap * 0.5;
+        player.position.y += ny * overlap * 0.5;
         asteroid.x -= nx * overlap * 0.5;
         asteroid.y -= ny * overlap * 0.5;
       }
-      // Impulso baseado em massas
-      const rvx = asteroid.vx - gameState.player.vx;
-      const rvy = asteroid.vy - gameState.player.vy;
+      const rvx = asteroid.vx - player.velocity.vx;
+      const rvy = asteroid.vy - player.velocity.vy;
       const velAlongNormal = rvx * nx + rvy * ny;
       if (velAlongNormal < 0) {
         const e = 0.2; // colisão menos elástica com a nave
@@ -884,31 +822,23 @@ function checkCollisions() {
         const j = (-(1 + e) * velAlongNormal) / (invMass1 + invMass2);
         const jx = j * nx;
         const jy = j * ny;
-        gameState.player.vx -= jx * invMass1;
-        gameState.player.vy -= jy * invMass1;
+        player.velocity.vx -= jx * invMass1;
+        player.velocity.vy -= jy * invMass1;
         asteroid.vx += jx * invMass2;
         asteroid.vy += jy * invMass2;
       }
 
-      // Dano baseado em momento relativo (com i-frames)
-      if (gameState.player.invulnerableTimer <= 0) {
+      if (player.invulnerableTimer <= 0) {
         const relSpeed = Math.sqrt(
-          (asteroid.vx - gameState.player.vx) ** 2 +
-            (asteroid.vy - gameState.player.vy) ** 2
+          (asteroid.vx - player.velocity.vx) ** 2 +
+            (asteroid.vy - player.velocity.vy) ** 2
         );
         const baseDamage = 12;
         const momentumFactor = (asteroid.mass * relSpeed) / 120;
         const rawDamage = baseDamage + momentumFactor;
-        const damage = Math.max(
-          3,
-          Math.floor(rawDamage) - gameState.player.armor
-        );
-        const playerSystem = gameServices.get('player');
-        const remaining = playerSystem
-          ? playerSystem.takeDamage(damage)
-          : gameState.player.health - damage;
-        gameState.player.health = remaining;
-        gameState.player.invulnerableTimer = 0.5;
+        const damage = Math.max(3, Math.floor(rawDamage) - player.armor);
+        const remaining = player.takeDamage(damage);
+        player.invulnerableTimer = 0.5;
 
         audio.playShipHit();
         addScreenShake(8, 0.3);
@@ -921,12 +851,31 @@ function checkCollisions() {
   });
 }
 
+function gameOver() {
+  const progression = gameServices.get('progression');
+  const player = gameServices.get('player');
+
+  const data = {
+    player: { level: progression ? progression.getLevel() : 1 },
+    stats: gameState.stats,
+    wave: gameState.wave,
+  };
+
+  if (typeof gameEvents !== 'undefined') {
+    gameEvents.emit('player-died', data);
+  }
+
+  gameState.screen = 'gameover';
+}
+
 // Game over UI handled por UISystem
 
 function renderGame() {
   if (!gameState.ctx) return;
 
   const ctx = gameState.ctx;
+
+  const player = gameServices.get('player');
 
   ctx.save();
 
@@ -1048,58 +997,60 @@ function renderGame() {
   });
 
   // Ship
-  ctx.save();
-  ctx.translate(gameState.player.x, gameState.player.y);
-  ctx.rotate(gameState.player.angle);
+  if (player) {
+    ctx.save();
+    ctx.translate(player.position.x, player.position.y);
+    ctx.rotate(player.angle);
 
-  // Ship body (triangle)
-  ctx.fillStyle = '#00FF88';
-  ctx.strokeStyle = '#00DD77';
-  ctx.lineWidth = 2;
+    // Ship body (triangle)
+    ctx.fillStyle = '#00FF88';
+    ctx.strokeStyle = '#00DD77';
+    ctx.lineWidth = 2;
 
-  ctx.beginPath();
-  ctx.moveTo(SHIP_SIZE, 0);
-  ctx.lineTo(-SHIP_SIZE / 2, -SHIP_SIZE / 2);
-  ctx.lineTo(-SHIP_SIZE / 3, 0);
-  ctx.lineTo(-SHIP_SIZE / 2, SHIP_SIZE / 2);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(SHIP_SIZE, 0);
+    ctx.lineTo(-SHIP_SIZE / 2, -SHIP_SIZE / 2);
+    ctx.lineTo(-SHIP_SIZE / 3, 0);
+    ctx.lineTo(-SHIP_SIZE / 2, SHIP_SIZE / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
 
-  // Wings
-  ctx.fillStyle = '#0088DD';
-  ctx.beginPath();
-  ctx.moveTo(-SHIP_SIZE / 3, -SHIP_SIZE / 3);
-  ctx.lineTo(-SHIP_SIZE, -SHIP_SIZE);
-  ctx.lineTo(-SHIP_SIZE / 2, -SHIP_SIZE / 2);
-  ctx.closePath();
-  ctx.fill();
+    // Wings
+    ctx.fillStyle = '#0088DD';
+    ctx.beginPath();
+    ctx.moveTo(-SHIP_SIZE / 3, -SHIP_SIZE / 3);
+    ctx.lineTo(-SHIP_SIZE, -SHIP_SIZE);
+    ctx.lineTo(-SHIP_SIZE / 2, -SHIP_SIZE / 2);
+    ctx.closePath();
+    ctx.fill();
 
-  ctx.beginPath();
-  ctx.moveTo(-SHIP_SIZE / 3, SHIP_SIZE / 3);
-  ctx.lineTo(-SHIP_SIZE, SHIP_SIZE);
-  ctx.lineTo(-SHIP_SIZE / 2, SHIP_SIZE / 2);
-  ctx.closePath();
-  ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-SHIP_SIZE / 3, SHIP_SIZE / 3);
+    ctx.lineTo(-SHIP_SIZE, SHIP_SIZE);
+    ctx.lineTo(-SHIP_SIZE / 2, SHIP_SIZE / 2);
+    ctx.closePath();
+    ctx.fill();
 
-  // Cockpit
-  ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath();
-  ctx.arc(SHIP_SIZE / 3, 0, 3, 0, Math.PI * 2);
-  ctx.fill();
+    // Cockpit
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(SHIP_SIZE / 3, 0, 3, 0, Math.PI * 2);
+    ctx.fill();
 
-  ctx.restore();
+    ctx.restore();
+  }
 
   // Magnetism field indicator
-  if (gameState.world.xpOrbs.some((orb) => !orb.collected)) {
+  if (player && gameState.world.xpOrbs.some((orb) => !orb.collected)) {
     ctx.strokeStyle = 'rgba(0, 221, 255, 0.25)';
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 3]);
     ctx.beginPath();
     ctx.arc(
-      gameState.player.x,
-      gameState.player.y,
-      gameState.player.magnetismRadius,
+      player.position.x,
+      player.position.y,
+      player.magnetismRadius,
       0,
       Math.PI * 2
     );
@@ -1124,10 +1075,12 @@ function renderGame() {
     // Target line
     ctx.strokeStyle = 'rgba(255, 255, 0, 0.3)';
     ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(gameState.player.x, gameState.player.y);
-    ctx.lineTo(target.x, target.y);
-    ctx.stroke();
+    if (player) {
+      ctx.beginPath();
+      ctx.moveTo(player.position.x, player.position.y);
+      ctx.lineTo(target.x, target.y);
+      ctx.stroke();
+    }
   }
 
   if (effects) {
