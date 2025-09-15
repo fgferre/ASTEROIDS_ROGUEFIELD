@@ -27,7 +27,22 @@ class PlayerSystem {
             gameServices.register('player', this);
         }
 
+        // Escutar eventos de upgrade para refletir stats atuais
+        this.setupEventListeners();
+
         console.log('[PlayerSystem] Initialized at', this.position);
+    }
+
+    setupEventListeners() {
+        if (typeof gameEvents === 'undefined') return;
+
+        gameEvents.on('upgrade-damage-boost', (data) => {
+            this.damage = Math.floor(this.damage * data.multiplier);
+        });
+
+        gameEvents.on('upgrade-multishot', (data) => {
+            this.multishot += data.bonus;
+        });
     }
 
     // === MÉTODO PRINCIPAL UPDATE ===
@@ -249,8 +264,3 @@ class PlayerSystem {
 }
 
 export default PlayerSystem;
-
-// Export
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = PlayerSystem;
-}
