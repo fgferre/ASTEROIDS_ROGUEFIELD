@@ -3702,44 +3702,177 @@ Se efeitos visuais ficarem diferentes ou performance piorar, me informe IMEDIATA
 
 ---
 
-## 📋 **FASE 6: LIMPEZA E FINALIZAÇÃO**
+## 📋 **FASE 6: LIMPEZA, FINALIZAÇÃO E VALIDAÇÃO**
 
-### **Prompt 6.1: Limpeza do Código Antigo - Parte 1**
+Esta fase final garantirá que o `app.js` se torne um orquestrador enxuto, removendo todo o código legado e solidificando a arquitetura modular.
 
-````
-CONTEXTO: Todos os módulos criados e funcionando. Agora remover código duplicado.
-OBJETIVO: Remover funções antigas que foram substituídas por módulos, mantendo funcionamento.
+### **Prompt 6.1: Centralizar Estado do Player e Remover Código Legado**
 
-AÇÕES DE LIMPEZA NO app.js:
+```
+CONTEXTO: A lógica de movimento do Player foi movida para o `PlayerSystem`, mas dados como vida, dano e stats ainda residem no `gameState`. O código legado de movimento e input ainda polui o `app.js`.
+OBJETIVO: Centralizar TODOS os dados do player dentro do `PlayerSystem` e remover as funções e sincronizações legadas de movimento e input do `app.js`.
 
-1. REMOVER funções antigas de UPDATE (que agora fazem console.log):
-   Deletar completamente estas funções:
-   - updateParticles()
-   - updateScreenShake()
-   - updateScreenFlash()
+AÇÕES NO `PlayerSystem.js`:
+1.  No construtor, adicione as propriedades de estado que hoje estão no `gameState.player`:
+    ```javascript
+    // Player Stats
+    this.health = 100;
+    this.maxHealth = 100;
+    this.damage = 25;
+    this.multishot = 1;
+    this.magnetismRadius = CONSTANTS.MAGNETISM_RADIUS;
+    // Adicione outros stats se houver
+    ```
+2.  Crie métodos `takeDamage(amount)` e `heal(amount)` para gerenciar a vida.
+3.  Crie métodos `getStats()` para retornar um objeto com os stats atuais (health, damage, etc.).
+4.  Adicione listeners de eventos para upgrades (`upgrade-damage-boost`, `upgrade-health-boost`, etc.) DENTRO do `PlayerSystem` para que ele modifique seus próprios stats.
 
-2. REMOVER funções antigas de INPUT que não são mais usadas:
-   Deletar ou comentar a seção setupEventListeners() APENAS as partes:
-   - document.addEventListener('keydown')
-   - document.addEventListener('keyup')
-   (MANTER os click events para botões)
+AÇÕES NO `app.js`:
+1.  **REMOVER COMPLETAMENTE** as seguintes funções:
+    -   `updatePlayerMovement()`
+    -   `setupInputListeners()` (ou a lógica de `keydown`/`keyup` dentro dela)
+2.  Na função `updateGame()`, **REMOVER** o bloco de sincronização do `playerSystem`:
+    ```javascript
+    // REMOVER ESTE BLOCO
+    gameState.player.x = player.position.x;
+    gameState.player.y = player.position.y;
+    // ... e todas as outras linhas de sincronização do player
+    ```
+3.  Na inicialização do `gameState`, **REMOVER** o objeto `player` inteiro. O `PlayerSystem` é agora a única fonte da verdade.
+4.  Na função `drawPlayer()`, obtenha os dados diretamente do `PlayerSystem` via `gameServices.get('player')`.
 
-3. REMOVER da função updateGame() as chamadas:
-   Remover estas linhas:
-   - updateParticles(deltaTime);
-   - updateScreenShake(deltaTime);
-   - updateScreenFlash(deltaTime);
+AÇÕES NO `CombatSystem.js` e `ProgressionSystem.js`:
+1.  Onde você acessa `gameState.player` (ex: `getPlayerCombatStats()`), substitua por `gameServices.get('player').getStats()`.
 
-4. REMOVER variáveis antigas de gameState que foram substituídas:
-   Na inicialização do gameState, REMOVER:
-   - input: {} (InputSystem gerencia)
-   - screenShake: {...} (EffectsSystem gerencia)
-<span style="display:none">[^2][^3]</span>
+VALIDAÇÃO OBRIGATÓRIA:
+1.  O jogo carrega sem erros.
+2.  O player se move e rotaciona corretamente, controlado 100% pelo `PlayerSystem`.
+3.  O tiro automático e targeting ainda funcionam, buscando os stats do `PlayerSystem`.
+4.  Upgrades de dano, velocidade, vida, etc., são aplicados corretamente no `PlayerSystem`.
+5.  A UI de vida reflete o estado do `PlayerSystem`.
+```
 
-<div style="text-align: center">⁂</div>
+### **Prompt 6.2: Remover Código Legado de Inimigos, Combate e Progressão**
 
-[^1]: app.js
-[^2]: index.html
-[^3]: style.css```
+```
+CONTEXTO: `EnemySystem`, `CombatSystem` e `ProgressionSystem` estão funcionando, mas o `app.js` ainda contém as funções antigas e a sincronização de estado com o `gameState`.
+OBJETIVO: Remover toda a lógica e estado legados de inimigos, combate e progressão do `app.js`, tornando os módulos as únicas fontes da verdade.
 
-````
+AÇÕES DE LIMPEZA NO `app.js`:
+
+1.  **REMOVER COMPLETAMENTE** as seguintes funções:
+    -   `updateTargeting()`
+    -   `handleShooting()`
+    -   `createBullet()`
+    -   `updateBullets()`
+    -   `updateAsteroids()`
+    -   `spawnAsteroid()`
+    -   `spawnInitialAsteroids()`
+    -   `updateWaveSystem()`
+    -   `collectXP()`
+    -   `createXPOrb()`
+    -   `levelUp()`
+    -   `selectUpgrade()`
+
+2.  Na função `updateGame()`, **REMOVER** todos os blocos de sincronização restantes:
+    ```javascript
+    // REMOVER BLOCO DO COMBATSYSTEM
+    gameState.world.bullets = combat.getBullets();
+    gameState.world.currentTarget = combat.getCurrentTarget();
+
+    // REMOVER BLOCO DO ENEMYSYSTEM
+    gameState.world.asteroids = enemies.getAllAsteroids();
+
+    // REMOVER BLOCO DO PROGRESSIONSYSTEM
+    gameState.player.level = progression.getLevel();
+    // ... e todas as outras linhas de sincronização
+    ```
+
+3.  Na função `checkCollisions()`, **REMOVER** a chamada para `combat.checkBulletCollisions()`. A detecção de colisão deve ser totalmente gerenciada internamente pelo `CombatSystem`.
+
+4.  Na inicialização do `gameState`, **REMOVER** as seguintes propriedades:
+    -   `world` (asteroids, bullets, xpOrbs)
+    -   `wave`
+    -   `stats` (parcialmente, o que for gerenciado por sistemas)
+
+AÇÕES NOS MÓDULOS:
+1.  `CombatSystem.js`: No método `update()`, adicione uma chamada para `this.checkBulletCollisions(gameServices.get('enemies').getAsteroids())`. A colisão agora é responsabilidade interna do módulo.
+2.  `EnemySystem.js`: Adicione a lógica de `updateWaveSystem()` dentro do `update()` do `EnemySystem` para que ele gerencie o spawning baseado nas ondas.
+
+VALIDAÇÃO OBRIGATÓRIA:
+1.  O jogo funciona perfeitamente.
+2.  Asteroides são criados e gerenciados pelo `EnemySystem`.
+3.  Ondas progridem corretamente.
+4.  O combate (tiro, targeting, colisão de projéteis) é 100% controlado pelo `CombatSystem`.
+5.  XP, level up e upgrades são 100% controlados pelo `ProgressionSystem`.
+6.  O objeto `gameState` está significativamente menor.
+```
+
+### **Prompt 6.3: Finalizar o `app.js` como Orquestrador Principal**
+
+```
+CONTEXTO: A maior parte do código legado foi removida. O `app.js` agora precisa ser limpo para atuar apenas como um ponto de entrada e orquestrador do loop principal.
+OBJETIVO: Simplificar o `app.js` ao seu papel final: inicializar sistemas, executar o game loop e gerenciar o estado global de alto nível (como 'playing', 'paused', 'gameover').
+
+AÇÕES DE REFINAMENTO NO `app.js`:
+
+1.  **REESTRUTURAR `init()`**:
+    -   A função `init()` deve apenas instanciar os sistemas e registrá-los no `ServiceLocator`.
+    -   Mova a lógica de setup de eventos de alto nível (como `player-died` ou `player-leveled-up` que pausam o jogo) para uma função separada `setupGlobalEventListeners()`.
+
+2.  **SIMPLIFICAR `updateGame(deltaTime)`**:
+    -   O corpo desta função deve ser apenas um loop que itera sobre os sistemas registrados e chama `update(deltaTime)` em cada um.
+    -   Exemplo:
+        ```javascript
+        const servicesToUpdate = ['input', 'player', 'combat', 'enemies', 'progression', 'effects', 'ui'];
+        for (const serviceName of servicesToUpdate) {
+            const service = gameServices.get(serviceName);
+            if (service && service.update) {
+                service.update(deltaTime);
+            }
+        }
+        ```
+
+3.  **SIMPLIFICAR `draw()`**:
+    -   A função `draw()` não deve mais acessar `gameState`.
+    -   Ela deve obter os objetos a serem renderizados de cada sistema correspondente:
+        -   `gameServices.get('player')` para a nave.
+        -   `gameServices.get('enemies').getAsteroids()` para os inimigos.
+        -   `gameServices.get('combat').getBullets()` para os projéteis.
+        -   `gameServices.get('progression').getXPOrbs()` para os orbs de XP.
+        -   `gameServices.get('effects').getParticles()` para as partículas.
+    -   Chame as funções de desenho para cada um desses elementos.
+
+4.  **REMOVER VARIÁVEIS GLOBAIS**:
+    -   Elimine todas as variáveis globais restantes que foram absorvidas pelos sistemas. O `gameState` deve conter apenas o estado da aplicação (`screen: 'playing'`), não mais o estado do jogo.
+
+VALIDAÇÃO OBRIGATÓRIA:
+1.  `app.js` tem menos de 300 linhas.
+2.  O jogo opera de forma idêntica à versão anterior.
+3.  O objeto `gameState` está mínimo e controla apenas o estado da tela (ex: 'playing', 'levelup', 'gameover').
+4.  Não há mais lógica de jogo (movimento, combate, etc.) diretamente no `app.js`.
+```
+
+### **Prompt 6.4: Validação Final do Jogo**
+
+```
+CONTEXTO: A refatoração está completa. A arquitetura modular está implementada e o código legado foi removido.
+OBJETIVO: Realizar uma verificação completa de todas as funcionalidades do jogo para garantir que nada foi quebrado durante o processo de limpeza final, usando o `test-checklist.md`.
+
+AÇÕES:
+1.  Abra o arquivo `docs/validation/test-checklist.md`.
+2.  Execute o jogo e teste CADA UM dos itens da checklist metodicamente.
+3.  Marque cada item (`[x]`) conforme for validado.
+4.  Preste atenção especial a:
+    -   **Interações entre sistemas**: O `CombatSystem` mira corretamente nos inimigos do `EnemySystem`? O `ProgressionSystem` cria orbs quando o `EnemySystem` reporta uma morte? A `UI` reflete os dados do `PlayerSystem` e `ProgressionSystem`?
+    -   **Performance**: O FPS continua estável? O número de partículas e outros objetos é gerenciado corretamente, sem vazamentos de memória?
+    -   **Ciclo de Jogo**: O jogo começa, progride através das ondas, permite upgrades, e termina (game over) corretamente? O reinício do jogo limpa o estado de todos os sistemas?
+
+VALIDAÇÃO CRÍTICA:
+-   TODOS os itens no `test-checklist.md` devem ser marcados como concluídos.
+-   O jogo deve estar 100% funcional, estável e com performance igual ou superior à original.
+-   O console do navegador deve estar limpo de erros ou warnings inesperados durante o gameplay.
+
+Se encontrar qualquer bug, relate-o detalhadamente para que possa ser corrigido antes de considerar o projeto concluído. Se tudo funcionar, a refatoração foi um sucesso.
+```
+

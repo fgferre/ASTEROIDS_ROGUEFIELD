@@ -1002,30 +1002,15 @@ function checkCollisions() {
   });
 }
 
-function createAsteroidExplosion(asteroid) {
-  const effects = gameServices.get('effects');
-  if (effects) effects.createAsteroidExplosion(asteroid);
-}
 
-function createXPCollectEffect(x, y) {
-  const effects = gameServices.get('effects');
-  if (effects) effects.createXPCollectEffect(x, y);
-}
 
-function createLevelUpExplosion() {
-  const effects = gameServices.get('effects');
-  if (effects) effects.createLevelUpExplosion(gameState.player);
-}
 
-function addScreenShake(intensity, duration) {
-  const effects = gameServices.get('effects');
-  if (effects) effects.addScreenShake(intensity, duration);
-}
 
-function addFreezeFrame(duration, fade = 0) {
-  const effects = gameServices.get('effects');
-  if (effects) effects.addFreezeFrame(duration, fade);
-}
+
+
+
+
+
 
 function addScreenFlash(color, duration, intensity) {
   const effects = gameServices.get('effects');
