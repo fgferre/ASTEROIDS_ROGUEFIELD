@@ -26,10 +26,12 @@ class CombatSystem {
     }
 
     // === UPDATE PRINCIPAL ===
-    update(deltaTime, playerStats) { // playerStats é recebido aqui
+    update(deltaTime) {
+        const playerStats = gameServices.get('player').getStats();
         this.updateTargeting(deltaTime);
-        this.handleShooting(deltaTime, playerStats); // E passado para a função de tiro
+        this.handleShooting(deltaTime, playerStats);
         this.updateBullets(deltaTime);
+        this.checkBulletCollisions(gameServices.get('enemies').getAsteroids());
     }
 
     // === SISTEMA DE TARGETING ===

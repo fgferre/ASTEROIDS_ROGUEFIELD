@@ -18,6 +18,10 @@ class PlayerSystem {
         this.linearDamping = CONSTANTS.SHIP_LINEAR_DAMPING;
         this.angularDamping = CONSTANTS.SHIP_ANGULAR_DAMPING;
 
+        // === STATS BÁSICOS ===
+        this.damage = 25;
+        this.multishot = 1;
+
         // Registrar no ServiceLocator
         if (typeof gameServices !== 'undefined') {
             gameServices.register('player', this);
@@ -213,6 +217,13 @@ class PlayerSystem {
 
     getVelocity() {
         return { ...this.velocity };
+    }
+
+    getStats() {
+        return {
+            damage: this.damage,
+            multishot: this.multishot
+        };
     }
 
     // === SETTERS (para reset, teleport, etc.) ===

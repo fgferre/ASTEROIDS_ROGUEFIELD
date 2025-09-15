@@ -618,11 +618,7 @@ function updateGame(deltaTime) {
   // Atualizar CombatSystem
   const combat = gameServices.get('combat');
   if (combat) {
-    const playerStats = {
-      damage: gameState.player.damage || 25,
-      multishot: gameState.player.multishot || 1,
-    };
-    combat.update(deltaTime, playerStats);
+    combat.update(deltaTime);
 
     // SINCRONIZAR bullets com gameState antigo (temporário)
     gameState.world.bullets = combat.getBullets();
@@ -872,11 +868,7 @@ function collectXP(amount) {
 
 // Detecção de colisão melhorada
 function checkCollisions() {
-  // Usar collision detection do CombatSystem
-  const combat = gameServices.get('combat');
-  if (combat) {
-    combat.checkBulletCollisions(gameState.world.asteroids);
-  }
+  // A lógica de colisão de balas foi movida para o CombatSystem.
 
   // A lógica de colisão de balas foi movida para um listener do evento 'bullet-hit'.
   // O código legado abaixo agora é redundante, mas o manteremos por enquanto
