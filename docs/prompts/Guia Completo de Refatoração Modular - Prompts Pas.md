@@ -3702,44 +3702,181 @@ Se efeitos visuais ficarem diferentes ou performance piorar, me informe IMEDIATA
 
 ---
 
-## 📋 **FASE 6: LIMPEZA E FINALIZAÇÃO**
+## 📋 **FASE 6: FINALIZAÇÃO - DESACOPLAMENTO DA RENDERIZAÇÃO**
 
-### **Prompt 6.1: Limpeza do Código Antigo - Parte 1**
+**Objetivo**: Modificar a função `renderGame` para que ela busque os dados diretamente dos sistemas modulares (`PlayerSystem`, `CombatSystem`, etc.) via `ServiceLocator`, em vez de ler do `gameState` global.
 
-````
-CONTEXTO: Todos os módulos criados e funcionando. Agora remover código duplicado.
-OBJETIVO: Remover funções antigas que foram substituídas por módulos, mantendo funcionamento.
+### **Prompt 6.1: Desacoplar Renderização do Player**
 
-AÇÕES DE LIMPEZA NO app.js:
+```
+CONTEXTO: A função `renderGame` em `app.js` atualmente lê a posição e ângulo do jogador do `gameState` global. Precisamos desacoplar isso para ler diretamente do `PlayerSystem`.
+OBJETIVO: Modificar `renderGame` para usar `gameServices.get('player')` para obter os dados de posição e ângulo do jogador, eliminando a dependência do `gameState.player` para a renderização.
 
-1. REMOVER funções antigas de UPDATE (que agora fazem console.log):
-   Deletar completamente estas funções:
-   - updateParticles()
-   - updateScreenShake()
-   - updateScreenFlash()
+AÇÕES:
+1.  Localize a função `renderGame()` em `app.js`.
+2.  Encontre as linhas que renderizam a nave, especificamente onde `ctx.translate(gameState.player.x, gameState.player.y)` e `ctx.rotate(gameState.player.angle)` são chamadas.
+3.  Substitua essas leituras do `gameState` por chamadas equivalentes ao `PlayerSystem` através do `ServiceLocator`.
 
-2. REMOVER funções antigas de INPUT que não são mais usadas:
-   Deletar ou comentar a seção setupEventListeners() APENAS as partes:
-   - document.addEventListener('keydown')
-   - document.addEventListener('keyup')
-   (MANTER os click events para botões)
+EXEMPLO DE CÓDIGO:
+// Antes:
+// ctx.translate(gameState.player.x, gameState.player.y);
+// ctx.rotate(gameState.player.angle);
 
-3. REMOVER da função updateGame() as chamadas:
-   Remover estas linhas:
-   - updateParticles(deltaTime);
-   - updateScreenShake(deltaTime);
-   - updateScreenFlash(deltaTime);
+// Depois:
+const player = gameServices.get('player');
+if (player) {
+    const playerPos = player.getPosition();
+    ctx.translate(playerPos.x, playerPos.y);
+    ctx.rotate(player.getAngle());
+}
 
-4. REMOVER variáveis antigas de gameState que foram substituídas:
-   Na inicialização do gameState, REMOVER:
-   - input: {} (InputSystem gerencia)
-   - screenShake: {...} (EffectsSystem gerencia)
-<span style="display:none">[^2][^3]</span>
+VALIDAÇÃO:
+- [ ] A nave do jogador é renderizada corretamente na tela.
+- [ ] A nave se move e rotaciona suavemente como antes, respondendo aos comandos.
+- [ ] Nenhum erro novo aparece no console.
+```
 
-<div style="text-align: center">⁂</div>
+### **Prompt 6.2: Desacoplar Renderização de Entidades (Balas, Asteroides, Orbes)**
 
-[^1]: app.js
-[^2]: index.html
-[^3]: style.css```
+```
+CONTEXTO: A renderização de balas, asteroides e orbes de XP ainda depende dos arrays em `gameState.world`.
+OBJETIVO: Modificar `renderGame` para buscar os arrays de entidades diretamente de seus respectivos sistemas (`CombatSystem`, `EnemySystem`, `ProgressionSystem`).
 
-````
+AÇÕES:
+1.  Em `renderGame`, localize os loops `forEach` que iteram sobre `gameState.world.bullets`, `gameState.world.asteroids`, e `gameState.world.xpOrbs`.
+2.  Altere esses loops para obterem os dados diretamente dos sistemas correspondentes usando o `ServiceLocator`.
+
+EXEMPLO DE CÓDIGO:
+// Balas (antes): gameState.world.bullets.forEach(...)
+// Balas (depois): gameServices.get('combat')?.getBullets().forEach(...)
+
+// Asteroides (antes): gameState.world.asteroids.forEach(...)
+// Asteroides (depois): gameServices.get('enemies')?.getAsteroids().forEach(...)
+
+// Orbes de XP (antes): gameState.world.xpOrbs.forEach(...)
+// Orbes de XP (depois): gameServices.get('progression')?.getXPOrbs().forEach(...)
+
+VALIDAÇÃO:
+- [ ] Balas, asteroides e orbes de XP continuam sendo renderizados corretamente.
+- [ ] O comportamento visual do jogo permanece inalterado.
+```
+
+### **Prompt 6.3: Desacoplar Indicadores de UI no Canvas (Alvo, Magnetismo)**
+
+```
+CONTEXTO: Os indicadores de alvo e do campo de magnetismo desenhados no canvas também dependem do `gameState`.
+OBJETIVO: Modificar `renderGame` para que os indicadores obtenham seus dados dos sistemas `CombatSystem` e `ProgressionSystem`.
+
+AÇÕES:
+1.  Localize a seção "Target indicator" em `renderGame`. Mude a leitura de `gameState.world.currentTarget` para usar `gameServices.get('combat').getCurrentTarget()`.
+2.  Localize a seção "Magnetism field indicator". Mude a leitura de `gameState.player.magnetismRadius` para obter o valor do `ProgressionSystem`. (Nota: talvez seja necessário adicionar um getter `getMagnetismRadius()` ao `ProgressionSystem` se ele não existir).
+
+VALIDAÇÃO:
+- [ ] O anel indicador ao redor do asteroide alvo funciona como antes.
+- [ ] A linha tracejada que indica o raio de magnetismo ao redor da nave aparece corretamente.
+```
+
+---
+
+## 📋 **FASE 7: FINALIZAÇÃO - LIMPEZA DO CÓDIGO LEGADO**
+
+**Objetivo**: Com a renderização desacoplada, podemos finalmente remover o código legado e os blocos de sincronização de `app.js`.
+
+### **Prompt 7.1: Remover Blocos de Sincronização e Funções Legadas**
+
+```
+CONTEXTO: A função `updateGame` ainda contém blocos de código `// SINCRONIZAR` que copiam dados dos novos sistemas para o `gameState` antigo. Como a renderização não depende mais do `gameState`, esses blocos são redundantes. Funções de update legadas também permanecem.
+OBJETIVO: Limpar `app.js` removendo os blocos de sincronização e as funções de update legadas.
+
+AÇÕES:
+1.  Em `updateGame`, delete todos os blocos de código comentados como `// SINCRONIZAR com gameState antigo (temporário)`.
+2.  Delete as seguintes funções inteiras de `app.js`, pois suas lógicas já estão contidas nos novos sistemas:
+    - `updateBullets(deltaTime)`
+    - `updateAsteroids(deltaTime)`
+    - `updateXPOrbs(deltaTime)`
+    - `updateWaveSystem(deltaTime)`
+3.  Delete a chamada para `updateAsteroids(deltaTime)` e `updateWaveSystem(deltaTime)` de dentro de `updateGame`.
+
+VALIDAÇÃO:
+- [ ] O jogo deve funcionar perfeitamente, usando `test-checklist.md`.
+- [ ] A remoção do código não deve introduzir nenhum bug visual ou de comportamento.
+```
+
+### **Prompt 7.2: Remover Classe `Asteroid` Duplicada**
+
+```
+CONTEXTO: `app.js` ainda contém uma definição completa da classe `Asteroid`, que também está definida e exportada por `EnemySystem.js`.
+OBJETIVO: Remover a definição duplicada da classe `Asteroid` de `app.js`.
+
+AÇÕES:
+1.  Localize e delete a definição inteira da `class Asteroid` de `app.js`.
+
+VALIDAÇÃO:
+- [ ] O jogo carrega e funciona sem erros. A classe `Asteroid` importada pelo `EnemySystem` é a única fonte da verdade.
+```
+
+---
+
+## 📋 **FASE 8: FINALIZAÇÃO - DESCENTRALIZAÇÃO DO ESTADO**
+
+**Objetivo**: Mover as últimas peças de lógica e estado do `gameState` para módulos dedicados, tornando `app.js` um orquestrador puro.
+
+### **Prompt 8.1: Mover Colisão Nave-Asteroide para `PlayerSystem`**
+
+```
+CONTEXTO: A lógica de colisão entre a nave e os asteroides ainda reside na função `checkCollisions` em `app.js`, manipulando `gameState.player` diretamente.
+OBJETIVO: Mover essa responsabilidade para o `PlayerSystem`, que deve gerenciar o estado de vida do jogador.
+
+AÇÕES:
+1.  Crie um novo método em `PlayerSystem`, como `checkCollisionWithEnemies(enemies)`.
+2.  Mova a lógica de detecção de colisão nave-asteroide de `checkCollisions` em `app.js` para este novo método.
+3.  Dentro do `PlayerSystem`, ao detectar uma colisão, modifique o estado de vida interno do sistema.
+4.  Em vez de modificar o `gameState`, o `PlayerSystem` deve emitir eventos como `player-took-damage` ou `player-died`.
+5.  Em `app.js`, chame `player.checkCollisionWithEnemies(enemies.getAsteroids())` a partir de `updateGame`.
+
+VALIDAÇÃO:
+- [ ] A colisão entre a nave e os asteroides causa dano corretamente.
+- [ ] A barra de vida na UI reflete o dano.
+- [ ] O jogo termina (game over) quando a vida do jogador chega a zero.
+```
+
+### **Prompt 8.2: Criar `WaveSystem` e Descentralizar `gameState.wave`**
+
+```
+CONTEXTO: O estado e a lógica das ondas de inimigos (`gameState.wave`) ainda são gerenciados em `app.js`.
+OBJETIVO: Criar um novo módulo `WaveSystem.js` para gerenciar o estado das ondas, o tempo e a progressão.
+
+AÇÕES:
+1.  Crie um novo arquivo `src/modules/WaveSystem.js`.
+2.  Mova toda a lógica de `updateWaveSystem`, `completeWave`, e `startNextWave` de `app.js` para o `WaveSystem`.
+3.  Mova o objeto `gameState.wave` para se tornar o estado interno do `WaveSystem`.
+4.  Instancie o `WaveSystem` em `init()` e chame seu método `update()` em `updateGame()`.
+5.  O `WaveSystem` deve emitir eventos como `wave-started`, `wave-completed`. O `EnemySystem` deve ouvir esses eventos para saber quando spawnar inimigos.
+
+VALIDAÇÃO:
+- [ ] As ondas de inimigos progridem corretamente.
+- [ ] O intervalo entre as ondas funciona.
+- [ ] A dificuldade aumenta a cada onda.
+```
+
+### **Prompt 8.3: Atualizar `completed-prompts.md`**
+
+```
+CONTEXTO: O arquivo de tracking de progresso `completed-prompts.md` está desatualizado.
+OBJETIVO: Documentar todo o trabalho de refatoração que foi concluído.
+
+AÇÕES:
+1.  Abra o arquivo `docs/prompts/completed-prompts.md`.
+2.  Liste todos os prompts das Fases 0 a 8 que foram implementados com sucesso.
+
+EXEMPLO:
+# Completed Prompts
+
+- **Fase 0**: 0.1, 0.2, 0.3, 0.4
+- **Fase 1**: 1.1, 1.2, 1.3, 1.4
+- ... e assim por diante.
+
+VALIDAÇÃO:
+- [ ] O arquivo `completed-prompts.md` reflete com precisão o estado atual da refatoração.
+```
+
