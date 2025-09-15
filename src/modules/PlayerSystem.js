@@ -24,6 +24,8 @@ class PlayerSystem {
     this.damage = 25;
     this.multishot = 1;
     this.magnetismRadius = CONSTANTS.MAGNETISM_RADIUS;
+    this.armor = 0;
+    this.invulnerableTimer = 0;
 
     // Registrar no ServiceLocator
     if (typeof gameServices !== 'undefined') {
@@ -77,6 +79,10 @@ class PlayerSystem {
     const movement = inputSystem.getMovementInput();
     this.updateMovement(deltaTime, movement);
     this.updatePosition(deltaTime);
+
+    if (this.invulnerableTimer > 0) {
+      this.invulnerableTimer = Math.max(0, this.invulnerableTimer - deltaTime);
+    }
 
     // Emitir evento para outros sistemas
     // Usamos o método 'emitSilently' para não poluir o console a cada frame.
@@ -308,6 +314,8 @@ class PlayerSystem {
     this.multishot = 1;
     this.magnetismRadius = CONSTANTS.MAGNETISM_RADIUS;
     this.maxSpeed = CONSTANTS.SHIP_MAX_SPEED;
+    this.armor = 0;
+    this.invulnerableTimer = 0;
   }
 
   reset() {
