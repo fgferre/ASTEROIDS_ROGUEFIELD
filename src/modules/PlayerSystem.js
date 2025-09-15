@@ -301,7 +301,17 @@ class PlayerSystem {
     this.angle = this.wrapAngle(angle);
   }
 
+  resetStats() {
+    this.health = 100;
+    this.maxHealth = 100;
+    this.damage = 25;
+    this.multishot = 1;
+    this.magnetismRadius = CONSTANTS.MAGNETISM_RADIUS;
+    this.maxSpeed = CONSTANTS.SHIP_MAX_SPEED;
+  }
+
   reset() {
+    this.resetStats();
     this.position = {
       x: CONSTANTS.GAME_WIDTH / 2,
       y: CONSTANTS.GAME_HEIGHT / 2,
