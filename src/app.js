@@ -31,11 +31,6 @@ const {
   MAGNETISM_RADIUS,
   MAGNETISM_FORCE,
   TARGET_UPDATE_INTERVAL,
-  ASTEROIDS_PER_WAVE_BASE,
-  ASTEROIDS_PER_WAVE_MULTIPLIER,
-  WAVE_DURATION,
-  WAVE_BREAK_TIME,
-  MAX_ASTEROIDS_ON_SCREEN,
 } = CONSTANTS;
 
 // Estado global do jogo - Estruturado
@@ -72,19 +67,7 @@ let gameState = {
     lastShotTime: 0,
     shootCooldown: 0.3,
   },
-  wave: {
-    current: 1,
-    totalAsteroids: ASTEROIDS_PER_WAVE_BASE,
-    asteroidsSpawned: 0,
-    asteroidsKilled: 0,
-    isActive: true,
-    breakTimer: 0,
-    completedWaves: 0,
-    timeRemaining: WAVE_DURATION, // Timer regressivo de 60 segundos
-    spawnTimer: 0,
-    spawnDelay: 1.0,
-    initialSpawnDone: false,
-  },
+  wave: {},
   stats: {
     totalKills: 0,
     time: 0,
@@ -94,8 +77,6 @@ let gameState = {
   ctx: null,
   initialized: false,
 };
-
-
 
 // Sistema de áudio espacial robusto
 class SpaceAudioSystem {
@@ -314,8 +295,6 @@ class SpaceAudioSystem {
   }
 }
 
-
-
 // Sistema de inicialização com tratamento de erros
 const audio = new SpaceAudioSystem();
 
@@ -367,7 +346,6 @@ function init() {
       // NOVO listener para quando inimigos morrem (lógica desacoplada)
       gameEvents.on('enemy-destroyed', (data) => {
         // Incrementar kills
-        gameState.wave.asteroidsKilled++;
         gameState.stats.totalKills++;
 
         // Tocar som de destruição
@@ -496,9 +474,8 @@ function spawnInitialAsteroids() {
   const enemies = gameServices.get('enemies');
   if (enemies) {
     enemies.spawnInitialAsteroids(4);
-    gameState.wave.asteroidsSpawned += 4;
+    gameState.wave = enemies.getWaveState();
   }
-  gameState.wave.initialSpawnDone = true;
 }
 
 function resetPlayer() {
@@ -551,19 +528,11 @@ function resetWorld() {
 }
 
 function resetWave() {
-  gameState.wave = {
-    current: 1,
-    totalAsteroids: ASTEROIDS_PER_WAVE_BASE,
-    asteroidsSpawned: 0,
-    asteroidsKilled: 0,
-    isActive: true,
-    breakTimer: 0,
-    completedWaves: 0,
-    timeRemaining: WAVE_DURATION, // CORREÇÃO BUG 3: Timer regressivo de 60s
-    spawnTimer: 0,
-    spawnDelay: 1.0,
-    initialSpawnDone: false,
-  };
+  const enemies = gameServices.get('enemies');
+  if (enemies) {
+    enemies.resetWave();
+    gameState.wave = enemies.getWaveState();
+  }
 
   gameState.stats = {
     totalKills: 0,
@@ -573,7 +542,6 @@ function resetWave() {
 }
 
 // UI management moved to UISystem
-
 
 // Loop principal do jogo com tratamento de erros
 
@@ -631,10 +599,11 @@ function updateGame(deltaTime) {
   // Atualizar EnemySystem
   const enemies = gameServices.get('enemies');
   if (enemies) {
-    enemies.update(deltaTime, gameState.wave);
+    enemies.update(deltaTime);
 
     // SINCRONIZAR asteroids com gameState antigo (temporário)
     gameState.world.asteroids = enemies.getAllAsteroids();
+    gameState.wave = enemies.getWaveState();
   }
 
   // Atualizar ProgressionSystem
@@ -660,10 +629,6 @@ function updateGame(deltaTime) {
       gameState.player.invulnerableTimer = 0;
   }
 
-  // Funções legadas que ainda precisam ser limpas
-  updateAsteroids(deltaTime);
-  updateWaveSystem(deltaTime);
-
   checkCollisions();
   const ui = gameServices.get('ui');
   if (ui) {
@@ -674,58 +639,6 @@ function updateGame(deltaTime) {
 function updateBullets(deltaTime) {
   // Esta função agora é redundante. O CombatSystem gerencia os projéteis.
   // A sincronização em updateGame() já atualiza o gameState.world.bullets.
-}
-
-function updateAsteroids(deltaTime) {
-  // Esta função agora é redundante. O EnemySystem gerencia os asteroides e suas colisões.
-  // A sincronização em updateGame() já atualiza o gameState.world.asteroids.
-  // A lógica de colisão abaixo também foi movida para o EnemySystem.
-  for (let i = 0; i < gameState.world.asteroids.length - 1; i++) {
-    const a1 = gameState.world.asteroids[i];
-    if (a1.destroyed) continue;
-
-    for (let j = i + 1; j < gameState.world.asteroids.length; j++) {
-      const a2 = gameState.world.asteroids[j];
-      if (a2.destroyed) continue;
-
-      const dx = a2.x - a1.x;
-      const dy = a2.y - a1.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      const minDistance = a1.radius + a2.radius;
-
-      if (distance < minDistance && distance > 0) {
-        const nx = dx / distance;
-        const ny = dy / distance;
-        // Correção de penetração
-        const overlap = minDistance - distance;
-        const percent = 0.5;
-        a1.x -= nx * overlap * percent;
-        a1.y -= ny * overlap * percent;
-        a2.x += nx * overlap * percent;
-        a2.y += ny * overlap * percent;
-
-        // Impulso elástico com massa e restituição
-        const rvx = a2.vx - a1.vx;
-        const rvy = a2.vy - a1.vy;
-        const velAlongNormal = rvx * nx + rvy * ny;
-        if (velAlongNormal < 0) {
-          const e = COLLISION_BOUNCE;
-          const invMass1 = 1 / a1.mass;
-          const invMass2 = 1 / a2.mass;
-          const j = (-(1 + e) * velAlongNormal) / (invMass1 + invMass2);
-          const jx = j * nx;
-          const jy = j * ny;
-          a1.vx -= jx * invMass1;
-          a1.vy -= jy * invMass1;
-          a2.vx += jx * invMass2;
-          a2.vy += jy * invMass2;
-        }
-
-        a1.rotationSpeed += (Math.random() - 0.5) * 1.5;
-        a2.rotationSpeed += (Math.random() - 0.5) * 1.5;
-      }
-    }
-  }
 }
 
 function updateXPOrbs(deltaTime) {
@@ -761,94 +674,6 @@ function updateXPOrbs(deltaTime) {
 }
 
 // CORREÇÃO BUG 3: Sistema de ondas com timer regressivo de 60 segundos
-function updateWaveSystem(deltaTime) {
-  if (gameState.wave.isActive) {
-    // Reduzir timer da onda
-    gameState.wave.timeRemaining -= deltaTime;
-
-    // Controlar spawn de asteroides
-    if (
-      gameState.wave.asteroidsSpawned < gameState.wave.totalAsteroids &&
-      gameState.world.asteroids.length < MAX_ASTEROIDS_ON_SCREEN
-    ) {
-      gameState.wave.spawnTimer -= deltaTime;
-
-      if (gameState.wave.spawnTimer <= 0) {
-        spawnAsteroid();
-        gameState.wave.asteroidsSpawned++;
-        gameState.wave.spawnTimer =
-          gameState.wave.spawnDelay * (0.5 + Math.random() * 0.5);
-      }
-    }
-
-    // Verificar se onda foi completada (timer chegou a 0 OU todos asteroides eliminados)
-    const allAsteroidsKilled =
-      gameState.wave.asteroidsKilled >= gameState.wave.totalAsteroids &&
-      gameState.world.asteroids.filter((a) => !a.destroyed).length === 0;
-
-    if (gameState.wave.timeRemaining <= 0 || allAsteroidsKilled) {
-      completeWave();
-    }
-  } else {
-    // Timer do intervalo entre ondas
-    gameState.wave.breakTimer -= deltaTime;
-
-    if (gameState.wave.breakTimer <= 0) {
-      startNextWave();
-    }
-  }
-}
-
-function spawnAsteroid() {
-  const enemies = gameServices.get('enemies');
-  if (enemies) {
-    const asteroid = enemies.spawnAsteroid();
-    // Atualizar contador de spawn da wave
-    if (gameState.wave.isActive) {
-      gameState.wave.asteroidsSpawned++;
-    }
-    return asteroid;
-  }
-  return null;
-}
-
-function completeWave() {
-  gameState.wave.isActive = false;
-  gameState.wave.breakTimer = WAVE_BREAK_TIME;
-  gameState.wave.completedWaves++;
-
-  // Recompensas de fim de onda
-  const orbCount = 4 + Math.floor(gameState.wave.current / 2);
-  for (let i = 0; i < orbCount; i++) {
-    const angle = (i / orbCount) * Math.PI * 2;
-    const distance = 100;
-    createXPOrb(
-      gameState.player.x + Math.cos(angle) * distance,
-      gameState.player.y + Math.sin(angle) * distance,
-      20 + gameState.wave.current * 5
-    );
-  }
-}
-
-function startNextWave() {
-  gameState.wave.current++;
-  gameState.wave.totalAsteroids = Math.floor(
-    ASTEROIDS_PER_WAVE_BASE *
-      Math.pow(ASTEROIDS_PER_WAVE_MULTIPLIER, gameState.wave.current - 1)
-  );
-  gameState.wave.totalAsteroids = Math.min(gameState.wave.totalAsteroids, 25); // Limite máximo
-  gameState.wave.asteroidsSpawned = 0;
-  gameState.wave.asteroidsKilled = 0;
-  gameState.wave.isActive = true;
-  gameState.wave.timeRemaining = WAVE_DURATION; // Resetar timer para 60 segundos
-  gameState.wave.spawnTimer = 1.0;
-  gameState.wave.spawnDelay = Math.max(0.8, 2.0 - gameState.wave.current * 0.1);
-  gameState.wave.initialSpawnDone = false;
-
-  // CORREÇÃO BUG 1: Spawn imediato de asteroides na nova onda
-  spawnInitialAsteroids();
-}
-
 function createXPOrb(x, y, value) {
   const progression = gameServices.get('progression');
   if (progression) {
@@ -952,20 +777,6 @@ function checkCollisions() {
     }
   });
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // Game over UI handled por UISystem
 
