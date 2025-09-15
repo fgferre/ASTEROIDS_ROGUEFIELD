@@ -1,4 +1,15 @@
-* 729b5e3 feat: introduce central EffectsSystem
+*   3812255 Merge pull request #14 from fgferre/codex/analyze-project-refactoring-phase
+|\  
+| * bbe401b feat(effects): restore thruster vfx via events
+|/  
+*   36d5c64 Merge branch 'main' of https://github.com/fgferre/ASTEROIDS_ROGUEFIELD
+|\  
+| *   abbec23 Merge pull request #12 from fgferre/codex/analyze-project-refactoring-status
+| |\  
+| | * 729b5e3 feat: introduce central EffectsSystem
+| |/  
+* / 6c3275d atualização de histórico
+|/  
 * 99e23d9 Commit: refactor(uisystem): remove CommonJS fallback; enforce ES modules Etapa do guia: atende “Padrões e escolhas técnicas → Sistema de Módulos (ES6 apenas)” e reforça “Princípios → Evoluir em passos curtos (refactor)” e “Validação contínua (Architecture rubric)”.
 *   0382876 Merge pull request #11 from fgferre/codex/analyze-next-steps-in-guide
 |\  
