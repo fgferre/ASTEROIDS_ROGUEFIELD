@@ -95,8 +95,6 @@ let gameState = {
   initialized: false,
 };
 
-
-
 // Sistema de áudio espacial robusto
 class SpaceAudioSystem {
   constructor() {
@@ -314,8 +312,6 @@ class SpaceAudioSystem {
   }
 }
 
-
-
 // Sistema de inicialização com tratamento de erros
 const audio = new SpaceAudioSystem();
 
@@ -404,44 +400,6 @@ function init() {
         }
         // Criar efeito de coleta (futuro EffectsSystem)
         // createXPCollectEffect(data.position.x, data.position.y);
-      });
-
-      gameEvents.on('upgrade-damage-boost', (data) => {
-        gameState.player.damage = Math.floor(
-          gameState.player.damage * data.multiplier
-        );
-        console.log('[Upgrade] Damage boosted to:', gameState.player.damage);
-      });
-
-      gameEvents.on('upgrade-speed-boost', (data) => {
-        gameState.player.maxSpeed = Math.floor(
-          gameState.player.maxSpeed * data.multiplier
-        );
-        console.log('[Upgrade] Speed boosted to:', gameState.player.maxSpeed);
-      });
-
-      gameEvents.on('upgrade-health-boost', (data) => {
-        gameState.player.maxHealth += data.bonus;
-        gameState.player.health += data.bonus; // Heal também
-        console.log('[Upgrade] Health boosted to:', gameState.player.maxHealth);
-      });
-
-      gameEvents.on('upgrade-multishot', (data) => {
-        gameState.player.multishot += data.bonus;
-        console.log(
-          '[Upgrade] Multishot boosted to:',
-          gameState.player.multishot
-        );
-      });
-
-      gameEvents.on('upgrade-magnetism', (data) => {
-        gameState.player.magnetismRadius = Math.floor(
-          gameState.player.magnetismRadius * data.multiplier
-        );
-        console.log(
-          '[Upgrade] Magnetism boosted to:',
-          gameState.player.magnetismRadius
-        );
       });
       // Atualizar state de tela quando UI mudar
       gameEvents.on('screen-changed', (data) => {
@@ -574,7 +532,6 @@ function resetWave() {
 
 // UI management moved to UISystem
 
-
 // Loop principal do jogo com tratamento de erros
 
 let lastTime = 0;
@@ -605,8 +562,10 @@ function gameLoop(currentTime) {
 function updateGame(deltaTime) {
   // Atualizar sistemas modulares
   const player = gameServices.get('player');
+  let playerStats = null;
   if (player) {
     player.update(deltaTime);
+    playerStats = player.getStats();
 
     // SINCRONIZAR com gameState antigo (temporário)
     gameState.player.x = player.position.x;
@@ -614,14 +573,15 @@ function updateGame(deltaTime) {
     gameState.player.vx = player.velocity.vx;
     gameState.player.vy = player.velocity.vy;
     gameState.player.angle = player.angle;
+    gameState.player.health = playerStats.health;
+    gameState.player.maxHealth = playerStats.maxHealth;
+    gameState.player.damage = playerStats.damage;
+    gameState.player.multishot = playerStats.multishot;
+    gameState.player.magnetismRadius = playerStats.magnetismRadius;
   }
   // Atualizar CombatSystem
   const combat = gameServices.get('combat');
-  if (combat) {
-    const playerStats = {
-      damage: gameState.player.damage || 25,
-      multishot: gameState.player.multishot || 1,
-    };
+  if (combat && playerStats) {
     combat.update(deltaTime, playerStats);
 
     // SINCRONIZAR bullets com gameState antigo (temporário)
@@ -939,33 +899,23 @@ function checkCollisions() {
           3,
           Math.floor(rawDamage) - gameState.player.armor
         );
-        gameState.player.health -= damage;
+        const playerSystem = gameServices.get('player');
+        const remaining = playerSystem
+          ? playerSystem.takeDamage(damage)
+          : gameState.player.health - damage;
+        gameState.player.health = remaining;
         gameState.player.invulnerableTimer = 0.5;
 
         audio.playShipHit();
         addScreenShake(8, 0.3);
 
-        if (gameState.player.health <= 0) {
+        if (remaining <= 0) {
           gameOver();
         }
       }
     }
   });
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // Game over UI handled por UISystem
 
