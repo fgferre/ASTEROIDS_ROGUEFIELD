@@ -90,7 +90,6 @@ let gameState = {
     time: 0,
     startTime: 0,
   },
-  input: {},
   canvas: null,
   ctx: null,
   initialized: false,
@@ -623,23 +622,6 @@ function init() {
 }
 
 function setupEventListeners() {
-  // Keyboard events
-  document.addEventListener('keydown', (e) => {
-    gameState.input[e.key.toLowerCase()] = true;
-    if (e.key.toLowerCase() === 'escape' && gameState.screen === 'levelup') {
-      e.preventDefault();
-    }
-
-    // Inicializar áudio no primeiro input
-    if (!audio.initialized) {
-      audio.init();
-    }
-  });
-
-  document.addEventListener('keyup', (e) => {
-    gameState.input[e.key.toLowerCase()] = false;
-  });
-
   // Button events - usando função de callback direta
   document.addEventListener('click', (e) => {
     if (e.target.id === 'start-game-btn') {
@@ -719,7 +701,6 @@ function resetWorld() {
     asteroids: [],
     bullets: [],
     xpOrbs: [],
-    particles: [],
     currentTarget: null,
     targetUpdateTimer: 0,
     lastShotTime: 0,
@@ -946,13 +927,6 @@ function updateXPOrbs(deltaTime) {
   gameState.world.xpOrbs = gameState.world.xpOrbs.filter(
     (orb) => !orb.collected
   );
-}
-
-function updateParticles(deltaTime) {
-  const effects = gameServices.get('effects');
-  if (effects && typeof effects.updateParticles === 'function') {
-    effects.updateParticles(deltaTime);
-  }
 }
 
 // CORREÇÃO BUG 3: Sistema de ondas com timer regressivo de 60 segundos
