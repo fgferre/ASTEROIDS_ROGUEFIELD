@@ -21,7 +21,7 @@ class UISystem {
       });
 
       gameEvents.on('player-died', (data) => {
-        this.showGameOverScreen(data.gameState);
+        this.showGameOverScreen(data);
       });
     }
   }
@@ -56,12 +56,20 @@ class UISystem {
 
   updateHUD(gameState) {
     try {
+      const player = gameServices.get('player');
+      const progression = gameServices.get('progression');
+
       const elements = [
         {
           id: 'health-display',
-          value: `${Math.max(0, Math.floor(gameState.player.health))}/${gameState.player.maxHealth}`,
+          value: player
+            ? `${Math.max(0, Math.floor(player.health))}/${player.maxHealth}`
+            : '0/0',
         },
-        { id: 'level-display', value: `Level ${gameState.player.level}` },
+        {
+          id: 'level-display',
+          value: progression ? `Level ${progression.getLevel()}` : 'Level 1',
+        },
         {
           id: 'kills-display',
           value: `${gameState.stats.totalKills} asteroides`,
