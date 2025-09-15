@@ -1,0 +1,296 @@
+import * as CONSTANTS from '../core/GameConstants.js';
+
+class SpaceParticle {
+  constructor(x, y, vx, vy, color, size, life, type = 'normal') {
+    this.x = x;
+    this.y = y;
+    this.vx = vx;
+    this.vy = vy;
+    this.color = color;
+    this.size = size;
+    this.life = life;
+    this.maxLife = life;
+    this.alpha = 1;
+    this.type = type;
+    this.rotation = Math.random() * Math.PI * 2;
+    this.rotationSpeed = (Math.random() - 0.5) * 4;
+  }
+
+  update(deltaTime) {
+    this.x += this.vx * deltaTime;
+    this.y += this.vy * deltaTime;
+    this.life -= deltaTime;
+    this.alpha = Math.max(0, this.life / this.maxLife);
+    this.rotation += this.rotationSpeed * deltaTime;
+
+    const friction = this.type === 'thruster' ? 0.98 : 0.96;
+    this.vx *= friction;
+    this.vy *= friction;
+
+    return this.life > 0;
+  }
+
+  draw(ctx) {
+    if (this.alpha <= 0) return;
+
+    ctx.save();
+    ctx.globalAlpha = this.alpha;
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation);
+
+    if (this.type === 'spark') {
+      ctx.strokeStyle = this.color;
+      ctx.lineWidth = this.size * this.alpha;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(-this.size, 0);
+      ctx.lineTo(this.size, 0);
+      ctx.stroke();
+    } else if (this.type === 'debris') {
+      ctx.fillStyle = this.color;
+      ctx.beginPath();
+      const s = this.size * this.alpha;
+      ctx.rect(-s / 2, -s / 2, s, s);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = this.color;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.size * this.alpha, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+}
+
+export default class EffectsSystem {
+  constructor(audio) {
+    this.audio = audio;
+    this.particles = [];
+    this.screenShake = { intensity: 0, duration: 0, timer: 0 };
+    this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
+    this.screenFlash = { timer: 0, duration: 0, color: '#FFFFFF', intensity: 0 };
+
+    if (typeof gameServices !== 'undefined') {
+      gameServices.register('effects', this);
+    }
+
+    console.log('[EffectsSystem] Initialized');
+  }
+
+  update(deltaTime) {
+    if (this.freezeFrame.timer > 0) {
+      this.freezeFrame.timer -= deltaTime;
+      if (this.freezeFrame.timer < 0) this.freezeFrame.timer = 0;
+      deltaTime *= this.freezeFrame.fade;
+    }
+
+    if (this.screenShake.timer > 0) {
+      this.screenShake.timer -= deltaTime;
+      if (this.screenShake.timer <= 0) {
+        this.screenShake.intensity = 0;
+        this.screenShake.duration = 0;
+      }
+    }
+
+    if (this.screenFlash.timer > 0) {
+      this.screenFlash.timer -= deltaTime;
+      if (this.screenFlash.timer < 0) this.screenFlash.timer = 0;
+    }
+
+    this.updateParticles(deltaTime);
+    return deltaTime;
+  }
+
+  updateParticles(deltaTime) {
+    this.particles = this.particles.filter((p) => p.update(deltaTime));
+    if (this.particles.length > 150) {
+      this.particles = this.particles.slice(-100);
+    }
+  }
+
+  applyScreenShake(ctx) {
+    if (this.screenShake.timer > 0) {
+      const shakeAmount =
+        this.screenShake.intensity *
+        (this.screenShake.timer / this.screenShake.duration);
+      ctx.translate(
+        (Math.random() - 0.5) * shakeAmount,
+        (Math.random() - 0.5) * shakeAmount
+      );
+    }
+  }
+
+  draw(ctx) {
+    this.particles.forEach((p) => p.draw(ctx));
+
+    if (this.screenFlash.timer > 0) {
+      const alpha =
+        (this.screenFlash.timer / this.screenFlash.duration) *
+        this.screenFlash.intensity;
+      ctx.save();
+      ctx.fillStyle = this.screenFlash.color;
+      ctx.globalAlpha = alpha;
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      ctx.restore();
+    }
+  }
+
+  addScreenShake(intensity, duration) {
+    this.screenShake.intensity = Math.max(this.screenShake.intensity, intensity);
+    this.screenShake.duration = Math.max(this.screenShake.duration, duration);
+    this.screenShake.timer = this.screenShake.duration;
+  }
+
+  addFreezeFrame(duration, fade = 0) {
+    this.freezeFrame.timer = Math.max(this.freezeFrame.timer, duration);
+    this.freezeFrame.duration = Math.max(this.freezeFrame.duration, duration);
+    this.freezeFrame.fade = fade;
+  }
+
+  addScreenFlash(color, duration, intensity) {
+    this.screenFlash.color = color;
+    this.screenFlash.duration = duration;
+    this.screenFlash.timer = duration;
+    this.screenFlash.intensity = intensity;
+  }
+
+  createThrusterEffect(direction, player) {
+    const angle = player.angle;
+    const forwardX = Math.cos(angle),
+      forwardY = Math.sin(angle);
+    const rightX = Math.cos(angle + Math.PI / 2),
+      rightY = Math.sin(angle + Math.PI / 2);
+
+    let offsetX = 0,
+      offsetY = 0,
+      dirX = 0,
+      dirY = 0;
+    switch (direction) {
+      case 'left':
+        offsetX = -rightX * CONSTANTS.SHIP_SIZE * 0.8;
+        offsetY = -rightY * 0.8 * CONSTANTS.SHIP_SIZE;
+        dirX = -rightX;
+        dirY = -rightY;
+        break;
+      case 'right':
+        offsetX = rightX * CONSTANTS.SHIP_SIZE * 0.8;
+        offsetY = rightY * 0.8 * CONSTANTS.SHIP_SIZE;
+        dirX = rightX;
+        dirY = rightY;
+        break;
+      case 'top':
+        offsetX = forwardX * CONSTANTS.SHIP_SIZE * 0.8;
+        offsetY = forwardY * 0.8 * CONSTANTS.SHIP_SIZE;
+        dirX = forwardX;
+        dirY = forwardY;
+        break;
+      case 'bottom':
+      default:
+        offsetX = -forwardX * CONSTANTS.SHIP_SIZE * 0.8;
+        offsetY = -forwardY * 0.8 * CONSTANTS.SHIP_SIZE;
+        dirX = -forwardX;
+        dirY = -forwardY;
+        break;
+    }
+
+    const thrusterX = player.x + offsetX;
+    const thrusterY = player.y + offsetY;
+
+    for (let i = 0; i < 2; i++) {
+      const speed = 80 + Math.random() * 40;
+      const p = new SpaceParticle(
+        thrusterX + (Math.random() - 0.5) * 4,
+        thrusterY + (Math.random() - 0.5) * 4,
+        dirX * speed + (Math.random() - 0.5) * 20,
+        dirY * speed + (Math.random() - 0.5) * 20,
+        `hsl(${Math.random() * 60 + 15}, 100%, 70%)`,
+        2 + Math.random() * 1.5,
+        0.25 + Math.random() * 0.15,
+        'thruster'
+      );
+      this.particles.push(p);
+    }
+  }
+
+  createXPCollectEffect(x, y) {
+    for (let i = 0; i < 6; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 25 + Math.random() * 40;
+      const particle = new SpaceParticle(
+        x,
+        y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        '#00DDFF',
+        1.5 + Math.random() * 1.5,
+        0.3 + Math.random() * 0.2
+      );
+      this.particles.push(particle);
+    }
+  }
+
+  createLevelUpExplosion(player) {
+    for (let i = 0; i < 20; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 60 + Math.random() * 120;
+      const particle = new SpaceParticle(
+        player.x,
+        player.y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        `hsl(${Math.random() * 40 + 40}, 100%, 60%)`,
+        2 + Math.random() * 2,
+        0.6 + Math.random() * 0.4,
+        'spark'
+      );
+      this.particles.push(particle);
+    }
+  }
+
+  createAsteroidExplosion(asteroid) {
+    const particleCount = { large: 12, medium: 8, small: 5 }[asteroid.size];
+
+    if (asteroid.size === 'small') {
+      this.addScreenShake(2, 0.1);
+    } else if (asteroid.size === 'medium') {
+      this.addScreenShake(4, 0.15);
+    } else if (asteroid.size === 'large') {
+      this.addScreenShake(8, 0.25);
+      this.addFreezeFrame(0.15, 0.2);
+      this.addScreenFlash('#FF6B6B', 0.2, 0.1);
+      if (this.audio && typeof this.audio.playBigExplosion === 'function') {
+        this.audio.playBigExplosion();
+      }
+    }
+
+    for (let i = 0; i < particleCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 40 + Math.random() * 80;
+
+      const debris = new SpaceParticle(
+        asteroid.x + (Math.random() - 0.5) * asteroid.radius,
+        asteroid.y + (Math.random() - 0.5) * asteroid.radius,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        '#8B4513',
+        2 + Math.random() * 3,
+        0.6 + Math.random() * 0.4,
+        'debris'
+      );
+      this.particles.push(debris);
+
+      const spark = new SpaceParticle(
+        asteroid.x,
+        asteroid.y,
+        Math.cos(angle) * speed * 1.3,
+        Math.sin(angle) * speed * 1.3,
+        `hsl(${Math.random() * 60 + 15}, 100%, 70%)`,
+        1.5 + Math.random() * 1.5,
+        0.3 + Math.random() * 0.2,
+        'spark'
+      );
+      this.particles.push(spark);
+    }
+  }
+}
