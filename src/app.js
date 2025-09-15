@@ -460,6 +460,10 @@ function spawnInitialAsteroids() {
 }
 
 function resetPlayer() {
+  const playerSystem = gameServices.get('player');
+  if (playerSystem) {
+    playerSystem.reset();
+  }
   gameState.player = {
     x: GAME_WIDTH / 2,
     y: GAME_HEIGHT / 2,
