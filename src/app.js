@@ -986,10 +986,7 @@ function checkCollisions() {
 
 
 
-function addScreenFlash(color, duration, intensity) {
-  const effects = gameServices.get('effects');
-  if (effects) effects.addScreenFlash(color, duration, intensity);
-}
+
 
 function gameOver() {
   const ui = gameServices.get('ui');
