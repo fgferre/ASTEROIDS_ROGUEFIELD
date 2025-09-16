@@ -1,3 +1,9 @@
+*   fdea20a Merge pull request #24 from fgferre/codex/execute-modular-refactoring-plan-4okfge
+|\  
+| * b5e313a Handle effect timers off-screen and restore asteroid damage
+| * 0934d9e refactor(app): finalize modular orchestrator
+|/  
+* a1af919 Update source control history
 *   7635489 Merge pull request #23 from fgferre/codex/execute-modular-refactoring-plan
 |\  
 | * 5153b83 refactor: shift wave and ui state to modular systems
