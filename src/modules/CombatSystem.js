@@ -40,7 +40,7 @@ class CombatSystem {
 
         const enemies = gameServices.get('enemies');
         if (enemies) {
-            this.checkBulletCollisions(enemies.getAsteroids());
+            this.checkBulletCollisions(enemies);
         }
     }
 
@@ -231,37 +231,61 @@ class CombatSystem {
     }
 
     // === DETECÇÃO DE COLISÃO ===
-    checkBulletCollisions(enemies) {
-        this.bullets.forEach(bullet => {
-            if (bullet.hit) return;
+    checkBulletCollisions(enemiesSystem) {
+        const asteroids = enemiesSystem.getAsteroids();
 
-            enemies.forEach(enemy => {
-                if (enemy.destroyed) return;
+        for (const bullet of this.bullets) {
+            if (bullet.hit) continue;
+
+            for (const enemy of asteroids) {
+                if (enemy.destroyed) continue;
 
                 const dx = bullet.x - enemy.x;
                 const dy = bullet.y - enemy.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
                 if (distance < (CONSTANTS.BULLET_SIZE + enemy.radius)) {
-                    // Colisão detectada
                     bullet.hit = true;
 
-                    // Aplicar dano
-                    const killed = enemy.takeDamage(bullet.damage);
+                    const damageResult = this.applyDamageToEnemy(
+                        enemiesSystem,
+                        enemy,
+                        bullet.damage
+                    );
 
-                    // Emitir eventos
                     if (typeof gameEvents !== 'undefined') {
                         gameEvents.emit('bullet-hit', {
                             bullet: bullet,
                             enemy: enemy,
                             position: { x: bullet.x, y: bullet.y },
                             damage: bullet.damage,
-                            killed: killed
+                            killed: damageResult.killed,
+                            remainingHealth: damageResult.remainingHealth
                         });
                     }
+
+                    break;
                 }
-            });
-        });
+            }
+        }
+    }
+
+    applyDamageToEnemy(enemiesSystem, enemy, damage) {
+        if (typeof enemiesSystem.applyDamage === 'function') {
+            const result = enemiesSystem.applyDamage(enemy, damage);
+            return {
+                killed: !!result?.killed,
+                remainingHealth: Math.max(0, result?.remainingHealth ?? enemy.health ?? 0)
+            };
+        }
+
+        const killed = enemy.takeDamage(damage);
+        if (killed) {
+            enemy.destroyed = true;
+            return { killed: true, remainingHealth: 0 };
+        }
+
+        return { killed: false, remainingHealth: Math.max(0, enemy.health ?? 0) };
     }
 
     // === GETTERS PÚBLICOS ===

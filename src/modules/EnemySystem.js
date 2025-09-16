@@ -372,6 +372,27 @@ class EnemySystem {
         return asteroid;
     }
 
+    applyDamage(asteroid, damage) {
+        if (!asteroid || typeof asteroid.takeDamage !== 'function') {
+            return { killed: false, remainingHealth: 0, fragments: [] };
+        }
+
+        if (asteroid.destroyed) {
+            return { killed: false, remainingHealth: 0, fragments: [] };
+        }
+
+        const killed = asteroid.takeDamage(damage);
+        asteroid.health = Math.max(0, asteroid.health);
+        const remainingHealth = asteroid.health;
+
+        if (killed) {
+            const fragments = this.destroyAsteroid(asteroid);
+            return { killed: true, remainingHealth: 0, fragments };
+        }
+
+        return { killed: false, remainingHealth, fragments: [] };
+    }
+
     // === GERENCIAMENTO DE DESTRUIÇÃO ===
     destroyAsteroid(asteroid, createFragments = true) {
         if (asteroid.destroyed) return [];

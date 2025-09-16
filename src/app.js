@@ -122,8 +122,14 @@ function gameLoop(currentTime) {
   gameState.lastTime = currentTime;
 
   try {
+    let adjustedDelta = deltaTime;
+    const effects = gameServices.get('effects');
+    if (effects && typeof effects.update === 'function') {
+      adjustedDelta = effects.update(deltaTime);
+    }
+
     if (gameState.screen === 'playing') {
-      updateGame(deltaTime);
+      updateGame(adjustedDelta);
     }
 
     renderGame();
@@ -135,12 +141,6 @@ function gameLoop(currentTime) {
 }
 
 function updateGame(deltaTime) {
-  const effects = gameServices.get('effects');
-  const adjustedDelta =
-    effects && typeof effects.update === 'function'
-      ? effects.update(deltaTime)
-      : deltaTime;
-
   const servicesToUpdate = [
     'input',
     'player',
@@ -154,7 +154,7 @@ function updateGame(deltaTime) {
   servicesToUpdate.forEach((serviceName) => {
     const service = gameServices.get(serviceName);
     if (service && typeof service.update === 'function') {
-      service.update(adjustedDelta);
+      service.update(deltaTime);
     }
   });
 }
