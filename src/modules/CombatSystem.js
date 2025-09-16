@@ -30,6 +30,12 @@ class CombatSystem {
         this.updateTargeting(deltaTime);
         this.handleShooting(deltaTime, playerStats); // E passado para a função de tiro
         this.updateBullets(deltaTime);
+
+        // Gerenciar colisões de projéteis internamente
+        const enemies = gameServices.get('enemies');
+        if (enemies) {
+            this.checkBulletCollisions(enemies.getAsteroids());
+        }
     }
 
     // === SISTEMA DE TARGETING ===

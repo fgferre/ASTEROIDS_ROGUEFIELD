@@ -557,7 +557,6 @@ function updateGame(deltaTime) {
   gameState.stats.time = (Date.now() - gameState.stats.startTime) / 1000;
 
   // Funções legadas que ainda precisam ser limpas
-  updateAsteroids(deltaTime);
   updateWaveSystem(deltaTime);
 
   checkCollisions();
@@ -570,58 +569,6 @@ function updateGame(deltaTime) {
 function updateBullets(deltaTime) {
   // Esta função agora é redundante. O CombatSystem gerencia os projéteis.
   // A sincronização em updateGame() já atualiza o gameState.world.bullets.
-}
-
-function updateAsteroids(deltaTime) {
-  // Esta função agora é redundante. O EnemySystem gerencia os asteroides e suas colisões.
-  // A sincronização em updateGame() já atualiza o gameState.world.asteroids.
-  // A lógica de colisão abaixo também foi movida para o EnemySystem.
-  for (let i = 0; i < gameState.world.asteroids.length - 1; i++) {
-    const a1 = gameState.world.asteroids[i];
-    if (a1.destroyed) continue;
-
-    for (let j = i + 1; j < gameState.world.asteroids.length; j++) {
-      const a2 = gameState.world.asteroids[j];
-      if (a2.destroyed) continue;
-
-      const dx = a2.x - a1.x;
-      const dy = a2.y - a1.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      const minDistance = a1.radius + a2.radius;
-
-      if (distance < minDistance && distance > 0) {
-        const nx = dx / distance;
-        const ny = dy / distance;
-        // Correção de penetração
-        const overlap = minDistance - distance;
-        const percent = 0.5;
-        a1.x -= nx * overlap * percent;
-        a1.y -= ny * overlap * percent;
-        a2.x += nx * overlap * percent;
-        a2.y += ny * overlap * percent;
-
-        // Impulso elástico com massa e restituição
-        const rvx = a2.vx - a1.vx;
-        const rvy = a2.vy - a1.vy;
-        const velAlongNormal = rvx * nx + rvy * ny;
-        if (velAlongNormal < 0) {
-          const e = COLLISION_BOUNCE;
-          const invMass1 = 1 / a1.mass;
-          const invMass2 = 1 / a2.mass;
-          const j = (-(1 + e) * velAlongNormal) / (invMass1 + invMass2);
-          const jx = j * nx;
-          const jy = j * ny;
-          a1.vx -= jx * invMass1;
-          a1.vy -= jy * invMass1;
-          a2.vx += jx * invMass2;
-          a2.vy += jy * invMass2;
-        }
-
-        a1.rotationSpeed += (Math.random() - 0.5) * 1.5;
-        a2.rotationSpeed += (Math.random() - 0.5) * 1.5;
-      }
-    }
-  }
 }
 
 function updateXPOrbs(deltaTime) {
@@ -774,25 +721,10 @@ function collectXP(amount) {
 
 // Detecção de colisão melhorada
 function checkCollisions() {
-  // Usar collision detection do CombatSystem
-  const combat = gameServices.get('combat');
-  if (combat) {
-    combat.checkBulletCollisions(gameState.world.asteroids);
-  }
-
   const player = gameServices.get('player');
   if (!player) return;
 
-  // A lógica de colisão de balas foi movida para um listener do evento 'bullet-hit'.
-  // O código legado abaixo agora é redundante, mas o manteremos por enquanto
-  // para limpar os arrays até que o EnemySystem assuma essa responsabilidade.
-
-  // gameState.world.bullets = gameState.world.bullets.filter(
-  //   (bullet) => !bullet.hit
-  // );
-  // gameState.world.asteroids = gameState.world.asteroids.filter(
-  //   (asteroid) => !asteroid.destroyed
-  // );
+  // A lógica de colisão de projéteis agora é gerenciada pelo CombatSystem.
 
   // Colisões nave-asteroide
   gameState.world.asteroids.forEach((asteroid) => {
