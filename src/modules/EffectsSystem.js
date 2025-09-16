@@ -98,6 +98,33 @@ export default class EffectsSystem {
         data.type
       );
     });
+
+    gameEvents.on('enemy-destroyed', (data) => {
+      if (data?.enemy) {
+        this.createAsteroidExplosion(data.enemy);
+      }
+    });
+
+    gameEvents.on('player-leveled-up', () => {
+      this.addScreenShake(6, 0.4);
+      this.addFreezeFrame(0.2, 0.4);
+      this.addScreenFlash('#FFD700', 0.15, 0.2);
+
+      const player = gameServices.get('player');
+      if (player) {
+        this.createLevelUpExplosion(player.position);
+      }
+    });
+
+    gameEvents.on('xp-collected', (data) => {
+      if (data?.position) {
+        this.createXPCollectEffect(data.position.x, data.position.y);
+      }
+    });
+
+    gameEvents.on('player-took-damage', () => {
+      this.addScreenShake(8, 0.3);
+    });
   }
 
   update(deltaTime) {
@@ -297,9 +324,6 @@ export default class EffectsSystem {
       this.addScreenShake(8, 0.25);
       this.addFreezeFrame(0.15, 0.2);
       this.addScreenFlash('#FF6B6B', 0.2, 0.1);
-      if (this.audio && typeof this.audio.playBigExplosion === 'function') {
-        this.audio.playBigExplosion();
-      }
     }
 
     for (let i = 0; i < particleCount; i++) {
@@ -330,5 +354,17 @@ export default class EffectsSystem {
       );
       this.particles.push(spark);
     }
+  }
+
+  reset() {
+    this.particles = [];
+    this.screenShake = { intensity: 0, duration: 0, timer: 0 };
+    this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
+    this.screenFlash = {
+      timer: 0,
+      duration: 0,
+      color: '#FFFFFF',
+      intensity: 0,
+    };
   }
 }

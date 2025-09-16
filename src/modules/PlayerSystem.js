@@ -264,6 +264,53 @@ class PlayerSystem {
     return { ...this.velocity };
   }
 
+  getMagnetismRadius() {
+    return this.magnetismRadius;
+  }
+
+  render(ctx) {
+    if (!ctx) return;
+
+    ctx.save();
+    ctx.translate(this.position.x, this.position.y);
+    ctx.rotate(this.angle);
+
+    ctx.fillStyle = '#00FF88';
+    ctx.strokeStyle = '#00DD77';
+    ctx.lineWidth = 2;
+
+    ctx.beginPath();
+    ctx.moveTo(CONSTANTS.SHIP_SIZE, 0);
+    ctx.lineTo(-CONSTANTS.SHIP_SIZE / 2, -CONSTANTS.SHIP_SIZE / 2);
+    ctx.lineTo(-CONSTANTS.SHIP_SIZE / 3, 0);
+    ctx.lineTo(-CONSTANTS.SHIP_SIZE / 2, CONSTANTS.SHIP_SIZE / 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#0088DD';
+    ctx.beginPath();
+    ctx.moveTo(-CONSTANTS.SHIP_SIZE / 3, -CONSTANTS.SHIP_SIZE / 3);
+    ctx.lineTo(-CONSTANTS.SHIP_SIZE, -CONSTANTS.SHIP_SIZE);
+    ctx.lineTo(-CONSTANTS.SHIP_SIZE / 2, -CONSTANTS.SHIP_SIZE / 2);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(-CONSTANTS.SHIP_SIZE / 3, CONSTANTS.SHIP_SIZE / 3);
+    ctx.lineTo(-CONSTANTS.SHIP_SIZE, CONSTANTS.SHIP_SIZE);
+    ctx.lineTo(-CONSTANTS.SHIP_SIZE / 2, CONSTANTS.SHIP_SIZE / 2);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(CONSTANTS.SHIP_SIZE / 3, 0, 3, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
   // === GERENCIAMENTO DE VIDA ===
   takeDamage(amount) {
     this.health = Math.max(0, this.health - Math.max(0, amount));
@@ -274,6 +321,10 @@ class PlayerSystem {
       });
     }
     return this.health;
+  }
+
+  setInvulnerableTimer(duration) {
+    this.invulnerableTimer = duration;
   }
 
   heal(amount) {

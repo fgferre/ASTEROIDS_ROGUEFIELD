@@ -54,6 +54,10 @@ class UISystem {
     this.showScreen('playing');
   }
 
+  update() {
+    this.updateHUD();
+  }
+
   updateHUD() {
     try {
       const player = gameServices.get('player');

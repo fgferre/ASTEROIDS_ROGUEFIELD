@@ -26,15 +26,21 @@ class CombatSystem {
     }
 
     // === UPDATE PRINCIPAL ===
-    update(deltaTime, playerStats) { // playerStats é recebido aqui
+    update(deltaTime) {
         this.updateTargeting(deltaTime);
-        this.handleShooting(deltaTime, playerStats); // E passado para a função de tiro
+
+        const player = gameServices.get('player');
+        const playerStats = player ? player.getStats() : null;
+
+        if (playerStats) {
+            this.handleShooting(deltaTime, playerStats);
+        }
+
         this.updateBullets(deltaTime);
 
-        // Gerenciar colisões de projéteis internamente
         const enemies = gameServices.get('enemies');
         if (enemies) {
-            this.checkBulletCollisions(enemies.getAsteroids());
+            this.checkBulletCollisions(enemies);
         }
     }
 
@@ -225,37 +231,61 @@ class CombatSystem {
     }
 
     // === DETECÇÃO DE COLISÃO ===
-    checkBulletCollisions(enemies) {
-        this.bullets.forEach(bullet => {
-            if (bullet.hit) return;
+    checkBulletCollisions(enemiesSystem) {
+        const asteroids = enemiesSystem.getAsteroids();
 
-            enemies.forEach(enemy => {
-                if (enemy.destroyed) return;
+        for (const bullet of this.bullets) {
+            if (bullet.hit) continue;
+
+            for (const enemy of asteroids) {
+                if (enemy.destroyed) continue;
 
                 const dx = bullet.x - enemy.x;
                 const dy = bullet.y - enemy.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
 
                 if (distance < (CONSTANTS.BULLET_SIZE + enemy.radius)) {
-                    // Colisão detectada
                     bullet.hit = true;
 
-                    // Aplicar dano
-                    const killed = enemy.takeDamage(bullet.damage);
+                    const damageResult = this.applyDamageToEnemy(
+                        enemiesSystem,
+                        enemy,
+                        bullet.damage
+                    );
 
-                    // Emitir eventos
                     if (typeof gameEvents !== 'undefined') {
                         gameEvents.emit('bullet-hit', {
                             bullet: bullet,
                             enemy: enemy,
                             position: { x: bullet.x, y: bullet.y },
                             damage: bullet.damage,
-                            killed: killed
+                            killed: damageResult.killed,
+                            remainingHealth: damageResult.remainingHealth
                         });
                     }
+
+                    break;
                 }
-            });
-        });
+            }
+        }
+    }
+
+    applyDamageToEnemy(enemiesSystem, enemy, damage) {
+        if (typeof enemiesSystem.applyDamage === 'function') {
+            const result = enemiesSystem.applyDamage(enemy, damage);
+            return {
+                killed: !!result?.killed,
+                remainingHealth: Math.max(0, result?.remainingHealth ?? enemy.health ?? 0)
+            };
+        }
+
+        const killed = enemy.takeDamage(damage);
+        if (killed) {
+            enemy.destroyed = true;
+            return { killed: true, remainingHealth: 0 };
+        }
+
+        return { killed: false, remainingHealth: Math.max(0, enemy.health ?? 0) };
     }
 
     // === GETTERS PÚBLICOS ===
@@ -269,6 +299,76 @@ class CombatSystem {
 
     getBulletCount() {
         return this.bullets.length;
+    }
+
+    render(ctx) {
+        if (!ctx) return;
+
+        this.bullets.forEach(bullet => {
+            if (bullet.hit) return;
+
+            if (bullet.trail.length > 1) {
+                ctx.save();
+                ctx.strokeStyle = '#FFFF00';
+                ctx.lineWidth = 2;
+                ctx.lineCap = 'round';
+                ctx.globalAlpha = 0.6;
+
+                ctx.beginPath();
+                ctx.moveTo(bullet.trail[0].x, bullet.trail[0].y);
+                for (let i = 1; i < bullet.trail.length; i++) {
+                    ctx.lineTo(bullet.trail[i].x, bullet.trail[i].y);
+                }
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            const gradient = ctx.createRadialGradient(
+                bullet.x,
+                bullet.y,
+                0,
+                bullet.x,
+                bullet.y,
+                CONSTANTS.BULLET_SIZE * 3
+            );
+            gradient.addColorStop(0, '#FFFF00');
+            gradient.addColorStop(0.5, 'rgba(255, 255, 0, 0.4)');
+            gradient.addColorStop(1, 'transparent');
+
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(bullet.x, bullet.y, CONSTANTS.BULLET_SIZE * 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.arc(bullet.x, bullet.y, CONSTANTS.BULLET_SIZE, 0, Math.PI * 2);
+            ctx.fill();
+        });
+
+        if (this.currentTarget && !this.currentTarget.destroyed) {
+            const target = this.currentTarget;
+            ctx.save();
+            ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([3, 3]);
+            ctx.beginPath();
+            ctx.arc(target.x, target.y, target.radius + 6, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+
+            const player = gameServices.get('player');
+            if (player) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(255, 255, 0, 0.3)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(player.position.x, player.position.y);
+                ctx.lineTo(target.x, target.y);
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
     }
 
     // === CONFIGURAÇÃO ===
