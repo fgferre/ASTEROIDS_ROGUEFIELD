@@ -54,10 +54,14 @@ class UISystem {
     this.showScreen('playing');
   }
 
-  updateHUD(gameState) {
+  updateHUD() {
     try {
       const player = gameServices.get('player');
       const progression = gameServices.get('progression');
+      const enemies = gameServices.get('enemies');
+
+      const stats = enemies ? enemies.getSessionStats() : { totalKills: 0, timeElapsed: 0 };
+      const wave = enemies ? enemies.getWaveState() : null;
 
       const elements = [
         {
@@ -72,9 +76,9 @@ class UISystem {
         },
         {
           id: 'kills-display',
-          value: `${gameState.stats.totalKills} asteroides`,
+          value: `${stats.totalKills} asteroides`,
         },
-        { id: 'time-display', value: `${Math.floor(gameState.stats.time)}s` },
+        { id: 'time-display', value: `${Math.floor(stats.timeElapsed)}s` },
       ];
 
       elements.forEach(({ id, value }) => {
@@ -88,31 +92,33 @@ class UISystem {
       const waveEnemies = document.getElementById('wave-enemies');
       const waveCountdown = document.getElementById('wave-countdown');
 
-      if (waveTitle) waveTitle.textContent = `Setor ${gameState.wave.current}`;
+      if (waveTitle) {
+        const waveNumber = wave ? wave.current : 1;
+        waveTitle.textContent = `Setor ${waveNumber}`;
+      }
 
-      if (gameState.wave.isActive) {
-        const timeLeft = Math.max(0, Math.ceil(gameState.wave.timeRemaining));
+      if (wave && wave.isActive) {
+        const timeLeft = Math.max(0, Math.ceil(wave.timeRemaining));
         if (waveTimerDisplay) waveTimerDisplay.textContent = `${timeLeft}s`;
 
         const progress = Math.min(
-          (gameState.wave.asteroidsKilled / gameState.wave.totalAsteroids) *
-            100,
+          (wave.asteroidsKilled / Math.max(1, wave.totalAsteroids)) * 100,
           100
         );
 
         if (waveProgressBar) waveProgressBar.style.width = progress + '%';
         if (waveEnemies)
-          waveEnemies.textContent = `${gameState.wave.asteroidsKilled} asteroides eliminados`;
+          waveEnemies.textContent = `${wave.asteroidsKilled} asteroides eliminados`;
         if (waveCountdown) waveCountdown.classList.add('hidden');
       } else {
-        if (waveTimerDisplay) waveTimerDisplay.textContent = '0s';
-        if (waveProgressBar) waveProgressBar.style.width = '100%';
-        if (waveEnemies) waveEnemies.textContent = 'Setor Limpo!';
+        if (waveTimerDisplay) waveTimerDisplay.textContent = wave ? '0s' : '--';
+        if (waveProgressBar) waveProgressBar.style.width = wave ? '100%' : '0%';
+        if (waveEnemies) waveEnemies.textContent = wave ? 'Setor Limpo!' : '--';
 
-        const countdown = Math.ceil(gameState.wave.breakTimer);
+        const countdown = wave ? Math.ceil(wave.breakTimer) : 0;
         const countdownTimer = document.getElementById('countdown-timer');
         if (countdownTimer) countdownTimer.textContent = countdown;
-        if (waveCountdown) waveCountdown.classList.remove('hidden');
+        if (waveCountdown) waveCountdown.classList.toggle('hidden', !wave || countdown <= 0);
       }
     } catch (error) {
       console.error('[UISystem] Failed to update HUD:', error);
@@ -171,11 +177,14 @@ class UISystem {
   showGameOverScreen(data) {
     this.showScreen('gameover');
 
+    const stats = data?.stats || { totalKills: 0, timeElapsed: 0 };
+    const wave = data?.wave || { completedWaves: 0 };
+
     const elements = [
       { id: 'final-level', value: data.player.level },
-      { id: 'final-kills', value: data.stats.totalKills },
-      { id: 'final-waves', value: data.wave.completedWaves },
-      { id: 'final-time', value: Math.floor(data.stats.time) + 's' },
+      { id: 'final-kills', value: stats.totalKills },
+      { id: 'final-waves', value: wave.completedWaves },
+      { id: 'final-time', value: Math.floor(stats.timeElapsed) + 's' },
     ];
 
     elements.forEach(({ id, value }) => {
