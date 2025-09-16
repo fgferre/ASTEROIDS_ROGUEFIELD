@@ -436,6 +436,16 @@ class EnemySystem {
         return this.asteroids.filter(asteroid => !asteroid.destroyed).length;
     }
 
+    render(ctx) {
+        if (!ctx) return;
+
+        this.asteroids.forEach(asteroid => {
+            if (!asteroid.destroyed && typeof asteroid.draw === 'function') {
+                asteroid.draw(ctx);
+            }
+        });
+    }
+
     // === INTERFACE PARA OUTROS SISTEMAS ===
     spawnInitialAsteroids(count = 4) {
         if (!this.waveState) return;

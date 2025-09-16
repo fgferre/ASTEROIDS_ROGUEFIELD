@@ -266,6 +266,39 @@ class ProgressionSystem {
     return this.xpOrbs.filter((orb) => !orb.collected);
   }
 
+  render(ctx) {
+    if (!ctx) return;
+
+    this.getXPOrbs().forEach((orb) => {
+      const gradient = ctx.createRadialGradient(
+        orb.x,
+        orb.y,
+        0,
+        orb.x,
+        orb.y,
+        CONSTANTS.XP_ORB_SIZE * 2
+      );
+      gradient.addColorStop(0, '#00DDFF');
+      gradient.addColorStop(0.7, 'rgba(0, 221, 255, 0.3)');
+      gradient.addColorStop(1, 'transparent');
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(orb.x, orb.y, CONSTANTS.XP_ORB_SIZE * 2, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#00DDFF';
+      ctx.beginPath();
+      ctx.arc(orb.x, orb.y, CONSTANTS.XP_ORB_SIZE, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(orb.x - 2, orb.y - 2, CONSTANTS.XP_ORB_SIZE * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
   getUpgradeCount(upgradeId) {
     return this.appliedUpgrades.get(upgradeId) || 0;
   }
