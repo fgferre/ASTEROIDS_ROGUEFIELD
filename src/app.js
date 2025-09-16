@@ -621,7 +621,6 @@ function updateWaveSystem(deltaTime) {
 
       if (gameState.wave.spawnTimer <= 0) {
         spawnAsteroid();
-        gameState.wave.asteroidsSpawned++;
         gameState.wave.spawnTimer =
           gameState.wave.spawnDelay * (0.5 + Math.random() * 0.5);
       }

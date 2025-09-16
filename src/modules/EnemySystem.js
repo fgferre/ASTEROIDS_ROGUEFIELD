@@ -244,6 +244,9 @@ class EnemySystem {
 
         if (this.shouldSpawn(waveState) && this.spawnTimer <= 0) {
             this.spawnAsteroid();
+            if (waveState && waveState.isActive && typeof waveState.asteroidsSpawned === 'number') {
+                waveState.asteroidsSpawned += 1;
+            }
             this.spawnTimer = this.spawnDelay * (0.5 + Math.random() * 0.5);
         }
     }
