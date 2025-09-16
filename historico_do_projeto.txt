@@ -1,3 +1,8 @@
+*   7635489 Merge pull request #23 from fgferre/codex/execute-modular-refactoring-plan
+|\  
+| * 5153b83 refactor: shift wave and ui state to modular systems
+|/  
+* 3ab99b7 atualizacao do histórico de commits
 *   9f845e1 Merge pull request #22 from fgferre/codex/implement-final-modular-refactoring-plan
 |\  
 | * a963937 fix: correct wave spawn counters
