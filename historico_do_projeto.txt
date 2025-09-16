@@ -1,3 +1,19 @@
+*   9f845e1 Merge pull request #22 from fgferre/codex/implement-final-modular-refactoring-plan
+|\  
+| * a963937 fix: correct wave spawn counters
+|/  
+*   c6a360c Merge pull request #21 from fgferre/codex/implement-final-phase-of-modular-refactoring
+|\  
+| * 87a8a06 refactor(combat): internalize bullet collision
+|/  
+*   24e2871 Merge branch 'main' of https://github.com/fgferre/ASTEROIDS_ROGUEFIELD
+|\  
+| *   0c10075 Merge pull request #20 from fgferre/codex/find-current-status-of-phase-6
+| |\  
+| | * a766e17 centralize player state and fix death handling
+| |/  
+* / dfa8a87 status update historico_do_projeto
+|/  
 *   a680c15 Merge pull request #17 from fgferre/codex/corrige-erro-no-playersystem.js
 |\  
 | * 3792731 fix: reset player stats on restart
