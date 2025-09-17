@@ -3,11 +3,25 @@
 class InputSystem {
     constructor() {
         this.keys = {}; // Estado atual das teclas
+        this.codes = {}; // Estado atual baseado no código físico da tecla
         this.mousePos = { x: 0, y: 0 };
         this.mouseButtons = {};
         this.gamepadConnected = false;
         this.gamepad = null;
-        
+
+        this.movementBindings = new Set([
+            'w', 'a', 's', 'd',
+            'keyw', 'keya', 'keys', 'keyd',
+            'arrowup', 'arrowdown', 'arrowleft', 'arrowright'
+        ]);
+
+        this.keyAliases = {
+            w: 'keyw',
+            a: 'keya',
+            s: 'keys',
+            d: 'keyd'
+        };
+
         this.setupEventListeners();
         
         // Registrar no ServiceLocator
@@ -21,22 +35,36 @@ class InputSystem {
     setupEventListeners() {
         // Keyboard events
         document.addEventListener('keydown', (e) => {
-            const key = e.key.toLowerCase();
-            const wasPressed = this.keys[key];
-            this.keys[key] = true;
-            
+            const key = typeof e.key === 'string' ? e.key.toLowerCase() : '';
+            const code = typeof e.code === 'string' ? e.code.toLowerCase() : '';
+            const wasPressed = (key && this.keys[key]) || (code && this.codes[code]);
+
+            if (key) this.keys[key] = true;
+            if (code) this.codes[code] = true;
+
+            if (this.isMovementBinding(key) || this.isMovementBinding(code)) {
+                e.preventDefault();
+            }
+
             // Emit event apenas na primeira pressão
             if (!wasPressed && typeof gameEvents !== 'undefined') {
-                gameEvents.emit('key-pressed', { key, type: 'down', event: e });
+                gameEvents.emit('key-pressed', { key, code, type: 'down', event: e });
             }
         });
-        
+
         document.addEventListener('keyup', (e) => {
-            const key = e.key.toLowerCase();
-            this.keys[key] = false;
-            
+            const key = typeof e.key === 'string' ? e.key.toLowerCase() : '';
+            const code = typeof e.code === 'string' ? e.code.toLowerCase() : '';
+
+            if (key) this.keys[key] = false;
+            if (code) this.codes[code] = false;
+
+            if (this.isMovementBinding(key) || this.isMovementBinding(code)) {
+                e.preventDefault();
+            }
+
             if (typeof gameEvents !== 'undefined') {
-                gameEvents.emit('key-pressed', { key, type: 'up', event: e });
+                gameEvents.emit('key-pressed', { key, code, type: 'up', event: e });
             }
         });
         
@@ -73,10 +101,31 @@ class InputSystem {
     }
     
     // === MÉTODOS PÚBLICOS ===
-    
+
+    isMovementBinding(binding) {
+        if (!binding) return false;
+        return this.movementBindings.has(binding.toLowerCase());
+    }
+
     // Verificar se tecla está pressionada
     isKeyDown(key) {
-        return !!this.keys[key.toLowerCase()];
+        if (!key) return false;
+
+        const normalized = key.toLowerCase();
+        if (this.keys[normalized]) return true;
+        if (this.codes[normalized]) return true;
+
+        const alias = this.keyAliases[normalized];
+        if (alias && this.codes[alias]) {
+            return true;
+        }
+
+        return false;
+    }
+
+    isCodeDown(code) {
+        if (!code) return false;
+        return !!this.codes[code.toLowerCase()];
     }
     
     // Verificar múltiplas teclas (OR logic)
@@ -111,7 +160,9 @@ class InputSystem {
     
     // Debug: listar teclas pressionadas
     getActiveKeys() {
-        return Object.keys(this.keys).filter(key => this.keys[key]);
+        const activeKeys = Object.keys(this.keys).filter(key => this.keys[key]);
+        const activeCodes = Object.keys(this.codes).filter(code => this.codes[code]);
+        return [...new Set([...activeKeys, ...activeCodes])];
     }
     
     // Update (chamado pelo game loop)

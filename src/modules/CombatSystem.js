@@ -219,11 +219,17 @@ class CombatSystem {
             bullet.y += bullet.vy * deltaTime;
             bullet.life -= deltaTime;
 
-            // Screen wrapping
-            if (bullet.x < 0) bullet.x = CONSTANTS.GAME_WIDTH;
-            if (bullet.x > CONSTANTS.GAME_WIDTH) bullet.x = 0;
-            if (bullet.y < 0) bullet.y = CONSTANTS.GAME_HEIGHT;
-            if (bullet.y > CONSTANTS.GAME_HEIGHT) bullet.y = 0;
+            // Remover projéteis que saem da tela para evitar "ricochete"
+            const outOfBounds =
+                bullet.x < 0 ||
+                bullet.x > CONSTANTS.GAME_WIDTH ||
+                bullet.y < 0 ||
+                bullet.y > CONSTANTS.GAME_HEIGHT;
+
+            if (outOfBounds) {
+                bullet.life = 0;
+                return;
+            }
         });
 
         // Remover bullets expirados

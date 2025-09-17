@@ -403,6 +403,11 @@ class EnemySystem {
         // Adicionar fragmentos
         if (fragments.length > 0) {
             this.asteroids.push(...fragments);
+
+            if (this.waveState && this.waveState.isActive) {
+                this.waveState.totalAsteroids += fragments.length;
+                this.waveState.asteroidsSpawned += fragments.length;
+            }
         }
 
         if (this.waveState) {
