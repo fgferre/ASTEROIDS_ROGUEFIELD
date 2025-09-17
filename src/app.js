@@ -118,14 +118,23 @@ function startGame() {
 function gameLoop(currentTime) {
   if (!gameState.initialized) return;
 
-  const deltaTime = Math.min((currentTime - gameState.lastTime) / 1000, 0.016);
+  const rawDelta =
+    gameState.lastTime === 0
+      ? 0
+      : Math.max((currentTime - gameState.lastTime) / 1000, 0);
   gameState.lastTime = currentTime;
 
+  const maxDelta = 0.1;
+  const clampedDelta = Math.min(rawDelta, maxDelta);
+
   try {
-    let adjustedDelta = deltaTime;
+    let adjustedDelta = clampedDelta;
     const effects = gameServices.get('effects');
     if (effects && typeof effects.update === 'function') {
-      adjustedDelta = effects.update(deltaTime);
+      const effectsDelta = effects.update(rawDelta);
+      if (typeof effectsDelta === 'number' && !Number.isNaN(effectsDelta)) {
+        adjustedDelta = Math.min(effectsDelta, maxDelta);
+      }
     }
 
     if (gameState.screen === 'playing') {
