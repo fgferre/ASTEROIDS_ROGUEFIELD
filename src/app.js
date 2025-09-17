@@ -8,6 +8,10 @@ import EffectsSystem from './modules/EffectsSystem.js';
 import AudioSystem from './modules/AudioSystem.js';
 import WorldSystem from './modules/WorldSystem.js';
 import RenderingSystem from './modules/RenderingSystem.js';
+import {
+  resolveDebugPreference,
+  applyDebugPreference,
+} from './core/debugLogging.js';
 
 const gameState = {
   screen: 'menu',
@@ -16,6 +20,11 @@ const gameState = {
   initialized: false,
   lastTime: 0,
 };
+
+function bootstrapDebugLogging() {
+  const preference = resolveDebugPreference();
+  applyDebugPreference(preference);
+}
 
 function init() {
   try {
@@ -169,6 +178,7 @@ function renderGame() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  bootstrapDebugLogging();
   init();
   console.log('Aplicação inicializada com sucesso!');
 });
