@@ -3708,7 +3708,7 @@ Esta fase final garantirá que o `app.js` se torne um orquestrador enxuto, remov
 
 ### **Prompt 6.1: Centralizar Estado do Player e Remover Código Legado**
 
-```
+````
 CONTEXTO: A lógica de movimento do Player foi movida para o `PlayerSystem`, mas dados como vida, dano e stats ainda residem no `gameState`. O código legado de movimento e input ainda polui o `app.js`.
 OBJETIVO: Centralizar TODOS os dados do player dentro do `PlayerSystem` e remover as funções e sincronizações legadas de movimento e input do `app.js`.
 
@@ -3750,11 +3750,11 @@ VALIDAÇÃO OBRIGATÓRIA:
 3.  O tiro automático e targeting ainda funcionam, buscando os stats do `PlayerSystem`.
 4.  Upgrades de dano, velocidade, vida, etc., são aplicados corretamente no `PlayerSystem`.
 5.  A UI de vida reflete o estado do `PlayerSystem`.
-```
+````
 
 ### **Prompt 6.2: Remover Código Legado de Inimigos, Combate e Progressão**
 
-```
+````
 CONTEXTO: `EnemySystem`, `CombatSystem` e `ProgressionSystem` estão funcionando, mas o `app.js` ainda contém as funções antigas e a sincronização de estado com o `gameState`.
 OBJETIVO: Remover toda a lógica e estado legados de inimigos, combate e progressão do `app.js`, tornando os módulos as únicas fontes da verdade.
 
@@ -3806,11 +3806,11 @@ VALIDAÇÃO OBRIGATÓRIA:
 4.  O combate (tiro, targeting, colisão de projéteis) é 100% controlado pelo `CombatSystem`.
 5.  XP, level up e upgrades são 100% controlados pelo `ProgressionSystem`.
 6.  O objeto `gameState` está significativamente menor.
-```
+````
 
 ### **Prompt 6.3: Finalizar o `app.js` como Orquestrador Principal**
 
-```
+````
 CONTEXTO: A maior parte do código legado foi removida. O `app.js` agora precisa ser limpo para atuar apenas como um ponto de entrada e orquestrador do loop principal.
 OBJETIVO: Simplificar o `app.js` ao seu papel final: inicializar sistemas, executar o game loop e gerenciar o estado global de alto nível (como 'playing', 'paused', 'gameover').
 
@@ -3851,7 +3851,7 @@ VALIDAÇÃO OBRIGATÓRIA:
 2.  O jogo opera de forma idêntica à versão anterior.
 3.  O objeto `gameState` está mínimo e controla apenas o estado da tela (ex: 'playing', 'levelup', 'gameover').
 4.  Não há mais lógica de jogo (movimento, combate, etc.) diretamente no `app.js`.
-```
+````
 
 ### **Prompt 6.4: Validação Final do Jogo**
 
@@ -3875,4 +3875,3 @@ VALIDAÇÃO CRÍTICA:
 
 Se encontrar qualquer bug, relate-o detalhadamente para que possa ser corrigido antes de considerar o projeto concluído. Se tudo funcionar, a refatoração foi um sucesso.
 ```
-

@@ -1,5 +1,5 @@
 {
-    "git.allowForcePush": true,
-    "git.useForcePushWithLease": false,
-    "CodeGPT.apiKey": "LM Studio"
+  "git.allowForcePush": true,
+  "git.useForcePushWithLease": false,
+  "CodeGPT.apiKey": "LM Studio"
 }

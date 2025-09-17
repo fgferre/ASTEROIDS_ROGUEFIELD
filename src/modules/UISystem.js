@@ -64,7 +64,9 @@ class UISystem {
       const progression = gameServices.get('progression');
       const enemies = gameServices.get('enemies');
 
-      const stats = enemies ? enemies.getSessionStats() : { totalKills: 0, timeElapsed: 0 };
+      const stats = enemies
+        ? enemies.getSessionStats()
+        : { totalKills: 0, timeElapsed: 0 };
       const wave = enemies ? enemies.getWaveState() : null;
 
       const elements = [
@@ -122,7 +124,8 @@ class UISystem {
         const countdown = wave ? Math.ceil(wave.breakTimer) : 0;
         const countdownTimer = document.getElementById('countdown-timer');
         if (countdownTimer) countdownTimer.textContent = countdown;
-        if (waveCountdown) waveCountdown.classList.toggle('hidden', !wave || countdown <= 0);
+        if (waveCountdown)
+          waveCountdown.classList.toggle('hidden', !wave || countdown <= 0);
       }
     } catch (error) {
       console.error('[UISystem] Failed to update HUD:', error);

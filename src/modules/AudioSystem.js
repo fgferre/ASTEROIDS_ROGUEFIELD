@@ -1,4 +1,3 @@
-
 class AudioSystem {
   constructor() {
     this.context = null;

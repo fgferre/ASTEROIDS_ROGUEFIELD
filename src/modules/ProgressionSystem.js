@@ -294,7 +294,13 @@ class ProgressionSystem {
 
       ctx.fillStyle = '#FFFFFF';
       ctx.beginPath();
-      ctx.arc(orb.x - 2, orb.y - 2, CONSTANTS.XP_ORB_SIZE * 0.3, 0, Math.PI * 2);
+      ctx.arc(
+        orb.x - 2,
+        orb.y - 2,
+        CONSTANTS.XP_ORB_SIZE * 0.3,
+        0,
+        Math.PI * 2
+      );
       ctx.fill();
     });
   }

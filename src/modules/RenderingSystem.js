@@ -109,7 +109,9 @@ class RenderingSystem {
     ctx.arc(
       playerPosition.x,
       playerPosition.y,
-      player.getMagnetismRadius ? player.getMagnetismRadius() : CONSTANTS.MAGNETISM_RADIUS,
+      player.getMagnetismRadius
+        ? player.getMagnetismRadius()
+        : CONSTANTS.MAGNETISM_RADIUS,
       0,
       Math.PI * 2
     );
