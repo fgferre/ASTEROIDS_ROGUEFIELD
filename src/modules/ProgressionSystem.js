@@ -234,7 +234,7 @@ class ProgressionSystem {
         break;
 
       case 'armor':
-        gameEvents.emit('upgrade-armor-boost', { multiplier: 1.25 });
+        gameEvents.emit('upgrade-armor-boost', { bonus: 25 });
         break;
 
       case 'multishot':

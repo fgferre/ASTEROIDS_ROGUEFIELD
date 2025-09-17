@@ -57,6 +57,19 @@ class PlayerSystem {
       console.log('[PlayerSystem] Health boosted to', this.maxHealth);
     });
 
+    gameEvents.on('upgrade-armor-boost', (data = {}) => {
+      const bonus = typeof data.bonus === 'number' ? data.bonus : 0;
+      if (bonus > 0) {
+        this.armor = Math.min(this.armor + bonus, 75);
+      } else if (typeof data.multiplier === 'number') {
+        const baseArmor = this.armor > 0 ? this.armor : 25;
+        this.armor = Math.min(Math.round(baseArmor * data.multiplier), 75);
+      } else {
+        this.armor = Math.min(this.armor + 25, 75);
+      }
+      console.log('[PlayerSystem] Armor boosted to', this.armor);
+    });
+
     gameEvents.on('upgrade-multishot', (data) => {
       this.multishot += data.bonus;
       console.log('[PlayerSystem] Multishot boosted to', this.multishot);
@@ -345,6 +358,7 @@ class PlayerSystem {
       damage: this.damage,
       multishot: this.multishot,
       magnetismRadius: this.magnetismRadius,
+      armor: this.armor,
     };
   }
 
