@@ -134,8 +134,9 @@ class ProgressionSystem {
     this.experience += amount;
     this.totalExperience += amount;
 
-    // Verificar level up
-    if (this.experience >= this.experienceToNext) {
+    // Processar múltiplos level ups em uma única coleta
+    while (this.experience >= this.experienceToNext) {
+      this.experience -= this.experienceToNext;
       this.levelUp();
     }
 
@@ -152,7 +153,6 @@ class ProgressionSystem {
 
   levelUp() {
     this.level++;
-    this.experience = 0;
     this.experienceToNext = Math.floor(
       this.experienceToNext * this.levelScaling
     );
