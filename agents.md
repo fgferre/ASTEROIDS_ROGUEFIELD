@@ -1,125 +1,110 @@
 # agents.md
 
-## 1) Propósito & Escopo
+## Escopo e objetivo
 
-Estabelecer **regras de colaboração** entre pessoas e agentes de IA em qualquer código, garantindo **segurança, qualidade, rastreabilidade** e **velocidade**. Este documento **não** descreve planos de entrega específicos.
+Documento único de referência para agentes e pessoas colaborando neste
+repositório. Define limites de atuação, boas práticas de colaboração e o fluxo
+para manter a arquitetura modular segura e rastreável.
 
-## 2) Princípios Operacionais
+## Princípios operacionais
 
-- **Menor mudança segura**: evoluir em passos pequenos e reversíveis.
-- **Fonte única de verdade**: decisões registradas em PRs/issues.
-- **Explícito > implícito**: entradas, saídas e limites sempre documentados.
-- **Automação com supervisão**: IA propõe; humanos decidem.
-- **Privacidade/segurança primeiro**: sem dados sensíveis em prompts/commits.
-- **Observabilidade**: tudo auditável (commits, logs, diffs, testes).
+- Priorize **mudanças pequenas e reversíveis**; valide cada passo antes de seguir.
+- **Fonte única de verdade**: toda decisão relevante deve constar em PRs, issues
+  ou no `historico_do_projeto.txt`.
+- **Explícito > implícito**: documente inputs, outputs e dependências dos
+  sistemas (especialmente EventBus e ServiceLocator).
+- **Supervisão humana obrigatória**: a IA sugere; humanos aprovam e aplicam.
+- **Sem dados sensíveis**: não exponha segredos ou informações pessoais em
+  prompts, commits ou artefatos.
 
-## 3) Papéis
+## Papéis
 
-- **Owner/Maintainer (humano)**: define prioridades, aprova merges, resolve conflitos.
-- **Contributor (humano)**: implementa, revisa e aciona IAs conforme políticas.
-- **AI Reviewer**: revisão estática (bug smells, style, segurança, licenças).
-- **AI Coder**: gera diffs **pequenos**, com testes e justificativas.
-- **AI Doc Writer**: atualiza docs/CHANGELOG a partir de diffs/PRs.
-- **CI/CD**: executa testes, linters, SCA/SAST/DAST, cobertura, build.
+- **Owner/Maintainer**: define prioridades, aprova merges e conduz rollbacks.
+- **Contributor**: implementa e testa seguindo este guia.
+- **AI Coder**: gera diffs enxutos com justificativa, evidências e testes.
+- **AI Reviewer**: aponta riscos (bugs, segurança, estilo) com referências.
+- **AI Doc Writer**: mantém documentação, histórico e changelog alinhados ao diff.
 
-## 4) Limites & Permissões (o que a IA **pode/não pode**)
+## Guardrails técnicos
 
-**Pode**
+- Preserve a arquitetura baseada em `ServiceLocator` e `EventBus`; não quebre
+  contratos públicos de sistemas sem plano de migração.
+- Evite dependências novas. Se inevitável, forneça motivação clara e validação
+  de impacto.
+- Trabalhe em **um módulo ou funcionalidade por vez**, mantendo compatibilidade
+  da API pública e dos eventos existentes.
+- Prefira ES Modules, funções puras e early returns. Não envolva imports em
+  blocos `try/catch`.
 
-- Sugerir/gerar mudanças **isoladas** com escopo claro.
-- Propor refactors **contidos** (1 módulo/feature por vez).
-- Criar/atualizar testes e docs relativos à mudança.
-- Abrir/atualizar issues com contexto e next steps.
+## Fluxo de trabalho padrão
 
-**Não pode**
+1. Confirme o escopo da tarefa e critérios de aceite.
+2. Produza diffs atômicos. Execute `npm run test` (mesmo que seja um no-op) e
+   demais checagens pertinentes.
+3. Anexe resultados e contexto no PR/commit.
+4. Atualize documentação afetada (ex.: `docs/validation/test-checklist.md`,
+   README, diagramas) antes de solicitar revisão.
+5. Revisões humanas ou automatizadas liberam o merge apenas com evidências
+   verdes.
 
-- Alterar chaves, segredos, políticas de acesso.
-- Introduzir dependências externas sem justificativa & aprovação.
-- Fazer mudanças transversais múltiplas em um único PR.
-- Comitar arquivos binários não rastreados sem aprovação.
+## Qualidade e risco
 
-## 5) Fluxo de Trabalho (resumo)
+### Quality gates obrigatórios
 
-1. **Issue/Task clara** → critérios de pronto/aceite definidos.
-2. **Branch curta** → **AI Coder** gera um **diff pequeno** + testes.
-3. **AI Reviewer** roda checagens → anexa evidências (linhas, regras).
-4. **Humano** revisa, decide **merge** ou **rework**.
-5. **CI** passa? → merge. Falhou? → correção incremental.
-6. **AI Doc Writer** atualiza docs/CHANGELOG.
+- Build/tests sem falhas bloqueantes.
+- Formatação/lint em conformidade com ferramentas existentes.
+- Sem vulnerabilidades críticas conhecidas.
+- Escopo do PR aderente à tarefa original e granular.
 
-## 6) Quality Gates (bloqueios de merge)
+### Gestão de risco
 
-- **Build & Test**: 100% verde; cobertura mínima definida pelo time.
-- **Linters/Format**: zero erros bloqueantes.
-- **SAST/SCA**: sem vulnerabilidades de severidade alta/crit.
-- **Licenças**: compatíveis com o projeto.
-- **Escopo**: PR cumpre apenas a issue alvo e mantém granularidade.
+- **Red flags**: diffs grandes, mudanças em segurança/build, redução de
+  cobertura, novos contratos quebrando compatibilidade.
+- **Mitigações**: feature toggles, caminhos de rollback, comunicação clara de
+  breaking changes e validação incremental.
 
-## 7) Decisão & Escalação
+## Testes e observabilidade
 
-- **Owner** tem voto final de **merge/rollback**.
-- Conflito persistente → **tríade** (Owner + Revisor humano + Autor).
-- Incidentes de qualidade/segurança → **freeze** de merges até remediação.
+- Rode os scripts disponíveis (`npm run test`, `npm run build`, etc.) e inclua o
+  output relevante nas notas.
+- Utilize `docs/validation/test-checklist.md` para validar manualmente o jogo.
+  Registre quando cada cenário foi coberto e mantenha o checklist atualizado.
+- Garanta logs e métricas suficientes para reproduzir bugs e auditar decisões.
 
-## 8) Rastreabilidade & Auditoria
+## Documentação e comunicação
 
-- Commits com **mensagem estruturada** (contexto → mudança → impacto).
-- PR descreve **motivo, alternativa considerada, trade-offs**.
-- As IAs devem **citar**: regra/regra-linters, CVE/regra de segurança, doc fonte.
+- Atualize docs, comentários e histórico sempre que alterar APIs, eventos ou
+  fluxos de jogo.
+- Commits precisam contar a história: contexto → mudança → impacto.
+- PRs devem mencionar alternativas descartadas, trade-offs e links úteis.
 
-## 9) Gestão de Risco
+## Templates rápidos de prompt
 
-- **Red flags**: diffs grandes, dependências novas sem razão, alterações em segurança/build, redução de cobertura.
-- **Mitigações**: feature toggles, canary, rollback script, migrations reversíveis.
-
-## 10) Manutenção de Documentação
-
-- Toda mudança **visível** ao usuário/SDK/API → doc atualizada no mesmo PR.
-- **CHANGELOG** semanticamente versionado (Keep a Changelog / SemVer).
-- Docs de arquitetura descrevem **contratos**, não implementações pontuais.
-
-## 11) Templates de Prompt (curtos)
-
-**AI Reviewer – pedido de revisão**
+**AI Reviewer**
 
 ```
 Tarefa: Revisar este diff pequeno para bugs, breaking changes, segurança e style.
-Entrada: <diff/PR link + contexto curto>
-Saída esperada: lista numerada de achados (linha/regra), risco, correção sugerida.
-Limites: não reescreva tudo; foque no escopo do diff.
+Entrada: <diff/PR + contexto resumido>
+Saída: lista numerada de achados (linha/regra), risco, correção sugerida.
+Limites: foque no escopo do diff.
 ```
 
-**AI Coder – geração de patch pequena**
+**AI Coder**
 
 ```
 Tarefa: Produzir um diff pequeno que resolva <issue>.
-Requisitos: testes cobrindo caso feliz e borda; comentários mínimos; sem novas deps salvo justificativa.
+Requisitos: testes para casos feliz e de borda; sem novas dependências salvo justificativa.
 Saída: patch + notas (motivo, trade-off, rollback).
 ```
 
-**AI Doc Writer – atualização de docs**
+**AI Doc Writer**
 
 ```
-Tarefa: Atualizar docs/CHANGELOG conforme diffs.
-Saída: texto curto, factual, sem marketing. Linkar PR/commit.
+Tarefa: Atualizar documentação/changelog conforme o diff aprovado.
+Saída: texto curto, factual, com links de referência.
 ```
 
-## 12) Conformidade & Privacidade
+## Conformidade e privacidade
 
-- Sem PII/segredos em prompts, commits e artefatos de CI.
-- Logs retidos apenas pelo tempo mínimo necessário.
-
----
-
-### O que mudou em relação ao seu arquivo anterior
-
-- **Removido**: guia de refatoração e qualquer detalhe de stack/eventos do jogo.
-- **Compactado**: princípios em bullets, gates claros, papéis objetivos.
-- **Generalizado**: serve para qualquer repo (web, backend, data, infra).
-- **Prompts curtos**: prontos para colar em qualquer ferramenta de IA.
-
-### Próximos passos rápidos
-
-1. Renomeie o atual para `refactor-guide.md` e deixe **apenas** o plano lá.
-2. Adote este texto como `agents-policy.md` (ou substitua `agents.md`).
-3. Linke ambos no `README` em “Processo & Governança”.
+- Não registrar PII nem segredos em nenhuma etapa.
+- Manter logs apenas pelo tempo necessário à auditoria e depuração.
