@@ -1,9 +1,23 @@
 // src/core/EventBus.js
+import {
+  isDebugLoggingEnabled,
+  registerDebugLoggingController,
+} from './debugLogging.js';
+
 class EventBus {
   constructor() {
     this.events = new Map();
-    this.debug = true; // Para debug durante desenvolvimento
-    console.log('[EventBus] Initialized');
+    this.debug = isDebugLoggingEnabled();
+    this._unregisterDebugController = registerDebugLoggingController(
+      'EventBus',
+      (enabled) => {
+        this.debug = enabled;
+      }
+    );
+
+    if (this.debug) {
+      console.log('[EventBus] Initialized');
+    }
   }
 
   // Registrar listener para evento
@@ -112,7 +126,14 @@ class EventBus {
   // Limpar tudo
   destroy() {
     this.events.clear();
-    console.log('[EventBus] Destroyed');
+    if (typeof this._unregisterDebugController === 'function') {
+      this._unregisterDebugController();
+      this._unregisterDebugController = null;
+    }
+
+    if (this.debug) {
+      console.log('[EventBus] Destroyed');
+    }
   }
 }
 

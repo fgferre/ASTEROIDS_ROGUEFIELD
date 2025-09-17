@@ -1,9 +1,20 @@
 // src/core/ServiceLocator.js
+import {
+  isDebugLoggingEnabled,
+  registerDebugLoggingController,
+} from './debugLogging.js';
+
 class ServiceLocator {
   constructor() {
     this.services = new Map();
-    this.debug = true;
-    console.log('[ServiceLocator] Initialized');
+    this.debug = isDebugLoggingEnabled();
+    registerDebugLoggingController('ServiceLocator', (enabled) => {
+      this.debug = enabled;
+    });
+
+    if (this.debug) {
+      console.log('[ServiceLocator] Initialized');
+    }
   }
 
   // Registrar serviço
