@@ -135,6 +135,34 @@ class RenderingSystem {
       Math.min(MAX_VISUAL_TILT, angularVelocity * TILT_MULTIPLIER)
     );
 
+    if (typeof player.getShieldState === 'function') {
+      const shieldState = player.getShieldState();
+      if (shieldState?.isActive && shieldState.maxHits > 0) {
+        const ratio = Math.max(
+          0,
+          Math.min(1, shieldState.currentHits / shieldState.maxHits)
+        );
+        const position =
+          typeof player.getPosition === 'function'
+            ? player.getPosition()
+            : player.position;
+
+        if (position) {
+          ctx.save();
+          const radius = CONSTANTS.SHIP_SIZE + 12;
+          const alpha = 0.35 + 0.4 * ratio;
+          ctx.strokeStyle = `rgba(0, 191, 255, ${alpha})`;
+          ctx.lineWidth = 4 + ratio * 4;
+          ctx.shadowColor = 'rgba(0, 191, 255, 0.8)';
+          ctx.shadowBlur = 15 + ratio * 12;
+          ctx.beginPath();
+          ctx.arc(position.x, position.y, radius, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+    }
+
     player.render(ctx, { tilt });
   }
 }

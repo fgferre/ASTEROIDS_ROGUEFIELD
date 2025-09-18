@@ -161,7 +161,17 @@ class EnemySystem {
       gameServices.register('enemies', this);
     }
 
+    this.setupEventListeners();
+
     console.log('[EnemySystem] Initialized');
+  }
+
+  setupEventListeners() {
+    if (typeof gameEvents === 'undefined') return;
+
+    gameEvents.on('shield-shockwave', (data) => {
+      this.handleShockwave(data);
+    });
   }
 
   createInitialWaveState() {
@@ -600,6 +610,50 @@ class EnemySystem {
 
   getSessionStats() {
     return { ...this.sessionStats };
+  }
+
+  handleShockwave(data) {
+    if (!data || !data.position) {
+      return;
+    }
+
+    const radius =
+      typeof data.radius === 'number'
+        ? data.radius
+        : CONSTANTS.SHIELD_SHOCKWAVE_RADIUS;
+    const force =
+      typeof data.force === 'number'
+        ? data.force
+        : CONSTANTS.SHIELD_SHOCKWAVE_FORCE;
+
+    const radiusSq = radius * radius;
+    const originX = data.position.x;
+    const originY = data.position.y;
+
+    this.asteroids.forEach((asteroid) => {
+      if (!asteroid || asteroid.destroyed) {
+        return;
+      }
+
+      const dx = asteroid.x - originX;
+      const dy = asteroid.y - originY;
+      const distanceSq = dx * dx + dy * dy;
+
+      if (distanceSq > radiusSq || distanceSq === 0) {
+        return;
+      }
+
+      const distance = Math.sqrt(distanceSq);
+      const falloff = 1 - Math.min(distance / radius, 1);
+      const impulse = (force * falloff) / Math.max(asteroid.mass, 1);
+      const nx = dx / Math.max(distance, 0.001);
+      const ny = dy / Math.max(distance, 0.001);
+
+      asteroid.vx += nx * impulse;
+      asteroid.vy += ny * impulse;
+      asteroid.rotationSpeed += (Math.random() - 0.5) * 4 * falloff;
+      asteroid.lastDamageTime = Math.max(asteroid.lastDamageTime, 0.12);
+    });
   }
 }
 

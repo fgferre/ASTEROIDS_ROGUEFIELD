@@ -7,6 +7,29 @@ const DRIFT_SETTINGS = {
   brakeReduction: 0.4,
 };
 
+const SHIELD_LEVEL_CONFIG = {
+  1: {
+    maxHits: CONSTANTS.SHIELD_DEFAULT_HITS,
+    cooldown: CONSTANTS.SHIELD_COOLDOWN_DURATION,
+  },
+  2: {
+    maxHits: CONSTANTS.SHIELD_DEFAULT_HITS + 1,
+    cooldown: CONSTANTS.SHIELD_COOLDOWN_DURATION,
+  },
+  3: {
+    maxHits: CONSTANTS.SHIELD_DEFAULT_HITS + 1,
+    cooldown: Math.max(5, CONSTANTS.SHIELD_COOLDOWN_DURATION - 5),
+  },
+  4: {
+    maxHits: CONSTANTS.SHIELD_DEFAULT_HITS + 2,
+    cooldown: Math.max(5, CONSTANTS.SHIELD_COOLDOWN_DURATION - 5),
+  },
+  5: {
+    maxHits: CONSTANTS.SHIELD_DEFAULT_HITS + 2,
+    cooldown: Math.max(5, CONSTANTS.SHIELD_COOLDOWN_DURATION - 5),
+  },
+};
+
 class PlayerSystem {
   constructor(x = CONSTANTS.GAME_WIDTH / 2, y = CONSTANTS.GAME_HEIGHT / 2) {
     // === APENAS MOVIMENTO E POSIÇÃO ===
@@ -31,7 +54,13 @@ class PlayerSystem {
     this.damage = 25;
     this.multishot = 1;
     this.magnetismRadius = CONSTANTS.MAGNETISM_RADIUS;
-    this.armor = 0;
+    this.shieldUpgradeLevel = 0;
+    this.shieldMaxHits = 0;
+    this.shieldCurrentHits = 0;
+    this.shieldCooldownTimer = 0;
+    this.shieldMaxCooldown = 0;
+    this.shieldWasInCooldown = false;
+    this.isShieldActive = false;
     this.invulnerableTimer = 0;
 
     // Registrar no ServiceLocator
@@ -64,19 +93,6 @@ class PlayerSystem {
       console.log('[PlayerSystem] Health boosted to', this.maxHealth);
     });
 
-    gameEvents.on('upgrade-armor-boost', (data = {}) => {
-      const bonus = typeof data.bonus === 'number' ? data.bonus : 0;
-      if (bonus > 0) {
-        this.armor = Math.min(this.armor + bonus, 75);
-      } else if (typeof data.multiplier === 'number') {
-        const baseArmor = this.armor > 0 ? this.armor : 25;
-        this.armor = Math.min(Math.round(baseArmor * data.multiplier), 75);
-      } else {
-        this.armor = Math.min(this.armor + 25, 75);
-      }
-      console.log('[PlayerSystem] Armor boosted to', this.armor);
-    });
-
     gameEvents.on('upgrade-multishot', (data) => {
       this.multishot += data.bonus;
       console.log('[PlayerSystem] Multishot boosted to', this.multishot);
@@ -86,6 +102,189 @@ class PlayerSystem {
       this.magnetismRadius = Math.floor(this.magnetismRadius * data.multiplier);
       console.log('[PlayerSystem] Magnetism boosted to', this.magnetismRadius);
     });
+
+    gameEvents.on('upgrade-deflector-shield', (data = {}) => {
+      const level = Number(data.level);
+      if (!Number.isFinite(level) || level <= 0) {
+        return;
+      }
+
+      this.applyShieldLevel(level);
+      console.log('[PlayerSystem] Deflector shield upgraded to level', level);
+    });
+  }
+
+  applyShieldLevel(level) {
+    const config = SHIELD_LEVEL_CONFIG[level];
+    if (!config) {
+      return;
+    }
+
+    this.shieldUpgradeLevel = level;
+    this.shieldMaxHits = config.maxHits;
+    this.shieldMaxCooldown = config.cooldown;
+
+    if (this.isShieldActive) {
+      this.shieldCurrentHits = this.shieldMaxHits;
+    } else if (this.shieldCooldownTimer <= 0) {
+      this.shieldCurrentHits = this.shieldMaxHits;
+    } else {
+      this.shieldCurrentHits = Math.min(
+        this.shieldCurrentHits,
+        this.shieldMaxHits
+      );
+    }
+
+    if (level === 1) {
+      this.shieldCooldownTimer = 0;
+      this.shieldWasInCooldown = false;
+    } else {
+      this.shieldCooldownTimer = Math.min(
+        this.shieldCooldownTimer,
+        this.shieldMaxCooldown
+      );
+    }
+
+    this.emitShieldStats();
+  }
+
+  emitShieldStats() {
+    if (typeof gameEvents === 'undefined') return;
+
+    gameEvents.emit('shield-stats-changed', {
+      level: this.shieldUpgradeLevel,
+      maxHits: this.shieldMaxHits,
+      currentHits:
+        this.isShieldActive || this.shieldCooldownTimer > 0
+          ? this.shieldCurrentHits
+          : this.shieldMaxHits,
+      isActive: this.isShieldActive,
+      cooldownTimer: this.shieldCooldownTimer,
+      cooldownDuration: this.shieldMaxCooldown,
+    });
+  }
+
+  emitShieldActivationFailed(reason) {
+    if (typeof gameEvents === 'undefined') return;
+
+    gameEvents.emit('shield-activation-failed', {
+      reason,
+      level: this.shieldUpgradeLevel,
+    });
+  }
+
+  activateShield() {
+    if (this.shieldUpgradeLevel <= 0) {
+      this.emitShieldActivationFailed('locked');
+      return false;
+    }
+
+    if (this.isShieldActive) {
+      this.emitShieldActivationFailed('active');
+      return false;
+    }
+
+    if (this.shieldCooldownTimer > 0) {
+      this.emitShieldActivationFailed('cooldown');
+      return false;
+    }
+
+    if (this.shieldMaxHits <= 0) {
+      this.emitShieldActivationFailed('unavailable');
+      return false;
+    }
+
+    this.isShieldActive = true;
+    this.shieldCurrentHits = this.shieldMaxHits;
+    this.shieldWasInCooldown = false;
+
+    if (typeof gameEvents !== 'undefined') {
+      gameEvents.emit('shield-activated', {
+        level: this.shieldUpgradeLevel,
+        maxHits: this.shieldMaxHits,
+      });
+    }
+
+    this.emitShieldStats();
+    return true;
+  }
+
+  shieldTookHit() {
+    if (!this.isShieldActive || this.shieldMaxHits <= 0) {
+      return;
+    }
+
+    this.shieldCurrentHits = Math.max(0, this.shieldCurrentHits - 1);
+
+    if (typeof gameEvents !== 'undefined') {
+      gameEvents.emit('shield-hit', {
+        level: this.shieldUpgradeLevel,
+        remainingHits: this.shieldCurrentHits,
+        maxHits: this.shieldMaxHits,
+      });
+    }
+
+    if (this.shieldCurrentHits <= 0) {
+      this.breakShield();
+    } else {
+      this.emitShieldStats();
+    }
+  }
+
+  breakShield() {
+    if (!this.isShieldActive) {
+      return;
+    }
+
+    this.isShieldActive = false;
+    this.shieldCurrentHits = 0;
+
+    if (typeof gameEvents !== 'undefined') {
+      gameEvents.emit('shield-broken', {
+        level: this.shieldUpgradeLevel,
+      });
+    }
+
+    if (this.shieldUpgradeLevel >= 5 && typeof gameEvents !== 'undefined') {
+      const position = this.getPosition();
+      gameEvents.emit('shield-shockwave', {
+        position,
+        radius: CONSTANTS.SHIELD_SHOCKWAVE_RADIUS,
+        force: CONSTANTS.SHIELD_SHOCKWAVE_FORCE,
+      });
+    }
+
+    if (this.shieldMaxCooldown > 0) {
+      this.shieldCooldownTimer = this.shieldMaxCooldown;
+      this.shieldWasInCooldown = true;
+    } else {
+      this.shieldCooldownTimer = 0;
+      this.shieldWasInCooldown = false;
+      if (typeof gameEvents !== 'undefined') {
+        gameEvents.emit('shield-recharged', {
+          level: this.shieldUpgradeLevel,
+        });
+      }
+      this.shieldCurrentHits = this.shieldMaxHits;
+    }
+
+    this.emitShieldStats();
+  }
+
+  getShieldState() {
+    return {
+      level: this.shieldUpgradeLevel,
+      maxHits: this.shieldMaxHits,
+      currentHits:
+        this.isShieldActive || this.shieldCooldownTimer > 0
+          ? this.shieldCurrentHits
+          : this.shieldMaxHits,
+      cooldownTimer: this.shieldCooldownTimer,
+      cooldownDuration: this.shieldMaxCooldown,
+      isActive: this.isShieldActive,
+      isUnlocked: this.shieldUpgradeLevel > 0,
+      isOnCooldown: this.shieldCooldownTimer > 0,
+    };
   }
 
   // === MÉTODO PRINCIPAL UPDATE ===
@@ -94,6 +293,23 @@ class PlayerSystem {
     if (!inputSystem) {
       console.warn('[PlayerSystem] InputSystem not found');
       return;
+    }
+
+    if (this.shieldCooldownTimer > 0) {
+      this.shieldCooldownTimer -= deltaTime;
+      if (this.shieldCooldownTimer <= 0) {
+        this.shieldCooldownTimer = 0;
+        if (this.shieldWasInCooldown) {
+          this.shieldWasInCooldown = false;
+          this.shieldCurrentHits = this.shieldMaxHits;
+          if (typeof gameEvents !== 'undefined') {
+            gameEvents.emit('shield-recharged', {
+              level: this.shieldUpgradeLevel,
+            });
+          }
+          this.emitShieldStats();
+        }
+      }
     }
 
     const movement = inputSystem.getMovementInput();
@@ -358,13 +574,26 @@ class PlayerSystem {
 
   // === GERENCIAMENTO DE VIDA ===
   takeDamage(amount) {
-    this.health = Math.max(0, this.health - Math.max(0, amount));
-    if (typeof gameEvents !== 'undefined') {
+    if (this.isShieldActive) {
+      this.shieldTookHit();
+      return undefined;
+    }
+
+    const damageAmount = Math.max(0, amount);
+    if (damageAmount <= 0) {
+      return this.health;
+    }
+
+    const previousHealth = this.health;
+    this.health = Math.max(0, this.health - damageAmount);
+
+    if (this.health !== previousHealth && typeof gameEvents !== 'undefined') {
       gameEvents.emit('player-health-changed', {
         current: this.health,
         max: this.maxHealth,
       });
     }
+
     return this.health;
   }
 
@@ -390,7 +619,9 @@ class PlayerSystem {
       damage: this.damage,
       multishot: this.multishot,
       magnetismRadius: this.magnetismRadius,
-      armor: this.armor,
+      shieldLevel: this.shieldUpgradeLevel,
+      shieldMaxHits: this.shieldMaxHits,
+      shieldCooldown: this.shieldMaxCooldown,
     };
   }
 
@@ -404,6 +635,16 @@ class PlayerSystem {
     this.angle = this.wrapAngle(angle);
   }
 
+  resetShieldState() {
+    this.shieldUpgradeLevel = 0;
+    this.shieldMaxHits = 0;
+    this.shieldCurrentHits = 0;
+    this.shieldCooldownTimer = 0;
+    this.shieldMaxCooldown = 0;
+    this.shieldWasInCooldown = false;
+    this.isShieldActive = false;
+  }
+
   resetStats() {
     this.health = 100;
     this.maxHealth = 100;
@@ -411,9 +652,9 @@ class PlayerSystem {
     this.multishot = 1;
     this.magnetismRadius = CONSTANTS.MAGNETISM_RADIUS;
     this.maxSpeed = CONSTANTS.SHIP_MAX_SPEED;
-    this.armor = 0;
     this.invulnerableTimer = 0;
     this.driftFactor = 0;
+    this.resetShieldState();
   }
 
   reset() {

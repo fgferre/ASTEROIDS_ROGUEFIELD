@@ -1065,6 +1065,107 @@ body.is-paused .xp-container {
   min-width: 20px;
 }
 
+#shield-status {
+  position: relative;
+  overflow: hidden;
+  border-left: 4px solid rgba(0, 191, 255, 0.85);
+  transition: transform 150ms var(--ease-standard),
+    box-shadow 200ms var(--ease-standard),
+    border-color 200ms var(--ease-standard);
+}
+
+#shield-status .shield-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+#shield-status .shield-info {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+#shield-status .shield-text {
+  font-size: var(--font-size-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+#shield-status .shield-hits {
+  font-weight: var(--font-weight-semibold);
+  color: rgba(0, 191, 255, 0.85);
+  font-size: var(--font-size-lg);
+}
+
+#shield-status #shield-cooldown-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 191, 255, 0.2) 0%,
+    rgba(0, 191, 255, 0.35) 40%,
+    rgba(0, 191, 255, 0.05) 100%
+  );
+  transform: scaleY(0);
+  transform-origin: top;
+  transition: transform 120ms linear, opacity 200ms ease;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+}
+
+#shield-status .shield-icon,
+#shield-status .shield-info {
+  position: relative;
+  z-index: 1;
+}
+
+#shield-status.ready {
+  box-shadow: 0 0 12px rgba(0, 191, 255, 0.35);
+}
+
+#shield-status.active {
+  border-color: rgba(0, 255, 204, 0.95);
+  box-shadow: 0 0 16px rgba(0, 255, 204, 0.45);
+}
+
+#shield-status.active .shield-hits {
+  color: rgba(0, 255, 204, 0.95);
+}
+
+#shield-status.cooldown {
+  opacity: 0.8;
+  border-color: rgba(0, 191, 255, 0.45);
+}
+
+#shield-status.cooldown .shield-hits {
+  color: rgba(173, 216, 230, 0.9);
+}
+
+#shield-status.locked {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+#shield-status.shield-fail {
+  animation: shieldFailFlash 0.3s ease;
+}
+
+@keyframes shieldFailFlash {
+  0% {
+    box-shadow: 0 0 0 rgba(255, 84, 89, 0);
+  }
+  30% {
+    box-shadow: 0 0 18px rgba(255, 84, 89, 0.7);
+  }
+  60% {
+    box-shadow: 0 0 6px rgba(255, 84, 89, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 0 rgba(255, 84, 89, 0);
+  }
+}
+
 .health {
   border-left: 4px solid var(--color-error);
 }

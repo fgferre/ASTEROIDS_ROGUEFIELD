@@ -126,6 +126,16 @@ function setupGlobalEventListeners() {
     gameState.isPaused = !gameState.isPaused;
     emitPauseState();
   });
+
+  gameEvents.on('activate-shield-pressed', () => {
+    if (gameState.screen !== 'playing') {
+      return;
+    }
+    const player = gameServices.get('player');
+    if (player && typeof player.activateShield === 'function') {
+      player.activateShield();
+    }
+  });
 }
 
 function startGame() {
