@@ -1,3 +1,8 @@
+*   9baa1fb Merge pull request #33 from fgferre/codex/implementar-funcionalidade-escudo-defletor
+|\  
+| * 24a8bc1 feat: add deflector shield ability
+|/  
+* d72fc1a update do histórico
 *   e4e8875 Merge pull request #32 from fgferre/codex/implement-round-1-polishing-and-qol
 |\  
 | * a51a0aa feat: improve ship feedback and add pause system
