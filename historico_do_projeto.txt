@@ -1,3 +1,24 @@
+*   e4e8875 Merge pull request #32 from fgferre/codex/implement-round-1-polishing-and-qol
+|\  
+| * a51a0aa feat: improve ship feedback and add pause system
+|/  
+* 3308084 ci: Ajusta workflows para deploy manual e autoformatação Este commit introduz melhorias significativas nos workflows do GitHub Actions para alinhar com as fases de desenvolvimento do projeto. - O workflow 'deploy.yml' foi modificado para ser acionado apenas manualmente (on: workflow_dispatch). Isso impede publicações automáticas a cada push na branch 'main' e dá ao desenvolvedor controle total sobre o momento do deploy. O workflow também foi corrigido para incluir as etapas de build (npm install, npm run build) , resolvendo falhas anteriores.
+*   e1a4e7c Merge pull request #31 from fgferre/codex/create-debuglogging-module-and-refactor-usage
+|\  
+| * 4a4b163 refactor: centralize debug logging utilities
+|/  
+*   4abb9d9 Merge pull request #27 from fgferre/codex/apply-next-step-of-modular-refactor-guide
+|\  
+| * f592592 docs: refine agent policy and validation checklist
+|/  
+* 79a62e0 Format changes Prettier and prettier implementation in automated actions
+*   f742ca0 Merge pull request #25 from fgferre/codex/execute-modular-refactoring-plan-0aq9q2
+|\  
+| * 19edab3 Fix bullet despawn, input handling, and wave progress
+| * fc6a4e2 fix(player): apply armor upgrade bonuses
+|/  
+* f0838fb Atualização arquivo de políticas agents
+* a70ac39 update source control history
 *   fdea20a Merge pull request #24 from fgferre/codex/execute-modular-refactoring-plan-4okfge
 |\  
 | * b5e313a Handle effect timers off-screen and restore asteroid damage
