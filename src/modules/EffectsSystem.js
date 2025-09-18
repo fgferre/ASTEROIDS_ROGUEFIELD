@@ -72,6 +72,7 @@ export default class EffectsSystem {
   constructor(audio) {
     this.audio = audio;
     this.particles = [];
+    this.shockwaves = [];
     this.screenShake = { intensity: 0, duration: 0, timer: 0 };
     this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
     this.screenFlash = {
@@ -144,6 +145,12 @@ export default class EffectsSystem {
     gameEvents.on('player-took-damage', () => {
       this.addScreenShake(8, 0.3);
     });
+
+    gameEvents.on('shield-shockwave', (data) => {
+      this.createShockwaveEffect(data);
+      this.addScreenShake(10, 0.35);
+      this.addScreenFlash('rgba(0, 191, 255, 0.35)', 0.25, 0.18);
+    });
   }
 
   update(deltaTime) {
@@ -167,6 +174,7 @@ export default class EffectsSystem {
     }
 
     this.updateParticles(deltaTime);
+    this.updateShockwaves(deltaTime);
     return deltaTime;
   }
 
@@ -175,6 +183,20 @@ export default class EffectsSystem {
     if (this.particles.length > 150) {
       this.particles = this.particles.slice(-100);
     }
+  }
+
+  updateShockwaves(deltaTime) {
+    this.shockwaves = this.shockwaves.filter((wave) => {
+      if (!wave) return false;
+
+      wave.timer += deltaTime;
+      const progress = Math.min(1, wave.timer / wave.duration);
+      wave.radius = wave.maxRadius * progress;
+      wave.alpha = Math.max(0, wave.maxAlpha * (1 - progress));
+      wave.lineWidth = wave.baseWidth * (1 - progress * 0.6);
+
+      return wave.timer < wave.duration;
+    });
   }
 
   applyScreenShake(ctx) {
@@ -192,6 +214,8 @@ export default class EffectsSystem {
   draw(ctx) {
     this.particles.forEach((p) => p.draw(ctx));
 
+    this.drawShockwaves(ctx);
+
     if (this.screenFlash.timer > 0) {
       const alpha =
         (this.screenFlash.timer / this.screenFlash.duration) *
@@ -202,6 +226,24 @@ export default class EffectsSystem {
       ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
       ctx.restore();
     }
+  }
+
+  drawShockwaves(ctx) {
+    if (!ctx) return;
+
+    this.shockwaves.forEach((wave) => {
+      if (!wave) return;
+
+      ctx.save();
+      ctx.strokeStyle = `rgba(0, 191, 255, ${wave.alpha})`;
+      ctx.lineWidth = Math.max(1, wave.lineWidth);
+      ctx.shadowColor = 'rgba(0, 191, 255, 0.6)';
+      ctx.shadowBlur = 25 * wave.alpha;
+      ctx.beginPath();
+      ctx.arc(wave.x, wave.y, wave.radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    });
   }
 
   addScreenShake(intensity, duration) {
@@ -297,6 +339,34 @@ export default class EffectsSystem {
     }
   }
 
+  createShockwaveEffect(data) {
+    if (!data || !data.position) {
+      return;
+    }
+
+    const radius =
+      typeof data.radius === 'number'
+        ? data.radius
+        : CONSTANTS.SHIELD_SHOCKWAVE_RADIUS;
+
+    const wave = {
+      x: data.position.x,
+      y: data.position.y,
+      maxRadius: radius,
+      radius: 0,
+      timer: 0,
+      duration: 0.45,
+      baseWidth: 10,
+      maxAlpha: 0.6,
+      alpha: 0.6,
+    };
+
+    this.shockwaves.push(wave);
+    if (this.shockwaves.length > 6) {
+      this.shockwaves = this.shockwaves.slice(-6);
+    }
+  }
+
   createXPCollectEffect(x, y) {
     for (let i = 0; i < 6; i++) {
       const angle = Math.random() * Math.PI * 2;
@@ -377,6 +447,7 @@ export default class EffectsSystem {
 
   reset() {
     this.particles = [];
+    this.shockwaves = [];
     this.screenShake = { intensity: 0, duration: 0, timer: 0 };
     this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
     this.screenFlash = {

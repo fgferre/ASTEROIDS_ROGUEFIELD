@@ -55,3 +55,15 @@ rápidas.
 - [ ] **Partículas não acumulam infinitamente**
   - Passos: manter múltiplas explosões e efeitos na tela por alguns minutos.
   - Esperado: sistema remove partículas antigas e a contagem permanece dentro de limites razoáveis.
+
+## Escudo Defletor
+
+- [ ] Upgrade "Matriz de Deflexão" é oferecido e suas descrições evoluem corretamente.
+- [ ] Tecla 'E' ativa o escudo, e o ícone na UI e a aura na nave refletem o estado "ativo".
+- [ ] Escudo anula corretamente o número de impactos definidos pelo seu nível de upgrade.
+- [ ] Aura visual do escudo diminui de espessura a cada impacto absorvido.
+- [ ] Ao quebrar, o escudo inicia o cooldown e a UI exibe a animação de recarga.
+- [ ] Tentar ativar o escudo durante o cooldown aciona o feedback de falha (som e visual).
+- [ ] **(Nv. 5)** A quebra do escudo dispara a onda de choque visual e sonora.
+- [ ] **(Nv. 5)** A onda de choque repele fisicamente os asteroides próximos.
+- [ ] Todos os efeitos sonoros associados ao escudo são reproduzidos nos momentos corretos.

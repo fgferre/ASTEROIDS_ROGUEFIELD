@@ -1,5 +1,13 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 
+const DEFLECTOR_DESCRIPTIONS = {
+  0: 'Adiciona um escudo ativável (Tecla E) que absorve 3 impactos.',
+  1: 'Aumenta a capacidade do escudo para 4 impactos.',
+  2: 'Reduz o cooldown do escudo em 5 segundos.',
+  3: 'Aumenta a capacidade do escudo para 5 impactos.',
+  4: 'Poder Final: Adiciona a Sobrecarga Defletora.',
+};
+
 class ProgressionSystem {
   constructor() {
     // === DADOS DE PROGRESSÃO ===
@@ -182,14 +190,32 @@ class ProgressionSystem {
 
   // === SISTEMA DE UPGRADES ===
   getRandomUpgrades(count = 3) {
-    // Misturar upgrades disponíveis
-    const shuffled = [...this.availableUpgrades].sort(
-      () => Math.random() - 0.5
-    );
-    return shuffled.slice(0, count).map((upgrade) => ({
-      ...upgrade,
-      currentLevel: this.appliedUpgrades.get(upgrade.id) || 0,
-    }));
+    const filtered = this.availableUpgrades.filter((upgrade) => {
+      if (upgrade.id !== 'deflector_shield') {
+        return true;
+      }
+
+      const currentLevel = this.getUpgradeCount(upgrade.id);
+      return currentLevel < 5;
+    });
+
+    const shuffled = [...filtered].sort(() => Math.random() - 0.5);
+
+    return shuffled.slice(0, count).map((upgrade) => {
+      const currentLevel = this.getUpgradeCount(upgrade.id);
+      let description = upgrade.description;
+
+      if (upgrade.id === 'deflector_shield') {
+        const cappedLevel = Math.min(currentLevel, 4);
+        description = DEFLECTOR_DESCRIPTIONS[cappedLevel];
+      }
+
+      return {
+        ...upgrade,
+        description,
+        currentLevel,
+      };
+    });
   }
 
   applyUpgrade(upgradeId) {
@@ -199,11 +225,16 @@ class ProgressionSystem {
       return false;
     }
 
+    const currentCount = this.appliedUpgrades.get(upgradeId) || 0;
+    if (upgradeId === 'deflector_shield' && currentCount >= 5) {
+      console.warn('[ProgressionSystem] Deflector shield already at max level');
+      return false;
+    }
+
     // Aplicar efeito do upgrade
     this.applyUpgradeEffect(upgrade);
 
     // Registrar upgrade aplicado
-    const currentCount = this.appliedUpgrades.get(upgradeId) || 0;
     this.appliedUpgrades.set(upgradeId, currentCount + 1);
 
     // Emitir evento
@@ -236,10 +267,6 @@ class ProgressionSystem {
         gameEvents.emit('upgrade-health-boost', { bonus: 50 });
         break;
 
-      case 'armor':
-        gameEvents.emit('upgrade-armor-boost', { bonus: 25 });
-        break;
-
       case 'multishot':
         gameEvents.emit('upgrade-multishot', { bonus: 1 });
         break;
@@ -248,6 +275,12 @@ class ProgressionSystem {
         this.orbMagnetismRadius *= 1.5;
         gameEvents.emit('upgrade-magnetism', { multiplier: 1.5 });
         break;
+
+      case 'deflector_shield': {
+        const newLevel = this.getUpgradeCount(upgrade.id) + 1;
+        gameEvents.emit('upgrade-deflector-shield', { level: newLevel });
+        break;
+      }
     }
   }
 

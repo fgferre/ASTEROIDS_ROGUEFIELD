@@ -56,6 +56,30 @@ class AudioSystem {
     gameEvents.on('player-took-damage', () => {
       this.playShipHit();
     });
+
+    gameEvents.on('shield-activated', () => {
+      this.playShieldActivate();
+    });
+
+    gameEvents.on('shield-hit', () => {
+      this.playShieldImpact();
+    });
+
+    gameEvents.on('shield-broken', () => {
+      this.playShieldBreak();
+    });
+
+    gameEvents.on('shield-recharged', () => {
+      this.playShieldRecharged();
+    });
+
+    gameEvents.on('shield-activation-failed', () => {
+      this.playShieldFail();
+    });
+
+    gameEvents.on('shield-shockwave', () => {
+      this.playShieldShockwave();
+    });
   }
 
   safePlay(soundFunction) {
@@ -240,6 +264,156 @@ class AudioSystem {
 
       osc.start();
       osc.stop(this.context.currentTime + 0.3);
+    });
+  }
+
+  playShieldActivate() {
+    this.safePlay(() => {
+      const osc = this.context.createOscillator();
+      const gain = this.context.createGain();
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+
+      const now = this.context.currentTime;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(320, now);
+      osc.frequency.exponentialRampToValueAtTime(540, now + 0.18);
+
+      gain.gain.setValueAtTime(0.16, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+      osc.start(now);
+      osc.stop(now + 0.18);
+    });
+  }
+
+  playShieldImpact() {
+    this.safePlay(() => {
+      const osc = this.context.createOscillator();
+      const gain = this.context.createGain();
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+
+      const now = this.context.currentTime;
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(520, now);
+      osc.frequency.exponentialRampToValueAtTime(220, now + 0.1);
+
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+      osc.start(now);
+      osc.stop(now + 0.12);
+    });
+  }
+
+  playShieldBreak() {
+    this.safePlay(() => {
+      const osc = this.context.createOscillator();
+      const gain = this.context.createGain();
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+
+      const now = this.context.currentTime;
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(180, now);
+      osc.frequency.exponentialRampToValueAtTime(70, now + 0.25);
+
+      gain.gain.setValueAtTime(0.22, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+      osc.start(now);
+      osc.stop(now + 0.25);
+    });
+  }
+
+  playShieldRecharged() {
+    this.safePlay(() => {
+      const osc = this.context.createOscillator();
+      const gain = this.context.createGain();
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+
+      const now = this.context.currentTime;
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(420, now);
+      osc.frequency.setValueAtTime(540, now + 0.06);
+      osc.frequency.setValueAtTime(660, now + 0.12);
+
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+      osc.start(now);
+      osc.stop(now + 0.18);
+    });
+  }
+
+  playShieldFail() {
+    this.safePlay(() => {
+      const osc = this.context.createOscillator();
+      const gain = this.context.createGain();
+
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+
+      const now = this.context.currentTime;
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(260, now);
+      osc.frequency.exponentialRampToValueAtTime(200, now + 0.12);
+
+      gain.gain.setValueAtTime(0.1, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+      osc.start(now);
+      osc.stop(now + 0.15);
+    });
+  }
+
+  playShieldShockwave() {
+    this.safePlay(() => {
+      const noiseBuffer = this.context.createBuffer(
+        1,
+        this.context.sampleRate * 0.4,
+        this.context.sampleRate
+      );
+      const output = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < noiseBuffer.length; i++) {
+        output[i] = (Math.random() * 2 - 1) * (1 - i / noiseBuffer.length);
+      }
+
+      const noise = this.context.createBufferSource();
+      noise.buffer = noiseBuffer;
+      const noiseGain = this.context.createGain();
+
+      const osc = this.context.createOscillator();
+      const oscGain = this.context.createGain();
+
+      noise.connect(noiseGain);
+      noiseGain.connect(this.masterGain);
+
+      osc.connect(oscGain);
+      oscGain.connect(this.masterGain);
+
+      const now = this.context.currentTime;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(140, now);
+      osc.frequency.exponentialRampToValueAtTime(60, now + 0.4);
+
+      oscGain.gain.setValueAtTime(0.18, now);
+      oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
+      noiseGain.gain.setValueAtTime(0.4, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+
+      noise.start(now);
+      noise.stop(now + 0.35);
+
+      osc.start(now);
+      osc.stop(now + 0.4);
     });
   }
 

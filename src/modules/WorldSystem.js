@@ -77,9 +77,12 @@ class WorldSystem {
       const baseDamage = 12;
       const momentumFactor = (asteroid.mass * relSpeed) / 120;
       const rawDamage = baseDamage + momentumFactor;
-      const armor = typeof player.armor === 'number' ? player.armor : 0;
-      const damage = Math.max(3, Math.floor(rawDamage) - armor);
+      const damage = Math.max(3, Math.floor(rawDamage));
       const remaining = player.takeDamage(damage);
+
+      if (typeof remaining !== 'number') {
+        return;
+      }
 
       if (typeof player.setInvulnerableTimer === 'function') {
         player.setInvulnerableTimer(0.5);

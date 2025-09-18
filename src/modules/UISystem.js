@@ -8,6 +8,7 @@ class UISystem {
 
     this.damageFlashTimeout = null;
     this.currentPauseState = false;
+    this.shieldFailTimeout = null;
 
     this.setupEventListeners();
     console.log('[UISystem] Initialized');
@@ -43,6 +44,10 @@ class UISystem {
         if (appState && typeof appState.isPaused === 'function') {
           this.updatePauseScreen(Boolean(appState.isPaused()));
         }
+      });
+
+      gameEvents.on('shield-activation-failed', () => {
+        this.flashShieldFailure();
       });
     }
   }
@@ -107,6 +112,11 @@ class UISystem {
         : { totalKills: 0, timeElapsed: 0 };
       const wave = enemies ? enemies.getWaveState() : null;
 
+      const shieldState =
+        player && typeof player.getShieldState === 'function'
+          ? player.getShieldState()
+          : null;
+
       const elements = [
         {
           id: 'health-display',
@@ -165,8 +175,57 @@ class UISystem {
         if (waveCountdown)
           waveCountdown.classList.toggle('hidden', !wave || countdown <= 0);
       }
+
+      this.updateShieldIndicator(shieldState);
     } catch (error) {
       console.error('[UISystem] Failed to update HUD:', error);
+    }
+  }
+
+  updateShieldIndicator(shieldState) {
+    const element = document.getElementById('shield-status');
+    const overlay = document.getElementById('shield-cooldown-overlay');
+    const hitsDisplay = document.getElementById('shield-hit-count');
+
+    if (!element || !overlay) {
+      return;
+    }
+
+    element.classList.remove('locked', 'ready', 'active', 'cooldown');
+
+    if (!shieldState || !shieldState.isUnlocked) {
+      element.classList.add('locked');
+      overlay.style.transform = 'scaleY(1)';
+      overlay.style.opacity = '0.5';
+      if (hitsDisplay) hitsDisplay.textContent = '--';
+      return;
+    }
+
+    if (shieldState.isActive) {
+      element.classList.add('active');
+    } else if (shieldState.isOnCooldown) {
+      element.classList.add('cooldown');
+    } else {
+      element.classList.add('ready');
+    }
+
+    if (hitsDisplay) {
+      const hits = shieldState.isActive
+        ? Math.max(0, shieldState.currentHits)
+        : shieldState.maxHits;
+      hitsDisplay.textContent = `${hits}`;
+    }
+
+    if (shieldState.isOnCooldown && shieldState.cooldownDuration > 0) {
+      const ratio = Math.max(
+        0,
+        Math.min(1, shieldState.cooldownTimer / shieldState.cooldownDuration)
+      );
+      overlay.style.transform = `scaleY(${ratio})`;
+      overlay.style.opacity = '1';
+    } else {
+      overlay.style.transform = 'scaleY(0)';
+      overlay.style.opacity = '0';
     }
   }
 
@@ -194,6 +253,24 @@ class UISystem {
       healthDisplay.classList.remove('damage-flash');
       this.damageFlashTimeout = null;
     }, 280);
+  }
+
+  flashShieldFailure() {
+    const element = document.getElementById('shield-status');
+    if (!element) return;
+
+    element.classList.remove('shield-fail');
+    void element.offsetWidth;
+    element.classList.add('shield-fail');
+
+    if (this.shieldFailTimeout) {
+      window.clearTimeout(this.shieldFailTimeout);
+    }
+
+    this.shieldFailTimeout = window.setTimeout(() => {
+      element.classList.remove('shield-fail');
+      this.shieldFailTimeout = null;
+    }, 300);
   }
 
   updatePauseScreen(isPaused) {

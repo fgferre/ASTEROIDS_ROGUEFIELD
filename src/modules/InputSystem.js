@@ -63,6 +63,14 @@ class InputSystem {
         }
       }
 
+      if (
+        !wasPressed &&
+        typeof gameEvents !== 'undefined' &&
+        (key === 'e' || code === 'keye')
+      ) {
+        gameEvents.emit('activate-shield-pressed');
+      }
+
       // Emit event apenas na primeira pressão
       if (!wasPressed && typeof gameEvents !== 'undefined') {
         gameEvents.emit('key-pressed', { key, code, type: 'down', event: e });

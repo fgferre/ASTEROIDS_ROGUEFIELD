@@ -38,6 +38,12 @@ export const COLLISION_BOUNCE = 0.6;
 export const MAGNETISM_RADIUS = 70;
 export const MAGNETISM_FORCE = 120;
 
+// === ESCUDO DEFLETOR ===
+export const SHIELD_DEFAULT_HITS = 3;
+export const SHIELD_COOLDOWN_DURATION = 20; // segundos
+export const SHIELD_SHOCKWAVE_RADIUS = 300;
+export const SHIELD_SHOCKWAVE_FORCE = 350;
+
 // === SISTEMA DE ONDAS ===
 export const TARGET_UPDATE_INTERVAL = 0.15;
 export const ASTEROIDS_PER_WAVE_BASE = 4;
@@ -70,11 +76,11 @@ export const SPACE_UPGRADES = [
     color: '#32CD32',
   },
   {
-    id: 'armor',
-    name: 'Blindagem Reativa',
-    description: '+25% resistência',
-    icon: '🔰',
-    color: '#FF6B6B',
+    id: 'deflector_shield',
+    name: 'Matriz de Deflexão',
+    description: 'Adiciona um escudo ativável (Tecla E) que absorve 3 impactos.',
+    icon: '💠',
+    color: '#00BFFF',
   },
   {
     id: 'multishot',
