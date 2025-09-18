@@ -850,6 +850,47 @@ body {
   position: relative;
 }
 
+/* Pause Screen */
+#pause-screen {
+  background: rgba(6, 12, 28, 0.7);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  color: var(--color-cream-50);
+  text-align: center;
+  flex-direction: column;
+  padding: var(--space-32);
+}
+
+.pause-content {
+  background: rgba(10, 24, 48, 0.6);
+  border: 2px solid rgba(51, 153, 255, 0.4);
+  border-radius: var(--radius-lg);
+  padding: var(--space-24) var(--space-32);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  max-width: 420px;
+}
+
+.pause-title {
+  font-size: 2.4rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin-bottom: var(--space-16);
+  color: rgba(104, 197, 255, 0.95);
+}
+
+.pause-subtitle {
+  font-size: var(--font-size-xl);
+  margin-bottom: var(--space-12);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.pause-hint {
+  font-size: var(--font-size-sm);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+}
+
 .levelup-title {
   font-size: 2.5rem;
   text-align: center;
@@ -906,6 +947,19 @@ body {
 .upgrade-info p {
   color: var(--color-text-secondary);
   margin: 0;
+}
+
+.upgrade-level-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-left: var(--space-8);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  background: rgba(51, 153, 255, 0.18);
+  color: rgba(51, 153, 255, 0.95);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
 }
 
 /* Game Over Screen */
@@ -966,6 +1020,20 @@ body {
   position: relative;
 }
 
+body.is-paused #game-ui {
+  filter: saturate(0.85) brightness(0.95);
+}
+
+body.is-paused #game-canvas {
+  filter: saturate(0.8) brightness(0.8);
+}
+
+body.is-paused .top-ui,
+body.is-paused .wave-ui,
+body.is-paused .xp-container {
+  opacity: 0.7;
+}
+
 .top-ui {
   display: flex;
   gap: var(--space-16);
@@ -1008,6 +1076,29 @@ body {
 }
 .time {
   border-left: 4px solid var(--color-warning);
+}
+
+#health-display.damage-flash {
+  animation: healthDamageFlash 0.28s ease-in-out;
+  color: var(--color-error);
+}
+
+@keyframes healthDamageFlash {
+  0% {
+    color: inherit;
+    text-shadow: none;
+  }
+  30% {
+    color: var(--color-error);
+    text-shadow: 0 0 12px rgba(255, 84, 89, 0.65);
+  }
+  60% {
+    color: rgba(255, 255, 255, 0.95);
+  }
+  100% {
+    color: inherit;
+    text-shadow: none;
+  }
 }
 
 /* Wave UI */

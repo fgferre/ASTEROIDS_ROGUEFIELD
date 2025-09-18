@@ -1,5 +1,8 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 
+const MAX_VISUAL_TILT = 0.3;
+const TILT_MULTIPLIER = 0.12;
+
 class RenderingSystem {
   constructor() {
     this.stars = this.generateStarField();
@@ -51,8 +54,8 @@ class RenderingSystem {
     }
 
     const player = gameServices.get('player');
-    if (player && typeof player.render === 'function') {
-      player.render(ctx);
+    if (player) {
+      this.renderPlayer(ctx, player);
     }
 
     this.drawMagnetismField(ctx, player, progression);
@@ -117,6 +120,22 @@ class RenderingSystem {
     );
     ctx.stroke();
     ctx.restore();
+  }
+
+  renderPlayer(ctx, player) {
+    if (!player || typeof player.render !== 'function') return;
+
+    const angularVelocity =
+      typeof player.getAngularVelocity === 'function'
+        ? player.getAngularVelocity()
+        : player.angularVelocity || 0;
+
+    const tilt = Math.max(
+      -MAX_VISUAL_TILT,
+      Math.min(MAX_VISUAL_TILT, angularVelocity * TILT_MULTIPLIER)
+    );
+
+    player.render(ctx, { tilt });
   }
 }
 

@@ -6,6 +6,9 @@ class UISystem {
       gameServices.register('ui', this);
     }
 
+    this.damageFlashTimeout = null;
+    this.currentPauseState = false;
+
     this.setupEventListeners();
     console.log('[UISystem] Initialized');
   }
@@ -23,11 +26,43 @@ class UISystem {
       gameEvents.on('player-died', (data) => {
         this.showGameOverScreen(data);
       });
+
+      gameEvents.on('player-took-damage', () => {
+        this.flashHealthDisplay();
+      });
+
+      gameEvents.on('pause-state-changed', (data) => {
+        this.updatePauseScreen(Boolean(data?.isPaused));
+      });
+
+      gameEvents.on('toggle-pause', () => {
+        const appState =
+          typeof gameServices !== 'undefined'
+            ? gameServices.get('game-state')
+            : null;
+        if (appState && typeof appState.isPaused === 'function') {
+          this.updatePauseScreen(Boolean(appState.isPaused()));
+        }
+      });
     }
   }
 
-  showScreen(screenName) {
+  showScreen(screenName, options = {}) {
+    const { overlay = false, show = true } = options;
     try {
+      if (overlay) {
+        const target = document.getElementById(`${screenName}-screen`);
+        if (target) {
+          target.classList.toggle('hidden', !show);
+        }
+
+        if (screenName === 'pause' && show) {
+          const gameUI = document.getElementById('game-ui');
+          if (gameUI) gameUI.classList.remove('hidden');
+        }
+        return;
+      }
+
       document.querySelectorAll('.screen').forEach((screen) => {
         screen.classList.add('hidden');
       });
@@ -41,6 +76,9 @@ class UISystem {
         const screen = document.getElementById(`${screenName}-screen`);
         if (screen) screen.classList.remove('hidden');
       }
+
+      const pauseOverlay = document.getElementById('pause-screen');
+      if (pauseOverlay) pauseOverlay.classList.add('hidden');
 
       if (typeof gameEvents !== 'undefined') {
         gameEvents.emit('screen-changed', { screen: screenName });
@@ -140,6 +178,34 @@ class UISystem {
     if (xpText) xpText.textContent = `XP: ${data.current} / ${data.needed}`;
   }
 
+  flashHealthDisplay() {
+    const healthDisplay = document.getElementById('health-display');
+    if (!healthDisplay) return;
+
+    healthDisplay.classList.remove('damage-flash');
+    void healthDisplay.offsetWidth;
+    healthDisplay.classList.add('damage-flash');
+
+    if (this.damageFlashTimeout) {
+      clearTimeout(this.damageFlashTimeout);
+    }
+
+    this.damageFlashTimeout = window.setTimeout(() => {
+      healthDisplay.classList.remove('damage-flash');
+      this.damageFlashTimeout = null;
+    }, 280);
+  }
+
+  updatePauseScreen(isPaused) {
+    const shouldPause = Boolean(isPaused);
+    if (this.currentPauseState === shouldPause) return;
+
+    this.currentPauseState = shouldPause;
+    this.showScreen('pause', { overlay: true, show: shouldPause });
+
+    document.body?.classList.toggle('is-paused', shouldPause);
+  }
+
   showLevelUpScreen(data) {
     this.showScreen('levelup');
 
@@ -157,12 +223,20 @@ class UISystem {
         button.className = 'upgrade-option';
         button.onclick = () => this.selectUpgrade(upgrade.id);
 
+        const currentLevel =
+          typeof upgrade.currentLevel === 'number' && upgrade.currentLevel > 0
+            ? upgrade.currentLevel
+            : 0;
+        const levelBadge = currentLevel
+          ? `<span class="upgrade-level-tag">Nv. ${currentLevel}</span>`
+          : '';
+
         button.innerHTML = `
         <div class="upgrade-icon" style="color: ${upgrade.color};">
           ${upgrade.icon}
         </div>
         <div class="upgrade-info">
-          <h3>${upgrade.name}</h3>
+          <h3>${upgrade.name}${levelBadge ? ` ${levelBadge}` : ''}</h3>
           <p>${upgrade.description}</p>
         </div>
       `;

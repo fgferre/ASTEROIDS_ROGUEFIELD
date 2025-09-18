@@ -19,9 +19,9 @@ export const TRAIL_LENGTH = 6;
 // === FÍSICA DA NAVE ===
 export const SHIP_ACCELERATION = 280;
 export const SHIP_MAX_SPEED = 220;
-export const SHIP_LINEAR_DAMPING = 3.9; // s^-1
+export const SHIP_LINEAR_DAMPING = 3.1; // s^-1
 export const SHIP_ROTATION_SPEED = 8; // rad/s
-export const SHIP_ANGULAR_DAMPING = 8.0; // s^-1
+export const SHIP_ANGULAR_DAMPING = 6.2; // s^-1
 export const SHIP_MASS = 60;
 
 // === VELOCIDADES ===

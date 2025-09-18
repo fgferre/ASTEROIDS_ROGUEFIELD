@@ -1,6 +1,12 @@
 // src/modules/PlayerSystem.js
 import * as CONSTANTS from '../core/GameConstants.js';
 
+const DRIFT_SETTINGS = {
+  rampSpeed: 2.8,
+  decaySpeed: 5.2,
+  brakeReduction: 0.4,
+};
+
 class PlayerSystem {
   constructor(x = CONSTANTS.GAME_WIDTH / 2, y = CONSTANTS.GAME_HEIGHT / 2) {
     // === APENAS MOVIMENTO E POSIÇÃO ===
@@ -9,6 +15,7 @@ class PlayerSystem {
     this.angle = 0;
     this.targetAngle = 0; // Para rotação suave (futuro)
     this.angularVelocity = 0;
+    this.driftFactor = 0;
 
     // === CONFIGURAÇÕES DE MOVIMENTO ===
     // Usar constantes do arquivo separado
@@ -127,12 +134,27 @@ class PlayerSystem {
     const noLinearInput = !input.up && !input.down;
     const speed = Math.hypot(this.velocity.vx, this.velocity.vy);
 
+    if (noLinearInput) {
+      this.driftFactor = Math.min(
+        1,
+        this.driftFactor + DRIFT_SETTINGS.rampSpeed * deltaTime
+      );
+    } else {
+      this.driftFactor = Math.max(
+        0,
+        this.driftFactor - DRIFT_SETTINGS.decaySpeed * deltaTime
+      );
+    }
+
+    const driftBrakeScale = 1 - this.driftFactor * DRIFT_SETTINGS.brakeReduction;
+
     if (noLinearInput && speed > 2) {
       const proj = this.velocity.vx * fwd.x + this.velocity.vy * fwd.y;
-      const k = Math.max(
+      const kBase = Math.max(
         0.35,
         Math.min(1, Math.abs(proj) / (this.maxSpeed * 0.8))
       );
+      const k = kBase * driftBrakeScale;
       if (proj > 0) thrAux = Math.max(thrAux, k);
       else if (proj < 0) thrMain = Math.max(thrMain, k);
     }
@@ -277,16 +299,26 @@ class PlayerSystem {
     return { ...this.velocity };
   }
 
+  getAngularVelocity() {
+    return this.angularVelocity;
+  }
+
   getMagnetismRadius() {
     return this.magnetismRadius;
   }
 
-  render(ctx) {
+  render(ctx, options = {}) {
     if (!ctx) return;
+
+    const tilt = typeof options.tilt === 'number' ? options.tilt : 0;
 
     ctx.save();
     ctx.translate(this.position.x, this.position.y);
     ctx.rotate(this.angle);
+
+    if (tilt !== 0) {
+      ctx.transform(1, 0, tilt, 1, 0, 0);
+    }
 
     ctx.fillStyle = '#00FF88';
     ctx.strokeStyle = '#00DD77';
@@ -381,6 +413,7 @@ class PlayerSystem {
     this.maxSpeed = CONSTANTS.SHIP_MAX_SPEED;
     this.armor = 0;
     this.invulnerableTimer = 0;
+    this.driftFactor = 0;
   }
 
   reset() {
@@ -392,6 +425,7 @@ class PlayerSystem {
     this.velocity = { vx: 0, vy: 0 };
     this.angle = 0;
     this.angularVelocity = 0;
+    this.driftFactor = 0;
   }
 
   destroy() {
