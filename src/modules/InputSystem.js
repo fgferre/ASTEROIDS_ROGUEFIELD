@@ -55,6 +55,14 @@ class InputSystem {
         e.preventDefault();
       }
 
+      const isEscape = key === 'escape' || code === 'escape';
+      if (isEscape) {
+        e.preventDefault();
+        if (!wasPressed && typeof gameEvents !== 'undefined') {
+          gameEvents.emit('toggle-pause');
+        }
+      }
+
       // Emit event apenas na primeira pressão
       if (!wasPressed && typeof gameEvents !== 'undefined') {
         gameEvents.emit('key-pressed', { key, code, type: 'down', event: e });

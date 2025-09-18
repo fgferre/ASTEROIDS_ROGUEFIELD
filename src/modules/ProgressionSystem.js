@@ -186,7 +186,10 @@ class ProgressionSystem {
     const shuffled = [...this.availableUpgrades].sort(
       () => Math.random() - 0.5
     );
-    return shuffled.slice(0, count);
+    return shuffled.slice(0, count).map((upgrade) => ({
+      ...upgrade,
+      currentLevel: this.appliedUpgrades.get(upgrade.id) || 0,
+    }));
   }
 
   applyUpgrade(upgradeId) {

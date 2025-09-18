@@ -1,5 +1,10 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 
+const MAIN_THRUSTER_FLASH_THRESHOLD = 0.85;
+const MAIN_THRUSTER_FLASH_COLOR = '#3399FF';
+const MAIN_THRUSTER_FLASH_DURATION = 0.05;
+const MAIN_THRUSTER_FLASH_INTENSITY = 0.05;
+
 class SpaceParticle {
   constructor(x, y, vx, vy, color, size, life, type = 'normal') {
     this.x = x;
@@ -89,6 +94,8 @@ export default class EffectsSystem {
     if (typeof gameEvents === 'undefined') return;
 
     gameEvents.on('thruster-effect', (data) => {
+      if (!data || !data.position || !data.direction) return;
+
       this.spawnThrusterVFX(
         data.position.x,
         data.position.y,
@@ -97,6 +104,18 @@ export default class EffectsSystem {
         data.intensity,
         data.type
       );
+
+      if (
+        data.type === 'main' &&
+        typeof data.intensity === 'number' &&
+        data.intensity >= MAIN_THRUSTER_FLASH_THRESHOLD
+      ) {
+        this.addScreenFlash(
+          MAIN_THRUSTER_FLASH_COLOR,
+          MAIN_THRUSTER_FLASH_DURATION,
+          MAIN_THRUSTER_FLASH_INTENSITY
+        );
+      }
     });
 
     gameEvents.on('enemy-destroyed', (data) => {

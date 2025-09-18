@@ -15,11 +15,27 @@ import {
 
 const gameState = {
   screen: 'menu',
+  isPaused: false,
   canvas: null,
   ctx: null,
   initialized: false,
   lastTime: 0,
 };
+
+function registerGameStateService() {
+  if (typeof gameServices === 'undefined') return;
+
+  gameServices.register('game-state', {
+    isPaused: () => gameState.isPaused,
+    getScreen: () => gameState.screen,
+  });
+}
+
+function emitPauseState() {
+  if (typeof gameEvents === 'undefined') return;
+
+  gameEvents.emit('pause-state-changed', { isPaused: gameState.isPaused });
+}
 
 function bootstrapDebugLogging() {
   const preference = resolveDebugPreference();
@@ -40,6 +56,8 @@ function init() {
 
     setupDomEventListeners();
     setupGlobalEventListeners();
+
+    registerGameStateService();
 
     const audioSystem = new AudioSystem();
     new InputSystem();
@@ -81,11 +99,32 @@ function setupGlobalEventListeners() {
   gameEvents.on('screen-changed', (data) => {
     if (data?.screen) {
       gameState.screen = data.screen;
+      if (gameState.screen !== 'playing' && gameState.isPaused) {
+        gameState.isPaused = false;
+        emitPauseState();
+      }
     }
   });
 
   gameEvents.on('player-died', () => {
     gameState.screen = 'gameover';
+    if (gameState.isPaused) {
+      gameState.isPaused = false;
+      emitPauseState();
+    }
+  });
+
+  gameEvents.on('toggle-pause', () => {
+    if (gameState.screen !== 'playing') {
+      if (gameState.isPaused) {
+        gameState.isPaused = false;
+        emitPauseState();
+      }
+      return;
+    }
+
+    gameState.isPaused = !gameState.isPaused;
+    emitPauseState();
   });
 }
 
@@ -116,6 +155,8 @@ function startGame() {
     if (ui) ui.showGameUI();
 
     gameState.screen = 'playing';
+    gameState.isPaused = false;
+    emitPauseState();
     gameState.lastTime = performance.now();
 
     console.log('Jogo iniciado com sucesso!');
@@ -131,13 +172,16 @@ function gameLoop(currentTime) {
   gameState.lastTime = currentTime;
 
   try {
+    const shouldUpdateGame =
+      gameState.screen === 'playing' && !gameState.isPaused;
+
     let adjustedDelta = deltaTime;
     const effects = gameServices.get('effects');
     if (effects && typeof effects.update === 'function') {
-      adjustedDelta = effects.update(deltaTime);
+      adjustedDelta = effects.update(shouldUpdateGame ? deltaTime : 0);
     }
 
-    if (gameState.screen === 'playing') {
+    if (shouldUpdateGame) {
       updateGame(adjustedDelta);
     }
 
