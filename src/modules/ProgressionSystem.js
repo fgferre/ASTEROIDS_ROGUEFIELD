@@ -78,14 +78,14 @@ class ProgressionSystem {
     this.orbMagnetismRadius = CONSTANTS.MAGNETISM_RADIUS;
     this.magnetismForce =
       CONSTANTS.ENHANCED_SHIP_MAGNETISM_FORCE || CONSTANTS.MAGNETISM_FORCE;
-    this.orbClusterRadius = CONSTANTS.ORB_MAGNETISM_RADIUS;
-    this.orbClusterForce = CONSTANTS.ORB_MAGNETISM_FORCE;
     this.minOrbDistance = CONSTANTS.MIN_ORB_DISTANCE;
     this.clusterFusionCount = CONSTANTS.CLUSTER_FUSION_COUNT;
-    this.fusionCheckInterval = 0.3;
-    this.fusionCheckTimer = 0;
     this.maxOrbsPerClass = 100;
     this.baseOrbValue = 5;
+    this.fusionCheckInterval = 0.3;
+    this.fusionCheckTimer = 0;
+    this.activeFusionAnimations = [];
+    this.configureOrbClustering();
 
     // === UPGRADES APLICADOS ===
     this.appliedUpgrades = new Map();
@@ -113,6 +113,31 @@ class ProgressionSystem {
       pools[className] = [];
       return pools;
     }, {});
+  }
+
+  configureOrbClustering() {
+    const baseRadius = CONSTANTS.ORB_MAGNETISM_RADIUS || 35;
+    const baseForce = CONSTANTS.ORB_MAGNETISM_FORCE || 150;
+
+    this.orbClusterRadius = Math.max(baseRadius * 1.55, 52);
+    this.orbClusterForce = baseForce * 2.4;
+
+    this.refreshFusionParameters();
+  }
+
+  refreshFusionParameters() {
+    this.fusionDetectionRadius = Math.max(this.orbClusterRadius * 0.85, 48);
+    this.fusionDetectionRadiusSq =
+      this.fusionDetectionRadius * this.fusionDetectionRadius;
+    this.fusionAnimationDuration = 0.82;
+  }
+
+  isOrbActive(orb) {
+    return Boolean(orb) && !orb.collected;
+  }
+
+  isOrbEligibleForFusion(orb) {
+    return this.isOrbActive(orb) && !orb.isFusing;
   }
 
   getOrbConfig(className) {
@@ -166,7 +191,7 @@ class ProgressionSystem {
       return;
     }
 
-    const active = pool.filter((orb) => !orb.collected);
+    const active = pool.filter((orb) => this.isOrbEligibleForFusion(orb));
     const excess = active.length - this.maxOrbsPerClass;
     if (excess <= 0) {
       return;
@@ -177,8 +202,15 @@ class ProgressionSystem {
       const groupsNeeded = Math.ceil(
         excess / Math.max(this.clusterFusionCount - 1, 1)
       );
-      this.performFusionForClass(className, nextClassName, groupsNeeded, 'overflow');
-      return;
+      const fused = this.performFusionForClass(
+        className,
+        nextClassName,
+        groupsNeeded,
+        'overflow'
+      );
+      if (fused) {
+        return;
+      }
     }
 
     active
@@ -195,31 +227,26 @@ class ProgressionSystem {
     maxGroups,
     reason = 'interval'
   ) {
-    if (!maxGroups || maxGroups <= 0) {
-      return;
+    if (!maxGroups || maxGroups <= 0 || !nextClassName) {
+      return false;
     }
 
-    const pool = this.xpOrbPools[className];
-    if (!Array.isArray(pool)) {
-      return;
+    const clusters = this.findOrbClusters(className, maxGroups);
+    if (!clusters.length) {
+      return false;
     }
 
-    const eligible = pool
-      .filter((orb) => !orb.collected)
-      .sort((a, b) => b.age - a.age);
-
-    const availableGroups = Math.min(
-      Math.floor(eligible.length / this.clusterFusionCount),
-      maxGroups
-    );
-
-    for (let i = 0; i < availableGroups; i += 1) {
-      const batch = eligible.splice(0, this.clusterFusionCount);
-      if (batch.length < this.clusterFusionCount) {
-        break;
-      }
-      this.fuseOrbs(className, nextClassName, batch, reason);
+    let started = false;
+    for (let index = 0; index < clusters.length; index += 1) {
+      started =
+        this.initiateOrbFusion(
+          className,
+          nextClassName,
+          clusters[index],
+          reason
+        ) || started;
     }
+    return started;
   }
 
   setupEventListeners() {
@@ -277,14 +304,104 @@ class ProgressionSystem {
   }
 
   updateXPOrbs(deltaTime) {
-    if (!this.xpOrbs.length) {
+    if (!this.xpOrbs.length && this.activeFusionAnimations.length === 0) {
       return;
     }
 
-    this.updateShipMagnetism(deltaTime);
-    this.updateOrbClustering(deltaTime);
-    this.checkOrbFusion(deltaTime);
+    this.updateFusionAnimations(deltaTime);
+
+    if (this.xpOrbs.length) {
+      this.updateShipMagnetism(deltaTime);
+      this.updateOrbClustering(deltaTime);
+      this.checkOrbFusion(deltaTime);
+    }
+
     this.cleanupCollectedOrbs();
+  }
+
+  updateFusionAnimations(deltaTime) {
+    if (!this.activeFusionAnimations.length) {
+      return;
+    }
+
+    for (let index = this.activeFusionAnimations.length - 1; index >= 0; index -= 1) {
+      const animation = this.activeFusionAnimations[index];
+      if (!animation) {
+        this.activeFusionAnimations.splice(index, 1);
+        continue;
+      }
+
+      animation.elapsed = (animation.elapsed || 0) + deltaTime;
+      const progress = Math.min(animation.elapsed / animation.duration, 1);
+      const eased = this.easeInOutCubic(progress);
+
+      let activeCount = 0;
+
+      for (let orbIndex = 0; orbIndex < animation.orbs.length; orbIndex += 1) {
+        const entry = animation.orbs[orbIndex];
+        const orb = entry?.orb;
+        if (!this.isOrbActive(orb)) {
+          continue;
+        }
+
+        activeCount += 1;
+        orb.x = this.lerp(entry.startX, animation.center.x, eased);
+        orb.y = this.lerp(entry.startY, animation.center.y, eased);
+      }
+
+      if (activeCount < this.clusterFusionCount) {
+        this.activeFusionAnimations.splice(index, 1);
+        animation.orbs.forEach(({ orb }) => {
+          if (!orb || orb.collected) {
+            return;
+          }
+          orb.isFusing = false;
+          delete orb.fusionId;
+        });
+        continue;
+      }
+
+      if (progress >= 1) {
+        this.activeFusionAnimations.splice(index, 1);
+        const orbsToFuse = animation.orbs
+          .map((entry) => entry.orb)
+          .filter((orb) => this.isOrbEligibleForFusion(orb));
+
+        if (orbsToFuse.length >= this.clusterFusionCount) {
+          this.fuseOrbs(
+            animation.className,
+            animation.targetClassName,
+            orbsToFuse,
+            animation.reason,
+            { center: animation.center }
+          );
+        } else {
+          orbsToFuse.forEach((orb) => {
+            if (!orb) {
+              return;
+            }
+            orb.isFusing = false;
+            delete orb.fusionId;
+          });
+        }
+      }
+    }
+  }
+
+  lerp(start, end, t) {
+    return start + (end - start) * t;
+  }
+
+  easeInOutCubic(t) {
+    if (t <= 0) {
+      return 0;
+    }
+    if (t >= 1) {
+      return 1;
+    }
+    return t < 0.5
+      ? 4 * t * t * t
+      : 1 - Math.pow(-2 * t + 2, 3) / 2;
   }
 
   updateShipMagnetism(deltaTime) {
@@ -302,7 +419,7 @@ class ProgressionSystem {
 
       for (let index = 0; index < pool.length; index += 1) {
         const orb = pool[index];
-        if (!orb || orb.collected) {
+        if (!this.isOrbActive(orb) || orb.isFusing) {
           continue;
         }
 
@@ -359,6 +476,11 @@ class ProgressionSystem {
       return;
     }
 
+    const clusterRadiusSq = this.orbClusterRadius * this.orbClusterRadius;
+    const comfortableSpacing = this.minOrbDistance * 1.12;
+    const idealSpacing = this.minOrbDistance * 0.95;
+    const denseSpacing = this.minOrbDistance * 0.75;
+
     for (let i = 0; i < this.orbClasses.length; i += 1) {
       const className = this.orbClasses[i];
       const pool = this.xpOrbPools[className];
@@ -368,56 +490,267 @@ class ProgressionSystem {
 
       for (let a = 0; a < pool.length; a += 1) {
         const orbA = pool[a];
-        if (!orbA || orbA.collected) {
+        if (!this.isOrbEligibleForFusion(orbA)) {
           continue;
         }
 
         for (let b = a + 1; b < pool.length; b += 1) {
           const orbB = pool[b];
-          if (!orbB || orbB.collected) {
+          if (!this.isOrbEligibleForFusion(orbB)) {
             continue;
           }
 
           const dx = orbB.x - orbA.x;
           const dy = orbB.y - orbA.y;
           const distanceSq = dx * dx + dy * dy;
-          if (distanceSq <= 0) {
+          if (distanceSq <= 0 || distanceSq > clusterRadiusSq) {
             continue;
           }
 
           const distance = Math.sqrt(distanceSq);
-          if (distance > this.orbClusterRadius) {
-            continue;
-          }
-
           const normalizedDx = dx / distance;
           const normalizedDy = dy / distance;
+          const closeness = Math.max(1 - distance / this.orbClusterRadius, 0);
 
-          if (distance < this.minOrbDistance) {
-            const overlap = this.minOrbDistance - distance;
-            const correction = (overlap * 0.5) || 0;
-            orbA.x -= normalizedDx * correction;
-            orbA.y -= normalizedDy * correction;
-            orbB.x += normalizedDx * correction;
-            orbB.y += normalizedDy * correction;
-            continue;
+          if (distance > comfortableSpacing) {
+            const baseStrength =
+              this.orbClusterForce * (0.5 + closeness * 1.5) + 30;
+            const step = Math.min(baseStrength * deltaTime, distance * 0.9);
+            const movement = step * 0.5;
+
+            orbA.x += normalizedDx * movement;
+            orbA.y += normalizedDy * movement;
+            orbB.x -= normalizedDx * movement;
+            orbB.y -= normalizedDy * movement;
+          } else if (distance > idealSpacing) {
+            const baseStrength =
+              this.orbClusterForce * (0.3 + closeness * 1.1) + 18;
+            const step = Math.min(baseStrength * deltaTime, distance * 0.6);
+            const movement = step * 0.5;
+
+            orbA.x += normalizedDx * movement;
+            orbA.y += normalizedDy * movement;
+            orbB.x -= normalizedDx * movement;
+            orbB.y -= normalizedDy * movement;
+          } else if (distance < denseSpacing) {
+            const overlap = denseSpacing - distance;
+            const push = overlap * 0.5;
+
+            orbA.x -= normalizedDx * push;
+            orbA.y -= normalizedDy * push;
+            orbB.x += normalizedDx * push;
+            orbB.y += normalizedDy * push;
           }
-
-          const closeness = 1 - distance / this.orbClusterRadius;
-          if (closeness <= 0) {
-            continue;
-          }
-
-          const attraction = this.orbClusterForce * closeness;
-          const movement = attraction * deltaTime * 0.5;
-
-          orbA.x += normalizedDx * movement;
-          orbA.y += normalizedDy * movement;
-          orbB.x -= normalizedDx * movement;
-          orbB.y -= normalizedDy * movement;
         }
       }
     }
+  }
+
+  findOrbClusters(className, maxClusters = 1) {
+    if (!maxClusters || maxClusters <= 0) {
+      return [];
+    }
+
+    const pool = this.xpOrbPools[className];
+    if (!Array.isArray(pool) || pool.length < this.clusterFusionCount) {
+      return [];
+    }
+
+    const candidates = pool.filter((orb) => this.isOrbEligibleForFusion(orb));
+    if (candidates.length < this.clusterFusionCount) {
+      return [];
+    }
+
+    const detectionRadius = this.fusionDetectionRadius;
+    const detectionRadiusSq = this.fusionDetectionRadiusSq;
+    const cellSize = detectionRadius;
+    const grid = new Map();
+    const getKey = (x, y) =>
+      `${Math.floor(x / cellSize)}:${Math.floor(y / cellSize)}`;
+
+    for (let i = 0; i < candidates.length; i += 1) {
+      const orb = candidates[i];
+      const key = getKey(orb.x, orb.y);
+      const cell = grid.get(key);
+      if (cell) {
+        cell.push(orb);
+      } else {
+        grid.set(key, [orb]);
+      }
+    }
+
+    const visited = new Set();
+    const clusters = [];
+
+    for (let i = 0; i < candidates.length; i += 1) {
+      const seed = candidates[i];
+      if (visited.has(seed)) {
+        continue;
+      }
+
+      const stack = [seed];
+      const component = [];
+      visited.add(seed);
+
+      while (stack.length > 0) {
+        const current = stack.pop();
+        if (!this.isOrbEligibleForFusion(current)) {
+          continue;
+        }
+
+        component.push(current);
+
+        const cellX = Math.floor(current.x / cellSize);
+        const cellY = Math.floor(current.y / cellSize);
+
+        for (let gx = cellX - 1; gx <= cellX + 1; gx += 1) {
+          for (let gy = cellY - 1; gy <= cellY + 1; gy += 1) {
+            const key = `${gx}:${gy}`;
+            const neighbors = grid.get(key);
+            if (!neighbors) {
+              continue;
+            }
+
+            for (let n = 0; n < neighbors.length; n += 1) {
+              const neighbor = neighbors[n];
+              if (visited.has(neighbor) || !this.isOrbEligibleForFusion(neighbor)) {
+                continue;
+              }
+
+              const dx = neighbor.x - current.x;
+              const dy = neighbor.y - current.y;
+              if (dx * dx + dy * dy <= detectionRadiusSq) {
+                visited.add(neighbor);
+                stack.push(neighbor);
+              }
+            }
+          }
+        }
+      }
+
+      if (component.length < this.clusterFusionCount) {
+        continue;
+      }
+
+      let sumX = 0;
+      let sumY = 0;
+      for (let index = 0; index < component.length; index += 1) {
+        sumX += component[index].x;
+        sumY += component[index].y;
+      }
+
+      const centerX = sumX / component.length;
+      const centerY = sumY / component.length;
+
+      const ordered = component
+        .map((orb) => {
+          const dx = orb.x - centerX;
+          const dy = orb.y - centerY;
+          return {
+            orb,
+            distanceSq: dx * dx + dy * dy,
+            age: orb.age || 0,
+          };
+        })
+        .sort((a, b) => {
+          if (a.distanceSq === b.distanceSq) {
+            return b.age - a.age;
+          }
+          return a.distanceSq - b.distanceSq;
+        })
+        .map((entry) => entry.orb);
+
+      let radiusSq = 0;
+      const sampleCount = Math.min(ordered.length, this.clusterFusionCount);
+      for (let index = 0; index < sampleCount; index += 1) {
+        const orb = ordered[index];
+        const dx = orb.x - centerX;
+        const dy = orb.y - centerY;
+        const distSq = dx * dx + dy * dy;
+        if (distSq > radiusSq) {
+          radiusSq = distSq;
+        }
+      }
+
+      clusters.push({
+        orbs: ordered,
+        center: { x: centerX, y: centerY },
+        radius: Math.sqrt(radiusSq),
+        size: component.length,
+      });
+    }
+
+    clusters.sort((a, b) => {
+      if (a.radius === b.radius) {
+        return b.size - a.size;
+      }
+      return a.radius - b.radius;
+    });
+
+    return clusters.slice(0, maxClusters);
+  }
+
+  initiateOrbFusion(
+    className,
+    targetClassName,
+    cluster,
+    reason = 'interval'
+  ) {
+    if (!cluster || !Array.isArray(cluster.orbs) || !targetClassName) {
+      return false;
+    }
+
+    const selected = [];
+    for (let index = 0; index < cluster.orbs.length; index += 1) {
+      const orb = cluster.orbs[index];
+      if (!this.isOrbEligibleForFusion(orb)) {
+        continue;
+      }
+
+      selected.push(orb);
+      if (selected.length >= this.clusterFusionCount) {
+        break;
+      }
+    }
+
+    if (selected.length < this.clusterFusionCount) {
+      return false;
+    }
+
+    const animationId = `fusion:${className}:${Date.now()}:${Math.random()}`;
+    const animation = {
+      id: animationId,
+      className,
+      targetClassName,
+      reason,
+      duration: this.fusionAnimationDuration,
+      elapsed: 0,
+      center: { x: cluster.center.x, y: cluster.center.y },
+      orbs: [],
+    };
+
+    let sumX = 0;
+    let sumY = 0;
+
+    selected.forEach((orb) => {
+      orb.isFusing = true;
+      orb.fusionId = animationId;
+      animation.orbs.push({
+        orb,
+        startX: orb.x,
+        startY: orb.y,
+      });
+      sumX += orb.x;
+      sumY += orb.y;
+    });
+
+    if (animation.orbs.length > 0) {
+      animation.center.x = sumX / animation.orbs.length;
+      animation.center.y = sumY / animation.orbs.length;
+    }
+
+    this.activeFusionAnimations.push(animation);
+    return true;
   }
 
   checkOrbFusion(deltaTime) {
@@ -439,48 +772,66 @@ class ProgressionSystem {
         continue;
       }
 
-      const pool = this.xpOrbPools[className];
-      if (!Array.isArray(pool)) {
+      const clusters = this.findOrbClusters(className, 1);
+      if (!clusters.length) {
         continue;
       }
 
-      const available = pool.filter((orb) => !orb.collected);
-      if (available.length < this.clusterFusionCount) {
-        continue;
-      }
-
-      const groups = Math.floor(available.length / this.clusterFusionCount);
-      if (groups > 0) {
-        this.performFusionForClass(className, nextClassName, groups, 'interval');
-      }
+      this.initiateOrbFusion(
+        className,
+        nextClassName,
+        clusters[0],
+        'interval'
+      );
     }
   }
 
-  fuseOrbs(className, targetClassName, orbs, reason = 'interval') {
+  fuseOrbs(
+    className,
+    targetClassName,
+    orbs,
+    reason = 'interval',
+    options = {}
+  ) {
     if (!Array.isArray(orbs) || orbs.length === 0) {
       return;
     }
 
     const targetConfig = this.getOrbConfig(targetClassName);
 
+    const validOrbs = orbs.filter((orb) => this.isOrbActive(orb));
+    const count = validOrbs.length;
+    if (count < this.clusterFusionCount) {
+      orbs.forEach((orb) => {
+        if (!orb) {
+          return;
+        }
+        orb.isFusing = false;
+        delete orb.fusionId;
+      });
+      return;
+    }
+
     let totalValue = 0;
     let centerX = 0;
     let centerY = 0;
 
-    orbs.forEach((orb) => {
-      if (!orb) {
-        return;
-      }
-
+    validOrbs.forEach((orb) => {
       totalValue += orb.value;
       centerX += orb.x;
       centerY += orb.y;
       orb.collected = true;
+      orb.isFusing = false;
+      delete orb.fusionId;
     });
 
-    const count = orbs.length;
-    centerX /= count;
-    centerY /= count;
+    if (options && options.center) {
+      centerX = options.center.x;
+      centerY = options.center.y;
+    } else {
+      centerX /= count;
+      centerY /= count;
+    }
 
     const fusedOrb = this.createXPOrb(centerX, centerY, totalValue, {
       className: targetConfig.name,
@@ -764,9 +1115,11 @@ class ProgressionSystem {
     this.orbMagnetismRadius = CONSTANTS.MAGNETISM_RADIUS;
     this.magnetismForce =
       CONSTANTS.ENHANCED_SHIP_MAGNETISM_FORCE || CONSTANTS.MAGNETISM_FORCE;
-    this.orbClusterRadius = CONSTANTS.ORB_MAGNETISM_RADIUS;
-    this.orbClusterForce = CONSTANTS.ORB_MAGNETISM_FORCE;
+    this.minOrbDistance = CONSTANTS.MIN_ORB_DISTANCE;
+    this.clusterFusionCount = CONSTANTS.CLUSTER_FUSION_COUNT;
+    this.configureOrbClustering();
     this.fusionCheckTimer = 0;
+    this.activeFusionAnimations = [];
 
     console.log('[ProgressionSystem] Reset');
   }
@@ -798,12 +1151,22 @@ class ProgressionSystem {
       data.magnetismForce ||
       CONSTANTS.ENHANCED_SHIP_MAGNETISM_FORCE ||
       CONSTANTS.MAGNETISM_FORCE;
-    this.orbClusterRadius = data.orbClusterRadius || CONSTANTS.ORB_MAGNETISM_RADIUS;
-    this.orbClusterForce = data.orbClusterForce || CONSTANTS.ORB_MAGNETISM_FORCE;
+    this.minOrbDistance = CONSTANTS.MIN_ORB_DISTANCE;
+    this.clusterFusionCount =
+      data.clusterFusionCount || CONSTANTS.CLUSTER_FUSION_COUNT;
+    this.configureOrbClustering();
+    if (typeof data.orbClusterRadius === 'number') {
+      this.orbClusterRadius = data.orbClusterRadius;
+    }
+    if (typeof data.orbClusterForce === 'number') {
+      this.orbClusterForce = data.orbClusterForce;
+    }
+    this.refreshFusionParameters();
     this.xpOrbs = [];
     this.orbClasses = [...ORB_CLASS_SEQUENCE];
     this.xpOrbPools = this.createEmptyOrbPools();
     this.fusionCheckTimer = 0;
+    this.activeFusionAnimations = [];
   }
 
   destroy() {
@@ -811,6 +1174,7 @@ class ProgressionSystem {
     this.xpOrbPools = this.createEmptyOrbPools();
     this.appliedUpgrades.clear();
     this.fusionCheckTimer = 0;
+    this.activeFusionAnimations = [];
     console.log('[ProgressionSystem] Destroyed');
   }
 }
