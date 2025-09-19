@@ -142,6 +142,12 @@ export default class EffectsSystem {
       }
     });
 
+    gameEvents.on('xp-orb-fused', (data) => {
+      if (data?.position) {
+        this.createOrbFusionEffect(data);
+      }
+    });
+
     gameEvents.on('player-took-damage', () => {
       this.addScreenShake(8, 0.3);
     });
@@ -440,6 +446,63 @@ export default class EffectsSystem {
       );
       this.particles.push(particle);
     }
+  }
+
+  createOrbFusionEffect(data) {
+    const tier = data?.tier || 1;
+    const consumed = data?.consumed || 0;
+    const particleColor = data?.color || '#FFFFFF';
+    const glowColor = data?.glow || 'rgba(255, 255, 255, 0.35)';
+    const flashColor = data?.flash || 'rgba(255, 255, 255, 0.2)';
+    const { x, y } = data.position;
+
+    const particleCount = 12 + Math.min(24, tier * 4 + Math.floor(consumed / 2));
+
+    for (let i = 0; i < particleCount; i += 1) {
+      const angle = (Math.PI * 2 * i) / particleCount + Math.random() * 0.3;
+      const speed = 60 + Math.random() * 80;
+      const particle = new SpaceParticle(
+        x,
+        y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        particleColor,
+        1.5 + Math.random() * 2.5,
+        0.4 + Math.random() * 0.35,
+        'spark'
+      );
+      this.particles.push(particle);
+    }
+
+    const halo = new SpaceParticle(
+      x,
+      y,
+      0,
+      0,
+      glowColor,
+      5 + tier * 1.8,
+      0.35 + tier * 0.07
+    );
+    this.particles.push(halo);
+
+    const ringCount = 4 + tier;
+    for (let i = 0; i < ringCount; i += 1) {
+      const angle = (Math.PI * 2 * i) / ringCount;
+      const speed = 40 + tier * 12;
+      const particle = new SpaceParticle(
+        x,
+        y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        glowColor,
+        2.5 + tier * 0.8,
+        0.45 + Math.random() * 0.2
+      );
+      this.particles.push(particle);
+    }
+
+    this.addScreenShake(2 + tier * 0.6, 0.12 + tier * 0.03);
+    this.addScreenFlash(flashColor, 0.1, 0.14 + tier * 0.02);
   }
 
   createLevelUpExplosion(player) {
