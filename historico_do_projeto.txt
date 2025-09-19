@@ -1,3 +1,9 @@
+*   e0ca2ba Merge pull request #34 from fgferre/codex/add-data-source-for-ship-silhouettes
+|\  
+| * 3256228 Improve shield visuals and collision behaviour
+| * 501c0bf feat: centralize player hull geometry
+|/  
+* 346b000 update history
 *   9baa1fb Merge pull request #33 from fgferre/codex/implementar-funcionalidade-escudo-defletor
 |\  
 | * 24a8bc1 feat: add deflector shield ability
