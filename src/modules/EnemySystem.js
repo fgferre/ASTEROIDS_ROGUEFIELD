@@ -28,6 +28,7 @@ class Asteroid {
     this.rotation = Math.random() * Math.PI * 2;
     this.rotationSpeed = (Math.random() - 0.5) * 1.5;
     this.lastDamageTime = 0;
+    this.shieldHitCooldown = 0;
     this.vertices = this.generateVertices();
     this.destroyed = false;
   }
@@ -62,6 +63,10 @@ class Asteroid {
 
     if (this.lastDamageTime > 0) {
       this.lastDamageTime -= deltaTime;
+    }
+
+    if (this.shieldHitCooldown > 0) {
+      this.shieldHitCooldown = Math.max(0, this.shieldHitCooldown - deltaTime);
     }
   }
 

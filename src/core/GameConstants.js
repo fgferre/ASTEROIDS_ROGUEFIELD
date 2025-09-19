@@ -43,6 +43,11 @@ export const SHIELD_DEFAULT_HITS = 3;
 export const SHIELD_COOLDOWN_DURATION = 20; // segundos
 export const SHIELD_SHOCKWAVE_RADIUS = 300;
 export const SHIELD_SHOCKWAVE_FORCE = 350;
+export const SHIELD_HIT_GRACE_TIME = 0.28; // segundos entre absorções consecutivas
+export const SHIELD_COLLISION_BOUNCE = 0.85;
+export const SHIELD_REFLECT_SPEED = 95; // incremento de velocidade aplicado no impacto
+export const SHIELD_IMPACT_DAMAGE_BASE = 10;
+export const SHIELD_IMPACT_DAMAGE_PER_LEVEL = 4;
 
 // === SISTEMA DE ONDAS ===
 export const TARGET_UPDATE_INTERVAL = 0.15;

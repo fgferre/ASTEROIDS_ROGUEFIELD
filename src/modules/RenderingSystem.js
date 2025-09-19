@@ -2,6 +2,144 @@ import * as CONSTANTS from '../core/GameConstants.js';
 
 const MAX_VISUAL_TILT = 0.3;
 const TILT_MULTIPLIER = 0.12;
+const MIN_OUTLINE_POINTS = 3;
+const EPSILON = 1e-6;
+
+function normalizeVector(x, y) {
+  const length = Math.hypot(x, y);
+  if (length < EPSILON) {
+    return { x: 0, y: 0, length: 0 };
+  }
+
+  return { x: x / length, y: y / length, length };
+}
+
+function computePolygonArea(points) {
+  if (!Array.isArray(points) || points.length < MIN_OUTLINE_POINTS) {
+    return 0;
+  }
+
+  let area = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const current = points[i];
+    const next = points[(i + 1) % points.length];
+    area += current.x * next.y - next.x * current.y;
+  }
+
+  return area / 2;
+}
+
+function expandHullOutline(outline, padding) {
+  if (!Array.isArray(outline) || outline.length < MIN_OUTLINE_POINTS) {
+    return null;
+  }
+
+  if (!padding) {
+    return outline.map((point) => ({ x: point.x, y: point.y }));
+  }
+
+  const orientation = computePolygonArea(outline) >= 0 ? 1 : -1;
+  const expanded = [];
+
+  for (let i = 0; i < outline.length; i += 1) {
+    const prev = outline[(i - 1 + outline.length) % outline.length];
+    const curr = outline[i];
+    const next = outline[(i + 1) % outline.length];
+
+    if (!curr) {
+      expanded.push({ x: 0, y: 0 });
+      continue;
+    }
+
+    const edgePrev = normalizeVector(curr.x - prev.x, curr.y - prev.y);
+    const edgeNext = normalizeVector(next.x - curr.x, next.y - curr.y);
+
+    const normalPrev = {
+      x: -edgePrev.y * orientation,
+      y: edgePrev.x * orientation,
+    };
+    const normalNext = {
+      x: -edgeNext.y * orientation,
+      y: edgeNext.x * orientation,
+    };
+
+    const normalSum = normalizeVector(
+      normalPrev.x + normalNext.x,
+      normalPrev.y + normalNext.y
+    );
+
+    const cross =
+      (curr.x - prev.x) * (next.y - curr.y) -
+      (curr.y - prev.y) * (next.x - curr.x);
+    const isConcave = orientation > 0 ? cross < 0 : cross > 0;
+
+    let offsetDir =
+      normalSum.length > EPSILON ? normalSum : normalizeVector(normalPrev.x, normalPrev.y);
+
+    if (isConcave) {
+      const radial = normalizeVector(curr.x, curr.y);
+      if (radial.length > EPSILON) {
+        offsetDir = radial;
+      }
+    }
+
+    const denom =
+      offsetDir.x * normalPrev.x + offsetDir.y * normalPrev.y;
+    const safeDenom =
+      Math.abs(denom) > EPSILON
+        ? denom
+        : denom >= 0
+        ? EPSILON
+        : -EPSILON;
+
+    const scale = padding / safeDenom;
+
+    expanded.push({
+      x: curr.x + offsetDir.x * scale,
+      y: curr.y + offsetDir.y * scale,
+    });
+  }
+
+  return expanded;
+}
+
+function buildPathFromPoints(points) {
+  if (!Array.isArray(points) || points.length < MIN_OUTLINE_POINTS) {
+    return null;
+  }
+
+  const path = new Path2D();
+  let moved = false;
+
+  points.forEach((point) => {
+    if (!point) return;
+    if (!moved) {
+      path.moveTo(point.x, point.y);
+      moved = true;
+    } else {
+      path.lineTo(point.x, point.y);
+    }
+  });
+
+  if (!moved) {
+    return null;
+  }
+
+  path.closePath();
+  return path;
+}
+
+function computeOutlineRadius(points) {
+  if (!Array.isArray(points) || points.length === 0) {
+    return 0;
+  }
+
+  return points.reduce((max, point) => {
+    if (!point) return max;
+    const radius = Math.hypot(point.x, point.y);
+    return radius > max ? radius : max;
+  }, 0);
+}
 
 class RenderingSystem {
   constructor() {
@@ -135,89 +273,125 @@ class RenderingSystem {
       Math.min(MAX_VISUAL_TILT, angularVelocity * TILT_MULTIPLIER)
     );
 
-    if (typeof player.getShieldState === 'function') {
-      const shieldState = player.getShieldState();
-      if (shieldState?.isActive && shieldState.maxHits > 0) {
-        const ratio = Math.max(
+    const shieldState =
+      typeof player.getShieldState === 'function'
+        ? player.getShieldState()
+        : null;
+    if (shieldState?.isActive && shieldState.maxHits > 0) {
+      const ratio = Math.max(
+        0,
+        Math.min(1, shieldState.currentHits / shieldState.maxHits)
+      );
+      const position =
+        typeof player.getPosition === 'function'
+          ? player.getPosition()
+          : player.position;
+
+      if (position) {
+        const hullOutline =
+          typeof player.getHullOutline === 'function'
+            ? player.getHullOutline()
+            : null;
+        const padding = Math.max(
           0,
-          Math.min(1, shieldState.currentHits / shieldState.maxHits)
+          typeof player.getShieldPadding === 'function'
+            ? player.getShieldPadding()
+            : 0
         );
-        const position =
-          typeof player.getPosition === 'function'
-            ? player.getPosition()
-            : player.position;
 
-        if (position) {
-          const hullOutline =
-            typeof player.getHullOutline === 'function'
-              ? player.getHullOutline()
-              : null;
-          const padding = Math.max(
-            0,
-            typeof player.getShieldPadding === 'function'
-              ? player.getShieldPadding()
-              : 0
-          );
+        const expandedOutline =
+          Array.isArray(hullOutline) && hullOutline.length >= MIN_OUTLINE_POINTS
+            ? expandHullOutline(hullOutline, padding)
+            : null;
 
-          let paddedOutline = null;
-          if (Array.isArray(hullOutline) && hullOutline.length >= 3) {
-            const angle =
-              typeof player.getAngle === 'function'
-                ? player.getAngle()
-                : player.angle || 0;
-            const cos = Math.cos(angle);
-            const sin = Math.sin(angle);
-            paddedOutline = [];
+        const outlineToUse =
+          expandedOutline && expandedOutline.length >= MIN_OUTLINE_POINTS
+            ? expandedOutline
+            : Array.isArray(hullOutline) && hullOutline.length >= MIN_OUTLINE_POINTS
+            ? hullOutline.map((vertex) => ({ ...vertex }))
+            : null;
 
-            hullOutline.forEach((vertex) => {
-              if (!vertex) return;
-              const length = Math.hypot(vertex.x, vertex.y);
-              const safeLength = length > 0 ? length : 1;
-              const scale = (safeLength + padding) / safeLength;
-              const localX = vertex.x * scale;
-              const localY = vertex.y * scale;
+        const hullRadius =
+          typeof player.getHullBoundingRadius === 'function'
+            ? player.getHullBoundingRadius()
+            : Math.max(
+                computeOutlineRadius(hullOutline || []),
+                CONSTANTS.SHIP_SIZE
+              );
+        const fallbackRadius =
+          typeof player.getShieldRadius === 'function'
+            ? player.getShieldRadius()
+            : hullRadius + padding;
 
-              paddedOutline.push({
-                x: position.x + localX * cos - localY * sin,
-                y: position.y + localX * sin + localY * cos,
-              });
-            });
-          }
+        const outlineRadius = outlineToUse
+          ? computeOutlineRadius(outlineToUse)
+          : 0;
+        const radiusForGradient = Math.max(outlineRadius, fallbackRadius);
 
-          ctx.save();
-          const alpha = 0.35 + 0.4 * ratio;
-          ctx.strokeStyle = `rgba(0, 191, 255, ${alpha})`;
-          ctx.lineWidth = 4 + ratio * 4;
-          ctx.shadowColor = 'rgba(0, 191, 255, 0.8)';
-          ctx.shadowBlur = 15 + ratio * 12;
-          ctx.beginPath();
+        let shieldPath = outlineToUse
+          ? buildPathFromPoints(outlineToUse)
+          : null;
 
-          if (paddedOutline && paddedOutline.length >= 3) {
-            let hasMoved = false;
-            paddedOutline.forEach((point) => {
-              if (!point) return;
-              if (!hasMoved) {
-                ctx.moveTo(point.x, point.y);
-                hasMoved = true;
-              } else {
-                ctx.lineTo(point.x, point.y);
-              }
-            });
-
-            if (hasMoved) {
-              ctx.closePath();
-            } else {
-              const fallbackRadius = CONSTANTS.SHIP_SIZE + padding;
-              ctx.arc(position.x, position.y, fallbackRadius, 0, Math.PI * 2);
-            }
-          } else {
-            const fallbackRadius = CONSTANTS.SHIP_SIZE + padding;
-            ctx.arc(position.x, position.y, fallbackRadius, 0, Math.PI * 2);
-          }
-
-          ctx.stroke();
-          ctx.restore();
+        if (!shieldPath) {
+          shieldPath = new Path2D();
+          shieldPath.arc(0, 0, fallbackRadius, 0, Math.PI * 2);
         }
+
+        const angle =
+          typeof player.getAngle === 'function'
+            ? player.getAngle()
+            : player.angle || 0;
+
+        ctx.save();
+        ctx.translate(position.x, position.y);
+        ctx.rotate(angle);
+        if (tilt !== 0) {
+          ctx.transform(1, 0, tilt, 1, 0, 0);
+        }
+
+        const now =
+          typeof performance !== 'undefined' &&
+          typeof performance.now === 'function'
+            ? performance.now()
+            : Date.now();
+        const pulse = 0.6 + 0.4 * Math.sin(now / 180);
+
+        const glowGradient = ctx.createRadialGradient(
+          0,
+          0,
+          radiusForGradient * 0.35,
+          0,
+          0,
+          radiusForGradient * 1.25
+        );
+        glowGradient.addColorStop(
+          0,
+          `rgba(120, 240, 255, ${0.08 + ratio * 0.14})`
+        );
+        glowGradient.addColorStop(
+          0.55,
+          `rgba(0, 190, 255, ${0.25 + ratio * 0.3})`
+        );
+        glowGradient.addColorStop(1, 'rgba(0, 150, 255, 0)');
+
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = glowGradient;
+        ctx.fill(shieldPath);
+
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.shadowColor = `rgba(90, 200, 255, ${0.75 + ratio * 0.15})`;
+        ctx.shadowBlur = 10 + ratio * 16 + pulse * 4;
+        ctx.lineWidth = 2.4 + ratio * 2.2 + pulse * 0.35;
+        ctx.strokeStyle = `rgba(160, 245, 255, ${0.52 + ratio * 0.35})`;
+        ctx.stroke(shieldPath);
+
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = 1 + ratio * 1.4;
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.28 + ratio * 0.3})`;
+        ctx.globalAlpha = 0.9;
+        ctx.stroke(shieldPath);
+        ctx.restore();
       }
     }
 

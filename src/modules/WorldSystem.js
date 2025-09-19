@@ -22,44 +22,80 @@ class WorldSystem {
       return;
     }
 
-    this.handlePlayerAsteroidCollisions(player, enemies.getAsteroids());
+    this.handlePlayerAsteroidCollisions(player, enemies.getAsteroids(), enemies);
   }
 
-  handlePlayerAsteroidCollisions(player, asteroids) {
+  handlePlayerAsteroidCollisions(player, asteroids, enemiesSystem) {
     if (!Array.isArray(asteroids)) return;
 
     asteroids.forEach((asteroid) => {
       if (asteroid.destroyed) return;
 
+      const shieldState =
+        typeof player.getShieldState === 'function'
+          ? player.getShieldState()
+          : null;
+      const shieldActive =
+        shieldState?.isActive &&
+        shieldState.maxHits > 0 &&
+        shieldState.currentHits > 0;
+      const impactProfile =
+        shieldActive && typeof player.getShieldImpactProfile === 'function'
+          ? player.getShieldImpactProfile()
+          : { damage: 0, forceMultiplier: 1, level: shieldState?.level ?? 0 };
+
+      const hullRadius =
+        typeof player.getHullBoundingRadius === 'function'
+          ? player.getHullBoundingRadius()
+          : CONSTANTS.SHIP_SIZE;
+      const padding =
+        shieldActive && typeof player.getShieldPadding === 'function'
+          ? player.getShieldPadding()
+          : 0;
+      const collisionRadius = hullRadius + padding;
+
       const dx = player.position.x - asteroid.x;
       const dy = player.position.y - asteroid.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
-      if (distance >= CONSTANTS.SHIP_SIZE + asteroid.radius) {
+      if (distance >= collisionRadius + asteroid.radius) {
         return;
       }
 
       const nx = dx / Math.max(distance, 1);
       const ny = dy / Math.max(distance, 1);
-      const overlap = CONSTANTS.SHIP_SIZE + asteroid.radius - distance;
+      const overlap = collisionRadius + asteroid.radius - distance;
 
       if (overlap > 0) {
-        player.position.x += nx * overlap * 0.5;
-        player.position.y += ny * overlap * 0.5;
-        asteroid.x -= nx * overlap * 0.5;
-        asteroid.y -= ny * overlap * 0.5;
+        const playerPushRatio = shieldActive ? 0.18 : 0.5;
+        const asteroidPushRatio = 1 - playerPushRatio;
+        player.position.x += nx * overlap * playerPushRatio;
+        player.position.y += ny * overlap * playerPushRatio;
+        asteroid.x -= nx * overlap * asteroidPushRatio;
+        asteroid.y -= ny * overlap * asteroidPushRatio;
       }
 
       const rvx = asteroid.vx - player.velocity.vx;
       const rvy = asteroid.vy - player.velocity.vy;
       const velAlongNormal = rvx * nx + rvy * ny;
+
       if (velAlongNormal < 0) {
-        const e = 0.2;
-        const invMass1 = 1 / CONSTANTS.SHIP_MASS;
+        const bounce = shieldActive
+          ? CONSTANTS.SHIELD_COLLISION_BOUNCE
+          : 0.2;
+        const playerMass = shieldActive
+          ? CONSTANTS.SHIP_MASS * Math.max(impactProfile.forceMultiplier, 1)
+          : CONSTANTS.SHIP_MASS;
+        const invMass1 = 1 / playerMass;
         const invMass2 = 1 / asteroid.mass;
-        const j = (-(1 + e) * velAlongNormal) / (invMass1 + invMass2);
+        let j = (-(1 + bounce) * velAlongNormal) / (invMass1 + invMass2);
+        if (shieldActive) {
+          j *= Math.max(impactProfile.forceMultiplier, 1);
+        }
+
         const jx = j * nx;
         const jy = j * ny;
+
         player.velocity.vx -= jx * invMass1;
         player.velocity.vy -= jy * invMass1;
         asteroid.vx += jx * invMass2;
@@ -70,6 +106,9 @@ class WorldSystem {
         return;
       }
 
+      const previousShieldHits = shieldState?.currentHits ?? 0;
+      const prevShieldActive = shieldActive;
+
       const relSpeed = Math.sqrt(
         (asteroid.vx - player.velocity.vx) ** 2 +
           (asteroid.vy - player.velocity.vy) ** 2
@@ -79,6 +118,49 @@ class WorldSystem {
       const rawDamage = baseDamage + momentumFactor;
       const damage = Math.max(3, Math.floor(rawDamage));
       const remaining = player.takeDamage(damage);
+
+      const newShieldState =
+        typeof player.getShieldState === 'function'
+          ? player.getShieldState()
+          : null;
+
+      const shieldAbsorbedHit =
+        prevShieldActive &&
+        (!newShieldState?.isActive ||
+          (typeof newShieldState.currentHits === 'number' &&
+            newShieldState.currentHits < previousShieldHits));
+
+      if (shieldAbsorbedHit) {
+        const boost =
+          CONSTANTS.SHIELD_REFLECT_SPEED *
+          Math.max(impactProfile.forceMultiplier, 1);
+        asteroid.vx -= nx * boost;
+        asteroid.vy -= ny * boost;
+
+        const cooldown = CONSTANTS.SHIELD_HIT_GRACE_TIME;
+        if (
+          asteroid.shieldHitCooldown === undefined ||
+          !Number.isFinite(asteroid.shieldHitCooldown)
+        ) {
+          asteroid.shieldHitCooldown = 0;
+        }
+
+        if (asteroid.shieldHitCooldown <= 0) {
+          if (enemiesSystem && typeof enemiesSystem.applyDamage === 'function') {
+            enemiesSystem.applyDamage(asteroid, impactProfile.damage);
+          }
+          asteroid.shieldHitCooldown = cooldown;
+        }
+
+        if (typeof gameEvents !== 'undefined') {
+          gameEvents.emit('shield-deflected', {
+            position: { x: player.position.x, y: player.position.y },
+            normal: { x: nx, y: ny },
+            level: impactProfile.level || shieldState?.level || 0,
+            intensity: Math.max(impactProfile.forceMultiplier, 1),
+          });
+        }
+      }
 
       if (typeof remaining !== 'number') {
         return;
