@@ -151,6 +151,10 @@ export default class EffectsSystem {
       this.addScreenShake(10, 0.35);
       this.addScreenFlash('rgba(0, 191, 255, 0.35)', 0.25, 0.18);
     });
+
+    gameEvents.on('shield-deflected', (data) => {
+      this.createShieldHitEffect(data);
+    });
   }
 
   update(deltaTime) {
@@ -365,6 +369,60 @@ export default class EffectsSystem {
     if (this.shockwaves.length > 6) {
       this.shockwaves = this.shockwaves.slice(-6);
     }
+  }
+
+  createShieldHitEffect(data = {}) {
+    if (!data.position) {
+      return;
+    }
+
+    const normalInput = data.normal || { x: 0, y: -1 };
+    const normalLength = Math.hypot(normalInput.x || 0, normalInput.y || 0);
+    const nx = normalLength > 0 ? normalInput.x / normalLength : 0;
+    const ny = normalLength > 0 ? normalInput.y / normalLength : -1;
+
+    const level = Number.isFinite(data.level) ? data.level : 1;
+    const intensityBase = Number.isFinite(data.intensity) ? data.intensity : 1;
+    const intensity = Math.min(2.5, Math.max(0.6, intensityBase));
+
+    const particleCount = Math.round(12 + level * 2 + intensity * 4);
+    for (let i = 0; i < particleCount; i += 1) {
+      const spread = (Math.random() - 0.5) * Math.PI * 0.7;
+      const angle = Math.atan2(-ny, -nx) + spread;
+      const speed = 140 + Math.random() * 120 * intensity;
+      const vx = Math.cos(angle) * speed;
+      const vy = Math.sin(angle) * speed;
+      this.particles.push(
+        new SpaceParticle(
+          data.position.x,
+          data.position.y,
+          vx,
+          vy,
+          `rgba(80, 220, 255, ${0.6 + Math.random() * 0.3})`,
+          2.4 + Math.random() * 1.6,
+          0.28 + Math.random() * 0.18,
+          'spark'
+        )
+      );
+    }
+
+    const glow = new SpaceParticle(
+      data.position.x,
+      data.position.y,
+      -nx * 40,
+      -ny * 40,
+      'rgba(140, 240, 255, 0.4)',
+      5 + level * 1.3,
+      0.3 + 0.05 * level
+    );
+    this.particles.push(glow);
+
+    this.addScreenShake(3 + level * 0.6, 0.15 + 0.02 * intensity);
+    this.addScreenFlash(
+      'rgba(0, 191, 255, 0.22)',
+      0.12,
+      0.18 + 0.04 * level
+    );
   }
 
   createXPCollectEffect(x, y) {

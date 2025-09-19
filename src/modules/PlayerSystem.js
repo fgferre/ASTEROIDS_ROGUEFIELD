@@ -1,5 +1,6 @@
 // src/modules/PlayerSystem.js
 import * as CONSTANTS from '../core/GameConstants.js';
+import shipModels from '../data/shipModels.js';
 
 const DRIFT_SETTINGS = {
   rampSpeed: 2.8,
@@ -54,6 +55,13 @@ class PlayerSystem {
     this.damage = 25;
     this.multishot = 1;
     this.magnetismRadius = CONSTANTS.MAGNETISM_RADIUS;
+    this.currentHull = null;
+    this._currentHullMetrics = {
+      outline: [],
+      boundingRadius: CONSTANTS.SHIP_SIZE,
+      shieldPadding: 0,
+    };
+    this.setHull(shipModels.defaultHull);
     this.shieldUpgradeLevel = 0;
     this.shieldMaxHits = 0;
     this.shieldCurrentHits = 0;
@@ -61,6 +69,7 @@ class PlayerSystem {
     this.shieldMaxCooldown = 0;
     this.shieldWasInCooldown = false;
     this.isShieldActive = false;
+    this.shieldHitGraceTimer = 0;
     this.invulnerableTimer = 0;
 
     // Registrar no ServiceLocator
@@ -197,6 +206,7 @@ class PlayerSystem {
     this.isShieldActive = true;
     this.shieldCurrentHits = this.shieldMaxHits;
     this.shieldWasInCooldown = false;
+    this.shieldHitGraceTimer = 0;
 
     if (typeof gameEvents !== 'undefined') {
       gameEvents.emit('shield-activated', {
@@ -211,9 +221,14 @@ class PlayerSystem {
 
   shieldTookHit() {
     if (!this.isShieldActive || this.shieldMaxHits <= 0) {
-      return;
+      return false;
     }
 
+    if (this.shieldHitGraceTimer > 0) {
+      return false;
+    }
+
+    this.shieldHitGraceTimer = CONSTANTS.SHIELD_HIT_GRACE_TIME;
     this.shieldCurrentHits = Math.max(0, this.shieldCurrentHits - 1);
 
     if (typeof gameEvents !== 'undefined') {
@@ -229,6 +244,8 @@ class PlayerSystem {
     } else {
       this.emitShieldStats();
     }
+
+    return true;
   }
 
   breakShield() {
@@ -238,6 +255,7 @@ class PlayerSystem {
 
     this.isShieldActive = false;
     this.shieldCurrentHits = 0;
+    this.shieldHitGraceTimer = 0;
 
     if (typeof gameEvents !== 'undefined') {
       gameEvents.emit('shield-broken', {
@@ -318,6 +336,13 @@ class PlayerSystem {
 
     if (this.invulnerableTimer > 0) {
       this.invulnerableTimer = Math.max(0, this.invulnerableTimer - deltaTime);
+    }
+
+    if (this.shieldHitGraceTimer > 0) {
+      this.shieldHitGraceTimer = Math.max(
+        0,
+        this.shieldHitGraceTimer - deltaTime
+      );
     }
 
     // Emitir evento para outros sistemas
@@ -476,6 +501,47 @@ class PlayerSystem {
   }
 
   // === UTILITÁRIOS ===
+  computeHullMetrics(hullDefinition) {
+    if (!hullDefinition) {
+      return {
+        outline: [],
+        boundingRadius: CONSTANTS.SHIP_SIZE,
+        shieldPadding: 0,
+      };
+    }
+
+    const outline = Array.isArray(hullDefinition.outline)
+      ? hullDefinition.outline.map((vertex) => ({
+          x: Number.isFinite(vertex?.x) ? vertex.x : 0,
+          y: Number.isFinite(vertex?.y) ? vertex.y : 0,
+        }))
+      : [];
+
+    let boundingRadius = 0;
+    outline.forEach((vertex) => {
+      const radius = Math.hypot(vertex.x, vertex.y);
+      if (radius > boundingRadius) {
+        boundingRadius = radius;
+      }
+    });
+
+    if (boundingRadius <= 0) {
+      boundingRadius = CONSTANTS.SHIP_SIZE;
+    }
+
+    const shieldPadding =
+      typeof hullDefinition.shieldPadding === 'number' &&
+      Number.isFinite(hullDefinition.shieldPadding)
+        ? hullDefinition.shieldPadding
+        : 0;
+
+    return {
+      outline,
+      boundingRadius,
+      shieldPadding,
+    };
+  }
+
   wrapAngle(angle) {
     while (angle > Math.PI) angle -= Math.PI * 2;
     while (angle < -Math.PI) angle += Math.PI * 2;
@@ -523,6 +589,57 @@ class PlayerSystem {
     return this.magnetismRadius;
   }
 
+  getHullOutline() {
+    if (
+      !this._currentHullMetrics ||
+      !Array.isArray(this._currentHullMetrics.outline)
+    ) {
+      return [];
+    }
+
+    return this._currentHullMetrics.outline.map((vertex) => ({ ...vertex }));
+  }
+
+  getHullBoundingRadius() {
+    if (
+      this._currentHullMetrics &&
+      typeof this._currentHullMetrics.boundingRadius === 'number'
+    ) {
+      return this._currentHullMetrics.boundingRadius;
+    }
+
+    return CONSTANTS.SHIP_SIZE;
+  }
+
+  getShieldPadding() {
+    if (
+      this._currentHullMetrics &&
+      typeof this._currentHullMetrics.shieldPadding === 'number'
+    ) {
+      return this._currentHullMetrics.shieldPadding;
+    }
+
+    return 0;
+  }
+
+  getShieldRadius() {
+    return this.getHullBoundingRadius() + this.getShieldPadding();
+  }
+
+  getShieldImpactProfile() {
+    if (this.shieldUpgradeLevel <= 0) {
+      return { damage: 0, forceMultiplier: 1, level: 0 };
+    }
+
+    const level = this.shieldUpgradeLevel;
+    const damage =
+      CONSTANTS.SHIELD_IMPACT_DAMAGE_BASE +
+      CONSTANTS.SHIELD_IMPACT_DAMAGE_PER_LEVEL * Math.max(0, level - 1);
+    const forceMultiplier = 1 + Math.max(0, level - 1) * 0.22;
+
+    return { damage, forceMultiplier, level };
+  }
+
   render(ctx, options = {}) {
     if (!ctx) return;
 
@@ -540,34 +657,71 @@ class PlayerSystem {
     ctx.strokeStyle = '#00DD77';
     ctx.lineWidth = 2;
 
-    ctx.beginPath();
-    ctx.moveTo(CONSTANTS.SHIP_SIZE, 0);
-    ctx.lineTo(-CONSTANTS.SHIP_SIZE / 2, -CONSTANTS.SHIP_SIZE / 2);
-    ctx.lineTo(-CONSTANTS.SHIP_SIZE / 3, 0);
-    ctx.lineTo(-CONSTANTS.SHIP_SIZE / 2, CONSTANTS.SHIP_SIZE / 2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+    const hull = this.currentHull;
+    const outline = Array.isArray(this._currentHullMetrics?.outline)
+      ? this._currentHullMetrics.outline
+      : Array.isArray(hull?.outline)
+      ? hull.outline
+      : [];
 
-    ctx.fillStyle = '#0088DD';
-    ctx.beginPath();
-    ctx.moveTo(-CONSTANTS.SHIP_SIZE / 3, -CONSTANTS.SHIP_SIZE / 3);
-    ctx.lineTo(-CONSTANTS.SHIP_SIZE, -CONSTANTS.SHIP_SIZE);
-    ctx.lineTo(-CONSTANTS.SHIP_SIZE / 2, -CONSTANTS.SHIP_SIZE / 2);
-    ctx.closePath();
-    ctx.fill();
+    if (outline.length >= 3) {
+      ctx.beginPath();
+      let hasMoved = false;
+      outline.forEach((vertex) => {
+        if (!vertex) return;
+        if (!hasMoved) {
+          ctx.moveTo(vertex.x, vertex.y);
+          hasMoved = true;
+        } else {
+          ctx.lineTo(vertex.x, vertex.y);
+        }
+      });
 
-    ctx.beginPath();
-    ctx.moveTo(-CONSTANTS.SHIP_SIZE / 3, CONSTANTS.SHIP_SIZE / 3);
-    ctx.lineTo(-CONSTANTS.SHIP_SIZE, CONSTANTS.SHIP_SIZE);
-    ctx.lineTo(-CONSTANTS.SHIP_SIZE / 2, CONSTANTS.SHIP_SIZE / 2);
-    ctx.closePath();
-    ctx.fill();
+      if (hasMoved) {
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+    }
 
-    ctx.fillStyle = '#FFFFFF';
-    ctx.beginPath();
-    ctx.arc(CONSTANTS.SHIP_SIZE / 3, 0, 3, 0, Math.PI * 2);
-    ctx.fill();
+    const accents = Array.isArray(hull?.accents) ? hull.accents : [];
+    if (accents.length > 0) {
+      ctx.fillStyle = '#0088DD';
+      accents.forEach((polygon) => {
+        if (!Array.isArray(polygon) || polygon.length === 0) {
+          return;
+        }
+        ctx.beginPath();
+        let accentHasMoved = false;
+        polygon.forEach((vertex) => {
+          if (!vertex) return;
+          if (!accentHasMoved) {
+            ctx.moveTo(vertex.x, vertex.y);
+            accentHasMoved = true;
+          } else {
+            ctx.lineTo(vertex.x, vertex.y);
+          }
+        });
+        if (accentHasMoved) {
+          ctx.closePath();
+          ctx.fill();
+        }
+      });
+    }
+
+    const cockpit = hull?.cockpit;
+    if (cockpit?.position && typeof cockpit.radius === 'number') {
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(
+        cockpit.position.x,
+        cockpit.position.y,
+        Math.max(0, cockpit.radius),
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+    }
 
     ctx.restore();
   }
@@ -626,6 +780,22 @@ class PlayerSystem {
   }
 
   // === SETTERS (para reset, teleport, etc.) ===
+  setHull(hullDefinition) {
+    if (!hullDefinition) {
+      this.currentHull = null;
+      this._currentHullMetrics = {
+        outline: [],
+        boundingRadius: CONSTANTS.SHIP_SIZE,
+        shieldPadding: 0,
+      };
+      return false;
+    }
+
+    this.currentHull = hullDefinition;
+    this._currentHullMetrics = this.computeHullMetrics(hullDefinition);
+    return true;
+  }
+
   setPosition(x, y) {
     this.position.x = x;
     this.position.y = y;
@@ -643,6 +813,7 @@ class PlayerSystem {
     this.shieldMaxCooldown = 0;
     this.shieldWasInCooldown = false;
     this.isShieldActive = false;
+    this.shieldHitGraceTimer = 0;
   }
 
   resetStats() {
