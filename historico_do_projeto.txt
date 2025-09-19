@@ -1,3 +1,12 @@
+*   8c5c686 Merge pull request #37 from fgferre/codex/fix-orb-clustering-and-fusion-system
+|\  
+| * fd1af6e Implement spatial orb fusion with animations
+|/  
+*   3814699 Merge pull request #36 from fgferre/codex/implement-dynamic-magnetism-and-orb-clustering-system
+|\  
+| * ed77c43 feat: enhance xp orb magnetism and clustering
+|/  
+* d9f5d03 update history source control
 *   e0ca2ba Merge pull request #34 from fgferre/codex/add-data-source-for-ship-silhouettes
 |\  
 | * 3256228 Improve shield visuals and collision behaviour
