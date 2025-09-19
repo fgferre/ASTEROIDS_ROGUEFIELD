@@ -37,6 +37,11 @@ export const COLLISION_BOUNCE = 0.6;
 // === MAGNETISMO ===
 export const MAGNETISM_RADIUS = 70;
 export const MAGNETISM_FORCE = 120;
+export const ENHANCED_SHIP_MAGNETISM_FORCE = 300;
+export const ORB_MAGNETISM_RADIUS = 35;
+export const ORB_MAGNETISM_FORCE = 150;
+export const MIN_ORB_DISTANCE = 18;
+export const CLUSTER_FUSION_COUNT = 10;
 
 // === ESCUDO DEFLETOR ===
 export const SHIELD_DEFAULT_HITS = 3;
