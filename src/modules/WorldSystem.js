@@ -31,8 +31,8 @@ class WorldSystem {
     asteroids.forEach((asteroid) => {
       if (asteroid.destroyed) return;
 
-      const dx = player.position.x - asteroid.x;
-      const dy = player.position.y - asteroid.y;
+      const dx = asteroid.x - player.position.x;
+      const dy = asteroid.y - player.position.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
 
       if (distance >= CONSTANTS.SHIP_SIZE + asteroid.radius) {
@@ -44,10 +44,10 @@ class WorldSystem {
       const overlap = CONSTANTS.SHIP_SIZE + asteroid.radius - distance;
 
       if (overlap > 0) {
-        player.position.x += nx * overlap * 0.5;
-        player.position.y += ny * overlap * 0.5;
-        asteroid.x -= nx * overlap * 0.5;
-        asteroid.y -= ny * overlap * 0.5;
+        player.position.x -= nx * overlap * 0.5;
+        player.position.y -= ny * overlap * 0.5;
+        asteroid.x += nx * overlap * 0.5;
+        asteroid.y += ny * overlap * 0.5;
       }
 
       const rvx = asteroid.vx - player.velocity.vx;
