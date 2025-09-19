@@ -364,9 +364,23 @@ class ProgressionSystem {
         this.activeFusionAnimations.splice(index, 1);
         const orbsToFuse = animation.orbs
           .map((entry) => entry.orb)
-          .filter((orb) => this.isOrbEligibleForFusion(orb));
+          .filter((orb) => this.isOrbActive(orb));
+        const hasEnoughOrbs =
+          orbsToFuse.length >= this.clusterFusionCount;
 
-        if (orbsToFuse.length >= this.clusterFusionCount) {
+        animation.orbs.forEach((entry) => {
+          const orb = entry?.orb;
+          if (!orb) {
+            return;
+          }
+
+          if (!this.isOrbActive(orb) || !hasEnoughOrbs) {
+            orb.isFusing = false;
+            delete orb.fusionId;
+          }
+        });
+
+        if (hasEnoughOrbs) {
           this.fuseOrbs(
             animation.className,
             animation.targetClassName,
@@ -374,14 +388,6 @@ class ProgressionSystem {
             animation.reason,
             { center: animation.center }
           );
-        } else {
-          orbsToFuse.forEach((orb) => {
-            if (!orb) {
-              return;
-            }
-            orb.isFusing = false;
-            delete orb.fusionId;
-          });
         }
       }
     }
