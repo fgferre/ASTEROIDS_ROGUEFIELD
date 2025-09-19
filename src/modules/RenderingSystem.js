@@ -148,15 +148,73 @@ class RenderingSystem {
             : player.position;
 
         if (position) {
+          const hullOutline =
+            typeof player.getHullOutline === 'function'
+              ? player.getHullOutline()
+              : null;
+          const padding = Math.max(
+            0,
+            typeof player.getShieldPadding === 'function'
+              ? player.getShieldPadding()
+              : 0
+          );
+
+          let paddedOutline = null;
+          if (Array.isArray(hullOutline) && hullOutline.length >= 3) {
+            const angle =
+              typeof player.getAngle === 'function'
+                ? player.getAngle()
+                : player.angle || 0;
+            const cos = Math.cos(angle);
+            const sin = Math.sin(angle);
+            paddedOutline = [];
+
+            hullOutline.forEach((vertex) => {
+              if (!vertex) return;
+              const length = Math.hypot(vertex.x, vertex.y);
+              const safeLength = length > 0 ? length : 1;
+              const scale = (safeLength + padding) / safeLength;
+              const localX = vertex.x * scale;
+              const localY = vertex.y * scale;
+
+              paddedOutline.push({
+                x: position.x + localX * cos - localY * sin,
+                y: position.y + localX * sin + localY * cos,
+              });
+            });
+          }
+
           ctx.save();
-          const radius = CONSTANTS.SHIP_SIZE + 12;
           const alpha = 0.35 + 0.4 * ratio;
           ctx.strokeStyle = `rgba(0, 191, 255, ${alpha})`;
           ctx.lineWidth = 4 + ratio * 4;
           ctx.shadowColor = 'rgba(0, 191, 255, 0.8)';
           ctx.shadowBlur = 15 + ratio * 12;
           ctx.beginPath();
-          ctx.arc(position.x, position.y, radius, 0, Math.PI * 2);
+
+          if (paddedOutline && paddedOutline.length >= 3) {
+            let hasMoved = false;
+            paddedOutline.forEach((point) => {
+              if (!point) return;
+              if (!hasMoved) {
+                ctx.moveTo(point.x, point.y);
+                hasMoved = true;
+              } else {
+                ctx.lineTo(point.x, point.y);
+              }
+            });
+
+            if (hasMoved) {
+              ctx.closePath();
+            } else {
+              const fallbackRadius = CONSTANTS.SHIP_SIZE + padding;
+              ctx.arc(position.x, position.y, fallbackRadius, 0, Math.PI * 2);
+            }
+          } else {
+            const fallbackRadius = CONSTANTS.SHIP_SIZE + padding;
+            ctx.arc(position.x, position.y, fallbackRadius, 0, Math.PI * 2);
+          }
+
           ctx.stroke();
           ctx.restore();
         }
