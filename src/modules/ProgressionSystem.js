@@ -1,49 +1,59 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 
-const ORB_CLASS_CONFIG = [
-  {
-    name: 'blue',
-    tier: 1,
+const ORB_CLASS_ORDER = [
+  { name: 'blue', tier: 1 },
+  { name: 'green', tier: 2 },
+  { name: 'yellow', tier: 3 },
+  { name: 'purple', tier: 4 },
+  { name: 'red', tier: 5 },
+];
+
+const ORB_COLOR_PALETTE = {
+  blue: {
     baseColor: '#00DDFF',
     glowColor: 'rgba(0, 221, 255, 0.35)',
     highlightColor: '#E9FCFF',
     fusionFlash: 'rgba(0, 221, 255, 0.55)',
   },
-  {
-    name: 'green',
-    tier: 2,
-    baseColor: '#2EE58F',
-    glowColor: 'rgba(46, 229, 143, 0.35)',
-    highlightColor: '#E6FFEF',
-    fusionFlash: 'rgba(46, 229, 143, 0.55)',
+  green: {
+    baseColor: '#00FF00',
+    glowColor: 'rgba(0, 255, 0, 0.35)',
+    highlightColor: '#E6FFE6',
+    fusionFlash: 'rgba(0, 255, 0, 0.55)',
   },
-  {
-    name: 'yellow',
-    tier: 3,
-    baseColor: '#FFD54F',
-    glowColor: 'rgba(255, 213, 79, 0.35)',
-    highlightColor: '#FFF8E1',
-    fusionFlash: 'rgba(255, 213, 79, 0.55)',
+  yellow: {
+    baseColor: '#FFFF00',
+    glowColor: 'rgba(255, 255, 0, 0.35)',
+    highlightColor: '#FFFFE6',
+    fusionFlash: 'rgba(255, 255, 0, 0.55)',
   },
-  {
-    name: 'purple',
-    tier: 4,
-    baseColor: '#B388FF',
-    glowColor: 'rgba(179, 136, 255, 0.35)',
-    highlightColor: '#F3E9FF',
-    fusionFlash: 'rgba(179, 136, 255, 0.55)',
+  purple: {
+    baseColor: '#9932CC',
+    glowColor: 'rgba(153, 50, 204, 0.35)',
+    highlightColor: '#F3E6FF',
+    fusionFlash: 'rgba(153, 50, 204, 0.55)',
   },
-  {
-    name: 'red',
-    tier: 5,
-    baseColor: '#FF6B6B',
-    glowColor: 'rgba(255, 107, 107, 0.35)',
+  red: {
+    baseColor: '#FF0000',
+    glowColor: 'rgba(255, 0, 0, 0.35)',
     highlightColor: '#FFE6E6',
-    fusionFlash: 'rgba(255, 107, 107, 0.6)',
+    fusionFlash: 'rgba(255, 0, 0, 0.6)',
   },
-];
+};
 
-const ORB_CLASS_LOOKUP = ORB_CLASS_CONFIG.reduce((lookup, config) => {
+const ORB_CLASS_CONFIG = ORB_CLASS_ORDER.map(({ name, tier }) => {
+  const palette = ORB_COLOR_PALETTE[name] || {};
+  return {
+    name,
+    tier,
+    baseColor: palette.baseColor || '#FFFFFF',
+    glowColor: palette.glowColor || 'rgba(255, 255, 255, 0.35)',
+    highlightColor: palette.highlightColor || '#FFFFFF',
+    fusionFlash: palette.fusionFlash || 'rgba(255, 255, 255, 0.55)',
+  };
+});
+
+const ORB_CLASSES = ORB_CLASS_CONFIG.reduce((lookup, config) => {
   lookup[config.name] = config;
   return lookup;
 }, {});
@@ -141,12 +151,12 @@ class ProgressionSystem {
   }
 
   getOrbConfig(className) {
-    return ORB_CLASS_LOOKUP[className] || ORB_CLASS_LOOKUP.blue;
+    return ORB_CLASSES[className] || ORB_CLASSES.blue;
   }
 
   resolveOrbClass(value, options = {}) {
-    if (options.className && ORB_CLASS_LOOKUP[options.className]) {
-      return ORB_CLASS_LOOKUP[options.className];
+    if (options.className && ORB_CLASSES[options.className]) {
+      return ORB_CLASSES[options.className];
     }
 
     if (typeof options.tier === 'number') {
@@ -173,7 +183,7 @@ class ProgressionSystem {
 
     return (
       ORB_CLASS_CONFIG.find((config) => config.tier === tier) ||
-      ORB_CLASS_LOOKUP.blue
+      ORB_CLASSES.blue
     );
   }
 
@@ -202,23 +212,13 @@ class ProgressionSystem {
       const groupsNeeded = Math.ceil(
         excess / Math.max(this.clusterFusionCount - 1, 1)
       );
-      const fused = this.performFusionForClass(
+      this.performFusionForClass(
         className,
         nextClassName,
         groupsNeeded,
         'overflow'
       );
-      if (fused) {
-        return;
-      }
     }
-
-    active
-      .sort((a, b) => b.age - a.age)
-      .slice(0, excess)
-      .forEach((orb) => {
-        orb.collected = true;
-      });
   }
 
   performFusionForClass(
@@ -280,7 +280,6 @@ class ProgressionSystem {
       class: resolvedConfig.name,
       tier: resolvedConfig.tier,
       collected: false,
-      lifetime: options.lifetime ?? 45,
       age: options.age ?? 0,
     };
 
@@ -424,11 +423,6 @@ class ProgressionSystem {
         }
 
         orb.age += deltaTime;
-
-        if (orb.age > orb.lifetime) {
-          orb.collected = true;
-          continue;
-        }
 
         if (!playerPos) {
           continue;
