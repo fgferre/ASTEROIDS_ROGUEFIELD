@@ -107,11 +107,14 @@ export const ASTEROID_VARIANTS = {
       stroke: '#5E1A0D',
       cracks: 'rgba(255, 200, 120, 0.7)',
       pulse: 'rgba(255, 120, 30, 0.45)',
+      glow: 'rgba(255, 140, 40, 0.65)',
+      innerGlow: 'rgba(255, 210, 140, 0.4)',
     },
     behavior: {
       type: 'volatile',
       fuseTime: 6,
       armTime: 1.6,
+      trailInterval: 0.08,
       explosion: {
         radius: 70,
         damage: 35,

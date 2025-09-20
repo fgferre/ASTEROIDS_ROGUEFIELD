@@ -93,6 +93,7 @@ class Asteroid {
         fuseTimer: this.behavior.fuseTime ?? 0,
         armed: false,
         exploded: false,
+        trailTimer: 0,
       };
     }
 
@@ -207,12 +208,20 @@ class Asteroid {
       return;
     }
 
+    const behavior = this.behavior || {};
+    const fuseTime = Number.isFinite(behavior.fuseTime) ? behavior.fuseTime : 0;
+    const baseTrailInterval =
+      Number.isFinite(behavior.trailInterval) && behavior.trailInterval > 0
+        ? behavior.trailInterval
+        : 0.08;
+    const trailInterval = Math.max(0.05, baseTrailInterval);
+
     this.variantState.fuseTimer -= deltaTime;
 
     if (
       !this.variantState.armed &&
-      typeof this.behavior?.armTime === 'number' &&
-      this.variantState.fuseTimer <= this.behavior.armTime
+      typeof behavior.armTime === 'number' &&
+      this.variantState.fuseTimer <= behavior.armTime
     ) {
       this.variantState.armed = true;
       if (typeof gameEvents !== 'undefined') {
@@ -220,6 +229,33 @@ class Asteroid {
           asteroid: this,
           position: { x: this.x, y: this.y },
         });
+      }
+    }
+
+    if (!this.variantState.exploded) {
+      if (typeof this.variantState.trailTimer !== 'number') {
+        this.variantState.trailTimer = 0;
+      } else {
+        this.variantState.trailTimer -= deltaTime;
+      }
+
+      if (this.variantState.trailTimer <= 0) {
+        this.variantState.trailTimer = trailInterval;
+        if (typeof gameEvents !== 'undefined') {
+          const normalizedFuse =
+            fuseTime > 0
+              ? Math.max(0, Math.min(1, this.variantState.fuseTimer / fuseTime))
+              : 0;
+
+          gameEvents.emit('asteroid-volatile-trail', {
+            asteroid: this,
+            position: { x: this.x, y: this.y },
+            velocity: { x: this.vx, y: this.vy },
+            radius: this.radius,
+            armed: !!this.variantState.armed,
+            fuseRatio: normalizedFuse,
+          });
+        }
       }
     }
 

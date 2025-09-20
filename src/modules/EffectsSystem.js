@@ -142,6 +142,10 @@ export default class EffectsSystem {
       this.createVolatileExplosionEffect(data);
     });
 
+    gameEvents.on('asteroid-volatile-trail', (data) => {
+      this.spawnVolatileTrail(data);
+    });
+
     gameEvents.on('player-leveled-up', () => {
       this.addScreenShake(6, 0.4);
       this.addFreezeFrame(0.2, 0.4);
@@ -262,10 +266,12 @@ export default class EffectsSystem {
       if (!wave) return;
 
       ctx.save();
-      ctx.strokeStyle = `rgba(0, 191, 255, ${wave.alpha})`;
+      const alpha = Math.max(0, Math.min(1, wave.alpha));
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = wave.color || 'rgba(0, 191, 255, 1)';
       ctx.lineWidth = Math.max(1, wave.lineWidth);
-      ctx.shadowColor = 'rgba(0, 191, 255, 0.6)';
-      ctx.shadowBlur = 25 * wave.alpha;
+      ctx.shadowColor = wave.shadowColor || 'rgba(0, 191, 255, 0.6)';
+      ctx.shadowBlur = 25 * alpha;
       ctx.beginPath();
       ctx.arc(wave.x, wave.y, wave.radius, 0, Math.PI * 2);
       ctx.stroke();
@@ -375,6 +381,14 @@ export default class EffectsSystem {
       typeof data.radius === 'number'
         ? data.radius
         : CONSTANTS.SHIELD_SHOCKWAVE_RADIUS;
+    const duration =
+      Number.isFinite(data.duration) && data.duration > 0 ? data.duration : 0.45;
+    const baseWidth =
+      Number.isFinite(data.baseWidth) && data.baseWidth > 0
+        ? data.baseWidth
+        : 10;
+    const maxAlpha =
+      Number.isFinite(data.maxAlpha) && data.maxAlpha > 0 ? data.maxAlpha : 0.6;
 
     const wave = {
       x: data.position.x,
@@ -382,11 +396,14 @@ export default class EffectsSystem {
       maxRadius: radius,
       radius: 0,
       timer: 0,
-      duration: 0.45,
-      baseWidth: 10,
-      maxAlpha: 0.6,
-      alpha: 0.6,
+      duration,
+      baseWidth,
+      maxAlpha,
+      alpha: maxAlpha,
+      color: data.color || 'rgba(0, 191, 255, 1)',
+      shadowColor: data.shadowColor || 'rgba(0, 191, 255, 0.6)',
     };
+    wave.lineWidth = wave.baseWidth;
 
     this.shockwaves.push(wave);
     if (this.shockwaves.length > 6) {
@@ -624,6 +641,95 @@ export default class EffectsSystem {
     }
   }
 
+  spawnVolatileTrail(data = {}) {
+    if (!data.position) {
+      return;
+    }
+
+    const { position } = data;
+    const velocity = data.velocity || { x: 0, y: 0 };
+    const radius = data.radius ?? 12;
+    const speed = Math.hypot(velocity.x, velocity.y);
+    const dirX = speed > 0.001 ? velocity.x / speed : 0;
+    const dirY = speed > 0.001 ? velocity.y / speed : 0;
+    const fuseRatio = Number.isFinite(data.fuseRatio)
+      ? Math.max(0, Math.min(1, data.fuseRatio))
+      : 0;
+    const intensity = Math.min(
+      1.25,
+      (data.armed ? 0.6 : 0.35) + (1 - fuseRatio) * 0.9 + speed / 180
+    );
+    const particleCount = Math.max(1, Math.round(1 + intensity));
+
+    for (let i = 0; i < particleCount; i += 1) {
+      const backward = radius * (0.4 + Math.random() * 0.45);
+      const lateralJitter = (Math.random() - 0.5) * radius * 0.4;
+      let offsetX = lateralJitter;
+      let offsetY = 0;
+
+      if (speed > 0.001) {
+        const perpX = -dirY;
+        const perpY = dirX;
+        offsetX = perpX * lateralJitter;
+        offsetY = perpY * lateralJitter;
+      } else {
+        const randomAngle = Math.random() * Math.PI * 2;
+        offsetX = Math.cos(randomAngle) * lateralJitter;
+        offsetY = Math.sin(randomAngle) * lateralJitter;
+      }
+
+      const px = position.x - dirX * backward + offsetX;
+      const py = position.y - dirY * backward + offsetY;
+
+      const baseAngle =
+        speed > 0.001 ? Math.atan2(-dirY, -dirX) : Math.random() * Math.PI * 2;
+      const spread = (Math.random() - 0.5) * 0.9;
+      const angle = baseAngle + spread;
+      const flameSpeed = 50 + intensity * 60 + Math.random() * 30;
+
+      const flame = new SpaceParticle(
+        px,
+        py,
+        Math.cos(angle) * flameSpeed,
+        Math.sin(angle) * flameSpeed,
+        `rgba(255, ${Math.floor(130 + Math.random() * 80)}, ${Math.floor(
+          40 + Math.random() * 50
+        )}, ${0.5 + Math.random() * 0.3})`,
+        1.2 + Math.random() * 1.1,
+        0.22 + Math.random() * 0.16,
+        'spark'
+      );
+      this.particles.push(flame);
+
+      if (Math.random() < 0.2) {
+        const ember = new SpaceParticle(
+          px,
+          py,
+          flame.vx * 0.4,
+          flame.vy * 0.4,
+          'rgba(120, 45, 15, 0.35)',
+          1 + Math.random() * 0.8,
+          0.18 + Math.random() * 0.12,
+          'debris'
+        );
+        this.particles.push(ember);
+      }
+    }
+
+    if (Math.random() < 0.35) {
+      const glow = new SpaceParticle(
+        position.x,
+        position.y,
+        -dirX * (25 + Math.random() * 20),
+        -dirY * (25 + Math.random() * 20),
+        `rgba(255, 120, 40, ${0.18 + intensity * 0.22})`,
+        Math.max(radius * 0.6, 5),
+        0.22 + intensity * 0.12
+      );
+      this.particles.push(glow);
+    }
+  }
+
   createVolatileExplosionEffect(data) {
     if (!data || !data.position) {
       return;
@@ -632,8 +738,73 @@ export default class EffectsSystem {
     const radius = data.radius ?? 70;
     const position = data.position;
 
+    this.createShockwaveEffect({
+      position,
+      radius,
+      duration: 0.55,
+      baseWidth: Math.max(12, Math.min(20, radius * 0.18)),
+      maxAlpha: 0.7,
+      color: 'rgba(255, 170, 60, 1)',
+      shadowColor: 'rgba(255, 120, 30, 0.65)',
+    });
+
     this.addScreenShake(6 + radius * 0.02, 0.3);
     this.addScreenFlash('rgba(255, 120, 0, 0.45)', 0.22, 0.2);
+
+    const haloLife = 0.35 + Math.min(0.25, radius / 220);
+    const outerHalo = new SpaceParticle(
+      position.x,
+      position.y,
+      0,
+      0,
+      'rgba(255, 150, 60, 0.35)',
+      Math.max(radius * 0.85, 18),
+      haloLife
+    );
+    const innerHalo = new SpaceParticle(
+      position.x,
+      position.y,
+      0,
+      0,
+      'rgba(255, 220, 180, 0.22)',
+      Math.max(radius * 0.45, 12),
+      haloLife * 0.8
+    );
+    this.particles.push(outerHalo, innerHalo);
+
+    const ringCount = Math.max(16, Math.round(radius / 3));
+    for (let i = 0; i < ringCount; i += 1) {
+      const angle = (i / ringCount) * Math.PI * 2;
+      const px = position.x + Math.cos(angle) * radius;
+      const py = position.y + Math.sin(angle) * radius;
+      const tangentAngle = angle + (Math.random() - 0.5) * 0.9;
+      const tangentialSpeed = 40 + Math.random() * 60;
+      const outwardSpeed = 80 + Math.random() * 80;
+
+      const vx =
+        Math.cos(tangentAngle) * tangentialSpeed +
+        Math.cos(angle) * outwardSpeed * 0.25;
+      const vy =
+        Math.sin(tangentAngle) * tangentialSpeed +
+        Math.sin(angle) * outwardSpeed * 0.25;
+
+      const emberColor = `rgba(255, ${Math.floor(
+        130 + Math.random() * 90
+      )}, ${Math.floor(40 + Math.random() * 50)}, ${0.48 + Math.random() * 0.28})`;
+
+      this.particles.push(
+        new SpaceParticle(
+          px,
+          py,
+          vx,
+          vy,
+          emberColor,
+          1.1 + Math.random() * 0.9,
+          0.28 + Math.random() * 0.18,
+          'spark'
+        )
+      );
+    }
 
     const particleTotal = 18 + Math.floor(radius / 6);
     for (let i = 0; i < particleTotal; i += 1) {
