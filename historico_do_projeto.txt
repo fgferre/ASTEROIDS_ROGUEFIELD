@@ -1,3 +1,24 @@
+*   685cafa Merge pull request #40 from fgferre/codex/refine-prompt-for-progressive-fragmentation-system
+|\  
+| *   03873e1 Merge pull request #41 from fgferre/codex/update-applydirectdamagetoplayer-for-radius-check
+| |\  
+| | * 8bf9b6a Fix EnemySystem import path in tests
+| | * a72083e Respect explosion radius when damaging player
+| * | 9e3194a Gate volatile explosion damage to radius
+| |/  
+| * a9897dd Implement advanced asteroid variants and orb rewards
+|/  
+*   6b1aaed Merge pull request #39 from fgferre/codex/update-fusion-animation-logic-in-progressionsystem
+|\  
+| * 8bda1b6 Fix fusion animation orb filtering
+|/  
+*   50b2004 Merge pull request #38 from fgferre/codex/adjust-orb-persistence-and-color-standardization
+|\  
+| * fa4bfcd Persist XP orbs and centralize class colors
+|/  
+* f12f561 Novas políticas
+* 143f96b ci: add workflow to update project history
+* 5e1d5ec atualização do ccode source history
 *   8c5c686 Merge pull request #37 from fgferre/codex/fix-orb-clustering-and-fusion-system
 |\  
 | * fd1af6e Implement spatial orb fusion with animations
