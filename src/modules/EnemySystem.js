@@ -72,6 +72,7 @@ class Asteroid {
 
     this.vertices = this.generateVertices();
     this.variantState = this.initializeVariantState();
+    this.visualState = this.initializeVisualState();
   }
 
   computeWaveHealthMultiplier(wave) {
@@ -103,6 +104,26 @@ class Asteroid {
     }
 
     return {};
+  }
+
+  initializeVisualState() {
+    const visual = this.variantConfig?.visual;
+    if (!visual) {
+      return {};
+    }
+
+    const state = {};
+
+    if (visual.pulse) {
+      state.glowTime = Math.random() * Math.PI * 2;
+    }
+
+    if (this.behavior?.type === 'volatile' && visual.trail) {
+      const baseInterval = visual.trail.interval ?? 0.05;
+      state.trailCooldown = Math.random() * baseInterval;
+    }
+
+    return state;
   }
 
   createSeededRandom(seed) {
@@ -166,10 +187,39 @@ class Asteroid {
     return layers;
   }
 
+  updateVisualState(deltaTime) {
+    if (!this.variantConfig?.visual) {
+      return;
+    }
+
+    if (!this.visualState) {
+      this.visualState = {};
+    }
+
+    const pulse = this.variantConfig.visual.pulse;
+    if (pulse) {
+      if (typeof this.visualState.glowTime !== 'number') {
+        this.visualState.glowTime = Math.random() * Math.PI * 2;
+      }
+
+      const speed = Math.max(0, pulse.speed ?? 1);
+      if (speed > 0) {
+        const angularSpeed = speed * Math.PI * 2;
+        this.visualState.glowTime += deltaTime * angularSpeed;
+
+        if (this.visualState.glowTime > Math.PI * 512) {
+          this.visualState.glowTime -= Math.PI * 512;
+        }
+      }
+    }
+  }
+
   update(deltaTime) {
     if (this.destroyed) {
       return;
     }
+
+    this.updateVisualState(deltaTime);
 
     if (this.behavior?.type === 'parasite') {
       this.updateParasiteBehavior(deltaTime);
@@ -209,6 +259,10 @@ class Asteroid {
 
     this.variantState.fuseTimer -= deltaTime;
 
+    if (!this.variantState.exploded) {
+      this.maybeEmitVolatileTrail(deltaTime);
+    }
+
     if (
       !this.variantState.armed &&
       typeof this.behavior?.armTime === 'number' &&
@@ -227,6 +281,77 @@ class Asteroid {
       this.variantState.exploded = true;
       if (this.system && typeof this.system.handleVolatileTimeout === 'function') {
         this.system.handleVolatileTimeout(this);
+      }
+    }
+  }
+
+  getVolatileFuseProgress() {
+    if (this.behavior?.type !== 'volatile') {
+      return 0;
+    }
+
+    const fuseTime = this.behavior?.fuseTime ?? 0;
+    if (!Number.isFinite(fuseTime) || fuseTime <= 0) {
+      return 1;
+    }
+
+    const remaining = Number.isFinite(this.variantState?.fuseTimer)
+      ? Math.max(0, this.variantState.fuseTimer)
+      : fuseTime;
+    const normalized = 1 - remaining / fuseTime;
+    return Math.max(0, Math.min(1, normalized));
+  }
+
+  maybeEmitVolatileTrail(deltaTime) {
+    if (this.behavior?.type !== 'volatile') {
+      return;
+    }
+
+    if (this.variantState?.exploded) {
+      return;
+    }
+
+    const visual = this.variantConfig?.visual;
+    const trail = visual?.trail;
+    if (!trail) {
+      return;
+    }
+
+    if (!this.visualState) {
+      this.visualState = {};
+    }
+
+    if (typeof this.visualState.trailCooldown !== 'number') {
+      this.visualState.trailCooldown = 0;
+    }
+
+    const fuseProgress = this.getVolatileFuseProgress();
+    const baseInterval = trail.interval ?? 0.05;
+    const minInterval = Math.max(0.005, trail.minimumInterval ?? baseInterval);
+    const acceleration = Math.max(0, trail.accelerationFactor ?? 0);
+    const desiredInterval = Math.max(
+      minInterval,
+      baseInterval * (1 - acceleration * fuseProgress)
+    );
+
+    this.visualState.trailCooldown -= deltaTime;
+    const bursts = Math.min(3, Math.max(1, Math.ceil(deltaTime / desiredInterval)));
+    let emitted = 0;
+
+    while (this.visualState.trailCooldown <= 0 && emitted < bursts) {
+      this.visualState.trailCooldown += desiredInterval;
+      emitted += 1;
+
+      if (typeof gameEvents !== 'undefined') {
+        gameEvents.emit('asteroid-volatile-trail', {
+          asteroidId: this.id,
+          position: { x: this.x, y: this.y },
+          velocity: { x: this.vx, y: this.vy },
+          config: trail,
+          armed: !!this.variantState?.armed,
+          fuseProgress,
+          intensity: Math.min(1, 0.35 + fuseProgress * 0.55 + (this.variantState?.armed ? 0.2 : 0)),
+        });
       }
     }
   }
@@ -378,15 +503,46 @@ class Asteroid {
 
     const colors = this.getVariantColors();
     const isFlashing = this.lastDamageTime > 0;
-    let fillStyle = colors.fill;
+    const visual = this.variantConfig?.visual || {};
+    const isVolatile = this.behavior?.type === 'volatile';
+    const fuseProgress = isVolatile ? this.getVolatileFuseProgress() : 0;
+    const pulseConfig = visual.pulse;
+    const glowConfig = visual.glow || {};
 
-    if (this.behavior?.type === 'volatile' && !isFlashing) {
-      const fuse = this.variantState?.fuseTimer ?? this.behavior?.fuseTime ?? 0;
-      const normalizedFuse = Math.max(0, Math.min(fuse / (this.behavior?.fuseTime || 1), 1));
-      const pulseIntensity = 1 - normalizedFuse;
-      if (colors.pulse) {
-        const baseColor = colors.fill;
-        fillStyle = this.mixColor(baseColor, colors.pulse, pulseIntensity * 0.8);
+    let basePulse = 0;
+    let fillStyle = colors.fill;
+    const strokeStyle = colors.stroke;
+
+    if (!isFlashing) {
+      if (pulseConfig) {
+        if (!this.visualState) {
+          this.visualState = {};
+        }
+
+        if (typeof this.visualState.glowTime !== 'number') {
+          this.visualState.glowTime = Math.random() * Math.PI * 2;
+        }
+
+        basePulse = (Math.sin(this.visualState.glowTime) + 1) / 2;
+        const dynamicFactor = basePulse * (pulseConfig.amount ?? 0);
+        const fuseFactor = isVolatile
+          ? fuseProgress * (pulseConfig.fuseBoost ?? 0)
+          : 0;
+        const armedFactor =
+          isVolatile && this.variantState?.armed
+            ? pulseConfig.armedBoost ?? 0
+            : 0;
+        const pulseMix = Math.min(1, dynamicFactor + fuseFactor + armedFactor);
+
+        const pulseColor =
+          pulseConfig.color || colors.pulse || colors.glow || colors.innerGlow;
+        if (pulseColor) {
+          fillStyle = this.mixColor(fillStyle, pulseColor, pulseMix);
+        }
+      } else if (isVolatile && colors.pulse) {
+        basePulse = fuseProgress;
+        const pulseMix = Math.min(1, fuseProgress * 0.8);
+        fillStyle = this.mixColor(fillStyle, colors.pulse, pulseMix);
       }
     }
 
@@ -395,11 +551,47 @@ class Asteroid {
       ctx.strokeStyle = '#FFFFFF';
     } else {
       ctx.fillStyle = fillStyle;
-      ctx.strokeStyle = colors.stroke;
+      ctx.strokeStyle = strokeStyle;
 
       if (colors.glow || colors.innerGlow) {
-        ctx.shadowColor = colors.glow || colors.innerGlow;
-        ctx.shadowBlur = 12;
+        const baseGlowColor = colors.glow || colors.innerGlow;
+        const shadowBlurBase = Number.isFinite(glowConfig.baseBlur)
+          ? glowConfig.baseBlur
+          : 12;
+        const blurPulse = Number.isFinite(glowConfig.pulseBlur)
+          ? glowConfig.pulseBlur
+          : 0;
+        const blurFuse =
+          isVolatile && Number.isFinite(glowConfig.fuseBlur)
+            ? glowConfig.fuseBlur * fuseProgress
+            : 0;
+        const blurArmed =
+          isVolatile && this.variantState?.armed && Number.isFinite(glowConfig.armedBlur)
+            ? glowConfig.armedBlur
+            : 0;
+        ctx.shadowBlur =
+          shadowBlurBase + blurPulse * basePulse + blurFuse + blurArmed;
+
+        if (Number.isFinite(glowConfig.baseAlpha)) {
+          const baseAlpha = glowConfig.baseAlpha ?? 0.6;
+          const pulseAlpha = glowConfig.pulseAlpha ?? 0;
+          const fuseAlpha =
+            isVolatile && Number.isFinite(glowConfig.fuseAlpha)
+              ? glowConfig.fuseAlpha * fuseProgress
+              : 0;
+          const armedAlpha =
+            isVolatile && this.variantState?.armed && Number.isFinite(glowConfig.armedAlpha)
+              ? glowConfig.armedAlpha
+              : 0;
+
+          const totalAlpha = Math.min(
+            1,
+            baseAlpha + pulseAlpha * basePulse + fuseAlpha + armedAlpha
+          );
+          ctx.shadowColor = this.withAlpha(baseGlowColor, totalAlpha);
+        } else {
+          ctx.shadowColor = baseGlowColor;
+        }
       }
     }
 
@@ -418,6 +610,38 @@ class Asteroid {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
+
+    if (!isFlashing && colors.innerGlow) {
+      const gradient = ctx.createRadialGradient(
+        0,
+        0,
+        Math.max(2, this.radius * 0.2),
+        0,
+        0,
+        this.radius * 1.1
+      );
+
+      const armedBonus =
+        isVolatile && this.variantState?.armed ? 0.25 : 0;
+      const innerIntensity = Math.min(
+        1,
+        0.35 + basePulse * 0.35 + fuseProgress * 0.6 + armedBonus
+      );
+
+      gradient.addColorStop(0, this.withAlpha(colors.innerGlow, innerIntensity));
+      gradient.addColorStop(
+        0.7,
+        this.withAlpha(colors.innerGlow, innerIntensity * 0.4)
+      );
+      gradient.addColorStop(1, this.withAlpha(colors.innerGlow, 0));
+
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius * 1.05, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+    }
 
     if (this.crackStage > 0 && !isFlashing) {
       ctx.lineWidth = 1.2;
@@ -440,41 +664,53 @@ class Asteroid {
     ctx.restore();
   }
 
+  parseColor(color) {
+    if (typeof color !== 'string') {
+      return { r: 255, g: 255, b: 255 };
+    }
+
+    if (color.startsWith('#')) {
+      let hex = color.slice(1);
+      if (hex.length === 3) {
+        hex = hex
+          .split('')
+          .map((c) => c + c)
+          .join('');
+      }
+      if (hex.length === 6) {
+        const bigint = Number.parseInt(hex, 16);
+        return {
+          r: (bigint >> 16) & 255,
+          g: (bigint >> 8) & 255,
+          b: bigint & 255,
+        };
+      }
+    }
+
+    const rgbaMatch = color.match(/rgba?\s*\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if (rgbaMatch) {
+      return {
+        r: Number.parseInt(rgbaMatch[1], 10) || 255,
+        g: Number.parseInt(rgbaMatch[2], 10) || 255,
+        b: Number.parseInt(rgbaMatch[3], 10) || 255,
+      };
+    }
+
+    return { r: 255, g: 255, b: 255 };
+  }
+
+  withAlpha(color, alpha) {
+    const parsed = this.parseColor(color);
+    const clamped = Math.max(0, Math.min(1, alpha));
+    return `rgba(${parsed.r}, ${parsed.g}, ${parsed.b}, ${clamped})`;
+  }
+
   mixColor(baseColor, overlayColor, factor) {
     if (factor <= 0) return baseColor;
     if (factor >= 1) return overlayColor;
 
-    const parseColor = (color) => {
-      if (typeof color !== 'string') {
-        return { r: 255, g: 255, b: 255 };
-      }
-
-      if (color.startsWith('#')) {
-        const hex = color.slice(1);
-        const bigint = parseInt(hex, 16);
-        if (hex.length === 6) {
-          return {
-            r: (bigint >> 16) & 255,
-            g: (bigint >> 8) & 255,
-            b: bigint & 255,
-          };
-        }
-      }
-
-      const rgbaMatch = color.match(/rgba?\s*\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
-      if (rgbaMatch) {
-        return {
-          r: Number.parseInt(rgbaMatch[1], 10) || 255,
-          g: Number.parseInt(rgbaMatch[2], 10) || 255,
-          b: Number.parseInt(rgbaMatch[3], 10) || 255,
-        };
-      }
-
-      return { r: 255, g: 255, b: 255 };
-    };
-
-    const base = parseColor(baseColor);
-    const overlay = parseColor(overlayColor);
+    const base = this.parseColor(baseColor);
+    const overlay = this.parseColor(overlayColor);
 
     const mix = (component) =>
       Math.round(base[component] + (overlay[component] - base[component]) * factor);

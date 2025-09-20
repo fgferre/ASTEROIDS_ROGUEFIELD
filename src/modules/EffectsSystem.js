@@ -142,6 +142,10 @@ export default class EffectsSystem {
       this.createVolatileExplosionEffect(data);
     });
 
+    gameEvents.on('asteroid-volatile-trail', (data) => {
+      this.spawnVolatileTrail(data);
+    });
+
     gameEvents.on('player-leveled-up', () => {
       this.addScreenShake(6, 0.4);
       this.addFreezeFrame(0.2, 0.4);
@@ -218,9 +222,19 @@ export default class EffectsSystem {
 
       wave.timer += deltaTime;
       const progress = Math.min(1, wave.timer / wave.duration);
-      wave.radius = wave.maxRadius * progress;
-      wave.alpha = Math.max(0, wave.maxAlpha * (1 - progress));
-      wave.lineWidth = wave.baseWidth * (1 - progress * 0.6);
+      const easingPower =
+        Number.isFinite(wave.easingPower) && wave.easingPower > 0
+          ? wave.easingPower
+          : 1;
+      const easedProgress =
+        easingPower === 1 ? progress : Math.pow(progress, easingPower);
+
+      wave.radius = wave.maxRadius * easedProgress;
+      wave.alpha = Math.max(0, wave.maxAlpha * (1 - easedProgress));
+
+      const widthFade = Number.isFinite(wave.widthFade) ? wave.widthFade : 0.6;
+      const widthFactor = Math.max(0, 1 - easedProgress * widthFade);
+      wave.lineWidth = Math.max(0.35, wave.baseWidth * widthFactor);
 
       return wave.timer < wave.duration;
     });
@@ -262,12 +276,25 @@ export default class EffectsSystem {
       if (!wave) return;
 
       ctx.save();
-      ctx.strokeStyle = `rgba(0, 191, 255, ${wave.alpha})`;
-      ctx.lineWidth = Math.max(1, wave.lineWidth);
-      ctx.shadowColor = 'rgba(0, 191, 255, 0.6)';
-      ctx.shadowBlur = 25 * wave.alpha;
+      ctx.globalAlpha = wave.alpha;
+      ctx.strokeStyle = wave.color || 'rgba(0, 191, 255, 1)';
+      ctx.lineWidth = Math.max(0.5, wave.lineWidth);
+
+      if (wave.shadowColor) {
+        const blurBase = Number.isFinite(wave.shadowBlur) ? wave.shadowBlur : 25;
+        ctx.shadowColor = wave.shadowColor;
+        ctx.shadowBlur = blurBase * wave.alpha;
+      } else {
+        ctx.shadowColor = 'rgba(0, 0, 0, 0)';
+        ctx.shadowBlur = 0;
+      }
+
       ctx.beginPath();
       ctx.arc(wave.x, wave.y, wave.radius, 0, Math.PI * 2);
+      if (wave.fillColor) {
+        ctx.fillStyle = wave.fillColor;
+        ctx.fill();
+      }
       ctx.stroke();
       ctx.restore();
     });
@@ -376,16 +403,37 @@ export default class EffectsSystem {
         ? data.radius
         : CONSTANTS.SHIELD_SHOCKWAVE_RADIUS;
 
+    const duration =
+      typeof data.duration === 'number' && data.duration > 0
+        ? data.duration
+        : 0.45;
+    const baseWidth =
+      typeof data.baseWidth === 'number' && data.baseWidth > 0
+        ? data.baseWidth
+        : 10;
+    const maxAlpha =
+      typeof data.maxAlpha === 'number' ? Math.max(0, data.maxAlpha) : 0.6;
+    const widthFade =
+      typeof data.widthFade === 'number' ? data.widthFade : 0.6;
+    const easingPower =
+      typeof data.easingPower === 'number' ? data.easingPower : 1;
+
     const wave = {
       x: data.position.x,
       y: data.position.y,
       maxRadius: radius,
       radius: 0,
       timer: 0,
-      duration: 0.45,
-      baseWidth: 10,
-      maxAlpha: 0.6,
-      alpha: 0.6,
+      duration,
+      baseWidth,
+      maxAlpha,
+      alpha: maxAlpha,
+      widthFade,
+      easingPower,
+      color: data.color,
+      shadowColor: data.shadowColor,
+      shadowBlur: data.shadowBlur,
+      fillColor: data.fillColor,
     };
 
     this.shockwaves.push(wave);
@@ -605,6 +653,135 @@ export default class EffectsSystem {
     }
   }
 
+  spawnVolatileTrail(data = {}) {
+    if (!data || !data.position) {
+      return;
+    }
+
+    const config = data.config || {};
+    const position = data.position;
+    const velocity = data.velocity || { x: 0, y: 0 };
+    const hasVelocity =
+      Number.isFinite(velocity.x) &&
+      Number.isFinite(velocity.y) &&
+      (velocity.x !== 0 || velocity.y !== 0);
+    const baseAngle = hasVelocity
+      ? Math.atan2(velocity.y, velocity.x) + Math.PI
+      : Math.random() * Math.PI * 2;
+
+    const colors = config.colors || {};
+    const coreColor = colors.core || 'rgba(255, 200, 130, 0.9)';
+    const emberColor = colors.ember || 'rgba(255, 110, 40, 0.85)';
+    const smokeColor = colors.smoke || 'rgba(60, 24, 10, 0.35)';
+
+    const resolveRange = (value, fallback) => {
+      if (Array.isArray(value)) {
+        const min = Number.isFinite(value[0]) ? value[0] : fallback[0];
+        const max = Number.isFinite(value[1]) ? value[1] : fallback[1];
+        return [min, max];
+      }
+      if (Number.isFinite(value)) {
+        return [value, value];
+      }
+      return fallback;
+    };
+
+    const intensityInput = Number.isFinite(data.intensity)
+      ? data.intensity
+      : Number.isFinite(data.fuseProgress)
+        ? data.fuseProgress
+        : 0;
+    const intensity = Math.max(0, Math.min(1, intensityInput));
+    const armedBonus = data.armed ? 0.15 : 0;
+    const totalIntensity = Math.min(1.2, intensity + armedBonus);
+
+    const countRange = config.countRange || [2, 4];
+    const countMin = Array.isArray(countRange) ? countRange[0] ?? 2 : countRange;
+    const countMax = Array.isArray(countRange) ? countRange[1] ?? countMin : countMin;
+    const spawnCount = Math.max(
+      1,
+      Math.round(
+        this.randomRange(countMin, countMax + totalIntensity * 1.2)
+      )
+    );
+
+    const spread = Number.isFinite(config.spread) ? config.spread : Math.PI / 4;
+    const speedRange = resolveRange(config.speedRange, [28, 90]);
+    const sizeRange = resolveRange(config.sizeRange, [2.2, 3.6]);
+    const lifeRange = resolveRange(config.lifeRange, [0.26, 0.46]);
+    const jitter = Number.isFinite(config.emberJitter) ? config.emberJitter : 5;
+
+    const speedMagnitude = Math.hypot(velocity.x || 0, velocity.y || 0);
+    const speedScale =
+      0.7 + Math.min(1.2, speedMagnitude / 140) * 0.4 + totalIntensity * 0.3;
+
+    for (let i = 0; i < spawnCount; i += 1) {
+      const angleOffset = (Math.random() - 0.5) * spread;
+      const angle = baseAngle + angleOffset;
+      const offsetMag = this.randomRange(0, jitter);
+      const spawnX = position.x + Math.cos(angle + Math.PI) * offsetMag;
+      const spawnY = position.y + Math.sin(angle + Math.PI) * offsetMag;
+
+      const emberSpeed =
+        this.randomRange(speedRange[0], speedRange[1]) * speedScale;
+      const emberLife =
+        this.randomRange(lifeRange[0], lifeRange[1]) *
+        (0.7 + totalIntensity * 0.5);
+      const emberSize =
+        this.randomRange(sizeRange[0], sizeRange[1]) *
+        (0.75 + totalIntensity * 0.45);
+
+      const spark = new SpaceParticle(
+        spawnX,
+        spawnY,
+        Math.cos(angle) * emberSpeed,
+        Math.sin(angle) * emberSpeed,
+        emberColor,
+        emberSize * 0.6,
+        emberLife * 0.75,
+        'spark'
+      );
+      this.particles.push(spark);
+
+      const core = new SpaceParticle(
+        spawnX,
+        spawnY,
+        Math.cos(angle) * emberSpeed * 0.45,
+        Math.sin(angle) * emberSpeed * 0.45,
+        coreColor,
+        emberSize,
+        emberLife
+      );
+      this.particles.push(core);
+
+      if (Math.random() < 0.55) {
+        const smoke = new SpaceParticle(
+          spawnX,
+          spawnY,
+          Math.cos(angle) * emberSpeed * 0.25,
+          Math.sin(angle) * emberSpeed * 0.25,
+          smokeColor,
+          emberSize * (1.2 + Math.random() * 0.6),
+          emberLife * (1.3 + Math.random() * 0.4)
+        );
+        this.particles.push(smoke);
+      }
+
+      if (Math.random() < 0.3) {
+        const glint = new SpaceParticle(
+          spawnX,
+          spawnY,
+          Math.cos(angle) * emberSpeed * 0.2,
+          Math.sin(angle) * emberSpeed * 0.2,
+          'rgba(255, 220, 180, 0.7)',
+          emberSize * 0.5,
+          emberLife * 0.5
+        );
+        this.particles.push(glint);
+      }
+    }
+  }
+
   spawnVolatileWarning(position) {
     const particles = 6;
     for (let i = 0; i < particles; i += 1) {
@@ -624,6 +801,43 @@ export default class EffectsSystem {
     }
   }
 
+  createExplosionShockwave(data = {}) {
+    if (!data.position) {
+      return;
+    }
+
+    const radius = data.radius ?? 80;
+    this.createShockwaveEffect({
+      position: data.position,
+      radius,
+      duration: data.duration ?? 0.6,
+      baseWidth: data.baseWidth ?? 18,
+      maxAlpha: data.maxAlpha ?? 0.78,
+      widthFade: data.widthFade ?? 0.45,
+      easingPower: data.easingPower ?? 0.8,
+      color: data.color ?? 'rgba(255, 180, 90, 1)',
+      shadowColor: data.shadowColor ?? 'rgba(255, 130, 50, 0.75)',
+      shadowBlur: data.shadowBlur ?? 34,
+    });
+
+    const innerScale = data.innerScale ?? 0.55;
+    if (innerScale > 0) {
+      this.createShockwaveEffect({
+        position: data.position,
+        radius: radius * innerScale,
+        duration: data.innerDuration ?? 0.5,
+        baseWidth: data.innerBaseWidth ?? 10,
+        maxAlpha: data.innerMaxAlpha ?? 0.6,
+        widthFade: data.innerWidthFade ?? 0.7,
+        easingPower: data.innerEasingPower ?? 1.1,
+        color: data.innerColor ?? 'rgba(255, 220, 200, 1)',
+        shadowColor: data.innerShadowColor ?? 'rgba(255, 200, 160, 0.55)',
+        shadowBlur: data.innerShadowBlur ?? 22,
+        fillColor: data.innerFillColor ?? 'rgba(255, 210, 170, 0.12)',
+      });
+    }
+  }
+
   createVolatileExplosionEffect(data) {
     if (!data || !data.position) {
       return;
@@ -631,23 +845,31 @@ export default class EffectsSystem {
 
     const radius = data.radius ?? 70;
     const position = data.position;
+    const intensity = Math.min(1.2, radius / 90);
 
-    this.addScreenShake(6 + radius * 0.02, 0.3);
-    this.addScreenFlash('rgba(255, 120, 0, 0.45)', 0.22, 0.2);
+    this.addScreenShake(7 + radius * 0.025, 0.32);
+    this.addScreenFlash('rgba(255, 150, 70, 0.55)', 0.26, 0.24);
 
-    const particleTotal = 18 + Math.floor(radius / 6);
+    this.createExplosionShockwave({
+      position,
+      radius: radius * 1.05,
+    });
+
+    const particleTotal = 22 + Math.floor(radius / 5);
     for (let i = 0; i < particleTotal; i += 1) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 60 + Math.random() * 120;
+      const speed = (70 + Math.random() * 150) * (0.8 + intensity * 0.4);
 
       const flame = new SpaceParticle(
         position.x,
         position.y,
         Math.cos(angle) * speed,
         Math.sin(angle) * speed,
-        `rgba(255, ${Math.floor(120 + Math.random() * 60)}, 0, 0.8)`,
-        2.2 + Math.random() * 1.5,
-        0.4 + Math.random() * 0.2,
+        `rgba(255, ${Math.floor(140 + Math.random() * 70)}, ${Math.floor(
+          40 + Math.random() * 40
+        )}, ${0.7 + Math.random() * 0.2})`,
+        2.4 + Math.random() * 1.8,
+        0.38 + Math.random() * 0.24,
         'spark'
       );
       this.particles.push(flame);
@@ -664,6 +886,47 @@ export default class EffectsSystem {
       );
       this.particles.push(debris);
     }
+
+    const smokeCount = 10 + Math.floor(radius / 8);
+    for (let i = 0; i < smokeCount; i += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = Math.random() * radius * 0.55;
+      const speed = 20 + Math.random() * 50;
+      const smoke = new SpaceParticle(
+        position.x + Math.cos(angle) * distance,
+        position.y + Math.sin(angle) * distance,
+        Math.cos(angle) * speed * 0.35,
+        Math.sin(angle) * speed * 0.35,
+        `rgba(60, 30, 20, ${0.25 + Math.random() * 0.18})`,
+        3.5 + Math.random() * 3.5,
+        0.85 + Math.random() * 0.5
+      );
+      this.particles.push(smoke);
+    }
+
+    this.particles.push(
+      new SpaceParticle(
+        position.x,
+        position.y,
+        0,
+        0,
+        'rgba(255, 200, 140, 0.5)',
+        radius * 0.24,
+        0.45 + Math.random() * 0.2
+      )
+    );
+  }
+
+  randomRange(min, max) {
+    const start = Number.isFinite(min) ? min : 0;
+    const end = Number.isFinite(max) ? max : start;
+    if (end === start) {
+      return start;
+    }
+
+    const low = Math.min(start, end);
+    const high = Math.max(start, end);
+    return low + Math.random() * (high - low);
   }
 
   reset() {
