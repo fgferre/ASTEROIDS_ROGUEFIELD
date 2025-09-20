@@ -45,6 +45,10 @@ class AudioSystem {
       }
     });
 
+    gameEvents.on('asteroid-volatile-exploded', () => {
+      this.playBigExplosion();
+    });
+
     gameEvents.on('player-leveled-up', () => {
       this.playLevelUp();
     });

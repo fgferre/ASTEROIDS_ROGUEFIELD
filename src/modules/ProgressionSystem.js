@@ -6,6 +6,7 @@ const ORB_CLASS_ORDER = [
   { name: 'yellow', tier: 3 },
   { name: 'purple', tier: 4 },
   { name: 'red', tier: 5 },
+  { name: 'crystal', tier: 6 },
 ];
 
 const ORB_COLOR_PALETTE = {
@@ -38,6 +39,12 @@ const ORB_COLOR_PALETTE = {
     glowColor: 'rgba(255, 0, 0, 0.35)',
     highlightColor: '#FFE6E6',
     fusionFlash: 'rgba(255, 0, 0, 0.6)',
+  },
+  crystal: {
+    baseColor: '#8DF7FF',
+    glowColor: 'rgba(120, 240, 255, 0.55)',
+    highlightColor: '#F2FFFF',
+    fusionFlash: 'rgba(135, 255, 255, 0.75)',
   },
 };
 
@@ -253,8 +260,21 @@ class ProgressionSystem {
     if (typeof gameEvents !== 'undefined') {
       // Quando inimigo morre, criar XP orb
       gameEvents.on('enemy-destroyed', (data) => {
-        const xpValue = this.calculateXPReward(data.enemy, data.size);
-        this.createXPOrb(data.position.x, data.position.y, xpValue);
+        const drops = this.buildVariantXPDropPlan(data);
+        if (!Array.isArray(drops) || drops.length === 0) {
+          return;
+        }
+
+        const originX = data?.position?.x ?? 0;
+        const originY = data?.position?.y ?? 0;
+
+        drops.forEach((drop, index) => {
+          const offset = this.getDropOffset(index, drops.length);
+          this.createXPOrb(originX + offset.x, originY + offset.y, drop.value, {
+            ...drop.options,
+            source: drop.options?.source || 'enemy-drop',
+          });
+        });
       });
 
       // Quando bullet acerta inimigo (bonus XP futuro)
@@ -915,16 +935,127 @@ class ProgressionSystem {
     console.log('[ProgressionSystem] Level up! New level:', this.level);
   }
 
-  calculateXPReward(enemy, size) {
-    // XP baseado no tamanho e nível atual
-    const baseXP = {
+  getBaseXPValue(size) {
+    const baseLookup = CONSTANTS.ASTEROID_XP_BASE || {
       large: 15,
       medium: 8,
       small: 5,
     };
 
-    const xp = (baseXP[size] || 5) + Math.floor(this.level * 0.5);
-    return xp;
+    const baseValue = baseLookup[size] ?? baseLookup.small ?? 5;
+    return Math.max(1, Math.round(baseValue + Math.floor(this.level * 0.5)));
+  }
+
+  getVariantConfig(variantKey = 'common') {
+    const variants = CONSTANTS.ASTEROID_VARIANTS || {};
+    return variants[variantKey] || variants.common || null;
+  }
+
+  buildVariantXPDropPlan(data) {
+    if (!data) {
+      return [];
+    }
+
+    const size = data.size || data.enemy?.size || 'small';
+    const variantKey = data.variant || data.enemy?.variant || 'common';
+
+    const baseValue = this.getBaseXPValue(size);
+    const variantConfig = this.getVariantConfig(variantKey);
+    const multiplier = variantConfig?.xpMultiplier ?? 1;
+    const totalValue = Math.max(1, Math.round(baseValue * multiplier));
+
+    const drops = [];
+    let allocated = 0;
+
+    const dropConfig = variantConfig?.drops || { baseSplit: 1, extraOrbs: [] };
+    const extras = Array.isArray(dropConfig.extraOrbs)
+      ? dropConfig.extraOrbs
+      : [];
+
+    extras.forEach((extra) => {
+      if (!extra) return;
+
+      const count = Math.max(1, extra.count ?? 1);
+      const valueMultiplier = extra.valueMultiplier ?? 0;
+      if (valueMultiplier <= 0) {
+        return;
+      }
+
+      for (let i = 0; i < count; i += 1) {
+        if (allocated >= totalValue) {
+          break;
+        }
+
+        const value = Math.max(
+          1,
+          Math.min(
+            Math.round(baseValue * valueMultiplier),
+            totalValue - allocated
+          )
+        );
+
+        allocated += value;
+        drops.push({
+          value,
+          options: {
+            tier: extra.tier,
+            className: extra.className,
+            variant: variantKey,
+          },
+        });
+      }
+    });
+
+    const remaining = Math.max(totalValue - allocated, 0);
+    const baseSplit = Math.max(0, dropConfig.baseSplit ?? 1);
+
+    if (remaining > 0 && baseSplit > 0) {
+      const baseValueEach = Math.max(1, Math.floor(remaining / baseSplit));
+      let remainder = remaining - baseValueEach * baseSplit;
+
+      for (let i = 0; i < baseSplit; i += 1) {
+        let value = baseValueEach;
+        if (remainder > 0) {
+          value += 1;
+          remainder -= 1;
+        }
+
+        drops.push({
+          value,
+          options: { variant: variantKey },
+        });
+      }
+    } else if (remaining > 0 && drops.length > 0) {
+      drops[drops.length - 1].value += remaining;
+    } else if (remaining > 0 && drops.length === 0) {
+      drops.push({
+        value: remaining,
+        options: { variant: variantKey },
+      });
+    }
+
+    return drops;
+  }
+
+  getDropOffset(index, total) {
+    if (!Number.isFinite(index) || !Number.isFinite(total) || total <= 1) {
+      return { x: 0, y: 0 };
+    }
+
+    const spreadRadius = 12 + Math.min(total * 4, 28);
+    const angle = (index / total) * Math.PI * 2;
+    return {
+      x: Math.cos(angle) * spreadRadius,
+      y: Math.sin(angle) * spreadRadius,
+    };
+  }
+
+  calculateXPReward(enemy, size, variant) {
+    const baseValue = this.getBaseXPValue(size);
+    const variantKey = variant || enemy?.variant || 'common';
+    const variantConfig = this.getVariantConfig(variantKey);
+    const multiplier = variantConfig?.xpMultiplier ?? 1;
+    return Math.max(1, Math.round(baseValue * multiplier));
   }
 
   // === SISTEMA DE UPGRADES ===
