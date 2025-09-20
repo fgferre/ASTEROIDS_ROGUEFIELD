@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { EnemySystem } from '../src/modules/EnemySystem.js';
+import { EnemySystem } from '../modules/EnemySystem.js';
 
 function createPlayer() {
   const player = {
