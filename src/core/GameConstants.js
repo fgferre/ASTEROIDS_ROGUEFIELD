@@ -107,14 +107,51 @@ export const ASTEROID_VARIANTS = {
       stroke: '#5E1A0D',
       cracks: 'rgba(255, 200, 120, 0.7)',
       pulse: 'rgba(255, 120, 30, 0.45)',
+      glow: 'rgba(255, 180, 90, 0.6)',
+      innerGlow: 'rgba(255, 120, 45, 0.5)',
     },
     behavior: {
       type: 'volatile',
       fuseTime: 6,
       armTime: 1.6,
       explosion: {
-        radius: 70,
+        radius: 85,
         damage: 35,
+      },
+    },
+    visual: {
+      pulse: {
+        speed: 2.4,
+        amount: 0.75,
+        fuseBoost: 0.6,
+        armedBoost: 0.25,
+        color: 'rgba(255, 160, 70, 0.9)',
+      },
+      glow: {
+        baseBlur: 18,
+        pulseBlur: 12,
+        armedBlur: 10,
+        fuseBlur: 8,
+        baseAlpha: 0.5,
+        pulseAlpha: 0.28,
+        armedAlpha: 0.3,
+        fuseAlpha: 0.32,
+      },
+      trail: {
+        interval: 0.055,
+        minimumInterval: 0.025,
+        accelerationFactor: 0.65,
+        countRange: [2, 4],
+        speedRange: [32, 96],
+        sizeRange: [2.2, 3.8],
+        lifeRange: [0.26, 0.48],
+        spread: Math.PI / 3,
+        emberJitter: 6,
+        colors: {
+          core: 'rgba(255, 200, 130, 0.9)',
+          ember: 'rgba(255, 100, 40, 0.85)',
+          smoke: 'rgba(60, 24, 10, 0.35)',
+        },
       },
     },
     drops: {
@@ -150,6 +187,19 @@ export const ASTEROID_VARIANTS = {
       contactDamage: 20,
       cooldown: 1.2,
     },
+    visual: {
+      pulse: {
+        speed: 1.7,
+        amount: 0.38,
+        color: 'rgba(190, 120, 255, 0.75)',
+      },
+      glow: {
+        baseBlur: 10,
+        pulseBlur: 6,
+        baseAlpha: 0.38,
+        pulseAlpha: 0.22,
+      },
+    },
     availability: {
       minWave: 4,
     },
@@ -177,6 +227,19 @@ export const ASTEROID_VARIANTS = {
       stroke: '#2A8FB4',
       cracks: 'rgba(240, 255, 255, 0.85)',
       glow: 'rgba(120, 240, 255, 0.55)',
+    },
+    visual: {
+      pulse: {
+        speed: 1.9,
+        amount: 0.35,
+        color: 'rgba(220, 255, 255, 0.8)',
+      },
+      glow: {
+        baseBlur: 12,
+        pulseBlur: 9,
+        baseAlpha: 0.4,
+        pulseAlpha: 0.26,
+      },
     },
     drops: {
       baseSplit: 0,
