@@ -1032,11 +1032,36 @@ class EnemySystem {
       }
     });
 
-    this.applyDirectDamageToPlayer(damage, {
-      cause: 'volatile-explosion',
-      position: { x: asteroid.x, y: asteroid.y },
-      radius,
-    });
+    let shouldDamagePlayer = false;
+
+    if (
+      typeof gameServices !== 'undefined' &&
+      typeof gameServices.has === 'function' &&
+      gameServices.has('player')
+    ) {
+      const player = gameServices.get('player');
+      const playerPos = player?.position;
+
+      if (
+        playerPos &&
+        Number.isFinite(playerPos.x) &&
+        Number.isFinite(playerPos.y)
+      ) {
+        const playerDx = playerPos.x - asteroid.x;
+        const playerDy = playerPos.y - asteroid.y;
+        const playerDistanceSq = playerDx * playerDx + playerDy * playerDy;
+
+        shouldDamagePlayer = playerDistanceSq <= radiusSq;
+      }
+    }
+
+    if (shouldDamagePlayer) {
+      this.applyDirectDamageToPlayer(damage, {
+        cause: 'volatile-explosion',
+        position: { x: asteroid.x, y: asteroid.y },
+        radius,
+      });
+    }
 
     if (typeof gameEvents !== 'undefined') {
       gameEvents.emit('asteroid-volatile-exploded', {
