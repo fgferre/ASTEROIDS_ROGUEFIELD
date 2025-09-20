@@ -1096,6 +1096,53 @@ class EnemySystem {
       return { applied: false };
     }
 
+    const hasBlastRadius =
+      context &&
+      context.position &&
+      Number.isFinite(context.position.x) &&
+      Number.isFinite(context.position.y) &&
+      Number.isFinite(context.radius) &&
+      context.radius > 0;
+
+    if (hasBlastRadius) {
+      let playerPosition = null;
+
+      if (
+        player.position &&
+        Number.isFinite(player.position.x) &&
+        Number.isFinite(player.position.y)
+      ) {
+        playerPosition = player.position;
+      } else if (typeof player.getPosition === 'function') {
+        const fetchedPosition = player.getPosition();
+        if (
+          fetchedPosition &&
+          Number.isFinite(fetchedPosition.x) &&
+          Number.isFinite(fetchedPosition.y)
+        ) {
+          playerPosition = fetchedPosition;
+        }
+      }
+
+      if (playerPosition) {
+        const rawHullRadius =
+          typeof player.getHullBoundingRadius === 'function'
+            ? player.getHullBoundingRadius()
+            : CONSTANTS.SHIP_SIZE;
+        const hullRadius = Number.isFinite(rawHullRadius)
+          ? Math.max(0, rawHullRadius)
+          : CONSTANTS.SHIP_SIZE;
+
+        const dx = playerPosition.x - context.position.x;
+        const dy = playerPosition.y - context.position.y;
+        const distance = Math.hypot(dx, dy);
+
+        if (distance > context.radius + hullRadius) {
+          return { applied: false };
+        }
+      }
+    }
+
     if (Number.isFinite(player.invulnerableTimer) && player.invulnerableTimer > 0) {
       return { applied: false };
     }
