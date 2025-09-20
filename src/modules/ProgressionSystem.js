@@ -67,10 +67,13 @@ const ORB_CLASSES = ORB_CLASS_CONFIG.reduce((lookup, config) => {
 
 const ORB_CLASS_SEQUENCE = ORB_CLASS_CONFIG.map((config) => config.name);
 
-const ORB_NEXT_CLASS = ORB_CLASS_CONFIG.reduce((lookup, config, index, array) => {
-  lookup[config.name] = array[index + 1]?.name || null;
-  return lookup;
-}, {});
+const ORB_NEXT_CLASS = ORB_CLASS_CONFIG.reduce(
+  (lookup, config, index, array) => {
+    lookup[config.name] = array[index + 1]?.name || null;
+    return lookup;
+  },
+  {}
+);
 
 const DEFLECTOR_DESCRIPTIONS = {
   0: 'Adiciona um escudo ativável (Tecla E) que absorve 3 impactos.',
@@ -123,13 +126,16 @@ class ProgressionSystem {
   }
 
   createEmptyOrbPools() {
-    return this.orbClasses?.reduce((pools, className) => {
-      pools[className] = [];
-      return pools;
-    }, {}) || ORB_CLASS_SEQUENCE.reduce((pools, className) => {
-      pools[className] = [];
-      return pools;
-    }, {});
+    return (
+      this.orbClasses?.reduce((pools, className) => {
+        pools[className] = [];
+        return pools;
+      }, {}) ||
+      ORB_CLASS_SEQUENCE.reduce((pools, className) => {
+        pools[className] = [];
+        return pools;
+      }, {})
+    );
   }
 
   configureOrbClustering() {
@@ -343,7 +349,11 @@ class ProgressionSystem {
       return;
     }
 
-    for (let index = this.activeFusionAnimations.length - 1; index >= 0; index -= 1) {
+    for (
+      let index = this.activeFusionAnimations.length - 1;
+      index >= 0;
+      index -= 1
+    ) {
       const animation = this.activeFusionAnimations[index];
       if (!animation) {
         this.activeFusionAnimations.splice(index, 1);
@@ -385,8 +395,7 @@ class ProgressionSystem {
         const orbsToFuse = animation.orbs
           .map((entry) => entry.orb)
           .filter((orb) => this.isOrbActive(orb));
-        const hasEnoughOrbs =
-          orbsToFuse.length >= this.clusterFusionCount;
+        const hasEnoughOrbs = orbsToFuse.length >= this.clusterFusionCount;
 
         animation.orbs.forEach((entry) => {
           const orb = entry?.orb;
@@ -424,9 +433,7 @@ class ProgressionSystem {
     if (t >= 1) {
       return 1;
     }
-    return t < 0.5
-      ? 4 * t * t * t
-      : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   }
 
   updateShipMagnetism(deltaTime) {
@@ -633,7 +640,10 @@ class ProgressionSystem {
 
             for (let n = 0; n < neighbors.length; n += 1) {
               const neighbor = neighbors[n];
-              if (visited.has(neighbor) || !this.isOrbEligibleForFusion(neighbor)) {
+              if (
+                visited.has(neighbor) ||
+                !this.isOrbEligibleForFusion(neighbor)
+              ) {
                 continue;
               }
 
@@ -710,12 +720,7 @@ class ProgressionSystem {
     return clusters.slice(0, maxClusters);
   }
 
-  initiateOrbFusion(
-    className,
-    targetClassName,
-    cluster,
-    reason = 'interval'
-  ) {
+  initiateOrbFusion(className, targetClassName, cluster, reason = 'interval') {
     if (!cluster || !Array.isArray(cluster.orbs) || !targetClassName) {
       return false;
     }
@@ -797,12 +802,7 @@ class ProgressionSystem {
         continue;
       }
 
-      this.initiateOrbFusion(
-        className,
-        nextClassName,
-        clusters[0],
-        'interval'
-      );
+      this.initiateOrbFusion(className, nextClassName, clusters[0], 'interval');
     }
   }
 

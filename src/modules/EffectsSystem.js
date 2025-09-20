@@ -281,7 +281,9 @@ export default class EffectsSystem {
       ctx.lineWidth = Math.max(0.5, wave.lineWidth);
 
       if (wave.shadowColor) {
-        const blurBase = Number.isFinite(wave.shadowBlur) ? wave.shadowBlur : 25;
+        const blurBase = Number.isFinite(wave.shadowBlur)
+          ? wave.shadowBlur
+          : 25;
         ctx.shadowColor = wave.shadowColor;
         ctx.shadowBlur = blurBase * wave.alpha;
       } else {
@@ -413,8 +415,7 @@ export default class EffectsSystem {
         : 10;
     const maxAlpha =
       typeof data.maxAlpha === 'number' ? Math.max(0, data.maxAlpha) : 0.6;
-    const widthFade =
-      typeof data.widthFade === 'number' ? data.widthFade : 0.6;
+    const widthFade = typeof data.widthFade === 'number' ? data.widthFade : 0.6;
     const easingPower =
       typeof data.easingPower === 'number' ? data.easingPower : 1;
 
@@ -489,11 +490,7 @@ export default class EffectsSystem {
     this.particles.push(glow);
 
     this.addScreenShake(3 + level * 0.6, 0.15 + 0.02 * intensity);
-    this.addScreenFlash(
-      'rgba(0, 191, 255, 0.22)',
-      0.12,
-      0.18 + 0.04 * level
-    );
+    this.addScreenFlash('rgba(0, 191, 255, 0.22)', 0.12, 0.18 + 0.04 * level);
   }
 
   createXPCollectEffect(x, y) {
@@ -521,7 +518,8 @@ export default class EffectsSystem {
     const flashColor = data?.flash || 'rgba(255, 255, 255, 0.2)';
     const { x, y } = data.position;
 
-    const particleCount = 12 + Math.min(24, tier * 4 + Math.floor(consumed / 2));
+    const particleCount =
+      12 + Math.min(24, tier * 4 + Math.floor(consumed / 2));
 
     for (let i = 0; i < particleCount; i += 1) {
       const angle = (Math.PI * 2 * i) / particleCount + Math.random() * 0.3;
@@ -696,13 +694,15 @@ export default class EffectsSystem {
     const totalIntensity = Math.min(1.2, intensity + armedBonus);
 
     const countRange = config.countRange || [2, 4];
-    const countMin = Array.isArray(countRange) ? countRange[0] ?? 2 : countRange;
-    const countMax = Array.isArray(countRange) ? countRange[1] ?? countMin : countMin;
+    const countMin = Array.isArray(countRange)
+      ? countRange[0] ?? 2
+      : countRange;
+    const countMax = Array.isArray(countRange)
+      ? countRange[1] ?? countMin
+      : countMin;
     const spawnCount = Math.max(
       1,
-      Math.round(
-        this.randomRange(countMin, countMax + totalIntensity * 1.2)
-      )
+      Math.round(this.randomRange(countMin, countMax + totalIntensity * 1.2))
     );
 
     const spread = Number.isFinite(config.spread) ? config.spread : Math.PI / 4;

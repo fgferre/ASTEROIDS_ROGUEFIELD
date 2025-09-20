@@ -42,11 +42,17 @@ export function parseBoolean(value, fallback = DEBUG_LOGGING_DEFAULT) {
       return true;
     }
 
-    if (['true', '1', 'yes', 'y', 'on', 'enable', 'enabled'].includes(normalized)) {
+    if (
+      ['true', '1', 'yes', 'y', 'on', 'enable', 'enabled'].includes(normalized)
+    ) {
       return true;
     }
 
-    if (['false', '0', 'no', 'n', 'off', 'disable', 'disabled'].includes(normalized)) {
+    if (
+      ['false', '0', 'no', 'n', 'off', 'disable', 'disabled'].includes(
+        normalized
+      )
+    ) {
       return false;
     }
   }
@@ -72,7 +78,10 @@ function readFromQueryString() {
 
     return parseBoolean(value, true);
   } catch (error) {
-    console.warn('[debugLogging] Não foi possível ler parâmetro de query:', error);
+    console.warn(
+      '[debugLogging] Não foi possível ler parâmetro de query:',
+      error
+    );
     return null;
   }
 }
@@ -91,7 +100,10 @@ function readFromStorage() {
 
     return parseBoolean(storedValue, DEBUG_LOGGING_DEFAULT);
   } catch (error) {
-    console.warn('[debugLogging] Não foi possível acessar localStorage:', error);
+    console.warn(
+      '[debugLogging] Não foi possível acessar localStorage:',
+      error
+    );
     return null;
   }
 }
@@ -130,7 +142,10 @@ function persistPreference(value) {
   try {
     storage.setItem(DEBUG_LOGGING_STORAGE_KEY, value ? 'true' : 'false');
   } catch (error) {
-    console.warn('[debugLogging] Não foi possível salvar preferência de debug:', error);
+    console.warn(
+      '[debugLogging] Não foi possível salvar preferência de debug:',
+      error
+    );
   }
 }
 
@@ -169,13 +184,11 @@ export function applyDebugPreference(preference, options = {}) {
   return enabled;
 }
 
-export function registerDebugLoggingController(
-  name,
-  controller,
-  options = {}
-) {
+export function registerDebugLoggingController(name, controller, options = {}) {
   if (typeof name !== 'string' || name.trim().length === 0) {
-    console.warn('[debugLogging] Nome do controlador deve ser uma string não vazia.');
+    console.warn(
+      '[debugLogging] Nome do controlador deve ser uma string não vazia.'
+    );
     return () => {};
   }
 

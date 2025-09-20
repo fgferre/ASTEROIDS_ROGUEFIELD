@@ -346,7 +346,8 @@ export const SPACE_UPGRADES = [
   {
     id: 'deflector_shield',
     name: 'Matriz de Deflexão',
-    description: 'Adiciona um escudo ativável (Tecla E) que absorve 3 impactos.',
+    description:
+      'Adiciona um escudo ativável (Tecla E) que absorve 3 impactos.',
     icon: '💠',
     color: '#00BFFF',
   },

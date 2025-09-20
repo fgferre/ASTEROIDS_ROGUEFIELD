@@ -22,7 +22,11 @@ class WorldSystem {
       return;
     }
 
-    this.handlePlayerAsteroidCollisions(player, enemies.getAsteroids(), enemies);
+    this.handlePlayerAsteroidCollisions(
+      player,
+      enemies.getAsteroids(),
+      enemies
+    );
   }
 
   handlePlayerAsteroidCollisions(player, asteroids, enemiesSystem) {
@@ -80,9 +84,7 @@ class WorldSystem {
       const velAlongNormal = rvx * nx + rvy * ny;
 
       if (velAlongNormal < 0) {
-        const bounce = shieldActive
-          ? CONSTANTS.SHIELD_COLLISION_BOUNCE
-          : 0.2;
+        const bounce = shieldActive ? CONSTANTS.SHIELD_COLLISION_BOUNCE : 0.2;
         const playerMass = shieldActive
           ? CONSTANTS.SHIP_MASS * Math.max(impactProfile.forceMultiplier, 1)
           : CONSTANTS.SHIP_MASS;
@@ -146,7 +148,10 @@ class WorldSystem {
         }
 
         if (asteroid.shieldHitCooldown <= 0) {
-          if (enemiesSystem && typeof enemiesSystem.applyDamage === 'function') {
+          if (
+            enemiesSystem &&
+            typeof enemiesSystem.applyDamage === 'function'
+          ) {
             enemiesSystem.applyDamage(asteroid, impactProfile.damage);
           }
           asteroid.shieldHitCooldown = cooldown;

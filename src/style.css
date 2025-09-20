@@ -1069,7 +1069,8 @@ body.is-paused .xp-container {
   position: relative;
   overflow: hidden;
   border-left: 4px solid rgba(0, 191, 255, 0.85);
-  transition: transform 150ms var(--ease-standard),
+  transition:
+    transform 150ms var(--ease-standard),
     box-shadow 200ms var(--ease-standard),
     border-color 200ms var(--ease-standard);
 }
@@ -1108,7 +1109,9 @@ body.is-paused .xp-container {
   );
   transform: scaleY(0);
   transform-origin: top;
-  transition: transform 120ms linear, opacity 200ms ease;
+  transition:
+    transform 120ms linear,
+    opacity 200ms ease;
   pointer-events: none;
   z-index: 0;
   opacity: 0;

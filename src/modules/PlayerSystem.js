@@ -387,7 +387,8 @@ class PlayerSystem {
       );
     }
 
-    const driftBrakeScale = 1 - this.driftFactor * DRIFT_SETTINGS.brakeReduction;
+    const driftBrakeScale =
+      1 - this.driftFactor * DRIFT_SETTINGS.brakeReduction;
 
     if (noLinearInput && speed > 2) {
       const proj = this.velocity.vx * fwd.x + this.velocity.vy * fwd.y;
@@ -661,8 +662,8 @@ class PlayerSystem {
     const outline = Array.isArray(this._currentHullMetrics?.outline)
       ? this._currentHullMetrics.outline
       : Array.isArray(hull?.outline)
-      ? hull.outline
-      : [];
+        ? hull.outline
+        : [];
 
     if (outline.length >= 3) {
       ctx.beginPath();

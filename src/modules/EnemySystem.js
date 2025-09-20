@@ -170,7 +170,9 @@ class Asteroid {
         const offset = (seededRandom() - 0.5) * 0.9;
         const lengthFactor = 0.35 + seededRandom() * 0.5;
         const startRadius = this.radius * (0.25 + seededRandom() * 0.45);
-        const endRadius = startRadius + this.radius * lengthFactor * (0.5 + seededRandom() * 0.5);
+        const endRadius =
+          startRadius +
+          this.radius * lengthFactor * (0.5 + seededRandom() * 0.5);
 
         lines.push({
           x1: Math.cos(startAngle) * startRadius,
@@ -279,7 +281,10 @@ class Asteroid {
 
     if (this.variantState.fuseTimer <= 0 && !this.variantState.exploded) {
       this.variantState.exploded = true;
-      if (this.system && typeof this.system.handleVolatileTimeout === 'function') {
+      if (
+        this.system &&
+        typeof this.system.handleVolatileTimeout === 'function'
+      ) {
         this.system.handleVolatileTimeout(this);
       }
     }
@@ -335,7 +340,10 @@ class Asteroid {
     );
 
     this.visualState.trailCooldown -= deltaTime;
-    const bursts = Math.min(3, Math.max(1, Math.ceil(deltaTime / desiredInterval)));
+    const bursts = Math.min(
+      3,
+      Math.max(1, Math.ceil(deltaTime / desiredInterval))
+    );
     let emitted = 0;
 
     while (this.visualState.trailCooldown <= 0 && emitted < bursts) {
@@ -350,7 +358,10 @@ class Asteroid {
           config: trail,
           armed: !!this.variantState?.armed,
           fuseProgress,
-          intensity: Math.min(1, 0.35 + fuseProgress * 0.55 + (this.variantState?.armed ? 0.2 : 0)),
+          intensity: Math.min(
+            1,
+            0.35 + fuseProgress * 0.55 + (this.variantState?.armed ? 0.2 : 0)
+          ),
         });
       }
     }
@@ -474,9 +485,9 @@ class Asteroid {
 
   getVariantColors() {
     const fallback = {
-      fill: { large: '#8B4513', medium: '#A0522D', small: '#CD853F' }[
-        this.size
-      ] || '#8B4513',
+      fill:
+        { large: '#8B4513', medium: '#A0522D', small: '#CD853F' }[this.size] ||
+        '#8B4513',
       stroke: '#654321',
       cracks: 'rgba(255, 255, 255, 0.45)',
     };
@@ -566,7 +577,9 @@ class Asteroid {
             ? glowConfig.fuseBlur * fuseProgress
             : 0;
         const blurArmed =
-          isVolatile && this.variantState?.armed && Number.isFinite(glowConfig.armedBlur)
+          isVolatile &&
+          this.variantState?.armed &&
+          Number.isFinite(glowConfig.armedBlur)
             ? glowConfig.armedBlur
             : 0;
         ctx.shadowBlur =
@@ -580,7 +593,9 @@ class Asteroid {
               ? glowConfig.fuseAlpha * fuseProgress
               : 0;
           const armedAlpha =
-            isVolatile && this.variantState?.armed && Number.isFinite(glowConfig.armedAlpha)
+            isVolatile &&
+            this.variantState?.armed &&
+            Number.isFinite(glowConfig.armedAlpha)
               ? glowConfig.armedAlpha
               : 0;
 
@@ -621,14 +636,16 @@ class Asteroid {
         this.radius * 1.1
       );
 
-      const armedBonus =
-        isVolatile && this.variantState?.armed ? 0.25 : 0;
+      const armedBonus = isVolatile && this.variantState?.armed ? 0.25 : 0;
       const innerIntensity = Math.min(
         1,
         0.35 + basePulse * 0.35 + fuseProgress * 0.6 + armedBonus
       );
 
-      gradient.addColorStop(0, this.withAlpha(colors.innerGlow, innerIntensity));
+      gradient.addColorStop(
+        0,
+        this.withAlpha(colors.innerGlow, innerIntensity)
+      );
       gradient.addColorStop(
         0.7,
         this.withAlpha(colors.innerGlow, innerIntensity * 0.4)
@@ -713,7 +730,9 @@ class Asteroid {
     const overlay = this.parseColor(overlayColor);
 
     const mix = (component) =>
-      Math.round(base[component] + (overlay[component] - base[component]) * factor);
+      Math.round(
+        base[component] + (overlay[component] - base[component]) * factor
+      );
 
     return `rgb(${mix('r')}, ${mix('g')}, ${mix('b')})`;
   }
@@ -729,8 +748,7 @@ class Asteroid {
     const baseSpeed = CONSTANTS.ASTEROID_SPEEDS[newSize] || 40;
 
     for (let i = 0; i < count; i += 1) {
-      const angle =
-        (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
+      const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
       const speed = baseSpeed * (0.85 + Math.random() * 0.45);
       const distance = this.radius * (0.5 + Math.random() * 0.4);
 
@@ -1133,8 +1151,7 @@ class EnemySystem {
 
       const sizeAllowed =
         !Array.isArray(allowedSizes) || allowedSizes.includes(size);
-      const waveAllowed =
-        typeof minWave !== 'number' || wave >= minWave;
+      const waveAllowed = typeof minWave !== 'number' || wave >= minWave;
       const disallowed =
         Array.isArray(context.disallowedVariants) &&
         context.disallowedVariants.includes(key);
@@ -1379,7 +1396,10 @@ class EnemySystem {
       }
     }
 
-    if (Number.isFinite(player.invulnerableTimer) && player.invulnerableTimer > 0) {
+    if (
+      Number.isFinite(player.invulnerableTimer) &&
+      player.invulnerableTimer > 0
+    ) {
       return { applied: false };
     }
 

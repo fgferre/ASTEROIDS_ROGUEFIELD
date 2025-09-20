@@ -74,7 +74,9 @@ function expandHullOutline(outline, padding) {
     const isConcave = orientation > 0 ? cross < 0 : cross > 0;
 
     let offsetDir =
-      normalSum.length > EPSILON ? normalSum : normalizeVector(normalPrev.x, normalPrev.y);
+      normalSum.length > EPSILON
+        ? normalSum
+        : normalizeVector(normalPrev.x, normalPrev.y);
 
     if (isConcave) {
       const radial = normalizeVector(curr.x, curr.y);
@@ -83,14 +85,9 @@ function expandHullOutline(outline, padding) {
       }
     }
 
-    const denom =
-      offsetDir.x * normalPrev.x + offsetDir.y * normalPrev.y;
+    const denom = offsetDir.x * normalPrev.x + offsetDir.y * normalPrev.y;
     const safeDenom =
-      Math.abs(denom) > EPSILON
-        ? denom
-        : denom >= 0
-        ? EPSILON
-        : -EPSILON;
+      Math.abs(denom) > EPSILON ? denom : denom >= 0 ? EPSILON : -EPSILON;
 
     const scale = padding / safeDenom;
 
@@ -307,9 +304,10 @@ class RenderingSystem {
         const outlineToUse =
           expandedOutline && expandedOutline.length >= MIN_OUTLINE_POINTS
             ? expandedOutline
-            : Array.isArray(hullOutline) && hullOutline.length >= MIN_OUTLINE_POINTS
-            ? hullOutline.map((vertex) => ({ ...vertex }))
-            : null;
+            : Array.isArray(hullOutline) &&
+                hullOutline.length >= MIN_OUTLINE_POINTS
+              ? hullOutline.map((vertex) => ({ ...vertex }))
+              : null;
 
         const hullRadius =
           typeof player.getHullBoundingRadius === 'function'
