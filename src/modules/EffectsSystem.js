@@ -125,6 +125,23 @@ export default class EffectsSystem {
       }
     });
 
+    gameEvents.on('asteroid-crack-stage-changed', (data) => {
+      if (data?.asteroid) {
+        this.createCrackDebris(data.asteroid, data.stage);
+      }
+    });
+
+    gameEvents.on('asteroid-volatile-armed', (data) => {
+      if (data?.position) {
+        this.addScreenFlash('rgba(255, 140, 60, 0.18)', 0.12, 0.08);
+        this.spawnVolatileWarning(data.position);
+      }
+    });
+
+    gameEvents.on('asteroid-volatile-exploded', (data) => {
+      this.createVolatileExplosionEffect(data);
+    });
+
     gameEvents.on('player-leveled-up', () => {
       this.addScreenShake(6, 0.4);
       this.addFreezeFrame(0.2, 0.4);
@@ -563,6 +580,89 @@ export default class EffectsSystem {
         'spark'
       );
       this.particles.push(spark);
+    }
+  }
+
+  createCrackDebris(asteroid, stage = 1) {
+    const intensity = Math.min(Math.max(stage, 1), 3);
+    const sparks = 2 + intensity * 2;
+
+    for (let i = 0; i < sparks; i += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 35 + Math.random() * 45;
+
+      const spark = new SpaceParticle(
+        asteroid.x + Math.cos(angle) * asteroid.radius * 0.4,
+        asteroid.y + Math.sin(angle) * asteroid.radius * 0.4,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        'rgba(255, 235, 200, 0.85)',
+        1 + Math.random() * 1.2,
+        0.25 + Math.random() * 0.2,
+        'spark'
+      );
+      this.particles.push(spark);
+    }
+  }
+
+  spawnVolatileWarning(position) {
+    const particles = 6;
+    for (let i = 0; i < particles; i += 1) {
+      const angle = (i / particles) * Math.PI * 2;
+      const speed = 20 + Math.random() * 15;
+      const particle = new SpaceParticle(
+        position.x,
+        position.y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        'rgba(255, 120, 0, 0.45)',
+        1.8 + Math.random() * 0.6,
+        0.35 + Math.random() * 0.15,
+        'spark'
+      );
+      this.particles.push(particle);
+    }
+  }
+
+  createVolatileExplosionEffect(data) {
+    if (!data || !data.position) {
+      return;
+    }
+
+    const radius = data.radius ?? 70;
+    const position = data.position;
+
+    this.addScreenShake(6 + radius * 0.02, 0.3);
+    this.addScreenFlash('rgba(255, 120, 0, 0.45)', 0.22, 0.2);
+
+    const particleTotal = 18 + Math.floor(radius / 6);
+    for (let i = 0; i < particleTotal; i += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 60 + Math.random() * 120;
+
+      const flame = new SpaceParticle(
+        position.x,
+        position.y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        `rgba(255, ${Math.floor(120 + Math.random() * 60)}, 0, 0.8)`,
+        2.2 + Math.random() * 1.5,
+        0.4 + Math.random() * 0.2,
+        'spark'
+      );
+      this.particles.push(flame);
+
+      const debris = new SpaceParticle(
+        position.x + (Math.random() - 0.5) * radius * 0.4,
+        position.y + (Math.random() - 0.5) * radius * 0.4,
+        Math.cos(angle) * speed * 0.6,
+        Math.sin(angle) * speed * 0.6,
+        '#5E1A0D',
+        2 + Math.random() * 2,
+        0.6 + Math.random() * 0.2,
+        'debris'
+      );
+      this.particles.push(debris);
     }
   }
 
