@@ -82,13 +82,75 @@ export default class EffectsSystem {
       intensity: 0,
     };
 
+    this.settings = null;
+    this.motionReduced = false;
+    this.screenShakeScale = 1;
+    this.damageFlashEnabled = true;
+
     if (typeof gameServices !== 'undefined') {
       gameServices.register('effects', this);
     }
 
+    this.setupSettingsIntegration();
     this.setupEventListeners();
 
     console.log('[EffectsSystem] Initialized');
+  }
+
+  setupSettingsIntegration() {
+    if (
+      typeof gameServices !== 'undefined' &&
+      typeof gameServices.has === 'function' &&
+      gameServices.has('settings')
+    ) {
+      this.settings = gameServices.get('settings');
+    }
+
+    if (this.settings && typeof this.settings.getCategoryValues === 'function') {
+      const accessibility = this.settings.getCategoryValues('accessibility');
+      if (accessibility) {
+        this.applyAccessibilityPreferences(accessibility);
+      }
+
+      const video = this.settings.getCategoryValues('video');
+      if (video) {
+        this.applyVideoPreferences(video);
+      }
+    }
+
+    if (typeof gameEvents !== 'undefined') {
+      gameEvents.on('settings-accessibility-changed', (payload = {}) => {
+        if (payload?.values) {
+          this.applyAccessibilityPreferences(payload.values);
+        }
+      });
+
+      gameEvents.on('settings-video-changed', (payload = {}) => {
+        if (payload?.values) {
+          this.applyVideoPreferences(payload.values);
+        }
+      });
+    }
+  }
+
+  applyAccessibilityPreferences(values = {}) {
+    this.motionReduced = Boolean(values.reducedMotion);
+  }
+
+  applyVideoPreferences(values = {}) {
+    if (Number.isFinite(values.screenShakeIntensity)) {
+      const normalized = Math.max(0, Math.min(1.5, Number(values.screenShakeIntensity)));
+      this.screenShakeScale = normalized;
+      if (this.screenShakeScale <= 0) {
+        this.screenShake = { intensity: 0, duration: 0, timer: 0 };
+      }
+    }
+
+    this.damageFlashEnabled = values.damageFlash !== false;
+    if (!this.damageFlashEnabled) {
+      this.screenFlash.timer = 0;
+      this.screenFlash.intensity = 0;
+    }
   }
 
   setupEventListeners() {
@@ -303,25 +365,70 @@ export default class EffectsSystem {
   }
 
   addScreenShake(intensity, duration) {
-    this.screenShake.intensity = Math.max(
-      this.screenShake.intensity,
-      intensity
-    );
-    this.screenShake.duration = Math.max(this.screenShake.duration, duration);
+    const inputIntensity = Number.isFinite(intensity) ? intensity : 0;
+    const inputDuration = Number.isFinite(duration) ? duration : 0;
+
+    const scale = Math.max(0, this.screenShakeScale ?? 1);
+    const motionScale = this.motionReduced ? 0.45 : 1;
+    const finalIntensity = inputIntensity * scale * motionScale;
+
+    if (finalIntensity <= 0) {
+      return;
+    }
+
+    let finalDuration = inputDuration;
+    if (this.motionReduced) {
+      finalDuration = Math.min(finalDuration, 0.2);
+    }
+    finalDuration = Math.max(0, finalDuration);
+    if (finalDuration <= 0) {
+      return;
+    }
+
+    this.screenShake.intensity = Math.max(this.screenShake.intensity, finalIntensity);
+    this.screenShake.duration = Math.max(this.screenShake.duration, finalDuration);
     this.screenShake.timer = this.screenShake.duration;
   }
 
   addFreezeFrame(duration, fade = 0) {
-    this.freezeFrame.timer = Math.max(this.freezeFrame.timer, duration);
-    this.freezeFrame.duration = Math.max(this.freezeFrame.duration, duration);
-    this.freezeFrame.fade = fade;
+    let finalDuration = Number.isFinite(duration) ? Math.max(0, duration) : 0;
+    let finalFade = Number.isFinite(fade) ? fade : 0;
+
+    if (this.motionReduced) {
+      finalDuration = Math.min(finalDuration, 0.12);
+      finalFade = Math.min(finalFade, 0.2);
+    }
+
+    if (finalDuration <= 0) {
+      return;
+    }
+
+    this.freezeFrame.timer = Math.max(this.freezeFrame.timer, finalDuration);
+    this.freezeFrame.duration = Math.max(this.freezeFrame.duration, finalDuration);
+    this.freezeFrame.fade = finalFade;
   }
 
   addScreenFlash(color, duration, intensity) {
+    if (!this.damageFlashEnabled) {
+      return;
+    }
+
+    let finalDuration = Number.isFinite(duration) ? Math.max(0, duration) : 0;
+    let finalIntensity = Number.isFinite(intensity) ? Math.max(0, intensity) : 0;
+
+    if (this.motionReduced) {
+      finalDuration = Math.min(finalDuration, 0.18);
+      finalIntensity *= 0.6;
+    }
+
+    if (finalDuration <= 0 || finalIntensity <= 0) {
+      return;
+    }
+
     this.screenFlash.color = color;
-    this.screenFlash.duration = duration;
-    this.screenFlash.timer = duration;
-    this.screenFlash.intensity = intensity;
+    this.screenFlash.duration = finalDuration;
+    this.screenFlash.timer = finalDuration;
+    this.screenFlash.intensity = finalIntensity;
   }
 
   spawnThrusterVFX(worldX, worldY, dirX, dirY, intensity = 1, type = 'main') {
