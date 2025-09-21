@@ -285,7 +285,7 @@ class UISystem {
       return;
     }
 
-    const { canvas, gameUi, gameField, controls } = this.domRefs;
+    const { canvas, gameUi, gameField } = this.domRefs;
     if (!canvas || !gameUi) {
       return;
     }
@@ -318,18 +318,9 @@ class UISystem {
       parseFloat(
         computedStyles.paddingRight || computedStyles.paddingInlineEnd || '0'
       ) || 0;
-    const gapValue =
-      parseFloat(computedStyles.rowGap || computedStyles.gap || '0') || 0;
+    const overlaySafeArea = Math.min(Math.max(viewportHeight * 0.22, 140), 260);
 
-    const hudHeight = this.domRefs.root
-      ? this.domRefs.root.getBoundingClientRect().height
-      : 0;
-    const controlsHeight = controls
-      ? controls.getBoundingClientRect().height
-      : 0;
-
-    const reservedVertical =
-      hudHeight + controlsHeight + paddingTop + paddingBottom + gapValue * 2;
+    const reservedVertical = paddingTop + paddingBottom + overlaySafeArea;
     const availableHeight = viewportHeight - reservedVertical;
     const MIN_SCALE = 0.45;
     const heightScale = Math.max(

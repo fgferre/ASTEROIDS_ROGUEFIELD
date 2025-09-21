@@ -83,48 +83,80 @@
                   Simulação estelar em desenvolvimento
                 </p>
               </div>
-              <section
-                id="tutorial-panel"
-                class="tutorial-panel"
-                aria-live="polite"
-                aria-label="Centro de treinamento"
-                data-state="idle"
+              <div
+                id="tutorial-card"
+                class="tutorial-card"
+                data-expanded="false"
               >
-                <header class="tutorial-panel__header">
-                  <span id="tutorial-status" class="tutorial-panel__status">
+                <button
+                  id="tutorial-toggle-btn"
+                  class="btn btn--outline btn--sm tutorial-card__toggle"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="tutorial-panel"
+                >
+                  <span class="tutorial-card__toggle-title">
+                    Centro de treinamento (opcional)
+                  </span>
+                  <span
+                    id="tutorial-toggle-status"
+                    class="tutorial-card__toggle-status"
+                  >
                     Tutorial inicial
                   </span>
-                  <span id="tutorial-progress" class="tutorial-panel__progress">
-                    --
-                  </span>
-                </header>
-                <h2 id="tutorial-step-title" class="tutorial-panel__title">
-                  Centro de treinamento
-                </h2>
-                <p
-                  id="tutorial-step-description"
-                  class="tutorial-panel__description"
+                  <span class="tutorial-card__toggle-icon" aria-hidden="true"
+                    >▾</span
+                  >
+                </button>
+                <section
+                  id="tutorial-panel"
+                  class="tutorial-panel"
+                  aria-live="polite"
+                  aria-label="Centro de treinamento"
+                  data-state="idle"
+                  tabindex="-1"
+                  hidden
                 >
-                  Clique em “Iniciar missão” para praticar os controles básicos.
-                </p>
-                <p id="tutorial-step-hint" class="tutorial-panel__hint"></p>
-                <div class="tutorial-panel__actions">
-                  <button
-                    id="tutorial-primary-btn"
-                    class="btn btn--secondary btn--full-width"
-                    type="button"
+                  <header class="tutorial-panel__header">
+                    <span id="tutorial-status" class="tutorial-panel__status">
+                      Tutorial inicial
+                    </span>
+                    <span
+                      id="tutorial-progress"
+                      class="tutorial-panel__progress"
+                    >
+                      --
+                    </span>
+                  </header>
+                  <h2 id="tutorial-step-title" class="tutorial-panel__title">
+                    Centro de treinamento
+                  </h2>
+                  <p
+                    id="tutorial-step-description"
+                    class="tutorial-panel__description"
                   >
-                    Avançar
-                  </button>
-                  <button
-                    id="tutorial-replay-btn"
-                    class="btn btn--outline btn--full-width btn--sm"
-                    type="button"
-                  >
-                    Rever tutorial
-                  </button>
-                </div>
-              </section>
+                    Clique em “Iniciar missão” para praticar os controles
+                    básicos.
+                  </p>
+                  <p id="tutorial-step-hint" class="tutorial-panel__hint"></p>
+                  <div class="tutorial-panel__actions">
+                    <button
+                      id="tutorial-primary-btn"
+                      class="btn btn--secondary btn--full-width"
+                      type="button"
+                    >
+                      Avançar
+                    </button>
+                    <button
+                      id="tutorial-replay-btn"
+                      class="btn btn--outline btn--full-width btn--sm"
+                      type="button"
+                    >
+                      Rever tutorial
+                    </button>
+                  </div>
+                </section>
+              </div>
             </aside>
           </div>
         </div>

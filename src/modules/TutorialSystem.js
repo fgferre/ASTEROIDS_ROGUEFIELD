@@ -16,9 +16,14 @@ class TutorialSystem {
     this.activeHighlights = [];
     this.panelState = 'idle';
     this.runContext = { fromStartRequest: false };
+    this.autoInterceptEnabled = false;
+    this.panelExpanded = false;
 
     this.dom = this.cacheDom();
     this.completionPersisted = this.loadCompletion();
+
+    this.setPanelVisibility(false, { force: true });
+    this.setToggleDisabled(false);
 
     this.bindUiEvents();
     this.subscribeToEvents();
@@ -41,6 +46,9 @@ class TutorialSystem {
       hint: document.getElementById('tutorial-step-hint') || null,
       primaryButton: document.getElementById('tutorial-primary-btn') || null,
       replayButton: document.getElementById('tutorial-replay-btn') || null,
+      card: document.getElementById('tutorial-card') || null,
+      toggleButton: document.getElementById('tutorial-toggle-btn') || null,
+      toggleStatus: document.getElementById('tutorial-toggle-status') || null,
       startButton: document.getElementById('start-game-btn') || null,
     };
   }
@@ -82,6 +90,63 @@ class TutorialSystem {
     const state = this.completionPersisted ? 'completed' : 'idle';
     this.setPanelState(state);
     this.refreshIdleView();
+    this.syncToggleState();
+  }
+
+  setPanelVisibility(visible, options = {}) {
+    const panel = this.dom.panel;
+
+    const next = Boolean(visible);
+    if (!options.force && next === this.panelExpanded) {
+      return;
+    }
+
+    this.panelExpanded = next;
+
+    if (panel) {
+      panel.hidden = !this.panelExpanded;
+      if (
+        this.panelExpanded &&
+        options.focus === true &&
+        typeof panel.focus === 'function'
+      ) {
+        panel.focus();
+      }
+    }
+
+    this.syncToggleState();
+  }
+
+  syncToggleState() {
+    const { card, toggleButton } = this.dom;
+    const expanded = this.panelExpanded;
+
+    if (card) {
+      card.setAttribute('data-expanded', expanded ? 'true' : 'false');
+    }
+
+    if (toggleButton) {
+      toggleButton.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      toggleButton.setAttribute(
+        'aria-label',
+        expanded
+          ? 'Ocultar centro de treinamento'
+          : 'Mostrar centro de treinamento (opcional)'
+      );
+      toggleButton.classList.toggle('is-expanded', expanded);
+    }
+  }
+
+  setToggleDisabled(disabled) {
+    if (!this.dom.toggleButton) {
+      return;
+    }
+
+    this.dom.toggleButton.disabled = Boolean(disabled);
+    this.dom.toggleButton.setAttribute(
+      'aria-disabled',
+      disabled ? 'true' : 'false'
+    );
   }
 
   bindUiEvents() {
@@ -94,6 +159,21 @@ class TutorialSystem {
     if (this.dom.replayButton) {
       this.dom.replayButton.addEventListener('click', () => {
         this.handleReplayButton();
+      });
+    }
+
+    if (this.dom.toggleButton) {
+      this.dom.toggleButton.addEventListener('click', () => {
+        if (this.dom.toggleButton.disabled) {
+          return;
+        }
+
+        if (this.isActive && this.panelExpanded) {
+          return;
+        }
+
+        const shouldExpand = !this.panelExpanded;
+        this.setPanelVisibility(shouldExpand, { focus: shouldExpand });
       });
     }
   }
@@ -109,7 +189,11 @@ class TutorialSystem {
   }
 
   shouldInterceptStart() {
-    return !this.completionPersisted && this.steps.length > 0;
+    return (
+      this.autoInterceptEnabled &&
+      !this.completionPersisted &&
+      this.steps.length > 0
+    );
   }
 
   requestStart() {
@@ -136,6 +220,8 @@ class TutorialSystem {
     this.currentStepIndex = 0;
     this.runContext = { fromStartRequest };
     this.setPanelState('active');
+    this.setPanelVisibility(true, { focus: true });
+    this.setToggleDisabled(true);
     this.clearHighlight();
     this.clearAutoAdvance();
 
@@ -341,6 +427,8 @@ class TutorialSystem {
     this.saveCompletion(true);
     this.setPanelState('completed');
     this.refreshIdleView();
+    this.setToggleDisabled(false);
+    this.setPanelVisibility(false);
 
     if (typeof gameEvents !== 'undefined') {
       gameEvents.emit('tutorial-completed', {
@@ -359,10 +447,10 @@ class TutorialSystem {
       : 'Tutorial inicial';
     const description = isCompleted
       ? 'Você já conhece os controles principais. Revise o tutorial quando quiser.'
-      : 'Clique em “Iniciar missão” para iniciar o treinamento guiado antes da primeira partida.';
+      : 'Inicie o centro de treinamento para praticar os controles antes de entrar em combate.';
     const hint = isCompleted
       ? 'Use “Rever tutorial” para praticar novamente sem iniciar uma partida.'
-      : 'O jogo começa somente após concluir o treinamento inicial.';
+      : 'O treinamento é opcional: execute quando quiser reforçar os comandos básicos.';
 
     this.updateStatus(statusText);
     this.updateProgress(isCompleted ? '✔' : '--');
@@ -388,6 +476,10 @@ class TutorialSystem {
   updateStatus(text) {
     if (this.dom.status) {
       this.dom.status.textContent = text;
+    }
+
+    if (this.dom.toggleStatus) {
+      this.dom.toggleStatus.textContent = text;
     }
   }
 
