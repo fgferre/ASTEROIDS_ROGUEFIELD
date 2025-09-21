@@ -71,7 +71,11 @@ const HUD_LAYOUT = [
     },
     rootId: 'hud-kills',
     valueId: 'kills-display',
-    initialValue: '0 asteroides',
+    initialValue: '0',
+    unit: {
+      singular: 'asteroide',
+      plural: 'asteroides',
+    },
     ariaLive: 'polite',
   },
   {

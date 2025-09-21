@@ -143,6 +143,8 @@
   --container-lg: 64rem;
   --container-xl: 80rem;
   --hud-scale: 1;
+  --hud-scale-auto: 1;
+  --hud-scale-effective: 1;
 }
 
 /* Dark mode colors */
@@ -845,31 +847,38 @@ html[data-motion='reduced'] *::after {
 /* Menu Screen with space theme */
 #menu-screen {
   background: var(--color-bg-8);
-  padding: var(--space-32);
+  padding: clamp(1.5rem, 4vh, 2.75rem);
 }
 
 .menu-content {
   color: var(--color-text);
-  padding: var(--space-32);
+  padding: clamp(1.5rem, 2.5vw, 2.25rem);
   background: var(--color-surface);
   border-radius: var(--radius-lg);
   border: 2px solid var(--color-primary);
   box-shadow: var(--shadow-lg);
-  width: min(960px, 90vw);
+  width: min(820px, 88vw);
+  max-height: min(88vh, 680px);
+  overflow-y: auto;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1.5rem, 2vh, 2rem);
+  overscroll-behavior: contain;
 }
 
 .menu-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: var(--space-32);
-  align-items: stretch;
+  gap: clamp(1.5rem, 2vw, 2.25rem);
+  align-items: start;
+  min-height: 0;
 }
 
 .menu-primary {
   display: flex;
   flex-direction: column;
-  gap: var(--space-24);
+  gap: clamp(1rem, 2vh, 1.75rem);
 }
 
 .menu-header {
@@ -894,13 +903,16 @@ html[data-motion='reduced'] *::after {
 .menu-instructions {
   list-style: none;
   margin: 0;
-  padding: var(--space-16);
+  padding: var(--space-12) var(--space-16);
   background: var(--color-bg-1);
   border-radius: var(--radius-base);
   border: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  gap: var(--space-12);
+  gap: var(--space-10);
+  max-height: min(320px, 45vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .menu-instructions li {
@@ -908,7 +920,7 @@ html[data-motion='reduced'] *::after {
   align-items: flex-start;
   gap: var(--space-12);
   color: var(--color-text-secondary);
-  padding: var(--space-8) var(--space-12);
+  padding: var(--space-8) var(--space-10);
   border-radius: var(--radius-base);
   transition:
     background-color var(--duration-fast) var(--ease-standard),
@@ -938,7 +950,7 @@ html[data-motion='reduced'] *::after {
 .menu-secondary {
   display: flex;
   flex-direction: column;
-  gap: var(--space-16);
+  gap: clamp(1rem, 2vh, 1.5rem);
 }
 
 .menu-visual {
@@ -1059,17 +1071,18 @@ html[data-motion='reduced'] *::after {
 
 @media (max-width: 960px) {
   #menu-screen {
-    padding: var(--space-24);
+    padding: clamp(1.25rem, 4vh, 2rem);
   }
 
   .menu-content {
-    padding: var(--space-24);
-    width: min(640px, 94vw);
+    padding: clamp(1.25rem, 3vw, 1.75rem);
+    width: min(640px, 92vw);
+    max-height: min(86vh, 640px);
   }
 
   .menu-grid {
     grid-template-columns: 1fr;
-    gap: var(--space-24);
+    gap: clamp(1.25rem, 3vh, 1.75rem);
   }
 
   .menu-actions .btn {
@@ -1079,7 +1092,7 @@ html[data-motion='reduced'] *::after {
 
 @media (max-width: 640px) {
   .menu-content {
-    padding: var(--space-16);
+    padding: clamp(1rem, 4vw, 1.5rem);
   }
 
   .menu-actions {
@@ -1808,14 +1821,18 @@ body.color-assist-mode .upgrade-option__next {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
+  gap: clamp(0.75rem, 2vh, 1.5rem);
+  box-sizing: border-box;
+  padding: clamp(1rem, 2vh, 1.5rem) clamp(0.75rem, 2vw, 1.75rem);
   background: radial-gradient(
     ellipse at center,
     #1a1a2e 0%,
     #16213e 50%,
     #0f0f1a 100%
   );
-  padding: var(--space-16);
   position: relative;
+  overflow: hidden;
 }
 
 body.is-paused #game-ui {
@@ -1862,7 +1879,7 @@ body.is-paused #hud-root .hud-xp {
 }
 
 #hud-root {
-  transform: scale(var(--hud-scale, 1));
+  transform: scale(var(--hud-scale-effective, 1));
   transform-origin: top center;
   transition: transform var(--duration-normal) var(--ease-standard);
 }
@@ -1879,7 +1896,7 @@ body.motion-reduced #hud-root {
   flex-direction: column;
   gap: clamp(0.75rem, 1.2vw, 1.25rem);
   align-items: stretch;
-  margin-bottom: clamp(0.75rem, 1.8vw, 1.75rem);
+  margin-bottom: 0;
   z-index: 10;
   position: relative;
   padding-inline: clamp(0.25rem, 0.6vw, 0.75rem);
@@ -1923,6 +1940,7 @@ body.hud-high-contrast .hud-xp {
 }
 
 body.hud-high-contrast .hud-item__value,
+body.hud-high-contrast .hud-item__value-unit,
 body.hud-high-contrast .hud-item__label,
 body.hud-high-contrast .hud-panel__title,
 body.hud-high-contrast .xp-text,
@@ -1960,7 +1978,30 @@ body.hud-high-contrast .hud-item__icon {
   color: var(--color-text-secondary);
 }
 
-.hud-item__value,
+.hud-item__value {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-6);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.hud-item__value-number {
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.hud-item__value-unit {
+  font-size: var(--font-size-xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
 #shield-status .shield-hits {
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
@@ -2137,6 +2178,10 @@ body.hud-high-contrast .hud-item__icon {
   margin: 0;
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
 }
 
 .wave-progress {
@@ -2354,7 +2399,7 @@ body.particles-reduced #game-canvas {
 }
 
 .controls {
-  margin-top: var(--space-16);
+  margin-top: 0;
   text-align: center;
   color: var(--color-text-secondary);
   font-size: var(--font-size-sm);

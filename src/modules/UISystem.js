@@ -22,6 +22,14 @@ class UISystem {
     this.damageFlashTimeout = null;
     this.currentPauseState = false;
     this.shieldFailTimeout = null;
+    this.resizeRaf = null;
+    this.currentHudBaseScale = 1;
+    this.currentHudAutoScale = 1;
+    this.currentCanvasScale = 1;
+    this.canvasBaseSize = { width: 0, height: 0 };
+    this.handleResize = this.handleResize.bind(this);
+    this.numberFormatter = this.createNumberFormatter('standard');
+    this.compactNumberFormatter = this.createNumberFormatter('compact');
 
     this.hudLayout = Array.isArray(HUD_LAYOUT) ? HUD_LAYOUT : [];
     this.hudElements = new Map();
@@ -84,6 +92,7 @@ class UISystem {
     this.bindPauseControls();
     this.bindSettingsControls();
     this.bootstrapSettingsState();
+    this.initializeViewportScaling();
 
     console.log('[UISystem] Initialized');
   }
@@ -92,6 +101,10 @@ class UISystem {
     return {
       root: document.getElementById('hud-root') || null,
       hudPrimary: document.getElementById('hud-primary') || null,
+      gameUi: document.getElementById('game-ui') || null,
+      gameField: document.querySelector('#game-ui .game-field') || null,
+      canvas: document.getElementById('game-canvas') || null,
+      controls: document.querySelector('#game-ui .controls') || null,
       xp: {
         container: document.getElementById('hud-xp') || null,
         progress: document.getElementById('xp-progress') || null,
@@ -161,6 +174,219 @@ class UISystem {
 
     if (!this.schemaByCategory.has(this.settingsState.activeCategory)) {
       this.settingsState.activeCategory = this.settingsSchema[0]?.id || 'audio';
+    }
+  }
+
+  createNumberFormatter(mode = 'standard') {
+    if (
+      typeof Intl === 'undefined' ||
+      typeof Intl.NumberFormat !== 'function'
+    ) {
+      return {
+        format: (value) =>
+          String(
+            Math.max(
+              0,
+              Math.floor(Number.isFinite(value) ? value : Number(value) || 0)
+            )
+          ),
+      };
+    }
+
+    if (mode === 'compact') {
+      return new Intl.NumberFormat('pt-BR', {
+        notation: 'compact',
+        maximumFractionDigits: 1,
+      });
+    }
+
+    return new Intl.NumberFormat('pt-BR');
+  }
+
+  formatCount(value = 0, options = {}) {
+    const { allowCompact = true } = options;
+    const numericValue = Number(value);
+    const normalized =
+      Number.isFinite(numericValue) && numericValue > 0
+        ? Math.floor(numericValue)
+        : 0;
+
+    if (allowCompact && normalized >= 1000 && this.compactNumberFormatter) {
+      return this.compactNumberFormatter.format(normalized);
+    }
+
+    if (this.numberFormatter) {
+      return this.numberFormatter.format(normalized);
+    }
+
+    return String(normalized);
+  }
+
+  getUnitLabel(unitConfig, value = 0) {
+    if (!unitConfig) {
+      return '';
+    }
+
+    if (typeof unitConfig === 'string') {
+      return unitConfig;
+    }
+
+    const isSingular = value === 1;
+    if (isSingular && unitConfig.singular) {
+      return unitConfig.singular;
+    }
+
+    if (!isSingular && unitConfig.plural) {
+      return unitConfig.plural;
+    }
+
+    return unitConfig.plural || unitConfig.singular || '';
+  }
+
+  initializeViewportScaling() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    this.requestViewportScaleUpdate(true);
+    window.addEventListener('resize', this.handleResize, { passive: true });
+  }
+
+  handleResize() {
+    this.requestViewportScaleUpdate();
+  }
+
+  requestViewportScaleUpdate(force = false) {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (force) {
+      if (this.resizeRaf) {
+        window.cancelAnimationFrame(this.resizeRaf);
+        this.resizeRaf = null;
+      }
+      this.updateViewportScaling({ force: true });
+      return;
+    }
+
+    if (this.resizeRaf) {
+      return;
+    }
+
+    this.resizeRaf = window.requestAnimationFrame(() => {
+      this.resizeRaf = null;
+      this.updateViewportScaling();
+    });
+  }
+
+  updateViewportScaling(options = {}) {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const { canvas, gameUi, gameField, controls } = this.domRefs;
+    if (!canvas || !gameUi) {
+      return;
+    }
+
+    if (!this.canvasBaseSize.width || !this.canvasBaseSize.height) {
+      this.canvasBaseSize.width =
+        Number(canvas.width) || canvas.getBoundingClientRect().width || 800;
+      this.canvasBaseSize.height =
+        Number(canvas.height) || canvas.getBoundingClientRect().height || 600;
+    }
+
+    const baseWidth = this.canvasBaseSize.width;
+    const baseHeight = this.canvasBaseSize.height;
+
+    const viewportHeight =
+      window.innerHeight ||
+      document.documentElement?.clientHeight ||
+      baseHeight;
+    const viewportWidth =
+      window.innerWidth || document.documentElement?.clientWidth || baseWidth;
+
+    const computedStyles = window.getComputedStyle(gameUi);
+    const paddingTop = parseFloat(computedStyles.paddingTop || '0') || 0;
+    const paddingBottom = parseFloat(computedStyles.paddingBottom || '0') || 0;
+    const paddingLeft =
+      parseFloat(
+        computedStyles.paddingLeft || computedStyles.paddingInlineStart || '0'
+      ) || 0;
+    const paddingRight =
+      parseFloat(
+        computedStyles.paddingRight || computedStyles.paddingInlineEnd || '0'
+      ) || 0;
+    const gapValue =
+      parseFloat(computedStyles.rowGap || computedStyles.gap || '0') || 0;
+
+    const hudHeight = this.domRefs.root
+      ? this.domRefs.root.getBoundingClientRect().height
+      : 0;
+    const controlsHeight = controls
+      ? controls.getBoundingClientRect().height
+      : 0;
+
+    const reservedVertical =
+      hudHeight + controlsHeight + paddingTop + paddingBottom + gapValue * 2;
+    const availableHeight = viewportHeight - reservedVertical;
+    const MIN_SCALE = 0.45;
+    const heightScale = Math.max(
+      MIN_SCALE,
+      Math.min(1, availableHeight / baseHeight)
+    );
+
+    const horizontalReserve = paddingLeft + paddingRight + 48;
+    const availableWidth = viewportWidth - horizontalReserve;
+    const widthScale = Math.max(
+      MIN_SCALE,
+      Math.min(1, availableWidth / baseWidth)
+    );
+
+    const scale = Math.min(heightScale, widthScale);
+
+    if (!options.force && Math.abs(scale - this.currentCanvasScale) < 0.005) {
+      return;
+    }
+
+    this.currentCanvasScale = scale;
+
+    const scaledWidth = Math.round(baseWidth * scale);
+    const scaledHeight = Math.round(baseHeight * scale);
+
+    canvas.style.width = `${scaledWidth}px`;
+    canvas.style.height = `${scaledHeight}px`;
+    canvas.style.maxWidth = '100%';
+    canvas.style.maxHeight = '100%';
+
+    if (gameField && gameField instanceof HTMLElement) {
+      gameField.style.setProperty('--game-canvas-width', `${scaledWidth}px`);
+      gameField.style.setProperty('--game-canvas-height', `${scaledHeight}px`);
+    }
+
+    const hudAutoScale =
+      scale >= 0.95 ? 1 : Math.min(1, Math.max(0.82, scale + 0.05));
+    this.updateHudScale(hudAutoScale);
+  }
+
+  updateHudScale(autoScale = null) {
+    if (Number.isFinite(autoScale)) {
+      this.currentHudAutoScale = autoScale;
+    }
+
+    const baseScale = Number.isFinite(this.currentHudBaseScale)
+      ? this.currentHudBaseScale
+      : 1;
+    const auto = Number.isFinite(this.currentHudAutoScale)
+      ? this.currentHudAutoScale
+      : 1;
+    const effective = Math.max(0.6, Math.min(1.2, baseScale * auto));
+    const root = document.documentElement;
+
+    if (root) {
+      root.style.setProperty('--hud-scale-auto', auto.toFixed(3));
+      root.style.setProperty('--hud-scale-effective', effective.toFixed(3));
     }
   }
 
@@ -365,21 +591,37 @@ class UISystem {
     label.classList.add('hud-item__label');
     label.textContent = config.label;
 
-    const value = document.createElement('span');
-    value.classList.add('hud-item__value');
-    value.textContent = config.initialValue ?? '--';
+    const valueWrapper = document.createElement('span');
+    valueWrapper.classList.add('hud-item__value');
+
+    const valueNumber = document.createElement('span');
+    valueNumber.classList.add('hud-item__value-number');
+    valueNumber.textContent = config.initialValue ?? '--';
     if (config.valueId) {
-      value.id = config.valueId;
+      valueNumber.id = config.valueId;
+    }
+    valueWrapper.appendChild(valueNumber);
+
+    let unitElement = null;
+    if (config.unit) {
+      unitElement = document.createElement('span');
+      unitElement.classList.add('hud-item__value-unit');
+      const initialUnit = this.getUnitLabel(config.unit, 2);
+      if (initialUnit) {
+        unitElement.textContent = initialUnit;
+      }
+      valueWrapper.appendChild(unitElement);
     }
 
-    content.append(label, value);
+    content.append(label, valueWrapper);
     root.appendChild(content);
 
     return {
       key: config.key,
       config,
       root,
-      value,
+      value: valueNumber,
+      unit: unitElement,
     };
   }
 
@@ -587,11 +829,16 @@ class UISystem {
       : Number.isFinite(Number(values.hudScale))
         ? Number(values.hudScale)
         : 1;
+    const baseScale = Math.max(0.6, Math.min(1.4, hudScale));
 
     if (root) {
-      root.style.setProperty('--hud-scale', String(hudScale));
-      root.dataset.hudScale = String(hudScale);
+      root.style.setProperty('--hud-scale', String(baseScale));
+      root.dataset.hudScale = String(baseScale);
     }
+
+    this.currentHudBaseScale = baseScale;
+    this.updateHudScale();
+    this.requestViewportScaleUpdate();
 
     const body = document.body;
     if (body) {
@@ -1476,8 +1723,27 @@ class UISystem {
     const totalKills = Math.max(0, Math.floor(sessionData.totalKills ?? 0));
     if (killsEntry?.value) {
       if (force || totalKills !== this.cachedValues.sessionKills) {
-        killsEntry.value.textContent = `${totalKills} asteroides`;
+        const formattedKills = this.formatCount(totalKills, {
+          allowCompact: true,
+        });
+        killsEntry.value.textContent = formattedKills;
+
+        if (killsEntry.unit) {
+          const unitLabel = this.getUnitLabel(
+            killsEntry.config?.unit,
+            totalKills
+          );
+          if (unitLabel) {
+            killsEntry.unit.textContent = unitLabel;
+          }
+        }
+
+        if (killsEntry.root) {
+          killsEntry.root.title = `Asteroides destruídos: ${formattedKills}`;
+        }
+
         this.cachedValues.sessionKills = totalKills;
+        this.requestViewportScaleUpdate();
       }
     }
 
@@ -1516,6 +1782,15 @@ class UISystem {
       : 0;
 
     const lastWave = this.cachedValues.wave;
+    const formattedKills =
+      normalized.isActive || normalized.totalAsteroids > 0
+        ? this.formatCount(normalized.asteroidsKilled, { allowCompact: true })
+        : null;
+    const formattedTotal =
+      normalized.totalAsteroids > 0
+        ? this.formatCount(normalized.totalAsteroids, { allowCompact: true })
+        : null;
+    let layoutNeedsUpdate = false;
 
     const hasChanged =
       force ||
@@ -1559,19 +1834,29 @@ class UISystem {
           `${Math.round(percentage)}`
         );
         const valueText = normalized.isActive
-          ? `${normalized.asteroidsKilled} de ${normalized.totalAsteroids} asteroides eliminados`
+          ? formattedTotal
+            ? `Asteroides eliminados: ${formattedKills} de ${formattedTotal}`
+            : `Asteroides eliminados: ${formattedKills}`
           : 'Setor concluído';
         waveRefs.progressTrack.setAttribute('aria-valuetext', valueText);
       }
     }
 
     if (waveRefs.enemies) {
+      let enemiesText = '--';
+
       if (normalized.isActive) {
-        waveRefs.enemies.textContent = `${normalized.asteroidsKilled} asteroides eliminados`;
+        enemiesText = formattedTotal
+          ? `Asteroides eliminados: ${formattedKills} / ${formattedTotal}`
+          : `Asteroides eliminados: ${formattedKills}`;
       } else if (normalized.totalAsteroids > 0) {
-        waveRefs.enemies.textContent = 'Setor limpo!';
-      } else {
-        waveRefs.enemies.textContent = '--';
+        enemiesText = 'Setor limpo!';
+      }
+
+      if (waveRefs.enemies.textContent !== enemiesText) {
+        waveRefs.enemies.textContent = enemiesText;
+        waveRefs.enemies.title = enemiesText === '--' ? '' : enemiesText;
+        layoutNeedsUpdate = true;
       }
     }
 
@@ -1596,6 +1881,10 @@ class UISystem {
           countdownValue.classList.remove('is-ticking');
         }
       }
+    }
+
+    if (layoutNeedsUpdate) {
+      this.requestViewportScaleUpdate();
     }
 
     waveRefs.container.classList.toggle(
