@@ -275,6 +275,12 @@ class UISystem {
     gameEvents.on('wave-state-updated', (payload) => {
       this.handleWaveStateUpdated(payload);
     });
+
+    gameEvents.on('ui-show-screen', (payload = {}) => {
+      if (payload?.screen) {
+        this.showScreen(payload.screen, payload.options || {});
+      }
+    });
   }
 
   bootstrapHudValues() {
