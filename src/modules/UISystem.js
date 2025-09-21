@@ -521,8 +521,19 @@ class UISystem {
         'aria-hidden',
         shouldShowCountdown ? 'false' : 'true'
       );
-      if (waveRefs.countdownValue && shouldShowCountdown) {
-        waveRefs.countdownValue.textContent = `${breakSeconds}`;
+      if (waveRefs.countdownValue) {
+        const { countdownValue } = waveRefs;
+        if (shouldShowCountdown) {
+          const nextValue = `${breakSeconds}`;
+          if (countdownValue.textContent !== nextValue) {
+            countdownValue.textContent = nextValue;
+            countdownValue.classList.remove('is-ticking');
+            void countdownValue.offsetWidth;
+            countdownValue.classList.add('is-ticking');
+          }
+        } else {
+          countdownValue.classList.remove('is-ticking');
+        }
       }
     }
 

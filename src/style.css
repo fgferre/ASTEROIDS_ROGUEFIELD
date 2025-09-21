@@ -1321,11 +1321,19 @@ body.is-paused #hud-root .hud-xp {
   width: 0%;
 }
 
-.wave-countdown {
+.game-field__overlay {
   position: absolute;
-  top: var(--space-16);
-  right: var(--space-16);
+  inset: 0;
   display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: var(--space-16);
+  pointer-events: none;
+  z-index: 15;
+}
+
+.wave-countdown {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
@@ -1337,17 +1345,14 @@ body.is-paused #hud-root .hud-xp {
   color: var(--color-warning);
   font-weight: var(--font-weight-semibold);
   width: max-content;
-  max-width: min(320px, calc(100% - (var(--space-16) * 2)));
+  max-width: min(320px, 100%);
   text-align: center;
   box-shadow: var(--shadow-lg);
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
-  pointer-events: none;
-  z-index: 20;
-  --wave-countdown-translate-x: 0%;
   opacity: 0;
   visibility: hidden;
-  transform: translate3d(var(--wave-countdown-translate-x), -10px, 0);
+  transform: translate3d(0, -16px, 0);
   transition:
     opacity var(--duration-fast) var(--ease-standard),
     transform var(--duration-fast) var(--ease-standard),
@@ -1357,31 +1362,11 @@ body.is-paused #hud-root .hud-xp {
 .wave-countdown.is-visible {
   opacity: 1;
   visibility: visible;
-  transform: translate3d(var(--wave-countdown-translate-x), 0, 0);
+  transform: translate3d(0, 0, 0);
   transition:
     opacity var(--duration-fast) var(--ease-standard),
     transform var(--duration-fast) var(--ease-standard),
     visibility 0s linear 0s;
-}
-
-@media (max-width: 720px) {
-  .wave-countdown {
-    top: var(--space-12);
-    left: 50%;
-    right: auto;
-    --wave-countdown-translate-x: -50%;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .wave-countdown,
-  .wave-countdown.is-visible {
-    transition: none;
-  }
-
-  .wave-countdown {
-    transform: translate3d(var(--wave-countdown-translate-x), 0, 0);
-  }
 }
 
 .countdown-label {
@@ -1392,9 +1377,52 @@ body.is-paused #hud-root .hud-xp {
 }
 
 .countdown-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   font-size: 1.8rem;
   font-weight: var(--font-weight-bold);
   color: var(--color-warning);
+}
+
+.countdown-value.is-ticking {
+  animation: wave-countdown-tick var(--duration-fast) var(--ease-standard);
+}
+
+@keyframes wave-countdown-tick {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  60% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+
+  100% {
+    opacity: 0.35;
+    transform: scale(0.92);
+  }
+}
+
+@media (max-width: 720px) {
+  .game-field__overlay {
+    justify-content: center;
+    padding: var(--space-12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wave-countdown,
+  .wave-countdown.is-visible {
+    transition: none;
+    transform: translate3d(0, 0, 0);
+  }
+
+  .countdown-value.is-ticking {
+    animation: none;
+  }
 }
 
 .hud-xp {
