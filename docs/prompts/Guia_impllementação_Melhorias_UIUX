@@ -1,149 +1,258 @@
-Plano de Implementação para Melhorias de UX/UI
+Guia de Implementação de Melhorias de UX/UI
+Documento orientador para evoluir o ASTEROIDS_ROGUEFIELD em ciclos curtos, aderentes à política descrita em agents.md. Use cada etapa como insumo para abrir tarefas e PRs pequenos, sempre com validação explícita.
 
-Este plano ordena as melhorias propostas para o ASTEROIDS_ROGUEFIELD em função de impacto e aderência às diretrizes do arquivo agents.md. Cada item está pensado para ser entregue via pull request pequeno e atômico, priorizando dados centralizados, arquitetura modular e documentação atualizada
-GitHub
-. Use-o como guia para organizar o backlog.
+Panorama do estado atual (Atualizado em 2025-09-21)
+Orquestração e ciclo de jogo
 
-Prioridade Alta (1ª onda de melhorias)
-1. Estruturação do HUD unificado
+src/app.js instancia os sistemas manualmente, mantém o estado global (screen, isPaused) e chama update()/render() a cada frame. Não há um GameLoopSystem, portanto novos fluxos (tutorial, configurações, histórico) precisam conversar com o orquestrador via eventos ou acesso ao ServiceLocator.
 
-Objetivo: consolidar indicadores de vida, nível, kills, tempo e escudo em uma barra ou painel único, utilizando ícones e cores já definidos nos design tokens
-GitHub
-.
+Interface do usuário
 
-Tarefas:
+UISystem centraliza HUD, telas (menu, pausa, level up, game over) e efeitos visuais (flash de dano, cooldown do escudo). Hoje o HUD é atualizado a cada update() por meio de document.getElementById, sem cache ou esquema de configuração.
 
-1.1 Definir constantes de UI: Adicionar ao GameConstants.js variáveis para posições, tamanhos e visibilidade dos elementos do HUD. Isso evita valores mágicos e facilita ajustes futuros
-GitHub
-.
+O layout vive em src/index.html com estilos em src/style.css, que já oferece tokens de design (claro/escuro) aproveitáveis para acessibilidade e temas.
 
-1.2 Criar/Atualizar sistema de UI: No diretório /src/modules, criar UiHudSystem.js ou atualizar o sistema existente para montar o HUD dinamicamente a partir dos dados em GameConstants.js e eventos do jogo. Esse sistema deve assinar eventos como player-damaged, wave-updated e shield-state-changed pelo Event Bus
-GitHub
-.
+Áudio e feedback
 
-1.3 Ajustar index.html e style.css: Refatorar a marcação para conter um único contêiner HUD e utilizar classes CSS específicas (cores de status, animações de dano). Evitar estilos inline; manter o uso de design tokens
-GitHub
-.
+AudioSystem possui masterGain único e múltiplos efeitos procedurais, mas sem canais separados (música, efeitos), sem ajustes de volume ou persistência.
 
-1.4 Validação: Atualizar docs/validation/test-checklist.md com cenários de renderização do HUD e verificar em diferentes resoluções (desktop/laptop e mobile).
+Entrada e controle
 
-2. Tela de Menu e Tutorial Interativo
+InputSystem rastreia teclado/mouse e detecta gamepad apenas superficialmente. Bindings são fixos (WASD/setas/Esc/E) e não há remapeamento nem persistência.
 
-Objetivo: melhorar a experiência inicial do jogador, explicando controles e objetivos de forma acessível.
+Progressão e upgrades
 
-Tarefas:
+ProgressionSystem calcula XP/orbes, controla level e aplica upgrades. SPACE_UPGRADES está hardcoded em GameConstants.js. A tela de level-up é montada diretamente no UISystem, sem dados estruturados adicionais (categoria, níveis, ícones alternativos).
 
-2.1 Atualizar o menu principal: Modificar index.html para incluir um contêiner de fundo dinâmico (pode ser CSS animado ou canvas leve) e reorganizar o card de instruções com ícones para movimentos, tiro automático e coleta de XP
-GitHub
-. Adicionar um botão de acesso à tela de configurações.
+Estatísticas e histórico
 
-2.2 Sistema de Tutorial (TutorialSystem.js): Criar um novo sistema em /src/modules que, ao iniciar a primeira partida, exiba overlays sequenciais explicando controles básicos. O tutorial deve ser parametrizado via um objeto em /data/tutorialSteps.js para facilitar futuras edições (princípio data‑driven
-GitHub
-).
+EnemySystem já coleta sessionStats (kills, tempo, ondas) e o WorldSystem propaga esses dados no evento player-died. Não existe sistema dedicado para guardar ou comparar partidas anteriores.
 
-2.3 Integração com o Event Bus: TutorialSystem deve emitir eventos como tutorial-completed quando finalizar, permitindo que outros sistemas (por exemplo, GameLoopSystem) iniciem o jogo apenas após o tutorial.
+Efeitos visuais
 
-3. Modos de Pausa e Configurações
+EffectsSystem emite partículas/flash/shake com lógica acoplada; não há esquema data-driven que permita ajustar intensidade por configuração ou pelo futuro menu de opções.
 
-Objetivo: oferecer ao jogador um controle maior sobre a experiência durante o jogo e reforçar a modularidade.
+Documentação e validação
 
-Tarefas:
+Não existe docs/validation/test-checklist.md, embora agents.md exija validações explícitas.
 
-3.1 Adicionar SettingsSystem.js: Criar um sistema responsável por armazenar e aplicar preferências de áudio, controles (WASD/setas/gamepad) e acessibilidade (modo daltônico, tamanho de fonte). Utilizar localStorage para persistência, mas manter a lógica de acesso a partir do Service Locator
-GitHub
-.
+historico_do_projeto.txt registra evolução arquitetural, mas o plano atual de UX/UI (em docs/prompts/Guia_impllementação_Melhorias_UIUX) não reflete as descobertas acima.
 
-3.2 Refatorar a tela de pausa: Usar o template de estilo existente para criar uma lista de opções (Retomar, Configurações, Voltar ao menu). Garantir que a transição para Configurações acione o SettingsSystem sem acoplamento direto (via eventos).
+Princípios de execução (reforço de agents.md)
+Dados centralizados: novos parâmetros devem ir para GameConstants.js ou arquivos em src/data/.
 
-3.3 Atualização de documentação: Incluir no agents.md um resumo de como SettingsSystem interage com outros sistemas, mantendo a documentação viva
-GitHub
-.
+Comunicação desacoplada: continuar usando gameEvents e gameServices.
 
-Prioridade Média (2ª onda de melhorias)
-4. Tela de Upgrade Aprimorada
+PRs atômicos e verificáveis: cada item abaixo deve resultar em mudanças pequenas, acompanhadas de atualização no checklist de testes e, quando aplicável, na documentação (agents.md, README.md, guias em /docs).
 
-Objetivo: permitir ao jogador escolhas informadas e fornecer feedback visual claro ao subir de nível.
+Sem dependências extras: privilegiar APIs nativas do browser e recursos já presentes no build toolchain (Vite, Grunt, Prettier).
 
-Tarefas:
+Etapas propostas
+Etapa 0 – Preparação e governança
+Checklist de validação
 
-4.1 Modelo de dados para upgrades: Criar /data/upgrades.js contendo a definição de cada upgrade (nome, descrição, categoria, níveis máximos, efeitos). Remover valores hard‑coded do sistema de upgrades existente.
+Criar docs/validation/test-checklist.md descrevendo cenários mínimos para menu, HUD, telas de pausa/game over e futuras configurações. Referenciar sempre que uma etapa alterar a experiência do jogador.
 
-4.2 Atualizar LevelUpSystem.js: Ajustar o sistema responsável por exibir upgrades para ler dados de /data/upgrades.js. Apresentar as opções em grid como cards com ícones e destacar o nível atual. Aproveitar as classes .upgrade-option e estados de hover definidos em style.css
-GitHub
-.
+Documentação de artefatos
 
-4.3 Navegação acessível: Permitir seleção de upgrades via teclado/gamepad. Emitir evento upgrade-selected com os dados da escolha para outros sistemas aplicarem os efeitos.
+Atualizar agents.md (ou criar apêndice em /docs) sempre que um novo sistema/evento for adicionado, mantendo o glossário vivo.
 
-4.4 Documentação: Adicionar seção em docs explicando a estrutura de /data/upgrades.js e orientações para adicionar novos upgrades, garantindo escalabilidade por design
-GitHub
-.
+Inventário de eventos/UI
 
-5. Acessibilidade e Responsividade
+Mapear indicadores existentes (vida, escudo, XP, kills, tempo, ondas) com seus eventos/fontes atuais para guiar a etapa 1.
 
-Objetivo: garantir que o jogo seja jogável por um público amplo e em diversos dispositivos.
+Etapa 1 – HUD unificado e data-driven
+Objetivo: eliminar IDs “mágicos”, reduzir queries por frame e permitir reordenação/configuração do HUD por dados.
 
 Tarefas:
 
-5.1 Modo daltônico: Criar uma variante de design tokens em style.css (ex.: --color-primary-alt) com cores de alto contraste. Integrar a escolha ao SettingsSystem.
+Criar esquema (src/data/ui/hudLayout.js ou GameConstants.HUD_CONFIG) definindo chaves, rótulos, ícones, ordem e condições de visibilidade.
 
-5.2 Redimensionamento dinâmico: Revisar style.css e index.html para utilizar unidades relativas (rem, %) e media queries, mantendo a legibilidade em resoluções diferentes. Adicionar cenários de teste no test-checklist.md.
+Refatorar UISystem:
 
-5.3 Controle de volume: Expor propriedades no SettingsSystem para ajustar níveis de música e efeitos. Garantir que sistemas de áudio emitam eventos para refletir as mudanças.
+Cachear referências de DOM no constructor.
 
-Prioridade Baixa (3ª onda de melhorias)
-6. Histórico e Estatísticas de Partidas
+Usar o novo esquema para popular o HUD (ex.: renderHudElement(config, stats)).
 
-Objetivo: enriquecer a tela de game over com comparativos e incentivar a progressão contínua.
+Assinar eventos existentes (player-health-changed, experience-changed, shield-stats-changed, wave-state-updated) para atualizar apenas quando necessário; manter fallback de update() para elementos sem evento específico.
 
-Tarefas:
+Ajustar src/index.html e src/style.css:
 
-6.1 Sistema de Histórico (HistorySystem.js): Gravar dados básicos da partida (tempo, ondas, kills, upgrades escolhidos) em um armazenamento local após cada game over. Manter o módulo isolado e centralizado para fácil expansão.
+Consolidar o HUD em um contêiner único reutilizando tokens (--color-*, --font-*).
 
-6.2 Visualização de estatísticas: Expandir a tela de gameover-screen para mostrar gráficos simples (barras ou progressões) comparando a última partida com a média das últimas três. Isso pode ser feito com SVG ou canvas nativo (evitar bibliotecas externas, conforme diretriz de não adicionar dependências desnecessárias
-GitHub
-).
+Adicionar classes utilitárias para estados (perigo, cooldown, alerta).
 
-6.3 Atualização de documentação: Descrever o formato de dados do histórico e como ele deve ser consumido por outros sistemas.
+Atualizar o checklist de testes com cenários de HUD (desktop e viewport reduzida).
 
-7. Efeitos Visuais Avançados
+Dependências: Etapa 0 (checklist pronto para ser atualizado).
 
-Objetivo: aumentar a imersão mantendo a performance acima de 60 FPS
-GitHub
-.
+Etapa 2 – Menu principal e tutorial interativo
+Objetivo: melhorar onboarding e preparar caminho para configurações.
 
 Tarefas:
 
-7.1 Sistema de Partículas (ParticleSystem.js): Desenvolver um sistema leve para emitir partículas ao destruir asteroides, coletar orbes e ativar o escudo. Os parâmetros (quantidade, duração, cores) devem residir em /data.
+Reorganizar menu-screen em index.html para incluir:
 
-7.2 Fundo dinâmico: Investigar o uso de canvas ou CSS animations para criar paralaxe de estrelas no fundo do menu e do jogo. Encapsular a lógica em um módulo independente para permitir substituição ou desativação conforme as preferências do jogador.
+Botão “Configurações”.
 
-7.3 Integração com Escalabilidade: Garantir que adição de novos efeitos não degrade a arquitetura existente, respeitando o princípio de escalabilidade por design
-GitHub
-.
+Espaço reservado para tutorial e futuro fundo animado (CSS ou canvas leve via RenderingSystem).
 
-Considerações Finais
+Criar src/data/tutorialSteps.js descrevendo etapas (texto, elemento-alvo, ação esperada).
 
-Cada item deve ser entregue em um pull request dedicado, com descrição clara do escopo e validações relacionadas
-GitHub
-.
+Implementar TutorialSystem em src/modules/:
 
-Atualize a documentação (agents.md, README.md e novos documentos em /docs) à medida que sistemas ou dados forem adicionados
-GitHub
-.
+Controlar a sequência de passos com base nos dados.
 
-Antes de iniciar qualquer tarefa, verifique se os parâmetros necessários podem ser definidos em GameConstants.js ou em arquivos de /data
-GitHub
-.
+Pausar startGame() até emitir tutorial-completed.
 
-Sempre que possível, aproveite o Event Bus e o Service Locator para manter a comunicação desacoplada entre sistemas
-GitHub
-.
+Persistir conclusão em localStorage (detectar primeira execução).
 
-Este plano serve como roteiro incremental para evoluir a interface e a experiência do jogador, mantendo a arquitetura modular e as boas práticas estabelecidas no projeto.
+Expor ganchos em app.js:
 
-O arquivo está pronto para ser adicionado ao repositório, por exemplo em docs/ui-ux-implementation-plan.md. Basta baixá-lo e colocá-lo no diretório desejado do projeto.
+Antes de chamar startGame(), verificar se o tutorial deve rodar.
 
-Fontes
+Permitir que TutorialSystem solicite transições de tela via gameEvents.
 
-Agente
-Fontes
+Atualizar checklist com cenários de tutorial (primeira execução, repetição).
+
+Dependências: Etapa 1 (HUD consistente facilita instruções visuais).
+
+Etapa 3 – Pausa e Configurações
+Objetivo: dar controle ao jogador e abrir espaço para acessibilidade/áudio.
+
+Tarefas:
+
+Criar SettingsSystem (src/modules/SettingsSystem.js) com responsabilidades:
+
+Schema em src/data/settingsSchema.js (categorias: áudio, controles, acessibilidade, vídeo).
+
+Persistência (localStorage), defaults e validação de entrada.
+
+API pública (getSetting, setSetting, subscribe) registrada no ServiceLocator.
+
+Evoluir AudioSystem:
+
+Separar ganhos (música, efeitos), adicionar eventos (settings-audio-changed) e persistir volumes via SettingsSystem.
+
+Considerar canal futuro de “efeitos visuais” para reduzir particulados (integração com Etapa 7).
+
+Refatorar InputSystem:
+
+Criar camada de bindings configuráveis (ex.: this.bindings = { moveUp: ['w', 'arrowup'] }).
+
+Permitir remapeamento via SettingsSystem (guardando preferências).
+
+Iniciar suporte real a gamepad (polling no update()).
+
+Atualizar telas de pausa/configurações:
+
+Extrair lógica do UISystem em métodos específicos (ex.: showPauseOverlay, renderSettingsPanel).
+
+Conectar inputs a SettingsSystem via eventos (settings-changed).
+
+Documentar integração no agents.md.
+
+Checklist: fluxos de pausa, ajustes de volume e remapeamento básico.
+
+Dependências: Etapa 2 (botão de configurações acessível), Etapa 0 (checklist atualizado).
+
+Etapa 4 – Upgrades e tela de level-up
+Objetivo: oferecer escolhas ricas e escaláveis.
+
+Tarefas:
+
+Criar src/data/upgrades.js:
+
+Estrutura com níveis, categorias, pré-requisitos, ícones e descrições longas.
+
+Separar texto para tradução futura, se desejado.
+
+Atualizar ProgressionSystem:
+
+Consumir o novo arquivo, suportar múltiplos níveis por upgrade e efeitos específicos.
+
+Emitir eventos ricos (upgrade-options-ready, upgrade-applied) com metadados completos.
+
+Refatorar UISystem.showLevelUpScreen:
+
+Construir cards dinamicamente (grid responsivo, badges de nível, descrições).
+
+Suportar navegação por teclado/gamepad (reutilizar bindings do InputSystem).
+
+Checklist: cenários de escolha com teclado, mouse, gamepad; cobertura para upgrades esgotados.
+
+Dependências: Etapa 3 (para input/configurações), Etapa 1 (HUD coeso exibindo upgrades ativos).
+
+Etapa 5 – Acessibilidade e responsividade
+Objetivo: ampliar alcance e conforto visual.
+
+Tarefas:
+
+Criar variantes de design tokens em style.css:
+
+Modo daltônico, maior contraste, redução de motion.
+
+Utilizar atributos data-theme ou classes definidas pelo SettingsSystem.
+
+Revisar layout (HTML/CSS):
+
+Usar unidades relativas (rem, clamp) e media queries.
+
+Garantir legibilidade mínima (WCAG AA de contraste).
+
+Integrar opções no SettingsSystem:
+
+Toggles (ex.: “Modo alto contraste”, “Reduzir partículas”).
+
+Propagar mudanças via eventos (settings-visual-changed).
+
+Checklist: resoluções diversas (mobile landscape, 1366×768, 1920×1080) e verificação de contraste.
+
+Dependências: Etapa 3 (Settings) e tokens prontos (já existentes em style.css).
+
+Etapa 6 – Histórico e estatísticas de partidas
+Objetivo: dar feedback pós-partida e incentivar progressão.
+
+Tarefas:
+
+Criar HistorySystem (src/modules/HistorySystem.js):
+
+Armazenar dados recebidos via player-died (kills, tempo, ondas, upgrades).
+
+Persistir no localStorage, manter janela (ex.: últimas 10 partidas) e expor agregados.
+
+Estender UISystem:
+
+Mostrar estatísticas no game over (médias, melhor run, variação).
+
+Considerar gráficos simples (SVG inline ou canvas leve) sem bibliotecas externas.
+
+Documentar formato dos dados (/docs/history.md ou seção no checklist).
+
+Checklist: validação de persistência, limpeza, cenários sem histórico.
+
+Dependências: Etapa 3 (Settings para possíveis resets), Etapa 4 (dados de upgrades).
+
+Etapa 7 – Efeitos visuais e performance
+Objetivo: aprimorar imersão com controle de intensidade.
+
+Tarefas:
+
+Refatorar EffectsSystem:
+
+Introduzir src/data/particles.js (configurações por tipo: thruster, shield, XP, explosões).
+
+Permitir ajuste de intensidade (SettingsSystem → eventos).
+
+Atualizar RenderingSystem ou adicionar módulo dedicado:
+
+Suporte a fundos dinâmicos (paralaxe, animações CSS/Canvas) configuráveis.
+
+Garantir desativação via opção “modo performance”.
+
+Medir impacto (60 FPS mínimo) e ajustar checklist com cenários de performance.
+
+Avaliar integração com AudioSystem/SettingsSystem para sincronizar feedback (ex.: vibração visual menor quando volumes baixos).
+
+Dependências: Etapa 3 (Settings) e Etapa 5 (opções de acessibilidade/performance).
+
