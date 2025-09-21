@@ -16,7 +16,10 @@ class AudioSystem {
 
     if (typeof gameServices !== 'undefined') {
       gameServices.register('audio', this);
-      if (typeof gameServices.has === 'function' && gameServices.has('settings')) {
+      if (
+        typeof gameServices.has === 'function' &&
+        gameServices.has('settings')
+      ) {
         this.settings = gameServices.get('settings');
       }
     }
@@ -113,7 +116,10 @@ class AudioSystem {
   }
 
   bootstrapSettings() {
-    if (this.settings && typeof this.settings.getCategoryValues === 'function') {
+    if (
+      this.settings &&
+      typeof this.settings.getCategoryValues === 'function'
+    ) {
       const values = this.settings.getCategoryValues('audio');
       if (values) {
         this.updateVolumeState(values);
@@ -136,7 +142,10 @@ class AudioSystem {
     this.volumeState = {
       master: this.sanitizeVolume(values.masterVolume, this.volumeState.master),
       music: this.sanitizeVolume(values.musicVolume, this.volumeState.music),
-      effects: this.sanitizeVolume(values.effectsVolume, this.volumeState.effects),
+      effects: this.sanitizeVolume(
+        values.effectsVolume,
+        this.volumeState.effects
+      ),
       muteAll: Boolean(values.muteAll ?? this.volumeState.muteAll),
     };
 

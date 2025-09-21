@@ -27,7 +27,7 @@ const SHIELD_LEVEL_CONFIG = {
   },
   5: {
     maxHits: CONSTANTS.SHIELD_DEFAULT_HITS + 2,
-    cooldown: Math.max(5, CONSTANTS.SHIELD_COOLDOWN_DURATION - 5),
+    cooldown: Math.max(4, CONSTANTS.SHIELD_COOLDOWN_DURATION - 7),
   },
 };
 

@@ -3,7 +3,12 @@
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 
 const CONTROLS_CATEGORY_ID = 'controls';
-const MOVEMENT_ACTIONS = new Set(['moveUp', 'moveDown', 'moveLeft', 'moveRight']);
+const MOVEMENT_ACTIONS = new Set([
+  'moveUp',
+  'moveDown',
+  'moveLeft',
+  'moveRight',
+]);
 const DEFAULT_GAMEPAD_AXIS_THRESHOLD = 0.45;
 
 function ensureArray(value) {
@@ -93,7 +98,10 @@ class InputSystem {
   initializeBindings() {
     this.settings = this.resolveSettingsService();
     let values = null;
-    if (this.settings && typeof this.settings.getCategoryValues === 'function') {
+    if (
+      this.settings &&
+      typeof this.settings.getCategoryValues === 'function'
+    ) {
       values = this.settings.getCategoryValues(CONTROLS_CATEGORY_ID);
     }
 
@@ -158,7 +166,9 @@ class InputSystem {
     document.addEventListener('mousedown', (event) => this.onMouseDown(event));
     document.addEventListener('mouseup', (event) => this.onMouseUp(event));
 
-    window.addEventListener('gamepadconnected', (event) => this.onGamepadConnected(event));
+    window.addEventListener('gamepadconnected', (event) =>
+      this.onGamepadConnected(event)
+    );
     window.addEventListener('gamepaddisconnected', (event) =>
       this.onGamepadDisconnected(event)
     );
@@ -409,17 +419,24 @@ class InputSystem {
 
     gameEvents.emit('gamepad-input-detected', {
       ...details,
-      timestamp: typeof performance !== 'undefined' ? performance.now() : Date.now(),
+      timestamp:
+        typeof performance !== 'undefined' ? performance.now() : Date.now(),
     });
   }
 
   pollGamepad() {
-    if (typeof navigator === 'undefined' || typeof navigator.getGamepads !== 'function') {
+    if (
+      typeof navigator === 'undefined' ||
+      typeof navigator.getGamepads !== 'function'
+    ) {
       return;
     }
 
     const pads = navigator.getGamepads();
-    const pad = pads?.[this.gamepadIndex] || pads?.find((candidate) => Boolean(candidate)) || null;
+    const pad =
+      pads?.[this.gamepadIndex] ||
+      pads?.find((candidate) => Boolean(candidate)) ||
+      null;
 
     if (!pad) {
       if (this.gamepadConnected || this.activeGamepadActions.size > 0) {
@@ -447,7 +464,11 @@ class InputSystem {
       }
 
       if (pressed && !this.previousGamepadButtons[index]) {
-        this.emitGamepadDetection({ type: 'button', index, value: button?.value ?? 1 });
+        this.emitGamepadDetection({
+          type: 'button',
+          index,
+          value: button?.value ?? 1,
+        });
       }
 
       this.previousGamepadButtons[index] = pressed;
@@ -456,7 +477,10 @@ class InputSystem {
     pad.axes.forEach((value, index) => {
       const positive = value >= this.gamepadAxisThreshold;
       const negative = value <= -this.gamepadAxisThreshold;
-      const previous = this.previousGamepadAxes[index] || { positive: false, negative: false };
+      const previous = this.previousGamepadAxes[index] || {
+        positive: false,
+        negative: false,
+      };
 
       if (positive) {
         const key = `axis:${index}:positive`;
@@ -515,7 +539,10 @@ class InputSystem {
   clearGamepadActions() {
     const active = Array.from(this.activeGamepadActions);
     active.forEach((action) => {
-      this.handleActionRelease(action, 'gamepad', { device: 'gamepad', forced: true });
+      this.handleActionRelease(action, 'gamepad', {
+        device: 'gamepad',
+        forced: true,
+      });
     });
     this.activeGamepadActions.clear();
     this.previousGamepadButtons = [];
@@ -547,9 +574,10 @@ class InputSystem {
         return null;
       }
       const directionPart = parts[2];
-      const direction = directionPart.startsWith('-') || directionPart === 'negative'
-        ? 'negative'
-        : 'positive';
+      const direction =
+        directionPart.startsWith('-') || directionPart === 'negative'
+          ? 'negative'
+          : 'positive';
       return { type: 'axis', index, direction };
     }
 
@@ -717,7 +745,9 @@ class InputSystem {
 
   getActiveKeys() {
     const activeKeys = Object.keys(this.keys).filter((key) => this.keys[key]);
-    const activeCodes = Object.keys(this.codes).filter((code) => this.codes[code]);
+    const activeCodes = Object.keys(this.codes).filter(
+      (code) => this.codes[code]
+    );
     return [...new Set([...activeKeys, ...activeCodes])];
   }
 

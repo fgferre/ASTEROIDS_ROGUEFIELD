@@ -30,6 +30,21 @@ Este documento orienta a execução de testes manuais sempre que fluxos de inter
 - [ ] Após concluir o tutorial uma vez, novas partidas iniciam imediatamente ao clicar em **Iniciar missão**, sem repetir as etapas.
 - [ ] O botão **Rever tutorial** reinicia o treinamento completo sem lançar a partida automaticamente ao término.
 
+## Level up e upgrades
+
+- [ ] A tela de level up exibe cards com categoria, nível atual e resumo do próximo nível disponível para cada upgrade.
+- [ ] Navegação por teclado ou gamepad percorre as opções na ordem visual e o botão de confirmar aplica o upgrade focado.
+- [ ] Pré-requisitos aparecem com indicadores de concluído/bloqueado, refletindo corretamente o estado atual.
+- [ ] Quando não há upgrades disponíveis, a partida retorna automaticamente sem ficar presa na tela de seleção.
+
+## Acessibilidade e responsividade
+
+- [ ] O toggle **Modo daltônico** aplica a nova paleta em HUD e cards de upgrade mantendo contraste AA mínimo.
+- [ ] O ajuste **Aumentar contraste do HUD** e o tema padrão alternam corretamente os tokens sem gerar conflitos com modo escuro.
+- [ ] Ativar **Reduzir movimentos intensos** e **Reduzir partículas** elimina tremores/flashes agressivos e reduz a densidade de efeitos sem travamentos visíveis.
+- [ ] HUD, menu e tela de level up permanecem legíveis em 1366×768, 1920×1080 e larguras ≤ 900px, sem recortes ou sobreposição do canvas.
+- [ ] Verificar contraste (WCAG AA) nos elementos críticos (botões primários, indicadores de HUD, barras de XP) em ambos os temas.
+
 ## Pós-partida
 
 - [x] Estatísticas finais mantêm consistência com os dados emitidos em `player-died` (level, kills, ondas, tempo).

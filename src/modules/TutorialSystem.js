@@ -71,7 +71,10 @@ class TutorialSystem {
         this.completionPersisted ? '1' : '0'
       );
     } catch (error) {
-      console.warn('[TutorialSystem] Failed to persist tutorial completion:', error);
+      console.warn(
+        '[TutorialSystem] Failed to persist tutorial completion:',
+        error
+      );
     }
   }
 
@@ -199,7 +202,9 @@ class TutorialSystem {
     }
 
     const keys = Array.isArray(action.keys) ? action.keys : [];
-    const matched = keys.some((key) => this.normalizeInput(key) === normalizedKey);
+    const matched = keys.some(
+      (key) => this.normalizeInput(key) === normalizedKey
+    );
     if (!matched || this.resolvingStep) {
       return;
     }
@@ -301,9 +306,9 @@ class TutorialSystem {
       return '';
     }
 
-    const labels = [...new Set(keys.map((key) => this.getKeyLabel(key)))].filter(
-      Boolean
-    );
+    const labels = [
+      ...new Set(keys.map((key) => this.getKeyLabel(key))),
+    ].filter(Boolean);
     if (labels.length === 0) {
       return '';
     }

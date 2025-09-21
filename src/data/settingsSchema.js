@@ -41,7 +41,8 @@ const SETTINGS_SCHEMA = [
         key: 'musicVolume',
         type: 'range',
         label: 'Trilha sonora',
-        description: 'Define a intensidade da música ambiente e futuras faixas temáticas.',
+        description:
+          'Define a intensidade da música ambiente e futuras faixas temáticas.',
         default: 0.6,
         min: 0,
         max: 1,
@@ -51,7 +52,8 @@ const SETTINGS_SCHEMA = [
         key: 'effectsVolume',
         type: 'range',
         label: 'Efeitos sonoros',
-        description: 'Afeta tiros, explosões, coleta de XP e demais efeitos instantâneos.',
+        description:
+          'Afeta tiros, explosões, coleta de XP e demais efeitos instantâneos.',
         default: 0.85,
         min: 0,
         max: 1,
@@ -200,10 +202,19 @@ const SETTINGS_SCHEMA = [
         default: false,
       },
       {
+        key: 'colorBlindPalette',
+        type: 'toggle',
+        label: 'Modo daltônico',
+        description:
+          'Ativa uma paleta alternativa com maior distinção entre categorias e alertas.',
+        default: false,
+      },
+      {
         key: 'tutorialReminders',
         type: 'toggle',
         label: 'Manter lembretes do tutorial',
-        description: 'Exibe avisos contextuais mesmo após concluir o treinamento inicial.',
+        description:
+          'Exibe avisos contextuais mesmo após concluir o treinamento inicial.',
         default: true,
       },
     ],
@@ -238,8 +249,17 @@ const SETTINGS_SCHEMA = [
         key: 'damageFlash',
         type: 'toggle',
         label: 'Flash de dano',
-        description: 'Habilita ou desabilita o flash branco rápido ao levar dano.',
+        description:
+          'Habilita ou desabilita o flash branco rápido ao levar dano.',
         default: true,
+      },
+      {
+        key: 'reducedParticles',
+        type: 'toggle',
+        label: 'Reduzir partículas',
+        description:
+          'Simplifica efeitos visuais intensos como fagulhas, detritos e trilhas.',
+        default: false,
       },
     ],
   },

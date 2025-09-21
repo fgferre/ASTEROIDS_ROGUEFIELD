@@ -5,6 +5,14 @@ import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
+const COLOR_ASSIST_ACCENTS = {
+  offense: '#3366CC',
+  defense: '#2F855A',
+  mobility: '#E76F51',
+  utility: '#8E6CFF',
+  default: '#4C6EF5',
+};
+
 class UISystem {
   constructor() {
     if (typeof gameServices !== 'undefined') {
@@ -53,6 +61,18 @@ class UISystem {
       source: 'menu',
       activeCategory: 'audio',
       capture: null,
+    };
+    this.levelUpState = {
+      isVisible: false,
+      options: [],
+      buttons: [],
+      focusIndex: -1,
+      poolSize: 0,
+    };
+    this.currentVisualPreferences = {
+      accessibility: {},
+      video: {},
+      derived: {},
     };
 
     this.initializeSettingsMetadata();
@@ -145,41 +165,33 @@ class UISystem {
   }
 
   bootstrapSettingsState() {
-    if (!this.settings) {
-      if (Array.isArray(SETTINGS_SCHEMA)) {
-        const accessibilityFallback = SETTINGS_SCHEMA.find(
-          (category) => category.id === 'accessibility'
-        );
-        const videoFallback = SETTINGS_SCHEMA.find(
-          (category) => category.id === 'video'
-        );
-        if (accessibilityFallback) {
-          const fallbackValues = {};
-          ensureArray(accessibilityFallback.fields).forEach((field) => {
-            fallbackValues[field.key] = field.default;
-          });
-          this.applyAccessibilitySettings(fallbackValues);
-        }
-        if (videoFallback) {
-          const fallbackValues = {};
-          ensureArray(videoFallback.fields).forEach((field) => {
-            fallbackValues[field.key] = field.default;
-          });
-          this.applyVideoSettings(fallbackValues);
-        }
+    let accessibility = {};
+    let video = {};
+
+    if (this.settings) {
+      accessibility = this.settings.getCategoryValues('accessibility') || {};
+      video = this.settings.getCategoryValues('video') || {};
+    } else if (Array.isArray(SETTINGS_SCHEMA)) {
+      const accessibilityFallback = SETTINGS_SCHEMA.find(
+        (category) => category.id === 'accessibility'
+      );
+      if (accessibilityFallback) {
+        ensureArray(accessibilityFallback.fields).forEach((field) => {
+          accessibility[field.key] = field.default;
+        });
       }
-      return;
+
+      const videoFallback = SETTINGS_SCHEMA.find(
+        (category) => category.id === 'video'
+      );
+      if (videoFallback) {
+        ensureArray(videoFallback.fields).forEach((field) => {
+          video[field.key] = field.default;
+        });
+      }
     }
 
-    const accessibility = this.settings.getCategoryValues('accessibility');
-    if (accessibility) {
-      this.applyAccessibilitySettings(accessibility);
-    }
-
-    const video = this.settings.getCategoryValues('video');
-    if (video) {
-      this.applyVideoSettings(video);
-    }
+    this.applyVisualPreferences({ accessibility, video });
   }
 
   bindPauseControls() {
@@ -423,7 +435,10 @@ class UISystem {
 
     gameEvents.on('player-leveled-up', (data) => {
       this.updateLevelDisplay(data?.newLevel, { force: true });
-      this.showLevelUpScreen(data);
+    });
+
+    gameEvents.on('upgrade-options-ready', (payload = {}) => {
+      this.handleUpgradeOptions(payload);
     });
 
     gameEvents.on('player-died', (data) => {
@@ -484,16 +499,8 @@ class UISystem {
       }
     });
 
-    gameEvents.on('settings-accessibility-changed', (payload = {}) => {
-      if (payload?.values) {
-        this.applyAccessibilitySettings(payload.values);
-      }
-    });
-
-    gameEvents.on('settings-video-changed', (payload = {}) => {
-      if (payload?.values) {
-        this.applyVideoSettings(payload.values);
-      }
+    gameEvents.on('settings-visual-changed', (payload = {}) => {
+      this.handleVisualPreferencesChange(payload);
     });
 
     gameEvents.on('key-pressed', (payload) => {
@@ -502,6 +509,14 @@ class UISystem {
 
     gameEvents.on('gamepad-input-detected', (payload) => {
       this.handleGamepadInputForCapture(payload);
+    });
+
+    gameEvents.on('input-action', (payload = {}) => {
+      this.handleLevelUpInputAction(payload);
+    });
+
+    gameEvents.on('input-confirmed', () => {
+      this.handleLevelUpConfirm();
     });
   }
 
@@ -521,39 +536,105 @@ class UISystem {
       return;
     }
 
-    if (change.category === 'accessibility' && change.value) {
-      this.applyAccessibilitySettings(change.value);
-    }
-
-    if (change.category === 'video' && change.value) {
-      this.applyVideoSettings(change.value);
-    }
-
-    if (this.settingsState.isOpen && change.category === this.settingsState.activeCategory) {
+    if (
+      this.settingsState.isOpen &&
+      change.category === this.settingsState.activeCategory
+    ) {
       this.renderSettingsPanel(this.settingsState.activeCategory);
     }
   }
 
-  applyAccessibilitySettings(values = {}) {
-    const body = document.body;
-    if (!body) {
+  handleVisualPreferencesChange(payload = {}) {
+    if (!payload || !payload.values) {
       return;
     }
 
-    body.classList.toggle('hud-high-contrast', Boolean(values.highContrastHud));
-    body.classList.toggle('motion-reduced', Boolean(values.reducedMotion));
+    this.applyVisualPreferences(payload.values);
   }
 
-  applyVideoSettings(values = {}) {
+  applyAccessibilitySettings(values = {}, derived = null) {
+    const body = document.body;
     const root = document.documentElement;
-    if (root && typeof values.hudScale === 'number') {
-      root.style.setProperty('--hud-scale', String(values.hudScale));
+
+    const highContrast = derived?.contrast
+      ? derived.contrast === 'high'
+      : Boolean(values.highContrastHud);
+    const reducedMotion =
+      derived?.reducedMotion ?? Boolean(values.reducedMotion);
+    const colorVision = derived?.colorVision
+      ? derived.colorVision
+      : values.colorBlindPalette
+        ? 'assist'
+        : 'standard';
+
+    if (body) {
+      body.classList.toggle('hud-high-contrast', highContrast);
+      body.classList.toggle('motion-reduced', reducedMotion);
+      body.classList.toggle('color-assist-mode', colorVision === 'assist');
+    }
+
+    if (root) {
+      root.dataset.contrast = highContrast ? 'high' : 'normal';
+      root.dataset.motion = reducedMotion ? 'reduced' : 'standard';
+      root.dataset.colorVision = colorVision;
+    }
+  }
+
+  applyVideoSettings(values = {}, derived = null) {
+    const root = document.documentElement;
+    const hudScale = Number.isFinite(Number(derived?.hudScale))
+      ? Number(derived.hudScale)
+      : Number.isFinite(Number(values.hudScale))
+        ? Number(values.hudScale)
+        : 1;
+
+    if (root) {
+      root.style.setProperty('--hud-scale', String(hudScale));
+      root.dataset.hudScale = String(hudScale);
     }
 
     const body = document.body;
     if (body) {
-      body.classList.toggle('damage-flash-disabled', values.damageFlash === false);
+      const damageFlashEnabled =
+        derived?.damageFlash ?? values.damageFlash !== false;
+      const reducedParticles =
+        derived?.reducedParticles ?? Boolean(values.reducedParticles);
+
+      body.classList.toggle('damage-flash-disabled', !damageFlashEnabled);
+      body.classList.toggle('particles-reduced', reducedParticles);
     }
+  }
+
+  deriveVisualPreferences(accessibility = {}, video = {}) {
+    const highContrast = Boolean(accessibility.highContrastHud);
+    const reducedMotion = Boolean(accessibility.reducedMotion);
+    const colorVision = accessibility.colorBlindPalette ? 'assist' : 'standard';
+    const hudScale = Number.isFinite(Number(video.hudScale))
+      ? Number(video.hudScale)
+      : 1;
+    const damageFlash = video.damageFlash !== false;
+    const reducedParticles = Boolean(video.reducedParticles);
+
+    return {
+      contrast: highContrast ? 'high' : 'normal',
+      reducedMotion,
+      colorVision,
+      hudScale,
+      damageFlash,
+      reducedParticles,
+    };
+  }
+
+  applyVisualPreferences(values = {}) {
+    const accessibility = values.accessibility || {};
+    const video = values.video || {};
+    const derived =
+      values.derived || this.deriveVisualPreferences(accessibility, video);
+
+    this.currentVisualPreferences = { accessibility, video, derived };
+
+    this.applyAccessibilitySettings(accessibility, derived);
+    this.applyVideoSettings(video, derived);
   }
 
   handleSettingsInputChange(event) {
@@ -563,7 +644,8 @@ class UISystem {
     }
 
     const fieldKey = target.dataset.settingKey;
-    const categoryId = target.dataset.settingCategory || this.settingsState.activeCategory;
+    const categoryId =
+      target.dataset.settingCategory || this.settingsState.activeCategory;
     if (!fieldKey || !this.settings || !categoryId) {
       return;
     }
@@ -571,7 +653,9 @@ class UISystem {
     const field = this.getFieldDefinition(categoryId, fieldKey);
 
     if (target.type === 'checkbox') {
-      this.settings.setSetting(categoryId, fieldKey, target.checked, { source: 'ui' });
+      this.settings.setSetting(categoryId, fieldKey, target.checked, {
+        source: 'ui',
+      });
       return;
     }
 
@@ -591,7 +675,8 @@ class UISystem {
     }
 
     const fieldKey = target.dataset.settingKey;
-    const categoryId = target.dataset.settingCategory || this.settingsState.activeCategory;
+    const categoryId =
+      target.dataset.settingCategory || this.settingsState.activeCategory;
     if (!fieldKey || !this.settings || !categoryId) {
       return;
     }
@@ -607,7 +692,9 @@ class UISystem {
   }
 
   handleSettingsClick(event) {
-    const captureButton = event.target.closest('[data-action="capture-binding"]');
+    const captureButton = event.target.closest(
+      '[data-action="capture-binding"]'
+    );
     if (captureButton) {
       event.preventDefault();
       this.beginBindingCapture(captureButton);
@@ -658,7 +745,9 @@ class UISystem {
     overlay.setAttribute('aria-hidden', 'false');
     document.body?.classList.add('is-settings-open');
 
-    const activeTab = overlay.querySelector('[data-settings-category].is-active');
+    const activeTab = overlay.querySelector(
+      '[data-settings-category].is-active'
+    );
     if (activeTab instanceof HTMLElement) {
       activeTab.focus();
     }
@@ -729,7 +818,11 @@ class UISystem {
     const values = this.settings?.getCategoryValues(categoryId) || {};
 
     ensureArray(category.fields).forEach((field) => {
-      const element = this.renderSettingField(categoryId, field, values[field.key]);
+      const element = this.renderSettingField(
+        categoryId,
+        field,
+        values[field.key]
+      );
       if (element) {
         container.appendChild(element);
       }
@@ -871,7 +964,9 @@ class UISystem {
       const bindings = ensureArray(value?.[device]);
       const metadata = field.metadata?.[device] || {};
       const maxSlots = Math.max(
-        Number(metadata.max) || bindings.length || ensureArray(field.default?.[device]).length,
+        Number(metadata.max) ||
+          bindings.length ||
+          ensureArray(field.default?.[device]).length,
         1
       );
 
@@ -880,7 +975,8 @@ class UISystem {
 
       const deviceTitle = document.createElement('span');
       deviceTitle.className = 'settings-binding__device';
-      deviceTitle.textContent = metadata.label || (device === 'keyboard' ? 'Teclado' : 'Gamepad');
+      deviceTitle.textContent =
+        metadata.label || (device === 'keyboard' ? 'Teclado' : 'Gamepad');
       deviceGroup.appendChild(deviceTitle);
 
       const list = document.createElement('div');
@@ -983,7 +1079,8 @@ class UISystem {
       }
       if (value.startsWith('axis:')) {
         const [, index, direction] = value.split(':');
-        const symbol = direction === 'negative' || direction === '-' ? '−' : '+';
+        const symbol =
+          direction === 'negative' || direction === '-' ? '−' : '+';
         return `Eixo ${index} ${symbol}`;
       }
     }
@@ -1164,8 +1261,14 @@ class UISystem {
     }
 
     if (payload.type === 'axis' && Number.isInteger(payload.index)) {
-      const direction = payload.direction === 'negative' || payload.direction === '-' ? '-' : '+';
-      this.commitBindingCapture(`axis:${payload.index}:${direction}`, 'gamepad');
+      const direction =
+        payload.direction === 'negative' || payload.direction === '-'
+          ? '-'
+          : '+';
+      this.commitBindingCapture(
+        `axis:${payload.index}:${direction}`,
+        'gamepad'
+      );
     }
   }
 
@@ -1229,7 +1332,10 @@ class UISystem {
       return null;
     }
 
-    return ensureArray(category.fields).find((field) => field.key === fieldKey) || null;
+    return (
+      ensureArray(category.fields).find((field) => field.key === fieldKey) ||
+      null
+    );
   }
 
   bootstrapHudValues() {
@@ -1710,6 +1816,7 @@ class UISystem {
   }
 
   showGameUI() {
+    this.resetLevelUpState();
     this.showScreen('playing');
     this.refreshHudFromServices(true);
   }
@@ -1723,57 +1830,427 @@ class UISystem {
 
     document.body?.classList.toggle('is-paused', shouldPause);
 
-    if (!shouldPause && this.settingsState.isOpen && this.settingsState.source === 'pause') {
+    if (
+      !shouldPause &&
+      this.settingsState.isOpen &&
+      this.settingsState.source === 'pause'
+    ) {
       this.closeSettingsPanel();
     }
   }
 
-  showLevelUpScreen(data) {
+  showLevelUpScreen(data = {}) {
+    const options = ensureArray(data.options || data.availableUpgrades);
+
+    if (!options.length) {
+      if (data.autoResolved) {
+        this.resetLevelUpState();
+        this.showGameUI();
+      }
+      return;
+    }
+
+    const levelValue = Number.isFinite(Number(data.level))
+      ? Number(data.level)
+      : Number.isFinite(Number(data.newLevel))
+        ? Number(data.newLevel)
+        : null;
+
+    this.levelUpState.isVisible = true;
+    this.levelUpState.options = options;
+    this.levelUpState.poolSize = Number.isFinite(Number(data.poolSize))
+      ? Number(data.poolSize)
+      : options.length;
+    this.levelUpState.focusIndex = -1;
+
     this.showScreen('levelup');
 
     if (this.domRefs.levelUp.text) {
-      this.domRefs.levelUp.text.textContent = `Level ${data.newLevel} - Escolha sua tecnologia:`;
+      const optionCount = options.length;
+      const poolSize = this.levelUpState.poolSize;
+      const optionLabel = optionCount === 1 ? 'opção' : 'opções';
+      let suffix = ` (${optionCount} ${optionLabel})`;
+      if (poolSize > optionCount) {
+        suffix = ` (${optionCount} de ${poolSize} ${optionLabel})`;
+      }
+      const prefix = Number.isFinite(levelValue)
+        ? `Level ${levelValue} - Escolha sua tecnologia`
+        : 'Escolha sua tecnologia';
+      this.domRefs.levelUp.text.textContent = `${prefix}${suffix}:`;
     }
 
     const container = this.domRefs.levelUp.container;
     if (container) {
       container.innerHTML = '';
+      const fragment = document.createDocumentFragment();
+      const buttons = [];
 
-      data.availableUpgrades.forEach((upgrade) => {
-        const button = document.createElement('button');
-        button.className = 'upgrade-option';
-        button.onclick = () => this.selectUpgrade(upgrade.id);
-
-        const currentLevel =
-          typeof upgrade.currentLevel === 'number' && upgrade.currentLevel > 0
-            ? upgrade.currentLevel
-            : 0;
-        const levelBadge = currentLevel
-          ? `<span class="upgrade-level-tag">Nv. ${currentLevel}</span>`
-          : '';
-
-        button.innerHTML = `
-        <div class="upgrade-icon" style="color: ${upgrade.color};">
-          ${upgrade.icon}
-        </div>
-        <div class="upgrade-info">
-          <h3>${upgrade.name}${levelBadge ? ` ${levelBadge}` : ''}</h3>
-          <p>${upgrade.description}</p>
-        </div>
-      `;
-        container.appendChild(button);
+      options.forEach((option, index) => {
+        const button = this.createUpgradeOptionButton(option, index);
+        fragment.appendChild(button);
+        buttons.push(button);
       });
+
+      container.appendChild(fragment);
+      this.levelUpState.buttons = buttons;
+      this.focusLevelUpOption(0, { preventFocus: false });
+    } else {
+      this.levelUpState.buttons = [];
     }
   }
 
+  createUpgradeOptionButton(option, index) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'upgrade-option';
+    button.dataset.upgradeId = option.id;
+    button.dataset.index = `${index}`;
+
+    const accentColors = this.resolveAccentColors(option);
+    button.style.setProperty('--upgrade-accent', accentColors.accent);
+    button.style.setProperty('--upgrade-accent-soft', accentColors.soft);
+
+    button.innerHTML = this.buildUpgradeOptionMarkup(option);
+    button.addEventListener('click', () => this.selectUpgrade(option.id));
+    button.addEventListener('mouseenter', () =>
+      this.focusLevelUpOption(index, { preventFocus: true, fromPointer: true })
+    );
+    button.addEventListener('focus', () =>
+      this.focusLevelUpOption(index, { preventFocus: false })
+    );
+
+    return button;
+  }
+
+  buildUpgradeOptionMarkup(option = {}) {
+    const category = option.category || {};
+    const currentLevel = Number.isFinite(Number(option.currentLevel))
+      ? Number(option.currentLevel)
+      : 0;
+    const maxLevel = Number.isFinite(Number(option.maxLevel))
+      ? Number(option.maxLevel)
+      : Math.max(currentLevel, 1);
+    const nextLevel = option.nextLevel || null;
+    const summary = option.summary ? option.summary : '';
+    const highlights = Array.isArray(nextLevel?.highlights)
+      ? nextLevel.highlights
+      : [];
+    const prerequisites = ensureArray(option.prerequisites);
+
+    const categoryIcon = category.icon
+      ? `<span class="upgrade-option__category-icon" aria-hidden="true">${category.icon}</span>`
+      : '';
+
+    const nextLevelSection = nextLevel
+      ? `<section class="upgrade-option__next">
+          <p class="upgrade-option__next-label">Próximo: ${
+            nextLevel.title || `Nível ${currentLevel + 1}`
+          }</p>
+          <p class="upgrade-option__description">${
+            nextLevel.description || ''
+          }</p>
+          ${
+            highlights.length
+              ? `<ul class="upgrade-highlights">
+                  ${highlights.map((item) => `<li>${item}</li>`).join('')}
+                </ul>`
+              : ''
+          }
+        </section>`
+      : '<p class="upgrade-option__maxed">Tecnologia já maximizada.</p>';
+
+    const prerequisitesSection = prerequisites.length
+      ? `<footer class="upgrade-option__footer">
+          <ul class="upgrade-prerequisites">
+            ${prerequisites
+              .map((entry) => {
+                const label = entry?.label || entry?.description || '';
+                if (!label) {
+                  return '';
+                }
+                const stateClass = entry.met ? 'is-met' : 'is-locked';
+                const icon = entry.met ? '✔️' : '🔒';
+                return `<li class="${stateClass}">${icon} ${label}</li>`;
+              })
+              .join('')}
+          </ul>
+        </footer>`
+      : '';
+
+    return `
+      <header class="upgrade-option__header">
+        <span class="upgrade-icon" aria-hidden="true">${
+          option.icon || '✨'
+        }</span>
+        <div class="upgrade-option__meta">
+          <span class="upgrade-option__category">
+            ${categoryIcon}
+            ${category.label || 'Tecnologia'}
+          </span>
+          <span class="upgrade-option__level">Nv. atual: ${currentLevel}/${
+            maxLevel || Math.max(1, currentLevel)
+          }</span>
+        </div>
+      </header>
+      <div class="upgrade-option__body">
+        <h3 class="upgrade-option__title">${option.name || option.id}</h3>
+        ${summary ? `<p class="upgrade-option__summary">${summary}</p>` : ''}
+        ${nextLevelSection}
+      </div>
+      ${prerequisitesSection}
+    `;
+  }
+
   selectUpgrade(upgradeId) {
-    const progression = gameServices.get('progression');
-    if (progression) {
-      const success = progression.applyUpgrade(upgradeId);
-      if (success) {
+    if (!upgradeId) {
+      return;
+    }
+
+    const progression =
+      typeof gameServices !== 'undefined'
+        ? gameServices.get('progression')
+        : null;
+
+    if (!progression || typeof progression.applyUpgrade !== 'function') {
+      this.showGameUI();
+      return;
+    }
+
+    this.disableLevelUpOptions();
+    const success = progression.applyUpgrade(upgradeId);
+    if (success) {
+      this.showGameUI();
+    } else {
+      this.enableLevelUpOptions();
+    }
+  }
+
+  handleUpgradeOptions(payload = {}) {
+    const options = ensureArray(payload.options || payload.availableUpgrades);
+    this.levelUpState.poolSize = Number.isFinite(Number(payload.poolSize))
+      ? Number(payload.poolSize)
+      : options.length;
+    this.levelUpState.options = options;
+
+    if (
+      Number.isFinite(Number(payload.level)) ||
+      Number.isFinite(Number(payload.newLevel))
+    ) {
+      this.updateLevelDisplay(payload.level ?? payload.newLevel, {
+        force: true,
+      });
+    }
+
+    if (!options.length) {
+      this.resetLevelUpState();
+      if (payload.autoResolved) {
         this.showGameUI();
       }
+      return;
     }
+
+    this.showLevelUpScreen({
+      level: payload.level ?? payload.newLevel,
+      options,
+      poolSize: this.levelUpState.poolSize,
+      autoResolved: payload.autoResolved,
+    });
+  }
+
+  focusLevelUpOption(index, options = {}) {
+    const buttons = ensureArray(this.levelUpState.buttons);
+    if (!buttons.length) {
+      this.levelUpState.focusIndex = -1;
+      return;
+    }
+
+    const safeIndex =
+      ((index % buttons.length) + buttons.length) % buttons.length;
+    buttons.forEach((button, idx) => {
+      if (!button) {
+        return;
+      }
+      if (idx === safeIndex) {
+        button.classList.add('is-focused');
+        if (!options.preventFocus && document.activeElement !== button) {
+          button.focus({ preventScroll: true });
+        }
+      } else {
+        button.classList.remove('is-focused');
+      }
+    });
+
+    this.levelUpState.focusIndex = safeIndex;
+  }
+
+  moveLevelUpFocus(direction) {
+    const buttons = ensureArray(this.levelUpState.buttons);
+    if (!buttons.length) {
+      return;
+    }
+
+    const currentIndex =
+      this.levelUpState.focusIndex >= 0 ? this.levelUpState.focusIndex : 0;
+    this.focusLevelUpOption(currentIndex + direction, { preventFocus: false });
+  }
+
+  handleLevelUpInputAction(payload = {}) {
+    if (!this.levelUpState.isVisible) {
+      return;
+    }
+
+    if (payload.phase && payload.phase !== 'pressed') {
+      return;
+    }
+
+    switch (payload.action) {
+      case 'moveUp':
+      case 'moveLeft':
+        this.moveLevelUpFocus(-1);
+        break;
+      case 'moveDown':
+      case 'moveRight':
+        this.moveLevelUpFocus(1);
+        break;
+      default:
+        break;
+    }
+  }
+
+  handleLevelUpConfirm() {
+    if (!this.levelUpState.isVisible) {
+      return;
+    }
+
+    this.applyFocusedUpgrade();
+  }
+
+  applyFocusedUpgrade() {
+    const index = this.levelUpState.focusIndex;
+    if (index < 0) {
+      this.focusLevelUpOption(0, { preventFocus: false });
+    }
+
+    const option = this.levelUpState.options?.[this.levelUpState.focusIndex];
+    if (option && option.id) {
+      this.selectUpgrade(option.id);
+    }
+  }
+
+  disableLevelUpOptions() {
+    ensureArray(this.levelUpState.buttons).forEach((button) => {
+      if (button) {
+        button.disabled = true;
+      }
+    });
+  }
+
+  enableLevelUpOptions() {
+    ensureArray(this.levelUpState.buttons).forEach((button) => {
+      if (button) {
+        button.disabled = false;
+      }
+    });
+  }
+
+  resetLevelUpState() {
+    ensureArray(this.levelUpState.buttons).forEach((button) => {
+      if (button) {
+        button.classList.remove('is-focused');
+        button.disabled = false;
+      }
+    });
+
+    this.levelUpState = {
+      isVisible: false,
+      options: [],
+      buttons: [],
+      focusIndex: -1,
+      poolSize: 0,
+    };
+  }
+
+  resolveAccentColors(option) {
+    const fallback = '#3399ff';
+    let accent = fallback;
+    let categoryId = null;
+
+    if (option && typeof option === 'object') {
+      if (
+        typeof option.themeColor === 'string' &&
+        option.themeColor.trim().length
+      ) {
+        accent = option.themeColor.trim();
+      } else if (
+        typeof option.color === 'string' &&
+        option.color.trim().length
+      ) {
+        accent = option.color.trim();
+      }
+
+      categoryId =
+        option.category?.id ||
+        option.categoryId ||
+        (typeof option.id === 'string' ? option.id : null);
+    } else if (typeof option === 'string' && option.trim().length) {
+      accent = option.trim();
+    }
+
+    const colorVision =
+      this.currentVisualPreferences?.derived?.colorVision || 'standard';
+
+    if (colorVision === 'assist') {
+      const assistAccent = this.resolveAssistAccent(categoryId);
+      if (assistAccent) {
+        accent = assistAccent;
+      }
+    }
+
+    const normalized =
+      typeof accent === 'string' ? accent.trim().toLowerCase() : '';
+    const softAlpha = colorVision === 'assist' ? 0.35 : 0.25;
+    let soft = 'rgba(51, 153, 255, 0.25)';
+
+    if (normalized.startsWith('#')) {
+      soft = this.hexToRgba(normalized, softAlpha);
+    } else if (normalized.startsWith('rgb')) {
+      soft = normalized.replace('rgb', 'rgba').replace(')', `, ${softAlpha})`);
+    } else if (normalized.startsWith('hsl')) {
+      soft = normalized.replace('hsl', 'hsla').replace(')', `, ${softAlpha})`);
+    } else if (colorVision === 'assist') {
+      soft = 'rgba(76, 110, 245, 0.32)';
+    }
+
+    return { accent, soft };
+  }
+
+  resolveAssistAccent(categoryId) {
+    if (!categoryId) {
+      return COLOR_ASSIST_ACCENTS.default;
+    }
+
+    return COLOR_ASSIST_ACCENTS[categoryId] || COLOR_ASSIST_ACCENTS.default;
+  }
+
+  hexToRgba(hex, alpha = 1) {
+    const sanitized = typeof hex === 'string' ? hex.replace('#', '') : '';
+    const clampedAlpha = Math.min(1, Math.max(0, alpha));
+
+    if (sanitized.length === 3) {
+      const r = parseInt(sanitized[0] + sanitized[0], 16);
+      const g = parseInt(sanitized[1] + sanitized[1], 16);
+      const b = parseInt(sanitized[2] + sanitized[2], 16);
+      return `rgba(${r}, ${g}, ${b}, ${clampedAlpha})`;
+    }
+
+    if (sanitized.length === 6) {
+      const r = parseInt(sanitized.slice(0, 2), 16);
+      const g = parseInt(sanitized.slice(2, 4), 16);
+      const b = parseInt(sanitized.slice(4, 6), 16);
+      return `rgba(${r}, ${g}, ${b}, ${clampedAlpha})`;
+    }
+
+    return `rgba(51, 153, 255, ${clampedAlpha})`;
   }
 
   showGameOverScreen(data) {

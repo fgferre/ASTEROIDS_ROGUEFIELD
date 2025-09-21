@@ -86,6 +86,7 @@ export default class EffectsSystem {
     this.motionReduced = false;
     this.screenShakeScale = 1;
     this.damageFlashEnabled = true;
+    this.particleDensity = 1;
 
     if (typeof gameServices !== 'undefined') {
       gameServices.register('effects', this);
@@ -106,7 +107,10 @@ export default class EffectsSystem {
       this.settings = gameServices.get('settings');
     }
 
-    if (this.settings && typeof this.settings.getCategoryValues === 'function') {
+    if (
+      this.settings &&
+      typeof this.settings.getCategoryValues === 'function'
+    ) {
       const accessibility = this.settings.getCategoryValues('accessibility');
       if (accessibility) {
         this.applyAccessibilityPreferences(accessibility);
@@ -139,7 +143,10 @@ export default class EffectsSystem {
 
   applyVideoPreferences(values = {}) {
     if (Number.isFinite(values.screenShakeIntensity)) {
-      const normalized = Math.max(0, Math.min(1.5, Number(values.screenShakeIntensity)));
+      const normalized = Math.max(
+        0,
+        Math.min(1.5, Number(values.screenShakeIntensity))
+      );
       this.screenShakeScale = normalized;
       if (this.screenShakeScale <= 0) {
         this.screenShake = { intensity: 0, duration: 0, timer: 0 };
@@ -151,6 +158,37 @@ export default class EffectsSystem {
       this.screenFlash.timer = 0;
       this.screenFlash.intensity = 0;
     }
+
+    if (typeof values.reducedParticles === 'boolean') {
+      this.particleDensity = values.reducedParticles ? 0.55 : 1;
+    }
+  }
+
+  getScaledParticleCount(baseCount, options = {}) {
+    const numeric = Number(baseCount);
+    const allowZero = options.allowZero === true;
+    const minimum = Number.isFinite(options.minimum) ? options.minimum : 1;
+
+    if (!Number.isFinite(numeric)) {
+      return allowZero ? 0 : minimum;
+    }
+
+    const scaled = Math.round(numeric * this.particleDensity);
+    if (allowZero) {
+      return Math.max(0, scaled);
+    }
+
+    return Math.max(minimum, scaled);
+  }
+
+  getScaledProbability(probability) {
+    const numeric = Number(probability);
+    if (!Number.isFinite(numeric)) {
+      return 0;
+    }
+
+    const clamped = Math.max(0, Math.min(1, numeric));
+    return Math.max(0, Math.min(1, clamped * this.particleDensity));
   }
 
   setupEventListeners() {
@@ -385,8 +423,14 @@ export default class EffectsSystem {
       return;
     }
 
-    this.screenShake.intensity = Math.max(this.screenShake.intensity, finalIntensity);
-    this.screenShake.duration = Math.max(this.screenShake.duration, finalDuration);
+    this.screenShake.intensity = Math.max(
+      this.screenShake.intensity,
+      finalIntensity
+    );
+    this.screenShake.duration = Math.max(
+      this.screenShake.duration,
+      finalDuration
+    );
     this.screenShake.timer = this.screenShake.duration;
   }
 
@@ -404,7 +448,10 @@ export default class EffectsSystem {
     }
 
     this.freezeFrame.timer = Math.max(this.freezeFrame.timer, finalDuration);
-    this.freezeFrame.duration = Math.max(this.freezeFrame.duration, finalDuration);
+    this.freezeFrame.duration = Math.max(
+      this.freezeFrame.duration,
+      finalDuration
+    );
     this.freezeFrame.fade = finalFade;
   }
 
@@ -414,7 +461,9 @@ export default class EffectsSystem {
     }
 
     let finalDuration = Number.isFinite(duration) ? Math.max(0, duration) : 0;
-    let finalIntensity = Number.isFinite(intensity) ? Math.max(0, intensity) : 0;
+    let finalIntensity = Number.isFinite(intensity)
+      ? Math.max(0, intensity)
+      : 0;
 
     if (this.motionReduced) {
       finalDuration = Math.min(finalDuration, 0.18);
@@ -461,7 +510,8 @@ export default class EffectsSystem {
           `hsl(${200 + Math.random() * 25}, 100%, ${70 + Math.random() * 18}%)`;
     }
 
-    const count = Math.max(1, Math.round(baseCount * (0.8 + i * 2.0)));
+    const rawCount = baseCount * (0.8 + i * 2.0);
+    const count = this.getScaledParticleCount(rawCount);
 
     for (let c = 0; c < count; c++) {
       const jitter = (Math.random() - 0.5) * 0.35;
@@ -484,7 +534,7 @@ export default class EffectsSystem {
         )
       );
 
-      if (Math.random() < 0.25) {
+      if (Math.random() < this.getScaledProbability(0.25)) {
         const sparkSpd = spd * (0.9 + Math.random() * 0.3);
         this.particles.push(
           new SpaceParticle(
@@ -564,7 +614,9 @@ export default class EffectsSystem {
     const intensityBase = Number.isFinite(data.intensity) ? data.intensity : 1;
     const intensity = Math.min(2.5, Math.max(0.6, intensityBase));
 
-    const particleCount = Math.round(12 + level * 2 + intensity * 4);
+    const particleCount = this.getScaledParticleCount(
+      12 + level * 2 + intensity * 4
+    );
     for (let i = 0; i < particleCount; i += 1) {
       const spread = (Math.random() - 0.5) * Math.PI * 0.7;
       const angle = Math.atan2(-ny, -nx) + spread;
@@ -601,7 +653,8 @@ export default class EffectsSystem {
   }
 
   createXPCollectEffect(x, y) {
-    for (let i = 0; i < 6; i++) {
+    const count = this.getScaledParticleCount(6);
+    for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 25 + Math.random() * 40;
       const particle = new SpaceParticle(
@@ -625,8 +678,9 @@ export default class EffectsSystem {
     const flashColor = data?.flash || 'rgba(255, 255, 255, 0.2)';
     const { x, y } = data.position;
 
-    const particleCount =
-      12 + Math.min(24, tier * 4 + Math.floor(consumed / 2));
+    const particleCount = this.getScaledParticleCount(
+      12 + Math.min(24, tier * 4 + Math.floor(consumed / 2))
+    );
 
     for (let i = 0; i < particleCount; i += 1) {
       const angle = (Math.PI * 2 * i) / particleCount + Math.random() * 0.3;
@@ -655,7 +709,7 @@ export default class EffectsSystem {
     );
     this.particles.push(halo);
 
-    const ringCount = 4 + tier;
+    const ringCount = this.getScaledParticleCount(4 + tier, { minimum: 2 });
     for (let i = 0; i < ringCount; i += 1) {
       const angle = (Math.PI * 2 * i) / ringCount;
       const speed = 40 + tier * 12;
@@ -676,7 +730,8 @@ export default class EffectsSystem {
   }
 
   createLevelUpExplosion(player) {
-    for (let i = 0; i < 20; i++) {
+    const count = this.getScaledParticleCount(20);
+    for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 60 + Math.random() * 120;
       const particle = new SpaceParticle(
@@ -694,7 +749,8 @@ export default class EffectsSystem {
   }
 
   createAsteroidExplosion(asteroid) {
-    const particleCount = { large: 12, medium: 8, small: 5 }[asteroid.size];
+    const baseCount = { large: 12, medium: 8, small: 5 }[asteroid.size] || 6;
+    const particleCount = this.getScaledParticleCount(baseCount);
 
     if (asteroid.size === 'small') {
       this.addScreenShake(2, 0.1);
@@ -738,7 +794,7 @@ export default class EffectsSystem {
 
   createCrackDebris(asteroid, stage = 1) {
     const intensity = Math.min(Math.max(stage, 1), 3);
-    const sparks = 2 + intensity * 2;
+    const sparks = this.getScaledParticleCount(2 + intensity * 2);
 
     for (let i = 0; i < sparks; i += 1) {
       const angle = Math.random() * Math.PI * 2;
@@ -807,9 +863,8 @@ export default class EffectsSystem {
     const countMax = Array.isArray(countRange)
       ? countRange[1] ?? countMin
       : countMin;
-    const spawnCount = Math.max(
-      1,
-      Math.round(this.randomRange(countMin, countMax + totalIntensity * 1.2))
+    const spawnCount = this.getScaledParticleCount(
+      this.randomRange(countMin, countMax + totalIntensity * 1.2)
     );
 
     const spread = Number.isFinite(config.spread) ? config.spread : Math.PI / 4;
@@ -861,7 +916,7 @@ export default class EffectsSystem {
       );
       this.particles.push(core);
 
-      if (Math.random() < 0.55) {
+      if (Math.random() < this.getScaledProbability(0.55)) {
         const smoke = new SpaceParticle(
           spawnX,
           spawnY,
@@ -874,7 +929,7 @@ export default class EffectsSystem {
         this.particles.push(smoke);
       }
 
-      if (Math.random() < 0.3) {
+      if (Math.random() < this.getScaledProbability(0.3)) {
         const glint = new SpaceParticle(
           spawnX,
           spawnY,
@@ -890,7 +945,7 @@ export default class EffectsSystem {
   }
 
   spawnVolatileWarning(position) {
-    const particles = 6;
+    const particles = this.getScaledParticleCount(6);
     for (let i = 0; i < particles; i += 1) {
       const angle = (i / particles) * Math.PI * 2;
       const speed = 20 + Math.random() * 15;
@@ -962,7 +1017,9 @@ export default class EffectsSystem {
       radius: radius * 1.05,
     });
 
-    const particleTotal = 22 + Math.floor(radius / 5);
+    const particleTotal = this.getScaledParticleCount(
+      22 + Math.floor(radius / 5)
+    );
     for (let i = 0; i < particleTotal; i += 1) {
       const angle = Math.random() * Math.PI * 2;
       const speed = (70 + Math.random() * 150) * (0.8 + intensity * 0.4);
@@ -994,7 +1051,7 @@ export default class EffectsSystem {
       this.particles.push(debris);
     }
 
-    const smokeCount = 10 + Math.floor(radius / 8);
+    const smokeCount = this.getScaledParticleCount(10 + Math.floor(radius / 8));
     for (let i = 0; i < smokeCount; i += 1) {
       const angle = Math.random() * Math.PI * 2;
       const distance = Math.random() * radius * 0.55;

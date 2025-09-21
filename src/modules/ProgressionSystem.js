@@ -1,4 +1,5 @@
 import * as CONSTANTS from '../core/GameConstants.js';
+import UPGRADE_LIBRARY, { UPGRADE_CATEGORIES } from '../data/upgrades.js';
 
 const ORB_CLASS_ORDER = [
   { name: 'blue', tier: 1 },
@@ -75,12 +76,14 @@ const ORB_NEXT_CLASS = ORB_CLASS_CONFIG.reduce(
   {}
 );
 
-const DEFLECTOR_DESCRIPTIONS = {
-  0: 'Adiciona um escudo ativável (Tecla E) que absorve 3 impactos.',
-  1: 'Aumenta a capacidade do escudo para 4 impactos.',
-  2: 'Reduz o cooldown do escudo em 5 segundos.',
-  3: 'Aumenta a capacidade do escudo para 5 impactos.',
-  4: 'Poder Final: Adiciona a Sobrecarga Defletora.',
+const asArray = (value) => (Array.isArray(value) ? value : []);
+
+const DEFAULT_UPGRADE_CATEGORY = {
+  id: 'general',
+  label: 'Tecnologia',
+  description: 'Melhorias que ampliam capacidades gerais da nave.',
+  icon: '✨',
+  themeColor: '#3399FF',
 };
 
 class ProgressionSystem {
@@ -109,7 +112,11 @@ class ProgressionSystem {
 
     // === UPGRADES APLICADOS ===
     this.appliedUpgrades = new Map();
-    this.availableUpgrades = [...CONSTANTS.SPACE_UPGRADES];
+    this.upgradeDefinitions = this.buildUpgradeDefinitions(UPGRADE_LIBRARY);
+    this.upgradeLookup = this.buildUpgradeLookup(this.upgradeDefinitions);
+    this.upgradeCategoryMap = this.buildUpgradeCategoryMap(UPGRADE_CATEGORIES);
+    this.defaultUpgradeCategory = { ...DEFAULT_UPGRADE_CATEGORY };
+    this.pendingUpgradeOptions = [];
 
     // === CONFIGURAÇÕES ===
     this.levelScaling = 1.2; // Multiplicador de XP por nível
@@ -925,10 +932,21 @@ class ProgressionSystem {
     );
 
     // Emitir evento
+    const { options, poolSize, totalDefinitions } =
+      this.prepareUpgradeOptions(3);
+
     if (typeof gameEvents !== 'undefined') {
       gameEvents.emit('player-leveled-up', {
         newLevel: this.level,
-        availableUpgrades: this.getRandomUpgrades(3),
+      });
+
+      gameEvents.emit('upgrade-options-ready', {
+        level: this.level,
+        options,
+        poolSize,
+        totalDefinitions,
+        inventory: this.getUpgradeProgressSnapshot(),
+        autoResolved: options.length === 0,
       });
     }
 
@@ -1059,99 +1077,686 @@ class ProgressionSystem {
   }
 
   // === SISTEMA DE UPGRADES ===
-  getRandomUpgrades(count = 3) {
-    const filtered = this.availableUpgrades.filter((upgrade) => {
-      if (upgrade.id !== 'deflector_shield') {
-        return true;
-      }
+  prepareUpgradeOptions(count = 3) {
+    const eligible = asArray(this.upgradeDefinitions).filter((definition) =>
+      this.isUpgradeSelectable(definition)
+    );
 
-      const currentLevel = this.getUpgradeCount(upgrade.id);
-      return currentLevel < 5;
+    const fallbackCount = 3;
+    const numericCount = Number(count);
+    const requested = Number.isFinite(numericCount)
+      ? Math.max(0, Math.floor(numericCount))
+      : fallbackCount;
+    const desired = requested > 0 ? requested : fallbackCount;
+    const cappedCount = Math.min(desired, eligible.length);
+
+    if (!eligible.length || cappedCount === 0) {
+      this.pendingUpgradeOptions = [];
+      return {
+        options: [],
+        poolSize: eligible.length,
+        totalDefinitions: this.upgradeDefinitions.length,
+      };
+    }
+
+    const shuffled = [...eligible].sort(() => Math.random() - 0.5);
+    const selection = shuffled.slice(0, cappedCount);
+    const options = selection
+      .map((definition) => this.buildUpgradeOption(definition))
+      .filter(Boolean);
+
+    this.pendingUpgradeOptions = options;
+
+    return {
+      options,
+      poolSize: eligible.length,
+      totalDefinitions: this.upgradeDefinitions.length,
+    };
+  }
+
+  getRandomUpgrades(count = 3) {
+    const { options } = this.prepareUpgradeOptions(count);
+    return options;
+  }
+
+  isUpgradeSelectable(definition) {
+    if (!definition || typeof definition !== 'object') {
+      return false;
+    }
+
+    const levels = asArray(definition.levels);
+    const maxLevel = levels.length;
+    const currentLevel = this.getUpgradeCount(definition.id);
+
+    if (maxLevel > 0 && currentLevel >= maxLevel) {
+      return false;
+    }
+
+    if (
+      Number.isFinite(definition.unlockLevel) &&
+      this.level < definition.unlockLevel
+    ) {
+      return false;
+    }
+
+    const prerequisites = this.collectRawPrerequisites(definition);
+    return prerequisites.every((requirement) =>
+      this.evaluatePrerequisite(requirement)
+    );
+  }
+
+  collectRawPrerequisites(definition, options = {}) {
+    if (!definition || typeof definition !== 'object') {
+      return [];
+    }
+
+    const includeUnlock = options.includeUnlock === true;
+    const result = [];
+
+    if (
+      includeUnlock &&
+      Number.isFinite(definition.unlockLevel) &&
+      definition.unlockLevel > 1
+    ) {
+      result.push({
+        type: 'player-level',
+        level: Math.max(1, Math.floor(definition.unlockLevel)),
+        text: `Disponível a partir do level ${definition.unlockLevel}.`,
+      });
+    }
+
+    asArray(definition.prerequisites).forEach((entry) => {
+      const normalized = this.normalizePrerequisite(entry);
+      if (normalized) {
+        result.push(normalized);
+      }
     });
 
-    const shuffled = [...filtered].sort(() => Math.random() - 0.5);
+    return result;
+  }
 
-    return shuffled.slice(0, count).map((upgrade) => {
-      const currentLevel = this.getUpgradeCount(upgrade.id);
-      let description = upgrade.description;
+  normalizePrerequisite(prerequisite) {
+    if (!prerequisite) {
+      return null;
+    }
 
-      if (upgrade.id === 'deflector_shield') {
-        const cappedLevel = Math.min(currentLevel, 4);
-        description = DEFLECTOR_DESCRIPTIONS[cappedLevel];
+    if (typeof prerequisite === 'string') {
+      return {
+        type: 'upgrade',
+        id: prerequisite,
+        level: 1,
+        text: '',
+      };
+    }
+
+    if (typeof prerequisite !== 'object') {
+      return null;
+    }
+
+    const rawType =
+      typeof prerequisite.type === 'string'
+        ? prerequisite.type.toLowerCase()
+        : 'upgrade';
+
+    if (
+      rawType === 'player-level' ||
+      rawType === 'playerlevel' ||
+      rawType === 'level'
+    ) {
+      const levelValue = Number(
+        prerequisite.level ?? prerequisite.value ?? prerequisite.minLevel
+      );
+      const level = Number.isFinite(levelValue)
+        ? Math.max(1, Math.floor(levelValue))
+        : 1;
+      return {
+        type: 'player-level',
+        level,
+        text: prerequisite.text || prerequisite.description || '',
+      };
+    }
+
+    const id =
+      prerequisite.id || prerequisite.upgradeId || prerequisite.key || null;
+    if (!id) {
+      return null;
+    }
+
+    const levelValue = Number(
+      prerequisite.level ?? prerequisite.minLevel ?? prerequisite.value
+    );
+    const level = Number.isFinite(levelValue)
+      ? Math.max(1, Math.floor(levelValue))
+      : 1;
+
+    return {
+      type: 'upgrade',
+      id,
+      level,
+      text: prerequisite.text || prerequisite.description || '',
+    };
+  }
+
+  evaluatePrerequisite(prerequisite) {
+    if (!prerequisite) {
+      return true;
+    }
+
+    if (prerequisite.type === 'player-level') {
+      return this.level >= (prerequisite.level || 1);
+    }
+
+    if (prerequisite.type === 'upgrade') {
+      const requiredLevel = prerequisite.level || 1;
+      return this.getUpgradeCount(prerequisite.id) >= requiredLevel;
+    }
+
+    return true;
+  }
+
+  generatePrerequisiteLabel(prerequisite) {
+    if (!prerequisite) {
+      return '';
+    }
+
+    if (prerequisite.type === 'player-level') {
+      return `Level do piloto ${prerequisite.level || 1}+`;
+    }
+
+    if (prerequisite.type === 'upgrade') {
+      const reference = this.upgradeLookup?.get(prerequisite.id);
+      const name = reference?.text?.name || reference?.name || prerequisite.id;
+      const levelLabel =
+        (prerequisite.level || 1) > 1 ? `Nv. ${prerequisite.level}` : 'Nv. 1';
+      return `${name} (${levelLabel})`;
+    }
+
+    return '';
+  }
+
+  describePrerequisites(definition, options = {}) {
+    const includeUnlock = options.includeUnlock !== false;
+    const entries = [];
+
+    if (
+      includeUnlock &&
+      Number.isFinite(definition?.unlockLevel) &&
+      definition.unlockLevel > 1
+    ) {
+      const unlockEntry = {
+        type: 'player-level',
+        level: Math.max(1, Math.floor(definition.unlockLevel)),
+        text: options.unlockText || '',
+      };
+      const label =
+        unlockEntry.text || this.generatePrerequisiteLabel(unlockEntry);
+      entries.push({
+        ...unlockEntry,
+        met: this.evaluatePrerequisite(unlockEntry),
+        label,
+        description: label,
+      });
+    }
+
+    this.collectRawPrerequisites(definition).forEach((entry) => {
+      const label =
+        entry.text && entry.text.length
+          ? entry.text
+          : this.generatePrerequisiteLabel(entry);
+      entries.push({
+        ...entry,
+        label,
+        description: label,
+        met: this.evaluatePrerequisite(entry),
+      });
+    });
+
+    return entries;
+  }
+
+  buildUpgradeOption(definition) {
+    if (!definition || typeof definition !== 'object') {
+      return null;
+    }
+
+    const currentLevel = this.getUpgradeCount(definition.id);
+    const levels = asArray(definition.levels);
+    const maxLevel = levels.length;
+    const category = this.resolveUpgradeCategory(definition.category);
+    const text = definition.text || {};
+    const levelTexts = asArray(text.levels);
+    const hasNextLevel = currentLevel < maxLevel;
+    const nextLevelDefinition = hasNextLevel ? levels[currentLevel] : null;
+    const nextLevelText = hasNextLevel ? levelTexts[currentLevel] || {} : null;
+
+    return {
+      id: definition.id,
+      name: text.name || definition.name || definition.id,
+      summary: text.summary || definition.description || '',
+      lore: text.lore || '',
+      icon: definition.icon || '✨',
+      themeColor: definition.themeColor || category.themeColor,
+      category,
+      tags: asArray(definition.tags),
+      currentLevel,
+      maxLevel,
+      unlockLevel: definition.unlockLevel ?? null,
+      isMaxed: !hasNextLevel,
+      nextLevel: hasNextLevel
+        ? {
+            rank: nextLevelDefinition.rank ?? currentLevel + 1,
+            title:
+              nextLevelText?.title ||
+              nextLevelDefinition.title ||
+              `Nível ${currentLevel + 1}`,
+            description:
+              nextLevelText?.description ||
+              nextLevelDefinition.description ||
+              '',
+            highlights: asArray(
+              nextLevelText?.highlights || nextLevelDefinition.highlights
+            ).filter(Boolean),
+          }
+        : null,
+      prerequisites: this.describePrerequisites(definition),
+    };
+  }
+
+  resolveUpgradeCategory(categoryRef) {
+    if (!categoryRef) {
+      return { ...this.defaultUpgradeCategory };
+    }
+
+    if (typeof categoryRef === 'string') {
+      if (this.upgradeCategoryMap.has(categoryRef)) {
+        return { ...this.upgradeCategoryMap.get(categoryRef) };
+      }
+
+      return { ...this.defaultUpgradeCategory, id: categoryRef };
+    }
+
+    if (typeof categoryRef === 'object') {
+      const key =
+        categoryRef.id ||
+        categoryRef.key ||
+        categoryRef.slug ||
+        categoryRef.name ||
+        null;
+
+      if (key && this.upgradeCategoryMap.has(key)) {
+        return {
+          ...this.upgradeCategoryMap.get(key),
+          ...categoryRef,
+          id: key,
+        };
       }
 
       return {
-        ...upgrade,
-        description,
-        currentLevel,
+        ...this.defaultUpgradeCategory,
+        ...categoryRef,
+        id: key || this.defaultUpgradeCategory.id,
+      };
+    }
+
+    return { ...this.defaultUpgradeCategory };
+  }
+
+  buildUpgradeDefinitions(source) {
+    return asArray(source)
+      .map((entry) => this.normalizeUpgradeDefinition(entry))
+      .filter((entry) => entry && entry.id);
+  }
+
+  normalizeUpgradeDefinition(entry) {
+    if (!entry || typeof entry !== 'object') {
+      return null;
+    }
+
+    const id = typeof entry.id === 'string' ? entry.id.trim() : '';
+    if (!id) {
+      return null;
+    }
+
+    const levels = asArray(entry.levels).map((level, index) => {
+      const rankValue = Number(level?.rank);
+      const rank =
+        Number.isFinite(rankValue) && rankValue > 0
+          ? Math.floor(rankValue)
+          : index + 1;
+
+      const effects = asArray(level?.effects)
+        .map((effect) => {
+          if (!effect || typeof effect !== 'object') {
+            return null;
+          }
+
+          const payload =
+            effect.payload && typeof effect.payload === 'object'
+              ? { ...effect.payload }
+              : effect.payload;
+
+          const type =
+            typeof effect.type === 'string'
+              ? effect.type.toLowerCase()
+              : effect.type;
+
+          return {
+            ...effect,
+            type,
+            payload,
+          };
+        })
+        .filter(Boolean);
+
+      return {
+        rank,
+        title: level?.title || '',
+        description: level?.description || '',
+        highlights: asArray(level?.highlights)
+          .map((item) => (typeof item === 'string' ? item : `${item}`))
+          .filter(Boolean),
+        effects,
       };
     });
+
+    const text = this.normalizeUpgradeText(entry.text, levels.length);
+
+    return {
+      id,
+      category: entry.category || entry.type || DEFAULT_UPGRADE_CATEGORY.id,
+      icon: entry.icon || '✨',
+      themeColor:
+        entry.themeColor || entry.color || DEFAULT_UPGRADE_CATEGORY.themeColor,
+      unlockLevel: entry.unlockLevel ?? null,
+      tags: asArray(entry.tags).map((tag) => `${tag}`),
+      prerequisites: asArray(entry.prerequisites),
+      name: entry.name || '',
+      description: entry.description || '',
+      text,
+      levels,
+    };
+  }
+
+  normalizeUpgradeText(text, levelCount) {
+    const normalized = {
+      name: '',
+      summary: '',
+      lore: '',
+      levels: [],
+    };
+
+    if (text && typeof text === 'object') {
+      normalized.name = text.name || text.title || '';
+      normalized.summary = text.summary || text.description || '';
+      normalized.lore = text.lore || text.flavor || '';
+    }
+
+    for (let index = 0; index < levelCount; index += 1) {
+      const sourceLevel =
+        (text && Array.isArray(text.levels) && text.levels[index]) || {};
+
+      normalized.levels.push({
+        title: sourceLevel.title || '',
+        description: sourceLevel.description || '',
+        highlights: asArray(sourceLevel.highlights)
+          .map((item) => (typeof item === 'string' ? item : `${item}`))
+          .filter(Boolean),
+      });
+    }
+
+    return normalized;
+  }
+
+  buildUpgradeLookup(definitions) {
+    return asArray(definitions).reduce((map, definition) => {
+      if (definition && definition.id) {
+        map.set(definition.id, definition);
+      }
+      return map;
+    }, new Map());
+  }
+
+  buildUpgradeCategoryMap(categories) {
+    const map = new Map();
+
+    if (categories && typeof categories === 'object') {
+      Object.values(categories).forEach((entry) => {
+        if (!entry || typeof entry !== 'object') {
+          return;
+        }
+
+        const id = entry.id || entry.key || entry.slug || entry.name || null;
+        if (!id) {
+          return;
+        }
+
+        map.set(id, {
+          ...DEFAULT_UPGRADE_CATEGORY,
+          ...entry,
+          id,
+          themeColor:
+            entry.themeColor ||
+            entry.color ||
+            DEFAULT_UPGRADE_CATEGORY.themeColor,
+        });
+      });
+    }
+
+    return map;
+  }
+
+  buildAppliedUpgradeSummary(definition, levelIndex) {
+    if (!definition || typeof definition !== 'object') {
+      return null;
+    }
+
+    const text = definition.text || {};
+    const category = this.resolveUpgradeCategory(definition.category);
+    const levelTexts = asArray(text.levels);
+    const levels = asArray(definition.levels);
+    const levelData = levels[levelIndex] || {};
+    const levelText = levelTexts[levelIndex] || {};
+
+    return {
+      id: definition.id,
+      name: text.name || definition.name || definition.id,
+      icon: definition.icon || '✨',
+      themeColor: definition.themeColor || category.themeColor,
+      category,
+      level: levelIndex + 1,
+      totalLevels: levels.length,
+      summary: text.summary || '',
+      lore: text.lore || '',
+      levelText: {
+        title: levelText.title || levelData.title || `Nível ${levelIndex + 1}`,
+        description: levelText.description || levelData.description || '',
+        highlights: asArray(
+          levelText.highlights || levelData.highlights
+        ).filter(Boolean),
+      },
+      tags: asArray(definition.tags),
+    };
+  }
+
+  cloneEffects(effects) {
+    return asArray(effects)
+      .map((effect) => {
+        if (!effect || typeof effect !== 'object') {
+          return null;
+        }
+
+        const payload =
+          effect.payload && typeof effect.payload === 'object'
+            ? { ...effect.payload }
+            : effect.payload;
+
+        return {
+          ...effect,
+          payload,
+        };
+      })
+      .filter(Boolean);
   }
 
   applyUpgrade(upgradeId) {
-    const upgrade = CONSTANTS.SPACE_UPGRADES.find((u) => u.id === upgradeId);
-    if (!upgrade) {
+    const definition = this.upgradeLookup?.get(upgradeId);
+    if (!definition) {
       console.error('[ProgressionSystem] Upgrade not found:', upgradeId);
       return false;
     }
 
-    const currentCount = this.appliedUpgrades.get(upgradeId) || 0;
-    if (upgradeId === 'deflector_shield' && currentCount >= 5) {
-      console.warn('[ProgressionSystem] Deflector shield already at max level');
+    const levels = asArray(definition.levels);
+    const currentLevel = this.getUpgradeCount(upgradeId);
+    const maxLevel = levels.length;
+
+    if (maxLevel > 0 && currentLevel >= maxLevel) {
+      console.warn(
+        '[ProgressionSystem] Upgrade already at max level:',
+        upgradeId
+      );
       return false;
     }
 
-    // Aplicar efeito do upgrade
-    this.applyUpgradeEffect(upgrade);
+    if (
+      Number.isFinite(definition.unlockLevel) &&
+      this.level < definition.unlockLevel
+    ) {
+      console.warn('[ProgressionSystem] Upgrade locked by level:', upgradeId);
+      return false;
+    }
 
-    // Registrar upgrade aplicado
-    this.appliedUpgrades.set(upgradeId, currentCount + 1);
+    if (!this.isUpgradeSelectable(definition)) {
+      console.warn(
+        '[ProgressionSystem] Upgrade prerequisites not met:',
+        upgradeId
+      );
+      return false;
+    }
 
-    // Emitir evento
+    const levelDefinition = levels[currentLevel];
+    if (!levelDefinition) {
+      console.error(
+        '[ProgressionSystem] Missing level definition for upgrade:',
+        upgradeId
+      );
+      return false;
+    }
+
+    const newLevel = currentLevel + 1;
+    this.appliedUpgrades.set(upgradeId, newLevel);
+
+    this.applyUpgradeEffects(definition, levelDefinition, newLevel);
+
+    const summary = this.buildAppliedUpgradeSummary(definition, currentLevel);
+
     if (typeof gameEvents !== 'undefined') {
       gameEvents.emit('upgrade-applied', {
-        upgrade: upgrade,
-        count: currentCount + 1,
-        playerId: 'player',
+        upgradeId,
+        level: newLevel,
+        previousLevel: currentLevel,
+        maxLevel,
+        summary,
+        effects: this.cloneEffects(levelDefinition.effects),
+        prerequisites: this.describePrerequisites(definition),
       });
     }
 
-    console.log('[ProgressionSystem] Applied upgrade:', upgrade.name);
+    console.log(
+      '[ProgressionSystem] Applied upgrade:',
+      summary?.name || upgradeId,
+      '→ nível',
+      newLevel
+    );
+
+    this.pendingUpgradeOptions = [];
+
     return true;
   }
 
-  applyUpgradeEffect(upgrade) {
-    // Por enquanto, emitir eventos para outros sistemas aplicarem
-    // No futuro, PlayerStats system gerenciará isso
+  applyUpgradeEffects(definition, levelDefinition, newLevel) {
+    const effects = asArray(levelDefinition?.effects);
+    let shouldRefreshFusion = false;
 
-    switch (upgrade.id) {
-      case 'plasma':
-        gameEvents.emit('upgrade-damage-boost', { multiplier: 1.25 });
-        break;
-
-      case 'propulsors':
-        gameEvents.emit('upgrade-speed-boost', { multiplier: 1.2 });
-        break;
-
-      case 'shield':
-        gameEvents.emit('upgrade-health-boost', { bonus: 50 });
-        break;
-
-      case 'multishot':
-        gameEvents.emit('upgrade-multishot', { bonus: 1 });
-        break;
-
-      case 'magfield':
-        this.orbMagnetismRadius *= 1.5;
-        gameEvents.emit('upgrade-magnetism', { multiplier: 1.5 });
-        break;
-
-      case 'deflector_shield': {
-        const newLevel = this.getUpgradeCount(upgrade.id) + 1;
-        gameEvents.emit('upgrade-deflector-shield', { level: newLevel });
-        break;
+    effects.forEach((effect) => {
+      if (!effect || typeof effect !== 'object') {
+        return;
       }
+
+      const type = effect.type || 'event';
+
+      if (type === 'progression') {
+        this.applyProgressionEffect(effect);
+        if (
+          effect.property === 'orbMagnetismRadius' ||
+          effect.property === 'magnetismForce'
+        ) {
+          shouldRefreshFusion = true;
+        }
+        return;
+      }
+
+      if (type === 'event' && typeof effect.event === 'string') {
+        if (typeof gameEvents !== 'undefined') {
+          const payload = {
+            ...(effect.payload || {}),
+            upgradeId: definition.id,
+            level: newLevel,
+            category: definition.category,
+          };
+          gameEvents.emit(effect.event, payload);
+        }
+        return;
+      }
+
+      console.warn('[ProgressionSystem] Unknown upgrade effect type:', type);
+    });
+
+    if (shouldRefreshFusion) {
+      this.refreshFusionParameters();
     }
+  }
+
+  applyProgressionEffect(effect) {
+    if (!effect || typeof effect !== 'object') {
+      return;
+    }
+
+    const property = effect.property;
+    if (!property || typeof this[property] !== 'number') {
+      return;
+    }
+
+    const value = Number(effect.value);
+    if (!Number.isFinite(value)) {
+      return;
+    }
+
+    const operation = effect.operation || 'set';
+
+    switch (operation) {
+      case 'multiply':
+        this[property] *= value;
+        break;
+      case 'add':
+        this[property] += value;
+        break;
+      case 'set':
+        this[property] = value;
+        break;
+      default:
+        console.warn(
+          '[ProgressionSystem] Unknown progression operation:',
+          operation
+        );
+        break;
+    }
+  }
+
+  getUpgradeProgressSnapshot() {
+    return Array.from(this.appliedUpgrades.entries()).map(([id, level]) => ({
+      id,
+      level,
+    }));
   }
 
   // === GETTERS PÚBLICOS ===
@@ -1243,6 +1848,7 @@ class ProgressionSystem {
     this.orbClasses = [...ORB_CLASS_SEQUENCE];
     this.xpOrbPools = this.createEmptyOrbPools();
     this.appliedUpgrades.clear();
+    this.pendingUpgradeOptions = [];
     this.orbMagnetismRadius = CONSTANTS.MAGNETISM_RADIUS;
     this.magnetismForce =
       CONSTANTS.ENHANCED_SHIP_MAGNETISM_FORCE || CONSTANTS.MAGNETISM_FORCE;
@@ -1298,6 +1904,7 @@ class ProgressionSystem {
     this.xpOrbPools = this.createEmptyOrbPools();
     this.fusionCheckTimer = 0;
     this.activeFusionAnimations = [];
+    this.pendingUpgradeOptions = [];
   }
 
   destroy() {
