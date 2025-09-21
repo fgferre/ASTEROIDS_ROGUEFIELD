@@ -516,7 +516,11 @@ class UISystem {
 
     if (waveRefs.countdown) {
       const shouldShowCountdown = !normalized.isActive && breakSeconds > 0;
-      waveRefs.countdown.classList.toggle('hidden', !shouldShowCountdown);
+      waveRefs.countdown.classList.toggle('is-visible', shouldShowCountdown);
+      waveRefs.countdown.setAttribute(
+        'aria-hidden',
+        shouldShowCountdown ? 'false' : 'true'
+      );
       if (waveRefs.countdownValue && shouldShowCountdown) {
         waveRefs.countdownValue.textContent = `${breakSeconds}`;
       }

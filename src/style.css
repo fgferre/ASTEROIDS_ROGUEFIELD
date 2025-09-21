@@ -1344,10 +1344,44 @@ body.is-paused #hud-root .hud-xp {
   backdrop-filter: blur(12px);
   pointer-events: none;
   z-index: 20;
+  --wave-countdown-translate-x: 0%;
+  opacity: 0;
+  visibility: hidden;
+  transform: translate3d(var(--wave-countdown-translate-x), -10px, 0);
+  transition:
+    opacity var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard),
+    visibility 0s linear var(--duration-fast);
 }
 
-.wave-countdown.hidden {
-  display: none;
+.wave-countdown.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translate3d(var(--wave-countdown-translate-x), 0, 0);
+  transition:
+    opacity var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard),
+    visibility 0s linear 0s;
+}
+
+@media (max-width: 720px) {
+  .wave-countdown {
+    top: var(--space-12);
+    left: 50%;
+    right: auto;
+    --wave-countdown-translate-x: -50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wave-countdown,
+  .wave-countdown.is-visible {
+    transition: none;
+  }
+
+  .wave-countdown {
+    transform: translate3d(var(--wave-countdown-translate-x), 0, 0);
+  }
 }
 
 .countdown-label {
