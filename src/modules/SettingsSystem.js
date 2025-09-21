@@ -464,6 +464,13 @@ class SettingsSystem {
           change,
         });
       }
+
+      if (change.category === 'video') {
+        gameEvents.emit('settings-video-changed', {
+          values: this.getCategoryValues('video'),
+          change,
+        });
+      }
     }
   }
 
