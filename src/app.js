@@ -8,6 +8,7 @@ import EffectsSystem from './modules/EffectsSystem.js';
 import AudioSystem from './modules/AudioSystem.js';
 import WorldSystem from './modules/WorldSystem.js';
 import RenderingSystem from './modules/RenderingSystem.js';
+import TutorialSystem from './modules/TutorialSystem.js';
 import {
   resolveDebugPreference,
   applyDebugPreference,
@@ -21,6 +22,8 @@ const gameState = {
   initialized: false,
   lastTime: 0,
 };
+
+let pendingTutorialStart = false;
 
 function registerGameStateService() {
   if (typeof gameServices === 'undefined') return;
@@ -66,6 +69,7 @@ function init() {
     new EnemySystem();
     new ProgressionSystem();
     new UISystem();
+    new TutorialSystem();
     new EffectsSystem(audioSystem);
     new WorldSystem();
     new RenderingSystem();
@@ -83,12 +87,27 @@ function init() {
 
 function setupDomEventListeners() {
   document.addEventListener('click', (event) => {
-    if (event.target.id === 'start-game-btn') {
+    if (!(event.target instanceof Element)) {
+      return;
+    }
+
+    const button = event.target.closest('button');
+    if (!button) {
+      return;
+    }
+
+    if (button.id === 'start-game-btn') {
       event.preventDefault();
-      startGame();
-    } else if (event.target.id === 'restart-game-btn') {
+      requestStartGame();
+    } else if (button.id === 'restart-game-btn') {
       event.preventDefault();
-      startGame();
+      requestStartGame();
+    } else if (button.id === 'open-settings-btn') {
+      event.preventDefault();
+      if (typeof gameEvents !== 'undefined') {
+        gameEvents.emit('settings-menu-requested', { source: 'menu' });
+      }
+      console.info('[app] Configurações serão implementadas na próxima etapa.');
     }
   });
 }
@@ -136,9 +155,40 @@ function setupGlobalEventListeners() {
       player.activateShield();
     }
   });
+
+  gameEvents.on('tutorial-completed', () => {
+    if (!pendingTutorialStart) {
+      return;
+    }
+
+    pendingTutorialStart = false;
+    startGame();
+  });
+}
+
+function requestStartGame() {
+  let tutorial = null;
+  if (
+    typeof gameServices !== 'undefined' &&
+    typeof gameServices.has === 'function' &&
+    gameServices.has('tutorial')
+  ) {
+    tutorial = gameServices.get('tutorial');
+  }
+
+  if (tutorial && typeof tutorial.requestStart === 'function') {
+    const intercepted = tutorial.requestStart();
+    if (intercepted) {
+      pendingTutorialStart = true;
+      return;
+    }
+  }
+
+  startGame();
 }
 
 function startGame() {
+  pendingTutorialStart = false;
   try {
     const player = gameServices.get('player');
     if (player?.reset) player.reset();

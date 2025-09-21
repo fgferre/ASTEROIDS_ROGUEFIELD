@@ -24,6 +24,12 @@ Este documento orienta a execução de testes manuais sempre que fluxos de inter
 - [x] Painel de ondas ocupa toda a largura disponível e mantém textos legíveis.
 - [x] Contador de ondas permanece visível e alinhado quando ativado. Overlay fixa-se ao topo do campo de jogo e não empurra o conteúdo em telas menores.
 
+## Tutorial interativo
+
+- [ ] Primeira execução: ao clicar em **Iniciar missão** o treinamento interativo é exibido e o jogo só começa após o término do tutorial.
+- [ ] Após concluir o tutorial uma vez, novas partidas iniciam imediatamente ao clicar em **Iniciar missão**, sem repetir as etapas.
+- [ ] O botão **Rever tutorial** reinicia o treinamento completo sem lançar a partida automaticamente ao término.
+
 ## Pós-partida
 
 - [x] Estatísticas finais mantêm consistência com os dados emitidos em `player-died` (level, kills, ondas, tempo).
