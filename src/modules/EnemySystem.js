@@ -777,6 +777,7 @@ class EnemySystem {
     this.waveState = this.createInitialWaveState();
     this.sessionStats = this.createInitialSessionStats();
     this.sessionActive = false;
+    this.lastWaveBroadcast = null;
 
     // Registrar no ServiceLocator
     if (typeof gameServices !== 'undefined') {
@@ -784,6 +785,8 @@ class EnemySystem {
     }
 
     this.setupEventListeners();
+
+    this.emitWaveStateUpdate(true);
 
     console.log('[EnemySystem] Initialized');
   }
@@ -819,6 +822,74 @@ class EnemySystem {
     };
   }
 
+  emitWaveStateUpdate(force = false) {
+    if (typeof gameEvents === 'undefined') {
+      return;
+    }
+
+    const wave = this.waveState
+      ? {
+          current: this.waveState.current,
+          totalAsteroids: this.waveState.totalAsteroids,
+          asteroidsKilled: this.waveState.asteroidsKilled,
+          isActive: Boolean(this.waveState.isActive),
+          breakTimer: Math.max(0, this.waveState.breakTimer),
+          completedWaves: this.waveState.completedWaves,
+          timeRemaining: Math.max(0, this.waveState.timeRemaining),
+        }
+      : null;
+
+    const session = this.sessionStats
+      ? {
+          totalKills: this.sessionStats.totalKills,
+          timeElapsed: this.sessionStats.timeElapsed,
+        }
+      : null;
+
+    const snapshot = {
+      current: wave?.current ?? 0,
+      totalAsteroids: wave?.totalAsteroids ?? 0,
+      asteroidsKilled: wave?.asteroidsKilled ?? 0,
+      isActive: wave?.isActive ?? false,
+      timeRemainingSeconds: wave?.isActive
+        ? Math.max(0, Math.ceil(wave?.timeRemaining ?? 0))
+        : 0,
+      breakTimerSeconds: !wave?.isActive
+        ? Math.max(0, Math.ceil(wave?.breakTimer ?? 0))
+        : 0,
+      completedWaves: wave?.completedWaves ?? 0,
+      totalKills: session?.totalKills ?? 0,
+      sessionTimeSeconds: session
+        ? Math.max(0, Math.floor(session.timeElapsed ?? 0))
+        : 0,
+    };
+
+    if (!force && this.lastWaveBroadcast) {
+      const prev = this.lastWaveBroadcast;
+      const unchanged =
+        prev.current === snapshot.current &&
+        prev.totalAsteroids === snapshot.totalAsteroids &&
+        prev.asteroidsKilled === snapshot.asteroidsKilled &&
+        prev.isActive === snapshot.isActive &&
+        prev.timeRemainingSeconds === snapshot.timeRemainingSeconds &&
+        prev.breakTimerSeconds === snapshot.breakTimerSeconds &&
+        prev.completedWaves === snapshot.completedWaves &&
+        prev.totalKills === snapshot.totalKills &&
+        prev.sessionTimeSeconds === snapshot.sessionTimeSeconds;
+
+      if (unchanged) {
+        return;
+      }
+    }
+
+    this.lastWaveBroadcast = snapshot;
+
+    gameEvents.emit('wave-state-updated', {
+      wave,
+      session,
+    });
+  }
+
   // === UPDATE PRINCIPAL ===
   update(deltaTime) {
     if (!this.sessionActive) {
@@ -830,6 +901,8 @@ class EnemySystem {
     this.updateAsteroids(deltaTime);
     this.updateWaveLogic(deltaTime);
     this.cleanupDestroyed();
+
+    this.emitWaveStateUpdate();
   }
 
   updateWaveLogic(deltaTime) {
@@ -1110,6 +1183,8 @@ class EnemySystem {
         spawnedBy: asteroid.spawnedBy,
       });
     }
+
+    this.emitWaveStateUpdate();
 
     if (this.waveState && this.waveState.isActive) {
       const allAsteroidsKilled =
@@ -1495,8 +1570,10 @@ class EnemySystem {
     this.waveState = this.createInitialWaveState();
     this.sessionStats = this.createInitialSessionStats();
     this.sessionActive = true;
+    this.lastWaveBroadcast = null;
 
     this.spawnInitialAsteroids(4);
+    this.emitWaveStateUpdate(true);
     console.log('[EnemySystem] Reset');
   }
 
@@ -1531,6 +1608,8 @@ class EnemySystem {
         breakTimer: wave.breakTimer,
       });
     }
+
+    this.emitWaveStateUpdate(true);
   }
 
   startNextWave() {
@@ -1559,6 +1638,8 @@ class EnemySystem {
         totalAsteroids: wave.totalAsteroids,
       });
     }
+
+    this.emitWaveStateUpdate(true);
   }
 
   grantWaveRewards() {
