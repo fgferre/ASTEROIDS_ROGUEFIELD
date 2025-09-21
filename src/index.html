@@ -107,15 +107,6 @@
             <p id="wave-enemies" class="wave-enemies">
               Asteroides: 0 eliminados
             </p>
-            <div
-              id="wave-countdown"
-              class="wave-countdown hidden"
-              role="status"
-              aria-live="assertive"
-            >
-              <span class="countdown-label">Próximo Setor em:</span>
-              <span id="countdown-timer" class="countdown-value">10</span>
-            </div>
           </section>
 
           <div
@@ -131,7 +122,19 @@
           </div>
         </div>
 
-        <canvas id="game-canvas" width="800" height="600"></canvas>
+        <div class="game-field">
+          <canvas id="game-canvas" width="800" height="600"></canvas>
+
+          <div
+            id="wave-countdown"
+            class="wave-countdown hidden"
+            role="status"
+            aria-live="assertive"
+          >
+            <span class="countdown-label">Próximo Setor em:</span>
+            <span id="countdown-timer" class="countdown-value">10</span>
+          </div>
+        </div>
 
         <div class="controls">
           <p>
