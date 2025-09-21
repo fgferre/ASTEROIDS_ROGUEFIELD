@@ -34,7 +34,8 @@ const TUTORIAL_STEPS = [
     action: {
       type: 'key',
       keys: ['escape'],
-      successMessage: 'Pausa confirmada. Você pode retomá-la sempre que precisar.',
+      successMessage:
+        'Pausa confirmada. Você pode retomá-la sempre que precisar.',
     },
   },
   {

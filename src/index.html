@@ -22,9 +22,7 @@
               <ul class="menu-instructions" id="menu-instructions">
                 <li data-instruction="movement">
                   <span class="instruction-icon" aria-hidden="true">🚀</span>
-                  <div>
-                    <strong>WASD</strong> para acelerar a nave espacial
-                  </div>
+                  <div><strong>WASD</strong> para acelerar a nave espacial</div>
                 </li>
                 <li data-instruction="auto-fire">
                   <span class="instruction-icon" aria-hidden="true">⚡</span>
@@ -40,11 +38,16 @@
                 </li>
                 <li data-instruction="shield">
                   <span class="instruction-icon" aria-hidden="true">🛡️</span>
-                  <div>Pressione <strong>E</strong> para testar o escudo defletor</div>
+                  <div>
+                    Pressione <strong>E</strong> para testar o escudo defletor
+                  </div>
                 </li>
                 <li data-instruction="pause">
                   <span class="instruction-icon" aria-hidden="true">⏸️</span>
-                  <div>Use <strong>Esc</strong> para pausar e planejar sua estratégia</div>
+                  <div>
+                    Use <strong>Esc</strong> para pausar e planejar sua
+                    estratégia
+                  </div>
                 </li>
                 <li data-instruction="survive">
                   <span class="instruction-icon" aria-hidden="true">🌌</span>
@@ -52,7 +55,11 @@
                 </li>
               </ul>
               <div class="menu-actions">
-                <button id="start-game-btn" class="btn btn--primary btn--lg" type="button">
+                <button
+                  id="start-game-btn"
+                  class="btn btn--primary btn--lg"
+                  type="button"
+                >
                   INICIAR MISSÃO!
                 </button>
                 <button
@@ -76,45 +83,80 @@
                   Simulação estelar em desenvolvimento
                 </p>
               </div>
-              <section
-                id="tutorial-panel"
-                class="tutorial-panel"
-                aria-live="polite"
-                aria-label="Centro de treinamento"
-                data-state="idle"
+              <div
+                id="tutorial-card"
+                class="tutorial-card"
+                data-expanded="false"
               >
-                <header class="tutorial-panel__header">
-                  <span id="tutorial-status" class="tutorial-panel__status">
+                <button
+                  id="tutorial-toggle-btn"
+                  class="btn btn--outline btn--sm tutorial-card__toggle"
+                  type="button"
+                  aria-expanded="false"
+                  aria-controls="tutorial-panel"
+                >
+                  <span class="tutorial-card__toggle-title">
+                    Centro de treinamento (opcional)
+                  </span>
+                  <span
+                    id="tutorial-toggle-status"
+                    class="tutorial-card__toggle-status"
+                  >
                     Tutorial inicial
                   </span>
-                  <span id="tutorial-progress" class="tutorial-panel__progress">
-                    --
-                  </span>
-                </header>
-                <h2 id="tutorial-step-title" class="tutorial-panel__title">
-                  Centro de treinamento
-                </h2>
-                <p id="tutorial-step-description" class="tutorial-panel__description">
-                  Clique em “Iniciar missão” para praticar os controles básicos.
-                </p>
-                <p id="tutorial-step-hint" class="tutorial-panel__hint"></p>
-                <div class="tutorial-panel__actions">
-                  <button
-                    id="tutorial-primary-btn"
-                    class="btn btn--secondary btn--full-width"
-                    type="button"
+                  <span class="tutorial-card__toggle-icon" aria-hidden="true"
+                    >▾</span
                   >
-                    Avançar
-                  </button>
-                  <button
-                    id="tutorial-replay-btn"
-                    class="btn btn--outline btn--full-width btn--sm"
-                    type="button"
+                </button>
+                <section
+                  id="tutorial-panel"
+                  class="tutorial-panel"
+                  aria-live="polite"
+                  aria-label="Centro de treinamento"
+                  data-state="idle"
+                  tabindex="-1"
+                  hidden
+                >
+                  <header class="tutorial-panel__header">
+                    <span id="tutorial-status" class="tutorial-panel__status">
+                      Tutorial inicial
+                    </span>
+                    <span
+                      id="tutorial-progress"
+                      class="tutorial-panel__progress"
+                    >
+                      --
+                    </span>
+                  </header>
+                  <h2 id="tutorial-step-title" class="tutorial-panel__title">
+                    Centro de treinamento
+                  </h2>
+                  <p
+                    id="tutorial-step-description"
+                    class="tutorial-panel__description"
                   >
-                    Rever tutorial
-                  </button>
-                </div>
-              </section>
+                    Clique em “Iniciar missão” para praticar os controles
+                    básicos.
+                  </p>
+                  <p id="tutorial-step-hint" class="tutorial-panel__hint"></p>
+                  <div class="tutorial-panel__actions">
+                    <button
+                      id="tutorial-primary-btn"
+                      class="btn btn--secondary btn--full-width"
+                      type="button"
+                    >
+                      Avançar
+                    </button>
+                    <button
+                      id="tutorial-replay-btn"
+                      class="btn btn--outline btn--full-width btn--sm"
+                      type="button"
+                    >
+                      Rever tutorial
+                    </button>
+                  </div>
+                </section>
+              </div>
             </aside>
           </div>
         </div>
@@ -146,16 +188,25 @@
             <p class="pause-subtitle">Pressione Esc para continuar</p>
           </header>
           <div class="pause-actions">
-            <button id="pause-resume-btn" class="btn btn--primary" type="button">
+            <button
+              id="pause-resume-btn"
+              class="btn btn--primary"
+              type="button"
+            >
               Retomar missão
             </button>
-            <button id="pause-settings-btn" class="btn btn--secondary" type="button">
+            <button
+              id="pause-settings-btn"
+              class="btn btn--secondary"
+              type="button"
+            >
               Configurações
             </button>
           </div>
           <div class="pause-hints">
             <p class="pause-hint">
-              Use este intervalo para ajustar configurações ou planejar a próxima onda.
+              Use este intervalo para ajustar configurações ou planejar a
+              próxima onda.
             </p>
           </div>
         </div>
@@ -186,13 +237,25 @@
               class="settings-tabs"
               aria-label="Categorias de configurações"
             ></nav>
-            <div id="settings-content" class="settings-content" tabindex="0"></div>
+            <div
+              id="settings-content"
+              class="settings-content"
+              tabindex="0"
+            ></div>
           </div>
           <footer class="settings-footer">
-            <button id="settings-reset-btn" class="btn btn--outline" type="button">
+            <button
+              id="settings-reset-btn"
+              class="btn btn--outline"
+              type="button"
+            >
               Restaurar categoria
             </button>
-            <button id="settings-close-footer-btn" class="btn btn--primary" type="button">
+            <button
+              id="settings-close-footer-btn"
+              class="btn btn--primary"
+              type="button"
+            >
               Concluir
             </button>
           </footer>

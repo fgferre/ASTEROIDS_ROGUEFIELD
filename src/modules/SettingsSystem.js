@@ -2,6 +2,8 @@
 
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 
+const VISUAL_CATEGORIES = new Set(['accessibility', 'video']);
+
 const STORAGE_KEY = 'astro:settings:v1';
 
 function deepClone(value) {
@@ -90,7 +92,9 @@ class SettingsSystem {
       state[category.id] = {};
       category.fields.forEach((field) => {
         state[category.id][field.key] = deepClone(
-          field.default !== undefined ? field.default : this.getFallbackDefault(field.type)
+          field.default !== undefined
+            ? field.default
+            : this.getFallbackDefault(field.type)
         );
       });
     });
@@ -150,7 +154,10 @@ class SettingsSystem {
 
       return JSON.parse(raw);
     } catch (error) {
-      console.warn('[SettingsSystem] Failed to load settings from storage:', error);
+      console.warn(
+        '[SettingsSystem] Failed to load settings from storage:',
+        error
+      );
       return null;
     }
   }
@@ -161,10 +168,7 @@ class SettingsSystem {
         return;
       }
 
-      window.localStorage.setItem(
-        this.storageKey,
-        JSON.stringify(this.values)
-      );
+      window.localStorage.setItem(this.storageKey, JSON.stringify(this.values));
     } catch (error) {
       console.warn('[SettingsSystem] Failed to persist settings:', error);
     }
@@ -229,10 +233,14 @@ class SettingsSystem {
     devices.forEach((device) => {
       const maxBindings = Math.max(
         1,
-        Number(field.metadata?.[device]?.max) || ensureArray(defaultValue[device]).length || 2
+        Number(field.metadata?.[device]?.max) ||
+          ensureArray(defaultValue[device]).length ||
+          2
       );
       const rawList =
-        rawValue && typeof rawValue === 'object' && Array.isArray(rawValue[device])
+        rawValue &&
+        typeof rawValue === 'object' &&
+        Array.isArray(rawValue[device])
           ? rawValue[device]
           : ensureArray(defaultValue[device]);
 
@@ -275,13 +283,17 @@ class SettingsSystem {
     }
 
     if (!(key in this.values[categoryId])) {
-      console.warn(`[SettingsSystem] Unknown setting '${key}' in category '${categoryId}'`);
+      console.warn(
+        `[SettingsSystem] Unknown setting '${key}' in category '${categoryId}'`
+      );
       return null;
     }
 
     const field = this.findField(categoryId, key);
     if (!field) {
-      console.warn(`[SettingsSystem] Schema field not found for ${categoryId}.${key}`);
+      console.warn(
+        `[SettingsSystem] Schema field not found for ${categoryId}.${key}`
+      );
       return null;
     }
 
@@ -471,6 +483,16 @@ class SettingsSystem {
           change,
         });
       }
+
+      if (
+        VISUAL_CATEGORIES.has(change.category) ||
+        change.type === 'reset-all'
+      ) {
+        gameEvents.emit('settings-visual-changed', {
+          values: this.getVisualPreferences(),
+          change,
+        });
+      }
     }
   }
 
@@ -496,6 +518,44 @@ class SettingsSystem {
         },
       });
     });
+
+    gameEvents.emit('settings-visual-changed', {
+      values: this.getVisualPreferences(),
+      change: {
+        category: null,
+        key: null,
+        value: this.getVisualPreferences(),
+        type: 'init',
+        source: 'init',
+      },
+    });
+  }
+
+  getVisualPreferences() {
+    const accessibility = this.getCategoryValues('accessibility') || {};
+    const video = this.getCategoryValues('video') || {};
+
+    const hudScale = Number.isFinite(Number(video.hudScale))
+      ? Number(video.hudScale)
+      : 1;
+    const screenShake = Number.isFinite(Number(video.screenShakeIntensity))
+      ? Number(video.screenShakeIntensity)
+      : 1;
+
+    return {
+      accessibility,
+      video,
+      derived: {
+        contrast: accessibility.highContrastHud ? 'high' : 'normal',
+        colorVision: accessibility.colorBlindPalette ? 'assist' : 'standard',
+        reducedMotion: Boolean(accessibility.reducedMotion),
+        tutorialReminders: Boolean(accessibility.tutorialReminders),
+        hudScale,
+        screenShake,
+        damageFlash: video.damageFlash !== false,
+        reducedParticles: Boolean(video.reducedParticles),
+      },
+    };
   }
 }
 
