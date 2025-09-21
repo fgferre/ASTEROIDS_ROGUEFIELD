@@ -1,3 +1,4 @@
+import SettingsSystem from './modules/SettingsSystem.js';
 import InputSystem from './modules/InputSystem.js';
 import PlayerSystem from './modules/PlayerSystem.js';
 import CombatSystem from './modules/CombatSystem.js';
@@ -62,6 +63,8 @@ function init() {
 
     registerGameStateService();
 
+    new SettingsSystem();
+
     const audioSystem = new AudioSystem();
     new InputSystem();
     new PlayerSystem();
@@ -107,7 +110,6 @@ function setupDomEventListeners() {
       if (typeof gameEvents !== 'undefined') {
         gameEvents.emit('settings-menu-requested', { source: 'menu' });
       }
-      console.info('[app] Configurações serão implementadas na próxima etapa.');
     }
   });
 }

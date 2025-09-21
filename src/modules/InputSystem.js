@@ -1,39 +1,59 @@
 // src/modules/InputSystem.js
 
+import SETTINGS_SCHEMA from '../data/settingsSchema.js';
+
+const CONTROLS_CATEGORY_ID = 'controls';
+const MOVEMENT_ACTIONS = new Set(['moveUp', 'moveDown', 'moveLeft', 'moveRight']);
+const DEFAULT_GAMEPAD_AXIS_THRESHOLD = 0.45;
+
+function ensureArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function clone(value) {
+  if (value === undefined) {
+    return undefined;
+  }
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (error) {
+    console.warn('[InputSystem] Failed to clone value:', error);
+    return value;
+  }
+}
+
 class InputSystem {
   constructor() {
-    this.keys = {}; // Estado atual das teclas
-    this.codes = {}; // Estado atual baseado no código físico da tecla
+    this.keys = {};
+    this.codes = {};
     this.mousePos = { x: 0, y: 0 };
     this.mouseButtons = {};
+
     this.gamepadConnected = false;
     this.gamepad = null;
+    this.gamepadIndex = 0;
+    this.previousGamepadButtons = [];
+    this.previousGamepadAxes = [];
+    this.gamepadAxisThreshold = DEFAULT_GAMEPAD_AXIS_THRESHOLD;
 
-    this.movementBindings = new Set([
-      'w',
-      'a',
-      's',
-      'd',
-      'keyw',
-      'keya',
-      'keys',
-      'keyd',
-      'arrowup',
-      'arrowdown',
-      'arrowleft',
-      'arrowright',
-    ]);
+    this.settings = null;
+    this.actionBindings = {};
+    this.keyboardBindingMap = new Map();
+    this.gamepadButtonMap = new Map();
+    this.gamepadAxisMap = new Map();
+    this.movementBindings = new Set();
+    this.activeKeyboardActions = new Set();
+    this.activeGamepadActions = new Set();
+    this.keyboardActionInputs = new Map();
+    this.isCapturingBinding = false;
 
-    this.keyAliases = {
-      w: 'keyw',
-      a: 'keya',
-      s: 'keys',
-      d: 'keyd',
-    };
+    this.keyAliases = { w: 'keyw', a: 'keya', s: 'keys', d: 'keyd' };
+
+    this.controlFieldDefinitions = this.resolveControlFieldMap();
 
     this.setupEventListeners();
+    this.initializeBindings();
 
-    // Registrar no ServiceLocator
     if (typeof gameServices !== 'undefined') {
       gameServices.register('input', this);
     }
@@ -41,106 +61,608 @@ class InputSystem {
     console.log('[InputSystem] Initialized');
   }
 
-  setupEventListeners() {
-    // Keyboard events
-    document.addEventListener('keydown', (e) => {
-      const key = typeof e.key === 'string' ? e.key.toLowerCase() : '';
-      const code = typeof e.code === 'string' ? e.code.toLowerCase() : '';
-      const wasPressed = (key && this.keys[key]) || (code && this.codes[code]);
+  resolveControlFieldMap() {
+    const schema = Array.isArray(SETTINGS_SCHEMA) ? SETTINGS_SCHEMA : [];
+    const category = schema.find((entry) => entry.id === CONTROLS_CATEGORY_ID);
+    if (!category) {
+      return new Map();
+    }
 
-      if (key) this.keys[key] = true;
-      if (code) this.codes[code] = true;
-
-      if (this.isMovementBinding(key) || this.isMovementBinding(code)) {
-        e.preventDefault();
+    const map = new Map();
+    category.fields.forEach((field) => {
+      map.set(field.key, field);
+      const threshold = Number(field.metadata?.gamepad?.threshold);
+      if (Number.isFinite(threshold)) {
+        this.gamepadAxisThreshold = threshold;
       }
+    });
+    return map;
+  }
 
-      const isEscape = key === 'escape' || code === 'escape';
-      if (isEscape) {
-        e.preventDefault();
-        if (!wasPressed && typeof gameEvents !== 'undefined') {
-          gameEvents.emit('toggle-pause');
+  resolveSettingsService() {
+    if (
+      typeof gameServices !== 'undefined' &&
+      typeof gameServices.has === 'function' &&
+      gameServices.has('settings')
+    ) {
+      return gameServices.get('settings');
+    }
+    return null;
+  }
+
+  initializeBindings() {
+    this.settings = this.resolveSettingsService();
+    let values = null;
+    if (this.settings && typeof this.settings.getCategoryValues === 'function') {
+      values = this.settings.getCategoryValues(CONTROLS_CATEGORY_ID);
+    }
+
+    if (!values) {
+      values = this.extractDefaultsFromSchema();
+    }
+
+    this.applyControlSettings(values);
+  }
+
+  extractDefaultsFromSchema() {
+    const defaults = {};
+    this.controlFieldDefinitions.forEach((field, key) => {
+      defaults[key] = clone(field.default) || { keyboard: [], gamepad: [] };
+    });
+    return defaults;
+  }
+
+  resetBindingMaps() {
+    this.keyboardBindingMap.clear();
+    this.gamepadButtonMap.clear();
+    this.gamepadAxisMap.clear();
+    this.movementBindings.clear();
+    this.actionBindings = {};
+  }
+
+  applyControlSettings(values = {}) {
+    this.resetBindingMaps();
+
+    Object.entries(values).forEach(([action, bindingValue]) => {
+      const field = this.controlFieldDefinitions.get(action);
+      const normalized = this.normalizeBindingStructure(bindingValue);
+      this.actionBindings[action] = normalized;
+
+      if (field) {
+        const threshold = Number(field.metadata?.gamepad?.threshold);
+        if (Number.isFinite(threshold)) {
+          this.gamepadAxisThreshold = threshold;
         }
       }
 
-      if (
-        !wasPressed &&
-        typeof gameEvents !== 'undefined' &&
-        (key === 'e' || code === 'keye')
-      ) {
-        gameEvents.emit('activate-shield-pressed');
-      }
-
-      // Emit event apenas na primeira pressão
-      if (!wasPressed && typeof gameEvents !== 'undefined') {
-        gameEvents.emit('key-pressed', { key, code, type: 'down', event: e });
-      }
-    });
-
-    document.addEventListener('keyup', (e) => {
-      const key = typeof e.key === 'string' ? e.key.toLowerCase() : '';
-      const code = typeof e.code === 'string' ? e.code.toLowerCase() : '';
-
-      if (key) this.keys[key] = false;
-      if (code) this.codes[code] = false;
-
-      if (this.isMovementBinding(key) || this.isMovementBinding(code)) {
-        e.preventDefault();
-      }
-
-      if (typeof gameEvents !== 'undefined') {
-        gameEvents.emit('key-pressed', { key, code, type: 'up', event: e });
-      }
-    });
-
-    // Mouse events
-    document.addEventListener('mousemove', (e) => {
-      this.mousePos.x = e.clientX;
-      this.mousePos.y = e.clientY;
-    });
-
-    document.addEventListener('mousedown', (e) => {
-      this.mouseButtons[e.button] = true;
-      if (typeof gameEvents !== 'undefined') {
-        gameEvents.emit('mouse-pressed', {
-          button: e.button,
-          type: 'down',
-          pos: { ...this.mousePos },
-        });
-      }
-    });
-
-    document.addEventListener('mouseup', (e) => {
-      this.mouseButtons[e.button] = false;
-      if (typeof gameEvents !== 'undefined') {
-        gameEvents.emit('mouse-pressed', {
-          button: e.button,
-          type: 'up',
-          pos: { ...this.mousePos },
-        });
-      }
-    });
-
-    // Gamepad support (futuro)
-    window.addEventListener('gamepadconnected', (e) => {
-      this.gamepadConnected = true;
-      console.log('[InputSystem] Gamepad connected:', e.gamepad);
-    });
-
-    window.addEventListener('gamepaddisconnected', (e) => {
-      this.gamepadConnected = false;
-      console.log('[InputSystem] Gamepad disconnected');
+      this.registerKeyboardBindings(action, normalized.keyboard, field);
+      this.registerGamepadBindings(action, normalized.gamepad);
     });
   }
 
-  // === MÉTODOS PÚBLICOS ===
+  normalizeBindingStructure(binding) {
+    if (!binding || typeof binding !== 'object') {
+      return { keyboard: [], gamepad: [] };
+    }
+
+    return {
+      keyboard: ensureArray(binding.keyboard).filter(Boolean),
+      gamepad: ensureArray(binding.gamepad).filter(Boolean),
+    };
+  }
+
+  setupEventListeners() {
+    document.addEventListener('keydown', (event) => this.onKeyDown(event));
+    document.addEventListener('keyup', (event) => this.onKeyUp(event));
+    document.addEventListener('mousemove', (event) => this.onMouseMove(event));
+    document.addEventListener('mousedown', (event) => this.onMouseDown(event));
+    document.addEventListener('mouseup', (event) => this.onMouseUp(event));
+
+    window.addEventListener('gamepadconnected', (event) => this.onGamepadConnected(event));
+    window.addEventListener('gamepaddisconnected', (event) =>
+      this.onGamepadDisconnected(event)
+    );
+
+    if (typeof gameEvents !== 'undefined') {
+      gameEvents.on('settings-controls-changed', (payload = {}) => {
+        if (payload?.values) {
+          this.applyControlSettings(payload.values);
+        }
+      });
+
+      gameEvents.on('input-binding-capture', (payload = {}) => {
+        this.isCapturingBinding = payload?.state === 'start';
+      });
+    }
+  }
+
+  onKeyDown(event) {
+    const key = typeof event.key === 'string' ? event.key.toLowerCase() : '';
+    const code = typeof event.code === 'string' ? event.code.toLowerCase() : '';
+    const wasPressed = (key && this.keys[key]) || (code && this.codes[code]);
+
+    if (key) this.keys[key] = true;
+    if (code) this.codes[code] = true;
+
+    if (this.isMovementBinding(key) || this.isMovementBinding(code)) {
+      event.preventDefault();
+    }
+
+    const normalizedKey = this.normalizeKeyboardBinding(event.key);
+    const normalizedCode = this.normalizeKeyboardBinding(event.code);
+
+    const actions = this.collectKeyboardActions(normalizedKey, normalizedCode);
+
+    if (!wasPressed) {
+      actions.forEach((action) => {
+        this.handleActionPress(action, 'keyboard', {
+          event,
+          device: 'keyboard',
+          inputId: normalizedCode || normalizedKey || key || code,
+        });
+      });
+    }
+
+    if (!wasPressed && typeof gameEvents !== 'undefined') {
+      gameEvents.emit('key-pressed', {
+        key,
+        code,
+        type: 'down',
+        event,
+        actions: Array.from(actions),
+      });
+    }
+  }
+
+  onKeyUp(event) {
+    const key = typeof event.key === 'string' ? event.key.toLowerCase() : '';
+    const code = typeof event.code === 'string' ? event.code.toLowerCase() : '';
+
+    if (key) this.keys[key] = false;
+    if (code) this.codes[code] = false;
+
+    const normalizedKey = this.normalizeKeyboardBinding(event.key);
+    const normalizedCode = this.normalizeKeyboardBinding(event.code);
+    const actions = this.collectKeyboardActions(normalizedKey, normalizedCode);
+
+    actions.forEach((action) => {
+      this.handleActionRelease(action, 'keyboard', {
+        event,
+        device: 'keyboard',
+        inputId: normalizedCode || normalizedKey || key || code,
+      });
+    });
+
+    if (typeof gameEvents !== 'undefined') {
+      gameEvents.emit('key-pressed', {
+        key,
+        code,
+        type: 'up',
+        event,
+        actions: Array.from(actions),
+      });
+    }
+  }
+
+  onMouseMove(event) {
+    this.mousePos.x = event.clientX;
+    this.mousePos.y = event.clientY;
+  }
+
+  onMouseDown(event) {
+    this.mouseButtons[event.button] = true;
+    if (typeof gameEvents !== 'undefined') {
+      gameEvents.emit('mouse-pressed', {
+        button: event.button,
+        type: 'down',
+        pos: { ...this.mousePos },
+      });
+    }
+  }
+
+  onMouseUp(event) {
+    this.mouseButtons[event.button] = false;
+    if (typeof gameEvents !== 'undefined') {
+      gameEvents.emit('mouse-pressed', {
+        button: event.button,
+        type: 'up',
+        pos: { ...this.mousePos },
+      });
+    }
+  }
+
+  onGamepadConnected(event) {
+    this.gamepadConnected = true;
+    this.gamepadIndex = event.gamepad?.index ?? 0;
+    console.log('[InputSystem] Gamepad connected:', event.gamepad);
+  }
+
+  onGamepadDisconnected() {
+    this.gamepadConnected = false;
+    this.gamepad = null;
+    this.clearGamepadActions();
+    console.log('[InputSystem] Gamepad disconnected');
+  }
+
+  collectKeyboardActions(...inputs) {
+    const actions = new Set();
+    inputs
+      .filter((input) => typeof input === 'string' && input.length > 0)
+      .forEach((input) => {
+        const normalized = input.toLowerCase();
+        const mapped = this.keyboardBindingMap.get(normalized);
+        if (mapped) {
+          mapped.forEach((action) => actions.add(action));
+        }
+      });
+    return actions;
+  }
+
+  handleActionPress(action, source, context = {}) {
+    if (!action) {
+      return;
+    }
+
+    if (source === 'keyboard' && this.isCapturingBinding) {
+      return;
+    }
+
+    const wasActive = this.isActionActive(action);
+
+    if (source === 'keyboard') {
+      const inputId = context.inputId;
+      if (inputId) {
+        if (!this.keyboardActionInputs.has(action)) {
+          this.keyboardActionInputs.set(action, new Set());
+        }
+        this.keyboardActionInputs.get(action).add(inputId);
+      }
+      this.activeKeyboardActions.add(action);
+    } else if (source === 'gamepad') {
+      this.activeGamepadActions.add(action);
+    }
+
+    if (wasActive) {
+      return;
+    }
+
+    this.emitActionEvent(action, 'pressed', source, context);
+  }
+
+  handleActionRelease(action, source, context = {}) {
+    if (!action) {
+      return;
+    }
+
+    if (source === 'keyboard') {
+      const inputId = context.inputId;
+      if (inputId && this.keyboardActionInputs.has(action)) {
+        const inputSet = this.keyboardActionInputs.get(action);
+        inputSet.delete(inputId);
+        if (inputSet.size === 0) {
+          this.keyboardActionInputs.delete(action);
+          this.activeKeyboardActions.delete(action);
+        }
+      } else {
+        this.activeKeyboardActions.delete(action);
+      }
+    } else if (source === 'gamepad') {
+      this.activeGamepadActions.delete(action);
+    }
+
+    if (this.isActionActive(action)) {
+      return;
+    }
+
+    this.emitActionEvent(action, 'released', source, context);
+  }
+
+  emitActionEvent(action, phase, source, context = {}) {
+    if (typeof gameEvents !== 'undefined') {
+      gameEvents.emit('input-action', {
+        action,
+        phase,
+        source,
+        context,
+      });
+    }
+
+    if (phase !== 'pressed') {
+      return;
+    }
+
+    switch (action) {
+      case 'pause':
+        if (typeof gameEvents !== 'undefined') {
+          gameEvents.emit('toggle-pause');
+        }
+        break;
+      case 'activateShield':
+        if (typeof gameEvents !== 'undefined') {
+          gameEvents.emit('activate-shield-pressed');
+        }
+        break;
+      case 'openSettings':
+        if (typeof gameEvents !== 'undefined') {
+          gameEvents.emit('settings-menu-requested', {
+            source: context.device || source || 'input',
+          });
+        }
+        break;
+      case 'confirm':
+        if (typeof gameEvents !== 'undefined') {
+          gameEvents.emit('input-confirmed', {
+            source,
+            context,
+          });
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  emitGamepadDetection(details) {
+    if (typeof gameEvents === 'undefined') {
+      return;
+    }
+
+    gameEvents.emit('gamepad-input-detected', {
+      ...details,
+      timestamp: typeof performance !== 'undefined' ? performance.now() : Date.now(),
+    });
+  }
+
+  pollGamepad() {
+    if (typeof navigator === 'undefined' || typeof navigator.getGamepads !== 'function') {
+      return;
+    }
+
+    const pads = navigator.getGamepads();
+    const pad = pads?.[this.gamepadIndex] || pads?.find((candidate) => Boolean(candidate)) || null;
+
+    if (!pad) {
+      if (this.gamepadConnected || this.activeGamepadActions.size > 0) {
+        this.clearGamepadActions();
+      }
+      this.gamepadConnected = false;
+      this.gamepad = null;
+      return;
+    }
+
+    this.gamepad = pad;
+    this.gamepadConnected = true;
+    this.gamepadIndex = pad.index;
+
+    const activeActions = new Set();
+
+    pad.buttons.forEach((button, index) => {
+      const pressed = Boolean(button?.pressed);
+      if (pressed) {
+        const key = `button:${index}`;
+        const mapped = this.gamepadButtonMap.get(key);
+        if (mapped) {
+          mapped.forEach((action) => activeActions.add(action));
+        }
+      }
+
+      if (pressed && !this.previousGamepadButtons[index]) {
+        this.emitGamepadDetection({ type: 'button', index, value: button?.value ?? 1 });
+      }
+
+      this.previousGamepadButtons[index] = pressed;
+    });
+
+    pad.axes.forEach((value, index) => {
+      const positive = value >= this.gamepadAxisThreshold;
+      const negative = value <= -this.gamepadAxisThreshold;
+      const previous = this.previousGamepadAxes[index] || { positive: false, negative: false };
+
+      if (positive) {
+        const key = `axis:${index}:positive`;
+        const mapped = this.gamepadAxisMap.get(key);
+        if (mapped) {
+          mapped.forEach((action) => activeActions.add(action));
+        }
+        if (!previous.positive) {
+          this.emitGamepadDetection({
+            type: 'axis',
+            index,
+            direction: 'positive',
+            value,
+          });
+        }
+      }
+
+      if (negative) {
+        const key = `axis:${index}:negative`;
+        const mapped = this.gamepadAxisMap.get(key);
+        if (mapped) {
+          mapped.forEach((action) => activeActions.add(action));
+        }
+        if (!previous.negative) {
+          this.emitGamepadDetection({
+            type: 'axis',
+            index,
+            direction: 'negative',
+            value,
+          });
+        }
+      }
+
+      this.previousGamepadAxes[index] = { positive, negative };
+    });
+
+    this.syncGamepadActions(activeActions);
+  }
+
+  syncGamepadActions(activeActions) {
+    const previous = new Set(this.activeGamepadActions);
+
+    activeActions.forEach((action) => {
+      if (!this.activeGamepadActions.has(action)) {
+        this.handleActionPress(action, 'gamepad', { device: 'gamepad' });
+      }
+    });
+
+    previous.forEach((action) => {
+      if (!activeActions.has(action)) {
+        this.handleActionRelease(action, 'gamepad', { device: 'gamepad' });
+      }
+    });
+  }
+
+  clearGamepadActions() {
+    const active = Array.from(this.activeGamepadActions);
+    active.forEach((action) => {
+      this.handleActionRelease(action, 'gamepad', { device: 'gamepad', forced: true });
+    });
+    this.activeGamepadActions.clear();
+    this.previousGamepadButtons = [];
+    this.previousGamepadAxes = [];
+  }
+
+  parseGamepadBinding(binding) {
+    if (typeof binding !== 'string') {
+      return null;
+    }
+
+    const normalized = binding.trim().toLowerCase();
+    if (!normalized) {
+      return null;
+    }
+
+    if (normalized.startsWith('button:')) {
+      const index = Number(normalized.split(':')[1]);
+      return Number.isInteger(index) ? { type: 'button', index } : null;
+    }
+
+    if (normalized.startsWith('axis:')) {
+      const parts = normalized.split(':');
+      if (parts.length < 3) {
+        return null;
+      }
+      const index = Number(parts[1]);
+      if (!Number.isInteger(index)) {
+        return null;
+      }
+      const directionPart = parts[2];
+      const direction = directionPart.startsWith('-') || directionPart === 'negative'
+        ? 'negative'
+        : 'positive';
+      return { type: 'axis', index, direction };
+    }
+
+    return null;
+  }
+
+  normalizeKeyboardBinding(value) {
+    if (typeof value !== 'string') {
+      return '';
+    }
+    return value.trim().toLowerCase();
+  }
+
+  getKeyboardSynonyms(binding) {
+    const synonyms = new Set();
+    if (!binding) {
+      return synonyms;
+    }
+
+    if (binding.startsWith('key') && binding.length === 4) {
+      synonyms.add(binding.slice(3));
+    }
+
+    if (binding === 'space') {
+      synonyms.add(' ');
+      synonyms.add('spacebar');
+    }
+
+    if (binding.startsWith('shift')) {
+      synonyms.add('shift');
+    }
+
+    if (binding.startsWith('control')) {
+      synonyms.add('control');
+      synonyms.add('ctrl');
+    }
+
+    if (binding.startsWith('alt')) {
+      synonyms.add('alt');
+    }
+
+    if (binding.startsWith('meta')) {
+      synonyms.add('meta');
+    }
+
+    return synonyms;
+  }
+
+  addKeyboardBinding(binding, action) {
+    if (!binding) {
+      return;
+    }
+
+    if (!this.keyboardBindingMap.has(binding)) {
+      this.keyboardBindingMap.set(binding, new Set());
+    }
+
+    this.keyboardBindingMap.get(binding).add(action);
+
+    if (this.isMovementAction(action)) {
+      this.movementBindings.add(binding);
+    }
+  }
+
+  registerKeyboardBindings(action, bindings = [], field) {
+    const entries = ensureArray(bindings);
+    entries.forEach((binding) => {
+      const normalized = this.normalizeKeyboardBinding(binding);
+      if (!normalized) {
+        return;
+      }
+
+      this.addKeyboardBinding(normalized, action);
+      const synonyms = this.getKeyboardSynonyms(normalized);
+      synonyms.forEach((synonym) => this.addKeyboardBinding(synonym, action));
+    });
+  }
+
+  registerGamepadBindings(action, bindings = []) {
+    const entries = ensureArray(bindings);
+    entries.forEach((binding) => {
+      const parsed = this.parseGamepadBinding(binding);
+      if (!parsed) {
+        return;
+      }
+
+      if (parsed.type === 'button') {
+        const key = `button:${parsed.index}`;
+        if (!this.gamepadButtonMap.has(key)) {
+          this.gamepadButtonMap.set(key, new Set());
+        }
+        this.gamepadButtonMap.get(key).add(action);
+      } else if (parsed.type === 'axis') {
+        const key = `axis:${parsed.index}:${parsed.direction}`;
+        if (!this.gamepadAxisMap.has(key)) {
+          this.gamepadAxisMap.set(key, new Set());
+        }
+        this.gamepadAxisMap.get(key).add(action);
+      }
+    });
+  }
+
+  isMovementAction(action) {
+    return MOVEMENT_ACTIONS.has(action);
+  }
 
   isMovementBinding(binding) {
-    if (!binding) return false;
+    if (!binding) {
+      return false;
+    }
     return this.movementBindings.has(binding.toLowerCase());
   }
 
-  // Verificar se tecla está pressionada
   isKeyDown(key) {
     if (!key) return false;
 
@@ -161,73 +683,55 @@ class InputSystem {
     return !!this.codes[code.toLowerCase()];
   }
 
-  // Verificar múltiplas teclas (OR logic)
   areAnyKeysDown(keys) {
     return keys.some((key) => this.isKeyDown(key));
   }
 
-  // Verificar todas as teclas (AND logic)
   areAllKeysDown(keys) {
     return keys.every((key) => this.isKeyDown(key));
   }
 
-  // Obter input de movimento (compatível com código atual)
+  isActionActive(action) {
+    return (
+      this.activeKeyboardActions.has(action) ||
+      this.activeGamepadActions.has(action)
+    );
+  }
+
   getMovementInput() {
     return {
-      up: this.isKeyDown('w') || this.isKeyDown('arrowup'),
-      down: this.isKeyDown('s') || this.isKeyDown('arrowdown'),
-      left: this.isKeyDown('a') || this.isKeyDown('arrowleft'),
-      right: this.isKeyDown('d') || this.isKeyDown('arrowright'),
+      up: this.isActionActive('moveUp'),
+      down: this.isActionActive('moveDown'),
+      left: this.isActionActive('moveLeft'),
+      right: this.isActionActive('moveRight'),
     };
   }
 
-  // Posição do mouse
   getMousePosition() {
     return { ...this.mousePos };
   }
 
-  // Estado do mouse
   isMouseButtonDown(button = 0) {
     return !!this.mouseButtons[button];
   }
 
-  // Debug: listar teclas pressionadas
   getActiveKeys() {
     const activeKeys = Object.keys(this.keys).filter((key) => this.keys[key]);
-    const activeCodes = Object.keys(this.codes).filter(
-      (code) => this.codes[code]
-    );
+    const activeCodes = Object.keys(this.codes).filter((code) => this.codes[code]);
     return [...new Set([...activeKeys, ...activeCodes])];
   }
 
-  // Update (chamado pelo game loop)
-  update(deltaTime) {
-    // Input system é baseado em eventos, não precisa update por frame
-    // Mas mantemos interface consistente para futuras expansões
-
-    // Futuro: gamepad polling aqui
-    if (this.gamepadConnected) {
-      this.updateGamepad();
-    }
+  update() {
+    this.pollGamepad();
   }
 
-  updateGamepad() {
-    const gamepads = navigator.getGamepads();
-    this.gamepad = gamepads?.[0]; // Primeiro gamepad
-
-    // Implementar lógica de gamepad no futuro
-  }
-
-  // Cleanup
   destroy() {
-    // Remove event listeners se necessário
     console.log('[InputSystem] Destroyed');
   }
 }
 
 export default InputSystem;
 
-// Compatibilidade
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = InputSystem;
 }

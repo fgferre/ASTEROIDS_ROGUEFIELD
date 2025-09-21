@@ -135,10 +135,67 @@
 
       <!-- Tela de Pausa -->
       <div id="pause-screen" class="screen hidden">
-        <div class="pause-content">
-          <h2 class="pause-title">JOGO PAUSADO</h2>
-          <p class="pause-subtitle">Pressione Esc para continuar</p>
-          <p class="pause-hint">Respire fundo. As ondas esperam por você.</p>
+        <div
+          class="pause-content"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pause-title"
+        >
+          <header class="pause-header">
+            <h2 id="pause-title" class="pause-title">JOGO PAUSADO</h2>
+            <p class="pause-subtitle">Pressione Esc para continuar</p>
+          </header>
+          <div class="pause-actions">
+            <button id="pause-resume-btn" class="btn btn--primary" type="button">
+              Retomar missão
+            </button>
+            <button id="pause-settings-btn" class="btn btn--secondary" type="button">
+              Configurações
+            </button>
+          </div>
+          <div class="pause-hints">
+            <p class="pause-hint">
+              Use este intervalo para ajustar configurações ou planejar a próxima onda.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div
+        id="settings-screen"
+        class="screen screen--overlay hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settings-title"
+      >
+        <div class="settings-container">
+          <header class="settings-header">
+            <h2 id="settings-title" class="settings-title">Configurações</h2>
+            <button
+              id="settings-close-btn"
+              class="settings-close-btn"
+              type="button"
+              aria-label="Fechar configurações"
+            >
+              ✕
+            </button>
+          </header>
+          <div class="settings-body">
+            <nav
+              id="settings-tabs"
+              class="settings-tabs"
+              aria-label="Categorias de configurações"
+            ></nav>
+            <div id="settings-content" class="settings-content" tabindex="0"></div>
+          </div>
+          <footer class="settings-footer">
+            <button id="settings-reset-btn" class="btn btn--outline" type="button">
+              Restaurar categoria
+            </button>
+            <button id="settings-close-footer-btn" class="btn btn--primary" type="button">
+              Concluir
+            </button>
+          </footer>
         </div>
       </div>
 

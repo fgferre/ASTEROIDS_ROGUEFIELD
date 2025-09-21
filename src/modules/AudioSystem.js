@@ -2,14 +2,27 @@ class AudioSystem {
   constructor() {
     this.context = null;
     this.masterGain = null;
+    this.musicGain = null;
+    this.effectsGain = null;
     this.initialized = false;
     this.sounds = new Map();
+    this.settings = null;
+    this.volumeState = {
+      master: 0.25,
+      music: 0.6,
+      effects: 1,
+      muteAll: false,
+    };
 
     if (typeof gameServices !== 'undefined') {
       gameServices.register('audio', this);
+      if (typeof gameServices.has === 'function' && gameServices.has('settings')) {
+        this.settings = gameServices.get('settings');
+      }
     }
 
     this.setupEventListeners();
+    this.bootstrapSettings();
     console.log('[AudioSystem] Initialized');
   }
 
@@ -22,7 +35,14 @@ class AudioSystem {
 
       this.masterGain = this.context.createGain();
       this.masterGain.connect(this.context.destination);
-      this.masterGain.gain.value = 0.25;
+
+      this.musicGain = this.context.createGain();
+      this.effectsGain = this.context.createGain();
+
+      this.musicGain.connect(this.masterGain);
+      this.effectsGain.connect(this.masterGain);
+
+      this.applyVolumeToNodes();
       this.initialized = true;
     } catch (error) {
       console.warn('Áudio não disponível:', error);
@@ -32,6 +52,12 @@ class AudioSystem {
 
   setupEventListeners() {
     if (typeof gameEvents === 'undefined') return;
+
+    gameEvents.on('settings-audio-changed', (payload = {}) => {
+      if (payload?.values) {
+        this.updateVolumeState(payload.values);
+      }
+    });
 
     gameEvents.on('weapon-fired', () => {
       this.playLaserShot();
@@ -86,6 +112,73 @@ class AudioSystem {
     });
   }
 
+  bootstrapSettings() {
+    if (this.settings && typeof this.settings.getCategoryValues === 'function') {
+      const values = this.settings.getCategoryValues('audio');
+      if (values) {
+        this.updateVolumeState(values);
+        return;
+      }
+    }
+
+    this.applyVolumeToNodes();
+  }
+
+  sanitizeVolume(value, fallback) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return fallback;
+    }
+    return Math.min(1, Math.max(0, numeric));
+  }
+
+  updateVolumeState(values = {}) {
+    this.volumeState = {
+      master: this.sanitizeVolume(values.masterVolume, this.volumeState.master),
+      music: this.sanitizeVolume(values.musicVolume, this.volumeState.music),
+      effects: this.sanitizeVolume(values.effectsVolume, this.volumeState.effects),
+      muteAll: Boolean(values.muteAll ?? this.volumeState.muteAll),
+    };
+
+    this.applyVolumeToNodes();
+  }
+
+  applyVolumeToNodes() {
+    if (!this.masterGain) {
+      return;
+    }
+
+    const { master, music, effects, muteAll } = this.volumeState;
+    const masterValue = muteAll ? 0 : master;
+
+    this.masterGain.gain.value = masterValue;
+
+    if (this.musicGain) {
+      this.musicGain.gain.value = muteAll ? 0 : master * music;
+    }
+
+    if (this.effectsGain) {
+      this.effectsGain.gain.value = muteAll ? 0 : master * effects;
+    }
+  }
+
+  getEffectsDestination() {
+    if (this.effectsGain) {
+      return this.effectsGain;
+    }
+    if (this.masterGain) {
+      return this.masterGain;
+    }
+    return null;
+  }
+
+  connectGainNode(node) {
+    const destination = this.getEffectsDestination();
+    if (destination && node && typeof node.connect === 'function') {
+      node.connect(destination);
+    }
+  }
+
   safePlay(soundFunction) {
     if (!this.initialized || !this.context) return;
 
@@ -105,7 +198,7 @@ class AudioSystem {
       const gain = this.context.createGain();
 
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      this.connectGainNode(gain);
 
       osc.frequency.setValueAtTime(800, this.context.currentTime);
       osc.frequency.exponentialRampToValueAtTime(
@@ -134,7 +227,7 @@ class AudioSystem {
       const gain = this.context.createGain();
 
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      this.connectGainNode(gain);
 
       osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(baseFreq, this.context.currentTime);
@@ -159,7 +252,10 @@ class AudioSystem {
       const osc = this.context.createOscillator();
       const oscGain = this.context.createGain();
       osc.connect(oscGain);
-      oscGain.connect(this.masterGain);
+      const destination = this.getEffectsDestination();
+      if (destination) {
+        oscGain.connect(destination);
+      }
 
       const bufferSize = this.context.sampleRate * 0.5;
       const noiseBuffer = this.context.createBuffer(
@@ -175,7 +271,9 @@ class AudioSystem {
       noise.buffer = noiseBuffer;
       const noiseGain = this.context.createGain();
       noise.connect(noiseGain);
-      noiseGain.connect(this.masterGain);
+      if (destination) {
+        noiseGain.connect(destination);
+      }
 
       const now = this.context.currentTime;
 
@@ -203,7 +301,7 @@ class AudioSystem {
       const gain = this.context.createGain();
 
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      this.connectGainNode(gain);
 
       osc.frequency.setValueAtTime(600, this.context.currentTime);
       osc.frequency.exponentialRampToValueAtTime(
@@ -230,7 +328,7 @@ class AudioSystem {
         const gain = this.context.createGain();
 
         osc.connect(gain);
-        gain.connect(this.masterGain);
+        this.connectGainNode(gain);
 
         const startTime = this.context.currentTime + index * 0.06;
         osc.frequency.setValueAtTime(freq, startTime);
@@ -251,7 +349,7 @@ class AudioSystem {
       const gain = this.context.createGain();
 
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      this.connectGainNode(gain);
 
       osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(180, this.context.currentTime);
@@ -277,7 +375,7 @@ class AudioSystem {
       const gain = this.context.createGain();
 
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      this.connectGainNode(gain);
 
       const now = this.context.currentTime;
       osc.type = 'sine';
@@ -298,7 +396,7 @@ class AudioSystem {
       const gain = this.context.createGain();
 
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      this.connectGainNode(gain);
 
       const now = this.context.currentTime;
       osc.type = 'triangle';
@@ -319,7 +417,7 @@ class AudioSystem {
       const gain = this.context.createGain();
 
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      this.connectGainNode(gain);
 
       const now = this.context.currentTime;
       osc.type = 'sawtooth';
@@ -340,7 +438,7 @@ class AudioSystem {
       const gain = this.context.createGain();
 
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      this.connectGainNode(gain);
 
       const now = this.context.currentTime;
       osc.type = 'square';
@@ -362,7 +460,7 @@ class AudioSystem {
       const gain = this.context.createGain();
 
       osc.connect(gain);
-      gain.connect(this.masterGain);
+      this.connectGainNode(gain);
 
       const now = this.context.currentTime;
       osc.type = 'square';
@@ -397,10 +495,10 @@ class AudioSystem {
       const oscGain = this.context.createGain();
 
       noise.connect(noiseGain);
-      noiseGain.connect(this.masterGain);
+      this.connectGainNode(noiseGain);
 
       osc.connect(oscGain);
-      oscGain.connect(this.masterGain);
+      this.connectGainNode(oscGain);
 
       const now = this.context.currentTime;
       osc.type = 'sine';
