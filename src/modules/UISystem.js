@@ -49,6 +49,7 @@ class UISystem {
       level: null,
       xp: { current: null, needed: null, percentage: null },
       sessionKills: null,
+      sessionKillsTextLength: 0,
       sessionTimeSeconds: null,
       wave: {
         current: null,
@@ -58,6 +59,8 @@ class UISystem {
         isActive: null,
         timeRemainingSeconds: null,
         breakTimerSeconds: null,
+        titleLength: 0,
+        enemiesTextLength: 0,
       },
     };
 
@@ -350,6 +353,13 @@ class UISystem {
     canvas.style.height = `${scaledHeight}px`;
     canvas.style.maxWidth = '100%';
     canvas.style.maxHeight = '100%';
+
+    if (gameUi && gameUi instanceof HTMLElement) {
+      gameUi.style.setProperty('--game-canvas-width', `${scaledWidth}px`);
+      gameUi.style.setProperty('--game-canvas-height', `${scaledHeight}px`);
+      const hudMaxWidth = Math.max(Math.min(scaledWidth + 160, 992), 480);
+      gameUi.style.setProperty('--hud-max-width', `${hudMaxWidth}px`);
+    }
 
     if (gameField && gameField instanceof HTMLElement) {
       gameField.style.setProperty('--game-canvas-width', `${scaledWidth}px`);
@@ -1710,13 +1720,21 @@ class UISystem {
     const killsEntry = this.hudElements.get('kills');
     const timeEntry = this.hudElements.get('time');
     const force = Boolean(options.force);
+    let layoutNeedsUpdate = false;
 
     const totalKills = Math.max(0, Math.floor(sessionData.totalKills ?? 0));
     if (killsEntry?.value) {
-      if (force || totalKills !== this.cachedValues.sessionKills) {
-        const formattedKills = this.formatCount(totalKills, {
-          allowCompact: true,
-        });
+      const formattedKills = this.formatCount(totalKills, {
+        allowCompact: true,
+      });
+      const nextLength = formattedKills.length;
+      const previousLength = this.cachedValues.sessionKillsTextLength ?? 0;
+      const shouldUpdateValue =
+        force ||
+        totalKills !== this.cachedValues.sessionKills ||
+        killsEntry.value.textContent !== formattedKills;
+
+      if (shouldUpdateValue) {
         killsEntry.value.textContent = formattedKills;
 
         if (killsEntry.unit) {
@@ -1732,10 +1750,14 @@ class UISystem {
         if (killsEntry.root) {
           killsEntry.root.title = `Asteroides destruídos: ${formattedKills}`;
         }
-
-        this.cachedValues.sessionKills = totalKills;
-        this.requestViewportScaleUpdate();
       }
+
+      if (nextLength > previousLength) {
+        layoutNeedsUpdate = true;
+      }
+
+      this.cachedValues.sessionKills = totalKills;
+      this.cachedValues.sessionKillsTextLength = nextLength;
     }
 
     const timeSeconds = Math.max(0, Math.floor(sessionData.timeElapsed ?? 0));
@@ -1744,6 +1766,10 @@ class UISystem {
         timeEntry.value.textContent = `${timeSeconds}s`;
         this.cachedValues.sessionTimeSeconds = timeSeconds;
       }
+    }
+
+    if (layoutNeedsUpdate) {
+      this.requestViewportScaleUpdate();
     }
   }
 
@@ -1782,6 +1808,10 @@ class UISystem {
         ? this.formatCount(normalized.totalAsteroids, { allowCompact: true })
         : null;
     let layoutNeedsUpdate = false;
+    const previousTitleLength = this.cachedValues.wave.titleLength ?? 0;
+    const previousEnemiesLength = this.cachedValues.wave.enemiesTextLength ?? 0;
+    let nextTitleLength = previousTitleLength;
+    let nextEnemiesLength = previousEnemiesLength;
 
     const hasChanged =
       force ||
@@ -1798,7 +1828,18 @@ class UISystem {
     }
 
     if (waveRefs.title) {
-      waveRefs.title.textContent = `Setor ${normalized.current}`;
+      const titleText = `Setor ${normalized.current}`;
+      const newTitleLength = titleText.length;
+
+      if (waveRefs.title.textContent !== titleText) {
+        waveRefs.title.textContent = titleText;
+      }
+
+      if (newTitleLength > previousTitleLength) {
+        layoutNeedsUpdate = true;
+      }
+
+      nextTitleLength = newTitleLength;
     }
 
     if (waveRefs.timerValue) {
@@ -1847,8 +1888,14 @@ class UISystem {
       if (waveRefs.enemies.textContent !== enemiesText) {
         waveRefs.enemies.textContent = enemiesText;
         waveRefs.enemies.title = enemiesText === '--' ? '' : enemiesText;
+      }
+
+      const newEnemiesLength = enemiesText.length;
+      if (newEnemiesLength > previousEnemiesLength) {
         layoutNeedsUpdate = true;
       }
+
+      nextEnemiesLength = newEnemiesLength;
     }
 
     if (waveRefs.countdown) {
@@ -1891,6 +1938,8 @@ class UISystem {
       isActive: normalized.isActive,
       timeRemainingSeconds: timeSeconds,
       breakTimerSeconds: breakSeconds,
+      titleLength: nextTitleLength,
+      enemiesTextLength: nextEnemiesLength,
     };
   }
 

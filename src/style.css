@@ -1865,6 +1865,7 @@ body.color-assist-mode .upgrade-option__next {
 
 /* Game UI */
 #game-ui {
+  --hud-max-width: 62rem;
   width: 100%;
   height: 100%;
   display: grid;
@@ -1926,21 +1927,23 @@ body.damage-flash-disabled #health-display.damage-flash {
   }
 }
 
-body.is-paused #hud-root,
-body.is-paused #hud-root .hud-panel,
-body.is-paused #hud-root .hud-xp {
-  opacity: 0.7;
-}
-
 #hud-root {
   align-self: start;
   justify-self: center;
-  margin-top: clamp(1rem, 3vh, 1.75rem);
-  width: min(100%, 62rem);
+  margin-top: clamp(0.75rem, 2.5vh, 1.5rem);
+  width: min(100%, var(--hud-max-width, 62rem));
+  max-width: var(--hud-max-width, 62rem);
+  --hud-stack-width: min(var(--hud-max-width, 56rem), 94vw);
   transform: scale(var(--hud-scale-effective, 1));
   transform-origin: top center;
   transition: transform var(--duration-normal) var(--ease-standard);
   z-index: 12;
+}
+
+body.is-paused #hud-root,
+body.is-paused #hud-root .hud-panel,
+body.is-paused #hud-root .hud-xp {
+  opacity: 0.7;
 }
 
 .motion-reduced #hud-root,
@@ -1949,8 +1952,8 @@ body.motion-reduced #hud-root {
 }
 
 .hud {
-  width: min(100%, 94vw);
-  max-width: 56rem;
+  width: min(100%, var(--hud-stack-width, 94vw));
+  max-width: var(--hud-stack-width, 56rem);
   display: flex;
   flex-direction: column;
   gap: clamp(0.75rem, 1.2vw, 1.25rem);
