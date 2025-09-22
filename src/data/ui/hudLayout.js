@@ -2,6 +2,7 @@ const HUD_LAYOUT = [
   {
     key: 'health',
     type: 'stat',
+    position: 'top-left',
     label: 'Integridade',
     description: 'Integridade atual e máxima da nave',
     icon: {
@@ -24,6 +25,7 @@ const HUD_LAYOUT = [
   {
     key: 'shield',
     type: 'shield',
+    position: 'top-left',
     label: 'Escudo',
     description: 'Estado do escudo defletor',
     icon: {
@@ -39,6 +41,7 @@ const HUD_LAYOUT = [
   {
     key: 'level',
     type: 'stat',
+    position: 'top-middle',
     label: 'Level',
     description: 'Nível atual do piloto',
     icon: {
@@ -58,6 +61,7 @@ const HUD_LAYOUT = [
   {
     key: 'kills',
     type: 'stat',
+    position: 'top-right',
     label: 'Abates',
     description: 'Total de asteroides destruídos na sessão',
     icon: {
@@ -81,6 +85,7 @@ const HUD_LAYOUT = [
   {
     key: 'time',
     type: 'stat',
+    position: 'top-right',
     label: 'Tempo',
     description: 'Tempo total de sobrevivência na sessão atual',
     icon: {

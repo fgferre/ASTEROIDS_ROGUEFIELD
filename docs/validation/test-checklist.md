@@ -15,8 +15,11 @@ Este documento orienta a execução de testes manuais sempre que fluxos de inter
 - [x] Elementos do HUD são renderizados segundo o esquema `src/data/ui/hudLayout.js`, sem valores estáticos no HTML.
 - [x] Indicador de integridade atualiza via evento `player-health-changed` e aplica estado de perigo abaixo de 35% da vida máxima.
 - [x] Escudo alterna entre travado, pronto, ativo e cooldown, exibindo overlay proporcional ao tempo restante.
+- [x] Consumo de hits do escudo reduz visualmente os segmentos e aplica pulso no cartão.
 - [x] Painel de ondas reflete progresso (`wave-state-updated`), mostra countdown entre ondas e aplica destaque de alerta durante a pausa entre setores. Contador agora aparece como overlay no campo de jogo sem deslocar o canvas.
+- [x] Countdown de ondas apresenta estado de alerta nos últimos 5 segundos e o painel destaca períodos de intervalo/conclusão.
 - [x] Barra de XP reage ao evento `experience-changed` e reseta corretamente após level up.
+- [x] Pulses visuais para XP, kills, tempo e level up são disparados ao ganhar experiência, eliminar inimigos ou subir de nível.
 
 ### Viewport reduzida (≤ 900px)
 

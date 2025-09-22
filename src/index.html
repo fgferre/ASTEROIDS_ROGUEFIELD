@@ -291,53 +291,74 @@
 
       <!-- UI do Jogo -->
       <div id="game-ui" class="hidden">
-        <div id="hud-root" class="hud">
-          <div id="hud-primary" class="hud-row" aria-live="polite"></div>
-
-          <section id="hud-wave" class="hud-panel" aria-live="polite">
-            <div class="hud-panel__header">
-              <h3 id="wave-title" class="hud-panel__title">Setor 1</h3>
-              <div
-                class="wave-timer"
-                role="group"
-                aria-label="Tempo restante da onda"
-              >
-                <span class="timer-label">Tempo restante:</span>
-                <span id="wave-timer-display" class="timer-value">60s</span>
-              </div>
-            </div>
-            <div
-              id="wave-progress"
-              class="wave-progress"
-              role="progressbar"
-              aria-valuemin="0"
-              aria-valuemax="100"
-              aria-valuenow="0"
-            >
-              <div id="wave-progress-bar" class="wave-progress-bar"></div>
-            </div>
-            <p id="wave-enemies" class="wave-enemies">
-              Asteroides: 0 eliminados
-            </p>
-          </section>
-
-          <div
-            id="hud-xp"
-            class="hud-xp"
-            role="group"
-            aria-label="Progresso de experiência"
-          >
-            <div class="xp-bar" aria-hidden="true">
-              <div id="xp-progress" class="xp-progress"></div>
-            </div>
-            <div id="xp-text" class="xp-text">XP: 0 / 100</div>
-          </div>
-        </div>
-
         <div class="game-field">
           <canvas id="game-canvas" width="800" height="600"></canvas>
 
           <div class="game-field__overlay">
+            <div id="hud-root" class="hud">
+              <div
+                id="hud-region-top-left"
+                class="hud-region hud-region--top-left"
+                aria-live="polite"
+              ></div>
+
+              <div
+                id="hud-region-top-middle"
+                class="hud-region hud-region--top-middle"
+                aria-live="polite"
+              ></div>
+
+              <div
+                id="hud-region-top-right"
+                class="hud-region hud-region--top-right"
+                aria-live="polite"
+              ></div>
+
+              <div id="hud-region-bottom-left" class="hud-region hud-region--bottom-left">
+                <section id="hud-wave" class="hud-panel" aria-live="polite">
+                  <div class="hud-panel__header">
+                    <h3 id="wave-title" class="hud-panel__title">Setor 1</h3>
+                    <div
+                      class="wave-timer"
+                      role="group"
+                      aria-label="Tempo restante da onda"
+                    >
+                      <span class="timer-label">Tempo restante:</span>
+                      <span id="wave-timer-display" class="timer-value">60s</span>
+                    </div>
+                  </div>
+                  <div
+                    id="wave-progress"
+                    class="wave-progress"
+                    role="progressbar"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    aria-valuenow="0"
+                  >
+                    <div id="wave-progress-bar" class="wave-progress-bar"></div>
+                  </div>
+                  <p id="wave-enemies" class="wave-enemies">
+                    Asteroides: 0 eliminados
+                  </p>
+                </section>
+              </div>
+
+              <div id="hud-region-bottom-center" class="hud-region hud-region--bottom-center">
+                <div
+                  id="hud-xp"
+                  class="hud-xp"
+                  role="group"
+                  aria-label="Progresso de XP"
+                >
+                  <div class="xp-bar" aria-hidden="true">
+                    <div id="xp-progress" class="xp-progress"></div>
+                  </div>
+                  <div id="xp-text" class="xp-text">XP: 0 / 100</div>
+                </div>
+              </div>
+
+              <div id="hud-region-bottom-right" class="hud-region hud-region--bottom-right"></div>
+            </div>
             <div
               id="wave-countdown"
               class="wave-countdown"

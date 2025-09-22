@@ -51,6 +51,15 @@ class SpaceParticle {
       ctx.moveTo(-this.size, 0);
       ctx.lineTo(this.size, 0);
       ctx.stroke();
+    } else if (this.type === 'crack') {
+      ctx.strokeStyle = this.color;
+      ctx.lineWidth = Math.max(0.6, this.size * 0.4);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      const length = this.size * 3.2;
+      ctx.moveTo(-length * 0.5, 0);
+      ctx.lineTo(length * 0.5, 0);
+      ctx.stroke();
     } else if (this.type === 'debris') {
       ctx.fillStyle = this.color;
       ctx.beginPath();
@@ -749,31 +758,57 @@ export default class EffectsSystem {
   }
 
   createAsteroidExplosion(asteroid) {
-    const baseCount = { large: 12, medium: 8, small: 5 }[asteroid.size] || 6;
-    const particleCount = this.getScaledParticleCount(baseCount);
-
-    if (asteroid.size === 'small') {
-      this.addScreenShake(2, 0.1);
-    } else if (asteroid.size === 'medium') {
-      this.addScreenShake(4, 0.15);
-    } else if (asteroid.size === 'large') {
-      this.addScreenShake(8, 0.25);
-      this.addFreezeFrame(0.15, 0.2);
-      this.addScreenFlash('#FF6B6B', 0.2, 0.1);
+    if (!asteroid) {
+      return;
     }
 
-    for (let i = 0; i < particleCount; i++) {
+    const variantColors =
+      typeof asteroid.getVariantColors === 'function'
+        ? asteroid.getVariantColors()
+        : null;
+    const debrisColor = variantColors?.fill || '#8B4513';
+    const sparkColor =
+      variantColors?.glow ||
+      variantColors?.pulse ||
+      `hsl(${Math.random() * 20 + 30}, 100%, 70%)`;
+    const secondarySparkColor = variantColors?.cracks || 'rgba(255, 220, 170, 0.85)';
+
+    const baseCount = { large: 12, medium: 8, small: 5 }[asteroid.size] || 6;
+    const radius = Number.isFinite(asteroid.radius) ? Math.max(asteroid.radius, 12) : 20;
+    const densityFactor = Math.max(1, radius / 22);
+    const particleCount = this.getScaledParticleCount(Math.round(baseCount * densityFactor));
+
+    const parentVx = Number.isFinite(asteroid.vx) ? asteroid.vx : 0;
+    const parentVy = Number.isFinite(asteroid.vy) ? asteroid.vy : 0;
+    const momentumScale = 0.35;
+    const speedScale = Math.max(0.85, Math.min(1.8, radius / 24));
+
+    if (asteroid.size === 'small') {
+      this.addScreenShake(2 + radius * 0.01, 0.12);
+    } else if (asteroid.size === 'medium') {
+      this.addScreenShake(4 + radius * 0.012, 0.18);
+    } else if (asteroid.size === 'large') {
+      this.addScreenShake(8 + radius * 0.015, 0.28);
+      this.addFreezeFrame(0.18, 0.24);
+      this.addScreenFlash(variantColors?.glow || '#FF6B6B', 0.22, 0.12);
+    }
+
+    for (let i = 0; i < particleCount; i += 1) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 40 + Math.random() * 80;
+      const speed = (40 + Math.random() * 80) * speedScale;
+
+      const offset = radius * 0.5 * (Math.random() - 0.5);
+      const spawnX = asteroid.x + Math.cos(angle) * offset;
+      const spawnY = asteroid.y + Math.sin(angle) * offset;
 
       const debris = new SpaceParticle(
-        asteroid.x + (Math.random() - 0.5) * asteroid.radius,
-        asteroid.y + (Math.random() - 0.5) * asteroid.radius,
-        Math.cos(angle) * speed,
-        Math.sin(angle) * speed,
-        '#8B4513',
-        2 + Math.random() * 3,
-        0.6 + Math.random() * 0.4,
+        spawnX,
+        spawnY,
+        Math.cos(angle) * speed + parentVx * momentumScale,
+        Math.sin(angle) * speed + parentVy * momentumScale,
+        debrisColor,
+        2 + Math.random() * 3.2,
+        0.6 + Math.random() * 0.45,
         'debris'
       );
       this.particles.push(debris);
@@ -781,36 +816,112 @@ export default class EffectsSystem {
       const spark = new SpaceParticle(
         asteroid.x,
         asteroid.y,
-        Math.cos(angle) * speed * 1.3,
-        Math.sin(angle) * speed * 1.3,
-        `hsl(${Math.random() * 60 + 15}, 100%, 70%)`,
-        1.5 + Math.random() * 1.5,
-        0.3 + Math.random() * 0.2,
+        Math.cos(angle) * speed * 1.25 + parentVx * momentumScale,
+        Math.sin(angle) * speed * 1.25 + parentVy * momentumScale,
+        sparkColor,
+        1.6 + Math.random() * 1.6,
+        0.32 + Math.random() * 0.22,
         'spark'
       );
       this.particles.push(spark);
+
+      if (Math.random() < 0.35) {
+        const secondary = new SpaceParticle(
+          asteroid.x,
+          asteroid.y,
+          Math.cos(angle + Math.PI / 2) * speed * 0.6,
+          Math.sin(angle + Math.PI / 2) * speed * 0.6,
+          secondarySparkColor,
+          1.2 + Math.random() * 1,
+          0.28 + Math.random() * 0.18,
+          'spark'
+        );
+        this.particles.push(secondary);
+      }
     }
   }
 
   createCrackDebris(asteroid, stage = 1) {
+    if (!asteroid) {
+      return;
+    }
+
     const intensity = Math.min(Math.max(stage, 1), 3);
-    const sparks = this.getScaledParticleCount(2 + intensity * 2);
+    const variantColors =
+      typeof asteroid.getVariantColors === 'function'
+        ? asteroid.getVariantColors()
+        : null;
+    const crackColor = variantColors?.cracks || 'rgba(255, 235, 200, 0.92)';
+    const glowColor = variantColors?.innerGlow || 'rgba(255, 255, 255, 0.28)';
 
-    for (let i = 0; i < sparks; i += 1) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 35 + Math.random() * 45;
+    const rotation = Math.random() * Math.PI * 2;
+    const startOffset = asteroid.radius * 0.15;
+    const branchSpread = Math.PI / 9;
+    const baseLifetime = 0.22 + intensity * 0.08;
 
-      const spark = new SpaceParticle(
-        asteroid.x + Math.cos(angle) * asteroid.radius * 0.4,
-        asteroid.y + Math.sin(angle) * asteroid.radius * 0.4,
-        Math.cos(angle) * speed,
-        Math.sin(angle) * speed,
-        'rgba(255, 235, 200, 0.85)',
-        1 + Math.random() * 1.2,
-        0.25 + Math.random() * 0.2,
-        'spark'
+    const pushCrack = (angle, lengthFactor) => {
+      const angleRad = angle + rotation;
+      const length = asteroid.radius * lengthFactor;
+      const startX = asteroid.x + Math.cos(angleRad) * startOffset;
+      const startY = asteroid.y + Math.sin(angleRad) * startOffset;
+      const endX = asteroid.x + Math.cos(angleRad) * (startOffset + length);
+      const endY = asteroid.y + Math.sin(angleRad) * (startOffset + length);
+      const centerX = (startX + endX) * 0.5;
+      const centerY = (startY + endY) * 0.5;
+
+      const crack = new SpaceParticle(
+        centerX,
+        centerY,
+        0,
+        0,
+        crackColor,
+        Math.max(0.6, length / 3.2),
+        baseLifetime,
+        'crack'
       );
-      this.particles.push(spark);
+      crack.rotation = angleRad;
+      crack.rotationSpeed = 0;
+      this.particles.push(crack);
+
+      if (!this.motionReduced) {
+        const sparkSpeed = 26 + Math.random() * 34;
+        const spark = new SpaceParticle(
+          endX,
+          endY,
+          Math.cos(angleRad) * sparkSpeed * 0.3,
+          Math.sin(angleRad) * sparkSpeed * 0.3,
+          glowColor,
+          0.9 + Math.random() * 0.7,
+          0.2 + Math.random() * 0.15,
+          'spark'
+        );
+        this.particles.push(spark);
+      }
+    };
+
+    const mainCount = 3;
+    const mainLength = 0.55;
+    for (let i = 0; i < mainCount; i += 1) {
+      const angle = (i / mainCount) * Math.PI * 2;
+      pushCrack(angle, mainLength);
+    }
+
+    if (intensity >= 2) {
+      const branchCount = 3;
+      const branchLength = 0.38;
+      for (let i = 0; i < branchCount; i += 1) {
+        const angle = (i / branchCount) * Math.PI * 2 + Math.PI / branchCount;
+        pushCrack(angle, branchLength);
+      }
+    }
+
+    if (intensity >= 3 && !this.motionReduced) {
+      const microLength = 0.24;
+      for (let i = 0; i < mainCount; i += 1) {
+        const baseAngle = (i / mainCount) * Math.PI * 2;
+        pushCrack(baseAngle + branchSpread, microLength);
+        pushCrack(baseAngle - branchSpread, microLength);
+      }
     }
   }
 

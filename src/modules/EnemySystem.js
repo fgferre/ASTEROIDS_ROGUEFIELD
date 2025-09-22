@@ -747,16 +747,23 @@ class Asteroid {
     const fragments = [];
     const baseSpeed = CONSTANTS.ASTEROID_SPEEDS[newSize] || 40;
 
+    const momentumScale = 0.35;
+    const parentVx = Number.isFinite(this.vx) ? this.vx : 0;
+    const parentVy = Number.isFinite(this.vy) ? this.vy : 0;
+
     for (let i = 0; i < count; i += 1) {
       const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
       const speed = baseSpeed * (0.85 + Math.random() * 0.45);
       const distance = this.radius * (0.5 + Math.random() * 0.4);
 
+      const vx = Math.cos(angle) * speed + parentVx * momentumScale;
+      const vy = Math.sin(angle) * speed + parentVy * momentumScale;
+
       fragments.push({
         x: this.x + Math.cos(angle) * distance,
         y: this.y + Math.sin(angle) * distance,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
+        vx,
+        vy,
         size: newSize,
         wave: this.wave,
         spawnedBy: this.id,

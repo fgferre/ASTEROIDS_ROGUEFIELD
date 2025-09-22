@@ -22,6 +22,9 @@ class UISystem {
     this.damageFlashTimeout = null;
     this.currentPauseState = false;
     this.shieldFailTimeout = null;
+    this.timePulseTimeout = null;
+    this.killsPulseTimeout = null;
+    this.levelPulseTimeout = null;
     this.resizeRaf = null;
     this.currentHudBaseScale = 1;
     this.currentHudAutoScale = 1;
@@ -103,7 +106,6 @@ class UISystem {
   cacheStaticNodes() {
     return {
       root: document.getElementById('hud-root') || null,
-      hudPrimary: document.getElementById('hud-primary') || null,
       gameUi: document.getElementById('game-ui') || null,
       gameField: document.querySelector('#game-ui .game-field') || null,
       canvas: document.getElementById('game-canvas') || null,
@@ -321,21 +323,22 @@ class UISystem {
       parseFloat(
         computedStyles.paddingRight || computedStyles.paddingInlineEnd || '0'
       ) || 0;
-    const overlaySafeArea = Math.min(Math.max(viewportHeight * 0.22, 140), 260);
-
-    const reservedVertical = paddingTop + paddingBottom + overlaySafeArea;
+    // Overlay now lives above the canvas. Do not reserve extra
+    // vertical space for HUD; only account for container paddings.
+    const reservedVertical = paddingTop + paddingBottom;
     const availableHeight = viewportHeight - reservedVertical;
     const MIN_SCALE = 0.45;
+    const MAX_SCALE = 1.9;
     const heightScale = Math.max(
       MIN_SCALE,
-      Math.min(1, availableHeight / baseHeight)
+      Math.min(MAX_SCALE, availableHeight / baseHeight)
     );
 
     const horizontalReserve = paddingLeft + paddingRight + 48;
     const availableWidth = viewportWidth - horizontalReserve;
     const widthScale = Math.max(
       MIN_SCALE,
-      Math.min(1, availableWidth / baseWidth)
+      Math.min(MAX_SCALE, availableWidth / baseWidth)
     );
 
     const scale = Math.min(heightScale, widthScale);
@@ -357,7 +360,7 @@ class UISystem {
     if (gameUi && gameUi instanceof HTMLElement) {
       gameUi.style.setProperty('--game-canvas-width', `${scaledWidth}px`);
       gameUi.style.setProperty('--game-canvas-height', `${scaledHeight}px`);
-      const hudMaxWidth = Math.max(Math.min(scaledWidth + 160, 992), 480);
+      const hudMaxWidth = Math.max(Math.min(scaledWidth + 320, 1600), 560);
       gameUi.style.setProperty('--hud-max-width', `${hudMaxWidth}px`);
     }
 
@@ -366,8 +369,7 @@ class UISystem {
       gameField.style.setProperty('--game-canvas-height', `${scaledHeight}px`);
     }
 
-    const hudAutoScale =
-      scale >= 0.95 ? 1 : Math.min(1, Math.max(0.82, scale + 0.05));
+    const hudAutoScale = Math.min(1.25, Math.max(0.82, scale));
     this.updateHudScale(hudAutoScale);
   }
 
@@ -506,12 +508,32 @@ class UISystem {
   }
 
   setupHudLayout() {
-    const container = this.domRefs.hudPrimary;
-    if (!container) {
+    const root = this.domRefs.root;
+    if (!root) {
       return;
     }
 
-    container.innerHTML = '';
+    const getRegionContainer = (position) => {
+      const map = {
+        'top-left': '#hud-region-top-left',
+        'top-middle': '#hud-region-top-middle',
+        'top-right': '#hud-region-top-right',
+        'bottom-left': '#hud-region-bottom-left',
+        'bottom-right': '#hud-region-bottom-right',
+        'bottom-center': '#hud-region-bottom-center',
+      };
+      const selector = map[position] || map['top-left'];
+      return root.querySelector(selector) || root;
+    };
+
+    // Clear known regions (safe: only clears dynamic items, not wave/xp panels)
+    ['#hud-region-top-left', '#hud-region-top-middle', '#hud-region-top-right']
+      .forEach((sel) => {
+        const region = root.querySelector(sel);
+        if (region) {
+          region.innerHTML = '';
+        }
+      });
 
     this.hudLayout.forEach((itemConfig) => {
       const element = this.createHudItem(itemConfig);
@@ -519,7 +541,8 @@ class UISystem {
         return;
       }
 
-      container.appendChild(element.root);
+      const target = getRegionContainer(itemConfig.position);
+      target.appendChild(element.root);
       this.hudElements.set(itemConfig.key, element);
     });
   }
@@ -551,25 +574,33 @@ class UISystem {
     }
 
     if (config.type === 'shield') {
-      root.classList.add('locked');
+      root.classList.add('hud-item--shield', 'locked');
 
-      const info = document.createElement('span');
-      info.className = 'shield-info';
-      info.classList.add('hud-item__content');
+      const content = document.createElement('div');
+      content.classList.add('hud-item__content', 'hud-item__content--shield');
+
+      const header = document.createElement('div');
+      header.classList.add('hud-item__metric-header');
 
       const label = document.createElement('span');
-      label.className = 'shield-text';
+      label.classList.add('hud-item__label');
       label.textContent = config.label;
 
-      const value = document.createElement('span');
-      value.className = 'shield-hits';
-      value.textContent = config.initialValue ?? '--';
+      const status = document.createElement('span');
+      status.classList.add('hud-item__shield-status');
+      status.textContent = config.initialValue ?? '--';
       if (config.valueId) {
-        value.id = config.valueId;
+        status.id = config.valueId;
       }
 
-      info.append(label, value);
-      root.appendChild(info);
+      header.append(label, status);
+
+      const slotsContainer = document.createElement('div');
+      slotsContainer.classList.add('shield-slots');
+      slotsContainer.setAttribute('aria-hidden', 'true');
+
+      content.append(header, slotsContainer);
+      root.appendChild(content);
 
       const overlay = document.createElement('div');
       overlay.id = config.overlayId || 'shield-cooldown-overlay';
@@ -580,8 +611,58 @@ class UISystem {
         key: config.key,
         config,
         root,
-        value,
+        value: status,
         overlay,
+        slotsContainer,
+        slots: [],
+      };
+    }
+
+    if (config.key === 'health') {
+      const content = document.createElement('div');
+      content.classList.add('hud-item__content', 'hud-item__content--health');
+
+      const header = document.createElement('div');
+      header.classList.add('hud-item__metric-header');
+
+      const label = document.createElement('span');
+      label.classList.add('hud-item__label');
+      label.textContent = config.label;
+
+      const valueWrapper = document.createElement('span');
+      valueWrapper.classList.add('hud-item__value', 'hud-item__value--health');
+
+      const valueNumber = document.createElement('span');
+      valueNumber.classList.add('hud-item__value-number');
+      valueNumber.textContent = config.initialValue ?? '--';
+      if (config.valueId) {
+        valueNumber.id = config.valueId;
+      }
+      valueWrapper.appendChild(valueNumber);
+
+      header.append(label, valueWrapper);
+
+      const bar = document.createElement('div');
+      bar.classList.add('hud-bar', 'hud-bar--health');
+      bar.setAttribute('role', 'progressbar');
+      bar.setAttribute('aria-valuemin', '0');
+      bar.setAttribute('aria-valuemax', '100');
+
+      const barFill = document.createElement('div');
+      barFill.classList.add('hud-bar__fill');
+      barFill.style.width = '100%';
+      bar.appendChild(barFill);
+
+      content.append(header, bar);
+      root.appendChild(content);
+
+      return {
+        key: config.key,
+        config,
+        root,
+        value: valueNumber,
+        bar: bar,
+        barFill,
       };
     }
 
@@ -1655,9 +1736,23 @@ class UISystem {
     }
 
     const ratio = max > 0 ? current / max : 0;
+    const percentage = Math.max(0, Math.min(100, ratio * 100));
     const dangerThreshold = entry.config?.thresholds?.danger ?? 0;
+    const warningThreshold = Math.max(dangerThreshold, 0.6);
     const isDanger = max > 0 && ratio <= dangerThreshold;
+    const isWarning = !isDanger && max > 0 && ratio <= warningThreshold;
+
     entry.root.classList.toggle('is-danger', isDanger);
+    entry.root.classList.toggle('is-warning', isWarning);
+    entry.root.style.setProperty('--hud-health-ratio', ratio.toFixed(3));
+
+    if (entry.bar) {
+      entry.bar.setAttribute('aria-valuenow', `${Math.round(percentage)}`);
+    }
+
+    if (entry.barFill) {
+      entry.barFill.style.width = `${percentage}%`;
+    }
   }
 
   updateLevelDisplay(level, options = {}) {
@@ -1666,12 +1761,33 @@ class UISystem {
       return;
     }
 
+    const previousLevel = Number.isFinite(this.cachedValues.level)
+      ? this.cachedValues.level
+      : null;
     const normalizedLevel = Math.max(1, Math.floor(level ?? 1));
     const force = Boolean(options.force);
 
     if (force || normalizedLevel !== this.cachedValues.level) {
       entry.value.textContent = `Level ${normalizedLevel}`;
       this.cachedValues.level = normalizedLevel;
+
+      const leveledUp =
+        previousLevel !== null && normalizedLevel > previousLevel && !force;
+
+      if (entry.root && leveledUp) {
+        entry.root.classList.remove('is-levelup');
+        void entry.root.offsetWidth;
+        entry.root.classList.add('is-levelup');
+
+        if (this.levelPulseTimeout) {
+          window.clearTimeout(this.levelPulseTimeout);
+        }
+
+        this.levelPulseTimeout = window.setTimeout(() => {
+          entry.root.classList.remove('is-levelup');
+          this.levelPulseTimeout = null;
+        }, 900);
+      }
     }
   }
 
@@ -1697,22 +1813,41 @@ class UISystem {
     const force = Boolean(options.force);
 
     if (xpProgress) {
-      if (force || percentage !== this.cachedValues.xp.percentage) {
+      const shouldUpdateWidth =
+        force || percentage !== this.cachedValues.xp.percentage;
+
+      if (shouldUpdateWidth) {
         xpProgress.style.width = `${percentage * 100}%`;
         this.cachedValues.xp.percentage = percentage;
+
+        xpProgress.classList.remove('is-pulsing');
+        void xpProgress.offsetWidth;
+        xpProgress.classList.add('is-pulsing');
+      }
+
+      xpProgress.classList.toggle('is-maxed', percentage >= 1);
+      if (xpProgress.parentElement) {
+        xpProgress.parentElement.classList.toggle('is-maxed', percentage >= 1);
       }
     }
 
     if (xpText) {
-      if (
+      const shouldUpdateText =
         force ||
         current !== this.cachedValues.xp.current ||
-        needed !== this.cachedValues.xp.needed
-      ) {
+        needed !== this.cachedValues.xp.needed;
+
+      if (shouldUpdateText) {
         xpText.textContent = `XP: ${current} / ${needed}`;
         this.cachedValues.xp.current = current;
         this.cachedValues.xp.needed = needed;
+
+        xpText.classList.remove('is-pulsing');
+        void xpText.offsetWidth;
+        xpText.classList.add('is-pulsing');
       }
+
+      xpText.classList.toggle('is-maxed', percentage >= 1);
     }
   }
 
@@ -1736,6 +1871,21 @@ class UISystem {
 
       if (shouldUpdateValue) {
         killsEntry.value.textContent = formattedKills;
+
+        if (killsEntry.root) {
+          killsEntry.root.classList.remove('is-updating');
+          void killsEntry.root.offsetWidth;
+          killsEntry.root.classList.add('is-updating');
+
+          if (this.killsPulseTimeout) {
+            window.clearTimeout(this.killsPulseTimeout);
+          }
+
+          this.killsPulseTimeout = window.setTimeout(() => {
+            killsEntry.root.classList.remove('is-updating');
+            this.killsPulseTimeout = null;
+          }, 340);
+        }
 
         if (killsEntry.unit) {
           const unitLabel = this.getUnitLabel(
@@ -1765,6 +1915,21 @@ class UISystem {
       if (force || timeSeconds !== this.cachedValues.sessionTimeSeconds) {
         timeEntry.value.textContent = `${timeSeconds}s`;
         this.cachedValues.sessionTimeSeconds = timeSeconds;
+
+        if (timeEntry.root) {
+          timeEntry.root.classList.remove('is-updating');
+          void timeEntry.root.offsetWidth;
+          timeEntry.root.classList.add('is-updating');
+
+          if (this.timePulseTimeout) {
+            window.clearTimeout(this.timePulseTimeout);
+          }
+
+          this.timePulseTimeout = window.setTimeout(() => {
+            timeEntry.root.classList.remove('is-updating');
+            this.timePulseTimeout = null;
+          }, 340);
+        }
       }
     }
 
@@ -1874,6 +2039,10 @@ class UISystem {
       }
     }
 
+    const inBreak = !normalized.isActive && breakSeconds > 0;
+    const waveCompleted =
+      !normalized.isActive && breakSeconds === 0 && normalized.totalAsteroids > 0;
+
     if (waveRefs.enemies) {
       let enemiesText = '--';
 
@@ -1881,7 +2050,9 @@ class UISystem {
         enemiesText = formattedTotal
           ? `Asteroides eliminados: ${formattedKills} / ${formattedTotal}`
           : `Asteroides eliminados: ${formattedKills}`;
-      } else if (normalized.totalAsteroids > 0) {
+      } else if (inBreak) {
+        enemiesText = `Próximo setor em: ${breakSeconds}s`;
+      } else if (waveCompleted) {
         enemiesText = 'Setor limpo!';
       }
 
@@ -1899,12 +2070,13 @@ class UISystem {
     }
 
     if (waveRefs.countdown) {
-      const shouldShowCountdown = !normalized.isActive && breakSeconds > 0;
+      const shouldShowCountdown = inBreak;
       waveRefs.countdown.classList.toggle('is-visible', shouldShowCountdown);
       waveRefs.countdown.setAttribute(
         'aria-hidden',
         shouldShowCountdown ? 'false' : 'true'
       );
+      waveRefs.countdown.classList.toggle('is-alert', breakSeconds > 0 && breakSeconds <= 5);
       if (waveRefs.countdownValue) {
         const { countdownValue } = waveRefs;
         if (shouldShowCountdown) {
@@ -1923,6 +2095,11 @@ class UISystem {
 
     if (layoutNeedsUpdate) {
       this.requestViewportScaleUpdate();
+    }
+
+    if (waveRefs.container) {
+      waveRefs.container.classList.toggle('hud-panel--wave-break', inBreak);
+      waveRefs.container.classList.toggle('hud-panel--wave-complete', waveCompleted);
     }
 
     waveRefs.container.classList.toggle(
@@ -2004,14 +2181,101 @@ class UISystem {
       'is-cooldown'
     );
 
+    const statusLabel = entry.value;
+    const slotsContainer = entry.slotsContainer;
+    const ensureSlots = (count) => {
+      if (!slotsContainer) {
+        return;
+      }
+
+      const safeCount = Math.max(0, Math.floor(count));
+      if (!Array.isArray(entry.slots)) {
+        entry.slots = [];
+      }
+
+      if (entry.slots.length === safeCount) {
+        return;
+      }
+
+      slotsContainer.innerHTML = '';
+      entry.slots = [];
+
+      if (safeCount <= 0) {
+        const placeholder = document.createElement('span');
+        placeholder.classList.add('shield-slot', 'shield-slot--empty');
+        slotsContainer.appendChild(placeholder);
+        return;
+      }
+
+      for (let i = 0; i < safeCount; i += 1) {
+        const slot = document.createElement('span');
+        slot.classList.add('shield-slot');
+        slotsContainer.appendChild(slot);
+        entry.slots.push(slot);
+      }
+    };
+
+    let statusText = '--';
+
     if (!state.isUnlocked) {
       entry.root.classList.add('locked');
-      entry.value.textContent = '--';
+      statusText = 'Offline';
+      ensureSlots(0);
+
       if (entry.overlay) {
         entry.overlay.style.transform = 'scaleY(1)';
-        entry.overlay.style.opacity = '0.5';
+        entry.overlay.style.opacity = '0.4';
       }
     } else {
+      const maxHitsTotal = Math.max(0, state.maxHits);
+      ensureSlots(maxHitsTotal);
+
+      const remainingHits = state.isActive
+        ? Math.max(0, state.currentHits)
+        : maxHitsTotal;
+
+      if (Array.isArray(entry.slots)) {
+        let consumedHit = false;
+
+        entry.slots.forEach((slot, index) => {
+          const wasCharged = slot.classList.contains('is-charged');
+          const shouldBeCharged = index < remainingHits;
+          const shouldBeActive = state.isActive && index < remainingHits;
+
+          slot.classList.toggle('is-charged', shouldBeCharged);
+          slot.classList.toggle('is-depleted', !shouldBeCharged);
+          slot.classList.toggle('is-active', shouldBeActive);
+
+          if (wasCharged && !shouldBeCharged) {
+            consumedHit = true;
+            slot.classList.remove('was-consumed');
+            void slot.offsetWidth;
+            slot.classList.add('was-consumed');
+          }
+        });
+
+        if (consumedHit && entry.root) {
+          entry.root.classList.remove('shield-hit');
+          void entry.root.offsetWidth;
+          entry.root.classList.add('shield-hit');
+        }
+      }
+
+      if (slotsContainer) {
+        slotsContainer.classList.toggle('is-cooling', state.isOnCooldown);
+      }
+
+      if (state.isActive) {
+        statusText = `Ativo · ${remainingHits}/${maxHitsTotal}`;
+      } else if (state.isOnCooldown) {
+        const remaining = state.cooldownDuration > 0
+          ? Math.ceil(Math.max(0, state.cooldownTimer))
+          : 0;
+        statusText = `Recarregando · ${remaining}s`;
+      } else {
+        statusText = `Pronto · ${maxHitsTotal}x`;
+      }
+
       if (state.isActive) {
         entry.root.classList.add('active');
       } else if (state.isOnCooldown) {
@@ -2019,11 +2283,6 @@ class UISystem {
       } else {
         entry.root.classList.add('ready');
       }
-
-      const hits = state.isActive
-        ? Math.max(0, state.currentHits)
-        : state.maxHits;
-      entry.value.textContent = `${hits}`;
 
       if (entry.overlay) {
         if (state.isOnCooldown && state.cooldownDuration > 0) {
@@ -2034,6 +2293,10 @@ class UISystem {
           entry.overlay.style.opacity = '0';
         }
       }
+    }
+
+    if (statusLabel) {
+      statusLabel.textContent = statusText;
     }
 
     this.cachedValues.shield = {

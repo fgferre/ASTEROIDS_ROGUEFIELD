@@ -42,7 +42,9 @@
 - `npm run build`
 - `npm run test` (atualmente sem testes implementados, mas mantém a verificação integrada)
 
-## Fase 1 — Layout em Overlay (sem alterar o conteúdo do HUD)
+## Fase 1 - Layout em Overlay (sem alterar o conteúdo do HUD)
+
+**Status:** Concluído. `#hud-root` foi movido para `.game-field__overlay`, mantendo o contador de ondas e respeitando o fluxo de eventos existente. O overlay segue com `pointer-events: none` por padrão e expõe `.hud-interactive-area` quando necessário.
 1. **Preparar o contêiner overlay**
    - Garantir que `.game-field__overlay` ocupe 100% da área do canvas (`inset: 0`) e mantenha `pointer-events: none` por padrão.
    - Adicionar uma classe utilitária (ex.: `.hud-interactive-area`) com `pointer-events: auto` para uso futuro sem quebrar o overlay.
@@ -64,7 +66,9 @@
 - `npm run build`
 - Smoke manual: verificar em 1280×720 e 1920×1080 se o HUD sobrepõe o canvas sem desalinhamentos, se o contador de ondas continua visível e se o menu de pausa permanece acessível.
 
-## Fase 2 — Revisão da Lógica de Escala
+## Fase 2 - Revisão da Lógica de Escala
+
+**Status:** Concluído. `updateViewportScaling` deixou de reservar área fixa para o HUD, considera apenas os paddings do contêiner e agora aceita escala até ~135% quando o viewport permite. `#game-ui` teve os paddings reduzidos, liberando mais área jogável no navegador.
 1. **Refatorar `updateViewportScaling`**
    - Manter o cálculo baseado na resolução lógica (800×600), mas eliminar o `overlaySafeArea`, usando o tamanho real de `#game-ui`/`.game-field` para definir o `scale`.
    - Calcular `availableWidth`/`availableHeight` considerando apenas o padding atual do contêiner e preservar `scale = 1` sempre que o viewport permitir.
@@ -86,7 +90,9 @@
 - Medir `canvas.getBoundingClientRect()` em resoluções pequenas (por exemplo 1024×576) para garantir que a proporção 4:3 é preservada sem barras laterais inesperadas.
 - Monitorar o console por warnings/erros durante redimensionamentos consecutivos para confirmar que o debounce e os observers estão funcionando.
 
-## Fase 3 — Distribuição Modular do HUD
+## Fase 3 - Distribuição Modular do HUD
+
+**Status:** Concluído. As posições definidas em `hudLayout.js` alimentam regiões absolutas (`top-left`, `top-middle`, `top-right`, `bottom-left`, `bottom-center` e `bottom-right`) gerenciadas pelo `UISystem`. O bloco legado foi removido para evitar renderizações duplicadas.
 1. **Estender o schema de layout**
    - Adicionar a cada item de `hudLayout.js` um campo `position` (`'top-left'`, `'top-right'`, `'bottom-left'`, `'bottom-right'`, `'bottom-center'`) com default `'top-left'` para manter compatibilidade.
    - Registrar no arquivo um comentário curto sobre cada posição esperada para orientar futuros colaboradores.
@@ -111,7 +117,9 @@
 - `npm run build`
 - Checklist manual: alternar entre jogo ativo e pausa para garantir que os slots mantenham `z-index` correto, que o HUD não desloca o canvas e que navegabilidade por teclado não seja obstruída.
 
-## Fase 4 — Redesign Visual e Microinterações
+## Fase 4 - Redesign Visual e Microinterações
+
+**Status:** Concluído. O HUD recebeu cartões translúcidos integrados, barra de integridade neon com estados, escudo segmentado com feedback de impacto/cooldown, painel de ondas harmonizado com destaques de intervalo e conclusão, além de pulses para XP, kills, tempo e level up. O chip de countdown alerta nos últimos 5 segundos e permanece sobre o campo.
 1. **Vida como barra dinâmica**
    - Atualizar `createHudItem` para o tipo `health` gerar um contêiner com barra preenchível (`<div class="hud-bar"><div class="hud-bar__fill"></div></div>`), garantindo que `aria-valuenow`/`aria-valuemax` reflitam o estado atual.
    - Adaptar `handleHealthChange` para controlar `width`/`data-state` da barra, reutilizando a lógica existente de `damage-flash` e evitando reflow completo a cada frame.

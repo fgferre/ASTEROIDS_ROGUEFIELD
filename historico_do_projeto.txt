@@ -232,3 +232,13 @@
 * 752d455 Create npm-grunt.yml
 * aefe499 Add files via upload
 * 533038a Initial commit
+* hud-overlay: move HUD into game-field overlay; keep legacy block hidden with -legacy IDs to avoid breakage; added CSS for top-center placement and .hud-interactive-area utility; no logic changes yet (Phase 1 partial)
+* hud-overlay aesthetics: neon health bar, segmented shield, restyled HUD panels and countdown; removed legacy HUD block (build ok)
+* hud-overlay layout pass: reorganized top regions, neon time/xp pulses, balanced shield/wave styling (build ok)
+* hud overlay polish: enhanced shied offline contrast, top regions rebalanced, kills/time pulses, wave styling tweaks (build ok)
+* hud scaling tweak: allow scale up to 1.35, reduced container padding for larger play area (build ok)
+* hud overlay phase 4 complete: level-up pulse, shield slot animations, countdown alerts, docs/checklist updated
+* hud scaling 4k: increased max scale to 1.9 and dynamic hud width to fill large monitors (build ok)
+* effects: redesigned crack debris with variant-aware segments and new 'crack' particle; build ok
+* effects: asteroid explosions now variant-aware with inherited momentum; fragment velocities increased; build ok
+* effects: refined crack effect with structured mask-style segments; build ok
