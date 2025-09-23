@@ -242,3 +242,4 @@
 * effects: redesigned crack debris with variant-aware segments and new 'crack' particle; build ok
 * effects: asteroid explosions now variant-aware with inherited momentum; fragment velocities increased; build ok
 * effects: refined crack effect with structured mask-style segments; build ok
+* asteroid fracture pass: data-driven crack profiles, fragment tuning, EffectsSystem burst tweaks; docs checklist updated (build ok)

@@ -45,6 +45,7 @@ Este documento orienta a execução de testes manuais sempre que fluxos de inter
 - [ ] O toggle **Modo daltônico** aplica a nova paleta em HUD e cards de upgrade mantendo contraste AA mínimo.
 - [ ] O ajuste **Aumentar contraste do HUD** e o tema padrão alternam corretamente os tokens sem gerar conflitos com modo escuro.
 - [ ] Ativar **Reduzir movimentos intensos** e **Reduzir partículas** elimina tremores/flashes agressivos e reduz a densidade de efeitos sem travamentos visíveis.
+- [ ] Mudança de estágio das rachaduras respeita `Reduzir partículas`, mostrando apenas o overlay sem detritos extras.
 - [ ] HUD, menu e tela de level up permanecem legíveis em 1366×768, 1920×1080 e larguras ≤ 900px, sem recortes ou sobreposição do canvas.
 - [ ] Verificar contraste (WCAG AA) nos elementos críticos (botões primários, indicadores de HUD, barras de XP) em ambos os temas.
 
