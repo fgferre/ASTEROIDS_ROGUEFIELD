@@ -869,106 +869,149 @@ export default class EffectsSystem {
     }
 
     const position = event.position;
+    const rotation = Number.isFinite(event.rotation) ? event.rotation : 0;
     const radius = Number.isFinite(event.radius)
       ? Math.max(event.radius, 6)
       : 18;
     const variant = event.variant || 'common';
     const size = event.size || 'medium';
 
-    const colors = this.resolveAsteroidColors(variant, size);
-    const layerTemplate =
-      CONSTANTS.ASTEROID_CRACK_LAYER_LOOKUP?.[event.layerId]?.config || null;
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
 
+    const toWorldPoint = (point) => ({
+      x: position.x + point.x * cos - point.y * sin,
+      y: position.y + point.x * sin + point.y * cos,
+    });
+
+    const rotateVector = (vector) => ({
+      x: vector.x * cos - vector.y * sin,
+      y: vector.x * sin + vector.y * cos,
+    });
+
+    const colors = this.resolveAsteroidColors(variant, size);
     const intensity = Math.max(1, Math.round(event.intensity ?? 1));
     const baseLifetime = 0.2 + intensity * 0.08;
+    const burst = event.burst || {};
 
-    const avgFromRange = (range, fallback) => {
-      if (Array.isArray(range) && range.length === 2) {
-        const [min, max] = range;
-        if (Number.isFinite(min) && Number.isFinite(max)) {
-          return (min + max) * 0.5;
+    const segmentsInput = Array.isArray(event.segments) ? event.segments : [];
+    const sanitizedSegments = segmentsInput
+      .map((segment) => {
+        if (!segment) {
+          return null;
         }
-      }
-      if (Number.isFinite(range)) {
-        return range;
-      }
-      return fallback;
+
+        const startX = Number.isFinite(segment.start?.x)
+          ? segment.start.x
+          : Number.isFinite(segment.x1)
+            ? segment.x1
+            : 0;
+        const startY = Number.isFinite(segment.start?.y)
+          ? segment.start.y
+          : Number.isFinite(segment.y1)
+            ? segment.y1
+            : 0;
+        const endX = Number.isFinite(segment.end?.x)
+          ? segment.end.x
+          : Number.isFinite(segment.x2)
+            ? segment.x2
+            : 0;
+        const endY = Number.isFinite(segment.end?.y)
+          ? segment.end.y
+          : Number.isFinite(segment.y2)
+            ? segment.y2
+            : 0;
+        const length = Number.isFinite(segment.length)
+          ? segment.length
+          : Math.hypot(endX - startX, endY - startY);
+
+        if (!Number.isFinite(length) || length <= 0.2) {
+          return null;
+        }
+
+        return {
+          id: segment.id || null,
+          width: Number.isFinite(segment.width) ? segment.width : 1,
+          length,
+          start: { x: startX, y: startY },
+          end: { x: endX, y: endY },
+          type: segment.type || 'line',
+        };
+      })
+      .filter(Boolean);
+
+    const createSegmentKey = (segment) => {
+      const startX = Number.isFinite(segment.start?.x) ? segment.start.x : 0;
+      const startY = Number.isFinite(segment.start?.y) ? segment.start.y : 0;
+      const endX = Number.isFinite(segment.end?.x) ? segment.end.x : 0;
+      const endY = Number.isFinite(segment.end?.y) ? segment.end.y : 0;
+      const type = segment.type || 'line';
+      return [
+        segment.id ?? 'no-id',
+        startX.toFixed(4),
+        startY.toFixed(4),
+        endX.toFixed(4),
+        endY.toFixed(4),
+        type,
+      ].join(':');
     };
 
-    const startOffsetFactor = Math.max(
-      0.08,
-      avgFromRange(layerTemplate?.startRadiusRange, 0.24)
-    );
-    const mainLengthFactor = Math.max(
-      0.2,
-      avgFromRange(layerTemplate?.mainLengthRange, 0.6)
-    );
-    let mainCount = Math.max(1, Math.round(layerTemplate?.mainRays ?? 3));
-    let branchCount = Math.max(
-      0,
-      Math.round(layerTemplate?.branch?.count ?? 0)
-    );
-    let microCount = Math.max(
-      0,
-      Math.round(layerTemplate?.micro?.count ?? 0)
-    );
-    const branchLengthFactor = Math.max(
-      0.1,
-      mainLengthFactor * (layerTemplate?.branch?.lengthMultiplier ?? 0.5)
-    );
-    const microLengthFactor = Math.max(
-      0.08,
-      mainLengthFactor * (layerTemplate?.micro?.lengthMultiplier ?? 0.3)
-    );
-    const branchSpread = layerTemplate?.branch?.spread ?? 0.35;
-    const microSpread = layerTemplate?.micro?.spread ?? 0.45;
+    const segments = [];
+    const seenSegments = new Set();
 
-    const burst = event.burst || {};
-    if (Number.isFinite(burst.cracks) && burst.cracks > 0) {
-      mainCount = Math.max(
-        1,
-        mainCount + Math.round(burst.cracks * 0.25)
-      );
+    sanitizedSegments.forEach((segment) => {
+      const key = createSegmentKey(segment);
+      if (seenSegments.has(key)) {
+        return;
+      }
+
+      seenSegments.add(key);
+      segments.push(segment);
+    });
+
+    if (!segments.length) {
+      return;
     }
 
-    if (this.particleDensity < 0.7) {
-      branchCount = 0;
-      microCount = 0;
-      mainCount = Math.max(1, Math.round(mainCount * 0.75));
-    } else if (this.particleDensity < 0.9) {
-      microCount = Math.min(1, microCount);
-    }
+    segments.sort((a, b) => b.length - a.length);
 
-    const pushCrack = (angle, lengthFactor) => {
-      const angleRad = angle;
-      const startRadius =
-        radius *
-        Math.max(
-          0.1,
-          startOffsetFactor + (Math.random() - 0.5) * 0.08
-        );
-      const endRadius = Math.min(
-        radius * 1.12,
-        startRadius +
-          radius * lengthFactor * (0.85 + Math.random() * 0.35)
-      );
+    const baseCrackCount = Math.max(
+      1,
+      Math.round(segments.length * (0.65 + this.particleDensity * 0.45))
+    );
 
-      const startX = position.x + Math.cos(angleRad) * startRadius;
-      const startY = position.y + Math.sin(angleRad) * startRadius;
-      const endX = position.x + Math.cos(angleRad) * endRadius;
-      const endY = position.y + Math.sin(angleRad) * endRadius;
+    const cracksToSpawn = Math.max(
+      1,
+      Math.min(
+        segments.length,
+        this.getScaledParticleCount(baseCrackCount, {
+          allowZero: false,
+          minimum: 1,
+        })
+      )
+    );
+
+    const selectedSegments = segments.slice(0, cracksToSpawn);
+
+    selectedSegments.forEach((segment) => {
+      const worldStart = toWorldPoint(segment.start);
+      const worldEnd = toWorldPoint(segment.end);
+      const midX = (worldStart.x + worldEnd.x) * 0.5;
+      const midY = (worldStart.y + worldEnd.y) * 0.5;
+      const angle = Math.atan2(worldEnd.y - worldStart.y, worldEnd.x - worldStart.x);
+      const crackLength = Math.max(0.5, segment.length);
 
       const crack = new SpaceParticle(
-        (startX + endX) * 0.5,
-        (startY + endY) * 0.5,
+        midX,
+        midY,
         0,
         0,
         colors.cracks,
-        Math.max(0.55, (endRadius - startRadius) / 2.6),
-        baseLifetime,
+        Math.max(0.55, crackLength / 3.2),
+        baseLifetime + Math.min(0.12, crackLength / (radius * 6)),
         'crack'
       );
-      crack.rotation = angleRad;
+      crack.rotation = angle;
       crack.rotationSpeed = 0;
       this.particles.push(crack);
 
@@ -976,10 +1019,10 @@ export default class EffectsSystem {
         const sparkSpeed = 22 + Math.random() * 28;
         this.particles.push(
           new SpaceParticle(
-            endX,
-            endY,
-            Math.cos(angleRad) * sparkSpeed * 0.32,
-            Math.sin(angleRad) * sparkSpeed * 0.32,
+            worldEnd.x,
+            worldEnd.y,
+            Math.cos(angle) * sparkSpeed * 0.32,
+            Math.sin(angle) * sparkSpeed * 0.32,
             colors.glow,
             0.9 + Math.random() * 0.7,
             0.22 + Math.random() * 0.16,
@@ -987,60 +1030,45 @@ export default class EffectsSystem {
           )
         );
       }
-    };
-
-    const mainRotation = Math.random() * Math.PI * 2;
-    const branchPerMain =
-      branchCount > 0 ? Math.max(1, Math.round(branchCount / mainCount)) : 0;
-    const microPerMain =
-      microCount > 0 ? Math.max(1, Math.round(microCount / mainCount)) : 0;
-
-    for (let i = 0; i < mainCount; i += 1) {
-      const baseAngle = mainRotation + (i / mainCount) * Math.PI * 2;
-      pushCrack(baseAngle, mainLengthFactor);
-
-      if (branchPerMain > 0 && this.particleDensity > 0.65) {
-        for (let b = 0; b < branchPerMain; b += 1) {
-          const offset =
-            (branchPerMain > 1 ? b / (branchPerMain - 1) - 0.5 : 0) *
-              branchSpread *
-              2 +
-            (Math.random() - 0.5) * branchSpread * 0.3;
-          pushCrack(baseAngle + offset, branchLengthFactor);
-        }
-      }
-
-      if (microPerMain > 0 && this.particleDensity > 0.8) {
-        for (let m = 0; m < microPerMain; m += 1) {
-          const offset =
-            (microPerMain > 1 ? m / (microPerMain - 1) - 0.5 : 0) *
-              microSpread *
-              2 +
-            (Math.random() - 0.5) * microSpread * 0.25;
-          pushCrack(baseAngle + offset, microLengthFactor);
-        }
-      }
-    }
+    });
 
     const shardCount = this.getScaledParticleCount(burst.shards ?? 0, {
       allowZero: true,
     });
-    for (let i = 0; i < shardCount; i += 1) {
-      const angle = Math.random() * Math.PI * 2;
-      const dist = radius * (0.35 + Math.random() * 0.55);
-      const speed = 22 + Math.random() * 32;
-      this.particles.push(
-        new SpaceParticle(
-          position.x + Math.cos(angle) * dist * 0.6,
-          position.y + Math.sin(angle) * dist * 0.6,
-          Math.cos(angle) * speed,
-          Math.sin(angle) * speed,
-          colors.debris,
-          1.4 + Math.random() * 1.6,
-          0.38 + Math.random() * 0.22,
-          'debris'
-        )
-      );
+
+    if (shardCount > 0 && selectedSegments.length > 0) {
+      for (let i = 0; i < shardCount; i += 1) {
+        const segment = selectedSegments[i % selectedSegments.length];
+        const t = Math.random();
+        const localPoint = {
+          x: segment.start.x + (segment.end.x - segment.start.x) * t,
+          y: segment.start.y + (segment.end.y - segment.start.y) * t,
+        };
+        const worldPoint = toWorldPoint(localPoint);
+        const direction = rotateVector({
+          x: segment.end.x - segment.start.x,
+          y: segment.end.y - segment.start.y,
+        });
+        const dirLength = Math.hypot(direction.x, direction.y) || 1;
+        const normalized = {
+          x: direction.x / dirLength,
+          y: direction.y / dirLength,
+        };
+        const speed = 22 + Math.random() * 32;
+
+        this.particles.push(
+          new SpaceParticle(
+            worldPoint.x,
+            worldPoint.y,
+            normalized.x * speed,
+            normalized.y * speed,
+            colors.debris,
+            1.4 + Math.random() * 1.6,
+            0.38 + Math.random() * 0.22,
+            'debris'
+          )
+        );
+      }
     }
 
     const sparkBase =
@@ -1049,15 +1077,46 @@ export default class EffectsSystem {
     const sparkCount = this.getScaledParticleCount(sparkBase, {
       allowZero: true,
     });
+
     for (let i = 0; i < sparkCount; i += 1) {
-      const angle = Math.random() * Math.PI * 2;
+      const segment =
+        selectedSegments.length > 0
+          ? selectedSegments[Math.floor(Math.random() * selectedSegments.length)]
+          : null;
+      const t = Math.random();
+      const localOrigin = segment
+        ? {
+            x: segment.start.x + (segment.end.x - segment.start.x) * t,
+            y: segment.start.y + (segment.end.y - segment.start.y) * t,
+          }
+        : { x: 0, y: 0 };
+      const worldOrigin = toWorldPoint(localOrigin);
+
+      let dirX;
+      let dirY;
+
+      if (segment) {
+        const rotated = rotateVector({
+          x: segment.end.x - segment.start.x,
+          y: segment.end.y - segment.start.y,
+        });
+        const dirLength = Math.hypot(rotated.x, rotated.y) || 1;
+        dirX = rotated.x / dirLength;
+        dirY = rotated.y / dirLength;
+      } else {
+        const angle = Math.random() * Math.PI * 2;
+        dirX = Math.cos(angle);
+        dirY = Math.sin(angle);
+      }
+
       const speed = 35 + Math.random() * 40;
+
       this.particles.push(
         new SpaceParticle(
-          position.x,
-          position.y,
-          Math.cos(angle) * speed,
-          Math.sin(angle) * speed,
+          worldOrigin.x,
+          worldOrigin.y,
+          dirX * speed,
+          dirY * speed,
           colors.glow,
           1.2 + Math.random() * 0.8,
           0.24 + Math.random() * 0.14,
