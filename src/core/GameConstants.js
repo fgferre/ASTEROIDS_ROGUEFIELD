@@ -44,6 +44,580 @@ export const ASTEROID_SPEEDS = {
 
 export const ASTEROID_CRACK_THRESHOLDS = [0.7, 0.4, 0.15];
 
+
+// === ASTEROID CRACK PROFILES ===
+export const ASTEROID_CRACK_PROFILES = Object.freeze({
+  default: {
+    key: 'default',
+    rotationJitter: 0.28,
+    startRadiusRange: [0.18, 0.32],
+    lineWidthRange: [0.85, 1.25],
+    layers: [
+      {
+        id: 'default-stage-1',
+        mainRays: 3,
+        mainLengthRange: [0.48, 0.62],
+        startRadiusRange: [0.24, 0.36],
+        angularJitter: 0.2,
+        branch: {
+          count: 1,
+          lengthMultiplier: 0.55,
+          spread: 0.32,
+          offsetFromStart: 0.45,
+        },
+        micro: {
+          count: 0,
+          lengthMultiplier: 0.35,
+          spread: 0.5,
+        },
+        ring: null,
+        intensity: 0.6,
+        burst: {
+          cracks: 4,
+          sparks: 1,
+          shards: 0,
+        },
+      },
+      {
+        id: 'default-stage-2',
+        mainRays: 4,
+        mainLengthRange: [0.6, 0.8],
+        startRadiusRange: [0.22, 0.34],
+        angularJitter: 0.24,
+        branch: {
+          count: 2,
+          lengthMultiplier: 0.5,
+          spread: 0.36,
+          offsetFromStart: 0.38,
+        },
+        micro: {
+          count: 2,
+          lengthMultiplier: 0.32,
+          spread: 0.46,
+        },
+        ring: {
+          segments: 5,
+          radiusRange: [0.45, 0.62],
+          width: 0.58,
+        },
+        intensity: 0.85,
+        burst: {
+          cracks: 6,
+          sparks: 2,
+          shards: 1,
+        },
+      },
+      {
+        id: 'default-stage-3',
+        mainRays: 5,
+        mainLengthRange: [0.72, 0.92],
+        startRadiusRange: [0.18, 0.28],
+        angularJitter: 0.3,
+        branch: {
+          count: 3,
+          lengthMultiplier: 0.46,
+          spread: 0.38,
+          offsetFromStart: 0.32,
+        },
+        micro: {
+          count: 4,
+          lengthMultiplier: 0.28,
+          spread: 0.5,
+        },
+        ring: {
+          segments: 7,
+          radiusRange: [0.5, 0.72],
+          width: 0.62,
+        },
+        intensity: 1,
+        burst: {
+          cracks: 8,
+          sparks: 3,
+          shards: 2,
+        },
+      },
+    ],
+  },
+  denseCore: {
+    key: 'denseCore',
+    rotationJitter: 0.2,
+    startRadiusRange: [0.26, 0.4],
+    lineWidthRange: [1.1, 1.6],
+    layers: [
+      {
+        id: 'denseCore-stage-1',
+        mainRays: 4,
+        mainLengthRange: [0.5, 0.7],
+        startRadiusRange: [0.3, 0.4],
+        angularJitter: 0.16,
+        branch: {
+          count: 1,
+          lengthMultiplier: 0.58,
+          spread: 0.22,
+          offsetFromStart: 0.52,
+        },
+        micro: {
+          count: 1,
+          lengthMultiplier: 0.32,
+          spread: 0.2,
+        },
+        ring: {
+          segments: 4,
+          radiusRange: [0.32, 0.42],
+          width: 0.5,
+        },
+        intensity: 0.7,
+        burst: {
+          cracks: 5,
+          sparks: 1,
+          shards: 1,
+        },
+      },
+      {
+        id: 'denseCore-stage-2',
+        mainRays: 5,
+        mainLengthRange: [0.62, 0.82],
+        startRadiusRange: [0.28, 0.38],
+        angularJitter: 0.18,
+        branch: {
+          count: 2,
+          lengthMultiplier: 0.5,
+          spread: 0.28,
+          offsetFromStart: 0.44,
+        },
+        micro: {
+          count: 2,
+          lengthMultiplier: 0.3,
+          spread: 0.26,
+        },
+        ring: {
+          segments: 6,
+          radiusRange: [0.38, 0.55],
+          width: 0.58,
+        },
+        intensity: 0.95,
+        burst: {
+          cracks: 7,
+          sparks: 2,
+          shards: 2,
+        },
+      },
+      {
+        id: 'denseCore-stage-3',
+        mainRays: 6,
+        mainLengthRange: [0.74, 0.94],
+        startRadiusRange: [0.26, 0.36],
+        angularJitter: 0.22,
+        branch: {
+          count: 3,
+          lengthMultiplier: 0.48,
+          spread: 0.3,
+          offsetFromStart: 0.36,
+        },
+        micro: {
+          count: 3,
+          lengthMultiplier: 0.26,
+          spread: 0.28,
+        },
+        ring: {
+          segments: 8,
+          radiusRange: [0.42, 0.62],
+          width: 0.62,
+        },
+        intensity: 1.1,
+        burst: {
+          cracks: 9,
+          sparks: 3,
+          shards: 3,
+        },
+      },
+    ],
+  },
+  volatile: {
+    key: 'volatile',
+    rotationJitter: 0.42,
+    startRadiusRange: [0.2, 0.34],
+    lineWidthRange: [0.8, 1.3],
+    layers: [
+      {
+        id: 'volatile-stage-1',
+        mainRays: 3,
+        mainLengthRange: [0.52, 0.7],
+        startRadiusRange: [0.22, 0.34],
+        angularJitter: 0.34,
+        branch: {
+          count: 1,
+          lengthMultiplier: 0.6,
+          spread: 0.46,
+          offsetFromStart: 0.4,
+        },
+        micro: {
+          count: 2,
+          lengthMultiplier: 0.32,
+          spread: 0.52,
+        },
+        ring: null,
+        intensity: 0.75,
+        burst: {
+          cracks: 5,
+          sparks: 2,
+          shards: 1,
+        },
+      },
+      {
+        id: 'volatile-stage-2',
+        mainRays: 4,
+        mainLengthRange: [0.66, 0.86],
+        startRadiusRange: [0.2, 0.34],
+        angularJitter: 0.42,
+        branch: {
+          count: 2,
+          lengthMultiplier: 0.55,
+          spread: 0.48,
+          offsetFromStart: 0.34,
+        },
+        micro: {
+          count: 3,
+          lengthMultiplier: 0.3,
+          spread: 0.54,
+        },
+        ring: {
+          segments: 6,
+          radiusRange: [0.46, 0.66],
+          width: 0.56,
+        },
+        intensity: 1,
+        burst: {
+          cracks: 8,
+          sparks: 3,
+          shards: 2,
+        },
+      },
+      {
+        id: 'volatile-stage-3',
+        mainRays: 5,
+        mainLengthRange: [0.78, 1],
+        startRadiusRange: [0.18, 0.3],
+        angularJitter: 0.5,
+        branch: {
+          count: 3,
+          lengthMultiplier: 0.5,
+          spread: 0.5,
+          offsetFromStart: 0.28,
+        },
+        micro: {
+          count: 4,
+          lengthMultiplier: 0.28,
+          spread: 0.6,
+        },
+        ring: {
+          segments: 7,
+          radiusRange: [0.5, 0.7],
+          width: 0.62,
+        },
+        intensity: 1.2,
+        burst: {
+          cracks: 10,
+          sparks: 4,
+          shards: 3,
+        },
+      },
+    ],
+  },
+  parasite: {
+    key: 'parasite',
+    rotationJitter: 0.34,
+    startRadiusRange: [0.24, 0.38],
+    lineWidthRange: [0.85, 1.3],
+    layers: [
+      {
+        id: 'parasite-stage-1',
+        mainRays: 4,
+        mainLengthRange: [0.54, 0.72],
+        startRadiusRange: [0.26, 0.38],
+        angularJitter: 0.26,
+        branch: {
+          count: 1,
+          lengthMultiplier: 0.62,
+          spread: 0.3,
+          offsetFromStart: 0.42,
+        },
+        micro: {
+          count: 1,
+          lengthMultiplier: 0.32,
+          spread: 0.34,
+        },
+        ring: null,
+        intensity: 0.7,
+        burst: {
+          cracks: 5,
+          sparks: 1,
+          shards: 1,
+        },
+      },
+      {
+        id: 'parasite-stage-2',
+        mainRays: 5,
+        mainLengthRange: [0.66, 0.86],
+        startRadiusRange: [0.24, 0.34],
+        angularJitter: 0.32,
+        branch: {
+          count: 2,
+          lengthMultiplier: 0.56,
+          spread: 0.34,
+          offsetFromStart: 0.36,
+        },
+        micro: {
+          count: 2,
+          lengthMultiplier: 0.28,
+          spread: 0.4,
+        },
+        ring: {
+          segments: 5,
+          radiusRange: [0.46, 0.62],
+          width: 0.52,
+        },
+        intensity: 0.95,
+        burst: {
+          cracks: 7,
+          sparks: 2,
+          shards: 2,
+        },
+      },
+      {
+        id: 'parasite-stage-3',
+        mainRays: 6,
+        mainLengthRange: [0.78, 0.98],
+        startRadiusRange: [0.22, 0.32],
+        angularJitter: 0.36,
+        branch: {
+          count: 3,
+          lengthMultiplier: 0.5,
+          spread: 0.36,
+          offsetFromStart: 0.3,
+        },
+        micro: {
+          count: 3,
+          lengthMultiplier: 0.26,
+          spread: 0.46,
+        },
+        ring: {
+          segments: 7,
+          radiusRange: [0.5, 0.68],
+          width: 0.58,
+        },
+        intensity: 1.15,
+        burst: {
+          cracks: 9,
+          sparks: 3,
+          shards: 3,
+        },
+      },
+    ],
+  },
+  crystal: {
+    key: 'crystal',
+    rotationJitter: 0.18,
+    startRadiusRange: [0.2, 0.3],
+    lineWidthRange: [0.9, 1.35],
+    layers: [
+      {
+        id: 'crystal-stage-1',
+        mainRays: 4,
+        mainLengthRange: [0.58, 0.74],
+        startRadiusRange: [0.22, 0.3],
+        angularJitter: 0.14,
+        branch: {
+          count: 1,
+          lengthMultiplier: 0.5,
+          spread: 0.2,
+          offsetFromStart: 0.4,
+        },
+        micro: {
+          count: 2,
+          lengthMultiplier: 0.3,
+          spread: 0.22,
+        },
+        ring: {
+          segments: 6,
+          radiusRange: [0.44, 0.6],
+          width: 0.55,
+        },
+        intensity: 0.75,
+        burst: {
+          cracks: 6,
+          sparks: 2,
+          shards: 1,
+        },
+      },
+      {
+        id: 'crystal-stage-2',
+        mainRays: 6,
+        mainLengthRange: [0.7, 0.88],
+        startRadiusRange: [0.2, 0.28],
+        angularJitter: 0.18,
+        branch: {
+          count: 2,
+          lengthMultiplier: 0.46,
+          spread: 0.24,
+          offsetFromStart: 0.36,
+        },
+        micro: {
+          count: 3,
+          lengthMultiplier: 0.26,
+          spread: 0.28,
+        },
+        ring: {
+          segments: 8,
+          radiusRange: [0.48, 0.66],
+          width: 0.58,
+        },
+        intensity: 1,
+        burst: {
+          cracks: 8,
+          sparks: 3,
+          shards: 2,
+        },
+      },
+      {
+        id: 'crystal-stage-3',
+        mainRays: 8,
+        mainLengthRange: [0.78, 0.98],
+        startRadiusRange: [0.18, 0.26],
+        angularJitter: 0.2,
+        branch: {
+          count: 3,
+          lengthMultiplier: 0.44,
+          spread: 0.26,
+          offsetFromStart: 0.32,
+        },
+        micro: {
+          count: 4,
+          lengthMultiplier: 0.22,
+          spread: 0.3,
+        },
+        ring: {
+          segments: 10,
+          radiusRange: [0.52, 0.7],
+          width: 0.6,
+        },
+        intensity: 1.2,
+        burst: {
+          cracks: 10,
+          sparks: 4,
+          shards: 3,
+        },
+      },
+    ],
+  },
+});
+const __crackLayerLookup = {};
+Object.values(ASTEROID_CRACK_PROFILES).forEach((profile) => {
+  profile.layers.forEach((layer, index) => {
+    const layerId = layer.id || `${profile.key}-stage-${index + 1}`;
+    __crackLayerLookup[layerId] = Object.freeze({
+      id: layerId,
+      profile: profile.key,
+      index,
+      config: layer,
+    });
+  });
+});
+export const ASTEROID_CRACK_LAYER_LOOKUP = Object.freeze(__crackLayerLookup);
+
+export const ASTEROID_FRAGMENT_RULES = Object.freeze({
+  default: {
+    key: 'default',
+    inheritVelocity: 0.42,
+    angleJitter: 0.45,
+    radialDistanceRange: [0.48, 0.92],
+    radialOffsetJitter: 0.18,
+    speedMultiplierBySize: {
+      large: [0.82, 1.12],
+      medium: [0.92, 1.22],
+      small: [1, 1],
+    },
+    countBySize: {
+      large: [3, 4],
+      medium: [2, 3],
+      small: [0, 0],
+    },
+    maxGeneration: 3,
+  },
+  denseCore: {
+    key: 'denseCore',
+    inheritVelocity: 0.34,
+    angleJitter: 0.32,
+    radialDistanceRange: [0.42, 0.78],
+    radialOffsetJitter: 0.12,
+    speedMultiplierBySize: {
+      large: [0.7, 0.95],
+      medium: [0.82, 1.08],
+      small: [1, 1],
+    },
+    countBySize: {
+      large: [2, 3],
+      medium: [2, 2],
+      small: [0, 0],
+    },
+    maxGeneration: 3,
+  },
+  volatile: {
+    key: 'volatile',
+    inheritVelocity: 0.55,
+    angleJitter: 0.6,
+    radialDistanceRange: [0.55, 1.05],
+    radialOffsetJitter: 0.24,
+    speedMultiplierBySize: {
+      large: [0.95, 1.35],
+      medium: [1, 1.35],
+      small: [1, 1],
+    },
+    countBySize: {
+      large: [3, 4],
+      medium: [3, 4],
+      small: [0, 0],
+    },
+    maxGeneration: 3,
+  },
+  parasite: {
+    key: 'parasite',
+    inheritVelocity: 0.5,
+    angleJitter: 0.5,
+    radialDistanceRange: [0.5, 0.9],
+    radialOffsetJitter: 0.2,
+    speedMultiplierBySize: {
+      large: [0.9, 1.25],
+      medium: [0.95, 1.25],
+      small: [1, 1],
+    },
+    countBySize: {
+      large: [3, 4],
+      medium: [3, 3],
+      small: [0, 0],
+    },
+    maxGeneration: 3,
+  },
+  crystal: {
+    key: 'crystal',
+    inheritVelocity: 0.4,
+    angleJitter: 0.28,
+    radialDistanceRange: [0.48, 0.86],
+    radialOffsetJitter: 0.16,
+    speedMultiplierBySize: {
+      large: [0.82, 1.08],
+      medium: [0.88, 1.12],
+      small: [1, 1],
+    },
+    countBySize: {
+      large: [4, 4],
+      medium: [3, 4],
+      small: [0, 0],
+    },
+    maxGeneration: 3,
+  },
+});
+
 export const ASTEROID_XP_BASE = {
   large: 15,
   medium: 8,
@@ -59,6 +633,8 @@ export const ASTEROID_VARIANTS = {
     speedMultiplier: 1,
     massMultiplier: 1,
     xpMultiplier: 1,
+    crackProfile: 'default',
+    fragmentProfile: 'default',
     colors: {
       fill: '#8B4513',
       stroke: '#654321',
@@ -77,6 +653,8 @@ export const ASTEROID_VARIANTS = {
     speedMultiplier: 0.65,
     massMultiplier: 1.4,
     xpMultiplier: 2,
+    crackProfile: 'denseCore',
+    fragmentProfile: 'denseCore',
     colors: {
       fill: '#2F8CA3',
       stroke: '#1F5E6F',
@@ -102,6 +680,8 @@ export const ASTEROID_VARIANTS = {
     speedMultiplier: 1.4,
     massMultiplier: 0.7,
     xpMultiplier: 1.2,
+    crackProfile: 'volatile',
+    fragmentProfile: 'volatile',
     colors: {
       fill: '#B64220',
       stroke: '#5E1A0D',
@@ -173,6 +753,8 @@ export const ASTEROID_VARIANTS = {
     speedMultiplier: 1.2,
     massMultiplier: 0.9,
     xpMultiplier: 1.5,
+    crackProfile: 'parasite',
+    fragmentProfile: 'parasite',
     colors: {
       fill: '#612E83',
       stroke: '#37154D',
@@ -222,6 +804,8 @@ export const ASTEROID_VARIANTS = {
     speedMultiplier: 0.8,
     massMultiplier: 0.95,
     xpMultiplier: 2.2,
+    crackProfile: 'crystal',
+    fragmentProfile: 'crystal',
     colors: {
       fill: '#4FD0FF',
       stroke: '#2A8FB4',

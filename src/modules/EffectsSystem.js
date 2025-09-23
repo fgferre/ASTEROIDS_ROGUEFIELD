@@ -235,8 +235,8 @@ export default class EffectsSystem {
     });
 
     gameEvents.on('asteroid-crack-stage-changed', (data) => {
-      if (data?.asteroid) {
-        this.createCrackDebris(data.asteroid, data.stage);
+      if (data?.position) {
+        this.createCrackDebris(data);
       }
     });
 
@@ -841,41 +841,130 @@ export default class EffectsSystem {
     }
   }
 
-  createCrackDebris(asteroid, stage = 1) {
-    if (!asteroid) {
+  resolveAsteroidColors(variant, size) {
+    const fallbackBySize = {
+      large: '#8B4513',
+      medium: '#A0522D',
+      small: '#CD853F',
+    };
+    const config =
+      CONSTANTS.ASTEROID_VARIANTS?.[variant] ||
+      CONSTANTS.ASTEROID_VARIANTS?.common;
+    const colors = config?.colors || {};
+    const fallbackFill = fallbackBySize[size] || fallbackBySize.medium;
+
+    return {
+      cracks: colors.cracks || 'rgba(255, 235, 200, 0.92)',
+      glow:
+        colors.innerGlow ||
+        colors.glow ||
+        'rgba(255, 255, 255, 0.28)',
+      debris: colors.fill || fallbackFill,
+    };
+  }
+
+  createCrackDebris(event = {}) {
+    if (!event || !event.position) {
       return;
     }
 
-    const intensity = Math.min(Math.max(stage, 1), 3);
-    const variantColors =
-      typeof asteroid.getVariantColors === 'function'
-        ? asteroid.getVariantColors()
-        : null;
-    const crackColor = variantColors?.cracks || 'rgba(255, 235, 200, 0.92)';
-    const glowColor = variantColors?.innerGlow || 'rgba(255, 255, 255, 0.28)';
+    const position = event.position;
+    const radius = Number.isFinite(event.radius)
+      ? Math.max(event.radius, 6)
+      : 18;
+    const variant = event.variant || 'common';
+    const size = event.size || 'medium';
 
-    const rotation = Math.random() * Math.PI * 2;
-    const startOffset = asteroid.radius * 0.15;
-    const branchSpread = Math.PI / 9;
-    const baseLifetime = 0.22 + intensity * 0.08;
+    const colors = this.resolveAsteroidColors(variant, size);
+    const layerTemplate =
+      CONSTANTS.ASTEROID_CRACK_LAYER_LOOKUP?.[event.layerId]?.config || null;
+
+    const intensity = Math.max(1, Math.round(event.intensity ?? 1));
+    const baseLifetime = 0.2 + intensity * 0.08;
+
+    const avgFromRange = (range, fallback) => {
+      if (Array.isArray(range) && range.length === 2) {
+        const [min, max] = range;
+        if (Number.isFinite(min) && Number.isFinite(max)) {
+          return (min + max) * 0.5;
+        }
+      }
+      if (Number.isFinite(range)) {
+        return range;
+      }
+      return fallback;
+    };
+
+    const startOffsetFactor = Math.max(
+      0.08,
+      avgFromRange(layerTemplate?.startRadiusRange, 0.24)
+    );
+    const mainLengthFactor = Math.max(
+      0.2,
+      avgFromRange(layerTemplate?.mainLengthRange, 0.6)
+    );
+    let mainCount = Math.max(1, Math.round(layerTemplate?.mainRays ?? 3));
+    let branchCount = Math.max(
+      0,
+      Math.round(layerTemplate?.branch?.count ?? 0)
+    );
+    let microCount = Math.max(
+      0,
+      Math.round(layerTemplate?.micro?.count ?? 0)
+    );
+    const branchLengthFactor = Math.max(
+      0.1,
+      mainLengthFactor * (layerTemplate?.branch?.lengthMultiplier ?? 0.5)
+    );
+    const microLengthFactor = Math.max(
+      0.08,
+      mainLengthFactor * (layerTemplate?.micro?.lengthMultiplier ?? 0.3)
+    );
+    const branchSpread = layerTemplate?.branch?.spread ?? 0.35;
+    const microSpread = layerTemplate?.micro?.spread ?? 0.45;
+
+    const burst = event.burst || {};
+    if (Number.isFinite(burst.cracks) && burst.cracks > 0) {
+      mainCount = Math.max(
+        1,
+        mainCount + Math.round(burst.cracks * 0.25)
+      );
+    }
+
+    if (this.particleDensity < 0.7) {
+      branchCount = 0;
+      microCount = 0;
+      mainCount = Math.max(1, Math.round(mainCount * 0.75));
+    } else if (this.particleDensity < 0.9) {
+      microCount = Math.min(1, microCount);
+    }
 
     const pushCrack = (angle, lengthFactor) => {
-      const angleRad = angle + rotation;
-      const length = asteroid.radius * lengthFactor;
-      const startX = asteroid.x + Math.cos(angleRad) * startOffset;
-      const startY = asteroid.y + Math.sin(angleRad) * startOffset;
-      const endX = asteroid.x + Math.cos(angleRad) * (startOffset + length);
-      const endY = asteroid.y + Math.sin(angleRad) * (startOffset + length);
-      const centerX = (startX + endX) * 0.5;
-      const centerY = (startY + endY) * 0.5;
+      const angleRad = angle;
+      const startRadius =
+        radius *
+        Math.max(
+          0.1,
+          startOffsetFactor + (Math.random() - 0.5) * 0.08
+        );
+      const endRadius = Math.min(
+        radius * 1.12,
+        startRadius +
+          radius * lengthFactor * (0.85 + Math.random() * 0.35)
+      );
+
+      const startX = position.x + Math.cos(angleRad) * startRadius;
+      const startY = position.y + Math.sin(angleRad) * startRadius;
+      const endX = position.x + Math.cos(angleRad) * endRadius;
+      const endY = position.y + Math.sin(angleRad) * endRadius;
 
       const crack = new SpaceParticle(
-        centerX,
-        centerY,
+        (startX + endX) * 0.5,
+        (startY + endY) * 0.5,
         0,
         0,
-        crackColor,
-        Math.max(0.6, length / 3.2),
+        colors.cracks,
+        Math.max(0.55, (endRadius - startRadius) / 2.6),
         baseLifetime,
         'crack'
       );
@@ -884,44 +973,97 @@ export default class EffectsSystem {
       this.particles.push(crack);
 
       if (!this.motionReduced) {
-        const sparkSpeed = 26 + Math.random() * 34;
-        const spark = new SpaceParticle(
-          endX,
-          endY,
-          Math.cos(angleRad) * sparkSpeed * 0.3,
-          Math.sin(angleRad) * sparkSpeed * 0.3,
-          glowColor,
-          0.9 + Math.random() * 0.7,
-          0.2 + Math.random() * 0.15,
-          'spark'
+        const sparkSpeed = 22 + Math.random() * 28;
+        this.particles.push(
+          new SpaceParticle(
+            endX,
+            endY,
+            Math.cos(angleRad) * sparkSpeed * 0.32,
+            Math.sin(angleRad) * sparkSpeed * 0.32,
+            colors.glow,
+            0.9 + Math.random() * 0.7,
+            0.22 + Math.random() * 0.16,
+            'spark'
+          )
         );
-        this.particles.push(spark);
       }
     };
 
-    const mainCount = 3;
-    const mainLength = 0.55;
+    const mainRotation = Math.random() * Math.PI * 2;
+    const branchPerMain =
+      branchCount > 0 ? Math.max(1, Math.round(branchCount / mainCount)) : 0;
+    const microPerMain =
+      microCount > 0 ? Math.max(1, Math.round(microCount / mainCount)) : 0;
+
     for (let i = 0; i < mainCount; i += 1) {
-      const angle = (i / mainCount) * Math.PI * 2;
-      pushCrack(angle, mainLength);
-    }
+      const baseAngle = mainRotation + (i / mainCount) * Math.PI * 2;
+      pushCrack(baseAngle, mainLengthFactor);
 
-    if (intensity >= 2) {
-      const branchCount = 3;
-      const branchLength = 0.38;
-      for (let i = 0; i < branchCount; i += 1) {
-        const angle = (i / branchCount) * Math.PI * 2 + Math.PI / branchCount;
-        pushCrack(angle, branchLength);
+      if (branchPerMain > 0 && this.particleDensity > 0.65) {
+        for (let b = 0; b < branchPerMain; b += 1) {
+          const offset =
+            (branchPerMain > 1 ? b / (branchPerMain - 1) - 0.5 : 0) *
+              branchSpread *
+              2 +
+            (Math.random() - 0.5) * branchSpread * 0.3;
+          pushCrack(baseAngle + offset, branchLengthFactor);
+        }
+      }
+
+      if (microPerMain > 0 && this.particleDensity > 0.8) {
+        for (let m = 0; m < microPerMain; m += 1) {
+          const offset =
+            (microPerMain > 1 ? m / (microPerMain - 1) - 0.5 : 0) *
+              microSpread *
+              2 +
+            (Math.random() - 0.5) * microSpread * 0.25;
+          pushCrack(baseAngle + offset, microLengthFactor);
+        }
       }
     }
 
-    if (intensity >= 3 && !this.motionReduced) {
-      const microLength = 0.24;
-      for (let i = 0; i < mainCount; i += 1) {
-        const baseAngle = (i / mainCount) * Math.PI * 2;
-        pushCrack(baseAngle + branchSpread, microLength);
-        pushCrack(baseAngle - branchSpread, microLength);
-      }
+    const shardCount = this.getScaledParticleCount(burst.shards ?? 0, {
+      allowZero: true,
+    });
+    for (let i = 0; i < shardCount; i += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = radius * (0.35 + Math.random() * 0.55);
+      const speed = 22 + Math.random() * 32;
+      this.particles.push(
+        new SpaceParticle(
+          position.x + Math.cos(angle) * dist * 0.6,
+          position.y + Math.sin(angle) * dist * 0.6,
+          Math.cos(angle) * speed,
+          Math.sin(angle) * speed,
+          colors.debris,
+          1.4 + Math.random() * 1.6,
+          0.38 + Math.random() * 0.22,
+          'debris'
+        )
+      );
+    }
+
+    const sparkBase =
+      (burst.sparks ?? intensity * 2) +
+      Math.max(0, Number.isFinite(burst.cracks) ? burst.cracks * 0.3 : 0);
+    const sparkCount = this.getScaledParticleCount(sparkBase, {
+      allowZero: true,
+    });
+    for (let i = 0; i < sparkCount; i += 1) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 35 + Math.random() * 40;
+      this.particles.push(
+        new SpaceParticle(
+          position.x,
+          position.y,
+          Math.cos(angle) * speed,
+          Math.sin(angle) * speed,
+          colors.glow,
+          1.2 + Math.random() * 0.8,
+          0.24 + Math.random() * 0.14,
+          'spark'
+        )
+      );
     }
   }
 

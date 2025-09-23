@@ -16,6 +16,18 @@ class Asteroid {
     this.variantConfig =
       CONSTANTS.ASTEROID_VARIANTS[this.variant] ||
       CONSTANTS.ASTEROID_VARIANTS.common;
+
+    this.crackProfileKey =
+      this.variantConfig?.crackProfile || this.variant || 'default';
+    this.fragmentProfileKey =
+      this.variantConfig?.fragmentProfile || this.variant || 'default';
+    this.crackProfile =
+      CONSTANTS.ASTEROID_CRACK_PROFILES[this.crackProfileKey] ||
+      CONSTANTS.ASTEROID_CRACK_PROFILES.default;
+    this.fragmentProfile =
+      CONSTANTS.ASTEROID_FRAGMENT_RULES[this.fragmentProfileKey] ||
+      CONSTANTS.ASTEROID_FRAGMENT_RULES.default;
+
     this.behavior = this.variantConfig?.behavior || null;
 
     const baseMass = this.radius * this.radius * 0.05;
@@ -156,34 +168,220 @@ class Asteroid {
 
   generateCrackLayers() {
     const thresholds = CONSTANTS.ASTEROID_CRACK_THRESHOLDS || [];
-    if (!thresholds.length) return [];
+    if (!thresholds.length) {
+      return [];
+    }
+
+    const profile =
+      this.crackProfile ||
+      CONSTANTS.ASTEROID_CRACK_PROFILES?.[this.crackProfileKey] ||
+      CONSTANTS.ASTEROID_CRACK_PROFILES.default;
 
     const layers = [];
     const seededRandom = this.createSeededRandom(this.crackSeed ^ 0x9e3779);
+    const baseRotation = seededRandom() * Math.PI * 2;
+    const rotationJitter = profile?.rotationJitter ?? 0.3;
+
+    const sampleRange = (range, fallback) => {
+      if (Array.isArray(range) && range.length === 2) {
+        const [min, max] = range;
+        const low = Number.isFinite(min) ? min : fallback ?? 0;
+        const high = Number.isFinite(max) ? max : low;
+        if (high <= low) {
+          return low;
+        }
+        return low + (high - low) * seededRandom();
+      }
+      if (Number.isFinite(range)) {
+        return range;
+      }
+      return fallback ?? 0;
+    };
+
+    const clampRadius = (value) =>
+      Math.max(0, Math.min(value, this.radius * 1.15));
 
     for (let i = 0; i < thresholds.length; i += 1) {
-      const lineCount = 3 + i * 2;
-      const lines = [];
+      const template =
+        profile?.layers?.[i] ??
+        profile?.layers?.[profile.layers.length - 1];
 
-      for (let j = 0; j < lineCount; j += 1) {
-        const startAngle = seededRandom() * Math.PI * 2;
-        const offset = (seededRandom() - 0.5) * 0.9;
-        const lengthFactor = 0.35 + seededRandom() * 0.5;
-        const startRadius = this.radius * (0.25 + seededRandom() * 0.45);
-        const endRadius =
-          startRadius +
-          this.radius * lengthFactor * (0.5 + seededRandom() * 0.5);
-
-        lines.push({
-          x1: Math.cos(startAngle) * startRadius,
-          y1: Math.sin(startAngle) * startRadius,
-          x2: Math.cos(startAngle + offset) * endRadius,
-          y2: Math.sin(startAngle + offset) * endRadius,
-          width: 0.6 + seededRandom() * 0.9,
+      if (!template) {
+        layers.push({
+          id: `${this.crackProfileKey}-stage-${i + 1}`,
+          lines: [],
+          intensity: i + 1,
+          burst: { cracks: 0, sparks: 0, shards: 0 },
         });
+        continue;
       }
 
-      layers.push(lines);
+      const layerId = template.id || `${profile.key}-stage-${i + 1}`;
+      const lines = [];
+
+      const mainCount = Math.max(1, Math.round(template.mainRays ?? 3));
+      const lengthRange = template.mainLengthRange || [0.5, 0.7];
+      const startRadiusRange =
+        template.startRadiusRange ||
+        profile?.startRadiusRange ||
+        [0.2, 0.32];
+      const widthRange =
+        template.lineWidthRange || profile?.lineWidthRange || [0.8, 1.25];
+      const angularJitter = template.angularJitter ?? 0.25;
+
+      const layerRotation =
+        baseRotation +
+        (seededRandom() - 0.5) * 2 * (rotationJitter ?? 0.3);
+
+      const branchConfig = template.branch || null;
+      const microConfig = template.micro || null;
+      const ringConfig = template.ring || null;
+
+      for (let ray = 0; ray < mainCount; ray += 1) {
+        const baseAngle =
+          layerRotation + (ray / Math.max(1, mainCount)) * Math.PI * 2;
+        const angle =
+          baseAngle +
+          (seededRandom() - 0.5) * 2 * angularJitter;
+
+        const startRadius =
+          this.radius * sampleRange(startRadiusRange, 0.24);
+        const mainLength =
+          this.radius * sampleRange(lengthRange, 0.6);
+        const endRadius = clampRadius(startRadius + mainLength);
+        const bend = (seededRandom() - 0.5) * angularJitter * 0.6;
+        const endAngle = angle + bend;
+
+        const lineWidth = Math.max(
+          0.45,
+          sampleRange(widthRange, 1)
+        );
+
+        const startX = Math.cos(angle) * startRadius;
+        const startY = Math.sin(angle) * startRadius;
+        const endX = Math.cos(endAngle) * endRadius;
+        const endY = Math.sin(endAngle) * endRadius;
+
+        lines.push({
+          x1: startX,
+          y1: startY,
+          x2: endX,
+          y2: endY,
+          width: lineWidth,
+        });
+
+        if (branchConfig?.count) {
+          const branchCount = Math.max(0, Math.round(branchConfig.count));
+          const branchSpread = branchConfig.spread ?? 0.3;
+          const branchLengthFactor = branchConfig.lengthMultiplier ?? 0.5;
+          const anchorT = Math.max(
+            0,
+            Math.min(1, branchConfig.offsetFromStart ?? 0.4)
+          );
+          const anchorRadius =
+            startRadius + (endRadius - startRadius) * anchorT;
+          const anchorAngle = angle + (endAngle - angle) * anchorT;
+          const anchorX = Math.cos(anchorAngle) * anchorRadius;
+          const anchorY = Math.sin(anchorAngle) * anchorRadius;
+
+          for (let b = 0; b < branchCount; b += 1) {
+            const normalized =
+              branchCount > 1 ? b / (branchCount - 1) - 0.5 : 0;
+            const offset = normalized * branchSpread * 2;
+            const branchAngle =
+              anchorAngle +
+              offset +
+              (seededRandom() - 0.5) * branchSpread * 0.35;
+            const branchLength =
+              mainLength *
+              branchLengthFactor *
+              (0.8 + seededRandom() * 0.4);
+            const branchEndRadius = clampRadius(
+              anchorRadius + branchLength
+            );
+            lines.push({
+              x1: anchorX,
+              y1: anchorY,
+              x2: Math.cos(branchAngle) * branchEndRadius,
+              y2: Math.sin(branchAngle) * branchEndRadius,
+              width: lineWidth * 0.7,
+            });
+          }
+        }
+
+        if (microConfig?.count) {
+          const microCount = Math.max(0, Math.round(microConfig.count));
+          const microSpread = microConfig.spread ?? 0.45;
+          const microLengthFactor = microConfig.lengthMultiplier ?? 0.3;
+
+          for (let m = 0; m < microCount; m += 1) {
+            const normalized =
+              microCount > 1 ? m / (microCount - 1) - 0.5 : 0;
+            const offset = normalized * microSpread * 2;
+            const base = endAngle + offset;
+            const microAngle =
+              base + (seededRandom() - 0.5) * microSpread * 0.4;
+            const microStartRadius =
+              endRadius * (0.85 + seededRandom() * 0.12);
+            const microLength =
+              this.radius *
+              microLengthFactor *
+              (0.55 + seededRandom() * 0.5);
+            const microEndRadius = clampRadius(
+              microStartRadius + microLength
+            );
+            lines.push({
+              x1: Math.cos(microAngle) * microStartRadius,
+              y1: Math.sin(microAngle) * microStartRadius,
+              x2: Math.cos(microAngle) * microEndRadius,
+              y2: Math.sin(microAngle) * microEndRadius,
+              width: lineWidth * 0.6,
+            });
+          }
+        }
+      }
+
+      if (ringConfig?.segments) {
+        const ringSegments = Math.max(0, Math.round(ringConfig.segments));
+        const ringRadius =
+          this.radius * sampleRange(ringConfig.radiusRange, 0.55);
+        const ringWidth = Math.max(
+          0.4,
+          ringConfig.width ??
+            sampleRange(widthRange, widthRange[0] ?? 0.8)
+        );
+        const arcStep = (Math.PI * 2) / Math.max(1, ringSegments);
+
+        for (let r = 0; r < ringSegments; r += 1) {
+          const arcAngle = layerRotation + r * arcStep;
+          const nextAngle = arcAngle + arcStep * 0.7;
+          lines.push({
+            x1: Math.cos(arcAngle) * ringRadius,
+            y1: Math.sin(arcAngle) * ringRadius,
+            x2: Math.cos(nextAngle) * ringRadius,
+            y2: Math.sin(nextAngle) * ringRadius,
+            width: ringWidth,
+          });
+        }
+      }
+
+      const burstConfig = template.burst || {};
+      layers.push({
+        id: layerId,
+        lines,
+        intensity: template.intensity ?? i + 1,
+        burst: {
+          cracks:
+            burstConfig.cracks ??
+            Math.max(lines.length, 4),
+          sparks:
+            burstConfig.sparks ??
+            Math.ceil(Math.max(lines.length, 1) / 4),
+          shards:
+            burstConfig.shards ??
+            Math.floor(Math.max(lines.length - mainCount, 0) / 5),
+        },
+      });
     }
 
     return layers;
@@ -457,11 +655,20 @@ class Asteroid {
     if (newStage !== this.crackStage) {
       this.crackStage = newStage;
       if (typeof gameEvents !== 'undefined') {
+        const layer = this.crackLayers[this.crackStage - 1] || null;
         gameEvents.emit('asteroid-crack-stage-changed', {
-          asteroid: this,
+          asteroidId: this.id,
+          layerId: layer?.id ?? null,
+          profile: this.crackProfileKey,
           stage: this.crackStage,
+          intensity: layer?.intensity ?? this.crackStage,
+          burst: layer?.burst ?? null,
           ratio,
           variant: this.variant,
+          size: this.size,
+          position: { x: this.x, y: this.y },
+          radius: this.radius,
+          velocity: { x: this.vx, y: this.vy },
         });
       }
     }
@@ -661,18 +868,22 @@ class Asteroid {
     }
 
     if (this.crackStage > 0 && !isFlashing) {
-      ctx.lineWidth = 1.2;
       ctx.strokeStyle = colors.cracks || 'rgba(255, 255, 255, 0.45)';
 
       for (let stage = 0; stage < this.crackStage; stage += 1) {
-        const lines = this.crackLayers[stage];
-        if (!lines) continue;
+        const layer = this.crackLayers[stage];
+        if (!layer) continue;
 
+        const lines = Array.isArray(layer.lines) ? layer.lines : [];
         lines.forEach((line) => {
+          const width = Math.max(
+            0.45,
+            Number.isFinite(line?.width) ? line.width : 1.2
+          );
           ctx.beginPath();
           ctx.moveTo(line.x1, line.y1);
           ctx.lineTo(line.x2, line.y2);
-          ctx.lineWidth = line.width;
+          ctx.lineWidth = width;
           ctx.stroke();
         });
       }
@@ -743,31 +954,103 @@ class Asteroid {
     }
 
     const newSize = this.size === 'large' ? 'medium' : 'small';
-    const count = 2 + Math.floor(Math.random() * 2);
+    const rules =
+      this.fragmentProfile ||
+      CONSTANTS.ASTEROID_FRAGMENT_RULES?.[this.fragmentProfileKey] ||
+      CONSTANTS.ASTEROID_FRAGMENT_RULES.default;
+
+    const currentGeneration = this.generation ?? 0;
+    const maxGeneration = rules?.maxGeneration;
+    if (Number.isFinite(maxGeneration) && currentGeneration + 1 > maxGeneration) {
+      return [];
+    }
+
+    const countRange =
+      rules?.countBySize?.[this.size] ||
+      rules?.countBySize?.default ||
+      [2, 3];
+
+    const seededRandom = this.createSeededRandom(this.crackSeed ^ 0x5e17);
+
+    const sampleRange = (range, fallback) => {
+      if (Array.isArray(range) && range.length === 2) {
+        const [min, max] = range;
+        const low = Number.isFinite(min) ? min : fallback ?? 0;
+        const high = Number.isFinite(max) ? max : low;
+        if (high <= low) {
+          return low;
+        }
+        return low + (high - low) * seededRandom();
+      }
+      if (Number.isFinite(range)) {
+        return range;
+      }
+      return fallback ?? 0;
+    };
+
+    const resolveCount = (range) => {
+      if (Array.isArray(range) && range.length === 2) {
+        const min = Math.floor(Number.isFinite(range[0]) ? range[0] : 0);
+        const max = Math.floor(Number.isFinite(range[1]) ? range[1] : min);
+        if (max <= min) {
+          return Math.max(0, min);
+        }
+        return min + Math.floor(seededRandom() * (max - min + 1));
+      }
+      const numeric = Number(range);
+      if (!Number.isFinite(numeric)) {
+        return 0;
+      }
+      return Math.max(0, Math.round(numeric));
+    };
+
+    let fragmentCount = resolveCount(countRange);
+    if (fragmentCount <= 0) {
+      fragmentCount = 1;
+    }
+
     const fragments = [];
     const baseSpeed = CONSTANTS.ASTEROID_SPEEDS[newSize] || 40;
+    const speedRange =
+      rules?.speedMultiplierBySize?.[this.size] ||
+      rules?.speedMultiplierBySize?.default ||
+      [0.85, 1.2];
+    const inheritVelocity = rules?.inheritVelocity ?? 0.4;
+    const angleJitter = rules?.angleJitter ?? Math.PI / 6;
+    const radialRange = rules?.radialDistanceRange || [0.45, 0.9];
+    const offsetJitter = rules?.radialOffsetJitter ?? 0.2;
 
-    const momentumScale = 0.35;
     const parentVx = Number.isFinite(this.vx) ? this.vx : 0;
     const parentVy = Number.isFinite(this.vy) ? this.vy : 0;
+    const angleOffset = seededRandom() * Math.PI * 2;
 
-    for (let i = 0; i < count; i += 1) {
-      const angle = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
-      const speed = baseSpeed * (0.85 + Math.random() * 0.45);
-      const distance = this.radius * (0.5 + Math.random() * 0.4);
-
-      const vx = Math.cos(angle) * speed + parentVx * momentumScale;
-      const vy = Math.sin(angle) * speed + parentVy * momentumScale;
+    for (let i = 0; i < fragmentCount; i += 1) {
+      const baseAngle =
+        angleOffset + (i / Math.max(1, fragmentCount)) * Math.PI * 2;
+      const travelAngle =
+        baseAngle + (seededRandom() - 0.5) * 2 * angleJitter;
+      const spawnAngle =
+        travelAngle + (seededRandom() - 0.5) * 2 * offsetJitter;
+      const distance =
+        this.radius *
+        sampleRange(radialRange, 0.6);
+      const speedMultiplier = sampleRange(speedRange, 1);
+      const vx =
+        Math.cos(travelAngle) * baseSpeed * speedMultiplier +
+        parentVx * inheritVelocity;
+      const vy =
+        Math.sin(travelAngle) * baseSpeed * speedMultiplier +
+        parentVy * inheritVelocity;
 
       fragments.push({
-        x: this.x + Math.cos(angle) * distance,
-        y: this.y + Math.sin(angle) * distance,
+        x: this.x + Math.cos(spawnAngle) * distance,
+        y: this.y + Math.sin(spawnAngle) * distance,
         vx,
         vy,
         size: newSize,
         wave: this.wave,
         spawnedBy: this.id,
-        generation: (this.generation ?? 0) + 1,
+        generation: currentGeneration + 1,
       });
     }
 
