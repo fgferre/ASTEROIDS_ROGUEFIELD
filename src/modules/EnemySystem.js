@@ -86,8 +86,6 @@ class Asteroid {
 
     const crackData = this.generateCrackLayers();
     this.crackLayers = crackData.layers;
-    this.crackSegments = crackData.segments;
-    this.crackSegmentLookup = crackData.segmentLookup;
 
     this.variantState = this.initializeVariantState();
     this.visualState = this.initializeVisualState();
@@ -1209,7 +1207,61 @@ class Asteroid {
               };
             })
           : [];
-        const sanitizedSegments = segmentList.filter(Boolean);
+
+        const seenSegmentKeys = new Set();
+        const sanitizedSegments = [];
+
+        segmentList.forEach((segment) => {
+          if (!segment) {
+            return;
+          }
+
+          const startX = Number.isFinite(segment.start?.x)
+            ? segment.start.x
+            : 0;
+          const startY = Number.isFinite(segment.start?.y)
+            ? segment.start.y
+            : 0;
+          const endX = Number.isFinite(segment.end?.x) ? segment.end.x : 0;
+          const endY = Number.isFinite(segment.end?.y) ? segment.end.y : 0;
+          const type = segment.type || 'line';
+          const key = [
+            segment.id ?? 'no-id',
+            startX.toFixed(4),
+            startY.toFixed(4),
+            endX.toFixed(4),
+            endY.toFixed(4),
+            type,
+          ].join(':');
+
+          if (seenSegmentKeys.has(key)) {
+            return;
+          }
+
+          seenSegmentKeys.add(key);
+          sanitizedSegments.push(segment);
+        });
+
+        const sanitizedSegmentIds = [];
+        const seenSegmentIds = new Set();
+
+        sanitizedSegments.forEach((segment) => {
+          if (!segment?.id) {
+            return;
+          }
+
+          if (seenSegmentIds.has(segment.id)) {
+            return;
+          }
+
+          seenSegmentIds.add(segment.id);
+          sanitizedSegmentIds.push(segment.id);
+        });
+
+        if (layer) {
+          layer.segmentIds = sanitizedSegmentIds;
+        }
+
         gameEvents.emit('asteroid-crack-stage-changed', {
           asteroidId: this.id,
           layerId: layer?.id ?? null,
@@ -1224,7 +1276,7 @@ class Asteroid {
           radius: this.radius,
           velocity: { x: this.vx, y: this.vy },
           rotation: this.rotation,
-          segmentIds: layer?.segmentIds || sanitizedSegments.map((segment) => segment.id),
+          segmentIds: sanitizedSegmentIds,
           segments: sanitizedSegments,
         });
       }

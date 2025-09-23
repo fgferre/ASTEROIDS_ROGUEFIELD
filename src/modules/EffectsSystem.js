@@ -940,61 +940,34 @@ export default class EffectsSystem {
       })
       .filter(Boolean);
 
-    const fallbackTemplate =
-      CONSTANTS.ASTEROID_CRACK_LAYER_LOOKUP?.[event.layerId]?.config || null;
-
-    const averageFromRange = (range, fallback) => {
-      if (Array.isArray(range) && range.length === 2) {
-        const [min, max] = range;
-        if (Number.isFinite(min) && Number.isFinite(max)) {
-          return (min + max) * 0.5;
-        }
-      }
-      if (Number.isFinite(range)) {
-        return range;
-      }
-      return fallback;
+    const createSegmentKey = (segment) => {
+      const startX = Number.isFinite(segment.start?.x) ? segment.start.x : 0;
+      const startY = Number.isFinite(segment.start?.y) ? segment.start.y : 0;
+      const endX = Number.isFinite(segment.end?.x) ? segment.end.x : 0;
+      const endY = Number.isFinite(segment.end?.y) ? segment.end.y : 0;
+      const type = segment.type || 'line';
+      return [
+        segment.id ?? 'no-id',
+        startX.toFixed(4),
+        startY.toFixed(4),
+        endX.toFixed(4),
+        endY.toFixed(4),
+        type,
+      ].join(':');
     };
 
-    const segments = sanitizedSegments.slice();
+    const segments = [];
+    const seenSegments = new Set();
 
-    if (!segments.length) {
-      const baseCount = fallbackTemplate?.mainRays ?? Math.max(2, Math.round(intensity * 1.4));
-      const fallbackCount = Math.max(2, Math.round(baseCount));
-      const startFactor = Math.max(
-        0.08,
-        averageFromRange(fallbackTemplate?.startRadiusRange, 0.24)
-      );
-      const lengthFactor = Math.max(
-        0.2,
-        averageFromRange(fallbackTemplate?.mainLengthRange, 0.6)
-      );
-      const baseAngle = Math.random() * Math.PI * 2;
-
-      for (let i = 0; i < fallbackCount; i += 1) {
-        const angle = baseAngle + (i / fallbackCount) * Math.PI * 2;
-        const startRadius = radius * startFactor * (0.85 + Math.random() * 0.2);
-        const endRadius = Math.min(
-          radius * 0.95,
-          startRadius + radius * lengthFactor * (0.75 + Math.random() * 0.35)
-        );
-
-        segments.push({
-          id: `fallback-${i}`,
-          width: 1,
-          length: Math.max(0.5, endRadius - startRadius),
-          start: {
-            x: Math.cos(angle) * startRadius,
-            y: Math.sin(angle) * startRadius,
-          },
-          end: {
-            x: Math.cos(angle) * endRadius,
-            y: Math.sin(angle) * endRadius,
-          },
-          type: 'line',
-        });
+    sanitizedSegments.forEach((segment) => {
+      const key = createSegmentKey(segment);
+      if (seenSegments.has(key)) {
+        return;
       }
-    }
+
+      seenSegments.add(key);
+      segments.push(segment);
+    });
 
     if (!segments.length) {
       return;
@@ -1004,11 +977,7 @@ export default class EffectsSystem {
 
     const baseCrackCount = Math.max(
       1,
-      Math.round(
-        segments.length
-          ? segments.length * (0.65 + this.particleDensity * 0.45)
-          : intensity * 1.4
-      )
+      Math.round(segments.length * (0.65 + this.particleDensity * 0.45))
     );
 
     const cracksToSpawn = Math.max(
