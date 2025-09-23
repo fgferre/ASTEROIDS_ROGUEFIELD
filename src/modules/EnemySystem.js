@@ -80,9 +80,15 @@ class Asteroid {
 
     this.crackSeed = Math.floor(Math.random() * 1_000_000);
     this.crackStage = 0;
-    this.crackLayers = this.generateCrackLayers();
 
     this.vertices = this.generateVertices();
+    this.rebuildPolygonCache();
+
+    const crackData = this.generateCrackLayers();
+    this.crackLayers = crackData.layers;
+    this.crackSegments = crackData.segments;
+    this.crackSegmentLookup = crackData.segmentLookup;
+
     this.variantState = this.initializeVariantState();
     this.visualState = this.initializeVisualState();
   }
@@ -166,10 +172,124 @@ class Asteroid {
     return vertices;
   }
 
+  rebuildPolygonCache() {
+    if (!Array.isArray(this.vertices) || this.vertices.length < 3) {
+      this.polygonEdges = [];
+      this.minSurfaceRadius = this.radius;
+      return;
+    }
+
+    const edges = [];
+    for (let i = 0; i < this.vertices.length; i += 1) {
+      const current = this.vertices[i];
+      const next = this.vertices[(i + 1) % this.vertices.length];
+      edges.push({
+        ax: current.x,
+        ay: current.y,
+        bx: next.x,
+        by: next.y,
+        dx: next.x - current.x,
+        dy: next.y - current.y,
+      });
+    }
+
+    this.polygonEdges = edges;
+    this.minSurfaceRadius = this.computeMinSurfaceRadius();
+  }
+
+  calculateCross(ax, ay, bx, by) {
+    return ax * by - ay * bx;
+  }
+
+  intersectRayWithEdges(startX, startY, dirX, dirY) {
+    if (!Array.isArray(this.polygonEdges) || this.polygonEdges.length === 0) {
+      return 0;
+    }
+
+    const epsilon = 1e-6;
+    let closest = Infinity;
+
+    for (let i = 0; i < this.polygonEdges.length; i += 1) {
+      const edge = this.polygonEdges[i];
+      const ax = edge.ax - startX;
+      const ay = edge.ay - startY;
+      const bx = edge.bx - startX;
+      const by = edge.by - startY;
+      const segDirX = bx - ax;
+      const segDirY = by - ay;
+
+      const denom = this.calculateCross(dirX, dirY, segDirX, segDirY);
+      if (Math.abs(denom) < epsilon) {
+        continue;
+      }
+
+      const t = this.calculateCross(ax, ay, segDirX, segDirY) / denom;
+      const u = this.calculateCross(ax, ay, dirX, dirY) / denom;
+
+      if (t >= 0 && u >= 0 && u <= 1) {
+        if (t < closest) {
+          closest = t;
+        }
+      }
+    }
+
+    if (closest === Infinity) {
+      return 0;
+    }
+
+    return closest;
+  }
+
+  measureRayDistance(startX, startY, angle, margin = 0.6) {
+    const dirX = Math.cos(angle);
+    const dirY = Math.sin(angle);
+    const distance = this.intersectRayWithEdges(startX, startY, dirX, dirY);
+    if (distance <= 0) {
+      return 0;
+    }
+
+    const safeMargin = Math.max(0, margin);
+    const safeDistance = distance - safeMargin;
+    return safeDistance > 0 ? safeDistance : 0;
+  }
+
+  computeMinSurfaceRadius() {
+    if (!Array.isArray(this.polygonEdges) || this.polygonEdges.length === 0) {
+      return this.radius;
+    }
+
+    const samples = Math.max(12, (this.vertices?.length || 0) * 3);
+    let minDistance = Infinity;
+
+    for (let i = 0; i < samples; i += 1) {
+      const angle = (i / samples) * Math.PI * 2;
+      const distance = this.intersectRayWithEdges(
+        0,
+        0,
+        Math.cos(angle),
+        Math.sin(angle)
+      );
+
+      if (distance > 0 && distance < minDistance) {
+        minDistance = distance;
+      }
+    }
+
+    if (minDistance === Infinity) {
+      return this.radius;
+    }
+
+    return Math.max(0, minDistance);
+  }
+
   generateCrackLayers() {
     const thresholds = CONSTANTS.ASTEROID_CRACK_THRESHOLDS || [];
     if (!thresholds.length) {
-      return [];
+      return { layers: [], segments: [], segmentLookup: {} };
+    }
+
+    if (!Array.isArray(this.vertices) || this.vertices.length < 3) {
+      return { layers: [], segments: [], segmentLookup: {} };
     }
 
     const profile =
@@ -177,7 +297,54 @@ class Asteroid {
       CONSTANTS.ASTEROID_CRACK_PROFILES?.[this.crackProfileKey] ||
       CONSTANTS.ASTEROID_CRACK_PROFILES.default;
 
-    const layers = [];
+    const baseGraphRules = CONSTANTS.ASTEROID_CRACK_GRAPH_RULES || {};
+    const profileGraphRules = profile?.graphRules || {};
+
+    const graphRules = {
+      continuationBias:
+        profileGraphRules.continuationBias ??
+        baseGraphRules.continuationBias ??
+        0.82,
+      newRootChance:
+        profileGraphRules.newRootChance ??
+        baseGraphRules.newRootChance ??
+        0.2,
+      childPenalty:
+        profileGraphRules.childPenalty ??
+        baseGraphRules.childPenalty ??
+        0.45,
+      branchParentPenalty:
+        profileGraphRules.branchParentPenalty ??
+        baseGraphRules.branchParentPenalty ??
+        0.5,
+      microParentPenalty:
+        profileGraphRules.microParentPenalty ??
+        baseGraphRules.microParentPenalty ??
+        0.35,
+      minSegmentLengthRatio: Math.max(
+        0.04,
+        profileGraphRules.minSegmentLengthRatio ??
+          baseGraphRules.minSegmentLengthRatio ??
+          0.12
+      ),
+      surfaceMargin:
+        profileGraphRules.surfaceMargin ??
+        baseGraphRules.surfaceMargin ??
+        0.65,
+      branchAnchorJitter:
+        profileGraphRules.branchAnchorJitter ??
+        baseGraphRules.branchAnchorJitter ??
+        0.15,
+      microAnchorJitter:
+        profileGraphRules.microAnchorJitter ??
+        baseGraphRules.microAnchorJitter ??
+        0.22,
+      continuationJitter:
+        profileGraphRules.continuationJitter ??
+        baseGraphRules.continuationJitter ??
+        0.5,
+    };
+
     const seededRandom = this.createSeededRandom(this.crackSeed ^ 0x9e3779);
     const baseRotation = seededRandom() * Math.PI * 2;
     const rotationJitter = profile?.rotationJitter ?? 0.3;
@@ -198,193 +365,534 @@ class Asteroid {
       return fallback ?? 0;
     };
 
-    const clampRadius = (value) =>
-      Math.max(0, Math.min(value, this.radius * 1.15));
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
-    for (let i = 0; i < thresholds.length; i += 1) {
-      const template =
-        profile?.layers?.[i] ??
-        profile?.layers?.[profile.layers.length - 1];
+    const stageTemplates = thresholds.map(
+      (_, index) =>
+        profile?.layers?.[index] ??
+        profile?.layers?.[profile.layers.length - 1] ??
+        {}
+    );
 
-      if (!template) {
-        layers.push({
-          id: `${this.crackProfileKey}-stage-${i + 1}`,
-          lines: [],
-          intensity: i + 1,
-          burst: { cracks: 0, sparks: 0, shards: 0 },
-        });
-        continue;
-      }
+    const layers = [];
+    const segments = [];
+    const segmentLookup = {};
 
-      const layerId = template.id || `${profile.key}-stage-${i + 1}`;
-      const lines = [];
+    const segmentPrefix = `${this.crackProfileKey}-${this.crackSeed.toString(16)}`;
+    let nextSegmentIndex = 0;
 
-      const mainCount = Math.max(1, Math.round(template.mainRays ?? 3));
-      const lengthRange = template.mainLengthRange || [0.5, 0.7];
+    const trunkRecords = [];
+    const minSegmentLength = Math.max(
+      1.2,
+      this.radius * graphRules.minSegmentLengthRatio
+    );
+    const uniformRadius = Math.max(
+      0,
+      (this.minSurfaceRadius || this.radius) - graphRules.surfaceMargin * 1.1
+    );
+
+    const countMainSegments = (list) =>
+      list.filter(
+        (segment) =>
+          segment &&
+          (segment.type === 'trunk' || segment.type === 'extension')
+      ).length;
+
+    for (let stageIndex = 0; stageIndex < stageTemplates.length; stageIndex += 1) {
+      const stageNumber = stageIndex + 1;
+      const template = stageTemplates[stageIndex] || {};
+
+      const widthRange =
+        template.lineWidthRange ||
+        profile?.lineWidthRange ||
+        [0.8, 1.25];
+      const angularJitter = template.angularJitter ?? 0.25;
+      const mainCountTarget = Math.max(
+        1,
+        Math.round(
+          template.mainRays ??
+            (stageIndex === 0 ? 3 : trunkRecords.length || 3)
+        )
+      );
       const startRadiusRange =
         template.startRadiusRange ||
         profile?.startRadiusRange ||
         [0.2, 0.32];
-      const widthRange =
-        template.lineWidthRange || profile?.lineWidthRange || [0.8, 1.25];
-      const angularJitter = template.angularJitter ?? 0.25;
+      const mainLengthRange = template.mainLengthRange || [0.5, 0.7];
 
-      const layerRotation =
+      const stageRotation =
         baseRotation +
-        (seededRandom() - 0.5) * 2 * (rotationJitter ?? 0.3);
+        (seededRandom() - 0.5) * 2 * rotationJitter;
 
-      const branchConfig = template.branch || null;
-      const microConfig = template.micro || null;
-      const ringConfig = template.ring || null;
+      const stageSegments = [];
 
-      for (let ray = 0; ray < mainCount; ray += 1) {
+      const getWidth = (scale = 1) => {
+        const sampled = sampleRange(widthRange, 1);
+        const numeric = Number.isFinite(sampled) ? sampled : 1;
+        return Math.max(0.35, numeric * scale);
+      };
+
+      const spawnSegment = ({
+        type,
+        start,
+        end,
+        width,
+        angle,
+        parentId = null,
+        rootId = null,
+      }) => {
+        if (!start || !end) {
+          return null;
+        }
+
+        const length = Math.hypot(end.x - start.x, end.y - start.y);
+        if (!Number.isFinite(length) || length < minSegmentLength * 0.5) {
+          return null;
+        }
+
+        const segmentId = `${segmentPrefix}-${stageNumber}-${(nextSegmentIndex += 1)}`;
+        const parentSegment = parentId ? segmentLookup[parentId] : null;
+        const resolvedRoot =
+          rootId ?? parentSegment?.rootId ?? parentId ?? null;
+
+        const segment = {
+          id: segmentId,
+          stage: stageNumber,
+          type,
+          parentId: parentId ?? null,
+          rootId: resolvedRoot ?? segmentId,
+          x1: start.x,
+          y1: start.y,
+          x2: end.x,
+          y2: end.y,
+          start: { x: start.x, y: start.y },
+          end: { x: end.x, y: end.y },
+          width,
+          length,
+          angle,
+          children: 0,
+        };
+
+        stageSegments.push(segment);
+        segments.push(segment);
+        segmentLookup[segment.id] = segment;
+
+        if (segment.parentId && segmentLookup[segment.parentId]) {
+          const parent = segmentLookup[segment.parentId];
+          parent.children = (parent.children || 0) + 1;
+        }
+
+        if (!segment.rootId) {
+          segment.rootId = segment.id;
+        }
+
+        return segment;
+      };
+
+      const measureSurface = (sx, sy, angle) =>
+        this.measureRayDistance(sx, sy, angle, graphRules.surfaceMargin);
+
+      const createRootSegment = () => {
         const baseAngle =
-          layerRotation + (ray / Math.max(1, mainCount)) * Math.PI * 2;
+          stageRotation +
+          (trunkRecords.length / Math.max(1, mainCountTarget)) *
+            Math.PI *
+            2;
         const angle =
           baseAngle +
           (seededRandom() - 0.5) * 2 * angularJitter;
 
-        const startRadius =
-          this.radius * sampleRange(startRadiusRange, 0.24);
-        const mainLength =
-          this.radius * sampleRange(lengthRange, 0.6);
-        const endRadius = clampRadius(startRadius + mainLength);
-        const bend = (seededRandom() - 0.5) * angularJitter * 0.6;
-        const endAngle = angle + bend;
+        let maxReach = measureSurface(0, 0, angle);
+        if (maxReach <= minSegmentLength * 1.1) {
+          return false;
+        }
 
-        const lineWidth = Math.max(
-          0.45,
-          sampleRange(widthRange, 1)
+        const maxStart = Math.max(0, maxReach - minSegmentLength * 0.6);
+        if (maxStart <= 0) {
+          return false;
+        }
+
+        let startRadius = clamp(
+          maxReach * sampleRange(startRadiusRange, 0.24),
+          0,
+          maxStart
         );
+        const minStart = Math.min(maxStart, minSegmentLength * 0.25);
+        if (startRadius < minStart) {
+          startRadius = minStart;
+        }
 
-        const startX = Math.cos(angle) * startRadius;
-        const startY = Math.sin(angle) * startRadius;
-        const endX = Math.cos(endAngle) * endRadius;
-        const endY = Math.sin(endAngle) * endRadius;
+        let desiredEnd =
+          startRadius + maxReach * sampleRange(mainLengthRange, 0.6);
+        desiredEnd = Math.min(desiredEnd, maxReach);
+        let length = desiredEnd - startRadius;
+        if (length < minSegmentLength) {
+          length = Math.min(maxReach - startRadius, minSegmentLength);
+        }
+        if (length < minSegmentLength * 0.6) {
+          return false;
+        }
 
-        lines.push({
-          x1: startX,
-          y1: startY,
-          x2: endX,
-          y2: endY,
-          width: lineWidth,
+        const startPoint = {
+          x: Math.cos(angle) * startRadius,
+          y: Math.sin(angle) * startRadius,
+        };
+        const endPoint = {
+          x: startPoint.x + Math.cos(angle) * length,
+          y: startPoint.y + Math.sin(angle) * length,
+        };
+
+        const segment = spawnSegment({
+          type: 'trunk',
+          start: startPoint,
+          end: endPoint,
+          width: getWidth(1),
+          angle,
         });
 
-        if (branchConfig?.count) {
-          const branchCount = Math.max(0, Math.round(branchConfig.count));
-          const branchSpread = branchConfig.spread ?? 0.3;
-          const branchLengthFactor = branchConfig.lengthMultiplier ?? 0.5;
-          const anchorT = Math.max(
-            0,
-            Math.min(1, branchConfig.offsetFromStart ?? 0.4)
-          );
-          const anchorRadius =
-            startRadius + (endRadius - startRadius) * anchorT;
-          const anchorAngle = angle + (endAngle - angle) * anchorT;
-          const anchorX = Math.cos(anchorAngle) * anchorRadius;
-          const anchorY = Math.sin(anchorAngle) * anchorRadius;
+        if (!segment) {
+          return false;
+        }
 
-          for (let b = 0; b < branchCount; b += 1) {
-            const normalized =
-              branchCount > 1 ? b / (branchCount - 1) - 0.5 : 0;
-            const offset = normalized * branchSpread * 2;
-            const branchAngle =
-              anchorAngle +
-              offset +
-              (seededRandom() - 0.5) * branchSpread * 0.35;
-            const branchLength =
-              mainLength *
-              branchLengthFactor *
-              (0.8 + seededRandom() * 0.4);
-            const branchEndRadius = clampRadius(
-              anchorRadius + branchLength
-            );
-            lines.push({
-              x1: anchorX,
-              y1: anchorY,
-              x2: Math.cos(branchAngle) * branchEndRadius,
-              y2: Math.sin(branchAngle) * branchEndRadius,
-              width: lineWidth * 0.7,
-            });
+        const trunk = {
+          id: `trunk-${trunkRecords.length}`,
+          angle,
+          endPoint: { x: segment.x2, y: segment.y2 },
+          lastSegmentId: segment.id,
+          rootSegmentId: segment.rootId,
+          exhausted: false,
+        };
+        trunkRecords.push(trunk);
+        return true;
+      };
+
+      const extendTrunk = (trunk) => {
+        if (!trunk) {
+          return null;
+        }
+
+        const angle =
+          trunk.angle +
+          (seededRandom() - 0.5) *
+            2 *
+            angularJitter *
+            (graphRules.continuationJitter ?? 0.5);
+
+        const maxReach = measureSurface(trunk.endPoint.x, trunk.endPoint.y, angle);
+        if (maxReach <= minSegmentLength * 0.6) {
+          trunk.exhausted = true;
+          return null;
+        }
+
+        let length =
+          maxReach * sampleRange(mainLengthRange, 0.55);
+        length = clamp(
+          length,
+          minSegmentLength * 0.8,
+          Math.max(minSegmentLength, maxReach)
+        );
+        length = Math.min(length, maxReach);
+        if (length < minSegmentLength * 0.6) {
+          trunk.exhausted = true;
+          return null;
+        }
+
+        const startPoint = { x: trunk.endPoint.x, y: trunk.endPoint.y };
+        const endPoint = {
+          x: startPoint.x + Math.cos(angle) * length,
+          y: startPoint.y + Math.sin(angle) * length,
+        };
+
+        const segment = spawnSegment({
+          type: 'extension',
+          start: startPoint,
+          end: endPoint,
+          width: getWidth(0.95),
+          angle,
+          parentId: trunk.lastSegmentId,
+          rootId: trunk.rootSegmentId,
+        });
+
+        if (!segment) {
+          trunk.exhausted = true;
+          return null;
+        }
+
+        trunk.endPoint = { x: segment.x2, y: segment.y2 };
+        trunk.lastSegmentId = segment.id;
+        trunk.angle = angle;
+        trunk.exhausted = false;
+        return segment;
+      };
+
+      const selectParent = (options = {}) => {
+        const includeBranches = options.includeBranches !== false;
+        const includeMicro = options.includeMicro === true;
+        const candidates = segments.filter((segment) => {
+          if (!segment) return false;
+          if (segment.stage > stageNumber) return false;
+          if (segment.type === 'micro' && !includeMicro) return false;
+          if (segment.type === 'branch' && !includeBranches) return false;
+          return true;
+        });
+
+        if (!candidates.length) {
+          return null;
+        }
+
+        const weights = [];
+        let totalWeight = 0;
+
+        for (let i = 0; i < candidates.length; i += 1) {
+          const candidate = candidates[i];
+          let weight = candidate.length || 1;
+          if (candidate.type === 'branch') {
+            weight *= 1 - graphRules.branchParentPenalty;
+          } else if (candidate.type === 'micro') {
+            weight *= 1 - graphRules.microParentPenalty;
+          } else {
+            weight *= 1 + graphRules.continuationBias * 0.15;
+          }
+
+          const childCount = candidate.children || 0;
+          const penalty =
+            1 / (1 + childCount * (graphRules.childPenalty ?? 0.45));
+          weight *= Math.max(0.1, penalty);
+
+          totalWeight += weight;
+          weights.push(weight);
+        }
+
+        if (totalWeight <= 0) {
+          return candidates[0];
+        }
+
+        const pick = seededRandom() * totalWeight;
+        let accumulator = 0;
+        for (let i = 0; i < candidates.length; i += 1) {
+          accumulator += weights[i];
+          if (pick <= accumulator) {
+            return candidates[i];
           }
         }
 
-        if (microConfig?.count) {
-          const microCount = Math.max(0, Math.round(microConfig.count));
-          const microSpread = microConfig.spread ?? 0.45;
-          const microLengthFactor = microConfig.lengthMultiplier ?? 0.3;
+        return candidates[candidates.length - 1];
+      };
 
-          for (let m = 0; m < microCount; m += 1) {
-            const normalized =
-              microCount > 1 ? m / (microCount - 1) - 0.5 : 0;
-            const offset = normalized * microSpread * 2;
-            const base = endAngle + offset;
-            const microAngle =
-              base + (seededRandom() - 0.5) * microSpread * 0.4;
-            const microStartRadius =
-              endRadius * (0.85 + seededRandom() * 0.12);
-            const microLength =
-              this.radius *
-              microLengthFactor *
-              (0.55 + seededRandom() * 0.5);
-            const microEndRadius = clampRadius(
-              microStartRadius + microLength
-            );
-            lines.push({
-              x1: Math.cos(microAngle) * microStartRadius,
-              y1: Math.sin(microAngle) * microStartRadius,
-              x2: Math.cos(microAngle) * microEndRadius,
-              y2: Math.sin(microAngle) * microEndRadius,
-              width: lineWidth * 0.6,
-            });
+      const createBranchSegment = (config = {}, isMicro = false) => {
+        const parent = selectParent({
+          includeBranches: true,
+          includeMicro: false,
+        });
+
+        if (!parent) {
+          return null;
+        }
+
+        const baseAngle = parent.angle ?? Math.atan2(
+          parent.y2 - parent.y1,
+          parent.x2 - parent.x1
+        );
+        const spread = config.spread ?? (isMicro ? 0.45 : 0.32);
+        const offset = (seededRandom() - 0.5) * 2 * spread;
+
+        let anchorT = config.offsetFromStart ?? (isMicro ? 0.6 : 0.4);
+        const anchorJitter = isMicro
+          ? graphRules.microAnchorJitter
+          : graphRules.branchAnchorJitter;
+        anchorT += (seededRandom() - 0.5) * 2 * anchorJitter;
+        anchorT = clamp(anchorT, 0.08, 0.92);
+
+        const startPoint = {
+          x: parent.x1 + (parent.x2 - parent.x1) * anchorT,
+          y: parent.y1 + (parent.y2 - parent.y1) * anchorT,
+        };
+
+        const angle = baseAngle + offset;
+        const maxReach = measureSurface(startPoint.x, startPoint.y, angle);
+        if (maxReach <= minSegmentLength * (isMicro ? 0.4 : 0.6)) {
+          return null;
+        }
+
+        const lengthFactor =
+          config.lengthMultiplier ?? (isMicro ? 0.28 : 0.5);
+        const desiredLength =
+          parent.length *
+          lengthFactor *
+          (0.7 + seededRandom() * 0.5);
+        const minLength = minSegmentLength * (isMicro ? 0.55 : 0.8);
+        const maxLength = Math.max(minSegmentLength * (isMicro ? 0.9 : 1.1), maxReach);
+        let length = clamp(desiredLength, minLength, maxLength);
+        length = Math.min(length, maxReach);
+        if (length < minSegmentLength * (isMicro ? 0.45 : 0.7)) {
+          return null;
+        }
+
+        const endPoint = {
+          x: startPoint.x + Math.cos(angle) * length,
+          y: startPoint.y + Math.sin(angle) * length,
+        };
+
+        return spawnSegment({
+          type: isMicro ? 'micro' : 'branch',
+          start: startPoint,
+          end: endPoint,
+          width: getWidth(isMicro ? 0.6 : 0.72),
+          angle,
+          parentId: parent.id,
+          rootId: parent.rootId,
+        });
+      };
+
+      if (stageIndex === 0) {
+        let attempts = 0;
+        while (
+          countMainSegments(stageSegments) < mainCountTarget &&
+          attempts < mainCountTarget * 4
+        ) {
+          attempts += 1;
+          createRootSegment();
+        }
+      } else {
+        for (let i = 0; i < trunkRecords.length; i += 1) {
+          extendTrunk(trunkRecords[i]);
+        }
+
+        let producedMain = countMainSegments(stageSegments);
+        let guard = 0;
+
+        while (
+          producedMain < mainCountTarget &&
+          guard < mainCountTarget * 4
+        ) {
+          guard += 1;
+          const viableTrunks = trunkRecords.filter((trunk) => !trunk.exhausted);
+          const preferContinuation =
+            viableTrunks.length > 0 &&
+            seededRandom() < (graphRules.continuationBias ?? 0.82);
+
+          if (preferContinuation) {
+            const trunk =
+              viableTrunks[Math.floor(seededRandom() * viableTrunks.length)];
+            const segment = extendTrunk(trunk);
+            if (segment) {
+              producedMain = countMainSegments(stageSegments);
+              continue;
+            }
+          }
+
+          if (seededRandom() < (graphRules.newRootChance ?? 0.2)) {
+            createRootSegment();
+          } else if (trunkRecords.length) {
+            const trunk =
+              trunkRecords[Math.floor(seededRandom() * trunkRecords.length)];
+            trunk.exhausted = false;
+            extendTrunk(trunk);
+          }
+
+          producedMain = countMainSegments(stageSegments);
+        }
+      }
+
+      const branchConfig = template.branch || null;
+      const branchCount = Math.max(0, Math.round(branchConfig?.count ?? 0));
+
+      if (branchCount > 0) {
+        let created = 0;
+        let attempts = 0;
+        while (
+          created < branchCount &&
+          attempts < branchCount * 5
+        ) {
+          attempts += 1;
+          if (createBranchSegment(branchConfig, false)) {
+            created += 1;
           }
         }
       }
 
-      if (ringConfig?.segments) {
-        const ringSegments = Math.max(0, Math.round(ringConfig.segments));
-        const ringRadius =
-          this.radius * sampleRange(ringConfig.radiusRange, 0.55);
-        const ringWidth = Math.max(
-          0.4,
-          ringConfig.width ??
-            sampleRange(widthRange, widthRange[0] ?? 0.8)
-        );
-        const arcStep = (Math.PI * 2) / Math.max(1, ringSegments);
+      const microConfig = template.micro || null;
+      const microCount = Math.max(0, Math.round(microConfig?.count ?? 0));
 
-        for (let r = 0; r < ringSegments; r += 1) {
-          const arcAngle = layerRotation + r * arcStep;
-          const nextAngle = arcAngle + arcStep * 0.7;
-          lines.push({
-            x1: Math.cos(arcAngle) * ringRadius,
-            y1: Math.sin(arcAngle) * ringRadius,
-            x2: Math.cos(nextAngle) * ringRadius,
-            y2: Math.sin(nextAngle) * ringRadius,
-            width: ringWidth,
-          });
+      if (microCount > 0) {
+        let created = 0;
+        let attempts = 0;
+        while (
+          created < microCount &&
+          attempts < microCount * 5
+        ) {
+          attempts += 1;
+          if (createBranchSegment(microConfig, true)) {
+            created += 1;
+          }
+        }
+      }
+
+      const ringConfig = template.ring || null;
+      if (ringConfig?.segments) {
+        const ringSegmentsCount = Math.max(0, Math.round(ringConfig.segments));
+        if (ringSegmentsCount > 0 && uniformRadius > minSegmentLength) {
+          const ringRadius = clamp(
+            uniformRadius * sampleRange(ringConfig.radiusRange, 0.55),
+            minSegmentLength,
+            uniformRadius
+          );
+          const arcStep = (Math.PI * 2) / ringSegmentsCount;
+          const ringWidth = Number.isFinite(ringConfig.width)
+            ? Math.max(0.35, ringConfig.width)
+            : getWidth(0.85);
+
+          for (let r = 0; r < ringSegmentsCount; r += 1) {
+            const arcAngle = stageRotation + r * arcStep;
+            const nextAngle = arcAngle + arcStep * 0.7;
+            const startPoint = {
+              x: Math.cos(arcAngle) * ringRadius,
+              y: Math.sin(arcAngle) * ringRadius,
+            };
+            const endPoint = {
+              x: Math.cos(nextAngle) * ringRadius,
+              y: Math.sin(nextAngle) * ringRadius,
+            };
+            const angle = Math.atan2(
+              endPoint.y - startPoint.y,
+              endPoint.x - startPoint.x
+            );
+
+            spawnSegment({
+              type: 'ring',
+              start: startPoint,
+              end: endPoint,
+              width: ringWidth,
+              angle,
+            });
+          }
         }
       }
 
       const burstConfig = template.burst || {};
-      layers.push({
-        id: layerId,
-        lines,
-        intensity: template.intensity ?? i + 1,
+      const stageEntry = {
+        id: template.id || `${profile.key}-stage-${stageNumber}`,
+        intensity: template.intensity ?? stageNumber,
         burst: {
           cracks:
-            burstConfig.cracks ??
-            Math.max(lines.length, 4),
+            burstConfig.cracks ?? Math.max(stageSegments.length, 4),
           sparks:
             burstConfig.sparks ??
-            Math.ceil(Math.max(lines.length, 1) / 4),
+            Math.ceil(Math.max(stageSegments.length, 1) / 3),
           shards:
             burstConfig.shards ??
-            Math.floor(Math.max(lines.length - mainCount, 0) / 5),
+            Math.max(0, Math.floor(stageSegments.length / 4)),
         },
-      });
+      };
+
+      stageEntry.segments = stageSegments;
+      stageEntry.lines = stageSegments;
+      stageEntry.segmentIds = stageSegments.map((segment) => segment.id);
+
+      layers.push(stageEntry);
     }
 
-    return layers;
+    return { layers, segments, segmentLookup };
   }
 
   updateVisualState(deltaTime) {
@@ -656,6 +1164,52 @@ class Asteroid {
       this.crackStage = newStage;
       if (typeof gameEvents !== 'undefined') {
         const layer = this.crackLayers[this.crackStage - 1] || null;
+        const segmentList = Array.isArray(layer?.segments)
+          ? layer.segments.map((segment) => {
+              if (!segment) {
+                return null;
+              }
+
+              const startX = Number.isFinite(segment.x1)
+                ? segment.x1
+                : Number.isFinite(segment.start?.x)
+                  ? segment.start.x
+                  : 0;
+              const startY = Number.isFinite(segment.y1)
+                ? segment.y1
+                : Number.isFinite(segment.start?.y)
+                  ? segment.start.y
+                  : 0;
+              const endX = Number.isFinite(segment.x2)
+                ? segment.x2
+                : Number.isFinite(segment.end?.x)
+                  ? segment.end.x
+                  : 0;
+              const endY = Number.isFinite(segment.y2)
+                ? segment.y2
+                : Number.isFinite(segment.end?.y)
+                  ? segment.end.y
+                  : 0;
+              const length = Number.isFinite(segment.length)
+                ? segment.length
+                : Math.hypot(endX - startX, endY - startY);
+
+              return {
+                id: segment.id || null,
+                parentId: segment.parentId ?? null,
+                rootId: segment.rootId ?? null,
+                stage: segment.stage ?? this.crackStage,
+                type: segment.type || 'line',
+                width: Number.isFinite(segment.width)
+                  ? segment.width
+                  : 1,
+                length,
+                start: { x: startX, y: startY },
+                end: { x: endX, y: endY },
+              };
+            })
+          : [];
+        const sanitizedSegments = segmentList.filter(Boolean);
         gameEvents.emit('asteroid-crack-stage-changed', {
           asteroidId: this.id,
           layerId: layer?.id ?? null,
@@ -669,6 +1223,9 @@ class Asteroid {
           position: { x: this.x, y: this.y },
           radius: this.radius,
           velocity: { x: this.vx, y: this.vy },
+          rotation: this.rotation,
+          segmentIds: layer?.segmentIds || sanitizedSegments.map((segment) => segment.id),
+          segments: sanitizedSegments,
         });
       }
     }
@@ -874,8 +1431,12 @@ class Asteroid {
         const layer = this.crackLayers[stage];
         if (!layer) continue;
 
-        const lines = Array.isArray(layer.lines) ? layer.lines : [];
-        lines.forEach((line) => {
+        const segments = Array.isArray(layer?.segments)
+          ? layer.segments
+          : Array.isArray(layer?.lines)
+            ? layer.lines
+            : [];
+        segments.forEach((line) => {
           const width = Math.max(
             0.45,
             Number.isFinite(line?.width) ? line.width : 1.2
