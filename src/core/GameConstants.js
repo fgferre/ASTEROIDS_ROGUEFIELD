@@ -44,6 +44,41 @@ export const ASTEROID_SPEEDS = {
 
 export const ASTEROID_CRACK_THRESHOLDS = [0.7, 0.4, 0.15];
 
+export const ASTEROID_CRACK_EFFECTS = {
+  lineWidthRange: [0.75, 1.6],
+  colorGlowMix: 0.25,
+  stageAlphaBase: 0.55,
+  stageAlphaPerStage: 0.2,
+  stageWidthGrowth: 0.28,
+  transitionDurationRange: [0.12, 0.18],
+  halo: {
+    baseScale: 1.08,
+    scalePerStage: 0.06,
+    baseAlpha: 0.08,
+    alphaPerStage: 0.12,
+  },
+  shadow: {
+    baseBlur: 6,
+    blurPerStage: 6,
+    baseAlpha: 0.25,
+    alphaPerStage: 0.35,
+  },
+  overlayPulse: {
+    duration: 0.45,
+    amplitude: 0.05,
+  },
+  shards: {
+    countRange: [2, 4],
+    stageBonus: 1,
+    lifetime: 0.42,
+    radiusMultiplierRange: [0.65, 1.05],
+    radialDriftMultiplier: 0.25,
+    angularSpeedRange: [1.6, 3.4],
+    sizeRange: [0.9, 1.5],
+    colorGlowMix: 0.4,
+  },
+};
+
 export const ASTEROID_XP_BASE = {
   large: 15,
   medium: 8,
@@ -64,6 +99,11 @@ export const ASTEROID_VARIANTS = {
       stroke: '#654321',
       cracks: 'rgba(255, 255, 255, 0.45)',
     },
+    visual: {
+      cracks: {
+        lineWidthRange: [0.7, 1.45],
+      },
+    },
     drops: {
       baseSplit: 1,
       extraOrbs: [],
@@ -82,6 +122,16 @@ export const ASTEROID_VARIANTS = {
       stroke: '#1F5E6F',
       cracks: 'rgba(163, 227, 255, 0.6)',
       innerGlow: 'rgba(90, 220, 255, 0.35)',
+    },
+    visual: {
+      cracks: {
+        lineWidthRange: [0.85, 1.75],
+        colorGlowMix: 0.32,
+        halo: {
+          baseAlpha: 0.12,
+          alphaPerStage: 0.18,
+        },
+      },
     },
     drops: {
       baseSplit: 1,
@@ -136,6 +186,22 @@ export const ASTEROID_VARIANTS = {
         pulseAlpha: 0.28,
         armedAlpha: 0.3,
         fuseAlpha: 0.32,
+      },
+      cracks: {
+        lineWidthRange: [0.85, 1.9],
+        colorGlowMix: 0.5,
+        stageWidthGrowth: 0.35,
+        overlayPulse: {
+          amplitude: 0.065,
+        },
+        halo: {
+          baseAlpha: 0.14,
+          alphaPerStage: 0.22,
+        },
+        shards: {
+          stageBonus: 1.4,
+          colorGlowMix: 0.55,
+        },
       },
       trail: {
         interval: 0.055,
@@ -199,6 +265,16 @@ export const ASTEROID_VARIANTS = {
         baseAlpha: 0.38,
         pulseAlpha: 0.22,
       },
+      cracks: {
+        lineWidthRange: [0.8, 1.7],
+        colorGlowMix: 0.38,
+        halo: {
+          scalePerStage: 0.08,
+        },
+        shards: {
+          stageBonus: 0.8,
+        },
+      },
     },
     availability: {
       minWave: 4,
@@ -239,6 +315,13 @@ export const ASTEROID_VARIANTS = {
         pulseBlur: 9,
         baseAlpha: 0.4,
         pulseAlpha: 0.26,
+      },
+      cracks: {
+        lineWidthRange: [0.78, 1.6],
+        colorGlowMix: 0.42,
+        halo: {
+          baseAlpha: 0.16,
+        },
       },
     },
     drops: {

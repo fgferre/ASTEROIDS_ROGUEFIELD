@@ -6,7 +6,17 @@ const MAIN_THRUSTER_FLASH_DURATION = 0.05;
 const MAIN_THRUSTER_FLASH_INTENSITY = 0.05;
 
 class SpaceParticle {
-  constructor(x, y, vx, vy, color, size, life, type = 'normal') {
+  constructor(
+    x,
+    y,
+    vx,
+    vy,
+    color,
+    size,
+    life,
+    type = 'normal',
+    options = {}
+  ) {
     this.x = x;
     this.y = y;
     this.vx = vx;
@@ -19,18 +29,58 @@ class SpaceParticle {
     this.type = type;
     this.rotation = Math.random() * Math.PI * 2;
     this.rotationSpeed = (Math.random() - 0.5) * 4;
+
+    if (this.type === 'orbit') {
+      const orbitOptions = options || {};
+      const anchorX = Number.isFinite(orbitOptions.anchorX)
+        ? orbitOptions.anchorX
+        : x;
+      const anchorY = Number.isFinite(orbitOptions.anchorY)
+        ? orbitOptions.anchorY
+        : y;
+      const radius = Number.isFinite(orbitOptions.radius)
+        ? orbitOptions.radius
+        : Math.hypot(x - anchorX, y - anchorY) || 1;
+      const initialAngle = Number.isFinite(orbitOptions.initialAngle)
+        ? orbitOptions.initialAngle
+        : Math.atan2(y - anchorY, x - anchorX);
+      this.orbit = {
+        anchorX,
+        anchorY,
+        radius,
+        angle: initialAngle,
+        angularSpeed: Number.isFinite(orbitOptions.angularSpeed)
+          ? orbitOptions.angularSpeed
+          : 2.2,
+        radialSpeed: Number.isFinite(orbitOptions.radialSpeed)
+          ? orbitOptions.radialSpeed
+          : 0,
+      };
+      this.rotationSpeed = (Math.random() - 0.5) * 6;
+      this.x = anchorX + Math.cos(initialAngle) * radius;
+      this.y = anchorY + Math.sin(initialAngle) * radius;
+    }
   }
 
   update(deltaTime) {
-    this.x += this.vx * deltaTime;
-    this.y += this.vy * deltaTime;
+    if (this.type === 'orbit' && this.orbit) {
+      this.orbit.angle += this.orbit.angularSpeed * deltaTime;
+      this.orbit.radius += this.orbit.radialSpeed * deltaTime;
+      const radius = Math.max(0, this.orbit.radius);
+      this.x = this.orbit.anchorX + Math.cos(this.orbit.angle) * radius;
+      this.y = this.orbit.anchorY + Math.sin(this.orbit.angle) * radius;
+    } else {
+      this.x += this.vx * deltaTime;
+      this.y += this.vy * deltaTime;
+
+      const friction = this.type === 'thruster' ? 0.98 : 0.96;
+      this.vx *= friction;
+      this.vy *= friction;
+    }
+
     this.life -= deltaTime;
     this.alpha = Math.max(0, this.life / this.maxLife);
     this.rotation += this.rotationSpeed * deltaTime;
-
-    const friction = this.type === 'thruster' ? 0.98 : 0.96;
-    this.vx *= friction;
-    this.vy *= friction;
 
     return this.life > 0;
   }
@@ -65,6 +115,18 @@ class SpaceParticle {
       ctx.beginPath();
       const s = this.size * this.alpha;
       ctx.rect(-s / 2, -s / 2, s, s);
+      ctx.fill();
+    } else if (this.type === 'orbit') {
+      ctx.globalCompositeOperation = 'lighter';
+      const scale = 0.8 + Math.sin((1 - this.alpha) * Math.PI) * 0.2;
+      const s = Math.max(0.5, this.size * scale);
+      ctx.fillStyle = this.color;
+      ctx.beginPath();
+      ctx.moveTo(0, -s * 0.6);
+      ctx.lineTo(s * 0.6, 0);
+      ctx.lineTo(0, s * 0.6);
+      ctx.lineTo(-s * 0.6, 0);
+      ctx.closePath();
       ctx.fill();
     } else {
       ctx.fillStyle = this.color;
@@ -171,6 +233,10 @@ export default class EffectsSystem {
     if (typeof values.reducedParticles === 'boolean') {
       this.particleDensity = values.reducedParticles ? 0.55 : 1;
     }
+  }
+
+  isParticleReductionActive() {
+    return this.particleDensity < 0.999;
   }
 
   getScaledParticleCount(baseCount, options = {}) {
@@ -923,6 +989,110 @@ export default class EffectsSystem {
         pushCrack(baseAngle - branchSpread, microLength);
       }
     }
+
+    const crackSettings =
+      typeof asteroid.getCrackVisualSettings === 'function'
+        ? asteroid.getCrackVisualSettings()
+        : null;
+    const shardConfig =
+      crackSettings?.shards || CONSTANTS.ASTEROID_CRACK_EFFECTS?.shards || null;
+    if (shardConfig) {
+      this.spawnOrbitShards(asteroid, stage, shardConfig, variantColors);
+    }
+  }
+
+  spawnOrbitShards(asteroid, stage, config, variantColors = {}) {
+    if (!asteroid) {
+      return;
+    }
+
+    if (!Number.isFinite(stage) || stage <= 0) {
+      return;
+    }
+
+    const countRange = Array.isArray(config.countRange)
+      ? config.countRange
+      : [Number(config.countRange) || 0, Number(config.countRange) || 0];
+    const stageBonus = Number.isFinite(config.stageBonus) ? config.stageBonus : 0;
+    const rawCount =
+      this.randomRange(countRange[0], countRange[1]) + stageBonus * Math.max(0, stage - 1);
+    const spawnCount = this.getScaledParticleCount(Math.round(rawCount), {
+      allowZero: true,
+      minimum: 0,
+    });
+    if (spawnCount <= 0) {
+      return;
+    }
+
+    const radiusRange = Array.isArray(config.radiusMultiplierRange)
+      ? config.radiusMultiplierRange
+      : [0.6, 1.1];
+    const sizeRange = Array.isArray(config.sizeRange)
+      ? config.sizeRange
+      : [0.9, 1.4];
+    const angularSpeedRange = Array.isArray(config.angularSpeedRange)
+      ? config.angularSpeedRange
+      : [1.4, 3];
+    const radialDriftMultiplier = Number.isFinite(config.radialDriftMultiplier)
+      ? config.radialDriftMultiplier
+      : 0;
+    const mixFactor = Number.isFinite(config.colorGlowMix) ? config.colorGlowMix : 0.35;
+    const lifetimeBase = Number.isFinite(config.lifetime) ? config.lifetime : 0.4;
+
+    const totalStages = Math.max(
+      1,
+      Array.isArray(asteroid.crackLayers) ? asteroid.crackLayers.length : 1
+    );
+    const stageProgress = Math.min(1, Math.max(0, stage / totalStages));
+
+    const baseColor = variantColors?.cracks || 'rgba(255, 235, 200, 0.92)';
+    const glowColor =
+      variantColors?.innerGlow || variantColors?.glow || variantColors?.pulse || baseColor;
+
+    for (let i = 0; i < spawnCount; i += 1) {
+      const radiusMultiplier = this.randomRange(radiusRange[0], radiusRange[1]);
+      const orbitRadius = Math.max(
+        4,
+        asteroid.radius * radiusMultiplier * (0.9 + Math.random() * 0.2)
+      );
+      const angle = Math.random() * Math.PI * 2;
+      const angularSpeed =
+        (Math.random() < 0.5 ? -1 : 1) *
+        this.randomRange(angularSpeedRange[0], angularSpeedRange[1]);
+      const radialSpeed =
+        asteroid.radius *
+        radialDriftMultiplier *
+        (0.6 + stageProgress * 0.4) *
+        (this.motionReduced ? 0.5 : 1) *
+        (0.8 + Math.random() * 0.4);
+      const shardSize =
+        this.randomRange(sizeRange[0], sizeRange[1]) * (1 + stageProgress * 0.35);
+      const colorMix = Math.min(1, mixFactor * (0.55 + stageProgress * 0.5));
+      const color = this.mixColors(baseColor, glowColor, colorMix);
+      const lifetime =
+        lifetimeBase * (0.85 + stageProgress * 0.35) * (this.motionReduced ? 0.85 : 1);
+
+      const particle = new SpaceParticle(
+        asteroid.x + Math.cos(angle) * orbitRadius,
+        asteroid.y + Math.sin(angle) * orbitRadius,
+        0,
+        0,
+        color,
+        shardSize,
+        lifetime,
+        'orbit',
+        {
+          anchorX: asteroid.x,
+          anchorY: asteroid.y,
+          radius: orbitRadius,
+          initialAngle: angle,
+          angularSpeed,
+          radialSpeed,
+        }
+      );
+      particle.rotation = angle + Math.PI / 2;
+      this.particles.push(particle);
+    }
   }
 
   spawnVolatileTrail(data = {}) {
@@ -1202,6 +1372,56 @@ export default class EffectsSystem {
     const low = Math.min(start, end);
     const high = Math.max(start, end);
     return low + Math.random() * (high - low);
+  }
+
+  parseColor(color) {
+    if (typeof color !== 'string') {
+      return { r: 255, g: 255, b: 255 };
+    }
+
+    if (color.startsWith('#')) {
+      let hex = color.slice(1);
+      if (hex.length === 3) {
+        hex = hex
+          .split('')
+          .map((c) => c + c)
+          .join('');
+      }
+      if (hex.length === 6) {
+        const numeric = Number.parseInt(hex, 16);
+        return {
+          r: (numeric >> 16) & 255,
+          g: (numeric >> 8) & 255,
+          b: numeric & 255,
+        };
+      }
+    }
+
+    const match = color.match(/rgba?\s*\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if (match) {
+      return {
+        r: Number.parseInt(match[1], 10) || 255,
+        g: Number.parseInt(match[2], 10) || 255,
+        b: Number.parseInt(match[3], 10) || 255,
+      };
+    }
+
+    return { r: 255, g: 255, b: 255 };
+  }
+
+  mixColors(baseColor, overlayColor, factor) {
+    if (factor <= 0) return baseColor;
+    if (factor >= 1) return overlayColor;
+
+    const base = this.parseColor(baseColor);
+    const overlay = this.parseColor(overlayColor);
+
+    const mixComponent = (component) =>
+      Math.round(
+        base[component] + (overlay[component] - base[component]) * factor
+      );
+
+    return `rgb(${mixComponent('r')}, ${mixComponent('g')}, ${mixComponent('b')})`;
   }
 
   reset() {

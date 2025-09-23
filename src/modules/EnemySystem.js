@@ -68,6 +68,9 @@ class Asteroid {
 
     this.crackSeed = Math.floor(Math.random() * 1_000_000);
     this.crackStage = 0;
+    this.crackVisual = this.createCrackVisualSettings();
+    this.crackStageTransition = null;
+    this.crackStagePulse = null;
     this.crackLayers = this.generateCrackLayers();
 
     this.vertices = this.generateVertices();
@@ -154,12 +157,186 @@ class Asteroid {
     return vertices;
   }
 
+  createCrackVisualSettings() {
+    const defaults = CONSTANTS.ASTEROID_CRACK_EFFECTS || {};
+    const variantVisual = this.variantConfig?.visual?.cracks || {};
+
+    const pickNumber = (value, fallback, fallbackDefault) => {
+      if (Number.isFinite(value)) {
+        return value;
+      }
+      if (Number.isFinite(fallback)) {
+        return fallback;
+      }
+      return fallbackDefault;
+    };
+
+    const pickRange = (value, fallback, fallbackDefault) => {
+      if (Array.isArray(value) && value.length >= 2) {
+        return [value[0], value[1]];
+      }
+      if (Array.isArray(fallback) && fallback.length >= 2) {
+        return [fallback[0], fallback[1]];
+      }
+      if (Array.isArray(fallbackDefault) && fallbackDefault.length >= 2) {
+        return [fallbackDefault[0], fallbackDefault[1]];
+      }
+      return [0, 0];
+    };
+
+    const haloDefaults = defaults.halo || {};
+    const haloVariant = variantVisual.halo || {};
+    const shadowDefaults = defaults.shadow || {};
+    const shadowVariant = variantVisual.shadow || {};
+    const overlayDefaults = defaults.overlayPulse || {};
+    const overlayVariant = variantVisual.overlayPulse || {};
+    const shardDefaults = defaults.shards || {};
+    const shardVariant = variantVisual.shards || {};
+
+    return {
+      lineWidthRange: pickRange(
+        variantVisual.lineWidthRange,
+        defaults.lineWidthRange,
+        [0.6, 1.5]
+      ),
+      colorGlowMix: pickNumber(
+        variantVisual.colorGlowMix,
+        defaults.colorGlowMix,
+        0.2
+      ),
+      stageAlphaBase: pickNumber(
+        variantVisual.stageAlphaBase,
+        defaults.stageAlphaBase,
+        0.6
+      ),
+      stageAlphaPerStage: pickNumber(
+        variantVisual.stageAlphaPerStage,
+        defaults.stageAlphaPerStage,
+        0.18
+      ),
+      stageWidthGrowth: pickNumber(
+        variantVisual.stageWidthGrowth,
+        defaults.stageWidthGrowth,
+        0.25
+      ),
+      transitionDurationRange: pickRange(
+        variantVisual.transitionDurationRange,
+        defaults.transitionDurationRange,
+        [0.1, 0.18]
+      ),
+      halo: {
+        baseScale: pickNumber(
+          haloVariant.baseScale,
+          haloDefaults.baseScale,
+          1.05
+        ),
+        scalePerStage: pickNumber(
+          haloVariant.scalePerStage,
+          haloDefaults.scalePerStage,
+          0.05
+        ),
+        baseAlpha: pickNumber(
+          haloVariant.baseAlpha,
+          haloDefaults.baseAlpha,
+          0.06
+        ),
+        alphaPerStage: pickNumber(
+          haloVariant.alphaPerStage,
+          haloDefaults.alphaPerStage,
+          0.12
+        ),
+      },
+      shadow: {
+        baseBlur: pickNumber(
+          shadowVariant.baseBlur,
+          shadowDefaults.baseBlur,
+          4
+        ),
+        blurPerStage: pickNumber(
+          shadowVariant.blurPerStage,
+          shadowDefaults.blurPerStage,
+          4
+        ),
+        baseAlpha: pickNumber(
+          shadowVariant.baseAlpha,
+          shadowDefaults.baseAlpha,
+          0.2
+        ),
+        alphaPerStage: pickNumber(
+          shadowVariant.alphaPerStage,
+          shadowDefaults.alphaPerStage,
+          0.25
+        ),
+      },
+      overlayPulse: {
+        duration: pickNumber(
+          overlayVariant.duration,
+          overlayDefaults.duration,
+          0.4
+        ),
+        amplitude: pickNumber(
+          overlayVariant.amplitude,
+          overlayDefaults.amplitude,
+          0.05
+        ),
+      },
+      shards: {
+        countRange: pickRange(
+          shardVariant.countRange,
+          shardDefaults.countRange,
+          [2, 3]
+        ),
+        stageBonus: pickNumber(
+          shardVariant.stageBonus,
+          shardDefaults.stageBonus,
+          0.8
+        ),
+        lifetime: pickNumber(
+          shardVariant.lifetime,
+          shardDefaults.lifetime,
+          0.4
+        ),
+        radiusMultiplierRange: pickRange(
+          shardVariant.radiusMultiplierRange,
+          shardDefaults.radiusMultiplierRange,
+          [0.6, 1.1]
+        ),
+        radialDriftMultiplier: pickNumber(
+          shardVariant.radialDriftMultiplier,
+          shardDefaults.radialDriftMultiplier,
+          0.2
+        ),
+        angularSpeedRange: pickRange(
+          shardVariant.angularSpeedRange,
+          shardDefaults.angularSpeedRange,
+          [1.4, 3]
+        ),
+        sizeRange: pickRange(
+          shardVariant.sizeRange,
+          shardDefaults.sizeRange,
+          [0.9, 1.4]
+        ),
+        colorGlowMix: pickNumber(
+          shardVariant.colorGlowMix,
+          shardDefaults.colorGlowMix,
+          0.35
+        ),
+      },
+    };
+  }
+
   generateCrackLayers() {
     const thresholds = CONSTANTS.ASTEROID_CRACK_THRESHOLDS || [];
     if (!thresholds.length) return [];
 
     const layers = [];
     const seededRandom = this.createSeededRandom(this.crackSeed ^ 0x9e3779);
+
+    const widthRange = Array.isArray(this.crackVisual?.lineWidthRange)
+      ? this.crackVisual.lineWidthRange
+      : [0.6, 1.5];
+    const widthMin = Number.isFinite(widthRange[0]) ? widthRange[0] : 0.6;
+    const widthMax = Number.isFinite(widthRange[1]) ? widthRange[1] : widthMin;
 
     for (let i = 0; i < thresholds.length; i += 1) {
       const lineCount = 3 + i * 2;
@@ -173,13 +350,18 @@ class Asteroid {
         const endRadius =
           startRadius +
           this.radius * lengthFactor * (0.5 + seededRandom() * 0.5);
+        const intensity = seededRandom();
+        const widthVariance = seededRandom();
+        const width =
+          widthMin + (widthMax - widthMin) * Math.pow(widthVariance, 0.7);
 
         lines.push({
           x1: Math.cos(startAngle) * startRadius,
           y1: Math.sin(startAngle) * startRadius,
           x2: Math.cos(startAngle + offset) * endRadius,
           y2: Math.sin(startAngle + offset) * endRadius,
-          width: 0.6 + seededRandom() * 0.9,
+          width,
+          intensity,
         });
       }
 
@@ -216,6 +398,34 @@ class Asteroid {
     }
   }
 
+  updateCrackVisualEffects(deltaTime) {
+    if (this.crackStageTransition) {
+      if (!Number.isFinite(this.crackStageTransition.elapsed)) {
+        this.crackStageTransition.elapsed = 0;
+      }
+
+      this.crackStageTransition.elapsed = Math.min(
+        this.crackStageTransition.duration,
+        this.crackStageTransition.elapsed + deltaTime
+      );
+
+      if (this.crackStageTransition.elapsed >= this.crackStageTransition.duration) {
+        this.crackStageTransition.elapsed = this.crackStageTransition.duration;
+      }
+    }
+
+    if (this.crackStagePulse) {
+      if (!Number.isFinite(this.crackStagePulse.elapsed)) {
+        this.crackStagePulse.elapsed = 0;
+      }
+
+      this.crackStagePulse.elapsed += deltaTime;
+      if (this.crackStagePulse.elapsed >= this.crackStagePulse.duration) {
+        this.crackStagePulse = null;
+      }
+    }
+  }
+
   update(deltaTime) {
     if (this.destroyed) {
       return;
@@ -248,6 +458,8 @@ class Asteroid {
     if (this.shieldHitCooldown > 0) {
       this.shieldHitCooldown = Math.max(0, this.shieldHitCooldown - deltaTime);
     }
+
+    this.updateCrackVisualEffects(deltaTime);
   }
 
   updateVolatileBehavior(deltaTime) {
@@ -455,11 +667,47 @@ class Asteroid {
     }
 
     if (newStage !== this.crackStage) {
+      const previousStage = this.crackStage;
       this.crackStage = newStage;
+
+      if (newStage > 0) {
+        const transitionRange = Array.isArray(
+          this.crackVisual?.transitionDurationRange
+        )
+          ? this.crackVisual.transitionDurationRange
+          : [0.12, 0.18];
+        const min = Number.isFinite(transitionRange[0])
+          ? transitionRange[0]
+          : 0.12;
+        const max = Number.isFinite(transitionRange[1])
+          ? transitionRange[1]
+          : min;
+        const duration = min + Math.random() * Math.max(0, max - min);
+        this.crackStageTransition = {
+          stageIndex: Math.max(0, newStage - 1),
+          duration,
+          elapsed: 0,
+        };
+      } else {
+        this.crackStageTransition = null;
+      }
+
+      if (newStage > previousStage && this.shouldTriggerCrackPulse()) {
+        const pulseConfig = this.crackVisual?.overlayPulse;
+        const pulseDuration = Number.isFinite(pulseConfig?.duration)
+          ? pulseConfig.duration
+          : 0.4;
+        this.crackStagePulse = {
+          elapsed: 0,
+          duration: pulseDuration,
+        };
+      }
+
       if (typeof gameEvents !== 'undefined') {
         gameEvents.emit('asteroid-crack-stage-changed', {
           asteroid: this,
           stage: this.crackStage,
+          previousStage,
           ratio,
           variant: this.variant,
         });
@@ -505,6 +753,69 @@ class Asteroid {
       innerGlow: colors.innerGlow,
       pulse: colors.pulse,
     };
+  }
+
+  getCrackVisualSettings() {
+    if (!this.crackVisual) {
+      this.crackVisual = this.createCrackVisualSettings();
+    }
+    return this.crackVisual;
+  }
+
+  isParticleReductionActive() {
+    if (
+      typeof gameServices === 'undefined' ||
+      typeof gameServices.has !== 'function' ||
+      !gameServices.has('effects')
+    ) {
+      return false;
+    }
+
+    const effects = gameServices.get('effects');
+    if (!effects) {
+      return false;
+    }
+
+    if (typeof effects.isParticleReductionActive === 'function') {
+      return effects.isParticleReductionActive();
+    }
+
+    if (typeof effects.particleDensity === 'number') {
+      return effects.particleDensity < 1;
+    }
+
+    return false;
+  }
+
+  shouldTriggerCrackPulse() {
+    if (!this.crackVisual?.overlayPulse) {
+      return false;
+    }
+
+    return this.isParticleReductionActive();
+  }
+
+  getCrackStageActivation(stageIndex) {
+    if (!this.crackStageTransition) {
+      return 1;
+    }
+
+    if (this.crackStageTransition.stageIndex !== stageIndex) {
+      return 1;
+    }
+
+    const duration = Math.max(
+      0.001,
+      Number.isFinite(this.crackStageTransition.duration)
+        ? this.crackStageTransition.duration
+        : 0.001
+    );
+    const elapsed = Math.max(
+      0,
+      Math.min(duration, this.crackStageTransition.elapsed || 0)
+    );
+    const progress = elapsed / duration;
+    return this.easeOutCubic(progress);
   }
 
   draw(ctx) {
@@ -661,21 +972,161 @@ class Asteroid {
     }
 
     if (this.crackStage > 0 && !isFlashing) {
-      ctx.lineWidth = 1.2;
-      ctx.strokeStyle = colors.cracks || 'rgba(255, 255, 255, 0.45)';
+      const crackSettings = this.getCrackVisualSettings();
+      const totalStages = Math.max(1, this.crackLayers.length);
+      const stageRatio = Math.min(1, this.crackStage / totalStages);
+      const baseCrackColor = colors.cracks || 'rgba(255, 255, 255, 0.45)';
+      const glowColor =
+        colors.glow || colors.innerGlow || colors.pulse || baseCrackColor;
+
+      const overlayPulse = crackSettings?.overlayPulse || {};
+      let overlayScale = 1;
+      if (this.crackStagePulse && overlayPulse) {
+        const amplitude = Number.isFinite(overlayPulse.amplitude)
+          ? overlayPulse.amplitude
+          : 0;
+        if (amplitude > 0) {
+          const totalDuration = Math.max(
+            0.001,
+            Number.isFinite(this.crackStagePulse.duration)
+              ? this.crackStagePulse.duration
+              : overlayPulse.duration || 0.4
+          );
+          const progress = Math.min(
+            1,
+            Math.max(0, (this.crackStagePulse.elapsed || 0) / totalDuration)
+          );
+          const eased = Math.sin(progress * Math.PI);
+          overlayScale = 1 + amplitude * eased;
+        }
+      }
+
+      const haloConfig = crackSettings?.halo || {};
+      const haloAlpha = Math.min(
+        1,
+        Math.max(
+          0,
+          (Number.isFinite(haloConfig.baseAlpha) ? haloConfig.baseAlpha : 0.06) +
+            (Number.isFinite(haloConfig.alphaPerStage)
+              ? haloConfig.alphaPerStage
+              : 0.12) * stageRatio
+        )
+      );
+      const haloScale =
+        (Number.isFinite(haloConfig.baseScale) ? haloConfig.baseScale : 1.05) +
+        (Number.isFinite(haloConfig.scalePerStage)
+          ? haloConfig.scalePerStage
+          : 0.05) * stageRatio;
+
+      ctx.save();
+      if (overlayScale !== 1) {
+        ctx.scale(overlayScale, overlayScale);
+      }
+
+      if (haloAlpha > 0 && glowColor) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const haloRadius = this.radius * haloScale;
+        const haloGradient = ctx.createRadialGradient(
+          0,
+          0,
+          Math.max(2, this.radius * 0.85),
+          0,
+          0,
+          haloRadius
+        );
+        haloGradient.addColorStop(0, this.withAlpha(glowColor, haloAlpha));
+        haloGradient.addColorStop(1, this.withAlpha(glowColor, 0));
+        ctx.fillStyle = haloGradient;
+        ctx.beginPath();
+        ctx.arc(0, 0, haloRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      const shadowConfig = crackSettings?.shadow || {};
+      const shadowAlpha = Math.min(
+        1,
+        Math.max(
+          0,
+          (Number.isFinite(shadowConfig.baseAlpha) ? shadowConfig.baseAlpha : 0.2) +
+            (Number.isFinite(shadowConfig.alphaPerStage)
+              ? shadowConfig.alphaPerStage
+              : 0.25) * stageRatio
+        )
+      );
+      if (shadowAlpha > 0 && glowColor) {
+        const baseBlur = Number.isFinite(shadowConfig.baseBlur)
+          ? shadowConfig.baseBlur
+          : 4;
+        const blurPerStage = Number.isFinite(shadowConfig.blurPerStage)
+          ? shadowConfig.blurPerStage
+          : 4;
+        ctx.shadowColor = this.withAlpha(glowColor, shadowAlpha);
+        ctx.shadowBlur = baseBlur + blurPerStage * stageRatio;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+      } else {
+        ctx.shadowColor = 'rgba(0, 0, 0, 0)';
+        ctx.shadowBlur = 0;
+      }
+
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      const colorGlowMix = Math.max(0, crackSettings?.colorGlowMix ?? 0.25);
+      const widthGrowth = Number.isFinite(crackSettings?.stageWidthGrowth)
+        ? crackSettings.stageWidthGrowth
+        : 0.25;
 
       for (let stage = 0; stage < this.crackStage; stage += 1) {
         const lines = this.crackLayers[stage];
         if (!lines) continue;
 
+        const stageProgress = (stage + 1) / totalStages;
+        const baseAlpha = Math.min(
+          1,
+          Math.max(
+            0,
+            (crackSettings?.stageAlphaBase ?? 0.6) +
+              (crackSettings?.stageAlphaPerStage ?? 0.18) * stageProgress
+          )
+        );
+        const activation = this.getCrackStageActivation(stage);
+        const stageAlpha = Math.min(1, baseAlpha * activation);
+        if (stageAlpha <= 0) {
+          continue;
+        }
+
+        const stageColorMix = Math.min(1, colorGlowMix * stageProgress);
+
         lines.forEach((line) => {
+          const intensity = Number.isFinite(line.intensity)
+            ? line.intensity
+            : 0.5;
+          const perLineMix = Math.min(1, stageColorMix * (0.6 + intensity * 0.4));
+          const lineColor = this.mixColor(
+            baseCrackColor,
+            glowColor,
+            perLineMix
+          );
+          const widthScale = 1 + widthGrowth * stageProgress;
+          const width = Math.max(0.35, (line.width || 1) * widthScale);
+          const lineAlpha = Math.min(
+            1,
+            stageAlpha * (0.75 + intensity * 0.35)
+          );
+
+          ctx.strokeStyle = this.withAlpha(lineColor, lineAlpha);
+          ctx.lineWidth = width;
           ctx.beginPath();
           ctx.moveTo(line.x1, line.y1);
           ctx.lineTo(line.x2, line.y2);
-          ctx.lineWidth = line.width;
           ctx.stroke();
         });
       }
+
+      ctx.restore();
     }
 
     ctx.restore();
@@ -735,6 +1186,11 @@ class Asteroid {
       );
 
     return `rgb(${mix('r')}, ${mix('g')}, ${mix('b')})`;
+  }
+
+  easeOutCubic(t) {
+    const clamped = Math.max(0, Math.min(1, t));
+    return 1 - (1 - clamped) ** 3;
   }
 
   generateFragments() {

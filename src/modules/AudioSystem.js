@@ -74,6 +74,10 @@ class AudioSystem {
       }
     });
 
+    gameEvents.on('asteroid-crack-stage-changed', (data) => {
+      this.playCrackStressPing(data?.stage, data?.variant);
+    });
+
     gameEvents.on('asteroid-volatile-exploded', () => {
       this.playBigExplosion();
     });
@@ -254,6 +258,58 @@ class AudioSystem {
       osc.start();
       osc.stop(this.context.currentTime + duration);
     });
+  }
+
+  playCrackStressPing(stage = 1, variant = 'common') {
+    if (!Number.isFinite(stage) || stage <= 0) {
+      return;
+    }
+
+    const normalizedStage = Math.max(1, Math.min(3, Number(stage) || 1));
+
+    this.safePlay(() => {
+      const now = this.context.currentTime;
+      const osc = this.context.createOscillator();
+      const filter = this.context.createBiquadFilter();
+      const gain = this.context.createGain();
+
+      osc.type = 'triangle';
+      filter.type = 'highpass';
+
+      const pitchOffset = this.getVariantPitchOffset(variant);
+      const baseFrequency = 520 + normalizedStage * 110 + pitchOffset;
+      const endFrequency = baseFrequency + 180;
+
+      osc.connect(filter);
+      filter.connect(gain);
+      this.connectGainNode(gain);
+
+      filter.frequency.setValueAtTime(320 + normalizedStage * 70, now);
+
+      osc.frequency.setValueAtTime(baseFrequency, now);
+      osc.frequency.linearRampToValueAtTime(endFrequency, now + 0.16);
+
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+      osc.start(now);
+      osc.stop(now + 0.2);
+    });
+  }
+
+  getVariantPitchOffset(variant) {
+    if (!variant) {
+      return 0;
+    }
+
+    const name = String(variant);
+    let hash = 0;
+    for (let i = 0; i < name.length; i += 1) {
+      hash = (hash + name.charCodeAt(i) * 17) % 512;
+    }
+
+    const normalized = hash / 512 - 0.5;
+    return normalized * 70;
   }
 
   playBigExplosion() {
