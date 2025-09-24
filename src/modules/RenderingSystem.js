@@ -138,26 +138,467 @@ function computeOutlineRadius(points) {
   }, 0);
 }
 
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function randomRange(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+const SPACE_SKY_LAYERS = [
+  { density: 220, vx: -0.006, vy: -0.002, size: 0.9, glow: 0.35 },
+  { density: 380, vx: -0.01, vy: -0.004, size: 1.2, glow: 0.48 },
+  { density: 490, vx: -0.016, vy: -0.007, size: 1.5, glow: 0.62 },
+  { density: 60, vx: -0.015, vy: -0.006, size: 2.2, glow: 0.9 },
+];
+
+const SPACE_SKY_PRESETS = {
+  minimal: {
+    densityK: 0.5,
+    twinkleHz: 0.8,
+    twinkleAmp: 0.45,
+    tint: { r: 230, g: 238, b: 255 },
+    drift: { vx: 0, vy: 0 },
+  },
+  cinematic: {
+    densityK: 0.8,
+    twinkleHz: 0.9,
+    twinkleAmp: 0.55,
+    tint: { r: 225, g: 236, b: 255 },
+    drift: { vx: -0.002, vy: -0.001 },
+  },
+  deep_space: {
+    densityK: 0.6,
+    twinkleHz: 0.7,
+    twinkleAmp: 0.5,
+    tint: { r: 210, g: 228, b: 255 },
+    drift: { vx: -0.004, vy: -0.001 },
+  },
+  warp_hint: {
+    densityK: 1,
+    twinkleHz: 1.1,
+    twinkleAmp: 0.6,
+    tint: { r: 235, g: 240, b: 255 },
+    drift: { vx: -0.03, vy: -0.012 },
+  },
+};
+
+function resolveDevicePixelRatio() {
+  if (typeof window === 'undefined') {
+    return 1;
+  }
+
+  const ratio = Number(window.devicePixelRatio) || 1;
+  return Math.max(1, Math.min(2, ratio));
+}
+
+function resolveTimestamp() {
+  if (
+    typeof performance !== 'undefined' &&
+    typeof performance.now === 'function'
+  ) {
+    return performance.now();
+  }
+
+  return Date.now();
+}
+
+function normalizeTintValue(value, fallback) {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return clamp(Math.round(value), 0, 255);
+}
+
+function extractVelocityComponent(velocity, primaryKey, fallbackKey) {
+  if (!velocity) {
+    return 0;
+  }
+
+  if (Number.isFinite(velocity[primaryKey])) {
+    return velocity[primaryKey];
+  }
+
+  if (Number.isFinite(velocity[fallbackKey])) {
+    return velocity[fallbackKey];
+  }
+
+  return 0;
+}
+
+class SpaceSkyBackground {
+  constructor() {
+    this.dpr = resolveDevicePixelRatio();
+    this.layers = SPACE_SKY_LAYERS.map((layer) => ({
+      density: layer.density,
+      vx: layer.vx,
+      vy: layer.vy,
+      size: layer.size,
+      glow: layer.glow,
+      stars: [],
+    }));
+
+    this.width = 0;
+    this.height = 0;
+    this.areaMP = 0;
+
+    this.densityK = 1;
+    this.twinkleHz = 0.9;
+    this.twinkleAmp = 0.55;
+    this.tint = { r: 225, g: 236, b: 255 };
+    this.parallax = {
+      enabled: true,
+      factor: 0.06,
+      tilt: 0.045,
+      maxTilt: 0.06,
+      speedForMaxTilt: CONSTANTS.SHIP_MAX_SPEED || 220,
+    };
+    this.baseDrift = { vx: 0, vy: 0 };
+
+    this.velocityProvider = null;
+    this.lastTime = resolveTimestamp();
+    this.currentPreset = null;
+
+    this.applyPreset('cinematic');
+  }
+
+  bindVelocityProvider(fn) {
+    this.velocityProvider = typeof fn === 'function' ? fn : null;
+  }
+
+  setParallax(factor, tilt, maxTilt, speedForMaxTilt) {
+    if (Number.isFinite(factor)) {
+      this.parallax.factor = factor;
+    }
+
+    if (Number.isFinite(tilt)) {
+      this.parallax.tilt = Math.abs(tilt);
+    }
+
+    if (Number.isFinite(maxTilt)) {
+      this.parallax.maxTilt = Math.abs(maxTilt);
+    }
+
+    if (Number.isFinite(speedForMaxTilt) && speedForMaxTilt > EPSILON) {
+      this.parallax.speedForMaxTilt = speedForMaxTilt;
+    }
+
+    if (this.parallax.tilt > this.parallax.maxTilt) {
+      this.parallax.tilt = this.parallax.maxTilt;
+    }
+  }
+
+  enableParallax(enabled) {
+    this.parallax.enabled = Boolean(enabled);
+  }
+
+  resize(width, height) {
+    const newWidth = Math.max(1, Math.floor(width));
+    const newHeight = Math.max(1, Math.floor(height));
+
+    if (newWidth === this.width && newHeight === this.height) {
+      return;
+    }
+
+    const previousWidth = this.width || newWidth;
+    const previousHeight = this.height || newHeight;
+    const scaleX = previousWidth > 0 ? newWidth / previousWidth : 1;
+    const scaleY = previousHeight > 0 ? newHeight / previousHeight : 1;
+
+    this.width = newWidth;
+    this.height = newHeight;
+    this.areaMP = (this.width * this.height) / 1_000_000;
+
+    if (previousWidth === 0 || previousHeight === 0) {
+      this.layers.forEach((layer) => {
+        layer.stars.length = 0;
+      });
+    } else {
+      this.layers.forEach((layer) => {
+        layer.stars.forEach((star) => {
+          star.x *= scaleX;
+          star.y *= scaleY;
+        });
+      });
+    }
+
+    this.rebuild();
+  }
+
+  rebuild() {
+    if (!this.width || !this.height) {
+      return;
+    }
+
+    const areaFactor = Math.max(0.6, this.areaMP);
+    this.layers.forEach((layer) => {
+      const target = Math.floor(layer.density * this.densityK * areaFactor);
+      const { stars } = layer;
+
+      if (stars.length < target) {
+        for (let i = stars.length; i < target; i += 1) {
+          stars.push(this.makeStar());
+        }
+      } else if (stars.length > target) {
+        stars.length = target;
+      }
+    });
+  }
+
+  makeStar() {
+    return {
+      x: Math.random() * this.width,
+      y: Math.random() * this.height,
+      phase: Math.random() * Math.PI * 2,
+      jitter: randomRange(0.6, 1.4),
+    };
+  }
+
+  applyPreset(name, overrides = {}) {
+    const preset = SPACE_SKY_PRESETS[name];
+    if (!preset) {
+      return false;
+    }
+
+    this.densityK =
+      Number.isFinite(preset.densityK) && preset.densityK > 0
+        ? preset.densityK
+        : this.densityK;
+    this.twinkleHz = Number.isFinite(preset.twinkleHz)
+      ? Math.max(0, preset.twinkleHz)
+      : this.twinkleHz;
+    this.twinkleAmp = Number.isFinite(preset.twinkleAmp)
+      ? Math.max(0, preset.twinkleAmp)
+      : this.twinkleAmp;
+
+    if (preset.tint) {
+      this.tint = {
+        r: normalizeTintValue(preset.tint.r, this.tint.r),
+        g: normalizeTintValue(preset.tint.g, this.tint.g),
+        b: normalizeTintValue(preset.tint.b, this.tint.b),
+      };
+    }
+
+    if (preset.drift) {
+      this.baseDrift = {
+        vx: Number.isFinite(preset.drift.vx) ? preset.drift.vx : 0,
+        vy: Number.isFinite(preset.drift.vy) ? preset.drift.vy : 0,
+      };
+    } else {
+      this.baseDrift = { vx: 0, vy: 0 };
+    }
+
+    if (overrides.tint) {
+      this.tint = {
+        r: normalizeTintValue(overrides.tint.r, this.tint.r),
+        g: normalizeTintValue(overrides.tint.g, this.tint.g),
+        b: normalizeTintValue(overrides.tint.b, this.tint.b),
+      };
+    }
+
+    if (overrides.densityK != null && Number.isFinite(overrides.densityK)) {
+      this.densityK = Math.max(0.2, Math.min(4, overrides.densityK));
+    }
+
+    if (overrides.twinkleHz != null && Number.isFinite(overrides.twinkleHz)) {
+      this.twinkleHz = Math.max(0, overrides.twinkleHz);
+    }
+
+    if (overrides.twinkleAmp != null && Number.isFinite(overrides.twinkleAmp)) {
+      this.twinkleAmp = Math.max(0, overrides.twinkleAmp);
+    }
+
+    if (overrides.drift) {
+      this.baseDrift = {
+        vx: Number.isFinite(overrides.drift.vx)
+          ? overrides.drift.vx
+          : this.baseDrift.vx,
+        vy: Number.isFinite(overrides.drift.vy)
+          ? overrides.drift.vy
+          : this.baseDrift.vy,
+      };
+    }
+
+    this.currentPreset = name;
+    this.rebuild();
+    return true;
+  }
+
+  resolveVelocity(options) {
+    const provided = options?.velocity;
+    if (provided) {
+      return provided;
+    }
+
+    if (typeof this.velocityProvider === 'function') {
+      return this.velocityProvider();
+    }
+
+    return null;
+  }
+
+  detectVisualPreset() {
+    if (typeof document === 'undefined' || !document.body) {
+      return null;
+    }
+
+    const reduced = document.body.classList.contains('particles-reduced');
+    return reduced ? 'minimal' : 'cinematic';
+  }
+
+  render(ctx, options = {}) {
+    if (!ctx) return;
+
+    const canvasWidth = Number.isFinite(options.width)
+      ? options.width
+      : ctx.canvas?.width;
+    const canvasHeight = Number.isFinite(options.height)
+      ? options.height
+      : ctx.canvas?.height;
+
+    if (canvasWidth && canvasHeight) {
+      this.resize(canvasWidth, canvasHeight);
+    }
+
+    const preset = this.detectVisualPreset();
+    if (preset && preset !== this.currentPreset) {
+      this.applyPreset(preset);
+    }
+
+    const now = resolveTimestamp();
+    const delta = now - this.lastTime;
+    const safeDelta = Number.isFinite(delta) ? Math.max(0, delta) : 0;
+    const dt = Math.min(34, safeDelta);
+    this.lastTime = now;
+
+    const velocity = this.resolveVelocity(options);
+    const rawVX = extractVelocityComponent(velocity, 'vx', 'x');
+    const rawVY = extractVelocityComponent(velocity, 'vy', 'y');
+
+    let driftVX = this.baseDrift.vx;
+    let driftVY = this.baseDrift.vy;
+    let tilt = 0;
+
+    if (velocity && this.parallax.enabled) {
+      const vxMs = Number.isFinite(rawVX) ? rawVX / 1000 : 0;
+      const vyMs = Number.isFinite(rawVY) ? rawVY / 1000 : 0;
+
+      driftVX += -vxMs * this.parallax.factor;
+      driftVY += -vyMs * this.parallax.factor;
+
+      const speed = Math.hypot(rawVX, rawVY);
+      if (speed > EPSILON) {
+        const referenceSpeed = Math.max(
+          EPSILON,
+          Number.isFinite(this.parallax.speedForMaxTilt)
+            ? this.parallax.speedForMaxTilt
+            : CONSTANTS.SHIP_MAX_SPEED || speed
+        );
+        const speedRatio = clamp(speed / referenceSpeed, 0, 1);
+        const bankDirection = -rawVX / speed;
+        const desiredTilt = bankDirection * this.parallax.tilt * speedRatio;
+
+        tilt = clamp(
+          desiredTilt,
+          -this.parallax.maxTilt,
+          this.parallax.maxTilt
+        );
+      }
+    }
+
+    ctx.save();
+
+    if (tilt !== 0) {
+      ctx.translate(this.width / 2, this.height / 2);
+      ctx.rotate(tilt);
+      ctx.translate(-this.width / 2, -this.height / 2);
+    }
+
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, this.width, this.height);
+
+    const gradient = ctx.createRadialGradient(
+      this.width / 2,
+      this.height / 2,
+      Math.min(this.width, this.height) * 0.2,
+      this.width / 2,
+      this.height / 2,
+      Math.hypot(this.width, this.height) * 0.55
+    );
+    gradient.addColorStop(0, 'rgba(0,0,0,0)');
+    gradient.addColorStop(1, 'rgba(0,0,0,0.35)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, this.width, this.height);
+
+    const twinkleStep = this.twinkleHz * 2 * Math.PI * (dt / 1000);
+
+    this.layers.forEach((layer) => {
+      const vx = (layer.vx + driftVX) * this.dpr;
+      const vy = (layer.vy + driftVY) * this.dpr;
+
+      layer.stars.forEach((star) => {
+        star.x += vx * dt;
+        star.y += vy * dt;
+
+        if (star.x < 0) star.x += this.width;
+        else if (star.x >= this.width) star.x -= this.width;
+        if (star.y < 0) star.y += this.height;
+        else if (star.y >= this.height) star.y -= this.height;
+
+        star.phase += twinkleStep * star.jitter;
+
+        const twinkle =
+          1 -
+          this.twinkleAmp * 0.5 +
+          Math.sin(star.phase) * (this.twinkleAmp * 0.5);
+        const alpha = Math.min(1, layer.glow * 1.05 * twinkle);
+        const radius = Math.max(
+          0.5,
+          layer.size *
+            (0.9 + 0.2 * Math.sin(star.phase * 0.7)) *
+            star.jitter *
+            this.dpr
+        );
+
+        ctx.fillStyle = `rgba(${this.tint.r}, ${this.tint.g}, ${this.tint.b}, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+      });
+    });
+
+    ctx.restore();
+  }
+}
+
 class RenderingSystem {
   constructor() {
-    this.stars = this.generateStarField();
+    this.spaceSky = new SpaceSkyBackground();
+    this.spaceSky.setParallax(0.06, 0.05, 0.06, CONSTANTS.SHIP_MAX_SPEED);
 
     if (typeof gameServices !== 'undefined') {
+      this.spaceSky.bindVelocityProvider(() => {
+        const player = gameServices.get('player');
+        if (!player) {
+          return null;
+        }
+
+        if (typeof player.getVelocity === 'function') {
+          return player.getVelocity();
+        }
+
+        if (player.velocity) {
+          return { ...player.velocity };
+        }
+
+        return null;
+      });
       gameServices.register('renderer', this);
     }
 
     console.log('[RenderingSystem] Initialized');
-  }
-
-  generateStarField(count = 80) {
-    const stars = [];
-    for (let i = 0; i < count; i++) {
-      const x = (i * 123.456) % CONSTANTS.GAME_WIDTH;
-      const y = (i * 234.567) % CONSTANTS.GAME_HEIGHT;
-      const size = Math.floor(i % 3) + 1;
-      stars.push({ x, y, size });
-    }
-    return stars;
   }
 
   render(ctx) {
@@ -170,8 +611,13 @@ class RenderingSystem {
       effects.applyScreenShake(ctx);
     }
 
-    this.drawBackground(ctx);
-    this.drawStars(ctx);
+    const player = gameServices.get('player');
+    const playerVelocity =
+      typeof player?.getVelocity === 'function'
+        ? player.getVelocity()
+        : player?.velocity || null;
+
+    this.drawBackground(ctx, playerVelocity);
 
     const progression = gameServices.get('progression');
     if (progression && typeof progression.render === 'function') {
@@ -188,7 +634,6 @@ class RenderingSystem {
       enemies.render(ctx);
     }
 
-    const player = gameServices.get('player');
     if (player) {
       this.renderPlayer(ctx, player);
     }
@@ -202,7 +647,16 @@ class RenderingSystem {
     ctx.restore();
   }
 
-  drawBackground(ctx) {
+  drawBackground(ctx, playerVelocity) {
+    if (this.spaceSky) {
+      this.spaceSky.render(ctx, {
+        width: ctx.canvas?.width ?? CONSTANTS.GAME_WIDTH,
+        height: ctx.canvas?.height ?? CONSTANTS.GAME_HEIGHT,
+        velocity: playerVelocity,
+      });
+      return;
+    }
+
     const gradient = ctx.createRadialGradient(
       CONSTANTS.GAME_WIDTH / 2,
       CONSTANTS.GAME_HEIGHT / 2,
@@ -217,13 +671,6 @@ class RenderingSystem {
 
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, CONSTANTS.GAME_WIDTH, CONSTANTS.GAME_HEIGHT);
-  }
-
-  drawStars(ctx) {
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    this.stars.forEach((star) => {
-      ctx.fillRect(star.x, star.y, star.size, star.size);
-    });
   }
 
   drawMagnetismField(ctx, player, progression) {
