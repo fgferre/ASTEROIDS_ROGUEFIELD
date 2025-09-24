@@ -251,8 +251,9 @@ class SpaceSkyBackground {
     this.parallax = {
       enabled: true,
       factor: 0.06,
-      tilt: 0.0009,
+      tilt: 0.045,
       maxTilt: 0.06,
+      speedForMaxTilt: CONSTANTS.SHIP_MAX_SPEED || 220,
     };
     this.baseDrift = { vx: 0, vy: 0 };
 
@@ -267,17 +268,25 @@ class SpaceSkyBackground {
     this.velocityProvider = typeof fn === 'function' ? fn : null;
   }
 
-  setParallax(factor, tilt, maxTilt) {
+  setParallax(factor, tilt, maxTilt, speedForMaxTilt) {
     if (Number.isFinite(factor)) {
       this.parallax.factor = factor;
     }
 
     if (Number.isFinite(tilt)) {
-      this.parallax.tilt = tilt;
+      this.parallax.tilt = Math.abs(tilt);
     }
 
     if (Number.isFinite(maxTilt)) {
       this.parallax.maxTilt = Math.abs(maxTilt);
+    }
+
+    if (Number.isFinite(speedForMaxTilt) && speedForMaxTilt > EPSILON) {
+      this.parallax.speedForMaxTilt = speedForMaxTilt;
+    }
+
+    if (this.parallax.tilt > this.parallax.maxTilt) {
+      this.parallax.tilt = this.parallax.maxTilt;
     }
   }
 
@@ -473,15 +482,30 @@ class SpaceSkyBackground {
     let tilt = 0;
 
     if (velocity && this.parallax.enabled) {
-      const vxMs = rawVX / 1000;
-      const vyMs = rawVY / 1000;
+      const vxMs = Number.isFinite(rawVX) ? rawVX / 1000 : 0;
+      const vyMs = Number.isFinite(rawVY) ? rawVY / 1000 : 0;
+
       driftVX += -vxMs * this.parallax.factor;
       driftVY += -vyMs * this.parallax.factor;
-      tilt = clamp(
-        -vxMs * this.parallax.tilt,
-        -this.parallax.maxTilt,
-        this.parallax.maxTilt
-      );
+
+      const speed = Math.hypot(rawVX, rawVY);
+      if (speed > EPSILON) {
+        const referenceSpeed = Math.max(
+          EPSILON,
+          Number.isFinite(this.parallax.speedForMaxTilt)
+            ? this.parallax.speedForMaxTilt
+            : CONSTANTS.SHIP_MAX_SPEED || speed
+        );
+        const speedRatio = clamp(speed / referenceSpeed, 0, 1);
+        const bankDirection = -rawVX / speed;
+        const desiredTilt = bankDirection * this.parallax.tilt * speedRatio;
+
+        tilt = clamp(
+          desiredTilt,
+          -this.parallax.maxTilt,
+          this.parallax.maxTilt
+        );
+      }
     }
 
     ctx.save();
@@ -552,7 +576,7 @@ class SpaceSkyBackground {
 class RenderingSystem {
   constructor() {
     this.spaceSky = new SpaceSkyBackground();
-    this.spaceSky.setParallax(0.06, 0.0009, 0.06);
+    this.spaceSky.setParallax(0.06, 0.05, 0.06, CONSTANTS.SHIP_MAX_SPEED);
 
     if (typeof gameServices !== 'undefined') {
       this.spaceSky.bindVelocityProvider(() => {
