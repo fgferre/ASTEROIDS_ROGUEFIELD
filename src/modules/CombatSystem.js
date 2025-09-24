@@ -17,20 +17,96 @@ class CombatSystem {
     this.bulletLifetime = 1.8;
     this.trailLength = CONSTANTS.TRAIL_LENGTH;
 
+    // === CACHES DE SERVIÇOS ===
+    this.cachedPlayer = null;
+    this.cachedEnemies = null;
+    this.cachedPhysics = null;
+
     // Registrar no ServiceLocator
     if (typeof gameServices !== 'undefined') {
       gameServices.register('combat', this);
     }
 
+    this.setupEventListeners();
+    this.resolveCachedServices(true);
+
     console.log('[CombatSystem] Initialized');
+  }
+
+  setupEventListeners() {
+    if (typeof gameEvents === 'undefined') {
+      return;
+    }
+
+    gameEvents.on('player-reset', () => {
+      this.resolveCachedServices(true);
+    });
+
+    gameEvents.on('progression-reset', () => {
+      this.resolveCachedServices(true);
+    });
+
+    gameEvents.on('physics-reset', () => {
+      this.resolveCachedServices(true);
+    });
+  }
+
+  resolveCachedServices(force = false) {
+    if (typeof gameServices === 'undefined') {
+      return;
+    }
+
+    if (force || !this.cachedPlayer) {
+      if (
+        typeof gameServices.has === 'function' &&
+        gameServices.has('player')
+      ) {
+        this.cachedPlayer = gameServices.get('player');
+      } else {
+        this.cachedPlayer = null;
+      }
+    }
+
+    if (force || !this.cachedEnemies) {
+      if (
+        typeof gameServices.has === 'function' &&
+        gameServices.has('enemies')
+      ) {
+        this.cachedEnemies = gameServices.get('enemies');
+      } else {
+        this.cachedEnemies = null;
+      }
+    }
+
+    if (force || !this.cachedPhysics) {
+      if (
+        typeof gameServices.has === 'function' &&
+        gameServices.has('physics')
+      ) {
+        this.cachedPhysics = gameServices.get('physics');
+      } else {
+        this.cachedPhysics = null;
+      }
+    }
+  }
+
+  getCachedPlayer() {
+    if (!this.cachedPlayer) {
+      this.resolveCachedServices();
+    }
+    return this.cachedPlayer;
   }
 
   // === UPDATE PRINCIPAL ===
   update(deltaTime) {
+    this.resolveCachedServices();
     this.updateTargeting(deltaTime);
 
-    const player = gameServices.get('player');
-    const playerStats = player ? player.getStats() : null;
+    const player = this.cachedPlayer;
+    const playerStats =
+      player && typeof player.getStats === 'function'
+        ? player.getStats()
+        : null;
 
     if (playerStats) {
       this.handleShooting(deltaTime, playerStats);
@@ -38,8 +114,21 @@ class CombatSystem {
 
     this.updateBullets(deltaTime);
 
-    const enemies = gameServices.get('enemies');
-    if (enemies) {
+    const enemies = this.cachedEnemies;
+    const physics = this.cachedPhysics;
+
+    if (
+      physics &&
+      enemies &&
+      typeof physics.forEachBulletCollision === 'function'
+    ) {
+      physics.forEachBulletCollision(this.bullets, (bullet, asteroid) => {
+        if (!asteroid || bullet.hit) {
+          return;
+        }
+        this.processBulletHit(bullet, asteroid, enemies);
+      });
+    } else if (enemies) {
       this.checkBulletCollisions(enemies);
     }
   }
@@ -63,17 +152,30 @@ class CombatSystem {
   }
 
   findBestTarget() {
-    const player = gameServices.get('player');
-    if (!player) return;
+    const player = this.getCachedPlayer();
+    if (!player || typeof player.getPosition !== 'function') {
+      return;
+    }
 
     const playerPos = player.getPosition();
+    if (!playerPos) {
+      return;
+    }
     let bestTarget = null;
     let closestDistance = Infinity;
 
-    const enemies = gameServices.get('enemies');
-    if (!enemies) return;
-    enemies.getAsteroids().forEach((enemy) => {
-      if (enemy.destroyed) return;
+    const enemies = this.cachedEnemies;
+    if (!enemies || typeof enemies.getAsteroids !== 'function') {
+      return;
+    }
+
+    const asteroids = enemies.getAsteroids();
+    for (let i = 0; i < asteroids.length; i += 1) {
+      const enemy = asteroids[i];
+      if (!enemy || enemy.destroyed) {
+        continue;
+      }
+
       const dx = enemy.x - playerPos.x;
       const dy = enemy.y - playerPos.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
@@ -82,7 +184,7 @@ class CombatSystem {
         closestDistance = distance;
         bestTarget = enemy;
       }
-    });
+    }
 
     this.currentTarget = bestTarget;
   }
@@ -90,8 +192,10 @@ class CombatSystem {
   isValidTarget(target) {
     if (!target || target.destroyed) return false;
 
-    const player = gameServices.get('player');
-    if (!player) return false;
+    const player = this.getCachedPlayer();
+    if (!player || typeof player.getPosition !== 'function') {
+      return false;
+    }
 
     const playerPos = player.getPosition();
     const dx = target.x - playerPos.x;
@@ -107,7 +211,7 @@ class CombatSystem {
 
     if (!this.canShoot()) return;
 
-    const player = gameServices.get('player');
+    const player = this.getCachedPlayer();
     if (!player) return;
 
     const playerPos = player.getPosition();
@@ -263,29 +367,39 @@ class CombatSystem {
         const distance = Math.sqrt(dx * dx + dy * dy);
 
         if (distance < CONSTANTS.BULLET_SIZE + enemy.radius) {
-          bullet.hit = true;
-
-          const damageResult = this.applyDamageToEnemy(
-            enemiesSystem,
-            enemy,
-            bullet.damage
-          );
-
-          if (typeof gameEvents !== 'undefined') {
-            gameEvents.emit('bullet-hit', {
-              bullet: bullet,
-              enemy: enemy,
-              position: { x: bullet.x, y: bullet.y },
-              damage: bullet.damage,
-              killed: damageResult.killed,
-              remainingHealth: damageResult.remainingHealth,
-            });
-          }
-
+          this.processBulletHit(bullet, enemy, enemiesSystem);
           break;
         }
       }
     }
+  }
+
+  processBulletHit(bullet, enemy, enemiesSystem) {
+    if (!bullet || !enemy || bullet.hit) {
+      return;
+    }
+
+    bullet.hit = true;
+
+    const damageResult = enemiesSystem
+      ? this.applyDamageToEnemy(enemiesSystem, enemy, bullet.damage)
+      : {
+          killed: Boolean(enemy.destroyed),
+          remainingHealth: Math.max(0, enemy.health ?? 0),
+        };
+
+    if (typeof gameEvents !== 'undefined') {
+      gameEvents.emit('bullet-hit', {
+        bullet: bullet,
+        enemy: enemy,
+        position: { x: bullet.x, y: bullet.y },
+        damage: bullet.damage,
+        killed: damageResult.killed,
+        remainingHealth: damageResult.remainingHealth,
+      });
+    }
+
+    return damageResult;
   }
 
   applyDamageToEnemy(enemiesSystem, enemy, damage) {
@@ -378,7 +492,7 @@ class CombatSystem {
       ctx.stroke();
       ctx.restore();
 
-      const player = gameServices.get('player');
+      const player = this.getCachedPlayer();
       if (player) {
         ctx.save();
         ctx.strokeStyle = 'rgba(255, 255, 0, 0.3)';
@@ -406,6 +520,7 @@ class CombatSystem {
     this.bullets = [];
     this.currentTarget = null;
     this.lastShotTime = 0;
+    this.resolveCachedServices(true);
     console.log('[CombatSystem] Reset');
   }
 

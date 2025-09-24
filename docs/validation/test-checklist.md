@@ -53,4 +53,10 @@ Este documento orienta a execução de testes manuais sempre que fluxos de inter
 
 - [x] Estatísticas finais mantêm consistência com os dados emitidos em `player-died` (level, kills, ondas, tempo).
 
+## Progressão e Performance
+
+- [ ] Ganho de XP em cadeia (coletar múltiplos orbes grandes) mantém o excedente após subir mais de um nível e dispara os eventos `experience-changed` e `player-leveled-up` na ordem correta.
+- [ ] Stress test com 100+ orbes ativos mantém FPS estável após o caching de sprites/gradientes do XPOrbSystem (sem quedas abruptas nem GC visível a cada frame).
+- [ ] Stress test com ondas de 25 asteroides e fragmentações em sequência mantém a detecção de colisões responsiva usando o PhysicsSystem (sem projéteis atravessando inimigos ou congelamentos).
+
 > Sempre que um cenário acima for impactado, execute a validação correspondente e atualize este checklist com novos casos quando necessário.
