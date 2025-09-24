@@ -6,6 +6,7 @@ class PhysicsSystem {
     this.maxAsteroidRadius = this.computeMaxAsteroidRadius();
     this.activeAsteroids = new Set();
     this.asteroidIndex = new Map();
+    this.indexDirty = false;
     this.cachedEnemies = null;
     this.bootstrapCompleted = false;
 
@@ -112,7 +113,10 @@ class PhysicsSystem {
       return;
     }
 
-    this.activeAsteroids.add(asteroid);
+    if (!this.activeAsteroids.has(asteroid)) {
+      this.activeAsteroids.add(asteroid);
+      this.indexDirty = true;
+    }
   }
 
   unregisterAsteroid(asteroid) {
@@ -121,7 +125,7 @@ class PhysicsSystem {
     }
 
     if (this.activeAsteroids.delete(asteroid)) {
-      // Clean removal triggers rebuild on next update
+      this.indexDirty = true;
     }
   }
 
@@ -144,12 +148,31 @@ class PhysicsSystem {
     toRemove.forEach((asteroid) => {
       this.activeAsteroids.delete(asteroid);
     });
+
+    this.indexDirty = true;
+  }
+
+  ensureSpatialIndex() {
+    if (!this.indexDirty) {
+      return;
+    }
+
+    if (!this.activeAsteroids.size) {
+      if (this.asteroidIndex.size) {
+        this.asteroidIndex.clear();
+      }
+      this.indexDirty = false;
+      return;
+    }
+
+    this.rebuildSpatialIndex();
   }
 
   rebuildSpatialIndex() {
     this.asteroidIndex.clear();
 
     if (!this.activeAsteroids.size) {
+      this.indexDirty = false;
       return;
     }
 
@@ -170,6 +193,8 @@ class PhysicsSystem {
       }
       bucket.push(asteroid);
     });
+
+    this.indexDirty = false;
   }
 
   update() {
@@ -180,16 +205,20 @@ class PhysicsSystem {
       if (this.asteroidIndex.size) {
         this.asteroidIndex.clear();
       }
+      this.indexDirty = false;
       return;
     }
 
-    this.rebuildSpatialIndex();
+    this.indexDirty = true;
+    this.ensureSpatialIndex();
   }
 
   getNearbyAsteroids(x, y, radius) {
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
       return [];
     }
+
+    this.ensureSpatialIndex();
 
     const searchRadius = Math.max(radius, this.maxAsteroidRadius);
     const cellRange = Math.max(1, Math.ceil(searchRadius / this.cellSize));
@@ -239,6 +268,8 @@ class PhysicsSystem {
       return;
     }
 
+    this.ensureSpatialIndex();
+
     if (!this.asteroidIndex.size) {
       return;
     }
@@ -282,6 +313,7 @@ class PhysicsSystem {
   reset() {
     this.activeAsteroids.clear();
     this.asteroidIndex.clear();
+    this.indexDirty = false;
     this.bootstrapCompleted = false;
     this.resolveCachedServices(true);
 
@@ -295,6 +327,7 @@ class PhysicsSystem {
   destroy() {
     this.activeAsteroids.clear();
     this.asteroidIndex.clear();
+    this.indexDirty = false;
     this.cachedEnemies = null;
     this.bootstrapCompleted = false;
     console.log('[PhysicsSystem] Destroyed');
