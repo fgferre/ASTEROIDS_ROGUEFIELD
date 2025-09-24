@@ -1076,8 +1076,8 @@ class Asteroid {
     if (!behavior) return;
 
     const player =
-      typeof gameServices !== 'undefined' && gameServices.has('player')
-        ? gameServices.get('player')
+      this.system && typeof this.system.getCachedPlayer === 'function'
+        ? this.system.getCachedPlayer()
         : null;
 
     if (!player || !player.position) {
@@ -1681,6 +1681,11 @@ class EnemySystem {
     this.sessionStats = this.createInitialSessionStats();
     this.sessionActive = false;
     this.lastWaveBroadcast = null;
+    this.cachedPlayer = null;
+    this.cachedWorld = null;
+    this.cachedProgression = null;
+    this.activeAsteroidCache = [];
+    this.activeAsteroidCacheDirty = true;
 
     // Registrar no ServiceLocator
     if (typeof gameServices !== 'undefined') {
@@ -1688,6 +1693,7 @@ class EnemySystem {
     }
 
     this.setupEventListeners();
+    this.resolveCachedServices(true);
 
     this.emitWaveStateUpdate(true);
 
@@ -1700,6 +1706,110 @@ class EnemySystem {
     gameEvents.on('shield-shockwave', (data) => {
       this.handleShockwave(data);
     });
+
+    gameEvents.on('player-reset', () => {
+      this.resolveCachedServices(true);
+    });
+
+    gameEvents.on('progression-reset', () => {
+      this.resolveCachedServices(true);
+    });
+
+    gameEvents.on('world-reset', () => {
+      this.resolveCachedServices(true);
+    });
+  }
+
+  resolveCachedServices(force = false) {
+    if (typeof gameServices === 'undefined') {
+      return;
+    }
+
+    if (force || !this.cachedPlayer) {
+      if (typeof gameServices.has === 'function' && gameServices.has('player')) {
+        this.cachedPlayer = gameServices.get('player');
+      } else {
+        this.cachedPlayer = null;
+      }
+    }
+
+    if (force || !this.cachedWorld) {
+      if (typeof gameServices.has === 'function' && gameServices.has('world')) {
+        this.cachedWorld = gameServices.get('world');
+      } else {
+        this.cachedWorld = null;
+      }
+    }
+
+    if (force || !this.cachedProgression) {
+      if (
+        typeof gameServices.has === 'function' &&
+        gameServices.has('progression')
+      ) {
+        this.cachedProgression = gameServices.get('progression');
+      } else {
+        this.cachedProgression = null;
+      }
+    }
+  }
+
+  getCachedPlayer() {
+    if (!this.cachedPlayer) {
+      this.resolveCachedServices();
+    }
+    return this.cachedPlayer;
+  }
+
+  getCachedWorld() {
+    if (!this.cachedWorld) {
+      this.resolveCachedServices();
+    }
+    return this.cachedWorld;
+  }
+
+  getCachedProgression() {
+    if (!this.cachedProgression) {
+      this.resolveCachedServices();
+    }
+    return this.cachedProgression;
+  }
+
+  invalidateActiveAsteroidCache() {
+    this.activeAsteroidCacheDirty = true;
+  }
+
+  rebuildActiveAsteroidCache() {
+    if (!this.activeAsteroidCacheDirty) {
+      return;
+    }
+
+    if (!Array.isArray(this.activeAsteroidCache)) {
+      this.activeAsteroidCache = [];
+    }
+
+    this.activeAsteroidCache.length = 0;
+
+    for (let i = 0; i < this.asteroids.length; i += 1) {
+      const asteroid = this.asteroids[i];
+      if (asteroid && !asteroid.destroyed) {
+        this.activeAsteroidCache.push(asteroid);
+      }
+    }
+
+    this.activeAsteroidCacheDirty = false;
+  }
+
+  forEachActiveAsteroid(callback) {
+    if (typeof callback !== 'function') {
+      return;
+    }
+
+    for (let i = 0; i < this.asteroids.length; i += 1) {
+      const asteroid = this.asteroids[i];
+      if (asteroid && !asteroid.destroyed) {
+        callback(asteroid);
+      }
+    }
   }
 
   createInitialWaveState() {
@@ -1799,6 +1909,8 @@ class EnemySystem {
       return;
     }
 
+    this.resolveCachedServices();
+
     this.sessionStats.timeElapsed += deltaTime;
 
     this.updateAsteroids(deltaTime);
@@ -1819,7 +1931,7 @@ class EnemySystem {
 
       const allAsteroidsKilled =
         wave.asteroidsKilled >= wave.totalAsteroids &&
-        this.getAsteroids().length === 0;
+        this.getAsteroidCount() === 0;
 
       if (wave.timeRemaining <= 0 || allAsteroidsKilled) {
         this.completeCurrentWave();
@@ -1926,7 +2038,7 @@ class EnemySystem {
 
     return (
       wave.asteroidsSpawned < wave.totalAsteroids &&
-      this.getAsteroids().length < CONSTANTS.MAX_ASTEROIDS_ON_SCREEN
+      this.getAsteroidCount() < CONSTANTS.MAX_ASTEROIDS_ON_SCREEN
     );
   }
 
@@ -1978,6 +2090,7 @@ class EnemySystem {
     });
 
     this.asteroids.push(asteroid);
+    this.invalidateActiveAsteroidCache();
 
     if (this.waveState && this.waveState.isActive) {
       this.waveState.asteroidsSpawned += 1;
@@ -2030,6 +2143,7 @@ class EnemySystem {
     const createFragments = options.createFragments !== false;
 
     asteroid.destroyed = true;
+    this.invalidateActiveAsteroidCache();
 
     const fragmentDescriptors = createFragments
       ? asteroid.generateFragments()
@@ -2092,7 +2206,7 @@ class EnemySystem {
     if (this.waveState && this.waveState.isActive) {
       const allAsteroidsKilled =
         this.waveState.asteroidsKilled >= this.waveState.totalAsteroids &&
-        this.getAsteroids().length === 0;
+        this.getAsteroidCount() === 0;
 
       if (allAsteroidsKilled && this.waveState.timeRemaining > 0) {
         this.completeCurrentWave();
@@ -2265,25 +2379,20 @@ class EnemySystem {
 
     let shouldDamagePlayer = false;
 
+    const player = this.getCachedPlayer();
+    const playerPos = player?.position;
+
     if (
-      typeof gameServices !== 'undefined' &&
-      typeof gameServices.has === 'function' &&
-      gameServices.has('player')
+      player &&
+      playerPos &&
+      Number.isFinite(playerPos.x) &&
+      Number.isFinite(playerPos.y)
     ) {
-      const player = gameServices.get('player');
-      const playerPos = player?.position;
+      const playerDx = playerPos.x - asteroid.x;
+      const playerDy = playerPos.y - asteroid.y;
+      const playerDistanceSq = playerDx * playerDx + playerDy * playerDy;
 
-      if (
-        playerPos &&
-        Number.isFinite(playerPos.x) &&
-        Number.isFinite(playerPos.y)
-      ) {
-        const playerDx = playerPos.x - asteroid.x;
-        const playerDy = playerPos.y - asteroid.y;
-        const playerDistanceSq = playerDx * playerDx + playerDy * playerDy;
-
-        shouldDamagePlayer = playerDistanceSq <= radiusSq;
-      }
+      shouldDamagePlayer = playerDistanceSq <= radiusSq;
     }
 
     if (shouldDamagePlayer) {
@@ -2318,11 +2427,7 @@ class EnemySystem {
   }
 
   applyDirectDamageToPlayer(amount, context = {}) {
-    if (typeof gameServices === 'undefined' || !gameServices.has('player')) {
-      return { applied: false };
-    }
-
-    const player = gameServices.get('player');
+    const player = this.getCachedPlayer();
     if (!player || typeof player.takeDamage !== 'function') {
       return { applied: false };
     }
@@ -2402,8 +2507,8 @@ class EnemySystem {
       });
     }
 
-    if (remaining <= 0 && gameServices.has('world')) {
-      const world = gameServices.get('world');
+    if (remaining <= 0) {
+      const world = this.getCachedWorld();
       if (world && typeof world.handlePlayerDeath === 'function') {
         if (world.playerAlive !== false) {
           world.handlePlayerDeath();
@@ -2417,6 +2522,7 @@ class EnemySystem {
   cleanupDestroyed() {
     const countBefore = this.asteroids.length;
     this.asteroids = this.asteroids.filter((asteroid) => !asteroid.destroyed);
+    this.invalidateActiveAsteroidCache();
 
     if (this.asteroids.length !== countBefore) {
       // Debug
@@ -2426,7 +2532,8 @@ class EnemySystem {
 
   // === GETTERS PÚBLICOS ===
   getAsteroids() {
-    return this.asteroids.filter((asteroid) => !asteroid.destroyed);
+    this.rebuildActiveAsteroidCache();
+    return this.activeAsteroidCache;
   }
 
   getAllAsteroids() {
@@ -2434,7 +2541,8 @@ class EnemySystem {
   }
 
   getAsteroidCount() {
-    return this.asteroids.filter((asteroid) => !asteroid.destroyed).length;
+    this.rebuildActiveAsteroidCache();
+    return this.activeAsteroidCache.length;
   }
 
   render(ctx) {
@@ -2469,11 +2577,14 @@ class EnemySystem {
   // === RESET E CLEANUP ===
   reset() {
     this.asteroids = [];
+    this.invalidateActiveAsteroidCache();
     this.spawnTimer = 0;
     this.waveState = this.createInitialWaveState();
     this.sessionStats = this.createInitialSessionStats();
     this.sessionActive = true;
     this.lastWaveBroadcast = null;
+
+    this.resolveCachedServices(true);
 
     this.spawnInitialAsteroids(4);
     this.emitWaveStateUpdate(true);
@@ -2483,6 +2594,11 @@ class EnemySystem {
   destroy() {
     this.asteroids = [];
     this.sessionActive = false;
+    this.cachedPlayer = null;
+    this.cachedWorld = null;
+    this.cachedProgression = null;
+    this.activeAsteroidCache = [];
+    this.activeAsteroidCacheDirty = true;
     console.log('[EnemySystem] Destroyed');
   }
 
@@ -2546,14 +2662,8 @@ class EnemySystem {
   }
 
   grantWaveRewards() {
-    const progression =
-      typeof gameServices !== 'undefined' && gameServices.has('progression')
-        ? gameServices.get('progression')
-        : null;
-    const player =
-      typeof gameServices !== 'undefined' && gameServices.has('player')
-        ? gameServices.get('player')
-        : null;
+    const progression = this.getCachedProgression();
+    const player = this.getCachedPlayer();
 
     if (!progression || !player) return;
 
