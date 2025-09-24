@@ -578,9 +578,31 @@ class RenderingSystem {
     this.spaceSky = new SpaceSkyBackground();
     this.spaceSky.setParallax(0.06, 0.05, 0.06, CONSTANTS.SHIP_MAX_SPEED);
 
+    this.cachedPlayer = null;
+    this.cachedProgression = null;
+    this.cachedXPOrbs = null;
+    this.cachedEffects = null;
+    this.cachedCombat = null;
+    this.cachedEnemies = null;
+
+    this.shieldVisualCache = {
+      signature: '',
+      path: null,
+      radius: CONSTANTS.SHIP_SIZE,
+      padding: 0,
+    };
+    this.shieldGradientCache = {
+      radius: 0,
+      ratio: 0,
+      canvas: null,
+      context: null,
+      size: 0,
+    };
+
     if (typeof gameServices !== 'undefined') {
       this.spaceSky.bindVelocityProvider(() => {
-        const player = gameServices.get('player');
+        this.resolveCachedServices();
+        const player = this.cachedPlayer;
         if (!player) {
           return null;
         }
@@ -601,17 +623,55 @@ class RenderingSystem {
     console.log('[RenderingSystem] Initialized');
   }
 
+  resolveCachedServices(force = false) {
+    if (typeof gameServices === 'undefined') {
+      return;
+    }
+
+    const fetch = (name) => {
+      if (typeof gameServices.has === 'function' && !gameServices.has(name)) {
+        return null;
+      }
+      try {
+        return gameServices.get(name);
+      } catch (error) {
+        return null;
+      }
+    };
+
+    if (force || !this.cachedPlayer) {
+      this.cachedPlayer = fetch('player');
+    }
+    if (force || !this.cachedProgression) {
+      this.cachedProgression = fetch('progression');
+    }
+    if (force || !this.cachedXPOrbs) {
+      this.cachedXPOrbs = fetch('xp-orbs');
+    }
+    if (force || !this.cachedEffects) {
+      this.cachedEffects = fetch('effects');
+    }
+    if (force || !this.cachedCombat) {
+      this.cachedCombat = fetch('combat');
+    }
+    if (force || !this.cachedEnemies) {
+      this.cachedEnemies = fetch('enemies');
+    }
+  }
+
   render(ctx) {
     if (!ctx) return;
 
     ctx.save();
 
-    const effects = gameServices.get('effects');
+    this.resolveCachedServices();
+
+    const effects = this.cachedEffects;
     if (effects && typeof effects.applyScreenShake === 'function') {
       effects.applyScreenShake(ctx);
     }
 
-    const player = gameServices.get('player');
+    const player = this.cachedPlayer;
     const playerVelocity =
       typeof player?.getVelocity === 'function'
         ? player.getVelocity()
@@ -619,17 +679,17 @@ class RenderingSystem {
 
     this.drawBackground(ctx, playerVelocity);
 
-    const progression = gameServices.get('progression');
-    if (progression && typeof progression.render === 'function') {
-      progression.render(ctx);
+    const xpOrbs = this.cachedXPOrbs;
+    if (xpOrbs && typeof xpOrbs.render === 'function') {
+      xpOrbs.render(ctx);
     }
 
-    const combat = gameServices.get('combat');
+    const combat = this.cachedCombat;
     if (combat && typeof combat.render === 'function') {
       combat.render(ctx);
     }
 
-    const enemies = gameServices.get('enemies');
+    const enemies = this.cachedEnemies;
     if (enemies && typeof enemies.render === 'function') {
       enemies.render(ctx);
     }
@@ -638,7 +698,7 @@ class RenderingSystem {
       this.renderPlayer(ctx, player);
     }
 
-    this.drawMagnetismField(ctx, player, progression);
+    this.drawMagnetismField(ctx, player, xpOrbs);
 
     if (effects && typeof effects.draw === 'function') {
       effects.draw(ctx);
@@ -673,10 +733,13 @@ class RenderingSystem {
     ctx.fillRect(0, 0, CONSTANTS.GAME_WIDTH, CONSTANTS.GAME_HEIGHT);
   }
 
-  drawMagnetismField(ctx, player, progression) {
-    if (!player || !progression) return;
+  drawMagnetismField(ctx, player, xpOrbs) {
+    if (!player || !xpOrbs) return;
 
-    const orbs = progression.getXPOrbs ? progression.getXPOrbs() : [];
+    const orbs =
+      typeof xpOrbs.getActiveOrbs === 'function'
+        ? xpOrbs.getActiveOrbs()
+        : [];
     const hasActiveOrb = orbs.some((orb) => !orb.collected);
     if (!hasActiveOrb) return;
 
@@ -686,20 +749,20 @@ class RenderingSystem {
         : player.position;
     if (!playerPosition) return;
 
+    const magnetismRadius =
+      (typeof player.getMagnetismRadius === 'function'
+        ? player.getMagnetismRadius()
+        : null) ||
+      (typeof xpOrbs.getMagnetismRadius === 'function'
+        ? xpOrbs.getMagnetismRadius()
+        : CONSTANTS.MAGNETISM_RADIUS);
+
     ctx.save();
     ctx.strokeStyle = 'rgba(0, 221, 255, 0.25)';
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 3]);
     ctx.beginPath();
-    ctx.arc(
-      playerPosition.x,
-      playerPosition.y,
-      player.getMagnetismRadius
-        ? player.getMagnetismRadius()
-        : CONSTANTS.MAGNETISM_RADIUS,
-      0,
-      Math.PI * 2
-    );
+    ctx.arc(playerPosition.x, playerPosition.y, magnetismRadius, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }
@@ -714,17 +777,18 @@ class RenderingSystem {
 
     const tilt = Math.max(
       -MAX_VISUAL_TILT,
-      Math.min(MAX_VISUAL_TILT, angularVelocity * TILT_MULTIPLIER)
+      Math.min(MAX_VISUAL_TILT, angularVelocity * TILT_MULTIPLIER),
     );
 
     const shieldState =
       typeof player.getShieldState === 'function'
         ? player.getShieldState()
         : null;
+
     if (shieldState?.isActive && shieldState.maxHits > 0) {
       const ratio = Math.max(
         0,
-        Math.min(1, shieldState.currentHits / shieldState.maxHits)
+        Math.min(1, shieldState.currentHits / shieldState.maxHits),
       );
       const position =
         typeof player.getPosition === 'function'
@@ -732,115 +796,216 @@ class RenderingSystem {
           : player.position;
 
       if (position) {
-        const hullOutline =
-          typeof player.getHullOutline === 'function'
-            ? player.getHullOutline()
-            : null;
         const padding = Math.max(
           0,
           typeof player.getShieldPadding === 'function'
             ? player.getShieldPadding()
-            : 0
+            : 0,
         );
 
-        const expandedOutline =
-          Array.isArray(hullOutline) && hullOutline.length >= MIN_OUTLINE_POINTS
-            ? expandHullOutline(hullOutline, padding)
-            : null;
+        const visuals = this.resolveShieldVisual(player, padding);
+        const shieldPath = visuals.path;
+        const radiusForGradient = visuals.radius;
 
-        const outlineToUse =
-          expandedOutline && expandedOutline.length >= MIN_OUTLINE_POINTS
-            ? expandedOutline
-            : Array.isArray(hullOutline) &&
-                hullOutline.length >= MIN_OUTLINE_POINTS
-              ? hullOutline.map((vertex) => ({ ...vertex }))
-              : null;
+        if (shieldPath && radiusForGradient > 0) {
+          const angle =
+            typeof player.getAngle === 'function'
+              ? player.getAngle()
+              : player.angle || 0;
 
-        const hullRadius =
-          typeof player.getHullBoundingRadius === 'function'
-            ? player.getHullBoundingRadius()
-            : Math.max(
-                computeOutlineRadius(hullOutline || []),
-                CONSTANTS.SHIP_SIZE
-              );
-        const fallbackRadius =
-          typeof player.getShieldRadius === 'function'
-            ? player.getShieldRadius()
-            : hullRadius + padding;
+          ctx.save();
+          ctx.translate(position.x, position.y);
+          ctx.rotate(angle);
+          if (tilt !== 0) {
+            ctx.transform(1, 0, tilt, 1, 0, 0);
+          }
 
-        const outlineRadius = outlineToUse
-          ? computeOutlineRadius(outlineToUse)
-          : 0;
-        const radiusForGradient = Math.max(outlineRadius, fallbackRadius);
+          const now =
+            typeof performance !== 'undefined' &&
+            typeof performance.now === 'function'
+              ? performance.now()
+              : Date.now();
+          const pulse = 0.6 + 0.4 * Math.sin(now / 180);
 
-        let shieldPath = outlineToUse
-          ? buildPathFromPoints(outlineToUse)
-          : null;
+          const gradientCanvas = this.ensureShieldGradientCanvas(
+            radiusForGradient,
+            ratio,
+          );
 
-        if (!shieldPath) {
-          shieldPath = new Path2D();
-          shieldPath.arc(0, 0, fallbackRadius, 0, Math.PI * 2);
+          ctx.globalCompositeOperation = 'lighter';
+
+          if (gradientCanvas) {
+            const offset = gradientCanvas.width / 2;
+            ctx.drawImage(gradientCanvas, -offset, -offset);
+          } else {
+            const glowGradient = ctx.createRadialGradient(
+              0,
+              0,
+              radiusForGradient * 0.35,
+              0,
+              0,
+              radiusForGradient * 1.25,
+            );
+            glowGradient.addColorStop(
+              0,
+              `rgba(120, 240, 255, ${0.08 + ratio * 0.14})`,
+            );
+            glowGradient.addColorStop(
+              0.55,
+              `rgba(0, 190, 255, ${0.25 + ratio * 0.3})`,
+            );
+            glowGradient.addColorStop(1, 'rgba(0, 150, 255, 0)');
+            ctx.fillStyle = glowGradient;
+            ctx.fill(shieldPath);
+          }
+
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.lineJoin = 'round';
+          ctx.lineCap = 'round';
+          ctx.shadowColor = `rgba(90, 200, 255, ${0.75 + ratio * 0.15})`;
+          ctx.shadowBlur = 10 + ratio * 16 + pulse * 4;
+          ctx.lineWidth = 2.4 + ratio * 2.2 + pulse * 0.35;
+          ctx.strokeStyle = `rgba(160, 245, 255, ${0.52 + ratio * 0.35})`;
+          ctx.stroke(shieldPath);
+
+          ctx.shadowBlur = 0;
+          ctx.lineWidth = 1 + ratio * 1.4;
+          ctx.strokeStyle = `rgba(255, 255, 255, ${0.28 + ratio * 0.3})`;
+          ctx.globalAlpha = 0.9;
+          ctx.stroke(shieldPath);
+          ctx.restore();
         }
-
-        const angle =
-          typeof player.getAngle === 'function'
-            ? player.getAngle()
-            : player.angle || 0;
-
-        ctx.save();
-        ctx.translate(position.x, position.y);
-        ctx.rotate(angle);
-        if (tilt !== 0) {
-          ctx.transform(1, 0, tilt, 1, 0, 0);
-        }
-
-        const now =
-          typeof performance !== 'undefined' &&
-          typeof performance.now === 'function'
-            ? performance.now()
-            : Date.now();
-        const pulse = 0.6 + 0.4 * Math.sin(now / 180);
-
-        const glowGradient = ctx.createRadialGradient(
-          0,
-          0,
-          radiusForGradient * 0.35,
-          0,
-          0,
-          radiusForGradient * 1.25
-        );
-        glowGradient.addColorStop(
-          0,
-          `rgba(120, 240, 255, ${0.08 + ratio * 0.14})`
-        );
-        glowGradient.addColorStop(
-          0.55,
-          `rgba(0, 190, 255, ${0.25 + ratio * 0.3})`
-        );
-        glowGradient.addColorStop(1, 'rgba(0, 150, 255, 0)');
-
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.fillStyle = glowGradient;
-        ctx.fill(shieldPath);
-
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        ctx.shadowColor = `rgba(90, 200, 255, ${0.75 + ratio * 0.15})`;
-        ctx.shadowBlur = 10 + ratio * 16 + pulse * 4;
-        ctx.lineWidth = 2.4 + ratio * 2.2 + pulse * 0.35;
-        ctx.strokeStyle = `rgba(160, 245, 255, ${0.52 + ratio * 0.35})`;
-        ctx.stroke(shieldPath);
-
-        ctx.shadowBlur = 0;
-        ctx.lineWidth = 1 + ratio * 1.4;
-        ctx.strokeStyle = `rgba(255, 255, 255, ${0.28 + ratio * 0.3})`;
-        ctx.globalAlpha = 0.9;
-        ctx.stroke(shieldPath);
-        ctx.restore();
       }
     }
 
     player.render(ctx, { tilt });
+  }
+
+  resolveShieldVisual(player, padding) {
+    const cache = this.shieldVisualCache;
+    const hullOutline =
+      typeof player.getHullOutline === 'function'
+        ? player.getHullOutline()
+        : null;
+
+    let signature = `circle:${padding}`;
+    if (Array.isArray(hullOutline) && hullOutline.length >= MIN_OUTLINE_POINTS) {
+      const keyParts = [padding, hullOutline.length];
+      for (let i = 0; i < Math.min(4, hullOutline.length); i += 1) {
+        const vertex = hullOutline[i] || { x: 0, y: 0 };
+        keyParts.push(Math.round((vertex.x ?? 0) * 100) / 100);
+        keyParts.push(Math.round((vertex.y ?? 0) * 100) / 100);
+      }
+      signature = keyParts.join(':');
+    }
+
+    if (cache.signature !== signature) {
+      const fallbackRadius = this.resolveShieldFallbackRadius(player, padding);
+
+      if (Array.isArray(hullOutline) && hullOutline.length >= MIN_OUTLINE_POINTS) {
+        const expanded = expandHullOutline(hullOutline, padding);
+        const outlineToUse =
+          expanded && expanded.length >= MIN_OUTLINE_POINTS
+            ? expanded
+            : hullOutline.map((vertex) => ({ ...vertex }));
+        const outlinePath = buildPathFromPoints(outlineToUse);
+        const outlineRadius = computeOutlineRadius(outlineToUse);
+        cache.path = outlinePath || null;
+        cache.radius = Math.max(outlineRadius, fallbackRadius);
+      } else {
+        const path = new Path2D();
+        path.arc(0, 0, fallbackRadius, 0, Math.PI * 2);
+        cache.path = path;
+        cache.radius = fallbackRadius;
+      }
+
+      cache.signature = signature;
+      cache.padding = padding;
+    }
+
+    if (!cache.path) {
+      const fallbackRadius = this.resolveShieldFallbackRadius(player, padding);
+      const path = new Path2D();
+      path.arc(0, 0, fallbackRadius, 0, Math.PI * 2);
+      cache.path = path;
+      cache.radius = fallbackRadius;
+    }
+
+    return cache;
+  }
+
+  resolveShieldFallbackRadius(player, padding) {
+    const hullRadius =
+      typeof player.getHullBoundingRadius === 'function'
+        ? player.getHullBoundingRadius()
+        : CONSTANTS.SHIP_SIZE;
+    const fallback =
+      typeof player.getShieldRadius === 'function'
+        ? player.getShieldRadius()
+        : hullRadius + padding;
+    return Math.max(fallback, CONSTANTS.SHIP_SIZE);
+  }
+
+  ensureShieldGradientCanvas(radius, ratio) {
+    const cache = this.shieldGradientCache;
+    const clampedRatio = Math.max(0, Math.min(1, ratio));
+    const roundedRadius = Math.max(1, Math.round(radius));
+
+    if (typeof document === 'undefined') {
+      cache.canvas = null;
+      cache.context = null;
+      cache.radius = roundedRadius;
+      cache.ratio = clampedRatio;
+      cache.size = 0;
+      return null;
+    }
+
+    const needsUpdate =
+      !cache.canvas ||
+      cache.radius !== roundedRadius ||
+      Math.abs(cache.ratio - clampedRatio) > 0.001;
+
+    if (needsUpdate) {
+      const canvas = cache.canvas || document.createElement('canvas');
+      const size = Math.max(1, Math.ceil(roundedRadius * 2.5));
+      if (canvas.width !== size || canvas.height !== size) {
+        canvas.width = size;
+        canvas.height = size;
+      }
+
+      const ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const center = size / 2;
+      const gradient = ctx.createRadialGradient(
+        center,
+        center,
+        roundedRadius * 0.35,
+        center,
+        center,
+        roundedRadius * 1.25,
+      );
+      gradient.addColorStop(
+        0,
+        `rgba(120, 240, 255, ${0.08 + clampedRatio * 0.14})`,
+      );
+      gradient.addColorStop(
+        0.55,
+        `rgba(0, 190, 255, ${0.25 + clampedRatio * 0.3})`,
+      );
+      gradient.addColorStop(1, 'rgba(0, 150, 255, 0)');
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(center, center, roundedRadius * 1.25, 0, Math.PI * 2);
+      ctx.fill();
+
+      cache.canvas = canvas;
+      cache.context = ctx;
+      cache.radius = roundedRadius;
+      cache.ratio = clampedRatio;
+      cache.size = size;
+    }
+
+    return cache.canvas;
   }
 }
 

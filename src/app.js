@@ -3,6 +3,7 @@ import InputSystem from './modules/InputSystem.js';
 import PlayerSystem from './modules/PlayerSystem.js';
 import CombatSystem from './modules/CombatSystem.js';
 import { EnemySystem } from './modules/EnemySystem.js';
+import XPOrbSystem from './modules/XPOrbSystem.js';
 import ProgressionSystem from './modules/ProgressionSystem.js';
 import UISystem from './modules/UISystem.js';
 import EffectsSystem from './modules/EffectsSystem.js';
@@ -70,6 +71,7 @@ function init() {
     new PlayerSystem();
     new CombatSystem();
     new EnemySystem();
+    new XPOrbSystem();
     new ProgressionSystem();
     new UISystem();
     new TutorialSystem();
@@ -204,6 +206,9 @@ function startGame() {
     const progression = gameServices.get('progression');
     if (progression?.reset) progression.reset();
 
+    const xpOrbs = gameServices.get('xp-orbs');
+    if (xpOrbs?.reset) xpOrbs.reset();
+
     const effects = gameServices.get('effects');
     if (effects?.reset) effects.reset();
 
@@ -261,6 +266,7 @@ function updateGame(deltaTime) {
     'player',
     'combat',
     'enemies',
+    'xp-orbs',
     'progression',
     'world',
     'ui',
