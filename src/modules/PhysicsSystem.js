@@ -96,6 +96,14 @@ class PhysicsSystem {
       return;
     }
 
+    if (typeof this.cachedEnemies.forEachActiveAsteroid === 'function') {
+      this.cachedEnemies.forEachActiveAsteroid((asteroid) => {
+        this.registerAsteroid(asteroid);
+      });
+      this.bootstrapCompleted = true;
+      return;
+    }
+
     const asteroids = this.cachedEnemies.getAsteroids();
     if (!Array.isArray(asteroids) || asteroids.length === 0) {
       return;

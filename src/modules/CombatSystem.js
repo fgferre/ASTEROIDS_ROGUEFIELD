@@ -165,15 +165,13 @@ class CombatSystem {
     let closestDistance = Infinity;
 
     const enemies = this.cachedEnemies;
-    if (!enemies || typeof enemies.getAsteroids !== 'function') {
+    if (!enemies) {
       return;
     }
 
-    const asteroids = enemies.getAsteroids();
-    for (let i = 0; i < asteroids.length; i += 1) {
-      const enemy = asteroids[i];
+    const processEnemy = (enemy) => {
       if (!enemy || enemy.destroyed) {
-        continue;
+        return;
       }
 
       const dx = enemy.x - playerPos.x;
@@ -183,6 +181,15 @@ class CombatSystem {
       if (distance < this.targetingRange && distance < closestDistance) {
         closestDistance = distance;
         bestTarget = enemy;
+      }
+    };
+
+    if (typeof enemies.forEachActiveAsteroid === 'function') {
+      enemies.forEachActiveAsteroid(processEnemy);
+    } else if (typeof enemies.getAsteroids === 'function') {
+      const asteroids = enemies.getAsteroids();
+      for (let i = 0; i < asteroids.length; i += 1) {
+        processEnemy(asteroids[i]);
       }
     }
 
@@ -354,13 +361,24 @@ class CombatSystem {
 
   // === DETECÇÃO DE COLISÃO ===
   checkBulletCollisions(enemiesSystem) {
-    const asteroids = enemiesSystem.getAsteroids();
+    const iterateAsteroids = (handler) => {
+      if (typeof enemiesSystem.forEachActiveAsteroid === 'function') {
+        enemiesSystem.forEachActiveAsteroid(handler);
+      } else if (typeof enemiesSystem.getAsteroids === 'function') {
+        const asteroids = enemiesSystem.getAsteroids();
+        for (let i = 0; i < asteroids.length; i += 1) {
+          handler(asteroids[i]);
+        }
+      }
+    };
 
     for (const bullet of this.bullets) {
       if (bullet.hit) continue;
 
-      for (const enemy of asteroids) {
-        if (enemy.destroyed) continue;
+      iterateAsteroids((enemy) => {
+        if (!enemy || enemy.destroyed || bullet.hit) {
+          return;
+        }
 
         const dx = bullet.x - enemy.x;
         const dy = bullet.y - enemy.y;
@@ -368,9 +386,8 @@ class CombatSystem {
 
         if (distance < CONSTANTS.BULLET_SIZE + enemy.radius) {
           this.processBulletHit(bullet, enemy, enemiesSystem);
-          break;
         }
-      }
+      });
     }
   }
 

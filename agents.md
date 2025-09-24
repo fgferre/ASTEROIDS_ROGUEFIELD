@@ -36,6 +36,7 @@ O projeto utiliza uma **Arquitetura Modular baseada em Sistemas**, orquestrada p
 - **Service Locator (`gameServices`):** Um registro central para que sistemas possam acessar outros sistemas sem acoplamento direto (ex: `CombatSystem` acessando `gameServices.get('player')`).
 - **Event Bus (`gameEvents`):** Um barramento de eventos para comunicação desacoplada. Sistemas emitem eventos (`gameEvents.emit('enemy-destroyed', ...)`) e outros sistemas reagem a eles (`gameEvents.on('enemy-destroyed', ...)`), sem se conhecerem diretamente.
 - **Sistemas:** Cada arquivo em `/src/modules` é um sistema que encapsula a lógica e o estado de um domínio específico (Player, Inimigos, UI). Novas funcionalidades devem ser adicionadas ao sistema apropriado.
+- **PhysicsSystem:** Centraliza a malha espacial de asteroides e oferece utilitários de broad-phase compartilhados (por exemplo, `forEachNearbyAsteroid`, `forEachBulletCollision`) reutilizados por combate, mundo e progressão. Prefira consultar esse serviço a varrer listas completas em hot paths.
 - **Data-Driven:** A lógica deve ser parametrizada através de constantes em `GameConstants.js` e arquivos no diretório `/data`. Evite valores fixos dentro dos métodos dos sistemas.
 
 #### 4. **HTML & CSS**
