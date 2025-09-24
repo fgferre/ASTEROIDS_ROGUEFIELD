@@ -898,6 +898,13 @@ export const ORB_MAGNETISM_FORCE = 150;
 export const MIN_ORB_DISTANCE = 18;
 export const CLUSTER_FUSION_COUNT = 10;
 
+// === XP ORBS ===
+export const XP_ORB_BASE_VALUE = 5;
+export const XP_ORB_MAX_PER_CLASS = 100;
+export const XP_ORB_FUSION_CHECK_INTERVAL = 0.3;
+export const XP_ORB_FUSION_ANIMATION_DURATION = 0.82;
+export const XP_ORB_MAGNETISM_BOOST = 2.2;
+
 // === ESCUDO DEFLETOR ===
 export const SHIELD_DEFAULT_HITS = 3;
 export const SHIELD_COOLDOWN_DURATION = 20; // segundos
