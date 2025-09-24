@@ -26,6 +26,7 @@ export const ASTEROID_HEALTH_SCALING = {
 export const BULLET_SIZE = 3;
 export const XP_ORB_SIZE = 8;
 export const TRAIL_LENGTH = 6;
+export const PHYSICS_CELL_SIZE = 96;
 
 // === FÍSICA DA NAVE ===
 export const SHIP_ACCELERATION = 280;
@@ -56,7 +57,6 @@ export const ASTEROID_CRACK_GRAPH_RULES = Object.freeze({
   microAnchorJitter: 0.22,
   continuationJitter: 0.5,
 });
-
 
 // === ASTEROID CRACK PROFILES ===
 export const ASTEROID_CRACK_PROFILES = Object.freeze({

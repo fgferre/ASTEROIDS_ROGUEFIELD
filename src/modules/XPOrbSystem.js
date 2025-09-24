@@ -72,11 +72,10 @@ const ORB_NEXT_CLASS = ORB_CLASS_CONFIG.reduce(
     lookup[config.name] = array[index + 1]?.name || null;
     return lookup;
   },
-  {},
+  {}
 );
 
 const ORB_SPATIAL_NEIGHBOURS = [-1, 0, 1];
-
 
 class XPOrbSystem {
   constructor() {
@@ -157,6 +156,95 @@ class XPOrbSystem {
     }, {});
   }
 
+  createOffscreenCanvas(width, height) {
+    const safeWidth = Math.max(1, Math.floor(width));
+    const safeHeight = Math.max(1, Math.floor(height));
+
+    if (
+      typeof document !== 'undefined' &&
+      typeof document.createElement === 'function'
+    ) {
+      const canvas = document.createElement('canvas');
+      canvas.width = safeWidth;
+      canvas.height = safeHeight;
+      return canvas;
+    }
+
+    if (typeof OffscreenCanvas !== 'undefined') {
+      return new OffscreenCanvas(safeWidth, safeHeight);
+    }
+
+    return null;
+  }
+
+  createOrbSprite(visual) {
+    const diameter = Math.ceil(visual.glowRadius * 2 + 6);
+    const canvas = this.createOffscreenCanvas(diameter, diameter);
+    if (!canvas || typeof canvas.getContext !== 'function') {
+      return null;
+    }
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return null;
+    }
+
+    ctx.save();
+    ctx.translate(diameter / 2, diameter / 2);
+
+    const gradient = ctx.createRadialGradient(
+      0,
+      0,
+      visual.baseRadius * 0.4,
+      0,
+      0,
+      visual.glowRadius
+    );
+    gradient.addColorStop(0, visual.baseColor);
+    gradient.addColorStop(0.6, visual.glowColor);
+    gradient.addColorStop(1, 'transparent');
+
+    ctx.fillStyle = gradient;
+    ctx.fill(visual.glowPath);
+
+    ctx.fillStyle = visual.baseColor;
+    ctx.fill(visual.basePath);
+
+    ctx.fillStyle = visual.highlightColor;
+    ctx.fill(visual.highlightPath);
+
+    ctx.restore();
+
+    return {
+      canvas,
+      width: diameter,
+      height: diameter,
+      halfWidth: diameter / 2,
+      halfHeight: diameter / 2,
+    };
+  }
+
+  ensureOrbSprite(visual) {
+    if (!visual) {
+      return null;
+    }
+
+    if (visual.sprite) {
+      return visual.sprite;
+    }
+
+    if (visual.spriteAttempted) {
+      return null;
+    }
+
+    visual.spriteAttempted = true;
+    const sprite = this.createOrbSprite(visual);
+    if (sprite) {
+      visual.sprite = sprite;
+    }
+    return visual.sprite || null;
+  }
+
   configureOrbClustering() {
     const baseRadius = CONSTANTS.ORB_MAGNETISM_RADIUS || 35;
     const baseForce = CONSTANTS.ORB_MAGNETISM_FORCE || 150;
@@ -230,7 +318,7 @@ class XPOrbSystem {
 
     if (typeof options.tier === 'number') {
       const configByTier = ORB_CLASS_CONFIG.find(
-        (config) => config.tier === options.tier,
+        (config) => config.tier === options.tier
       );
       if (configByTier) {
         return configByTier;
@@ -280,18 +368,23 @@ class XPOrbSystem {
     const nextClassName = ORB_NEXT_CLASS[className];
     if (nextClassName) {
       const groupsNeeded = Math.ceil(
-        excess / Math.max(this.clusterFusionCount - 1, 1),
+        excess / Math.max(this.clusterFusionCount - 1, 1)
       );
       this.performFusionForClass(
         className,
         nextClassName,
         groupsNeeded,
-        'overflow',
+        'overflow'
       );
     }
   }
 
-  performFusionForClass(className, nextClassName, maxGroups, reason = 'interval') {
+  performFusionForClass(
+    className,
+    nextClassName,
+    maxGroups,
+    reason = 'interval'
+  ) {
     if (!maxGroups || maxGroups <= 0 || !nextClassName) {
       return false;
     }
@@ -308,7 +401,7 @@ class XPOrbSystem {
           className,
           nextClassName,
           clusters[index],
-          reason,
+          reason
         ) || started;
     }
     return started;
@@ -433,7 +526,7 @@ class XPOrbSystem {
             animation.targetClassName,
             orbsToFuse,
             animation.reason,
-            { center: animation.center },
+            { center: animation.center }
           );
         }
       }
@@ -504,7 +597,10 @@ class XPOrbSystem {
   }
 
   updateShipMagnetism(deltaTime) {
-    if (!this.cachedPlayer || typeof this.cachedPlayer.getPosition !== 'function') {
+    if (
+      !this.cachedPlayer ||
+      typeof this.cachedPlayer.getPosition !== 'function'
+    ) {
       this.resolveCachedServices();
     }
 
@@ -623,7 +719,10 @@ class XPOrbSystem {
               const distance = Math.sqrt(distanceSq);
               const normalizedDx = dx / distance;
               const normalizedDy = dy / distance;
-              const closeness = Math.max(1 - distance / this.orbClusterRadius, 0);
+              const closeness = Math.max(
+                1 - distance / this.orbClusterRadius,
+                0
+              );
 
               if (distance > comfortableSpacing) {
                 const baseStrength =
@@ -675,7 +774,7 @@ class XPOrbSystem {
     }
 
     const candidates = classData.orbs.filter((orb) =>
-      this.isOrbEligibleForFusion(orb),
+      this.isOrbEligibleForFusion(orb)
     );
     if (candidates.length < this.clusterFusionCount) {
       return [];
@@ -888,7 +987,7 @@ class XPOrbSystem {
     targetClassName,
     orbs,
     reason = 'interval',
-    options = {},
+    options = {}
   ) {
     if (!Array.isArray(orbs) || orbs.length === 0) {
       return;
@@ -1050,7 +1149,13 @@ class XPOrbSystem {
     glowPath.arc(0, 0, glowRadius, 0, Math.PI * 2);
 
     const highlightPath = new Path2D();
-    highlightPath.arc(-baseRadius * 0.35, -baseRadius * 0.35, highlightRadius, 0, Math.PI * 2);
+    highlightPath.arc(
+      -baseRadius * 0.35,
+      -baseRadius * 0.35,
+      highlightRadius,
+      0,
+      Math.PI * 2
+    );
 
     const visual = {
       baseRadius,
@@ -1064,6 +1169,7 @@ class XPOrbSystem {
       highlightColor: config.highlightColor,
     };
 
+    this.ensureOrbSprite(visual);
     this.visualCache.set(key, visual);
     return visual;
   }
@@ -1078,6 +1184,22 @@ class XPOrbSystem {
 
     activeOrbs.forEach((orb) => {
       const visual = this.getOrbVisualConfig(orb.class, orb.tier);
+      const sprite = this.ensureOrbSprite(visual);
+
+      if (sprite && (sprite.canvas || sprite.bitmap)) {
+        const image = sprite.bitmap || sprite.canvas;
+        const offsetX = sprite.halfWidth || sprite.width / 2 || 0;
+        const offsetY = sprite.halfHeight || sprite.height / 2 || 0;
+
+        ctx.drawImage(
+          image,
+          orb.x - offsetX,
+          orb.y - offsetY,
+          sprite.width || image.width,
+          sprite.height || image.height
+        );
+        return;
+      }
 
       ctx.save();
       ctx.translate(orb.x, orb.y);
@@ -1088,7 +1210,7 @@ class XPOrbSystem {
         visual.baseRadius * 0.4,
         0,
         0,
-        visual.glowRadius,
+        visual.glowRadius
       );
       gradient.addColorStop(0, visual.baseColor);
       gradient.addColorStop(0.6, visual.glowColor);
@@ -1116,9 +1238,10 @@ class XPOrbSystem {
 
     const baseValue = baseLookup[size] ?? baseLookup.small ?? 5;
     const progression = this.cachedProgression;
-    const level = progression && typeof progression.getLevel === 'function'
-      ? progression.getLevel()
-      : 1;
+    const level =
+      progression && typeof progression.getLevel === 'function'
+        ? progression.getLevel()
+        : 1;
 
     return Math.max(1, Math.round(baseValue + Math.floor(level * 0.5)));
   }
@@ -1171,8 +1294,8 @@ class XPOrbSystem {
           1,
           Math.min(
             Math.round(baseValue * valueMultiplier),
-            totalValue - allocated,
-          ),
+            totalValue - allocated
+          )
         );
 
         allocated += value;

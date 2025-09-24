@@ -3,6 +3,7 @@ import InputSystem from './modules/InputSystem.js';
 import PlayerSystem from './modules/PlayerSystem.js';
 import CombatSystem from './modules/CombatSystem.js';
 import { EnemySystem } from './modules/EnemySystem.js';
+import PhysicsSystem from './modules/PhysicsSystem.js';
 import XPOrbSystem from './modules/XPOrbSystem.js';
 import ProgressionSystem from './modules/ProgressionSystem.js';
 import UISystem from './modules/UISystem.js';
@@ -69,8 +70,9 @@ function init() {
     const audioSystem = new AudioSystem();
     new InputSystem();
     new PlayerSystem();
-    new CombatSystem();
     new EnemySystem();
+    new PhysicsSystem();
+    new CombatSystem();
     new XPOrbSystem();
     new ProgressionSystem();
     new UISystem();
@@ -203,6 +205,9 @@ function startGame() {
     const enemies = gameServices.get('enemies');
     if (enemies?.reset) enemies.reset();
 
+    const physics = gameServices.get('physics');
+    if (physics?.reset) physics.reset();
+
     const progression = gameServices.get('progression');
     if (progression?.reset) progression.reset();
 
@@ -264,8 +269,9 @@ function updateGame(deltaTime) {
   const servicesToUpdate = [
     'input',
     'player',
-    'combat',
     'enemies',
+    'physics',
+    'combat',
     'xp-orbs',
     'progression',
     'world',
