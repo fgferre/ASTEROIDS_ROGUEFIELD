@@ -14,9 +14,17 @@ const DEFAULT_UPGRADE_CATEGORY = {
 class ProgressionSystem {
   constructor() {
     // === DADOS DE PROGRESSÃO ===
-    this.level = 1;
+    const initialLevel = Number.isFinite(CONSTANTS.PROGRESSION_INITIAL_LEVEL)
+      ? CONSTANTS.PROGRESSION_INITIAL_LEVEL
+      : 1;
+    this.level = Math.max(1, initialLevel);
     this.experience = 0;
-    this.experienceToNext = 100;
+    const initialRequirement = Number.isFinite(
+      CONSTANTS.PROGRESSION_INITIAL_XP_REQUIREMENT
+    )
+      ? CONSTANTS.PROGRESSION_INITIAL_XP_REQUIREMENT
+      : 100;
+    this.experienceToNext = Math.max(1, Math.floor(initialRequirement));
     this.totalExperience = 0;
 
     // === UPGRADES APLICADOS ===
@@ -35,7 +43,10 @@ class ProgressionSystem {
 
     // === CONFIGURAÇÕES ===
 
-    this.levelScaling = 1.2; // Multiplicador de XP por nível
+    const levelScaling = Number.isFinite(CONSTANTS.PROGRESSION_LEVEL_SCALING)
+      ? CONSTANTS.PROGRESSION_LEVEL_SCALING
+      : 1;
+    this.levelScaling = Math.max(1, levelScaling);
 
     // Registrar no ServiceLocator
     if (typeof gameServices !== 'undefined') {
@@ -166,7 +177,9 @@ class ProgressionSystem {
       this.experienceToNext * this.levelScaling,
     );
 
-    const upgradeContext = this.prepareUpgradeOptions(3);
+    const upgradeContext = this.prepareUpgradeOptions(
+      CONSTANTS.PROGRESSION_UPGRADE_ROLL_COUNT
+    );
 
     return {
       level: this.level,
@@ -200,12 +213,16 @@ class ProgressionSystem {
   }
 
   // === SISTEMA DE UPGRADES ===
-  prepareUpgradeOptions(count = 3) {
+  prepareUpgradeOptions(count = CONSTANTS.PROGRESSION_UPGRADE_ROLL_COUNT) {
     const eligible = asArray(this.upgradeDefinitions).filter((definition) =>
       this.isUpgradeSelectable(definition)
     );
 
-    const fallbackCount = 3;
+    const fallbackCount = Number.isFinite(
+      CONSTANTS.PROGRESSION_UPGRADE_FALLBACK_COUNT
+    )
+      ? Math.max(1, Math.floor(CONSTANTS.PROGRESSION_UPGRADE_FALLBACK_COUNT))
+      : 3;
     const numericCount = Number(count);
     const requested = Number.isFinite(numericCount)
       ? Math.max(0, Math.floor(numericCount))

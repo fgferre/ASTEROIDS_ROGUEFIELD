@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "grunt build",
     "test": "vitest run",
+    "stress": "node scripts/run-stress-checks.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
