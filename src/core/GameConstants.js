@@ -28,6 +28,13 @@ export const XP_ORB_SIZE = 8;
 export const TRAIL_LENGTH = 6;
 export const PHYSICS_CELL_SIZE = 96;
 
+// === PROGRESSÃO ===
+export const PROGRESSION_INITIAL_LEVEL = 1;
+export const PROGRESSION_INITIAL_XP_REQUIREMENT = 100;
+export const PROGRESSION_LEVEL_SCALING = 1.2;
+export const PROGRESSION_UPGRADE_ROLL_COUNT = 3;
+export const PROGRESSION_UPGRADE_FALLBACK_COUNT = 3;
+
 // === FÍSICA DA NAVE ===
 export const SHIP_ACCELERATION = 280;
 export const SHIP_MAX_SPEED = 220;
@@ -904,6 +911,28 @@ export const XP_ORB_MAX_PER_CLASS = 100;
 export const XP_ORB_FUSION_CHECK_INTERVAL = 0.3;
 export const XP_ORB_FUSION_ANIMATION_DURATION = 0.82;
 export const XP_ORB_MAGNETISM_BOOST = 2.2;
+export const XP_ORB_COLLECTION_RADIUS_PADDING = 0.1;
+export const XP_ORB_CLUSTER_CONFIG = Object.freeze({
+  radiusMultiplier: 1.55,
+  minRadius: 52,
+  forceMultiplier: 2.4,
+  detectionRadiusFactor: 0.85,
+  detectionMinRadius: 48,
+  comfortableSpacingFactor: 1.12,
+  idealSpacingFactor: 0.95,
+  denseSpacingFactor: 0.75,
+  comfortableForceBase: 0.5,
+  comfortableForceCloseness: 1.5,
+  comfortableForceOffset: 30,
+  comfortableStepClamp: 0.9,
+  comfortableMovementFactor: 0.5,
+  idealForceBase: 0.3,
+  idealForceCloseness: 1.1,
+  idealForceOffset: 18,
+  idealStepClamp: 0.6,
+  idealMovementFactor: 0.5,
+  densePushFactor: 0.5,
+});
 
 // === ESCUDO DEFLETOR ===
 export const SHIELD_DEFAULT_HITS = 3;
@@ -915,6 +944,13 @@ export const SHIELD_COLLISION_BOUNCE = 0.85;
 export const SHIELD_REFLECT_SPEED = 95; // incremento de velocidade aplicado no impacto
 export const SHIELD_IMPACT_DAMAGE_BASE = 10;
 export const SHIELD_IMPACT_DAMAGE_PER_LEVEL = 4;
+
+// === COMBATE ===
+export const COMBAT_SHOOT_COOLDOWN = 0.3;
+export const COMBAT_TARGETING_RANGE = 400;
+export const COMBAT_BULLET_LIFETIME = 1.8;
+export const COMBAT_PREDICTION_TIME = 0.5;
+export const COMBAT_MULTISHOT_SPREAD_STEP = 0.3;
 
 // === SISTEMA DE ONDAS ===
 export const TARGET_UPDATE_INTERVAL = 0.15;

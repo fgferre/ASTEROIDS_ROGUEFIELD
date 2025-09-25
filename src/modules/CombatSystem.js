@@ -8,13 +8,22 @@ class CombatSystem {
     this.currentTarget = null;
     this.targetUpdateTimer = 0;
     this.lastShotTime = 0;
-    this.shootCooldown = 0.3;
+    this.shootCooldown =
+      Number.isFinite(CONSTANTS.COMBAT_SHOOT_COOLDOWN)
+        ? Math.max(0, CONSTANTS.COMBAT_SHOOT_COOLDOWN)
+        : 0.3;
 
     // === CONFIGURAÇÕES ===
-    this.targetingRange = 400;
+    this.targetingRange =
+      Number.isFinite(CONSTANTS.COMBAT_TARGETING_RANGE)
+        ? Math.max(0, CONSTANTS.COMBAT_TARGETING_RANGE)
+        : 400;
     this.targetUpdateInterval = CONSTANTS.TARGET_UPDATE_INTERVAL;
     this.bulletSpeed = CONSTANTS.BULLET_SPEED;
-    this.bulletLifetime = 1.8;
+    this.bulletLifetime =
+      Number.isFinite(CONSTANTS.COMBAT_BULLET_LIFETIME)
+        ? Math.max(0, CONSTANTS.COMBAT_BULLET_LIFETIME)
+        : 1.8;
     this.trailLength = CONSTANTS.TRAIL_LENGTH;
 
     // === CACHES DE SERVIÇOS ===
@@ -268,7 +277,10 @@ class CombatSystem {
     if (!this.currentTarget) return null;
 
     // Predição simples de movimento
-    const predictTime = 0.5;
+    const predictTime =
+      Number.isFinite(CONSTANTS.COMBAT_PREDICTION_TIME)
+        ? Math.max(0, CONSTANTS.COMBAT_PREDICTION_TIME)
+        : 0.5;
     return {
       x: this.currentTarget.x + (this.currentTarget.vx || 0) * predictTime,
       y: this.currentTarget.y + (this.currentTarget.vy || 0) * predictTime,
@@ -276,7 +288,10 @@ class CombatSystem {
   }
 
   applyMultishotSpread(playerPos, targetPos, shotIndex, totalShots) {
-    const spreadAngle = (shotIndex - (totalShots - 1) / 2) * 0.3;
+    const spreadStep = Number.isFinite(CONSTANTS.COMBAT_MULTISHOT_SPREAD_STEP)
+      ? CONSTANTS.COMBAT_MULTISHOT_SPREAD_STEP
+      : 0.3;
+    const spreadAngle = (shotIndex - (totalShots - 1) / 2) * spreadStep;
 
     const dx = targetPos.x - playerPos.x;
     const dy = targetPos.y - playerPos.y;

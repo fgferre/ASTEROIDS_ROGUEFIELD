@@ -97,6 +97,15 @@ class XPOrbSystem {
       : 2.2;
     this.minOrbDistance = CONSTANTS.MIN_ORB_DISTANCE;
     this.clusterFusionCount = CONSTANTS.CLUSTER_FUSION_COUNT;
+    this.clusterConfig =
+      typeof CONSTANTS.XP_ORB_CLUSTER_CONFIG === 'object'
+        ? CONSTANTS.XP_ORB_CLUSTER_CONFIG
+        : {};
+    this.collectionRadiusPadding = Number.isFinite(
+      CONSTANTS.XP_ORB_COLLECTION_RADIUS_PADDING
+    )
+      ? CONSTANTS.XP_ORB_COLLECTION_RADIUS_PADDING
+      : 0.1;
 
     this.fusionCheckInterval =
       Number.isFinite(CONSTANTS.XP_ORB_FUSION_CHECK_INTERVAL) &&
@@ -264,14 +273,38 @@ class XPOrbSystem {
     const baseRadius = CONSTANTS.ORB_MAGNETISM_RADIUS || 35;
     const baseForce = CONSTANTS.ORB_MAGNETISM_FORCE || 150;
 
-    this.orbClusterRadius = Math.max(baseRadius * 1.55, 52);
-    this.orbClusterForce = baseForce * 2.4;
+    const radiusMultiplier = Number.isFinite(this.clusterConfig.radiusMultiplier)
+      ? this.clusterConfig.radiusMultiplier
+      : 1.55;
+    const minRadius = Number.isFinite(this.clusterConfig.minRadius)
+      ? this.clusterConfig.minRadius
+      : 52;
+    const forceMultiplier = Number.isFinite(this.clusterConfig.forceMultiplier)
+      ? this.clusterConfig.forceMultiplier
+      : 2.4;
+
+    this.orbClusterRadius = Math.max(baseRadius * radiusMultiplier, minRadius);
+    this.orbClusterForce = baseForce * forceMultiplier;
 
     this.refreshFusionParameters();
   }
 
   refreshFusionParameters() {
-    this.fusionDetectionRadius = Math.max(this.orbClusterRadius * 0.85, 48);
+    const detectionFactor = Number.isFinite(
+      this.clusterConfig.detectionRadiusFactor
+    )
+      ? this.clusterConfig.detectionRadiusFactor
+      : 0.85;
+    const detectionMinRadius = Number.isFinite(
+      this.clusterConfig.detectionMinRadius
+    )
+      ? this.clusterConfig.detectionMinRadius
+      : 48;
+
+    this.fusionDetectionRadius = Math.max(
+      this.orbClusterRadius * detectionFactor,
+      detectionMinRadius
+    );
     this.fusionDetectionRadiusSq =
       this.fusionDetectionRadius * this.fusionDetectionRadius;
     const baseDuration =
@@ -674,7 +707,9 @@ class XPOrbSystem {
 
     const magnetismRadiusSq = magnetismRadius * magnetismRadius;
     const collectionRadius =
-      CONSTANTS.SHIP_SIZE + CONSTANTS.XP_ORB_SIZE + this.minOrbDistance * 0.1;
+      CONSTANTS.SHIP_SIZE +
+      CONSTANTS.XP_ORB_SIZE +
+      this.minOrbDistance * this.collectionRadiusPadding;
     const collectionRadiusSq = collectionRadius * collectionRadius;
 
     const spatialIndex = this.ensureSpatialIndex();
@@ -788,9 +823,24 @@ class XPOrbSystem {
 
     const index = this.ensureSpatialIndex();
     const clusterRadiusSq = this.orbClusterRadius * this.orbClusterRadius;
-    const comfortableSpacing = this.minOrbDistance * 1.12;
-    const idealSpacing = this.minOrbDistance * 0.95;
-    const denseSpacing = this.minOrbDistance * 0.75;
+    const comfortableSpacingFactor = Number.isFinite(
+      this.clusterConfig.comfortableSpacingFactor
+    )
+      ? this.clusterConfig.comfortableSpacingFactor
+      : 1.12;
+    const idealSpacingFactor = Number.isFinite(
+      this.clusterConfig.idealSpacingFactor
+    )
+      ? this.clusterConfig.idealSpacingFactor
+      : 0.95;
+    const denseSpacingFactor = Number.isFinite(
+      this.clusterConfig.denseSpacingFactor
+    )
+      ? this.clusterConfig.denseSpacingFactor
+      : 0.75;
+    const comfortableSpacing = this.minOrbDistance * comfortableSpacingFactor;
+    const idealSpacing = this.minOrbDistance * idealSpacingFactor;
+    const denseSpacing = this.minOrbDistance * denseSpacingFactor;
 
     index.forEach((classData) => {
       const { orbs, cells, cellSize } = classData;
@@ -841,20 +891,80 @@ class XPOrbSystem {
               );
 
               if (distance > comfortableSpacing) {
+                const forceBase = Number.isFinite(
+                  this.clusterConfig.comfortableForceBase
+                )
+                  ? this.clusterConfig.comfortableForceBase
+                  : 0.5;
+                const forceCloseness = Number.isFinite(
+                  this.clusterConfig.comfortableForceCloseness
+                )
+                  ? this.clusterConfig.comfortableForceCloseness
+                  : 1.5;
+                const forceOffset = Number.isFinite(
+                  this.clusterConfig.comfortableForceOffset
+                )
+                  ? this.clusterConfig.comfortableForceOffset
+                  : 30;
+                const stepClamp = Number.isFinite(
+                  this.clusterConfig.comfortableStepClamp
+                )
+                  ? this.clusterConfig.comfortableStepClamp
+                  : 0.9;
+                const movementFactor = Number.isFinite(
+                  this.clusterConfig.comfortableMovementFactor
+                )
+                  ? this.clusterConfig.comfortableMovementFactor
+                  : 0.5;
+
                 const baseStrength =
-                  this.orbClusterForce * (0.5 + closeness * 1.5) + 30;
-                const step = Math.min(baseStrength * deltaTime, distance * 0.9);
-                const movement = step * 0.5;
+                  this.orbClusterForce * (forceBase + closeness * forceCloseness) +
+                  forceOffset;
+                const step = Math.min(
+                  baseStrength * deltaTime,
+                  distance * stepClamp
+                );
+                const movement = step * movementFactor;
 
                 orbA.x += normalizedDx * movement;
                 orbA.y += normalizedDy * movement;
                 orbB.x -= normalizedDx * movement;
                 orbB.y -= normalizedDy * movement;
               } else if (distance > idealSpacing) {
+                const forceBase = Number.isFinite(
+                  this.clusterConfig.idealForceBase
+                )
+                  ? this.clusterConfig.idealForceBase
+                  : 0.3;
+                const forceCloseness = Number.isFinite(
+                  this.clusterConfig.idealForceCloseness
+                )
+                  ? this.clusterConfig.idealForceCloseness
+                  : 1.1;
+                const forceOffset = Number.isFinite(
+                  this.clusterConfig.idealForceOffset
+                )
+                  ? this.clusterConfig.idealForceOffset
+                  : 18;
+                const stepClamp = Number.isFinite(
+                  this.clusterConfig.idealStepClamp
+                )
+                  ? this.clusterConfig.idealStepClamp
+                  : 0.6;
+                const movementFactor = Number.isFinite(
+                  this.clusterConfig.idealMovementFactor
+                )
+                  ? this.clusterConfig.idealMovementFactor
+                  : 0.5;
+
                 const baseStrength =
-                  this.orbClusterForce * (0.3 + closeness * 1.1) + 18;
-                const step = Math.min(baseStrength * deltaTime, distance * 0.6);
-                const movement = step * 0.5;
+                  this.orbClusterForce * (forceBase + closeness * forceCloseness) +
+                  forceOffset;
+                const step = Math.min(
+                  baseStrength * deltaTime,
+                  distance * stepClamp
+                );
+                const movement = step * movementFactor;
 
                 orbA.x += normalizedDx * movement;
                 orbA.y += normalizedDy * movement;
@@ -862,7 +972,12 @@ class XPOrbSystem {
                 orbB.y -= normalizedDy * movement;
               } else if (distance < denseSpacing) {
                 const overlap = denseSpacing - distance;
-                const push = overlap * 0.5;
+                const pushFactor = Number.isFinite(
+                  this.clusterConfig.densePushFactor
+                )
+                  ? this.clusterConfig.densePushFactor
+                  : 0.5;
+                const push = overlap * pushFactor;
 
                 orbA.x -= normalizedDx * push;
                 orbA.y -= normalizedDy * push;
