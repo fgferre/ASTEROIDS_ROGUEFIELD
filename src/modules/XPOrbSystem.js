@@ -82,16 +82,27 @@ class XPOrbSystem {
     this.orbClasses = [...ORB_CLASS_SEQUENCE];
     this.xpOrbs = [];
     this.xpOrbPools = this.createEmptyOrbPools();
-    this.maxOrbsPerClass = 100;
-    this.baseOrbValue = 5;
+    this.maxOrbsPerClass = Number.isFinite(CONSTANTS.XP_ORB_MAX_PER_CLASS)
+      ? CONSTANTS.XP_ORB_MAX_PER_CLASS
+      : 100;
+    this.baseOrbValue = Number.isFinite(CONSTANTS.XP_ORB_BASE_VALUE)
+      ? CONSTANTS.XP_ORB_BASE_VALUE
+      : 5;
 
     this.orbMagnetismRadius = CONSTANTS.MAGNETISM_RADIUS;
     this.magnetismForce =
       CONSTANTS.ENHANCED_SHIP_MAGNETISM_FORCE || CONSTANTS.MAGNETISM_FORCE;
+    this.magnetismBoost = Number.isFinite(CONSTANTS.XP_ORB_MAGNETISM_BOOST)
+      ? CONSTANTS.XP_ORB_MAGNETISM_BOOST
+      : 2.2;
     this.minOrbDistance = CONSTANTS.MIN_ORB_DISTANCE;
     this.clusterFusionCount = CONSTANTS.CLUSTER_FUSION_COUNT;
 
-    this.fusionCheckInterval = 0.3;
+    this.fusionCheckInterval =
+      Number.isFinite(CONSTANTS.XP_ORB_FUSION_CHECK_INTERVAL) &&
+      CONSTANTS.XP_ORB_FUSION_CHECK_INTERVAL > 0
+        ? CONSTANTS.XP_ORB_FUSION_CHECK_INTERVAL
+        : 0.3;
     this.fusionCheckTimer = 0;
     this.activeFusionAnimations = [];
 
@@ -99,7 +110,11 @@ class XPOrbSystem {
     this.orbClusterForce = 0;
     this.fusionDetectionRadius = 0;
     this.fusionDetectionRadiusSq = 0;
-    this.fusionAnimationDuration = 0.82;
+    this.fusionAnimationDuration =
+      Number.isFinite(CONSTANTS.XP_ORB_FUSION_ANIMATION_DURATION) &&
+      CONSTANTS.XP_ORB_FUSION_ANIMATION_DURATION > 0
+        ? CONSTANTS.XP_ORB_FUSION_ANIMATION_DURATION
+        : 0.82;
 
     this.spatialIndex = new Map();
     this.spatialIndexDirty = true;
@@ -259,7 +274,12 @@ class XPOrbSystem {
     this.fusionDetectionRadius = Math.max(this.orbClusterRadius * 0.85, 48);
     this.fusionDetectionRadiusSq =
       this.fusionDetectionRadius * this.fusionDetectionRadius;
-    this.fusionAnimationDuration = 0.82;
+    const baseDuration =
+      Number.isFinite(CONSTANTS.XP_ORB_FUSION_ANIMATION_DURATION) &&
+      CONSTANTS.XP_ORB_FUSION_ANIMATION_DURATION > 0
+        ? CONSTANTS.XP_ORB_FUSION_ANIMATION_DURATION
+        : this.fusionAnimationDuration;
+    this.fusionAnimationDuration = baseDuration;
     this.invalidateSpatialIndex();
   }
 
@@ -447,12 +467,33 @@ class XPOrbSystem {
     this.updateFusionAnimations(deltaTime);
 
     if (this.xpOrbs.length) {
+      this.advanceOrbAges(deltaTime);
       this.updateShipMagnetism(deltaTime);
       this.updateOrbClustering(deltaTime);
       this.checkOrbFusion(deltaTime);
     }
 
     this.cleanupCollectedOrbs();
+  }
+
+  advanceOrbAges(deltaTime) {
+    if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
+      return;
+    }
+
+    if (!this.xpOrbs.length) {
+      return;
+    }
+
+    for (let i = 0; i < this.xpOrbs.length; i += 1) {
+      const orb = this.xpOrbs[i];
+      if (!orb || orb.collected) {
+        continue;
+      }
+
+      const currentAge = Number.isFinite(orb.age) ? orb.age : 0;
+      orb.age = currentAge + deltaTime;
+    }
   }
 
   updateFusionAnimations(deltaTime) {
@@ -597,6 +638,10 @@ class XPOrbSystem {
   }
 
   updateShipMagnetism(deltaTime) {
+    if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
+      return;
+    }
+
     if (
       !this.cachedPlayer ||
       typeof this.cachedPlayer.getPosition !== 'function'
@@ -605,60 +650,131 @@ class XPOrbSystem {
     }
 
     const player = this.cachedPlayer;
-    const playerPos = player ? player.getPosition() : null;
+    if (!player || typeof player.getPosition !== 'function') {
+      return;
+    }
+
+    const playerPos = player.getPosition();
+    if (
+      !playerPos ||
+      !Number.isFinite(playerPos.x) ||
+      !Number.isFinite(playerPos.y)
+    ) {
+      return;
+    }
+
     const magnetismRadius =
-      (player && typeof player.getMagnetismRadius === 'function'
+      (typeof player.getMagnetismRadius === 'function'
         ? player.getMagnetismRadius()
         : this.orbMagnetismRadius) || this.orbMagnetismRadius;
 
+    if (!Number.isFinite(magnetismRadius) || magnetismRadius <= 0) {
+      return;
+    }
+
+    const magnetismRadiusSq = magnetismRadius * magnetismRadius;
     const collectionRadius =
       CONSTANTS.SHIP_SIZE + CONSTANTS.XP_ORB_SIZE + this.minOrbDistance * 0.1;
+    const collectionRadiusSq = collectionRadius * collectionRadius;
+
+    const spatialIndex = this.ensureSpatialIndex();
+    if (!spatialIndex || spatialIndex.size === 0) {
+      return;
+    }
+
+    const playerX = playerPos.x;
+    const playerY = playerPos.y;
+    const magnetismForce = this.magnetismForce || 0;
+    const boostMultiplier =
+      Number.isFinite(this.magnetismBoost) && this.magnetismBoost >= 0
+        ? this.magnetismBoost
+        : 2.2;
 
     let moved = false;
 
-    for (let i = 0; i < this.orbClasses.length; i += 1) {
-      const className = this.orbClasses[i];
-      const pool = this.xpOrbPools[className];
-      if (!Array.isArray(pool) || pool.length === 0) {
-        continue;
+    spatialIndex.forEach((classData) => {
+      if (!classData || !classData.cells || classData.cells.size === 0) {
+        return;
       }
 
-      for (let index = 0; index < pool.length; index += 1) {
-        const orb = pool[index];
-        if (!this.isOrbActive(orb) || orb.isFusing) {
-          continue;
-        }
+      const cellSize =
+        Number.isFinite(classData.cellSize) && classData.cellSize > 0
+          ? classData.cellSize
+          : magnetismRadius;
+      if (!Number.isFinite(cellSize) || cellSize <= 0) {
+        return;
+      }
 
-        orb.age += deltaTime;
+      const searchRange = Math.max(
+        1,
+        Math.ceil((magnetismRadius + this.minOrbDistance) / cellSize)
+      );
+      const centerCellX = Math.floor(playerX / cellSize);
+      const centerCellY = Math.floor(playerY / cellSize);
 
-        if (!playerPos) {
-          continue;
-        }
+      for (let offsetX = -searchRange; offsetX <= searchRange; offsetX += 1) {
+        for (
+          let offsetY = -searchRange;
+          offsetY <= searchRange;
+          offsetY += 1
+        ) {
+          const key = `${centerCellX + offsetX}:${centerCellY + offsetY}`;
+          const bucket = classData.cells.get(key);
+          if (!bucket || bucket.length === 0) {
+            continue;
+          }
 
-        const dx = playerPos.x - orb.x;
-        const dy = playerPos.y - orb.y;
-        let distance = Math.hypot(dx, dy);
+          for (let idx = 0; idx < bucket.length; idx += 1) {
+            const orb = bucket[idx];
+            if (!this.isOrbActive(orb) || orb.isFusing) {
+              continue;
+            }
 
-        if (distance > 0 && distance < magnetismRadius) {
-          const normalizedDx = dx / distance;
-          const normalizedDy = dy / distance;
-          const proximity = 1 - Math.min(distance / magnetismRadius, 1);
-          const magnetBoost = 1 + proximity * 2.2;
-          const speed = this.magnetismForce * magnetBoost;
-          const step = speed * deltaTime;
+            const dx = playerX - orb.x;
+            const dy = playerY - orb.y;
+            const distanceSq = dx * dx + dy * dy;
 
-          orb.x += normalizedDx * step;
-          orb.y += normalizedDy * step;
-          moved = true;
+            if (distanceSq <= collectionRadiusSq) {
+              this.collectOrb(orb);
+              moved = true;
+              continue;
+            }
 
-          distance = Math.hypot(playerPos.x - orb.x, playerPos.y - orb.y);
-        }
+            if (distanceSq <= 0 || distanceSq > magnetismRadiusSq) {
+              continue;
+            }
 
-        if (distance < collectionRadius) {
-          this.collectOrb(orb);
+            const distance = Math.sqrt(distanceSq);
+            if (!Number.isFinite(distance) || distance === 0) {
+              this.collectOrb(orb);
+              moved = true;
+              continue;
+            }
+
+            const normalizedDx = dx / distance;
+            const normalizedDy = dy / distance;
+            const proximity = 1 - Math.min(distance / magnetismRadius, 1);
+            const magnetBoost = 1 + proximity * boostMultiplier;
+            const speed = magnetismForce * magnetBoost;
+            const step = speed * deltaTime;
+
+            if (!Number.isFinite(step) || step <= 0) {
+              continue;
+            }
+
+            orb.x += normalizedDx * step;
+            orb.y += normalizedDy * step;
+            moved = true;
+
+            const postDx = playerX - orb.x;
+            const postDy = playerY - orb.y;
+            if (postDx * postDx + postDy * postDy <= collectionRadiusSq) {
+              this.collectOrb(orb);
+            }
+          }
         }
       }
-    }
+    });
 
     if (moved) {
       this.invalidateSpatialIndex();
