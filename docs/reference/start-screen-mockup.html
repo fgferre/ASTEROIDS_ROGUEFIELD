@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asteroid Roguefield</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #00000a;
+            font-family: 'Orbitron', sans-serif;
+            color: #e0e0e0;
+        }
+
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            z-index: -1;
+            outline: none;
+        }
+
+        .overlay-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            pointer-events: none;
+        }
+
+        .title {
+            font-weight: 900;
+            font-size: 5rem;
+            color: #fff;
+            text-shadow:
+                0 0 5px rgba(173, 216, 230, 0.7),
+                0 0 10px rgba(0, 170, 255, 0.6),
+                0 0 15px rgba(0, 170, 255, 0.5),
+                0 0 25px rgba(0, 170, 255, 0.4),
+                0 0 40px rgba(0, 170, 255, 0.3);
+            animation: flicker 2.5s infinite alternate;
+            user-select: none;
+        }
+
+        @keyframes flicker {
+            0%, 18%, 22%, 25%, 53%, 57%, 100% {
+                 text-shadow:
+                    0 0 5px rgba(173, 216, 230, 0.7),
+                    0 0 10px rgba(0, 170, 255, 0.6),
+                    0 0 15px rgba(0, 170, 255, 0.5),
+                    0 0 25px rgba(0, 170, 255, 0.4),
+                    0 0 40px rgba(0, 170, 255, 0.3);
+            }
+            20%, 24%, 55% {       
+                text-shadow: 
+                    0 0 2px rgba(173, 216, 230, 0.5),
+                    0 0 4px rgba(0, 170, 255, 0.3);
+            }
+        }
+
+        .nav-button {
+            pointer-events: all;
+            background: rgba(10, 20, 30, 0.5);
+            border: 2px solid #00aaff;
+            color: #00aaff;
+            padding: 1rem 2.5rem;
+            margin: 1rem;
+            font-size: 1.25rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            box-shadow: 0 0 15px rgba(0, 170, 255, 0.5);
+            border-radius: 8px;
+        }
+
+        .nav-button:hover {
+            background: #00aaff;
+            color: #000;
+            box-shadow: 0 0 25px rgba(0, 170, 255, 1);
+        }
+
+        @media (max-width: 768px) {
+            .title { font-size: 3rem; }
+            .nav-button { padding: 0.8rem 2rem; font-size: 1rem; }
+            .navigation { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="overlay-container">
+        <div class="flex flex-col items-center justify-center h-full p-4">
+            <h1 class="title mb-8">ASTEROID ROGUEFIELD</h1>
+            <nav class="navigation flex">
+                <button class="nav-button">Start</button>
+                <button class="nav-button">Options</button>
+                <button class="nav-button">Credits</button>
+            </nav>
+        </div>
+    </div>
+    <canvas id="bg-canvas"></canvas>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/r16/Stats.min.js"></script>
+
+    <script>
+      // Moved Stats.js initialization to a classic script to avoid module scope issues.
+      const stats = new Stats();
+      stats.showPanel(0); // 0: fps, 1: ms, 2: mb
+      document.body.appendChild(stats.dom);
+      // Attach to window for the module to access.
+      window.stats = stats;
+    </script>
+
+    <script type="module">
+        // --- Configuração da Cena e Câmera ---
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x000104, 0.008); 
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 10000);
+        camera.position.z = 100;
+
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('bg-canvas'), antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.shadowMap.enabled = true;
+
+        // --- Luzes ---
+        scene.add(new THREE.AmbientLight(0x405060, 0.5));
+        const pointLight = new THREE.PointLight(0xffffff, 1, 1000);
+        pointLight.position.set(80, 80, 80);
+        pointLight.castShadow = true;
+        scene.add(pointLight);
+        const fillLight = new THREE.PointLight(0x00aaff, 0.3, 1000); 
+        fillLight.position.set(-100, -50, -100);
+        scene.add(fillLight);
+        
+        // --- Mundo da Física (Cannon.js) ---
+        const world = new CANNON.World();
+        world.gravity.set(0, 0, 0); 
+        world.broadphase = new CANNON.NaiveBroadphase();
+        world.solver.iterations = 5;
+        
+        // --- Fundo de Estrelas Estático ---
+        const starLayers = [];
+        const layerData = [
+            { count: 4000, size: 0.3, distance: 8000, speedFactor: 0.05 },
+            { count: 3000, size: 0.4, distance: 6000, speedFactor: 0.1 }, 
+            { count: 2000, size: 0.5, distance: 4000, speedFactor: 0.2 }  
+        ];
+        layerData.forEach(data => {
+            const starsGeometry = new THREE.BufferGeometry();
+            const posArray = new Float32Array(data.count * 3);
+            for (let i = 0; i < data.count * 3; i+=3) {
+                 const u = Math.random(), v = Math.random();
+                 const theta = 2 * Math.PI * u, phi = Math.acos(2 * v - 1);
+                 posArray[i] = data.distance * Math.sin(phi) * Math.cos(theta);
+                 posArray[i+1] = data.distance * Math.sin(phi) * Math.sin(theta);
+                 posArray[i+2] = data.distance * Math.cos(phi);
+            }
+            starsGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: data.size, transparent: true, opacity: Math.random() * 0.3 + 0.4, fog: false });
+            const starMesh = new THREE.Points(starsGeometry, starsMaterial);
+            starLayers.push({ mesh: starMesh, speedFactor: data.speedFactor });
+            scene.add(starMesh);
+        });
+
+        // --- Simplex Noise (função auxiliar) ---
+        function SimplexNoise(random) {
+            if (!random) random = Math.random; this.p = new Uint8Array(256); this.perm = new Uint8Array(512); this.permMod12 = new Uint8Array(512); for (let i = 0; i < 256; i++) this.p[i] = i; let n; for (let i = 255; i > 0; i--) { n = Math.floor((i + 1) * random()); let t = this.p[i]; this.p[i] = this.p[n]; this.p[n] = t; } for (let i = 0; i < 512; i++) { this.perm[i] = this.p[i & 255]; this.permMod12[i] = this.perm[i] % 12; }
+        }
+        SimplexNoise.prototype = { grad3: new Float32Array([1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1, 0, 1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, -1, 0, 1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1]), noise3d: function (xin, yin, zin) { let n0, n1, n2, n3; let F3 = 1 / 3; let s = (xin + yin + zin) * F3; let i = Math.floor(xin + s), j = Math.floor(yin + s), k = Math.floor(zin + s); let G3 = 1 / 6; let t = (i + j + k) * G3; let X0 = i - t, Y0 = j - t, Z0 = k - t; let x0 = xin - X0, y0 = yin - Y0, z0 = zin - Z0; let i1, j1, k1, i2, j2, k2; if (x0 >= y0) { if (y0 >= z0) { i1 = 1; j1 = 0; k1 = 0; i2 = 1; j2 = 1; k2 = 0; } else if (x0 >= z0) { i1 = 1; j1 = 0; k1 = 0; i2 = 1; j2 = 0; k2 = 1; } else { i1 = 0; j1 = 0; k1 = 1; i2 = 1; j2 = 0; k2 = 1; } } else { if (y0 < z0) { i1 = 0; j1 = 0; k1 = 1; i2 = 0; j2 = 1; k2 = 1; } else if (x0 < z0) { i1 = 0; j1 = 1; k1 = 0; i2 = 0; j2 = 1; k2 = 1; } else { i1 = 0; j1 = 1; k1 = 0; i2 = 1; j2 = 1; k2 = 0; } } let x1 = x0 - i1 + G3, y1 = y0 - j1 + G3, z1 = z0 - k1 + G3; let x2 = x0 - i2 + 2 * G3, y2 = y0 - j2 + 2 * G3, z2 = z0 - k2 + 2 * G3; let x3 = x0 - 1 + 3 * G3, y3 = y0 - 1 + 3 * G3, z3 = z0 - 1 + 3 * G3; let ii = i & 255, jj = j & 255, kk = k & 255; let gi0 = this.permMod12[ii + this.perm[jj + this.perm[kk]]]; let gi1 = this.permMod12[ii + i1 + this.perm[jj + j1 + this.perm[kk + k1]]]; let gi2 = this.permMod12[ii + i2 + this.perm[jj + j2 + this.perm[kk + k2]]]; let gi3 = this.permMod12[ii + 1 + this.perm[jj + 1 + this.perm[kk + 1]]]; let t0 = 0.6 - x0 * x0 - y0 * y0 - z0 * z0; if (t0 < 0) n0 = 0; else { t0 *= t0; n0 = t0 * t0 * (this.grad3[gi0] * x0 + this.grad3[gi0 + 1] * y0 + this.grad3[gi0 + 2] * z0); } let t1 = 0.6 - x1 * x1 - y1 * y1 - z1 * z1; if (t1 < 0) n1 = 0; else { t1 *= t1; n1 = t1 * t1 * (this.grad3[gi1] * x1 + this.grad3[gi1 + 1] * y1 + this.grad3[gi1 + 2] * z1); } let t2 = 0.6 - x2 * x2 - y2 * y2 - z2 * z2; if (t2 < 0) n2 = 0; else { t2 *= t2; n2 = t2 * t2 * (this.grad3[gi2] * x2 + this.grad3[gi2 + 1] * y2 + this.grad3[gi2 + 2] * z2); } let t3 = 0.6 - x3 * x3 - y3 * y3 - z3 * z3; if (t3 < 0) n3 = 0; else { t3 *= t3; n3 = t3 * t3 * (this.grad3[gi3] * x3 + this.grad3[gi3 + 1] * y3 + this.grad3[gi3 + 2] * z3); } return 32 * (n0 + n1 + n2 + n3); }};
+        
+        // --- Constantes de Otimização ---
+        const MAX_ASTEROIDS = 100;
+        const MAX_FRAGMENTATION_LEVEL = 2;
+        const FRAGMENTATION_THRESHOLD = 60;
+        const CULLING_DISTANCE_SQR = 300 * 300;
+
+        const simplex = new SimplexNoise();
+        const activeAsteroids = [];
+        const asteroidPool = [];
+        const objectsToDeactivate = [];
+
+        // --- Geração Simplificada de Recursos ---
+        const baseGeometries = [];
+        const baseMaterials = [];
+
+        function createBaseAssets() {
+            for (let i = 0; i < 5; i++) {
+                // Criar geometria base
+                const geometry = new THREE.IcosahedronGeometry(1, 5); // Alta resolução
+                const pos = geometry.attributes.position;
+                const vec = new THREE.Vector3();
+                const seed = Math.random() * 100;
+                const noiseScale = Math.random() * 0.2 + 0.2;
+                const distortion = Math.random() * 0.3 + 0.2;
+                for (let j = 0; j < pos.count; j++) {
+                    vec.fromBufferAttribute(pos, j);
+                    let totalNoise = 0, frequency = noiseScale, amplitude = 1;
+                    for (let k = 0; k < 4; k++) {
+                        let nVec = vec.clone().multiplyScalar(frequency).addScalar(seed);
+                        totalNoise += simplex.noise3d(nVec.x, nVec.y, nVec.z) * amplitude;
+                        frequency *= 2; amplitude *= 0.5;
+                    }
+                    vec.normalize().multiplyScalar(1 + totalNoise * distortion);
+                    pos.setXYZ(j, vec.x, vec.y, vec.z);
+                }
+                geometry.computeVertexNormals();
+                baseGeometries.push(geometry);
+
+                // Criar material base com textura procedural
+                const canvas = document.createElement('canvas');
+                const size = 256;
+                canvas.width = size; canvas.height = size;
+                const context = canvas.getContext('2d');
+                const imageData = context.createImageData(size, size);
+                const noise = new SimplexNoise(() => seed);
+                for (let x = 0; x < size; x++) {
+                    for (let y = 0; y < size; y++) {
+                        const idx = (x + y * size) * 4;
+                        const value = (noise.noise3d(x / 32, y / 32, seed) + 1) * 0.5;
+                        const color = 80 + value * 80;
+                        imageData.data[idx] = color; imageData.data[idx+1] = color; imageData.data[idx+2] = color; imageData.data[idx+3] = 255;
+                    }
+                }
+                context.putImageData(imageData, 0, 0);
+                const texture = new THREE.CanvasTexture(canvas);
+                const material = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.8, metalness: 0.2, bumpMap: texture, bumpScale: 0.1 });
+                baseMaterials.push(material);
+            }
+        }
+        
+        // --- Gerenciamento do Pool de Asteroides ---
+        function createPoolableAsteroid() {
+            const mesh = new THREE.Mesh();
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            mesh.visible = false;
+            scene.add(mesh);
+            
+            const body = new CANNON.Body({ mass: 1, shape: new CANNON.Sphere(1) });
+            body.sleep();
+            world.addBody(body);
+            
+            const asteroidObject = { mesh, body, active: false, fragmentationLevel: 0 };
+            body.asteroidObject = asteroidObject;
+            body.addEventListener('collide', (e) => onCollision(e, asteroidObject));
+            asteroidPool.push(asteroidObject);
+        }
+
+        function getAsteroidFromPool() {
+            if (activeAsteroids.length >= MAX_ASTEROIDS) return null;
+            let pooled = asteroidPool.find(obj => !obj.active);
+            if (!pooled) {
+                createPoolableAsteroid();
+                pooled = asteroidPool[asteroidPool.length - 1];
+            }
+            return pooled;
+        }
+
+        function activateAsteroid(params) {
+            const asteroid = getAsteroidFromPool();
+            if (!asteroid) return;
+
+            const { position, scale, velocity, angularVelocity, fragmentationLevel = 0 } = params;
+            
+            asteroid.mesh.geometry = baseGeometries[Math.floor(Math.random() * baseGeometries.length)];
+            asteroid.mesh.material = baseMaterials[Math.floor(Math.random() * baseMaterials.length)];
+            
+            asteroid.mesh.position.copy(position);
+            asteroid.mesh.scale.copy(scale);
+            asteroid.mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+            asteroid.mesh.visible = true;
+
+            const avgRadius = (scale.x + scale.y + scale.z) / 3.0;
+            asteroid.body.shapes[0].radius = avgRadius;
+            asteroid.body.updateBoundingRadius();
+            asteroid.body.mass = Math.pow(avgRadius, 3);
+            asteroid.body.position.copy(position);
+            asteroid.body.velocity.copy(velocity);
+            asteroid.body.angularVelocity.copy(angularVelocity);
+            asteroid.body.wakeUp();
+
+            asteroid.active = true;
+            asteroid.fragmentationLevel = fragmentationLevel;
+            activeAsteroids.push(asteroid);
+        }
+
+        function deactivateAsteroid(asteroid) {
+            if (!asteroid.active) return;
+            asteroid.active = false;
+            asteroid.mesh.visible = false;
+            asteroid.body.position.set(10000, 10000, 10000); // Move para longe
+            asteroid.body.velocity.set(0,0,0);
+            asteroid.body.angularVelocity.set(0,0,0);
+            asteroid.body.sleep();
+            
+            const index = activeAsteroids.indexOf(asteroid);
+            if (index > -1) activeAsteroids.splice(index, 1);
+        }
+
+        // --- Lógica de Colisão e Efeitos ---
+        function onCollision(event, asteroid) {
+            if (!asteroid.active || asteroid.fragmentationLevel >= MAX_FRAGMENTATION_LEVEL) return;
+            
+            const impactStrength = event.contact.getImpactVelocityAlongNormal();
+            if (impactStrength > FRAGMENTATION_THRESHOLD) {
+                objectsToDeactivate.push(asteroid);
+                fragmentAsteroid(asteroid);
+            }
+        }
+
+        function fragmentAsteroid(parent) {
+            createExplosion(parent.body.position);
+            const numFragments = Math.floor(Math.random() * 3) + 2;
+            for(let i=0; i<numFragments; i++) {
+                const newScale = parent.mesh.scale.clone().multiplyScalar(Math.random() * 0.3 + 0.4);
+                if (newScale.x < 1) continue;
+
+                const offset = new THREE.Vector3().copy(parent.body.position).add(
+                    new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(parent.body.shapes[0].radius)
+                );
+                
+                const explosionVec = new CANNON.Vec3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).unit().scale(15);
+                const newVelocity = parent.body.velocity.vadd(explosionVec);
+                const newAngularVelocity = new CANNON.Vec3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).scale(5);
+
+                activateAsteroid({
+                    position: offset,
+                    scale: newScale,
+                    velocity: newVelocity,
+                    angularVelocity: newAngularVelocity,
+                    fragmentationLevel: parent.fragmentationLevel + 1
+                });
+            }
+        }
+        
+        function createExplosion(position) { /* ...código da explosão... */ }
+
+        // --- Geração Inicial e "Kamikaze" ---
+        function prepareInitialField() {
+            const numAsteroids = 60;
+            const asteroidBelt = { innerRadius: 40, outerRadius: 150, height: 30 };
+            for (let i = 0; i < numAsteroids; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const radius = asteroidBelt.innerRadius + Math.random() * (asteroidBelt.outerRadius - asteroidBelt.innerRadius);
+                const pos = new THREE.Vector3( Math.cos(angle) * radius, (Math.random() - 0.5) * asteroidBelt.height, Math.sin(angle) * radius );
+                const scaleVal = (i < 20) ? (Math.random() * 5 + 5) : (Math.random() * 3 + 2); // 20 maiores, resto médio
+                const scale = new THREE.Vector3(
+                    scaleVal * (1 + (Math.random() - 0.5) * 0.8),
+                    scaleVal * (1 + (Math.random() - 0.5) * 0.8),
+                    scaleVal * (1 + (Math.random() - 0.5) * 0.8)
+                );
+                const velocity = new CANNON.Vec3((Math.random()-0.5)*2, (Math.random()-0.5)*2, (Math.random()-0.5)*2);
+                const angularVelocity = new CANNON.Vec3((Math.random()-0.5)*1, (Math.random()-0.5)*1, (Math.random()-0.5)*1);
+                activateAsteroid({ position: pos, scale: scale, velocity: velocity, angularVelocity: angularVelocity });
+            }
+        }
+
+        function spawnRogueAsteroid() {
+            const potentialTargets = activeAsteroids.filter(a => a.active);
+            if (potentialTargets.length === 0) return;
+
+            const target = potentialTargets[Math.floor(Math.random() * potentialTargets.length)];
+            const spawnPos = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(300);
+            
+            const rogueSpeed = 80;
+            const timeToIntercept = spawnPos.distanceTo(target.mesh.position) / rogueSpeed;
+            const targetFuturePos = target.body.position.vadd(target.body.velocity.scale(timeToIntercept));
+            
+            const velocity = new CANNON.Vec3().copy(targetFuturePos).vsub(spawnPos).unit().scale(rogueSpeed);
+            const scaleVal = Math.random() * 4 + 4;
+            const scale = new THREE.Vector3(scaleVal, scaleVal, scaleVal);
+            
+            activateAsteroid({ position: spawnPos, scale, velocity, angularVelocity: new CANNON.Vec3() });
+        }
+
+        // --- Loop Principal de Animação ---
+        const clock = new THREE.Clock();
+        let rogueAsteroidSpawnTimer = 0;
+
+        function animate() {
+            stats.begin(); 
+
+            requestAnimationFrame(animate);
+            const deltaTime = clock.getDelta();
+
+            // Lógica de Timers
+            rogueAsteroidSpawnTimer += deltaTime;
+            if (rogueAsteroidSpawnTimer > 15) {
+                spawnRogueAsteroid();
+                rogueAsteroidSpawnTimer = 0;
+            }
+
+            // Simulação de Física
+            world.step(1 / 60, deltaTime, 3);
+            
+            // Sincronização e Culling
+            for (let i = activeAsteroids.length - 1; i >= 0; i--) {
+                const asteroid = activeAsteroids[i];
+                asteroid.mesh.position.copy(asteroid.body.position);
+                asteroid.mesh.quaternion.copy(asteroid.body.quaternion);
+                
+                if (asteroid.body.position.lengthSquared() > CULLING_DISTANCE_SQR) {
+                    objectsToDeactivate.push(asteroid);
+                }
+            }
+
+            // Processamento Pós-Física
+            while (objectsToDeactivate.length > 0) {
+                deactivateAsteroid(objectsToDeactivate.pop());
+            }
+
+            // Movimento da Câmera
+            const timer = clock.getElapsedTime() * 0.03;
+            const orbitalRadius = 70;
+            camera.position.x = Math.cos(timer) * orbitalRadius;
+            camera.position.z = Math.sin(timer) * orbitalRadius;
+            camera.position.y = Math.sin(timer * 0.7) * 15;
+            camera.lookAt(scene.position);
+            
+            // Movimento do Fundo
+            starLayers.forEach(layer => {
+                layer.mesh.rotation.y = -timer * layer.speedFactor;
+            });
+            
+            renderer.render(scene, camera);
+
+            stats.end();
+        }
+        
+        // --- Inicialização ---
+        createBaseAssets();
+        for (let i = 0; i < MAX_ASTEROIDS; i++) createPoolableAsteroid();
+        prepareInitialField();
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

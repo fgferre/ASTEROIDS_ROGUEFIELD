@@ -1,0 +1,62 @@
+# Plano de Integração da Nova Tela Inicial
+
+## Objetivo
+Substituir a tela inicial atual do Asteroid Roguefield pelo layout 3D fornecido, removendo o fluxo de tutorial legado e garantindo que o novo visual siga o padrão modular do projeto.
+
+## Perguntas em Aberto
+1. Devemos remover completamente o fluxo de tutorial (painel + interceptador) ou preservar a lógica para possível uso futuro?
+2. O botão "Credits" deve abrir uma nova tela dedicada, um modal ou apenas exibir informações na própria tela inicial?
+3. Podemos adicionar `three`, `cannon-es` (substituindo `cannon.js` legacy) e `stats.js` como dependências locais via npm?
+4. Mantemos Tailwind via pipeline local (Tailwind CLI/PostCSS) ou replicamos o visual com CSS manual em `src/style.css`?
+5. O painel de FPS (Stats.js) fica sempre visível ou restrito a um modo de debug?
+
+> **Próximo passo:** avançar para a execução somente após validar estas decisões.
+
+## Sequência Proposta
+
+1. **Preparar Dependências e Build**
+   - Atualizar `package.json` com bibliotecas necessárias (Three.js, Cannon-es, Tailwind, PostCSS, Autoprefixer, Stats.js) e scripts de build.
+   - Configurar `tailwind.config.js` e `postcss.config.js` se Tailwind for confirmado.
+   - Ajustar `Gruntfile.js` para preservar o CSS gerado.
+
+2. **Registrar HTML de Referência**
+   - Adicionar `docs/reference/start-screen-mockup.html` com o markup fornecido para consulta visual.
+
+3. **Refatorar `src/index.html`**
+   - Substituir o bloco atual da tela de menu pelo layout final (canvas + overlay + botões Start/Options/Credits).
+   - Incluir estrutura da tela de créditos, caso confirmada, e remover componentes obsoletos (tutorial, mensagens antigas).
+
+4. **Atualizar Estilização**
+   - Integrar Tailwind ou replicar utilitários equivalentes, garantindo consistência com tokens existentes.
+   - Criar camadas (`@layer base/components`) para customizações (sombra neon, animações).
+
+5. **Implementar Sistema de Fundo 3D**
+   - Criar módulo `MenuBackgroundSystem` responsável por inicializar/pausar a cena Three.js com Cannon.
+   - Conectar o ciclo de vida ao `UISystem` via `gameEvents` (iniciar ao mostrar o menu, pausar em outras telas).
+   - Gerenciar redimensionamento e limpeza de recursos.
+
+6. **Remover Tutorial Legado**
+   - Excluir `TutorialSystem` e dados associados, simplificando `app.js` para iniciar o jogo imediatamente.
+   - Garantir que o botão Start invoque `requestStartGame()` direto.
+
+7. **Implementar Fluxo de Créditos**
+   - Definir comportamento do botão Credits conforme resposta da pergunta 2.
+   - Garantir navegação limpa entre telas de menu e créditos.
+
+8. **Validação e Testes**
+   - Rodar `npm run build`/`npm run dev` para verificar a pipeline.
+   - Testar manualmente a navegação entre menu, jogo e créditos.
+   - Atualizar `docs/validation/test-checklist.md` se necessário.
+
+## Gestão de Riscos
+- **Dependências novas:** manter justificativas claras no PR e travar versões para evitar mudanças inesperadas.
+- **Performance do menu 3D:** monitorar FPS e prever fallback caso dispositivos mais modestos apresentem problemas.
+- **Acessibilidade:** garantir foco e navegação por teclado para os botões Start/Options/Credits.
+
+## Cronograma Sugerido
+1. Aprovação das decisões pendentes.
+2. Execução das etapas 1–4 (infra + layout).
+3. Implementação do sistema 3D (etapa 5).
+4. Remoção do tutorial e fluxo de créditos (etapas 6–7).
+5. Validação final e atualização de documentação (etapa 8).
+
