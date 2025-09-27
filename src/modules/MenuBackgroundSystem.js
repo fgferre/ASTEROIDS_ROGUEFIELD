@@ -1,5 +1,42 @@
-import * as THREE from 'three';
-import { Body, Sphere, Vec3, World } from 'cannon-es';
+let THREE;
+let Body;
+let Sphere;
+let Vec3;
+let World;
+
+const THREE_CDN_SRC =
+  'https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js';
+const CANNON_CDN_SRC =
+  'https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js';
+
+async function loadMenuBackgroundDependencies() {
+  if (THREE && Body && Sphere && Vec3 && World) {
+    return;
+  }
+
+  try {
+    const [threeModule, cannonModule] = await Promise.all([
+      import('three'),
+      import('cannon-es'),
+    ]);
+
+    THREE = threeModule;
+    ({ Body, Sphere, Vec3, World } = cannonModule);
+  } catch (error) {
+    console.warn(
+      '[MenuBackgroundSystem] Falling back to CDN modules for three.js and cannon-es',
+      error,
+    );
+
+    const [threeModule, cannonModule] = await Promise.all([
+      import(THREE_CDN_SRC),
+      import(CANNON_CDN_SRC),
+    ]);
+
+    THREE = threeModule;
+    ({ Body, Sphere, Vec3, World } = cannonModule);
+  }
+}
 
 const ASTEROID_COUNT = 36;
 const FIELD_RADIUS = 140;
@@ -50,6 +87,55 @@ class MenuBackgroundSystem {
       return;
     }
 
+    this.renderer = null;
+    this.scene = null;
+    this.camera = null;
+    this.clock = null;
+    this.world = null;
+    this.tmpForce = null;
+    this.tmpSwirl = null;
+    this.lookAtTarget = null;
+    this.asteroids = [];
+    this.animationHandle = null;
+    this.isRunning = false;
+    this.isInitialized = false;
+    this.pendingStart = !document
+      .getElementById('menu-screen')
+      ?.classList.contains('hidden');
+
+    this.animate = this.animate.bind(this);
+    this.handleResize = this.handleResize.bind(this);
+    this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
+    this.handleScreenChange = this.handleScreenChange.bind(this);
+
+    window.addEventListener('resize', this.handleResize);
+    document.addEventListener('visibilitychange', this.handleVisibilityChange);
+
+    if (typeof gameEvents !== 'undefined') {
+      gameEvents.on('screen-changed', this.handleScreenChange);
+    }
+
+    if (typeof gameServices !== 'undefined') {
+      gameServices.register('menu-background', this);
+    }
+
+    this.initializePromise = loadMenuBackgroundDependencies()
+      .then(() => {
+        this.initializeScene();
+        if (this.pendingStart) {
+          this.pendingStart = false;
+          this.start();
+        }
+      })
+      .catch((error) => {
+        console.error(
+          '[MenuBackgroundSystem] Failed to initialize Three.js background',
+          error,
+        );
+      });
+  }
+
+  initializeScene() {
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
       antialias: true,
@@ -71,11 +157,8 @@ class MenuBackgroundSystem {
     this.camera.position.set(0, 16, CAMERA_ORBIT_RADIUS);
 
     this.clock = new THREE.Clock();
-    this.animationHandle = null;
-    this.isRunning = false;
 
     this.world = new World({ gravity: new Vec3(0, 0, 0) });
-    this.asteroids = [];
     this.tmpForce = new Vec3();
     this.tmpSwirl = new Vec3();
     this.lookAtTarget = new THREE.Vector3();
@@ -84,25 +167,7 @@ class MenuBackgroundSystem {
     this.createStarfield();
     this.spawnAsteroids();
 
-    this.animate = this.animate.bind(this);
-    this.handleResize = this.handleResize.bind(this);
-    this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
-    this.handleScreenChange = this.handleScreenChange.bind(this);
-
-    window.addEventListener('resize', this.handleResize);
-    document.addEventListener('visibilitychange', this.handleVisibilityChange);
-
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.on('screen-changed', this.handleScreenChange);
-    }
-
-    if (typeof gameServices !== 'undefined') {
-      gameServices.register('menu-background', this);
-    }
-
-    if (!document.getElementById('menu-screen')?.classList.contains('hidden')) {
-      this.start();
-    }
+    this.isInitialized = true;
   }
 
   setupLighting() {
@@ -213,7 +278,7 @@ class MenuBackgroundSystem {
   }
 
   handleResize() {
-    if (!this.renderer) return;
+    if (!this.isInitialized || !this.renderer) return;
     const width = window.innerWidth;
     const height = window.innerHeight;
     this.renderer.setSize(width, height, false);
@@ -222,7 +287,11 @@ class MenuBackgroundSystem {
   }
 
   start() {
-    if (this.isRunning || !this.renderer) {
+    if (!this.isInitialized) {
+      this.pendingStart = true;
+      return this.initializePromise;
+    }
+    if (this.isRunning) {
       return;
     }
     this.isRunning = true;
@@ -231,6 +300,13 @@ class MenuBackgroundSystem {
   }
 
   stop() {
+    if (!this.isInitialized) {
+      this.pendingStart = false;
+      return;
+    }
+    if (!this.isRunning) {
+      return;
+    }
     this.isRunning = false;
     if (this.animationHandle) {
       cancelAnimationFrame(this.animationHandle);
@@ -239,7 +315,7 @@ class MenuBackgroundSystem {
   }
 
   animate() {
-    if (!this.isRunning) {
+    if (!this.isRunning || !this.isInitialized) {
       return;
     }
 
