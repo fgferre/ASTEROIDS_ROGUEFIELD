@@ -12,6 +12,7 @@ import AudioSystem from './modules/AudioSystem.js';
 import WorldSystem from './modules/WorldSystem.js';
 import RenderingSystem from './modules/RenderingSystem.js';
 import TutorialSystem from './modules/TutorialSystem.js';
+import MenuBackgroundSystem from './modules/MenuBackgroundSystem.js';
 import {
   resolveDebugPreference,
   applyDebugPreference,
@@ -76,13 +77,45 @@ function init() {
     new XPOrbSystem();
     new ProgressionSystem();
     new UISystem();
+    const menuBackgroundSystem = new MenuBackgroundSystem();
     new TutorialSystem();
     new EffectsSystem(audioSystem);
     new WorldSystem();
     new RenderingSystem();
 
+    if (typeof gameEvents !== 'undefined') {
+      gameEvents.on('screen-changed', (data) => {
+        const targetScreen = data?.screen;
+        if (!targetScreen || !menuBackgroundSystem) {
+          return;
+        }
+
+        if (targetScreen === 'menu') {
+          menuBackgroundSystem.start();
+        } else {
+          menuBackgroundSystem.stop();
+        }
+      });
+
+      gameEvents.on('pause-state-changed', ({ isPaused }) => {
+        if (!menuBackgroundSystem || gameState.screen !== 'menu') {
+          return;
+        }
+
+        if (isPaused) {
+          menuBackgroundSystem.pause();
+        } else {
+          menuBackgroundSystem.resume();
+        }
+      });
+    }
+
     const ui = gameServices.get('ui');
     if (ui) ui.showScreen('menu');
+
+    if (menuBackgroundSystem) {
+      menuBackgroundSystem.start();
+    }
 
     gameState.initialized = true;
     requestAnimationFrame(gameLoop);

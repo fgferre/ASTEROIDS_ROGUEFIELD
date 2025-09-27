@@ -10,15 +10,31 @@
     <div id="game-container">
       <!-- Menu Principal -->
       <div id="menu-screen" class="screen">
-        <div class="menu-content">
-          <div class="menu-grid">
-            <section class="menu-primary">
-              <header class="menu-header">
-                <h1 class="game-title">ASTEROIDS SURVIVOR</h1>
+        <canvas
+          id="menu-3d-canvas"
+          class="menu-3d-canvas"
+          aria-hidden="true"
+        ></canvas>
+        <div class="menu-overlay" role="presentation">
+          <div class="menu-overlay__layout">
+            <section
+              class="menu-overlay__primary"
+              role="region"
+              aria-labelledby="menu-title"
+            >
+              <header class="menu-hero">
+                <h1 id="menu-title" class="game-title">ASTEROIDS SURVIVOR</h1>
                 <p class="game-subtitle">
                   Sobreviva às ondas infinitas de asteroides espaciais!
                 </p>
               </header>
+              <p
+                class="menu-overlay__fallback"
+                data-menu-background-fallback
+                role="status"
+              >
+                Preparando visual interativo do hangar espacial...
+              </p>
               <ul class="menu-instructions" id="menu-instructions">
                 <li data-instruction="movement">
                   <span class="instruction-icon" aria-hidden="true">🚀</span>
@@ -54,7 +70,7 @@
                   <div>Sobreviva às ondas de asteroides fragmentados</div>
                 </li>
               </ul>
-              <div class="menu-actions">
+              <div class="menu-overlay__actions">
                 <button
                   id="start-game-btn"
                   class="btn btn--primary btn--lg"
@@ -71,18 +87,7 @@
                 </button>
               </div>
             </section>
-            <aside class="menu-secondary">
-              <div class="menu-visual" aria-hidden="true">
-                <canvas
-                  id="menu-background-canvas"
-                  class="menu-visual__canvas"
-                  width="320"
-                  height="200"
-                ></canvas>
-                <p class="menu-visual__caption">
-                  Simulação estelar em desenvolvimento
-                </p>
-              </div>
+            <aside class="menu-overlay__aside">
               <div
                 id="tutorial-card"
                 class="tutorial-card"

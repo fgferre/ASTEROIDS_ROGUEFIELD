@@ -1,0 +1,148 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "OpenAI MenuBackgroundSystem"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "MenuShip",
+      "mesh": 0
+    }
+  ],
+  "meshes": [
+    {
+      "name": "MenuShipMesh",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0
+          },
+          "indices": 1,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "name": "IridescentHull",
+      "pbrMetallicRoughness": {
+        "baseColorFactor": [
+          0.38,
+          0.78,
+          0.94,
+          1.0
+        ],
+        "metallicFactor": 0.35,
+        "roughnessFactor": 0.25
+      },
+      "emissiveFactor": [
+        0.08,
+        0.18,
+        0.38
+      ],
+      "doubleSided": true
+    }
+  ],
+  "animations": [
+    {
+      "name": "IdleSpin",
+      "samplers": [
+        {
+          "input": 2,
+          "output": 3,
+          "interpolation": "LINEAR"
+        }
+      ],
+      "channels": [
+        {
+          "sampler": 0,
+          "target": {
+            "node": 0,
+            "path": "rotation"
+          }
+        }
+      ]
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 156,
+      "uri": "data:application/octet-stream;base64,AAAAAAAAwD8AAAAAAACAPwAAgL8AAIA/AACAvwAAgL8AAIA/AACAvwAAgL8AAIC/AACAPwAAgL8AAIC/AQACAAMAAQADAAQAAAABAAIAAAACAAMAAAADAAQAAAAEAAEAAAAAAAAAwD8AAEBAAAAAAAAAAAAAAAAAAACAPwAAAAAAAIA/AAAAADIxjSQAAAAAAAAAAAAAAAAAAIA/"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 60,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 60,
+      "byteLength": 36,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 96,
+      "byteLength": 12
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 108,
+      "byteLength": 48
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 5,
+      "type": "VEC3",
+      "min": [
+        -1.0,
+        -1.0,
+        -1.0
+      ],
+      "max": [
+        1.0,
+        1.5,
+        1.0
+      ]
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5123,
+      "count": 18,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 3,
+      "type": "SCALAR",
+      "min": [
+        0.0
+      ],
+      "max": [
+        3.0
+      ]
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5126,
+      "count": 3,
+      "type": "VEC4"
+    }
+  ]
+}
