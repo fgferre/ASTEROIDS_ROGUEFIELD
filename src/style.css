@@ -844,312 +844,37 @@ html[data-motion='reduced'] *::after {
   display: none !important;
 }
 
-/* Menu Screen with space theme */
+/* Start Screen */
 #menu-screen {
-  background: var(--color-bg-8);
-  padding: clamp(1.5rem, 4vh, 2.75rem);
+  background: #00000a;
+  align-items: stretch;
+  justify-content: stretch;
+  overflow: hidden;
 }
 
-.menu-content {
-  color: var(--color-text);
-  padding: clamp(1.5rem, 2.5vw, 2.25rem);
-  background: var(--color-surface);
-  border-radius: var(--radius-lg);
-  border: 2px solid var(--color-primary);
-  box-shadow: var(--shadow-lg);
-  width: min(760px, 90vw);
-  max-height: none;
-  overflow: visible;
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: clamp(1.25rem, 2vh, 1.75rem);
-  overscroll-behavior: contain;
+.menu-background-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  background: radial-gradient(circle at center, rgba(0, 170, 255, 0.08), transparent);
 }
 
-.menu-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: clamp(1.25rem, 2vw, 1.75rem);
-  align-items: start;
-  min-height: 0;
-}
-
-.menu-primary {
-  display: flex;
-  flex-direction: column;
-  gap: clamp(1rem, 2vh, 1.75rem);
-}
-
-.menu-header {
-  text-align: left;
-}
-
-.game-title {
-  font-size: clamp(2.4rem, 4vw, 3rem);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-primary);
-  margin-bottom: var(--space-12);
-  text-transform: uppercase;
-  letter-spacing: 3px;
-}
-
-.game-subtitle {
-  font-size: var(--font-size-xl);
-  color: var(--color-text-secondary);
-  margin: 0;
-}
-
-.menu-instructions {
-  list-style: none;
-  margin: 0;
-  padding: var(--space-12) var(--space-16);
-  background: var(--color-bg-1);
-  border-radius: var(--radius-base);
-  border: 1px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-10);
-  max-height: min(320px, 45vh);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-.menu-instructions li {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-12);
-  color: var(--color-text-secondary);
-  padding: var(--space-8) var(--space-10);
-  border-radius: var(--radius-base);
-  transition:
-    background-color var(--duration-fast) var(--ease-standard),
-    box-shadow var(--duration-fast) var(--ease-standard);
-}
-
-.menu-instructions strong {
-  color: var(--color-primary);
-}
-
-.instruction-icon {
-  font-size: 1.4rem;
-  line-height: 1;
-  min-width: 1.4rem;
-}
-
-.menu-actions {
-  display: flex;
-  flex-wrap: wrap;
+.start-screen__overlay > .pointer-events-auto {
   gap: var(--space-16);
 }
 
-.menu-actions .btn {
-  flex: 1 1 200px;
-}
-
-.menu-secondary {
-  display: flex;
-  flex-direction: column;
-  gap: clamp(1rem, 2vh, 1.5rem);
-  align-items: stretch;
-}
-
-.menu-visual {
-  position: relative;
-  border-radius: var(--radius-lg);
-  border: 1px dashed var(--color-border);
-  padding: var(--space-16);
-  background: linear-gradient(
-    145deg,
-    rgba(var(--color-teal-500-rgb), 0.12),
-    rgba(var(--color-orange-500-rgb), 0.12)
-  );
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+.start-screen__overlay nav {
+  flex-wrap: wrap;
   justify-content: center;
-  text-align: center;
-  color: var(--color-text-secondary);
-  min-height: 180px;
-}
-
-.menu-visual__canvas {
-  width: 100%;
-  height: auto;
-  opacity: 0.18;
-  border-radius: var(--radius-base);
-  border: 1px solid rgba(var(--color-teal-500-rgb), 0.15);
-}
-
-.menu-visual__caption {
-  margin-top: var(--space-12);
-  font-size: var(--font-size-sm);
-  letter-spacing: 0.02em;
-}
-
-.tutorial-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-12);
-  align-items: stretch;
-}
-
-.tutorial-card__toggle {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-8);
-  text-align: left;
-  padding: var(--space-10) var(--space-14);
-}
-
-.tutorial-card[data-expanded='true'] .tutorial-card__toggle {
-  border-color: rgba(var(--color-teal-500-rgb), 0.6);
-  box-shadow: var(--shadow-sm);
-}
-
-.tutorial-card__toggle-title {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-primary);
-}
-
-.tutorial-card__toggle-status {
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-  margin-left: auto;
-  white-space: nowrap;
-}
-
-.tutorial-card__toggle-icon {
-  transition: transform var(--duration-fast) var(--ease-standard);
-  font-size: 0.9rem;
-  color: var(--color-text-secondary);
-}
-
-.tutorial-card[data-expanded='true'] .tutorial-card__toggle-icon {
-  transform: rotate(180deg);
-}
-
-.tutorial-panel {
-  background: rgba(var(--color-slate-900-rgb), 0.04);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--color-border);
-  padding: clamp(1.25rem, 3vw, 1.75rem);
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-14);
-  transition:
-    box-shadow var(--duration-normal) var(--ease-standard),
-    border-color var(--duration-normal) var(--ease-standard);
-}
-
-.tutorial-panel[data-state='active'] {
-  border-color: rgba(var(--color-teal-500-rgb), 0.6);
-  box-shadow: var(--shadow-md);
-}
-
-.tutorial-panel__header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.tutorial-panel__status {
-  font-weight: var(--font-weight-semibold);
-}
-
-.tutorial-panel__progress {
-  font-family: var(--font-family-mono);
-}
-
-.tutorial-panel__title {
-  margin: 0;
-  font-size: clamp(1.6rem, 2.8vw, 2rem);
-  font-weight: var(--font-weight-bold);
-  color: var(--color-text);
-}
-
-.tutorial-panel__description {
-  margin: 0;
-  color: var(--color-text-secondary);
-  line-height: var(--line-height-normal);
-}
-
-.tutorial-panel__hint {
-  margin: 0;
-  min-height: 1.5em;
-  color: var(--color-primary);
-  font-weight: var(--font-weight-medium);
-}
-
-.tutorial-panel__actions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-12);
-}
-
-#tutorial-primary-btn {
-  display: none;
-}
-
-.tutorial-panel[data-state='active'] #tutorial-primary-btn {
-  display: block;
-}
-
-.tutorial-panel__actions .btn--sm {
-  font-size: var(--font-size-sm);
-  padding-top: var(--space-8);
-  padding-bottom: var(--space-8);
-}
-
-.is-tutorial-highlight {
-  background: rgba(var(--color-teal-500-rgb), 0.1);
-  box-shadow: 0 0 0 4px rgba(var(--color-teal-500-rgb), 0.25);
-  outline: 2px solid rgba(var(--color-teal-500-rgb), 0.6);
-}
-
-@media (max-width: 960px) {
-  #menu-screen {
-    padding: clamp(1.25rem, 4vh, 2rem);
-  }
-
-  .menu-content {
-    padding: clamp(1.25rem, 3vw, 1.75rem);
-    width: min(640px, 92vw);
-    max-height: min(86vh, 640px);
-    overflow-y: auto;
-  }
-
-  .menu-grid {
-    grid-template-columns: 1fr;
-    gap: clamp(1.25rem, 3vh, 1.75rem);
-  }
-
-  .menu-actions .btn {
-    flex: 1 1 100%;
-  }
 }
 
 @media (max-width: 640px) {
-  .menu-content {
-    padding: clamp(1rem, 4vw, 1.5rem);
-  }
-
-  .menu-actions {
+  .start-screen__overlay nav {
     flex-direction: column;
-  }
-
-  .menu-visual {
-    min-height: 140px;
   }
 }
 

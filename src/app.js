@@ -11,7 +11,7 @@ import EffectsSystem from './modules/EffectsSystem.js';
 import AudioSystem from './modules/AudioSystem.js';
 import WorldSystem from './modules/WorldSystem.js';
 import RenderingSystem from './modules/RenderingSystem.js';
-import TutorialSystem from './modules/TutorialSystem.js';
+import MenuBackgroundSystem from './modules/MenuBackgroundSystem.js';
 import {
   resolveDebugPreference,
   applyDebugPreference,
@@ -25,8 +25,6 @@ const gameState = {
   initialized: false,
   lastTime: 0,
 };
-
-let pendingTutorialStart = false;
 
 function registerGameStateService() {
   if (typeof gameServices === 'undefined') return;
@@ -76,7 +74,7 @@ function init() {
     new XPOrbSystem();
     new ProgressionSystem();
     new UISystem();
-    new TutorialSystem();
+    new MenuBackgroundSystem();
     new EffectsSystem(audioSystem);
     new WorldSystem();
     new RenderingSystem();
@@ -162,39 +160,13 @@ function setupGlobalEventListeners() {
     }
   });
 
-  gameEvents.on('tutorial-completed', () => {
-    if (!pendingTutorialStart) {
-      return;
-    }
-
-    pendingTutorialStart = false;
-    startGame();
-  });
 }
 
 function requestStartGame() {
-  let tutorial = null;
-  if (
-    typeof gameServices !== 'undefined' &&
-    typeof gameServices.has === 'function' &&
-    gameServices.has('tutorial')
-  ) {
-    tutorial = gameServices.get('tutorial');
-  }
-
-  if (tutorial && typeof tutorial.requestStart === 'function') {
-    const intercepted = tutorial.requestStart();
-    if (intercepted) {
-      pendingTutorialStart = true;
-      return;
-    }
-  }
-
   startGame();
 }
 
 function startGame() {
-  pendingTutorialStart = false;
   try {
     const player = gameServices.get('player');
     if (player?.reset) player.reset();

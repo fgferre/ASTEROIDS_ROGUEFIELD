@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-menu-bg text-slate-200 font-sans;
+  }
+}
+
+@layer components {
+  .start-screen__overlay {
+    @apply pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6 text-center;
+  }
+
+  .start-screen__title {
+    @apply font-orbitron text-4xl md:text-6xl font-black text-white drop-shadow-neon select-none mb-12;
+  }
+
+  .start-screen__title::after {
+    content: '';
+    @apply block h-px w-20 mx-auto mt-6 bg-cyan-400 opacity-60;
+  }
+
+  .start-screen__nav {
+    @apply flex flex-col md:flex-row gap-4 pointer-events-auto;
+  }
+
+  .start-screen__button {
+    @apply uppercase tracking-[0.25em] px-10 py-4 text-sm md:text-base font-semibold text-cyan-300 border-2 border-cyan-400/70 rounded-lg transition duration-300 ease-out backdrop-blur-md bg-slate-900/40 shadow-[0_0_25px_rgba(0,170,255,0.25)] hover:bg-cyan-400 hover:text-slate-900 hover:shadow-[0_0_35px_rgba(0,170,255,0.75)];
+  }
+
+  .start-screen__button:focus-visible {
+    @apply outline-none ring-4 ring-cyan-300/60 ring-offset-2 ring-offset-slate-900;
+  }
+
+  .start-screen__credits-note {
+    @apply mt-10 max-w-md text-sm text-slate-300/80 pointer-events-none;
+  }
+}
+
+@layer utilities {
+  @keyframes start-screen-flicker {
+    0%, 18%, 22%, 25%, 53%, 57%, 100% {
+      text-shadow: 0 0 6px rgba(173, 216, 230, 0.75), 0 0 12px rgba(0, 170, 255, 0.65),
+        0 0 20px rgba(0, 170, 255, 0.55), 0 0 35px rgba(0, 170, 255, 0.4);
+    }
+    20%, 24%, 55% {
+      text-shadow: 0 0 2px rgba(173, 216, 230, 0.45), 0 0 6px rgba(0, 170, 255, 0.25);
+    }
+  }
+
+  .start-screen__title {
+    animation: start-screen-flicker 2.8s infinite alternate;
+  }
+}

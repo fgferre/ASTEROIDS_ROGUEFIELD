@@ -209,14 +209,6 @@ const SETTINGS_SCHEMA = [
           'Ativa uma paleta alternativa com maior distinção entre categorias e alertas.',
         default: false,
       },
-      {
-        key: 'tutorialReminders',
-        type: 'toggle',
-        label: 'Manter lembretes do tutorial',
-        description:
-          'Exibe avisos contextuais mesmo após concluir o treinamento inicial.',
-        default: true,
-      },
     ],
   },
   {

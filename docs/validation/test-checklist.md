@@ -27,11 +27,11 @@ Este documento orienta a execução de testes manuais sempre que fluxos de inter
 - [x] Painel de ondas ocupa toda a largura disponível e mantém textos legíveis.
 - [x] Contador de ondas permanece visível e alinhado quando ativado. Overlay fixa-se ao topo do campo de jogo e não empurra o conteúdo em telas menores.
 
-## Tutorial interativo
+## Tela inicial 3D
 
-- [ ] Primeira execução: ao clicar em **Iniciar missão** o treinamento interativo é exibido e o jogo só começa após o término do tutorial.
-- [ ] Após concluir o tutorial uma vez, novas partidas iniciam imediatamente ao clicar em **Iniciar missão**, sem repetir as etapas.
-- [ ] O botão **Rever tutorial** reinicia o treinamento completo sem lançar a partida automaticamente ao término.
+- [ ] Canvas 3D do menu carrega sem erros visuais e pausa quando outra tela assume o foco.
+- [ ] Botão **Iniciar missão** inicia a partida imediatamente sem etapas intermediárias.
+- [ ] Botões **Configurações** e **Créditos** permanecem acessíveis e alinhados em diferentes larguras (Créditos sem ação por enquanto).
 
 ## Level up e upgrades
 
