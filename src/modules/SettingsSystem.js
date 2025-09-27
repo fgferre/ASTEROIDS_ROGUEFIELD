@@ -549,7 +549,6 @@ class SettingsSystem {
         contrast: accessibility.highContrastHud ? 'high' : 'normal',
         colorVision: accessibility.colorBlindPalette ? 'assist' : 'standard',
         reducedMotion: Boolean(accessibility.reducedMotion),
-        tutorialReminders: Boolean(accessibility.tutorialReminders),
         hudScale,
         screenShake,
         damageFlash: video.damageFlash !== false,

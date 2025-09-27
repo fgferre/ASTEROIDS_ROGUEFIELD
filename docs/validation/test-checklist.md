@@ -4,7 +4,7 @@ Este documento orienta a execução de testes manuais sempre que fluxos de inter
 
 ## Base das telas
 
-- [x] Menu principal apresenta título, instruções e botão **Iniciar Missão** funcionais.
+- [x] Tela inicial exibe título "Asteroid Roguefield", animação 3D ativa e botões **Start**, **Options** e **Credits** visíveis.
 - [x] Tela de pausa aparece/oculta corretamente via `Esc`, mantendo o jogo congelado.
 - [x] Tela de game over exibe level, kills, ondas e tempo com valores consistentes com a run encerrada.
 
@@ -27,11 +27,13 @@ Este documento orienta a execução de testes manuais sempre que fluxos de inter
 - [x] Painel de ondas ocupa toda a largura disponível e mantém textos legíveis.
 - [x] Contador de ondas permanece visível e alinhado quando ativado. Overlay fixa-se ao topo do campo de jogo e não empurra o conteúdo em telas menores.
 
-## Tutorial interativo
+## Tela inicial 3D
 
-- [ ] Primeira execução: ao clicar em **Iniciar missão** o treinamento interativo é exibido e o jogo só começa após o término do tutorial.
-- [ ] Após concluir o tutorial uma vez, novas partidas iniciam imediatamente ao clicar em **Iniciar missão**, sem repetir as etapas.
-- [ ] O botão **Rever tutorial** reinicia o treinamento completo sem lançar a partida automaticamente ao término.
+- [ ] Cena 3D do menu carrega sem erros no console assim que a tela inicial é exibida.
+- [ ] Clicar em **Start** inicia a partida imediatamente, ocultando o menu e exibindo o HUD de jogo.
+- [ ] Botão **Options** abre e fecha o painel de configurações sobre o menu sem interromper a animação de fundo.
+- [ ] Botão **Credits** permanece disponível (sem ação definida) e não interfere na navegação por teclado ou controle.
+- [ ] Redimensionar a janela mantém o canvas 3D ajustado ao viewport, sem barras vazias ou distorções.
 
 ## Level up e upgrades
 
