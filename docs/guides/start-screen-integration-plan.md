@@ -1,21 +1,26 @@
 # Plano de Integração da Nova Tela Inicial
 
 ## Objetivo
-Substituir a tela inicial atual do Asteroid Roguefield pelo layout 3D fornecido, removendo o fluxo de tutorial legado e garantindo que o novo visual siga o padrão modular do projeto.
+Substituir a tela inicial atual do Asteroid Roguefield pelo layout 3D fornecido (docs\reference\start-screen-mockup.html), removendo o fluxo de tutorial legado e garantindo que o novo visual siga o padrão modular do projeto.
 
 ## Perguntas em Aberto
 1. Devemos remover completamente o fluxo de tutorial (painel + interceptador) ou preservar a lógica para possível uso futuro?
+sim
 2. O botão "Credits" deve abrir uma nova tela dedicada, um modal ou apenas exibir informações na própria tela inicial?
+por enquanto só deixar o botao sem nenhuma acao.
 3. Podemos adicionar `three`, `cannon-es` (substituindo `cannon.js` legacy) e `stats.js` como dependências locais via npm?
+porque nao buscar as dependencias online como já é feito hoje no codigo que devemos migrar (docs\reference\start-screen-mockup.html)
 4. Mantemos Tailwind via pipeline local (Tailwind CLI/PostCSS) ou replicamos o visual com CSS manual em `src/style.css`?
+Porque nao fazemos o mesmo metodo de docs\reference\start-screen-mockup.html
 5. O painel de FPS (Stats.js) fica sempre visível ou restrito a um modo de debug?
+pode retirar a funcionalidade (se ainda houver)
 
-> **Próximo passo:** avançar para a execução somente após validar estas decisões.
+> **Próximos passo:** avançar para a execução somente após validar estas decisões.
 
 ## Sequência Proposta
 
 1. **Preparar Dependências e Build**
-   - Atualizar `package.json` com bibliotecas necessárias (Three.js, Cannon-es, Tailwind, PostCSS, Autoprefixer, Stats.js) e scripts de build.
+   - Atualizar `package.json` com bibliotecas se forem necessárias (Three.js, Cannon-es, Tailwind, PostCSS, Autoprefixer, Stats.js) e scripts de build.
    - Configurar `tailwind.config.js` e `postcss.config.js` se Tailwind for confirmado.
    - Ajustar `Gruntfile.js` para preservar o CSS gerado.
 
