@@ -4,160 +4,52 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Asteroids Survivor - Jogo Espacial</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles/tailwind.generated.css" />
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <div id="game-container">
       <!-- Menu Principal -->
-      <div id="menu-screen" class="screen">
-        <div class="menu-content">
-          <div class="menu-grid">
-            <section class="menu-primary">
-              <header class="menu-header">
-                <h1 class="game-title">ASTEROIDS SURVIVOR</h1>
-                <p class="game-subtitle">
-                  Sobreviva às ondas infinitas de asteroides espaciais!
-                </p>
-              </header>
-              <ul class="menu-instructions" id="menu-instructions">
-                <li data-instruction="movement">
-                  <span class="instruction-icon" aria-hidden="true">🚀</span>
-                  <div><strong>WASD</strong> para acelerar a nave espacial</div>
-                </li>
-                <li data-instruction="auto-fire">
-                  <span class="instruction-icon" aria-hidden="true">⚡</span>
-                  <div>Tiro automático com mira no asteroide mais próximo</div>
-                </li>
-                <li data-instruction="magnet">
-                  <span class="instruction-icon" aria-hidden="true">💎</span>
-                  <div>Colete orbes de XP com campo magnético!</div>
-                </li>
-                <li data-instruction="upgrades">
-                  <span class="instruction-icon" aria-hidden="true">🔥</span>
-                  <div>Escolha upgrades tecnológicos espaciais</div>
-                </li>
-                <li data-instruction="shield">
-                  <span class="instruction-icon" aria-hidden="true">🛡️</span>
-                  <div>
-                    Pressione <strong>E</strong> para testar o escudo defletor
-                  </div>
-                </li>
-                <li data-instruction="pause">
-                  <span class="instruction-icon" aria-hidden="true">⏸️</span>
-                  <div>
-                    Use <strong>Esc</strong> para pausar e planejar sua
-                    estratégia
-                  </div>
-                </li>
-                <li data-instruction="survive">
-                  <span class="instruction-icon" aria-hidden="true">🌌</span>
-                  <div>Sobreviva às ondas de asteroides fragmentados</div>
-                </li>
-              </ul>
-              <div class="menu-actions">
-                <button
-                  id="start-game-btn"
-                  class="btn btn--primary btn--lg"
-                  type="button"
-                >
-                  INICIAR MISSÃO!
-                </button>
-                <button
-                  id="open-settings-btn"
-                  class="btn btn--outline btn--lg"
-                  type="button"
-                >
-                  CONFIGURAÇÕES
-                </button>
-              </div>
-            </section>
-            <aside class="menu-secondary">
-              <div class="menu-visual" aria-hidden="true">
-                <canvas
-                  id="menu-background-canvas"
-                  class="menu-visual__canvas"
-                  width="320"
-                  height="200"
-                ></canvas>
-                <p class="menu-visual__caption">
-                  Simulação estelar em desenvolvimento
-                </p>
-              </div>
-              <div
-                id="tutorial-card"
-                class="tutorial-card"
-                data-expanded="false"
+      <div id="menu-screen" class="screen start-screen">
+        <canvas
+          id="start-screen-canvas"
+          class="start-screen__canvas"
+          aria-hidden="true"
+        ></canvas>
+
+        <div class="start-screen__overlay">
+          <div class="start-screen__content">
+            <p class="start-screen__subtitle">Pressione Start para decolar</p>
+            <h1 class="start-screen__title">ASTEROID ROGUEFIELD</h1>
+            <nav class="start-screen__nav" aria-label="Menu principal">
+              <button
+                id="start-game-btn"
+                class="start-screen-button"
+                type="button"
               >
-                <button
-                  id="tutorial-toggle-btn"
-                  class="btn btn--outline btn--sm tutorial-card__toggle"
-                  type="button"
-                  aria-expanded="false"
-                  aria-controls="tutorial-panel"
-                >
-                  <span class="tutorial-card__toggle-title">
-                    Centro de treinamento (opcional)
-                  </span>
-                  <span
-                    id="tutorial-toggle-status"
-                    class="tutorial-card__toggle-status"
-                  >
-                    Tutorial inicial
-                  </span>
-                  <span class="tutorial-card__toggle-icon" aria-hidden="true"
-                    >▾</span
-                  >
-                </button>
-                <section
-                  id="tutorial-panel"
-                  class="tutorial-panel"
-                  aria-live="polite"
-                  aria-label="Centro de treinamento"
-                  data-state="idle"
-                  tabindex="-1"
-                  hidden
-                >
-                  <header class="tutorial-panel__header">
-                    <span id="tutorial-status" class="tutorial-panel__status">
-                      Tutorial inicial
-                    </span>
-                    <span
-                      id="tutorial-progress"
-                      class="tutorial-panel__progress"
-                    >
-                      --
-                    </span>
-                  </header>
-                  <h2 id="tutorial-step-title" class="tutorial-panel__title">
-                    Centro de treinamento
-                  </h2>
-                  <p
-                    id="tutorial-step-description"
-                    class="tutorial-panel__description"
-                  >
-                    Clique em “Iniciar missão” para praticar os controles
-                    básicos.
-                  </p>
-                  <p id="tutorial-step-hint" class="tutorial-panel__hint"></p>
-                  <div class="tutorial-panel__actions">
-                    <button
-                      id="tutorial-primary-btn"
-                      class="btn btn--secondary btn--full-width"
-                      type="button"
-                    >
-                      Avançar
-                    </button>
-                    <button
-                      id="tutorial-replay-btn"
-                      class="btn btn--outline btn--full-width btn--sm"
-                      type="button"
-                    >
-                      Rever tutorial
-                    </button>
-                  </div>
-                </section>
-              </div>
-            </aside>
+                Start
+              </button>
+              <button
+                id="open-settings-btn"
+                class="start-screen-button"
+                type="button"
+              >
+                Options
+              </button>
+              <button
+                id="open-credits-btn"
+                class="start-screen-button"
+                type="button"
+              >
+                Credits
+              </button>
+            </nav>
           </div>
         </div>
       </div>
