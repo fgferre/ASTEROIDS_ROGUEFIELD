@@ -5,18 +5,28 @@
   "main": "app.js",
   "scripts": {
     "dev": "vite",
-    "build": "grunt build",
+    "dev:css": "tailwindcss -c tailwind.config.js -i ./src/styles/tailwind.css -o ./src/styles/tailwind.generated.css --watch",
+    "build": "npm run build:css && grunt build",
+    "build:css": "tailwindcss -c tailwind.config.js -i ./src/styles/tailwind.css -o ./src/styles/tailwind.generated.css --minify",
     "test": "vitest run",
     "stress": "node scripts/run-stress-checks.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
+  "dependencies": {
+    "cannon-es": "^0.20.0",
+    "stats.js": "^0.17.0",
+    "three": "^0.161.0"
+  },
   "devDependencies": {
+    "autoprefixer": "^10.4.20",
     "grunt": "^1.6.1",
     "grunt-cli": "^1.5.0",
     "grunt-contrib-clean": "^2.0.1",
     "grunt-contrib-copy": "^1.0.0",
+    "postcss": "^8.4.47",
     "prettier": "3.2.5",
+    "tailwindcss": "^3.4.13",
     "vite": "^5.2.11",
     "vitest": "^3.2.4"
   }

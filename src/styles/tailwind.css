@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Utility extensions and tokens that will support the incoming
+  start screen implementation live here. Keeping them inside an
+  isolated layer allows us to progressively migrate the legacy
+  styles without breaking the current HUD while we iterate.
+*/
+@layer base {
+  :root {
+    --start-screen-font: 'Orbitron', sans-serif;
+    --start-screen-bg: #00000a;
+    --start-screen-overlay: rgba(10, 20, 30, 0.65);
+    --start-screen-border: #00aaff;
+  }
+}
+
+@layer components {
+  .start-screen-button {
+    @apply uppercase font-bold tracking-wide px-10 py-4 border-2 border-[var(--start-screen-border)]
+      text-[var(--start-screen-border)] bg-[var(--start-screen-overlay)]
+      transition-all duration-300 ease-out rounded-lg shadow-neon-glow pointer-events-auto;
+  }
+
+  .start-screen-button:hover {
+    @apply bg-neon-cyan text-black shadow-[0_0_35px_rgba(0,170,255,0.95)];
+  }
+}
