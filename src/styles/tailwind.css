@@ -25,7 +25,7 @@
   }
 
   .start-screen-button:hover {
-    @apply bg-neon-cyan text-black shadow-[0_0_35px_rgba(0,170,255,0.95)];
+    @apply bg-neon-cyan text-black shadow-neon-glow-strong;
   }
 
   .start-screen-button:focus-visible {

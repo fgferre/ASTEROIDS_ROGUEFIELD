@@ -22,6 +22,7 @@ module.exports = {
       },
       boxShadow: {
         'neon-glow': '0 0 25px rgba(0, 170, 255, 0.75)',
+        'neon-glow-strong': '0 0 35px rgba(0, 170, 255, 0.95)',
       },
     },
   },
