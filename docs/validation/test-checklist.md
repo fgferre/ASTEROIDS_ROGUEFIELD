@@ -6,6 +6,7 @@ Este documento orienta a execução de testes manuais sempre que fluxos de inter
 
 - [x] Tela inicial exibe título "Asteroid Roguefield", animação 3D ativa e botões **Start**, **Options** e **Credits** visíveis.
 - [x] Tela de pausa aparece/oculta corretamente via `Esc`, mantendo o jogo congelado.
+- [ ] Botão **Sair para o menu** do pause encerra a sessão atual, retorna ao menu principal e desbloqueia o input do HUD.
 - [x] Tela de game over exibe level, kills, ondas e tempo com valores consistentes com a run encerrada.
 
 ## HUD unificado e data-driven
@@ -32,7 +33,7 @@ Este documento orienta a execução de testes manuais sempre que fluxos de inter
 - [ ] Cena 3D do menu carrega sem erros no console assim que a tela inicial é exibida.
 - [ ] Clicar em **Start** inicia a partida imediatamente, ocultando o menu e exibindo o HUD de jogo.
 - [ ] Botão **Options** abre e fecha o painel de configurações sobre o menu sem interromper a animação de fundo.
-- [ ] Botão **Credits** permanece disponível (sem ação definida) e não interfere na navegação por teclado ou controle.
+- [ ] Botão **Credits** abre o painel de créditos, mantém o menu em segundo plano e pode ser fechado tanto pelo botão quanto pela tecla `Esc`.
 - [ ] Redimensionar a janela mantém o canvas 3D ajustado ao viewport, sem barras vazias ou distorções.
 - [ ] Fundo de estrelas permanece visível em monitores padrão, respeitando o contraste do mockup de referência.
 - [ ] Colisões entre asteroides geram fragmentação em cascata com brilho transitório, sem desaparecimentos abruptos.
