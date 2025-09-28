@@ -238,6 +238,17 @@ const SETTINGS_SCHEMA = [
         step: 0.1,
       },
       {
+        key: 'menuAsteroidNormalIntensity',
+        type: 'range',
+        label: 'Relevo dos asteroides do menu',
+        description:
+          'Ajusta a intensidade do normal map na tela inicial para destacar os detalhes sem perder desempenho.',
+        default: 1,
+        min: 0,
+        max: 2.5,
+        step: 0.1,
+      },
+      {
         key: 'damageFlash',
         type: 'toggle',
         label: 'Flash de dano',

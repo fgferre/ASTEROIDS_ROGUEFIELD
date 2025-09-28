@@ -49,6 +49,11 @@ class MenuBackgroundSystem {
     this.stats = this.ready && typeof window.stats !== 'undefined' ? window.stats : null;
     this.alphaToCoverageEnabled = false;
 
+    this.normalIntensity = this.resolveInitialNormalIntensity();
+    this.unsubscribeFromSettings = null;
+
+    this.handleVideoSettingsChanged = this.handleVideoSettingsChanged.bind(this);
+
     this.handleResize = this.handleResize.bind(this);
     this.handleScreenChanged = this.handleScreenChanged.bind(this);
     this.animate = this.animate.bind(this);
@@ -56,6 +61,7 @@ class MenuBackgroundSystem {
     if (this.ready) {
       this.bootstrapScene();
       this.registerEventHooks();
+      this.setupSettingsSubscription();
       this.syncInitialState();
     } else {
       if (!this.canvas) {
@@ -121,6 +127,7 @@ class MenuBackgroundSystem {
     this.createLighting();
     this.createStarLayers();
     this.createBaseAssets(5);
+    this.updateNormalIntensity(this.normalIntensity);
     this.ensurePoolSize(this.config.maxAsteroids);
     this.prepareInitialField();
   }
@@ -210,6 +217,39 @@ class MenuBackgroundSystem {
     }
   }
 
+  resolveInitialNormalIntensity() {
+    let resolved = 1;
+
+    try {
+      if (
+        typeof gameServices !== 'undefined' &&
+        gameServices?.has &&
+        typeof gameServices.has === 'function' &&
+        gameServices.has('settings')
+      ) {
+        const settings = gameServices.get('settings');
+        if (
+          settings &&
+          typeof settings.getCategoryValues === 'function'
+        ) {
+          const videoValues = settings.getCategoryValues('video');
+          const stored = videoValues?.menuAsteroidNormalIntensity;
+          if (typeof stored === 'number' && Number.isFinite(stored)) {
+            resolved = stored;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(
+        '[MenuBackgroundSystem] Unable to resolve initial normal intensity from settings:',
+        error
+      );
+    }
+
+    const numeric = Number(resolved);
+    return Number.isFinite(numeric) ? Math.max(0, Math.min(2.5, numeric)) : 1;
+  }
+
   createRandomGenerator(seed = Math.random() * 1000) {
     let value = Math.floor(seed * 1000) % 2147483647;
     if (value <= 0) {
@@ -252,7 +292,22 @@ class MenuBackgroundSystem {
       positions.setXYZ(i, vertex.x, vertex.y, vertex.z);
     }
 
+    if (geometry.attributes.position) {
+      geometry.attributes.position.needsUpdate = true;
+    }
+
     geometry.computeVertexNormals();
+    if (typeof geometry.normalizeNormals === 'function') {
+      geometry.normalizeNormals();
+    }
+
+    try {
+      if (geometry.attributes.uv) {
+        geometry.computeTangents();
+      }
+    } catch (error) {
+      console.warn('[MenuBackgroundSystem] Failed to compute tangents for asteroid geometry:', error);
+    }
     return geometry;
   }
 
@@ -265,36 +320,237 @@ class MenuBackgroundSystem {
     const ctx = canvas.getContext('2d');
     const imageData = ctx.createImageData(size, size);
     const simplex = new SimplexNoise(this.createRandomGenerator(seed));
+    const heightData = new Float32Array(size * size);
 
     for (let x = 0; x < size; x += 1) {
       for (let y = 0; y < size; y += 1) {
-        const value = simplex.noise3d(x / 32, y / 32, seed) * 0.5 + 0.5;
-        const color = 80 + value * 80;
+        let amplitude = 1;
+        let frequency = 1;
+        let totalAmplitude = 0;
+        let noiseValue = 0;
+
+        for (let octave = 0; octave < 4; octave += 1) {
+          noiseValue +=
+            simplex.noise3d(
+              (x / size) * frequency + seed * 0.37,
+              (y / size) * frequency + seed * 0.53,
+              seed * 0.19 + octave * 13.37
+            ) * amplitude;
+          totalAmplitude += amplitude;
+          amplitude *= 0.55;
+          frequency *= 2;
+        }
+
+        const normalized = noiseValue / totalAmplitude;
+        const value = normalized * 0.5 + 0.5;
+        heightData[x + y * size] = value;
+
+        const base = 72 + value * 75;
+        const r = Math.max(0, Math.min(255, base + value * 18));
+        const g = Math.max(0, Math.min(255, base));
+        const b = Math.max(0, Math.min(255, base - value * 20));
         const index = (x + y * size) * 4;
-        imageData.data[index] = color;
-        imageData.data[index + 1] = color;
-        imageData.data[index + 2] = color;
+        imageData.data[index] = r;
+        imageData.data[index + 1] = g;
+        imageData.data[index + 2] = b;
         imageData.data[index + 3] = 255;
       }
     }
 
     ctx.putImageData(imageData, 0, 0);
 
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
-    if (typeof texture.encoding !== 'undefined') {
-      texture.encoding = THREE.sRGBEncoding;
+    const albedoTexture = new THREE.CanvasTexture(canvas);
+    albedoTexture.wrapS = THREE.RepeatWrapping;
+    albedoTexture.wrapT = THREE.RepeatWrapping;
+    albedoTexture.anisotropy = Math.min(
+      8,
+      this.renderer?.capabilities?.getMaxAnisotropy?.() || 1
+    );
+    albedoTexture.generateMipmaps = true;
+    albedoTexture.needsUpdate = true;
+    if (typeof albedoTexture.encoding !== 'undefined') {
+      albedoTexture.encoding = THREE.sRGBEncoding;
+    }
+
+    const normalData = new Uint8Array(size * size * 4);
+    const normalStrength = 4;
+    const sampleHeight = (sx, sy) => {
+      const xIndex = Math.max(0, Math.min(size - 1, sx));
+      const yIndex = Math.max(0, Math.min(size - 1, sy));
+      return heightData[xIndex + yIndex * size];
+    };
+
+    for (let y = 0; y < size; y += 1) {
+      for (let x = 0; x < size; x += 1) {
+        const left = sampleHeight(x - 1, y);
+        const right = sampleHeight(x + 1, y);
+        const up = sampleHeight(x, y - 1);
+        const down = sampleHeight(x, y + 1);
+
+        const dx = (right - left) * normalStrength;
+        const dy = (down - up) * normalStrength;
+        const nx = -dx;
+        const ny = -dy;
+        const nz = 1;
+        const length = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+        const index = (x + y * size) * 4;
+        normalData[index] = Math.round(((nx / length) * 0.5 + 0.5) * 255);
+        normalData[index + 1] = Math.round(((ny / length) * 0.5 + 0.5) * 255);
+        normalData[index + 2] = Math.round(((nz / length) * 0.5 + 0.5) * 255);
+        normalData[index + 3] = 255;
+      }
+    }
+
+    const normalTexture = new THREE.DataTexture(
+      normalData,
+      size,
+      size,
+      THREE.RGBAFormat,
+      THREE.UnsignedByteType
+    );
+    normalTexture.wrapS = THREE.RepeatWrapping;
+    normalTexture.wrapT = THREE.RepeatWrapping;
+    normalTexture.anisotropy = Math.min(
+      8,
+      this.renderer?.capabilities?.getMaxAnisotropy?.() || 1
+    );
+    normalTexture.generateMipmaps = true;
+    normalTexture.needsUpdate = true;
+    if (typeof normalTexture.encoding !== 'undefined') {
+      normalTexture.encoding = THREE.LinearEncoding;
     }
 
     const material = new THREE.MeshStandardMaterial({
-      map: texture,
-      roughness: 0.8,
-      metalness: 0.2,
-      bumpMap: texture,
-      bumpScale: 0.1,
+      map: albedoTexture,
+      normalMap: normalTexture,
+      roughness: 0.9,
+      metalness: 0.05,
     });
+    material.normalMapType = THREE.TangentSpaceNormalMap;
     material.dithering = true;
+    material.userData = material.userData || {};
+    material.userData.normalTexture = normalTexture;
+    material.userData.albedoTexture = albedoTexture;
+    this.applyNormalIntensityToMaterial(material);
     return material;
+  }
+
+  applyNormalIntensityToMaterial(material, targetIntensity = this.normalIntensity) {
+    const { THREE } = this;
+    if (!material || !THREE) {
+      return;
+    }
+
+    const intensity = Number.isFinite(targetIntensity)
+      ? Math.max(0, Math.min(2.5, targetIntensity))
+      : 1;
+
+    if (!material.normalScale || typeof material.normalScale.set !== 'function') {
+      material.normalScale = new THREE.Vector2(intensity, intensity);
+    } else {
+      material.normalScale.set(intensity, intensity);
+    }
+
+    material.userData = material.userData || {};
+    material.userData.menuNormalIntensity = intensity;
+    material.needsUpdate = true;
+  }
+
+  updateNormalIntensity(rawValue) {
+    const numeric = Number(rawValue);
+    const resolved = Number.isFinite(numeric) ? numeric : this.normalIntensity;
+    const clamped = Math.max(0, Math.min(2.5, resolved));
+    this.normalIntensity = clamped;
+
+    this.baseMaterials.forEach((material) => {
+      this.applyNormalIntensityToMaterial(material, clamped);
+    });
+
+    this.activeAsteroids.forEach((asteroid) => {
+      if (asteroid?.material) {
+        this.applyNormalIntensityToMaterial(asteroid.material, clamped);
+      }
+    });
+  }
+
+  setupSettingsSubscription() {
+    try {
+      if (
+        typeof gameServices === 'undefined' ||
+        !gameServices?.has ||
+        typeof gameServices.has !== 'function' ||
+        !gameServices.has('settings')
+      ) {
+        return;
+      }
+
+      const settings = gameServices.get('settings');
+      if (!settings || typeof settings.subscribe !== 'function') {
+        return;
+      }
+
+      if (typeof this.unsubscribeFromSettings === 'function') {
+        this.unsubscribeFromSettings();
+        this.unsubscribeFromSettings = null;
+      }
+
+      this.unsubscribeFromSettings = settings.subscribe(
+        (change = {}) => {
+          if (!change) {
+            return;
+          }
+
+          if (change.type === 'snapshot') {
+            const snapshotValue = change.value?.video?.menuAsteroidNormalIntensity;
+            if (typeof snapshotValue === 'number') {
+              this.updateNormalIntensity(snapshotValue);
+            }
+            return;
+          }
+
+          if (change.category === 'video') {
+            if (
+              change.key === 'menuAsteroidNormalIntensity' &&
+              typeof change.value === 'number'
+            ) {
+              this.updateNormalIntensity(change.value);
+              return;
+            }
+
+            if (typeof settings.getCategoryValues === 'function') {
+              const videoValues = settings.getCategoryValues('video');
+              const stored = videoValues?.menuAsteroidNormalIntensity;
+              if (typeof stored === 'number') {
+                this.updateNormalIntensity(stored);
+              }
+            }
+          }
+        },
+        { immediate: true }
+      );
+    } catch (error) {
+      console.warn(
+        '[MenuBackgroundSystem] Unable to subscribe to settings updates:',
+        error
+      );
+    }
+  }
+
+  handleVideoSettingsChanged(event = {}) {
+    const { values, change } = event;
+
+    if (values && typeof values.menuAsteroidNormalIntensity === 'number') {
+      this.updateNormalIntensity(values.menuAsteroidNormalIntensity);
+      return;
+    }
+
+    if (
+      change &&
+      change.key === 'menuAsteroidNormalIntensity' &&
+      typeof change.value === 'number'
+    ) {
+      this.updateNormalIntensity(change.value);
+    }
   }
 
   applyEdgeFeather(material) {
@@ -499,6 +755,7 @@ class MenuBackgroundSystem {
       {},
       baseMaterial.userData || {}
     );
+    this.applyNormalIntensityToMaterial(asteroid.material);
     this.applyEdgeFeather(asteroid.material);
     asteroid.material.transparent = true;
     asteroid.material.opacity = 1;
@@ -832,6 +1089,7 @@ class MenuBackgroundSystem {
 
     if (typeof gameEvents !== 'undefined' && gameEvents?.on) {
       gameEvents.on('screen-changed', this.handleScreenChanged);
+      gameEvents.on('settings-video-changed', this.handleVideoSettingsChanged);
     }
   }
 

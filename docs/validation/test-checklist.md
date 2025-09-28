@@ -37,6 +37,7 @@ Este documento orienta a execução de testes manuais sempre que fluxos de inter
 - [ ] Fundo de estrelas permanece visível em monitores padrão, respeitando o contraste do mockup de referência.
 - [ ] Colisões entre asteroides geram fragmentação em cascata com brilho transitório, sem desaparecimentos abruptos.
 - [ ] Bordas dos asteroides exibem suavização por alpha blending sem serrilhados perceptíveis durante a rotação.
+- [ ] Slider **Relevo dos asteroides do menu** reage em tempo real, ajustando o normal map sem queda perceptível de FPS.
 
 ## Level up e upgrades
 
