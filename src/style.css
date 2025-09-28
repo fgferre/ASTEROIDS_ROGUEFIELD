@@ -494,6 +494,24 @@ pre code {
   background: var(--color-secondary);
 }
 
+.btn--danger {
+  color: var(--color-cream-50);
+  background: rgba(var(--color-error-rgb), 0.18);
+  border: 1px solid rgba(var(--color-error-rgb), 0.45);
+  box-shadow: 0 8px 18px rgba(var(--color-error-rgb), 0.25);
+}
+
+.btn--danger:hover {
+  background: rgba(var(--color-error-rgb), 0.28);
+  border-color: rgba(var(--color-error-rgb), 0.6);
+}
+
+.btn--danger:active {
+  background: rgba(var(--color-error-rgb), 0.38);
+  border-color: rgba(var(--color-error-rgb), 0.7);
+  box-shadow: 0 4px 12px rgba(var(--color-error-rgb), 0.35);
+}
+
 .btn--sm {
   padding: var(--space-4) var(--space-12);
   font-size: var(--font-size-sm);
@@ -1076,6 +1094,118 @@ html[data-motion='reduced'] *::after {
   box-shadow: var(--shadow-lg);
   overflow: hidden;
   position: relative;
+}
+
+/* Credits Overlay */
+#credits-screen {
+  align-items: center;
+  justify-content: center;
+}
+
+.credits-dialog {
+  width: min(640px, 92vw);
+  max-height: min(540px, 88vh);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-24);
+  background: rgba(6, 12, 28, 0.9);
+  border: 1px solid rgba(51, 153, 255, 0.35);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 64px rgba(4, 10, 24, 0.55);
+  padding: var(--space-32);
+  color: var(--color-cream-50);
+}
+
+.credits-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-16);
+}
+
+.credits-title {
+  margin: 0;
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-3xl);
+  letter-spacing: 0.08em;
+}
+
+.credits-close-btn {
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-cream-50);
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: var(--font-size-lg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--duration-fast) var(--ease-standard);
+}
+
+.credits-close-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.credits-close-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(51, 153, 255, 0.5);
+}
+
+.credits-body {
+  overflow-y: auto;
+  padding-right: var(--space-8);
+  line-height: 1.6;
+}
+
+.credits-description {
+  margin: 0 0 var(--space-24);
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.credits-list {
+  display: grid;
+  gap: var(--space-16);
+  margin: 0;
+}
+
+.credits-entry {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.credits-entry dt {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(142, 196, 255, 0.95);
+}
+
+.credits-entry dd {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.credits-footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 540px) {
+  .credits-dialog {
+    padding: var(--space-24);
+    gap: var(--space-20);
+  }
+
+  .credits-title {
+    font-size: var(--font-size-2xl);
+  }
+
+  .credits-footer {
+    justify-content: center;
+  }
 }
 
 .settings-header {

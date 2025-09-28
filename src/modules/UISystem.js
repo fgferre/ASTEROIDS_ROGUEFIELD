@@ -76,6 +76,11 @@ class UISystem {
       activeCategory: 'audio',
       capture: null,
     };
+    this.creditsState = {
+      isOpen: false,
+      triggerId: null,
+    };
+    this.handleCreditsKeyDown = this.handleCreditsKeyDown.bind(this);
     this.levelUpState = {
       isVisible: false,
       options: [],
@@ -97,6 +102,7 @@ class UISystem {
     this.bootstrapHudValues();
     this.bindPauseControls();
     this.bindSettingsControls();
+    this.bindCreditsControls();
     this.bootstrapSettingsState();
     this.initializeViewportScaling();
 
@@ -139,6 +145,7 @@ class UISystem {
         container: document.getElementById('pause-screen') || null,
         resumeBtn: document.getElementById('pause-resume-btn') || null,
         settingsBtn: document.getElementById('pause-settings-btn') || null,
+        exitBtn: document.getElementById('pause-exit-btn') || null,
       },
       settings: {
         overlay: document.getElementById('settings-screen') || null,
@@ -148,6 +155,14 @@ class UISystem {
         closeButtons: [
           document.getElementById('settings-close-btn'),
           document.getElementById('settings-close-footer-btn'),
+        ].filter(Boolean),
+      },
+      credits: {
+        overlay: document.getElementById('credits-screen') || null,
+        primaryAction: document.getElementById('credits-back-btn') || null,
+        closeButtons: [
+          document.getElementById('credits-close-btn'),
+          document.getElementById('credits-back-btn'),
         ].filter(Boolean),
       },
     };
@@ -448,6 +463,16 @@ class UISystem {
         gameEvents.emit('settings-menu-requested', { source: 'pause' });
       });
     }
+
+    if (pauseRefs.exitBtn) {
+      pauseRefs.exitBtn.addEventListener('click', () => {
+        if (!this.currentPauseState || typeof gameEvents === 'undefined') {
+          return;
+        }
+
+        gameEvents.emit('exit-to-menu-requested', { source: 'pause-menu' });
+      });
+    }
   }
 
   bindSettingsControls() {
@@ -505,6 +530,32 @@ class UISystem {
         this.handleSettingsClick(event);
       });
     }
+  }
+
+  bindCreditsControls() {
+    if (typeof document !== 'undefined') {
+      document.addEventListener('keydown', this.handleCreditsKeyDown);
+    }
+
+    const creditsRefs = this.domRefs.credits;
+    if (!creditsRefs) {
+      return;
+    }
+
+    if (creditsRefs.overlay) {
+      creditsRefs.overlay.addEventListener('click', (event) => {
+        if (event.target === creditsRefs.overlay) {
+          this.closeCreditsOverlay({ restoreFocus: true });
+        }
+      });
+    }
+
+    ensureArray(creditsRefs.closeButtons).forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        this.closeCreditsOverlay({ restoreFocus: true });
+      });
+    });
   }
 
   setupHudLayout() {
@@ -813,6 +864,10 @@ class UISystem {
       this.handleSettingsChange(change);
     });
 
+    gameEvents.on('credits-menu-requested', (payload = {}) => {
+      this.handleCreditsMenuRequest(payload);
+    });
+
     gameEvents.on('settings-controls-changed', (payload = {}) => {
       if (
         this.settingsState.isOpen &&
@@ -855,6 +910,25 @@ class UISystem {
     this.openSettingsPanel(source);
   }
 
+  handleCreditsMenuRequest(payload = {}) {
+    if (payload && payload.open === false) {
+      const restoreFocus = payload.restoreFocus !== false;
+      this.closeCreditsOverlay({ restoreFocus });
+      return;
+    }
+
+    if (payload && payload.toggle === true) {
+      if (this.creditsState.isOpen) {
+        this.closeCreditsOverlay({ restoreFocus: true });
+      } else {
+        this.openCreditsOverlay(payload.triggerId);
+      }
+      return;
+    }
+
+    this.openCreditsOverlay(payload?.triggerId);
+  }
+
   handleSettingsChange(change) {
     if (!change) {
       return;
@@ -874,6 +948,81 @@ class UISystem {
     }
 
     this.applyVisualPreferences(payload.values);
+  }
+
+  openCreditsOverlay(triggerId = null) {
+    const creditsRefs = this.domRefs.credits;
+    const overlay = creditsRefs?.overlay;
+    if (!overlay) {
+      return;
+    }
+
+    let resolvedTriggerId = null;
+    if (typeof triggerId === 'string' && triggerId) {
+      resolvedTriggerId = triggerId;
+    } else if (
+      typeof document !== 'undefined' &&
+      document.activeElement instanceof HTMLElement &&
+      document.activeElement.id
+    ) {
+      resolvedTriggerId = document.activeElement.id;
+    }
+
+    if (resolvedTriggerId) {
+      this.creditsState.triggerId = resolvedTriggerId;
+    }
+
+    this.creditsState.isOpen = true;
+
+    this.showScreen('credits', { overlay: true, show: true });
+    overlay.setAttribute('aria-hidden', 'false');
+    document.body?.classList.add('is-credits-open');
+
+    const focusTarget =
+      creditsRefs?.primaryAction ||
+      overlay.querySelector('button, [href], [tabindex]:not([tabindex="-1"])');
+    if (focusTarget instanceof HTMLElement) {
+      focusTarget.focus();
+    }
+  }
+
+  closeCreditsOverlay(options = {}) {
+    if (!this.creditsState.isOpen) {
+      this.creditsState.triggerId = null;
+      return;
+    }
+
+    const restoreFocus = Boolean(options?.restoreFocus);
+    const overlay = this.domRefs.credits?.overlay;
+
+    this.showScreen('credits', { overlay: true, show: false });
+    if (overlay) {
+      overlay.setAttribute('aria-hidden', 'true');
+    }
+
+    document.body?.classList.remove('is-credits-open');
+
+    const triggerId = this.creditsState.triggerId;
+    this.creditsState.isOpen = false;
+    this.creditsState.triggerId = null;
+
+    if (restoreFocus && triggerId) {
+      const trigger = document.getElementById(triggerId);
+      if (trigger instanceof HTMLElement) {
+        trigger.focus();
+      }
+    }
+  }
+
+  handleCreditsKeyDown(event) {
+    if (!this.creditsState.isOpen) {
+      return;
+    }
+
+    if (event.key === 'Escape' || event.key === 'Esc') {
+      event.preventDefault();
+      this.closeCreditsOverlay({ restoreFocus: true });
+    }
   }
 
   applyAccessibilitySettings(values = {}, derived = null) {
@@ -2398,6 +2547,19 @@ class UISystem {
 
       const pauseOverlay = document.getElementById('pause-screen');
       if (pauseOverlay) pauseOverlay.classList.add('hidden');
+
+      const creditsOverlay = document.getElementById('credits-screen');
+      if (creditsOverlay) {
+        creditsOverlay.classList.add('hidden');
+        creditsOverlay.setAttribute('aria-hidden', 'true');
+      }
+
+      if (this.creditsState) {
+        this.creditsState.isOpen = false;
+        this.creditsState.triggerId = null;
+      }
+
+      document.body?.classList.remove('is-credits-open');
 
       if (typeof gameEvents !== 'undefined') {
         gameEvents.emit('screen-changed', { screen: screenName });

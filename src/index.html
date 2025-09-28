@@ -100,6 +100,13 @@
             >
               Configurações
             </button>
+            <button
+              id="pause-exit-btn"
+              class="btn btn--outline btn--danger"
+              type="button"
+            >
+              Sair para o menu
+            </button>
           </div>
           <div class="pause-hints">
             <p class="pause-hint">
@@ -155,6 +162,63 @@
               type="button"
             >
               Concluir
+            </button>
+          </footer>
+        </div>
+      </div>
+
+      <div
+        id="credits-screen"
+        class="screen screen--overlay hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="credits-title"
+      >
+        <div class="credits-dialog">
+          <header class="credits-header">
+            <h2 id="credits-title" class="credits-title">Créditos</h2>
+            <button
+              id="credits-close-btn"
+              class="credits-close-btn"
+              type="button"
+              aria-label="Fechar créditos"
+            >
+              ✕
+            </button>
+          </header>
+          <div class="credits-body" tabindex="0">
+            <p class="credits-description">
+              Asteroid Roguefield é um projeto independente focado em explorar
+              sistemas modulares de combate espacial. Este protótipo reúne
+              contribuições de design, código e efeitos sonoros para viabilizar
+              ciclos rápidos de iteração.
+            </p>
+            <dl class="credits-list">
+              <div class="credits-entry">
+                <dt>Direção Criativa</dt>
+                <dd>Equipe Roguefield Labs</dd>
+              </div>
+              <div class="credits-entry">
+                <dt>Programação</dt>
+                <dd>Arquitetura modular por colaboradores da comunidade</dd>
+              </div>
+              <div class="credits-entry">
+                <dt>Design de Som</dt>
+                <dd>Biblioteca interna de efeitos sintetizados</dd>
+              </div>
+              <div class="credits-entry">
+                <dt>Documentação</dt>
+                <dd>Compilada a partir de workshops e playtests</dd>
+              </div>
+            </dl>
+          </div>
+          <footer class="credits-footer">
+            <button
+              id="credits-back-btn"
+              class="btn btn--secondary"
+              type="button"
+            >
+              Voltar ao menu
             </button>
           </footer>
         </div>

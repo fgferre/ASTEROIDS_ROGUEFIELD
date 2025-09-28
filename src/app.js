@@ -35,6 +35,39 @@ function registerGameStateService() {
   });
 }
 
+function resetGameSystems() {
+  if (typeof gameServices === 'undefined') {
+    return;
+  }
+
+  const servicesToReset = [
+    'player',
+    'combat',
+    'enemies',
+    'physics',
+    'progression',
+    'xp-orbs',
+    'effects',
+    'world',
+    'audio',
+  ];
+
+  servicesToReset.forEach((serviceName) => {
+    try {
+      if (typeof gameServices.has === 'function' && !gameServices.has(serviceName)) {
+        return;
+      }
+
+      const service = gameServices.get(serviceName);
+      if (service && typeof service.reset === 'function') {
+        service.reset();
+      }
+    } catch (error) {
+      console.warn(`Não foi possível resetar o serviço "${serviceName}":`, error);
+    }
+  });
+}
+
 function emitPauseState() {
   if (typeof gameEvents === 'undefined') return;
 
@@ -112,6 +145,15 @@ function setupDomEventListeners() {
       if (typeof gameEvents !== 'undefined') {
         gameEvents.emit('settings-menu-requested', { source: 'menu' });
       }
+    } else if (button.id === 'menu-credits-btn') {
+      event.preventDefault();
+      if (typeof gameEvents !== 'undefined') {
+        gameEvents.emit('credits-menu-requested', {
+          open: true,
+          source: 'menu',
+          triggerId: 'menu-credits-btn',
+        });
+      }
     }
   });
 }
@@ -150,6 +192,10 @@ function setupGlobalEventListeners() {
     emitPauseState();
   });
 
+  gameEvents.on('exit-to-menu-requested', (payload = {}) => {
+    exitToMenu(payload);
+  });
+
   gameEvents.on('activate-shield-pressed', () => {
     if (gameState.screen !== 'playing') {
       return;
@@ -162,34 +208,18 @@ function setupGlobalEventListeners() {
 }
 
 function requestStartGame() {
+  if (typeof gameEvents !== 'undefined') {
+    gameEvents.emit('credits-menu-requested', {
+      open: false,
+      restoreFocus: false,
+    });
+  }
   startGame();
 }
 
 function startGame() {
   try {
-    const player = gameServices.get('player');
-    if (player?.reset) player.reset();
-
-    const combat = gameServices.get('combat');
-    if (combat?.reset) combat.reset();
-
-    const enemies = gameServices.get('enemies');
-    if (enemies?.reset) enemies.reset();
-
-    const physics = gameServices.get('physics');
-    if (physics?.reset) physics.reset();
-
-    const progression = gameServices.get('progression');
-    if (progression?.reset) progression.reset();
-
-    const xpOrbs = gameServices.get('xp-orbs');
-    if (xpOrbs?.reset) xpOrbs.reset();
-
-    const effects = gameServices.get('effects');
-    if (effects?.reset) effects.reset();
-
-    const world = gameServices.get('world');
-    if (world?.reset) world.reset();
+    resetGameSystems();
 
     const audio = gameServices.get('audio');
     if (audio?.init) audio.init();
@@ -205,6 +235,35 @@ function startGame() {
     console.log('Jogo iniciado com sucesso!');
   } catch (error) {
     console.error('Erro ao iniciar jogo:', error);
+  }
+}
+
+function exitToMenu(payload = {}) {
+  try {
+    resetGameSystems();
+
+    const ui = gameServices.get('ui');
+    if (ui) {
+      if (typeof ui.resetLevelUpState === 'function') {
+        ui.resetLevelUpState();
+      }
+      ui.showScreen('menu');
+    }
+
+    gameState.screen = 'menu';
+    const wasPaused = gameState.isPaused;
+    gameState.isPaused = false;
+    if (wasPaused) {
+      emitPauseState();
+    }
+
+    if (payload?.source) {
+      console.log(`Retornando ao menu (origem: ${payload.source}).`);
+    } else {
+      console.log('Retornando ao menu.');
+    }
+  } catch (error) {
+    console.error('Erro ao retornar ao menu:', error);
   }
 }
 
