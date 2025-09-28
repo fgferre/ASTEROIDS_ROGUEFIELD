@@ -69,7 +69,7 @@ class MenuBackgroundSystem {
     const { THREE, CANNON } = this;
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x020924, 0.0045);
+    this.scene.fog = new THREE.FogExp2(0x06122c, 0.0028);
 
     this.camera = new THREE.PerspectiveCamera(
       60,
@@ -86,6 +86,7 @@ class MenuBackgroundSystem {
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setClearColor(0x030a17, 1);
     this.renderer.shadowMap.enabled = true;
 
     this.world = new CANNON.World();
@@ -124,9 +125,30 @@ class MenuBackgroundSystem {
   createStarLayers() {
     const { THREE } = this;
     const layerConfigs = [
-      { count: 4000, size: 0.38, distance: 6500, speedFactor: 0.022 },
-      { count: 2600, size: 0.45, distance: 5200, speedFactor: 0.04 },
-      { count: 1600, size: 0.6, distance: 3600, speedFactor: 0.06 },
+      {
+        count: 2200,
+        radius: 540,
+        size: 2.4,
+        color: 0xb9ddff,
+        opacity: 0.88,
+        speedFactor: 0.003,
+      },
+      {
+        count: 1600,
+        radius: 420,
+        size: 1.9,
+        color: 0xdff4ff,
+        opacity: 0.82,
+        speedFactor: 0.006,
+      },
+      {
+        count: 900,
+        radius: 320,
+        size: 1.4,
+        color: 0xffffff,
+        opacity: 0.78,
+        speedFactor: 0.01,
+      },
     ];
 
     this.starLayers = layerConfigs.map((config) => {
@@ -136,7 +158,8 @@ class MenuBackgroundSystem {
       for (let i = 0; i < config.count; i += 1) {
         const theta = Math.random() * Math.PI * 2;
         const phi = Math.acos(2 * Math.random() - 1);
-        const radius = config.distance;
+        const radius =
+          config.radius * Math.cbrt(Math.random() * 0.85 + 0.15);
 
         const x = radius * Math.sin(phi) * Math.cos(theta);
         const y = radius * Math.sin(phi) * Math.sin(theta);
@@ -150,13 +173,13 @@ class MenuBackgroundSystem {
 
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
       const material = new THREE.PointsMaterial({
-        color: 0xcfe7ff,
+        color: config.color,
         size: config.size,
         transparent: true,
-        opacity: 0.9,
+        opacity: config.opacity,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
-        sizeAttenuation: true,
+        sizeAttenuation: false,
       });
 
       const mesh = new THREE.Points(geometry, material);
@@ -516,8 +539,10 @@ class MenuBackgroundSystem {
     this.camera.position.y = camY;
     this.camera.lookAt(0, 0, 0);
 
-    this.starLayers.forEach((layer) => {
-      layer.mesh.rotation.y = this.elapsedTime * layer.speedFactor;
+    this.starLayers.forEach((layer, index) => {
+      const speed = layer.speedFactor;
+      layer.mesh.rotation.y = this.elapsedTime * speed;
+      layer.mesh.rotation.x = this.elapsedTime * speed * 0.35 + index * 0.2;
     });
 
     this.renderer.render(this.scene, this.camera);
