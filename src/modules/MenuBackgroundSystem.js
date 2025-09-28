@@ -47,6 +47,7 @@ class MenuBackgroundSystem {
 
     this.spawnedBeltAsteroids = 0;
     this.stats = this.ready && typeof window.stats !== 'undefined' ? window.stats : null;
+    this.alphaToCoverageEnabled = false;
 
     this.handleResize = this.handleResize.bind(this);
     this.handleScreenChanged = this.handleScreenChanged.bind(this);
@@ -89,11 +90,26 @@ class MenuBackgroundSystem {
       canvas: this.canvas,
       antialias: true,
       alpha: true,
+      premultipliedAlpha: true,
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    const pixelRatio = window.devicePixelRatio || 1;
+    this.renderer.setPixelRatio(pixelRatio);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setClearColor(0x00000a, 1);
+    this.renderer.setClearColor(0x050916, 1);
     this.renderer.shadowMap.enabled = true;
+    if (typeof this.renderer.outputEncoding !== 'undefined' && THREE && THREE.sRGBEncoding) {
+      this.renderer.outputEncoding = THREE.sRGBEncoding;
+    }
+    if (
+      typeof this.renderer.toneMapping !== 'undefined' &&
+      THREE &&
+      typeof THREE.ACESFilmicToneMapping !== 'undefined'
+    ) {
+      this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      this.renderer.toneMappingExposure = 1.05;
+    }
+
+    this.enableAlphaToCoverage();
 
     this.world = new CANNON.World();
     this.world.gravity.set(0, 0, 0);
@@ -104,9 +120,26 @@ class MenuBackgroundSystem {
 
     this.createLighting();
     this.createStarLayers();
-    this.createBaseAssets(7);
+    this.createBaseAssets(5);
     this.ensurePoolSize(this.config.maxAsteroids);
     this.prepareInitialField();
+  }
+
+  enableAlphaToCoverage() {
+    if (!this.renderer) {
+      return;
+    }
+
+    try {
+      const gl = this.renderer.getContext();
+      if (gl && typeof gl.SAMPLE_ALPHA_TO_COVERAGE !== 'undefined') {
+        gl.enable(gl.SAMPLE_ALPHA_TO_COVERAGE);
+        this.alphaToCoverageEnabled = true;
+      }
+    } catch (error) {
+      console.warn('[MenuBackgroundSystem] Failed to enable alpha-to-coverage.', error);
+      this.alphaToCoverageEnabled = false;
+    }
   }
 
   createLighting() {
@@ -129,7 +162,7 @@ class MenuBackgroundSystem {
     const layerConfigs = [
       { count: 4000, distance: 8000, size: 0.3, speedFactor: 0.05 },
       { count: 3000, distance: 6000, size: 0.4, speedFactor: 0.1 },
-      { count: 2000, distance: 4000, size: 0.5, speedFactor: 0.2 },
+      { count: 2000, distance: 4000, size: 0.55, speedFactor: 0.2 },
     ];
 
     this.starLayers = layerConfigs.map((config) => {
@@ -156,9 +189,12 @@ class MenuBackgroundSystem {
         color: 0xffffff,
         size: config.size,
         transparent: true,
-        opacity: Math.random() * 0.3 + 0.4,
+        opacity: Math.random() * 0.35 + 0.55,
         fog: false,
       });
+      material.sizeAttenuation = true;
+      material.depthWrite = false;
+      material.blending = THREE.AdditiveBlending;
 
       const mesh = new THREE.Points(geometry, material);
       this.scene.add(mesh);
@@ -166,7 +202,7 @@ class MenuBackgroundSystem {
     });
   }
 
-  createBaseAssets(count = 6) {
+  createBaseAssets(count = 5) {
     for (let i = 0; i < count; i += 1) {
       const geometry = this.createDeformedIcosahedron();
       this.baseGeometries.push(geometry);
@@ -188,27 +224,31 @@ class MenuBackgroundSystem {
 
   createDeformedIcosahedron(detailSeed = Math.random() * 100) {
     const { THREE } = this;
-    const geometry = new THREE.IcosahedronGeometry(1, 4);
+    const geometry = new THREE.IcosahedronGeometry(1, 5);
     const simplex = new SimplexNoise(this.createRandomGenerator(detailSeed));
     const positions = geometry.attributes.position;
     const vertex = new THREE.Vector3();
+    const temp = new THREE.Vector3();
+    const noiseScale = Math.random() * 0.2 + 0.2;
+    const distortion = Math.random() * 0.3 + 0.2;
 
     for (let i = 0; i < positions.count; i += 1) {
       vertex.fromBufferAttribute(positions, i);
 
-      let frequency = 0.9;
-      let amplitude = 0.6;
-      let noiseValue = 0;
+      let totalNoise = 0;
+      let frequency = noiseScale;
+      let amplitude = 1;
 
       for (let octave = 0; octave < 4; octave += 1) {
-        const sample = vertex.clone().multiplyScalar(frequency).addScalar(detailSeed);
-        noiseValue += simplex.noise3d(sample.x, sample.y, sample.z) * amplitude;
-        frequency *= 1.9;
-        amplitude *= 0.55;
+        temp.copy(vertex).multiplyScalar(frequency).addScalar(detailSeed);
+        totalNoise += simplex.noise3d(temp.x, temp.y, temp.z) * amplitude;
+        frequency *= 2;
+        amplitude *= 0.5;
       }
 
-      const displacement = 1 + noiseValue * 0.35;
-      vertex.normalize().multiplyScalar(displacement);
+      vertex
+        .normalize()
+        .multiplyScalar(1 + totalNoise * distortion);
       positions.setXYZ(i, vertex.x, vertex.y, vertex.z);
     }
 
@@ -228,12 +268,12 @@ class MenuBackgroundSystem {
 
     for (let x = 0; x < size; x += 1) {
       for (let y = 0; y < size; y += 1) {
-        const n = simplex.noise3d(x / 32, y / 32, seed) * 0.5 + 0.5;
-        const shade = 90 + n * 120;
+        const value = simplex.noise3d(x / 32, y / 32, seed) * 0.5 + 0.5;
+        const color = 80 + value * 80;
         const index = (x + y * size) * 4;
-        imageData.data[index] = shade;
-        imageData.data[index + 1] = shade * 0.92;
-        imageData.data[index + 2] = shade * 0.85;
+        imageData.data[index] = color;
+        imageData.data[index + 1] = color;
+        imageData.data[index + 2] = color;
         imageData.data[index + 3] = 255;
       }
     }
@@ -242,14 +282,63 @@ class MenuBackgroundSystem {
 
     const texture = new THREE.CanvasTexture(canvas);
     texture.anisotropy = Math.min(8, this.renderer.capabilities.getMaxAnisotropy());
+    if (typeof texture.encoding !== 'undefined') {
+      texture.encoding = THREE.sRGBEncoding;
+    }
 
-    return new THREE.MeshStandardMaterial({
+    const material = new THREE.MeshStandardMaterial({
       map: texture,
-      roughness: 0.82,
+      roughness: 0.8,
       metalness: 0.2,
       bumpMap: texture,
-      bumpScale: 0.08,
+      bumpScale: 0.1,
     });
+    material.dithering = true;
+    return material;
+  }
+
+  applyEdgeFeather(material) {
+    if (!material) {
+      return;
+    }
+
+    if (!material.userData) {
+      material.userData = {};
+    }
+
+    if (material.userData.edgeFeatherApplied) {
+      return;
+    }
+
+    material.userData.edgeFeatherApplied = true;
+    material.transparent = true;
+    material.dithering = true;
+
+    const uniforms = {
+      edgeFeatherStrength: { value: 0.55 },
+      edgeFeatherPower: { value: 1.6 },
+    };
+
+    material.onBeforeCompile = (shader) => {
+      shader.uniforms.edgeFeatherStrength = uniforms.edgeFeatherStrength;
+      shader.uniforms.edgeFeatherPower = uniforms.edgeFeatherPower;
+      shader.fragmentShader = shader.fragmentShader.replace(
+        'uniform float opacity;',
+        'uniform float opacity;\nuniform float edgeFeatherStrength;\nuniform float edgeFeatherPower;'
+      );
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <alphamap_fragment>',
+        `#include <alphamap_fragment>\n` +
+          'float viewDot = dot(normalize(vNormal), normalize(-vViewPosition));\n' +
+          'float fresnel = pow(1.0 - abs(viewDot), edgeFeatherPower);\n' +
+          'fresnel = smoothstep(0.0, 1.0, fresnel);\n' +
+          'float alphaFeather = clamp(1.0 - fresnel * edgeFeatherStrength, 0.35, 1.0);\n' +
+          'diffuseColor.a *= alphaFeather;\n'
+      );
+    };
+
+    material.customProgramCacheKey = () => 'menu-background-asteroid-feather';
+    material.needsUpdate = true;
   }
 
   ensurePoolSize(size) {
@@ -406,6 +495,11 @@ class MenuBackgroundSystem {
     } else {
       asteroid.material.copy(baseMaterial);
     }
+    asteroid.material.userData = Object.assign(
+      {},
+      baseMaterial.userData || {}
+    );
+    this.applyEdgeFeather(asteroid.material);
     asteroid.material.transparent = true;
     asteroid.material.opacity = 1;
     asteroid.material.needsUpdate = true;
