@@ -33,14 +33,20 @@ class MenuBackgroundSystem {
     this.asteroidPool = [];
     this.activeAsteroids = [];
     this.objectsToDeactivate = [];
+    this.explosions = [];
 
     this.config = {
-      maxAsteroids: 80,
-      baseFieldCount: 55,
-      rogueSpawnInterval: 18,
-      cullingDistanceSqr: 450 * 450,
+      maxAsteroids: 100,
+      baseFieldCount: 60,
+      rogueSpawnInterval: 15,
+      cullingDistanceSqr: 300 * 300,
       fadeOutDuration: 1.25,
+      fragmentationThreshold: 60,
+      maxFragmentationLevel: 2,
     };
+
+    this.spawnedBeltAsteroids = 0;
+    this.stats = this.ready && typeof window.stats !== 'undefined' ? window.stats : null;
 
     this.handleResize = this.handleResize.bind(this);
     this.handleScreenChanged = this.handleScreenChanged.bind(this);
@@ -69,7 +75,7 @@ class MenuBackgroundSystem {
     const { THREE, CANNON } = this;
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x06122c, 0.0028);
+    this.scene.fog = new THREE.FogExp2(0x000104, 0.008);
 
     this.camera = new THREE.PerspectiveCamera(
       60,
@@ -77,7 +83,7 @@ class MenuBackgroundSystem {
       0.1,
       10000
     );
-    this.camera.position.set(0, 40, 120);
+    this.camera.position.set(0, 0, 100);
 
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
@@ -86,13 +92,13 @@ class MenuBackgroundSystem {
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setClearColor(0x030a17, 1);
+    this.renderer.setClearColor(0x00000a, 1);
     this.renderer.shadowMap.enabled = true;
 
     this.world = new CANNON.World();
     this.world.gravity.set(0, 0, 0);
     this.world.broadphase = new CANNON.NaiveBroadphase();
-    this.world.solver.iterations = 7;
+    this.world.solver.iterations = 5;
 
     this.clock = new THREE.Clock();
 
@@ -105,50 +111,25 @@ class MenuBackgroundSystem {
 
   createLighting() {
     const { THREE } = this;
-    const ambient = new THREE.AmbientLight(0x355a9a, 0.72);
+    const ambient = new THREE.AmbientLight(0x405060, 0.5);
     this.scene.add(ambient);
 
-    const keyLight = new THREE.PointLight(0xf6fbff, 1.2, 1500, 1.4);
-    keyLight.position.set(70, 90, 110);
+    const keyLight = new THREE.PointLight(0xffffff, 1, 1000);
+    keyLight.position.set(80, 80, 80);
     keyLight.castShadow = true;
     this.scene.add(keyLight);
 
-    const fillLight = new THREE.PointLight(0x3a9eff, 0.55, 1400, 2);
-    fillLight.position.set(-120, -30, -150);
+    const fillLight = new THREE.PointLight(0x00aaff, 0.3, 1000);
+    fillLight.position.set(-100, -50, -100);
     this.scene.add(fillLight);
-
-    const rimLight = new THREE.PointLight(0xff9a64, 0.4, 900, 2.5);
-    rimLight.position.set(40, -60, 160);
-    this.scene.add(rimLight);
   }
 
   createStarLayers() {
     const { THREE } = this;
     const layerConfigs = [
-      {
-        count: 2200,
-        radius: 540,
-        size: 2.4,
-        color: 0xb9ddff,
-        opacity: 0.88,
-        speedFactor: 0.003,
-      },
-      {
-        count: 1600,
-        radius: 420,
-        size: 1.9,
-        color: 0xdff4ff,
-        opacity: 0.82,
-        speedFactor: 0.006,
-      },
-      {
-        count: 900,
-        radius: 320,
-        size: 1.4,
-        color: 0xffffff,
-        opacity: 0.78,
-        speedFactor: 0.01,
-      },
+      { count: 4000, distance: 8000, size: 0.3, speedFactor: 0.05 },
+      { count: 3000, distance: 6000, size: 0.4, speedFactor: 0.1 },
+      { count: 2000, distance: 4000, size: 0.5, speedFactor: 0.2 },
     ];
 
     this.starLayers = layerConfigs.map((config) => {
@@ -158,8 +139,7 @@ class MenuBackgroundSystem {
       for (let i = 0; i < config.count; i += 1) {
         const theta = Math.random() * Math.PI * 2;
         const phi = Math.acos(2 * Math.random() - 1);
-        const radius =
-          config.radius * Math.cbrt(Math.random() * 0.85 + 0.15);
+        const radius = config.distance;
 
         const x = radius * Math.sin(phi) * Math.cos(theta);
         const y = radius * Math.sin(phi) * Math.sin(theta);
@@ -173,13 +153,11 @@ class MenuBackgroundSystem {
 
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
       const material = new THREE.PointsMaterial({
-        color: config.color,
+        color: 0xffffff,
         size: config.size,
         transparent: true,
-        opacity: config.opacity,
-        blending: THREE.AdditiveBlending,
-        depthWrite: false,
-        sizeAttenuation: false,
+        opacity: Math.random() * 0.3 + 0.4,
+        fog: false,
       });
 
       const mesh = new THREE.Points(geometry, material);
@@ -196,10 +174,22 @@ class MenuBackgroundSystem {
     }
   }
 
+  createRandomGenerator(seed = Math.random() * 1000) {
+    let value = Math.floor(seed * 1000) % 2147483647;
+    if (value <= 0) {
+      value += 2147483646;
+    }
+
+    return () => {
+      value = (value * 16807) % 2147483647;
+      return (value - 1) / 2147483646;
+    };
+  }
+
   createDeformedIcosahedron(detailSeed = Math.random() * 100) {
     const { THREE } = this;
     const geometry = new THREE.IcosahedronGeometry(1, 4);
-    const simplex = new SimplexNoise(() => detailSeed);
+    const simplex = new SimplexNoise(this.createRandomGenerator(detailSeed));
     const positions = geometry.attributes.position;
     const vertex = new THREE.Vector3();
 
@@ -234,7 +224,7 @@ class MenuBackgroundSystem {
     canvas.height = size;
     const ctx = canvas.getContext('2d');
     const imageData = ctx.createImageData(size, size);
-    const simplex = new SimplexNoise(() => seed);
+    const simplex = new SimplexNoise(this.createRandomGenerator(seed));
 
     for (let x = 0; x < size; x += 1) {
       for (let y = 0; y < size; y += 1) {
@@ -280,54 +270,74 @@ class MenuBackgroundSystem {
     body.sleep();
     this.world.addBody(body);
 
-    this.asteroidPool.push({
+    const asteroid = {
       mesh,
       body,
       active: false,
       fading: false,
       fadeElapsed: 0,
       material: null,
+      fragmentationLevel: 0,
+    };
+
+    body.asteroidRef = asteroid;
+    body.addEventListener('collide', (event) => {
+      this.handleBodyCollision(event, asteroid);
     });
+
+    this.asteroidPool.push(asteroid);
   }
 
   prepareInitialField() {
+    const largeCount = Math.min(20, this.config.baseFieldCount);
     for (let i = 0; i < this.config.baseFieldCount; i += 1) {
-      this.spawnBeltAsteroid();
+      this.spawnBeltAsteroid({ forceLarge: i < largeCount });
     }
   }
 
-  spawnBeltAsteroid() {
+  spawnBeltAsteroid({ forceLarge = false } = {}) {
     const { THREE, CANNON } = this;
-    const radius = 55 + Math.random() * 90;
-    const angle = Math.random() * Math.PI * 2;
-    const height = (Math.random() - 0.5) * 60;
+    this.spawnedBeltAsteroids += 1;
 
+    const belt = { innerRadius: 40, outerRadius: 150, height: 30 };
+    const angle = Math.random() * Math.PI * 2;
+    const radius =
+      belt.innerRadius + Math.random() * (belt.outerRadius - belt.innerRadius);
     const position = new THREE.Vector3(
       Math.cos(angle) * radius,
-      height,
+      (Math.random() - 0.5) * belt.height,
       Math.sin(angle) * radius
     );
 
-    const baseScale = Math.random() * 3 + 2;
-    const scaleNoise = 0.65 + Math.random() * 0.7;
+    const shouldSpawnLarge =
+      forceLarge || this.spawnedBeltAsteroids <= 20 || Math.random() < 0.25;
+    const scaleVal = shouldSpawnLarge
+      ? Math.random() * 5 + 5
+      : Math.random() * 3 + 2;
     const scale = new THREE.Vector3(
-      baseScale * scaleNoise,
-      baseScale * (0.8 + Math.random() * 0.4),
-      baseScale * (0.85 + Math.random() * 0.5)
+      scaleVal * (1 + (Math.random() - 0.5) * 0.8),
+      scaleVal * (1 + (Math.random() - 0.5) * 0.8),
+      scaleVal * (1 + (Math.random() - 0.5) * 0.8)
     );
 
-    const orbitalSpeed = 12 + Math.random() * 10;
-    const tangential = new CANNON.Vec3(-Math.sin(angle), 0, Math.cos(angle));
-    tangential.scale(orbitalSpeed, tangential);
-    tangential.y = (Math.random() - 0.5) * 4;
-
-    const spin = new CANNON.Vec3(
-      (Math.random() - 0.5) * 1.5,
-      (Math.random() - 0.5) * 1.5,
-      (Math.random() - 0.5) * 1.5
+    const velocity = new CANNON.Vec3(
+      (Math.random() - 0.5) * 2,
+      (Math.random() - 0.5) * 2,
+      (Math.random() - 0.5) * 2
     );
 
-    this.activateAsteroid({ position, scale, velocity: tangential, angularVelocity: spin });
+    const angularVelocity = new CANNON.Vec3(
+      (Math.random() - 0.5) * 1,
+      (Math.random() - 0.5) * 1,
+      (Math.random() - 0.5) * 1
+    );
+
+    this.activateAsteroid({
+      position,
+      scale,
+      velocity,
+      angularVelocity,
+    });
   }
 
   spawnRogueAsteroid() {
@@ -346,7 +356,7 @@ class MenuBackgroundSystem {
       Math.random() - 0.5
     ).normalize();
 
-    const spawnDistance = 320;
+    const spawnDistance = 300;
     const position = spawnDirection.multiplyScalar(spawnDistance);
 
     const velocity = new CANNON.Vec3();
@@ -355,9 +365,9 @@ class MenuBackgroundSystem {
       velocity
     );
     velocity.normalize();
-    velocity.scale(70 + Math.random() * 20, velocity);
+    velocity.scale(80, velocity);
 
-    const scaleValue = Math.random() * 4 + 3;
+    const scaleValue = Math.random() * 4 + 4;
     const scale = new THREE.Vector3(
       scaleValue,
       scaleValue * (0.85 + Math.random() * 0.3),
@@ -373,7 +383,13 @@ class MenuBackgroundSystem {
     this.activateAsteroid({ position, scale, velocity, angularVelocity });
   }
 
-  activateAsteroid({ position, scale, velocity, angularVelocity }) {
+  activateAsteroid({
+    position,
+    scale,
+    velocity,
+    angularVelocity,
+    fragmentationLevel = 0,
+  }) {
     const asteroid = this.getAsteroidFromPool();
     if (!asteroid) {
       return;
@@ -405,7 +421,7 @@ class MenuBackgroundSystem {
       body.updateBoundingRadius();
     }
 
-    body.mass = Math.max(0.5, Math.pow(avgRadius, 2.2));
+    body.mass = Math.max(0.5, Math.pow(avgRadius, 3));
     body.updateMassProperties();
     body.position.set(position.x, position.y, position.z);
     body.velocity.set(velocity.x, velocity.y, velocity.z);
@@ -421,10 +437,15 @@ class MenuBackgroundSystem {
     asteroid.active = true;
     asteroid.fading = false;
     asteroid.fadeElapsed = 0;
+    asteroid.fragmentationLevel = fragmentationLevel;
     this.activeAsteroids.push(asteroid);
   }
 
   getAsteroidFromPool() {
+    if (this.activeAsteroids.length >= this.config.maxAsteroids) {
+      return null;
+    }
+
     const idle = this.asteroidPool.find((item) => !item.active);
     if (idle) {
       return idle;
@@ -446,6 +467,7 @@ class MenuBackgroundSystem {
     asteroid.active = false;
     asteroid.fading = false;
     asteroid.fadeElapsed = 0;
+    asteroid.fragmentationLevel = 0;
     asteroid.mesh.visible = false;
     asteroid.mesh.position.set(0, -10000, 0);
     asteroid.body.sleep();
@@ -469,6 +491,106 @@ class MenuBackgroundSystem {
     }
   }
 
+  handleBodyCollision(event, asteroid) {
+    if (!asteroid?.active) {
+      return;
+    }
+
+    if (asteroid.fragmentationLevel >= this.config.maxFragmentationLevel) {
+      return;
+    }
+
+    const impact =
+      typeof event?.contact?.getImpactVelocityAlongNormal === 'function'
+        ? event.contact.getImpactVelocityAlongNormal()
+        : 0;
+
+    if (impact <= this.config.fragmentationThreshold) {
+      return;
+    }
+
+    this.createExplosion(asteroid.mesh.position);
+    this.fragmentAsteroid(asteroid);
+    this.objectsToDeactivate.push(asteroid);
+  }
+
+  fragmentAsteroid(parent) {
+    const { THREE, CANNON } = this;
+    const radius = parent.body.shapes[0]?.radius || 1;
+    const fragments = Math.floor(Math.random() * 3) + 2;
+
+    for (let i = 0; i < fragments; i += 1) {
+      const scaleMultiplier = Math.random() * 0.3 + 0.4;
+      const newScale = parent.mesh.scale.clone().multiplyScalar(scaleMultiplier);
+
+      if (newScale.x < 1 && newScale.y < 1 && newScale.z < 1) {
+        continue;
+      }
+
+      const direction = new THREE.Vector3(
+        Math.random() - 0.5,
+        Math.random() - 0.5,
+        Math.random() - 0.5
+      ).normalize();
+
+      const offset = parent.mesh.position.clone().add(direction.clone().multiplyScalar(radius));
+
+      const explosionImpulse = new CANNON.Vec3(direction.x, direction.y, direction.z);
+      explosionImpulse.scale(15, explosionImpulse);
+
+      const velocity = new CANNON.Vec3(
+        parent.body.velocity.x + explosionImpulse.x,
+        parent.body.velocity.y + explosionImpulse.y,
+        parent.body.velocity.z + explosionImpulse.z
+      );
+
+      const angularVelocity = new CANNON.Vec3(
+        (Math.random() - 0.5) * 5,
+        (Math.random() - 0.5) * 5,
+        (Math.random() - 0.5) * 5
+      );
+
+      this.activateAsteroid({
+        position: offset,
+        scale: newScale,
+        velocity,
+        angularVelocity,
+        fragmentationLevel: parent.fragmentationLevel + 1,
+      });
+    }
+  }
+
+  createExplosion(position) {
+    const { THREE } = this;
+    const light = new THREE.PointLight(0xffaa66, 3.5, 140, 2);
+    light.position.copy(position);
+    this.scene.add(light);
+
+    this.explosions.push({
+      light,
+      life: 0.4,
+      maxLife: 0.4,
+      initialIntensity: light.intensity,
+      initialDistance: light.distance,
+    });
+  }
+
+  updateExplosions(delta) {
+    for (let i = this.explosions.length - 1; i >= 0; i -= 1) {
+      const explosion = this.explosions[i];
+      explosion.life -= delta;
+
+      const progress = Math.max(explosion.life, 0) / explosion.maxLife;
+      explosion.light.intensity = explosion.initialIntensity * progress;
+      explosion.light.distance = explosion.initialDistance * (0.7 + progress * 0.3);
+
+      if (explosion.life <= 0) {
+        this.scene.remove(explosion.light);
+        this.explosions.splice(i, 1);
+      }
+    }
+  }
+
   animate() {
     if (!this.isActive) {
       return;
@@ -477,6 +599,9 @@ class MenuBackgroundSystem {
     this.animationFrame = requestAnimationFrame(this.animate);
 
     const delta = Math.min(this.clock.getDelta(), 0.05);
+    if (this.stats) {
+      this.stats.begin();
+    }
     this.elapsedTime += delta;
     this.rogueSpawnTimer += delta;
 
@@ -532,20 +657,22 @@ class MenuBackgroundSystem {
       this.spawnBeltAsteroid();
     }
 
-    const orbitRadius = 85;
-    const camY = Math.sin(this.elapsedTime * 0.4) * 18;
-    this.camera.position.x = Math.cos(this.elapsedTime * 0.18) * orbitRadius;
-    this.camera.position.z = Math.sin(this.elapsedTime * 0.18) * orbitRadius;
-    this.camera.position.y = camY;
+    const timer = this.elapsedTime * 0.03;
+    const orbitalRadius = 70;
+    this.camera.position.x = Math.cos(timer) * orbitalRadius;
+    this.camera.position.z = Math.sin(timer) * orbitalRadius;
+    this.camera.position.y = Math.sin(timer * 0.7) * 15;
     this.camera.lookAt(0, 0, 0);
 
-    this.starLayers.forEach((layer, index) => {
-      const speed = layer.speedFactor;
-      layer.mesh.rotation.y = this.elapsedTime * speed;
-      layer.mesh.rotation.x = this.elapsedTime * speed * 0.35 + index * 0.2;
+    this.starLayers.forEach((layer) => {
+      layer.mesh.rotation.y = -timer * layer.speedFactor;
     });
 
+    this.updateExplosions(delta);
     this.renderer.render(this.scene, this.camera);
+    if (this.stats) {
+      this.stats.end();
+    }
   }
 
   start() {

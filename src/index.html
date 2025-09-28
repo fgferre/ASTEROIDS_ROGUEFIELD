@@ -281,6 +281,15 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/r16/Stats.min.js"></script>
+    <script>
+      if (typeof window !== 'undefined' && typeof Stats !== 'undefined' && !window.stats) {
+        const statsPanel = new Stats();
+        statsPanel.showPanel(0);
+        document.body.appendChild(statsPanel.dom);
+        window.stats = statsPanel;
+      }
+    </script>
 
     <!-- Módulos Core (carregados primeiro para estarem disponíveis globalmente) -->
     <script type="module" src="./core/EventBus.js"></script>

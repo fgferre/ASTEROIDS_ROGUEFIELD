@@ -34,6 +34,8 @@ Este documento orienta a execução de testes manuais sempre que fluxos de inter
 - [ ] Botão **Options** abre e fecha o painel de configurações sobre o menu sem interromper a animação de fundo.
 - [ ] Botão **Credits** permanece disponível (sem ação definida) e não interfere na navegação por teclado ou controle.
 - [ ] Redimensionar a janela mantém o canvas 3D ajustado ao viewport, sem barras vazias ou distorções.
+- [ ] Fundo de estrelas permanece visível em monitores padrão, respeitando o contraste do mockup de referência.
+- [ ] Colisões entre asteroides geram fragmentação em cascata com brilho transitório, sem desaparecimentos abruptos.
 
 ## Level up e upgrades
 
