@@ -39,6 +39,7 @@ class MenuBackgroundSystem {
       baseFieldCount: 55,
       rogueSpawnInterval: 18,
       cullingDistanceSqr: 450 * 450,
+      fadeOutDuration: 1.25,
     };
 
     this.handleResize = this.handleResize.bind(this);
@@ -68,7 +69,7 @@ class MenuBackgroundSystem {
     const { THREE, CANNON } = this;
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x000104, 0.008);
+    this.scene.fog = new THREE.FogExp2(0x020924, 0.0045);
 
     this.camera = new THREE.PerspectiveCamera(
       60,
@@ -103,19 +104,19 @@ class MenuBackgroundSystem {
 
   createLighting() {
     const { THREE } = this;
-    const ambient = new THREE.AmbientLight(0x203a60, 0.55);
+    const ambient = new THREE.AmbientLight(0x355a9a, 0.72);
     this.scene.add(ambient);
 
-    const keyLight = new THREE.PointLight(0xffffff, 1.05, 1500, 1.5);
+    const keyLight = new THREE.PointLight(0xf6fbff, 1.2, 1500, 1.4);
     keyLight.position.set(70, 90, 110);
     keyLight.castShadow = true;
     this.scene.add(keyLight);
 
-    const fillLight = new THREE.PointLight(0x2a8eff, 0.45, 1400, 2);
+    const fillLight = new THREE.PointLight(0x3a9eff, 0.55, 1400, 2);
     fillLight.position.set(-120, -30, -150);
     this.scene.add(fillLight);
 
-    const rimLight = new THREE.PointLight(0xff8844, 0.35, 900, 2.5);
+    const rimLight = new THREE.PointLight(0xff9a64, 0.4, 900, 2.5);
     rimLight.position.set(40, -60, 160);
     this.scene.add(rimLight);
   }
@@ -123,9 +124,9 @@ class MenuBackgroundSystem {
   createStarLayers() {
     const { THREE } = this;
     const layerConfigs = [
-      { count: 4000, size: 0.35, distance: 6500, speedFactor: 0.02 },
-      { count: 2600, size: 0.4, distance: 5200, speedFactor: 0.035 },
-      { count: 1600, size: 0.55, distance: 3600, speedFactor: 0.055 },
+      { count: 4000, size: 0.38, distance: 6500, speedFactor: 0.022 },
+      { count: 2600, size: 0.45, distance: 5200, speedFactor: 0.04 },
+      { count: 1600, size: 0.6, distance: 3600, speedFactor: 0.06 },
     ];
 
     this.starLayers = layerConfigs.map((config) => {
@@ -149,11 +150,13 @@ class MenuBackgroundSystem {
 
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
       const material = new THREE.PointsMaterial({
-        color: 0xffffff,
+        color: 0xcfe7ff,
         size: config.size,
         transparent: true,
-        opacity: 0.65,
+        opacity: 0.9,
+        blending: THREE.AdditiveBlending,
         depthWrite: false,
+        sizeAttenuation: true,
       });
 
       const mesh = new THREE.Points(geometry, material);
@@ -254,7 +257,14 @@ class MenuBackgroundSystem {
     body.sleep();
     this.world.addBody(body);
 
-    this.asteroidPool.push({ mesh, body, active: false });
+    this.asteroidPool.push({
+      mesh,
+      body,
+      active: false,
+      fading: false,
+      fadeElapsed: 0,
+      material: null,
+    });
   }
 
   prepareInitialField() {
@@ -348,10 +358,19 @@ class MenuBackgroundSystem {
 
     const { mesh, body } = asteroid;
     const geometry = this.baseGeometries[Math.floor(Math.random() * this.baseGeometries.length)];
-    const material = this.baseMaterials[Math.floor(Math.random() * this.baseMaterials.length)];
+    const baseMaterial =
+      this.baseMaterials[Math.floor(Math.random() * this.baseMaterials.length)];
 
     mesh.geometry = geometry;
-    mesh.material = material;
+    if (!asteroid.material) {
+      asteroid.material = baseMaterial.clone();
+    } else {
+      asteroid.material.copy(baseMaterial);
+    }
+    asteroid.material.transparent = true;
+    asteroid.material.opacity = 1;
+    asteroid.material.needsUpdate = true;
+    mesh.material = asteroid.material;
     mesh.visible = true;
     mesh.position.copy(position);
     mesh.scale.copy(scale);
@@ -377,6 +396,8 @@ class MenuBackgroundSystem {
     body.wakeUp();
 
     asteroid.active = true;
+    asteroid.fading = false;
+    asteroid.fadeElapsed = 0;
     this.activeAsteroids.push(asteroid);
   }
 
@@ -400,16 +421,28 @@ class MenuBackgroundSystem {
     }
 
     asteroid.active = false;
+    asteroid.fading = false;
+    asteroid.fadeElapsed = 0;
     asteroid.mesh.visible = false;
     asteroid.mesh.position.set(0, -10000, 0);
     asteroid.body.sleep();
     asteroid.body.position.set(0, -10000, 0);
     asteroid.body.velocity.set(0, 0, 0);
     asteroid.body.angularVelocity.set(0, 0, 0);
+    if (asteroid.material) {
+      asteroid.material.opacity = 1;
+    }
 
     const index = this.activeAsteroids.indexOf(asteroid);
     if (index >= 0) {
       this.activeAsteroids.splice(index, 1);
+    }
+  }
+
+  startFadeOut(asteroid) {
+    if (!asteroid.fading) {
+      asteroid.fading = true;
+      asteroid.fadeElapsed = 0;
     }
   }
 
@@ -448,7 +481,23 @@ class MenuBackgroundSystem {
         body.position.z * body.position.z;
 
       if (distanceSqr > this.config.cullingDistanceSqr) {
-        this.objectsToDeactivate.push(asteroid);
+        this.startFadeOut(asteroid);
+      }
+
+      if (asteroid.fading) {
+        asteroid.fadeElapsed += delta;
+        const fadeProgress = Math.min(
+          asteroid.fadeElapsed / this.config.fadeOutDuration,
+          1
+        );
+        if (asteroid.material) {
+          asteroid.material.opacity = 1 - fadeProgress;
+          asteroid.material.needsUpdate = true;
+        }
+
+        if (fadeProgress >= 1) {
+          this.objectsToDeactivate.push(asteroid);
+        }
       }
     }
 
