@@ -209,14 +209,6 @@ const SETTINGS_SCHEMA = [
           'Ativa uma paleta alternativa com maior distinção entre categorias e alertas.',
         default: false,
       },
-      {
-        key: 'tutorialReminders',
-        type: 'toggle',
-        label: 'Manter lembretes do tutorial',
-        description:
-          'Exibe avisos contextuais mesmo após concluir o treinamento inicial.',
-        default: true,
-      },
     ],
   },
   {
@@ -243,6 +235,17 @@ const SETTINGS_SCHEMA = [
         default: 1,
         min: 0,
         max: 1,
+        step: 0.1,
+      },
+      {
+        key: 'menuAsteroidNormalIntensity',
+        type: 'range',
+        label: 'Relevo dos asteroides do menu',
+        description:
+          'Ajusta a intensidade do normal map na tela inicial para destacar os detalhes sem perder desempenho.',
+        default: 1,
+        min: 0,
+        max: 2.5,
         step: 0.1,
       },
       {
