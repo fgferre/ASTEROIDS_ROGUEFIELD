@@ -1751,6 +1751,17 @@ class EnemySystem {
         this.cachedProgression = null;
       }
     }
+
+    if (force || !this.cachedXPOrbs) {
+      if (
+        typeof gameServices.has === 'function' &&
+        gameServices.has('xp-orbs')
+      ) {
+        this.cachedXPOrbs = gameServices.get('xp-orbs');
+      } else {
+        this.cachedXPOrbs = null;
+      }
+    }
   }
 
   getCachedPlayer() {
@@ -1772,6 +1783,13 @@ class EnemySystem {
       this.resolveCachedServices();
     }
     return this.cachedProgression;
+  }
+
+  getCachedXPOrbs() {
+    if (!this.cachedXPOrbs) {
+      this.resolveCachedServices();
+    }
+    return this.cachedXPOrbs;
   }
 
   invalidateActiveAsteroidCache() {
@@ -2662,17 +2680,17 @@ class EnemySystem {
   }
 
   grantWaveRewards() {
-    const progression = this.getCachedProgression();
+    const xpOrbs = this.getCachedXPOrbs();
     const player = this.getCachedPlayer();
 
-    if (!progression || !player) return;
+    if (!xpOrbs || !player) return;
 
     const orbCount = 4 + Math.floor(this.waveState.current / 2);
 
     for (let i = 0; i < orbCount; i++) {
       const angle = (i / orbCount) * Math.PI * 2;
       const distance = 100;
-      progression.createXPOrb(
+      xpOrbs.createXPOrb(
         player.position.x + Math.cos(angle) * distance,
         player.position.y + Math.sin(angle) * distance,
         20 + this.waveState.current * 5
