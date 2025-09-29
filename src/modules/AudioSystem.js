@@ -1,3 +1,7 @@
+import AudioPool from './AudioPool.js';
+import AudioCache from './AudioCache.js';
+import AudioBatcher from './AudioBatcher.js';
+
 class AudioSystem {
   constructor() {
     this.context = null;
@@ -12,6 +16,22 @@ class AudioSystem {
       music: 0.6,
       effects: 1,
       muteAll: false,
+    };
+
+    // Optimization systems
+    this.pool = null;
+    this.cache = null;
+    this.batcher = null;
+
+    // Performance tracking
+    this.performanceMonitor = {
+      enabled: true,
+      frameCount: 0,
+      audioCallsPerFrame: 0,
+      averageCallsPerFrame: 0,
+      peakCallsPerFrame: 0,
+      lastFrameTime: performance.now(),
+      totalAudioCalls: 0
     };
 
     if (typeof gameServices !== 'undefined') {
@@ -45,8 +65,18 @@ class AudioSystem {
       this.musicGain.connect(this.masterGain);
       this.effectsGain.connect(this.masterGain);
 
+      // Initialize optimization systems
+      this.pool = new AudioPool(this.context, 50);
+      this.cache = new AudioCache(this.context, 20);
+      this.batcher = new AudioBatcher(this, 16);
+
       this.applyVolumeToNodes();
       this.initialized = true;
+
+      // Start performance monitoring
+      this._startPerformanceMonitoring();
+
+      console.log('[AudioSystem] Fully initialized with optimizations');
     } catch (error) {
       console.warn('Áudio não disponível:', error);
       this.initialized = false;
@@ -202,9 +232,17 @@ class AudioSystem {
   }
 
   playLaserShot() {
+    this._trackPerformance('playLaserShot');
+
+    // Use batching for laser shots if available
+    if (this.batcher && this.batcher.scheduleSound('playLaserShot', [], { allowOverlap: true, priority: 1 })) {
+      return;
+    }
+
+    // Fallback to immediate play
     this.safePlay(() => {
-      const osc = this.context.createOscillator();
-      const gain = this.context.createGain();
+      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
+      const gain = this.pool ? this.pool.getGain() : this.context.createGain();
 
       osc.connect(gain);
       this.connectGainNode(gain);
@@ -223,17 +261,32 @@ class AudioSystem {
 
       osc.start();
       osc.stop(this.context.currentTime + 0.08);
+
+      // Return gain to pool after use if using pool
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(gain);
+        }, 90);
+      }
     });
   }
 
   playAsteroidBreak(size) {
+    this._trackPerformance('playAsteroidBreak');
+
+    // Use batching for asteroid breaks if available
+    if (this.batcher && this.batcher.scheduleSound('playAsteroidBreak', [size], { allowOverlap: false, priority: 2 })) {
+      return;
+    }
+
+    // Fallback to immediate play
     this.safePlay(() => {
       const baseFreq = size === 'large' ? 70 : size === 'medium' ? 110 : 150;
       const duration =
         size === 'large' ? 0.35 : size === 'medium' ? 0.25 : 0.18;
 
-      const osc = this.context.createOscillator();
-      const gain = this.context.createGain();
+      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
+      const gain = this.pool ? this.pool.getGain() : this.context.createGain();
 
       osc.connect(gain);
       this.connectGainNode(gain);
@@ -253,32 +306,49 @@ class AudioSystem {
 
       osc.start();
       osc.stop(this.context.currentTime + duration);
+
+      // Return gain to pool after use if using pool
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(gain);
+        }, duration * 1000 + 10);
+      }
     });
   }
 
   playBigExplosion() {
+    this._trackPerformance('playBigExplosion');
+
     this.safePlay(() => {
-      const osc = this.context.createOscillator();
-      const oscGain = this.context.createGain();
+      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
+      const oscGain = this.pool ? this.pool.getGain() : this.context.createGain();
       osc.connect(oscGain);
       const destination = this.getEffectsDestination();
       if (destination) {
         oscGain.connect(destination);
       }
 
-      const bufferSize = this.context.sampleRate * 0.5;
-      const noiseBuffer = this.context.createBuffer(
-        1,
-        bufferSize,
-        this.context.sampleRate
-      );
-      const output = noiseBuffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) {
-        output[i] = Math.random() * 2 - 1;
+      // Use cached noise buffer if available
+      let noiseBuffer;
+      if (this.cache) {
+        noiseBuffer = this.cache.getNoiseBuffer(0.5, true, 'exponential');
+      } else {
+        // Fallback to creating buffer
+        const bufferSize = this.context.sampleRate * 0.5;
+        noiseBuffer = this.context.createBuffer(
+          1,
+          bufferSize,
+          this.context.sampleRate
+        );
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          output[i] = Math.random() * 2 - 1;
+        }
       }
-      const noise = this.context.createBufferSource();
+
+      const noise = this.pool ? this.pool.getBufferSource() : this.context.createBufferSource();
       noise.buffer = noiseBuffer;
-      const noiseGain = this.context.createGain();
+      const noiseGain = this.pool ? this.pool.getGain() : this.context.createGain();
       noise.connect(noiseGain);
       if (destination) {
         noiseGain.connect(destination);
@@ -301,13 +371,29 @@ class AudioSystem {
 
       noise.start(now);
       noise.stop(now + 0.4);
+
+      // Return gains to pool after use if using pool
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(oscGain);
+          this.pool.returnGain(noiseGain);
+        }, 510);
+      }
     });
   }
 
   playXPCollect() {
+    this._trackPerformance('playXPCollect');
+
+    // Use batching for XP collect if available
+    if (this.batcher && this.batcher.scheduleSound('playXPCollect', [], { allowOverlap: true, priority: 1 })) {
+      return;
+    }
+
+    // Fallback to immediate play
     this.safePlay(() => {
-      const osc = this.context.createOscillator();
-      const gain = this.context.createGain();
+      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
+      const gain = this.pool ? this.pool.getGain() : this.context.createGain();
 
       osc.connect(gain);
       this.connectGainNode(gain);
@@ -326,6 +412,13 @@ class AudioSystem {
 
       osc.start();
       osc.stop(this.context.currentTime + 0.12);
+
+      // Return gain to pool after use if using pool
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(gain);
+        }, 130);
+      }
     });
   }
 
@@ -485,23 +578,32 @@ class AudioSystem {
   }
 
   playShieldShockwave() {
+    this._trackPerformance('playShieldShockwave');
+
     this.safePlay(() => {
-      const noiseBuffer = this.context.createBuffer(
-        1,
-        this.context.sampleRate * 0.4,
-        this.context.sampleRate
-      );
-      const output = noiseBuffer.getChannelData(0);
-      for (let i = 0; i < noiseBuffer.length; i++) {
-        output[i] = (Math.random() * 2 - 1) * (1 - i / noiseBuffer.length);
+      // Use cached noise buffer if available
+      let noiseBuffer;
+      if (this.cache) {
+        noiseBuffer = this.cache.getNoiseBuffer(0.4, true, 'linear');
+      } else {
+        // Fallback to creating buffer
+        noiseBuffer = this.context.createBuffer(
+          1,
+          this.context.sampleRate * 0.4,
+          this.context.sampleRate
+        );
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < noiseBuffer.length; i++) {
+          output[i] = (Math.random() * 2 - 1) * (1 - i / noiseBuffer.length);
+        }
       }
 
-      const noise = this.context.createBufferSource();
+      const noise = this.pool ? this.pool.getBufferSource() : this.context.createBufferSource();
       noise.buffer = noiseBuffer;
-      const noiseGain = this.context.createGain();
+      const noiseGain = this.pool ? this.pool.getGain() : this.context.createGain();
 
-      const osc = this.context.createOscillator();
-      const oscGain = this.context.createGain();
+      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
+      const oscGain = this.pool ? this.pool.getGain() : this.context.createGain();
 
       noise.connect(noiseGain);
       this.connectGainNode(noiseGain);
@@ -525,11 +627,166 @@ class AudioSystem {
 
       osc.start(now);
       osc.stop(now + 0.4);
+
+      // Return gains to pool after use if using pool
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(noiseGain);
+          this.pool.returnGain(oscGain);
+        }, 410);
+      }
     });
   }
 
   reset() {
-    // Nada específico por enquanto, mas mantemos interface consistente
+    // Cleanup optimization systems
+    if (this.pool) {
+      this.pool.cleanup();
+    }
+
+    if (this.cache) {
+      this.cache.clearCache();
+    }
+
+    if (this.batcher) {
+      this.batcher.flushPendingBatches();
+      this.batcher.resetStats();
+    }
+
+    // Reset performance monitoring
+    this._resetPerformanceMonitoring();
+  }
+
+  // === Performance Monitoring ===
+
+  /**
+   * Inicia o sistema de monitoramento de performance
+   */
+  _startPerformanceMonitoring() {
+    if (!this.performanceMonitor.enabled) return;
+
+    // Update performance stats every second
+    setInterval(() => {
+      this._updatePerformanceStats();
+    }, 1000);
+  }
+
+  /**
+   * Tracked de chamadas de áudio para performance
+   */
+  _trackPerformance(methodName) {
+    if (!this.performanceMonitor.enabled) return;
+
+    this.performanceMonitor.audioCallsPerFrame++;
+    this.performanceMonitor.totalAudioCalls++;
+  }
+
+  /**
+   * Atualiza estatísticas de performance
+   */
+  _updatePerformanceStats() {
+    const now = performance.now();
+    const deltaTime = now - this.performanceMonitor.lastFrameTime;
+
+    if (deltaTime >= 1000) { // Update every second
+      this.performanceMonitor.frameCount++;
+
+      // Calculate average calls per frame
+      const avgCalls = this.performanceMonitor.audioCallsPerFrame;
+      this.performanceMonitor.averageCallsPerFrame =
+        (this.performanceMonitor.averageCallsPerFrame + avgCalls) / 2;
+
+      // Track peak calls
+      if (avgCalls > this.performanceMonitor.peakCallsPerFrame) {
+        this.performanceMonitor.peakCallsPerFrame = avgCalls;
+      }
+
+      // Reset frame counters
+      this.performanceMonitor.audioCallsPerFrame = 0;
+      this.performanceMonitor.lastFrameTime = now;
+
+      // Log performance periodically (every 10 seconds)
+      if (this.performanceMonitor.frameCount % 10 === 0) {
+        this._logPerformanceStats();
+      }
+    }
+  }
+
+  /**
+   * Log de estatísticas de performance
+   */
+  _logPerformanceStats() {
+    if (!this.performanceMonitor.enabled) return;
+
+    const poolStats = this.pool ? this.pool.getStats() : null;
+    const cacheStats = this.cache ? this.cache.getStats() : null;
+    const batcherStats = this.batcher ? this.batcher.getStats() : null;
+
+    console.log('[AudioSystem] Performance Stats:', {
+      totalAudioCalls: this.performanceMonitor.totalAudioCalls,
+      averageCallsPerFrame: this.performanceMonitor.averageCallsPerFrame.toFixed(1),
+      peakCallsPerFrame: this.performanceMonitor.peakCallsPerFrame,
+      pool: poolStats,
+      cache: cacheStats,
+      batcher: batcherStats
+    });
+  }
+
+  /**
+   * Reset de monitoramento de performance
+   */
+  _resetPerformanceMonitoring() {
+    this.performanceMonitor = {
+      enabled: true,
+      frameCount: 0,
+      audioCallsPerFrame: 0,
+      averageCallsPerFrame: 0,
+      peakCallsPerFrame: 0,
+      lastFrameTime: performance.now(),
+      totalAudioCalls: 0
+    };
+
+    if (this.pool) this.pool.resetStats();
+    if (this.cache) this.cache.resetStats();
+    if (this.batcher) this.batcher.resetStats();
+  }
+
+  // === Public API for Performance ===
+
+  /**
+   * Obtém estatísticas completas do sistema de áudio
+   */
+  getPerformanceStats() {
+    return {
+      performance: { ...this.performanceMonitor },
+      pool: this.pool ? this.pool.getStats() : null,
+      cache: this.cache ? this.cache.getStats() : null,
+      batcher: this.batcher ? this.batcher.getStats() : null,
+      optimizationsEnabled: {
+        pooling: !!this.pool,
+        caching: !!this.cache,
+        batching: !!this.batcher
+      }
+    };
+  }
+
+  /**
+   * Enable/disable performance monitoring
+   */
+  setPerformanceMonitoring(enabled) {
+    this.performanceMonitor.enabled = enabled;
+    if (!enabled) {
+      this._resetPerformanceMonitoring();
+    }
+  }
+
+  /**
+   * Força flush de todos os batches pendentes
+   */
+  flushAudioBatches() {
+    if (this.batcher) {
+      this.batcher.flushPendingBatches();
+    }
   }
 }
 
