@@ -351,11 +351,20 @@ export default class EffectsSystem {
     // Update particles and return expired ones to pool
     const activeParticles = [];
     for (const particle of this.particles) {
-      if (particle.update(deltaTime)) {
+      if (particle && typeof particle.update === 'function' && particle.update(deltaTime)) {
         activeParticles.push(particle);
-      } else {
-        // Return expired particle to pool
-        GamePools.particles.release(particle);
+      } else if (particle) {
+        // Only try to return to pool if it came from the pool
+        // Check if it has the pooled object structure
+        if (particle.active !== undefined && !particle.constructor.name) {
+          try {
+            GamePools.particles.release(particle);
+          } catch (error) {
+            // If release fails, it wasn't from this pool - just ignore
+            console.debug('[EffectsSystem] Particle not from pool, skipping release');
+          }
+        }
+        // For old SpaceParticle instances, just let them be garbage collected
       }
     }
     this.particles = activeParticles;
@@ -364,7 +373,13 @@ export default class EffectsSystem {
     if (this.particles.length > 150) {
       const excessParticles = this.particles.splice(0, this.particles.length - 100);
       for (const particle of excessParticles) {
-        GamePools.particles.release(particle);
+        if (particle && particle.active !== undefined && !particle.constructor.name) {
+          try {
+            GamePools.particles.release(particle);
+          } catch (error) {
+            // Ignore release errors for non-pool particles
+          }
+        }
       }
     }
   }
