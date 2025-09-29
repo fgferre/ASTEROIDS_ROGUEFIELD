@@ -1,5 +1,6 @@
 // src/modules/CombatSystem.js
 import * as CONSTANTS from '../core/GameConstants.js';
+import { GamePools } from '../core/GamePools.js';
 
 class CombatSystem {
   constructor() {
@@ -316,17 +317,27 @@ class CombatSystem {
 
     if (distance === 0) return;
 
-    const bullet = {
-      id: Date.now() + Math.random(),
-      x: fromPos.x,
-      y: fromPos.y,
-      vx: (dx / distance) * this.bulletSpeed,
-      vy: (dy / distance) * this.bulletSpeed,
-      damage: damage,
-      life: this.bulletLifetime,
-      trail: [],
-      hit: false,
-    };
+    // Use object pool instead of creating new object
+    const bullet = GamePools.bullets.acquire();
+
+    // Configure bullet properties
+    bullet.x = fromPos.x;
+    bullet.y = fromPos.y;
+    bullet.vx = (dx / distance) * this.bulletSpeed;
+    bullet.vy = (dy / distance) * this.bulletSpeed;
+    bullet.damage = damage;
+    bullet.life = this.bulletLifetime;
+    bullet.maxLife = this.bulletLifetime;
+    bullet.hit = false;
+    bullet.active = true;
+    bullet.type = 'player';
+
+    // Initialize trail array
+    if (!bullet.trail) {
+      bullet.trail = [];
+    } else {
+      bullet.trail.length = 0; // Clear existing trail
+    }
 
     this.bullets.push(bullet);
 
@@ -368,10 +379,17 @@ class CombatSystem {
       }
     });
 
-    // Remover bullets expirados
-    this.bullets = this.bullets.filter(
-      (bullet) => bullet.life > 0 && !bullet.hit
-    );
+    // Return expired bullets to pool and remove from active list
+    const activeBullets = [];
+    for (const bullet of this.bullets) {
+      if (bullet.life > 0 && !bullet.hit) {
+        activeBullets.push(bullet);
+      } else {
+        // Return to pool
+        GamePools.bullets.release(bullet);
+      }
+    }
+    this.bullets = activeBullets;
   }
 
   // === DETECÇÃO DE COLISÃO ===
@@ -549,6 +567,10 @@ class CombatSystem {
 
   // === CLEANUP ===
   reset() {
+    // Return all bullets to pool before clearing array
+    for (const bullet of this.bullets) {
+      GamePools.bullets.release(bullet);
+    }
     this.bullets = [];
     this.currentTarget = null;
     this.lastShotTime = 0;
@@ -557,6 +579,10 @@ class CombatSystem {
   }
 
   destroy() {
+    // Return all bullets to pool before destroying
+    for (const bullet of this.bullets) {
+      GamePools.bullets.release(bullet);
+    }
     this.bullets = [];
     this.currentTarget = null;
     console.log('[CombatSystem] Destroyed');
