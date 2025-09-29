@@ -12,6 +12,7 @@ import AudioSystem from './modules/AudioSystem.js';
 import WorldSystem from './modules/WorldSystem.js';
 import RenderingSystem from './modules/RenderingSystem.js';
 import MenuBackgroundSystem from './modules/MenuBackgroundSystem.js';
+import { GamePools } from './core/GamePools.js';
 import {
   resolveDebugPreference,
   applyDebugPreference,
@@ -95,6 +96,16 @@ function init() {
     setupGlobalEventListeners();
 
     registerGameStateService();
+
+    // Initialize object pools before any game systems
+    GamePools.initialize({
+      bullets: { initial: 25, max: 120 },
+      particles: { initial: 60, max: 400 },
+      asteroids: { initial: 20, max: 100 },
+      xpOrbs: { initial: 40, max: 250 },
+      shockwaves: { initial: 8, max: 25 },
+      tempObjects: { initial: 15, max: 60 }
+    });
 
     new SettingsSystem();
 
@@ -276,6 +287,9 @@ function gameLoop(currentTime) {
   try {
     const shouldUpdateGame =
       gameState.screen === 'playing' && !gameState.isPaused;
+
+    // Update object pools (always, for TTL and auto-management)
+    GamePools.update(deltaTime);
 
     let adjustedDelta = deltaTime;
     const effects = gameServices.get('effects');

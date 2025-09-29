@@ -1,4 +1,5 @@
 import * as CONSTANTS from '../core/GameConstants.js';
+import { GamePools } from '../core/GamePools.js';
 
 const MAIN_THRUSTER_FLASH_THRESHOLD = 0.85;
 const MAIN_THRUSTER_FLASH_COLOR = '#3399FF';
@@ -105,6 +106,34 @@ export default class EffectsSystem {
     this.setupEventListeners();
 
     console.log('[EffectsSystem] Initialized');
+  }
+
+  // === PARTICLE POOL HELPERS ===
+  createParticle(x, y, vx, vy, color, size, life, type = 'normal') {
+    const particle = GamePools.particles.acquire();
+
+    // Configure particle from pool
+    particle.x = x;
+    particle.y = y;
+    particle.vx = vx;
+    particle.vy = vy;
+    particle.color = color;
+    particle.size = size;
+    particle.life = life;
+    particle.maxLife = life;
+    particle.alpha = 1;
+    particle.type = type;
+    particle.rotation = Math.random() * Math.PI * 2;
+    particle.rotationSpeed = (Math.random() - 0.5) * 4;
+    particle.active = true;
+
+    return particle;
+  }
+
+  addParticle(x, y, vx, vy, color, size, life, type = 'normal') {
+    const particle = this.createParticle(x, y, vx, vy, color, size, life, type);
+    this.particles.push(particle);
+    return particle;
   }
 
   setupSettingsIntegration() {
@@ -319,9 +348,24 @@ export default class EffectsSystem {
   }
 
   updateParticles(deltaTime) {
-    this.particles = this.particles.filter((p) => p.update(deltaTime));
+    // Update particles and return expired ones to pool
+    const activeParticles = [];
+    for (const particle of this.particles) {
+      if (particle.update(deltaTime)) {
+        activeParticles.push(particle);
+      } else {
+        // Return expired particle to pool
+        GamePools.particles.release(particle);
+      }
+    }
+    this.particles = activeParticles;
+
+    // Return oldest particles to pool if we have too many
     if (this.particles.length > 150) {
-      this.particles = this.particles.slice(-100);
+      const excessParticles = this.particles.splice(0, this.particles.length - 100);
+      for (const particle of excessParticles) {
+        GamePools.particles.release(particle);
+      }
     }
   }
 
@@ -531,7 +575,7 @@ export default class EffectsSystem {
       const life = lifeRange[0] + Math.random() * (lifeRange[1] - lifeRange[0]);
 
       this.particles.push(
-        new SpaceParticle(
+        this.createParticle(
           worldX + (Math.random() - 0.5) * 3,
           worldY + (Math.random() - 0.5) * 3,
           vx,
@@ -546,7 +590,7 @@ export default class EffectsSystem {
       if (Math.random() < this.getScaledProbability(0.25)) {
         const sparkSpd = spd * (0.9 + Math.random() * 0.3);
         this.particles.push(
-          new SpaceParticle(
+          this.createParticle(
             worldX,
             worldY,
             -dirX * sparkSpd,
@@ -633,7 +677,7 @@ export default class EffectsSystem {
       const vx = Math.cos(angle) * speed;
       const vy = Math.sin(angle) * speed;
       this.particles.push(
-        new SpaceParticle(
+        this.createParticle(
           data.position.x,
           data.position.y,
           vx,
@@ -646,7 +690,7 @@ export default class EffectsSystem {
       );
     }
 
-    const glow = new SpaceParticle(
+    const glow = this.createParticle(
       data.position.x,
       data.position.y,
       -nx * 40,
@@ -666,7 +710,7 @@ export default class EffectsSystem {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 25 + Math.random() * 40;
-      const particle = new SpaceParticle(
+      const particle = this.createParticle(
         x,
         y,
         Math.cos(angle) * speed,
@@ -694,7 +738,7 @@ export default class EffectsSystem {
     for (let i = 0; i < particleCount; i += 1) {
       const angle = (Math.PI * 2 * i) / particleCount + Math.random() * 0.3;
       const speed = 60 + Math.random() * 80;
-      const particle = new SpaceParticle(
+      const particle = this.createParticle(
         x,
         y,
         Math.cos(angle) * speed,
@@ -707,7 +751,7 @@ export default class EffectsSystem {
       this.particles.push(particle);
     }
 
-    const halo = new SpaceParticle(
+    const halo = this.createParticle(
       x,
       y,
       0,
@@ -722,7 +766,7 @@ export default class EffectsSystem {
     for (let i = 0; i < ringCount; i += 1) {
       const angle = (Math.PI * 2 * i) / ringCount;
       const speed = 40 + tier * 12;
-      const particle = new SpaceParticle(
+      const particle = this.createParticle(
         x,
         y,
         Math.cos(angle) * speed,
@@ -743,7 +787,7 @@ export default class EffectsSystem {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 60 + Math.random() * 120;
-      const particle = new SpaceParticle(
+      const particle = this.createParticle(
         player.x,
         player.y,
         Math.cos(angle) * speed,
@@ -801,7 +845,7 @@ export default class EffectsSystem {
       const spawnX = asteroid.x + Math.cos(angle) * offset;
       const spawnY = asteroid.y + Math.sin(angle) * offset;
 
-      const debris = new SpaceParticle(
+      const debris = this.createParticle(
         spawnX,
         spawnY,
         Math.cos(angle) * speed + parentVx * momentumScale,
@@ -813,7 +857,7 @@ export default class EffectsSystem {
       );
       this.particles.push(debris);
 
-      const spark = new SpaceParticle(
+      const spark = this.createParticle(
         asteroid.x,
         asteroid.y,
         Math.cos(angle) * speed * 1.25 + parentVx * momentumScale,
@@ -1018,7 +1062,7 @@ export default class EffectsSystem {
       if (!this.motionReduced) {
         const sparkSpeed = 22 + Math.random() * 28;
         this.particles.push(
-          new SpaceParticle(
+          this.createParticle(
             worldEnd.x,
             worldEnd.y,
             Math.cos(angle) * sparkSpeed * 0.32,
@@ -1057,7 +1101,7 @@ export default class EffectsSystem {
         const speed = 22 + Math.random() * 32;
 
         this.particles.push(
-          new SpaceParticle(
+          this.createParticle(
             worldPoint.x,
             worldPoint.y,
             normalized.x * speed,
@@ -1112,7 +1156,7 @@ export default class EffectsSystem {
       const speed = 35 + Math.random() * 40;
 
       this.particles.push(
-        new SpaceParticle(
+        this.createParticle(
           worldOrigin.x,
           worldOrigin.y,
           dirX * speed,
@@ -1205,7 +1249,7 @@ export default class EffectsSystem {
         this.randomRange(sizeRange[0], sizeRange[1]) *
         (0.75 + totalIntensity * 0.45);
 
-      const spark = new SpaceParticle(
+      const spark = this.createParticle(
         spawnX,
         spawnY,
         Math.cos(angle) * emberSpeed,
@@ -1261,7 +1305,7 @@ export default class EffectsSystem {
     for (let i = 0; i < particles; i += 1) {
       const angle = (i / particles) * Math.PI * 2;
       const speed = 20 + Math.random() * 15;
-      const particle = new SpaceParticle(
+      const particle = this.createParticle(
         position.x,
         position.y,
         Math.cos(angle) * speed,
@@ -1350,7 +1394,7 @@ export default class EffectsSystem {
       );
       this.particles.push(flame);
 
-      const debris = new SpaceParticle(
+      const debris = this.createParticle(
         position.x + (Math.random() - 0.5) * radius * 0.4,
         position.y + (Math.random() - 0.5) * radius * 0.4,
         Math.cos(angle) * speed * 0.6,
