@@ -1,4 +1,7 @@
 import * as CONSTANTS from '../core/GameConstants.js';
+import RenderBatch from '../core/RenderBatch.js';
+import CanvasStateManager from '../core/CanvasStateManager.js';
+import GradientCache from '../core/GradientCache.js';
 
 const MAX_VISUAL_TILT = 0.3;
 const TILT_MULTIPLIER = 0.12;
@@ -578,6 +581,19 @@ class RenderingSystem {
     this.spaceSky = new SpaceSkyBackground();
     this.spaceSky.setParallax(0.06, 0.05, 0.06, CONSTANTS.SHIP_MAX_SPEED);
 
+    // Batch rendering optimization systems
+    this.renderBatch = new RenderBatch();
+    this.stateManager = new CanvasStateManager();
+    this.gradientCache = new GradientCache();
+
+    // Performance tracking
+    this.renderStats = {
+      frameCount: 0,
+      lastStatsTime: performance.now(),
+      avgFrameTime: 0,
+      batchEfficiency: 0
+    };
+
     this.cachedPlayer = null;
     this.cachedProgression = null;
     this.cachedXPOrbs = null;
@@ -620,7 +636,15 @@ class RenderingSystem {
       gameServices.register('renderer', this);
     }
 
-    console.log('[RenderingSystem] Initialized');
+    // Initialize state manager with common presets
+    this.stateManager.createPreset('starfield', {
+      fillStyle: 'rgba(255, 255, 255, 0.8)',
+      strokeStyle: 'transparent',
+      globalAlpha: 1,
+      shadowBlur: 0
+    });
+
+    console.log('[RenderingSystem] Initialized with batch rendering optimization');
   }
 
   resolveCachedServices(force = false) {
@@ -662,6 +686,14 @@ class RenderingSystem {
   render(ctx) {
     if (!ctx) return;
 
+    const frameStart = performance.now();
+
+    // Initialize state manager if needed
+    if (!this.stateManager.currentState.fillStyle) {
+      this.stateManager.initialize(ctx);
+      this.gradientCache.preloadGradients(ctx);
+    }
+
     ctx.save();
 
     this.resolveCachedServices();
@@ -677,34 +709,56 @@ class RenderingSystem {
         ? player.getVelocity()
         : player?.velocity || null;
 
+    // Optimized rendering with batching
+    this.renderOptimized(ctx, player, playerVelocity);
+
+    ctx.restore();
+
+    // Update performance stats
+    this.updateRenderStats(frameStart);
+  }
+
+  renderOptimized(ctx, player, playerVelocity) {
+    // Background phase
+    this.stateManager.transitionToPhase(ctx, 'background');
     this.drawBackground(ctx, playerVelocity);
 
+    // Objects phase - batch similar objects
+    this.stateManager.transitionToPhase(ctx, 'objects');
+
+    // XP Orbs
     const xpOrbs = this.cachedXPOrbs;
     if (xpOrbs && typeof xpOrbs.render === 'function') {
       xpOrbs.render(ctx);
     }
 
+    // Combat (bullets)
     const combat = this.cachedCombat;
     if (combat && typeof combat.render === 'function') {
       combat.render(ctx);
     }
 
+    // Enemies
     const enemies = this.cachedEnemies;
     if (enemies && typeof enemies.render === 'function') {
       enemies.render(ctx);
     }
 
+    // Player
     if (player) {
       this.renderPlayer(ctx, player);
     }
 
+    // UI Elements
+    this.stateManager.transitionToPhase(ctx, 'ui');
     this.drawMagnetismField(ctx, player, xpOrbs);
 
+    // Effects phase
+    this.stateManager.transitionToPhase(ctx, 'effects');
+    const effects = this.cachedEffects;
     if (effects && typeof effects.draw === 'function') {
       effects.draw(ctx);
     }
-
-    ctx.restore();
   }
 
   drawBackground(ctx, playerVelocity) {
@@ -947,65 +1001,135 @@ class RenderingSystem {
   }
 
   ensureShieldGradientCanvas(radius, ratio) {
-    const cache = this.shieldGradientCache;
-    const clampedRatio = Math.max(0, Math.min(1, ratio));
-    const roundedRadius = Math.max(1, Math.round(radius));
+    // Use the new gradient cache system for better performance
+    return this.gradientCache.createShieldGradient(null, radius, ratio);
+  }
 
-    if (typeof document === 'undefined') {
-      cache.canvas = null;
-      cache.context = null;
-      cache.radius = roundedRadius;
-      cache.ratio = clampedRatio;
-      cache.size = 0;
-      return null;
+  /**
+   * Update rendering performance statistics
+   */
+  updateRenderStats(frameStart) {
+    const frameTime = performance.now() - frameStart;
+    this.renderStats.frameCount++;
+
+    // Calculate rolling average
+    if (this.renderStats.frameCount === 1) {
+      this.renderStats.avgFrameTime = frameTime;
+    } else {
+      const alpha = 0.1; // Smoothing factor
+      this.renderStats.avgFrameTime =
+        this.renderStats.avgFrameTime * (1 - alpha) + frameTime * alpha;
     }
 
-    const needsUpdate =
-      !cache.canvas ||
-      cache.radius !== roundedRadius ||
-      Math.abs(cache.ratio - clampedRatio) > 0.001;
+    // Update batch efficiency
+    const batchStats = this.renderBatch.getStats();
+    this.renderStats.batchEfficiency = parseFloat(batchStats.efficiency) || 0;
 
-    if (needsUpdate) {
-      const canvas = cache.canvas || document.createElement('canvas');
-      const size = Math.max(1, Math.ceil(roundedRadius * 2.5));
-      if (canvas.width !== size || canvas.height !== size) {
-        canvas.width = size;
-        canvas.height = size;
-      }
+    // Log stats every 5 seconds
+    const now = performance.now();
+    if (now - this.renderStats.lastStatsTime > 5000) {
+      this.logPerformanceStats();
+      this.renderStats.lastStatsTime = now;
+    }
+  }
 
-      const ctx = canvas.getContext('2d');
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const center = size / 2;
-      const gradient = ctx.createRadialGradient(
-        center,
-        center,
-        roundedRadius * 0.35,
-        center,
-        center,
-        roundedRadius * 1.25,
-      );
-      gradient.addColorStop(
-        0,
-        `rgba(120, 240, 255, ${0.08 + clampedRatio * 0.14})`,
-      );
-      gradient.addColorStop(
-        0.55,
-        `rgba(0, 190, 255, ${0.25 + clampedRatio * 0.3})`,
-      );
-      gradient.addColorStop(1, 'rgba(0, 150, 255, 0)');
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(center, center, roundedRadius * 1.25, 0, Math.PI * 2);
-      ctx.fill();
+  /**
+   * Log comprehensive performance statistics
+   */
+  logPerformanceStats() {
+    const renderStats = this.renderStats;
+    const batchStats = this.renderBatch.getStats();
+    const stateStats = this.stateManager.getStats();
+    const gradientStats = this.gradientCache.getStats();
 
-      cache.canvas = canvas;
-      cache.context = ctx;
-      cache.radius = roundedRadius;
-      cache.ratio = clampedRatio;
-      cache.size = size;
+    console.log(`[RenderingSystem] Performance Stats - Frames: ${renderStats.frameCount}`);
+    console.log(`  Avg Frame Time: ${renderStats.avgFrameTime.toFixed(2)}ms`);
+    console.log(`  Batch Efficiency: ${batchStats.efficiency}`);
+    console.log(`  State Efficiency: ${stateStats.efficiency}`);
+    console.log(`  Gradient Cache: ${gradientStats.hitRates.gradients} hit rate`);
+    console.log(`  Canvas Cache: ${gradientStats.hitRates.canvases} hit rate`);
+  }
+
+  /**
+   * Get current performance metrics
+   */
+  getPerformanceMetrics() {
+    return {
+      frameTime: this.renderStats.avgFrameTime,
+      frameCount: this.renderStats.frameCount,
+      batchEfficiency: this.renderStats.batchEfficiency,
+      batchStats: this.renderBatch.getStats(),
+      stateStats: this.stateManager.getStats(),
+      gradientStats: this.gradientCache.getStats()
+    };
+  }
+
+  /**
+   * Optimize rendering for specific object types
+   */
+  renderBatchedCircles(ctx, circles, fillStyle, strokeStyle = null) {
+    if (!circles || circles.length === 0) return;
+
+    const batch = this.renderBatch.beginBatch('circles', {
+      fillStyle,
+      strokeStyle,
+      globalAlpha: 1
+    });
+
+    for (const circle of circles) {
+      this.renderBatch.addCircle(
+        circle.x,
+        circle.y,
+        circle.radius,
+        fillStyle,
+        strokeStyle
+      );
     }
 
-    return cache.canvas;
+    this.renderBatch.flushBatch(ctx);
+  }
+
+  /**
+   * Render batched lines for trails, effects
+   */
+  renderBatchedLines(ctx, lines, strokeStyle, lineWidth = 1) {
+    if (!lines || lines.length === 0) return;
+
+    const batch = this.renderBatch.beginBatch('lines', {
+      strokeStyle,
+      lineWidth
+    });
+
+    for (const line of lines) {
+      this.renderBatch.addLine(
+        line.x1,
+        line.y1,
+        line.x2,
+        line.y2,
+        strokeStyle,
+        lineWidth
+      );
+    }
+
+    this.renderBatch.flushBatch(ctx);
+  }
+
+  /**
+   * Reset all performance stats and caches
+   */
+  resetPerformanceTracking() {
+    this.renderStats = {
+      frameCount: 0,
+      lastStatsTime: performance.now(),
+      avgFrameTime: 0,
+      batchEfficiency: 0
+    };
+
+    this.renderBatch.resetStats();
+    this.stateManager.resetStats();
+    this.gradientCache.reset();
+
+    console.log('[RenderingSystem] Performance tracking reset');
   }
 }
 
