@@ -1,14 +1,32 @@
 import * as CONSTANTS from '../core/GameConstants.js';
+import { SpatialHash } from '../core/SpatialHash.js';
 
 class PhysicsSystem {
   constructor() {
     this.cellSize = CONSTANTS.PHYSICS_CELL_SIZE || 96;
     this.maxAsteroidRadius = this.computeMaxAsteroidRadius();
     this.activeAsteroids = new Set();
+
+    // New SpatialHash-based collision system
+    this.spatialHash = new SpatialHash(this.cellSize, {
+      maxObjects: 8,
+      maxDepth: 4,
+      dynamicResize: true
+    });
+
+    // Legacy spatial index for backward compatibility
     this.asteroidIndex = new Map();
     this.indexDirty = false;
     this.cachedEnemies = null;
     this.bootstrapCompleted = false;
+
+    // Performance tracking
+    this.performanceMetrics = {
+      lastUpdateTime: 0,
+      collisionChecks: 0,
+      spatialQueries: 0,
+      frameTime: 0
+    };
 
     if (typeof gameServices !== 'undefined') {
       gameServices.register('physics', this);
@@ -124,6 +142,11 @@ class PhysicsSystem {
     if (!this.activeAsteroids.has(asteroid)) {
       this.activeAsteroids.add(asteroid);
       this.indexDirty = true;
+
+      // Add to spatial hash
+      if (Number.isFinite(asteroid.x) && Number.isFinite(asteroid.y) && Number.isFinite(asteroid.radius)) {
+        this.spatialHash.insert(asteroid, asteroid.x, asteroid.y, asteroid.radius);
+      }
     }
   }
 
@@ -134,6 +157,9 @@ class PhysicsSystem {
 
     if (this.activeAsteroids.delete(asteroid)) {
       this.indexDirty = true;
+
+      // Remove from spatial hash
+      this.spatialHash.remove(asteroid);
     }
   }
 
@@ -205,20 +231,55 @@ class PhysicsSystem {
     this.indexDirty = false;
   }
 
+  /**
+   * Updates the spatial hash with current asteroid positions.
+   * This ensures collision detection uses up-to-date positions.
+   */
+  updateSpatialHash() {
+    for (const asteroid of this.activeAsteroids) {
+      if (asteroid.destroyed) {
+        continue;
+      }
+
+      // Update asteroid position in spatial hash
+      if (Number.isFinite(asteroid.x) && Number.isFinite(asteroid.y) && Number.isFinite(asteroid.radius)) {
+        this.spatialHash.update(asteroid, asteroid.x, asteroid.y, asteroid.radius);
+      }
+    }
+
+    // Cleanup the spatial hash periodically
+    if (performance.now() % 1000 < 50) { // Every ~1 second
+      this.spatialHash.cleanup();
+    }
+  }
+
   update() {
+    const startTime = performance.now();
+
     this.resolveCachedServices();
     this.cleanupDestroyedAsteroids();
+
+    // Update spatial hash with current asteroid positions
+    this.updateSpatialHash();
 
     if (!this.activeAsteroids.size) {
       if (this.asteroidIndex.size) {
         this.asteroidIndex.clear();
       }
       this.indexDirty = false;
+      this.spatialHash.clear();
       return;
     }
 
     this.indexDirty = true;
     this.ensureSpatialIndex();
+
+    // Update spatial hash
+    this.spatialHash.update();
+
+    // Track performance
+    this.performanceMetrics.frameTime = performance.now() - startTime;
+    this.performanceMetrics.lastUpdateTime = performance.now();
   }
 
   getNearbyAsteroids(x, y, radius) {
@@ -226,34 +287,16 @@ class PhysicsSystem {
       return [];
     }
 
-    this.ensureSpatialIndex();
+    this.performanceMetrics.spatialQueries++;
 
+    // Use SpatialHash for efficient nearby object retrieval
     const searchRadius = Math.max(radius, this.maxAsteroidRadius);
-    const cellRange = Math.max(1, Math.ceil(searchRadius / this.cellSize));
-    const centerCellX = Math.floor(x / this.cellSize);
-    const centerCellY = Math.floor(y / this.cellSize);
-
-    const candidates = [];
-    const seen = new Set();
-
-    for (let offsetX = -cellRange; offsetX <= cellRange; offsetX += 1) {
-      for (let offsetY = -cellRange; offsetY <= cellRange; offsetY += 1) {
-        const key = `${centerCellX + offsetX}:${centerCellY + offsetY}`;
-        const bucket = this.asteroidIndex.get(key);
-        if (!bucket) {
-          continue;
-        }
-
-        for (let index = 0; index < bucket.length; index += 1) {
-          const asteroid = bucket[index];
-          if (!asteroid || asteroid.destroyed || seen.has(asteroid)) {
-            continue;
-          }
-          seen.add(asteroid);
-          candidates.push(asteroid);
-        }
+    const candidates = this.spatialHash.query(x, y, searchRadius, {
+      filter: (obj) => {
+        // Filter for active asteroids only
+        return this.activeAsteroids.has(obj) && !obj.destroyed;
       }
-    }
+    });
 
     return candidates;
   }
@@ -276,9 +319,7 @@ class PhysicsSystem {
       return;
     }
 
-    this.ensureSpatialIndex();
-
-    if (!this.asteroidIndex.size) {
+    if (!this.activeAsteroids.size) {
       return;
     }
 
@@ -291,15 +332,12 @@ class PhysicsSystem {
         continue;
       }
 
-      const candidates = this.getNearbyAsteroids(
-        bullet.x,
-        bullet.y,
-        maxCheckRadius
-      );
+      // Use spatial hash for efficient collision detection
+      const candidates = this.spatialHash.query(bullet.x, bullet.y, maxCheckRadius, {
+        filter: (obj) => this.activeAsteroids.has(obj) && !obj.destroyed
+      });
 
-      if (!candidates.length) {
-        continue;
-      }
+      this.performanceMetrics.collisionChecks += candidates.length;
 
       for (let j = 0; j < candidates.length; j += 1) {
         const asteroid = candidates[j];
@@ -307,15 +345,29 @@ class PhysicsSystem {
           continue;
         }
 
-        const dx = bullet.x - asteroid.x;
-        const dy = bullet.y - asteroid.y;
-        const collisionRadius = bulletRadius + (asteroid.radius || 0);
-        if (dx * dx + dy * dy <= collisionRadius * collisionRadius) {
+        // Precise collision detection
+        if (this.checkCircleCollision(
+          bullet.x, bullet.y, bulletRadius,
+          asteroid.x, asteroid.y, asteroid.radius || 0
+        )) {
           handler(bullet, asteroid);
           break;
         }
       }
     }
+  }
+
+  /**
+   * Checks collision between two circular objects.
+   * Optimized circle-circle collision detection.
+   */
+  checkCircleCollision(x1, y1, r1, x2, y2, r2) {
+    const dx = x1 - x2;
+    const dy = y1 - y2;
+    const totalRadius = r1 + r2;
+
+    // Use squared distance to avoid expensive sqrt operation
+    return (dx * dx + dy * dy) <= (totalRadius * totalRadius);
   }
 
   buildPlayerCollisionContext(player) {
@@ -585,15 +637,57 @@ class PhysicsSystem {
   reset() {
     this.activeAsteroids.clear();
     this.asteroidIndex.clear();
+    this.spatialHash.clear();
     this.indexDirty = false;
     this.bootstrapCompleted = false;
     this.resolveCachedServices(true);
+
+    // Reset performance metrics
+    this.performanceMetrics = {
+      lastUpdateTime: 0,
+      collisionChecks: 0,
+      spatialQueries: 0,
+      frameTime: 0
+    };
 
     if (typeof gameEvents !== 'undefined') {
       gameEvents.emit('physics-reset');
     }
 
     console.log('[PhysicsSystem] Reset');
+  }
+
+  /**
+   * Gets performance metrics for debugging and optimization.
+   */
+  getPerformanceMetrics() {
+    return {
+      ...this.performanceMetrics,
+      spatialHashStats: this.spatialHash.getStats(),
+      activeAsteroids: this.activeAsteroids.size,
+      indexCells: this.asteroidIndex.size
+    };
+  }
+
+  /**
+   * Validates spatial hash consistency with active asteroids.
+   */
+  validateSpatialHash() {
+    const validation = this.spatialHash.validate();
+    const errors = [...validation.errors];
+
+    // Check if all active asteroids are in spatial hash
+    for (const asteroid of this.activeAsteroids) {
+      if (!asteroid.destroyed && !this.spatialHash.objects.has(asteroid)) {
+        errors.push(`Active asteroid not in spatial hash: ${asteroid.id || 'unknown'}`);
+      }
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors,
+      spatialHashValidation: validation
+    };
   }
 
   destroy() {
