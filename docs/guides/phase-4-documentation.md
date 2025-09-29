@@ -1,0 +1,1449 @@
+# Fase 4: Documentação & Quality Assurance
+
+## 🎯 Objetivo
+Estabelecer uma base sólida de qualidade através de documentação completa, cobertura de testes robusta, CI/CD aprimorado e sistemas de monitoramento que garantam manutenibilidade a longo prazo.
+
+## 📊 Gap Analysis Atual
+
+### **Estado Atual vs. Meta**
+| Aspecto | Atual | Meta | Gap |
+|---------|-------|------|-----|
+| **Cobertura de Testes** | ~5% (1 arquivo) | 70%+ | 65% |
+| **API Documentation** | 0% JSDoc | 100% APIs públicas | 100% |
+| **Type Safety** | JavaScript puro | JSDoc + validação | 100% |
+| **CI/CD Quality Gates** | Básico | Completo | 80% |
+| **Performance Monitoring** | Manual | Automatizado | 100% |
+| **Error Tracking** | Console logs | Structured logging | 100% |
+
+### **Documentação Existente (Positiva)**
+✅ Guides em [docs/guides/](docs/guides/)
+✅ README básico funcional
+✅ Histórico de projeto mantido
+✅ Prettier configurado
+
+## 🗺️ Plano de Implementação
+
+### **Etapa 4.1: Cobertura de Testes Abrangente** (Dias 1-4)
+
+#### **4.1.1 Test Architecture & Utils**
+```javascript
+// src/__tests__/__utils__/testHelpers.js
+import { DIContainer } from '../../core/DIContainer.js';
+import { ServiceRegistry } from '../../core/ServiceRegistry.js';
+
+export class TestEnvironment {
+  static createMockServices() {
+    const container = new DIContainer();
+
+    // Mock services for testing
+    container.register('event-bus', () => new MockEventBus());
+    container.register('settings', () => new MockSettings());
+    container.register('audio', () => new MockAudioSystem());
+    container.register('physics', () => new MockPhysicsSystem());
+
+    return container;
+  }
+
+  static createGameState(overrides = {}) {
+    return {
+      screen: 'menu',
+      isPaused: false,
+      canvas: this.createMockCanvas(),
+      ctx: this.createMockContext(),
+      initialized: true,
+      lastTime: 0,
+      ...overrides
+    };
+  }
+
+  static createMockCanvas() {
+    return {
+      width: 800,
+      height: 600,
+      getContext: () => this.createMockContext()
+    };
+  }
+
+  static createMockContext() {
+    return {
+      save: vi.fn(),
+      restore: vi.fn(),
+      translate: vi.fn(),
+      rotate: vi.fn(),
+      scale: vi.fn(),
+      fillRect: vi.fn(),
+      strokeRect: vi.fn(),
+      beginPath: vi.fn(),
+      closePath: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      arc: vi.fn(),
+      fill: vi.fn(),
+      stroke: vi.fn(),
+      clearRect: vi.fn(),
+      globalAlpha: 1,
+      fillStyle: '#FFFFFF',
+      strokeStyle: '#FFFFFF',
+      lineWidth: 1
+    };
+  }
+
+  static simulateGameLoop(system, deltaTime = 0.016, frames = 60) {
+    for (let i = 0; i < frames; i++) {
+      if (system.update) {
+        system.update(deltaTime);
+      }
+    }
+  }
+}
+
+export class MockEventBus {
+  constructor() {
+    this.events = new Map();
+  }
+
+  on(event, callback) {
+    if (!this.events.has(event)) {
+      this.events.set(event, []);
+    }
+    this.events.get(event).push(callback);
+  }
+
+  emit(event, data) {
+    if (this.events.has(event)) {
+      this.events.get(event).forEach(callback => callback(data));
+    }
+  }
+
+  off(event, callback) {
+    if (this.events.has(event)) {
+      const callbacks = this.events.get(event);
+      const index = callbacks.indexOf(callback);
+      if (index > -1) {
+        callbacks.splice(index, 1);
+      }
+    }
+  }
+
+  clear() {
+    this.events.clear();
+  }
+}
+```
+
+#### **4.1.2 Core System Tests**
+```javascript
+// src/__tests__/core/DIContainer.test.js
+import { describe, test, expect, beforeEach } from 'vitest';
+import { DIContainer } from '../../core/DIContainer.js';
+
+describe('DIContainer', () => {
+  let container;
+
+  beforeEach(() => {
+    container = new DIContainer();
+  });
+
+  describe('Service Registration', () => {
+    test('should register service factory', () => {
+      const factory = () => ({ name: 'test' });
+      container.register('test', factory);
+
+      expect(container.has('test')).toBe(true);
+    });
+
+    test('should throw error on duplicate registration', () => {
+      const factory = () => ({});
+      container.register('test', factory);
+
+      expect(() => {
+        container.register('test', factory);
+      }).toThrow('Service \'test\' already registered');
+    });
+  });
+
+  describe('Service Resolution', () => {
+    test('should resolve service with no dependencies', () => {
+      const mockService = { name: 'test' };
+      container.register('test', () => mockService);
+
+      const resolved = container.resolve('test');
+      expect(resolved).toBe(mockService);
+    });
+
+    test('should resolve service with dependencies', () => {
+      container.register('dep1', () => ({ name: 'dependency' }));
+      container.register('service', (dep1) => ({ dep: dep1 }), {
+        dependencies: ['dep1']
+      });
+
+      const resolved = container.resolve('service');
+      expect(resolved.dep.name).toBe('dependency');
+    });
+
+    test('should detect circular dependencies', () => {
+      container.register('a', (b) => ({ b }), { dependencies: ['b'] });
+      container.register('b', (a) => ({ a }), { dependencies: ['a'] });
+
+      expect(() => container.resolve('a'))
+        .toThrow('Circular dependency detected');
+    });
+
+    test('should cache singletons', () => {
+      let instanceCount = 0;
+      container.register('singleton', () => {
+        instanceCount++;
+        return { id: instanceCount };
+      });
+
+      const first = container.resolve('singleton');
+      const second = container.resolve('singleton');
+
+      expect(first).toBe(second);
+      expect(instanceCount).toBe(1);
+    });
+  });
+
+  describe('Error Handling', () => {
+    test('should throw on unknown service', () => {
+      expect(() => container.resolve('unknown'))
+        .toThrow('Service \'unknown\' not found');
+    });
+  });
+});
+```
+
+#### **4.1.3 Game System Tests**
+```javascript
+// src/__tests__/modules/PlayerSystem.test.js
+import { describe, test, expect, beforeEach, vi } from 'vitest';
+import { PlayerSystem } from '../../modules/PlayerSystem.js';
+import { TestEnvironment, MockEventBus } from '../__utils__/testHelpers.js';
+
+describe('PlayerSystem', () => {
+  let playerSystem;
+  let mockEventBus;
+  let mockInput;
+  let mockAudio;
+
+  beforeEach(() => {
+    mockEventBus = new MockEventBus();
+    mockInput = {
+      isPressed: vi.fn(() => false),
+      getMousePosition: vi.fn(() => ({ x: 0, y: 0 }))
+    };
+    mockAudio = {
+      playSound: vi.fn()
+    };
+
+    playerSystem = new PlayerSystem(mockEventBus, mockInput, mockAudio);
+  });
+
+  describe('Player Movement', () => {
+    test('should update position when thrust input active', () => {
+      mockInput.isPressed.mockImplementation(key => key === 'thrust');
+
+      const initialX = playerSystem.player.x;
+      const initialY = playerSystem.player.y;
+
+      playerSystem.update(0.016); // One frame at 60fps
+
+      expect(playerSystem.player.x).not.toBe(initialX);
+      expect(playerSystem.player.y).not.toBe(initialY);
+    });
+
+    test('should rotate when turn input active', () => {
+      mockInput.isPressed.mockImplementation(key => key === 'turnLeft');
+
+      const initialAngle = playerSystem.player.angle;
+      playerSystem.update(0.016);
+
+      expect(playerSystem.player.angle).not.toBe(initialAngle);
+    });
+
+    test('should respect world boundaries', () => {
+      // Move player to edge
+      playerSystem.player.x = -10;
+      playerSystem.update(0.016);
+
+      expect(playerSystem.player.x).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe('Combat', () => {
+    test('should fire bullet when shoot input active', () => {
+      mockInput.isPressed.mockImplementation(key => key === 'shoot');
+
+      const bulletsBeforeShoot = playerSystem.bullets.length;
+      playerSystem.update(0.016);
+
+      expect(playerSystem.bullets.length).toBeGreaterThan(bulletsBeforeShoot);
+    });
+
+    test('should respect fire rate limit', () => {
+      mockInput.isPressed.mockImplementation(key => key === 'shoot');
+
+      playerSystem.update(0.016);
+      const bulletsAfterFirst = playerSystem.bullets.length;
+
+      playerSystem.update(0.001); // Very short time
+      expect(playerSystem.bullets.length).toBe(bulletsAfterFirst);
+    });
+  });
+
+  describe('Health System', () => {
+    test('should take damage correctly', () => {
+      const initialHealth = playerSystem.player.health;
+      const damage = 25;
+
+      playerSystem.takeDamage(damage);
+
+      expect(playerSystem.player.health).toBe(initialHealth - damage);
+    });
+
+    test('should emit death event when health reaches zero', () => {
+      const deathSpy = vi.fn();
+      mockEventBus.on('player-died', deathSpy);
+
+      playerSystem.takeDamage(playerSystem.player.health);
+
+      expect(deathSpy).toHaveBeenCalled();
+    });
+
+    test('should not go below zero health', () => {
+      playerSystem.takeDamage(playerSystem.player.health + 50);
+
+      expect(playerSystem.player.health).toBe(0);
+    });
+  });
+
+  describe('Shield System', () => {
+    test('should activate shield when available', () => {
+      playerSystem.player.shieldLevel = 1;
+      playerSystem.player.shieldCooldown = 0;
+
+      playerSystem.activateShield();
+
+      expect(playerSystem.player.shieldActive).toBe(true);
+    });
+
+    test('should not activate shield when on cooldown', () => {
+      playerSystem.player.shieldLevel = 1;
+      playerSystem.player.shieldCooldown = 1000;
+
+      playerSystem.activateShield();
+
+      expect(playerSystem.player.shieldActive).toBe(false);
+    });
+
+    test('should deflect damage when shield is active', () => {
+      playerSystem.player.shieldActive = true;
+      playerSystem.player.shieldHits = 1;
+      const initialHealth = playerSystem.player.health;
+
+      playerSystem.takeDamage(25);
+
+      expect(playerSystem.player.health).toBe(initialHealth);
+      expect(playerSystem.player.shieldHits).toBe(0);
+    });
+  });
+});
+```
+
+#### **4.1.4 Integration Tests**
+```javascript
+// src/__tests__/integration/gameFlow.test.js
+import { describe, test, expect, beforeEach } from 'vitest';
+import { TestEnvironment } from '../__utils__/testHelpers.js';
+
+describe('Game Flow Integration', () => {
+  let gameState;
+  let container;
+
+  beforeEach(() => {
+    container = TestEnvironment.createMockServices();
+    gameState = TestEnvironment.createGameState();
+  });
+
+  describe('Game Initialization', () => {
+    test('should initialize all systems without errors', () => {
+      expect(() => {
+        const systems = ['player', 'enemies', 'physics', 'ui'];
+        systems.forEach(name => container.resolve(name));
+      }).not.toThrow();
+    });
+
+    test('should setup event system correctly', () => {
+      const eventBus = container.resolve('event-bus');
+      const emittedEvents = [];
+
+      eventBus.on('test-event', (data) => emittedEvents.push(data));
+      eventBus.emit('test-event', { message: 'test' });
+
+      expect(emittedEvents).toHaveLength(1);
+      expect(emittedEvents[0].message).toBe('test');
+    });
+  });
+
+  describe('Player-Enemy Interaction', () => {
+    test('should handle player-enemy collision', async () => {
+      const playerSystem = container.resolve('player');
+      const enemySystem = container.resolve('enemies');
+      const eventBus = container.resolve('event-bus');
+
+      let collisionDetected = false;
+      eventBus.on('player-enemy-collision', () => {
+        collisionDetected = true;
+      });
+
+      // Setup collision scenario
+      playerSystem.player.x = 100;
+      playerSystem.player.y = 100;
+
+      enemySystem.spawnAsteroid({
+        x: 105, y: 105, // Close to player
+        size: 'large'
+      });
+
+      // Run physics update
+      const physicsSystem = container.resolve('physics');
+      physicsSystem.update(0.016);
+
+      expect(collisionDetected).toBe(true);
+    });
+  });
+
+  describe('XP and Progression', () => {
+    test('should level up player when XP threshold reached', () => {
+      const playerSystem = container.resolve('player');
+      const progressionSystem = container.resolve('progression');
+      const eventBus = container.resolve('event-bus');
+
+      let levelUpTriggered = false;
+      eventBus.on('player-level-up', () => {
+        levelUpTriggered = true;
+      });
+
+      const initialLevel = playerSystem.player.level;
+      const xpNeeded = progressionSystem.getXPNeededForLevel(initialLevel + 1);
+
+      progressionSystem.addXP(xpNeeded);
+
+      expect(playerSystem.player.level).toBe(initialLevel + 1);
+      expect(levelUpTriggered).toBe(true);
+    });
+  });
+});
+```
+
+### **Etapa 4.2: JSDoc API Documentation** (Dias 5-6)
+
+#### **4.2.1 JSDoc Configuration**
+```javascript
+// jsdoc.conf.json
+{
+  "source": {
+    "include": ["src/"],
+    "exclude": ["src/__tests__/", "src/legacy/"],
+    "includePattern": "\\.(js)$"
+  },
+  "opts": {
+    "destination": "docs/api/",
+    "recurse": true
+  },
+  "plugins": ["plugins/markdown"],
+  "templates": {
+    "cleverLinks": false,
+    "monospaceLinks": false
+  },
+  "markdown": {
+    "parser": "gfm"
+  }
+}
+```
+
+#### **4.2.2 Core Class Documentation**
+```javascript
+// src/core/DIContainer.js (Documented version)
+/**
+ * Dependency Injection Container for managing service lifecycle and dependencies.
+ *
+ * @example
+ * ```javascript
+ * const container = new DIContainer();
+ * container.register('logger', () => new Logger());
+ * container.register('service', (logger) => new Service(logger), {
+ *   dependencies: ['logger']
+ * });
+ * const service = container.resolve('service');
+ * ```
+ *
+ * @class DIContainer
+ */
+export class DIContainer {
+  /**
+   * Creates a new DI container instance.
+   *
+   * @constructor
+   */
+  constructor() {
+    /** @private @type {Map<string, any>} */
+    this.services = new Map();
+
+    /** @private @type {Map<string, any>} */
+    this.singletons = new Map();
+
+    /** @private @type {Map<string, ServiceConfig>} */
+    this.factories = new Map();
+
+    /** @private @type {Set<string>} */
+    this.initializing = new Set();
+  }
+
+  /**
+   * Registers a service factory with the container.
+   *
+   * @param {string} name - Unique service identifier
+   * @param {Function} factory - Factory function that creates the service
+   * @param {ServiceOptions} [options={}] - Registration options
+   * @param {boolean} [options.singleton=true] - Whether service is singleton
+   * @param {string[]} [options.dependencies=[]] - Array of dependency names
+   *
+   * @throws {Error} If service name is already registered
+   *
+   * @example
+   * ```javascript
+   * container.register('database', (config) => new Database(config), {
+   *   singleton: true,
+   *   dependencies: ['config']
+   * });
+   * ```
+   */
+  register(name, factory, options = {}) {
+    // Implementation...
+  }
+
+  /**
+   * Resolves a service and its dependencies.
+   *
+   * @param {string} name - Service name to resolve
+   * @returns {any} The resolved service instance
+   *
+   * @throws {Error} If service is not found
+   * @throws {Error} If circular dependency detected
+   *
+   * @example
+   * ```javascript
+   * const userService = container.resolve('user-service');
+   * ```
+   */
+  resolve(name) {
+    // Implementation...
+  }
+
+  /**
+   * Checks if a service is registered.
+   *
+   * @param {string} name - Service name to check
+   * @returns {boolean} True if service exists
+   */
+  has(name) {
+    // Implementation...
+  }
+}
+
+/**
+ * Service configuration object.
+ *
+ * @typedef {Object} ServiceConfig
+ * @property {Function} factory - Service factory function
+ * @property {string[]} dependencies - Array of dependency names
+ * @property {boolean} singleton - Whether service is singleton
+ */
+
+/**
+ * Service registration options.
+ *
+ * @typedef {Object} ServiceOptions
+ * @property {boolean} [singleton=true] - Whether service is singleton
+ * @property {string[]} [dependencies=[]] - Array of dependency names
+ */
+```
+
+#### **4.2.3 Game System Documentation**
+```javascript
+// src/modules/PlayerSystem.js (Documented sections)
+/**
+ * Manages player state, input handling, and game mechanics.
+ *
+ * Handles:
+ * - Player movement and physics
+ * - Weapon systems and combat
+ * - Health and shield management
+ * - Level progression integration
+ *
+ * @class PlayerSystem
+ * @extends {BaseSystem}
+ */
+export class PlayerSystem extends BaseSystem {
+  /**
+   * Creates a new PlayerSystem instance.
+   *
+   * @param {EventBus} eventBus - Global event system
+   * @param {InputSystem} input - Input handling system
+   * @param {AudioSystem} audio - Audio system for sound effects
+   */
+  constructor(eventBus, input, audio) {
+    super('PlayerSystem', ['event-bus', 'input', 'audio']);
+
+    /**
+     * Current player state object.
+     * @type {PlayerState}
+     */
+    this.player = this.createInitialPlayerState();
+
+    // ... rest of constructor
+  }
+
+  /**
+   * Updates player logic for one frame.
+   *
+   * @param {number} deltaTime - Time elapsed since last frame in seconds
+   *
+   * @fires PlayerSystem#player-moved
+   * @fires PlayerSystem#player-shot
+   * @fires PlayerSystem#player-damaged
+   */
+  update(deltaTime) {
+    this.handleInput(deltaTime);
+    this.updateMovement(deltaTime);
+    this.updateWeapons(deltaTime);
+    this.updateShield(deltaTime);
+    this.updateBullets(deltaTime);
+  }
+
+  /**
+   * Applies damage to the player.
+   *
+   * @param {number} amount - Damage amount
+   * @param {DamageSource} [source] - Damage source information
+   * @returns {boolean} True if damage was applied, false if blocked
+   *
+   * @fires PlayerSystem#player-damaged
+   * @fires PlayerSystem#player-died
+   */
+  takeDamage(amount, source = null) {
+    // Implementation with detailed JSDoc...
+  }
+}
+
+/**
+ * Player state object structure.
+ *
+ * @typedef {Object} PlayerState
+ * @property {number} x - X coordinate
+ * @property {number} y - Y coordinate
+ * @property {number} angle - Rotation angle in radians
+ * @property {number} velocity - Current velocity
+ * @property {number} health - Current health points
+ * @property {number} maxHealth - Maximum health points
+ * @property {number} level - Current player level
+ * @property {boolean} shieldActive - Whether shield is currently active
+ * @property {number} shieldLevel - Shield upgrade level
+ */
+
+/**
+ * Player moved event.
+ *
+ * @event PlayerSystem#player-moved
+ * @type {object}
+ * @property {number} x - New X position
+ * @property {number} y - New Y position
+ * @property {number} angle - New angle
+ */
+```
+
+### **Etapa 4.3: CI/CD Quality Gates** (Dias 7-8)
+
+#### **4.3.1 Enhanced GitHub Actions**
+```yaml
+# .github/workflows/quality-gates.yml
+name: Quality Gates
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-and-analyze:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Code formatting check
+      run: npm run format:check
+
+    - name: Lint check
+      run: npm run lint
+
+    - name: Type check (JSDoc)
+      run: npm run type-check
+
+    - name: Unit tests
+      run: npm run test:unit -- --coverage
+
+    - name: Integration tests
+      run: npm run test:integration
+
+    - name: Performance benchmarks
+      run: npm run test:performance
+
+    - name: Build check
+      run: npm run build
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage/lcov.info
+
+    - name: Quality gate check
+      run: |
+        COVERAGE=$(node scripts/get-coverage.js)
+        echo "Coverage: $COVERAGE%"
+        if (( $(echo "$COVERAGE < 70" | bc -l) )); then
+          echo "Coverage below 70%"
+          exit 1
+        fi
+
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Security audit
+      run: npm audit --audit-level moderate
+
+    - name: License check
+      run: npx license-checker --summary
+
+  performance-regression:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Run performance tests
+      run: npm run test:performance -- --json > performance.json
+
+    - name: Check for regressions
+      run: node scripts/check-performance-regression.js
+
+    - name: Upload performance data
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-data
+        path: performance.json
+
+  deploy-staging:
+    if: github.ref == 'refs/heads/develop'
+    needs: [test-and-analyze, security-audit]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Deploy to staging
+      run: |
+        npm ci
+        npm run build
+        npm run deploy:staging
+
+  deploy-production:
+    if: github.ref == 'refs/heads/main'
+    needs: [test-and-analyze, security-audit, performance-regression]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Deploy to production
+      run: |
+        npm ci
+        npm run build
+        npm run deploy:production
+```
+
+#### **4.3.2 Quality Scripts**
+```javascript
+// scripts/quality/coverage-check.js
+const fs = require('fs');
+
+function getCoveragePercentage() {
+  const coverageFile = './coverage/coverage-summary.json';
+
+  if (!fs.existsSync(coverageFile)) {
+    console.error('Coverage file not found');
+    process.exit(1);
+  }
+
+  const coverage = JSON.parse(fs.readFileSync(coverageFile, 'utf8'));
+  const totalCoverage = coverage.total;
+
+  return {
+    lines: totalCoverage.lines.pct,
+    branches: totalCoverage.branches.pct,
+    functions: totalCoverage.functions.pct,
+    statements: totalCoverage.statements.pct
+  };
+}
+
+function checkQualityGates() {
+  const coverage = getCoveragePercentage();
+  const gates = {
+    lines: 70,
+    branches: 65,
+    functions: 70,
+    statements: 70
+  };
+
+  console.log('Coverage Report:');
+  console.log(`Lines: ${coverage.lines}% (required: ${gates.lines}%)`);
+  console.log(`Branches: ${coverage.branches}% (required: ${gates.branches}%)`);
+  console.log(`Functions: ${coverage.functions}% (required: ${gates.functions}%)`);
+  console.log(`Statements: ${coverage.statements}% (required: ${gates.statements}%)`);
+
+  let failed = false;
+  for (const [metric, required] of Object.entries(gates)) {
+    if (coverage[metric] < required) {
+      console.error(`❌ ${metric} coverage ${coverage[metric]}% below required ${required}%`);
+      failed = true;
+    } else {
+      console.log(`✅ ${metric} coverage ${coverage[metric]}% meets requirement`);
+    }
+  }
+
+  if (failed) {
+    process.exit(1);
+  } else {
+    console.log('🎉 All quality gates passed!');
+  }
+}
+
+checkQualityGates();
+```
+
+#### **4.3.3 Performance Regression Detection**
+```javascript
+// scripts/performance/regression-check.js
+const fs = require('fs');
+const path = require('path');
+
+class PerformanceRegression {
+  constructor() {
+    this.baselineFile = 'performance-baseline.json';
+    this.currentFile = 'performance.json';
+    this.thresholds = {
+      fps: -5, // 5% FPS degradation allowed
+      memoryUsage: 10, // 10% memory increase allowed
+      loadTime: 15 // 15% load time increase allowed
+    };
+  }
+
+  loadBaseline() {
+    if (!fs.existsSync(this.baselineFile)) {
+      console.log('No baseline found, creating new baseline');
+      return null;
+    }
+
+    return JSON.parse(fs.readFileSync(this.baselineFile, 'utf8'));
+  }
+
+  loadCurrentResults() {
+    if (!fs.existsSync(this.currentFile)) {
+      throw new Error('Current performance results not found');
+    }
+
+    return JSON.parse(fs.readFileSync(this.currentFile, 'utf8'));
+  }
+
+  compareResults(baseline, current) {
+    const results = {
+      passed: true,
+      comparisons: []
+    };
+
+    for (const testName of Object.keys(current)) {
+      if (!baseline || !baseline[testName]) {
+        results.comparisons.push({
+          test: testName,
+          status: 'NEW',
+          current: current[testName],
+          message: 'New test, no baseline comparison'
+        });
+        continue;
+      }
+
+      const baseMetric = baseline[testName];
+      const currentMetric = current[testName];
+
+      for (const [metricName, threshold] of Object.entries(this.thresholds)) {
+        if (baseMetric[metricName] && currentMetric[metricName]) {
+          const percentChange = ((currentMetric[metricName] - baseMetric[metricName]) / baseMetric[metricName]) * 100;
+          const passed = percentChange <= threshold;
+
+          results.comparisons.push({
+            test: testName,
+            metric: metricName,
+            status: passed ? 'PASS' : 'FAIL',
+            baseline: baseMetric[metricName],
+            current: currentMetric[metricName],
+            change: percentChange,
+            threshold: threshold
+          });
+
+          if (!passed) {
+            results.passed = false;
+          }
+        }
+      }
+    }
+
+    return results;
+  }
+
+  generateReport(results) {
+    console.log('🚀 Performance Regression Report');
+    console.log('================================\n');
+
+    for (const comparison of results.comparisons) {
+      const emoji = comparison.status === 'PASS' ? '✅' :
+                   comparison.status === 'FAIL' ? '❌' : '🆕';
+
+      console.log(`${emoji} ${comparison.test}${comparison.metric ? ` - ${comparison.metric}` : ''}`);
+
+      if (comparison.baseline && comparison.current) {
+        console.log(`   Baseline: ${comparison.baseline}`);
+        console.log(`   Current:  ${comparison.current}`);
+        console.log(`   Change:   ${comparison.change.toFixed(2)}% (threshold: ${comparison.threshold}%)`);
+      }
+
+      console.log(`   Message:  ${comparison.message || comparison.status}\n`);
+    }
+
+    console.log(`Overall Status: ${results.passed ? '✅ PASSED' : '❌ FAILED'}`);
+    return results.passed;
+  }
+
+  updateBaseline(current) {
+    fs.writeFileSync(this.baselineFile, JSON.stringify(current, null, 2));
+    console.log('📊 Baseline updated with current results');
+  }
+
+  run() {
+    try {
+      const baseline = this.loadBaseline();
+      const current = this.loadCurrentResults();
+
+      const results = this.compareResults(baseline, current);
+      const passed = this.generateReport(results);
+
+      // Update baseline if no regression detected
+      if (passed && process.env.UPDATE_BASELINE === 'true') {
+        this.updateBaseline(current);
+      }
+
+      process.exit(passed ? 0 : 1);
+    } catch (error) {
+      console.error('Performance regression check failed:', error);
+      process.exit(1);
+    }
+  }
+}
+
+new PerformanceRegression().run();
+```
+
+### **Etapa 4.4: Performance Monitoring & Alerting** (Dia 9)
+
+#### **4.4.1 Real-time Performance Monitor**
+```javascript
+// src/core/PerformanceMonitor.js
+export class PerformanceMonitor {
+  constructor() {
+    this.enabled = process.env.NODE_ENV !== 'production' ||
+                   localStorage.getItem('perf-monitor') === 'true';
+
+    this.metrics = {
+      fps: [],
+      frameTime: [],
+      memoryUsage: [],
+      renderTime: [],
+      updateTime: []
+    };
+
+    this.thresholds = {
+      fps: 55, // Alert if below 55 FPS
+      frameTime: 20, // Alert if frame time > 20ms
+      memoryUsage: 100 * 1024 * 1024 // Alert if > 100MB
+    };
+
+    this.alerts = [];
+    this.lastReport = 0;
+    this.reportInterval = 5000; // Report every 5 seconds
+  }
+
+  startFrame() {
+    if (!this.enabled) return;
+    this.frameStart = performance.now();
+    this.updateStart = null;
+    this.renderStart = null;
+  }
+
+  startUpdate() {
+    if (!this.enabled) return;
+    this.updateStart = performance.now();
+  }
+
+  endUpdate() {
+    if (!this.enabled || !this.updateStart) return;
+    const updateTime = performance.now() - this.updateStart;
+    this.addMetric('updateTime', updateTime);
+  }
+
+  startRender() {
+    if (!this.enabled) return;
+    this.renderStart = performance.now();
+  }
+
+  endRender() {
+    if (!this.enabled || !this.renderStart) return;
+    const renderTime = performance.now() - this.renderStart;
+    this.addMetric('renderTime', renderTime);
+  }
+
+  endFrame() {
+    if (!this.enabled || !this.frameStart) return;
+
+    const frameTime = performance.now() - this.frameStart;
+    const fps = 1000 / frameTime;
+
+    this.addMetric('frameTime', frameTime);
+    this.addMetric('fps', fps);
+
+    // Memory usage (if available)
+    if (performance.memory) {
+      this.addMetric('memoryUsage', performance.memory.usedJSHeapSize);
+    }
+
+    this.checkThresholds();
+    this.maybeReport();
+  }
+
+  addMetric(name, value) {
+    const metrics = this.metrics[name];
+    metrics.push(value);
+
+    // Keep only last 300 samples (5 seconds at 60fps)
+    if (metrics.length > 300) {
+      metrics.splice(0, metrics.length - 300);
+    }
+  }
+
+  checkThresholds() {
+    const now = performance.now();
+
+    // Check FPS threshold
+    if (this.metrics.fps.length > 0) {
+      const currentFPS = this.metrics.fps[this.metrics.fps.length - 1];
+      if (currentFPS < this.thresholds.fps) {
+        this.addAlert('LOW_FPS', `FPS dropped to ${currentFPS.toFixed(1)}`, now);
+      }
+    }
+
+    // Check frame time threshold
+    if (this.metrics.frameTime.length > 0) {
+      const currentFrameTime = this.metrics.frameTime[this.metrics.frameTime.length - 1];
+      if (currentFrameTime > this.thresholds.frameTime) {
+        this.addAlert('HIGH_FRAME_TIME', `Frame time: ${currentFrameTime.toFixed(1)}ms`, now);
+      }
+    }
+
+    // Check memory threshold
+    if (this.metrics.memoryUsage.length > 0) {
+      const currentMemory = this.metrics.memoryUsage[this.metrics.memoryUsage.length - 1];
+      if (currentMemory > this.thresholds.memoryUsage) {
+        this.addAlert('HIGH_MEMORY', `Memory usage: ${(currentMemory / 1024 / 1024).toFixed(1)}MB`, now);
+      }
+    }
+  }
+
+  addAlert(type, message, timestamp) {
+    // Prevent spam by checking if same alert was recently triggered
+    const recentAlert = this.alerts.find(alert =>
+      alert.type === type &&
+      timestamp - alert.timestamp < 1000 // Within 1 second
+    );
+
+    if (!recentAlert) {
+      this.alerts.push({ type, message, timestamp });
+      console.warn(`[Performance Alert] ${type}: ${message}`);
+
+      // Emit event for UI notification
+      if (typeof gameEvents !== 'undefined') {
+        gameEvents.emit('performance-alert', { type, message, timestamp });
+      }
+    }
+  }
+
+  maybeReport() {
+    const now = performance.now();
+    if (now - this.lastReport > this.reportInterval) {
+      this.generateReport();
+      this.lastReport = now;
+    }
+  }
+
+  generateReport() {
+    const report = {};
+
+    for (const [metricName, values] of Object.entries(this.metrics)) {
+      if (values.length === 0) continue;
+
+      const sum = values.reduce((a, b) => a + b, 0);
+      const avg = sum / values.length;
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+
+      report[metricName] = {
+        avg: parseFloat(avg.toFixed(2)),
+        min: parseFloat(min.toFixed(2)),
+        max: parseFloat(max.toFixed(2)),
+        samples: values.length
+      };
+    }
+
+    // Recent alerts
+    const recentAlerts = this.alerts.filter(alert =>
+      performance.now() - alert.timestamp < this.reportInterval
+    );
+
+    if (recentAlerts.length > 0) {
+      report.alerts = recentAlerts;
+    }
+
+    console.group('🚀 Performance Report');
+    console.table(report);
+    if (report.alerts) {
+      console.warn('Recent Alerts:', report.alerts);
+    }
+    console.groupEnd();
+
+    return report;
+  }
+
+  getMetrics() {
+    return { ...this.metrics };
+  }
+
+  clearMetrics() {
+    for (const metricName of Object.keys(this.metrics)) {
+      this.metrics[metricName] = [];
+    }
+    this.alerts = [];
+  }
+}
+```
+
+#### **4.4.2 Error Tracking & Structured Logging**
+```javascript
+// src/core/ErrorTracker.js
+export class ErrorTracker {
+  constructor() {
+    this.errors = [];
+    this.maxErrors = 100;
+    this.sessionId = this.generateSessionId();
+    this.setupGlobalErrorHandling();
+  }
+
+  generateSessionId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2);
+  }
+
+  setupGlobalErrorHandling() {
+    // Catch unhandled errors
+    window.addEventListener('error', (event) => {
+      this.trackError('UNHANDLED_ERROR', event.error, {
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno
+      });
+    });
+
+    // Catch unhandled promise rejections
+    window.addEventListener('unhandledrejection', (event) => {
+      this.trackError('UNHANDLED_REJECTION', event.reason, {
+        type: 'promise_rejection'
+      });
+    });
+  }
+
+  trackError(type, error, context = {}) {
+    const errorData = {
+      id: this.generateErrorId(),
+      sessionId: this.sessionId,
+      timestamp: new Date().toISOString(),
+      type,
+      message: error?.message || String(error),
+      stack: error?.stack,
+      url: window.location.href,
+      userAgent: navigator.userAgent,
+      context,
+      gameState: this.captureGameState()
+    };
+
+    this.errors.push(errorData);
+
+    // Keep only recent errors
+    if (this.errors.length > this.maxErrors) {
+      this.errors.splice(0, this.errors.length - this.maxErrors);
+    }
+
+    // Log to console with details
+    console.group(`🚨 Error Tracked: ${type}`);
+    console.error('Message:', errorData.message);
+    console.error('Context:', errorData.context);
+    console.error('Game State:', errorData.gameState);
+    if (errorData.stack) {
+      console.error('Stack:', errorData.stack);
+    }
+    console.groupEnd();
+
+    // Send to analytics service (if configured)
+    this.sendToAnalytics(errorData);
+
+    return errorData.id;
+  }
+
+  generateErrorId() {
+    return Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
+  }
+
+  captureGameState() {
+    try {
+      const gameState = {
+        screen: 'unknown',
+        isPaused: false,
+        playerHealth: null,
+        enemyCount: null,
+        currentLevel: null
+      };
+
+      // Try to capture game state if available
+      if (typeof gameServices !== 'undefined') {
+        const gameStateService = gameServices.has('game-state') ?
+          gameServices.get('game-state') : null;
+
+        if (gameStateService) {
+          gameState.screen = gameStateService.getScreen();
+          gameState.isPaused = gameStateService.isPaused();
+        }
+
+        const player = gameServices.has('player') ?
+          gameServices.get('player') : null;
+
+        if (player && player.player) {
+          gameState.playerHealth = player.player.health;
+          gameState.currentLevel = player.player.level;
+        }
+
+        const enemies = gameServices.has('enemies') ?
+          gameServices.get('enemies') : null;
+
+        if (enemies && enemies.asteroids) {
+          gameState.enemyCount = enemies.asteroids.length;
+        }
+      }
+
+      return gameState;
+    } catch (captureError) {
+      return { captureError: captureError.message };
+    }
+  }
+
+  sendToAnalytics(errorData) {
+    // Only in production or if explicitly enabled
+    if (process.env.NODE_ENV !== 'production' &&
+        !localStorage.getItem('error-tracking-enabled')) {
+      return;
+    }
+
+    // Example: Send to analytics service
+    // This would be replaced with actual service like Sentry, LogRocket, etc.
+    try {
+      fetch('/api/errors', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(errorData)
+      }).catch(() => {
+        // Fail silently for analytics
+      });
+    } catch (e) {
+      // Fail silently for analytics
+    }
+  }
+
+  getErrors(filter = {}) {
+    let filteredErrors = this.errors;
+
+    if (filter.type) {
+      filteredErrors = filteredErrors.filter(e => e.type === filter.type);
+    }
+
+    if (filter.since) {
+      const since = new Date(filter.since);
+      filteredErrors = filteredErrors.filter(e => new Date(e.timestamp) >= since);
+    }
+
+    return filteredErrors;
+  }
+
+  generateReport() {
+    const report = {
+      sessionId: this.sessionId,
+      totalErrors: this.errors.length,
+      errorTypes: {},
+      recentErrors: this.errors.slice(-10),
+      timeline: this.generateTimeline()
+    };
+
+    // Count error types
+    for (const error of this.errors) {
+      report.errorTypes[error.type] = (report.errorTypes[error.type] || 0) + 1;
+    }
+
+    return report;
+  }
+
+  generateTimeline() {
+    const timeline = [];
+    const now = Date.now();
+    const hourMs = 60 * 60 * 1000;
+
+    // Group errors by hour for the last 24 hours
+    for (let i = 23; i >= 0; i--) {
+      const hourStart = now - (i * hourMs);
+      const hourEnd = hourStart + hourMs;
+
+      const errorsInHour = this.errors.filter(error => {
+        const errorTime = new Date(error.timestamp).getTime();
+        return errorTime >= hourStart && errorTime < hourEnd;
+      });
+
+      timeline.push({
+        hour: new Date(hourStart).toISOString(),
+        errorCount: errorsInHour.length
+      });
+    }
+
+    return timeline;
+  }
+}
+```
+
+## 📊 Quality Metrics Dashboard
+
+### **Package.json Scripts Update**
+```json
+{
+  "scripts": {
+    "test": "vitest run",
+    "test:unit": "vitest run src/**/*.test.js",
+    "test:integration": "vitest run src/**/*.integration.test.js",
+    "test:performance": "vitest run scripts/benchmarks/",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "docs:generate": "jsdoc -c jsdoc.conf.json",
+    "docs:serve": "http-server docs/api -p 3001",
+    "type-check": "npx -p typescript tsc src/**/*.js --allowJs --checkJs --noEmit",
+    "quality:check": "node scripts/quality/coverage-check.js",
+    "quality:report": "npm run test:coverage && npm run quality:check",
+    "lint": "eslint src/ --ext .js",
+    "lint:fix": "eslint src/ --ext .js --fix"
+  }
+}
+```
+
+## 📋 Implementation Checklist
+
+### **Etapa 4.1: Testing Infrastructure**
+- [ ] Configurar Vitest com coverage
+- [ ] Criar test utilities e mocks
+- [ ] Implementar testes unitários para core systems
+- [ ] Implementar testes de integração
+- [ ] Configurar performance benchmarks
+- [ ] Atingir 70%+ code coverage
+
+### **Etapa 4.2: Documentation**
+- [ ] Configurar JSDoc
+- [ ] Documentar todas as classes públicas
+- [ ] Criar examples e tutorials
+- [ ] Gerar API documentation website
+- [ ] Validar documentation completeness
+
+### **Etapa 4.3: CI/CD Enhancement**
+- [ ] Implementar quality gates no GitHub Actions
+- [ ] Configurar automated testing
+- [ ] Setup performance regression detection
+- [ ] Configurar deployment automático
+- [ ] Security audit automation
+
+### **Etapa 4.4: Monitoring**
+- [ ] Implementar PerformanceMonitor
+- [ ] Setup ErrorTracker
+- [ ] Configurar alerting system
+- [ ] Dashboard para métricas em tempo real
+- [ ] Analytics integration
+
+## 🎯 Success Metrics
+
+### **Quantitative Targets**
+- **Test Coverage:** 70%+ (lines, branches, functions)
+- **API Documentation:** 100% public APIs documented
+- **Build Success Rate:** 95%+ in CI/CD
+- **Performance Regression:** <5% allowed degradation
+- **Error Rate:** <1% unhandled errors in production
+
+### **Qualitative Goals**
+- **Developer Experience:** New contributors can understand and contribute
+- **Maintenance:** Issues can be debugged quickly with good logging
+- **Reliability:** System degrades gracefully under stress
+- **Observability:** Performance issues are detected proactively
+
+---
+
+**📚 Resultado Final:** Base técnica sólida com documentação completa, testes robustos e monitoramento proativo que garante qualidade a longo prazo.
+
+**🛡️ Meta:** Sistema auto-documentado e auto-monitorado que facilita manutenção e evolução contínua do projeto.
