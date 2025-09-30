@@ -53,20 +53,18 @@ function initializeDependencyInjection() {
     // Register all services
     ServiceRegistry.setupServices(diContainer);
 
-    // Replace global gameServices with adapter for backward compatibility
-    if (typeof window !== 'undefined') {
-      const adapter = new ServiceLocatorAdapter(diContainer);
-      adapter.showDeprecationWarnings = false; // Disable during transition
-      window.gameServices = adapter;
+    // IMPORTANT: Don't replace gameServices yet!
+    // Systems need to register themselves first using the original ServiceLocator
+    // The adapter will be enabled in Phase 2.2+ when systems use constructor injection
 
-      // Expose container for debugging
-      if (process.env.NODE_ENV === 'development') {
-        window.diContainer = diContainer;
-      }
+    // Just expose container for debugging
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+      window.diContainer = diContainer;
     }
 
     console.log('[App] ✓ DI system initialized successfully');
     console.log(`[App] ✓ ${diContainer.getServiceNames().length} services registered`);
+    console.log('[App] ℹ ServiceLocator adapter will be enabled in Phase 2.2');
 
     return true;
   } catch (error) {
