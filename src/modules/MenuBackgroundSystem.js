@@ -167,9 +167,9 @@ class MenuBackgroundSystem {
   createStarLayers() {
     const { THREE } = this;
     const layerConfigs = [
-      { count: 4000, distance: 8000, size: 0.3, speedFactor: 0.05 },
-      { count: 3000, distance: 6000, size: 0.4, speedFactor: 0.1 },
-      { count: 2000, distance: 4000, size: 0.55, speedFactor: 0.2 },
+      { count: 4000, distance: 8000, pixelSize: 0.9, speedFactor: 0.05 },
+      { count: 3000, distance: 6000, pixelSize: 1.1, speedFactor: 0.1 },
+      { count: 2000, distance: 4000, pixelSize: 1.4, speedFactor: 0.2 },
     ];
 
     this.starLayers = layerConfigs.map((config) => {
@@ -194,7 +194,7 @@ class MenuBackgroundSystem {
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
       const material = new THREE.PointsMaterial({
         color: 0xffffff,
-        size: config.size,
+        size: this.computeWorldSpacePointSize(config.distance, config.pixelSize),
         transparent: true,
         opacity: Math.random() * 0.35 + 0.55,
         fog: false,
@@ -205,7 +205,53 @@ class MenuBackgroundSystem {
 
       const mesh = new THREE.Points(geometry, material);
       this.scene.add(mesh);
-      return { mesh, speedFactor: config.speedFactor };
+      return {
+        mesh,
+        speedFactor: config.speedFactor,
+        config: { ...config },
+      };
+    });
+  }
+
+  computeWorldSpacePointSize(distance, pixelSize = 1) {
+    if (!this.camera) {
+      return pixelSize;
+    }
+
+    const fov = typeof this.camera.fov === 'number' ? this.camera.fov : 60;
+    const height =
+      this.renderer?.domElement?.clientHeight || window.innerHeight || 1;
+    const pixelRatio =
+      (typeof this.renderer?.getPixelRatio === 'function'
+        ? this.renderer.getPixelRatio()
+        : null) || window.devicePixelRatio || 1;
+
+    const effectivePixelSize = pixelSize * pixelRatio;
+    const fovInRadians = (fov * Math.PI) / 180;
+    const viewHeightAtDistance = 2 * distance * Math.tan(fovInRadians / 2);
+
+    return (
+      (effectivePixelSize / Math.max(1, height)) * viewHeightAtDistance ||
+      pixelSize
+    );
+  }
+
+  updateStarLayerSizes() {
+    this.starLayers.forEach((layer) => {
+      const { mesh, config } = layer;
+      if (!mesh?.material || !config) {
+        return;
+      }
+
+      const newSize = this.computeWorldSpacePointSize(
+        config.distance,
+        config.pixelSize
+      );
+
+      if (mesh.material.size !== newSize) {
+        mesh.material.size = newSize;
+        mesh.material.needsUpdate = true;
+      }
     });
   }
 
@@ -1080,6 +1126,7 @@ class MenuBackgroundSystem {
     this.camera.aspect = this.getAspectRatio(width, height);
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
+    this.updateStarLayerSizes();
   }
 
   handleScreenChanged(event) {
