@@ -263,10 +263,10 @@ class XPOrbSystem {
       !GamePools?.xpOrbs ||
       typeof GamePools.xpOrbs.release !== 'function'
     ) {
-      return;
+      return false;
     }
 
-    GamePools.xpOrbs.release(orb);
+    return GamePools.xpOrbs.release(orb);
   }
 
   releaseAllOrbsToPool() {
@@ -1411,14 +1411,19 @@ class XPOrbSystem {
     const remaining = [];
     const toRelease = [];
     let removed = 0;
+    let sawNullEntry = false;
 
     for (let i = 0; i < this.xpOrbs.length; i += 1) {
       const orb = this.xpOrbs[i];
-      if (!orb || orb.collected) {
-        if (orb) {
-          orb.active = false;
-          toRelease.push(orb);
-        }
+      if (!orb) {
+        removed += 1;
+        sawNullEntry = true;
+        continue;
+      }
+
+      if (orb.collected) {
+        orb.active = false;
+        toRelease.push(orb);
         removed += 1;
         continue;
       }
@@ -1429,20 +1434,36 @@ class XPOrbSystem {
     this.xpOrbs = remaining;
 
     if (toRelease.length > 0) {
-      const releasedSet = new Set(toRelease);
+      const releaseSet = new Set(toRelease);
+      const poolNames = Object.keys(this.xpOrbPools);
 
-      for (let i = 0; i < this.orbClasses.length; i += 1) {
-        const className = this.orbClasses[i];
+      for (let i = 0; i < poolNames.length; i += 1) {
+        const className = poolNames[i];
         const pool = this.xpOrbPools[className];
         if (!Array.isArray(pool) || pool.length === 0) {
           continue;
         }
 
-        this.xpOrbPools[className] = pool.filter((orb) => !releasedSet.has(orb));
+        this.xpOrbPools[className] = pool.filter(
+          (candidate) => candidate && !releaseSet.has(candidate)
+        );
       }
 
       for (let i = 0; i < toRelease.length; i += 1) {
         this.releaseOrb(toRelease[i]);
+      }
+    }
+
+    if (sawNullEntry) {
+      const poolNames = Object.keys(this.xpOrbPools);
+      for (let i = 0; i < poolNames.length; i += 1) {
+        const className = poolNames[i];
+        const pool = this.xpOrbPools[className];
+        if (!Array.isArray(pool) || pool.length === 0) {
+          continue;
+        }
+
+        this.xpOrbPools[className] = pool.filter(Boolean);
       }
     }
 
