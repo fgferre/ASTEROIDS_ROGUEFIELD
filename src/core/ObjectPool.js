@@ -313,6 +313,48 @@ export class ObjectPool {
     const stats = this.getStats();
     return `ObjectPool[available: ${stats.available}, inUse: ${stats.inUse}, hitRate: ${stats.hitRate}]`;
   }
+
+  /**
+   * Reconfigures the pool with new lifecycle handlers.
+   * Clears existing cached objects and re-warms the pool using
+   * the provided factory/reset functions.
+   *
+   * @param {Function} createFn - New factory function
+   * @param {Function} resetFn - New reset function
+   * @param {number} [initialSize=this.available.length] - Objects to pre-create
+   * @param {number} [maxSize=this.maxSize] - New maximum pool size
+   */
+  reconfigure(createFn, resetFn, initialSize = this.available.length, maxSize = this.maxSize) {
+    if (typeof createFn !== 'function') {
+      throw new Error('reconfigure(createFn, resetFn, ...) requires a create function');
+    }
+
+    if (typeof resetFn !== 'function') {
+      throw new Error('reconfigure(createFn, resetFn, ...) requires a reset function');
+    }
+
+    if (this.inUse.size > 0) {
+      throw new Error('Cannot reconfigure pool while objects are still in use');
+    }
+
+    this.createFn = createFn;
+    this.resetFn = resetFn;
+
+    if (Number.isFinite(maxSize) && maxSize >= 0) {
+      this.maxSize = maxSize;
+    }
+
+    this.available.length = 0;
+    this.totalCreated = 0;
+    this.totalAcquired = 0;
+    this.totalReleased = 0;
+    this.totalHits = 0;
+    this.objectUsage = new WeakSet();
+
+    if (initialSize > 0) {
+      this.expand(initialSize);
+    }
+  }
 }
 
 /**

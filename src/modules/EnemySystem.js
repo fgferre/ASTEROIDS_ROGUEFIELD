@@ -1,16 +1,28 @@
 // src/modules/EnemySystem.js
 import * as CONSTANTS from '../core/GameConstants.js';
+import { GamePools } from '../core/GamePools.js';
 
 // === CLASSE ASTEROID (MOVIDA DO APP.JS) ===
 class Asteroid {
   constructor(system, config = {}) {
+    this.resetForPool();
+    if (system) {
+      this.initialize(system, config);
+    }
+  }
+
+  initialize(system, config = {}) {
+    const options = config || {};
+
+    this.resetForPool();
+
     this.system = system;
-    this.id = Date.now() + Math.random();
-    this.size = config.size || 'small';
-    this.variant = config.variant || 'common';
-    this.wave = config.wave || 1;
-    this.spawnedBy = config.spawnedBy ?? null;
-    this.generation = config.generation ?? 0;
+    this.id = options.id ?? Date.now() + Math.random();
+    this.size = options.size || 'small';
+    this.variant = options.variant || 'common';
+    this.wave = options.wave || 1;
+    this.spawnedBy = options.spawnedBy ?? null;
+    this.generation = options.generation ?? 0;
 
     this.radius = CONSTANTS.ASTEROID_SIZES[this.size] || 12;
     this.variantConfig =
@@ -38,12 +50,12 @@ class Asteroid {
     const speedMultiplier = this.variantConfig?.speedMultiplier ?? 1;
     const finalSpeed = randomSpeed * speedMultiplier;
 
-    this.x = config.x ?? 0;
-    this.y = config.y ?? 0;
+    this.x = options.x ?? 0;
+    this.y = options.y ?? 0;
 
-    if (Number.isFinite(config.vx) || Number.isFinite(config.vy)) {
-      this.vx = (config.vx ?? 0) * speedMultiplier;
-      this.vy = (config.vy ?? 0) * speedMultiplier;
+    if (Number.isFinite(options.vx) || Number.isFinite(options.vy)) {
+      this.vx = (options.vx ?? 0) * speedMultiplier;
+      this.vy = (options.vy ?? 0) * speedMultiplier;
 
       if (this.vx === 0 && this.vy === 0) {
         const angle = Math.random() * Math.PI * 2;
@@ -51,14 +63,14 @@ class Asteroid {
         this.vy = Math.sin(angle) * finalSpeed;
       }
     } else {
-      const angle = config.angle ?? Math.random() * Math.PI * 2;
+      const angle = options.angle ?? Math.random() * Math.PI * 2;
       this.vx = Math.cos(angle) * finalSpeed;
       this.vy = Math.sin(angle) * finalSpeed;
     }
 
-    this.rotation = config.rotation ?? Math.random() * Math.PI * 2;
+    this.rotation = options.rotation ?? Math.random() * Math.PI * 2;
     this.rotationSpeed =
-      (config.rotationSpeed ?? (Math.random() - 0.5) * 1.5) *
+      (options.rotationSpeed ?? (Math.random() - 0.5) * 1.5) *
       (this.variantConfig?.rotationMultiplier ?? 1);
 
     const baseHealth =
@@ -89,6 +101,44 @@ class Asteroid {
 
     this.variantState = this.initializeVariantState();
     this.visualState = this.initializeVisualState();
+  }
+
+  resetForPool() {
+    this.system = null;
+    this.id = 0;
+    this.size = 'small';
+    this.variant = 'common';
+    this.wave = 1;
+    this.spawnedBy = null;
+    this.generation = 0;
+    this.radius = 0;
+    this.variantConfig = null;
+    this.crackProfileKey = 'default';
+    this.fragmentProfileKey = 'default';
+    this.crackProfile = null;
+    this.fragmentProfile = null;
+    this.behavior = null;
+    this.mass = 0;
+    this.x = 0;
+    this.y = 0;
+    this.vx = 0;
+    this.vy = 0;
+    this.rotation = 0;
+    this.rotationSpeed = 0;
+    this.maxHealth = 0;
+    this.health = 0;
+    this.lastDamageTime = 0;
+    this.shieldHitCooldown = 0;
+    this.destroyed = true;
+    this.crackSeed = 0;
+    this.crackStage = 0;
+    this.vertices = [];
+    this.polygonEdges = [];
+    this.minSurfaceRadius = 0;
+    this.crackLayers = [];
+    this.variantState = {};
+    this.visualState = {};
+    this.spawnTime = 0;
   }
 
   computeWaveHealthMultiplier(wave) {
@@ -1684,14 +1734,17 @@ class EnemySystem {
     this.cachedPlayer = null;
     this.cachedWorld = null;
     this.cachedProgression = null;
+    this.cachedXPOrbs = null;
     this.activeAsteroidCache = [];
     this.activeAsteroidCacheDirty = true;
+    this.usesAsteroidPool = false;
 
     // Registrar no ServiceLocator
     if (typeof gameServices !== 'undefined') {
       gameServices.register('enemies', this);
     }
 
+    this.setupAsteroidPoolIntegration();
     this.setupEventListeners();
     this.resolveCachedServices(true);
 
@@ -1762,6 +1815,70 @@ class EnemySystem {
         this.cachedXPOrbs = null;
       }
     }
+  }
+
+  setupAsteroidPoolIntegration() {
+    if (!GamePools || typeof GamePools.configureAsteroidLifecycle !== 'function') {
+      this.usesAsteroidPool = false;
+      return;
+    }
+
+    try {
+      GamePools.configureAsteroidLifecycle({
+        create: () => new Asteroid(),
+        reset: (asteroid) => {
+          if (asteroid && typeof asteroid.resetForPool === 'function') {
+            asteroid.resetForPool();
+          }
+        }
+      });
+      this.usesAsteroidPool = true;
+    } catch (error) {
+      this.usesAsteroidPool = false;
+      console.warn('[EnemySystem] Failed to configure asteroid pool lifecycle', error);
+    }
+  }
+
+  acquireAsteroid(config) {
+    if (
+      this.usesAsteroidPool &&
+      GamePools?.asteroids &&
+      typeof GamePools.asteroids.acquire === 'function'
+    ) {
+      const asteroid = GamePools.asteroids.acquire();
+      if (asteroid && typeof asteroid.initialize === 'function') {
+        asteroid.initialize(this, config);
+        return asteroid;
+      }
+    }
+
+    return new Asteroid(this, config);
+  }
+
+  releaseAsteroid(asteroid) {
+    if (
+      !asteroid ||
+      !this.usesAsteroidPool ||
+      !GamePools?.asteroids ||
+      typeof GamePools.asteroids.release !== 'function'
+    ) {
+      return;
+    }
+
+    GamePools.asteroids.release(asteroid);
+  }
+
+  releaseAllAsteroidsToPool() {
+    if (!Array.isArray(this.asteroids) || this.asteroids.length === 0) {
+      return;
+    }
+
+    for (let i = 0; i < this.asteroids.length; i += 1) {
+      this.releaseAsteroid(this.asteroids[i]);
+    }
+
+    this.asteroids.length = 0;
+    this.invalidateActiveAsteroidCache();
   }
 
   getCachedPlayer() {
@@ -2099,7 +2216,7 @@ class EnemySystem {
       spawnType: 'spawn',
     });
 
-    const asteroid = new Asteroid(this, {
+    const asteroid = this.acquireAsteroid({
       x,
       y,
       size,
@@ -2176,7 +2293,7 @@ class EnemySystem {
       );
 
       fragmentDescriptors.forEach((descriptor, index) => {
-        const fragment = new Asteroid(this, {
+        const fragment = this.acquireAsteroid({
           ...descriptor,
           variant: fragmentVariants[index],
           wave: descriptor.wave || waveNumber,
@@ -2538,13 +2655,27 @@ class EnemySystem {
   }
 
   cleanupDestroyed() {
-    const countBefore = this.asteroids.length;
-    this.asteroids = this.asteroids.filter((asteroid) => !asteroid.destroyed);
-    this.invalidateActiveAsteroidCache();
+    if (!Array.isArray(this.asteroids) || this.asteroids.length === 0) {
+      return;
+    }
 
-    if (this.asteroids.length !== countBefore) {
-      // Debug
-      // console.log(`[EnemySystem] Cleaned up ${countBefore - this.asteroids.length} asteroids`);
+    const remaining = [];
+    let removed = 0;
+
+    for (let i = 0; i < this.asteroids.length; i += 1) {
+      const asteroid = this.asteroids[i];
+      if (!asteroid || asteroid.destroyed) {
+        this.releaseAsteroid(asteroid);
+        removed += 1;
+        continue;
+      }
+
+      remaining.push(asteroid);
+    }
+
+    if (removed > 0) {
+      this.asteroids = remaining;
+      this.invalidateActiveAsteroidCache();
     }
   }
 
@@ -2594,6 +2725,7 @@ class EnemySystem {
 
   // === RESET E CLEANUP ===
   reset() {
+    this.releaseAllAsteroidsToPool();
     this.asteroids = [];
     this.invalidateActiveAsteroidCache();
     this.spawnTimer = 0;
@@ -2610,6 +2742,7 @@ class EnemySystem {
   }
 
   destroy() {
+    this.releaseAllAsteroidsToPool();
     this.asteroids = [];
     this.sessionActive = false;
     this.cachedPlayer = null;
