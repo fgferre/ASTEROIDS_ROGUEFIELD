@@ -167,9 +167,9 @@ class MenuBackgroundSystem {
   createStarLayers() {
     const { THREE } = this;
     const layerConfigs = [
-      { count: 4000, distance: 8000, size: 0.3, speedFactor: 0.05 },
-      { count: 3000, distance: 6000, size: 0.4, speedFactor: 0.1 },
-      { count: 2000, distance: 4000, size: 0.55, speedFactor: 0.2 },
+      { count: 4000, distance: 8000, pixelSize: 1.2, speedFactor: 0.05 },
+      { count: 3000, distance: 6000, pixelSize: 1.6, speedFactor: 0.1 },
+      { count: 2000, distance: 4000, pixelSize: 2.1, speedFactor: 0.2 },
     ];
 
     this.starLayers = layerConfigs.map((config) => {
@@ -192,9 +192,10 @@ class MenuBackgroundSystem {
       }
 
       geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      const pixelSize = Math.max(0.5, config.pixelSize || config.size || 1.2);
       const material = new THREE.PointsMaterial({
         color: 0xffffff,
-        size: config.size,
+        size: this.getStarWorldSize(config.distance, pixelSize),
         transparent: true,
         opacity: Math.random() * 0.35 + 0.55,
         fog: false,
@@ -205,7 +206,60 @@ class MenuBackgroundSystem {
 
       const mesh = new THREE.Points(geometry, material);
       this.scene.add(mesh);
-      return { mesh, speedFactor: config.speedFactor };
+      return {
+        mesh,
+        speedFactor: config.speedFactor,
+        distance: config.distance,
+        pixelSize,
+      };
+    });
+
+    this.updateStarLayerSizes();
+  }
+
+  getStarWorldSize(distance, pixelSize) {
+    const { THREE } = this;
+    const camera = this.camera;
+    const renderer = this.renderer;
+    const canvas = renderer?.domElement;
+
+    if (!camera || !renderer || !canvas) {
+      return pixelSize;
+    }
+
+    const pixelRatio = renderer.getPixelRatio
+      ? renderer.getPixelRatio()
+      : window.devicePixelRatio || 1;
+    const canvasHeight = canvas.clientHeight || window.innerHeight || 1;
+    const safeDistance = Math.max(1, Number(distance) || 1);
+    const fov =
+      THREE?.MathUtils?.degToRad && typeof camera.fov === 'number'
+        ? THREE.MathUtils.degToRad(camera.fov)
+        : ((camera.fov || 60) * Math.PI) / 180;
+    const viewHeight = 2 * Math.tan(fov / 2) * safeDistance;
+    const worldPerPixel = viewHeight / (canvasHeight * pixelRatio || 1);
+    const resolvedPixelSize = Math.max(0.5, Number(pixelSize) || 1);
+    const worldSize = worldPerPixel * resolvedPixelSize;
+
+    return Number.isFinite(worldSize) && worldSize > 0 ? worldSize : resolvedPixelSize;
+  }
+
+  updateStarLayerSizes() {
+    if (!Array.isArray(this.starLayers) || !this.starLayers.length) {
+      return;
+    }
+
+    this.starLayers.forEach((layer) => {
+      const material = layer?.mesh?.material;
+      if (!material) {
+        return;
+      }
+
+      const size = this.getStarWorldSize(layer.distance, layer.pixelSize);
+      if (Number.isFinite(size) && size > 0 && material.size !== size) {
+        material.size = size;
+        material.needsUpdate = true;
+      }
     });
   }
 
@@ -1080,6 +1134,7 @@ class MenuBackgroundSystem {
     this.camera.aspect = this.getAspectRatio(width, height);
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
+    this.updateStarLayerSizes();
   }
 
   handleScreenChanged(event) {
