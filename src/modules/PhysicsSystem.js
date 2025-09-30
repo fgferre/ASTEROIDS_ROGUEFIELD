@@ -339,6 +339,9 @@ class PhysicsSystem {
 
       this.performanceMetrics.collisionChecks += candidates.length;
 
+      let closestMatch = null;
+      let closestDistanceSq = Infinity;
+
       for (let j = 0; j < candidates.length; j += 1) {
         const asteroid = candidates[j];
         if (!asteroid) {
@@ -350,9 +353,19 @@ class PhysicsSystem {
           bullet.x, bullet.y, bulletRadius,
           asteroid.x, asteroid.y, asteroid.radius || 0
         )) {
-          handler(bullet, asteroid);
-          break;
+          const dx = bullet.x - asteroid.x;
+          const dy = bullet.y - asteroid.y;
+          const distanceSq = dx * dx + dy * dy;
+
+          if (distanceSq < closestDistanceSq) {
+            closestDistanceSq = distanceSq;
+            closestMatch = asteroid;
+          }
         }
+      }
+
+      if (closestMatch) {
+        handler(bullet, closestMatch);
       }
     }
   }

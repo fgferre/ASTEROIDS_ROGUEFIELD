@@ -221,7 +221,7 @@ export class SpatialHash {
   query(x, y, radius, options = {}) {
     const bounds = this.calculateBounds(x, y, radius);
     const cells = this.getCellsForBounds(bounds);
-    const results = new Set();
+    const results = new Map();
 
     this.stats.queries++;
 
@@ -244,17 +244,23 @@ export class SpatialHash {
         // Check if object is actually within query bounds
         const objectData = this.objects.get(object);
         if (objectData && this.boundsIntersect(bounds, objectData.bounds)) {
-          results.add(object);
-
-          // Check max results limit
-          if (options.maxResults && results.size >= options.maxResults) {
-            return Array.from(results);
-          }
+          const dx = objectData.x - x;
+          const dy = objectData.y - y;
+          const distanceSq = dx * dx + dy * dy;
+          results.set(object, distanceSq);
         }
       }
     }
 
-    return Array.from(results);
+    const sortedResults = Array.from(results.entries())
+      .sort((a, b) => a[1] - b[1])
+      .map(([object]) => object);
+
+    if (options.maxResults) {
+      return sortedResults.slice(0, options.maxResults);
+    }
+
+    return sortedResults;
   }
 
   /**

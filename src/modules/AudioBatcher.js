@@ -3,12 +3,13 @@
  * Otimiza sons similares executados ao mesmo tempo
  */
 class AudioBatcher {
-  constructor(audioSystem, batchWindow = 16) {
+  constructor(audioSystem, batchWindow = 0) {
     this.audioSystem = audioSystem;
     this.batchWindow = batchWindow; // ms para agrupar sons
 
     // Queues de batching por tipo de som
     this.pendingBatches = new Map();
+    this.pendingFlushes = new Map();
 
     // Tracking de sobreposição
     this.activeSounds = new Map();
@@ -34,7 +35,7 @@ class AudioBatcher {
     // Check for overlap prevention
     if (!allowOverlap && this._shouldPreventOverlap(soundType, now)) {
       this.stats.prevented++;
-      return false;
+      return true;
     }
 
     // Check if we should batch this sound
@@ -53,8 +54,9 @@ class AudioBatcher {
    * Verifica se deve evitar sobreposição
    */
   _shouldPreventOverlap(soundType, now) {
-    const lastPlay = this.activeSounds.get(soundType);
-    if (!lastPlay) return false;
+    const category = this._getSoundCategory(soundType);
+    const lastPlay = this.activeSounds.get(category);
+    if (typeof lastPlay !== 'number') return false;
 
     // Define minimum intervals between same sounds
     const minIntervals = {
@@ -66,8 +68,7 @@ class AudioBatcher {
       'levelup': 1000   // Prevent spam
     };
 
-    const soundCategory = this._getSoundCategory(soundType);
-    const minInterval = minIntervals[soundCategory] || 100;
+    const minInterval = minIntervals[category] || 100;
 
     return (now - lastPlay) < minInterval;
   }
@@ -93,11 +94,6 @@ class AudioBatcher {
   _addToBatch(soundType, params, timestamp, priority) {
     if (!this.pendingBatches.has(soundType)) {
       this.pendingBatches.set(soundType, []);
-
-      // Schedule batch execution
-      setTimeout(() => {
-        this._executeBatch(soundType);
-      }, this.batchWindow);
     }
 
     this.pendingBatches.get(soundType).push({
@@ -105,12 +101,22 @@ class AudioBatcher {
       timestamp,
       priority
     });
+
+    this._scheduleBatchExecution(soundType);
   }
 
   /**
    * Executa um batch de sons
    */
   _executeBatch(soundType) {
+    if (this.pendingFlushes.has(soundType)) {
+      const handle = this.pendingFlushes.get(soundType);
+      if (typeof handle === 'number') {
+        clearTimeout(handle);
+      }
+      this.pendingFlushes.delete(soundType);
+    }
+
     const batch = this.pendingBatches.get(soundType);
     if (!batch || batch.length === 0) {
       this.pendingBatches.delete(soundType);
@@ -133,6 +139,29 @@ class AudioBatcher {
     }
 
     this.pendingBatches.delete(soundType);
+  }
+
+  /**
+   * Agenda execução do batch respeitando a janela configurada
+   */
+  _scheduleBatchExecution(soundType) {
+    if (this.pendingFlushes.has(soundType)) {
+      return;
+    }
+
+    if (this.batchWindow <= 0) {
+      this.pendingFlushes.set(soundType, 'microtask');
+      Promise.resolve().then(() => {
+        this._executeBatch(soundType);
+      });
+      return;
+    }
+
+    const handle = setTimeout(() => {
+      this._executeBatch(soundType);
+    }, this.batchWindow);
+
+    this.pendingFlushes.set(soundType, handle);
   }
 
   /**
@@ -359,12 +388,16 @@ class AudioBatcher {
    * Reproduz som imediatamente sem batching
    */
   _playImmediate(soundType, params) {
-    if (this.audioSystem[soundType]) {
-      this.audioSystem[soundType](...(Array.isArray(params) ? params : [params]));
+    const args = Array.isArray(params) ? params : [params];
+    const category = this._getSoundCategory(soundType);
 
-      const category = this._getSoundCategory(soundType);
-      this.activeSounds.set(category, performance.now());
+    if (typeof this.audioSystem._executeBatchedSound === 'function') {
+      this.audioSystem._executeBatchedSound(soundType, args);
+    } else if (typeof this.audioSystem[soundType] === 'function') {
+      this.audioSystem[soundType](...args);
     }
+
+    this.activeSounds.set(category, performance.now());
   }
 
   /**
@@ -384,9 +417,17 @@ class AudioBatcher {
    * Força execução de todos os batches pendentes
    */
   flushPendingBatches() {
-    for (const soundType of this.pendingBatches.keys()) {
+    for (const [soundType, handle] of Array.from(this.pendingFlushes.entries())) {
+      if (typeof handle === 'number') {
+        clearTimeout(handle);
+      }
+      this.pendingFlushes.delete(soundType);
       this._executeBatch(soundType);
     }
+
+    Array.from(this.pendingBatches.keys()).forEach((soundType) => {
+      this._executeBatch(soundType);
+    });
   }
 
   /**

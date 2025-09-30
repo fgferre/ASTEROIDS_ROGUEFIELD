@@ -57,6 +57,12 @@ export class ObjectPool {
     /** @private @type {number} Total objects released (for stats) */
     this.totalReleased = 0;
 
+    /** @private @type {number} Total successful reuse operations */
+    this.totalHits = 0;
+
+    /** @private @type {WeakSet<Object>} Objects that have been acquired at least once */
+    this.objectUsage = new WeakSet();
+
     // Pre-populate pool
     this.expand(initialSize);
 
@@ -79,6 +85,9 @@ export class ObjectPool {
 
     if (this.available.length > 0) {
       obj = this.available.pop();
+      if (this.objectUsage.has(obj)) {
+        this.totalHits++;
+      }
     } else {
       // Pool exhausted, create new object
       obj = this.createFn();
@@ -91,6 +100,9 @@ export class ObjectPool {
 
     this.inUse.add(obj);
     this.totalAcquired++;
+    if (typeof obj === 'object' && obj !== null) {
+      this.objectUsage.add(obj);
+    }
 
     return obj;
   }
@@ -192,9 +204,9 @@ export class ObjectPool {
       totalCreated: this.totalCreated,
       totalAcquired: this.totalAcquired,
       totalReleased: this.totalReleased,
-      hitRate: this.totalAcquired > 0 ?
-        ((this.totalAcquired - this.totalCreated) / this.totalAcquired * 100).toFixed(1) + '%' :
-        '0%',
+      hitRate: this.totalAcquired > 0
+        ? ((this.totalHits / this.totalAcquired) * 100).toFixed(1) + '%'
+        : '0%',
       maxSize: this.maxSize
     };
   }
@@ -366,7 +378,17 @@ export class TTLObjectPool extends ObjectPool {
    * @param {number} [currentTime] - Current time (defaults to performance.now())
    */
   update(currentTime = performance.now()) {
-    if (currentTime - this.lastCleanup < this.cleanupInterval) {
+    if (!this.ttlMap.size) {
+      this.lastCleanup = currentTime;
+      return;
+    }
+
+    const nextExpiration = this._getNextExpirationTime();
+    const shouldCleanup =
+      currentTime - this.lastCleanup >= this.cleanupInterval ||
+      (typeof nextExpiration === 'number' && currentTime >= nextExpiration);
+
+    if (!shouldCleanup) {
       return;
     }
 
@@ -404,12 +426,34 @@ export class TTLObjectPool extends ObjectPool {
    */
   getStats() {
     const baseStats = super.getStats();
+    const nextExpiration = this._getNextExpirationTime();
     return {
       ...baseStats,
       objectsWithTTL: this.ttlMap.size,
-      nextExpiration: this.ttlMap.size > 0 ?
-        Math.min(...this.ttlMap.values()) - performance.now() : null
+      nextExpiration: typeof nextExpiration === 'number'
+        ? nextExpiration - performance.now()
+        : null
     };
+  }
+
+  /**
+   * Obtém o próximo tempo de expiração registrado.
+   *
+   * @returns {number|null} timestamp absoluto da próxima expiração
+   */
+  _getNextExpirationTime() {
+    if (!this.ttlMap.size) {
+      return null;
+    }
+
+    let nextExpiration = Infinity;
+    for (const expireTime of this.ttlMap.values()) {
+      if (expireTime < nextExpiration) {
+        nextExpiration = expireTime;
+      }
+    }
+
+    return Number.isFinite(nextExpiration) ? nextExpiration : null;
   }
 }
 

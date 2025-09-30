@@ -34,6 +34,10 @@ class AudioSystem {
       totalAudioCalls: 0
     };
 
+    // AudioContext resume coordination
+    this.resumePromise = null;
+    this.pendingSoundQueue = [];
+
     if (typeof gameServices !== 'undefined') {
       gameServices.register('audio', this);
       if (
@@ -68,7 +72,7 @@ class AudioSystem {
       // Initialize optimization systems
       this.pool = new AudioPool(this.context, 50);
       this.cache = new AudioCache(this.context, 20);
-      this.batcher = new AudioBatcher(this, 16);
+      this.batcher = new AudioBatcher(this, 0);
 
       this.applyVolumeToNodes();
       this.initialized = true;
@@ -219,13 +223,57 @@ class AudioSystem {
   }
 
   safePlay(soundFunction) {
-    if (!this.initialized || !this.context) return;
+    if (!this.initialized || !this.context || typeof soundFunction !== 'function') {
+      return;
+    }
 
+    if (this.context.state !== 'running' || this.resumePromise) {
+      this.pendingSoundQueue.push(soundFunction);
+      this._ensureContextResumed();
+      return;
+    }
+
+    if (this.pendingSoundQueue.length) {
+      this._flushPendingSounds();
+    }
+
+    this._invokeSoundFunction(soundFunction);
+  }
+
+  _ensureContextResumed() {
+    if (!this.context || this.context.state === 'running' || this.resumePromise) {
+      return;
+    }
+
+    this.resumePromise = this.context.resume()
+      .catch((error) => {
+        console.warn('Erro ao retomar contexto de áudio:', error);
+      })
+      .finally(() => {
+        this.resumePromise = null;
+        this._flushPendingSounds();
+      });
+  }
+
+  _flushPendingSounds() {
+    if (!this.pendingSoundQueue.length) {
+      return;
+    }
+
+    if (!this.context || this.context.state !== 'running') {
+      this.pendingSoundQueue.length = 0;
+      return;
+    }
+
+    const queuedSounds = this.pendingSoundQueue.splice(0);
+    queuedSounds.forEach((callback) => {
+      this._invokeSoundFunction(callback);
+    });
+  }
+
+  _invokeSoundFunction(callback) {
     try {
-      if (this.context.state === 'suspended') {
-        this.context.resume();
-      }
-      soundFunction();
+      callback();
     } catch (error) {
       console.warn('Erro ao reproduzir som:', error);
     }
@@ -234,86 +282,21 @@ class AudioSystem {
   playLaserShot() {
     this._trackPerformance('playLaserShot');
 
-    // Use batching for laser shots if available
-    if (this.batcher && this.batcher.scheduleSound('playLaserShot', [], { allowOverlap: true, priority: 1 })) {
+    if (this._scheduleBatchedSound('playLaserShot', [], { allowOverlap: true, priority: 1 })) {
       return;
     }
 
-    // Fallback to immediate play
-    this.safePlay(() => {
-      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
-      const gain = this.pool ? this.pool.getGain() : this.context.createGain();
-
-      osc.connect(gain);
-      this.connectGainNode(gain);
-
-      osc.frequency.setValueAtTime(800, this.context.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(
-        150,
-        this.context.currentTime + 0.08
-      );
-
-      gain.gain.setValueAtTime(0.12, this.context.currentTime);
-      gain.gain.exponentialRampToValueAtTime(
-        0.001,
-        this.context.currentTime + 0.08
-      );
-
-      osc.start();
-      osc.stop(this.context.currentTime + 0.08);
-
-      // Return gain to pool after use if using pool
-      if (this.pool) {
-        setTimeout(() => {
-          this.pool.returnGain(gain);
-        }, 90);
-      }
-    });
+    this._playLaserShotDirect();
   }
 
   playAsteroidBreak(size) {
     this._trackPerformance('playAsteroidBreak');
 
-    // Use batching for asteroid breaks if available
-    if (this.batcher && this.batcher.scheduleSound('playAsteroidBreak', [size], { allowOverlap: false, priority: 2 })) {
+    if (this._scheduleBatchedSound('playAsteroidBreak', [size], { allowOverlap: false, priority: 2 })) {
       return;
     }
 
-    // Fallback to immediate play
-    this.safePlay(() => {
-      const baseFreq = size === 'large' ? 70 : size === 'medium' ? 110 : 150;
-      const duration =
-        size === 'large' ? 0.35 : size === 'medium' ? 0.25 : 0.18;
-
-      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
-      const gain = this.pool ? this.pool.getGain() : this.context.createGain();
-
-      osc.connect(gain);
-      this.connectGainNode(gain);
-
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(baseFreq, this.context.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(
-        baseFreq * 0.4,
-        this.context.currentTime + duration
-      );
-
-      gain.gain.setValueAtTime(0.15, this.context.currentTime);
-      gain.gain.exponentialRampToValueAtTime(
-        0.001,
-        this.context.currentTime + duration
-      );
-
-      osc.start();
-      osc.stop(this.context.currentTime + duration);
-
-      // Return gain to pool after use if using pool
-      if (this.pool) {
-        setTimeout(() => {
-          this.pool.returnGain(gain);
-        }, duration * 1000 + 10);
-      }
-    });
+    this._playAsteroidBreakDirect(size);
   }
 
   playBigExplosion() {
@@ -385,12 +368,89 @@ class AudioSystem {
   playXPCollect() {
     this._trackPerformance('playXPCollect');
 
-    // Use batching for XP collect if available
-    if (this.batcher && this.batcher.scheduleSound('playXPCollect', [], { allowOverlap: true, priority: 1 })) {
+    if (this._scheduleBatchedSound('playXPCollect', [], { allowOverlap: true, priority: 1 })) {
       return;
     }
 
-    // Fallback to immediate play
+    this._playXPCollectDirect();
+  }
+
+  _scheduleBatchedSound(soundType, params = [], options = {}) {
+    if (!this.batcher) {
+      return false;
+    }
+
+    return this.batcher.scheduleSound(soundType, params, options);
+  }
+
+  _playLaserShotDirect() {
+    this.safePlay(() => {
+      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
+      const gain = this.pool ? this.pool.getGain() : this.context.createGain();
+
+      osc.connect(gain);
+      this.connectGainNode(gain);
+
+      osc.frequency.setValueAtTime(800, this.context.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(
+        150,
+        this.context.currentTime + 0.08
+      );
+
+      gain.gain.setValueAtTime(0.12, this.context.currentTime);
+      gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        this.context.currentTime + 0.08
+      );
+
+      osc.start();
+      osc.stop(this.context.currentTime + 0.08);
+
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(gain);
+        }, 90);
+      }
+    });
+  }
+
+  _playAsteroidBreakDirect(size) {
+    this.safePlay(() => {
+      const baseFreq = size === 'large' ? 70 : size === 'medium' ? 110 : 150;
+      const duration =
+        size === 'large' ? 0.35 : size === 'medium' ? 0.25 : 0.18;
+
+      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
+      const gain = this.pool ? this.pool.getGain() : this.context.createGain();
+
+      osc.connect(gain);
+      this.connectGainNode(gain);
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(baseFreq, this.context.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(
+        baseFreq * 0.4,
+        this.context.currentTime + duration
+      );
+
+      gain.gain.setValueAtTime(0.15, this.context.currentTime);
+      gain.gain.exponentialRampToValueAtTime(
+        0.001,
+        this.context.currentTime + duration
+      );
+
+      osc.start();
+      osc.stop(this.context.currentTime + duration);
+
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(gain);
+        }, duration * 1000 + 10);
+      }
+    });
+  }
+
+  _playXPCollectDirect() {
     this.safePlay(() => {
       const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
       const gain = this.pool ? this.pool.getGain() : this.context.createGain();
@@ -413,13 +473,29 @@ class AudioSystem {
       osc.start();
       osc.stop(this.context.currentTime + 0.12);
 
-      // Return gain to pool after use if using pool
       if (this.pool) {
         setTimeout(() => {
           this.pool.returnGain(gain);
         }, 130);
       }
     });
+  }
+
+  _executeBatchedSound(soundType, params = []) {
+    switch (soundType) {
+      case 'playLaserShot':
+        this._playLaserShotDirect();
+        break;
+      case 'playAsteroidBreak':
+        this._playAsteroidBreakDirect(params?.[0]);
+        break;
+      case 'playXPCollect':
+        this._playXPCollectDirect();
+        break;
+      default:
+        console.warn(`[AudioSystem] No direct handler registered for "${soundType}"`);
+        break;
+    }
   }
 
   playLevelUp() {
@@ -655,6 +731,10 @@ class AudioSystem {
 
     // Reset performance monitoring
     this._resetPerformanceMonitoring();
+
+    // Clear pending playback queue
+    this.pendingSoundQueue.length = 0;
+    this.resumePromise = null;
   }
 
   // === Performance Monitoring ===
