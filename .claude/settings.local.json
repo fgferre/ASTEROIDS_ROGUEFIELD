@@ -11,7 +11,9 @@
       "Bash(npm start)",
       "Bash(timeout:*)",
       "Bash(npm run serve:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(git log:*)",
+      "Bash(git stash push:*)"
     ],
     "deny": [],
     "ask": []
