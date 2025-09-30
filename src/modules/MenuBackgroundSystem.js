@@ -301,15 +301,25 @@ class MenuBackgroundSystem {
       geometry.normalizeNormals();
     }
 
-    try {
-      if (geometry.attributes.uv) {
-        geometry.computeTangents();
+      const hasTangentPrerequisites =
+        geometry.index &&
+        geometry.attributes &&
+        geometry.attributes.position &&
+        geometry.attributes.normal &&
+        geometry.attributes.uv;
+
+      if (hasTangentPrerequisites && typeof geometry.computeTangents === 'function') {
+        try {
+          geometry.computeTangents();
+        } catch (error) {
+          console.warn(
+            '[MenuBackgroundSystem] Failed to compute tangents for asteroid geometry:',
+            error
+          );
+        }
       }
-    } catch (error) {
-      console.warn('[MenuBackgroundSystem] Failed to compute tangents for asteroid geometry:', error);
+      return geometry;
     }
-    return geometry;
-  }
 
   createProceduralMaterial(seed) {
     const { THREE } = this;

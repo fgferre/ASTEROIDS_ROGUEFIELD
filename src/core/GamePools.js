@@ -22,6 +22,8 @@ import { ObjectPool, TTLObjectPool } from './ObjectPool.js';
  */
 export class GamePools {
   static initialized = false;
+  static poolConfig = null;
+  static lifecycleOverrides = {};
 
   // Pool instances
   static bullets = null;
@@ -52,6 +54,8 @@ export class GamePools {
       tempObjects: { initial: 10, max: 50 },
       ...options
     };
+
+    this.poolConfig = config;
 
     this.initializeBulletPool(config.bullets);
     this.initializeParticlePool(config.particles);
@@ -280,6 +284,42 @@ export class GamePools {
   }
 
   /**
+   * Overrides asteroid pool lifecycle with system-provided handlers.
+   *
+   * @param {Object} lifecycle - Lifecycle configuration
+   * @param {Function} lifecycle.create - Factory that returns a new asteroid instance
+   * @param {Function} lifecycle.reset - Reset handler invoked when releasing the asteroid
+   * @param {number} [lifecycle.initial] - Optional warm-up size override
+   * @param {number} [lifecycle.max] - Optional max size override
+   */
+  static configureAsteroidLifecycle(lifecycle = {}) {
+    if (!lifecycle || typeof lifecycle.create !== 'function' || typeof lifecycle.reset !== 'function') {
+      console.warn('[GamePools] Invalid asteroid lifecycle configuration provided');
+      return;
+    }
+
+    if (!this.asteroids) {
+      const baseConfig = this.poolConfig?.asteroids || { initial: 0, max: 0 };
+      this.initializeAsteroidPool(baseConfig);
+    }
+
+    const initialSize = Number.isFinite(lifecycle.initial)
+      ? lifecycle.initial
+      : this.poolConfig?.asteroids?.initial ?? this.asteroids.available?.length ?? 0;
+    const maxSize = Number.isFinite(lifecycle.max)
+      ? lifecycle.max
+      : this.poolConfig?.asteroids?.max ?? this.asteroids.maxSize;
+
+    try {
+      this.asteroids.reconfigure(lifecycle.create, lifecycle.reset, initialSize, maxSize);
+      this.lifecycleOverrides.asteroids = { ...lifecycle, initial: initialSize, max: maxSize };
+      console.log('[GamePools] Asteroid pool lifecycle configured via EnemySystem');
+    } catch (error) {
+      console.error('[GamePools] Failed to configure asteroid lifecycle:', error);
+    }
+  }
+
+  /**
    * Initializes XP orb object pool.
    *
    * @private
@@ -326,6 +366,42 @@ export class GamePools {
       config.initial,
       config.max
     );
+  }
+
+  /**
+   * Overrides XP orb pool lifecycle with system-provided handlers.
+   *
+   * @param {Object} lifecycle - Lifecycle configuration
+   * @param {Function} lifecycle.create - Factory function returning a new XP orb
+   * @param {Function} lifecycle.reset - Reset handler when releasing XP orb
+   * @param {number} [lifecycle.initial] - Optional warm-up size override
+   * @param {number} [lifecycle.max] - Optional max size override
+   */
+  static configureXPOrbLifecycle(lifecycle = {}) {
+    if (!lifecycle || typeof lifecycle.create !== 'function' || typeof lifecycle.reset !== 'function') {
+      console.warn('[GamePools] Invalid XP orb lifecycle configuration provided');
+      return;
+    }
+
+    if (!this.xpOrbs) {
+      const baseConfig = this.poolConfig?.xpOrbs || { initial: 0, max: 0 };
+      this.initializeXPOrbPool(baseConfig);
+    }
+
+    const initialSize = Number.isFinite(lifecycle.initial)
+      ? lifecycle.initial
+      : this.poolConfig?.xpOrbs?.initial ?? this.xpOrbs.available?.length ?? 0;
+    const maxSize = Number.isFinite(lifecycle.max)
+      ? lifecycle.max
+      : this.poolConfig?.xpOrbs?.max ?? this.xpOrbs.maxSize;
+
+    try {
+      this.xpOrbs.reconfigure(lifecycle.create, lifecycle.reset, initialSize, maxSize);
+      this.lifecycleOverrides.xpOrbs = { ...lifecycle, initial: initialSize, max: maxSize };
+      console.log('[GamePools] XP orb pool lifecycle configured via XPOrbSystem');
+    } catch (error) {
+      console.error('[GamePools] Failed to configure XP orb lifecycle:', error);
+    }
   }
 
   /**

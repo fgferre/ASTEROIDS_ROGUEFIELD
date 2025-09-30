@@ -13,6 +13,7 @@ import WorldSystem from './modules/WorldSystem.js';
 import RenderingSystem from './modules/RenderingSystem.js';
 import MenuBackgroundSystem from './modules/MenuBackgroundSystem.js';
 import { GamePools } from './core/GamePools.js';
+import { GarbageCollectionManager } from './core/GarbageCollectionManager.js';
 import {
   resolveDebugPreference,
   applyDebugPreference,
@@ -26,6 +27,12 @@ const gameState = {
   initialized: false,
   lastTime: 0,
 };
+
+const garbageCollectionManager = new GarbageCollectionManager({
+  defaultInterval: 4500,
+  idleTimeout: 120,
+  maxTasksPerFrame: 2,
+});
 
 function registerGameStateService() {
   if (typeof gameServices === 'undefined') return;
@@ -106,6 +113,23 @@ function init() {
       shockwaves: { initial: 8, max: 25 },
       tempObjects: { initial: 15, max: 60 }
     });
+
+    garbageCollectionManager.initialize();
+    garbageCollectionManager.registerPeriodicTask(
+      'pool-auto-manage',
+      () => GamePools.autoManageAll(),
+      { interval: 5000, priority: 2, runImmediately: true }
+    );
+    garbageCollectionManager.registerPeriodicTask(
+      'temp-pool-trim',
+      () => {
+        const tempPool = GamePools.tempObjects;
+        if (tempPool && typeof tempPool.autoManage === 'function') {
+          tempPool.autoManage({ targetUtilization: 0.55, maxShrinkage: 10, maxExpansion: 6 });
+        }
+      },
+      { interval: 7000, priority: 1 }
+    );
 
     new SettingsSystem();
 
@@ -290,6 +314,7 @@ function gameLoop(currentTime) {
 
     // Update object pools (always, for TTL and auto-management)
     GamePools.update(deltaTime);
+    garbageCollectionManager.update(deltaTime);
 
     let adjustedDelta = deltaTime;
     const effects = gameServices.get('effects');

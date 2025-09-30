@@ -1,4 +1,5 @@
 import * as CONSTANTS from '../core/GameConstants.js';
+import { GamePools } from '../core/GamePools.js';
 
 const ORB_CLASS_ORDER = [
   { name: 'blue', tier: 1 },
@@ -133,6 +134,9 @@ class XPOrbSystem {
 
     this.visualCache = new Map();
 
+    this.usesOrbPool = false;
+    this.setupOrbPoolIntegration();
+
     this.configureOrbClustering();
 
     if (typeof gameServices !== 'undefined') {
@@ -178,6 +182,103 @@ class XPOrbSystem {
       pools[className] = [];
       return pools;
     }, {});
+  }
+
+  setupOrbPoolIntegration() {
+    if (!GamePools || typeof GamePools.configureXPOrbLifecycle !== 'function') {
+      this.usesOrbPool = false;
+      return;
+    }
+
+    try {
+      GamePools.configureXPOrbLifecycle({
+        create: () => this.createPooledOrb(),
+        reset: (orb) => this.resetOrbForPool(orb)
+      });
+      this.usesOrbPool = true;
+    } catch (error) {
+      this.usesOrbPool = false;
+      console.warn('[XPOrbSystem] Failed to configure XP orb pool lifecycle', error);
+    }
+  }
+
+  createPooledOrb() {
+    return {
+      id: 0,
+      x: 0,
+      y: 0,
+      value: 0,
+      class: 'blue',
+      tier: 1,
+      collected: false,
+      age: 0,
+      isFusing: false,
+      fusionTimer: 0,
+      pulsePhase: 0,
+      clusterId: null,
+      source: 'drop',
+      pendingRemoval: false,
+      active: false
+    };
+  }
+
+  resetOrbForPool(orb) {
+    if (!orb) {
+      return;
+    }
+
+    orb.id = 0;
+    orb.x = 0;
+    orb.y = 0;
+    orb.value = 0;
+    orb.class = 'blue';
+    orb.tier = 1;
+    orb.collected = false;
+    orb.age = 0;
+    orb.isFusing = false;
+    orb.fusionTimer = 0;
+    orb.pulsePhase = 0;
+    orb.clusterId = null;
+    orb.source = 'drop';
+    orb.pendingRemoval = false;
+    orb.active = false;
+  }
+
+  acquireOrb() {
+    if (
+      this.usesOrbPool &&
+      GamePools?.xpOrbs &&
+      typeof GamePools.xpOrbs.acquire === 'function'
+    ) {
+      return GamePools.xpOrbs.acquire();
+    }
+
+    return this.createPooledOrb();
+  }
+
+  releaseOrb(orb) {
+    if (
+      !orb ||
+      !this.usesOrbPool ||
+      !GamePools?.xpOrbs ||
+      typeof GamePools.xpOrbs.release !== 'function'
+    ) {
+      return false;
+    }
+
+    return GamePools.xpOrbs.release(orb);
+  }
+
+  releaseAllOrbsToPool() {
+    if (!Array.isArray(this.xpOrbs) || this.xpOrbs.length === 0) {
+      return;
+    }
+
+    for (let i = 0; i < this.xpOrbs.length; i += 1) {
+      this.releaseOrb(this.xpOrbs[i]);
+    }
+
+    this.xpOrbs.length = 0;
   }
 
   createOffscreenCanvas(width, height) {
@@ -462,16 +563,8 @@ class XPOrbSystem {
 
   createXPOrb(x, y, value, options = {}) {
     const resolvedConfig = this.resolveOrbClass(value, options);
-    const orb = {
-      id: Date.now() + Math.random(),
-      x,
-      y,
-      value,
-      class: resolvedConfig.name,
-      tier: resolvedConfig.tier,
-      collected: false,
-      age: options.age ?? 0,
-    };
+    const orb = this.acquireOrb();
+    this.initializeOrbState(orb, x, y, value, resolvedConfig, options);
 
     this.addOrbToPools(orb);
     this.enforceClassLimit(orb.class);
@@ -488,6 +581,30 @@ class XPOrbSystem {
         glow: resolvedConfig.glowColor,
       });
     }
+
+    return orb;
+  }
+
+  initializeOrbState(orb, x, y, value, resolvedConfig, options = {}) {
+    if (!orb) {
+      return null;
+    }
+
+    orb.id = Date.now() + Math.random();
+    orb.x = x;
+    orb.y = y;
+    orb.value = Number.isFinite(value) ? value : this.baseOrbValue;
+    orb.class = resolvedConfig.name;
+    orb.tier = resolvedConfig.tier;
+    orb.collected = false;
+    orb.age = options.age ?? 0;
+    orb.isFusing = false;
+    orb.fusionTimer = 0;
+    orb.pulsePhase = orb.pulsePhase ?? 0;
+    orb.clusterId = options.clusterId ?? null;
+    orb.source = options.source || 'drop';
+    orb.pendingRemoval = false;
+    orb.active = true;
 
     return orb;
   }
@@ -1291,20 +1408,66 @@ class XPOrbSystem {
       return;
     }
 
-    const before = this.xpOrbs.length;
-    this.xpOrbs = this.xpOrbs.filter((orb) => !orb.collected);
+    const remaining = [];
+    const toRelease = [];
+    let removed = 0;
+    let sawNullEntry = false;
 
-    for (let i = 0; i < this.orbClasses.length; i += 1) {
-      const className = this.orbClasses[i];
-      const pool = this.xpOrbPools[className];
-      if (!Array.isArray(pool) || pool.length === 0) {
+    for (let i = 0; i < this.xpOrbs.length; i += 1) {
+      const orb = this.xpOrbs[i];
+      if (!orb) {
+        removed += 1;
+        sawNullEntry = true;
         continue;
       }
 
-      this.xpOrbPools[className] = pool.filter((orb) => !orb.collected);
+      if (orb.collected) {
+        orb.active = false;
+        toRelease.push(orb);
+        removed += 1;
+        continue;
+      }
+
+      remaining.push(orb);
     }
 
-    if (before !== this.xpOrbs.length) {
+    this.xpOrbs = remaining;
+
+    if (toRelease.length > 0) {
+      const releaseSet = new Set(toRelease);
+      const poolNames = Object.keys(this.xpOrbPools);
+
+      for (let i = 0; i < poolNames.length; i += 1) {
+        const className = poolNames[i];
+        const pool = this.xpOrbPools[className];
+        if (!Array.isArray(pool) || pool.length === 0) {
+          continue;
+        }
+
+        this.xpOrbPools[className] = pool.filter(
+          (candidate) => candidate && !releaseSet.has(candidate)
+        );
+      }
+
+      for (let i = 0; i < toRelease.length; i += 1) {
+        this.releaseOrb(toRelease[i]);
+      }
+    }
+
+    if (sawNullEntry) {
+      const poolNames = Object.keys(this.xpOrbPools);
+      for (let i = 0; i < poolNames.length; i += 1) {
+        const className = poolNames[i];
+        const pool = this.xpOrbPools[className];
+        if (!Array.isArray(pool) || pool.length === 0) {
+          continue;
+        }
+
+        this.xpOrbPools[className] = pool.filter(Boolean);
+      }
+    }
+
+    if (removed > 0) {
       this.invalidateSpatialIndex();
     }
   }
@@ -1586,6 +1749,7 @@ class XPOrbSystem {
   }
 
   reset() {
+    this.releaseAllOrbsToPool();
     this.orbClasses = [...ORB_CLASS_SEQUENCE];
     this.xpOrbs = [];
     this.xpOrbPools = this.createEmptyOrbPools();
