@@ -53,8 +53,9 @@ class AudioBatcher {
    * Verifica se deve evitar sobreposição
    */
   _shouldPreventOverlap(soundType, now) {
-    const lastPlay = this.activeSounds.get(soundType);
-    if (!lastPlay) return false;
+    const category = this._getSoundCategory(soundType);
+    const lastPlay = this.activeSounds.get(category);
+    if (typeof lastPlay !== 'number') return false;
 
     // Define minimum intervals between same sounds
     const minIntervals = {
@@ -66,8 +67,7 @@ class AudioBatcher {
       'levelup': 1000   // Prevent spam
     };
 
-    const soundCategory = this._getSoundCategory(soundType);
-    const minInterval = minIntervals[soundCategory] || 100;
+    const minInterval = minIntervals[category] || 100;
 
     return (now - lastPlay) < minInterval;
   }
@@ -359,12 +359,16 @@ class AudioBatcher {
    * Reproduz som imediatamente sem batching
    */
   _playImmediate(soundType, params) {
-    if (this.audioSystem[soundType]) {
-      this.audioSystem[soundType](...(Array.isArray(params) ? params : [params]));
+    const args = Array.isArray(params) ? params : [params];
+    const category = this._getSoundCategory(soundType);
 
-      const category = this._getSoundCategory(soundType);
-      this.activeSounds.set(category, performance.now());
+    if (typeof this.audioSystem._executeBatchedSound === 'function') {
+      this.audioSystem._executeBatchedSound(soundType, args);
+    } else if (typeof this.audioSystem[soundType] === 'function') {
+      this.audioSystem[soundType](...args);
     }
+
+    this.activeSounds.set(category, performance.now());
   }
 
   /**
