@@ -68,7 +68,7 @@ class AudioSystem {
       // Initialize optimization systems
       this.pool = new AudioPool(this.context, 50);
       this.cache = new AudioCache(this.context, 20);
-      this.batcher = new AudioBatcher(this, 16);
+      this.batcher = new AudioBatcher(this, 0);
 
       this.applyVolumeToNodes();
       this.initialized = true;
