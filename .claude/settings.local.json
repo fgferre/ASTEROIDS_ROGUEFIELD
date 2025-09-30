@@ -7,7 +7,11 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(npm test:*)",
-      "Bash(npm install)"
+      "Bash(npm install)",
+      "Bash(npm start)",
+      "Bash(timeout:*)",
+      "Bash(npm run serve:*)",
+      "Bash(npm run:*)"
     ],
     "deny": [],
     "ask": []

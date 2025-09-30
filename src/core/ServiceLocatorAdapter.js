@@ -87,20 +87,12 @@ export class ServiceLocatorAdapter {
       return this.legacyServices.get(name);
     }
 
-    // Try to resolve from DI container
-    if (this.container.has(name)) {
-      this.stats.getContainerCalls++;
-      this.emitDeprecationWarning(name, caller);
-      return this.container.resolve(name);
-    }
+    // DON'T try to resolve from DI container in Phase 2.1
+    // The container placeholders would create circular dependencies
+    // Real DI resolution will be enabled in Phase 2.2+
 
-    // Service not found
-    console.error(`[ServiceLocatorAdapter] Service not found: ${name}`);
-    console.log('Available services:', [
-      ...this.container.getServiceNames(),
-      ...this.legacyServices.keys()
-    ]);
-
+    // Service not found in legacy services
+    // This is expected during startup before systems register themselves
     return null;
   }
 
