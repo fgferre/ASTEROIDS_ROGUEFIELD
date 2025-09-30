@@ -1409,12 +1409,16 @@ class XPOrbSystem {
     }
 
     const remaining = [];
+    const toRelease = [];
     let removed = 0;
 
     for (let i = 0; i < this.xpOrbs.length; i += 1) {
       const orb = this.xpOrbs[i];
       if (!orb || orb.collected) {
-        this.releaseOrb(orb);
+        if (orb) {
+          orb.active = false;
+          toRelease.push(orb);
+        }
         removed += 1;
         continue;
       }
@@ -1424,14 +1428,22 @@ class XPOrbSystem {
 
     this.xpOrbs = remaining;
 
-    for (let i = 0; i < this.orbClasses.length; i += 1) {
-      const className = this.orbClasses[i];
-      const pool = this.xpOrbPools[className];
-      if (!Array.isArray(pool) || pool.length === 0) {
-        continue;
+    if (toRelease.length > 0) {
+      const releasedSet = new Set(toRelease);
+
+      for (let i = 0; i < this.orbClasses.length; i += 1) {
+        const className = this.orbClasses[i];
+        const pool = this.xpOrbPools[className];
+        if (!Array.isArray(pool) || pool.length === 0) {
+          continue;
+        }
+
+        this.xpOrbPools[className] = pool.filter((orb) => !releasedSet.has(orb));
       }
 
-      this.xpOrbPools[className] = pool.filter((orb) => !orb.collected);
+      for (let i = 0; i < toRelease.length; i += 1) {
+        this.releaseOrb(toRelease[i]);
+      }
     }
 
     if (removed > 0) {
