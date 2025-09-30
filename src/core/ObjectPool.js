@@ -378,7 +378,17 @@ export class TTLObjectPool extends ObjectPool {
    * @param {number} [currentTime] - Current time (defaults to performance.now())
    */
   update(currentTime = performance.now()) {
-    if (currentTime - this.lastCleanup < this.cleanupInterval) {
+    if (!this.ttlMap.size) {
+      this.lastCleanup = currentTime;
+      return;
+    }
+
+    const nextExpiration = this._getNextExpirationTime();
+    const shouldCleanup =
+      currentTime - this.lastCleanup >= this.cleanupInterval ||
+      (typeof nextExpiration === 'number' && currentTime >= nextExpiration);
+
+    if (!shouldCleanup) {
       return;
     }
 
@@ -416,12 +426,34 @@ export class TTLObjectPool extends ObjectPool {
    */
   getStats() {
     const baseStats = super.getStats();
+    const nextExpiration = this._getNextExpirationTime();
     return {
       ...baseStats,
       objectsWithTTL: this.ttlMap.size,
-      nextExpiration: this.ttlMap.size > 0 ?
-        Math.min(...this.ttlMap.values()) - performance.now() : null
+      nextExpiration: typeof nextExpiration === 'number'
+        ? nextExpiration - performance.now()
+        : null
     };
+  }
+
+  /**
+   * Obtém o próximo tempo de expiração registrado.
+   *
+   * @returns {number|null} timestamp absoluto da próxima expiração
+   */
+  _getNextExpirationTime() {
+    if (!this.ttlMap.size) {
+      return null;
+    }
+
+    let nextExpiration = Infinity;
+    for (const expireTime of this.ttlMap.values()) {
+      if (expireTime < nextExpiration) {
+        nextExpiration = expireTime;
+      }
+    }
+
+    return Number.isFinite(nextExpiration) ? nextExpiration : null;
   }
 }
 

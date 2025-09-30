@@ -34,6 +34,10 @@ class AudioSystem {
       totalAudioCalls: 0
     };
 
+    // AudioContext resume coordination
+    this.resumePromise = null;
+    this.pendingSoundQueue = [];
+
     if (typeof gameServices !== 'undefined') {
       gameServices.register('audio', this);
       if (
@@ -219,13 +223,57 @@ class AudioSystem {
   }
 
   safePlay(soundFunction) {
-    if (!this.initialized || !this.context) return;
+    if (!this.initialized || !this.context || typeof soundFunction !== 'function') {
+      return;
+    }
 
+    if (this.context.state !== 'running' || this.resumePromise) {
+      this.pendingSoundQueue.push(soundFunction);
+      this._ensureContextResumed();
+      return;
+    }
+
+    if (this.pendingSoundQueue.length) {
+      this._flushPendingSounds();
+    }
+
+    this._invokeSoundFunction(soundFunction);
+  }
+
+  _ensureContextResumed() {
+    if (!this.context || this.context.state === 'running' || this.resumePromise) {
+      return;
+    }
+
+    this.resumePromise = this.context.resume()
+      .catch((error) => {
+        console.warn('Erro ao retomar contexto de áudio:', error);
+      })
+      .finally(() => {
+        this.resumePromise = null;
+        this._flushPendingSounds();
+      });
+  }
+
+  _flushPendingSounds() {
+    if (!this.pendingSoundQueue.length) {
+      return;
+    }
+
+    if (!this.context || this.context.state !== 'running') {
+      this.pendingSoundQueue.length = 0;
+      return;
+    }
+
+    const queuedSounds = this.pendingSoundQueue.splice(0);
+    queuedSounds.forEach((callback) => {
+      this._invokeSoundFunction(callback);
+    });
+  }
+
+  _invokeSoundFunction(callback) {
     try {
-      if (this.context.state === 'suspended') {
-        this.context.resume();
-      }
-      soundFunction();
+      callback();
     } catch (error) {
       console.warn('Erro ao reproduzir som:', error);
     }
@@ -683,6 +731,10 @@ class AudioSystem {
 
     // Reset performance monitoring
     this._resetPerformanceMonitoring();
+
+    // Clear pending playback queue
+    this.pendingSoundQueue.length = 0;
+    this.resumePromise = null;
   }
 
   // === Performance Monitoring ===
