@@ -19,6 +19,11 @@ import {
   applyDebugPreference,
 } from './core/debugLogging.js';
 
+// Dependency Injection System (Phase 2.1)
+import { DIContainer } from './core/DIContainer.js';
+import { ServiceRegistry } from './core/ServiceRegistry.js';
+import { ServiceLocatorAdapter } from './core/ServiceLocatorAdapter.js';
+
 const gameState = {
   screen: 'menu',
   isPaused: false,
@@ -33,6 +38,41 @@ const garbageCollectionManager = new GarbageCollectionManager({
   idleTimeout: 120,
   maxTasksPerFrame: 2,
 });
+
+// Initialize DI Container (Phase 2.1)
+let diContainer = null;
+
+function initializeDependencyInjection() {
+  console.log('[App] Initializing Dependency Injection system...');
+
+  try {
+    // Create DI container
+    diContainer = new DIContainer();
+    diContainer.verbose = false; // Keep it quiet in production
+
+    // Register all services
+    ServiceRegistry.setupServices(diContainer);
+
+    // IMPORTANT: Don't replace gameServices yet!
+    // Systems need to register themselves first using the original ServiceLocator
+    // The adapter will be enabled in Phase 2.2+ when systems use constructor injection
+
+    // Just expose container for debugging
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+      window.diContainer = diContainer;
+    }
+
+    console.log('[App] ✓ DI system initialized successfully');
+    console.log(`[App] ✓ ${diContainer.getServiceNames().length} services registered`);
+    console.log('[App] ℹ ServiceLocator adapter will be enabled in Phase 2.2');
+
+    return true;
+  } catch (error) {
+    console.error('[App] ✗ Failed to initialize DI system:', error);
+    console.warn('[App] Falling back to legacy ServiceLocator');
+    return false;
+  }
+}
 
 function registerGameStateService() {
   if (typeof gameServices === 'undefined') return;
@@ -102,6 +142,9 @@ function init() {
     setupDomEventListeners();
     setupGlobalEventListeners();
 
+    // Initialize DI system first (Phase 2.1)
+    const diInitialized = initializeDependencyInjection();
+
     registerGameStateService();
 
     // Initialize object pools before any game systems
@@ -131,6 +174,9 @@ function init() {
       { interval: 7000, priority: 1 }
     );
 
+    // Initialize game systems
+    // Note: Systems still register themselves with gameServices internally
+    // DI integration will be gradual in Phase 2.2+
     new SettingsSystem();
 
     const audioSystem = new AudioSystem();
@@ -151,6 +197,15 @@ function init() {
     if (ui) ui.showScreen('menu');
 
     gameState.initialized = true;
+
+    // Log DI statistics in development
+    if (process.env.NODE_ENV === 'development' && diInitialized) {
+      console.group('📊 DI System Status');
+      console.log('Container:', diContainer.getStats());
+      console.log('Validation:', diContainer.validate());
+      console.groupEnd();
+    }
+
     requestAnimationFrame(gameLoop);
   } catch (error) {
     console.error('Erro na inicialização:', error);
