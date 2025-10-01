@@ -1038,26 +1038,38 @@ export class Asteroid extends BaseEnemy {
       return;
     }
 
+    // Check if using external movement component
+    const useExternalMovement = this.system?.useComponents && this.system?.movementComponent;
+
+    // Always update visual state
     this.updateVisualState(deltaTime);
 
-    if (this.behavior?.type === 'parasite') {
-      this.updateParasiteBehavior(deltaTime);
-    }
-
+    // Behavior updates (non-movement)
     if (this.behavior?.type === 'volatile') {
       this.updateVolatileBehavior(deltaTime);
     }
 
-    this.x += this.vx * deltaTime;
-    this.y += this.vy * deltaTime;
-    this.rotation += this.rotationSpeed * deltaTime;
+    // Movement - only if NOT using component
+    if (!useExternalMovement) {
+      // Parasite behavior (movement + attack)
+      if (this.behavior?.type === 'parasite') {
+        this.updateParasiteBehavior(deltaTime);
+      }
 
-    const margin = this.radius;
-    if (this.x < -margin) this.x = CONSTANTS.GAME_WIDTH + margin;
-    if (this.x > CONSTANTS.GAME_WIDTH + margin) this.x = -margin;
-    if (this.y < -margin) this.y = CONSTANTS.GAME_HEIGHT + margin;
-    if (this.y > CONSTANTS.GAME_HEIGHT + margin) this.y = -margin;
+      // Linear movement
+      this.x += this.vx * deltaTime;
+      this.y += this.vy * deltaTime;
+      this.rotation += this.rotationSpeed * deltaTime;
 
+      // Screen wrapping
+      const margin = this.radius;
+      if (this.x < -margin) this.x = CONSTANTS.GAME_WIDTH + margin;
+      if (this.x > CONSTANTS.GAME_WIDTH + margin) this.x = -margin;
+      if (this.y < -margin) this.y = CONSTANTS.GAME_HEIGHT + margin;
+      if (this.y > CONSTANTS.GAME_HEIGHT + margin) this.y = -margin;
+    }
+
+    // Timers (always update)
     if (this.lastDamageTime > 0) {
       this.lastDamageTime = Math.max(0, this.lastDamageTime - deltaTime);
     }

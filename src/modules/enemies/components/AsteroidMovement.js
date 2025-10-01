@@ -60,6 +60,9 @@ export class AsteroidMovement {
 
     // Wrap around screen edges
     this.wrapScreenEdges(asteroid, context.worldBounds);
+
+    // Update behavior-specific state (e.g., parasite attack cooldown)
+    this.updateBehaviorState(asteroid, deltaTime, context);
   }
 
   /**
@@ -77,7 +80,7 @@ export class AsteroidMovement {
 
   /**
    * Parasite movement strategy.
-   * Tracks and moves toward player position.
+   * Tracks and moves toward player position using the proven Asteroid logic.
    *
    * @param {Asteroid} asteroid - The asteroid
    * @param {number} deltaTime - Time delta
@@ -93,56 +96,33 @@ export class AsteroidMovement {
       return;
     }
 
-    // Initialize tracking state
-    if (!asteroid.variantState) {
-      asteroid.variantState = {};
-    }
-
-    if (!asteroid.variantState.trackingStartTime) {
-      asteroid.variantState.trackingStartTime = Date.now();
-      asteroid.variantState.hasAccelerated = false;
-    }
-
-    const trackingDuration = (Date.now() - asteroid.variantState.trackingStartTime) / 1000;
-    const trackingDelay = behavior.tracking?.delay ?? 1.5;
-    const accelerationDelay = behavior.tracking?.accelerationDelay ?? 3.0;
-    const targetSpeed = behavior.tracking?.targetSpeed ?? 150;
-    const accelerationRate = behavior.tracking?.accelerationRate ?? 50;
-
-    // Initial delay before tracking starts
-    if (trackingDuration < trackingDelay) {
-      this.linearMovement(asteroid, deltaTime, context);
-      return;
-    }
-
     // Calculate direction to player
     const dx = player.position.x - asteroid.x;
     const dy = player.position.y - asteroid.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-
-    if (distance === 0) {
-      return;
-    }
-
+    const distance = Math.hypot(dx, dy) || 0.0001;
     const dirX = dx / distance;
     const dirY = dy / distance;
 
-    // Accelerate after delay
-    if (trackingDuration >= accelerationDelay && !asteroid.variantState.hasAccelerated) {
-      const speed = Math.sqrt(asteroid.vx * asteroid.vx + asteroid.vy * asteroid.vy);
-      const newSpeed = Math.min(targetSpeed, speed + accelerationRate * deltaTime);
+    // Apply acceleration toward player
+    const acceleration = behavior.acceleration ?? 0;
+    asteroid.vx += dirX * acceleration * deltaTime;
+    asteroid.vy += dirY * acceleration * deltaTime;
 
-      asteroid.vx = dirX * newSpeed;
-      asteroid.vy = dirY * newSpeed;
+    // Limit maximum speed
+    const maxSpeed = behavior.maxSpeed ?? Infinity;
+    const currentSpeed = Math.hypot(asteroid.vx, asteroid.vy);
+    if (currentSpeed > maxSpeed) {
+      const scale = maxSpeed / currentSpeed;
+      asteroid.vx *= scale;
+      asteroid.vy *= scale;
+    }
 
-      if (newSpeed >= targetSpeed) {
-        asteroid.variantState.hasAccelerated = true;
-      }
-    } else {
-      // Gradual steering toward player
-      const steeringStrength = 0.3;
-      asteroid.vx += dirX * steeringStrength * deltaTime * 60;
-      asteroid.vy += dirY * steeringStrength * deltaTime * 60;
+    // Repel when too close (avoid sticking to player)
+    const minDistance = behavior.minDistance ?? 0;
+    if (distance < minDistance) {
+      const repelStrength = (minDistance - distance) / Math.max(minDistance, 1);
+      asteroid.vx -= dirX * acceleration * repelStrength * deltaTime * 1.2;
+      asteroid.vy -= dirY * acceleration * repelStrength * deltaTime * 1.2;
     }
 
     // Apply movement
@@ -173,25 +153,98 @@ export class AsteroidMovement {
    * Wraps asteroid position around screen edges.
    *
    * @param {Asteroid} asteroid - The asteroid
-   * @param {Object} bounds - World bounds {width, height}
+   * @param {Object} bounds - World bounds {width, height} (optional, uses CONSTANTS as fallback)
    */
   wrapScreenEdges(asteroid, bounds) {
-    if (!bounds) {
-      return;
-    }
+    // Use provided bounds or fallback to CONSTANTS
+    const width = bounds?.width ?? CONSTANTS.GAME_WIDTH;
+    const height = bounds?.height ?? CONSTANTS.GAME_HEIGHT;
 
     const margin = asteroid.radius || 30;
 
     if (asteroid.x < -margin) {
-      asteroid.x = bounds.width + margin;
-    } else if (asteroid.x > bounds.width + margin) {
+      asteroid.x = width + margin;
+    } else if (asteroid.x > width + margin) {
       asteroid.x = -margin;
     }
 
     if (asteroid.y < -margin) {
-      asteroid.y = bounds.height + margin;
-    } else if (asteroid.y > bounds.height + margin) {
+      asteroid.y = height + margin;
+    } else if (asteroid.y > height + margin) {
       asteroid.y = -margin;
+    }
+  }
+
+  /**
+   * Updates behavior-specific state that's coupled with movement.
+   * Called AFTER movement is applied.
+   *
+   * @param {Asteroid} asteroid - The asteroid
+   * @param {number} deltaTime - Time delta
+   * @param {Object} context - Game context
+   */
+  updateBehaviorState(asteroid, deltaTime, context) {
+    if (asteroid.behavior?.type === 'parasite') {
+      this.updateParasiteAttack(asteroid, deltaTime, context);
+    }
+  }
+
+  /**
+   * Handles parasite contact attack logic.
+   * Separated from movement but executed in the same update cycle.
+   *
+   * @param {Asteroid} asteroid - The parasite asteroid
+   * @param {number} deltaTime - Time delta
+   * @param {Object} context - Game context with player
+   */
+  updateParasiteAttack(asteroid, deltaTime, context) {
+    const { player } = context;
+    const behavior = asteroid.behavior;
+
+    if (!player || !asteroid.system) {
+      return;
+    }
+
+    // Initialize attack cooldown state
+    if (!asteroid.variantState) {
+      asteroid.variantState = { attackCooldown: 0 };
+    }
+
+    // Update attack cooldown
+    asteroid.variantState.attackCooldown = Math.max(
+      0,
+      (asteroid.variantState.attackCooldown || 0) - deltaTime
+    );
+
+    // Calculate attack range
+    const playerRadius =
+      typeof player.getHullBoundingRadius === 'function'
+        ? player.getHullBoundingRadius()
+        : CONSTANTS.SHIP_SIZE;
+    const attackRange =
+      (behavior.minDistance ?? 0) + asteroid.radius + playerRadius + 6;
+
+    // Check if in range to attack
+    const dx = player.position.x - asteroid.x;
+    const dy = player.position.y - asteroid.y;
+    const distance = Math.hypot(dx, dy);
+
+    if (
+      distance <= attackRange &&
+      asteroid.variantState.attackCooldown === 0 &&
+      typeof asteroid.system.applyDirectDamageToPlayer === 'function'
+    ) {
+      // Execute contact attack
+      const damage = behavior.contactDamage ?? 20;
+      const result = asteroid.system.applyDirectDamageToPlayer(damage, {
+        cause: 'parasite',
+        position: { x: asteroid.x, y: asteroid.y },
+      });
+
+      // Set cooldown if attack was successful
+      if (result?.applied) {
+        asteroid.variantState.attackCooldown = behavior.cooldown ?? 1.2;
+      }
     }
   }
 
