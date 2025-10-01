@@ -2,6 +2,12 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
 import { Asteroid } from './enemies/types/Asteroid.js';
+import { EnemyFactory } from './enemies/base/EnemyFactory.js';
+import { WaveManager } from './enemies/managers/WaveManager.js';
+import { RewardManager } from './enemies/managers/RewardManager.js';
+import { AsteroidMovement } from './enemies/components/AsteroidMovement.js';
+import { AsteroidCollision } from './enemies/components/AsteroidCollision.js';
+import { AsteroidRenderer } from './enemies/components/AsteroidRenderer.js';
 
 // === CLASSE ENEMYSYSTEM ===
 // Asteroid class moved to: ./enemies/types/Asteroid.js
@@ -11,10 +17,13 @@ class EnemySystem {
     this.asteroids = [];
     this.spawnTimer = 0;
     this.spawnDelay = 1.0;
+
+    // Legacy wave state (for backward compatibility during migration)
     this.waveState = this.createInitialWaveState();
     this.sessionStats = this.createInitialSessionStats();
     this.sessionActive = false;
     this.lastWaveBroadcast = null;
+
     this.cachedPlayer = null;
     this.cachedWorld = null;
     this.cachedProgression = null;
@@ -23,12 +32,30 @@ class EnemySystem {
     this.activeAsteroidCacheDirty = true;
     this.usesAsteroidPool = false;
 
+    // Factory (optional - new architecture)
+    this.factory = null;
+    this.useFactory = false; // Feature flag for gradual migration - DISABLED (pool conflicts)
+
+    // Managers (new architecture)
+    this.waveManager = null;
+    this.rewardManager = null;
+    this.useManagers = true; // Feature flag to enable new manager system
+
+    // Components (new architecture)
+    this.movementComponent = null;
+    this.collisionComponent = null;
+    this.rendererComponent = null;
+    this.useComponents = true; // Feature flag to enable component system
+
     // Registrar no ServiceLocator
     if (typeof gameServices !== 'undefined') {
       gameServices.register('enemies', this);
     }
 
     this.setupAsteroidPoolIntegration();
+    this.setupEnemyFactory(); // Initialize factory (optional)
+    this.setupManagers(); // Initialize wave and reward managers
+    this.setupComponents(); // Initialize components
     this.setupEventListeners();
     this.resolveCachedServices(true);
 
@@ -55,6 +82,15 @@ class EnemySystem {
     gameEvents.on('world-reset', () => {
       this.resolveCachedServices(true);
     });
+
+    // NEW: Integrate RewardManager with enemy destruction
+    if (this.useManagers) {
+      gameEvents.on('enemy-destroyed', (data) => {
+        if (this.rewardManager && data.enemy) {
+          this.rewardManager.dropRewards(data.enemy);
+        }
+      });
+    }
   }
 
   resolveCachedServices(force = false) {
@@ -123,7 +159,80 @@ class EnemySystem {
     }
   }
 
+  setupEnemyFactory() {
+    try {
+      this.factory = new EnemyFactory(this);
+
+      // Register asteroid type with factory
+      this.factory.registerType('asteroid', {
+        class: Asteroid,
+        pool: GamePools?.asteroids || null,
+        defaults: {
+          size: 'medium',
+          variant: 'common'
+        },
+        tags: ['destructible', 'enemy']
+      });
+
+      console.log('[EnemySystem] EnemyFactory initialized (optional - not active yet)');
+    } catch (error) {
+      console.warn('[EnemySystem] Failed to initialize EnemyFactory', error);
+      this.factory = null;
+    }
+  }
+
+  setupManagers() {
+    try {
+      // Initialize WaveManager
+      if (typeof gameEvents !== 'undefined') {
+        this.waveManager = new WaveManager(this, gameEvents);
+        console.log('[EnemySystem] WaveManager initialized');
+      }
+
+      // Initialize RewardManager
+      this.resolveCachedServices();
+      const xpOrbSystem = this.getCachedXPOrbs();
+      if (xpOrbSystem) {
+        this.rewardManager = new RewardManager(this, xpOrbSystem);
+        console.log('[EnemySystem] RewardManager initialized');
+      }
+    } catch (error) {
+      console.warn('[EnemySystem] Failed to initialize managers', error);
+      this.waveManager = null;
+      this.rewardManager = null;
+      this.useManagers = false;
+    }
+  }
+
+  setupComponents() {
+    try {
+      // Initialize movement component
+      this.movementComponent = new AsteroidMovement();
+      console.log('[EnemySystem] AsteroidMovement component initialized');
+
+      // Initialize collision component
+      this.collisionComponent = new AsteroidCollision();
+      console.log('[EnemySystem] AsteroidCollision component initialized');
+
+      // Initialize renderer component
+      this.rendererComponent = new AsteroidRenderer();
+      console.log('[EnemySystem] AsteroidRenderer component initialized');
+    } catch (error) {
+      console.warn('[EnemySystem] Failed to initialize components', error);
+      this.movementComponent = null;
+      this.collisionComponent = null;
+      this.rendererComponent = null;
+      this.useComponents = false;
+    }
+  }
+
   acquireAsteroid(config) {
+    // NEW: Use factory if enabled (feature flag)
+    if (this.useFactory && this.factory) {
+      return this.acquireEnemyViaFactory('asteroid', config);
+    }
+
+    // LEGACY: Original implementation (default)
     if (
       this.usesAsteroidPool &&
       GamePools?.asteroids &&
@@ -139,9 +248,39 @@ class EnemySystem {
     return new Asteroid(this, config);
   }
 
+  // NEW: Factory-based enemy acquisition (optional path)
+  acquireEnemyViaFactory(type, config) {
+    if (!this.factory) {
+      console.warn('[EnemySystem] Factory not available, falling back to legacy');
+      return this.acquireAsteroid(config);
+    }
+
+    try {
+      const enemy = this.factory.create(type, config);
+      if (enemy) {
+        this.asteroids.push(enemy);
+        this.invalidateActiveAsteroidCache();
+      }
+      return enemy;
+    } catch (error) {
+      console.error('[EnemySystem] Factory creation failed:', error);
+      return null;
+    }
+  }
+
   releaseAsteroid(asteroid) {
+    if (!asteroid) {
+      return;
+    }
+
+    // NEW: Use factory release if enabled
+    if (this.useFactory && this.factory) {
+      this.factory.release(asteroid);
+      return;
+    }
+
+    // LEGACY: Direct pool release
     if (
-      !asteroid ||
       !this.usesAsteroidPool ||
       !GamePools?.asteroids ||
       typeof GamePools.asteroids.release !== 'function'
@@ -366,6 +505,7 @@ class EnemySystem {
 
   // === GERENCIAMENTO DE ASTEROIDES ===
   updateAsteroids(deltaTime) {
+    // Update asteroids - they handle their own movement internally
     this.asteroids.forEach((asteroid) => {
       if (!asteroid.destroyed) {
         asteroid.update(deltaTime);
@@ -377,15 +517,21 @@ class EnemySystem {
   }
 
   handleAsteroidCollisions() {
-    for (let i = 0; i < this.asteroids.length - 1; i++) {
-      const a1 = this.asteroids[i];
-      if (a1.destroyed) continue;
+    // NEW: Use collision component if available
+    if (this.useComponents && this.collisionComponent) {
+      this.collisionComponent.handleAsteroidCollisions(this.asteroids);
+    } else {
+      // LEGACY: Original collision logic
+      for (let i = 0; i < this.asteroids.length - 1; i++) {
+        const a1 = this.asteroids[i];
+        if (a1.destroyed) continue;
 
-      for (let j = i + 1; j < this.asteroids.length; j++) {
-        const a2 = this.asteroids[j];
-        if (a2.destroyed) continue;
+        for (let j = i + 1; j < this.asteroids.length; j++) {
+          const a2 = this.asteroids[j];
+          if (a2.destroyed) continue;
 
-        this.checkAsteroidCollision(a1, a2);
+          this.checkAsteroidCollision(a1, a2);
+        }
       }
     }
   }
@@ -981,11 +1127,17 @@ class EnemySystem {
   render(ctx) {
     if (!ctx) return;
 
-    this.asteroids.forEach((asteroid) => {
-      if (!asteroid.destroyed && typeof asteroid.draw === 'function') {
-        asteroid.draw(ctx);
-      }
-    });
+    // NEW: Use renderer component if available
+    if (this.useComponents && this.rendererComponent) {
+      this.rendererComponent.renderAll(ctx, this.asteroids);
+    } else {
+      // LEGACY: Original render logic
+      this.asteroids.forEach((asteroid) => {
+        if (!asteroid.destroyed && typeof asteroid.draw === 'function') {
+          asteroid.draw(ctx);
+        }
+      });
+    }
   }
 
   // === INTERFACE PARA OUTROS SISTEMAS ===
