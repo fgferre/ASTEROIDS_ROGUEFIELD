@@ -14,7 +14,9 @@
       "Bash(npm run:*)",
       "Bash(git push:*)",
       "Bash(git restore:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(git merge:*)",
+      "Bash(git branch:*)"
     ],
     "deny": [],
     "ask": []
