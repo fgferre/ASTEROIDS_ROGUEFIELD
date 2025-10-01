@@ -505,14 +505,50 @@ class EnemySystem {
 
   // === GERENCIAMENTO DE ASTEROIDES ===
   updateAsteroids(deltaTime) {
-    // Update asteroids - they handle their own movement internally
-    this.asteroids.forEach((asteroid) => {
-      if (!asteroid.destroyed) {
-        asteroid.update(deltaTime);
-      }
-    });
+    // NEW: Use movement component if enabled
+    if (this.useComponents && this.movementComponent) {
+      // Build context for movement component
+      const context = {
+        player: this.getCachedPlayer(),
+        worldBounds: {
+          width: CONSTANTS.GAME_WIDTH,
+          height: CONSTANTS.GAME_HEIGHT
+        }
+      };
 
-    // Física de colisão entre asteroides
+      // Update each asteroid using component
+      this.asteroids.forEach((asteroid) => {
+        if (!asteroid.destroyed) {
+          // Component handles movement
+          this.movementComponent.update(asteroid, deltaTime, context);
+
+          // Asteroid handles its own state updates (non-movement)
+          asteroid.updateVisualState(deltaTime);
+
+          // Volatile behavior (timer, not movement)
+          if (asteroid.behavior?.type === 'volatile') {
+            asteroid.updateVolatileBehavior(deltaTime);
+          }
+
+          // Timers
+          if (asteroid.lastDamageTime > 0) {
+            asteroid.lastDamageTime = Math.max(0, asteroid.lastDamageTime - deltaTime);
+          }
+          if (asteroid.shieldHitCooldown > 0) {
+            asteroid.shieldHitCooldown = Math.max(0, asteroid.shieldHitCooldown - deltaTime);
+          }
+        }
+      });
+    } else {
+      // LEGACY: Asteroids handle their own update
+      this.asteroids.forEach((asteroid) => {
+        if (!asteroid.destroyed) {
+          asteroid.update(deltaTime);
+        }
+      });
+    }
+
+    // Física de colisão entre asteroides (always enabled)
     this.handleAsteroidCollisions();
   }
 
