@@ -12,7 +12,9 @@
       "Bash(timeout:*)",
       "Bash(npm run serve:*)",
       "Bash(npm run:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git restore:*)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []
