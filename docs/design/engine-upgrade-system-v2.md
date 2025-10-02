@@ -1,0 +1,305 @@
+# Engine Upgrade System Design v2
+
+**EXPANDED PROGRESSION** - More upgrades, smoother power curve
+
+---
+
+## Upgrade Path: "Propulsores Principais" (Main Engines)
+
+**5 Ranks Total** - Gradual progression from sluggish to fighter jet
+
+### Rank 1: "Bicos Otimizados"
+**Gameplay**:
+- Acceleration: +12% (280 → 314 units/s²)
+- Max Speed: +10% (220 → 242 units/s)
+
+**Visual**:
+- Thruster: 15% longer flame
+- Color: Standard blue (#3399FF) → Slightly brighter blue (#4DA6FF)
+- Particles: +20%
+
+**Description**:
+> "Substitui os bicos padrão por modelos calibrados. A nave responde um pouco mais rápido."
+
+---
+
+### Rank 2: "Queima Estável"
+**Gameplay**:
+- Acceleration: +25% total (280 → 350 units/s²)
+- Max Speed: +20% total (220 → 264 units/s)
+
+**Visual**:
+- Thruster: 30% longer flame
+- Color: Bright blue (#4DA6FF) → Cyan (#00CCFF)
+- Particles: +35%
+- Adds subtle glow around exhaust
+
+**Description**:
+> "Otimiza a câmara de combustão para queima mais eficiente. Aceleração notavelmente melhorada."
+
+---
+
+### Rank 3: "Injeção Dupla"
+**Gameplay**:
+- Acceleration: +40% total (280 → 392 units/s²)
+- Max Speed: +32% total (220 → 290 units/s)
+
+**Visual**:
+- Thruster: 50% longer flame
+- Color: Cyan (#00CCFF) → Electric blue (#0099FF)
+- Particles: +55%
+- Secondary exhaust glow
+- Burst particles (20% chance per frame)
+
+**Description**:
+> "Instala segundo estágio de injeção. A nave agora acelera como um caça de combate."
+
+---
+
+### Rank 4: "Plasma Superaquecido"
+**Gameplay**:
+- Acceleration: +55% total (280 → 434 units/s²)
+- Max Speed: +45% total (220 → 319 units/s)
+
+**Visual**:
+- Thruster: 75% longer flame
+- Color: Electric blue → White core (#FFFFFF) with blue edges (#0099FF)
+- Particles: +80%
+- Burst particles (50% chance)
+- Heat shimmer effect behind ship
+
+**Description**:
+> "Propelente superaquecido aumenta dramaticamente o impulso. Temperaturas extremas demandam resfriamento ativo."
+
+---
+
+### Rank 5: "Sobrecarga Vetorial"
+**Gameplay**:
+- Acceleration: +70% total (280 → 476 units/s²)
+- Max Speed: +60% total (220 → 352 units/s)
+
+**Visual**:
+- Thruster: 100% longer flame (double length!)
+- Color: Intense white core with electric blue corona
+- Particles: +120%
+- Constant burst particles
+- Heavy heat distortion
+- Engine "roar" pulsing effect
+
+**Description**:
+> "Alimenta os propulsores além dos limites de segurança. Desempenho absoluto ao custo de desgaste acelerado."
+
+---
+
+## Upgrade Path: "Sistema RCS" (Maneuvering Thrusters)
+
+**5 Ranks Total** - From heavy rotation to instant spins
+
+### Rank 1: "RCS Básico"
+**Gameplay**:
+- Rotation Speed: +15% (8 → 9.2 rad/s)
+- No angular damping change yet
+
+**Visual**:
+- Small side thruster puffs appear (4px wide)
+- Only visible during active rotation
+- Subtle cyan color
+
+**Description**:
+> "Ativa propulsores laterais básicos. Rotação ligeiramente mais responsiva."
+
+---
+
+### Rank 2: "RCS Ativado"
+**Gameplay**:
+- Rotation Speed: +30% total (8 → 10.4 rad/s)
+- Angular Damping: Reduced by 10% (6.2 → 5.58)
+
+**Visual**:
+- Medium thruster puffs (6px wide)
+- More frequent particles
+- Counter-thrusters fire when stopping rotation
+- Brighter cyan color
+
+**Description**:
+> "Aumenta potência dos propulsores de manobra. Giros tornam-se mais ágeis."
+
+---
+
+### Rank 3: "RCS Aprimorado"
+**Gameplay**:
+- Rotation Speed: +50% total (8 → 12 rad/s)
+- Angular Damping: Reduced by 20% total (6.2 → 4.96)
+
+**Visual**:
+- Large thruster bursts (8px wide)
+- Particle trails during rotation
+- Dramatic counter-thruster effects
+- Electric blue color
+
+**Description**:
+> "Duplica a potência dos propulsores de manobra. Ajustes de mira tornam-se instantâneos."
+
+---
+
+### Rank 4: "RCS Vetorial"
+**Gameplay**:
+- Rotation Speed: +70% total (8 → 13.6 rad/s)
+- Angular Damping: Reduced by 30% total (6.2 → 4.34)
+- Reduces input deadzone by 25%
+
+**Visual**:
+- Thrusters fire almost constantly (10px wide)
+- Adds "vectoring" effect - thrusters angle slightly
+- Counter-thruster "clouds" when braking
+- White-blue color
+
+**Description**:
+> "Propulsores vetoriais permitem ajustes precisos de orientação durante manobras complexas."
+
+---
+
+### Rank 5: "RCS Omni-direcional"
+**Gameplay**:
+- Rotation Speed: +90% total (8 → 15.2 rad/s)
+- Angular Damping: Reduced by 40% total (6.2 → 3.72)
+- Input deadzone removed completely
+- **NEW**: Allows strafe movement (WASD moves ship sideways at 60% speed)
+
+**Visual**:
+- Constant thruster dance during any input (12px wide)
+- Thrusters pulse in rhythm with inputs
+- Creates visible "thruster envelope" around ship
+- Plasma white color
+- Counter-thrusters create dramatic clouds
+
+**Description**:
+> "Sistema omnidirecional de última geração. Permite manobras impossíveis para naves padrão, incluindo deslocamento lateral."
+
+---
+
+## Optional: "Motores de Freio" (Braking Thrusters)
+
+**3 Ranks Total** - For players who want MORE control
+
+### Rank 1: "Freios Reforçados"
+**Gameplay**:
+- Linear Damping: +25% (3.1 → 3.875 s⁻¹) - Stops faster
+- No change to max speed/acceleration
+
+**Visual**:
+- Counter-thrusters 50% brighter
+- Adds "brake glow" effect when decelerating
+
+**Description**:
+> "Reforça os propulsores de contra-impulso. A nave para mais rapidamente ao soltar os controles."
+
+---
+
+### Rank 2: "Reversão Ativa"
+**Gameplay**:
+- Linear Damping: +50% total (3.1 → 4.65 s⁻¹)
+- Allows manual reverse (press opposite direction for instant reverse thrust)
+
+**Visual**:
+- Bright counter-thruster bursts
+- "Reverse thrust" indicator on HUD
+- Large particle clouds when reversing
+
+**Description**:
+> "Permite reversão ativa dos motores principais. Manobras evasivas tornam-se possíveis."
+
+---
+
+### Rank 3: "Parada de Emergência"
+**Gameplay**:
+- Linear Damping: +75% total (3.1 → 5.425 s⁻¹)
+- Adds "Emergency Brake" ability (keybind: Shift) - instant stop with 3s cooldown
+
+**Visual**:
+- Massive counter-thruster burst on emergency brake
+- Ship surrounded by thruster clouds
+- Screen shake on activation
+
+**Description**:
+> "Sistema de parada de emergência. Libera toda energia disponível para frear instantaneamente a nave."
+
+---
+
+## Progression Summary
+
+### Total Mobility Upgrades: 13 Ranks
+- **Main Engines**: 5 ranks (acceleration + speed)
+- **RCS System**: 5 ranks (rotation + agility)
+- **Braking System**: 3 ranks (optional - for control-focused players)
+
+### Power Curve (All Main + RCS Upgrades)
+
+**Base Ship**:
+- Acceleration: 280 units/s²
+- Max Speed: 220 units/s
+- Rotation: 8 rad/s
+- **Feel**: Heavy space tanker
+
+**Mid-Game (Rank 3 on both)**:
+- Acceleration: 392 units/s² (+40%)
+- Max Speed: 290 units/s (+32%)
+- Rotation: 12 rad/s (+50%)
+- **Feel**: Responsive fighter
+
+**End-Game (Rank 5 on both)**:
+- Acceleration: 476 units/s² (+70%)
+- Max Speed: 352 units/s (+60%)
+- Rotation: 15.2 rad/s (+90%)
+- **Feel**: Elite interceptor
+
+---
+
+## Visual Evolution Chart
+
+| Rank | Main Thruster | Side Thrusters | Color | Particles |
+|------|---------------|----------------|-------|-----------|
+| 0 (Base) | Standard flame | None | Blue | 3/frame |
+| 1 | +15% length | Small puffs (4px) | Bright blue | 4/frame |
+| 2 | +30% length | Medium (6px) | Cyan | 5/frame |
+| 3 | +50% length | Large (8px) | Electric blue | 6/frame + bursts |
+| 4 | +75% length | Constant (10px) | White/blue | 8/frame + bursts |
+| 5 | +100% length | Envelope (12px) | Plasma white | 10/frame + constant bursts |
+
+---
+
+## Balance Notes
+
+### Why 13 upgrades is good:
+1. **Smoother progression** - Each upgrade feels meaningful but not overwhelming
+2. **Build variety** - Players can specialize (all engines vs all RCS vs balanced)
+3. **Replayability** - Different upgrade paths feel different
+4. **Reward frequency** - Get mobility upgrades every 2-3 levels
+
+### Unlock Timing (Suggested):
+- **Main Engines Rank 1**: Level 1 (always available)
+- **Main Engines Rank 2**: Level 3
+- **RCS Rank 1**: Level 2 (prerequisite: Main Engines Rank 1)
+- **Main Engines Rank 3**: Level 5
+- **RCS Rank 2**: Level 4
+- **Braking Rank 1**: Level 6 (prerequisite: Main Engines Rank 2)
+- **Main Engines Rank 4**: Level 8
+- **RCS Rank 3**: Level 7
+- **Main Engines Rank 5**: Level 10
+- **RCS Rank 4**: Level 9
+- **Braking Rank 2**: Level 11
+- **RCS Rank 5**: Level 12
+- **Braking Rank 3**: Level 14
+
+---
+
+## Next Steps
+
+1. Implement basic thruster visual system
+2. Create upgrade events for Main Engines
+3. Create RCS upgrade
+4. Add visual feedback for each rank
+5. Playtest and tune numbers
+6. Add Braking system if needed
+
+**Status**: Design v2 Complete - Ready for feedback

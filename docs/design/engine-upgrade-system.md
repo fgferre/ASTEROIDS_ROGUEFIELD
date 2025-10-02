@@ -1,0 +1,368 @@
+# Engine Upgrade System Design
+
+**Design Goal**: Make ship upgrades feel POWERFUL with clear visual and gameplay feedback.
+
+**Core Philosophy**: Start sluggish and heavy (realistic space physics), become a nimble fighter through upgrades.
+
+---
+
+## The Problem
+
+**Current State**:
+- "Propulsores Melhorados" only boosts max speed (+15%/+28%/+40%)
+- Doesn't affect acceleration or rotation
+- No visual feedback
+- Upgrades don't feel impactful
+
+**User Feedback**:
+- Ship feels "heavy and sluggish" without upgrades ✅ (this is good!)
+- Upgrades don't make a noticeable difference ❌ (this is bad!)
+- Love the counter-thruster momentum feel ✅ (preserve this!)
+
+---
+
+## The Solution: Dual Engine System
+
+### 1. **Main Engines** (Forward Thrust)
+**Affects**: Acceleration & Max Speed
+**Visual**: Main thruster intensity/size increases with upgrades
+
+### 2. **Maneuvering Thrusters** (RCS - Reaction Control System)
+**Affects**: Rotation speed & angular acceleration
+**Visual**: Side thrusters become more visible/frequent with upgrades
+
+---
+
+## New Upgrade: "Propulsores Principais" (Main Engines)
+
+Replaces current "Propulsores Melhorados"
+
+### Rank 1: "Queima Estável"
+**Gameplay**:
+- Acceleration: +20% (280 → 336 units/s²)
+- Max Speed: +15% (220 → 253 units/s)
+
+**Visual**:
+- Main thruster: Slightly longer flame trail
+- Thruster color: Standard blue → Brighter cyan
+- Particle count: +25%
+
+**Description**:
+> "Otimiza a câmara de combustão para queima mais eficiente. A nave responde mais rapidamente aos comandos."
+
+---
+
+### Rank 2: "Injeção Dupla"
+**Gameplay**:
+- Acceleration: +40% total (280 → 392 units/s²)
+- Max Speed: +30% total (220 → 286 units/s)
+
+**Visual**:
+- Main thruster: 50% longer flame
+- Adds secondary exhaust glow
+- Thruster color: Bright cyan → Electric blue
+- Particle count: +50%
+- Adds occasional "burst" particles
+
+**Description**:
+> "Instala segundo estágio de injeção. Aceleração dramaticamente melhorada."
+
+---
+
+### Rank 3: "Sobrecarga Vetorial"
+**Gameplay**:
+- Acceleration: +60% total (280 → 448 units/s²)
+- Max Speed: +50% total (220 → 330 units/s)
+
+**Visual**:
+- Main thruster: Double length flame
+- Core becomes white-hot
+- Thruster color: Electric blue → Plasma white with blue edges
+- Particle count: +100%
+- Constant "burst" particles
+- Adds heat distortion effect
+
+**Description**:
+> "Alimenta os propulsores além dos limites de segurança. Desempenho máximo ao custo de maior consumo energético."
+
+---
+
+## New Upgrade: "Sistema RCS" (Maneuvering Thrusters)
+
+New upgrade in Mobility category
+
+### Rank 1: "RCS Ativado"
+**Gameplay**:
+- Rotation Speed: +25% (8 → 10 rad/s)
+- Angular Damping: Reduced by 15% (6.2 → 5.27) - rotates longer before stopping
+
+**Visual**:
+- Side thrusters appear when rotating
+- Small cyan puffs on left/right when turning
+- Counter-thrusters fire when stopping rotation
+
+**Description**:
+> "Ativa propulsores laterais para controle preciso de rotação. Permite manobras mais ágeis."
+
+---
+
+### Rank 2: "RCS Aprimorado"
+**Gameplay**:
+- Rotation Speed: +50% total (8 → 12 rad/s)
+- Angular Damping: Reduced by 25% total (6.2 → 4.65)
+- **NEW**: Reduces rotation "deadzone" for instant response
+
+**Visual**:
+- Larger, brighter side thruster effects
+- More frequent particle bursts
+- Counter-thruster effects more dramatic
+- Adds subtle trail effect during spins
+
+**Description**:
+> "Duplica a potência dos propulsores de manobra. Giros e ajustes de mira tornam-se instantâneos."
+
+---
+
+### Rank 3: "RCS Vetorial"
+**Gameplay**:
+- Rotation Speed: +75% total (8 → 14 rad/s)
+- Angular Damping: Reduced by 35% total (6.2 → 4.03)
+- **NEW**: Allows "drift turns" - rotate while maintaining velocity vector
+
+**Visual**:
+- Thrusters fire almost constantly during maneuvers
+- Adds "vectoring" visual - thrusters angle slightly
+- Counter-thrusters create visible "clouds" when braking rotation
+- Full thruster "dance" during complex maneuvers
+
+**Description**:
+> "Propulsores vetoriais de última geração. Permite manobras impossíveis para naves padrão."
+
+---
+
+## Visual Feedback System
+
+### Thruster Intensity Levels
+
+**Level 0 (Base Ship)**:
+```javascript
+mainThruster: {
+  length: 15,
+  width: 8,
+  color: '#3399FF',
+  particleCount: 3,
+  particleLife: 0.3
+}
+sideThruster: {
+  enabled: false  // No side thrusters yet
+}
+```
+
+**Level 1 (One Main Engine Upgrade)**:
+```javascript
+mainThruster: {
+  length: 20,        // +33%
+  width: 10,         // +25%
+  color: '#00CCFF',  // Brighter
+  particleCount: 4,
+  particleLife: 0.4,
+  glowIntensity: 1.2
+}
+```
+
+**Level 2**:
+```javascript
+mainThruster: {
+  length: 25,
+  width: 12,
+  color: '#0099FF',  // Electric blue
+  particleCount: 5,
+  particleLife: 0.5,
+  glowIntensity: 1.5,
+  burstChance: 0.3   // 30% chance of burst particles
+}
+```
+
+**Level 3 (Max)**:
+```javascript
+mainThruster: {
+  length: 35,        // More than double base
+  width: 15,
+  color: '#FFFFFF',  // White core
+  colorEdge: '#0099FF', // Blue edge
+  particleCount: 8,
+  particleLife: 0.6,
+  glowIntensity: 2.0,
+  burstChance: 1.0,  // Constant bursts
+  heatDistortion: true
+}
+```
+
+### RCS Thruster Effects
+
+**Without RCS**: No visible side thrusters
+
+**RCS Rank 1**:
+- Small cyan puffs when rotating (5px wide)
+- Counter-thruster "pop" when stopping rotation
+
+**RCS Rank 2**:
+- Larger thruster bursts (8px wide)
+- More frequent particles
+- Visible thrust "trails" during rotation
+
+**RCS Rank 3**:
+- Almost constant thruster fire during maneuvers (12px wide)
+- Dramatic counter-thrust clouds
+- Thrusters angle based on input (vectoring effect)
+
+---
+
+## Counter-Thruster System
+
+**Preserve the momentum feel!**
+
+The counter-thrusters (what stops the ship when you release WASD) will:
+1. Always be present (part of base ship design)
+2. Scale visually with upgrades but NOT affect stopping power
+3. Create satisfying visual feedback when braking
+
+**Visual Evolution**:
+- Base: Small white puffs opposite to movement direction
+- With RCS 1: Cyan puffs, slightly larger
+- With RCS 2: Blue bursts with particles
+- With RCS 3: Dramatic thruster clouds with trails
+
+**Gameplay**: Counter-thrusters always apply the same damping (3.1 s⁻¹ for linear, 6.2 s⁻¹ for angular). This preserves the momentum feel you love!
+
+---
+
+## Implementation Plan
+
+### Phase 1: Visual Thruster System
+1. Create thruster visual component with upgrade levels
+2. Hook into PlayerSystem to detect current upgrade levels
+3. Render enhanced thrusters based on upgrades
+4. Add particle effects for each level
+
+### Phase 2: RCS Upgrade
+1. Create new "Sistema RCS" upgrade in upgrades.js
+2. Add event handlers for rotation speed boosts
+3. Add side thruster visual effects
+4. Implement counter-thruster visuals
+
+### Phase 3: Main Engine Upgrade Rework
+1. Modify "Propulsores Melhorados" to also boost acceleration
+2. Update event handlers to apply both acceleration and speed
+3. Add progressive thruster visual effects
+4. Add thruster color transitions
+
+### Phase 4: Polish
+1. Add sound effects for different thruster levels
+2. Add screen shake when firing max-level thrusters
+3. Add "boost" visual when hitting max speed
+4. Tune balance based on playtesting
+
+---
+
+## Balance Tuning
+
+### Starting Values (Heavy & Sluggish ✅)
+```javascript
+SHIP_ACCELERATION = 280      // Feels slow
+SHIP_MAX_SPEED = 220          // Conservative
+SHIP_ROTATION_SPEED = 8       // Deliberate turns
+```
+
+### Max Upgraded Values (Nimble Fighter ✅)
+```javascript
+SHIP_ACCELERATION = 448      // +60% - Responsive!
+SHIP_MAX_SPEED = 330          // +50% - Fast!
+SHIP_ROTATION_SPEED = 14      // +75% - Agile!
+```
+
+### Preserved Values (Keep The Feel ✅)
+```javascript
+SHIP_LINEAR_DAMPING = 3.1     // UNCHANGED - Momentum preserved
+SHIP_ANGULAR_DAMPING = 6.2    // UNCHANGED - Rotation inertia preserved
+```
+
+---
+
+## User Experience Journey
+
+**Wave 1-2 (No Upgrades)**:
+> "The ship is heavy... I need to plan my movements. Can't just dodge on reaction."
+
+**Wave 3-5 (First Engine Upgrade)**:
+> "Oh! The ship responds faster now! The thruster looks brighter too. I can feel the difference!"
+
+**Wave 6-8 (RCS Unlock)**:
+> "Wow, I can turn so much faster! The side thrusters are firing - this feels like a different ship!"
+
+**Wave 10+ (Max Upgrades)**:
+> "This thing is a monster! The thrusters are blazing white-hot, I'm dancing around enemies!"
+
+---
+
+## Technical Notes
+
+### Thruster Rendering
+- Use existing `thruster-effect` event system
+- Add `intensity` parameter based on upgrade level
+- Modify EffectsSystem to scale particles/colors
+
+### Performance
+- More particles = more draw calls
+- Cap max particles per thruster to avoid FPS drop
+- Use object pooling for thruster particles (already implemented)
+
+### Accessibility
+- Higher thruster intensity = easier to see ship orientation
+- Color changes help distinguish upgrade levels
+- Visual feedback reinforces gameplay changes
+
+---
+
+## Example Upgrade Events
+
+```javascript
+// Main Engine Boost (affects acceleration AND max speed)
+{
+  id: 'propulsors',
+  levels: [
+    {
+      rank: 1,
+      effects: [
+        { type: 'event', event: 'upgrade-acceleration-boost',
+          payload: { multiplier: 1.20 } },
+        { type: 'event', event: 'upgrade-speed-boost',
+          payload: { multiplier: 1.15 } },
+        { type: 'event', event: 'upgrade-thruster-visual',
+          payload: { level: 1 } }
+      ]
+    }
+  ]
+}
+
+// RCS Upgrade (affects rotation)
+{
+  id: 'rcs_system',
+  levels: [
+    {
+      rank: 1,
+      effects: [
+        { type: 'event', event: 'upgrade-rotation-boost',
+          payload: { multiplier: 1.25 } },
+        { type: 'event', event: 'upgrade-rcs-visual',
+          payload: { level: 1 } }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+**Status**: Design Complete - Ready for Implementation
+**Next**: Implement thruster visual system
