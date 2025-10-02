@@ -1623,7 +1623,7 @@ class XPOrbSystem {
     });
   }
 
-  getBaseXPValue(size) {
+  getBaseXPValue(size, wave = 1) {
     const baseLookup = CONSTANTS.ASTEROID_XP_BASE || {
       large: 15,
       medium: 8,
@@ -1631,13 +1631,20 @@ class XPOrbSystem {
     };
 
     const baseValue = baseLookup[size] ?? baseLookup.small ?? 5;
+
+    // Wave scaling: matches HP difficulty (+12% per wave, cap at wave 10)
+    const effectiveWave = Math.max(1, Math.min(wave, 10));
+    const waveMultiplier = 1 + ((effectiveWave - 1) * 0.12);
+
+    // Player level bonus (small extra reward for progression)
     const progression = this.cachedProgression;
     const level =
       progression && typeof progression.getLevel === 'function'
         ? progression.getLevel()
         : 1;
+    const levelBonus = Math.floor(level * 0.3);
 
-    return Math.max(1, Math.round(baseValue + Math.floor(level * 0.5)));
+    return Math.max(1, Math.round(baseValue * waveMultiplier + levelBonus));
   }
 
   getVariantConfig(variantKey = 'common') {
@@ -1656,79 +1663,48 @@ class XPOrbSystem {
 
     const size = data.size || data.enemy?.size || 'small';
     const variantKey = data.variant || data.enemy?.variant || 'common';
+    const wave = data.wave || data.enemy?.wave || 1;
 
-    const baseValue = this.getBaseXPValue(size);
+    // === NEW ORB-BASED SYSTEM ===
+    // Calculate number of orbs based on: BASE × SIZE × VARIANT × WAVE
+    const orbValue = CONSTANTS.ORB_VALUE || 5;  // Fixed 5 XP per orb
+    const baseOrbs = CONSTANTS.ASTEROID_BASE_ORBS?.[size] ?? 1;
+    const sizeFactor = CONSTANTS.ASTEROID_SIZE_ORB_FACTOR?.[size] ?? 1.0;
+
     const variantConfig = this.getVariantConfig(variantKey);
-    const multiplier = variantConfig?.xpMultiplier ?? 1;
-    const totalValue = Math.max(1, Math.round(baseValue * multiplier));
+    const orbMultiplier = variantConfig?.orbMultiplier ?? 1.0;
 
+    // Wave scaling: +1 orb per 5 waves (wave 1-4: +0, wave 5-9: +1, wave 10+: +2)
+    const waveBonus = wave <= 10
+      ? Math.floor(wave / 5)
+      : Math.floor((wave - 10) / 3) + 2;
+
+    // Final orb count (rounded)
+    const numOrbs = Math.max(1, Math.round(baseOrbs * sizeFactor * orbMultiplier + waveBonus));
+    const totalValue = numOrbs * orbValue;
+
+    // === SIMPLIFIED ORB DISTRIBUTION ===
+    // Distribute totalValue evenly across numOrbs
+    // Each orb gets orbValue (5 XP), but may vary slightly due to rounding
     const drops = [];
-    let allocated = 0;
+    const valuePerOrb = Math.floor(totalValue / numOrbs);
+    let remainder = totalValue - (valuePerOrb * numOrbs);
 
-    const dropConfig = variantConfig?.drops || { baseSplit: 1, extraOrbs: [] };
-    const extras = Array.isArray(dropConfig.extraOrbs)
-      ? dropConfig.extraOrbs
-      : [];
+    for (let i = 0; i < numOrbs; i += 1) {
+      let value = valuePerOrb;
 
-    extras.forEach((extra) => {
-      if (!extra) return;
-
-      const count = Math.max(1, extra.count ?? 1);
-      const valueMultiplier = extra.valueMultiplier ?? 0;
-      if (valueMultiplier <= 0) {
-        return;
+      // Distribute remainder across first orbs
+      if (remainder > 0) {
+        value += 1;
+        remainder -= 1;
       }
 
-      for (let i = 0; i < count; i += 1) {
-        if (allocated >= totalValue) {
-          break;
-        }
-
-        const value = Math.max(
-          1,
-          Math.min(
-            Math.round(baseValue * valueMultiplier),
-            totalValue - allocated
-          )
-        );
-
-        allocated += value;
-        drops.push({
-          value,
-          options: {
-            tier: extra.tier,
-            className: extra.className,
-            variant: variantKey,
-          },
-        });
-      }
-    });
-
-    const remaining = Math.max(totalValue - allocated, 0);
-    const baseSplit = Math.max(0, dropConfig.baseSplit ?? 1);
-
-    if (remaining > 0 && baseSplit > 0) {
-      const baseValueEach = Math.max(1, Math.floor(remaining / baseSplit));
-      let remainder = remaining - baseValueEach * baseSplit;
-
-      for (let i = 0; i < baseSplit; i += 1) {
-        let value = baseValueEach;
-        if (remainder > 0) {
-          value += 1;
-          remainder -= 1;
-        }
-
-        drops.push({
-          value,
-          options: { variant: variantKey },
-        });
-      }
-    } else if (remaining > 0 && drops.length > 0) {
-      drops[drops.length - 1].value += remaining;
-    } else if (remaining > 0 && drops.length === 0) {
       drops.push({
-        value: remaining,
-        options: { variant: variantKey },
+        value: Math.max(1, value),  // Each orb should be at least 1 XP
+        options: {
+          variant: variantKey,
+          tier: 1,  // Always tier 1 (blue) for fusion system
+        },
       });
     }
 

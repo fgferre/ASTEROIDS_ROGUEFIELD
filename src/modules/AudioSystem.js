@@ -116,8 +116,25 @@ class AudioSystem {
       this.playLevelUp();
     });
 
-    gameEvents.on('xp-collected', () => {
-      this.playXPCollect();
+    gameEvents.on('xp-collected', (data) => {
+      // Special sound for Gold orbs
+      if (data?.orb?.options?.variant === 'gold') {
+        this.playGoldCollect();
+      } else {
+        this.playXPCollect();
+      }
+    });
+
+    gameEvents.on('xp-orb-fused', (data) => {
+      // Play fusion sound based on tier
+      this.playOrbFusion(data?.toClass);
+    });
+
+    gameEvents.on('enemy-spawned', (data) => {
+      // Special sound for Gold spawn
+      if (data?.enemy?.variant === 'gold') {
+        this.playGoldSpawn();
+      }
     });
 
     gameEvents.on('player-took-damage', () => {
@@ -517,6 +534,126 @@ class AudioSystem {
 
         osc.start(startTime);
         osc.stop(startTime + 0.18);
+      });
+    });
+  }
+
+  playOrbFusion(toClass) {
+    // Beautiful ascending fusion sound based on tier
+    this.safePlay(() => {
+      // Map tier classes to base frequencies
+      const tierFrequencies = {
+        'xp-green': 523,    // C5 (tier 2)
+        'xp-yellow': 659,   // E5 (tier 3)
+        'xp-purple': 784,   // G5 (tier 4)
+        'xp-red': 988,      // B5 (tier 5)
+        'xp-crystal': 1175, // D6 (tier 6)
+      };
+
+      const baseFreq = tierFrequencies[toClass] || 440;
+
+      // Sparkle effect: quick ascending notes
+      const sparkleNotes = [baseFreq * 0.75, baseFreq, baseFreq * 1.25];
+      sparkleNotes.forEach((freq, index) => {
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+
+        osc.connect(gain);
+        this.connectGainNode(gain);
+
+        osc.type = 'sine';
+        const startTime = this.context.currentTime + index * 0.04;
+        osc.frequency.setValueAtTime(freq, startTime);
+
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(0.08, startTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.2);
+
+        osc.start(startTime);
+        osc.stop(startTime + 0.2);
+      });
+
+      // Bell-like "ding" for completion
+      const bell = this.context.createOscillator();
+      const bellGain = this.context.createGain();
+      bell.connect(bellGain);
+      this.connectGainNode(bellGain);
+
+      bell.type = 'sine';
+      const bellTime = this.context.currentTime + 0.12;
+      bell.frequency.setValueAtTime(baseFreq * 2, bellTime);
+
+      bellGain.gain.setValueAtTime(0, bellTime);
+      bellGain.gain.linearRampToValueAtTime(0.12, bellTime + 0.01);
+      bellGain.gain.exponentialRampToValueAtTime(0.001, bellTime + 0.4);
+
+      bell.start(bellTime);
+      bell.stop(bellTime + 0.4);
+    });
+  }
+
+  playGoldSpawn() {
+    // Magical "bling!" sound when Gold asteroid spawns
+    this.safePlay(() => {
+      const frequencies = [880, 1108, 1318, 1760]; // A5-A6 arpeggio
+      frequencies.forEach((freq, index) => {
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+
+        osc.connect(gain);
+        this.connectGainNode(gain);
+
+        osc.type = 'triangle';
+        const startTime = this.context.currentTime + index * 0.05;
+        osc.frequency.setValueAtTime(freq, startTime);
+
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(0.15, startTime + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.3);
+
+        osc.start(startTime);
+        osc.stop(startTime + 0.3);
+      });
+    });
+  }
+
+  playGoldCollect() {
+    // Cash register "ka-ching!" sound
+    this.safePlay(() => {
+      // First "ka" (percussive)
+      const noise = this.context.createOscillator();
+      const noiseGain = this.context.createGain();
+      noise.connect(noiseGain);
+      this.connectGainNode(noiseGain);
+
+      noise.type = 'square';
+      noise.frequency.setValueAtTime(100, this.context.currentTime);
+
+      noiseGain.gain.setValueAtTime(0.2, this.context.currentTime);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 0.05);
+
+      noise.start();
+      noise.stop(this.context.currentTime + 0.05);
+
+      // Then "ching!" (bright bell)
+      const frequencies = [1318, 1760, 2217]; // E6-A6-C#7
+      frequencies.forEach((freq, index) => {
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+
+        osc.connect(gain);
+        this.connectGainNode(gain);
+
+        osc.type = 'sine';
+        const startTime = this.context.currentTime + 0.05 + index * 0.02;
+        osc.frequency.setValueAtTime(freq, startTime);
+
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(0.18, startTime + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.5);
+
+        osc.start(startTime);
+        osc.stop(startTime + 0.5);
       });
     });
   }

@@ -202,11 +202,45 @@ export class Asteroid extends BaseEnemy {
 
   computeWaveHealthMultiplier(wave) {
     const scaling = CONSTANTS.ASTEROID_HEALTH_SCALING || {};
-    const perWave = scaling.perWave ?? 0;
-    const maxMultiplier = scaling.maxMultiplier ?? 1;
-    const waveIndex = Math.max(0, (wave || 1) - 1);
-    const multiplier = 1 + perWave * waveIndex;
-    return Math.min(multiplier, maxMultiplier);
+    const currentWave = wave || 1;
+
+    // Waves 1-10: Original scaling with cap at 2.2x
+    if (currentWave <= 10) {
+      const perWave = scaling.perWave ?? 0.12;
+      const maxMultiplier = scaling.maxMultiplier ?? 2.2;
+      const waveIndex = Math.max(0, currentWave - 1);
+      const multiplier = 1 + perWave * waveIndex;
+      return Math.min(multiplier, maxMultiplier);
+    }
+
+    // Waves 11+: Infinite scaling with soft cap and hard cap
+    const infiniteConfig = scaling.infiniteScaling || {};
+    if (!infiniteConfig.enabled) {
+      return scaling.maxMultiplier ?? 2.2;
+    }
+
+    const baseMultiplier = scaling.maxMultiplier ?? 2.2;
+    const startWave = infiniteConfig.startWave ?? 11;
+    const increment = infiniteConfig.perWaveIncrement ?? 0.08;
+    const softCapWave = infiniteConfig.softCapWave ?? 50;
+    const hardCap = infiniteConfig.maxMultiplier ?? 10.0;
+
+    const wavesAboveStart = currentWave - startWave;
+
+    // Before soft cap: linear scaling
+    if (currentWave < softCapWave) {
+      const multiplier = baseMultiplier + (wavesAboveStart * increment);
+      return Math.min(multiplier, hardCap);
+    }
+
+    // After soft cap: logarithmic diminishing returns
+    // Formula: base + (softCapBonus) + log2(wavesAboveSoftCap) * increment
+    const softCapBonus = (softCapWave - startWave) * increment;
+    const wavesAboveSoftCap = currentWave - softCapWave;
+    const logBonus = Math.log2(wavesAboveSoftCap + 1) * increment;
+    const multiplier = baseMultiplier + softCapBonus + logBonus;
+
+    return Math.min(multiplier, hardCap);
   }
 
   initializeVariantState() {

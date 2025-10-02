@@ -20,7 +20,19 @@ export const ASTEROID_BASE_HEALTH = {
 
 export const ASTEROID_HEALTH_SCALING = {
   perWave: 0.12,
-  maxMultiplier: 2.2,
+  maxMultiplier: 2.2, // Only applies up to wave 10
+  // Infinite scaling formula for wave 11+:
+  // multiplier = 2.2 + (wave - 10) * 0.08 (logarithmic slow growth)
+  // Wave 15: 2.2 + 5*0.08 = 2.6x
+  // Wave 20: 2.2 + 10*0.08 = 3.0x
+  // Wave 30: 2.2 + 20*0.08 = 3.8x
+  infiniteScaling: {
+    enabled: true,
+    startWave: 11,
+    perWaveIncrement: 0.08, // Slower than early game
+    softCapWave: 50, // Start diminishing returns
+    maxMultiplier: 10.0, // Hard cap at 10x base HP
+  },
 };
 
 export const BULLET_SIZE = 3;
@@ -638,10 +650,36 @@ export const ASTEROID_FRAGMENT_RULES = Object.freeze({
   },
 });
 
+// === ORB VALUE SYSTEM ===
+// Each orb has FIXED value of 5 XP (tier 1 blue orb)
+// Reward is calculated by NUMBER OF ORBS, not XP directly
+export const ORB_VALUE = 5;
+
+// Base orbs = 1 for all sizes (size multiplier defines actual count)
+export const ASTEROID_BASE_ORBS = {
+  large: 1,
+  medium: 1,
+  small: 1,
+};
+
+// Size factor: how many orbs each size drops (multiplicative)
+export const ASTEROID_SIZE_ORB_FACTOR = {
+  large: 3.0,   // 3x orbs
+  medium: 2.0,  // 2x orbs (baseline)
+  small: 1.0,   // 1x orbs
+};
+
+// DEPRECATED: Old XP-based system (kept for backward compatibility during migration)
 export const ASTEROID_XP_BASE = {
   large: 15,
-  medium: 8,
+  medium: 10,
   small: 5,
+};
+
+export const ASTEROID_ORB_DROP_MULTIPLIER = {
+  large: 2.0,
+  medium: 1.0,
+  small: 0.6,
 };
 
 export const ASTEROID_VARIANTS = {
@@ -649,10 +687,18 @@ export const ASTEROID_VARIANTS = {
     key: 'common',
     displayName: 'Padrão',
     allowedSizes: ['large', 'medium', 'small'],
-    hpMultiplier: 1,
-    speedMultiplier: 1,
-    massMultiplier: 1,
+    hpMultiplier: 1.0,
+    speedMultiplier: 1.0,
+    massMultiplier: 1.0,
+
+    // NEW ORB SYSTEM:
+    orbMultiplier: 1.0,       // Base multiplier (size × stats × rarity)
+    statsFactor: 1.0,         // HP × speed × danger = 1.0 × 1.0 × 1.0
+    rarityBonus: 1.0,         // Common = baseline (70% spawn)
+
+    // DEPRECATED:
     xpMultiplier: 1,
+
     crackProfile: 'default',
     fragmentProfile: 'default',
     colors: {
@@ -665,14 +711,51 @@ export const ASTEROID_VARIANTS = {
       extraOrbs: [],
     },
   },
+  iron: {
+    key: 'iron',
+    displayName: 'Blindado',
+    allowedSizes: ['large', 'medium', 'small'],
+    hpMultiplier: 1.3,
+    speedMultiplier: 0.85,
+    massMultiplier: 1.2,
+
+    // NEW ORB SYSTEM:
+    orbMultiplier: 2.53,      // stats × rarity = 1.1 × 2.3
+    statsFactor: 1.1,         // HP × speed × danger = 1.3 × 0.85 × 1.0
+    rarityBonus: 2.3,         // 8% spawn rate
+
+    // DEPRECATED:
+    xpMultiplier: 1.4,
+
+    crackProfile: 'default',
+    fragmentProfile: 'default',
+    colors: {
+      fill: '#5A6F7F',
+      stroke: '#3A4A57',
+      cracks: 'rgba(180, 200, 220, 0.5)',
+      innerGlow: 'rgba(120, 140, 160, 0.25)',
+    },
+    drops: {
+      baseSplit: 1,
+      extraOrbs: [],
+    },
+  },
   denseCore: {
     key: 'denseCore',
     displayName: 'Núcleo Denso',
-    allowedSizes: ['medium'],
+    allowedSizes: ['large', 'medium'],
     hpMultiplier: 1.8,
     speedMultiplier: 0.65,
     massMultiplier: 1.4,
+
+    // NEW ORB SYSTEM:
+    orbMultiplier: 2.93,      // stats × rarity = 1.17 × 2.5
+    statsFactor: 1.17,        // HP × speed × danger = 1.8 × 0.65 × 1.0
+    rarityBonus: 2.5,         // 7% spawn rate
+
+    // DEPRECATED:
     xpMultiplier: 2,
+
     crackProfile: 'denseCore',
     fragmentProfile: 'denseCore',
     colors: {
@@ -682,24 +765,69 @@ export const ASTEROID_VARIANTS = {
       innerGlow: 'rgba(90, 220, 255, 0.35)',
     },
     drops: {
+      baseSplit: 2,
+      extraOrbs: [],
+    },
+  },
+  gold: {
+    key: 'gold',
+    displayName: 'Tesouro Dourado 💰',
+    allowedSizes: ['medium', 'small'],
+    hpMultiplier: 0.4,        // ULTRA FRÁGIL (vidro!)
+    speedMultiplier: 1.8,     // ULTRA RÁPIDO (foge!)
+    massMultiplier: 0.6,
+
+    // NEW ORB SYSTEM:
+    orbMultiplier: 4.90,      // stats × rarity = 0.72 × 6.8
+    statsFactor: 0.72,        // HP × speed × danger = 0.4 × 1.8 × 1.0
+    rarityBonus: 6.8,         // 0.4% spawn rate (ULTRA RARO!)
+
+    // DEPRECATED:
+    xpMultiplier: 4.0,
+
+    crackProfile: 'crystal',
+    fragmentProfile: 'crystal',
+    colors: {
+      fill: '#FFD700',
+      stroke: '#DAA520',
+      cracks: 'rgba(255, 250, 205, 0.95)',
+      glow: 'rgba(255, 223, 0, 0.8)',  // Glow intenso!
+    },
+    visual: {
+      pulse: {
+        speed: 3.0,           // Pulso RÁPIDO (atenção!)
+        amount: 0.6,          // Pulso FORTE
+        color: 'rgba(255, 240, 150, 1.0)',
+      },
+      glow: {
+        baseBlur: 20,         // Glow GRANDE
+        pulseBlur: 15,
+        baseAlpha: 0.6,       // MUITO visível
+        pulseAlpha: 0.4,
+      },
+    },
+    drops: {
       baseSplit: 1,
-      extraOrbs: [
-        {
-          count: 1,
-          valueMultiplier: 1,
-          tier: 3,
-        },
-      ],
+      extraOrbs: [],
+      dropPattern: 'explosion',  // Mecânica especial: orbs explodem radialmente!
     },
   },
   volatile: {
     key: 'volatile',
     displayName: 'Fragmento Volátil',
-    allowedSizes: ['medium', 'small'],
+    allowedSizes: ['large', 'medium', 'small'],
     hpMultiplier: 0.6,
     speedMultiplier: 1.4,
     massMultiplier: 0.7,
-    xpMultiplier: 1.2,
+
+    // NEW ORB SYSTEM:
+    orbMultiplier: 5.46,      // stats × rarity = 2.1 × 2.6
+    statsFactor: 2.1,         // HP × speed × danger = 0.6 × 1.4 × 2.5 (explosion!)
+    rarityBonus: 2.6,         // 6.5% spawn rate
+
+    // DEPRECATED:
+    xpMultiplier: 3.2,
+
     crackProfile: 'volatile',
     fragmentProfile: 'volatile',
     colors: {
@@ -755,24 +883,26 @@ export const ASTEROID_VARIANTS = {
       },
     },
     drops: {
-      baseSplit: 1,
-      extraOrbs: [
-        {
-          count: 1,
-          valueMultiplier: 0.2,
-          tier: 1,
-        },
-      ],
+      baseSplit: 3, // 3 blue orbs - DANGER = REWARD (26 XP at wave 1)
+      extraOrbs: [],
     },
   },
   parasite: {
     key: 'parasite',
     displayName: 'Parásita',
-    allowedSizes: ['medium', 'small'],
+    allowedSizes: ['large', 'medium', 'small'],
     hpMultiplier: 0.8,
     speedMultiplier: 1.2,
     massMultiplier: 0.9,
-    xpMultiplier: 1.5,
+
+    // NEW ORB SYSTEM:
+    orbMultiplier: 8.10,      // stats × rarity = 2.7 × 3.0
+    statsFactor: 2.7,         // HP × speed × danger = 0.8 × 1.2 × 2.8 (persegue + contato!)
+    rarityBonus: 3.0,         // 4.5% spawn rate
+
+    // DEPRECATED:
+    xpMultiplier: 3.5,
+
     crackProfile: 'parasite',
     fragmentProfile: 'parasite',
     colors: {
@@ -806,14 +936,8 @@ export const ASTEROID_VARIANTS = {
       minWave: 4,
     },
     drops: {
-      baseSplit: 1,
-      extraOrbs: [
-        {
-          count: 1,
-          valueMultiplier: 0.5,
-          tier: 2,
-        },
-      ],
+      baseSplit: 4, // 4 blue orbs - hardest enemy = biggest reward (28 XP at wave 1)
+      extraOrbs: [],
     },
   },
   crystal: {
@@ -821,9 +945,17 @@ export const ASTEROID_VARIANTS = {
     displayName: 'Cristal Energético',
     allowedSizes: ['large', 'medium', 'small'],
     hpMultiplier: 0.7,
-    speedMultiplier: 0.8,
+    speedMultiplier: 1.3,     // AUMENTADO de 0.8 para 1.3 (ágil!)
     massMultiplier: 0.95,
-    xpMultiplier: 2.2,
+
+    // NEW ORB SYSTEM:
+    orbMultiplier: 4.73,      // stats × rarity = 0.91 × 5.2
+    statsFactor: 0.91,        // HP × speed × danger = 0.7 × 1.3 × 1.0
+    rarityBonus: 5.2,         // 1.5% spawn rate (raro!)
+
+    // DEPRECATED:
+    xpMultiplier: 3.0,
+
     crackProfile: 'crystal',
     fragmentProfile: 'crystal',
     colors: {
@@ -846,12 +978,13 @@ export const ASTEROID_VARIANTS = {
       },
     },
     drops: {
-      baseSplit: 0,
+      baseSplit: 3, // 3 blue orbs base (24 XP at wave 1)
       extraOrbs: [
         {
-          count: 1,
-          valueMultiplier: 2.2,
-          className: 'crystal',
+          count: 1, // +1 orb per 3 waves (wave scaling)
+          valueMultiplier: 1.0,
+          tier: 1, // Always blue tier for clustering
+          waveScaling: true, // Flag for XPOrbSystem to handle
         },
       ],
     },
@@ -860,36 +993,41 @@ export const ASTEROID_VARIANTS = {
 
 export const ASTEROID_VARIANT_CHANCES = {
   large: {
-    baseChance: 0.3,
+    baseChance: 0.35,
     distribution: {
-      denseCore: 0.45,
-      volatile: 0.25,
-      parasite: 0.2,
-      crystal: 0.1,
+      iron: 0.27,       // 9.45% total
+      denseCore: 0.30,  // 10.5% total
+      volatile: 0.22,   // 7.7% total
+      parasite: 0.16,   // 5.6% total
+      gold: 0.00,       // Gold não spawna em large
+      crystal: 0.05,    // 1.75% total (raro!)
     },
   },
   medium: {
-    baseChance: 0.2,
+    baseChance: 0.25,
     distribution: {
-      denseCore: 0.3,
-      volatile: 0.35,
-      parasite: 0.25,
-      crystal: 0.1,
+      iron: 0.30,       // 7.5% total
+      denseCore: 0.20,  // 5% total
+      volatile: 0.25,   // 6.25% total
+      parasite: 0.15,   // 3.75% total
+      gold: 0.02,       // 0.5% total (ULTRA RARO! 💰)
+      crystal: 0.08,    // 2% total (raro)
     },
   },
   small: {
-    baseChance: 0.12,
+    baseChance: 0.15,
     distribution: {
-      denseCore: 0.1,
-      volatile: 0.45,
-      parasite: 0.35,
-      crystal: 0.1,
+      iron: 0.35,       // 5.25% total
+      volatile: 0.30,   // 4.5% total
+      parasite: 0.20,   // 3% total
+      gold: 0.02,       // 0.3% total (ULTRA RARO! 💰)
+      crystal: 0.13,    // 1.95% total (raro)
     },
   },
   waveBonus: {
     startWave: 4,
-    increment: 0.02,
-    maxBonus: 0.12,
+    increment: 0.025,
+    maxBonus: 0.15,
   },
 };
 
