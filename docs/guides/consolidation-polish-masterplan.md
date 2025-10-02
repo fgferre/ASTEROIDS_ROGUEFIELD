@@ -1,0 +1,2069 @@
+# 🎨 Plano Mestre de Consolidação & Polish
+
+**Data:** 2025-10-01
+**Objetivo:** Transformar o jogo atual em uma experiência polida e memorável
+**Duração Estimada:** 2-4 semanas (dependendo do ritmo)
+**Status:** PRONTO PARA EXECUÇÃO
+
+---
+
+## 🎯 Visão Geral
+
+**Estado Atual:**
+- ✅ Arquitetura sólida (componentes ativos)
+- ✅ Gameplay funcional (asteroids, variants, waves)
+- ✅ Sistemas de progressão (XP, levels, upgrades)
+
+**Meta:**
+- 🎨 **Game feel incrível** (juice, polish, feedback)
+- ⚖️ **Balance perfeito** (dificuldade, progressão)
+- 🎵 **Áudio imersivo** (SFX, música, spatial audio)
+- ✨ **Visual atraente** (efeitos, animações, UI)
+- 🎮 **Experiência completa** (tutoriais, feedback, flow)
+
+---
+
+## 📋 Roadmap de 4 Semanas
+
+### **Semana 1: Balance & Feel** 🎮
+Foco: Jogabilidade se sentir perfeita
+
+### **Semana 2: Visual Polish** ✨
+Foco: Efeitos visuais e feedback
+
+### **Semana 3: Audio & Juice** 🎵
+Foco: Som e micro-animações
+
+### **Semana 4: Final Touch** 🏆
+Foco: Tutoriais, QA e ajustes finais
+
+---
+
+# 📅 SEMANA 1: Balance & Feel
+
+## Objetivo
+**Fazer o jogo se sentir BOM de jogar**
+
+---
+
+## Dia 1-2: Análise e Balanceamento de Gameplay
+
+### 🎯 Tarefa 1.1: Playtesting Estruturado
+
+**O que fazer:**
+1. Jogar 10 partidas completas (até morte)
+2. Anotar para cada partida:
+   - Wave alcançada
+   - Causa da morte (asteroid, parasite, volatile, etc.)
+   - Nível de personagem alcançado
+   - Sensação de dificuldade (muito fácil, bom, muito difícil)
+   - Upgrades escolhidos
+   - Momentos frustrantes
+   - Momentos divertidos
+
+**Criar planilha:**
+```
+Partida | Wave Max | Nível | Causa Morte | Dificuldade | Notas
+--------|----------|-------|-------------|-------------|------
+1       | 5        | 3     | Parasite    | Média       | Muito parasite de uma vez
+2       | 8        | 5     | Volatile    | Alta        | Explosão inesperada
+...
+```
+
+**Tempo:** 2-3 horas
+
+---
+
+### 🎯 Tarefa 1.2: Balance de Asteroids
+
+**Análise atual:**
+```javascript
+// GameConstants.js
+ASTEROID_BASE_HEALTH = {
+  large: 90,
+  medium: 50,
+  small: 30,
+}
+
+ASTEROID_HEALTH_SCALING = {
+  perWave: 0.12,      // +12% HP por wave
+  maxMultiplier: 2.2   // Cap em 2.2x
+}
+```
+
+**Perguntas a responder:**
+- Large demora muito para destruir?
+- Small morre rápido demais?
+- Progressão de HP está boa? (wave 1 vs wave 10)
+
+**Ajustes possíveis:**
+```javascript
+// Opção A: Reduzir HP de large
+ASTEROID_BASE_HEALTH = {
+  large: 75,    // -15 HP
+  medium: 45,   // -5 HP
+  small: 25,    // -5 HP
+}
+
+// Opção B: Ajustar scaling
+ASTEROID_HEALTH_SCALING = {
+  perWave: 0.10,      // Mais gradual
+  maxMultiplier: 2.5  // Teto mais alto
+}
+```
+
+**Como testar:**
+1. Ajustar valores
+2. Jogar 3 partidas
+3. Sentir diferença
+4. Iterar
+
+**Tempo:** 2 horas
+
+---
+
+### 🎯 Tarefa 1.3: Balance de Variants
+
+**Variants atuais:**
+- Common (padrão)
+- Iron (mais HP, mais resistente)
+- Gold (mais XP)
+- Crystal (???)
+- Volatile (explode)
+- Parasite (persegue player)
+- DenseCore (muito HP)
+
+**Análise:**
+1. **Parasite está balanceado?**
+   - Velocidade de tracking
+   - Dano de contato
+   - Frequência de spawn
+
+2. **Volatile está justo?**
+   - Timer de explosão (muito rápido/lento?)
+   - Raio de explosão
+   - Dano
+
+3. **Recompensas fazem sentido?**
+   - Gold dá XP suficiente?
+   - Vale a pena matar DenseCore?
+
+**Ajustes a testar:**
+```javascript
+// Se parasite está muito difícil
+behavior: {
+  acceleration: 80,    // Era 100
+  maxSpeed: 120,       // Era 150
+  contactDamage: 15    // Era 20
+}
+
+// Se volatile está muito previsível
+behavior: {
+  fuseTime: 8,         // Era 10 (mais urgente)
+  explosion: {
+    radius: 120,       // Era 100 (mais perigoso)
+    damage: 35         // Era 30
+  }
+}
+```
+
+**Tempo:** 3 horas
+
+---
+
+## Dia 3-4: Feel & Responsiveness
+
+### 🎯 Tarefa 1.4: Ship Controls Feel
+
+**O que testar:**
+1. **Aceleração** - Nave responde rápido o suficiente?
+2. **Rotação** - Turning radius está bom?
+3. **Inércia** - Física se sente natural ou esponjosa?
+
+**Valores atuais:**
+```javascript
+// GameConstants.js
+SHIP_ACCELERATION = 280;
+SHIP_MAX_SPEED = 220;
+SHIP_LINEAR_DAMPING = 3.1;
+SHIP_ROTATION_SPEED = 8;
+SHIP_ANGULAR_DAMPING = 6.2;
+```
+
+**Experimentos:**
+```javascript
+// Opção A: Mais responsivo (arcade)
+SHIP_ACCELERATION = 350;
+SHIP_ROTATION_SPEED = 10;
+SHIP_LINEAR_DAMPING = 4.0;
+
+// Opção B: Mais floaty (space sim)
+SHIP_ACCELERATION = 200;
+SHIP_ROTATION_SPEED = 6;
+SHIP_LINEAR_DAMPING = 2.0;
+
+// Opção C: Balanceado
+SHIP_ACCELERATION = 300;
+SHIP_ROTATION_SPEED = 9;
+SHIP_LINEAR_DAMPING = 3.5;
+```
+
+**Como testar:**
+1. Implementar toggle para testar diferentes presets
+2. Jogar com cada um por 10 minutos
+3. Anotar qual se sente melhor
+4. Refinar valores
+
+**Tempo:** 2 horas
+
+---
+
+### 🎯 Tarefa 1.5: Weapon Feel
+
+**Análise:**
+1. **Fire rate** - Pode atirar rápido o suficiente?
+2. **Bullet speed** - Projéteis muito lentos/rápidos?
+3. **Damage** - Um tiro mata small? Quantos tiros para large?
+4. **Recoil/kickback** - Nave tem feedback ao atirar?
+
+**Melhorias possíveis:**
+
+#### A) Bullet Tracer Effect
+```javascript
+// src/modules/CombatSystem.js
+createBullet(x, y, angle, speed) {
+  const bullet = {
+    // ... existing
+    trail: [] // NEW: histórico de posições
+  };
+
+  return bullet;
+}
+
+renderBullet(ctx, bullet) {
+  // Desenhar trail
+  if (bullet.trail.length > 0) {
+    ctx.globalAlpha = 0.5;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(bullet.trail[0].x, bullet.trail[0].y);
+    for (let i = 1; i < bullet.trail.length; i++) {
+      ctx.lineTo(bullet.trail[i].x, bullet.trail[i].y);
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1.0;
+  }
+
+  // Bullet normal
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(bullet.x - 2, bullet.y - 2, 4, 4);
+}
+```
+
+#### B) Screen Shake ao Atirar
+```javascript
+// Quando jogador atira
+fireWeapon() {
+  // ... criar bullet
+
+  // NEW: Mini shake
+  if (this.worldSystem) {
+    this.worldSystem.addScreenShake(0.5, 0.05); // intensidade 0.5, duração 0.05s
+  }
+}
+```
+
+#### C) Muzzle Flash
+```javascript
+// EffectsSystem.js - novo método
+createMuzzleFlash(x, y, angle) {
+  const particles = [];
+  for (let i = 0; i < 3; i++) {
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * 200 * (0.8 + Math.random() * 0.4),
+      vy: Math.sin(angle) * 200 * (0.8 + Math.random() * 0.4),
+      life: 0.1,
+      maxLife: 0.1,
+      size: 3,
+      color: '#ffff00'
+    });
+  }
+  this.particles.push(...particles);
+}
+```
+
+**Tempo:** 3 horas
+
+---
+
+## Dia 5: Wave Progression & Difficulty Curve
+
+### 🎯 Tarefa 1.6: Analisar Curva de Dificuldade
+
+**Criar gráfico:**
+```
+Wave | Total Asteroids | HP Médio | Spawn Rate | Difficulty Score
+-----|-----------------|----------|------------|------------------
+1    | 6               | 30       | Lento      | 180
+2    | 7               | 34       | Lento      | 238
+3    | 8               | 38       | Médio      | 304
+5    | 12              | 48       | Médio      | 576
+10   | 20              | 66       | Rápido     | 1320
+```
+
+**Perguntas:**
+1. Wave 1-3 são muito fáceis? (tutorial natural)
+2. Há um "spike" de dificuldade em alguma wave?
+3. Wave 10+ está impossível ou entediante?
+
+**Ajustes:**
+```javascript
+// GameConstants.js
+
+// Atual
+ASTEROIDS_PER_WAVE_BASE = 4;
+ASTEROIDS_PER_WAVE_MULTIPLIER = 1.15;
+WAVE_DURATION = 60; // segundos
+
+// Se muito fácil no início
+ASTEROIDS_PER_WAVE_BASE = 5; // +1 asteroid
+
+// Se muito difícil depois
+ASTEROIDS_PER_WAVE_MULTIPLIER = 1.12; // Crescimento mais suave
+
+// Se waves muito longas
+WAVE_DURATION = 45; // Mais rápido
+```
+
+**Tempo:** 2 horas
+
+---
+
+### 🎯 Tarefa 1.7: Variant Frequency Balance
+
+**Análise atual:**
+```javascript
+// GameConstants.js - ASTEROID_VARIANT_CHANCES
+baseChance: 0.15,    // 15% de chance de variant
+distribution: {
+  iron: 3,           // Peso 3
+  gold: 2,           // Peso 2
+  crystal: 1,        // Peso 1
+  volatile: 1,
+  parasite: 1
+}
+```
+
+**Perguntas:**
+1. Parasite aparece com frequência correta?
+2. Muito volatile no início frustra?
+3. Gold é raro o suficiente para ser especial?
+
+**Teste com planilha:**
+```
+Wave | Comum | Iron | Gold | Crystal | Volatile | Parasite | Total Variants
+-----|-------|------|------|---------|----------|----------|---------------
+1-3  | 85%   | 10%  | 3%   | 1%      | 1%       | 0%       | 15%
+4-6  | 75%   | 12%  | 5%   | 3%      | 3%       | 2%       | 25%
+7-10 | 65%   | 10%  | 8%   | 5%      | 7%       | 5%       | 35%
+```
+
+**Objetivo:**
+- Early game: Seguro, poucas surpresas
+- Mid game: Introduzir variants gradualmente
+- Late game: Caos controlado
+
+**Tempo:** 2 horas
+
+---
+
+## 📊 Semana 1 - Checklist de Conclusão
+
+- [ ] 10 partidas de playtest completadas
+- [ ] Planilha de análise preenchida
+- [ ] HP de asteroids balanceado
+- [ ] Variants ajustados (parasite, volatile)
+- [ ] Ship controls refinados
+- [ ] Weapon feel melhorado (tracer, shake, flash)
+- [ ] Curva de dificuldade analisada
+- [ ] Variant frequency balanceada
+- [ ] Documento de mudanças criado
+
+**Entregável:** Jogo balanceado e se sentindo bom de jogar
+
+---
+
+# 📅 SEMANA 2: Visual Polish
+
+## Objetivo
+**Fazer o jogo parecer INCRÍVEL**
+
+---
+
+## Dia 6-7: Efeitos de Partículas
+
+### 🎯 Tarefa 2.1: Enhanced Explosion Effects
+
+**Estado atual:** Explosões funcionam mas podem ser mais impactantes
+
+**Melhorias:**
+
+#### A) Explosão em Camadas
+```javascript
+// EffectsSystem.js
+createEnhancedExplosion(x, y, size, variant) {
+  // Layer 1: Flash brilhante
+  this.createFlash(x, y, size * 2, variant.color);
+
+  // Layer 2: Shockwave ring
+  this.createShockwaveRing(x, y, size);
+
+  // Layer 3: Debris chunks
+  this.createDebris(x, y, size, variant);
+
+  // Layer 4: Spark shower
+  this.createSparks(x, y, size * 20);
+
+  // Layer 5: Smoke trail
+  this.createSmoke(x, y, size / 2);
+}
+
+createFlash(x, y, radius, color) {
+  // Circle que expande e fade
+  this.flashes.push({
+    x, y,
+    radius: 0,
+    maxRadius: radius,
+    life: 0.2,
+    maxLife: 0.2,
+    color: color || '#ffffff'
+  });
+}
+
+createShockwaveRing(x, y, baseRadius) {
+  // Ring que expande
+  this.rings.push({
+    x, y,
+    radius: baseRadius,
+    maxRadius: baseRadius * 3,
+    thickness: 3,
+    life: 0.3,
+    maxLife: 0.3
+  });
+}
+
+createDebris(x, y, count, variant) {
+  for (let i = 0; i < count; i++) {
+    const angle = (Math.PI * 2 * i) / count;
+    const speed = 100 + Math.random() * 100;
+
+    this.particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      rotation: Math.random() * Math.PI * 2,
+      rotationSpeed: (Math.random() - 0.5) * 10,
+      size: 3 + Math.random() * 5,
+      life: 0.5 + Math.random() * 0.5,
+      maxLife: 1.0,
+      color: variant.debrisColor || '#888888',
+      shape: 'rect' // ou 'triangle'
+    });
+  }
+}
+```
+
+**Tempo:** 4 horas
+
+---
+
+### 🎯 Tarefa 2.2: Variant Visual Identity
+
+**Cada variant deve ser visualmente DISTINTO**
+
+#### Parasite (Vermelho/Pulsante)
+```javascript
+// Asteroid.js - draw()
+if (this.variant === 'parasite') {
+  // Glow pulsante
+  const pulse = Math.sin(Date.now() * 0.005) * 0.5 + 0.5;
+  const glowRadius = this.radius * (1.2 + pulse * 0.3);
+
+  ctx.shadowBlur = 15;
+  ctx.shadowColor = 'rgba(255, 0, 0, ' + (0.5 + pulse * 0.5) + ')';
+
+  // Veias vermelhas
+  ctx.strokeStyle = '#ff0000';
+  ctx.lineWidth = 2;
+  // ... desenhar veias conectando vertices
+}
+```
+
+#### Volatile (Laranja/Com Trail)
+```javascript
+if (this.variant === 'volatile') {
+  const fuseProgress = this.getVolatileFuseProgress();
+
+  // Intensidade aumenta conforme fuse diminui
+  ctx.shadowBlur = 10 + fuseProgress * 20;
+  ctx.shadowColor = 'rgba(255, 128, 0, ' + (0.3 + fuseProgress * 0.7) + ')';
+
+  // Core pulsante
+  if (fuseProgress > 0.7) {
+    // Pulsando rápido quando prestes a explodir
+    const rapidPulse = Math.sin(Date.now() * 0.02) * 0.5 + 0.5;
+    ctx.fillStyle = `rgba(255, 100, 0, ${rapidPulse})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, this.radius * 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+```
+
+#### Gold (Brilho Dourado)
+```javascript
+if (this.variant === 'gold') {
+  // Shimmer effect
+  const shimmer = Math.sin(Date.now() * 0.003 + this.x + this.y) * 0.5 + 0.5;
+
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = `rgba(255, 215, 0, ${0.5 + shimmer * 0.5})`;
+
+  // Gradient fill
+  const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius);
+  gradient.addColorStop(0, '#ffed4e');
+  gradient.addColorStop(0.5, '#ffaa00');
+  gradient.addColorStop(1, '#cc8800');
+  ctx.fillStyle = gradient;
+}
+```
+
+#### Crystal (Azul/Cristalino)
+```javascript
+if (this.variant === 'crystal') {
+  // Faceted look
+  ctx.shadowBlur = 12;
+  ctx.shadowColor = 'rgba(0, 200, 255, 0.6)';
+
+  // Desenhar facets (triângulos dentro)
+  ctx.strokeStyle = '#00ffff';
+  ctx.lineWidth = 1;
+  // ... desenhar linhas internas criando padrão cristalino
+}
+```
+
+**Tempo:** 5 horas (1 hora por variant)
+
+---
+
+### 🎯 Tarefa 2.3: Trail Effects
+
+**Ships deixam trail:**
+```javascript
+// PlayerSystem.js
+update(deltaTime) {
+  // ... movimento
+
+  // NEW: Trail particles
+  if (this.isThrusting && Math.random() < 0.3) {
+    this.effectsSystem.createThrustParticle(
+      this.position.x - Math.cos(this.rotation) * 10,
+      this.position.y - Math.sin(this.rotation) * 10,
+      this.rotation
+    );
+  }
+}
+
+// EffectsSystem.js
+createThrustParticle(x, y, shipRotation) {
+  this.particles.push({
+    x, y,
+    vx: -Math.cos(shipRotation) * 50 + (Math.random() - 0.5) * 20,
+    vy: -Math.sin(shipRotation) * 50 + (Math.random() - 0.5) * 20,
+    size: 2 + Math.random() * 2,
+    life: 0.3,
+    maxLife: 0.3,
+    color: '#ff6600',
+    fadeOut: true
+  });
+}
+```
+
+**Tempo:** 2 horas
+
+---
+
+## Dia 8-9: UI Polish
+
+### 🎯 Tarefa 2.4: Animated UI Elements
+
+**HUD com micro-animations:**
+
+#### A) Health Bar Animations
+```javascript
+// UISystem.js
+renderHealthBar(ctx, current, max) {
+  const barWidth = 200;
+  const barHeight = 20;
+
+  // Smooth interpolation
+  if (!this.healthBarSmooth) {
+    this.healthBarSmooth = current;
+  }
+
+  // Lerp atual para target
+  this.healthBarSmooth += (current - this.healthBarSmooth) * 0.1;
+
+  // Background
+  ctx.fillStyle = '#330000';
+  ctx.fillRect(10, 10, barWidth, barHeight);
+
+  // Damage flash (red overlay quando toma dano)
+  if (this.lastHealth > current) {
+    this.damageFlash = 1.0;
+    this.lastHealth = current;
+  }
+
+  if (this.damageFlash > 0) {
+    ctx.fillStyle = `rgba(255, 0, 0, ${this.damageFlash * 0.5})`;
+    ctx.fillRect(10, 10, barWidth, barHeight);
+    this.damageFlash -= 0.05;
+  }
+
+  // Health fill (smooth)
+  const fillWidth = (this.healthBarSmooth / max) * barWidth;
+  const gradient = ctx.createLinearGradient(10, 10, 10 + fillWidth, 10);
+  gradient.addColorStop(0, '#ff0000');
+  gradient.addColorStop(1, '#ff6666');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(10, 10, fillWidth, barHeight);
+
+  // Border
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(10, 10, barWidth, barHeight);
+}
+```
+
+#### B) XP Bar com Shine Effect
+```javascript
+renderXPBar(ctx, current, required) {
+  const barWidth = 200;
+  const barHeight = 10;
+  const y = 40;
+
+  // ... background
+
+  // XP fill
+  const fillWidth = (current / required) * barWidth;
+  ctx.fillStyle = '#00ff00';
+  ctx.fillRect(10, y, fillWidth, barHeight);
+
+  // NEW: Shine effect que atravessa a barra
+  if (!this.shinePos) this.shinePos = 0;
+  this.shinePos += 0.01;
+  if (this.shinePos > 1) this.shinePos = 0;
+
+  const shineX = 10 + fillWidth * this.shinePos;
+  const gradient = ctx.createLinearGradient(shineX - 20, 0, shineX + 20, 0);
+  gradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
+  gradient.addColorStop(0.5, 'rgba(255, 255, 255, 0.8)');
+  gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(shineX - 20, y, 40, barHeight);
+}
+```
+
+#### C) Wave Counter com Pulse
+```javascript
+renderWaveCounter(ctx, waveNumber) {
+  const x = 400;
+  const y = 30;
+
+  // Pulse quando wave muda
+  if (this.lastWave !== waveNumber) {
+    this.wavePulse = 1.5;
+    this.lastWave = waveNumber;
+  }
+
+  if (this.wavePulse > 1.0) {
+    this.wavePulse -= 0.02;
+  }
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(this.wavePulse, this.wavePulse);
+
+  ctx.font = 'bold 24px monospace';
+  ctx.textAlign = 'center';
+
+  // Shadow
+  ctx.shadowBlur = 5;
+  ctx.shadowColor = '#000000';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(`WAVE ${waveNumber}`, 0, 0);
+
+  ctx.restore();
+}
+```
+
+**Tempo:** 4 horas
+
+---
+
+### 🎯 Tarefa 2.5: Damage Numbers
+
+**Floating damage numbers quando acerta asteroid:**
+
+```javascript
+// CombatSystem.js
+applyDamageToAsteroid(asteroid, damage) {
+  // ... damage logic
+
+  // NEW: Damage number
+  this.effectsSystem.createDamageNumber(
+    asteroid.x,
+    asteroid.y,
+    damage,
+    asteroid.destroyed ? 'kill' : 'hit'
+  );
+}
+
+// EffectsSystem.js
+createDamageNumber(x, y, damage, type) {
+  this.damageNumbers.push({
+    x,
+    y: y - 10,
+    vy: -30, // Float up
+    damage: Math.round(damage),
+    life: 1.0,
+    maxLife: 1.0,
+    type, // 'hit' ou 'kill'
+    scale: 1.0
+  });
+}
+
+renderDamageNumbers(ctx) {
+  this.damageNumbers.forEach(num => {
+    const progress = 1 - (num.life / num.maxLife);
+
+    ctx.save();
+    ctx.globalAlpha = num.life / num.maxLife;
+
+    // Scale down conforme sobe
+    ctx.translate(num.x, num.y);
+    ctx.scale(num.scale, num.scale);
+
+    ctx.font = 'bold 16px monospace';
+    ctx.textAlign = 'center';
+
+    // Cor baseada em tipo
+    if (num.type === 'kill') {
+      ctx.fillStyle = '#ff0000';
+      ctx.font = 'bold 20px monospace';
+    } else {
+      ctx.fillStyle = '#ffffff';
+    }
+
+    // Shadow para legibilidade
+    ctx.shadowBlur = 3;
+    ctx.shadowColor = '#000000';
+
+    ctx.fillText(num.damage.toString(), 0, 0);
+
+    ctx.restore();
+  });
+
+  // Update
+  this.damageNumbers = this.damageNumbers.filter(num => {
+    num.y += num.vy * 0.016; // deltaTime
+    num.life -= 0.016;
+    num.scale += 0.01;
+    return num.life > 0;
+  });
+}
+```
+
+**Tempo:** 2 horas
+
+---
+
+## Dia 10: Screen Effects
+
+### 🎯 Tarefa 2.6: Chromatic Aberration (quando toma dano)
+
+```javascript
+// RenderingSystem.js (ou criar PostProcessing.js)
+applyChromaticAberration(ctx, intensity) {
+  if (intensity <= 0) return;
+
+  const canvas = ctx.canvas;
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+
+  const offset = Math.floor(intensity * 5);
+
+  // Shift RGB channels
+  // (implementação simplificada - versão real usa shaders)
+
+  ctx.putImageData(imageData, 0, 0);
+}
+
+render() {
+  // ... render normal
+
+  // Se player tomou dano recentemente
+  if (this.chromaticIntensity > 0) {
+    this.applyChromaticAberration(ctx, this.chromaticIntensity);
+    this.chromaticIntensity -= 0.02;
+  }
+}
+```
+
+**Tempo:** 2 horas
+
+---
+
+### 🎯 Tarefa 2.7: Vignette Effect
+
+```javascript
+// RenderingSystem.js
+renderVignette(ctx) {
+  const centerX = GAME_WIDTH / 2;
+  const centerY = GAME_HEIGHT / 2;
+  const radius = Math.max(GAME_WIDTH, GAME_HEIGHT) * 0.7;
+
+  const gradient = ctx.createRadialGradient(
+    centerX, centerY, radius * 0.3,
+    centerX, centerY, radius
+  );
+
+  gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  gradient.addColorStop(0.7, 'rgba(0, 0, 0, 0)');
+  gradient.addColorStop(1, 'rgba(0, 0, 0, 0.6)');
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+}
+```
+
+**Tempo:** 1 hora
+
+---
+
+## 📊 Semana 2 - Checklist de Conclusão
+
+- [ ] Explosões em camadas implementadas
+- [ ] Cada variant visualmente distinto
+- [ ] Ship thrust trail funcionando
+- [ ] Health bar animada (smooth + flash)
+- [ ] XP bar com shine effect
+- [ ] Wave counter com pulse
+- [ ] Damage numbers flutuantes
+- [ ] Chromatic aberration ao tomar dano
+- [ ] Vignette sutil implementado
+- [ ] Screenshot comparativo (antes/depois)
+
+**Entregável:** Jogo visualmente polido e atraente
+
+---
+
+# 📅 SEMANA 3: Audio & Juice
+
+## Objetivo
+**Fazer o jogo SOAR incrível e se sentir responsivo**
+
+---
+
+## Dia 11-12: Sound Effects
+
+### 🎯 Tarefa 3.1: SFX Audit & Enhancement
+
+**Sons atuais (verificar AudioSystem.js):**
+- Tiro
+- Explosão
+- Coleta de XP
+- Level up
+- Hit/damage
+
+**Sons faltando:**
+- Engine thrust loop
+- Asteroid cracking (quando toma dano mas não morre)
+- Variant-specific sounds:
+  - Parasite growl
+  - Volatile ticking/beeping
+  - Crystal chime
+- Wave complete fanfare
+- UI hover/click
+- Shield hit
+- Power-up pickup
+
+**Como adicionar:**
+```javascript
+// AudioSystem.js
+loadSounds() {
+  this.sounds = {
+    // Existentes
+    shoot: 'assets/audio/shoot.mp3',
+    explosion: 'assets/audio/explosion.mp3',
+
+    // NOVOS
+    engineThrust: 'assets/audio/engine_loop.mp3',
+    asteroidCrack: 'assets/audio/crack.mp3',
+    parasiteGrowl: 'assets/audio/parasite.mp3',
+    volatileBeep: 'assets/audio/beep.mp3',
+    crystalChime: 'assets/audio/crystal.mp3',
+    waveComplete: 'assets/audio/fanfare.mp3',
+    uiClick: 'assets/audio/click.mp3',
+    shieldHit: 'assets/audio/shield.mp3'
+  };
+
+  // Pre-load
+  Object.entries(this.sounds).forEach(([key, path]) => {
+    const audio = new Audio(path);
+    audio.preload = 'auto';
+    this.loadedSounds.set(key, audio);
+  });
+}
+
+playSound(soundKey, options = {}) {
+  const audio = this.loadedSounds.get(soundKey);
+  if (!audio) return;
+
+  // Clone para permitir overlap
+  const clone = audio.cloneNode();
+  clone.volume = options.volume || 1.0;
+  clone.playbackRate = options.pitch || 1.0;
+
+  clone.play().catch(err => {
+    console.warn('[AudioSystem] Playback failed:', err);
+  });
+}
+```
+
+**Onde adicionar:**
+```javascript
+// PlayerSystem.js - thrust sound
+update() {
+  if (this.isThrusting) {
+    if (!this.thrustSoundPlaying) {
+      audioSystem.playLoopingSound('engineThrust', { volume: 0.3 });
+      this.thrustSoundPlaying = true;
+    }
+  } else {
+    audioSystem.stopLoopingSound('engineThrust');
+    this.thrustSoundPlaying = false;
+  }
+}
+
+// Asteroid.js - crack sound
+takeDamage(amount) {
+  this.health -= amount;
+
+  if (this.health > 0) {
+    // Não morreu, só rachou
+    audioSystem.playSound('asteroidCrack', {
+      volume: 0.5,
+      pitch: 1.0 + (Math.random() - 0.5) * 0.2 // Variation
+    });
+  }
+
+  return this.health <= 0;
+}
+```
+
+**Tempo:** 4 horas (incluindo buscar/gerar sons)
+
+---
+
+### 🎯 Tarefa 3.2: Spatial Audio
+
+**Som 3D (volume baseado em distância):**
+
+```javascript
+// AudioSystem.js
+playSoundAtPosition(soundKey, x, y, listenerX, listenerY, options = {}) {
+  const distance = Math.hypot(x - listenerX, y - listenerY);
+  const maxDistance = options.maxDistance || 400;
+
+  // Attenuation (mais longe = mais quiet)
+  const volume = Math.max(0, 1 - (distance / maxDistance));
+
+  if (volume > 0.01) {
+    this.playSound(soundKey, {
+      ...options,
+      volume: (options.volume || 1.0) * volume
+    });
+  }
+}
+
+// Uso:
+// Quando asteroid explode
+destroyAsteroid(asteroid) {
+  const playerPos = this.playerSystem.position;
+
+  audioSystem.playSoundAtPosition(
+    'explosion',
+    asteroid.x,
+    asteroid.y,
+    playerPos.x,
+    playerPos.y,
+    { volume: 0.8, maxDistance: 500 }
+  );
+}
+```
+
+**Tempo:** 2 horas
+
+---
+
+### 🎯 Tarefa 3.3: Dynamic Music
+
+**Música que se adapta ao gameplay:**
+
+```javascript
+// AudioSystem.js
+setupDynamicMusic() {
+  this.musicLayers = {
+    ambient: new Audio('assets/music/ambient_layer.mp3'),
+    rhythm: new Audio('assets/music/rhythm_layer.mp3'),
+    intensity: new Audio('assets/music/intensity_layer.mp3')
+  };
+
+  // Loop todas
+  Object.values(this.musicLayers).forEach(layer => {
+    layer.loop = true;
+    layer.volume = 0;
+  });
+
+  // Start ambient
+  this.musicLayers.ambient.play();
+  this.musicLayers.ambient.volume = 0.5;
+}
+
+updateMusicIntensity(waveNumber, enemyCount) {
+  // Fade layers based on intensity
+  const intensity = Math.min(1, (waveNumber - 1) / 10);
+
+  // Ambient sempre presente
+  this.musicLayers.ambient.volume = 0.5;
+
+  // Rhythm em wave 3+
+  if (waveNumber >= 3) {
+    this.musicLayers.rhythm.volume = 0.3 + intensity * 0.2;
+    if (this.musicLayers.rhythm.paused) {
+      this.musicLayers.rhythm.play();
+    }
+  }
+
+  // Intensity em wave 5+ ou muitos inimigos
+  if (waveNumber >= 5 || enemyCount > 15) {
+    this.musicLayers.intensity.volume = intensity * 0.4;
+    if (this.musicLayers.intensity.paused) {
+      this.musicLayers.intensity.play();
+    }
+  }
+}
+```
+
+**Tempo:** 3 horas (incluindo música)
+
+---
+
+## Dia 13-14: Micro-Animations & Juice
+
+### 🎯 Tarefa 3.4: Easing System
+
+**Criar biblioteca de easing:**
+
+```javascript
+// src/core/Easing.js
+export class Easing {
+  static linear(t) { return t; }
+
+  static easeOutQuad(t) {
+    return 1 - (1 - t) * (1 - t);
+  }
+
+  static easeOutCubic(t) {
+    return 1 - Math.pow(1 - t, 3);
+  }
+
+  static easeOutBounce(t) {
+    if (t < 1 / 2.75) {
+      return 7.5625 * t * t;
+    } else if (t < 2 / 2.75) {
+      return 7.5625 * (t -= 1.5 / 2.75) * t + 0.75;
+    } else if (t < 2.5 / 2.75) {
+      return 7.5625 * (t -= 2.25 / 2.75) * t + 0.9375;
+    } else {
+      return 7.5625 * (t -= 2.625 / 2.75) * t + 0.984375;
+    }
+  }
+
+  static easeOutElastic(t) {
+    const c4 = (2 * Math.PI) / 3;
+    return t === 0 ? 0 : t === 1 ? 1 :
+      Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
+  }
+}
+```
+
+**Tempo:** 2 horas
+
+---
+
+### 🎯 Tarefa 3.5: XP Orb Attraction Animation
+
+**Orbs com easing suave:**
+
+```javascript
+// XPOrbSystem.js
+updateOrb(orb, deltaTime, playerPos) {
+  const dx = playerPos.x - orb.x;
+  const dy = playerPos.y - orb.y;
+  const distance = Math.hypot(dx, dy);
+
+  if (distance < this.magnetRange) {
+    // Acceleration com easing
+    const pullStrength = Easing.easeOutCubic(1 - (distance / this.magnetRange));
+
+    orb.vx += (dx / distance) * this.magnetForce * pullStrength * deltaTime;
+    orb.vy += (dy / distance) * this.magnetForce * pullStrength * deltaTime;
+
+    // Visual feedback: scale up quando perto
+    if (distance < 50) {
+      orb.scale = 1 + Easing.easeOutBounce((50 - distance) / 50) * 0.5;
+    }
+  }
+
+  orb.x += orb.vx * deltaTime;
+  orb.y += orb.vy * deltaTime;
+
+  // Bobbing animation
+  orb.bobPhase += deltaTime * 3;
+  orb.renderY = orb.y + Math.sin(orb.bobPhase) * 3;
+}
+```
+
+**Tempo:** 2 horas
+
+---
+
+### 🎯 Tarefa 3.6: Asteroid Spawn Animation
+
+**Asteroids aparecem com animation em vez de pop:**
+
+```javascript
+// EnemySystem.js
+spawnAsteroid() {
+  const asteroid = this.acquireAsteroid(config);
+
+  // NEW: Spawn animation
+  asteroid.spawnAnimation = {
+    progress: 0,
+    duration: 0.5 // 0.5 seconds
+  };
+
+  this.asteroids.push(asteroid);
+  return asteroid;
+}
+
+// Asteroid.js
+update(deltaTime) {
+  // ... existing
+
+  // Spawn animation
+  if (this.spawnAnimation) {
+    this.spawnAnimation.progress += deltaTime / this.spawnAnimation.duration;
+
+    if (this.spawnAnimation.progress >= 1) {
+      this.spawnAnimation = null;
+    }
+  }
+}
+
+draw(ctx) {
+  ctx.save();
+  ctx.translate(this.x, this.y);
+
+  // Apply spawn animation scale
+  if (this.spawnAnimation) {
+    const scale = Easing.easeOutElastic(this.spawnAnimation.progress);
+    ctx.scale(scale, scale);
+
+    // Rotation durante spawn
+    const spinProgress = Easing.easeOutCubic(this.spawnAnimation.progress);
+    ctx.rotate(this.rotation + (1 - spinProgress) * Math.PI * 4);
+  } else {
+    ctx.rotate(this.rotation);
+  }
+
+  // ... resto do drawing
+
+  ctx.restore();
+}
+```
+
+**Tempo:** 2 horas
+
+---
+
+### 🎯 Tarefa 3.7: Hit Freeze (Time Slow ao acertar)
+
+**Tiny freeze frame quando acerta:**
+
+```javascript
+// CombatSystem.js (ou WorldSystem.js)
+applyDamageToAsteroid(asteroid, damage) {
+  const killed = asteroid.takeDamage(damage);
+
+  if (killed) {
+    // Freeze maior ao matar
+    this.worldSystem.addHitFreeze(0.05); // 50ms
+  } else {
+    // Freeze pequeno ao hit
+    this.worldSystem.addHitFreeze(0.01); // 10ms
+  }
+
+  return killed;
+}
+
+// WorldSystem.js
+addHitFreeze(duration) {
+  this.hitFreezeTimer = duration;
+}
+
+update(deltaTime) {
+  // Hit freeze
+  if (this.hitFreezeTimer > 0) {
+    this.hitFreezeTimer -= deltaTime;
+    return; // Skip update during freeze
+  }
+
+  // Normal update
+  this.playerSystem.update(deltaTime);
+  this.enemySystem.update(deltaTime);
+  // ...
+}
+```
+
+**Tempo:** 1 hora
+
+---
+
+## Dia 15: Polish Details
+
+### 🎯 Tarefa 3.8: Combo System (visual)
+
+**Contador de combo quando mata vários rapidamente:**
+
+```javascript
+// CombatSystem.js
+constructor() {
+  this.comboCount = 0;
+  this.comboTimer = 0;
+  this.comboDecayTime = 2.0; // Reset após 2s sem kill
+}
+
+onEnemyKilled() {
+  this.comboCount++;
+  this.comboTimer = this.comboDecayTime;
+
+  // Visual feedback
+  if (this.comboCount >= 3) {
+    this.uiSystem.showComboNotification(this.comboCount);
+  }
+
+  // Audio feedback
+  if (this.comboCount >= 5) {
+    this.audioSystem.playSound('comboHigh');
+  }
+}
+
+update(deltaTime) {
+  if (this.comboTimer > 0) {
+    this.comboTimer -= deltaTime;
+
+    if (this.comboTimer <= 0) {
+      this.comboCount = 0;
+    }
+  }
+}
+
+// UISystem.js
+showComboNotification(count) {
+  this.comboNotification = {
+    count,
+    life: 2.0,
+    maxLife: 2.0,
+    scale: 1.5
+  };
+}
+
+renderComboNotification(ctx) {
+  if (!this.comboNotification) return;
+
+  const notif = this.comboNotification;
+  const progress = 1 - (notif.life / notif.maxLife);
+
+  ctx.save();
+  ctx.globalAlpha = 1 - progress;
+  ctx.translate(GAME_WIDTH / 2, GAME_HEIGHT / 3);
+
+  // Scale bounce
+  const scale = notif.scale * Easing.easeOutBounce(Math.min(1, progress * 2));
+  ctx.scale(scale, scale);
+
+  ctx.font = 'bold 48px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffff00';
+  ctx.strokeStyle = '#ff0000';
+  ctx.lineWidth = 3;
+
+  const text = `${notif.count}x COMBO!`;
+  ctx.strokeText(text, 0, 0);
+  ctx.fillText(text, 0, 0);
+
+  ctx.restore();
+
+  notif.life -= 0.016;
+  if (notif.life <= 0) {
+    this.comboNotification = null;
+  }
+}
+```
+
+**Tempo:** 2 horas
+
+---
+
+## 📊 Semana 3 - Checklist de Conclusão
+
+- [ ] Sons novos adicionados (thrust, crack, variant sounds)
+- [ ] Spatial audio implementado
+- [ ] Música dinâmica funcionando
+- [ ] Easing system criado
+- [ ] XP orb attraction suave
+- [ ] Asteroid spawn animation
+- [ ] Hit freeze ao acertar
+- [ ] Sistema de combo visual
+- [ ] Audio mix balanceado
+
+**Entregável:** Jogo com feedback excelente e juice
+
+---
+
+# 📅 SEMANA 4: Final Touch
+
+## Objetivo
+**Polimento final e experiência completa**
+
+---
+
+## Dia 16-17: Tutorial & Onboarding
+
+### 🎯 Tarefa 4.1: Quick Tutorial Overlay
+
+**Tutorial não intrusivo (primeira vez que joga):**
+
+```javascript
+// TutorialSystem.js
+export class TutorialSystem {
+  constructor() {
+    this.steps = [
+      {
+        id: 'movement',
+        text: 'Use WASD or Arrow Keys to move',
+        trigger: () => this.hasMovedShip,
+        position: { x: 400, y: 300 }
+      },
+      {
+        id: 'shooting',
+        text: 'SPACE or LEFT MOUSE to shoot',
+        trigger: () => this.hasFired,
+        position: { x: 400, y: 350 }
+      },
+      {
+        id: 'xp',
+        text: 'Collect green XP orbs to level up',
+        trigger: () => this.hasCollectedXP,
+        position: { x: 400, y: 400 }
+      }
+    ];
+
+    this.currentStep = 0;
+    this.completed = this.loadProgress();
+  }
+
+  update(gameState) {
+    if (this.completed) return;
+
+    const step = this.steps[this.currentStep];
+    if (!step) {
+      this.completed = true;
+      this.saveProgress();
+      return;
+    }
+
+    // Check trigger
+    if (step.trigger()) {
+      this.currentStep++;
+    }
+  }
+
+  render(ctx) {
+    if (this.completed) return;
+
+    const step = this.steps[this.currentStep];
+    if (!step) return;
+
+    // Pulse animation
+    const pulse = Math.sin(Date.now() * 0.003) * 0.1 + 0.9;
+
+    ctx.save();
+    ctx.globalAlpha = pulse;
+
+    // Background box
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(step.position.x - 200, step.position.y - 30, 400, 60);
+
+    // Text
+    ctx.font = '18px monospace';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.fillText(step.text, step.position.x, step.position.y);
+
+    ctx.restore();
+  }
+
+  loadProgress() {
+    return localStorage.getItem('tutorial_completed') === 'true';
+  }
+
+  saveProgress() {
+    localStorage.setItem('tutorial_completed', 'true');
+  }
+}
+```
+
+**Tempo:** 3 horas
+
+---
+
+### 🎯 Tarefa 4.2: Contextual Help
+
+**Hints que aparecem em momentos específicos:**
+
+```javascript
+// HintSystem.js
+export class HintSystem {
+  constructor() {
+    this.hints = {
+      firstParasite: {
+        text: 'Watch out! Red asteroids track your position!',
+        shown: false
+      },
+      firstVolatile: {
+        text: 'Orange asteroids explode! Keep your distance!',
+        shown: false
+      },
+      wave5: {
+        text: 'Difficulty increases with each wave. Stay focused!',
+        shown: false
+      }
+    };
+
+    this.currentHint = null;
+    this.hintTimer = 0;
+  }
+
+  triggerHint(hintKey) {
+    const hint = this.hints[hintKey];
+    if (!hint || hint.shown) return;
+
+    hint.shown = true;
+    this.currentHint = {
+      text: hint.text,
+      life: 4.0 // 4 seconds
+    };
+  }
+
+  update(deltaTime) {
+    if (this.currentHint) {
+      this.currentHint.life -= deltaTime;
+      if (this.currentHint.life <= 0) {
+        this.currentHint = null;
+      }
+    }
+  }
+
+  render(ctx) {
+    if (!this.currentHint) return;
+
+    const y = GAME_HEIGHT - 80;
+    const alpha = Math.min(1, this.currentHint.life);
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    // Background
+    ctx.fillStyle = 'rgba(255, 165, 0, 0.9)';
+    ctx.fillRect(50, y - 20, GAME_WIDTH - 100, 50);
+
+    // Icon
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 24px monospace';
+    ctx.fillText('!', 70, y + 10);
+
+    // Text
+    ctx.font = '16px monospace';
+    ctx.fillText(this.currentHint.text, 100, y + 8);
+
+    ctx.restore();
+  }
+}
+```
+
+**Onde triggar:**
+```javascript
+// EnemySystem.js
+spawnAsteroid() {
+  const asteroid = this.acquireAsteroid(config);
+
+  // Trigger hints
+  if (asteroid.variant === 'parasite' && !this.parasiteHintShown) {
+    this.hintSystem.triggerHint('firstParasite');
+    this.parasiteHintShown = true;
+  }
+
+  if (asteroid.variant === 'volatile' && !this.volatileHintShown) {
+    this.hintSystem.triggerHint('firstVolatile');
+    this.volatileHintShown = true;
+  }
+}
+```
+
+**Tempo:** 2 horas
+
+---
+
+## Dia 18: Performance & QA
+
+### 🎯 Tarefa 4.3: Performance Audit
+
+**Verificar FPS em diferentes cenários:**
+
+```javascript
+// PerformanceMonitor.js
+export class PerformanceMonitor {
+  constructor() {
+    this.frameTimes = [];
+    this.maxSamples = 60;
+    this.lastTime = performance.now();
+  }
+
+  update() {
+    const now = performance.now();
+    const deltaTime = now - this.lastTime;
+    this.lastTime = now;
+
+    this.frameTimes.push(deltaTime);
+    if (this.frameTimes.length > this.maxSamples) {
+      this.frameTimes.shift();
+    }
+  }
+
+  getAverageFPS() {
+    const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
+    return Math.round(1000 / avg);
+  }
+
+  getMinFPS() {
+    const max = Math.max(...this.frameTimes);
+    return Math.round(1000 / max);
+  }
+
+  render(ctx) {
+    const fps = this.getAverageFPS();
+    const minFps = this.getMinFPS();
+
+    ctx.font = '14px monospace';
+    ctx.fillStyle = fps < 50 ? '#ff0000' : '#00ff00';
+    ctx.fillText(`FPS: ${fps} (min: ${minFps})`, 10, GAME_HEIGHT - 10);
+  }
+}
+```
+
+**Cenários de teste:**
+- [ ] 20+ asteroids na tela
+- [ ] Múltiplas explosões simultâneas
+- [ ] 50+ particles ativas
+- [ ] Wave 10+
+- [ ] Jogar por 10 minutos (memory leak check)
+
+**Tempo:** 2 horas
+
+---
+
+### 🎯 Tarefa 4.4: Bug Fixing Sprint
+
+**QA estruturado:**
+
+**Checklist:**
+- [ ] Ship não pode sair da tela?
+- [ ] Bullets são destruídos fora da tela?
+- [ ] Asteroids não ficam presos nas bordas?
+- [ ] XP orbs não atravessam asteroids?
+- [ ] Level up funciona corretamente?
+- [ ] Upgrades aplicam efeito?
+- [ ] Wave progression correta?
+- [ ] Morte reseta jogo adequadamente?
+- [ ] Audio não sobrepõe demais?
+- [ ] UI não tem elementos cortados?
+
+**Tempo:** 4 horas
+
+---
+
+## Dia 19-20: Final Polish
+
+### 🎯 Tarefa 4.5: Start Screen Polish
+
+**Menu inicial atraente:**
+
+```javascript
+// MenuSystem.js
+renderStartScreen(ctx) {
+  // Background com asteroids em movimento lento
+  this.renderMenuBackground(ctx);
+
+  // Title com effect
+  const titlePulse = Math.sin(Date.now() * 0.002) * 0.05 + 0.95;
+
+  ctx.save();
+  ctx.translate(GAME_WIDTH / 2, 150);
+  ctx.scale(titlePulse, titlePulse);
+
+  // Shadow
+  ctx.shadowBlur = 20;
+  ctx.shadowColor = '#00ffff';
+
+  ctx.font = 'bold 72px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffffff';
+  ctx.strokeStyle = '#00ffff';
+  ctx.lineWidth = 3;
+  ctx.strokeText('ASTEROIDS', 0, 0);
+  ctx.fillText('ASTEROIDS', 0, 0);
+
+  ctx.restore();
+
+  // Subtitle
+  ctx.font = '24px monospace';
+  ctx.fillStyle = '#aaaaaa';
+  ctx.textAlign = 'center';
+  ctx.fillText('ROGUE FIELD', GAME_WIDTH / 2, 200);
+
+  // Menu options
+  this.renderMenuOptions(ctx);
+
+  // Footer
+  ctx.font = '14px monospace';
+  ctx.fillStyle = '#666666';
+  ctx.fillText('Press SPACE or CLICK to Start', GAME_WIDTH / 2, GAME_HEIGHT - 30);
+}
+
+renderMenuBackground(ctx) {
+  // Starfield
+  for (let i = 0; i < 100; i++) {
+    const x = (this.menuBackgroundOffset + i * 37) % GAME_WIDTH;
+    const y = (i * 79) % GAME_HEIGHT;
+    const size = (i % 3) + 1;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.globalAlpha = 0.5;
+    ctx.fillRect(x, y, size, size);
+  }
+  ctx.globalAlpha = 1.0;
+
+  this.menuBackgroundOffset += 0.2;
+
+  // Floating asteroids
+  this.menuAsteroids.forEach(ast => {
+    ctx.save();
+    ctx.translate(ast.x, ast.y);
+    ctx.rotate(ast.rotation);
+    ctx.globalAlpha = 0.3;
+
+    // Simple asteroid shape
+    ctx.fillStyle = '#888888';
+    ctx.beginPath();
+    ctx.moveTo(ast.size, 0);
+    for (let i = 1; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2;
+      const radius = ast.size * (0.8 + Math.random() * 0.4);
+      ctx.lineTo(Math.cos(angle) * radius, Math.sin(angle) * radius);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.restore();
+
+    // Update
+    ast.x += ast.vx * 0.016;
+    ast.y += ast.vy * 0.016;
+    ast.rotation += ast.rotSpeed * 0.016;
+
+    // Wrap
+    if (ast.x < -50) ast.x = GAME_WIDTH + 50;
+    if (ast.x > GAME_WIDTH + 50) ast.x = -50;
+    if (ast.y < -50) ast.y = GAME_HEIGHT + 50;
+    if (ast.y > GAME_HEIGHT + 50) ast.y = -50;
+  });
+}
+```
+
+**Tempo:** 3 horas
+
+---
+
+### 🎯 Tarefa 4.6: Game Over Screen
+
+**Tela de morte com estatísticas:**
+
+```javascript
+// GameOverScreen.js
+render(ctx, stats) {
+  // Dark overlay
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+  ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+  // Game Over title
+  ctx.font = 'bold 64px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ff0000';
+  ctx.fillText('GAME OVER', GAME_WIDTH / 2, 150);
+
+  // Stats box
+  const boxY = 220;
+  ctx.fillStyle = 'rgba(50, 50, 50, 0.9)';
+  ctx.fillRect(200, boxY, 400, 280);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '20px monospace';
+  ctx.textAlign = 'left';
+
+  let y = boxY + 40;
+  const lineHeight = 35;
+
+  ctx.fillText(`Wave Reached: ${stats.wave}`, 220, y);
+  y += lineHeight;
+
+  ctx.fillText(`Level: ${stats.level}`, 220, y);
+  y += lineHeight;
+
+  ctx.fillText(`Asteroids Destroyed: ${stats.kills}`, 220, y);
+  y += lineHeight;
+
+  ctx.fillText(`Time Survived: ${this.formatTime(stats.time)}`, 220, y);
+  y += lineHeight;
+
+  ctx.fillText(`Score: ${stats.score}`, 220, y);
+  y += lineHeight;
+
+  // High score
+  if (stats.score > stats.highScore) {
+    ctx.fillStyle = '#ffff00';
+    ctx.font = 'bold 24px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('NEW HIGH SCORE!', GAME_WIDTH / 2, y + 20);
+  }
+
+  // Retry prompt
+  ctx.fillStyle = '#aaaaaa';
+  ctx.font = '18px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('Press SPACE to Retry', GAME_WIDTH / 2, GAME_HEIGHT - 50);
+}
+
+formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+```
+
+**Tempo:** 2 horas
+
+---
+
+### 🎯 Tarefa 4.7: Settings Menu
+
+**Menu de configurações simples:**
+
+```javascript
+// SettingsMenu.js
+render(ctx) {
+  // Background
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+  ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '32px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('SETTINGS', GAME_WIDTH / 2, 80);
+
+  ctx.font = '20px monospace';
+  ctx.textAlign = 'left';
+
+  const options = [
+    {
+      label: 'Master Volume',
+      value: this.settings.masterVolume,
+      type: 'slider'
+    },
+    {
+      label: 'SFX Volume',
+      value: this.settings.sfxVolume,
+      type: 'slider'
+    },
+    {
+      label: 'Music Volume',
+      value: this.settings.musicVolume,
+      type: 'slider'
+    },
+    {
+      label: 'Screen Shake',
+      value: this.settings.screenShake,
+      type: 'toggle'
+    },
+    {
+      label: 'Show FPS',
+      value: this.settings.showFPS,
+      type: 'toggle'
+    }
+  ];
+
+  let y = 150;
+  options.forEach((opt, index) => {
+    // Highlight selected
+    if (index === this.selectedOption) {
+      ctx.fillStyle = '#ffff00';
+    } else {
+      ctx.fillStyle = '#ffffff';
+    }
+
+    ctx.fillText(opt.label, 150, y);
+
+    // Render control
+    if (opt.type === 'slider') {
+      this.renderSlider(ctx, 450, y - 10, opt.value);
+    } else if (opt.type === 'toggle') {
+      this.renderToggle(ctx, 450, y - 10, opt.value);
+    }
+
+    y += 50;
+  });
+
+  // Instructions
+  ctx.fillStyle = '#aaaaaa';
+  ctx.font = '16px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('↑↓ Navigate | ←→ Adjust | SPACE Toggle | ESC Back', GAME_WIDTH / 2, GAME_HEIGHT - 30);
+}
+
+renderSlider(ctx, x, y, value) {
+  // Track
+  ctx.fillStyle = '#333333';
+  ctx.fillRect(x, y, 200, 20);
+
+  // Fill
+  ctx.fillStyle = '#00ff00';
+  ctx.fillRect(x, y, 200 * value, 20);
+
+  // Border
+  ctx.strokeStyle = '#ffffff';
+  ctx.strokeRect(x, y, 200, 20);
+
+  // Value text
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '14px monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText(`${Math.round(value * 100)}%`, x + 220, y + 15);
+}
+
+renderToggle(ctx, x, y, enabled) {
+  // Box
+  ctx.fillStyle = enabled ? '#00ff00' : '#333333';
+  ctx.fillRect(x, y, 40, 20);
+
+  ctx.strokeStyle = '#ffffff';
+  ctx.strokeRect(x, y, 40, 20);
+
+  // Text
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '12px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(enabled ? 'ON' : 'OFF', x + 50, y + 15);
+}
+```
+
+**Tempo:** 3 horas
+
+---
+
+## Dia 21: Final Testing & Documentation
+
+### 🎯 Tarefa 4.8: Complete Playthrough
+
+**Fazer um playthrough completo:**
+- [ ] Start screen → Jogar → Game over → Retry
+- [ ] Testar todas as configurações
+- [ ] Testar todos os upgrades
+- [ ] Chegar até wave 15+
+- [ ] Anotar qualquer bug/polish menor
+
+**Tempo:** 2 horas
+
+---
+
+### 🎯 Tarefa 4.9: Create Gameplay Video
+
+**Gravar gameplay para showcase:**
+- Melhor partida possível
+- Mostrar todos os features
+- 2-3 minutos de duração
+
+**Tempo:** 1 hora
+
+---
+
+### 🎯 Tarefa 4.10: Update Documentation
+
+**Atualizar README com:**
+- Screenshots
+- Feature list
+- How to play
+- Controls
+- Credits
+
+**Tempo:** 1 hora
+
+---
+
+## 📊 Semana 4 - Checklist de Conclusão
+
+- [ ] Tutorial overlay implementado
+- [ ] Hint system funcionando
+- [ ] Performance 60 FPS garantido
+- [ ] Todos os bugs críticos corrigidos
+- [ ] Start screen polido
+- [ ] Game over screen com stats
+- [ ] Settings menu funcional
+- [ ] Playthrough completo sem bugs
+- [ ] Gameplay video gravado
+- [ ] Documentation atualizada
+
+**Entregável:** Jogo 100% completo e polido
+
+---
+
+# 🎯 Checklist Final: Jogo Pronto para Lançamento
+
+## Core Gameplay
+- [ ] Balance perfeito (testado e refinado)
+- [ ] Dificuldade progressiva adequada
+- [ ] Todas as variants funcionando
+- [ ] Wave progression balanceada
+- [ ] Ship controls responsivos
+
+## Visual Polish
+- [ ] Explosões impactantes
+- [ ] Cada variant visualmente distinto
+- [ ] Particle effects impressionantes
+- [ ] UI animada e responsiva
+- [ ] Damage numbers flutuantes
+- [ ] Screen effects (vignette, chromatic aberration)
+
+## Audio
+- [ ] Todos os SFX implementados
+- [ ] Spatial audio funcionando
+- [ ] Música dinâmica
+- [ ] Audio mix balanceado
+
+## Game Feel
+- [ ] Easing system ativo
+- [ ] Micro-animations em tudo
+- [ ] Hit freeze ao acertar
+- [ ] Screen shake balanceado
+- [ ] Combo system funcionando
+
+## UX
+- [ ] Tutorial não intrusivo
+- [ ] Hints contextuais
+- [ ] Start screen atraente
+- [ ] Game over screen com stats
+- [ ] Settings menu completo
+
+## Technical
+- [ ] 60 FPS consistente
+- [ ] Sem memory leaks
+- [ ] Sem bugs críticos
+- [ ] Build otimizado
+
+## Documentation
+- [ ] README atualizado
+- [ ] Screenshots de qualidade
+- [ ] Gameplay video
+- [ ] Credits completos
+
+---
+
+# 🚀 Deployment Checklist
+
+Quando tudo estiver pronto:
+
+## Preparação
+- [ ] Versão final testada
+- [ ] Todos os assets otimizados
+- [ ] Build de produção gerado
+- [ ] Performance validada
+
+## Publicação
+- [ ] Deploy em itch.io / github pages
+- [ ] Descrição atraente escrita
+- [ ] Tags apropriadas
+- [ ] Thumbnail chamativo
+
+## Marketing
+- [ ] Post no Reddit (r/WebGames, r/incremental_games)
+- [ ] Tweet com gameplay gif
+- [ ] Share em comunidades de game dev
+
+---
+
+# 📈 Métricas de Sucesso
+
+**Como saber se o polish foi bem-sucedido:**
+
+### Feedback Subjetivo
+- ✅ "O jogo se sente muito bom de jogar"
+- ✅ "Cada tiro parece impactante"
+- ✅ "Não quero parar de jogar"
+- ✅ "Visual é muito atraente"
+
+### Métricas Objetivas
+- ✅ Tempo médio de sessão > 15 minutos
+- ✅ Taxa de retry após game over > 70%
+- ✅ Performance consistente 60 FPS
+- ✅ Zero bugs críticos
+
+---
+
+**Este é o caminho para transformar seu jogo de "funcional" para "INCRÍVEL"! 🎮✨**
+
+**Pronto para começar?** 🚀

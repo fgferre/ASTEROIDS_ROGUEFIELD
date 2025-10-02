@@ -18,6 +18,7 @@ import {
   resolveDebugPreference,
   applyDebugPreference,
 } from './core/debugLogging.js';
+import { PerformanceMonitor } from './utils/PerformanceMonitor.js';
 
 // Dependency Injection System (Phase 2.1)
 import { DIContainer } from './core/DIContainer.js';
@@ -38,6 +39,9 @@ const garbageCollectionManager = new GarbageCollectionManager({
   idleTimeout: 120,
   maxTasksPerFrame: 2,
 });
+
+// Performance monitoring (Week 1: Balance & Feel)
+const performanceMonitor = new PerformanceMonitor();
 
 // Initialize DI Container (Phase 2.1)
 let diContainer = null;
@@ -60,6 +64,14 @@ function initializeDependencyInjection() {
     // Just expose container for debugging
     if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
       window.diContainer = diContainer;
+      window.performanceMonitor = performanceMonitor;
+
+      // Enable auto-logging every 10 seconds
+      performanceMonitor.enableAutoLog(10000);
+
+      console.log('[App] ℹ Performance monitor available: window.performanceMonitor');
+      console.log('[App] ℹ Auto-logging enabled (logs saved to localStorage)');
+      console.log('[App] ℹ Get logs: localStorage.getItem("performanceLog")');
     }
 
     console.log('[App] ✓ DI system initialized successfully');
@@ -360,6 +372,9 @@ function exitToMenu(payload = {}) {
 function gameLoop(currentTime) {
   if (!gameState.initialized) return;
 
+  // Start performance monitoring
+  performanceMonitor.startFrame();
+
   const deltaTime = Math.min((currentTime - gameState.lastTime) / 1000, 0.016);
   gameState.lastTime = currentTime;
 
@@ -381,10 +396,29 @@ function gameLoop(currentTime) {
       updateGame(adjustedDelta);
     }
 
+    // Update performance metrics
+    if (shouldUpdateGame) {
+      const enemies = gameServices.get('enemies');
+      const combat = gameServices.get('combat');
+      const xpOrbs = gameServices.get('xp-orbs');
+      const effects = gameServices.get('effects');
+
+      performanceMonitor.updateMetrics({
+        enemies: enemies?.asteroids?.length || 0,
+        bullets: combat?.bullets?.length || 0,
+        orbs: xpOrbs?.orbs?.length || 0,
+        particles: effects?.particles?.length || 0,
+        wave: enemies?.waveManager?.currentWave || 0,
+      });
+    }
+
     renderGame();
   } catch (error) {
     console.error('Erro no game loop:', error);
   }
+
+  // End performance monitoring
+  performanceMonitor.endFrame();
 
   requestAnimationFrame(gameLoop);
 }

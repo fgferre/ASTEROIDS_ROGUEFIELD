@@ -1,5 +1,6 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
+import { ScreenShake } from '../utils/ScreenShake.js';
 
 const MAIN_THRUSTER_FLASH_THRESHOLD = 0.85;
 const MAIN_THRUSTER_FLASH_COLOR = '#3399FF';
@@ -83,7 +84,9 @@ export default class EffectsSystem {
     this.audio = audio;
     this.particles = [];
     this.shockwaves = [];
-    this.screenShake = { intensity: 0, duration: 0, timer: 0 };
+
+    // Upgraded screen shake (Week 1: Balance & Feel)
+    this.screenShake = new ScreenShake();
     this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
     this.screenFlash = {
       timer: 0,
@@ -187,7 +190,7 @@ export default class EffectsSystem {
       );
       this.screenShakeScale = normalized;
       if (this.screenShakeScale <= 0) {
-        this.screenShake = { intensity: 0, duration: 0, timer: 0 };
+        this.screenShake.reset();
       }
     }
 
@@ -231,6 +234,12 @@ export default class EffectsSystem {
 
   setupEventListeners() {
     if (typeof gameEvents === 'undefined') return;
+
+    // Weapon fire feedback (Week 1: Balance & Feel)
+    // DISABLED - User feedback: too dizzying
+    // gameEvents.on('bullet-created', () => {
+    //   this.addScreenShake(0.3, 0.05); // Very subtle shake on weapon fire
+    // });
 
     gameEvents.on('thruster-effect', (data) => {
       if (!data || !data.position || !data.direction) return;
@@ -329,13 +338,8 @@ export default class EffectsSystem {
       deltaTime *= this.freezeFrame.fade;
     }
 
-    if (this.screenShake.timer > 0) {
-      this.screenShake.timer -= deltaTime;
-      if (this.screenShake.timer <= 0) {
-        this.screenShake.intensity = 0;
-        this.screenShake.duration = 0;
-      }
-    }
+    // Update screen shake (new trauma-based system)
+    this.screenShake.update(deltaTime);
 
     if (this.screenFlash.timer > 0) {
       this.screenFlash.timer -= deltaTime;
@@ -409,15 +413,10 @@ export default class EffectsSystem {
   }
 
   applyScreenShake(ctx) {
-    if (this.screenShake.timer > 0) {
-      const shakeAmount =
-        this.screenShake.intensity *
-        (this.screenShake.timer / this.screenShake.duration);
-      ctx.translate(
-        (Math.random() - 0.5) * shakeAmount,
-        (Math.random() - 0.5) * shakeAmount
-      );
-    }
+    // Apply trauma-based screen shake
+    const centerX = CONSTANTS.GAME_WIDTH / 2;
+    const centerY = CONSTANTS.GAME_HEIGHT / 2;
+    this.screenShake.apply(ctx, centerX, centerY);
   }
 
   draw(ctx) {
@@ -491,15 +490,10 @@ export default class EffectsSystem {
       return;
     }
 
-    this.screenShake.intensity = Math.max(
-      this.screenShake.intensity,
-      finalIntensity
-    );
-    this.screenShake.duration = Math.max(
-      this.screenShake.duration,
-      finalDuration
-    );
-    this.screenShake.timer = this.screenShake.duration;
+    // Convert old intensity (0-12 range) to trauma (0-1 range)
+    // Old max was ~12, so divide by 15 to get 0-0.8 trauma range
+    const trauma = Math.min(1, finalIntensity / 15);
+    this.screenShake.add(trauma, finalDuration);
   }
 
   addFreezeFrame(duration, fade = 0) {
@@ -1467,7 +1461,7 @@ export default class EffectsSystem {
   reset() {
     this.particles = [];
     this.shockwaves = [];
-    this.screenShake = { intensity: 0, duration: 0, timer: 0 };
+    this.screenShake.reset();
     this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
     this.screenFlash = {
       timer: 0,

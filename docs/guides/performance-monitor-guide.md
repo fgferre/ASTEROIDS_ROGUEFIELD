@@ -1,0 +1,187 @@
+# Performance Monitor Usage Guide
+
+The performance monitor is automatically available in development mode.
+
+## How to Access
+
+1. Open the game in your browser (http://localhost:5501)
+2. Open the browser console (F12 or Ctrl+Shift+I)
+3. Look for these initialization messages:
+   ```
+   [App] ℹ Performance monitor available: window.performanceMonitor
+   [App] ℹ Get report: window.performanceMonitor.getReport()
+   [App] ℹ Get summary: window.performanceMonitor.getSummary()
+   ```
+
+## Console Commands
+
+### Get Full Report
+```javascript
+window.performanceMonitor.getReport()
+```
+
+Returns detailed performance data:
+```javascript
+{
+  fps: {
+    current: "60.0",
+    average: "59.8",
+    min: "58.2",
+    max: "60.0"
+  },
+  frameTime: {
+    current: "16.67",
+    average: "16.73",
+    min: "16.67",
+    max: "17.18"
+  },
+  session: {
+    duration: "45.2",
+    totalFrames: 2712,
+    averageFPS: "59.9"
+  },
+  memory: {
+    used: "42.5",
+    total: "64.0",
+    limit: "2048.0"
+  },
+  metrics: {
+    enemies: 12,
+    bullets: 8,
+    orbs: 24,
+    particles: 156,
+    wave: 5
+  },
+  warnings: []
+}
+```
+
+### Get Quick Summary
+```javascript
+window.performanceMonitor.getSummary()
+```
+
+Returns one-line summary:
+```
+"FPS: 60 (avg: 60) | Frame: 16.7ms | Enemies: 12 | Bullets: 8 | Orbs: 24 | Mem: 42.5MB"
+```
+
+### Log Report to Console
+```javascript
+window.performanceMonitor.logReport()
+```
+
+Prints formatted report to console.
+
+### Reset Statistics
+```javascript
+window.performanceMonitor.reset()
+```
+
+Clears all tracking data and restarts measurement.
+
+## Monitoring Performance During Play
+
+### Option 1: Console Table
+Run this in console to see live updates:
+```javascript
+setInterval(() => {
+  console.clear();
+  console.table(window.performanceMonitor.getReport());
+}, 1000);
+```
+
+### Option 2: Continuous Log
+```javascript
+setInterval(() => {
+  console.log(window.performanceMonitor.getSummary());
+}, 2000);
+```
+
+### Option 3: Check After Session
+1. Play for a few minutes
+2. Open console
+3. Run: `window.performanceMonitor.getReport()`
+
+## What to Look For
+
+### Good Performance
+- **FPS**: Consistently 60 (or close to it)
+- **Frame Time**: ~16.67ms average
+- **No Warnings**: Empty warnings array
+
+### Performance Issues
+- **Low FPS**: Below 45 FPS average
+- **High Frame Time**: Above 20ms consistently
+- **Warnings**: Check warnings array for issues
+
+### Memory Leaks
+- **Memory Usage**: Constantly increasing over time
+- Run for 5+ minutes and check if memory keeps growing
+
+## Example Session Analysis
+
+```javascript
+// After playing to wave 10
+const report = window.performanceMonitor.getReport();
+
+console.log(`Session Duration: ${report.session.duration}s`);
+console.log(`Average FPS: ${report.fps.average}`);
+console.log(`Min FPS: ${report.fps.min}`);
+console.log(`Peak Objects: ${report.metrics.enemies} enemies, ${report.metrics.particles} particles`);
+console.log(`Warnings: ${report.warnings.length}`);
+```
+
+## Performance Thresholds
+
+The monitor automatically tracks these thresholds:
+
+- **Low FPS Warning**: < 30 FPS
+- **High Frame Time Warning**: > 33.33ms
+- **Warning FPS**: < 45 FPS (caution level)
+
+Warnings are stored in the `warnings` array with timestamps.
+
+## Troubleshooting
+
+### "performanceMonitor is not defined"
+- Make sure you're in development mode (not production build)
+- Check console for initialization messages
+- Refresh the page
+
+### Memory Info Not Available
+- Some browsers don't expose `performance.memory`
+- This is normal, other metrics still work
+- Try Chrome/Chromium for memory tracking
+
+### Metrics Show 0
+- Make sure you're in "playing" mode (not menu)
+- Game must be active and running
+
+## Advanced Usage
+
+### Custom Tracking
+```javascript
+// Access raw data
+const monitor = window.performanceMonitor;
+
+// Check if shake is active
+if (monitor.metrics.enemies > 15) {
+  console.warn('High enemy count!');
+}
+
+// Track specific scenarios
+console.log('Wave 10 FPS:', monitor.fps.current);
+```
+
+### Export Data
+```javascript
+// Save report as JSON
+const report = window.performanceMonitor.getReport();
+console.log(JSON.stringify(report, null, 2));
+// Copy from console to save
+```
+
+---
+
+**Pro Tip**: Leave console open while playing to see warnings appear in real-time!
