@@ -1,3 +1,6 @@
 node_modules/
 dist/
 exported-assets/
+
+# Performance logs
+performance-log.json
