@@ -102,6 +102,12 @@ class AudioSystem {
 
     gameEvents.on('enemy-destroyed', (data) => {
       if (!data) return;
+
+      // Epic sound when Gold asteroid is destroyed
+      if (data.variant === 'gold') {
+        this.playGoldJackpot();
+      }
+
       this.playAsteroidBreak(data.size);
       if (data.size === 'large') {
         this.playBigExplosion();
@@ -116,13 +122,9 @@ class AudioSystem {
       this.playLevelUp();
     });
 
-    gameEvents.on('xp-collected', (data) => {
-      // Special sound for Gold orbs
-      if (data?.orb?.options?.variant === 'gold') {
-        this.playGoldCollect();
-      } else {
-        this.playXPCollect();
-      }
+    gameEvents.on('xp-collected', () => {
+      // All orbs play same sound (all are tier 1 blue)
+      this.playXPCollect();
     });
 
     gameEvents.on('xp-orb-fused', (data) => {
@@ -617,8 +619,8 @@ class AudioSystem {
     });
   }
 
-  playGoldCollect() {
-    // Cash register "ka-ching!" sound
+  playGoldJackpot() {
+    // Epic jackpot sound when Gold asteroid is destroyed
     this.safePlay(() => {
       // First "ka" (percussive)
       const noise = this.context.createOscillator();
