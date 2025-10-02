@@ -62,6 +62,12 @@ class PlayerSystem {
       shieldPadding: 0,
     };
     this.setHull(shipModels.defaultHull);
+
+    // === VISUAL UPGRADE LEVELS ===
+    this.thrusterVisualLevel = 0;
+    this.rcsVisualLevel = 0;
+    this.brakingVisualLevel = 0;
+
     this.shieldUpgradeLevel = 0;
     this.shieldMaxHits = 0;
     this.shieldCurrentHits = 0;
@@ -94,6 +100,41 @@ class PlayerSystem {
     gameEvents.on('upgrade-speed-boost', (data) => {
       this.maxSpeed = Math.floor(this.maxSpeed * data.multiplier);
       console.log('[PlayerSystem] Speed boosted to', this.maxSpeed);
+    });
+
+    gameEvents.on('upgrade-acceleration-boost', (data) => {
+      this.acceleration = this.acceleration * data.multiplier;
+      console.log('[PlayerSystem] Acceleration boosted to', this.acceleration);
+    });
+
+    gameEvents.on('upgrade-rotation-boost', (data) => {
+      this.rotationSpeed = this.rotationSpeed * data.multiplier;
+      console.log('[PlayerSystem] Rotation speed boosted to', this.rotationSpeed);
+    });
+
+    gameEvents.on('upgrade-angular-damping', (data) => {
+      this.angularDamping = this.angularDamping * data.multiplier;
+      console.log('[PlayerSystem] Angular damping adjusted to', this.angularDamping);
+    });
+
+    gameEvents.on('upgrade-linear-damping', (data) => {
+      this.linearDamping = this.linearDamping * data.multiplier;
+      console.log('[PlayerSystem] Linear damping adjusted to', this.linearDamping);
+    });
+
+    gameEvents.on('upgrade-thruster-visual', (data) => {
+      this.thrusterVisualLevel = data.level || 0;
+      console.log('[PlayerSystem] Thruster visual level:', this.thrusterVisualLevel);
+    });
+
+    gameEvents.on('upgrade-rcs-visual', (data) => {
+      this.rcsVisualLevel = data.level || 0;
+      console.log('[PlayerSystem] RCS visual level:', this.rcsVisualLevel);
+    });
+
+    gameEvents.on('upgrade-braking-visual', (data) => {
+      this.brakingVisualLevel = data.level || 0;
+      console.log('[PlayerSystem] Braking visual level:', this.brakingVisualLevel);
     });
 
     gameEvents.on('upgrade-health-boost', (data) => {
@@ -452,6 +493,7 @@ class PlayerSystem {
         direction: { x: fwd.x, y: fwd.y },
         intensity: thrMain,
         type: 'main',
+        visualLevel: this.thrusterVisualLevel,
       });
     }
 
@@ -462,6 +504,7 @@ class PlayerSystem {
         direction: { x: -fwd.x, y: -fwd.y },
         intensity: thrAux,
         type: 'aux',
+        visualLevel: this.brakingVisualLevel,
       });
     }
 
@@ -474,6 +517,7 @@ class PlayerSystem {
         direction: dir,
         intensity: thrSideL,
         type: 'side',
+        visualLevel: this.rcsVisualLevel,
       });
     }
 
@@ -485,6 +529,7 @@ class PlayerSystem {
         direction: dir,
         intensity: thrSideR,
         type: 'side',
+        visualLevel: this.rcsVisualLevel,
       });
     }
   }
@@ -824,8 +869,18 @@ class PlayerSystem {
     this.multishot = 1;
     this.magnetismRadius = CONSTANTS.MAGNETISM_RADIUS;
     this.maxSpeed = CONSTANTS.SHIP_MAX_SPEED;
+    this.acceleration = CONSTANTS.SHIP_ACCELERATION;
+    this.rotationSpeed = CONSTANTS.SHIP_ROTATION_SPEED;
+    this.linearDamping = CONSTANTS.SHIP_LINEAR_DAMPING;
+    this.angularDamping = CONSTANTS.SHIP_ANGULAR_DAMPING;
     this.invulnerableTimer = 0;
     this.driftFactor = 0;
+
+    // Reset visual upgrade levels
+    this.thrusterVisualLevel = 0;
+    this.rcsVisualLevel = 0;
+    this.brakingVisualLevel = 0;
+
     this.resetShieldState();
   }
 

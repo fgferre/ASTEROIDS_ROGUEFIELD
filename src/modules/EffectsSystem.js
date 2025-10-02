@@ -250,7 +250,8 @@ export default class EffectsSystem {
         data.direction.x,
         data.direction.y,
         data.intensity,
-        data.type
+        data.type,
+        data.visualLevel || 0
       );
 
       if (
@@ -542,34 +543,75 @@ export default class EffectsSystem {
     this.screenFlash.intensity = finalIntensity;
   }
 
-  spawnThrusterVFX(worldX, worldY, dirX, dirY, intensity = 1, type = 'main') {
+  spawnThrusterVFX(worldX, worldY, dirX, dirY, intensity = 1, type = 'main', visualLevel = 0) {
     const i = Math.max(0, Math.min(1, intensity));
+
+    // AGGRESSIVE Visual upgrade scaling matching design doc v3:
+    // Rank 5 = +150% particles (2.5x), +100% size (2x), +50% lifetime (1.5x), +50% speed (creates longer trail)
+    const visualBoost = 1 + (visualLevel * 0.3); // 30% per level = 2.5x at rank 5
+    const sizeBoost = 1 + (visualLevel * 0.2); // 20% per level = 2x at rank 5
+    const lifeBoost = 1 + (visualLevel * 0.1); // 10% per level = 1.5x at rank 5
+    const speedBoost = 1 + (visualLevel * 0.1); // 10% per level = 1.5x at rank 5 (creates "length")
+
     let baseCount, speedBase, sizeRange, lifeRange, colorFn;
 
     switch (type) {
       case 'main':
-        baseCount = 3;
-        speedBase = 120;
-        sizeRange = [2.0, 3.2];
-        lifeRange = [0.22, 0.28];
-        colorFn = () =>
-          `hsl(${18 + Math.random() * 22}, 100%, ${62 + Math.random() * 18}%)`;
+        baseCount = 3 * visualBoost;
+        speedBase = 120 * speedBoost; // Faster particles = longer visible trail
+        sizeRange = [2.0 * sizeBoost, 3.2 * sizeBoost];
+        lifeRange = [0.22 * lifeBoost, 0.28 * lifeBoost];
+        // DRAMATIC color shifts: Orange → Bright yellow → PLASMA WHITE
+        colorFn = () => {
+          if (visualLevel >= 5) {
+            // RANK 5: PLASMA WHITE with electric blue corona
+            return Math.random() > 0.3
+              ? `hsl(0, 0%, ${85 + Math.random() * 15}%)` // White core
+              : `hsl(${200 + Math.random() * 20}, 100%, ${80 + Math.random() * 15}%)`;
+          } else if (visualLevel >= 4) {
+            // RANK 4: White-blue
+            return `hsl(${200 + Math.random() * 30}, 100%, ${75 + Math.random() * 15}%)`;
+          } else if (visualLevel >= 3) {
+            // RANK 3: Bright yellow
+            return `hsl(${45 + Math.random() * 15}, 100%, ${70 + Math.random() * 15}%)`;
+          } else if (visualLevel >= 1) {
+            // RANK 1-2: Brighter orange
+            return `hsl(${25 + Math.random() * 20}, 100%, ${65 + Math.random() * 15}%)`;
+          }
+          // Base: Standard orange
+          return `hsl(${18 + Math.random() * 22}, 100%, ${62 + Math.random() * 18}%)`;
+        };
         break;
       case 'aux':
-        baseCount = 2;
-        speedBase = 105;
-        sizeRange = [1.8, 2.6];
-        lifeRange = [0.18, 0.26];
-        colorFn = () =>
-          `hsl(${200 + Math.random() * 25}, 100%, ${68 + Math.random() * 18}%)`;
+        baseCount = 2 * visualBoost;
+        speedBase = 105 * speedBoost;
+        sizeRange = [1.8 * sizeBoost, 2.6 * sizeBoost];
+        lifeRange = [0.18 * lifeBoost, 0.26 * lifeBoost];
+        // Braking thrusters get brighter with upgrades
+        colorFn = () => {
+          if (visualLevel >= 3) {
+            return `hsl(${190 + Math.random() * 20}, 100%, ${75 + Math.random() * 15}%)`;
+          }
+          return `hsl(${200 + Math.random() * 25}, 100%, ${68 + Math.random() * 18}%)`;
+        };
         break;
       default: // 'side'
-        baseCount = 2;
-        speedBase = 110;
-        sizeRange = [1.6, 2.2];
-        lifeRange = [0.16, 0.22];
-        colorFn = () =>
-          `hsl(${200 + Math.random() * 25}, 100%, ${70 + Math.random() * 18}%)`;
+        baseCount = 2 * visualBoost;
+        speedBase = 110 * speedBoost;
+        sizeRange = [1.6 * sizeBoost, 2.2 * sizeBoost];
+        lifeRange = [0.16 * lifeBoost, 0.22 * lifeBoost];
+        // RCS thrusters: Blue → BRIGHT CYAN
+        colorFn = () => {
+          if (visualLevel >= 5) {
+            // RANK 5: ELECTRIC CYAN
+            return `hsl(${180 + Math.random() * 10}, 100%, ${80 + Math.random() * 15}%)`;
+          } else if (visualLevel >= 3) {
+            // RANK 3+: Bright cyan
+            return `hsl(${180 + Math.random() * 20}, 100%, ${75 + Math.random() * 15}%)`;
+          }
+          // Base: Standard blue
+          return `hsl(${200 + Math.random() * 25}, 100%, ${70 + Math.random() * 18}%)`;
+        };
     }
 
     const rawCount = baseCount * (0.8 + i * 2.0);
@@ -596,8 +638,11 @@ export default class EffectsSystem {
         )
       );
 
-      if (Math.random() < this.getScaledProbability(0.25)) {
+      // Spark probability increases with visual level (25% → 70% at rank 5)
+      const sparkProbability = 0.25 + (visualLevel * 0.09);
+      if (Math.random() < this.getScaledProbability(sparkProbability)) {
         const sparkSpd = spd * (0.9 + Math.random() * 0.3);
+        const sparkSize = (1.2 + Math.random() * 0.8) * sizeBoost;
         this.particles.push(
           this.createParticle(
             worldX,
@@ -605,7 +650,7 @@ export default class EffectsSystem {
             -dirX * sparkSpd,
             -dirY * sparkSpd,
             '#FFFFFF',
-            1.2 + Math.random() * 0.8,
+            sparkSize,
             0.08 + Math.random() * 0.06,
             'spark'
           )
