@@ -717,6 +717,9 @@ class PlayerSystem {
   render(ctx, options = {}) {
     if (!ctx) return;
 
+    // Hide ship during quit explosion
+    if (this._quitExplosionHidden) return;
+
     const tilt = typeof options.tilt === 'number' ? options.tilt : 0;
 
     ctx.save();

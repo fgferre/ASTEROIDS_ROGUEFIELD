@@ -344,11 +344,13 @@ function exitToMenu(payload = {}) {
   try {
     // If exiting from pause menu, trigger epic ship explosion first!
     if (payload?.source === 'pause-menu' && gameState.screen === 'playing') {
+      console.log('[App] Quit from pause - triggering epic explosion...');
+
       const player = gameServices.get('player');
-      const world = gameServices.get('world');
+      const effects = gameServices.get('effects');
       const ui = gameServices.get('ui');
 
-      // Unpause game so explosion can play
+      // Unpause game so explosion can animate
       gameState.isPaused = false;
       emitPauseState();
 
@@ -362,16 +364,23 @@ function exitToMenu(payload = {}) {
         ? player.getPosition()
         : (player ? player.position : { x: 960, y: 540 });
 
-      // Trigger player death (which triggers epic explosion)
-      if (world && typeof world.handlePlayerDeath === 'function') {
-        console.log('[App] Triggering epic explosion before exit...');
-        world.handlePlayerDeath();
+      // DIRECTLY trigger epic explosion effect (don't reuse death system!)
+      if (effects && typeof effects.createEpicShipExplosion === 'function') {
+        effects.createEpicShipExplosion(playerPosition);
       }
 
-      // Wait for explosion to play before going to menu
+      // Hide player ship during explosion
+      if (player) {
+        player._quitExplosionHidden = true; // Flag to hide rendering
+      }
+
+      // Wait for explosion to complete before going to menu
       setTimeout(() => {
+        if (player) {
+          player._quitExplosionHidden = false; // Restore for next game
+        }
         performExitToMenu(payload);
-      }, 3500); // 3.5s to see explosion + a bit extra
+      }, 3500); // 3.5s to see full explosion
     } else {
       performExitToMenu(payload);
     }
