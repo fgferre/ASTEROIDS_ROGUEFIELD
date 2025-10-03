@@ -743,33 +743,35 @@ export default class EffectsSystem {
   }
 
   createMuzzleFlash(x, y, dirX, dirY) {
-    // Create 3-5 bright particles shooting forward from weapon barrel
-    const particleCount = this.getScaledParticleCount(3 + Math.random() * 2);
+    // Create 5-8 bright particles shooting forward from weapon barrel
+    const particleCount = this.getScaledParticleCount(5 + Math.random() * 3);
 
     for (let i = 0; i < particleCount; i++) {
-      // Cone spread: ±15° from firing direction
-      const spreadAngle = (Math.random() - 0.5) * 0.26; // ~15° in radians
+      // Cone spread: ±20° from firing direction (wider cone)
+      const spreadAngle = (Math.random() - 0.5) * 0.35; // ~20° in radians
       const angle = Math.atan2(dirY, dirX) + spreadAngle;
 
-      // Speed: 150-250 px/s in firing direction
-      const speed = 150 + Math.random() * 100;
+      // Speed: 200-350 px/s in firing direction (FASTER, more visible)
+      const speed = 200 + Math.random() * 150;
       const vx = Math.cos(angle) * speed;
       const vy = Math.sin(angle) * speed;
 
-      // Color: Yellow-white gradient
-      const brightness = 88 + Math.random() * 12; // 88-100
-      const color = `hsl(${55 + Math.random() * 5}, 100%, ${brightness}%)`;
+      // Color: BRIGHT white-yellow (more visible)
+      const useWhite = Math.random() > 0.5;
+      const color = useWhite
+        ? '#FFFFFF' // Pure white
+        : `hsl(${50 + Math.random() * 10}, 100%, 95%)`; // Very bright yellow
 
-      // Size: 2-4px (small sparks)
-      const size = 2 + Math.random() * 2;
+      // Size: 3-6px (BIGGER sparks, more visible)
+      const size = 3 + Math.random() * 3;
 
-      // Lifetime: 0.08-0.15s (very brief flash)
-      const life = 0.08 + Math.random() * 0.07;
+      // Lifetime: 0.12-0.20s (longer duration)
+      const life = 0.12 + Math.random() * 0.08;
 
       this.particles.push(
         this.createParticle(
-          x + dirX * 8, // Spawn slightly ahead of ship (barrel position)
-          y + dirY * 8,
+          x + dirX * 10, // Spawn further ahead (more visible separation)
+          y + dirY * 10,
           vx,
           vy,
           color,
@@ -787,24 +789,26 @@ export default class EffectsSystem {
 
   createBulletImpact(position, enemyVelocity, killed) {
     // More particles if killed, fewer for just a hit
-    const particleCount = this.getScaledParticleCount(killed ? 8 : 4);
+    const particleCount = this.getScaledParticleCount(killed ? 12 : 6);
 
     for (let i = 0; i < particleCount; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 60 + Math.random() * 80;
+      const speed = 80 + Math.random() * 100; // FASTER (80-180 vs 60-140)
 
-      // Spark color: red if killed, yellow if hit
-      const color = killed ? '#FF6644' : '#FFFF88';
+      // Spark color: BRIGHT red if killed, BRIGHT cyan/blue if hit (different from muzzle)
+      const color = killed
+        ? (Math.random() > 0.3 ? '#FF3333' : '#FFAA00') // Red/orange mix for kills
+        : (Math.random() > 0.5 ? '#00FFFF' : '#88FFFF'); // Cyan for hits (contrast with yellow muzzle)
 
       // Inherit some momentum from the enemy
       const vx = Math.cos(angle) * speed + enemyVelocity.x * 0.3;
       const vy = Math.sin(angle) * speed + enemyVelocity.y * 0.3;
 
-      // Slightly larger sparks if killed
-      const size = killed ? 2 + Math.random() * 2 : 1.5 + Math.random() * 1.5;
+      // BIGGER sparks (more visible)
+      const size = killed ? 3 + Math.random() * 2.5 : 2.5 + Math.random() * 2;
 
-      // Lifetime: 0.15-0.25s
-      const life = 0.15 + Math.random() * 0.1;
+      // Longer lifetime
+      const life = 0.18 + Math.random() * 0.12; // 0.18-0.30s
 
       this.particles.push(
         this.createParticle(
