@@ -1782,21 +1782,21 @@ body.color-assist-mode .upgrade-option__next {
   color: rgba(255, 210, 190, 0.9);
 }
 
-/* Game Over Screen */
+/* Game Over Screen - Semi-transparent overlay */
 #gameover-screen {
-  background: var(--color-bg-4);
-  -webkit-backdrop-filter: blur(5px);
-  backdrop-filter: blur(5px);
+  background: rgba(0, 0, 0, 0.7); /* Dark semi-transparent overlay */
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 
 .gameover-content {
   text-align: center;
   color: var(--color-text);
   padding: var(--space-32);
-  background: var(--color-surface);
+  background: rgba(20, 25, 35, 0.85); /* Semi-transparent dark background */
   border-radius: var(--radius-lg);
   border: 2px solid var(--color-error);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 8px 32px rgba(255, 0, 0, 0.3), var(--shadow-lg);
   max-width: 400px;
 }
 
