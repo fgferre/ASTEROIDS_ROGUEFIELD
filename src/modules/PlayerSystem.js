@@ -926,6 +926,7 @@ class PlayerSystem {
     this.angle = 0;
     this.angularVelocity = 0;
     this.driftFactor = 0;
+    this._quitExplosionHidden = false; // Reset visibility flag
   }
 
   destroy() {

@@ -165,6 +165,11 @@ class WorldSystem {
       ? player.getPosition()
       : (player ? player.position : { x: 960, y: 540 }); // Fallback to center
 
+    // Hide player ship immediately so only explosion is visible
+    if (player) {
+      player._quitExplosionHidden = true;
+    }
+
     const data = {
       player: { level: progression ? progression.getLevel() : 1 },
       stats: enemies

@@ -274,7 +274,8 @@ function setupGlobalEventListeners() {
   });
 
   gameEvents.on('player-died', () => {
-    gameState.screen = 'gameover';
+    // DON'T change screen immediately - let explosion animate!
+    // UISystem will change screen to 'gameover' after 3s delay
     if (gameState.isPaused) {
       gameState.isPaused = false;
       emitPauseState();
@@ -381,6 +382,7 @@ function exitToMenu(payload = {}) {
         }
         performExitToMenu(payload);
       }, 3500); // 3.5s to see full explosion
+      return;
     } else {
       performExitToMenu(payload);
     }

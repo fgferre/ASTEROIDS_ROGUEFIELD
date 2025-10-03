@@ -118,7 +118,8 @@ class CombatSystem {
         ? player.getStats()
         : null;
 
-    if (playerStats) {
+    // Don't shoot if player is hidden (e.g., during quit explosion)
+    if (playerStats && !player._quitExplosionHidden) {
       this.handleShooting(deltaTime, playerStats);
     }
 
@@ -488,6 +489,12 @@ class CombatSystem {
 
   render(ctx) {
     if (!ctx) return;
+
+    // Don't render combat elements if player is hidden (e.g., during quit explosion)
+    const player = this.getCachedPlayer();
+    if (player && player._quitExplosionHidden) {
+      return;
+    }
 
     this.bullets.forEach((bullet) => {
       if (bullet.hit) return;
