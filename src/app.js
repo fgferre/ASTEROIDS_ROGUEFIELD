@@ -342,6 +342,47 @@ function startGame() {
 
 function exitToMenu(payload = {}) {
   try {
+    // If exiting from pause menu, trigger epic ship explosion first!
+    if (payload?.source === 'pause-menu' && gameState.screen === 'playing') {
+      const player = gameServices.get('player');
+      const world = gameServices.get('world');
+      const ui = gameServices.get('ui');
+
+      // Unpause game so explosion can play
+      gameState.isPaused = false;
+      emitPauseState();
+
+      // Hide pause screen to show explosion
+      if (ui && typeof ui.showScreen === 'function') {
+        ui.showScreen('playing');
+      }
+
+      // Get player position for explosion
+      const playerPosition = player && typeof player.getPosition === 'function'
+        ? player.getPosition()
+        : (player ? player.position : { x: 960, y: 540 });
+
+      // Trigger player death (which triggers epic explosion)
+      if (world && typeof world.handlePlayerDeath === 'function') {
+        console.log('[App] Triggering epic explosion before exit...');
+        world.handlePlayerDeath();
+      }
+
+      // Wait for explosion to play before going to menu
+      setTimeout(() => {
+        performExitToMenu(payload);
+      }, 3500); // 3.5s to see explosion + a bit extra
+    } else {
+      performExitToMenu(payload);
+    }
+  } catch (error) {
+    console.error('Erro ao sair para o menu:', error);
+    performExitToMenu(payload); // Fallback
+  }
+}
+
+function performExitToMenu(payload = {}) {
+  try {
     resetGameSystems();
 
     const ui = gameServices.get('ui');
