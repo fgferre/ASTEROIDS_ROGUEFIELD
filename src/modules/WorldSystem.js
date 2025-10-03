@@ -151,12 +151,19 @@ class WorldSystem {
 
   handlePlayerDeath() {
     if (!this.playerAlive) return;
-    this.playerAlive = false;
+
+    console.log('[WorldSystem] Player died - triggering explosion');
 
     this.resolveCachedServices();
 
+    const player = this.cachedPlayer;
     const progression = this.cachedProgression;
     const enemies = this.cachedEnemies;
+
+    // Get player position BEFORE marking as dead
+    const playerPosition = player && typeof player.getPosition === 'function'
+      ? player.getPosition()
+      : (player ? player.position : { x: 960, y: 540 }); // Fallback to center
 
     const data = {
       player: { level: progression ? progression.getLevel() : 1 },
@@ -164,15 +171,22 @@ class WorldSystem {
         ? enemies.getSessionStats()
         : { totalKills: 0, timeElapsed: 0 },
       wave: enemies ? enemies.getWaveState() : { completedWaves: 0 },
+      position: playerPosition, // CRITICAL: Add position for explosion!
     };
 
-    if (enemies && typeof enemies.stop === 'function') {
-      enemies.stop();
-    }
-
+    // Emit player-died FIRST so explosion triggers
     if (typeof gameEvents !== 'undefined') {
       gameEvents.emit('player-died', data);
     }
+
+    // THEN mark player as dead and stop enemies AFTER a delay
+    // This allows the explosion animation to play
+    setTimeout(() => {
+      this.playerAlive = false;
+      if (enemies && typeof enemies.stop === 'function') {
+        enemies.stop();
+      }
+    }, 100); // Small delay to ensure explosion starts
   }
 
   reset() {

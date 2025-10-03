@@ -1782,11 +1782,12 @@ body.color-assist-mode .upgrade-option__next {
   color: rgba(255, 210, 190, 0.9);
 }
 
-/* Game Over Screen - Semi-transparent overlay */
+/* Game Over Screen - Semi-transparent overlay over canvas */
 #gameover-screen {
   background: rgba(0, 0, 0, 0.7); /* Dark semi-transparent overlay */
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
+  pointer-events: all; /* Capture clicks to prevent interaction with game */
 }
 
 .gameover-content {
