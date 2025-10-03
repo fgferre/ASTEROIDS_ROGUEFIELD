@@ -392,8 +392,15 @@ export default class EffectsSystem {
       }
     });
 
-    gameEvents.on('player-took-damage', () => {
+    gameEvents.on('player-took-damage', (data) => {
+      // Intense screen shake
       this.addScreenShake(8, 0.3);
+
+      // Red damage flash
+      this.addScreenFlash('rgba(255, 50, 50, 0.4)', 0.25, 0.3);
+
+      // Brief freeze frame for impact
+      this.addFreezeFrame(0.12, 0.15);
     });
 
     gameEvents.on('shield-shockwave', (data) => {
@@ -404,6 +411,12 @@ export default class EffectsSystem {
 
     gameEvents.on('shield-deflected', (data) => {
       this.createShieldHitEffect(data);
+    });
+
+    gameEvents.on('player-died', (data) => {
+      if (data?.position) {
+        this.createEpicShipExplosion(data.position);
+      }
     });
   }
 
@@ -1000,6 +1013,81 @@ export default class EffectsSystem {
 
     this.addScreenShake(2 + tier * 0.6, 0.12 + tier * 0.03);
     this.addScreenFlash(flashColor, 0.1, 0.14 + tier * 0.02);
+  }
+
+  createEpicShipExplosion(position) {
+    // EPIC DEATH EXPLOSION - High velocity fragments + massive shockwave
+
+    // Huge freeze frame for dramatic impact
+    this.addFreezeFrame(0.35, 0.4);
+
+    // Massive screen shake
+    this.addScreenShake(15, 0.6);
+
+    // Bright white flash
+    this.addScreenFlash('rgba(255, 255, 255, 0.8)', 0.4, 0.6);
+
+    // HIGH VELOCITY FRAGMENTS (50-80 particles)
+    const fragmentCount = this.getScaledParticleCount(50 + Math.random() * 30);
+    for (let i = 0; i < fragmentCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      // HIGH VELOCITY: 250-500 px/s
+      const speed = 250 + Math.random() * 250;
+
+      // Mix of colors: white, yellow, orange, red
+      const colorChoice = Math.random();
+      let color;
+      if (colorChoice < 0.25) color = '#FFFFFF'; // White hot
+      else if (colorChoice < 0.5) color = '#FFFF00'; // Yellow
+      else if (colorChoice < 0.75) color = '#FF8800'; // Orange
+      else color = '#FF3333'; // Red
+
+      // Large fragments
+      const size = 3 + Math.random() * 4;
+
+      // Long lifetime
+      const life = 0.6 + Math.random() * 0.4;
+
+      this.particles.push(
+        this.createParticle(
+          position.x,
+          position.y,
+          Math.cos(angle) * speed,
+          Math.sin(angle) * speed,
+          color,
+          size,
+          life,
+          'debris'
+        )
+      );
+    }
+
+    // MASSIVE DESTRUCTIVE SHOCKWAVE (70% of screen)
+    const screenWidth = CONSTANTS.GAME_WIDTH || 1920;
+    const screenHeight = CONSTANTS.GAME_HEIGHT || 1080;
+    const maxDimension = Math.max(screenWidth, screenHeight);
+    const shockwaveRadius = maxDimension * 0.7; // 70% of screen
+
+    this.createShockwaveEffect({
+      position: position,
+      radius: shockwaveRadius,
+      duration: 0.8, // Longer duration
+      color: 'rgba(255, 100, 50, 0.6)', // Orange-red
+      baseWidth: 8, // Thick wave
+      maxAlpha: 0.8 // Very visible
+    });
+
+    // Secondary inner shockwave (more intense)
+    setTimeout(() => {
+      this.createShockwaveEffect({
+        position: position,
+        radius: shockwaveRadius * 0.5,
+        duration: 0.5,
+        color: 'rgba(255, 200, 100, 0.7)', // Bright yellow-orange
+        baseWidth: 6,
+        maxAlpha: 0.9
+      });
+    }, 100);
   }
 
   createLevelUpExplosion(player) {

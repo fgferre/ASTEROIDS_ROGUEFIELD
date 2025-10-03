@@ -68,6 +68,10 @@ class PlayerSystem {
     this.rcsVisualLevel = 0;
     this.brakingVisualLevel = 0;
 
+    // === WEAPON RECOIL ===
+    this.recoilOffset = { x: 0, y: 0 };
+    this.recoilDecay = 0.85; // Fast decay for snappy feel
+
     this.shieldUpgradeLevel = 0;
     this.shieldMaxHits = 0;
     this.shieldCurrentHits = 0;
@@ -161,6 +165,22 @@ class PlayerSystem {
 
       this.applyShieldLevel(level);
       console.log('[PlayerSystem] Deflector shield upgraded to level', level);
+    });
+
+    gameEvents.on('weapon-fired', (data) => {
+      // Apply recoil when weapon fires
+      if (data?.position && data?.target) {
+        const dx = data.target.x - data.position.x;
+        const dy = data.target.y - data.position.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance > 0) {
+          // Recoil opposite to firing direction
+          const recoilStrength = 2.5; // pixels
+          this.recoilOffset.x = -(dx / distance) * recoilStrength;
+          this.recoilOffset.y = -(dy / distance) * recoilStrength;
+        }
+      }
     });
   }
 
@@ -374,6 +394,14 @@ class PlayerSystem {
     const movement = inputSystem.getMovementInput();
     this.updateMovement(deltaTime, movement);
     this.updatePosition(deltaTime);
+
+    // Update weapon recoil (decay over time)
+    this.recoilOffset.x *= this.recoilDecay;
+    this.recoilOffset.y *= this.recoilDecay;
+
+    // Clear recoil when very small (prevent tiny jitter)
+    if (Math.abs(this.recoilOffset.x) < 0.01) this.recoilOffset.x = 0;
+    if (Math.abs(this.recoilOffset.y) < 0.01) this.recoilOffset.y = 0;
 
     if (this.invulnerableTimer > 0) {
       this.invulnerableTimer = Math.max(0, this.invulnerableTimer - deltaTime);
@@ -822,6 +850,7 @@ class PlayerSystem {
       shieldLevel: this.shieldUpgradeLevel,
       shieldMaxHits: this.shieldMaxHits,
       shieldCooldown: this.shieldMaxCooldown,
+      recoilOffset: this.recoilOffset, // Expose recoil for rendering
     };
   }
 

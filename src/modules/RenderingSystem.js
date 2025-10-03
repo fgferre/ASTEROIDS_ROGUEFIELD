@@ -834,6 +834,14 @@ class RenderingSystem {
       Math.min(MAX_VISUAL_TILT, angularVelocity * TILT_MULTIPLIER),
     );
 
+    // Get recoil offset from player stats
+    const playerStats = typeof player.getStats === 'function' ? player.getStats() : null;
+    const recoilOffset = playerStats?.recoilOffset || { x: 0, y: 0 };
+
+    // Apply recoil by translating the context
+    ctx.save();
+    ctx.translate(recoilOffset.x, recoilOffset.y);
+
     const shieldState =
       typeof player.getShieldState === 'function'
         ? player.getShieldState()
@@ -933,6 +941,9 @@ class RenderingSystem {
     }
 
     player.render(ctx, { tilt });
+
+    // Restore context (remove recoil transform)
+    ctx.restore();
   }
 
   resolveShieldVisual(player, padding) {

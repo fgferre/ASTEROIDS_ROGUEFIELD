@@ -494,17 +494,34 @@ class CombatSystem {
 
       if (bullet.trail.length > 1) {
         ctx.save();
-        ctx.strokeStyle = '#FFFF00';
-        ctx.lineWidth = 2;
         ctx.lineCap = 'round';
-        ctx.globalAlpha = 0.6;
 
-        ctx.beginPath();
-        ctx.moveTo(bullet.trail[0].x, bullet.trail[0].y);
+        // Draw glow layer (wider, softer)
         for (let i = 1; i < bullet.trail.length; i++) {
+          const alpha = (i / bullet.trail.length) * 0.4; // Fade toward tail
+          ctx.strokeStyle = `rgba(255, 255, 100, ${alpha})`;
+          ctx.lineWidth = 4;
+          ctx.globalAlpha = alpha;
+
+          ctx.beginPath();
+          ctx.moveTo(bullet.trail[i - 1].x, bullet.trail[i - 1].y);
           ctx.lineTo(bullet.trail[i].x, bullet.trail[i].y);
+          ctx.stroke();
         }
-        ctx.stroke();
+
+        // Draw core trail (bright, thin)
+        for (let i = 1; i < bullet.trail.length; i++) {
+          const alpha = (i / bullet.trail.length) * 0.8; // Fade toward tail
+          ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+          ctx.lineWidth = 2;
+          ctx.globalAlpha = alpha;
+
+          ctx.beginPath();
+          ctx.moveTo(bullet.trail[i - 1].x, bullet.trail[i - 1].y);
+          ctx.lineTo(bullet.trail[i].x, bullet.trail[i].y);
+          ctx.stroke();
+        }
+
         ctx.restore();
       }
 
