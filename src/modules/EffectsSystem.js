@@ -141,6 +141,7 @@ export default class EffectsSystem {
     this.particles = [];
     this.shockwaves = [];
     this.hitMarkers = []; // NEW: Hit marker tracking
+    this.damageIndicators = []; // NEW: Directional damage indicators
 
     // Upgraded screen shake (Week 1: Balance & Feel)
     this.screenShake = new ScreenShake();
@@ -401,6 +402,11 @@ export default class EffectsSystem {
 
       // Brief freeze frame for impact
       this.addFreezeFrame(0.12, 0.15);
+
+      // Directional damage indicator
+      if (data?.damageSource && data?.playerPosition) {
+        this.createDirectionalDamageIndicator(data.damageSource, data.playerPosition);
+      }
     });
 
     gameEvents.on('shield-shockwave', (data) => {
@@ -438,11 +444,20 @@ export default class EffectsSystem {
     this.updateParticles(deltaTime);
     this.updateShockwaves(deltaTime);
     this.updateHitMarkers(deltaTime);
+    this.updateDamageIndicators(deltaTime);
     return deltaTime;
   }
 
   updateHitMarkers(deltaTime) {
     this.hitMarkers = this.hitMarkers.filter(marker => marker.update(deltaTime));
+  }
+
+  updateDamageIndicators(deltaTime) {
+    this.damageIndicators = this.damageIndicators.filter(indicator => {
+      indicator.life -= deltaTime;
+      indicator.expansion += deltaTime * 30; // Expand at 30px/s
+      return indicator.life > 0;
+    });
   }
 
   updateParticles(deltaTime) {
@@ -520,6 +535,9 @@ export default class EffectsSystem {
 
     // Draw hit markers
     this.hitMarkers.forEach((marker) => marker.draw(ctx));
+
+    // Draw directional damage indicators
+    this.drawDamageIndicators(ctx);
 
     if (this.screenFlash.timer > 0) {
       const alpha =
@@ -798,6 +816,81 @@ export default class EffectsSystem {
 
   createHitMarker(position, killed, damage) {
     this.hitMarkers.push(new HitMarker(position.x, position.y, killed, damage));
+  }
+
+  createDirectionalDamageIndicator(damageSourcePos, playerPos) {
+    // Calculate angle from player to damage source
+    const dx = damageSourcePos.x - playerPos.x;
+    const dy = damageSourcePos.y - playerPos.y;
+    const angle = Math.atan2(dy, dx);
+
+    // Calculate screen edge position
+    // Use half screen dimensions to position at edge
+    const halfWidth = CONSTANTS.GAME_WIDTH / 2;
+    const halfHeight = CONSTANTS.GAME_HEIGHT / 2;
+
+    // Find intersection with screen edge
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+
+    // Calculate which edge the indicator should appear on
+    let edgeX, edgeY;
+    const tanAngle = Math.abs(sin / cos);
+
+    if (tanAngle < halfHeight / halfWidth) {
+      // Hit left or right edge
+      edgeX = cos > 0 ? CONSTANTS.GAME_WIDTH - 40 : 40;
+      edgeY = halfHeight + (edgeX - halfWidth) * (sin / cos);
+    } else {
+      // Hit top or bottom edge
+      edgeY = sin > 0 ? CONSTANTS.GAME_HEIGHT - 40 : 40;
+      edgeX = halfWidth + (edgeY - halfHeight) * (cos / sin);
+    }
+
+    this.damageIndicators.push({
+      x: edgeX,
+      y: edgeY,
+      angle: angle + Math.PI, // Point inward toward threat
+      life: 0.6, // 0.6s visibility
+      maxLife: 0.6,
+      expansion: 0,
+      color: 'rgba(255, 50, 50, 0.9)', // Bright red
+    });
+  }
+
+  drawDamageIndicators(ctx) {
+    this.damageIndicators.forEach((indicator) => {
+      ctx.save();
+
+      // Fade out based on remaining life
+      const alpha = indicator.life / indicator.maxLife;
+
+      // Translate to indicator position
+      ctx.translate(indicator.x, indicator.y);
+      ctx.rotate(indicator.angle);
+
+      // Draw chevron (triple arrow: <<<)
+      ctx.strokeStyle = indicator.color.replace('0.9)', `${alpha * 0.9})`);
+      ctx.fillStyle = indicator.color.replace('0.9)', `${alpha * 0.7})`);
+      ctx.lineWidth = 3;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      const size = 15 + indicator.expansion * 0.5; // Slight expansion
+      const spacing = 8;
+
+      // Draw three chevrons (>>>)
+      for (let i = 0; i < 3; i++) {
+        const offsetX = i * spacing;
+        ctx.beginPath();
+        ctx.moveTo(offsetX, -size);
+        ctx.lineTo(offsetX + size, 0);
+        ctx.lineTo(offsetX, size);
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    });
   }
 
   createBulletImpact(position, enemyVelocity, killed) {

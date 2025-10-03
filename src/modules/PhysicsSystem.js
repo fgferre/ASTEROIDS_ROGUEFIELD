@@ -578,6 +578,8 @@ class PhysicsSystem {
         remaining,
         max: player.maxHealth,
         position: { ...player.position },
+        playerPosition: { x: player.position.x, y: player.position.y },
+        damageSource: { x: asteroid.x, y: asteroid.y },
       });
     }
 

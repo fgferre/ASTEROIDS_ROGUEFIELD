@@ -2030,6 +2030,37 @@ body.motion-reduced #hud-root {
   color: #ff8a8a;
 }
 
+/* Low health blinking animation (25% or less) */
+.hud-item--health.is-low-health .hud-bar__fill {
+  animation: health-bar-blink 1.2s ease-in-out infinite;
+}
+
+.hud-item--health.is-low-health .hud-item__value-number {
+  animation: health-text-blink 1.2s ease-in-out infinite;
+}
+
+@keyframes health-bar-blink {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 18px rgba(255, 75, 90, 0.45);
+  }
+  50% {
+    opacity: 0.4;
+    box-shadow: 0 0 8px rgba(255, 75, 90, 0.2);
+  }
+}
+
+@keyframes health-text-blink {
+  0%, 100% {
+    opacity: 1;
+    text-shadow: 0 0 8px rgba(255, 138, 138, 0.5);
+  }
+  50% {
+    opacity: 0.5;
+    text-shadow: 0 0 4px rgba(255, 138, 138, 0.3);
+  }
+}
+
 .hud-item__content--shield {
   width: 100%;
   display: flex;

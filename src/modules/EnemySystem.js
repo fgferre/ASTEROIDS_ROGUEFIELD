@@ -1104,6 +1104,8 @@ class EnemySystem {
         remaining,
         max: player.maxHealth,
         position: { ...player.position },
+        playerPosition: { x: player.position.x, y: player.position.y },
+        damageSource: context.position ? { x: context.position.x, y: context.position.y } : null,
         cause: context.cause || 'enemy',
       });
     }

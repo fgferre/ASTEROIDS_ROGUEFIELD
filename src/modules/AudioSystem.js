@@ -38,6 +38,9 @@ class AudioSystem {
     this.resumePromise = null;
     this.pendingSoundQueue = [];
 
+    // Low health warning state
+    this.lowHealthWarning = false;
+
     if (typeof gameServices !== 'undefined') {
       gameServices.register('audio', this);
       if (
@@ -170,6 +173,41 @@ class AudioSystem {
 
     gameEvents.on('shield-shockwave', () => {
       this.playShieldShockwave();
+    });
+
+    // UI Sound Effects
+    gameEvents.on('upgrade-applied', (data) => {
+      this.playUpgradeSelect(data?.rarity || 'common');
+    });
+
+    gameEvents.on('pause-state-changed', (data) => {
+      if (data?.isPaused) {
+        this.playPauseOpen();
+      } else {
+        this.playPauseClose();
+      }
+    });
+
+    gameEvents.on('screen-changed', () => {
+      this.playMenuTransition();
+    });
+
+    gameEvents.on('input-confirmed', () => {
+      this.playButtonClick();
+    });
+
+    // Low health warning
+    gameEvents.on('player-health-changed', (data) => {
+      const healthPercent = data?.health / data?.maxHealth;
+      if (healthPercent <= 0.25 && healthPercent > 0) {
+        // Only play if we just entered low health state
+        if (!this.lowHealthWarning) {
+          this.playLowHealthWarning();
+          this.lowHealthWarning = true;
+        }
+      } else {
+        this.lowHealthWarning = false;
+      }
     });
   }
 
@@ -900,6 +938,167 @@ class AudioSystem {
           this.pool.returnGain(noiseGain);
           this.pool.returnGain(oscGain);
         }, 410);
+      }
+    });
+  }
+
+  // === UI Sound Effects ===
+
+  /**
+   * Play upgrade selection sound - pitch varies by rarity
+   */
+  playUpgradeSelect(rarity = 'common') {
+    const frequencies = {
+      'common': 440,      // A4
+      'uncommon': 554,    // C#5
+      'rare': 659,        // E5
+      'epic': 784         // G5
+    };
+
+    const freq = frequencies[rarity] || 440;
+
+    this.safePlay(() => {
+      const osc = this.context.createOscillator();
+      const gain = this.context.createGain();
+
+      osc.connect(gain);
+      this.connectGainNode(gain);
+
+      const now = this.context.currentTime;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.5, now + 0.15);
+
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+
+      osc.start(now);
+      osc.stop(now + 0.15);
+    });
+  }
+
+  /**
+   * Play button click sound - quick blip
+   */
+  playButtonClick() {
+    this.safePlay(() => {
+      const osc = this.context.createOscillator();
+      const gain = this.context.createGain();
+
+      osc.connect(gain);
+      this.connectGainNode(gain);
+
+      const now = this.context.currentTime;
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(880, now);
+
+      gain.gain.setValueAtTime(0.06, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+      osc.start(now);
+      osc.stop(now + 0.04);
+    });
+  }
+
+  /**
+   * Play pause menu open sound - descending "dum"
+   */
+  playPauseOpen() {
+    this.safePlay(() => {
+      const osc = this.context.createOscillator();
+      const gain = this.context.createGain();
+
+      osc.connect(gain);
+      this.connectGainNode(gain);
+
+      const now = this.context.currentTime;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(400, now);
+      osc.frequency.exponentialRampToValueAtTime(300, now + 0.12);
+
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+      osc.start(now);
+      osc.stop(now + 0.12);
+    });
+  }
+
+  /**
+   * Play pause menu close sound - ascending "boop"
+   */
+  playPauseClose() {
+    this.safePlay(() => {
+      const osc = this.context.createOscillator();
+      const gain = this.context.createGain();
+
+      osc.connect(gain);
+      this.connectGainNode(gain);
+
+      const now = this.context.currentTime;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(300, now);
+      osc.frequency.exponentialRampToValueAtTime(400, now + 0.1);
+
+      gain.gain.setValueAtTime(0.12, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+      osc.start(now);
+      osc.stop(now + 0.1);
+    });
+  }
+
+  /**
+   * Play menu transition sound - soft whoosh
+   */
+  playMenuTransition() {
+    this.safePlay(() => {
+      const osc = this.context.createOscillator();
+      const gain = this.context.createGain();
+
+      osc.connect(gain);
+      this.connectGainNode(gain);
+
+      const now = this.context.currentTime;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(600, now);
+      osc.frequency.exponentialRampToValueAtTime(800, now + 0.08);
+
+      gain.gain.setValueAtTime(0.08, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+
+      osc.start(now);
+      osc.stop(now + 0.08);
+    });
+  }
+
+  /**
+   * Play low health warning sound - urgent alarm
+   */
+  playLowHealthWarning() {
+    this.safePlay(() => {
+      const now = this.context.currentTime;
+
+      // Two-tone alarm pattern
+      for (let i = 0; i < 2; i++) {
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+
+        osc.connect(gain);
+        this.connectGainNode(gain);
+
+        const offset = i * 0.15; // Stagger the beeps
+        const freq = i === 0 ? 880 : 660; // High-low pattern
+
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(freq, now + offset);
+
+        gain.gain.setValueAtTime(0, now + offset);
+        gain.gain.linearRampToValueAtTime(0.18, now + offset + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.12);
+
+        osc.start(now + offset);
+        osc.stop(now + offset + 0.12);
       }
     });
   }

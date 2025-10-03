@@ -1894,9 +1894,11 @@ class UISystem {
     const warningThreshold = Math.max(dangerThreshold, 0.6);
     const isDanger = max > 0 && ratio <= dangerThreshold;
     const isWarning = !isDanger && max > 0 && ratio <= warningThreshold;
+    const isLowHealth = max > 0 && ratio <= 0.25 && current > 0; // 25% or less
 
     entry.root.classList.toggle('is-danger', isDanger);
     entry.root.classList.toggle('is-warning', isWarning);
+    entry.root.classList.toggle('is-low-health', isLowHealth);
     entry.root.style.setProperty('--hud-health-ratio', ratio.toFixed(3));
 
     if (entry.bar) {
