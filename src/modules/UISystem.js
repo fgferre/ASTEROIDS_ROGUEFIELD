@@ -817,7 +817,11 @@ class UISystem {
     });
 
     gameEvents.on('player-died', (data) => {
-      this.showGameOverScreen(data);
+      // Delay game over screen to show epic ship explosion
+      // Explosion has: 0.35s freeze + 0.8s shockwave + 0.6-1.0s particles
+      setTimeout(() => {
+        this.showGameOverScreen(data);
+      }, 1500); // 1.5s delay to enjoy the spectacle!
     });
 
     gameEvents.on('player-took-damage', () => {
