@@ -79,11 +79,68 @@ class SpaceParticle {
   }
 }
 
+class HitMarker {
+  constructor(x, y, killed, damage) {
+    this.x = x;
+    this.y = y;
+    this.killed = killed;
+    this.damage = damage;
+    this.life = 0.3; // 0.3s lifetime
+    this.maxLife = 0.3;
+    this.size = killed ? 12 : 8; // Larger for kills
+    this.expansion = 0; // Expands outward
+  }
+
+  update(deltaTime) {
+    this.life -= deltaTime;
+    this.expansion += deltaTime * 20; // Expand at 20px/s
+    return this.life > 0;
+  }
+
+  draw(ctx) {
+    const alpha = Math.max(0, this.life / this.maxLife);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(this.x, this.y);
+
+    const color = this.killed ? '#FF4444' : '#FFFF88';
+    const lineWidth = this.killed ? 2.5 : 2;
+    const radius = this.size + this.expansion;
+
+    // Draw X shape for kills, + shape for hits
+    ctx.strokeStyle = color;
+    ctx.lineWidth = lineWidth;
+    ctx.lineCap = 'round';
+
+    if (this.killed) {
+      // X marker (45° rotation)
+      ctx.rotate(Math.PI / 4);
+      ctx.beginPath();
+      ctx.moveTo(-radius, 0);
+      ctx.lineTo(radius, 0);
+      ctx.moveTo(0, -radius);
+      ctx.lineTo(0, radius);
+      ctx.stroke();
+    } else {
+      // + marker
+      ctx.beginPath();
+      ctx.moveTo(-radius, 0);
+      ctx.lineTo(radius, 0);
+      ctx.moveTo(0, -radius);
+      ctx.lineTo(0, radius);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+}
+
 export default class EffectsSystem {
   constructor(audio) {
     this.audio = audio;
     this.particles = [];
     this.shockwaves = [];
+    this.hitMarkers = []; // NEW: Hit marker tracking
 
     // Upgraded screen shake (Week 1: Balance & Feel)
     this.screenShake = new ScreenShake();
@@ -236,10 +293,17 @@ export default class EffectsSystem {
     if (typeof gameEvents === 'undefined') return;
 
     // Weapon fire feedback (Week 1: Balance & Feel)
-    // DISABLED - User feedback: too dizzying
-    // gameEvents.on('bullet-created', () => {
-    //   this.addScreenShake(0.3, 0.05); // Very subtle shake on weapon fire
-    // });
+    gameEvents.on('bullet-created', (data) => {
+      if (data?.from && data?.bullet) {
+        // Calculate firing direction from bullet velocity
+        const vx = data.bullet.vx || 0;
+        const vy = data.bullet.vy || 0;
+        const speed = Math.sqrt(vx * vx + vy * vy);
+        if (speed > 0) {
+          this.createMuzzleFlash(data.from.x, data.from.y, vx / speed, vy / speed);
+        }
+      }
+    });
 
     gameEvents.on('thruster-effect', (data) => {
       if (!data || !data.position || !data.direction) return;
@@ -263,6 +327,17 @@ export default class EffectsSystem {
           MAIN_THRUSTER_FLASH_COLOR,
           MAIN_THRUSTER_FLASH_DURATION,
           MAIN_THRUSTER_FLASH_INTENSITY
+        );
+      }
+    });
+
+    gameEvents.on('bullet-hit', (data) => {
+      if (data?.position) {
+        this.createHitMarker(data.position, data.killed || false, data.damage || 0);
+        this.createBulletImpact(
+          data.position,
+          { x: data.enemy?.vx || 0, y: data.enemy?.vy || 0 },
+          data.killed || false
         );
       }
     });
@@ -349,7 +424,12 @@ export default class EffectsSystem {
 
     this.updateParticles(deltaTime);
     this.updateShockwaves(deltaTime);
+    this.updateHitMarkers(deltaTime);
     return deltaTime;
+  }
+
+  updateHitMarkers(deltaTime) {
+    this.hitMarkers = this.hitMarkers.filter(marker => marker.update(deltaTime));
   }
 
   updateParticles(deltaTime) {
@@ -424,6 +504,9 @@ export default class EffectsSystem {
     this.particles.forEach((p) => p.draw(ctx));
 
     this.drawShockwaves(ctx);
+
+    // Draw hit markers
+    this.hitMarkers.forEach((marker) => marker.draw(ctx));
 
     if (this.screenFlash.timer > 0) {
       const alpha =
@@ -656,6 +739,85 @@ export default class EffectsSystem {
           )
         );
       }
+    }
+  }
+
+  createMuzzleFlash(x, y, dirX, dirY) {
+    // Create 3-5 bright particles shooting forward from weapon barrel
+    const particleCount = this.getScaledParticleCount(3 + Math.random() * 2);
+
+    for (let i = 0; i < particleCount; i++) {
+      // Cone spread: ±15° from firing direction
+      const spreadAngle = (Math.random() - 0.5) * 0.26; // ~15° in radians
+      const angle = Math.atan2(dirY, dirX) + spreadAngle;
+
+      // Speed: 150-250 px/s in firing direction
+      const speed = 150 + Math.random() * 100;
+      const vx = Math.cos(angle) * speed;
+      const vy = Math.sin(angle) * speed;
+
+      // Color: Yellow-white gradient
+      const brightness = 88 + Math.random() * 12; // 88-100
+      const color = `hsl(${55 + Math.random() * 5}, 100%, ${brightness}%)`;
+
+      // Size: 2-4px (small sparks)
+      const size = 2 + Math.random() * 2;
+
+      // Lifetime: 0.08-0.15s (very brief flash)
+      const life = 0.08 + Math.random() * 0.07;
+
+      this.particles.push(
+        this.createParticle(
+          x + dirX * 8, // Spawn slightly ahead of ship (barrel position)
+          y + dirY * 8,
+          vx,
+          vy,
+          color,
+          size,
+          life,
+          'spark'
+        )
+      );
+    }
+  }
+
+  createHitMarker(position, killed, damage) {
+    this.hitMarkers.push(new HitMarker(position.x, position.y, killed, damage));
+  }
+
+  createBulletImpact(position, enemyVelocity, killed) {
+    // More particles if killed, fewer for just a hit
+    const particleCount = this.getScaledParticleCount(killed ? 8 : 4);
+
+    for (let i = 0; i < particleCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 60 + Math.random() * 80;
+
+      // Spark color: red if killed, yellow if hit
+      const color = killed ? '#FF6644' : '#FFFF88';
+
+      // Inherit some momentum from the enemy
+      const vx = Math.cos(angle) * speed + enemyVelocity.x * 0.3;
+      const vy = Math.sin(angle) * speed + enemyVelocity.y * 0.3;
+
+      // Slightly larger sparks if killed
+      const size = killed ? 2 + Math.random() * 2 : 1.5 + Math.random() * 1.5;
+
+      // Lifetime: 0.15-0.25s
+      const life = 0.15 + Math.random() * 0.1;
+
+      this.particles.push(
+        this.createParticle(
+          position.x,
+          position.y,
+          vx,
+          vy,
+          color,
+          size,
+          life,
+          'spark'
+        )
+      );
     }
   }
 
@@ -1506,6 +1668,7 @@ export default class EffectsSystem {
   reset() {
     this.particles = [];
     this.shockwaves = [];
+    this.hitMarkers = [];
     this.screenShake.reset();
     this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
     this.screenFlash = {

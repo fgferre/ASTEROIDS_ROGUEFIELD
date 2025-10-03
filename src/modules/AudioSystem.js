@@ -139,6 +139,11 @@ class AudioSystem {
       }
     });
 
+    gameEvents.on('bullet-hit', (data) => {
+      // Play hit confirm sound
+      this.playBulletHit(data?.killed || false);
+    });
+
     gameEvents.on('player-took-damage', () => {
       this.playShipHit();
     });
@@ -657,6 +662,52 @@ class AudioSystem {
         osc.start(startTime);
         osc.stop(startTime + 0.5);
       });
+    });
+  }
+
+  playBulletHit(killed = false) {
+    this.safePlay(() => {
+      const osc = this.context.createOscillator();
+      const gain = this.context.createGain();
+
+      osc.connect(gain);
+      this.connectGainNode(gain);
+
+      osc.type = 'square';
+
+      if (killed) {
+        // Kill confirm: Lower pitch, longer, more satisfying
+        osc.frequency.setValueAtTime(220, this.context.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(
+          90,
+          this.context.currentTime + 0.15
+        );
+
+        gain.gain.setValueAtTime(0.15, this.context.currentTime);
+        gain.gain.exponentialRampToValueAtTime(
+          0.001,
+          this.context.currentTime + 0.15
+        );
+
+        osc.start();
+        osc.stop(this.context.currentTime + 0.15);
+      } else {
+        // Hit confirm: Higher pitch, quick, subtle
+        osc.frequency.setValueAtTime(440, this.context.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(
+          220,
+          this.context.currentTime + 0.06
+        );
+
+        gain.gain.setValueAtTime(0.08, this.context.currentTime);
+        gain.gain.exponentialRampToValueAtTime(
+          0.001,
+          this.context.currentTime + 0.06
+        );
+
+        osc.start();
+        osc.stop(this.context.currentTime + 0.06);
+      }
     });
   }
 
