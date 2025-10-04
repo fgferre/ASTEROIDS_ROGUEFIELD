@@ -59,6 +59,12 @@ class CombatSystem {
     gameEvents.on('physics-reset', () => {
       this.resolveCachedServices(true);
     });
+
+    gameEvents.on('player-died', () => {
+      // Clear target when player dies (bullets keep flying)
+      this.currentTarget = null;
+      console.log('[CombatSystem] Player died - cleared target');
+    });
   }
 
   resolveCachedServices(force = false) {
@@ -110,7 +116,6 @@ class CombatSystem {
   // === UPDATE PRINCIPAL ===
   update(deltaTime) {
     this.resolveCachedServices();
-    this.updateTargeting(deltaTime);
 
     const player = this.cachedPlayer;
     const playerStats =
@@ -118,11 +123,16 @@ class CombatSystem {
         ? player.getStats()
         : null;
 
-    // Don't shoot if player is hidden (e.g., during quit explosion)
-    if (playerStats && !player._quitExplosionHidden) {
-      this.handleShooting(deltaTime, playerStats);
+    // Only target and shoot when ship hull exists (visible and alive)
+    if (player && !player.isDead && !player.isRetrying && !player._quitExplosionHidden) {
+      this.updateTargeting(deltaTime);
+
+      if (playerStats) {
+        this.handleShooting(deltaTime, playerStats);
+      }
     }
 
+    // Always update bullets - they keep flying even without ship hull
     this.updateBullets(deltaTime);
 
     const enemies = this.cachedEnemies;
@@ -490,12 +500,9 @@ class CombatSystem {
   render(ctx) {
     if (!ctx) return;
 
-    // Don't render combat elements if player is hidden (e.g., during quit explosion)
     const player = this.getCachedPlayer();
-    if (player && player._quitExplosionHidden) {
-      return;
-    }
 
+    // Always render bullets - they keep flying
     this.bullets.forEach((bullet) => {
       if (bullet.hit) return;
 
@@ -555,7 +562,8 @@ class CombatSystem {
       ctx.fill();
     });
 
-    if (this.currentTarget && !this.currentTarget.destroyed) {
+    // Only render targeting indicator when ship hull exists
+    if (this.currentTarget && !this.currentTarget.destroyed && player && !player.isDead && !player.isRetrying && !player._quitExplosionHidden) {
       const target = this.currentTarget;
       ctx.save();
       ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)';
@@ -566,17 +574,14 @@ class CombatSystem {
       ctx.stroke();
       ctx.restore();
 
-      const player = this.getCachedPlayer();
-      if (player) {
-        ctx.save();
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.3)';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(player.position.x, player.position.y);
-        ctx.lineTo(target.x, target.y);
-        ctx.stroke();
-        ctx.restore();
-      }
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 255, 0, 0.3)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(player.position.x, player.position.y);
+      ctx.lineTo(target.x, target.y);
+      ctx.stroke();
+      ctx.restore();
     }
   }
 

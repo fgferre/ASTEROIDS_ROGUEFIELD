@@ -10,23 +10,23 @@ const DRIFT_SETTINGS = {
 
 const SHIELD_LEVEL_CONFIG = {
   1: {
-    maxHits: CONSTANTS.SHIELD_DEFAULT_HITS,
+    maxHP: 50,
     cooldown: CONSTANTS.SHIELD_COOLDOWN_DURATION,
   },
   2: {
-    maxHits: CONSTANTS.SHIELD_DEFAULT_HITS + 1,
+    maxHP: 75,
     cooldown: CONSTANTS.SHIELD_COOLDOWN_DURATION,
   },
   3: {
-    maxHits: CONSTANTS.SHIELD_DEFAULT_HITS + 1,
+    maxHP: 75,
     cooldown: Math.max(5, CONSTANTS.SHIELD_COOLDOWN_DURATION - 5),
   },
   4: {
-    maxHits: CONSTANTS.SHIELD_DEFAULT_HITS + 2,
+    maxHP: 100,
     cooldown: Math.max(5, CONSTANTS.SHIELD_COOLDOWN_DURATION - 5),
   },
   5: {
-    maxHits: CONSTANTS.SHIELD_DEFAULT_HITS + 2,
+    maxHP: 125,
     cooldown: Math.max(4, CONSTANTS.SHIELD_COOLDOWN_DURATION - 7),
   },
 };
@@ -73,14 +73,17 @@ class PlayerSystem {
     this.recoilDecay = 0.85; // Fast decay for snappy feel
 
     this.shieldUpgradeLevel = 0;
-    this.shieldMaxHits = 0;
-    this.shieldCurrentHits = 0;
+    this.shieldMaxHP = 0;
+    this.shieldHP = 0;
     this.shieldCooldownTimer = 0;
     this.shieldMaxCooldown = 0;
     this.shieldWasInCooldown = false;
     this.isShieldActive = false;
-    this.shieldHitGraceTimer = 0;
     this.invulnerableTimer = 0;
+
+    // === DEATH/RETRY STATE ===
+    this.isDead = false;
+    this.isRetrying = false;
 
     // Registrar no ServiceLocator
     if (typeof gameServices !== 'undefined') {
@@ -191,17 +194,17 @@ class PlayerSystem {
     }
 
     this.shieldUpgradeLevel = level;
-    this.shieldMaxHits = config.maxHits;
+    this.shieldMaxHP = config.maxHP;
     this.shieldMaxCooldown = config.cooldown;
 
     if (this.isShieldActive) {
-      this.shieldCurrentHits = this.shieldMaxHits;
+      this.shieldHP = this.shieldMaxHP;
     } else if (this.shieldCooldownTimer <= 0) {
-      this.shieldCurrentHits = this.shieldMaxHits;
+      this.shieldHP = this.shieldMaxHP;
     } else {
-      this.shieldCurrentHits = Math.min(
-        this.shieldCurrentHits,
-        this.shieldMaxHits
+      this.shieldHP = Math.min(
+        this.shieldHP,
+        this.shieldMaxHP
       );
     }
 
@@ -223,11 +226,11 @@ class PlayerSystem {
 
     gameEvents.emit('shield-stats-changed', {
       level: this.shieldUpgradeLevel,
-      maxHits: this.shieldMaxHits,
-      currentHits:
+      maxHP: this.shieldMaxHP,
+      currentHP:
         this.isShieldActive || this.shieldCooldownTimer > 0
-          ? this.shieldCurrentHits
-          : this.shieldMaxHits,
+          ? this.shieldHP
+          : this.shieldMaxHP,
       isActive: this.isShieldActive,
       cooldownTimer: this.shieldCooldownTimer,
       cooldownDuration: this.shieldMaxCooldown,
@@ -259,20 +262,19 @@ class PlayerSystem {
       return false;
     }
 
-    if (this.shieldMaxHits <= 0) {
+    if (this.shieldMaxHP <= 0) {
       this.emitShieldActivationFailed('unavailable');
       return false;
     }
 
     this.isShieldActive = true;
-    this.shieldCurrentHits = this.shieldMaxHits;
+    this.shieldHP = this.shieldMaxHP;
     this.shieldWasInCooldown = false;
-    this.shieldHitGraceTimer = 0;
 
     if (typeof gameEvents !== 'undefined') {
       gameEvents.emit('shield-activated', {
         level: this.shieldUpgradeLevel,
-        maxHits: this.shieldMaxHits,
+        maxHP: this.shieldMaxHP,
       });
     }
 
@@ -280,27 +282,24 @@ class PlayerSystem {
     return true;
   }
 
-  shieldTookHit() {
-    if (!this.isShieldActive || this.shieldMaxHits <= 0) {
+  shieldTookDamage(damageAmount) {
+    if (!this.isShieldActive || this.shieldMaxHP <= 0) {
       return false;
     }
 
-    if (this.shieldHitGraceTimer > 0) {
-      return false;
-    }
-
-    this.shieldHitGraceTimer = CONSTANTS.SHIELD_HIT_GRACE_TIME;
-    this.shieldCurrentHits = Math.max(0, this.shieldCurrentHits - 1);
+    const actualDamage = Math.max(0, damageAmount);
+    this.shieldHP = Math.max(0, this.shieldHP - actualDamage);
 
     if (typeof gameEvents !== 'undefined') {
       gameEvents.emit('shield-hit', {
         level: this.shieldUpgradeLevel,
-        remainingHits: this.shieldCurrentHits,
-        maxHits: this.shieldMaxHits,
+        remainingHP: this.shieldHP,
+        maxHP: this.shieldMaxHP,
+        damage: actualDamage,
       });
     }
 
-    if (this.shieldCurrentHits <= 0) {
+    if (this.shieldHP <= 0) {
       this.breakShield();
     } else {
       this.emitShieldStats();
@@ -315,8 +314,7 @@ class PlayerSystem {
     }
 
     this.isShieldActive = false;
-    this.shieldCurrentHits = 0;
-    this.shieldHitGraceTimer = 0;
+    this.shieldHP = 0;
 
     if (typeof gameEvents !== 'undefined') {
       gameEvents.emit('shield-broken', {
@@ -324,12 +322,12 @@ class PlayerSystem {
       });
     }
 
+    // Level 5: Deflective explosion on shield break
     if (this.shieldUpgradeLevel >= 5 && typeof gameEvents !== 'undefined') {
       const position = this.getPosition();
-      gameEvents.emit('shield-shockwave', {
+      gameEvents.emit('shield-deflective-explosion', {
         position,
-        radius: CONSTANTS.SHIELD_SHOCKWAVE_RADIUS,
-        force: CONSTANTS.SHIELD_SHOCKWAVE_FORCE,
+        level: this.shieldUpgradeLevel,
       });
     }
 
@@ -344,7 +342,7 @@ class PlayerSystem {
           level: this.shieldUpgradeLevel,
         });
       }
-      this.shieldCurrentHits = this.shieldMaxHits;
+      this.shieldHP = this.shieldMaxHP;
     }
 
     this.emitShieldStats();
@@ -353,11 +351,15 @@ class PlayerSystem {
   getShieldState() {
     return {
       level: this.shieldUpgradeLevel,
-      maxHits: this.shieldMaxHits,
-      currentHits:
+      maxHits: this.shieldMaxHP, // For backward compatibility with rendering
+      currentHits: this.isShieldActive || this.shieldCooldownTimer > 0
+          ? this.shieldHP
+          : this.shieldMaxHP, // For backward compatibility with rendering
+      maxHP: this.shieldMaxHP,
+      currentHP:
         this.isShieldActive || this.shieldCooldownTimer > 0
-          ? this.shieldCurrentHits
-          : this.shieldMaxHits,
+          ? this.shieldHP
+          : this.shieldMaxHP,
       cooldownTimer: this.shieldCooldownTimer,
       cooldownDuration: this.shieldMaxCooldown,
       isActive: this.isShieldActive,
@@ -380,15 +382,22 @@ class PlayerSystem {
         this.shieldCooldownTimer = 0;
         if (this.shieldWasInCooldown) {
           this.shieldWasInCooldown = false;
-          this.shieldCurrentHits = this.shieldMaxHits;
+          this.shieldHP = this.shieldMaxHP;
           if (typeof gameEvents !== 'undefined') {
             gameEvents.emit('shield-recharged', {
               level: this.shieldUpgradeLevel,
             });
           }
           this.emitShieldStats();
+        } else {
+          this.emitShieldStats(); // Emit stats during cooldown for UI progress bar
         }
       }
+    }
+
+    // === ONLY UPDATE WHEN ALIVE: ===
+    if (this.isDead || this.isRetrying) {
+      return; // Don't process input, movement, or effects when dead/retrying
     }
 
     const movement = inputSystem.getMovementInput();
@@ -717,8 +726,8 @@ class PlayerSystem {
   render(ctx, options = {}) {
     if (!ctx) return;
 
-    // Hide ship during quit explosion
-    if (this._quitExplosionHidden) return;
+    // Hide ship when dead or during quit explosion
+    if (this.isDead || this._quitExplosionHidden) return;
 
     const tilt = typeof options.tilt === 'number' ? options.tilt : 0;
 
@@ -805,16 +814,18 @@ class PlayerSystem {
 
   // === GERENCIAMENTO DE VIDA ===
   takeDamage(amount) {
-    if (this.isShieldActive) {
-      this.shieldTookHit();
-      return undefined;
-    }
-
     const damageAmount = Math.max(0, amount);
     if (damageAmount <= 0) {
       return this.health;
     }
 
+    // Shield absorbs damage if active
+    if (this.isShieldActive) {
+      this.shieldTookDamage(damageAmount);
+      return undefined; // Shield absorbed all damage
+    }
+
+    // Apply damage to health
     const previousHealth = this.health;
     this.health = Math.max(0, this.health - damageAmount);
 
@@ -851,7 +862,7 @@ class PlayerSystem {
       multishot: this.multishot,
       magnetismRadius: this.magnetismRadius,
       shieldLevel: this.shieldUpgradeLevel,
-      shieldMaxHits: this.shieldMaxHits,
+      shieldMaxHP: this.shieldMaxHP,
       shieldCooldown: this.shieldMaxCooldown,
       recoilOffset: this.recoilOffset, // Expose recoil for rendering
     };
@@ -885,13 +896,12 @@ class PlayerSystem {
 
   resetShieldState() {
     this.shieldUpgradeLevel = 0;
-    this.shieldMaxHits = 0;
-    this.shieldCurrentHits = 0;
+    this.shieldMaxHP = 0;
+    this.shieldHP = 0;
     this.shieldCooldownTimer = 0;
     this.shieldMaxCooldown = 0;
     this.shieldWasInCooldown = false;
     this.isShieldActive = false;
-    this.shieldHitGraceTimer = 0;
   }
 
   resetStats() {
@@ -927,6 +937,38 @@ class PlayerSystem {
     this.angularVelocity = 0;
     this.driftFactor = 0;
     this._quitExplosionHidden = false; // Reset visibility flag
+    this.isDead = false;
+    this.isRetrying = false;
+  }
+
+  markDead() {
+    this.isDead = true;
+    this.isRetrying = false;
+    console.log('[PlayerSystem] Player marked as dead');
+  }
+
+  respawn(position, invulnerabilityDuration = 3) {
+    this.isDead = false;
+    this.isRetrying = false;
+
+    if (position) {
+      this.position.x = position.x;
+      this.position.y = position.y;
+    }
+
+    // Reset velocity and rotation
+    this.velocity.vx = 0;
+    this.velocity.vy = 0;
+    this.angularVelocity = 0;
+    this.driftFactor = 0;
+
+    // Give invulnerability
+    this.invulnerableTimer = invulnerabilityDuration;
+
+    // Show ship again
+    this._quitExplosionHidden = false;
+
+    console.log('[PlayerSystem] Player respawned at', position, 'with', invulnerabilityDuration, 's invulnerability');
   }
 
   destroy() {

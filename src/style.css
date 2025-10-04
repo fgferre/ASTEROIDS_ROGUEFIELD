@@ -1790,38 +1790,81 @@ body.color-assist-mode .upgrade-option__next {
   pointer-events: all; /* Capture clicks to prevent interaction with game */
 }
 
+/* Game Over Overlay - appears on top of faded game canvas */
+#gameover-screen:not(.hidden) {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: rgba(0, 0, 0, 0.75) !important;
+  z-index: 100 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
 .gameover-content {
+  font-family: 'FKGroteskNeue', 'Geist', 'Inter', sans-serif;
   text-align: center;
   color: var(--color-text);
-  padding: var(--space-32);
-  background: rgba(20, 25, 35, 0.85); /* Semi-transparent dark background */
-  border-radius: var(--radius-lg);
-  border: 2px solid var(--color-error);
-  box-shadow: 0 8px 32px rgba(255, 0, 0, 0.3), var(--shadow-lg);
+  padding: clamp(1.5rem, 4vw, 2rem);
+  background: linear-gradient(135deg, rgba(12, 20, 36, 0.95), rgba(8, 14, 28, 0.95));
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 75, 90, 0.5);
+  box-shadow:
+    0 0 30px rgba(255, 75, 90, 0.3),
+    0 8px 24px rgba(0, 0, 0, 0.5);
   max-width: 400px;
+  backdrop-filter: blur(12px);
 }
 
 .gameover-title {
-  font-size: 2.5rem;
-  color: var(--color-error);
-  margin-bottom: var(--space-24);
-  text-transform: uppercase;
-  letter-spacing: 2px;
+  font-family: 'FKGroteskNeue', 'Geist', 'Inter', sans-serif;
+  font-size: clamp(1.75rem, 5vw, 2.25rem);
+  color: #ff6b6b;
+  margin-bottom: 1.5rem;
+  text-transform: none;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-shadow:
+    0 0 16px rgba(255, 107, 107, 0.6),
+    0 0 8px rgba(255, 107, 107, 0.4);
 }
 
 .stats {
-  margin: var(--space-24) 0;
+  margin: 1.25rem 0;
 }
 
 .stats p {
-  font-size: var(--font-size-lg);
-  margin-bottom: var(--space-12);
-  color: var(--color-text-secondary);
+  font-family: 'FKGroteskNeue', 'Geist', 'Inter', sans-serif;
+  font-size: 0.95rem;
+  margin-bottom: 0.5rem;
+  color: rgba(255, 255, 255, 0.65);
+  font-weight: 500;
 }
 
 .stat-value {
-  color: var(--color-primary);
-  font-weight: var(--font-weight-bold);
+  color: #00aaff;
+  font-weight: 700;
+  text-shadow: 0 0 6px rgba(0, 170, 255, 0.4);
+  margin-left: 0.5rem;
+}
+
+.gameover-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  margin-top: 1.5rem;
+}
+
+.gameover-actions .btn {
+  font-family: 'FKGroteskNeue', 'Geist', 'Inter', sans-serif;
+  padding: 0.65rem 1.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0.02em;
 }
 
 /* Game UI */
@@ -2653,6 +2696,410 @@ body.hud-high-contrast .wave-progress-bar {
 /* Utility: re-enable interactions within overlay when needed */
 .hud-interactive-area {
   pointer-events: auto;
+}
+
+/* === FRAMELESS FLOATING HUD REDESIGN === */
+/* Clean floating text with FKGroteskNeue font, no background boxes */
+
+/* Remove ALL backgrounds, borders, and boxes from ALL HUD items */
+.hud-item,
+.hud-region--top-left .hud-item,
+.hud-region--top-middle .hud-item,
+.hud-region--top-right .hud-item,
+.hud-region--bottom-left .hud-item,
+.hud-region--bottom-center .hud-item,
+.hud-region--bottom-right .hud-item,
+#hud-wave,
+.hud-panel {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  padding: 0.5rem !important;
+  gap: 0.5rem !important;
+  flex: 0 0 auto;
+  min-width: auto;
+}
+
+/* Ensure health item has no background either */
+.hud-item--health,
+.hud-item--shield,
+.hud-item--level,
+.hud-item--kills,
+.hud-item--time {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Apply FKGroteskNeue font to all HUD elements */
+.hud-item,
+.hud-item__value,
+.hud-item__label,
+.hud-panel__title,
+.wave-enemies,
+.xp-text {
+  font-family: 'FKGroteskNeue', 'Geist', 'Inter', -apple-system, sans-serif !important;
+}
+
+/* Hide verbose labels - icons + values only */
+.hud-region--top-left .hud-item__label,
+.hud-region--top-middle .hud-item__label,
+.hud-region--top-right .hud-item__label {
+  display: none !important;
+}
+
+/* === TOP LEFT: HEALTH + SHIELD === */
+.hud-item--health {
+  width: auto !important;
+  max-width: none !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  position: relative !important;
+}
+
+.hud-item--health .hud-item__content {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 0.25rem !important;
+  position: relative !important;
+}
+
+.hud-item--health .hud-item__icon {
+  font-size: 18px;
+  filter: drop-shadow(0 0 8px rgba(255, 75, 90, 0.6));
+  order: -1;
+}
+
+.hud-item--health .hud-item__value {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #ff6b6b;
+  text-shadow:
+    0 0 10px rgba(255, 107, 107, 0.7),
+    0 0 4px rgba(255, 75, 90, 0.5),
+    0 2px 4px rgba(0, 0, 0, 0.8);
+  position: absolute;
+  top: -18px;
+  right: 0;
+  white-space: nowrap;
+}
+
+.hud-item--health .hud-bar {
+  width: 180px !important;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.5) !important;
+  border: 1px solid rgba(255, 107, 107, 0.4);
+  border-radius: 3px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+/* === SHIELD BAR (HP-based, below health) === */
+.hud-item--shield {
+  width: auto !important;
+  max-width: none !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+  position: relative !important;
+  margin-top: 0.25rem !important; /* Closer to health bar */
+}
+
+.hud-item--shield .hud-item__content {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  gap: 0.25rem !important;
+  position: relative !important;
+}
+
+.hud-item--shield .hud-item__icon {
+  font-size: 18px;
+  filter: drop-shadow(0 0 8px rgba(0, 170, 255, 0.6));
+  order: -1;
+}
+
+.hud-item--shield .hud-item__value {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #00aaff;
+  text-shadow:
+    0 0 10px rgba(0, 170, 255, 0.7),
+    0 0 4px rgba(0, 170, 255, 0.5),
+    0 2px 4px rgba(0, 0, 0, 0.8);
+  position: absolute;
+  top: -18px;
+  right: 0;
+  white-space: nowrap;
+}
+
+.hud-item--shield .hud-bar {
+  width: 180px !important;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.5) !important;
+  border: 1px solid rgba(0, 170, 255, 0.4);
+  border-radius: 3px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.hud-item--shield .hud-bar__fill {
+  background: linear-gradient(90deg, #00aaff, #5ec8ff) !important;
+  box-shadow:
+    0 0 14px rgba(0, 170, 255, 0.9),
+    0 0 8px rgba(94, 200, 255, 0.7) !important;
+}
+
+/* Hide shield when not available (no upgrade) */
+.hud-item--shield.is-unavailable {
+  display: none !important;
+}
+
+/* === TOP MIDDLE: LEVEL === */
+.hud-item--level {
+  width: auto !important;
+  max-width: none !important;
+  padding: 0.25rem 0 !important;
+}
+
+.hud-item--level .hud-item__value {
+  font-size: 20px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #00aaff;
+  text-shadow:
+    0 0 16px rgba(0, 170, 255, 0.9),
+    0 0 6px rgba(0, 170, 255, 0.7),
+    0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+/* === TOP RIGHT: KILLS + TIME === */
+.hud-region--top-right {
+  flex-direction: row !important;
+  gap: 1.5rem !important;
+}
+
+.hud-item--kills,
+.hud-item--time {
+  width: auto !important;
+  min-width: auto !important;
+  max-width: none !important;
+  padding: 0.25rem 0 !important;
+}
+
+.hud-item--kills .hud-item__icon,
+.hud-item--time .hud-item__icon {
+  font-size: 18px;
+  filter: drop-shadow(0 0 6px rgba(0, 170, 255, 0.5));
+}
+
+.hud-item--kills .hud-item__value,
+.hud-item--time .hud-item__value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #00aaff;
+  text-shadow:
+    0 0 10px rgba(0, 170, 255, 0.7),
+    0 0 4px rgba(0, 170, 255, 0.5),
+    0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.hud-item--kills .hud-item__value-unit,
+.hud-item--time .hud-item__value-unit {
+  display: none !important;
+}
+
+/* === BOTTOM LEFT: WAVE PANEL === */
+.hud-region--bottom-left #hud-wave {
+  width: auto !important;
+  max-width: none !important;
+  padding: 0.5rem !important;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.hud-region--bottom-left #hud-wave .hud-panel__header {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.hud-region--bottom-left #hud-wave .hud-panel__title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+  color: #00aaff;
+  text-shadow:
+    0 0 10px rgba(0, 170, 255, 0.7),
+    0 0 4px rgba(0, 170, 255, 0.5),
+    0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.hud-region--bottom-left #hud-wave .wave-timer {
+  display: none !important;
+}
+
+.hud-region--bottom-left #hud-wave .wave-progress {
+  width: 120px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.4) !important;
+  border: 1px solid rgba(0, 170, 255, 0.3);
+  border-radius: 3px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+.hud-region--bottom-left #hud-wave .wave-enemies {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  color: #00aaff;
+  text-shadow:
+    0 0 10px rgba(0, 170, 255, 0.7),
+    0 0 4px rgba(0, 170, 255, 0.5),
+    0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+/* Hide verbose "Asteroides eliminados:" label */
+.wave-enemies::before {
+  content: '' !important;
+}
+
+/* === BOTTOM CENTER: XP BAR === */
+.hud-region--bottom-center #hud-xp {
+  max-width: 300px !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 0.75rem !important;
+  padding: 0.5rem !important;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.hud-region--bottom-center #hud-xp .xp-text {
+  order: -1;
+  font-size: 14px;
+  font-weight: 700;
+  color: #00aaff;
+  text-shadow:
+    0 0 10px rgba(0, 170, 255, 0.7),
+    0 0 4px rgba(0, 170, 255, 0.5),
+    0 2px 4px rgba(0, 0, 0, 0.8);
+  white-space: nowrap;
+}
+
+.hud-region--bottom-center #hud-xp .xp-bar {
+  display: block !important;
+  flex: 1 !important;
+  min-width: 150px !important;
+  height: 6px !important;
+  background: rgba(0, 0, 0, 0.4) !important;
+  border: 1px solid rgba(0, 170, 255, 0.3) !important;
+  border-radius: 3px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6) !important;
+  overflow: hidden !important;
+}
+
+/* === PROGRESS BAR FILLS === */
+.xp-progress,
+.wave-progress-bar {
+  display: block !important;
+  background: linear-gradient(90deg, #00ff88, #00aaff) !important;
+  box-shadow:
+    0 0 12px rgba(0, 170, 255, 0.8),
+    0 0 6px rgba(0, 255, 136, 0.6) !important;
+  border-radius: 2px !important;
+  height: 100% !important;
+  transition: width 0.3s ease !important;
+}
+
+/* Health bar: Red gradient */
+.hud-item--health .hud-bar__fill {
+  display: block !important;
+  background: linear-gradient(90deg, #ff6b6b, #ff4b5c) !important;
+  box-shadow:
+    0 0 14px rgba(255, 107, 107, 0.9),
+    0 0 8px rgba(255, 75, 92, 0.7) !important;
+  border-radius: 2px !important;
+  height: 100% !important;
+  transition: width 0.3s ease !important;
+}
+
+/* Low health becomes darker red */
+.hud-item--health.is-low-health .hud-bar__fill {
+  background: linear-gradient(90deg, #ff4444, #ff2f4b) !important;
+  box-shadow:
+    0 0 16px rgba(255, 47, 75, 0.95),
+    0 0 10px rgba(255, 68, 68, 0.8) !important;
+}
+
+/* === NUCLEAR OPTION: KILL ALL BOXES EVERYWHERE === */
+/* This overrides everything to ensure frameless design */
+.hud-item,
+.hud-item::before,
+.hud-item::after {
+  background: none !important;
+  background-image: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* === WAVE COUNTDOWN: CENTERED FLOATING TEXT === */
+.wave-countdown {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.5rem !important;
+}
+
+.countdown-label {
+  font-family: 'FKGroteskNeue', sans-serif !important;
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.15em !important;
+  color: #00aaff !important;
+  text-shadow:
+    0 0 20px rgba(0, 170, 255, 1),
+    0 0 10px rgba(0, 170, 255, 0.8),
+    0 2px 8px rgba(0, 0, 0, 0.9) !important;
+}
+
+.countdown-value {
+  font-family: 'FKGroteskNeue', sans-serif !important;
+  font-size: 48px !important;
+  font-weight: 700 !important;
+  color: #00ff88 !important;
+  text-shadow:
+    0 0 24px rgba(0, 255, 136, 1),
+    0 0 12px rgba(0, 255, 136, 0.8),
+    0 2px 8px rgba(0, 0, 0, 0.9) !important;
+}
+
+.wave-countdown.is-visible {
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .wave-countdown {

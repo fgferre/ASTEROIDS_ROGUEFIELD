@@ -40,8 +40,8 @@ class UISystem {
       health: { current: null, max: null },
       shield: {
         level: null,
-        maxHits: null,
-        currentHits: null,
+        maxHP: null,
+        currentHP: null,
         isActive: null,
         isUnlocked: null,
         isOnCooldown: null,
@@ -637,35 +637,40 @@ class UISystem {
       label.classList.add('hud-item__label');
       label.textContent = config.label;
 
-      const status = document.createElement('span');
-      status.classList.add('hud-item__shield-status');
-      status.textContent = config.initialValue ?? '--';
+      const valueWrapper = document.createElement('span');
+      valueWrapper.classList.add('hud-item__value', 'hud-item__value--shield');
+
+      const valueNumber = document.createElement('span');
+      valueNumber.classList.add('hud-item__value-number');
+      valueNumber.textContent = config.initialValue ?? '--';
       if (config.valueId) {
-        status.id = config.valueId;
+        valueNumber.id = config.valueId;
       }
+      valueWrapper.appendChild(valueNumber);
 
-      header.append(label, status);
+      header.append(label, valueWrapper);
 
-      const slotsContainer = document.createElement('div');
-      slotsContainer.classList.add('shield-slots');
-      slotsContainer.setAttribute('aria-hidden', 'true');
+      const bar = document.createElement('div');
+      bar.classList.add('hud-bar', 'hud-bar--shield');
+      bar.setAttribute('role', 'progressbar');
+      bar.setAttribute('aria-valuemin', '0');
+      bar.setAttribute('aria-valuemax', '100');
 
-      content.append(header, slotsContainer);
+      const barFill = document.createElement('div');
+      barFill.classList.add('hud-bar__fill');
+      barFill.style.width = '0%';
+      bar.appendChild(barFill);
+
+      content.append(header, bar);
       root.appendChild(content);
-
-      const overlay = document.createElement('div');
-      overlay.id = config.overlayId || 'shield-cooldown-overlay';
-      overlay.classList.add('hud-item__cooldown');
-      root.appendChild(overlay);
 
       return {
         key: config.key,
         config,
         root,
-        value: status,
-        overlay,
-        slotsContainer,
-        slots: [],
+        value: valueNumber,
+        bar: bar,
+        barFill,
       };
     }
 
@@ -1993,7 +1998,7 @@ class UISystem {
         needed !== this.cachedValues.xp.needed;
 
       if (shouldUpdateText) {
-        xpText.textContent = `XP: ${current} / ${needed}`;
+        xpText.textContent = `⚡ ${current} / ${needed}`;
         this.cachedValues.xp.current = current;
         this.cachedValues.xp.needed = needed;
 
@@ -2187,9 +2192,9 @@ class UISystem {
         );
         const valueText = normalized.isActive
           ? formattedTotal
-            ? `Asteroides eliminados: ${formattedKills} de ${formattedTotal}`
-            : `Asteroides eliminados: ${formattedKills}`
-          : 'Setor concluído';
+            ? `Kills: ${formattedKills} of ${formattedTotal}`
+            : `Kills: ${formattedKills}`
+          : 'Sector complete';
         waveRefs.progressTrack.setAttribute('aria-valuetext', valueText);
       }
     }
@@ -2203,12 +2208,12 @@ class UISystem {
 
       if (normalized.isActive) {
         enemiesText = formattedTotal
-          ? `Asteroides eliminados: ${formattedKills} / ${formattedTotal}`
-          : `Asteroides eliminados: ${formattedKills}`;
+          ? `☄ ${formattedKills} / ${formattedTotal}`
+          : `☄ ${formattedKills}`;
       } else if (inBreak) {
-        enemiesText = `Próximo setor em: ${breakSeconds}s`;
+        enemiesText = `⏱ ${breakSeconds}s`;
       } else if (waveCompleted) {
-        enemiesText = 'Setor limpo!';
+        enemiesText = '✓ Clear!';
       }
 
       if (waveRefs.enemies.textContent !== enemiesText) {
@@ -2297,8 +2302,8 @@ class UISystem {
 
     const state = shieldState || {
       level: 0,
-      maxHits: 0,
-      currentHits: 0,
+      maxHP: 0,
+      currentHP: 0,
       cooldownTimer: 0,
       cooldownDuration: 0,
       isActive: false,
@@ -2310,15 +2315,15 @@ class UISystem {
 
     const cooldownRatio =
       state.isOnCooldown && state.cooldownDuration > 0
-        ? Math.max(0, Math.min(1, state.cooldownTimer / state.cooldownDuration))
+        ? 1 - Math.max(0, Math.min(1, state.cooldownTimer / state.cooldownDuration))
         : 0;
 
     const cached = this.cachedValues.shield;
     const shouldUpdate =
       force ||
       cached.level !== state.level ||
-      cached.maxHits !== state.maxHits ||
-      cached.currentHits !== state.currentHits ||
+      cached.maxHP !== state.maxHP ||
+      cached.currentHP !== state.currentHP ||
       cached.isActive !== state.isActive ||
       cached.isUnlocked !== state.isUnlocked ||
       cached.isOnCooldown !== state.isOnCooldown ||
@@ -2337,127 +2342,53 @@ class UISystem {
     );
 
     const statusLabel = entry.value;
-    const slotsContainer = entry.slotsContainer;
-    const ensureSlots = (count) => {
-      if (!slotsContainer) {
-        return;
-      }
-
-      const safeCount = Math.max(0, Math.floor(count));
-      if (!Array.isArray(entry.slots)) {
-        entry.slots = [];
-      }
-
-      if (entry.slots.length === safeCount) {
-        return;
-      }
-
-      slotsContainer.innerHTML = '';
-      entry.slots = [];
-
-      if (safeCount <= 0) {
-        const placeholder = document.createElement('span');
-        placeholder.classList.add('shield-slot', 'shield-slot--empty');
-        slotsContainer.appendChild(placeholder);
-        return;
-      }
-
-      for (let i = 0; i < safeCount; i += 1) {
-        const slot = document.createElement('span');
-        slot.classList.add('shield-slot');
-        slotsContainer.appendChild(slot);
-        entry.slots.push(slot);
-      }
-    };
-
-    let statusText = '--';
 
     if (!state.isUnlocked) {
       entry.root.classList.add('locked');
-      statusText = 'Offline';
-      ensureSlots(0);
+      statusLabel.textContent = '--';
 
-      if (entry.overlay) {
-        entry.overlay.style.transform = 'scaleY(1)';
-        entry.overlay.style.opacity = '0.4';
+      if (entry.bar) {
+        entry.bar.style.opacity = '0.3';
+        if (entry.barFill) {
+          entry.barFill.style.width = '0%';
+        }
       }
     } else {
-      const maxHitsTotal = Math.max(0, state.maxHits);
-      ensureSlots(maxHitsTotal);
+      const maxHP = Math.max(0, state.maxHP);
+      const currentHP = state.isActive
+        ? Math.max(0, state.currentHP)
+        : maxHP;
 
-      const remainingHits = state.isActive
-        ? Math.max(0, state.currentHits)
-        : maxHitsTotal;
+      // Update HP text display
+      statusLabel.textContent = `${currentHP}/${maxHP}`;
 
-      if (Array.isArray(entry.slots)) {
-        let consumedHit = false;
+      // Update HP bar fill
+      if (entry.bar && entry.barFill) {
+        const hpRatio = maxHP > 0 ? Math.max(0, Math.min(1, currentHP / maxHP)) : 0;
 
-        entry.slots.forEach((slot, index) => {
-          const wasCharged = slot.classList.contains('is-charged');
-          const shouldBeCharged = index < remainingHits;
-          const shouldBeActive = state.isActive && index < remainingHits;
-
-          slot.classList.toggle('is-charged', shouldBeCharged);
-          slot.classList.toggle('is-depleted', !shouldBeCharged);
-          slot.classList.toggle('is-active', shouldBeActive);
-
-          if (wasCharged && !shouldBeCharged) {
-            consumedHit = true;
-            slot.classList.remove('was-consumed');
-            void slot.offsetWidth;
-            slot.classList.add('was-consumed');
-          }
-        });
-
-        if (consumedHit && entry.root) {
-          entry.root.classList.remove('shield-hit');
-          void entry.root.offsetWidth;
-          entry.root.classList.add('shield-hit');
-        }
-      }
-
-      if (slotsContainer) {
-        slotsContainer.classList.toggle('is-cooling', state.isOnCooldown);
-      }
-
-      if (state.isActive) {
-        statusText = `Ativo · ${remainingHits}/${maxHitsTotal}`;
-      } else if (state.isOnCooldown) {
-        const remaining = state.cooldownDuration > 0
-          ? Math.ceil(Math.max(0, state.cooldownTimer))
-          : 0;
-        statusText = `Recarregando · ${remaining}s`;
-      } else {
-        statusText = `Pronto · ${maxHitsTotal}x`;
-      }
-
-      if (state.isActive) {
-        entry.root.classList.add('active');
-      } else if (state.isOnCooldown) {
-        entry.root.classList.add('cooldown', 'is-cooldown');
-      } else {
-        entry.root.classList.add('ready');
-      }
-
-      if (entry.overlay) {
-        if (state.isOnCooldown && state.cooldownDuration > 0) {
-          entry.overlay.style.transform = `scaleY(${cooldownRatio})`;
-          entry.overlay.style.opacity = '1';
+        if (state.isOnCooldown) {
+          // During cooldown: show progress from left to right (empty → full)
+          entry.root.classList.add('cooldown', 'is-cooldown');
+          entry.bar.style.opacity = '0.5'; // Faded during cooldown
+          entry.barFill.style.width = `${cooldownRatio * 100}%`;
+        } else if (!state.isActive) {
+          // Ready to activate: full bar, slightly faded
+          entry.root.classList.add('ready');
+          entry.bar.style.opacity = '0.7'; // Slightly faded when inactive
+          entry.barFill.style.width = '100%';
         } else {
-          entry.overlay.style.transform = 'scaleY(0)';
-          entry.overlay.style.opacity = '0';
+          // Active: show current HP
+          entry.root.classList.add('active');
+          entry.bar.style.opacity = '1'; // Full opacity when active
+          entry.barFill.style.width = `${hpRatio * 100}%`;
         }
       }
-    }
-
-    if (statusLabel) {
-      statusLabel.textContent = statusText;
     }
 
     this.cachedValues.shield = {
       level: state.level,
-      maxHits: state.maxHits,
-      currentHits: state.currentHits,
+      maxHP: state.maxHP,
+      currentHP: state.currentHP,
       isActive: state.isActive,
       isUnlocked: state.isUnlocked,
       isOnCooldown: state.isOnCooldown,
@@ -2522,7 +2453,8 @@ class UISystem {
           target.classList.toggle('hidden', !show);
         }
 
-        if (screenName === 'pause' && show) {
+        // Keep game-ui visible for pause and gameover overlays
+        if ((screenName === 'pause' || screenName === 'gameover') && show) {
           const gameUI = document.getElementById('game-ui');
           if (gameUI) gameUI.classList.remove('hidden');
         }
@@ -3014,7 +2946,8 @@ class UISystem {
   }
 
   showGameOverScreen(data) {
-    this.showScreen('gameover');
+    // Show gameover as overlay so game canvas stays visible with asteroids wandering
+    this.showScreen('gameover', { overlay: true, show: true });
 
     const stats = data?.stats || { totalKills: 0, timeElapsed: 0 };
     const wave = data?.wave || { completedWaves: 0 };
