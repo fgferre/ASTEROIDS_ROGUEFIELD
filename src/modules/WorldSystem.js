@@ -76,9 +76,8 @@ class WorldSystem {
   }
 
   update(deltaTime) {
-    if (!this.playerAlive) {
-      return;
-    }
+    // DON'T return early - let game keep running even when player is dead
+    // This allows asteroids to keep wandering while player is in death state
 
     this.resolveCachedServices();
 
@@ -86,6 +85,11 @@ class WorldSystem {
     const enemies = this.cachedEnemies;
 
     if (!player || !enemies) {
+      return;
+    }
+
+    // Skip collision detection if player is dead or retrying
+    if (!this.playerAlive || player.isDead || player.isRetrying) {
       return;
     }
 
@@ -165,9 +169,9 @@ class WorldSystem {
       ? player.getPosition()
       : (player ? player.position : { x: 960, y: 540 }); // Fallback to center
 
-    // Hide player ship immediately so only explosion is visible
-    if (player) {
-      player._quitExplosionHidden = true;
+    // Mark player as dead (but keep game running)
+    if (player && typeof player.markDead === 'function') {
+      player.markDead();
     }
 
     const data = {
@@ -184,14 +188,10 @@ class WorldSystem {
       gameEvents.emit('player-died', data);
     }
 
-    // THEN mark player as dead and stop enemies AFTER a delay
-    // This allows the explosion animation to play
-    setTimeout(() => {
-      this.playerAlive = false;
-      if (enemies && typeof enemies.stop === 'function') {
-        enemies.stop();
-      }
-    }, 100); // Small delay to ensure explosion starts
+    // Mark world state as player not alive (but DON'T stop enemies - they keep wandering)
+    this.playerAlive = false;
+
+    // DON'T stop enemies - let them keep moving while player is dead/retrying
   }
 
   reset() {

@@ -3,16 +3,11 @@ const HUD_LAYOUT = [
     key: 'health',
     type: 'stat',
     position: 'top-left',
-    label: 'Integridade',
-    description: 'Integridade atual e máxima da nave',
+    label: 'Health',
+    description: 'Current and maximum ship health',
     icon: {
-      type: 'svg',
-      viewBox: '0 0 24 24',
-      paths: [
-        {
-          d: 'M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z',
-        },
-      ],
+      type: 'text',
+      value: '❤️',
     },
     rootId: 'hud-health',
     valueId: 'health-display',
@@ -26,8 +21,8 @@ const HUD_LAYOUT = [
     key: 'shield',
     type: 'shield',
     position: 'top-left',
-    label: 'Escudo',
-    description: 'Estado do escudo defletor',
+    label: 'Shield',
+    description: 'Deflector shield status',
     icon: {
       type: 'text',
       value: '💠',
@@ -43,7 +38,7 @@ const HUD_LAYOUT = [
     type: 'stat',
     position: 'top-middle',
     label: 'Level',
-    description: 'Nível atual do piloto',
+    description: 'Current pilot level',
     icon: {
       type: 'svg',
       viewBox: '0 0 24 24',
@@ -62,8 +57,8 @@ const HUD_LAYOUT = [
     key: 'kills',
     type: 'stat',
     position: 'top-right',
-    label: 'Abates',
-    description: 'Total de asteroides destruídos na sessão',
+    label: 'Kills',
+    description: 'Total asteroids destroyed in session',
     icon: {
       type: 'svg',
       viewBox: '0 0 24 24',
@@ -77,8 +72,8 @@ const HUD_LAYOUT = [
     valueId: 'kills-display',
     initialValue: '0',
     unit: {
-      singular: 'asteroide',
-      plural: 'asteroides',
+      singular: 'asteroid',
+      plural: 'asteroids',
     },
     ariaLive: 'polite',
   },
@@ -86,8 +81,8 @@ const HUD_LAYOUT = [
     key: 'time',
     type: 'stat',
     position: 'top-right',
-    label: 'Tempo',
-    description: 'Tempo total de sobrevivência na sessão atual',
+    label: 'Time',
+    description: 'Total survival time in current session',
     icon: {
       type: 'svg',
       viewBox: '0 0 24 24',

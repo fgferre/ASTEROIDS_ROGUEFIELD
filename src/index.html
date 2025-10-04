@@ -65,20 +65,20 @@
         </div>
       </div>
 
-      <!-- Tela de Level Up -->
+      <!-- Level Up Screen -->
       <div id="levelup-screen" class="screen hidden">
         <div class="levelup-content">
-          <h2 class="levelup-title">UPGRADE TECNOLÓGICO!</h2>
+          <h2 class="levelup-title">TECH UPGRADE!</h2>
           <p id="levelup-text" class="levelup-subtitle">
-            Level X - Escolha sua tecnologia:
+            Level X - Choose your upgrade:
           </p>
           <div id="upgrades-container" class="upgrades-grid">
-            <!-- Upgrades serão inseridos aqui dinamicamente -->
+            <!-- Upgrades will be inserted here dynamically -->
           </div>
         </div>
       </div>
 
-      <!-- Tela de Pausa -->
+      <!-- Pause Screen -->
       <div id="pause-screen" class="screen hidden">
         <div
           class="pause-content"
@@ -87,8 +87,8 @@
           aria-labelledby="pause-title"
         >
           <header class="pause-header">
-            <h2 id="pause-title" class="pause-title">JOGO PAUSADO</h2>
-            <p class="pause-subtitle">Pressione Esc para continuar</p>
+            <h2 id="pause-title" class="pause-title">GAME PAUSED</h2>
+            <p class="pause-subtitle">Press Esc to continue</p>
           </header>
           <div class="pause-actions">
             <button
@@ -96,27 +96,26 @@
               class="btn btn--primary"
               type="button"
             >
-              Retomar missão
+              Resume Mission
             </button>
             <button
               id="pause-settings-btn"
               class="btn btn--secondary"
               type="button"
             >
-              Configurações
+              Settings
             </button>
             <button
               id="pause-exit-btn"
               class="btn btn--outline btn--danger"
               type="button"
             >
-              Sair para o menu
+              Quit to Menu
             </button>
           </div>
           <div class="pause-hints">
             <p class="pause-hint">
-              Use este intervalo para ajustar configurações ou planejar a
-              próxima onda.
+              Use this break to adjust settings or plan your next wave.
             </p>
           </div>
         </div>
@@ -131,12 +130,12 @@
       >
         <div class="settings-container">
           <header class="settings-header">
-            <h2 id="settings-title" class="settings-title">Configurações</h2>
+            <h2 id="settings-title" class="settings-title">Settings</h2>
             <button
               id="settings-close-btn"
               class="settings-close-btn"
               type="button"
-              aria-label="Fechar configurações"
+              aria-label="Close settings"
             >
               ✕
             </button>
@@ -145,7 +144,7 @@
             <nav
               id="settings-tabs"
               class="settings-tabs"
-              aria-label="Categorias de configurações"
+              aria-label="Settings categories"
             ></nav>
             <div
               id="settings-content"
@@ -159,14 +158,14 @@
               class="btn btn--outline"
               type="button"
             >
-              Restaurar categoria
+              Reset Category
             </button>
             <button
               id="settings-close-footer-btn"
               class="btn btn--primary"
               type="button"
             >
-              Concluir
+              Done
             </button>
           </footer>
         </div>
@@ -181,39 +180,39 @@
       >
         <div class="credits-dialog">
           <header class="credits-header">
-            <h2 id="credits-title" class="credits-title">Créditos</h2>
+            <h2 id="credits-title" class="credits-title">Credits</h2>
             <button
               id="credits-close-btn"
               class="credits-close-btn"
               type="button"
-              aria-label="Fechar créditos"
+              aria-label="Close credits"
             >
               ✕
             </button>
           </header>
           <div class="credits-body" tabindex="0">
             <p class="credits-description">
-              Asteroid Roguefield é um projeto independente focado em explorar
-              sistemas modulares de combate espacial. Este protótipo reúne
-              contribuições de design, código e efeitos sonoros para viabilizar
-              ciclos rápidos de iteração.
+              Asteroid Roguefield is an independent project focused on exploring
+              modular space combat systems. This prototype brings together
+              contributions in design, code, and sound effects to enable
+              rapid iteration cycles.
             </p>
             <dl class="credits-list">
               <div class="credits-entry">
-                <dt>Direção Criativa</dt>
-                <dd>Equipe Roguefield Labs</dd>
+                <dt>Creative Direction</dt>
+                <dd>Roguefield Labs Team</dd>
               </div>
               <div class="credits-entry">
-                <dt>Programação</dt>
-                <dd>Arquitetura modular por colaboradores da comunidade</dd>
+                <dt>Programming</dt>
+                <dd>Modular architecture by community contributors</dd>
               </div>
               <div class="credits-entry">
-                <dt>Design de Som</dt>
-                <dd>Biblioteca interna de efeitos sintetizados</dd>
+                <dt>Sound Design</dt>
+                <dd>Internal library of synthesized effects</dd>
               </div>
               <div class="credits-entry">
-                <dt>Documentação</dt>
-                <dd>Compilada a partir de workshops e playtests</dd>
+                <dt>Documentation</dt>
+                <dd>Compiled from workshops and playtests</dd>
               </div>
             </dl>
           </div>
@@ -223,36 +222,44 @@
               class="btn btn--secondary"
               type="button"
             >
-              Voltar ao menu
+              Back to Menu
             </button>
           </footer>
         </div>
       </div>
 
-      <!-- Tela de Game Over -->
-      <div id="gameover-screen" class="screen hidden">
+      <!-- Game Over Overlay -->
+      <div id="gameover-screen" class="screen screen--overlay hidden">
         <div class="gameover-content">
-          <h1 class="gameover-title">MISSÃO FALHADA</h1>
+          <h1 class="gameover-title">Mission Failed</h1>
           <div class="stats">
             <p>
-              Level Alcançado:
+              Level Reached:
               <span id="final-level" class="stat-value">0</span>
             </p>
             <p>
-              Asteroides Destruídos:
+              Asteroids Destroyed:
               <span id="final-kills" class="stat-value">0</span>
             </p>
             <p>
-              Ondas Completadas:
+              Waves Completed:
               <span id="final-waves" class="stat-value">0</span>
             </p>
             <p>
-              Tempo de Voo: <span id="final-time" class="stat-value">0s</span>
+              Flight Time: <span id="final-time" class="stat-value">0s</span>
             </p>
           </div>
-          <button id="restart-game-btn" class="btn btn--secondary btn--lg">
-            NOVA MISSÃO
-          </button>
+          <div class="gameover-actions">
+            <button id="retry-game-btn" class="btn btn--primary">
+              Retry (<span id="retry-count">1</span>/1)
+            </button>
+            <button id="restart-game-btn" class="btn btn--secondary">
+              New Mission
+            </button>
+            <button id="quit-game-btn" class="btn btn--outline">
+              Quit to Menu
+            </button>
+          </div>
         </div>
       </div>
 
@@ -333,17 +340,10 @@
               aria-live="assertive"
               aria-hidden="true"
             >
-              <span class="countdown-label">Próximo Setor em:</span>
+              <span class="countdown-label">NEXT WAVE</span>
               <span id="countdown-timer" class="countdown-value">10</span>
             </div>
           </div>
-        </div>
-
-        <div class="controls">
-          <p>
-            Use <strong>WASD</strong> para acelerar a nave • Tiro automático com
-            mira • Campo magnético ativo!
-          </p>
         </div>
       </div>
     </div>

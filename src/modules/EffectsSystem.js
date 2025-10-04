@@ -409,10 +409,29 @@ export default class EffectsSystem {
       }
     });
 
-    gameEvents.on('shield-shockwave', (data) => {
-      this.createShockwaveEffect(data);
-      this.addScreenShake(10, 0.35);
-      this.addScreenFlash('rgba(0, 191, 255, 0.35)', 0.25, 0.18);
+    // Level 5 shield: deflective explosion when shield breaks
+    gameEvents.on('shield-deflective-explosion', (data) => {
+      if (!data?.position) return;
+
+      // Create cyan shockwave effect
+      this.createShockwaveEffect({
+        position: data.position,
+        radius: 200, // AoE damage radius
+        color: 'rgba(0, 255, 255, 0.6)',
+      });
+
+      // Screen effects
+      this.addScreenShake(12, 0.4);
+      this.addScreenFlash('rgba(0, 255, 255, 0.4)', 0.3, 0.2);
+
+      // Emit damage event for enemies in radius
+      if (typeof gameEvents !== 'undefined') {
+        gameEvents.emit('shield-explosion-damage', {
+          position: data.position,
+          radius: 200,
+          damage: 50, // AoE damage amount
+        });
+      }
     });
 
     gameEvents.on('shield-deflected', (data) => {
@@ -675,25 +694,23 @@ export default class EffectsSystem {
         speedBase = 120 * speedBoost; // Faster particles = longer visible trail
         sizeRange = [2.0 * sizeBoost, 3.2 * sizeBoost];
         lifeRange = [0.22 * lifeBoost, 0.28 * lifeBoost];
-        // DRAMATIC color shifts: Orange → Bright yellow → PLASMA WHITE
+        // Color progression: Orange → Yellow → Cyan-blue (no white plasma)
         colorFn = () => {
           if (visualLevel >= 5) {
-            // RANK 5: PLASMA WHITE with electric blue corona
-            return Math.random() > 0.3
-              ? `hsl(0, 0%, ${85 + Math.random() * 15}%)` // White core
-              : `hsl(${200 + Math.random() * 20}, 100%, ${80 + Math.random() * 15}%)`;
+            // RANK 5: Electric cyan-blue (no white)
+            return `hsl(${190 + Math.random() * 20}, 100%, ${70 + Math.random() * 12}%)`;
           } else if (visualLevel >= 4) {
-            // RANK 4: White-blue
-            return `hsl(${200 + Math.random() * 30}, 100%, ${75 + Math.random() * 15}%)`;
+            // RANK 4: Bright cyan
+            return `hsl(${185 + Math.random() * 25}, 100%, ${68 + Math.random() * 14}%)`;
           } else if (visualLevel >= 3) {
             // RANK 3: Bright yellow
-            return `hsl(${45 + Math.random() * 15}, 100%, ${70 + Math.random() * 15}%)`;
+            return `hsl(${45 + Math.random() * 15}, 100%, ${68 + Math.random() * 14}%)`;
           } else if (visualLevel >= 1) {
             // RANK 1-2: Brighter orange
-            return `hsl(${25 + Math.random() * 20}, 100%, ${65 + Math.random() * 15}%)`;
+            return `hsl(${25 + Math.random() * 20}, 100%, ${63 + Math.random() * 14}%)`;
           }
           // Base: Standard orange
-          return `hsl(${18 + Math.random() * 22}, 100%, ${62 + Math.random() * 18}%)`;
+          return `hsl(${18 + Math.random() * 22}, 100%, ${60 + Math.random() * 16}%)`;
         };
         break;
       case 'aux':

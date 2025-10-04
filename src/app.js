@@ -32,6 +32,7 @@ const gameState = {
   ctx: null,
   initialized: false,
   lastTime: 0,
+  deathSnapshot: null, // Snapshot of game state at death for retry
 };
 
 const garbageCollectionManager = new GarbageCollectionManager({
@@ -139,6 +140,227 @@ function bootstrapDebugLogging() {
   applyDebugPreference(preference);
 }
 
+function createDeathSnapshot() {
+  const player = gameServices.get('player');
+  const enemies = gameServices.get('enemies');
+  const physics = gameServices.get('physics');
+  const progression = gameServices.get('progression');
+
+  if (!player || !enemies || !physics || !progression) return;
+
+  gameState.deathSnapshot = {
+    // Player state (excluding health - will be restored to max)
+    player: {
+      maxHealth: player.maxHealth || 100,
+      upgrades: player.upgrades ? [...player.upgrades] : [],
+      position: player.position ? { ...player.position } : null,
+    },
+    // Progression state
+    progression: {
+      level: progression.level || 1,
+      experience: progression.experience || 0,
+      experienceNeeded: progression.experienceNeeded || 100,
+    },
+    // Enemy state (asteroids, enemies)
+    enemies: enemies.getSnapshotState ? enemies.getSnapshotState() : null,
+    // Physics state (asteroids positions)
+    physics: physics.getSnapshotState ? physics.getSnapshotState() : null,
+    // Timestamp
+    timestamp: Date.now(),
+  };
+
+  console.log('[Retry] Death snapshot created', gameState.deathSnapshot);
+}
+
+function restoreFromSnapshot() {
+  if (!gameState.deathSnapshot) {
+    console.warn('[Retry] No snapshot available');
+    return false;
+  }
+
+  const player = gameServices.get('player');
+  const enemies = gameServices.get('enemies');
+  const physics = gameServices.get('physics');
+  const progression = gameServices.get('progression');
+
+  if (!player || !enemies || !physics || !progression) return false;
+
+  const snapshot = gameState.deathSnapshot;
+
+  // Restore player (with FULL health)
+  if (snapshot.player) {
+    player.maxHealth = snapshot.player.maxHealth;
+    player.health = snapshot.player.maxHealth; // FULL HEALTH on retry
+    player.upgrades = snapshot.player.upgrades ? [...snapshot.player.upgrades] : [];
+    if (snapshot.player.position) {
+      player.position.x = snapshot.player.position.x;
+      player.position.y = snapshot.player.position.y;
+    }
+  }
+
+  // Restore progression
+  if (snapshot.progression && typeof progression.restoreState === 'function') {
+    progression.restoreState(snapshot.progression);
+  }
+
+  // Restore enemies
+  if (snapshot.enemies && typeof enemies.restoreSnapshotState === 'function') {
+    enemies.restoreSnapshotState(snapshot.enemies);
+  }
+
+  // Restore physics
+  if (snapshot.physics && typeof physics.restoreSnapshotState === 'function') {
+    physics.restoreSnapshotState(snapshot.physics);
+  }
+
+  console.log('[Retry] Game state restored from snapshot');
+  return true;
+}
+
+function findSafeSpawnPoint() {
+  const enemies = gameServices.get('enemies');
+  if (!enemies) return { x: CONSTANTS.GAME_WIDTH / 2, y: CONSTANTS.GAME_HEIGHT / 2 };
+
+  const asteroids = enemies.getAsteroids ? enemies.getAsteroids() : [];
+  const canvas = gameState.canvas;
+  const safeDistance = 300; // Minimum distance from any asteroid
+
+  // Try center first
+  const center = { x: canvas.width / 2, y: canvas.height / 2 };
+  let isSafe = asteroids.every(ast => {
+    const dx = ast.x - center.x;
+    const dy = ast.y - center.y;
+    return Math.sqrt(dx * dx + dy * dy) > safeDistance;
+  });
+
+  if (isSafe) return center;
+
+  // Try quadrants
+  const quadrants = [
+    { x: canvas.width * 0.25, y: canvas.height * 0.25 },
+    { x: canvas.width * 0.75, y: canvas.height * 0.25 },
+    { x: canvas.width * 0.25, y: canvas.height * 0.75 },
+    { x: canvas.width * 0.75, y: canvas.height * 0.75 },
+  ];
+
+  for (const point of quadrants) {
+    isSafe = asteroids.every(ast => {
+      const dx = ast.x - point.x;
+      const dy = ast.y - point.y;
+      return Math.sqrt(dx * dx + dy * dy) > safeDistance;
+    });
+    if (isSafe) return point;
+  }
+
+  // Fallback to center (even if not safe)
+  return center;
+}
+
+function startRetryCountdown() {
+  console.log('[Retry] Starting countdown...');
+
+  // Hide game over screen
+  const gameoverScreen = document.getElementById('gameover-screen');
+  if (gameoverScreen) {
+    gameoverScreen.classList.add('hidden');
+  }
+
+  // Make sure game-ui is visible during countdown
+  const gameUI = document.getElementById('game-ui');
+  if (gameUI) {
+    gameUI.classList.remove('hidden');
+  }
+
+  // Mark player as retrying
+  const player = gameServices.get('player');
+  if (player) {
+    player.isRetrying = true;
+    console.log('[Retry] Player marked as retrying');
+  }
+
+  // Show countdown: 3, 2, 1
+  showCountdownNumber(3, () => {
+    showCountdownNumber(2, () => {
+      showCountdownNumber(1, () => {
+        // Countdown done - respawn player
+        executeRetryRespawn();
+      });
+    });
+  });
+}
+
+function showCountdownNumber(number, onComplete) {
+  console.log(`[Retry] Showing countdown: ${number}`);
+
+  // Create/get countdown element
+  let countdown = document.getElementById('retry-countdown');
+  if (!countdown) {
+    countdown = document.createElement('div');
+    countdown.id = 'retry-countdown';
+    countdown.className = 'wave-countdown';
+    document.body.appendChild(countdown);
+    console.log('[Retry] Created countdown element');
+  }
+
+  countdown.textContent = number.toString();
+  countdown.classList.remove('hidden');
+
+  // Hide after 1 second and call onComplete
+  setTimeout(() => {
+    countdown.classList.add('hidden');
+    setTimeout(onComplete, 100); // Small delay between numbers
+  }, 900);
+}
+
+function executeRetryRespawn() {
+  console.log('[Retry] Starting respawn sequence...');
+
+  const player = gameServices.get('player');
+  const world = gameServices.get('world');
+
+  if (!player || !world) {
+    console.error('[Retry] Cannot respawn - missing services');
+    return;
+  }
+
+  // Find safe spawn point
+  const safeSpawn = findSafeSpawnPoint();
+  console.log('[Retry] Safe spawn point:', safeSpawn);
+
+  // Restore snapshot state
+  if (!restoreFromSnapshot()) {
+    console.error('[Retry] Failed to restore snapshot');
+    return;
+  }
+  console.log('[Retry] Snapshot restored');
+
+  // Respawn player at safe location with invulnerability
+  player.respawn(safeSpawn, 3);
+  console.log('[Retry] Player respawned');
+
+  // Reset world state
+  world.reset();
+  console.log('[Retry] World reset');
+
+  // Hide gameover screen and countdown, show game
+  const gameoverScreen = document.getElementById('gameover-screen');
+  if (gameoverScreen) {
+    gameoverScreen.classList.add('hidden');
+  }
+
+  const countdown = document.getElementById('retry-countdown');
+  if (countdown) {
+    countdown.classList.add('hidden');
+  }
+
+  const gameUI = document.getElementById('game-ui');
+  if (gameUI) {
+    gameUI.classList.remove('hidden');
+  }
+
+  console.log('[Retry] Respawn complete - game resumed');
+}
+
 function init() {
   try {
     gameState.canvas = document.getElementById('game-canvas');
@@ -242,6 +464,23 @@ function setupDomEventListeners() {
     } else if (button.id === 'restart-game-btn') {
       event.preventDefault();
       requestStartGame();
+    } else if (button.id === 'retry-game-btn') {
+      event.preventDefault();
+      const retryCountEl = document.getElementById('retry-count');
+      const currentRetries = parseInt(retryCountEl?.textContent || '0');
+      if (currentRetries > 0 && gameState.deathSnapshot) {
+        retryCountEl.textContent = '0';
+        button.disabled = true;
+        button.style.opacity = '0.5';
+
+        // Start retry flow with countdown
+        startRetryCountdown();
+      }
+    } else if (button.id === 'quit-game-btn') {
+      event.preventDefault();
+      if (typeof gameEvents !== 'undefined') {
+        gameEvents.emit('exit-to-menu-requested', { source: 'gameover' });
+      }
     } else if (button.id === 'open-settings-btn') {
       event.preventDefault();
       if (typeof gameEvents !== 'undefined') {
@@ -280,6 +519,9 @@ function setupGlobalEventListeners() {
       gameState.isPaused = false;
       emitPauseState();
     }
+
+    // Create snapshot for retry system
+    createDeathSnapshot();
   });
 
   gameEvents.on('toggle-pause', () => {

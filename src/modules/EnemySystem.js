@@ -67,8 +67,9 @@ class EnemySystem {
   setupEventListeners() {
     if (typeof gameEvents === 'undefined') return;
 
-    gameEvents.on('shield-shockwave', (data) => {
-      this.handleShockwave(data);
+    // Handle level 5 shield deflective explosion (AoE damage)
+    gameEvents.on('shield-explosion-damage', (data) => {
+      this.handleShieldExplosionDamage(data);
     });
 
     gameEvents.on('player-reset', () => {
@@ -1313,6 +1314,51 @@ class EnemySystem {
 
   getSessionStats() {
     return { ...this.sessionStats };
+  }
+
+  handleShieldExplosionDamage(data) {
+    if (!data || !data.position) {
+      return;
+    }
+
+    const radius = typeof data.radius === 'number' ? data.radius : 200;
+    const damage = typeof data.damage === 'number' ? data.damage : 50;
+
+    const radiusSq = radius * radius;
+    const originX = data.position.x;
+    const originY = data.position.y;
+
+    this.asteroids.forEach((asteroid) => {
+      if (!asteroid || asteroid.destroyed) {
+        return;
+      }
+
+      const dx = asteroid.x - originX;
+      const dy = asteroid.y - originY;
+      const distanceSq = dx * dx + dy * dy;
+
+      if (distanceSq > radiusSq) {
+        return;
+      }
+
+      // Apply damage with distance falloff
+      const distance = Math.sqrt(distanceSq);
+      const falloff = 1 - Math.min(distance / radius, 1);
+      const actualDamage = damage * falloff;
+
+      asteroid.takeDamage(actualDamage);
+
+      // Also apply knockback
+      if (distanceSq > 0) {
+        const impulse = (300 * falloff) / Math.max(asteroid.mass, 1);
+        const nx = dx / Math.max(distance, 0.001);
+        const ny = dy / Math.max(distance, 0.001);
+
+        asteroid.vx += nx * impulse;
+        asteroid.vy += ny * impulse;
+        asteroid.rotationSpeed += (Math.random() - 0.5) * 3 * falloff;
+      }
+    });
   }
 
   handleShockwave(data) {
