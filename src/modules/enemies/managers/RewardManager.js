@@ -65,32 +65,32 @@ export class RewardManager {
   loadRewardConfigurations() {
     const configs = new Map();
 
-    // Asteroid rewards (current implementation)
+    // Asteroid rewards (matches XPOrbSystem orb-based logic)
+    // Uses ORB VALUE (5 XP) × ORB COUNT (based on size)
     configs.set('asteroid', {
-      baseXP: (size) => {
-        const xpValues = CONSTANTS.ASTEROID_XP_VALUES || {
-          small: 5,
-          medium: 15,
-          large: 40
-        };
-        return xpValues[size] || 5;
+      orbValue: CONSTANTS.ORB_VALUE || 5, // Fixed XP per orb
+      baseOrbs: (size) => {
+        const base = CONSTANTS.ASTEROID_BASE_ORBS?.[size] ?? 1;
+        return base;
       },
-      orbCount: (size) => {
-        const orbCounts = CONSTANTS.ASTEROID_XP_ORB_COUNTS || {
-          small: 1,
-          medium: 2,
-          large: 4
+      sizeFactor: (size) => {
+        const factors = CONSTANTS.ASTEROID_SIZE_ORB_FACTOR || {
+          large: 3.0,
+          medium: 2.0,
+          small: 1.0
         };
-        return orbCounts[size] || 1;
+        return factors[size] || 1.0;
       },
       variantMultiplier: (variant) => {
-        const multipliers = CONSTANTS.ASTEROID_VARIANT_XP_MULTIPLIERS || {
+        // Using XPOrbSystem's orbMultiplier values
+        const multipliers = {
           common: 1.0,
           iron: 1.2,
           gold: 2.0,
           crystal: 1.5,
           volatile: 1.3,
-          parasite: 1.4
+          parasite: 1.4,
+          denseCore: 1.2
         };
         return multipliers[variant] || 1.0;
       }
@@ -132,21 +132,28 @@ export class RewardManager {
       return;
     }
 
-    // Calculate XP and orb count
-    const baseXP = typeof config.baseXP === 'function'
-      ? config.baseXP(enemy.size)
-      : config.baseXP;
-
+    // Calculate orb count using orb-based system (matches XPOrbSystem logic)
+    const orbValue = config.orbValue || 5;
+    const baseOrbs = typeof config.baseOrbs === 'function'
+      ? config.baseOrbs(enemy.size)
+      : 1;
+    const sizeFactor = typeof config.sizeFactor === 'function'
+      ? config.sizeFactor(enemy.size)
+      : 1.0;
     const variantMultiplier = typeof config.variantMultiplier === 'function'
       ? config.variantMultiplier(enemy.variant)
       : 1.0;
 
-    const orbCount = typeof config.orbCount === 'function'
-      ? config.orbCount(enemy.size)
-      : 1;
+    // Wave scaling: +1 orb per 5 waves (same as XPOrbSystem)
+    const wave = enemy.wave || 1;
+    const waveBonus = wave <= 10
+      ? Math.floor(wave / 5)
+      : Math.floor((wave - 10) / 3) + 2;
 
-    const totalXP = Math.round(baseXP * variantMultiplier);
-    const xpPerOrb = Math.floor(totalXP / orbCount);
+    // Final orb count
+    const orbCount = Math.max(1, Math.round(baseOrbs * sizeFactor * variantMultiplier + waveBonus));
+    const totalXP = orbCount * orbValue;
+    const xpPerOrb = orbValue;
 
     // Create XP orbs
     this.createXPOrbs(enemy, orbCount, xpPerOrb);
@@ -369,21 +376,21 @@ export class RewardManager {
       return;
     }
 
-    // Base drop rates:
-    // - Large asteroids: 15% chance (increased for testing)
-    // - Medium asteroids: 8% chance (increased for testing)
-    // - Special variants: +5% bonus
+    // RARE drop rates (truly rare as requested by user):
+    // - Large asteroids: 5% base chance
+    // - Medium asteroids: 2% base chance
+    // - Special variants: +3% bonus (gold, crystal, volatile, parasite)
     let dropChance = 0;
 
     if (enemy.size === 'large') {
-      dropChance = 0.15; // 15%
+      dropChance = 0.05; // 5% - rare
     } else if (enemy.size === 'medium') {
-      dropChance = 0.08; // 8%
+      dropChance = 0.02; // 2% - very rare
     }
 
-    // Bonus for special variants
+    // Bonus for special variants (makes them worth hunting)
     if (enemy.variant && ['gold', 'crystal', 'volatile', 'parasite'].includes(enemy.variant)) {
-      dropChance += 0.05; // +5%
+      dropChance += 0.03; // +3% bonus
     }
 
     console.log(`[RewardManager] Checking heart drop: ${enemy.size} ${enemy.variant || 'common'} - chance: ${(dropChance * 100).toFixed(1)}%`);
