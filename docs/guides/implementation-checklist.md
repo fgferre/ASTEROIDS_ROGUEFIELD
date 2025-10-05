@@ -205,6 +205,15 @@ Antes de avançar para a próxima fase, **TODOS** os itens da fase atual devem s
 - [ ] Plano de migração gradual
 - [ ] Setup de compatibility tests
 
+#### 📌 Convivência Temporária (Fase 2.1)
+
+- **Objetivo:** manter `gameServices` como fonte primária enquanto o `diContainer` recebe placeholders via `ServiceRegistry`.
+- **Novos sistemas devem:**
+  1. Adicionar o identificador do serviço ao `ServiceRegistry.setupServices` para garantir que o container reconheça a dependência.
+  2. Registrar a instância em `gameServices.register('nome', instancia)` durante o boot do sistema.
+  3. Opcionalmente sincronizar com o container através de `diContainer.replaceSingleton('nome', instancia)` se o serviço precisar ser visível para ferramentas ou novos módulos que já consumam o DI.
+- **Migração planejada:** quando o `ServiceLocatorAdapter` for ativado (Fase 2.2), `gameServices` passará a delegar automaticamente para o container. Prepare construtores para aceitar dependências por parâmetro e elimine acessos globais onde possível.
+
 ### **🔧 Etapa 2.1: Dependency Injection (Dias 1-3)**
 
 #### **Core Implementation**

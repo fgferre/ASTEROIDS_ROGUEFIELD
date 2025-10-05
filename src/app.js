@@ -48,6 +48,62 @@ const performanceMonitor = new PerformanceMonitor();
 // Initialize DI Container (Phase 2.1)
 let diContainer = null;
 
+/**
+ * Cria um mapeamento do fluxo atual de registro de serviços.
+ *
+ * A função descreve como o `ServiceRegistry` povoa o `DIContainer`
+ * com placeholders enquanto o `ServiceLocatorAdapter` permanece como
+ * ponte de compatibilidade com `gameServices` durante a Fase 2.1.
+ * O resultado é usado apenas para depuração em desenvolvimento.
+ *
+ * @returns {Array<object>} Lista ordenada com o status de cada etapa
+ */
+function mapServiceRegistrationFlow() {
+  const containerServices = diContainer ? diContainer.getServiceNames() : [];
+  const adapterStatus =
+    typeof ServiceLocatorAdapter === 'function' ? 'importado' : 'indisponível';
+  const legacyLocatorStatus =
+    typeof gameServices !== 'undefined' ? 'ativo (legado)' : 'indisponível';
+
+  const flow = [
+    {
+      etapa: '1. Criar DIContainer',
+      origem: 'initializeDependencyInjection()',
+      status: diContainer ? 'concluído' : 'pendente',
+      detalhe:
+        'Instância única criada antes de qualquer registro para alimentar a fase de migração.',
+    },
+    {
+      etapa: '2. Registrar placeholders',
+      origem: 'ServiceRegistry.setupServices(diContainer)',
+      status: containerServices.length > 0 ? 'concluído' : 'pendente',
+      detalhe: `${containerServices.length} serviços expostos via DI com getters que delegam ao Service Locator legado.`,
+    },
+    {
+      etapa: '3. Manter Service Locator legado',
+      origem: 'gameServices.register(...)',
+      status: legacyLocatorStatus,
+      detalhe:
+        'Sistemas continuam registrando e resolvendo dependências pelo Service Locator existente até a Fase 2.2.',
+    },
+    {
+      etapa: '4. Preparar ServiceLocatorAdapter',
+      origem: 'ServiceLocatorAdapter (fase futura)',
+      status: adapterStatus,
+      detalhe:
+        'Adapter importado como ponte para futura substituição transparente de gameServices pelo DIContainer.',
+    },
+  ];
+
+  if (process.env.NODE_ENV === 'development' && typeof console !== 'undefined') {
+    console.group('[App] Fluxo de registro de serviços');
+    console.table(flow);
+    console.groupEnd();
+  }
+
+  return flow;
+}
+
 function initializeDependencyInjection() {
   console.log('[App] Initializing Dependency Injection system...');
 
@@ -63,10 +119,13 @@ function initializeDependencyInjection() {
     // Systems need to register themselves first using the original ServiceLocator
     // The adapter will be enabled in Phase 2.2+ when systems use constructor injection
 
+    const registrationFlow = mapServiceRegistrationFlow();
+
     // Just expose container for debugging
     if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
       window.diContainer = diContainer;
       window.performanceMonitor = performanceMonitor;
+      window.serviceRegistrationFlow = registrationFlow;
 
       // Enable auto-logging every 10 seconds
       performanceMonitor.enableAutoLog(10000);
