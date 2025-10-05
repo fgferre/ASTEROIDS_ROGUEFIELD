@@ -4,6 +4,16 @@
 
 Este checklist serve como guia definitivo para implementar todas as melhorias identificadas de forma sistemática e segura. Cada item possui critérios específicos de aceitação e procedures de validação.
 
+## 🔄 Nota sobre Migração de Serviços (Fase 2.1)
+
+- **Fluxo atual:** os sistemas continuam registrando instâncias em `gameServices` (Service Locator legado). O `ServiceRegistry.setupServices(diContainer)` apenas garante que cada serviço tenha um placeholder no novo contêiner para futura resolução automática.
+- **Diagnóstico:** `src/app.js` inicializa o `ServiceLocatorAdapter` e expõe `logServiceRegistrationFlow()` para inspecionar como `gameServices`, `ServiceRegistry` e o `diContainer` coexistem durante a transição.
+- **Novos sistemas:**
+  1. Registre o serviço no `gameServices` como hoje.
+  2. Acrescente o identificador ao array de `ServiceRegistry.setupServices()`.
+  3. Estruture o construtor esperando dependências explícitas (mesmo que ainda venham de `gameServices`) para facilitar a troca para injeção direta na Fase 2.2.
+- **Próximo passo:** quando o adapter passar a fornecer os serviços diretamente do `diContainer`, os sistemas poderão migrar para construtores injetados gradualmente, removendo `gameServices.get()`.
+
 ## 🎯 Quality Gates por Fase
 
 ### **Phase Gate Requirements**

@@ -47,6 +47,54 @@ const performanceMonitor = new PerformanceMonitor();
 
 // Initialize DI Container (Phase 2.1)
 let diContainer = null;
+let serviceLocatorAdapter = null;
+
+function logServiceRegistrationFlow({ reason = 'bootstrap' } = {}) {
+  if (!diContainer || typeof diContainer.getServiceNames !== 'function') {
+    return;
+  }
+
+  const legacyHas =
+    typeof gameServices !== 'undefined' && typeof gameServices.has === 'function'
+      ? (name) => gameServices.has(name)
+      : () => false;
+
+  const serviceSnapshot = diContainer.getServiceNames().map((name) => ({
+    service: name,
+    placeholder: typeof diContainer.has === 'function' ? diContainer.has(name) : false,
+    legacyRegistered: legacyHas(name),
+    diSingleton: typeof diContainer.isInstantiated === 'function'
+      ? diContainer.isInstantiated(name)
+      : false,
+  }));
+
+  const shouldLog = typeof console !== 'undefined' && typeof console.groupCollapsed === 'function';
+
+  if (!shouldLog) {
+    return;
+  }
+
+  console.groupCollapsed(`[App] Service registration flow (${reason})`);
+  console.log(
+    '1) gameServices (ServiceLocator) recebe instâncias concretas registradas pelos sistemas legados.'
+  );
+  console.log(
+    '2) ServiceRegistry.setupServices(diContainer) cria placeholders na DI para acompanhar os serviços existentes.'
+  );
+  console.log(
+    '3) ServiceLocatorAdapter monitora o ServiceLocator legado e prepara a sincronização para fases futuras.'
+  );
+
+  if (typeof console.table === 'function') {
+    console.table(serviceSnapshot);
+  } else {
+    serviceSnapshot.forEach((row) => {
+      console.log(` - ${row.service}: placeholder=${row.placeholder}, legacy=${row.legacyRegistered}, singleton=${row.diSingleton}`);
+    });
+  }
+
+  console.groupEnd();
+}
 
 function initializeDependencyInjection() {
   console.log('[App] Initializing Dependency Injection system...');
@@ -59,6 +107,10 @@ function initializeDependencyInjection() {
     // Register all services
     ServiceRegistry.setupServices(diContainer);
 
+    if (typeof gameServices !== 'undefined') {
+      serviceLocatorAdapter = new ServiceLocatorAdapter(diContainer);
+    }
+
     // IMPORTANT: Don't replace gameServices yet!
     // Systems need to register themselves first using the original ServiceLocator
     // The adapter will be enabled in Phase 2.2+ when systems use constructor injection
@@ -67,6 +119,9 @@ function initializeDependencyInjection() {
     if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
       window.diContainer = diContainer;
       window.performanceMonitor = performanceMonitor;
+      window.serviceLocatorAdapter = serviceLocatorAdapter;
+
+      logServiceRegistrationFlow({ reason: 'development snapshot' });
 
       // Enable auto-logging every 10 seconds
       performanceMonitor.enableAutoLog(10000);
@@ -79,6 +134,10 @@ function initializeDependencyInjection() {
     console.log('[App] ✓ DI system initialized successfully');
     console.log(`[App] ✓ ${diContainer.getServiceNames().length} services registered`);
     console.log('[App] ℹ ServiceLocator adapter will be enabled in Phase 2.2');
+
+    if (process.env.NODE_ENV === 'production') {
+      logServiceRegistrationFlow({ reason: 'production snapshot' });
+    }
 
     return true;
   } catch (error) {
