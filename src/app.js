@@ -257,8 +257,6 @@ function findSafeSpawnPoint() {
 }
 
 function startRetryCountdown() {
-  console.log('[Retry] Starting countdown...');
-
   // Hide game over screen
   const gameoverScreen = document.getElementById('gameover-screen');
   if (gameoverScreen) {
@@ -275,7 +273,6 @@ function startRetryCountdown() {
   const player = gameServices.get('player');
   if (player) {
     player.isRetrying = true;
-    console.log('[Retry] Player marked as retrying');
   }
 
   // Show countdown: 3, 2, 1
@@ -290,8 +287,6 @@ function startRetryCountdown() {
 }
 
 function showCountdownNumber(number, onComplete) {
-  console.log(`[Retry] Showing countdown: ${number}`);
-
   // Create/get countdown element
   let countdown = document.getElementById('retry-countdown');
   if (!countdown) {
@@ -299,7 +294,6 @@ function showCountdownNumber(number, onComplete) {
     countdown.id = 'retry-countdown';
     countdown.className = 'wave-countdown';
     document.body.appendChild(countdown);
-    console.log('[Retry] Created countdown element');
   }
 
   countdown.textContent = number.toString();
@@ -313,8 +307,6 @@ function showCountdownNumber(number, onComplete) {
 }
 
 function executeRetryRespawn() {
-  console.log('[Retry] Starting respawn sequence...');
-
   const player = gameServices.get('player');
   const world = gameServices.get('world');
 
@@ -325,22 +317,18 @@ function executeRetryRespawn() {
 
   // Find safe spawn point
   const safeSpawn = findSafeSpawnPoint();
-  console.log('[Retry] Safe spawn point:', safeSpawn);
 
   // Restore snapshot state
   if (!restoreFromSnapshot()) {
     console.error('[Retry] Failed to restore snapshot');
     return;
   }
-  console.log('[Retry] Snapshot restored');
 
   // Respawn player at safe location with invulnerability
   player.respawn(safeSpawn, 3);
-  console.log('[Retry] Player respawned');
 
   // Reset world state
   world.reset();
-  console.log('[Retry] World reset');
 
   // Hide gameover screen and countdown, show game
   const gameoverScreen = document.getElementById('gameover-screen');
@@ -357,8 +345,6 @@ function executeRetryRespawn() {
   if (gameUI) {
     gameUI.classList.remove('hidden');
   }
-
-  console.log('[Retry] Respawn complete - game resumed');
 }
 
 function init() {
