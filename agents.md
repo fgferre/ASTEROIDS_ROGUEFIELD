@@ -39,6 +39,19 @@ O projeto utiliza uma **Arquitetura Modular baseada em Sistemas**, orquestrada p
 - **PhysicsSystem:** Centraliza a malha espacial de asteroides e oferece utilitários de broad-phase compartilhados (por exemplo, `forEachNearbyAsteroid`, `forEachBulletCollision`) reutilizados por combate, mundo e progressão. Prefira consultar esse serviço a varrer listas completas em hot paths.
 - **Data-Driven:** A lógica deve ser parametrizada através de constantes em `GameConstants.js` e arquivos no diretório `/data`. Evite valores fixos dentro dos métodos dos sistemas.
 
+##### Coexistência `gameServices` × `diContainer`
+
+- `gameServices` (Service Locator legado) continua sendo a fonte de verdade para registrar instâncias concretas durante a Fase 2.1. Os sistemas ainda chamam `gameServices.register()` em seus construtores e recuperam dependências com `gameServices.get()`.
+- `diContainer` é o novo contêiner de injeção. Durante a Fase 2.1 ele recebe **placeholders** através de `ServiceRegistry.setupServices(diContainer)` e é usado para telemetria/planejamento da migração. Ele já está exposto em `window.diContainer` em ambiente de desenvolvimento.
+- `ServiceLocatorAdapter` faz a ponte entre ambos. Ele é inicializado em `src/app.js` para acompanhar o fluxo atual e será ativado como substituto do locator legado na Fase 2.2.
+
+**Ao criar um novo serviço ou sistema:**
+
+1. Registre-o normalmente em `gameServices` (como os sistemas existentes fazem hoje).
+2. Adicione o nome do serviço ao array em `ServiceRegistry.setupServices()` para que o placeholder exista no `diContainer`.
+3. Quando o sistema precisar acessar outro serviço, prefira manter `gameServices.get()` até que a fase de injeção por construtor esteja liberada. Planeje o construtor pensando em receber dependências explicitamente.
+4. Utilize `logServiceRegistrationFlow()` (expõe snapshot no console) durante o desenvolvimento para verificar se o serviço aparece tanto no locator legado quanto como placeholder na DI.
+
 #### 4. **HTML & CSS**
 
 - **Estrutura:** O `index.html` define a estrutura das telas (menu, game over) e o contêiner do jogo. A UI é feita com elementos HTML nativos para melhor acessibilidade.
