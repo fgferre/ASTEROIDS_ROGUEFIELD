@@ -1,0 +1,7 @@
+# Arquivo de Arquivo Histórico
+
+Este diretório preserva implementações legadas que foram removidas do código-fonte ativo, mas que ainda servem como referência durante a refatoração da arquitetura.
+
+- `EnemySystem.old.js`: Versão original monolítica do sistema de inimigos utilizada antes da Fase 2 da refatoração. Mantida apenas para consultas históricas e comparação durante extrações de componentes.
+
+Nenhum dos arquivos aqui é carregado pelo build atual. Use-os apenas como referência documental.
