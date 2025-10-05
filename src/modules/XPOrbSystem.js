@@ -426,10 +426,6 @@ class XPOrbSystem {
       return;
     }
 
-    // DEPRECATED: This listener is now handled by RewardManager
-    // The RewardManager provides more flexible reward configuration
-    // and handles both XP orbs AND other drops (like health hearts)
-    /*
     gameEvents.on('enemy-destroyed', (data) => {
       const drops = this.buildVariantXPDropPlan(data);
       if (!Array.isArray(drops) || drops.length === 0) {
@@ -447,7 +443,6 @@ class XPOrbSystem {
         });
       });
     });
-    */
 
     gameEvents.on('progression-reset', () => {
       this.resolveCachedServices(true);
