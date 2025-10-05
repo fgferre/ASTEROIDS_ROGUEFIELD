@@ -24,14 +24,13 @@ export class HealthHeartSystem {
   update(deltaTime) {
     this.resolveCachedServices();
 
-    const playerPosition = this.getPlayerPosition();
-
     // Update all hearts
     this.hearts.forEach(heart => {
-      heart.update(deltaTime, playerPosition);
+      heart.update(deltaTime);
     });
 
     // Check for collection
+    const playerPosition = this.getPlayerPosition();
     if (playerPosition && this.cachedPlayer) {
       this.checkHeartCollection(playerPosition);
     }
