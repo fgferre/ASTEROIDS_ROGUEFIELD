@@ -12,7 +12,7 @@ Refatorar a arquitetura para eliminar tight coupling, quebrar classes monolític
 
 ### **Problema 2: Classes Monolíticas**
 **Localização:**
-- `EnemySystem.js` - 2,738 linhas
+- `EnemySystem.js` - 2,738 linhas *(versão original monolítica agora arquivada em [`docs/archive/EnemySystem.old.js`](../archive/EnemySystem.old.js) para referência histórica)*
 - `UISystem.js` - 3,031 linhas
 - `EffectsSystem.js` - 1,420 linhas
 **Impacto:** Difícil manutenção, violação SRP
