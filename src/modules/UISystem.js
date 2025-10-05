@@ -2948,22 +2948,7 @@ class UISystem {
   showGameOverScreen(data) {
     // Show gameover as overlay so game canvas stays visible with asteroids wandering
     this.showScreen('gameover', { overlay: true, show: true });
-
-    const stats = data?.stats || { totalKills: 0, timeElapsed: 0 };
-    const wave = data?.wave || { completedWaves: 0 };
-
-    if (this.domRefs.gameOver.level) {
-      this.domRefs.gameOver.level.textContent = data?.player?.level ?? 0;
-    }
-    if (this.domRefs.gameOver.kills) {
-      this.domRefs.gameOver.kills.textContent = stats.totalKills;
-    }
-    if (this.domRefs.gameOver.waves) {
-      this.domRefs.gameOver.waves.textContent = wave.completedWaves;
-    }
-    if (this.domRefs.gameOver.time) {
-      this.domRefs.gameOver.time.textContent = `${Math.floor(stats.timeElapsed)}s`;
-    }
+    // Simplified game over screen - no stats display
   }
 }
 

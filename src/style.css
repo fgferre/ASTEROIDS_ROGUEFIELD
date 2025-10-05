@@ -1808,60 +1808,35 @@ body.color-assist-mode .upgrade-option__next {
   font-family: 'FKGroteskNeue', 'Geist', 'Inter', sans-serif;
   text-align: center;
   color: var(--color-text);
-  padding: clamp(1.5rem, 4vw, 2rem);
-  background: linear-gradient(135deg, rgba(12, 20, 36, 0.95), rgba(8, 14, 28, 0.95));
-  border-radius: 1rem;
-  border: 1px solid rgba(255, 75, 90, 0.5);
-  box-shadow:
-    0 0 30px rgba(255, 75, 90, 0.3),
-    0 8px 24px rgba(0, 0, 0, 0.5);
-  max-width: 400px;
-  backdrop-filter: blur(12px);
+  padding: clamp(2rem, 5vw, 3rem);
 }
 
 .gameover-title {
   font-family: 'FKGroteskNeue', 'Geist', 'Inter', sans-serif;
-  font-size: clamp(1.75rem, 5vw, 2.25rem);
+  font-size: clamp(3rem, 8vw, 4.5rem);
   color: #ff6b6b;
-  margin-bottom: 1.5rem;
-  text-transform: none;
+  margin-bottom: 3rem;
+  text-transform: uppercase;
   font-weight: 700;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.15em;
   text-shadow:
-    0 0 16px rgba(255, 107, 107, 0.6),
-    0 0 8px rgba(255, 107, 107, 0.4);
-}
-
-.stats {
-  margin: 1.25rem 0;
-}
-
-.stats p {
-  font-family: 'FKGroteskNeue', 'Geist', 'Inter', sans-serif;
-  font-size: 0.95rem;
-  margin-bottom: 0.5rem;
-  color: rgba(255, 255, 255, 0.65);
-  font-weight: 500;
-}
-
-.stat-value {
-  color: #00aaff;
-  font-weight: 700;
-  text-shadow: 0 0 6px rgba(0, 170, 255, 0.4);
-  margin-left: 0.5rem;
+    0 0 24px rgba(255, 107, 107, 0.8),
+    0 0 12px rgba(255, 107, 107, 0.6),
+    0 4px 16px rgba(0, 0, 0, 0.8);
 }
 
 .gameover-actions {
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
-  margin-top: 1.5rem;
+  gap: 1rem;
+  max-width: 280px;
+  margin: 0 auto;
 }
 
 .gameover-actions .btn {
   font-family: 'FKGroteskNeue', 'Geist', 'Inter', sans-serif;
-  padding: 0.65rem 1.25rem;
-  font-size: 0.95rem;
+  padding: 0.85rem 1.5rem;
+  font-size: 1rem;
   font-weight: 600;
   text-transform: none;
   letter-spacing: 0.02em;

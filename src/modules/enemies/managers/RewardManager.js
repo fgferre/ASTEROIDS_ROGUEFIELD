@@ -137,6 +137,9 @@ export class RewardManager {
     // Create XP orbs
     this.createXPOrbs(enemy, orbCount, xpPerOrb);
 
+    // Rare health heart drop from tough enemies
+    this.tryDropHealthHeart(enemy);
+
     // Update statistics
     this.updateStats(enemy.type, orbCount, totalXP);
   }
@@ -333,7 +336,56 @@ export class RewardManager {
         console.error('[RewardManager] Failed to create wave bonus:', error);
       }
 
-      console.log(`[RewardManager] Wave ${waveNumber} bonus: ${totalBonus} XP`);
+      console.log(`[RewardManager] Wave ${waveNumber} bonus: ${totalXP} XP`);
+    }
+  }
+
+  /**
+   * Attempts to drop a rare health heart from tough enemies.
+   *
+   * @param {BaseEnemy} enemy - The destroyed enemy
+   */
+  tryDropHealthHeart(enemy) {
+    // Only from tough enemies (medium/large asteroids, special variants)
+    const isToughEnemy =
+      (enemy.size === 'medium' || enemy.size === 'large') ||
+      (enemy.variant && ['gold', 'crystal', 'volatile', 'parasite'].includes(enemy.variant));
+
+    if (!isToughEnemy) {
+      return;
+    }
+
+    // Base drop rates:
+    // - Large asteroids: 15% chance (increased for testing)
+    // - Medium asteroids: 8% chance (increased for testing)
+    // - Special variants: +5% bonus
+    let dropChance = 0;
+
+    if (enemy.size === 'large') {
+      dropChance = 0.15; // 15%
+    } else if (enemy.size === 'medium') {
+      dropChance = 0.08; // 8%
+    }
+
+    // Bonus for special variants
+    if (enemy.variant && ['gold', 'crystal', 'volatile', 'parasite'].includes(enemy.variant)) {
+      dropChance += 0.05; // +5%
+    }
+
+    console.log(`[RewardManager] Checking heart drop: ${enemy.size} ${enemy.variant || 'common'} - chance: ${(dropChance * 100).toFixed(1)}%`);
+
+    // Roll for drop
+    if (Math.random() < dropChance) {
+      const healthHeartSystem = typeof gameServices !== 'undefined'
+        ? gameServices.get('healthHearts')
+        : null;
+
+      if (healthHeartSystem && typeof healthHeartSystem.spawnHeart === 'function') {
+        healthHeartSystem.spawnHeart(enemy.x, enemy.y);
+        console.log(`[RewardManager] ❤️ Health heart dropped from ${enemy.size} ${enemy.variant || 'common'} asteroid!`);
+      } else {
+        console.error('[RewardManager] HealthHeartSystem not available!');
+      }
     }
   }
 }

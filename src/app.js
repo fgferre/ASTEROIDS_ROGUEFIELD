@@ -5,6 +5,7 @@ import CombatSystem from './modules/CombatSystem.js';
 import { EnemySystem } from './modules/EnemySystem.js';
 import PhysicsSystem from './modules/PhysicsSystem.js';
 import XPOrbSystem from './modules/XPOrbSystem.js';
+import HealthHeartSystem from './modules/collectibles/HealthHeartSystem.js';
 import ProgressionSystem from './modules/ProgressionSystem.js';
 import UISystem from './modules/UISystem.js';
 import EffectsSystem from './modules/EffectsSystem.js';
@@ -108,6 +109,7 @@ function resetGameSystems() {
     'physics',
     'progression',
     'xp-orbs',
+    'healthHearts',
     'effects',
     'world',
     'audio',
@@ -406,6 +408,7 @@ function init() {
     new PhysicsSystem();
     new CombatSystem();
     new XPOrbSystem();
+    new HealthHeartSystem();
     new ProgressionSystem();
     new UISystem();
     new MenuBackgroundSystem();
@@ -557,6 +560,18 @@ function startGame() {
 
     const ui = gameServices.get('ui');
     if (ui) ui.showGameUI();
+
+    // Reset retry count to 1 for new game
+    const retryCountEl = document.getElementById('retry-count');
+    if (retryCountEl) {
+      retryCountEl.textContent = '1';
+    }
+
+    const retryBtn = document.getElementById('retry-game-btn');
+    if (retryBtn) {
+      retryBtn.disabled = false;
+      retryBtn.style.opacity = '1';
+    }
 
     gameState.screen = 'playing';
     gameState.isPaused = false;
@@ -711,6 +726,7 @@ function updateGame(deltaTime) {
     'physics',
     'combat',
     'xp-orbs',
+    'healthHearts',
     'progression',
     'world',
     'ui',

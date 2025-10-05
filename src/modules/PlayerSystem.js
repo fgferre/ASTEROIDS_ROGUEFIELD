@@ -858,6 +858,7 @@ class PlayerSystem {
     return {
       health: this.health,
       maxHealth: this.maxHealth,
+      maxHP: this.maxHealth, // Alias for consistency
       damage: this.damage,
       multishot: this.multishot,
       magnetismRadius: this.magnetismRadius,
@@ -969,6 +970,24 @@ class PlayerSystem {
     this._quitExplosionHidden = false;
 
     console.log('[PlayerSystem] Player respawned at', position, 'with', invulnerabilityDuration, 's invulnerability');
+  }
+
+  heal(amount) {
+    if (this.isDead) return 0;
+
+    const oldHealth = this.health;
+    this.health = Math.min(this.maxHealth, this.health + amount);
+    const actualHealing = this.health - oldHealth;
+
+    if (actualHealing > 0 && typeof gameEvents !== 'undefined') {
+      gameEvents.emit('player-healed', {
+        amount: actualHealing,
+        currentHealth: this.health,
+        maxHealth: this.maxHealth
+      });
+    }
+
+    return actualHealing;
   }
 
   destroy() {

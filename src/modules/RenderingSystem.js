@@ -597,6 +597,7 @@ class RenderingSystem {
     this.cachedPlayer = null;
     this.cachedProgression = null;
     this.cachedXPOrbs = null;
+    this.cachedHealthHearts = null;
     this.cachedEffects = null;
     this.cachedCombat = null;
     this.cachedEnemies = null;
@@ -672,6 +673,9 @@ class RenderingSystem {
     if (force || !this.cachedXPOrbs) {
       this.cachedXPOrbs = fetch('xp-orbs');
     }
+    if (force || !this.cachedHealthHearts) {
+      this.cachedHealthHearts = fetch('healthHearts');
+    }
     if (force || !this.cachedEffects) {
       this.cachedEffects = fetch('effects');
     }
@@ -730,6 +734,12 @@ class RenderingSystem {
     const xpOrbs = this.cachedXPOrbs;
     if (xpOrbs && typeof xpOrbs.render === 'function') {
       xpOrbs.render(ctx);
+    }
+
+    // Health Hearts
+    const healthHearts = this.cachedHealthHearts;
+    if (healthHearts && typeof healthHearts.render === 'function') {
+      healthHearts.render(ctx);
     }
 
     // Combat (bullets)
