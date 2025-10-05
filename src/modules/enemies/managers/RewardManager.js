@@ -82,17 +82,9 @@ export class RewardManager {
         return factors[size] || 1.0;
       },
       variantMultiplier: (variant) => {
-        // Using XPOrbSystem's orbMultiplier values
-        const multipliers = {
-          common: 1.0,
-          iron: 1.2,
-          gold: 2.0,
-          crystal: 1.5,
-          volatile: 1.3,
-          parasite: 1.4,
-          denseCore: 1.2
-        };
-        return multipliers[variant] || 1.0;
+        // Use correct orbMultiplier from GameConstants
+        const variantConfig = CONSTANTS.ASTEROID_VARIANTS[variant];
+        return variantConfig?.orbMultiplier ?? 1.0;
       }
     });
 
