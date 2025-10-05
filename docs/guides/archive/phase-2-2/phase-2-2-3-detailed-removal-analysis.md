@@ -1,5 +1,9 @@
 # Fase 2.2.3: Análise Detalhada do Código a Ser Removido
 
+> **Estado:** Arquivado. Consulte
+> [`docs/guides/phase-2-2-actual-state.md`](../../phase-2-2-actual-state.md)
+> para o panorama atualizado.
+
 **Data:** 2025-10-01
 **Objetivo:** Entender EXATAMENTE o que será removido e por quê
 

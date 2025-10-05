@@ -1,5 +1,8 @@
 # Fase 2.2.2: Plano de Ativação do WaveManager
 
+> **Estado:** Arquivado. A situação atual do WaveManager está descrita em
+> [`docs/guides/phase-2-2-actual-state.md`](../../phase-2-2-actual-state.md).
+
 **Data:** 2025-10-01
 **Branch:** `feature/phase-2-2-2-activate-wavemanager` (a criar)
 **Objetivo:** Ativar o componente WaveManager de forma segura, sem quebras

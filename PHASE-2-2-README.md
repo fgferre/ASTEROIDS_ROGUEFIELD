@@ -12,12 +12,12 @@
 |-----------|--------|---------|-------|-------|
 | RewardManager | ✅ Complete | Yes | 339 | 100% |
 | AsteroidCollision | ✅ Complete | Yes | 241 | 100% |
-| AsteroidRenderer | ✅ Complete | Yes | 201 | 50% |
-| AsteroidMovement | ⚠️ Not Used | No | 222 | 0% |
-| WaveManager | ⚠️ Not Used | No | 447 | 0% |
+| AsteroidRenderer | ✅ Complete | Yes | 201 | 100% |
+| AsteroidMovement | ✅ Integrated (movement) | Yes | 222 | 100% |
+| WaveManager | ⚠️ Pending integration | Constructor only | 447 | 0% |
 | EnemyFactory | ❌ Disabled | No | 428 | 0% |
 
-**Overall:** 3/6 components functional
+**Overall:** 4/6 componentes ativos (WaveManager pendente, EnemyFactory desativada)
 
 ---
 
@@ -81,39 +81,52 @@ if (this.useComponents && this.rendererComponent) {
 
 **⚠️ Note:** Delegates to `asteroid.draw()`, doesn't refactor rendering logic
 
+### 4. AsteroidMovement - FUNCTIONAL (Movement Delegated)
+
+Handles velocity updates through the component pipeline. Visual timers and
+special behaviours remain in the asteroid type where needed.
+
+**Usage:**
+```javascript
+if (this.useComponents && this.movementComponent) {
+  this.movementComponent.update(asteroid, deltaTime, context);
+}
+```
+
+**Highlights:**
+- Movement strategies (linear/parasite/volatile) now run from the component.
+- Screen wrapping and physics integration handled centrally.
+- EnemySystem still calls `asteroid.updateVisualState()` and behaviour timers
+  after movement so legacy visuals are preserved.
+
+**Follow-up:** Audit remaining helpers in `Asteroid.js` to retire any
+duplicated velocity code.
+
 ---
 
-## ❌ What Doesn't Work Yet
+## ❌ What Still Needs Work
 
-### 4. AsteroidMovement - Dead Code
+### WaveManager - Pending Integration
 
-**Problem:** Created but never called.
+**State:** Constructor runs (`new WaveManager(this, gameEvents)`), but the main
+update loop still calls legacy `updateWaveLogic()` on `EnemySystem`. Feature flag
+`useManagers` stays `true` to keep RewardManager active, yet wave progression is
+unchanged.
 
-**Reason:** Asteroids have complex integrated movement logic that wasn't refactored.
+**Next steps:**
+- Route wave timing through `waveManager.update(deltaTime)`.
+- Migrate spawn control and state broadcasting out of `EnemySystem`.
+- Delete the redundant legacy wave helpers once parity is confirmed.
 
-**Options:**
-- A) Integrate it (2-3 hours work)
-- B) Remove it (accept movement stays in Asteroid)
+### EnemyFactory - Disabled Feature Flag
 
-### 5. WaveManager - Dead Code
+**State:** `useFactory = false` blocks runtime usage even though the factory is
+constructed and registers the `asteroid` type.
 
-**Problem:** Initialized but `update()` never called.
-
-**Reason:** Legacy wave logic (~300 lines) still in EnemySystem.
-
-**Options:**
-- A) Integrate it (3-4 hours work)
-- B) Remove it (accept wave logic stays in EnemySystem)
-
-### 6. EnemyFactory - Disabled
-
-**Problem:** `useFactory = false` due to pool conflicts.
-
-**Reason:** Unknown conflict with object pools.
-
-**Options:**
-- A) Investigate and fix (2-3 hours)
-- B) Remove it (not essential for current functionality)
+**Next steps:**
+- Investigate pool conflicts when toggling `useFactory` to `true`.
+- Confirm lifecycle hooks with `GamePools.configureAsteroidLifecycle()`.
+- Re-evaluate whether factory adds value versus direct constructors.
 
 ---
 
@@ -146,19 +159,22 @@ git merge feature/phase-2-2-enemy-decomposition
 
 Follow the roadmap in `docs/guides/phase-2-2-actual-state.md`:
 
-**Phase 2.2.1: Cleanup (1-2h)**
-- Remove AsteroidMovement.js
-- Remove WaveManager.js
-- Remove/fix EnemyFactory.js
-- Remove duplicated collision code
+**Foco atual:**
 
-**Phase 2.2.2: Activate Movement (2-3h)**
-- Refactor Asteroid.update() to use component
-- Test all behaviors
+**Phase 2.2.1: Integrar WaveManager (2-3h)**
+- Plugar `waveManager.update(deltaTime)` no loop principal.
+- Migrar spawn/broadcast da wave do `EnemySystem` para o manager.
+- Validar telemetria de ondas e limpar duplicatas legadas.
 
-**Phase 2.2.3: Activate WaveManager (3-4h)**
-- Integrate WaveManager.update()
-- Remove legacy wave logic
+**Phase 2.2.2: Revisar EnemyFactory (2h)**
+- Reproduzir conflito com `useFactory = true` e ajustar integração com `GamePools`.
+- Definir política de ciclo de vida (quem inicializa/recicla instâncias).
+- Documentar decisão: manter ou remover Factory.
+
+**Phase 2.2.3: Cleanup Final (1-2h)**
+- Remover utilitários de colisão legados (`checkAsteroidCollision`).
+- Consolidar funções residuais de movimento em `AsteroidMovement`.
+- Atualizar checklist de testes com os novos caminhos ativos.
 
 ---
 
@@ -175,6 +191,11 @@ Follow the roadmap in `docs/guides/phase-2-2-actual-state.md`:
    - Real implementation status
    - Detailed analysis
    - Roadmap for improvements
+
+3. **[archive/phase-2-2/README.md](docs/guides/archive/phase-2-2/README.md)**
+   - Histórico dos planos originais
+   - Links para estratégias antigas (agora arquivadas)
+   - Útil para entender decisões anteriores
 
 ### Component Documentation
 
@@ -195,9 +216,9 @@ Control what's active:
 
 ```javascript
 // In EnemySystem.js constructor:
-this.useManagers = true;     // RewardManager: ON, WaveManager: OFF
-this.useComponents = true;   // Collision/Renderer: ON, Movement: OFF
-this.useFactory = false;     // Factory: OFF (pool conflict)
+this.useManagers = true;     // RewardManager ON; WaveManager ainda sem update()
+this.useComponents = true;   // Movement/Collision/Renderer ON
+this.useFactory = false;     // Factory OFF (pool conflict em investigação)
 ```
 
 ### Debugging
@@ -231,29 +252,33 @@ npm run dev
 
 ## 🐛 Known Issues
 
-### 1. Code Duplication
+### 1. WaveManager sem loop ativo
 
-**Issue:** Collision logic exists in both component and EnemySystem
+**Issue:** `WaveManager` inicializa mas nunca recebe `update()`.
 
-**Impact:** Maintenance burden
+**Impact:** Lógica de ondas segue duplicada no `EnemySystem`, o que dificulta
+o ajuste de dificuldade.
 
-**Fix:** Remove `EnemySystem.checkAsteroidCollision()` (lines 539-581)
+**Fix:** Encaminhar o loop para o manager, migrar contadores e remover helpers
+legados.
 
-### 2. Dead Code
+### 2. EnemyFactory desativada
 
-**Issue:** 1,097 lines of unused code (58% of new code)
+**Issue:** `useFactory = false` impede validar o fluxo baseado em fábrica.
 
-**Impact:** Confusing codebase, wasted effort
+**Impact:** Sem consenso sobre ciclo de vida dos inimigos; dificulta expandir
+para novos tipos.
 
-**Fix:** Remove unused components (see Phase 2.2.1 cleanup)
+**Fix:** Investigar conflito com pools, decidir entre ativar ou remover.
 
-### 3. Weak Inheritance
+### 3. Código duplicado de colisão
 
-**Issue:** Asteroid extends BaseEnemy but doesn't use its features
+**Issue:** `EnemySystem.checkAsteroidCollision()` permanece como fallback
+mesmo com o componente ativo.
 
-**Impact:** Lost opportunities for code reuse
+**Impact:** Dobra pontos de manutenção e pode gerar divergências sutis.
 
-**Fix:** Refactor Asteroid to use template methods
+**Fix:** Remover fallback após confirmar estabilidade do componente.
 
 ---
 
@@ -275,26 +300,26 @@ npm run dev
 ### For Production
 
 **MERGE AS IS** if:
-- You want the RewardManager functionality
-- You're okay with some dead code temporarily
-- You plan to clean up later
+- Você quer RewardManager + componentes ativos agora.
+- Aceita manter WaveManager em backlog por enquanto.
+- Planeja revisar EnemyFactory quando houver tempo dedicado.
 
 **WAIT AND CLEANUP** if:
-- Dead code bothers you
-- You want a cleaner codebase first
-- You have 1-2 hours for cleanup
+- Prefere consolidar WaveManager antes de seguir.
+- Precisa validar EnemyFactory para novos tipos de inimigo.
+- Quer eliminar utilitários legados (colisão/movimento) no mesmo ciclo.
 
 ### For Development
 
 **Continue Implementation** if:
-- You want full component architecture
-- You have 5-8 hours to complete
-- You want to reach <400 lines EnemySystem goal
+- Está pronto para integrar WaveManager e revisar EnemyFactory.
+- Tem 5-8 horas para reduzir o `EnemySystem` removendo lógica duplicada.
+- Quer destravar novos tipos de inimigo orientados a dados.
 
 **Simplify and Accept** if:
-- Current architecture is good enough
-- You want to move to other features
-- You're okay with larger EnemySystem
+- Arquitetura atual atende ao roadmap imediato.
+- Prefere focar em outras features (HUD, armas, etc.).
+- Pode conviver com WaveManager legado por mais algum tempo.
 
 ---
 

@@ -1,5 +1,8 @@
 # Fase 2.2: Arquitetura Preparada para Expansão
 
+> **Estado:** Arquivado. A avaliação atualizada encontra-se em
+> [`docs/guides/phase-2-2-actual-state.md`](../../phase-2-2-actual-state.md).
+
 **Data:** 2025-10-01
 **Status:** ✅ Fase 2.2.1 Completa | Arquitetura Pronta para Novos Enemy Types
 **Decisão:** MANTER código preparatório (EnemyFactory, WaveManager) para expansão futura

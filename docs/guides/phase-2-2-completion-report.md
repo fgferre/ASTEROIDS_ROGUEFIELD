@@ -1,5 +1,8 @@
 # Phase 2.2: Enemy System Decomposition - Completion Report
 
+> **Aviso:** Documento histórico otimista. Para o status vigente consulte
+> [`phase-2-2-actual-state.md`](./phase-2-2-actual-state.md).
+
 **Status:** ✅ **COMPLETE AND TESTED**
 **Date:** 2025-10-01
 **Branch:** `feature/phase-2-2-enemy-decomposition`

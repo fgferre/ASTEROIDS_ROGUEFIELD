@@ -1,5 +1,8 @@
 # Fase 2.2.1: Plano de Testes - AsteroidMovement Ativado
 
+> **Estado:** Arquivado. Para validações atuais consulte
+> [`docs/guides/phase-2-2-actual-state.md`](../../phase-2-2-actual-state.md).
+
 **Data:** 2025-10-01
 **Branch:** `feature/phase-2-2-1-activate-movement`
 **Servidor:** http://localhost:5501/
