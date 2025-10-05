@@ -790,6 +790,11 @@ class RenderingSystem {
   drawMagnetismField(ctx, player, xpOrbs) {
     if (!player || !xpOrbs) return;
 
+    // Don't render magnetism range when ship hull doesn't exist
+    if (player.isDead || player.isRetrying || player._quitExplosionHidden) {
+      return;
+    }
+
     const orbs =
       typeof xpOrbs.getActiveOrbs === 'function'
         ? xpOrbs.getActiveOrbs()
@@ -847,7 +852,9 @@ class RenderingSystem {
         ? player.getShieldState()
         : null;
 
-    if (shieldState?.isActive && shieldState.maxHits > 0) {
+    // Only render shield when ship hull exists
+    const hullExists = !player.isDead && !player.isRetrying && !player._quitExplosionHidden;
+    if (hullExists && shieldState?.isActive && shieldState.maxHits > 0) {
       const ratio = Math.max(
         0,
         Math.min(1, shieldState.currentHits / shieldState.maxHits),
