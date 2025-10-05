@@ -1,5 +1,8 @@
 # Fase 2.2.1: Plano de Ativação do AsteroidMovement
 
+> **Estado:** Arquivado. O status atual da implementação está documentado em
+> [`docs/guides/phase-2-2-actual-state.md`](../../phase-2-2-actual-state.md).
+
 **Data:** 2025-10-01
 **Objetivo:** Ativar o componente AsteroidMovement de forma segura, sem quebras
 

@@ -14,8 +14,20 @@ Decomposizar o EnemySystem (1,237 linhas) em componentes especializados, reduzin
 ### Realidade
 - **EnemySystem:** 1,325 linhas (+88 linhas)
 - **Componentes criados:** 3 (665 linhas totais)
-- **Componentes ativos:** 2 de 3
-- **Managers ativos:** 1 de 2
+- **Componentes ativos:** 3 de 3 (movimento, colisão e renderização)
+- **Managers ativos:** 1 de 2 (RewardManager ✅ / WaveManager ⚠️)
+
+---
+
+## 🧭 Resumo Rápido
+
+| Status | Item | Flag / Hook | Próximo Passo |
+| --- | --- | --- | --- |
+| ✅ Ativo | `useComponents` (movimento/colisão/render) | `true` | Consolidar limpeza de código legado após estabilização. |
+| ✅ Ativo | `RewardManager` | `useManagers = true` | Continuar dropando XP; sem ações imediatas. |
+| 🕒 Backlog | `WaveManager` | `useManagers = true` (sem `update()`) | Conectar loop e migrar estado das waves. |
+| 🕒 Backlog | `EnemyFactory` | `useFactory = false` | Reproduzir conflito com pools e decidir ativação/remover. |
+| 📚 Arquivo | Planos históricos da fase | - | Ver [`docs/guides/archive/phase-2-2/README.md`](archive/phase-2-2/README.md). |
 
 ---
 
@@ -50,7 +62,43 @@ gameEvents.on('enemy-destroyed', (data) => {
 
 ---
 
-### 2. AsteroidCollision ✅ **ATIVO COM RESSALVA**
+### 2. AsteroidMovement ✅ **MOVIMENTO VIA COMPONENTE**
+
+**Arquivo:** `src/modules/enemies/components/AsteroidMovement.js` (222 linhas)
+
+**Status:** Integrado via `useComponents = true`. O componente recebe cada
+asteroide durante `EnemySystem.updateAsteroids()`.
+
+**Como funciona:**
+```javascript
+if (this.useComponents && this.movementComponent) {
+  const context = { player: this.getCachedPlayer(), worldBounds: { ... } };
+  this.movementComponent.update(asteroid, deltaTime, context);
+  asteroid.updateVisualState(deltaTime);
+  // timers específicos permanecem no Asteroid
+}
+```
+
+**Benefícios:**
+- Centraliza estratégias linear/parasite/volatile num único ponto.
+- Screen wrapping e ajuste de velocidade ocorrem fora do tipo específico.
+- Mantém compatibilidade porque o Asteroid ainda controla timers visuais e
+  comportamentos especiais após o movimento.
+
+**⚠️ Observações:**
+- Há utilitários de movimento redundantes no `Asteroid`. Avaliar remoção após
+  validar o componente em produção.
+- `updateVisualState()` e timers (`lastDamageTime`, `shieldHitCooldown`) seguem
+  no tipo para preservar efeitos.
+
+**Testes:**
+- ✅ Asteroides continuam com comportamento esperado (parasite/volatile).
+- ✅ Screen wrapping funciona (movimento contínuo no campo de jogo).
+- ✅ Nenhuma regressão de velocidade/rotação detectada.
+
+---
+
+### 3. AsteroidCollision ✅ **ATIVO COM RESSALVA**
 
 **Arquivo:** `src/modules/enemies/components/AsteroidCollision.js` (241 linhas)
 
@@ -80,7 +128,7 @@ if (this.useComponents && this.collisionComponent) {
 
 ---
 
-### 3. AsteroidRenderer ✅ **ATIVO (WRAPPER)**
+### 4. AsteroidRenderer ✅ **ATIVO (WRAPPER)**
 
 **Arquivo:** `src/modules/enemies/components/AsteroidRenderer.js` (201 linhas)
 
@@ -115,81 +163,44 @@ render(ctx, asteroid) {
 
 ---
 
-## ❌ O que NÃO Funciona
+## ⏳ Backlog Prioritário
 
-### 4. AsteroidMovement ❌ **CÓDIGO MORTO**
-
-**Arquivo:** `src/modules/enemies/components/AsteroidMovement.js` (222 linhas)
-
-**Status:** Criado mas NUNCA é usado
-
-**Problema:**
-```javascript
-// No EnemySystem.updateAsteroids()
-this.asteroids.forEach((asteroid) => {
-  asteroid.update(deltaTime);  // ← Asteroid faz próprio movimento
-});
-
-// movementComponent.update() NUNCA é chamado ❌
-```
-
-**Por quê não está ativo:**
-- Asteroids têm lógica de movimento complexa integrada
-- Behaviors (parasite, volatile) estão no Asteroid.update()
-- Screen wrapping está no Asteroid.update()
-- Tentativa de integração causou erro (WorldSystem.getBounds não existe)
-
-**Ação necessária:**
-- **Opção A:** Refatorar Asteroid.update() para usar o componente
-- **Opção B:** Remover o componente (aceitar que movimento fica no Asteroid)
-
----
-
-### 5. WaveManager ❌ **NÃO ATIVO**
+### WaveManager ⚠️ **PRECISA DE LOOP**
 
 **Arquivo:** `src/modules/enemies/managers/WaveManager.js` (447 linhas)
 
-**Status:** Inicializado mas não usado
+**Estado atual:** É instanciado dentro de `EnemySystem.setupManagers()`, porém o
+loop principal ainda chama `updateWaveLogic()` legada. Nenhuma chamada para
+`waveManager.update(deltaTime)` acontece.
 
-**Problema:**
-```javascript
-// WaveManager é criado:
-this.waveManager = new WaveManager(this, gameEvents);  // ✅ Inicializado
+**Por que importa:** Enquanto o manager não assume o controle, duplicamos o
+estado das waves (`waveState`) e mantemos lógica complexa dentro do
+`EnemySystem`, inviabilizando ajustes finos de pacing.
 
-// Mas update() NUNCA é chamado:
-update(deltaTime) {
-  this.updateAsteroids(deltaTime);
-  this.updateWaveLogic(deltaTime);  // ← Usa lógica LEGADA ❌
-  // this.waveManager.update() não é chamado!
-}
-```
+**Próximos passos recomendados:**
+- Expor `waveManager.update(deltaTime)` no loop principal.
+- Migrar spawning, timers e broadcast de eventos (`waveState`) para o manager.
+- Depurar transição de estados (intervalos/breaks) antes de remover helpers
+  legados.
 
-**Por quê não está ativo:**
-- Sistema de waves legado (~300 linhas) ainda está no EnemySystem
-- Migração completa requer refatoração grande
-- Interface do WaveManager diferente da lógica atual
-
-**Ação necessária:**
-- **Opção A:** Integrar WaveManager.update() no game loop
-- **Opção B:** Remover WaveManager (aceitar wave logic no EnemySystem)
-
----
-
-### 6. EnemyFactory ❌ **DESABILITADO**
+### EnemyFactory ❌ **FEATURE FLAG DESLIGADA**
 
 **Arquivo:** `src/modules/enemies/base/EnemyFactory.js` (428 linhas)
 
-**Status:** Implementado mas desabilitado
+**Estado atual:** Construída em `EnemySystem.setupEnemyFactory()`, registra o
+tipo `asteroid`, mas `useFactory` permanece `false` por causa de conflitos com o
+sistema de pools (`GamePools`).
 
-**Feature Flag:**
-```javascript
-this.useFactory = false; // DISABLED (pool conflicts)
-```
+**Por que importa:** Sem validar a fábrica não sabemos se o fluxo baseado em
+dados é viável. Novos tipos de inimigos precisarão decidir entre instanciar
+direto ou depender do factory.
 
-**Problema:**
-- Conflito com sistema de object pools
-- Não está claro qual é o conflito exato
-- Factory foi registrado mas nunca é usado
+**Próximos passos recomendados:**
+- Reproduzir o conflito ao setar `useFactory = true` e mapear o comportamento do
+pool de asteroides.
+- Garantir que `GamePools.configureAsteroidLifecycle()` e a fábrica não disputam
+responsabilidade de reset.
+- Documentar a decisão final (manter ligada ou remover o módulo).
 
 **Ação necessária:**
 - Investigar e resolver conflito com pools
@@ -203,21 +214,20 @@ this.useFactory = false; // DISABLED (pool conflicts)
 
 | Arquivo | Linhas | Status | Uso |
 |---------|--------|--------|-----|
-| AsteroidMovement.js | 222 | ❌ Não usado | 0% |
+| AsteroidMovement.js | 222 | ✅ Ativo (movimento) | 100% |
 | AsteroidCollision.js | 241 | ✅ Ativo | 100% |
-| AsteroidRenderer.js | 201 | ✅ Ativo (wrapper) | 50% |
+| AsteroidRenderer.js | 201 | ✅ Ativo (wrapper) | 100% |
 | RewardManager.js | 339 | ✅ Ativo | 100% |
-| WaveManager.js | 447 | ❌ Não usado | 0% |
+| WaveManager.js | 447 | ⚠️ Sem loop | 0% |
 | EnemyFactory.js | 428 | ❌ Desabilitado | 0% |
 | **Total Novo** | **1,878** | - | - |
 | EnemySystem.js | 1,325 | ✅ Ativo | 100% |
 
-### Código Morto
+### Código não exercitado
 
-- **AsteroidMovement:** 222 linhas
-- **WaveManager:** 447 linhas
-- **EnemyFactory:** 428 linhas
-- **Total código morto:** 1,097 linhas (58% do código novo!)
+- **WaveManager:** 447 linhas (aguardando integração)
+- **EnemyFactory:** 428 linhas (feature flag desligada)
+- **Total fora do loop:** 875 linhas
 
 ### Código Duplicado
 
@@ -229,7 +239,7 @@ this.useFactory = false; // DISABLED (pool conflicts)
 | Flag | Estado | Efetivo? |
 |------|--------|----------|
 | `useManagers` | `true` | Parcial (1/2) |
-| `useComponents` | `true` | Parcial (2/3) |
+| `useComponents` | `true` | Completo (3/3) |
 | `useFactory` | `false` | Não |
 
 ---
@@ -265,92 +275,70 @@ this.useFactory = false; // DISABLED (pool conflicts)
    - Real: EnemySystem = 1,325 linhas
    - Aumento: +88 linhas
 
-2. **Muito Código Não Utilizado**
-   - 1,097 linhas criadas mas não usadas (58%)
-   - Desperdício de esforço de desenvolvimento
+2. **Código fora do loop**
+   - WaveManager (447) + EnemyFactory (428) ainda não executam (875 linhas).
+   - Impacta clareza das responsabilidades de spawning/progressão.
 
 3. **Duplicação de Código**
    - Lógica de colisão duplicada
    - Aumenta manutenção
 
-4. **Inconsistência Arquitetural**
-   - Alguns componentes ativos, outros não
-   - Feature flags parcialmente implementadas
-   - Mistura de código novo e legado
+4. **Feature flags pendentes**
+   - `useManagers` cobre RewardManager, mas WaveManager não foi plugado.
+   - `useFactory` permanece off até validação de pools.
 
 ---
 
 ## 🚀 Roadmap de Correções
 
-### Fase 2.2.1: Cleanup Imediato (1-2 horas)
+### Fase 2.2.1: Integrar WaveManager (2-3 horas)
 
 **Prioridade:** Alta
-**Objetivo:** Remover código morto e duplicação
+**Objetivo:** Colocar o gerenciamento de waves no módulo dedicado.
 
 **Tarefas:**
-1. ❌ Remover `AsteroidMovement.js` (não está sendo usado)
-2. ❌ Remover `WaveManager.js` (não está sendo usado)
-3. ❌ Remover ou corrigir `EnemyFactory.js`
-4. ✅ Remover código duplicado de colisão no EnemySystem
-5. ✅ Atualizar feature flags para refletir realidade
-6. ✅ Adicionar comentários explicando estado atual
+1. Chamar `waveManager.update(deltaTime)` dentro de `EnemySystem.update()`.
+2. Migrar timers (`breakTimer`, `timeRemaining`) e controle de spawn.
+3. Garantir que `emitWaveStateUpdate()` passe a consumir dados do manager.
+4. Rodar sessões completas para validar progressão e broadcasts.
 
 **Resultado esperado:**
-- Menos código morto
-- Menos confusão
-- Código mais honesto
+- Estado de waves centralizado e pronto para tuning.
+- Redução significativa na seção de ondas do `EnemySystem`.
 
 ---
 
-### Fase 2.2.2: Ativar AsteroidMovement (2-3 horas)
+### Fase 2.2.2: Validar EnemyFactory (2 horas)
 
 **Prioridade:** Média
-**Objetivo:** Fazer AsteroidMovement funcionar
+**Objetivo:** Decidir se a factory permanece ou é removida.
 
 **Tarefas:**
-1. Refatorar `Asteroid.update()` para delegar movimento ao componente
-2. Mover lógica de screen wrapping para componente
-3. Testar todos os comportamentos (linear, parasite, volatile)
-4. Remover código duplicado de movimento do Asteroid
+1. Ativar `useFactory = true` em ambiente de teste e observar interações com `GamePools`.
+2. Ajustar hooks de `configureAsteroidLifecycle` para evitar resets duplicados.
+3. Medir impacto na performance/spawn de asteroides.
+4. Documentar decisão (ativar permanentemente ou retirar módulo).
 
 **Resultado esperado:**
-- Componente funcional
-- Redução de ~100 linhas no Asteroid.js
+- Caminho oficial para criar inimigos (via factory ou direto).
+- Remoção de incerteza para novos tipos de inimigo.
 
 ---
 
-### Fase 2.2.3: Ativar WaveManager (3-4 horas)
+### Fase 2.2.3: Cleanup Pós-Integração (1-2 horas)
 
-**Prioridade:** Baixa
-**Objetivo:** Migrar gerenciamento de waves
-
-**Tarefas:**
-1. Conectar `WaveManager.update()` no game loop
-2. Migrar lógica de spawning para WaveManager
-3. Remover lógica legada de waves do EnemySystem
-4. Testar progressão de waves
-
-**Resultado esperado:**
-- Wave management centralizado
-- Redução de ~300 linhas no EnemySystem
-- EnemySystem mais próximo do target de <400 linhas
-
----
-
-### Fase 2.2.4: Extrair Variant Logic (2-3 horas)
-
-**Prioridade:** Baixa
-**Objetivo:** Reduzir mais o EnemySystem
+**Prioridade:** Média
+**Objetivo:** Eliminar resíduos após ligar managers/componentes.
 
 **Tarefas:**
-1. Criar `VariantManager.js`
-2. Mover `decideVariant()`, `assignVariantsToFragments()`
-3. Centralizar lógica de variants
-4. Testar todas as variantes
+1. Remover `EnemySystem.checkAsteroidCollision()` e helpers legados.
+2. Consolidar utilitários de movimento restantes no `Asteroid`.
+3. Atualizar `docs/validation/test-checklist.md` com os novos fluxos.
+4. Revisar telemetria/logs para garantir clareza pós-migração.
 
 **Resultado esperado:**
-- Redução de ~200 linhas no EnemySystem
-- Sistema de variants reutilizável
+- `EnemySystem` mais enxuto e alinhado à arquitetura modular.
+- Documentação e testes refletindo a realidade atualizada.
 
 ---
 
@@ -361,9 +349,9 @@ this.useFactory = false; // DISABLED (pool conflicts)
 - [x] RewardManager criado e funcional
 - [x] AsteroidCollision criado e funcional
 - [x] AsteroidRenderer criado e funcional
-- [x] AsteroidMovement criado (mas não usado)
-- [x] WaveManager criado (mas não usado)
-- [x] EnemyFactory criado (mas desabilitado)
+- [x] AsteroidMovement criado e integrado via componente
+- [x] WaveManager criado (aguardando integração)
+- [x] EnemyFactory criada (feature flag desligada)
 - [x] BaseEnemy hierarchy criada
 - [x] Asteroid extends BaseEnemy
 
@@ -372,16 +360,16 @@ this.useFactory = false; // DISABLED (pool conflicts)
 - [x] RewardManager integrado via eventos
 - [x] AsteroidCollision integrado via feature flag
 - [x] AsteroidRenderer integrado via feature flag
-- [ ] AsteroidMovement NÃO integrado
+- [x] AsteroidMovement integrado no loop (`useComponents`)
 - [ ] WaveManager NÃO integrado
 - [ ] EnemyFactory NÃO ativo
 
 ### Limpeza
 
 - [ ] Código duplicado removido
-- [ ] Código morto removido
+- [ ] Código fora do loop (WaveManager/Factory) resolvido
 - [ ] Feature flags consistentes
-- [ ] Documentação atualizada com estado real
+- [x] Documentação atualizada com estado real
 
 ### Testes
 
@@ -414,8 +402,8 @@ this.useFactory = false; // DISABLED (pool conflicts)
 ### O que precisa melhorar ⚠️
 
 1. **Planejamento de Integração**
-   - Criar componentes sem integrar = código morto
-   - Deve-se integrar incrementalmente
+   - Falta concluir a etapa WaveManager/Factory
+   - Devemos reservar tempo dedicado para fechar o ciclo das feature flags
 
 2. **Análise de Dependências**
    - Erro com WorldSystem.getBounds mostrou falta de análise prévia
@@ -433,36 +421,33 @@ this.useFactory = false; // DISABLED (pool conflicts)
 
 ## 🎯 Conclusão Honesta
 
-### Status Real: **6/10**
+### Status Real: **7/10**
 
-**O que funciona (40%):**
-- ✅ RewardManager: Excelente implementação
-- ✅ AsteroidCollision: Funcional, precisa cleanup
-- ✅ AsteroidRenderer: Funcional, mas limitado
+**O que funciona (4/6 frentes ativas):**
+- ✅ RewardManager: totalmente integrado via eventos.
+- ✅ AsteroidMovement: componente controla deslocamento com `useComponents`.
+- ✅ AsteroidCollision: física centralizada (precisa remover fallback legacy).
+- ✅ AsteroidRenderer: organiza draw + modo debug.
 
-**O que não funciona (60%):**
-- ❌ AsteroidMovement: Código morto
-- ❌ WaveManager: Código morto
-- ❌ EnemyFactory: Desabilitado
-- ❌ Objetivo de LOC: Não alcançado
+**Backlog imediato (2/6):**
+- ⚠️ WaveManager: precisa assumir o loop para eliminar lógica duplicada.
+- ❌ EnemyFactory: permanece desativada até resolver conflito com pools.
 
 ### Recomendação
 
-**Aceitar estado atual como "foundation"** e fazer correções incrementais:
+**Aceitar estado atual como "foundation"** e executar as ações planejadas:
 
 1. **Curto prazo (esta sprint):**
-   - Remover código morto
-   - Cleanup de duplicação
-   - Documentação honesta
+   - Integrar WaveManager ao loop.
+   - Resolver feature flag da EnemyFactory (ativar ou remover).
 
 2. **Médio prazo (próxima sprint):**
-   - Ativar AsteroidMovement
-   - Ou removê-lo definitivamente
+   - Remover colisão/movimento legados após estabilização.
+   - Revisar métricas de LOC para aproximar do alvo <400 linhas.
 
 3. **Longo prazo (quando necessário):**
-   - Ativar WaveManager
-   - Extrair variant logic
-   - Alcançar target de <400 linhas
+   - Evoluir VariantManager ou outras otimizações de conteúdo.
+   - Expandir inimigos usando o caminho validado (Factory ou direto).
 
 ---
 

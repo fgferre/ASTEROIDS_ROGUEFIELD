@@ -1,5 +1,8 @@
 # Análise de Priorização - Fase 2.2 Restante
 
+> **Estado:** Arquivado. Prioridades vigentes estão registradas em
+> [`docs/guides/phase-2-2-actual-state.md`](../../phase-2-2-actual-state.md).
+
 **Data:** 2025-10-01
 **Status:** Fase 2.2.1 ✅ COMPLETA | Planejando próximas fases
 
