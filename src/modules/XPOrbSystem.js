@@ -426,23 +426,19 @@ class XPOrbSystem {
       return;
     }
 
-    gameEvents.on('enemy-destroyed', (data) => {
-      const drops = this.buildVariantXPDropPlan(data);
-      if (!Array.isArray(drops) || drops.length === 0) {
-        return;
-      }
-
-      const originX = data?.position?.x ?? 0;
-      const originY = data?.position?.y ?? 0;
-
-      drops.forEach((drop, index) => {
-        const offset = this.getDropOffset(index, drops.length);
-        this.createXPOrb(originX + offset.x, originY + offset.y, drop.value, {
-          ...drop.options,
-          source: drop.options?.source || 'enemy-drop',
-        });
-      });
-    });
+    // ARCHITECTURE NOTE:
+    // XPOrbSystem is responsible for MANAGING orbs (pooling, fusion, magnetism, rendering)
+    // RewardManager is responsible for DECIDING what to drop (XP orbs, health hearts, coins, etc.)
+    // This separation keeps the architecture clean and extensible.
+    //
+    // The old 'enemy-destroyed' listener here was removed because:
+    // - It caused duplicate orb creation (both systems creating orbs)
+    // - Drop decisions should be centralized in RewardManager
+    // - XPOrbSystem should only receive createXPOrb() calls, not decide when to drop
+    //
+    // RewardManager now calls xpOrbSystem.createXPOrb() for XP drops
+    // HealthHeartSystem handles health hearts
+    // Future systems (coins, etc.) will follow the same pattern
 
     gameEvents.on('progression-reset', () => {
       this.resolveCachedServices(true);

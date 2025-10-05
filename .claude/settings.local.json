@@ -17,7 +17,9 @@
       "Bash(git pull:*)",
       "Bash(git merge:*)",
       "Bash(git branch:*)",
-      "Bash(git revert:*)"
+      "Bash(git revert:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)"
     ],
     "deny": [],
     "ask": []

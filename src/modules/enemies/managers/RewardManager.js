@@ -1,14 +1,28 @@
 /**
  * Reward Manager
  *
- * Manages XP orb drops and rewards from destroyed enemies.
- * Supports different reward strategies for different enemy types.
+ * ARCHITECTURE: Centralized reward drop system that DECIDES what to drop.
+ *
+ * RESPONSIBILITIES:
+ * - ✅ Listens to 'enemy-destroyed' events
+ * - ✅ Decides WHAT to drop (XP orbs, health hearts, coins, etc.)
+ * - ✅ Delegates to specialized systems for actual creation:
+ *   - XP orbs → xpOrbSystem.createXPOrb()
+ *   - Health hearts → healthHeartSystem.spawnHeart()
+ *   - Future: Coins → coinSystem.createCoin()
+ *
+ * WHAT IT DOESN'T DO:
+ * - ❌ Does NOT manage orb lifecycle (fusion, magnetism, rendering)
+ * - ❌ That's XPOrbSystem's job
+ *
+ * This separation keeps the architecture clean and extensible.
  *
  * Features:
- * - XP orb creation and placement
- * - Reward scaling by enemy type and wave
- * - Multiple reward strategies
- * - Bonus rewards for special conditions
+ * - XP orb drops (delegated to XPOrbSystem)
+ * - Health heart drops (rare, from tough enemies)
+ * - Reward scaling by enemy type, size, and variant
+ * - Multiple reward strategies for different enemy types
+ * - Extensible for future collectibles (coins, powerups, etc.)
  *
  * @example
  * ```javascript
