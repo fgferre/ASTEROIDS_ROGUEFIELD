@@ -2,6 +2,12 @@
 
 Este documento orienta a execução de testes manuais sempre que fluxos de interface ou HUD forem alterados. Marque cada cenário após validar em build local.
 
+## Funcionalidades confirmadas
+
+- O HUD é renderizado a partir do esquema data-driven em `src/data/ui/hudLayout.js`, mantendo layout e estados sincronizados com os eventos `player-health-changed`, `experience-changed`, `shield-stats-changed` e `wave-state-updated` descritos no UISystem.
+- O painel de configurações utiliza o `SettingsSystem` (`src/modules/SettingsSystem.js`) e o schema em `src/data/settingsSchema.js`, permitindo persistência local por categoria (`audio`, `controls`, `accessibility`, `video`) e ouvindo/emitiendo os eventos `settings-update-requested` e `settings-reset-requested` para alterações e resets dirigidos.
+- Os cenários marcados como concluídos abaixo refletem o estado atual validado do HUD unificado, da reorganização para viewports menores e dos testes de estresse que garantem estabilidade quando os eventos de progresso são disparados pelo jogo.
+
 ## Base das telas
 
 - [x] Tela inicial exibe título "Asteroid Roguefield", animação 3D ativa e botões **Start**, **Options** e **Credits** visíveis.
