@@ -344,7 +344,9 @@ if (successRate >= 95) {
 }
 
 console.log('\n🔧 Next Steps:');
-console.log('1. Run the HTML test suite: test-audio-optimization.html');
+console.log(
+  '1. Run the HTML test suite: docs/reference/prototypes/test-audio-optimization.html'
+);
 console.log('2. Monitor performance in real gameplay scenarios');
 console.log('3. Fine-tune optimization parameters if needed');
 console.log('4. Consider implementing additional optimization strategies');
