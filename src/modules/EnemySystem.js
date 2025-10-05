@@ -87,19 +87,8 @@ class EnemySystem {
     // NEW: Integrate RewardManager with enemy destruction
     if (this.useManagers) {
       gameEvents.on('enemy-destroyed', (data) => {
-        console.log('[EnemySystem] enemy-destroyed event received:', {
-          hasRewardManager: !!this.rewardManager,
-          hasEnemy: !!data.enemy,
-          enemySize: data.enemy?.size,
-          enemyVariant: data.enemy?.variant
-        });
         if (this.rewardManager && data.enemy) {
           this.rewardManager.dropRewards(data.enemy);
-        } else {
-          console.warn('[EnemySystem] Cannot drop rewards:', {
-            rewardManager: !!this.rewardManager,
-            enemy: !!data.enemy
-          });
         }
       });
     }

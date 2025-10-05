@@ -404,11 +404,11 @@ function init() {
     const audioSystem = new AudioSystem();
     new InputSystem();
     new PlayerSystem();
+    new XPOrbSystem(); // Must be before EnemySystem so RewardManager can be initialized
+    new HealthHeartSystem(); // Must be before EnemySystem
     new EnemySystem();
     new PhysicsSystem();
     new CombatSystem();
-    new XPOrbSystem();
-    new HealthHeartSystem();
     new ProgressionSystem();
     new UISystem();
     new MenuBackgroundSystem();
