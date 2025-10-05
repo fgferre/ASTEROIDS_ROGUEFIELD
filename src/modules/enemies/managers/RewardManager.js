@@ -110,6 +110,14 @@ export class RewardManager {
    * @param {BaseEnemy} enemy - The destroyed enemy
    */
   dropRewards(enemy) {
+    console.log('[RewardManager] dropRewards called:', {
+      hasEnemy: !!enemy,
+      enemyType: enemy?.type,
+      enemySize: enemy?.size,
+      enemyVariant: enemy?.variant,
+      hasXPOrbSystem: !!this.xpOrbSystem
+    });
+
     if (!enemy || !this.xpOrbSystem) return;
 
     const config = this.rewardConfigs.get(enemy.type);
