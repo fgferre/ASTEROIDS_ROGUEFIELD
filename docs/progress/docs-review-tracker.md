@@ -46,8 +46,8 @@ Atualizado em 2025-10-06 para consolidar o status de cada documento conforme o p
 
 | Documento | Status | Evidências principais | Responsável | Data da revisão | Próximas ações |
 |-----------|--------|-----------------------|-------------|-----------------|----------------|
-| implementation-checklist.md | ⏳ Revisar | Checklist não alinhada ao fluxo atualizado de testes/DI; precisa conciliar com `validation/test-checklist.md`. | gpt-5-codex | 2025-10-05 | Atualizar itens ou consolidar com checklists atuais. |
-| phase-1-performance.md | 📦 Encerrar | Objetivos concluídos e já refletidos nos relatórios; candidato a arquivo. | gpt-5-codex | 2025-10-05 | Mover para `docs/guides/archive` com nota histórica. |
+| implementation-checklist.md | ✅ Atualizado | Revisão 2025-10-08 detalha estado real das entregas (pooling, spatial hash, batch rendering parcial, GC manager). | gpt-5-codex | 2025-10-08 | Acompanhar pendências registradas (reset de partículas, batching completo, automação de benchmarks). |
+| archive/phase-1-performance.md | 📦 Arquivado | Movido para `docs/guides/archive/phase-1-performance.md` com resumo de revisão e referências aos módulos implementados. | gpt-5-codex | 2025-10-08 | Nenhuma ação adicional; manter como registro histórico. |
 | phase-2-architecture.md | ⏳ Em andamento | Parte das ações (DI container) ainda em progresso. | gpt-5-codex | 2025-10-05 | Revisitar quando migração para DI concluir. |
 | phase-2-1-completion-report.md | ✅ Concluído | Síntese de entrega fase 2.1; não há ações pendentes. | gpt-5-codex | 2025-10-05 | Arquivar como registro oficial após duplicar em histórico. |
 | phase-2-2-actual-state.md | ✅ Atual | Documento descreve componentes ativos (`useComponents`) e registra WaveManager pendente, alinhado ao código atual (`EnemySystem.updateAsteroids`, ausência de `waveManager.update`). | gpt-5-codex | 2025-10-07 | Reabrir após integração do WaveManager para atualizar métricas. |
