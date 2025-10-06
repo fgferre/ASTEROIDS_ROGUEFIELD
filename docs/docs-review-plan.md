@@ -88,7 +88,7 @@ Este plano descreve como revisar **cada arquivo** existente em `docs/` para conf
 | `test-checklist.md` | Checklist de validação manual. | Garantir alinhamento com pipelines de build/teste atuais. | Atualizar itens e datas de revisão. |
 
 ## Próximos Passos
-1. Criar `docs/progress/docs-review-tracker.md` com tabela consolidada (colunas: Documento, Pasta, Status, Evidências, Responsável, Data da revisão, Próximas ações).
+1. Criar `docs/progress/docs-review-tracker.md` com tabela consolidada (colunas: Documento, Pasta, Status, Evidências, Responsável, Data da revisão, Próximas ações). ✅ Concluído em 2025-02-15.
 2. Agendar sessões de revisão (ex.: 2h por subpasta) e designar responsáveis.
 3. Após concluir cada revisão, atualizar este plano indicando data da última varredura e eventuais novos documentos.
 4. Repetir a varredura a cada final de fase ou quando novos documentos forem adicionados.
