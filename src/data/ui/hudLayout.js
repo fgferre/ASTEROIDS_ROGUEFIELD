@@ -66,8 +66,18 @@ const HUD_LAYOUT = [
     layout: 'inline-progress',
     description: 'Current wave progress',
     icon: {
-      type: 'text',
-      value: '🪨',
+      type: 'svg',
+      viewBox: '0 0 32 32',
+      paths: [
+        {
+          d: 'M12.2 4.5 5.7 12.3 4 21.9l6.4 5.6h10.5l5.8-8.4-1.7-10.4L18 4.5z',
+          fill: 'currentColor',
+        },
+        {
+          d: 'M13.6 8.2 9.1 14.1l-.8 5.8 3.7 3.2h7.6l4.2-6.1-1.2-7.2-4.8-2.7z',
+          fill: 'rgba(255, 255, 255, 0.45)',
+        },
+      ],
     },
     rootId: 'hud-wave',
     progressBarId: 'wave-progress',
@@ -91,8 +101,18 @@ const HUD_LAYOUT = [
     layout: 'inline-value',
     description: 'Total asteroids destroyed in session',
     icon: {
-      type: 'text',
-      value: '🪨',
+      type: 'svg',
+      viewBox: '0 0 32 32',
+      paths: [
+        {
+          d: 'M12.2 4.5 5.7 12.3 4 21.9l6.4 5.6h10.5l5.8-8.4-1.7-10.4L18 4.5z',
+          fill: 'currentColor',
+        },
+        {
+          d: 'M13.6 8.2 9.1 14.1l-.8 5.8 3.7 3.2h7.6l4.2-6.1-1.2-7.2-4.8-2.7z',
+          fill: 'rgba(255, 255, 255, 0.45)',
+        },
+      ],
     },
     rootId: 'hud-kills',
     valueId: 'kills-display',

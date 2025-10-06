@@ -2762,6 +2762,7 @@ body.hud-high-contrast .wave-progress-bar {
 }
 
 .hud-item--progress {
+  --hud-progress-icon-basis: clamp(1rem, 1.22vw, 1.32rem);
   width: 100%;
   display: flex;
   align-items: center;
@@ -2770,8 +2771,11 @@ body.hud-high-contrast .wave-progress-bar {
 }
 
 .hud-item--progress .hud-item__icon {
-  font-size: clamp(0.78rem, 1vw, 0.98rem);
-  flex: 0 0 auto;
+  font-size: clamp(0.82rem, 1.02vw, 1.08rem);
+  flex: 0 0 var(--hud-progress-icon-basis);
+  width: var(--hud-progress-icon-basis);
+  height: var(--hud-progress-icon-basis);
+  line-height: 1;
   filter: drop-shadow(0 0 8px rgba(118, 200, 255, 0.4));
 }
 
@@ -2832,8 +2836,10 @@ body.hud-high-contrast .wave-progress-bar {
 }
 
 .hud-progress__value {
-  flex: 0 0 auto;
+  flex: 0 0 clamp(3.2rem, 4.4vw, 5.2rem);
   min-width: clamp(3.2rem, 4.4vw, 5.2rem);
+  max-width: clamp(3.2rem, 4.4vw, 5.2rem);
+  width: clamp(3.2rem, 4.4vw, 5.2rem);
   text-align: right;
   font-size: clamp(0.5rem, 0.48rem + 0.08vw, 0.64rem);
   letter-spacing: 0.04em;
@@ -2847,8 +2853,10 @@ body.hud-high-contrast .wave-progress-bar {
 }
 
 .hud-progress__meta {
-  flex: 0 0 auto;
+  flex: 0 0 clamp(2.6rem, 3.8vw, 4.6rem);
   min-width: clamp(2.6rem, 3.8vw, 4.6rem);
+  max-width: clamp(2.6rem, 3.8vw, 4.6rem);
+  width: clamp(2.6rem, 3.8vw, 4.6rem);
   text-align: right;
   font-size: clamp(0.5rem, 0.48rem + 0.08vw, 0.64rem);
   letter-spacing: 0.08em;
@@ -2887,7 +2895,10 @@ body.hud-high-contrast .wave-progress-bar {
 }
 
 .hud-group--wave-status .hud-item--inline-value .hud-item__icon {
-  font-size: clamp(0.6rem, 0.82vw, 0.78rem);
+  flex: 0 0 clamp(0.96rem, 1.18vw, 1.14rem);
+  width: clamp(0.96rem, 1.18vw, 1.14rem);
+  height: clamp(0.96rem, 1.18vw, 1.14rem);
+  font-size: clamp(0.74rem, 0.94vw, 0.98rem);
   filter: drop-shadow(0 0 6px rgba(118, 200, 255, 0.35));
 }
 
@@ -2901,6 +2912,11 @@ body.hud-high-contrast .wave-progress-bar {
 
 .hud-item--wave .hud-progress__value {
   color: rgba(230, 242, 255, 0.86);
+}
+
+.hud-item--wave .hud-item__icon,
+.hud-item--kills .hud-item__icon {
+  color: rgba(196, 228, 255, 0.92);
 }
 
 
