@@ -1,0 +1,80 @@
+> [!NOTE]
+Documento arquivado em 2025-10-10. Itens rastreados no novo plano: Seção 3.1 Sistema de recompensas e orbs. Consulte `docs/plans/docs-implementation-master-plan.md` para objetivos e critérios atualizados.
+
+# Análise Completa: Sistema de Drops de XP Orbs
+
+**Revisão:** 2025-10-05  
+**Status:** ✅ Fluxo único controlado pelo RewardManager
+
+---
+
+## 🔍 Resumo Executivo
+
+O fluxo de drops de XP foi centralizado no `RewardManager`. O sistema antigo de drops do `XPOrbSystem` permanece ativo apenas como gestor do ciclo de vida dos orbs (pooling, magnetismo, fusão e renderização). Não existem mais dois listeners respondendo a `enemy-destroyed`; em vez disso, o `EnemySystem` encaminha o evento ao `RewardManager`, que calcula os drops e delega a criação física de cada orb para o `XPOrbSystem`.
+
+---
+
+## 🧩 Fluxo de Eventos Atual
+
+```
+Asteroide destruído
+    │
+    └─> EnemySystem listener
+         └─> RewardManager.dropRewards(enemy)
+              ├─> Calcula quantidade + valor de XP por orb
+              ├─> createXPOrbs(enemy, count, value)
+              │     └─> XPOrbSystem.createXPOrb(x, y, xpPerOrb, metadata)
+              └─> tryDropHealthHeart(enemy)
+```
+
+### Pontos-chave do fluxo
+- `EnemySystem` garante que o `RewardManager` seja criado com uma instância válida de `XPOrbSystem` antes de processar destruições de inimigos.  
+- `RewardManager.dropRewards` é a **única** fonte de decisão de drops (XP, corações, futuros itens).  
+- `XPOrbSystem.createXPOrb` apenas instancia e registra orbs; toda a lógica de quando e quantos orbs gerar fica fora do sistema.
+
+---
+
+## 🛠️ RewardManager.dropRewards
+
+`RewardManager.dropRewards(enemy)` executa três passos principais:
+
+1. **Recuperar configuração do inimigo:** lê `rewardConfigs` (alimentado por `GameConstants`) para obter valor base, contagem de orbs, fatores por tamanho e multiplicadores por variante.
+2. **Aplicar escalonamento:** combina tamanho, variante e bônus de wave (`+1` orb a cada 5 waves até a wave 10; depois escala a cada 3 waves) para definir o número final de orbs e o XP total.  
+3. **Delegar criação:** chama `createXPOrbs`, que por sua vez itera e envia chamadas a `XPOrbSystem.createXPOrb` com metadados do inimigo (tipo, tamanho, variante, velocidade inicial). Também registra estatísticas e tenta dropar corações.
+
+Esse design garante que qualquer novo tipo de recompensa seja controlado em um único lugar, mantendo o `XPOrbSystem` focado na mecânica dos orbs.
+
+---
+
+## 🏗️ Papel Atual do XPOrbSystem
+
+O `XPOrbSystem` continua sendo responsável por:
+- Pooling e reciclagem de entidades de orb.
+- Magnetismo em relação à nave do jogador.
+- Fusão de orbs próximos e animações relacionadas.
+- Emissão de eventos `xp-orb-created` quando um orb é instanciado.
+
+O arquivo contém um comentário de arquitetura destacando que as decisões de drop agora pertencem ao `RewardManager`, enquanto o `XPOrbSystem` apenas gerencia o ciclo de vida dos orbs. Esse comentário é a referência oficial para manter a separação de responsabilidades.
+
+---
+
+## 📌 Responsabilidades Resumidas
+
+| Sistema | Responsabilidades | Observações |
+| --- | --- | --- |
+| RewardManager | Calcula recompensas, decide drops, aciona criação de orbs e corações, atualiza estatísticas. | Centraliza toda lógica de recompensas e escala por wave. |
+| XPOrbSystem | Gerencia instâncias de orbs, física leve, magnetismo, fusão e renderização. | Recebe pedidos via `createXPOrb` e não escuta mais `enemy-destroyed`. |
+
+---
+
+## ✅ Validação Recomendada
+
+1. **Logs do RewardManager:** habilitar os `console.log` existentes em `RewardManager.createXPOrbs` para verificar a quantidade de orbs criados por inimigo e confirmar que apenas esse sistema reporta drops de XP.
+2. **Stress test rápido:** executar `npm run quick-performance-test` após destruir múltiplos asteroides para confirmar que a contagem de orbs permanece consistente e que não há explosão de entidades.
+3. **Métrica manual:** no modo de desenvolvimento, eliminar uma sequência de asteroides de tamanhos diferentes e somar o XP recebido comparando com `GameConstants` para assegurar que o total corresponde ao plano calculado.
+
+> Registrar na planilha de validação ou no changelog interno os resultados das verificações acima e manter o log do RewardManager ligado apenas durante a auditoria.
+
+---
+
+**Histórico da revisão:** Documento atualizado em 2025-10-05 após validar o fluxo `RewardManager → XPOrbSystem`.

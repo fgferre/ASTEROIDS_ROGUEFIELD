@@ -1,0 +1,79 @@
+> [!NOTE]
+Documento arquivado em 2025-10-10. Itens rastreados no novo plano: Seção 6.1 Checklists e critérios de saída. Consulte `docs/plans/docs-implementation-master-plan.md` para objetivos e critérios atualizados.
+
+# Checklist de Validação de UI
+
+Este documento orienta a execução de testes manuais sempre que fluxos de interface ou HUD forem alterados. Marque cada cenário após validar em build local.
+
+## Funcionalidades confirmadas
+
+- O HUD é renderizado a partir do esquema data-driven em `src/data/ui/hudLayout.js`, mantendo layout e estados sincronizados com os eventos `player-health-changed`, `experience-changed`, `shield-stats-changed` e `wave-state-updated` descritos no UISystem.
+- O painel de configurações utiliza o `SettingsSystem` (`src/modules/SettingsSystem.js`) e o schema em `src/data/settingsSchema.js`, permitindo persistência local por categoria (`audio`, `controls`, `accessibility`, `video`) e ouvindo/emitiendo os eventos `settings-update-requested` e `settings-reset-requested` para alterações e resets dirigidos.
+- Os cenários marcados como concluídos abaixo refletem o estado atual validado do HUD unificado, da reorganização para viewports menores e dos testes de estresse que garantem estabilidade quando os eventos de progresso são disparados pelo jogo.
+
+## Base das telas
+
+- [x] Tela inicial exibe título "Asteroid Roguefield", animação 3D ativa e botões **Start**, **Options** e **Credits** visíveis.
+- [x] Tela de pausa aparece/oculta corretamente via `Esc`, mantendo o jogo congelado.
+- [ ] Botão **Sair para o menu** do pause encerra a sessão atual, retorna ao menu principal e desbloqueia o input do HUD.
+- [x] Tela de game over exibe level, kills, ondas e tempo com valores consistentes com a run encerrada.
+
+## HUD unificado e data-driven
+
+### Resolução desktop (≥ 1280px)
+
+- [x] Elementos do HUD são renderizados segundo o esquema `src/data/ui/hudLayout.js`, sem valores estáticos no HTML.
+- [x] Indicador de integridade atualiza via evento `player-health-changed` e aplica estado de perigo abaixo de 35% da vida máxima.
+- [x] Escudo alterna entre travado, pronto, ativo e cooldown, exibindo overlay proporcional ao tempo restante.
+- [x] Consumo de hits do escudo reduz visualmente os segmentos e aplica pulso no cartão.
+- [x] Painel de ondas reflete progresso (`wave-state-updated`), mostra countdown entre ondas e aplica destaque de alerta durante a pausa entre setores. Contador agora aparece como overlay no campo de jogo sem deslocar o canvas.
+- [x] Countdown de ondas apresenta estado de alerta nos últimos 5 segundos e o painel destaca períodos de intervalo/conclusão.
+- [x] Barra de XP reage ao evento `experience-changed` e reseta corretamente após level up.
+- [x] Pulses visuais para XP, kills, tempo e level up são disparados ao ganhar experiência, eliminar inimigos ou subir de nível.
+
+### Viewport reduzida (≤ 900px)
+
+- [x] HUD reorganiza elementos em duas colunas sem sobrepor o canvas.
+- [x] Painel de ondas ocupa toda a largura disponível e mantém textos legíveis.
+- [x] Contador de ondas permanece visível e alinhado quando ativado. Overlay fixa-se ao topo do campo de jogo e não empurra o conteúdo em telas menores.
+
+## Tela inicial 3D
+
+- [ ] Cena 3D do menu carrega sem erros no console assim que a tela inicial é exibida.
+- [ ] Clicar em **Start** inicia a partida imediatamente, ocultando o menu e exibindo o HUD de jogo.
+- [ ] Botão **Options** abre e fecha o painel de configurações sobre o menu sem interromper a animação de fundo.
+- [ ] Botão **Credits** abre o painel de créditos, mantém o menu em segundo plano e pode ser fechado tanto pelo botão quanto pela tecla `Esc`.
+- [ ] Redimensionar a janela mantém o canvas 3D ajustado ao viewport, sem barras vazias ou distorções.
+- [ ] Fundo de estrelas permanece visível em monitores padrão, respeitando o contraste do mockup de referência.
+- [ ] Colisões entre asteroides geram fragmentação em cascata com brilho transitório, sem desaparecimentos abruptos.
+- [ ] Bordas dos asteroides exibem suavização por alpha blending sem serrilhados perceptíveis durante a rotação.
+- [ ] Slider **Relevo dos asteroides do menu** reage em tempo real, ajustando o normal map sem queda perceptível de FPS.
+
+## Level up e upgrades
+
+- [ ] A tela de level up exibe cards com categoria, nível atual e resumo do próximo nível disponível para cada upgrade.
+- [ ] Navegação por teclado ou gamepad percorre as opções na ordem visual e o botão de confirmar aplica o upgrade focado.
+- [ ] Pré-requisitos aparecem com indicadores de concluído/bloqueado, refletindo corretamente o estado atual.
+- [ ] Quando não há upgrades disponíveis, a partida retorna automaticamente sem ficar presa na tela de seleção.
+
+## Acessibilidade e responsividade
+
+- [ ] O toggle **Modo daltônico** aplica a nova paleta em HUD e cards de upgrade mantendo contraste AA mínimo.
+- [ ] O ajuste **Aumentar contraste do HUD** e o tema padrão alternam corretamente os tokens sem gerar conflitos com modo escuro.
+- [ ] Ativar **Reduzir movimentos intensos** e **Reduzir partículas** elimina tremores/flashes agressivos e reduz a densidade de efeitos sem travamentos visíveis.
+- [ ] Mudança de estágio das rachaduras respeita `Reduzir partículas`, mostrando apenas o overlay sem detritos extras.
+- [ ] HUD, menu e tela de level up permanecem legíveis em 1366×768, 1920×1080 e larguras ≤ 900px, sem recortes ou sobreposição do canvas.
+- [ ] Verificar contraste (WCAG AA) nos elementos críticos (botões primários, indicadores de HUD, barras de XP) em ambos os temas.
+
+## Pós-partida
+
+- [x] Estatísticas finais mantêm consistência com os dados emitidos em `player-died` (level, kills, ondas, tempo).
+
+## Progressão e Performance
+
+- [x] Ganho de XP em cadeia (coletar múltiplos orbes grandes) mantém o excedente após subir mais de um nível e dispara os eventos `experience-changed` e `player-leveled-up` na ordem correta. _(automatizado via `npm run stress`)_
+- [x] Stress test com 100+ orbes ativos mantém FPS estável após o caching de sprites/gradientes do XPOrbSystem (sem quedas abruptas nem GC visível a cada frame). _(automatizado via `npm run stress`)_
+- [x] Stress test com ondas de 25 asteroides e fragmentações em sequência mantém a detecção de colisões responsiva usando o PhysicsSystem (sem projéteis atravessando inimigos ou congelamentos). _(automatizado via `npm run stress`)_
+- [x] Verificar colisões entre nave e asteroides com o PhysicsSystem habilitado, garantindo que empurrões, danos e escudo sejam aplicados corretamente mesmo em ondas densas _(consolidado no PhysicsSystem; revalidar nos próximos stress tests)._ 
+
+> Sempre que um cenário acima for impactado, execute a validação correspondente e atualize este checklist com novos casos quando necessário.

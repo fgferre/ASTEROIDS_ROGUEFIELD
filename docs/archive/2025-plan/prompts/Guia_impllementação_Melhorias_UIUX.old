@@ -1,0 +1,60 @@
+> [!NOTE]
+Documento arquivado em 2025-10-10. Itens rastreados no novo plano: Seções 2.1 HUD tático minimalista; 5.1 Feedback Sensorial. Consulte `docs/plans/docs-implementation-master-plan.md` para objetivos e critérios atualizados.
+
+Guia de Implementação de Melhorias de UX/UI
+==========================================
+
+Documento orientador para evoluir o ASTEROIDS_ROGUEFIELD em ciclos curtos, aderentes à política descrita em agents.md. Use cada etapa como insumo para abrir tarefas e PRs pequenos, sempre com validação explícita.
+
+Panorama do estado atual (Atualizado em 2025-10-05)
+---------------------------------------------------
+
+- **Orquestração e ciclo de jogo:** `src/app.js` continua instanciando os sistemas manualmente, controlando `screen` e `isPaused`. A transição entre fluxos ainda depende de eventos (`gameEvents`) e acessos ao `ServiceLocator`.
+- **HUD unificado:** O `UISystem` lê o layout data-driven de `src/data/ui/hudLayout.js`, cacheia elementos e reage aos eventos `player-health-changed`, `shield-stats-changed`, `experience-changed` e `wave-state-updated` já listados em `docs/validation/test-checklist.md`.
+- **Configurações persistentes:** `src/modules/SettingsSystem.js` carrega o schema de `src/data/settingsSchema.js`, mantém categorias (`audio`, `controls`, `accessibility`, `video e HUD`) e persiste preferências no `localStorage`. O sistema responde aos eventos `settings-update-requested` e `settings-reset-requested`, emitidos a partir dos painéis de UI.
+- **Documentação e validação:** `docs/validation/test-checklist.md` cobre cenários de HUD (desktop e ≤900px), estresse de ondas/XP e fluxo pós-partida. Os itens marcados como concluídos refletem o estado após a migração para layout data-driven.
+
+Artefatos disponíveis
+---------------------
+
+- `docs/validation/test-checklist.md`: cenários manuais atualizados sempre que HUD/menu/configurações mudarem.
+- `src/data/ui/hudLayout.js`: esquema do HUD com posições, ícones, thresholds e IDs de elementos renderizados.
+- `src/data/settingsSchema.js`: categorias e campos utilizados pelo `SettingsSystem`, incluindo faixas numéricas, toggles e bindings.
+- `src/modules/SettingsSystem.js`: serviço registrado no `ServiceLocator`, responsável por carregar defaults, aplicar normalização/validação e propagar alterações via eventos.
+
+Princípios de execução (reforço de agents.md)
+---------------------------------------------
+
+- **Dados centralizados:** novos parâmetros devem ir para `GameConstants.js` ou arquivos em `src/data/`.
+- **Comunicação desacoplada:** continuar usando `gameEvents` e `gameServices`.
+- **PRs atômicos e verificáveis:** cada item abaixo deve resultar em mudanças pequenas, acompanhadas de atualização no checklist de testes e, quando aplicável, na documentação (agents.md, README.md, guias em `/docs`).
+- **Sem dependências extras:** privilegiar APIs nativas do browser e recursos já presentes no toolchain (Vite, Grunt, Prettier).
+
+Próximos passos prioritários
+----------------------------
+
+1. **Tutorial e onboarding ampliados (Etapa 2 revisitada)**
+   - Reestruturar o menu (`index.html`) para acomodar painel de tutorial e atalhos de configurações.
+   - Criar `src/data/tutorialSteps.js` descrevendo textos, alvos do HUD e gatilhos para cada passo.
+   - Implementar `TutorialSystem` orquestrando o fluxo, pausando o jogo até receber `tutorial-completed` e persistindo progresso em `localStorage`.
+   - Atualizar o checklist com cenários de primeira execução, repetição e interrupção pelo jogador.
+
+2. **Integração de áudio e feedback (continuação da Etapa 3)**
+   - Conectar `AudioSystem` ao `SettingsSystem` para aplicar `masterVolume`, `musicVolume`, `effectsVolume` e `muteAll` em tempo real.
+   - Emitir `settings-audio-changed` e registrar no checklist validação de sliders e mute instantâneo.
+   - Mapear dependências futuras de efeitos visuais que respondam a `reducedParticles` e `damageFlash`.
+
+3. **Acessibilidade e responsividade avançadas (Etapa 5 ajustada)**
+   - Aplicar `highContrastHud`, `colorBlindPalette` e `hudScale` à folha de estilos, usando tokens existentes (`src/style.css`).
+   - Introduzir testes de contraste (WCAG AA) no checklist para temas padrão e alto contraste.
+   - Revisar layout para garantir legibilidade em 1366×768, 1920×1080 e viewports ≤900px após ajuste dinâmico de escala.
+
+4. **Histórico e estatísticas pós-partida (Etapa 6)**
+   - Criar `HistorySystem` para consumir os dados de `player-died`, persistir as últimas sessões e expor métricas agregadas.
+   - Expandir a tela de game over com comparativos de melhor run e médias.
+   - Documentar formato dos dados em `/docs` e acrescentar cenários de validação ao checklist.
+
+Changelog
+---------
+
+- **2025-10-05:** Removidas as etapas concluídas (HUD data-driven, checklist, SettingsSystem), adicionadas referências aos artefatos existentes e redefinidos os próximos passos focando tutorial, áudio, acessibilidade e histórico.

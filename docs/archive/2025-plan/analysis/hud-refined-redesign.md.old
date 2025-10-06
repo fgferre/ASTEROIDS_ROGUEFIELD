@@ -1,0 +1,383 @@
+> [!NOTE]
+Documento arquivado em 2025-10-10. Itens rastreados no novo plano: Seção 2.1 HUD tático minimalista. Consulte `docs/plans/docs-implementation-master-plan.md` para objetivos e critérios atualizados.
+
+# HUD Refined Redesign - Sleek & Unified
+**Date**: 2025-10-03
+**Goal**: Reduce canvas occupation while keeping health/XP bars, maintaining design consistency with start screen
+
+---
+
+## 🎨 Design Language Analysis
+
+### **Start Screen Design Patterns** (for consistency):
+
+#### **Color Palette**:
+- **Primary Accent**: `#00aaff` (bright cyan-blue)
+- **Glow**: `rgba(0, 170, 255, 0.5-1.0)` multi-layer shadows
+- **Background**: `rgba(10, 20, 30, 0.5)` dark semi-transparent
+- **Border**: `2px solid #00aaff`
+- **Text**: `#00aaff` on dark, `#000000` on accent hover
+
+#### **Effects**:
+- **Backdrop blur**: `blur(5-12px)`
+- **Box shadow**: `0 0 15-25px rgba(0, 170, 255, 0.5-1)`
+- **Border radius**: `0.5-0.9rem` (rounded corners)
+- **Glow animation**: Subtle flicker/pulse
+
+#### **Typography**:
+- **Weight**: Bold (700-900)
+- **Transform**: UPPERCASE for emphasis
+- **Letter spacing**: `0.08-0.18em` (wide tracking)
+- **Font**: Sans-serif (system font stack)
+
+---
+
+## 🎯 Refined Redesign Proposal: "Sleek Tactical HUD"
+
+### **Philosophy**:
+1. **Keep health & XP bars** - Make them sleeker and more elegant
+2. **Match start screen aesthetics** - Cyan glow, dark backgrounds, blur
+3. **Reduce footprint** - Smaller, tighter, more compact
+4. **Smart grouping** - Related stats clustered together
+5. **Consistent design** - Same visual language throughout
+
+---
+
+## 📐 Detailed Component Design
+
+### **1. Top-Left Cluster** - Player Vitals (Redesigned, NOT removed)
+
+**Current Issues**:
+- Two separate cards stacked vertically (health + shield)
+- Each card ~288-416px wide
+- Lots of padding and labels
+
+**New Design**:
+```
+┌─────────────────────────┐
+│ ❤️ 100/100 ███████████  │
+│ 💠 3 hits  ▓▓▓░░       │
+└─────────────────────────┘
+```
+
+**Specs**:
+- **Single unified card** (not two separate)
+- **Width**: `220px` (down from 288-416px)
+- **Height**: `68px` (compact, both bars stacked)
+- **Background**: `linear-gradient(135deg, rgba(12, 20, 36, 0.88), rgba(8, 14, 28, 0.78))`
+- **Border**: `1px solid rgba(0, 170, 255, 0.35)` (cyan glow theme)
+- **Box shadow**: `0 0 18px rgba(0, 170, 255, 0.25)` (subtle glow)
+- **Backdrop blur**: `blur(12px)`
+- **Border radius**: `0.9rem`
+
+**Internal Layout**:
+- Each bar: Icon + Value + Progress (horizontal)
+- Health: ❤️ emoji + `100/100` + bar (8px height)
+- Shield: 💠 emoji + `3 hits` + bar (8px height)
+- Gap between: `8px`
+- Padding: `12px`
+- No labels ("Integridade", "Escudo") - icons are self-explanatory
+
+**Color Coding**:
+- Health bar: Green-cyan gradient (`#00ff88` → `#00aaff`)
+- Health low (<25%): Red-orange with blink (`#ff4444`)
+- Shield bar: Cyan gradient (`#00aaff` → `#5fcfff`)
+- Shield inactive: Gray (`rgba(100, 120, 140, 0.3)`)
+
+---
+
+### **2. Top-Middle** - Level (Refined)
+
+**Current**: Separate card with star icon, "Level" label, "Level 5"
+
+**New Design**:
+```
+┌──────────┐
+│ ⭐ LV 5  │
+└──────────┘
+```
+
+**Specs**:
+- **Width**: `90px` (down from ~200px)
+- **Height**: `36px` (slim pill shape)
+- **Background**: Same gradient as vitals
+- **Border**: `1px solid rgba(0, 170, 255, 0.35)`
+- **Box shadow**: `0 0 15px rgba(0, 170, 255, 0.2)`
+- **Text**: `LV 5` (uppercase, bold, no "Level" word)
+- **Font size**: `18px`
+- **Padding**: `8px 16px`
+
+---
+
+### **3. Top-Right Cluster** - Session Stats (Redesigned)
+
+**Current Issues**:
+- Two separate cards (kills + time)
+- Each ~288-416px wide
+- Verbose labels
+
+**New Design**:
+```
+┌───────────────────┐
+│ 🎯 42 ⏱ 1:45    │
+└───────────────────┘
+```
+
+**Specs**:
+- **Single unified card** (not two separate)
+- **Width**: `140px` (down from 288-416px!)
+- **Height**: `36px` (slim horizontal strip)
+- **Layout**: Icon + value, side-by-side (no stacking)
+- **Kills**: 🎯 + `42` (no "asteroides" label)
+- **Time**: ⏱ + `1:45` (mm:ss format, compact)
+- **Gap**: `12px` between stats
+- **Same styling**: Gradient, cyan border, glow
+
+---
+
+### **4. Bottom-Left** - Wave Panel (Massively Simplified)
+
+**Current Issues**:
+- Huge panel: 256-384px × 120-140px
+- Redundant timer (shown in countdown chip)
+- Redundant kill counter (shown top-right)
+- Too much padding
+
+**New Design**:
+```
+┌────────────────────────┐
+│ SETOR 2  ██████░░ 6/8 │
+└────────────────────────┘
+```
+
+**Specs**:
+- **Width**: `240px` (down from 256-384px)
+- **Height**: `36px` (down from 120-140px!)
+- **Layout**: Title + Progress + Count (single line)
+- **Title**: `SETOR 2` (uppercase, bold, cyan color)
+- **Progress bar**: Inline, 80px width, 6px height
+- **Count**: `6/8` (enemies killed/total)
+- **Padding**: `8px 14px`
+- **Same styling**: Gradient, cyan border, glow
+
+**Removed**:
+- ❌ "Tempo restante" timer (redundant)
+- ❌ "Asteroides: N eliminados" text (redundant)
+- ❌ Large vertical stacking
+
+---
+
+### **5. Bottom-Center** - XP Bar (Kept but Refined)
+
+**Current**: Wide bar (224-416px) with text below
+
+**New Design**:
+```
+┌──────────────────────────────────┐
+│    XP ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 840/1000│
+└──────────────────────────────────┘
+```
+
+**Specs**:
+- **Width**: `380px` (down from 224-416px, centered)
+- **Height**: `32px` (down from 40px)
+- **Layout**: Label + Bar + Value (horizontal, single line)
+- **Label**: `XP` (bold, cyan, 14px)
+- **Bar**: 240px width, 8px height (inline, not stacked)
+- **Value**: `840/1000` (inline on right, tabular-nums)
+- **Padding**: `8px 16px`
+- **Same styling**: Gradient background, cyan border, glow
+- **Bar gradient**: Green-cyan (`#00ff88` → `#00aaff`)
+- **Full XP glow**: Gold pulse when ready to level up
+
+---
+
+## 🎨 Unified Visual Language
+
+### **All HUD Elements Share**:
+
+#### **Background**:
+```css
+background: linear-gradient(135deg,
+  rgba(12, 20, 36, 0.88),
+  rgba(8, 14, 28, 0.78)
+);
+backdrop-filter: blur(12px);
+```
+
+#### **Border & Glow**:
+```css
+border: 1px solid rgba(0, 170, 255, 0.35);
+box-shadow:
+  0 0 18px rgba(0, 170, 255, 0.25),
+  inset 0 0 22px rgba(82, 170, 255, 0.12);
+border-radius: 0.9rem;
+```
+
+#### **Typography**:
+```css
+font-weight: 700;
+text-transform: uppercase;
+letter-spacing: 0.08em;
+color: #00aaff;
+text-shadow: 0 0 8px rgba(0, 170, 255, 0.4);
+```
+
+#### **Progress Bars**:
+```css
+background: rgba(12, 18, 34, 0.55);
+border: 1px solid rgba(0, 170, 255, 0.25);
+border-radius: 999px; /* full rounded */
+box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.45);
+
+/* Fill */
+background: linear-gradient(90deg, #00ff88, #00aaff);
+box-shadow: 0 0 12px rgba(0, 170, 255, 0.6);
+```
+
+---
+
+## 📊 Space Savings Comparison
+
+| Element | Old Size | New Size | Savings |
+|---------|----------|----------|---------|
+| **Top-Left (Vitals)** | 288-416px × 120-180px | 220px × 68px | **70-85% area** |
+| **Top-Middle (Level)** | ~200px × 60px | 90px × 36px | **85% area** |
+| **Top-Right (Stats)** | 288-416px × 120-180px | 140px × 36px | **95% area** |
+| **Bottom-Left (Wave)** | 256-384px × 120-140px | 240px × 36px | **92% area** |
+| **Bottom-Center (XP)** | 224-416px × 40px | 380px × 32px | **20% area** |
+
+### **Total Canvas Freed**:
+- **Top corners**: ~80,000px² freed
+- **Bottom**: ~15,000px² freed
+- **Total**: **~95,000px² = 20% more visible playfield**
+
+---
+
+## 🎨 Visual Mockup
+
+### **Before** (Current):
+```
+┌──[Health]──────┐  ┌────[Level]────┐  ┌──[Kills]───────┐
+│ ❤️ Integridade  │  │ ⭐ Level       │  │ 🎯 Abates      │
+│ 100/100         │  │ Level 5        │  │ 42 asteroides  │
+│ [█████████████] │  └────────────────┘  │ ⏱ Tempo        │
+└─────────────────┘                      │ 1m 45s         │
+┌──[Shield]──────┐                       └────────────────┘
+│ 💠 Escudo       │
+│ 3 hits          │
+│ [▓▓▓░░]        │
+└─────────────────┘
+
+              [Tiny Playfield]
+
+┌──[Wave Panel]──────────────────┐  ┌─[XP Bar]──────────────┐
+│ SETOR 2                         │  │                        │
+│ Tempo restante: 60s             │  │ XP: 840 / 1000         │
+│ [████████░░]                   │  │ [▓▓▓▓▓▓▓▓▓░░░░]       │
+│ Asteroides: 6 eliminados        │  └────────────────────────┘
+└─────────────────────────────────┘
+```
+
+### **After** (Refined):
+```
+┌────────────────────┐  ┌──────┐  ┌─────────────┐
+│ ❤️ 100/100 ████████ │  │⭐ LV 5│  │ 🎯42 ⏱1:45 │
+│ 💠 3 hits  ▓▓▓░░    │  └──────┘  └─────────────┘
+└────────────────────┘
+
+           [MASSIVE PLAYFIELD - 20% LARGER]
+
+┌──────────────────┐  ┌─────────────────────────────────┐
+│ SETOR 2 ████░ 6/8│  │ XP ▓▓▓▓▓▓▓▓▓░░░ 840/1000       │
+└──────────────────┘  └─────────────────────────────────┘
+```
+
+---
+
+## 🔧 Implementation Plan
+
+### **Phase 1: Top Clusters Redesign** (2 hours)
+1. ✅ Merge health + shield into single compact card (220px × 68px)
+2. ✅ Shrink level to pill shape (90px × 36px)
+3. ✅ Merge kills + time into single horizontal card (140px × 36px)
+4. ✅ Apply unified cyan-glow styling to all
+5. ✅ Remove verbose text labels, keep icons + values only
+
+### **Phase 2: Bottom Elements Refinement** (1.5 hours)
+1. ✅ Condense wave panel to single-line (240px × 36px)
+2. ✅ Refine XP bar to horizontal layout (380px × 32px)
+3. ✅ Apply same visual styling (gradient, glow, blur)
+4. ✅ Remove redundant information
+
+### **Phase 3: CSS Unification** (1 hour)
+1. ✅ Create shared `.hud-element` base class
+2. ✅ Extract common gradient, border, glow styles
+3. ✅ Ensure consistency with start screen design
+4. ✅ Add smooth transitions/animations
+
+### **Phase 4: Polish & Testing** (30 min)
+1. ✅ Verify low-health blinking works on compact bars
+2. ✅ Test shield inactive state styling
+3. ✅ Ensure XP full glow animation works
+4. ✅ Accessibility check (screen readers, high contrast)
+
+**Total Time**: **5 hours**
+
+---
+
+## ✅ Success Criteria
+
+### **Visual Consistency**:
+- [ ] All HUD elements use cyan (#00aaff) as primary accent
+- [ ] All elements have matching glow effects
+- [ ] Background gradients consistent across all cards
+- [ ] Border radius and blur consistent
+- [ ] Typography matches start screen (bold, uppercase, wide tracking)
+
+### **Space Efficiency**:
+- [ ] Top-left reduced by 70-85% area
+- [ ] Top-right reduced by 95% area
+- [ ] Wave panel reduced by 92% area
+- [ ] Total playfield increase ≥ 20%
+- [ ] No information lost
+
+### **Functionality**:
+- [ ] Health/XP bars still prominently visible
+- [ ] All critical info readable at a glance
+- [ ] Low health warning still works (blink + sound)
+- [ ] Shield states clearly distinguishable
+- [ ] Level-up glow still prominent
+
+---
+
+## 🎨 Design Highlights
+
+### **What Makes This Design Cohesive**:
+
+1. **Cyan Glow Everywhere** - Matches title screen's `#00aaff` theme
+2. **Dark Blurred Backgrounds** - Same semi-transparent tech feel
+3. **Minimal Text** - Icons + numbers only (like modern games)
+4. **Compact Clustering** - Related stats grouped smartly
+5. **Rounded Corners** - Soft, modern aesthetic throughout
+6. **Progress Bars Inline** - Not stacked, saves vertical space
+7. **Uppercase Bold** - Strong, readable, matches menu buttons
+
+---
+
+## 🚀 Recommendation
+
+**Priority**: ⭐⭐⭐⭐⭐ **CRITICAL**
+
+**Why This Approach**:
+- ✅ Keeps health/XP bars as requested
+- ✅ Maintains design consistency with start screen
+- ✅ Drastically reduces canvas occupation (20% more playfield)
+- ✅ Looks sleek, modern, professional
+- ✅ All information still accessible
+
+**Next Steps**: Approve → Implement Phase 1 → Test → Iterate
+
+---
+
+**Status**: READY FOR IMPLEMENTATION ✅
