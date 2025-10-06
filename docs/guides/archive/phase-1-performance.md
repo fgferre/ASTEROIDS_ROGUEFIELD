@@ -1,4 +1,21 @@
-# Fase 1: Otimizações de Performance Críticas
+# Fase 1: Otimizações de Performance Críticas _(Arquivo Histórico)_
+
+_Revisão encerrada em 2025-10-08._ Este documento foi movido para `docs/guides/archive`
+após confirmar que as entregas de object pooling, spatial hash e gerenciamento de
+memória estão ativas no código atual. As otimizações foram incorporadas em
+`src/core/ObjectPool.js`, `src/core/GamePools.js`, `src/core/SpatialHash.js`,
+`src/modules/PhysicsSystem.js` e no bootstrap do jogo (`src/app.js`). 【F:src/core/ObjectPool.js†L1-L147】【F:src/core/GamePools.js†L33-L120】【F:src/core/SpatialHash.js†L1-L199】【F:src/modules/PhysicsSystem.js†L72-L220】【F:src/app.js†L426-L454】
+
+### Resumo da revisão 2025-10-08
+- Object pooling inicializado em `GamePools.initialize()` com automação de manutenção
+  via `GamePools.autoManageAll()` e tarefas do `GarbageCollectionManager`. 【F:src/core/GamePools.js†L496-L540】【F:src/app.js†L426-L454】
+- Sistemas principais (`CombatSystem`, `EffectsSystem`, `EnemySystem`, `XPOrbSystem`)
+  utilizam `GamePools` para aquisição/liberação de objetos, garantindo o objetivo da
+  Fase 1.1. 【F:src/modules/CombatSystem.js†L332-L614】【F:src/modules/EffectsSystem.js†L174-L513】【F:src/modules/EnemySystem.js†L240-L292】【F:src/modules/XPOrbSystem.js†L251-L269】
+- O Spatial Hash está ativo e testado, sustentando a meta de performance da Fase 1.2.
+  【F:src/core/SpatialHash.js†L1-L199】【F:src/__tests__/physics/collision-accuracy.test.js†L1-L118】
+- Itens remanescentes (renderização batched completa e reset seguro das partículas)
+  foram registrados em `implementation-checklist.md` para acompanhamento contínuo.
 
 ## 🎯 Objetivo
 Implementar melhorias de performance que resultarão em ganhos imediatos de 20-40% no FPS e eliminação de stuttering durante gameplay intenso.
