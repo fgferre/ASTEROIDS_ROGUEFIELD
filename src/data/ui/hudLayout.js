@@ -65,6 +65,10 @@ const HUD_LAYOUT = [
     group: 'wave-status',
     layout: 'inline-progress',
     description: 'Current wave progress',
+    icon: {
+      type: 'text',
+      value: '🪨',
+    },
     rootId: 'hud-wave',
     progressBarId: 'wave-progress',
     progressFillId: 'wave-progress-bar',

@@ -2796,11 +2796,16 @@ body.hud-high-contrast .wave-progress-bar {
   min-width: 0;
 }
 
+.hud-item--progress {
+  --hud-progress-track-basis: clamp(8.1rem, 11vw, 11.6rem);
+}
+
 .hud-item--progress .hud-bar {
   position: relative;
-  flex: 1 1 clamp(8.1rem, 11vw, 11.6rem);
-  min-width: clamp(6.6rem, 8.6vw, 9.2rem);
-  max-width: clamp(8.6rem, 11.6vw, 12rem);
+  flex: 0 0 var(--hud-progress-track-basis);
+  width: var(--hud-progress-track-basis);
+  min-width: var(--hud-progress-track-basis);
+  max-width: var(--hud-progress-track-basis);
   height: 0.45rem;
   border-radius: var(--radius-full);
   overflow: hidden;
