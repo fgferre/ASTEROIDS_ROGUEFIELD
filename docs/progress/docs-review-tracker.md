@@ -1,6 +1,6 @@
 # Rastreador da Revisão da Pasta `docs`
 
-Atualizado em 2025-10-08 para consolidar o status de cada documento conforme o plano em `docs/docs-review-plan.md`.
+Atualizado em 2025-10-06 para consolidar o status de cada documento conforme o plano em `docs/docs-review-plan.md`.
 
 ## `docs/analysis`
 
@@ -45,20 +45,20 @@ Atualizado em 2025-10-08 para consolidar o status de cada documento conforme o p
 
 | Documento | Status | Evidências principais | Responsável | Data da revisão | Próximas ações |
 |-----------|--------|-----------------------|-------------|-----------------|----------------|
-| implementation-checklist.md | 🔄 Divergente | Checkboxes seguem vazios para pools e benchmarks já ativos (`src/core/ObjectPool.js`, `src/app.js`, `CombatSystem`), ignorando o checklist vivo em `docs/validation/test-checklist.md`. | gpt-5-codex | 2025-10-07 | Revisar documento marcando entregas reais ou movê-lo para histórico para evitar duplicidade. |
+| implementation-checklist.md | ⏳ Revisar | Checklist não alinhada ao fluxo atualizado de testes/DI; precisa conciliar com `validation/test-checklist.md`. | gpt-5-codex | 2025-10-05 | Atualizar itens ou consolidar com checklists atuais. |
 | phase-1-performance.md | 📦 Encerrar | Objetivos concluídos e já refletidos nos relatórios; candidato a arquivo. | gpt-5-codex | 2025-10-05 | Mover para `docs/guides/archive` com nota histórica. |
-| phase-2-architecture.md | 🔄 Desatualizado | Ainda instrui substituir `window.gameServices` pelo adapter e mantém checklist Fase 2.1 em aberto, enquanto o app preserva o locator legado e só inicializa o adapter sem ativá-lo. | gpt-5-codex | 2025-10-07 | Atualizar narrativa da migração para refletir o estado real e separar backlog futuro. |
+| phase-2-architecture.md | ⏳ Em andamento | Parte das ações (DI container) ainda em progresso. | gpt-5-codex | 2025-10-05 | Revisitar quando migração para DI concluir. |
 | phase-2-1-completion-report.md | ✅ Concluído | Síntese de entrega fase 2.1; não há ações pendentes. | gpt-5-codex | 2025-10-05 | Arquivar como registro oficial após duplicar em histórico. |
-| phase-2-2-actual-state.md | ⏳ Em andamento | Confirma RewardManager ativo, mas `EnemySystem.update()` continua chamando `updateWaveLogic` legado e `WaveManager` permanece sem `update()`, assim como a flag do `EnemyFactory`. | gpt-5-codex | 2025-10-07 | Decidir se o WaveManager será conectado ou se o plano será reescrito antes da próxima revisão. |
-| phase-2-2-completion-report.md | ⚠️ Otimista | Relato marca a fase como concluída mesmo registrando WaveManager sem loop e EnemySystem retendo lógica de waves. | gpt-5-codex | 2025-10-07 | Rebaixar para histórico parcial ou alinhar com o estado real descrito em `phase-2-2-actual-state.md`. |
-| phase-3-juice-polish.md | 🔄 Divergente | Plano ainda exige criar `Easing.js`/`TweenSystem` e `UIAnimations` que não existem no core ou nos módulos atuais, mostrando que o backlog não saiu do papel. | gpt-5-codex | 2025-10-09 | Reescrever alinhando com o estado real e extrair apenas iniciativas ainda válidas (indicadores, SFX, haptics). |
-| phase-4-documentation.md | 🔄 Divergente | Gap analysis ignora a bateria atual de testes (`src/__tests__/core|balance|physics`) e referencia utilitários inexistentes (`__utils__/TestEnvironment`). | gpt-5-codex | 2025-10-09 | Levantar inventário real de testes/CI e redefinir metas factíveis para cobertura e documentação. |
+| phase-2-2-actual-state.md | ⏳ Atualizar | Status indica WaveManager pendente; precisa revisão após progresso recente. | gpt-5-codex | 2025-10-05 | Atualizar tabela de progresso e próximos passos. |
+| phase-2-2-completion-report.md | ⏳ Validar | Relatório afirma conclusão; verificar se critérios finais (WaveManager) foram atingidos. | gpt-5-codex | 2025-10-05 | Confirmar entregas e marcar como concluído ou ajustar. |
+| phase-3-juice-polish.md | ⏳ Em andamento | Muitos itens (indicadores direcionais, SFX UI) ainda pendentes. | gpt-5-codex | 2025-10-05 | Priorizar backlog de polish após revisão atual. |
+| phase-4-documentation.md | ⏳ Planejar | Plano de documentação final depende desta revisão. | gpt-5-codex | 2025-10-05 | Atualizar milestones conforme limpeza avançar. |
 | hud-overlay-refactor.md | ⏳ Em andamento | HUD atual segue layout antigo; refatoração não aplicada. | gpt-5-codex | 2025-10-05 | Consolidar com plano de redesign antes de codificar. |
-| asteroid-break-enhancement.md | 🔄 Desatualizado | Sistema atual já usa perfis de rachadura em `ASTEROID_CRACK_PROFILES` e gera camadas/fragmentos via tipo `Asteroid` (`src/core/GameConstants.js`, `src/modules/enemies/types/Asteroid.js`). | gpt-5-codex | 2025-10-08 | Atualizar guia para refletir pipeline data-driven ou arquivar como histórico. |
-| improvement-roadmap.md | 🔄 Desatualizado | Continua priorizando pooling, spatial hash e batch rendering já presentes em `GamePools`, `PhysicsSystem` e `RenderingSystem`, além de metas genéricas sem owner. | gpt-5-codex | 2025-10-09 | Converter em retro/post-mortem ou atualizar com lacunas reais (áudio, docs, QA). |
+| asteroid-break-enhancement.md | ⏳ Validar | Necessário checar `PhysicsSystem`/`AsteroidSystem` para ver se melhorias foram incorporadas. | gpt-5-codex | 2025-10-05 | Rodar auditoria de colisão/quebra e atualizar doc. |
+| improvement-roadmap.md | ⏳ Revisar | Roadmap contém itens já executados e outros obsoletos. | gpt-5-codex | 2025-10-05 | Atualizar estado de cada iniciativa ou mover para histórico. |
 | performance-monitor-guide.md | ✅ Implementado | Scripts `quick-performance-test.js` e `realistic-performance-test.js` seguem instruções do guia. | gpt-5-codex | 2025-10-05 | Acrescentar notas de uso em CI futuramente. |
-| start-screen-integration-plan.md | ✅ Implementado | Menu atual replica layout 3D com canvas dedicado, botões e créditos em `src/index.html`, fundo animado via `MenuBackgroundSystem` e slider `menuAsteroidNormalIntensity` controlando normal map (`src/modules/MenuBackgroundSystem.js`, `src/data/settingsSchema.js`, `src/app.js`). | gpt-5-codex | 2025-10-08 | Registrar retroativo da migração e decidir se o plano migra para histórico. |
-| consolidation-polish-masterplan.md | 🔁 Redundante | Repete fases cobrindo as mesmas entregas dos guias individuais e não registra o estado atual das iniciativas concluídas. | gpt-5-codex | 2025-10-09 | Decidir se vira sumário executivo ou arquivar após distribuir itens para documentos focados. |
+| start-screen-integration-plan.md | ⏳ Em andamento | Necessário verificar integração final da tela inicial com UI atual. | gpt-5-codex | 2025-10-05 | Validar assets versus implementação e atualizar doc. |
+| consolidation-polish-masterplan.md | ⏳ Revisar | Documento mestre contém itens duplicados com outros planos. | gpt-5-codex | 2025-10-05 | Consolidar com roadmap final ou arquivar se fragmentado. |
 
 ### `docs/guides/archive/phase-2-2`
 
@@ -82,15 +82,15 @@ Atualizado em 2025-10-08 para consolidar o status de cada documento conforme o p
 
 | Documento | Status | Evidências principais | Responsável | Data da revisão | Próximas ações |
 |-----------|--------|-----------------------|-------------|-----------------|----------------|
-| completed-prompts.md | ❌ Vazio | Documento contém apenas o cabeçalho `# Completed Prompts`, sem registrar execuções. | gpt-5-codex | 2025-10-08 | Preencher com histórico real ou remover para evitar documentação duplicada. |
-| Guia Completo de Refatoração Modular - Prompts Pas.md | 📦 Redundante | Prompts obrigam copiar versão antiga do `EventBus` e recriar estrutura monolítica, destoando do core atual com debug controller (`src/core/EventBus.js`). | gpt-5-codex | 2025-10-08 | Arquivar como legado ou extrair apenas trechos ainda válidos. |
-| Guia_impllementação_Melhorias_UIUX | ✏️ Padronizar | Guia descreve orchestration/HUD/Settings atuais com referências a `src/app.js` e `docs/validation/test-checklist.md`, porém segue sem extensão `.md` e precisa de formatação. | gpt-5-codex | 2025-10-08 | Renomear para `.md`, aplicar Markdown consistente e manter atualização contínua. |
+| completed-prompts.md | ⏳ Atualizar | Lista desatualizada comparada ao `historico_do_projeto.txt`. | gpt-5-codex | 2025-10-05 | Sincronizar com histórico recente de entregas. |
+| Guia Completo de Refatoração Modular - Prompts Pas.md | 📦 Referência | Conteúdo redundante com `phase-2-architecture`. | gpt-5-codex | 2025-10-05 | Padronizar nomenclatura e arquivar após extrair itens úteis. |
+| Guia_impllementação_Melhorias_UIUX | ⏳ Padronizar | Arquivo sem extensão e com prompt bruto; precisa higienização. | gpt-5-codex | 2025-10-05 | Definir formato (`.md`), revisar conteúdo e decidir manter/arquivar. |
 
 ## `docs/reference`
 
 | Documento | Status | Evidências principais | Responsável | Data da revisão | Próximas ações |
 |-----------|--------|-----------------------|-------------|-----------------|----------------|
-| start-screen-mockup.html | 📦 Diverge | Mockup ainda usa Tailwind/CDNs inline e painel de FPS permanente, enquanto `src/index.html` aplica CSS próprio e injeta Stats opcional junto ao `MenuBackgroundSystem`. | gpt-5-codex | 2025-10-08 | Capturar screenshots para arquivo histórico ou atualizar markup para a versão final. |
+| start-screen-mockup.html | ⏳ Validar | Mockup precisa ser comparado com implementação real da start screen. | gpt-5-codex | 2025-10-05 | Revisar componentes UI e atualizar referências. |
 | prototypes/README.md | 📦 Referência | Protótipos experimentais mantidos para consulta; não fazem parte do build. | gpt-5-codex | 2025-10-05 | Manter isolados; documentar acesso se reutilizar. |
 | prototypes/test-audio-optimization.html | 📦 Referência | Protótipo legado não integrado ao app. | gpt-5-codex | 2025-10-05 | Nenhuma ação. |
 | prototypes/test-batch-rendering.html | 📦 Referência | Protótipo legado; técnicas já aplicadas no motor atual. | gpt-5-codex | 2025-10-05 | Nenhuma ação. |
