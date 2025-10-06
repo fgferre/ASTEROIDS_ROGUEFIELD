@@ -1,0 +1,464 @@
+> [!NOTE]
+Documento arquivado em 2025-10-10. Itens rastreados no novo plano: Seção 4.1 Migração DI + WaveManager. Consulte `docs/plans/docs-implementation-master-plan.md` para objetivos e critérios atualizados.
+
+# Phase 2.2: Estado Real da Implementação
+
+**Data:** 2025-10-01
+**Branch:** `feature/phase-2-2-enemy-decomposition`
+**Status:** ⚠️ **PARCIALMENTE IMPLEMENTADO**
+
+---
+
+## 🎯 Objetivo Original vs Realidade
+
+### Objetivo
+Decomposizar o EnemySystem (1,237 linhas) em componentes especializados, reduzindo para <400 linhas.
+
+### Realidade
+- **EnemySystem:** 1,325 linhas (+88 linhas)
+- **Componentes criados:** 3 (665 linhas totais)
+- **Componentes ativos:** 3 de 3 (movimento, colisão e renderização)
+- **Managers ativos:** 1 de 2 (RewardManager ✅ / WaveManager ⚠️)
+
+---
+
+## 🧭 Resumo Rápido
+
+| Status | Item | Flag / Hook | Próximo Passo |
+| --- | --- | --- | --- |
+| ✅ Ativo | `useComponents` (movimento/colisão/render) | `true` | Consolidar limpeza de código legado após estabilização. |
+| ✅ Ativo | `RewardManager` | `useManagers = true` | Continuar dropando XP; sem ações imediatas. |
+| 🕒 Backlog | `WaveManager` | `useManagers = true` (sem `update()`) | Conectar loop e migrar estado das waves. |
+| 🕒 Backlog | `EnemyFactory` | `useFactory = false` | Reproduzir conflito com pools e decidir ativação/remover. |
+| 📚 Arquivo | Planos históricos da fase | - | Ver [`docs/guides/archive/phase-2-2/README.md`](archive/phase-2-2/README.md). |
+
+---
+
+## ✅ O que REALMENTE Funciona
+
+### 1. RewardManager ✅ **100% FUNCIONAL**
+
+**Arquivo:** `src/modules/enemies/managers/RewardManager.js` (339 linhas)
+
+**Status:** Totalmente integrado e ativo
+
+**Como funciona:**
+```javascript
+// No EnemySystem.setupEventListeners()
+gameEvents.on('enemy-destroyed', (data) => {
+  if (this.rewardManager && data.enemy) {
+    this.rewardManager.dropRewards(data.enemy);  // ✅ Chamado automaticamente
+  }
+});
+```
+
+**Benefícios:**
+- ✅ Automaticamente dropa XP orbs quando inimigos são destruídos
+- ✅ Calcula XP baseado em tipo, tamanho e variante
+- ✅ Sistema de recompensas centralizado e reutilizável
+- ✅ Rastreia estatísticas de drops
+
+**Testes:**
+- ✅ XP orbs aparecem após destruir asteroids
+- ✅ Quantidade varia por tamanho (small=1, medium=2, large=4)
+- ✅ Multiplicadores de variante funcionam (gold=2x, etc.)
+
+---
+
+### 2. AsteroidMovement ✅ **MOVIMENTO VIA COMPONENTE**
+
+**Arquivo:** `src/modules/enemies/components/AsteroidMovement.js` (222 linhas)
+
+**Status:** Integrado via `useComponents = true`. O componente recebe cada
+asteroide durante `EnemySystem.updateAsteroids()`.
+
+**Como funciona:**
+```javascript
+if (this.useComponents && this.movementComponent) {
+  const context = { player: this.getCachedPlayer(), worldBounds: { ... } };
+  this.movementComponent.update(asteroid, deltaTime, context);
+  asteroid.updateVisualState(deltaTime);
+  // timers específicos permanecem no Asteroid
+}
+```
+
+**Benefícios:**
+- Centraliza estratégias linear/parasite/volatile num único ponto.
+- Screen wrapping e ajuste de velocidade ocorrem fora do tipo específico.
+- Mantém compatibilidade porque o Asteroid ainda controla timers visuais e
+  comportamentos especiais após o movimento.
+
+**⚠️ Observações:**
+- Há utilitários de movimento redundantes no `Asteroid`. Avaliar remoção após
+  validar o componente em produção.
+- `updateVisualState()` e timers (`lastDamageTime`, `shieldHitCooldown`) seguem
+  no tipo para preservar efeitos.
+
+**Testes:**
+- ✅ Asteroides continuam com comportamento esperado (parasite/volatile).
+- ✅ Screen wrapping funciona (movimento contínuo no campo de jogo).
+- ✅ Nenhuma regressão de velocidade/rotação detectada.
+
+---
+
+### 3. AsteroidCollision ✅ **ATIVO COM RESSALVA**
+
+**Arquivo:** `src/modules/enemies/components/AsteroidCollision.js` (241 linhas)
+
+**Status:** Integrado e funcional
+
+**Como funciona:**
+```javascript
+// No EnemySystem.handleAsteroidCollisions()
+if (this.useComponents && this.collisionComponent) {
+  this.collisionComponent.handleAsteroidCollisions(this.asteroids);  // ✅ Usado
+}
+```
+
+**Benefícios:**
+- ✅ Física de colisão elástica funcionando
+- ✅ Separação de penetração funcional
+- ✅ Efeitos de rotação preservados
+
+**⚠️ PROBLEMA:**
+- Código duplicado: EnemySystem ainda tem método `checkAsteroidCollision()` (43 linhas)
+- **Ação necessária:** Remover código legado duplicado
+
+**Testes:**
+- ✅ Asteroids colidem entre si
+- ✅ Física realista preservada
+- ✅ Performance mantida
+
+---
+
+### 4. AsteroidRenderer ✅ **ATIVO (WRAPPER)**
+
+**Arquivo:** `src/modules/enemies/components/AsteroidRenderer.js` (201 linhas)
+
+**Status:** Integrado mas funciona como wrapper
+
+**Como funciona:**
+```javascript
+// No EnemySystem.render()
+if (this.useComponents && this.rendererComponent) {
+  this.rendererComponent.renderAll(ctx, this.asteroids);  // ✅ Usado
+}
+
+// Mas dentro do componente:
+render(ctx, asteroid) {
+  asteroid.draw(ctx);  // ← Apenas delega para o asteroid
+}
+```
+
+**Benefícios:**
+- ✅ Organização do código de renderização
+- ✅ Estatísticas de rendering
+- ✅ Modo debug com bounding boxes e vetores
+
+**⚠️ LIMITAÇÃO:**
+- Não refatora lógica de renderização, apenas organiza chamadas
+- Asteroid.draw() ainda tem toda a complexidade (400+ linhas)
+
+**Testes:**
+- ✅ Rendering idêntico ao original
+- ✅ Performance mantida
+- ✅ Debug mode funciona
+
+---
+
+## ⏳ Backlog Prioritário
+
+### WaveManager ⚠️ **PRECISA DE LOOP**
+
+**Arquivo:** `src/modules/enemies/managers/WaveManager.js` (447 linhas)
+
+**Estado atual:** É instanciado dentro de `EnemySystem.setupManagers()`, porém o
+loop principal ainda chama `updateWaveLogic()` legada. Nenhuma chamada para
+`waveManager.update(deltaTime)` acontece.
+
+**Por que importa:** Enquanto o manager não assume o controle, duplicamos o
+estado das waves (`waveState`) e mantemos lógica complexa dentro do
+`EnemySystem`, inviabilizando ajustes finos de pacing.
+
+**Próximos passos recomendados:**
+- Expor `waveManager.update(deltaTime)` no loop principal.
+- Migrar spawning, timers e broadcast de eventos (`waveState`) para o manager.
+- Depurar transição de estados (intervalos/breaks) antes de remover helpers
+  legados.
+
+### EnemyFactory ❌ **FEATURE FLAG DESLIGADA**
+
+**Arquivo:** `src/modules/enemies/base/EnemyFactory.js` (428 linhas)
+
+**Estado atual:** Construída em `EnemySystem.setupEnemyFactory()`, registra o
+tipo `asteroid`, mas `useFactory` permanece `false` por causa de conflitos com o
+sistema de pools (`GamePools`).
+
+**Por que importa:** Sem validar a fábrica não sabemos se o fluxo baseado em
+dados é viável. Novos tipos de inimigos precisarão decidir entre instanciar
+direto ou depender do factory.
+
+**Próximos passos recomendados:**
+- Reproduzir o conflito ao setar `useFactory = true` e mapear o comportamento do
+pool de asteroides.
+- Garantir que `GamePools.configureAsteroidLifecycle()` e a fábrica não disputam
+responsabilidade de reset.
+- Documentar a decisão final (manter ligada ou remover o módulo).
+
+**Ação necessária:**
+- Investigar e resolver conflito com pools
+- Ou remover factory se não for necessário
+
+---
+
+## 📊 Métricas Reais
+
+### Linhas de Código
+
+| Arquivo | Linhas | Status | Uso |
+|---------|--------|--------|-----|
+| AsteroidMovement.js | 222 | ✅ Ativo (movimento) | 100% |
+| AsteroidCollision.js | 241 | ✅ Ativo | 100% |
+| AsteroidRenderer.js | 201 | ✅ Ativo (wrapper) | 100% |
+| RewardManager.js | 339 | ✅ Ativo | 100% |
+| WaveManager.js | 447 | ⚠️ Sem loop | 0% |
+| EnemyFactory.js | 428 | ❌ Desabilitado | 0% |
+| **Total Novo** | **1,878** | - | - |
+| EnemySystem.js | 1,325 | ✅ Ativo | 100% |
+
+### Código não exercitado
+
+- **WaveManager:** 447 linhas (aguardando integração)
+- **EnemyFactory:** 428 linhas (feature flag desligada)
+- **Total fora do loop:** 875 linhas
+
+### Código Duplicado
+
+- **Collision logic:** ~43 linhas duplicadas
+- **Deveria estar:** Apenas no componente
+
+### Feature Flags
+
+| Flag | Estado | Efetivo? |
+|------|--------|----------|
+| `useManagers` | `true` | Parcial (1/2) |
+| `useComponents` | `true` | Completo (3/3) |
+| `useFactory` | `false` | Não |
+
+---
+
+## 🎯 O que foi Alcançado
+
+### Positivo ✅
+
+1. **Arquitetura Conceitual Sólida**
+   - Componentes bem projetados e documentados
+   - Padrões de design corretos (Strategy, Component, Facade)
+   - Código limpo e legível
+
+2. **RewardManager Funcional**
+   - Sistema de recompensas totalmente funcional
+   - Separação de responsabilidades alcançada
+   - Reutilizável para futuros tipos de inimigos
+
+3. **Zero Breaking Changes**
+   - Jogo funciona perfeitamente
+   - Performance mantida (60 FPS)
+   - Todos os recursos preservados
+
+4. **Foundation para Futuro**
+   - Componentes prontos para ativação
+   - Feature flags permitem migração gradual
+   - Extensível para novos enemy types
+
+### Negativo ❌
+
+1. **Objetivo de LOC não alcançado**
+   - Target: EnemySystem <400 linhas
+   - Real: EnemySystem = 1,325 linhas
+   - Aumento: +88 linhas
+
+2. **Código fora do loop**
+   - WaveManager (447) + EnemyFactory (428) ainda não executam (875 linhas).
+   - Impacta clareza das responsabilidades de spawning/progressão.
+
+3. **Duplicação de Código**
+   - Lógica de colisão duplicada
+   - Aumenta manutenção
+
+4. **Feature flags pendentes**
+   - `useManagers` cobre RewardManager, mas WaveManager não foi plugado.
+   - `useFactory` permanece off até validação de pools.
+
+---
+
+## 🚀 Roadmap de Correções
+
+### Fase 2.2.1: Integrar WaveManager (2-3 horas)
+
+**Prioridade:** Alta
+**Objetivo:** Colocar o gerenciamento de waves no módulo dedicado.
+
+**Tarefas:**
+1. Chamar `waveManager.update(deltaTime)` dentro de `EnemySystem.update()`.
+2. Migrar timers (`breakTimer`, `timeRemaining`) e controle de spawn.
+3. Garantir que `emitWaveStateUpdate()` passe a consumir dados do manager.
+4. Rodar sessões completas para validar progressão e broadcasts.
+
+**Resultado esperado:**
+- Estado de waves centralizado e pronto para tuning.
+- Redução significativa na seção de ondas do `EnemySystem`.
+
+---
+
+### Fase 2.2.2: Validar EnemyFactory (2 horas)
+
+**Prioridade:** Média
+**Objetivo:** Decidir se a factory permanece ou é removida.
+
+**Tarefas:**
+1. Ativar `useFactory = true` em ambiente de teste e observar interações com `GamePools`.
+2. Ajustar hooks de `configureAsteroidLifecycle` para evitar resets duplicados.
+3. Medir impacto na performance/spawn de asteroides.
+4. Documentar decisão (ativar permanentemente ou retirar módulo).
+
+**Resultado esperado:**
+- Caminho oficial para criar inimigos (via factory ou direto).
+- Remoção de incerteza para novos tipos de inimigo.
+
+---
+
+### Fase 2.2.3: Cleanup Pós-Integração (1-2 horas)
+
+**Prioridade:** Média
+**Objetivo:** Eliminar resíduos após ligar managers/componentes.
+
+**Tarefas:**
+1. Remover `EnemySystem.checkAsteroidCollision()` e helpers legados.
+2. Consolidar utilitários de movimento restantes no `Asteroid`.
+3. Atualizar `docs/validation/test-checklist.md` com os novos fluxos.
+4. Revisar telemetria/logs para garantir clareza pós-migração.
+
+**Resultado esperado:**
+- `EnemySystem` mais enxuto e alinhado à arquitetura modular.
+- Documentação e testes refletindo a realidade atualizada.
+
+---
+
+## 📋 Checklist de Estado Atual
+
+### Implementação
+
+- [x] RewardManager criado e funcional
+- [x] AsteroidCollision criado e funcional
+- [x] AsteroidRenderer criado e funcional
+- [x] AsteroidMovement criado e integrado via componente
+- [x] WaveManager criado (aguardando integração)
+- [x] EnemyFactory criada (feature flag desligada)
+- [x] BaseEnemy hierarchy criada
+- [x] Asteroid extends BaseEnemy
+
+### Integração
+
+- [x] RewardManager integrado via eventos
+- [x] AsteroidCollision integrado via feature flag
+- [x] AsteroidRenderer integrado via feature flag
+- [x] AsteroidMovement integrado no loop (`useComponents`)
+- [ ] WaveManager NÃO integrado
+- [ ] EnemyFactory NÃO ativo
+
+### Limpeza
+
+- [ ] Código duplicado removido
+- [ ] Código fora do loop (WaveManager/Factory) resolvido
+- [ ] Feature flags consistentes
+- [x] Documentação atualizada com estado real
+
+### Testes
+
+- [x] Build passando
+- [x] Jogo funcional
+- [x] Zero breaking changes
+- [x] Performance mantida
+- [x] Rewards funcionando
+- [x] Colisões funcionando
+- [x] Rendering funcionando
+
+---
+
+## 💡 Lições Aprendidas
+
+### O que funcionou bem ✅
+
+1. **Abordagem Incremental**
+   - Feature flags permitiram desenvolvimento seguro
+   - Rollback fácil se necessário
+
+2. **Separação de Responsabilidades**
+   - RewardManager é um exemplo perfeito
+   - Modularidade alcançada onde ativo
+
+3. **Documentação Detalhada**
+   - Componentes bem documentados
+   - JSDoc completo
+
+### O que precisa melhorar ⚠️
+
+1. **Planejamento de Integração**
+   - Falta concluir a etapa WaveManager/Factory
+   - Devemos reservar tempo dedicado para fechar o ciclo das feature flags
+
+2. **Análise de Dependências**
+   - Erro com WorldSystem.getBounds mostrou falta de análise prévia
+   - Deve-se mapear dependências antes de refatorar
+
+3. **Scope Creep**
+   - Tentou fazer muita coisa de uma vez
+   - Melhor fazer menos, mas completamente
+
+4. **Validação Contínua**
+   - Deveria ter feito análise detalhada mais cedo
+   - Catch problemas antes do "completion report"
+
+---
+
+## 🎯 Conclusão Honesta
+
+### Status Real: **7/10**
+
+**O que funciona (4/6 frentes ativas):**
+- ✅ RewardManager: totalmente integrado via eventos.
+- ✅ AsteroidMovement: componente controla deslocamento com `useComponents`.
+- ✅ AsteroidCollision: física centralizada (precisa remover fallback legacy).
+- ✅ AsteroidRenderer: organiza draw + modo debug.
+
+**Backlog imediato (2/6):**
+- ⚠️ WaveManager: precisa assumir o loop para eliminar lógica duplicada.
+- ❌ EnemyFactory: permanece desativada até resolver conflito com pools.
+
+### Recomendação
+
+**Aceitar estado atual como "foundation"** e executar as ações planejadas:
+
+1. **Curto prazo (esta sprint):**
+   - Integrar WaveManager ao loop.
+   - Resolver feature flag da EnemyFactory (ativar ou remover).
+
+2. **Médio prazo (próxima sprint):**
+   - Remover colisão/movimento legados após estabilização.
+   - Revisar métricas de LOC para aproximar do alvo <400 linhas.
+
+3. **Longo prazo (quando necessário):**
+   - Evoluir VariantManager ou outras otimizações de conteúdo.
+   - Expandir inimigos usando o caminho validado (Factory ou direto).
+
+---
+
+**Este documento reflete o estado REAL do projeto.**
+**Use-o como base para decisões de desenvolvimento futuro.**
+
+---
+
+**🤖 Gerado com honestidade por [Claude Code](https://claude.com/claude-code)**
+
+**Co-Authored-By:** Claude <noreply@anthropic.com>

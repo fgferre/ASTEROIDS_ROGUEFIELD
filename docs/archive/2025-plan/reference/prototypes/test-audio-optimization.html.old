@@ -1,0 +1,688 @@
+> [!NOTE]
+Documento arquivado em 2025-10-10. Itens rastreados no novo plano: Seção 5.1 Feedback Sensorial. Consulte `docs/plans/docs-implementation-master-plan.md` para objetivos e critérios atualizados.
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio System Optimization Test</title>
+    <style>
+        body {
+            font-family: 'Consolas', 'Monaco', monospace;
+            background: #1a1a1a;
+            color: #00ff41;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #00ff41;
+            padding-bottom: 20px;
+        }
+
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #333;
+            border-radius: 5px;
+            background: #222;
+        }
+
+        .test-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        button {
+            background: #00ff41;
+            color: #000;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+
+        button:hover {
+            background: #00cc33;
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .stats-display {
+            background: #111;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            white-space: pre-wrap;
+            font-family: 'Consolas', monospace;
+            font-size: 12px;
+            line-height: 1.4;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .benchmark-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .benchmark-controls input[type="number"] {
+            background: #333;
+            color: #00ff41;
+            border: 1px solid #666;
+            padding: 5px;
+            border-radius: 3px;
+            width: 100px;
+        }
+
+        .benchmark-results {
+            margin: 20px 0;
+            padding: 15px;
+            background: #0a0a0a;
+            border: 1px solid #00ff41;
+            border-radius: 5px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ff41, #00cc33);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            border: 1px solid #333;
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        .comparison-table th {
+            background: #333;
+            font-weight: bold;
+        }
+
+        .performance-indicator {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: bold;
+        }
+
+        .performance-excellent { background: #00ff41; color: #000; }
+        .performance-good { background: #ffaa00; color: #000; }
+        .performance-poor { background: #ff4444; color: #fff; }
+
+        .audio-visualization {
+            width: 100%;
+            height: 100px;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 5px;
+            margin: 10px 0;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .audio-bar {
+            position: absolute;
+            bottom: 0;
+            width: 4px;
+            background: #00ff41;
+            transition: height 0.1s ease;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎵 Audio System Optimization Test Suite</h1>
+            <p>ETAPA 1.4: Validação de Performance do Sistema de Áudio Otimizado</p>
+        </div>
+
+        <!-- Sistema Status -->
+        <div class="test-section">
+            <h2>📊 System Status</h2>
+            <div class="stats-display" id="systemStatus">Initializing audio system...</div>
+            <button onclick="initializeAudioSystem()">Initialize Audio System</button>
+            <button onclick="refreshStats()">Refresh Stats</button>
+        </div>
+
+        <!-- Testes Individuais -->
+        <div class="test-section">
+            <h2>🎯 Individual Sound Tests</h2>
+            <div class="test-controls">
+                <button onclick="testIndividualSound('playLaserShot')">Laser Shot</button>
+                <button onclick="testIndividualSound('playAsteroidBreak', 'large')">Large Asteroid</button>
+                <button onclick="testIndividualSound('playAsteroidBreak', 'medium')">Medium Asteroid</button>
+                <button onclick="testIndividualSound('playAsteroidBreak', 'small')">Small Asteroid</button>
+                <button onclick="testIndividualSound('playBigExplosion')">Big Explosion</button>
+                <button onclick="testIndividualSound('playXPCollect')">XP Collect</button>
+                <button onclick="testIndividualSound('playLevelUp')">Level Up</button>
+                <button onclick="testIndividualSound('playShieldShockwave')">Shield Shockwave</button>
+            </div>
+            <div class="audio-visualization" id="audioVisualization"></div>
+        </div>
+
+        <!-- Testes de Batching -->
+        <div class="test-section">
+            <h2>⚡ Batching Tests</h2>
+            <div class="test-controls">
+                <button onclick="testBatching('playLaserShot', 5)">5 Laser Shots</button>
+                <button onclick="testBatching('playAsteroidBreak', 8, 'medium')">8 Asteroids</button>
+                <button onclick="testBatching('playXPCollect', 10)">10 XP Collects</button>
+                <button onclick="testBatching('mixed', 15)">15 Mixed Sounds</button>
+            </div>
+            <div id="batchingStats" class="stats-display">No batching tests run yet.</div>
+        </div>
+
+        <!-- Stress Test -->
+        <div class="test-section">
+            <h2>🔥 Stress Test</h2>
+            <div class="benchmark-controls">
+                <label>Sounds per second:</label>
+                <input type="number" id="stressRate" value="30" min="1" max="100">
+                <label>Duration (seconds):</label>
+                <input type="number" id="stressDuration" value="10" min="1" max="60">
+                <button onclick="startStressTest()" id="stressButton">Start Stress Test</button>
+                <button onclick="stopStressTest()">Stop Test</button>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="stressProgress"></div>
+            </div>
+            <div id="stressResults" class="stats-display">No stress test run yet.</div>
+        </div>
+
+        <!-- Benchmark Comparison -->
+        <div class="test-section">
+            <h2>📈 Performance Benchmark</h2>
+            <div class="benchmark-controls">
+                <button onclick="runBenchmark('pooling')" id="benchmarkPooling">Test Pooling</button>
+                <button onclick="runBenchmark('caching')" id="benchmarkCaching">Test Caching</button>
+                <button onclick="runBenchmark('batching')" id="benchmarkBatching">Test Batching</button>
+                <button onclick="runBenchmark('full')" id="benchmarkFull">Full Benchmark</button>
+            </div>
+            <div id="benchmarkResults" class="benchmark-results">
+                <div class="stats-display">Click a benchmark button to start testing...</div>
+            </div>
+        </div>
+
+        <!-- Performance Monitoring -->
+        <div class="test-section">
+            <h2>📡 Real-time Performance Monitoring</h2>
+            <div class="test-controls">
+                <button onclick="startMonitoring()">Start Monitoring</button>
+                <button onclick="stopMonitoring()">Stop Monitoring</button>
+                <button onclick="clearMonitoring()">Clear Data</button>
+            </div>
+            <div id="monitoringDisplay" class="stats-display">Monitoring not started.</div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Import audio modules
+        import AudioSystem from '../../src/modules/AudioSystem.js';
+        import AudioPool from '../../src/modules/AudioPool.js';
+        import AudioCache from '../../src/modules/AudioCache.js';
+        import AudioBatcher from '../../src/modules/AudioBatcher.js';
+
+        // Global audio system instance
+        window.audioSystem = null;
+        window.monitoringInterval = null;
+        window.stressTestInterval = null;
+        window.stressTestStartTime = null;
+
+        // Mock gameServices for testing
+        window.gameServices = {
+            register: () => {},
+            has: () => false,
+            get: () => null
+        };
+
+        // Mock gameEvents for testing
+        window.gameEvents = {
+            on: () => {},
+            emit: () => {}
+        };
+
+        // Initialize audio system
+        window.initializeAudioSystem = async function() {
+            try {
+                window.audioSystem = new AudioSystem();
+                await window.audioSystem.init();
+
+                updateSystemStatus();
+                document.getElementById('systemStatus').textContent =
+                    '✅ Audio System initialized successfully with optimizations!';
+            } catch (error) {
+                document.getElementById('systemStatus').textContent =
+                    '❌ Failed to initialize audio system: ' + error.message;
+            }
+        };
+
+        // Update system status display
+        window.updateSystemStatus = function() {
+            if (!window.audioSystem) return;
+
+            const stats = window.audioSystem.getPerformanceStats();
+            const display = document.getElementById('systemStatus');
+
+            display.textContent = `
+🎵 Audio System Status:
+┣━ Initialization: ${window.audioSystem.initialized ? '✅ Ready' : '❌ Not Ready'}
+┣━ Context State: ${window.audioSystem.context?.state || 'N/A'}
+┣━ Optimizations:
+┃  ┣━ Pooling: ${stats.optimizationsEnabled.pooling ? '✅ Active' : '❌ Disabled'}
+┃  ┣━ Caching: ${stats.optimizationsEnabled.caching ? '✅ Active' : '❌ Disabled'}
+┃  ┗━ Batching: ${stats.optimizationsEnabled.batching ? '✅ Active' : '❌ Disabled'}
+┣━ Performance:
+┃  ┣━ Total Audio Calls: ${stats.performance.totalAudioCalls}
+┃  ┣━ Avg Calls/Frame: ${stats.performance.averageCallsPerFrame.toFixed(1)}
+┃  ┗━ Peak Calls/Frame: ${stats.performance.peakCallsPerFrame}
+┗━ Pool Stats: ${stats.pool ?
+    `${stats.pool.poolEfficiency.toFixed(1)}% efficiency, ${stats.pool.activeNodes} active nodes` :
+    'Not available'}`;
+        };
+
+        // Refresh stats display
+        window.refreshStats = function() {
+            updateSystemStatus();
+        };
+
+        // Test individual sound
+        window.testIndividualSound = function(method, ...args) {
+            if (!window.audioSystem || !window.audioSystem.initialized) {
+                alert('Please initialize the audio system first!');
+                return;
+            }
+
+            try {
+                window.audioSystem[method](...args);
+                animateAudioVisualization();
+
+                // Update stats after a brief delay
+                setTimeout(updateSystemStatus, 100);
+            } catch (error) {
+                console.error('Sound test error:', error);
+            }
+        };
+
+        // Test batching
+        window.testBatching = function(soundType, count, ...args) {
+            if (!window.audioSystem || !window.audioSystem.initialized) {
+                alert('Please initialize the audio system first!');
+                return;
+            }
+
+            const startTime = performance.now();
+            const batcherStatsBefore = window.audioSystem.getPerformanceStats().batcher;
+
+            try {
+                if (soundType === 'mixed') {
+                    // Mixed sounds test
+                    const sounds = ['playLaserShot', 'playAsteroidBreak', 'playXPCollect'];
+                    for (let i = 0; i < count; i++) {
+                        const method = sounds[i % sounds.length];
+                        const methodArgs = method === 'playAsteroidBreak' ? ['medium'] : [];
+                        window.audioSystem[method](...methodArgs);
+
+                        // Small delay to trigger batching
+                        if (i % 3 === 2) {
+                            setTimeout(() => {}, 1);
+                        }
+                    }
+                } else {
+                    // Single sound type test
+                    for (let i = 0; i < count; i++) {
+                        window.audioSystem[soundType](...args);
+                    }
+                }
+
+                const endTime = performance.now();
+                const duration = endTime - startTime;
+
+                // Update batching stats display
+                setTimeout(() => {
+                    const batcherStatsAfter = window.audioSystem.getPerformanceStats().batcher;
+                    const batchDisplay = document.getElementById('batchingStats');
+
+                    batchDisplay.textContent = `
+🔄 Batching Test Results:
+┣━ Test: ${count} ${soundType} sounds
+┣━ Duration: ${duration.toFixed(2)}ms
+┣━ Batching Stats:
+┃  ┣━ Batched Sounds: ${batcherStatsAfter ? batcherStatsAfter.batched : 'N/A'}
+┃  ┣━ Individual Sounds: ${batcherStatsAfter ? batcherStatsAfter.individual : 'N/A'}
+┃  ┣━ Prevented Overlaps: ${batcherStatsAfter ? batcherStatsAfter.prevented : 'N/A'}
+┃  ┗━ Batch Efficiency: ${batcherStatsAfter ? batcherStatsAfter.batchEfficiency.toFixed(1) + '%' : 'N/A'}
+┗━ Performance: ${(count / duration * 1000).toFixed(0)} sounds/second`;
+
+                    updateSystemStatus();
+                }, 100);
+
+            } catch (error) {
+                console.error('Batching test error:', error);
+            }
+        };
+
+        // Start stress test
+        window.startStressTest = function() {
+            if (!window.audioSystem || !window.audioSystem.initialized) {
+                alert('Please initialize the audio system first!');
+                return;
+            }
+
+            const rate = parseInt(document.getElementById('stressRate').value);
+            const duration = parseInt(document.getElementById('stressDuration').value);
+            const button = document.getElementById('stressButton');
+
+            button.disabled = true;
+            button.textContent = 'Running...';
+
+            window.stressTestStartTime = performance.now();
+            let soundsPlayed = 0;
+            let elapsedTime = 0;
+
+            const sounds = [
+                { method: 'playLaserShot', args: [] },
+                { method: 'playAsteroidBreak', args: ['medium'] },
+                { method: 'playXPCollect', args: [] },
+                { method: 'playBigExplosion', args: [] }
+            ];
+
+            window.stressTestInterval = setInterval(() => {
+                elapsedTime = performance.now() - window.stressTestStartTime;
+                const progress = Math.min((elapsedTime / 1000) / duration, 1);
+
+                // Update progress bar
+                document.getElementById('stressProgress').style.width = (progress * 100) + '%';
+
+                if (progress >= 1) {
+                    stopStressTest();
+                    return;
+                }
+
+                // Play random sound
+                const sound = sounds[Math.floor(Math.random() * sounds.length)];
+                window.audioSystem[sound.method](...sound.args);
+                soundsPlayed++;
+
+                // Update results display
+                const stats = window.audioSystem.getPerformanceStats();
+                document.getElementById('stressResults').textContent = `
+🔥 Stress Test Progress:
+┣━ Elapsed: ${(elapsedTime / 1000).toFixed(1)}s / ${duration}s
+┣━ Sounds Played: ${soundsPlayed}
+┣━ Rate: ${(soundsPlayed / (elapsedTime / 1000)).toFixed(1)} sounds/second
+┣━ System Performance:
+┃  ┣━ Total Audio Calls: ${stats.performance.totalAudioCalls}
+┃  ┣━ Peak Calls/Frame: ${stats.performance.peakCallsPerFrame}
+┃  ┗━ Pool Efficiency: ${stats.pool ? stats.pool.poolEfficiency.toFixed(1) + '%' : 'N/A'}
+┗━ Status: ${progress >= 1 ? '✅ Completed' : '⏳ Running...'}`;
+
+            }, 1000 / rate);
+        };
+
+        // Stop stress test
+        window.stopStressTest = function() {
+            if (window.stressTestInterval) {
+                clearInterval(window.stressTestInterval);
+                window.stressTestInterval = null;
+            }
+
+            const button = document.getElementById('stressButton');
+            button.disabled = false;
+            button.textContent = 'Start Stress Test';
+
+            document.getElementById('stressProgress').style.width = '0%';
+
+            if (window.stressTestStartTime) {
+                const totalTime = performance.now() - window.stressTestStartTime;
+                const finalStats = window.audioSystem ? window.audioSystem.getPerformanceStats() : null;
+
+                document.getElementById('stressResults').textContent += `
+\n✅ Test Completed!
+┗━ Total Duration: ${(totalTime / 1000).toFixed(2)}s`;
+            }
+        };
+
+        // Run benchmark
+        window.runBenchmark = function(type) {
+            if (!window.audioSystem || !window.audioSystem.initialized) {
+                alert('Please initialize the audio system first!');
+                return;
+            }
+
+            const button = document.getElementById(`benchmark${type.charAt(0).toUpperCase() + type.slice(1)}`);
+            button.disabled = true;
+            button.textContent = 'Running...';
+
+            const resultsDiv = document.getElementById('benchmarkResults');
+            resultsDiv.innerHTML = '<div class="stats-display">Running benchmark...</div>';
+
+            setTimeout(() => {
+                const results = performBenchmark(type);
+                displayBenchmarkResults(results);
+
+                button.disabled = false;
+                button.textContent = button.textContent.replace('Running...',
+                    type === 'pooling' ? 'Test Pooling' :
+                    type === 'caching' ? 'Test Caching' :
+                    type === 'batching' ? 'Test Batching' : 'Full Benchmark');
+            }, 100);
+        };
+
+        // Perform benchmark
+        function performBenchmark(type) {
+            const results = {
+                type,
+                timestamp: new Date().toISOString(),
+                tests: []
+            };
+
+            const testSounds = [
+                { method: 'playLaserShot', args: [], count: 20 },
+                { method: 'playAsteroidBreak', args: ['medium'], count: 15 },
+                { method: 'playXPCollect', args: [], count: 25 },
+                { method: 'playBigExplosion', args: [], count: 5 }
+            ];
+
+            testSounds.forEach(test => {
+                const startTime = performance.now();
+                const statsBefore = window.audioSystem.getPerformanceStats();
+
+                // Run test
+                for (let i = 0; i < test.count; i++) {
+                    window.audioSystem[test.method](...test.args);
+                }
+
+                const endTime = performance.now();
+                const statsAfter = window.audioSystem.getPerformanceStats();
+
+                results.tests.push({
+                    sound: test.method,
+                    count: test.count,
+                    duration: endTime - startTime,
+                    avgTimePerSound: (endTime - startTime) / test.count,
+                    poolEfficiencyBefore: statsBefore.pool?.poolEfficiency || 0,
+                    poolEfficiencyAfter: statsAfter.pool?.poolEfficiency || 0,
+                    cacheHitRate: statsAfter.cache?.hitRate || 0,
+                    batchEfficiency: statsAfter.batcher?.batchEfficiency || 0
+                });
+            });
+
+            return results;
+        }
+
+        // Display benchmark results
+        function displayBenchmarkResults(results) {
+            const resultsDiv = document.getElementById('benchmarkResults');
+
+            let html = `
+                <h3>🏆 Benchmark Results - ${results.type.toUpperCase()}</h3>
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Sound Type</th>
+                            <th>Count</th>
+                            <th>Total Time</th>
+                            <th>Avg/Sound</th>
+                            <th>Pool Efficiency</th>
+                            <th>Cache Hit Rate</th>
+                            <th>Performance</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            results.tests.forEach(test => {
+                const performanceClass =
+                    test.avgTimePerSound < 0.5 ? 'performance-excellent' :
+                    test.avgTimePerSound < 1.0 ? 'performance-good' : 'performance-poor';
+
+                html += `
+                    <tr>
+                        <td>${test.sound}</td>
+                        <td>${test.count}</td>
+                        <td>${test.duration.toFixed(2)}ms</td>
+                        <td>${test.avgTimePerSound.toFixed(2)}ms</td>
+                        <td>${test.poolEfficiencyAfter.toFixed(1)}%</td>
+                        <td>${test.cacheHitRate.toFixed(1)}%</td>
+                        <td><span class="performance-indicator ${performanceClass}">
+                            ${test.avgTimePerSound < 0.5 ? 'EXCELLENT' :
+                              test.avgTimePerSound < 1.0 ? 'GOOD' : 'POOR'}
+                        </span></td>
+                    </tr>
+                `;
+            });
+
+            html += `
+                    </tbody>
+                </table>
+                <div class="stats-display">
+📊 Summary:
+┣━ Average performance: ${(results.tests.reduce((sum, test) => sum + test.avgTimePerSound, 0) / results.tests.length).toFixed(2)}ms per sound
+┣━ Pool efficiency: ${(results.tests.reduce((sum, test) => sum + test.poolEfficiencyAfter, 0) / results.tests.length).toFixed(1)}%
+┗━ Cache hit rate: ${(results.tests.reduce((sum, test) => sum + test.cacheHitRate, 0) / results.tests.length).toFixed(1)}%
+                </div>
+            `;
+
+            resultsDiv.innerHTML = html;
+        }
+
+        // Audio visualization
+        function animateAudioVisualization() {
+            const container = document.getElementById('audioVisualization');
+            const bar = document.createElement('div');
+            bar.className = 'audio-bar';
+            bar.style.left = Math.random() * (container.offsetWidth - 4) + 'px';
+            bar.style.height = Math.random() * 80 + 20 + 'px';
+
+            container.appendChild(bar);
+
+            setTimeout(() => {
+                bar.style.height = '0px';
+                setTimeout(() => {
+                    if (container.contains(bar)) {
+                        container.removeChild(bar);
+                    }
+                }, 200);
+            }, 100);
+        }
+
+        // Start performance monitoring
+        window.startMonitoring = function() {
+            if (window.monitoringInterval) {
+                clearInterval(window.monitoringInterval);
+            }
+
+            window.monitoringInterval = setInterval(() => {
+                if (window.audioSystem) {
+                    const stats = window.audioSystem.getPerformanceStats();
+                    const display = document.getElementById('monitoringDisplay');
+
+                    display.textContent = `
+📡 Real-time Performance Monitoring:
+┣━ Timestamp: ${new Date().toLocaleTimeString()}
+┣━ Performance:
+┃  ┣━ Total Calls: ${stats.performance.totalAudioCalls}
+┃  ┣━ Avg Calls/Frame: ${stats.performance.averageCallsPerFrame.toFixed(1)}
+┃  ┗━ Peak Calls/Frame: ${stats.performance.peakCallsPerFrame}
+┣━ Pool Stats:
+┃  ┣━ Efficiency: ${stats.pool ? stats.pool.poolEfficiency.toFixed(1) + '%' : 'N/A'}
+┃  ┣━ Active Nodes: ${stats.pool ? stats.pool.activeNodes : 'N/A'}
+┃  ┗━ Reused/Created: ${stats.pool ? `${stats.pool.reused}/${stats.pool.created}` : 'N/A'}
+┣━ Cache Stats:
+┃  ┣━ Hit Rate: ${stats.cache ? stats.cache.hitRate.toFixed(1) + '%' : 'N/A'}
+┃  ┣━ Total Cached: ${stats.cache ? stats.cache.totalCached : 'N/A'}
+┃  ┗━ Cache Utilization: ${stats.cache ? stats.cache.cacheUtilization.toFixed(1) + '%' : 'N/A'}
+┗━ Batcher Stats:
+   ┣━ Efficiency: ${stats.batcher ? stats.batcher.batchEfficiency.toFixed(1) + '%' : 'N/A'}
+   ┣━ Prevented Overlaps: ${stats.batcher ? stats.batcher.prevented : 'N/A'}
+   ┗━ Pending Batches: ${stats.batcher ? stats.batcher.pendingBatches : 'N/A'}`;
+                }
+            }, 1000);
+        };
+
+        // Stop monitoring
+        window.stopMonitoring = function() {
+            if (window.monitoringInterval) {
+                clearInterval(window.monitoringInterval);
+                window.monitoringInterval = null;
+            }
+        };
+
+        // Clear monitoring
+        window.clearMonitoring = function() {
+            document.getElementById('monitoringDisplay').textContent = 'Monitoring cleared.';
+            if (window.audioSystem) {
+                window.audioSystem.setPerformanceMonitoring(false);
+                window.audioSystem.setPerformanceMonitoring(true);
+            }
+        };
+
+        // Auto-initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(initializeAudioSystem, 500);
+        });
+    </script>
+</body>
+</html>

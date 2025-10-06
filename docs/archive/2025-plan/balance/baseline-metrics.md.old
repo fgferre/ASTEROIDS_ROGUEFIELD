@@ -1,0 +1,588 @@
+> [!NOTE]
+Documento arquivado em 2025-10-10. Itens rastreados no novo plano: Seção 4.3 Automação de métricas de performance. Consulte `docs/plans/docs-implementation-master-plan.md` para objetivos e critérios atualizados.
+
+# Baseline Balance Metrics
+
+**Document Purpose**: Current game balance reference with orb-based economy and mobility upgrades.
+**Last Updated**: 2025-10-03 (Post-Week 1 Polish)
+**Phase**: Orb Economy + Mobility Tree Implementation
+
+---
+
+## Recent Major Changes
+
+### ✅ Completed (Week 1+):
+- **Orb-Based Economy**: Fixed 5 XP per orb, rewards based on orb count
+- **Gold Variant**: Ultra-rare (0.4-0.5% spawn), ultra-fragile, massive rewards
+- **Mobility Upgrade Tree**: 3 trees (Main Engines, RCS, Braking) with 5 ranks each
+- **Performance Monitoring**: Integrated and active
+- **Screen Shake**: Implemented for game feel
+- **Audio Enhancements**: Gold spawn/destroy sounds, spatial audio improvements
+- **Crystal Buff**: Speed increased from 0.8x to 1.3x (now agile!)
+
+---
+
+## Performance Baseline
+
+### Target Performance
+- **Target FPS**: 60 FPS stable ✅
+- **Acceptable FPS**: 45+ FPS
+- **Critical FPS**: 30 FPS (warning threshold)
+- **Max Frame Time**: 16.67ms (60 FPS) / 33.33ms (30 FPS)
+
+### Expected Object Counts (Wave 10)
+- **Asteroids**: ~15-20 active
+- **Bullets**: ~30-50 (with multishot)
+- **XP Orbs**: ~40-100 (depending on collection rate)
+- **Particles**: ~200-500 (explosions, trails, effects)
+
+**Status**: ✅ Performance monitoring active, Week 1 polish complete
+
+---
+
+## Ship Balance
+
+### Movement Physics (Base Stats)
+```javascript
+SHIP_ACCELERATION = 280      // Units/s²
+SHIP_MAX_SPEED = 220          // Units/s
+SHIP_LINEAR_DAMPING = 3.1     // s⁻¹ (drift decay)
+SHIP_ROTATION_SPEED = 8       // rad/s
+SHIP_ANGULAR_DAMPING = 6.2    // s⁻¹ (rotation decay)
+SHIP_MASS = 60                // kg
+```
+
+### Mobility Upgrades (NEW!)
+
+**3 Upgrade Trees Available:**
+
+#### 1. Propulsores Principais (Main Engines)
+| Rank | Name | Acceleration | Max Speed | Visual |
+|------|------|--------------|-----------|--------|
+| 0 (Base) | Standard | 280 (+0%) | 220 (+0%) | Blue flames |
+| 1 | Bicos Otimizados | 314 (+12%) | 242 (+10%) | Brighter blue, +15% length |
+| 2 | Queima Estável | 350 (+25%) | 268 (+22%) | Cyan, +35% length, glow |
+| 3 | Injeção Dupla | 406 (+45%) | 304 (+38%) | Electric blue, +60% length |
+| 4 | Plasma Superaquecido⚡ | 490 (+75%) | 352 (+60%) | White core, **+100% length** |
+| 5 | Sobrecarga Vetorial⚡⚡⚡ | 588 (+110%) | 407 (+85%) | **Plasma white, ion trail (5 DPS)** |
+
+#### 2. Sistema RCS (Maneuvering)
+| Rank | Name | Rotation Speed | Angular Damping | Special |
+|------|------|----------------|-----------------|---------|
+| 0 (Base) | Standard | 8 rad/s (+0%) | 6.2 s⁻¹ (+0%) | - |
+| 1 | RCS Básico | 9.2 (+15%) | 6.2 (-0%) | Small puffs |
+| 2 | RCS Ativado | 10.6 (+32%) | 5.46 (-12%) | Counter-thrusters |
+| 3 | RCS Aprimorado | 12.4 (+55%) | 4.65 (-25%) | Particle trails |
+| 4 | RCS Vetorial⚡ | 15.2 (+90%) | 3.72 (-40%) | Vectoring effect |
+| 5 | RCS Omni-direcional⚡⚡⚡ | 18.4 (+130%) | 2.79 (-55%) | **Strafe movement unlocked!** |
+
+#### 3. Motores de Freio (Braking)
+| Rank | Name | Linear Damping | Special |
+|------|------|----------------|---------|
+| 0 (Base) | Standard | 3.1 s⁻¹ (+0%) | - |
+| 1 | Freios Reforçados | 4.03 (+30%) | Bright counter-thrusters |
+| 2 | Reversão Ativa | 4.96 (+60%) | Manual reverse thrust |
+| 3 | Parada de Emergência⚡⚡ | 6.2 (+100%) | **Emergency brake + shockwave** |
+
+**Design Philosophy**: Aggressive power curve (gentle start, EXPLOSIVE finish)
+- Ranks 1-2: +12-25% (helpful but not transformative)
+- Rank 3: +38-55% (significant upgrade!)
+- Ranks 4-5: +75-130% (**GODLIKE** - double base stats or more!)
+
+**Reference**: See [engine-upgrade-system-v3-aggressive.md](../design/engine-upgrade-system-v3-aggressive.md)
+
+---
+
+## Asteroid Balance
+
+### Base Health by Size
+```javascript
+Large:  90 HP (base)
+Medium: 50 HP (base)
+Small:  30 HP (base)
+```
+
+### Health Scaling
+```javascript
+ASTEROID_HEALTH_SCALING = {
+  perWave: 0.12,          // +12% per wave (waves 1-10)
+  maxMultiplier: 2.2      // Max 220% at wave 10
+
+  // Infinite scaling (wave 11+):
+  perWaveIncrement: 0.08  // Slower growth
+  maxMultiplier: 10.0     // Hard cap at 10x
+}
+```
+
+**Examples:**
+- **Wave 1**: 90 / 50 / 30 HP (100%)
+- **Wave 5**: 133 / 74 / 44 HP (+48%)
+- **Wave 10**: 198 / 110 / 66 HP (+120%, capped)
+- **Wave 15**: 234 / 130 / 78 HP (+160%, infinite scaling)
+- **Wave 30**: 342 / 190 / 114 HP (+280%, approaching soft cap)
+
+### Speed by Size
+```javascript
+Large:  25 Units/s
+Medium: 45 Units/s
+Small:  70 Units/s
+```
+
+---
+
+## ⭐ Orb-Based Reward System (NEW!)
+
+### Core Mechanics
+- **Base Orb Value**: 5 XP (tier 1 blue orb) - **FIXED**
+- **Reward = Number of Orbs × 5 XP**
+- **Orb Tiers**: Blue (1) → Green (2) → Yellow (3) → Purple (4) → Red (5) → Crystal (6)
+- **Orb Fusion**: 10 orbs of same tier = 1 orb of next tier (automatic clustering)
+
+### Reward Formula
+```
+Orbs Dropped = BaseOrbs × SizeMultiplier × OrbMultiplier
+```
+
+Where:
+```javascript
+BaseOrbs = 1 (all asteroids)
+
+SizeMultiplier = {
+  large: 3.0,   // 3x orbs
+  medium: 2.0,  // 2x orbs (baseline)
+  small: 1.0    // 1x orbs
+}
+
+OrbMultiplier = StatsFactor × RarityBonus
+  StatsFactor = HP × Speed × Danger
+  RarityBonus = Inversely proportional to spawn rate
+```
+
+### Asteroid Rewards by Variant
+
+| Variant | Spawn Rate | Size Factor | Orb Multiplier | Large (15 orbs) | Medium (10 orbs) | Small (5 orbs) |
+|---------|-----------|-------------|----------------|-----------------|------------------|----------------|
+| **Common** | ~70% | L:3x M:2x S:1x | 1.0 | 15 orbs (75 XP) | 10 orbs (50 XP) | 5 orbs (25 XP) |
+| **Iron** | 8% | L:3x M:2x S:1x | 2.53 | 38 orbs (190 XP) | 25 orbs (125 XP) | 13 orbs (65 XP) |
+| **DenseCore** | 7% | L:3x M:2x | 2.93 | 44 orbs (220 XP) | 29 orbs (145 XP) | ❌ |
+| **Volatile** | 6.5% | L:3x M:2x S:1x | 5.46 | 82 orbs (410 XP)⚡ | 55 orbs (275 XP) | 27 orbs (135 XP) |
+| **Parasite** | 4.5% | L:3x M:2x S:1x | 8.10 | 121 orbs (605 XP)⚡⚡ | 81 orbs (405 XP) | 40 orbs (200 XP) |
+| **Crystal** | 1.5% | L:3x M:2x S:1x | 4.73 + scaling | 71 orbs (355 XP)💎 | 47 orbs (235 XP) | 24 orbs (120 XP) |
+| **Gold** 💰 | **0.4%** | M:2x S:1x | 4.90 | ❌ | 49 orbs (245 XP)💰 | 25 orbs (125 XP) |
+
+**Notes**:
+- ⚡ Volatile: High reward compensates for explosion danger
+- ⚡⚡ Parasite: Highest reward (pursues player + contact damage)
+- 💎 Crystal: Bonus orb every 3 waves (scales infinitely!)
+- 💰 Gold: ULTRA-RARE, fast, fragile, special audio feedback
+
+---
+
+## Variant Balance (Updated)
+
+### Variant Stats Comparison
+
+| Variant | HP Mult | Speed Mult | Mass | Spawn Rate | Special Mechanics |
+|---------|---------|------------|------|------------|-------------------|
+| **Common** | 1.0x | 1.0x | 1.0x | ~70% | Standard |
+| **Iron** | 1.3x | 0.85x | 1.2x | 8% | Armored (slow tank) |
+| **DenseCore** | 1.8x | 0.65x | 1.4x | 7% | Heavy tank (M/L only) |
+| **Volatile** | 0.6x | 1.4x | 0.7x | 6.5% | Explodes after 6s |
+| **Parasite** | 0.8x | 1.2x | 0.9x | 4.5% | Pursues player, 20 dmg contact |
+| **Crystal** | 0.7x | **1.3x** ⚡ | 0.95x | 1.5% | Agile, scales with waves |
+| **Gold** 💰 | **0.4x** | **1.8x** | 0.6x | **0.4%** | Ultra-fragile, ultra-fast, epic audio |
+
+### Gold Variant (NEW!)
+```javascript
+GOLD_ASTEROID = {
+  displayName: 'Tesouro Dourado 💰',
+  allowedSizes: ['medium', 'small'],  // No large!
+  hpMultiplier: 0.4,      // GLASS CANNON (dies in ~2 hits)
+  speedMultiplier: 1.8,   // ULTRA FAST (tries to escape!)
+  massMultiplier: 0.6,
+
+  spawnRate: {
+    medium: 0.5%,   // 0.02 × 0.25 = 0.005
+    small: 0.3%     // 0.02 × 0.15 = 0.003
+  },
+
+  visual: {
+    fill: '#FFD700',
+    glow: 'rgba(255, 223, 0, 0.8)',  // Intense glow!
+    pulse: {
+      speed: 3.0,     // FAST pulse (attention!)
+      amount: 0.6     // STRONG pulse
+    }
+  },
+
+  audio: {
+    spawn: 'playGoldSpawn()',     // Magical "bling!" arpeggio
+    destroy: 'playGoldJackpot()'  // Epic jackpot "ka-ching!"
+  },
+
+  drops: {
+    pattern: 'explosion',  // Orbs explode radially!
+    orbMultiplier: 4.90
+  }
+}
+```
+
+**Balance Questions:**
+- [ ] Is Gold fast enough to feel challenging to catch?
+- [ ] Does 0.4% spawn rate feel appropriately rare?
+- [ ] Do audio cues make Gold feel rewarding to destroy?
+- [ ] Is the risk/reward balance satisfying?
+
+### Crystal Buff (Changed!)
+```diff
+- speedMultiplier: 0.8   // OLD: Slow and tanky
++ speedMultiplier: 1.3   // NEW: Agile and evasive!
+```
+
+**Impact**: Crystal is no longer a slow tank. Now it's a fast, evasive target that scales with waves.
+
+---
+
+## Variant Spawn Chances (Detailed)
+
+### Large Asteroids
+```javascript
+baseChance: 0.35 (35%)
+distribution: {
+  iron: 0.27       → 9.45% total
+  denseCore: 0.30  → 10.5% total
+  volatile: 0.22   → 7.7% total
+  parasite: 0.16   → 5.6% total
+  gold: 0.00       → ❌ Gold never spawns as Large
+  crystal: 0.05    → 1.75% total (rare!)
+}
+```
+
+### Medium Asteroids
+```javascript
+baseChance: 0.25 (25%)
+distribution: {
+  iron: 0.30       → 7.5% total
+  denseCore: 0.20  → 5% total
+  volatile: 0.25   → 6.25% total
+  parasite: 0.15   → 3.75% total
+  gold: 0.02       → 0.5% total 💰 ULTRA RARE!
+  crystal: 0.08    → 2% total (rare)
+}
+```
+
+### Small Asteroids
+```javascript
+baseChance: 0.15 (15%)
+distribution: {
+  iron: 0.35       → 5.25% total
+  volatile: 0.30   → 4.5% total
+  parasite: 0.20   → 3% total
+  gold: 0.02       → 0.3% total 💰 ULTRA RARE!
+  crystal: 0.13    → 1.95% total (rare)
+}
+```
+
+### Wave Bonus
+```javascript
+waveBonus: {
+  startWave: 4,
+  increment: 0.025,  // +2.5% per wave
+  maxBonus: 0.15     // Capped at +15%
+}
+```
+
+---
+
+## Special Behaviors
+
+### Parasite Variant
+```javascript
+Acceleration: 180 units/s²
+Max Speed: 160 units/s
+Min Distance: 25 units (repel when too close)
+Contact Damage: 20 HP
+Cooldown: 1.2 seconds
+Min Wave: 4 (doesn't spawn before wave 4)
+```
+
+**Balance Questions**:
+- [ ] Parasite tracking speed feels threatening?
+- [ ] Contact damage feels fair?
+- [ ] Wave 4 min spawn is appropriate?
+- [ ] Orb reward (highest in game) justifies difficulty?
+
+### Volatile Variant
+```javascript
+Fuse Time: 6 seconds (total)
+Arm Time: 1.6 seconds (safe period)
+Explosion Radius: 85 units
+Explosion Damage: 35 HP
+Visual: Orange glow, pulsing faster when armed
+Trail: Ember particles with jitter
+```
+
+**Balance Questions**:
+- [ ] 6-second fuse feels fair?
+- [ ] 85-unit explosion radius is clear to avoid?
+- [ ] Visual warning (pulse speed) is noticeable?
+- [ ] Orb reward compensates for danger?
+
+---
+
+## Shield System
+
+### Shield Stats
+```javascript
+Default Hits: 3
+Cooldown: 20 seconds
+Shockwave Radius: 300 units
+Shockwave Force: 350 units/s
+Hit Grace Time: 0.28 seconds (prevent double-hits)
+Impact Damage: 10 + (4 × level)
+```
+
+**Balance Questions**:
+- [ ] 3 hits feels generous enough?
+- [ ] 20s cooldown feels fair?
+- [ ] Shockwave radius feels impactful?
+- [ ] Impact damage scaling with level is noticeable?
+
+---
+
+## Combat System
+
+### Weapon Stats
+```javascript
+COMBAT_SHOOT_COOLDOWN = 0.3        // 3.33 shots/sec
+BULLET_SPEED = 450                 // Units/s
+COMBAT_BULLET_LIFETIME = 1.8       // seconds
+COMBAT_TARGETING_RANGE = 400       // Units (auto-aim)
+COMBAT_MULTISHOT_SPREAD_STEP = 0.3 // radians (~17°)
+```
+
+**Balance Questions**:
+- [ ] Fire rate feels satisfying?
+- [ ] Bullet speed appropriate for hit feedback?
+- [ ] Auto-targeting range balanced?
+- [ ] Multishot spread feels good?
+
+---
+
+## Wave Progression
+
+### Wave Configuration
+```javascript
+ASTEROIDS_PER_WAVE_BASE = 4
+ASTEROIDS_PER_WAVE_MULTIPLIER = 1.3  // 30% increase per wave
+WAVE_DURATION = 60                   // seconds
+WAVE_BREAK_TIME = 10                 // seconds between waves
+MAX_ASTEROIDS_ON_SCREEN = 20
+```
+
+### Wave Examples
+**Wave 1-3**: 4-6 asteroids, mostly small, few variants
+**Wave 4-6**: 8-10 asteroids, mixed sizes, variants start appearing
+**Wave 7-10**: 12-16 asteroids, all sizes, frequent variants
+**Wave 11+**: 18-20 asteroids, dynamic scaling, max variant chance
+
+**Variant Frequency by Wave Range:**
+| Wave Range | Variant Chance | Notes |
+|------------|----------------|-------|
+| 1-3 | 15-20% | Safe introduction |
+| 4-6 | 25-30% | Variants become common |
+| 7-10 | 35-40% | High variant density |
+| 11+ | 45-50% (capped) | Chaos mode |
+
+---
+
+## Progression Balance
+
+### Level Progression
+```javascript
+Initial XP Requirement: 100 XP
+Level Scaling: 1.2x per level
+
+Level 1→2: 100 XP  (20 common small or 2 medium)
+Level 2→3: 120 XP
+Level 3→4: 144 XP
+Level 4→5: 173 XP
+Level 5→6: 207 XP
+Level 6→7: 248 XP
+Level 10→11: 517 XP
+```
+
+### XP Economy Examples
+```
+1 Common Small = 5 orbs = 25 XP
+1 Common Medium = 10 orbs = 50 XP
+1 Common Large = 15 orbs = 75 XP
+
+1 Gold Medium = 49 orbs = 245 XP (almost 2.5 levels!)
+1 Parasite Large = 121 orbs = 605 XP (JACKPOT!)
+```
+
+### Upgrade System
+- **3 upgrades offered per level**
+- **Weighted random selection**
+- **Categories**: Offense, Defense, Mobility, Utility
+- **Max ranks per upgrade**: 3-5 (depending on upgrade)
+
+---
+
+## Balance Testing Checklist
+
+### Early Game (Waves 1-3)
+- [ ] Player can learn controls comfortably
+- [ ] Base ship stats feel responsive
+- [ ] Damage output feels significant
+- [ ] Asteroid HP appropriate for learning
+- [ ] First upgrades feel impactful
+
+### Mid Game (Waves 4-7)
+- [ ] Difficulty curve noticeable but not frustrating
+- [ ] Variants add interesting challenge
+- [ ] Mobility upgrades (if obtained) feel powerful
+- [ ] Orb economy feels rewarding
+- [ ] Gold asteroid sightings feel special
+
+### Late Game (Waves 8-10)
+- [ ] Challenge intense but fair
+- [ ] High-tier mobility upgrades feel GODLIKE
+- [ ] Parasite/Volatile asteroids threatening but manageable
+- [ ] Orb fusion creates satisfying visual/progression moments
+- [ ] Build variety from upgrade choices
+
+### Endgame (Waves 11+)
+- [ ] Infinite scaling sustainable
+- [ ] Performance remains 60 FPS
+- [ ] Health cap prevents bullet sponges
+- [ ] Rank 4-5 mobility feels necessary to survive
+- [ ] Gold spawns still exciting at high waves
+
+---
+
+## Known Balance Questions (Updated)
+
+### Orb Economy
+- [ ] Is 5 XP per orb intuitive?
+- [ ] Does orb fusion (10→1 upgrade) feel satisfying?
+- [ ] Are orb rewards balanced across variants?
+- [ ] Does clustering create fun "orb explosions"?
+
+### Gold Variant
+- [ ] Is 0.4% spawn too rare? Too common?
+- [ ] Does ultra-low HP (0.4x) feel fair?
+- [ ] Is ultra-high speed (1.8x) challenging enough?
+- [ ] Do audio cues (spawn/destroy) feel epic?
+- [ ] Is reward (49 orbs medium) appropriate for rarity?
+
+### Crystal Buff Impact
+- [ ] Does 1.3x speed (up from 0.8x) change difficulty?
+- [ ] Is Crystal now too easy/hard to hit?
+- [ ] Does wave scaling feel appropriate for new speed?
+
+### Mobility Upgrades
+- [ ] Do Ranks 1-2 feel "helpful but not transformative"?
+- [ ] Does Rank 3 feel like a "significant upgrade"?
+- [ ] Do Ranks 4-5 feel GODLIKE?
+- [ ] Is the aggressive curve too steep early on?
+- [ ] Are special abilities (strafe, ion trail, emergency brake) balanced?
+- [ ] Can players survive late game WITHOUT mobility upgrades?
+
+### Ship Feel
+- [ ] With mobility upgrades, does ship feel too fast?
+- [ ] Without upgrades, does base ship feel too sluggish late game?
+- [ ] Is screen shake intensity appropriate?
+
+### Weapon Feel (Post-Polish)
+- [ ] Does screen shake on fire feel good?
+- [ ] Are bullet tracers readable?
+- [ ] Does weapon punch feel satisfying?
+
+---
+
+## Performance Metrics (Post-Week 1)
+
+### Baseline Performance
+```
+Average FPS: 60 ✅
+Min FPS (Wave 10): 55+
+Frame Time Avg: ~16.5ms
+Frame Time Max: <18ms (spike tolerance)
+```
+
+### Object Count Limits
+```
+Max Asteroids: 20 (hard cap)
+Max Bullets: 50 (lifetime cleanup)
+Max Orbs: 100 per tier (fusion triggers at ~10 nearby)
+Max Particles: 500 (pool-based)
+```
+
+**Status**: ✅ Performance monitoring active, no degradation observed
+
+---
+
+## Audio System (Updated)
+
+### Implemented Sounds
+- ✅ Weapon fire
+- ✅ Asteroid destruction
+- ✅ XP orb collection
+- ✅ Level up
+- ✅ Damage hit
+- ✅ **Gold spawn** (arpeggio "bling!")
+- ✅ **Gold destroy** (jackpot "ka-ching!")
+- ✅ Shield hit
+- ✅ Screen shake integration
+
+### Audio Balance
+- [ ] Gold sounds distinctive and rewarding?
+- [ ] Audio doesn't overlap excessively?
+- [ ] Spatial audio (distance attenuation) working?
+- [ ] Music/SFX balance appropriate?
+
+---
+
+## Next Steps
+
+### Balance Priorities
+1. **Playtest orb economy** - Does 5 XP per orb feel intuitive?
+2. **Gold spawn rate** - 0.4% appropriate or needs adjustment?
+3. **Mobility curve validation** - Are Ranks 4-5 too powerful?
+4. **Crystal speed buff** - Does 1.3x change difficulty significantly?
+5. **Late game scaling** - Is infinite scaling sustainable past wave 20?
+
+### Polish Priorities (Week 2+)
+1. Visual polish for orb fusion
+2. Mobility upgrade visual effects (thruster scaling)
+3. Gold asteroid glow/pulse refinement
+4. Damage numbers floating text
+5. UI animations (health bar, XP bar)
+
+### Documentation
+- [x] Baseline metrics updated
+- [ ] Mobility upgrade guide (reference: engine-upgrade-system-v3)
+- [ ] Orb economy deep dive
+- [ ] Gold variant showcase video
+
+---
+
+## Reference Documents
+
+### Design Docs
+- [Mobility Upgrade System v3](../design/engine-upgrade-system-v3-aggressive.md) - Aggressive power curve
+- [Consolidation & Polish Masterplan](../guides/consolidation-polish-masterplan.md) - Week 1-4 roadmap
+
+### Recent Commits
+- `6ee2b28` - Massive reward system overhaul (orb economy + Gold)
+- `73b978b` - Mobility upgrade tree with visual progression
+- `4e6895f` - Performance monitoring and screen shake polish
+- `d7de6ee` - Gold audio feedback alignment
+
+---
+
+**Status**: ✅ Updated with latest game state (orb economy, Gold variant, mobility tree)
+**Next Review**: After 10+ playtests with new systems
+**Document Owner**: Balance & Feel Team

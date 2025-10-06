@@ -1,0 +1,370 @@
+> [!NOTE]
+Documento arquivado em 2025-10-10. Itens rastreados no novo plano: Seção 4.1 Migração DI + WaveManager. Consulte `docs/plans/docs-implementation-master-plan.md` para objetivos e critérios atualizados.
+
+# Fase 2.2.3: Análise Detalhada do Código a Ser Removido
+
+> **Estado:** Arquivado. Consulte
+> [`docs/guides/phase-2-2-actual-state.md`](../../phase-2-2-actual-state.md)
+> para o panorama atualizado.
+
+**Data:** 2025-10-01
+**Objetivo:** Entender EXATAMENTE o que será removido e por quê
+
+---
+
+## ⚠️ RESPOSTA À SUA PERGUNTA
+
+Sim, você está **100% correto** em questionar!
+
+O código proposto para remoção **FOI implementado esperando ser ativado**, mas por diferentes razões nunca foi ativado. Vou explicar detalhadamente cada caso:
+
+---
+
+## 1️⃣ EnemyFactory.js - 428 linhas
+
+### 📍 Localização
+`src/modules/enemies/base/EnemyFactory.js`
+
+### 🎯 Propósito Original
+Factory Pattern para criar diferentes tipos de inimigos (asteroids, drones, etc.)
+
+### ✅ Estado Atual
+```javascript
+// EnemySystem.js linha 37
+this.useFactory = false; // DISABLED (pool conflicts)
+```
+
+**É inicializado mas NUNCA usado:**
+```javascript
+// EnemySystem.js linha 162-182
+setupEnemyFactory() {
+  try {
+    this.factory = new EnemyFactory(this);
+
+    // Register asteroid type
+    this.factory.registerType('asteroid', {
+      class: Asteroid,
+      pool: GamePools?.asteroids || null,
+      defaults: { size: 'medium', variant: 'common' },
+      tags: ['destructible', 'enemy']
+    });
+
+    console.log('[EnemySystem] EnemyFactory initialized (optional - not active yet)');
+  } catch (error) {
+    console.warn('[EnemySystem] Failed to initialize EnemyFactory', error);
+    this.factory = null;
+  }
+}
+```
+
+### 🔍 Como é (NÃO) Usado
+
+**No acquireAsteroid():**
+```javascript
+// EnemySystem.js linha 229-249
+acquireAsteroid(config) {
+  // NEW: Use factory if enabled (feature flag)
+  if (this.useFactory && this.factory) {  // ← useFactory é FALSE!
+    return this.acquireEnemyViaFactory('asteroid', config);
+  }
+
+  // LEGACY: Original implementation (default) ← SEMPRE CAI AQUI
+  if (this.usesAsteroidPool && GamePools?.asteroids) {
+    const asteroid = GamePools.asteroids.acquire();
+    if (asteroid) {
+      asteroid.initialize(this, config);
+      return asteroid;
+    }
+  }
+
+  return new Asteroid(this, config);
+}
+```
+
+**Factory nunca é chamado porque `useFactory = false`!**
+
+### ❓ Por Que Foi Desabilitado?
+
+Comentário diz: `// DISABLED (pool conflicts)`
+
+**Mas qual é o conflito?** Vamos investigar:
+
+#### Teoria 1: Duplicação de Responsabilidade
+- **GamePools.asteroids** já gerencia pooling
+- **EnemyFactory** também quer gerenciar pooling
+- Dois sistemas fazendo a mesma coisa = conflito
+
+#### Teoria 2: Factory foi criado para FUTUROS enemy types
+- Planejado para drones, bosses, etc.
+- Mas esses tipos nunca foram implementados
+- Factory ficou "pronta" mas sem uso real
+
+#### Teoria 3: Overcomplexity
+- Factory adiciona uma camada extra de abstração
+- Para apenas 1 tipo de inimigo (asteroid), não vale a pena
+- Decisão foi manter código mais simples
+
+### 🤔 O Código É Bom?
+
+**SIM!** O código está:
+- ✅ Bem estruturado
+- ✅ Bem documentado
+- ✅ Implementa Factory Pattern corretamente
+- ✅ Preparado para múltiplos enemy types
+
+### 💡 Mas Então Por Que Remover?
+
+**Porque:**
+1. ❌ Nunca foi ativado (useFactory = false)
+2. ❌ Não há outros enemy types implementados
+3. ❌ GamePools já faz pooling adequadamente
+4. ❌ 428 linhas de código não usado = confusão
+5. ❌ Manutenção desnecessária
+
+### ✅ Quando Seria Útil?
+
+**Se você for implementar:**
+- Drones com armas
+- Bosses
+- Múltiplos tipos de inimigos
+
+**Aí sim faria sentido reativar ou reimplementar o Factory!**
+
+### 🎯 Decisão Recomendada
+
+**OPÇÃO A: Remover Agora** (recomendado)
+- Remove código não usado
+- Simplifica codebase
+- Pode ser reimplementado no futuro SE necessário
+
+**OPÇÃO B: Manter "Just in Case"**
+- Mantém código preparado para futuros enemy types
+- Mas adiciona confusão (código presente mas não ativo)
+- 428 linhas de "talvez um dia"
+
+**OPÇÃO C: Documentar Melhor**
+- Não remove
+- Mas adiciona comentários explicando estado
+- Remove a flag `useFactory` (já que nunca será true)
+
+---
+
+## 2️⃣ Código Duplicado de Colisão - 43 linhas
+
+### 📍 Localização
+`src/modules/EnemySystem.js` linhas 575-618
+
+### 🎯 Propósito Original
+Física de colisão entre asteroids
+
+### ✅ Estado Atual
+
+**Há DUAS implementações da mesma lógica:**
+
+#### Implementação 1: No EnemySystem (LEGADO - NÃO USADO)
+```javascript
+// EnemySystem.js linha 575-618
+checkAsteroidCollision(a1, a2) {
+  const dx = a2.x - a1.x;
+  const dy = a2.y - a1.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  const minDistance = a1.radius + a2.radius;
+
+  if (distance < minDistance && distance > 0) {
+    const nx = dx / distance;
+    const ny = dy / distance;
+
+    // Correção de penetração
+    const overlap = minDistance - distance;
+    const percent = 0.5;
+    a1.x -= nx * overlap * percent;
+    a1.y -= ny * overlap * percent;
+    a2.x += nx * overlap * percent;
+    a2.y += ny * overlap * percent;
+
+    // Impulso elástico com massa
+    const rvx = a2.vx - a1.vx;
+    const rvy = a2.vy - a1.vy;
+    const velAlongNormal = rvx * nx + rvy * ny;
+
+    if (velAlongNormal < 0) {
+      const e = CONSTANTS.COLLISION_BOUNCE;
+      const invMass1 = 1 / a1.mass;
+      const invMass2 = 1 / a2.mass;
+      const j = (-(1 + e) * velAlongNormal) / (invMass1 + invMass2);
+
+      const jx = j * nx;
+      const jy = j * ny;
+
+      a1.vx -= jx * invMass1;
+      a1.vy -= jy * invMass1;
+      a2.vx += jx * invMass2;
+      a2.vy += jy * invMass2;
+    }
+
+    // Rotação adicional
+    a1.rotationSpeed += (Math.random() - 0.5) * 1.5;
+    a2.rotationSpeed += (Math.random() - 0.5) * 1.5;
+  }
+}
+```
+
+#### Implementação 2: No AsteroidCollision Component (ATIVO)
+```javascript
+// src/modules/enemies/components/AsteroidCollision.js
+// MESMA LÓGICA, código idêntico mas dentro do component
+```
+
+### 🔍 Como É Chamado?
+
+```javascript
+// EnemySystem.js linha 555-573
+handleAsteroidCollisions() {
+  // NEW: Use collision component if available
+  if (this.useComponents && this.collisionComponent) {
+    // ← ESTE É O CAMINHO ATIVO (useComponents = true)
+    this.collisionComponent.handleAsteroidCollisions(this.asteroids);
+  } else {
+    // LEGACY: Original collision logic ← NUNCA EXECUTADO
+    for (let i = 0; i < this.asteroids.length - 1; i++) {
+      const a1 = this.asteroids[i];
+      if (a1.destroyed) continue;
+
+      for (let j = i + 1; j < this.asteroids.length; j++) {
+        const a2 = this.asteroids[j];
+        if (a2.destroyed) continue;
+
+        this.checkAsteroidCollision(a1, a2); // ← NUNCA É CHAMADO
+      }
+    }
+  }
+}
+```
+
+**Como `useComponents = true`, SEMPRE usa o component!**
+
+### ❓ Por Que Há Duplicação?
+
+Durante a Fase 2.2 (migração para componentes):
+1. Criou-se `AsteroidCollision` component
+2. Ativou-se via flag `useComponents = true`
+3. Manteve-se código legado "por segurança" (rollback path)
+
+### 🤔 É Seguro Remover?
+
+**SIM!** Porque:
+1. ✅ Component já está ativo e testado
+2. ✅ Você mesmo testou e funcionou
+3. ✅ Código é 100% idêntico
+4. ✅ Flag `useComponents` nunca será false (já committed)
+
+### 💡 Mas E Se Precisar Fazer Rollback?
+
+**Opções de rollback:**
+1. Git revert (volta commits inteiros)
+2. Copiar código do histórico do Git
+3. Já está no Git, não precisa manter duplicado
+
+### 🎯 Decisão
+
+**REMOVER SEGURAMENTE** porque:
+- ✅ Código duplicado = bug potential (atualiza um, esquece outro)
+- ✅ Component já está ativo há commits
+- ✅ Git guarda histórico se precisar
+- ✅ Reduz 43 linhas de código morto
+
+---
+
+## 📊 Comparação: O Que Propus Remover
+
+| Item | Linhas | Foi Implementado? | Foi Ativado? | Motivo da Não Ativação |
+|------|--------|-------------------|--------------|------------------------|
+| **EnemyFactory** | 428 | ✅ Sim, bem feito | ❌ Nunca (`useFactory=false`) | "pool conflicts" + não há outros enemy types |
+| **checkAsteroidCollision()** | 43 | ✅ Sim, funciona | ❌ Substituído pelo component | Migração para componentes completa |
+
+---
+
+## 💭 Filosofia: "Código Morto"
+
+### O Que É Código Morto?
+
+Código que:
+1. Está no codebase
+2. Nunca é executado
+3. Não contribui para funcionalidade
+
+### Por Que Remover?
+
+**Contra-argumentos para MANTER:**
+- "E se precisarmos no futuro?" → Git guarda histórico
+- "Mas foi trabalho!" → Sim, mas não está sendo usado
+- "Pode ser útil depois" → Reimplementar quando necessário
+
+**Argumentos para REMOVER:**
+- ✅ Código mais limpo e entendível
+- ✅ Menos confusão para novos devs
+- ✅ Reduz superfície de bugs
+- ✅ Força decisões claras (em vez de "maybe later")
+
+---
+
+## 🎯 Minhas Recomendações Atualizadas
+
+### Para EnemyFactory
+
+**OPÇÃO A: Remover Completamente**
+- Se você NÃO planeja adicionar outros enemy types em breve
+- Simplifica código agora
+- Pode reimplementar factory quando adicionar drones/bosses
+
+**OPÇÃO B: Documentar e Manter**
+- Se você PLANEJA adicionar outros enemy types em 1-2 meses
+- Adiciona comentários explicando que está "preparado mas não ativo"
+- Mantém código para usar no futuro próximo
+
+**OPÇÃO C: Arquivar em Branch Separado**
+- Criar branch `feature/enemy-factory-prepared`
+- Remove da main
+- Mantém disponível para merge futuro
+
+### Para Código Duplicado de Colisão
+
+**SEM DÚVIDA: REMOVER**
+- Component já está ativo e testado
+- Duplicação é perigosa (bug potential)
+- Zero benefício em manter
+
+---
+
+## ❓ Perguntas para Você Decidir
+
+### 1. Você planeja adicionar outros tipos de inimigos (drones, bosses) nos próximos meses?
+
+**Se SIM:** Considere manter EnemyFactory mas documentar melhor
+
+**Se NÃO:** Remova EnemyFactory (pode reimplementar depois se precisar)
+
+### 2. Você quer código mais limpo mesmo que perca "preparação futura"?
+
+**Se SIM:** Remova tudo (filosofia: código limpo > "maybe useful")
+
+**Se NÃO:** Mantenha EnemyFactory mas documente que não está ativo
+
+---
+
+## 🚀 Proposta Final Ajustada
+
+### Quick Win Mínima (ZERO RISCO)
+**Remove apenas:** Código duplicado de colisão (43 linhas)
+**Mantém:** EnemyFactory (por enquanto)
+**Tempo:** 30 minutos
+**Benefício:** Remove duplicação perigosa
+
+### Quick Win Completa (RISCO BAIXO)
+**Remove:** Código duplicado + EnemyFactory (471 linhas)
+**Tempo:** 2 horas
+**Benefício:** Código muito mais limpo
+
+---
+
+**O que você prefere?** 🤔

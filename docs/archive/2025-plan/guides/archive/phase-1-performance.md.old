@@ -1,0 +1,471 @@
+> [!NOTE]
+Documento arquivado em 2025-10-10. Itens rastreados no novo plano: Seção 4.3 Automação de métricas de performance. Consulte `docs/plans/docs-implementation-master-plan.md` para objetivos e critérios atualizados.
+
+# Fase 1: Otimizações de Performance Críticas _(Arquivo Histórico)_
+
+_Revisão encerrada em 2025-10-08._ Este documento foi movido para `docs/guides/archive`
+após confirmar que as entregas de object pooling, spatial hash e gerenciamento de
+memória estão ativas no código atual. As otimizações foram incorporadas em
+`src/core/ObjectPool.js`, `src/core/GamePools.js`, `src/core/SpatialHash.js`,
+`src/modules/PhysicsSystem.js` e no bootstrap do jogo (`src/app.js`). 【F:src/core/ObjectPool.js†L1-L147】【F:src/core/GamePools.js†L33-L120】【F:src/core/SpatialHash.js†L1-L199】【F:src/modules/PhysicsSystem.js†L72-L220】【F:src/app.js†L426-L454】
+
+### Resumo da revisão 2025-10-08
+- Object pooling inicializado em `GamePools.initialize()` com automação de manutenção
+  via `GamePools.autoManageAll()` e tarefas do `GarbageCollectionManager`. 【F:src/core/GamePools.js†L496-L540】【F:src/app.js†L426-L454】
+- Sistemas principais (`CombatSystem`, `EffectsSystem`, `EnemySystem`, `XPOrbSystem`)
+  utilizam `GamePools` para aquisição/liberação de objetos, garantindo o objetivo da
+  Fase 1.1. 【F:src/modules/CombatSystem.js†L332-L614】【F:src/modules/EffectsSystem.js†L174-L513】【F:src/modules/EnemySystem.js†L240-L292】【F:src/modules/XPOrbSystem.js†L251-L269】
+- O Spatial Hash está ativo e testado, sustentando a meta de performance da Fase 1.2.
+  【F:src/core/SpatialHash.js†L1-L199】【F:src/__tests__/physics/collision-accuracy.test.js†L1-L118】
+- Itens remanescentes (renderização batched completa e reset seguro das partículas)
+  foram registrados em `implementation-checklist.md` para acompanhamento contínuo.
+
+## 🎯 Objetivo
+Implementar melhorias de performance que resultarão em ganhos imediatos de 20-40% no FPS e eliminação de stuttering durante gameplay intenso.
+
+## ⚡ Problemas Identificados
+
+### **Problema 1: Sistema de Colisão Ineficiente**
+**Localização:** `src/modules/PhysicsSystem.js:274-318`
+**Impacto:** FPS cai drasticamente com 50+ objetos
+**Solução:** Spatial hashing otimizado
+
+### **Problema 2: Alocações Excessivas no Game Loop**
+**Localização:** Múltiplos arquivos
+**Impacto:** GC pauses frequentes (5-15ms)
+**Solução:** Object pooling system
+
+### **Problema 3: Rendering Ineficiente**
+**Localização:** `src/modules/RenderingSystem.js:949-1009`
+**Impacto:** Context state changes excessivos
+**Solução:** Batch rendering
+
+## 🗺️ Plano de Implementação
+
+### **Etapa 1.1: Object Pooling System** (Dias 1-2)
+
+#### **1.1.1 Criar ObjectPool base**
+```javascript
+// src/core/ObjectPool.js
+class ObjectPool {
+  constructor(createFn, resetFn, initialSize = 10) {
+    this.createFn = createFn;
+    this.resetFn = resetFn;
+    this.available = [];
+    this.inUse = new Set();
+
+    // Pre-populate pool
+    for (let i = 0; i < initialSize; i++) {
+      this.available.push(this.createFn());
+    }
+  }
+
+  acquire() {
+    let obj;
+    if (this.available.length > 0) {
+      obj = this.available.pop();
+    } else {
+      obj = this.createFn();
+    }
+    this.inUse.add(obj);
+    return obj;
+  }
+
+  release(obj) {
+    if (this.inUse.has(obj)) {
+      this.resetFn(obj);
+      this.inUse.delete(obj);
+      this.available.push(obj);
+    }
+  }
+
+  releaseAll() {
+    for (const obj of this.inUse) {
+      this.resetFn(obj);
+      this.available.push(obj);
+    }
+    this.inUse.clear();
+  }
+}
+```
+
+#### **1.1.2 Implementar pools específicos**
+**Localização:** `src/core/GamePools.js`
+- BulletPool (20 inicial, 50 máximo)
+- ParticlePool (100 inicial, 300 máximo)
+- AsteroidPool (30 inicial, 80 máximo)
+- XPOrbPool (50 inicial, 200 máximo)
+
+#### **1.1.3 Integrar nos sistemas existentes**
+**Modificar arquivos:**
+- `src/modules/CombatSystem.js` - usar BulletPool
+- `src/modules/EffectsSystem.js` - usar ParticlePool
+- `src/modules/EnemySystem.js` - usar AsteroidPool
+- `src/modules/XPOrbSystem.js` - usar XPOrbPool
+
+### **Etapa 1.2: Otimização do Sistema de Colisão** (Dias 3-4)
+
+#### **1.2.1 Implementar Spatial Hash Grid**
+```javascript
+// src/core/SpatialHash.js
+class SpatialHash {
+  constructor(cellSize = 100) {
+    this.cellSize = cellSize;
+    this.grid = new Map();
+    this.objects = new Map(); // Track object positions
+  }
+
+  insert(obj, x, y, radius = 0) {
+    const cells = this.getCells(x, y, radius);
+
+    for (const cellKey of cells) {
+      if (!this.grid.has(cellKey)) {
+        this.grid.set(cellKey, new Set());
+      }
+      this.grid.get(cellKey).add(obj);
+    }
+
+    this.objects.set(obj, { x, y, radius, cells });
+  }
+
+  remove(obj) {
+    const data = this.objects.get(obj);
+    if (!data) return;
+
+    for (const cellKey of data.cells) {
+      const cell = this.grid.get(cellKey);
+      if (cell) {
+        cell.delete(obj);
+        if (cell.size === 0) {
+          this.grid.delete(cellKey);
+        }
+      }
+    }
+
+    this.objects.delete(obj);
+  }
+
+  update(obj, x, y, radius = 0) {
+    this.remove(obj);
+    this.insert(obj, x, y, radius);
+  }
+
+  getNearby(x, y, radius = 0) {
+    const cells = this.getCells(x, y, radius);
+    const nearby = new Set();
+
+    for (const cellKey of cells) {
+      const cell = this.grid.get(cellKey);
+      if (cell) {
+        for (const obj of cell) {
+          nearby.add(obj);
+        }
+      }
+    }
+
+    return nearby;
+  }
+
+  getCells(x, y, radius) {
+    const minX = Math.floor((x - radius) / this.cellSize);
+    const maxX = Math.floor((x + radius) / this.cellSize);
+    const minY = Math.floor((y - radius) / this.cellSize);
+    const maxY = Math.floor((y + radius) / this.cellSize);
+
+    const cells = [];
+    for (let gridX = minX; gridX <= maxX; gridX++) {
+      for (let gridY = minY; gridY <= maxY; gridY++) {
+        cells.push(`${gridX},${gridY}`);
+      }
+    }
+    return cells;
+  }
+
+  clear() {
+    this.grid.clear();
+    this.objects.clear();
+  }
+}
+```
+
+#### **1.2.2 Refatorar PhysicsSystem**
+**Arquivo:** `src/modules/PhysicsSystem.js`
+
+**Substituir:**
+```javascript
+// ANTES - O(n²) collision detection
+for (let i = 0; i < objects.length; i++) {
+  for (let j = i + 1; j < objects.length; j++) {
+    checkCollision(objects[i], objects[j]);
+  }
+}
+```
+
+**Por:**
+```javascript
+// DEPOIS - O(n) com spatial hashing
+for (const obj of objects) {
+  const nearby = this.spatialHash.getNearby(obj.x, obj.y, obj.radius);
+  for (const other of nearby) {
+    if (obj !== other && this.shouldCheckCollision(obj, other)) {
+      this.checkCollision(obj, other);
+    }
+  }
+}
+```
+
+### **Etapa 1.3: Batch Rendering System** (Dias 5-6)
+
+#### **1.3.1 Criar RenderBatch**
+```javascript
+// src/core/RenderBatch.js
+class RenderBatch {
+  constructor() {
+    this.batches = new Map(); // key: render state, value: objects array
+    this.currentState = null;
+  }
+
+  begin() {
+    this.batches.clear();
+  }
+
+  add(obj, renderState) {
+    const key = this.getStateKey(renderState);
+    if (!this.batches.has(key)) {
+      this.batches.set(key, []);
+    }
+    this.batches.get(key).push(obj);
+  }
+
+  render(ctx) {
+    for (const [stateKey, objects] of this.batches) {
+      const state = this.parseStateKey(stateKey);
+      this.applyRenderState(ctx, state);
+
+      for (const obj of objects) {
+        obj.draw(ctx, false); // Don't apply state, already set
+      }
+    }
+  }
+
+  getStateKey(state) {
+    return `${state.fillStyle || ''}_${state.strokeStyle || ''}_${state.lineWidth || 1}`;
+  }
+}
+```
+
+#### **1.3.2 Otimizar Canvas Operations**
+**Arquivo:** `src/modules/RenderingSystem.js`
+
+**Implementar:**
+- **State caching:** Evitar mudanças desnecessárias
+- **Texture reuse:** Cache de gradients e padrões
+- **Draw call batching:** Agrupar objetos similares
+
+### **Etapa 1.4: Memory Management** (Dias 6-7)
+
+#### **1.4.1 Implementar GarbageCollectionManager**
+```javascript
+// src/core/GCManager.js
+class GarbageCollectionManager {
+  constructor() {
+    this.lastCleanup = 0;
+    this.cleanupInterval = 5000; // 5 seconds
+    this.tempObjects = new Set();
+  }
+
+  registerTempObject(obj, ttl = 1000) {
+    this.tempObjects.add({ obj, expiry: Date.now() + ttl });
+  }
+
+  cleanup() {
+    const now = Date.now();
+    if (now - this.lastCleanup > this.cleanupInterval) {
+      this.cleanupExpiredObjects();
+      this.requestIdleGC();
+      this.lastCleanup = now;
+    }
+  }
+
+  requestIdleGC() {
+    if (window.requestIdleCallback) {
+      window.requestIdleCallback(() => {
+        if (window.gc) window.gc(); // Chrome dev tools
+      });
+    }
+  }
+}
+```
+
+## 📊 Métricas de Sucesso
+
+### **Performance Benchmarks**
+```javascript
+// scripts/benchmarks/performance.js
+class PerformanceBenchmark {
+  static async runCollisionTest() {
+    const objects = this.generateTestObjects(100);
+    const startTime = performance.now();
+
+    // Run collision detection 1000 times
+    for (let i = 0; i < 1000; i++) {
+      physicsSystem.update(0.016); // 60 FPS
+    }
+
+    const endTime = performance.now();
+    return {
+      avgTime: (endTime - startTime) / 1000,
+      fps: 1000 / ((endTime - startTime) / 1000)
+    };
+  }
+}
+```
+
+### **Critérios de Aceitação**
+- **FPS:** Mantém 60 FPS com 100+ objetos simultâneos
+- **Memory:** <5MB heap crescimento por minuto
+- **GC Pauses:** <2ms máximo, <0.5ms médio
+- **Load Time:** <200ms para inicialização
+
+## 🧪 Plano de Testes
+
+### **Testes Unitários**
+```javascript
+// src/__tests__/performance/objectPool.test.js
+describe('ObjectPool', () => {
+  test('should reuse objects efficiently', () => {
+    const pool = new ObjectPool(
+      () => ({ x: 0, y: 0 }),
+      (obj) => { obj.x = 0; obj.y = 0; }
+    );
+
+    const obj1 = pool.acquire();
+    pool.release(obj1);
+    const obj2 = pool.acquire();
+
+    expect(obj1).toBe(obj2); // Same object instance
+  });
+});
+```
+
+### **Testes de Stress**
+```javascript
+// scripts/stress-tests/collision-stress.js
+async function stressTestCollisions() {
+  const results = [];
+
+  for (let objectCount = 10; objectCount <= 200; objectCount += 10) {
+    const fps = await measureFPSWithObjects(objectCount);
+    results.push({ objectCount, fps });
+
+    if (fps < 55) {
+      console.warn(`Performance degradation at ${objectCount} objects: ${fps} FPS`);
+    }
+  }
+
+  return results;
+}
+```
+
+## 🔧 Ferramentas de Debugging
+
+### **Performance Monitor**
+```javascript
+// src/core/PerformanceMonitor.js
+class PerformanceMonitor {
+  constructor() {
+    this.frameTimes = [];
+    this.maxSamples = 60;
+    this.enabled = process.env.NODE_ENV === 'development';
+  }
+
+  startFrame() {
+    if (!this.enabled) return;
+    this.frameStart = performance.now();
+  }
+
+  endFrame() {
+    if (!this.enabled) return;
+    const frameTime = performance.now() - this.frameStart;
+    this.frameTimes.push(frameTime);
+
+    if (this.frameTimes.length > this.maxSamples) {
+      this.frameTimes.shift();
+    }
+
+    if (frameTime > 20) { // > 50 FPS warning
+      console.warn(`Slow frame: ${frameTime.toFixed(2)}ms`);
+    }
+  }
+
+  getStats() {
+    const avg = this.frameTimes.reduce((a, b) => a + b) / this.frameTimes.length;
+    const fps = 1000 / avg;
+    return { avgFrameTime: avg, fps, samples: this.frameTimes.length };
+  }
+}
+```
+
+## 📋 Checklist de Implementação
+
+### **Antes de Começar**
+- [ ] Criar branch `feature/phase-1-performance`
+- [ ] Configurar benchmarking tools
+- [ ] Backup do estado atual
+- [ ] Definir métricas baseline
+
+### **Etapa 1.1: Object Pooling**
+- [ ] Implementar ObjectPool base
+- [ ] Criar pools específicos (Bullet, Particle, etc.)
+- [ ] Integrar no CombatSystem
+- [ ] Integrar no EffectsSystem
+- [ ] Testes unitários
+- [ ] Benchmark antes/depois
+
+### **Etapa 1.2: Collision Optimization**
+- [ ] Implementar SpatialHash
+- [ ] Refatorar PhysicsSystem
+- [ ] Testes de stress com 100+ objetos
+- [ ] Validar collision accuracy
+- [ ] Benchmark antes/depois
+
+### **Etapa 1.3: Batch Rendering**
+- [ ] Implementar RenderBatch
+- [ ] Refatorar RenderingSystem
+- [ ] Cache de render states
+- [ ] Testes visuais
+- [ ] Benchmark rendering performance
+
+### **Etapa 1.4: Memory Management**
+- [ ] Implementar GCManager
+- [ ] Integrar cleanup automático
+- [ ] Memory leak tests
+- [ ] Profiling com DevTools
+
+### **Validação Final**
+- [ ] Todos os testes passando
+- [ ] Performance targets atingidos
+- [ ] Gameplay não alterado
+- [ ] Code review aprovado
+- [ ] Merge para main
+
+## 🚨 Troubleshooting
+
+### **Problemas Comuns**
+1. **Pool exhaustion:** Aumentar tamanho inicial ou implementar expansão dinâmica
+2. **Spatial hash hotspots:** Ajustar cell size baseado no tamanho médio dos objetos
+3. **Render state conflicts:** Verificar ordem de batching
+4. **Memory leaks:** Usar WeakMap onde apropriado
+
+### **Rollback Plan**
+Se performance targets não forem atingidos:
+1. Reverter para main branch
+2. Analisar bottlenecks específicos
+3. Implementar otimizações pontuais
+4. Re-tentar com estratégia modificada
+
+---
+
+**⚠️ Importante:** Manter gameplay e visual 100% idênticos. Performance é invisível ao jogador quando funciona corretamente.
+
+**🎯 Meta:** 20-40% melhoria FPS mantendo qualidade visual e responsividade.
