@@ -184,22 +184,6 @@ const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
     ariaLive: 'polite',
   },
   {
-    key: 'level',
-    type: 'stat',
-    position: 'top-middle',
-    group: 'tactical-vitals',
-    layout: 'inline-value',
-    description: 'Pilot level indicator',
-    icon: {
-      type: 'text',
-      value: '⭐',
-    },
-    rootId: 'hud-level',
-    valueId: 'level-display',
-    initialValue: 'Level 1',
-    ariaLive: 'polite',
-  },
-  {
     key: 'kills',
     type: 'stat',
     position: 'top-middle',
@@ -264,6 +248,13 @@ const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
       initialValue: 'XP',
       classes: ['hud-item__leading--xp'],
     },
+    metaPosition: 'after-value',
+    meta: {
+      id: 'xp-level-indicator',
+      initialValue: 'Lv 1',
+      ariaLabel: 'Current pilot level',
+      classes: ['hud-item__meta--level'],
+    },
     rootId: 'hud-xp',
     valueId: 'xp-display',
     initialValue: '0/1',
@@ -272,7 +263,7 @@ const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
   {
     key: 'wave',
     type: 'wave',
-    position: 'bottom-left',
+    position: 'bottom-center',
     layout: 'inline-progress',
     description: 'Current wave progress',
     leading: {
