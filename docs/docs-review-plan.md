@@ -20,6 +20,7 @@ Este plano descreve como revisar **cada arquivo** existente em `docs/` para conf
 ## Checklist por Subpasta e Documento
 
 ### `docs/analysis`
+> Última varredura completa: **2025-10-07** (registrada em `docs/progress/docs-review-tracker.md`).
 | Documento | Propósito principal | Como verificar implementação | Entregável após revisão |
 |-----------|--------------------|-----------------------------|-------------------------|
 | `xp-drop-system-analysis.md` | Avalia comportamento do sistema de XP/drop. | Revisar `src/modules/ProgressionSystem` (ou equivalente) e constantes de XP em `GameConstants`; validar se mudanças sugeridas estão presentes. | Status registrado + lista de divergências ou confirmação de implementação. |

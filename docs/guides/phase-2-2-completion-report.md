@@ -29,7 +29,7 @@ Decompose the monolithic EnemySystem (1,237 lines) into specialized, reusable co
 ### 1. AsteroidMovement ([src/modules/enemies/components/AsteroidMovement.js](../../../src/modules/enemies/components/AsteroidMovement.js))
 
 **Lines of Code:** 229
-**Status:** Created (Ready for integration)
+**Status:** ✅ **Ativo no jogo**
 
 #### Features:
 - ✅ Strategy pattern for different movement types
@@ -48,7 +48,7 @@ movement.parasiteMovement(asteroid, deltaTime, context)
 movement.volatileMovement(asteroid, deltaTime, context)
 ```
 
-**Current Status:** Component created but not actively used. Asteroids continue to handle their own movement via `asteroid.update()`. This preserves all existing behavior while providing a path for future refactoring.
+**Current Status:** `EnemySystem.updateAsteroids()` chama o componente quando `useComponents = true`, passando o contexto com jogador e limites do mundo. O método `asteroid.update()` permanece apenas para estado visual e timers legados.
 
 ### 2. AsteroidCollision ([src/modules/enemies/components/AsteroidCollision.js](../../../src/modules/enemies/components/AsteroidCollision.js))
 
