@@ -17,7 +17,7 @@ The game now automatically logs performance data. Just download the file and I'l
 
 5. A file called `performance-log.json` will download to your Downloads folder
 
-6. **Move the file to the project folder** (same folder as this README)
+6. **Move the file to the project folder** (raiz do repositório, ao lado do `README.md`)
 
 That's it! The game logs performance data every 10 seconds automatically, and I can read the JSON file directly.
 
@@ -42,3 +42,9 @@ Download with a specific name (useful for multiple tests):
 ```javascript
 window.performanceMonitor.downloadLogs('test-wave-10.json')
 ```
+
+---
+
+### Referências Relacionadas
+
+- [Guia do monitor de performance](./performance-monitor-guide.md) — explica métricas disponíveis e como interpretar os relatórios antes de enviá-los.

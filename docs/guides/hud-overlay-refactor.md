@@ -23,7 +23,7 @@
 - **Mudanças atômicas**: mantenha cada entrega pequena (< 300 linhas) e validada com `npm run build`/`npm run test` antes de prosseguir.
 - **Dados centralizados**: continue evoluindo `hudLayout.js` e tokens CSS ao invés de espalhar valores mágicos pela lógica.
 - **Acessibilidade**: preserve `aria-live`, `role` e hierarquia semântica ao mover elementos.
-- **Rastreamento**: toda fase deve atualizar este guia com descobertas relevantes e registrar decisões no `historico_do_projeto.txt`.
+- **Rastreamento**: toda fase deve atualizar este guia com descobertas relevantes e registrar decisões no `docs/progress/historico_do_projeto.txt`.
 - **Limpeza de recursos**: novos observers/listeners precisam ser cancelados no teardown do `UISystem`.
 
 ## Fase 0 — Auditoria e Baseline
@@ -146,7 +146,7 @@
    - Registrar as mudanças de layout/escala neste guia e avaliar se `agents.md` ou outros documentos precisam de atualização.
    - Atualizar o `docs/validation/test-checklist.md` com os novos cenários validados.
 2. **Histórico de decisões**
-   - Atualizar `historico_do_projeto.txt` com um resumo da migração para overlay e decisões de escala.
+   - Atualizar `docs/progress/historico_do_projeto.txt` com um resumo da migração para overlay e decisões de escala.
 3. **Monitoramento contínuo**
    - Criar tarefas futuras para medir performance (FPS), testar monitores ultrawide e acompanhar a experiência em dispositivos touch.
    - Planejar follow-ups para incorporar feedback visual/UX coletado após a refatoração.

@@ -55,7 +55,7 @@ Cada iteracao deve caber em um PR pequeno (<300 linhas) e encerrar com `npm run 
 ## Validacao e documentacao
 
 - Atualizar `docs/validation/test-checklist.md` ao fim de cada iteracao com cenarios cobertos.
-- Registrar decisoes relevantes em `historico_do_projeto.txt` e no guia do HUD se necessario.
+- Registrar decisoes relevantes em `docs/progress/historico_do_projeto.txt` e no guia do HUD se necessario.
 - Capturar comparativos antes/depois para uso futuro em README ou apresentacoes.
 
 ## Proximos passos imediatos
