@@ -5,7 +5,7 @@
 ## Itens ativos do plano mestre
 | Item | Seção | Status | Responsável | Última atualização | Observações |
 |------|-------|--------|-------------|--------------------|-------------|
-| 2.1.A | HUD tático minimalista | 📋 Planejado | UI/UX | — | Aguardar decisão de layout consolidado. |
+| 2.1.A | HUD tático minimalista | ✅ Concluído | UI/UX | 2025-10-06 | Layout consolidado em `docs/ui/hud-minimal-tactical-layout.md` + mockup `assets/ui/minimal-tactical-hud.svg`. |
 | 2.1.B | HUD tático minimalista | 📋 Planejado | Gameplay | — | Depende da aprovação do item 2.1.A. |
 | 2.1.C | HUD tático minimalista | 📋 Planejado | QA/UI | — | Checklist de acessibilidade será criado junto ao item 6.1.A. |
 | 2.2.A | Tela inicial e onboarding | 📋 Planejado | UI/UX | — | Mockup já disponível na pasta de assets. |
