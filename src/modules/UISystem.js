@@ -36,6 +36,7 @@ class UISystem {
 
     this.hudLayout = Array.isArray(HUD_LAYOUT) ? HUD_LAYOUT : [];
     this.hudElements = new Map();
+    this.hudGroups = new Map();
     this.cachedValues = {
       health: { current: null, max: null },
       shield: {
@@ -50,7 +51,7 @@ class UISystem {
         cooldownRatio: null,
       },
       level: null,
-      xp: { current: null, needed: null, percentage: null },
+      xp: { current: null, needed: null, percentage: null, level: null },
       sessionKills: null,
       sessionKillsTextLength: 0,
       sessionTimeSeconds: null,
@@ -62,7 +63,7 @@ class UISystem {
         isActive: null,
         timeRemainingSeconds: null,
         breakTimerSeconds: null,
-        titleLength: 0,
+        labelLength: 0,
         enemiesTextLength: 0,
       },
     };
@@ -116,18 +117,14 @@ class UISystem {
       gameField: document.querySelector('#game-ui .game-field') || null,
       canvas: document.getElementById('game-canvas') || null,
       controls: document.querySelector('#game-ui .controls') || null,
-      xp: {
-        container: document.getElementById('hud-xp') || null,
-        progress: document.getElementById('xp-progress') || null,
-        text: document.getElementById('xp-text') || null,
-      },
       wave: {
-        container: document.getElementById('hud-wave') || null,
-        title: document.getElementById('wave-title') || null,
-        timerValue: document.getElementById('wave-timer-display') || null,
-        progressTrack: document.getElementById('wave-progress') || null,
-        progressBar: document.getElementById('wave-progress-bar') || null,
-        enemies: document.getElementById('wave-enemies') || null,
+        container: null,
+        title: null,
+        timerValue: null,
+        progressTrack: null,
+        progressBar: null,
+        enemies: null,
+        totalKills: null,
         countdown: document.getElementById('wave-countdown') || null,
         countdownValue: document.getElementById('countdown-timer') || null,
       },
@@ -564,6 +561,9 @@ class UISystem {
       return;
     }
 
+    this.hudElements.clear();
+    this.hudGroups.clear();
+
     const getRegionContainer = (position) => {
       const map = {
         'top-left': '#hud-region-top-left',
@@ -575,6 +575,21 @@ class UISystem {
       };
       const selector = map[position] || map['top-left'];
       return root.querySelector(selector) || root;
+    };
+
+    const ensureGroupContainer = (position, groupId) => {
+      const key = `${position}:${groupId}`;
+      if (this.hudGroups.has(key)) {
+        return this.hudGroups.get(key);
+      }
+
+      const region = getRegionContainer(position);
+      const groupElement = document.createElement('div');
+      groupElement.classList.add('hud-group', `hud-group--${groupId}`);
+      groupElement.dataset.hudGroup = groupId;
+      region.appendChild(groupElement);
+      this.hudGroups.set(key, groupElement);
+      return groupElement;
     };
 
     // Clear known regions (safe: only clears dynamic items, not wave/xp panels)
@@ -592,10 +607,14 @@ class UISystem {
         return;
       }
 
-      const target = getRegionContainer(itemConfig.position);
+      const target = itemConfig.group
+        ? ensureGroupContainer(itemConfig.position, itemConfig.group)
+        : getRegionContainer(itemConfig.position);
       target.appendChild(element.root);
       this.hudElements.set(itemConfig.key, element);
     });
+
+    this.refreshWaveDomRefs();
   }
 
   createHudItem(config) {
@@ -619,111 +638,123 @@ class UISystem {
     }
 
     const iconElement = this.createIconElement(config.icon);
-    if (iconElement) {
-      iconElement.classList.add('hud-item__icon');
-      root.appendChild(iconElement);
-    }
+    const leadingElement = this.createLeadingElement(config.leading);
+    const metaElement = this.createMetaElement(config.meta);
+    const metaPosition = config.metaPosition || 'before';
 
-    if (config.type === 'shield') {
-      root.classList.add('hud-item--shield', 'locked');
+    if (config.layout === 'inline-progress') {
+      root.classList.add('hud-item--progress');
 
-      const content = document.createElement('div');
-      content.classList.add('hud-item__content', 'hud-item__content--shield');
+      if (iconElement) {
+        iconElement.classList.add('hud-item__icon');
+        root.appendChild(iconElement);
+      }
 
-      const header = document.createElement('div');
-      header.classList.add('hud-item__metric-header');
+      if (leadingElement) {
+        root.appendChild(leadingElement);
+      }
 
-      const label = document.createElement('span');
-      label.classList.add('hud-item__label');
-      label.textContent = config.label;
+      const progressWrapper = document.createElement('div');
+      progressWrapper.classList.add('hud-progress');
 
-      const valueWrapper = document.createElement('span');
-      valueWrapper.classList.add('hud-item__value', 'hud-item__value--shield');
+      const progressBar = document.createElement('div');
+      progressBar.classList.add('hud-bar', 'hud-progress__track');
+      if (config.progressBarId) {
+        progressBar.id = config.progressBarId;
+      }
+      progressBar.setAttribute('role', 'progressbar');
+      progressBar.setAttribute('aria-valuemin', '0');
+      progressBar.setAttribute('aria-valuemax', '100');
+      progressBar.setAttribute('aria-valuenow', '0');
+      if (config.description) {
+        progressBar.setAttribute('aria-label', config.description);
+      }
+
+      const progressFill = document.createElement('div');
+      progressFill.classList.add('hud-bar__fill', `hud-bar__fill--${config.key}`);
+      if (config.progressFillId) {
+        progressFill.id = config.progressFillId;
+      }
+      progressFill.style.width = '0%';
+      progressBar.appendChild(progressFill);
 
       const valueNumber = document.createElement('span');
-      valueNumber.classList.add('hud-item__value-number');
+      valueNumber.classList.add(
+        'hud-item__value-number',
+        'hud-progress__value',
+        'hud-item__value'
+      );
       valueNumber.textContent = config.initialValue ?? '--';
       if (config.valueId) {
         valueNumber.id = config.valueId;
       }
-      valueWrapper.appendChild(valueNumber);
 
-      header.append(label, valueWrapper);
+      progressWrapper.append(progressBar, valueNumber);
 
-      const bar = document.createElement('div');
-      bar.classList.add('hud-bar', 'hud-bar--shield');
-      bar.setAttribute('role', 'progressbar');
-      bar.setAttribute('aria-valuemin', '0');
-      bar.setAttribute('aria-valuemax', '100');
+      if (metaElement && metaPosition === 'after-value') {
+        metaElement.classList.add('hud-progress__meta');
+        progressWrapper.appendChild(metaElement);
+      }
 
-      const barFill = document.createElement('div');
-      barFill.classList.add('hud-bar__fill');
-      barFill.style.width = '0%';
-      bar.appendChild(barFill);
+      root.appendChild(progressWrapper);
 
-      content.append(header, bar);
-      root.appendChild(content);
+      if (metaElement && metaPosition !== 'after-value') {
+        root.appendChild(metaElement);
+      }
+
+      if (config.key === 'shield') {
+        root.classList.add('locked');
+      }
 
       return {
         key: config.key,
         config,
         root,
         value: valueNumber,
-        bar: bar,
-        barFill,
+        bar: progressBar,
+        barFill: progressFill,
+        meta: metaElement,
+        leading: leadingElement,
       };
     }
 
-    if (config.key === 'health') {
-      const content = document.createElement('div');
-      content.classList.add('hud-item__content', 'hud-item__content--health');
+    if (config.layout === 'inline-value') {
+      root.classList.add('hud-item--inline-value');
 
-      const header = document.createElement('div');
-      header.classList.add('hud-item__metric-header');
-
-      const label = document.createElement('span');
-      label.classList.add('hud-item__label');
-      label.textContent = config.label;
-
-      const valueWrapper = document.createElement('span');
-      valueWrapper.classList.add('hud-item__value', 'hud-item__value--health');
+      if (iconElement) {
+        iconElement.classList.add('hud-item__icon');
+        root.appendChild(iconElement);
+      }
 
       const valueNumber = document.createElement('span');
-      valueNumber.classList.add('hud-item__value-number');
+      valueNumber.classList.add('hud-item__value-number', 'hud-inline-value');
       valueNumber.textContent = config.initialValue ?? '--';
       if (config.valueId) {
         valueNumber.id = config.valueId;
       }
-      valueWrapper.appendChild(valueNumber);
 
-      header.append(label, valueWrapper);
+      root.appendChild(valueNumber);
 
-      const bar = document.createElement('div');
-      bar.classList.add('hud-bar', 'hud-bar--health');
-      bar.setAttribute('role', 'progressbar');
-      bar.setAttribute('aria-valuemin', '0');
-      bar.setAttribute('aria-valuemax', '100');
-
-      const barFill = document.createElement('div');
-      barFill.classList.add('hud-bar__fill');
-      barFill.style.width = '100%';
-      bar.appendChild(barFill);
-
-      content.append(header, bar);
-      root.appendChild(content);
+      if (metaElement && metaPosition !== 'after-value') {
+        root.appendChild(metaElement);
+      }
 
       return {
         key: config.key,
         config,
         root,
         value: valueNumber,
-        bar: bar,
-        barFill,
+        meta: metaElement,
       };
     }
 
     const content = document.createElement('div');
     content.classList.add('hud-item__content');
+
+    if (iconElement) {
+      iconElement.classList.add('hud-item__icon');
+      root.appendChild(iconElement);
+    }
 
     const label = document.createElement('span');
     label.classList.add('hud-item__label');
@@ -754,13 +785,76 @@ class UISystem {
     content.append(label, valueWrapper);
     root.appendChild(content);
 
+    if (metaElement && metaPosition !== 'after-value') {
+      root.appendChild(metaElement);
+    }
+
     return {
       key: config.key,
       config,
       root,
       value: valueNumber,
       unit: unitElement,
+      meta: metaElement,
     };
+  }
+
+  createMetaElement(metaConfig) {
+    if (!metaConfig) {
+      return null;
+    }
+
+    const element = document.createElement('span');
+    element.classList.add('hud-item__meta');
+
+    if (Array.isArray(metaConfig.classes)) {
+      metaConfig.classes.forEach((className) => {
+        if (className) {
+          element.classList.add(className);
+        }
+      });
+    }
+
+    if (metaConfig.id) {
+      element.id = metaConfig.id;
+    }
+
+    if (metaConfig.ariaLabel) {
+      element.setAttribute('aria-label', metaConfig.ariaLabel);
+    }
+
+    element.textContent = metaConfig.initialValue ?? '';
+
+    return element;
+  }
+
+  createLeadingElement(leadingConfig) {
+    if (!leadingConfig) {
+      return null;
+    }
+
+    const element = document.createElement('span');
+    element.classList.add('hud-item__leading');
+
+    if (Array.isArray(leadingConfig.classes)) {
+      leadingConfig.classes.forEach((className) => {
+        if (className) {
+          element.classList.add(className);
+        }
+      });
+    }
+
+    if (leadingConfig.id) {
+      element.id = leadingConfig.id;
+    }
+
+    if (leadingConfig.ariaLabel) {
+      element.setAttribute('aria-label', leadingConfig.ariaLabel);
+    }
+
+    element.textContent = leadingConfig.initialValue ?? '';
+
+    return element;
   }
 
   createIconElement(iconConfig) {
@@ -798,6 +892,27 @@ class UISystem {
     }
 
     return null;
+  }
+
+  refreshWaveDomRefs() {
+    const waveRefs = this.domRefs.wave || {};
+
+    const container = document.getElementById('hud-wave');
+    const waveNumber = document.getElementById('wave-number');
+    const progressTrack = document.getElementById('wave-progress');
+    const progressBar = document.getElementById('wave-progress-bar');
+    const enemies = document.getElementById('wave-enemies');
+    const totalKills = document.getElementById('kills-display');
+
+    this.domRefs.wave = {
+      ...waveRefs,
+      container: container || null,
+      waveNumber: waveNumber || null,
+      progressTrack: progressTrack || null,
+      progressBar: progressBar || null,
+      enemies: enemies || null,
+      totalKills: totalKills || null,
+    };
   }
 
   setupEventListeners() {
@@ -1916,45 +2031,75 @@ class UISystem {
   }
 
   updateLevelDisplay(level, options = {}) {
-    const entry = this.hudElements.get('level');
-    if (!entry?.value) {
-      return;
-    }
-
+    const levelEntry = this.hudElements.get('level');
+    const xpEntry = this.hudElements.get('xp');
     const previousLevel = Number.isFinite(this.cachedValues.level)
       ? this.cachedValues.level
       : null;
     const normalizedLevel = Math.max(1, Math.floor(level ?? 1));
     const force = Boolean(options.force);
 
-    if (force || normalizedLevel !== this.cachedValues.level) {
-      entry.value.textContent = `Level ${normalizedLevel}`;
-      this.cachedValues.level = normalizedLevel;
+    if (!force && normalizedLevel === this.cachedValues.level) {
+      return;
+    }
 
-      const leveledUp =
-        previousLevel !== null && normalizedLevel > previousLevel && !force;
+    this.cachedValues.level = normalizedLevel;
 
-      if (entry.root && leveledUp) {
-        entry.root.classList.remove('is-levelup');
-        void entry.root.offsetWidth;
-        entry.root.classList.add('is-levelup');
+    if (levelEntry?.value) {
+      levelEntry.value.textContent = `Level ${normalizedLevel}`;
+    }
 
-        if (this.levelPulseTimeout) {
-          window.clearTimeout(this.levelPulseTimeout);
-        }
+    if (xpEntry?.meta) {
+      xpEntry.meta.textContent = `Lv ${normalizedLevel}`;
+    }
 
-        this.levelPulseTimeout = window.setTimeout(() => {
-          entry.root.classList.remove('is-levelup');
-          this.levelPulseTimeout = null;
-        }, 900);
+    const leveledUp =
+      previousLevel !== null && normalizedLevel > previousLevel && !force;
+
+    const pulseEntry = levelEntry?.root ? levelEntry : xpEntry;
+    if (pulseEntry?.root && leveledUp) {
+      pulseEntry.root.classList.remove('is-levelup');
+      void pulseEntry.root.offsetWidth;
+      pulseEntry.root.classList.add('is-levelup');
+
+      if (this.levelPulseTimeout) {
+        window.clearTimeout(this.levelPulseTimeout);
       }
+
+      this.levelPulseTimeout = window.setTimeout(() => {
+        pulseEntry.root.classList.remove('is-levelup');
+        this.levelPulseTimeout = null;
+      }, 900);
+    }
+
+    const hasCachedXp =
+      this.cachedValues.xp.current !== null &&
+      this.cachedValues.xp.needed !== null;
+
+    if (hasCachedXp && this.hudElements.has('xp')) {
+      const cachedPercentage = this.cachedValues.xp.percentage;
+      const percentageFallback =
+        this.cachedValues.xp.needed > 0
+          ? this.cachedValues.xp.current / this.cachedValues.xp.needed
+          : 0;
+
+      this.updateXPBar(
+        {
+          current: this.cachedValues.xp.current,
+          needed: this.cachedValues.xp.needed,
+          percentage: Number.isFinite(cachedPercentage)
+            ? cachedPercentage
+            : percentageFallback,
+          level: normalizedLevel,
+        },
+        { force: true }
+      );
     }
   }
 
   updateXPBar(data = {}, options = {}) {
-    const xpProgress = this.domRefs.xp.progress;
-    const xpText = this.domRefs.xp.text;
-    if (!xpProgress && !xpText) {
+    const entry = this.hudElements.get('xp');
+    if (!entry?.value || !entry.bar || !entry.barFill) {
       return;
     }
 
@@ -1968,46 +2113,76 @@ class UISystem {
     );
     const percentageRaw = Number.isFinite(data.percentage)
       ? data.percentage
-      : current / needed;
+      : needed > 0
+        ? current / needed
+        : 0;
     const percentage = Math.max(0, Math.min(1, percentageRaw));
     const force = Boolean(options.force);
 
-    if (xpProgress) {
-      const shouldUpdateWidth =
-        force || percentage !== this.cachedValues.xp.percentage;
+    const shouldUpdateWidth =
+      force || percentage !== this.cachedValues.xp.percentage;
 
-      if (shouldUpdateWidth) {
-        xpProgress.style.width = `${percentage * 100}%`;
-        this.cachedValues.xp.percentage = percentage;
+    if (shouldUpdateWidth) {
+      entry.barFill.style.width = `${percentage * 100}%`;
+      this.cachedValues.xp.percentage = percentage;
 
-        xpProgress.classList.remove('is-pulsing');
-        void xpProgress.offsetWidth;
-        xpProgress.classList.add('is-pulsing');
-      }
-
-      xpProgress.classList.toggle('is-maxed', percentage >= 1);
-      if (xpProgress.parentElement) {
-        xpProgress.parentElement.classList.toggle('is-maxed', percentage >= 1);
-      }
+      entry.barFill.classList.remove('is-pulsing');
+      void entry.barFill.offsetWidth;
+      entry.barFill.classList.add('is-pulsing');
     }
 
-    if (xpText) {
-      const shouldUpdateText =
-        force ||
-        current !== this.cachedValues.xp.current ||
-        needed !== this.cachedValues.xp.needed;
+    entry.bar.setAttribute('aria-valuenow', `${Math.round(percentage * 100)}`);
+    const isMaxed = percentage >= 1;
+    entry.bar.classList.toggle('is-maxed', isMaxed);
+    entry.barFill.classList.toggle('is-maxed', isMaxed);
+    entry.root.classList.toggle('is-maxed', isMaxed);
 
-      if (shouldUpdateText) {
-        xpText.textContent = `⚡ ${current} / ${needed}`;
-        this.cachedValues.xp.current = current;
-        this.cachedValues.xp.needed = needed;
+    const cachedLevel = Number.isFinite(this.cachedValues.level)
+      ? this.cachedValues.level
+      : null;
+    const levelFromData = Math.max(
+      1,
+      Math.floor(
+        data.level ??
+          data.currentLevel ??
+          data.playerLevel ??
+          cachedLevel ??
+          1
+      )
+    );
+    const level = cachedLevel ?? levelFromData;
 
-        xpText.classList.remove('is-pulsing');
-        void xpText.offsetWidth;
-        xpText.classList.add('is-pulsing');
+    const shouldUpdateText =
+      force ||
+      current !== this.cachedValues.xp.current ||
+      needed !== this.cachedValues.xp.needed ||
+      level !== this.cachedValues.xp.level;
+
+    if (shouldUpdateText) {
+      entry.value.textContent = `${current}/${needed}`;
+      this.cachedValues.xp.current = current;
+      this.cachedValues.xp.needed = needed;
+      this.cachedValues.xp.level = level;
+
+      if (entry.meta) {
+        entry.meta.textContent = `Lv ${level}`;
       }
 
-      xpText.classList.toggle('is-maxed', percentage >= 1);
+      entry.value.classList.remove('is-pulsing');
+      void entry.value.offsetWidth;
+      entry.value.classList.add('is-pulsing');
+    }
+
+    if (entry.meta && this.cachedValues.level !== level) {
+      entry.meta.textContent = `Lv ${level}`;
+    }
+
+    if (
+      !Number.isFinite(this.cachedValues.level) ||
+      force ||
+      this.cachedValues.level !== level
+    ) {
+      this.cachedValues.level = level;
     }
   }
 
@@ -2133,9 +2308,9 @@ class UISystem {
         ? this.formatCount(normalized.totalAsteroids, { allowCompact: true })
         : null;
     let layoutNeedsUpdate = false;
-    const previousTitleLength = this.cachedValues.wave.titleLength ?? 0;
+    const previousLabelLength = this.cachedValues.wave.labelLength ?? 0;
     const previousEnemiesLength = this.cachedValues.wave.enemiesTextLength ?? 0;
-    let nextTitleLength = previousTitleLength;
+    let nextLabelLength = previousLabelLength;
     let nextEnemiesLength = previousEnemiesLength;
 
     const hasChanged =
@@ -2152,19 +2327,19 @@ class UISystem {
       return;
     }
 
-    if (waveRefs.title) {
-      const titleText = `Setor ${normalized.current}`;
-      const newTitleLength = titleText.length;
+    if (waveRefs.waveNumber) {
+      const numberText = `Wave ${normalized.current}`;
+      const newLabelLength = numberText.length;
 
-      if (waveRefs.title.textContent !== titleText) {
-        waveRefs.title.textContent = titleText;
+      if (waveRefs.waveNumber.textContent !== numberText) {
+        waveRefs.waveNumber.textContent = numberText;
       }
 
-      if (newTitleLength > previousTitleLength) {
+      if (newLabelLength > previousLabelLength) {
         layoutNeedsUpdate = true;
       }
 
-      nextTitleLength = newTitleLength;
+      nextLabelLength = newLabelLength;
     }
 
     if (waveRefs.timerValue) {
@@ -2192,9 +2367,9 @@ class UISystem {
         );
         const valueText = normalized.isActive
           ? formattedTotal
-            ? `Kills: ${formattedKills} of ${formattedTotal}`
-            : `Kills: ${formattedKills}`
-          : 'Sector complete';
+            ? `Wave progress ${formattedKills} of ${formattedTotal}`
+            : `Wave progress ${formattedKills}`
+          : 'Wave complete';
         waveRefs.progressTrack.setAttribute('aria-valuetext', valueText);
       }
     }
@@ -2208,8 +2383,8 @@ class UISystem {
 
       if (normalized.isActive) {
         enemiesText = formattedTotal
-          ? `☄ ${formattedKills} / ${formattedTotal}`
-          : `☄ ${formattedKills}`;
+          ? `${formattedKills}/${formattedTotal}`
+          : `${formattedKills}`;
       } else if (inBreak) {
         enemiesText = `⏱ ${breakSeconds}s`;
       } else if (waveCompleted) {
@@ -2275,7 +2450,7 @@ class UISystem {
       isActive: normalized.isActive,
       timeRemainingSeconds: timeSeconds,
       breakTimerSeconds: breakSeconds,
-      titleLength: nextTitleLength,
+      labelLength: nextLabelLength,
       enemiesTextLength: nextEnemiesLength,
     };
   }
