@@ -1,6 +1,7 @@
 // src/modules/SettingsSystem.js
 
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
+import { DEFAULT_HUD_LAYOUT_ID } from '../data/ui/hudLayout.js';
 
 const VISUAL_CATEGORIES = new Set(['accessibility', 'video']);
 
@@ -541,6 +542,10 @@ class SettingsSystem {
     const screenShake = Number.isFinite(Number(video.screenShakeIntensity))
       ? Number(video.screenShakeIntensity)
       : 1;
+    const hudLayout =
+      typeof video.hudLayout === 'string' && video.hudLayout
+        ? video.hudLayout
+        : DEFAULT_HUD_LAYOUT_ID;
 
     return {
       accessibility,
@@ -553,6 +558,7 @@ class SettingsSystem {
         screenShake,
         damageFlash: video.damageFlash !== false,
         reducedParticles: Boolean(video.reducedParticles),
+        hudLayout,
       },
     };
   }

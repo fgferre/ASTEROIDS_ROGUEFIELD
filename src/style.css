@@ -1386,6 +1386,28 @@ html[data-motion='reduced'] *::after {
   accent-color: var(--color-primary);
 }
 
+.settings-field--select {
+  gap: var(--space-12);
+}
+
+.settings-select-input {
+  width: 100%;
+  padding: var(--space-12);
+  border-radius: var(--radius-base);
+  border: 1px solid rgba(var(--color-brown-600-rgb), 0.25);
+  background: rgba(var(--color-brown-600-rgb), 0.08);
+  color: var(--color-text);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.4;
+}
+
+.settings-select-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
 .settings-field--binding {
   gap: var(--space-16);
 }
@@ -2645,6 +2667,137 @@ body.hud-high-contrast .wave-progress-bar {
   left: 50%;
   transform: translateX(-50%);
   align-items: center;
+}
+
+body.hud-layout-minimal .hud-region--top-middle {
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: clamp(1rem, 2.8vw, 2.5rem);
+  width: clamp(30rem, 70vw, 46rem);
+  padding: 0 var(--space-12);
+}
+
+body.hud-layout-minimal .hud-group--tactical-vitals,
+body.hud-layout-minimal .hud-group--tactical-session {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: clamp(0.6rem, 1.4vw, 1.2rem);
+}
+
+body.hud-layout-minimal .hud-group--tactical-vitals {
+  flex: 1 1 auto;
+  justify-content: flex-start;
+}
+
+body.hud-layout-minimal .hud-group--tactical-session {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
+body.hud-layout-minimal .hud-group--tactical-vitals .hud-item--progress {
+  max-width: clamp(11rem, 18vw, 14rem);
+}
+
+body.hud-layout-minimal .hud-group--tactical-session .hud-item--inline-value {
+  min-width: clamp(5.4rem, 8vw, 6.8rem);
+  justify-content: flex-end;
+}
+
+body.hud-layout-minimal .hud-item--level {
+  padding: 0 !important;
+}
+
+body.hud-layout-minimal .hud-item--level .hud-item__value {
+  font-size: clamp(0.78rem, 0.72rem + 0.4vw, 1rem);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: rgba(118, 200, 255, 0.95);
+  font-weight: var(--font-weight-bold);
+}
+
+body.hud-layout-minimal .hud-item--kills .hud-item__value,
+body.hud-layout-minimal .hud-item--time .hud-item__value {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+  color: rgba(220, 242, 255, 0.9);
+}
+
+body.hud-layout-minimal .hud-item--kills .hud-inline-value,
+body.hud-layout-minimal .hud-item--time .hud-inline-value {
+  text-align: right;
+}
+
+body.hud-layout-minimal .hud-region--bottom-center {
+  width: clamp(22rem, 42vw, 32rem);
+  align-items: stretch;
+}
+
+body.hud-layout-minimal .hud-item--xp {
+  width: 100%;
+  padding: var(--space-12) var(--space-16);
+  background: rgba(8, 18, 32, 0.4);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(118, 200, 255, 0.25);
+  box-shadow: 0 12px 28px rgba(0, 20, 40, 0.35);
+}
+
+body.hud-layout-minimal .hud-item--xp .hud-item__leading {
+  font-size: clamp(0.6rem, 0.54rem + 0.1vw, 0.72rem);
+  letter-spacing: 0.18em;
+  color: rgba(210, 240, 255, 0.75);
+}
+
+body.hud-layout-minimal .hud-item--xp .hud-progress {
+  align-items: center;
+}
+
+body.hud-layout-minimal .hud-item--xp .hud-progress__value {
+  font-size: clamp(0.62rem, 0.56rem + 0.16vw, 0.82rem);
+  color: rgba(230, 245, 255, 0.94);
+}
+
+body.hud-layout-minimal .hud-item--xp .hud-progress__meta {
+  display: none;
+}
+
+body.hud-layout-minimal .hud-region--bottom-left {
+  align-items: stretch;
+}
+
+body.hud-layout-minimal #hud-wave {
+  width: clamp(20rem, 38vw, 30rem);
+  display: flex;
+  align-items: center;
+  gap: clamp(0.6rem, 0.9vw, 1.1rem);
+  padding: var(--space-12) var(--space-16) !important;
+  background: rgba(8, 18, 32, 0.4) !important;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(118, 200, 255, 0.22) !important;
+  box-shadow: 0 10px 24px rgba(0, 20, 40, 0.32) !important;
+}
+
+body.hud-layout-minimal #hud-wave .hud-item__leading {
+  font-size: clamp(0.58rem, 0.52rem + 0.12vw, 0.74rem);
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  color: rgba(210, 236, 255, 0.78);
+}
+
+body.hud-layout-minimal #hud-wave .hud-progress {
+  align-items: center;
+}
+
+body.hud-layout-minimal #hud-wave .hud-progress__value {
+  font-size: clamp(0.6rem, 0.56rem + 0.12vw, 0.8rem);
+  color: rgba(235, 248, 255, 0.92);
+}
+
+body.hud-layout-minimal #hud-wave .hud-item__meta {
+  font-size: clamp(0.54rem, 0.5rem + 0.1vw, 0.7rem);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
 }
 
 /* Prevent oversized cards in corners */
