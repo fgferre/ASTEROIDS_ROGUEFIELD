@@ -1,6 +1,6 @@
 # Rastreador da Revisão da Pasta `docs`
 
-Atualizado em 2025-10-06 para consolidar o status de cada documento conforme o plano em `docs/docs-review-plan.md`.
+Atualizado em 2025-10-09 para consolidar o status de cada documento conforme o plano em `docs/docs-review-plan.md`.
 
 ## `docs/analysis`
 
@@ -58,6 +58,7 @@ Atualizado em 2025-10-06 para consolidar o status de cada documento conforme o p
 | asteroid-break-enhancement.md | ⏳ Validar | Necessário checar `PhysicsSystem`/`AsteroidSystem` para ver se melhorias foram incorporadas. | gpt-5-codex | 2025-10-05 | Rodar auditoria de colisão/quebra e atualizar doc. |
 | improvement-roadmap.md | ⏳ Revisar | Roadmap contém itens já executados e outros obsoletos. | gpt-5-codex | 2025-10-05 | Atualizar estado de cada iniciativa ou mover para histórico. |
 | performance-monitor-guide.md | ✅ Implementado | Scripts `quick-performance-test.js` e `realistic-performance-test.js` seguem instruções do guia. | gpt-5-codex | 2025-10-05 | Acrescentar notas de uso em CI futuramente. |
+| how-to-send-performance-data.md | ✅ Implementado | `performanceMonitor.enableAutoLog(10000)` expõe `window.performanceMonitor.downloadLogs()` e fluxo manual funciona conforme guia (`src/app.js`, `src/utils/PerformanceMonitor.js`). | gpt-5-codex | 2025-10-09 | Referenciar guia no onboarding de playtests e manter alinhado ao monitor. |
 | start-screen-integration-plan.md | ⏳ Em andamento | Necessário verificar integração final da tela inicial com UI atual. | gpt-5-codex | 2025-10-05 | Validar assets versus implementação e atualizar doc. |
 | consolidation-polish-masterplan.md | ⏳ Revisar | Documento mestre contém itens duplicados com outros planos. | gpt-5-codex | 2025-10-05 | Consolidar com roadmap final ou arquivar se fragmentado. |
 
@@ -69,6 +70,7 @@ Atualizado em 2025-10-06 para consolidar o status de cada documento conforme o p
 | phase-2-2-1-activation-plan.md | 📦 Arquivo histórico | Plano concluído; funcionalidades ativadas conforme relatórios. | gpt-5-codex | 2025-10-05 | Nenhuma ação. |
 | phase-2-2-1-test-plan.md | 📦 Arquivo histórico | Testes executados durante fase 2.2; hoje apenas referência. | gpt-5-codex | 2025-10-05 | Considerar migração para `docs/validation` se ainda útil. |
 | phase-2-2-2-wavemanager-activation-plan.md | ⏳ Em andamento | WaveManager ainda não finalizado; plano permanece relevante. | gpt-5-codex | 2025-10-05 | Atualizar conforme implementação progride. |
+| phase-2-2-branch-readme.md | 📦 Arquivo histórico | README de branch documenta estado parcial (WaveManager sem loop e EnemyFactory desativada) refletido no código atual (`src/modules/EnemySystem.js`). | gpt-5-codex | 2025-10-09 | Manter arquivado como contexto da fase após concluir integração do WaveManager. |
 | phase-2-2-3-detailed-removal-analysis.md | 📦 Arquivo histórico | Análise concluída durante fase 2.2. | gpt-5-codex | 2025-10-05 | Nenhuma ação. |
 | phase-2-2-future-expansion-ready.md | ⏳ Em andamento | Itens de expansão futura (telemetria, bosses) ainda pendentes. | gpt-5-codex | 2025-10-05 | Revisar backlog quando fase 2.2 encerrar oficialmente. |
 | phase-2-2-priority-analysis.md | 📦 Arquivo histórico | Priorização utilizada durante execução; hoje serve de registro. | gpt-5-codex | 2025-10-05 | Nenhuma ação. |
@@ -78,12 +80,13 @@ Atualizado em 2025-10-06 para consolidar o status de cada documento conforme o p
 | Documento | Status | Evidências principais | Responsável | Data da revisão | Próximas ações |
 |-----------|--------|-----------------------|-------------|-----------------|----------------|
 | week-1-session-1-report.md | 📦 Registro | Informações já consolidadas no histórico do projeto. | gpt-5-codex | 2025-10-05 | Avaliar mover para `docs/archive` junto de outros relatórios antigos. |
+| historico_do_projeto.txt | ✅ Atualizado | Arquivo movido para `docs/progress/`; mantém log contínuo de commits recentes (último merge #41). | gpt-5-codex | 2025-10-09 | Continuar atualização automática via workflow; avaliar conversão para Markdown no futuro. |
 
 ## `docs/prompts`
 
 | Documento | Status | Evidências principais | Responsável | Data da revisão | Próximas ações |
 |-----------|--------|-----------------------|-------------|-----------------|----------------|
-| completed-prompts.md | ⏳ Atualizar | Lista desatualizada comparada ao `historico_do_projeto.txt`. | gpt-5-codex | 2025-10-05 | Sincronizar com histórico recente de entregas. |
+| completed-prompts.md | ⏳ Atualizar | Lista desatualizada comparada ao `docs/progress/historico_do_projeto.txt`. | gpt-5-codex | 2025-10-05 | Sincronizar com histórico recente de entregas. |
 | Guia Completo de Refatoração Modular - Prompts Pas.md | 📦 Referência | Conteúdo redundante com `phase-2-architecture`. | gpt-5-codex | 2025-10-05 | Padronizar nomenclatura e arquivar após extrair itens úteis. |
 | Guia_impllementação_Melhorias_UIUX | ⏳ Padronizar | Arquivo sem extensão e com prompt bruto; precisa higienização. | gpt-5-codex | 2025-10-05 | Definir formato (`.md`), revisar conteúdo e decidir manter/arquivar. |
 

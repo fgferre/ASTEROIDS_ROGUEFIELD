@@ -1,5 +1,7 @@
 # Phase 2.2: Enemy System Decomposition - Branch README
 
+> ⚠️ **Arquivo histórico** — este README foi movido para `docs/guides/archive/phase-2-2/` apenas para referência durante a revisão de documentação de 2025-10-09. Consulte `docs/guides/phase-2-2-actual-state.md` para o retrato atual da fase.
+
 **Branch:** `feature/phase-2-2-enemy-decomposition`
 **Status:** ⚠️ Foundation Complete, Partial Implementation
 **Date:** 2025-10-01
