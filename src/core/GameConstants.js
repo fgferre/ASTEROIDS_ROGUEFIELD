@@ -1119,6 +1119,21 @@ export const COMBAT_AIMING_UPGRADE_CONFIG = Object.freeze({
       small: 1,
     },
     distance: 0.75,
+    impact: {
+      distanceWeight: 18,
+      distanceNormalization: 150,
+      timeWeight: 12,
+      timeNormalization: 1.25,
+      hpWeight: 8,
+      hpNormalization: 180,
+      urgencyDistance: 12,
+      urgencyTime: 10,
+      hpUrgencyMultiplier: 1.1,
+      stackMultiplier: 1.35,
+      stackBase: 0.4,
+      minStackScore: 0.15,
+      maxRecommended: 4,
+    },
   },
   dynamicPrediction: {
     minLeadTime: 0.05,
@@ -1132,8 +1147,10 @@ export const COMBAT_AIMING_UPGRADE_CONFIG = Object.freeze({
     multiLock: 0.1,
   },
   multiLock: {
-    baseTargetCount: 2,
+    baseTargetCount: 4,
     cooldownMultiplier: 0.92,
+    parallelSpacing: 14,
+    parallelRadiusMultiplier: 0.55,
   },
   feedback: {
     lockPulseDuration: 0.4,

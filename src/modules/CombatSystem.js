@@ -79,6 +79,8 @@ class CombatSystem {
     this.currentTargetLocks = [];
     this.predictedAimPoints = [];
     this.predictedAimPointsMap = new Map();
+    this.currentLockAssignments = [];
+    this.targetThreatCache = new Map();
     this.targetIndicatorPulse = 0;
     this.lastKnownPlayerStats = null;
     this.lastPrimaryTargetId = null;
@@ -110,9 +112,11 @@ class CombatSystem {
       this.resolveCachedServices(true);
       this.currentTarget = null;
       this.currentTargetLocks = [];
+      this.currentLockAssignments = [];
       this.targetingPriorityList = [];
       this.predictedAimPoints = [];
       this.predictedAimPointsMap = new Map();
+      this.targetThreatCache.clear();
       this.targetIndicatorPulse = 0;
       this.lastKnownPlayerStats = null;
       this.lastPrimaryTargetId = null;
@@ -121,6 +125,7 @@ class CombatSystem {
     gameEvents.on('progression-reset', () => {
       this.resolveCachedServices(true);
       this.resetAimingBranchState();
+      this.targetThreatCache.clear();
     });
 
     gameEvents.on('physics-reset', () => {
@@ -130,6 +135,13 @@ class CombatSystem {
     gameEvents.on('player-died', () => {
       // Clear target when player dies (bullets keep flying)
       this.currentTarget = null;
+      this.currentTargetLocks = [];
+      this.currentLockAssignments = [];
+      this.targetingPriorityList = [];
+      this.predictedAimPoints = [];
+      this.predictedAimPointsMap.clear();
+      this.targetThreatCache.clear();
+      this.targetIndicatorPulse = 0;
       console.log('[CombatSystem] Player died - cleared target');
     });
 
@@ -239,9 +251,11 @@ class CombatSystem {
     ) {
       this.currentTarget = null;
       this.currentTargetLocks = [];
+      this.currentLockAssignments = [];
       this.targetingPriorityList = [];
       this.predictedAimPoints = [];
       this.predictedAimPointsMap.clear();
+      this.targetThreatCache.clear();
       if (this.lastPrimaryTargetId !== null && typeof gameEvents !== 'undefined') {
         gameEvents.emit('combat-target-lock', { lost: true });
       }
@@ -256,7 +270,7 @@ class CombatSystem {
       this.targetUpdateTimer = this.targetUpdateInterval;
     } else if (this.targetingUpgradeLevel >= 3) {
       const desiredLocks = this.computeLockCount(this.lastKnownPlayerStats);
-      if (desiredLocks !== this.currentTargetLocks.length) {
+      if (desiredLocks !== this.currentLockAssignments.length) {
         this.rebuildLockSet(desiredLocks);
       }
     }
@@ -270,6 +284,7 @@ class CombatSystem {
     if (!player || typeof player.getPosition !== 'function') {
       this.currentTarget = null;
       this.currentTargetLocks = [];
+      this.currentLockAssignments = [];
       this.targetingPriorityList = [];
       return;
     }
@@ -279,6 +294,15 @@ class CombatSystem {
       return;
     }
 
+    const playerVelocity =
+      typeof player.getVelocity === 'function' ? player.getVelocity() : null;
+    const playerRadius =
+      typeof player.getShieldRadius === 'function'
+        ? player.getShieldRadius()
+        : typeof player.getHullBoundingRadius === 'function'
+        ? player.getHullBoundingRadius()
+        : CONSTANTS.SHIP_SIZE || 24;
+
     const enemies = this.cachedEnemies;
     if (!enemies) {
       return;
@@ -286,6 +310,7 @@ class CombatSystem {
 
     const candidates = [];
     const scoringEnabled = this.dangerScoreEnabled;
+    this.targetThreatCache.clear();
 
     const processEnemy = (enemy) => {
       if (!enemy || enemy.destroyed) {
@@ -301,10 +326,42 @@ class CombatSystem {
       }
 
       const score = scoringEnabled
-        ? this.calculateDangerScore(enemy, playerPos, distance)
+        ? this.calculateDangerScore(
+            enemy,
+            playerPos,
+            distance,
+            playerVelocity,
+            playerRadius
+          )
         : -distance;
 
-      candidates.push({ enemy, distance, score });
+      const candidateEntry = {
+        enemy,
+        distance,
+        score: scoringEnabled && score && typeof score === 'object'
+          ? score.total
+          : score,
+      };
+
+      if (scoringEnabled && score && typeof score === 'object') {
+        candidateEntry.breakdown = score;
+        candidateEntry.score = score.total;
+        this.targetThreatCache.set(enemy.id, {
+          enemy,
+          distance,
+          score: score.total,
+          breakdown: score,
+        });
+      } else {
+        this.targetThreatCache.set(enemy.id, {
+          enemy,
+          distance,
+          score: candidateEntry.score,
+          breakdown: null,
+        });
+      }
+
+      candidates.push(candidateEntry);
     };
 
     if (typeof enemies.forEachActiveAsteroid === 'function') {
@@ -342,11 +399,7 @@ class CombatSystem {
     this.targetingPriorityList = sorted;
 
     const desiredLocks = this.computeLockCount(this.lastKnownPlayerStats);
-    const lockEntries = sorted.slice(0, Math.max(1, desiredLocks));
-
-    this.currentTargetLocks = lockEntries
-      .map((entry) => entry.enemy)
-      .filter((enemy) => enemy && !enemy.destroyed);
+    this.rebuildLockSet(Math.max(1, desiredLocks));
 
     this.currentTarget = this.currentTargetLocks[0] || null;
 
@@ -406,70 +459,142 @@ class CombatSystem {
     }
 
     const totalShots = Math.max(1, Math.floor(playerStats?.multishot ?? 1));
-    const usingMultiLock =
-      this.targetingUpgradeLevel >= 3 && lockTargets.length > 1;
+    const usingAdvancedBattery = this.targetingUpgradeLevel >= 3;
 
-    const predictedTargets = lockTargets.map((enemy, index) => {
-      const predicted =
-        this.predictedAimPointsMap.get(enemy.id) ||
-        this.getPredictedTargetPosition(enemy, playerPos);
-      const fallback = predicted || { x: enemy.x, y: enemy.y };
-      return { enemy, position: { ...fallback }, index };
-    });
+    const assignments = usingAdvancedBattery
+      ? (Array.isArray(this.currentLockAssignments) &&
+          this.currentLockAssignments.length
+          ? this.currentLockAssignments
+          : lockTargets.map((enemy, index) => ({
+              enemy,
+              predictedAim:
+                this.predictedAimPointsMap.get(enemy.id) ||
+                this.getPredictedTargetPosition(enemy, playerPos) ||
+                { x: enemy.x, y: enemy.y },
+              fireOrigin: { ...playerPos },
+              fireOffset: { x: 0, y: 0 },
+              duplicateIndex: index,
+              duplicateCount: lockTargets.length,
+              index,
+            })))
+      : lockTargets.map((enemy, index) => ({
+          enemy,
+          predictedAim:
+            this.predictedAimPointsMap.get(enemy.id) ||
+            this.getPredictedTargetPosition(enemy, playerPos) ||
+            { x: enemy.x, y: enemy.y },
+          fireOrigin: { ...playerPos },
+          fireOffset: { x: 0, y: 0 },
+          duplicateIndex: index,
+          duplicateCount: lockTargets.length,
+          index,
+        }));
+
+    if (!assignments.length) {
+      return;
+    }
+
+    const multiLockActive = usingAdvancedBattery && lockTargets.length > 1;
 
     const firedTargets = [];
 
     for (let shotIndex = 0; shotIndex < totalShots; shotIndex += 1) {
-      const lockIndex = usingMultiLock
-        ? Math.min(predictedTargets.length - 1, shotIndex)
-        : Math.min(predictedTargets.length - 1, 0);
+      const assignment = usingAdvancedBattery
+        ? assignments[Math.min(assignments.length - 1, shotIndex)] ||
+          assignments[assignments.length - 1]
+        : assignments[Math.min(assignments.length - 1, 0)];
 
-      const lockData = predictedTargets[lockIndex] || predictedTargets[0];
-      if (!lockData) {
+      if (!assignment || !assignment.enemy) {
         continue;
       }
 
-      let aimPoint = { ...lockData.position };
-      const shouldApplySpread =
-        totalShots > 1 &&
-        (!usingMultiLock || shotIndex >= predictedTargets.length);
+      const duplicateCount = Math.max(1, assignment.duplicateCount || 1);
+      const duplicateIndex = assignment.duplicateIndex || 0;
 
-      if (shouldApplySpread) {
-        aimPoint = this.applyMultishotSpread(
-          playerPos,
-          aimPoint,
-          shotIndex,
-          totalShots
-        );
+      let fireOrigin = assignment.fireOrigin
+        ? { ...assignment.fireOrigin }
+        : { ...playerPos };
+      let aimPoint = assignment.predictedAim
+        ? { ...assignment.predictedAim }
+        : null;
+
+      if (!aimPoint) {
+        const predicted =
+          this.getPredictedTargetPosition(assignment.enemy, playerPos) ||
+          { x: assignment.enemy.x, y: assignment.enemy.y };
+        if (usingAdvancedBattery) {
+          const offset = this.computeParallelOffset(
+            playerPos,
+            predicted,
+            duplicateIndex,
+            duplicateCount,
+            assignment.enemy
+          );
+          fireOrigin = {
+            x: playerPos.x + offset.x,
+            y: playerPos.y + offset.y,
+          };
+          aimPoint = {
+            x: predicted.x + offset.x,
+            y: predicted.y + offset.y,
+          };
+        } else {
+          aimPoint = predicted;
+          fireOrigin = { ...playerPos };
+        }
       }
 
-      this.createBullet(playerPos, aimPoint, playerStats.damage);
+      if (usingAdvancedBattery && assignment.fireOffset) {
+        fireOrigin = {
+          x: playerPos.x + assignment.fireOffset.x,
+          y: playerPos.y + assignment.fireOffset.y,
+        };
+        aimPoint = {
+          x: (assignment.predictedAim?.x ?? aimPoint.x),
+          y: (assignment.predictedAim?.y ?? aimPoint.y),
+        };
+      }
+
+      if (!usingAdvancedBattery && totalShots > 1) {
+        const shouldApplySpread =
+          totalShots > assignments.length || assignments.length <= 1;
+        if (shouldApplySpread) {
+          aimPoint = this.applyMultishotSpread(
+            playerPos,
+            aimPoint,
+            shotIndex,
+            totalShots
+          );
+        }
+      }
+
+      this.createBullet(fireOrigin, aimPoint, playerStats.damage);
       firedTargets.push({
-        enemyId: lockData.enemy?.id ?? null,
+        enemyId: assignment.enemy?.id ?? null,
         position: { ...aimPoint },
       });
     }
 
     this.lastShotTime = 0;
 
-    if (typeof gameEvents !== 'undefined') {
-      const firstTarget = firedTargets[0]?.position || null;
-      gameEvents.emit('weapon-fired', {
-        position: playerPos,
-        target: firstTarget,
-        weaponType: 'basic',
-        primaryTargetId: this.currentTarget ? this.currentTarget.id : null,
-        targeting: {
-          dynamicPrediction: this.usingDynamicPrediction(),
-          lockCount: lockTargets.length,
-          multiLockActive: usingMultiLock,
-          predictedPoints: firedTargets.map((entry) => ({
-            enemyId: entry.enemyId,
-            position: entry.position,
-          })),
-        },
-      });
-    }
+      if (typeof gameEvents !== 'undefined') {
+        const firstTarget = firedTargets[0]?.position || null;
+        gameEvents.emit('weapon-fired', {
+          position: playerPos,
+          target: firstTarget,
+          weaponType: 'basic',
+          primaryTargetId: this.currentTarget ? this.currentTarget.id : null,
+          targeting: {
+            dynamicPrediction: this.usingDynamicPrediction(),
+            lockCount: lockTargets.length,
+            multiLockActive,
+            predictedPoints: firedTargets.map((entry) => ({
+              enemyId: entry.enemyId,
+              position: entry.position,
+            })),
+          },
+        });
+      }
   }
 
   canShoot() {
@@ -549,6 +674,44 @@ class CombatSystem {
     return map;
   }
 
+  sanitizeImpactWeights(config = {}) {
+    const sanitized = {
+      distanceWeight: this.toNumber(config.distanceWeight, 0),
+      distanceNormalization: Math.max(
+        1,
+        this.toNumber(config.distanceNormalization, 160)
+      ),
+      timeWeight: this.toNumber(config.timeWeight, 0),
+      timeNormalization: Math.max(
+        0.05,
+        this.toNumber(config.timeNormalization, 1.1)
+      ),
+      hpWeight: this.toNumber(config.hpWeight, 0),
+      hpNormalization: Math.max(1, this.toNumber(config.hpNormalization, 140)),
+      urgencyDistance: this.toNumber(
+        config.urgencyDistance,
+        config.distanceWeight !== undefined ? config.distanceWeight : 0
+      ),
+      urgencyTime: this.toNumber(
+        config.urgencyTime,
+        config.timeWeight !== undefined ? config.timeWeight : 0
+      ),
+      hpUrgencyMultiplier: Math.max(
+        0,
+        this.toNumber(config.hpUrgencyMultiplier, 0.8)
+      ),
+      stackMultiplier: Math.max(0, this.toNumber(config.stackMultiplier, 1.2)),
+      stackBase: Math.max(0, this.toNumber(config.stackBase, 0.2)),
+      minStackScore: Math.max(0, this.toNumber(config.minStackScore, 0)),
+      maxRecommended: Math.max(
+        1,
+        Math.floor(this.toNumber(config.maxRecommended, 4))
+      ),
+    };
+
+    return sanitized;
+  }
+
   sanitizeDangerWeights(config = {}) {
     return {
       behavior: this.sanitizeWeightMap(config.behavior, 0),
@@ -567,6 +730,7 @@ class CombatSystem {
       ),
       size: this.sanitizeWeightMap(config.size, 0),
       distance: this.toNumber(config.distance, 0),
+      impact: this.sanitizeImpactWeights(config.impact || {}),
     };
   }
 
@@ -582,6 +746,7 @@ class CombatSystem {
       speedReference: this.toNumber(weights.speedReference, 200),
       size: { ...(weights.size || {}) },
       distance: this.toNumber(weights.distance, 0),
+      impact: { ...(weights.impact || {}) },
     };
   }
 
@@ -618,6 +783,7 @@ class CombatSystem {
     this.targetUpdateInterval = this.baseTargetUpdateInterval;
     this.targetIndicatorPulse = 0;
     this.currentTargetLocks = [];
+    this.currentLockAssignments = [];
     this.targetingPriorityList = [];
     this.predictedAimPoints = [];
     if (this.predictedAimPointsMap) {
@@ -625,6 +791,7 @@ class CombatSystem {
     } else {
       this.predictedAimPointsMap = new Map();
     }
+    this.targetThreatCache.clear();
     this.lastPrimaryTargetId = null;
     this.shootCooldown = this.baseShootCooldown;
   }
@@ -761,6 +928,14 @@ class CombatSystem {
         this.dangerWeights.distance
       );
     }
+
+    if (overrides.impact) {
+      const sanitized = this.sanitizeImpactWeights(overrides.impact);
+      this.dangerWeights.impact = {
+        ...(this.dangerWeights.impact || {}),
+        ...sanitized,
+      };
+    }
   }
 
   updateDynamicPredictionSettings(overrides = {}) {
@@ -839,30 +1014,69 @@ class CombatSystem {
   }
 
   pruneInvalidLocks() {
-    if (!Array.isArray(this.currentTargetLocks) || !this.currentTargetLocks.length) {
+    if (
+      !Array.isArray(this.currentLockAssignments) ||
+      !this.currentLockAssignments.length
+    ) {
+      this.currentTargetLocks = [];
       if (!this.currentTarget || !this.isValidTarget(this.currentTarget)) {
         this.currentTarget = null;
       }
       return;
     }
 
-    const filtered = this.currentTargetLocks.filter(
-      (enemy) => enemy && !enemy.destroyed && this.isValidTarget(enemy)
+    const filteredAssignments = this.currentLockAssignments.filter(
+      (assignment) =>
+        assignment &&
+        assignment.enemy &&
+        !assignment.enemy.destroyed &&
+        this.isValidTarget(assignment.enemy)
     );
 
-    if (filtered.length !== this.currentTargetLocks.length) {
-      this.currentTargetLocks = filtered;
+    if (filteredAssignments.length !== this.currentLockAssignments.length) {
+      this.currentLockAssignments = filteredAssignments;
     }
 
-    if (!filtered.length) {
+    if (!this.currentLockAssignments.length) {
+      this.currentTargetLocks = [];
       this.currentTarget = null;
-    } else {
-      this.currentTarget = filtered[0];
+      return;
     }
+
+    const desiredCount =
+      this.targetingUpgradeLevel >= 3
+        ? this.computeLockCount(this.lastKnownPlayerStats)
+        : 1;
+
+    if (
+      this.targetingUpgradeLevel >= 3 &&
+      this.currentLockAssignments.length !== desiredCount
+    ) {
+      this.rebuildLockSet(desiredCount);
+      return;
+    }
+
+    this.currentTargetLocks = this.currentLockAssignments.map(
+      (assignment) => assignment.enemy
+    );
+    this.currentTarget = this.currentTargetLocks[0] || null;
   }
 
   rebuildLockSet(desiredCount) {
     const count = Math.max(1, Math.floor(desiredCount));
+    const assignments = this.buildLockAssignments(count);
+
+    this.currentLockAssignments = assignments;
+    this.currentTargetLocks = assignments.map((assignment) => assignment.enemy);
+    this.currentTarget = this.currentTargetLocks[0] || null;
+  }
+
+  buildLockAssignments(desiredCount) {
+    const count = Math.max(0, Math.floor(desiredCount));
+    if (count <= 0) {
+      return [];
+    }
+
     const validEntries = this.targetingPriorityList.filter(
       (entry) =>
         entry &&
@@ -871,22 +1085,160 @@ class CombatSystem {
         this.isValidTarget(entry.enemy)
     );
 
-    this.currentTargetLocks = validEntries
-      .slice(0, count)
-      .map((entry) => entry.enemy);
+    if (!validEntries.length) {
+      return [];
+    }
 
-    this.currentTarget = this.currentTargetLocks[0] || null;
+    const stats = validEntries.map((entry, index) => {
+      const enemy = entry.enemy;
+      const threat = this.targetThreatCache.get(enemy.id) || {};
+      const breakdown = threat.breakdown?.impact ||
+        (threat.breakdown ? threat.breakdown.impact : null) ||
+        entry.breakdown?.impact ||
+        null;
+      const recommended = Math.max(
+        1,
+        Math.min(
+          count,
+          Math.round(
+            breakdown && Number.isFinite(breakdown.recommendedShots)
+              ? breakdown.recommendedShots
+              : threat.breakdown?.impact?.recommendedShots || 1
+          )
+        )
+      );
+      const urgency = Number.isFinite(breakdown?.urgency)
+        ? breakdown.urgency
+        : Number.isFinite(threat.breakdown?.impact?.urgency)
+        ? threat.breakdown.impact.urgency
+        : entry.score ?? 0;
+      return {
+        enemy,
+        index,
+        threat,
+        breakdown: threat.breakdown || entry.breakdown || null,
+        recommended,
+        urgency,
+        score: entry.score ?? 0,
+        id: enemy.id,
+        assigned: 0,
+        remaining: recommended,
+      };
+    });
+
+    const counts = new Map();
+    let remaining = count;
+
+    // Baseline assignment - ensure each top priority target receives at least one slot
+    for (let i = 0; i < stats.length && remaining > 0; i += 1) {
+      const stat = stats[i];
+      counts.set(stat.id, 1);
+      stat.assigned = 1;
+      stat.remaining = Math.max(0, stat.recommended - 1);
+      remaining -= 1;
+    }
+
+    const computePriority = (stat) => {
+      if (!stat) {
+        return -Infinity;
+      }
+      const urgency = Number.isFinite(stat.urgency) ? stat.urgency : 0;
+      const stackMultiplier = Math.max(
+        0,
+        this.dangerWeights?.impact?.stackMultiplier || 0
+      );
+      const remainingBias = Math.max(0, stat.remaining || 0);
+      const scoreBias = Number.isFinite(stat.score) ? stat.score : 0;
+      return urgency * (1 + stackMultiplier * 0.5 + remainingBias) + scoreBias * 0.01;
+    };
+
+    while (remaining > 0 && stats.length) {
+      let bestStat = null;
+      let bestValue = -Infinity;
+      for (const stat of stats) {
+        const value = computePriority(stat);
+        if (value > bestValue) {
+          bestValue = value;
+          bestStat = stat;
+        }
+      }
+
+      if (!bestStat) {
+        break;
+      }
+
+      counts.set(
+        bestStat.id,
+        (counts.get(bestStat.id) || 0) + 1
+      );
+      bestStat.assigned += 1;
+      bestStat.remaining = Math.max(0, bestStat.recommended - bestStat.assigned);
+      remaining -= 1;
+    }
+
+    const topStat = stats[0];
+    while (remaining > 0 && topStat) {
+      counts.set(topStat.id, (counts.get(topStat.id) || 0) + 1);
+      topStat.assigned += 1;
+      topStat.remaining = Math.max(0, topStat.recommended - topStat.assigned);
+      remaining -= 1;
+    }
+
+    const assignments = [];
+    stats.forEach((stat) => {
+      const totalForTarget = counts.get(stat.id) || 0;
+      for (let i = 0; i < totalForTarget; i += 1) {
+        assignments.push({
+          enemy: stat.enemy,
+          priorityIndex: stat.index,
+          threat: stat.threat,
+          breakdown: stat.breakdown,
+          urgency: stat.urgency,
+        });
+      }
+    });
+
+    if (assignments.length > count) {
+      assignments.length = count;
+    }
+
+    while (assignments.length < count && topStat) {
+      assignments.push({
+        enemy: topStat.enemy,
+        priorityIndex: topStat.index,
+        threat: topStat.threat,
+        breakdown: topStat.breakdown,
+        urgency: topStat.urgency,
+      });
+    }
+
+    assignments.sort((a, b) => {
+      if (a.priorityIndex !== b.priorityIndex) {
+        return a.priorityIndex - b.priorityIndex;
+      }
+      return 0;
+    });
+
+    const totals = new Map();
+    assignments.forEach((assignment) => {
+      const id = assignment.enemy?.id ?? assignment.priorityIndex;
+      totals.set(id, (totals.get(id) || 0) + 1);
+    });
+
+    const running = new Map();
+    assignments.forEach((assignment, index) => {
+      const id = assignment.enemy?.id ?? assignment.priorityIndex;
+      const duplicateIndex = running.get(id) || 0;
+      assignment.index = index;
+      assignment.duplicateIndex = duplicateIndex;
+      assignment.duplicateCount = totals.get(id) || 1;
+      running.set(id, duplicateIndex + 1);
+    });
+
+    return assignments;
   }
 
   refreshPredictedAimPoints() {
-    if (!this.currentTarget) {
-      this.predictedAimPoints = [];
-      if (this.predictedAimPointsMap) {
-        this.predictedAimPointsMap.clear();
-      }
-      return;
-    }
-
     const player = this.getCachedPlayer();
     if (!player || typeof player.getPosition !== 'function') {
       return;
@@ -896,31 +1248,131 @@ class CombatSystem {
     if (!playerPos) {
       return;
     }
+    const assignments =
+      Array.isArray(this.currentLockAssignments) &&
+      this.currentLockAssignments.length
+        ? this.currentLockAssignments
+        : this.currentTarget
+        ? [
+            {
+              enemy: this.currentTarget,
+              priorityIndex: 0,
+              duplicateIndex: 0,
+              duplicateCount: 1,
+            },
+          ]
+        : [];
 
-    const locks =
-      this.currentTargetLocks && this.currentTargetLocks.length
-        ? this.currentTargetLocks
-        : [this.currentTarget];
+    if (!assignments.length) {
+      this.predictedAimPoints = [];
+      if (this.predictedAimPointsMap) {
+        this.predictedAimPointsMap.clear();
+      }
+      return;
+    }
 
     const map = new Map();
     const list = [];
 
-    locks.forEach((enemy, index) => {
+    assignments.forEach((assignment, index) => {
+      const enemy = assignment.enemy;
       if (!enemy) {
         return;
       }
-      const predicted = this.getPredictedTargetPosition(enemy, playerPos);
-      if (predicted) {
-        map.set(enemy.id, predicted);
-        list.push({ enemy, position: predicted, index });
-      }
+
+      const predicted =
+        this.getPredictedTargetPosition(enemy, playerPos) ||
+        { x: enemy.x, y: enemy.y };
+      const duplicateIndex = Number.isFinite(assignment.duplicateIndex)
+        ? assignment.duplicateIndex
+        : 0;
+      const duplicateCount = Number.isFinite(assignment.duplicateCount)
+        ? assignment.duplicateCount
+        : 1;
+      const offset = this.computeParallelOffset(
+        playerPos,
+        predicted,
+        duplicateIndex,
+        duplicateCount,
+        enemy
+      );
+
+      const aimPoint = {
+        x: predicted.x + offset.x,
+        y: predicted.y + offset.y,
+      };
+      assignment.predictedAim = aimPoint;
+      assignment.fireOffset = offset;
+      assignment.fireOrigin = {
+        x: playerPos.x + offset.x,
+        y: playerPos.y + offset.y,
+      };
+      assignment.index = index;
+
+      list.push({
+        enemy,
+        position: aimPoint,
+        index,
+        duplicateIndex,
+        duplicateCount,
+      });
+      map.set(enemy.id, aimPoint);
     });
 
     this.predictedAimPoints = list;
     this.predictedAimPointsMap = map;
   }
 
-  calculateDangerScore(enemy, playerPos, distance) {
+  computeParallelOffset(
+    playerPos,
+    aimPoint,
+    duplicateIndex,
+    duplicateCount,
+    enemy
+  ) {
+    if (!Number.isFinite(duplicateCount) || duplicateCount <= 1) {
+      return { x: 0, y: 0 };
+    }
+
+    const dx = aimPoint.x - playerPos.x;
+    const dy = aimPoint.y - playerPos.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance === 0) {
+      return { x: 0, y: 0 };
+    }
+
+    const slotCenter = (duplicateCount - 1) / 2;
+    const offsetIndex = duplicateIndex - slotCenter;
+    if (Math.abs(offsetIndex) < 0.0001) {
+      return { x: 0, y: 0 };
+    }
+
+    const spacing = this.aimingConfig?.multiLock?.parallelSpacing ?? 10;
+    const maxOffsetSetting = this.aimingConfig?.multiLock?.parallelMaxOffset;
+    const radiusMultiplier =
+      this.aimingConfig?.multiLock?.parallelRadiusMultiplier ?? 0.5;
+
+    let magnitude = offsetIndex * spacing;
+    const targetRadius = enemy?.radius || 16;
+    const clampLimit = Number.isFinite(maxOffsetSetting)
+      ? Math.max(spacing, maxOffsetSetting)
+      : Math.max(spacing, targetRadius * radiusMultiplier);
+    magnitude = Math.max(-clampLimit, Math.min(clampLimit, magnitude));
+
+    const perpX = (-dy / distance) * magnitude;
+    const perpY = (dx / distance) * magnitude;
+
+    return { x: perpX, y: perpY };
+  }
+
+  calculateDangerScore(
+    enemy,
+    playerPos,
+    distance,
+    playerVelocity = null,
+    playerRadius = null
+  ) {
     const weights = this.dangerWeights || {};
     const variantWeight = this.resolveVariantWeight(enemy);
     const rewardValue = this.estimateRewardValue(enemy);
@@ -934,15 +1386,162 @@ class CombatSystem {
     const sizeScore = weights.size?.[enemy?.size] ?? 0;
     const distanceScore =
       this.computeDistanceFactor(distance) * (weights.distance || 0);
+    const impactDetails = this.calculateImpactThreat(
+      enemy,
+      playerPos,
+      distance,
+      playerVelocity,
+      playerRadius
+    );
 
-    return (
+    const total =
       variantWeight +
       rewardScore +
       directionScore +
       speedScore +
       sizeScore +
-      distanceScore
+      distanceScore +
+      impactDetails.total;
+
+    return {
+      total,
+      variant: variantWeight,
+      reward: rewardScore,
+      direction: directionScore,
+      speed: speedScore,
+      size: sizeScore,
+      distance: distanceScore,
+      impact: impactDetails,
+    };
+  }
+
+  calculateImpactThreat(
+    enemy,
+    playerPos,
+    distance,
+    playerVelocity = null,
+    playerRadius = null
+  ) {
+    const weights = this.dangerWeights?.impact;
+    if (!weights) {
+      return {
+        total: 0,
+        distanceComponent: 0,
+        timeComponent: 0,
+        hpComponent: 0,
+        timeToImpact: Infinity,
+        projectedDistance: Number.isFinite(distance) ? distance : Infinity,
+        urgency: 0,
+        recommendedShots: 1,
+      };
+    }
+
+    const vx = enemy?.vx || 0;
+    const vy = enemy?.vy || 0;
+    const playerVx = playerVelocity?.x || 0;
+    const playerVy = playerVelocity?.y || 0;
+
+    const relVx = vx - playerVx;
+    const relVy = vy - playerVy;
+    const relSpeedSq = relVx * relVx + relVy * relVy;
+
+    const dx = enemy.x - playerPos.x;
+    const dy = enemy.y - playerPos.y;
+    const baseDistance = Number.isFinite(distance)
+      ? distance
+      : Math.sqrt(dx * dx + dy * dy);
+
+    let timeToImpact = Infinity;
+    if (relSpeedSq > 0.0001) {
+      const projection = (dx * relVx + dy * relVy) / relSpeedSq;
+      if (projection > 0) {
+        timeToImpact = projection;
+      } else {
+        timeToImpact = 0;
+      }
+    }
+
+    const maxTime = Math.max(0.1, weights.timeNormalization || 1);
+    const clampedTime = Math.min(timeToImpact, maxTime);
+    const timeComponent =
+      (1 - clampedTime / maxTime) * (weights.timeWeight || 0);
+
+    let projectedDistance = baseDistance;
+    if (Number.isFinite(timeToImpact) && timeToImpact !== Infinity) {
+      const futureDx = dx + relVx * timeToImpact;
+      const futureDy = dy + relVy * timeToImpact;
+      projectedDistance = Math.sqrt(futureDx * futureDx + futureDy * futureDy);
+    }
+
+    const effectiveRadius = Math.max(
+      1,
+      Number.isFinite(playerRadius)
+        ? playerRadius
+        : CONSTANTS.SHIP_SIZE || 24
     );
+    const distanceNormalization = Math.max(
+      effectiveRadius * 2,
+      weights.distanceNormalization || effectiveRadius * 3
+    );
+    const clampedDistance = Math.min(projectedDistance, distanceNormalization);
+    const distanceComponent =
+      (1 - clampedDistance / distanceNormalization) *
+      (weights.distanceWeight || 0);
+
+    const remainingHealth = Math.max(
+      0,
+      Number.isFinite(enemy?.health)
+        ? enemy.health
+        : Number.isFinite(enemy?.maxHealth)
+        ? enemy.maxHealth
+        : 0
+    );
+    const maxHealth = Math.max(remainingHealth, enemy?.maxHealth || remainingHealth);
+    const hpNormalization = Math.max(
+      1,
+      weights.hpNormalization || maxHealth || 1
+    );
+    const hpRatio = Math.min(1, remainingHealth / hpNormalization);
+    const hpComponent = hpRatio * (weights.hpWeight || 0);
+
+    const total = distanceComponent + timeComponent + hpComponent;
+
+    const urgencyDistance =
+      (weights.urgencyDistance ?? weights.distanceWeight ?? 0) *
+      (distanceComponent > 0 ? distanceComponent / (weights.distanceWeight || 1) : 0);
+    const urgencyTime =
+      (weights.urgencyTime ?? weights.timeWeight ?? 0) *
+      (timeComponent > 0 ? timeComponent / (weights.timeWeight || 1) : 0);
+
+    const urgencyBase = urgencyDistance + urgencyTime;
+    const hpUrgencyMultiplier = Math.max(0, weights.hpUrgencyMultiplier || 0);
+    const urgency = urgencyBase * (1 + hpUrgencyMultiplier * hpRatio);
+
+    const stackMultiplier = Math.max(0, weights.stackMultiplier || 0);
+    const stackBase = Math.max(0, weights.stackBase || 0);
+    const minStackScore = Math.max(0, weights.minStackScore || 0);
+    let stackPressure = urgency * stackMultiplier + stackBase * hpRatio;
+    if (stackPressure < minStackScore) {
+      stackPressure = minStackScore * hpRatio;
+    }
+
+    const maxRecommended = Math.max(1, weights.maxRecommended || 4);
+    const recommendedShots = Math.max(
+      1,
+      Math.min(maxRecommended, Math.round(1 + stackPressure))
+    );
+
+    return {
+      total,
+      distanceComponent,
+      timeComponent,
+      hpComponent,
+      timeToImpact,
+      projectedDistance,
+      urgency,
+      hpRatio,
+      recommendedShots,
+    };
   }
 
   resolveVariantWeight(enemy) {
@@ -1339,15 +1938,23 @@ class CombatSystem {
         ? player.getPosition()
         : null);
 
-    const locks =
-      this.currentTargetLocks && this.currentTargetLocks.length
-        ? this.currentTargetLocks
+    const lockAssignments =
+      Array.isArray(this.currentLockAssignments) &&
+      this.currentLockAssignments.length
+        ? this.currentLockAssignments
         : this.currentTarget
-        ? [this.currentTarget]
+        ? [
+            {
+              enemy: this.currentTarget,
+              index: 0,
+              duplicateIndex: 0,
+              duplicateCount: 1,
+            },
+          ]
         : [];
 
     if (
-      locks.length &&
+      lockAssignments.length &&
       player &&
       !player.isDead &&
       !player.isRetrying &&
@@ -1360,18 +1967,34 @@ class CombatSystem {
         Math.min(1, this.targetIndicatorPulse / pulseDuration)
       );
 
-      locks.forEach((target, index) => {
+      const duplicateTotals = new Map();
+      lockAssignments.forEach((assignment) => {
+        const target = assignment.enemy;
+        if (!target || target.destroyed) {
+          return;
+        }
+        const id = target.id || assignment.index;
+        duplicateTotals.set(id, assignment.duplicateCount || 1);
+      });
+
+      lockAssignments.forEach((assignment, index) => {
+        const target = assignment.enemy;
         if (!target || target.destroyed) {
           return;
         }
 
+        const duplicateIndex = assignment.duplicateIndex || 0;
+        const duplicateCount = duplicateTotals.get(target.id || index) || 1;
         const hue = 52 + index * 36;
         const baseAlpha =
           index === 0 ? this.lockHighlightAlpha : this.lockLineAlpha;
         const lineAlpha = Math.min(1, baseAlpha + pulseRatio * 0.25);
         const radiusBase = target.radius || 16;
         const arcRadius =
-          radiusBase + 6 + pulseRatio * (index === 0 ? 6 : 3.5);
+          radiusBase +
+          6 +
+          duplicateIndex * 4 +
+          pulseRatio * (index === 0 ? 6 : 3.5);
 
         ctx.save();
         ctx.setLineDash([4, 3]);
@@ -1394,21 +2017,22 @@ class CombatSystem {
     }
 
     if (this.predictedAimPoints.length && this.usingDynamicPrediction()) {
-      this.predictedAimPoints.forEach(({ position, index }) => {
-        if (!position) {
-          return;
-        }
+      this.predictedAimPoints.forEach(
+        ({ position, index, duplicateIndex, duplicateCount }) => {
+          if (!position) {
+            return;
+          }
 
-        const hue = 52 + index * 36;
-        const alpha = index === 0 ? 0.55 : 0.38;
-        const radius =
-          (this.predictedMarkerRadius || 12) *
-          (index === 0 ? 1 : 0.82);
+          const hue = 52 + index * 36;
+          const alpha = index === 0 ? 0.55 : 0.38;
+          const radius =
+            (this.predictedMarkerRadius || 12) *
+            (index === 0 ? 1 : 0.82 + duplicateIndex * 0.04);
 
-        ctx.save();
-        ctx.setLineDash([]);
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = `hsla(${hue}, 95%, 72%, ${alpha})`;
+          ctx.save();
+          ctx.setLineDash([]);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = `hsla(${hue}, 95%, 72%, ${alpha})`;
         ctx.beginPath();
         ctx.arc(position.x, position.y, radius, 0, Math.PI * 2);
         ctx.stroke();
@@ -1419,7 +2043,8 @@ class CombatSystem {
         ctx.arc(position.x, position.y, radius * 0.45, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
-      });
+        }
+      );
     }
   }
 
@@ -1440,6 +2065,13 @@ class CombatSystem {
     }
     this.bullets = [];
     this.currentTarget = null;
+    this.currentTargetLocks = [];
+    this.currentLockAssignments = [];
+    this.predictedAimPoints = [];
+    if (this.predictedAimPointsMap) {
+      this.predictedAimPointsMap.clear();
+    }
+    this.targetThreatCache.clear();
     this.lastShotTime = 0;
     this.resolveCachedServices(true);
     console.log('[CombatSystem] Reset');
@@ -1452,6 +2084,13 @@ class CombatSystem {
     }
     this.bullets = [];
     this.currentTarget = null;
+    this.currentTargetLocks = [];
+    this.currentLockAssignments = [];
+    this.predictedAimPoints = [];
+    if (this.predictedAimPointsMap) {
+      this.predictedAimPointsMap.clear();
+    }
+    this.targetThreatCache.clear();
     console.log('[CombatSystem] Destroyed');
   }
 }

@@ -517,10 +517,10 @@ const UPGRADE_LIBRARY = [
         {
           title: 'Travas Coordenadas',
           description:
-            'Sincroniza múltiplos alvos quando multishot está ativo, dividindo a rajada entre ameaças distintas.',
+            'Ativa uma bateria de quatro canhões independentes que priorizam ameaças críticas em paralelo.',
           highlights: [
             'Disponível apenas com Tiro Múltiplo instalado (Nv. 1+).',
-            'Reduz ligeiramente o intervalo entre rajadas ao coordenar travas.',
+            'Coordena até quatro travas e pode concentrar fogo em um único alvo iminente.',
           ],
         },
       ],
@@ -569,7 +569,7 @@ const UPGRADE_LIBRARY = [
             type: 'event',
             event: 'upgrade-aiming-suite',
             payload: {
-              multiLockTargets: 2,
+              multiLockTargets: 4,
               cooldownMultiplier: 0.92,
             },
           },
