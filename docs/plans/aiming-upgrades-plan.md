@@ -3,61 +3,61 @@
 ## Diagnóstico do Sistema Atual
 
 ### Mecânicas Principais
-- O `CombatSystem` mantém referências para jogador, inimigos e física através do service locator, garantindo acesso consistente aos dados necessários para mirar e atirar.【F:src/modules/CombatSystem.js†L70-L155】
-- A cada ciclo `findBestTarget` recompõe a lista ordenada de inimigos; quando `dangerScoreEnabled` está ativo o ranking usa `calculateDangerScore`, caso contrário aplica a ordenação por distância como fallback.【F:src/modules/CombatSystem.js†L240-L340】
-- O disparo só acontece quando existe alvo válido, respeitando tempo de recarga e aplicando predição linear ou dinâmica antes de instanciar projéteis e emitir eventos globais.【F:src/modules/CombatSystem.js†L386-L470】
-- Balas são obtidas de um pool, atualizadas com trilhas e removidas ao expirar, reduzindo custos de alocação e mantendo a cena limpa de projéteis inválidos.【F:src/modules/CombatSystem.js†L508-L618】
+- O `CombatSystem` já mantém caches para jogador, inimigos e física, limpando o estado sempre que eventos globais de reset ou morte acontecem, o que garante que travas e pontos preditivos não sobrevivam após a destruição da nave.【F:src/modules/CombatSystem.js†L111-L147】
+- A aquisição de alvos recompõe uma lista ordenada sempre que o temporizador expira e, com a mira evoluída, calcula uma `dangerScore` que soma pesos de variante, recompensa, direção, velocidade, tamanho, distância e o termo de impacto iminente antes de ranquear as ameaças.【F:src/modules/CombatSystem.js†L200-L344】【F:src/modules/CombatSystem.js†L1376-L1414】
+- A pontuação de impacto estima tempo para colisão, distância projetada, proporção de HP restante e converte esses fatores em urgência e `recommendedShots`, que alimentam o algoritmo de distribuição das travas coordenadas.【F:src/modules/CombatSystem.js†L1418-L1534】【F:src/modules/CombatSystem.js†L1092-L1238】
+- O disparo consulta `player.getStats()` para obter dano acumulado (influenciado pelos upgrades de força) e o valor atual de `multishot`, decidindo entre a bateria coordenada ou o padrão de spread legado conforme o nível do upgrade de mira.【F:src/modules/CombatSystem.js†L439-L569】【F:src/modules/PlayerSystem.js†L102-L156】【F:src/modules/PlayerSystem.js†L860-L869】
 
-### Colisão e Feedback
-- Cada impacto processa dano através do sistema de inimigos e dispara evento `bullet-hit`, que serve de gatilho para feedback visual e sonoro contextualizado.【F:src/modules/CombatSystem.js†L406-L465】
-- O `EffectsSystem` responde aos eventos de criação de projéteis e acertos para gerar muzzle flash, partículas de impacto e indicadores de dano direcionais.【F:src/modules/EffectsSystem.js†L296-L360】【F:src/modules/EffectsSystem.js†L913-L948】
-- O `AudioSystem` sincroniza o disparo e a confirmação de impacto com efeitos sonoros sintetizados, reforçando ritmo de tiro e sensação de acerto.【F:src/modules/AudioSystem.js†L93-L148】【F:src/modules/AudioSystem.js†L344-L372】【F:src/modules/AudioSystem.js†L704-L738】
-- O indicador visual de alvo ativo aparece durante o `render` do sistema de combate, conectando nave e inimigo com traço e anel pulsante.【F:src/modules/CombatSystem.js†L500-L585】
+### Distribuição de Canhões, VFX e SFX
+- No nível 3, `computeLockCount` limita travas ativas ao mínimo entre `multiLockTargets` (hoje 4) e os projéteis disponíveis, permitindo dividir ou concentrar fogo de acordo com a urgência calculada.【F:src/modules/CombatSystem.js†L1001-L1014】
+- `computeParallelOffset` cria deslocamentos laterais determinísticos para cada canhão redundante, removendo o spread randômico e evitando sobreposição de projéteis quando múltiplos canhões focam o mesmo alvo.【F:src/modules/CombatSystem.js†L1326-L1367】
+- O `render` já diferencia indicadores para cada trava (incluindo duplicatas no mesmo inimigo) e só exibe marcadores preditivos quando a predição dinâmica está ativa e o jogador permanece vivo.【F:src/modules/CombatSystem.js†L1935-L2048】
+- O `AudioSystem` aumenta discretamente o pitch e o sustain do disparo conforme o número de canhões ativos e sinaliza o uso da predição dinâmica, preservando o batching existente.【F:src/modules/AudioSystem.js†L351-L409】
 
-### Observações
-- A matriz de periculosidade soma pesos de variante, recompensa, direção, velocidade, tamanho e distância, mas não inclui nenhum termo de iminência de impacto apesar de já existir cálculo de interceptação dinâmica para tiros.【F:src/modules/CombatSystem.js†L923-L1039】
-- O `computeLockCount` limita o número de travas ao mínimo entre `multiLockTargets` e o valor atual de multishot, enquanto `handleShooting` continua aplicando `applyMultishotSpread` para projéteis excedentes; assim, mesmo com nível 3 instalado o padrão de espalhamento permanece ativo além das travas prioritárias.【F:src/modules/CombatSystem.js†L386-L522】【F:src/modules/CombatSystem.js†L826-L879】【F:src/core/GameConstants.js†L1094-L1137】
-- Tanto o desenho de indicadores quanto a construção de pontos preditivos iteram apenas sobre `currentTargetLocks`; como o limite base permanece em duas travas, a UI nunca representa mais de dois alvos simultâneos mesmo que o multishot exceda esse valor.【F:src/modules/CombatSystem.js†L1336-L1394】【F:src/modules/CombatSystem.js†L900-L920】【F:src/core/GameConstants.js†L1094-L1137】【F:src/data/upgrades.js†L558-L577】
-- O indicador de predição permanece visível mesmo após a nave ser destruída, pois o `render` não valida o estado do jogador antes de desenhar `predictedAimPoints`.【F:src/modules/CombatSystem.js†L1336-L1405】
+### Configuração e Dados
+- Os pesos padrão, intervalos de atualização, espaçamento paralelo e parâmetros de feedback do ramo de mira já estão centralizados em `COMBAT_AIMING_UPGRADE_CONFIG`, com o termo de impacto calibrado via dados.【F:src/core/GameConstants.js†L1087-L1160】
+- O catálogo de upgrades define a árvore da Matriz de Mira com evento de reset de pesos no nível 1, ajustes de predição no nível 2 e carga de quatro travas com redução de cooldown no nível 3, incluindo a exigência explícita de `multishot` nível 1.【F:src/data/upgrades.js†L528-L577】
+- O sistema de progressão valida requisitos globais e específicos de cada nível antes de oferecer ou aplicar upgrades, impedindo que a bateria coordenada seja desbloqueada sem o pré-requisito de multishot.【F:src/modules/ProgressionSystem.js†L262-L353】
 
-### Achados da Revisão de Código
-- A lógica atual do upgrade 1 ativa a matriz de perigo existente, mas a fórmula não reflete o termo de impacto iminente descrito no plano anterior nem há parâmetros correspondentes em `GameConstants`.
-- O upgrade 3 continua limitado a duas travas simultâneas e mantém a lógica de spread para multishot acima do limite, não implementando a bateria de quatro canhões independentes prevista.
-- O bug visual do indicador preditivo pós-morte continua reproduzível; nenhuma limpeza adicional acontece no evento `player-died`.
+## Observações e Pontos de Atenção
+- O cálculo de `recommendedShots` usa apenas o HP absoluto do alvo e constantes de empilhamento; quando a nave acumula upgrades de dano (`plasma`), ainda podemos acabar dedicando 3–4 canhões a inimigos que cairiam com um único disparo. Precisamos considerar o dano por projétil atual ao estimar quantos canhões valem a pena concentrar.【F:src/modules/CombatSystem.js†L1418-L1534】【F:src/modules/PlayerSystem.js†L102-L156】
+- As janelas de tempo e distância para urgência são estáticas. Playtests devem validar se variantes muito rápidas (parasitas/voláteis) continuam liderando o ranking mesmo quando o jogador acelera (`propulsors`) ou quando o alvo se aproxima por ângulos extremos – calibragem fina pode exigir ajustes em `urgencyDistance`/`urgencyTime` ou um leve bias direcional adicional.【F:src/modules/CombatSystem.js†L1444-L1519】
+- O espaçamento paralelo usa valores fixos (`parallelSpacing` e `parallelRadiusMultiplier`). Em situações com quatro canhões focando um alvo minúsculo é possível que os offsets ultrapassem o raio visível; vale planejar telemetria ou visual debug para garantir que não ocorram over-shoots ao ajustar esses parâmetros.【F:src/modules/CombatSystem.js†L1326-L1367】【F:src/core/GameConstants.js†L1149-L1154】
+- A UI e o áudio já escalam com o número de travas, mas ainda não há teste automatizado garantindo que `player-died` limpe marcadores em todos os estados intermediários (ex.: morte durante animação de aquisição). Cobertura adicional evitará regressões.【F:src/modules/CombatSystem.js†L111-L147】【F:src/modules/CombatSystem.js†L1935-L2048】
 
-## Diretrizes Gerais para Upgrades
-- Persistir parâmetros em `GameConstants` ou arquivos de dados, mantendo abordagem data-driven já utilizada no projeto.【F:src/core/GameConstants.js†L1086-L1091】
-- Reutilizar eventos globais existentes (`weapon-fired`, `bullet-created`, `bullet-hit`) para expandir VFX/SFX sem criar canais paralelos, garantindo compatibilidade com sistemas de efeitos e áudio atuais.【F:src/modules/CombatSystem.js†L269-L360】【F:src/modules/EffectsSystem.js†L296-L339】【F:src/modules/AudioSystem.js†L93-L147】
+## Mapa de Comportamentos por Upgrade
 
-## Upgrade 1 — Matriz de Aquisição Adaptativa
-**Objetivo:** tornar a seleção de alvo responsiva a ameaças ao invés de apenas proximidade, incorporando janela de impacto iminente.
+| Upgrade de Mira | Multishot | Comportamento Observado |
+| --- | --- | --- |
+| Nível 0 | 1 | Mira padrão por distância, um único canhão, sem predição dinâmica. |
+| Nível 0 | 2–4 | Multishot aplica spread legado proporcional ao índice do tiro.【F:src/modules/CombatSystem.js†L558-L569】 |
+| Nível 1 | 1 | `dangerScore` habilitado com matriz completa de pesos; segue disparando um projétil central.【F:src/modules/CombatSystem.js†L824-L826】【F:src/modules/CombatSystem.js†L439-L571】 |
+| Nível 1 | 2–4 | Prioridade de alvo já usa periculosidade, mas spread continua ativo para os tiros extras.【F:src/modules/CombatSystem.js†L558-L569】 |
+| Nível 2 | 1 | Predição dinâmica ativa, marcador auxiliar exibido enquanto a nave estiver viva.【F:src/modules/CombatSystem.js†L828-L829】【F:src/modules/CombatSystem.js†L1935-L2048】 |
+| Nível 2 | 2–4 | Igual ao nível 1 com spread, porém pontos preditivos são atualizados a cada travamento.【F:src/modules/CombatSystem.js†L439-L569】 |
+| Nível 3 | 1 | Mantém mira preditiva, sem spread, e respeita cooldown reduzido mesmo com um único canhão.【F:src/modules/CombatSystem.js†L832-L845】【F:src/modules/CombatSystem.js†L558-L569】 |
+| Nível 3 | 2 | Duas travas coordenadas; pode empilhar no mesmo alvo com offset paralelo se a urgência recomendar dois canhões.【F:src/modules/CombatSystem.js†L1092-L1238】【F:src/modules/CombatSystem.js†L1326-L1367】 |
+| Nível 3 | 3–4 | Até quatro travas simultâneas, distribuídas pela urgência calculada e limitadas pelo valor de multishot; áudio e indicadores visuais escalam com o número de canhões ativos.【F:src/modules/CombatSystem.js†L1001-L1014】【F:src/modules/AudioSystem.js†L351-L409】【F:src/modules/CombatSystem.js†L1935-L2048】 |
 
-- **Estado Atual:** `calculateDangerScore` adiciona os pesos de variante, recompensa, direção, velocidade, tamanho e distância definidos em `COMBAT_AIMING_UPGRADE_CONFIG`, porém não utiliza o tempo de interceptação para ajustar a prioridade de alvos com impacto iminente.【F:src/modules/CombatSystem.js†L923-L945】【F:src/core/GameConstants.js†L1094-L1121】
-- **Ajustes Necessários:** introduzir um termo de iminência que consuma o tempo retornado por `calculateDynamicIntercept` quando disponível, além de um fallback proporcional à distância em casos degenerados. Incluir parâmetros data-driven (ex.: peso máximo, curva de decaimento, amortização por HP) em `COMBAT_AIMING_UPGRADE_CONFIG` para calibrar o ganho do novo termo.【F:src/modules/CombatSystem.js†L1026-L1078】【F:src/core/GameConstants.js†L1094-L1121】
-- **VFX/SFX:** manter o pulso de travamento já existente e planejar um incremento leve quando o termo de iminência elevar a prioridade (ex.: reforço temporário do arco e um ping curto de aquisição via `AudioSystem`).【F:src/modules/CombatSystem.js†L344-L371】【F:src/modules/AudioSystem.js†L93-L148】
+## Diretrizes por Nível de Upgrade
 
-## Upgrade 2 — Núcleo de Predição Dinâmica
-**Objetivo:** melhorar precisão de tiros em alvos móveis e comunicar claramente o ponto previsto.
+### Upgrade 1 — Matriz de Aquisição Adaptativa
+- **Estado Atual:** A matriz data-driven está aplicada e inclui termo de impacto iminente, ordenando variantes parasitas/voláteis com prioridade máxima.【F:src/modules/CombatSystem.js†L1376-L1436】【F:src/core/GameConstants.js†L1094-L1136】
+- **Próximos Passos:** Ajustar `recommendedShots` para considerar o dano por disparo e validar, via playtests, se o peso atual de recompensa continua relevante após a introdução da urgência baseada em impacto.【F:src/modules/CombatSystem.js†L1418-L1534】【F:src/modules/PlayerSystem.js†L102-L156】
 
-- **Estado Atual:** `getPredictedTargetPosition` já tenta resolver o intercepto balístico via `calculateDynamicIntercept`, recortando o tempo pelas janelas configuradas e caindo para a predição linear padrão quando necessário.【F:src/modules/CombatSystem.js†L484-L507】【F:src/modules/CombatSystem.js†L1026-L1078】
-- **Ajustes Necessários:** validar o comportamento sob o novo termo de iminência (Upgrade 1), garantindo que a mesma janela de tempo seja usada para pontuação e mira. Avaliar redução adicional em `targetUpdateInterval` para nivel 2 e adicionar telemetria mínima para aferir ganhos de precisão durante playtests.【F:src/modules/CombatSystem.js†L240-L340】【F:src/modules/CombatSystem.js†L795-L839】
-- **VFX/SFX:** manter o marcador translúcido do ponto previsto e planejar nuance sonora discreta (leve swell no disparo) para diferenciar tiros com predição dinâmica ativa.【F:src/modules/CombatSystem.js†L1336-L1405】【F:src/modules/AudioSystem.js†L93-L148】
+### Upgrade 2 — Núcleo de Predição Dinâmica
+- **Estado Atual:** `calculateDynamicIntercept` limita o tempo de lead conforme parâmetros configurados e o render só exibe o marcador preditivo quando a predição avançada está ativa e o jogador permanece vivo.【F:src/modules/CombatSystem.js†L1047-L1323】【F:src/modules/CombatSystem.js†L1935-L2048】
+- **Próximos Passos:** Instrumentar telemetria simples (ex.: comparação entre ponto previsto e impacto real) para calibrar `minLeadTime`/`maxLeadTime` em velocidades extremas e garantir que ajustes no termo de impacto não criem discrepâncias visuais na predição.【F:src/core/GameConstants.js†L1138-L1147】【F:src/modules/CombatSystem.js†L1418-L1519】
 
-## Upgrade 3 — Bateria de Canhões Coordenada
-**Objetivo:** substituir o padrão de spread pelo controle de quatro canhões independentes que respeitam a prioridade de ameaça e podem se concentrar em um único alvo.
+### Upgrade 3 — Bateria de Canhões Coordenada
+- **Estado Atual:** A lógica de travas múltiplas aloca canhões conforme urgência, aplica offsets paralelos e remove o spread dos tiros extras; áudio e UI já refletem a contagem total de barris ativos.【F:src/modules/CombatSystem.js†L439-L569】【F:src/modules/CombatSystem.js†L1092-L1367】【F:src/modules/AudioSystem.js†L351-L409】
+- **Próximos Passos:**
+  - Revisar o algoritmo de distribuição para ponderar dano por disparo, evitando overkill quando upgrades de força estiverem ativos.【F:src/modules/CombatSystem.js†L1418-L1534】【F:src/modules/PlayerSystem.js†L102-L156】
+  - Validar offsets em alvos pequenos e ajustar `parallelSpacing`/`parallelRadiusMultiplier` via dados se forem observados cruzamentos exagerados.【F:src/modules/CombatSystem.js†L1326-L1367】【F:src/core/GameConstants.js†L1149-L1154】
+  - Cobrir via testes ou tooling que eventos de morte limpam imediatamente `currentLockAssignments` e `predictedAimPoints`, prevenindo regressões visuais.【F:src/modules/CombatSystem.js†L111-L147】【F:src/modules/CombatSystem.js†L1935-L2048】
 
-- **Estado Atual:** o terceiro nível apenas reduz o `shootCooldown`, limita `multiLockTargets` a duas ameaças e deixa a distribuição adicional de multishot a cargo do spread convencional.【F:src/data/upgrades.js†L528-L577】【F:src/modules/CombatSystem.js†L408-L444】【F:src/modules/CombatSystem.js†L826-L839】
-- **Ajustes Necessários:**
-  - Fixar `multiLockTargets` em quatro canhões virtuais e reformular `handleShooting` para que cada canhão selecione alvo a partir da fila ordenada pela `dangerScore`, podendo convergir quando a iminência/HP justificar.【F:src/modules/CombatSystem.js†L386-L522】【F:src/modules/CombatSystem.js†L826-L879】
-  - Desativar `applyMultishotSpread` para todo o ciclo enquanto o nível 3 estiver ativo, substituindo-o pela distribuição coordenada e por possível reutilização do mesmo alvo.【F:src/modules/CombatSystem.js†L386-L522】
-  - Estender `rebuildLockSet`, `refreshPredictedAimPoints` e o `render` para lidar com até quatro travas, garantindo que indicadores e círculos preditivos reflitam o número real de canhões ativos, inclusive em cenários de foco compartilhado.【F:src/modules/CombatSystem.js†L826-L920】【F:src/modules/CombatSystem.js†L1336-L1405】
-  - Introduzir uma malha de posicionamento paralelo para canhões que compartilham alvo: calcular offsets laterais mínimos (ex.: deslocamento baseado na normal ao vetor nave→alvo) para evitar sobreposição visual e física dos projéteis sem reintroduzir spread aleatório.
-  - Atualizar `COMBAT_AIMING_UPGRADE_CONFIG` e a carga do upgrade (event payload) para refletir o novo limite e ajustes de cooldown necessários.【F:src/modules/CombatSystem.js†L386-L522】【F:src/core/GameConstants.js†L1094-L1137】【F:src/data/upgrades.js†L558-L577】
-- **VFX/SFX:** estender o `render` para diferenciar os quatro feixes (largura/alpha) e escalonar o `playLaserShot` com camadas discretas que reflitam o número de canhões ativos, preservando o batch atual para evitar clipping.【F:src/modules/CombatSystem.js†L1336-L1405】【F:src/modules/AudioSystem.js†L93-L148】
+## Próximos Passos Gerais
+1. Implementar telemetria leve para correlacionar `recommendedShots` com dano real aplicado e ajustar pesos de impacto com base em playtests (foco nas combinações com Plasma nível 3 + Multishot nível 3).【F:src/modules/CombatSystem.js†L1418-L1534】【F:src/modules/PlayerSystem.js†L102-L156】
+2. Criar testes automatizados garantindo que `progression-reset` e `player-died` limpem travas, marcadores preditivos e cooldowns da bateria coordenada.【F:src/modules/CombatSystem.js†L111-L147】【F:src/modules/CombatSystem.js†L771-L797】
+3. Documentar guidelines de tuning para `parallelSpacing` e `urgency` no repositório de dados após coletar métricas de playtest, permitindo ajustes futuros sem refatorar a lógica.【F:src/core/GameConstants.js†L1094-L1154】【F:src/modules/CombatSystem.js†L1326-L1367】
 
-## Próximos Passos
-1. Realizar sessões de playtest direcionadas para validar a nova função de impacto iminente—incluindo cenários em que múltiplos canhões convergem num mesmo alvo—ajustando pesos apenas se parasitas/voláteis perderem prioridade injustificadamente.【F:src/core/GameConstants.js†L1094-L1122】【F:src/modules/CombatSystem.js†L923-L945】
-2. Implementar testes automatizados cobrindo o reset de pesos e a distribuição de canhões após `progression-reset`, garantindo que o estado da bateria coordenada retorne ao baseline quando upgrades são removidos.【F:src/modules/CombatSystem.js†L600-L720】【F:src/modules/CombatSystem.js†L344-L447】
-3. Corrigir o bug do indicador preditivo garantindo que `player-died` limpe `predictedAimPoints` ou que `render` cheque o estado da nave antes de desenhar os círculos auxiliares; adicionar testes de regressão para travas visuais pós-morte.【F:src/modules/CombatSystem.js†L114-L327】【F:src/modules/CombatSystem.js†L1336-L1405】
-4. Avaliar mixagem de áudio e sobreposição visual com quatro canhões simultâneos, certificando-se de que os feixes concentrados não estouram ganho nem saturam a camada de disparo coordenado.【F:src/modules/AudioSystem.js†L93-L148】【F:src/modules/CombatSystem.js†L1336-L1405】
-5. Prototipar o cálculo dos offsets paralelos dos canhões coordenados e validar o comportamento em playtests, evitando empilhamento de projéteis tanto quando convergem num único alvo quanto quando distribuem quatro travas distintas.【F:src/modules/CombatSystem.js†L386-L522】【F:src/modules/CombatSystem.js†L1336-L1405】
