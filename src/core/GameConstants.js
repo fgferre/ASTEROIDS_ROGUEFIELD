@@ -1089,9 +1089,78 @@ export const COMBAT_TARGETING_RANGE = 400;
 export const COMBAT_BULLET_LIFETIME = 1.8;
 export const COMBAT_PREDICTION_TIME = 0.5;
 export const COMBAT_MULTISHOT_SPREAD_STEP = 0.3;
+export const TARGET_UPDATE_INTERVAL = 0.15;
+
+export const COMBAT_AIMING_UPGRADE_CONFIG = Object.freeze({
+  dangerWeights: {
+    behavior: {
+      parasite: 240,
+      volatile: 200,
+      default: 140,
+    },
+    variantOverrides: {
+      parasite: 240,
+      volatile: 200,
+      gold: 170,
+      crystal: 160,
+      denseCore: 150,
+      iron: 140,
+      common: 120,
+    },
+    reward: 30,
+    rewardNormalization: 20,
+    direction: 6,
+    directionBias: 0.12,
+    speed: 4,
+    speedReference: 180,
+    size: {
+      large: 3,
+      medium: 2,
+      small: 1,
+    },
+    distance: 0.75,
+    impact: {
+      distanceWeight: 18,
+      distanceNormalization: 150,
+      timeWeight: 12,
+      timeNormalization: 1.25,
+      hpWeight: 8,
+      hpNormalization: 180,
+      urgencyDistance: 12,
+      urgencyTime: 10,
+      hpUrgencyMultiplier: 1.1,
+      stackMultiplier: 1.35,
+      stackBase: 0.4,
+      minStackScore: 0.15,
+      maxRecommended: 4,
+    },
+  },
+  dynamicPrediction: {
+    minLeadTime: 0.05,
+    maxLeadTime: 1.1,
+    fallbackLeadTime: 0.35,
+  },
+  targetUpdateIntervals: {
+    base: TARGET_UPDATE_INTERVAL,
+    adaptive: 0.14,
+    dynamic: 0.12,
+    multiLock: 0.1,
+  },
+  multiLock: {
+    baseTargetCount: 4,
+    cooldownMultiplier: 0.92,
+    parallelSpacing: 14,
+    parallelRadiusMultiplier: 0.55,
+  },
+  feedback: {
+    lockPulseDuration: 0.4,
+    lockLineAlpha: 0.35,
+    lockHighlightAlpha: 0.75,
+    predictedMarkerRadius: 14,
+  },
+});
 
 // === SISTEMA DE ONDAS ===
-export const TARGET_UPDATE_INTERVAL = 0.15;
 export const ASTEROIDS_PER_WAVE_BASE = 4;
 export const ASTEROIDS_PER_WAVE_MULTIPLIER = 1.3;
 export const WAVE_DURATION = 60; // segundos

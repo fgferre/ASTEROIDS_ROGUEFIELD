@@ -99,8 +99,15 @@ class AudioSystem {
       }
     });
 
-    gameEvents.on('weapon-fired', () => {
-      this.playLaserShot();
+    gameEvents.on('weapon-fired', (data) => {
+      this.playLaserShot(data || {});
+    });
+
+    gameEvents.on('combat-target-lock', (data) => {
+      if (data?.lost) {
+        return;
+      }
+      this.playTargetLock(data || {});
     });
 
     gameEvents.on('enemy-destroyed', (data) => {
@@ -341,14 +348,64 @@ class AudioSystem {
     }
   }
 
-  playLaserShot() {
+  playLaserShot(options = {}) {
     this._trackPerformance('playLaserShot');
 
-    if (this._scheduleBatchedSound('playLaserShot', [], { allowOverlap: true, priority: 1 })) {
+    const params = this.normalizeLaserShotOptions(options);
+
+    if (
+      this._scheduleBatchedSound(
+        'playLaserShot',
+        [
+          Math.round(params.pitchMultiplier * 1000),
+          params.lockCount,
+        ],
+        { allowOverlap: true, priority: 1 }
+      )
+    ) {
       return;
     }
 
-    this._playLaserShotDirect();
+    this._playLaserShotDirect(params);
+  }
+
+  normalizeLaserShotOptions(options = {}) {
+    const targeting = options?.targeting || {};
+    const lockCount = Math.max(1, Math.floor(targeting.lockCount || 1));
+
+    let pitchMultiplier = 1;
+    if (targeting.dynamicPrediction) {
+      pitchMultiplier += 0.12;
+    }
+    if (lockCount > 1) {
+      pitchMultiplier += Math.min(0.18, 0.04 * (lockCount - 1));
+    }
+
+    const tailGain = 0.12 + Math.min(0.05, 0.02 * (lockCount - 1));
+
+    return {
+      pitchMultiplier,
+      tailGain,
+      lockCount,
+    };
+  }
+
+  playTargetLock(data = {}) {
+    this._trackPerformance('playTargetLock');
+
+    const lockCount = Math.max(1, Math.floor(data.lockCount || 1));
+
+    if (
+      this._scheduleBatchedSound(
+        'playTargetLock',
+        [lockCount],
+        { allowOverlap: false, priority: 2 }
+      )
+    ) {
+      return;
+    }
+
+    this._playTargetLockDirect({ lockCount });
   }
 
   playAsteroidBreak(size) {
@@ -445,7 +502,7 @@ class AudioSystem {
     return this.batcher.scheduleSound(soundType, params, options);
   }
 
-  _playLaserShotDirect() {
+  _playLaserShotDirect(params = {}) {
     this.safePlay(() => {
       const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
       const gain = this.pool ? this.pool.getGain() : this.context.createGain();
@@ -453,13 +510,23 @@ class AudioSystem {
       osc.connect(gain);
       this.connectGainNode(gain);
 
-      osc.frequency.setValueAtTime(800, this.context.currentTime);
+      const pitchMultiplier = Number.isFinite(params.pitchMultiplier)
+        ? Math.max(0.6, Math.min(1.6, params.pitchMultiplier))
+        : 1;
+      const tailGain = Number.isFinite(params.tailGain)
+        ? Math.min(0.22, Math.max(0.08, params.tailGain))
+        : 0.12;
+
+      const startFreq = Math.min(1150, 800 * pitchMultiplier);
+      const endFreq = Math.max(110, 150 * Math.max(0.7, pitchMultiplier * 0.9));
+
+      osc.frequency.setValueAtTime(startFreq, this.context.currentTime);
       osc.frequency.exponentialRampToValueAtTime(
-        150,
+        endFreq,
         this.context.currentTime + 0.08
       );
 
-      gain.gain.setValueAtTime(0.12, this.context.currentTime);
+      gain.gain.setValueAtTime(tailGain, this.context.currentTime);
       gain.gain.exponentialRampToValueAtTime(
         0.001,
         this.context.currentTime + 0.08
@@ -472,6 +539,38 @@ class AudioSystem {
         setTimeout(() => {
           this.pool.returnGain(gain);
         }, 90);
+      }
+    });
+  }
+
+  _playTargetLockDirect(params = {}) {
+    this.safePlay(() => {
+      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
+      const gain = this.pool ? this.pool.getGain() : this.context.createGain();
+
+      osc.connect(gain);
+      this.connectGainNode(gain);
+
+      const lockCount = Math.max(1, Math.floor(params.lockCount || 1));
+      const baseFrequency = 720;
+      const frequency = Math.min(1200, baseFrequency * (1 + (lockCount - 1) * 0.12));
+      const peakGain = 0.08 + Math.min(0.05, 0.018 * (lockCount - 1));
+      const now = this.context.currentTime;
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(frequency, now);
+      osc.frequency.linearRampToValueAtTime(frequency * 1.12, now + 0.1);
+
+      gain.gain.setValueAtTime(peakGain, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+
+      osc.start(now);
+      osc.stop(now + 0.14);
+
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(gain);
+        }, 150);
       }
     });
   }
@@ -547,6 +646,9 @@ class AudioSystem {
     switch (soundType) {
       case 'playLaserShot':
         this._playLaserShotDirect();
+        break;
+      case 'playTargetLock':
+        this._playTargetLockDirect({ lockCount: params?.[0] });
         break;
       case 'playAsteroidBreak':
         this._playAsteroidBreakDirect(params?.[0]);
