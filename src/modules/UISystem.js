@@ -654,6 +654,7 @@ class UISystem {
 
     this.currentHudLayoutId = resolvedId;
     this.hudLayout = getHudLayoutItems(resolvedId);
+    this.hudGroups.clear();
     this.setupHudLayout();
     this.updateHudLayoutClass(resolvedId);
     this.refreshHudFromServices(true);
