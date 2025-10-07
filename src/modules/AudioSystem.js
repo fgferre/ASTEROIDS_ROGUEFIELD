@@ -647,6 +647,9 @@ class AudioSystem {
       case 'playLaserShot':
         this._playLaserShotDirect();
         break;
+      case 'playTargetLock':
+        this._playTargetLockDirect({ lockCount: params?.[0] });
+        break;
       case 'playAsteroidBreak':
         this._playAsteroidBreakDirect(params?.[0]);
         break;
