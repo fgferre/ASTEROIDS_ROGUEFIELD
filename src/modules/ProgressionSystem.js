@@ -280,7 +280,20 @@ class ProgressionSystem {
     }
 
     const prerequisites = this.collectRawPrerequisites(definition);
-    return prerequisites.every((requirement) =>
+    const baseRequirementsMet = prerequisites.every((requirement) =>
+      this.evaluatePrerequisite(requirement)
+    );
+
+    if (!baseRequirementsMet) {
+      return false;
+    }
+
+    const levelRequirements = this.collectLevelPrerequisites(
+      definition,
+      currentLevel
+    );
+
+    return levelRequirements.every((requirement) =>
       this.evaluatePrerequisite(requirement)
     );
   }
@@ -313,6 +326,30 @@ class ProgressionSystem {
     });
 
     return result;
+  }
+
+  collectLevelPrerequisites(definition, levelIndex) {
+    if (!definition || typeof definition !== 'object') {
+      return [];
+    }
+
+    const nextLevelIndex = Number.isFinite(levelIndex)
+      ? Math.max(0, Math.floor(levelIndex))
+      : 0;
+    const levels = asArray(definition.levels);
+
+    if (nextLevelIndex >= levels.length) {
+      return [];
+    }
+
+    const levelDefinition = levels[nextLevelIndex];
+    if (!levelDefinition || !Array.isArray(levelDefinition.prerequisites)) {
+      return [];
+    }
+
+    return levelDefinition.prerequisites
+      .map((entry) => this.normalizePrerequisite(entry))
+      .filter(Boolean);
   }
 
   normalizePrerequisite(prerequisite) {
@@ -454,6 +491,33 @@ class ProgressionSystem {
     return entries;
   }
 
+  describeLevelPrerequisites(definition, levelIndex) {
+    const entries = [];
+    if (!definition) {
+      return entries;
+    }
+
+    const levelRequirements = this.collectLevelPrerequisites(
+      definition,
+      levelIndex
+    );
+
+    levelRequirements.forEach((entry) => {
+      const label =
+        entry.text && entry.text.length
+          ? entry.text
+          : this.generatePrerequisiteLabel(entry);
+      entries.push({
+        ...entry,
+        label,
+        description: label,
+        met: this.evaluatePrerequisite(entry),
+      });
+    });
+
+    return entries;
+  }
+
   buildUpgradeOption(definition) {
     if (!definition || typeof definition !== 'object') {
       return null;
@@ -468,6 +532,12 @@ class ProgressionSystem {
     const hasNextLevel = currentLevel < maxLevel;
     const nextLevelDefinition = hasNextLevel ? levels[currentLevel] : null;
     const nextLevelText = hasNextLevel ? levelTexts[currentLevel] || {} : null;
+
+    const globalPrereqs = this.describePrerequisites(definition);
+    const levelPrereqs = this.describeLevelPrerequisites(
+      definition,
+      currentLevel
+    );
 
     return {
       id: definition.id,
@@ -498,7 +568,7 @@ class ProgressionSystem {
             ).filter(Boolean),
           }
         : null,
-      prerequisites: this.describePrerequisites(definition),
+      prerequisites: [...globalPrereqs, ...levelPrereqs],
     };
   }
 
@@ -588,6 +658,8 @@ class ProgressionSystem {
         })
         .filter(Boolean);
 
+      const prerequisites = asArray(level?.prerequisites);
+
       return {
         rank,
         title: level?.title || '',
@@ -596,6 +668,7 @@ class ProgressionSystem {
           .map((item) => (typeof item === 'string' ? item : `${item}`))
           .filter(Boolean),
         effects,
+        prerequisites,
       };
     });
 
