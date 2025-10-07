@@ -1,6 +1,11 @@
 // src/modules/UISystem.js
 
-import HUD_LAYOUT from '../data/ui/hudLayout.js';
+import {
+  DEFAULT_HUD_LAYOUT_ID,
+  HUD_LAYOUT_OPTIONS,
+  getHudLayoutDefinition,
+  getHudLayoutItems,
+} from '../data/ui/hudLayout.js';
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
@@ -34,7 +39,14 @@ class UISystem {
     this.numberFormatter = this.createNumberFormatter('standard');
     this.compactNumberFormatter = this.createNumberFormatter('compact');
 
-    this.hudLayout = Array.isArray(HUD_LAYOUT) ? HUD_LAYOUT : [];
+    this.availableHudLayoutIds =
+      Array.isArray(HUD_LAYOUT_OPTIONS) && HUD_LAYOUT_OPTIONS.length > 0
+        ? HUD_LAYOUT_OPTIONS.map((option) => option.value)
+        : [DEFAULT_HUD_LAYOUT_ID];
+
+    const defaultLayout = getHudLayoutDefinition(DEFAULT_HUD_LAYOUT_ID);
+    this.currentHudLayoutId = defaultLayout?.id || DEFAULT_HUD_LAYOUT_ID;
+    this.hudLayout = getHudLayoutItems(this.currentHudLayoutId);
     this.hudElements = new Map();
     this.hudGroups = new Map();
     this.cachedValues = {
@@ -99,6 +111,7 @@ class UISystem {
 
     this.domRefs = this.cacheStaticNodes();
     this.setupHudLayout();
+    this.updateHudLayoutClass(this.currentHudLayoutId);
     this.setupEventListeners();
     this.bootstrapHudValues();
     this.bindPauseControls();
@@ -593,13 +606,19 @@ class UISystem {
     };
 
     // Clear known regions (safe: only clears dynamic items, not wave/xp panels)
-    ['#hud-region-top-left', '#hud-region-top-middle', '#hud-region-top-right']
-      .forEach((sel) => {
-        const region = root.querySelector(sel);
-        if (region) {
-          region.innerHTML = '';
-        }
-      });
+    [
+      '#hud-region-top-left',
+      '#hud-region-top-middle',
+      '#hud-region-top-right',
+      '#hud-region-bottom-left',
+      '#hud-region-bottom-center',
+      '#hud-region-bottom-right',
+    ].forEach((sel) => {
+      const region = root.querySelector(sel);
+      if (region) {
+        region.innerHTML = '';
+      }
+    });
 
     this.hudLayout.forEach((itemConfig) => {
       const element = this.createHudItem(itemConfig);
@@ -615,6 +634,48 @@ class UISystem {
     });
 
     this.refreshWaveDomRefs();
+  }
+
+  applyHudLayoutPreference(layoutId) {
+    const definition = getHudLayoutDefinition(layoutId);
+    const resolvedId = definition?.id || DEFAULT_HUD_LAYOUT_ID;
+    this.setHudLayout(resolvedId);
+  }
+
+  setHudLayout(layoutId, options = {}) {
+    const definition = getHudLayoutDefinition(layoutId);
+    const resolvedId = definition?.id || DEFAULT_HUD_LAYOUT_ID;
+    const force = Boolean(options.force);
+
+    if (!force && resolvedId === this.currentHudLayoutId) {
+      this.updateHudLayoutClass(resolvedId);
+      return;
+    }
+
+    this.currentHudLayoutId = resolvedId;
+    this.hudLayout = getHudLayoutItems(resolvedId);
+    this.hudGroups.clear();
+    this.setupHudLayout();
+    this.updateHudLayoutClass(resolvedId);
+    this.refreshHudFromServices(true);
+  }
+
+  updateHudLayoutClass(layoutId) {
+    const body = document.body;
+    if (body) {
+      if (!this.availableHudLayoutIds.includes(layoutId)) {
+        this.availableHudLayoutIds.push(layoutId);
+      }
+      this.availableHudLayoutIds.forEach((id) => {
+        const className = `hud-layout-${id}`;
+        body.classList.toggle(className, id === layoutId);
+      });
+    }
+
+    const hudRoot = this.domRefs.root;
+    if (hudRoot) {
+      hudRoot.dataset.hudLayout = layoutId;
+    }
   }
 
   createHudItem(config) {
@@ -1205,6 +1266,14 @@ class UISystem {
       body.classList.toggle('damage-flash-disabled', !damageFlashEnabled);
       body.classList.toggle('particles-reduced', reducedParticles);
     }
+
+    const layoutPreference =
+      (typeof derived?.hudLayout === 'string' && derived.hudLayout) ||
+      (typeof values.hudLayout === 'string' && values.hudLayout) ||
+      this.currentHudLayoutId ||
+      DEFAULT_HUD_LAYOUT_ID;
+
+    this.applyHudLayoutPreference(layoutPreference);
   }
 
   deriveVisualPreferences(accessibility = {}, video = {}) {
@@ -1216,6 +1285,10 @@ class UISystem {
       : 1;
     const damageFlash = video.damageFlash !== false;
     const reducedParticles = Boolean(video.reducedParticles);
+    const hudLayout =
+      typeof video.hudLayout === 'string' && video.hudLayout
+        ? video.hudLayout
+        : DEFAULT_HUD_LAYOUT_ID;
 
     return {
       contrast: highContrast ? 'high' : 'normal',
@@ -1224,6 +1297,7 @@ class UISystem {
       hudScale,
       damageFlash,
       reducedParticles,
+      hudLayout,
     };
   }
 
@@ -1241,7 +1315,9 @@ class UISystem {
 
   handleSettingsInputChange(event) {
     const target = event.target;
-    if (!(target instanceof HTMLInputElement)) {
+    const isInput = target instanceof HTMLInputElement;
+    const isSelect = target instanceof HTMLSelectElement;
+    if (!isInput && !isSelect) {
       return;
     }
 
@@ -1254,19 +1330,26 @@ class UISystem {
 
     const field = this.getFieldDefinition(categoryId, fieldKey);
 
-    if (target.type === 'checkbox') {
+    if (isInput && target.type === 'checkbox') {
       this.settings.setSetting(categoryId, fieldKey, target.checked, {
         source: 'ui',
       });
       return;
     }
 
-    if (target.type === 'range') {
+    if (isInput && target.type === 'range') {
       const value = Number(target.value);
       if (Number.isFinite(value)) {
         this.settings.setSetting(categoryId, fieldKey, value, { source: 'ui' });
         this.updateRangeDisplay(fieldKey, field, value);
       }
+      return;
+    }
+
+    if (isSelect) {
+      this.settings.setSetting(categoryId, fieldKey, target.value, {
+        source: 'ui',
+      });
     }
   }
 
@@ -1437,6 +1520,8 @@ class UISystem {
         return this.renderToggleField(categoryId, field, value);
       case 'range':
         return this.renderRangeField(categoryId, field, value);
+      case 'select':
+        return this.renderSelectField(categoryId, field, value);
       case 'binding':
         return this.renderBindingField(categoryId, field, value);
       default: {
@@ -1524,6 +1609,66 @@ class UISystem {
     slider.dataset.settingCategory = categoryId;
     slider.className = 'settings-range-input';
     wrapper.appendChild(slider);
+
+    if (field.description) {
+      const description = document.createElement('p');
+      description.className = 'settings-field__description';
+      description.textContent = field.description;
+      wrapper.appendChild(description);
+    }
+
+    return wrapper;
+  }
+
+  renderSelectField(categoryId, field, value) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'settings-field settings-field--select';
+    wrapper.dataset.settingKey = field.key;
+    wrapper.dataset.settingCategory = categoryId;
+
+    const label = document.createElement('label');
+    const selectId = `setting-${categoryId}-${field.key}`;
+    label.className = 'settings-field__label';
+    label.setAttribute('for', selectId);
+    label.textContent = field.label || field.key;
+    wrapper.appendChild(label);
+
+    const select = document.createElement('select');
+    select.id = selectId;
+    select.className = 'settings-select-input';
+    select.dataset.settingKey = field.key;
+    select.dataset.settingCategory = categoryId;
+
+    const options = ensureArray(field.options);
+    const optionLabels =
+      (field.optionLabels && typeof field.optionLabels === 'object'
+        ? field.optionLabels
+        : {}) || {};
+
+    options.forEach((optionValue) => {
+      const optionElement = document.createElement('option');
+      optionElement.value = optionValue;
+      optionElement.textContent =
+        optionLabels[optionValue] ?? String(optionValue);
+      select.appendChild(optionElement);
+    });
+
+    const defaultValue =
+      typeof value === 'string' && value
+        ? value
+        : typeof field.default === 'string'
+          ? field.default
+          : options[0];
+
+    if (defaultValue !== undefined && defaultValue !== null) {
+      select.value = defaultValue;
+    }
+
+    if (options.length === 0) {
+      select.disabled = true;
+    }
+
+    wrapper.appendChild(select);
 
     if (field.description) {
       const description = document.createElement('p');

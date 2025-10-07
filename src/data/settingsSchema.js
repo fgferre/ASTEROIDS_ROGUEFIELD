@@ -1,5 +1,11 @@
 // src/data/settingsSchema.js
 
+import {
+  DEFAULT_HUD_LAYOUT_ID,
+  HUD_LAYOUT_OPTIONS,
+  HUD_LAYOUT_OPTION_LABELS,
+} from './ui/hudLayout.js';
+
 const DEFAULT_BINDING_METADATA = {
   keyboard: {
     max: 2,
@@ -226,6 +232,16 @@ const SETTINGS_SCHEMA = [
         min: 0.8,
         max: 1.3,
         step: 0.05,
+      },
+      {
+        key: 'hudLayout',
+        type: 'select',
+        label: 'Layout do HUD',
+        description:
+          'Alterne entre o visual clássico e o HUD tático minimalista.',
+        default: DEFAULT_HUD_LAYOUT_ID,
+        options: HUD_LAYOUT_OPTIONS.map((option) => option.value),
+        optionLabels: HUD_LAYOUT_OPTION_LABELS,
       },
       {
         key: 'screenShakeIntensity',

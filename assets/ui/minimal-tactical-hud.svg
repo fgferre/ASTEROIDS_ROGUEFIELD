@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <linearGradient id="hud-bg" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#0a1524" stop-opacity="0.88" />
+      <stop offset="100%" stop-color="#08101c" stop-opacity="0.78" />
+    </linearGradient>
+    <linearGradient id="health-bar" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0%" stop-color="#ff6f91" />
+      <stop offset="100%" stop-color="#ff3f6a" />
+    </linearGradient>
+    <linearGradient id="shield-bar" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0%" stop-color="#5ec8ff" />
+      <stop offset="100%" stop-color="#8bf1ff" />
+    </linearGradient>
+    <linearGradient id="xp-bar" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0%" stop-color="#4cf1ba" />
+      <stop offset="100%" stop-color="#39aef3" />
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="720" fill="#04080f" />
+
+  <g transform="translate(160 80)">
+    <rect x="0" y="0" width="960" height="72" rx="18" fill="url(#hud-bg)" stroke="#00aaff" stroke-opacity="0.35" stroke-width="2" />
+
+    <g transform="translate(32 18)" font-family="Orbitron, 'Inter', sans-serif" font-size="24" fill="#f5faff">
+      <text x="0" y="22">❤️ 120/150</text>
+      <rect x="220" y="6" width="160" height="10" rx="5" fill="#0d2233" />
+      <rect x="220" y="6" width="120" height="10" rx="5" fill="url(#health-bar)" />
+
+      <text x="420" y="22">💠 3</text>
+      <rect x="500" y="6" width="120" height="10" rx="5" fill="#0d2233" />
+      <rect x="500" y="6" width="80" height="10" rx="5" fill="url(#shield-bar)" />
+
+      <text x="660" y="22">⭐ LV 07</text>
+
+      <text x="760" y="22">🎯 042</text>
+      <text x="880" y="22">⏱ 07:45</text>
+    </g>
+  </g>
+
+  <g transform="translate(320 520)">
+    <rect x="0" y="0" width="640" height="56" rx="16" fill="url(#hud-bg)" stroke="#00aaff" stroke-opacity="0.35" stroke-width="2" />
+    <text x="32" y="35" font-family="Orbitron, 'Inter', sans-serif" font-size="22" fill="#6fe9ff">XP</text>
+    <rect x="92" y="20" width="360" height="12" rx="6" fill="#0d2233" />
+    <rect x="92" y="20" width="270" height="12" rx="6" fill="url(#xp-bar)" />
+    <text x="472" y="35" font-family="Orbitron, 'Inter', sans-serif" font-size="22" fill="#f5faff" text-anchor="end">2 480 / 3 200</text>
+  </g>
+
+  <g transform="translate(220 600)">
+    <rect x="0" y="0" width="320" height="48" rx="14" fill="url(#hud-bg)" stroke="#00aaff" stroke-opacity="0.35" stroke-width="2" />
+    <text x="24" y="30" font-family="Orbitron, 'Inter', sans-serif" font-size="22" fill="#6fe9ff">Setor 3</text>
+    <rect x="150" y="20" width="120" height="8" rx="4" fill="#0d2233" />
+    <rect x="150" y="20" width="90" height="8" rx="4" fill="url(#xp-bar)" />
+    <text x="280" y="30" font-family="Orbitron, 'Inter', sans-serif" font-size="20" fill="#f5faff" text-anchor="end">12 / 18</text>
+  </g>
+</svg>
