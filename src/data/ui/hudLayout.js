@@ -9,8 +9,13 @@ const CLASSIC_LAYOUT_ITEMS = [
     layout: 'inline-progress',
     description: 'Current and maximum ship health',
     icon: {
-      type: 'text',
-      value: '❤️',
+      type: 'svg',
+      viewBox: '0 0 24 24',
+      paths: [
+        {
+          d: 'M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z',
+        },
+      ],
     },
     rootId: 'hud-health',
     valueId: 'health-display',
@@ -28,8 +33,13 @@ const CLASSIC_LAYOUT_ITEMS = [
     layout: 'inline-progress',
     description: 'Deflector shield status',
     icon: {
-      type: 'text',
-      value: '💠',
+      type: 'svg',
+      viewBox: '0 0 24 24',
+      paths: [
+        {
+          d: 'M 12 2 C 6.48 2 2 6.48 2 12 V 22 L 12 18 L 22 22 V 12 C 22 6.48 17.52 2 12 2 Z',
+        },
+      ],
     },
     rootId: 'shield-status',
     valueId: 'shield-hit-count',
@@ -45,8 +55,9 @@ const CLASSIC_LAYOUT_ITEMS = [
     layout: 'inline-progress',
     description: 'Experience towards the next level',
     icon: {
-      type: 'text',
-      value: '⚡',
+      type: 'svg',
+      viewBox: '0 0 24 24',
+      paths: [{ d: 'M6 15l6 -6l6 6' }],
     },
     metaPosition: 'after-value',
     meta: {
@@ -104,16 +115,10 @@ const CLASSIC_LAYOUT_ITEMS = [
     description: 'Total asteroids destroyed in session',
     icon: {
       type: 'svg',
-      viewBox: '0 0 32 32',
+      viewBox: '0 0 24 24',
       paths: [
-        {
-          d: 'M12.2 4.5 5.7 12.3 4 21.9l6.4 5.6h10.5l5.8-8.4-1.7-10.4L18 4.5z',
-          fill: 'currentColor',
-        },
-        {
-          d: 'M13.6 8.2 9.1 14.1l-.8 5.8 3.7 3.2h7.6l4.2-6.1-1.2-7.2-4.8-2.7z',
-          fill: 'rgba(255, 255, 255, 0.45)',
-        },
+        { d: 'M 5 12 L 19 12', 'stroke-width': '2', 'stroke-linecap': 'round' },
+        { d: 'M 12 5 L 12 19', 'stroke-width': '2', 'stroke-linecap': 'round' },
       ],
     },
     rootId: 'hud-kills',
@@ -124,7 +129,8 @@ const CLASSIC_LAYOUT_ITEMS = [
   {
     key: 'time',
     type: 'stat',
-    position: 'top-right',
+    position: 'top-left',
+    group: 'wave-status',
     label: 'Time',
     description: 'Total survival time in current session',
     icon: {
@@ -155,8 +161,13 @@ const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
     layout: 'inline-progress',
     description: 'Current and maximum ship health',
     icon: {
-      type: 'text',
-      value: '❤️',
+      type: 'svg',
+      viewBox: '0 0 24 24',
+      paths: [
+        {
+          d: 'M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z',
+        },
+      ],
     },
     rootId: 'hud-health',
     valueId: 'health-display',
@@ -174,8 +185,13 @@ const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
     layout: 'inline-progress',
     description: 'Deflector shield status',
     icon: {
-      type: 'text',
-      value: '💠',
+      type: 'svg',
+      viewBox: '0 0 24 24',
+      paths: [
+        {
+          d: 'M 12 2 C 6.48 2 2 6.48 2 12 V 22 L 12 18 L 22 22 V 12 C 22 6.48 17.52 2 12 2 Z',
+        },
+      ],
     },
     rootId: 'shield-status',
     valueId: 'shield-hit-count',
@@ -192,16 +208,10 @@ const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
     description: 'Total asteroids destroyed in session',
     icon: {
       type: 'svg',
-      viewBox: '0 0 32 32',
+      viewBox: '0 0 24 24',
       paths: [
-        {
-          d: 'M12.2 4.5 5.7 12.3 4 21.9l6.4 5.6h10.5l5.8-8.4-1.7-10.4L18 4.5z',
-          fill: 'currentColor',
-        },
-        {
-          d: 'M13.6 8.2 9.1 14.1l-.8 5.8 3.7 3.2h7.6l4.2-6.1-1.2-7.2-4.8-2.7z',
-          fill: 'rgba(255, 255, 255, 0.45)',
-        },
+        { d: 'M 5 12 L 19 12', 'stroke-width': '2', 'stroke-linecap': 'round' },
+        { d: 'M 12 5 L 12 19', 'stroke-width': '2', 'stroke-linecap': 'round' },
       ],
     },
     rootId: 'hud-kills',
@@ -240,8 +250,9 @@ const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
     layout: 'inline-progress',
     description: 'Experience towards the next level',
     icon: {
-      type: 'text',
-      value: '⚡',
+      type: 'svg',
+      viewBox: '0 0 24 24',
+      paths: [{ d: 'M6 15l6 -6l6 6' }],
     },
     leading: {
       id: 'xp-label',

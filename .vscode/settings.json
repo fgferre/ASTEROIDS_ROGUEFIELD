@@ -1,5 +1,6 @@
 {
   "git.allowForcePush": true,
   "git.useForcePushWithLease": false,
-  "CodeGPT.apiKey": "LM Studio"
+  "CodeGPT.apiKey": "LM Studio",
+  "chatgpt.openOnStartup": true
 }

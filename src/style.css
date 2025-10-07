@@ -3719,3 +3719,65 @@ body.particles-reduced #game-canvas {
 #hud-wave .wave-progress {
   margin-top: var(--space-8);
 }
+
+/* --- HUD IMPROVEMENTS --- */
+
+/* 1. Universal Improvements */
+
+/* Numeric Stability: Prevent layout shifts when numbers change width */
+.hud-item__value-number {
+  min-width: 3ch;
+  text-align: right;
+  /* Adding a subtle shadow for readability */
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+/* Ensure all icons have a consistent size and drop shadow for pop */
+.hud-item__icon svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 0 8px rgba(118, 200, 255, 0.4));
+}
+
+
+/* 2. Overlap Prevention */
+
+/* Increase vertical gap between HUD regions */
+.hud {
+  gap: clamp(1.25rem, 2vh, 1.5rem);
+}
+
+/* Add a minimum height to the game container to prevent vertical collapse */
+#game-container {
+  min-height: 350px;
+}
+
+
+/* 3. Classic Layout Improvements */
+
+/* Add separation between status and wave groups */
+.hud-layout-classic .hud-group--status-progress {
+  margin-bottom: var(--space-12);
+  padding-bottom: var(--space-12);
+  border-bottom: 1px solid rgba(110, 160, 255, 0.18);
+}
+
+/* Narrow screen robustness for Classic Layout */
+@media (max-width: 600px) {
+  .hud-layout-classic .hud-item--progress,
+  .hud-layout-classic .hud-item--inline-value {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+}
+
+
+/* 4. Minimal-Tactical Layout Improvements */
+
+/* Ensure uniform progress bars at the bottom */
+.hud-layout-minimal #hud-region-bottom-center {
+  display: grid;
+  grid-template-columns: 1fr;
+  width: clamp(28rem, 50vw, 42rem);
+}
