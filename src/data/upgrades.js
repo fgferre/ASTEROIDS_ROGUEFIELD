@@ -484,6 +484,100 @@ const UPGRADE_LIBRARY = [
     ],
   },
   {
+    id: 'targeting_suite',
+    category: 'offense',
+    icon: '🎯',
+    themeColor: '#FFD166',
+    unlockLevel: 3,
+    tags: ['mira', 'tático', 'armamento'],
+    text: {
+      name: 'Matriz de Mira',
+      summary:
+        'Implanta heurísticas de combate que priorizam ameaças críticas e refinam a predição de disparos.',
+      lore: 'Firmware experimental extraído de drones de escolta, calibrado para leitura instantânea de perigo em cenários caóticos.',
+      levels: [
+        {
+          title: 'Aquisição Adaptativa',
+          description:
+            'Ativa uma matriz de periculosidade que privilegia variantes perseguidoras e explosivas antes de qualquer outra ameaça.',
+          highlights: [
+            'Classifica os inimigos por comportamento, recompensa e direção relativa ao jogador.',
+            'Linha de mira pulsa ao fixar um novo alvo prioritário.',
+          ],
+        },
+        {
+          title: 'Predição Dinâmica',
+          description:
+            'Calcula interceptações com base na velocidade real do projétil, reduzindo erros em alvos rápidos.',
+          highlights: [
+            'Marca visualmente o ponto previsto de impacto.',
+            'Modula levemente o timbre do disparo para indicar a predição avançada.',
+          ],
+        },
+        {
+          title: 'Travas Coordenadas',
+          description:
+            'Sincroniza múltiplos alvos quando multishot está ativo, dividindo a rajada entre ameaças distintas.',
+          highlights: [
+            'Disponível apenas com Tiro Múltiplo instalado (Nv. 1+).',
+            'Reduz ligeiramente o intervalo entre rajadas ao coordenar travas.',
+          ],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-aiming-suite',
+            payload: {
+              resetWeights: true,
+            },
+          },
+        ],
+      },
+      {
+        rank: 2,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-aiming-suite',
+            payload: {
+              dynamicPrediction: {
+                minLeadTime: 0.05,
+                maxLeadTime: 1,
+                fallbackLeadTime: 0.32,
+              },
+            },
+          },
+        ],
+      },
+      {
+        rank: 3,
+        prerequisites: [
+          {
+            type: 'upgrade',
+            id: 'multishot',
+            level: 1,
+            text: 'Requer Tiro Múltiplo instalado (Nv. 1).',
+          },
+        ],
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-aiming-suite',
+            payload: {
+              multiLockTargets: 2,
+              cooldownMultiplier: 0.92,
+            },
+          },
+        ],
+      },
+    ],
+  },
+  {
     id: 'magfield',
     category: 'utility',
     icon: '🧲',
