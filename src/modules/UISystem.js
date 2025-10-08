@@ -959,6 +959,7 @@ class UISystem {
     const waveRefs = this.domRefs.wave || {};
 
     const container = document.getElementById('hud-wave');
+    const waveLabel = document.getElementById('wave-label');
     const waveNumber = document.getElementById('wave-number');
     const progressTrack = document.getElementById('wave-progress');
     const progressBar = document.getElementById('wave-progress-bar');
@@ -968,6 +969,7 @@ class UISystem {
     this.domRefs.wave = {
       ...waveRefs,
       container: container || null,
+      waveLabel: waveLabel || null,
       waveNumber: waveNumber || null,
       progressTrack: progressTrack || null,
       progressBar: progressBar || null,
@@ -2270,10 +2272,6 @@ class UISystem {
     if (shouldUpdateWidth) {
       entry.barFill.style.width = `${percentage * 100}%`;
       this.cachedValues.xp.percentage = percentage;
-
-      entry.barFill.classList.remove('is-pulsing');
-      void entry.barFill.offsetWidth;
-      entry.barFill.classList.add('is-pulsing');
     }
 
     entry.bar.setAttribute('aria-valuenow', `${Math.round(percentage * 100)}`);
@@ -2312,10 +2310,13 @@ class UISystem {
       if (entry.meta) {
         entry.meta.textContent = `Lv ${level}`;
       }
+    }
 
-      entry.value.classList.remove('is-pulsing');
-      void entry.value.offsetWidth;
-      entry.value.classList.add('is-pulsing');
+    if (entry.leading) {
+      const leadingLabel = `XP / Lvl ${level}`;
+      if (entry.leading.textContent !== leadingLabel) {
+        entry.leading.textContent = leadingLabel;
+      }
     }
 
     if (entry.meta && this.cachedValues.level !== level) {
@@ -2472,20 +2473,22 @@ class UISystem {
       return;
     }
 
-    if (waveRefs.waveNumber) {
-      const numberText = `Wave ${normalized.current}`;
-      const newLabelLength = numberText.length;
+    const numberText = `WAVE ${normalized.current}`;
+    let newLabelLength = numberText.length;
 
-      if (waveRefs.waveNumber.textContent !== numberText) {
-        waveRefs.waveNumber.textContent = numberText;
-      }
-
-      if (newLabelLength > previousLabelLength) {
-        layoutNeedsUpdate = true;
-      }
-
-      nextLabelLength = newLabelLength;
+    if (waveRefs.waveLabel && waveRefs.waveLabel.textContent !== numberText) {
+      waveRefs.waveLabel.textContent = numberText;
     }
+
+    if (waveRefs.waveNumber && waveRefs.waveNumber.textContent !== numberText) {
+      waveRefs.waveNumber.textContent = numberText;
+    }
+
+    if (newLabelLength > previousLabelLength) {
+      layoutNeedsUpdate = true;
+    }
+
+    nextLabelLength = newLabelLength;
 
     if (waveRefs.timerValue) {
       if (normalized.isActive) {
