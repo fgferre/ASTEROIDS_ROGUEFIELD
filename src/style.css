@@ -2693,7 +2693,7 @@ body.hud-layout-minimal .hud-region--top-middle {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: stretch;
   justify-content: center;
-  gap: clamp(1rem, 2.8vw, 2.5rem);
+  gap: clamp(0.75rem, 2.1vw, 1.8rem);
   width: clamp(30rem, 70vw, 46rem);
   padding: 0 var(--space-12);
 }
@@ -2714,7 +2714,7 @@ body.hud-layout-minimal .hud-group--tactical-vitals {
     minmax(clamp(9rem, 14vw, 12rem), 1fr)
   );
   align-items: center;
-  gap: clamp(0.75rem, 1.6vw, 1.35rem);
+  gap: clamp(0.5rem, 1vw, 1rem);
 }
 
 body.hud-layout-minimal .hud-group--tactical-session {
@@ -2723,7 +2723,7 @@ body.hud-layout-minimal .hud-group--tactical-session {
   grid-auto-columns: minmax(clamp(4.75rem, 7vw, 6.4rem), auto);
   align-items: center;
   justify-content: end;
-  gap: clamp(0.75rem, 1.6vw, 1.35rem);
+  gap: clamp(0.55rem, 1.2vw, 1.05rem);
 }
 
 body.hud-layout-minimal .hud-group--tactical-vitals .hud-item,
@@ -2733,7 +2733,7 @@ body.hud-layout-minimal .hud-group--tactical-session .hud-item {
   border: none !important;
   box-shadow: none !important;
   min-width: 0;
-  gap: clamp(0.38rem, 0.7vw, 0.6rem) !important;
+  gap: clamp(0.28rem, 0.55vw, 0.52rem) !important;
 }
 
 body.hud-layout-minimal .hud-group--tactical-vitals .hud-item--progress {
@@ -2791,9 +2791,9 @@ body.hud-layout-minimal .hud-region--bottom-center {
   width: clamp(30rem, 64vw, 46rem);
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-  align-items: end;
+  align-items: center;
   justify-items: stretch;
-  gap: clamp(0.9rem, 1.8vw, 1.6rem);
+  gap: clamp(0.7rem, 1.4vw, 1.25rem);
 }
 
 body.hud-layout-minimal .hud-region--bottom-center .hud-item {
@@ -2802,13 +2802,14 @@ body.hud-layout-minimal .hud-region--bottom-center .hud-item {
   background: none !important;
   border: none !important;
   box-shadow: none !important;
+  align-items: center;
 }
 
 body.hud-layout-minimal .hud-item--xp,
 body.hud-layout-minimal #hud-wave {
   display: flex;
   align-items: center;
-  gap: clamp(0.65rem, 1.1vw, 1.25rem);
+  gap: clamp(0.4rem, 0.75vw, 0.9rem);
 }
 
 body.hud-layout-minimal .hud-item--xp .hud-item__leading,
@@ -2824,7 +2825,7 @@ body.hud-layout-minimal #hud-wave .hud-progress {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: clamp(0.42rem, 0.68vw, 0.75rem);
+  gap: clamp(0.28rem, 0.5vw, 0.58rem);
 }
 
 body.hud-layout-minimal .hud-item--xp .hud-progress__track,
@@ -2861,14 +2862,13 @@ body.hud-layout-minimal #hud-wave .hud-item__meta {
 body.hud-layout-minimal .hud-item--xp .hud-progress__meta {
   display: inline-flex;
   align-items: baseline;
-  gap: var(--space-4);
+  gap: clamp(0.18rem, 0.32vw, 0.36rem);
   font-weight: var(--font-weight-semibold);
+  margin-left: clamp(0.14rem, 0.22vw, 0.28rem);
 }
 
 body.hud-layout-minimal #hud-wave .hud-item__meta {
-  margin-left: clamp(0.55rem, 1vw, 0.95rem);
-  flex-shrink: 0;
-  white-space: nowrap;
+  display: none;
 }
 
 @media (max-width: 860px) {

@@ -959,6 +959,7 @@ class UISystem {
     const waveRefs = this.domRefs.wave || {};
 
     const container = document.getElementById('hud-wave');
+    const waveLabel = document.getElementById('wave-label');
     const waveNumber = document.getElementById('wave-number');
     const progressTrack = document.getElementById('wave-progress');
     const progressBar = document.getElementById('wave-progress-bar');
@@ -968,6 +969,7 @@ class UISystem {
     this.domRefs.wave = {
       ...waveRefs,
       container: container || null,
+      waveLabel: waveLabel || null,
       waveNumber: waveNumber || null,
       progressTrack: progressTrack || null,
       progressBar: progressBar || null,
@@ -2472,20 +2474,22 @@ class UISystem {
       return;
     }
 
-    if (waveRefs.waveNumber) {
-      const numberText = `Wave ${normalized.current}`;
-      const newLabelLength = numberText.length;
+    const numberText = `WAVE ${normalized.current}`;
+    let newLabelLength = numberText.length;
 
-      if (waveRefs.waveNumber.textContent !== numberText) {
-        waveRefs.waveNumber.textContent = numberText;
-      }
-
-      if (newLabelLength > previousLabelLength) {
-        layoutNeedsUpdate = true;
-      }
-
-      nextLabelLength = newLabelLength;
+    if (waveRefs.waveLabel && waveRefs.waveLabel.textContent !== numberText) {
+      waveRefs.waveLabel.textContent = numberText;
     }
+
+    if (waveRefs.waveNumber && waveRefs.waveNumber.textContent !== numberText) {
+      waveRefs.waveNumber.textContent = numberText;
+    }
+
+    if (newLabelLength > previousLabelLength) {
+      layoutNeedsUpdate = true;
+    }
+
+    nextLabelLength = newLabelLength;
 
     if (waveRefs.timerValue) {
       if (normalized.isActive) {

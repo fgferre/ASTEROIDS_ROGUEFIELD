@@ -268,7 +268,7 @@ const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
     description: 'Current wave progress',
     leading: {
       id: 'wave-label',
-      initialValue: 'Setor',
+      initialValue: 'WAVE 1',
       classes: ['hud-item__leading--wave'],
     },
     icon: {
