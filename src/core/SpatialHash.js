@@ -219,6 +219,7 @@ export class SpatialHash {
    * @returns {Array<Object>} Array of nearby objects
    */
   query(x, y, radius, options = {}) {
+    const { filter, maxResults, sorted = true } = options;
     const bounds = this.calculateBounds(x, y, radius);
     const cells = this.getCellsForBounds(bounds);
     const results = new Map();
@@ -237,7 +238,7 @@ export class SpatialHash {
         this.stats.objectChecks++;
 
         // Apply filter if provided
-        if (options.filter && !options.filter(object)) {
+        if (filter && !filter(object)) {
           continue;
         }
 
@@ -252,15 +253,20 @@ export class SpatialHash {
       }
     }
 
-    const sortedResults = Array.from(results.entries())
-      .sort((a, b) => a[1] - b[1])
-      .map(([object]) => object);
-
-    if (options.maxResults) {
-      return sortedResults.slice(0, options.maxResults);
+    if (!sorted && !maxResults) {
+      return Array.from(results.keys());
     }
 
-    return sortedResults;
+    const sortedEntries = Array.from(results.entries())
+      .sort((a, b) => a[1] - b[1]);
+
+    const objects = sortedEntries.map(([object]) => object);
+
+    if (maxResults) {
+      return objects.slice(0, maxResults);
+    }
+
+    return objects;
   }
 
   /**

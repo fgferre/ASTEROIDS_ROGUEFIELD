@@ -91,6 +91,7 @@ class CombatSystem {
     this.cachedPlayer = null;
     this.cachedEnemies = null;
     this.cachedPhysics = null;
+    this.bulletGlowCache = null;
 
     // Registrar no ServiceLocator
     if (typeof gameServices !== 'undefined') {
@@ -1867,6 +1868,62 @@ class CombatSystem {
     return this.bullets.length;
   }
 
+  ensureBulletGlowCache() {
+    const glowRadius = (CONSTANTS.BULLET_SIZE || 0) * 3;
+
+    if (!Number.isFinite(glowRadius) || glowRadius <= 0) {
+      this.bulletGlowCache = null;
+      return null;
+    }
+
+    if (
+      this.bulletGlowCache &&
+      this.bulletGlowCache.radius === glowRadius &&
+      this.bulletGlowCache.canvas
+    ) {
+      return this.bulletGlowCache;
+    }
+
+    if (typeof document === 'undefined') {
+      return null;
+    }
+
+    const diameter = Math.ceil(glowRadius * 2);
+    const offscreen = document.createElement('canvas');
+    offscreen.width = diameter;
+    offscreen.height = diameter;
+    const offscreenCtx = offscreen.getContext('2d');
+
+    if (!offscreenCtx) {
+      return null;
+    }
+
+    const gradient = offscreenCtx.createRadialGradient(
+      glowRadius,
+      glowRadius,
+      0,
+      glowRadius,
+      glowRadius,
+      glowRadius
+    );
+    gradient.addColorStop(0, '#FFFF00');
+    gradient.addColorStop(0.5, 'rgba(255, 255, 0, 0.4)');
+    gradient.addColorStop(1, 'transparent');
+
+    offscreenCtx.clearRect(0, 0, diameter, diameter);
+    offscreenCtx.fillStyle = gradient;
+    offscreenCtx.beginPath();
+    offscreenCtx.arc(glowRadius, glowRadius, glowRadius, 0, Math.PI * 2);
+    offscreenCtx.fill();
+
+    this.bulletGlowCache = {
+      canvas: offscreen,
+      radius: glowRadius
+    };
+
+    return this.bulletGlowCache;
+  }
+
   render(ctx) {
     if (!ctx) return;
 
@@ -1909,22 +1966,32 @@ class CombatSystem {
         ctx.restore();
       }
 
-      const gradient = ctx.createRadialGradient(
-        bullet.x,
-        bullet.y,
-        0,
-        bullet.x,
-        bullet.y,
-        CONSTANTS.BULLET_SIZE * 3
-      );
-      gradient.addColorStop(0, '#FFFF00');
-      gradient.addColorStop(0.5, 'rgba(255, 255, 0, 0.4)');
-      gradient.addColorStop(1, 'transparent');
+      const glowSprite = this.ensureBulletGlowCache();
 
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(bullet.x, bullet.y, CONSTANTS.BULLET_SIZE * 3, 0, Math.PI * 2);
-      ctx.fill();
+      if (glowSprite) {
+        ctx.drawImage(
+          glowSprite.canvas,
+          bullet.x - glowSprite.radius,
+          bullet.y - glowSprite.radius
+        );
+      } else {
+        const gradient = ctx.createRadialGradient(
+          bullet.x,
+          bullet.y,
+          0,
+          bullet.x,
+          bullet.y,
+          CONSTANTS.BULLET_SIZE * 3
+        );
+        gradient.addColorStop(0, '#FFFF00');
+        gradient.addColorStop(0.5, 'rgba(255, 255, 0, 0.4)');
+        gradient.addColorStop(1, 'transparent');
+
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, CONSTANTS.BULLET_SIZE * 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       ctx.fillStyle = '#FFFFFF';
       ctx.beginPath();

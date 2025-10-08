@@ -32,6 +32,7 @@ export class GamePools {
   static xpOrbs = null;
   static shockwaves = null;
   static tempObjects = null;
+  static lastAutoManageTime = 0;
 
   /**
    * Initializes all game object pools.
@@ -65,6 +66,7 @@ export class GamePools {
     this.initializeTempObjectPool(config.tempObjects);
 
     this.initialized = true;
+    this.lastAutoManageTime = performance.now();
 
     console.log('[GamePools] All pools initialized successfully');
     if (process.env.NODE_ENV === 'development') {
@@ -492,8 +494,10 @@ export class GamePools {
     }
 
     // Auto-manage pool sizes periodically
-    if (performance.now() % 5000 < 100) { // Every ~5 seconds
+    const now = performance.now();
+    if (now - this.lastAutoManageTime >= 5000) {
       this.autoManageAll();
+      this.lastAutoManageTime = now;
     }
   }
 
