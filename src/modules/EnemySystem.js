@@ -324,6 +324,50 @@ class EnemySystem {
     return this.cachedPlayer;
   }
 
+  getPlayerPositionSnapshot(player) {
+    if (!player) {
+      return null;
+    }
+
+    if (
+      player.position &&
+      Number.isFinite(player.position.x) &&
+      Number.isFinite(player.position.y)
+    ) {
+      return { x: player.position.x, y: player.position.y };
+    }
+
+    if (typeof player.getPosition === 'function') {
+      const fetchedPosition = player.getPosition();
+      if (
+        fetchedPosition &&
+        Number.isFinite(fetchedPosition.x) &&
+        Number.isFinite(fetchedPosition.y)
+      ) {
+        return { x: fetchedPosition.x, y: fetchedPosition.y };
+      }
+    }
+
+    return null;
+  }
+
+  getPlayerHullRadius(player) {
+    if (!player) {
+      return CONSTANTS.SHIP_SIZE;
+    }
+
+    const rawHullRadius =
+      typeof player.getHullBoundingRadius === 'function'
+        ? player.getHullBoundingRadius()
+        : player.hullRadius;
+
+    if (Number.isFinite(rawHullRadius)) {
+      return Math.max(0, rawHullRadius);
+    }
+
+    return CONSTANTS.SHIP_SIZE;
+  }
+
   getCachedWorld() {
     if (!this.cachedWorld) {
       this.resolveCachedServices();
@@ -1053,6 +1097,8 @@ class EnemySystem {
       return { applied: false };
     }
 
+    const playerPosition = this.getPlayerPositionSnapshot(player);
+
     const hasBlastRadius =
       context &&
       context.position &&
@@ -1061,42 +1107,14 @@ class EnemySystem {
       Number.isFinite(context.radius) &&
       context.radius > 0;
 
-    if (hasBlastRadius) {
-      let playerPosition = null;
+    if (hasBlastRadius && playerPosition) {
+      const hullRadius = this.getPlayerHullRadius(player);
+      const dx = playerPosition.x - context.position.x;
+      const dy = playerPosition.y - context.position.y;
+      const distance = Math.hypot(dx, dy);
 
-      if (
-        player.position &&
-        Number.isFinite(player.position.x) &&
-        Number.isFinite(player.position.y)
-      ) {
-        playerPosition = player.position;
-      } else if (typeof player.getPosition === 'function') {
-        const fetchedPosition = player.getPosition();
-        if (
-          fetchedPosition &&
-          Number.isFinite(fetchedPosition.x) &&
-          Number.isFinite(fetchedPosition.y)
-        ) {
-          playerPosition = fetchedPosition;
-        }
-      }
-
-      if (playerPosition) {
-        const rawHullRadius =
-          typeof player.getHullBoundingRadius === 'function'
-            ? player.getHullBoundingRadius()
-            : CONSTANTS.SHIP_SIZE;
-        const hullRadius = Number.isFinite(rawHullRadius)
-          ? Math.max(0, rawHullRadius)
-          : CONSTANTS.SHIP_SIZE;
-
-        const dx = playerPosition.x - context.position.x;
-        const dy = playerPosition.y - context.position.y;
-        const distance = Math.hypot(dx, dy);
-
-        if (distance > context.radius + hullRadius) {
-          return { applied: false };
-        }
+      if (distance > context.radius + hullRadius) {
+        return { applied: false };
       }
     }
 
@@ -1119,13 +1137,24 @@ class EnemySystem {
     }
 
     if (typeof gameEvents !== 'undefined') {
+      const eventPosition = playerPosition
+        ? { x: playerPosition.x, y: playerPosition.y }
+        : null;
+      const damageSource =
+        context &&
+        context.position &&
+        Number.isFinite(context.position.x) &&
+        Number.isFinite(context.position.y)
+          ? { x: context.position.x, y: context.position.y }
+          : null;
+
       gameEvents.emit('player-took-damage', {
         damage: amount,
         remaining,
-        max: player.maxHealth,
-        position: { ...player.position },
-        playerPosition: { x: player.position.x, y: player.position.y },
-        damageSource: context.position ? { x: context.position.x, y: context.position.y } : null,
+        max: Number.isFinite(player.maxHealth) ? player.maxHealth : undefined,
+        position: eventPosition,
+        playerPosition: eventPosition,
+        damageSource,
         cause: context.cause || 'enemy',
       });
     }
