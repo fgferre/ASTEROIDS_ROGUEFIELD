@@ -2272,10 +2272,6 @@ class UISystem {
     if (shouldUpdateWidth) {
       entry.barFill.style.width = `${percentage * 100}%`;
       this.cachedValues.xp.percentage = percentage;
-
-      entry.barFill.classList.remove('is-pulsing');
-      void entry.barFill.offsetWidth;
-      entry.barFill.classList.add('is-pulsing');
     }
 
     entry.bar.setAttribute('aria-valuenow', `${Math.round(percentage * 100)}`);
