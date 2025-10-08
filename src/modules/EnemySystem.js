@@ -28,6 +28,7 @@ class EnemySystem {
     this.cachedWorld = null;
     this.cachedProgression = null;
     this.cachedXPOrbs = null;
+    this.cachedPhysics = null;
     this.activeAsteroidCache = [];
     this.activeAsteroidCacheDirty = true;
     this.usesAsteroidPool = false;
@@ -134,6 +135,17 @@ class EnemySystem {
         this.cachedXPOrbs = gameServices.get('xp-orbs');
       } else {
         this.cachedXPOrbs = null;
+      }
+    }
+
+    if (force || !this.cachedPhysics) {
+      if (
+        typeof gameServices.has === 'function' &&
+        gameServices.has('physics')
+      ) {
+        this.cachedPhysics = gameServices.get('physics');
+      } else {
+        this.cachedPhysics = null;
       }
     }
   }
@@ -331,6 +343,13 @@ class EnemySystem {
       this.resolveCachedServices();
     }
     return this.cachedXPOrbs;
+  }
+
+  getCachedPhysics() {
+    if (!this.cachedPhysics) {
+      this.resolveCachedServices();
+    }
+    return this.cachedPhysics;
   }
 
   invalidateActiveAsteroidCache() {
@@ -1328,9 +1347,19 @@ class EnemySystem {
     const originX = data.position.x;
     const originY = data.position.y;
 
-    this.asteroids.forEach((asteroid) => {
+    const physics = this.getCachedPhysics();
+    const nearbyAsteroids = physics && typeof physics.getNearbyAsteroids === 'function'
+      ? physics.getNearbyAsteroids(originX, originY, radius)
+      : this.asteroids;
+
+    if (!nearbyAsteroids || nearbyAsteroids.length === 0) {
+      return;
+    }
+
+    for (let i = 0; i < nearbyAsteroids.length; i += 1) {
+      const asteroid = nearbyAsteroids[i];
       if (!asteroid || asteroid.destroyed) {
-        return;
+        continue;
       }
 
       const dx = asteroid.x - originX;
@@ -1338,7 +1367,7 @@ class EnemySystem {
       const distanceSq = dx * dx + dy * dy;
 
       if (distanceSq > radiusSq) {
-        return;
+        continue;
       }
 
       // Apply damage with distance falloff
@@ -1358,7 +1387,7 @@ class EnemySystem {
         asteroid.vy += ny * impulse;
         asteroid.rotationSpeed += (Math.random() - 0.5) * 3 * falloff;
       }
-    });
+    }
   }
 
   handleShockwave(data) {
@@ -1379,9 +1408,19 @@ class EnemySystem {
     const originX = data.position.x;
     const originY = data.position.y;
 
-    this.asteroids.forEach((asteroid) => {
+    const physics = this.getCachedPhysics();
+    const nearbyAsteroids = physics && typeof physics.getNearbyAsteroids === 'function'
+      ? physics.getNearbyAsteroids(originX, originY, radius)
+      : this.asteroids;
+
+    if (!nearbyAsteroids || nearbyAsteroids.length === 0) {
+      return;
+    }
+
+    for (let i = 0; i < nearbyAsteroids.length; i += 1) {
+      const asteroid = nearbyAsteroids[i];
       if (!asteroid || asteroid.destroyed) {
-        return;
+        continue;
       }
 
       const dx = asteroid.x - originX;
@@ -1389,7 +1428,7 @@ class EnemySystem {
       const distanceSq = dx * dx + dy * dy;
 
       if (distanceSq > radiusSq || distanceSq === 0) {
-        return;
+        continue;
       }
 
       const distance = Math.sqrt(distanceSq);
@@ -1402,7 +1441,7 @@ class EnemySystem {
       asteroid.vy += ny * impulse;
       asteroid.rotationSpeed += (Math.random() - 0.5) * 4 * falloff;
       asteroid.lastDamageTime = Math.max(asteroid.lastDamageTime, 0.12);
-    });
+    }
   }
 }
 

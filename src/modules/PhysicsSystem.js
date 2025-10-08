@@ -19,6 +19,7 @@ class PhysicsSystem {
     this.indexDirty = false;
     this.cachedEnemies = null;
     this.bootstrapCompleted = false;
+    this.lastSpatialHashMaintenance = performance.now();
 
     // Performance tracking
     this.performanceMetrics = {
@@ -236,6 +237,8 @@ class PhysicsSystem {
    * This ensures collision detection uses up-to-date positions.
    */
   updateSpatialHash() {
+    const now = performance.now();
+
     for (const asteroid of this.activeAsteroids) {
       if (asteroid.destroyed) {
         continue;
@@ -247,9 +250,10 @@ class PhysicsSystem {
       }
     }
 
-    // Cleanup the spatial hash periodically
-    if (performance.now() % 1000 < 50) { // Every ~1 second
+    // Cleanup the spatial hash on a fixed cadence
+    if (now - this.lastSpatialHashMaintenance >= 1000) {
       this.spatialHash.cleanup();
+      this.lastSpatialHashMaintenance = now;
     }
   }
 
@@ -274,9 +278,6 @@ class PhysicsSystem {
     this.indexDirty = true;
     this.ensureSpatialIndex();
 
-    // Update spatial hash
-    this.spatialHash.update();
-
     // Track performance
     this.performanceMetrics.frameTime = performance.now() - startTime;
     this.performanceMetrics.lastUpdateTime = performance.now();
@@ -295,7 +296,8 @@ class PhysicsSystem {
       filter: (obj) => {
         // Filter for active asteroids only
         return this.activeAsteroids.has(obj) && !obj.destroyed;
-      }
+      },
+      sorted: false
     });
 
     return candidates;
@@ -334,7 +336,8 @@ class PhysicsSystem {
 
       // Use spatial hash for efficient collision detection
       const candidates = this.spatialHash.query(bullet.x, bullet.y, maxCheckRadius, {
-        filter: (obj) => this.activeAsteroids.has(obj) && !obj.destroyed
+        filter: (obj) => this.activeAsteroids.has(obj) && !obj.destroyed,
+        sorted: false
       });
 
       this.performanceMetrics.collisionChecks += candidates.length;
@@ -655,6 +658,7 @@ class PhysicsSystem {
     this.spatialHash.clear();
     this.indexDirty = false;
     this.bootstrapCompleted = false;
+    this.lastSpatialHashMaintenance = performance.now();
     this.resolveCachedServices(true);
 
     // Reset performance metrics
