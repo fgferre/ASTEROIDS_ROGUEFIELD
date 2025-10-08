@@ -2314,10 +2314,13 @@ class UISystem {
       if (entry.meta) {
         entry.meta.textContent = `Lv ${level}`;
       }
+    }
 
-      entry.value.classList.remove('is-pulsing');
-      void entry.value.offsetWidth;
-      entry.value.classList.add('is-pulsing');
+    if (entry.leading) {
+      const leadingLabel = `XP / Lvl ${level}`;
+      if (entry.leading.textContent !== leadingLabel) {
+        entry.leading.textContent = leadingLabel;
+      }
     }
 
     if (entry.meta && this.cachedValues.level !== level) {

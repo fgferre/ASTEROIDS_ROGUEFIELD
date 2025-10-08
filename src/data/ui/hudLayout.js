@@ -245,15 +245,8 @@ const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
     },
     leading: {
       id: 'xp-label',
-      initialValue: 'XP',
+      initialValue: 'XP / Lvl 1',
       classes: ['hud-item__leading--xp'],
-    },
-    metaPosition: 'after-value',
-    meta: {
-      id: 'xp-level-indicator',
-      initialValue: 'Lv 1',
-      ariaLabel: 'Current pilot level',
-      classes: ['hud-item__meta--level'],
     },
     rootId: 'hud-xp',
     valueId: 'xp-display',

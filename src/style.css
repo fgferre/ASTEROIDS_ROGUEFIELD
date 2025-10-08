@@ -2711,19 +2711,19 @@ body.hud-layout-minimal .hud-group--tactical-vitals {
   display: grid;
   grid-template-columns: repeat(
     2,
-    minmax(clamp(9rem, 14vw, 12rem), 1fr)
+    minmax(clamp(10.2rem, 17vw, 15rem), 1fr)
   );
   align-items: center;
-  gap: clamp(0.5rem, 1vw, 1rem);
+  gap: clamp(0.64rem, 1.2vw, 1.2rem);
 }
 
 body.hud-layout-minimal .hud-group--tactical-session {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(clamp(4.75rem, 7vw, 6.4rem), auto);
+  grid-auto-columns: minmax(clamp(4.4rem, 6.6vw, 6rem), auto);
   align-items: center;
   justify-content: end;
-  gap: clamp(0.55rem, 1.2vw, 1.05rem);
+  gap: clamp(0.38rem, 0.8vw, 0.7rem);
 }
 
 body.hud-layout-minimal .hud-group--tactical-vitals .hud-item,
@@ -2737,25 +2737,37 @@ body.hud-layout-minimal .hud-group--tactical-session .hud-item {
 }
 
 body.hud-layout-minimal .hud-group--tactical-vitals .hud-item--progress {
-  --hud-progress-track-basis: clamp(8.5rem, 12vw, 11.4rem);
+  --hud-progress-track-basis: min(100%, clamp(8.8rem, 12.8vw, 12.6rem));
   width: auto;
-  min-width: clamp(8.5rem, 12vw, 11.4rem);
-  max-width: clamp(10.8rem, 16vw, 13.8rem);
+  min-width: 0;
+  max-width: none;
 }
 
 body.hud-layout-minimal .hud-group--tactical-vitals .hud-item--progress .hud-progress {
-  flex: 0 1 auto;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+body.hud-layout-minimal .hud-group--tactical-vitals .hud-progress__track {
+  flex: 1 1 auto;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
 }
 
 body.hud-layout-minimal .hud-group--tactical-session .hud-item--inline-value {
-  min-width: clamp(4.75rem, 7vw, 6.4rem);
+  min-width: clamp(4.4rem, 6.6vw, 6rem);
   justify-content: flex-end;
   text-align: right;
 }
 
+body.hud-layout-minimal .hud-group--tactical-session .hud-item--inline-value {
+  gap: clamp(0.22rem, 0.42vw, 0.4rem) !important;
+}
+
 body.hud-layout-minimal .hud-item--kills .hud-inline-value,
 body.hud-layout-minimal .hud-item--time .hud-inline-value {
-  min-width: clamp(2.15rem, 3.1vw, 3.4rem);
+  min-width: clamp(1.9rem, 2.8vw, 3.1rem);
 }
 
 @media (max-width: 960px) {
@@ -2815,9 +2827,13 @@ body.hud-layout-minimal #hud-wave {
 body.hud-layout-minimal .hud-item--xp .hud-item__leading,
 body.hud-layout-minimal #hud-wave .hud-item__leading {
   font-size: clamp(0.58rem, 0.52rem + 0.1vw, 0.72rem);
-  letter-spacing: 0.18em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: rgba(204, 232, 255, 0.75);
+}
+
+body.hud-layout-minimal .hud-item--xp .hud-item__leading {
+  white-space: nowrap;
 }
 
 body.hud-layout-minimal .hud-item--xp .hud-progress,
