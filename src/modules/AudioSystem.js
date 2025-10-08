@@ -650,6 +650,9 @@ class AudioSystem {
       case 'playAsteroidBreak':
         this._playAsteroidBreakDirect(params?.[0]);
         break;
+      case 'playTargetLock':
+        this._playTargetLockDirect(params?.[0]);
+        break;
       case 'playXPCollect':
         this._playXPCollectDirect();
         break;
