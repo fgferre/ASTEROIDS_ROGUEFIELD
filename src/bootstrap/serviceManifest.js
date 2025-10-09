@@ -16,7 +16,7 @@ import MenuBackgroundSystem from '../modules/MenuBackgroundSystem.js';
 import { GamePools } from '../core/GamePools.js';
 import { GarbageCollectionManager } from '../core/GarbageCollectionManager.js';
 
-const DEFAULT_POOL_CONFIG = {
+export const DEFAULT_POOL_CONFIG = {
   bullets: { initial: 25, max: 120 },
   particles: { initial: 60, max: 400 },
   asteroids: { initial: 20, max: 100 },
@@ -25,7 +25,7 @@ const DEFAULT_POOL_CONFIG = {
   tempObjects: { initial: 15, max: 60 }
 };
 
-const DEFAULT_GC_OPTIONS = {
+export const DEFAULT_GC_OPTIONS = {
   defaultInterval: 4500,
   idleTimeout: 120,
   maxTasksPerFrame: 2
