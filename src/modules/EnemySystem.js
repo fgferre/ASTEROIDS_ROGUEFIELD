@@ -1,6 +1,7 @@
 // src/modules/EnemySystem.js
 import * as CONSTANTS from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
+import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 import { Asteroid } from './enemies/types/Asteroid.js';
 import { EnemyFactory } from './enemies/base/EnemyFactory.js';
 import { WaveManager } from './enemies/managers/WaveManager.js';
@@ -13,7 +14,16 @@ import { AsteroidRenderer } from './enemies/components/AsteroidRenderer.js';
 // Asteroid class moved to: ./enemies/types/Asteroid.js
 // === SISTEMA DE INIMIGOS ===
 class EnemySystem {
-  constructor() {
+  constructor(dependencies = {}) {
+    this.dependencies = normalizeDependencies(dependencies);
+    this.services = {
+      player: null,
+      world: null,
+      progression: null,
+      xpOrbs: null,
+      physics: null
+    };
+
     this.asteroids = [];
     this.spawnTimer = 0;
     this.spawnDelay = 1.0;
@@ -24,11 +34,6 @@ class EnemySystem {
     this.sessionActive = false;
     this.lastWaveBroadcast = null;
 
-    this.cachedPlayer = null;
-    this.cachedWorld = null;
-    this.cachedProgression = null;
-    this.cachedXPOrbs = null;
-    this.cachedPhysics = null;
     this.activeAsteroidCache = [];
     this.activeAsteroidCacheDirty = true;
     this.usesAsteroidPool = false;
@@ -58,7 +63,8 @@ class EnemySystem {
     this.setupManagers(); // Initialize wave and reward managers
     this.setupComponents(); // Initialize components
     this.setupEventListeners();
-    this.resolveCachedServices(true);
+    this.refreshInjectedServices(true);
+    this.syncPhysicsIntegration(true);
 
     this.emitWaveStateUpdate(true);
 
@@ -74,15 +80,20 @@ class EnemySystem {
     });
 
     gameEvents.on('player-reset', () => {
-      this.resolveCachedServices(true);
+      this.refreshInjectedServices(true);
     });
 
     gameEvents.on('progression-reset', () => {
-      this.resolveCachedServices(true);
+      this.refreshInjectedServices(true);
     });
 
     gameEvents.on('world-reset', () => {
-      this.resolveCachedServices(true);
+      this.refreshInjectedServices(true);
+    });
+
+    gameEvents.on('physics-reset', () => {
+      this.refreshInjectedServices(true);
+      this.syncPhysicsIntegration(true);
     });
 
     // NEW: Integrate RewardManager with enemy destruction
@@ -95,59 +106,43 @@ class EnemySystem {
     }
   }
 
-  resolveCachedServices(force = false) {
-    if (typeof gameServices === 'undefined') {
+  refreshInjectedServices(force = false) {
+    if (force) {
+      this.services.player = null;
+      this.services.world = null;
+      this.services.progression = null;
+      this.services.xpOrbs = null;
+      this.services.physics = null;
+    }
+
+    if (!this.services.player) {
+      this.services.player = resolveService('player', this.dependencies);
+    }
+
+    if (!this.services.world) {
+      this.services.world = resolveService('world', this.dependencies);
+    }
+
+    if (!this.services.progression) {
+      this.services.progression = resolveService('progression', this.dependencies);
+    }
+
+    if (!this.services.xpOrbs) {
+      this.services.xpOrbs = resolveService('xp-orbs', this.dependencies);
+    }
+
+    if (!this.services.physics) {
+      this.services.physics = resolveService('physics', this.dependencies);
+    }
+  }
+
+  syncPhysicsIntegration(force = false) {
+    const physics = this.getCachedPhysics();
+    if (!physics || typeof physics.bootstrapFromEnemySystem !== 'function') {
       return;
     }
 
-    if (force || !this.cachedPlayer) {
-      if (typeof gameServices.has === 'function' && gameServices.has('player')) {
-        this.cachedPlayer = gameServices.get('player');
-      } else {
-        this.cachedPlayer = null;
-      }
-    }
-
-    if (force || !this.cachedWorld) {
-      if (typeof gameServices.has === 'function' && gameServices.has('world')) {
-        this.cachedWorld = gameServices.get('world');
-      } else {
-        this.cachedWorld = null;
-      }
-    }
-
-    if (force || !this.cachedProgression) {
-      if (
-        typeof gameServices.has === 'function' &&
-        gameServices.has('progression')
-      ) {
-        this.cachedProgression = gameServices.get('progression');
-      } else {
-        this.cachedProgression = null;
-      }
-    }
-
-    if (force || !this.cachedXPOrbs) {
-      if (
-        typeof gameServices.has === 'function' &&
-        gameServices.has('xp-orbs')
-      ) {
-        this.cachedXPOrbs = gameServices.get('xp-orbs');
-      } else {
-        this.cachedXPOrbs = null;
-      }
-    }
-
-    if (force || !this.cachedPhysics) {
-      if (
-        typeof gameServices.has === 'function' &&
-        gameServices.has('physics')
-      ) {
-        this.cachedPhysics = gameServices.get('physics');
-      } else {
-        this.cachedPhysics = null;
-      }
-    }
+    physics.bootstrapFromEnemySystem(this, { force });
   }
 
   setupAsteroidPoolIntegration() {
@@ -203,7 +198,7 @@ class EnemySystem {
       }
 
       // Initialize RewardManager
-      this.resolveCachedServices();
+      this.refreshInjectedServices();
       const xpOrbSystem = this.getCachedXPOrbs();
       if (xpOrbSystem) {
         this.rewardManager = new RewardManager(this, xpOrbSystem);
@@ -318,10 +313,8 @@ class EnemySystem {
   }
 
   getCachedPlayer() {
-    if (!this.cachedPlayer) {
-      this.resolveCachedServices();
-    }
-    return this.cachedPlayer;
+    this.refreshInjectedServices();
+    return this.services.player;
   }
 
   getPlayerPositionSnapshot(player) {
@@ -369,31 +362,23 @@ class EnemySystem {
   }
 
   getCachedWorld() {
-    if (!this.cachedWorld) {
-      this.resolveCachedServices();
-    }
-    return this.cachedWorld;
+    this.refreshInjectedServices();
+    return this.services.world;
   }
 
   getCachedProgression() {
-    if (!this.cachedProgression) {
-      this.resolveCachedServices();
-    }
-    return this.cachedProgression;
+    this.refreshInjectedServices();
+    return this.services.progression;
   }
 
   getCachedXPOrbs() {
-    if (!this.cachedXPOrbs) {
-      this.resolveCachedServices();
-    }
-    return this.cachedXPOrbs;
+    this.refreshInjectedServices();
+    return this.services.xpOrbs;
   }
 
   getCachedPhysics() {
-    if (!this.cachedPhysics) {
-      this.resolveCachedServices();
-    }
-    return this.cachedPhysics;
+    this.refreshInjectedServices();
+    return this.services.physics;
   }
 
   invalidateActiveAsteroidCache() {
@@ -531,7 +516,7 @@ class EnemySystem {
       return;
     }
 
-    this.resolveCachedServices();
+    this.refreshInjectedServices();
 
     this.sessionStats.timeElapsed += deltaTime;
 
@@ -1257,7 +1242,8 @@ class EnemySystem {
     this.sessionActive = true;
     this.lastWaveBroadcast = null;
 
-    this.resolveCachedServices(true);
+    this.refreshInjectedServices(true);
+    this.syncPhysicsIntegration(true);
 
     this.spawnInitialAsteroids(4);
     this.emitWaveStateUpdate(true);
@@ -1268,9 +1254,13 @@ class EnemySystem {
     this.releaseAllAsteroidsToPool();
     this.asteroids = [];
     this.sessionActive = false;
-    this.cachedPlayer = null;
-    this.cachedWorld = null;
-    this.cachedProgression = null;
+    this.services = {
+      player: null,
+      world: null,
+      progression: null,
+      xpOrbs: null,
+      physics: null
+    };
     this.activeAsteroidCache = [];
     this.activeAsteroidCacheDirty = true;
     console.log('[EnemySystem] Destroyed');

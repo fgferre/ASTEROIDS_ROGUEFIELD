@@ -1,16 +1,18 @@
 import AudioPool from './AudioPool.js';
 import AudioCache from './AudioCache.js';
 import AudioBatcher from './AudioBatcher.js';
+import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
 class AudioSystem {
-  constructor() {
+  constructor(dependencies = {}) {
+    this.dependencies = normalizeDependencies(dependencies);
     this.context = null;
     this.masterGain = null;
     this.musicGain = null;
     this.effectsGain = null;
     this.initialized = false;
     this.sounds = new Map();
-    this.settings = null;
+    this.settings = resolveService('settings', this.dependencies);
     this.volumeState = {
       master: 0.25,
       music: 0.6,
@@ -43,12 +45,6 @@ class AudioSystem {
 
     if (typeof gameServices !== 'undefined') {
       gameServices.register('audio', this);
-      if (
-        typeof gameServices.has === 'function' &&
-        gameServices.has('settings')
-      ) {
-        this.settings = gameServices.get('settings');
-      }
     }
 
     this.setupEventListeners();

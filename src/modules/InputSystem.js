@@ -1,6 +1,7 @@
 // src/modules/InputSystem.js
 
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
+import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
 const CONTROLS_CATEGORY_ID = 'controls';
 const MOVEMENT_ACTIONS = new Set([
@@ -28,7 +29,8 @@ function clone(value) {
 }
 
 class InputSystem {
-  constructor() {
+  constructor(dependencies = {}) {
+    this.dependencies = normalizeDependencies(dependencies);
     this.keys = {};
     this.codes = {};
     this.mousePos = { x: 0, y: 0 };
@@ -85,13 +87,11 @@ class InputSystem {
   }
 
   resolveSettingsService() {
-    if (
-      typeof gameServices !== 'undefined' &&
-      typeof gameServices.has === 'function' &&
-      gameServices.has('settings')
-    ) {
-      return gameServices.get('settings');
+    const injected = resolveService('settings', this.dependencies);
+    if (injected) {
+      return injected;
     }
+
     return null;
   }
 

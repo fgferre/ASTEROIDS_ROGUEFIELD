@@ -1,8 +1,11 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 import { SpatialHash } from '../core/SpatialHash.js';
+import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
 class PhysicsSystem {
-  constructor() {
+  constructor(dependencies = {}) {
+    this.dependencies = normalizeDependencies(dependencies);
+    this.enemySystem = null;
     this.cellSize = CONSTANTS.PHYSICS_CELL_SIZE || 96;
     this.maxAsteroidRadius = this.computeMaxAsteroidRadius();
     this.activeAsteroids = new Set();
@@ -17,7 +20,6 @@ class PhysicsSystem {
     // Legacy spatial index for backward compatibility
     this.asteroidIndex = new Map();
     this.indexDirty = false;
-    this.cachedEnemies = null;
     this.bootstrapCompleted = false;
     this.lastSpatialHashMaintenance = performance.now();
 
@@ -34,7 +36,7 @@ class PhysicsSystem {
     }
 
     this.setupEventListeners();
-    this.resolveCachedServices(true);
+    this.refreshEnemyReference();
 
     console.log('[PhysicsSystem] Initialized');
   }
@@ -85,54 +87,53 @@ class PhysicsSystem {
     });
   }
 
-  resolveCachedServices(force = false) {
-    if (typeof gameServices === 'undefined') {
-      return;
+  refreshEnemyReference(force = false) {
+    if (force) {
+      this.enemySystem = null;
+      this.bootstrapCompleted = false;
     }
 
-    if (force || !this.cachedEnemies) {
-      if (
-        typeof gameServices.has === 'function' &&
-        gameServices.has('enemies')
-      ) {
-        this.cachedEnemies = gameServices.get('enemies');
-        this.bootstrapCompleted = false;
-      } else {
-        this.cachedEnemies = null;
-      }
+    if (!this.enemySystem) {
+      this.enemySystem = resolveService('enemies', this.dependencies);
     }
 
-    if (!this.bootstrapCompleted) {
-      this.bootstrapExistingAsteroids();
+    if (this.enemySystem) {
+      this.bootstrapFromEnemySystem(this.enemySystem, { force });
     }
   }
 
-  bootstrapExistingAsteroids() {
-    if (
-      !this.cachedEnemies ||
-      typeof this.cachedEnemies.getAsteroids !== 'function'
-    ) {
+  bootstrapFromEnemySystem(enemySystem, { force = false } = {}) {
+    if (!enemySystem) {
       return;
     }
 
-    if (typeof this.cachedEnemies.forEachActiveAsteroid === 'function') {
-      this.cachedEnemies.forEachActiveAsteroid((asteroid) => {
+    if (force) {
+      this.bootstrapCompleted = false;
+    }
+
+    this.enemySystem = enemySystem;
+
+    if (this.bootstrapCompleted && !force) {
+      return;
+    }
+
+    if (typeof enemySystem.forEachActiveAsteroid === 'function') {
+      enemySystem.forEachActiveAsteroid((asteroid) => {
         this.registerAsteroid(asteroid);
       });
       this.bootstrapCompleted = true;
       return;
     }
 
-    const asteroids = this.cachedEnemies.getAsteroids();
-    if (!Array.isArray(asteroids) || asteroids.length === 0) {
-      return;
+    if (typeof enemySystem.getAsteroids === 'function') {
+      const asteroids = enemySystem.getAsteroids();
+      if (Array.isArray(asteroids) && asteroids.length) {
+        asteroids.forEach((asteroid) => {
+          this.registerAsteroid(asteroid);
+        });
+      }
+      this.bootstrapCompleted = true;
     }
-
-    asteroids.forEach((asteroid) => {
-      this.registerAsteroid(asteroid);
-    });
-
-    this.bootstrapCompleted = true;
   }
 
   registerAsteroid(asteroid) {
@@ -260,7 +261,7 @@ class PhysicsSystem {
   update() {
     const startTime = performance.now();
 
-    this.resolveCachedServices();
+    this.refreshEnemyReference();
     this.cleanupDestroyedAsteroids();
 
     // Update spatial hash with current asteroid positions
@@ -659,7 +660,7 @@ class PhysicsSystem {
     this.indexDirty = false;
     this.bootstrapCompleted = false;
     this.lastSpatialHashMaintenance = performance.now();
-    this.resolveCachedServices(true);
+    this.refreshEnemyReference(true);
 
     // Reset performance metrics
     this.performanceMetrics = {
@@ -713,7 +714,7 @@ class PhysicsSystem {
     this.activeAsteroids.clear();
     this.asteroidIndex.clear();
     this.indexDirty = false;
-    this.cachedEnemies = null;
+    this.enemySystem = null;
     this.bootstrapCompleted = false;
     console.log('[PhysicsSystem] Destroyed');
   }

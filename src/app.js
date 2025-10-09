@@ -1,25 +1,10 @@
-import SettingsSystem from './modules/SettingsSystem.js';
-import InputSystem from './modules/InputSystem.js';
-import PlayerSystem from './modules/PlayerSystem.js';
-import CombatSystem from './modules/CombatSystem.js';
-import { EnemySystem } from './modules/EnemySystem.js';
-import PhysicsSystem from './modules/PhysicsSystem.js';
-import XPOrbSystem from './modules/XPOrbSystem.js';
-import HealthHeartSystem from './modules/collectibles/HealthHeartSystem.js';
-import ProgressionSystem from './modules/ProgressionSystem.js';
-import UISystem from './modules/UISystem.js';
-import EffectsSystem from './modules/EffectsSystem.js';
-import AudioSystem from './modules/AudioSystem.js';
-import WorldSystem from './modules/WorldSystem.js';
-import RenderingSystem from './modules/RenderingSystem.js';
-import MenuBackgroundSystem from './modules/MenuBackgroundSystem.js';
 import { GamePools } from './core/GamePools.js';
-import { GarbageCollectionManager } from './core/GarbageCollectionManager.js';
 import {
   resolveDebugPreference,
   applyDebugPreference,
 } from './core/debugLogging.js';
 import { PerformanceMonitor } from './utils/PerformanceMonitor.js';
+import { bootstrapServices } from './bootstrap/bootstrapServices.js';
 
 // Dependency Injection System (Phase 2.1)
 import { DIContainer } from './core/DIContainer.js';
@@ -36,11 +21,7 @@ const gameState = {
   deathSnapshot: null, // Snapshot of game state at death for retry
 };
 
-const garbageCollectionManager = new GarbageCollectionManager({
-  defaultInterval: 4500,
-  idleTimeout: 120,
-  maxTasksPerFrame: 2,
-});
+let garbageCollectionManager = null;
 
 // Performance monitoring (Week 1: Balance & Feel)
 const performanceMonitor = new PerformanceMonitor();
@@ -96,7 +77,7 @@ function logServiceRegistrationFlow({ reason = 'bootstrap' } = {}) {
   console.groupEnd();
 }
 
-function initializeDependencyInjection() {
+function initializeDependencyInjection(manifestContext) {
   console.log('[App] Initializing Dependency Injection system...');
 
   try {
@@ -105,7 +86,7 @@ function initializeDependencyInjection() {
     diContainer.verbose = false; // Keep it quiet in production
 
     // Register all services
-    ServiceRegistry.setupServices(diContainer);
+    ServiceRegistry.setupServices(diContainer, manifestContext);
 
     if (typeof gameServices !== 'undefined') {
       serviceLocatorAdapter = new ServiceLocatorAdapter(diContainer);
@@ -145,15 +126,6 @@ function initializeDependencyInjection() {
     console.warn('[App] Falling back to legacy ServiceLocator');
     return false;
   }
-}
-
-function registerGameStateService() {
-  if (typeof gameServices === 'undefined') return;
-
-  gameServices.register('game-state', {
-    isPaused: () => gameState.isPaused,
-    getScreen: () => gameState.screen,
-  });
 }
 
 function resetGameSystems() {
@@ -423,59 +395,34 @@ function init() {
     setupDomEventListeners();
     setupGlobalEventListeners();
 
+    const manifestContext = {
+      gameState,
+      poolConfig: {
+        bullets: { initial: 25, max: 120 },
+        particles: { initial: 60, max: 400 },
+        asteroids: { initial: 20, max: 100 },
+        xpOrbs: { initial: 40, max: 250 },
+        shockwaves: { initial: 8, max: 25 },
+        tempObjects: { initial: 15, max: 60 }
+      },
+      garbageCollectorOptions: {
+        defaultInterval: 4500,
+        idleTimeout: 120,
+        maxTasksPerFrame: 2
+      }
+    };
+
     // Initialize DI system first (Phase 2.1)
-    const diInitialized = initializeDependencyInjection();
+    const diInitialized = initializeDependencyInjection(manifestContext);
 
-    registerGameStateService();
-
-    // Initialize object pools before any game systems
-    GamePools.initialize({
-      bullets: { initial: 25, max: 120 },
-      particles: { initial: 60, max: 400 },
-      asteroids: { initial: 20, max: 100 },
-      xpOrbs: { initial: 40, max: 250 },
-      shockwaves: { initial: 8, max: 25 },
-      tempObjects: { initial: 15, max: 60 }
+    const { services } = bootstrapServices({
+      container: diContainer,
+      manifestContext
     });
 
-    garbageCollectionManager.initialize();
-    garbageCollectionManager.registerPeriodicTask(
-      'pool-auto-manage',
-      () => GamePools.autoManageAll(),
-      { interval: 5000, priority: 2, runImmediately: true }
-    );
-    garbageCollectionManager.registerPeriodicTask(
-      'temp-pool-trim',
-      () => {
-        const tempPool = GamePools.tempObjects;
-        if (tempPool && typeof tempPool.autoManage === 'function') {
-          tempPool.autoManage({ targetUtilization: 0.55, maxShrinkage: 10, maxExpansion: 6 });
-        }
-      },
-      { interval: 7000, priority: 1 }
-    );
+    garbageCollectionManager = services['garbage-collector'] || garbageCollectionManager;
 
-    // Initialize game systems
-    // Note: Systems still register themselves with gameServices internally
-    // DI integration will be gradual in Phase 2.2+
-    new SettingsSystem();
-
-    const audioSystem = new AudioSystem();
-    new InputSystem();
-    new PlayerSystem();
-    new XPOrbSystem(); // Must be before EnemySystem so RewardManager can be initialized
-    new HealthHeartSystem(); // Must be before EnemySystem
-    new EnemySystem();
-    new PhysicsSystem();
-    new CombatSystem();
-    new ProgressionSystem();
-    new UISystem();
-    new MenuBackgroundSystem();
-    new EffectsSystem(audioSystem);
-    new WorldSystem();
-    new RenderingSystem();
-
-    const ui = gameServices.get('ui');
+    const ui = services['ui'] || gameServices.get('ui');
     if (ui) ui.showScreen('menu');
 
     gameState.initialized = true;
@@ -738,7 +685,9 @@ function gameLoop(currentTime) {
 
     // Update object pools (always, for TTL and auto-management)
     GamePools.update(deltaTime);
-    garbageCollectionManager.update(deltaTime);
+    if (garbageCollectionManager && typeof garbageCollectionManager.update === 'function') {
+      garbageCollectionManager.update(deltaTime);
+    }
 
     let adjustedDelta = deltaTime;
     const effects = gameServices.get('effects');
