@@ -17,11 +17,11 @@ class EnemySystem {
   constructor(dependencies = {}) {
     this.dependencies = normalizeDependencies(dependencies);
     this.services = {
-      player: null,
-      world: null,
-      progression: null,
-      xpOrbs: null,
-      physics: null
+      player: this.dependencies.player || null,
+      world: this.dependencies.world || null,
+      progression: this.dependencies.progression || null,
+      xpOrbs: this.dependencies['xp-orbs'] || null,
+      physics: this.dependencies.physics || null,
     };
 
     this.asteroids = [];
@@ -108,11 +108,11 @@ class EnemySystem {
 
   refreshInjectedServices(force = false) {
     if (force) {
-      this.services.player = null;
-      this.services.world = null;
-      this.services.progression = null;
-      this.services.xpOrbs = null;
-      this.services.physics = null;
+      this.services.player = this.dependencies.player || null;
+      this.services.world = this.dependencies.world || null;
+      this.services.progression = this.dependencies.progression || null;
+      this.services.xpOrbs = this.dependencies['xp-orbs'] || null;
+      this.services.physics = this.dependencies.physics || null;
     }
 
     if (!this.services.player) {
