@@ -1,4 +1,5 @@
 import { GamePools } from './core/GamePools.js';
+import * as CONSTANTS from './core/GameConstants.js';
 import {
   resolveDebugPreference,
   applyDebugPreference,
@@ -251,15 +252,28 @@ function restoreFromSnapshot() {
 }
 
 function findSafeSpawnPoint() {
+  const fallbackCenter = {
+    x: CONSTANTS.GAME_WIDTH / 2,
+    y: CONSTANTS.GAME_HEIGHT / 2,
+  };
+
   const enemies = gameServices.get('enemies');
-  if (!enemies) return { x: CONSTANTS.GAME_WIDTH / 2, y: CONSTANTS.GAME_HEIGHT / 2 };
+  const canvas = gameState.canvas;
+
+  if (!enemies || !canvas) {
+    return fallbackCenter;
+  }
 
   const asteroids = enemies.getAsteroids ? enemies.getAsteroids() : [];
-  const canvas = gameState.canvas;
-  const safeDistance = 300; // Minimum distance from any asteroid
+  const safeDistance =
+    CONSTANTS.PLAYER_SAFE_SPAWN_DISTANCE ??
+    CONSTANTS.DEFAULT_SAFE_SPAWN_DISTANCE ??
+    300;
 
   // Try center first
-  const center = { x: canvas.width / 2, y: canvas.height / 2 };
+  const center = canvas
+    ? { x: canvas.width / 2, y: canvas.height / 2 }
+    : fallbackCenter;
   let isSafe = asteroids.every(ast => {
     const dx = ast.x - center.x;
     const dy = ast.y - center.y;
@@ -286,7 +300,7 @@ function findSafeSpawnPoint() {
   }
 
   // Fallback to center (even if not safe)
-  return center;
+  return center || fallbackCenter;
 }
 
 function startRetryCountdown() {

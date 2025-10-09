@@ -4,6 +4,8 @@
 export const GAME_WIDTH = 800;
 export const GAME_HEIGHT = 600;
 export const SHIP_SIZE = 15;
+export const DEFAULT_SAFE_SPAWN_DISTANCE = 300;
+export const PLAYER_SAFE_SPAWN_DISTANCE = 300;
 
 // === TAMANHOS DE OBJETOS ===
 export const ASTEROID_SIZES = {
