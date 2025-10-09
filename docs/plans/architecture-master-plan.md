@@ -16,6 +16,7 @@
 - Registrar um serviço singleton `random` no contêiner e injetá-lo progressivamente nos sistemas que hoje usam `Math.random()` diretamente (efeitos, áudio procedural, spawns, drops).
 - Começar por sistemas cosméticos para validar a API sem risco, avançando para progressão, loot e IA conforme as dependências forem injetadas.
 - **Benefício:** desbloqueia replays determinísticos, seeds compartilháveis (daily challenges) e debugging reproduzível com baixo custo adicional após a fase 1.
+- Plano detalhado: [docs/plans/phase2-random-service-plan.md](./phase2-random-service-plan.md).
 
 ### Fase 3 – Extrair `GameSessionService`
 - Mover `gameState`, `createDeathSnapshot`, `restoreFromSnapshot`, `startRetryCountdown` e utilitários correlatos de `app.js` para um módulo dedicado (`/src/modules/GameSessionService.js`), deixando o bootstrap responsável apenas pelo loop.
