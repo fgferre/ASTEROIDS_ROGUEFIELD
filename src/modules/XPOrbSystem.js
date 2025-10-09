@@ -1,5 +1,6 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
+import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
 const ORB_CLASS_ORDER = [
   { name: 'blue', tier: 1 },
@@ -79,7 +80,12 @@ const ORB_NEXT_CLASS = ORB_CLASS_CONFIG.reduce(
 const ORB_SPATIAL_NEIGHBOURS = [-1, 0, 1];
 
 class XPOrbSystem {
-  constructor() {
+  constructor({ player, progression } = {}) {
+    this.dependencies = normalizeDependencies({
+      player,
+      progression,
+    });
+
     this.orbClasses = [...ORB_CLASS_SEQUENCE];
     this.xpOrbs = [];
     this.xpOrbPools = this.createEmptyOrbPools();
@@ -129,8 +135,8 @@ class XPOrbSystem {
     this.spatialIndex = new Map();
     this.spatialIndexDirty = true;
 
-    this.cachedPlayer = null;
-    this.cachedProgression = null;
+    this.cachedPlayer = this.dependencies.player || null;
+    this.cachedProgression = this.dependencies.progression || null;
 
     this.visualCache = new Map();
 
@@ -150,30 +156,17 @@ class XPOrbSystem {
   }
 
   resolveCachedServices(force = false) {
-    if (typeof gameServices === 'undefined') {
-      return;
+    if (force) {
+      this.cachedPlayer = this.dependencies.player || null;
+      this.cachedProgression = this.dependencies.progression || null;
     }
 
-    if (force || !this.cachedPlayer) {
-      if (
-        typeof gameServices.has === 'function' &&
-        gameServices.has('player')
-      ) {
-        this.cachedPlayer = gameServices.get('player');
-      } else {
-        this.cachedPlayer = null;
-      }
+    if (!this.cachedPlayer) {
+      this.cachedPlayer = resolveService('player', this.dependencies);
     }
 
-    if (force || !this.cachedProgression) {
-      if (
-        typeof gameServices.has === 'function' &&
-        gameServices.has('progression')
-      ) {
-        this.cachedProgression = gameServices.get('progression');
-      } else {
-        this.cachedProgression = null;
-      }
+    if (!this.cachedProgression) {
+      this.cachedProgression = resolveService('progression', this.dependencies);
     }
   }
 

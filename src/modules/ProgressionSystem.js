@@ -39,10 +39,10 @@ class ProgressionSystem {
 
     // === CACHES DE SERVIÇOS ===
     this.services = {
-      xpOrbs: null,
-      player: null,
-      ui: null,
-      effects: null
+      xpOrbs: this.dependencies['xp-orbs'] || null,
+      player: this.dependencies.player || null,
+      ui: this.dependencies.ui || null,
+      effects: this.dependencies.effects || null,
     };
 
     // === CONFIGURAÇÕES ===
@@ -65,10 +65,10 @@ class ProgressionSystem {
 
   refreshInjectedServices(force = false) {
     if (force) {
-      this.services.xpOrbs = null;
-      this.services.player = null;
-      this.services.ui = null;
-      this.services.effects = null;
+      this.services.xpOrbs = this.dependencies['xp-orbs'] || null;
+      this.services.player = this.dependencies.player || null;
+      this.services.ui = this.dependencies.ui || null;
+      this.services.effects = this.dependencies.effects || null;
     }
 
     if (!this.services.xpOrbs) {

@@ -170,7 +170,10 @@ export function createServiceManifest(context = {}) {
       singleton: true,
       lazy: false,
       dependencies: ['player'],
-      factory: ({ resolved }) => new XPOrbSystem({ player: resolved['player'] })
+      factory: ({ resolved }) =>
+        new XPOrbSystem({
+          player: resolved['player'],
+        })
     },
     {
       name: 'healthHearts',
@@ -208,10 +211,10 @@ export function createServiceManifest(context = {}) {
       dependencies: ['xp-orbs', 'player', 'ui', 'effects'],
       factory: ({ resolved }) =>
         new ProgressionSystem({
-          xpOrbs: resolved['xp-orbs'],
+          'xp-orbs': resolved['xp-orbs'],
           player: resolved['player'],
           ui: resolved['ui'],
-          effects: resolved['effects']
+          effects: resolved['effects'],
         })
     },
     {
@@ -222,9 +225,9 @@ export function createServiceManifest(context = {}) {
       factory: ({ resolved }) =>
         new EnemySystem({
           player: resolved['player'],
-          xpOrbs: resolved['xp-orbs'],
+          'xp-orbs': resolved['xp-orbs'],
           progression: resolved['progression'],
-          physics: resolved['physics']
+          physics: resolved['physics'],
         })
     },
     {
