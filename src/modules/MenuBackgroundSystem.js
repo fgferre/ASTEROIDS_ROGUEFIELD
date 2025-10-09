@@ -1,7 +1,11 @@
 // src/modules/MenuBackgroundSystem.js
 
+import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+
 class MenuBackgroundSystem {
-  constructor() {
+  constructor(dependencies = {}) {
+    this.dependencies = normalizeDependencies(dependencies);
+    this.settingsService = null;
     this.canvas =
       typeof document !== 'undefined'
         ? document.getElementById('menu-background-canvas')
@@ -76,6 +80,22 @@ class MenuBackgroundSystem {
     if (typeof gameServices !== 'undefined' && gameServices?.register) {
       gameServices.register('menu-background', this);
     }
+  }
+
+  getService(name) {
+    return resolveService(name, this.dependencies);
+  }
+
+  getSettingsService({ refresh = false } = {}) {
+    if (refresh) {
+      this.settingsService = null;
+    }
+
+    if (!this.settingsService) {
+      this.settingsService = this.getService('settings');
+    }
+
+    return this.settingsService;
   }
 
   bootstrapScene() {
@@ -267,22 +287,15 @@ class MenuBackgroundSystem {
     let resolved = 1;
 
     try {
+      const settings = this.getSettingsService();
       if (
-        typeof gameServices !== 'undefined' &&
-        gameServices?.has &&
-        typeof gameServices.has === 'function' &&
-        gameServices.has('settings')
+        settings &&
+        typeof settings.getCategoryValues === 'function'
       ) {
-        const settings = gameServices.get('settings');
-        if (
-          settings &&
-          typeof settings.getCategoryValues === 'function'
-        ) {
-          const videoValues = settings.getCategoryValues('video');
-          const stored = videoValues?.menuAsteroidNormalIntensity;
-          if (typeof stored === 'number' && Number.isFinite(stored)) {
-            resolved = stored;
-          }
+        const videoValues = settings.getCategoryValues('video');
+        const stored = videoValues?.menuAsteroidNormalIntensity;
+        if (typeof stored === 'number' && Number.isFinite(stored)) {
+          resolved = stored;
         }
       }
     } catch (error) {
@@ -531,16 +544,7 @@ class MenuBackgroundSystem {
 
   setupSettingsSubscription() {
     try {
-      if (
-        typeof gameServices === 'undefined' ||
-        !gameServices?.has ||
-        typeof gameServices.has !== 'function' ||
-        !gameServices.has('settings')
-      ) {
-        return;
-      }
-
-      const settings = gameServices.get('settings');
+      const settings = this.getSettingsService();
       if (!settings || typeof settings.subscribe !== 'function') {
         return;
       }
@@ -1159,15 +1163,9 @@ class MenuBackgroundSystem {
 
   getCurrentScreen() {
     try {
-      if (
-        typeof gameServices !== 'undefined' &&
-        gameServices?.has &&
-        gameServices.has('game-state')
-      ) {
-        const state = gameServices.get('game-state');
-        if (state && typeof state.getScreen === 'function') {
-          return state.getScreen();
-        }
+      const state = this.getService('game-state');
+      if (state && typeof state.getScreen === 'function') {
+        return state.getScreen();
       }
     } catch (error) {
       console.warn('[MenuBackgroundSystem] Unable to resolve current screen:', error);

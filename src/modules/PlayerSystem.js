@@ -1,6 +1,7 @@
 // src/modules/PlayerSystem.js
 import * as CONSTANTS from '../core/GameConstants.js';
 import shipModels from '../data/shipModels.js';
+import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
 const DRIFT_SETTINGS = {
   rampSpeed: 2.8,
@@ -32,9 +33,18 @@ const SHIELD_LEVEL_CONFIG = {
 };
 
 class PlayerSystem {
-  constructor(x = CONSTANTS.GAME_WIDTH / 2, y = CONSTANTS.GAME_HEIGHT / 2) {
+  constructor(config = {}) {
+    const { position, dependencies } = this.normalizeConfig(config);
+    this.dependencies = normalizeDependencies(dependencies);
+    const startX = Number.isFinite(position?.x)
+      ? position.x
+      : CONSTANTS.GAME_WIDTH / 2;
+    const startY = Number.isFinite(position?.y)
+      ? position.y
+      : CONSTANTS.GAME_HEIGHT / 2;
+
     // === APENAS MOVIMENTO E POSIÇÃO ===
-    this.position = { x, y };
+    this.position = { x: startX, y: startY };
     this.velocity = { vx: 0, vy: 0 };
     this.angle = 0;
     this.targetAngle = 0; // Para rotação suave (futuro)
@@ -94,6 +104,20 @@ class PlayerSystem {
     this.setupEventListeners();
 
     console.log('[PlayerSystem] Initialized at', this.position);
+  }
+
+  normalizeConfig(config) {
+    if (!config || typeof config !== 'object' || Array.isArray(config)) {
+      return { position: null, dependencies: {} };
+    }
+
+    const { position = null, dependencies = null, ...rest } = config;
+
+    if (dependencies && typeof dependencies === 'object' && !Array.isArray(dependencies)) {
+      return { position, dependencies };
+    }
+
+    return { position, dependencies: rest };
   }
 
   setupEventListeners() {
@@ -370,7 +394,7 @@ class PlayerSystem {
 
   // === MÉTODO PRINCIPAL UPDATE ===
   update(deltaTime) {
-    const inputSystem = gameServices.get('input');
+    const inputSystem = resolveService('input', this.dependencies);
     if (!inputSystem) {
       console.warn('[PlayerSystem] InputSystem not found');
       return;

@@ -7,6 +7,7 @@ import {
   getHudLayoutItems,
 } from '../data/ui/hudLayout.js';
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
+import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
@@ -19,7 +20,8 @@ const COLOR_ASSIST_ACCENTS = {
 };
 
 class UISystem {
-  constructor() {
+  constructor(dependencies = {}) {
+    this.dependencies = normalizeDependencies(dependencies);
     if (typeof gameServices !== 'undefined') {
       gameServices.register('ui', this);
     }
@@ -124,6 +126,14 @@ class UISystem {
     console.log('[UISystem] Initialized');
   }
 
+  getService(name) {
+    return resolveService(name, this.dependencies);
+  }
+
+  resolveSettingsService() {
+    return this.getService('settings');
+  }
+
   cacheStaticNodes() {
     return {
       root: document.getElementById('hud-root') || null,
@@ -180,12 +190,9 @@ class UISystem {
   }
 
   initializeSettingsMetadata() {
-    if (
-      typeof gameServices !== 'undefined' &&
-      typeof gameServices.has === 'function' &&
-      gameServices.has('settings')
-    ) {
-      this.settings = gameServices.get('settings');
+    const resolvedSettings = this.resolveSettingsService();
+    if (resolvedSettings) {
+      this.settings = resolvedSettings;
     }
 
     if (this.settings && typeof this.settings.getSchema === 'function') {
@@ -1017,10 +1024,7 @@ class UISystem {
     });
 
     gameEvents.on('toggle-pause', () => {
-      const appState =
-        typeof gameServices !== 'undefined'
-          ? gameServices.get('game-state')
-          : null;
+      const appState = this.getService('game-state');
       if (appState && typeof appState.isPaused === 'function') {
         this.updatePauseScreen(Boolean(appState.isPaused()));
       }
@@ -2093,11 +2097,7 @@ class UISystem {
   }
 
   refreshHudFromServices(force = false) {
-    if (typeof gameServices === 'undefined') {
-      return;
-    }
-
-    const player = gameServices.get('player');
+    const player = this.getService('player');
     if (player) {
       this.handleHealthChange(
         { current: player.health, max: player.maxHealth },
@@ -2109,7 +2109,7 @@ class UISystem {
       }
     }
 
-    const progression = gameServices.get('progression');
+    const progression = this.getService('progression');
     if (progression) {
       if (typeof progression.getLevel === 'function') {
         this.updateLevelDisplay(progression.getLevel(), { force });
@@ -2120,7 +2120,7 @@ class UISystem {
       }
     }
 
-    const enemies = gameServices.get('enemies');
+    const enemies = this.getService('enemies');
     if (enemies) {
       if (typeof enemies.getSessionStats === 'function') {
         this.updateSessionStatsFromData(enemies.getSessionStats(), { force });
@@ -3030,10 +3030,7 @@ class UISystem {
       return;
     }
 
-    const progression =
-      typeof gameServices !== 'undefined'
-        ? gameServices.get('progression')
-        : null;
+    const progression = this.getService('progression');
 
     if (!progression || typeof progression.applyUpgrade !== 'function') {
       this.showGameUI();

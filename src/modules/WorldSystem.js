@@ -1,17 +1,22 @@
+import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+
 class WorldSystem {
-  constructor() {
+  constructor(dependencies = {}) {
+    this.dependencies = normalizeDependencies(dependencies);
     if (typeof gameServices !== 'undefined') {
       gameServices.register('world', this);
     }
 
     this.playerAlive = true;
-    this.cachedPlayer = null;
-    this.cachedEnemies = null;
-    this.cachedPhysics = null;
-    this.cachedProgression = null;
+    this.services = {
+      player: null,
+      enemies: null,
+      physics: null,
+      progression: null
+    };
 
     this.setupEventListeners();
-    this.resolveCachedServices(true);
+    this.refreshInjectedServices(true);
 
     console.log('[WorldSystem] Initialized');
   }
@@ -22,56 +27,40 @@ class WorldSystem {
     }
 
     gameEvents.on('player-reset', () => {
-      this.resolveCachedServices(true);
+      this.refreshInjectedServices(true);
     });
 
     gameEvents.on('progression-reset', () => {
-      this.resolveCachedServices(true);
+      this.refreshInjectedServices(true);
     });
 
     gameEvents.on('physics-reset', () => {
-      this.resolveCachedServices(true);
+      this.refreshInjectedServices(true);
     });
   }
 
-  resolveCachedServices(force = false) {
-    if (typeof gameServices === 'undefined') {
-      return;
+  refreshInjectedServices(force = false) {
+    if (force) {
+      this.services.player = null;
+      this.services.enemies = null;
+      this.services.physics = null;
+      this.services.progression = null;
     }
 
-    if (force || !this.cachedPlayer) {
-      if (typeof gameServices.has === 'function' && gameServices.has('player')) {
-        this.cachedPlayer = gameServices.get('player');
-      } else {
-        this.cachedPlayer = null;
-      }
+    if (!this.services.player) {
+      this.services.player = resolveService('player', this.dependencies);
     }
 
-    if (force || !this.cachedEnemies) {
-      if (typeof gameServices.has === 'function' && gameServices.has('enemies')) {
-        this.cachedEnemies = gameServices.get('enemies');
-      } else {
-        this.cachedEnemies = null;
-      }
+    if (!this.services.enemies) {
+      this.services.enemies = resolveService('enemies', this.dependencies);
     }
 
-    if (force || !this.cachedPhysics) {
-      if (typeof gameServices.has === 'function' && gameServices.has('physics')) {
-        this.cachedPhysics = gameServices.get('physics');
-      } else {
-        this.cachedPhysics = null;
-      }
+    if (!this.services.physics) {
+      this.services.physics = resolveService('physics', this.dependencies);
     }
 
-    if (force || !this.cachedProgression) {
-      if (
-        typeof gameServices.has === 'function' &&
-        gameServices.has('progression')
-      ) {
-        this.cachedProgression = gameServices.get('progression');
-      } else {
-        this.cachedProgression = null;
-      }
+    if (!this.services.progression) {
+      this.services.progression = resolveService('progression', this.dependencies);
     }
   }
 
@@ -79,10 +68,10 @@ class WorldSystem {
     // DON'T return early - let game keep running even when player is dead
     // This allows asteroids to keep wandering while player is in death state
 
-    this.resolveCachedServices();
+    this.refreshInjectedServices();
 
-    const player = this.cachedPlayer;
-    const enemies = this.cachedEnemies;
+    const player = this.services.player;
+    const enemies = this.services.enemies;
 
     if (!player || !enemies) {
       return;
@@ -93,7 +82,7 @@ class WorldSystem {
       return;
     }
 
-    const physics = this.cachedPhysics;
+    const physics = this.services.physics;
 
     if (
       physics &&
@@ -158,11 +147,11 @@ class WorldSystem {
 
     console.log('[WorldSystem] Player died - triggering explosion');
 
-    this.resolveCachedServices();
+    this.refreshInjectedServices();
 
-    const player = this.cachedPlayer;
-    const progression = this.cachedProgression;
-    const enemies = this.cachedEnemies;
+    const player = this.services.player;
+    const progression = this.services.progression;
+    const enemies = this.services.enemies;
 
     // Get player position BEFORE marking as dead
     const playerPosition = player && typeof player.getPosition === 'function'
@@ -196,7 +185,7 @@ class WorldSystem {
 
   reset() {
     this.playerAlive = true;
-    this.resolveCachedServices(true);
+    this.refreshInjectedServices(true);
   }
 }
 

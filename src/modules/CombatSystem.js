@@ -1,9 +1,11 @@
 // src/modules/CombatSystem.js
 import * as CONSTANTS from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
+import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
 class CombatSystem {
-  constructor() {
+  constructor(dependencies = {}) {
+    this.dependencies = normalizeDependencies(dependencies);
     // === ESTADO DO SISTEMA DE COMBATE ===
     this.bullets = [];
     this.currentTarget = null;
@@ -88,9 +90,9 @@ class CombatSystem {
     this.resetAimingBranchState();
 
     // === CACHES DE SERVIÇOS ===
-    this.cachedPlayer = null;
-    this.cachedEnemies = null;
-    this.cachedPhysics = null;
+    this.cachedPlayer = resolveService('player', this.dependencies);
+    this.cachedEnemies = resolveService('enemies', this.dependencies);
+    this.cachedPhysics = resolveService('physics', this.dependencies);
     this.bulletGlowCache = null;
 
     // Registrar no ServiceLocator
@@ -152,41 +154,16 @@ class CombatSystem {
   }
 
   resolveCachedServices(force = false) {
-    if (typeof gameServices === 'undefined') {
-      return;
-    }
-
     if (force || !this.cachedPlayer) {
-      if (
-        typeof gameServices.has === 'function' &&
-        gameServices.has('player')
-      ) {
-        this.cachedPlayer = gameServices.get('player');
-      } else {
-        this.cachedPlayer = null;
-      }
+      this.cachedPlayer = resolveService('player', this.dependencies);
     }
 
     if (force || !this.cachedEnemies) {
-      if (
-        typeof gameServices.has === 'function' &&
-        gameServices.has('enemies')
-      ) {
-        this.cachedEnemies = gameServices.get('enemies');
-      } else {
-        this.cachedEnemies = null;
-      }
+      this.cachedEnemies = resolveService('enemies', this.dependencies);
     }
 
     if (force || !this.cachedPhysics) {
-      if (
-        typeof gameServices.has === 'function' &&
-        gameServices.has('physics')
-      ) {
-        this.cachedPhysics = gameServices.get('physics');
-      } else {
-        this.cachedPhysics = null;
-      }
+      this.cachedPhysics = resolveService('physics', this.dependencies);
     }
   }
 
