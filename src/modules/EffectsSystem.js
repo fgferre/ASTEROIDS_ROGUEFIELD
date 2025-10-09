@@ -1,6 +1,7 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
 import { ScreenShake } from '../utils/ScreenShake.js';
+import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
 const MAIN_THRUSTER_FLASH_THRESHOLD = 0.85;
 const MAIN_THRUSTER_FLASH_COLOR = '#3399FF';
@@ -136,8 +137,13 @@ class HitMarker {
 }
 
 export default class EffectsSystem {
-  constructor(audio) {
-    this.audio = audio;
+  constructor(config = {}) {
+    const normalizedConfig =
+      config && typeof config === 'object' && !Array.isArray(config) ? config : {};
+    const { audio = null, ...dependencies } = normalizedConfig;
+
+    this.dependencies = normalizeDependencies(dependencies);
+    this.audio = audio ?? resolveService('audio', this.dependencies);
     this.particles = [];
     this.shockwaves = [];
     this.hitMarkers = []; // NEW: Hit marker tracking
@@ -153,7 +159,7 @@ export default class EffectsSystem {
       intensity: 0,
     };
 
-    this.settings = null;
+    this.settings = resolveService('settings', this.dependencies);
     this.motionReduced = false;
     this.screenShakeScale = 1;
     this.damageFlashEnabled = true;
@@ -198,12 +204,8 @@ export default class EffectsSystem {
   }
 
   setupSettingsIntegration() {
-    if (
-      typeof gameServices !== 'undefined' &&
-      typeof gameServices.has === 'function' &&
-      gameServices.has('settings')
-    ) {
-      this.settings = gameServices.get('settings');
+    if (!this.settings) {
+      this.settings = resolveService('settings', this.dependencies);
     }
 
     if (
@@ -375,7 +377,7 @@ export default class EffectsSystem {
       this.addFreezeFrame(0.2, 0.4);
       this.addScreenFlash('#FFD700', 0.15, 0.2);
 
-      const player = gameServices.get('player');
+      const player = resolveService('player', this.dependencies);
       if (player) {
         this.createLevelUpExplosion(player.position);
       }

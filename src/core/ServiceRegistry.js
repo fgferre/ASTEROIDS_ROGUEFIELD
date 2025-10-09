@@ -19,6 +19,7 @@
  */
 
 import { DIContainer } from './DIContainer.js';
+import { createServiceManifest } from '../bootstrap/serviceManifest.js';
 
 export class ServiceRegistry {
   /**
@@ -26,73 +27,70 @@ export class ServiceRegistry {
    *
    * @param {DIContainer} container - The DI container to populate
    */
-  static setupServices(container) {
+  static setupServices(container, context = {}) {
     if (!(container instanceof DIContainer)) {
       throw new Error('[ServiceRegistry] Invalid container provided');
     }
 
-    console.log('[ServiceRegistry] Setting up service placeholders...');
+    const manifest = createServiceManifest(context);
+    const registeredNames = new Set();
 
-    // Register all service names that systems use
-    const serviceNames = [
-      // Core
-      'event-bus',
-      'settings',
-      'game-pools',
-      'garbage-collector',
+    manifest.forEach((entry) => {
+      const {
+        name,
+        factory,
+        dependencies = [],
+        singleton = true,
+        lazy = true
+      } = entry;
 
-      // Infrastructure
-      'audio',
-      'input',
-      'physics',
-      'renderer',
-      'world',
+      if (!name || typeof name !== 'string') {
+        throw new Error('[ServiceRegistry] Service entry missing valid name');
+      }
 
-      // Game Logic
-      'player',
-      'enemies',
-      'combat',
-      'xp-orbs',
+      if (registeredNames.has(name)) {
+        throw new Error(`[ServiceRegistry] Duplicate service definition: ${name}`);
+      }
 
-      // UI & Effects
-      'effects',
-      'ui',
-      'progression',
-      'menu-background',
+      if (typeof factory !== 'function') {
+        throw new Error(`[ServiceRegistry] Service '${name}' is missing a factory function`);
+      }
 
-      // Utility
-      'game-state'
-    ];
-
-    // Register each service as a lazy getter from gameServices
-    serviceNames.forEach(name => {
-      container.register(name, () => {
-        // Try to get from existing gameServices (legacy)
-        if (typeof gameServices !== 'undefined') {
-          if (gameServices.has && gameServices.has(name)) {
-            return gameServices.get(name);
-          }
-          // Try direct property access for adapter
-          if (gameServices.legacyServices && gameServices.legacyServices.has(name)) {
-            return gameServices.legacyServices.get(name);
-          }
+      dependencies.forEach((dependency) => {
+        const dependencyExists = manifest.some((candidate) => candidate.name === dependency);
+        if (!dependencyExists) {
+          throw new Error(
+            `[ServiceRegistry] Service '${name}' depends on unknown service '${dependency}'`
+          );
         }
-
-        // Special cases
-        if (name === 'event-bus' && typeof gameEvents !== 'undefined') {
-          return gameEvents;
-        }
-
-        // Service not available yet
-        console.warn(`[ServiceRegistry] Service '${name}' not available yet`);
-        return null;
-      }, {
-        singleton: true,
-        dependencies: []
       });
+
+      registeredNames.add(name);
+
+      container.register(
+        name,
+        (...resolvedDeps) => {
+          const resolved = {};
+          dependencies.forEach((dependencyName, index) => {
+            resolved[dependencyName] = resolvedDeps[index];
+          });
+
+          return factory({
+            resolved,
+            container,
+            context,
+            manifestEntry: entry
+          });
+        },
+        {
+          dependencies,
+          singleton,
+          lazy
+        }
+      );
     });
 
-    console.log(`[ServiceRegistry] Registered ${serviceNames.length} service placeholders`);
+    console.log(`[ServiceRegistry] Registered ${registeredNames.size} services in DI container`);
   }
 
   /**
