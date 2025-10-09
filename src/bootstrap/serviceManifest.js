@@ -175,37 +175,11 @@ export function createServiceManifest(context = {}) {
       factory: ({ resolved }) => new HealthHeartSystem({ player: resolved['player'] })
     },
     {
-      name: 'enemies',
-      singleton: true,
-      lazy: false,
-      dependencies: ['xp-orbs'],
-      factory: ({ resolved }) => new EnemySystem({ xpOrbs: resolved['xp-orbs'] })
-    },
-    {
       name: 'physics',
       singleton: true,
       lazy: false,
       dependencies: [],
       factory: () => new PhysicsSystem()
-    },
-    {
-      name: 'combat',
-      singleton: true,
-      lazy: false,
-      dependencies: ['player', 'enemies', 'physics'],
-      factory: ({ resolved }) =>
-        new CombatSystem({
-          player: resolved['player'],
-          enemies: resolved['enemies'],
-          physics: resolved['physics']
-        })
-    },
-    {
-      name: 'progression',
-      singleton: true,
-      lazy: false,
-      dependencies: [],
-      factory: () => new ProgressionSystem()
     },
     {
       name: 'ui',
@@ -223,11 +197,55 @@ export function createServiceManifest(context = {}) {
         new EffectsSystem({ audio: resolved['audio'], settings: resolved['settings'] })
     },
     {
+      name: 'progression',
+      singleton: true,
+      lazy: false,
+      dependencies: ['xp-orbs', 'player', 'ui', 'effects'],
+      factory: ({ resolved }) =>
+        new ProgressionSystem({
+          xpOrbs: resolved['xp-orbs'],
+          player: resolved['player'],
+          ui: resolved['ui'],
+          effects: resolved['effects']
+        })
+    },
+    {
+      name: 'enemies',
+      singleton: true,
+      lazy: false,
+      dependencies: ['player', 'xp-orbs', 'progression', 'physics'],
+      factory: ({ resolved }) =>
+        new EnemySystem({
+          player: resolved['player'],
+          xpOrbs: resolved['xp-orbs'],
+          progression: resolved['progression'],
+          physics: resolved['physics']
+        })
+    },
+    {
+      name: 'combat',
+      singleton: true,
+      lazy: false,
+      dependencies: ['player', 'enemies', 'physics'],
+      factory: ({ resolved }) =>
+        new CombatSystem({
+          player: resolved['player'],
+          enemies: resolved['enemies'],
+          physics: resolved['physics']
+        })
+    },
+    {
       name: 'world',
       singleton: true,
       lazy: false,
-      dependencies: [],
-      factory: () => new WorldSystem()
+      dependencies: ['player', 'enemies', 'physics', 'progression'],
+      factory: ({ resolved }) =>
+        new WorldSystem({
+          player: resolved['player'],
+          enemies: resolved['enemies'],
+          physics: resolved['physics'],
+          progression: resolved['progression']
+        })
     },
     {
       name: 'renderer',

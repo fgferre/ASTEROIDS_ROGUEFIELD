@@ -1,5 +1,6 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 import UPGRADE_LIBRARY, { UPGRADE_CATEGORIES } from '../data/upgrades.js';
+import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
 
@@ -12,7 +13,8 @@ const DEFAULT_UPGRADE_CATEGORY = {
 };
 
 class ProgressionSystem {
-  constructor() {
+  constructor(dependencies = {}) {
+    this.dependencies = normalizeDependencies(dependencies);
     // === DADOS DE PROGRESSÃO ===
     const initialLevel = Number.isFinite(CONSTANTS.PROGRESSION_INITIAL_LEVEL)
       ? CONSTANTS.PROGRESSION_INITIAL_LEVEL
@@ -36,10 +38,12 @@ class ProgressionSystem {
     this.pendingUpgradeOptions = [];
 
     // === CACHES DE SERVIÇOS ===
-    this.cachedXPOrbs = null;
-    this.cachedPlayer = null;
-    this.cachedUI = null;
-    this.cachedEffects = null;
+    this.services = {
+      xpOrbs: null,
+      player: null,
+      ui: null,
+      effects: null
+    };
 
     // === CONFIGURAÇÕES ===
 
@@ -59,46 +63,33 @@ class ProgressionSystem {
     console.log('[ProgressionSystem] Initialized - Level', this.level);
   }
 
-  resolveCachedServices(force = false) {
-    if (typeof gameServices === 'undefined') {
-      return;
+  refreshInjectedServices(force = false) {
+    if (force) {
+      this.services.xpOrbs = null;
+      this.services.player = null;
+      this.services.ui = null;
+      this.services.effects = null;
     }
 
-    if (force || !this.cachedXPOrbs) {
-      if (typeof gameServices.has === 'function' && gameServices.has('xp-orbs')) {
-        this.cachedXPOrbs = gameServices.get('xp-orbs');
-      } else {
-        this.cachedXPOrbs = null;
-      }
+    if (!this.services.xpOrbs) {
+      this.services.xpOrbs = resolveService('xp-orbs', this.dependencies);
     }
 
-    if (force || !this.cachedPlayer) {
-      if (typeof gameServices.has === 'function' && gameServices.has('player')) {
-        this.cachedPlayer = gameServices.get('player');
-      } else {
-        this.cachedPlayer = null;
-      }
+    if (!this.services.player) {
+      this.services.player = resolveService('player', this.dependencies);
     }
 
-    if (force || !this.cachedUI) {
-      if (typeof gameServices.has === 'function' && gameServices.has('ui')) {
-        this.cachedUI = gameServices.get('ui');
-      } else {
-        this.cachedUI = null;
-      }
+    if (!this.services.ui) {
+      this.services.ui = resolveService('ui', this.dependencies);
     }
 
-    if (force || !this.cachedEffects) {
-      if (typeof gameServices.has === 'function' && gameServices.has('effects')) {
-        this.cachedEffects = gameServices.get('effects');
-      } else {
-        this.cachedEffects = null;
-      }
+    if (!this.services.effects) {
+      this.services.effects = resolveService('effects', this.dependencies);
     }
   }
 
   setupEventListeners() {
-    this.resolveCachedServices();
+    this.refreshInjectedServices();
     if (typeof gameEvents === 'undefined') {
       return;
     }
@@ -108,11 +99,11 @@ class ProgressionSystem {
     });
 
     gameEvents.on('progression-reset', () => {
-      this.resolveCachedServices(true);
+      this.refreshInjectedServices(true);
     });
 
     gameEvents.on('player-reset', () => {
-      this.resolveCachedServices(true);
+      this.refreshInjectedServices(true);
     });
   }
 
@@ -930,8 +921,8 @@ class ProgressionSystem {
     }
 
     const operation = effect.operation || 'set';
-    this.resolveCachedServices();
-    const xpSystem = this.cachedXPOrbs;
+    this.refreshInjectedServices();
+    const xpSystem = this.services.xpOrbs;
 
     if (!xpSystem) {
       return;
@@ -1014,7 +1005,7 @@ class ProgressionSystem {
     this.appliedUpgrades.clear();
     this.pendingUpgradeOptions = [];
 
-    this.resolveCachedServices(true);
+    this.refreshInjectedServices(true);
     this.emitExperienceChanged();
 
     if (typeof gameEvents !== 'undefined') {
@@ -1052,10 +1043,12 @@ class ProgressionSystem {
   destroy() {
     this.appliedUpgrades.clear();
     this.pendingUpgradeOptions = [];
-    this.cachedXPOrbs = null;
-    this.cachedPlayer = null;
-    this.cachedUI = null;
-    this.cachedEffects = null;
+    this.services = {
+      xpOrbs: null,
+      player: null,
+      ui: null,
+      effects: null
+    };
     console.log('[ProgressionSystem] Destroyed');
   }
 }
