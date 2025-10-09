@@ -6,6 +6,10 @@ import {
 } from './core/debugLogging.js';
 import { PerformanceMonitor } from './utils/PerformanceMonitor.js';
 import { bootstrapServices } from './bootstrap/bootstrapServices.js';
+import {
+  DEFAULT_POOL_CONFIG,
+  DEFAULT_GC_OPTIONS
+} from './bootstrap/serviceManifest.js';
 
 // Dependency Injection System (Phase 2.1)
 import { DIContainer } from './core/DIContainer.js';
@@ -411,19 +415,10 @@ function init() {
 
     const manifestContext = {
       gameState,
-      poolConfig: {
-        bullets: { initial: 25, max: 120 },
-        particles: { initial: 60, max: 400 },
-        asteroids: { initial: 20, max: 100 },
-        xpOrbs: { initial: 40, max: 250 },
-        shockwaves: { initial: 8, max: 25 },
-        tempObjects: { initial: 15, max: 60 }
-      },
-      garbageCollectorOptions: {
-        defaultInterval: 4500,
-        idleTimeout: 120,
-        maxTasksPerFrame: 2
-      }
+      poolConfig: Object.fromEntries(
+        Object.entries(DEFAULT_POOL_CONFIG).map(([key, value]) => [key, { ...value }])
+      ),
+      garbageCollectorOptions: { ...DEFAULT_GC_OPTIONS }
     };
 
     // Initialize DI system first (Phase 2.1)
