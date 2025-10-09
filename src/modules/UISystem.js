@@ -61,6 +61,7 @@ class UISystem {
         cooldownDuration: null,
         cooldownTimer: null,
         cooldownRatio: null,
+        hpRatio: null,
       },
       level: null,
       xp: { current: null, needed: null, percentage: null, level: null },
@@ -2641,6 +2642,14 @@ class UISystem {
         ? 1 - Math.max(0, Math.min(1, state.cooldownTimer / state.cooldownDuration))
         : 0;
 
+    const maxHP = Math.max(0, state.maxHP);
+    const activeHP = Math.max(0, state.currentHP);
+    const effectiveHP = state.isActive ? activeHP : maxHP;
+    const hpRatio =
+      state.isUnlocked && maxHP > 0
+        ? Math.max(0, Math.min(1, effectiveHP / maxHP))
+        : 0;
+
     const cached = this.cachedValues.shield;
     const shouldUpdate =
       force ||
@@ -2650,7 +2659,8 @@ class UISystem {
       cached.isActive !== state.isActive ||
       cached.isUnlocked !== state.isUnlocked ||
       cached.isOnCooldown !== state.isOnCooldown ||
-      cached.cooldownRatio !== cooldownRatio;
+      cached.cooldownRatio !== cooldownRatio ||
+      cached.hpRatio !== hpRatio;
 
     if (!shouldUpdate) {
       return;
@@ -2661,10 +2671,12 @@ class UISystem {
       'ready',
       'active',
       'cooldown',
-      'is-cooldown'
+      'is-cooldown',
+      'is-low'
     );
 
     const statusLabel = entry.value;
+    let isLowShield = false;
 
     if (!state.isUnlocked) {
       entry.root.classList.add('locked');
@@ -2677,36 +2689,32 @@ class UISystem {
         }
       }
     } else {
-      const maxHP = Math.max(0, state.maxHP);
-      const currentHP = state.isActive
-        ? Math.max(0, state.currentHP)
-        : maxHP;
+      const currentHP = effectiveHP;
 
-      // Update HP text display
       statusLabel.textContent = `${currentHP}/${maxHP}`;
 
-      // Update HP bar fill
       if (entry.bar && entry.barFill) {
-        const hpRatio = maxHP > 0 ? Math.max(0, Math.min(1, currentHP / maxHP)) : 0;
-
         if (state.isOnCooldown) {
-          // During cooldown: show progress from left to right (empty → full)
           entry.root.classList.add('cooldown', 'is-cooldown');
-          entry.bar.style.opacity = '0.5'; // Faded during cooldown
+          entry.bar.style.opacity = '0.5';
           entry.barFill.style.width = `${cooldownRatio * 100}%`;
         } else if (!state.isActive) {
-          // Ready to activate: full bar, slightly faded
           entry.root.classList.add('ready');
-          entry.bar.style.opacity = '0.7'; // Slightly faded when inactive
+          entry.bar.style.opacity = '0.7';
           entry.barFill.style.width = '100%';
         } else {
-          // Active: show current HP
           entry.root.classList.add('active');
-          entry.bar.style.opacity = '1'; // Full opacity when active
+          entry.bar.style.opacity = '1';
           entry.barFill.style.width = `${hpRatio * 100}%`;
+
+          const lowShieldThreshold = 0.3;
+          isLowShield = hpRatio > 0 && hpRatio <= lowShieldThreshold;
         }
       }
     }
+
+    entry.root.classList.toggle('is-low', isLowShield);
+    entry.root.style.setProperty('--hud-shield-ratio', hpRatio.toFixed(3));
 
     this.cachedValues.shield = {
       level: state.level,
@@ -2718,6 +2726,7 @@ class UISystem {
       cooldownDuration: state.cooldownDuration,
       cooldownTimer: state.cooldownTimer,
       cooldownRatio,
+      hpRatio,
     };
   }
 
