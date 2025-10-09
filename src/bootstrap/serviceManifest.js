@@ -84,7 +84,12 @@ function createGarbageCollector(options) {
     { interval: 7000, priority: 1 }
   );
 
-  if (typeof gameServices !== 'undefined') {
+  if (
+    typeof gameServices !== 'undefined' &&
+    typeof gameServices.has === 'function' &&
+    typeof gameServices.register === 'function' &&
+    !gameServices.has('garbage-collector')
+  ) {
     gameServices.register('garbage-collector', manager);
   }
 
