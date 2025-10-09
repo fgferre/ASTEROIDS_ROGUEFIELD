@@ -5,12 +5,14 @@
  * Hearts persist until collected or game over (not cleared on death/retry).
  */
 
+import { normalizeDependencies, resolveService } from '../../core/serviceUtils.js';
 import HealthHeart from './HealthHeart.js';
 
 export class HealthHeartSystem {
-  constructor() {
+  constructor({ player } = {}) {
+    this.dependencies = normalizeDependencies({ player });
     this.hearts = [];
-    this.cachedPlayer = null;
+    this.cachedPlayer = resolveService('player', this.dependencies);
     this.collectionRadius = 25;
 
     // Register in gameServices
@@ -97,12 +99,8 @@ export class HealthHeartSystem {
   }
 
   resolveCachedServices() {
-    if (typeof gameServices === 'undefined') {
-      return;
-    }
-
     if (!this.cachedPlayer) {
-      this.cachedPlayer = gameServices.get('player');
+      this.cachedPlayer = resolveService('player', this.dependencies);
     }
   }
 
