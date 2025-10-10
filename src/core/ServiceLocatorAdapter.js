@@ -87,11 +87,19 @@ export class ServiceLocatorAdapter {
       return this.legacyServices.get(name);
     }
 
-    // DON'T try to resolve from DI container in Phase 2.1
-    // The container placeholders would create circular dependencies
-    // Real DI resolution will be enabled in Phase 2.2+
+    // Try to resolve from DI container when not available in legacy map
+    if (this.container.has(name)) {
+      try {
+        const instance = this.container.resolve(name);
+        this.stats.getContainerCalls++;
+        this.emitDeprecationWarning(name, caller);
+        return instance;
+      } catch (error) {
+        console.error(`[ServiceLocatorAdapter] Failed to resolve '${name}' from DI container:`, error);
+      }
+    }
 
-    // Service not found in legacy services
+    // Service not found in legacy services or DI container
     // This is expected during startup before systems register themselves
     return null;
   }
@@ -142,6 +150,47 @@ export class ServiceLocatorAdapter {
     this.stats.directRegistrations++;
 
     console.log(`[ServiceLocatorAdapter] Registered legacy service: ${name}`);
+    return true;
+  }
+
+  /**
+   * Synchronizes a DI-created instance with the legacy service map.
+   *
+   * @param {string} name - Service name
+   * @param {any} instance - Service instance created by the DI container
+   * @returns {boolean} True if synchronization succeeded
+   */
+  syncInstance(name, instance) {
+    if (!name || typeof name !== 'string') {
+      console.error('[ServiceLocatorAdapter] Cannot sync service without a valid name');
+      return false;
+    }
+
+    if (instance === null || instance === undefined) {
+      console.error(`[ServiceLocatorAdapter] Cannot sync '${name}': instance is null/undefined`);
+      return false;
+    }
+
+    let syncedWithContainer = false;
+
+    if (typeof this.container.replaceSingleton === 'function') {
+      try {
+        this.container.replaceSingleton(name, instance);
+        syncedWithContainer = true;
+      } catch (error) {
+        console.warn(
+          `[ServiceLocatorAdapter] Could not replace DI singleton '${name}' during sync:`,
+          error
+        );
+      }
+    }
+
+    this.legacyServices.set(name, instance);
+
+    if (this.showDeprecationWarnings && syncedWithContainer) {
+      console.debug?.(`[ServiceLocatorAdapter] Synced DI instance '${name}' with legacy locator`);
+    }
+
     return true;
   }
 

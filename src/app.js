@@ -85,6 +85,9 @@ function logServiceRegistrationFlow({ reason = 'bootstrap' } = {}) {
 function initializeDependencyInjection(manifestContext) {
   console.log('[App] Initializing Dependency Injection system...');
 
+  let legacyLocatorSnapshot =
+    typeof gameServices !== 'undefined' ? gameServices : null;
+
   try {
     // Create DI container
     diContainer = new DIContainer();
@@ -94,18 +97,48 @@ function initializeDependencyInjection(manifestContext) {
     ServiceRegistry.setupServices(diContainer, manifestContext);
 
     if (typeof gameServices !== 'undefined') {
+      const legacyLocator = gameServices;
+      legacyLocatorSnapshot = legacyLocator;
       serviceLocatorAdapter = new ServiceLocatorAdapter(diContainer);
+
+      // Synchronize already-registered legacy services into the adapter
+      try {
+        const legacyEntries = legacyLocator?.services instanceof Map
+          ? Array.from(legacyLocator.services.entries())
+          : [];
+
+        legacyEntries.forEach(([name, instance]) => {
+          if (!name) return;
+          try {
+            serviceLocatorAdapter.syncInstance(name, instance);
+          } catch (syncError) {
+            console.warn(`[App] Failed to sync legacy service '${name}' to adapter:`, syncError);
+          }
+        });
+      } catch (syncError) {
+        console.warn('[App] Could not synchronize existing legacy services:', syncError);
+      }
+
+      if (typeof globalThis !== 'undefined') {
+        if (!globalThis.__legacyGameServices) {
+          globalThis.__legacyGameServices = legacyLocator;
+        }
+        globalThis.gameServices = serviceLocatorAdapter;
+      }
     }
 
-    // IMPORTANT: Don't replace gameServices yet!
-    // Systems need to register themselves first using the original ServiceLocator
-    // The adapter will be enabled in Phase 2.2+ when systems use constructor injection
+    // The adapter keeps legacy APIs operational while mirroring DI instances.
+    // Systems continue to call gameServices.register/get() transparently until
+    // full constructor injection is introduced in Phase 2.2+.
 
     // Just expose container for debugging
     if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
       window.diContainer = diContainer;
       window.performanceMonitor = performanceMonitor;
       window.serviceLocatorAdapter = serviceLocatorAdapter;
+      if (serviceLocatorAdapter) {
+        window.gameServices = serviceLocatorAdapter;
+      }
 
       logServiceRegistrationFlow({ reason: 'development snapshot' });
 
@@ -129,6 +162,9 @@ function initializeDependencyInjection(manifestContext) {
   } catch (error) {
     console.error('[App] ✗ Failed to initialize DI system:', error);
     console.warn('[App] Falling back to legacy ServiceLocator');
+    if (legacyLocatorSnapshot && typeof globalThis !== 'undefined') {
+      globalThis.gameServices = legacyLocatorSnapshot;
+    }
     return false;
   }
 }
@@ -426,7 +462,8 @@ function init() {
 
     const { services } = bootstrapServices({
       container: diContainer,
-      manifestContext
+      manifestContext,
+      adapter: serviceLocatorAdapter
     });
 
     garbageCollectionManager = services['garbage-collector'] || garbageCollectionManager;
