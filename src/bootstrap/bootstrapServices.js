@@ -3,7 +3,8 @@ import { createServiceManifest } from './serviceManifest.js';
 export function bootstrapServices({
   container,
   manifestContext = {},
-  logger = console
+  logger = console,
+  adapter = null
 } = {}) {
   if (!container) {
     throw new Error('[bootstrapServices] DI container instance is required');
@@ -16,6 +17,10 @@ export function bootstrapServices({
     try {
       const instance = container.resolve(entry.name);
       resolvedServices[entry.name] = instance;
+
+      if (adapter && typeof adapter.syncInstance === 'function') {
+        adapter.syncInstance(entry.name, instance);
+      }
     } catch (error) {
       throw new Error(`Failed to bootstrap service '${entry.name}': ${error.message}`);
     }
