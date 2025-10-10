@@ -2,6 +2,7 @@ import * as CONSTANTS from '../core/GameConstants.js';
 import RenderBatch from '../core/RenderBatch.js';
 import CanvasStateManager from '../core/CanvasStateManager.js';
 import GradientCache from '../core/GradientCache.js';
+import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
 const MAX_VISUAL_TILT = 0.3;
 const TILT_MULTIPLIER = 0.12;
@@ -577,7 +578,8 @@ class SpaceSkyBackground {
 }
 
 class RenderingSystem {
-  constructor() {
+  constructor(dependencies = {}) {
+    this.dependencies = normalizeDependencies(dependencies);
     this.spaceSky = new SpaceSkyBackground();
     this.spaceSky.setParallax(0.06, 0.05, 0.06, CONSTANTS.SHIP_MAX_SPEED);
 
@@ -616,24 +618,25 @@ class RenderingSystem {
       size: 0,
     };
 
-    if (typeof gameServices !== 'undefined') {
-      this.spaceSky.bindVelocityProvider(() => {
-        this.resolveCachedServices();
-        const player = this.cachedPlayer;
-        if (!player) {
-          return null;
-        }
-
-        if (typeof player.getVelocity === 'function') {
-          return player.getVelocity();
-        }
-
-        if (player.velocity) {
-          return { ...player.velocity };
-        }
-
+    this.spaceSky.bindVelocityProvider(() => {
+      this.resolveCachedServices();
+      const player = this.cachedPlayer;
+      if (!player) {
         return null;
-      });
+      }
+
+      if (typeof player.getVelocity === 'function') {
+        return player.getVelocity();
+      }
+
+      if (player.velocity) {
+        return { ...player.velocity };
+      }
+
+      return null;
+    });
+
+    if (typeof gameServices !== 'undefined') {
       gameServices.register('renderer', this);
     }
 
@@ -645,46 +648,27 @@ class RenderingSystem {
       shadowBlur: 0
     });
 
+    this.resolveCachedServices(true);
+
     console.log('[RenderingSystem] Initialized with batch rendering optimization');
   }
 
   resolveCachedServices(force = false) {
-    if (typeof gameServices === 'undefined') {
-      return;
-    }
+    const assign = (property, serviceName) => {
+      if (!force && this[property]) {
+        return;
+      }
 
-    const fetch = (name) => {
-      if (typeof gameServices.has === 'function' && !gameServices.has(name)) {
-        return null;
-      }
-      try {
-        return gameServices.get(name);
-      } catch (error) {
-        return null;
-      }
+      this[property] = resolveService(serviceName, this.dependencies);
     };
 
-    if (force || !this.cachedPlayer) {
-      this.cachedPlayer = fetch('player');
-    }
-    if (force || !this.cachedProgression) {
-      this.cachedProgression = fetch('progression');
-    }
-    if (force || !this.cachedXPOrbs) {
-      this.cachedXPOrbs = fetch('xp-orbs');
-    }
-    if (force || !this.cachedHealthHearts) {
-      this.cachedHealthHearts = fetch('healthHearts');
-    }
-    if (force || !this.cachedEffects) {
-      this.cachedEffects = fetch('effects');
-    }
-    if (force || !this.cachedCombat) {
-      this.cachedCombat = fetch('combat');
-    }
-    if (force || !this.cachedEnemies) {
-      this.cachedEnemies = fetch('enemies');
-    }
+    assign('cachedPlayer', 'player');
+    assign('cachedProgression', 'progression');
+    assign('cachedXPOrbs', 'xp-orbs');
+    assign('cachedHealthHearts', 'healthHearts');
+    assign('cachedEffects', 'effects');
+    assign('cachedCombat', 'combat');
+    assign('cachedEnemies', 'enemies');
   }
 
   render(ctx) {
