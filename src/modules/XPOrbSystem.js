@@ -1,6 +1,6 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { normalizeDependencies } from '../core/serviceUtils.js';
 
 const ORB_CLASS_ORDER = [
   { name: 'blue', tier: 1 },
@@ -145,28 +145,60 @@ class XPOrbSystem {
 
     this.configureOrbClustering();
 
+    this.missingDependencyWarnings = new Set();
+
     if (typeof gameServices !== 'undefined') {
       gameServices.register('xp-orbs', this);
     }
 
     this.setupEventListeners();
-    this.resolveCachedServices(true);
+    this.resolveCachedServices({ force: true, suppressWarnings: true });
 
     console.log('[XPOrbSystem] Initialized');
   }
 
-  resolveCachedServices(force = false) {
+  attachProgression(progressionSystem) {
+    if (!progressionSystem) {
+      this.logMissingDependency('progression');
+      return;
+    }
+
+    this.dependencies.progression = progressionSystem;
+    this.cachedProgression = progressionSystem;
+    this.missingDependencyWarnings.delete('progression');
+  }
+
+  logMissingDependency(name) {
+    if (this.missingDependencyWarnings.has(name)) {
+      return;
+    }
+
+    this.missingDependencyWarnings.add(name);
+    console.warn(`[XPOrbSystem] Missing dependency: ${name}`);
+  }
+
+  resolveCachedServices({ force = false, suppressWarnings = false } = {}) {
     if (force) {
-      this.cachedPlayer = this.dependencies.player || null;
-      this.cachedProgression = this.dependencies.progression || null;
+      this.cachedPlayer = null;
+      this.cachedProgression = null;
     }
 
-    if (!this.cachedPlayer) {
-      this.cachedPlayer = resolveService('player', this.dependencies);
+    if (!this.cachedPlayer && this.dependencies.player) {
+      this.cachedPlayer = this.dependencies.player;
+      this.missingDependencyWarnings.delete('player');
     }
 
-    if (!this.cachedProgression) {
-      this.cachedProgression = resolveService('progression', this.dependencies);
+    if (!this.cachedProgression && this.dependencies.progression) {
+      this.cachedProgression = this.dependencies.progression;
+      this.missingDependencyWarnings.delete('progression');
+    }
+
+    if (!this.cachedPlayer && !suppressWarnings) {
+      this.logMissingDependency('player');
+    }
+
+    if (!this.cachedProgression && !suppressWarnings) {
+      this.logMissingDependency('progression');
     }
   }
 
@@ -434,11 +466,11 @@ class XPOrbSystem {
     // Future systems (coins, etc.) will follow the same pattern
 
     gameEvents.on('progression-reset', () => {
-      this.resolveCachedServices(true);
+      this.resolveCachedServices({ force: true });
     });
 
     gameEvents.on('player-reset', () => {
-      this.resolveCachedServices(true);
+      this.resolveCachedServices({ force: true });
     });
   }
 
@@ -1731,7 +1763,7 @@ class XPOrbSystem {
     this.clusterFusionCount = CONSTANTS.CLUSTER_FUSION_COUNT;
     this.configureOrbClustering();
 
-    this.resolveCachedServices(true);
+    this.resolveCachedServices({ force: true });
 
     if (typeof gameEvents !== 'undefined') {
       gameEvents.emit('xp-orbs-reset');

@@ -1,7 +1,7 @@
 // src/modules/EnemySystem.js
 import * as CONSTANTS from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { normalizeDependencies } from '../core/serviceUtils.js';
 import { Asteroid } from './enemies/types/Asteroid.js';
 import { EnemyFactory } from './enemies/base/EnemyFactory.js';
 import { WaveManager } from './enemies/managers/WaveManager.js';
@@ -59,17 +59,70 @@ class EnemySystem {
       gameServices.register('enemies', this);
     }
 
+    this.missingDependencyWarnings = new Set();
+    this.deferredDependencyWarnings = new Set(['world']);
+
     this.setupAsteroidPoolIntegration();
     this.setupEnemyFactory(); // Initialize factory (optional)
     this.setupManagers(); // Initialize wave and reward managers
     this.setupComponents(); // Initialize components
     this.setupEventListeners();
-    this.refreshInjectedServices(true);
+    this.refreshInjectedServices({ force: true, suppressWarnings: true });
     this.syncPhysicsIntegration(true);
 
     this.emitWaveStateUpdate(true);
 
     console.log('[EnemySystem] Initialized');
+  }
+
+  attachProgression(progressionSystem) {
+    if (!progressionSystem) {
+      this.logMissingDependency('progression');
+      return;
+    }
+
+    this.dependencies.progression = progressionSystem;
+    this.refreshInjectedServices({ force: true });
+  }
+
+  attachWorld(worldSystem) {
+    if (!worldSystem) {
+      this.logMissingDependency('world');
+      return;
+    }
+
+    this.dependencies.world = worldSystem;
+    this.deferredDependencyWarnings.delete('world');
+    this.refreshInjectedServices({ force: true });
+  }
+
+  logMissingDependency(name) {
+    if (this.missingDependencyWarnings.has(name)) {
+      return;
+    }
+
+    this.missingDependencyWarnings.add(name);
+    console.warn(`[EnemySystem] Missing dependency: ${name}`);
+  }
+
+  updateServiceCache(targetKey, dependencyKey, { force = false, suppressWarnings = false } = {}) {
+    if (force) {
+      this.services[targetKey] = null;
+    }
+
+    const dependency = this.dependencies[dependencyKey];
+    if (dependency) {
+      this.services[targetKey] = dependency;
+      this.missingDependencyWarnings.delete(dependencyKey);
+      return;
+    }
+
+    if (!this.services[targetKey] && !suppressWarnings) {
+      if (this.deferredDependencyWarnings.has(dependencyKey)) {
+        return;
+      }
+      this.logMissingDependency(dependencyKey);
+    }
   }
 
   setupEventListeners() {
@@ -81,19 +134,19 @@ class EnemySystem {
     });
 
     gameEvents.on('player-reset', () => {
-      this.refreshInjectedServices(true);
+      this.refreshInjectedServices({ force: true });
     });
 
     gameEvents.on('progression-reset', () => {
-      this.refreshInjectedServices(true);
+      this.refreshInjectedServices({ force: true });
     });
 
     gameEvents.on('world-reset', () => {
-      this.refreshInjectedServices(true);
+      this.refreshInjectedServices({ force: true });
     });
 
     gameEvents.on('physics-reset', () => {
-      this.refreshInjectedServices(true);
+      this.refreshInjectedServices({ force: true });
       this.syncPhysicsIntegration(true);
     });
 
@@ -107,39 +160,14 @@ class EnemySystem {
     }
   }
 
-  refreshInjectedServices(force = false) {
-    if (force) {
-      this.services.player = this.dependencies.player || null;
-      this.services.world = this.dependencies.world || null;
-      this.services.progression = this.dependencies.progression || null;
-      this.services.xpOrbs = this.dependencies['xp-orbs'] || null;
-      this.services.physics = this.dependencies.physics || null;
-      this.services.healthHearts = this.dependencies.healthHearts || null;
-    }
-
-    if (!this.services.player) {
-      this.services.player = resolveService('player', this.dependencies);
-    }
-
-    if (!this.services.world) {
-      this.services.world = resolveService('world', this.dependencies);
-    }
-
-    if (!this.services.progression) {
-      this.services.progression = resolveService('progression', this.dependencies);
-    }
-
-    if (!this.services.xpOrbs) {
-      this.services.xpOrbs = resolveService('xp-orbs', this.dependencies);
-    }
-
-    if (!this.services.physics) {
-      this.services.physics = resolveService('physics', this.dependencies);
-    }
-
-    if (!this.services.healthHearts) {
-      this.services.healthHearts = resolveService('healthHearts', this.dependencies);
-    }
+  refreshInjectedServices({ force = false, suppressWarnings = false } = {}) {
+    const options = { force, suppressWarnings };
+    this.updateServiceCache('player', 'player', options);
+    this.updateServiceCache('world', 'world', options);
+    this.updateServiceCache('progression', 'progression', options);
+    this.updateServiceCache('xpOrbs', 'xp-orbs', options);
+    this.updateServiceCache('physics', 'physics', options);
+    this.updateServiceCache('healthHearts', 'healthHearts', options);
   }
 
   syncPhysicsIntegration(force = false) {
@@ -1258,7 +1286,7 @@ class EnemySystem {
     this.sessionActive = true;
     this.lastWaveBroadcast = null;
 
-    this.refreshInjectedServices(true);
+    this.refreshInjectedServices({ force: true });
     this.syncPhysicsIntegration(true);
 
     this.spawnInitialAsteroids(4);
