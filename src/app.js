@@ -24,6 +24,11 @@ const gameState = {
   initialized: false,
   lastTime: 0,
   deathSnapshot: null, // Snapshot of game state at death for retry
+  randomSeed: null,
+  randomSeedSource: 'unknown',
+  randomSnapshot: null,
+  randomScope: 'uninitialized',
+  randomService: null,
 };
 
 let garbageCollectionManager = null;
@@ -34,6 +39,165 @@ const performanceMonitor = new PerformanceMonitor();
 // Initialize DI Container (Phase 2.1)
 let diContainer = null;
 let serviceLocatorAdapter = null;
+
+const RANDOM_STORAGE_KEYS = {
+  override: 'roguefield.seedOverride',
+  last: 'roguefield.lastSeed'
+};
+
+function parseSeedCandidate(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const trimmed = String(value).trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  const numeric = Number(trimmed);
+  if (Number.isFinite(numeric)) {
+    return numeric;
+  }
+
+  return trimmed;
+}
+
+function persistLastSeed(seed, source) {
+  if (typeof window === 'undefined' || !window.localStorage) {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(
+      RANDOM_STORAGE_KEYS.last,
+      JSON.stringify({
+        seed: typeof seed === 'number' ? seed : String(seed),
+        source: source || 'unknown',
+        timestamp: Date.now()
+      })
+    );
+  } catch (error) {
+    console.warn('[Random] Failed to persist last seed snapshot:', error);
+  }
+}
+
+function deriveInitialSeed() {
+  let source = 'crypto';
+  let seed = null;
+
+  if (typeof window !== 'undefined') {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const fromUrl = params.get('seed');
+      const parsedUrlSeed = parseSeedCandidate(fromUrl);
+      if (parsedUrlSeed !== null) {
+        source = 'url';
+        seed = parsedUrlSeed;
+        return { seed, source };
+      }
+    } catch (error) {
+      console.warn('[Random] Failed to parse seed from URL:', error);
+    }
+
+    try {
+      const storage = window.localStorage;
+      if (storage) {
+        const override = storage.getItem(RANDOM_STORAGE_KEYS.override);
+        const parsedOverride = parseSeedCandidate(override);
+        if (parsedOverride !== null) {
+          source = 'localStorage';
+          seed = parsedOverride;
+          return { seed, source };
+        }
+      }
+    } catch (error) {
+      console.warn('[Random] Failed to read seed override from localStorage:', error);
+    }
+
+    if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+      const buffer = new Uint32Array(1);
+      window.crypto.getRandomValues(buffer);
+      seed = buffer[0];
+      return { seed, source };
+    }
+  }
+
+  source = 'math-random';
+  seed = Math.floor(Math.random() * 0xffffffff);
+  return { seed, source };
+}
+
+function logRandomSnapshot(scope, snapshot, { mode = 'reset' } = {}) {
+  if (!snapshot) {
+    return;
+  }
+
+  const { seed, state } = snapshot;
+  const stateHex = typeof state === 'number' ? `0x${state.toString(16).padStart(8, '0')}` : state;
+  console.log(`[Random] ${scope} (${mode}) → seed=${seed} state=${stateHex}`);
+}
+
+function getRandomService() {
+  if (gameState.randomService) {
+    return gameState.randomService;
+  }
+
+  if (typeof gameServices !== 'undefined') {
+    try {
+      if (typeof gameServices.has === 'function' ? gameServices.has('random') : true) {
+        const service = gameServices.get('random');
+        if (service) {
+          gameState.randomService = service;
+          return service;
+        }
+      }
+    } catch (error) {
+      console.warn('[Random] Failed to obtain service from legacy locator:', error);
+    }
+  }
+
+  if (diContainer && typeof diContainer.resolve === 'function') {
+    try {
+      const service = diContainer.resolve('random');
+      if (service) {
+        gameState.randomService = service;
+        return service;
+      }
+    } catch (error) {
+      console.warn('[Random] Failed to resolve random service from DI:', error);
+    }
+  }
+
+  return null;
+}
+
+function prepareRandomForScope(scope, { mode = 'reset', snapshot } = {}) {
+  const random = getRandomService();
+
+  if (!random || typeof random.serialize !== 'function') {
+    console.warn(`[Random] Cannot prepare RNG for scope "${scope}" - service unavailable.`);
+    return null;
+  }
+
+  if (mode === 'restore' && snapshot) {
+    try {
+      random.restore(snapshot);
+    } catch (error) {
+      console.warn(`[Random] Failed to restore RNG snapshot for scope "${scope}":`, error);
+      random.reset(gameState.randomSeed);
+      mode = 'reset';
+    }
+  } else {
+    random.reset(gameState.randomSeed);
+  }
+
+  const currentSnapshot = random.serialize();
+  gameState.randomSnapshot = currentSnapshot;
+  gameState.randomScope = scope;
+  logRandomSnapshot(scope, currentSnapshot, { mode });
+  return random;
+}
 
 function logServiceRegistrationFlow({ reason = 'bootstrap' } = {}) {
   if (!diContainer || typeof diContainer.getServiceNames !== 'function') {
@@ -169,7 +333,15 @@ function initializeDependencyInjection(manifestContext) {
   }
 }
 
-function resetGameSystems() {
+function resetGameSystems({ manageRandom = true } = {}) {
+  if (manageRandom) {
+    prepareRandomForScope('systems.reset', { mode: 'reset' });
+  } else {
+    logRandomSnapshot('systems.reset (pre-managed)', gameState.randomSnapshot, {
+      mode: 'snapshot'
+    });
+  }
+
   if (typeof gameServices === 'undefined') {
     return;
   }
@@ -222,6 +394,15 @@ function createDeathSnapshot() {
 
   if (!player || !enemies || !physics || !progression) return;
 
+  const random = getRandomService();
+  const randomSnapshot = random && typeof random.serialize === 'function'
+    ? random.serialize()
+    : gameState.randomSnapshot;
+  if (randomSnapshot) {
+    gameState.randomSnapshot = randomSnapshot;
+    logRandomSnapshot('death.snapshot', randomSnapshot, { mode: 'snapshot' });
+  }
+
   gameState.deathSnapshot = {
     // Player state (excluding health - will be restored to max)
     player: {
@@ -241,6 +422,8 @@ function createDeathSnapshot() {
     physics: physics.getSnapshotState ? physics.getSnapshotState() : null,
     // Timestamp
     timestamp: Date.now(),
+    randomSeed: gameState.randomSeed,
+    random: randomSnapshot,
   };
 
   console.log('[Retry] Death snapshot created', gameState.deathSnapshot);
@@ -260,6 +443,12 @@ function restoreFromSnapshot() {
   if (!player || !enemies || !physics || !progression) return false;
 
   const snapshot = gameState.deathSnapshot;
+
+  if (snapshot.random) {
+    prepareRandomForScope('snapshot.restore', { mode: 'restore', snapshot: snapshot.random });
+  } else {
+    prepareRandomForScope('snapshot.restore', { mode: 'reset' });
+  }
 
   // Restore player (with FULL health)
   if (snapshot.player) {
@@ -394,6 +583,13 @@ function showCountdownNumber(number, onComplete) {
 }
 
 function executeRetryRespawn() {
+  const snapshot = gameState.deathSnapshot;
+  if (snapshot?.random) {
+    prepareRandomForScope('retry.respawn', { mode: 'restore', snapshot: snapshot.random });
+  } else {
+    prepareRandomForScope('retry.respawn', { mode: 'reset' });
+  }
+
   const player = gameServices.get('player');
   const world = gameServices.get('world');
 
@@ -449,12 +645,21 @@ function init() {
     setupDomEventListeners();
     setupGlobalEventListeners();
 
+    const { seed: initialSeed, source: seedSource } = deriveInitialSeed();
+    gameState.randomSeed = initialSeed;
+    gameState.randomSeedSource = seedSource;
+    persistLastSeed(initialSeed, seedSource);
+    console.log(`[Random] Boot seed (${seedSource}): ${String(initialSeed)}`);
+
     const manifestContext = {
       gameState,
       poolConfig: Object.fromEntries(
         Object.entries(DEFAULT_POOL_CONFIG).map(([key, value]) => [key, { ...value }])
       ),
-      garbageCollectorOptions: { ...DEFAULT_GC_OPTIONS }
+      garbageCollectorOptions: { ...DEFAULT_GC_OPTIONS },
+      seed: initialSeed,
+      randomSeed: initialSeed,
+      randomSeedSource: seedSource
     };
 
     // Initialize DI system first (Phase 2.1)
@@ -467,6 +672,15 @@ function init() {
     });
 
     garbageCollectionManager = services['garbage-collector'] || garbageCollectionManager;
+
+    if (services['random']) {
+      gameState.randomService = services['random'];
+    }
+
+    const bootRandom = prepareRandomForScope('bootstrap', { mode: 'reset' });
+    if (bootRandom) {
+      persistLastSeed(gameState.randomSnapshot?.seed ?? initialSeed, seedSource);
+    }
 
     const ui = services['ui'] || gameServices.get('ui');
     if (ui) ui.showScreen('menu');
@@ -605,7 +819,10 @@ function requestStartGame() {
 
 function startGame() {
   try {
-    resetGameSystems();
+    prepareRandomForScope('run.start', { mode: 'reset' });
+    gameState.deathSnapshot = null;
+
+    resetGameSystems({ manageRandom: false });
 
     const audio = gameServices.get('audio');
     if (audio?.init) audio.init();
@@ -689,7 +906,8 @@ function exitToMenu(payload = {}) {
 
 function performExitToMenu(payload = {}) {
   try {
-    resetGameSystems();
+    prepareRandomForScope('menu.exit', { mode: 'reset' });
+    resetGameSystems({ manageRandom: false });
 
     const ui = gameServices.get('ui');
     if (ui) {
