@@ -1,10 +1,34 @@
 // src/modules/MenuBackgroundSystem.js
 
+import RandomService from '../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+
+const SIMPLEX_DEFAULT_RANDOM = new RandomService();
 
 class MenuBackgroundSystem {
   constructor(dependencies = {}) {
-    this.dependencies = normalizeDependencies(dependencies);
+    const input =
+      dependencies && typeof dependencies === 'object' && !Array.isArray(dependencies)
+        ? dependencies
+        : {};
+    const { random = null, ...rest } = input;
+
+    this.dependencies = normalizeDependencies(rest);
+    this.random = random ?? resolveService('random', this.dependencies);
+    if (!this.random) {
+      this.random = new RandomService();
+    }
+
+    this.dependencies.random = this.random;
+    this.randomForks = {
+      base: this.random.fork('menu.base'),
+      starfield: this.random.fork('menu.starfield'),
+      assets: this.random.fork('menu.assets'),
+      belt: this.random.fork('menu.belt'),
+      asteroids: this.random.fork('menu.asteroids'),
+      fragments: this.random.fork('menu.fragments'),
+      materials: this.random.fork('menu.materials'),
+    };
     this.settingsService = null;
     this.canvas =
       typeof document !== 'undefined'
@@ -80,6 +104,77 @@ class MenuBackgroundSystem {
     if (typeof gameServices !== 'undefined' && gameServices?.register) {
       gameServices.register('menu-background', this);
     }
+  }
+
+  getRandomFork(name = 'base') {
+    if (!this.randomForks) {
+      return null;
+    }
+
+    return this.randomForks[name] || this.randomForks.base || null;
+  }
+
+  randomFloat(name = 'base') {
+    const fork = this.getRandomFork(name);
+    if (fork && typeof fork.float === 'function') {
+      return fork.float();
+    }
+
+    return globalThis.Math.random();
+  }
+
+  randomRange(min, max, name = 'base') {
+    const fork = this.getRandomFork(name);
+    if (fork && typeof fork.range === 'function') {
+      return fork.range(min, max);
+    }
+
+    return min + (max - min) * this.randomFloat(name);
+  }
+
+  randomInt(min, max, name = 'base') {
+    const fork = this.getRandomFork(name);
+    if (fork && typeof fork.int === 'function') {
+      return fork.int(min, max);
+    }
+
+    const low = Math.min(min, max);
+    const high = Math.max(min, max);
+    return low + Math.floor((high - low + 1) * this.randomFloat(name));
+  }
+
+  randomChance(probability, name = 'base') {
+    if (probability <= 0) {
+      return false;
+    }
+
+    if (probability >= 1) {
+      return true;
+    }
+
+    const fork = this.getRandomFork(name);
+    if (fork && typeof fork.chance === 'function') {
+      return fork.chance(probability);
+    }
+
+    return this.randomFloat(name) < probability;
+  }
+
+  randomCentered(span = 1, name = 'base') {
+    return (this.randomFloat(name) - 0.5) * span;
+  }
+
+  randomPick(array, name = 'base') {
+    if (!Array.isArray(array) || array.length === 0) {
+      return undefined;
+    }
+
+    const fork = this.getRandomFork(name);
+    if (fork && typeof fork.pick === 'function') {
+      return fork.pick(array);
+    }
+
+    return array[this.randomInt(0, array.length - 1, name)];
   }
 
   getService(name) {
@@ -197,8 +292,8 @@ class MenuBackgroundSystem {
       const positions = new Float32Array(config.count * 3);
 
       for (let i = 0; i < config.count; i += 1) {
-        const theta = Math.random() * Math.PI * 2;
-        const phi = Math.acos(2 * Math.random() - 1);
+        const theta = this.randomFloat('starfield') * Math.PI * 2;
+        const phi = Math.acos(2 * this.randomFloat('starfield') - 1);
         const radius = config.distance;
 
         const x = radius * Math.sin(phi) * Math.cos(theta);
@@ -216,7 +311,7 @@ class MenuBackgroundSystem {
         color: 0xffffff,
         size: this.computeWorldSpacePointSize(config.distance, config.pixelSize),
         transparent: true,
-        opacity: Math.random() * 0.35 + 0.55,
+        opacity: this.randomFloat('starfield') * 0.35 + 0.55,
         fog: false,
       });
       material.sizeAttenuation = true;
@@ -279,7 +374,7 @@ class MenuBackgroundSystem {
     for (let i = 0; i < count; i += 1) {
       const geometry = this.createDeformedIcosahedron();
       this.baseGeometries.push(geometry);
-      this.baseMaterials.push(this.createProceduralMaterial(Math.random() * 100));
+      this.baseMaterials.push(this.createProceduralMaterial(this.randomFloat('assets') * 100));
     }
   }
 
@@ -309,7 +404,7 @@ class MenuBackgroundSystem {
     return Number.isFinite(numeric) ? Math.max(0, Math.min(2.5, numeric)) : 1;
   }
 
-  createRandomGenerator(seed = Math.random() * 1000) {
+  createRandomGenerator(seed = this.randomFloat('assets') * 1000) {
     let value = Math.floor(seed * 1000) % 2147483647;
     if (value <= 0) {
       value += 2147483646;
@@ -321,15 +416,15 @@ class MenuBackgroundSystem {
     };
   }
 
-  createDeformedIcosahedron(detailSeed = Math.random() * 100) {
+  createDeformedIcosahedron(detailSeed = this.randomFloat('assets') * 100) {
     const { THREE } = this;
     const geometry = new THREE.IcosahedronGeometry(1, 5);
     const simplex = new SimplexNoise(this.createRandomGenerator(detailSeed));
     const positions = geometry.attributes.position;
     const vertex = new THREE.Vector3();
     const temp = new THREE.Vector3();
-    const noiseScale = Math.random() * 0.2 + 0.2;
-    const distortion = Math.random() * 0.3 + 0.2;
+    const noiseScale = this.randomFloat('assets') * 0.2 + 0.2;
+    const distortion = this.randomFloat('assets') * 0.3 + 0.2;
 
     for (let i = 0; i < positions.count; i += 1) {
       vertex.fromBufferAttribute(positions, i);
@@ -705,36 +800,36 @@ class MenuBackgroundSystem {
     this.spawnedBeltAsteroids += 1;
 
     const belt = { innerRadius: 40, outerRadius: 150, height: 30 };
-    const angle = Math.random() * Math.PI * 2;
+    const angle = this.randomFloat('belt') * Math.PI * 2;
     const radius =
-      belt.innerRadius + Math.random() * (belt.outerRadius - belt.innerRadius);
+      belt.innerRadius + this.randomFloat('belt') * (belt.outerRadius - belt.innerRadius);
     const position = new THREE.Vector3(
       Math.cos(angle) * radius,
-      (Math.random() - 0.5) * belt.height,
+      (this.randomFloat('belt') - 0.5) * belt.height,
       Math.sin(angle) * radius
     );
 
     const shouldSpawnLarge =
-      forceLarge || this.spawnedBeltAsteroids <= 20 || Math.random() < 0.25;
+      forceLarge || this.spawnedBeltAsteroids <= 20 || this.randomFloat('belt') < 0.25;
     const scaleVal = shouldSpawnLarge
-      ? Math.random() * 5 + 5
-      : Math.random() * 3 + 2;
+      ? this.randomFloat('belt') * 5 + 5
+      : this.randomFloat('belt') * 3 + 2;
     const scale = new THREE.Vector3(
-      scaleVal * (1 + (Math.random() - 0.5) * 0.8),
-      scaleVal * (1 + (Math.random() - 0.5) * 0.8),
-      scaleVal * (1 + (Math.random() - 0.5) * 0.8)
+      scaleVal * (1 + (this.randomFloat('belt') - 0.5) * 0.8),
+      scaleVal * (1 + (this.randomFloat('belt') - 0.5) * 0.8),
+      scaleVal * (1 + (this.randomFloat('belt') - 0.5) * 0.8)
     );
 
     const velocity = new CANNON.Vec3(
-      (Math.random() - 0.5) * 2,
-      (Math.random() - 0.5) * 2,
-      (Math.random() - 0.5) * 2
+      (this.randomFloat('belt') - 0.5) * 2,
+      (this.randomFloat('belt') - 0.5) * 2,
+      (this.randomFloat('belt') - 0.5) * 2
     );
 
     const angularVelocity = new CANNON.Vec3(
-      (Math.random() - 0.5) * 1,
-      (Math.random() - 0.5) * 1,
-      (Math.random() - 0.5) * 1
+      (this.randomFloat('belt') - 0.5) * 1,
+      (this.randomFloat('belt') - 0.5) * 1,
+      (this.randomFloat('belt') - 0.5) * 1
     );
 
     this.activateAsteroid({
@@ -752,13 +847,13 @@ class MenuBackgroundSystem {
 
     const { THREE, CANNON } = this;
     const target = this.activeAsteroids[
-      Math.floor(Math.random() * this.activeAsteroids.length)
+      Math.floor(this.randomFloat('asteroids') * this.activeAsteroids.length)
     ];
 
     const spawnDirection = new THREE.Vector3(
-      Math.random() - 0.5,
-      Math.random() - 0.5,
-      Math.random() - 0.5
+      this.randomFloat('asteroids') - 0.5,
+      this.randomFloat('asteroids') - 0.5,
+      this.randomFloat('asteroids') - 0.5
     ).normalize();
 
     const spawnDistance = 300;
@@ -772,17 +867,17 @@ class MenuBackgroundSystem {
     velocity.normalize();
     velocity.scale(80, velocity);
 
-    const scaleValue = Math.random() * 4 + 4;
+    const scaleValue = this.randomFloat('asteroids') * 4 + 4;
     const scale = new THREE.Vector3(
       scaleValue,
-      scaleValue * (0.85 + Math.random() * 0.3),
-      scaleValue * (0.9 + Math.random() * 0.25)
+      scaleValue * (0.85 + this.randomFloat('asteroids') * 0.3),
+      scaleValue * (0.9 + this.randomFloat('asteroids') * 0.25)
     );
 
     const angularVelocity = new CANNON.Vec3(
-      (Math.random() - 0.5) * 3,
-      (Math.random() - 0.5) * 3,
-      (Math.random() - 0.5) * 3
+      (this.randomFloat('asteroids') - 0.5) * 3,
+      (this.randomFloat('asteroids') - 0.5) * 3,
+      (this.randomFloat('asteroids') - 0.5) * 3
     );
 
     this.activateAsteroid({ position, scale, velocity, angularVelocity });
@@ -801,9 +896,9 @@ class MenuBackgroundSystem {
     }
 
     const { mesh, body } = asteroid;
-    const geometry = this.baseGeometries[Math.floor(Math.random() * this.baseGeometries.length)];
+    const geometry = this.baseGeometries[Math.floor(this.randomFloat('asteroids') * this.baseGeometries.length)];
     const baseMaterial =
-      this.baseMaterials[Math.floor(Math.random() * this.baseMaterials.length)];
+      this.baseMaterials[Math.floor(this.randomFloat('asteroids') * this.baseMaterials.length)];
 
     mesh.geometry = geometry;
     if (!asteroid.material) {
@@ -824,7 +919,7 @@ class MenuBackgroundSystem {
     mesh.visible = true;
     mesh.position.copy(position);
     mesh.scale.copy(scale);
-    mesh.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+    mesh.rotation.set(this.randomFloat('asteroids') * Math.PI, this.randomFloat('asteroids') * Math.PI, this.randomFloat('asteroids') * Math.PI);
 
     const avgRadius = (scale.x + scale.y + scale.z) / 3;
     if (body.shapes[0]) {
@@ -928,10 +1023,10 @@ class MenuBackgroundSystem {
   fragmentAsteroid(parent) {
     const { THREE, CANNON } = this;
     const radius = parent.body.shapes[0]?.radius || 1;
-    const fragments = Math.floor(Math.random() * 3) + 2;
+    const fragments = Math.floor(this.randomFloat('fragments') * 3) + 2;
 
     for (let i = 0; i < fragments; i += 1) {
-      const scaleMultiplier = Math.random() * 0.3 + 0.4;
+      const scaleMultiplier = this.randomFloat('fragments') * 0.3 + 0.4;
       const newScale = parent.mesh.scale.clone().multiplyScalar(scaleMultiplier);
 
       if (newScale.x < 1 && newScale.y < 1 && newScale.z < 1) {
@@ -939,9 +1034,9 @@ class MenuBackgroundSystem {
       }
 
       const direction = new THREE.Vector3(
-        Math.random() - 0.5,
-        Math.random() - 0.5,
-        Math.random() - 0.5
+        this.randomFloat('fragments') - 0.5,
+        this.randomFloat('fragments') - 0.5,
+        this.randomFloat('fragments') - 0.5
       ).normalize();
 
       const offset = parent.mesh.position.clone().add(direction.clone().multiplyScalar(radius));
@@ -956,9 +1051,9 @@ class MenuBackgroundSystem {
       );
 
       const angularVelocity = new CANNON.Vec3(
-        (Math.random() - 0.5) * 5,
-        (Math.random() - 0.5) * 5,
-        (Math.random() - 0.5) * 5
+        (this.randomFloat('fragments') - 0.5) * 5,
+        (this.randomFloat('fragments') - 0.5) * 5,
+        (this.randomFloat('fragments') - 0.5) * 5
       );
 
       this.activateAsteroid({
@@ -1180,7 +1275,7 @@ class MenuBackgroundSystem {
 
 // Simplex noise implementation adapted for procedural asteroid generation
 class SimplexNoise {
-  constructor(randomFn = Math.random) {
+  constructor(randomFn = () => SIMPLEX_DEFAULT_RANDOM.float()) {
     this.p = new Uint8Array(256);
     this.perm = new Uint8Array(512);
     this.permMod12 = new Uint8Array(512);
