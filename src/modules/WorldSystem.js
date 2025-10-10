@@ -1,4 +1,4 @@
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { normalizeDependencies } from '../core/serviceUtils.js';
 
 class WorldSystem {
   constructor(dependencies = {}) {
@@ -40,27 +40,31 @@ class WorldSystem {
   }
 
   refreshInjectedServices(force = false) {
+    const assign = (serviceKey, dependencyKey) => {
+      const dependencyValue = this.dependencies[dependencyKey] || null;
+      if (force || !this.services[serviceKey] || this.services[serviceKey] !== dependencyValue) {
+        this.services[serviceKey] = dependencyValue;
+      }
+    };
+
+    assign('player', 'player');
+    assign('enemies', 'enemies');
+    assign('physics', 'physics');
+    assign('progression', 'progression');
+
     if (force) {
-      this.services.player = null;
-      this.services.enemies = null;
-      this.services.physics = null;
-      this.services.progression = null;
-    }
-
-    if (!this.services.player) {
-      this.services.player = resolveService('player', this.dependencies);
-    }
-
-    if (!this.services.enemies) {
-      this.services.enemies = resolveService('enemies', this.dependencies);
-    }
-
-    if (!this.services.physics) {
-      this.services.physics = resolveService('physics', this.dependencies);
-    }
-
-    if (!this.services.progression) {
-      this.services.progression = resolveService('progression', this.dependencies);
+      if (!this.services.player) {
+        console.warn('[WorldSystem] Player system not attached');
+      }
+      if (!this.services.enemies) {
+        console.warn('[WorldSystem] Enemy system not attached');
+      }
+      if (!this.services.physics) {
+        console.warn('[WorldSystem] Physics system not attached');
+      }
+      if (!this.services.progression) {
+        console.warn('[WorldSystem] Progression system not attached');
+      }
     }
   }
 

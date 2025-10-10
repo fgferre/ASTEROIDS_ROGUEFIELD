@@ -1,6 +1,6 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 import { SpatialHash } from '../core/SpatialHash.js';
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { normalizeDependencies } from '../core/serviceUtils.js';
 
 class PhysicsSystem {
   constructor(dependencies = {}) {
@@ -39,6 +39,16 @@ class PhysicsSystem {
     this.refreshEnemyReference();
 
     console.log('[PhysicsSystem] Initialized');
+  }
+
+  attachEnemySystem(enemySystem, { force = true } = {}) {
+    if (!enemySystem) {
+      console.warn('[PhysicsSystem] Cannot attach enemy system: invalid instance');
+      return;
+    }
+
+    this.dependencies.enemies = enemySystem;
+    this.refreshEnemyReference(force);
   }
 
   computeMaxAsteroidRadius() {
@@ -94,12 +104,17 @@ class PhysicsSystem {
     }
 
     if (!this.enemySystem) {
-      this.enemySystem = resolveService('enemies', this.dependencies);
+      this.enemySystem = this.dependencies.enemies || null;
     }
 
-    if (this.enemySystem) {
-      this.bootstrapFromEnemySystem(this.enemySystem, { force });
+    if (!this.enemySystem) {
+      if (force) {
+        console.warn('[PhysicsSystem] Enemy system not attached; spatial index disabled');
+      }
+      return;
     }
+
+    this.bootstrapFromEnemySystem(this.enemySystem, { force });
   }
 
   bootstrapFromEnemySystem(enemySystem, { force = false } = {}) {

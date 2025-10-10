@@ -1,6 +1,6 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 import UPGRADE_LIBRARY, { UPGRADE_CATEGORIES } from '../data/upgrades.js';
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { normalizeDependencies } from '../core/serviceUtils.js';
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
 
@@ -64,27 +64,31 @@ class ProgressionSystem {
   }
 
   refreshInjectedServices(force = false) {
+    const assign = (serviceKey, dependencyKey) => {
+      const dependencyValue = this.dependencies[dependencyKey] || null;
+      if (force || !this.services[serviceKey] || this.services[serviceKey] !== dependencyValue) {
+        this.services[serviceKey] = dependencyValue;
+      }
+    };
+
+    assign('xpOrbs', 'xp-orbs');
+    assign('player', 'player');
+    assign('ui', 'ui');
+    assign('effects', 'effects');
+
     if (force) {
-      this.services.xpOrbs = this.dependencies['xp-orbs'] || null;
-      this.services.player = this.dependencies.player || null;
-      this.services.ui = this.dependencies.ui || null;
-      this.services.effects = this.dependencies.effects || null;
-    }
-
-    if (!this.services.xpOrbs) {
-      this.services.xpOrbs = resolveService('xp-orbs', this.dependencies);
-    }
-
-    if (!this.services.player) {
-      this.services.player = resolveService('player', this.dependencies);
-    }
-
-    if (!this.services.ui) {
-      this.services.ui = resolveService('ui', this.dependencies);
-    }
-
-    if (!this.services.effects) {
-      this.services.effects = resolveService('effects', this.dependencies);
+      if (!this.services.xpOrbs) {
+        console.warn('[ProgressionSystem] XP orb system not attached');
+      }
+      if (!this.services.player) {
+        console.warn('[ProgressionSystem] Player system not attached');
+      }
+      if (!this.services.ui) {
+        console.warn('[ProgressionSystem] UI system not attached');
+      }
+      if (!this.services.effects) {
+        console.warn('[ProgressionSystem] Effects system not attached');
+      }
     }
   }
 

@@ -187,7 +187,14 @@ export function createServiceManifest(context = {}) {
       singleton: true,
       lazy: false,
       dependencies: [],
-      factory: () => new PhysicsSystem()
+      factory: ({ resolved }) => {
+        const physics = new PhysicsSystem();
+        const enemies = resolved['enemies'];
+        if (enemies && typeof physics.attachEnemySystem === 'function') {
+          physics.attachEnemySystem(enemies);
+        }
+        return physics;
+      }
     },
     {
       name: 'ui',
@@ -209,26 +216,47 @@ export function createServiceManifest(context = {}) {
       singleton: true,
       lazy: false,
       dependencies: ['xp-orbs', 'player', 'ui', 'effects'],
-      factory: ({ resolved }) =>
-        new ProgressionSystem({
+      factory: ({ resolved }) => {
+        const progression = new ProgressionSystem({
           'xp-orbs': resolved['xp-orbs'],
           player: resolved['player'],
           ui: resolved['ui'],
           effects: resolved['effects'],
-        })
+        });
+
+        const xpOrbs = resolved['xp-orbs'];
+        if (xpOrbs && typeof xpOrbs.attachProgression === 'function') {
+          xpOrbs.attachProgression(progression);
+        }
+
+        return progression;
+      }
     },
     {
       name: 'enemies',
       singleton: true,
       lazy: false,
       dependencies: ['player', 'xp-orbs', 'progression', 'physics'],
-      factory: ({ resolved }) =>
-        new EnemySystem({
+      factory: ({ resolved }) => {
+        const enemies = new EnemySystem({
           player: resolved['player'],
           'xp-orbs': resolved['xp-orbs'],
           progression: resolved['progression'],
           physics: resolved['physics'],
-        })
+        });
+
+        const physics = resolved['physics'];
+        if (physics && typeof physics.attachEnemySystem === 'function') {
+          physics.attachEnemySystem(enemies);
+        }
+
+        const progression = resolved['progression'];
+        if (progression && typeof enemies.attachProgression === 'function') {
+          enemies.attachProgression(progression);
+        }
+
+        return enemies;
+      }
     },
     {
       name: 'combat',
@@ -247,13 +275,21 @@ export function createServiceManifest(context = {}) {
       singleton: true,
       lazy: false,
       dependencies: ['player', 'enemies', 'physics', 'progression'],
-      factory: ({ resolved }) =>
-        new WorldSystem({
+      factory: ({ resolved }) => {
+        const world = new WorldSystem({
           player: resolved['player'],
           enemies: resolved['enemies'],
           physics: resolved['physics'],
           progression: resolved['progression']
-        })
+        });
+
+        const enemies = resolved['enemies'];
+        if (enemies && typeof enemies.attachWorld === 'function') {
+          enemies.attachWorld(world);
+        }
+
+        return world;
+      }
     },
     {
       name: 'renderer',

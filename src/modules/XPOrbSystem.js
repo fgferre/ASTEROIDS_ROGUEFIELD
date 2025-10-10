@@ -1,6 +1,6 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { normalizeDependencies } from '../core/serviceUtils.js';
 
 const ORB_CLASS_ORDER = [
   { name: 'blue', tier: 1 },
@@ -155,18 +155,34 @@ class XPOrbSystem {
     console.log('[XPOrbSystem] Initialized');
   }
 
+  attachProgression(progressionSystem) {
+    if (!progressionSystem) {
+      console.warn('[XPOrbSystem] Cannot attach progression system: invalid instance');
+      return;
+    }
+
+    this.dependencies.progression = progressionSystem;
+    this.cachedProgression = progressionSystem;
+  }
+
   resolveCachedServices(force = false) {
     if (force) {
-      this.cachedPlayer = this.dependencies.player || null;
-      this.cachedProgression = this.dependencies.progression || null;
+      this.cachedPlayer = null;
+      this.cachedProgression = null;
     }
 
     if (!this.cachedPlayer) {
-      this.cachedPlayer = resolveService('player', this.dependencies);
+      this.cachedPlayer = this.dependencies.player || null;
+      if (!this.cachedPlayer && force) {
+        console.warn('[XPOrbSystem] Player system not attached');
+      }
     }
 
     if (!this.cachedProgression) {
-      this.cachedProgression = resolveService('progression', this.dependencies);
+      this.cachedProgression = this.dependencies.progression || null;
+      if (!this.cachedProgression && force) {
+        console.warn('[XPOrbSystem] Progression system not attached');
+      }
     }
   }
 

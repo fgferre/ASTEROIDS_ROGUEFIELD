@@ -1,7 +1,7 @@
 // src/modules/EnemySystem.js
 import * as CONSTANTS from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { normalizeDependencies } from '../core/serviceUtils.js';
 import { Asteroid } from './enemies/types/Asteroid.js';
 import { EnemyFactory } from './enemies/base/EnemyFactory.js';
 import { WaveManager } from './enemies/managers/WaveManager.js';
@@ -71,6 +71,26 @@ class EnemySystem {
     console.log('[EnemySystem] Initialized');
   }
 
+  attachWorld(worldSystem) {
+    if (!worldSystem) {
+      console.warn('[EnemySystem] Cannot attach world system: invalid instance');
+      return;
+    }
+
+    this.dependencies.world = worldSystem;
+    this.services.world = worldSystem;
+  }
+
+  attachProgression(progressionSystem) {
+    if (!progressionSystem) {
+      console.warn('[EnemySystem] Cannot attach progression system: invalid instance');
+      return;
+    }
+
+    this.dependencies.progression = progressionSystem;
+    this.services.progression = progressionSystem;
+  }
+
   setupEventListeners() {
     if (typeof gameEvents === 'undefined') return;
 
@@ -107,32 +127,35 @@ class EnemySystem {
   }
 
   refreshInjectedServices(force = false) {
+    const assign = (serviceKey, dependencyKey) => {
+      const dependencyValue = this.dependencies[dependencyKey] || null;
+      if (force || !this.services[serviceKey] || this.services[serviceKey] !== dependencyValue) {
+        this.services[serviceKey] = dependencyValue;
+      }
+    };
+
+    assign('player', 'player');
+    assign('world', 'world');
+    assign('progression', 'progression');
+    assign('xpOrbs', 'xp-orbs');
+    assign('physics', 'physics');
+
     if (force) {
-      this.services.player = this.dependencies.player || null;
-      this.services.world = this.dependencies.world || null;
-      this.services.progression = this.dependencies.progression || null;
-      this.services.xpOrbs = this.dependencies['xp-orbs'] || null;
-      this.services.physics = this.dependencies.physics || null;
-    }
-
-    if (!this.services.player) {
-      this.services.player = resolveService('player', this.dependencies);
-    }
-
-    if (!this.services.world) {
-      this.services.world = resolveService('world', this.dependencies);
-    }
-
-    if (!this.services.progression) {
-      this.services.progression = resolveService('progression', this.dependencies);
-    }
-
-    if (!this.services.xpOrbs) {
-      this.services.xpOrbs = resolveService('xp-orbs', this.dependencies);
-    }
-
-    if (!this.services.physics) {
-      this.services.physics = resolveService('physics', this.dependencies);
+      if (!this.services.player) {
+        console.warn('[EnemySystem] Player system not attached');
+      }
+      if (!this.services.progression) {
+        console.warn('[EnemySystem] Progression system not attached');
+      }
+      if (!this.services.world) {
+        console.warn('[EnemySystem] World system not attached');
+      }
+      if (!this.services.xpOrbs) {
+        console.warn('[EnemySystem] XP orb system not attached');
+      }
+      if (!this.services.physics) {
+        console.warn('[EnemySystem] Physics system not attached');
+      }
     }
   }
 
