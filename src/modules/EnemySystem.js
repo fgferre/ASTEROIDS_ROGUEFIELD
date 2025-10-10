@@ -22,6 +22,7 @@ class EnemySystem {
       progression: this.dependencies.progression || null,
       xpOrbs: this.dependencies['xp-orbs'] || null,
       physics: this.dependencies.physics || null,
+      healthHearts: this.dependencies.healthHearts || null,
     };
 
     this.asteroids = [];
@@ -113,6 +114,7 @@ class EnemySystem {
       this.services.progression = this.dependencies.progression || null;
       this.services.xpOrbs = this.dependencies['xp-orbs'] || null;
       this.services.physics = this.dependencies.physics || null;
+      this.services.healthHearts = this.dependencies.healthHearts || null;
     }
 
     if (!this.services.player) {
@@ -133,6 +135,10 @@ class EnemySystem {
 
     if (!this.services.physics) {
       this.services.physics = resolveService('physics', this.dependencies);
+    }
+
+    if (!this.services.healthHearts) {
+      this.services.healthHearts = resolveService('healthHearts', this.dependencies);
     }
   }
 
@@ -200,8 +206,13 @@ class EnemySystem {
       // Initialize RewardManager
       this.refreshInjectedServices();
       const xpOrbSystem = this.getCachedXPOrbs();
+      const healthHeartSystem = this.getCachedHealthHearts();
       if (xpOrbSystem) {
-        this.rewardManager = new RewardManager(this, xpOrbSystem);
+        this.rewardManager = new RewardManager({
+          enemySystem: this,
+          xpOrbSystem,
+          healthHearts: healthHeartSystem,
+        });
         console.log('[EnemySystem] RewardManager initialized');
       }
     } catch (error) {
@@ -379,6 +390,11 @@ class EnemySystem {
   getCachedPhysics() {
     this.refreshInjectedServices();
     return this.services.physics;
+  }
+
+  getCachedHealthHearts() {
+    this.refreshInjectedServices();
+    return this.services.healthHearts;
   }
 
   invalidateActiveAsteroidCache() {

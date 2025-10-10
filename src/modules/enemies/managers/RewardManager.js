@@ -26,23 +26,51 @@
  *
  * @example
  * ```javascript
- * const rewardManager = new RewardManager(enemySystem, xpOrbSystem);
+ * const rewardManager = new RewardManager({ enemySystem, xpOrbSystem });
  * rewardManager.dropRewards(enemy);
  * ```
  */
 
 import * as CONSTANTS from '../../../core/GameConstants.js';
+import { normalizeDependencies, resolveService } from '../../../core/serviceUtils.js';
 
 export class RewardManager {
-  /**
+ /**
    * Creates a new Reward Manager.
    *
-   * @param {Object} enemySystem - Reference to EnemySystem
-   * @param {Object} xpOrbSystem - Reference to XPOrbSystem
+   * @param {Object} dependencies - Object containing injected services
+   * @param {Object} dependencies.enemySystem - Reference to EnemySystem
+   * @param {Object} dependencies.xpOrbSystem - Reference to XPOrbSystem
+   * @param {Object} dependencies.healthHearts - Reference to HealthHeartSystem
+   *
+   * Legacy signature `new RewardManager(enemySystem, xpOrbSystem, healthHearts)`
+   * remains supported for backwards compatibility.
    */
-  constructor(enemySystem, xpOrbSystem) {
-    this.enemySystem = enemySystem;
-    this.xpOrbSystem = xpOrbSystem;
+  constructor(dependenciesOrEnemySystem = {}, xpOrbSystem, healthHearts) {
+    const isLegacySignature = arguments.length > 1;
+    const dependencies = isLegacySignature
+      ? {
+          enemySystem: dependenciesOrEnemySystem,
+          xpOrbSystem,
+          healthHearts,
+        }
+      : dependenciesOrEnemySystem;
+
+    this.dependencies = normalizeDependencies(dependencies);
+
+    this.enemySystem =
+      this.dependencies.enemySystem ||
+      this.dependencies.enemies ||
+      resolveService('enemies', this.dependencies);
+
+    this.xpOrbSystem =
+      this.dependencies.xpOrbSystem ||
+      this.dependencies['xp-orbs'] ||
+      resolveService('xp-orbs', this.dependencies);
+
+    this.healthHeartSystem =
+      this.dependencies.healthHearts ||
+      resolveService('healthHearts', this.dependencies);
 
     // Reward configurations
     this.rewardConfigs = this.loadRewardConfigurations();
@@ -116,7 +144,10 @@ export class RewardManager {
    * @param {BaseEnemy} enemy - The destroyed enemy
    */
   dropRewards(enemy) {
-    if (!enemy || !this.xpOrbSystem) return;
+    if (!enemy) return;
+
+    const xpOrbSystem = this.getXPOrbSystem();
+    if (!xpOrbSystem) return;
 
     const config = this.rewardConfigs.get(enemy.type);
     if (!config) {
@@ -165,7 +196,8 @@ export class RewardManager {
    * @param {number} xpPerOrb - XP value per orb
    */
   createXPOrbs(enemy, count, xpPerOrb) {
-    if (!this.xpOrbSystem || typeof this.xpOrbSystem.createXPOrb !== 'function') {
+    const xpOrbSystem = this.getXPOrbSystem();
+    if (!xpOrbSystem || typeof xpOrbSystem.createXPOrb !== 'function') {
       console.warn('[RewardManager] XPOrbSystem not available or invalid');
       return;
     }
@@ -184,7 +216,7 @@ export class RewardManager {
       const vy = Math.sin(angle) * speed;
 
       try {
-        this.xpOrbSystem.createXPOrb(orbX, orbY, xpPerOrb, {
+        xpOrbSystem.createXPOrb(orbX, orbY, xpPerOrb, {
           vx: vx,
           vy: vy,
           fromEnemy: enemy.type,
@@ -285,7 +317,8 @@ export class RewardManager {
    * @param {string} milestone - Milestone type
    */
   createMilestoneReward(x, y, milestone) {
-    if (!this.xpOrbSystem) return;
+    const xpOrbSystem = this.getXPOrbSystem();
+    if (!xpOrbSystem) return;
 
     const milestoneRewards = {
       'first_kill': 50,
@@ -298,7 +331,7 @@ export class RewardManager {
     const xpValue = milestoneRewards[milestone] || 100;
 
     try {
-      this.xpOrbSystem.createXPOrb(x, y, xpValue, {
+      xpOrbSystem.createXPOrb(x, y, xpValue, {
         special: true,
         milestone: milestone,
         vx: 0,
@@ -329,13 +362,16 @@ export class RewardManager {
 
     const totalBonus = baseBonus + perfectBonus + timeBonus;
 
-    if (totalBonus > 0 && this.xpOrbSystem) {
+    const xpOrbSystem = this.getXPOrbSystem();
+    const enemySystem = this.getEnemySystem();
+
+    if (totalBonus > 0 && xpOrbSystem) {
       // Create bonus orb at screen center
-      const worldBounds = this.enemySystem.getCachedWorld()?.getBounds() ||
+      const worldBounds = enemySystem?.getCachedWorld()?.getBounds() ||
                          { width: 800, height: 600 };
 
       try {
-        this.xpOrbSystem.createXPOrb(
+        xpOrbSystem.createXPOrb(
           worldBounds.width / 2,
           worldBounds.height / 2,
           totalBonus,
@@ -389,9 +425,7 @@ export class RewardManager {
 
     // Roll for drop
     if (Math.random() < dropChance) {
-      const healthHeartSystem = typeof gameServices !== 'undefined'
-        ? gameServices.get('healthHearts')
-        : null;
+      const healthHeartSystem = this.getHealthHeartSystem();
 
       if (healthHeartSystem && typeof healthHeartSystem.spawnHeart === 'function') {
         healthHeartSystem.spawnHeart(enemy.x, enemy.y);
@@ -400,5 +434,37 @@ export class RewardManager {
         console.error('[RewardManager] HealthHeartSystem not available!');
       }
     }
+  }
+
+  getXPOrbSystem() {
+    if (!this.xpOrbSystem) {
+      this.xpOrbSystem =
+        this.dependencies.xpOrbSystem ||
+        this.dependencies['xp-orbs'] ||
+        resolveService('xp-orbs', this.dependencies);
+    }
+
+    return this.xpOrbSystem;
+  }
+
+  getHealthHeartSystem() {
+    if (!this.healthHeartSystem) {
+      this.healthHeartSystem =
+        this.dependencies.healthHearts ||
+        resolveService('healthHearts', this.dependencies);
+    }
+
+    return this.healthHeartSystem;
+  }
+
+  getEnemySystem() {
+    if (!this.enemySystem) {
+      this.enemySystem =
+        this.dependencies.enemySystem ||
+        this.dependencies.enemies ||
+        resolveService('enemies', this.dependencies);
+    }
+
+    return this.enemySystem;
   }
 }
