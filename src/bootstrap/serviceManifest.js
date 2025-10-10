@@ -259,8 +259,25 @@ export function createServiceManifest(context = {}) {
       name: 'renderer',
       singleton: true,
       lazy: false,
-      dependencies: [],
-      factory: () => new RenderingSystem()
+      dependencies: [
+        'player',
+        'progression',
+        'xp-orbs',
+        'healthHearts',
+        'effects',
+        'combat',
+        'enemies'
+      ],
+      factory: ({ resolved }) =>
+        new RenderingSystem({
+          player: resolved['player'],
+          progression: resolved['progression'],
+          'xp-orbs': resolved['xp-orbs'],
+          healthHearts: resolved['healthHearts'],
+          effects: resolved['effects'],
+          combat: resolved['combat'],
+          enemies: resolved['enemies']
+        })
     },
     {
       name: 'menu-background',
