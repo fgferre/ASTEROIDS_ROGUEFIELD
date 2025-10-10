@@ -44,11 +44,13 @@ class PhysicsSystem {
   attachEnemySystem(enemySystem, { force = true } = {}) {
     if (!enemySystem) {
       console.warn('[PhysicsSystem] Cannot attach enemy system: invalid instance');
-      return;
+      return this;
     }
 
     this.dependencies.enemies = enemySystem;
     this.refreshEnemyReference(force);
+
+    return this;
   }
 
   computeMaxAsteroidRadius() {

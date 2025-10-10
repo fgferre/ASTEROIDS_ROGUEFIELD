@@ -74,21 +74,27 @@ class EnemySystem {
   attachWorld(worldSystem) {
     if (!worldSystem) {
       console.warn('[EnemySystem] Cannot attach world system: invalid instance');
-      return;
+      return this;
     }
 
     this.dependencies.world = worldSystem;
     this.services.world = worldSystem;
+    this.refreshInjectedServices(true);
+
+    return this;
   }
 
   attachProgression(progressionSystem) {
     if (!progressionSystem) {
       console.warn('[EnemySystem] Cannot attach progression system: invalid instance');
-      return;
+      return this;
     }
 
     this.dependencies.progression = progressionSystem;
     this.services.progression = progressionSystem;
+    this.refreshInjectedServices(true);
+
+    return this;
   }
 
   setupEventListeners() {

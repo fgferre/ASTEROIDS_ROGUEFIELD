@@ -158,11 +158,14 @@ class XPOrbSystem {
   attachProgression(progressionSystem) {
     if (!progressionSystem) {
       console.warn('[XPOrbSystem] Cannot attach progression system: invalid instance');
-      return;
+      return this;
     }
 
     this.dependencies.progression = progressionSystem;
     this.cachedProgression = progressionSystem;
+    this.resolveCachedServices(true);
+
+    return this;
   }
 
   resolveCachedServices(force = false) {
