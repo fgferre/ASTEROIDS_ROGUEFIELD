@@ -85,6 +85,9 @@ function logServiceRegistrationFlow({ reason = 'bootstrap' } = {}) {
 function initializeDependencyInjection(manifestContext) {
   console.log('[App] Initializing Dependency Injection system...');
 
+  let legacyLocatorSnapshot =
+    typeof gameServices !== 'undefined' ? gameServices : null;
+
   try {
     // Create DI container
     diContainer = new DIContainer();
@@ -95,6 +98,7 @@ function initializeDependencyInjection(manifestContext) {
 
     if (typeof gameServices !== 'undefined') {
       const legacyLocator = gameServices;
+      legacyLocatorSnapshot = legacyLocator;
       serviceLocatorAdapter = new ServiceLocatorAdapter(diContainer);
 
       // Synchronize already-registered legacy services into the adapter
@@ -158,6 +162,9 @@ function initializeDependencyInjection(manifestContext) {
   } catch (error) {
     console.error('[App] ✗ Failed to initialize DI system:', error);
     console.warn('[App] Falling back to legacy ServiceLocator');
+    if (legacyLocatorSnapshot && typeof globalThis !== 'undefined') {
+      globalThis.gameServices = legacyLocatorSnapshot;
+    }
     return false;
   }
 }
