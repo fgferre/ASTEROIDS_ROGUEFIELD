@@ -60,6 +60,7 @@ class EnemySystem {
     }
 
     this.missingDependencyWarnings = new Set();
+    this.deferredDependencyWarnings = new Set(['world']);
 
     this.setupAsteroidPoolIntegration();
     this.setupEnemyFactory(); // Initialize factory (optional)
@@ -91,6 +92,7 @@ class EnemySystem {
     }
 
     this.dependencies.world = worldSystem;
+    this.deferredDependencyWarnings.delete('world');
     this.refreshInjectedServices({ force: true });
   }
 
@@ -116,6 +118,9 @@ class EnemySystem {
     }
 
     if (!this.services[targetKey] && !suppressWarnings) {
+      if (this.deferredDependencyWarnings.has(dependencyKey)) {
+        return;
+      }
       this.logMissingDependency(dependencyKey);
     }
   }
