@@ -221,13 +221,14 @@ export function createServiceManifest(context = {}) {
       name: 'enemies',
       singleton: true,
       lazy: false,
-      dependencies: ['player', 'xp-orbs', 'progression', 'physics'],
+      dependencies: ['player', 'xp-orbs', 'progression', 'physics', 'healthHearts'],
       factory: ({ resolved }) =>
         new EnemySystem({
           player: resolved['player'],
           'xp-orbs': resolved['xp-orbs'],
           progression: resolved['progression'],
           physics: resolved['physics'],
+          healthHearts: resolved['healthHearts'],
         })
     },
     {
