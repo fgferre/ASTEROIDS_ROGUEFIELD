@@ -152,7 +152,7 @@ class XPOrbSystem {
     }
 
     this.setupEventListeners();
-    this.resolveCachedServices(true);
+    this.resolveCachedServices({ force: true, suppressWarnings: true });
 
     console.log('[XPOrbSystem] Initialized');
   }
@@ -177,7 +177,7 @@ class XPOrbSystem {
     console.warn(`[XPOrbSystem] Missing dependency: ${name}`);
   }
 
-  resolveCachedServices(force = false) {
+  resolveCachedServices({ force = false, suppressWarnings = false } = {}) {
     if (force) {
       this.cachedPlayer = null;
       this.cachedProgression = null;
@@ -193,11 +193,11 @@ class XPOrbSystem {
       this.missingDependencyWarnings.delete('progression');
     }
 
-    if (!this.cachedPlayer) {
+    if (!this.cachedPlayer && !suppressWarnings) {
       this.logMissingDependency('player');
     }
 
-    if (!this.cachedProgression) {
+    if (!this.cachedProgression && !suppressWarnings) {
       this.logMissingDependency('progression');
     }
   }
@@ -466,11 +466,11 @@ class XPOrbSystem {
     // Future systems (coins, etc.) will follow the same pattern
 
     gameEvents.on('progression-reset', () => {
-      this.resolveCachedServices(true);
+      this.resolveCachedServices({ force: true });
     });
 
     gameEvents.on('player-reset', () => {
-      this.resolveCachedServices(true);
+      this.resolveCachedServices({ force: true });
     });
   }
 
@@ -1763,7 +1763,7 @@ class XPOrbSystem {
     this.clusterFusionCount = CONSTANTS.CLUSTER_FUSION_COUNT;
     this.configureOrbClustering();
 
-    this.resolveCachedServices(true);
+    this.resolveCachedServices({ force: true });
 
     if (typeof gameEvents !== 'undefined') {
       gameEvents.emit('xp-orbs-reset');

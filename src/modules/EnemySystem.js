@@ -66,7 +66,7 @@ class EnemySystem {
     this.setupManagers(); // Initialize wave and reward managers
     this.setupComponents(); // Initialize components
     this.setupEventListeners();
-    this.refreshInjectedServices(true);
+    this.refreshInjectedServices({ force: true, suppressWarnings: true });
     this.syncPhysicsIntegration(true);
 
     this.emitWaveStateUpdate(true);
@@ -81,7 +81,7 @@ class EnemySystem {
     }
 
     this.dependencies.progression = progressionSystem;
-    this.refreshInjectedServices(true);
+    this.refreshInjectedServices({ force: true });
   }
 
   attachWorld(worldSystem) {
@@ -91,7 +91,7 @@ class EnemySystem {
     }
 
     this.dependencies.world = worldSystem;
-    this.refreshInjectedServices(true);
+    this.refreshInjectedServices({ force: true });
   }
 
   logMissingDependency(name) {
@@ -103,7 +103,7 @@ class EnemySystem {
     console.warn(`[EnemySystem] Missing dependency: ${name}`);
   }
 
-  updateServiceCache(targetKey, dependencyKey, { force = false } = {}) {
+  updateServiceCache(targetKey, dependencyKey, { force = false, suppressWarnings = false } = {}) {
     if (force) {
       this.services[targetKey] = null;
     }
@@ -115,7 +115,7 @@ class EnemySystem {
       return;
     }
 
-    if (!this.services[targetKey]) {
+    if (!this.services[targetKey] && !suppressWarnings) {
       this.logMissingDependency(dependencyKey);
     }
   }
@@ -129,19 +129,19 @@ class EnemySystem {
     });
 
     gameEvents.on('player-reset', () => {
-      this.refreshInjectedServices(true);
+      this.refreshInjectedServices({ force: true });
     });
 
     gameEvents.on('progression-reset', () => {
-      this.refreshInjectedServices(true);
+      this.refreshInjectedServices({ force: true });
     });
 
     gameEvents.on('world-reset', () => {
-      this.refreshInjectedServices(true);
+      this.refreshInjectedServices({ force: true });
     });
 
     gameEvents.on('physics-reset', () => {
-      this.refreshInjectedServices(true);
+      this.refreshInjectedServices({ force: true });
       this.syncPhysicsIntegration(true);
     });
 
@@ -155,13 +155,14 @@ class EnemySystem {
     }
   }
 
-  refreshInjectedServices(force = false) {
-    this.updateServiceCache('player', 'player', { force });
-    this.updateServiceCache('world', 'world', { force });
-    this.updateServiceCache('progression', 'progression', { force });
-    this.updateServiceCache('xpOrbs', 'xp-orbs', { force });
-    this.updateServiceCache('physics', 'physics', { force });
-    this.updateServiceCache('healthHearts', 'healthHearts', { force });
+  refreshInjectedServices({ force = false, suppressWarnings = false } = {}) {
+    const options = { force, suppressWarnings };
+    this.updateServiceCache('player', 'player', options);
+    this.updateServiceCache('world', 'world', options);
+    this.updateServiceCache('progression', 'progression', options);
+    this.updateServiceCache('xpOrbs', 'xp-orbs', options);
+    this.updateServiceCache('physics', 'physics', options);
+    this.updateServiceCache('healthHearts', 'healthHearts', options);
   }
 
   syncPhysicsIntegration(force = false) {
@@ -1280,7 +1281,7 @@ class EnemySystem {
     this.sessionActive = true;
     this.lastWaveBroadcast = null;
 
-    this.refreshInjectedServices(true);
+    this.refreshInjectedServices({ force: true });
     this.syncPhysicsIntegration(true);
 
     this.spawnInitialAsteroids(4);

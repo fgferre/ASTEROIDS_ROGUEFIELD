@@ -37,7 +37,7 @@ class PhysicsSystem {
     }
 
     this.setupEventListeners();
-    this.refreshEnemyReference();
+    this.refreshEnemyReference({ suppressWarning: true });
 
     console.log('[PhysicsSystem] Initialized');
   }
@@ -104,7 +104,7 @@ class PhysicsSystem {
     });
   }
 
-  refreshEnemyReference(force = false) {
+  refreshEnemyReference({ force = false, suppressWarning = false } = {}) {
     if (force) {
       this.bootstrapCompleted = false;
     }
@@ -123,7 +123,7 @@ class PhysicsSystem {
       return;
     }
 
-    if (!this.missingEnemyWarningLogged) {
+    if (!this.missingEnemyWarningLogged && !suppressWarning) {
       console.warn('[PhysicsSystem] Enemy system dependency not available');
       this.missingEnemyWarningLogged = true;
     }
@@ -688,7 +688,7 @@ class PhysicsSystem {
     this.bootstrapCompleted = false;
     this.lastSpatialHashMaintenance = performance.now();
     this.missingEnemyWarningLogged = false;
-    this.refreshEnemyReference(true);
+    this.refreshEnemyReference({ force: true });
 
     // Reset performance metrics
     this.performanceMetrics = {
