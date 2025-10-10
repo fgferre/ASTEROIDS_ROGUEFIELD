@@ -1,6 +1,6 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 import { SpatialHash } from '../core/SpatialHash.js';
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { normalizeDependencies } from '../core/serviceUtils.js';
 
 class PhysicsSystem {
   constructor(dependencies = {}) {
@@ -22,6 +22,7 @@ class PhysicsSystem {
     this.indexDirty = false;
     this.bootstrapCompleted = false;
     this.lastSpatialHashMaintenance = performance.now();
+    this.missingEnemyWarningLogged = false;
 
     // Performance tracking
     this.performanceMetrics = {
@@ -39,6 +40,22 @@ class PhysicsSystem {
     this.refreshEnemyReference();
 
     console.log('[PhysicsSystem] Initialized');
+  }
+
+  attachEnemySystem(enemySystem, { force = false } = {}) {
+    if (!enemySystem) {
+      if (!this.missingEnemyWarningLogged) {
+        console.warn('[PhysicsSystem] attachEnemySystem called without enemy system instance');
+        this.missingEnemyWarningLogged = true;
+      }
+      return;
+    }
+
+    this.dependencies.enemies = enemySystem;
+    this.missingEnemyWarningLogged = false;
+    const needsForce = force || this.enemySystem !== enemySystem;
+    this.enemySystem = enemySystem;
+    this.bootstrapFromEnemySystem(enemySystem, { force: needsForce });
   }
 
   computeMaxAsteroidRadius() {
@@ -89,16 +106,26 @@ class PhysicsSystem {
 
   refreshEnemyReference(force = false) {
     if (force) {
-      this.enemySystem = null;
       this.bootstrapCompleted = false;
     }
 
-    if (!this.enemySystem) {
-      this.enemySystem = resolveService('enemies', this.dependencies);
+    const dependencyEnemy = this.dependencies.enemies;
+    if (dependencyEnemy) {
+      const changed = this.enemySystem !== dependencyEnemy;
+      this.enemySystem = dependencyEnemy;
+      this.bootstrapFromEnemySystem(this.enemySystem, { force: force || changed });
+      this.missingEnemyWarningLogged = false;
+      return;
     }
 
     if (this.enemySystem) {
       this.bootstrapFromEnemySystem(this.enemySystem, { force });
+      return;
+    }
+
+    if (!this.missingEnemyWarningLogged) {
+      console.warn('[PhysicsSystem] Enemy system dependency not available');
+      this.missingEnemyWarningLogged = true;
     }
   }
 
@@ -660,6 +687,7 @@ class PhysicsSystem {
     this.indexDirty = false;
     this.bootstrapCompleted = false;
     this.lastSpatialHashMaintenance = performance.now();
+    this.missingEnemyWarningLogged = false;
     this.refreshEnemyReference(true);
 
     // Reset performance metrics
@@ -716,6 +744,7 @@ class PhysicsSystem {
     this.indexDirty = false;
     this.enemySystem = null;
     this.bootstrapCompleted = false;
+    this.missingEnemyWarningLogged = false;
     console.log('[PhysicsSystem] Destroyed');
   }
 }
