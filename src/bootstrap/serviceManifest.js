@@ -15,6 +15,7 @@ import RenderingSystem from '../modules/RenderingSystem.js';
 import MenuBackgroundSystem from '../modules/MenuBackgroundSystem.js';
 import { GamePools } from '../core/GamePools.js';
 import { GarbageCollectionManager } from '../core/GarbageCollectionManager.js';
+import RandomService from '../core/RandomService.js';
 
 export const DEFAULT_POOL_CONFIG = {
   bullets: { initial: 25, max: 120 },
@@ -96,11 +97,82 @@ function createGarbageCollector(options) {
   return manager;
 }
 
+function createRandomService(context = {}) {
+  const { randomOverrides, seed } = context;
+
+  const baseSeed =
+    (randomOverrides && typeof randomOverrides === 'object' && 'seed' in randomOverrides)
+      ? randomOverrides.seed
+      : seed;
+
+  if (typeof randomOverrides === 'function') {
+    const result = randomOverrides({
+      seed: baseSeed,
+      context,
+      RandomService,
+    });
+
+    if (result) {
+      return result;
+    }
+  }
+
+  if (randomOverrides && typeof randomOverrides === 'object') {
+    if (typeof randomOverrides.factory === 'function') {
+      const factoryResult = randomOverrides.factory({
+        seed: baseSeed,
+        context,
+        RandomService,
+      });
+
+      if (factoryResult) {
+        return factoryResult;
+      }
+    }
+
+    if (randomOverrides.instance) {
+      return randomOverrides.instance;
+    }
+
+    if (typeof randomOverrides.create === 'function') {
+      const created = randomOverrides.create({
+        seed: baseSeed,
+        context,
+        RandomService,
+      });
+
+      if (created) {
+        return created;
+      }
+    }
+  }
+
+  const ServiceCtor =
+    (randomOverrides && typeof randomOverrides === 'object' && randomOverrides.Service)
+      || (randomOverrides && typeof randomOverrides === 'object' && randomOverrides.RandomService)
+      || (randomOverrides && typeof randomOverrides === 'object' && randomOverrides.constructorOverride)
+      || RandomService;
+
+  const service = new ServiceCtor(baseSeed);
+
+  if (randomOverrides && typeof randomOverrides === 'object' && typeof randomOverrides.configure === 'function') {
+    randomOverrides.configure(service, {
+      seed: baseSeed,
+      context,
+      RandomService,
+    });
+  }
+
+  return service;
+}
+
 export function createServiceManifest(context = {}) {
   const {
     gameState,
     poolConfig,
-    garbageCollectorOptions
+    garbageCollectorOptions,
+    seed,
+    randomOverrides
   } = context;
 
   return [
@@ -115,6 +187,14 @@ export function createServiceManifest(context = {}) {
         }
         return gameEvents;
       }
+    },
+    {
+      name: 'random',
+      singleton: true,
+      lazy: false,
+      dependencies: [],
+      factory: ({ context: manifestContext }) =>
+        createRandomService({ ...manifestContext, seed, randomOverrides })
     },
     {
       name: 'game-state',
@@ -148,8 +228,9 @@ export function createServiceManifest(context = {}) {
       name: 'audio',
       singleton: true,
       lazy: true,
-      dependencies: ['settings'],
-      factory: ({ resolved }) => new AudioSystem({ settings: resolved['settings'] })
+      dependencies: ['settings', 'random'],
+      factory: ({ resolved }) =>
+        new AudioSystem({ settings: resolved['settings'], random: resolved['random'] })
     },
     {
       name: 'input',
@@ -169,10 +250,11 @@ export function createServiceManifest(context = {}) {
       name: 'xp-orbs',
       singleton: true,
       lazy: false,
-      dependencies: ['player'],
+      dependencies: ['player', 'random'],
       factory: ({ resolved }) =>
         new XPOrbSystem({
           player: resolved['player'],
+          random: resolved['random'],
         })
     },
     {
@@ -214,9 +296,13 @@ export function createServiceManifest(context = {}) {
       name: 'effects',
       singleton: true,
       lazy: false,
-      dependencies: ['audio', 'settings'],
+      dependencies: ['audio', 'settings', 'random'],
       factory: ({ resolved }) =>
-        new EffectsSystem({ audio: resolved['audio'], settings: resolved['settings'] })
+        new EffectsSystem({
+          audio: resolved['audio'],
+          settings: resolved['settings'],
+          random: resolved['random'],
+        })
     },
     {
       name: 'progression',
@@ -243,7 +329,7 @@ export function createServiceManifest(context = {}) {
       name: 'enemies',
       singleton: true,
       lazy: false,
-      dependencies: ['player', 'xp-orbs', 'progression', 'physics', 'healthHearts'],
+      dependencies: ['player', 'xp-orbs', 'progression', 'physics', 'healthHearts', 'random'],
       factory: ({ resolved }) => {
         const enemySystem = new EnemySystem({
           player: resolved['player'],
@@ -251,6 +337,7 @@ export function createServiceManifest(context = {}) {
           progression: resolved['progression'],
           physics: resolved['physics'],
           healthHearts: resolved['healthHearts'],
+          random: resolved['random'],
         });
 
         if (resolved['progression'] && typeof enemySystem.attachProgression === 'function') {
@@ -307,7 +394,8 @@ export function createServiceManifest(context = {}) {
         'healthHearts',
         'effects',
         'combat',
-        'enemies'
+        'enemies',
+        'random'
       ],
       factory: ({ resolved }) =>
         new RenderingSystem({
@@ -317,15 +405,20 @@ export function createServiceManifest(context = {}) {
           healthHearts: resolved['healthHearts'],
           effects: resolved['effects'],
           combat: resolved['combat'],
-          enemies: resolved['enemies']
+          enemies: resolved['enemies'],
+          random: resolved['random'],
         })
     },
     {
       name: 'menu-background',
       singleton: true,
       lazy: false,
-      dependencies: ['settings'],
-      factory: ({ resolved }) => new MenuBackgroundSystem({ settings: resolved['settings'] })
+      dependencies: ['settings', 'random'],
+      factory: ({ resolved }) =>
+        new MenuBackgroundSystem({
+          settings: resolved['settings'],
+          random: resolved['random'],
+        })
     }
   ];
 }

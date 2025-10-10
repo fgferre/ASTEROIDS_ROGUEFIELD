@@ -3,6 +3,8 @@ import { createServiceManifest } from './serviceManifest.js';
 export function bootstrapServices({
   container,
   manifestContext = {},
+  seed,
+  randomOverrides,
   logger = console,
   adapter = null
 } = {}) {
@@ -10,7 +12,20 @@ export function bootstrapServices({
     throw new Error('[bootstrapServices] DI container instance is required');
   }
 
-  const manifest = createServiceManifest(manifestContext);
+  const resolvedManifestContext = { ...manifestContext };
+
+  if (seed !== undefined && resolvedManifestContext.seed === undefined) {
+    resolvedManifestContext.seed = seed;
+  }
+
+  if (
+    randomOverrides !== undefined &&
+    resolvedManifestContext.randomOverrides === undefined
+  ) {
+    resolvedManifestContext.randomOverrides = randomOverrides;
+  }
+
+  const manifest = createServiceManifest(resolvedManifestContext);
   const resolvedServices = {};
 
   manifest.forEach((entry) => {

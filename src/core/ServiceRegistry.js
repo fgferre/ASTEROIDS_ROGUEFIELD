@@ -20,6 +20,7 @@
 
 import { DIContainer } from './DIContainer.js';
 import { createServiceManifest } from '../bootstrap/serviceManifest.js';
+import RandomService from './RandomService.js';
 
 export class ServiceRegistry {
   /**
@@ -27,12 +28,37 @@ export class ServiceRegistry {
    *
    * @param {DIContainer} container - The DI container to populate
    */
-  static setupServices(container, context = {}) {
+  static setupServices(container, options = {}) {
     if (!(container instanceof DIContainer)) {
       throw new Error('[ServiceRegistry] Invalid container provided');
     }
 
-    const manifest = createServiceManifest(context);
+    const manifestContext = (() => {
+      if (!options || typeof options !== 'object') {
+        return {};
+      }
+
+      if (options.manifestContext && typeof options.manifestContext === 'object') {
+        return { ...options.manifestContext };
+      }
+
+      return { ...options };
+    })();
+
+    if (options && typeof options === 'object') {
+      if (Object.prototype.hasOwnProperty.call(options, 'seed') && manifestContext.seed === undefined) {
+        manifestContext.seed = options.seed;
+      }
+
+      if (
+        Object.prototype.hasOwnProperty.call(options, 'randomOverrides') &&
+        manifestContext.randomOverrides === undefined
+      ) {
+        manifestContext.randomOverrides = options.randomOverrides;
+      }
+    }
+
+    const manifest = createServiceManifest(manifestContext);
     const registeredNames = new Set();
 
     manifest.forEach((entry) => {
@@ -78,7 +104,7 @@ export class ServiceRegistry {
           return factory({
             resolved,
             container,
-            context,
+            context: manifestContext,
             manifestEntry: entry
           });
         },
@@ -114,12 +140,42 @@ export class ServiceRegistry {
     container.verbose = false; // Disable verbose logging in tests
 
     // Register minimal services
-    container.register('event-bus', () => overrides.eventBus || { on: () => {}, emit: () => {}, off: () => {} });
-    container.register('settings', () => overrides.settings || { get: () => null, set: () => {} });
-    container.register('audio', () => overrides.audio || { play: () => {}, stop: () => {} });
+    const {
+      random: randomOverride,
+      randomSeed,
+      ...serviceOverrides
+    } = overrides || {};
+
+    container.register(
+      'event-bus',
+      () => serviceOverrides.eventBus || { on: () => {}, emit: () => {}, off: () => {} }
+    );
+    container.register('settings', () => serviceOverrides.settings || { get: () => null, set: () => {} });
+    container.register('audio', () => serviceOverrides.audio || { play: () => {}, stop: () => {} });
+
+    const deterministicRandom = (() => {
+      if (randomOverride) {
+        if (typeof randomOverride === 'function') {
+          const produced = randomOverride({
+            seed: randomSeed,
+            RandomService,
+          });
+
+          if (produced) {
+            return produced;
+          }
+        }
+
+        return randomOverride;
+      }
+
+      return new RandomService(Number.isFinite(randomSeed) ? randomSeed : 1337);
+    })();
+
+    container.register('random', () => deterministicRandom);
 
     // Add any additional overrides
-    for (const [name, factory] of Object.entries(overrides)) {
+    for (const [name, factory] of Object.entries(serviceOverrides)) {
       if (!container.has(name)) {
         container.register(name, () => factory);
       }
