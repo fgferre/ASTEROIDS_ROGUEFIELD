@@ -170,9 +170,7 @@ export function createServiceManifest(context = {}) {
   const {
     gameState,
     poolConfig,
-    garbageCollectorOptions,
-    seed,
-    randomOverrides
+    garbageCollectorOptions
   } = context;
 
   return [
@@ -194,7 +192,7 @@ export function createServiceManifest(context = {}) {
       lazy: false,
       dependencies: [],
       factory: ({ context: manifestContext }) =>
-        createRandomService({ ...manifestContext, seed, randomOverrides })
+        createRandomService({ ...manifestContext })
     },
     {
       name: 'game-state',
