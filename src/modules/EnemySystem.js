@@ -1,7 +1,7 @@
 // src/modules/EnemySystem.js
 import * as CONSTANTS from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
-import { normalizeDependencies } from '../core/serviceUtils.js';
+import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 import { Asteroid } from './enemies/types/Asteroid.js';
 import { EnemyFactory } from './enemies/base/EnemyFactory.js';
 import { WaveManager } from './enemies/managers/WaveManager.js';
@@ -113,6 +113,14 @@ class EnemySystem {
     const dependency = this.dependencies[dependencyKey];
     if (dependency) {
       this.services[targetKey] = dependency;
+      this.missingDependencyWarnings.delete(dependencyKey);
+      return;
+    }
+
+    const resolvedService = resolveService(dependencyKey, this.dependencies);
+    if (resolvedService) {
+      this.services[targetKey] = resolvedService;
+      this.dependencies[dependencyKey] = resolvedService;
       this.missingDependencyWarnings.delete(dependencyKey);
       return;
     }

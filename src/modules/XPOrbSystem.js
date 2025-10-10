@@ -1,6 +1,6 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
-import { normalizeDependencies } from '../core/serviceUtils.js';
+import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
 const ORB_CLASS_ORDER = [
   { name: 'blue', tier: 1 },
@@ -183,22 +183,40 @@ class XPOrbSystem {
       this.cachedProgression = null;
     }
 
-    if (!this.cachedPlayer && this.dependencies.player) {
-      this.cachedPlayer = this.dependencies.player;
-      this.missingDependencyWarnings.delete('player');
+    if (!this.cachedPlayer) {
+      if (this.dependencies.player) {
+        this.cachedPlayer = this.dependencies.player;
+      } else {
+        const resolvedPlayer = resolveService('player', this.dependencies);
+        if (resolvedPlayer) {
+          this.cachedPlayer = resolvedPlayer;
+          this.dependencies.player = resolvedPlayer;
+        }
+      }
+
+      if (this.cachedPlayer) {
+        this.missingDependencyWarnings.delete('player');
+      } else if (!suppressWarnings) {
+        this.logMissingDependency('player');
+      }
     }
 
-    if (!this.cachedProgression && this.dependencies.progression) {
-      this.cachedProgression = this.dependencies.progression;
-      this.missingDependencyWarnings.delete('progression');
-    }
+    if (!this.cachedProgression) {
+      if (this.dependencies.progression) {
+        this.cachedProgression = this.dependencies.progression;
+      } else {
+        const resolvedProgression = resolveService('progression', this.dependencies);
+        if (resolvedProgression) {
+          this.cachedProgression = resolvedProgression;
+          this.dependencies.progression = resolvedProgression;
+        }
+      }
 
-    if (!this.cachedPlayer && !suppressWarnings) {
-      this.logMissingDependency('player');
-    }
-
-    if (!this.cachedProgression && !suppressWarnings) {
-      this.logMissingDependency('progression');
+      if (this.cachedProgression) {
+        this.missingDependencyWarnings.delete('progression');
+      } else if (!suppressWarnings) {
+        this.logMissingDependency('progression');
+      }
     }
   }
 

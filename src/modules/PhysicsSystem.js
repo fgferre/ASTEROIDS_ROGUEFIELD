@@ -1,6 +1,6 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 import { SpatialHash } from '../core/SpatialHash.js';
-import { normalizeDependencies } from '../core/serviceUtils.js';
+import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
 class PhysicsSystem {
   constructor(dependencies = {}) {
@@ -109,10 +109,21 @@ class PhysicsSystem {
       this.bootstrapCompleted = false;
     }
 
-    const dependencyEnemy = this.dependencies.enemies;
-    if (dependencyEnemy) {
-      const changed = this.enemySystem !== dependencyEnemy;
-      this.enemySystem = dependencyEnemy;
+    let enemyService = this.dependencies.enemies;
+    if (!enemyService) {
+      try {
+        enemyService = resolveService('enemies', this.dependencies);
+        if (enemyService) {
+          this.dependencies.enemies = enemyService;
+        }
+      } catch (error) {
+        enemyService = null;
+      }
+    }
+
+    if (enemyService) {
+      const changed = this.enemySystem !== enemyService;
+      this.enemySystem = enemyService;
       this.bootstrapFromEnemySystem(this.enemySystem, { force: force || changed });
       this.missingEnemyWarningLogged = false;
       return;
