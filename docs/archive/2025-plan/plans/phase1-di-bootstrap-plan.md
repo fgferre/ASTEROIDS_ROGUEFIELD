@@ -44,8 +44,8 @@
 - **Diferenças de inicialização assíncrona:** Alguns sistemas (ex.: `MenuBackgroundSystem`) dependem de recursos WebGL. Garantir que fábricas tratem indisponibilidade e registrem serviço mesmo em fallback para manter compatibilidade atual.【F:src/modules/MenuBackgroundSystem.js†L60-L134】
 
 ## 7. Checklist de saída da Fase 1
-- [ ] `ServiceRegistry` depende exclusivamente do manifesto e conhece todas as dependências diretas.
-- [ ] `bootstrapServices()` substitui o bloco manual em `init()` e publica snapshot no console com validação do container.
-- [ ] Todos os sistemas aceitam injeção explícita e funcionam com `gameServices` desabilitado (exceto pelo adaptador legado que continuará ativo até a fase 2).
-- [ ] `GamePools`, `GarbageCollectionManager` e `event-bus` são resolvidos via DI.
-- [ ] Fluxos de reset/retry e tela de menu continuam operando sem regressões visíveis.
+- [x] `ServiceRegistry` depende exclusivamente do manifesto e conhece todas as dependências diretas.
+- [x] `bootstrapServices()` substitui o bloco manual em `init()` e publica snapshot no console com validação do container.
+- [x] Todos os sistemas aceitam injeção explícita e funcionam com `gameServices` desabilitado (exceto pelo adaptador legado que continuará ativo até a fase 2).
+- [x] `GamePools`, `GarbageCollectionManager` e `event-bus` são resolvidos via DI.
+- [x] Fluxos de reset/retry e tela de menu continuam operando sem regressões visíveis.
