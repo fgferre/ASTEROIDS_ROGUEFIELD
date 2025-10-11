@@ -22,7 +22,12 @@
  */
 
 export class ScreenShake {
-  constructor() {
+  constructor(randomGenerator = null) {
+    this.random =
+      randomGenerator && typeof randomGenerator.float === 'function'
+        ? randomGenerator
+        : null;
+
     // Trauma system
     this.trauma = 0; // 0-1 range
     this.traumaDecay = 1.5; // How fast trauma decays per second
@@ -35,15 +40,23 @@ export class ScreenShake {
     this.angle = 0;
 
     // Noise seeds for smooth shake
-    this.seedX = Math.random() * 1000;
-    this.seedY = Math.random() * 1000;
-    this.seedAngle = Math.random() * 1000;
+    this.seedX = this.getRandomSeed();
+    this.seedY = this.getRandomSeed();
+    this.seedAngle = this.getRandomSeed();
 
     // Time tracking
     this.time = 0;
     this.frequency = 15; // Shake frequency multiplier
 
     console.log('[ScreenShake] Initialized');
+  }
+
+  getRandomSeed() {
+    if (this.random) {
+      return this.random.range(0, 1000);
+    }
+
+    return Math.random() * 1000;
   }
 
   /**

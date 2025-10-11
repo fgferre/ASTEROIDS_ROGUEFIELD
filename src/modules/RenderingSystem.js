@@ -2,6 +2,7 @@ import * as CONSTANTS from '../core/GameConstants.js';
 import RenderBatch from '../core/RenderBatch.js';
 import CanvasStateManager from '../core/CanvasStateManager.js';
 import GradientCache from '../core/GradientCache.js';
+import RandomService from '../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
 const MAX_VISUAL_TILT = 0.3;
@@ -146,10 +147,6 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function randomRange(min, max) {
-  return min + Math.random() * (max - min);
-}
-
 const SPACE_SKY_LAYERS = [
   { density: 220, vx: -0.006, vy: -0.002, size: 0.9, glow: 0.35 },
   { density: 380, vx: -0.01, vy: -0.004, size: 1.2, glow: 0.48 },
@@ -233,8 +230,12 @@ function extractVelocityComponent(velocity, primaryKey, fallbackKey) {
 }
 
 class SpaceSkyBackground {
-  constructor() {
+  constructor(randomGenerator = null) {
     this.dpr = resolveDevicePixelRatio();
+    this.random =
+      randomGenerator && typeof randomGenerator.float === 'function'
+        ? randomGenerator
+        : null;
     this.layers = SPACE_SKY_LAYERS.map((layer) => ({
       density: layer.density,
       vx: layer.vx,
@@ -266,6 +267,18 @@ class SpaceSkyBackground {
     this.currentPreset = null;
 
     this.applyPreset('cinematic');
+  }
+
+  getRandomFloat() {
+    return this.random ? this.random.float() : globalThis.Math.random();
+  }
+
+  getRandomRange(min, max) {
+    if (this.random && typeof this.random.range === 'function') {
+      return this.random.range(min, max);
+    }
+
+    return min + (max - min) * this.getRandomFloat();
   }
 
   bindVelocityProvider(fn) {
@@ -353,10 +366,10 @@ class SpaceSkyBackground {
 
   makeStar() {
     return {
-      x: Math.random() * this.width,
-      y: Math.random() * this.height,
-      phase: Math.random() * Math.PI * 2,
-      jitter: randomRange(0.6, 1.4),
+      x: this.getRandomRange(0, this.width),
+      y: this.getRandomRange(0, this.height),
+      phase: this.getRandomRange(0, Math.PI * 2),
+      jitter: this.getRandomRange(0.6, 1.4),
     };
   }
 
@@ -579,8 +592,25 @@ class SpaceSkyBackground {
 
 class RenderingSystem {
   constructor(dependencies = {}) {
-    this.dependencies = normalizeDependencies(dependencies);
-    this.spaceSky = new SpaceSkyBackground();
+    const input =
+      dependencies && typeof dependencies === 'object' && !Array.isArray(dependencies)
+        ? dependencies
+        : {};
+    const { random = null, ...rest } = input;
+
+    this.dependencies = normalizeDependencies(rest);
+    this.random = random ?? resolveService('random', this.dependencies);
+    if (!this.random) {
+      this.random = new RandomService();
+    }
+
+    this.dependencies.random = this.random;
+    this.randomForks = {
+      starfield: this.random.fork('rendering.starfield'),
+      assets: this.random.fork('rendering.assets'),
+    };
+
+    this.spaceSky = new SpaceSkyBackground(this.randomForks.starfield);
     this.spaceSky.setParallax(0.06, 0.05, 0.06, CONSTANTS.SHIP_MAX_SPEED);
 
     // Batch rendering optimization systems

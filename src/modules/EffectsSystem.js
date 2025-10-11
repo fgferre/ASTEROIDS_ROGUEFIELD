@@ -1,5 +1,6 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
+import RandomService from '../core/RandomService.js';
 import { ScreenShake } from '../utils/ScreenShake.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
@@ -9,7 +10,7 @@ const MAIN_THRUSTER_FLASH_DURATION = 0.05;
 const MAIN_THRUSTER_FLASH_INTENSITY = 0.05;
 
 class SpaceParticle {
-  constructor(x, y, vx, vy, color, size, life, type = 'normal') {
+  constructor(x, y, vx, vy, color, size, life, type = 'normal', random = null) {
     this.x = x;
     this.y = y;
     this.vx = vx;
@@ -20,8 +21,12 @@ class SpaceParticle {
     this.maxLife = life;
     this.alpha = 1;
     this.type = type;
-    this.rotation = Math.random() * Math.PI * 2;
-    this.rotationSpeed = (Math.random() - 0.5) * 4;
+
+    const rng = random && typeof random.float === 'function' ? random : null;
+    const float = rng ? () => rng.float() : () => globalThis.Math.random();
+
+    this.rotation = float() * Math.PI * 2;
+    this.rotationSpeed = (float() - 0.5) * 4;
   }
 
   update(deltaTime) {
@@ -140,17 +145,38 @@ export default class EffectsSystem {
   constructor(config = {}) {
     const normalizedConfig =
       config && typeof config === 'object' && !Array.isArray(config) ? config : {};
-    const { audio = null, ...dependencies } = normalizedConfig;
+    const { audio = null, random = null, ...dependencies } = normalizedConfig;
 
     this.dependencies = normalizeDependencies(dependencies);
     this.audio = audio ?? resolveService('audio', this.dependencies);
+    this.random = random ?? resolveService('random', this.dependencies);
+    if (!this.random) {
+      this.random = new RandomService();
+    }
+
+    if (this.random) {
+      this.dependencies.random = this.random;
+      this.randomForks = {
+        base: this.random.fork('effects.base'),
+        particles: this.random.fork('effects.particles'),
+        thrusters: this.random.fork('effects.thrusters'),
+        colors: this.random.fork('effects.colors'),
+        muzzleFlash: this.random.fork('effects.muzzleFlash'),
+        hits: this.random.fork('effects.hitEffects'),
+        explosions: this.random.fork('effects.explosions'),
+        volatility: this.random.fork('effects.volatility'),
+        screenShake: this.random.fork('effects.screenShake'),
+      };
+    } else {
+      this.randomForks = null;
+    }
     this.particles = [];
     this.shockwaves = [];
     this.hitMarkers = []; // NEW: Hit marker tracking
     this.damageIndicators = []; // NEW: Directional damage indicators
 
     // Upgraded screen shake (Week 1: Balance & Feel)
-    this.screenShake = new ScreenShake();
+    this.screenShake = new ScreenShake(this.getRandomFork('screenShake'));
     this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
     this.screenFlash = {
       timer: 0,
@@ -175,6 +201,68 @@ export default class EffectsSystem {
     console.log('[EffectsSystem] Initialized');
   }
 
+  getRandomFork(name = 'base') {
+    if (!this.randomForks) {
+      return null;
+    }
+
+    return this.randomForks[name] || this.randomForks.base || null;
+  }
+
+  randomFloat(name = 'base') {
+    const fork = this.getRandomFork(name);
+    if (fork && typeof fork.float === 'function') {
+      return fork.float();
+    }
+
+    return globalThis.Math.random();
+  }
+
+  randomInt(min, max, name = 'base') {
+    const fork = this.getRandomFork(name);
+    if (fork && typeof fork.int === 'function') {
+      return fork.int(min, max);
+    }
+
+    const low = Math.min(min, max);
+    const high = Math.max(min, max);
+    return low + Math.floor((high - low + 1) * this.randomFloat(name));
+  }
+
+  randomChance(probability, name = 'base') {
+    const fork = this.getRandomFork(name);
+    if (fork && typeof fork.chance === 'function') {
+      return fork.chance(probability);
+    }
+
+    if (probability <= 0) {
+      return false;
+    }
+
+    if (probability >= 1) {
+      return true;
+    }
+
+    return this.randomFloat(name) < probability;
+  }
+
+  randomCentered(span = 1, name = 'base') {
+    return (this.randomFloat(name) - 0.5) * span;
+  }
+
+  randomPick(array, name = 'base') {
+    if (!Array.isArray(array) || array.length === 0) {
+      return undefined;
+    }
+
+    const fork = this.getRandomFork(name);
+    if (fork && typeof fork.pick === 'function') {
+      return fork.pick(array);
+    }
+
+    return array[this.randomInt(0, array.length - 1, name)];
+  }
+
   // === PARTICLE POOL HELPERS ===
   createParticle(x, y, vx, vy, color, size, life, type = 'normal') {
     const particle = GamePools.particles.acquire();
@@ -190,8 +278,8 @@ export default class EffectsSystem {
     particle.maxLife = life;
     particle.alpha = 1;
     particle.type = type;
-    particle.rotation = Math.random() * Math.PI * 2;
-    particle.rotationSpeed = (Math.random() - 0.5) * 4;
+    particle.rotation = this.randomRange(0, Math.PI * 2, 'particles');
+    particle.rotationSpeed = this.randomCentered(4, 'particles');
     particle.active = true;
 
     return particle;
@@ -680,6 +768,8 @@ export default class EffectsSystem {
 
   spawnThrusterVFX(worldX, worldY, dirX, dirY, intensity = 1, type = 'main', visualLevel = 0) {
     const i = Math.max(0, Math.min(1, intensity));
+    const thrusterFork = 'thrusters';
+    const colorFork = 'colors';
 
     // AGGRESSIVE Visual upgrade scaling matching design doc v3:
     // Rank 5 = +150% particles (2.5x), +100% size (2x), +50% lifetime (1.5x), +50% speed (creates longer trail)
@@ -700,19 +790,19 @@ export default class EffectsSystem {
         colorFn = () => {
           if (visualLevel >= 5) {
             // RANK 5: Electric cyan-blue (no white)
-            return `hsl(${190 + Math.random() * 20}, 100%, ${70 + Math.random() * 12}%)`;
+            return `hsl(${190 + this.randomFloat(colorFork) * 20}, 100%, ${70 + this.randomFloat(colorFork) * 12}%)`;
           } else if (visualLevel >= 4) {
             // RANK 4: Bright cyan
-            return `hsl(${185 + Math.random() * 25}, 100%, ${68 + Math.random() * 14}%)`;
+            return `hsl(${185 + this.randomFloat(colorFork) * 25}, 100%, ${68 + this.randomFloat(colorFork) * 14}%)`;
           } else if (visualLevel >= 3) {
             // RANK 3: Bright yellow
-            return `hsl(${45 + Math.random() * 15}, 100%, ${68 + Math.random() * 14}%)`;
+            return `hsl(${45 + this.randomFloat(colorFork) * 15}, 100%, ${68 + this.randomFloat(colorFork) * 14}%)`;
           } else if (visualLevel >= 1) {
             // RANK 1-2: Brighter orange
-            return `hsl(${25 + Math.random() * 20}, 100%, ${63 + Math.random() * 14}%)`;
+            return `hsl(${25 + this.randomFloat(colorFork) * 20}, 100%, ${63 + this.randomFloat(colorFork) * 14}%)`;
           }
           // Base: Standard orange
-          return `hsl(${18 + Math.random() * 22}, 100%, ${60 + Math.random() * 16}%)`;
+          return `hsl(${18 + this.randomFloat(colorFork) * 22}, 100%, ${60 + this.randomFloat(colorFork) * 16}%)`;
         };
         break;
       case 'aux':
@@ -723,9 +813,9 @@ export default class EffectsSystem {
         // Braking thrusters get brighter with upgrades
         colorFn = () => {
           if (visualLevel >= 3) {
-            return `hsl(${190 + Math.random() * 20}, 100%, ${75 + Math.random() * 15}%)`;
+            return `hsl(${190 + this.randomFloat(colorFork) * 20}, 100%, ${75 + this.randomFloat(colorFork) * 15}%)`;
           }
-          return `hsl(${200 + Math.random() * 25}, 100%, ${68 + Math.random() * 18}%)`;
+          return `hsl(${200 + this.randomFloat(colorFork) * 25}, 100%, ${68 + this.randomFloat(colorFork) * 18}%)`;
         };
         break;
       default: // 'side'
@@ -737,13 +827,13 @@ export default class EffectsSystem {
         colorFn = () => {
           if (visualLevel >= 5) {
             // RANK 5: ELECTRIC CYAN
-            return `hsl(${180 + Math.random() * 10}, 100%, ${80 + Math.random() * 15}%)`;
+            return `hsl(${180 + this.randomFloat(colorFork) * 10}, 100%, ${80 + this.randomFloat(colorFork) * 15}%)`;
           } else if (visualLevel >= 3) {
             // RANK 3+: Bright cyan
-            return `hsl(${180 + Math.random() * 20}, 100%, ${75 + Math.random() * 15}%)`;
+            return `hsl(${180 + this.randomFloat(colorFork) * 20}, 100%, ${75 + this.randomFloat(colorFork) * 15}%)`;
           }
           // Base: Standard blue
-          return `hsl(${200 + Math.random() * 25}, 100%, ${70 + Math.random() * 18}%)`;
+          return `hsl(${200 + this.randomFloat(colorFork) * 25}, 100%, ${70 + this.randomFloat(colorFork) * 18}%)`;
         };
     }
 
@@ -751,17 +841,17 @@ export default class EffectsSystem {
     const count = this.getScaledParticleCount(rawCount);
 
     for (let c = 0; c < count; c++) {
-      const jitter = (Math.random() - 0.5) * 0.35;
-      const spd = speedBase * (0.8 + i * 1.6) * (0.85 + Math.random() * 0.3);
-      const vx = (-dirX + jitter) * spd + (Math.random() - 0.5) * 20;
-      const vy = (-dirY + jitter) * spd + (Math.random() - 0.5) * 20;
-      const size = sizeRange[0] + Math.random() * (sizeRange[1] - sizeRange[0]);
-      const life = lifeRange[0] + Math.random() * (lifeRange[1] - lifeRange[0]);
+      const jitter = (this.randomFloat(thrusterFork) - 0.5) * 0.35;
+      const spd = speedBase * (0.8 + i * 1.6) * (0.85 + this.randomFloat(thrusterFork) * 0.3);
+      const vx = (-dirX + jitter) * spd + (this.randomFloat(thrusterFork) - 0.5) * 20;
+      const vy = (-dirY + jitter) * spd + (this.randomFloat(thrusterFork) - 0.5) * 20;
+      const size = sizeRange[0] + this.randomFloat(thrusterFork) * (sizeRange[1] - sizeRange[0]);
+      const life = lifeRange[0] + this.randomFloat(thrusterFork) * (lifeRange[1] - lifeRange[0]);
 
       this.particles.push(
         this.createParticle(
-          worldX + (Math.random() - 0.5) * 3,
-          worldY + (Math.random() - 0.5) * 3,
+          worldX + (this.randomFloat(thrusterFork) - 0.5) * 3,
+          worldY + (this.randomFloat(thrusterFork) - 0.5) * 3,
           vx,
           vy,
           colorFn(),
@@ -773,9 +863,9 @@ export default class EffectsSystem {
 
       // Spark probability increases with visual level (25% → 70% at rank 5)
       const sparkProbability = 0.25 + (visualLevel * 0.09);
-      if (Math.random() < this.getScaledProbability(sparkProbability)) {
-        const sparkSpd = spd * (0.9 + Math.random() * 0.3);
-        const sparkSize = (1.2 + Math.random() * 0.8) * sizeBoost;
+      if (this.randomFloat(thrusterFork) < this.getScaledProbability(sparkProbability)) {
+        const sparkSpd = spd * (0.9 + this.randomFloat(thrusterFork) * 0.3);
+        const sparkSize = (1.2 + this.randomFloat(thrusterFork) * 0.8) * sizeBoost;
         this.particles.push(
           this.createParticle(
             worldX,
@@ -784,7 +874,7 @@ export default class EffectsSystem {
             -dirY * sparkSpd,
             '#FFFFFF',
             sparkSize,
-            0.08 + Math.random() * 0.06,
+            0.08 + this.randomFloat(thrusterFork) * 0.06,
             'spark'
           )
         );
@@ -794,29 +884,29 @@ export default class EffectsSystem {
 
   createMuzzleFlash(x, y, dirX, dirY) {
     // Create 5-8 bright particles shooting forward from weapon barrel
-    const particleCount = this.getScaledParticleCount(5 + Math.random() * 3);
+    const particleCount = this.getScaledParticleCount(5 + this.randomFloat('muzzleFlash') * 3);
 
     for (let i = 0; i < particleCount; i++) {
       // Cone spread: ±20° from firing direction (wider cone)
-      const spreadAngle = (Math.random() - 0.5) * 0.35; // ~20° in radians
+      const spreadAngle = (this.randomFloat('muzzleFlash') - 0.5) * 0.35; // ~20° in radians
       const angle = Math.atan2(dirY, dirX) + spreadAngle;
 
       // Speed: 200-350 px/s in firing direction (FASTER, more visible)
-      const speed = 200 + Math.random() * 150;
+      const speed = 200 + this.randomFloat('muzzleFlash') * 150;
       const vx = Math.cos(angle) * speed;
       const vy = Math.sin(angle) * speed;
 
       // Color: BRIGHT white-yellow (more visible)
-      const useWhite = Math.random() > 0.5;
+      const useWhite = this.randomFloat('muzzleFlash') > 0.5;
       const color = useWhite
         ? '#FFFFFF' // Pure white
-        : `hsl(${50 + Math.random() * 10}, 100%, 95%)`; // Very bright yellow
+        : `hsl(${50 + this.randomFloat('muzzleFlash') * 10}, 100%, 95%)`; // Very bright yellow
 
       // Size: 3-6px (BIGGER sparks, more visible)
-      const size = 3 + Math.random() * 3;
+      const size = 3 + this.randomFloat('muzzleFlash') * 3;
 
       // Lifetime: 0.12-0.20s (longer duration)
-      const life = 0.12 + Math.random() * 0.08;
+      const life = 0.12 + this.randomFloat('muzzleFlash') * 0.08;
 
       this.particles.push(
         this.createParticle(
@@ -917,23 +1007,23 @@ export default class EffectsSystem {
     const particleCount = this.getScaledParticleCount(killed ? 12 : 6);
 
     for (let i = 0; i < particleCount; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 80 + Math.random() * 100; // FASTER (80-180 vs 60-140)
+      const angle = this.randomFloat('hits') * Math.PI * 2;
+      const speed = 80 + this.randomFloat('hits') * 100; // FASTER (80-180 vs 60-140)
 
       // Spark color: BRIGHT red if killed, BRIGHT cyan/blue if hit (different from muzzle)
       const color = killed
-        ? (Math.random() > 0.3 ? '#FF3333' : '#FFAA00') // Red/orange mix for kills
-        : (Math.random() > 0.5 ? '#00FFFF' : '#88FFFF'); // Cyan for hits (contrast with yellow muzzle)
+        ? (this.randomFloat('hits') > 0.3 ? '#FF3333' : '#FFAA00') // Red/orange mix for kills
+        : (this.randomFloat('hits') > 0.5 ? '#00FFFF' : '#88FFFF'); // Cyan for hits (contrast with yellow muzzle)
 
       // Inherit some momentum from the enemy
       const vx = Math.cos(angle) * speed + enemyVelocity.x * 0.3;
       const vy = Math.sin(angle) * speed + enemyVelocity.y * 0.3;
 
       // BIGGER sparks (more visible)
-      const size = killed ? 3 + Math.random() * 2.5 : 2.5 + Math.random() * 2;
+      const size = killed ? 3 + this.randomFloat('hits') * 2.5 : 2.5 + this.randomFloat('hits') * 2;
 
       // Longer lifetime
-      const life = 0.18 + Math.random() * 0.12; // 0.18-0.30s
+      const life = 0.18 + this.randomFloat('hits') * 0.12; // 0.18-0.30s
 
       this.particles.push(
         this.createParticle(
@@ -1016,9 +1106,9 @@ export default class EffectsSystem {
       12 + level * 2 + intensity * 4
     );
     for (let i = 0; i < particleCount; i += 1) {
-      const spread = (Math.random() - 0.5) * Math.PI * 0.7;
+      const spread = (this.randomFloat('hits') - 0.5) * Math.PI * 0.7;
       const angle = Math.atan2(-ny, -nx) + spread;
-      const speed = 140 + Math.random() * 120 * intensity;
+      const speed = 140 + this.randomFloat('hits') * 120 * intensity;
       const vx = Math.cos(angle) * speed;
       const vy = Math.sin(angle) * speed;
       this.particles.push(
@@ -1027,9 +1117,9 @@ export default class EffectsSystem {
           data.position.y,
           vx,
           vy,
-          `rgba(80, 220, 255, ${0.6 + Math.random() * 0.3})`,
-          2.4 + Math.random() * 1.6,
-          0.28 + Math.random() * 0.18,
+          `rgba(80, 220, 255, ${0.6 + this.randomFloat('hits') * 0.3})`,
+          2.4 + this.randomFloat('hits') * 1.6,
+          0.28 + this.randomFloat('hits') * 0.18,
           'spark'
         )
       );
@@ -1053,16 +1143,16 @@ export default class EffectsSystem {
   createXPCollectEffect(x, y) {
     const count = this.getScaledParticleCount(6);
     for (let i = 0; i < count; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 25 + Math.random() * 40;
+      const angle = this.randomFloat('explosions') * Math.PI * 2;
+      const speed = 25 + this.randomFloat('explosions') * 40;
       const particle = this.createParticle(
         x,
         y,
         Math.cos(angle) * speed,
         Math.sin(angle) * speed,
         '#00DDFF',
-        1.5 + Math.random() * 1.5,
-        0.3 + Math.random() * 0.2
+        1.5 + this.randomFloat('explosions') * 1.5,
+        0.3 + this.randomFloat('explosions') * 0.2
       );
       this.particles.push(particle);
     }
@@ -1081,16 +1171,16 @@ export default class EffectsSystem {
     );
 
     for (let i = 0; i < particleCount; i += 1) {
-      const angle = (Math.PI * 2 * i) / particleCount + Math.random() * 0.3;
-      const speed = 60 + Math.random() * 80;
+      const angle = (Math.PI * 2 * i) / particleCount + this.randomFloat('explosions') * 0.3;
+      const speed = 60 + this.randomFloat('explosions') * 80;
       const particle = this.createParticle(
         x,
         y,
         Math.cos(angle) * speed,
         Math.sin(angle) * speed,
         particleColor,
-        1.5 + Math.random() * 2.5,
-        0.4 + Math.random() * 0.35,
+        1.5 + this.randomFloat('explosions') * 2.5,
+        0.4 + this.randomFloat('explosions') * 0.35,
         'spark'
       );
       this.particles.push(particle);
@@ -1118,7 +1208,7 @@ export default class EffectsSystem {
         Math.sin(angle) * speed,
         glowColor,
         2.5 + tier * 0.8,
-        0.45 + Math.random() * 0.2
+        0.45 + this.randomFloat('explosions') * 0.2
       );
       this.particles.push(particle);
     }
@@ -1140,14 +1230,14 @@ export default class EffectsSystem {
     this.addScreenFlash('rgba(255, 255, 255, 0.8)', 0.4, 0.6);
 
     // HIGH VELOCITY FRAGMENTS (50-80 particles)
-    const fragmentCount = this.getScaledParticleCount(50 + Math.random() * 30);
+    const fragmentCount = this.getScaledParticleCount(50 + this.randomFloat('explosions') * 30);
     for (let i = 0; i < fragmentCount; i++) {
-      const angle = Math.random() * Math.PI * 2;
+      const angle = this.randomFloat('explosions') * Math.PI * 2;
       // HIGH VELOCITY: 250-500 px/s
-      const speed = 250 + Math.random() * 250;
+      const speed = 250 + this.randomFloat('explosions') * 250;
 
       // Mix of colors: white, yellow, orange, red
-      const colorChoice = Math.random();
+      const colorChoice = this.randomFloat('explosions');
       let color;
       if (colorChoice < 0.25) color = '#FFFFFF'; // White hot
       else if (colorChoice < 0.5) color = '#FFFF00'; // Yellow
@@ -1155,10 +1245,10 @@ export default class EffectsSystem {
       else color = '#FF3333'; // Red
 
       // Large fragments
-      const size = 3 + Math.random() * 4;
+      const size = 3 + this.randomFloat('explosions') * 4;
 
       // Long lifetime
-      const life = 0.6 + Math.random() * 0.4;
+      const life = 0.6 + this.randomFloat('explosions') * 0.4;
 
       this.particles.push(
         this.createParticle(
@@ -1205,16 +1295,16 @@ export default class EffectsSystem {
   createLevelUpExplosion(player) {
     const count = this.getScaledParticleCount(20);
     for (let i = 0; i < count; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 60 + Math.random() * 120;
+      const angle = this.randomFloat('explosions') * Math.PI * 2;
+      const speed = 60 + this.randomFloat('explosions') * 120;
       const particle = this.createParticle(
         player.x,
         player.y,
         Math.cos(angle) * speed,
         Math.sin(angle) * speed,
-        `hsl(${Math.random() * 40 + 40}, 100%, 60%)`,
-        2 + Math.random() * 2,
-        0.6 + Math.random() * 0.4,
+        `hsl(${this.randomFloat('explosions') * 40 + 40}, 100%, 60%)`,
+        2 + this.randomFloat('explosions') * 2,
+        0.6 + this.randomFloat('explosions') * 0.4,
         'spark'
       );
       this.particles.push(particle);
@@ -1234,7 +1324,7 @@ export default class EffectsSystem {
     const sparkColor =
       variantColors?.glow ||
       variantColors?.pulse ||
-      `hsl(${Math.random() * 20 + 30}, 100%, 70%)`;
+      `hsl(${this.randomFloat('explosions') * 20 + 30}, 100%, 70%)`;
     const secondarySparkColor = variantColors?.cracks || 'rgba(255, 220, 170, 0.85)';
 
     const baseCount = { large: 12, medium: 8, small: 5 }[asteroid.size] || 6;
@@ -1258,10 +1348,10 @@ export default class EffectsSystem {
     }
 
     for (let i = 0; i < particleCount; i += 1) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = (40 + Math.random() * 80) * speedScale;
+      const angle = this.randomFloat('explosions') * Math.PI * 2;
+      const speed = (40 + this.randomFloat('explosions') * 80) * speedScale;
 
-      const offset = radius * 0.5 * (Math.random() - 0.5);
+      const offset = radius * 0.5 * (this.randomFloat('explosions') - 0.5);
       const spawnX = asteroid.x + Math.cos(angle) * offset;
       const spawnY = asteroid.y + Math.sin(angle) * offset;
 
@@ -1271,8 +1361,8 @@ export default class EffectsSystem {
         Math.cos(angle) * speed + parentVx * momentumScale,
         Math.sin(angle) * speed + parentVy * momentumScale,
         debrisColor,
-        2 + Math.random() * 3.2,
-        0.6 + Math.random() * 0.45,
+        2 + this.randomFloat('explosions') * 3.2,
+        0.6 + this.randomFloat('explosions') * 0.45,
         'debris'
       );
       this.particles.push(debris);
@@ -1283,22 +1373,23 @@ export default class EffectsSystem {
         Math.cos(angle) * speed * 1.25 + parentVx * momentumScale,
         Math.sin(angle) * speed * 1.25 + parentVy * momentumScale,
         sparkColor,
-        1.6 + Math.random() * 1.6,
-        0.32 + Math.random() * 0.22,
+        1.6 + this.randomFloat('explosions') * 1.6,
+        0.32 + this.randomFloat('explosions') * 0.22,
         'spark'
       );
       this.particles.push(spark);
 
-      if (Math.random() < 0.35) {
+      if (this.randomFloat('explosions') < 0.35) {
         const secondary = new SpaceParticle(
           asteroid.x,
           asteroid.y,
           Math.cos(angle + Math.PI / 2) * speed * 0.6,
           Math.sin(angle + Math.PI / 2) * speed * 0.6,
           secondarySparkColor,
-          1.2 + Math.random() * 1,
-          0.28 + Math.random() * 0.18,
-          'spark'
+          1.2 + this.randomFloat('explosions') * 1,
+          0.28 + this.randomFloat('explosions') * 0.18,
+          'spark',
+          this.getRandomFork('explosions')
         );
         this.particles.push(secondary);
       }
@@ -1473,14 +1564,15 @@ export default class EffectsSystem {
         colors.cracks,
         Math.max(0.55, crackLength / 3.2),
         baseLifetime + Math.min(0.12, crackLength / (radius * 6)),
-        'crack'
+        'crack',
+        this.getRandomFork('explosions')
       );
       crack.rotation = angle;
       crack.rotationSpeed = 0;
       this.particles.push(crack);
 
       if (!this.motionReduced) {
-        const sparkSpeed = 22 + Math.random() * 28;
+        const sparkSpeed = 22 + this.randomFloat('explosions') * 28;
         this.particles.push(
           this.createParticle(
             worldEnd.x,
@@ -1488,8 +1580,8 @@ export default class EffectsSystem {
             Math.cos(angle) * sparkSpeed * 0.32,
             Math.sin(angle) * sparkSpeed * 0.32,
             colors.glow,
-            0.9 + Math.random() * 0.7,
-            0.22 + Math.random() * 0.16,
+            0.9 + this.randomFloat('explosions') * 0.7,
+            0.22 + this.randomFloat('explosions') * 0.16,
             'spark'
           )
         );
@@ -1503,7 +1595,7 @@ export default class EffectsSystem {
     if (shardCount > 0 && selectedSegments.length > 0) {
       for (let i = 0; i < shardCount; i += 1) {
         const segment = selectedSegments[i % selectedSegments.length];
-        const t = Math.random();
+        const t = this.randomFloat('explosions');
         const localPoint = {
           x: segment.start.x + (segment.end.x - segment.start.x) * t,
           y: segment.start.y + (segment.end.y - segment.start.y) * t,
@@ -1518,7 +1610,7 @@ export default class EffectsSystem {
           x: direction.x / dirLength,
           y: direction.y / dirLength,
         };
-        const speed = 22 + Math.random() * 32;
+        const speed = 22 + this.randomFloat('explosions') * 32;
 
         this.particles.push(
           this.createParticle(
@@ -1527,8 +1619,8 @@ export default class EffectsSystem {
             normalized.x * speed,
             normalized.y * speed,
             colors.debris,
-            1.4 + Math.random() * 1.6,
-            0.38 + Math.random() * 0.22,
+            1.4 + this.randomFloat('explosions') * 1.6,
+            0.38 + this.randomFloat('explosions') * 0.22,
             'debris'
           )
         );
@@ -1545,9 +1637,9 @@ export default class EffectsSystem {
     for (let i = 0; i < sparkCount; i += 1) {
       const segment =
         selectedSegments.length > 0
-          ? selectedSegments[Math.floor(Math.random() * selectedSegments.length)]
+          ? selectedSegments[Math.floor(this.randomFloat('explosions') * selectedSegments.length)]
           : null;
-      const t = Math.random();
+      const t = this.randomFloat('explosions');
       const localOrigin = segment
         ? {
             x: segment.start.x + (segment.end.x - segment.start.x) * t,
@@ -1568,12 +1660,12 @@ export default class EffectsSystem {
         dirX = rotated.x / dirLength;
         dirY = rotated.y / dirLength;
       } else {
-        const angle = Math.random() * Math.PI * 2;
+        const angle = this.randomFloat('explosions') * Math.PI * 2;
         dirX = Math.cos(angle);
         dirY = Math.sin(angle);
       }
 
-      const speed = 35 + Math.random() * 40;
+      const speed = 35 + this.randomFloat('explosions') * 40;
 
       this.particles.push(
         this.createParticle(
@@ -1582,8 +1674,8 @@ export default class EffectsSystem {
           dirX * speed,
           dirY * speed,
           colors.glow,
-          1.2 + Math.random() * 0.8,
-          0.24 + Math.random() * 0.14,
+          1.2 + this.randomFloat('explosions') * 0.8,
+          0.24 + this.randomFloat('explosions') * 0.14,
           'spark'
         )
       );
@@ -1604,7 +1696,7 @@ export default class EffectsSystem {
       (velocity.x !== 0 || velocity.y !== 0);
     const baseAngle = hasVelocity
       ? Math.atan2(velocity.y, velocity.x) + Math.PI
-      : Math.random() * Math.PI * 2;
+      : this.randomFloat('volatility') * Math.PI * 2;
 
     const colors = config.colors || {};
     const coreColor = colors.core || 'rgba(255, 200, 130, 0.9)';
@@ -1640,7 +1732,7 @@ export default class EffectsSystem {
       ? countRange[1] ?? countMin
       : countMin;
     const spawnCount = this.getScaledParticleCount(
-      this.randomRange(countMin, countMax + totalIntensity * 1.2)
+      this.randomRange(countMin, countMax + totalIntensity * 1.2, 'volatility')
     );
 
     const spread = Number.isFinite(config.spread) ? config.spread : Math.PI / 4;
@@ -1654,19 +1746,19 @@ export default class EffectsSystem {
       0.7 + Math.min(1.2, speedMagnitude / 140) * 0.4 + totalIntensity * 0.3;
 
     for (let i = 0; i < spawnCount; i += 1) {
-      const angleOffset = (Math.random() - 0.5) * spread;
+      const angleOffset = (this.randomFloat('volatility') - 0.5) * spread;
       const angle = baseAngle + angleOffset;
-      const offsetMag = this.randomRange(0, jitter);
+      const offsetMag = this.randomRange(0, jitter, 'volatility');
       const spawnX = position.x + Math.cos(angle + Math.PI) * offsetMag;
       const spawnY = position.y + Math.sin(angle + Math.PI) * offsetMag;
 
       const emberSpeed =
-        this.randomRange(speedRange[0], speedRange[1]) * speedScale;
+        this.randomRange(speedRange[0], speedRange[1], 'volatility') * speedScale;
       const emberLife =
-        this.randomRange(lifeRange[0], lifeRange[1]) *
+        this.randomRange(lifeRange[0], lifeRange[1], 'volatility') *
         (0.7 + totalIntensity * 0.5);
       const emberSize =
-        this.randomRange(sizeRange[0], sizeRange[1]) *
+        this.randomRange(sizeRange[0], sizeRange[1], 'volatility') *
         (0.75 + totalIntensity * 0.45);
 
       const spark = this.createParticle(
@@ -1688,24 +1780,28 @@ export default class EffectsSystem {
         Math.sin(angle) * emberSpeed * 0.45,
         coreColor,
         emberSize,
-        emberLife
+        emberLife,
+        'normal',
+        this.getRandomFork('volatility')
       );
       this.particles.push(core);
 
-      if (Math.random() < this.getScaledProbability(0.55)) {
+      if (this.randomFloat('volatility') < this.getScaledProbability(0.55)) {
         const smoke = new SpaceParticle(
           spawnX,
           spawnY,
           Math.cos(angle) * emberSpeed * 0.25,
           Math.sin(angle) * emberSpeed * 0.25,
           smokeColor,
-          emberSize * (1.2 + Math.random() * 0.6),
-          emberLife * (1.3 + Math.random() * 0.4)
+          emberSize * (1.2 + this.randomFloat('volatility') * 0.6),
+          emberLife * (1.3 + this.randomFloat('volatility') * 0.4),
+          'normal',
+          this.getRandomFork('volatility')
         );
         this.particles.push(smoke);
       }
 
-      if (Math.random() < this.getScaledProbability(0.3)) {
+      if (this.randomFloat('volatility') < this.getScaledProbability(0.3)) {
         const glint = new SpaceParticle(
           spawnX,
           spawnY,
@@ -1713,7 +1809,9 @@ export default class EffectsSystem {
           Math.sin(angle) * emberSpeed * 0.2,
           'rgba(255, 220, 180, 0.7)',
           emberSize * 0.5,
-          emberLife * 0.5
+          emberLife * 0.5,
+          'normal',
+          this.getRandomFork('volatility')
         );
         this.particles.push(glint);
       }
@@ -1724,15 +1822,15 @@ export default class EffectsSystem {
     const particles = this.getScaledParticleCount(6);
     for (let i = 0; i < particles; i += 1) {
       const angle = (i / particles) * Math.PI * 2;
-      const speed = 20 + Math.random() * 15;
+      const speed = 20 + this.randomFloat('volatility') * 15;
       const particle = this.createParticle(
         position.x,
         position.y,
         Math.cos(angle) * speed,
         Math.sin(angle) * speed,
         'rgba(255, 120, 0, 0.45)',
-        1.8 + Math.random() * 0.6,
-        0.35 + Math.random() * 0.15,
+        1.8 + this.randomFloat('volatility') * 0.6,
+        0.35 + this.randomFloat('volatility') * 0.15,
         'spark'
       );
       this.particles.push(particle);
@@ -1797,31 +1895,32 @@ export default class EffectsSystem {
       22 + Math.floor(radius / 5)
     );
     for (let i = 0; i < particleTotal; i += 1) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = (70 + Math.random() * 150) * (0.8 + intensity * 0.4);
+      const angle = this.randomFloat('volatility') * Math.PI * 2;
+      const speed = (70 + this.randomFloat('volatility') * 150) * (0.8 + intensity * 0.4);
 
       const flame = new SpaceParticle(
         position.x,
         position.y,
         Math.cos(angle) * speed,
         Math.sin(angle) * speed,
-        `rgba(255, ${Math.floor(140 + Math.random() * 70)}, ${Math.floor(
-          40 + Math.random() * 40
-        )}, ${0.7 + Math.random() * 0.2})`,
-        2.4 + Math.random() * 1.8,
-        0.38 + Math.random() * 0.24,
-        'spark'
+        `rgba(255, ${Math.floor(140 + this.randomFloat('volatility') * 70)}, ${Math.floor(
+          40 + this.randomFloat('volatility') * 40
+        )}, ${0.7 + this.randomFloat('volatility') * 0.2})`,
+        2.4 + this.randomFloat('volatility') * 1.8,
+        0.38 + this.randomFloat('volatility') * 0.24,
+        'spark',
+        this.getRandomFork('volatility')
       );
       this.particles.push(flame);
 
       const debris = this.createParticle(
-        position.x + (Math.random() - 0.5) * radius * 0.4,
-        position.y + (Math.random() - 0.5) * radius * 0.4,
+        position.x + (this.randomFloat('volatility') - 0.5) * radius * 0.4,
+        position.y + (this.randomFloat('volatility') - 0.5) * radius * 0.4,
         Math.cos(angle) * speed * 0.6,
         Math.sin(angle) * speed * 0.6,
         '#5E1A0D',
-        2 + Math.random() * 2,
-        0.6 + Math.random() * 0.2,
+        2 + this.randomFloat('volatility') * 2,
+        0.6 + this.randomFloat('volatility') * 0.2,
         'debris'
       );
       this.particles.push(debris);
@@ -1829,17 +1928,19 @@ export default class EffectsSystem {
 
     const smokeCount = this.getScaledParticleCount(10 + Math.floor(radius / 8));
     for (let i = 0; i < smokeCount; i += 1) {
-      const angle = Math.random() * Math.PI * 2;
-      const distance = Math.random() * radius * 0.55;
-      const speed = 20 + Math.random() * 50;
+      const angle = this.randomFloat('volatility') * Math.PI * 2;
+      const distance = this.randomFloat('volatility') * radius * 0.55;
+      const speed = 20 + this.randomFloat('volatility') * 50;
       const smoke = new SpaceParticle(
         position.x + Math.cos(angle) * distance,
         position.y + Math.sin(angle) * distance,
         Math.cos(angle) * speed * 0.35,
         Math.sin(angle) * speed * 0.35,
-        `rgba(60, 30, 20, ${0.25 + Math.random() * 0.18})`,
-        3.5 + Math.random() * 3.5,
-        0.85 + Math.random() * 0.5
+        `rgba(60, 30, 20, ${0.25 + this.randomFloat('volatility') * 0.18})`,
+        3.5 + this.randomFloat('volatility') * 3.5,
+        0.85 + this.randomFloat('volatility') * 0.5,
+        'normal',
+        this.getRandomFork('volatility')
       );
       this.particles.push(smoke);
     }
@@ -1852,12 +1953,14 @@ export default class EffectsSystem {
         0,
         'rgba(255, 200, 140, 0.5)',
         radius * 0.24,
-        0.45 + Math.random() * 0.2
+        0.45 + this.randomFloat('volatility') * 0.2,
+        'normal',
+        this.getRandomFork('volatility')
       )
     );
   }
 
-  randomRange(min, max) {
+  randomRange(min, max, name = 'base') {
     const start = Number.isFinite(min) ? min : 0;
     const end = Number.isFinite(max) ? max : start;
     if (end === start) {
@@ -1866,7 +1969,7 @@ export default class EffectsSystem {
 
     const low = Math.min(start, end);
     const high = Math.max(start, end);
-    return low + Math.random() * (high - low);
+    return low + this.randomFloat(name) * (high - low);
   }
 
   reset() {
