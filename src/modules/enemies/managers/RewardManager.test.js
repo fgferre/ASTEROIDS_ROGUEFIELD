@@ -49,6 +49,13 @@ describe('RewardManager', () => {
 
     rewardManager.dropRewards(createBaseEnemy({ size: 'large', variant: 'gold' }));
 
-    expect(spawnHeart).toHaveBeenCalledWith(100, 150);
+    expect(spawnHeart).toHaveBeenCalledWith(
+      100,
+      150,
+      expect.objectContaining({
+        random: deterministicRandom,
+        pulsePhase: 0,
+      })
+    );
   });
 });

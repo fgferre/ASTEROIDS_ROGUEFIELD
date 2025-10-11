@@ -77,8 +77,8 @@ export class HealthHeartSystem {
     }
   }
 
-  spawnHeart(x, y) {
-    const heart = new HealthHeart(x, y);
+  spawnHeart(x, y, options = {}) {
+    const heart = new HealthHeart(x, y, options);
     this.hearts.push(heart);
     console.log(`[HealthHeartSystem] Heart spawned at (${x}, ${y})`);
     return heart;

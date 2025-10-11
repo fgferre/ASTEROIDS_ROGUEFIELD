@@ -35,6 +35,8 @@ import * as CONSTANTS from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../../../core/serviceUtils.js';
 
+const TWO_PI = Math.PI * 2;
+
 export class RewardManager {
  /**
    * Creates a new Reward Manager.
@@ -200,11 +202,13 @@ export class RewardManager {
     const totalXP = orbCount * orbValue;
     const xpPerOrb = orbValue;
 
+    const dropRandomContext = this.createDropRandomContext(enemy);
+
     // Create XP orbs
-    this.createXPOrbs(enemy, orbCount, xpPerOrb);
+    this.createXPOrbs(enemy, orbCount, xpPerOrb, dropRandomContext);
 
     // Rare health heart drop from tough enemies
-    this.tryDropHealthHeart(enemy);
+    this.tryDropHealthHeart(enemy, dropRandomContext);
 
     // Update statistics
     this.updateStats(enemy.type, orbCount, totalXP);
@@ -217,25 +221,31 @@ export class RewardManager {
    * @param {number} count - Number of orbs to create
    * @param {number} xpPerOrb - XP value per orb
    */
-  createXPOrbs(enemy, count, xpPerOrb) {
+  createXPOrbs(enemy, count, xpPerOrb, randomContext = null) {
     const xpOrbSystem = this.getXPOrbSystem();
     if (!xpOrbSystem || typeof xpOrbSystem.createXPOrb !== 'function') {
       console.warn('[RewardManager] XPOrbSystem not available or invalid');
       return;
     }
 
-    for (let i = 0; i < count; i++) {
-      // Spread orbs around the enemy position
-      const dropRandom = this.createDropRandom(`xp-orb:${enemy.id ?? 'enemy'}:${i}`);
-      const angleOffset = dropRandom.range(0, 0.3);
-      const angle = (Math.PI * 2 * i) / count + angleOffset;
-      const distance = enemy.radius * 0.5 + dropRandom.range(0, enemy.radius);
+    const context = randomContext || this.createDropRandomContext(enemy);
+    const placementRandom = context?.placement || context?.base;
+    const velocityRandom = context?.velocity || context?.base;
+    const radius = Number.isFinite(enemy?.radius) ? enemy.radius : 0;
+    const total = Math.max(count, 1);
+
+    for (let i = 0; i < count; i += 1) {
+      const orbPlacementRandom = this.forkRandom(placementRandom, `orb-${i}`) || placementRandom;
+      const orbVelocityRandom = this.forkRandom(velocityRandom, `orb-${i}`) || velocityRandom;
+
+      const angleOffset = this.randomRange(orbPlacementRandom, 0, 0.3);
+      const angle = (TWO_PI * i) / total + angleOffset;
+      const distance = radius * 0.5 + this.randomRange(orbPlacementRandom, 0, radius);
 
       const orbX = enemy.x + Math.cos(angle) * distance;
       const orbY = enemy.y + Math.sin(angle) * distance;
 
-      // Add some initial velocity for scatter effect
-      const speed = 20 + dropRandom.range(0, 30);
+      const speed = 20 + this.randomRange(orbVelocityRandom, 0, 30);
       const vx = Math.cos(angle) * speed;
       const vy = Math.sin(angle) * speed;
 
@@ -418,7 +428,7 @@ export class RewardManager {
    *
    * @param {BaseEnemy} enemy - The destroyed enemy
    */
-  tryDropHealthHeart(enemy) {
+  tryDropHealthHeart(enemy, randomContext = null) {
     // Only from tough enemies (medium/large asteroids, special variants)
     const isToughEnemy =
       (enemy.size === 'medium' || enemy.size === 'large') ||
@@ -447,15 +457,22 @@ export class RewardManager {
 
     console.log(`[RewardManager] Checking heart drop: ${enemy.size} ${enemy.variant || 'common'} - chance: ${(dropChance * 100).toFixed(1)}%`);
 
-    // Roll for drop
-    const heartRandom = this.createDropRandom(`heart:${enemy.id ?? 'enemy'}`);
-    const shouldDrop = heartRandom.chance(dropChance);
+    const context = randomContext || this.createDropRandomContext(enemy);
+    const heartRandom = context?.heart || context?.base;
+    const shouldDrop = this.randomChance(heartRandom, dropChance);
 
     if (shouldDrop) {
       const healthHeartSystem = this.getHealthHeartSystem();
 
       if (healthHeartSystem && typeof healthHeartSystem.spawnHeart === 'function') {
-        healthHeartSystem.spawnHeart(enemy.x, enemy.y);
+        const pulsePhase = this.randomRange(heartRandom, 0, TWO_PI);
+        healthHeartSystem.spawnHeart(enemy.x, enemy.y, {
+          random: heartRandom,
+          pulsePhase,
+          source: 'enemy-drop',
+          enemyType: enemy.type,
+          enemySize: enemy.size,
+        });
         console.log(`[RewardManager] ❤️ Health heart dropped from ${enemy.size} ${enemy.variant || 'common'} asteroid!`);
       } else {
         console.error('[RewardManager] HealthHeartSystem not available!');
@@ -511,15 +528,99 @@ export class RewardManager {
   createDropRandom(label) {
     const baseRandom = this.getRandomService();
     const sequence = this.randomSequence++;
+    const scope = `reward:${label}:${sequence}`;
 
     if (baseRandom && typeof baseRandom.fork === 'function') {
-      return baseRandom.fork(`reward:${label}:${sequence}`);
+      return baseRandom.fork(scope);
     }
 
-    const fallbackSeed = sequence + 1;
-    const fallback = new RandomService(fallbackSeed);
-    this._fallbackRandom = fallback;
-    this.random = fallback;
-    return fallback;
+    if (!this._fallbackRandom) {
+      this._fallbackRandom = new RandomService(sequence + 1);
+    }
+
+    if (typeof this._fallbackRandom.fork === 'function') {
+      return this._fallbackRandom.fork(scope);
+    }
+
+    this._fallbackRandom.reset(sequence + 1);
+    return this._fallbackRandom;
+  }
+
+  createDropRandomContext(enemy) {
+    const sequence = this.randomSequence;
+    const identifier =
+      enemy?.id !== undefined && enemy?.id !== null
+        ? enemy.id
+        : `sequence-${sequence}`;
+    const labelParts = [
+      enemy?.type || 'enemy',
+      enemy?.variant || 'common',
+      enemy?.size || 'unknown',
+      identifier,
+      `wave-${enemy?.wave ?? 0}`
+    ];
+    const label = labelParts.filter(Boolean).join(':');
+    const base = this.createDropRandom(label);
+
+    if (!base || typeof base.fork !== 'function') {
+      return {
+        base,
+        placement: base,
+        velocity: base,
+        heart: base,
+      };
+    }
+
+    return {
+      base,
+      placement: base.fork('placement'),
+      velocity: base.fork('velocity'),
+      heart: base.fork('heart'),
+    };
+  }
+
+  forkRandom(random, scope) {
+    if (!random || typeof random.fork !== 'function') {
+      return null;
+    }
+
+    if (!scope) {
+      return random;
+    }
+
+    return random.fork(scope);
+  }
+
+  randomRange(random, min, max) {
+    const rng = random && typeof random.range === 'function' ? random : this.getRandomService();
+    if (!rng || typeof rng.range !== 'function') {
+      const fallback = this.getRandomService();
+      if (fallback && typeof fallback.range === 'function') {
+        return fallback.range(min, max);
+      }
+      return min;
+    }
+
+    if (!Number.isFinite(min) || !Number.isFinite(max)) {
+      return min;
+    }
+
+    if (max === min) {
+      return min;
+    }
+
+    return rng.range(min, max);
+  }
+
+  randomChance(random, probability) {
+    const rng = random && typeof random.chance === 'function' ? random : this.getRandomService();
+    if (!rng || typeof rng.chance !== 'function') {
+      if (!this._fallbackRandom) {
+        this._fallbackRandom = new RandomService();
+      }
+      return this._fallbackRandom.chance(probability);
+    }
+
+    return rng.chance(probability);
   }
 }

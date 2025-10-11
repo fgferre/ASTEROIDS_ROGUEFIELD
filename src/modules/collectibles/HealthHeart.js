@@ -1,3 +1,7 @@
+import RandomService from '../../core/RandomService.js';
+
+const TWO_PI = Math.PI * 2;
+
 /**
  * Health Heart Collectible
  *
@@ -6,13 +10,35 @@
  */
 
 export class HealthHeart {
-  constructor(x, y) {
+  constructor(x, y, { random = null, pulsePhase = null } = {}) {
     this.x = x;
     this.y = y;
     this.radius = 14;
-    this.pulsePhase = Math.random() * Math.PI * 2;
+    this.random =
+      random && typeof random.range === 'function' ? random : null;
+    this.pulsePhase = this.resolvePulsePhase(pulsePhase);
     this.collected = false;
     this.lifetime = 0;
+  }
+
+  resolvePulsePhase(pulsePhase) {
+    if (Number.isFinite(pulsePhase)) {
+      return pulsePhase;
+    }
+
+    const rng = this.random || this.getFallbackRandom();
+    if (rng && typeof rng.range === 'function') {
+      return rng.range(0, TWO_PI);
+    }
+
+    return Math.random() * TWO_PI;
+  }
+
+  getFallbackRandom() {
+    if (!HealthHeart._fallbackRandom) {
+      HealthHeart._fallbackRandom = new RandomService();
+    }
+    return HealthHeart._fallbackRandom;
   }
 
   update(deltaTime) {
@@ -91,5 +117,7 @@ export class HealthHeart {
     return this.collected;
   }
 }
+
+HealthHeart._fallbackRandom = null;
 
 export default HealthHeart;
