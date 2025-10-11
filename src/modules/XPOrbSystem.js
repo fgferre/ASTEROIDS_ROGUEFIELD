@@ -97,6 +97,7 @@ class XPOrbSystem {
     };
     this._fallbackRandom = null;
     this._randomForkSource = null;
+    this._randomForkSignature = null;
 
     this.orbClasses = [...ORB_CLASS_SEQUENCE];
     this.xpOrbs = [];
@@ -158,7 +159,6 @@ class XPOrbSystem {
     this.configureOrbClustering();
 
     this.ensureRandom({ force: true });
-    this.fusionCheckTimer = this.generateInitialFusionTimer();
 
     this.missingDependencyWarnings = new Set();
 
@@ -211,12 +211,48 @@ class XPOrbSystem {
 
     this.random = candidate;
 
-    if (force || this._randomForkSource !== candidate) {
+    const signature = this.captureRandomSignature(candidate);
+    const signatureChanged =
+      signature !== undefined && signature !== this._randomForkSignature;
+
+    if (force || this._randomForkSource !== candidate || signatureChanged) {
       this.randomForks = this.createRandomForks(candidate);
       this._randomForkSource = candidate;
+      this._randomForkSignature = signature;
+      this.fusionCheckTimer = this.generateInitialFusionTimer();
     }
 
     return this.random;
+  }
+
+  captureRandomSignature(random) {
+    if (!random || typeof random !== 'object') {
+      return undefined;
+    }
+
+    const seed =
+      typeof random.seed === 'number' && Number.isFinite(random.seed)
+        ? random.seed >>> 0
+        : undefined;
+
+    let resetCount;
+    if (typeof random.getResetCount === 'function') {
+      resetCount = random.getResetCount();
+    } else if (random._stats && random._stats.calls) {
+      resetCount = random._stats.calls.reset;
+    }
+
+    if (seed === undefined && resetCount === undefined) {
+      return undefined;
+    }
+
+    const seedPart = seed === undefined ? 'unknown' : String(seed);
+    const resetPart =
+      typeof resetCount === 'number' && Number.isFinite(resetCount)
+        ? String(resetCount >>> 0)
+        : 'unknown';
+
+    return `${seedPart}:${resetPart}`;
   }
 
   createRandomForks(random) {
@@ -374,7 +410,7 @@ class XPOrbSystem {
       }
     }
 
-    this.ensureRandom({ force: false });
+    this.ensureRandom({ force });
   }
 
   createEmptyOrbPools() {
