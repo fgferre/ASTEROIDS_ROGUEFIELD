@@ -31,26 +31,22 @@ A estrutura do projeto está organizada por responsabilidade arquitetônica:
 
 #### 3. **Arquitetura de Código**
 
-O projeto utiliza uma **Arquitetura Modular baseada em Sistemas**, orquestrada por dois padrões centrais:
+O jogo segue uma **Arquitetura Modular baseada em Sistemas** com contratos explícitos de serviços e eventos. A orquestração acontece em torno do manifesto criado por `createServiceManifest()` e aplicado em `ServiceRegistry.setupServices()`, garantindo que cada sistema declare dependências formais desde o bootstrap.
 
-- **Service Locator (`gameServices`):** Um registro central para que sistemas possam acessar outros sistemas sem acoplamento direto (ex: `CombatSystem` acessando `gameServices.get('player')`).
-- **Event Bus (`gameEvents`):** Um barramento de eventos para comunicação desacoplada. Sistemas emitem eventos (`gameEvents.emit('enemy-destroyed', ...)`) e outros sistemas reagem a eles (`gameEvents.on('enemy-destroyed', ...)`), sem se conhecerem diretamente.
-- **Sistemas:** Cada arquivo em `/src/modules` é um sistema que encapsula a lógica e o estado de um domínio específico (Player, Inimigos, UI). Novas funcionalidades devem ser adicionadas ao sistema apropriado.
-- **PhysicsSystem:** Centraliza a malha espacial de asteroides e oferece utilitários de broad-phase compartilhados (por exemplo, `forEachNearbyAsteroid`, `forEachBulletCollision`) reutilizados por combate, mundo e progressão. Prefira consultar esse serviço a varrer listas completas em hot paths.
-- **Data-Driven:** A lógica deve ser parametrizada através de constantes em `GameConstants.js` e arquivos no diretório `/data`. Evite valores fixos dentro dos métodos dos sistemas.
+- **Manifesto e Registro:** O arquivo `src/bootstrap/serviceManifest.js` exporta `createServiceManifest()` com os serviços disponíveis e suas dependências declaradas. `ServiceRegistry.setupServices()` consome esse manifesto para registrar os sistemas reais na inicialização, preservando a ordem de carregamento e habilitando validações automáticas.
+- **Ponte de Compatibilidade:** `ServiceLocatorAdapter` (instanciado em `src/app.js`) conecta o manifesto estável ao legado `gameServices`, permitindo que sistemas antigos continuem usando o locator enquanto novos módulos podem optar por injeção direta. Ele deve ser encarado apenas como ponte de compatibilidade.
+- **Event Bus (`gameEvents`):** Continua sendo o canal primário de comunicação desacoplada. Sistemas emitem (`gameEvents.emit(...)`) e consomem (`gameEvents.on(...)`) eventos sem acoplamento direto.
+- **Sistemas:** Cada arquivo em `/src/modules` encapsula um domínio (ex.: `EnemySystem`, `WorldSystem`, `CombatSystem`). Eles são registrados via manifesto, consomem serviços via injeção ou `resolveService()` e se comunicam por eventos.
+- **PhysicsSystem:** Centraliza a malha espacial de asteroides e disponibiliza utilitários reutilizáveis (por exemplo, `forEachNearbyAsteroid`, `forEachBulletCollision`), evitando percursos completos em hot paths.
+- **Data-Driven:** Parâmetros operacionais residem em `GameConstants.js` e nos arquivos de `/data`. Evite valores fixos na lógica dos sistemas.
 
-##### Coexistência `gameServices` × `diContainer`
+##### Recomendações Permanentes
 
-- `gameServices` (Service Locator legado) continua sendo a fonte de verdade para registrar instâncias concretas durante a Fase 2.1. Os sistemas ainda chamam `gameServices.register()` em seus construtores e recuperam dependências com `gameServices.get()`.
-- `diContainer` é o novo contêiner de injeção. Durante a Fase 2.1 ele recebe **placeholders** através de `ServiceRegistry.setupServices(diContainer)` e é usado para telemetria/planejamento da migração. Ele já está exposto em `window.diContainer` em ambiente de desenvolvimento.
-- `ServiceLocatorAdapter` faz a ponte entre ambos. Ele é inicializado em `src/app.js` para acompanhar o fluxo atual e será ativado como substituto do locator legado na Fase 2.2.
-
-**Ao criar um novo serviço ou sistema:**
-
-1. Registre-o normalmente em `gameServices` (como os sistemas existentes fazem hoje).
-2. Adicione o nome do serviço ao array em `ServiceRegistry.setupServices()` para que o placeholder exista no `diContainer`.
-3. Quando o sistema precisar acessar outro serviço, prefira manter `gameServices.get()` até que a fase de injeção por construtor esteja liberada. Planeje o construtor pensando em receber dependências explicitamente.
-4. Utilize `logServiceRegistrationFlow()` (expõe snapshot no console) durante o desenvolvimento para verificar se o serviço aparece tanto no locator legado quanto como placeholder na DI.
+- **Registro via Manifesto:** Ao adicionar um novo sistema, inclua-o em `createServiceManifest()` com suas dependências explícitas. Observe como `src/bootstrap/serviceManifest.js` registra `EnemySystem` e `WorldSystem`, o que permite que `ServiceRegistry.setupServices()` injete ambos corretamente durante o `bootstrap` em `src/app.js`.
+- **Comunicação por Eventos:** Use `gameEvents` para fluxo de informações. `EnemySystem` em `src/modules/EnemySystem.js` emite eventos como `enemy-spawned` e `enemy-destroyed`, enquanto `WorldSystem` (`src/modules/WorldSystem.js`) consome eventos globais de reset para sincronizar seu estado sem acoplamento direto.
+- **Resolução de Dependências:** Prefira injeção de dependências via construtor ou `resolveService()` fornecido pelo manifest, mantendo `gameServices` apenas como fallback através do `ServiceLocatorAdapter`. Verifique `src/app.js` para ver como os serviços são instanciados com suas dependências resolvidas.
+- **Randomização Determinística:** Utilize `RandomService` seedado pelo manifesto para gerar comportamentos reprodutíveis. Veja como `EnemySystem` consome o serviço para decisões de spawn controladas.
+- **Reuso de Recursos:** Reforce o uso de pools de entidades e objetos de apoio configurados no manifesto (veja `GamePools` em `src/bootstrap/serviceManifest.js`) e reutilizados por sistemas como o `EnemySystem`, reduzindo alocações e garantindo performance consistente.
 
 #### 4. **HTML & CSS**
 
@@ -69,24 +65,25 @@ O projeto utiliza uma **Arquitetura Modular baseada em Sistemas**, orquestrada p
 
 #### 6. **"Definition of Done" (DoD) para uma Feature**
 
-Uma nova funcionalidade ou alteração é considerada "concluída" quando:
+Considere uma feature pronta quando:
 
-- A lógica está implementada dentro do(s) sistema(s) apropriado(s).
-- Parâmetros e configurações estão em `GameConstants.js` ou `/data`.
-- O `test-checklist.md` foi atualizado e os cenários relevantes foram validados.
-- A performance se mantém estável (60 FPS) e sem vazamentos de memória.
-- O PR é pequeno, focado e descreve claramente a mudança.
+- A entrega é atômica e compreensível em um PR isolado, com descrição clara do impacto.
+- A lógica reside nos sistemas apropriados e continua parametrizada por `GameConstants.js` e/ou arquivos em `/src/data`.
+- Documentação, telemetria e planos relevantes foram atualizados (quando aplicável), mantendo `agents.md`, `README.md` e relatórios consistentes.
+- Os planos em `docs/plans/` foram consultados para alinhar a evolução da arquitetura e validar aderência a decisões anteriores.
+- Performance (60 FPS) e ausência de vazamentos são observadas, com uso racional de pools e serviços compartilhados.
 
-#### 7. **Fluxo de Trabalho e Checklists**
-
-O projeto deve seguir o fluxo descrito em `agents.md`, com foco em PRs pequenos e revisões claras.
+#### 7. **Fluxo de Trabalho e Planejamento Contínuo**
 
 - **Antes de Codificar:**
-  1.  A funcionalidade pode ser controlada por dados em `GameConstants` ou `/data`?
-  2.  Qual sistema existente será modificado ou será necessário um novo sistema?
+  1. Verifique se a mudança pode ser parametrizada em `GameConstants` ou `/src/data`, mantendo o jogo orientado a dados.
+  2. Confirme em `docs/plans/` a estratégia vigente para o domínio afetado e qual sistema será ajustado ou criado.
+- **Durante o Desenvolvimento:**
+  - Utilize o manifesto para registrar novos serviços e mantenha dependências explícitas.
+  - Reforce o uso de `gameEvents`, pools e serviços compartilhados (como `RandomService`).
 - **Ao Criar um Pull Request:**
-  1.  O PR é pequeno e focado (< 300 linhas)?
-  2.  As validações do `test-checklist.md` foram realizadas?
-  3.  A descrição do PR é clara, explicando o quê e o porquê da mudança?
+  1. Garanta que o PR cubra uma única responsabilidade.
+  2. Documente qualquer nova métrica ou ajuste de telemetria.
+  3. Relate validações executadas, referenciando planos ou experimentos relevantes em `docs/plans/`.
 
 Esta política adaptada serve como um guia prático para manter a qualidade e a escalabilidade do seu projeto, respeitando a excelente arquitetura que você já implementou.
