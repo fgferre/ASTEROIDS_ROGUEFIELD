@@ -20,6 +20,8 @@
  */
 
 import * as CONSTANTS from '../../../core/GameConstants.js';
+import RandomService from '../../../core/RandomService.js';
+import { normalizeDependencies, resolveService } from '../../../core/serviceUtils.js';
 
 export class WaveManager {
   /**
@@ -28,9 +30,55 @@ export class WaveManager {
    * @param {Object} enemySystem - Reference to EnemySystem
    * @param {Object} eventBus - Event bus for wave events
    */
-  constructor(enemySystem, eventBus) {
-    this.enemySystem = enemySystem;
-    this.eventBus = eventBus;
+  constructor(dependenciesOrEnemySystem = {}, legacyEventBus) {
+    const isLegacySignature =
+      arguments.length > 1 ||
+      !dependenciesOrEnemySystem ||
+      (typeof dependenciesOrEnemySystem === 'object' &&
+        dependenciesOrEnemySystem !== null &&
+        !('enemySystem' in dependenciesOrEnemySystem) &&
+        !('eventBus' in dependenciesOrEnemySystem) &&
+        !('random' in dependenciesOrEnemySystem));
+
+    const dependencies = isLegacySignature
+      ? {
+          enemySystem: dependenciesOrEnemySystem,
+          eventBus: legacyEventBus,
+        }
+      : dependenciesOrEnemySystem;
+
+    this.dependencies = normalizeDependencies(dependencies);
+
+    this.enemySystem =
+      this.dependencies.enemySystem ||
+      resolveService('enemies', this.dependencies) ||
+      null;
+
+    this.eventBus =
+      this.dependencies.eventBus ||
+      legacyEventBus ||
+      resolveService('event-bus', this.dependencies) ||
+      null;
+
+    let resolvedRandom =
+      this.dependencies.random ||
+      (this.enemySystem &&
+        typeof this.enemySystem.getRandomScope === 'function'
+        ? this.enemySystem.getRandomScope('wave-manager', {
+            label: 'wave-manager',
+          })
+        : null) ||
+      resolveService('random', this.dependencies) ||
+      null;
+
+    if (!resolvedRandom || typeof resolvedRandom.float !== 'function') {
+      resolvedRandom = new RandomService();
+    }
+
+    this.random = resolvedRandom;
+    this.randomScopes = this.createRandomScopes(this.random);
+    this.randomSequences = { spawn: 0, variants: 0, fragments: 0 };
+    this._fallbackRandom = null;
 
     // Wave state
     this.currentWave = 0;
@@ -148,13 +196,14 @@ export class WaveManager {
     if (waveNumber >= 10) variants.push('parasite');
 
     const enemies = [];
+    const variantRandom = this.getRandomScope('variants');
 
     // Large asteroids
     enemies.push({
       type: 'asteroid',
       count: Math.max(1, Math.floor(baseCount * 0.3)),
       size: 'large',
-      variant: this.selectRandomVariant(variants, waveNumber)
+      variant: this.selectRandomVariant(variants, waveNumber, variantRandom)
     });
 
     // Medium asteroids
@@ -162,7 +211,7 @@ export class WaveManager {
       type: 'asteroid',
       count: Math.floor(baseCount * 0.4),
       size: 'medium',
-      variant: this.selectRandomVariant(variants, waveNumber)
+      variant: this.selectRandomVariant(variants, waveNumber, variantRandom)
     });
 
     // Small asteroids
@@ -170,7 +219,7 @@ export class WaveManager {
       type: 'asteroid',
       count: Math.floor(baseCount * 0.3),
       size: 'small',
-      variant: this.selectRandomVariant(variants, waveNumber)
+      variant: this.selectRandomVariant(variants, waveNumber, variantRandom)
     });
 
     // Future: Add other enemy types here
@@ -192,9 +241,11 @@ export class WaveManager {
    * @param {number} waveNumber - Current wave
    * @returns {string} Selected variant
    */
-  selectRandomVariant(variants, waveNumber) {
+  selectRandomVariant(variants, waveNumber, random = this.getRandomScope('variants')) {
+    const variantRandom = this.resolveScopedRandom(random, 'variants', 'variant-roll');
+
     // Higher waves have more chance of rare variants
-    const roll = Math.random();
+    const roll = variantRandom.float();
 
     if (waveNumber < 5) {
       return 'common'; // Early waves are mostly common
@@ -266,11 +317,13 @@ export class WaveManager {
 
     for (const enemyGroup of waveConfig.enemies) {
       for (let i = 0; i < enemyGroup.count; i++) {
+        const spawnContext = this.createScopedRandom('spawn', 'wave-spawn');
         // Calculate safe spawn position
         const position = this.calculateSafeSpawnPosition(
           worldBounds,
           player,
-          safeDistance
+          safeDistance,
+          spawnContext.random
         );
 
         // Create enemy configuration
@@ -281,6 +334,11 @@ export class WaveManager {
           wave: this.currentWave,
           spawnIndex: i
         };
+
+        if (spawnContext.random?.fork) {
+          enemyConfig.random = spawnContext.random.fork('asteroid-core');
+          enemyConfig.randomScope = 'spawn';
+        }
 
         // Use factory if available, otherwise use legacy method
         let enemy;
@@ -306,31 +364,32 @@ export class WaveManager {
    * @param {number} safeDistance - Minimum distance from player
    * @returns {Object} {x, y} position
    */
-  calculateSafeSpawnPosition(bounds, player, safeDistance) {
+  calculateSafeSpawnPosition(bounds, player, safeDistance, random = this.getRandomScope('spawn')) {
+    const spawnRandom = this.resolveScopedRandom(random, 'spawn', 'spawn-position');
     const margin = 50;
     let x, y, attempts = 0;
     const maxAttempts = 10;
 
     do {
       // Random position at screen edges
-      const edge = Math.floor(Math.random() * 4);
+      const edge = spawnRandom.int(0, 3);
 
       switch (edge) {
         case 0: // Top
-          x = Math.random() * bounds.width;
+          x = spawnRandom.range(0, bounds.width);
           y = -margin;
           break;
         case 1: // Right
           x = bounds.width + margin;
-          y = Math.random() * bounds.height;
+          y = spawnRandom.range(0, bounds.height);
           break;
         case 2: // Bottom
-          x = Math.random() * bounds.width;
+          x = spawnRandom.range(0, bounds.width);
           y = bounds.height + margin;
           break;
         case 3: // Left
           x = -margin;
-          y = Math.random() * bounds.height;
+          y = spawnRandom.range(0, bounds.height);
           break;
       }
 
@@ -352,6 +411,23 @@ export class WaveManager {
     } while (attempts < maxAttempts);
 
     return { x, y };
+  }
+
+  resolveScopedRandom(random, scope = 'base', label = scope) {
+    if (random && typeof random.float === 'function') {
+      return random;
+    }
+
+    const scoped = this.createScopedRandom(scope, label);
+    if (scoped?.random && typeof scoped.random.float === 'function') {
+      return scoped.random;
+    }
+
+    if (!this._fallbackRandom) {
+      this._fallbackRandom = new RandomService('wave-manager:fallback');
+    }
+
+    return this._fallbackRandom;
   }
 
   /**
@@ -421,6 +497,11 @@ export class WaveManager {
     this.totalEnemiesThisWave = 0;
     this.spawnTimer = 0;
     this.waveCountdown = 0;
+    if (this.randomSequences) {
+      this.randomSequences.spawn = 0;
+      this.randomSequences.variants = 0;
+      this.randomSequences.fragments = 0;
+    }
 
     console.log('[WaveManager] Reset');
   }
@@ -442,6 +523,70 @@ export class WaveManager {
       progress: this.totalEnemiesThisWave > 0
         ? this.enemiesKilledThisWave / this.totalEnemiesThisWave
         : 0
+    };
+  }
+
+  createRandomScopes(random) {
+    let baseRandom = random;
+    if (!baseRandom || typeof baseRandom.fork !== 'function') {
+      baseRandom = new RandomService();
+      this._fallbackRandom = baseRandom;
+    }
+
+    return {
+      base: baseRandom,
+      spawn: baseRandom.fork('wave-manager:spawn'),
+      variants: baseRandom.fork('wave-manager:variants'),
+      fragments: baseRandom.fork('wave-manager:fragments'),
+    };
+  }
+
+  getRandomService() {
+    if (!this.randomScopes) {
+      this.randomScopes = this.createRandomScopes(this.random);
+    }
+    return this.randomScopes.base;
+  }
+
+  getRandomScope(scope) {
+    if (!this.randomScopes) {
+      this.randomScopes = this.createRandomScopes(this.random);
+    }
+
+    return this.randomScopes[scope] || this.randomScopes.base;
+  }
+
+  nextRandomSequence(scope) {
+    if (!this.randomSequences) {
+      this.randomSequences = {};
+    }
+
+    if (typeof this.randomSequences[scope] !== 'number') {
+      this.randomSequences[scope] = 0;
+    }
+
+    const sequence = this.randomSequences[scope];
+    this.randomSequences[scope] += 1;
+    return sequence;
+  }
+
+  createScopedRandom(scope = 'spawn', label = scope) {
+    const generator = this.getRandomScope(scope);
+    const sequence = this.nextRandomSequence(scope);
+
+    if (generator && typeof generator.fork === 'function') {
+      return {
+        random: generator.fork(`wave-manager:${label}:${sequence}`),
+        sequence,
+      };
+    }
+
+    const fallback = this._fallbackRandom || new RandomService();
+    this._fallbackRandom = fallback;
+
+    return {
+      random: fallback.fork(`wave-manager:${label}:${sequence}`),
+      sequence,
     };
   }
 }

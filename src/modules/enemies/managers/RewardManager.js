@@ -32,6 +32,7 @@
  */
 
 import * as CONSTANTS from '../../../core/GameConstants.js';
+import RandomService from '../../../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../../../core/serviceUtils.js';
 
 export class RewardManager {
@@ -71,6 +72,27 @@ export class RewardManager {
     this.healthHeartSystem =
       this.dependencies.healthHearts ||
       resolveService('healthHearts', this.dependencies);
+
+    this.random =
+      this.dependencies.random ||
+      (this.enemySystem &&
+        typeof this.enemySystem.getRandomScope === 'function'
+        ? this.enemySystem.getRandomScope('enemy-rewards', {
+            parentScope: 'fragments',
+            label: 'enemy-rewards',
+          })
+        : null) ||
+      resolveService('random', this.dependencies) ||
+      null;
+
+    if (!this.random || typeof this.random.float !== 'function') {
+      this._fallbackRandom = new RandomService();
+      this.random = this._fallbackRandom;
+    } else {
+      this._fallbackRandom = null;
+    }
+
+    this.randomSequence = 0;
 
     // Reward configurations
     this.rewardConfigs = this.loadRewardConfigurations();
@@ -204,14 +226,16 @@ export class RewardManager {
 
     for (let i = 0; i < count; i++) {
       // Spread orbs around the enemy position
-      const angle = (Math.PI * 2 * i) / count + Math.random() * 0.3;
-      const distance = enemy.radius * 0.5 + Math.random() * enemy.radius;
+      const dropRandom = this.createDropRandom(`xp-orb:${enemy.id ?? 'enemy'}:${i}`);
+      const angleOffset = dropRandom.range(0, 0.3);
+      const angle = (Math.PI * 2 * i) / count + angleOffset;
+      const distance = enemy.radius * 0.5 + dropRandom.range(0, enemy.radius);
 
       const orbX = enemy.x + Math.cos(angle) * distance;
       const orbY = enemy.y + Math.sin(angle) * distance;
 
       // Add some initial velocity for scatter effect
-      const speed = 20 + Math.random() * 30;
+      const speed = 20 + dropRandom.range(0, 30);
       const vx = Math.cos(angle) * speed;
       const vy = Math.sin(angle) * speed;
 
@@ -424,7 +448,10 @@ export class RewardManager {
     console.log(`[RewardManager] Checking heart drop: ${enemy.size} ${enemy.variant || 'common'} - chance: ${(dropChance * 100).toFixed(1)}%`);
 
     // Roll for drop
-    if (Math.random() < dropChance) {
+    const heartRandom = this.createDropRandom(`heart:${enemy.id ?? 'enemy'}`);
+    const shouldDrop = heartRandom.chance(dropChance);
+
+    if (shouldDrop) {
       const healthHeartSystem = this.getHealthHeartSystem();
 
       if (healthHeartSystem && typeof healthHeartSystem.spawnHeart === 'function') {
@@ -466,5 +493,33 @@ export class RewardManager {
     }
 
     return this.enemySystem;
+  }
+
+  getRandomService() {
+    if (this.random && typeof this.random.float === 'function') {
+      return this.random;
+    }
+
+    if (!this._fallbackRandom) {
+      this._fallbackRandom = new RandomService();
+    }
+
+    this.random = this._fallbackRandom;
+    return this.random;
+  }
+
+  createDropRandom(label) {
+    const baseRandom = this.getRandomService();
+    const sequence = this.randomSequence++;
+
+    if (baseRandom && typeof baseRandom.fork === 'function') {
+      return baseRandom.fork(`reward:${label}:${sequence}`);
+    }
+
+    const fallbackSeed = sequence + 1;
+    const fallback = new RandomService(fallbackSeed);
+    this._fallbackRandom = fallback;
+    this.random = fallback;
+    return fallback;
   }
 }
