@@ -144,9 +144,20 @@ export class AsteroidMovement {
     this.linearMovement(asteroid, deltaTime, context);
 
     // Optional: Add slight rotation speed variation
-    if (Math.random() < 0.01) {
-      asteroid.rotationSpeed += (Math.random() - 0.5) * 0.5;
+    const movementRandom =
+      typeof asteroid?.getRandomFor === 'function'
+        ? asteroid.getRandomFor('movement')
+        : null;
+    if (!movementRandom?.chance || !movementRandom?.range) {
+      return;
     }
+
+    if (!movementRandom.chance(0.01)) {
+      return;
+    }
+
+    const delta = movementRandom.range(-0.25, 0.25);
+    asteroid.rotationSpeed += delta;
   }
 
   /**

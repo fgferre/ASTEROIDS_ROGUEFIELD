@@ -1,6 +1,7 @@
 // src/modules/EnemySystem.js
 import * as CONSTANTS from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
+import RandomService from '../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 import { Asteroid } from './enemies/types/Asteroid.js';
 import { EnemyFactory } from './enemies/base/EnemyFactory.js';
@@ -23,7 +24,12 @@ class EnemySystem {
       xpOrbs: this.dependencies['xp-orbs'] || null,
       physics: this.dependencies.physics || null,
       healthHearts: this.dependencies.healthHearts || null,
+      random: this.dependencies.random || null,
     };
+
+    this.randomScopes = null;
+    this.randomSequences = null;
+    this._fallbackRandom = null;
 
     this.asteroids = [];
     this.spawnTimer = 0;
@@ -64,10 +70,11 @@ class EnemySystem {
 
     this.setupAsteroidPoolIntegration();
     this.setupEnemyFactory(); // Initialize factory (optional)
+    this.refreshInjectedServices({ force: true, suppressWarnings: true });
+    this.setupRandomGenerators();
     this.setupManagers(); // Initialize wave and reward managers
     this.setupComponents(); // Initialize components
     this.setupEventListeners();
-    this.refreshInjectedServices({ force: true, suppressWarnings: true });
     this.syncPhysicsIntegration(true);
 
     this.emitWaveStateUpdate(true);
@@ -176,6 +183,15 @@ class EnemySystem {
     this.updateServiceCache('xpOrbs', 'xp-orbs', options);
     this.updateServiceCache('physics', 'physics', options);
     this.updateServiceCache('healthHearts', 'healthHearts', options);
+    const previousRandom = this.services.random;
+    this.updateServiceCache('random', 'random', options);
+
+    if (previousRandom !== this.services.random) {
+      this.randomScopes = null;
+      this.randomSequences = null;
+    }
+
+    this.setupRandomGenerators();
   }
 
   syncPhysicsIntegration(force = false) {
@@ -185,6 +201,122 @@ class EnemySystem {
     }
 
     physics.bootstrapFromEnemySystem(this, { force });
+  }
+
+  setupRandomGenerators() {
+    let randomService = this.services.random || this.dependencies.random;
+
+    if (!randomService) {
+      randomService = resolveService('random', this.dependencies);
+      if (randomService) {
+        this.dependencies.random = randomService;
+        this.services.random = randomService;
+      }
+    }
+
+    if (!randomService) {
+      if (!this._fallbackRandom) {
+        this._fallbackRandom = new RandomService();
+      }
+      randomService = this._fallbackRandom;
+      this.services.random = randomService;
+    }
+
+    if (this.randomScopes && this.randomScopes.base === randomService) {
+      if (!this.randomSequences) {
+        this.randomSequences = { spawn: 0, variants: 0, fragments: 0 };
+      }
+      return;
+    }
+
+    this.randomScopes = {
+      base: randomService,
+      spawn: randomService.fork('enemy-system:spawn'),
+      variants: randomService.fork('enemy-system:variants'),
+      fragments: randomService.fork('enemy-system:fragments'),
+    };
+
+    this.randomSequences = {
+      spawn: 0,
+      variants: 0,
+      fragments: 0,
+    };
+  }
+
+  getRandomService() {
+    this.setupRandomGenerators();
+    return this.randomScopes?.base || this._fallbackRandom || null;
+  }
+
+  getRandomScope(scope, { parentScope = 'base', label } = {}) {
+    this.setupRandomGenerators();
+
+    if (!this.randomScopes) {
+      return null;
+    }
+
+    if (this.randomScopes[scope]) {
+      return this.randomScopes[scope];
+    }
+
+    const parent = this.randomScopes[parentScope] || this.randomScopes.base;
+    if (parent && typeof parent.fork === 'function') {
+      const forkLabel = label || `enemy-system:${scope}`;
+      const forked = parent.fork(forkLabel);
+      this.randomScopes[scope] = forked;
+      if (!this.randomSequences) {
+        this.randomSequences = {};
+      }
+      if (this.randomSequences[scope] === undefined) {
+        this.randomSequences[scope] = 0;
+      }
+      return forked;
+    }
+
+    if (!this._fallbackRandom) {
+      this._fallbackRandom = new RandomService();
+    }
+
+    this.randomScopes[scope] = this._fallbackRandom;
+    if (!this.randomSequences) {
+      this.randomSequences = {};
+    }
+    if (this.randomSequences[scope] === undefined) {
+      this.randomSequences[scope] = 0;
+    }
+
+    return this.randomScopes[scope];
+  }
+
+  nextRandomSequence(scope) {
+    if (!this.randomSequences) {
+      this.randomSequences = {};
+    }
+
+    if (typeof this.randomSequences[scope] !== 'number') {
+      this.randomSequences[scope] = 0;
+    }
+
+    const sequence = this.randomSequences[scope];
+    this.randomSequences[scope] += 1;
+    return sequence;
+  }
+
+  createScopedRandom(scope = 'spawn', label = scope) {
+    const generator = this.getRandomScope(scope);
+    const sequence = this.nextRandomSequence(scope);
+
+    if (generator && typeof generator.fork === 'function') {
+      return {
+        random: generator.fork(`enemy-system:${label}:${sequence}`),
+        sequence,
+      };
+    }
+
+    return {
+      random: new RandomService(),
+      sequence,
+    };
   }
 
   setupAsteroidPoolIntegration() {
@@ -235,7 +367,15 @@ class EnemySystem {
     try {
       // Initialize WaveManager
       if (typeof gameEvents !== 'undefined') {
-        this.waveManager = new WaveManager(this, gameEvents);
+        const waveManagerRandom = this.getRandomScope('wave-manager', {
+          label: 'wave-manager',
+        });
+
+        this.waveManager = new WaveManager({
+          enemySystem: this,
+          eventBus: gameEvents,
+          random: waveManagerRandom,
+        });
         console.log('[EnemySystem] WaveManager initialized');
       }
 
@@ -244,10 +384,16 @@ class EnemySystem {
       const xpOrbSystem = this.getCachedXPOrbs();
       const healthHeartSystem = this.getCachedHealthHearts();
       if (xpOrbSystem) {
+        const rewardRandom = this.getRandomScope('enemy-rewards', {
+          parentScope: 'fragments',
+          label: 'enemy-rewards',
+        });
+
         this.rewardManager = new RewardManager({
           enemySystem: this,
           xpOrbSystem,
           healthHearts: healthHeartSystem,
+          random: rewardRandom,
         });
         console.log('[EnemySystem] RewardManager initialized');
       }
@@ -281,10 +427,18 @@ class EnemySystem {
     }
   }
 
-  acquireAsteroid(config) {
+  acquireAsteroid(config = {}) {
+    const scopeHint = config.randomScope || (config.spawnedBy ? 'fragments' : 'spawn');
+    const asteroidRandom =
+      config.random || this.createScopedRandom(scopeHint, 'asteroid').random;
+    const asteroidConfig = {
+      ...config,
+      random: asteroidRandom,
+    };
+
     // NEW: Use factory if enabled (feature flag)
     if (this.useFactory && this.factory) {
-      return this.acquireEnemyViaFactory('asteroid', config);
+      return this.acquireEnemyViaFactory('asteroid', asteroidConfig);
     }
 
     // LEGACY: Original implementation (default)
@@ -295,12 +449,12 @@ class EnemySystem {
     ) {
       const asteroid = GamePools.asteroids.acquire();
       if (asteroid && typeof asteroid.initialize === 'function') {
-        asteroid.initialize(this, config);
+        asteroid.initialize(this, asteroidConfig);
         return asteroid;
       }
     }
 
-    return new Asteroid(this, config);
+    return new Asteroid(this, asteroidConfig);
   }
 
   // NEW: Factory-based enemy acquisition (optional path)
@@ -712,8 +866,15 @@ class EnemySystem {
       }
 
       // Rotação adicional
-      a1.rotationSpeed += (Math.random() - 0.5) * 1.5;
-      a2.rotationSpeed += (Math.random() - 0.5) * 1.5;
+      const collisionRandom =
+        (typeof a1?.getRandomFor === 'function' && a1.getRandomFor('collision')) ||
+        (typeof a2?.getRandomFor === 'function' && a2.getRandomFor('collision')) ||
+        this.getRandomScope('fragments');
+      const rotationDelta = collisionRandom?.range
+        ? collisionRandom.range(-0.75, 0.75)
+        : (Math.random() - 0.5) * 1.5;
+      a1.rotationSpeed += rotationDelta;
+      a2.rotationSpeed += rotationDelta;
     }
   }
 
@@ -728,7 +889,11 @@ class EnemySystem {
 
     if (this.shouldSpawn() && this.spawnTimer <= 0) {
       this.spawnAsteroid();
-      this.spawnTimer = wave.spawnDelay * (0.5 + Math.random() * 0.5);
+      const spawnRandom = this.getRandomScope('spawn');
+      const delayMultiplier = spawnRandom?.range
+        ? spawnRandom.range(0.5, 1)
+        : 0.5 + Math.random() * 0.5;
+      this.spawnTimer = wave.spawnDelay * delayMultiplier;
     }
   }
 
@@ -747,32 +912,42 @@ class EnemySystem {
   spawnAsteroid() {
     if (!this.sessionActive) return null;
 
-    const side = Math.floor(Math.random() * 4);
+    const spawnContext = this.createScopedRandom('spawn', 'asteroid-spawn');
+    const spawnRandom = spawnContext.random;
+    const side = spawnRandom?.int ? spawnRandom.int(0, 3) : Math.floor(Math.random() * 4);
     let x;
     let y;
     const margin = 80;
 
     switch (side) {
       case 0:
-        x = Math.random() * CONSTANTS.GAME_WIDTH;
+        x = spawnRandom?.range
+          ? spawnRandom.range(0, CONSTANTS.GAME_WIDTH)
+          : Math.random() * CONSTANTS.GAME_WIDTH;
         y = -margin;
         break;
       case 1:
         x = CONSTANTS.GAME_WIDTH + margin;
-        y = Math.random() * CONSTANTS.GAME_HEIGHT;
+        y = spawnRandom?.range
+          ? spawnRandom.range(0, CONSTANTS.GAME_HEIGHT)
+          : Math.random() * CONSTANTS.GAME_HEIGHT;
         break;
       case 2:
-        x = Math.random() * CONSTANTS.GAME_WIDTH;
+        x = spawnRandom?.range
+          ? spawnRandom.range(0, CONSTANTS.GAME_WIDTH)
+          : Math.random() * CONSTANTS.GAME_WIDTH;
         y = CONSTANTS.GAME_HEIGHT + margin;
         break;
       default:
         x = -margin;
-        y = Math.random() * CONSTANTS.GAME_HEIGHT;
+        y = spawnRandom?.range
+          ? spawnRandom.range(0, CONSTANTS.GAME_HEIGHT)
+          : Math.random() * CONSTANTS.GAME_HEIGHT;
         break;
     }
 
     let size;
-    const rand = Math.random();
+    const rand = spawnRandom?.float ? spawnRandom.float() : Math.random();
     if (rand < 0.5) size = 'large';
     else if (rand < 0.8) size = 'medium';
     else size = 'small';
@@ -781,7 +956,12 @@ class EnemySystem {
     const variant = this.decideVariant(size, {
       wave: waveNumber,
       spawnType: 'spawn',
+      random: this.getRandomScope('variants'),
     });
+
+    const asteroidRandom = spawnRandom?.fork
+      ? spawnRandom.fork('asteroid-core')
+      : null;
 
     const asteroid = this.acquireAsteroid({
       x,
@@ -789,6 +969,8 @@ class EnemySystem {
       size,
       variant,
       wave: waveNumber,
+      random: asteroidRandom,
+      randomScope: 'spawn',
     });
 
     this.asteroids.push(asteroid);
@@ -847,7 +1029,7 @@ class EnemySystem {
     asteroid.destroyed = true;
     this.invalidateActiveAsteroidCache();
 
-    const fragmentDescriptors = createFragments
+      const fragmentDescriptors = createFragments
       ? asteroid.generateFragments()
       : [];
     const fragments = [];
@@ -860,10 +1042,13 @@ class EnemySystem {
       );
 
       fragmentDescriptors.forEach((descriptor, index) => {
+        const fragmentRandom = this.createScopedRandom('fragments', 'fragment');
         const fragment = this.acquireAsteroid({
           ...descriptor,
           variant: fragmentVariants[index],
           wave: descriptor.wave || waveNumber,
+          random: fragmentRandom.random,
+          randomScope: 'fragments',
         });
         this.asteroids.push(fragment);
         fragments.push(fragment);
@@ -956,7 +1141,12 @@ class EnemySystem {
     });
 
     const availableKeys = Object.keys(distribution);
-    if (!availableKeys.length || Math.random() > chance) {
+    const variantRandom = context.random || this.getRandomScope('variants');
+    const shouldRoll = variantRandom?.chance
+      ? variantRandom.chance(chance)
+      : Math.random() <= chance;
+
+    if (!availableKeys.length || !shouldRoll) {
       return 'common';
     }
 
@@ -969,7 +1159,12 @@ class EnemySystem {
       return 'common';
     }
 
-    let roll = Math.random() * totalWeight;
+    let roll;
+    if (variantRandom?.range) {
+      roll = variantRandom.range(0, totalWeight);
+    } else {
+      roll = Math.random() * totalWeight;
+    }
     for (let i = 0; i < availableKeys.length; i += 1) {
       const key = availableKeys[i];
       roll -= distribution[key];
@@ -1002,11 +1197,17 @@ class EnemySystem {
     }
 
     const variants = new Array(fragments.length).fill('common');
+    const variantRandom = this.getRandomScope('variants');
 
     if (parent?.size === 'large') {
       const denseChance = Math.min(1, 0.3 + this.computeVariantWaveBonus(wave));
-      if (Math.random() < denseChance) {
-        const denseIndex = Math.floor(Math.random() * fragments.length);
+      const shouldApplyDense = variantRandom?.chance
+        ? variantRandom.chance(denseChance)
+        : Math.random() < denseChance;
+      if (shouldApplyDense) {
+        const denseIndex = variantRandom?.int
+          ? variantRandom.int(0, fragments.length - 1)
+          : Math.floor(Math.random() * fragments.length);
         variants[denseIndex] = 'denseCore';
       }
     }
@@ -1028,6 +1229,7 @@ class EnemySystem {
         spawnType: 'fragment',
         parent,
         disallowedVariants: disallowed,
+        random: variantRandom,
       });
     }
 
@@ -1293,6 +1495,11 @@ class EnemySystem {
     this.sessionStats = this.createInitialSessionStats();
     this.sessionActive = true;
     this.lastWaveBroadcast = null;
+    if (this.randomSequences) {
+      this.randomSequences.spawn = 0;
+      this.randomSequences.variants = 0;
+      this.randomSequences.fragments = 0;
+    }
 
     this.refreshInjectedServices({ force: true });
     this.syncPhysicsIntegration(true);
@@ -1311,10 +1518,14 @@ class EnemySystem {
       world: null,
       progression: null,
       xpOrbs: null,
-      physics: null
+      physics: null,
+      healthHearts: null,
+      random: null,
     };
     this.activeAsteroidCache = [];
     this.activeAsteroidCacheDirty = true;
+    this.randomScopes = null;
+    this.randomSequences = null;
     console.log('[EnemySystem] Destroyed');
   }
 
@@ -1456,7 +1667,14 @@ class EnemySystem {
 
         asteroid.vx += nx * impulse;
         asteroid.vy += ny * impulse;
-        asteroid.rotationSpeed += (Math.random() - 0.5) * 3 * falloff;
+        const collisionRandom =
+          typeof asteroid.getRandomFor === 'function'
+            ? asteroid.getRandomFor('collision')
+            : null;
+        const rotationImpulse = collisionRandom?.range
+          ? collisionRandom.range(-1.5, 1.5)
+          : (Math.random() - 0.5) * 3;
+        asteroid.rotationSpeed += rotationImpulse * falloff;
       }
     }
   }
@@ -1510,7 +1728,14 @@ class EnemySystem {
 
       asteroid.vx += nx * impulse;
       asteroid.vy += ny * impulse;
-      asteroid.rotationSpeed += (Math.random() - 0.5) * 4 * falloff;
+      const collisionRandom =
+        typeof asteroid.getRandomFor === 'function'
+          ? asteroid.getRandomFor('collision')
+          : null;
+      const rotationImpulse = collisionRandom?.range
+        ? collisionRandom.range(-2, 2)
+        : (Math.random() - 0.5) * 4;
+      asteroid.rotationSpeed += rotationImpulse * falloff;
       asteroid.lastDamageTime = Math.max(asteroid.lastDamageTime, 0.12);
     }
   }

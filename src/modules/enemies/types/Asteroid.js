@@ -1,5 +1,6 @@
 // src/modules/enemies/types/Asteroid.js
 import * as CONSTANTS from '../../../core/GameConstants.js';
+import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
 /**
@@ -48,11 +49,54 @@ export class Asteroid extends BaseEnemy {
     this.variantState = {};
     this.visualState = {};
     this.spawnTime = 0;
+    this.random = null;
+    this.randomScopes = null;
 
     // Initialize if config was provided
     if (system && Object.keys(config).length > 0) {
       this.initialize(system, config);
     }
+  }
+
+  setRandomSource(random) {
+    if (random && typeof random.float === 'function') {
+      this.random = random;
+    } else {
+      this.random = new RandomService();
+    }
+    this.randomScopes = null;
+    return this.random;
+  }
+
+  ensureRandomScopes() {
+    if (!this.random) {
+      this.setRandomSource();
+    }
+
+    if (!this.randomScopes) {
+      this.randomScopes = {
+        core: this.random,
+        movement: this.random.fork('movement'),
+        visual: this.random.fork('visual'),
+        collision: this.random.fork('collision'),
+        cracks: this.random.fork('cracks'),
+      };
+    }
+
+    return this.randomScopes;
+  }
+
+  getRandomFor(scope = 'core') {
+    const scopes = this.ensureRandomScopes();
+    if (scope === 'core') {
+      return scopes.core;
+    }
+
+    if (!scopes[scope]) {
+      scopes[scope] = this.random.fork(`asteroid:${scope}`);
+    }
+
+    return scopes[scope];
   }
 
   /**
@@ -66,7 +110,24 @@ export class Asteroid extends BaseEnemy {
     this.resetForPool();
 
     this.system = system;
-    this.id = options.id ?? Date.now() + Math.random();
+    const scopeHint = options.randomScope || (options.spawnedBy ? 'fragments' : 'spawn');
+    let randomSource = options.random;
+    if (!randomSource && this.system && typeof this.system.getRandomScope === 'function') {
+      const scopedRandom = this.system.getRandomScope(scopeHint, {
+        label: `asteroid-fallback:${scopeHint}`,
+      });
+      if (scopedRandom && typeof scopedRandom.fork === 'function') {
+        randomSource = scopedRandom.fork('asteroid-core');
+      } else {
+        randomSource = scopedRandom;
+      }
+    }
+
+    const baseRandom = this.setRandomSource(randomSource);
+    const movementRandom = this.getRandomFor('movement');
+    const cracksRandom = this.getRandomFor('cracks');
+
+    this.id = options.id ?? baseRandom.uuid('asteroid');
     this.size = options.size || 'small';
     this.variant = options.variant || 'common';
     this.wave = options.wave || 1;
@@ -95,7 +156,7 @@ export class Asteroid extends BaseEnemy {
     this.mass = baseMass * (this.variantConfig?.massMultiplier ?? 1);
 
     const baseSpeed = CONSTANTS.ASTEROID_SPEEDS[this.size] || 40;
-    const randomSpeed = baseSpeed * (0.8 + Math.random() * 0.4);
+    const randomSpeed = baseSpeed * movementRandom.range(0.8, 1.2);
     const speedMultiplier = this.variantConfig?.speedMultiplier ?? 1;
     const finalSpeed = randomSpeed * speedMultiplier;
 
@@ -107,20 +168,21 @@ export class Asteroid extends BaseEnemy {
       this.vy = (options.vy ?? 0) * speedMultiplier;
 
       if (this.vx === 0 && this.vy === 0) {
-        const angle = Math.random() * Math.PI * 2;
+        const angle = movementRandom.range(0, Math.PI * 2);
         this.vx = Math.cos(angle) * finalSpeed;
         this.vy = Math.sin(angle) * finalSpeed;
       }
     } else {
-      const angle = options.angle ?? Math.random() * Math.PI * 2;
+      const angle = options.angle ?? movementRandom.range(0, Math.PI * 2);
       this.vx = Math.cos(angle) * finalSpeed;
       this.vy = Math.sin(angle) * finalSpeed;
     }
 
-    this.rotation = options.rotation ?? Math.random() * Math.PI * 2;
+    this.rotation = options.rotation ?? movementRandom.range(0, Math.PI * 2);
+    const baseRotationSpeed =
+      options.rotationSpeed ?? movementRandom.range(-0.75, 0.75);
     this.rotationSpeed =
-      (options.rotationSpeed ?? (Math.random() - 0.5) * 1.5) *
-      (this.variantConfig?.rotationMultiplier ?? 1);
+      baseRotationSpeed * (this.variantConfig?.rotationMultiplier ?? 1);
 
     const baseHealth =
       CONSTANTS.ASTEROID_BASE_HEALTH[this.size] ??
@@ -141,7 +203,7 @@ export class Asteroid extends BaseEnemy {
     this.alive = true;
     this.initialized = true;
 
-    this.crackSeed = Math.floor(Math.random() * 1_000_000);
+    this.crackSeed = cracksRandom.int(0, 999999);
     this.crackStage = 0;
 
     this.vertices = this.generateVertices();
@@ -198,6 +260,8 @@ export class Asteroid extends BaseEnemy {
     this.variantState = {};
     this.visualState = {};
     this.spawnTime = 0;
+    this.random = null;
+    this.randomScopes = null;
   }
 
   computeWaveHealthMultiplier(wave) {
@@ -272,14 +336,15 @@ export class Asteroid extends BaseEnemy {
     }
 
     const state = {};
+    const visualRandom = this.getRandomFor('visual');
 
     if (visual.pulse) {
-      state.glowTime = Math.random() * Math.PI * 2;
+      state.glowTime = visualRandom.range(0, Math.PI * 2);
     }
 
     if (this.behavior?.type === 'volatile' && visual.trail) {
       const baseInterval = visual.trail.interval ?? 0.05;
-      state.trailCooldown = Math.random() * baseInterval;
+      state.trailCooldown = visualRandom.range(0, baseInterval);
     }
 
     return state;
@@ -1048,7 +1113,7 @@ export class Asteroid extends BaseEnemy {
     const pulse = this.variantConfig.visual.pulse;
     if (pulse) {
       if (typeof this.visualState.glowTime !== 'number') {
-        this.visualState.glowTime = Math.random() * Math.PI * 2;
+        this.visualState.glowTime = this.getRandomFor('visual').range(0, Math.PI * 2);
       }
 
       const speed = Math.max(0, pulse.speed ?? 1);
@@ -1514,7 +1579,7 @@ export class Asteroid extends BaseEnemy {
         }
 
         if (typeof this.visualState.glowTime !== 'number') {
-          this.visualState.glowTime = Math.random() * Math.PI * 2;
+          this.visualState.glowTime = this.getRandomFor('visual').range(0, Math.PI * 2);
         }
 
         basePulse = (Math.sin(this.visualState.glowTime) + 1) / 2;

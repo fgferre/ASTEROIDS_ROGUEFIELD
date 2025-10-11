@@ -128,9 +128,16 @@ export class AsteroidCollision {
 
     // === ROTATION EFFECTS ===
     // Add some rotational spin from collision
-    const rotationImpulse = (Math.random() - 0.5) * 1.5;
-    a1.rotationSpeed += rotationImpulse;
-    a2.rotationSpeed += rotationImpulse;
+    const collisionRandom =
+      (typeof a1?.getRandomFor === 'function' && a1.getRandomFor('collision')) ||
+      (typeof a2?.getRandomFor === 'function' && a2.getRandomFor('collision')) ||
+      null;
+
+    if (collisionRandom?.range) {
+      const rotationImpulse = collisionRandom.range(-0.75, 0.75);
+      a1.rotationSpeed += rotationImpulse;
+      a2.rotationSpeed += rotationImpulse;
+    }
   }
 
   /**

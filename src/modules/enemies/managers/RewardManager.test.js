@@ -34,11 +34,17 @@ describe('RewardManager', () => {
     const spawnHeart = vi.fn();
     const createXPOrb = vi.fn();
 
-    vi.spyOn(Math, 'random').mockReturnValue(0);
+    const deterministicRandom = {
+      float: () => 0,
+      range: (min) => min,
+      chance: () => true,
+      fork: () => deterministicRandom,
+    };
 
     const rewardManager = new RewardManager({
       xpOrbSystem: { createXPOrb },
       healthHearts: { spawnHeart },
+      random: deterministicRandom,
     });
 
     rewardManager.dropRewards(createBaseEnemy({ size: 'large', variant: 'gold' }));

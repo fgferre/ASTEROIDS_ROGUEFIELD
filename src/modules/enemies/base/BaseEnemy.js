@@ -25,6 +25,8 @@
  * ```
  */
 
+let fallbackEnemyIdSequence = 0;
+
 export class BaseEnemy {
   /**
    * Creates a base enemy instance.
@@ -382,7 +384,17 @@ export class BaseEnemy {
    * @returns {string} Unique ID
    */
   generateId() {
-    return `${this.type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const randomService =
+      this.system && typeof this.system.getRandomService === 'function'
+        ? this.system.getRandomService()
+        : null;
+
+    if (randomService && typeof randomService.uuid === 'function') {
+      return randomService.uuid(this.type);
+    }
+
+    fallbackEnemyIdSequence += 1;
+    return `${this.type}-${fallbackEnemyIdSequence}`;
   }
 
   /**
