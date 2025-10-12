@@ -1,5 +1,6 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
+import RandomService from '../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
 const ORB_CLASS_ORDER = [
@@ -80,11 +81,23 @@ const ORB_NEXT_CLASS = ORB_CLASS_CONFIG.reduce(
 const ORB_SPATIAL_NEIGHBOURS = [-1, 0, 1];
 
 class XPOrbSystem {
-  constructor({ player, progression } = {}) {
+  constructor({ player, progression, random } = {}) {
     this.dependencies = normalizeDependencies({
       player,
       progression,
+      random,
     });
+
+    this.random = null;
+    this.randomForks = {
+      base: null,
+      creation: null,
+      clustering: null,
+      fusion: null,
+    };
+    this._fallbackRandom = null;
+    this._randomForkSource = null;
+    this._randomForkSignature = null;
 
     this.orbClasses = [...ORB_CLASS_SEQUENCE];
     this.xpOrbs = [];
@@ -145,6 +158,8 @@ class XPOrbSystem {
 
     this.configureOrbClustering();
 
+    this.ensureRandom({ force: true });
+
     this.missingDependencyWarnings = new Set();
 
     if (typeof gameServices !== 'undefined') {
@@ -175,6 +190,182 @@ class XPOrbSystem {
 
     this.missingDependencyWarnings.add(name);
     console.warn(`[XPOrbSystem] Missing dependency: ${name}`);
+  }
+
+  ensureRandom({ force = false } = {}) {
+    let candidate = this.dependencies.random || this.random;
+    if (!candidate) {
+      const resolvedRandom = resolveService('random', this.dependencies);
+      if (resolvedRandom) {
+        candidate = resolvedRandom;
+        this.dependencies.random = resolvedRandom;
+      }
+    }
+
+    if (!candidate || typeof candidate.fork !== 'function') {
+      if (!this._fallbackRandom) {
+        this._fallbackRandom = new RandomService();
+      }
+      candidate = this._fallbackRandom;
+    }
+
+    this.random = candidate;
+
+    const signature = this.captureRandomSignature(candidate);
+    const signatureChanged =
+      signature !== undefined && signature !== this._randomForkSignature;
+
+    if (force || this._randomForkSource !== candidate || signatureChanged) {
+      this.randomForks = this.createRandomForks(candidate);
+      this._randomForkSource = candidate;
+      this._randomForkSignature = signature;
+      this.fusionCheckTimer = this.generateInitialFusionTimer();
+    }
+
+    return this.random;
+  }
+
+  captureRandomSignature(random) {
+    if (!random || typeof random !== 'object') {
+      return undefined;
+    }
+
+    const seed =
+      typeof random.seed === 'number' && Number.isFinite(random.seed)
+        ? random.seed >>> 0
+        : undefined;
+
+    let resetCount;
+    if (typeof random.getResetCount === 'function') {
+      resetCount = random.getResetCount();
+    } else if (random._stats && random._stats.calls) {
+      resetCount = random._stats.calls.reset;
+    }
+
+    if (seed === undefined && resetCount === undefined) {
+      return undefined;
+    }
+
+    const seedPart = seed === undefined ? 'unknown' : String(seed);
+    const resetPart =
+      typeof resetCount === 'number' && Number.isFinite(resetCount)
+        ? String(resetCount >>> 0)
+        : 'unknown';
+
+    return `${seedPart}:${resetPart}`;
+  }
+
+  createRandomForks(random) {
+    if (!random || typeof random.fork !== 'function') {
+      return {
+        base: null,
+        creation: null,
+        clustering: null,
+        fusion: null,
+      };
+    }
+
+    const base = random.fork('xp-orbs.base');
+    const creation =
+      base && typeof base.fork === 'function' ? base.fork('xp-orbs.creation') : null;
+    const clustering =
+      base && typeof base.fork === 'function' ? base.fork('xp-orbs.clustering') : null;
+    const fusion =
+      base && typeof base.fork === 'function' ? base.fork('xp-orbs.fusion') : null;
+
+    return {
+      base,
+      creation,
+      clustering,
+      fusion,
+    };
+  }
+
+  getRandomFork(name) {
+    if (!name || typeof name !== 'string') {
+      return null;
+    }
+
+    if (!this.randomForks) {
+      return null;
+    }
+
+    return this.randomForks[name] || null;
+  }
+
+  generateInitialFusionTimer() {
+    if (!Number.isFinite(this.fusionCheckInterval) || this.fusionCheckInterval <= 0) {
+      return 0;
+    }
+
+    const clusteringRandom = this.getRandomFork('clustering');
+    if (clusteringRandom && typeof clusteringRandom.range === 'function') {
+      return clusteringRandom.range(0, this.fusionCheckInterval);
+    }
+
+    if (this.random && typeof this.random.range === 'function') {
+      return this.random.range(0, this.fusionCheckInterval);
+    }
+
+    if (!this._fallbackRandom) {
+      this._fallbackRandom = new RandomService();
+    }
+
+    return this._fallbackRandom.range(0, this.fusionCheckInterval);
+  }
+
+  generateOrbId() {
+    const creationRandom = this.getRandomFork('creation');
+    if (creationRandom && typeof creationRandom.uuid === 'function') {
+      return creationRandom.uuid('xp-orb');
+    }
+
+    const randomSource = this.ensureRandom();
+    if (randomSource && typeof randomSource.uuid === 'function') {
+      return randomSource.uuid('xp-orb');
+    }
+
+    if (!this._fallbackRandom) {
+      this._fallbackRandom = new RandomService();
+    }
+
+    return this._fallbackRandom.uuid('xp-orb');
+  }
+
+  generateFusionAnimationId(className = 'unknown') {
+    const scopeLabel = `fusion:${className}`;
+    const fusionRandom = this.getRandomFork('fusion');
+    if (fusionRandom && typeof fusionRandom.uuid === 'function') {
+      return fusionRandom.uuid(scopeLabel);
+    }
+
+    const randomSource = this.ensureRandom();
+    if (randomSource && typeof randomSource.uuid === 'function') {
+      return randomSource.uuid(scopeLabel);
+    }
+
+    if (!this._fallbackRandom) {
+      this._fallbackRandom = new RandomService();
+    }
+
+    const fallback = this._fallbackRandom;
+    if (typeof fallback.uuid === 'function') {
+      return fallback.uuid(scopeLabel);
+    }
+
+    const suffixSource =
+      fusionRandom && typeof fusionRandom.range === 'function'
+        ? fusionRandom
+        : randomSource && typeof randomSource.range === 'function'
+        ? randomSource
+        : fallback;
+
+    const suffix =
+      suffixSource && typeof suffixSource.range === 'function'
+        ? Math.floor(suffixSource.range(0, Number.MAX_SAFE_INTEGER)).toString(16)
+        : `${Date.now()}`;
+
+    return `${scopeLabel}:${suffix}`;
   }
 
   resolveCachedServices({ force = false, suppressWarnings = false } = {}) {
@@ -218,6 +409,8 @@ class XPOrbSystem {
         this.logMissingDependency('progression');
       }
     }
+
+    this.ensureRandom({ force });
   }
 
   createEmptyOrbPools() {
@@ -629,7 +822,7 @@ class XPOrbSystem {
       return null;
     }
 
-    orb.id = Date.now() + Math.random();
+    orb.id = this.generateOrbId();
     orb.x = x;
     orb.y = y;
     orb.value = Number.isFinite(value) ? value : this.baseOrbValue;
@@ -1305,7 +1498,7 @@ class XPOrbSystem {
       return false;
     }
 
-    const animationId = `fusion:${className}:${Date.now()}:${Math.random()}`;
+    const animationId = this.generateFusionAnimationId(className);
     const animation = {
       id: animationId,
       className,
