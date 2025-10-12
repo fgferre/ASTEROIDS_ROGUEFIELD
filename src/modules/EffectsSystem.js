@@ -22,10 +22,14 @@ class SpaceParticle {
     this.alpha = 1;
     this.type = type;
 
-    const rng = random && typeof random.float === 'function' ? random : null;
-    const float = rng ? () => rng.float() : () => globalThis.Math.random();
+    const rng = SpaceParticle.resolveRandom(random);
+    const float = () => rng.float();
 
-    this.rotation = float() * Math.PI * 2;
+    if (typeof rng.range === 'function') {
+      this.rotation = rng.range(0, Math.PI * 2);
+    } else {
+      this.rotation = float() * Math.PI * 2;
+    }
     this.rotationSpeed = (float() - 0.5) * 4;
   }
 
@@ -84,6 +88,20 @@ class SpaceParticle {
     ctx.restore();
   }
 }
+
+SpaceParticle._fallbackRandom = null;
+
+SpaceParticle.resolveRandom = function resolveRandom(random) {
+  if (random && typeof random.float === 'function') {
+    return random;
+  }
+
+  if (!SpaceParticle._fallbackRandom) {
+    SpaceParticle._fallbackRandom = new RandomService('effects-system:particle:fallback');
+  }
+
+  return SpaceParticle._fallbackRandom;
+};
 
 class HitMarker {
   constructor(x, y, killed, damage) {
@@ -151,7 +169,7 @@ export default class EffectsSystem {
     this.audio = audio ?? resolveService('audio', this.dependencies);
     this.random = random ?? resolveService('random', this.dependencies);
     if (!this.random) {
-      this.random = new RandomService();
+      this.random = new RandomService('effects-system:fallback');
     }
 
     if (this.random) {
@@ -185,6 +203,8 @@ export default class EffectsSystem {
       this.randomForkLabels = {};
       this.randomForkSeeds = {};
     }
+    this._fallbackRandom = null;
+    this._fallbackRandomForks = new Map();
     this.particles = [];
     this.shockwaves = [];
     this.hitMarkers = []; // NEW: Hit marker tracking
@@ -224,32 +244,48 @@ export default class EffectsSystem {
     return this.randomForks[name] || this.randomForks.base || null;
   }
 
-  randomFloat(name = 'base') {
+  ensureRandom(name = 'base') {
     const fork = this.getRandomFork(name);
     if (fork && typeof fork.float === 'function') {
-      return fork.float();
+      return fork;
     }
 
-    return globalThis.Math.random();
+    if (!this._fallbackRandom) {
+      if (this.random && typeof this.random.fork === 'function') {
+        this._fallbackRandom = this.random.fork('effects-system:fallback-base');
+      } else {
+        this._fallbackRandom = new RandomService('effects-system:fallback-base');
+      }
+    }
+
+    if (!this._fallbackRandomForks.has(name)) {
+      const source =
+        this.random && typeof this.random.fork === 'function'
+          ? this.random.fork(`effects-system:fallback:${name}`)
+          : this._fallbackRandom.fork(`effects-system:fallback:${name}`);
+      this._fallbackRandomForks.set(name, source);
+    }
+
+    return this._fallbackRandomForks.get(name);
+  }
+
+  randomFloat(name = 'base') {
+    const fork = this.ensureRandom(name);
+    return fork.float();
   }
 
   randomInt(min, max, name = 'base') {
-    const fork = this.getRandomFork(name);
-    if (fork && typeof fork.int === 'function') {
+    const fork = this.ensureRandom(name);
+    if (typeof fork.int === 'function') {
       return fork.int(min, max);
     }
 
     const low = Math.min(min, max);
     const high = Math.max(min, max);
-    return low + Math.floor((high - low + 1) * this.randomFloat(name));
+    return low + Math.floor((high - low + 1) * fork.float());
   }
 
   randomChance(probability, name = 'base') {
-    const fork = this.getRandomFork(name);
-    if (fork && typeof fork.chance === 'function') {
-      return fork.chance(probability);
-    }
-
     if (probability <= 0) {
       return false;
     }
@@ -258,11 +294,17 @@ export default class EffectsSystem {
       return true;
     }
 
-    return this.randomFloat(name) < probability;
+    const fork = this.ensureRandom(name);
+    if (typeof fork.chance === 'function') {
+      return fork.chance(probability);
+    }
+
+    return fork.float() < probability;
   }
 
   randomCentered(span = 1, name = 'base') {
-    return (this.randomFloat(name) - 0.5) * span;
+    const fork = this.ensureRandom(name);
+    return (fork.float() - 0.5) * span;
   }
 
   randomPick(array, name = 'base') {
@@ -270,8 +312,8 @@ export default class EffectsSystem {
       return undefined;
     }
 
-    const fork = this.getRandomFork(name);
-    if (fork && typeof fork.pick === 'function') {
+    const fork = this.ensureRandom(name);
+    if (typeof fork.pick === 'function') {
       return fork.pick(array);
     }
 

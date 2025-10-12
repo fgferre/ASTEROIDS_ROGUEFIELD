@@ -30,13 +30,17 @@ export class HealthHeart {
     if (rng && typeof rng.range === 'function') {
       return rng.range(0, TWO_PI);
     }
+    const fallback = this.getFallbackRandom();
+    if (typeof fallback.range === 'function') {
+      return fallback.range(0, TWO_PI);
+    }
 
-    return Math.random() * TWO_PI;
+    return fallback.float() * TWO_PI;
   }
 
   getFallbackRandom() {
     if (!HealthHeart._fallbackRandom) {
-      HealthHeart._fallbackRandom = new RandomService();
+      HealthHeart._fallbackRandom = new RandomService('health-heart:fallback');
     }
     return HealthHeart._fallbackRandom;
   }

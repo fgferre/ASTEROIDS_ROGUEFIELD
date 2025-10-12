@@ -40,42 +40,25 @@ export function installMathRandomGuard({ logger = console } = {}) {
 
   const originalRandom = Math.random;
   let guardEnabled = false;
-  let totalWarnings = 0;
-  const seenStacks = new Set();
-  const WARNING_LIMIT = 10;
 
-  function emitWarning() {
-    if (!logger || typeof logger.warn !== 'function') {
-      return;
-    }
-
+  function emitViolation() {
     const stack = formatStack(new Error().stack);
-
-    if (stack) {
-      if (seenStacks.has(stack)) {
-        return;
-      }
-      seenStacks.add(stack);
-    }
-
-    if (totalWarnings >= WARNING_LIMIT) {
-      if (totalWarnings === WARNING_LIMIT && typeof logger.warn === 'function') {
-        logger.warn('[RandomGuard] Additional Math.random() warnings suppressed.');
-      }
-      totalWarnings += 1;
-      return;
-    }
-
-    totalWarnings += 1;
     const context = stack ? `\nStack: ${stack}` : '';
-    logger.warn(
-      `[RandomGuard] Math.random() invoked after deterministic bootstrap. Use RandomService forks instead.${context}`
-    );
+    const message =
+      `[RandomGuard] Math.random() invoked after deterministic bootstrap. Use RandomService forks instead.${context}`;
+
+    if (logger && typeof logger.error === 'function') {
+      logger.error(message);
+    } else if (logger && typeof logger.warn === 'function') {
+      logger.warn(message);
+    }
+
+    throw new Error(message);
   }
 
   function patchedRandom(...args) {
     if (guardEnabled) {
-      emitWarning();
+      emitViolation();
     }
     return originalRandom.apply(this, args);
   }

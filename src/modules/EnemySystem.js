@@ -227,7 +227,7 @@ class EnemySystem {
 
     if (!randomService) {
       if (!this._fallbackRandom) {
-        this._fallbackRandom = new RandomService();
+        this._fallbackRandom = new RandomService('enemy-system:fallback');
       }
       randomService = this._fallbackRandom;
       this.services.random = randomService;
@@ -289,12 +289,13 @@ class EnemySystem {
     }
 
     if (!this._fallbackRandom) {
-      this._fallbackRandom = new RandomService();
+      this._fallbackRandom = new RandomService('enemy-system:fallback');
     }
 
-    this.randomScopes[scope] = this._fallbackRandom;
+    const fallbackFork = this._fallbackRandom.fork(forkLabel);
+    this.randomScopes[scope] = fallbackFork;
     this.registerRandomScopeLabel(scope, forkLabel);
-    this.captureRandomScopeSeed(scope, this._fallbackRandom);
+    this.captureRandomScopeSeed(scope, fallbackFork);
     if (!this.randomSequences) {
       this.randomSequences = {};
     }
@@ -330,8 +331,12 @@ class EnemySystem {
       };
     }
 
+    const fallbackBase = this.getRandomService() || this._fallbackRandom || new RandomService('enemy-system:fallback');
     return {
-      random: new RandomService(),
+      random:
+        typeof fallbackBase.fork === 'function'
+          ? fallbackBase.fork(`enemy-system:${label}:${sequence}:fallback`)
+          : fallbackBase,
       sequence,
     };
   }
@@ -956,9 +961,12 @@ class EnemySystem {
         (typeof a1?.getRandomFor === 'function' && a1.getRandomFor('collision')) ||
         (typeof a2?.getRandomFor === 'function' && a2.getRandomFor('collision')) ||
         this.getRandomScope('fragments');
-      const rotationDelta = collisionRandom?.range
-        ? collisionRandom.range(-0.75, 0.75)
-        : (Math.random() - 0.5) * 1.5;
+      const rotationSource =
+        collisionRandom || this.getRandomScope('fragments') || this.getRandomService();
+      const rotationDelta =
+        rotationSource && typeof rotationSource.range === 'function'
+          ? rotationSource.range(-0.75, 0.75)
+          : (rotationSource.float() - 0.5) * 1.5;
       a1.rotationSpeed += rotationDelta;
       a2.rotationSpeed += rotationDelta;
     }
@@ -975,10 +983,11 @@ class EnemySystem {
 
     if (this.shouldSpawn() && this.spawnTimer <= 0) {
       this.spawnAsteroid();
-      const spawnRandom = this.getRandomScope('spawn');
-      const delayMultiplier = spawnRandom?.range
-        ? spawnRandom.range(0.5, 1)
-        : 0.5 + Math.random() * 0.5;
+      const spawnRandom = this.getRandomScope('spawn') || this.getRandomService();
+      const delayMultiplier =
+        spawnRandom && typeof spawnRandom.range === 'function'
+          ? spawnRandom.range(0.5, 1)
+          : 0.5 + spawnRandom.float() * 0.5;
       this.spawnTimer = wave.spawnDelay * delayMultiplier;
     }
   }
@@ -999,41 +1008,52 @@ class EnemySystem {
     if (!this.sessionActive) return null;
 
     const spawnContext = this.createScopedRandom('spawn', 'asteroid-spawn');
-    const spawnRandom = spawnContext.random;
-    const side = spawnRandom?.int ? spawnRandom.int(0, 3) : Math.floor(Math.random() * 4);
+    const globalRandom = this.getRandomService();
+    const spawnRandom =
+      spawnContext.random || this.getRandomScope('spawn') || globalRandom;
+    const floatRandom =
+      spawnRandom && typeof spawnRandom.float === 'function' ? spawnRandom : globalRandom;
+    const side =
+      spawnRandom && typeof spawnRandom.int === 'function'
+        ? spawnRandom.int(0, 3)
+        : Math.floor(floatRandom.float() * 4);
     let x;
     let y;
     const margin = 80;
 
     switch (side) {
       case 0:
-        x = spawnRandom?.range
-          ? spawnRandom.range(0, CONSTANTS.GAME_WIDTH)
-          : Math.random() * CONSTANTS.GAME_WIDTH;
+        x =
+          spawnRandom && typeof spawnRandom.range === 'function'
+            ? spawnRandom.range(0, CONSTANTS.GAME_WIDTH)
+            : floatRandom.float() * CONSTANTS.GAME_WIDTH;
         y = -margin;
         break;
       case 1:
         x = CONSTANTS.GAME_WIDTH + margin;
-        y = spawnRandom?.range
-          ? spawnRandom.range(0, CONSTANTS.GAME_HEIGHT)
-          : Math.random() * CONSTANTS.GAME_HEIGHT;
+        y =
+          spawnRandom && typeof spawnRandom.range === 'function'
+            ? spawnRandom.range(0, CONSTANTS.GAME_HEIGHT)
+            : floatRandom.float() * CONSTANTS.GAME_HEIGHT;
         break;
       case 2:
-        x = spawnRandom?.range
-          ? spawnRandom.range(0, CONSTANTS.GAME_WIDTH)
-          : Math.random() * CONSTANTS.GAME_WIDTH;
+        x =
+          spawnRandom && typeof spawnRandom.range === 'function'
+            ? spawnRandom.range(0, CONSTANTS.GAME_WIDTH)
+            : floatRandom.float() * CONSTANTS.GAME_WIDTH;
         y = CONSTANTS.GAME_HEIGHT + margin;
         break;
       default:
         x = -margin;
-        y = spawnRandom?.range
-          ? spawnRandom.range(0, CONSTANTS.GAME_HEIGHT)
-          : Math.random() * CONSTANTS.GAME_HEIGHT;
+        y =
+          spawnRandom && typeof spawnRandom.range === 'function'
+            ? spawnRandom.range(0, CONSTANTS.GAME_HEIGHT)
+            : floatRandom.float() * CONSTANTS.GAME_HEIGHT;
         break;
     }
 
     let size;
-    const rand = spawnRandom?.float ? spawnRandom.float() : Math.random();
+    const rand = floatRandom.float();
     if (rand < 0.5) size = 'large';
     else if (rand < 0.8) size = 'medium';
     else size = 'small';
@@ -1227,10 +1247,12 @@ class EnemySystem {
     });
 
     const availableKeys = Object.keys(distribution);
-    const variantRandom = context.random || this.getRandomScope('variants');
-    const shouldRoll = variantRandom?.chance
-      ? variantRandom.chance(chance)
-      : Math.random() <= chance;
+    const variantRandom =
+      context.random || this.getRandomScope('variants') || this.getRandomService();
+    const shouldRoll =
+      variantRandom && typeof variantRandom.chance === 'function'
+        ? variantRandom.chance(chance)
+        : variantRandom.float() <= chance;
 
     if (!availableKeys.length || !shouldRoll) {
       return 'common';
@@ -1246,10 +1268,10 @@ class EnemySystem {
     }
 
     let roll;
-    if (variantRandom?.range) {
+    if (variantRandom && typeof variantRandom.range === 'function') {
       roll = variantRandom.range(0, totalWeight);
     } else {
-      roll = Math.random() * totalWeight;
+      roll = variantRandom.float() * totalWeight;
     }
     for (let i = 0; i < availableKeys.length; i += 1) {
       const key = availableKeys[i];
@@ -1283,17 +1305,19 @@ class EnemySystem {
     }
 
     const variants = new Array(fragments.length).fill('common');
-    const variantRandom = this.getRandomScope('variants');
+    const variantRandom = this.getRandomScope('variants') || this.getRandomService();
 
     if (parent?.size === 'large') {
       const denseChance = Math.min(1, 0.3 + this.computeVariantWaveBonus(wave));
-      const shouldApplyDense = variantRandom?.chance
-        ? variantRandom.chance(denseChance)
-        : Math.random() < denseChance;
+      const shouldApplyDense =
+        variantRandom && typeof variantRandom.chance === 'function'
+          ? variantRandom.chance(denseChance)
+          : variantRandom.float() < denseChance;
       if (shouldApplyDense) {
-        const denseIndex = variantRandom?.int
-          ? variantRandom.int(0, fragments.length - 1)
-          : Math.floor(Math.random() * fragments.length);
+        const denseIndex =
+          variantRandom && typeof variantRandom.int === 'function'
+            ? variantRandom.int(0, fragments.length - 1)
+            : Math.floor(variantRandom.float() * fragments.length);
         variants[denseIndex] = 'denseCore';
       }
     }
@@ -1752,9 +1776,12 @@ class EnemySystem {
           typeof asteroid.getRandomFor === 'function'
             ? asteroid.getRandomFor('collision')
             : null;
-        const rotationImpulse = collisionRandom?.range
-          ? collisionRandom.range(-1.5, 1.5)
-          : (Math.random() - 0.5) * 3;
+        const rotationSource =
+          collisionRandom || this.getRandomScope('fragments') || this.getRandomService();
+        const rotationImpulse =
+          rotationSource && typeof rotationSource.range === 'function'
+            ? rotationSource.range(-1.5, 1.5)
+            : (rotationSource.float() - 0.5) * 3;
         asteroid.rotationSpeed += rotationImpulse * falloff;
       }
     }
@@ -1813,9 +1840,12 @@ class EnemySystem {
         typeof asteroid.getRandomFor === 'function'
           ? asteroid.getRandomFor('collision')
           : null;
-      const rotationImpulse = collisionRandom?.range
-        ? collisionRandom.range(-2, 2)
-        : (Math.random() - 0.5) * 4;
+      const rotationImpulseSource =
+        collisionRandom || this.getRandomScope('fragments') || this.getRandomService();
+      const rotationImpulse =
+        rotationImpulseSource && typeof rotationImpulseSource.range === 'function'
+          ? rotationImpulseSource.range(-2, 2)
+          : (rotationImpulseSource.float() - 0.5) * 4;
       asteroid.rotationSpeed += rotationImpulse * falloff;
       asteroid.lastDamageTime = Math.max(asteroid.lastDamageTime, 0.12);
     }

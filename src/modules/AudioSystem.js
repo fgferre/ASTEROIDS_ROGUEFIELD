@@ -19,6 +19,7 @@ class AudioSystem {
       (this.dependencies && this.dependencies.random) ||
       new RandomService('audio-system:fallback');
     this.randomScopes = this._createRandomScopes(this.random);
+    this._fallbackRandom = null;
     this.volumeState = {
       master: 0.25,
       music: 0.6,
@@ -457,10 +458,17 @@ class AudioSystem {
           const bufferRandom =
             this.randomScopes.bufferFamilies.explosion ||
             this.randomScopes.families.explosion ||
+            this.randomScopes.base ||
             null;
-          const sample = bufferRandom
-            ? bufferRandom.range(-1, 1)
-            : Math.random() * 2 - 1;
+          const rng = this._resolveRandom(
+            bufferRandom,
+            this.randomScopes.base,
+            this.random
+          );
+          const sample =
+            typeof rng.range === 'function'
+              ? rng.range(-1, 1)
+              : rng.float() * 2 - 1;
           output[i] = sample;
         }
       }
@@ -517,6 +525,24 @@ class AudioSystem {
     }
 
     return this.batcher.scheduleSound(soundType, params, options);
+  }
+
+  _resolveRandom(...candidates) {
+    for (const candidate of candidates) {
+      if (candidate && typeof candidate.float === 'function') {
+        return candidate;
+      }
+    }
+
+    if (!this._fallbackRandom) {
+      if (this.random && typeof this.random.fork === 'function') {
+        this._fallbackRandom = this.random.fork('audio-system:fallback-base');
+      } else {
+        this._fallbackRandom = new RandomService('audio-system:fallback-base');
+      }
+    }
+
+    return this._fallbackRandom;
   }
 
   _playLaserShotDirect(params = {}) {
@@ -1023,10 +1049,17 @@ class AudioSystem {
           const bufferRandom =
             this.randomScopes.bufferFamilies.shield ||
             this.randomScopes.families.shield ||
+            this.randomScopes.base ||
             null;
-          const noiseSample = bufferRandom
-            ? bufferRandom.range(-1, 1)
-            : Math.random() * 2 - 1;
+          const rng = this._resolveRandom(
+            bufferRandom,
+            this.randomScopes.base,
+            this.random
+          );
+          const noiseSample =
+            typeof rng.range === 'function'
+              ? rng.range(-1, 1)
+              : rng.float() * 2 - 1;
           output[i] = noiseSample * (1 - i / noiseBuffer.length);
         }
       }
