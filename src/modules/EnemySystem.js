@@ -191,14 +191,18 @@ class EnemySystem {
     this.updateServiceCache('healthHearts', 'healthHearts', options);
     const previousRandom = this.services.random;
     this.updateServiceCache('random', 'random', options);
+    const randomServiceChanged = previousRandom !== this.services.random;
 
-    if (previousRandom !== this.services.random) {
+    if (randomServiceChanged) {
       this.randomScopes = null;
       this.randomSequences = null;
     }
 
     this.setupRandomGenerators();
-    this.reseedRandomScopes({ resetSequences: force });
+
+    if (force || randomServiceChanged) {
+      this.reseedRandomScopes({ resetSequences: force || randomServiceChanged });
+    }
   }
 
   syncPhysicsIntegration(force = false) {
