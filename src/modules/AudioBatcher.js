@@ -3,9 +3,11 @@
  * Otimiza sons similares executados ao mesmo tempo
  */
 class AudioBatcher {
-  constructor(audioSystem, batchWindow = 0) {
+  constructor(audioSystem, batchWindow = 0, { random } = {}) {
     this.audioSystem = audioSystem;
     this.batchWindow = batchWindow; // ms para agrupar sons
+    this.random = random || null;
+    this.randomForks = this._initializeRandomForks(this.random);
 
     // Queues de batching por tipo de som
     this.pendingBatches = new Map();
@@ -273,7 +275,8 @@ class AudioBatcher {
         this.audioSystem.connectGainNode(gain);
 
         const freqVariation = baseFreq * 0.3;
-        const freq = baseFreq + (Math.random() - 0.5) * freqVariation;
+        const freqOffset = this._getRandomRange('asteroid', -freqVariation / 2, freqVariation / 2);
+        const freq = baseFreq + freqOffset;
         const delay = i * 0.02;
 
         osc.type = 'sawtooth';
@@ -298,6 +301,29 @@ class AudioBatcher {
         }, (delay + duration) * 1000 + 10);
       }
     });
+  }
+
+  _initializeRandomForks(random) {
+    if (!random || typeof random.fork !== 'function') {
+      return {};
+    }
+
+    return {
+      laser: random.fork('audio-batcher:laser'),
+      asteroid: random.fork('audio-batcher:asteroid'),
+      shield: random.fork('audio-batcher:shield'),
+      xp: random.fork('audio-batcher:xp'),
+    };
+  }
+
+  _getRandomRange(family, min, max) {
+    const rng = this.randomForks[family];
+    if (rng && typeof rng.range === 'function') {
+      return rng.range(min, max);
+    }
+
+    // Fallback preserves previous behaviour if no RNG provided
+    return min + (Math.random() * (max - min));
   }
 
   /**

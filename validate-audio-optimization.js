@@ -6,6 +6,7 @@
 import AudioPool from './src/modules/AudioPool.js';
 import AudioCache from './src/modules/AudioCache.js';
 import AudioBatcher from './src/modules/AudioBatcher.js';
+import RandomService from './src/core/RandomService.js';
 
 console.log('🎵 Starting Audio System Optimization Validation...\n');
 
@@ -90,6 +91,9 @@ function runTest(category, testName, testFn) {
 console.log('🔧 Testing AudioPool System...');
 const mockContext = new MockAudioContext();
 const pool = new AudioPool(mockContext, 10);
+const validationRandom = new RandomService('audio-validation');
+const cacheRandom = validationRandom.fork('cache-primary');
+const batcherRandom = validationRandom.fork('batcher-primary');
 
 runTest('pooling', 'AudioPool instantiation', () => {
   return pool instanceof AudioPool;
@@ -125,7 +129,7 @@ runTest('pooling', 'AudioPool reuse functionality', () => {
 });
 
 console.log('\n🗄️ Testing AudioCache System...');
-const cache = new AudioCache(mockContext, 5);
+const cache = new AudioCache(mockContext, 5, { random: cacheRandom });
 
 runTest('caching', 'AudioCache instantiation', () => {
   return cache instanceof AudioCache;
@@ -173,7 +177,7 @@ const mockAudioSystem = {
   playXPCollect: () => {}
 };
 
-const batcher = new AudioBatcher(mockAudioSystem, 16);
+const batcher = new AudioBatcher(mockAudioSystem, 16, { random: batcherRandom });
 
 runTest('batching', 'AudioBatcher instantiation', () => {
   return batcher instanceof AudioBatcher;
@@ -205,8 +209,13 @@ console.log('\n🔗 Testing Integration...');
 runTest('integration', 'AudioSystem with all optimizations', () => {
   // Test that all components work together
   const testPool = new AudioPool(mockContext, 20);
-  const testCache = new AudioCache(mockContext, 10);
-  const testBatcher = new AudioBatcher(mockAudioSystem, 16);
+  const integrationRandom = new RandomService('audio-validation:integration');
+  const testCache = new AudioCache(mockContext, 10, {
+    random: integrationRandom.fork('cache'),
+  });
+  const testBatcher = new AudioBatcher(mockAudioSystem, 16, {
+    random: integrationRandom.fork('batcher'),
+  });
 
   return testPool && testCache && testBatcher;
 });
@@ -228,7 +237,10 @@ runTest('integration', 'Performance monitoring integration', () => {
 runTest('integration', 'Memory management integration', () => {
   // Test cleanup functionality
   const testPool = new AudioPool(mockContext, 5);
-  const testCache = new AudioCache(mockContext, 3);
+  const memoryRandom = new RandomService('audio-validation:memory');
+  const testCache = new AudioCache(mockContext, 3, {
+    random: memoryRandom.fork('cache'),
+  });
 
   // Create some objects
   testPool.getOscillator();
@@ -269,7 +281,10 @@ function benchmarkPooling() {
 
 function benchmarkCaching() {
   const iterations = 500;
-  const testCache = new AudioCache(mockContext, 20);
+  const benchmarkRandom = new RandomService('audio-validation:benchmark');
+  const testCache = new AudioCache(mockContext, 20, {
+    random: benchmarkRandom.fork('cache'),
+  });
 
   const startTime = performance.now();
 
