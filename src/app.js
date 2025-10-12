@@ -10,6 +10,7 @@ import {
   DEFAULT_POOL_CONFIG,
   DEFAULT_GC_OPTIONS
 } from './bootstrap/serviceManifest.js';
+import { installMathRandomGuard } from './utils/dev/mathRandomGuard.js';
 
 // Dependency Injection System (Phase 2.1)
 import { DIContainer } from './core/DIContainer.js';
@@ -39,6 +40,7 @@ const performanceMonitor = new PerformanceMonitor();
 // Initialize DI Container (Phase 2.1)
 let diContainer = null;
 let serviceLocatorAdapter = null;
+let mathRandomGuard = null;
 
 const RANDOM_STORAGE_KEYS = {
   override: 'roguefield.seedOverride',
@@ -632,6 +634,10 @@ function executeRetryRespawn() {
 
 function init() {
   try {
+    if (process.env.NODE_ENV === 'development' && !mathRandomGuard) {
+      mathRandomGuard = installMathRandomGuard({ logger: console });
+    }
+
     gameState.canvas = document.getElementById('game-canvas');
     if (!gameState.canvas) {
       throw new Error('Canvas não encontrado');
@@ -686,6 +692,10 @@ function init() {
     if (ui) ui.showScreen('menu');
 
     gameState.initialized = true;
+
+    if (process.env.NODE_ENV === 'development') {
+      mathRandomGuard?.activate?.({ reason: 'bootstrap-complete' });
+    }
 
     // Log DI statistics in development
     if (process.env.NODE_ENV === 'development' && diInitialized) {
