@@ -95,6 +95,7 @@ class XPOrbSystem {
       clustering: null,
       fusion: null,
     };
+    this.randomForkSeeds = {};
     this._fallbackRandom = null;
     this._randomForkSource = null;
     this._randomForkSignature = null;
@@ -219,6 +220,7 @@ class XPOrbSystem {
       this.randomForks = this.createRandomForks(candidate);
       this._randomForkSource = candidate;
       this._randomForkSignature = signature;
+      this.captureRandomForkSeeds();
       this.fusionCheckTimer = this.generateInitialFusionTimer();
     }
 
@@ -273,12 +275,16 @@ class XPOrbSystem {
     const fusion =
       base && typeof base.fork === 'function' ? base.fork('xp-orbs.fusion') : null;
 
-    return {
+    const forks = {
       base,
       creation,
       clustering,
       fusion,
     };
+
+    this.captureRandomForkSeeds(forks);
+
+    return forks;
   }
 
   getRandomFork(name) {
@@ -291,6 +297,43 @@ class XPOrbSystem {
     }
 
     return this.randomForks[name] || null;
+  }
+
+  captureRandomForkSeeds(forks = this.randomForks) {
+    if (!forks) {
+      return;
+    }
+
+    if (!this.randomForkSeeds) {
+      this.randomForkSeeds = {};
+    }
+
+    Object.entries(forks).forEach(([name, fork]) => {
+      if (fork && typeof fork.seed === 'number' && Number.isFinite(fork.seed)) {
+        this.randomForkSeeds[name] = fork.seed >>> 0;
+      }
+    });
+  }
+
+  reseedRandomForks() {
+    if (!this.randomForks) {
+      return;
+    }
+
+    if (!this.randomForkSeeds) {
+      this.captureRandomForkSeeds();
+    }
+
+    Object.entries(this.randomForks).forEach(([name, fork]) => {
+      if (!fork || typeof fork.reset !== 'function') {
+        return;
+      }
+
+      const storedSeed = this.randomForkSeeds?.[name];
+      if (storedSeed !== undefined) {
+        fork.reset(storedSeed);
+      }
+    });
   }
 
   generateInitialFusionTimer() {
@@ -1957,6 +2000,7 @@ class XPOrbSystem {
   }
 
   reset() {
+    this.reseedRandomForks();
     this.releaseAllOrbsToPool();
     this.orbClasses = [...ORB_CLASS_SEQUENCE];
     this.xpOrbs = [];

@@ -51,6 +51,13 @@ export class Asteroid extends BaseEnemy {
     this.spawnTime = 0;
     this.random = null;
     this.randomScopes = null;
+    this.randomScopeSeeds = null;
+    this.randomScopeLabels = {
+      movement: 'movement',
+      visual: 'visual',
+      collision: 'collision',
+      cracks: 'cracks',
+    };
 
     // Initialize if config was provided
     if (system && Object.keys(config).length > 0) {
@@ -65,6 +72,7 @@ export class Asteroid extends BaseEnemy {
       this.random = new RandomService();
     }
     this.randomScopes = null;
+    this.randomScopeSeeds = null;
     return this.random;
   }
 
@@ -76,11 +84,13 @@ export class Asteroid extends BaseEnemy {
     if (!this.randomScopes) {
       this.randomScopes = {
         core: this.random,
-        movement: this.random.fork('movement'),
-        visual: this.random.fork('visual'),
-        collision: this.random.fork('collision'),
-        cracks: this.random.fork('cracks'),
+        movement: this.random.fork(this.randomScopeLabels.movement),
+        visual: this.random.fork(this.randomScopeLabels.visual),
+        collision: this.random.fork(this.randomScopeLabels.collision),
+        cracks: this.random.fork(this.randomScopeLabels.cracks),
       };
+      this.randomScopeSeeds = {};
+      this.captureRandomScopeSeeds();
     }
 
     return this.randomScopes;
@@ -93,7 +103,9 @@ export class Asteroid extends BaseEnemy {
     }
 
     if (!scopes[scope]) {
-      scopes[scope] = this.random.fork(`asteroid:${scope}`);
+      const label = this.randomScopeLabels?.[scope] || `asteroid:${scope}`;
+      scopes[scope] = this.random.fork(label);
+      this.captureRandomScopeSeed(scope, scopes[scope]);
     }
 
     return scopes[scope];
@@ -262,6 +274,7 @@ export class Asteroid extends BaseEnemy {
     this.spawnTime = 0;
     this.random = null;
     this.randomScopes = null;
+    this.randomScopeSeeds = null;
   }
 
   computeWaveHealthMultiplier(wave) {
@@ -1900,5 +1913,47 @@ export class Asteroid extends BaseEnemy {
     }
 
     return fragments;
+  }
+
+  captureRandomScopeSeed(scope, generator) {
+    if (!generator || typeof generator.seed !== 'number') {
+      return;
+    }
+
+    if (!this.randomScopeSeeds) {
+      this.randomScopeSeeds = {};
+    }
+
+    this.randomScopeSeeds[scope] = generator.seed >>> 0;
+  }
+
+  captureRandomScopeSeeds(scopes = this.randomScopes) {
+    if (!scopes) {
+      return;
+    }
+
+    Object.entries(scopes).forEach(([scope, generator]) => {
+      if (scope === 'core') {
+        return;
+      }
+      this.captureRandomScopeSeed(scope, generator);
+    });
+  }
+
+  reseedRandomScopes() {
+    if (!this.randomScopes || !this.randomScopeSeeds) {
+      return;
+    }
+
+    Object.entries(this.randomScopes).forEach(([scope, generator]) => {
+      if (scope === 'core' || !generator || typeof generator.reset !== 'function') {
+        return;
+      }
+
+      const storedSeed = this.randomScopeSeeds?.[scope];
+      if (storedSeed !== undefined) {
+        generator.reset(storedSeed);
+      }
+    });
   }
 }

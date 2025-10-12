@@ -51,6 +51,17 @@ export class ScreenShake {
     console.log('[ScreenShake] Initialized');
   }
 
+  reseed(randomGenerator = this.random) {
+    this.random =
+      randomGenerator && typeof randomGenerator.float === 'function'
+        ? randomGenerator
+        : null;
+
+    this.seedX = this.getRandomSeed();
+    this.seedY = this.getRandomSeed();
+    this.seedAngle = this.getRandomSeed();
+  }
+
   getRandomSeed() {
     if (this.random) {
       return this.random.range(0, 1000);

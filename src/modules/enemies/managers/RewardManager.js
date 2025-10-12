@@ -94,6 +94,11 @@ export class RewardManager {
       this._fallbackRandom = null;
     }
 
+    this.initialRandomSeed =
+      typeof this.random?.seed === 'number' && Number.isFinite(this.random.seed)
+        ? this.random.seed >>> 0
+        : undefined;
+
     this.randomSequence = 0;
 
     // Reward configurations
@@ -622,5 +627,34 @@ export class RewardManager {
     }
 
     return rng.chance(probability);
+  }
+
+  reseedRandom(random = this.random) {
+    if (random && typeof random.float === 'function') {
+      this.random = random;
+    } else if (this._fallbackRandom) {
+      this.random = this._fallbackRandom;
+    }
+
+    if (!this.random) {
+      return;
+    }
+
+    if (
+      this.initialRandomSeed === undefined &&
+      typeof this.random.seed === 'number' &&
+      Number.isFinite(this.random.seed)
+    ) {
+      this.initialRandomSeed = this.random.seed >>> 0;
+    }
+
+    if (
+      this.initialRandomSeed !== undefined &&
+      typeof this.random.reset === 'function'
+    ) {
+      this.random.reset(this.initialRandomSeed);
+    }
+
+    this.randomSequence = 0;
   }
 }

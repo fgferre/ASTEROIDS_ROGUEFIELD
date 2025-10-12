@@ -29,6 +29,12 @@ class EnemySystem {
 
     this.randomScopes = null;
     this.randomSequences = null;
+    this.randomScopeSeeds = {};
+    this.randomScopeLabels = {
+      spawn: 'enemy-system:spawn',
+      variants: 'enemy-system:variants',
+      fragments: 'enemy-system:fragments',
+    };
     this._fallbackRandom = null;
 
     this.asteroids = [];
@@ -185,13 +191,18 @@ class EnemySystem {
     this.updateServiceCache('healthHearts', 'healthHearts', options);
     const previousRandom = this.services.random;
     this.updateServiceCache('random', 'random', options);
+    const randomServiceChanged = previousRandom !== this.services.random;
 
-    if (previousRandom !== this.services.random) {
+    if (randomServiceChanged) {
       this.randomScopes = null;
       this.randomSequences = null;
     }
 
     this.setupRandomGenerators();
+
+    if (force || randomServiceChanged) {
+      this.reseedRandomScopes({ resetSequences: force || randomServiceChanged });
+    }
   }
 
   syncPhysicsIntegration(force = false) {
@@ -231,10 +242,12 @@ class EnemySystem {
 
     this.randomScopes = {
       base: randomService,
-      spawn: randomService.fork('enemy-system:spawn'),
-      variants: randomService.fork('enemy-system:variants'),
-      fragments: randomService.fork('enemy-system:fragments'),
+      spawn: randomService.fork(this.randomScopeLabels.spawn),
+      variants: randomService.fork(this.randomScopeLabels.variants),
+      fragments: randomService.fork(this.randomScopeLabels.fragments),
     };
+
+    this.captureRandomScopeSeeds();
 
     this.randomSequences = {
       spawn: 0,
@@ -259,11 +272,13 @@ class EnemySystem {
       return this.randomScopes[scope];
     }
 
+    const forkLabel = label || `enemy-system:${scope}`;
     const parent = this.randomScopes[parentScope] || this.randomScopes.base;
     if (parent && typeof parent.fork === 'function') {
-      const forkLabel = label || `enemy-system:${scope}`;
       const forked = parent.fork(forkLabel);
       this.randomScopes[scope] = forked;
+      this.registerRandomScopeLabel(scope, forkLabel);
+      this.captureRandomScopeSeed(scope, forked);
       if (!this.randomSequences) {
         this.randomSequences = {};
       }
@@ -278,6 +293,8 @@ class EnemySystem {
     }
 
     this.randomScopes[scope] = this._fallbackRandom;
+    this.registerRandomScopeLabel(scope, forkLabel);
+    this.captureRandomScopeSeed(scope, this._fallbackRandom);
     if (!this.randomSequences) {
       this.randomSequences = {};
     }
@@ -317,6 +334,75 @@ class EnemySystem {
       random: new RandomService(),
       sequence,
     };
+  }
+
+  registerRandomScopeLabel(scope, label) {
+    if (!this.randomScopeLabels) {
+      this.randomScopeLabels = {};
+    }
+
+    if (label) {
+      this.randomScopeLabels[scope] = label;
+    }
+  }
+
+  captureRandomScopeSeed(scope, generator) {
+    if (!generator || typeof generator.seed !== 'number') {
+      return;
+    }
+
+    if (!this.randomScopeSeeds) {
+      this.randomScopeSeeds = {};
+    }
+
+    this.randomScopeSeeds[scope] = generator.seed >>> 0;
+  }
+
+  captureRandomScopeSeeds(scopes = this.randomScopes) {
+    if (!scopes) {
+      return;
+    }
+
+    Object.entries(scopes).forEach(([scope, generator]) => {
+      this.captureRandomScopeSeed(scope, generator);
+    });
+  }
+
+  reseedRandomScopes({ resetSequences = false } = {}) {
+    if (!this.randomScopes) {
+      return;
+    }
+
+    if (!this.randomScopeSeeds) {
+      this.randomScopeSeeds = {};
+      this.captureRandomScopeSeeds();
+    }
+
+    Object.entries(this.randomScopes).forEach(([scope, generator]) => {
+      if (scope === 'base' || !generator || typeof generator.reset !== 'function') {
+        return;
+      }
+
+      const storedSeed = this.randomScopeSeeds?.[scope];
+      if (storedSeed !== undefined) {
+        generator.reset(storedSeed);
+      }
+    });
+
+    if (resetSequences && this.randomSequences) {
+      Object.keys(this.randomSequences).forEach((scope) => {
+        this.randomSequences[scope] = 0;
+      });
+    }
+
+    if (this.waveManager && typeof this.waveManager.reseedRandomScopes === 'function') {
+      this.waveManager.reseedRandomScopes({ resetSequences });
+    }
+
+    if (this.rewardManager && typeof this.rewardManager.reseedRandom === 'function') {
+      const rewardRandom = this.randomScopes?.['enemy-rewards'];
+      this.rewardManager.reseedRandom(rewardRandom);
+    }
   }
 
   setupAsteroidPoolIntegration() {
@@ -1495,11 +1581,6 @@ class EnemySystem {
     this.sessionStats = this.createInitialSessionStats();
     this.sessionActive = true;
     this.lastWaveBroadcast = null;
-    if (this.randomSequences) {
-      this.randomSequences.spawn = 0;
-      this.randomSequences.variants = 0;
-      this.randomSequences.fragments = 0;
-    }
 
     this.refreshInjectedServices({ force: true });
     this.syncPhysicsIntegration(true);

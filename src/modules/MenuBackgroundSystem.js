@@ -20,15 +20,26 @@ class MenuBackgroundSystem {
     }
 
     this.dependencies.random = this.random;
-    this.randomForks = {
-      base: this.random.fork('menu.base'),
-      starfield: this.random.fork('menu.starfield'),
-      assets: this.random.fork('menu.assets'),
-      belt: this.random.fork('menu.belt'),
-      asteroids: this.random.fork('menu.asteroids'),
-      fragments: this.random.fork('menu.fragments'),
-      materials: this.random.fork('menu.materials'),
+    this.randomForkLabels = {
+      base: 'menu.base',
+      starfield: 'menu.starfield',
+      assets: 'menu.assets',
+      belt: 'menu.belt',
+      asteroids: 'menu.asteroids',
+      fragments: 'menu.fragments',
+      materials: 'menu.materials',
     };
+    this.randomForks = {
+      base: this.random.fork(this.randomForkLabels.base),
+      starfield: this.random.fork(this.randomForkLabels.starfield),
+      assets: this.random.fork(this.randomForkLabels.assets),
+      belt: this.random.fork(this.randomForkLabels.belt),
+      asteroids: this.random.fork(this.randomForkLabels.asteroids),
+      fragments: this.random.fork(this.randomForkLabels.fragments),
+      materials: this.random.fork(this.randomForkLabels.materials),
+    };
+    this.randomForkSeeds = {};
+    this.captureRandomForkSeeds();
     this.settingsService = null;
     this.canvas =
       typeof document !== 'undefined'
@@ -175,6 +186,54 @@ class MenuBackgroundSystem {
     }
 
     return array[this.randomInt(0, array.length - 1, name)];
+  }
+
+  captureRandomForkSeeds() {
+    if (!this.randomForks) {
+      this.randomForkSeeds = {};
+      return;
+    }
+
+    if (!this.randomForkSeeds) {
+      this.randomForkSeeds = {};
+    }
+
+    Object.entries(this.randomForks).forEach(([name, fork]) => {
+      if (fork && typeof fork.seed === 'number' && Number.isFinite(fork.seed)) {
+        this.randomForkSeeds[name] = fork.seed >>> 0;
+      }
+    });
+  }
+
+  reseedRandomForks() {
+    if (!this.randomForks) {
+      return;
+    }
+
+    if (!this.randomForkSeeds) {
+      this.captureRandomForkSeeds();
+    }
+
+    Object.entries(this.randomForks).forEach(([name, fork]) => {
+      if (!fork || typeof fork.reset !== 'function') {
+        return;
+      }
+
+      const storedSeed = this.randomForkSeeds?.[name];
+      if (storedSeed !== undefined) {
+        fork.reset(storedSeed);
+      } else if (this.random && this.randomForkLabels?.[name]) {
+        const replacement = this.random.fork(this.randomForkLabels[name]);
+        this.randomForks[name] = replacement;
+        if (replacement && typeof replacement.seed === 'number') {
+          this.randomForkSeeds[name] = replacement.seed >>> 0;
+        }
+      }
+    });
+  }
+
+  reset() {
+    this.reseedRandomForks();
   }
 
   getService(name) {

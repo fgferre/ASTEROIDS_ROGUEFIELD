@@ -76,7 +76,14 @@ export class WaveManager {
     }
 
     this.random = resolvedRandom;
+    this.randomScopeLabels = {
+      spawn: 'wave-manager:spawn',
+      variants: 'wave-manager:variants',
+      fragments: 'wave-manager:fragments',
+    };
+    this.randomScopeSeeds = {};
     this.randomScopes = this.createRandomScopes(this.random);
+    this.captureRandomScopeSeeds();
     this.randomSequences = { spawn: 0, variants: 0, fragments: 0 };
     this._fallbackRandom = null;
 
@@ -533,17 +540,26 @@ export class WaveManager {
       this._fallbackRandom = baseRandom;
     }
 
-    return {
+    const spawnLabel = this.randomScopeLabels?.spawn || 'wave-manager:spawn';
+    const variantLabel = this.randomScopeLabels?.variants || 'wave-manager:variants';
+    const fragmentLabel = this.randomScopeLabels?.fragments || 'wave-manager:fragments';
+
+    const scopes = {
       base: baseRandom,
-      spawn: baseRandom.fork('wave-manager:spawn'),
-      variants: baseRandom.fork('wave-manager:variants'),
-      fragments: baseRandom.fork('wave-manager:fragments'),
+      spawn: baseRandom.fork(spawnLabel),
+      variants: baseRandom.fork(variantLabel),
+      fragments: baseRandom.fork(fragmentLabel),
     };
+
+    this.captureRandomScopeSeeds(scopes);
+
+    return scopes;
   }
 
   getRandomService() {
     if (!this.randomScopes) {
       this.randomScopes = this.createRandomScopes(this.random);
+      this.captureRandomScopeSeeds();
     }
     return this.randomScopes.base;
   }
@@ -551,6 +567,7 @@ export class WaveManager {
   getRandomScope(scope) {
     if (!this.randomScopes) {
       this.randomScopes = this.createRandomScopes(this.random);
+      this.captureRandomScopeSeeds();
     }
 
     return this.randomScopes[scope] || this.randomScopes.base;
@@ -588,5 +605,55 @@ export class WaveManager {
       random: fallback.fork(`wave-manager:${label}:${sequence}`),
       sequence,
     };
+  }
+
+  captureRandomScopeSeed(scope, generator) {
+    if (!generator || typeof generator.seed !== 'number') {
+      return;
+    }
+
+    if (!this.randomScopeSeeds) {
+      this.randomScopeSeeds = {};
+    }
+
+    this.randomScopeSeeds[scope] = generator.seed >>> 0;
+  }
+
+  captureRandomScopeSeeds(scopes = this.randomScopes) {
+    if (!scopes) {
+      return;
+    }
+
+    Object.entries(scopes).forEach(([scope, generator]) => {
+      this.captureRandomScopeSeed(scope, generator);
+    });
+  }
+
+  reseedRandomScopes({ resetSequences = false } = {}) {
+    if (!this.randomScopes) {
+      this.randomScopes = this.createRandomScopes(this.random);
+    }
+
+    if (!this.randomScopeSeeds) {
+      this.randomScopeSeeds = {};
+      this.captureRandomScopeSeeds();
+    }
+
+    Object.entries(this.randomScopes).forEach(([scope, generator]) => {
+      if (scope === 'base' || !generator || typeof generator.reset !== 'function') {
+        return;
+      }
+
+      const storedSeed = this.randomScopeSeeds?.[scope];
+      if (storedSeed !== undefined) {
+        generator.reset(storedSeed);
+      }
+    });
+
+    if (resetSequences && this.randomSequences) {
+      Object.keys(this.randomSequences).forEach((scope) => {
+        this.randomSequences[scope] = 0;
+      });
+    }
   }
 }

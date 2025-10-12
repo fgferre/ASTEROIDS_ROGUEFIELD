@@ -156,19 +156,34 @@ export default class EffectsSystem {
 
     if (this.random) {
       this.dependencies.random = this.random;
-      this.randomForks = {
-        base: this.random.fork('effects.base'),
-        particles: this.random.fork('effects.particles'),
-        thrusters: this.random.fork('effects.thrusters'),
-        colors: this.random.fork('effects.colors'),
-        muzzleFlash: this.random.fork('effects.muzzleFlash'),
-        hits: this.random.fork('effects.hitEffects'),
-        explosions: this.random.fork('effects.explosions'),
-        volatility: this.random.fork('effects.volatility'),
-        screenShake: this.random.fork('effects.screenShake'),
+      this.randomForkLabels = {
+        base: 'effects.base',
+        particles: 'effects.particles',
+        thrusters: 'effects.thrusters',
+        colors: 'effects.colors',
+        muzzleFlash: 'effects.muzzleFlash',
+        hits: 'effects.hitEffects',
+        explosions: 'effects.explosions',
+        volatility: 'effects.volatility',
+        screenShake: 'effects.screenShake',
       };
+      this.randomForks = {
+        base: this.random.fork(this.randomForkLabels.base),
+        particles: this.random.fork(this.randomForkLabels.particles),
+        thrusters: this.random.fork(this.randomForkLabels.thrusters),
+        colors: this.random.fork(this.randomForkLabels.colors),
+        muzzleFlash: this.random.fork(this.randomForkLabels.muzzleFlash),
+        hits: this.random.fork(this.randomForkLabels.hits),
+        explosions: this.random.fork(this.randomForkLabels.explosions),
+        volatility: this.random.fork(this.randomForkLabels.volatility),
+        screenShake: this.random.fork(this.randomForkLabels.screenShake),
+      };
+      this.randomForkSeeds = {};
+      this.captureRandomForkSeeds();
     } else {
       this.randomForks = null;
+      this.randomForkLabels = {};
+      this.randomForkSeeds = {};
     }
     this.particles = [];
     this.shockwaves = [];
@@ -1972,7 +1987,55 @@ export default class EffectsSystem {
     return low + this.randomFloat(name) * (high - low);
   }
 
+  captureRandomForkSeeds() {
+    if (!this.randomForks) {
+      this.randomForkSeeds = {};
+      return;
+    }
+
+    if (!this.randomForkSeeds) {
+      this.randomForkSeeds = {};
+    }
+
+    Object.entries(this.randomForks).forEach(([name, fork]) => {
+      if (fork && typeof fork.seed === 'number' && Number.isFinite(fork.seed)) {
+        this.randomForkSeeds[name] = fork.seed >>> 0;
+      }
+    });
+  }
+
+  reseedRandomForks() {
+    if (!this.randomForks) {
+      return;
+    }
+
+    if (!this.randomForkSeeds) {
+      this.captureRandomForkSeeds();
+    }
+
+    Object.entries(this.randomForks).forEach(([name, fork]) => {
+      if (!fork || typeof fork.reset !== 'function') {
+        return;
+      }
+
+      const storedSeed = this.randomForkSeeds?.[name];
+      if (storedSeed !== undefined) {
+        fork.reset(storedSeed);
+      } else if (this.random && this.randomForkLabels?.[name]) {
+        const replacement = this.random.fork(this.randomForkLabels[name]);
+        this.randomForks[name] = replacement;
+        if (replacement && typeof replacement.seed === 'number') {
+          this.randomForkSeeds[name] = replacement.seed >>> 0;
+        }
+      }
+    });
+  }
+
   reset() {
+    this.reseedRandomForks();
+    if (this.screenShake && typeof this.screenShake.reseed === 'function') {
+      this.screenShake.reseed(this.getRandomFork('screenShake'));
+    }
     this.particles = [];
     this.shockwaves = [];
     this.hitMarkers = [];
