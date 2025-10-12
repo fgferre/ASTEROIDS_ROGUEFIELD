@@ -50,6 +50,16 @@
 - **Performance:** medir custo adicional do PRNG ao migrar loops críticos (ex.: partículas) e, se necessário, expor métodos especializados (`fastFloat()` sem checagens) para hot paths.
 - **Integração com áudio Web:** validar que partilhar buffers determinísticos não introduz artefatos audíveis; oferecer opção de recalc em hot reload apenas em dev.
 
+### Convenção de nomes para forks do `RandomService`
+- Prefixe o domínio (sistema ou módulo) seguido de subescopos hierárquicos usando pontos (`wave-manager.spawn`, `xp-orbs.creation`, `rendering.starfield`).
+- Use substantivos/verbos descritivos para o segundo nível (ex.: `effects.explosions`, `enemy-rewards.velocity`) e evite números mágicos; para sequências repetidas, acrescente um sufixo semântico (`.shards`, `.boss-phase`).
+- Quando um sistema delegar forks para dependentes, derive do nome recebido (ex.: `random.fork(parentScope + '.fragments')`) para preservar rastreabilidade nos logs do `RandomService`.
+- Seeds customizadas devem ser anexadas via `fork(scope, seed)` apenas em ferramentas (debug/teste); produção deve depender de nomes estáveis para permitir restauração pelo snapshot do serviço.
+
+### Monitoramento em desenvolvimento
+- Ativar um guardião de desenvolvimento que monkey patcha `Math.random()` após o bootstrap determinístico e emite `console.warn` com o stack trace resumido. O objetivo é identificar rapidamente chamadas não migradas para o `RandomService`.
+- O guardião deve ser habilitado automaticamente quando `process.env.NODE_ENV === 'development'` e ser silencioso durante o bootstrap inicial (antes do seed ser travado) para evitar falsos positivos.
+
 ## 7. Checklist de saída da Fase 2
 - [ ] `RandomService` registrado no manifesto, acessível via DI e `gameServices`, com API documentada e testes cobrindo repetibilidade.
 - [ ] `app.js` inicializa e reinicia seeds de maneira previsível, armazenando valor atual no `gameState` e nos snapshots de retry.
