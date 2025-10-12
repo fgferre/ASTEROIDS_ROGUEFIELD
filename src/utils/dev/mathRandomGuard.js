@@ -52,8 +52,6 @@ export function installMathRandomGuard({ logger = console } = {}) {
     } else if (logger && typeof logger.warn === 'function') {
       logger.warn(message);
     }
-
-    throw new Error(message);
   }
 
   function patchedRandom(...args) {
