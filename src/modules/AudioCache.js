@@ -1,11 +1,14 @@
+import RandomService from '../core/RandomService.js';
+
 /**
  * AudioCache - Sistema de cache para buffers de áudio e patterns
  * Evita regeneração desnecessária de buffers de ruído
  */
 class AudioCache {
-  constructor(audioContext, maxCacheSize = 20) {
+  constructor(audioContext, maxCacheSize = 20, { random } = {}) {
     this.context = audioContext;
     this.maxCacheSize = maxCacheSize;
+    this.random = random || null;
 
     // Cache de buffers por tipo
     this.noiseBuffers = new Map();
@@ -13,6 +16,9 @@ class AudioCache {
 
     // LRU tracking
     this.accessOrder = [];
+
+    // Fork seeds por assinatura
+    this.noiseForkSeeds = new Map();
 
     // Performance metrics
     this.stats = {
@@ -31,8 +37,27 @@ class AudioCache {
   /**
    * Obtém um buffer de ruído com características específicas
    */
-  getNoiseBuffer(duration, fadeOut = false, amplitudePattern = 'linear') {
-    const key = `noise_${duration}_${fadeOut}_${amplitudePattern}`;
+  getNoiseBuffer(duration, fadeOut = false, amplitudePattern = 'linear', options = {}) {
+    const { random = this.random, family = 'noise' } = options || {};
+    const normalizedFamily = typeof family === 'string' && family.length > 0 ? family : 'noise';
+    const forkKey = `${normalizedFamily}:${duration}:${fadeOut ? 'fade' : 'flat'}:${amplitudePattern}`;
+
+    let forkSeed = this.noiseForkSeeds.get(forkKey);
+    let generatorRandom = null;
+
+    if (!forkSeed && random && typeof random.fork === 'function') {
+      const forked = random.fork(`audio-cache:${forkKey}`);
+      forkSeed = forked.seed >>> 0;
+      generatorRandom = forked;
+      this.noiseForkSeeds.set(forkKey, forkSeed);
+    }
+
+    const seedComponent =
+      typeof forkSeed === 'number'
+        ? forkSeed
+        : this._getSeedComponent(random);
+
+    const key = `noise_${normalizedFamily}_${seedComponent}_${duration}_${fadeOut}_${amplitudePattern}`;
 
     if (this.noiseBuffers.has(key)) {
       this._updateAccessOrder(key);
@@ -40,8 +65,12 @@ class AudioCache {
       return this.noiseBuffers.get(key);
     }
 
+    if (!generatorRandom && typeof forkSeed === 'number') {
+      generatorRandom = new RandomService(forkSeed);
+    }
+
     // Create new buffer
-    const buffer = this._createNoiseBuffer(duration, fadeOut, amplitudePattern);
+    const buffer = this._createNoiseBuffer(duration, fadeOut, amplitudePattern, generatorRandom);
     this._cacheBuffer(key, buffer, this.noiseBuffers);
     this.stats.misses++;
     this.stats.created++;
@@ -78,13 +107,13 @@ class AudioCache {
    */
   _pregenerateCommonBuffers() {
     // Common explosion noise patterns
-    this.getNoiseBuffer(0.4, true, 'exponential'); // Big explosion
-    this.getNoiseBuffer(0.35, true, 'linear');     // Shield shockwave
-    this.getNoiseBuffer(0.5, true, 'exponential'); // Large asteroid break
+    this.getNoiseBuffer(0.4, true, 'exponential', { family: 'explosion' }); // Big explosion
+    this.getNoiseBuffer(0.35, true, 'linear', { family: 'shield' });       // Shield shockwave
+    this.getNoiseBuffer(0.5, true, 'exponential', { family: 'asteroid' });  // Large asteroid break
 
     // Common short noises
-    this.getNoiseBuffer(0.1, true, 'linear');      // Quick impact
-    this.getNoiseBuffer(0.15, true, 'exponential'); // Medium impact
+    this.getNoiseBuffer(0.1, true, 'linear', { family: 'impact' });        // Quick impact
+    this.getNoiseBuffer(0.15, true, 'exponential', { family: 'impact' });  // Medium impact
 
     console.log('[AudioCache] Pregenerated', this.noiseBuffers.size, 'common buffers');
   }
@@ -92,13 +121,15 @@ class AudioCache {
   /**
    * Cria um buffer de ruído com padrão específico
    */
-  _createNoiseBuffer(duration, fadeOut, amplitudePattern) {
+  _createNoiseBuffer(duration, fadeOut, amplitudePattern, randomInstance = null) {
     const bufferSize = this.context.sampleRate * duration;
     const buffer = this.context.createBuffer(1, bufferSize, this.context.sampleRate);
     const output = buffer.getChannelData(0);
 
     for (let i = 0; i < bufferSize; i++) {
-      const noise = Math.random() * 2 - 1;
+      const noise = randomInstance
+        ? randomInstance.range(-1, 1)
+        : Math.random() * 2 - 1;
       let amplitude = 1;
 
       if (fadeOut) {
@@ -209,6 +240,30 @@ class AudioCache {
       created: 0,
       evicted: 0
     };
+  }
+
+  _getSeedComponent(randomInstance) {
+    if (!randomInstance) {
+      return 'unseeded';
+    }
+
+    if (typeof randomInstance.seed === 'number') {
+      return randomInstance.seed >>> 0;
+    }
+
+    try {
+      const snapshot =
+        typeof randomInstance.debugSnapshot === 'function'
+          ? randomInstance.debugSnapshot()
+          : null;
+      if (snapshot && typeof snapshot.seed === 'number') {
+        return snapshot.seed >>> 0;
+      }
+    } catch (error) {
+      // Ignore snapshot failures in production
+    }
+
+    return 'unseeded';
   }
 }
 

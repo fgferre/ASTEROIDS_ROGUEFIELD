@@ -1,6 +1,7 @@
 import AudioPool from './AudioPool.js';
 import AudioCache from './AudioCache.js';
 import AudioBatcher from './AudioBatcher.js';
+import RandomService from '../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
 class AudioSystem {
@@ -13,6 +14,11 @@ class AudioSystem {
     this.initialized = false;
     this.sounds = new Map();
     this.settings = resolveService('settings', this.dependencies);
+    this.random =
+      resolveService('random', this.dependencies) ||
+      (this.dependencies && this.dependencies.random) ||
+      new RandomService('audio-system:fallback');
+    this.randomScopes = this._createRandomScopes(this.random);
     this.volumeState = {
       master: 0.25,
       music: 0.6,
@@ -49,6 +55,7 @@ class AudioSystem {
 
     this.setupEventListeners();
     this.bootstrapSettings();
+    this._exposeRandomDebugControls();
     console.log('[AudioSystem] Initialized');
   }
 
@@ -70,8 +77,12 @@ class AudioSystem {
 
       // Initialize optimization systems
       this.pool = new AudioPool(this.context, 50);
-      this.cache = new AudioCache(this.context, 20);
-      this.batcher = new AudioBatcher(this, 0);
+      this.cache = new AudioCache(this.context, 20, {
+        random: this.randomScopes.cache,
+      });
+      this.batcher = new AudioBatcher(this, 0, {
+        random: this.randomScopes.batcher,
+      });
 
       this.applyVolumeToNodes();
       this.initialized = true;
@@ -429,7 +440,10 @@ class AudioSystem {
       // Use cached noise buffer if available
       let noiseBuffer;
       if (this.cache) {
-        noiseBuffer = this.cache.getNoiseBuffer(0.5, true, 'exponential');
+        noiseBuffer = this.cache.getNoiseBuffer(0.5, true, 'exponential', {
+          family: 'explosion',
+          random: this.randomScopes.bufferFamilies.explosion,
+        });
       } else {
         // Fallback to creating buffer
         const bufferSize = this.context.sampleRate * 0.5;
@@ -440,7 +454,14 @@ class AudioSystem {
         );
         const output = noiseBuffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
-          output[i] = Math.random() * 2 - 1;
+          const bufferRandom =
+            this.randomScopes.bufferFamilies.explosion ||
+            this.randomScopes.families.explosion ||
+            null;
+          const sample = bufferRandom
+            ? bufferRandom.range(-1, 1)
+            : Math.random() * 2 - 1;
+          output[i] = sample;
         }
       }
 
@@ -986,7 +1007,10 @@ class AudioSystem {
       // Use cached noise buffer if available
       let noiseBuffer;
       if (this.cache) {
-        noiseBuffer = this.cache.getNoiseBuffer(0.4, true, 'linear');
+        noiseBuffer = this.cache.getNoiseBuffer(0.4, true, 'linear', {
+          family: 'shield',
+          random: this.randomScopes.bufferFamilies.shield,
+        });
       } else {
         // Fallback to creating buffer
         noiseBuffer = this.context.createBuffer(
@@ -996,7 +1020,14 @@ class AudioSystem {
         );
         const output = noiseBuffer.getChannelData(0);
         for (let i = 0; i < noiseBuffer.length; i++) {
-          output[i] = (Math.random() * 2 - 1) * (1 - i / noiseBuffer.length);
+          const bufferRandom =
+            this.randomScopes.bufferFamilies.shield ||
+            this.randomScopes.families.shield ||
+            null;
+          const noiseSample = bufferRandom
+            ? bufferRandom.range(-1, 1)
+            : Math.random() * 2 - 1;
+          output[i] = noiseSample * (1 - i / noiseBuffer.length);
         }
       }
 
@@ -1038,6 +1069,87 @@ class AudioSystem {
         }, 410);
       }
     });
+  }
+
+  _createRandomScopes(baseRandom) {
+    const canFork = baseRandom && typeof baseRandom.fork === 'function';
+    if (!canFork) {
+      return {
+        base: baseRandom,
+        cache: null,
+        families: {},
+        bufferFamilies: {},
+        batcher: null,
+      };
+    }
+
+    const families = {
+      laser: baseRandom.fork('audio:family:laser'),
+      explosion: baseRandom.fork('audio:family:explosion'),
+      shield: baseRandom.fork('audio:family:shield'),
+      asteroid: baseRandom.fork('audio:family:asteroid'),
+      xp: baseRandom.fork('audio:family:xp'),
+      impact: baseRandom.fork('audio:family:impact'),
+      ui: baseRandom.fork('audio:family:ui'),
+    };
+
+    const cacheRandom = baseRandom.fork('audio:cache');
+
+    const bufferFamilies = Object.fromEntries(
+      Object.entries({
+        ...families,
+        generic: cacheRandom,
+      }).map(([name, rng]) => [
+        name,
+        rng && typeof rng.fork === 'function'
+          ? rng.fork(`audio:buffer:${name}`)
+          : null,
+      ])
+    );
+
+    return {
+      base: baseRandom,
+      cache: cacheRandom,
+      families,
+      bufferFamilies,
+      batcher: baseRandom.fork('audio:batcher'),
+    };
+  }
+
+  _exposeRandomDebugControls() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (
+      typeof process !== 'undefined' &&
+      process.env &&
+      process.env.NODE_ENV !== 'development'
+    ) {
+      return;
+    }
+
+    const debugData = {
+      seed: this.random?.seed ?? null,
+      debugSnapshot: () => this.random?.debugSnapshot(),
+      forks: {},
+    };
+
+    Object.entries(this.randomScopes?.families || {}).forEach(([name, rng]) => {
+      debugData.forks[name] = {
+        seed: rng?.seed ?? null,
+        debugSnapshot: () => rng?.debugSnapshot(),
+      };
+    });
+
+    if (!debugData.forks.cache && this.randomScopes?.cache) {
+      debugData.forks.cache = {
+        seed: this.randomScopes.cache.seed ?? null,
+        debugSnapshot: () => this.randomScopes.cache.debugSnapshot(),
+      };
+    }
+
+    window.__AUDIO_RANDOM_DEBUG__ = debugData;
   }
 
   // === UI Sound Effects ===
