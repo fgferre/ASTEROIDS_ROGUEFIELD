@@ -3,7 +3,7 @@
 import RandomService from '../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
-const SIMPLEX_DEFAULT_RANDOM = new RandomService();
+const SIMPLEX_DEFAULT_RANDOM = new RandomService('menu-background:simplex-default');
 
 class MenuBackgroundSystem {
   constructor(dependencies = {}) {
@@ -16,7 +16,7 @@ class MenuBackgroundSystem {
     this.dependencies = normalizeDependencies(rest);
     this.random = random ?? resolveService('random', this.dependencies);
     if (!this.random) {
-      this.random = new RandomService();
+      this.random = new RandomService('menu-background:fallback');
     }
 
     this.dependencies.random = this.random;
@@ -40,6 +40,8 @@ class MenuBackgroundSystem {
     };
     this.randomForkSeeds = {};
     this.captureRandomForkSeeds();
+    this._fallbackRandom = null;
+    this._fallbackRandomForks = new Map();
     this.settingsService = null;
     this.canvas =
       typeof document !== 'undefined'
@@ -125,13 +127,34 @@ class MenuBackgroundSystem {
     return this.randomForks[name] || this.randomForks.base || null;
   }
 
-  randomFloat(name = 'base') {
+  ensureRandom(name = 'base') {
     const fork = this.getRandomFork(name);
     if (fork && typeof fork.float === 'function') {
-      return fork.float();
+      return fork;
     }
 
-    return globalThis.Math.random();
+    if (!this._fallbackRandom) {
+      if (this.random && typeof this.random.fork === 'function') {
+        this._fallbackRandom = this.random.fork('menu-background:fallback-base');
+      } else {
+        this._fallbackRandom = new RandomService('menu-background:fallback-base');
+      }
+    }
+
+    if (!this._fallbackRandomForks.has(name)) {
+      const source =
+        this.random && typeof this.random.fork === 'function'
+          ? this.random.fork(`menu-background:fallback:${name}`)
+          : this._fallbackRandom.fork(`menu-background:fallback:${name}`);
+      this._fallbackRandomForks.set(name, source);
+    }
+
+    return this._fallbackRandomForks.get(name);
+  }
+
+  randomFloat(name = 'base') {
+    const fork = this.ensureRandom(name);
+    return fork.float();
   }
 
   randomRange(min, max, name = 'base') {
