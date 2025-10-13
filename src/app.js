@@ -11,6 +11,7 @@ import {
   DEFAULT_GC_OPTIONS
 } from './bootstrap/serviceManifest.js';
 import { installMathRandomGuard } from './utils/dev/mathRandomGuard.js';
+import GameSessionService from './services/GameSessionService.js';
 
 // Dependency Injection System (Phase 2.1)
 import { DIContainer } from './core/DIContainer.js';
@@ -41,104 +42,7 @@ const performanceMonitor = new PerformanceMonitor();
 let diContainer = null;
 let serviceLocatorAdapter = null;
 let mathRandomGuard = null;
-
-const RANDOM_STORAGE_KEYS = {
-  override: 'roguefield.seedOverride',
-  last: 'roguefield.lastSeed'
-};
-
-function parseSeedCandidate(value) {
-  if (value === null || value === undefined) {
-    return null;
-  }
-
-  const trimmed = String(value).trim();
-  if (!trimmed) {
-    return null;
-  }
-
-  const numeric = Number(trimmed);
-  if (Number.isFinite(numeric)) {
-    return numeric;
-  }
-
-  return trimmed;
-}
-
-function persistLastSeed(seed, source) {
-  if (typeof window === 'undefined' || !window.localStorage) {
-    return;
-  }
-
-  try {
-    window.localStorage.setItem(
-      RANDOM_STORAGE_KEYS.last,
-      JSON.stringify({
-        seed: typeof seed === 'number' ? seed : String(seed),
-        source: source || 'unknown',
-        timestamp: Date.now()
-      })
-    );
-  } catch (error) {
-    console.warn('[Random] Failed to persist last seed snapshot:', error);
-  }
-}
-
-function deriveInitialSeed() {
-  let source = 'crypto';
-  let seed = null;
-
-  if (typeof window !== 'undefined') {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const fromUrl = params.get('seed');
-      const parsedUrlSeed = parseSeedCandidate(fromUrl);
-      if (parsedUrlSeed !== null) {
-        source = 'url';
-        seed = parsedUrlSeed;
-        return { seed, source };
-      }
-    } catch (error) {
-      console.warn('[Random] Failed to parse seed from URL:', error);
-    }
-
-    try {
-      const storage = window.localStorage;
-      if (storage) {
-        const override = storage.getItem(RANDOM_STORAGE_KEYS.override);
-        const parsedOverride = parseSeedCandidate(override);
-        if (parsedOverride !== null) {
-          source = 'localStorage';
-          seed = parsedOverride;
-          return { seed, source };
-        }
-      }
-    } catch (error) {
-      console.warn('[Random] Failed to read seed override from localStorage:', error);
-    }
-
-    if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
-      const buffer = new Uint32Array(1);
-      window.crypto.getRandomValues(buffer);
-      seed = buffer[0];
-      return { seed, source };
-    }
-  }
-
-  source = 'math-random';
-  seed = Math.floor(Math.random() * 0xffffffff);
-  return { seed, source };
-}
-
-function logRandomSnapshot(scope, snapshot, { mode = 'reset' } = {}) {
-  if (!snapshot) {
-    return;
-  }
-
-  const { seed, state } = snapshot;
-  const stateHex = typeof state === 'number' ? `0x${state.toString(16).padStart(8, '0')}` : state;
-  console.log(`[Random] ${scope} (${mode}) → seed=${seed} state=${stateHex}`);
-}
+let gameSessionService = null;
 
 function getRandomService() {
   if (gameState.randomService) {
@@ -172,81 +76,6 @@ function getRandomService() {
   }
 
   return null;
-}
-
-function getAudioService() {
-  if (typeof gameServices !== 'undefined' && gameServices) {
-    try {
-      if (typeof gameServices.has === 'function' && !gameServices.has('audio')) {
-        // Legacy locator knows audio is unavailable.
-      } else if (typeof gameServices.get === 'function') {
-        const service = gameServices.get('audio');
-        if (service) {
-          return service;
-        }
-      }
-    } catch (error) {
-      console.warn('[Audio] Failed to obtain service from legacy locator:', error);
-    }
-  }
-
-  if (diContainer && typeof diContainer.resolve === 'function') {
-    try {
-      return diContainer.resolve('audio');
-    } catch (error) {
-      console.warn('[Audio] Failed to resolve audio service from DI:', error);
-    }
-  }
-
-  return null;
-}
-
-function synchronizeAudioRandomScopes({ refreshForks = false } = {}) {
-  const audio = getAudioService();
-
-  if (!audio) {
-    return;
-  }
-
-  if (typeof audio.reseedRandomScopes === 'function') {
-    audio.reseedRandomScopes({ refreshForks });
-    return;
-  }
-
-  if (refreshForks && typeof audio.captureRandomScopes === 'function') {
-    audio.captureRandomScopes({ refreshForks: true });
-  } else if (typeof audio.captureRandomScopes === 'function') {
-    audio.captureRandomScopes();
-  }
-}
-
-function prepareRandomForScope(scope, { mode = 'reset', snapshot } = {}) {
-  const random = getRandomService();
-
-  if (!random || typeof random.serialize !== 'function') {
-    console.warn(`[Random] Cannot prepare RNG for scope "${scope}" - service unavailable.`);
-    return null;
-  }
-
-  if (mode === 'restore' && snapshot) {
-    try {
-      random.restore(snapshot);
-    } catch (error) {
-      console.warn(`[Random] Failed to restore RNG snapshot for scope "${scope}":`, error);
-      random.reset(gameState.randomSeed);
-      mode = 'reset';
-    }
-  } else {
-    random.reset(gameState.randomSeed);
-  }
-
-  synchronizeAudioRandomScopes({ refreshForks: true });
-
-  const currentSnapshot = random.serialize();
-  gameState.randomSnapshot = currentSnapshot;
-  gameState.randomScope = scope;
-  logRandomSnapshot(scope, currentSnapshot, { mode });
-  return random;
 }
 
 function logServiceRegistrationFlow({ reason = 'bootstrap' } = {}) {
@@ -385,11 +214,22 @@ function initializeDependencyInjection(manifestContext) {
 
 function resetGameSystems({ manageRandom = true } = {}) {
   if (manageRandom) {
-    prepareRandomForScope('systems.reset', { mode: 'reset' });
+    if (gameSessionService?.prepareRandomForScope) {
+      gameSessionService.prepareRandomForScope('systems.reset', { mode: 'reset' });
+    } else {
+      console.warn('[Random] Unable to prepare RNG scope "systems.reset" - service unavailable.');
+    }
   } else {
-    logRandomSnapshot('systems.reset (pre-managed)', gameState.randomSnapshot, {
-      mode: 'snapshot'
-    });
+    const snapshot = gameSessionService?.getRandomSnapshot?.() ?? gameState.randomSnapshot;
+    if (gameSessionService?.logRandomSnapshot) {
+      gameSessionService.logRandomSnapshot('systems.reset (pre-managed)', snapshot, {
+        mode: 'snapshot'
+      });
+    } else {
+      GameSessionService.logRandomSnapshot('systems.reset (pre-managed)', snapshot, {
+        mode: 'snapshot'
+      });
+    }
   }
 
   if (typeof gameServices === 'undefined') {
@@ -451,8 +291,18 @@ function createDeathSnapshot() {
     : gameState.randomSnapshot;
   if (randomSnapshot) {
     gameState.randomSnapshot = randomSnapshot;
-    logRandomSnapshot('death.snapshot', randomSnapshot, { mode: 'snapshot' });
+    if (gameSessionService?.logRandomSnapshot) {
+      gameSessionService.logRandomSnapshot('death.snapshot', randomSnapshot, {
+        mode: 'snapshot'
+      });
+    } else {
+      GameSessionService.logRandomSnapshot('death.snapshot', randomSnapshot, {
+        mode: 'snapshot'
+      });
+    }
   }
+
+  const seedInfo = gameSessionService?.getSeedInfo?.();
 
   gameState.deathSnapshot = {
     // Player state (excluding health - will be restored to max)
@@ -473,7 +323,7 @@ function createDeathSnapshot() {
     physics: physics.getSnapshotState ? physics.getSnapshotState() : null,
     // Timestamp
     timestamp: Date.now(),
-    randomSeed: gameState.randomSeed,
+    randomSeed: seedInfo?.seed ?? gameState.randomSeed,
     random: randomSnapshot,
   };
 
@@ -495,10 +345,41 @@ function restoreFromSnapshot() {
 
   const snapshot = gameState.deathSnapshot;
 
-  if (snapshot.random) {
-    prepareRandomForScope('snapshot.restore', { mode: 'restore', snapshot: snapshot.random });
+  if (gameSessionService?.prepareRandomForScope) {
+    if (snapshot.random) {
+      gameSessionService.prepareRandomForScope('snapshot.restore', {
+        mode: 'restore',
+        snapshot: snapshot.random
+      });
+    } else {
+      gameSessionService.prepareRandomForScope('snapshot.restore', { mode: 'reset' });
+    }
   } else {
-    prepareRandomForScope('snapshot.restore', { mode: 'reset' });
+    const random = getRandomService();
+    if (!random || typeof random.reset !== 'function') {
+      console.warn('[Random] Unable to restore RNG without GameSessionService or random service.');
+    } else {
+      let mode = 'reset';
+      if (snapshot.random) {
+        try {
+          random.restore?.(snapshot.random);
+          mode = 'restore';
+        } catch (error) {
+          console.warn('[Random] Fallback restore failed for snapshot.restore:', error);
+          random.reset(gameState.randomSeed);
+        }
+      } else {
+        random.reset(gameState.randomSeed);
+      }
+
+      const fallbackSnapshot = random.serialize?.();
+      if (fallbackSnapshot) {
+        gameState.randomSnapshot = fallbackSnapshot;
+        GameSessionService.logRandomSnapshot('snapshot.restore (fallback)', fallbackSnapshot, {
+          mode
+        });
+      }
+    }
   }
 
   // Restore player (with FULL health)
@@ -635,10 +516,41 @@ function showCountdownNumber(number, onComplete) {
 
 function executeRetryRespawn() {
   const snapshot = gameState.deathSnapshot;
-  if (snapshot?.random) {
-    prepareRandomForScope('retry.respawn', { mode: 'restore', snapshot: snapshot.random });
+  if (gameSessionService?.prepareRandomForScope) {
+    if (snapshot?.random) {
+      gameSessionService.prepareRandomForScope('retry.respawn', {
+        mode: 'restore',
+        snapshot: snapshot.random
+      });
+    } else {
+      gameSessionService.prepareRandomForScope('retry.respawn', { mode: 'reset' });
+    }
   } else {
-    prepareRandomForScope('retry.respawn', { mode: 'reset' });
+    const random = getRandomService();
+    if (!random || typeof random.reset !== 'function') {
+      console.warn('[Random] Unable to configure RNG for retry without GameSessionService or random service.');
+    } else {
+      let mode = 'reset';
+      if (snapshot?.random) {
+        try {
+          random.restore?.(snapshot.random);
+          mode = 'restore';
+        } catch (error) {
+          console.warn('[Random] Fallback restore failed for retry.respawn:', error);
+          random.reset(gameState.randomSeed);
+        }
+      } else {
+        random.reset(gameState.randomSeed);
+      }
+
+      const fallbackSnapshot = random.serialize?.();
+      if (fallbackSnapshot) {
+        gameState.randomSnapshot = fallbackSnapshot;
+        GameSessionService.logRandomSnapshot('retry.respawn (fallback)', fallbackSnapshot, {
+          mode
+        });
+      }
+    }
   }
 
   const player = gameServices.get('player');
@@ -700,11 +612,9 @@ function init() {
     setupDomEventListeners();
     setupGlobalEventListeners();
 
-    const { seed: initialSeed, source: seedSource } = deriveInitialSeed();
+    const { seed: initialSeed, source: seedSource } = GameSessionService.deriveInitialSeed();
     gameState.randomSeed = initialSeed;
     gameState.randomSeedSource = seedSource;
-    persistLastSeed(initialSeed, seedSource);
-    console.log(`[Random] Boot seed (${seedSource}): ${String(initialSeed)}`);
 
     const manifestContext = {
       gameState,
@@ -732,9 +642,40 @@ function init() {
       gameState.randomService = services['random'];
     }
 
-    const bootRandom = prepareRandomForScope('bootstrap', { mode: 'reset' });
-    if (bootRandom) {
-      persistLastSeed(gameState.randomSnapshot?.seed ?? initialSeed, seedSource);
+    gameSessionService = services['game-session'] || null;
+
+    if (!gameSessionService && diContainer && typeof diContainer.resolve === 'function') {
+      try {
+        gameSessionService = diContainer.resolve('game-session');
+      } catch (error) {
+        console.warn('[App] Failed to resolve GameSessionService from DI:', error);
+      }
+    }
+
+    if (gameSessionService && typeof gameSessionService.initialize === 'function') {
+      gameSessionService.initialize({
+        seed: initialSeed,
+        source: seedSource,
+        canvas: gameState.canvas,
+        ctx: gameState.ctx,
+      });
+    }
+
+    const bootRandom =
+      gameSessionService?.prepareRandomForScope?.('bootstrap', { mode: 'reset' }) || null;
+
+    if (!bootRandom) {
+      console.warn('[Random] GameSessionService could not prepare bootstrap scope deterministically.');
+      if (!gameSessionService) {
+        GameSessionService.persistLastSeed(initialSeed, seedSource);
+      }
+    } else if (gameSessionService) {
+      const snapshot = gameSessionService.getRandomSnapshot();
+      const seedInfo = gameSessionService.getSeedInfo();
+      GameSessionService.persistLastSeed(
+        snapshot?.seed ?? seedInfo.seed,
+        seedInfo.source
+      );
     }
 
     const ui = services['ui'] || gameServices.get('ui');
@@ -878,7 +819,23 @@ function requestStartGame() {
 
 function startGame() {
   try {
-    prepareRandomForScope('run.start', { mode: 'reset' });
+    if (gameSessionService?.prepareRandomForScope) {
+      gameSessionService.prepareRandomForScope('run.start', { mode: 'reset' });
+    } else {
+      const random = getRandomService();
+      if (random && typeof random.reset === 'function') {
+        random.reset(gameState.randomSeed);
+        const snapshot = random.serialize?.();
+        if (snapshot) {
+          gameState.randomSnapshot = snapshot;
+          GameSessionService.logRandomSnapshot('run.start (fallback)', snapshot, {
+            mode: 'reset'
+          });
+        }
+      } else {
+        console.warn('[Random] Unable to prepare RNG for run.start - service unavailable.');
+      }
+    }
     gameState.deathSnapshot = null;
 
     resetGameSystems({ manageRandom: false });
@@ -965,7 +922,23 @@ function exitToMenu(payload = {}) {
 
 function performExitToMenu(payload = {}) {
   try {
-    prepareRandomForScope('menu.exit', { mode: 'reset' });
+    if (gameSessionService?.prepareRandomForScope) {
+      gameSessionService.prepareRandomForScope('menu.exit', { mode: 'reset' });
+    } else {
+      const random = getRandomService();
+      if (random && typeof random.reset === 'function') {
+        random.reset(gameState.randomSeed);
+        const snapshot = random.serialize?.();
+        if (snapshot) {
+          gameState.randomSnapshot = snapshot;
+          GameSessionService.logRandomSnapshot('menu.exit (fallback)', snapshot, {
+            mode: 'reset'
+          });
+        }
+      } else {
+        console.warn('[Random] Unable to prepare RNG for menu.exit - service unavailable.');
+      }
+    }
     resetGameSystems({ manageRandom: false });
 
     const ui = gameServices.get('ui');
