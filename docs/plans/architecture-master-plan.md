@@ -16,12 +16,13 @@
 - Registrar um serviço singleton `random` no contêiner e injetá-lo progressivamente nos sistemas que hoje usam `Math.random()` diretamente (efeitos, áudio procedural, spawns, drops).
 - Começar por sistemas cosméticos para validar a API sem risco, avançando para progressão, loot e IA conforme as dependências forem injetadas.
 - **Benefício:** desbloqueia replays determinísticos, seeds compartilháveis (daily challenges) e debugging reproduzível com baixo custo adicional após a fase 1.
-- Plano detalhado: [docs/plans/phase2-random-service-plan.md](./phase2-random-service-plan.md).
+- Plano detalhado: [docs/archive/2025-plan/plans/phase2-random-service-plan.md](../archive/2025-plan/plans/phase2-random-service-plan.md).
 
 ### Fase 3 – Extrair `GameSessionService`
 - Mover `gameState`, `createDeathSnapshot`, `restoreFromSnapshot`, `startRetryCountdown` e utilitários correlatos de `app.js` para um módulo dedicado (`/src/modules/GameSessionService.js`), deixando o bootstrap responsável apenas pelo loop.
 - Esse serviço passa a orquestrar player, progressão e inimigos via API pública, reduzindo acoplamento com DOM e preparando terreno para salvar/retomar runs.
 - **Benefício:** clarifica a autoridade sobre o estado da run e cria ponto único para futuras features de save/load e modos alternativos (ex.: “daily seed”).
+- Plano detalhado: [docs/plans/phase3-game-session-service-plan.md](./phase3-game-session-service-plan.md).
 
 ### Fase 4 – Evoluir Input/Combate para Fila de Comandos
 - Ajustar `InputSystem` para produzir objetos de comando (`MoveCommand`, `ShootCommand`, etc.) a cada frame, entregando-os a um `CommandQueueService` compartilhado.
