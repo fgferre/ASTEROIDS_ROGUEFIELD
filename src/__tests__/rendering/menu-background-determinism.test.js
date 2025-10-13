@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ServiceRegistry } from '../../core/ServiceRegistry.js';
 import MenuBackgroundSystem from '../../modules/MenuBackgroundSystem.js';
 
-function createMathUtilsStub() {
+function createFrozenMathUtilsStub() {
   const mathUtils = {
     DEG2RAD: Math.PI / 180,
     RAD2DEG: 180 / Math.PI,
@@ -22,13 +22,31 @@ function createMathUtilsStub() {
   return { mathUtils, originalGenerator };
 }
 
+function createConfigurableMathUtilsStub() {
+  const mathUtils = {
+    DEG2RAD: Math.PI / 180,
+    RAD2DEG: 180 / Math.PI,
+  };
+
+  const originalGenerator = vi.fn(() => `module-${Math.random().toString(16).slice(2)}`);
+
+  Object.defineProperty(mathUtils, 'generateUUID', {
+    configurable: true,
+    enumerable: true,
+    writable: true,
+    value: originalGenerator,
+  });
+
+  return { mathUtils, originalGenerator };
+}
+
 describe('MenuBackgroundSystem THREE UUID determinism', () => {
   it('replaces non-configurable MathUtils.generateUUID with deterministic generator', () => {
     const container = ServiceRegistry.createTestContainer({ randomSeed: 314159 });
     const random = container.resolve('random');
     const system = new MenuBackgroundSystem({ random });
 
-    const { mathUtils, originalGenerator } = createMathUtilsStub();
+    const { mathUtils, originalGenerator } = createFrozenMathUtilsStub();
     const threeStub = {
       MathUtils: mathUtils,
       Math: mathUtils,
@@ -95,6 +113,53 @@ describe('MenuBackgroundSystem THREE UUID determinism', () => {
       expect(system.THREE.MathUtils).toBe(mathUtils);
       expect(system.THREE.Math).toBe(mathUtils);
 
+      system.THREE.MathUtils.generateUUID();
+
+      expect(originalGenerator).toHaveBeenCalledTimes(1);
+      expect(mathRandomSpy).toHaveBeenCalled();
+    } finally {
+      mathRandomSpy.mockRestore();
+    }
+  });
+  it('patches configurable MathUtils.generateUUID in place without using Math.random', () => {
+    const container = ServiceRegistry.createTestContainer({ randomSeed: 424242 });
+    const random = container.resolve('random');
+    const system = new MenuBackgroundSystem({ random });
+
+    const { mathUtils, originalGenerator } = createConfigurableMathUtilsStub();
+    const threeStub = {
+      MathUtils: mathUtils,
+      Math: mathUtils,
+    };
+
+    system.THREE = threeStub;
+    system.ready = true;
+
+    const mathRandomSpy = vi.spyOn(Math, 'random');
+
+    try {
+      system.applyDeterministicThreeUuidGenerator();
+
+      expect(system.THREE.MathUtils).toBe(mathUtils);
+      expect(system.THREE.Math).toBe(mathUtils);
+
+      const forkUuidSpy = vi.spyOn(system.randomForks.threeUuid, 'uuid');
+
+      try {
+        const first = system.THREE.MathUtils.generateUUID();
+        const second = system.THREE.MathUtils.generateUUID();
+
+        expect(first).not.toEqual(second);
+        expect(forkUuidSpy).toHaveBeenCalledTimes(2);
+        expect(originalGenerator).not.toHaveBeenCalled();
+        expect(mathRandomSpy).not.toHaveBeenCalled();
+      } finally {
+        forkUuidSpy.mockRestore();
+      }
+
+      system.destroy();
+
+      mathRandomSpy.mockClear();
       system.THREE.MathUtils.generateUUID();
 
       expect(originalGenerator).toHaveBeenCalledTimes(1);

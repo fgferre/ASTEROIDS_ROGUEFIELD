@@ -71,6 +71,8 @@ class MenuBackgroundSystem {
       originalMath: undefined,
       deterministicMathUtils: null,
       deterministicUuidGenerator: null,
+      generateUuidDescriptors: new Map(),
+      patchedMathUtilsTargets: new Set(),
     };
 
     this.animationFrame = null;
@@ -283,6 +285,33 @@ class MenuBackgroundSystem {
       };
     }
 
+    const patchedOriginal = this.patchMathUtilsGenerateUuid(
+      mathUtilsCandidate,
+      state.deterministicUuidGenerator
+    );
+
+    let aliasPatched = false;
+    if (aliasCandidate && aliasCandidate !== mathUtilsCandidate) {
+      aliasPatched = this.patchMathUtilsGenerateUuid(
+        aliasCandidate,
+        state.deterministicUuidGenerator
+      );
+    }
+
+    if (patchedOriginal || aliasPatched) {
+      state.deterministicMathUtils = mathUtilsCandidate;
+      three.MathUtils = mathUtilsCandidate;
+
+      if (
+        aliasCandidate !== null ||
+        (state.originalMath !== null && state.originalMath !== undefined)
+      ) {
+        three.Math = aliasCandidate ?? mathUtilsCandidate;
+      }
+
+      return;
+    }
+
     const deterministic = this.cloneMathUtilsWithDeterministicUuid(
       mathUtilsCandidate,
       state.deterministicUuidGenerator
@@ -304,6 +333,8 @@ class MenuBackgroundSystem {
     if (!state || !this.THREE || typeof this.THREE !== 'object') {
       return;
     }
+
+    this.restorePatchedMathUtilsTargets();
 
     const three = this.THREE;
     if (state.deterministicMathUtils && three.MathUtils === state.deterministicMathUtils) {
@@ -396,6 +427,206 @@ class MenuBackgroundSystem {
     }
 
     return clone;
+  }
+
+  copyGenerateUuidDescriptor(target) {
+    if (!target || typeof target !== 'object') {
+      return null;
+    }
+
+    const descriptor = Object.getOwnPropertyDescriptor(target, 'generateUUID');
+    if (!descriptor) {
+      return null;
+    }
+
+    const copy = {
+      configurable: descriptor.configurable,
+      enumerable: descriptor.enumerable,
+    };
+
+    if (Object.prototype.hasOwnProperty.call(descriptor, 'writable')) {
+      copy.writable = descriptor.writable;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+      copy.value = descriptor.value;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(descriptor, 'get')) {
+      copy.get = descriptor.get;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(descriptor, 'set')) {
+      copy.set = descriptor.set;
+    }
+
+    return copy;
+  }
+
+  overwriteGenerateUuid(target, uuidGenerator) {
+    if (!target || typeof target !== 'object') {
+      return false;
+    }
+
+    const descriptor = Object.getOwnPropertyDescriptor(target, 'generateUUID');
+
+    if (!descriptor) {
+      try {
+        target.generateUUID = uuidGenerator;
+        if (target.generateUUID === uuidGenerator) {
+          return true;
+        }
+      } catch (error) {
+        // Ignore assignment errors and fallback to defineProperty
+      }
+
+      try {
+        Object.defineProperty(target, 'generateUUID', {
+          configurable: true,
+          enumerable: true,
+          writable: true,
+          value: uuidGenerator,
+        });
+        return target.generateUUID === uuidGenerator;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    if (descriptor.configurable !== false) {
+      const nextDescriptor = {
+        configurable: descriptor.configurable,
+        enumerable: descriptor.enumerable,
+      };
+
+      if (Object.prototype.hasOwnProperty.call(descriptor, 'writable')) {
+        nextDescriptor.writable = descriptor.writable;
+      }
+
+      try {
+        Object.defineProperty(target, 'generateUUID', {
+          ...nextDescriptor,
+          value: uuidGenerator,
+        });
+        if (target.generateUUID === uuidGenerator) {
+          return true;
+        }
+      } catch (error) {
+        // Ignore defineProperty failure and fallback to direct assignment
+      }
+    }
+
+    if (descriptor.set && typeof descriptor.set === 'function') {
+      try {
+        descriptor.set.call(target, uuidGenerator);
+        if (target.generateUUID === uuidGenerator) {
+          return true;
+        }
+      } catch (error) {
+        // Ignore setter errors and continue to fallback attempts
+      }
+    }
+
+    if (descriptor.writable) {
+      try {
+        target.generateUUID = uuidGenerator;
+        if (target.generateUUID === uuidGenerator) {
+          return true;
+        }
+      } catch (error) {
+        return false;
+      }
+    }
+
+    return false;
+  }
+
+  patchMathUtilsGenerateUuid(target, uuidGenerator) {
+    if (!target || typeof target !== 'object' || typeof uuidGenerator !== 'function') {
+      return false;
+    }
+
+    const state = this._threeMathUtilsState;
+    if (!state) {
+      return false;
+    }
+
+    if (!state.generateUuidDescriptors) {
+      state.generateUuidDescriptors = new Map();
+    }
+
+    if (!state.generateUuidDescriptors.has(target)) {
+      state.generateUuidDescriptors.set(target, this.copyGenerateUuidDescriptor(target));
+    }
+
+    const patched = this.overwriteGenerateUuid(target, uuidGenerator);
+
+    if (patched) {
+      if (!state.patchedMathUtilsTargets) {
+        state.patchedMathUtilsTargets = new Set();
+      }
+      state.patchedMathUtilsTargets.add(target);
+    } else {
+      state.generateUuidDescriptors.delete(target);
+    }
+
+    return patched;
+  }
+
+  restoreMathUtilsGenerateUuid(target) {
+    if (!target || typeof target !== 'object') {
+      return;
+    }
+
+    const state = this._threeMathUtilsState;
+    if (!state || !state.generateUuidDescriptors) {
+      return;
+    }
+
+    const descriptor = state.generateUuidDescriptors.get(target) || null;
+
+    if (!descriptor) {
+      if (Object.prototype.hasOwnProperty.call(target, 'generateUUID')) {
+        try {
+          delete target.generateUUID;
+        } catch (error) {
+          try {
+            target.generateUUID = undefined;
+          } catch (innerError) {
+            // Swallow errors restoring missing descriptor
+          }
+        }
+      }
+      state.generateUuidDescriptors.delete(target);
+      return;
+    }
+
+    try {
+      Object.defineProperty(target, 'generateUUID', descriptor);
+    } catch (error) {
+      if (Object.prototype.hasOwnProperty.call(descriptor, 'value')) {
+        try {
+          target.generateUUID = descriptor.value;
+        } catch (innerError) {
+          // Ignore assignment errors when restoring descriptor value
+        }
+      }
+    }
+
+    state.generateUuidDescriptors.delete(target);
+  }
+
+  restorePatchedMathUtilsTargets() {
+    const state = this._threeMathUtilsState;
+    if (!state || !state.patchedMathUtilsTargets) {
+      return;
+    }
+
+    state.patchedMathUtilsTargets.forEach((target) => {
+      this.restoreMathUtilsGenerateUuid(target);
+    });
+
+    state.patchedMathUtilsTargets.clear();
   }
 
   getService(name) {
