@@ -71,6 +71,20 @@ describe('MenuBackgroundSystem THREE UUID determinism', () => {
         expect(forkUuidSpy).toHaveBeenCalledTimes(1);
         expect(baseUuidSpy).not.toHaveBeenCalled();
         expect(mathRandomSpy).not.toHaveBeenCalled();
+
+        forkUuidSpy.mockClear();
+
+        system.randomForks.threeUuid = null;
+        const ensureSpy = vi.spyOn(system, 'ensureThreeUuidRandom');
+
+        patchedMathUtils.generateUUID();
+
+        expect(ensureSpy).toHaveBeenCalledTimes(1);
+        ensureSpy.mockRestore();
+        expect(system.randomForks.threeUuid).not.toBeNull();
+        expect(forkUuidSpy).not.toHaveBeenCalled();
+        expect(baseUuidSpy).not.toHaveBeenCalled();
+        expect(mathRandomSpy).not.toHaveBeenCalled();
       } finally {
         baseUuidSpy.mockRestore();
         forkUuidSpy.mockRestore();

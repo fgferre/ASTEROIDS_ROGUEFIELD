@@ -155,10 +155,45 @@ class MenuBackgroundSystem {
     }
 
     Object.entries(this.randomForks).forEach(([name, fork]) => {
-      if (fork && typeof fork.seed === 'number' && Number.isFinite(fork.seed)) {
-        this.randomForkSeeds[name] = fork.seed >>> 0;
-      }
+      this.storeRandomForkSeed(name, fork);
     });
+  }
+
+  storeRandomForkSeed(name, fork) {
+    if (!name || !fork || typeof fork !== 'object') {
+      return;
+    }
+
+    if (!this.randomForkSeeds) {
+      this.randomForkSeeds = {};
+    }
+
+    if (typeof fork.seed === 'number' && Number.isFinite(fork.seed)) {
+      this.randomForkSeeds[name] = fork.seed >>> 0;
+    }
+  }
+
+  ensureThreeUuidRandom() {
+    if (!this.randomForks || typeof this.randomForks !== 'object') {
+      this.randomForks = {};
+    }
+
+    let fork = this.randomForks.threeUuid;
+    if (fork && typeof fork.uuid === 'function') {
+      return fork;
+    }
+
+    const label = this.randomForkLabels?.threeUuid ?? 'menu.three-uuid';
+    const parentRandom =
+      (this.random && typeof this.random.fork === 'function'
+        ? this.random
+        : SIMPLEX_DEFAULT_RANDOM) ?? SIMPLEX_DEFAULT_RANDOM;
+
+    fork = parentRandom.fork(label);
+    this.randomForks.threeUuid = fork;
+    this.storeRandomForkSeed('threeUuid', fork);
+
+    return fork;
   }
 
   reseedRandomForks() {
@@ -240,14 +275,11 @@ class MenuBackgroundSystem {
 
     if (!state.deterministicUuidGenerator) {
       state.deterministicUuidGenerator = () => {
-        const fork =
-          this.randomForks && typeof this.randomForks === 'object'
-            ? this.randomForks.threeUuid || null
-            : null;
+        const fork = this.ensureThreeUuidRandom();
         if (fork && typeof fork.uuid === 'function') {
           return fork.uuid('menu-background:three.uuid');
         }
-        return this.random.uuid('menu-background:three.uuid');
+        return SIMPLEX_DEFAULT_RANDOM.uuid('menu-background:three.uuid');
       };
     }
 
