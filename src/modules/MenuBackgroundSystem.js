@@ -42,11 +42,13 @@ class MenuBackgroundSystem {
     this.randomForkSeeds = {};
     this.captureRandomForkSeeds();
 
-    this.randomHelpers = createRandomHelpers({
+    const randomHelpers = createRandomHelpers({
       getRandomFork: (name) => this.getRandomFork(name),
       random: this.random,
       fallbackSeedPrefix: 'menu-background',
     });
+    this.randomHelpers = randomHelpers;
+    Object.assign(this, randomHelpers);
     this.settingsService = null;
     this.canvas =
       typeof document !== 'undefined'
@@ -130,34 +132,6 @@ class MenuBackgroundSystem {
     }
 
     return this.randomForks[name] || this.randomForks.base || null;
-  }
-
-  ensureRandom(name = 'base') {
-    return this.randomHelpers.ensureRandom(name);
-  }
-
-  randomFloat(name = 'base') {
-    return this.randomHelpers.randomFloat(name);
-  }
-
-  randomRange(min, max, name = 'base') {
-    return this.randomHelpers.randomRange(min, max, name);
-  }
-
-  randomInt(min, max, name = 'base') {
-    return this.randomHelpers.randomInt(min, max, name);
-  }
-
-  randomChance(probability, name = 'base') {
-    return this.randomHelpers.randomChance(probability, name);
-  }
-
-  randomCentered(span = 1, name = 'base') {
-    return this.randomHelpers.randomCentered(span, name);
-  }
-
-  randomPick(array, name = 'base') {
-    return this.randomHelpers.randomPick(array, name);
   }
 
   captureRandomForkSeeds() {

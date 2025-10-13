@@ -205,11 +205,13 @@ export default class EffectsSystem {
       this.randomForkSeeds = {};
     }
 
-    this.randomHelpers = createRandomHelpers({
+    const randomHelpers = createRandomHelpers({
       getRandomFork: (name) => this.getRandomFork(name),
       random: this.random,
       fallbackSeedPrefix: 'effects-system',
     });
+    this.randomHelpers = randomHelpers;
+    Object.assign(this, randomHelpers);
     this.particles = [];
     this.shockwaves = [];
     this.hitMarkers = []; // NEW: Hit marker tracking
@@ -251,30 +253,6 @@ export default class EffectsSystem {
     }
 
     return this.randomForks[name] || this.randomForks.base || null;
-  }
-
-  ensureRandom(name = 'base') {
-    return this.randomHelpers.ensureRandom(name);
-  }
-
-  randomFloat(name = 'base') {
-    return this.randomHelpers.randomFloat(name);
-  }
-
-  randomInt(min, max, name = 'base') {
-    return this.randomHelpers.randomInt(min, max, name);
-  }
-
-  randomChance(probability, name = 'base') {
-    return this.randomHelpers.randomChance(probability, name);
-  }
-
-  randomCentered(span = 1, name = 'base') {
-    return this.randomHelpers.randomCentered(span, name);
-  }
-
-  randomPick(array, name = 'base') {
-    return this.randomHelpers.randomPick(array, name);
   }
 
   // === PARTICLE POOL HELPERS ===
@@ -1972,10 +1950,6 @@ export default class EffectsSystem {
         this.getRandomFork('volatility')
       )
     );
-  }
-
-  randomRange(min, max, name = 'base') {
-    return this.randomHelpers.randomRange(min, max, name);
   }
 
   captureRandomForkSeeds() {

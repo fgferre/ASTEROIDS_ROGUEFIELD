@@ -117,7 +117,7 @@ export function createRandomHelpers({
     return array[randomInt(0, array.length - 1, name)];
   }
 
-  return {
+  const helpers = {
     ensureRandom,
     randomFloat,
     randomRange,
@@ -126,6 +126,15 @@ export function createRandomHelpers({
     randomCentered,
     randomPick,
   };
+
+  const boundHelpers = {};
+  Object.entries(helpers).forEach(([key, fn]) => {
+    if (typeof fn === 'function') {
+      boundHelpers[key] = fn.bind(null);
+    }
+  });
+
+  return Object.freeze(boundHelpers);
 }
 
 export default createRandomHelpers;
