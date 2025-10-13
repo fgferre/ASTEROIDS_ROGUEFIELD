@@ -15,6 +15,8 @@ const DEFAULT_UPGRADE_CATEGORY = {
 class ProgressionSystem {
   constructor(dependencies = {}) {
     this.dependencies = normalizeDependencies(dependencies);
+    this.randomSource = null;
+    this.random = null;
     // === DADOS DE PROGRESSÃO ===
     const initialLevel = Number.isFinite(CONSTANTS.PROGRESSION_INITIAL_LEVEL)
       ? CONSTANTS.PROGRESSION_INITIAL_LEVEL
@@ -44,6 +46,8 @@ class ProgressionSystem {
       ui: this.dependencies.ui || null,
       effects: this.dependencies.effects || null,
     };
+
+    this.refreshRandom(true);
 
     // === CONFIGURAÇÕES ===
 
@@ -86,6 +90,8 @@ class ProgressionSystem {
     if (!this.services.effects) {
       this.services.effects = resolveService('effects', this.dependencies);
     }
+
+    this.refreshRandom(force);
   }
 
   setupEventListeners() {
@@ -105,6 +111,40 @@ class ProgressionSystem {
     gameEvents.on('player-reset', () => {
       this.refreshInjectedServices(true);
     });
+  }
+
+  refreshRandom(force = false) {
+    const resolvedRandom = resolveService('random', this.dependencies);
+
+    if (!resolvedRandom) {
+      if (force) {
+        this.randomSource = null;
+        this.random = null;
+      }
+      return this.random;
+    }
+
+    const needsInitialization =
+      resolvedRandom !== this.randomSource || !this.random;
+
+    if (needsInitialization) {
+      this.randomSource = resolvedRandom;
+      if (resolvedRandom && typeof resolvedRandom.fork === 'function') {
+        this.random = resolvedRandom.fork('progression.upgrades');
+      } else {
+        this.random = resolvedRandom;
+      }
+    }
+
+    if ((force || needsInitialization) && this.random && typeof this.random.reset === 'function') {
+      if (Object.prototype.hasOwnProperty.call(this.random, 'seed')) {
+        this.random.reset(this.random.seed);
+      } else {
+        this.random.reset();
+      }
+    }
+
+    return this.random;
   }
 
   handleOrbCollected(data) {
@@ -230,8 +270,20 @@ class ProgressionSystem {
       };
     }
 
-    const shuffled = [...eligible].sort(() => Math.random() - 0.5);
-    const selection = shuffled.slice(0, cappedCount);
+    const rng = this.refreshRandom() || this.random;
+    let selection;
+
+    if (rng && typeof rng.int === 'function') {
+      const pool = [...eligible];
+      for (let index = pool.length - 1; index > 0; index -= 1) {
+        const swapIndex = rng.int(0, index);
+        [pool[index], pool[swapIndex]] = [pool[swapIndex], pool[index]];
+      }
+      selection = pool.slice(0, cappedCount);
+    } else {
+      const fallback = [...eligible].sort(() => Math.random() - 0.5);
+      selection = fallback.slice(0, cappedCount);
+    }
     const options = selection
       .map((definition) => this.buildUpgradeOption(definition))
       .filter(Boolean);
