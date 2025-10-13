@@ -29,6 +29,7 @@ class MenuBackgroundSystem {
       asteroids: 'menu.asteroids',
       fragments: 'menu.fragments',
       materials: 'menu.materials',
+      threeUuid: 'menu.three.uuid',
     };
     this.randomForks = {
       base: this.random.fork(this.randomForkLabels.base),
@@ -38,6 +39,7 @@ class MenuBackgroundSystem {
       asteroids: this.random.fork(this.randomForkLabels.asteroids),
       fragments: this.random.fork(this.randomForkLabels.fragments),
       materials: this.random.fork(this.randomForkLabels.materials),
+      threeUuid: this.random.fork(this.randomForkLabels.threeUuid),
     };
     this.randomForkSeeds = {};
     this.captureRandomForkSeeds();
@@ -63,6 +65,8 @@ class MenuBackgroundSystem {
     this.THREE = this.ready ? window.THREE : null;
     this.CANNON = this.ready ? window.CANNON : null;
     this.ready = this.ready && Boolean(this.THREE) && Boolean(this.CANNON);
+
+    this.applyDeterministicThreeUuidGenerator();
 
     this.animationFrame = null;
     this.isActive = false;
@@ -132,6 +136,40 @@ class MenuBackgroundSystem {
     }
 
     return this.randomForks[name] || this.randomForks.base || null;
+  }
+
+  applyDeterministicThreeUuidGenerator() {
+    if (this._hasAppliedDeterministicThreeUuid) {
+      return;
+    }
+
+    const mathUtils = this.THREE?.MathUtils;
+    if (!mathUtils || typeof mathUtils !== 'object') {
+      return;
+    }
+
+    const scopeLabel = 'menu-background.three-uuid';
+    const resolveUuidRandom = () => {
+      if (typeof this.ensureRandom === 'function') {
+        const fork = this.ensureRandom('threeUuid');
+        if (fork && typeof fork.uuid === 'function') {
+          return fork;
+        }
+      }
+
+      if (!this._threeUuidFallbackRandom) {
+        const base =
+          this.random && typeof this.random.fork === 'function'
+            ? this.random.fork('menu-background:three-uuid:fallback-base')
+            : new RandomService('menu-background:three-uuid:fallback-base');
+        this._threeUuidFallbackRandom = base;
+      }
+
+      return this._threeUuidFallbackRandom;
+    };
+
+    mathUtils.generateUUID = () => resolveUuidRandom().uuid(scopeLabel);
+    this._hasAppliedDeterministicThreeUuid = true;
   }
 
   captureRandomForkSeeds() {

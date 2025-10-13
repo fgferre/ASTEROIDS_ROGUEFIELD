@@ -1,6 +1,7 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 import UPGRADE_LIBRARY, { UPGRADE_CATEGORIES } from '../data/upgrades.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import RandomService from '../core/RandomService.js';
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
 
@@ -17,6 +18,10 @@ class ProgressionSystem {
     this.dependencies = normalizeDependencies(dependencies);
     this.randomSource = null;
     this.random = null;
+    this._fallbackRandom = null;
+    this._fallbackRandomSeed = null;
+    this._fallbackRandomFork = null;
+    this._fallbackRandomForkSeed = null;
     // === DADOS DE PROGRESSÃO ===
     const initialLevel = Number.isFinite(CONSTANTS.PROGRESSION_INITIAL_LEVEL)
       ? CONSTANTS.PROGRESSION_INITIAL_LEVEL
@@ -65,6 +70,32 @@ class ProgressionSystem {
     this.setupEventListeners();
 
     console.log('[ProgressionSystem] Initialized - Level', this.level);
+  }
+
+  ensureFallbackRandom(force = false) {
+    if (!this._fallbackRandom) {
+      this._fallbackRandom = new RandomService('progression:fallback');
+      this._fallbackRandomSeed = this._fallbackRandom.seed >>> 0;
+    } else if (
+      force &&
+      typeof this._fallbackRandom.reset === 'function' &&
+      this._fallbackRandomSeed !== null
+    ) {
+      this._fallbackRandom.reset(this._fallbackRandomSeed);
+    }
+
+    if (!this._fallbackRandomFork) {
+      this._fallbackRandomFork = this._fallbackRandom.fork('progression.upgrades');
+      this._fallbackRandomForkSeed = this._fallbackRandomFork.seed >>> 0;
+    } else if (
+      force &&
+      typeof this._fallbackRandomFork.reset === 'function' &&
+      this._fallbackRandomForkSeed !== null
+    ) {
+      this._fallbackRandomFork.reset(this._fallbackRandomForkSeed);
+    }
+
+    return this._fallbackRandomFork;
   }
 
   refreshInjectedServices(force = false) {
@@ -117,10 +148,9 @@ class ProgressionSystem {
     const resolvedRandom = resolveService('random', this.dependencies);
 
     if (!resolvedRandom) {
-      if (force) {
-        this.randomSource = null;
-        this.random = null;
-      }
+      const fallbackRandom = this.ensureFallbackRandom(force);
+      this.randomSource = this._fallbackRandom;
+      this.random = fallbackRandom;
       return this.random;
     }
 
@@ -270,20 +300,17 @@ class ProgressionSystem {
       };
     }
 
-    const rng = this.refreshRandom() || this.random;
-    let selection;
-
-    if (rng && typeof rng.int === 'function') {
-      const pool = [...eligible];
-      for (let index = pool.length - 1; index > 0; index -= 1) {
-        const swapIndex = rng.int(0, index);
-        [pool[index], pool[swapIndex]] = [pool[swapIndex], pool[index]];
-      }
-      selection = pool.slice(0, cappedCount);
-    } else {
-      const fallback = [...eligible].sort(() => Math.random() - 0.5);
-      selection = fallback.slice(0, cappedCount);
+    let rng = this.refreshRandom() || this.random;
+    if (!rng || typeof rng.int !== 'function') {
+      rng = this.ensureFallbackRandom();
     }
+
+    const pool = [...eligible];
+    for (let index = pool.length - 1; index > 0; index -= 1) {
+      const swapIndex = rng.int(0, index);
+      [pool[index], pool[swapIndex]] = [pool[swapIndex], pool[index]];
+    }
+    const selection = pool.slice(0, cappedCount);
     const options = selection
       .map((definition) => this.buildUpgradeOption(definition))
       .filter(Boolean);
