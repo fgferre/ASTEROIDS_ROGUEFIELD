@@ -2,6 +2,7 @@
 
 import RandomService from '../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { createRandomHelpers } from '../utils/randomHelpers.js';
 
 const SIMPLEX_DEFAULT_RANDOM = new RandomService('menu-background:simplex-default');
 
@@ -40,8 +41,12 @@ class MenuBackgroundSystem {
     };
     this.randomForkSeeds = {};
     this.captureRandomForkSeeds();
-    this._fallbackRandom = null;
-    this._fallbackRandomForks = new Map();
+
+    this.randomHelpers = createRandomHelpers({
+      getRandomFork: (name) => this.getRandomFork(name),
+      random: this.random,
+      fallbackSeedPrefix: 'menu-background',
+    });
     this.settingsService = null;
     this.canvas =
       typeof document !== 'undefined'
@@ -128,87 +133,31 @@ class MenuBackgroundSystem {
   }
 
   ensureRandom(name = 'base') {
-    const fork = this.getRandomFork(name);
-    if (fork && typeof fork.float === 'function') {
-      return fork;
-    }
-
-    if (!this._fallbackRandom) {
-      if (this.random && typeof this.random.fork === 'function') {
-        this._fallbackRandom = this.random.fork('menu-background:fallback-base');
-      } else {
-        this._fallbackRandom = new RandomService('menu-background:fallback-base');
-      }
-    }
-
-    if (!this._fallbackRandomForks.has(name)) {
-      const source =
-        this.random && typeof this.random.fork === 'function'
-          ? this.random.fork(`menu-background:fallback:${name}`)
-          : this._fallbackRandom.fork(`menu-background:fallback:${name}`);
-      this._fallbackRandomForks.set(name, source);
-    }
-
-    return this._fallbackRandomForks.get(name);
+    return this.randomHelpers.ensureRandom(name);
   }
 
   randomFloat(name = 'base') {
-    const fork = this.ensureRandom(name);
-    return fork.float();
+    return this.randomHelpers.randomFloat(name);
   }
 
   randomRange(min, max, name = 'base') {
-    const fork = this.getRandomFork(name);
-    if (fork && typeof fork.range === 'function') {
-      return fork.range(min, max);
-    }
-
-    return min + (max - min) * this.randomFloat(name);
+    return this.randomHelpers.randomRange(min, max, name);
   }
 
   randomInt(min, max, name = 'base') {
-    const fork = this.getRandomFork(name);
-    if (fork && typeof fork.int === 'function') {
-      return fork.int(min, max);
-    }
-
-    const low = Math.min(min, max);
-    const high = Math.max(min, max);
-    return low + Math.floor((high - low + 1) * this.randomFloat(name));
+    return this.randomHelpers.randomInt(min, max, name);
   }
 
   randomChance(probability, name = 'base') {
-    if (probability <= 0) {
-      return false;
-    }
-
-    if (probability >= 1) {
-      return true;
-    }
-
-    const fork = this.getRandomFork(name);
-    if (fork && typeof fork.chance === 'function') {
-      return fork.chance(probability);
-    }
-
-    return this.randomFloat(name) < probability;
+    return this.randomHelpers.randomChance(probability, name);
   }
 
   randomCentered(span = 1, name = 'base') {
-    return (this.randomFloat(name) - 0.5) * span;
+    return this.randomHelpers.randomCentered(span, name);
   }
 
   randomPick(array, name = 'base') {
-    if (!Array.isArray(array) || array.length === 0) {
-      return undefined;
-    }
-
-    const fork = this.getRandomFork(name);
-    if (fork && typeof fork.pick === 'function') {
-      return fork.pick(array);
-    }
-
-    return array[this.randomInt(0, array.length - 1, name)];
+    return this.randomHelpers.randomPick(array, name);
   }
 
   captureRandomForkSeeds() {
