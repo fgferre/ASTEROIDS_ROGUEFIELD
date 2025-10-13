@@ -2,6 +2,8 @@ import * as CONSTANTS from '../core/GameConstants.js';
 import { SpatialHash } from '../core/SpatialHash.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
+const ASTEROID_POOL_ID = Symbol.for('ASTEROIDS_ROGUEFIELD:asteroidPoolId');
+
 class PhysicsSystem {
   constructor(dependencies = {}) {
     this.dependencies = normalizeDependencies(dependencies);
@@ -23,6 +25,7 @@ class PhysicsSystem {
     this.bootstrapCompleted = false;
     this.lastSpatialHashMaintenance = performance.now();
     this.missingEnemyWarningLogged = false;
+    this._snapshotFallbackWarningIssued = false;
 
     // Performance tracking
     this.performanceMetrics = {
@@ -294,6 +297,177 @@ class PhysicsSystem {
       this.spatialHash.cleanup();
       this.lastSpatialHashMaintenance = now;
     }
+  }
+
+  serializeAsteroidForSnapshot(asteroid) {
+    if (!asteroid || asteroid.destroyed) {
+      return null;
+    }
+
+    const safeNumber = (value, fallback = 0) =>
+      Number.isFinite(value) ? value : fallback;
+
+    return {
+      poolId: asteroid[ASTEROID_POOL_ID] ?? null,
+      id: asteroid.id ?? null,
+      x: safeNumber(asteroid.x),
+      y: safeNumber(asteroid.y),
+      vx: safeNumber(asteroid.vx),
+      vy: safeNumber(asteroid.vy),
+      radius: safeNumber(asteroid.radius),
+      rotation: safeNumber(asteroid.rotation),
+      rotationSpeed: safeNumber(asteroid.rotationSpeed),
+      randomSeed:
+        asteroid.random && typeof asteroid.random.seed === 'number'
+          ? asteroid.random.seed >>> 0
+          : null,
+      randomScopes: asteroid.randomScopeSeeds
+        ? { ...asteroid.randomScopeSeeds }
+        : null,
+    };
+  }
+
+  exportState() {
+    const asteroids = [];
+    for (const asteroid of this.activeAsteroids) {
+      const snapshot = this.serializeAsteroidForSnapshot(asteroid);
+      if (snapshot) {
+        asteroids.push(snapshot);
+      }
+    }
+
+    return {
+      version: 1,
+      asteroids,
+    };
+  }
+
+  handleSnapshotFallback(reason) {
+    if (!this._snapshotFallbackWarningIssued) {
+      const detail = reason ? ` (${reason})` : '';
+      console.warn(
+        `[PhysicsSystem] Snapshot data unavailable, performing full reset${detail}`
+      );
+      this._snapshotFallbackWarningIssued = true;
+    }
+
+    this.reset();
+    return false;
+  }
+
+  importState(snapshot) {
+    if (!snapshot || typeof snapshot !== 'object') {
+      return this.handleSnapshotFallback('invalid snapshot payload');
+    }
+
+    const asteroidSnapshots = Array.isArray(snapshot.asteroids)
+      ? snapshot.asteroids
+      : null;
+
+    if (!asteroidSnapshots) {
+      return this.handleSnapshotFallback('missing asteroid list');
+    }
+
+    this.refreshEnemyReference({ suppressWarning: true });
+    const enemySystem = this.enemySystem;
+    if (!enemySystem) {
+      return this.handleSnapshotFallback('enemy system unavailable');
+    }
+
+    const availableAsteroids =
+      typeof enemySystem.getAllAsteroids === 'function'
+        ? enemySystem.getAllAsteroids()
+        : Array.isArray(enemySystem.asteroids)
+        ? enemySystem.asteroids
+        : [];
+
+    const asteroidByPoolId = new Map();
+    for (let i = 0; i < availableAsteroids.length; i += 1) {
+      const asteroid = availableAsteroids[i];
+      if (!asteroid || asteroid.destroyed) {
+        continue;
+      }
+
+      const poolId = asteroid[ASTEROID_POOL_ID];
+      if (poolId != null) {
+        asteroidByPoolId.set(poolId, asteroid);
+      }
+    }
+
+    this.activeAsteroids.clear();
+    this.asteroidIndex.clear();
+    this.spatialHash.clear();
+
+    let restored = 0;
+
+    for (let i = 0; i < asteroidSnapshots.length; i += 1) {
+      const entry = asteroidSnapshots[i];
+      if (!entry || entry.poolId == null) {
+        continue;
+      }
+
+      const asteroid = asteroidByPoolId.get(entry.poolId);
+      if (!asteroid || asteroid.destroyed) {
+        continue;
+      }
+
+      if (Number.isFinite(entry.x)) {
+        asteroid.x = entry.x;
+      }
+      if (Number.isFinite(entry.y)) {
+        asteroid.y = entry.y;
+      }
+      if (Number.isFinite(entry.vx)) {
+        asteroid.vx = entry.vx;
+      }
+      if (Number.isFinite(entry.vy)) {
+        asteroid.vy = entry.vy;
+      }
+      if (Number.isFinite(entry.radius)) {
+        asteroid.radius = entry.radius;
+      }
+      if (Number.isFinite(entry.rotation)) {
+        asteroid.rotation = entry.rotation;
+      }
+      if (Number.isFinite(entry.rotationSpeed)) {
+        asteroid.rotationSpeed = entry.rotationSpeed;
+      }
+
+      if (entry.randomSeed != null && asteroid.random && typeof asteroid.random.reset === 'function') {
+        asteroid.random.reset(entry.randomSeed);
+      }
+
+      if (entry.randomScopes && typeof entry.randomScopes === 'object') {
+        asteroid.randomScopeSeeds = { ...entry.randomScopes };
+        if (typeof asteroid.ensureRandomScopes === 'function') {
+          asteroid.ensureRandomScopes();
+        }
+        if (typeof asteroid.reseedRandomScopes === 'function') {
+          asteroid.reseedRandomScopes();
+        }
+      }
+
+      this.registerAsteroid(asteroid);
+      restored += 1;
+    }
+
+    if (asteroidSnapshots.length > 0 && restored === 0) {
+      return this.handleSnapshotFallback('no asteroids restored');
+    }
+
+    this.bootstrapCompleted = true;
+    this.indexDirty = true;
+    this.lastSpatialHashMaintenance = performance.now();
+    this._snapshotFallbackWarningIssued = false;
+    return true;
+  }
+
+  getSnapshotState() {
+    return this.exportState();
+  }
+
+  restoreSnapshotState(snapshot) {
+    return this.importState(snapshot);
   }
 
   update() {
@@ -699,6 +873,7 @@ class PhysicsSystem {
     this.bootstrapCompleted = false;
     this.lastSpatialHashMaintenance = performance.now();
     this.missingEnemyWarningLogged = false;
+    this._snapshotFallbackWarningIssued = false;
     this.refreshEnemyReference({ force: true });
 
     // Reset performance metrics
