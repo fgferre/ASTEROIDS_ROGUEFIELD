@@ -147,6 +147,10 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+const SPACE_SKY_RANDOM_SEED = 'rendering:starfield';
+
+const RENDERING_RANDOM_FALLBACK_SEED = 'rendering:system';
+
 const SPACE_SKY_LAYERS = [
   { density: 220, vx: -0.006, vy: -0.002, size: 0.9, glow: 0.35 },
   { density: 380, vx: -0.01, vy: -0.004, size: 1.2, glow: 0.48 },
@@ -232,10 +236,9 @@ function extractVelocityComponent(velocity, primaryKey, fallbackKey) {
 class SpaceSkyBackground {
   constructor(randomGenerator = null) {
     this.dpr = resolveDevicePixelRatio();
-    this.random =
-      randomGenerator && typeof randomGenerator.float === 'function'
-        ? randomGenerator
-        : null;
+    this.random = this.resolveRandomGenerator(randomGenerator);
+    this.randomSeed = undefined;
+    this.captureRandomSeed(this.random);
     this.layers = SPACE_SKY_LAYERS.map((layer) => ({
       density: layer.density,
       vx: layer.vx,
@@ -269,8 +272,71 @@ class SpaceSkyBackground {
     this.applyPreset('cinematic');
   }
 
+  resolveRandomGenerator(randomGenerator) {
+    if (
+      randomGenerator &&
+      typeof randomGenerator.float === 'function' &&
+      typeof randomGenerator.range === 'function'
+    ) {
+      return randomGenerator;
+    }
+
+    if (randomGenerator && typeof randomGenerator.float === 'function') {
+      const seedCandidate =
+        typeof randomGenerator.seed === 'number' && Number.isFinite(randomGenerator.seed)
+          ? randomGenerator.seed
+          : SPACE_SKY_RANDOM_SEED;
+      return new RandomService(seedCandidate);
+    }
+
+    return new RandomService(SPACE_SKY_RANDOM_SEED);
+  }
+
+  captureRandomSeed(randomGenerator = this.random) {
+    if (
+      randomGenerator &&
+      typeof randomGenerator.seed === 'number' &&
+      Number.isFinite(randomGenerator.seed)
+    ) {
+      this.randomSeed = randomGenerator.seed >>> 0;
+      return this.randomSeed;
+    }
+
+    this.randomSeed = undefined;
+    return undefined;
+  }
+
+  reseed(randomGenerator = null) {
+    if (randomGenerator) {
+      this.random = this.resolveRandomGenerator(randomGenerator);
+      this.captureRandomSeed(this.random);
+    } else if (this.random && typeof this.random.reset === 'function') {
+      if (this.randomSeed !== undefined) {
+        this.random.reset(this.randomSeed);
+      } else {
+        this.random.reset();
+        this.captureRandomSeed(this.random);
+      }
+    } else {
+      this.random = this.resolveRandomGenerator(null);
+      this.captureRandomSeed(this.random);
+    }
+
+    this.layers.forEach((layer) => {
+      layer.stars.length = 0;
+    });
+
+    this.lastTime = resolveTimestamp();
+    this.rebuild();
+  }
+
   getRandomFloat() {
-    return this.random ? this.random.float() : globalThis.Math.random();
+    if (!this.random || typeof this.random.float !== 'function') {
+      this.random = this.resolveRandomGenerator(null);
+      this.captureRandomSeed(this.random);
+    }
+
+    return this.random.float();
   }
 
   getRandomRange(min, max) {
@@ -599,16 +665,21 @@ class RenderingSystem {
     const { random = null, ...rest } = input;
 
     this.dependencies = normalizeDependencies(rest);
+    this.randomForkLabels = {
+      base: 'rendering.base',
+      starfield: 'rendering.starfield',
+      assets: 'rendering.assets',
+    };
+    this.randomForkSeeds = {};
+
     this.random = random ?? resolveService('random', this.dependencies);
-    if (!this.random) {
-      this.random = new RandomService();
+    if (!this.random || typeof this.random.fork !== 'function') {
+      this.random = new RandomService(RENDERING_RANDOM_FALLBACK_SEED);
     }
 
     this.dependencies.random = this.random;
-    this.randomForks = {
-      starfield: this.random.fork('rendering.starfield'),
-      assets: this.random.fork('rendering.assets'),
-    };
+    this.randomForks = this.createRandomForks(this.random);
+    this.captureRandomForkSeeds();
 
     this.spaceSky = new SpaceSkyBackground(this.randomForks.starfield);
     this.spaceSky.setParallax(0.06, 0.05, 0.06, CONSTANTS.SHIP_MAX_SPEED);
@@ -681,6 +752,88 @@ class RenderingSystem {
     this.resolveCachedServices(true);
 
     console.log('[RenderingSystem] Initialized with batch rendering optimization');
+  }
+
+  createRandomForks(random) {
+    let base = null;
+    if (random && typeof random.fork === 'function') {
+      base = random.fork(this.randomForkLabels.base);
+    }
+
+    if (!base || typeof base.fork !== 'function') {
+      base = new RandomService(`${this.randomForkLabels.base}:fallback`);
+    }
+
+    const starfield = base && typeof base.fork === 'function'
+      ? base.fork(this.randomForkLabels.starfield)
+      : new RandomService(this.randomForkLabels.starfield);
+    const assets = base && typeof base.fork === 'function'
+      ? base.fork(this.randomForkLabels.assets)
+      : new RandomService(this.randomForkLabels.assets);
+
+    return {
+      base,
+      starfield,
+      assets,
+    };
+  }
+
+  captureRandomForkSeeds(forks = this.randomForks) {
+    if (!forks) {
+      this.randomForkSeeds = {};
+      return;
+    }
+
+    if (!this.randomForkSeeds) {
+      this.randomForkSeeds = {};
+    }
+
+    Object.entries(forks).forEach(([name, fork]) => {
+      if (fork && typeof fork.seed === 'number' && Number.isFinite(fork.seed)) {
+        this.randomForkSeeds[name] = fork.seed >>> 0;
+      }
+    });
+  }
+
+  getRandomFork(name) {
+    if (!name || !this.randomForks) {
+      return null;
+    }
+
+    return this.randomForks[name] || null;
+  }
+
+  reseedRandomForks({ refreshForks = false } = {}) {
+    if (refreshForks || !this.randomForks) {
+      this.randomForks = this.createRandomForks(this.random);
+      this.captureRandomForkSeeds(this.randomForks);
+    } else {
+      if (!this.randomForkSeeds) {
+        this.captureRandomForkSeeds(this.randomForks);
+      }
+
+      Object.entries(this.randomForks).forEach(([name, fork]) => {
+        if (!fork || typeof fork.reset !== 'function') {
+          return;
+        }
+
+        const storedSeed = this.randomForkSeeds?.[name];
+        if (storedSeed !== undefined) {
+          fork.reset(storedSeed);
+        }
+      });
+
+      this.captureRandomForkSeeds(this.randomForks);
+    }
+
+    if (this.spaceSky) {
+      const starfieldRandom = this.getRandomFork('starfield');
+      this.spaceSky.reseed(starfieldRandom);
+    }
+  }
+
+  reset({ refreshForks = false } = {}) {
+    this.reseedRandomForks({ refreshForks });
   }
 
   resolveCachedServices(force = false) {
