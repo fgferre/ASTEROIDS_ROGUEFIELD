@@ -143,15 +143,26 @@ export class ServiceRegistry {
     const {
       random: randomOverride,
       randomSeed,
+      gameSession: gameSessionOverride,
+      eventBus: eventBusOverride,
+      settings: settingsOverride,
+      audio: audioOverride,
       ...serviceOverrides
     } = overrides || {};
 
     container.register(
       'event-bus',
-      () => serviceOverrides.eventBus || { on: () => {}, emit: () => {}, off: () => {} }
+      () =>
+        eventBusOverride || { on: () => {}, emit: () => {}, off: () => {} }
     );
-    container.register('settings', () => serviceOverrides.settings || { get: () => null, set: () => {} });
-    container.register('audio', () => serviceOverrides.audio || { play: () => {}, stop: () => {} });
+    container.register(
+      'settings',
+      () => settingsOverride || { get: () => null, set: () => {} }
+    );
+    container.register(
+      'audio',
+      () => audioOverride || { play: () => {}, stop: () => {} }
+    );
 
     const deterministicRandom = (() => {
       if (randomOverride) {
@@ -173,6 +184,22 @@ export class ServiceRegistry {
     })();
 
     container.register('random', () => deterministicRandom);
+
+    const sessionState = { paused: false, screen: 'menu' };
+    const defaultSessionStub = {
+      isPaused: () => sessionState.paused,
+      setPaused: (value) => {
+        sessionState.paused = Boolean(value);
+        return sessionState.paused;
+      },
+      getScreen: () => sessionState.screen,
+      setScreen: (screen) => {
+        sessionState.screen = screen;
+        return sessionState.screen;
+      }
+    };
+
+    container.register('game-session', () => gameSessionOverride || defaultSessionStub);
 
     // Add any additional overrides
     for (const [name, factory] of Object.entries(serviceOverrides)) {

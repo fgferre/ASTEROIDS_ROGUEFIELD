@@ -16,6 +16,7 @@ import MenuBackgroundSystem from '../modules/MenuBackgroundSystem.js';
 import { GamePools } from '../core/GamePools.js';
 import { GarbageCollectionManager } from '../core/GarbageCollectionManager.js';
 import RandomService from '../core/RandomService.js';
+import GameSessionService from '../services/GameSessionService.js';
 
 export const DEFAULT_POOL_CONFIG = {
   bullets: { initial: 25, max: 120 },
@@ -37,16 +38,81 @@ function ensureGameStateService(gameState) {
     throw new Error('[serviceManifest] Missing game state reference');
   }
 
+  let sessionDelegate = null;
+
   const service = {
-    isPaused: () => Boolean(gameState.isPaused),
-    getScreen: () => gameState.screen,
+    isPaused: () => {
+      if (sessionDelegate && typeof sessionDelegate.isPaused === 'function') {
+        try {
+          return Boolean(sessionDelegate.isPaused());
+        } catch (error) {
+          console.warn('[serviceManifest] Falling back to raw pause state:', error);
+        }
+      }
+      return Boolean(gameState.isPaused);
+    },
+    getScreen: () => {
+      if (sessionDelegate && typeof sessionDelegate.getScreen === 'function') {
+        try {
+          return sessionDelegate.getScreen();
+        } catch (error) {
+          console.warn('[serviceManifest] Falling back to raw screen state:', error);
+        }
+      }
+      return gameState.screen;
+    },
     setScreen: (screen) => {
+      if (sessionDelegate && typeof sessionDelegate.setScreen === 'function') {
+        sessionDelegate.setScreen(screen);
+        const delegatedScreen =
+          typeof sessionDelegate.getScreen === 'function' ? sessionDelegate.getScreen() : undefined;
+        if (delegatedScreen !== undefined) {
+          gameState.screen = delegatedScreen;
+          return;
+        }
+      }
+
       gameState.screen = screen;
     },
     setPaused: (value) => {
+      if (sessionDelegate && typeof sessionDelegate.setPaused === 'function') {
+        sessionDelegate.setPaused(value);
+        const delegatedState =
+          typeof sessionDelegate.isPaused === 'function' ? sessionDelegate.isPaused() : undefined;
+        if (delegatedState !== undefined) {
+          gameState.isPaused = Boolean(delegatedState);
+          return;
+        }
+      }
+
       gameState.isPaused = Boolean(value);
-    }
+    },
+    getRawState: () => gameState
   };
+
+  Object.defineProperty(service, '__attachSessionService', {
+    value: (sessionService) => {
+      sessionDelegate = sessionService || null;
+
+      if (sessionDelegate) {
+        if (typeof sessionDelegate.getScreen === 'function') {
+          const screen = sessionDelegate.getScreen();
+          if (screen !== undefined) {
+            gameState.screen = screen;
+          }
+        }
+
+        if (typeof sessionDelegate.isPaused === 'function') {
+          const paused = sessionDelegate.isPaused();
+          if (paused !== undefined) {
+            gameState.isPaused = Boolean(paused);
+          }
+        }
+      }
+    },
+    enumerable: false,
+    writable: false
+  });
 
   if (typeof gameServices !== 'undefined') {
     gameServices.register('game-state', service);
@@ -380,6 +446,62 @@ export function createServiceManifest(context = {}) {
         }
 
         return world;
+      }
+    },
+    {
+      name: 'game-session',
+      singleton: true,
+      lazy: false,
+      dependencies: [
+        'event-bus',
+        'random',
+        'game-state',
+        'audio',
+        'ui',
+        'player',
+        'progression',
+        'enemies',
+        'physics',
+        'xp-orbs',
+        'healthHearts',
+        'world',
+        'effects'
+      ],
+      factory: ({ resolved, context }) => {
+        const instance = new GameSessionService({
+          eventBus: resolved['event-bus'],
+          random: resolved['random'],
+          gameStateFacade: resolved['game-state'],
+          services: {
+            audio: resolved['audio'],
+            ui: resolved['ui'],
+            player: resolved['player'],
+            progression: resolved['progression'],
+            enemies: resolved['enemies'],
+            physics: resolved['physics'],
+            xpOrbs: resolved['xp-orbs'],
+            healthHearts: resolved['healthHearts'],
+            world: resolved['world'],
+            effects: resolved['effects']
+          },
+          gameState: context.gameState
+        });
+
+        if (
+          typeof gameServices !== 'undefined' &&
+          typeof gameServices.register === 'function'
+        ) {
+          gameServices.register('game-session', instance);
+        }
+
+        if (
+          resolved['game-state'] &&
+          typeof resolved['game-state'].__attachSessionService === 'function'
+        ) {
+          resolved['game-state'].__attachSessionService(instance);
+        }
+
+        return instance;
       }
     },
     {
