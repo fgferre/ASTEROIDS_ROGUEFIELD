@@ -21,12 +21,14 @@
  * ```
  */
 
+import RandomService from '../core/RandomService.js';
+
 export class ScreenShake {
   constructor(randomGenerator = null) {
-    this.random =
-      randomGenerator && typeof randomGenerator.float === 'function'
-        ? randomGenerator
-        : null;
+    this._fallbackRandom = new RandomService('screen-shake:fallback');
+    this._fallbackSeed = this._fallbackRandom.seed >>> 0;
+    this._seedSnapshot = null;
+    this.random = null;
 
     // Trauma system
     this.trauma = 0; // 0-1 range
@@ -40,34 +42,91 @@ export class ScreenShake {
     this.angle = 0;
 
     // Noise seeds for smooth shake
-    this.seedX = this.getRandomSeed();
-    this.seedY = this.getRandomSeed();
-    this.seedAngle = this.getRandomSeed();
+    this.seedX = 0;
+    this.seedY = 0;
+    this.seedAngle = 0;
 
     // Time tracking
     this.time = 0;
     this.frequency = 15; // Shake frequency multiplier
 
+    this.reseed(randomGenerator);
+
     console.log('[ScreenShake] Initialized');
   }
 
-  reseed(randomGenerator = this.random) {
-    this.random =
-      randomGenerator && typeof randomGenerator.float === 'function'
-        ? randomGenerator
-        : null;
+  _resolveRandom(randomGenerator, { resetFallback = false } = {}) {
+    if (randomGenerator && typeof randomGenerator.float === 'function') {
+      if (randomGenerator === this._fallbackRandom && resetFallback) {
+        this._fallbackRandom.reset(this._fallbackSeed);
+      }
+      return randomGenerator;
+    }
 
-    this.seedX = this.getRandomSeed();
-    this.seedY = this.getRandomSeed();
-    this.seedAngle = this.getRandomSeed();
+    if (!this._fallbackRandom) {
+      this._fallbackRandom = new RandomService('screen-shake:fallback');
+      this._fallbackSeed = this._fallbackRandom.seed >>> 0;
+    } else if (resetFallback && typeof this._fallbackRandom.reset === 'function') {
+      this._fallbackRandom.reset(this._fallbackSeed);
+    }
+
+    return this._fallbackRandom;
+  }
+
+  _isValidSeedState(seedState) {
+    return (
+      seedState &&
+      typeof seedState === 'object' &&
+      Number.isFinite(seedState.x) &&
+      Number.isFinite(seedState.y) &&
+      Number.isFinite(seedState.angle)
+    );
+  }
+
+  reseed(randomGenerator = this.random, options = {}) {
+    const { seedState = null } = options ?? {};
+    this.random = this._resolveRandom(randomGenerator, { resetFallback: true });
+
+    const seeds = this._isValidSeedState(seedState)
+      ? { ...seedState }
+      : {
+          x: this.getRandomSeed(),
+          y: this.getRandomSeed(),
+          angle: this.getRandomSeed(),
+        };
+
+    this.seedX = seeds.x;
+    this.seedY = seeds.y;
+    this.seedAngle = seeds.angle;
+    this._seedSnapshot = { ...seeds };
+    return { ...this._seedSnapshot };
   }
 
   getRandomSeed() {
-    if (this.random) {
-      return this.random.range(0, 1000);
+    const source =
+      this.random && typeof this.random.float === 'function'
+        ? this.random
+        : this._fallbackRandom;
+
+    if (source && typeof source.range === 'function') {
+      return source.range(0, 1000);
+    }
+
+    if (source && typeof source.float === 'function') {
+      return source.float() * 1000;
     }
 
     return Math.random() * 1000;
+  }
+
+  captureSeedState() {
+    const snapshot = {
+      x: Number.isFinite(this.seedX) ? this.seedX : 0,
+      y: Number.isFinite(this.seedY) ? this.seedY : 0,
+      angle: Number.isFinite(this.seedAngle) ? this.seedAngle : 0,
+    };
+    this._seedSnapshot = { ...snapshot };
+    return { ...this._seedSnapshot };
   }
 
   /**
