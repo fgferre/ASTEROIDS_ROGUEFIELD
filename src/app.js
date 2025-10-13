@@ -174,6 +174,52 @@ function getRandomService() {
   return null;
 }
 
+function getAudioService() {
+  if (typeof gameServices !== 'undefined' && gameServices) {
+    try {
+      if (typeof gameServices.has === 'function' && !gameServices.has('audio')) {
+        // Legacy locator knows audio is unavailable.
+      } else if (typeof gameServices.get === 'function') {
+        const service = gameServices.get('audio');
+        if (service) {
+          return service;
+        }
+      }
+    } catch (error) {
+      console.warn('[Audio] Failed to obtain service from legacy locator:', error);
+    }
+  }
+
+  if (diContainer && typeof diContainer.resolve === 'function') {
+    try {
+      return diContainer.resolve('audio');
+    } catch (error) {
+      console.warn('[Audio] Failed to resolve audio service from DI:', error);
+    }
+  }
+
+  return null;
+}
+
+function synchronizeAudioRandomScopes({ refreshForks = false } = {}) {
+  const audio = getAudioService();
+
+  if (!audio) {
+    return;
+  }
+
+  if (typeof audio.reseedRandomScopes === 'function') {
+    audio.reseedRandomScopes({ refreshForks });
+    return;
+  }
+
+  if (refreshForks && typeof audio.captureRandomScopes === 'function') {
+    audio.captureRandomScopes({ refreshForks: true });
+  } else if (typeof audio.captureRandomScopes === 'function') {
+    audio.captureRandomScopes();
+  }
+}
+
 function prepareRandomForScope(scope, { mode = 'reset', snapshot } = {}) {
   const random = getRandomService();
 
@@ -193,6 +239,8 @@ function prepareRandomForScope(scope, { mode = 'reset', snapshot } = {}) {
   } else {
     random.reset(gameState.randomSeed);
   }
+
+  synchronizeAudioRandomScopes({ refreshForks: true });
 
   const currentSnapshot = random.serialize();
   gameState.randomSnapshot = currentSnapshot;

@@ -18,7 +18,12 @@ class AudioSystem {
       resolveService('random', this.dependencies) ||
       (this.dependencies && this.dependencies.random) ||
       new RandomService('audio-system:fallback');
-    this.randomScopes = this._createRandomScopes(this.random);
+    this.randomScopes = {
+      ...this._createRandomScopes(this.random),
+      seeds: null,
+      cacheSnapshot: null,
+      batcherSnapshot: null,
+    };
     this._fallbackRandom = null;
     this.volumeState = {
       master: 0.25,
@@ -54,6 +59,7 @@ class AudioSystem {
       gameServices.register('audio', this);
     }
 
+    this.captureRandomScopes();
     this.setupEventListeners();
     this.bootstrapSettings();
     this._exposeRandomDebugControls();
@@ -84,6 +90,8 @@ class AudioSystem {
       this.batcher = new AudioBatcher(this, 0, {
         random: this.randomScopes.batcher,
       });
+
+      this.captureRandomScopes();
 
       this.applyVolumeToNodes();
       this.initialized = true;
@@ -1149,6 +1157,156 @@ class AudioSystem {
     };
   }
 
+  captureRandomScopes({ refreshForks = false } = {}) {
+    if (!this.random) {
+      return null;
+    }
+
+    if (!this.randomScopes || refreshForks) {
+      const refreshed = this._createRandomScopes(this.random);
+      this.randomScopes = {
+        ...refreshed,
+        seeds: this.randomScopes?.seeds ?? null,
+        cacheSnapshot: this.randomScopes?.cacheSnapshot ?? null,
+        batcherSnapshot: this.randomScopes?.batcherSnapshot ?? null,
+      };
+    }
+
+    if (refreshForks) {
+      if (this.cache) {
+        this.cache.random = this.randomScopes.cache;
+        if (typeof this.cache.clearCache === 'function') {
+          this.cache.clearCache('all');
+        }
+        if (typeof this.cache.resetStats === 'function') {
+          this.cache.resetStats();
+        }
+      }
+
+      if (this.batcher) {
+        this.batcher.random = this.randomScopes.batcher;
+        if (typeof this.batcher._initializeRandomForks === 'function') {
+          this.batcher.randomForks = this.batcher._initializeRandomForks(
+            this.randomScopes.batcher
+          );
+        }
+        if (typeof this.batcher.resetStats === 'function') {
+          this.batcher.resetStats();
+        }
+      }
+    }
+
+    const seeds = {
+      base:
+        typeof this.random.seed === 'number' ? this.random.seed >>> 0 : null,
+      cache:
+        this.randomScopes?.cache &&
+        typeof this.randomScopes.cache.seed === 'number'
+          ? this.randomScopes.cache.seed >>> 0
+          : null,
+      batcher:
+        this.randomScopes?.batcher &&
+        typeof this.randomScopes.batcher.seed === 'number'
+          ? this.randomScopes.batcher.seed >>> 0
+          : null,
+      families: {},
+      bufferFamilies: {},
+    };
+
+    Object.entries(this.randomScopes?.families || {}).forEach(([name, rng]) => {
+      seeds.families[name] =
+        rng && typeof rng.seed === 'number' ? rng.seed >>> 0 : null;
+    });
+
+    Object.entries(this.randomScopes?.bufferFamilies || {}).forEach(
+      ([name, rng]) => {
+        seeds.bufferFamilies[name] =
+          rng && typeof rng.seed === 'number' ? rng.seed >>> 0 : null;
+      }
+    );
+
+    this.randomScopes.seeds = seeds;
+
+    if (this.cache && typeof this.cache.captureNoiseSeeds === 'function') {
+      this.randomScopes.cacheSnapshot = this.cache.captureNoiseSeeds();
+    }
+
+    if (
+      this.batcher &&
+      typeof this.batcher.captureRandomForkSeeds === 'function'
+    ) {
+      this.randomScopes.batcherSnapshot = this.batcher.captureRandomForkSeeds();
+    }
+
+    this._exposeRandomDebugControls();
+    return { ...seeds };
+  }
+
+  reseedRandomScopes({ refreshForks = false } = {}) {
+    if (!this.random) {
+      return null;
+    }
+
+    if (!this.randomScopes || refreshForks) {
+      this.captureRandomScopes({ refreshForks: true });
+    }
+
+    if (!this.randomScopes?.seeds) {
+      this.captureRandomScopes();
+    }
+
+    const seeds = this.randomScopes?.seeds;
+    if (!seeds) {
+      return null;
+    }
+
+    const applySeed = (rng, seed) => {
+      if (
+        rng &&
+        typeof rng.reset === 'function' &&
+        typeof seed === 'number'
+      ) {
+        rng.reset(seed);
+      }
+    };
+
+    applySeed(this.random, seeds.base);
+    applySeed(this.randomScopes?.cache, seeds.cache);
+    applySeed(this.randomScopes?.batcher, seeds.batcher);
+
+    Object.entries(this.randomScopes?.families || {}).forEach(([name, rng]) => {
+      applySeed(rng, seeds.families?.[name]);
+    });
+
+    Object.entries(this.randomScopes?.bufferFamilies || {}).forEach(
+      ([name, rng]) => {
+        applySeed(rng, seeds.bufferFamilies?.[name]);
+      }
+    );
+
+    if (this.cache) {
+      this.cache.random = this.randomScopes?.cache || this.cache.random;
+      if (typeof this.cache.reseedNoiseGenerators === 'function') {
+        this.cache.reseedNoiseGenerators(this.randomScopes?.cacheSnapshot);
+      }
+    }
+
+    if (this.batcher) {
+      this.batcher.random = this.randomScopes?.batcher || this.batcher.random;
+      if (refreshForks && typeof this.batcher._initializeRandomForks === 'function') {
+        this.batcher.randomForks = this.batcher._initializeRandomForks(
+          this.batcher.random
+        );
+      }
+      if (typeof this.batcher.reseedRandomForks === 'function') {
+        this.batcher.reseedRandomForks();
+      }
+    }
+
+    this.captureRandomScopes();
+    return { ...seeds };
+  }
+
   _exposeRandomDebugControls() {
     if (typeof window === 'undefined') {
       return;
@@ -1166,6 +1324,7 @@ class AudioSystem {
       seed: this.random?.seed ?? null,
       debugSnapshot: () => this.random?.debugSnapshot(),
       forks: {},
+      seeds: this.randomScopes?.seeds || null,
     };
 
     Object.entries(this.randomScopes?.families || {}).forEach(([name, rng]) => {
@@ -1367,6 +1526,8 @@ class AudioSystem {
     // Clear pending playback queue
     this.pendingSoundQueue.length = 0;
     this.resumePromise = null;
+
+    this.reseedRandomScopes();
   }
 
   // === Performance Monitoring ===
