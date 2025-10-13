@@ -333,8 +333,20 @@ class AudioBatcher {
       return fallbackRng.range(min, max);
     }
 
-    // Último recurso (não deveria ocorrer) mantém compatibilidade
-    return min + Math.random() * (max - min);
+    if (fallbackRng && typeof fallbackRng.float === 'function') {
+      return min + (max - min) * fallbackRng.float();
+    }
+
+    const emergency = this._ensureFallbackRandomFork('emergency');
+    if (emergency && typeof emergency.range === 'function') {
+      return emergency.range(min, max);
+    }
+
+    if (emergency && typeof emergency.float === 'function') {
+      return min + (max - min) * emergency.float();
+    }
+
+    throw new Error('AudioBatcher could not resolve deterministic RNG instance');
   }
 
   _ensureFallbackRandomFork(family) {

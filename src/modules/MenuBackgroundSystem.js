@@ -29,6 +29,7 @@ class MenuBackgroundSystem {
       asteroids: 'menu.asteroids',
       fragments: 'menu.fragments',
       materials: 'menu.materials',
+      threeUtils: 'menu.three-utils',
     };
     this.randomForks = {
       base: this.random.fork(this.randomForkLabels.base),
@@ -38,6 +39,7 @@ class MenuBackgroundSystem {
       asteroids: this.random.fork(this.randomForkLabels.asteroids),
       fragments: this.random.fork(this.randomForkLabels.fragments),
       materials: this.random.fork(this.randomForkLabels.materials),
+      threeUtils: this.random.fork(this.randomForkLabels.threeUtils),
     };
     this.randomForkSeeds = {};
     this.captureRandomForkSeeds();
@@ -100,6 +102,10 @@ class MenuBackgroundSystem {
     this.normalIntensity = this.resolveInitialNormalIntensity();
     this.unsubscribeFromSettings = null;
 
+    this._threeRandomOverridesInstalled = false;
+    this._threeUuidLookupTable = null;
+    this._threeSeededRandomGenerator = null;
+
     this.handleVideoSettingsChanged = this.handleVideoSettingsChanged.bind(this);
 
     this.handleResize = this.handleResize.bind(this);
@@ -107,6 +113,7 @@ class MenuBackgroundSystem {
     this.animate = this.animate.bind(this);
 
     if (this.ready) {
+      this.installDeterministicThreeRandom();
       this.bootstrapScene();
       this.registerEventHooks();
       this.setupSettingsSubscription();
@@ -156,6 +163,8 @@ class MenuBackgroundSystem {
       return;
     }
 
+    this._threeSeededRandomGenerator = null;
+
     if (!this.randomForkSeeds) {
       this.captureRandomForkSeeds();
     }
@@ -180,6 +189,157 @@ class MenuBackgroundSystem {
 
   reset() {
     this.reseedRandomForks();
+  }
+
+  installDeterministicThreeRandom() {
+    if (this._threeRandomOverridesInstalled) {
+      return;
+    }
+
+    const { THREE } = this;
+    if (!THREE || !THREE.MathUtils) {
+      return;
+    }
+
+    const mathUtils = THREE.MathUtils;
+
+    if (!this._threeUuidLookupTable) {
+      this._threeUuidLookupTable = Array.from({ length: 256 }, (_, index) =>
+        (index < 16 ? '0' : '') + index.toString(16).toUpperCase()
+      );
+    }
+
+    const resolveGenerator = () => {
+      const fork = this.getRandomFork('threeUtils');
+      if (fork && typeof fork.float === 'function') {
+        return fork;
+      }
+      return SIMPLEX_DEFAULT_RANDOM;
+    };
+
+    const randomFloat = () => {
+      const generator = resolveGenerator();
+      if (typeof generator.float === 'function') {
+        return generator.float();
+      }
+      return SIMPLEX_DEFAULT_RANDOM.float();
+    };
+
+    const randomInt = (min = 0, max = 1) => {
+      const generator = resolveGenerator();
+      if (typeof generator.int === 'function') {
+        return generator.int(min, max);
+      }
+      const low = Math.min(min, max);
+      const high = Math.max(min, max);
+      const span = high - low + 1;
+      return low + Math.floor(randomFloat() * span);
+    };
+
+    const randomUint32 = () => {
+      const generator = resolveGenerator();
+      if (typeof generator.int === 'function') {
+        return generator.int(0, 0xffffffff) >>> 0;
+      }
+      return Math.floor(randomFloat() * 0x100000000) >>> 0;
+    };
+
+    const lut = this._threeUuidLookupTable;
+    const generateUUID = () => {
+      const d0 = randomUint32();
+      const d1 = randomUint32();
+      const d2 = randomUint32();
+      const d3 = randomUint32();
+
+      return (
+        lut[d0 & 0xff] +
+        lut[(d0 >> 8) & 0xff] +
+        lut[(d0 >> 16) & 0xff] +
+        lut[(d0 >> 24) & 0xff] +
+        '-' +
+        lut[d1 & 0xff] +
+        lut[(d1 >> 8) & 0xff] +
+        '-' +
+        lut[((d1 >> 16) & 0x0f) | 0x40] +
+        lut[(d1 >> 24) & 0xff] +
+        '-' +
+        lut[(d2 & 0x3f) | 0x80] +
+        lut[(d2 >> 8) & 0xff] +
+        '-' +
+        lut[(d2 >> 16) & 0xff] +
+        lut[(d2 >> 24) & 0xff] +
+        lut[d3 & 0xff] +
+        lut[(d3 >> 8) & 0xff] +
+        lut[(d3 >> 16) & 0xff] +
+        lut[(d3 >> 24) & 0xff]
+      );
+    };
+
+    const seededRandom = (seedValue) => {
+      if (seedValue !== undefined) {
+        if (!this._threeSeededRandomGenerator) {
+          this._threeSeededRandomGenerator = new RandomService(seedValue);
+        } else {
+          this._threeSeededRandomGenerator.reset(seedValue);
+        }
+      } else if (!this._threeSeededRandomGenerator) {
+        const generator = resolveGenerator();
+        if (typeof generator.fork === 'function') {
+          this._threeSeededRandomGenerator = generator.fork('menu.three-utils:seeded');
+        } else {
+          this._threeSeededRandomGenerator = new RandomService('menu.three-utils:seeded');
+        }
+      }
+
+      if (this._threeSeededRandomGenerator && typeof this._threeSeededRandomGenerator.float === 'function') {
+        return this._threeSeededRandomGenerator.float();
+      }
+
+      return randomFloat();
+    };
+
+    mathUtils.randFloat = (low = 0, high = 1) => {
+      const minValue = Number(low);
+      const maxValue = Number(high);
+      if (!Number.isFinite(minValue) || !Number.isFinite(maxValue)) {
+        return Number.NaN;
+      }
+      if (maxValue === minValue) {
+        return minValue;
+      }
+      const [start, end] = maxValue > minValue ? [minValue, maxValue] : [maxValue, minValue];
+      return start + (end - start) * randomFloat();
+    };
+
+    mathUtils.randFloatSpread = (range = 1) => {
+      const width = Number(range);
+      if (!Number.isFinite(width)) {
+        return Number.NaN;
+      }
+      return width * (randomFloat() - 0.5);
+    };
+
+    mathUtils.randInt = (low = 0, high = 1) => {
+      const minValue = Number(low);
+      const maxValue = Number(high);
+      if (!Number.isFinite(minValue) || !Number.isFinite(maxValue)) {
+        return Number.NaN;
+      }
+      if (maxValue === minValue) {
+        return Math.floor(minValue);
+      }
+      const [start, end] = maxValue > minValue ? [minValue, maxValue] : [maxValue, minValue];
+      return randomInt(Math.ceil(start), Math.floor(end));
+    };
+
+    mathUtils.seededRandom = (seedValue) => seededRandom(seedValue);
+    mathUtils.generateUUID = () => generateUUID();
+
+    if (THREE.Math && typeof THREE.Math === 'object') {
+      THREE.Math.generateUUID = () => generateUUID();
+    }
+
+    this._threeRandomOverridesInstalled = true;
   }
 
   getService(name) {
