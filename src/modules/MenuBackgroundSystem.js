@@ -64,6 +64,13 @@ class MenuBackgroundSystem {
     this.CANNON = this.ready ? window.CANNON : null;
     this.ready = this.ready && Boolean(this.THREE) && Boolean(this.CANNON);
 
+    this._threeMathUtilsState = {
+      originalMathUtils: null,
+      originalMath: undefined,
+      deterministicMathUtils: null,
+      deterministicUuidGenerator: null,
+    };
+
     this.animationFrame = null;
     this.isActive = false;
     this.clock = null;
@@ -107,6 +114,7 @@ class MenuBackgroundSystem {
     this.animate = this.animate.bind(this);
 
     if (this.ready) {
+      this.applyDeterministicThreeUuidGenerator();
       this.bootstrapScene();
       this.registerEventHooks();
       this.setupSettingsSubscription();
@@ -178,8 +186,174 @@ class MenuBackgroundSystem {
     });
   }
 
-  reset() {
+  reset(options = {}) {
     this.reseedRandomForks();
+
+    const normalized =
+      options && typeof options === 'object' && options !== null ? options : {};
+
+    if (normalized.restoreThreeUuidGenerator) {
+      this.restoreOriginalThreeUuidGenerator();
+    }
+
+    this.applyDeterministicThreeUuidGenerator();
+  }
+
+  applyDeterministicThreeUuidGenerator() {
+    const state = this._threeMathUtilsState;
+    if (!state || !this.THREE || typeof this.THREE !== 'object') {
+      return;
+    }
+
+    const three = this.THREE;
+    const mathUtilsCandidate = three.MathUtils ?? three.Math;
+    if (!mathUtilsCandidate || typeof mathUtilsCandidate !== 'object') {
+      return;
+    }
+
+    const aliasCandidate =
+      typeof three.Math === 'object' && three.Math !== null ? three.Math : null;
+
+    if (state.deterministicMathUtils && mathUtilsCandidate === state.deterministicMathUtils) {
+      if (
+        state.deterministicMathUtils &&
+        aliasCandidate !== state.deterministicMathUtils &&
+        (aliasCandidate !== null ||
+          (state.originalMath !== null && state.originalMath !== undefined))
+      ) {
+        three.Math = state.deterministicMathUtils;
+      }
+      return;
+    }
+
+    state.originalMathUtils = mathUtilsCandidate;
+
+    if (aliasCandidate !== state.deterministicMathUtils) {
+      if (aliasCandidate !== null) {
+        state.originalMath = aliasCandidate;
+      } else if (state.originalMath === undefined) {
+        state.originalMath = null;
+      }
+    }
+
+    if (!state.deterministicUuidGenerator) {
+      state.deterministicUuidGenerator = () =>
+        this.random.uuid('menu-background:three.uuid');
+    }
+
+    const deterministic = this.cloneMathUtilsWithDeterministicUuid(
+      mathUtilsCandidate,
+      state.deterministicUuidGenerator
+    );
+
+    state.deterministicMathUtils = deterministic;
+    three.MathUtils = deterministic;
+
+    if (
+      aliasCandidate !== null ||
+      (state.originalMath !== null && state.originalMath !== undefined)
+    ) {
+      three.Math = deterministic;
+    }
+  }
+
+  restoreOriginalThreeUuidGenerator() {
+    const state = this._threeMathUtilsState;
+    if (!state || !this.THREE || typeof this.THREE !== 'object') {
+      return;
+    }
+
+    const three = this.THREE;
+    if (state.deterministicMathUtils && three.MathUtils === state.deterministicMathUtils) {
+      if (state.originalMathUtils) {
+        three.MathUtils = state.originalMathUtils;
+      }
+    }
+
+    if (state.deterministicMathUtils) {
+      const aliasCandidate =
+        typeof three.Math === 'object' && three.Math !== null ? three.Math : null;
+
+      if (aliasCandidate === state.deterministicMathUtils) {
+        if (state.originalMath === null) {
+          const descriptor = Object.getOwnPropertyDescriptor(three, 'Math');
+          if (descriptor && descriptor.configurable === false) {
+            three.Math = undefined;
+          } else if (descriptor) {
+            delete three.Math;
+          } else {
+            three.Math = undefined;
+          }
+        } else if (state.originalMath !== undefined) {
+          three.Math = state.originalMath;
+        } else if (state.originalMathUtils) {
+          three.Math = state.originalMathUtils;
+        }
+      }
+    }
+
+    state.deterministicMathUtils = null;
+  }
+
+  destroy() {
+    this.stop();
+    this.restoreOriginalThreeUuidGenerator();
+  }
+
+  cloneMathUtilsWithDeterministicUuid(source, uuidGenerator) {
+    const prototype = Object.getPrototypeOf(source) || Object.prototype;
+    const clone = Object.create(prototype);
+    const keys = Reflect.ownKeys(source);
+
+    keys.forEach((key) => {
+      const descriptor = Object.getOwnPropertyDescriptor(source, key);
+      if (!descriptor) {
+        clone[key] = source[key];
+        return;
+      }
+
+      if (key === 'generateUUID') {
+        const enumerable = descriptor.enumerable ?? false;
+        const configurable = descriptor.configurable ?? true;
+        const writable =
+          Object.prototype.hasOwnProperty.call(descriptor, 'writable')
+            ? Boolean(descriptor.writable)
+            : true;
+
+        Object.defineProperty(clone, key, {
+          configurable,
+          enumerable,
+          writable,
+          value: uuidGenerator,
+        });
+        return;
+      }
+
+      Object.defineProperty(clone, key, descriptor);
+    });
+
+    if (!keys.includes('generateUUID')) {
+      Object.defineProperty(clone, 'generateUUID', {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: uuidGenerator,
+      });
+    }
+
+    const isFrozen = Object.isFrozen(source);
+    const isSealed = Object.isSealed(source);
+    const isExtensible = Object.isExtensible(source);
+
+    if (isFrozen) {
+      Object.freeze(clone);
+    } else if (isSealed) {
+      Object.seal(clone);
+    } else if (!isExtensible) {
+      Object.preventExtensions(clone);
+    }
+
+    return clone;
   }
 
   getService(name) {
