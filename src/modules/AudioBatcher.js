@@ -1,3 +1,5 @@
+import RandomService from '../core/RandomService.js';
+
 /**
  * AudioBatcher - Sistema de batching para sons simultâneos
  * Otimiza sons similares executados ao mesmo tempo
@@ -7,7 +9,11 @@ class AudioBatcher {
     this.audioSystem = audioSystem;
     this.batchWindow = batchWindow; // ms para agrupar sons
     this.random = random || null;
+    this._fallbackRandom = null;
+    this._fallbackRandomForks = {};
+    this._randomForkSeeds = {};
     this.randomForks = this._initializeRandomForks(this.random);
+    this.captureRandomForkSeeds();
 
     // Queues de batching por tipo de som
     this.pendingBatches = new Map();
@@ -322,8 +328,88 @@ class AudioBatcher {
       return rng.range(min, max);
     }
 
-    // Fallback preserves previous behaviour if no RNG provided
-    return min + (Math.random() * (max - min));
+    const fallbackRng = this._ensureFallbackRandomFork(family);
+    if (fallbackRng && typeof fallbackRng.range === 'function') {
+      return fallbackRng.range(min, max);
+    }
+
+    // Último recurso (não deveria ocorrer) mantém compatibilidade
+    return min + Math.random() * (max - min);
+  }
+
+  _ensureFallbackRandomFork(family) {
+    if (!this._fallbackRandom) {
+      this._fallbackRandom = new RandomService('audio-batcher:fallback');
+      this.captureRandomForkSeeds();
+    }
+
+    if (!this._fallbackRandomForks[family]) {
+      this._fallbackRandomForks[family] = this._fallbackRandom.fork(
+        `audio-batcher:fallback:${family}`
+      );
+      this.captureRandomForkSeeds();
+    }
+
+    return this._fallbackRandomForks[family];
+  }
+
+  captureRandomForkSeeds() {
+    const seeds = {};
+
+    if (this.randomForks) {
+      Object.entries(this.randomForks).forEach(([name, rng]) => {
+        if (rng && typeof rng.reset === 'function' && rng.seed !== undefined) {
+          seeds[`family:${name}`] = rng.seed;
+        }
+      });
+    }
+
+    if (this._fallbackRandom) {
+      if (
+        typeof this._fallbackRandom.reset === 'function' &&
+        this._fallbackRandom.seed !== undefined
+      ) {
+        seeds['fallback:root'] = this._fallbackRandom.seed;
+      }
+
+      Object.entries(this._fallbackRandomForks).forEach(([name, rng]) => {
+        if (rng && typeof rng.reset === 'function' && rng.seed !== undefined) {
+          seeds[`fallback:${name}`] = rng.seed;
+        }
+      });
+    }
+
+    this._randomForkSeeds = seeds;
+    return { ...seeds };
+  }
+
+  reseedRandomForks() {
+    const seeds = this._randomForkSeeds && Object.keys(this._randomForkSeeds).length
+      ? this._randomForkSeeds
+      : this.captureRandomForkSeeds();
+
+    Object.entries(this.randomForks || {}).forEach(([name, rng]) => {
+      const seed = seeds[`family:${name}`];
+      if (seed !== undefined && rng && typeof rng.reset === 'function') {
+        rng.reset(seed);
+      }
+    });
+
+    if (this._fallbackRandom && typeof this._fallbackRandom.reset === 'function') {
+      const fallbackSeed = seeds['fallback:root'];
+      if (fallbackSeed !== undefined) {
+        this._fallbackRandom.reset(fallbackSeed);
+      }
+    }
+
+    Object.entries(this._fallbackRandomForks || {}).forEach(([name, rng]) => {
+      const seed = seeds[`fallback:${name}`];
+      if (seed !== undefined && rng && typeof rng.reset === 'function') {
+        rng.reset(seed);
+      }
+    });
+
+    return this.captureRandomForkSeeds();
   }
 
   /**
@@ -476,6 +562,7 @@ class AudioBatcher {
    * Reset das estatísticas
    */
   resetStats() {
+    this.reseedRandomForks();
     this.stats = {
       batched: 0,
       individual: 0,
