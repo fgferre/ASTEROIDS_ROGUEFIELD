@@ -9,6 +9,7 @@ class AudioCache {
     this.context = audioContext;
     this.maxCacheSize = maxCacheSize;
     this.random = random || null;
+    this._fallbackRandom = new RandomService('audio-cache:fallback');
 
     // Cache de buffers por tipo
     this.noiseBuffers = new Map();
@@ -19,6 +20,8 @@ class AudioCache {
 
     // Fork seeds por assinatura
     this.noiseForkSeeds = new Map();
+    this.noiseRandomForks = new Map();
+    this._noiseSeedSnapshot = null;
 
     // Performance metrics
     this.stats = {
@@ -42,19 +45,44 @@ class AudioCache {
     const normalizedFamily = typeof family === 'string' && family.length > 0 ? family : 'noise';
     const forkKey = `${normalizedFamily}:${duration}:${fadeOut ? 'fade' : 'flat'}:${amplitudePattern}`;
 
-    let forkSeed = this.noiseForkSeeds.get(forkKey);
-    let generatorRandom = null;
+    let forkRecord = this.noiseForkSeeds.get(forkKey) || null;
+    let generatorRandom = this.noiseRandomForks.get(forkKey) || null;
 
-    if (!forkSeed && random && typeof random.fork === 'function') {
-      const forked = random.fork(`audio-cache:${forkKey}`);
-      forkSeed = forked.seed >>> 0;
-      generatorRandom = forked;
-      this.noiseForkSeeds.set(forkKey, forkSeed);
+    if (!forkRecord) {
+      if (random && typeof random.fork === 'function') {
+        const scope = `audio-cache:${forkKey}`;
+        const forked = random.fork(scope);
+        forkRecord = {
+          seed: forked.seed >>> 0,
+          scope,
+          source: 'service'
+        };
+        generatorRandom = forked;
+      } else {
+        const scope = `audio-cache:fallback:${forkKey}`;
+        const fallbackFork = this._fallbackRandom.fork(scope);
+        forkRecord = {
+          seed: fallbackFork.seed >>> 0,
+          scope,
+          source: 'fallback'
+        };
+        generatorRandom = fallbackFork;
+      }
+
+      this.noiseForkSeeds.set(forkKey, forkRecord);
+      if (generatorRandom) {
+        this.noiseRandomForks.set(forkKey, generatorRandom);
+      }
+    }
+
+    if (!generatorRandom && forkRecord && typeof forkRecord.seed === 'number') {
+      generatorRandom = new RandomService(forkRecord.seed);
+      this.noiseRandomForks.set(forkKey, generatorRandom);
     }
 
     const seedComponent =
-      typeof forkSeed === 'number'
-        ? forkSeed
+      forkRecord && typeof forkRecord.seed === 'number'
+        ? forkRecord.seed
         : this._getSeedComponent(random);
 
     const key = `noise_${normalizedFamily}_${seedComponent}_${duration}_${fadeOut}_${amplitudePattern}`;
@@ -63,10 +91,6 @@ class AudioCache {
       this._updateAccessOrder(key);
       this.stats.hits++;
       return this.noiseBuffers.get(key);
-    }
-
-    if (!generatorRandom && typeof forkSeed === 'number') {
-      generatorRandom = new RandomService(forkSeed);
     }
 
     // Create new buffer
@@ -126,10 +150,14 @@ class AudioCache {
     const buffer = this.context.createBuffer(1, bufferSize, this.context.sampleRate);
     const output = buffer.getChannelData(0);
 
+    const rng = randomInstance instanceof RandomService
+      ? randomInstance
+      : randomInstance && typeof randomInstance.range === 'function'
+        ? randomInstance
+        : this._fallbackRandom;
+
     for (let i = 0; i < bufferSize; i++) {
-      const noise = randomInstance
-        ? randomInstance.range(-1, 1)
-        : Math.random() * 2 - 1;
+      const noise = rng.range(-1, 1);
       let amplitude = 1;
 
       if (fadeOut) {
@@ -198,6 +226,11 @@ class AudioCache {
     switch (type) {
       case 'noise':
         this.noiseBuffers.clear();
+        this.noiseForkSeeds.clear();
+        this.noiseRandomForks.clear();
+        if (this._fallbackRandom && typeof this._fallbackRandom.reset === 'function') {
+          this._fallbackRandom.reset('audio-cache:fallback');
+        }
         break;
       case 'custom':
         this.customBuffers.clear();
@@ -207,6 +240,11 @@ class AudioCache {
         this.noiseBuffers.clear();
         this.customBuffers.clear();
         this.accessOrder = [];
+        this.noiseForkSeeds.clear();
+        this.noiseRandomForks.clear();
+        if (this._fallbackRandom && typeof this._fallbackRandom.reset === 'function') {
+          this._fallbackRandom.reset('audio-cache:fallback');
+        }
         break;
     }
   }
@@ -264,6 +302,117 @@ class AudioCache {
     }
 
     return 'unseeded';
+  }
+
+  captureNoiseSeeds() {
+    const forks = [];
+    for (const [key, record] of this.noiseForkSeeds.entries()) {
+      const normalizedSeed =
+        record && typeof record.seed === 'number' ? record.seed >>> 0 : undefined;
+      if (normalizedSeed === undefined) {
+        continue;
+      }
+      forks.push({
+        key,
+        seed: normalizedSeed,
+        scope: record?.scope || `audio-cache:${key}`,
+        source: record?.source || 'service'
+      });
+    }
+
+    const snapshot = {
+      baseSeed:
+        this.random && typeof this.random.seed === 'number'
+          ? this.random.seed >>> 0
+          : null,
+      fallbackSeed:
+        this._fallbackRandom && typeof this._fallbackRandom.seed === 'number'
+          ? this._fallbackRandom.seed >>> 0
+          : null,
+      forks
+    };
+
+    this._noiseSeedSnapshot = JSON.parse(JSON.stringify(snapshot));
+    return JSON.parse(JSON.stringify(snapshot));
+  }
+
+  reseedNoiseGenerators(snapshot = null) {
+    const payload = snapshot
+      ? JSON.parse(JSON.stringify(snapshot))
+      : this._noiseSeedSnapshot
+        ? JSON.parse(JSON.stringify(this._noiseSeedSnapshot))
+        : this.captureNoiseSeeds();
+
+    if (!payload) {
+      return null;
+    }
+
+    if (
+      this.random &&
+      typeof this.random.reset === 'function' &&
+      typeof payload.baseSeed === 'number'
+    ) {
+      this.random.reset(payload.baseSeed);
+    }
+
+    if (
+      this._fallbackRandom &&
+      typeof this._fallbackRandom.reset === 'function' &&
+      typeof payload.fallbackSeed === 'number'
+    ) {
+      this._fallbackRandom.reset(payload.fallbackSeed);
+    }
+
+    this.noiseForkSeeds.clear();
+    this.noiseRandomForks.clear();
+
+    if (Array.isArray(payload.forks)) {
+      payload.forks.forEach(entry => {
+        if (!entry || typeof entry.seed !== 'number') {
+          return;
+        }
+
+        const { key, seed, scope, source } = entry;
+        const normalizedSeed = seed >>> 0;
+        const normalizedScope = scope || `audio-cache:${key}`;
+        const normalizedSource = source || 'service';
+
+        let rngInstance = null;
+
+        if (normalizedSource === 'service' && this.random && typeof this.random.fork === 'function') {
+          const forked = this.random.fork(normalizedScope);
+          if (typeof forked.reset === 'function') {
+            forked.reset(normalizedSeed);
+          }
+          rngInstance = forked;
+        } else if (
+          normalizedSource === 'fallback' &&
+          this._fallbackRandom &&
+          typeof this._fallbackRandom.fork === 'function'
+        ) {
+          const forked = this._fallbackRandom.fork(normalizedScope);
+          if (typeof forked.reset === 'function') {
+            forked.reset(normalizedSeed);
+          }
+          rngInstance = forked;
+        } else {
+          rngInstance = new RandomService(normalizedSeed);
+        }
+
+        this.noiseForkSeeds.set(key, {
+          seed: normalizedSeed,
+          scope: normalizedScope,
+          source: normalizedSource
+        });
+
+        if (rngInstance) {
+          this.noiseRandomForks.set(key, rngInstance);
+        }
+      });
+    }
+
+    this._noiseSeedSnapshot = JSON.parse(JSON.stringify(payload));
+    return JSON.parse(JSON.stringify(payload));
   }
 }
 
