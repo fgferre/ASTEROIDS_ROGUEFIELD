@@ -9,7 +9,12 @@ describe('MenuBackgroundSystem deterministic UUID integration', () => {
 
     const system = new MenuBackgroundSystem({ random: new RandomService('menu-test-seed') });
 
-    const mathUtils = { generateUUID: vi.fn(() => 'original-uuid') };
+    const mathUtils = {};
+    Object.defineProperty(mathUtils, 'generateUUID', {
+      value: vi.fn(() => 'original-uuid'),
+      configurable: true,
+      writable: false,
+    });
     system.THREE = { MathUtils: mathUtils };
 
     system.applyDeterministicThreeUuidGenerator();

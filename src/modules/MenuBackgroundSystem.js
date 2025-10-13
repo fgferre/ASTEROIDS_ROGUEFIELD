@@ -168,8 +168,35 @@ class MenuBackgroundSystem {
       return this._threeUuidFallbackRandom;
     };
 
-    mathUtils.generateUUID = () => resolveUuidRandom().uuid(scopeLabel);
-    this._hasAppliedDeterministicThreeUuid = true;
+    const deterministicGenerator = () => resolveUuidRandom().uuid(scopeLabel);
+    const existingDescriptor = Object.getOwnPropertyDescriptor(mathUtils, 'generateUUID');
+
+    if (existingDescriptor && !existingDescriptor.configurable && existingDescriptor.writable === false) {
+      console.warn(
+        '[MenuBackgroundSystem] Unable to override THREE.MathUtils.generateUUID; deterministic fallback disabled.'
+      );
+      return;
+    }
+
+    try {
+      this._originalThreeUuidDescriptor = existingDescriptor || {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: mathUtils.generateUUID,
+      };
+
+      Object.defineProperty(mathUtils, 'generateUUID', {
+        configurable: existingDescriptor?.configurable !== false,
+        enumerable: existingDescriptor?.enumerable ?? true,
+        writable: true,
+        value: deterministicGenerator,
+      });
+
+      this._hasAppliedDeterministicThreeUuid = true;
+    } catch (error) {
+      console.error('[MenuBackgroundSystem] Failed to apply deterministic UUID generator.', error);
+    }
   }
 
   captureRandomForkSeeds() {
