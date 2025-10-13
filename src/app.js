@@ -405,6 +405,7 @@ function resetGameSystems({ manageRandom = true } = {}) {
     'xp-orbs',
     'healthHearts',
     'effects',
+    'renderer',
     'world',
     'audio',
   ];
