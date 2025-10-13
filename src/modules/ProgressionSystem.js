@@ -1105,7 +1105,7 @@ class ProgressionSystem {
     };
   }
 
-  deserialize(data) {
+  deserialize(data, options = {}) {
     this.level = data?.level || 1;
     this.experience = data?.experience || 0;
     this.experienceToNext = data?.experienceToNext || 100;
@@ -1116,7 +1116,27 @@ class ProgressionSystem {
       : [];
     this.appliedUpgrades = new Map(entries);
     this.pendingUpgradeOptions = [];
+
+    if (!options?.suppressEvents) {
+      this.emitExperienceChanged();
+    }
+  }
+
+  restoreState(data) {
+    this.refreshInjectedServices(true);
+    this.deserialize(data, { suppressEvents: true });
     this.emitExperienceChanged();
+
+    if (typeof gameEvents !== 'undefined') {
+      gameEvents.emit('progression-restored', {
+        level: this.level,
+        experience: this.experience,
+        experienceToNext: this.experienceToNext,
+        totalExperience: this.totalExperience,
+      });
+    }
+
+    return true;
   }
 
   destroy() {
