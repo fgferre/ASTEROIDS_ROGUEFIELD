@@ -116,7 +116,12 @@ export class ScreenShake {
       return source.float() * 1000;
     }
 
-    return Math.random() * 1000;
+    const emergency = this._resolveRandom(null);
+    if (typeof emergency.range === 'function') {
+      return emergency.range(0, 1000);
+    }
+
+    return emergency.float() * 1000;
   }
 
   captureSeedState() {
