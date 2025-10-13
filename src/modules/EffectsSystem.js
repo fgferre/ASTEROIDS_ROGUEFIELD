@@ -217,6 +217,10 @@ export default class EffectsSystem {
 
     // Upgraded screen shake (Week 1: Balance & Feel)
     this.screenShake = new ScreenShake(this.getRandomFork('screenShake'));
+    this.screenShakeSeedState =
+      this.screenShake && typeof this.screenShake.captureSeedState === 'function'
+        ? this.screenShake.captureSeedState()
+        : null;
     this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
     this.screenFlash = {
       timer: 0,
@@ -1977,52 +1981,63 @@ export default class EffectsSystem {
   captureRandomForkSeeds() {
     if (!this.randomForks) {
       this.randomForkSeeds = {};
-      return;
     }
 
     if (!this.randomForkSeeds) {
       this.randomForkSeeds = {};
     }
 
-    Object.entries(this.randomForks).forEach(([name, fork]) => {
-      if (fork && typeof fork.seed === 'number' && Number.isFinite(fork.seed)) {
-        this.randomForkSeeds[name] = fork.seed >>> 0;
-      }
-    });
+    if (this.randomForks) {
+      Object.entries(this.randomForks).forEach(([name, fork]) => {
+        if (fork && typeof fork.seed === 'number' && Number.isFinite(fork.seed)) {
+          this.randomForkSeeds[name] = fork.seed >>> 0;
+        }
+      });
+    }
+
+    if (this.screenShake && typeof this.screenShake.captureSeedState === 'function') {
+      this.screenShakeSeedState = this.screenShake.captureSeedState();
+    }
   }
 
   reseedRandomForks() {
-    if (!this.randomForks) {
-      return;
-    }
-
     if (!this.randomForkSeeds) {
       this.captureRandomForkSeeds();
     }
 
-    Object.entries(this.randomForks).forEach(([name, fork]) => {
-      if (!fork || typeof fork.reset !== 'function') {
-        return;
-      }
-
-      const storedSeed = this.randomForkSeeds?.[name];
-      if (storedSeed !== undefined) {
-        fork.reset(storedSeed);
-      } else if (this.random && this.randomForkLabels?.[name]) {
-        const replacement = this.random.fork(this.randomForkLabels[name]);
-        this.randomForks[name] = replacement;
-        if (replacement && typeof replacement.seed === 'number') {
-          this.randomForkSeeds[name] = replacement.seed >>> 0;
+    if (this.randomForks) {
+      Object.entries(this.randomForks).forEach(([name, fork]) => {
+        if (!fork || typeof fork.reset !== 'function') {
+          return;
         }
+
+        const storedSeed = this.randomForkSeeds?.[name];
+        if (storedSeed !== undefined) {
+          fork.reset(storedSeed);
+        } else if (this.random && this.randomForkLabels?.[name]) {
+          const replacement = this.random.fork(this.randomForkLabels[name]);
+          this.randomForks[name] = replacement;
+          if (replacement && typeof replacement.seed === 'number') {
+            this.randomForkSeeds[name] = replacement.seed >>> 0;
+          }
+        }
+      });
+    }
+
+    if (this.screenShake && typeof this.screenShake.reseed === 'function') {
+      const snapshot = this.screenShake.reseed(this.getRandomFork('screenShake'), {
+        seedState: this.screenShakeSeedState,
+      });
+      if (snapshot && typeof snapshot === 'object') {
+        this.screenShakeSeedState = { ...snapshot };
+      } else if (typeof this.screenShake.captureSeedState === 'function') {
+        this.screenShakeSeedState = this.screenShake.captureSeedState();
       }
-    });
+    }
   }
 
   reset() {
     this.reseedRandomForks();
-    if (this.screenShake && typeof this.screenShake.reseed === 'function') {
-      this.screenShake.reseed(this.getRandomFork('screenShake'));
-    }
     this.particles = [];
     this.shockwaves = [];
     this.hitMarkers = [];
