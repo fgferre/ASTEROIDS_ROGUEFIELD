@@ -3,6 +3,7 @@ import { GamePools } from '../core/GamePools.js';
 import RandomService from '../core/RandomService.js';
 import { ScreenShake } from '../utils/ScreenShake.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { createRandomHelpers } from '../utils/randomHelpers.js';
 
 const MAIN_THRUSTER_FLASH_THRESHOLD = 0.85;
 const MAIN_THRUSTER_FLASH_COLOR = '#3399FF';
@@ -203,8 +204,12 @@ export default class EffectsSystem {
       this.randomForkLabels = {};
       this.randomForkSeeds = {};
     }
-    this._fallbackRandom = null;
-    this._fallbackRandomForks = new Map();
+
+    this.randomHelpers = createRandomHelpers({
+      getRandomFork: (name) => this.getRandomFork(name),
+      random: this.random,
+      fallbackSeedPrefix: 'effects-system',
+    });
     this.particles = [];
     this.shockwaves = [];
     this.hitMarkers = []; // NEW: Hit marker tracking
@@ -245,79 +250,27 @@ export default class EffectsSystem {
   }
 
   ensureRandom(name = 'base') {
-    const fork = this.getRandomFork(name);
-    if (fork && typeof fork.float === 'function') {
-      return fork;
-    }
-
-    if (!this._fallbackRandom) {
-      if (this.random && typeof this.random.fork === 'function') {
-        this._fallbackRandom = this.random.fork('effects-system:fallback-base');
-      } else {
-        this._fallbackRandom = new RandomService('effects-system:fallback-base');
-      }
-    }
-
-    if (!this._fallbackRandomForks.has(name)) {
-      const source =
-        this.random && typeof this.random.fork === 'function'
-          ? this.random.fork(`effects-system:fallback:${name}`)
-          : this._fallbackRandom.fork(`effects-system:fallback:${name}`);
-      this._fallbackRandomForks.set(name, source);
-    }
-
-    return this._fallbackRandomForks.get(name);
+    return this.randomHelpers.ensureRandom(name);
   }
 
   randomFloat(name = 'base') {
-    const fork = this.ensureRandom(name);
-    return fork.float();
+    return this.randomHelpers.randomFloat(name);
   }
 
   randomInt(min, max, name = 'base') {
-    const fork = this.ensureRandom(name);
-    if (typeof fork.int === 'function') {
-      return fork.int(min, max);
-    }
-
-    const low = Math.min(min, max);
-    const high = Math.max(min, max);
-    return low + Math.floor((high - low + 1) * fork.float());
+    return this.randomHelpers.randomInt(min, max, name);
   }
 
   randomChance(probability, name = 'base') {
-    if (probability <= 0) {
-      return false;
-    }
-
-    if (probability >= 1) {
-      return true;
-    }
-
-    const fork = this.ensureRandom(name);
-    if (typeof fork.chance === 'function') {
-      return fork.chance(probability);
-    }
-
-    return fork.float() < probability;
+    return this.randomHelpers.randomChance(probability, name);
   }
 
   randomCentered(span = 1, name = 'base') {
-    const fork = this.ensureRandom(name);
-    return (fork.float() - 0.5) * span;
+    return this.randomHelpers.randomCentered(span, name);
   }
 
   randomPick(array, name = 'base') {
-    if (!Array.isArray(array) || array.length === 0) {
-      return undefined;
-    }
-
-    const fork = this.ensureRandom(name);
-    if (typeof fork.pick === 'function') {
-      return fork.pick(array);
-    }
-
-    return array[this.randomInt(0, array.length - 1, name)];
+    return this.randomHelpers.randomPick(array, name);
   }
 
   // === PARTICLE POOL HELPERS ===
@@ -2018,15 +1971,7 @@ export default class EffectsSystem {
   }
 
   randomRange(min, max, name = 'base') {
-    const start = Number.isFinite(min) ? min : 0;
-    const end = Number.isFinite(max) ? max : start;
-    if (end === start) {
-      return start;
-    }
-
-    const low = Math.min(start, end);
-    const high = Math.max(start, end);
-    return low + this.randomFloat(name) * (high - low);
+    return this.randomHelpers.randomRange(min, max, name);
   }
 
   captureRandomForkSeeds() {
