@@ -306,13 +306,14 @@ export function createServiceManifest(context = {}) {
       name: 'progression',
       singleton: true,
       lazy: false,
-      dependencies: ['xp-orbs', 'player', 'ui', 'effects'],
+      dependencies: ['xp-orbs', 'player', 'ui', 'effects', 'random'],
       factory: ({ resolved }) => {
         const progression = new ProgressionSystem({
           'xp-orbs': resolved['xp-orbs'],
           player: resolved['player'],
           ui: resolved['ui'],
           effects: resolved['effects'],
+          random: resolved['random'],
         });
 
         const xpOrbSystem = resolved['xp-orbs'];
