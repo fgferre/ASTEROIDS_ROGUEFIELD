@@ -2,6 +2,10 @@
 
 ## Automação
 - [ ] `npm test -- --run src/__tests__/core/RandomService.test.js`
+- [ ] `npm test -- --run src/__tests__/progression/progression-determinism.test.js`
+- [ ] `npm test -- --run src/__tests__/audio/audio-determinism.test.js`
+- [ ] `npm test -- --run src/__tests__/rendering/rendering-determinism.test.js`
+- [ ] `npm test -- --run src/__tests__/rendering/screen-shake-determinism.test.js`
 - [ ] `npm test -- --run tests/integration/deterministic-systems.test.js`
 - [ ] `npm test -- --run tests/integration/enemy-system-determinism.test.js`
 - [ ] `npm test`
