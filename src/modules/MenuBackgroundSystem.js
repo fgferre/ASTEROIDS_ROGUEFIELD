@@ -29,6 +29,7 @@ class MenuBackgroundSystem {
       asteroids: 'menu.asteroids',
       fragments: 'menu.fragments',
       materials: 'menu.materials',
+      threeUuid: 'menu.three-uuid',
     };
     this.randomForks = {
       base: this.random.fork(this.randomForkLabels.base),
@@ -38,6 +39,7 @@ class MenuBackgroundSystem {
       asteroids: this.random.fork(this.randomForkLabels.asteroids),
       fragments: this.random.fork(this.randomForkLabels.fragments),
       materials: this.random.fork(this.randomForkLabels.materials),
+      threeUuid: this.random.fork(this.randomForkLabels.threeUuid),
     };
     this.randomForkSeeds = {};
     this.captureRandomForkSeeds();
@@ -237,8 +239,16 @@ class MenuBackgroundSystem {
     }
 
     if (!state.deterministicUuidGenerator) {
-      state.deterministicUuidGenerator = () =>
-        this.random.uuid('menu-background:three.uuid');
+      state.deterministicUuidGenerator = () => {
+        const fork =
+          this.randomForks && typeof this.randomForks === 'object'
+            ? this.randomForks.threeUuid || null
+            : null;
+        if (fork && typeof fork.uuid === 'function') {
+          return fork.uuid('menu-background:three.uuid');
+        }
+        return this.random.uuid('menu-background:three.uuid');
+      };
     }
 
     const deterministic = this.cloneMathUtilsWithDeterministicUuid(

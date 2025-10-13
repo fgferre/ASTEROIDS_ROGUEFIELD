@@ -49,27 +49,31 @@ describe('MenuBackgroundSystem THREE UUID determinism', () => {
       expect(patchedMathUtils.DEG2RAD).toBe(mathUtils.DEG2RAD);
       expect(system.THREE.Math).toBe(patchedMathUtils);
 
-      const uuidSpy = vi.spyOn(system.random, 'uuid');
+      const baseUuidSpy = vi.spyOn(system.random, 'uuid');
+      const forkUuidSpy = vi.spyOn(system.randomForks.threeUuid, 'uuid');
 
       try {
         const first = patchedMathUtils.generateUUID();
         const second = patchedMathUtils.generateUUID();
 
         expect(first).not.toEqual(second);
-        expect(uuidSpy).toHaveBeenCalledTimes(2);
+        expect(forkUuidSpy).toHaveBeenCalledTimes(2);
+        expect(baseUuidSpy).not.toHaveBeenCalled();
         expect(mathRandomSpy).not.toHaveBeenCalled();
 
-        uuidSpy.mockClear();
+        forkUuidSpy.mockClear();
 
         system.reset();
 
         expect(system.THREE.MathUtils).toBe(patchedMathUtils);
         patchedMathUtils.generateUUID();
 
-        expect(uuidSpy).toHaveBeenCalledTimes(1);
+        expect(forkUuidSpy).toHaveBeenCalledTimes(1);
+        expect(baseUuidSpy).not.toHaveBeenCalled();
         expect(mathRandomSpy).not.toHaveBeenCalled();
       } finally {
-        uuidSpy.mockRestore();
+        baseUuidSpy.mockRestore();
+        forkUuidSpy.mockRestore();
       }
 
       system.destroy();
