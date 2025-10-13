@@ -18,7 +18,12 @@ class AudioSystem {
       resolveService('random', this.dependencies) ||
       (this.dependencies && this.dependencies.random) ||
       new RandomService('audio-system:fallback');
-    this.randomScopes = this._createRandomScopes(this.random);
+    this.randomScopes = {
+      ...this._createRandomScopes(this.random),
+      seeds: null,
+      cacheSnapshot: null,
+      batcherSnapshot: null,
+    };
     this._fallbackRandom = null;
     this.volumeState = {
       master: 0.25,
@@ -54,6 +59,7 @@ class AudioSystem {
       gameServices.register('audio', this);
     }
 
+    this.captureRandomScopes();
     this.setupEventListeners();
     this.bootstrapSettings();
     this._exposeRandomDebugControls();
@@ -84,6 +90,8 @@ class AudioSystem {
       this.batcher = new AudioBatcher(this, 0, {
         random: this.randomScopes.batcher,
       });
+
+      this.captureRandomScopes();
 
       this.applyVolumeToNodes();
       this.initialized = true;
@@ -1116,37 +1124,233 @@ class AudioSystem {
       };
     }
 
-    const families = {
-      laser: baseRandom.fork('audio:family:laser'),
-      explosion: baseRandom.fork('audio:family:explosion'),
-      shield: baseRandom.fork('audio:family:shield'),
-      asteroid: baseRandom.fork('audio:family:asteroid'),
-      xp: baseRandom.fork('audio:family:xp'),
-      impact: baseRandom.fork('audio:family:impact'),
-      ui: baseRandom.fork('audio:family:ui'),
-    };
+    const supportsSnapshot =
+      typeof baseRandom?.debugSnapshot === 'function' &&
+      typeof baseRandom?.restore === 'function';
+    const snapshot = supportsSnapshot ? baseRandom.debugSnapshot() : null;
 
-    const cacheRandom = baseRandom.fork('audio:cache');
+    let families = {};
+    let cacheRandom = null;
+    let bufferFamilies = {};
+    let batcherRandom = null;
 
-    const bufferFamilies = Object.fromEntries(
-      Object.entries({
-        ...families,
-        generic: cacheRandom,
-      }).map(([name, rng]) => [
-        name,
-        rng && typeof rng.fork === 'function'
-          ? rng.fork(`audio:buffer:${name}`)
-          : null,
-      ])
-    );
+    try {
+      families = {
+        laser: baseRandom.fork('audio:family:laser'),
+        explosion: baseRandom.fork('audio:family:explosion'),
+        shield: baseRandom.fork('audio:family:shield'),
+        asteroid: baseRandom.fork('audio:family:asteroid'),
+        xp: baseRandom.fork('audio:family:xp'),
+        impact: baseRandom.fork('audio:family:impact'),
+        ui: baseRandom.fork('audio:family:ui'),
+      };
+
+      cacheRandom = baseRandom.fork('audio:cache');
+      batcherRandom = baseRandom.fork('audio:batcher');
+
+      bufferFamilies = Object.fromEntries(
+        Object.entries({
+          ...families,
+          generic: cacheRandom,
+        }).map(([name, rng]) => [
+          name,
+          rng && typeof rng.fork === 'function'
+            ? rng.fork(`audio:buffer:${name}`)
+            : null,
+        ])
+      );
+    } finally {
+      if (snapshot) {
+        try {
+          baseRandom.restore(snapshot);
+        } catch (error) {
+          console.warn(
+            '[Audio] Failed to restore base RNG state after creating audio scopes:',
+            error
+          );
+        }
+      }
+    }
 
     return {
       base: baseRandom,
       cache: cacheRandom,
       families,
       bufferFamilies,
-      batcher: baseRandom.fork('audio:batcher'),
+      batcher: batcherRandom,
     };
+  }
+
+  captureRandomScopes({ refreshForks = false } = {}) {
+    if (!this.random) {
+      return null;
+    }
+
+    if (!this.randomScopes || refreshForks) {
+      const refreshed = this._createRandomScopes(this.random);
+      this.randomScopes = {
+        ...refreshed,
+        seeds: this.randomScopes?.seeds ?? null,
+        cacheSnapshot: this.randomScopes?.cacheSnapshot ?? null,
+        batcherSnapshot: this.randomScopes?.batcherSnapshot ?? null,
+      };
+    }
+
+    if (refreshForks) {
+      if (this.cache) {
+        this.cache.random = this.randomScopes.cache;
+        if (typeof this.cache.clearCache === 'function') {
+          this.cache.clearCache('all');
+        }
+        if (typeof this.cache.resetStats === 'function') {
+          this.cache.resetStats();
+        }
+      }
+
+      if (this.batcher) {
+        this.batcher.random = this.randomScopes.batcher;
+        if (typeof this.batcher._initializeRandomForks === 'function') {
+          this.batcher.randomForks = this.batcher._initializeRandomForks(
+            this.randomScopes.batcher
+          );
+        }
+        if (typeof this.batcher.resetStats === 'function') {
+          this.batcher.resetStats();
+        }
+      }
+    }
+
+    const seeds = {
+      base:
+        typeof this.random.seed === 'number' ? this.random.seed >>> 0 : null,
+      cache:
+        this.randomScopes?.cache &&
+        typeof this.randomScopes.cache.seed === 'number'
+          ? this.randomScopes.cache.seed >>> 0
+          : null,
+      batcher:
+        this.randomScopes?.batcher &&
+        typeof this.randomScopes.batcher.seed === 'number'
+          ? this.randomScopes.batcher.seed >>> 0
+          : null,
+      families: {},
+      bufferFamilies: {},
+    };
+
+    Object.entries(this.randomScopes?.families || {}).forEach(([name, rng]) => {
+      seeds.families[name] =
+        rng && typeof rng.seed === 'number' ? rng.seed >>> 0 : null;
+    });
+
+    Object.entries(this.randomScopes?.bufferFamilies || {}).forEach(
+      ([name, rng]) => {
+        seeds.bufferFamilies[name] =
+          rng && typeof rng.seed === 'number' ? rng.seed >>> 0 : null;
+      }
+    );
+
+    this.randomScopes.seeds = seeds;
+
+    if (this.cache && typeof this.cache.captureNoiseSeeds === 'function') {
+      this.randomScopes.cacheSnapshot = this.cache.captureNoiseSeeds();
+    }
+
+    if (
+      this.batcher &&
+      typeof this.batcher.captureRandomForkSeeds === 'function'
+    ) {
+      this.randomScopes.batcherSnapshot = this.batcher.captureRandomForkSeeds();
+    }
+
+    this._exposeRandomDebugControls();
+    return { ...seeds };
+  }
+
+  reseedRandomScopes({ refreshForks = false } = {}) {
+    if (!this.random) {
+      return null;
+    }
+
+    if (!this.randomScopes || refreshForks) {
+      this.captureRandomScopes({ refreshForks: true });
+    }
+
+    if (!this.randomScopes?.seeds) {
+      this.captureRandomScopes();
+    }
+
+    const seeds = this.randomScopes?.seeds;
+    if (!seeds) {
+      return null;
+    }
+
+    const applySeed = (rng, seed) => {
+      if (
+        rng &&
+        typeof rng.reset === 'function' &&
+        typeof seed === 'number'
+      ) {
+        rng.reset(seed);
+      }
+    };
+
+    const canPreserveBaseState =
+      typeof this.random?.debugSnapshot === 'function' &&
+      typeof this.random?.restore === 'function';
+    const baseSnapshot = canPreserveBaseState
+      ? this.random.debugSnapshot()
+      : null;
+
+    try {
+      applySeed(this.randomScopes?.cache, seeds.cache);
+      applySeed(this.randomScopes?.batcher, seeds.batcher);
+
+      Object.entries(this.randomScopes?.families || {}).forEach(([name, rng]) => {
+        applySeed(rng, seeds.families?.[name]);
+      });
+
+      Object.entries(this.randomScopes?.bufferFamilies || {}).forEach(
+        ([name, rng]) => {
+          applySeed(rng, seeds.bufferFamilies?.[name]);
+        }
+      );
+
+      if (this.cache) {
+        this.cache.random = this.randomScopes?.cache || this.cache.random;
+        if (typeof this.cache.reseedNoiseGenerators === 'function') {
+          this.cache.reseedNoiseGenerators(this.randomScopes?.cacheSnapshot);
+        }
+      }
+
+      if (this.batcher) {
+        this.batcher.random = this.randomScopes?.batcher || this.batcher.random;
+        if (
+          refreshForks &&
+          typeof this.batcher._initializeRandomForks === 'function'
+        ) {
+          this.batcher.randomForks = this.batcher._initializeRandomForks(
+            this.batcher.random
+          );
+        }
+        if (typeof this.batcher.reseedRandomForks === 'function') {
+          this.batcher.reseedRandomForks();
+        }
+      }
+    } finally {
+      if (baseSnapshot) {
+        try {
+          this.random.restore(baseSnapshot);
+        } catch (error) {
+          console.warn(
+            '[Audio] Failed to restore base RNG state after reseeding audio scopes:',
+            error
+          );
+        }
+      }
+    }
+
+    this.captureRandomScopes();
+    return { ...seeds };
   }
 
   _exposeRandomDebugControls() {
@@ -1166,6 +1370,7 @@ class AudioSystem {
       seed: this.random?.seed ?? null,
       debugSnapshot: () => this.random?.debugSnapshot(),
       forks: {},
+      seeds: this.randomScopes?.seeds || null,
     };
 
     Object.entries(this.randomScopes?.families || {}).forEach(([name, rng]) => {
@@ -1367,6 +1572,8 @@ class AudioSystem {
     // Clear pending playback queue
     this.pendingSoundQueue.length = 0;
     this.resumePromise = null;
+
+    this.reseedRandomScopes();
   }
 
   // === Performance Monitoring ===
