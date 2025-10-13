@@ -1124,36 +1124,60 @@ class AudioSystem {
       };
     }
 
-    const families = {
-      laser: baseRandom.fork('audio:family:laser'),
-      explosion: baseRandom.fork('audio:family:explosion'),
-      shield: baseRandom.fork('audio:family:shield'),
-      asteroid: baseRandom.fork('audio:family:asteroid'),
-      xp: baseRandom.fork('audio:family:xp'),
-      impact: baseRandom.fork('audio:family:impact'),
-      ui: baseRandom.fork('audio:family:ui'),
-    };
+    const supportsSnapshot =
+      typeof baseRandom?.debugSnapshot === 'function' &&
+      typeof baseRandom?.restore === 'function';
+    const snapshot = supportsSnapshot ? baseRandom.debugSnapshot() : null;
 
-    const cacheRandom = baseRandom.fork('audio:cache');
+    let families = {};
+    let cacheRandom = null;
+    let bufferFamilies = {};
+    let batcherRandom = null;
 
-    const bufferFamilies = Object.fromEntries(
-      Object.entries({
-        ...families,
-        generic: cacheRandom,
-      }).map(([name, rng]) => [
-        name,
-        rng && typeof rng.fork === 'function'
-          ? rng.fork(`audio:buffer:${name}`)
-          : null,
-      ])
-    );
+    try {
+      families = {
+        laser: baseRandom.fork('audio:family:laser'),
+        explosion: baseRandom.fork('audio:family:explosion'),
+        shield: baseRandom.fork('audio:family:shield'),
+        asteroid: baseRandom.fork('audio:family:asteroid'),
+        xp: baseRandom.fork('audio:family:xp'),
+        impact: baseRandom.fork('audio:family:impact'),
+        ui: baseRandom.fork('audio:family:ui'),
+      };
+
+      cacheRandom = baseRandom.fork('audio:cache');
+      batcherRandom = baseRandom.fork('audio:batcher');
+
+      bufferFamilies = Object.fromEntries(
+        Object.entries({
+          ...families,
+          generic: cacheRandom,
+        }).map(([name, rng]) => [
+          name,
+          rng && typeof rng.fork === 'function'
+            ? rng.fork(`audio:buffer:${name}`)
+            : null,
+        ])
+      );
+    } finally {
+      if (snapshot) {
+        try {
+          baseRandom.restore(snapshot);
+        } catch (error) {
+          console.warn(
+            '[Audio] Failed to restore base RNG state after creating audio scopes:',
+            error
+          );
+        }
+      }
+    }
 
     return {
       base: baseRandom,
       cache: cacheRandom,
       families,
       bufferFamilies,
-      batcher: baseRandom.fork('audio:batcher'),
+      batcher: batcherRandom,
     };
   }
 
@@ -1270,36 +1294,58 @@ class AudioSystem {
       }
     };
 
-    applySeed(this.random, seeds.base);
-    applySeed(this.randomScopes?.cache, seeds.cache);
-    applySeed(this.randomScopes?.batcher, seeds.batcher);
+    const canPreserveBaseState =
+      typeof this.random?.debugSnapshot === 'function' &&
+      typeof this.random?.restore === 'function';
+    const baseSnapshot = canPreserveBaseState
+      ? this.random.debugSnapshot()
+      : null;
 
-    Object.entries(this.randomScopes?.families || {}).forEach(([name, rng]) => {
-      applySeed(rng, seeds.families?.[name]);
-    });
+    try {
+      applySeed(this.randomScopes?.cache, seeds.cache);
+      applySeed(this.randomScopes?.batcher, seeds.batcher);
 
-    Object.entries(this.randomScopes?.bufferFamilies || {}).forEach(
-      ([name, rng]) => {
-        applySeed(rng, seeds.bufferFamilies?.[name]);
+      Object.entries(this.randomScopes?.families || {}).forEach(([name, rng]) => {
+        applySeed(rng, seeds.families?.[name]);
+      });
+
+      Object.entries(this.randomScopes?.bufferFamilies || {}).forEach(
+        ([name, rng]) => {
+          applySeed(rng, seeds.bufferFamilies?.[name]);
+        }
+      );
+
+      if (this.cache) {
+        this.cache.random = this.randomScopes?.cache || this.cache.random;
+        if (typeof this.cache.reseedNoiseGenerators === 'function') {
+          this.cache.reseedNoiseGenerators(this.randomScopes?.cacheSnapshot);
+        }
       }
-    );
 
-    if (this.cache) {
-      this.cache.random = this.randomScopes?.cache || this.cache.random;
-      if (typeof this.cache.reseedNoiseGenerators === 'function') {
-        this.cache.reseedNoiseGenerators(this.randomScopes?.cacheSnapshot);
+      if (this.batcher) {
+        this.batcher.random = this.randomScopes?.batcher || this.batcher.random;
+        if (
+          refreshForks &&
+          typeof this.batcher._initializeRandomForks === 'function'
+        ) {
+          this.batcher.randomForks = this.batcher._initializeRandomForks(
+            this.batcher.random
+          );
+        }
+        if (typeof this.batcher.reseedRandomForks === 'function') {
+          this.batcher.reseedRandomForks();
+        }
       }
-    }
-
-    if (this.batcher) {
-      this.batcher.random = this.randomScopes?.batcher || this.batcher.random;
-      if (refreshForks && typeof this.batcher._initializeRandomForks === 'function') {
-        this.batcher.randomForks = this.batcher._initializeRandomForks(
-          this.batcher.random
-        );
-      }
-      if (typeof this.batcher.reseedRandomForks === 'function') {
-        this.batcher.reseedRandomForks();
+    } finally {
+      if (baseSnapshot) {
+        try {
+          this.random.restore(baseSnapshot);
+        } catch (error) {
+          console.warn(
+            '[Audio] Failed to restore base RNG state after reseeding audio scopes:',
+            error
+          );
+        }
       }
     }
 
