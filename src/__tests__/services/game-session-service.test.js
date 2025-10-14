@@ -156,16 +156,38 @@ describe('GameSessionService lifecycle flows', () => {
 
     eventBus.emit.mockClear();
     service.startNewRun({ source: 'spec' });
-    expect(
-      eventBus.emit.mock.calls.filter((call) => call[0] === 'screen-changed')
-    ).toHaveLength(1);
+    const getScreenEvents = () =>
+      eventBus.emit.mock.calls
+        .filter((call) => call[0] === 'screen-changed')
+        .map((call) => call[1]);
+
+    expect(getScreenEvents()).toEqual([
+      expect.objectContaining({ screen: 'playing', source: 'session.start' })
+    ]);
     service.setRetryCount(2);
+    vi.useFakeTimers();
+
     service.handlePlayerDeath({ reason: 'spec' });
+
+    expect(service.getScreen()).toBe('playing');
+    expect(getScreenEvents()).toEqual([
+      expect.objectContaining({ screen: 'playing', source: 'session.start' })
+    ]);
+
+    vi.advanceTimersByTime(3000);
+
+    expect(service.getScreen()).toBe('gameover');
+    expect(getScreenEvents()).toEqual([
+      expect.objectContaining({ screen: 'playing', source: 'session.start' }),
+      expect.objectContaining({
+        screen: 'gameover',
+        source: 'player-died',
+        data: { reason: 'spec' }
+      })
+    ]);
 
     expect(service.hasDeathSnapshot()).toBe(true);
     expect(random.serialize).toHaveBeenCalled();
-
-    vi.useFakeTimers();
 
     const started = service.requestRetry({ source: 'unit-test' });
 
@@ -182,6 +204,16 @@ describe('GameSessionService lifecycle flows', () => {
     expect(world.reset).toHaveBeenCalled();
     expect(service.getSessionState()).toBe('running');
     expect(service.isRetryCountdownActive).toBe(false);
+    expect(service.getScreen()).toBe('playing');
+    expect(getScreenEvents()).toEqual([
+      expect.objectContaining({ screen: 'playing', source: 'session.start' }),
+      expect.objectContaining({
+        screen: 'gameover',
+        source: 'player-died',
+        data: { reason: 'spec' }
+      }),
+      expect.objectContaining({ screen: 'playing', source: 'retry-complete' })
+    ]);
   });
 
   it('restores retry button and player state when snapshot restoration fails', () => {

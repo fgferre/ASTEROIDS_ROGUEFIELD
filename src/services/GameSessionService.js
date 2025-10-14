@@ -14,6 +14,8 @@ const RANDOM_STORAGE_KEYS = {
   last: 'roguefield.lastSeed'
 };
 
+const GAME_OVER_SCREEN_DELAY_MS = 3000;
+
 export default class GameSessionService {
   /**
    * @param {Object} options
@@ -51,6 +53,7 @@ export default class GameSessionService {
     this.deathSnapshot = null;
     this.sessionState = 'menu';
     this.quitExplosionTimeoutId = null;
+    this.gameOverScreenTimeoutId = null;
     this.quitExplosionPlayerRef = null;
     this.isRetryCountdownActive = false;
 
@@ -551,6 +554,7 @@ export default class GameSessionService {
     }
 
     this.clearRetryCountdownTimers();
+    this.clearPendingGameOverTransition();
     this.isRetryCountdownActive = false;
     this.clearDeathSnapshot();
     this.hideRetryCountdown();
@@ -612,6 +616,8 @@ export default class GameSessionService {
     if (!this.hasDeathSnapshot()) {
       this.createDeathSnapshot();
     }
+
+    this.scheduleGameOverScreenTransition(data);
 
     const retriesRemaining = this.getRetryCount();
     if (retriesRemaining <= 0) {
@@ -723,6 +729,7 @@ export default class GameSessionService {
   }
 
   completeRetryRespawn() {
+    this.clearPendingGameOverTransition();
     this.isRetryCountdownActive = false;
 
     const player = this.resolveServiceInstance('player');
@@ -801,6 +808,8 @@ export default class GameSessionService {
       gameUI.classList.remove('hidden');
     }
 
+    this.setScreen('playing');
+    this.emitScreenChanged('playing', { source: 'retry-complete' });
     this.setSessionState('running', { reason: 'retry-complete' });
 
     return true;
@@ -954,6 +963,7 @@ export default class GameSessionService {
       }
     }
 
+    this.clearPendingGameOverTransition();
     this.setScreen('menu');
     this.emitScreenChanged('menu', { source: payload?.source || 'unknown' });
 
@@ -1135,6 +1145,29 @@ export default class GameSessionService {
       this.gameState.deathSnapshot = null;
       this.gameState.randomSnapshot = null;
     }
+  }
+
+  clearPendingGameOverTransition() {
+    if (this.gameOverScreenTimeoutId) {
+      clearTimeout(this.gameOverScreenTimeoutId);
+      this.gameOverScreenTimeoutId = null;
+    }
+  }
+
+  scheduleGameOverScreenTransition(data = {}) {
+    if (typeof setTimeout !== 'function') {
+      this.setScreen('gameover');
+      this.emitScreenChanged('gameover', { source: 'player-died', data, immediate: true });
+      return;
+    }
+
+    this.clearPendingGameOverTransition();
+
+    this.gameOverScreenTimeoutId = setTimeout(() => {
+      this.gameOverScreenTimeoutId = null;
+      this.setScreen('gameover');
+      this.emitScreenChanged('gameover', { source: 'player-died', data });
+    }, GAME_OVER_SCREEN_DELAY_MS);
   }
 
   hasDeathSnapshot() {
@@ -1756,6 +1789,7 @@ export default class GameSessionService {
 
   resetForMenu() {
     this.clearRetryCountdownTimers();
+    this.clearPendingGameOverTransition();
     this.isRetryCountdownActive = false;
     this.hideRetryCountdown();
     this.setRetryCount(0);
