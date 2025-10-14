@@ -49,6 +49,10 @@ export default class GameSessionService {
     this.currentRandomScope = 'uninitialized';
     this.randomSnapshot = null;
     this.deathSnapshot = null;
+    this.sessionState = 'menu';
+    this.quitExplosionTimeoutId = null;
+    this.quitExplosionPlayerRef = null;
+    this.isRetryCountdownActive = false;
 
     this.retryCountdownElement = this.lookupDomElement('retry-countdown');
     this.retryButtonElement = this.lookupDomElement('retry-game-btn');
@@ -94,6 +98,12 @@ export default class GameSessionService {
     if (!Object.prototype.hasOwnProperty.call(this.gameState, 'isPaused')) {
       this.gameState.isPaused = false;
     }
+
+    if (!Object.prototype.hasOwnProperty.call(this.gameState, 'sessionState')) {
+      this.gameState.sessionState = 'menu';
+    }
+
+    this.sessionState = this.gameState.sessionState;
   }
 
   lookupDomElement(id) {
@@ -188,6 +198,439 @@ export default class GameSessionService {
       this.gameState.screen = screen;
     }
     return screen;
+  }
+
+  emitScreenChanged(screen, meta = {}) {
+    if (!this.eventBus || typeof this.eventBus.emit !== 'function') {
+      return;
+    }
+
+    this.eventBus.emit('screen-changed', { screen, ...meta });
+  }
+
+  emitPauseState(meta = {}) {
+    if (!this.eventBus || typeof this.eventBus.emit !== 'function') {
+      return;
+    }
+
+    this.eventBus.emit('pause-state-changed', {
+      isPaused: this.isPaused(),
+      ...meta
+    });
+  }
+
+  setSessionState(state, meta = {}) {
+    const nextState = state || 'unknown';
+    const previous = this.sessionState;
+
+    if (this.gameState) {
+      this.gameState.sessionState = nextState;
+    }
+
+    this.sessionState = nextState;
+
+    if (!this.eventBus || typeof this.eventBus.emit !== 'function') {
+      return nextState;
+    }
+
+    if (previous === nextState && !meta.forceEmit) {
+      return nextState;
+    }
+
+    this.eventBus.emit('session-state-changed', {
+      state: nextState,
+      previousState: previous,
+      ...meta
+    });
+
+    return nextState;
+  }
+
+  getSessionState() {
+    return this.sessionState;
+  }
+
+  emitSessionRetryCountdown(payload = {}) {
+    if (!this.eventBus || typeof this.eventBus.emit !== 'function') {
+      return;
+    }
+
+    this.eventBus.emit('session-retry-countdown', { ...payload });
+  }
+
+  startNewRun() {
+    try {
+      this.prepareRandomForScope('run.start', { mode: 'reset' });
+    } catch (error) {
+      console.warn('[GameSessionService] Failed to prepare RNG for run start:', error);
+    }
+
+    this.clearDeathSnapshot();
+    this.hideRetryCountdown();
+    this.setRetryCount(1);
+    this.setRetryButtonEnabled(true);
+
+    try {
+      this.resetSystems({ manageRandom: false });
+    } catch (error) {
+      console.error('[GameSessionService] Failed to reset systems during start:', error);
+    }
+
+    const ui = this.resolveServiceInstance('ui');
+    if (ui && typeof ui.showGameUI === 'function') {
+      try {
+        ui.showGameUI();
+      } catch (error) {
+        console.error('[GameSessionService] Failed to show game UI:', error);
+      }
+    }
+
+    const audio = this.audioService || this.resolveServiceInstance('audio');
+    if (!this.audioService && audio) {
+      this.audioService = audio;
+    }
+
+    if (audio && typeof audio.init === 'function') {
+      try {
+        audio.init();
+      } catch (error) {
+        console.error('[GameSessionService] Failed to initialize audio:', error);
+      }
+    }
+
+    this.setScreen('playing');
+    this.emitScreenChanged('playing', { source: 'session.start' });
+
+    this.setPaused(false);
+    this.emitPauseState({ source: 'session.start' });
+
+    this.setSessionState('running', { reason: 'start-new-run' });
+  }
+
+  handlePlayerDeath(data = {}) {
+    if (this.isPaused()) {
+      this.setPaused(false);
+      this.emitPauseState({ source: 'player-died' });
+    }
+
+    if (!this.hasDeathSnapshot()) {
+      this.createDeathSnapshot();
+    }
+
+    if (this.getRetryCount() <= 0) {
+      this.setRetryCount(1);
+    }
+
+    this.setRetryButtonEnabled(true);
+
+    this.setSessionState('player-died', {
+      reason: 'player-died',
+      data
+    });
+  }
+
+  beginRetryCountdown() {
+    if (this.isRetryCountdownActive) {
+      return;
+    }
+
+    const retries = this.getRetryCount();
+    if (retries <= 0) {
+      console.warn('[Retry] No retries remaining.');
+      this.setRetryButtonEnabled(false);
+      return;
+    }
+
+    if (!this.hasDeathSnapshot()) {
+      console.error('[Retry] Cannot begin countdown - missing snapshot');
+      this.setRetryButtonEnabled(true);
+      return;
+    }
+
+    this.isRetryCountdownActive = true;
+
+    this.setRetryButtonEnabled(false);
+    this.setRetryCount(Math.max(0, retries - 1));
+
+    this.emitSessionRetryCountdown({
+      phase: 'start',
+      total: 3
+    });
+
+    const gameoverScreen = this.lookupDomElement('gameover-screen');
+    if (gameoverScreen) {
+      gameoverScreen.classList.add('hidden');
+    }
+
+    const gameUI = this.lookupDomElement('game-ui');
+    if (gameUI) {
+      gameUI.classList.remove('hidden');
+    }
+
+    const player = this.resolveServiceInstance('player');
+    if (player) {
+      player.isRetrying = true;
+    }
+
+    this.hideRetryCountdown();
+
+    const countdownValues = [3, 2, 1];
+
+    const advanceCountdown = (index = 0) => {
+      if (index >= countdownValues.length) {
+        this.emitSessionRetryCountdown({ phase: 'complete' });
+        this.completeRetryRespawn();
+        return;
+      }
+
+      const value = countdownValues[index];
+      this.emitSessionRetryCountdown({
+        phase: 'tick',
+        value,
+        index,
+        remaining: countdownValues.length - index - 1,
+        total: countdownValues.length
+      });
+
+      this.showRetryCountdownNumber(value, () => advanceCountdown(index + 1));
+    };
+
+    advanceCountdown(0);
+
+    this.setSessionState('retrying', { reason: 'retry-countdown' });
+  }
+
+  completeRetryRespawn() {
+    this.isRetryCountdownActive = false;
+
+    const snapshot = this.getDeathSnapshot();
+
+    if (!snapshot) {
+      console.error('[Retry] Cannot respawn - missing snapshot');
+      this.setRetryButtonEnabled(true);
+      return false;
+    }
+
+    try {
+      if (snapshot.random) {
+        this.prepareRandomForScope('retry.respawn', {
+          mode: 'restore',
+          snapshot: snapshot.random
+        });
+      } else {
+        this.prepareRandomForScope('retry.respawn', { mode: 'reset' });
+      }
+    } catch (error) {
+      console.warn('[Retry] Failed to configure RNG for retry:', error);
+    }
+
+    const player = this.resolveServiceInstance('player');
+    const world = this.resolveServiceInstance('world');
+
+    if (!player || !world) {
+      console.error('[Retry] Cannot respawn - missing services');
+      this.setRetryButtonEnabled(true);
+      return false;
+    }
+
+    const restored = this.restoreFromSnapshot({ snapshot });
+    if (!restored) {
+      console.error('[Retry] Failed to restore snapshot');
+      this.setRetryButtonEnabled(true);
+      return false;
+    }
+
+    const safeSpawn = this.findSafeSpawnPoint();
+
+    if (typeof player.respawn === 'function') {
+      try {
+        player.respawn(safeSpawn, 3);
+      } catch (error) {
+        console.error('[Retry] Failed to respawn player:', error);
+        this.setRetryButtonEnabled(true);
+        return false;
+      }
+    }
+
+    if (typeof world.reset === 'function') {
+      try {
+        world.reset();
+      } catch (error) {
+        console.warn('[Retry] Failed to reset world during respawn:', error);
+      }
+    }
+
+    const gameoverScreen = this.lookupDomElement('gameover-screen');
+    if (gameoverScreen) {
+      gameoverScreen.classList.add('hidden');
+    }
+
+    this.hideRetryCountdown();
+
+    const gameUI = this.lookupDomElement('game-ui');
+    if (gameUI) {
+      gameUI.classList.remove('hidden');
+    }
+
+    this.setSessionState('running', { reason: 'retry-complete' });
+
+    return true;
+  }
+
+  togglePause() {
+    const currentScreen = this.getScreen();
+
+    if (currentScreen !== 'playing') {
+      if (this.isPaused()) {
+        this.setPaused(false);
+        this.emitPauseState({ source: 'toggle-pause' });
+        this.setSessionState('running', { reason: 'toggle-pause' });
+      }
+      return this.isPaused();
+    }
+
+    const next = !this.isPaused();
+    this.setPaused(next);
+    this.emitPauseState({ source: 'toggle-pause' });
+    this.setSessionState(next ? 'paused' : 'running', { reason: 'toggle-pause' });
+    return next;
+  }
+
+  cancelQuitExplosionTimer({ restorePlayer = true } = {}) {
+    if (!this.quitExplosionTimeoutId) {
+      return;
+    }
+
+    clearTimeout(this.quitExplosionTimeoutId);
+    this.quitExplosionTimeoutId = null;
+
+    if (restorePlayer && this.quitExplosionPlayerRef) {
+      this.quitExplosionPlayerRef._quitExplosionHidden = false;
+    }
+
+    this.quitExplosionPlayerRef = null;
+  }
+
+  exitToMenu(payload = {}) {
+    const { source } = payload || {};
+
+    try {
+      if (source === 'pause-menu' && this.getScreen() === 'playing') {
+        if (this.quitExplosionTimeoutId) {
+          return;
+        }
+
+        console.log('[GameSessionService] Quit from pause - triggering epic explosion...');
+
+        const player = this.resolveServiceInstance('player');
+        const effects = this.resolveServiceInstance('effects');
+        const ui = this.resolveServiceInstance('ui');
+
+        this.setPaused(false);
+        this.emitPauseState({ source: 'exit-to-menu' });
+
+        if (ui && typeof ui.showScreen === 'function') {
+          try {
+            ui.showScreen('playing');
+          } catch (error) {
+            console.warn('[GameSessionService] Failed to show playing screen before quit:', error);
+          }
+        }
+
+        const playerPosition =
+          player && typeof player.getPosition === 'function'
+            ? player.getPosition()
+            : player && player.position
+              ? { ...player.position }
+              : {
+                  x: CONSTANTS.GAME_WIDTH / 2,
+                  y: CONSTANTS.GAME_HEIGHT / 2
+                };
+
+        if (effects && typeof effects.createEpicShipExplosion === 'function') {
+          try {
+            effects.createEpicShipExplosion(playerPosition);
+          } catch (error) {
+            console.warn('[GameSessionService] Failed to create quit explosion:', error);
+          }
+        }
+
+        if (player) {
+          player._quitExplosionHidden = true;
+          this.quitExplosionPlayerRef = player;
+        }
+
+        this.quitExplosionTimeoutId = setTimeout(() => {
+          if (this.quitExplosionPlayerRef) {
+            this.quitExplosionPlayerRef._quitExplosionHidden = false;
+          }
+          this.quitExplosionPlayerRef = null;
+          this.quitExplosionTimeoutId = null;
+          this.performExitToMenu(payload);
+        }, 3500);
+
+        return;
+      }
+
+      this.performExitToMenu(payload);
+    } catch (error) {
+      console.error('[GameSessionService] Failed to exit to menu:', error);
+      this.performExitToMenu(payload);
+    }
+  }
+
+  performExitToMenu(payload = {}) {
+    this.cancelQuitExplosionTimer({ restorePlayer: false });
+
+    try {
+      this.prepareRandomForScope('menu.exit', { mode: 'reset' });
+    } catch (error) {
+      console.warn('[GameSessionService] Failed to prepare RNG for menu exit:', error);
+    }
+
+    try {
+      this.resetSystems({ manageRandom: false });
+    } catch (error) {
+      console.error('[GameSessionService] Failed to reset systems during exit:', error);
+    }
+
+    this.resetForMenu();
+
+    const ui = this.resolveServiceInstance('ui');
+    if (ui) {
+      if (typeof ui.resetLevelUpState === 'function') {
+        try {
+          ui.resetLevelUpState();
+        } catch (error) {
+          console.warn('[GameSessionService] Failed to reset UI level-up state:', error);
+        }
+      }
+
+      if (typeof ui.showScreen === 'function') {
+        try {
+          ui.showScreen('menu');
+        } catch (error) {
+          console.error('[GameSessionService] Failed to show menu screen:', error);
+        }
+      }
+    }
+
+    this.setScreen('menu');
+    this.emitScreenChanged('menu', { source: payload?.source || 'unknown' });
+
+    const wasPaused = this.isPaused();
+    this.setPaused(false);
+    if (wasPaused) {
+      this.emitPauseState({ source: 'exit-to-menu' });
+    }
+
+    if (payload?.source) {
+      console.log(`Retornando ao menu (origem: ${payload.source}).`);
+    } else {
+      console.log('Retornando ao menu.');
+    }
+
+    this.setSessionState('menu', { reason: 'exit-to-menu', source: payload?.source });
   }
 
   /**

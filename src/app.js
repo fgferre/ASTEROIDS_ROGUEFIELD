@@ -283,166 +283,18 @@ function bootstrapDebugLogging() {
 }
 
 function startRetryCountdown() {
-  if (gameSessionService?.hideRetryCountdown) {
-    gameSessionService.hideRetryCountdown();
+  if (gameSessionService?.beginRetryCountdown) {
+    gameSessionService.beginRetryCountdown();
   } else {
-    const countdown = document.getElementById('retry-countdown');
-    if (countdown) {
-      countdown.classList.add('hidden');
-    }
+    console.warn('[Retry] GameSessionService unavailable - fallback countdown not implemented.');
   }
-
-  // Hide game over screen
-  const gameoverScreen = document.getElementById('gameover-screen');
-  if (gameoverScreen) {
-    gameoverScreen.classList.add('hidden');
-  }
-
-  // Make sure game-ui is visible during countdown
-  const gameUI = document.getElementById('game-ui');
-  if (gameUI) {
-    gameUI.classList.remove('hidden');
-  }
-
-  // Mark player as retrying
-  const player = gameServices.get('player');
-  if (player) {
-    player.isRetrying = true;
-  }
-
-  const fallbackShow = (number, onComplete) => {
-    let countdown = document.getElementById('retry-countdown');
-    if (!countdown) {
-      countdown = document.createElement('div');
-      countdown.id = 'retry-countdown';
-      countdown.className = 'wave-countdown';
-      document.body.appendChild(countdown);
-    }
-
-    countdown.textContent = number.toString();
-    countdown.classList.remove('hidden');
-
-    setTimeout(() => {
-      countdown.classList.add('hidden');
-      setTimeout(() => {
-        if (typeof onComplete === 'function') {
-          onComplete();
-        }
-      }, 100);
-    }, 900);
-  };
-
-  const displayCountdown = gameSessionService?.showRetryCountdownNumber
-    ? (value, next) => gameSessionService.showRetryCountdownNumber(value, next)
-    : fallbackShow;
-
-  // Show countdown: 3, 2, 1
-  displayCountdown(3, () => {
-    displayCountdown(2, () => {
-      displayCountdown(1, () => {
-        // Countdown done - respawn player
-        executeRetryRespawn();
-      });
-    });
-  });
 }
 
 function executeRetryRespawn() {
-  const snapshot =
-    gameSessionService?.getDeathSnapshot?.() ?? gameState.deathSnapshot ?? null;
-
-  if (!snapshot) {
-    console.error('[Retry] Cannot respawn - missing snapshot');
-    if (gameSessionService?.setRetryButtonEnabled) {
-      gameSessionService.setRetryButtonEnabled(true);
-    }
-    return;
-  }
-
-  if (gameSessionService?.prepareRandomForScope) {
-    if (snapshot.random) {
-      gameSessionService.prepareRandomForScope('retry.respawn', {
-        mode: 'restore',
-        snapshot: snapshot.random
-      });
-    } else {
-      gameSessionService.prepareRandomForScope('retry.respawn', { mode: 'reset' });
-    }
+  if (gameSessionService?.completeRetryRespawn) {
+    gameSessionService.completeRetryRespawn();
   } else {
-    const random = getRandomService();
-    if (!random || typeof random.reset !== 'function') {
-      console.warn('[Random] Unable to configure RNG for retry without GameSessionService or random service.');
-    } else {
-      let mode = 'reset';
-      if (snapshot.random) {
-        try {
-          random.restore?.(snapshot.random);
-          mode = 'restore';
-        } catch (error) {
-          console.warn('[Random] Fallback restore failed for retry.respawn:', error);
-          random.reset(gameState.randomSeed);
-        }
-      } else {
-        random.reset(gameState.randomSeed);
-      }
-
-      const fallbackSnapshot = random.serialize?.();
-      if (fallbackSnapshot) {
-        gameState.randomSnapshot = fallbackSnapshot;
-        GameSessionService.logRandomSnapshot('retry.respawn (fallback)', fallbackSnapshot, {
-          mode
-        });
-      }
-    }
-  }
-
-  const player = gameServices.get('player');
-  const world = gameServices.get('world');
-
-  if (!player || !world) {
-    console.error('[Retry] Cannot respawn - missing services');
-    return;
-  }
-
-  const safeSpawn =
-    gameSessionService?.findSafeSpawnPoint?.() || {
-      x: CONSTANTS.GAME_WIDTH / 2,
-      y: CONSTANTS.GAME_HEIGHT / 2,
-    };
-
-  const restored = gameSessionService?.restoreFromSnapshot?.({ snapshot });
-  if (!restored) {
-    console.error('[Retry] Failed to restore snapshot');
-    if (gameSessionService?.setRetryButtonEnabled) {
-      gameSessionService.setRetryButtonEnabled(true);
-    }
-    return;
-  }
-
-  // Respawn player at safe location with invulnerability
-  player.respawn(safeSpawn, 3);
-
-  // Reset world state
-  world.reset();
-
-  // Hide gameover screen and countdown, show game
-  const gameoverScreen = document.getElementById('gameover-screen');
-  if (gameoverScreen) {
-    gameoverScreen.classList.add('hidden');
-  }
-
-  if (gameSessionService?.hideRetryCountdown) {
-    gameSessionService.hideRetryCountdown();
-  } else {
-    const countdown = document.getElementById('retry-countdown');
-    if (countdown) {
-      countdown.classList.add('hidden');
-    }
-  }
-
-  const gameUI = document.getElementById('game-ui');
-  if (gameUI) {
-    gameUI.classList.remove('hidden');
+    console.warn('[Retry] GameSessionService unavailable - respawn skipped.');
   }
 }
 
@@ -574,30 +426,10 @@ function setupDomEventListeners() {
       requestStartGame();
     } else if (button.id === 'retry-game-btn') {
       event.preventDefault();
-      const currentRetries =
-        gameSessionService?.getRetryCount?.() ??
-        parseInt(document.getElementById('retry-count')?.textContent || '0', 10);
-      const hasSnapshot =
-        gameSessionService?.hasDeathSnapshot?.() ?? Boolean(gameState.deathSnapshot);
-
-      if (currentRetries > 0 && hasSnapshot) {
-        if (gameSessionService?.setRetryCount) {
-          gameSessionService.setRetryCount(0);
-        } else {
-          const retryCountEl = document.getElementById('retry-count');
-          if (retryCountEl) {
-            retryCountEl.textContent = '0';
-          }
-        }
-
-        if (gameSessionService?.setRetryButtonEnabled) {
-          gameSessionService.setRetryButtonEnabled(false);
-        } else {
-          button.disabled = true;
-          button.style.opacity = '0.5';
-        }
-
-        startRetryCountdown();
+      if (gameSessionService?.beginRetryCountdown) {
+        gameSessionService.beginRetryCountdown();
+      } else {
+        console.warn('[Retry] GameSessionService unavailable - countdown skipped.');
       }
     } else if (button.id === 'quit-game-btn') {
       event.preventDefault();
@@ -635,23 +467,25 @@ function setupGlobalEventListeners() {
     }
   });
 
-  gameEvents.on('player-died', () => {
-    // DON'T change screen immediately - let explosion animate!
-    // UISystem will change screen to 'gameover' after 3s delay
-    if (gameState.isPaused) {
-      gameState.isPaused = false;
-      emitPauseState();
-    }
-
-    // Create snapshot for retry system
-    if (gameSessionService?.createDeathSnapshot) {
-      gameSessionService.createDeathSnapshot();
+  gameEvents.on('player-died', (data) => {
+    if (gameSessionService?.handlePlayerDeath) {
+      gameSessionService.handlePlayerDeath(data);
     } else {
+      if (gameState.isPaused) {
+        gameState.isPaused = false;
+        emitPauseState();
+      }
+
       console.warn('[Retry] Unable to capture snapshot - GameSessionService unavailable.');
     }
   });
 
   gameEvents.on('toggle-pause', () => {
+    if (gameSessionService?.togglePause) {
+      gameSessionService.togglePause();
+      return;
+    }
+
     if (gameState.screen !== 'playing') {
       if (gameState.isPaused) {
         gameState.isPaused = false;
@@ -691,62 +525,76 @@ function requestStartGame() {
 
 function startGame() {
   try {
-    if (gameSessionService?.prepareRandomForScope) {
-      gameSessionService.prepareRandomForScope('run.start', { mode: 'reset' });
+    let usedService = false;
+
+    if (gameSessionService?.startNewRun) {
+      gameSessionService.startNewRun();
+      usedService = true;
     } else {
-      const random = getRandomService();
-      if (random && typeof random.reset === 'function') {
-        random.reset(gameState.randomSeed);
-        const snapshot = random.serialize?.();
-        if (snapshot) {
-          gameState.randomSnapshot = snapshot;
-          GameSessionService.logRandomSnapshot('run.start (fallback)', snapshot, {
-            mode: 'reset'
-          });
-        }
+      if (gameSessionService?.prepareRandomForScope) {
+        gameSessionService.prepareRandomForScope('run.start', { mode: 'reset' });
       } else {
-        console.warn('[Random] Unable to prepare RNG for run.start - service unavailable.');
+        const random = getRandomService();
+        if (random && typeof random.reset === 'function') {
+          random.reset(gameState.randomSeed);
+          const snapshot = random.serialize?.();
+          if (snapshot) {
+            gameState.randomSnapshot = snapshot;
+            GameSessionService.logRandomSnapshot('run.start (fallback)', snapshot, {
+              mode: 'reset'
+            });
+          }
+        } else {
+          console.warn('[Random] Unable to prepare RNG for run.start - service unavailable.');
+        }
       }
-    }
-    if (gameSessionService?.clearDeathSnapshot) {
-      gameSessionService.clearDeathSnapshot();
-    } else {
-      gameState.deathSnapshot = null;
-    }
 
-    resetGameSystems({ manageRandom: false });
-
-    const audio = gameServices.get('audio');
-    if (audio?.init) audio.init();
-
-    const ui = gameServices.get('ui');
-    if (ui) ui.showGameUI();
-
-    // Reset retry UI state for new game
-    if (gameSessionService?.setRetryCount) {
-      gameSessionService.setRetryCount(1);
-    } else {
-      const retryCountEl = document.getElementById('retry-count');
-      if (retryCountEl) {
-        retryCountEl.textContent = '1';
+      if (gameSessionService?.clearDeathSnapshot) {
+        gameSessionService.clearDeathSnapshot();
+      } else {
+        gameState.deathSnapshot = null;
       }
-    }
 
-    if (gameSessionService?.setRetryButtonEnabled) {
-      gameSessionService.setRetryButtonEnabled(true);
-    } else {
-      const retryBtn = document.getElementById('retry-game-btn');
-      if (retryBtn) {
-        retryBtn.disabled = false;
-        retryBtn.style.opacity = '1';
+      resetGameSystems({ manageRandom: false });
+
+      const audio = gameServices.get('audio');
+      if (audio?.init) audio.init();
+
+      const ui = gameServices.get('ui');
+      if (ui) ui.showGameUI();
+
+      // Reset retry UI state for new game
+      if (gameSessionService?.setRetryCount) {
+        gameSessionService.setRetryCount(1);
+      } else {
+        const retryCountEl = document.getElementById('retry-count');
+        if (retryCountEl) {
+          retryCountEl.textContent = '1';
+        }
       }
+
+      if (gameSessionService?.setRetryButtonEnabled) {
+        gameSessionService.setRetryButtonEnabled(true);
+      } else {
+        const retryBtn = document.getElementById('retry-game-btn');
+        if (retryBtn) {
+          retryBtn.disabled = false;
+          retryBtn.style.opacity = '1';
+        }
+      }
+
+      gameSessionService?.hideRetryCountdown?.();
+
+      gameState.screen = 'playing';
+      gameState.isPaused = false;
+      emitPauseState();
     }
 
-    gameSessionService?.hideRetryCountdown?.();
+    if (usedService) {
+      gameState.screen = gameSessionService?.getScreen?.() ?? 'playing';
+      gameState.isPaused = Boolean(gameSessionService?.isPaused?.());
+    }
 
-    gameState.screen = 'playing';
-    gameState.isPaused = false;
-    emitPauseState();
     gameState.lastTime = performance.now();
 
     console.log('Jogo iniciado com sucesso!');
@@ -756,6 +604,19 @@ function startGame() {
 }
 
 function exitToMenu(payload = {}) {
+  if (gameSessionService?.exitToMenu) {
+    try {
+      gameSessionService.exitToMenu(payload);
+      return;
+    } catch (error) {
+      console.error('Erro ao sair para o menu via GameSessionService:', error);
+    }
+  }
+
+  legacyExitToMenu(payload);
+}
+
+function legacyExitToMenu(payload = {}) {
   try {
     // If exiting from pause menu, trigger epic ship explosion first!
     if (payload?.source === 'pause-menu' && gameState.screen === 'playing') {
@@ -794,19 +655,19 @@ function exitToMenu(payload = {}) {
         if (player) {
           player._quitExplosionHidden = false; // Restore for next game
         }
-        performExitToMenu(payload);
+        legacyPerformExitToMenu(payload);
       }, 3500); // 3.5s to see full explosion
       return;
     } else {
-      performExitToMenu(payload);
+      legacyPerformExitToMenu(payload);
     }
   } catch (error) {
     console.error('Erro ao sair para o menu:', error);
-    performExitToMenu(payload); // Fallback
+    legacyPerformExitToMenu(payload); // Fallback
   }
 }
 
-function performExitToMenu(payload = {}) {
+function legacyPerformExitToMenu(payload = {}) {
   try {
     if (gameSessionService?.prepareRandomForScope) {
       gameSessionService.prepareRandomForScope('menu.exit', { mode: 'reset' });
