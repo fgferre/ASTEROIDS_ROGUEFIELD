@@ -35,9 +35,36 @@ const SHIELD_LEVEL_CONFIG = {
 class PlayerSystem {
   constructor(config = {}) {
     const { position, dependencies } = this.normalizeConfig(config);
-    this.dependencies = normalizeDependencies(dependencies);
-    this.commandQueue = resolveService('command-queue', this.dependencies) || null;
+    const normalizedDependencies = normalizeDependencies(dependencies);
+
+    if (
+      config &&
+      typeof config === 'object' &&
+      !Array.isArray(config)
+    ) {
+      if (
+        config['command-queue'] &&
+        !normalizedDependencies['command-queue']
+      ) {
+        normalizedDependencies['command-queue'] = config['command-queue'];
+      }
+
+      if (
+        config.commandQueue &&
+        !normalizedDependencies['command-queue']
+      ) {
+        normalizedDependencies['command-queue'] = config.commandQueue;
+      }
+    }
+
+    this.dependencies = normalizedDependencies;
+    this.commandQueue =
+      this.dependencies['command-queue'] ||
+      resolveService('command-queue', this.dependencies) ||
+      null;
     this.commandQueueConsumerId = 'player-system';
+    this.cachedMovementInput = this.getDefaultMovementBinary();
+    this.lastConsumedMovementCommand = null;
     const startX = Number.isFinite(position?.x)
       ? position.x
       : CONSTANTS.GAME_WIDTH / 2;
@@ -123,11 +150,127 @@ class PlayerSystem {
   }
 
   getCommandQueue() {
-    if (!this.commandQueue) {
-      this.commandQueue = resolveService('command-queue', this.dependencies) || null;
+    if (this.commandQueue) {
+      return this.commandQueue;
+    }
+
+    if (this.dependencies && this.dependencies['command-queue']) {
+      this.commandQueue = this.dependencies['command-queue'];
+      return this.commandQueue;
+    }
+
+    this.commandQueue = resolveService('command-queue', this.dependencies) || null;
+
+    if (this.commandQueue && this.dependencies) {
+      this.dependencies['command-queue'] = this.commandQueue;
     }
 
     return this.commandQueue;
+  }
+
+  consumeMovementCommands() {
+    const queue = this.getCommandQueue();
+
+    if (!queue || typeof queue.consume !== 'function') {
+      return { consumed: false, binary: null };
+    }
+
+    let entries;
+
+    try {
+      entries = queue.consume({
+        types: ['move'],
+        consumerId: this.commandQueueConsumerId,
+      });
+    } catch (error) {
+      console.warn('[PlayerSystem] Failed to consume move commands:', error);
+      return { consumed: false, binary: null };
+    }
+
+    if (!Array.isArray(entries) || entries.length === 0) {
+      return { consumed: false, binary: null };
+    }
+
+    const latestEntry = entries[entries.length - 1];
+    const normalizedBinary = this.extractMovementBinary(latestEntry);
+
+    if (!normalizedBinary) {
+      this.lastConsumedMovementCommand = latestEntry || null;
+      return { consumed: true, binary: null };
+    }
+
+    this.cachedMovementInput = { ...normalizedBinary };
+    this.lastConsumedMovementCommand = latestEntry || null;
+
+    return { consumed: true, binary: { ...normalizedBinary } };
+  }
+
+  extractMovementBinary(entry) {
+    if (!entry || typeof entry !== 'object') {
+      return null;
+    }
+
+    const payload = entry.payload || null;
+
+    if (payload && typeof payload === 'object') {
+      if (payload.binary && typeof payload.binary === 'object') {
+        return this.normalizeMovementBinary(payload.binary);
+      }
+
+      if (payload.axes && typeof payload.axes === 'object') {
+        const threshold = 0.25;
+        const x = Number(payload.axes.x) || 0;
+        const y = Number(payload.axes.y) || 0;
+
+        return this.normalizeMovementBinary({
+          up: y < -threshold,
+          down: y > threshold,
+          left: x < -threshold,
+          right: x > threshold,
+        });
+      }
+    }
+
+    return null;
+  }
+
+  normalizeMovementBinary(binary) {
+    if (!binary || typeof binary !== 'object') {
+      return this.getDefaultMovementBinary();
+    }
+
+    return {
+      up: Boolean(binary.up),
+      down: Boolean(binary.down),
+      left: Boolean(binary.left),
+      right: Boolean(binary.right),
+    };
+  }
+
+  getDefaultMovementBinary() {
+    return {
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+    };
+  }
+
+  pullLegacyMovementFromInput(inputSystem) {
+    if (!inputSystem || typeof inputSystem.getMovementInput !== 'function') {
+      return null;
+    }
+
+    try {
+      const legacy = inputSystem.getMovementInput();
+      if (legacy && typeof legacy === 'object') {
+        return this.normalizeMovementBinary(legacy);
+      }
+    } catch (error) {
+      console.warn('[PlayerSystem] Failed to read legacy movement input:', error);
+    }
+
+    return null;
   }
 
   setupEventListeners() {
@@ -404,10 +547,29 @@ class PlayerSystem {
 
   // === MÉTODO PRINCIPAL UPDATE ===
   update(deltaTime) {
+    const commandQueue = this.getCommandQueue();
     const inputSystem = resolveService('input', this.dependencies);
-    if (!inputSystem) {
-      console.warn('[PlayerSystem] InputSystem not found');
+
+    if (!inputSystem && !commandQueue) {
+      console.warn('[PlayerSystem] InputSystem and CommandQueue not found');
       return;
+    }
+
+    const { consumed, binary } = this.consumeMovementCommands();
+    let movement = null;
+
+    if (consumed && binary) {
+      movement = { ...binary };
+    } else if (!commandQueue) {
+      const legacyMovement = this.pullLegacyMovementFromInput(inputSystem);
+      if (legacyMovement) {
+        this.cachedMovementInput = { ...legacyMovement };
+        movement = { ...legacyMovement };
+      }
+    }
+
+    if (!movement) {
+      movement = { ...this.cachedMovementInput };
     }
 
     if (this.shieldCooldownTimer > 0) {
@@ -434,7 +596,6 @@ class PlayerSystem {
       return; // Don't process input, movement, or effects when dead/retrying
     }
 
-    const movement = inputSystem.getMovementInput();
     this.updateMovement(deltaTime, movement);
     this.updatePosition(deltaTime);
 
