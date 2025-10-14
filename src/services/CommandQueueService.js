@@ -208,6 +208,36 @@ export default class CommandQueueService {
     return this.queue.map((entry) => this.cloneEntry(entry));
   }
 
+  peekLast(options = {}) {
+    if (this.queue.length === 0) {
+      return null;
+    }
+
+    const { type = null, types = null, predicate = null } = options || {};
+    const matchType = typeof type === 'string' ? type : null;
+    const typeSet = Array.isArray(types) && types.length > 0 ? new Set(types) : null;
+    const shouldInclude = typeof predicate === 'function' ? predicate : null;
+
+    for (let index = this.queue.length - 1; index >= 0; index -= 1) {
+      const entry = this.queue[index];
+      if (matchType && entry.type !== matchType) {
+        continue;
+      }
+
+      if (typeSet && !typeSet.has(entry.type)) {
+        continue;
+      }
+
+      if (shouldInclude && !shouldInclude(entry)) {
+        continue;
+      }
+
+      return this.cloneEntry(entry);
+    }
+
+    return null;
+  }
+
   size() {
     return this.queue.length;
   }

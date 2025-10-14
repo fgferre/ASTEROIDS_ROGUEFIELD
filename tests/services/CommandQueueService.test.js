@@ -64,6 +64,28 @@ describe('CommandQueueService', () => {
     expect(onClear.mock.calls[0][0].reason).toBe('reset');
   });
 
+  it('retrieves the most recent matching entry via peekLast', () => {
+    const queue = new CommandQueueService();
+
+    const first = queue.enqueue({ type: 'move', axes: { x: 0, y: 1 } });
+    const middle = queue.enqueue({ type: 'firePrimary', phase: 'pressed' });
+    const last = queue.enqueue({ type: 'move', axes: { x: 1, y: 0 } });
+
+    const latestMove = queue.peekLast({ type: 'move' });
+    expect(latestMove.payload.axes).toStrictEqual({ x: 1, y: 0 });
+    expect(latestMove).not.toBe(last);
+
+    const latestFire = queue.peekLast({ types: ['firePrimary'] });
+    expect(latestFire.payload.phase).toBe('pressed');
+    expect(latestFire).not.toBe(middle);
+
+    const matchingPredicate = queue.peekLast({
+      predicate: (entry) => entry.payload?.axes?.x === first.payload.axes.x,
+    });
+    expect(matchingPredicate.payload.axes).toStrictEqual({ x: 0, y: 1 });
+    expect(matchingPredicate).not.toBe(first);
+  });
+
   it('clears queued commands and reports queue size', () => {
     const queue = new CommandQueueService();
     queue.enqueue({ type: 'move', axes: { x: 0, y: 1 } });
