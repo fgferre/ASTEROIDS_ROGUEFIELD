@@ -180,6 +180,27 @@ describe('GameSessionService lifecycle flows', () => {
     expect(service.isRetryCountdownActive).toBe(false);
   });
 
+  it('restores retry button and player state when snapshot restoration fails', () => {
+    const { service, player } = createServiceHarness();
+
+    player.isRetrying = true;
+    service.retryButtonElement.disabled = true;
+    service.retryButtonElement.style.opacity = '0.5';
+    service.deathSnapshot = { random: null };
+
+    const restoreSpy = vi
+      .spyOn(service, 'restoreFromSnapshot')
+      .mockReturnValue(false);
+
+    const result = service.completeRetryRespawn();
+
+    expect(result).toBe(false);
+    expect(restoreSpy).toHaveBeenCalledWith({ snapshot: service.deathSnapshot });
+    expect(player.isRetrying).toBe(false);
+    expect(service.retryButtonElement.disabled).toBe(false);
+    expect(service.retryButtonElement.style.opacity).toBe('1');
+  });
+
   it('toggles pause state and emits pause events while playing', () => {
     const { service, eventBus } = createServiceHarness();
 
