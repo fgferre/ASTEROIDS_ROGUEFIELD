@@ -560,11 +560,15 @@ export default class GameSessionService {
       this.createDeathSnapshot();
     }
 
-    if (this.getRetryCount() <= 0) {
-      this.setRetryCount(1);
+    const retriesRemaining = this.getRetryCount();
+    if (retriesRemaining <= 0) {
+      if (retriesRemaining < 0) {
+        this.setRetryCount(0);
+      }
+      this.setRetryButtonEnabled(false);
+    } else {
+      this.setRetryButtonEnabled(true);
     }
-
-    this.setRetryButtonEnabled(true);
 
     this.setSessionState('player-died', {
       reason: 'player-died',
