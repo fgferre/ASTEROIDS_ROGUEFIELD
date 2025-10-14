@@ -29,7 +29,6 @@ const gameState = {
   randomSeedSource: 'unknown',
   randomSnapshot: null,
   randomScope: 'uninitialized',
-  randomService: null,
 };
 
 let garbageCollectionManager = null;
@@ -42,40 +41,6 @@ let diContainer = null;
 let serviceLocatorAdapter = null;
 let mathRandomGuard = null;
 let gameSessionService = null;
-
-function getRandomService() {
-  if (gameState.randomService) {
-    return gameState.randomService;
-  }
-
-  if (typeof gameServices !== 'undefined') {
-    try {
-      if (typeof gameServices.has === 'function' ? gameServices.has('random') : true) {
-        const service = gameServices.get('random');
-        if (service) {
-          gameState.randomService = service;
-          return service;
-        }
-      }
-    } catch (error) {
-      console.warn('[Random] Failed to obtain service from legacy locator:', error);
-    }
-  }
-
-  if (diContainer && typeof diContainer.resolve === 'function') {
-    try {
-      const service = diContainer.resolve('random');
-      if (service) {
-        gameState.randomService = service;
-        return service;
-      }
-    } catch (error) {
-      console.warn('[Random] Failed to resolve random service from DI:', error);
-    }
-  }
-
-  return null;
-}
 
 function logServiceRegistrationFlow({ reason = 'bootstrap' } = {}) {
   if (!diContainer || typeof diContainer.getServiceNames !== 'function') {
@@ -258,10 +223,6 @@ function init() {
     });
 
     garbageCollectionManager = services['garbage-collector'] || garbageCollectionManager;
-
-    if (services['random']) {
-      gameState.randomService = services['random'];
-    }
 
     let resolvedGameSession = null;
     if (diContainer && typeof diContainer.resolve === 'function') {
