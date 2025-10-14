@@ -566,7 +566,7 @@ export default class GameSessionService {
     const ui = this.resolveServiceInstance('ui');
     if (ui && typeof ui.showGameUI === 'function') {
       try {
-        ui.showGameUI();
+        ui.showGameUI({ emitEvent: false });
       } catch (error) {
         console.error('[GameSessionService] Failed to show game UI:', error);
       }
@@ -863,7 +863,7 @@ export default class GameSessionService {
 
         if (ui && typeof ui.showScreen === 'function') {
           try {
-            ui.showScreen('playing');
+            ui.showScreen('playing', { emitEvent: false });
           } catch (error) {
             console.warn('[GameSessionService] Failed to show playing screen before quit:', error);
           }
@@ -940,7 +940,7 @@ export default class GameSessionService {
 
       if (typeof ui.showScreen === 'function') {
         try {
-          ui.showScreen('menu');
+          ui.showScreen('menu', { emitEvent: false });
         } catch (error) {
           console.error('[GameSessionService] Failed to show menu screen:', error);
         }
