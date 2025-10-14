@@ -2777,7 +2777,7 @@ class UISystem {
   }
 
   showScreen(screenName, options = {}) {
-    const { overlay = false, show = true } = options;
+    const { overlay = false, show = true, suppressEvent = false } = options;
     try {
       if (overlay) {
         const target = document.getElementById(`${screenName}-screen`);
@@ -2831,7 +2831,7 @@ class UISystem {
 
       document.body?.classList.remove('is-credits-open');
 
-      if (typeof gameEvents !== 'undefined') {
+      if (!suppressEvent && typeof gameEvents !== 'undefined') {
         gameEvents.emit('screen-changed', { screen: screenName });
       }
     } catch (error) {
@@ -2839,9 +2839,9 @@ class UISystem {
     }
   }
 
-  showGameUI() {
+  showGameUI(options = {}) {
     this.resetLevelUpState();
-    this.showScreen('playing');
+    this.showScreen('playing', options);
     this.refreshHudFromServices(true);
   }
 

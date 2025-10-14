@@ -64,10 +64,18 @@ function createServiceHarness() {
   };
 
   const ui = {
-    showGameUI: vi.fn(),
-    showScreen: vi.fn(),
-    resetLevelUpState: vi.fn()
+    resetLevelUpState: vi.fn(),
+    showScreen: vi.fn((screen, options = {}) => {
+      if (!options?.suppressEvent) {
+        eventBus.emit('screen-changed', { screen, source: 'ui' });
+      }
+    })
   };
+
+  ui.showGameUI = vi.fn((options = {}) => {
+    ui.resetLevelUpState();
+    ui.showScreen('playing', options);
+  });
 
   const xpOrbs = { reset: vi.fn() };
   const healthHearts = { reset: vi.fn() };
@@ -148,6 +156,21 @@ describe('GameSessionService lifecycle flows', () => {
     vi.useRealTimers();
   });
 
+  it('emits a single screen change when starting a new run', () => {
+    const { service, eventBus } = createServiceHarness();
+
+    service.startNewRun({ source: 'spec' });
+
+    const screenChangeCalls = eventBus.emit.mock.calls.filter(
+      ([eventName]) => eventName === 'screen-changed'
+    );
+
+    expect(screenChangeCalls).toHaveLength(1);
+    expect(screenChangeCalls[0][1]).toEqual(
+      expect.objectContaining({ screen: 'playing', source: 'session.start' })
+    );
+  });
+
   it('runs retry countdown to completion and respawns player', () => {
     const { service, eventBus, player, world, random } = createServiceHarness();
 
@@ -224,9 +247,17 @@ describe('GameSessionService lifecycle flows', () => {
     expect(exitSpy).toHaveBeenCalledWith({ source: 'pause-menu' });
     expect(player._quitExplosionHidden).toBe(false);
     expect(service.getScreen()).toBe('menu');
-    expect(ui.showScreen).toHaveBeenCalledWith('menu');
-    expect(eventBus.emit).toHaveBeenCalledWith(
-      'screen-changed',
+    expect(ui.showScreen).toHaveBeenCalledWith(
+      'menu',
+      expect.objectContaining({ suppressEvent: true })
+    );
+
+    const screenChangeCalls = eventBus.emit.mock.calls.filter(
+      ([eventName]) => eventName === 'screen-changed'
+    );
+
+    expect(screenChangeCalls).toHaveLength(1);
+    expect(screenChangeCalls[0][1]).toEqual(
       expect.objectContaining({ screen: 'menu', source: 'pause-menu' })
     );
   });
