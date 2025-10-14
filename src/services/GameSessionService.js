@@ -711,6 +711,36 @@ export default class GameSessionService {
       }
     }
 
+    if (progressionRestored) {
+      const {
+        reapplied: reappliedUpgrades,
+        total: totalUpgradeLevels,
+        errors: upgradeReapplyErrors
+      } = this.reapplyProgressionUpgrades({
+        progression,
+        snapshot: payload.progression
+      });
+
+      if (totalUpgradeLevels > 0) {
+        if (upgradeReapplyErrors > 0) {
+          hadFallback = true;
+          console.warn(
+            '[Retry] Failed to fully reapply upgrade effects after restoration.',
+            {
+              reapplied: reappliedUpgrades,
+              total: totalUpgradeLevels,
+              errors: upgradeReapplyErrors
+            }
+          );
+        } else {
+          console.log(
+            '[Retry] Reapplied upgrade effects after snapshot restore:',
+            reappliedUpgrades
+          );
+        }
+      }
+    }
+
     let enemiesRestored = false;
     if (payload.enemies && typeof enemies.restoreSnapshotState === 'function') {
       try {
@@ -772,6 +802,108 @@ export default class GameSessionService {
     }
 
     return true;
+  }
+
+  reapplyProgressionUpgrades({ progression, snapshot } = {}) {
+    if (!progression || typeof progression.applyUpgradeEffects !== 'function') {
+      return { reapplied: 0, total: 0, errors: 0 };
+    }
+
+    let entries = [];
+
+    if (Array.isArray(snapshot?.appliedUpgrades)) {
+      entries = snapshot.appliedUpgrades
+        .map((entry) => {
+          if (Array.isArray(entry) && entry.length >= 2) {
+            return [entry[0], entry[1]];
+          }
+
+          if (entry && typeof entry === 'object') {
+            return [entry.id, entry.level];
+          }
+
+          return null;
+        })
+        .filter((entry) => entry && typeof entry[0] === 'string');
+    }
+
+    if (entries.length === 0 && typeof progression.getAllUpgrades === 'function') {
+      entries = Array.from(progression.getAllUpgrades().entries());
+    }
+
+    if (!entries.length) {
+      return { reapplied: 0, total: 0, errors: 0 };
+    }
+
+    if (typeof progression.refreshInjectedServices === 'function') {
+      try {
+        progression.refreshInjectedServices(true);
+      } catch (error) {
+        console.warn('[Retry] Failed to refresh progression services before reapply:', error);
+      }
+    }
+
+    let reapplied = 0;
+    let total = 0;
+    let errors = 0;
+
+    const upgradeLookup = progression && progression.upgradeLookup;
+
+    entries.forEach(([upgradeId, level]) => {
+      if (!upgradeId || !Number.isFinite(level)) {
+        return;
+      }
+
+      const normalizedLevel = Math.max(0, Math.floor(level));
+      if (normalizedLevel <= 0) {
+        return;
+      }
+
+      const definition =
+        upgradeLookup && typeof upgradeLookup.get === 'function'
+          ? upgradeLookup.get(upgradeId)
+          : null;
+      if (!definition) {
+        total += normalizedLevel;
+        errors += normalizedLevel;
+        console.warn('[Retry] Missing upgrade definition during reapply:', upgradeId);
+        return;
+      }
+
+      const levels = Array.isArray(definition.levels) ? definition.levels : [];
+
+      for (let index = 0; index < normalizedLevel; index += 1) {
+        total += 1;
+        const levelDefinition = levels[index];
+
+        if (!levelDefinition) {
+          errors += 1;
+          console.warn(
+            '[Retry] Missing level definition during upgrade reapply:',
+            upgradeId,
+            'level',
+            index + 1
+          );
+          continue;
+        }
+
+        try {
+          progression.applyUpgradeEffects(definition, levelDefinition, index + 1);
+          reapplied += 1;
+        } catch (error) {
+          errors += 1;
+          console.warn(
+            '[Retry] Failed to apply upgrade effect during reapply:',
+            upgradeId,
+            'level',
+            index + 1,
+            error
+          );
+        }
+      }
+    });
+
+    return { reapplied, total, errors };
   }
 
   findSafeSpawnPoint() {
