@@ -136,19 +136,32 @@ export default class GameSessionService {
    * @param {Object} [options]
    * @param {*} [options.seed]
    * @param {string} [options.source]
+   * @param {{ seed: *, source?: string }} [options.seedInfo]
    * @param {HTMLCanvasElement} [options.canvas]
    * @param {CanvasRenderingContext2D} [options.ctx]
    */
-  initialize({ seed, source, canvas, ctx } = {}) {
-    if (typeof seed !== 'undefined') {
-      this.seedInfo.seed = seed;
+  initialize({ seed, source, seedInfo, canvas, ctx } = {}) {
+    const normalizedSeedInfo = typeof seedInfo === 'object' && seedInfo !== null
+      ? { ...seedInfo }
+      : {};
+
+    if (typeof normalizedSeedInfo.seed === 'undefined' && typeof seed !== 'undefined') {
+      normalizedSeedInfo.seed = seed;
+    }
+
+    if (typeof normalizedSeedInfo.source === 'undefined' && typeof source === 'string') {
+      normalizedSeedInfo.source = source;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(normalizedSeedInfo, 'seed')) {
+      this.seedInfo.seed = normalizedSeedInfo.seed;
       if (this.gameState) {
-        this.gameState.randomSeed = seed;
+        this.gameState.randomSeed = normalizedSeedInfo.seed;
       }
     }
 
-    if (typeof source === 'string') {
-      this.seedInfo.source = source;
+    if (typeof normalizedSeedInfo.source === 'string') {
+      this.seedInfo.source = normalizedSeedInfo.source;
     }
 
     if (this.gameState) {
@@ -163,8 +176,10 @@ export default class GameSessionService {
       this.ctx = ctx;
     }
 
-    GameSessionService.persistLastSeed(this.seedInfo.seed, this.seedInfo.source);
-    console.log(`[Random] Boot seed (${this.seedInfo.source}): ${String(this.seedInfo.seed)}`);
+    if (typeof this.seedInfo.seed !== 'undefined' && this.seedInfo.seed !== null) {
+      GameSessionService.persistLastSeed(this.seedInfo.seed, this.seedInfo.source);
+      console.log(`[Random] Boot seed (${this.seedInfo.source}): ${String(this.seedInfo.seed)}`);
+    }
 
     this.setupDomEventListeners();
     this.setupGlobalEventListeners();
@@ -176,6 +191,14 @@ export default class GameSessionService {
    */
   isPaused() {
     return Boolean(this.gameState?.isPaused);
+  }
+
+  /**
+   * Indicates whether gameplay should be processed during the current frame.
+   * @returns {boolean}
+   */
+  isRunning() {
+    return this.getScreen() === 'playing' && !this.isPaused();
   }
 
   /**
@@ -262,6 +285,36 @@ export default class GameSessionService {
 
   getSessionState() {
     return this.sessionState;
+  }
+
+  synchronizeLegacyState() {
+    if (!this.gameState || typeof this.gameState !== 'object') {
+      return;
+    }
+
+    const screen = this.getScreen();
+    if (typeof screen === 'string') {
+      this.gameState.screen = screen;
+    }
+
+    this.gameState.isPaused = this.isPaused();
+    this.gameState.sessionState = this.sessionState;
+
+    if (Object.prototype.hasOwnProperty.call(this.seedInfo, 'seed')) {
+      this.gameState.randomSeed = this.seedInfo.seed;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(this.seedInfo, 'source')) {
+      this.gameState.randomSeedSource = this.seedInfo.source;
+    }
+
+    if (this.currentRandomSnapshot) {
+      this.gameState.randomSnapshot = this.currentRandomSnapshot;
+    }
+
+    if (typeof this.currentRandomScope === 'string') {
+      this.gameState.randomScope = this.currentRandomScope;
+    }
   }
 
   emitSessionRetryCountdown(payload = {}) {
