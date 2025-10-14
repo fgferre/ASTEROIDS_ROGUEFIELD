@@ -645,16 +645,28 @@ export default class GameSessionService {
     }
 
     if (payload.player) {
-      const { maxHealth, health, position } = payload.player;
+      const { maxHealth, health, position, upgrades } = payload.player;
 
-      if (Number.isFinite(maxHealth)) {
+      const hasValidMaxHealth = Number.isFinite(maxHealth) && maxHealth > 0;
+      if (hasValidMaxHealth) {
         player.maxHealth = maxHealth;
       }
 
-      if (Number.isFinite(health)) {
-        player.health = health;
-      } else if (Number.isFinite(maxHealth)) {
-        player.health = maxHealth;
+      if (Array.isArray(upgrades)) {
+        player.upgrades = [...upgrades];
+      }
+
+      let nextHealth = null;
+      if (hasValidMaxHealth) {
+        nextHealth = maxHealth;
+      } else if (Number.isFinite(health) && health > 0) {
+        nextHealth = health;
+      }
+
+      if (Number.isFinite(nextHealth)) {
+        player.health = nextHealth;
+      } else if (Number.isFinite(player.maxHealth) && player.maxHealth > 0) {
+        player.health = player.maxHealth;
       }
 
       if (position && typeof position === 'object') {
