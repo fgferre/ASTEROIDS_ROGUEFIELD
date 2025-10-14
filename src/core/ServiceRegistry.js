@@ -185,8 +185,40 @@ export class ServiceRegistry {
 
     container.register('random', () => deterministicRandom);
 
-    const sessionState = { paused: false, screen: 'menu' };
+    const sessionState = {
+      paused: false,
+      screen: 'menu',
+      sessionState: 'menu',
+      retryCount: 0,
+      retryCountdownActive: false,
+      seed: null,
+      seedSource: 'unknown',
+      randomScope: 'uninitialized',
+      randomSnapshot: null
+    };
+
     const defaultSessionStub = {
+      initialize: ({ seedInfo, seed, source } = {}) => {
+        const normalizedSeedInfo = typeof seedInfo === 'object' && seedInfo !== null ? seedInfo : {};
+
+        if (typeof normalizedSeedInfo.seed === 'undefined' && typeof seed !== 'undefined') {
+          normalizedSeedInfo.seed = seed;
+        }
+
+        if (typeof normalizedSeedInfo.source === 'undefined' && typeof source === 'string') {
+          normalizedSeedInfo.source = source;
+        }
+
+        if (Object.prototype.hasOwnProperty.call(normalizedSeedInfo, 'seed')) {
+          sessionState.seed = normalizedSeedInfo.seed;
+        }
+
+        if (typeof normalizedSeedInfo.source === 'string') {
+          sessionState.seedSource = normalizedSeedInfo.source;
+        }
+
+        return { seed: sessionState.seed, source: sessionState.seedSource };
+      },
       isPaused: () => sessionState.paused,
       setPaused: (value) => {
         sessionState.paused = Boolean(value);
@@ -196,10 +228,128 @@ export class ServiceRegistry {
       setScreen: (screen) => {
         sessionState.screen = screen;
         return sessionState.screen;
-      }
+      },
+      isRunning: () => sessionState.screen === 'playing' && !sessionState.paused,
+      setSessionState: (state) => {
+        sessionState.sessionState = state;
+        return sessionState.sessionState;
+      },
+      getSessionState: () => sessionState.sessionState,
+      getRetryCount: () => sessionState.retryCount,
+      setRetryCount: (value) => {
+        const numeric = Number.isFinite(value) ? value : 0;
+        sessionState.retryCount = Math.max(0, numeric);
+        return sessionState.retryCount;
+      },
+      requestRetry: () => {
+        if (sessionState.retryCountdownActive || sessionState.retryCount <= 0) {
+          return false;
+        }
+
+        sessionState.retryCountdownActive = true;
+        sessionState.retryCount = Math.max(0, sessionState.retryCount - 1);
+        sessionState.sessionState = 'retrying';
+        return true;
+      },
+      beginRetryCountdown: () => {
+        if (sessionState.retryCountdownActive || sessionState.retryCount <= 0) {
+          return false;
+        }
+
+        sessionState.retryCountdownActive = true;
+        sessionState.retryCount = Math.max(0, sessionState.retryCount - 1);
+        sessionState.sessionState = 'retrying';
+        return true;
+      },
+      completeRetryRespawn: () => {
+        sessionState.retryCountdownActive = false;
+        sessionState.sessionState = 'running';
+        sessionState.screen = 'playing';
+        sessionState.paused = false;
+        return true;
+      },
+      handlePlayerDeath: () => {
+        sessionState.sessionState = 'player-died';
+        sessionState.screen = 'gameover';
+        return true;
+      },
+      startNewRun: ({ source } = {}) => {
+        sessionState.screen = 'playing';
+        sessionState.paused = false;
+        sessionState.sessionState = 'running';
+        sessionState.lastStartSource = source || 'unknown';
+        if (sessionState.retryCount <= 0) {
+          sessionState.retryCount = 1;
+        }
+        sessionState.retryCountdownActive = false;
+        return true;
+      },
+      exitToMenu: ({ source } = {}) => {
+        sessionState.screen = 'menu';
+        sessionState.paused = false;
+        sessionState.sessionState = 'menu';
+        sessionState.retryCountdownActive = false;
+        sessionState.retryCount = 0;
+        sessionState.randomScope = 'menu';
+        sessionState.lastExitSource = source || 'unknown';
+        return true;
+      },
+      togglePause: ({ forcedState } = {}) => {
+        if (typeof forcedState === 'boolean') {
+          sessionState.paused = forcedState;
+        } else {
+          sessionState.paused = !sessionState.paused;
+        }
+        sessionState.sessionState = sessionState.paused ? 'paused' : 'running';
+        return sessionState.paused;
+      },
+      prepareRandomForScope: (scope, { mode = 'reset', snapshot } = {}) => {
+        sessionState.randomScope = scope;
+        if (snapshot) {
+          sessionState.randomSnapshot = snapshot;
+        } else if (mode === 'reset') {
+          sessionState.randomSnapshot = {
+            seed: sessionState.seed,
+            scope,
+            mode
+          };
+        }
+        return {
+          scope,
+          mode,
+          snapshot: sessionState.randomSnapshot
+        };
+      },
+      getRandomSnapshot: () => sessionState.randomSnapshot,
+      getSeedInfo: () => ({
+        seed: sessionState.seed,
+        source: sessionState.seedSource
+      }),
+      synchronizeLegacyState: () => undefined
     };
 
-    container.register('game-session', () => gameSessionOverride || defaultSessionStub);
+    const resolvedGameSession = (() => {
+      if (typeof gameSessionOverride === 'function') {
+        const produced = gameSessionOverride({
+          defaults: defaultSessionStub,
+          state: sessionState
+        });
+
+        if (produced && typeof produced === 'object') {
+          return { ...defaultSessionStub, ...produced };
+        }
+
+        return defaultSessionStub;
+      }
+
+      if (gameSessionOverride && typeof gameSessionOverride === 'object') {
+        return { ...defaultSessionStub, ...gameSessionOverride };
+      }
+
+      return defaultSessionStub;
+    })();
+
+    container.register('game-session', () => resolvedGameSession);
 
     // Add any additional overrides
     for (const [name, factory] of Object.entries(serviceOverrides)) {
