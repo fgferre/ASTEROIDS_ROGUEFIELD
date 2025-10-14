@@ -265,6 +265,8 @@ export default class GameSessionService {
       console.warn('[GameSessionService] Failed to prepare RNG for run start:', error);
     }
 
+    this.clearRetryCountdownTimers();
+    this.isRetryCountdownActive = false;
     this.clearDeathSnapshot();
     this.hideRetryCountdown();
     this.setRetryCount(1);
@@ -1415,6 +1417,7 @@ export default class GameSessionService {
 
   resetForMenu() {
     this.clearRetryCountdownTimers();
+    this.isRetryCountdownActive = false;
     this.hideRetryCountdown();
     this.setRetryCount(0);
     this.setRetryButtonEnabled(false);
