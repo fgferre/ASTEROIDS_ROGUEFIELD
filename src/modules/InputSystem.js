@@ -10,6 +10,7 @@ const MOVEMENT_ACTIONS = new Set([
   'moveLeft',
   'moveRight',
 ]);
+const MOVEMENT_ACTION_LIST = Array.from(MOVEMENT_ACTIONS);
 const DEFAULT_GAMEPAD_AXIS_THRESHOLD = 0.45;
 
 function ensureArray(value) {
@@ -31,6 +32,9 @@ function clone(value) {
 class InputSystem {
   constructor(dependencies = {}) {
     this.dependencies = normalizeDependencies(dependencies);
+    this.commandQueue =
+      resolveService('command-queue', this.dependencies) || null;
+    this.lastMovementCommand = null;
     this.keys = {};
     this.codes = {};
     this.mousePos = { x: 0, y: 0 };
@@ -66,6 +70,14 @@ class InputSystem {
     }
 
     console.log('[InputSystem] Initialized');
+  }
+
+  resolveCommandQueue(force = false) {
+    if (force || !this.commandQueue) {
+      this.commandQueue =
+        resolveService('command-queue', this.dependencies) || this.commandQueue;
+    }
+    return this.commandQueue;
   }
 
   resolveControlFieldMap() {
@@ -336,6 +348,7 @@ class InputSystem {
       return;
     }
 
+    this.enqueueActionCommand(action, 'pressed', source, context);
     this.emitActionEvent(action, 'pressed', source, context);
   }
 
@@ -364,6 +377,7 @@ class InputSystem {
       return;
     }
 
+    this.enqueueActionCommand(action, 'released', source, context);
     this.emitActionEvent(action, 'released', source, context);
   }
 
@@ -726,13 +740,255 @@ class InputSystem {
     );
   }
 
-  getMovementInput() {
+  sanitizeCommandContext(context = {}) {
+    if (!context || typeof context !== 'object') {
+      return {};
+    }
+
+    const { event, ...rest } = context;
+    return { ...rest };
+  }
+
+  getCurrentTimestamp() {
+    if (
+      typeof performance !== 'undefined' &&
+      typeof performance.now === 'function'
+    ) {
+      return performance.now();
+    }
+
+    return Date.now();
+  }
+
+  collectMovementBindingDetails() {
+    let hasKeyboard = false;
+    let hasGamepad = false;
+    const keyboardInputs = new Set();
+
+    for (const action of MOVEMENT_ACTION_LIST) {
+      if (this.activeKeyboardActions.has(action)) {
+        hasKeyboard = true;
+      }
+      if (this.activeGamepadActions.has(action)) {
+        hasGamepad = true;
+      }
+
+      const inputs = this.keyboardActionInputs.get(action);
+      if (inputs) {
+        inputs.forEach((inputId) => keyboardInputs.add(inputId));
+      }
+    }
+
+    const source = hasKeyboard && hasGamepad
+      ? 'mixed'
+      : hasGamepad
+        ? 'gamepad'
+        : hasKeyboard
+          ? 'keyboard'
+          : 'none';
+
+    return {
+      source,
+      devices: {
+        keyboard: hasKeyboard,
+        gamepad: hasGamepad,
+      },
+      rawInputs: {
+        keyboard: Array.from(keyboardInputs),
+      },
+    };
+  }
+
+  getMovementBinaryState() {
     return {
       up: this.isActionActive('moveUp'),
       down: this.isActionActive('moveDown'),
       left: this.isActionActive('moveLeft'),
       right: this.isActionActive('moveRight'),
     };
+  }
+
+  computeMovementVector(binary) {
+    let x = 0;
+    let y = 0;
+
+    if (binary.left) {
+      x -= 1;
+    }
+    if (binary.right) {
+      x += 1;
+    }
+    if (binary.up) {
+      y -= 1;
+    }
+    if (binary.down) {
+      y += 1;
+    }
+
+    const rawMagnitude = Math.hypot(x, y);
+    const divisor = rawMagnitude > 1 ? rawMagnitude : 1;
+    const normalizedX = rawMagnitude > 0 ? x / divisor : 0;
+    const normalizedY = rawMagnitude > 0 ? y / divisor : 0;
+
+    return {
+      axes: { x: normalizedX, y: normalizedY },
+      rawMagnitude,
+      normalizedMagnitude:
+        rawMagnitude > 1 ? 1 : rawMagnitude,
+    };
+  }
+
+  buildMovementCommandPayload() {
+    const binary = this.getMovementBinaryState();
+    const vector = this.computeMovementVector(binary);
+    const details = this.collectMovementBindingDetails();
+    const timestamp = this.getCurrentTimestamp();
+
+    const command = {
+      type: 'move',
+      source: details.source,
+      axes: vector.axes,
+      binary,
+      magnitude: vector.normalizedMagnitude,
+      timestamp,
+    };
+
+    return {
+      command,
+      metadata: {
+        source: command.source,
+        metadata: {
+          devices: details.devices,
+          rawInputs: details.rawInputs,
+          rawMagnitude: vector.rawMagnitude,
+          timestamp,
+        },
+      },
+    };
+  }
+
+  enqueueActionCommand(action, phase, source, context = {}) {
+    const queue = this.resolveCommandQueue();
+    if (!queue) {
+      return;
+    }
+
+    const sanitizedContext = this.sanitizeCommandContext(context);
+    const hasContext = Object.keys(sanitizedContext).length > 0;
+    const normalizedSource = sanitizedContext.device || source || 'input';
+    const timestamp = this.getCurrentTimestamp();
+
+    if (action === 'activateShield' && phase === 'pressed') {
+      const command = {
+        type: 'ability',
+        abilityId: 'shield',
+        phase: 'pressed',
+        source: normalizedSource,
+        timestamp,
+      };
+
+      if (hasContext) {
+        command.context = sanitizedContext;
+      }
+
+      const metadata = {
+        source: normalizedSource,
+        metadata: {
+          action,
+          phase,
+          abilityId: 'shield',
+        },
+      };
+
+      if (hasContext) {
+        metadata.metadata.context = sanitizedContext;
+      }
+
+      try {
+        queue.enqueue(command, metadata);
+      } catch (error) {
+        console.warn('[InputSystem] Failed to enqueue shield command:', error);
+      }
+
+      return;
+    }
+
+    if (action === 'firePrimary') {
+      const command = {
+        type: 'firePrimary',
+        phase,
+        source: normalizedSource,
+        timestamp,
+      };
+
+      if (hasContext) {
+        command.context = sanitizedContext;
+      }
+
+      const metadata = {
+        source: normalizedSource,
+        metadata: {
+          action,
+          phase,
+        },
+      };
+
+      if (hasContext) {
+        metadata.metadata.context = sanitizedContext;
+      }
+
+      try {
+        queue.enqueue(command, metadata);
+      } catch (error) {
+        console.warn('[InputSystem] Failed to enqueue fire command:', error);
+      }
+    }
+  }
+
+  getLastMoveCommandFromQueue() {
+    const queue = this.resolveCommandQueue();
+    if (!queue) {
+      return null;
+    }
+
+    const entries = queue.peek();
+    if (!Array.isArray(entries) || entries.length === 0) {
+      return null;
+    }
+
+    for (let index = entries.length - 1; index >= 0; index -= 1) {
+      const entry = entries[index];
+      if (entry && entry.type === 'move' && entry.payload) {
+        return entry.payload;
+      }
+    }
+
+    return null;
+  }
+
+  getMovementInput() {
+    // LEGACY: This adapter reads from the command queue until Step 7 removes it.
+    const lastMove = this.getLastMoveCommandFromQueue();
+
+    if (lastMove && lastMove.binary) {
+      return {
+        up: Boolean(lastMove.binary.up),
+        down: Boolean(lastMove.binary.down),
+        left: Boolean(lastMove.binary.left),
+        right: Boolean(lastMove.binary.right),
+      };
+    }
+
+    if (this.lastMovementCommand && this.lastMovementCommand.binary) {
+      return {
+        up: Boolean(this.lastMovementCommand.binary.up),
+        down: Boolean(this.lastMovementCommand.binary.down),
+        left: Boolean(this.lastMovementCommand.binary.left),
+        right: Boolean(this.lastMovementCommand.binary.right),
+      };
+    }
+
+    return this.getMovementBinaryState();
   }
 
   getMousePosition() {
@@ -753,6 +1009,20 @@ class InputSystem {
 
   update() {
     this.pollGamepad();
+
+    const { command, metadata } = this.buildMovementCommandPayload();
+    this.lastMovementCommand = command;
+
+    const queue = this.resolveCommandQueue();
+    if (!queue) {
+      return;
+    }
+
+    try {
+      queue.enqueue(command, metadata);
+    } catch (error) {
+      console.warn('[InputSystem] Failed to enqueue movement command:', error);
+    }
   }
 
   destroy() {

@@ -298,13 +298,6 @@ export function createServiceManifest(context = {}) {
         new AudioSystem({ settings: resolved['settings'], random: resolved['random'] })
     },
     {
-      name: 'input',
-      singleton: true,
-      lazy: false,
-      dependencies: ['settings'],
-      factory: ({ resolved }) => new InputSystem({ settings: resolved['settings'] })
-    },
-    {
       name: 'command-queue',
       singleton: true,
       lazy: false,
@@ -316,6 +309,17 @@ export function createServiceManifest(context = {}) {
             : 0,
           frameSource: manifestContext?.frameSource,
           hooks: manifestContext?.metrics?.commandQueue,
+        })
+    },
+    {
+      name: 'input',
+      singleton: true,
+      lazy: false,
+      dependencies: ['settings', 'command-queue'],
+      factory: ({ resolved }) =>
+        new InputSystem({
+          settings: resolved['settings'],
+          'command-queue': resolved['command-queue'],
         })
     },
     {
