@@ -66,9 +66,16 @@ function createServiceHarness() {
   const ui = {
     resetLevelUpState: vi.fn(),
     showScreen: vi.fn((screen, options = {}) => {
-      if (!options?.suppressEvent) {
-        eventBus.emit('screen-changed', { screen, source: 'ui' });
+      if (options?.suppressEvent) {
+        return;
       }
+
+      const payload = { screen };
+      if (options?.eventPayload && typeof options.eventPayload === 'object') {
+        Object.assign(payload, options.eventPayload);
+      }
+
+      eventBus.emit('screen-changed', payload);
     })
   };
 
@@ -247,10 +254,14 @@ describe('GameSessionService lifecycle flows', () => {
     expect(exitSpy).toHaveBeenCalledWith({ source: 'pause-menu' });
     expect(player._quitExplosionHidden).toBe(false);
     expect(service.getScreen()).toBe('menu');
-    expect(ui.showScreen).toHaveBeenCalledWith(
-      'menu',
-      expect.objectContaining({ suppressEvent: true })
+    const menuCall = ui.showScreen.mock.calls.find(([name]) => name === 'menu');
+    expect(menuCall).toBeTruthy();
+    expect(menuCall[1]).toEqual(
+      expect.objectContaining({
+        eventPayload: expect.objectContaining({ source: 'pause-menu' })
+      })
     );
+    expect(menuCall[1]?.suppressEvent).not.toBe(true);
 
     const screenChangeCalls = eventBus.emit.mock.calls.filter(
       ([eventName]) => eventName === 'screen-changed'

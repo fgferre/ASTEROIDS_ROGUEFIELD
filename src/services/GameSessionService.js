@@ -564,9 +564,11 @@ export default class GameSessionService {
     }
 
     const ui = this.resolveServiceInstance('ui');
+    let screenChangeHandled = false;
     if (ui && typeof ui.showGameUI === 'function') {
       try {
-        ui.showGameUI({ suppressEvent: true });
+        ui.showGameUI({ eventPayload: { source: 'session.start' } });
+        screenChangeHandled = true;
       } catch (error) {
         console.error('[GameSessionService] Failed to show game UI:', error);
       }
@@ -586,7 +588,9 @@ export default class GameSessionService {
     }
 
     this.setScreen('playing');
-    this.emitScreenChanged('playing', { source: 'session.start' });
+    if (!screenChangeHandled) {
+      this.emitScreenChanged('playing', { source: 'session.start' });
+    }
 
     const wasPaused = this.isPaused();
     this.setPaused(false);
@@ -929,6 +933,7 @@ export default class GameSessionService {
     this.resetForMenu();
 
     const ui = this.resolveServiceInstance('ui');
+    let screenChangeHandled = false;
     if (ui) {
       if (typeof ui.resetLevelUpState === 'function') {
         try {
@@ -940,7 +945,10 @@ export default class GameSessionService {
 
       if (typeof ui.showScreen === 'function') {
         try {
-          ui.showScreen('menu', { suppressEvent: true });
+          ui.showScreen('menu', {
+            eventPayload: { source: payload?.source || 'unknown' }
+          });
+          screenChangeHandled = true;
         } catch (error) {
           console.error('[GameSessionService] Failed to show menu screen:', error);
         }
@@ -948,7 +956,9 @@ export default class GameSessionService {
     }
 
     this.setScreen('menu');
-    this.emitScreenChanged('menu', { source: payload?.source || 'unknown' });
+    if (!screenChangeHandled) {
+      this.emitScreenChanged('menu', { source: payload?.source || 'unknown' });
+    }
 
     const wasPaused = this.isPaused();
     this.setPaused(false);

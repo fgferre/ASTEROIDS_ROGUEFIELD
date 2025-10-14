@@ -2777,7 +2777,12 @@ class UISystem {
   }
 
   showScreen(screenName, options = {}) {
-    const { overlay = false, show = true, suppressEvent = false } = options;
+    const {
+      overlay = false,
+      show = true,
+      suppressEvent = false,
+      eventPayload = null,
+    } = options;
     try {
       if (overlay) {
         const target = document.getElementById(`${screenName}-screen`);
@@ -2832,7 +2837,13 @@ class UISystem {
       document.body?.classList.remove('is-credits-open');
 
       if (!suppressEvent && typeof gameEvents !== 'undefined') {
-        gameEvents.emit('screen-changed', { screen: screenName });
+        const payload = { screen: screenName };
+
+        if (eventPayload && typeof eventPayload === 'object') {
+          Object.assign(payload, eventPayload);
+        }
+
+        gameEvents.emit('screen-changed', payload);
       }
     } catch (error) {
       console.error('[UISystem] Failed to show screen:', error);
