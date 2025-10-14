@@ -11,6 +11,7 @@
 - Criar um orquestrador único (`bootstrapServices`) responsável por instanciar cada serviço via fábricas registradas no `ServiceRegistry`, injetando dependências explicitamente e só então expondo as instâncias no `gameServices` enquanto durar a transição legada.
 - **Benefício:** elimina duplicidade entre Service Locator e DI, deixa explícitas as dependências e facilita a troca de implementações sem caça manual a `gameServices.get()`.
 - **Escopo inicial:** mover a sequência de `new ...System()` de `app.js` para o manifesto, adaptar construtores para receber dependências opcionais e adicionar uma fase de validação (`diContainer.validate()`) que garanta resolução antes do loop principal.
+- Plano detalhado: [docs/archive/2025-plan/plans/phase1-di-bootstrap-plan.md](../archive/2025-plan/plans/phase1-di-bootstrap-plan.md).
 
 ### Fase 2 – Introduzir `RandomService` Seedado e Substituir `Math.random()`
 - Registrar um serviço singleton `random` no contêiner e injetá-lo progressivamente nos sistemas que hoje usam `Math.random()` diretamente (efeitos, áudio procedural, spawns, drops).
@@ -22,12 +23,13 @@
 - Mover `gameState`, `createDeathSnapshot`, `restoreFromSnapshot`, `startRetryCountdown` e utilitários correlatos de `app.js` para um módulo dedicado (`/src/modules/GameSessionService.js`), deixando o bootstrap responsável apenas pelo loop.
 - Esse serviço passa a orquestrar player, progressão e inimigos via API pública, reduzindo acoplamento com DOM e preparando terreno para salvar/retomar runs.
 - **Benefício:** clarifica a autoridade sobre o estado da run e cria ponto único para futuras features de save/load e modos alternativos (ex.: “daily seed”).
-- Plano detalhado: [docs/plans/phase3-game-session-service-plan.md](./phase3-game-session-service-plan.md).
+- Plano detalhado: [docs/archive/2025-plan/plans/phase3-game-session-service-plan.md](../archive/2025-plan/plans/phase3-game-session-service-plan.md).
 
 ### Fase 4 – Evoluir Input/Combate para Fila de Comandos
 - Ajustar `InputSystem` para produzir objetos de comando (`MoveCommand`, `ShootCommand`, etc.) a cada frame, entregando-os a um `CommandQueueService` compartilhado.
 - `PlayerSystem` e `CombatSystem` passam a consumir a fila ao invés de consultar estado diretamente (`getMovementInput`, flags, timers), abrindo espaço para bufferização, replays e IA usando o mesmo caminho.
 - **Benefício:** reduz checagens espalhadas, facilita entendimento/testes e documenta claramente “quem pediu o quê” em cada frame.
+- Plano detalhado: [docs/plans/phase4-command-queue-plan.md](phase4-command-queue-plan.md).
 
 ### Fase 5 – Consolidar Utilidades Globais em Serviços Específicos (Opcional após Fases 2–4)
 - Reposicionar lógica de UI (ex.: retry countdown) para `UISystem`/`GameSessionService`, encapsular interações com DOM em helpers e deixar `app.js` apenas com inicialização do loop e delegação.
