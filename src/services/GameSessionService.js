@@ -725,10 +725,15 @@ export default class GameSessionService {
   completeRetryRespawn() {
     this.isRetryCountdownActive = false;
 
+    const player = this.resolveServiceInstance('player');
+    const world = this.resolveServiceInstance('world');
     const snapshot = this.getDeathSnapshot();
 
     if (!snapshot) {
       console.error('[Retry] Cannot respawn - missing snapshot');
+      if (player) {
+        player.isRetrying = false;
+      }
       this.setRetryButtonEnabled(true);
       return false;
     }
@@ -746,11 +751,11 @@ export default class GameSessionService {
       console.warn('[Retry] Failed to configure RNG for retry:', error);
     }
 
-    const player = this.resolveServiceInstance('player');
-    const world = this.resolveServiceInstance('world');
-
     if (!player || !world) {
       console.error('[Retry] Cannot respawn - missing services');
+      if (player) {
+        player.isRetrying = false;
+      }
       this.setRetryButtonEnabled(true);
       return false;
     }
@@ -758,6 +763,7 @@ export default class GameSessionService {
     const restored = this.restoreFromSnapshot({ snapshot });
     if (!restored) {
       console.error('[Retry] Failed to restore snapshot');
+      player.isRetrying = false;
       this.setRetryButtonEnabled(true);
       return false;
     }
@@ -769,6 +775,7 @@ export default class GameSessionService {
         player.respawn(safeSpawn, 3);
       } catch (error) {
         console.error('[Retry] Failed to respawn player:', error);
+        player.isRetrying = false;
         this.setRetryButtonEnabled(true);
         return false;
       }
