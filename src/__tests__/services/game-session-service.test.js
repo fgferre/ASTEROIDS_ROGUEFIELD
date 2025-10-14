@@ -165,7 +165,16 @@ describe('GameSessionService lifecycle flows', () => {
       expect.objectContaining({ screen: 'playing', source: 'session.start' })
     ]);
     service.setRetryCount(2);
+    vi.useFakeTimers();
+
     service.handlePlayerDeath({ reason: 'spec' });
+
+    expect(service.getScreen()).toBe('playing');
+    expect(getScreenEvents()).toEqual([
+      expect.objectContaining({ screen: 'playing', source: 'session.start' })
+    ]);
+
+    vi.advanceTimersByTime(3000);
 
     expect(service.getScreen()).toBe('gameover');
     expect(getScreenEvents()).toEqual([
@@ -179,8 +188,6 @@ describe('GameSessionService lifecycle flows', () => {
 
     expect(service.hasDeathSnapshot()).toBe(true);
     expect(random.serialize).toHaveBeenCalled();
-
-    vi.useFakeTimers();
 
     const started = service.requestRetry({ source: 'unit-test' });
 
