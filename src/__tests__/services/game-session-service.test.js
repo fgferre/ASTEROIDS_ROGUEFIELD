@@ -154,7 +154,11 @@ describe('GameSessionService lifecycle flows', () => {
     service.setScreen('playing');
     service.setPaused(false);
 
+    eventBus.emit.mockClear();
     service.startNewRun({ source: 'spec' });
+    expect(
+      eventBus.emit.mock.calls.filter((call) => call[0] === 'screen-changed')
+    ).toHaveLength(1);
     service.setRetryCount(2);
     service.handlePlayerDeath({ reason: 'spec' });
 
@@ -245,10 +249,32 @@ describe('GameSessionService lifecycle flows', () => {
     expect(exitSpy).toHaveBeenCalledWith({ source: 'pause-menu' });
     expect(player._quitExplosionHidden).toBe(false);
     expect(service.getScreen()).toBe('menu');
-    expect(ui.showScreen).toHaveBeenCalledWith('menu');
+    expect(ui.showScreen).toHaveBeenCalledWith('playing', { emitEvent: false });
+    expect(ui.showScreen).toHaveBeenCalledWith('menu', { emitEvent: false });
     expect(eventBus.emit).toHaveBeenCalledWith(
       'screen-changed',
       expect.objectContaining({ screen: 'menu', source: 'pause-menu' })
+    );
+    expect(
+      eventBus.emit.mock.calls.filter((call) => call[0] === 'screen-changed')
+    ).toHaveLength(1);
+  });
+
+  it('emits screen-changed once when starting a new run', () => {
+    const { service, eventBus, ui } = createServiceHarness();
+
+    eventBus.emit.mockClear();
+
+    service.startNewRun({ source: 'test' });
+
+    expect(ui.showGameUI).toHaveBeenCalledWith({ emitEvent: false });
+
+    const screenChangedCalls = eventBus.emit.mock.calls.filter(
+      (call) => call[0] === 'screen-changed'
+    );
+    expect(screenChangedCalls).toHaveLength(1);
+    expect(screenChangedCalls[0][1]).toEqual(
+      expect.objectContaining({ screen: 'playing', source: 'session.start' })
     );
   });
 });
