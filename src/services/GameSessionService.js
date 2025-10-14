@@ -60,6 +60,17 @@ export default class GameSessionService {
     this.retryCountdownHideTimeout = null;
     this.retryCountdownFollowupTimeout = null;
 
+    this.domClickHandler = (event) => this.handleDocumentClick(event);
+    this.domClickUnsubscribe = null;
+    this.globalEventUnsubscribes = [];
+    this.globalEventHandlers = {
+      screenChanged: (data) => this.handleScreenChangedEvent(data),
+      playerDied: (data) => this.handlePlayerDiedEvent(data),
+      togglePause: (payload) => this.handleTogglePauseEvent(payload),
+      exitToMenuRequested: (payload) => this.exitToMenu(payload || {}),
+      activateShieldPressed: () => this.handleActivateShieldPressedEvent()
+    };
+
     this.initializeSessionState();
 
     if (
@@ -154,6 +165,9 @@ export default class GameSessionService {
 
     GameSessionService.persistLastSeed(this.seedInfo.seed, this.seedInfo.source);
     console.log(`[Random] Boot seed (${this.seedInfo.source}): ${String(this.seedInfo.seed)}`);
+
+    this.setupDomEventListeners();
+    this.setupGlobalEventListeners();
   }
 
   /**
@@ -258,7 +272,225 @@ export default class GameSessionService {
     this.eventBus.emit('session-retry-countdown', { ...payload });
   }
 
-  startNewRun() {
+  setupDomEventListeners() {
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    this.teardownDomEventListeners();
+
+    document.addEventListener('click', this.domClickHandler);
+    this.domClickUnsubscribe = () => {
+      document.removeEventListener('click', this.domClickHandler);
+      this.domClickUnsubscribe = null;
+    };
+  }
+
+  teardownDomEventListeners() {
+    if (typeof this.domClickUnsubscribe === 'function') {
+      try {
+        this.domClickUnsubscribe();
+      } catch (error) {
+        console.warn('[GameSessionService] Failed to remove DOM listener:', error);
+      }
+    }
+
+    this.domClickUnsubscribe = null;
+  }
+
+  handleDocumentClick(event) {
+    if (!event) {
+      return;
+    }
+
+    const { target } = event;
+    if (!target) {
+      return;
+    }
+
+    if (typeof Element !== 'undefined' && !(target instanceof Element)) {
+      return;
+    }
+
+    const elementTarget = /** @type {Element} */ (target);
+
+    const button = typeof elementTarget.closest === 'function'
+      ? elementTarget.closest('button')
+      : null;
+    if (!button) {
+      return;
+    }
+
+    const { id } = button;
+    if (!id) {
+      return;
+    }
+
+    const preventDefault = () => {
+      try {
+        event.preventDefault();
+      } catch (error) {
+        console.warn('[GameSessionService] Failed to prevent default action:', error);
+      }
+    };
+
+    switch (id) {
+      case 'start-game-btn':
+      case 'restart-game-btn': {
+        preventDefault();
+        this.emitCreditsMenuRequest({ open: false, source: id });
+        this.startNewRun({ source: id });
+        break;
+      }
+      case 'retry-game-btn': {
+        preventDefault();
+        if (!this.requestRetry({ source: id })) {
+          console.warn('[Retry] Request rejected - verify retry availability.');
+        }
+        break;
+      }
+      case 'quit-game-btn': {
+        preventDefault();
+        this.exitToMenu({ source: 'gameover' });
+        break;
+      }
+      case 'open-settings-btn': {
+        preventDefault();
+        this.emitSettingsMenuRequest({ source: 'menu' });
+        break;
+      }
+      case 'menu-credits-btn': {
+        preventDefault();
+        this.emitCreditsMenuRequest({
+          open: true,
+          source: 'menu',
+          triggerId: 'menu-credits-btn'
+        });
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  emitCreditsMenuRequest({ open, source, restoreFocus = false, triggerId } = {}) {
+    if (!this.eventBus || typeof this.eventBus.emit !== 'function') {
+      return;
+    }
+
+    this.eventBus.emit('credits-menu-requested', {
+      open,
+      restoreFocus,
+      source,
+      triggerId
+    });
+  }
+
+  emitSettingsMenuRequest(payload = {}) {
+    if (!this.eventBus || typeof this.eventBus.emit !== 'function') {
+      return;
+    }
+
+    this.eventBus.emit('settings-menu-requested', { ...payload });
+  }
+
+  setupGlobalEventListeners() {
+    if (!this.eventBus || typeof this.eventBus.on !== 'function') {
+      return;
+    }
+
+    this.teardownGlobalEventListeners();
+
+    const register = (eventName, handler) => {
+      if (typeof handler !== 'function') {
+        return;
+      }
+
+      this.eventBus.on(eventName, handler);
+      this.globalEventUnsubscribes.push(() => {
+        if (this.eventBus && typeof this.eventBus.off === 'function') {
+          this.eventBus.off(eventName, handler);
+        }
+      });
+    };
+
+    register('screen-changed', this.globalEventHandlers.screenChanged);
+    register('player-died', this.globalEventHandlers.playerDied);
+    register('toggle-pause', this.globalEventHandlers.togglePause);
+    register('exit-to-menu-requested', this.globalEventHandlers.exitToMenuRequested);
+    register('activate-shield-pressed', this.globalEventHandlers.activateShieldPressed);
+  }
+
+  teardownGlobalEventListeners() {
+    if (!Array.isArray(this.globalEventUnsubscribes)) {
+      this.globalEventUnsubscribes = [];
+      return;
+    }
+
+    this.globalEventUnsubscribes.forEach((unsubscribe) => {
+      try {
+        if (typeof unsubscribe === 'function') {
+          unsubscribe();
+        }
+      } catch (error) {
+        console.warn('[GameSessionService] Failed to remove event listener:', error);
+      }
+    });
+
+    this.globalEventUnsubscribes = [];
+  }
+
+  handleScreenChangedEvent(data) {
+    if (!data || typeof data.screen !== 'string') {
+      return;
+    }
+
+    const nextScreen = data.screen;
+    const previousScreen = this.getScreen();
+    if (nextScreen && previousScreen !== nextScreen) {
+      this.setScreen(nextScreen);
+    }
+
+    if (nextScreen !== 'playing') {
+      const wasPaused = this.isPaused();
+      if (wasPaused) {
+        this.setPaused(false);
+        this.emitPauseState({ source: 'screen-changed' });
+      }
+
+      if (nextScreen === 'menu') {
+        this.setSessionState('menu', { reason: 'screen-changed' });
+      }
+      return;
+    }
+
+    this.setSessionState('running', { reason: 'screen-changed' });
+  }
+
+  handlePlayerDiedEvent(data) {
+    this.handlePlayerDeath(data);
+  }
+
+  handleTogglePauseEvent(payload = {}) {
+    this.togglePause({ source: payload?.source || 'toggle-pause' });
+  }
+
+  handleActivateShieldPressedEvent() {
+    if (this.getScreen() !== 'playing') {
+      return;
+    }
+
+    const player = this.resolveServiceInstance('player');
+    if (player && typeof player.activateShield === 'function') {
+      try {
+        player.activateShield();
+      } catch (error) {
+        console.warn('[GameSessionService] Failed to activate shield:', error);
+      }
+    }
+  }
+
+  startNewRun({ source = 'unknown' } = {}) {
     try {
       this.prepareRandomForScope('run.start', { mode: 'reset' });
     } catch (error) {
@@ -303,10 +535,19 @@ export default class GameSessionService {
     this.setScreen('playing');
     this.emitScreenChanged('playing', { source: 'session.start' });
 
+    const wasPaused = this.isPaused();
     this.setPaused(false);
-    this.emitPauseState({ source: 'session.start' });
+    if (wasPaused) {
+      this.emitPauseState({ source: 'session.start' });
+    }
 
     this.setSessionState('running', { reason: 'start-new-run' });
+
+    if (this.gameState) {
+      this.gameState.lastTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    }
+
+    console.log('[GameSessionService] Run started successfully!', { source });
   }
 
   handlePlayerDeath(data = {}) {
@@ -331,22 +572,40 @@ export default class GameSessionService {
     });
   }
 
-  beginRetryCountdown() {
+  requestRetry({ source = 'unknown' } = {}) {
     if (this.isRetryCountdownActive) {
-      return;
+      console.warn('[Retry] Countdown already active - ignoring duplicate request.');
+      return false;
+    }
+
+    const started = this.beginRetryCountdown({ source });
+    if (!started) {
+      this.emitSessionRetryCountdown({
+        phase: 'aborted',
+        reason: 'validation-failed',
+        source
+      });
+    }
+
+    return started;
+  }
+
+  beginRetryCountdown({ source = 'unknown' } = {}) {
+    if (this.isRetryCountdownActive) {
+      return false;
     }
 
     const retries = this.getRetryCount();
     if (retries <= 0) {
       console.warn('[Retry] No retries remaining.');
       this.setRetryButtonEnabled(false);
-      return;
+      return false;
     }
 
     if (!this.hasDeathSnapshot()) {
       console.error('[Retry] Cannot begin countdown - missing snapshot');
       this.setRetryButtonEnabled(true);
-      return;
+      return false;
     }
 
     this.isRetryCountdownActive = true;
@@ -356,7 +615,8 @@ export default class GameSessionService {
 
     this.emitSessionRetryCountdown({
       phase: 'start',
-      total: 3
+      total: 3,
+      source
     });
 
     const gameoverScreen = this.lookupDomElement('gameover-screen');
@@ -380,7 +640,7 @@ export default class GameSessionService {
 
     const advanceCountdown = (index = 0) => {
       if (index >= countdownValues.length) {
-        this.emitSessionRetryCountdown({ phase: 'complete' });
+        this.emitSessionRetryCountdown({ phase: 'complete', source });
         this.completeRetryRespawn();
         return;
       }
@@ -391,7 +651,8 @@ export default class GameSessionService {
         value,
         index,
         remaining: countdownValues.length - index - 1,
-        total: countdownValues.length
+        total: countdownValues.length,
+        source
       });
 
       this.showRetryCountdownNumber(value, () => advanceCountdown(index + 1));
@@ -399,7 +660,9 @@ export default class GameSessionService {
 
     advanceCountdown(0);
 
-    this.setSessionState('retrying', { reason: 'retry-countdown' });
+    this.setSessionState('retrying', { reason: 'retry-countdown', source });
+
+    return true;
   }
 
   completeRetryRespawn() {
@@ -479,22 +742,29 @@ export default class GameSessionService {
     return true;
   }
 
-  togglePause() {
+  togglePause({ source = 'toggle-pause' } = {}) {
     const currentScreen = this.getScreen();
 
     if (currentScreen !== 'playing') {
-      if (this.isPaused()) {
+      const wasPaused = this.isPaused();
+      if (wasPaused) {
         this.setPaused(false);
-        this.emitPauseState({ source: 'toggle-pause' });
-        this.setSessionState('running', { reason: 'toggle-pause' });
+        this.emitPauseState({ source });
+        this.setSessionState('running', { reason: source });
       }
       return this.isPaused();
     }
 
-    const next = !this.isPaused();
+    const previous = this.isPaused();
+    const next = !previous;
+
+    if (next === previous) {
+      return next;
+    }
+
     this.setPaused(next);
-    this.emitPauseState({ source: 'toggle-pause' });
-    this.setSessionState(next ? 'paused' : 'running', { reason: 'toggle-pause' });
+    this.emitPauseState({ source });
+    this.setSessionState(next ? 'paused' : 'running', { reason: source });
     return next;
   }
 
@@ -528,8 +798,11 @@ export default class GameSessionService {
         const effects = this.resolveServiceInstance('effects');
         const ui = this.resolveServiceInstance('ui');
 
+        const wasPaused = this.isPaused();
         this.setPaused(false);
-        this.emitPauseState({ source: 'exit-to-menu' });
+        if (wasPaused) {
+          this.emitPauseState({ source: 'exit-to-menu' });
+        }
 
         if (ui && typeof ui.showScreen === 'function') {
           try {
@@ -897,6 +1170,8 @@ export default class GameSessionService {
     if (element) {
       element.classList.add('hidden');
     }
+
+    this.emitSessionRetryCountdown({ phase: 'hidden' });
   }
 
   showRetryCountdownNumber(number, onComplete) {
