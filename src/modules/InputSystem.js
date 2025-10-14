@@ -951,16 +951,13 @@ class InputSystem {
       return null;
     }
 
-    const entries = queue.peek();
-    if (!Array.isArray(entries) || entries.length === 0) {
-      return null;
+    if (typeof queue.peekLast !== 'function') {
+      return this.lastMovementCommand || null;
     }
 
-    for (let index = entries.length - 1; index >= 0; index -= 1) {
-      const entry = entries[index];
-      if (entry && entry.type === 'move' && entry.payload) {
-        return entry.payload;
-      }
+    const latestMove = queue.peekLast({ type: 'move' });
+    if (latestMove && latestMove.payload) {
+      return latestMove.payload;
     }
 
     return null;
