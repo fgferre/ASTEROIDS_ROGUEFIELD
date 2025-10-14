@@ -6,6 +6,8 @@ import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 class CombatSystem {
   constructor(dependencies = {}) {
     this.dependencies = normalizeDependencies(dependencies);
+    this.commandQueue = resolveService('command-queue', this.dependencies) || null;
+    this.commandQueueConsumerId = 'combat-system';
     // === ESTADO DO SISTEMA DE COMBATE ===
     this.bullets = [];
     this.currentTarget = null;
@@ -164,6 +166,10 @@ class CombatSystem {
 
     if (force || !this.cachedPhysics) {
       this.cachedPhysics = resolveService('physics', this.dependencies);
+    }
+
+    if (force || !this.commandQueue) {
+      this.commandQueue = resolveService('command-queue', this.dependencies) || null;
     }
   }
 

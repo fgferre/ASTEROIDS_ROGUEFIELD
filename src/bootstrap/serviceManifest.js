@@ -17,6 +17,7 @@ import { GamePools } from '../core/GamePools.js';
 import { GarbageCollectionManager } from '../core/GarbageCollectionManager.js';
 import RandomService from '../core/RandomService.js';
 import GameSessionService from '../services/GameSessionService.js';
+import CommandQueueService from '../services/CommandQueueService.js';
 
 export const DEFAULT_POOL_CONFIG = {
   bullets: { initial: 25, max: 120 },
@@ -304,11 +305,29 @@ export function createServiceManifest(context = {}) {
       factory: ({ resolved }) => new InputSystem({ settings: resolved['settings'] })
     },
     {
+      name: 'command-queue',
+      singleton: true,
+      lazy: false,
+      dependencies: [],
+      factory: ({ context: manifestContext }) =>
+        new CommandQueueService({
+          initialFrame: Number.isFinite(manifestContext?.initialFrame)
+            ? manifestContext.initialFrame
+            : 0,
+          frameSource: manifestContext?.frameSource,
+          hooks: manifestContext?.metrics?.commandQueue,
+        })
+    },
+    {
       name: 'player',
       singleton: true,
       lazy: false,
-      dependencies: ['input'],
-      factory: ({ resolved }) => new PlayerSystem({ input: resolved['input'] })
+      dependencies: ['input', 'command-queue'],
+      factory: ({ resolved }) =>
+        new PlayerSystem({
+          input: resolved['input'],
+          'command-queue': resolved['command-queue'],
+        })
     },
     {
       name: 'xp-orbs',
@@ -420,12 +439,13 @@ export function createServiceManifest(context = {}) {
       name: 'combat',
       singleton: true,
       lazy: false,
-      dependencies: ['player', 'enemies', 'physics'],
+      dependencies: ['player', 'enemies', 'physics', 'command-queue'],
       factory: ({ resolved }) =>
         new CombatSystem({
           player: resolved['player'],
           enemies: resolved['enemies'],
-          physics: resolved['physics']
+          physics: resolved['physics'],
+          'command-queue': resolved['command-queue']
         })
     },
     {
