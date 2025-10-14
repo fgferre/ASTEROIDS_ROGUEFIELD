@@ -1,5 +1,4 @@
 import { GamePools } from './core/GamePools.js';
-import * as CONSTANTS from './core/GameConstants.js';
 import {
   resolveDebugPreference,
   applyDebugPreference,
@@ -212,71 +211,6 @@ function initializeDependencyInjection(manifestContext) {
   }
 }
 
-function resetGameSystems({ manageRandom = true } = {}) {
-  if (gameSessionService?.resetSystems) {
-    gameSessionService.resetSystems({ manageRandom });
-    return;
-  }
-
-  if (manageRandom) {
-    if (gameSessionService?.prepareRandomForScope) {
-      gameSessionService.prepareRandomForScope('systems.reset', { mode: 'reset' });
-    } else {
-      console.warn('[Random] Unable to prepare RNG scope "systems.reset" - service unavailable.');
-    }
-  } else {
-    const snapshot = gameSessionService?.getRandomSnapshot?.() ?? gameState.randomSnapshot;
-    if (gameSessionService?.logRandomSnapshot) {
-      gameSessionService.logRandomSnapshot('systems.reset (pre-managed)', snapshot, {
-        mode: 'snapshot'
-      });
-    } else {
-      GameSessionService.logRandomSnapshot('systems.reset (pre-managed)', snapshot, {
-        mode: 'snapshot'
-      });
-    }
-  }
-
-  if (typeof gameServices === 'undefined') {
-    return;
-  }
-
-  const servicesToReset = [
-    'player',
-    'combat',
-    'enemies',
-    'physics',
-    'progression',
-    'xp-orbs',
-    'healthHearts',
-    'effects',
-    'renderer',
-    'world',
-    'audio',
-  ];
-
-  servicesToReset.forEach((serviceName) => {
-    try {
-      if (typeof gameServices.has === 'function' && !gameServices.has(serviceName)) {
-        return;
-      }
-
-      const service = gameServices.get(serviceName);
-      if (service && typeof service.reset === 'function') {
-        service.reset();
-      }
-    } catch (error) {
-      console.warn(`Não foi possível resetar o serviço "${serviceName}":`, error);
-    }
-  });
-}
-
-function emitPauseState() {
-  if (typeof gameEvents === 'undefined') return;
-
-  gameEvents.emit('pause-state-changed', { isPaused: gameState.isPaused });
-}
-
 function bootstrapDebugLogging() {
   const preference = resolveDebugPreference();
   applyDebugPreference(preference);
@@ -299,6 +233,7 @@ function init() {
     }
 
     const { seed: initialSeed, source: seedSource } = GameSessionService.deriveInitialSeed();
+    const seedInfo = { seed: initialSeed, source: seedSource };
     gameState.randomSeed = initialSeed;
     gameState.randomSeedSource = seedSource;
 
@@ -328,22 +263,22 @@ function init() {
       gameState.randomService = services['random'];
     }
 
-    gameSessionService = services['game-session'] || null;
-
-    if (!gameSessionService && diContainer && typeof diContainer.resolve === 'function') {
+    let resolvedGameSession = null;
+    if (diContainer && typeof diContainer.resolve === 'function') {
       try {
-        gameSessionService = diContainer.resolve('game-session');
+        resolvedGameSession = diContainer.resolve('game-session');
       } catch (error) {
         console.warn('[App] Failed to resolve GameSessionService from DI:', error);
       }
     }
 
+    gameSessionService = resolvedGameSession || services['game-session'] || null;
+
     if (gameSessionService && typeof gameSessionService.initialize === 'function') {
       gameSessionService.initialize({
-        seed: initialSeed,
-        source: seedSource,
         canvas: gameState.canvas,
         ctx: gameState.ctx,
+        seedInfo
       });
     }
 
@@ -353,7 +288,7 @@ function init() {
     if (!bootRandom) {
       console.warn('[Random] GameSessionService could not prepare bootstrap scope deterministically.');
       if (!gameSessionService) {
-        GameSessionService.persistLastSeed(initialSeed, seedSource);
+        GameSessionService.persistLastSeed(seedInfo.seed, seedInfo.source);
       }
     } else if (gameSessionService) {
       const snapshot = gameSessionService.getRandomSnapshot();
@@ -388,118 +323,6 @@ function init() {
   }
 }
 
-function exitToMenu(payload = {}) {
-  if (gameSessionService?.exitToMenu) {
-    try {
-      gameSessionService.exitToMenu(payload);
-      return;
-    } catch (error) {
-      console.error('Erro ao sair para o menu via GameSessionService:', error);
-    }
-  }
-
-  legacyExitToMenu(payload);
-}
-
-function legacyExitToMenu(payload = {}) {
-  try {
-    // If exiting from pause menu, trigger epic ship explosion first!
-    if (payload?.source === 'pause-menu' && gameState.screen === 'playing') {
-      console.log('[App] Quit from pause - triggering epic explosion...');
-
-      const player = gameServices.get('player');
-      const effects = gameServices.get('effects');
-      const ui = gameServices.get('ui');
-
-      // Unpause game so explosion can animate
-      gameState.isPaused = false;
-      emitPauseState();
-
-      // Hide pause screen to show explosion
-      if (ui && typeof ui.showScreen === 'function') {
-        ui.showScreen('playing');
-      }
-
-      // Get player position for explosion
-      const playerPosition = player && typeof player.getPosition === 'function'
-        ? player.getPosition()
-        : (player ? player.position : { x: 960, y: 540 });
-
-      // DIRECTLY trigger epic explosion effect (don't reuse death system!)
-      if (effects && typeof effects.createEpicShipExplosion === 'function') {
-        effects.createEpicShipExplosion(playerPosition);
-      }
-
-      // Hide player ship during explosion
-      if (player) {
-        player._quitExplosionHidden = true; // Flag to hide rendering
-      }
-
-      // Wait for explosion to complete before going to menu
-      setTimeout(() => {
-        if (player) {
-          player._quitExplosionHidden = false; // Restore for next game
-        }
-        legacyPerformExitToMenu(payload);
-      }, 3500); // 3.5s to see full explosion
-      return;
-    } else {
-      legacyPerformExitToMenu(payload);
-    }
-  } catch (error) {
-    console.error('Erro ao sair para o menu:', error);
-    legacyPerformExitToMenu(payload); // Fallback
-  }
-}
-
-function legacyPerformExitToMenu(payload = {}) {
-  try {
-    if (gameSessionService?.prepareRandomForScope) {
-      gameSessionService.prepareRandomForScope('menu.exit', { mode: 'reset' });
-    } else {
-      const random = getRandomService();
-      if (random && typeof random.reset === 'function') {
-        random.reset(gameState.randomSeed);
-        const snapshot = random.serialize?.();
-        if (snapshot) {
-          gameState.randomSnapshot = snapshot;
-          GameSessionService.logRandomSnapshot('menu.exit (fallback)', snapshot, {
-            mode: 'reset'
-          });
-        }
-      } else {
-        console.warn('[Random] Unable to prepare RNG for menu.exit - service unavailable.');
-      }
-    }
-    resetGameSystems({ manageRandom: false });
-
-    gameSessionService?.resetForMenu?.();
-
-    const ui = gameServices.get('ui');
-    if (ui) {
-      if (typeof ui.resetLevelUpState === 'function') {
-        ui.resetLevelUpState();
-      }
-      ui.showScreen('menu');
-    }
-
-    gameState.screen = 'menu';
-    const wasPaused = gameState.isPaused;
-    gameState.isPaused = false;
-    if (wasPaused) {
-      emitPauseState();
-    }
-
-    if (payload?.source) {
-      console.log(`Retornando ao menu (origem: ${payload.source}).`);
-    } else {
-      console.log('Retornando ao menu.');
-    }
-  } catch (error) {
-    console.error('Erro ao retornar ao menu:', error);
-  }
-}
-
 function gameLoop(currentTime) {
   if (!gameState.initialized) return;
 
@@ -510,8 +333,50 @@ function gameLoop(currentTime) {
   gameState.lastTime = currentTime;
 
   try {
-    const shouldUpdateGame =
-      gameState.screen === 'playing' && !gameState.isPaused;
+    const session = gameSessionService;
+
+    if (session && typeof session.synchronizeLegacyState === 'function') {
+      try {
+        session.synchronizeLegacyState();
+      } catch (syncError) {
+        console.warn('[App] Failed to synchronize legacy state:', syncError);
+      }
+    } else if (session) {
+      try {
+        const screen = typeof session.getScreen === 'function' ? session.getScreen() : undefined;
+        if (typeof screen === 'string') {
+          gameState.screen = screen;
+        }
+
+        const paused = typeof session.isPaused === 'function' ? session.isPaused() : undefined;
+        if (typeof paused === 'boolean') {
+          gameState.isPaused = paused;
+        }
+      } catch (syncError) {
+        console.warn('[App] Failed to mirror session state:', syncError);
+      }
+    }
+
+    const shouldUpdateGame = (() => {
+      if (session) {
+        try {
+          if (typeof session.isRunning === 'function') {
+            const running = session.isRunning();
+            if (typeof running === 'boolean') {
+              return running;
+            }
+          }
+
+          const screen = typeof session.getScreen === 'function' ? session.getScreen() : gameState.screen;
+          const paused = typeof session.isPaused === 'function' ? session.isPaused() : gameState.isPaused;
+          return screen === 'playing' && !paused;
+        } catch (stateError) {
+          console.warn('[App] Failed to evaluate session state:', stateError);
+        }
+      }
+
+      return gameState.screen === 'playing' && !gameState.isPaused;
+    })();
 
     // Update object pools (always, for TTL and auto-management)
     GamePools.update(deltaTime);
