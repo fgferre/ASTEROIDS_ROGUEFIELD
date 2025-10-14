@@ -162,6 +162,20 @@ describe('GameSessionService lifecycle flows', () => {
     service.setRetryCount(2);
     service.handlePlayerDeath({ reason: 'spec' });
 
+    expect(service.getScreen()).toBe('gameover');
+
+    let screenEvents = eventBus.emit.mock.calls.filter(
+      (call) => call[0] === 'screen-changed'
+    );
+    expect(screenEvents).toHaveLength(2);
+    expect(screenEvents[1][1]).toEqual(
+      expect.objectContaining({
+        screen: 'gameover',
+        source: 'player-died',
+        data: { reason: 'spec' }
+      })
+    );
+
     expect(service.hasDeathSnapshot()).toBe(true);
     expect(random.serialize).toHaveBeenCalled();
 
@@ -182,6 +196,17 @@ describe('GameSessionService lifecycle flows', () => {
     expect(world.reset).toHaveBeenCalled();
     expect(service.getSessionState()).toBe('running');
     expect(service.isRetryCountdownActive).toBe(false);
+
+    screenEvents = eventBus.emit.mock.calls.filter(
+      (call) => call[0] === 'screen-changed'
+    );
+    expect(screenEvents).toHaveLength(3);
+    expect(screenEvents[2][1]).toEqual(
+      expect.objectContaining({
+        screen: 'playing',
+        source: 'retry-complete'
+      })
+    );
   });
 
   it('restores retry button and player state when snapshot restoration fails', () => {

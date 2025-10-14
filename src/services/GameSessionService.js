@@ -613,6 +613,12 @@ export default class GameSessionService {
       this.createDeathSnapshot();
     }
 
+    this.setScreen('gameover');
+    this.emitScreenChanged('gameover', {
+      source: 'player-died',
+      data
+    });
+
     const retriesRemaining = this.getRetryCount();
     if (retriesRemaining <= 0) {
       if (retriesRemaining < 0) {
@@ -801,6 +807,8 @@ export default class GameSessionService {
       gameUI.classList.remove('hidden');
     }
 
+    this.setScreen('playing');
+    this.emitScreenChanged('playing', { source: 'retry-complete' });
     this.setSessionState('running', { reason: 'retry-complete' });
 
     return true;
