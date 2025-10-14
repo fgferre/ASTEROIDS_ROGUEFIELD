@@ -36,6 +36,8 @@ class PlayerSystem {
   constructor(config = {}) {
     const { position, dependencies } = this.normalizeConfig(config);
     this.dependencies = normalizeDependencies(dependencies);
+    this.commandQueue = resolveService('command-queue', this.dependencies) || null;
+    this.commandQueueConsumerId = 'player-system';
     const startX = Number.isFinite(position?.x)
       ? position.x
       : CONSTANTS.GAME_WIDTH / 2;
@@ -118,6 +120,14 @@ class PlayerSystem {
     }
 
     return { position, dependencies: rest };
+  }
+
+  getCommandQueue() {
+    if (!this.commandQueue) {
+      this.commandQueue = resolveService('command-queue', this.dependencies) || null;
+    }
+
+    return this.commandQueue;
   }
 
   setupEventListeners() {
