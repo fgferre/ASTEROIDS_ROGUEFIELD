@@ -124,8 +124,8 @@ export default class CommandQueueService {
       frame: frameTag,
       source: metadata.source || command.source || 'unknown',
       enqueuedAt: this.clock(),
-      payload: { ...command },
-      metadata: metadata.metadata ? { ...metadata.metadata } : undefined
+      payload: this.deepClone(command),
+      metadata: metadata.metadata ? this.deepClone(metadata.metadata) : undefined
     };
 
     this.queue.push(entry);
@@ -244,13 +244,62 @@ export default class CommandQueueService {
       frame: entry.frame,
       source: entry.source,
       enqueuedAt: entry.enqueuedAt,
-      payload: { ...entry.payload }
+      payload: this.deepClone(entry.payload)
     };
 
     if (entry.metadata) {
-      cloned.metadata = { ...entry.metadata };
+      cloned.metadata = this.deepClone(entry.metadata);
     }
 
     return cloned;
+  }
+
+  deepClone(value) {
+    if (value === null || typeof value !== 'object') {
+      return value;
+    }
+
+    if (typeof structuredClone === 'function') {
+      try {
+        return structuredClone(value);
+      } catch (error) {
+        console.warn('[CommandQueueService] structuredClone failed, falling back to JSON/manual clone:', error);
+      }
+    }
+
+    try {
+      return JSON.parse(JSON.stringify(value));
+    } catch (error) {
+      console.warn('[CommandQueueService] JSON clone failed, performing manual deep clone:', error);
+    }
+
+    return this.manualDeepClone(value, new WeakMap());
+  }
+
+  manualDeepClone(value, seen) {
+    if (value === null || typeof value !== 'object') {
+      return value;
+    }
+
+    if (seen.has(value)) {
+      return seen.get(value);
+    }
+
+    if (Array.isArray(value)) {
+      const clone = [];
+      seen.set(value, clone);
+      for (const item of value) {
+        clone.push(this.manualDeepClone(item, seen));
+      }
+      return clone;
+    }
+
+    const clone = {};
+    seen.set(value, clone);
+    for (const [key, item] of Object.entries(value)) {
+      clone[key] = this.manualDeepClone(item, seen);
+    }
+
+    return clone;
   }
 }

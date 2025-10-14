@@ -75,4 +75,24 @@ describe('CommandQueueService', () => {
     expect(queue.size()).toBe(0);
     expect(queue.consume()).toHaveLength(0);
   });
+
+  it('creates deep snapshots of payloads and metadata to avoid mutation bleed', () => {
+    const queue = new CommandQueueService({ initialFrame: 10 });
+    const sharedAxes = { x: 1, y: 2 };
+    const metadataEnvelope = { metadata: { origin: { id: 'player-1' } } };
+
+    const enqueued = queue.enqueue({ type: 'move', axes: sharedAxes }, metadataEnvelope);
+    sharedAxes.x = 42;
+    metadataEnvelope.metadata.origin.id = 'mutated';
+    enqueued.payload.axes.y = 99;
+
+    const peeked = queue.peek()[0];
+    peeked.payload.axes.x = -100;
+    peeked.metadata.origin.id = 'peek-mutated';
+
+    const consumed = queue.consume();
+    expect(consumed).toHaveLength(1);
+    expect(consumed[0].payload.axes).toStrictEqual({ x: 1, y: 2 });
+    expect(consumed[0].metadata).toStrictEqual({ origin: { id: 'player-1' } });
+  });
 });
