@@ -8,6 +8,7 @@ import { Asteroid } from './enemies/types/Asteroid.js';
 import { Drone } from './enemies/types/Drone.js';
 import { Mine } from './enemies/types/Mine.js';
 import { Hunter } from './enemies/types/Hunter.js';
+import { BossEnemy } from './enemies/types/BossEnemy.js';
 import { EnemyFactory } from './enemies/base/EnemyFactory.js';
 import { WaveManager } from './enemies/managers/WaveManager.js';
 import { RewardManager } from './enemies/managers/RewardManager.js';
@@ -539,6 +540,15 @@ class EnemySystem {
           pool: GamePools?.hunters || null,
           defaults: { ...ENEMY_TYPES.hunter },
           tags: ['enemy', 'hostile', 'ranged', 'elite']
+        });
+      }
+
+      if (CONSTANTS?.BOSS_CONFIG) {
+        this.factory.registerType('boss', {
+          class: BossEnemy,
+          pool: null,
+          defaults: { ...CONSTANTS.BOSS_CONFIG },
+          tags: ['enemy', 'boss', 'elite']
         });
       }
 

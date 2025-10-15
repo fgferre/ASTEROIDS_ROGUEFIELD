@@ -1093,6 +1093,49 @@ export const ENEMY_TYPES = Object.freeze({
   }),
 });
 
+export const BOSS_CONFIG = Object.freeze({
+  key: 'boss',
+  displayName: 'Apex Overlord',
+  radius: 60,
+  health: 1500,
+  healthScaling: 1.2,
+  speed: 60,
+  acceleration: 120,
+  contactDamage: 45,
+  projectileDamage: 35,
+  spreadProjectileCount: 7,
+  spreadProjectileSpeed: 260,
+  spreadInterval: 2.4,
+  spreadVariance: 0.45,
+  spreadArc: 0.85,
+  spreadAngleVariance: 0.12,
+  volleyBurstSize: 5,
+  volleyShotDelay: 0.16,
+  volleyInterval: 1.35,
+  volleyVariance: 0.2,
+  volleyProjectileSpeed: 320,
+  volleySpread: 0.12,
+  minionTypes: ['drone', 'hunter'],
+  spawnInterval: 6.5,
+  spawnVariance: 1.1,
+  chargeCooldown: 6.2,
+  chargeDuration: 1.1,
+  chargeRecovery: 1.4,
+  chargeSpeedMultiplier: 3.1,
+  chargeProjectileCount: 10,
+  chargeProjectileSpeed: 420,
+  chargeProjectileVariance: 0.08,
+  chargeAimVariance: 0.18,
+  phaseThresholds: [0.66, 0.33],
+  phaseCount: 3,
+  invulnerabilityDuration: 2.0,
+  rewards: Object.freeze({
+    xp: 500,
+    lootTable: Object.freeze(['core-upgrade', 'weapon-blueprint']),
+  }),
+  phaseColors: Object.freeze(['#ff6b6b', '#f9c74f', '#4d96ff']),
+});
+
 // === XP ORBS ===
 export const XP_ORB_BASE_VALUE = 5;
 export const XP_ORB_MAX_PER_CLASS = 100;
