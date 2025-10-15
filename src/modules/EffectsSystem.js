@@ -216,6 +216,7 @@ export default class EffectsSystem {
     this.shockwaves = [];
     this.hitMarkers = []; // NEW: Hit marker tracking
     this.damageIndicators = []; // NEW: Directional damage indicators
+    this.bossTransitionEffects = [];
 
     // Upgraded screen shake (Week 1: Balance & Feel)
     this.screenShake = new ScreenShake(this.getRandomFork('screenShake'));
@@ -374,6 +375,16 @@ export default class EffectsSystem {
 
   setupEventListeners() {
     if (typeof gameEvents === 'undefined') return;
+
+    const bossEvents = ['boss-spawned', 'boss-phase-changed'];
+    bossEvents.forEach((eventName) => {
+      gameEvents.on(eventName, (payload = {}) => {
+        this.triggerBossTransitionEffect(eventName, payload);
+      });
+      gameEvents.on(`effects-${eventName}`, (payload = {}) => {
+        this.triggerBossTransitionEffect(eventName, payload);
+      });
+    });
 
     // Weapon fire feedback (Week 1: Balance & Feel)
     gameEvents.on('bullet-created', (data) => {
@@ -546,6 +557,7 @@ export default class EffectsSystem {
     this.updateShockwaves(deltaTime);
     this.updateHitMarkers(deltaTime);
     this.updateDamageIndicators(deltaTime);
+    this.updateBossTransitions(deltaTime);
     return deltaTime;
   }
 
@@ -650,6 +662,8 @@ export default class EffectsSystem {
       ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
       ctx.restore();
     }
+
+    this.drawBossTransitions(ctx);
   }
 
   drawShockwaves(ctx) {
@@ -682,6 +696,130 @@ export default class EffectsSystem {
       }
       ctx.stroke();
       ctx.restore();
+    });
+  }
+
+  resolveBossTransitionColor(eventName, payload = {}) {
+    if (typeof payload.color === 'string' && payload.color.trim().length > 0) {
+      return payload.color.trim();
+    }
+
+    const palette = Array.isArray(payload.phaseColors)
+      ? payload.phaseColors
+      : Array.isArray(payload?.enemy?.phaseColors)
+      ? payload.enemy.phaseColors
+      : Array.isArray(payload?.boss?.phaseColors)
+      ? payload.boss.phaseColors
+      : null;
+
+    if (palette && palette.length) {
+      const phaseIndex = Math.max(
+        0,
+        Math.min(palette.length - 1, Math.floor(payload.phase ?? 0))
+      );
+      const candidate = palette[phaseIndex];
+      if (typeof candidate === 'string' && candidate.trim().length > 0) {
+        return candidate.trim();
+      }
+    }
+
+    if (payload.enemy && typeof payload.enemy.color === 'string') {
+      return payload.enemy.color;
+    }
+
+    if (payload.boss && typeof payload.boss.color === 'string') {
+      return payload.boss.color;
+    }
+
+    return eventName === 'boss-phase-changed'
+      ? 'rgba(255, 210, 120, 0.9)'
+      : 'rgba(255, 105, 140, 0.95)';
+  }
+
+  triggerBossTransitionEffect(eventName, payload = {}) {
+    if (!this.bossTransitionEffects) {
+      this.bossTransitionEffects = [];
+    }
+
+    const color = this.resolveBossTransitionColor(eventName, payload);
+    const duration = eventName === 'boss-spawned' ? 1.65 : 1.05;
+    const effect = {
+      event: eventName,
+      color,
+      duration,
+      timer: 0,
+      maxAlpha: eventName === 'boss-spawned' ? 0.65 : 0.5,
+      borderWidth: eventName === 'boss-spawned' ? 30 : 24,
+      pulseFrequency: eventName === 'boss-spawned' ? 1.8 : 2.4,
+      overlayAlpha: eventName === 'boss-spawned' ? 0.18 : 0.12,
+    };
+
+    this.bossTransitionEffects.push(effect);
+  }
+
+  updateBossTransitions(deltaTime) {
+    if (!Array.isArray(this.bossTransitionEffects) || !this.bossTransitionEffects.length) {
+      return;
+    }
+
+    this.bossTransitionEffects = this.bossTransitionEffects.filter((effect) => {
+      if (!effect) {
+        return false;
+      }
+
+      effect.timer += deltaTime;
+      return effect.timer < effect.duration;
+    });
+  }
+
+  drawBossTransitions(ctx) {
+    if (!ctx || !Array.isArray(this.bossTransitionEffects)) {
+      return;
+    }
+
+    const { width, height } = ctx.canvas || {
+      width: CONSTANTS.GAME_WIDTH || 800,
+      height: CONSTANTS.GAME_HEIGHT || 600,
+    };
+
+    this.bossTransitionEffects.forEach((effect) => {
+      if (!effect) {
+        return;
+      }
+
+      const progress = Math.min(1, effect.timer / effect.duration);
+      const fade = Math.max(0, 1 - Math.pow(progress, 1.5));
+      const pulse = 0.65 + 0.35 * Math.sin(progress * Math.PI * effect.pulseFrequency);
+      const borderAlpha = effect.maxAlpha * fade * pulse;
+
+      if (borderAlpha > 0.01) {
+        const strokeWidth = effect.borderWidth * (0.85 + 0.15 * pulse);
+        const inset = strokeWidth / 2 + 6;
+
+        ctx.save();
+        ctx.globalAlpha = borderAlpha;
+        ctx.strokeStyle = effect.color || 'rgba(255, 105, 140, 0.95)';
+        ctx.lineWidth = strokeWidth;
+        ctx.shadowColor = effect.color || 'rgba(255, 105, 140, 0.95)';
+        ctx.shadowBlur = strokeWidth * 1.4 * fade;
+        ctx.beginPath();
+        ctx.strokeRect(
+          inset,
+          inset,
+          Math.max(0, width - inset * 2),
+          Math.max(0, height - inset * 2)
+        );
+        ctx.restore();
+      }
+
+      const overlayAlpha = effect.overlayAlpha * fade * Math.min(1, pulse + 0.15);
+      if (overlayAlpha > 0.01) {
+        ctx.save();
+        ctx.globalAlpha = overlayAlpha;
+        ctx.fillStyle = effect.color || 'rgba(255, 105, 140, 0.9)';
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
+      }
     });
   }
 

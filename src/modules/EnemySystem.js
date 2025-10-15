@@ -1033,6 +1033,7 @@ class EnemySystem {
       maxHealth: 0,
       wave: null,
       color: null,
+      phaseColors: [],
       lastUpdate: null,
     };
   }
@@ -1047,7 +1048,15 @@ class EnemySystem {
     }
 
     if (patch && typeof patch === 'object') {
-      this.bossHudState = { ...this.bossHudState, ...patch };
+      const next = { ...this.bossHudState, ...patch };
+      if (patch.phaseColors && Array.isArray(patch.phaseColors)) {
+        next.phaseColors = [...patch.phaseColors];
+      }
+      this.bossHudState = next;
+    }
+
+    if (!Array.isArray(this.bossHudState.phaseColors)) {
+      this.bossHudState.phaseColors = [];
     }
 
     this.bossHudState.lastUpdate = timestamp;
@@ -2830,6 +2839,19 @@ class EnemySystem {
     return { ...this.waveState };
   }
 
+  getBossHudState() {
+    if (!this.bossHudState) {
+      this.bossHudState = this.createInitialBossHudState();
+    }
+
+    return {
+      ...this.bossHudState,
+      phaseColors: Array.isArray(this.bossHudState.phaseColors)
+        ? [...this.bossHudState.phaseColors]
+        : [],
+    };
+  }
+
   getSessionStats() {
     return { ...this.sessionStats };
   }
@@ -2839,6 +2861,12 @@ class EnemySystem {
       ? data.wave
       : this.waveState?.current ?? null;
 
+    const phaseColors = Array.isArray(data.phaseColors)
+      ? [...data.phaseColors]
+      : Array.isArray(this.bossHudState?.phaseColors)
+      ? [...this.bossHudState.phaseColors]
+      : [];
+
     this.bossHudState = {
       ...this.createInitialBossHudState(),
       upcoming: true,
@@ -2846,10 +2874,15 @@ class EnemySystem {
       defeated: false,
       wave: waveNumber,
       name: data.name || this.bossHudState?.name || null,
+      phaseColors,
     };
 
     this.emitBossHudUpdate();
-    this.forwardBossEvent('boss-wave-started', { ...data, wave: waveNumber });
+    this.forwardBossEvent('boss-wave-started', {
+      ...data,
+      wave: waveNumber,
+      phaseColors,
+    });
   }
 
   handleBossSpawned(data = {}) {
@@ -2877,8 +2910,15 @@ class EnemySystem {
     const phase = data.phase ?? boss.currentPhase ?? 0;
     const maxHealth = data.maxHealth ?? boss.maxHealth ?? boss.health ?? 0;
     const health = data.health ?? boss.health ?? maxHealth;
-    const phaseColors = Array.isArray(boss.phaseColors) ? boss.phaseColors : null;
-    const color = phaseColors
+    const phaseColorsSource = Array.isArray(boss.phaseColors)
+      ? boss.phaseColors
+      : Array.isArray(data.phaseColors)
+      ? data.phaseColors
+      : this.bossHudState?.phaseColors;
+    const phaseColors = Array.isArray(phaseColorsSource)
+      ? [...phaseColorsSource]
+      : [];
+    const color = phaseColors.length
       ? phaseColors[Math.min(phase, phaseColors.length - 1)]
       : this.bossHudState?.color ?? null;
 
@@ -2895,6 +2935,7 @@ class EnemySystem {
       maxHealth,
       wave: waveNumber,
       color,
+      phaseColors,
     };
 
     this.emitBossHudUpdate();
@@ -2906,6 +2947,7 @@ class EnemySystem {
       health,
       maxHealth,
       color,
+      phaseColors,
     });
   }
 
@@ -2923,8 +2965,15 @@ class EnemySystem {
     const phase = data.phase ?? boss?.currentPhase ?? this.bossHudState?.phase ?? 0;
     const maxHealth = data.maxHealth ?? boss?.maxHealth ?? this.bossHudState?.maxHealth ?? 0;
     const health = data.health ?? boss?.health ?? this.bossHudState?.health ?? maxHealth;
-    const phaseColors = boss && Array.isArray(boss.phaseColors) ? boss.phaseColors : null;
-    const color = phaseColors
+    const phaseColorsSource = boss && Array.isArray(boss.phaseColors)
+      ? boss.phaseColors
+      : Array.isArray(data.phaseColors)
+      ? data.phaseColors
+      : this.bossHudState?.phaseColors;
+    const phaseColors = Array.isArray(phaseColorsSource)
+      ? [...phaseColorsSource]
+      : [];
+    const color = phaseColors.length
       ? phaseColors[Math.min(phase, phaseColors.length - 1)]
       : this.bossHudState?.color ?? null;
 
@@ -2940,6 +2989,7 @@ class EnemySystem {
       maxHealth,
       wave: waveNumber,
       color,
+      phaseColors,
     };
 
     this.emitBossHudUpdate();
@@ -2951,6 +3001,7 @@ class EnemySystem {
       health,
       maxHealth,
       color,
+      phaseColors,
     });
   }
 
@@ -2976,6 +3027,15 @@ class EnemySystem {
 
     boss.destroyed = true;
 
+    const phaseColorsSource = Array.isArray(this.bossHudState?.phaseColors)
+      ? this.bossHudState.phaseColors
+      : Array.isArray(boss.phaseColors)
+      ? boss.phaseColors
+      : null;
+    const phaseColors = Array.isArray(phaseColorsSource)
+      ? [...phaseColorsSource]
+      : [];
+
     const nextHudState = {
       ...this.bossHudState,
       active: false,
@@ -2989,6 +3049,7 @@ class EnemySystem {
       maxHealth: rewards?.maxHealth ?? boss.maxHealth ?? this.bossHudState?.maxHealth ?? 0,
       wave: waveNumber,
       color: this.bossHudState?.color ?? null,
+      phaseColors,
     };
 
     this.unregisterEnemyFromPhysics(boss);
@@ -3004,6 +3065,8 @@ class EnemySystem {
       rewards,
       wave: waveNumber,
       position,
+      color: nextHudState.color,
+      phaseColors,
     });
 
     this.releaseAsteroid(boss);

@@ -110,6 +110,8 @@ class UISystem {
       derived: {},
     };
 
+    this.bossHudState = this.createInitialBossHudState();
+
     this.initializeSettingsMetadata();
 
     this.domRefs = this.cacheStaticNodes();
@@ -213,6 +215,194 @@ class UISystem {
     if (!this.schemaByCategory.has(this.settingsState.activeCategory)) {
       this.settingsState.activeCategory = this.settingsSchema[0]?.id || 'audio';
     }
+  }
+
+  createInitialBossHudState() {
+    const timestamp =
+      typeof performance !== 'undefined' && typeof performance.now === 'function'
+        ? performance.now()
+        : Date.now();
+
+    return {
+      active: false,
+      upcoming: false,
+      defeated: false,
+      bossId: null,
+      name: null,
+      phase: 0,
+      phaseCount: 0,
+      health: 0,
+      maxHealth: 0,
+      wave: null,
+      color: '#ff6b6b',
+      phaseColors: [],
+      lastEvent: null,
+      lastUpdate: timestamp,
+    };
+  }
+
+  normalizeBossPhaseColors(input) {
+    if (!input) {
+      return [];
+    }
+
+    const collection = Array.isArray(input)
+      ? input
+      : typeof input[Symbol.iterator] === 'function'
+      ? [...input]
+      : [];
+
+    return collection
+      .map((value) => (typeof value === 'string' ? value.trim() : null))
+      .filter((value) => value && value.length > 0);
+  }
+
+  resetBossHudState() {
+    this.bossHudState = this.createInitialBossHudState();
+    return this.bossHudState;
+  }
+
+  getBossHudState() {
+    const state = this.bossHudState || this.createInitialBossHudState();
+    return {
+      ...state,
+      phaseColors: Array.isArray(state.phaseColors) ? [...state.phaseColors] : [],
+    };
+  }
+
+  updateBossHud(patch = {}) {
+    const now =
+      typeof performance !== 'undefined' && typeof performance.now === 'function'
+        ? performance.now()
+        : Date.now();
+
+    const current = this.bossHudState || this.createInitialBossHudState();
+    const next = { ...current };
+
+    if (patch.bossId !== undefined) {
+      next.bossId = patch.bossId;
+    }
+
+    if (patch.name !== undefined && patch.name !== null) {
+      next.name = String(patch.name);
+    }
+
+    if (Number.isFinite(patch.maxHealth)) {
+      next.maxHealth = Math.max(0, Number(patch.maxHealth));
+    }
+
+    if (Number.isFinite(patch.health)) {
+      next.health = Math.max(0, Math.min(next.maxHealth, Number(patch.health)));
+    } else {
+      next.health = Math.max(0, Math.min(next.maxHealth, next.health));
+    }
+
+    if (Number.isFinite(patch.phaseCount)) {
+      next.phaseCount = Math.max(0, Math.floor(Number(patch.phaseCount)));
+    }
+
+    if (Number.isFinite(patch.phase)) {
+      const normalizedPhase = Math.max(0, Math.floor(Number(patch.phase)));
+      if (next.phaseCount > 0) {
+        next.phase = Math.min(normalizedPhase, Math.max(0, next.phaseCount - 1));
+      } else {
+        next.phase = normalizedPhase;
+      }
+    }
+
+    if (Number.isFinite(patch.wave)) {
+      next.wave = Number(patch.wave);
+    } else if (patch.wave === null) {
+      next.wave = null;
+    }
+
+    if (typeof patch.color === 'string' && patch.color.trim().length > 0) {
+      next.color = patch.color.trim();
+    }
+
+    if (patch.phaseColors !== undefined) {
+      const colors = this.normalizeBossPhaseColors(patch.phaseColors);
+      next.phaseColors = colors;
+      if ((!next.color || next.color === '#ff6b6b') && colors.length > 0) {
+        next.color = colors[Math.min(next.phase, colors.length - 1)];
+      }
+    }
+
+    if (typeof patch.active === 'boolean') {
+      next.active = patch.active;
+    }
+
+    if (typeof patch.upcoming === 'boolean') {
+      next.upcoming = patch.upcoming;
+    }
+
+    if (typeof patch.defeated === 'boolean') {
+      next.defeated = patch.defeated;
+    }
+
+    if (patch.lastEvent !== undefined && patch.lastEvent !== null) {
+      next.lastEvent = patch.lastEvent;
+    } else if (patch.event !== undefined && patch.event !== null) {
+      next.lastEvent = patch.event;
+    }
+
+    next.lastUpdate = now;
+
+    if (!next.defeated && next.health > 0) {
+      next.active = true;
+      next.upcoming = false;
+    }
+
+    if (next.defeated) {
+      next.active = false;
+      next.upcoming = false;
+      next.health = 0;
+    }
+
+    if (!next.color) {
+      next.color = '#ff6b6b';
+    }
+
+    this.bossHudState = next;
+    return this.bossHudState;
+  }
+
+  handleBossEvent(eventName, data = {}) {
+    if (!eventName) {
+      return this.bossHudState;
+    }
+
+    const patch = { ...data, lastEvent: eventName };
+
+    switch (eventName) {
+      case 'boss-wave-started':
+        patch.upcoming = true;
+        patch.active = false;
+        patch.defeated = false;
+        patch.health = 0;
+        break;
+      case 'boss-spawned':
+        patch.active = true;
+        patch.upcoming = false;
+        patch.defeated = false;
+        break;
+      case 'boss-phase-changed':
+        patch.active = true;
+        patch.upcoming = false;
+        patch.defeated = false;
+        break;
+      case 'boss-defeated':
+        patch.defeated = true;
+        patch.active = false;
+        patch.upcoming = false;
+        patch.health = 0;
+        break;
+      case 'boss-hud-update':
+      default:
+        break;
+    }
+
+    return this.updateBossHud(patch);
   }
 
   createNumberFormatter(mode = 'standard') {
@@ -990,6 +1180,27 @@ class UISystem {
     if (typeof gameEvents === 'undefined') {
       return;
     }
+
+    const registerBossEvent = (eventName) => {
+      gameEvents.on(eventName, (payload = {}) => {
+        this.handleBossEvent(eventName, payload);
+      });
+      gameEvents.on(`ui-${eventName}`, (payload = {}) => {
+        this.handleBossEvent(eventName, payload);
+      });
+    };
+
+    ['boss-hud-update', 'boss-wave-started', 'boss-spawned', 'boss-phase-changed', 'boss-defeated'].forEach(
+      registerBossEvent
+    );
+
+    gameEvents.on('player-reset', () => {
+      this.resetBossHudState();
+    });
+
+    gameEvents.on('progression-reset', () => {
+      this.resetBossHudState();
+    });
 
     gameEvents.on('experience-changed', (data) => {
       this.updateXPBar(data);

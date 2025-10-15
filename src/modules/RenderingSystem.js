@@ -704,6 +704,7 @@ class RenderingSystem {
     this.cachedEffects = null;
     this.cachedCombat = null;
     this.cachedEnemies = null;
+    this.cachedUI = null;
 
     this.shieldVisualCache = {
       signature: '',
@@ -852,6 +853,7 @@ class RenderingSystem {
     assign('cachedEffects', 'effects');
     assign('cachedCombat', 'combat');
     assign('cachedEnemies', 'enemies');
+    assign('cachedUI', 'ui');
   }
 
   render(ctx) {
@@ -929,6 +931,7 @@ class RenderingSystem {
     // UI Elements
     this.stateManager.transitionToPhase(ctx, 'ui');
     this.drawMagnetismField(ctx, player, xpOrbs);
+    this.drawBossHud(ctx);
 
     // Effects phase
     this.stateManager.transitionToPhase(ctx, 'effects');
@@ -1001,6 +1004,254 @@ class RenderingSystem {
     ctx.arc(playerPosition.x, playerPosition.y, magnetismRadius, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
+  }
+
+  resolveBossHudState() {
+    const enemies = this.cachedEnemies;
+    if (enemies) {
+      if (typeof enemies.getBossHudState === 'function') {
+        const state = enemies.getBossHudState();
+        if (state) {
+          return {
+            ...state,
+            phaseColors: Array.isArray(state.phaseColors)
+              ? [...state.phaseColors]
+              : [],
+          };
+        }
+      } else if (enemies.bossHudState) {
+        const state = enemies.bossHudState;
+        if (state) {
+          return {
+            ...state,
+            phaseColors: Array.isArray(state.phaseColors)
+              ? [...state.phaseColors]
+              : [],
+          };
+        }
+      }
+    }
+
+    const ui = this.cachedUI;
+    if (ui) {
+      if (typeof ui.getBossHudState === 'function') {
+        const state = ui.getBossHudState();
+        if (state) {
+          return {
+            ...state,
+            phaseColors: Array.isArray(state.phaseColors)
+              ? [...state.phaseColors]
+              : [],
+          };
+        }
+      } else if (ui.bossHudState) {
+        const state = ui.bossHudState;
+        if (state) {
+          return {
+            ...state,
+            phaseColors: Array.isArray(state.phaseColors)
+              ? [...state.phaseColors]
+              : [],
+          };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  drawBossHud(ctx) {
+    if (!ctx) {
+      return;
+    }
+
+    const hud = this.resolveBossHudState();
+    if (!hud) {
+      return;
+    }
+
+    const now =
+      typeof performance !== 'undefined' && typeof performance.now === 'function'
+        ? performance.now()
+        : Date.now();
+    const lastUpdate = Number.isFinite(hud.lastUpdate)
+      ? hud.lastUpdate
+      : now;
+    const elapsed = Math.max(0, (now - lastUpdate) / 1000);
+
+    const isActive = Boolean(hud.active) || (hud.health > 0 && !hud.defeated);
+    const isUpcoming = Boolean(hud.upcoming);
+    const showDefeated = Boolean(hud.defeated) && elapsed < 4.5;
+
+    if (!isActive && !isUpcoming && !showDefeated) {
+      return;
+    }
+
+    let alpha = 1;
+    if (hud.defeated) {
+      alpha = Math.max(0, 1 - elapsed / 3);
+    } else if (isUpcoming && !isActive) {
+      alpha = Math.max(0.25, 0.65 - elapsed / 6);
+    }
+    alpha = Math.min(1, Math.max(0.15, alpha));
+    if (alpha <= 0.05) {
+      return;
+    }
+
+    const canvasWidth = ctx.canvas?.width ?? CONSTANTS.GAME_WIDTH ?? 800;
+    const canvasHeight = ctx.canvas?.height ?? CONSTANTS.GAME_HEIGHT ?? 600;
+
+    const barWidth = Math.min(canvasWidth * 0.68, 520);
+    const barHeight = Math.max(16, canvasHeight * 0.028);
+    const originX = (canvasWidth - barWidth) / 2;
+    const originY = Math.max(28, canvasHeight * 0.08);
+
+    const frame = {
+      x: originX,
+      y: originY,
+      width: barWidth,
+      height: barHeight,
+      alpha,
+    };
+
+    this.drawBossHealthBar(ctx, hud, frame);
+    this.drawBossPhaseIndicators(ctx, hud, frame);
+  }
+
+  drawBossHealthBar(ctx, hud, frame) {
+    const { x, y, width, height, alpha } = frame;
+    const baseColor =
+      typeof hud.color === 'string' && hud.color.trim().length > 0
+        ? hud.color
+        : '#ff6b6b';
+    const clampedHealthRatio = hud.maxHealth > 0
+      ? Math.max(0, Math.min(1, Number(hud.health) / Number(hud.maxHealth)))
+      : 0;
+
+    ctx.save();
+
+    ctx.globalAlpha = alpha * 0.8;
+    ctx.fillStyle = 'rgba(6, 10, 22, 0.82)';
+    ctx.fillRect(x, y, width, height);
+
+    ctx.globalAlpha = alpha * 0.15;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+    ctx.fillRect(x, y, width, height);
+
+    if (clampedHealthRatio > 0) {
+      const fillWidth = width * clampedHealthRatio;
+      ctx.globalAlpha = alpha * 0.95;
+      ctx.fillStyle = baseColor;
+      ctx.fillRect(x, y, fillWidth, height);
+
+      ctx.globalAlpha = alpha * 0.45;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.fillRect(x, y, fillWidth, height * 0.35);
+    }
+
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+    ctx.strokeRect(x, y, width, height);
+
+    const name = (hud.name || 'Boss').toString().toUpperCase();
+    ctx.font = '600 18px "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(name, x + width / 2, y - 10);
+
+    if (hud.maxHealth > 0) {
+      const healthValue = Math.max(0, Math.round(hud.health || 0));
+      const maxValue = Math.max(0, Math.round(hud.maxHealth || 0));
+      const healthText = `${healthValue.toLocaleString()} / ${maxValue.toLocaleString()}`;
+      ctx.font = '500 14px "Segoe UI", sans-serif';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(healthText, x + width / 2, y + height / 2);
+    }
+
+    if (hud.phaseCount > 0) {
+      const activePhase = Math.max(
+        1,
+        Math.min(hud.phaseCount, Math.floor(hud.phase ?? 0) + 1)
+      );
+      const phaseText = `Phase ${activePhase} / ${hud.phaseCount}`;
+      ctx.font = '500 13px "Segoe UI", sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(phaseText, x + width, y - 10);
+    }
+
+    ctx.restore();
+  }
+
+  drawBossPhaseIndicators(ctx, hud, frame) {
+    const { x, y, width, height, alpha } = frame;
+    const phaseCount = Math.max(0, Math.floor(Number(hud.phaseCount) || 0));
+    if (phaseCount <= 1) {
+      return;
+    }
+
+    const palette = Array.isArray(hud.phaseColors) ? hud.phaseColors : [];
+    const indicatorHeight = Math.max(6, height * 0.38);
+    const gap = Math.min(12, width / (phaseCount * 3));
+    const indicatorWidth = Math.max(
+      18,
+      Math.min(48, (width - gap * (phaseCount - 1)) / phaseCount)
+    );
+    const totalWidth = indicatorWidth * phaseCount + gap * (phaseCount - 1);
+    const startX = x + (width - totalWidth) / 2;
+    const baseY = y + height + 12;
+
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.2;
+    ctx.fillStyle = 'rgba(6, 10, 22, 0.85)';
+    ctx.fillRect(startX - gap * 0.5, baseY - indicatorHeight * 0.5, totalWidth + gap, indicatorHeight * 1.6);
+    ctx.restore();
+
+    const activePhase = hud.defeated
+      ? phaseCount
+      : Math.max(0, Math.min(phaseCount - 1, Math.floor(hud.phase ?? 0)));
+
+    for (let i = 0; i < phaseCount; i += 1) {
+      const indicatorX = startX + i * (indicatorWidth + gap);
+      const color =
+        typeof palette[i] === 'string' && palette[i].trim().length > 0
+          ? palette[i]
+          : hud.color || '#ff6b6b';
+
+      let status = 'upcoming';
+      if (hud.defeated || i < activePhase) {
+        status = 'complete';
+      } else if (i === activePhase) {
+        status = 'current';
+      }
+
+      ctx.save();
+      if (status === 'upcoming') {
+        ctx.globalAlpha = alpha * 0.35;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(indicatorX, baseY, indicatorWidth, indicatorHeight);
+      } else {
+        ctx.globalAlpha = alpha * (status === 'current' ? 0.9 : 0.6);
+        ctx.fillStyle = color;
+        ctx.fillRect(indicatorX, baseY, indicatorWidth, indicatorHeight);
+
+        if (status === 'current') {
+          ctx.globalAlpha = alpha;
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+          ctx.strokeRect(
+            indicatorX - 1,
+            baseY - 1,
+            indicatorWidth + 2,
+            indicatorHeight + 2
+          );
+        }
+      }
+      ctx.restore();
+    }
   }
 
   renderPlayer(ctx, player) {
