@@ -10,6 +10,9 @@ const MAIN_THRUSTER_FLASH_COLOR = '#3399FF';
 const MAIN_THRUSTER_FLASH_DURATION = 0.05;
 const MAIN_THRUSTER_FLASH_INTENSITY = 0.05;
 
+const BOSS_EFFECTS = CONSTANTS.BOSS_EFFECTS_PRESETS || {};
+const BOSS_SHAKES = CONSTANTS.BOSS_SCREEN_SHAKES || {};
+
 class SpaceParticle {
   constructor(x, y, vx, vy, color, size, life, type = 'normal', random = null) {
     this.x = x;
@@ -185,6 +188,7 @@ export default class EffectsSystem {
         explosions: 'effects.explosions',
         volatility: 'effects.volatility',
         screenShake: 'effects.screenShake',
+        boss: 'effects.boss',
       };
       this.randomForks = {
         base: this.random.fork(this.randomForkLabels.base),
@@ -196,6 +200,7 @@ export default class EffectsSystem {
         explosions: this.random.fork(this.randomForkLabels.explosions),
         volatility: this.random.fork(this.randomForkLabels.volatility),
         screenShake: this.random.fork(this.randomForkLabels.screenShake),
+        boss: this.random.fork(this.randomForkLabels.boss),
       };
       this.randomForkSeeds = {};
       this.captureRandomForkSeeds();
@@ -231,6 +236,18 @@ export default class EffectsSystem {
       color: '#FFFFFF',
       intensity: 0,
     };
+    this.timeDilation = {
+      timer: 0,
+      duration: 0,
+      startScale: 1,
+      endScale: 1,
+      holdScale: 1,
+      holdTimer: 0,
+      easing: 'outCubic',
+      active: false,
+    };
+    this.activeBoss = { id: null, lastPhase: 0 };
+    this.lastAdjustedDelta = 0;
 
     this.settings = resolveService('settings', this.dependencies);
     this.motionReduced = false;
@@ -282,6 +299,39 @@ export default class EffectsSystem {
     const particle = this.createParticle(x, y, vx, vy, color, size, life, type);
     this.particles.push(particle);
     return particle;
+  }
+
+  releaseParticle(particle) {
+    if (!particle) {
+      return;
+    }
+
+    if (particle.bossEffectTag) {
+      delete particle.bossEffectTag;
+    }
+
+    if (typeof particle === 'object' && particle !== null) {
+      if (Object.prototype.hasOwnProperty.call(particle, 'active')) {
+        particle.active = false;
+      }
+
+      const ctorName =
+        particle.constructor && typeof particle.constructor.name === 'string'
+          ? particle.constructor.name
+          : null;
+
+      if (ctorName && ctorName !== 'Object') {
+        return;
+      }
+
+      if (particle.active !== undefined) {
+        try {
+          GamePools.particles.release(particle);
+        } catch (error) {
+          console.debug('[EffectsSystem] Particle not from pool, skipping release');
+        }
+      }
+    }
   }
 
   setupSettingsIntegration() {
@@ -376,14 +426,54 @@ export default class EffectsSystem {
   setupEventListeners() {
     if (typeof gameEvents === 'undefined') return;
 
-    const bossEvents = ['boss-spawned', 'boss-phase-changed'];
-    bossEvents.forEach((eventName) => {
-      gameEvents.on(eventName, (payload = {}) => {
-        this.triggerBossTransitionEffect(eventName, payload);
-      });
-      gameEvents.on(`effects-${eventName}`, (payload = {}) => {
-        this.triggerBossTransitionEffect(eventName, payload);
-      });
+    const registerBossEvent = (eventName, handler) => {
+      if (typeof handler !== 'function') {
+        return;
+      }
+
+      const wrapped = (payload = {}) => {
+        try {
+          handler(payload ?? {}, eventName);
+        } catch (bossError) {
+          console.warn(
+            '[EffectsSystem] Failed to handle boss effect event',
+            eventName,
+            bossError
+          );
+        }
+      };
+
+      gameEvents.on(eventName, wrapped);
+      gameEvents.on(`effects-${eventName}`, wrapped);
+    };
+
+    registerBossEvent('boss-spawned', (payload = {}) => {
+      this.clearBossEffectsState();
+      this.activeBoss.id = this.resolveBossId(payload);
+      if (Number.isFinite(payload?.phase)) {
+        this.activeBoss.lastPhase = payload.phase;
+      }
+      this.createBossEntranceEffect(payload);
+      this.triggerBossTransitionEffect('boss-spawned', payload);
+    });
+
+    registerBossEvent('boss-phase-changed', (payload = {}) => {
+      const bossId = this.resolveBossId(payload);
+      if (bossId != null) {
+        this.activeBoss.id = bossId;
+      }
+      if (Number.isFinite(payload?.phase)) {
+        this.activeBoss.lastPhase = payload.phase;
+      }
+      this.createBossPhaseTransition(payload);
+      this.triggerBossTransitionEffect('boss-phase-changed', payload);
+    });
+
+    registerBossEvent('boss-defeated', (payload = {}) => {
+      this.clearBossEffectsState();
+      this.createBossDefeatedExplosion(payload);
+      this.triggerBossTransitionEffect('boss-defeated', payload);
+      this.activeBoss = { id: null, lastPhase: 0 };
     });
 
     // Weapon fire feedback (Week 1: Balance & Feel)
@@ -539,26 +629,34 @@ export default class EffectsSystem {
   }
 
   update(deltaTime) {
-    if (this.freezeFrame.timer > 0) {
-      this.freezeFrame.timer -= deltaTime;
-      if (this.freezeFrame.timer < 0) this.freezeFrame.timer = 0;
-      deltaTime *= this.freezeFrame.fade;
-    }
+    const baseDelta = Number.isFinite(deltaTime) ? Math.max(0, deltaTime) : 0;
+    let effectDelta = baseDelta;
+    let adjustedDelta = baseDelta;
+
+    const freezeMultiplier = this.updateFreezeFrameState(baseDelta);
+    effectDelta *= freezeMultiplier;
+    adjustedDelta *= freezeMultiplier;
+
+    const timeScale = this.updateTimeDilationState(baseDelta);
+    effectDelta *= timeScale;
+    adjustedDelta *= timeScale;
 
     // Update screen shake (new trauma-based system)
-    this.screenShake.update(deltaTime);
+    this.screenShake.update(effectDelta);
 
     if (this.screenFlash.timer > 0) {
-      this.screenFlash.timer -= deltaTime;
+      this.screenFlash.timer -= effectDelta;
       if (this.screenFlash.timer < 0) this.screenFlash.timer = 0;
     }
 
-    this.updateParticles(deltaTime);
-    this.updateShockwaves(deltaTime);
-    this.updateHitMarkers(deltaTime);
-    this.updateDamageIndicators(deltaTime);
-    this.updateBossTransitions(deltaTime);
-    return deltaTime;
+    this.updateParticles(effectDelta);
+    this.updateShockwaves(effectDelta);
+    this.updateHitMarkers(effectDelta);
+    this.updateDamageIndicators(effectDelta);
+    this.updateBossTransitions(effectDelta);
+
+    this.lastAdjustedDelta = adjustedDelta;
+    return adjustedDelta;
   }
 
   updateHitMarkers(deltaTime) {
@@ -573,6 +671,94 @@ export default class EffectsSystem {
     });
   }
 
+  updateFreezeFrameState(baseDelta) {
+    if (!this.freezeFrame || this.freezeFrame.timer <= 0) {
+      return 1;
+    }
+
+    const frame = this.freezeFrame;
+    frame.timer = Math.max(0, frame.timer - baseDelta);
+
+    const duration = frame.duration > 0 ? frame.duration : Math.max(frame.timer, 0);
+    if (duration <= 0) {
+      frame.timer = 0;
+      return 1;
+    }
+
+    const fade = Math.max(0, Math.min(1, frame.fade ?? 0));
+    if (frame.timer <= 0) {
+      return 1;
+    }
+
+    const remaining = Math.max(0, Math.min(1, frame.timer / duration));
+    const normalized = 1 - remaining;
+    const multiplier = fade + (1 - fade) * normalized;
+
+    return Math.max(0, Math.min(1, multiplier));
+  }
+
+  updateTimeDilationState(baseDelta) {
+    if (!this.timeDilation) {
+      return 1;
+    }
+
+    const state = this.timeDilation;
+
+    if (state.holdTimer > 0) {
+      state.holdTimer = Math.max(0, state.holdTimer - baseDelta);
+      state.timer = Math.max(state.duration, 0);
+      state.active = true;
+      const scale = Math.max(0, Math.min(1, state.holdScale ?? 1));
+      if (state.holdTimer <= 0 && state.duration <= 0) {
+        state.active = false;
+      }
+      return scale;
+    }
+
+    if (state.timer > 0 && state.duration > 0) {
+      state.timer = Math.max(0, state.timer - baseDelta);
+      const progress = state.duration > 0 ? 1 - state.timer / state.duration : 1;
+      const eased = this.easeValue(state.easing, progress);
+      const start = Number.isFinite(state.startScale) ? state.startScale : 1;
+      const end = Number.isFinite(state.endScale) ? state.endScale : 1;
+      const scale = start + (end - start) * eased;
+
+      if (state.timer <= 0) {
+        state.timer = 0;
+        state.duration = 0;
+        state.startScale = 1;
+        state.endScale = 1;
+        state.holdScale = 1;
+        state.active = false;
+      } else {
+        state.active = true;
+      }
+
+      return Math.max(0, Math.min(1, scale));
+    }
+
+    state.timer = 0;
+    state.duration = 0;
+    state.startScale = 1;
+    state.endScale = 1;
+    state.holdScale = 1;
+    state.active = false;
+    return 1;
+  }
+
+  easeValue(easing, t) {
+    const clamped = Math.max(0, Math.min(1, t));
+    switch (easing) {
+      case 'smooth':
+        return clamped * clamped * (3 - 2 * clamped);
+      case 'outQuad':
+        return 1 - Math.pow(1 - clamped, 2);
+      case 'outCubic':
+      default:
+        return 1 - Math.pow(1 - clamped, 3);
+    }
+  }
+
   updateParticles(deltaTime) {
     // Update particles and return expired ones to pool
     const activeParticles = [];
@@ -580,17 +766,7 @@ export default class EffectsSystem {
       if (particle && typeof particle.update === 'function' && particle.update(deltaTime)) {
         activeParticles.push(particle);
       } else if (particle) {
-        // Only try to return to pool if it came from the pool
-        // Check if it has the pooled object structure
-        if (particle.active !== undefined && !particle.constructor.name) {
-          try {
-            GamePools.particles.release(particle);
-          } catch (error) {
-            // If release fails, it wasn't from this pool - just ignore
-            console.debug('[EffectsSystem] Particle not from pool, skipping release');
-          }
-        }
-        // For old SpaceParticle instances, just let them be garbage collected
+        this.releaseParticle(particle);
       }
     }
     this.particles = activeParticles;
@@ -599,12 +775,8 @@ export default class EffectsSystem {
     if (this.particles.length > 150) {
       const excessParticles = this.particles.splice(0, this.particles.length - 100);
       for (const particle of excessParticles) {
-        if (particle && particle.active !== undefined && !particle.constructor.name) {
-          try {
-            GamePools.particles.release(particle);
-          } catch (error) {
-            // Ignore release errors for non-pool particles
-          }
+        if (particle) {
+          this.releaseParticle(particle);
         }
       }
     }
@@ -731,9 +903,15 @@ export default class EffectsSystem {
       return payload.boss.color;
     }
 
-    return eventName === 'boss-phase-changed'
-      ? 'rgba(255, 210, 120, 0.9)'
-      : 'rgba(255, 105, 140, 0.95)';
+    if (eventName === 'boss-phase-changed') {
+      return 'rgba(255, 210, 120, 0.9)';
+    }
+
+    if (eventName === 'boss-defeated') {
+      return 'rgba(255, 245, 235, 0.92)';
+    }
+
+    return 'rgba(255, 105, 140, 0.95)';
   }
 
   triggerBossTransitionEffect(eventName, payload = {}) {
@@ -742,19 +920,656 @@ export default class EffectsSystem {
     }
 
     const color = this.resolveBossTransitionColor(eventName, payload);
-    const duration = eventName === 'boss-spawned' ? 1.65 : 1.05;
+    const presets = {
+      'boss-spawned': {
+        duration: 1.65,
+        maxAlpha: 0.65,
+        borderWidth: 30,
+        pulseFrequency: 1.8,
+        overlayAlpha: 0.18,
+        fadePower: 1.5,
+      },
+      'boss-phase-changed': {
+        duration: 1.05,
+        maxAlpha: 0.5,
+        borderWidth: 24,
+        pulseFrequency: 2.4,
+        overlayAlpha: 0.12,
+        fadePower: 1.6,
+      },
+      'boss-defeated': {
+        duration: 2.15,
+        maxAlpha: 0.85,
+        borderWidth: 36,
+        pulseFrequency: 1.1,
+        overlayAlpha: 0.22,
+        fadePower: 1.9,
+      },
+    };
+    const preset = presets[eventName] || presets['boss-phase-changed'];
     const effect = {
       event: eventName,
       color,
-      duration,
+      duration: preset.duration,
       timer: 0,
-      maxAlpha: eventName === 'boss-spawned' ? 0.65 : 0.5,
-      borderWidth: eventName === 'boss-spawned' ? 30 : 24,
-      pulseFrequency: eventName === 'boss-spawned' ? 1.8 : 2.4,
-      overlayAlpha: eventName === 'boss-spawned' ? 0.18 : 0.12,
+      maxAlpha: preset.maxAlpha,
+      borderWidth: preset.borderWidth,
+      pulseFrequency: preset.pulseFrequency,
+      overlayAlpha: preset.overlayAlpha,
+      fadePower: preset.fadePower,
     };
 
     this.bossTransitionEffects.push(effect);
+  }
+
+  getBossEffectConfig(name) {
+    if (!name) {
+      return null;
+    }
+
+    return BOSS_EFFECTS && Object.prototype.hasOwnProperty.call(BOSS_EFFECTS, name)
+      ? BOSS_EFFECTS[name]
+      : null;
+  }
+
+  getBossShakePreset(name) {
+    if (!name) {
+      return null;
+    }
+
+    return BOSS_SHAKES && Object.prototype.hasOwnProperty.call(BOSS_SHAKES, name)
+      ? BOSS_SHAKES[name]
+      : null;
+  }
+
+  applyBossScreenShake(name) {
+    const preset = this.getBossShakePreset(name);
+    if (!preset) {
+      return;
+    }
+
+    const intensity = Number.isFinite(preset.intensity) ? preset.intensity : null;
+    const duration = Number.isFinite(preset.duration) ? preset.duration : null;
+
+    if (intensity != null && duration != null) {
+      this.addScreenShake(intensity, duration);
+    }
+  }
+
+  applyBossEffectTimings(config = {}, palette = {}, eventName = '') {
+    if (config.freezeFrame) {
+      this.addFreezeFrame(config.freezeFrame.duration, config.freezeFrame.fade);
+    }
+
+    if (config.slowMotion) {
+      this.applyTimeDilation(config.slowMotion.scale ?? 0.6, {
+        duration: config.slowMotion.duration,
+        holdDuration: Number.isFinite(config.slowMotion.holdDuration)
+          ? config.slowMotion.holdDuration
+          : config.slowMotion.hold,
+        easing: config.slowMotion.easing,
+      });
+    }
+
+    const flashConfig = config.screenFlash;
+    if (flashConfig) {
+      const flashColor =
+        flashConfig.color || palette.flash || palette.core || '#ffffff';
+      const flashDuration = Number.isFinite(flashConfig.duration)
+        ? flashConfig.duration
+        : 0.35;
+      const flashIntensity = Number.isFinite(flashConfig.intensity)
+        ? flashConfig.intensity
+        : 0.25;
+      this.addScreenFlash(flashColor, flashDuration, flashIntensity);
+    }
+  }
+
+  tagBossParticle(particle, tag) {
+    if (particle && tag) {
+      particle.bossEffectTag = tag;
+    }
+    return particle;
+  }
+
+  clearBossEffectsState(options = {}) {
+    const preserveEvents = Array.isArray(options.preserveEvents)
+      ? new Set(options.preserveEvents)
+      : null;
+
+    if (Array.isArray(this.bossTransitionEffects)) {
+      if (preserveEvents && preserveEvents.size > 0) {
+        this.bossTransitionEffects = this.bossTransitionEffects.filter(
+          (effect) => effect && preserveEvents.has(effect.event)
+        );
+      } else {
+        this.bossTransitionEffects = [];
+      }
+    }
+
+    const preserveTags = Array.isArray(options.preserveTags)
+      ? new Set(options.preserveTags)
+      : null;
+
+    if (!Array.isArray(this.particles) || this.particles.length === 0) {
+      return;
+    }
+
+    const survivors = [];
+    for (const particle of this.particles) {
+      if (particle && particle.bossEffectTag) {
+        if (preserveTags && preserveTags.has(particle.bossEffectTag)) {
+          survivors.push(particle);
+          continue;
+        }
+        this.releaseParticle(particle);
+      } else {
+        survivors.push(particle);
+      }
+    }
+
+    this.particles = survivors;
+  }
+
+  resolveBossId(payload = {}) {
+    if (!payload || typeof payload !== 'object') {
+      return null;
+    }
+
+    const source = payload.enemy || payload.boss || payload.source || null;
+    if (source && source.id != null) {
+      return source.id;
+    }
+
+    if (payload.bossId != null) {
+      return payload.bossId;
+    }
+
+    if (payload.enemyId != null) {
+      return payload.enemyId;
+    }
+
+    if (payload.id != null) {
+      return payload.id;
+    }
+
+    return null;
+  }
+
+  resolveBossPosition(payload = {}) {
+    if (!payload || typeof payload !== 'object') {
+      return null;
+    }
+
+    const input = payload.position;
+    if (input && Number.isFinite(input.x) && Number.isFinite(input.y)) {
+      return { x: input.x, y: input.y };
+    }
+
+    const source = payload.enemy || payload.boss || payload.target || null;
+    if (source && Number.isFinite(source.x) && Number.isFinite(source.y)) {
+      return { x: source.x, y: source.y };
+    }
+
+    if (Number.isFinite(payload.x) && Number.isFinite(payload.y)) {
+      return { x: payload.x, y: payload.y };
+    }
+
+    return null;
+  }
+
+  resolveBossPalette(payload = {}, configColors = {}, eventName = 'boss-spawned') {
+    const colors = configColors || {};
+    const coreColor =
+      this.resolveBossTransitionColor(eventName, payload) || colors.core || '#ff6b9c';
+
+    const phaseColorsSource = Array.isArray(payload.phaseColors)
+      ? payload.phaseColors
+      : Array.isArray(payload.enemy?.phaseColors)
+      ? payload.enemy.phaseColors
+      : Array.isArray(payload.boss?.phaseColors)
+      ? payload.boss.phaseColors
+      : null;
+
+    const phaseValue = Number(payload.phase);
+    const fallbackPhase = Number.isFinite(this.activeBoss?.lastPhase)
+      ? this.activeBoss.lastPhase
+      : 0;
+    const selectedPhase = Number.isFinite(phaseValue) ? phaseValue : fallbackPhase;
+
+    let accentColor = colors.accent || null;
+    if (phaseColorsSource && phaseColorsSource.length) {
+      const index = Math.max(
+        0,
+        Math.min(phaseColorsSource.length - 1, Math.round(selectedPhase))
+      );
+      accentColor = phaseColorsSource[index];
+    }
+
+    if (!accentColor) {
+      accentColor = colors.accent || coreColor;
+    }
+
+    return {
+      core: coreColor,
+      accent: accentColor,
+      trail: colors.trail || accentColor,
+      smoke: colors.smoke || 'rgba(255, 255, 255, 0.24)',
+      flash: colors.flash || '#ffffff',
+    };
+  }
+
+  createBossEntranceEffect(payload = {}) {
+    const origin = this.resolveBossPosition(payload);
+    if (!origin) {
+      return;
+    }
+
+    const config = this.getBossEffectConfig('entrance') || {};
+    const palette = this.resolveBossPalette(payload, config.colors || {}, 'boss-spawned');
+
+    const swirl = config.swirl || {};
+    const swirlCount = this.getScaledParticleCount(swirl.count ?? 48, {
+      allowZero: true,
+    });
+    const innerRadius = Number.isFinite(swirl.innerRadius) ? swirl.innerRadius : 36;
+    const outerRadius = Number.isFinite(swirl.outerRadius)
+      ? swirl.outerRadius
+      : Math.max(innerRadius + 40, 120);
+    const swirlSpeedMin = swirl.speed?.min ?? 80;
+    const swirlSpeedMax = swirl.speed?.max ?? 150;
+    const swirlSizeMin = swirl.size?.min ?? 2.2;
+    const swirlSizeMax = swirl.size?.max ?? 3.4;
+    const swirlLifeMin = swirl.life?.min ?? 0.5;
+    const swirlLifeMax = swirl.life?.max ?? 0.8;
+
+    for (let i = 0; i < swirlCount; i += 1) {
+      const angle = (i / Math.max(1, swirlCount)) * Math.PI * 2;
+      const radius = this.randomRange(innerRadius, outerRadius, 'boss');
+      const offsetX = Math.cos(angle) * radius;
+      const offsetY = Math.sin(angle) * radius;
+      const speed = this.randomRange(swirlSpeedMin, swirlSpeedMax, 'boss');
+      const velocityAngle = angle + Math.PI / 2 + this.randomCentered(0.4, 'boss');
+      const particle = this.createParticle(
+        origin.x + offsetX,
+        origin.y + offsetY,
+        Math.cos(velocityAngle) * speed,
+        Math.sin(velocityAngle) * speed,
+        palette.accent,
+        this.randomRange(swirlSizeMin, swirlSizeMax, 'boss'),
+        this.randomRange(swirlLifeMin, swirlLifeMax, 'boss'),
+        'spark'
+      );
+      particle.rotationSpeed = this.randomCentered(6, 'boss');
+      this.tagBossParticle(particle, 'boss-entrance');
+      this.particles.push(particle);
+    }
+
+    const burst = config.burst || {};
+    const rings = Math.max(1, burst.rings ?? 2);
+    const perRing = Math.max(1, burst.particlesPerRing ?? 24);
+    const radiusStep = Number.isFinite(burst.radiusStep) ? burst.radiusStep : 44;
+    const burstSpeedMin = burst.speed?.min ?? 140;
+    const burstSpeedMax = burst.speed?.max ?? 220;
+    const burstSizeMin = burst.size?.min ?? 2.8;
+    const burstSizeMax = burst.size?.max ?? 4.2;
+    const burstLifeMin = burst.life?.min ?? 0.45;
+    const burstLifeMax = burst.life?.max ?? 0.75;
+
+    for (let ring = 0; ring < rings; ring += 1) {
+      const baseRadius = radiusStep * (ring + 1);
+      for (let i = 0; i < perRing; i += 1) {
+        const angle = (i / perRing) * Math.PI * 2;
+        const speed = this.randomRange(burstSpeedMin, burstSpeedMax, 'boss');
+        const offsetRadius = baseRadius * 0.28;
+        const particle = this.createParticle(
+          origin.x + Math.cos(angle) * offsetRadius,
+          origin.y + Math.sin(angle) * offsetRadius,
+          Math.cos(angle) * speed,
+          Math.sin(angle) * speed,
+          ring % 2 === 0 ? palette.core : palette.trail,
+          this.randomRange(burstSizeMin, burstSizeMax, 'boss'),
+          this.randomRange(burstLifeMin, burstLifeMax, 'boss'),
+          'spark'
+        );
+        particle.rotationSpeed = this.randomCentered(4, 'boss');
+        this.tagBossParticle(particle, 'boss-entrance');
+        this.particles.push(particle);
+      }
+    }
+
+    const dust = config.dust || {};
+    const dustCount = this.getScaledParticleCount(dust.count ?? 28, {
+      allowZero: true,
+    });
+    const dustSpeedMin = dust.speed?.min ?? 40;
+    const dustSpeedMax = dust.speed?.max ?? 90;
+    const dustSizeMin = dust.size?.min ?? 3.2;
+    const dustSizeMax = dust.size?.max ?? 5.2;
+    const dustLifeMin = dust.life?.min ?? 0.8;
+    const dustLifeMax = dust.life?.max ?? 1.4;
+
+    for (let i = 0; i < dustCount; i += 1) {
+      const angle = this.randomFloat('boss') * Math.PI * 2;
+      const speed = this.randomRange(dustSpeedMin, dustSpeedMax, 'boss');
+      const particle = this.createParticle(
+        origin.x,
+        origin.y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        palette.smoke,
+        this.randomRange(dustSizeMin, dustSizeMax, 'boss'),
+        this.randomRange(dustLifeMin, dustLifeMax, 'boss'),
+        'normal'
+      );
+      particle.rotationSpeed = this.randomCentered(1.2, 'boss');
+      this.tagBossParticle(particle, 'boss-entrance');
+      this.particles.push(particle);
+    }
+
+    if (config.shockwave) {
+      this.createShockwaveEffect({
+        position: origin,
+        radius: config.shockwave.radius,
+        duration: config.shockwave.duration,
+        baseWidth: config.shockwave.baseWidth,
+        maxAlpha: config.shockwave.maxAlpha,
+        widthFade: config.shockwave.widthFade,
+        easingPower: config.shockwave.easingPower,
+        color: palette.core,
+        shadowColor: config.shockwave.shadowColor,
+        shadowBlur: config.shockwave.shadowBlur,
+        fillColor: config.shockwave.fillColor,
+      });
+    }
+
+    this.applyBossScreenShake('spawn');
+    this.applyBossEffectTimings(config, palette, 'boss-spawned');
+  }
+
+  createBossPhaseTransition(payload = {}) {
+    const origin = this.resolveBossPosition(payload);
+    if (!origin) {
+      return;
+    }
+
+    const config = this.getBossEffectConfig('phaseTransition') || {};
+    const palette = this.resolveBossPalette(
+      payload,
+      config.colors || {},
+      'boss-phase-changed'
+    );
+
+    const burst = config.burst || {};
+    const burstCount = this.getScaledParticleCount(burst.count ?? 48, {
+      allowZero: true,
+    });
+    const burstSpeedMin = burst.speed?.min ?? 160;
+    const burstSpeedMax = burst.speed?.max ?? 280;
+    const burstSizeMin = burst.size?.min ?? 2.2;
+    const burstSizeMax = burst.size?.max ?? 3.4;
+    const burstLifeMin = burst.life?.min ?? 0.35;
+    const burstLifeMax = burst.life?.max ?? 0.65;
+
+    for (let i = 0; i < burstCount; i += 1) {
+      const angle = this.randomFloat('boss') * Math.PI * 2;
+      const speed = this.randomRange(burstSpeedMin, burstSpeedMax, 'boss');
+      const particle = this.createParticle(
+        origin.x,
+        origin.y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        palette.core,
+        this.randomRange(burstSizeMin, burstSizeMax, 'boss'),
+        this.randomRange(burstLifeMin, burstLifeMax, 'boss'),
+        'spark'
+      );
+      particle.rotationSpeed = this.randomCentered(5, 'boss');
+      this.tagBossParticle(particle, 'boss-phase');
+      this.particles.push(particle);
+    }
+
+    const petals = config.petals || {};
+    const petalsCount = this.getScaledParticleCount(petals.count ?? 16, {
+      allowZero: true,
+    });
+    const petalRadius = Number.isFinite(petals.radius) ? petals.radius : 110;
+    const petalAngularJitter = Number.isFinite(petals.angularJitter)
+      ? petals.angularJitter
+      : 0.3;
+    const petalSpeedMin = petals.speed?.min ?? 60;
+    const petalSpeedMax = petals.speed?.max ?? 120;
+    const petalSizeMin = petals.size?.min ?? 2.6;
+    const petalSizeMax = petals.size?.max ?? 3.6;
+    const petalLifeMin = petals.life?.min ?? 0.4;
+    const petalLifeMax = petals.life?.max ?? 0.75;
+
+    for (let i = 0; i < petalsCount; i += 1) {
+      const baseAngle = (i / Math.max(1, petalsCount)) * Math.PI * 2;
+      const jitter = this.randomCentered(petalAngularJitter, 'boss');
+      const angle = baseAngle + jitter;
+      const speed = this.randomRange(petalSpeedMin, petalSpeedMax, 'boss');
+      const particle = this.createParticle(
+        origin.x + Math.cos(angle) * petalRadius * 0.25,
+        origin.y + Math.sin(angle) * petalRadius * 0.25,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        palette.accent,
+        this.randomRange(petalSizeMin, petalSizeMax, 'boss'),
+        this.randomRange(petalLifeMin, petalLifeMax, 'boss'),
+        'spark'
+      );
+      particle.rotationSpeed = this.randomCentered(4, 'boss');
+      this.tagBossParticle(particle, 'boss-phase');
+      this.particles.push(particle);
+    }
+
+    const embers = config.embers || {};
+    const emberCount = this.getScaledParticleCount(embers.count ?? 24, {
+      allowZero: true,
+    });
+    const emberSpeedMin = embers.speed?.min ?? 35;
+    const emberSpeedMax = embers.speed?.max ?? 70;
+    const emberSizeMin = embers.size?.min ?? 2.4;
+    const emberSizeMax = embers.size?.max ?? 3.4;
+    const emberLifeMin = embers.life?.min ?? 1.1;
+    const emberLifeMax = embers.life?.max ?? 1.6;
+
+    for (let i = 0; i < emberCount; i += 1) {
+      const angle = this.randomFloat('boss') * Math.PI * 2;
+      const speed = this.randomRange(emberSpeedMin, emberSpeedMax, 'boss');
+      const particle = this.createParticle(
+        origin.x,
+        origin.y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        palette.smoke,
+        this.randomRange(emberSizeMin, emberSizeMax, 'boss'),
+        this.randomRange(emberLifeMin, emberLifeMax, 'boss'),
+        'normal'
+      );
+      particle.rotationSpeed = this.randomCentered(1.5, 'boss');
+      this.tagBossParticle(particle, 'boss-phase');
+      this.particles.push(particle);
+    }
+
+    if (config.shockwave) {
+      this.createShockwaveEffect({
+        position: origin,
+        radius: config.shockwave.radius,
+        duration: config.shockwave.duration,
+        baseWidth: config.shockwave.baseWidth,
+        maxAlpha: config.shockwave.maxAlpha,
+        widthFade: config.shockwave.widthFade,
+        easingPower: config.shockwave.easingPower,
+        color: palette.accent,
+        shadowColor: config.shockwave.shadowColor,
+        shadowBlur: config.shockwave.shadowBlur,
+        fillColor: config.shockwave.fillColor,
+      });
+    }
+
+    this.applyBossScreenShake('phaseChange');
+    this.applyBossEffectTimings(config, palette, 'boss-phase-changed');
+  }
+
+  createBossDefeatedExplosion(payload = {}) {
+    const origin = this.resolveBossPosition(payload);
+    if (!origin) {
+      return;
+    }
+
+    const config = this.getBossEffectConfig('defeated') || {};
+    const palette = this.resolveBossPalette(
+      payload,
+      config.colors || {},
+      'boss-defeated'
+    );
+
+    const debris = config.debris || {};
+    const debrisCount = this.getScaledParticleCount(debris.count ?? 60);
+    const debrisSpeedMin = debris.speed?.min ?? 180;
+    const debrisSpeedMax = debris.speed?.max ?? 320;
+    const debrisSizeMin = debris.size?.min ?? 2.8;
+    const debrisSizeMax = debris.size?.max ?? 4.6;
+    const debrisLifeMin = debris.life?.min ?? 0.9;
+    const debrisLifeMax = debris.life?.max ?? 1.4;
+
+    for (let i = 0; i < debrisCount; i += 1) {
+      const angle = this.randomFloat('boss') * Math.PI * 2;
+      const speed = this.randomRange(debrisSpeedMin, debrisSpeedMax, 'boss');
+      const particle = this.createParticle(
+        origin.x,
+        origin.y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        palette.core,
+        this.randomRange(debrisSizeMin, debrisSizeMax, 'boss'),
+        this.randomRange(debrisLifeMin, debrisLifeMax, 'boss'),
+        'debris'
+      );
+      particle.rotationSpeed = this.randomCentered(8, 'boss');
+      this.tagBossParticle(particle, 'boss-defeat');
+      this.particles.push(particle);
+    }
+
+    const sparks = config.sparks || {};
+    const sparkCount = this.getScaledParticleCount(sparks.count ?? 90);
+    const sparkSpeedMin = sparks.speed?.min ?? 260;
+    const sparkSpeedMax = sparks.speed?.max ?? 400;
+    const sparkSizeMin = sparks.size?.min ?? 2.4;
+    const sparkSizeMax = sparks.size?.max ?? 3.8;
+    const sparkLifeMin = sparks.life?.min ?? 0.5;
+    const sparkLifeMax = sparks.life?.max ?? 0.85;
+
+    for (let i = 0; i < sparkCount; i += 1) {
+      const angle = this.randomFloat('boss') * Math.PI * 2;
+      const speed = this.randomRange(sparkSpeedMin, sparkSpeedMax, 'boss');
+      const particle = this.createParticle(
+        origin.x,
+        origin.y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        i % 3 === 0 ? palette.accent : palette.core,
+        this.randomRange(sparkSizeMin, sparkSizeMax, 'boss'),
+        this.randomRange(sparkLifeMin, sparkLifeMax, 'boss'),
+        'spark'
+      );
+      particle.rotationSpeed = this.randomCentered(7, 'boss');
+      this.tagBossParticle(particle, 'boss-defeat');
+      this.particles.push(particle);
+    }
+
+    const embers = config.embers || {};
+    const emberCount = this.getScaledParticleCount(embers.count ?? 32, {
+      allowZero: true,
+    });
+    const emberSpeedMin = embers.speed?.min ?? 30;
+    const emberSpeedMax = embers.speed?.max ?? 60;
+    const emberSizeMin = embers.size?.min ?? 3.2;
+    const emberSizeMax = embers.size?.max ?? 4.4;
+    const emberLifeMin = embers.life?.min ?? 1.5;
+    const emberLifeMax = embers.life?.max ?? 2.2;
+
+    for (let i = 0; i < emberCount; i += 1) {
+      const angle = this.randomFloat('boss') * Math.PI * 2;
+      const speed = this.randomRange(emberSpeedMin, emberSpeedMax, 'boss');
+      const particle = this.createParticle(
+        origin.x,
+        origin.y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        palette.trail,
+        this.randomRange(emberSizeMin, emberSizeMax, 'boss'),
+        this.randomRange(emberLifeMin, emberLifeMax, 'boss'),
+        'normal'
+      );
+      particle.rotationSpeed = this.randomCentered(1.8, 'boss');
+      this.tagBossParticle(particle, 'boss-defeat');
+      this.particles.push(particle);
+    }
+
+    const smoke = config.smoke || {};
+    const smokeCount = this.getScaledParticleCount(smoke.count ?? 26, {
+      allowZero: true,
+    });
+    const smokeSpeedMin = smoke.speed?.min ?? 20;
+    const smokeSpeedMax = smoke.speed?.max ?? 55;
+    const smokeSizeMin = smoke.size?.min ?? 18;
+    const smokeSizeMax = smoke.size?.max ?? 26;
+    const smokeLifeMin = smoke.life?.min ?? 1.6;
+    const smokeLifeMax = smoke.life?.max ?? 2.8;
+
+    for (let i = 0; i < smokeCount; i += 1) {
+      const angle = this.randomFloat('boss') * Math.PI * 2;
+      const speed = this.randomRange(smokeSpeedMin, smokeSpeedMax, 'boss');
+      const particle = this.createParticle(
+        origin.x,
+        origin.y,
+        Math.cos(angle) * speed,
+        Math.sin(angle) * speed,
+        palette.smoke,
+        this.randomRange(smokeSizeMin, smokeSizeMax, 'boss'),
+        this.randomRange(smokeLifeMin, smokeLifeMax, 'boss'),
+        'normal'
+      );
+      particle.rotationSpeed = this.randomCentered(0.9, 'boss');
+      this.tagBossParticle(particle, 'boss-defeat');
+      this.particles.push(particle);
+    }
+
+    if (config.shockwave) {
+      this.createShockwaveEffect({
+        position: origin,
+        radius: config.shockwave.radius,
+        duration: config.shockwave.duration,
+        baseWidth: config.shockwave.baseWidth,
+        maxAlpha: config.shockwave.maxAlpha,
+        widthFade: config.shockwave.widthFade,
+        easingPower: config.shockwave.easingPower,
+        color: palette.core,
+        shadowColor: config.shockwave.shadowColor,
+        shadowBlur: config.shockwave.shadowBlur,
+        fillColor: config.shockwave.fillColor,
+      });
+    }
+
+    if (config.secondaryShockwave) {
+      this.createShockwaveEffect({
+        position: origin,
+        radius: config.secondaryShockwave.radius,
+        duration: config.secondaryShockwave.duration,
+        baseWidth: config.secondaryShockwave.baseWidth,
+        maxAlpha: config.secondaryShockwave.maxAlpha,
+        widthFade: config.secondaryShockwave.widthFade,
+        easingPower: config.secondaryShockwave.easingPower,
+        color: palette.accent,
+        fillColor: config.secondaryShockwave.fillColor,
+      });
+    }
+
+    this.applyBossScreenShake('defeated');
+    this.applyBossEffectTimings(config, palette, 'boss-defeated');
   }
 
   updateBossTransitions(deltaTime) {
@@ -788,8 +1603,14 @@ export default class EffectsSystem {
       }
 
       const progress = Math.min(1, effect.timer / effect.duration);
-      const fade = Math.max(0, 1 - Math.pow(progress, 1.5));
-      const pulse = 0.65 + 0.35 * Math.sin(progress * Math.PI * effect.pulseFrequency);
+      const fadePower = Number.isFinite(effect.fadePower)
+        ? Math.max(0.1, effect.fadePower)
+        : 1.5;
+      const fade = Math.max(0, 1 - Math.pow(progress, fadePower));
+      const pulseFrequency = Number.isFinite(effect.pulseFrequency)
+        ? effect.pulseFrequency
+        : 1.8;
+      const pulse = 0.65 + 0.35 * Math.sin(progress * Math.PI * pulseFrequency);
       const borderAlpha = effect.maxAlpha * fade * pulse;
 
       if (borderAlpha > 0.01) {
@@ -869,6 +1690,58 @@ export default class EffectsSystem {
       finalDuration
     );
     this.freezeFrame.fade = finalFade;
+  }
+
+  applyTimeDilation(targetScale, options = {}) {
+    if (!this.timeDilation) {
+      this.timeDilation = {
+        timer: 0,
+        duration: 0,
+        startScale: 1,
+        endScale: 1,
+        holdScale: 1,
+        holdTimer: 0,
+        easing: 'outCubic',
+        active: false,
+      };
+    }
+
+    const rawScale = Number.isFinite(targetScale) ? targetScale : 1;
+    let scale = Math.max(0, Math.min(1, rawScale));
+
+    const optionDuration = Number.isFinite(options.duration)
+      ? Math.max(0, options.duration)
+      : Number.isFinite(options.transition)
+      ? Math.max(0, options.transition)
+      : 0.45;
+    const optionHold = Number.isFinite(options.holdDuration)
+      ? Math.max(0, options.holdDuration)
+      : Number.isFinite(options.hold)
+      ? Math.max(0, options.hold)
+      : 0;
+    let duration = optionDuration;
+    let holdDuration = optionHold;
+
+    if (this.motionReduced) {
+      scale = Math.max(scale, 0.7);
+      duration = Math.min(duration, 0.35);
+      holdDuration = Math.min(holdDuration, 0.12);
+    }
+
+    if (scale >= 0.999 && holdDuration <= 0 && duration <= 0) {
+      return;
+    }
+
+    const easing = typeof options.easing === 'string' ? options.easing : 'outCubic';
+
+    this.timeDilation.holdScale = scale;
+    this.timeDilation.holdTimer = holdDuration;
+    this.timeDilation.startScale = scale;
+    this.timeDilation.endScale = 1;
+    this.timeDilation.duration = duration;
+    this.timeDilation.timer = duration;
+    this.timeDilation.easing = easing;
+    this.timeDilation.active = true;
   }
 
   addScreenFlash(color, duration, intensity) {
