@@ -15,6 +15,9 @@
  */
 
 import { ObjectPool, TTLObjectPool } from './ObjectPool.js';
+import { Drone } from '../modules/enemies/types/Drone.js';
+import { Mine } from '../modules/enemies/types/Mine.js';
+import { Hunter } from '../modules/enemies/types/Hunter.js';
 
 /**
  * Game object pool registry.
@@ -29,6 +32,9 @@ export class GamePools {
   static bullets = null;
   static particles = null;
   static asteroids = null;
+  static drones = null;
+  static mines = null;
+  static hunters = null;
   static xpOrbs = null;
   static shockwaves = null;
   static tempObjects = null;
@@ -50,6 +56,9 @@ export class GamePools {
       bullets: { initial: 20, max: 100 },
       particles: { initial: 50, max: 300 },
       asteroids: { initial: 15, max: 80 },
+      drones: { initial: 10, max: 30 },
+      mines: { initial: 5, max: 15 },
+      hunters: { initial: 5, max: 12 },
       xpOrbs: { initial: 30, max: 200 },
       shockwaves: { initial: 5, max: 20 },
       tempObjects: { initial: 10, max: 50 },
@@ -61,6 +70,9 @@ export class GamePools {
     this.initializeBulletPool(config.bullets);
     this.initializeParticlePool(config.particles);
     this.initializeAsteroidPool(config.asteroids);
+    this.initializeDronePool(config.drones);
+    this.initializeMinePool(config.mines);
+    this.initializeHunterPool(config.hunters);
     this.initializeXPOrbPool(config.xpOrbs);
     this.initializeShockwavePool(config.shockwaves);
     this.initializeTempObjectPool(config.tempObjects);
@@ -278,6 +290,105 @@ export class GamePools {
         asteroid.crackProfile = null;
         asteroid.lastDamageTime = 0;
         asteroid.spawnTime = 0;
+      },
+
+      config.initial,
+      config.max
+    );
+  }
+
+  /**
+   * Initializes drone enemy pool.
+   *
+   * @private
+   * @param {Object} config - Pool configuration
+   */
+  static initializeDronePool(config) {
+    this.drones = new ObjectPool(
+      // Factory function
+      () => {
+        const drone = new Drone();
+        if (typeof drone.resetForPool === 'function') {
+          drone.resetForPool();
+        }
+        return drone;
+      },
+
+      // Reset function
+      (drone) => {
+        if (!drone) return;
+        if (typeof drone.resetForPool === 'function') {
+          drone.resetForPool();
+        } else {
+          drone.alive = false;
+          drone.initialized = false;
+        }
+      },
+
+      config.initial,
+      config.max
+    );
+  }
+
+  /**
+   * Initializes mine enemy pool.
+   *
+   * @private
+   * @param {Object} config - Pool configuration
+   */
+  static initializeMinePool(config) {
+    this.mines = new ObjectPool(
+      // Factory function
+      () => {
+        const mine = new Mine();
+        if (typeof mine.resetForPool === 'function') {
+          mine.resetForPool();
+        }
+        return mine;
+      },
+
+      // Reset function
+      (mine) => {
+        if (!mine) return;
+        if (typeof mine.resetForPool === 'function') {
+          mine.resetForPool();
+        } else {
+          mine.alive = false;
+          mine.initialized = false;
+        }
+      },
+
+      config.initial,
+      config.max
+    );
+  }
+
+  /**
+   * Initializes hunter enemy pool.
+   *
+   * @private
+   * @param {Object} config - Pool configuration
+   */
+  static initializeHunterPool(config) {
+    this.hunters = new ObjectPool(
+      // Factory function
+      () => {
+        const hunter = new Hunter();
+        if (typeof hunter.resetForPool === 'function') {
+          hunter.resetForPool();
+        }
+        return hunter;
+      },
+
+      // Reset function
+      (hunter) => {
+        if (!hunter) return;
+        if (typeof hunter.resetForPool === 'function') {
+          hunter.resetForPool();
+        } else {
+          hunter.alive = false;
+          hunter.initialized = false;
+        }
       },
 
       config.initial,
@@ -511,6 +622,9 @@ export class GamePools {
       this.bullets,
       this.particles,
       this.asteroids,
+      this.drones,
+      this.mines,
+      this.hunters,
       this.xpOrbs,
       this.shockwaves,
       this.tempObjects
@@ -534,6 +648,9 @@ export class GamePools {
       this.bullets,
       this.particles,
       this.asteroids,
+      this.drones,
+      this.mines,
+      this.hunters,
       this.xpOrbs,
       this.shockwaves,
       this.tempObjects
@@ -563,6 +680,9 @@ export class GamePools {
       bullets: this.bullets?.getStats() || null,
       particles: this.particles?.getStats() || null,
       asteroids: this.asteroids?.getStats() || null,
+      drones: this.drones?.getStats() || null,
+      mines: this.mines?.getStats() || null,
+      hunters: this.hunters?.getStats() || null,
       xpOrbs: this.xpOrbs?.getStats() || null,
       shockwaves: this.shockwaves?.getStats() || null,
       tempObjects: this.tempObjects?.getStats() || null
@@ -591,6 +711,9 @@ export class GamePools {
       bullets: this.bullets,
       particles: this.particles,
       asteroids: this.asteroids,
+      drones: this.drones,
+      mines: this.mines,
+      hunters: this.hunters,
       xpOrbs: this.xpOrbs,
       shockwaves: this.shockwaves,
       tempObjects: this.tempObjects
@@ -623,6 +746,9 @@ export class GamePools {
     this.bullets = null;
     this.particles = null;
     this.asteroids = null;
+    this.drones = null;
+    this.mines = null;
+    this.hunters = null;
     this.xpOrbs = null;
     this.shockwaves = null;
     this.tempObjects = null;
@@ -686,6 +812,9 @@ export const {
   bullets: BulletPool,
   particles: ParticlePool,
   asteroids: AsteroidPool,
+  drones: DronePool,
+  mines: MinePool,
+  hunters: HunterPool,
   xpOrbs: XPOrbPool,
   shockwaves: ShockwavePool,
   tempObjects: TempObjectPool
