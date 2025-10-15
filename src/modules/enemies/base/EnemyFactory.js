@@ -170,7 +170,13 @@ export class EnemyFactory {
 
     // Initialize enemy
     try {
-      enemy.initialize(this.system, finalConfig);
+      if (typeof enemy.initialize === 'function') {
+        if (enemy.initialize.length === 0) {
+          enemy.initialize(finalConfig);
+        } else {
+          enemy.initialize(this.system, finalConfig);
+        }
+      }
 
       // Apply default tags
       for (const tag of typeConfig.tags) {

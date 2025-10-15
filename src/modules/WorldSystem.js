@@ -125,6 +125,10 @@ class WorldSystem {
     if (
       physics &&
       typeof physics.handlePlayerAsteroidCollision === 'function' &&
+      (
+        typeof enemies.getActiveEnemies === 'function' ||
+        typeof enemies.getAsteroids === 'function'
+      )
     ) {
       const asteroids =
         typeof enemies.getActiveEnemies === 'function'
