@@ -144,6 +144,14 @@ const CLASSIC_LAYOUT_ITEMS = [
     initialValue: '0s',
     ariaLive: 'polite',
   },
+  {
+    key: 'boss',
+    type: 'boss',
+    position: 'top-middle',
+    layout: 'boss',
+    description: 'Boss encounter status',
+    rootId: 'hud-boss',
+  },
 ];
 
 const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
@@ -232,6 +240,14 @@ const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
     valueId: 'time-display',
     initialValue: '0s',
     ariaLive: 'polite',
+  },
+  {
+    key: 'boss',
+    type: 'boss',
+    position: 'top-middle',
+    layout: 'boss',
+    description: 'Boss encounter status',
+    rootId: 'hud-boss',
   },
   {
     key: 'xp',
