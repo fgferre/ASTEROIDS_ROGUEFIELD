@@ -1,5 +1,10 @@
 {
   "git.allowForcePush": true,
   "git.useForcePushWithLease": false,
-  "CodeGPT.apiKey": "LM Studio"
+  "CodeGPT.apiKey": "LM Studio",
+  "traycer.additionalAgents": [
+    "Codex",
+    "Claude Code",
+    "Gemini"
+  ]
 }
