@@ -1372,13 +1372,13 @@ export const MUSIC_LAYER_CONFIG = Object.freeze({
     climax: Object.freeze({ frequency: 440, type: 'square' }),
   }),
   intensities: Object.freeze([
-    Object.freeze({ base: 0.16, tension: 0.0, danger: 0.0, climax: 0.0 }),
+    Object.freeze({ base: 0.0, tension: 0.0, danger: 0.0, climax: 0.0 }),
     Object.freeze({ base: 0.18, tension: 0.08, danger: 0.0, climax: 0.0 }),
     Object.freeze({ base: 0.2, tension: 0.12, danger: 0.08, climax: 0.0 }),
     Object.freeze({ base: 0.22, tension: 0.16, danger: 0.12, climax: 0.08 }),
   ]),
-  initialIntensity: 1,
-  relaxedIntensity: 1,
+  initialIntensity: 0,
+  relaxedIntensity: 0,
   bossIntensity: 3,
   rampDurations: Object.freeze({
     rise: 1.2,
