@@ -159,9 +159,8 @@ class CombatSystem {
       this.applyAimingUpgrade(data || {});
     });
 
-    gameEvents.on('enemy-fired', (data) => {
-      this.handleEnemyProjectile(data);
-    });
+    // Enemy projectiles are forwarded to the combat system by EnemySystem.
+    // Subscribing here would duplicate the handling and spawn two bullets.
   }
 
   resolveCachedServices(force = false) {
@@ -2317,6 +2316,43 @@ class CombatSystem {
       ctx.arc(bullet.x, bullet.y, CONSTANTS.BULLET_SIZE, 0, Math.PI * 2);
       ctx.fill();
     });
+
+    if (Array.isArray(this.enemyBullets) && this.enemyBullets.length) {
+      for (let i = 0; i < this.enemyBullets.length; i += 1) {
+        const bullet = this.enemyBullets[i];
+
+        if (!bullet || bullet.hit) {
+          continue;
+        }
+
+        const radius = Number.isFinite(bullet.radius)
+          ? Math.max(1, bullet.radius)
+          : CONSTANTS.BULLET_SIZE;
+        const glowRadius = Math.max(radius * 3, radius + 2);
+        const baseColor =
+          typeof bullet.color === 'string'
+            ? bullet.color
+            : 'rgba(255, 120, 80, 0.9)';
+
+        ctx.save();
+
+        if (glowRadius > 0) {
+          ctx.globalAlpha = 0.4;
+          ctx.fillStyle = baseColor;
+          ctx.beginPath();
+          ctx.arc(bullet.x, bullet.y, glowRadius, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = baseColor;
+        ctx.beginPath();
+        ctx.arc(bullet.x, bullet.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      }
+    }
 
     const playerPosition =
       (player && player.position) ||
