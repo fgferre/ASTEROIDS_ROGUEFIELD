@@ -10,6 +10,7 @@ class CombatSystem {
     this.commandQueueConsumerId = 'combat-system';
     // === ESTADO DO SISTEMA DE COMBATE ===
     this.bullets = [];
+    this.enemyBullets = [];
     this.currentTarget = null;
     this.targetUpdateTimer = 0;
     this.lastShotTime = 0;
@@ -125,16 +126,19 @@ class CombatSystem {
       this.targetIndicatorPulse = 0;
       this.lastKnownPlayerStats = null;
       this.lastPrimaryTargetId = null;
+      this.clearEnemyBullets();
     });
 
     gameEvents.on('progression-reset', () => {
       this.resolveCachedServices(true);
       this.resetAimingBranchState();
       this.targetThreatCache.clear();
+      this.clearEnemyBullets();
     });
 
     gameEvents.on('physics-reset', () => {
       this.resolveCachedServices(true);
+      this.clearEnemyBullets();
     });
 
     gameEvents.on('player-died', () => {
@@ -148,10 +152,15 @@ class CombatSystem {
       this.targetThreatCache.clear();
       this.targetIndicatorPulse = 0;
       console.log('[CombatSystem] Player died - cleared target');
+      this.clearEnemyBullets();
     });
 
     gameEvents.on('upgrade-aiming-suite', (data) => {
       this.applyAimingUpgrade(data || {});
+    });
+
+    gameEvents.on('enemy-fired', (data) => {
+      this.handleEnemyProjectile(data);
     });
   }
 
@@ -202,6 +211,7 @@ class CombatSystem {
 
     // Always update bullets - they keep flying even without ship hull
     this.updateBullets(deltaTime);
+    this.updateEnemyBullets(deltaTime, player);
 
     const enemies = this.cachedEnemies;
     const physics = this.cachedPhysics;
@@ -1723,6 +1733,318 @@ class CombatSystem {
     }
   }
 
+  handleEnemyProjectile(data = {}) {
+    this.createEnemyBullet(data);
+  }
+
+  createEnemyBullet(data = {}) {
+    if (!data) {
+      return null;
+    }
+
+    const position =
+      data.position ||
+      (data.enemy && {
+        x: data.enemy.x,
+        y: data.enemy.y,
+      });
+
+    const posX = Number.isFinite(position?.x) ? position.x : null;
+    const posY = Number.isFinite(position?.y) ? position.y : null;
+
+    if (posX === null || posY === null) {
+      return null;
+    }
+
+    const velocity = data.velocity || data.projectile?.velocity || {};
+    const vx = Number.isFinite(velocity?.x) ? velocity.x : 0;
+    const vy = Number.isFinite(velocity?.y) ? velocity.y : 0;
+
+    const projectile = data.projectile || {};
+    const declaredSpeed = Number.isFinite(projectile.speed)
+      ? Math.max(0, projectile.speed)
+      : null;
+    const computedSpeed = Math.sqrt(vx * vx + vy * vy);
+    const bulletSpeed = declaredSpeed ?? computedSpeed;
+
+    const bullet = GamePools.bullets.acquire();
+    bullet.x = posX;
+    bullet.y = posY;
+    bullet.vx = vx;
+    bullet.vy = vy;
+    bullet.speed = bulletSpeed;
+    bullet.damage = this.resolveEnemyProjectileDamage(data, projectile);
+
+    const lifetime = Number.isFinite(projectile.lifetime)
+      ? Math.max(0.05, projectile.lifetime)
+      : this.resolveEnemyProjectileLifetime(bulletSpeed);
+
+    bullet.life = lifetime;
+    bullet.maxLife = lifetime;
+    bullet.hit = false;
+    bullet.active = true;
+    bullet.type = 'enemy';
+    bullet.color = this.resolveEnemyProjectileColor(data, projectile);
+
+    if (Number.isFinite(projectile.radius)) {
+      bullet.radius = Math.max(0, projectile.radius);
+    } else if (!Number.isFinite(bullet.radius)) {
+      bullet.radius = CONSTANTS.BULLET_SIZE || 0;
+    }
+
+    if (Array.isArray(bullet.trail)) {
+      bullet.trail.length = 0;
+    } else {
+      bullet.trail = null;
+    }
+
+    bullet.enemyId = data.enemyId ?? data.source?.id ?? data.enemy?.id ?? null;
+    bullet.enemyType =
+      data.enemyType ?? data.source?.type ?? data.enemy?.type ?? null;
+    bullet.source = data.source
+      ? { ...data.source }
+      : bullet.enemyId || bullet.enemyType
+      ? {
+          id: bullet.enemyId,
+          type: bullet.enemyType,
+          wave: data.wave ?? data.enemy?.wave ?? null,
+        }
+      : null;
+
+    this.enemyBullets.push(bullet);
+
+    return bullet;
+  }
+
+  resolveEnemyProjectileColor(data = {}, projectile = {}) {
+    if (typeof projectile?.color === 'string') {
+      return projectile.color;
+    }
+
+    const enemyType =
+      data.enemyType ?? data.source?.type ?? data.enemy?.type ?? null;
+
+    switch (enemyType) {
+      case 'hunter':
+        return 'rgba(80, 220, 255, 0.9)';
+      case 'mine':
+        return 'rgba(255, 204, 102, 0.9)';
+      case 'drone':
+        return 'rgba(255, 96, 64, 0.92)';
+      default:
+        return 'rgba(255, 120, 80, 0.9)';
+    }
+  }
+
+  resolveEnemyProjectileDamage(data = {}, projectile = {}) {
+    if (Number.isFinite(data?.damage)) {
+      return data.damage;
+    }
+
+    if (Number.isFinite(projectile?.damage)) {
+      return projectile.damage;
+    }
+
+    if (Number.isFinite(data.enemy?.projectileDamage)) {
+      return data.enemy.projectileDamage;
+    }
+
+    const enemyType = data.enemyType ?? data.source?.type ?? data.enemy?.type;
+    const enemyConfig = enemyType ? CONSTANTS.ENEMY_TYPES?.[enemyType] : null;
+    if (enemyConfig && Number.isFinite(enemyConfig.projectileDamage)) {
+      return enemyConfig.projectileDamage;
+    }
+
+    return 10;
+  }
+
+  resolveEnemyProjectileLifetime(speed) {
+    if (Number.isFinite(speed) && speed > 0) {
+      const width = Number.isFinite(CONSTANTS.GAME_WIDTH)
+        ? CONSTANTS.GAME_WIDTH
+        : 0;
+      const height = Number.isFinite(CONSTANTS.GAME_HEIGHT)
+        ? CONSTANTS.GAME_HEIGHT
+        : 0;
+      const diagonal = Math.sqrt(width * width + height * height);
+
+      if (diagonal > 0) {
+        return Math.max(0.15, diagonal / speed);
+      }
+    }
+
+    return 2.5;
+  }
+
+  updateEnemyBullets(deltaTime, player = null) {
+    if (!Array.isArray(this.enemyBullets) || !this.enemyBullets.length) {
+      return;
+    }
+
+    const physics = this.cachedPhysics;
+    const gameWidth = Number.isFinite(CONSTANTS.GAME_WIDTH)
+      ? CONSTANTS.GAME_WIDTH
+      : Infinity;
+    const gameHeight = Number.isFinite(CONSTANTS.GAME_HEIGHT)
+      ? CONSTANTS.GAME_HEIGHT
+      : Infinity;
+    const defaultBulletRadius = Number.isFinite(CONSTANTS.BULLET_SIZE)
+      ? CONSTANTS.BULLET_SIZE
+      : 0;
+
+    const playerAlive =
+      player &&
+      !player.isDead &&
+      !player.isRetrying &&
+      !player._quitExplosionHidden;
+
+    let playerPosition = null;
+    let collisionContext = null;
+    const hitsToEmit = [];
+
+    const activeBullets = [];
+
+    for (let i = 0; i < this.enemyBullets.length; i += 1) {
+      const bullet = this.enemyBullets[i];
+      if (!bullet) {
+        continue;
+      }
+
+      bullet.x += bullet.vx * deltaTime;
+      bullet.y += bullet.vy * deltaTime;
+      bullet.life -= deltaTime;
+
+      const outOfBounds =
+        bullet.x < 0 ||
+        bullet.x > gameWidth ||
+        bullet.y < 0 ||
+        bullet.y > gameHeight;
+
+      if (outOfBounds) {
+        bullet.life = 0;
+      }
+
+      let collided = false;
+
+      if (playerAlive && bullet.life > 0 && !bullet.hit) {
+        if (!playerPosition) {
+          const candidatePosition =
+            (typeof player.getPosition === 'function'
+              ? player.getPosition()
+              : null) || player.position || null;
+
+          if (
+            candidatePosition &&
+            Number.isFinite(candidatePosition.x) &&
+            Number.isFinite(candidatePosition.y)
+          ) {
+            playerPosition = candidatePosition;
+          }
+        }
+
+        if (playerPosition) {
+          if (!collisionContext && physics && physics.buildPlayerCollisionContext) {
+            collisionContext = physics.buildPlayerCollisionContext(player);
+          }
+
+          const collisionRadius = Number.isFinite(
+            collisionContext?.collisionRadius
+          )
+            ? collisionContext.collisionRadius
+            : typeof player.getHullBoundingRadius === 'function'
+            ? player.getHullBoundingRadius()
+            : CONSTANTS.SHIP_SIZE || 0;
+
+          const bulletRadius = Number.isFinite(bullet.radius)
+            ? bullet.radius
+            : defaultBulletRadius;
+
+          if (collisionRadius > 0) {
+            if (physics && typeof physics.checkCircleCollision === 'function') {
+              collided = physics.checkCircleCollision(
+                bullet.x,
+                bullet.y,
+                bulletRadius,
+                playerPosition.x,
+                playerPosition.y,
+                collisionRadius
+              );
+            } else {
+              const dx = bullet.x - playerPosition.x;
+              const dy = bullet.y - playerPosition.y;
+              const totalRadius = bulletRadius + collisionRadius;
+              collided = dx * dx + dy * dy <= totalRadius * totalRadius;
+            }
+          }
+        }
+      }
+
+      if (collided) {
+        bullet.hit = true;
+        bullet.life = 0;
+
+        if (typeof gameEvents !== 'undefined') {
+          hitsToEmit.push({
+            damage: Number.isFinite(bullet.damage) ? bullet.damage : 0,
+            position: { x: bullet.x, y: bullet.y },
+            velocity: { x: bullet.vx, y: bullet.vy },
+            projectile: {
+              type: bullet.type || 'enemy',
+              color: bullet.color,
+              radius: Number.isFinite(bullet.radius)
+                ? bullet.radius
+                : defaultBulletRadius,
+            },
+            source: bullet.source
+              ? { ...bullet.source }
+              : {
+                  enemyId: bullet.enemyId ?? null,
+                  enemyType: bullet.enemyType ?? null,
+                  wave: null,
+                },
+          });
+        }
+      }
+
+      if (bullet.life > 0 && !bullet.hit) {
+        activeBullets.push(bullet);
+      } else {
+        bullet.source = null;
+        bullet.enemyId = null;
+        bullet.enemyType = null;
+        GamePools.bullets.release(bullet);
+      }
+    }
+
+    this.enemyBullets = activeBullets;
+
+    if (typeof gameEvents !== 'undefined') {
+      for (let i = 0; i < hitsToEmit.length; i += 1) {
+        gameEvents.emit('player-hit-by-projectile', hitsToEmit[i]);
+      }
+    }
+  }
+
+  clearEnemyBullets() {
+    if (!Array.isArray(this.enemyBullets) || !this.enemyBullets.length) {
+      this.enemyBullets = [];
+      return;
+    }
+
+    for (let i = 0; i < this.enemyBullets.length; i += 1) {
+      const bullet = this.enemyBullets[i];
+      if (!bullet) {
+        continue;
+      }
+      bullet.source = null;
+      bullet.enemyId = null;
+      bullet.enemyType = null;
+      GamePools.bullets.release(bullet);
+    }
+
+    this.enemyBullets.length = 0;
+  }
+
   updateBullets(deltaTime) {
     this.bullets.forEach((bullet) => {
       if (bullet.hit) return;
@@ -2128,6 +2450,7 @@ class CombatSystem {
       GamePools.bullets.release(bullet);
     }
     this.bullets = [];
+    this.clearEnemyBullets();
     this.currentTarget = null;
     this.currentTargetLocks = [];
     this.currentLockAssignments = [];
@@ -2147,6 +2470,7 @@ class CombatSystem {
       GamePools.bullets.release(bullet);
     }
     this.bullets = [];
+    this.clearEnemyBullets();
     this.currentTarget = null;
     this.currentTargetLocks = [];
     this.currentLockAssignments = [];
