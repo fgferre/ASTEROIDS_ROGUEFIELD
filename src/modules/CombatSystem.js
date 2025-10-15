@@ -2,6 +2,7 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { drawEnemyProjectile } from '../utils/drawEnemyProjectile.js';
 
 class CombatSystem {
   constructor(dependencies = {}) {
@@ -36,6 +37,8 @@ class CombatSystem {
         ? Math.max(0, CONSTANTS.COMBAT_BULLET_LIFETIME)
         : 1.8;
     this.trailLength = CONSTANTS.TRAIL_LENGTH;
+    this.enemyProjectileTrailLength = 10;
+    this.bossProjectileTrailLength = 18;
     this.baseShootCooldown = this.shootCooldown;
     this.linearPredictionTime =
       Number.isFinite(CONSTANTS.COMBAT_PREDICTION_TIME)
@@ -1783,6 +1786,7 @@ class CombatSystem {
     bullet.hit = false;
     bullet.active = true;
     bullet.type = 'enemy';
+    bullet.isBossProjectile = this.isBossProjectileSource(data);
     bullet.color = this.resolveEnemyProjectileColor(data, projectile);
 
     if (Number.isFinite(projectile.radius)) {
@@ -1794,8 +1798,10 @@ class CombatSystem {
     if (Array.isArray(bullet.trail)) {
       bullet.trail.length = 0;
     } else {
-      bullet.trail = null;
+      bullet.trail = [];
     }
+
+    bullet.trailMax = this.resolveEnemyProjectileTrailLength(data, projectile, bullet);
 
     bullet.enemyId = data.enemyId ?? data.source?.id ?? data.enemy?.id ?? null;
     bullet.enemyType =
@@ -1813,6 +1819,76 @@ class CombatSystem {
     this.enemyBullets.push(bullet);
 
     return bullet;
+  }
+
+  isBossProjectileSource(data = {}) {
+    const enemyType = data.enemyType ?? data.source?.type ?? data.enemy?.type;
+    if (enemyType === 'boss') {
+      return true;
+    }
+
+    const source = data.enemy ?? data.source ?? null;
+    if (!source) {
+      return false;
+    }
+
+    if (typeof source.hasTag === 'function' && source.hasTag('boss')) {
+      return true;
+    }
+
+    const tags = source.tags;
+    if (tags) {
+      if (typeof tags.has === 'function' && tags.has('boss')) {
+        return true;
+      }
+
+      if (Array.isArray(tags) && tags.includes('boss')) {
+        return true;
+      }
+    }
+
+    if (source.type === 'boss' || source.isBoss === true) {
+      return true;
+    }
+
+    if (source.bossId != null) {
+      return true;
+    }
+
+    return false;
+  }
+
+  resolveEnemyProjectileTrailLength(data = {}, projectile = {}, bullet = null) {
+    if (Number.isFinite(projectile?.trailLength)) {
+      return Math.max(2, projectile.trailLength);
+    }
+
+    if (Number.isFinite(data?.trailLength)) {
+      return Math.max(2, data.trailLength);
+    }
+
+    if (bullet && Number.isFinite(bullet.trailMax) && bullet.trailMax > 0) {
+      return Math.max(2, bullet.trailMax);
+    }
+
+    const isBoss = bullet?.isBossProjectile ?? this.isBossProjectileSource(data);
+    return isBoss
+      ? Math.max(2, this.bossProjectileTrailLength)
+      : Math.max(2, this.enemyProjectileTrailLength);
+  }
+
+  getEnemyBulletTrailLimit(bullet) {
+    if (!bullet) {
+      return 0;
+    }
+
+    if (Number.isFinite(bullet.trailMax) && bullet.trailMax > 0) {
+      return Math.max(2, bullet.trailMax);
+    }
+
+    return bullet.isBossProjectile
+      ? Math.max(2, this.bossProjectileTrailLength)
+      : Math.max(2, this.enemyProjectileTrailLength);
   }
 
   resolveEnemyProjectileColor(data = {}, projectile = {}) {
@@ -1907,6 +1983,14 @@ class CombatSystem {
       const bullet = this.enemyBullets[i];
       if (!bullet) {
         continue;
+      }
+
+      if (Array.isArray(bullet.trail)) {
+        bullet.trail.push({ x: bullet.x, y: bullet.y });
+        const trailLimit = this.getEnemyBulletTrailLimit(bullet);
+        if (trailLimit > 0 && bullet.trail.length > trailLimit) {
+          bullet.trail.splice(0, bullet.trail.length - trailLimit);
+        }
       }
 
       bullet.x += bullet.vx * deltaTime;
@@ -2011,6 +2095,11 @@ class CombatSystem {
         bullet.source = null;
         bullet.enemyId = null;
         bullet.enemyType = null;
+        bullet.isBossProjectile = false;
+        if (Array.isArray(bullet.trail)) {
+          bullet.trail.length = 0;
+        }
+        bullet.trailMax = 0;
         GamePools.bullets.release(bullet);
       }
     }
@@ -2038,6 +2127,11 @@ class CombatSystem {
       bullet.source = null;
       bullet.enemyId = null;
       bullet.enemyType = null;
+      bullet.isBossProjectile = false;
+      if (Array.isArray(bullet.trail)) {
+        bullet.trail.length = 0;
+      }
+      bullet.trailMax = 0;
       GamePools.bullets.release(bullet);
     }
 
@@ -2325,32 +2419,7 @@ class CombatSystem {
           continue;
         }
 
-        const radius = Number.isFinite(bullet.radius)
-          ? Math.max(1, bullet.radius)
-          : CONSTANTS.BULLET_SIZE;
-        const glowRadius = Math.max(radius * 3, radius + 2);
-        const baseColor =
-          typeof bullet.color === 'string'
-            ? bullet.color
-            : 'rgba(255, 120, 80, 0.9)';
-
-        ctx.save();
-
-        if (glowRadius > 0) {
-          ctx.globalAlpha = 0.4;
-          ctx.fillStyle = baseColor;
-          ctx.beginPath();
-          ctx.arc(bullet.x, bullet.y, glowRadius, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = baseColor;
-        ctx.beginPath();
-        ctx.arc(bullet.x, bullet.y, radius, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.restore();
+        drawEnemyProjectile(ctx, bullet);
       }
     }
 
