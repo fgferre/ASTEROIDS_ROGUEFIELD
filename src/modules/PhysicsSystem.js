@@ -1782,7 +1782,8 @@ class PhysicsSystem {
       }
 
       const distance = Math.sqrt(distanceSq);
-      const falloff = disableFalloff ? 1 : 1 - Math.min(distance / radius, 1);
+      const falloffDistance = Math.max(0, distance - effectiveRadius);
+      const falloff = disableFalloff ? 1 : 1 - Math.min(falloffDistance / radius, 1);
       const scaledDamage = Math.max(0, damage * falloff);
       if (scaledDamage <= 0) {
         continue;
@@ -1828,7 +1829,8 @@ class PhysicsSystem {
 
         if (distanceSq <= threshold * threshold) {
           const distance = Math.sqrt(distanceSq);
-          const falloff = disableFalloff ? 1 : 1 - Math.min(distance / radius, 1);
+          const falloffDistance = Math.max(0, distance - playerRadius);
+          const falloff = disableFalloff ? 1 : 1 - Math.min(falloffDistance / radius, 1);
           const scaledDamage = Math.max(0, Math.floor(damage * falloff));
           const nx = distance > 0 ? dx / Math.max(distance, 0.001) : 0;
           const ny = distance > 0 ? dy / Math.max(distance, 0.001) : 0;
