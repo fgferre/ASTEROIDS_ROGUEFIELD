@@ -1047,50 +1047,50 @@ export const CLUSTER_FUSION_COUNT = 10;
 
 // === ENEMY TYPES ===
 export const ENEMY_TYPES = Object.freeze({
-  drone: {
-    key: 'drone',
-    displayName: 'Assault Drone',
-    radius: 12,
-    health: 30,
-    speed: 180,
-    acceleration: 260,
-    fireRate: 2.0,
-    fireVariance: 0.35,
-    fireSpread: 0.06,
-    projectileSpeed: 340,
-    projectileDamage: 15,
-    targetingRange: 460,
-    contactDamage: 12,
-  },
-  mine: {
-    key: 'mine',
-    displayName: 'Proximity Mine',
-    radius: 18,
-    health: 20,
-    lifetime: 30,
-    armTime: 0.5,
-    proximityRadius: 80,
-    explosionRadius: 120,
-    explosionDamage: 40,
-    pulseSpeed: 2.6,
-    pulseAmount: 0.32,
-  },
-  hunter: {
-    key: 'hunter',
-    displayName: 'Hunter Frigate',
-    radius: 16,
-    health: 48,
-    speed: 120,
-    acceleration: 220,
-    preferredDistance: 175,
-    projectileSpeed: 420,
-    projectileDamage: 12,
-    fireRange: 520,
-    burstCount: 3,
-    burstInterval: 3.5,
-    burstDelay: 0.15,
-    fireSpread: 0.045,
-  },
+  drone: Object.freeze({
+    key: 'drone', // Unique identifier consumed by factories and pools
+    displayName: 'Assault Drone', // Human-readable label used in UI/debug output
+    radius: 12, // Collision radius in world units (pixels)
+    health: 30, // Base hit points before modifiers or scaling
+    speed: 180, // Maximum travel speed in units per second
+    acceleration: 260, // Acceleration applied when chasing the player
+    fireRate: 2.0, // Seconds between shots before variance is applied
+    fireVariance: 0.35, // +/- randomness added to fireRate for staggering
+    fireSpread: 0.06, // Radians of random aim offset per projectile
+    projectileSpeed: 340, // Units per second for drone bullets
+    projectileDamage: 15, // Damage dealt by each projectile impact
+    targetingRange: 460, // Maximum distance to acquire the player as a target
+    contactDamage: 12, // Damage inflicted on direct collision with the player
+  }),
+  mine: Object.freeze({
+    key: 'mine', // Identifier used when spawning or pooling mines
+    displayName: 'Proximity Mine', // Label shown in logs, HUD and analytics
+    radius: 18, // Collision radius while idle/armed
+    health: 20, // Base durability before detonation
+    lifetime: 30, // Seconds before automatic detonation if untouched
+    armTime: 0.5, // Seconds after spawn before the mine can trigger
+    proximityRadius: 80, // Distance that arms detonation when the player enters
+    explosionRadius: 120, // Area-of-effect radius applied on detonation
+    explosionDamage: 40, // Damage dealt to targets inside explosionRadius
+    pulseSpeed: 2.6, // Radians per second driving the pulse animation cycle
+    pulseAmount: 0.32, // Scale multiplier applied during pulsing visuals
+  }),
+  hunter: Object.freeze({
+    key: 'hunter', // Identifier for hunter frigates in factories and pools
+    displayName: 'Hunter Frigate', // Friendly name for UI and telemetry
+    radius: 16, // Collision radius used for physics checks
+    health: 48, // Base health pool before modifiers
+    speed: 120, // Maximum orbit speed while circling the player
+    acceleration: 220, // Acceleration applied when correcting orbit path
+    preferredDistance: 175, // Ideal distance maintained from the player
+    projectileSpeed: 420, // Units per second for hunter projectiles
+    projectileDamage: 12, // Damage per projectile fired by the hunter
+    fireRange: 520, // Maximum distance to start burst firing
+    burstCount: 3, // Number of shots emitted per firing burst
+    burstInterval: 3.5, // Seconds between consecutive bursts
+    burstDelay: 0.15, // Delay between shots inside a burst
+    fireSpread: 0.045, // Radians of random aim offset within a burst
+  }),
 });
 
 // === XP ORBS ===
