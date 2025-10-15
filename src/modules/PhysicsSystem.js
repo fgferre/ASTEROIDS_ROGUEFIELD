@@ -15,6 +15,9 @@ class PhysicsSystem {
     this.activeEnemies = activeEnemies;
     this.activeAsteroids = activeEnemies; // Legacy alias for backward compatibility
 
+    this._handledMineExplosions = new WeakSet();
+    this._handledMineExplosionIds = new Set();
+
     // New SpatialHash-based collision system
     this.spatialHash = new SpatialHash(this.cellSize, {
       maxObjects: 8,
@@ -130,7 +133,11 @@ class PhysicsSystem {
 
       if (enemy) {
         this.unregisterEnemy(enemy);
-        if (enemy.type === 'mine' && data.triggerMineExplosion !== false) {
+        if (
+          enemy.type === 'mine' &&
+          data.triggerMineExplosion !== false &&
+          !this.hasMineExplosionBeenHandled(enemy, data.enemyId)
+        ) {
           this.dispatchMineExplosion(enemy, data);
         }
       }
@@ -141,6 +148,10 @@ class PhysicsSystem {
           this.updateMaxEnemyRadiusFromPayload(fragment);
         });
       }
+    });
+
+    gameEvents.on('mine-exploded', (payload = {}) => {
+      this.markMineExplosionHandled(payload.enemy, payload.enemyId);
     });
 
     gameEvents.on('progression-reset', () => {
@@ -242,6 +253,8 @@ class PhysicsSystem {
       return;
     }
 
+    this.clearMineExplosionTracking(enemy);
+
     this.updateMaxEnemyRadiusFromPayload(enemy);
 
     if (!this.activeEnemies.has(enemy)) {
@@ -334,10 +347,17 @@ class PhysicsSystem {
       return;
     }
 
+    const enemyId = data.enemyId ?? enemy.id;
+    if (this.hasMineExplosionBeenHandled(enemy, enemyId)) {
+      return;
+    }
+
     const payload = this.buildMineExplosionPayload(enemy, data);
     if (!payload) {
       return;
     }
+
+    this.markMineExplosionHandled(payload.enemy, payload.enemyId);
 
     this.updateMaxEnemyRadiusFromPayload(payload);
 
@@ -419,6 +439,43 @@ class PhysicsSystem {
           wave: enemy.wave,
         },
     };
+  }
+
+  hasMineExplosionBeenHandled(enemy, enemyId) {
+    if (enemy && this._handledMineExplosions.has(enemy)) {
+      return true;
+    }
+
+    const id = enemyId ?? enemy?.id;
+    if (id != null && this._handledMineExplosionIds.has(id)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  markMineExplosionHandled(enemy, enemyId) {
+    if (enemy && typeof enemy === 'object') {
+      this._handledMineExplosions.add(enemy);
+      if (enemy.id != null) {
+        this._handledMineExplosionIds.add(enemy.id);
+      }
+    }
+
+    if (enemyId != null) {
+      this._handledMineExplosionIds.add(enemyId);
+    }
+  }
+
+  clearMineExplosionTracking(enemy, enemyId) {
+    if (enemy && this._handledMineExplosions) {
+      this._handledMineExplosions.delete(enemy);
+    }
+
+    const id = enemyId ?? enemy?.id;
+    if (id != null) {
+      this._handledMineExplosionIds.delete(id);
+    }
   }
 
   ensureSpatialIndex() {
@@ -1074,6 +1131,8 @@ class PhysicsSystem {
     this.lastSpatialHashMaintenance = performance.now();
     this.missingEnemyWarningLogged = false;
     this._snapshotFallbackWarningIssued = false;
+    this._handledMineExplosions = new WeakSet();
+    this._handledMineExplosionIds.clear();
     this.refreshEnemyReference({ force: true });
 
     // Reset performance metrics
