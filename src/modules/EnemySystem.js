@@ -33,6 +33,9 @@ class EnemySystem {
       combat: this.dependencies.combat || null,
       healthHearts: this.dependencies.healthHearts || null,
       random: this.dependencies.random || null,
+      effects: this.dependencies.effects || null,
+      audio: this.dependencies.audio || null,
+      ui: this.dependencies.ui || null,
     };
 
     this.randomScopes = null;
@@ -46,6 +49,8 @@ class EnemySystem {
     this._fallbackRandom = null;
 
     this.asteroids = [];
+    this.activeBosses = new Map();
+    this.bossHudState = this.createInitialBossHudState();
     this.spawnTimer = 0;
     this.spawnDelay = 1.0;
 
@@ -76,13 +81,15 @@ class EnemySystem {
     this.rendererComponent = null;
     this.useComponents = true; // Feature flag to enable component system
 
+    this.eventBus = typeof gameEvents !== 'undefined' ? gameEvents : null;
+
     // Registrar no ServiceLocator
     if (typeof gameServices !== 'undefined') {
       gameServices.register('enemies', this);
     }
 
     this.missingDependencyWarnings = new Set();
-    this.deferredDependencyWarnings = new Set(['world', 'combat']);
+    this.deferredDependencyWarnings = new Set(['world', 'combat', 'effects', 'audio', 'ui']);
 
     this.setupAsteroidPoolIntegration();
     this.setupEnemyFactory(); // Initialize factory (optional)
@@ -169,46 +176,63 @@ class EnemySystem {
   }
 
   setupEventListeners() {
-    if (typeof gameEvents === 'undefined') return;
+    const bus = this.eventBus || (typeof gameEvents !== 'undefined' ? gameEvents : null);
+    if (!bus) return;
 
     // Handle level 5 shield deflective explosion (AoE damage)
-    gameEvents.on('shield-explosion-damage', (data) => {
+    bus.on('shield-explosion-damage', (data) => {
       this.handleShieldExplosionDamage(data);
     });
 
-    gameEvents.on('player-reset', () => {
+    bus.on('player-reset', () => {
       this.refreshInjectedServices({ force: true });
     });
 
-    gameEvents.on('progression-reset', () => {
+    bus.on('progression-reset', () => {
       this.refreshInjectedServices({ force: true });
     });
 
-    gameEvents.on('world-reset', () => {
+    bus.on('world-reset', () => {
       this.refreshInjectedServices({ force: true });
     });
 
-    gameEvents.on('physics-reset', () => {
+    bus.on('physics-reset', () => {
       this.refreshInjectedServices({ force: true });
       this.syncPhysicsIntegration(true);
     });
 
-    gameEvents.on('enemy-fired', (data) => {
+    bus.on('enemy-fired', (data) => {
       this.handleEnemyProjectile(data);
     });
 
-    gameEvents.on('mine-exploded', (data) => {
+    bus.on('mine-exploded', (data) => {
       this.handleMineExplosion(data);
     });
 
     // NEW: Integrate RewardManager with enemy destruction
     if (this.useManagers) {
-      gameEvents.on('enemy-destroyed', (data) => {
+      bus.on('enemy-destroyed', (data) => {
         if (this.rewardManager && data.enemy) {
           this.rewardManager.dropRewards(data.enemy);
         }
       });
     }
+
+    bus.on('boss-wave-started', (data) => {
+      this.handleBossWaveStarted(data);
+    });
+
+    bus.on('boss-spawned', (data) => {
+      this.handleBossSpawned(data);
+    });
+
+    bus.on('boss-phase-changed', (data) => {
+      this.handleBossPhaseChange(data);
+    });
+
+    bus.on('boss-defeated', (data) => {
+      this.handleBossDefeated(data);
+    });
   }
 
   refreshInjectedServices({ force = false, suppressWarnings = false } = {}) {
@@ -220,6 +244,9 @@ class EnemySystem {
     this.updateServiceCache('physics', 'physics', options);
     this.updateServiceCache('combat', 'combat', options);
     this.updateServiceCache('healthHearts', 'healthHearts', options);
+    this.updateServiceCache('effects', 'effects', options);
+    this.updateServiceCache('audio', 'audio', options);
+    this.updateServiceCache('ui', 'ui', options);
     const previousRandom = this.services.random;
     this.updateServiceCache('random', 'random', options);
     const randomServiceChanged = previousRandom !== this.services.random;
@@ -546,7 +573,7 @@ class EnemySystem {
       if (CONSTANTS?.BOSS_CONFIG) {
         this.factory.registerType('boss', {
           class: BossEnemy,
-          pool: null,
+          pool: GamePools?.bosses || null,
           defaults: { ...CONSTANTS.BOSS_CONFIG },
           tags: ['enemy', 'boss', 'elite']
         });
@@ -692,8 +719,14 @@ class EnemySystem {
       return enemy;
     }
 
+    if (this.isBossEnemy(enemy)) {
+      this.trackBossEnemy(enemy);
+      enemy.destroyed = false;
+    }
+
     this.asteroids.push(enemy);
     this.invalidateActiveEnemyCache();
+    this.registerEnemyWithPhysics(enemy);
     return enemy;
   }
 
@@ -702,6 +735,11 @@ class EnemySystem {
       return;
     }
 
+    if (this.isBossEnemy(asteroid)) {
+      this.untrackBossEnemy(asteroid);
+    }
+
+    this.unregisterEnemyFromPhysics(asteroid);
     this.clearAsteroidPoolId(asteroid);
 
     // NEW: Use factory release if enabled
@@ -732,6 +770,10 @@ class EnemySystem {
     }
 
     this.asteroids.length = 0;
+    if (this.activeBosses) {
+      this.activeBosses.clear();
+    }
+    this.emitBossHudUpdate(this.createInitialBossHudState());
     this.invalidateActiveEnemyCache();
   }
 
@@ -814,6 +856,21 @@ class EnemySystem {
     return this.services.healthHearts;
   }
 
+  getCachedEffects() {
+    this.refreshInjectedServices();
+    return this.services.effects;
+  }
+
+  getCachedAudio() {
+    this.refreshInjectedServices();
+    return this.services.audio;
+  }
+
+  getCachedUI() {
+    this.refreshInjectedServices();
+    return this.services.ui;
+  }
+
   getAsteroidPoolId(asteroid) {
     if (!asteroid) {
       return null;
@@ -855,6 +912,488 @@ class EnemySystem {
     }
 
     delete asteroid[ASTEROID_POOL_ID];
+  }
+
+  isBossEnemy(enemy) {
+    if (!enemy) {
+      return false;
+    }
+
+    if (enemy.type === 'boss') {
+      return true;
+    }
+
+    if (typeof enemy.hasTag === 'function') {
+      return enemy.hasTag('boss');
+    }
+
+    if (enemy.tags && typeof enemy.tags.has === 'function') {
+      return enemy.tags.has('boss');
+    }
+
+    return false;
+  }
+
+  trackBossEnemy(enemy) {
+    if (!enemy) {
+      return;
+    }
+
+    if (!this.activeBosses) {
+      this.activeBosses = new Map();
+    }
+
+    const bossId = enemy.id ?? enemy.bossId ?? null;
+    if (bossId != null) {
+      this.activeBosses.set(bossId, enemy);
+    }
+  }
+
+  untrackBossEnemy(enemy) {
+    if (!enemy || !this.activeBosses) {
+      return;
+    }
+
+    const bossId = enemy.id ?? enemy.bossId ?? null;
+    if (bossId != null) {
+      this.activeBosses.delete(bossId);
+    }
+  }
+
+  getTrackedBoss(bossId) {
+    if (!this.activeBosses || bossId == null) {
+      return null;
+    }
+
+    return this.activeBosses.get(bossId) || null;
+  }
+
+  resolveBossReference(payload = {}) {
+    if (payload && payload.enemy) {
+      return payload.enemy;
+    }
+
+    const candidateId =
+      payload?.enemyId ?? payload?.id ?? payload?.source?.id ?? payload?.bossId ?? null;
+
+    if (candidateId != null) {
+      return this.getTrackedBoss(candidateId);
+    }
+
+    return null;
+  }
+
+  registerEnemyWithPhysics(enemy) {
+    const physics = this.getCachedPhysics();
+    if (!physics || typeof physics.registerEnemy !== 'function') {
+      return;
+    }
+
+    physics.registerEnemy(enemy);
+  }
+
+  unregisterEnemyFromPhysics(enemy) {
+    const physics = this.getCachedPhysics();
+    if (!physics || typeof physics.unregisterEnemy !== 'function') {
+      return;
+    }
+
+    physics.unregisterEnemy(enemy);
+  }
+
+  removeActiveEnemy(enemy) {
+    if (!enemy || !Array.isArray(this.asteroids)) {
+      return false;
+    }
+
+    const index = this.asteroids.indexOf(enemy);
+    if (index === -1) {
+      return false;
+    }
+
+    this.asteroids.splice(index, 1);
+    this.invalidateActiveEnemyCache();
+    return true;
+  }
+
+  createInitialBossHudState() {
+    return {
+      active: false,
+      upcoming: false,
+      defeated: false,
+      bossId: null,
+      name: null,
+      phase: 0,
+      phaseCount: 0,
+      health: 0,
+      maxHealth: 0,
+      wave: null,
+      color: null,
+      lastUpdate: null,
+    };
+  }
+
+  emitBossHudUpdate(patch = null) {
+    const timestamp = typeof performance !== 'undefined' && typeof performance.now === 'function'
+      ? performance.now()
+      : Date.now();
+
+    if (!this.bossHudState) {
+      this.bossHudState = this.createInitialBossHudState();
+    }
+
+    if (patch && typeof patch === 'object') {
+      this.bossHudState = { ...this.bossHudState, ...patch };
+    }
+
+    this.bossHudState.lastUpdate = timestamp;
+
+    const ui = this.getCachedUI();
+    if (ui) {
+      if (typeof ui.updateBossHud === 'function') {
+        ui.updateBossHud({ ...this.bossHudState });
+      } else if (typeof ui.handleBossEvent === 'function') {
+        ui.handleBossEvent('boss-hud-update', { ...this.bossHudState });
+      }
+    }
+
+    this.emitBossSystemEvent('ui', 'boss-hud-update', { ...this.bossHudState });
+
+    return this.bossHudState;
+  }
+
+  forwardBossEvent(eventName, payload = {}) {
+    const eventData = { event: eventName, ...payload };
+
+    const effects = this.getCachedEffects();
+    if (effects) {
+      if (typeof effects.handleBossEvent === 'function') {
+        effects.handleBossEvent(eventName, eventData);
+      } else if (typeof effects.onBossEvent === 'function') {
+        effects.onBossEvent(eventName, eventData);
+      } else if (typeof effects.enqueueBossEvent === 'function') {
+        effects.enqueueBossEvent(eventName, eventData);
+      } else {
+        this.applyBossEffectsFallback(effects, eventName, eventData);
+      }
+    } else {
+      this.applyBossEffectsFallback(null, eventName, eventData);
+    }
+
+    const audio = this.getCachedAudio();
+    if (audio) {
+      if (typeof audio.handleBossEvent === 'function') {
+        audio.handleBossEvent(eventName, eventData);
+      } else if (typeof audio.playBossEvent === 'function') {
+        audio.playBossEvent(eventName, eventData);
+      } else {
+        this.applyBossAudioFallback(audio, eventName, eventData);
+      }
+    } else {
+      this.applyBossAudioFallback(null, eventName, eventData);
+    }
+
+    const ui = this.getCachedUI();
+    if (ui) {
+      if (typeof ui.handleBossEvent === 'function') {
+        ui.handleBossEvent(eventName, eventData);
+      } else if (typeof ui.updateBossHud === 'function' && eventName !== 'boss-hud-update') {
+        ui.updateBossHud({ ...this.bossHudState, ...eventData });
+      }
+    }
+
+    this.emitBossSystemEvent('effects', eventName, eventData);
+    this.emitBossSystemEvent('audio', eventName, eventData);
+    this.emitBossSystemEvent('ui', eventName, eventData);
+    this.emitBossSystemEvent('boss', eventName, eventData);
+  }
+
+  applyBossEffectsFallback(effects, eventName, payload) {
+    const target = effects || this.getCachedEffects();
+
+    if (!target) {
+      return;
+    }
+
+    const flash = typeof target.addScreenFlash === 'function' ? target.addScreenFlash.bind(target) : null;
+    const shake = typeof target.addScreenShake === 'function' ? target.addScreenShake.bind(target) : null;
+    const shockwave = typeof target.createShockwaveEffect === 'function'
+      ? target.createShockwaveEffect.bind(target)
+      : null;
+
+    switch (eventName) {
+      case 'boss-wave-started':
+        if (flash) {
+          flash('rgba(255, 140, 0, 0.25)', 0.35, 0.2);
+        }
+        break;
+      case 'boss-spawned':
+        if (shake) {
+          shake(14, 0.55);
+        }
+        if (flash) {
+          flash('rgba(255, 80, 80, 0.35)', 0.45, 0.3);
+        }
+        break;
+      case 'boss-phase-changed':
+        if (flash) {
+          flash('rgba(255, 255, 255, 0.25)', 0.25, 0.18);
+        }
+        break;
+      case 'boss-defeated':
+        if (shake) {
+          shake(18, 0.75);
+        }
+        if (flash) {
+          flash('rgba(255, 215, 0, 0.45)', 0.5, 0.45);
+        }
+        if (shockwave) {
+          const enemy = payload?.enemy;
+          const position = payload?.position || (enemy
+            ? { x: enemy.x ?? 0, y: enemy.y ?? 0 }
+            : null);
+          if (position) {
+            shockwave({
+              position,
+              radius: Math.max(240, (enemy?.radius || 60) * 3),
+              color: 'rgba(255, 200, 80, 0.55)',
+            });
+          }
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  applyBossAudioFallback(audio, eventName, payload) {
+    const target = audio || this.getCachedAudio();
+    if (!target) {
+      return;
+    }
+
+    switch (eventName) {
+      case 'boss-wave-started':
+        if (typeof target.playShieldShockwave === 'function') {
+          target.playShieldShockwave();
+        } else if (typeof target.playGoldSpawn === 'function') {
+          target.playGoldSpawn();
+        }
+        break;
+      case 'boss-spawned':
+        if (typeof target.playGoldSpawn === 'function') {
+          target.playGoldSpawn(payload?.enemy);
+        } else if (typeof target.playBigExplosion === 'function') {
+          target.playBigExplosion();
+        }
+        break;
+      case 'boss-phase-changed':
+        if (typeof target.playShieldActivate === 'function') {
+          target.playShieldActivate();
+        } else if (typeof target.playTargetLock === 'function') {
+          target.playTargetLock(payload || {});
+        }
+        break;
+      case 'boss-defeated':
+        if (typeof target.playBigExplosion === 'function') {
+          target.playBigExplosion();
+        } else if (typeof target.playGoldJackpot === 'function') {
+          target.playGoldJackpot();
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  emitBossSystemEvent(channel, eventName, payload) {
+    const bus = this.eventBus || (typeof gameEvents !== 'undefined' ? gameEvents : null);
+    if (!bus || !eventName || !channel) {
+      return;
+    }
+
+    bus.emit(`${channel}-${eventName}`, payload);
+  }
+
+  mergeBossRewards(boss, override = {}) {
+    const baseRewards = boss && boss.rewards && typeof boss.rewards === 'object'
+      ? { ...boss.rewards }
+      : {};
+
+    if (override && typeof override === 'object') {
+      if (override.xp != null) {
+        baseRewards.xp = override.xp;
+      }
+
+      if (Array.isArray(override.lootTable)) {
+        baseRewards.lootTable = [...override.lootTable];
+      }
+    }
+
+    return baseRewards;
+  }
+
+  dropBossRewards(boss, rewards = {}) {
+    if (!boss) {
+      return;
+    }
+
+    const mergedRewards = this.mergeBossRewards(boss, rewards);
+    const xpReward = Number.isFinite(mergedRewards.xp) ? mergedRewards.xp : 0;
+
+    if (xpReward > 0) {
+      this.spawnBossXPOrbs(boss, xpReward);
+    }
+
+    if (
+      this.rewardManager &&
+      this.rewardManager.rewardConfigs &&
+      typeof this.rewardManager.rewardConfigs.has === 'function' &&
+      this.rewardManager.rewardConfigs.has('boss') &&
+      typeof this.rewardManager.dropRewards === 'function'
+    ) {
+      this.rewardManager.dropRewards(boss);
+    } else if (
+      this.rewardManager &&
+      typeof this.rewardManager.createMilestoneReward === 'function'
+    ) {
+      this.rewardManager.createMilestoneReward(boss.x ?? 0, boss.y ?? 0, 'boss_kill');
+    }
+
+    if (Array.isArray(mergedRewards.lootTable) && mergedRewards.lootTable.length > 0) {
+      this.emitBossSystemEvent('boss', 'loot-dropped', {
+        enemy: boss,
+        loot: [...mergedRewards.lootTable],
+        wave: boss.wave ?? this.waveState?.current ?? null,
+      });
+    }
+
+    return mergedRewards;
+  }
+
+  spawnBossXPOrbs(boss, xpAmount) {
+    if (!boss || !Number.isFinite(xpAmount) || xpAmount <= 0) {
+      return;
+    }
+
+    const xpOrbs = this.getCachedXPOrbs();
+    if (!xpOrbs || typeof xpOrbs.createXPOrb !== 'function') {
+      return;
+    }
+
+    const baseValue = CONSTANTS.ORB_VALUE || 5;
+    const safeBaseValue = Math.max(1, baseValue);
+    const orbCount = Math.max(1, Math.round(xpAmount / safeBaseValue));
+    const valuePerOrb = Math.max(1, Math.floor(xpAmount / orbCount));
+    let remainder = Math.max(0, Math.round(xpAmount - valuePerOrb * orbCount));
+
+    const radius = Math.max(80, (boss.radius || 60) + 24);
+    const originX = boss.x ?? 0;
+    const originY = boss.y ?? 0;
+
+    for (let i = 0; i < orbCount; i += 1) {
+      const angle = (Math.PI * 2 * i) / orbCount;
+      let value = valuePerOrb;
+      if (remainder > 0) {
+        value += 1;
+        remainder -= 1;
+      }
+
+      const x = originX + Math.cos(angle) * radius;
+      const y = originY + Math.sin(angle) * radius;
+
+      try {
+        xpOrbs.createXPOrb(x, y, value, {
+          source: 'boss-reward',
+          special: true,
+          clusterId: boss.id ? `boss-${boss.id}` : 'boss-reward',
+        });
+      } catch (error) {
+        console.warn('[EnemySystem] Failed to create boss XP orb', error);
+        break;
+      }
+    }
+  }
+
+  normalizeEnemyProjectilePayload(data = {}) {
+    const payload = { ...data };
+
+    if (payload.enemy == null) {
+      const resolvedBoss = this.resolveBossReference(payload);
+      if (resolvedBoss) {
+        payload.enemy = resolvedBoss;
+      }
+    }
+
+    const source = payload.source ? { ...payload.source } : {};
+    if (!source.id && payload.enemy?.id != null) {
+      source.id = payload.enemy.id;
+    }
+    if (!source.type && payload.enemy?.type) {
+      source.type = payload.enemy.type;
+    }
+    if (!source.wave && (payload.wave || payload.enemy?.wave)) {
+      source.wave = payload.wave ?? payload.enemy?.wave ?? null;
+    }
+    if (Object.keys(source).length) {
+      payload.source = source;
+    }
+
+    payload.enemyId = payload.enemyId ?? payload.enemy?.id ?? source.id ?? null;
+    payload.enemyType = payload.enemyType || payload.enemy?.type || source.type || null;
+
+    const projectile = payload.projectile && typeof payload.projectile === 'object'
+      ? { ...payload.projectile }
+      : {};
+
+    const meta = {
+      ...(projectile.meta && typeof projectile.meta === 'object' ? projectile.meta : {}),
+      ...(payload.meta && typeof payload.meta === 'object' ? payload.meta : {}),
+    };
+
+    if (meta.pattern == null && projectile.pattern) {
+      meta.pattern = projectile.pattern;
+    }
+
+    if (meta.phase == null && typeof payload.phase === 'number') {
+      meta.phase = payload.phase;
+    }
+
+    projectile.meta = { ...meta };
+    payload.projectile = projectile;
+    payload.meta = { ...meta };
+
+    return payload;
+  }
+
+  isBossProjectile(payload) {
+    if (!payload) {
+      return false;
+    }
+
+    const enemyType = typeof payload.enemyType === 'string' ? payload.enemyType.toLowerCase() : null;
+    if (enemyType === 'boss') {
+      return true;
+    }
+
+    const sourceType = typeof payload.source?.type === 'string' ? payload.source.type.toLowerCase() : null;
+    if (sourceType === 'boss') {
+      return true;
+    }
+
+    if (payload.enemy && this.isBossEnemy(payload.enemy)) {
+      return true;
+    }
+
+    if (payload.projectile?.pattern) {
+      return true;
+    }
+
+    if (payload.meta && (payload.meta.pattern || payload.meta.phase != null || payload.meta.stage != null)) {
+      return true;
+    }
+
+    return false;
   }
 
   invalidateActiveEnemyCache() {
@@ -1195,6 +1734,74 @@ class EnemySystem {
       wave.asteroidsSpawned < wave.totalAsteroids &&
       this.getActiveEnemyCount() < CONSTANTS.MAX_ASTEROIDS_ON_SCREEN
     );
+  }
+
+  spawnBoss(config = {}) {
+    const waveNumber = Number.isFinite(config.wave)
+      ? config.wave
+      : this.waveState?.current ?? 1;
+
+    const scopeLabel = config.randomScope || 'boss-spawn';
+    const spawnContext = this.createScopedRandom(scopeLabel, `boss-${waveNumber}`);
+    const spawnRandom =
+      config.random || spawnContext.random || this.getRandomScope(scopeLabel) || this.getRandomService();
+
+    const spawnConfig = {
+      ...config,
+      wave: waveNumber,
+      random: spawnRandom,
+      randomScope: scopeLabel,
+      randomParentScope: config.randomParentScope || 'spawn',
+    };
+
+    let boss = null;
+
+    if (this.useFactory && this.factory && typeof this.factory.hasType === 'function') {
+      if (this.factory.hasType('boss')) {
+        boss = this.acquireEnemyViaFactory('boss', spawnConfig);
+      }
+    } else if (this.useFactory && this.factory) {
+      boss = this.acquireEnemyViaFactory('boss', spawnConfig);
+    }
+
+    if (!boss) {
+      try {
+        boss = new BossEnemy(this, spawnConfig);
+        this.assignAsteroidPoolId(boss, spawnConfig.poolId);
+        this.registerActiveEnemy(boss, { skipDuplicateCheck: true });
+      } catch (error) {
+        console.error('[EnemySystem] Failed to instantiate boss enemy', error);
+        return null;
+      }
+    }
+
+    if (!boss) {
+      console.warn('[EnemySystem] Boss spawn failed: no instance created');
+      return null;
+    }
+
+    boss.destroyed = false;
+
+    if (this.waveState && this.waveState.isActive && config?.skipWaveAccounting !== true) {
+      this.waveState.totalAsteroids += 1;
+      this.waveState.asteroidsSpawned += 1;
+    }
+
+    const payload = {
+      enemy: boss,
+      wave: waveNumber,
+      config: spawnConfig,
+      rewards: this.mergeBossRewards(boss, spawnConfig.rewards || {}),
+      position: { x: boss.x ?? 0, y: boss.y ?? 0 },
+    };
+
+    if (typeof gameEvents !== 'undefined') {
+      gameEvents.emit('boss-spawned', payload);
+    }
+
+    this.handleBossSpawned(payload);
+
+    return boss;
   }
 
   spawnAsteroid() {
@@ -2109,6 +2716,10 @@ class EnemySystem {
     this.releaseAllAsteroidsToPool();
     this.asteroids = [];
     this.sessionActive = false;
+    if (this.activeBosses) {
+      this.activeBosses.clear();
+    }
+    this.bossHudState = this.createInitialBossHudState();
     this.services = {
       player: null,
       world: null,
@@ -2118,6 +2729,9 @@ class EnemySystem {
       combat: null,
       healthHearts: null,
       random: null,
+      effects: null,
+      audio: null,
+      ui: null,
     };
     this.activeEnemyCache = [];
     this.activeEnemyCacheDirty = true;
@@ -2216,32 +2830,216 @@ class EnemySystem {
     return { ...this.sessionStats };
   }
 
+  handleBossWaveStarted(data = {}) {
+    const waveNumber = Number.isFinite(data.wave)
+      ? data.wave
+      : this.waveState?.current ?? null;
+
+    this.bossHudState = {
+      ...this.createInitialBossHudState(),
+      upcoming: true,
+      active: false,
+      defeated: false,
+      wave: waveNumber,
+      name: data.name || this.bossHudState?.name || null,
+    };
+
+    this.emitBossHudUpdate();
+    this.forwardBossEvent('boss-wave-started', { ...data, wave: waveNumber });
+  }
+
+  handleBossSpawned(data = {}) {
+    const boss = this.resolveBossReference(data);
+
+    if (!boss) {
+      console.warn('[EnemySystem] boss-spawned event missing enemy reference');
+      this.forwardBossEvent('boss-spawned', data);
+      return;
+    }
+
+    if (!this.asteroids.includes(boss)) {
+      this.registerActiveEnemy(boss, { skipDuplicateCheck: true });
+    } else {
+      this.trackBossEnemy(boss);
+      this.registerEnemyWithPhysics(boss);
+    }
+
+    boss.destroyed = false;
+
+    const waveNumber = Number.isFinite(data.wave)
+      ? data.wave
+      : boss.wave ?? this.waveState?.current ?? null;
+
+    const phase = data.phase ?? boss.currentPhase ?? 0;
+    const maxHealth = data.maxHealth ?? boss.maxHealth ?? boss.health ?? 0;
+    const health = data.health ?? boss.health ?? maxHealth;
+    const phaseColors = Array.isArray(boss.phaseColors) ? boss.phaseColors : null;
+    const color = phaseColors
+      ? phaseColors[Math.min(phase, phaseColors.length - 1)]
+      : this.bossHudState?.color ?? null;
+
+    this.bossHudState = {
+      ...this.bossHudState,
+      active: true,
+      upcoming: false,
+      defeated: false,
+      bossId: boss.id ?? this.bossHudState?.bossId ?? null,
+      name: boss.displayName || boss.name || this.bossHudState?.name || 'Boss',
+      phase,
+      phaseCount: boss.phaseCount ?? this.bossHudState?.phaseCount ?? 0,
+      health,
+      maxHealth,
+      wave: waveNumber,
+      color,
+    };
+
+    this.emitBossHudUpdate();
+    this.forwardBossEvent('boss-spawned', {
+      ...data,
+      enemy: boss,
+      wave: waveNumber,
+      phase,
+      health,
+      maxHealth,
+      color,
+    });
+  }
+
+  handleBossPhaseChange(data = {}) {
+    const boss = this.resolveBossReference(data);
+
+    if (boss) {
+      this.trackBossEnemy(boss);
+    }
+
+    const waveNumber = Number.isFinite(data.wave)
+      ? data.wave
+      : boss?.wave ?? this.waveState?.current ?? null;
+
+    const phase = data.phase ?? boss?.currentPhase ?? this.bossHudState?.phase ?? 0;
+    const maxHealth = data.maxHealth ?? boss?.maxHealth ?? this.bossHudState?.maxHealth ?? 0;
+    const health = data.health ?? boss?.health ?? this.bossHudState?.health ?? maxHealth;
+    const phaseColors = boss && Array.isArray(boss.phaseColors) ? boss.phaseColors : null;
+    const color = phaseColors
+      ? phaseColors[Math.min(phase, phaseColors.length - 1)]
+      : this.bossHudState?.color ?? null;
+
+    this.bossHudState = {
+      ...this.bossHudState,
+      active: true,
+      upcoming: false,
+      bossId: boss?.id ?? this.bossHudState?.bossId ?? null,
+      name: boss?.displayName || boss?.name || this.bossHudState?.name || 'Boss',
+      phase,
+      phaseCount: boss?.phaseCount ?? this.bossHudState?.phaseCount ?? 0,
+      health,
+      maxHealth,
+      wave: waveNumber,
+      color,
+    };
+
+    this.emitBossHudUpdate();
+    this.forwardBossEvent('boss-phase-changed', {
+      ...data,
+      enemy: boss,
+      wave: waveNumber,
+      phase,
+      health,
+      maxHealth,
+      color,
+    });
+  }
+
+  handleBossDefeated(data = {}) {
+    const boss = this.resolveBossReference(data);
+
+    if (!boss) {
+      this.forwardBossEvent('boss-defeated', data);
+      return;
+    }
+
+    const waveNumber = Number.isFinite(data.wave)
+      ? data.wave
+      : boss.wave ?? this.waveState?.current ?? null;
+
+    const rewards = this.dropBossRewards(boss, data.rewards || {});
+    const position = data.position || { x: boss.x ?? 0, y: boss.y ?? 0 };
+
+    boss.destroyed = true;
+
+    const nextHudState = {
+      ...this.bossHudState,
+      active: false,
+      upcoming: false,
+      defeated: true,
+      bossId: boss.id ?? this.bossHudState?.bossId ?? null,
+      name: boss.displayName || boss.name || this.bossHudState?.name || 'Boss',
+      phase: boss.currentPhase ?? this.bossHudState?.phase ?? 0,
+      phaseCount: boss.phaseCount ?? this.bossHudState?.phaseCount ?? 0,
+      health: 0,
+      maxHealth: rewards?.maxHealth ?? boss.maxHealth ?? this.bossHudState?.maxHealth ?? 0,
+      wave: waveNumber,
+      color: this.bossHudState?.color ?? null,
+    };
+
+    this.unregisterEnemyFromPhysics(boss);
+    this.untrackBossEnemy(boss);
+    this.removeActiveEnemy(boss);
+
+    this.bossHudState = nextHudState;
+    this.emitBossHudUpdate();
+
+    this.forwardBossEvent('boss-defeated', {
+      ...data,
+      enemy: boss,
+      rewards,
+      wave: waveNumber,
+      position,
+    });
+
+    this.releaseAsteroid(boss);
+
+    this.sessionStats.totalKills += 1;
+    if (this.waveState) {
+      this.waveState.asteroidsKilled += 1;
+    }
+
+    this.emitWaveStateUpdate(true);
+  }
+
   handleEnemyProjectile(data = null) {
     if (!data) {
       return;
     }
 
+    const payload = this.normalizeEnemyProjectilePayload(data);
     const combat = this.getCachedCombat();
 
     if (combat) {
+      if (this.isBossProjectile(payload) && typeof combat.handleBossProjectile === 'function') {
+        combat.handleBossProjectile(payload);
+        return;
+      }
+
       if (typeof combat.handleEnemyProjectile === 'function') {
-        combat.handleEnemyProjectile(data);
+        combat.handleEnemyProjectile(payload);
         return;
       }
 
       if (typeof combat.queueEnemyProjectile === 'function') {
-        combat.queueEnemyProjectile(data);
+        combat.queueEnemyProjectile(payload);
         return;
       }
 
       if (typeof combat.spawnEnemyProjectile === 'function') {
-        combat.spawnEnemyProjectile(data);
+        combat.spawnEnemyProjectile(payload);
         return;
       }
     }
 
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('combat-enemy-projectile', data);
+    const bus = this.eventBus || (typeof gameEvents !== 'undefined' ? gameEvents : null);
+    if (bus) {
+      bus.emit('combat-enemy-projectile', payload);
     }
   }
 
