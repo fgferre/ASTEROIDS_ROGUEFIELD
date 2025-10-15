@@ -1,8 +1,8 @@
-import * as CONSTANTS from '../../../core/GameConstants.js';
+import { ENEMY_TYPES } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
-const HUNTER_DEFAULTS = CONSTANTS.ENEMY_TYPES?.hunter ?? {};
+const HUNTER_DEFAULTS = ENEMY_TYPES?.hunter ?? {};
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -53,7 +53,7 @@ export class Hunter extends BaseEnemy {
     this.resetForPool();
     super.initialize(config);
 
-    const defaults = CONSTANTS.ENEMY_TYPES?.hunter ?? {};
+    const defaults = ENEMY_TYPES?.hunter ?? {};
 
     this.radius = config.radius ?? defaults.radius ?? 16;
     this.maxHealth = config.maxHealth ?? config.health ?? defaults.health ?? 48;

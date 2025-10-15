@@ -1,9 +1,13 @@
 // src/modules/EnemySystem.js
 import * as CONSTANTS from '../core/GameConstants.js';
+import { ENEMY_TYPES } from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
 import RandomService from '../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 import { Asteroid } from './enemies/types/Asteroid.js';
+import { Drone } from './enemies/types/Drone.js';
+import { Mine } from './enemies/types/Mine.js';
+import { Hunter } from './enemies/types/Hunter.js';
 import { EnemyFactory } from './enemies/base/EnemyFactory.js';
 import { WaveManager } from './enemies/managers/WaveManager.js';
 import { RewardManager } from './enemies/managers/RewardManager.js';
@@ -500,6 +504,33 @@ class EnemySystem {
         },
         tags: ['destructible', 'enemy']
       });
+
+      if (ENEMY_TYPES?.drone) {
+        this.factory.registerType('drone', {
+          class: Drone,
+          pool: GamePools?.drones || null,
+          defaults: { ...ENEMY_TYPES.drone },
+          tags: ['enemy', 'hostile', 'ranged']
+        });
+      }
+
+      if (ENEMY_TYPES?.mine) {
+        this.factory.registerType('mine', {
+          class: Mine,
+          pool: GamePools?.mines || null,
+          defaults: { ...ENEMY_TYPES.mine },
+          tags: ['enemy', 'explosive', 'area-of-effect']
+        });
+      }
+
+      if (ENEMY_TYPES?.hunter) {
+        this.factory.registerType('hunter', {
+          class: Hunter,
+          pool: GamePools?.hunters || null,
+          defaults: { ...ENEMY_TYPES.hunter },
+          tags: ['enemy', 'hostile', 'ranged', 'elite']
+        });
+      }
 
       console.log('[EnemySystem] EnemyFactory initialized (optional - not active yet)');
     } catch (error) {

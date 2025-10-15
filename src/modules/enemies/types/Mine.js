@@ -1,8 +1,8 @@
-import * as CONSTANTS from '../../../core/GameConstants.js';
+import { ENEMY_TYPES } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
-const MINE_DEFAULTS = CONSTANTS.ENEMY_TYPES?.mine ?? {};
+const MINE_DEFAULTS = ENEMY_TYPES?.mine ?? {};
 
 export class Mine extends BaseEnemy {
   constructor(system, config = {}) {
@@ -33,7 +33,7 @@ export class Mine extends BaseEnemy {
     this.resetForPool();
     super.initialize(config);
 
-    const defaults = CONSTANTS.ENEMY_TYPES?.mine ?? {};
+    const defaults = ENEMY_TYPES?.mine ?? {};
 
     this.radius = config.radius ?? defaults.radius ?? 18;
     this.maxHealth = config.maxHealth ?? config.health ?? defaults.health ?? 20;

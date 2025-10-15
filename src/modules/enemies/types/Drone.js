@@ -1,8 +1,8 @@
-import * as CONSTANTS from '../../../core/GameConstants.js';
+import { ENEMY_TYPES } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
-const DRONE_DEFAULTS = CONSTANTS.ENEMY_TYPES?.drone ?? {};
+const DRONE_DEFAULTS = ENEMY_TYPES?.drone ?? {};
 
 function resolveVectorMagnitude(x, y) {
   const magnitude = Math.hypot(x, y);
@@ -42,7 +42,7 @@ export class Drone extends BaseEnemy {
     this.resetForPool();
     super.initialize(config);
 
-    const defaults = CONSTANTS.ENEMY_TYPES?.drone ?? {};
+    const defaults = ENEMY_TYPES?.drone ?? {};
 
     this.radius = config.radius ?? defaults.radius ?? 12;
     this.maxHealth = config.maxHealth ?? config.health ?? defaults.health ?? 30;
