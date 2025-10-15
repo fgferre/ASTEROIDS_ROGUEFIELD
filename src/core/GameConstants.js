@@ -1045,6 +1045,54 @@ export const ORB_MAGNETISM_FORCE = 150;
 export const MIN_ORB_DISTANCE = 18;
 export const CLUSTER_FUSION_COUNT = 10;
 
+// === ENEMY TYPES ===
+export const ENEMY_TYPES = Object.freeze({
+  drone: {
+    key: 'drone',
+    displayName: 'Assault Drone',
+    radius: 12,
+    health: 30,
+    speed: 180,
+    acceleration: 260,
+    fireRate: 2.0,
+    fireVariance: 0.35,
+    fireSpread: 0.06,
+    projectileSpeed: 340,
+    projectileDamage: 15,
+    targetingRange: 460,
+    contactDamage: 12,
+  },
+  mine: {
+    key: 'mine',
+    displayName: 'Proximity Mine',
+    radius: 18,
+    health: 20,
+    lifetime: 30,
+    armTime: 0.5,
+    proximityRadius: 80,
+    explosionRadius: 120,
+    explosionDamage: 40,
+    pulseSpeed: 2.6,
+    pulseAmount: 0.32,
+  },
+  hunter: {
+    key: 'hunter',
+    displayName: 'Hunter Frigate',
+    radius: 16,
+    health: 48,
+    speed: 120,
+    acceleration: 220,
+    preferredDistance: 175,
+    projectileSpeed: 420,
+    projectileDamage: 12,
+    fireRange: 520,
+    burstCount: 3,
+    burstInterval: 3.5,
+    burstDelay: 0.15,
+    fireSpread: 0.045,
+  },
+});
+
 // === XP ORBS ===
 export const XP_ORB_BASE_VALUE = 5;
 export const XP_ORB_MAX_PER_CLASS = 100;
