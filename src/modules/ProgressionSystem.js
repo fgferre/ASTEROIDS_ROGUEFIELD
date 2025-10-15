@@ -36,6 +36,16 @@ class ProgressionSystem {
     this.experienceToNext = Math.max(1, Math.floor(initialRequirement));
     this.totalExperience = 0;
 
+    // === COMBO ===
+    const comboTimeoutValue = Number(CONSTANTS.COMBO_TIMEOUT);
+    this.comboTimeout =
+      Number.isFinite(comboTimeoutValue) && comboTimeoutValue > 0
+        ? comboTimeoutValue
+        : 3;
+    this.currentCombo = 0;
+    this.comboTimer = 0;
+    this.comboMultiplier = 1;
+
     // === UPGRADES APLICADOS ===
     this.appliedUpgrades = new Map();
     this.upgradeDefinitions = this.buildUpgradeDefinitions(UPGRADE_LIBRARY);
@@ -136,11 +146,21 @@ class ProgressionSystem {
     });
 
     gameEvents.on('progression-reset', () => {
+      this.resetCombo({ reason: 'progression-reset' });
       this.refreshInjectedServices(true);
     });
 
     gameEvents.on('player-reset', () => {
+      this.resetCombo({ reason: 'player-reset' });
       this.refreshInjectedServices(true);
+    });
+
+    gameEvents.on('player-died', () => {
+      this.resetCombo({ reason: 'player-died' });
+    });
+
+    gameEvents.on('enemy-destroyed', (data) => {
+      this.handleEnemyDestroyed(data);
     });
   }
 
@@ -186,6 +206,24 @@ class ProgressionSystem {
     this.collectXP(amount);
   }
 
+  handleEnemyDestroyed() {
+    const baseCombo = Math.max(0, Math.floor(this.currentCombo));
+    this.currentCombo = baseCombo + 1;
+    this.comboTimer = Math.max(0, this.comboTimeout);
+    this.comboMultiplier = this.getComboMultiplier();
+
+    if (typeof gameEvents === 'undefined') {
+      return;
+    }
+
+    gameEvents.emit('combo-updated', {
+      count: this.currentCombo,
+      multiplier: this.comboMultiplier,
+      timer: this.comboTimer,
+      timeout: this.comboTimeout,
+    });
+  }
+
   emitExperienceChanged() {
     if (typeof gameEvents === 'undefined') {
       return;
@@ -202,6 +240,24 @@ class ProgressionSystem {
     });
   }
 
+  update(deltaTime = 0) {
+    const dt = Number(deltaTime);
+    if (!Number.isFinite(dt) || dt <= 0) {
+      return;
+    }
+
+    if (this.currentCombo <= 0) {
+      this.comboTimer = 0;
+      return;
+    }
+
+    this.comboTimer = Math.max(0, this.comboTimer - dt);
+
+    if (this.comboTimer <= 0 && this.currentCombo > 0) {
+      this.resetCombo({ reason: 'timeout' });
+    }
+  }
+
   // === SISTEMA DE EXPERIÊNCIA ===
   collectXP(amount) {
     const value = Number(amount);
@@ -209,9 +265,14 @@ class ProgressionSystem {
       return { gained: 0, levels: 0 };
     }
 
-    this.totalExperience += value;
+    const multiplier = Number.isFinite(this.comboMultiplier)
+      ? Math.max(1, this.comboMultiplier)
+      : 1;
+    const gained = value * multiplier;
 
-    let pool = this.experience + value;
+    this.totalExperience += gained;
+
+    let pool = this.experience + gained;
     let levelsGained = 0;
     const levelContexts = [];
 
@@ -228,7 +289,7 @@ class ProgressionSystem {
       this.emitLevelUp(context);
     });
 
-    return { gained: value, levels: levelsGained };
+    return { gained, levels: levelsGained };
   }
 
   applyLevelUp() {
@@ -1053,6 +1114,55 @@ class ProgressionSystem {
     }));
   }
 
+  // === SISTEMA DE COMBO ===
+  getComboMultiplier() {
+    const count = Math.max(0, Math.floor(this.currentCombo));
+
+    if (count >= 20) {
+      return 3;
+    }
+
+    if (count >= 10) {
+      return 2;
+    }
+
+    if (count >= 5) {
+      return 1.5;
+    }
+
+    return 1;
+  }
+
+  getComboState() {
+    return {
+      count: Math.max(0, Math.floor(this.currentCombo)),
+      multiplier: Number.isFinite(this.comboMultiplier)
+        ? Math.max(1, this.comboMultiplier)
+        : 1,
+      timer: Math.max(0, this.comboTimer),
+      timeout: Math.max(0, this.comboTimeout),
+    };
+  }
+
+  resetCombo(options = {}) {
+    const hadCombo = this.currentCombo > 0;
+    const reason = options.reason || 'reset';
+    const silent = options.silent === true;
+
+    this.currentCombo = 0;
+    this.comboTimer = 0;
+    this.comboMultiplier = 1;
+
+    if (!silent && hadCombo && typeof gameEvents !== 'undefined') {
+      gameEvents.emit('combo-broken', {
+        reason,
+        timeout: this.comboTimeout,
+      });
+    }
+
+    return hadCombo;
+  }
+
   // === GETTERS PÚBLICOS ===
   getLevel() {
     return this.level;
@@ -1084,6 +1194,8 @@ class ProgressionSystem {
     this.appliedUpgrades.clear();
     this.pendingUpgradeOptions = [];
 
+    this.resetCombo({ reason: 'progression-reset' });
+
     this.refreshInjectedServices(true);
     this.emitExperienceChanged();
 
@@ -1106,6 +1218,7 @@ class ProgressionSystem {
   }
 
   deserialize(data, options = {}) {
+    this.resetCombo({ silent: true, reason: 'deserialize' });
     this.level = data?.level || 1;
     this.experience = data?.experience || 0;
     this.experienceToNext = data?.experienceToNext || 100;
@@ -1140,6 +1253,7 @@ class ProgressionSystem {
   }
 
   destroy() {
+    this.resetCombo({ silent: true, reason: 'destroy' });
     this.appliedUpgrades.clear();
     this.pendingUpgradeOptions = [];
     this.services = {

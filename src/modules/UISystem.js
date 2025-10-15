@@ -70,6 +70,7 @@ class UISystem {
       sessionKills: null,
       sessionKillsTextLength: 0,
       sessionTimeSeconds: null,
+      combo: { count: 0, multiplier: 1 },
       wave: {
         current: null,
         completedWaves: null,
@@ -81,6 +82,13 @@ class UISystem {
         labelLength: 0,
         enemiesTextLength: 0,
       },
+    };
+    this.comboState = {
+      count: 0,
+      multiplier: 1,
+      timer: 0,
+      timeout: 0,
+      isActive: false,
     };
 
     this.settings = null;
@@ -642,6 +650,7 @@ class UISystem {
     });
 
     this.refreshWaveDomRefs();
+    this.updateComboIndicator({ force: true });
   }
 
   applyHudLayoutPreference(layoutId) {
@@ -704,6 +713,9 @@ class UISystem {
 
     if (config.description) {
       root.setAttribute('aria-label', config.description);
+      root.dataset.baseAriaLabel = config.description;
+    } else {
+      root.dataset.baseAriaLabel = '';
     }
 
     const iconElement = this.createIconElement(config.icon);
@@ -804,6 +816,15 @@ class UISystem {
 
       root.appendChild(valueNumber);
 
+      let comboElement = null;
+      if (config.key === 'kills') {
+        comboElement = document.createElement('span');
+        comboElement.classList.add('hud-item__meta', 'hud-item__meta--combo');
+        comboElement.setAttribute('aria-hidden', 'true');
+        comboElement.textContent = '';
+        root.appendChild(comboElement);
+      }
+
       if (metaElement && metaPosition !== 'after-value') {
         root.appendChild(metaElement);
       }
@@ -814,6 +835,7 @@ class UISystem {
         root,
         value: valueNumber,
         meta: metaElement,
+        combo: comboElement,
       };
     }
 
@@ -993,6 +1015,14 @@ class UISystem {
 
     gameEvents.on('experience-changed', (data) => {
       this.updateXPBar(data);
+    });
+
+    gameEvents.on('combo-updated', (data) => {
+      this.handleComboUpdated(data);
+    });
+
+    gameEvents.on('combo-broken', (data) => {
+      this.handleComboBroken(data);
     });
 
     gameEvents.on('player-health-changed', (data) => {
@@ -2118,6 +2148,18 @@ class UISystem {
       if (typeof progression.getExperience === 'function') {
         this.updateXPBar(progression.getExperience(), { force });
       }
+
+      if (typeof progression.getComboState === 'function') {
+        this.applyComboState(progression.getComboState(), { force });
+      } else if (force) {
+        this.applyComboState({ count: 0, multiplier: 1, timer: 0, timeout: 0 }, {
+          force: true,
+        });
+      }
+    } else if (force) {
+      this.applyComboState({ count: 0, multiplier: 1, timer: 0, timeout: 0 }, {
+        force: true,
+      });
     }
 
     const enemies = this.getService('enemies');
@@ -2380,8 +2422,10 @@ class UISystem {
         }
 
         if (killsEntry.root) {
-          killsEntry.root.title = `Asteroides destruídos: ${formattedKills}`;
+          killsEntry.root.dataset.baseKillsTitle = `Asteroides destruídos: ${formattedKills}`;
         }
+
+        this.cachedValues.sessionKillsFormatted = formattedKills;
       }
 
       if (nextLength > previousLength) {
@@ -2390,6 +2434,10 @@ class UISystem {
 
       this.cachedValues.sessionKills = totalKills;
       this.cachedValues.sessionKillsTextLength = nextLength;
+
+      if (shouldUpdateValue || force) {
+        this.updateComboIndicator({ force: true });
+      }
     }
 
     const timeSeconds = Math.max(0, Math.floor(sessionData.timeElapsed ?? 0));
@@ -2417,6 +2465,193 @@ class UISystem {
 
     if (layoutNeedsUpdate) {
       this.requestViewportScaleUpdate();
+    }
+  }
+
+  formatComboMultiplier(multiplier) {
+    if (!Number.isFinite(multiplier)) {
+      return 'x1';
+    }
+
+    const normalized = Math.max(1, multiplier);
+    const isInteger = Math.abs(normalized - Math.round(normalized)) < 0.001;
+    if (isInteger) {
+      return `x${Math.round(normalized)}`;
+    }
+
+    const rounded = normalized.toFixed(1).replace(/\.0$/, '');
+    return `x${rounded}`;
+  }
+
+  formatComboLabel(count, multiplier) {
+    const safeCount = Math.max(0, Math.floor(count));
+    const multiplierLabel = this.formatComboMultiplier(multiplier);
+    return `Combo ${safeCount} (${multiplierLabel})`;
+  }
+
+  applyComboState(state = {}, options = {}) {
+    const force = Boolean(options.force);
+    const countValue = Number(state?.count);
+    const count = Number.isFinite(countValue)
+      ? Math.max(0, Math.floor(countValue))
+      : 0;
+
+    const multiplierValue = Number(state?.multiplier);
+    const multiplier = Number.isFinite(multiplierValue)
+      ? Math.max(1, multiplierValue)
+      : 1;
+
+    const timeoutValue = Number(
+      state?.timeout ?? this.comboState.timeout ?? 0
+    );
+    const timeout =
+      Number.isFinite(timeoutValue) && timeoutValue > 0 ? timeoutValue : 0;
+
+    const timerValue = Number(state?.timer);
+    const timer =
+      Number.isFinite(timerValue) && timerValue > 0
+        ? Math.min(timerValue, timeout || timerValue)
+        : 0;
+
+    const changed =
+      force ||
+      count !== this.comboState.count ||
+      Math.abs(multiplier - this.comboState.multiplier) > 1e-6 ||
+      Math.abs(timer - this.comboState.timer) > 1e-6 ||
+      Math.abs(timeout - this.comboState.timeout) > 1e-6;
+
+    if (!changed) {
+      return;
+    }
+
+    this.comboState.count = count;
+    this.comboState.multiplier = multiplier;
+    this.comboState.timer = timer;
+    this.comboState.timeout = timeout;
+    this.comboState.isActive = count > 0;
+
+    this.updateComboIndicator({ force: true });
+  }
+
+  handleComboUpdated(payload = {}) {
+    this.applyComboState(
+      {
+        count: payload?.count,
+        multiplier: payload?.multiplier,
+        timer: payload?.timer,
+        timeout: payload?.timeout,
+      },
+      { force: true }
+    );
+  }
+
+  handleComboBroken(payload = {}) {
+    const timeoutValue = Number(payload?.timeout);
+    const timeout =
+      Number.isFinite(timeoutValue) && timeoutValue > 0
+        ? timeoutValue
+        : this.comboState.timeout;
+
+    this.applyComboState(
+      {
+        count: 0,
+        multiplier: 1,
+        timer: 0,
+        timeout,
+      },
+      { force: true }
+    );
+  }
+
+  updateComboIndicator(options = {}) {
+    const killsEntry = this.hudElements.get('kills');
+    if (!killsEntry?.root) {
+      return;
+    }
+
+    const force = Boolean(options.force);
+    const count = Math.max(0, Math.floor(this.comboState.count || 0));
+    const multiplier = Number.isFinite(this.comboState.multiplier)
+      ? Math.max(1, this.comboState.multiplier)
+      : 1;
+
+    const cached = this.cachedValues.combo || { count: 0, multiplier: 1 };
+    const multiplierChanged =
+      Math.abs((cached.multiplier ?? 1) - multiplier) > 1e-6;
+
+    if (!force && cached.count === count && !multiplierChanged) {
+      return;
+    }
+
+    this.cachedValues.combo = { count, multiplier };
+
+    const hasCombo = count > 0;
+    const hasBonus = hasCombo && multiplier > 1;
+
+    killsEntry.root.classList.toggle('has-combo', hasCombo);
+    killsEntry.root.classList.toggle('has-combo-bonus', hasBonus);
+
+    if (killsEntry.combo) {
+      if (hasCombo) {
+        const label = this.formatComboLabel(count, multiplier);
+        killsEntry.combo.textContent = label;
+        killsEntry.combo.classList.add('is-visible');
+      } else {
+        killsEntry.combo.textContent = '';
+        killsEntry.combo.classList.remove('is-visible');
+      }
+    }
+
+    if (killsEntry.root) {
+      if (hasCombo) {
+        killsEntry.root.dataset.comboCount = `${count}`;
+        killsEntry.root.dataset.comboMultiplier = `${multiplier}`;
+      } else {
+        delete killsEntry.root.dataset.comboCount;
+        delete killsEntry.root.dataset.comboMultiplier;
+      }
+    }
+
+    const baseAriaLabel =
+      killsEntry.root.dataset.baseAriaLabel ||
+      killsEntry.config?.description ||
+      '';
+
+    const baseTitle =
+      killsEntry.root.dataset.baseKillsTitle ||
+      (this.cachedValues.sessionKillsFormatted
+        ? `Asteroides destruídos: ${this.cachedValues.sessionKillsFormatted}`
+        : '');
+
+    if (hasCombo) {
+      const comboLabel = this.formatComboLabel(count, multiplier);
+      if (baseAriaLabel) {
+        killsEntry.root.setAttribute(
+          'aria-label',
+          `${baseAriaLabel}. ${comboLabel}.`
+        );
+      } else {
+        killsEntry.root.setAttribute('aria-label', comboLabel);
+      }
+
+      const titleLabel = baseTitle
+        ? `${baseTitle} • ${comboLabel}`
+        : comboLabel;
+      if (titleLabel) {
+        killsEntry.root.title = titleLabel;
+      }
+    } else {
+      if (baseAriaLabel) {
+        killsEntry.root.setAttribute('aria-label', baseAriaLabel);
+      } else {
+        killsEntry.root.removeAttribute('aria-label');
+      }
+
+      if (baseTitle) {
+        killsEntry.root.title = baseTitle;
+      } else {
+        killsEntry.root.removeAttribute('title');
+      }
     }
   }
 
