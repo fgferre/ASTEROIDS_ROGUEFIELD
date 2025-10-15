@@ -348,8 +348,15 @@ class CombatSystem {
       candidates.push(candidateEntry);
     };
 
-    if (typeof enemies.forEachActiveAsteroid === 'function') {
+    if (typeof enemies.forEachActiveEnemy === 'function') {
+      enemies.forEachActiveEnemy(processEnemy);
+    } else if (typeof enemies.forEachActiveAsteroid === 'function') {
       enemies.forEachActiveAsteroid(processEnemy);
+    } else if (typeof enemies.getActiveEnemies === 'function') {
+      const activeEnemies = enemies.getActiveEnemies();
+      for (let i = 0; i < activeEnemies.length; i += 1) {
+        processEnemy(activeEnemies[i]);
+      }
     } else if (typeof enemies.getAsteroids === 'function') {
       const asteroids = enemies.getAsteroids();
       for (let i = 0; i < asteroids.length; i += 1) {
@@ -1760,8 +1767,15 @@ class CombatSystem {
   // === DETECÇÃO DE COLISÃO ===
   checkBulletCollisions(enemiesSystem) {
     const iterateAsteroids = (handler) => {
-      if (typeof enemiesSystem.forEachActiveAsteroid === 'function') {
+      if (typeof enemiesSystem.forEachActiveEnemy === 'function') {
+        enemiesSystem.forEachActiveEnemy(handler);
+      } else if (typeof enemiesSystem.forEachActiveAsteroid === 'function') {
         enemiesSystem.forEachActiveAsteroid(handler);
+      } else if (typeof enemiesSystem.getActiveEnemies === 'function') {
+        const enemies = enemiesSystem.getActiveEnemies();
+        for (let i = 0; i < enemies.length; i += 1) {
+          handler(enemies[i]);
+        }
       } else if (typeof enemiesSystem.getAsteroids === 'function') {
         const asteroids = enemiesSystem.getAsteroids();
         for (let i = 0; i < asteroids.length; i += 1) {

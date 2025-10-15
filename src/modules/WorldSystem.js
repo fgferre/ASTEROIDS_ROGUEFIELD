@@ -98,9 +98,15 @@ class WorldSystem {
     if (
       physics &&
       typeof physics.handlePlayerAsteroidCollision === 'function' &&
-      typeof enemies.forEachActiveAsteroid === 'function'
+      (typeof enemies.forEachActiveEnemy === 'function' ||
+        typeof enemies.forEachActiveAsteroid === 'function')
     ) {
-      enemies.forEachActiveAsteroid((asteroid) => {
+      const iterateEnemies =
+        typeof enemies.forEachActiveEnemy === 'function'
+          ? enemies.forEachActiveEnemy.bind(enemies)
+          : enemies.forEachActiveAsteroid.bind(enemies);
+
+      iterateEnemies((asteroid) => {
         if (!this.playerAlive) {
           return;
         }
@@ -119,9 +125,17 @@ class WorldSystem {
     if (
       physics &&
       typeof physics.handlePlayerAsteroidCollision === 'function' &&
-      typeof enemies.getAsteroids === 'function'
+      (
+        typeof enemies.getActiveEnemies === 'function' ||
+        typeof enemies.getAsteroids === 'function'
+      )
     ) {
-      const asteroids = enemies.getAsteroids();
+      const asteroids =
+        typeof enemies.getActiveEnemies === 'function'
+          ? enemies.getActiveEnemies()
+          : typeof enemies.getAsteroids === 'function'
+          ? enemies.getAsteroids()
+          : [];
       if (Array.isArray(asteroids)) {
         for (let i = 0; i < asteroids.length; i += 1) {
           if (!this.playerAlive) {

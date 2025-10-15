@@ -23,6 +23,28 @@
  *   defaults: { size: 'medium' }
  * });
  *
+ * // Register pooled enemy ships using GameConstants defaults
+ * factory.registerType('drone', {
+ *   class: Drone,
+ *   pool: GamePools.drones,
+ *   defaults: GameConstants.ENEMY_TYPES.drone,
+ *   tags: ['enemy', 'hostile', 'ranged']
+ * });
+ *
+ * factory.registerType('mine', {
+ *   class: Mine,
+ *   pool: GamePools.mines,
+ *   defaults: GameConstants.ENEMY_TYPES.mine,
+ *   tags: ['enemy', 'explosive']
+ * });
+ *
+ * factory.registerType('hunter', {
+ *   class: Hunter,
+ *   pool: GamePools.hunters,
+ *   defaults: GameConstants.ENEMY_TYPES.hunter,
+ *   tags: ['enemy', 'elite']
+ * });
+ *
  * // Create an instance
  * const asteroid = factory.create('asteroid', {
  *   x: 100,
@@ -148,7 +170,13 @@ export class EnemyFactory {
 
     // Initialize enemy
     try {
-      enemy.initialize(finalConfig);
+      if (typeof enemy.initialize === 'function') {
+        if (enemy.initialize.length === 0) {
+          enemy.initialize(finalConfig);
+        } else {
+          enemy.initialize(this.system, finalConfig);
+        }
+      }
 
       // Apply default tags
       for (const tag of typeConfig.tags) {
