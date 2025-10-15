@@ -87,6 +87,19 @@ export class WaveManager {
     this.randomSequences = { spawn: 0, variants: 0, fragments: 0 };
     this._fallbackRandom = null;
 
+    const enemyTypes = CONSTANTS.ENEMY_TYPES || {};
+    this.enemyTypeKeys = {
+      asteroid: 'asteroid',
+      drone: enemyTypes.drone?.key || 'drone',
+      mine: enemyTypes.mine?.key || 'mine',
+      hunter: enemyTypes.hunter?.key || 'hunter',
+    };
+    this.enemyTypeDefaults = {
+      drone: enemyTypes.drone || {},
+      mine: enemyTypes.mine || {},
+      hunter: enemyTypes.hunter || {},
+    };
+
     // Wave state
     this.currentWave = 0;
     this.waveInProgress = false;
@@ -154,33 +167,51 @@ export class WaveManager {
       });
     }
 
-    // Later waves: Introduce variants
-    for (let i = 7; i <= 10; i++) {
-      configs.set(i, {
-        enemies: [
-          {
-            type: 'asteroid',
-            count: 3,
-            size: 'large',
-            variant: 'common'
-          },
-          {
-            type: 'asteroid',
-            count: 2,
-            size: 'medium',
-            variant: 'iron'
-          },
-          {
-            type: 'asteroid',
-            count: Math.floor(i / 3),
-            size: 'small',
-            variant: 'volatile'
-          }
-        ]
-      });
+    // Later waves: Introduce variants and combatants
+    for (let i = 7; i <= 12; i++) {
+      const baseGroups = [
+        {
+          type: 'asteroid',
+          count: 3,
+          size: 'large',
+          variant: 'common'
+        },
+        {
+          type: 'asteroid',
+          count: 2,
+          size: 'medium',
+          variant: 'iron'
+        },
+        {
+          type: 'asteroid',
+          count: Math.floor(i / 3),
+          size: 'small',
+          variant: 'volatile'
+        }
+      ];
+
+      const baseCount = this.computeBaseEnemyCount(i);
+
+      if (i >= 8) {
+        const droneCount = this.computeSupportCount('drone', i, baseCount);
+        const droneGroup = this.createSupportGroup('drone', droneCount);
+        if (droneGroup) {
+          baseGroups.push(droneGroup);
+        }
+      }
+
+      if (i >= 10) {
+        const mineCount = this.computeSupportCount('mine', i, baseCount);
+        const mineGroup = this.createSupportGroup('mine', mineCount);
+        if (mineGroup) {
+          baseGroups.push(mineGroup);
+        }
+      }
+
+      configs.set(i, { enemies: baseGroups });
     }
 
-    // Waves 11+: Dynamic generation
+    // Waves 13+: Dynamic generation
     // (handled by generateDynamicWave)
 
     return configs;
@@ -194,8 +225,7 @@ export class WaveManager {
    * @returns {Object} Wave configuration
    */
   generateDynamicWave(waveNumber) {
-    const difficulty = Math.floor(waveNumber / 5);
-    const baseCount = 5 + difficulty * 2;
+    const baseCount = this.computeBaseEnemyCount(waveNumber);
 
     // Variant distribution by difficulty
     const variants = ['common', 'iron', 'gold', 'crystal'];
@@ -229,16 +259,158 @@ export class WaveManager {
       variant: this.selectRandomVariant(variants, waveNumber, variantRandom)
     });
 
-    // Future: Add other enemy types here
-    // if (waveNumber >= 15) {
-    //   enemies.push({
-    //     type: 'drone',
-    //     count: 2,
-    //     weapon: 'laser'
-    //   });
-    // }
+    const supportWeights = this.computeSupportWeights(waveNumber);
+    for (const support of supportWeights) {
+      const supportCount = this.computeSupportCount(
+        support.key,
+        waveNumber,
+        baseCount,
+        support.weight
+      );
+      const supportGroup = this.createSupportGroup(support.key, supportCount);
+      if (supportGroup) {
+        enemies.push(supportGroup);
+      }
+    }
 
     return { enemies };
+  }
+
+  computeBaseEnemyCount(waveNumber) {
+    const difficulty = Math.floor(waveNumber / 5);
+    return 5 + difficulty * 2;
+  }
+
+  computeSupportWeights(waveNumber) {
+    const weights = [];
+
+    if (waveNumber >= 8) {
+      const droneWeight = 1 + Math.max(0, (waveNumber - 8) * 0.08);
+      weights.push({ key: 'drone', weight: droneWeight });
+    }
+
+    if (waveNumber >= 10) {
+      const mineWeight = 1 + Math.max(0, (waveNumber - 10) * 0.07);
+      weights.push({ key: 'mine', weight: mineWeight });
+    }
+
+    if (waveNumber >= 13) {
+      const hunterWeight = 1 + Math.max(0, (waveNumber - 13) * 0.1);
+      weights.push({ key: 'hunter', weight: hunterWeight });
+    }
+
+    return weights;
+  }
+
+  getBaselineSupportCount(kind, waveNumber, baseCount = this.computeBaseEnemyCount(waveNumber)) {
+    switch (kind) {
+      case 'drone':
+        if (waveNumber < 8) return 0;
+        if (waveNumber === 8) return 2;
+        if (waveNumber === 9) return 3;
+        if (waveNumber === 10) return 3;
+        if (waveNumber === 11) return 4;
+        if (waveNumber === 12) return 4;
+        return Math.max(
+          3 + Math.floor((waveNumber - 12) / 2),
+          Math.max(2, Math.round(baseCount * 0.35))
+        );
+      case 'mine':
+        if (waveNumber < 10) return 0;
+        if (waveNumber === 10) return 2;
+        if (waveNumber === 11) return 3;
+        if (waveNumber === 12) return 3;
+        return Math.max(
+          3 + Math.floor((waveNumber - 12) / 3),
+          Math.max(2, Math.round(baseCount * 0.25))
+        );
+      case 'hunter':
+        if (waveNumber < 13) return 0;
+        if (waveNumber === 13) return 1;
+        if (waveNumber === 14) return 1;
+        return Math.max(
+          1 + Math.floor((waveNumber - 13) / 2),
+          Math.max(1, Math.round(baseCount * 0.18))
+        );
+      default:
+        return 0;
+    }
+  }
+
+  computeSupportCount(
+    kind,
+    waveNumber,
+    baseCount = this.computeBaseEnemyCount(waveNumber),
+    weight = 1
+  ) {
+    const baseline = this.getBaselineSupportCount(kind, waveNumber, baseCount);
+    if (baseline <= 0) {
+      return 0;
+    }
+
+    const appliedWeight = Math.max(1, Number.isFinite(weight) ? weight : 1);
+    const weighted = Math.round(baseline * appliedWeight);
+
+    return Math.max(baseline, weighted);
+  }
+
+  createSupportGroup(kind, count) {
+    if (!count || count <= 0) {
+      return null;
+    }
+
+    const defaults = this.enemyTypeDefaults || {};
+
+    switch (kind) {
+      case 'drone': {
+        const droneDefaults = defaults.drone || {};
+        return {
+          type: this.enemyTypeKeys?.drone || 'drone',
+          count,
+          fireRate: droneDefaults.fireRate,
+          fireVariance: droneDefaults.fireVariance,
+          fireSpread: droneDefaults.fireSpread,
+          projectileSpeed: droneDefaults.projectileSpeed,
+          projectileDamage: droneDefaults.projectileDamage,
+          targetingRange: droneDefaults.targetingRange,
+          speed: droneDefaults.speed,
+          acceleration: droneDefaults.acceleration,
+        };
+      }
+      case 'mine': {
+        const mineDefaults = defaults.mine || {};
+        return {
+          type: this.enemyTypeKeys?.mine || 'mine',
+          count,
+          armTime: mineDefaults.armTime,
+          proximityRadius: mineDefaults.proximityRadius,
+          explosionRadius: mineDefaults.explosionRadius,
+          explosionDamage: mineDefaults.explosionDamage,
+          pulseSpeed: mineDefaults.pulseSpeed,
+          pulseAmount: mineDefaults.pulseAmount,
+          lifetime: mineDefaults.lifetime,
+        };
+      }
+      case 'hunter': {
+        const hunterDefaults = defaults.hunter || {};
+        return {
+          type: this.enemyTypeKeys?.hunter || 'hunter',
+          count,
+          preferredDistance: hunterDefaults.preferredDistance,
+          burstCount: hunterDefaults.burstCount,
+          burstInterval: hunterDefaults.burstInterval,
+          burstDelay: hunterDefaults.burstDelay,
+          fireSpread: hunterDefaults.fireSpread,
+          projectileSpeed: hunterDefaults.projectileSpeed,
+          projectileDamage: hunterDefaults.projectileDamage,
+          fireRange: hunterDefaults.fireRange,
+          speed: hunterDefaults.speed,
+          acceleration: hunterDefaults.acceleration,
+        };
+      }
+      default:
+        return null;
+    }
   }
 
   /**
