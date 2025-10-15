@@ -94,6 +94,7 @@ export class WaveManager {
       mine: enemyTypes.mine?.key || 'mine',
       hunter: enemyTypes.hunter?.key || 'hunter',
     };
+    this.bossEnemyKey = (CONSTANTS.BOSS_CONFIG && CONSTANTS.BOSS_CONFIG.key) || 'boss';
     this.enemyTypeDefaults = {
       drone: enemyTypes.drone || {},
       mine: enemyTypes.mine || {},
@@ -111,6 +112,7 @@ export class WaveManager {
     this.enemiesSpawnedThisWave = 0;
     this.enemiesKilledThisWave = 0;
     this.totalEnemiesThisWave = 0;
+    this.spawnQueue = [];
 
     // Timers
     this.spawnTimer = 0;
@@ -136,6 +138,7 @@ export class WaveManager {
     // Early waves: Small asteroids
     for (let i = 1; i <= 3; i++) {
       configs.set(i, {
+        isBossWave: false,
         enemies: [
           {
             type: 'asteroid',
@@ -150,6 +153,7 @@ export class WaveManager {
     // Mid waves: Mixed sizes
     for (let i = 4; i <= 6; i++) {
       configs.set(i, {
+        isBossWave: false,
         enemies: [
           {
             type: 'asteroid',
@@ -208,13 +212,54 @@ export class WaveManager {
         }
       }
 
-      configs.set(i, { enemies: baseGroups });
+      configs.set(i, { isBossWave: false, enemies: baseGroups });
     }
 
     // Waves 13+: Dynamic generation
     // (handled by generateDynamicWave)
 
     return configs;
+  }
+
+  cloneWaveConfig(config = {}) {
+    if (!config || typeof config !== 'object') {
+      return { isBossWave: false, enemies: [] };
+    }
+
+    const cloned = {
+      ...config,
+      enemies: Array.isArray(config.enemies)
+        ? config.enemies.map((group) => ({ ...group }))
+        : [],
+    };
+
+    if (config.boss) {
+      cloned.boss = { ...config.boss };
+    }
+
+    if (Array.isArray(config.supportGroups)) {
+      cloned.supportGroups = config.supportGroups.map((group) => ({ ...group }));
+    }
+
+    if (config.metadata && typeof config.metadata === 'object') {
+      cloned.metadata = { ...config.metadata };
+    }
+
+    return cloned;
+  }
+
+  isBossWave(waveNumber) {
+    if (!Number.isFinite(waveNumber) || waveNumber <= 0) {
+      return false;
+    }
+
+    const interval = Number(CONSTANTS.WAVE_BOSS_INTERVAL) || 0;
+    if (interval <= 0) {
+      return false;
+    }
+
+    const normalizedInterval = Math.max(1, Math.floor(interval));
+    return normalizedInterval > 0 && waveNumber % normalizedInterval === 0;
   }
 
   /**
@@ -273,7 +318,88 @@ export class WaveManager {
       }
     }
 
-    return { enemies };
+    return { isBossWave: false, enemies };
+  }
+
+  generateBossWave(waveNumber) {
+    const bossDefaults = CONSTANTS.BOSS_CONFIG || {};
+    const baseCount = this.computeBaseEnemyCount(waveNumber);
+
+    const supportGroups = [];
+
+    const droneCount = this.computeSupportCount('drone', waveNumber, baseCount);
+    if (droneCount > 0) {
+      const droneGroup = this.createSupportGroup('drone', droneCount);
+      if (droneGroup) {
+        supportGroups.push(droneGroup);
+      }
+    }
+
+    const hunterCount = this.computeSupportCount('hunter', waveNumber, baseCount);
+    if (hunterCount > 0) {
+      const hunterGroup = this.createSupportGroup('hunter', hunterCount);
+      if (hunterGroup) {
+        supportGroups.push(hunterGroup);
+      }
+    }
+
+    const safeDistance = Math.max(
+      Number(bossDefaults.safeDistance) || 0,
+      (CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200) * 2,
+      (bossDefaults.radius || 60) * 2
+    );
+
+    const bossEntry = {
+      type: this.bossEnemyKey || bossDefaults.key || 'boss',
+      key: bossDefaults.key || this.bossEnemyKey || 'boss',
+      count: 1,
+      displayName: bossDefaults.displayName || 'Boss',
+      radius: bossDefaults.radius,
+      health: bossDefaults.health,
+      healthScaling: bossDefaults.healthScaling,
+      spawnStrategy: 'scripted-entrance',
+      entrance: 'top-center',
+      safeDistance,
+      spawnOffset: Math.max(safeDistance, (bossDefaults.radius || 60) * 1.5),
+      rewards: bossDefaults.rewards ? { ...bossDefaults.rewards } : undefined,
+      randomScope: 'boss-spawn',
+      randomParentScope: 'spawn',
+      metadata: {
+        minionTypes: Array.isArray(bossDefaults.minionTypes)
+          ? [...bossDefaults.minionTypes]
+          : undefined,
+      },
+    };
+
+    return {
+      isBossWave: true,
+      boss: bossEntry,
+      enemies: supportGroups,
+      supportGroups: supportGroups.map((group) => ({ ...group })),
+      metadata: {
+        supportSummary: supportGroups.map((group) => ({
+          type: group.type,
+          count: group.count,
+        })),
+      },
+    };
+  }
+
+  computeTotalEnemies(waveConfig) {
+    if (!waveConfig || typeof waveConfig !== 'object') {
+      return 0;
+    }
+
+    const supportTotal = (Array.isArray(waveConfig.enemies) ? waveConfig.enemies : []).reduce(
+      (sum, group) => sum + (Number(group?.count) || 0),
+      0
+    );
+
+    const bossCount = waveConfig.boss && Number.isFinite(waveConfig.boss.count)
+      ? Math.max(0, Math.floor(waveConfig.boss.count))
+      : 0;
+
+    return supportTotal + bossCount;
   }
 
   computeBaseEnemyCount(waveNumber) {
@@ -456,30 +582,61 @@ export class WaveManager {
     this.waveStartTime = Date.now();
     this.enemiesSpawnedThisWave = 0;
     this.enemiesKilledThisWave = 0;
+    this.spawnQueue = [];
 
-    // Get wave configuration
-    const config = this.waveConfigs.get(this.currentWave) ||
-                   this.generateDynamicWave(this.currentWave);
+    const waveNumber = this.currentWave;
+    let config;
 
-    // Calculate total enemies for this wave
-    this.totalEnemiesThisWave = config.enemies.reduce(
-      (sum, group) => sum + group.count,
-      0
-    );
-
-    // Emit wave start event
-    if (this.eventBus) {
-      this.eventBus.emit('wave-started', {
-        wave: this.currentWave,
-        totalEnemies: this.totalEnemiesThisWave,
-        config: config
-      });
+    if (this.isBossWave(waveNumber)) {
+      config = this.generateBossWave(waveNumber);
+    } else {
+      const predefined = this.waveConfigs.get(waveNumber);
+      config = predefined
+        ? this.cloneWaveConfig(predefined)
+        : this.generateDynamicWave(waveNumber);
+      config.isBossWave = false;
     }
 
-    // Spawn wave
-    this.spawnWave(config);
+    config.isBossWave = Boolean(config.isBossWave);
 
-    console.log(`[WaveManager] Started wave ${this.currentWave} (${this.totalEnemiesThisWave} enemies)`);
+    this.totalEnemiesThisWave = this.computeTotalEnemies(config);
+
+    const waveEventPayload = {
+      wave: waveNumber,
+      totalEnemies: this.totalEnemiesThisWave,
+      config: this.cloneWaveConfig(config),
+      isBossWave: config.isBossWave,
+    };
+
+    if (this.eventBus) {
+      this.eventBus.emit('wave-started', waveEventPayload);
+
+      if (config.isBossWave) {
+        const supportGroups = Array.isArray(config.supportGroups)
+          ? config.supportGroups.map((group) => ({ ...group }))
+          : Array.isArray(config.enemies)
+            ? config.enemies.map((group) => ({ ...group }))
+            : [];
+
+        this.eventBus.emit('boss-wave-started', {
+          wave: waveNumber,
+          totalEnemies: this.totalEnemiesThisWave,
+          boss: config.boss ? { ...config.boss } : null,
+          support: supportGroups,
+          config: this.cloneWaveConfig(config),
+        });
+      }
+    }
+
+    if (config.isBossWave) {
+      this.queueBossWaveSpawns(config);
+    } else {
+      this.spawnWave(config);
+    }
+
+    console.log(
+      `[WaveManager] Started wave ${waveNumber} (${this.totalEnemiesThisWave} enemies${config.isBossWave ? ', boss wave' : ''})`
+    );
     return true;
   }
 
@@ -533,6 +690,182 @@ export class WaveManager {
         }
       }
     }
+  }
+
+  queueBossWaveSpawns(waveConfig = {}) {
+    const queue = [];
+
+    const bossConfig = waveConfig.boss ? { ...waveConfig.boss } : null;
+    if (bossConfig) {
+      queue.push({
+        type: 'boss',
+        execute: () => this.spawnBossEnemy(bossConfig, waveConfig),
+      });
+    }
+
+    const supportGroups = Array.isArray(waveConfig.enemies)
+      ? waveConfig.enemies.map((group) => ({ ...group }))
+      : [];
+
+    supportGroups.forEach((group) => {
+      queue.push({
+        type: 'support-group',
+        group,
+        execute: () => this.spawnWave({ ...waveConfig, enemies: [group] }),
+      });
+    });
+
+    this.spawnQueue = queue;
+    this.processSpawnQueue();
+
+    return queue;
+  }
+
+  processSpawnQueue() {
+    if (!Array.isArray(this.spawnQueue)) {
+      this.spawnQueue = [];
+      return;
+    }
+
+    while (this.spawnQueue.length > 0) {
+      const entry = this.spawnQueue.shift();
+
+      if (!entry) {
+        continue;
+      }
+
+      try {
+        if (typeof entry === 'function') {
+          entry();
+        } else if (typeof entry.execute === 'function') {
+          entry.execute();
+        }
+      } catch (error) {
+        console.error('[WaveManager] Failed to process spawn queue entry', error);
+      }
+    }
+
+    this.spawnQueue = [];
+  }
+
+  spawnBossEnemy(bossConfig = {}, waveConfig = {}) {
+    if (!this.enemySystem || typeof this.enemySystem.spawnBoss !== 'function') {
+      console.warn('[WaveManager] Cannot spawn boss - spawnBoss() not available on enemy system');
+      return null;
+    }
+
+    const worldBounds = this.enemySystem.getCachedWorld()?.getBounds() ||
+                       { width: 800, height: 600 };
+    const player = this.enemySystem.getCachedPlayer();
+    const safeDistance = Math.max(
+      Number(bossConfig.safeDistance) || 0,
+      (CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200) * 2,
+      (bossConfig.radius || CONSTANTS.BOSS_CONFIG?.radius || 60) * 1.25
+    );
+
+    const spawnPosition = this.resolveBossSpawnPosition(
+      bossConfig,
+      worldBounds,
+      player,
+      safeDistance
+    );
+
+    const metadata = {
+      ...(bossConfig.metadata || {}),
+      wave: this.currentWave,
+      isBossWave: true,
+      spawnSource: 'wave-manager',
+      entrance: bossConfig.entrance || 'top-center',
+      supportPlan: Array.isArray(waveConfig.enemies)
+        ? waveConfig.enemies.map((group) => ({ type: group.type, count: group.count }))
+        : undefined,
+    };
+
+    const spawnConfig = {
+      ...bossConfig,
+      x: spawnPosition.x,
+      y: spawnPosition.y,
+      wave: this.currentWave,
+      safeDistance,
+      spawnStrategy: bossConfig.spawnStrategy || 'scripted-entrance',
+      entrance: bossConfig.entrance || 'top-center',
+      spawnOffset: bossConfig.spawnOffset,
+      randomScope: bossConfig.randomScope || 'boss-spawn',
+      randomParentScope: bossConfig.randomParentScope || 'spawn',
+      metadata,
+      skipWaveAccounting: true,
+    };
+
+    const boss = this.enemySystem.spawnBoss(spawnConfig);
+    if (boss) {
+      this.enemiesSpawnedThisWave += 1;
+    }
+
+    return boss;
+  }
+
+  resolveBossSpawnPosition(
+    bossConfig = {},
+    bounds = { width: 800, height: 600 },
+    player,
+    safeDistance = (CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200) * 2
+  ) {
+    const spawnPosition = bossConfig.spawnPosition || {};
+    if (Number.isFinite(spawnPosition.x) && Number.isFinite(spawnPosition.y)) {
+      return { x: spawnPosition.x, y: spawnPosition.y };
+    }
+
+    const entrance = bossConfig.entrance || 'top-center';
+    const offset = bossConfig.spawnOffset || Math.max(safeDistance, (bossConfig.radius || 60) * 1.5);
+
+    let x = bounds.width / 2;
+    let y = -offset;
+
+    switch (entrance) {
+      case 'center':
+        x = bounds.width / 2;
+        y = bounds.height / 2;
+        break;
+      case 'bottom-center':
+      case 'bottom':
+        x = bounds.width / 2;
+        y = bounds.height + offset;
+        break;
+      case 'left':
+      case 'left-center':
+        x = -offset;
+        y = bounds.height / 2;
+        break;
+      case 'right':
+      case 'right-center':
+        x = bounds.width + offset;
+        y = bounds.height / 2;
+        break;
+      case 'top-center':
+      default:
+        x = bounds.width / 2;
+        y = -offset;
+        break;
+    }
+
+    if (player && Number.isFinite(player.x) && Number.isFinite(player.y)) {
+      const dx = x - player.x;
+      const dy = y - player.y;
+      const distance = Math.hypot(dx, dy);
+
+      if (distance < safeDistance) {
+        if (distance === 0) {
+          x = player.x;
+          y = player.y - safeDistance;
+        } else {
+          const scale = safeDistance / distance;
+          x = player.x + dx * scale;
+          y = player.y + dy * scale;
+        }
+      }
+    }
+
+    return { x, y };
   }
 
   /**
@@ -674,6 +1007,7 @@ export class WaveManager {
     this.enemiesSpawnedThisWave = 0;
     this.enemiesKilledThisWave = 0;
     this.totalEnemiesThisWave = 0;
+    this.spawnQueue = [];
     this.spawnTimer = 0;
     this.waveCountdown = 0;
     if (this.randomSequences) {
