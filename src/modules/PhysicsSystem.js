@@ -10,13 +10,18 @@ class PhysicsSystem {
     this.enemySystem = null;
     this.cellSize = CONSTANTS.PHYSICS_CELL_SIZE || 96;
     this.maxEnemyRadius = this.computeMaxEnemyRadius();
+    this.maxEnemyRadius = Math.max(this.maxEnemyRadius, this.getBossSpatialRadius());
     this.maxAsteroidRadius = this.maxEnemyRadius; // Legacy alias
     const activeEnemies = new Set();
     this.activeEnemies = activeEnemies;
     this.activeAsteroids = activeEnemies; // Legacy alias for backward compatibility
+    this.activeBosses = new Set();
+    this.bossCollisionState = new Map();
 
     this._handledMineExplosions = new WeakSet();
     this._handledMineExplosionIds = new Set();
+
+    this.effectsService = this.dependencies.effects || null;
 
     // New SpatialHash-based collision system
     this.spatialHash = new SpatialHash(this.cellSize, {
@@ -98,6 +103,19 @@ class PhysicsSystem {
       }
     }
 
+    const bossRadius = CONSTANTS.BOSS_CONFIG?.radius;
+    if (Number.isFinite(bossRadius)) {
+      radii.push(bossRadius);
+      const bossSpatialPadding = this.getBossSpatialPadding();
+      const bossCollisionPadding = this.getBossCollisionPadding();
+      if (bossSpatialPadding) {
+        radii.push(bossRadius + bossSpatialPadding);
+      }
+      if (bossCollisionPadding) {
+        radii.push(bossRadius + bossCollisionPadding);
+      }
+    }
+
     if (!radii.length) {
       return 0;
     }
@@ -156,6 +174,16 @@ class PhysicsSystem {
 
     gameEvents.on('progression-reset', () => {
       this.reset();
+    });
+
+    gameEvents.on('boss-defeated', (data = {}) => {
+      const boss = this.resolveBossEntity(data);
+      if (boss) {
+        this.clearBossPhysicsState(boss);
+        this.unregisterEnemy(boss);
+      } else if (data?.enemyId != null) {
+        this.clearBossPhysicsState(data.enemyId);
+      }
     });
   }
 
@@ -256,14 +284,27 @@ class PhysicsSystem {
     this.clearMineExplosionTracking(enemy);
 
     this.updateMaxEnemyRadiusFromPayload(enemy);
+    const spatialRadius = this.resolveEnemySpatialRadius(enemy);
+    if (Number.isFinite(spatialRadius) && spatialRadius > this.maxEnemyRadius) {
+      this.maxEnemyRadius = spatialRadius;
+      this.maxAsteroidRadius = this.maxEnemyRadius;
+    }
 
     if (!this.activeEnemies.has(enemy)) {
       this.activeEnemies.add(enemy);
       this.indexDirty = true;
 
+      if (this.isBossEnemy(enemy)) {
+        this.activeBosses.add(enemy);
+      }
+
       // Add to spatial hash
-      if (Number.isFinite(enemy.x) && Number.isFinite(enemy.y) && Number.isFinite(enemy.radius)) {
-        this.spatialHash.insert(enemy, enemy.x, enemy.y, enemy.radius);
+      if (
+        Number.isFinite(enemy.x) &&
+        Number.isFinite(enemy.y) &&
+        Number.isFinite(spatialRadius)
+      ) {
+        this.spatialHash.insert(enemy, enemy.x, enemy.y, spatialRadius);
       }
     }
   }
@@ -279,6 +320,11 @@ class PhysicsSystem {
 
     if (this.activeEnemies.delete(enemy)) {
       this.indexDirty = true;
+
+      if (this.isBossEnemy(enemy)) {
+        this.activeBosses.delete(enemy);
+        this.clearBossPhysicsState(enemy);
+      }
 
       // Remove from spatial hash
       this.spatialHash.remove(enemy);
@@ -307,6 +353,10 @@ class PhysicsSystem {
 
     toRemove.forEach((enemy) => {
       this.activeEnemies.delete(enemy);
+      if (this.isBossEnemy(enemy)) {
+        this.activeBosses.delete(enemy);
+        this.clearBossPhysicsState(enemy);
+      }
     });
 
     this.indexDirty = true;
@@ -332,7 +382,21 @@ class PhysicsSystem {
     }
 
     if (!radiusCandidates.length) {
-      return;
+      if (this.isBossEnemy(payload)) {
+        const bossRadius = this.resolveEnemySpatialRadius(payload);
+        if (Number.isFinite(bossRadius)) {
+          radiusCandidates.push(bossRadius);
+        }
+      } else if (payload && (payload.type === 'boss' || payload.enemyType === 'boss')) {
+        const bossRadius = this.getBossSpatialRadius();
+        if (Number.isFinite(bossRadius)) {
+          radiusCandidates.push(bossRadius);
+        }
+      }
+
+      if (!radiusCandidates.length) {
+        return;
+      }
     }
 
     const candidateMax = Math.max(...radiusCandidates);
@@ -340,6 +404,414 @@ class PhysicsSystem {
       this.maxEnemyRadius = candidateMax;
       this.maxAsteroidRadius = this.maxEnemyRadius;
     }
+  }
+
+  getBossPhysicsConfig() {
+    return CONSTANTS.BOSS_PHYSICS_CONFIG || {};
+  }
+
+  getBossBaseRadius(boss = null) {
+    const bossRadius = boss && Number.isFinite(boss.radius) ? Math.max(0, boss.radius) : NaN;
+    if (Number.isFinite(bossRadius)) {
+      return bossRadius;
+    }
+
+    const configRadius = CONSTANTS.BOSS_CONFIG?.radius;
+    if (Number.isFinite(configRadius)) {
+      return configRadius;
+    }
+
+    return 60;
+  }
+
+  getBossSpatialPadding() {
+    const config = this.getBossPhysicsConfig();
+    return Number.isFinite(config.spatialPadding) ? config.spatialPadding : 0;
+  }
+
+  getBossCollisionPadding() {
+    const config = this.getBossPhysicsConfig();
+    return Number.isFinite(config.collisionPadding) ? config.collisionPadding : 0;
+  }
+
+  getBossSpatialRadius(boss = null) {
+    const base = this.getBossBaseRadius(boss);
+    return base + this.getBossSpatialPadding();
+  }
+
+  resolveEnemySpatialRadius(enemy) {
+    if (!enemy) {
+      return 0;
+    }
+
+    if (this.isBossEnemy(enemy)) {
+      const base = Math.max(this.getBossBaseRadius(enemy), Number.isFinite(enemy.radius) ? Math.max(0, enemy.radius) : 0);
+      return base + this.getBossSpatialPadding();
+    }
+
+    if (Number.isFinite(enemy.radius)) {
+      return Math.max(0, enemy.radius);
+    }
+
+    return 0;
+  }
+
+  resolveEnemyCollisionRadius(enemy, { includeBossPadding = true } = {}) {
+    if (!enemy) {
+      return 0;
+    }
+
+    if (this.isBossEnemy(enemy) && includeBossPadding) {
+      const base = Math.max(this.getBossBaseRadius(enemy), Number.isFinite(enemy.radius) ? Math.max(0, enemy.radius) : 0);
+      return base + this.getBossCollisionPadding();
+    }
+
+    if (Number.isFinite(enemy.radius)) {
+      return Math.max(0, enemy.radius);
+    }
+
+    return 0;
+  }
+
+  isBossEnemy(enemy) {
+    if (!enemy) {
+      return false;
+    }
+
+    if (enemy.type === 'boss' || enemy.enemyType === 'boss') {
+      return true;
+    }
+
+    if (typeof enemy.hasTag === 'function') {
+      try {
+        if (enemy.hasTag('boss')) {
+          return true;
+        }
+      } catch (error) {
+        // ignore
+      }
+    }
+
+    const { tags } = enemy;
+    if (tags) {
+      if (tags instanceof Set) {
+        return tags.has('boss');
+      }
+      if (Array.isArray(tags)) {
+        return tags.includes('boss');
+      }
+    }
+
+    return Boolean(enemy.isBoss);
+  }
+
+  resolveBossEntity(payload = {}) {
+    if (!payload) {
+      return null;
+    }
+
+    if (payload.boss && this.isBossEnemy(payload.boss)) {
+      return payload.boss;
+    }
+
+    if (payload.enemy && this.isBossEnemy(payload.enemy)) {
+      return payload.enemy;
+    }
+
+    if (this.isBossEnemy(payload)) {
+      return payload;
+    }
+
+    const bossId =
+      payload.bossId ?? payload.enemyId ?? payload.id ?? payload.source?.bossId ?? payload.source?.id ?? null;
+
+    if (bossId == null) {
+      return null;
+    }
+
+    for (const boss of this.activeBosses) {
+      if (!boss) {
+        continue;
+      }
+
+      if (boss.id === bossId || boss.bossId === bossId) {
+        return boss;
+      }
+    }
+
+    return null;
+  }
+
+  getBossCollisionCooldown(type) {
+    const config = this.getBossPhysicsConfig();
+    if (type === 'boss-charge') {
+      return Number.isFinite(config.chargeCooldownMs) ? config.chargeCooldownMs : 240;
+    }
+
+    if (type === 'boss-area') {
+      return Number.isFinite(config.areaCooldownMs) ? config.areaCooldownMs : 300;
+    }
+
+    return Number.isFinite(config.contactCooldownMs) ? config.contactCooldownMs : 120;
+  }
+
+  shouldEmitBossCollision(boss, type) {
+    if (!boss) {
+      return false;
+    }
+
+    const now = performance.now();
+    const cooldown = this.getBossCollisionCooldown(type);
+    const state = this.bossCollisionState.get(boss) || {};
+    const lastTime = state[type] ?? 0;
+
+    if (now - lastTime < cooldown) {
+      return false;
+    }
+
+    state[type] = now;
+    this.bossCollisionState.set(boss, state);
+    return true;
+  }
+
+  clearBossPhysicsState(reference = null) {
+    if (reference == null) {
+      this.bossCollisionState.clear();
+      return;
+    }
+
+    if (!this.bossCollisionState.size) {
+      return;
+    }
+
+    if (this.bossCollisionState.delete(reference)) {
+      return;
+    }
+
+    const referenceId =
+      typeof reference === 'object' && reference
+        ? reference.id ?? reference.bossId ?? null
+        : reference;
+
+    if (referenceId == null) {
+      return;
+    }
+
+    for (const boss of this.bossCollisionState.keys()) {
+      if (!boss) {
+        this.bossCollisionState.delete(boss);
+        continue;
+      }
+
+      if (boss.id === referenceId || boss.bossId === referenceId) {
+        this.bossCollisionState.delete(boss);
+      }
+    }
+  }
+
+  getBossChargeKnockback(value) {
+    if (Number.isFinite(value)) {
+      return value;
+    }
+
+    const config = this.getBossPhysicsConfig();
+    return Number.isFinite(config.chargeKnockback) ? config.chargeKnockback : 0;
+  }
+
+  getBossChargeBossSlow(value) {
+    if (Number.isFinite(value)) {
+      return value;
+    }
+
+    const config = this.getBossPhysicsConfig();
+    return Number.isFinite(config.chargeBossSlow) ? config.chargeBossSlow : 0;
+  }
+
+  getBossChargeDamageBonus(value) {
+    if (Number.isFinite(value)) {
+      return value;
+    }
+
+    const config = this.getBossPhysicsConfig();
+    return Number.isFinite(config.chargeDamageBonus) ? config.chargeDamageBonus : 0;
+  }
+
+  getBossChargeShake(override) {
+    if (override && Number.isFinite(override.intensity) && Number.isFinite(override.duration)) {
+      return override;
+    }
+
+    const config = this.getBossPhysicsConfig();
+    const shake = config.chargeShake;
+    if (shake && Number.isFinite(shake.intensity) && Number.isFinite(shake.duration)) {
+      return shake;
+    }
+
+    return null;
+  }
+
+  getBossAreaDamage(value, boss = null) {
+    if (Number.isFinite(value)) {
+      return value;
+    }
+
+    const config = this.getBossPhysicsConfig();
+    if (Number.isFinite(config.areaDamage)) {
+      return config.areaDamage;
+    }
+
+    const base = boss?.contactDamage ?? CONSTANTS.BOSS_CONFIG?.contactDamage;
+    if (Number.isFinite(base)) {
+      return base * 1.1;
+    }
+
+    return 45;
+  }
+
+  getBossAreaForce(value) {
+    if (Number.isFinite(value)) {
+      return value;
+    }
+
+    const config = this.getBossPhysicsConfig();
+    return Number.isFinite(config.areaForce) ? config.areaForce : 280;
+  }
+
+  getBossAreaRadius(value, boss = null) {
+    if (Number.isFinite(value)) {
+      return value;
+    }
+
+    const baseRadius = this.getBossBaseRadius(boss);
+    const config = this.getBossPhysicsConfig();
+    const multiplier = Number.isFinite(config.areaRadiusMultiplier) ? config.areaRadiusMultiplier : 2.2;
+    return baseRadius * multiplier;
+  }
+
+  getBossAreaShake(override) {
+    if (override && Number.isFinite(override.intensity) && Number.isFinite(override.duration)) {
+      return override;
+    }
+
+    const config = this.getBossPhysicsConfig();
+    const shake = config.areaShake;
+    if (shake && Number.isFinite(shake.intensity) && Number.isFinite(shake.duration)) {
+      return shake;
+    }
+
+    return null;
+  }
+
+  getBossContactShake(override) {
+    if (override && Number.isFinite(override.intensity) && Number.isFinite(override.duration)) {
+      return override;
+    }
+
+    const config = this.getBossPhysicsConfig();
+    const shake = config.contactShake;
+    if (shake && Number.isFinite(shake.intensity) && Number.isFinite(shake.duration)) {
+      return shake;
+    }
+
+    return null;
+  }
+
+  emitBossPhysicsEvent(eventName, payload = {}) {
+    if (typeof gameEvents === 'undefined' || !gameEvents?.emit) {
+      return;
+    }
+
+    gameEvents.emit(eventName, { ...payload, processedBy: 'physics' });
+  }
+
+  getEffectsService() {
+    if (this.effectsService) {
+      return this.effectsService;
+    }
+
+    try {
+      const effects = resolveService('effects', this.dependencies);
+      if (effects) {
+        this.effectsService = effects;
+        return effects;
+      }
+    } catch (error) {
+      // ignore service resolution failures
+    }
+
+    return null;
+  }
+
+  triggerScreenShake(intensity, duration, reason = 'boss-impact', payload = {}) {
+    if (!Number.isFinite(intensity) || intensity <= 0 || !Number.isFinite(duration) || duration <= 0) {
+      return;
+    }
+
+    const effects = this.getEffectsService();
+    if (effects && typeof effects.addScreenShake === 'function') {
+      try {
+        effects.addScreenShake(intensity, duration);
+      } catch (error) {
+        // ignore effects failures
+      }
+    }
+
+    this.emitBossPhysicsEvent('boss-screen-shake', {
+      reason,
+      intensity,
+      duration,
+      ...payload,
+    });
+  }
+
+  handleBossCollisionFeedback(type, context = {}) {
+    const boss = context.boss || context.enemy || null;
+    if (!this.shouldEmitBossCollision(boss, type)) {
+      return;
+    }
+
+    let shakeConfig = null;
+
+    switch (type) {
+      case 'boss-charge':
+        shakeConfig = this.getBossChargeShake(context.screenShake);
+        break;
+      case 'boss-area':
+        shakeConfig = this.getBossAreaShake(context.screenShake);
+        break;
+      default:
+        shakeConfig = this.getBossContactShake(context.screenShake);
+        break;
+    }
+
+    if (shakeConfig) {
+      this.triggerScreenShake(shakeConfig.intensity, shakeConfig.duration, type, {
+        bossId: boss?.id ?? null,
+        playerId: context.player?.id ?? null,
+        impactPosition: context.impactPosition || null,
+        overlap: context.overlap ?? null,
+        relativeSpeed: context.relativeSpeed ?? null,
+      });
+    }
+
+    let eventName = 'boss-contact-collision';
+    if (type === 'boss-charge') {
+      eventName = 'boss-charge-impact';
+    } else if (type === 'boss-area') {
+      eventName = 'boss-area-damage';
+    }
+
+    this.emitBossPhysicsEvent(eventName, {
+      type,
+      boss,
+      player: context.player || null,
+      damage: context.damage ?? null,
+      knockback: context.knockback ?? null,
+      overlap: context.overlap ?? null,
+      relativeSpeed: context.relativeSpeed ?? null,
+      impactPosition: context.impactPosition || null,
+      source: context.source || 'physics',
+    });
   }
 
   dispatchMineExplosion(enemy, data = {}) {
@@ -536,8 +1008,13 @@ class PhysicsSystem {
       }
 
       // Update asteroid position in spatial hash
-      if (Number.isFinite(asteroid.x) && Number.isFinite(asteroid.y) && Number.isFinite(asteroid.radius)) {
-        this.spatialHash.update(asteroid, asteroid.x, asteroid.y, asteroid.radius);
+      const spatialRadius = this.resolveEnemySpatialRadius(asteroid);
+      if (
+        Number.isFinite(asteroid.x) &&
+        Number.isFinite(asteroid.y) &&
+        Number.isFinite(spatialRadius)
+      ) {
+        this.spatialHash.update(asteroid, asteroid.x, asteroid.y, spatialRadius);
       }
     }
 
@@ -762,7 +1239,49 @@ class PhysicsSystem {
       sorted: false
     });
 
-    return candidates;
+    const candidateList = Array.isArray(candidates) ? candidates : [];
+
+    if (!this.activeBosses.size) {
+      return candidateList;
+    }
+
+    const enriched = candidateList.slice();
+    const seen = new Set(candidateList);
+    const detectionRadius = Math.max(0, radius);
+
+    this.activeBosses.forEach((boss) => {
+      if (!boss || boss.destroyed || !this.activeEnemies.has(boss)) {
+        return;
+      }
+
+      if (seen.has(boss)) {
+        return;
+      }
+
+      if (!Number.isFinite(boss.x) || !Number.isFinite(boss.y)) {
+        return;
+      }
+
+      const effectiveRadius = this.resolveEnemySpatialRadius(boss);
+      if (!Number.isFinite(effectiveRadius) || effectiveRadius <= 0) {
+        return;
+      }
+
+      const dx = boss.x - x;
+      const dy = boss.y - y;
+      const maxDistance = detectionRadius + effectiveRadius;
+
+      if (maxDistance <= 0) {
+        return;
+      }
+
+      if (dx * dx + dy * dy <= maxDistance * maxDistance) {
+        enriched.push(boss);
+        seen.add(boss);
+      }
+    });
+
+    return enriched;
   }
 
   getNearbyAsteroids(x, y, radius) {
@@ -891,12 +1410,29 @@ class PhysicsSystem {
     };
   }
 
-  handlePlayerAsteroidCollision(player, asteroid, enemiesSystem) {
+  handlePlayerAsteroidCollision(player, asteroid, enemiesSystem, options = {}) {
     const result = { collided: false, playerDied: false };
 
     if (!asteroid || asteroid.destroyed || !player) {
       return result;
     }
+
+    const {
+      damageOverride = null,
+      extraKnockback = 0,
+      bossVelocityDamp = 0,
+      damageBonus = 0,
+      collisionType = null,
+      radiusOverride = null,
+      screenShake = null,
+    } = options || {};
+
+    const isBoss = this.isBossEnemy(asteroid);
+    const collisionLabel = collisionType || (isBoss ? 'boss-contact' : 'enemy-contact');
+
+    result.collisionType = collisionLabel;
+    result.enemy = asteroid || null;
+    result.isBossCollision = isBoss;
 
     const position = player.position;
     if (
@@ -908,10 +1444,13 @@ class PhysicsSystem {
     }
 
     const context = this.buildPlayerCollisionContext(player);
+    result.playerContext = context;
+
     const collisionRadius = context.collisionRadius;
-    const asteroidRadius = Number.isFinite(asteroid.radius)
-      ? Math.max(0, asteroid.radius)
-      : 0;
+    let asteroidRadius = this.resolveEnemyCollisionRadius(asteroid);
+    if (Number.isFinite(radiusOverride)) {
+      asteroidRadius = Math.max(asteroidRadius, Math.max(0, radiusOverride));
+    }
 
     if (collisionRadius <= 0) {
       return result;
@@ -927,21 +1466,41 @@ class PhysicsSystem {
     }
 
     result.collided = true;
+    result.enemyRadius = asteroidRadius;
+    result.maxDistance = maxDistance;
 
     const distance = Math.sqrt(distanceSq);
     const nx = distance > 0 ? dx / distance : 0;
     const ny = distance > 0 ? dy / distance : 0;
     const overlap = maxDistance - distance;
+    const overlapAmount = overlap > 0 ? overlap : 0;
+    const impactX = asteroid.x + nx * asteroidRadius;
+    const impactY = asteroid.y + ny * asteroidRadius;
+
+    result.distance = distance;
+    result.distanceSq = distanceSq;
+    result.collisionNormal = { x: nx, y: ny };
+    result.overlap = overlapAmount;
+    result.impactPosition = { x: impactX, y: impactY };
 
     if (overlap > 0) {
       const playerPushRatio = context.shieldActive ? 0.18 : 0.5;
       const asteroidPushRatio = 1 - playerPushRatio;
-      player.position.x += nx * overlap * playerPushRatio;
-      player.position.y += ny * overlap * playerPushRatio;
-      asteroid.x -= nx * overlap * asteroidPushRatio;
-      asteroid.y -= ny * overlap * asteroidPushRatio;
+      const playerShift = overlapAmount * playerPushRatio;
+      const asteroidShift = overlapAmount * asteroidPushRatio;
+      player.position.x += nx * playerShift;
+      player.position.y += ny * playerShift;
+      asteroid.x -= nx * asteroidShift;
+      asteroid.y -= ny * asteroidShift;
+      result.separationApplied = {
+        player: playerShift,
+        enemy: asteroidShift,
+      };
     }
 
+    const playerMass = context.shieldActive
+      ? CONSTANTS.SHIP_MASS * Math.max(context.impactProfile.forceMultiplier, 1)
+      : CONSTANTS.SHIP_MASS;
     const rvx = asteroid.vx - player.velocity.vx;
     const rvy = asteroid.vy - player.velocity.vy;
     const velAlongNormal = rvx * nx + rvy * ny;
@@ -950,11 +1509,8 @@ class PhysicsSystem {
       const bounce = context.shieldActive
         ? CONSTANTS.SHIELD_COLLISION_BOUNCE
         : 0.2;
-      const playerMass = context.shieldActive
-        ? CONSTANTS.SHIP_MASS * Math.max(context.impactProfile.forceMultiplier, 1)
-        : CONSTANTS.SHIP_MASS;
-      const invMass1 = 1 / playerMass;
-      const invMass2 = 1 / asteroid.mass;
+      const invMass1 = 1 / Math.max(playerMass, 1);
+      const invMass2 = 1 / Math.max(asteroid.mass || 1, 1);
       let j = (-(1 + bounce) * velAlongNormal) / (invMass1 + invMass2);
       if (context.shieldActive) {
         j *= Math.max(context.impactProfile.forceMultiplier, 1);
@@ -969,25 +1525,65 @@ class PhysicsSystem {
       asteroid.vy += jy * invMass2;
     }
 
+    if (Number.isFinite(extraKnockback) && extraKnockback !== 0) {
+      const impulse = extraKnockback / Math.max(playerMass, 1);
+      player.velocity.vx += nx * impulse;
+      player.velocity.vy += ny * impulse;
+      result.extraKnockbackApplied = extraKnockback;
+    }
+
+    if (isBoss && Number.isFinite(bossVelocityDamp) && bossVelocityDamp !== 0) {
+      const mass = Math.max(asteroid.mass || 1, 1);
+      const damp = bossVelocityDamp / mass;
+      asteroid.vx -= nx * damp;
+      asteroid.vy -= ny * damp;
+      result.bossVelocityDampApplied = bossVelocityDamp;
+    }
+
+    const relSpeed = Math.hypot(
+      asteroid.vx - player.velocity.vx,
+      asteroid.vy - player.velocity.vy
+    );
+    result.relativeSpeed = relSpeed;
+
+    const finalizeBossFeedback = (damageValue) => {
+      if (!isBoss) {
+        return;
+      }
+
+      this.handleBossCollisionFeedback(collisionLabel, {
+        boss: asteroid,
+        player,
+        damage: damageValue,
+        overlap: overlapAmount,
+        relativeSpeed: relSpeed,
+        impactPosition: result.impactPosition,
+        knockback: Number.isFinite(extraKnockback) ? extraKnockback : null,
+        screenShake,
+      });
+    };
+
     if (player.invulnerableTimer > 0) {
+      finalizeBossFeedback(0);
       return result;
     }
 
     const previousShieldHits = context.shieldState?.currentHits ?? 0;
     const prevShieldActive = context.shieldActive;
 
-    const relSpeed = Math.hypot(
-      asteroid.vx - player.velocity.vx,
-      asteroid.vy - player.velocity.vy
-    );
     const baseDamage = 12;
     const momentumFactor = (asteroid.mass * relSpeed) / 120;
-    const rawDamage = baseDamage + momentumFactor;
-    const damage = Math.max(3, Math.floor(rawDamage));
+    let rawDamage = baseDamage + momentumFactor + (Number.isFinite(damageBonus) ? damageBonus : 0);
+    let damage = Math.max(3, Math.floor(rawDamage));
+    if (Number.isFinite(damageOverride)) {
+      damage = Math.max(0, Math.floor(damageOverride));
+    }
+    result.damage = damage;
     const remaining =
       typeof player.takeDamage === 'function'
         ? player.takeDamage(damage)
         : undefined;
+    result.remainingHealth = typeof remaining === 'number' ? remaining : null;
 
     const newShieldState =
       typeof player.getShieldState === 'function'
@@ -1045,6 +1641,16 @@ class PhysicsSystem {
       player.invulnerableTimer = 0.5;
     }
 
+    finalizeBossFeedback(damage);
+
+    if (!isBoss && screenShake && Number.isFinite(screenShake.intensity) && Number.isFinite(screenShake.duration)) {
+      this.triggerScreenShake(screenShake.intensity, screenShake.duration, screenShake.reason || collisionLabel, {
+        playerId: player?.id ?? null,
+        enemyId: asteroid?.id ?? null,
+        impactPosition: result.impactPosition,
+      });
+    }
+
     if (typeof gameEvents !== 'undefined') {
       gameEvents.emit('player-took-damage', {
         damage,
@@ -1061,6 +1667,251 @@ class PhysicsSystem {
     }
 
     return result;
+  }
+
+  handleBossChargeCollision(payload = {}) {
+    const boss = this.resolveBossEntity(payload);
+    const player = payload?.player ?? payload?.target ?? null;
+    const enemiesSystem = payload?.enemiesSystem ?? this.enemySystem ?? null;
+
+    const outcome = {
+      type: 'boss-charge',
+      boss,
+      player,
+      processed: false,
+      processedBy: 'physics',
+    };
+
+    if (!boss || !player) {
+      outcome.reason = 'missing-actor';
+      return outcome;
+    }
+
+    const options = {
+      damageOverride: Number.isFinite(payload.damage) ? payload.damage : null,
+      extraKnockback: this.getBossChargeKnockback(payload.knockback),
+      bossVelocityDamp: this.getBossChargeBossSlow(payload.bossSlow),
+      damageBonus: this.getBossChargeDamageBonus(payload.damageBonus),
+      collisionType: 'boss-charge',
+      radiusOverride: Number.isFinite(payload.radius)
+        ? payload.radius
+        : Number.isFinite(payload.collisionRadius)
+        ? payload.collisionRadius
+        : null,
+      screenShake: payload.screenShake || null,
+    };
+
+    const collision = this.handlePlayerAsteroidCollision(
+      player,
+      boss,
+      enemiesSystem,
+      options
+    );
+
+    return {
+      ...collision,
+      ...outcome,
+      processed: true,
+    };
+  }
+
+  applyBossAreaDamage(payload = {}) {
+    const boss = this.resolveBossEntity(payload);
+    const basePosition = payload.position ||
+      (boss
+        ? { x: boss.x ?? 0, y: boss.y ?? 0 }
+        : null);
+
+    const summary = {
+      type: 'boss-area',
+      boss,
+      position: basePosition ? { ...basePosition } : null,
+      radius: null,
+      damage: null,
+      hits: [],
+      playerHit: null,
+      processed: false,
+      processedBy: 'physics',
+    };
+
+    if (!basePosition || !Number.isFinite(basePosition.x) || !Number.isFinite(basePosition.y)) {
+      summary.reason = 'invalid-position';
+      return summary;
+    }
+
+    const radius = this.getBossAreaRadius(payload.radius, boss);
+    if (!Number.isFinite(radius) || radius <= 0) {
+      summary.reason = 'invalid-radius';
+      return summary;
+    }
+
+    const damage = this.getBossAreaDamage(payload.damage, boss);
+    const force = this.getBossAreaForce(payload.force);
+    const disableFalloff = Boolean(payload.disableFalloff);
+    const includePlayer = payload.includePlayer !== false;
+    const player = includePlayer ? payload.player ?? null : null;
+    const enemiesSystem = payload.enemiesSystem ?? this.enemySystem ?? null;
+
+    summary.radius = radius;
+    summary.damage = damage;
+    summary.processed = true;
+
+    const originX = basePosition.x;
+    const originY = basePosition.y;
+    const radiusSq = radius * radius;
+
+    const candidates = this.getNearbyEnemies(originX, originY, radius);
+
+    for (let i = 0; i < candidates.length; i += 1) {
+      const enemy = candidates[i];
+      if (!enemy || enemy.destroyed || enemy === boss) {
+        continue;
+      }
+
+      if (!Number.isFinite(enemy.x) || !Number.isFinite(enemy.y)) {
+        continue;
+      }
+
+      const dx = enemy.x - originX;
+      const dy = enemy.y - originY;
+      const distanceSq = dx * dx + dy * dy;
+      const effectiveRadius = this.resolveEnemyCollisionRadius(enemy);
+      const threshold = radius + effectiveRadius;
+      if (distanceSq > threshold * threshold) {
+        continue;
+      }
+
+      const distance = Math.sqrt(distanceSq);
+      const falloff = disableFalloff ? 1 : 1 - Math.min(distance / radius, 1);
+      const scaledDamage = Math.max(0, damage * falloff);
+      if (scaledDamage <= 0) {
+        continue;
+      }
+
+      if (typeof enemy.takeDamage === 'function') {
+        try {
+          enemy.takeDamage(scaledDamage, { source: boss, type: 'boss-area' });
+        } catch (error) {
+          // ignore individual enemy damage errors
+        }
+      } else if (enemiesSystem && typeof enemiesSystem.applyDamage === 'function') {
+        enemiesSystem.applyDamage(enemy, scaledDamage);
+      }
+
+      let knockback = 0;
+      if (Number.isFinite(force) && distance > 0) {
+        const impulse = (force * falloff) / Math.max(enemy.mass || 1, 1);
+        const nx = distance > 0 ? dx / Math.max(distance, 0.001) : 0;
+        const ny = distance > 0 ? dy / Math.max(distance, 0.001) : 0;
+        enemy.vx += nx * impulse;
+        enemy.vy += ny * impulse;
+        knockback = impulse;
+      }
+
+      summary.hits.push({
+        enemy,
+        damage: scaledDamage,
+        distance,
+        falloff,
+        knockback,
+      });
+    }
+
+    if (player && player.position && Number.isFinite(player.position.x) && Number.isFinite(player.position.y)) {
+      const playerContext = this.buildPlayerCollisionContext(player);
+      const playerRadius = playerContext.collisionRadius;
+      if (playerRadius > 0) {
+        const dx = player.position.x - originX;
+        const dy = player.position.y - originY;
+        const distanceSq = dx * dx + dy * dy;
+        const threshold = radius + playerRadius;
+
+        if (distanceSq <= threshold * threshold) {
+          const distance = Math.sqrt(distanceSq);
+          const falloff = disableFalloff ? 1 : 1 - Math.min(distance / radius, 1);
+          const scaledDamage = Math.max(0, Math.floor(damage * falloff));
+          const nx = distance > 0 ? dx / Math.max(distance, 0.001) : 0;
+          const ny = distance > 0 ? dy / Math.max(distance, 0.001) : 0;
+          const playerMass = playerContext.shieldActive
+            ? CONSTANTS.SHIP_MASS * Math.max(playerContext.impactProfile.forceMultiplier, 1)
+            : CONSTANTS.SHIP_MASS;
+
+          const playerResult = {
+            player,
+            distance,
+            falloff,
+            damage: scaledDamage,
+            knockback: 0,
+          };
+
+          if (Number.isFinite(force) && distance > 0) {
+            const impulse = (force * falloff) / Math.max(playerMass, 1);
+            player.velocity.vx += nx * impulse;
+            player.velocity.vy += ny * impulse;
+            playerResult.knockback = impulse;
+          }
+
+          if (
+            scaledDamage > 0 &&
+            (!player.invulnerableTimer || player.invulnerableTimer <= 0)
+          ) {
+            const remaining =
+              typeof player.takeDamage === 'function'
+                ? player.takeDamage(scaledDamage)
+                : null;
+            playerResult.remainingHealth =
+              typeof remaining === 'number' ? remaining : null;
+
+            if (typeof player.setInvulnerableTimer === 'function') {
+              player.setInvulnerableTimer(0.4);
+            } else {
+              player.invulnerableTimer = 0.4;
+            }
+
+            if (typeof gameEvents !== 'undefined') {
+              gameEvents.emit('player-took-damage', {
+                damage: scaledDamage,
+                remaining,
+                max: player.maxHealth,
+                position: { ...player.position },
+                playerPosition: { x: player.position.x, y: player.position.y },
+                damageSource: { x: originX, y: originY },
+              });
+            }
+
+            if (typeof remaining === 'number' && remaining <= 0) {
+              playerResult.playerDied = true;
+            }
+          } else {
+            playerResult.skipped = true;
+          }
+
+          summary.playerHit = playerResult;
+        }
+      }
+    }
+
+    if (boss) {
+      this.handleBossCollisionFeedback('boss-area', {
+        boss,
+        player: summary.playerHit?.player ?? player ?? null,
+        damage,
+        overlap: null,
+        relativeSpeed: null,
+        impactPosition: summary.position,
+        screenShake: payload.screenShake || null,
+      });
+    } else {
+      this.emitBossPhysicsEvent('boss-area-damage', {
+        type: 'boss-area',
+        position: summary.position,
+        radius,
+        damage,
+        hits: summary.hits.length,
+      });
+    }
+
+    return summary;
   }
 
   processPlayerCollisions(player, enemiesSystem) {
@@ -1133,6 +1984,9 @@ class PhysicsSystem {
     this._snapshotFallbackWarningIssued = false;
     this._handledMineExplosions = new WeakSet();
     this._handledMineExplosionIds.clear();
+    this.activeBosses.clear();
+    this.bossCollisionState.clear();
+    this.effectsService = this.dependencies.effects || null;
     this.refreshEnemyReference({ force: true });
 
     // Reset performance metrics
