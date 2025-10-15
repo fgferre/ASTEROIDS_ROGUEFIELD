@@ -233,6 +233,10 @@ class EnemySystem {
     bus.on('boss-defeated', (data) => {
       this.handleBossDefeated(data);
     });
+
+    bus.on('boss-attack', (data) => {
+      this.handleBossAttackPayload(data);
+    });
   }
 
   refreshInjectedServices({ force = false, suppressWarnings = false } = {}) {
@@ -2958,6 +2962,11 @@ class EnemySystem {
       return;
     }
 
+    const physics = this.getCachedPhysics();
+    if (physics && typeof physics.clearBossPhysicsState === 'function') {
+      physics.clearBossPhysicsState(boss);
+    }
+
     const waveNumber = Number.isFinite(data.wave)
       ? data.wave
       : boss.wave ?? this.waveState?.current ?? null;
@@ -3005,6 +3014,72 @@ class EnemySystem {
     }
 
     this.emitWaveStateUpdate(true);
+  }
+
+  handleBossAttackPayload(data = {}) {
+    if (!data || data.processedBy === 'physics') {
+      return;
+    }
+
+    const physics = this.getCachedPhysics();
+    if (!physics) {
+      return;
+    }
+
+    const attackType =
+      data.type ||
+      data.attackType ||
+      data.event ||
+      data.kind ||
+      data.mode ||
+      null;
+
+    const boss = this.resolveBossReference(data) || data.boss || null;
+    const player = data.player || this.getCachedPlayer();
+
+    const payload = {
+      ...data,
+      boss,
+      player,
+      enemiesSystem: this,
+    };
+
+    if (!attackType && !payload.radius && !payload.knockback) {
+      return;
+    }
+
+    switch (attackType) {
+      case 'charge':
+      case 'charge-impact':
+      case 'charge-collision':
+      case 'boss-charge':
+        if (typeof physics.handleBossChargeCollision === 'function') {
+          physics.handleBossChargeCollision(payload);
+        }
+        break;
+      case 'area':
+      case 'area-damage':
+      case 'nova':
+      case 'shockwave':
+      case 'boss-area':
+        if (typeof physics.applyBossAreaDamage === 'function') {
+          physics.applyBossAreaDamage(payload);
+        }
+        break;
+      default:
+        if (
+          payload.collisionType === 'boss-charge' &&
+          typeof physics.handleBossChargeCollision === 'function'
+        ) {
+          physics.handleBossChargeCollision(payload);
+          break;
+        }
+
+        if (payload.radius && typeof physics.applyBossAreaDamage === 'function') {
+          physics.applyBossAreaDamage(payload);
+        }
+        break;
+    }
   }
 
   handleEnemyProjectile(data = null) {

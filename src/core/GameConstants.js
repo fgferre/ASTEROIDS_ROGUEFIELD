@@ -1136,6 +1136,23 @@ export const BOSS_CONFIG = Object.freeze({
   phaseColors: Object.freeze(['#ff6b6b', '#f9c74f', '#4d96ff']),
 });
 
+export const BOSS_PHYSICS_CONFIG = Object.freeze({
+  spatialPadding: 24,
+  collisionPadding: 18,
+  contactKnockback: 140,
+  contactCooldownMs: 140,
+  chargeKnockback: 520,
+  chargeBossSlow: 320,
+  chargeDamageBonus: 18,
+  chargeCooldownMs: 260,
+  areaDamage: 48,
+  areaForce: 360,
+  areaRadiusMultiplier: 2.35,
+  contactShake: Object.freeze({ intensity: 10, duration: 0.35 }),
+  chargeShake: Object.freeze({ intensity: 16, duration: 0.6 }),
+  areaShake: Object.freeze({ intensity: 12, duration: 0.45 }),
+});
+
 // === XP ORBS ===
 export const XP_ORB_BASE_VALUE = 5;
 export const XP_ORB_MAX_PER_CLASS = 100;
