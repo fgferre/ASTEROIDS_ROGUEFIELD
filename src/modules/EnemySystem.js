@@ -29,6 +29,7 @@ class EnemySystem {
       progression: this.dependencies.progression || null,
       xpOrbs: this.dependencies['xp-orbs'] || null,
       physics: this.dependencies.physics || null,
+      combat: this.dependencies.combat || null,
       healthHearts: this.dependencies.healthHearts || null,
       random: this.dependencies.random || null,
     };
@@ -53,15 +54,15 @@ class EnemySystem {
     this.sessionActive = false;
     this.lastWaveBroadcast = null;
 
-    this.activeAsteroidCache = [];
-    this.activeAsteroidCacheDirty = true;
+    this.activeEnemyCache = [];
+    this.activeEnemyCacheDirty = true;
     this.usesAsteroidPool = false;
     this._nextAsteroidPoolId = 1;
     this._snapshotFallbackWarningIssued = false;
 
     // Factory (optional - new architecture)
     this.factory = null;
-    this.useFactory = false; // Feature flag for gradual migration - DISABLED (pool conflicts)
+    this.useFactory = true; // Factory path enabled for runtime spawns
 
     // Managers (new architecture)
     this.waveManager = null;
@@ -80,7 +81,7 @@ class EnemySystem {
     }
 
     this.missingDependencyWarnings = new Set();
-    this.deferredDependencyWarnings = new Set(['world']);
+    this.deferredDependencyWarnings = new Set(['world', 'combat']);
 
     this.setupAsteroidPoolIntegration();
     this.setupEnemyFactory(); // Initialize factory (optional)
@@ -191,6 +192,14 @@ class EnemySystem {
       this.syncPhysicsIntegration(true);
     });
 
+    gameEvents.on('enemy-fired', (data) => {
+      this.handleEnemyProjectile(data);
+    });
+
+    gameEvents.on('mine-exploded', (data) => {
+      this.handleMineExplosion(data);
+    });
+
     // NEW: Integrate RewardManager with enemy destruction
     if (this.useManagers) {
       gameEvents.on('enemy-destroyed', (data) => {
@@ -208,6 +217,7 @@ class EnemySystem {
     this.updateServiceCache('progression', 'progression', options);
     this.updateServiceCache('xpOrbs', 'xp-orbs', options);
     this.updateServiceCache('physics', 'physics', options);
+    this.updateServiceCache('combat', 'combat', options);
     this.updateServiceCache('healthHearts', 'healthHearts', options);
     const previousRandom = this.services.random;
     this.updateServiceCache('random', 'random', options);
@@ -532,7 +542,7 @@ class EnemySystem {
         });
       }
 
-      console.log('[EnemySystem] EnemyFactory initialized (optional - not active yet)');
+      console.log('[EnemySystem] EnemyFactory initialized (factory-enabled)');
     } catch (error) {
       console.warn('[EnemySystem] Failed to initialize EnemyFactory', error);
       this.factory = null;
@@ -654,14 +664,27 @@ class EnemySystem {
       const enemy = this.factory.create(type, config);
       if (enemy) {
         this.assignAsteroidPoolId(enemy, config?.poolId);
-        this.asteroids.push(enemy);
-        this.invalidateActiveAsteroidCache();
+        this.registerActiveEnemy(enemy, { skipDuplicateCheck: true });
       }
       return enemy;
     } catch (error) {
       console.error('[EnemySystem] Factory creation failed:', error);
       return null;
     }
+  }
+
+  registerActiveEnemy(enemy, { skipDuplicateCheck = false } = {}) {
+    if (!enemy) {
+      return null;
+    }
+
+    if (!skipDuplicateCheck && this.asteroids.includes(enemy)) {
+      return enemy;
+    }
+
+    this.asteroids.push(enemy);
+    this.invalidateActiveEnemyCache();
+    return enemy;
   }
 
   releaseAsteroid(asteroid) {
@@ -699,7 +722,7 @@ class EnemySystem {
     }
 
     this.asteroids.length = 0;
-    this.invalidateActiveAsteroidCache();
+    this.invalidateActiveEnemyCache();
   }
 
   getCachedPlayer() {
@@ -771,6 +794,11 @@ class EnemySystem {
     return this.services.physics;
   }
 
+  getCachedCombat() {
+    this.refreshInjectedServices();
+    return this.services.combat;
+  }
+
   getCachedHealthHearts() {
     this.refreshInjectedServices();
     return this.services.healthHearts;
@@ -819,32 +847,32 @@ class EnemySystem {
     delete asteroid[ASTEROID_POOL_ID];
   }
 
-  invalidateActiveAsteroidCache() {
-    this.activeAsteroidCacheDirty = true;
+  invalidateActiveEnemyCache() {
+    this.activeEnemyCacheDirty = true;
   }
 
-  rebuildActiveAsteroidCache() {
-    if (!this.activeAsteroidCacheDirty) {
+  rebuildActiveEnemyCache() {
+    if (!this.activeEnemyCacheDirty) {
       return;
     }
 
-    if (!Array.isArray(this.activeAsteroidCache)) {
-      this.activeAsteroidCache = [];
+    if (!Array.isArray(this.activeEnemyCache)) {
+      this.activeEnemyCache = [];
     }
 
-    this.activeAsteroidCache.length = 0;
+    this.activeEnemyCache.length = 0;
 
     for (let i = 0; i < this.asteroids.length; i += 1) {
       const asteroid = this.asteroids[i];
       if (asteroid && !asteroid.destroyed) {
-        this.activeAsteroidCache.push(asteroid);
+        this.activeEnemyCache.push(asteroid);
       }
     }
 
-    this.activeAsteroidCacheDirty = false;
+    this.activeEnemyCacheDirty = false;
   }
 
-  forEachActiveAsteroid(callback) {
+  forEachActiveEnemy(callback) {
     if (typeof callback !== 'function') {
       return;
     }
@@ -855,6 +883,20 @@ class EnemySystem {
         callback(asteroid);
       }
     }
+  }
+
+  // Backward compatibility with legacy API
+  forEachActiveAsteroid(callback) {
+    if (
+      typeof process !== 'undefined' &&
+      process?.env?.NODE_ENV === 'development'
+    ) {
+      console.warn(
+        '[EnemySystem] forEachActiveAsteroid is deprecated. Use forEachActiveEnemy instead.'
+      );
+    }
+
+    this.forEachActiveEnemy(callback);
   }
 
   createInitialWaveState() {
@@ -976,7 +1018,7 @@ class EnemySystem {
 
       const allAsteroidsKilled =
         wave.asteroidsKilled >= wave.totalAsteroids &&
-        this.getAsteroidCount() === 0;
+        this.getActiveEnemyCount() === 0;
 
       if (wave.timeRemaining <= 0 || allAsteroidsKilled) {
         this.completeCurrentWave();
@@ -1141,7 +1183,7 @@ class EnemySystem {
 
     return (
       wave.asteroidsSpawned < wave.totalAsteroids &&
-      this.getAsteroidCount() < CONSTANTS.MAX_ASTEROIDS_ON_SCREEN
+      this.getActiveEnemyCount() < CONSTANTS.MAX_ASTEROIDS_ON_SCREEN
     );
   }
 
@@ -1220,8 +1262,7 @@ class EnemySystem {
       randomScope: 'spawn',
     });
 
-    this.asteroids.push(asteroid);
-    this.invalidateActiveAsteroidCache();
+    this.registerActiveEnemy(asteroid);
 
     if (this.waveState && this.waveState.isActive) {
       this.waveState.asteroidsSpawned += 1;
@@ -1274,7 +1315,7 @@ class EnemySystem {
     const createFragments = options.createFragments !== false;
 
     asteroid.destroyed = true;
-    this.invalidateActiveAsteroidCache();
+        this.invalidateActiveEnemyCache();
 
       const fragmentDescriptors = createFragments
       ? asteroid.generateFragments()
@@ -1297,7 +1338,7 @@ class EnemySystem {
           random: fragmentRandom.random,
           randomScope: 'fragments',
         });
-        this.asteroids.push(fragment);
+        this.registerActiveEnemy(fragment);
         fragments.push(fragment);
       });
 
@@ -1340,7 +1381,7 @@ class EnemySystem {
     if (this.waveState && this.waveState.isActive) {
       const allAsteroidsKilled =
         this.waveState.asteroidsKilled >= this.waveState.totalAsteroids &&
-        this.getAsteroidCount() === 0;
+        this.getActiveEnemyCount() === 0;
 
       if (allAsteroidsKilled && this.waveState.timeRemaining > 0) {
         this.completeCurrentWave();
@@ -1682,23 +1723,51 @@ class EnemySystem {
 
     if (removed > 0) {
       this.asteroids = remaining;
-      this.invalidateActiveAsteroidCache();
+      this.invalidateActiveEnemyCache();
     }
   }
 
   // === GETTERS PÚBLICOS ===
-  getAsteroids() {
-    this.rebuildActiveAsteroidCache();
-    return this.activeAsteroidCache;
+  getActiveEnemies() {
+    this.rebuildActiveEnemyCache();
+    return this.activeEnemyCache;
   }
 
-  getAllAsteroids() {
+  getActiveEnemiesByType(type) {
+    const enemies = this.getActiveEnemies();
+    if (!type || typeof type !== 'string') {
+      return enemies;
+    }
+
+    const normalized = type.toLowerCase();
+    return enemies.filter((enemy) => {
+      const enemyType = typeof enemy?.type === 'string'
+        ? enemy.type.toLowerCase()
+        : null;
+      return enemyType === normalized;
+    });
+  }
+
+  getAllEnemies() {
     return [...this.asteroids];
   }
 
+  getActiveEnemyCount() {
+    this.rebuildActiveEnemyCache();
+    return this.activeEnemyCache.length;
+  }
+
+  // === LEGACY COMPATIBILITY HELPERS ===
+  getAsteroids() {
+    return this.getActiveEnemies();
+  }
+
+  getAllAsteroids() {
+    return this.getAllEnemies();
+  }
+
   getAsteroidCount() {
-    this.rebuildActiveAsteroidCache();
-    return this.activeAsteroidCache.length;
+    return this.getActiveEnemyCount();
   }
 
   render(ctx) {
@@ -1961,11 +2030,11 @@ class EnemySystem {
       for (let i = 0; i < asteroidSnapshots.length; i += 1) {
         const restored = this.applyAsteroidSnapshot(asteroidSnapshots[i]);
         if (restored) {
-          this.asteroids.push(restored);
+          this.registerActiveEnemy(restored, { skipDuplicateCheck: true });
         }
       }
 
-      this.invalidateActiveAsteroidCache();
+      this.invalidateActiveEnemyCache();
       this.syncPhysicsIntegration(true);
       this.emitWaveStateUpdate(true);
       this._snapshotFallbackWarningIssued = false;
@@ -2009,7 +2078,7 @@ class EnemySystem {
   reset() {
     this.releaseAllAsteroidsToPool();
     this.asteroids = [];
-    this.invalidateActiveAsteroidCache();
+    this.invalidateActiveEnemyCache();
     this.spawnTimer = 0;
     this._nextAsteroidPoolId = 1;
     this.waveState = this.createInitialWaveState();
@@ -2036,11 +2105,12 @@ class EnemySystem {
       progression: null,
       xpOrbs: null,
       physics: null,
+      combat: null,
       healthHearts: null,
       random: null,
     };
-    this.activeAsteroidCache = [];
-    this.activeAsteroidCacheDirty = true;
+    this.activeEnemyCache = [];
+    this.activeEnemyCacheDirty = true;
     this.randomScopes = null;
     this.randomSequences = null;
     this._nextAsteroidPoolId = 1;
@@ -2134,6 +2204,65 @@ class EnemySystem {
 
   getSessionStats() {
     return { ...this.sessionStats };
+  }
+
+  handleEnemyProjectile(data = null) {
+    if (!data) {
+      return;
+    }
+
+    const combat = this.getCachedCombat();
+
+    if (combat) {
+      if (typeof combat.handleEnemyProjectile === 'function') {
+        combat.handleEnemyProjectile(data);
+        return;
+      }
+
+      if (typeof combat.queueEnemyProjectile === 'function') {
+        combat.queueEnemyProjectile(data);
+        return;
+      }
+
+      if (typeof combat.spawnEnemyProjectile === 'function') {
+        combat.spawnEnemyProjectile(data);
+        return;
+      }
+    }
+
+    if (typeof gameEvents !== 'undefined') {
+      gameEvents.emit('combat-enemy-projectile', data);
+    }
+  }
+
+  handleMineExplosion(data = null) {
+    if (!data || !data.position) {
+      return;
+    }
+
+    const physics = this.getCachedPhysics();
+    if (physics) {
+      if (typeof physics.handleMineExplosion === 'function') {
+        physics.handleMineExplosion(data);
+        return;
+      }
+
+      if (typeof physics.applyAreaDamage === 'function') {
+        physics.applyAreaDamage(data);
+        return;
+      }
+
+      if (typeof physics.queueAreaDamage === 'function') {
+        physics.queueAreaDamage(data);
+        return;
+      }
+    }
+
+    this.handleShieldExplosionDamage({
+      position: data.position,
+      radius: data.radius,
+      damage: data.damage,
+    });
   }
 
   handleShieldExplosionDamage(data) {

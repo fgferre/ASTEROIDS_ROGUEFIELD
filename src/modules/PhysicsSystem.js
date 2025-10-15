@@ -158,6 +158,25 @@ class PhysicsSystem {
       return;
     }
 
+    if (typeof enemySystem.forEachActiveEnemy === 'function') {
+      enemySystem.forEachActiveEnemy((asteroid) => {
+        this.registerAsteroid(asteroid);
+      });
+      this.bootstrapCompleted = true;
+      return;
+    }
+
+    if (typeof enemySystem.getActiveEnemies === 'function') {
+      const asteroids = enemySystem.getActiveEnemies();
+      if (Array.isArray(asteroids) && asteroids.length) {
+        asteroids.forEach((asteroid) => {
+          this.registerAsteroid(asteroid);
+        });
+      }
+      this.bootstrapCompleted = true;
+      return;
+    }
+
     if (typeof enemySystem.forEachActiveAsteroid === 'function') {
       enemySystem.forEachActiveAsteroid((asteroid) => {
         this.registerAsteroid(asteroid);

@@ -1737,7 +1737,11 @@ export default class GameSessionService {
     }
 
     const asteroids =
-      typeof enemies.getAsteroids === 'function' ? enemies.getAsteroids() : [];
+      typeof enemies.getActiveEnemies === 'function'
+        ? enemies.getActiveEnemies()
+        : typeof enemies.getAsteroids === 'function'
+        ? enemies.getAsteroids()
+        : [];
 
     const width = Number.isFinite(canvas.width) ? canvas.width : CONSTANTS.GAME_WIDTH;
     const height = Number.isFinite(canvas.height) ? canvas.height : CONSTANTS.GAME_HEIGHT;
