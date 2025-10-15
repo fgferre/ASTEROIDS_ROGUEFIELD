@@ -1153,6 +1153,169 @@ export const BOSS_PHYSICS_CONFIG = Object.freeze({
   areaShake: Object.freeze({ intensity: 12, duration: 0.45 }),
 });
 
+export const BOSS_EFFECTS_PRESETS = Object.freeze({
+  entrance: Object.freeze({
+    swirl: Object.freeze({
+      count: 48,
+      innerRadius: 42,
+      outerRadius: 120,
+      speed: Object.freeze({ min: 80, max: 150 }),
+      size: Object.freeze({ min: 2.2, max: 3.4 }),
+      life: Object.freeze({ min: 0.5, max: 0.8 }),
+    }),
+    burst: Object.freeze({
+      rings: 2,
+      particlesPerRing: 22,
+      radiusStep: 44,
+      speed: Object.freeze({ min: 140, max: 220 }),
+      size: Object.freeze({ min: 2.8, max: 4.2 }),
+      life: Object.freeze({ min: 0.45, max: 0.75 }),
+    }),
+    dust: Object.freeze({
+      count: 28,
+      speed: Object.freeze({ min: 40, max: 90 }),
+      size: Object.freeze({ min: 3.2, max: 5.2 }),
+      life: Object.freeze({ min: 0.8, max: 1.4 }),
+    }),
+    colors: Object.freeze({
+      core: '#ff6b9c',
+      accent: '#ffe066',
+      trail: '#ff9f1c',
+      smoke: 'rgba(255, 255, 255, 0.24)',
+      flash: 'rgba(255, 160, 220, 0.45)',
+    }),
+    shockwave: Object.freeze({
+      radius: 420,
+      duration: 0.75,
+      baseWidth: 34,
+      maxAlpha: 0.7,
+      shadowColor: 'rgba(255, 120, 200, 0.45)',
+      shadowBlur: 45,
+      fillColor: 'rgba(255, 120, 200, 0.12)',
+      widthFade: 0.7,
+      easingPower: 1.3,
+    }),
+    screenFlash: Object.freeze({
+      color: 'rgba(255, 140, 220, 0.4)',
+      duration: 0.45,
+      intensity: 0.32,
+    }),
+    freezeFrame: Object.freeze({ duration: 0.18, fade: 0.2 }),
+    slowMotion: Object.freeze({ scale: 0.55, hold: 0.18, duration: 0.65 }),
+  }),
+  phaseTransition: Object.freeze({
+    burst: Object.freeze({
+      count: 48,
+      speed: Object.freeze({ min: 160, max: 280 }),
+      size: Object.freeze({ min: 2.2, max: 3.4 }),
+      life: Object.freeze({ min: 0.35, max: 0.65 }),
+    }),
+    petals: Object.freeze({
+      count: 16,
+      radius: 110,
+      angularJitter: 0.3,
+      speed: Object.freeze({ min: 60, max: 120 }),
+      size: Object.freeze({ min: 2.6, max: 3.6 }),
+      life: Object.freeze({ min: 0.4, max: 0.75 }),
+    }),
+    embers: Object.freeze({
+      count: 24,
+      speed: Object.freeze({ min: 35, max: 70 }),
+      size: Object.freeze({ min: 2.4, max: 3.4 }),
+      life: Object.freeze({ min: 1.1, max: 1.6 }),
+    }),
+    colors: Object.freeze({
+      core: '#ffd166',
+      accent: '#5cc8ff',
+      smoke: 'rgba(255, 255, 255, 0.28)',
+      flash: 'rgba(255, 255, 255, 0.6)',
+    }),
+    shockwave: Object.freeze({
+      radius: 360,
+      duration: 0.6,
+      baseWidth: 26,
+      maxAlpha: 0.65,
+      shadowColor: 'rgba(255, 255, 255, 0.45)',
+      shadowBlur: 35,
+      fillColor: 'rgba(255, 255, 255, 0.12)',
+      widthFade: 0.65,
+      easingPower: 1.4,
+    }),
+    screenFlash: Object.freeze({
+      color: 'rgba(255, 255, 255, 0.55)',
+      duration: 0.36,
+      intensity: 0.28,
+    }),
+    freezeFrame: Object.freeze({ duration: 0.3, fade: 0.25 }),
+    slowMotion: Object.freeze({ scale: 0.6, hold: 0.16, duration: 0.6 }),
+  }),
+  defeated: Object.freeze({
+    debris: Object.freeze({
+      count: 60,
+      speed: Object.freeze({ min: 180, max: 320 }),
+      size: Object.freeze({ min: 2.8, max: 4.6 }),
+      life: Object.freeze({ min: 0.9, max: 1.4 }),
+    }),
+    sparks: Object.freeze({
+      count: 90,
+      speed: Object.freeze({ min: 260, max: 400 }),
+      size: Object.freeze({ min: 2.4, max: 3.8 }),
+      life: Object.freeze({ min: 0.5, max: 0.85 }),
+    }),
+    embers: Object.freeze({
+      count: 32,
+      speed: Object.freeze({ min: 30, max: 60 }),
+      size: Object.freeze({ min: 3.2, max: 4.4 }),
+      life: Object.freeze({ min: 1.5, max: 2.2 }),
+    }),
+    smoke: Object.freeze({
+      count: 26,
+      speed: Object.freeze({ min: 20, max: 55 }),
+      size: Object.freeze({ min: 18, max: 26 }),
+      life: Object.freeze({ min: 1.6, max: 2.8 }),
+    }),
+    colors: Object.freeze({
+      core: '#ff6b9c',
+      accent: '#ffe066',
+      flash: '#ffffff',
+      smoke: 'rgba(240, 240, 255, 0.25)',
+    }),
+    shockwave: Object.freeze({
+      radius: 520,
+      duration: 0.95,
+      baseWidth: 42,
+      maxAlpha: 0.8,
+      shadowColor: 'rgba(255, 255, 255, 0.5)',
+      shadowBlur: 50,
+      fillColor: 'rgba(255, 255, 255, 0.18)',
+      widthFade: 0.7,
+      easingPower: 1.2,
+    }),
+    secondaryShockwave: Object.freeze({
+      radius: 360,
+      duration: 0.7,
+      baseWidth: 22,
+      maxAlpha: 0.55,
+      fillColor: 'rgba(255, 170, 220, 0.18)',
+      widthFade: 0.6,
+      easingPower: 1.6,
+    }),
+    screenFlash: Object.freeze({
+      color: 'rgba(255, 255, 255, 0.7)',
+      duration: 0.6,
+      intensity: 0.5,
+    }),
+    freezeFrame: Object.freeze({ duration: 0.5, fade: 0.35 }),
+    slowMotion: Object.freeze({ scale: 0.38, hold: 0.32, duration: 1.1 }),
+  }),
+});
+
+export const BOSS_SCREEN_SHAKES = Object.freeze({
+  spawn: Object.freeze({ intensity: 18, duration: 0.65 }),
+  phaseChange: Object.freeze({ intensity: 14, duration: 0.5 }),
+  defeated: Object.freeze({ intensity: 24, duration: 0.85 }),
+});
+
 // === XP ORBS ===
 export const XP_ORB_BASE_VALUE = 5;
 export const XP_ORB_MAX_PER_CLASS = 100;
