@@ -1795,11 +1795,11 @@ class EnemySystem {
       position: { x: boss.x ?? 0, y: boss.y ?? 0 },
     };
 
-    if (typeof gameEvents !== 'undefined') {
+    if (typeof gameEvents !== 'undefined' && typeof gameEvents.emit === 'function') {
       gameEvents.emit('boss-spawned', payload);
+    } else {
+      this.handleBossSpawned(payload);
     }
-
-    this.handleBossSpawned(payload);
 
     return boss;
   }
