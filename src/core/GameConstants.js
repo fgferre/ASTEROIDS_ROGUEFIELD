@@ -1258,6 +1258,7 @@ export const ASTEROIDS_PER_WAVE_BASE = 4;
 export const ASTEROIDS_PER_WAVE_MULTIPLIER = 1.3;
 export const WAVE_DURATION = 60; // segundos
 export const WAVE_BREAK_TIME = 10; // segundos
+export const WAVE_BOSS_INTERVAL = 5;
 export const MAX_ASTEROIDS_ON_SCREEN = 20;
 
 console.log('[GameConstants] Loaded');
