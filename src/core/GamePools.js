@@ -18,6 +18,7 @@ import { ObjectPool, TTLObjectPool } from './ObjectPool.js';
 import { Drone } from '../modules/enemies/types/Drone.js';
 import { Mine } from '../modules/enemies/types/Mine.js';
 import { Hunter } from '../modules/enemies/types/Hunter.js';
+import { BossEnemy } from '../modules/enemies/types/BossEnemy.js';
 
 /**
  * Game object pool registry.
@@ -35,6 +36,7 @@ export class GamePools {
   static drones = null;
   static mines = null;
   static hunters = null;
+  static bosses = null;
   static xpOrbs = null;
   static shockwaves = null;
   static tempObjects = null;
@@ -59,6 +61,7 @@ export class GamePools {
       drones: { initial: 10, max: 30 },
       mines: { initial: 5, max: 15 },
       hunters: { initial: 5, max: 12 },
+      bosses: { initial: 1, max: 3 },
       xpOrbs: { initial: 30, max: 200 },
       shockwaves: { initial: 5, max: 20 },
       tempObjects: { initial: 10, max: 50 },
@@ -73,6 +76,7 @@ export class GamePools {
     this.initializeDronePool(config.drones);
     this.initializeMinePool(config.mines);
     this.initializeHunterPool(config.hunters);
+    this.initializeBossPool(config.bosses);
     this.initializeXPOrbPool(config.xpOrbs);
     this.initializeShockwavePool(config.shockwaves);
     this.initializeTempObjectPool(config.tempObjects);
@@ -397,6 +401,39 @@ export class GamePools {
   }
 
   /**
+   * Initializes boss enemy pool.
+   *
+   * @private
+   * @param {Object} config - Pool configuration
+   */
+  static initializeBossPool(config) {
+    this.bosses = new ObjectPool(
+      // Factory function
+      () => {
+        const boss = new BossEnemy();
+        if (typeof boss.resetForPool === 'function') {
+          boss.resetForPool();
+        }
+        return boss;
+      },
+
+      // Reset function
+      (boss) => {
+        if (!boss) return;
+        if (typeof boss.resetForPool === 'function') {
+          boss.resetForPool();
+        } else {
+          boss.alive = false;
+          boss.initialized = false;
+        }
+      },
+
+      config.initial,
+      config.max
+    );
+  }
+
+  /**
    * Overrides asteroid pool lifecycle with system-provided handlers.
    *
    * @param {Object} lifecycle - Lifecycle configuration
@@ -625,6 +662,7 @@ export class GamePools {
       this.drones,
       this.mines,
       this.hunters,
+      this.bosses,
       this.xpOrbs,
       this.shockwaves,
       this.tempObjects
@@ -651,6 +689,7 @@ export class GamePools {
       this.drones,
       this.mines,
       this.hunters,
+      this.bosses,
       this.xpOrbs,
       this.shockwaves,
       this.tempObjects
@@ -683,6 +722,7 @@ export class GamePools {
       drones: this.drones?.getStats() || null,
       mines: this.mines?.getStats() || null,
       hunters: this.hunters?.getStats() || null,
+      bosses: this.bosses?.getStats() || null,
       xpOrbs: this.xpOrbs?.getStats() || null,
       shockwaves: this.shockwaves?.getStats() || null,
       tempObjects: this.tempObjects?.getStats() || null
@@ -714,6 +754,7 @@ export class GamePools {
       drones: this.drones,
       mines: this.mines,
       hunters: this.hunters,
+      bosses: this.bosses,
       xpOrbs: this.xpOrbs,
       shockwaves: this.shockwaves,
       tempObjects: this.tempObjects
@@ -749,6 +790,7 @@ export class GamePools {
     this.drones = null;
     this.mines = null;
     this.hunters = null;
+    this.bosses = null;
     this.xpOrbs = null;
     this.shockwaves = null;
     this.tempObjects = null;
@@ -803,7 +845,8 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
     validate: () => GamePools.validateAll(),
     debugLog: () => GamePools.debugLog(),
     releaseAll: () => GamePools.releaseAll(),
-    autoManage: () => GamePools.autoManageAll()
+    autoManage: () => GamePools.autoManageAll(),
+    bosses: () => GamePools.bosses
   };
 }
 
@@ -815,6 +858,7 @@ export const {
   drones: DronePool,
   mines: MinePool,
   hunters: HunterPool,
+  bosses: BossPool,
   xpOrbs: XPOrbPool,
   shockwaves: ShockwavePool,
   tempObjects: TempObjectPool
