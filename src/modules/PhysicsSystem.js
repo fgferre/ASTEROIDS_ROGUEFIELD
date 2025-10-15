@@ -9,8 +9,14 @@ class PhysicsSystem {
     this.dependencies = normalizeDependencies(dependencies);
     this.enemySystem = null;
     this.cellSize = CONSTANTS.PHYSICS_CELL_SIZE || 96;
-    this.maxAsteroidRadius = this.computeMaxAsteroidRadius();
-    this.activeAsteroids = new Set();
+    this.maxEnemyRadius = this.computeMaxEnemyRadius();
+    this.maxAsteroidRadius = this.maxEnemyRadius; // Legacy alias
+    const activeEnemies = new Set();
+    this.activeEnemies = activeEnemies;
+    this.activeAsteroids = activeEnemies; // Legacy alias for backward compatibility
+
+    this._handledMineExplosions = new WeakSet();
+    this._handledMineExplosionIds = new Set();
 
     // New SpatialHash-based collision system
     this.spatialHash = new SpatialHash(this.cellSize, {
@@ -20,7 +26,9 @@ class PhysicsSystem {
     });
 
     // Legacy spatial index for backward compatibility
-    this.asteroidIndex = new Map();
+    const enemyIndex = new Map();
+    this.enemyIndex = enemyIndex;
+    this.asteroidIndex = enemyIndex; // Legacy alias for backward compatibility
     this.indexDirty = false;
     this.bootstrapCompleted = false;
     this.lastSpatialHashMaintenance = performance.now();
@@ -61,15 +69,40 @@ class PhysicsSystem {
     this.bootstrapFromEnemySystem(enemySystem, { force: needsForce });
   }
 
-  computeMaxAsteroidRadius() {
-    const sizes = CONSTANTS.ASTEROID_SIZES || {};
-    const values = Object.values(sizes).filter((value) =>
-      Number.isFinite(value)
-    );
-    if (!values.length) {
+  computeMaxEnemyRadius() {
+    const radii = [];
+
+    const asteroidSizes = CONSTANTS.ASTEROID_SIZES || {};
+    for (const value of Object.values(asteroidSizes)) {
+      if (Number.isFinite(value)) {
+        radii.push(value);
+      }
+    }
+
+    const enemyTypes = CONSTANTS.ENEMY_TYPES || {};
+    for (const config of Object.values(enemyTypes)) {
+      if (!config || typeof config !== 'object') {
+        continue;
+      }
+
+      if (Number.isFinite(config.radius)) {
+        radii.push(config.radius);
+      }
+
+      if (Number.isFinite(config.explosionRadius)) {
+        radii.push(config.explosionRadius);
+      }
+
+      if (Number.isFinite(config.proximityRadius)) {
+        radii.push(config.proximityRadius);
+      }
+    }
+
+    if (!radii.length) {
       return 0;
     }
-    return Math.max(...values);
+
+    return Math.max(...radii);
   }
 
   setupEventListeners() {
@@ -77,29 +110,48 @@ class PhysicsSystem {
       return;
     }
 
-    gameEvents.on('enemy-spawned', (data) => {
-      if (!data || (data.type && data.type !== 'asteroid')) {
+    gameEvents.on('enemy-spawned', (data = {}) => {
+      const enemy = data.enemy ?? data;
+      if (!enemy || enemy.destroyed) {
         return;
       }
-      if (data.enemy) {
-        this.registerAsteroid(data.enemy);
+
+      this.registerEnemy(enemy);
+      this.updateMaxEnemyRadiusFromPayload(enemy);
+      this.updateMaxEnemyRadiusFromPayload(data);
+
+      if (Array.isArray(data.fragments)) {
+        data.fragments.forEach((fragment) => {
+          this.registerEnemy(fragment);
+          this.updateMaxEnemyRadiusFromPayload(fragment);
+        });
       }
     });
 
-    gameEvents.on('enemy-destroyed', (data) => {
-      if (!data) {
-        return;
-      }
+    gameEvents.on('enemy-destroyed', (data = {}) => {
+      const enemy = data.enemy ?? null;
 
-      if (data.enemy) {
-        this.unregisterAsteroid(data.enemy);
+      if (enemy) {
+        this.unregisterEnemy(enemy);
+        if (
+          enemy.type === 'mine' &&
+          data.triggerMineExplosion !== false &&
+          !this.hasMineExplosionBeenHandled(enemy, data.enemyId)
+        ) {
+          this.dispatchMineExplosion(enemy, data);
+        }
       }
 
       if (Array.isArray(data.fragments)) {
         data.fragments.forEach((fragment) => {
-          this.registerAsteroid(fragment);
+          this.registerEnemy(fragment);
+          this.updateMaxEnemyRadiusFromPayload(fragment);
         });
       }
+    });
+
+    gameEvents.on('mine-exploded', (payload = {}) => {
+      this.markMineExplosionHandled(payload.enemy, payload.enemyId);
     });
 
     gameEvents.on('progression-reset', () => {
@@ -160,7 +212,7 @@ class PhysicsSystem {
 
     if (typeof enemySystem.forEachActiveEnemy === 'function') {
       enemySystem.forEachActiveEnemy((asteroid) => {
-        this.registerAsteroid(asteroid);
+        this.registerEnemy(asteroid);
       });
       this.bootstrapCompleted = true;
       return;
@@ -170,7 +222,7 @@ class PhysicsSystem {
       const asteroids = enemySystem.getActiveEnemies();
       if (Array.isArray(asteroids) && asteroids.length) {
         asteroids.forEach((asteroid) => {
-          this.registerAsteroid(asteroid);
+          this.registerEnemy(asteroid);
         });
       }
       this.bootstrapCompleted = true;
@@ -179,7 +231,7 @@ class PhysicsSystem {
 
     if (typeof enemySystem.forEachActiveAsteroid === 'function') {
       enemySystem.forEachActiveAsteroid((asteroid) => {
-        this.registerAsteroid(asteroid);
+        this.registerEnemy(asteroid);
       });
       this.bootstrapCompleted = true;
       return;
@@ -189,51 +241,63 @@ class PhysicsSystem {
       const asteroids = enemySystem.getAsteroids();
       if (Array.isArray(asteroids) && asteroids.length) {
         asteroids.forEach((asteroid) => {
-          this.registerAsteroid(asteroid);
+          this.registerEnemy(asteroid);
         });
       }
       this.bootstrapCompleted = true;
     }
   }
 
-  registerAsteroid(asteroid) {
-    if (!asteroid || asteroid.destroyed) {
+  registerEnemy(enemy) {
+    if (!enemy || enemy.destroyed) {
       return;
     }
 
-    if (!this.activeAsteroids.has(asteroid)) {
-      this.activeAsteroids.add(asteroid);
+    this.clearMineExplosionTracking(enemy);
+
+    this.updateMaxEnemyRadiusFromPayload(enemy);
+
+    if (!this.activeEnemies.has(enemy)) {
+      this.activeEnemies.add(enemy);
       this.indexDirty = true;
 
       // Add to spatial hash
-      if (Number.isFinite(asteroid.x) && Number.isFinite(asteroid.y) && Number.isFinite(asteroid.radius)) {
-        this.spatialHash.insert(asteroid, asteroid.x, asteroid.y, asteroid.radius);
+      if (Number.isFinite(enemy.x) && Number.isFinite(enemy.y) && Number.isFinite(enemy.radius)) {
+        this.spatialHash.insert(enemy, enemy.x, enemy.y, enemy.radius);
       }
     }
   }
 
-  unregisterAsteroid(asteroid) {
-    if (!asteroid) {
+  registerAsteroid(asteroid) {
+    return this.registerEnemy(asteroid);
+  }
+
+  unregisterEnemy(enemy) {
+    if (!enemy) {
       return;
     }
 
-    if (this.activeAsteroids.delete(asteroid)) {
+    if (this.activeEnemies.delete(enemy)) {
       this.indexDirty = true;
 
       // Remove from spatial hash
-      this.spatialHash.remove(asteroid);
+      this.spatialHash.remove(enemy);
     }
   }
 
-  cleanupDestroyedAsteroids() {
-    if (!this.activeAsteroids.size) {
+  unregisterAsteroid(asteroid) {
+    return this.unregisterEnemy(asteroid);
+  }
+
+  cleanupDestroyedEnemies() {
+    if (!this.activeEnemies.size) {
       return;
     }
 
     const toRemove = [];
-    this.activeAsteroids.forEach((asteroid) => {
-      if (!asteroid || asteroid.destroyed) {
-        toRemove.push(asteroid);
+    this.activeEnemies.forEach((enemy) => {
+      if (!enemy || enemy.destroyed) {
+        toRemove.push(enemy);
       }
     });
 
@@ -241,11 +305,177 @@ class PhysicsSystem {
       return;
     }
 
-    toRemove.forEach((asteroid) => {
-      this.activeAsteroids.delete(asteroid);
+    toRemove.forEach((enemy) => {
+      this.activeEnemies.delete(enemy);
     });
 
     this.indexDirty = true;
+  }
+
+  cleanupDestroyedAsteroids() {
+    this.cleanupDestroyedEnemies();
+  }
+
+  updateMaxEnemyRadiusFromPayload(payload) {
+    if (!payload || typeof payload !== 'object') {
+      return;
+    }
+
+    const radiusCandidates = [];
+    const radiusKeys = ['radius', 'explosionRadius', 'proximityRadius', 'collisionRadius'];
+
+    for (let i = 0; i < radiusKeys.length; i += 1) {
+      const value = payload[radiusKeys[i]];
+      if (Number.isFinite(value)) {
+        radiusCandidates.push(value);
+      }
+    }
+
+    if (!radiusCandidates.length) {
+      return;
+    }
+
+    const candidateMax = Math.max(...radiusCandidates);
+    if (!Number.isFinite(this.maxEnemyRadius) || candidateMax > this.maxEnemyRadius) {
+      this.maxEnemyRadius = candidateMax;
+      this.maxAsteroidRadius = this.maxEnemyRadius;
+    }
+  }
+
+  dispatchMineExplosion(enemy, data = {}) {
+    if (!enemy) {
+      return;
+    }
+
+    const enemyId = data.enemyId ?? enemy.id;
+    if (this.hasMineExplosionBeenHandled(enemy, enemyId)) {
+      return;
+    }
+
+    const payload = this.buildMineExplosionPayload(enemy, data);
+    if (!payload) {
+      return;
+    }
+
+    this.markMineExplosionHandled(payload.enemy, payload.enemyId);
+
+    this.updateMaxEnemyRadiusFromPayload(payload);
+
+    const enemySystem = this.enemySystem ?? this.dependencies.enemies;
+    if (enemySystem && typeof enemySystem.handleMineExplosion === 'function') {
+      enemySystem.handleMineExplosion(payload);
+      return;
+    }
+
+    if (typeof gameEvents !== 'undefined' && typeof gameEvents.emit === 'function') {
+      gameEvents.emit('mine-exploded', payload);
+    }
+  }
+
+  buildMineExplosionPayload(enemy, data = {}) {
+    if (!enemy) {
+      return null;
+    }
+
+    const defaults = (CONSTANTS.ENEMY_TYPES && CONSTANTS.ENEMY_TYPES.mine) || {};
+    const position = data.position || {
+      x: Number.isFinite(enemy.x) ? enemy.x : 0,
+      y: Number.isFinite(enemy.y) ? enemy.y : 0,
+    };
+
+    const velocity = data.velocity || {
+      x: Number.isFinite(enemy.vx) ? enemy.vx : 0,
+      y: Number.isFinite(enemy.vy) ? enemy.vy : 0,
+    };
+
+    const radiusCandidates = [
+      data.explosionRadius,
+      enemy.explosionRadius,
+      enemy.radius,
+      defaults.explosionRadius,
+      defaults.radius,
+    ].filter((value) => Number.isFinite(value));
+
+    const damageCandidates = [
+      data.explosionDamage,
+      enemy.explosionDamage,
+      defaults.explosionDamage,
+    ].filter((value) => Number.isFinite(value));
+
+    const fallbackRadius = Number.isFinite(defaults.explosionRadius)
+      ? defaults.explosionRadius
+      : Number.isFinite(defaults.radius)
+      ? defaults.radius
+      : Number.isFinite(enemy.radius)
+      ? enemy.radius
+      : 0;
+    const radius = radiusCandidates.length
+      ? Math.max(...radiusCandidates)
+      : fallbackRadius;
+
+    const fallbackDamage = Number.isFinite(defaults.explosionDamage)
+      ? defaults.explosionDamage
+      : Number.isFinite(enemy.explosionDamage)
+      ? enemy.explosionDamage
+      : 0;
+    const damage = damageCandidates.length ? damageCandidates[0] : fallbackDamage;
+
+    return {
+      enemy,
+      enemyId: enemy.id,
+      enemyType: enemy.type || 'mine',
+      wave: data.wave ?? enemy.wave,
+      position,
+      velocity,
+      radius,
+      damage,
+      cause: data.cause ?? enemy.explosionCause?.cause ?? 'detonation',
+      context: data.context ?? enemy.explosionCause?.context ?? {},
+      source:
+        data.source ??
+        {
+          id: enemy.id,
+          type: enemy.type,
+          wave: enemy.wave,
+        },
+    };
+  }
+
+  hasMineExplosionBeenHandled(enemy, enemyId) {
+    if (enemy && this._handledMineExplosions.has(enemy)) {
+      return true;
+    }
+
+    const id = enemyId ?? enemy?.id;
+    if (id != null && this._handledMineExplosionIds.has(id)) {
+      return true;
+    }
+
+    return false;
+  }
+
+  markMineExplosionHandled(enemy, enemyId) {
+    if (enemy && typeof enemy === 'object') {
+      this._handledMineExplosions.add(enemy);
+      if (enemy.id != null) {
+        this._handledMineExplosionIds.add(enemy.id);
+      }
+    }
+
+    if (enemyId != null) {
+      this._handledMineExplosionIds.add(enemyId);
+    }
+  }
+
+  clearMineExplosionTracking(enemy, enemyId) {
+    if (enemy && this._handledMineExplosions) {
+      this._handledMineExplosions.delete(enemy);
+    }
+
+    const id = enemyId ?? enemy?.id;
+    if (id != null) {
+      this._handledMineExplosionIds.delete(id);
+    }
   }
 
   ensureSpatialIndex() {
@@ -253,9 +483,9 @@ class PhysicsSystem {
       return;
     }
 
-    if (!this.activeAsteroids.size) {
-      if (this.asteroidIndex.size) {
-        this.asteroidIndex.clear();
+    if (!this.activeEnemies.size) {
+      if (this.enemyIndex.size) {
+        this.enemyIndex.clear();
       }
       this.indexDirty = false;
       return;
@@ -265,16 +495,16 @@ class PhysicsSystem {
   }
 
   rebuildSpatialIndex() {
-    this.asteroidIndex.clear();
+    this.enemyIndex.clear();
 
-    if (!this.activeAsteroids.size) {
+    if (!this.activeEnemies.size) {
       this.indexDirty = false;
       return;
     }
 
     const cellSize = this.cellSize;
 
-    this.activeAsteroids.forEach((asteroid) => {
+    this.activeEnemies.forEach((asteroid) => {
       if (!asteroid || asteroid.destroyed) {
         return;
       }
@@ -282,10 +512,10 @@ class PhysicsSystem {
       const cellX = Math.floor(asteroid.x / cellSize);
       const cellY = Math.floor(asteroid.y / cellSize);
       const key = `${cellX}:${cellY}`;
-      let bucket = this.asteroidIndex.get(key);
+      let bucket = this.enemyIndex.get(key);
       if (!bucket) {
         bucket = [];
-        this.asteroidIndex.set(key, bucket);
+        this.enemyIndex.set(key, bucket);
       }
       bucket.push(asteroid);
     });
@@ -300,7 +530,7 @@ class PhysicsSystem {
   updateSpatialHash() {
     const now = performance.now();
 
-    for (const asteroid of this.activeAsteroids) {
+    for (const asteroid of this.activeEnemies) {
       if (asteroid.destroyed) {
         continue;
       }
@@ -348,7 +578,7 @@ class PhysicsSystem {
 
   exportState() {
     const asteroids = [];
-    for (const asteroid of this.activeAsteroids) {
+    for (const asteroid of this.activeEnemies) {
       const snapshot = this.serializeAsteroidForSnapshot(asteroid);
       if (snapshot) {
         asteroids.push(snapshot);
@@ -413,8 +643,8 @@ class PhysicsSystem {
       }
     }
 
-    this.activeAsteroids.clear();
-    this.asteroidIndex.clear();
+    this.activeEnemies.clear();
+    this.enemyIndex.clear();
     this.spatialHash.clear();
 
     let restored = 0;
@@ -466,7 +696,7 @@ class PhysicsSystem {
         }
       }
 
-      this.registerAsteroid(asteroid);
+      this.registerEnemy(asteroid);
       restored += 1;
     }
 
@@ -493,14 +723,14 @@ class PhysicsSystem {
     const startTime = performance.now();
 
     this.refreshEnemyReference();
-    this.cleanupDestroyedAsteroids();
+    this.cleanupDestroyedEnemies();
 
     // Update spatial hash with current asteroid positions
     this.updateSpatialHash();
 
-    if (!this.activeAsteroids.size) {
-      if (this.asteroidIndex.size) {
-        this.asteroidIndex.clear();
+    if (!this.activeEnemies.size) {
+      if (this.enemyIndex.size) {
+        this.enemyIndex.clear();
       }
       this.indexDirty = false;
       this.spatialHash.clear();
@@ -515,7 +745,7 @@ class PhysicsSystem {
     this.performanceMetrics.lastUpdateTime = performance.now();
   }
 
-  getNearbyAsteroids(x, y, radius) {
+  getNearbyEnemies(x, y, radius) {
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
       return [];
     }
@@ -523,11 +753,11 @@ class PhysicsSystem {
     this.performanceMetrics.spatialQueries++;
 
     // Use SpatialHash for efficient nearby object retrieval
-    const searchRadius = Math.max(radius, this.maxAsteroidRadius);
+    const searchRadius = Math.max(radius, this.maxEnemyRadius);
     const candidates = this.spatialHash.query(x, y, searchRadius, {
       filter: (obj) => {
-        // Filter for active asteroids only
-        return this.activeAsteroids.has(obj) && !obj.destroyed;
+        // Filter for active enemies only
+        return this.activeEnemies.has(obj) && !obj.destroyed;
       },
       sorted: false
     });
@@ -535,17 +765,25 @@ class PhysicsSystem {
     return candidates;
   }
 
-  forEachNearbyAsteroid(position, radius, callback) {
+  getNearbyAsteroids(x, y, radius) {
+    return this.getNearbyEnemies(x, y, radius);
+  }
+
+  forEachNearbyEnemy(position, radius, callback) {
     if (typeof callback !== 'function') {
       return;
     }
 
     const x = position?.x ?? 0;
     const y = position?.y ?? 0;
-    const candidates = this.getNearbyAsteroids(x, y, radius);
+    const candidates = this.getNearbyEnemies(x, y, radius);
     for (let i = 0; i < candidates.length; i += 1) {
       callback(candidates[i]);
     }
+  }
+
+  forEachNearbyAsteroid(position, radius, callback) {
+    this.forEachNearbyEnemy(position, radius, callback);
   }
 
   forEachBulletCollision(bullets, handler) {
@@ -553,12 +791,12 @@ class PhysicsSystem {
       return;
     }
 
-    if (!this.activeAsteroids.size) {
+    if (!this.activeEnemies.size) {
       return;
     }
 
     const bulletRadius = CONSTANTS.BULLET_SIZE || 0;
-    const maxCheckRadius = bulletRadius + this.maxAsteroidRadius;
+    const maxCheckRadius = bulletRadius + this.maxEnemyRadius;
 
     for (let i = 0; i < bullets.length; i += 1) {
       const bullet = bullets[i];
@@ -568,7 +806,7 @@ class PhysicsSystem {
 
       // Use spatial hash for efficient collision detection
       const candidates = this.spatialHash.query(bullet.x, bullet.y, maxCheckRadius, {
-        filter: (obj) => this.activeAsteroids.has(obj) && !obj.destroyed,
+        filter: (obj) => this.activeEnemies.has(obj) && !obj.destroyed,
         sorted: false
       });
 
@@ -846,14 +1084,14 @@ class PhysicsSystem {
     const context = this.buildPlayerCollisionContext(player);
     const queryRadius = Math.max(
       0,
-      context.collisionRadius + (this.maxAsteroidRadius || 0)
+      context.collisionRadius + (this.maxEnemyRadius || 0)
     );
 
     if (queryRadius <= 0) {
       return summary;
     }
 
-    const candidates = this.getNearbyAsteroids(
+    const candidates = this.getNearbyEnemies(
       position.x,
       position.y,
       queryRadius
@@ -885,14 +1123,16 @@ class PhysicsSystem {
   }
 
   reset() {
-    this.activeAsteroids.clear();
-    this.asteroidIndex.clear();
+    this.activeEnemies.clear();
+    this.enemyIndex.clear();
     this.spatialHash.clear();
     this.indexDirty = false;
     this.bootstrapCompleted = false;
     this.lastSpatialHashMaintenance = performance.now();
     this.missingEnemyWarningLogged = false;
     this._snapshotFallbackWarningIssued = false;
+    this._handledMineExplosions = new WeakSet();
+    this._handledMineExplosionIds.clear();
     this.refreshEnemyReference({ force: true });
 
     // Reset performance metrics
@@ -917,8 +1157,9 @@ class PhysicsSystem {
     return {
       ...this.performanceMetrics,
       spatialHashStats: this.spatialHash.getStats(),
-      activeAsteroids: this.activeAsteroids.size,
-      indexCells: this.asteroidIndex.size
+      activeEnemies: this.activeEnemies.size,
+      activeAsteroids: this.activeEnemies.size,
+      indexCells: this.enemyIndex.size
     };
   }
 
@@ -930,7 +1171,7 @@ class PhysicsSystem {
     const errors = [...validation.errors];
 
     // Check if all active asteroids are in spatial hash
-    for (const asteroid of this.activeAsteroids) {
+    for (const asteroid of this.activeEnemies) {
       if (!asteroid.destroyed && !this.spatialHash.objects.has(asteroid)) {
         errors.push(`Active asteroid not in spatial hash: ${asteroid.id || 'unknown'}`);
       }
@@ -944,8 +1185,8 @@ class PhysicsSystem {
   }
 
   destroy() {
-    this.activeAsteroids.clear();
-    this.asteroidIndex.clear();
+    this.activeEnemies.clear();
+    this.enemyIndex.clear();
     this.indexDirty = false;
     this.enemySystem = null;
     this.bootstrapCompleted = false;

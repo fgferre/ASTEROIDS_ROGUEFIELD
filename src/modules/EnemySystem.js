@@ -2278,16 +2278,25 @@ class EnemySystem {
     const originY = data.position.y;
 
     const physics = this.getCachedPhysics();
-    const nearbyAsteroids = physics && typeof physics.getNearbyAsteroids === 'function'
-      ? physics.getNearbyAsteroids(originX, originY, radius)
-      : this.asteroids;
+    let nearbyEnemies = null;
+    if (physics) {
+      if (typeof physics.getNearbyEnemies === 'function') {
+        nearbyEnemies = physics.getNearbyEnemies(originX, originY, radius);
+      } else if (typeof physics.getNearbyAsteroids === 'function') {
+        nearbyEnemies = physics.getNearbyAsteroids(originX, originY, radius);
+      }
+    }
 
-    if (!nearbyAsteroids || nearbyAsteroids.length === 0) {
+    if (!nearbyEnemies || nearbyEnemies.length === 0) {
+      nearbyEnemies = this.asteroids;
+    }
+
+    if (!nearbyEnemies || nearbyEnemies.length === 0) {
       return;
     }
 
-    for (let i = 0; i < nearbyAsteroids.length; i += 1) {
-      const asteroid = nearbyAsteroids[i];
+    for (let i = 0; i < nearbyEnemies.length; i += 1) {
+      const asteroid = nearbyEnemies[i];
       if (!asteroid || asteroid.destroyed) {
         continue;
       }
@@ -2349,16 +2358,25 @@ class EnemySystem {
     const originY = data.position.y;
 
     const physics = this.getCachedPhysics();
-    const nearbyAsteroids = physics && typeof physics.getNearbyAsteroids === 'function'
-      ? physics.getNearbyAsteroids(originX, originY, radius)
-      : this.asteroids;
+    let nearbyEnemies = null;
+    if (physics) {
+      if (typeof physics.getNearbyEnemies === 'function') {
+        nearbyEnemies = physics.getNearbyEnemies(originX, originY, radius);
+      } else if (typeof physics.getNearbyAsteroids === 'function') {
+        nearbyEnemies = physics.getNearbyAsteroids(originX, originY, radius);
+      }
+    }
 
-    if (!nearbyAsteroids || nearbyAsteroids.length === 0) {
+    if (!nearbyEnemies || nearbyEnemies.length === 0) {
+      nearbyEnemies = this.asteroids;
+    }
+
+    if (!nearbyEnemies || nearbyEnemies.length === 0) {
       return;
     }
 
-    for (let i = 0; i < nearbyAsteroids.length; i += 1) {
-      const asteroid = nearbyAsteroids[i];
+    for (let i = 0; i < nearbyEnemies.length; i += 1) {
+      const asteroid = nearbyEnemies[i];
       if (!asteroid || asteroid.destroyed) {
         continue;
       }
