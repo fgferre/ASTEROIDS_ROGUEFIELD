@@ -143,6 +143,14 @@ class AudioSystem {
     }
   }
 
+  /**
+   * Registers listeners for gameplay events that trigger audio feedback.
+   *
+   * Enemy modules should emit `enemy-fired`/`mine-exploded` so that all audio
+   * synthesis stays centralized here instead of touching the AudioSystem
+   * directly. This keeps new enemy types decoupled from the sound pipeline
+   * while still allowing bespoke effects per archetype.
+   */
   setupEventListeners() {
     if (typeof gameEvents === 'undefined') return;
 
@@ -200,6 +208,26 @@ class AudioSystem {
       if (data?.enemy?.variant === 'gold') {
         this.playGoldSpawn();
       }
+    });
+
+    // Enemy modules fire projectiles/explosions exclusively through events so
+    // the audio layer can orchestrate batching and pooling.
+    gameEvents.on('enemy-fired', (data = {}) => {
+      const enemyType = (data?.enemyType || data?.enemy?.type || '').toLowerCase();
+
+      if (enemyType === 'drone') {
+        this.playDroneFire(data);
+        return;
+      }
+
+      if (enemyType === 'hunter') {
+        this.playHunterBurst(data);
+        return;
+      }
+    });
+
+    gameEvents.on('mine-exploded', (data = {}) => {
+      this.playMineExplosion(data);
     });
 
     gameEvents.on('boss-spawned', (data = {}) => {
@@ -687,6 +715,158 @@ class AudioSystem {
     };
   }
 
+  _normalizeDroneFireOptions(data = {}) {
+    const projectileSpeed = Number(data?.projectile?.speed);
+    let speed = Number.isFinite(projectileSpeed)
+      ? projectileSpeed
+      : Math.hypot(data?.velocity?.x ?? 0, data?.velocity?.y ?? 0);
+    if (!Number.isFinite(speed)) {
+      speed = 320;
+    }
+
+    const spread = Math.abs(Number(data?.projectile?.spread ?? 0));
+    const wave = Number(data?.wave);
+    const speedRatio = Math.min(1, Math.max(0, (speed - 180) / 320));
+    const baseFrequency = 600 + speedRatio * 200; // 600-800Hz window
+    const detune = Math.min(80, spread * 120);
+    const duration = 0.08 + speedRatio * 0.03;
+    const intensity = Math.min(1.2, 0.6 + speedRatio * 0.5);
+
+    return {
+      type: 'drone',
+      frequency: baseFrequency,
+      detune,
+      duration,
+      gain: 0.1 + intensity * 0.04,
+      intensity,
+      wave,
+      enemyType: (data?.enemyType || data?.enemy?.type || 'drone').toLowerCase(),
+    };
+  }
+
+  _normalizeHunterBurstOptions(data = {}) {
+    const burst = data?.projectile?.burst || {};
+    const totalShots = Math.max(1, Math.floor(burst.total ?? 3));
+    const shotsRemaining = Math.max(
+      0,
+      Math.floor(burst.shotsRemaining ?? totalShots)
+    );
+    const shotIndex = Math.max(0, totalShots - shotsRemaining);
+    const isFirstShot = shotIndex === 0;
+
+    if (!isFirstShot) {
+      // We synthesize the entire burst on the opening shot so repeated
+      // callbacks in the same burst don't stack unnecessarily.
+      return null;
+    }
+
+    const projectileSpeed = Number(data?.projectile?.speed);
+    const speedRatio = Number.isFinite(projectileSpeed)
+      ? Math.min(1, Math.max(0, (projectileSpeed - 260) / 320))
+      : 0.5;
+
+    const baseFrequency = 700 + speedRatio * 120;
+    const frequencyJitter = 60 + speedRatio * 30;
+    const spacing = 0.05;
+
+    return {
+      type: 'hunter',
+      baseFrequency,
+      frequencyJitter,
+      shotCount: totalShots,
+      spacing,
+      duration: 0.09,
+      gain: 0.13 + speedRatio * 0.06,
+      intensity: Math.min(1.2, 0.7 + speedRatio * 0.5),
+      burstId:
+        burst.id !== undefined
+          ? `hunter:${burst.id}`
+          : `hunter:${data?.enemyId ?? 'unknown'}:${data?.wave ?? 'w0'}`,
+      enemyType: (data?.enemyType || data?.enemy?.type || 'hunter').toLowerCase(),
+    };
+  }
+
+  _normalizeMineExplosionOptions(data = {}) {
+    const radius = Number(data?.radius);
+    const damage = Number(data?.damage);
+    const normalizedRadius = Number.isFinite(radius) ? radius : 120;
+    const normalizedDamage = Number.isFinite(damage) ? damage : 40;
+
+    const intensityBase =
+      normalizedRadius / 160 + normalizedDamage / 140;
+    const intensity = Math.min(1.5, Math.max(0.5, intensityBase));
+    const duration = 0.42 + Math.min(0.16, intensity * 0.12);
+
+    return {
+      type: 'mine',
+      duration,
+      startFrequency: 110 - intensity * 35,
+      endFrequency: 38,
+      noiseGain: 0.22 + intensity * 0.18,
+      rumbleGain: 0.2 + intensity * 0.18,
+      intensity,
+      enemyType: (data?.enemyType || data?.enemy?.type || 'mine').toLowerCase(),
+    };
+  }
+
+  playDroneFire(data = {}) {
+    this._trackPerformance('playDroneFire');
+
+    const params = this._normalizeDroneFireOptions(data);
+    const priority = this._resolveEnemySoundPriority(params.enemyType, data);
+
+    if (
+      this._scheduleBatchedSound('playDroneFire', params, {
+        allowOverlap: true,
+        priority,
+      })
+    ) {
+      return;
+    }
+
+    this._playDroneFireDirect(params);
+  }
+
+  playHunterBurst(data = {}) {
+    this._trackPerformance('playHunterBurst');
+
+    const params = this._normalizeHunterBurstOptions(data);
+    if (!params) {
+      return;
+    }
+
+    const priority = this._resolveEnemySoundPriority(params.enemyType, data);
+
+    if (
+      this._scheduleBatchedSound('playHunterBurst', params, {
+        allowOverlap: true,
+        priority,
+      })
+    ) {
+      return;
+    }
+
+    this._playHunterBurstDirect(params);
+  }
+
+  playMineExplosion(data = {}) {
+    this._trackPerformance('playMineExplosion');
+
+    const params = this._normalizeMineExplosionOptions(data);
+    const priority = this._resolveEnemySoundPriority(params.enemyType, data);
+
+    if (
+      this._scheduleBatchedSound('playMineExplosion', params, {
+        allowOverlap: false,
+        priority,
+      })
+    ) {
+      return;
+    }
+
+    this._playMineExplosionDirect(params);
+  }
+
   playTargetLock(data = {}) {
     this._trackPerformance('playTargetLock');
 
@@ -816,6 +996,50 @@ class AudioSystem {
     return this.batcher.scheduleSound(soundType, params, options);
   }
 
+  _resolveEnemySoundPriority(enemyType, data = {}) {
+    const normalizedType = typeof enemyType === 'string' ? enemyType.toLowerCase() : '';
+    const caps = {
+      drone: 2,
+      hunter: 3,
+      mine: 3,
+    };
+
+    const cap = caps[normalizedType] ?? 2;
+    let priority = 1;
+
+    const wave = Number(data?.wave);
+    if (Number.isFinite(wave) && wave > 0) {
+      priority = Math.max(priority, Math.min(cap, Math.ceil(wave / 8)));
+    }
+
+    if (normalizedType === 'drone') {
+      const projectileSpeed = Number(data?.projectile?.speed);
+      const velocityMagnitude = Math.hypot(
+        data?.velocity?.x ?? 0,
+        data?.velocity?.y ?? 0
+      );
+      const speed = Number.isFinite(projectileSpeed)
+        ? projectileSpeed
+        : velocityMagnitude;
+      if (Number.isFinite(speed) && speed > 360) {
+        priority = Math.max(priority, 2);
+      }
+    } else if (normalizedType === 'hunter') {
+      const burst = data?.projectile?.burst || {};
+      const totalShots = Math.max(1, Math.floor(burst.total ?? 1));
+      priority = Math.max(priority, Math.min(cap, totalShots));
+    } else if (normalizedType === 'mine') {
+      priority = cap;
+    }
+
+    const explicitPriority = Number(data?.priority);
+    if (Number.isFinite(explicitPriority)) {
+      priority = Math.max(priority, explicitPriority);
+    }
+
+    return Math.max(0, Math.min(cap, Math.round(priority)));
+  }
+
   _resolveRandom(...candidates) {
     for (const candidate of candidates) {
       if (candidate && typeof candidate.float === 'function') {
@@ -871,6 +1095,252 @@ class AudioSystem {
         setTimeout(() => {
           this.pool.returnGain(gain);
         }, 90);
+      }
+    });
+  }
+
+  _playDroneFireDirect(params = {}) {
+    this.safePlay(() => {
+      if (!this.context) {
+        return;
+      }
+
+      const voices = Math.max(
+        1,
+        Math.floor(params.count ?? params.concurrency ?? 1)
+      );
+      const intensity = Number.isFinite(params.intensity)
+        ? params.intensity
+        : 0.7;
+      const baseGain = Number.isFinite(params.gain) ? params.gain : 0.12;
+      const totalGain = Math.min(0.22, baseGain * (1 + (voices - 1) * 0.35));
+      const gainPerVoice = Math.max(0.035, totalGain / voices);
+      const detune = Number.isFinite(params.detune) ? params.detune : 0;
+      const duration = Math.max(0.06, Number(params.duration) || 0.1);
+      const startFrequency = Math.max(520, Number(params.frequency) || 680);
+      const now = this.context.currentTime;
+
+      for (let i = 0; i < voices; i += 1) {
+        const osc = this.pool
+          ? this.pool.getOscillator()
+          : this.context.createOscillator();
+        const gain = this.pool
+          ? this.pool.getGain()
+          : this.context.createGain();
+
+        osc.connect(gain);
+        this.connectGainNode(gain);
+
+        const spreadFactor = voices > 1 ? i / (voices - 1) - 0.5 : 0;
+        const pitchOffset = detune * spreadFactor;
+        const voiceStart = now + (voices > 2 ? i * 0.004 : 0);
+        const voiceFrequency = Math.max(520, startFrequency + pitchOffset);
+        const targetFrequency = Math.max(320, voiceFrequency * 0.55);
+
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(voiceFrequency, voiceStart);
+        osc.frequency.exponentialRampToValueAtTime(
+          targetFrequency,
+          voiceStart + duration
+        );
+
+        const accent = 1 + Math.min(0.35, intensity * 0.25) * spreadFactor;
+        gain.gain.setValueAtTime(gainPerVoice * (1 + accent * 0.2), voiceStart);
+        gain.gain.exponentialRampToValueAtTime(0.001, voiceStart + duration);
+
+        osc.start(voiceStart);
+        osc.stop(voiceStart + duration);
+
+        if (this.pool) {
+          setTimeout(() => {
+            this.pool.returnGain(gain);
+          }, (voiceStart + duration - now) * 1000 + 20);
+        }
+      }
+    });
+  }
+
+  _playHunterBurstDirect(params = {}) {
+    this.safePlay(() => {
+      if (!this.context) {
+        return;
+      }
+
+      const shotCount = Math.max(1, Math.floor(params.shotCount ?? 3));
+      const spacing = Math.max(0.02, Number(params.spacing) || 0.05);
+      const duration = Math.max(0.06, Number(params.duration) || 0.09);
+      const concurrency = Math.max(1, Math.floor(params.concurrency ?? 1));
+      const baseFrequency = Math.min(
+        900,
+        Math.max(700, Number(params.baseFrequency) || 760)
+      );
+      const frequencyJitter = Math.max(0, Number(params.frequencyJitter) || 60);
+      const intensity = Number.isFinite(params.intensity)
+        ? params.intensity
+        : 0.8;
+      const baseGain = Number.isFinite(params.gain) ? params.gain : 0.15;
+      const totalGain = Math.min(0.32, baseGain * concurrency);
+      const perShotGain = Math.max(0.04, totalGain / shotCount);
+      const now = this.context.currentTime;
+
+      for (let shot = 0; shot < shotCount; shot += 1) {
+        const osc = this.pool
+          ? this.pool.getOscillator()
+          : this.context.createOscillator();
+        const gain = this.pool
+          ? this.pool.getGain()
+          : this.context.createGain();
+
+        osc.connect(gain);
+        this.connectGainNode(gain);
+
+        const shotStart = now + shot * spacing;
+        const position = shotCount > 1 ? shot / (shotCount - 1) : 0.5;
+        const freqOffset = (position - 0.5) * frequencyJitter;
+        const shotFrequency = Math.min(
+          900,
+          Math.max(700, baseFrequency + freqOffset)
+        );
+        const targetFrequency = Math.max(360, shotFrequency * 0.6);
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(shotFrequency, shotStart);
+        osc.frequency.exponentialRampToValueAtTime(
+          targetFrequency,
+          shotStart + duration
+        );
+
+        const accent = 1 + Math.min(0.4, intensity * 0.3) * (1 - position);
+        gain.gain.setValueAtTime(perShotGain * accent, shotStart);
+        gain.gain.exponentialRampToValueAtTime(0.001, shotStart + duration);
+
+        osc.start(shotStart);
+        osc.stop(shotStart + duration);
+
+        if (this.pool) {
+          setTimeout(() => {
+            this.pool.returnGain(gain);
+          }, (shotStart + duration - now) * 1000 + 20);
+        }
+      }
+    });
+  }
+
+  _playMineExplosionDirect(params = {}) {
+    this.safePlay(() => {
+      if (!this.context) {
+        return;
+      }
+
+      const duration = Math.max(0.32, Number(params.duration) || 0.5);
+      const clusterSize = Math.max(1, Math.floor(params.clusterSize ?? 1));
+      const intensity = Number.isFinite(params.intensity)
+        ? params.intensity
+        : 0.9;
+      const startFrequency = Math.max(40, Number(params.startFrequency) || 90);
+      const endFrequency = Math.max(22, Number(params.endFrequency) || 36);
+      const noiseGainValue = Math.min(
+        0.55,
+        (Number(params.noiseGain) || 0.25) * (1 + (clusterSize - 1) * 0.18)
+      );
+      const rumbleGainValue = Math.min(
+        0.36,
+        (Number(params.rumbleGain) || 0.24) * (1 + (clusterSize - 1) * 0.22)
+      );
+
+      const now = this.context.currentTime;
+      const destination = this.getEffectsDestination();
+      if (!destination) {
+        return;
+      }
+
+      const rumbleOsc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
+      const rumbleGain = this.pool
+        ? this.pool.getGain()
+        : this.context.createGain();
+
+      rumbleOsc.type = 'sine';
+      rumbleOsc.frequency.setValueAtTime(startFrequency, now);
+      rumbleOsc.frequency.exponentialRampToValueAtTime(
+        endFrequency,
+        now + duration
+      );
+      rumbleOsc.connect(rumbleGain);
+      rumbleGain.connect(destination);
+
+      rumbleGain.gain.setValueAtTime(rumbleGainValue, now);
+      rumbleGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      let noiseBuffer = null;
+      if (this.cache && typeof this.cache.getNoiseBuffer === 'function') {
+        noiseBuffer = this.cache.getNoiseBuffer(duration, true, 'exponential', {
+          family: 'explosion',
+          random:
+            this.randomScopes?.bufferFamilies?.explosion ||
+            this.randomScopes?.families?.explosion ||
+            this.randomScopes?.base ||
+            null,
+        });
+      }
+
+      if (!noiseBuffer) {
+        const bufferSize = Math.max(
+          1,
+          Math.floor(this.context.sampleRate * duration)
+        );
+        noiseBuffer = this.context.createBuffer(
+          1,
+          bufferSize,
+          this.context.sampleRate
+        );
+        const output = noiseBuffer.getChannelData(0);
+        const rng = this._resolveRandom(
+          this.randomScopes?.bufferFamilies?.explosion,
+          this.randomScopes?.families?.explosion,
+          this.randomScopes?.base,
+          this.random
+        );
+        for (let i = 0; i < bufferSize; i += 1) {
+          const sample =
+            typeof rng.range === 'function' ? rng.range(-1, 1) : rng.float() * 2 - 1;
+          output[i] = sample;
+        }
+      }
+
+      const noiseSource = this.pool
+        ? this.pool.getBufferSource()
+        : this.context.createBufferSource();
+      noiseSource.buffer = noiseBuffer;
+      noiseSource.loop = false;
+
+      const noiseFilter = this.context.createBiquadFilter();
+      noiseFilter.type = 'lowpass';
+      noiseFilter.frequency.setValueAtTime(260 + intensity * 90, now);
+
+      const noiseGain = this.pool
+        ? this.pool.getGain()
+        : this.context.createGain();
+
+      noiseSource.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(destination);
+
+      noiseGain.gain.setValueAtTime(noiseGainValue, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.85);
+
+      rumbleOsc.start(now);
+      rumbleOsc.stop(now + duration);
+
+      noiseSource.start(now);
+      noiseSource.stop(now + duration * 0.85);
+
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(rumbleGain);
+          this.pool.returnGain(noiseGain);
+        }, duration * 1000 + 40);
       }
     });
   }
@@ -988,6 +1458,23 @@ class AudioSystem {
       case 'playXPCollect':
         this._playXPCollectDirect();
         break;
+      case 'playDroneFire': {
+        const options = Array.isArray(params) ? params[0] : params;
+        this._playDroneFireDirect(options || {});
+        break;
+      }
+      case 'playHunterBurst': {
+        const options = Array.isArray(params) ? params[0] : params;
+        if (options) {
+          this._playHunterBurstDirect(options);
+        }
+        break;
+      }
+      case 'playMineExplosion': {
+        const options = Array.isArray(params) ? params[0] : params;
+        this._playMineExplosionDirect(options || {});
+        break;
+      }
       default:
         console.warn(`[AudioSystem] No direct handler registered for "${soundType}"`);
         break;
