@@ -550,6 +550,20 @@ export default class EffectsSystem {
       }
     });
 
+    gameEvents.on('enemy-spawned', (payload = {}) => {
+      const enemy = payload?.enemy;
+      if (!enemy || !(this.processedMineExplosions instanceof WeakSet)) {
+        return;
+      }
+
+      const isMine = enemy.type === 'mine' || payload.type === 'mine';
+      if (!isMine) {
+        return;
+      }
+
+      this.processedMineExplosions.delete(enemy);
+    });
+
     gameEvents.on('mine-exploded', (payload = {}) => {
       this.createMineExplosion(payload);
     });
