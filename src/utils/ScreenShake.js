@@ -335,4 +335,43 @@ export const ShakePresets = {
     trauma: 0.25,
     duration: 0.8,
   },
+
+  // Enemy - drone destroyed
+  droneDestroyed: {
+    trauma: 0.23,
+    duration: 0.18,
+  },
+
+  // Enemy - mine explosion
+  mineExplosion: {
+    trauma: 0.6,
+    duration: 0.36,
+  },
+
+  // Enemy - hunter destroyed
+  hunterDestroyed: {
+    trauma: 0.35,
+    duration: 0.22,
+  },
+
+  // Boss events
+  bossSpawn: {
+    trauma: 1,
+    duration: 0.65,
+  },
+
+  bossPhaseChange: {
+    trauma: 0.93,
+    duration: 0.5,
+  },
+
+  bossDefeated: {
+    trauma: 1,
+    duration: 0.85,
+  },
+
+  bossAttack: {
+    trauma: 0.28,
+    duration: 0.18,
+  },
 };
