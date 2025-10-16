@@ -5,6 +5,57 @@ import RandomService from '../core/RandomService.js';
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
 
+const DEFAULT_COMBO_TIMEOUT = 3;
+const DEFAULT_COMBO_MULTIPLIER_STEP = 0.1;
+const DEFAULT_COMBO_MULTIPLIER_CAP = 2;
+
+const resolveComboTimeout = (value) => {
+  const raw = Number(value);
+  if (Number.isFinite(raw) && raw > 0) {
+    return raw;
+  }
+
+  return DEFAULT_COMBO_TIMEOUT;
+};
+
+const resolveComboStep = (value) => {
+  const raw = Number(value);
+  if (Number.isFinite(raw) && raw >= 0) {
+    return raw;
+  }
+
+  return DEFAULT_COMBO_MULTIPLIER_STEP;
+};
+
+const resolveComboCap = (value) => {
+  const raw = Number(value);
+  if (Number.isFinite(raw) && raw >= 1) {
+    return raw;
+  }
+
+  return DEFAULT_COMBO_MULTIPLIER_CAP;
+};
+
+const normalizeComboCount = (value) => {
+  const raw = Number(value);
+  if (!Number.isFinite(raw) || raw <= 0) {
+    return 0;
+  }
+
+  return Math.max(0, Math.floor(raw));
+};
+
+const clampComboTimer = (timer, timeout) => {
+  const normalizedTimeout = resolveComboTimeout(timeout);
+  const raw = Number(timer);
+
+  if (!Number.isFinite(raw) || raw <= 0) {
+    return 0;
+  }
+
+  return Math.min(raw, normalizedTimeout);
+};
+
 const DEFAULT_UPGRADE_CATEGORY = {
   id: 'general',
   label: 'Tecnologia',
@@ -61,6 +112,19 @@ class ProgressionSystem {
       : 1;
     this.levelScaling = Math.max(1, levelScaling);
 
+    this.comboTimeout = resolveComboTimeout(
+      CONSTANTS.PROGRESSION_COMBO_TIMEOUT
+    );
+    this.comboStep = resolveComboStep(
+      CONSTANTS.PROGRESSION_COMBO_MULTIPLIER_STEP
+    );
+    this.comboCap = resolveComboCap(
+      CONSTANTS.PROGRESSION_COMBO_MULTIPLIER_CAP
+    );
+    this.currentCombo = 0;
+    this.comboTimer = 0;
+    this.comboMultiplier = 1;
+
     // Registrar no ServiceLocator
     if (typeof gameServices !== 'undefined') {
       gameServices.register('progression', this);
@@ -68,6 +132,8 @@ class ProgressionSystem {
 
     // Escutar eventos
     this.setupEventListeners();
+
+    this.emitComboUpdated({ reason: 'initialized', silent: true, force: true });
 
     console.log('[ProgressionSystem] Initialized - Level', this.level);
   }
@@ -135,12 +201,22 @@ class ProgressionSystem {
       this.handleOrbCollected(data);
     });
 
+    gameEvents.on('enemy-destroyed', (data) => {
+      this.handleEnemyDestroyed(data);
+    });
+
     gameEvents.on('progression-reset', () => {
       this.refreshInjectedServices(true);
+      this.resetCombo({ reason: 'progression-reset', silent: true });
     });
 
     gameEvents.on('player-reset', () => {
       this.refreshInjectedServices(true);
+      this.resetCombo({ reason: 'player-reset', silent: true });
+    });
+
+    gameEvents.on('player-died', (data) => {
+      this.resetCombo({ reason: 'player-died', emitBroken: true, data });
     });
   }
 
@@ -202,6 +278,188 @@ class ProgressionSystem {
     });
   }
 
+  // === SISTEMA DE COMBO ===
+  handleEnemyDestroyed(data = {}) {
+    if (data && data.resetCombo) {
+      this.resetCombo({
+        reason: data.resetReason || 'enemy-destroyed',
+        emitBroken: true,
+        data,
+      });
+      return;
+    }
+
+    const current = normalizeComboCount(this.currentCombo);
+    this.currentCombo = current + 1;
+    this.comboTimer = resolveComboTimeout(this.comboTimeout);
+    this.comboMultiplier = this.calculateComboMultiplier(this.currentCombo);
+
+    this.emitComboUpdated({ reason: 'enemy-destroyed', data });
+  }
+
+  calculateComboMultiplier(count) {
+    const normalized = normalizeComboCount(count);
+    if (normalized <= 1) {
+      return 1;
+    }
+
+    const step = Number.isFinite(this.comboStep)
+      ? this.comboStep
+      : resolveComboStep(CONSTANTS.PROGRESSION_COMBO_MULTIPLIER_STEP);
+    const cap = Number.isFinite(this.comboCap)
+      ? this.comboCap
+      : resolveComboCap(CONSTANTS.PROGRESSION_COMBO_MULTIPLIER_CAP);
+
+    const multiplier = 1 + (normalized - 1) * step;
+    if (!Number.isFinite(multiplier)) {
+      return 1;
+    }
+
+    return Math.min(cap, multiplier);
+  }
+
+  getComboState() {
+    return {
+      comboCount: normalizeComboCount(this.currentCombo),
+      multiplier: Number.isFinite(this.comboMultiplier)
+        ? Math.max(1, this.comboMultiplier)
+        : 1,
+      timerRemaining: clampComboTimer(this.comboTimer, this.comboTimeout),
+      timeout: resolveComboTimeout(this.comboTimeout),
+    };
+  }
+
+  emitComboUpdated(options = {}) {
+    if (typeof gameEvents === 'undefined') {
+      return;
+    }
+
+    const payload = {
+      ...this.getComboState(),
+    };
+
+    if (options?.reason) {
+      payload.reason = options.reason;
+    }
+
+    if (options?.silent) {
+      payload.silent = true;
+    }
+
+    if (options?.force) {
+      payload.force = true;
+    }
+
+    if (options?.data?.cause) {
+      payload.cause = options.data.cause;
+    }
+
+    if (options?.data?.variant) {
+      payload.variant = options.data.variant;
+    }
+
+    gameEvents.emit('combo-updated', payload);
+  }
+
+  emitComboBroken(options = {}) {
+    if (typeof gameEvents === 'undefined') {
+      return;
+    }
+
+    const payload = {
+      comboCount: 0,
+      multiplier: 1,
+      previousCombo: normalizeComboCount(options?.previousCombo),
+      previousMultiplier: Number.isFinite(options?.previousMultiplier)
+        ? Math.max(1, options.previousMultiplier)
+        : 1,
+      reason: options?.reason || 'combo-broken',
+      timerRemaining: 0,
+      timeout: resolveComboTimeout(this.comboTimeout),
+    };
+
+    if (options?.silent) {
+      payload.silent = true;
+    }
+
+    if (options?.data?.cause) {
+      payload.cause = options.data.cause;
+    }
+
+    if (options?.data?.variant) {
+      payload.variant = options.data.variant;
+    }
+
+    gameEvents.emit('combo-broken', payload);
+  }
+
+  resetCombo(options = {}) {
+    const {
+      reason = 'manual',
+      suppressEvents = false,
+      emitBroken = false,
+      forceEmit = false,
+      silent = false,
+      data = null,
+    } = options || {};
+
+    const previousCombo = normalizeComboCount(this.currentCombo);
+    const previousMultiplier = Number.isFinite(this.comboMultiplier)
+      ? Math.max(1, this.comboMultiplier)
+      : 1;
+    const hadCombo = previousCombo > 0;
+
+    this.currentCombo = 0;
+    this.comboTimer = 0;
+    this.comboMultiplier = 1;
+
+    if (suppressEvents || typeof gameEvents === 'undefined') {
+      return hadCombo;
+    }
+
+    const shouldEmitUpdate = forceEmit || hadCombo;
+
+    if (emitBroken && (hadCombo || forceEmit)) {
+      this.emitComboBroken({
+        reason,
+        previousCombo,
+        previousMultiplier,
+        silent,
+        data,
+      });
+    }
+
+    if (shouldEmitUpdate) {
+      this.emitComboUpdated({ reason, silent, data });
+    }
+
+    return hadCombo;
+  }
+
+  update(deltaTime = 0) {
+    const numericDelta = Number(deltaTime);
+    if (!Number.isFinite(numericDelta) || numericDelta <= 0) {
+      return;
+    }
+
+    if (this.currentCombo <= 0) {
+      return;
+    }
+
+    this.comboTimer = clampComboTimer(
+      (Number.isFinite(this.comboTimer) ? this.comboTimer : 0) - numericDelta,
+      this.comboTimeout
+    );
+
+    if (this.comboTimer <= 0) {
+      this.resetCombo({
+        reason: 'timeout',
+        emitBroken: true,
+        data: { cause: 'timeout' },
+      });
+    }
+  }
+
   // === SISTEMA DE EXPERIÊNCIA ===
   collectXP(amount) {
     const value = Number(amount);
@@ -209,9 +467,14 @@ class ProgressionSystem {
       return { gained: 0, levels: 0 };
     }
 
-    this.totalExperience += value;
+    const multiplier = Number.isFinite(this.comboMultiplier)
+      ? Math.max(1, this.comboMultiplier)
+      : 1;
+    const effectiveGain = value * multiplier;
 
-    let pool = this.experience + value;
+    this.totalExperience += effectiveGain;
+
+    let pool = this.experience + effectiveGain;
     let levelsGained = 0;
     const levelContexts = [];
 
@@ -228,7 +491,7 @@ class ProgressionSystem {
       this.emitLevelUp(context);
     });
 
-    return { gained: value, levels: levelsGained };
+    return { gained: effectiveGain, levels: levelsGained, multiplier };
   }
 
   applyLevelUp() {
@@ -1084,6 +1347,21 @@ class ProgressionSystem {
     this.appliedUpgrades.clear();
     this.pendingUpgradeOptions = [];
 
+    this.comboTimeout = resolveComboTimeout(
+      CONSTANTS.PROGRESSION_COMBO_TIMEOUT
+    );
+    this.comboStep = resolveComboStep(
+      CONSTANTS.PROGRESSION_COMBO_MULTIPLIER_STEP
+    );
+    this.comboCap = resolveComboCap(
+      CONSTANTS.PROGRESSION_COMBO_MULTIPLIER_CAP
+    );
+    this.resetCombo({
+      reason: 'progression-reset',
+      forceEmit: typeof gameEvents !== 'undefined',
+      silent: true,
+    });
+
     this.refreshInjectedServices(true);
     this.emitExperienceChanged();
 
@@ -1102,6 +1380,7 @@ class ProgressionSystem {
       experienceToNext: this.experienceToNext,
       totalExperience: this.totalExperience,
       appliedUpgrades: Array.from(this.appliedUpgrades.entries()),
+      combo: this.getComboState(),
     };
   }
 
@@ -1117,8 +1396,54 @@ class ProgressionSystem {
     this.appliedUpgrades = new Map(entries);
     this.pendingUpgradeOptions = [];
 
+    this.comboTimeout = resolveComboTimeout(
+      data?.combo?.timeout ??
+        data?.combo?.comboTimeout ??
+        this.comboTimeout ??
+        CONSTANTS.PROGRESSION_COMBO_TIMEOUT
+    );
+    this.comboStep = resolveComboStep(
+      CONSTANTS.PROGRESSION_COMBO_MULTIPLIER_STEP
+    );
+    this.comboCap = resolveComboCap(
+      CONSTANTS.PROGRESSION_COMBO_MULTIPLIER_CAP
+    );
+
+    const comboData = data?.combo || {};
+    this.currentCombo = normalizeComboCount(
+      comboData.comboCount ??
+        comboData.count ??
+        data?.currentCombo ??
+        0
+    );
+    this.comboTimer = this.currentCombo > 0
+      ? clampComboTimer(
+          comboData.timer ??
+            comboData.timerRemaining ??
+            comboData.comboTimer ??
+            0,
+          this.comboTimeout
+        )
+      : 0;
+
+    const storedMultiplier = Number(
+      comboData.multiplier ?? comboData.comboMultiplier
+    );
+    if (Number.isFinite(storedMultiplier) && storedMultiplier >= 1) {
+      const cappedMultiplier = Math.min(storedMultiplier, this.comboCap);
+      this.comboMultiplier = Math.max(1, cappedMultiplier);
+    } else {
+      this.comboMultiplier = this.calculateComboMultiplier(this.currentCombo);
+    }
+
+    if (this.currentCombo === 0) {
+      this.comboTimer = 0;
+      this.comboMultiplier = 1;
+    }
+
     if (!options?.suppressEvents) {
       this.emitExperienceChanged();
+      this.emitComboUpdated({ reason: 'deserialized', silent: true });
     }
   }
 
@@ -1126,6 +1451,7 @@ class ProgressionSystem {
     this.refreshInjectedServices(true);
     this.deserialize(data, { suppressEvents: true });
     this.emitExperienceChanged();
+    this.emitComboUpdated({ reason: 'restore-state', silent: true });
 
     if (typeof gameEvents !== 'undefined') {
       gameEvents.emit('progression-restored', {
@@ -1140,6 +1466,7 @@ class ProgressionSystem {
   }
 
   destroy() {
+    this.resetCombo({ suppressEvents: true });
     this.appliedUpgrades.clear();
     this.pendingUpgradeOptions = [];
     this.services = {
