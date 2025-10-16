@@ -222,6 +222,7 @@ export default class EffectsSystem {
     this.hitMarkers = []; // NEW: Hit marker tracking
     this.damageIndicators = []; // NEW: Directional damage indicators
     this.bossTransitionEffects = [];
+    this.processedMineExplosions = new WeakSet();
 
     // Upgraded screen shake (Week 1: Balance & Feel)
     this.screenShake = new ScreenShake(this.getRandomFork('screenShake'));
@@ -489,6 +490,23 @@ export default class EffectsSystem {
       }
     });
 
+    gameEvents.on('enemy-fired', (payload = {}) => {
+      const type = this.resolveEnemyType(payload);
+      switch (type) {
+        case 'drone':
+          this.createDroneMuzzleFlash(payload);
+          break;
+        case 'hunter':
+          this.createHunterBurstEffect(payload);
+          break;
+        case 'boss':
+          this.createBossAttackEffect(payload);
+          break;
+        default:
+          break;
+      }
+    });
+
     gameEvents.on('thruster-effect', (data) => {
       if (!data || !data.position || !data.direction) return;
 
@@ -526,10 +544,14 @@ export default class EffectsSystem {
       }
     });
 
-    gameEvents.on('enemy-destroyed', (data) => {
+    gameEvents.on('enemy-destroyed', (data = {}) => {
       if (data?.enemy) {
-        this.createAsteroidExplosion(data.enemy);
+        this.createAsteroidExplosion(data.enemy, data);
       }
+    });
+
+    gameEvents.on('mine-exploded', (payload = {}) => {
+      this.createMineExplosion(payload);
     });
 
     gameEvents.on('asteroid-crack-stage-changed', (data) => {
@@ -1926,6 +1948,579 @@ export default class EffectsSystem {
     }
   }
 
+  resolveEnemyType(payload = {}, fallbackEnemy = null) {
+    if (!payload && !fallbackEnemy) {
+      return null;
+    }
+
+    const typeCandidate =
+      payload?.enemyType ??
+      payload?.type ??
+      payload?.enemy?.type ??
+      payload?.source?.type ??
+      fallbackEnemy?.type ??
+      null;
+
+    if (typeof typeCandidate === 'string' && typeCandidate.trim().length > 0) {
+      return typeCandidate.trim().toLowerCase();
+    }
+
+    return null;
+  }
+
+  resolveEnemyEffectPalette(type, fallbackType = null) {
+    if (!CONSTANTS.ENEMY_EFFECT_COLORS) {
+      return {};
+    }
+
+    const normalizedType = typeof type === 'string' ? type.toLowerCase() : null;
+    const fallback =
+      typeof fallbackType === 'string' ? fallbackType.toLowerCase() : null;
+
+    const palette =
+      (normalizedType && CONSTANTS.ENEMY_EFFECT_COLORS[normalizedType]) ||
+      (fallback && CONSTANTS.ENEMY_EFFECT_COLORS[fallback]) ||
+      null;
+
+    return palette || {};
+  }
+
+  resolveEnemyProjectileOrigin(payload = {}) {
+    const positionCandidate =
+      payload?.position || payload?.origin || payload?.source?.position || null;
+    const enemy = payload?.enemy || null;
+
+    const x = Number.isFinite(positionCandidate?.x)
+      ? positionCandidate.x
+      : Number.isFinite(enemy?.x)
+      ? enemy.x
+      : Number.isFinite(enemy?.position?.x)
+      ? enemy.position.x
+      : null;
+    const y = Number.isFinite(positionCandidate?.y)
+      ? positionCandidate.y
+      : Number.isFinite(enemy?.y)
+      ? enemy.y
+      : Number.isFinite(enemy?.position?.y)
+      ? enemy.position.y
+      : null;
+
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      return null;
+    }
+
+    return { x, y };
+  }
+
+  resolveEnemyProjectileDirection(payload = {}) {
+    const projectile = payload?.projectile || {};
+    let vx = Number.isFinite(payload?.velocity?.x) ? payload.velocity.x : null;
+    let vy = Number.isFinite(payload?.velocity?.y) ? payload.velocity.y : null;
+
+    if (!Number.isFinite(vx) || !Number.isFinite(vy)) {
+      vx = Number.isFinite(projectile?.vx) ? projectile.vx : vx;
+      vy = Number.isFinite(projectile?.vy) ? projectile.vy : vy;
+    }
+
+    if (!Number.isFinite(vx) || !Number.isFinite(vy)) {
+      const angle = Number.isFinite(projectile?.angle)
+        ? projectile.angle
+        : Number.isFinite(payload?.angle)
+        ? payload.angle
+        : null;
+
+      if (Number.isFinite(angle)) {
+        const speed = Number.isFinite(projectile?.speed)
+          ? Math.max(0, projectile.speed)
+          : 1;
+        vx = Math.cos(angle) * speed;
+        vy = Math.sin(angle) * speed;
+      }
+    }
+
+    vx = Number.isFinite(vx) ? vx : 0;
+    vy = Number.isFinite(vy) ? vy : 0;
+
+    const speed = Math.hypot(vx, vy);
+    if (speed <= 0.0001) {
+      return { x: 1, y: 0, speed: 0 };
+    }
+
+    return { x: vx / speed, y: vy / speed, speed };
+  }
+
+  createDroneMuzzleFlash(payload = {}) {
+    const origin = this.resolveEnemyProjectileOrigin(payload);
+    if (!origin) {
+      return;
+    }
+
+    const enemy = payload?.enemy || null;
+    const direction = this.resolveEnemyProjectileDirection(payload);
+    const palette = this.resolveEnemyEffectPalette('drone');
+    const radius = Number.isFinite(enemy?.radius) ? enemy.radius : 12;
+    const muzzleDistance = radius + 8;
+    const spawnX = origin.x + direction.x * muzzleDistance;
+    const spawnY = origin.y + direction.y * muzzleDistance;
+
+    const baseColor = palette.muzzle || '#7AD7FF';
+    const accentColor = palette.muzzleAccent || '#C9F1FF';
+    const exhaustColor = palette.exhaust || 'rgba(110, 200, 255, 0.45)';
+    const flashColor = palette.flash || 'rgba(150, 220, 255, 0.35)';
+
+    const particleCount = this.getScaledParticleCount(4 + this.randomFloat('muzzleFlash') * 3, {
+      minimum: 2,
+    });
+
+    const baseAngle = Math.atan2(direction.y, direction.x);
+    for (let i = 0; i < particleCount; i += 1) {
+      const spread = (this.randomFloat('muzzleFlash') - 0.5) * 0.4;
+      const angle = baseAngle + spread;
+      const speed = 220 + this.randomFloat('muzzleFlash') * 140;
+      const size = 2.4 + this.randomFloat('muzzleFlash') * 1.8;
+      const life = 0.1 + this.randomFloat('muzzleFlash') * 0.12;
+      const color = i % 2 === 0 ? baseColor : accentColor;
+
+      this.particles.push(
+        this.createParticle(
+          spawnX,
+          spawnY,
+          Math.cos(angle) * speed,
+          Math.sin(angle) * speed,
+          color,
+          size,
+          life,
+          'spark'
+        )
+      );
+    }
+
+    const glowCount = this.getScaledParticleCount(3, { allowZero: true });
+    for (let i = 0; i < glowCount; i += 1) {
+      const backSpeed = 70 + this.randomFloat('muzzleFlash') * 60;
+      this.particles.push(
+        this.createParticle(
+          origin.x,
+          origin.y,
+          -direction.x * backSpeed * (0.7 + this.randomFloat('muzzleFlash') * 0.5),
+          -direction.y * backSpeed * (0.7 + this.randomFloat('muzzleFlash') * 0.5),
+          exhaustColor,
+          2.6 + this.randomFloat('muzzleFlash') * 2.4,
+          0.16 + this.randomFloat('muzzleFlash') * 0.12,
+          'normal'
+        )
+      );
+    }
+
+    this.addScreenFlash(flashColor, 0.08, 0.06);
+    this.addScreenShake(2.2, 0.1);
+  }
+
+  createHunterBurstEffect(payload = {}) {
+    const origin = this.resolveEnemyProjectileOrigin(payload);
+    if (!origin) {
+      return;
+    }
+
+    const enemy = payload?.enemy || null;
+    const direction = this.resolveEnemyProjectileDirection(payload);
+    const palette = this.resolveEnemyEffectPalette('hunter');
+    const radius = Number.isFinite(enemy?.radius) ? enemy.radius : 16;
+    const muzzleDistance = radius + 10;
+    const spawnX = origin.x + direction.x * muzzleDistance;
+    const spawnY = origin.y + direction.y * muzzleDistance;
+
+    const baseColor = palette.muzzle || '#FF86E8';
+    const accentColor = palette.muzzleAccent || '#FFD6FF';
+    const trailColor = palette.burstTrail || '#BE9CFF';
+    const flashColor = palette.flash || 'rgba(255, 200, 255, 0.38)';
+
+    const burstInfo = payload?.projectile?.burst || {};
+    const shotsRemaining = Number.isFinite(burstInfo.shotsRemaining)
+      ? burstInfo.shotsRemaining
+      : null;
+    const finalShot = shotsRemaining != null ? shotsRemaining <= 1 : false;
+    const baseAngle = Math.atan2(direction.y, direction.x);
+
+    const streakAngles = [-0.1, 0, 0.1];
+    streakAngles.forEach((offset, index) => {
+      const jitter = (this.randomFloat('muzzleFlash') - 0.5) * 0.12;
+      const angle = baseAngle + offset + jitter;
+      const speed = 260 + this.randomFloat('muzzleFlash') * 160;
+      const size = 3 + this.randomFloat('muzzleFlash') * 2.2;
+      const life = 0.12 + this.randomFloat('muzzleFlash') * 0.12;
+      const color = index === 1 ? baseColor : accentColor;
+
+      this.particles.push(
+        this.createParticle(
+          spawnX,
+          spawnY,
+          Math.cos(angle) * speed,
+          Math.sin(angle) * speed,
+          color,
+          size,
+          life,
+          'spark'
+        )
+      );
+    });
+
+    const trailCount = this.getScaledParticleCount(4, { allowZero: true });
+    for (let i = 0; i < trailCount; i += 1) {
+      const backSpeed = 90 + this.randomFloat('muzzleFlash') * 70;
+      this.particles.push(
+        this.createParticle(
+          origin.x,
+          origin.y,
+          -direction.x * backSpeed * (0.6 + this.randomFloat('muzzleFlash') * 0.4),
+          -direction.y * backSpeed * (0.6 + this.randomFloat('muzzleFlash') * 0.4),
+          trailColor,
+          2.8 + this.randomFloat('muzzleFlash') * 2.6,
+          0.18 + this.randomFloat('muzzleFlash') * 0.1,
+          'normal'
+        )
+      );
+    }
+
+    const flashDuration = finalShot ? 0.12 : 0.09;
+    const flashIntensity = finalShot ? 0.12 : 0.08;
+    this.addScreenFlash(flashColor, flashDuration, flashIntensity);
+    this.addScreenShake(finalShot ? 3.8 : 2.6, finalShot ? 0.2 : 0.14);
+  }
+
+  createBossAttackEffect(payload = {}) {
+    const origin = this.resolveEnemyProjectileOrigin(payload);
+    const enemy = payload?.enemy || payload?.boss || null;
+    if (!origin || !enemy) {
+      return;
+    }
+
+    const direction = this.resolveEnemyProjectileDirection(payload);
+    const palette = this.resolveBossPalette(payload, {}, 'boss-phase-changed');
+    const radius = Number.isFinite(enemy?.radius) ? enemy.radius : 60;
+    const muzzleDistance = radius + 18;
+    const spawnX = origin.x + direction.x * muzzleDistance;
+    const spawnY = origin.y + direction.y * muzzleDistance;
+
+    const coreColor = palette.core || '#ff6b9c';
+    const accentColor = palette.accent || '#f9c74f';
+
+    const particleCount = this.getScaledParticleCount(6, { minimum: 3 });
+    const baseAngle = Math.atan2(direction.y, direction.x);
+    for (let i = 0; i < particleCount; i += 1) {
+      const spread = (this.randomFloat('boss') - 0.5) * 0.28;
+      const angle = baseAngle + spread;
+      const speed = 280 + this.randomFloat('boss') * 160;
+      const size = 3.2 + this.randomFloat('boss') * 2.6;
+      const life = 0.14 + this.randomFloat('boss') * 0.12;
+      const color = i % 2 === 0 ? coreColor : accentColor;
+
+      this.particles.push(
+        this.createParticle(
+          spawnX,
+          spawnY,
+          Math.cos(angle) * speed,
+          Math.sin(angle) * speed,
+          color,
+          size,
+          life,
+          'spark'
+        )
+      );
+    }
+
+    const flashColor = palette.flash || coreColor;
+    this.addScreenFlash(flashColor, 0.14, 0.12);
+    this.addScreenShake(4.2, 0.18);
+  }
+
+  createMineExplosion(payload = {}) {
+    if (!payload) {
+      return;
+    }
+
+    const enemy = payload.enemy || null;
+    if (enemy && this.processedMineExplosions instanceof WeakSet) {
+      if (this.processedMineExplosions.has(enemy)) {
+        return;
+      }
+      this.processedMineExplosions.add(enemy);
+    }
+
+    const positionCandidate = payload.position || (enemy ? { x: enemy.x, y: enemy.y } : null);
+    if (!positionCandidate) {
+      return;
+    }
+
+    const posX = Number.isFinite(positionCandidate.x) ? positionCandidate.x : null;
+    const posY = Number.isFinite(positionCandidate.y) ? positionCandidate.y : null;
+    if (!Number.isFinite(posX) || !Number.isFinite(posY)) {
+      return;
+    }
+
+    const position = { x: posX, y: posY };
+    const palette = this.resolveEnemyEffectPalette('mine');
+    const radius = Number.isFinite(payload.radius)
+      ? payload.radius
+      : Number.isFinite(enemy?.explosionRadius)
+      ? enemy.explosionRadius
+      : 120;
+    const velocity = payload.velocity || {
+      x: Number.isFinite(enemy?.vx) ? enemy.vx : 0,
+      y: Number.isFinite(enemy?.vy) ? enemy.vy : 0,
+    };
+
+    const intensity = Math.max(1, radius / 110);
+    const flashColor = palette.flash || 'rgba(255, 190, 110, 0.4)';
+    const shockwaveColor = palette.shockwave || palette.flash || 'rgba(255, 160, 70, 0.35)';
+    const debrisColor = palette.debris || '#7A3B16';
+    const sparkColor = palette.sparks || '#FFD27F';
+    const smokeColor = palette.smoke || 'rgba(90, 40, 20, 0.45)';
+
+    this.addScreenShake(6 + radius * 0.025, 0.28 + intensity * 0.08);
+    this.addScreenFlash(flashColor, 0.22, 0.2 + intensity * 0.05);
+    this.addFreezeFrame(0.14 + Math.min(0.12, intensity * 0.08), 0.18);
+
+    this.createShockwaveEffect({
+      position,
+      radius: radius * 1.1,
+      duration: 0.55,
+      baseWidth: 20,
+      maxAlpha: 0.72,
+      color: shockwaveColor,
+      shadowColor: 'rgba(255, 140, 60, 0.5)',
+      shadowBlur: 28,
+      fillColor: 'rgba(255, 210, 160, 0.18)',
+    });
+
+    const sparkCount = this.getScaledParticleCount(24 + Math.round(radius / 4));
+    for (let i = 0; i < sparkCount; i += 1) {
+      const angle = this.randomFloat('explosions') * Math.PI * 2;
+      const speed = (140 + this.randomFloat('explosions') * 180) * (0.9 + intensity * 0.25);
+      this.particles.push(
+        this.createParticle(
+          position.x,
+          position.y,
+          Math.cos(angle) * speed + (velocity.x || 0) * 0.35,
+          Math.sin(angle) * speed + (velocity.y || 0) * 0.35,
+          sparkColor,
+          2.4 + this.randomFloat('explosions') * 2.8,
+          0.32 + this.randomFloat('explosions') * 0.18,
+          'spark'
+        )
+      );
+    }
+
+    const debrisCount = this.getScaledParticleCount(14 + Math.round(radius / 6));
+    for (let i = 0; i < debrisCount; i += 1) {
+      const angle = this.randomFloat('explosions') * Math.PI * 2;
+      const speed = 90 + this.randomFloat('explosions') * 110;
+      this.particles.push(
+        this.createParticle(
+          position.x + Math.cos(angle) * radius * 0.18,
+          position.y + Math.sin(angle) * radius * 0.18,
+          Math.cos(angle) * speed + (velocity.x || 0) * 0.25,
+          Math.sin(angle) * speed + (velocity.y || 0) * 0.25,
+          debrisColor,
+          3.2 + this.randomFloat('explosions') * 2.4,
+          0.5 + this.randomFloat('explosions') * 0.3,
+          'debris'
+        )
+      );
+    }
+
+    const smokeCount = this.getScaledParticleCount(10 + Math.round(radius / 10), {
+      allowZero: true,
+    });
+    for (let i = 0; i < smokeCount; i += 1) {
+      const angle = this.randomFloat('explosions') * Math.PI * 2;
+      const speed = 40 + this.randomFloat('explosions') * 60;
+      this.particles.push(
+        this.createParticle(
+          position.x,
+          position.y,
+          Math.cos(angle) * speed * 0.6,
+          Math.sin(angle) * speed * 0.6,
+          smokeColor,
+          6 + this.randomFloat('explosions') * 5,
+          0.7 + this.randomFloat('explosions') * 0.4,
+          'normal'
+        )
+      );
+    }
+  }
+
+  createDroneDestructionEffect(enemy, context = {}) {
+    if (!enemy) {
+      return;
+    }
+
+    const position = {
+      x: Number.isFinite(enemy.x) ? enemy.x : Number.isFinite(context?.position?.x) ? context.position.x : null,
+      y: Number.isFinite(enemy.y) ? enemy.y : Number.isFinite(context?.position?.y) ? context.position.y : null,
+    };
+
+    if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) {
+      return;
+    }
+
+    const palette = this.resolveEnemyEffectPalette('drone');
+    const radius = Number.isFinite(enemy.radius) ? enemy.radius : 12;
+    const velocity = {
+      x: Number.isFinite(enemy.vx) ? enemy.vx : 0,
+      y: Number.isFinite(enemy.vy) ? enemy.vy : 0,
+    };
+
+    this.addScreenShake(3.4, 0.18);
+    this.addScreenFlash(palette.flash || 'rgba(150, 220, 255, 0.35)', 0.12, 0.1);
+
+    const sparkCount = this.getScaledParticleCount(14 + Math.round(radius));
+    for (let i = 0; i < sparkCount; i += 1) {
+      const angle = this.randomFloat('explosions') * Math.PI * 2;
+      const speed = 120 + this.randomFloat('explosions') * 150;
+      this.particles.push(
+        this.createParticle(
+          position.x,
+          position.y,
+          Math.cos(angle) * speed + velocity.x * 0.3,
+          Math.sin(angle) * speed + velocity.y * 0.3,
+          palette.explosionSpark || '#E1F6FF',
+          2 + this.randomFloat('explosions') * 2.2,
+          0.32 + this.randomFloat('explosions') * 0.18,
+          'spark'
+        )
+      );
+    }
+
+    const coreCount = this.getScaledParticleCount(6, { allowZero: true });
+    for (let i = 0; i < coreCount; i += 1) {
+      const angle = this.randomFloat('explosions') * Math.PI * 2;
+      const speed = 70 + this.randomFloat('explosions') * 80;
+      this.particles.push(
+        this.createParticle(
+          position.x,
+          position.y,
+          Math.cos(angle) * speed + velocity.x * 0.25,
+          Math.sin(angle) * speed + velocity.y * 0.25,
+          palette.explosionCore || 'rgba(120, 205, 255, 0.45)',
+          3 + this.randomFloat('explosions') * 2.8,
+          0.4 + this.randomFloat('explosions') * 0.18,
+          'normal'
+        )
+      );
+    }
+
+    const smokeCount = this.getScaledParticleCount(5, { allowZero: true });
+    for (let i = 0; i < smokeCount; i += 1) {
+      const angle = this.randomFloat('explosions') * Math.PI * 2;
+      const speed = 40 + this.randomFloat('explosions') * 60;
+      this.particles.push(
+        this.createParticle(
+          position.x,
+          position.y,
+          Math.cos(angle) * speed * 0.5,
+          Math.sin(angle) * speed * 0.5,
+          palette.explosionSmoke || 'rgba(40, 80, 120, 0.35)',
+          4.5 + this.randomFloat('explosions') * 3.2,
+          0.55 + this.randomFloat('explosions') * 0.22,
+          'normal'
+        )
+      );
+    }
+  }
+
+  createHunterDestructionEffect(enemy, context = {}) {
+    if (!enemy) {
+      return;
+    }
+
+    const position = {
+      x: Number.isFinite(enemy.x) ? enemy.x : Number.isFinite(context?.position?.x) ? context.position.x : null,
+      y: Number.isFinite(enemy.y) ? enemy.y : Number.isFinite(context?.position?.y) ? context.position.y : null,
+    };
+
+    if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) {
+      return;
+    }
+
+    const palette = this.resolveEnemyEffectPalette('hunter');
+    const radius = Number.isFinite(enemy.radius) ? enemy.radius : 16;
+    const velocity = {
+      x: Number.isFinite(enemy.vx) ? enemy.vx : 0,
+      y: Number.isFinite(enemy.vy) ? enemy.vy : 0,
+    };
+
+    this.addScreenShake(5.2, 0.22);
+    this.addScreenFlash(palette.flash || 'rgba(255, 200, 255, 0.38)', 0.14, 0.14);
+    this.createShockwaveEffect({
+      position,
+      radius: radius * 2.4,
+      duration: 0.42,
+      baseWidth: 16,
+      maxAlpha: 0.55,
+      color: palette.explosionCore || 'rgba(250, 150, 255, 0.5)',
+      shadowColor: 'rgba(120, 40, 160, 0.45)',
+      shadowBlur: 22,
+    });
+
+    const sparkCount = this.getScaledParticleCount(18 + Math.round(radius * 1.5));
+    for (let i = 0; i < sparkCount; i += 1) {
+      const angle = this.randomFloat('explosions') * Math.PI * 2;
+      const speed = 150 + this.randomFloat('explosions') * 170;
+      const color = i % 3 === 0
+        ? palette.explosionCore || 'rgba(250, 150, 255, 0.5)'
+        : palette.explosionSpark || '#FFE8FF';
+      this.particles.push(
+        this.createParticle(
+          position.x,
+          position.y,
+          Math.cos(angle) * speed + velocity.x * 0.35,
+          Math.sin(angle) * speed + velocity.y * 0.35,
+          color,
+          2.6 + this.randomFloat('explosions') * 2.6,
+          0.34 + this.randomFloat('explosions') * 0.2,
+          'spark'
+        )
+      );
+    }
+
+    const plumeCount = this.getScaledParticleCount(8, { allowZero: true });
+    for (let i = 0; i < plumeCount; i += 1) {
+      const angle = this.randomFloat('explosions') * Math.PI * 2;
+      const speed = 60 + this.randomFloat('explosions') * 80;
+      this.particles.push(
+        this.createParticle(
+          position.x,
+          position.y,
+          Math.cos(angle) * speed + velocity.x * 0.22,
+          Math.sin(angle) * speed + velocity.y * 0.22,
+          palette.explosionCore || 'rgba(250, 150, 255, 0.5)',
+          4.8 + this.randomFloat('explosions') * 3.4,
+          0.46 + this.randomFloat('explosions') * 0.24,
+          'normal'
+        )
+      );
+    }
+
+    const smokeCount = this.getScaledParticleCount(7, { allowZero: true });
+    for (let i = 0; i < smokeCount; i += 1) {
+      const angle = this.randomFloat('explosions') * Math.PI * 2;
+      const speed = 40 + this.randomFloat('explosions') * 60;
+      this.particles.push(
+        this.createParticle(
+          position.x,
+          position.y,
+          Math.cos(angle) * speed * 0.55,
+          Math.sin(angle) * speed * 0.55,
+          palette.explosionSmoke || 'rgba(70, 30, 110, 0.35)',
+          5.4 + this.randomFloat('explosions') * 3.6,
+          0.6 + this.randomFloat('explosions') * 0.22,
+          'normal'
+        )
+      );
+    }
+  }
+
   createHitMarker(position, killed, damage) {
     this.hitMarkers.push(new HitMarker(position.x, position.y, killed, damage));
   }
@@ -2314,8 +2909,48 @@ export default class EffectsSystem {
     }
   }
 
-  createAsteroidExplosion(asteroid) {
+  createAsteroidExplosion(asteroid, context = {}) {
     if (!asteroid) {
+      return;
+    }
+
+    const enemyType = this.resolveEnemyType({ enemy: asteroid });
+    if (enemyType === 'drone') {
+      this.createDroneDestructionEffect(asteroid, context);
+      return;
+    }
+
+    if (enemyType === 'hunter') {
+      this.createHunterDestructionEffect(asteroid, context);
+      return;
+    }
+
+    if (enemyType === 'mine') {
+      const minePayload = {
+        ...context,
+        enemy: asteroid,
+      };
+      if (!minePayload.position) {
+        minePayload.position = {
+          x: Number.isFinite(asteroid.x) ? asteroid.x : 0,
+          y: Number.isFinite(asteroid.y) ? asteroid.y : 0,
+        };
+      }
+      if (!Number.isFinite(minePayload.radius) && Number.isFinite(asteroid.explosionRadius)) {
+        minePayload.radius = asteroid.explosionRadius;
+      }
+      if (!minePayload.velocity) {
+        minePayload.velocity = {
+          x: Number.isFinite(asteroid.vx) ? asteroid.vx : 0,
+          y: Number.isFinite(asteroid.vy) ? asteroid.vy : 0,
+        };
+      }
+      this.createMineExplosion(minePayload);
+      return;
+    }
+
+    if (enemyType === 'boss') {
+      // Boss explosions are handled by dedicated boss events to avoid duplicates.
       return;
     }
 

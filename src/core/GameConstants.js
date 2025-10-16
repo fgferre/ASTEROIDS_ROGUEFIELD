@@ -1093,6 +1093,41 @@ export const ENEMY_TYPES = Object.freeze({
   }),
 });
 
+export const ENEMY_EFFECT_COLORS = Object.freeze({
+  drone: Object.freeze({
+    muzzle: '#7AD7FF',
+    muzzleAccent: '#C9F1FF',
+    exhaust: 'rgba(110, 200, 255, 0.45)',
+    flash: 'rgba(150, 220, 255, 0.35)',
+    explosionCore: 'rgba(120, 205, 255, 0.45)',
+    explosionSpark: '#E1F6FF',
+    explosionSmoke: 'rgba(40, 80, 120, 0.35)',
+  }),
+  hunter: Object.freeze({
+    muzzle: '#FF86E8',
+    muzzleAccent: '#FFD6FF',
+    burstTrail: '#BE9CFF',
+    flash: 'rgba(255, 200, 255, 0.38)',
+    explosionCore: 'rgba(250, 150, 255, 0.5)',
+    explosionSpark: '#FFE8FF',
+    explosionSmoke: 'rgba(70, 30, 110, 0.35)',
+  }),
+  mine: Object.freeze({
+    core: '#FF9348',
+    sparks: '#FFD27F',
+    debris: '#7A3B16',
+    smoke: 'rgba(90, 40, 20, 0.45)',
+    flash: 'rgba(255, 190, 110, 0.4)',
+    shockwave: 'rgba(255, 160, 70, 0.35)',
+  }),
+  boss: Object.freeze({
+    core: '#FF6B9C',
+    accent: '#F9C74F',
+    flash: 'rgba(255, 220, 240, 0.55)',
+    smoke: 'rgba(60, 20, 60, 0.35)',
+  }),
+});
+
 export const BOSS_CONFIG = Object.freeze({
   key: 'boss',
   displayName: 'Apex Overlord',
