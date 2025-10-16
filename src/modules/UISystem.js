@@ -19,6 +19,19 @@ const COLOR_ASSIST_ACCENTS = {
   default: '#4C6EF5',
 };
 
+const MINIMAP_DEFAULT_RANGE = 300;
+
+const MINIMAP_ENTITY_COLORS = {
+  asteroid: '#9aa5b1',
+  drone: '#48aff0',
+  mine: '#ffb347',
+  hunter: '#b084f7',
+  boss: '#ff6b6b',
+  default: '#94d2ff',
+};
+
+const COMBO_HIGH_THRESHOLD = 5;
+
 class UISystem {
   constructor(dependencies = {}) {
     this.dependencies = normalizeDependencies(dependencies);
@@ -82,6 +95,22 @@ class UISystem {
         enemiesTextLength: 0,
       },
       boss: this.createInitialBossCachedValues(),
+      combo: {
+        count: 0,
+        multiplier: 1,
+        active: false,
+        text: '0 Hits',
+        multiplierText: 'x1.0',
+        lastCount: 0,
+      },
+      minimap: {
+        range: null,
+        width: null,
+        height: null,
+      },
+      threats: {
+        totalIndicators: 0,
+      },
     };
 
     this.settings = null;
@@ -114,6 +143,8 @@ class UISystem {
     this.bossHudState = this.createInitialBossHudState();
     this.bossBannerTimeout = null;
     this.bossHideTimeout = null;
+
+    this.comboPulseTimeout = null;
 
     this.initializeSettingsMetadata();
 
@@ -190,6 +221,21 @@ class UISystem {
           document.getElementById('credits-close-btn'),
           document.getElementById('credits-back-btn'),
         ].filter(Boolean),
+      },
+      minimap: {
+        container: document.getElementById('hud-minimap') || null,
+        canvas: document.getElementById('minimap-canvas') || null,
+        context: null,
+        rangeLabel: document.getElementById('minimap-range') || null,
+      },
+      threats: {
+        container: document.getElementById('threat-indicators-container') || null,
+        overlay: document.getElementById('threat-indicators-overlay') || null,
+      },
+      combo: {
+        container: document.getElementById('hud-combo') || null,
+        value: document.getElementById('combo-display') || null,
+        multiplier: document.getElementById('combo-multiplier') || null,
       },
     };
   }
@@ -488,6 +534,16 @@ class UISystem {
       next.phaseColors = colors;
       if ((!next.color || next.color === '#ff6b6b') && colors.length > 0) {
         next.color = colors[Math.min(next.phase, colors.length - 1)];
+      }
+    }
+
+    if (Array.isArray(next.phaseColors) && next.phaseColors.length > 0) {
+      const phaseIndex = Number.isFinite(next.phase)
+        ? Math.max(0, Math.min(next.phase, next.phaseColors.length - 1))
+        : 0;
+      const phaseColor = next.phaseColors[phaseIndex];
+      if (phaseColor) {
+        next.color = phaseColor;
       }
     }
 
@@ -1485,6 +1541,7 @@ class UISystem {
     });
 
     this.refreshWaveDomRefs();
+    this.refreshTacticalDomRefs();
   }
 
   applyHudLayoutPreference(layoutId) {
@@ -1557,6 +1614,44 @@ class UISystem {
 
     if (config.type === 'boss' || config.layout === 'boss') {
       return this.createBossHudItem(config);
+    }
+
+    if (config.layout === 'custom') {
+      root.classList.add('hud-item--custom');
+
+      if (iconElement) {
+        iconElement.classList.add('hud-item__icon');
+        root.appendChild(iconElement);
+      }
+
+      if (leadingElement) {
+        root.appendChild(leadingElement);
+      }
+
+      const customWrapper = document.createElement('div');
+      customWrapper.classList.add('hud-custom');
+      root.appendChild(customWrapper);
+
+      const customElement = this.createCustomHudElement(config.custom);
+      if (customElement) {
+        customWrapper.appendChild(customElement);
+      }
+
+      if (metaElement && metaPosition === 'after-value') {
+        customWrapper.appendChild(metaElement);
+      } else if (metaElement) {
+        root.appendChild(metaElement);
+      }
+
+      return {
+        key: config.key,
+        config,
+        root,
+        customElement,
+        meta: metaElement,
+        leading: leadingElement,
+        icon: iconElement,
+      };
     }
 
     if (config.layout === 'inline-progress') {
@@ -1814,6 +1909,65 @@ class UISystem {
     };
   }
 
+  createCustomHudElement(customConfig = {}) {
+    if (!customConfig || typeof document === 'undefined') {
+      return null;
+    }
+
+    const elementName = typeof customConfig.element === 'string'
+      ? customConfig.element.toLowerCase()
+      : 'div';
+
+    let element = null;
+    if (elementName === 'canvas') {
+      element = document.createElement('canvas');
+      const width = Number(customConfig.width ?? customConfig.w);
+      const height = Number(customConfig.height ?? customConfig.h);
+      if (Number.isFinite(width) && width > 0) {
+        element.width = width;
+      }
+      if (Number.isFinite(height) && height > 0) {
+        element.height = height;
+      }
+    } else {
+      element = document.createElement(elementName || 'div');
+    }
+
+    if (!element) {
+      return null;
+    }
+
+    if (customConfig.id) {
+      element.id = customConfig.id;
+    }
+
+    if (Array.isArray(customConfig.classes)) {
+      customConfig.classes.forEach((className) => {
+        if (className) {
+          element.classList.add(className);
+        }
+      });
+    }
+
+    if (customConfig.dataset && element.dataset) {
+      Object.entries(customConfig.dataset).forEach(([key, value]) => {
+        if (key) {
+          element.dataset[key] = value;
+        }
+      });
+    }
+
+    if (customConfig.attributes) {
+      Object.entries(customConfig.attributes).forEach(([key, value]) => {
+        if (key) {
+          element.setAttribute(key, value);
+        }
+      });
+    }
+
+    return element;
+  }
+
   createMetaElement(metaConfig) {
     if (!metaConfig) {
       return null;
@@ -1932,6 +2086,72 @@ class UISystem {
     };
   }
 
+  refreshTacticalDomRefs() {
+    const minimapEntry = this.hudElements.get('minimap') || {};
+    const threatEntry = this.hudElements.get('threatIndicators') || {};
+    const comboEntry = this.hudElements.get('comboMeter') || {};
+
+    const minimapCanvas =
+      (minimapEntry.customElement && typeof minimapEntry.customElement.getContext === 'function')
+        ? minimapEntry.customElement
+        : document.getElementById('minimap-canvas');
+    const minimapContainer = minimapEntry.root || document.getElementById('hud-minimap');
+    const minimapRangeLabel = document.getElementById('minimap-range');
+    const minimapContext = minimapCanvas && typeof minimapCanvas.getContext === 'function'
+      ? minimapCanvas.getContext('2d')
+      : null;
+
+    let minimapRange = MINIMAP_DEFAULT_RANGE;
+    const datasetRange = minimapCanvas?.dataset?.range;
+    if (datasetRange !== undefined) {
+      const parsed = Number(datasetRange);
+      if (Number.isFinite(parsed) && parsed > 0) {
+        minimapRange = parsed;
+      }
+    } else if (Number.isFinite(minimapEntry?.config?.custom?.range)) {
+      const parsed = Number(minimapEntry.config.custom.range);
+      if (parsed > 0) {
+        minimapRange = parsed;
+      }
+    }
+
+    if (!this.domRefs.minimap) {
+      this.domRefs.minimap = {};
+    }
+
+    this.domRefs.minimap.container = minimapContainer || null;
+    this.domRefs.minimap.canvas = minimapCanvas || null;
+    this.domRefs.minimap.context = minimapContext;
+    this.domRefs.minimap.rangeLabel = minimapRangeLabel || null;
+
+    if (this.cachedValues.minimap) {
+      this.cachedValues.minimap.range = minimapRange;
+      this.cachedValues.minimap.width = minimapCanvas?.width || minimapCanvas?.clientWidth || null;
+      this.cachedValues.minimap.height = minimapCanvas?.height || minimapCanvas?.clientHeight || null;
+    }
+
+    const threatContainer = threatEntry.root || document.getElementById('threat-indicators-container');
+    const threatOverlay =
+      threatEntry.customElement && typeof threatEntry.customElement.appendChild === 'function'
+        ? threatEntry.customElement
+        : document.getElementById('threat-indicators-overlay');
+
+    this.domRefs.threats = {
+      container: threatContainer || null,
+      overlay: threatOverlay || threatContainer || null,
+    };
+
+    const comboRoot = comboEntry.root || document.getElementById('hud-combo');
+    const comboValue = comboEntry.value || document.getElementById('combo-display');
+    const comboMultiplier = comboEntry.meta || document.getElementById('combo-multiplier');
+
+    this.domRefs.combo = {
+      container: comboRoot || null,
+      value: comboValue || null,
+      multiplier: comboMultiplier || null,
+    };
+  }
+
   setupEventListeners() {
     if (typeof gameEvents === 'undefined') {
       return;
@@ -1952,10 +2172,27 @@ class UISystem {
 
     gameEvents.on('player-reset', () => {
       this.resetBossHudState();
+      this.resetTacticalHudState();
     });
 
     gameEvents.on('progression-reset', () => {
       this.resetBossHudState();
+      this.resetTacticalHudState();
+    });
+
+    gameEvents.on('combo-updated', (payload = {}) => {
+      this.updateComboMeter(payload, { force: true });
+    });
+
+    gameEvents.on('combo-broken', (payload = {}) => {
+      this.handleComboBroken(payload);
+    });
+
+    ['enemy-spawned', 'enemy-destroyed'].forEach((eventName) => {
+      gameEvents.on(eventName, () => {
+        this.renderMinimap();
+        this.updateThreatIndicators();
+      });
     });
 
     gameEvents.on('experience-changed', (data) => {
@@ -1980,6 +2217,7 @@ class UISystem {
       setTimeout(() => {
         this.showGameOverScreen(data);
       }, 3000); // 3s delay to fully enjoy the spectacle!
+      this.handleComboBroken();
     });
 
     gameEvents.on('player-took-damage', () => {
@@ -2007,6 +2245,8 @@ class UISystem {
 
     gameEvents.on('wave-state-updated', (payload) => {
       this.handleWaveStateUpdated(payload);
+      this.renderMinimap();
+      this.updateThreatIndicators();
     });
 
     gameEvents.on('wave-completed', (payload = {}) => {
@@ -3089,6 +3329,8 @@ class UISystem {
       if (typeof progression.getExperience === 'function') {
         this.updateXPBar(progression.getExperience(), { force });
       }
+
+      this.updateComboMeterFromServices({ force });
     }
 
     const enemies = this.getService('enemies');
@@ -3106,6 +3348,569 @@ class UISystem {
   update() {
     this.refreshHudFromServices(false);
     this.renderBossHud();
+    this.renderMinimap();
+    this.updateThreatIndicators();
+  }
+
+  resetTacticalHudState() {
+    this.resetComboMeter(true);
+    this.clearThreatIndicators();
+    this.clearMinimapCanvas();
+  }
+
+  updateComboMeterFromServices(options = {}) {
+    const progression = this.getService('progression');
+    if (!progression) {
+      return;
+    }
+
+    const force = Boolean(options.force);
+
+    let comboCount = null;
+    let multiplier = null;
+
+    if (typeof progression.getComboState === 'function') {
+      const comboState = progression.getComboState();
+      if (comboState && typeof comboState === 'object') {
+        comboCount = comboState.comboCount ?? comboState.count ?? comboState.combo ?? null;
+        multiplier = comboState.multiplier ?? comboState.comboMultiplier ?? null;
+      }
+    }
+
+    if (comboCount === null && typeof progression.getCurrentCombo === 'function') {
+      comboCount = progression.getCurrentCombo();
+    }
+
+    if (multiplier === null && typeof progression.getComboMultiplier === 'function') {
+      multiplier = progression.getComboMultiplier();
+    }
+
+    if (comboCount === null && typeof progression.currentCombo === 'number') {
+      comboCount = progression.currentCombo;
+    }
+
+    if (multiplier === null && typeof progression.comboMultiplier === 'number') {
+      multiplier = progression.comboMultiplier;
+    }
+
+    if (comboCount === null && multiplier === null) {
+      return;
+    }
+
+    this.updateComboMeter({ comboCount, multiplier }, { force });
+  }
+
+  updateComboMeter(data = {}, options = {}) {
+    if (!this.cachedValues.combo) {
+      this.cachedValues.combo = {
+        count: 0,
+        multiplier: 1,
+        active: false,
+        text: '0 Hits',
+        multiplierText: 'x1.0',
+        lastCount: 0,
+      };
+    }
+
+    const comboRefs = this.domRefs.combo || {};
+    const entry = this.hudElements.get('comboMeter');
+    const root = comboRefs.container || entry?.root || null;
+    const valueElement = comboRefs.value || entry?.value || null;
+    const multiplierElement = comboRefs.multiplier || entry?.meta || null;
+
+    const force = Boolean(options.force);
+    const silent = Boolean(options.silent);
+
+    const rawCount = data.comboCount ?? data.count ?? data.combo ?? 0;
+    const normalizedCount = Number.isFinite(Number(rawCount))
+      ? Math.max(0, Math.floor(Number(rawCount)))
+      : 0;
+
+    const rawMultiplier = data.multiplier ?? data.comboMultiplier ?? data.multiplierValue;
+    const normalizedMultiplier = Number.isFinite(Number(rawMultiplier))
+      ? Math.max(1, Number(rawMultiplier))
+      : 1;
+
+    const active = normalizedCount > 0;
+    const hitsLabel = normalizedCount === 1 ? '1 Hit' : `${normalizedCount} Hits`;
+    const multiplierLabel = `x${normalizedMultiplier.toFixed(1)}`;
+
+    const cached = this.cachedValues.combo;
+
+    if (valueElement && (force || cached.text !== hitsLabel)) {
+      valueElement.textContent = hitsLabel;
+      cached.text = hitsLabel;
+    }
+
+    if (multiplierElement && (force || cached.multiplierText !== multiplierLabel)) {
+      multiplierElement.textContent = multiplierLabel;
+      cached.multiplierText = multiplierLabel;
+    }
+
+    cached.count = normalizedCount;
+    cached.multiplier = normalizedMultiplier;
+    cached.active = active;
+
+    if (!root) {
+      return;
+    }
+
+    const becameHigher = normalizedCount > (cached.lastCount ?? 0);
+    cached.lastCount = normalizedCount;
+
+    root.classList.toggle('is-active', active);
+    root.classList.toggle('combo-high', normalizedCount >= COMBO_HIGH_THRESHOLD);
+
+    if (options.broken) {
+      root.classList.remove('combo-high');
+      root.classList.remove('is-active');
+      if (typeof window !== 'undefined') {
+        root.classList.add('is-broken');
+        window.setTimeout(() => {
+          root.classList.remove('is-broken');
+        }, 420);
+      } else {
+        root.classList.remove('is-broken');
+      }
+      this.clearComboPulse(root);
+      return;
+    }
+
+    if (!silent && active && becameHigher) {
+      this.triggerComboPulse(root);
+    } else if (!active) {
+      this.clearComboPulse(root);
+    }
+  }
+
+  triggerComboPulse(rootElement) {
+    if (!rootElement) {
+      return;
+    }
+
+    rootElement.classList.remove('is-pulsing');
+    // Force reflow for animation restart
+    // eslint-disable-next-line no-unused-expressions
+    rootElement.offsetWidth;
+    rootElement.classList.add('is-pulsing');
+
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    if (this.comboPulseTimeout) {
+      window.clearTimeout(this.comboPulseTimeout);
+    }
+
+    this.comboPulseTimeout = window.setTimeout(() => {
+      rootElement.classList.remove('is-pulsing');
+      this.comboPulseTimeout = null;
+    }, 520);
+  }
+
+  clearComboPulse(rootElement) {
+    if (this.comboPulseTimeout && typeof window !== 'undefined') {
+      window.clearTimeout(this.comboPulseTimeout);
+      this.comboPulseTimeout = null;
+    }
+
+    if (rootElement) {
+      rootElement.classList.remove('is-pulsing');
+    }
+  }
+
+  handleComboBroken(payload = {}) {
+    const comboCount = Number.isFinite(Number(payload.comboCount))
+      ? Math.max(0, Math.floor(Number(payload.comboCount)))
+      : 0;
+    const multiplier = Number.isFinite(Number(payload.multiplier))
+      ? Math.max(1, Number(payload.multiplier))
+      : 1;
+
+    this.updateComboMeter(
+      {
+        comboCount,
+        multiplier,
+      },
+      { force: true, broken: true }
+    );
+  }
+
+  resetComboMeter(silent = false) {
+    this.updateComboMeter(
+      {
+        comboCount: 0,
+        multiplier: 1,
+      },
+      { force: true, silent }
+    );
+  }
+
+  getMinimapContext() {
+    const minimapRefs = this.domRefs.minimap;
+    const canvas = minimapRefs?.canvas;
+    if (!canvas || typeof canvas.getContext !== 'function') {
+      return null;
+    }
+
+    if (!minimapRefs.context) {
+      minimapRefs.context = canvas.getContext('2d');
+    }
+
+    return minimapRefs.context;
+  }
+
+  resolveMinimapRange() {
+    const stored = this.cachedValues.minimap?.range;
+    if (Number.isFinite(Number(stored)) && Number(stored) > 0) {
+      return Number(stored);
+    }
+    return MINIMAP_DEFAULT_RANGE;
+  }
+
+  clearMinimapCanvas() {
+    const ctx = this.getMinimapContext();
+    const canvas = this.domRefs.minimap?.canvas;
+    if (!ctx || !canvas) {
+      return;
+    }
+
+    const width = canvas.width || canvas.clientWidth || 0;
+    const height = canvas.height || canvas.clientHeight || 0;
+    if (width <= 0 || height <= 0) {
+      return;
+    }
+
+    ctx.clearRect(0, 0, width, height);
+  }
+
+  renderMinimap() {
+    const ctx = this.getMinimapContext();
+    const canvas = this.domRefs.minimap?.canvas;
+    if (!ctx || !canvas) {
+      return;
+    }
+
+    const player = this.getService('player');
+    const physics = this.getService('physics');
+    if (!player || !physics || typeof physics.getNearbyEnemies !== 'function') {
+      this.clearMinimapCanvas();
+      return;
+    }
+
+    const position =
+      typeof player.getPosition === 'function'
+        ? player.getPosition()
+        : { x: player.x ?? 0, y: player.y ?? 0 };
+
+    if (!Number.isFinite(position?.x) || !Number.isFinite(position?.y)) {
+      this.clearMinimapCanvas();
+      return;
+    }
+
+    const range = this.resolveMinimapRange();
+    const enemies = physics.getNearbyEnemies(position.x, position.y, range) || [];
+
+    const rangeLabel = this.domRefs.minimap?.rangeLabel;
+    if (rangeLabel) {
+      const labelText = `Range ${Math.round(range)}u`;
+      if (rangeLabel.textContent !== labelText) {
+        rangeLabel.textContent = labelText;
+      }
+    }
+
+    const width = canvas.width || canvas.clientWidth || 0;
+    const height = canvas.height || canvas.clientHeight || 0;
+
+    if (!(width > 0 && height > 0)) {
+      return;
+    }
+
+    ctx.clearRect(0, 0, width, height);
+
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const radius = Math.max(8, Math.min(centerX, centerY) - 2);
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.lineWidth = 1;
+    if (typeof ctx.setLineDash === 'function') {
+      ctx.setLineDash([4, 6]);
+    }
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.beginPath();
+    ctx.moveTo(-radius, 0);
+    ctx.lineTo(radius, 0);
+    ctx.moveTo(0, -radius);
+    ctx.lineTo(0, radius);
+    ctx.stroke();
+    if (typeof ctx.setLineDash === 'function') {
+      ctx.setLineDash([]);
+    }
+
+    const playerAngle =
+      typeof player.getAngle === 'function'
+        ? player.getAngle()
+        : typeof player.angle === 'number'
+          ? player.angle
+          : 0;
+
+    ctx.save();
+    ctx.rotate(playerAngle);
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(0, -6);
+    ctx.lineTo(4, 5);
+    ctx.lineTo(-4, 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    const detectionRadius = Math.max(1, range);
+    const effectiveRadius = radius;
+
+    enemies.forEach((enemy) => {
+      const enemyX = enemy?.x;
+      const enemyY = enemy?.y;
+      if (!Number.isFinite(enemyX) || !Number.isFinite(enemyY)) {
+        return;
+      }
+
+      const dx = enemyX - position.x;
+      const dy = enemyY - position.y;
+      const distance = Math.hypot(dx, dy);
+      if (!Number.isFinite(distance)) {
+        return;
+      }
+
+      const angle = Math.atan2(dy, dx);
+      const normalized = Math.min(1, distance / detectionRadius);
+      const plotRadius = normalized * effectiveRadius;
+      const px = Math.cos(angle) * plotRadius;
+      const py = Math.sin(angle) * plotRadius;
+
+      const category = this.resolveEnemyCategory(enemy);
+      const color = MINIMAP_ENTITY_COLORS[category] || MINIMAP_ENTITY_COLORS.default;
+      const size = category === 'boss' ? 4.5 : category === 'asteroid' ? 2 : 3;
+
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(px, py, size, 0, Math.PI * 2);
+      ctx.fill();
+    });
+
+    ctx.restore();
+  }
+
+  resolveEnemyCategory(enemy = {}) {
+    if (!enemy) {
+      return 'default';
+    }
+
+    if (enemy.tags && typeof enemy.tags.has === 'function') {
+      if (enemy.tags.has('boss')) {
+        return 'boss';
+      }
+      if (enemy.tags.has('hunter')) {
+        return 'hunter';
+      }
+    }
+
+    const typeSource =
+      enemy.type || enemy.enemyType || enemy.category || enemy.kind || enemy.className || '';
+    const type = typeof typeSource === 'string' ? typeSource.toLowerCase() : '';
+
+    if (type.includes('boss')) {
+      return 'boss';
+    }
+    if (type.includes('hunter')) {
+      return 'hunter';
+    }
+    if (type.includes('drone')) {
+      return 'drone';
+    }
+    if (type.includes('mine')) {
+      return 'mine';
+    }
+    if (type.includes('asteroid') || type.includes('rock')) {
+      return 'asteroid';
+    }
+
+    return 'default';
+  }
+
+  resolveThreatViewportRadius(canvas) {
+    if (!canvas) {
+      return 0;
+    }
+
+    const width = Number(canvas.width) || canvas.clientWidth || canvas.offsetWidth || 0;
+    const height = Number(canvas.height) || canvas.clientHeight || canvas.offsetHeight || 0;
+
+    if (!(width > 0 && height > 0)) {
+      return 0;
+    }
+
+    return Math.min(width, height) * 0.5;
+  }
+
+  resolveThreatSeverity(proximity = 0) {
+    const normalized = Math.max(0, Math.min(1, proximity));
+    if (normalized >= 0.85) {
+      return 'critical';
+    }
+    if (normalized >= 0.6) {
+      return 'high';
+    }
+    if (normalized >= 0.35) {
+      return 'medium';
+    }
+    return 'low';
+  }
+
+  updateThreatIndicators() {
+    const threatRefs = this.domRefs.threats || {};
+    const overlay = threatRefs.overlay;
+    if (!overlay || typeof document === 'undefined') {
+      return;
+    }
+
+    const player = this.getService('player');
+    const physics = this.getService('physics');
+    if (!player || !physics || typeof physics.getNearbyEnemies !== 'function') {
+      this.clearThreatIndicators();
+      return;
+    }
+
+    const playerPosition =
+      typeof player.getPosition === 'function'
+        ? player.getPosition()
+        : { x: player.x ?? 0, y: player.y ?? 0 };
+
+    if (!Number.isFinite(playerPosition?.x) || !Number.isFinite(playerPosition?.y)) {
+      this.clearThreatIndicators();
+      return;
+    }
+
+    const overlayWidth = overlay.offsetWidth || overlay.clientWidth || 0;
+    const overlayHeight = overlay.offsetHeight || overlay.clientHeight || 0;
+
+    if (!(overlayWidth > 0 && overlayHeight > 0)) {
+      return;
+    }
+
+    const range = this.resolveMinimapRange();
+    const enemies = physics.getNearbyEnemies(playerPosition.x, playerPosition.y, range) || [];
+    const viewportRadius = this.resolveThreatViewportRadius(this.domRefs.canvas);
+    const detectionRadius = Math.max(range, viewportRadius || range);
+
+    const minIndicatorDistance = viewportRadius > 0 ? viewportRadius : detectionRadius * 0.4;
+
+    const centerX = overlayWidth / 2;
+    const centerY = overlayHeight / 2;
+    const radius = Math.max(8, Math.min(centerX, centerY) - 4);
+
+    const indicators = [];
+
+    enemies.forEach((enemy) => {
+      const enemyX = enemy?.x;
+      const enemyY = enemy?.y;
+      if (!Number.isFinite(enemyX) || !Number.isFinite(enemyY)) {
+        return;
+      }
+
+      const dx = enemyX - playerPosition.x;
+      const dy = enemyY - playerPosition.y;
+      const distance = Math.hypot(dx, dy);
+      if (!Number.isFinite(distance) || distance <= 0) {
+        return;
+      }
+
+      if (viewportRadius && distance <= viewportRadius) {
+        return;
+      }
+
+      if (distance < minIndicatorDistance) {
+        return;
+      }
+
+      const angle = Math.atan2(dy, dx);
+      const normalized = Math.min(1, distance / Math.max(detectionRadius, 1));
+      const proximity = 1 - normalized;
+      const severity = this.resolveThreatSeverity(proximity);
+      const category = this.resolveEnemyCategory(enemy);
+
+      indicators.push({ angle, severity, category, normalized });
+    });
+
+    if (indicators.length === 0) {
+      if (this.cachedValues.threats?.totalIndicators) {
+        this.clearThreatIndicators();
+      }
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+
+    indicators.forEach((indicator) => {
+      const element = document.createElement('div');
+      element.classList.add('threat-indicator');
+      element.classList.add(`threat-indicator--${indicator.category}`);
+      element.classList.add(`threat-indicator--${indicator.severity}`);
+      element.classList.add('threat-pulse');
+      element.dataset.severity = indicator.severity;
+      element.dataset.category = indicator.category;
+
+      const posX = centerX + Math.cos(indicator.angle) * radius;
+      const posY = centerY + Math.sin(indicator.angle) * radius;
+
+      element.style.left = `${posX}px`;
+      element.style.top = `${posY}px`;
+      element.style.transform = `translate(-50%, -50%) rotate(${indicator.angle}rad)`;
+      element.setAttribute('aria-hidden', 'true');
+
+      fragment.appendChild(element);
+    });
+
+    if (typeof overlay.replaceChildren === 'function') {
+      overlay.replaceChildren(fragment);
+    } else {
+      overlay.innerHTML = '';
+      overlay.appendChild(fragment);
+    }
+
+    overlay.classList.toggle('has-indicators', indicators.length > 0);
+
+    if (this.cachedValues.threats) {
+      this.cachedValues.threats.totalIndicators = indicators.length;
+    }
+  }
+
+  clearThreatIndicators() {
+    const overlay = this.domRefs.threats?.overlay;
+    if (!overlay) {
+      return;
+    }
+
+    if (typeof overlay.replaceChildren === 'function') {
+      overlay.replaceChildren();
+    } else {
+      overlay.innerHTML = '';
+    }
+
+    overlay.classList.remove('has-indicators');
+
+    if (this.cachedValues.threats) {
+      this.cachedValues.threats.totalIndicators = 0;
+    }
   }
 
   handleHealthChange(data = {}, options = {}) {
