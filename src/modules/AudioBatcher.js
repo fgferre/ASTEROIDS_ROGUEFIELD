@@ -33,6 +33,130 @@ class AudioBatcher {
     console.log('[AudioBatcher] Initialized with batch window:', batchWindow, 'ms');
   }
 
+  _extractBatchParams(raw) {
+    if (!raw) return null;
+    if (Array.isArray(raw)) {
+      if (raw.length === 1) {
+        return raw[0];
+      }
+      return raw;
+    }
+    return raw;
+  }
+
+  _playBatchedDroneFire(batch) {
+    const options = batch
+      .map(item => this._extractBatchParams(item.params))
+      .filter(Boolean);
+
+    if (!options.length) {
+      return;
+    }
+
+    const aggregated = options.reduce(
+      (acc, opt) => {
+        const frequency = Number(opt.frequency) || 680;
+        const detune = Number(opt.detune) || 0;
+        const duration = Number(opt.duration) || 0.1;
+        const intensity = Number(opt.intensity) || 0.7;
+        const gain = Number(opt.gain) || 0.12;
+
+        acc.frequency += frequency;
+        acc.detune = Math.max(acc.detune, detune);
+        acc.duration = Math.max(acc.duration, duration);
+        acc.intensity += intensity;
+        acc.gain += gain;
+        return acc;
+      },
+      { frequency: 0, detune: 0, duration: 0.1, intensity: 0, gain: 0 }
+    );
+
+    aggregated.count = options.length;
+    aggregated.frequency /= options.length;
+    aggregated.intensity /= options.length;
+    aggregated.gain /= options.length;
+
+    this.audioSystem._playDroneFireDirect(aggregated);
+  }
+
+  _playBatchedHunterBurst(batch) {
+    const options = batch
+      .map(item => this._extractBatchParams(item.params))
+      .filter(Boolean);
+
+    if (!options.length) {
+      return;
+    }
+
+    const grouped = new Map();
+    options.forEach(opt => {
+      const key = opt.burstId ?? `hunter:${grouped.size}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, []);
+      }
+      grouped.get(key).push(opt);
+    });
+
+    grouped.forEach((group) => {
+      if (!group.length) {
+        return;
+      }
+
+      const base = group[0];
+      const aggregated = { ...base };
+      aggregated.concurrency = group.length;
+      aggregated.intensity =
+        group.reduce((sum, opt) => sum + (Number(opt.intensity) || 0.8), 0) /
+        group.length;
+      aggregated.gain =
+        group.reduce((sum, opt) => sum + (Number(opt.gain) || 0.15), 0) /
+        group.length;
+
+      this.audioSystem._playHunterBurstDirect(aggregated);
+    });
+  }
+
+  _playBatchedMineExplosions(batch) {
+    const options = batch
+      .map(item => this._extractBatchParams(item.params))
+      .filter(Boolean);
+
+    if (!options.length) {
+      return;
+    }
+
+    const strongest = options.reduce((prev, current) => {
+      const prevIntensity = Number(prev?.intensity) || 0;
+      const currentIntensity = Number(current?.intensity) || 0;
+      return currentIntensity > prevIntensity ? current : prev;
+    }, options[0]);
+
+    const aggregated = { ...strongest };
+    aggregated.clusterSize = options.length;
+    aggregated.duration = options.reduce(
+      (max, opt) => Math.max(max, Number(opt.duration) || max),
+      Number(strongest?.duration) || 0.5
+    );
+    aggregated.noiseGain = options.reduce(
+      (max, opt) => Math.max(max, Number(opt.noiseGain) || 0),
+      Number(strongest?.noiseGain) || 0.25
+    );
+    aggregated.rumbleGain = options.reduce(
+      (max, opt) => Math.max(max, Number(opt.rumbleGain) || 0),
+      Number(strongest?.rumbleGain) || 0.24
+    );
+    const totalIntensity = options.reduce(
+      (sum, opt) => sum + (Number(opt.intensity) || 0.9),
+      0
+    );
+    aggregated.intensity = Math.min(
+      1.5,
+      totalIntensity / options.length + 0.12 * (options.length - 1)
+    );
+
+    this.audioSystem._playMineExplosionDirect(aggregated);
+  }
+
   /**
    * Agenda um som para batching
    */
@@ -90,7 +214,10 @@ class AudioBatcher {
       'playLaserShot',
       'playAsteroidBreak',
       'playXPCollect',
-      'playShieldImpact'
+      'playShieldImpact',
+      'playDroneFire',
+      'playHunterBurst',
+      'playMineExplosion'
     ];
 
     return batchableSounds.includes(soundType);
@@ -190,6 +317,15 @@ class AudioBatcher {
         break;
       case 'playShieldImpact':
         this._playBatchedShieldImpacts(batch);
+        break;
+      case 'playDroneFire':
+        this._playBatchedDroneFire(batch);
+        break;
+      case 'playHunterBurst':
+        this._playBatchedHunterBurst(batch);
+        break;
+      case 'playMineExplosion':
+        this._playBatchedMineExplosions(batch);
         break;
       default:
         // Fallback to individual sounds
@@ -529,6 +665,7 @@ class AudioBatcher {
    */
   _getSoundCategory(soundType) {
     if (soundType.includes('Laser') || soundType.includes('laser')) return 'laser';
+    if (soundType.includes('Drone') || soundType.includes('Hunter')) return 'laser';
     if (soundType.includes('Asteroid') || soundType.includes('asteroid')) return 'asteroid';
     if (soundType.includes('Explosion') || soundType.includes('explosion')) return 'explosion';
     if (soundType.includes('Shield') || soundType.includes('shield')) return 'shield';
