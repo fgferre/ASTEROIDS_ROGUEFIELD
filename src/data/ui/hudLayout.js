@@ -152,6 +152,109 @@ const CLASSIC_LAYOUT_ITEMS = [
     description: 'Boss encounter status',
     rootId: 'hud-boss',
   },
+  {
+    key: 'minimap',
+    type: 'minimap',
+    position: 'bottom-left',
+    group: 'status-intel',
+    layout: 'custom',
+    label: '',
+    description: 'Tactical minimap showing nearby threats within radar range.',
+    icon: {
+      type: 'svg',
+      viewBox: '0 0 24 24',
+      paths: [
+        {
+          d: 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18.5A8.5 8.5 0 1 1 20.5 12 8.5 8.5 0 0 1 12 20.5z',
+          fill: 'currentColor',
+        },
+        {
+          d: 'M12 6.75a5.25 5.25 0 1 0 5.25 5.25A5.25 5.25 0 0 0 12 6.75zm0 8.25a3 3 0 1 1 3-3 3 3 0 0 1-3 3z',
+          fill: 'rgba(255, 255, 255, 0.65)',
+        },
+        {
+          d: 'M12 3.75v3M20.25 12h-3M12 20.25v-3M4.75 12H8',
+          fill: 'currentColor',
+        },
+      ],
+    },
+    rootId: 'hud-minimap',
+    ariaLive: 'off',
+    initialValue: '',
+    meta: {
+      id: 'minimap-range',
+      initialValue: 'Range 300u',
+      ariaLabel: 'Radar coverage radius in units',
+      classes: ['minimap-range'],
+    },
+    custom: {
+      element: 'canvas',
+      id: 'minimap-canvas',
+      width: 120,
+      height: 120,
+      classes: ['minimap-canvas'],
+      dataset: {
+        range: 300,
+        anchor: 'bottom-left',
+      },
+    },
+  },
+  {
+    key: 'threatIndicators',
+    type: 'threat-indicators',
+    position: 'top-middle',
+    group: 'status-alerts',
+    layout: 'custom',
+    label: '',
+    description: 'Directional indicators highlighting off-screen hostile contacts.',
+    icon: {
+      type: 'svg',
+      viewBox: '0 0 24 24',
+      paths: [
+        {
+          d: 'M12 3.5L4 20.5l8-3 8 3z',
+          fill: 'currentColor',
+        },
+        {
+          d: 'M12 6.5L7 17.1l5-1.9 5 1.9z',
+          fill: 'rgba(255, 255, 255, 0.5)',
+        },
+      ],
+    },
+    rootId: 'threat-indicators-container',
+    ariaLive: 'off',
+    initialValue: '',
+    custom: {
+      element: 'div',
+      id: 'threat-indicators-overlay',
+      classes: ['threat-indicators-container'],
+    },
+    accessibilityHint:
+      'Indicators pulse to show the direction and relative urgency of approaching enemies.',
+  },
+  {
+    key: 'comboMeter',
+    type: 'combo',
+    position: 'top-left',
+    group: 'status-progress',
+    layout: 'inline-value',
+    description: 'Active combo streak and multiplier from recent eliminations.',
+    icon: {
+      type: 'text',
+      value: '🔥',
+    },
+    rootId: 'hud-combo',
+    valueId: 'combo-display',
+    initialValue: '0 Hits',
+    ariaLive: 'polite',
+    metaPosition: 'after-value',
+    meta: {
+      id: 'combo-multiplier',
+      initialValue: 'x1.0',
+      ariaLabel: 'Current combo multiplier',
+      classes: ['combo-multiplier'],
+    },
+  },
 ];
 
 const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
@@ -190,6 +293,29 @@ const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
     overlayId: 'shield-cooldown-overlay',
     initialValue: '--',
     ariaLive: 'polite',
+  },
+  {
+    key: 'comboMeter',
+    type: 'combo',
+    position: 'top-middle',
+    group: 'tactical-vitals',
+    layout: 'inline-value',
+    description: 'Current combo streak and multiplier earned from consecutive hits.',
+    icon: {
+      type: 'text',
+      value: '🔥',
+    },
+    rootId: 'hud-combo',
+    valueId: 'combo-display',
+    initialValue: '0 Hits',
+    ariaLive: 'polite',
+    metaPosition: 'after-value',
+    meta: {
+      id: 'combo-multiplier',
+      initialValue: 'x1.0',
+      ariaLabel: 'Current combo multiplier',
+      classes: ['combo-multiplier'],
+    },
   },
   {
     key: 'kills',
@@ -306,6 +432,87 @@ const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
       ariaLabel: 'Current wave number',
       classes: ['hud-item__meta--wave'],
     },
+  },
+  {
+    key: 'minimap',
+    type: 'minimap',
+    position: 'bottom-left',
+    group: 'tactical-intel',
+    layout: 'custom',
+    label: '',
+    description:
+      'Compact tactical minimap docked to the lower left, showing entities within a 300 unit radius.',
+    icon: {
+      type: 'svg',
+      viewBox: '0 0 24 24',
+      paths: [
+        {
+          d: 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18.25A8.25 8.25 0 1 1 20.25 12 8.26 8.26 0 0 1 12 20.25z',
+          fill: 'currentColor',
+        },
+        {
+          d: 'M12 7.25a4.75 4.75 0 1 0 4.75 4.75A4.75 4.75 0 0 0 12 7.25zm0 7a2.25 2.25 0 1 1 2.25-2.25A2.25 2.25 0 0 1 12 14.25z',
+          fill: 'rgba(255, 255, 255, 0.65)',
+        },
+        {
+          d: 'M12 4.25v2.5M19.25 12h-2.5M12 19.75v-2.5M6.75 12H9.5',
+          fill: 'currentColor',
+        },
+      ],
+    },
+    rootId: 'hud-minimap',
+    ariaLive: 'off',
+    initialValue: '',
+    meta: {
+      id: 'minimap-range',
+      initialValue: 'Range 300u',
+      ariaLabel: 'Radar coverage radius in units',
+      classes: ['minimap-range'],
+    },
+    custom: {
+      element: 'canvas',
+      id: 'minimap-canvas',
+      width: 120,
+      height: 120,
+      classes: ['minimap-canvas'],
+      dataset: {
+        range: 300,
+        anchor: 'bottom-left',
+      },
+    },
+  },
+  {
+    key: 'threatIndicators',
+    type: 'threat-indicators',
+    position: 'top-middle',
+    group: 'tactical-alerts',
+    layout: 'custom',
+    label: '',
+    description: 'Directional threat indicators for enemies outside the camera view.',
+    icon: {
+      type: 'svg',
+      viewBox: '0 0 24 24',
+      paths: [
+        {
+          d: 'M12 3L5 21l7-2.6L19 21z',
+          fill: 'currentColor',
+        },
+        {
+          d: 'M12 6.25L7.9 16.4l4.1-1.5 4.1 1.5z',
+          fill: 'rgba(255, 255, 255, 0.5)',
+        },
+      ],
+    },
+    rootId: 'threat-indicators-container',
+    ariaLive: 'off',
+    initialValue: '',
+    custom: {
+      element: 'div',
+      id: 'threat-indicators-overlay',
+      classes: ['threat-indicators-container'],
+    },
+    accessibilityHint:
+      'Indicators pulse to show the direction and relative urgency of approaching enemies.',
   },
 ];
 
