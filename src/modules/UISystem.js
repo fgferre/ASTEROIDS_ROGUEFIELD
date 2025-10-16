@@ -3598,14 +3598,18 @@ class UISystem {
     context.stroke();
 
     context.save();
-    context.rotate(playerAngle || 0);
+    const heading = Number.isFinite(playerAngle) ? playerAngle : 0;
+    context.rotate(heading);
     context.fillStyle = '#FFFFFF';
+    context.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    context.lineWidth = 1.5;
     context.beginPath();
-    context.moveTo(0, -6);
-    context.lineTo(4, 6);
-    context.lineTo(-4, 6);
+    context.moveTo(6, 0);
+    context.lineTo(-5, 4.5);
+    context.lineTo(-5, -4.5);
     context.closePath();
     context.fill();
+    context.stroke();
     context.restore();
 
     if (Array.isArray(contacts) && contacts.length > 0) {
