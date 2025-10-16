@@ -19,6 +19,28 @@ const COLOR_ASSIST_ACCENTS = {
   default: '#4C6EF5',
 };
 
+const MINIMAP_ENTITY_COLORS = {
+  asteroid: '#A0AEC0',
+  drone: '#63B3ED',
+  mine: '#F6AD55',
+  hunter: '#B794F4',
+  boss: '#F56565',
+  default: '#E2E8F0',
+};
+
+const THREAT_ICON_LOOKUP = {
+  boss: '☠',
+  hunter: '✦',
+  drone: '▲',
+  mine: '✸',
+  asteroid: '●',
+  default: '•',
+};
+
+const DEFAULT_MINIMAP_RANGE = 300;
+const DEFAULT_MINIMAP_DETECTION_MULTIPLIER = 1.5;
+const MAX_THREAT_INDICATORS = 8;
+
 class UISystem {
   constructor(dependencies = {}) {
     this.dependencies = normalizeDependencies(dependencies);
@@ -82,6 +104,20 @@ class UISystem {
         enemiesTextLength: 0,
       },
       boss: this.createInitialBossCachedValues(),
+      combo: {
+        count: 0,
+        multiplier: 1,
+        valueText: '0 Hits',
+        multiplierText: 'x1.0',
+        active: false,
+        high: false,
+      },
+      minimap: {
+        range: 0,
+        detectionRange: 0,
+        width: 0,
+        height: 0,
+      },
     };
 
     this.settings = null;
@@ -114,6 +150,12 @@ class UISystem {
     this.bossHudState = this.createInitialBossHudState();
     this.bossBannerTimeout = null;
     this.bossHideTimeout = null;
+
+    this.comboBreakTimeout = null;
+    this.tacticalState = {
+      contactsCache: null,
+      threats: new Map(),
+    };
 
     this.initializeSettingsMetadata();
 
@@ -191,6 +233,22 @@ class UISystem {
           document.getElementById('credits-back-btn'),
         ].filter(Boolean),
       },
+      minimap: {
+        container: document.getElementById('hud-minimap') || null,
+        canvas: document.getElementById('minimap-canvas') || null,
+        range: document.getElementById('minimap-range') || null,
+        context: null,
+      },
+      threatIndicators: {
+        container:
+          document.getElementById('threat-indicators-container') || null,
+        overlay: document.getElementById('threat-indicators-overlay') || null,
+      },
+      combo: {
+        container: document.getElementById('hud-combo') || null,
+        value: document.getElementById('combo-display') || null,
+        multiplier: document.getElementById('combo-multiplier') || null,
+      },
     };
   }
 
@@ -266,6 +324,8 @@ class UISystem {
       wave: null,
       phase: null,
       phaseCount: null,
+      phaseIndex: null,
+      phaseColors: [],
       status: null,
       color: null,
       health: null,
@@ -693,9 +753,16 @@ class UISystem {
       return;
     }
 
-    entry.root.classList.remove('is-active', 'is-upcoming', 'is-defeated', 'is-visible');
+    entry.root.classList.remove(
+      'is-active',
+      'is-upcoming',
+      'is-defeated',
+      'is-visible',
+      'boss-has-phase-colors'
+    );
     entry.root.classList.add('is-hidden');
     entry.root.setAttribute('aria-hidden', 'true');
+    delete entry.root.dataset.bossPhase;
 
     if (entry.barFill) {
       entry.barFill.style.width = '0%';
@@ -762,10 +829,30 @@ class UISystem {
 
     this.showBossHealthBar();
 
-    const color =
-      typeof state.color === 'string' && state.color.trim().length > 0
-        ? state.color.trim()
-        : '#ff6b6b';
+    const phaseColors = Array.isArray(state.phaseColors) ? state.phaseColors : [];
+
+    const waveNumber = Number.isFinite(state.wave) ? Math.max(1, Math.floor(state.wave)) : null;
+    const phaseCount = Number.isFinite(state.phaseCount)
+      ? Math.max(0, Math.floor(state.phaseCount))
+      : 0;
+    const phaseIndex = Number.isFinite(state.phase) ? Math.max(0, Math.floor(state.phase)) : null;
+    const normalizedPhaseIndex = phaseIndex !== null ? phaseIndex : null;
+
+    let color = null;
+    if (normalizedPhaseIndex !== null && phaseColors.length > 0) {
+      const idx = Math.min(normalizedPhaseIndex, phaseColors.length - 1);
+      const candidate = phaseColors[idx];
+      if (typeof candidate === 'string' && candidate.trim().length > 0) {
+        color = candidate.trim();
+      }
+    }
+
+    if (!color) {
+      color =
+        typeof state.color === 'string' && state.color.trim().length > 0
+          ? state.color.trim()
+          : '#ff6b6b';
+    }
 
     if (force || cached.color !== color) {
       entry.root.style.setProperty('--boss-accent', color);
@@ -797,6 +884,13 @@ class UISystem {
     entry.root.classList.toggle('is-active', isActive);
     entry.root.classList.toggle('is-upcoming', isUpcoming);
     entry.root.classList.toggle('is-defeated', isDefeated);
+    entry.root.classList.toggle('boss-has-phase-colors', phaseColors.length > 0);
+
+    if (phaseColors.length > 0 && normalizedPhaseIndex !== null) {
+      entry.root.dataset.bossPhase = `${normalizedPhaseIndex + 1}`;
+    } else {
+      delete entry.root.dataset.bossPhase;
+    }
 
     const bossName = state.name || 'Boss';
     if (force || cached.name !== bossName) {
@@ -805,12 +899,6 @@ class UISystem {
       }
       cached.name = bossName;
     }
-
-    const waveNumber = Number.isFinite(state.wave) ? Math.max(1, Math.floor(state.wave)) : null;
-    const phaseCount = Number.isFinite(state.phaseCount)
-      ? Math.max(0, Math.floor(state.phaseCount))
-      : 0;
-    const phaseIndex = Number.isFinite(state.phase) ? Math.max(0, Math.floor(state.phase)) : null;
 
     let phaseText = '';
     if (phaseCount > 0 && phaseIndex !== null) {
@@ -879,6 +967,9 @@ class UISystem {
     cached.healthRatio = ratio;
     cached.visible = true;
     cached.wave = waveNumber;
+    cached.phaseCount = phaseCount;
+    cached.phaseIndex = normalizedPhaseIndex;
+    cached.phaseColors = phaseColors.slice();
 
     const now = this.getHighResolutionTime();
     const phaseTimerState = state.timers?.phase || {};
@@ -1485,6 +1576,7 @@ class UISystem {
     });
 
     this.refreshWaveDomRefs();
+    this.refreshTacticalDomRefs();
   }
 
   applyHudLayoutPreference(layoutId) {
@@ -1557,6 +1649,47 @@ class UISystem {
 
     if (config.type === 'boss' || config.layout === 'boss') {
       return this.createBossHudItem(config);
+    }
+
+    if (config.layout === 'custom') {
+      root.classList.add('hud-item--custom');
+
+      if (iconElement) {
+        iconElement.classList.add('hud-item__icon');
+        root.appendChild(iconElement);
+      }
+
+      if (leadingElement) {
+        root.appendChild(leadingElement);
+      }
+
+      const customWrapper = document.createElement('div');
+      customWrapper.classList.add('hud-item__custom');
+
+      const customElement = this.createCustomElement(config.custom);
+      if (customElement) {
+        customWrapper.appendChild(customElement);
+      }
+
+      if (metaElement && metaPosition === 'before') {
+        metaElement.classList.add('hud-custom__meta');
+        root.appendChild(metaElement);
+      }
+
+      root.appendChild(customWrapper);
+
+      if (metaElement && metaPosition !== 'before') {
+        metaElement.classList.add('hud-custom__meta');
+        customWrapper.appendChild(metaElement);
+      }
+
+      return {
+        key: config.key,
+        config,
+        root,
+        custom: customElement,
+        meta: metaElement,
+      };
     }
 
     if (config.layout === 'inline-progress') {
@@ -1714,6 +1847,77 @@ class UISystem {
       unit: unitElement,
       meta: metaElement,
     };
+  }
+
+  createCustomElement(customConfig) {
+    if (!customConfig || typeof document === 'undefined') {
+      return null;
+    }
+
+    const elementName =
+      typeof customConfig.element === 'string' && customConfig.element.trim().length > 0
+        ? customConfig.element.trim().toLowerCase()
+        : 'div';
+
+    let element = null;
+    try {
+      if (elementName === 'canvas') {
+        element = document.createElement('canvas');
+      } else {
+        element = document.createElement(elementName);
+      }
+    } catch (error) {
+      console.warn('[UISystem] Failed to create custom HUD element:', error);
+      element = document.createElement('div');
+    }
+
+    if (customConfig.id) {
+      element.id = customConfig.id;
+    }
+
+    if (Array.isArray(customConfig.classes)) {
+      customConfig.classes.forEach((className) => {
+        if (className) {
+          element.classList.add(className);
+        }
+      });
+    }
+
+    if (customConfig.textContent !== undefined) {
+      element.textContent = `${customConfig.textContent}`;
+    } else if (customConfig.initialValue !== undefined) {
+      element.textContent = `${customConfig.initialValue}`;
+    }
+
+    const isCanvasElement =
+      typeof HTMLCanvasElement !== 'undefined' && element instanceof HTMLCanvasElement;
+
+    if (isCanvasElement) {
+      if (Number.isFinite(customConfig.width)) {
+        element.width = Math.max(1, Math.floor(customConfig.width));
+      }
+      if (Number.isFinite(customConfig.height)) {
+        element.height = Math.max(1, Math.floor(customConfig.height));
+      }
+    }
+
+    if (customConfig.dataset && typeof customConfig.dataset === 'object') {
+      Object.entries(customConfig.dataset).forEach(([key, value]) => {
+        if (key) {
+          element.dataset[key] = `${value}`;
+        }
+      });
+    }
+
+    if (customConfig.attributes && typeof customConfig.attributes === 'object') {
+      Object.entries(customConfig.attributes).forEach(([key, value]) => {
+        if (key) {
+          element.setAttribute(key, `${value}`);
+        }
+      });
+    }
+
+    return element;
   }
 
   createBossHudItem(config = {}) {
@@ -1932,6 +2136,43 @@ class UISystem {
     };
   }
 
+  refreshTacticalDomRefs() {
+    const minimapRefs = this.domRefs.minimap || {};
+    const canvas = document.getElementById('minimap-canvas');
+    const context = canvas && typeof canvas.getContext === 'function'
+      ? canvas.getContext('2d')
+      : null;
+
+    const rangeElement = document.getElementById('minimap-range');
+    const container = document.getElementById('hud-minimap');
+
+    this.domRefs.minimap = {
+      ...minimapRefs,
+      container: container || null,
+      canvas: canvas || null,
+      range: rangeElement || null,
+      context,
+    };
+
+    const threatContainer = document.getElementById('threat-indicators-container');
+    const threatOverlay = document.getElementById('threat-indicators-overlay');
+
+    this.domRefs.threatIndicators = {
+      container: threatContainer || null,
+      overlay: threatOverlay || threatContainer || null,
+    };
+
+    const comboContainer = document.getElementById('hud-combo');
+    const comboValue = document.getElementById('combo-display');
+    const comboMultiplier = document.getElementById('combo-multiplier');
+
+    this.domRefs.combo = {
+      container: comboContainer || null,
+      value: comboValue || null,
+      multiplier: comboMultiplier || null,
+    };
+  }
+
   setupEventListeners() {
     if (typeof gameEvents === 'undefined') {
       return;
@@ -1952,10 +2193,12 @@ class UISystem {
 
     gameEvents.on('player-reset', () => {
       this.resetBossHudState();
+      this.resetTacticalHud();
     });
 
     gameEvents.on('progression-reset', () => {
       this.resetBossHudState();
+      this.resetTacticalHud();
     });
 
     gameEvents.on('experience-changed', (data) => {
@@ -1980,6 +2223,7 @@ class UISystem {
       setTimeout(() => {
         this.showGameOverScreen(data);
       }, 3000); // 3s delay to fully enjoy the spectacle!
+      this.handleComboBroken({ silent: true });
     });
 
     gameEvents.on('player-took-damage', () => {
@@ -2011,6 +2255,14 @@ class UISystem {
 
     gameEvents.on('wave-completed', (payload = {}) => {
       this.handleBossWaveCompletion(payload);
+    });
+
+    gameEvents.on('combo-updated', (payload = {}) => {
+      this.updateComboMeter(payload);
+    });
+
+    gameEvents.on('combo-broken', (payload = {}) => {
+      this.handleComboBroken(payload);
     });
 
     gameEvents.on('ui-show-screen', (payload = {}) => {
@@ -3089,6 +3341,10 @@ class UISystem {
       if (typeof progression.getExperience === 'function') {
         this.updateXPBar(progression.getExperience(), { force });
       }
+
+      if (typeof progression.getComboState === 'function') {
+        this.updateComboMeter(progression.getComboState(), { force });
+      }
     }
 
     const enemies = this.getService('enemies');
@@ -3106,6 +3362,579 @@ class UISystem {
   update() {
     this.refreshHudFromServices(false);
     this.renderBossHud();
+    this.updateTacticalHud();
+  }
+
+  updateTacticalHud() {
+    const contactsData = this.collectTacticalContacts();
+    this.renderMinimap(contactsData);
+    this.updateThreatIndicators(contactsData);
+  }
+
+  collectTacticalContacts() {
+    const minimapRefs = this.domRefs.minimap || {};
+    const canvas = minimapRefs.canvas;
+    const context = minimapRefs.context;
+
+    if (!canvas || !context) {
+      this.tacticalState.contactsCache = null;
+      return null;
+    }
+
+    const range = this.resolveMinimapRange();
+    const detectionRange = Math.max(
+      range,
+      range * DEFAULT_MINIMAP_DETECTION_MULTIPLIER
+    );
+
+    const width = Number(canvas.width) || canvas.clientWidth || 0;
+    const height = Number(canvas.height) || canvas.clientHeight || 0;
+
+    const playerService = this.getService('player');
+    const physics = this.getService('physics');
+
+    const playerPosition =
+      playerService && typeof playerService.getPosition === 'function'
+        ? playerService.getPosition()
+        : null;
+    const playerAngle =
+      playerService && typeof playerService.getAngle === 'function'
+        ? playerService.getAngle()
+        : 0;
+
+    let contacts = [];
+    if (physics && playerPosition && typeof physics.getNearbyEnemies === 'function') {
+      try {
+        contacts = physics.getNearbyEnemies(
+          playerPosition.x,
+          playerPosition.y,
+          detectionRange
+        );
+      } catch (error) {
+        console.warn('[UISystem] Failed to gather tactical contacts:', error);
+        contacts = [];
+      }
+    }
+
+    const normalized = [];
+    if (playerPosition && Array.isArray(contacts)) {
+      for (let i = 0; i < contacts.length; i += 1) {
+        const enemy = contacts[i];
+        if (!enemy) {
+          continue;
+        }
+
+        const rawX =
+          enemy.x ??
+          enemy.position?.x ??
+          (Array.isArray(enemy.position) ? enemy.position[0] : null);
+        const rawY =
+          enemy.y ??
+          enemy.position?.y ??
+          (Array.isArray(enemy.position) ? enemy.position[1] : null);
+
+        const x = Number(rawX);
+        const y = Number(rawY);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) {
+          continue;
+        }
+
+        const dx = x - playerPosition.x;
+        const dy = y - playerPosition.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const angle = Math.atan2(dy, dx);
+
+        const rawType =
+          enemy.enemyType ||
+          enemy.type ||
+          enemy.category ||
+          enemy.kind ||
+          'asteroid';
+        const type =
+          typeof rawType === 'string' && rawType.length > 0
+            ? rawType.toLowerCase()
+            : 'asteroid';
+
+        const idCandidate =
+          enemy.id ??
+          enemy.enemyId ??
+          enemy.uid ??
+          enemy.uuid ??
+          enemy.__id ??
+          null;
+        const id = idCandidate !== null ? idCandidate : `${type}:${Math.round(x)}:${Math.round(y)}`;
+
+        normalized.push({
+          id,
+          type,
+          enemy,
+          x,
+          y,
+          dx,
+          dy,
+          distance,
+          angle,
+          radius: Number.isFinite(enemy.radius)
+            ? Number(enemy.radius)
+            : Number.isFinite(enemy.hitRadius)
+            ? Number(enemy.hitRadius)
+            : null,
+          isBoss:
+            type === 'boss' ||
+            enemy.isBoss === true ||
+            enemy.category === 'boss' ||
+            enemy.boss === true,
+        });
+      }
+    }
+
+    const result = {
+      player: playerPosition,
+      playerAngle,
+      range,
+      detectionRange,
+      width,
+      height,
+      contacts: normalized,
+    };
+
+    this.tacticalState.contactsCache = result;
+    this.cachedValues.minimap = {
+      ...this.cachedValues.minimap,
+      range,
+      detectionRange,
+      width,
+      height,
+    };
+
+    return result;
+  }
+
+  resolveMinimapRange() {
+    const minimapRefs = this.domRefs.minimap || {};
+    const canvas = minimapRefs.canvas;
+
+    if (canvas) {
+      const datasetRange = canvas.dataset?.range ?? canvas.getAttribute?.('data-range');
+      const parsedDataset = Number(datasetRange);
+      if (Number.isFinite(parsedDataset) && parsedDataset > 0) {
+        return parsedDataset;
+      }
+    }
+
+    const rangeNode = minimapRefs.range;
+    if (rangeNode && typeof rangeNode.textContent === 'string') {
+      const match = rangeNode.textContent.match(/(\d+(?:\.\d+)?)\s*u?/i);
+      if (match) {
+        const parsed = Number(match[1]);
+        if (Number.isFinite(parsed) && parsed > 0) {
+          return parsed;
+        }
+      }
+    }
+
+    return DEFAULT_MINIMAP_RANGE;
+  }
+
+  resolveMinimapContactColor(contact = {}) {
+    const type =
+      typeof contact.type === 'string' && contact.type.length > 0
+        ? contact.type.toLowerCase()
+        : 'default';
+
+    if (MINIMAP_ENTITY_COLORS[type]) {
+      return MINIMAP_ENTITY_COLORS[type];
+    }
+
+    return MINIMAP_ENTITY_COLORS.default;
+  }
+
+  renderMinimap(contactsData = null) {
+    const minimapRefs = this.domRefs.minimap || {};
+    const canvas = minimapRefs.canvas;
+    const context = minimapRefs.context;
+
+    if (!canvas || !context) {
+      return;
+    }
+
+    const width = Number(canvas.width) || canvas.clientWidth || 0;
+    const height = Number(canvas.height) || canvas.clientHeight || 0;
+
+    context.clearRect(0, 0, width, height);
+
+    const data = contactsData || this.tacticalState.contactsCache;
+    if (!data) {
+      return;
+    }
+
+    const { range, contacts, playerAngle } = data;
+    const radius = Math.max(8, Math.min(width, height) / 2 - 4);
+    const centerX = width / 2;
+    const centerY = height / 2;
+    const scale = radius / Math.max(1, range);
+
+    context.save();
+    context.translate(centerX, centerY);
+
+    context.beginPath();
+    context.fillStyle = 'rgba(10, 16, 28, 0.55)';
+    context.arc(0, 0, radius, 0, Math.PI * 2);
+    context.fill();
+
+    context.beginPath();
+    context.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    context.lineWidth = 2;
+    context.arc(0, 0, radius, 0, Math.PI * 2);
+    context.stroke();
+
+    context.beginPath();
+    context.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+    context.lineWidth = 1;
+    context.moveTo(-radius, 0);
+    context.lineTo(radius, 0);
+    context.moveTo(0, -radius);
+    context.lineTo(0, radius);
+    context.stroke();
+
+    context.save();
+    context.rotate(playerAngle || 0);
+    context.fillStyle = '#FFFFFF';
+    context.beginPath();
+    context.moveTo(0, -6);
+    context.lineTo(4, 6);
+    context.lineTo(-4, 6);
+    context.closePath();
+    context.fill();
+    context.restore();
+
+    if (Array.isArray(contacts) && contacts.length > 0) {
+      const sorted = contacts.slice().sort((a, b) => a.distance - b.distance);
+      for (let i = 0; i < sorted.length; i += 1) {
+        const contact = sorted[i];
+        const distance = Number(contact.distance);
+        if (!Number.isFinite(distance)) {
+          continue;
+        }
+
+        const dx = Number(contact.dx) || 0;
+        const dy = Number(contact.dy) || 0;
+        const magnitude = distance > 0 ? distance : 1;
+        const normalizedX = dx / magnitude;
+        const normalizedY = dy / magnitude;
+        const clampedDistance = Math.min(distance, range);
+        const drawX = normalizedX * clampedDistance * scale;
+        const drawY = normalizedY * clampedDistance * scale;
+        const color = this.resolveMinimapContactColor(contact);
+
+        const baseSize = contact.isBoss ? 5 : contact.type === 'hunter' ? 4 : 3;
+        context.fillStyle = color;
+        context.beginPath();
+        context.arc(drawX, drawY, baseSize, 0, Math.PI * 2);
+        context.fill();
+
+        if (distance > range) {
+          context.beginPath();
+          context.strokeStyle = color;
+          context.lineWidth = 1.5;
+          const boundaryX = normalizedX * radius;
+          const boundaryY = normalizedY * radius;
+          context.arc(boundaryX, boundaryY, baseSize + 1.5, 0, Math.PI * 2);
+          context.stroke();
+        }
+      }
+    }
+
+    context.restore();
+
+    const rangeNode = minimapRefs.range;
+    if (rangeNode) {
+      const label = `Range ${Math.round(range)}u`;
+      if (rangeNode.textContent !== label) {
+        rangeNode.textContent = label;
+        rangeNode.setAttribute('aria-label', label);
+      }
+    }
+  }
+
+  clearMinimapCanvas() {
+    const minimapRefs = this.domRefs.minimap || {};
+    const canvas = minimapRefs.canvas;
+    const context = minimapRefs.context;
+
+    if (canvas && context) {
+      const width = Number(canvas.width) || canvas.clientWidth || 0;
+      const height = Number(canvas.height) || canvas.clientHeight || 0;
+      context.clearRect(0, 0, width, height);
+    }
+
+    this.tacticalState.contactsCache = null;
+  }
+
+  resolveThreatId(contact = {}) {
+    if (contact.id !== undefined && contact.id !== null) {
+      return contact.id;
+    }
+
+    const keyParts = [contact.type || 'unknown'];
+    if (Number.isFinite(contact.distance)) {
+      keyParts.push(Math.round(contact.distance));
+    }
+    if (Number.isFinite(contact.angle)) {
+      keyParts.push(Math.round(contact.angle * 100));
+    }
+    return keyParts.join(':');
+  }
+
+  resolveThreatSeverity(distance, range, detectionRange) {
+    if (!Number.isFinite(distance)) {
+      return 'low';
+    }
+
+    if (!Number.isFinite(range) || range <= 0) {
+      return 'medium';
+    }
+
+    const effectiveDetection = Math.max(range, detectionRange || range);
+    const distanceBeyond = Math.max(0, distance - range);
+    const windowSize = Math.max(1, effectiveDetection - range);
+    const ratio = distanceBeyond / windowSize;
+
+    if (ratio <= 0.25) {
+      return 'high';
+    }
+
+    if (ratio <= 0.6) {
+      return 'medium';
+    }
+
+    return 'low';
+  }
+
+  resolveThreatIcon(type, isBoss = false) {
+    if (isBoss) {
+      return THREAT_ICON_LOOKUP.boss;
+    }
+
+    const normalized = typeof type === 'string' ? type.toLowerCase() : '';
+    return THREAT_ICON_LOOKUP[normalized] || THREAT_ICON_LOOKUP.default;
+  }
+
+  updateThreatIndicators(contactsData = null) {
+    const refs = this.domRefs.threatIndicators || {};
+    const container = refs.overlay || refs.container;
+
+    if (!container) {
+      this.resetThreatIndicators();
+      return;
+    }
+
+    const data = contactsData || this.tacticalState.contactsCache;
+    const contacts = data?.contacts || [];
+    const range = data?.range ?? this.cachedValues.minimap.range ?? DEFAULT_MINIMAP_RANGE;
+    const detectionRange =
+      data?.detectionRange ?? this.cachedValues.minimap.detectionRange ?? range;
+
+    const offscreen = contacts
+      .filter((contact) => Number.isFinite(contact.distance) && contact.distance > range)
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, MAX_THREAT_INDICATORS);
+
+    const seen = new Set();
+
+    for (let i = 0; i < offscreen.length; i += 1) {
+      const contact = offscreen[i];
+      const id = this.resolveThreatId(contact);
+      seen.add(id);
+
+      let entry = this.tacticalState.threats.get(id);
+      if (!entry) {
+        const element = document.createElement('div');
+        element.classList.add('threat-indicator');
+
+        const icon = document.createElement('span');
+        icon.classList.add('threat-indicator__icon');
+        element.appendChild(icon);
+
+        container.appendChild(element);
+        entry = { element, icon };
+        this.tacticalState.threats.set(id, entry);
+      }
+
+      const { element, icon } = entry;
+      const severity = this.resolveThreatSeverity(
+        contact.distance,
+        range,
+        detectionRange
+      );
+      const color = this.resolveMinimapContactColor(contact);
+      const iconSymbol = this.resolveThreatIcon(contact.type, contact.isBoss);
+
+      element.dataset.type = contact.type || 'unknown';
+      element.dataset.severity = severity;
+      element.style.setProperty('--threat-color', color);
+      element.classList.toggle('threat-indicator--high', severity === 'high');
+      element.classList.toggle('threat-indicator--medium', severity === 'medium');
+      element.classList.toggle('threat-indicator--low', severity === 'low');
+      element.classList.toggle('threat-pulse', severity !== 'low');
+
+      if (icon && icon.textContent !== iconSymbol) {
+        icon.textContent = iconSymbol;
+      }
+
+      if (Number.isFinite(contact.angle)) {
+        const angleDeg = (contact.angle * 180) / Math.PI;
+        const distanceBeyond = Math.max(0, contact.distance - range);
+        const windowSize = Math.max(1, detectionRange - range);
+        const normalizedOffset = Math.min(1, distanceBeyond / windowSize);
+        const radiusPercent = 42 + normalizedOffset * 18;
+        const x = 50 + Math.cos(contact.angle) * radiusPercent;
+        const y = 50 + Math.sin(contact.angle) * radiusPercent;
+        element.style.left = `${x}%`;
+        element.style.top = `${y}%`;
+        element.style.transform = `translate(-50%, -50%) rotate(${angleDeg}deg)`;
+        element.style.setProperty('--threat-angle', `${angleDeg}deg`);
+      }
+    }
+
+    for (const [id, entry] of this.tacticalState.threats.entries()) {
+      if (!seen.has(id)) {
+        if (entry?.element?.parentElement) {
+          entry.element.parentElement.removeChild(entry.element);
+        }
+        this.tacticalState.threats.delete(id);
+      }
+    }
+
+    container.classList.toggle('is-active', offscreen.length > 0);
+  }
+
+  resetThreatIndicators() {
+    if (this.tacticalState?.threats instanceof Map) {
+      for (const [, entry] of this.tacticalState.threats.entries()) {
+        if (entry?.element?.parentElement) {
+          entry.element.parentElement.removeChild(entry.element);
+        }
+      }
+      this.tacticalState.threats.clear();
+    }
+
+    const refs = this.domRefs.threatIndicators || {};
+    const container = refs.overlay || refs.container;
+    if (container) {
+      container.classList.remove('is-active');
+    }
+  }
+
+  resetTacticalHud() {
+    this.resetComboMeter({ silent: true });
+    this.resetThreatIndicators();
+    this.clearMinimapCanvas();
+  }
+
+  resetComboMeter(options = {}) {
+    const silent = Boolean(options?.silent);
+    this.updateComboMeter({ comboCount: 0, multiplier: 1 }, { force: true, silent, reset: true });
+  }
+
+  updateComboMeter(comboData = {}, options = {}) {
+    if (!this.cachedValues.combo) {
+      this.cachedValues.combo = {
+        count: 0,
+        multiplier: 1,
+        valueText: '0 Hits',
+        multiplierText: 'x1.0',
+        active: false,
+        high: false,
+      };
+    }
+
+    const entry = this.hudElements.get('comboMeter');
+    const refs = this.domRefs.combo || {};
+
+    const container = refs.container || entry?.root || null;
+    const valueNode = refs.value || entry?.value || null;
+    const multiplierNode = refs.multiplier || entry?.meta || null;
+
+    const force = Boolean(options.force);
+    const rawCount =
+      comboData.comboCount ?? comboData.count ?? comboData.value ?? comboData.current ?? 0;
+    const rawMultiplier =
+      comboData.multiplier ?? comboData.comboMultiplier ?? comboData.multiplierValue ?? 1;
+
+    const count = Number.isFinite(rawCount) ? Math.max(0, Math.floor(rawCount)) : 0;
+    const multiplier = Number.isFinite(rawMultiplier)
+      ? Math.max(1, Number(rawMultiplier))
+      : 1;
+    const isActive = count > 0;
+    const isHigh = count >= 5;
+
+    const hitsLabel = count === 1 ? 'Hit' : 'Hits';
+    const valueText = isActive ? `${count} ${hitsLabel}` : '0 Hits';
+    const multiplierText = `x${multiplier.toFixed(1)}`;
+
+    if (valueNode && (force || this.cachedValues.combo.valueText !== valueText)) {
+      valueNode.textContent = valueText;
+      this.cachedValues.combo.valueText = valueText;
+    }
+
+    if (multiplierNode && (force || this.cachedValues.combo.multiplierText !== multiplierText)) {
+      multiplierNode.textContent = multiplierText;
+      this.cachedValues.combo.multiplierText = multiplierText;
+    }
+
+    if (container) {
+      container.classList.toggle('combo-active', isActive);
+      container.classList.toggle('combo-high', isHigh);
+      if (!options.broken) {
+        container.classList.remove('combo-broken');
+      }
+
+      if (!options.silent && isActive && count !== this.cachedValues.combo.count) {
+        container.classList.remove('combo-pulse');
+        void container.offsetWidth; // restart animation
+        container.classList.add('combo-pulse');
+      }
+    }
+
+    this.cachedValues.combo.count = count;
+    this.cachedValues.combo.multiplier = multiplier;
+    this.cachedValues.combo.active = isActive;
+    this.cachedValues.combo.high = isHigh;
+  }
+
+  handleComboBroken(payload = {}) {
+    const silent = Boolean(payload?.silent);
+    const nextCount = Number.isFinite(payload?.comboCount) ? payload.comboCount : 0;
+    const nextMultiplier = Number.isFinite(payload?.multiplier) ? payload.multiplier : 1;
+
+    this.updateComboMeter(
+      { comboCount: nextCount, multiplier: nextMultiplier },
+      { force: true, broken: !silent, silent }
+    );
+
+    const container = this.domRefs.combo?.container || this.hudElements.get('comboMeter')?.root;
+    if (!container) {
+      return;
+    }
+
+    container.classList.remove('combo-pulse');
+
+    if (this.comboBreakTimeout && typeof window !== 'undefined') {
+      window.clearTimeout(this.comboBreakTimeout);
+      this.comboBreakTimeout = null;
+    }
+
+    if (silent || typeof window === 'undefined') {
+      container.classList.remove('combo-broken');
+      return;
+    }
+
+    container.classList.add('combo-broken');
+    this.comboBreakTimeout = window.setTimeout(() => {
+      container.classList.remove('combo-broken');
+      this.comboBreakTimeout = null;
+    }, 650);
   }
 
   handleHealthChange(data = {}, options = {}) {
