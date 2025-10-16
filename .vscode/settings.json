@@ -6,5 +6,8 @@
     "Codex",
     "Claude Code",
     "Gemini"
-  ]
+  ],
+  "chat.mcp.discovery.enabled": {
+    "claude-desktop": true
+  }
 }
