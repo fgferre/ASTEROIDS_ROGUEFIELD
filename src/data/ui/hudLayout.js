@@ -354,7 +354,7 @@ const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
   {
     key: 'xp',
     type: 'xp',
-    position: 'bottom-center',
+    position: 'bottom-left',
     layout: 'inline-progress',
     description: 'Experience towards the next level',
     icon: {
@@ -374,7 +374,7 @@ const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
   {
     key: 'wave',
     type: 'wave',
-    position: 'bottom-center',
+    position: 'bottom-right',
     layout: 'inline-progress',
     description: 'Current wave progress',
     leading: {
@@ -412,7 +412,7 @@ const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
   {
     key: 'minimap',
     type: 'minimap',
-    position: 'bottom-left',
+    position: 'bottom-center',
     group: 'tactical-intel',
     layout: 'custom',
     label: '',
@@ -525,7 +525,7 @@ const HUD_LAYOUTS = {
     id: 'minimal',
     label: 'HUD Tático Minimalista',
     description:
-      'Faixa superior compacta, XP centralizado e status de onda no rodapé.',
+      'Faixa superior compacta, XP à esquerda, minimapa central e onda à direita no rodapé.',
     items: MINIMAL_TACTICAL_LAYOUT_ITEMS,
   },
 };
