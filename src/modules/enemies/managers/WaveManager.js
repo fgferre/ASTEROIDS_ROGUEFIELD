@@ -676,12 +676,24 @@ export class WaveManager {
           enemyConfig.randomScope = 'spawn';
         }
 
-        // Use factory if available, otherwise use legacy method
-        let enemy;
-        if (this.enemySystem.factory) {
-          enemy = this.enemySystem.factory.create(enemyGroup.type, enemyConfig);
-        } else {
-          // Legacy: Direct Asteroid creation
+        // Use EnemySystem acquisition hooks where available
+        let enemy = null;
+
+        const canUseAcquireHook =
+          this.enemySystem &&
+          typeof this.enemySystem.acquireEnemyViaFactory === 'function';
+
+        if (canUseAcquireHook) {
+          enemy = this.enemySystem.acquireEnemyViaFactory(
+            enemyGroup.type,
+            enemyConfig
+          );
+        } else if (
+          enemyGroup.type === this.enemyTypeKeys.asteroid &&
+          this.enemySystem &&
+          typeof this.enemySystem.acquireAsteroid === 'function'
+        ) {
+          // Fallback: pure-asteroid waves without factory support
           enemy = this.enemySystem.acquireAsteroid(enemyConfig);
         }
 
