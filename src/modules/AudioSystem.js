@@ -338,7 +338,11 @@ class AudioSystem {
       this.musicController.lastNonBossIntensity = targetLevel;
     }
 
-    if (this.musicController.bossActive || isBossWave) {
+    if (isBossWave) {
+      return;
+    }
+
+    if (this.musicController.bossActive) {
       this.musicController.pendingNonBossIntensity = targetLevel;
       return;
     }
