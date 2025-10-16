@@ -53,6 +53,7 @@ class EnemySystem {
     this.bossHudState = this.createInitialBossHudState();
     this.spawnTimer = 0;
     this.spawnDelay = 1.0;
+    this.pendingEnemyProjectiles = [];
 
     // Legacy wave state (for backward compatibility during migration)
     this.waveState = this.createInitialWaveState();
@@ -264,6 +265,19 @@ class EnemySystem {
 
     if (force || randomServiceChanged) {
       this.reseedRandomScopes({ resetSequences: force || randomServiceChanged });
+    }
+
+    // Flush pending enemy projectiles when CombatSystem becomes available
+    if (this.pendingEnemyProjectiles.length > 0) {
+      const combat = this.services.combat;
+      if (combat) {
+        const pending = [...this.pendingEnemyProjectiles];
+        this.pendingEnemyProjectiles = [];
+        pending.forEach(payload => this.handleEnemyProjectile(payload));
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('[EnemySystem] Flushed pending projectiles', pending.length);
+        }
+      }
     }
   }
 
@@ -2716,6 +2730,7 @@ class EnemySystem {
     this.sessionActive = true;
     this.lastWaveBroadcast = null;
     this._snapshotFallbackWarningIssued = false;
+    this.pendingEnemyProjectiles = [];
 
     this.refreshInjectedServices({ force: true });
     this.syncPhysicsIntegration(true);
@@ -3147,7 +3162,7 @@ class EnemySystem {
 
   handleEnemyProjectile(data = null) {
     if (!data) {
-      return;
+      return false;
     }
 
     const payload = this.normalizeEnemyProjectilePayload(data);
@@ -3156,29 +3171,37 @@ class EnemySystem {
     if (combat) {
       if (this.isBossProjectile(payload) && typeof combat.handleBossProjectile === 'function') {
         combat.handleBossProjectile(payload);
-        return;
+        return true;
       }
 
       if (typeof combat.handleEnemyProjectile === 'function') {
         combat.handleEnemyProjectile(payload);
-        return;
+        return true;
       }
 
       if (typeof combat.queueEnemyProjectile === 'function') {
         combat.queueEnemyProjectile(payload);
-        return;
+        return true;
       }
 
       if (typeof combat.spawnEnemyProjectile === 'function') {
         combat.spawnEnemyProjectile(payload);
-        return;
+        return true;
       }
     }
 
     const bus = this.eventBus || (typeof gameEvents !== 'undefined' ? gameEvents : null);
     if (bus) {
       bus.emit('combat-enemy-projectile', payload);
+      return true;
     }
+
+    // Last-resort: queue payload when both combat and bus are unavailable
+    this.pendingEnemyProjectiles.push(payload);
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('[EnemySystem] Queued enemy projectile (combat/bus unavailable)', payload);
+    }
+    return false;
   }
 
   handleMineExplosion(data = null) {
