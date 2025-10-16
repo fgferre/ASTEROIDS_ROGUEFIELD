@@ -621,6 +621,19 @@ export class BossEnemy extends BaseEnemy {
       if (typeof this.system.registerActiveEnemy === 'function') {
         this.system.registerActiveEnemy(minion);
       }
+
+      // Update wave accounting to include dynamically-spawned minions
+      // This ensures WaveManager's totalEnemiesThisWave accurately reflects all enemies
+      if (this.system.waveManager) {
+        this.system.waveManager.totalEnemiesThisWave += 1;
+        this.system.waveManager.enemiesSpawnedThisWave += 1;
+      }
+
+      // Also update EnemySystem's wave state if active
+      if (this.system.waveState && this.system.waveState.isActive) {
+        this.system.waveState.totalAsteroids += 1;
+        this.system.waveState.asteroidsSpawned += 1;
+      }
     }
   }
 

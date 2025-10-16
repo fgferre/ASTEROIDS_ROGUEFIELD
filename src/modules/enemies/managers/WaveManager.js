@@ -793,11 +793,12 @@ export class WaveManager {
       randomScope: bossConfig.randomScope || 'boss-spawn',
       randomParentScope: bossConfig.randomParentScope || 'spawn',
       metadata,
-      skipWaveAccounting: true,
     };
 
     const boss = this.enemySystem.spawnBoss(spawnConfig);
     if (boss) {
+      // EnemySystem.spawnBoss() already increments wave counters
+      // We mirror that in WaveManager for consistency
       this.enemiesSpawnedThisWave += 1;
     }
 
@@ -948,9 +949,43 @@ export class WaveManager {
   onEnemyDestroyed() {
     this.enemiesKilledThisWave++;
 
+    // Development assertion: verify accounting consistency
+    if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+      this.assertAccountingConsistency();
+    }
+
     // Check if wave is complete
     if (this.enemiesKilledThisWave >= this.totalEnemiesThisWave) {
       this.completeWave();
+    }
+  }
+
+  /**
+   * Development-only assertion to verify wave accounting consistency.
+   * Compares WaveManager counts against EnemySystem counts.
+   * Only runs in development mode to avoid performance impact.
+   */
+  assertAccountingConsistency() {
+    if (!this.waveInProgress || !this.enemySystem?.waveState) {
+      return;
+    }
+
+    const waveManagerTotal = this.totalEnemiesThisWave;
+    const waveManagerSpawned = this.enemiesSpawnedThisWave;
+    const enemySystemTotal = this.enemySystem.waveState.totalAsteroids;
+    const enemySystemSpawned = this.enemySystem.waveState.asteroidsSpawned;
+
+    // Allow small discrepancies during spawn/death timing
+    const totalDelta = Math.abs(waveManagerTotal - enemySystemTotal);
+    const spawnedDelta = Math.abs(waveManagerSpawned - enemySystemSpawned);
+
+    if (totalDelta > 1 || spawnedDelta > 1) {
+      console.warn(
+        `[WaveManager] Accounting discrepancy detected!\n` +
+        `  WaveManager: ${waveManagerSpawned}/${waveManagerTotal}\n` +
+        `  EnemySystem: ${enemySystemSpawned}/${enemySystemTotal}\n` +
+        `  Wave: ${this.currentWave}`
+      );
     }
   }
 
