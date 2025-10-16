@@ -6,6 +6,7 @@ const noop = () => {};
 
 describe('ProgressionSystem randomised upgrade selection', () => {
   let listeners;
+  let emittedEvents;
 
   const dispatch = (event, payload) => {
     const handlers = listeners.get(event);
@@ -17,6 +18,7 @@ describe('ProgressionSystem randomised upgrade selection', () => {
 
   beforeEach(() => {
     listeners = new Map();
+    emittedEvents = [];
     globalThis.gameEvents = {
       on(event, handler) {
         if (!listeners.has(event)) {
@@ -25,6 +27,7 @@ describe('ProgressionSystem randomised upgrade selection', () => {
         listeners.get(event).push(handler);
       },
       emit(event, payload) {
+        emittedEvents.push({ event, payload });
         dispatch(event, payload);
       },
     };
@@ -32,6 +35,7 @@ describe('ProgressionSystem randomised upgrade selection', () => {
 
   afterEach(() => {
     delete globalThis.gameEvents;
+    emittedEvents = null;
   });
 
   const createProgression = (seed) =>
@@ -48,6 +52,9 @@ describe('ProgressionSystem randomised upgrade selection', () => {
       .prepareUpgradeOptions(count)
       .options.map((option) => option?.id)
       .filter(Boolean);
+
+  const findEvents = (type) =>
+    emittedEvents.filter((entry) => entry.event === type).map((entry) => entry.payload);
 
   it('produces identical upgrade options after deterministic resets', () => {
     const seed = 424242;
@@ -76,5 +83,35 @@ describe('ProgressionSystem randomised upgrade selection', () => {
     const secondOptions = collectUpgradeIds(second, desiredCount);
 
     expect(firstOptions).toStrictEqual(secondOptions);
+  });
+
+  it('tracks combos and applies multipliers to collected experience', () => {
+    const progression = createProgression(9001);
+
+    expect(progression.currentCombo).toBe(0);
+    expect(progression.comboMultiplier).toBe(1);
+
+    globalThis.gameEvents.emit('enemy-destroyed', { cause: 'test' });
+    expect(progression.currentCombo).toBe(1);
+    expect(progression.comboMultiplier).toBe(1);
+    expect(progression.comboTimer).toBeCloseTo(progression.comboTimeout);
+
+    globalThis.gameEvents.emit('enemy-destroyed', { cause: 'test' });
+    expect(progression.currentCombo).toBe(2);
+    expect(progression.comboMultiplier).toBeCloseTo(1.1, 5);
+
+    emittedEvents = [];
+    const result = progression.collectXP(100);
+    expect(result.gained).toBeGreaterThan(100);
+    expect(progression.totalExperience).toBe(result.gained);
+
+    progression.update(progression.comboTimeout + 0.5);
+    expect(progression.currentCombo).toBe(0);
+    expect(progression.comboMultiplier).toBe(1);
+
+    const comboBrokenEvents = findEvents('combo-broken');
+    expect(comboBrokenEvents.length).toBeGreaterThan(0);
+    const latestComboBreak = comboBrokenEvents[comboBrokenEvents.length - 1];
+    expect(latestComboBreak).toMatchObject({ reason: 'timeout' });
   });
 });
