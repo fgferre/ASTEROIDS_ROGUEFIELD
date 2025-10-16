@@ -616,16 +616,22 @@ class AudioSystem {
 
     this.musicController.relaxTimeout = setTimeout(() => {
       this.musicController.relaxTimeout = null;
-      const initialLevel =
-        typeof MUSIC_LAYER_CONFIG?.initialIntensity === 'number'
-          ? MUSIC_LAYER_CONFIG.initialIntensity
-          : 0;
-      const fallbackLevel =
-        this.musicController.pendingNonBossIntensity ??
-        this.musicController.lastNonBossIntensity ??
-        initialLevel;
+
+      const hasPendingLevel =
+        this.musicController.pendingNonBossIntensity !== null &&
+        this.musicController.pendingNonBossIntensity !== undefined;
+
+      if (!hasPendingLevel) {
+        return;
+      }
+
+      const fallbackLevel = this.musicController.pendingNonBossIntensity;
 
       this.musicController.pendingNonBossIntensity = null;
+
+      if (!Number.isFinite(fallbackLevel)) {
+        return;
+      }
 
       this.setMusicIntensity(fallbackLevel, {
         reason: 'bossVictory',
