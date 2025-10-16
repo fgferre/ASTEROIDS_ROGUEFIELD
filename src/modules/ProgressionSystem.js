@@ -217,11 +217,66 @@ class ProgressionSystem {
   }
 
   handleEnemyDestroyed(data = {}) {
+    if (!this.isPlayerResponsibleForEnemyDeath(data)) {
+      return;
+    }
+
     this.incrementCombo({
       enemy: data?.enemy || null,
       payload: data,
       reason: 'enemy-destroyed',
     });
+  }
+
+  isPlayerResponsibleForEnemyDeath(data = {}) {
+    if (!data || typeof data !== 'object') {
+      return false;
+    }
+
+    const extractCause = (payload) => {
+      if (!payload || typeof payload !== 'object') {
+        return '';
+      }
+
+      const directCause =
+        typeof payload.cause === 'string' ? payload.cause : '';
+      const reasonCause =
+        typeof payload.reason === 'string' ? payload.reason : '';
+      const sourceCause =
+        typeof payload.source?.cause === 'string' ? payload.source.cause : '';
+
+      return (directCause || reasonCause || sourceCause || '').toLowerCase();
+    };
+
+    const cause = extractCause(data);
+    if (!cause) {
+      return false;
+    }
+
+    if (cause === 'damage') {
+      return true;
+    }
+
+    if (cause.startsWith('player-') || cause === 'player') {
+      return true;
+    }
+
+    const source = data.source || null;
+    if (source && typeof source === 'object') {
+      const sourceType =
+        typeof source.type === 'string' ? source.type.toLowerCase() : '';
+      if (sourceType === 'player') {
+        return true;
+      }
+
+      const sourceOwner =
+        typeof source.owner === 'string' ? source.owner.toLowerCase() : '';
+      if (sourceOwner === 'player') {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   incrementCombo(context = {}) {
