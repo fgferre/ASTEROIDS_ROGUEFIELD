@@ -839,7 +839,12 @@ class PhysicsSystem {
       return;
     }
 
+    // Fallback: emit event only if not already emitted by Mine itself
     if (typeof gameEvents !== 'undefined' && typeof gameEvents.emit === 'function') {
+      // Prevent double-emission if Mine already emitted the event
+      if (data.__emittedByMine || payload.__emittedByMine) {
+        return;
+      }
       gameEvents.emit('mine-exploded', payload);
     }
   }

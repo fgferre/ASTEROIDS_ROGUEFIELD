@@ -179,6 +179,7 @@ export class Mine extends BaseEnemy {
         type: this.type,
         wave: this.wave,
       },
+      __emittedByMine: true,
     });
   }
 
