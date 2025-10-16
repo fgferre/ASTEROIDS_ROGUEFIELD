@@ -81,6 +81,7 @@ class UISystem {
         labelLength: 0,
         enemiesTextLength: 0,
       },
+      boss: this.createInitialBossCachedValues(),
     };
 
     this.settings = null;
@@ -111,6 +112,8 @@ class UISystem {
     };
 
     this.bossHudState = this.createInitialBossHudState();
+    this.bossBannerTimeout = null;
+    this.bossHideTimeout = null;
 
     this.initializeSettingsMetadata();
 
@@ -238,6 +241,42 @@ class UISystem {
       phaseColors: [],
       lastEvent: null,
       lastUpdate: timestamp,
+      timers: {
+        phase: {
+          remaining: null,
+          total: null,
+          endsAt: null,
+          label: 'Phase shift',
+        },
+        enrage: {
+          remaining: null,
+          total: null,
+          endsAt: null,
+          label: 'Enrage',
+        },
+      },
+    };
+  }
+
+  createInitialBossCachedValues() {
+    return {
+      visible: false,
+      bossId: null,
+      name: null,
+      wave: null,
+      phase: null,
+      phaseCount: null,
+      status: null,
+      color: null,
+      health: null,
+      maxHealth: null,
+      healthRatio: null,
+      healthText: null,
+      phaseTimerSeconds: null,
+      phaseTimerText: null,
+      enrageTimerSeconds: null,
+      enrageTimerText: null,
+      bannerType: null,
     };
   }
 
@@ -257,8 +296,66 @@ class UISystem {
       .filter((value) => value && value.length > 0);
   }
 
+  getHighResolutionTime() {
+    if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+      return performance.now();
+    }
+
+    return Date.now();
+  }
+
+  formatBossTimer(seconds, options = {}) {
+    if (!Number.isFinite(seconds) || seconds < 0) {
+      return null;
+    }
+
+    const { includeSecondsSuffix = false } = options;
+    const clamped = Math.max(0, seconds);
+    const minutes = Math.floor(clamped / 60);
+    const remainingSeconds = Math.max(0, Math.floor(clamped - minutes * 60));
+
+    if (minutes <= 0) {
+      return includeSecondsSuffix ? `${remainingSeconds}s` : `${remainingSeconds.toString().padStart(2, '0')}s`;
+    }
+
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  }
+
+  resolveBossTimerSeconds(timerState = {}, now = this.getHighResolutionTime()) {
+    if (!timerState) {
+      return null;
+    }
+
+    if (Number.isFinite(timerState.endsAt)) {
+      const seconds = (Number(timerState.endsAt) - now) / 1000;
+      if (Number.isFinite(seconds)) {
+        return Math.max(0, seconds);
+      }
+    }
+
+    if (Number.isFinite(timerState.remaining)) {
+      return Math.max(0, Number(timerState.remaining));
+    }
+
+    return null;
+  }
+
   resetBossHudState() {
     this.bossHudState = this.createInitialBossHudState();
+    this.cachedValues.boss = this.createInitialBossCachedValues();
+
+    if (this.bossBannerTimeout) {
+      window.clearTimeout(this.bossBannerTimeout);
+      this.bossBannerTimeout = null;
+    }
+
+    if (this.bossHideTimeout) {
+      window.clearTimeout(this.bossHideTimeout);
+      this.bossHideTimeout = null;
+    }
+
+    this.hideBossBanner(true);
+    this.hideBossHealthBar(true);
     return this.bossHudState;
   }
 
@@ -267,17 +364,83 @@ class UISystem {
     return {
       ...state,
       phaseColors: Array.isArray(state.phaseColors) ? [...state.phaseColors] : [],
+      timers: {
+        phase: { ...(state.timers?.phase || {}) },
+        enrage: { ...(state.timers?.enrage || {}) },
+      },
     };
   }
 
   updateBossHud(patch = {}) {
-    const now =
-      typeof performance !== 'undefined' && typeof performance.now === 'function'
-        ? performance.now()
-        : Date.now();
+    const now = this.getHighResolutionTime();
 
     const current = this.bossHudState || this.createInitialBossHudState();
-    const next = { ...current };
+    const next = {
+      ...current,
+      timers: {
+        phase: { ...(current.timers?.phase || {}) },
+        enrage: { ...(current.timers?.enrage || {}) },
+      },
+    };
+
+    const ensureTimer = (key) => {
+      if (!next.timers[key]) {
+        next.timers[key] = {};
+      }
+
+      const defaults = {
+        label: key === 'enrage' ? 'Enrage' : 'Phase shift',
+        remaining: null,
+        total: null,
+        endsAt: null,
+      };
+
+      next.timers[key] = { ...defaults, ...next.timers[key] };
+      return next.timers[key];
+    };
+
+    const updateTimerWithPatch = (key, timerPatch = {}) => {
+      if (!timerPatch || typeof timerPatch !== 'object') {
+        return;
+      }
+
+      const timer = ensureTimer(key);
+
+      if (timerPatch.label !== undefined && timerPatch.label !== null) {
+        timer.label = String(timerPatch.label);
+      }
+
+      const totalValue =
+        timerPatch.total ?? timerPatch.duration ?? timerPatch.max ?? timerPatch.timeTotal;
+      if (totalValue !== undefined) {
+        if (Number.isFinite(totalValue)) {
+          timer.total = Math.max(0, Number(totalValue));
+        } else if (totalValue === null) {
+          timer.total = null;
+        }
+      }
+
+      const remainingValue =
+        timerPatch.remaining ?? timerPatch.timeRemaining ?? timerPatch.seconds ?? timerPatch.value;
+      if (remainingValue !== undefined) {
+        if (Number.isFinite(remainingValue)) {
+          const normalized = Math.max(0, Number(remainingValue));
+          timer.remaining = normalized;
+          timer.endsAt = now + normalized * 1000;
+        } else if (remainingValue === null) {
+          timer.remaining = null;
+          timer.endsAt = null;
+        }
+      }
+
+      if (timerPatch.endsAt !== undefined) {
+        if (Number.isFinite(timerPatch.endsAt)) {
+          timer.endsAt = Number(timerPatch.endsAt);
+        } else if (timerPatch.endsAt === null) {
+          timer.endsAt = null;
+        }
+      }
+    };
 
     if (patch.bossId !== undefined) {
       next.bossId = patch.bossId;
@@ -346,6 +509,36 @@ class UISystem {
       next.lastEvent = patch.event;
     }
 
+    if (patch.phaseTimeRemaining !== undefined) {
+      updateTimerWithPatch('phase', { remaining: patch.phaseTimeRemaining });
+    }
+
+    if (patch.phaseTimeTotal !== undefined) {
+      updateTimerWithPatch('phase', { total: patch.phaseTimeTotal });
+    }
+
+    if (patch.phaseTimerLabel !== undefined) {
+      updateTimerWithPatch('phase', { label: patch.phaseTimerLabel });
+    }
+
+    if (patch.enrageTimeRemaining !== undefined) {
+      updateTimerWithPatch('enrage', { remaining: patch.enrageTimeRemaining });
+    }
+
+    if (patch.enrageTimeTotal !== undefined) {
+      updateTimerWithPatch('enrage', { total: patch.enrageTimeTotal });
+    }
+
+    if (patch.timers) {
+      if (patch.timers.phase) {
+        updateTimerWithPatch('phase', patch.timers.phase);
+      }
+
+      if (patch.timers.enrage) {
+        updateTimerWithPatch('enrage', patch.timers.enrage);
+      }
+    }
+
     next.lastUpdate = now;
 
     if (!next.defeated && next.health > 0) {
@@ -357,6 +550,12 @@ class UISystem {
       next.active = false;
       next.upcoming = false;
       next.health = 0;
+      ensureTimer('phase');
+      ensureTimer('enrage');
+      next.timers.phase.remaining = null;
+      next.timers.phase.endsAt = null;
+      next.timers.enrage.remaining = null;
+      next.timers.enrage.endsAt = null;
     }
 
     if (!next.color) {
@@ -402,7 +601,461 @@ class UISystem {
         break;
     }
 
-    return this.updateBossHud(patch);
+    const state = this.updateBossHud(patch);
+
+    switch (eventName) {
+      case 'boss-wave-started':
+        this.showBossHealthBar(state, { skipUpdate: true });
+        this.updateBossHealthBar(state, { force: true });
+        this.showBossBanner('incoming', state, { duration: 5200 });
+        break;
+      case 'boss-spawned':
+      case 'boss-phase-changed':
+        this.hideBossBanner(true);
+        this.showBossHealthBar(state, { skipUpdate: true });
+        this.updateBossHealthBar(state, { force: true });
+        break;
+      case 'boss-defeated':
+        this.updateBossHealthBar(state, { force: true });
+        this.showBossBanner('defeated', state, { duration: 6000 });
+        if (this.bossHideTimeout) {
+          window.clearTimeout(this.bossHideTimeout);
+        }
+        this.bossHideTimeout = window.setTimeout(() => {
+          this.bossHideTimeout = null;
+          this.resetBossHudState();
+        }, 4500);
+        break;
+      default:
+        this.updateBossHealthBar(state);
+        break;
+    }
+
+    return state;
+  }
+
+  showBossHealthBar(bossData = {}, options = {}) {
+    const entry = this.hudElements.get('boss');
+    if (!entry?.root) {
+      return;
+    }
+
+    if (!this.cachedValues.boss) {
+      this.cachedValues.boss = this.createInitialBossCachedValues();
+    }
+
+    if (this.bossHideTimeout) {
+      window.clearTimeout(this.bossHideTimeout);
+      this.bossHideTimeout = null;
+    }
+
+    const wasVisible = Boolean(this.cachedValues.boss.visible);
+
+    if (!wasVisible) {
+      entry.root.classList.remove('is-hidden');
+      entry.root.classList.add('is-visible');
+      entry.root.setAttribute('aria-hidden', 'false');
+    }
+
+    this.cachedValues.boss.visible = true;
+
+    const shouldUpdate =
+      !options?.skipUpdate &&
+      bossData &&
+      typeof bossData === 'object' &&
+      Object.keys(bossData).length > 0;
+
+    if (shouldUpdate) {
+      this.updateBossHealthBar(bossData, { force: true });
+      return;
+    }
+
+    if (!wasVisible && !options?.skipUpdate) {
+      this.updateBossHealthBar({}, { force: true });
+    }
+  }
+
+  hideBossHealthBar(force = false) {
+    const entry = this.hudElements.get('boss');
+    const cached = this.cachedValues.boss || this.createInitialBossCachedValues();
+
+    if (!entry?.root) {
+      this.cachedValues.boss = this.createInitialBossCachedValues();
+      return;
+    }
+
+    if (this.bossHideTimeout) {
+      window.clearTimeout(this.bossHideTimeout);
+      this.bossHideTimeout = null;
+    }
+
+    if (!force && !cached.visible) {
+      return;
+    }
+
+    entry.root.classList.remove('is-active', 'is-upcoming', 'is-defeated', 'is-visible');
+    entry.root.classList.add('is-hidden');
+    entry.root.setAttribute('aria-hidden', 'true');
+
+    if (entry.barFill) {
+      entry.barFill.style.width = '0%';
+    }
+
+    if (entry.bar) {
+      entry.bar.setAttribute('aria-valuenow', '0');
+      entry.bar.setAttribute('aria-valuetext', 'Boss health 0');
+    }
+
+    if (entry.health) {
+      entry.health.textContent = '--';
+    }
+
+    if (entry.phase) {
+      entry.phase.textContent = '';
+    }
+
+    if (entry.status) {
+      entry.status.textContent = '';
+    }
+
+    if (entry.phaseTimer) {
+      entry.phaseTimer.textContent = '';
+      entry.phaseTimer.style.display = 'none';
+      entry.phaseTimer.setAttribute('aria-hidden', 'true');
+    }
+
+    if (entry.enrageTimer) {
+      entry.enrageTimer.textContent = '';
+      entry.enrageTimer.style.display = 'none';
+      entry.enrageTimer.setAttribute('aria-hidden', 'true');
+    }
+
+    if (entry.timers) {
+      entry.timers.style.display = 'none';
+      entry.timers.setAttribute('aria-hidden', 'true');
+    }
+
+    this.hideBossBanner(true);
+    this.cachedValues.boss = this.createInitialBossCachedValues();
+  }
+
+  updateBossHealthBar(bossData = {}, options = {}) {
+    const entry = this.hudElements.get('boss');
+    if (!entry?.root) {
+      return;
+    }
+
+    if (!this.cachedValues.boss) {
+      this.cachedValues.boss = this.createInitialBossCachedValues();
+    }
+
+    const cached = this.cachedValues.boss;
+    const force = Boolean(options.force);
+    const hasPayload = bossData && typeof bossData === 'object' && Object.keys(bossData).length > 0;
+    const state = hasPayload ? bossData : this.getBossHudState();
+
+    const shouldDisplay = Boolean(state.active || state.upcoming || state.defeated);
+    if (!shouldDisplay) {
+      this.hideBossHealthBar(force);
+      return;
+    }
+
+    this.showBossHealthBar();
+
+    const color =
+      typeof state.color === 'string' && state.color.trim().length > 0
+        ? state.color.trim()
+        : '#ff6b6b';
+
+    if (force || cached.color !== color) {
+      entry.root.style.setProperty('--boss-accent', color);
+
+      let softColor = 'rgba(255, 107, 107, 0.35)';
+      if (typeof color === 'string') {
+        const trimmedColor = color.trim();
+        if (trimmedColor.startsWith('#')) {
+          softColor = this.hexToRgba(trimmedColor, 0.35);
+        } else if (trimmedColor.startsWith('rgba')) {
+          softColor = trimmedColor.replace(/\)$/u, ', 0.35)');
+        } else if (trimmedColor.startsWith('rgb')) {
+          softColor = trimmedColor.replace('rgb', 'rgba').replace(/\)$/u, ', 0.35)');
+        } else if (trimmedColor.startsWith('hsla')) {
+          softColor = trimmedColor.replace(/\)$/u, ', 0.35)');
+        } else if (trimmedColor.startsWith('hsl')) {
+          softColor = trimmedColor.replace('hsl', 'hsla').replace(/\)$/u, ', 0.35)');
+        }
+      }
+
+      entry.root.style.setProperty('--boss-accent-soft', softColor);
+      cached.color = color;
+    }
+
+    const isActive = Boolean(state.active && !state.defeated);
+    const isUpcoming = Boolean(state.upcoming && !state.active && !state.defeated);
+    const isDefeated = Boolean(state.defeated);
+
+    entry.root.classList.toggle('is-active', isActive);
+    entry.root.classList.toggle('is-upcoming', isUpcoming);
+    entry.root.classList.toggle('is-defeated', isDefeated);
+
+    const bossName = state.name || 'Boss';
+    if (force || cached.name !== bossName) {
+      if (entry.name) {
+        entry.name.textContent = bossName;
+      }
+      cached.name = bossName;
+    }
+
+    const waveNumber = Number.isFinite(state.wave) ? Math.max(1, Math.floor(state.wave)) : null;
+    const phaseCount = Number.isFinite(state.phaseCount)
+      ? Math.max(0, Math.floor(state.phaseCount))
+      : 0;
+    const phaseIndex = Number.isFinite(state.phase) ? Math.max(0, Math.floor(state.phase)) : null;
+
+    let phaseText = '';
+    if (phaseCount > 0 && phaseIndex !== null) {
+      const displayPhase = Math.min(phaseIndex + 1, phaseCount);
+      phaseText = `Phase ${displayPhase}/${phaseCount}`;
+    } else if (phaseIndex !== null) {
+      phaseText = `Phase ${phaseIndex + 1}`;
+    } else if (waveNumber !== null) {
+      phaseText = `Wave ${waveNumber}`;
+    }
+
+    if (entry.phase && (force || cached.phase !== phaseText)) {
+      entry.phase.textContent = phaseText;
+      cached.phase = phaseText;
+    }
+
+    let statusText = '';
+    if (isDefeated) {
+      statusText = 'Defeated';
+    } else if (isActive) {
+      statusText = waveNumber !== null ? `Wave ${waveNumber} • Engaged` : 'Engaged';
+    } else if (isUpcoming) {
+      statusText = waveNumber !== null ? `Wave ${waveNumber} • Approaching` : 'Approaching';
+    } else if (waveNumber !== null) {
+      statusText = `Wave ${waveNumber}`;
+    }
+
+    if (entry.status && (force || cached.status !== statusText)) {
+      entry.status.textContent = statusText;
+      cached.status = statusText;
+    }
+
+    const health = Number.isFinite(state.health) ? Math.max(0, Math.floor(state.health)) : 0;
+    const maxHealth = Number.isFinite(state.maxHealth)
+      ? Math.max(0, Math.floor(state.maxHealth))
+      : 0;
+    const ratio = maxHealth > 0 ? Math.max(0, Math.min(1, health / maxHealth)) : 0;
+
+    const healthText = maxHealth > 0
+      ? `${this.formatCount(health, { allowCompact: false })} / ${this.formatCount(maxHealth, {
+          allowCompact: false,
+        })}`
+      : this.formatCount(health, { allowCompact: false });
+
+    if (entry.health && (force || cached.healthText !== healthText)) {
+      entry.health.textContent = healthText;
+      cached.healthText = healthText;
+    }
+
+    if (entry.barFill && (force || cached.healthRatio !== ratio)) {
+      entry.barFill.style.width = `${(ratio * 100).toFixed(2)}%`;
+    }
+
+    if (entry.bar) {
+      entry.bar.setAttribute('aria-valuenow', `${Math.round(ratio * 100)}`);
+      const ariaText = maxHealth > 0
+        ? `Boss health ${health} of ${maxHealth}`
+        : `Boss health ${health}`;
+      if (force || cached.healthRatio !== ratio) {
+        entry.bar.setAttribute('aria-valuetext', ariaText);
+      }
+    }
+
+    cached.health = health;
+    cached.maxHealth = maxHealth;
+    cached.healthRatio = ratio;
+    cached.visible = true;
+    cached.wave = waveNumber;
+
+    const now = this.getHighResolutionTime();
+    const phaseTimerState = state.timers?.phase || {};
+    const enrageTimerState = state.timers?.enrage || {};
+    const phaseSeconds = this.resolveBossTimerSeconds(phaseTimerState, now);
+    const enrageSeconds = this.resolveBossTimerSeconds(enrageTimerState, now);
+
+    const buildTimerText = (seconds, label) => {
+      if (isDefeated || !Number.isFinite(seconds)) {
+        return '';
+      }
+
+      const normalizedLabel = label || 'Timer';
+      if (seconds <= 0) {
+        return `${normalizedLabel}: READY`;
+      }
+
+      const formatted = this.formatBossTimer(seconds);
+      return formatted ? `${normalizedLabel}: ${formatted}` : '';
+    };
+
+    const phaseLabel = phaseTimerState.label || 'Phase shift';
+    const enrageLabel = enrageTimerState.label || 'Enrage';
+    const phaseTimerText = buildTimerText(phaseSeconds, phaseLabel);
+    const enrageTimerText = buildTimerText(enrageSeconds, enrageLabel);
+
+    if (entry.phaseTimer) {
+      if (phaseTimerText) {
+        entry.phaseTimer.textContent = phaseTimerText;
+        entry.phaseTimer.style.display = '';
+        entry.phaseTimer.setAttribute('aria-hidden', 'false');
+      } else {
+        entry.phaseTimer.textContent = '';
+        entry.phaseTimer.style.display = 'none';
+        entry.phaseTimer.setAttribute('aria-hidden', 'true');
+      }
+    }
+
+    if (entry.enrageTimer) {
+      if (enrageTimerText) {
+        entry.enrageTimer.textContent = enrageTimerText;
+        entry.enrageTimer.style.display = '';
+        entry.enrageTimer.setAttribute('aria-hidden', 'false');
+      } else {
+        entry.enrageTimer.textContent = '';
+        entry.enrageTimer.style.display = 'none';
+        entry.enrageTimer.setAttribute('aria-hidden', 'true');
+      }
+    }
+
+    if (entry.timers) {
+      const timersVisible = Boolean(phaseTimerText || enrageTimerText);
+      entry.timers.style.display = timersVisible ? '' : 'none';
+      entry.timers.setAttribute('aria-hidden', timersVisible ? 'false' : 'true');
+    }
+
+    cached.phaseTimerSeconds = phaseSeconds;
+    cached.phaseTimerText = phaseTimerText;
+    cached.enrageTimerSeconds = enrageSeconds;
+    cached.enrageTimerText = enrageTimerText;
+  }
+
+  showBossBanner(type = 'incoming', state = {}, options = {}) {
+    const entry = this.hudElements.get('boss');
+    if (!entry?.banner || !entry.bannerText) {
+      return;
+    }
+
+    if (!this.cachedValues.boss) {
+      this.cachedValues.boss = this.createInitialBossCachedValues();
+    }
+
+    if (this.bossBannerTimeout) {
+      window.clearTimeout(this.bossBannerTimeout);
+      this.bossBannerTimeout = null;
+    }
+
+    const bossName = state?.name || 'Boss';
+    const waveNumber = Number.isFinite(state?.wave) ? Math.max(1, Math.floor(state.wave)) : null;
+
+    let text = options?.text;
+    if (!text) {
+      const prefix = waveNumber ? `Wave ${waveNumber} - ` : '';
+      if (type === 'defeated') {
+        text = `${prefix}${bossName} defeated!`;
+      } else {
+        text = `${prefix}${bossName} incoming!`;
+      }
+    }
+
+    if (!text) {
+      return;
+    }
+
+    entry.bannerText.textContent = text;
+    entry.banner.dataset.bannerType = type;
+    entry.banner.classList.add('is-visible');
+    entry.banner.setAttribute('aria-hidden', 'false');
+
+    const duration = Number.isFinite(options?.duration)
+      ? Math.max(0, options.duration)
+      : 4500;
+
+    if (duration > 0) {
+      this.bossBannerTimeout = window.setTimeout(() => {
+        this.hideBossBanner();
+      }, duration);
+    }
+
+    this.cachedValues.boss.bannerType = type;
+  }
+
+  hideBossBanner(force = false) {
+    const entry = this.hudElements.get('boss');
+    if (!entry?.banner) {
+      if (this.bossBannerTimeout) {
+        window.clearTimeout(this.bossBannerTimeout);
+        this.bossBannerTimeout = null;
+      }
+      return;
+    }
+
+    if (!force && !entry.banner.classList.contains('is-visible')) {
+      return;
+    }
+
+    entry.banner.classList.remove('is-visible');
+    entry.banner.setAttribute('aria-hidden', 'true');
+    entry.banner.removeAttribute('data-banner-type');
+    if (entry.bannerText) {
+      entry.bannerText.textContent = '';
+    }
+
+    if (this.bossBannerTimeout) {
+      window.clearTimeout(this.bossBannerTimeout);
+      this.bossBannerTimeout = null;
+    }
+
+    if (this.cachedValues.boss) {
+      this.cachedValues.boss.bannerType = null;
+    }
+  }
+
+  renderBossHud(force = false) {
+    const state = this.getBossHudState();
+    const shouldDisplay = Boolean(state.active || state.upcoming || state.defeated);
+
+    if (!shouldDisplay) {
+      this.hideBossHealthBar(force);
+      return;
+    }
+
+    if (!this.cachedValues.boss?.visible) {
+      this.showBossHealthBar(state, { skipUpdate: true });
+      force = true;
+    }
+
+    this.updateBossHealthBar(state, { force });
+  }
+
+  handleBossWaveCompletion(payload = {}) {
+    const state = this.getBossHudState();
+
+    if (state.active || state.upcoming) {
+      return;
+    }
+
+    const hasBossContext =
+      this.cachedValues.boss?.visible ||
+      state.defeated ||
+      state.bossId !== null;
+
+    if (!hasBossContext) {
+      return;
+    }
+
+    this.resetBossHudState();
   }
 
   createNumberFormatter(mode = 'standard') {
@@ -856,6 +1509,7 @@ class UISystem {
     this.setupHudLayout();
     this.updateHudLayoutClass(resolvedId);
     this.refreshHudFromServices(true);
+    this.renderBossHud(true);
   }
 
   updateHudLayoutClass(layoutId) {
@@ -900,6 +1554,10 @@ class UISystem {
     const leadingElement = this.createLeadingElement(config.leading);
     const metaElement = this.createMetaElement(config.meta);
     const metaPosition = config.metaPosition || 'before';
+
+    if (config.type === 'boss' || config.layout === 'boss') {
+      return this.createBossHudItem(config);
+    }
 
     if (config.layout === 'inline-progress') {
       root.classList.add('hud-item--progress');
@@ -1055,6 +1713,104 @@ class UISystem {
       value: valueNumber,
       unit: unitElement,
       meta: metaElement,
+    };
+  }
+
+  createBossHudItem(config = {}) {
+    const root = document.createElement('div');
+    root.classList.add('hud-item', 'hud-item--boss', 'is-hidden');
+    root.dataset.hudKey = config.key || 'boss';
+    root.setAttribute('role', 'group');
+    root.setAttribute('aria-live', 'polite');
+    root.setAttribute('aria-hidden', 'true');
+
+    if (config.rootId) {
+      root.id = config.rootId;
+    }
+
+    const banner = document.createElement('div');
+    banner.classList.add('boss-hud__banner');
+    banner.setAttribute('role', 'status');
+    banner.setAttribute('aria-live', 'assertive');
+    banner.setAttribute('aria-hidden', 'true');
+
+    const bannerText = document.createElement('span');
+    bannerText.classList.add('boss-hud__banner-text');
+    banner.appendChild(bannerText);
+    root.appendChild(banner);
+
+    const header = document.createElement('div');
+    header.classList.add('boss-hud__header');
+    root.appendChild(header);
+
+    const label = document.createElement('span');
+    label.classList.add('boss-hud__label');
+    label.textContent = config.label || 'BOSS';
+    header.appendChild(label);
+
+    const name = document.createElement('span');
+    name.classList.add('boss-hud__name');
+    name.textContent = config.initialName || '---';
+    header.appendChild(name);
+
+    const phase = document.createElement('span');
+    phase.classList.add('boss-hud__phase');
+    header.appendChild(phase);
+
+    const status = document.createElement('span');
+    status.classList.add('boss-hud__status');
+    header.appendChild(status);
+
+    const barWrapper = document.createElement('div');
+    barWrapper.classList.add('boss-hud__bar');
+    root.appendChild(barWrapper);
+
+    const barTrack = document.createElement('div');
+    barTrack.classList.add('boss-hud__bar-track');
+    barTrack.setAttribute('role', 'progressbar');
+    barTrack.setAttribute('aria-valuemin', '0');
+    barTrack.setAttribute('aria-valuemax', '100');
+    barTrack.setAttribute('aria-valuenow', '0');
+    barWrapper.appendChild(barTrack);
+
+    const barFill = document.createElement('div');
+    barFill.classList.add('boss-hud__bar-fill');
+    barTrack.appendChild(barFill);
+
+    const healthValue = document.createElement('span');
+    healthValue.classList.add('boss-hud__health');
+    healthValue.textContent = config.initialValue ?? '--';
+    barWrapper.appendChild(healthValue);
+
+    const timers = document.createElement('div');
+    timers.classList.add('boss-hud__timers');
+    root.appendChild(timers);
+
+    const phaseTimer = document.createElement('span');
+    phaseTimer.classList.add('boss-hud__timer', 'boss-hud__timer--phase');
+    timers.appendChild(phaseTimer);
+
+    const enrageTimer = document.createElement('span');
+    enrageTimer.classList.add('boss-hud__timer', 'boss-hud__timer--enrage');
+    timers.appendChild(enrageTimer);
+
+    return {
+      key: config.key || 'boss',
+      config,
+      root,
+      banner,
+      bannerText,
+      header,
+      label,
+      name,
+      phase,
+      status,
+      bar: barTrack,
+      barFill,
+      health: healthValue,
+      timers,
+      phaseTimer,
+      enrageTimer,
     };
   }
 
@@ -1251,6 +2007,10 @@ class UISystem {
 
     gameEvents.on('wave-state-updated', (payload) => {
       this.handleWaveStateUpdated(payload);
+    });
+
+    gameEvents.on('wave-completed', (payload = {}) => {
+      this.handleBossWaveCompletion(payload);
     });
 
     gameEvents.on('ui-show-screen', (payload = {}) => {
@@ -2345,6 +3105,7 @@ class UISystem {
 
   update() {
     this.refreshHudFromServices(false);
+    this.renderBossHud();
   }
 
   handleHealthChange(data = {}, options = {}) {
@@ -2738,6 +3499,10 @@ class UISystem {
     const waveCompleted =
       !normalized.isActive && breakSeconds === 0 && normalized.totalAsteroids > 0;
 
+    const justCompleted =
+      waveCompleted &&
+      (Boolean(lastWave?.isActive) || (Number.isFinite(lastWave?.breakTimerSeconds) && lastWave.breakTimerSeconds > 0));
+
     if (waveRefs.enemies) {
       let enemiesText = '--';
 
@@ -2801,6 +3566,10 @@ class UISystem {
       'is-alert',
       !normalized.isActive && breakSeconds > 0
     );
+
+    if (justCompleted) {
+      this.handleBossWaveCompletion({ wave: normalized.current });
+    }
 
     this.cachedValues.wave = {
       current: normalized.current,
