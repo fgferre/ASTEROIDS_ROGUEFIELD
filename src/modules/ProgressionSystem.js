@@ -44,6 +44,26 @@ class ProgressionSystem {
     this.defaultUpgradeCategory = { ...DEFAULT_UPGRADE_CATEGORY };
     this.pendingUpgradeOptions = [];
 
+    const comboTimeout = Number.isFinite(CONSTANTS.PROGRESSION_COMBO_TIMEOUT)
+      ? Math.max(0, Number(CONSTANTS.PROGRESSION_COMBO_TIMEOUT))
+      : 3;
+    const comboStep = Number.isFinite(CONSTANTS.PROGRESSION_COMBO_MULTIPLIER_STEP)
+      ? Math.max(0, Number(CONSTANTS.PROGRESSION_COMBO_MULTIPLIER_STEP))
+      : 0.1;
+    const comboCap = Number.isFinite(CONSTANTS.PROGRESSION_COMBO_MULTIPLIER_CAP)
+      ? Math.max(1, Number(CONSTANTS.PROGRESSION_COMBO_MULTIPLIER_CAP))
+      : 2;
+
+    this.defaultComboTimeout = comboTimeout;
+    this.defaultComboMultiplierStep = comboStep;
+    this.defaultComboMultiplierCap = comboCap;
+    this.currentCombo = 0;
+    this.comboTimer = 0;
+    this.comboTimeout = comboTimeout;
+    this.comboMultiplier = 1;
+    this.comboMultiplierStep = comboStep;
+    this.comboMultiplierCap = comboCap;
+
     // === CACHES DE SERVIÇOS ===
     this.services = {
       xpOrbs: this.dependencies['xp-orbs'] || null,
@@ -135,12 +155,22 @@ class ProgressionSystem {
       this.handleOrbCollected(data);
     });
 
-    gameEvents.on('progression-reset', () => {
-      this.refreshInjectedServices(true);
+    gameEvents.on('enemy-destroyed', (data) => {
+      this.handleEnemyDestroyed(data);
     });
 
-    gameEvents.on('player-reset', () => {
+    gameEvents.on('progression-reset', (payload = {}) => {
       this.refreshInjectedServices(true);
+      this.resetCombo({ reason: 'progression-reset', silent: true, force: true });
+    });
+
+    gameEvents.on('player-reset', (payload = {}) => {
+      this.refreshInjectedServices(true);
+      this.resetCombo({ reason: 'player-reset', silent: true, force: true });
+    });
+
+    gameEvents.on('player-died', (payload = {}) => {
+      this.resetCombo({ reason: 'player-died', silent: false, force: true });
     });
   }
 
@@ -186,6 +216,145 @@ class ProgressionSystem {
     this.collectXP(amount);
   }
 
+  handleEnemyDestroyed(data = {}) {
+    if (!this.isPlayerResponsibleForEnemyDeath(data)) {
+      return;
+    }
+
+    this.incrementCombo({
+      enemy: data?.enemy || null,
+      payload: data,
+      reason: 'enemy-destroyed',
+    });
+  }
+
+  isPlayerResponsibleForEnemyDeath(data = {}) {
+    if (!data || typeof data !== 'object') {
+      return false;
+    }
+
+    const extractCause = (payload) => {
+      if (!payload || typeof payload !== 'object') {
+        return '';
+      }
+
+      const directCause =
+        typeof payload.cause === 'string' ? payload.cause : '';
+      const reasonCause =
+        typeof payload.reason === 'string' ? payload.reason : '';
+      const sourceCause =
+        typeof payload.source?.cause === 'string' ? payload.source.cause : '';
+
+      return (directCause || reasonCause || sourceCause || '').toLowerCase();
+    };
+
+    const cause = extractCause(data);
+    if (!cause) {
+      return false;
+    }
+
+    if (cause === 'damage') {
+      return true;
+    }
+
+    if (cause.startsWith('player-') || cause === 'player') {
+      return true;
+    }
+
+    const source = data.source || null;
+    if (source && typeof source === 'object') {
+      const sourceType =
+        typeof source.type === 'string' ? source.type.toLowerCase() : '';
+      if (sourceType === 'player') {
+        return true;
+      }
+
+      const sourceOwner =
+        typeof source.owner === 'string' ? source.owner.toLowerCase() : '';
+      if (sourceOwner === 'player') {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  incrementCombo(context = {}) {
+    this.currentCombo = Math.max(0, Math.floor(this.currentCombo)) + 1;
+    this.comboTimer = this.comboTimeout;
+    this.updateComboMultiplier();
+
+    this.emitComboUpdated({
+      reason: context.reason || 'combo-increment',
+      enemy: context.enemy || null,
+      payload: context.payload || null,
+    });
+  }
+
+  updateComboMultiplier() {
+    const step = Number.isFinite(this.comboMultiplierStep)
+      ? Math.max(0, this.comboMultiplierStep)
+      : 0.1;
+    const cap = Number.isFinite(this.comboMultiplierCap)
+      ? Math.max(1, this.comboMultiplierCap)
+      : 2;
+
+    const effectiveCombo = Math.max(0, Math.floor(this.currentCombo) - 1);
+    const calculated = 1 + effectiveCombo * step;
+
+    this.comboMultiplier = Math.min(cap, Math.max(1, calculated));
+  }
+
+  emitComboUpdated(extra = {}) {
+    if (typeof gameEvents === 'undefined') {
+      return;
+    }
+
+    gameEvents.emit('combo-updated', {
+      comboCount: this.currentCombo,
+      multiplier: this.comboMultiplier,
+      remainingTime: this.comboTimer,
+      timeout: this.comboTimeout,
+      ...extra,
+    });
+  }
+
+  resetCombo(options = {}) {
+    const { silent = false, reason = 'reset', force = false, emit = true } = options;
+
+    const previousCombo = Math.max(0, Math.floor(this.currentCombo));
+    const previousMultiplier = Number.isFinite(this.comboMultiplier)
+      ? Math.max(1, this.comboMultiplier)
+      : 1;
+    const hadCombo =
+      previousCombo > 0 ||
+      previousMultiplier > 1 ||
+      (Number.isFinite(this.comboTimer) && this.comboTimer > 0);
+
+    this.currentCombo = 0;
+    this.comboTimer = 0;
+    this.comboMultiplier = 1;
+
+    if (!emit || typeof gameEvents === 'undefined') {
+      return;
+    }
+
+    if (!force && !hadCombo) {
+      return;
+    }
+
+    gameEvents.emit('combo-broken', {
+      comboCount: this.currentCombo,
+      multiplier: this.comboMultiplier,
+      remainingTime: this.comboTimer,
+      timeout: this.comboTimeout,
+      previousCombo,
+      previousMultiplier,
+      reason,
+      silent: Boolean(silent),
+    });
+  }
+
   emitExperienceChanged() {
     if (typeof gameEvents === 'undefined') {
       return;
@@ -209,9 +378,14 @@ class ProgressionSystem {
       return { gained: 0, levels: 0 };
     }
 
-    this.totalExperience += value;
+    const multiplier = Number.isFinite(this.comboMultiplier)
+      ? Math.max(1, this.comboMultiplier)
+      : 1;
+    const adjustedValue = Math.max(1, Math.round(value * multiplier));
 
-    let pool = this.experience + value;
+    this.totalExperience += adjustedValue;
+
+    let pool = this.experience + adjustedValue;
     let levelsGained = 0;
     const levelContexts = [];
 
@@ -228,7 +402,25 @@ class ProgressionSystem {
       this.emitLevelUp(context);
     });
 
-    return { gained: value, levels: levelsGained };
+    return { gained: adjustedValue, levels: levelsGained };
+  }
+
+  update(deltaTime = 0) {
+    const dt = Number(deltaTime);
+    if (!Number.isFinite(dt) || dt <= 0) {
+      return;
+    }
+
+    if (this.currentCombo <= 0 || this.comboTimer <= 0) {
+      return;
+    }
+
+    const previousTimer = this.comboTimer;
+    this.comboTimer = Math.max(0, this.comboTimer - dt);
+
+    if (previousTimer > 0 && this.comboTimer <= 0) {
+      this.resetCombo({ reason: 'timeout', force: true });
+    }
   }
 
   applyLevelUp() {
@@ -1067,6 +1259,15 @@ class ProgressionSystem {
     };
   }
 
+  getComboState() {
+    return {
+      comboCount: this.currentCombo,
+      multiplier: this.comboMultiplier,
+      remainingTime: this.comboTimer,
+      timeout: this.comboTimeout,
+    };
+  }
+
   getUpgradeCount(upgradeId) {
     return this.appliedUpgrades.get(upgradeId) || 0;
   }
@@ -1083,6 +1284,18 @@ class ProgressionSystem {
     this.totalExperience = 0;
     this.appliedUpgrades.clear();
     this.pendingUpgradeOptions = [];
+
+    if (Number.isFinite(this.defaultComboTimeout)) {
+      this.comboTimeout = this.defaultComboTimeout;
+    }
+    if (Number.isFinite(this.defaultComboMultiplierStep)) {
+      this.comboMultiplierStep = this.defaultComboMultiplierStep;
+    }
+    if (Number.isFinite(this.defaultComboMultiplierCap)) {
+      this.comboMultiplierCap = this.defaultComboMultiplierCap;
+    }
+
+    this.resetCombo({ reason: 'progression-reset', silent: true, emit: false });
 
     this.refreshInjectedServices(true);
     this.emitExperienceChanged();
@@ -1102,6 +1315,12 @@ class ProgressionSystem {
       experienceToNext: this.experienceToNext,
       totalExperience: this.totalExperience,
       appliedUpgrades: Array.from(this.appliedUpgrades.entries()),
+      comboState: {
+        comboCount: this.currentCombo,
+        comboTimer: this.comboTimer,
+        comboTimeout: this.comboTimeout,
+        comboMultiplier: this.comboMultiplier,
+      },
     };
   }
 
@@ -1117,8 +1336,56 @@ class ProgressionSystem {
     this.appliedUpgrades = new Map(entries);
     this.pendingUpgradeOptions = [];
 
+    if (Number.isFinite(this.defaultComboTimeout)) {
+      this.comboTimeout = this.defaultComboTimeout;
+    }
+    if (Number.isFinite(this.defaultComboMultiplierStep)) {
+      this.comboMultiplierStep = this.defaultComboMultiplierStep;
+    }
+    if (Number.isFinite(this.defaultComboMultiplierCap)) {
+      this.comboMultiplierCap = this.defaultComboMultiplierCap;
+    }
+
+    const comboData = data?.comboState || {};
+    if (Number.isFinite(comboData?.comboTimeout) && comboData.comboTimeout >= 0) {
+      this.comboTimeout = comboData.comboTimeout;
+    }
+
+    const restoredCombo = Number.isFinite(comboData?.comboCount)
+      ? Math.max(0, Math.floor(comboData.comboCount))
+      : 0;
+    const restoredTimer = Number.isFinite(comboData?.comboTimer)
+      ? Math.max(0, Number(comboData.comboTimer))
+      : 0;
+
+    this.currentCombo = restoredCombo;
+    this.comboTimer = Math.min(this.comboTimeout, restoredTimer);
+
+    if (this.currentCombo > 0 && this.comboTimer > 0) {
+      const restoredMultiplier = Number(comboData?.comboMultiplier);
+      if (Number.isFinite(restoredMultiplier) && restoredMultiplier >= 1) {
+        this.comboMultiplier = Math.min(
+          Math.max(1, restoredMultiplier),
+          Number.isFinite(this.comboMultiplierCap)
+            ? Math.max(1, this.comboMultiplierCap)
+            : restoredMultiplier,
+        );
+      } else {
+        this.updateComboMultiplier();
+      }
+    } else {
+      this.comboTimer = 0;
+      this.comboMultiplier = 1;
+      this.currentCombo = 0;
+    }
+
     if (!options?.suppressEvents) {
       this.emitExperienceChanged();
+      if (this.currentCombo > 0) {
+        this.emitComboUpdated({ reason: 'deserialize', silent: true });
+      } else {
+        this.resetCombo({ reason: 'deserialize', silent: true, force: true });
+      }
     }
   }
 
@@ -1126,6 +1393,12 @@ class ProgressionSystem {
     this.refreshInjectedServices(true);
     this.deserialize(data, { suppressEvents: true });
     this.emitExperienceChanged();
+
+    if (this.currentCombo > 0) {
+      this.emitComboUpdated({ reason: 'restore-state', silent: true });
+    } else {
+      this.resetCombo({ reason: 'restore-state', silent: true, force: true });
+    }
 
     if (typeof gameEvents !== 'undefined') {
       gameEvents.emit('progression-restored', {
@@ -1140,6 +1413,7 @@ class ProgressionSystem {
   }
 
   destroy() {
+    this.resetCombo({ emit: false });
     this.appliedUpgrades.clear();
     this.pendingUpgradeOptions = [];
     this.services = {
