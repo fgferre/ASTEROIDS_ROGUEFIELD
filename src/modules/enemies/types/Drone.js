@@ -27,6 +27,7 @@ export class Drone extends BaseEnemy {
     this.fireSpread = DRONE_DEFAULTS.fireSpread ?? 0;
     this.projectileSpeed = DRONE_DEFAULTS.projectileSpeed ?? 340;
     this.projectileDamage = DRONE_DEFAULTS.projectileDamage ?? 15;
+    this.projectileLifetime = DRONE_DEFAULTS.projectileLifetime ?? 2.0;
     this.targetingRange = DRONE_DEFAULTS.targetingRange ?? 460;
     this.maxSpeed = DRONE_DEFAULTS.speed ?? 180;
     this.acceleration = DRONE_DEFAULTS.acceleration ?? 220;
@@ -56,6 +57,8 @@ export class Drone extends BaseEnemy {
       config.projectileSpeed ?? defaults.projectileSpeed ?? 340;
     this.projectileDamage =
       config.projectileDamage ?? defaults.projectileDamage ?? 15;
+    this.projectileLifetime =
+      config.projectileLifetime ?? defaults.projectileLifetime ?? 2.0;
 
     this.fireInterval = config.fireRate ?? defaults.fireRate ?? 2;
     this.fireVariance = config.fireVariance ?? defaults.fireVariance ?? 0;
@@ -273,6 +276,7 @@ export class Drone extends BaseEnemy {
       projectile: {
         speed: projectileSpeed,
         spread: Math.abs(this.fireSpread || 0),
+        lifetime: this.projectileLifetime,
       },
       source: {
         id: this.id,
@@ -300,6 +304,7 @@ export class Drone extends BaseEnemy {
     this.fireSpread = DRONE_DEFAULTS.fireSpread ?? 0;
     this.projectileSpeed = DRONE_DEFAULTS.projectileSpeed ?? 340;
     this.projectileDamage = DRONE_DEFAULTS.projectileDamage ?? 15;
+    this.projectileLifetime = DRONE_DEFAULTS.projectileLifetime ?? 2.0;
     this.targetingRange = DRONE_DEFAULTS.targetingRange ?? 460;
     this.maxSpeed = DRONE_DEFAULTS.speed ?? 180;
     this.acceleration = DRONE_DEFAULTS.acceleration ?? 220;

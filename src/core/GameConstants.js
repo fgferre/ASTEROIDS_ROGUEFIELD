@@ -1062,6 +1062,7 @@ export const ENEMY_TYPES = Object.freeze({
     fireSpread: 0.06, // Radians of random aim offset per projectile
     projectileSpeed: 340, // Units per second for drone bullets
     projectileDamage: 15, // Damage dealt by each projectile impact
+    projectileLifetime: 2.0, // Seconds before projectile despawns (controls effective range)
     targetingRange: 460, // Maximum distance to acquire the player as a target
     contactDamage: 12, // Damage inflicted on direct collision with the player
   }),
@@ -1088,6 +1089,7 @@ export const ENEMY_TYPES = Object.freeze({
     preferredDistance: 175, // Ideal distance maintained from the player
     projectileSpeed: 420, // Units per second for hunter projectiles
     projectileDamage: 12, // Damage per projectile fired by the hunter
+    projectileLifetime: 1.5, // Seconds before projectile despawns (controls effective range)
     fireRange: 520, // Maximum distance to start burst firing
     burstCount: 3, // Number of shots emitted per firing burst
     burstInterval: 3.5, // Seconds between consecutive bursts

@@ -30,6 +30,7 @@ export class Hunter extends BaseEnemy {
     this.acceleration = HUNTER_DEFAULTS.acceleration ?? 220;
     this.projectileSpeed = HUNTER_DEFAULTS.projectileSpeed ?? 420;
     this.projectileDamage = HUNTER_DEFAULTS.projectileDamage ?? 12;
+    this.projectileLifetime = HUNTER_DEFAULTS.projectileLifetime ?? 1.5;
     this.fireRange = HUNTER_DEFAULTS.fireRange ?? 520;
     this.fireSpread = HUNTER_DEFAULTS.fireSpread ?? 0;
 
@@ -67,6 +68,8 @@ export class Hunter extends BaseEnemy {
       config.projectileSpeed ?? defaults.projectileSpeed ?? 420;
     this.projectileDamage =
       config.projectileDamage ?? defaults.projectileDamage ?? 12;
+    this.projectileLifetime =
+      config.projectileLifetime ?? defaults.projectileLifetime ?? 1.5;
     this.fireRange = config.fireRange ?? defaults.fireRange ?? 520;
     this.fireSpread = config.fireSpread ?? defaults.fireSpread ?? 0;
 
@@ -322,6 +325,7 @@ export class Hunter extends BaseEnemy {
       projectile: {
         speed: projectileSpeed,
         spread: Math.abs(this.fireSpread || 0),
+        lifetime: this.projectileLifetime,
         burst: {
           id: this.currentBurstId,
           shotsRemaining: this.burstShotsRemaining,
@@ -353,6 +357,7 @@ export class Hunter extends BaseEnemy {
     this.acceleration = HUNTER_DEFAULTS.acceleration ?? 220;
     this.projectileSpeed = HUNTER_DEFAULTS.projectileSpeed ?? 420;
     this.projectileDamage = HUNTER_DEFAULTS.projectileDamage ?? 12;
+    this.projectileLifetime = HUNTER_DEFAULTS.projectileLifetime ?? 1.5;
     this.fireRange = HUNTER_DEFAULTS.fireRange ?? 520;
     this.fireSpread = HUNTER_DEFAULTS.fireSpread ?? 0;
 
