@@ -3011,16 +3011,17 @@ body.hud-layout-minimal .hud-item--time .hud-inline-value {
 }
 
 body.hud-layout-minimal .hud-region--bottom-center {
-  width: clamp(30rem, 64vw, 46rem);
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  width: min-content;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-items: stretch;
-  gap: clamp(0.7rem, 1.4vw, 1.25rem);
+  justify-content: center;
+  gap: clamp(0.6rem, 1vw, 1.1rem);
 }
 
 body.hud-layout-minimal .hud-region--bottom-center .hud-item {
-  width: 100%;
+  width: auto;
   padding: 0 !important;
   background: none !important;
   border: none !important;
