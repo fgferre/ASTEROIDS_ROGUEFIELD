@@ -6,6 +6,7 @@ import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 import {
   BOSS_AUDIO_FREQUENCY_PRESETS,
   MUSIC_LAYER_CONFIG,
+  WAVE_BOSS_INTERVAL,
 } from '../core/GameConstants.js';
 
 class AudioSystem {
@@ -331,16 +332,15 @@ class AudioSystem {
       return;
     }
 
+    const isBossWave = this._isBossWaveEvent(waveEvent, waveNumber);
     const targetLevel = this._calculateWaveIntensityLevel(waveNumber);
-    const isBossWave = Boolean(waveEvent?.isBossWave);
-
-    if (!isBossWave) {
-      this.musicController.lastNonBossIntensity = targetLevel;
-    }
 
     if (isBossWave) {
+      this.musicController.pendingNonBossIntensity = null;
       return;
     }
+
+    this.musicController.lastNonBossIntensity = targetLevel;
 
     if (this.musicController.bossActive) {
       this.musicController.pendingNonBossIntensity = targetLevel;
@@ -365,6 +365,36 @@ class AudioSystem {
     this.setMusicIntensity(targetLevel, {
       rampDuration: gentleRamp,
     });
+  }
+
+  _isBossWaveEvent(waveEvent = {}, waveNumber = null) {
+    if (typeof waveEvent?.isBossWave === 'boolean') {
+      return waveEvent.isBossWave;
+    }
+
+    const configFlag = waveEvent?.config?.isBossWave;
+    if (typeof configFlag === 'boolean') {
+      return configFlag;
+    }
+
+    const resolvedWaveNumber = Number.isFinite(waveNumber)
+      ? waveNumber
+      : Number(waveEvent?.wave);
+    if (!Number.isFinite(resolvedWaveNumber) || resolvedWaveNumber <= 0) {
+      return false;
+    }
+
+    const rawInterval = Number(WAVE_BOSS_INTERVAL);
+    if (!Number.isFinite(rawInterval) || rawInterval <= 0) {
+      return false;
+    }
+
+    const normalizedInterval = Math.max(1, Math.floor(rawInterval));
+    if (normalizedInterval <= 0) {
+      return false;
+    }
+
+    return resolvedWaveNumber % normalizedInterval === 0;
   }
 
   _calculateWaveIntensityLevel(waveNumber) {
