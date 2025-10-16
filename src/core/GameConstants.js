@@ -1405,10 +1405,58 @@ export const BOSS_AUDIO_FREQUENCY_PRESETS = Object.freeze({
 
 export const MUSIC_LAYER_CONFIG = Object.freeze({
   layers: Object.freeze({
-    base: Object.freeze({ frequency: 110, type: 'sine' }),
-    tension: Object.freeze({ frequency: 220, type: 'triangle' }),
-    danger: Object.freeze({ frequency: 330, type: 'sawtooth' }),
-    climax: Object.freeze({ frequency: 440, type: 'square' }),
+    base: Object.freeze({
+      frequency: 110,
+      type: 'sine',
+      modulationDepth: 0.55,
+      modulationRate: 0.07,
+      modulationType: 'sine',
+      randomDetuneCents: 8,
+      filter: Object.freeze({
+        type: 'lowpass',
+        frequency: 420,
+        Q: 0.8,
+      }),
+    }),
+    tension: Object.freeze({
+      frequency: 220,
+      type: 'triangle',
+      modulationDepth: 0.4,
+      modulationRate: 0.12,
+      modulationType: 'sine',
+      randomDetuneCents: 6,
+      filter: Object.freeze({
+        type: 'bandpass',
+        frequency: 680,
+        Q: 1.1,
+      }),
+    }),
+    danger: Object.freeze({
+      frequency: 330,
+      type: 'sawtooth',
+      modulationDepth: 0.32,
+      modulationRate: 0.18,
+      modulationType: 'triangle',
+      randomDetuneCents: 5,
+      filter: Object.freeze({
+        type: 'bandpass',
+        frequency: 940,
+        Q: 1.3,
+      }),
+    }),
+    climax: Object.freeze({
+      frequency: 440,
+      type: 'square',
+      modulationDepth: 0.26,
+      modulationRate: 0.24,
+      modulationType: 'sine',
+      randomDetuneCents: 4,
+      filter: Object.freeze({
+        type: 'highpass',
+        frequency: 520,
+        Q: 0.7,
+      }),
+    }),
   }),
   intensities: Object.freeze([
     Object.freeze({ base: 0.0, tension: 0.0, danger: 0.0, climax: 0.0 }),
