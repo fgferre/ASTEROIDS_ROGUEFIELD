@@ -155,6 +155,7 @@ class UISystem {
     this.tacticalState = {
       contactsCache: null,
       threats: new Map(),
+      isReady: false,
     };
 
     this.initializeSettingsMetadata();
@@ -2171,6 +2172,9 @@ class UISystem {
       value: comboValue || null,
       multiplier: comboMultiplier || null,
     };
+
+    // Update tactical readiness flag: tactical HUD is ready when minimap context is valid
+    this.tacticalState.isReady = !!(canvas && context && container);
   }
 
   setupEventListeners() {
@@ -3366,6 +3370,17 @@ class UISystem {
   }
 
   updateTacticalHud() {
+    // Guard: Skip tactical updates if DOM refs are not ready
+    // This prevents null reference errors during initialization or layout transitions
+    if (!this.tacticalState.isReady) {
+      return;
+    }
+
+    const minimapRefs = this.domRefs.minimap || {};
+    if (!minimapRefs.context || !minimapRefs.container) {
+      return;
+    }
+
     const contactsData = this.collectTacticalContacts();
     this.renderMinimap(contactsData);
     this.updateThreatIndicators(contactsData);
@@ -3553,13 +3568,20 @@ class UISystem {
     const minimapRefs = this.domRefs.minimap || {};
     const canvas = minimapRefs.canvas;
     const context = minimapRefs.context;
+    const container = minimapRefs.container;
 
-    if (!canvas || !context) {
+    // Guard: Ensure all required DOM refs are valid before rendering
+    if (!canvas || !context || !container) {
       return;
     }
 
     const width = Number(canvas.width) || canvas.clientWidth || 0;
     const height = Number(canvas.height) || canvas.clientHeight || 0;
+
+    // Additional safety: Validate canvas dimensions
+    if (width <= 0 || height <= 0) {
+      return;
+    }
 
     context.clearRect(0, 0, width, height);
 
