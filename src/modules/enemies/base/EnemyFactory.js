@@ -170,11 +170,12 @@ export class EnemyFactory {
 
     // Initialize enemy
     try {
-      // Ensure pooled instances receive the system reference
-      enemy.system = this.system;
-
       if (typeof enemy.initialize === 'function') {
-        enemy.initialize(finalConfig);
+        if (enemy.initialize.length === 0) {
+          enemy.initialize(finalConfig);
+        } else {
+          enemy.initialize(this.system, finalConfig);
+        }
       }
 
       // Apply default tags
