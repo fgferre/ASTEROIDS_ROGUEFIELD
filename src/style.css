@@ -2089,7 +2089,6 @@ body.motion-reduced #hud-root {
   inset: 0;
   pointer-events: none;
   z-index: 14;
-  display: contents;
 }
 
 .threat-indicator {
