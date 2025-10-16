@@ -1,7 +1,7 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
 import RandomService from '../core/RandomService.js';
-import { ScreenShake } from '../utils/ScreenShake.js';
+import { ScreenShake, ShakePresets } from '../utils/ScreenShake.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
 
@@ -1019,16 +1019,48 @@ export default class EffectsSystem {
   }
 
   applyBossScreenShake(name) {
-    const preset = this.getBossShakePreset(name);
-    if (!preset) {
+    const config = this.getBossShakePreset(name);
+    const fallbackMap = {
+      spawn: 'bossSpawn',
+      phaseChange: 'bossPhaseChange',
+      defeated: 'bossDefeated',
+    };
+
+    let presetName = null;
+    let presetOptions;
+
+    if (typeof config === 'string') {
+      presetName = config;
+    } else if (config && typeof config === 'object') {
+      if (typeof config.preset === 'string') {
+        presetName = config.preset;
+      } else if (typeof config.shakePreset === 'string') {
+        presetName = config.shakePreset;
+      }
+
+      if (config.options && typeof config.options === 'object') {
+        presetOptions = config.options;
+      } else if (config.overrides && typeof config.overrides === 'object') {
+        presetOptions = config.overrides;
+      }
+    }
+
+    if (!presetName && fallbackMap[name]) {
+      presetName = fallbackMap[name];
+    }
+
+    if (presetName && Object.prototype.hasOwnProperty.call(ShakePresets, presetName)) {
+      this.addScreenShake(presetName, presetOptions);
       return;
     }
 
-    const intensity = Number.isFinite(preset.intensity) ? preset.intensity : null;
-    const duration = Number.isFinite(preset.duration) ? preset.duration : null;
+    if (config && typeof config === 'object') {
+      const intensity = Number.isFinite(config.intensity) ? config.intensity : null;
+      const duration = Number.isFinite(config.duration) ? config.duration : null;
 
-    if (intensity != null && duration != null) {
-      this.addScreenShake(intensity, duration);
+      if (intensity != null && duration != null) {
+        this.addScreenShake(intensity, duration);
+      }
     }
   }
 
@@ -1680,30 +1712,124 @@ export default class EffectsSystem {
     });
   }
 
-  addScreenShake(intensity, duration) {
-    const inputIntensity = Number.isFinite(intensity) ? intensity : 0;
-    const inputDuration = Number.isFinite(duration) ? duration : 0;
-
+  addScreenShake(presetOrIntensity, durationOrOptions) {
     const scale = Math.max(0, this.screenShakeScale ?? 1);
     const motionScale = this.motionReduced ? 0.45 : 1;
-    const finalIntensity = inputIntensity * scale * motionScale;
 
-    if (finalIntensity <= 0) {
+    let trauma = 0;
+    let finalDuration = 0;
+
+    const isPlainObject = value =>
+      value && typeof value === 'object' && !Array.isArray(value);
+
+    if (typeof presetOrIntensity === 'string') {
+      const preset = ShakePresets[presetOrIntensity];
+      if (!preset) {
+        return;
+      }
+
+      const options = isPlainObject(durationOrOptions) ? durationOrOptions : {};
+      trauma = Number.isFinite(preset.trauma) ? Math.max(0, preset.trauma) : 0;
+      finalDuration = Number.isFinite(preset.duration)
+        ? Math.max(0, preset.duration)
+        : 0;
+
+      if (Number.isFinite(options.trauma)) {
+        trauma = options.trauma;
+      } else {
+        const traumaMultiplier = Number.isFinite(options.traumaMultiplier)
+          ? options.traumaMultiplier
+          : 1;
+        const traumaOffset = Number.isFinite(options.traumaOffset)
+          ? options.traumaOffset
+          : 0;
+        trauma = trauma * traumaMultiplier + traumaOffset;
+      }
+
+      if (Number.isFinite(options.duration)) {
+        finalDuration = options.duration;
+      } else {
+        const durationMultiplier = Number.isFinite(options.durationMultiplier)
+          ? options.durationMultiplier
+          : 1;
+        const durationOffset = Number.isFinite(options.durationOffset)
+          ? options.durationOffset
+          : 0;
+        finalDuration = finalDuration * durationMultiplier + durationOffset;
+      }
+
+      if (Number.isFinite(options.maxTrauma)) {
+        trauma = Math.min(trauma, options.maxTrauma);
+      }
+      if (Number.isFinite(options.minTrauma)) {
+        trauma = Math.max(trauma, options.minTrauma);
+      }
+      if (Number.isFinite(options.maxDuration)) {
+        finalDuration = Math.min(finalDuration, options.maxDuration);
+      }
+      if (Number.isFinite(options.minDuration)) {
+        finalDuration = Math.max(finalDuration, options.minDuration);
+      }
+
+      trauma = Math.max(0, trauma);
+      finalDuration = Math.max(0, finalDuration);
+    } else if (
+      isPlainObject(presetOrIntensity) &&
+      Number.isFinite(presetOrIntensity.trauma) &&
+      Number.isFinite(presetOrIntensity.duration)
+    ) {
+      const options = isPlainObject(durationOrOptions) ? durationOrOptions : {};
+      trauma = Math.max(0, presetOrIntensity.trauma);
+      finalDuration = Math.max(0, presetOrIntensity.duration);
+
+      if (Number.isFinite(options.trauma)) {
+        trauma = options.trauma;
+      }
+      if (Number.isFinite(options.duration)) {
+        finalDuration = options.duration;
+      }
+    } else {
+      const intensity = Number.isFinite(presetOrIntensity) ? presetOrIntensity : 0;
+      const inputDuration = Number.isFinite(durationOrOptions)
+        ? durationOrOptions
+        : 0;
+
+      const finalIntensity = intensity * scale * motionScale;
+
+      if (finalIntensity <= 0) {
+        return;
+      }
+
+      finalDuration = inputDuration;
+      if (this.motionReduced) {
+        finalDuration = Math.min(finalDuration, 0.2);
+      }
+      finalDuration = Math.max(0, finalDuration);
+      if (finalDuration <= 0) {
+        return;
+      }
+
+      const traumaFromIntensity = Math.min(1, finalIntensity / 15);
+      this.screenShake.add(traumaFromIntensity, finalDuration);
       return;
     }
 
-    let finalDuration = inputDuration;
+    trauma *= scale * motionScale;
+
+    if (trauma <= 0) {
+      return;
+    }
+
     if (this.motionReduced) {
       finalDuration = Math.min(finalDuration, 0.2);
     }
+
     finalDuration = Math.max(0, finalDuration);
     if (finalDuration <= 0) {
       return;
     }
 
-    // Convert old intensity (0-12 range) to trauma (0-1 range)
-    // Old max was ~12, so divide by 15 to get 0-0.8 trauma range
-    const trauma = Math.min(1, finalIntensity / 15);
+    trauma = Math.min(1, trauma);
     this.screenShake.add(trauma, finalDuration);
   }
 
@@ -2245,7 +2371,7 @@ export default class EffectsSystem {
 
     const flashColor = palette.flash || coreColor;
     this.addScreenFlash(flashColor, 0.14, 0.12);
-    this.addScreenShake(4.2, 0.18);
+    this.addScreenShake('bossAttack');
   }
 
   createMineExplosion(payload = {}) {
@@ -2284,16 +2410,35 @@ export default class EffectsSystem {
       y: Number.isFinite(enemy?.vy) ? enemy.vy : 0,
     };
 
-    const intensity = Math.max(1, radius / 110);
+    const radiusFactor = Math.max(1, radius / 110);
     const flashColor = palette.flash || 'rgba(255, 190, 110, 0.4)';
     const shockwaveColor = palette.shockwave || palette.flash || 'rgba(255, 160, 70, 0.35)';
     const debrisColor = palette.debris || '#7A3B16';
     const sparkColor = palette.sparks || '#FFD27F';
     const smokeColor = palette.smoke || 'rgba(90, 40, 20, 0.45)';
 
-    this.addScreenShake(6 + radius * 0.025, 0.28 + intensity * 0.08);
-    this.addScreenFlash(flashColor, 0.22, 0.2 + intensity * 0.05);
-    this.addFreezeFrame(0.14 + Math.min(0.12, intensity * 0.08), 0.18);
+    const shakePreset = ShakePresets.mineExplosion;
+    const baseShakeIntensity = 6 + 110 * 0.025;
+    const shakeIntensity = 6 + radius * 0.025;
+    const traumaMultiplier = Math.max(
+      0.6,
+      Math.min(1.6, shakeIntensity / baseShakeIntensity)
+    );
+    const baseDuration = Number.isFinite(shakePreset?.duration)
+      ? shakePreset.duration
+      : 0.36;
+    const targetDuration = 0.28 + radiusFactor * 0.08;
+    const durationOffset = targetDuration - baseDuration;
+
+    this.addScreenShake('mineExplosion', {
+      traumaMultiplier,
+      durationOffset,
+      maxTrauma: 1,
+      minDuration: 0.2,
+      maxDuration: 1.2,
+    });
+    this.addScreenFlash(flashColor, 0.22, 0.2 + radiusFactor * 0.05);
+    this.addFreezeFrame(0.14 + Math.min(0.12, radiusFactor * 0.08), 0.18);
 
     this.createShockwaveEffect({
       position,
@@ -2310,7 +2455,8 @@ export default class EffectsSystem {
     const sparkCount = this.getScaledParticleCount(24 + Math.round(radius / 4));
     for (let i = 0; i < sparkCount; i += 1) {
       const angle = this.randomFloat('explosions') * Math.PI * 2;
-      const speed = (140 + this.randomFloat('explosions') * 180) * (0.9 + intensity * 0.25);
+      const speed =
+        (140 + this.randomFloat('explosions') * 180) * (0.9 + radiusFactor * 0.25);
       this.particles.push(
         this.createParticle(
           position.x,
@@ -2385,7 +2531,7 @@ export default class EffectsSystem {
       y: Number.isFinite(enemy.vy) ? enemy.vy : 0,
     };
 
-    this.addScreenShake(3.4, 0.18);
+    this.addScreenShake('droneDestroyed');
     this.addScreenFlash(palette.flash || 'rgba(150, 220, 255, 0.35)', 0.12, 0.1);
 
     const sparkCount = this.getScaledParticleCount(14 + Math.round(radius));
@@ -2464,7 +2610,7 @@ export default class EffectsSystem {
       y: Number.isFinite(enemy.vy) ? enemy.vy : 0,
     };
 
-    this.addScreenShake(5.2, 0.22);
+    this.addScreenShake('hunterDestroyed');
     this.addScreenFlash(palette.flash || 'rgba(255, 200, 255, 0.38)', 0.14, 0.14);
     this.createShockwaveEffect({
       position,

@@ -1346,9 +1346,13 @@ export const BOSS_EFFECTS_PRESETS = Object.freeze({
 });
 
 export const BOSS_SCREEN_SHAKES = Object.freeze({
-  spawn: Object.freeze({ intensity: 18, duration: 0.65 }),
-  phaseChange: Object.freeze({ intensity: 14, duration: 0.5 }),
-  defeated: Object.freeze({ intensity: 24, duration: 0.85 }),
+  spawn: Object.freeze({ intensity: 18, duration: 0.65, preset: 'bossSpawn' }),
+  phaseChange: Object.freeze({
+    intensity: 14,
+    duration: 0.5,
+    preset: 'bossPhaseChange',
+  }),
+  defeated: Object.freeze({ intensity: 24, duration: 0.85, preset: 'bossDefeated' }),
 });
 
 // === AUDIO PRESETS ===
