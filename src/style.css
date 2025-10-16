@@ -2180,21 +2180,25 @@ body.motion-reduced #hud-root {
   filter: drop-shadow(0 0 6px rgba(255, 140, 140, 0.55));
 }
 
-.threat-indicator[data-threat-level='low'] {
+.threat-indicator[data-severity='low'],
+.threat-indicator.threat-indicator--low {
   --threat-intensity: 0.45;
   animation-duration: 2s;
 }
 
-.threat-indicator[data-threat-level='medium'] {
+.threat-indicator[data-severity='medium'],
+.threat-indicator.threat-indicator--medium {
   --threat-intensity: 0.7;
 }
 
-.threat-indicator[data-threat-level='high'] {
+.threat-indicator[data-severity='high'],
+.threat-indicator.threat-indicator--high {
   --threat-intensity: 0.9;
   animation-duration: 1.2s;
 }
 
-.threat-indicator[data-threat-level='critical'],
+.threat-indicator[data-severity='critical'],
+.threat-indicator.threat-indicator--critical,
 .threat-indicator.is-critical {
   --threat-intensity: 1;
   animation-duration: 1s;
