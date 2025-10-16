@@ -6,6 +6,7 @@ import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 import {
   BOSS_AUDIO_FREQUENCY_PRESETS,
   MUSIC_LAYER_CONFIG,
+  WAVE_BOSS_INTERVAL,
 } from '../core/GameConstants.js';
 
 class AudioSystem {
@@ -71,6 +72,8 @@ class AudioSystem {
       targetLevel: initialIntensityLevel,
       bossActive: false,
       relaxTimeout: null,
+      lastNonBossIntensity: initialIntensityLevel,
+      pendingNonBossIntensity: null,
       relaxedIntensity:
         typeof MUSIC_LAYER_CONFIG?.relaxedIntensity === 'number'
           ? MUSIC_LAYER_CONFIG.relaxedIntensity
@@ -226,6 +229,10 @@ class AudioSystem {
       }
     });
 
+    gameEvents.on('wave-started', (waveEvent = {}) => {
+      this.updateWaveMusicIntensity(waveEvent);
+    });
+
     gameEvents.on('mine-exploded', (data = {}) => {
       this.playMineExplosion(data);
     });
@@ -312,6 +319,130 @@ class AudioSystem {
         this.lowHealthWarning = false;
       }
     });
+  }
+
+  updateWaveMusicIntensity(waveEvent = {}) {
+    const intensities = MUSIC_LAYER_CONFIG?.intensities || [];
+    if (!intensities.length) {
+      return;
+    }
+
+    const waveNumber = Number(waveEvent?.wave);
+    if (!Number.isFinite(waveNumber) || waveNumber <= 0) {
+      return;
+    }
+
+    const isBossWave = this._isBossWaveEvent(waveEvent, waveNumber);
+    const targetLevel = this._calculateWaveIntensityLevel(waveNumber);
+
+    if (isBossWave) {
+      this.musicController.pendingNonBossIntensity = null;
+      return;
+    }
+
+    this.musicController.lastNonBossIntensity = targetLevel;
+
+    if (this.musicController.bossActive) {
+      this.musicController.pendingNonBossIntensity = targetLevel;
+      return;
+    }
+
+    if (
+      targetLevel === this.musicController.targetLevel &&
+      targetLevel === this.musicController.intensityLevel
+    ) {
+      this.musicController.pendingNonBossIntensity = null;
+      return;
+    }
+
+    this.musicController.pendingNonBossIntensity = null;
+
+    const gentleRamp =
+      this.musicController?.rampDurations?.rise ??
+      this.musicController?.rampDurations?.fall ??
+      1.2;
+
+    this.setMusicIntensity(targetLevel, {
+      rampDuration: gentleRamp,
+    });
+  }
+
+  _isBossWaveEvent(waveEvent = {}, waveNumber = null) {
+    if (typeof waveEvent?.isBossWave === 'boolean') {
+      return waveEvent.isBossWave;
+    }
+
+    const configFlag = waveEvent?.config?.isBossWave;
+    if (typeof configFlag === 'boolean') {
+      return configFlag;
+    }
+
+    const resolvedWaveNumber = Number.isFinite(waveNumber)
+      ? waveNumber
+      : Number(waveEvent?.wave);
+    if (!Number.isFinite(resolvedWaveNumber) || resolvedWaveNumber <= 0) {
+      return false;
+    }
+
+    const rawInterval = Number(WAVE_BOSS_INTERVAL);
+    if (!Number.isFinite(rawInterval) || rawInterval <= 0) {
+      return false;
+    }
+
+    const normalizedInterval = Math.max(1, Math.floor(rawInterval));
+    if (normalizedInterval <= 0) {
+      return false;
+    }
+
+    return resolvedWaveNumber % normalizedInterval === 0;
+  }
+
+  _calculateWaveIntensityLevel(waveNumber) {
+    const intensities = MUSIC_LAYER_CONFIG?.intensities || [];
+    const stepCount = intensities.length - 1;
+
+    if (stepCount <= 0) {
+      return 0;
+    }
+
+    const normalizedWave = Math.max(1, Math.floor(Number(waveNumber) || 0));
+
+    const configuredStep = Number(MUSIC_LAYER_CONFIG?.wavesPerIntensityStep);
+    const progressionWindow = Number(
+      MUSIC_LAYER_CONFIG?.intensityProgressionWindow
+    );
+
+    let wavesPerStep = Number.isFinite(configuredStep)
+      ? configuredStep
+      : null;
+
+    if (!wavesPerStep || wavesPerStep <= 0) {
+      const fallbackWindow =
+        Number.isFinite(progressionWindow) && progressionWindow > 0
+          ? progressionWindow
+          : stepCount * 3;
+      wavesPerStep = Math.max(1, Math.round(fallbackWindow / stepCount));
+    }
+
+    const level = Math.floor((normalizedWave - 1) / wavesPerStep);
+    return Math.min(stepCount, Math.max(0, level));
+  }
+
+  _randomBetween(min, max) {
+    const candidates = [
+      this.randomScopes?.families?.music,
+      this.randomScopes?.base,
+      this.random,
+    ];
+
+    for (const rng of candidates) {
+      if (rng && typeof rng.range === 'function') {
+        return rng.range(min, max);
+      }
+    }
+
+    const [low, high] = max >= min ? [min, max] : [max, min];
+    return low + (high - low) * Math.random();
   }
 
   bootstrapSettings() {
@@ -408,20 +539,114 @@ class AudioSystem {
       const osc = this.context.createOscillator();
       const gain = this.context.createGain();
 
+      const baseFrequency = Number(layerConfig.frequency) || 110;
+
       osc.type = layerConfig.type || 'sine';
-      osc.frequency.setValueAtTime(
-        layerConfig.frequency || 110,
-        now
-      );
+      osc.frequency.setValueAtTime(Math.max(10, baseFrequency), now);
+
+      if (typeof layerConfig.detuneCents === 'number') {
+        osc.detune.setValueAtTime(layerConfig.detuneCents, now);
+      }
+
+      const randomDetuneSpan = Number(layerConfig.randomDetuneCents);
+      if (Number.isFinite(randomDetuneSpan) && randomDetuneSpan > 0) {
+        const offset = this._randomBetween(
+          -Math.abs(randomDetuneSpan),
+          Math.abs(randomDetuneSpan)
+        );
+        osc.detune.setValueAtTime(
+          (Number(layerConfig.detuneCents) || 0) + offset,
+          now
+        );
+      }
 
       gain.gain.setValueAtTime(0, now);
 
       osc.connect(gain);
-      this.connectMusicNode(gain);
 
+      let outputNode = gain;
+      const filterConfig = layerConfig.filter;
+      let filterNode = null;
+
+      if (
+        filterConfig &&
+        typeof this.context.createBiquadFilter === 'function'
+      ) {
+        filterNode = this.context.createBiquadFilter();
+        filterNode.type = filterConfig.type || 'lowpass';
+
+        if (typeof filterConfig.frequency === 'number') {
+          filterNode.frequency.setValueAtTime(
+            Math.max(10, filterConfig.frequency),
+            now
+          );
+        }
+
+        if (typeof filterConfig.Q === 'number') {
+          filterNode.Q.setValueAtTime(
+            Math.max(0.0001, filterConfig.Q),
+            now
+          );
+        }
+
+        if (
+          typeof filterConfig.gain === 'number' &&
+          ['lowshelf', 'highshelf', 'peaking'].includes(filterNode.type)
+        ) {
+          filterNode.gain.setValueAtTime(filterConfig.gain, now);
+        }
+
+        gain.connect(filterNode);
+        outputNode = filterNode;
+      }
+
+      let modulator = null;
+      const depthMultiplier =
+        typeof layerConfig.modulationDepth === 'number'
+          ? Math.max(0, Math.min(0.95, layerConfig.modulationDepth))
+          : 0;
+
+      if (depthMultiplier > 0 && typeof this.context.createOscillator === 'function') {
+        const lfo = this.context.createOscillator();
+        const depthGain = this.context.createGain();
+        const rate =
+          typeof layerConfig.modulationRate === 'number'
+            ? Math.max(0.01, layerConfig.modulationRate)
+            : 0.12;
+
+        lfo.type = layerConfig.modulationType || 'sine';
+        lfo.frequency.setValueAtTime(rate, now);
+        depthGain.gain.setValueAtTime(0, now);
+
+        lfo.connect(depthGain);
+        depthGain.connect(gain.gain);
+
+        let phaseOffset = 0;
+        if (layerConfig.randomizeModulationPhase !== false && rate > 0) {
+          const cycleDuration = 1 / rate;
+          const offsetWindow = Math.min(cycleDuration, 2.5);
+          phaseOffset = this._randomBetween(0, offsetWindow);
+        }
+
+        lfo.start(now + Math.max(0, phaseOffset));
+
+        modulator = {
+          lfo,
+          depthGain,
+          depthMultiplier,
+        };
+      }
+
+      this.connectMusicNode(outputNode);
       osc.start(now);
 
-      createdLayers[key] = { osc, gain, config: layerConfig };
+      createdLayers[key] = {
+        osc,
+        gain,
+        config: layerConfig,
+        filter: filterNode,
+        modulator,
+      };
     });
 
     this.musicController.layers = createdLayers;
@@ -504,19 +729,43 @@ class AudioSystem {
 
       if (immediate) {
         gainNode.gain.setValueAtTime(targetGain, now);
+      } else {
+        const currentValue =
+          typeof gainNode.gain.value === 'number'
+            ? gainNode.gain.value
+            : targetGain;
+
+        gainNode.gain.setValueAtTime(currentValue, now);
+        gainNode.gain.linearRampToValueAtTime(
+          targetGain,
+          now + rampDuration
+        );
+      }
+
+      const modulator = layer?.modulator;
+      const depthParam = modulator?.depthGain?.gain;
+      if (!depthParam) {
         return;
       }
 
-      const currentValue =
-        typeof gainNode.gain.value === 'number'
-          ? gainNode.gain.value
-          : targetGain;
+      const depthValue = Math.max(0, targetGain * modulator.depthMultiplier);
 
-      gainNode.gain.setValueAtTime(currentValue, now);
-      gainNode.gain.linearRampToValueAtTime(
-        targetGain,
-        now + rampDuration
-      );
+      try {
+        depthParam.cancelScheduledValues(now);
+      } catch (error) {
+        // Ignore browsers that throw when clearing empty schedules
+      }
+
+      if (immediate) {
+        depthParam.setValueAtTime(depthValue, now);
+        return;
+      }
+
+      const currentDepth =
+        typeof depthParam.value === 'number' ? depthParam.value : depthValue;
+
+      depthParam.setValueAtTime(currentDepth, now);
+      depthParam.linearRampToValueAtTime(depthValue, now + rampDuration);
     });
   }
 
@@ -532,14 +781,29 @@ class AudioSystem {
 
     this.musicController.relaxTimeout = setTimeout(() => {
       this.musicController.relaxTimeout = null;
-      const initialLevel =
-        typeof MUSIC_LAYER_CONFIG?.initialIntensity === 'number'
-          ? MUSIC_LAYER_CONFIG.initialIntensity
-          : 0;
-      this.setMusicIntensity(initialLevel, {
+
+      const hasPendingLevel =
+        this.musicController.pendingNonBossIntensity !== null &&
+        this.musicController.pendingNonBossIntensity !== undefined;
+
+      if (!hasPendingLevel) {
+        return;
+      }
+
+      const fallbackLevel = this.musicController.pendingNonBossIntensity;
+
+      this.musicController.pendingNonBossIntensity = null;
+
+      if (!Number.isFinite(fallbackLevel)) {
+        return;
+      }
+
+      this.setMusicIntensity(fallbackLevel, {
         reason: 'bossVictory',
         rampDuration: this.musicController.rampDurations.fall,
       });
+
+      this.musicController.lastNonBossIntensity = fallbackLevel;
     }, delay);
   }
 
@@ -2271,6 +2535,7 @@ class AudioSystem {
         asteroid: baseRandom.fork('audio:family:asteroid'),
         xp: baseRandom.fork('audio:family:xp'),
         impact: baseRandom.fork('audio:family:impact'),
+        music: baseRandom.fork('audio:family:music'),
         ui: baseRandom.fork('audio:family:ui'),
       };
 
