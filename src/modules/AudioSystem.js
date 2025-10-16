@@ -71,6 +71,8 @@ class AudioSystem {
       targetLevel: initialIntensityLevel,
       bossActive: false,
       relaxTimeout: null,
+      lastNonBossIntensity: initialIntensityLevel,
+      pendingNonBossIntensity: null,
       relaxedIntensity:
         typeof MUSIC_LAYER_CONFIG?.relaxedIntensity === 'number'
           ? MUSIC_LAYER_CONFIG.relaxedIntensity
@@ -226,6 +228,10 @@ class AudioSystem {
       }
     });
 
+    gameEvents.on('wave-started', (waveEvent = {}) => {
+      this.updateWaveMusicIntensity(waveEvent);
+    });
+
     gameEvents.on('mine-exploded', (data = {}) => {
       this.playMineExplosion(data);
     });
@@ -312,6 +318,80 @@ class AudioSystem {
         this.lowHealthWarning = false;
       }
     });
+  }
+
+  updateWaveMusicIntensity(waveEvent = {}) {
+    const intensities = MUSIC_LAYER_CONFIG?.intensities || [];
+    if (!intensities.length) {
+      return;
+    }
+
+    const waveNumber = Number(waveEvent?.wave);
+    if (!Number.isFinite(waveNumber) || waveNumber <= 0) {
+      return;
+    }
+
+    const targetLevel = this._calculateWaveIntensityLevel(waveNumber);
+    const isBossWave = Boolean(waveEvent?.isBossWave);
+
+    if (!isBossWave) {
+      this.musicController.lastNonBossIntensity = targetLevel;
+    }
+
+    if (this.musicController.bossActive || isBossWave) {
+      this.musicController.pendingNonBossIntensity = targetLevel;
+      return;
+    }
+
+    if (
+      targetLevel === this.musicController.targetLevel &&
+      targetLevel === this.musicController.intensityLevel
+    ) {
+      this.musicController.pendingNonBossIntensity = null;
+      return;
+    }
+
+    this.musicController.pendingNonBossIntensity = null;
+
+    const gentleRamp =
+      this.musicController?.rampDurations?.rise ??
+      this.musicController?.rampDurations?.fall ??
+      1.2;
+
+    this.setMusicIntensity(targetLevel, {
+      rampDuration: gentleRamp,
+    });
+  }
+
+  _calculateWaveIntensityLevel(waveNumber) {
+    const intensities = MUSIC_LAYER_CONFIG?.intensities || [];
+    const stepCount = intensities.length - 1;
+
+    if (stepCount <= 0) {
+      return 0;
+    }
+
+    const normalizedWave = Math.max(1, Math.floor(Number(waveNumber) || 0));
+
+    const configuredStep = Number(MUSIC_LAYER_CONFIG?.wavesPerIntensityStep);
+    const progressionWindow = Number(
+      MUSIC_LAYER_CONFIG?.intensityProgressionWindow
+    );
+
+    let wavesPerStep = Number.isFinite(configuredStep)
+      ? configuredStep
+      : null;
+
+    if (!wavesPerStep || wavesPerStep <= 0) {
+      const fallbackWindow =
+        Number.isFinite(progressionWindow) && progressionWindow > 0
+          ? progressionWindow
+          : stepCount * 3;
+      wavesPerStep = Math.max(1, Math.round(fallbackWindow / stepCount));
+    }
+
+    const level = Math.floor((normalizedWave - 1) / wavesPerStep);
+    return Math.min(stepCount, Math.max(0, level));
   }
 
   bootstrapSettings() {
@@ -536,10 +616,19 @@ class AudioSystem {
         typeof MUSIC_LAYER_CONFIG?.initialIntensity === 'number'
           ? MUSIC_LAYER_CONFIG.initialIntensity
           : 0;
-      this.setMusicIntensity(initialLevel, {
+      const fallbackLevel =
+        this.musicController.pendingNonBossIntensity ??
+        this.musicController.lastNonBossIntensity ??
+        initialLevel;
+
+      this.musicController.pendingNonBossIntensity = null;
+
+      this.setMusicIntensity(fallbackLevel, {
         reason: 'bossVictory',
         rampDuration: this.musicController.rampDurations.fall,
       });
+
+      this.musicController.lastNonBossIntensity = fallbackLevel;
     }, delay);
   }
 
