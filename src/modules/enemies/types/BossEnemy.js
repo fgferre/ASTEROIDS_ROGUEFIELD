@@ -581,20 +581,46 @@ export class BossEnemy extends BaseEnemy {
     };
 
     let minion = null;
-    if (typeof this.system.acquireEnemyViaFactory === 'function') {
+
+    // Special handling for asteroid type
+    if (type === 'asteroid' && typeof this.system.acquireAsteroid === 'function') {
+      minion = this.system.acquireAsteroid(spawnConfig);
+    } else if (typeof this.system.acquireEnemyViaFactory === 'function') {
+      // Check if factory has the type registered
+      if (this.system.factory && typeof this.system.factory.hasType === 'function') {
+        if (!this.system.factory.hasType(type)) {
+          console.warn(
+            `[BossEnemy] Minion type '${type}' not registered in factory. Minion spawn skipped.`
+          );
+          return;
+        }
+      }
+
       minion = this.system.acquireEnemyViaFactory(type, spawnConfig);
+
+      if (!minion) {
+        console.warn(
+          `[BossEnemy] Factory failed to create minion of type '${type}'. Check factory configuration.`
+        );
+        return;
+      }
+    } else {
+      console.warn(
+        `[BossEnemy] Factory not available for spawning minion type '${type}'.`
+      );
+      return;
     }
 
-    if (!minion && typeof gameEvents !== 'undefined' && gameEvents?.emit) {
-      gameEvents.emit('enemy-spawn-request', {
-        type,
-        config: spawnConfig,
-        spawnedBy: this,
-      });
-    }
+    // Successfully created minion - register and tag it
+    if (minion) {
+      if (typeof minion.addTag === 'function') {
+        minion.addTag('minion');
+      }
 
-    if (minion && typeof minion.addTag === 'function') {
-      minion.addTag('minion');
+      // Register the minion with the enemy system for tracking and updates
+      if (typeof this.system.registerActiveEnemy === 'function') {
+        this.system.registerActiveEnemy(minion);
+      }
     }
   }
 
