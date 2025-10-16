@@ -171,10 +171,10 @@ export class EnemyFactory {
     // Initialize enemy
     try {
       if (typeof enemy.initialize === 'function') {
-        if (enemy.initialize.length === 0) {
-          enemy.initialize(finalConfig);
-        } else {
+        if (enemy.initialize.length >= 2) {
           enemy.initialize(this.system, finalConfig);
+        } else {
+          enemy.initialize(finalConfig);
         }
       }
 
