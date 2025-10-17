@@ -738,17 +738,15 @@ export class WaveManager {
 
         // Use factory if available, otherwise use legacy method
         let enemy;
-        let createdViaFactory = false;
         if (this.enemySystem.factory) {
           enemy = this.enemySystem.factory.create(enemyGroup.type, enemyConfig);
-          createdViaFactory = true;
         } else {
           // Legacy: Direct Asteroid creation
           enemy = this.enemySystem.acquireAsteroid(enemyConfig);
         }
 
         let registeredEnemy = false;
-        if (createdViaFactory && enemy) {
+        if (enemy) {
           if (this.enemySystem && typeof this.enemySystem.registerActiveEnemy === 'function') {
             this.enemySystem.registerActiveEnemy(enemy, { skipDuplicateCheck: true });
             registeredEnemy = true;
@@ -762,7 +760,6 @@ export class WaveManager {
         if (enemy) {
           this.enemiesSpawnedThisWave++;
           if (
-            createdViaFactory &&
             registeredEnemy &&
             typeof process !== 'undefined' &&
             process.env?.NODE_ENV === 'development' &&
@@ -878,13 +875,14 @@ export class WaveManager {
       spawnOffset: bossConfig.spawnOffset,
       randomScope: bossConfig.randomScope || 'boss-spawn',
       randomParentScope: bossConfig.randomParentScope || 'spawn',
+      skipWaveAccounting: true,
       metadata,
     };
 
     const boss = this.enemySystem.spawnBoss(spawnConfig);
     if (boss) {
-      // EnemySystem.spawnBoss() already increments wave counters
-      // We mirror that in WaveManager for consistency
+      // EnemySystem.spawnBoss() will skip wave accounting when we pass the flag,
+      // so we track the spawn locally for wave metrics.
       this.enemiesSpawnedThisWave += 1;
     }
 
@@ -1102,11 +1100,14 @@ export class WaveManager {
 
     // Emit wave complete event
     if (this.eventBus) {
-      this.eventBus.emit('wave-complete', {
+      const payload = {
         wave: this.currentWave,
         duration: duration,
         enemiesKilled: this.enemiesKilledThisWave
-      });
+      };
+
+      this.eventBus.emit('wave-complete', payload);
+      this.eventBus.emit('wave-completed', payload);
     }
 
     // Start countdown for next wave
