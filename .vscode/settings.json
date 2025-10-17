@@ -5,7 +5,8 @@
   "traycer.additionalAgents": [
     "Codex",
     "Claude Code",
-    "Gemini"
+    "Gemini",
+    "Export as Markdown"
   ],
   "claude-code.useTerminal": false
 }
