@@ -35,6 +35,30 @@ import * as CONSTANTS from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../../../core/serviceUtils.js';
 
+/**
+ * @typedef {import('../base/BaseEnemy.js').BaseEnemy} BaseEnemy
+ */
+
+/**
+ * @typedef {Object} RewardConfig
+ * @property {number} [orbValue] - Optional fixed XP value per orb when `totalXP` is not provided.
+ * @property {number|((sizeOrVariant: string | undefined, enemy: BaseEnemy) => number)} [baseOrbs]
+ *   - Base orb count, or a function receiving `(sizeOrVariant, enemy)`.
+ * @property {number|((sizeOrVariant: string | undefined, enemy: BaseEnemy) => number)} [sizeFactor]
+ *   - Multiplier applied to the base orb count, can be a function receiving `(sizeOrVariant, enemy)`.
+ * @property {number|((sizeOrVariant: string | undefined, enemy: BaseEnemy) => number)} [variantMultiplier]
+ *   - Variant multiplier, or a function receiving `(sizeOrVariant, enemy)`.
+ * @property {number|((enemy: BaseEnemy, baseOrbCount: number) => number)} [totalXP]
+ *   - Total XP target, or a function receiving `(enemy, baseOrbCount)`.
+ * @property {number} [healthHeartChance] - Optional heart drop chance for non-asteroid enemies.
+ * @property {{
+ *   bySize?: Record<string, number>,
+ *   specialVariants?: string[],
+ *   variantBonus?: number,
+ *   chance?: number,
+ * }} [heartDrop] - Detailed heart drop configuration for asteroid or custom types.
+ */
+
 const TWO_PI = Math.PI * 2;
 
 export class RewardManager {
@@ -117,7 +141,7 @@ export class RewardManager {
   /**
    * Loads reward configurations for different enemy types.
    *
-   * @returns {Map<string, Object>} Reward configs by enemy type
+   * @returns {Map<string, RewardConfig>} Reward configs by enemy type
    */
   loadRewardConfigurations() {
     const configs = new Map();
@@ -145,24 +169,52 @@ export class RewardManager {
       }
     });
 
-    // Future: Other enemy types
-    // configs.set('drone', {
-    //   baseXP: () => 30,
-    //   orbCount: () => 2,
-    //   variantMultiplier: () => 1.0
-    // });
+    const droneRewards = CONSTANTS.ENEMY_REWARDS?.drone;
+    // Drone rewards: base orb count configured with total XP target
+    configs.set('drone', {
+      totalXP: droneRewards?.totalXP ?? 30,
+      baseOrbs: () => droneRewards?.baseOrbs ?? 2,
+      sizeFactor: () => 1.0,
+      variantMultiplier: () => 1.0, // No variant scaling (yet)
+    });
 
-    // configs.set('turret', {
-    //   baseXP: () => 50,
-    //   orbCount: () => 3,
-    //   variantMultiplier: () => 1.0
-    // });
+    const mineRewards = CONSTANTS.ENEMY_REWARDS?.mine;
+    // Mine rewards: randomized base orb count with total XP target
+    configs.set('mine', {
+      totalXP: mineRewards?.totalXP ?? 25,
+      baseOrbs: () => {
+        const min = mineRewards?.baseOrbsMin ?? 1;
+        const max = mineRewards?.baseOrbsMax ?? min;
+        const random = this.getRandomService();
+        if (random && typeof random.int === 'function') {
+          return random.int(min, max);
+        }
+        return min;
+      },
+      sizeFactor: () => 1.0,
+      variantMultiplier: () => 1.0,
+    });
 
-    // configs.set('boss', {
-    //   baseXP: () => 500,
-    //   orbCount: () => 10,
-    //   variantMultiplier: () => 1.0
-    // });
+    const hunterRewards = CONSTANTS.ENEMY_REWARDS?.hunter;
+    // Hunter rewards: base orb count configured with total XP target
+    configs.set('hunter', {
+      totalXP: hunterRewards?.totalXP ?? 50,
+      baseOrbs: () => hunterRewards?.baseOrbs ?? 3,
+      sizeFactor: () => 1.0,
+      variantMultiplier: () => 1.0, // No variant scaling (yet)
+    });
+
+    const bossRewards = CONSTANTS.ENEMY_REWARDS?.boss;
+    // Boss rewards: base orb count configured with total XP target.
+    configs.set('boss', {
+      totalXP: bossRewards?.totalXP ?? 500,
+      baseOrbs: () => bossRewards?.baseOrbs ?? 10,
+      sizeFactor: () => 1.0,
+      variantMultiplier: (variant) => {
+        // Boss phases could have different multipliers in the future
+        return 1.0;
+      },
+    });
 
     return configs;
   }
@@ -185,16 +237,18 @@ export class RewardManager {
     }
 
     // Calculate orb count using orb-based system (matches XPOrbSystem logic)
-    const orbValue = config.orbValue || 5;
-    const baseOrbs = typeof config.baseOrbs === 'function'
-      ? config.baseOrbs(enemy.size)
-      : 1;
+    const baseOrbsRaw = typeof config.baseOrbs === 'function'
+      ? config.baseOrbs(enemy.size, enemy)
+      : (config.baseOrbs ?? 1);
     const sizeFactor = typeof config.sizeFactor === 'function'
-      ? config.sizeFactor(enemy.size)
+      ? config.sizeFactor(enemy.size, enemy)
       : 1.0;
     const variantMultiplier = typeof config.variantMultiplier === 'function'
-      ? config.variantMultiplier(enemy.variant)
+      ? config.variantMultiplier(enemy.variant, enemy)
       : 1.0;
+
+    const baseOrbProduct = (baseOrbsRaw ?? 1) * sizeFactor * variantMultiplier;
+    const baseOrbCount = Math.max(1, Math.round(baseOrbProduct));
 
     // Wave scaling: +1 orb per 5 waves (same as XPOrbSystem)
     const wave = enemy.wave || 1;
@@ -202,15 +256,27 @@ export class RewardManager {
       ? Math.floor(wave / 5)
       : Math.floor((wave - 10) / 3) + 2;
 
-    // Final orb count
-    const orbCount = Math.max(1, Math.round(baseOrbs * sizeFactor * variantMultiplier + waveBonus));
-    const totalXP = orbCount * orbValue;
-    const xpPerOrb = orbValue;
+    // Final orb count including wave bonus
+    const orbCount = Math.max(1, baseOrbCount + Math.max(0, waveBonus));
+
+    const resolvedTotalXP = typeof config.totalXP === 'function'
+      ? config.totalXP(enemy, baseOrbCount)
+      : config.totalXP;
+    const fallbackOrbValue = config.orbValue ?? CONSTANTS.ORB_VALUE ?? 5;
+
+    const xpDistribution = this.buildXPDistribution({
+      baseOrbCount,
+      extraOrbCount: Math.max(0, orbCount - baseOrbCount),
+      totalXP: resolvedTotalXP,
+      fallbackOrbValue,
+    });
+
+    const totalXP = xpDistribution.reduce((sum, value) => sum + value, 0);
 
     const dropRandomContext = this.createDropRandomContext(enemy);
 
     // Create XP orbs
-    this.createXPOrbs(enemy, orbCount, xpPerOrb, dropRandomContext);
+    this.createXPOrbs(enemy, orbCount, xpDistribution, dropRandomContext);
 
     // Rare health heart drop from tough enemies
     this.tryDropHealthHeart(enemy, dropRandomContext);
@@ -238,6 +304,9 @@ export class RewardManager {
     const velocityRandom = context?.velocity || context?.base;
     const radius = Number.isFinite(enemy?.radius) ? enemy.radius : 0;
     const total = Math.max(count, 1);
+    const fallbackXP = Math.max(1, Array.isArray(xpPerOrb)
+      ? (xpPerOrb[0] ?? CONSTANTS.ORB_VALUE ?? 5)
+      : xpPerOrb);
 
     for (let i = 0; i < count; i += 1) {
       const orbPlacementRandom = this.forkRandom(placementRandom, `orb-${i}`) || placementRandom;
@@ -254,8 +323,12 @@ export class RewardManager {
       const vx = Math.cos(angle) * speed;
       const vy = Math.sin(angle) * speed;
 
+      const xpValue = Array.isArray(xpPerOrb)
+        ? Math.max(1, xpPerOrb[i] ?? fallbackXP ?? 1)
+        : Math.max(1, xpPerOrb);
+
       try {
-        xpOrbSystem.createXPOrb(orbX, orbY, xpPerOrb, {
+        xpOrbSystem.createXPOrb(orbX, orbY, xpValue, {
           vx: vx,
           vy: vy,
           fromEnemy: enemy.type,
@@ -266,6 +339,78 @@ export class RewardManager {
         console.error('[RewardManager] Failed to create XP orb:', error);
       }
     }
+  }
+
+  /**
+   * Calculates XP distribution per orb so the sum matches the configured total XP.
+   *
+   * @param {Object} params - Distribution parameters
+   * @param {number} params.baseOrbCount - Orb count before wave bonuses
+   * @param {number} params.extraOrbCount - Additional orbs granted by wave bonuses
+   * @param {number} params.totalXP - Target XP for the base orb count
+   * @param {number} params.fallbackOrbValue - Default XP per orb fallback
+   * @returns {number[]} XP value per orb
+   */
+  buildXPDistribution({
+    baseOrbCount,
+    extraOrbCount,
+    totalXP,
+    fallbackOrbValue,
+  }) {
+    const safeBaseCount = Math.max(1, Number.isFinite(baseOrbCount) ? Math.round(baseOrbCount) : 1);
+    const safeExtraCount = Math.max(0, Number.isFinite(extraOrbCount) ? Math.round(extraOrbCount) : 0);
+    const safeFallback = Math.max(1, Math.round(fallbackOrbValue ?? CONSTANTS.ORB_VALUE ?? 5));
+    const hasTargetXP = typeof totalXP === 'number' && Number.isFinite(totalXP) && totalXP > 0;
+
+    if (!hasTargetXP) {
+      return new Array(safeBaseCount + safeExtraCount).fill(safeFallback);
+    }
+
+    const baseValue = Math.max(1, Math.round(totalXP / safeBaseCount));
+    const distribution = new Array(safeBaseCount).fill(baseValue);
+
+    let difference = baseValue * safeBaseCount - totalXP;
+
+    if (difference !== 0) {
+      const adjust = difference > 0 ? -1 : 1;
+      let remaining = Math.abs(difference);
+      let index = 0;
+      const maxIterations = safeBaseCount * 10;
+
+      while (remaining > 0 && index < maxIterations) {
+        const pos = index % safeBaseCount;
+        const current = distribution[pos];
+        const nextValue = current + adjust;
+
+        if (nextValue >= 1) {
+          distribution[pos] = nextValue;
+          remaining -= 1;
+        }
+
+        index += 1;
+      }
+
+      if (remaining > 0 && safeBaseCount > 0) {
+        const pos = 0;
+        const fallbackAdjustment = adjust * remaining;
+        distribution[pos] = Math.max(1, distribution[pos] + fallbackAdjustment);
+        remaining = 0;
+      }
+    }
+
+    const baseSum = distribution.reduce((sum, value) => sum + value, 0);
+    if (baseSum !== totalXP && safeBaseCount > 0) {
+      const delta = totalXP - baseSum;
+      distribution[0] = Math.max(1, distribution[0] + delta);
+    }
+
+    const result = [...distribution];
+    const extraValue = distribution.length > 0 ? distribution[distribution.length - 1] : safeFallback;
+    for (let i = 0; i < safeExtraCount; i += 1) {
+      result.push(Math.max(1, extraValue));
+    }
+
+    return result;
   }
 
   /**
@@ -434,33 +579,50 @@ export class RewardManager {
    * @param {BaseEnemy} enemy - The destroyed enemy
    */
   tryDropHealthHeart(enemy, randomContext = null) {
-    // Only from tough enemies (medium/large asteroids, special variants)
-    const isToughEnemy =
-      (enemy.size === 'medium' || enemy.size === 'large') ||
-      (enemy.variant && ['gold', 'crystal', 'volatile', 'parasite'].includes(enemy.variant));
-
-    if (!isToughEnemy) {
+    const rewardConfig = CONSTANTS.ENEMY_REWARDS?.[enemy.type];
+    if (!rewardConfig) {
       return;
     }
 
-    // RARE drop rates (truly rare as requested by user):
-    // - Large asteroids: 5% base chance
-    // - Medium asteroids: 2% base chance
-    // - Special variants: +3% bonus (gold, crystal, volatile, parasite)
     let dropChance = 0;
 
-    if (enemy.size === 'large') {
-      dropChance = 0.05; // 5% - rare
-    } else if (enemy.size === 'medium') {
-      dropChance = 0.02; // 2% - very rare
+    if (enemy.type === 'asteroid') {
+      const heartDropConfig = rewardConfig?.heartDrop;
+      if (!heartDropConfig) {
+        return;
+      }
+
+      const sizeChances = heartDropConfig.bySize || {};
+      dropChance = sizeChances[enemy.size] ?? 0;
+
+      if (
+        enemy.variant &&
+        Array.isArray(heartDropConfig.specialVariants) &&
+        heartDropConfig.specialVariants.includes(enemy.variant)
+      ) {
+        dropChance += heartDropConfig.variantBonus ?? 0;
+      }
+
+      if (dropChance <= 0) {
+        return;
+      }
+    } else {
+      const chance = typeof rewardConfig.healthHeartChance === 'number'
+        ? rewardConfig.healthHeartChance
+        : (rewardConfig.heartDrop && typeof rewardConfig.heartDrop.chance === 'number'
+          ? rewardConfig.heartDrop.chance
+          : 0);
+
+      if (chance <= 0) {
+        return;
+      }
+
+      dropChance = chance;
     }
 
-    // Bonus for special variants (makes them worth hunting)
-    if (enemy.variant && ['gold', 'crystal', 'volatile', 'parasite'].includes(enemy.variant)) {
-      dropChance += 0.03; // +3% bonus
-    }
-
-    console.log(`[RewardManager] Checking heart drop: ${enemy.size} ${enemy.variant || 'common'} - chance: ${(dropChance * 100).toFixed(1)}%`);
+    const sizeLabel = enemy.size || 'N/A';
+    const variantLabel = enemy.variant || 'common';
+    console.log(`[RewardManager] Checking heart drop: ${enemy.type} ${sizeLabel} ${variantLabel} - chance: ${(dropChance * 100).toFixed(1)}%`);
 
     const context = randomContext || this.createDropRandomContext(enemy);
     const heartRandom = context?.heart || context?.base;
@@ -478,7 +640,7 @@ export class RewardManager {
           enemyType: enemy.type,
           enemySize: enemy.size,
         });
-        console.log(`[RewardManager] ❤️ Health heart dropped from ${enemy.size} ${enemy.variant || 'common'} asteroid!`);
+        console.log(`[RewardManager] ❤️ Health heart dropped from ${enemy.type} (${sizeLabel} ${variantLabel})!`);
       } else {
         console.error('[RewardManager] HealthHeartSystem not available!');
       }

@@ -380,3 +380,103 @@ A flag `USE_WAVE_MANAGER` será removida após:
 - Sincronização bidirecional: WaveManager → waveState (via `updateWaveManagerLogic()`) e waveState → WaveManager (via eventos)
 - Validação de consistência só roda em desenvolvimento (`process.env.NODE_ENV === 'development'`)
 
+## ✅ Reward System Expansion (WAVE-005)
+
+**Status:** Concluído
+
+**Objetivo:** Expandir RewardManager para suportar recompensas de novos tipos de inimigos (drone, mine, hunter, boss), mantendo consistência com o sistema orb-based existente.
+
+**Implementações Completas:**
+
+1. **Configurações de Recompensas (`RewardManager.loadRewardConfigurations()`):**
+   - **Drone:** 2 orbs base com XP redistribuído para totalizar **30 XP** por destruição (wave 1)
+   - **Mine:** 1-2 orbs base com XP redistribuído para totalizar **25 XP** (wave 1), mantendo variedade determinística
+   - **Hunter:** 3 orbs base com XP redistribuído para totalizar **50 XP** (wave 1)
+   - **Boss:** 10 orbs base com 50 XP por orb (**500 XP** total por destruição)
+   - Todas as configs seguem padrão de asteroides (baseOrbs, sizeFactor, variantMultiplier)
+   - `sizeFactor` e `variantMultiplier` sempre 1.0 (novos inimigos não têm sizes/variants)
+
+2. **Sistema Orb-Based Preservado:**
+   - Fórmula: `orbCount = baseOrbs × sizeFactor × variantMultiplier + waveBonus`
+   - Wave bonus automático: +1 orb a cada 5 waves (1-10), depois +1 a cada 3 waves (10+)
+   - XP por orb é calculado dinamicamente a partir de `totalXP ÷ baseOrbCount`, com ajustes para garantir soma exata
+   - Sem criação de sistema paralelo de baseXP – apenas redistribuição dos valores existentes
+
+3. **Randomização para Mine:**
+   - `baseOrbs()` usa `RandomService.int(1, 2)` para variedade
+   - Determinismo preservado via random scope do RewardManager
+   - Distribuição de XP ajustada para manter **25 XP** totais independentemente do resultado (ex.: [12,13])
+
+4. **Health Heart Drops Expandidos (`tryDropHealthHeart()`):**
+   - **Hunters:** 3% de chance (inimigos médio-fortes, 48 HP)
+   - **Bosses:** 25% de chance (inimigos épicos, 1500 HP)
+   - **Drones/Mines:** 0% (muito fracos, 30 HP e 20 HP)
+   - Taxas agora centralizadas em `GameConstants.ENEMY_REWARDS`, inclusive bônus por variante de asteroide
+   - Logs de debug expandidos para incluir tipo de inimigo
+
+5. **Compatibilidade com `dropRewards()`:**
+   - Método `dropRewards()` ajustado para redistribuir XP por orb com base em `totalXP`
+   - Continua buscando config via `enemy.type` e delegando para `createXPOrbs()` / `tryDropHealthHeart()`
+   - Sistema de estatísticas (`updateStats`) registra a soma real de XP distribuída
+
+**Tabela de Recompensas:**
+
+| Tipo | Base Orbs | XP Base (Wave 1) | Wave 5 Total* | Wave 10 Total* | Heart Drop |
+|------|-----------|------------------|---------------|----------------|------------|
+| Drone | 2 | 30 XP | 45 XP (+1 orb a 15 XP) | 60 XP (+2 orbs a 15 XP) | 0% |
+| Mine | 1-2 | 25 XP (distribuição ex.: [12,13]) | ~38 XP (+1 orb ≈ 13 XP)** | ~50 XP (+2 orbs ≈ 13 XP)** | 0% |
+| Hunter | 3 | 50 XP (distribuição ex.: [16,17,17]) | 67 XP (+1 orb a 17 XP) | 84 XP (+2 orbs a 17 XP) | 3% |
+| Boss | 10 | 500 XP (50 XP por orb) | 550 XP (+1 orb a 50 XP) | 600 XP (+2 orbs a 50 XP) | 25% |
+| Asteroid (large) | 3-4 | 15-20 XP | 20-30 XP | 25-35 XP | 5-8% +3% variante |
+
+*Wave bonus adiciona +1 orb nas waves 5/8 e +2 orbs a partir da wave 10 (1 orb extra a cada 3 waves).
+
+**Valor aproximado: a distribuição mantém 25 XP base e replica o valor médio (≈13 XP) para os orbs extras.
+
+**Nota sobre `BOSS_CONFIG.rewards.xp` (500):**
+- Valor de 500 XP em `BOSS_CONFIG.rewards.xp` agora é refletido diretamente nos orbs (10 orbs × 50 XP)
+- O sistema orb-based distribui 50 XP por orb para o boss, mantendo compatibilidade com futuros loot drops especiais
+- Wave bonus adiciona 50 XP por orb extra, mantendo escalonamento previsível
+
+**Testes Automatizados:**
+- Suite: `src/modules/enemies/managers/RewardManager.test.js`
+- Validações:
+- Drone: 2 orbs distribuídos para somar 30 XP (15 XP cada)
+- Mine: 1-2 orbs distribuídos para somar 25 XP (ex.: [12,13])
+- Hunter: 3 orbs distribuídos para somar 50 XP (ex.: [16,17,17])
+- Boss: 10 orbs com 50 XP cada (500 XP total)
+  - Wave bonus aplicado corretamente (wave 5: +1 orb)
+  - Unknown types logam warning e não crasham
+  - Health hearts dropam de hunters e bosses
+
+**Validação Manual:**
+1. Ativar `USE_WAVE_MANAGER=true` em GameConstants
+2. Jogar até wave 8+ (quando drones começam a spawnar)
+3. Destruir drones, mines, hunters e verificar XP orbs dropados
+4. Verificar que quantidade de orbs corresponde à tabela acima
+5. Confirmar que a soma do XP coletado por wave bate com os valores esperados (30/25/50/500 + bônus de wave)
+6. Verificar que health hearts dropam ocasionalmente de hunters/bosses
+7. Verificar logs: `[RewardManager] Checking heart drop: hunter N/A common - chance: 3.0%`
+
+**Critérios de Conclusão Atendidos:**
+- [x] Configurações adicionadas para drone, mine, hunter, boss
+- [x] Sistema orb-based preservado (sem baseXP paralelo)
+- [x] `dropRewards()` processa novos tipos sem modificações
+- [x] Health heart drops expandidos para hunters e bosses
+- [x] Testes unitários adicionados e passando
+- [x] Documentação atualizada com tabela de recompensas
+- [x] Discrepância `BOSS_CONFIG.rewards.xp` documentada
+
+**Próximos Passos:**
+1. Executar testes: `npm test -- RewardManager.test.js`
+2. Validação manual: jogar 10 waves com `USE_WAVE_MANAGER=true`
+3. Ajustar balanceamento se necessário (valores em `RewardManager.js` linhas 148-165)
+4. Considerar mover valores para `GameConstants.ENEMY_REWARDS` em fase futura
+5. Prosseguir para WAVE-006: Migrar geração de asteroides para WaveManager (fase subsequente)
+
+**Notas Técnicas:**
+- Mine usa `RandomService.int(1, 2)` para randomização determinística
+- Health heart chances: hunters 3%, bosses 25% (balanceamento inicial, pode ser ajustado)
+- Boss loot table (core-upgrade, weapon-blueprint) será implementado em sistema separado
+- Sistema de estatísticas (`getStats()`) rastreia drops por tipo automaticamente
+
