@@ -10,6 +10,7 @@
     "test": "vitest run",
     "test:baseline": "vitest run src/__tests__/legacy/asteroid-baseline-metrics.test.js",
     "test:baseline:watch": "vitest watch src/__tests__/legacy/asteroid-baseline-metrics.test.js",
+    "test:visual-enemies": "echo 'Abra http://localhost:5173/scripts/visual-enemy-rendering-test.html no navegador' && npm run dev",
     "stress": "node scripts/run-stress-checks.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

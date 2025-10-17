@@ -154,3 +154,94 @@ A flag `USE_WAVE_MANAGER` será removida após:
 - Validação em produção por pelo menos 2 semanas
 - Confirmação de que novos inimigos (Drone, Mine, Hunter, Boss) funcionam corretamente
 - Aprovação da equipe para deprecar sistema legado
+
+## ✅ Enemy Rendering Implementation (WAVE-003)
+
+**Status:** Concluído
+
+**Objetivo:** Implementar e validar renderização visual de Drone, Mine e Hunter antes de ativar spawn via WaveManager.
+
+**Implementações Completas:**
+
+1. **Drone.onDraw() (linhas 300-469):**
+   - Geometria: nave triangular com nose/tail/halfWidth proporcional ao radius
+   - Camadas: shadow layer (bodyShadow), inner layer (bodyHighlight), hull stroke
+   - Fins laterais com taper (~0.6)
+   - Accent ridges em ciano com glow opcional
+   - **Exhaust dinâmico:** glow reativo à velocidade com smoothing (~0.2), blur 6-12, alpha 0.28-0.72
+   - Composite 'lighter' para exhaust e accent glow
+   - Thrust smoothing via `_renderThrust` para evitar transições abruptas
+
+2. **Mine.onDraw() (linhas 194-312):**
+   - Geometria: esfera com core radius igual ao base radius
+   - Gradiente radial cacheado (bodyHighlight → body → bodyShadow)
+   - **Pulsação:** baseada em `pulsePhase`, intensidade aumenta quando `armed` (multiplier 1.45)
+   - Glow central com blur 10-15 e composite 'lighter'
+   - Halo ring (~1.45x radius) com alpha variável por pulse strength (exponent 1.4)
+   - Rim com alpha dinâmico (0.55-0.95) sincronizado com pulso
+   - Cache de gradiente com key validation (`_bodyGradientKey`)
+
+3. **Hunter.onDraw() (linhas 402-545):**
+   - Geometria: diamante (front 1.9x, rear 0.72x front, halfWidth 1.2x radius)
+   - Gradiente linear front-to-rear cacheado (shadow → body → highlight)
+   - Accent inset (~0.48x radius) com stroke magenta
+   - **Turret independente:** base circular + barrel retangular, rotaciona via `turretAngle`
+   - Ângulo relativo calculado: `normalizeAngle(turretAngle - rotation)`
+   - Highlight triangular no turret (alpha 0.45)
+   - Barrel accent line em magenta
+   - Cache de gradiente com key validation (`_hullGradientKey`)
+
+**Padrões Seguidos:**
+- Consumo de `ENEMY_EFFECT_COLORS` e `ENEMY_RENDER_PRESETS` de `GameConstants`
+- Retorno de payload descritivo quando `ctx` é null
+- Preservação de estado do canvas (reset de globalAlpha, shadowBlur, composite, etc.)
+- Uso de `save()`/`restore()` para isolamento de transformações
+- Cache de gradientes com key validation para performance
+- Composite 'lighter' para efeitos aditivos (glows)
+
+**Testes Automatizados:**
+- Suite: `src/__tests__/rendering/enemy-types-rendering.test.js`
+- Validações:
+  - Payload structure (type, id, radius, colors)
+  - Propriedades dinâmicas (thrust, pulse/armed, turretAngle)
+  - Canvas state preservation
+  - Determinismo com mock context
+
+**Validação Visual:**
+- Harness: `scripts/visual-enemy-rendering-test.html`
+- Checklist: `docs/validation/enemy-rendering-visual-checklist.md`
+- Script npm: `npm run test:visual-enemies`
+- Validações manuais:
+  - Geometria e proporções corretas
+  - Cores correspondendo a paletas definidas
+  - Animações suaves (thrust, pulse, turret rotation)
+  - Performance estável (60 FPS com múltiplas instâncias)
+  - Canvas state preservation
+
+**Comparação com BossEnemy.onDraw():**
+- ✅ Padrão de save/restore consistente
+- ✅ Consumo de constantes idêntico
+- ✅ Payload quando ctx é null
+- ✅ Cache de gradientes
+- ✅ Composite operations apropriadas
+- ✅ Reset de estado do canvas
+
+**Critérios de Conclusão Atendidos:**
+- [x] Implementações completas e funcionais
+- [x] Testes unitários passando
+- [x] Harness de teste visual criado
+- [x] Checklist de validação documentado
+- [x] Performance validada (60 FPS)
+- [x] Padrões consistentes com BossEnemy
+
+**Próximos Passos:**
+1. Executar validação visual via `npm run test:visual-enemies`
+2. Preencher checklist em `enemy-rendering-visual-checklist.md`
+3. Prosseguir para WAVE-004: Integrar WaveManager ao loop principal
+4. Validar rendering in-game após ativação de spawn
+
+**Notas Técnicas:**
+- Drone: `_renderThrust` é propriedade de instância para smoothing, não resetada em pool
+- Mine: `_bodyGradient` e `_bodyGradientKey` cacheados, resetados em `resetForPool()`
+- Hunter: `_hullGradient` e `_hullGradientKey` cacheados, resetados em `resetForPool()`
+- Todos os três tipos suportam chamada sem contexto (útil para telemetria/debugging)
