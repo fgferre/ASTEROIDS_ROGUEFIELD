@@ -6,5 +6,6 @@
     "Codex",
     "Claude Code",
     "Gemini"
-  ]
+  ],
+  "claude-code.useTerminal": false
 }
