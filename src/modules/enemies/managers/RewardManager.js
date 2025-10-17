@@ -35,6 +35,30 @@ import * as CONSTANTS from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../../../core/serviceUtils.js';
 
+/**
+ * @typedef {import('../base/BaseEnemy.js').BaseEnemy} BaseEnemy
+ */
+
+/**
+ * @typedef {Object} RewardConfig
+ * @property {number} [orbValue] - Optional fixed XP value per orb when `totalXP` is not provided.
+ * @property {number|((sizeOrVariant: string | undefined, enemy: BaseEnemy) => number)} [baseOrbs]
+ *   - Base orb count, or a function receiving `(sizeOrVariant, enemy)`.
+ * @property {number|((sizeOrVariant: string | undefined, enemy: BaseEnemy) => number)} [sizeFactor]
+ *   - Multiplier applied to the base orb count, can be a function receiving `(sizeOrVariant, enemy)`.
+ * @property {number|((sizeOrVariant: string | undefined, enemy: BaseEnemy) => number)} [variantMultiplier]
+ *   - Variant multiplier, or a function receiving `(sizeOrVariant, enemy)`.
+ * @property {number|((enemy: BaseEnemy, baseOrbCount: number) => number)} [totalXP]
+ *   - Total XP target, or a function receiving `(enemy, baseOrbCount)`.
+ * @property {number} [healthHeartChance] - Optional heart drop chance for non-asteroid enemies.
+ * @property {{
+ *   bySize?: Record<string, number>,
+ *   specialVariants?: string[],
+ *   variantBonus?: number,
+ *   chance?: number,
+ * }} [heartDrop] - Detailed heart drop configuration for asteroid or custom types.
+ */
+
 const TWO_PI = Math.PI * 2;
 
 export class RewardManager {
@@ -117,7 +141,7 @@ export class RewardManager {
   /**
    * Loads reward configurations for different enemy types.
    *
-   * @returns {Map<string, Object>} Reward configs by enemy type
+   * @returns {Map<string, RewardConfig>} Reward configs by enemy type
    */
   loadRewardConfigurations() {
     const configs = new Map();
