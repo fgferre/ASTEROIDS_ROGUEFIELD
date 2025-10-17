@@ -68,6 +68,7 @@ class EnemySystem {
     this._snapshotFallbackWarningIssued = false;
     this._waveSystemDebugLogged = false;
     this._waveManagerFallbackWarningIssued = false;
+    this._waveManagerInvalidStateWarningIssued = false;
 
     // Factory (optional - new architecture)
     this.factory = null;
@@ -1656,7 +1657,22 @@ class EnemySystem {
 
     const managerState = this.waveManager.getState ? this.waveManager.getState() : null;
 
-    if (!managerState) {
+    const managerStateValid =
+      managerState &&
+      managerState.currentWave !== undefined &&
+      managerState.inProgress !== undefined &&
+      managerState.spawned !== undefined &&
+      managerState.killed !== undefined &&
+      managerState.total !== undefined;
+
+    if (!managerStateValid) {
+      if (!this._waveManagerInvalidStateWarningIssued) {
+        console.warn(
+          '[EnemySystem] WaveManager returned invalid state. Falling back to updateWaveLogic() while USE_WAVE_MANAGER is active.'
+        );
+        this._waveManagerInvalidStateWarningIssued = true;
+      }
+      this.updateWaveLogic(deltaTime);
       return;
     }
 
