@@ -1676,11 +1676,19 @@ class EnemySystem {
       return;
     }
 
-    wave.current = managerState.currentWave;
-    wave.isActive = managerState.inProgress;
-    wave.asteroidsSpawned = managerState.spawned;
-    wave.asteroidsKilled = managerState.killed;
-    wave.totalAsteroids = managerState.total;
+    const {
+      current: previousCurrent,
+      isActive: previousIsActive,
+      asteroidsSpawned: previousSpawned,
+      asteroidsKilled: previousKilled,
+      totalAsteroids: previousTotal,
+    } = wave;
+
+    wave.current = managerState.currentWave ?? previousCurrent;
+    wave.isActive = managerState.inProgress ?? previousIsActive;
+    wave.asteroidsSpawned = managerState.spawned ?? previousSpawned;
+    wave.asteroidsKilled = managerState.killed ?? previousKilled;
+    wave.totalAsteroids = managerState.total ?? previousTotal;
 
     console.debug(
       `[EnemySystem] WaveManager state synced: wave ${wave.current}, ${wave.asteroidsKilled}/${wave.totalAsteroids} enemies`
