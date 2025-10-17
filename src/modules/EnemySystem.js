@@ -2870,6 +2870,7 @@ class EnemySystem {
 
       this.spawnTimer = Number.isFinite(snapshot.spawnTimer) ? snapshot.spawnTimer : 0;
       this.sessionActive = snapshot.sessionActive !== false;
+      this._lastWaveManagerCompletionHandled = null;
 
       if (snapshot.random) {
         this.restoreRandomFromSnapshot(snapshot.random);

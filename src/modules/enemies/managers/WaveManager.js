@@ -656,12 +656,22 @@ export class WaveManager {
     const waveEventPayload = {
       wave: waveNumber,
       totalEnemies: this.totalEnemiesThisWave,
-      config: this.cloneWaveConfig(config),
       isBossWave: config.isBossWave,
+      spawnDelayMultiplier: sharedSpawnDelayMultiplier,
     };
 
     if (this.eventBus) {
       this.eventBus.emit('wave-started', waveEventPayload);
+
+      if (
+        typeof process !== 'undefined' &&
+        process.env?.NODE_ENV === 'development'
+      ) {
+        this.eventBus.emit('wave-started-debug', {
+          ...waveEventPayload,
+          config: this.cloneWaveConfig(config),
+        });
+      }
 
       if (config.isBossWave) {
         const supportGroups = Array.isArray(config.supportGroups)
@@ -1091,9 +1101,13 @@ export class WaveManager {
   /**
    * Called when an enemy is destroyed.
    */
-  onEnemyDestroyed() {
+  onEnemyDestroyed(data = {}) {
     if (!this.waveInProgress || this.totalEnemiesThisWave <= 0) {
       return;
+    }
+
+    if (Array.isArray(data?.fragments) && data.fragments.length > 0) {
+      this.totalEnemiesThisWave += data.fragments.length;
     }
 
     this.enemiesKilledThisWave++;
@@ -1115,7 +1129,17 @@ export class WaveManager {
     }
 
     // Check if wave is complete
-    if (this.enemiesKilledThisWave >= this.totalEnemiesThisWave) {
+    const killsCleared = this.enemiesKilledThisWave >= this.totalEnemiesThisWave;
+    let activeEnemiesCleared = true;
+
+    if (
+      this.enemySystem &&
+      typeof this.enemySystem.getActiveEnemyCount === 'function'
+    ) {
+      activeEnemiesCleared = this.enemySystem.getActiveEnemyCount() === 0;
+    }
+
+    if (killsCleared && activeEnemiesCleared) {
       this.completeWave();
     }
   }
