@@ -478,10 +478,22 @@ describe.sequential('Legacy Asteroid Baseline Metrics', () => {
 
       const { sizeCounts, total } = collectSpawnMetrics(spawnLog);
 
-      expect(total).toBe(SAMPLE_ASTEROID_COUNT);
-      expectWithinTolerance(sizeCounts.large / total, 0.5);
-      expectWithinTolerance(sizeCounts.medium / total, 0.3);
-      expectWithinTolerance(sizeCounts.small / total, 0.2);
+      try {
+        expect(total).toBe(SAMPLE_ASTEROID_COUNT);
+        expectWithinTolerance(sizeCounts.large / total, 0.5);
+        expectWithinTolerance(sizeCounts.medium / total, 0.3);
+        expectWithinTolerance(sizeCounts.small / total, 0.2);
+      } finally {
+        spawnLog.forEach((asteroid) => {
+          if (asteroid) {
+            harness.enemySystem.destroyAsteroid(asteroid, { createFragments: false });
+          }
+        });
+
+        if (typeof harness.enemySystem.cleanupDestroyed === 'function') {
+          harness.enemySystem.cleanupDestroyed();
+        }
+      }
     });
   });
 
