@@ -1,6 +1,6 @@
 // src/modules/EnemySystem.js
 import * as CONSTANTS from '../core/GameConstants.js';
-import { ENEMY_TYPES, USE_WAVE_MANAGER } from '../core/GameConstants.js';
+import { ENEMY_TYPES } from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
 import RandomService from '../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
@@ -1580,12 +1580,12 @@ class EnemySystem {
       typeof globalThis !== 'undefined' &&
       globalThis.__USE_WAVE_MANAGER_OVERRIDE__ === true;
 
-    const waveManagerEnabled =
-      USE_WAVE_MANAGER ||
-      waveManagerOverride ||
-      (typeof CONSTANTS?.USE_WAVE_MANAGER === 'boolean'
+    const constantsFlag =
+      typeof CONSTANTS?.USE_WAVE_MANAGER === 'boolean'
         ? CONSTANTS.USE_WAVE_MANAGER
-        : false);
+        : false;
+
+    const waveManagerEnabled = constantsFlag || waveManagerOverride;
 
     if (!this._waveSystemDebugLogged) {
       console.debug(

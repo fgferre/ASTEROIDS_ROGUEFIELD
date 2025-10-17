@@ -878,5 +878,43 @@ describe.sequential('Legacy Asteroid Baseline Metrics', () => {
         warnSpy.mockRestore();
       }
     });
+
+    test('WaveManager counters sync into legacy waveState when enabled', () => {
+      const stubState = {
+        currentWave: 7,
+        inProgress: true,
+        spawned: 5,
+        killed: 3,
+        total: 11
+      };
+
+      prepareWave(harness.enemySystem, 2);
+
+      harness.enemySystem.waveManager = {
+        update: vi.fn(),
+        getState: vi.fn(() => ({ ...stubState }))
+      };
+
+      const initialWaveState = { ...harness.enemySystem.waveState };
+
+      try {
+        globalThis.__USE_WAVE_MANAGER_OVERRIDE__ = true;
+
+        harness.enemySystem.update(0.25);
+
+        expect(harness.enemySystem.waveManager.update).toHaveBeenCalledWith(0.25);
+
+        const syncedState = harness.enemySystem.waveState;
+        expect(syncedState.current).not.toBe(initialWaveState.current);
+        expect(syncedState.current).toBe(stubState.currentWave);
+        expect(syncedState.isActive).toBe(stubState.inProgress);
+        expect(syncedState.asteroidsSpawned).toBe(stubState.spawned);
+        expect(syncedState.asteroidsKilled).toBe(stubState.killed);
+        expect(syncedState.totalAsteroids).toBe(stubState.total);
+      } finally {
+        delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
+        harness.enemySystem.waveManager = null;
+      }
+    });
   });
 });
