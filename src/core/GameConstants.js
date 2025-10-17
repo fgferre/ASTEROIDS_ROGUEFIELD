@@ -1098,6 +1098,30 @@ export const ENEMY_TYPES = Object.freeze({
   }),
 });
 
+export const ENEMY_REWARDS = Object.freeze({
+  drone: Object.freeze({
+    baseOrbs: 2,
+    orbValue: 5,
+    healthHeartChance: 0.0,
+  }),
+  mine: Object.freeze({
+    baseOrbsMin: 1,
+    baseOrbsMax: 2,
+    orbValue: 5,
+    healthHeartChance: 0.0,
+  }),
+  hunter: Object.freeze({
+    baseOrbs: 3,
+    orbValue: 5,
+    healthHeartChance: 0.03,
+  }),
+  boss: Object.freeze({
+    baseOrbs: 10,
+    orbValue: 5,
+    healthHeartChance: 0.25,
+  }),
+});
+
 export const ENEMY_EFFECT_COLORS = Object.freeze({
   drone: Object.freeze({
     body: '#5B6B7A',

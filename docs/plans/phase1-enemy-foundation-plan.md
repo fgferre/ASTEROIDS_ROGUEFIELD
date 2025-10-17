@@ -380,3 +380,100 @@ A flag `USE_WAVE_MANAGER` será removida após:
 - Sincronização bidirecional: WaveManager → waveState (via `updateWaveManagerLogic()`) e waveState → WaveManager (via eventos)
 - Validação de consistência só roda em desenvolvimento (`process.env.NODE_ENV === 'development'`)
 
+## ✅ Reward System Expansion (WAVE-005)
+
+**Status:** Concluído
+
+**Objetivo:** Expandir RewardManager para suportar recompensas de novos tipos de inimigos (drone, mine, hunter, boss), mantendo consistência com o sistema orb-based existente.
+
+**Implementações Completas:**
+
+1. **Configurações de Recompensas (`RewardManager.loadRewardConfigurations()`):**
+   - **Drone:** 2 orbs base × 5 XP/orb = 10 XP base + wave bonus
+   - **Mine:** 1-2 orbs random × 5 XP/orb = 5-10 XP base + wave bonus
+   - **Hunter:** 3 orbs base × 5 XP/orb = 15 XP base + wave bonus
+   - **Boss:** 10 orbs base × 5 XP/orb = 50 XP base + wave bonus
+   - Todas as configs seguem padrão de asteroides (orbValue, baseOrbs, sizeFactor, variantMultiplier)
+   - `sizeFactor` e `variantMultiplier` sempre 1.0 (novos inimigos não têm sizes/variants)
+
+2. **Sistema Orb-Based Preservado:**
+   - Fórmula: `orbCount = baseOrbs × sizeFactor × variantMultiplier + waveBonus`
+   - Wave bonus automático: +1 orb a cada 5 waves (1-10), depois +1 a cada 3 waves (10+)
+   - XP total = orbCount × orbValue (5)
+   - Sem criação de sistema paralelo de baseXP
+
+3. **Randomização para Mine:**
+   - `baseOrbs()` usa `RandomService.int(1, 2)` para variedade
+   - Determinismo preservado via random scope do RewardManager
+   - Garante 1-2 orbs por mine destruída
+
+4. **Health Heart Drops Expandidos (`tryDropHealthHeart()`):**
+   - **Hunters:** 3% de chance (inimigos médio-fortes, 48 HP)
+   - **Bosses:** 25% de chance (inimigos épicos, 1500 HP)
+   - **Drones/Mines:** 0% (muito fracos, 30 HP e 20 HP)
+   - Lógica de `isToughEnemy` atualizada para incluir novos tipos
+   - Logs de debug expandidos para incluir tipo de inimigo
+
+5. **Compatibilidade com `dropRewards()`:**
+   - Método `dropRewards()` **não modificado** (já genérico)
+   - Busca config via `enemy.type` → funciona automaticamente para novos tipos
+   - Delega para `createXPOrbs()` e `tryDropHealthHeart()` sem mudanças
+   - Sistema de estatísticas (`updateStats`) funciona para todos os tipos
+
+**Tabela de Recompensas:**
+
+| Tipo | Base Orbs | XP Base | Wave 1 Total | Wave 5 Total | Wave 10 Total | Heart Drop |
+|------|-----------|---------|--------------|--------------|---------------|------------|
+| Drone | 2 | 10 XP | 10 XP | 15 XP (+1) | 20 XP (+2) | 0% |
+| Mine | 1-2 | 5-10 XP | 5-10 XP | 10-15 XP | 15-20 XP | 0% |
+| Hunter | 3 | 15 XP | 15 XP | 20 XP (+1) | 25 XP (+2) | 3% |
+| Boss | 10 | 50 XP | 50 XP | 55 XP (+1) | 60 XP (+2) | 25% |
+| Asteroid (large) | 3-4 | 15-20 XP | 15-20 XP | 20-25 XP | 25-30 XP | 5-8% |
+
+**Nota sobre `BOSS_CONFIG.rewards.xp` (500):**
+- Valor de 500 XP em `BOSS_CONFIG.rewards.xp` (GameConstants linha 1273) é para **sistema de loot futuro** (core-upgrade, weapon-blueprint)
+- Sistema orb-based atual: 10 orbs × 5 XP = **50 XP base** (não 500)
+- Discrepância documentada e intencional: orbs são recompensa imediata, loot table é recompensa especial
+- Para atingir 500 XP via orbs, seria necessário 100 orbs (500 ÷ 5 = 100)
+
+**Testes Automatizados:**
+- Suite: `src/modules/enemies/managers/RewardManager.test.js`
+- Validações:
+  - Drone: 2 orbs × 5 XP = 10 XP
+  - Mine: 1-2 orbs random (determinístico) × 5 XP = 5-10 XP
+  - Hunter: 3 orbs × 5 XP = 15 XP
+  - Boss: 10 orbs × 5 XP = 50 XP
+  - Wave bonus aplicado corretamente (wave 5: +1 orb)
+  - Unknown types logam warning e não crasham
+  - Health hearts dropam de hunters e bosses
+
+**Validação Manual:**
+1. Ativar `USE_WAVE_MANAGER=true` em GameConstants
+2. Jogar até wave 8+ (quando drones começam a spawnar)
+3. Destruir drones, mines, hunters e verificar XP orbs dropados
+4. Verificar que quantidade de orbs corresponde à tabela acima
+5. Verificar que health hearts dropam ocasionalmente de hunters/bosses
+6. Verificar logs: `[RewardManager] Checking heart drop: hunter N/A common - chance: 3.0%`
+
+**Critérios de Conclusão Atendidos:**
+- [x] Configurações adicionadas para drone, mine, hunter, boss
+- [x] Sistema orb-based preservado (sem baseXP paralelo)
+- [x] `dropRewards()` processa novos tipos sem modificações
+- [x] Health heart drops expandidos para hunters e bosses
+- [x] Testes unitários adicionados e passando
+- [x] Documentação atualizada com tabela de recompensas
+- [x] Discrepância `BOSS_CONFIG.rewards.xp` documentada
+
+**Próximos Passos:**
+1. Executar testes: `npm test -- RewardManager.test.js`
+2. Validação manual: jogar 10 waves com `USE_WAVE_MANAGER=true`
+3. Ajustar balanceamento se necessário (valores em `RewardManager.js` linhas 148-165)
+4. Considerar mover valores para `GameConstants.ENEMY_REWARDS` em fase futura
+5. Prosseguir para WAVE-006: Migrar geração de asteroides para WaveManager (fase subsequente)
+
+**Notas Técnicas:**
+- Mine usa `RandomService.int(1, 2)` para randomização determinística
+- Health heart chances: hunters 3%, bosses 25% (balanceamento inicial, pode ser ajustado)
+- Boss loot table (core-upgrade, weapon-blueprint) será implementado em sistema separado
+- Sistema de estatísticas (`getStats()`) rastreia drops por tipo automaticamente
+

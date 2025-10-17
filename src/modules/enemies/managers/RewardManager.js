@@ -145,24 +145,52 @@ export class RewardManager {
       }
     });
 
-    // Future: Other enemy types
-    // configs.set('drone', {
-    //   baseXP: () => 30,
-    //   orbCount: () => 2,
-    //   variantMultiplier: () => 1.0
-    // });
+    const droneRewards = CONSTANTS.ENEMY_REWARDS?.drone;
+    // Drone rewards: 2 orbs base (10 XP) + wave bonus
+    configs.set('drone', {
+      orbValue: droneRewards?.orbValue ?? CONSTANTS.ORB_VALUE ?? 5,
+      baseOrbs: () => droneRewards?.baseOrbs ?? 2,
+      sizeFactor: () => 1.0,
+      variantMultiplier: () => 1.0, // No variant scaling (yet)
+    });
 
-    // configs.set('turret', {
-    //   baseXP: () => 50,
-    //   orbCount: () => 3,
-    //   variantMultiplier: () => 1.0
-    // });
+    const mineRewards = CONSTANTS.ENEMY_REWARDS?.mine;
+    // Mine rewards: 1-2 orbs random (5-10 XP) + wave bonus
+    configs.set('mine', {
+      orbValue: mineRewards?.orbValue ?? CONSTANTS.ORB_VALUE ?? 5,
+      baseOrbs: () => {
+        const min = mineRewards?.baseOrbsMin ?? 1;
+        const max = mineRewards?.baseOrbsMax ?? min;
+        const random = this.getRandomService();
+        if (random && typeof random.int === 'function') {
+          return random.int(min, max);
+        }
+        return min;
+      },
+      sizeFactor: () => 1.0,
+      variantMultiplier: () => 1.0,
+    });
 
-    // configs.set('boss', {
-    //   baseXP: () => 500,
-    //   orbCount: () => 10,
-    //   variantMultiplier: () => 1.0
-    // });
+    const hunterRewards = CONSTANTS.ENEMY_REWARDS?.hunter;
+    // Hunter rewards: 3 orbs base (15 XP) + wave bonus
+    configs.set('hunter', {
+      orbValue: hunterRewards?.orbValue ?? CONSTANTS.ORB_VALUE ?? 5,
+      baseOrbs: () => hunterRewards?.baseOrbs ?? 3,
+      sizeFactor: () => 1.0,
+      variantMultiplier: () => 1.0, // No variant scaling (yet)
+    });
+
+    const bossRewards = CONSTANTS.ENEMY_REWARDS?.boss;
+    // Boss rewards: 10 orbs base (50 XP) + wave bonus. Note: BOSS_CONFIG.rewards.xp (500) is for future loot system, not orb-based XP.
+    configs.set('boss', {
+      orbValue: bossRewards?.orbValue ?? CONSTANTS.ORB_VALUE ?? 5,
+      baseOrbs: () => bossRewards?.baseOrbs ?? 10,
+      sizeFactor: () => 1.0,
+      variantMultiplier: (variant) => {
+        // Boss phases could have different multipliers in the future
+        return 1.0;
+      },
+    });
 
     return configs;
   }
@@ -434,33 +462,44 @@ export class RewardManager {
    * @param {BaseEnemy} enemy - The destroyed enemy
    */
   tryDropHealthHeart(enemy, randomContext = null) {
-    // Only from tough enemies (medium/large asteroids, special variants)
+    const specialAsteroidVariants = ['gold', 'crystal', 'volatile', 'parasite'];
+    const isAsteroid = enemy.type === 'asteroid';
+    const isToughAsteroid =
+      isAsteroid &&
+      ((enemy.size === 'medium' || enemy.size === 'large') ||
+        (enemy.variant && specialAsteroidVariants.includes(enemy.variant)));
+
+    // Tough enemies: large/medium asteroids, special variants, hunters, bosses
     const isToughEnemy =
-      (enemy.size === 'medium' || enemy.size === 'large') ||
-      (enemy.variant && ['gold', 'crystal', 'volatile', 'parasite'].includes(enemy.variant));
+      isToughAsteroid ||
+      enemy.type === 'hunter' ||
+      enemy.type === 'boss';
 
     if (!isToughEnemy) {
       return;
     }
 
-    // RARE drop rates (truly rare as requested by user):
-    // - Large asteroids: 5% base chance
-    // - Medium asteroids: 2% base chance
-    // - Special variants: +3% bonus (gold, crystal, volatile, parasite)
     let dropChance = 0;
-
-    if (enemy.size === 'large') {
-      dropChance = 0.05; // 5% - rare
-    } else if (enemy.size === 'medium') {
-      dropChance = 0.02; // 2% - very rare
+    const rewardConfig = CONSTANTS.ENEMY_REWARDS?.[enemy.type];
+    if (rewardConfig && typeof rewardConfig.healthHeartChance === 'number') {
+      dropChance = rewardConfig.healthHeartChance;
     }
 
-    // Bonus for special variants (makes them worth hunting)
-    if (enemy.variant && ['gold', 'crystal', 'volatile', 'parasite'].includes(enemy.variant)) {
-      dropChance += 0.03; // +3% bonus
+    if (isAsteroid) {
+      if (enemy.size === 'large') {
+        dropChance = 0.05; // 5% - rare
+      } else if (enemy.size === 'medium') {
+        dropChance = 0.02; // 2% - very rare
+      }
+
+      if (enemy.variant && specialAsteroidVariants.includes(enemy.variant)) {
+        dropChance += 0.03; // +3% bonus
+      }
     }
 
-    console.log(`[RewardManager] Checking heart drop: ${enemy.size} ${enemy.variant || 'common'} - chance: ${(dropChance * 100).toFixed(1)}%`);
+    const sizeLabel = enemy.size || 'N/A';
+    const variantLabel = enemy.variant || 'common';
+    console.log(`[RewardManager] Checking heart drop: ${enemy.type} ${sizeLabel} ${variantLabel} - chance: ${(dropChance * 100).toFixed(1)}%`);
 
     const context = randomContext || this.createDropRandomContext(enemy);
     const heartRandom = context?.heart || context?.base;
@@ -478,7 +517,7 @@ export class RewardManager {
           enemyType: enemy.type,
           enemySize: enemy.size,
         });
-        console.log(`[RewardManager] ❤️ Health heart dropped from ${enemy.size} ${enemy.variant || 'common'} asteroid!`);
+        console.log(`[RewardManager] ❤️ Health heart dropped from ${enemy.type} (${sizeLabel} ${variantLabel})!`);
       } else {
         console.error('[RewardManager] HealthHeartSystem not available!');
       }
