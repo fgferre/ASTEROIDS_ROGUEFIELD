@@ -62,6 +62,7 @@ export class WaveManager {
 
     this._onEnemyDestroyedHandler = null;
     this._isEnemyDestroyedListenerActive = false;
+    this._enemyDestroyedBus = null;
 
     let resolvedRandom =
       this.dependencies.random ||
@@ -228,7 +229,8 @@ export class WaveManager {
   }
 
   connectEventListeners() {
-    if (!this.eventBus || typeof this.eventBus.on !== 'function') {
+    const eventBus = this.eventBus;
+    if (!eventBus || typeof eventBus.on !== 'function') {
       return;
     }
 
@@ -236,27 +238,29 @@ export class WaveManager {
       this._onEnemyDestroyedHandler = (data) => this.onEnemyDestroyed(data);
     }
 
+    if (this._enemyDestroyedBus && this._enemyDestroyedBus !== eventBus) {
+      this.disconnect();
+    }
+
     if (this._isEnemyDestroyedListenerActive) {
       return;
     }
 
     // WAVE-004: Conectar ao evento de destruição para progressão automática de ondas
-    this.eventBus.on('enemy-destroyed', this._onEnemyDestroyedHandler);
+    eventBus.on('enemy-destroyed', this._onEnemyDestroyedHandler);
+    this._enemyDestroyedBus = eventBus;
     this._isEnemyDestroyedListenerActive = true;
   }
 
   disconnect() {
-    if (
-      !this.eventBus ||
-      typeof this.eventBus.off !== 'function' ||
-      !this._onEnemyDestroyedHandler ||
-      !this._isEnemyDestroyedListenerActive
-    ) {
-      return;
+    const bus = this._enemyDestroyedBus || this.eventBus;
+
+    if (bus && typeof bus.off === 'function' && this._onEnemyDestroyedHandler) {
+      bus.off('enemy-destroyed', this._onEnemyDestroyedHandler);
     }
 
-    this.eventBus.off('enemy-destroyed', this._onEnemyDestroyedHandler);
     this._isEnemyDestroyedListenerActive = false;
+    this._enemyDestroyedBus = null;
   }
 
   cloneWaveConfig(config = {}) {
@@ -644,6 +648,9 @@ export class WaveManager {
 
     config.isBossWave = Boolean(config.isBossWave);
 
+    const sharedSpawnDelayMultiplier = this.resolveWaveSpawnDelayMultiplier(config);
+    config.spawnDelayMultiplier = sharedSpawnDelayMultiplier;
+
     this.totalEnemiesThisWave = this.computeTotalEnemies(config);
 
     const waveEventPayload = {
@@ -686,6 +693,43 @@ export class WaveManager {
   }
 
   /**
+   * Resolves a deterministic spawn delay multiplier for the provided wave configuration.
+   * The multiplier is cached on the config object so boss support groups reuse the same pacing.
+   *
+   * @param {Object} waveConfig - Wave configuration
+   * @returns {number} Effective spawn delay multiplier
+   */
+  resolveWaveSpawnDelayMultiplier(waveConfig = {}) {
+    const existingMultiplier = Number(waveConfig?.spawnDelayMultiplier);
+
+    if (Number.isFinite(existingMultiplier) && existingMultiplier > 0) {
+      return existingMultiplier;
+    }
+
+    const spawnDelayRandom = this.resolveScopedRandom(
+      this.randomScopes?.spawn,
+      'spawn',
+      'wave-spawn-delay'
+    );
+
+    const generatedMultiplier =
+      spawnDelayRandom && typeof spawnDelayRandom.range === 'function'
+        ? spawnDelayRandom.range(0.5, 1)
+        : 1;
+
+    const sanitizedMultiplier =
+      Number.isFinite(generatedMultiplier) && generatedMultiplier > 0
+        ? generatedMultiplier
+        : 1;
+
+    if (waveConfig && typeof waveConfig === 'object') {
+      waveConfig.spawnDelayMultiplier = sanitizedMultiplier;
+    }
+
+    return sanitizedMultiplier;
+  }
+
+  /**
    * Spawns enemies for the current wave using the factory pattern.
    *
    * @param {Object} waveConfig - Wave configuration
@@ -696,18 +740,9 @@ export class WaveManager {
     const player = this.enemySystem.getCachedPlayer();
     const safeDistance = CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200;
 
-    const spawnDelayRandom = this.resolveScopedRandom(
-      this.randomScopes?.spawn,
-      'spawn',
-      'wave-spawn-delay'
-    );
-    const spawnDelayMultiplier =
-      spawnDelayRandom && typeof spawnDelayRandom.range === 'function'
-        ? spawnDelayRandom.range(0.5, 1)
-        : 1;
-
+    const spawnDelayMultiplier = this.resolveWaveSpawnDelayMultiplier(waveConfig);
     this.spawnDelayMultiplier = spawnDelayMultiplier;
-    const effectiveSpawnDelay = this.spawnDelay * this.spawnDelayMultiplier;
+    const effectiveSpawnDelay = this.spawnDelay * spawnDelayMultiplier;
 
     for (const enemyGroup of waveConfig.enemies) {
       for (let i = 0; i < enemyGroup.count; i++) {
@@ -778,23 +813,29 @@ export class WaveManager {
   queueBossWaveSpawns(waveConfig = {}) {
     const queue = [];
 
-    const bossConfig = waveConfig.boss ? { ...waveConfig.boss } : null;
+    const sharedSpawnDelayMultiplier = this.resolveWaveSpawnDelayMultiplier(waveConfig);
+    const baseConfig = {
+      ...waveConfig,
+      spawnDelayMultiplier: sharedSpawnDelayMultiplier,
+    };
+
+    const bossConfig = baseConfig.boss ? { ...baseConfig.boss } : null;
     if (bossConfig) {
       queue.push({
         type: 'boss',
-        execute: () => this.spawnBossEnemy(bossConfig, waveConfig),
+        execute: () => this.spawnBossEnemy(bossConfig, baseConfig),
       });
     }
 
-    const supportGroups = Array.isArray(waveConfig.enemies)
-      ? waveConfig.enemies.map((group) => ({ ...group }))
+    const supportGroups = Array.isArray(baseConfig.enemies)
+      ? baseConfig.enemies.map((group) => ({ ...group }))
       : [];
 
     supportGroups.forEach((group) => {
       queue.push({
         type: 'support-group',
         group,
-        execute: () => this.spawnWave({ ...waveConfig, enemies: [group] }),
+        execute: () => this.spawnWave({ ...baseConfig, enemies: [group] }),
       });
     });
 
@@ -1031,7 +1072,7 @@ export class WaveManager {
    * Called when an enemy is destroyed.
    */
   onEnemyDestroyed() {
-    if (!this.waveInProgress) {
+    if (!this.waveInProgress || this.totalEnemiesThisWave <= 0) {
       return;
     }
 
@@ -1125,10 +1166,11 @@ export class WaveManager {
     // Handle wave countdown
     if (!this.waveInProgress && this.waveCountdown > 0) {
       this.waveCountdown -= deltaTime;
+      this.waveCountdown = Math.max(0, this.waveCountdown);
+    }
 
-      if (this.waveCountdown <= 0) {
-        this.startNextWave();
-      }
+    if (!this.waveInProgress && this.waveCountdown <= 0) {
+      this.startNextWave();
     }
   }
 

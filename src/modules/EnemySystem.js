@@ -69,6 +69,7 @@ class EnemySystem {
     this._waveSystemDebugLogged = false;
     this._waveManagerFallbackWarningIssued = false;
     this._waveManagerInvalidStateWarningIssued = false;
+    this._lastWaveManagerCompletionHandled = null;
 
     // Factory (optional - new architecture)
     this.factory = null;
@@ -222,13 +223,31 @@ class EnemySystem {
       });
 
       if (this.waveManager) {
-        bus.on('wave-complete', (data) => {
+        bus.on('wave-complete', (data = {}) => {
           if (Boolean(CONSTANTS?.USE_WAVE_MANAGER) && this.waveState) {
+            const waveNumber = Number.isFinite(Number(data.wave))
+              ? Number(data.wave)
+              : Number.isFinite(this.waveState.current)
+              ? this.waveState.current
+              : null;
+
+            if (
+              waveNumber !== null &&
+              this._lastWaveManagerCompletionHandled === waveNumber
+            ) {
+              return;
+            }
+
             console.debug(
               '[EnemySystem] Wave complete event received from WaveManager:',
               data
             );
-            // WaveManager já marcou a conclusão; evitar duplicar completeCurrentWave()
+
+            if (waveNumber !== null) {
+              this._lastWaveManagerCompletionHandled = waveNumber;
+            }
+
+            this.handleWaveManagerWaveComplete(data);
           }
         });
       }
@@ -1725,6 +1744,72 @@ class EnemySystem {
     }
   }
 
+  handleWaveManagerWaveComplete(data = {}) {
+    if (!this.waveState) {
+      return;
+    }
+
+    const waveNumberCandidate = Number(data.wave);
+    if (Number.isFinite(waveNumberCandidate) && waveNumberCandidate > 0) {
+      this.waveState.current = waveNumberCandidate;
+    }
+
+    const breakDuration = Number(CONSTANTS.WAVE_BREAK_TIME) || 0;
+
+    this.waveState.isActive = false;
+    this.waveState.breakTimer = breakDuration;
+    this.waveState.timeRemaining = 0;
+    this.waveState.spawnTimer = 0;
+    this.waveState.initialSpawnDone = false;
+
+    if (
+      this.waveManager &&
+      Number.isFinite(Number(this.waveManager.totalEnemiesThisWave))
+    ) {
+      this.waveState.totalAsteroids = Number(this.waveManager.totalEnemiesThisWave);
+    }
+
+    if (!Number.isFinite(Number(this.waveState.asteroidsSpawned))) {
+      this.waveState.asteroidsSpawned = 0;
+    }
+
+    this.waveState.asteroidsSpawned = Math.max(
+      Number(this.waveState.asteroidsSpawned) || 0,
+      Number(this.waveState.totalAsteroids) || 0
+    );
+
+    const possibleKilledValues = [];
+    const payloadKilled = Number(data.enemiesKilled);
+    if (Number.isFinite(payloadKilled)) {
+      possibleKilledValues.push(payloadKilled);
+    }
+
+    if (
+      this.waveManager &&
+      Number.isFinite(Number(this.waveManager.enemiesKilledThisWave))
+    ) {
+      possibleKilledValues.push(Number(this.waveManager.enemiesKilledThisWave));
+    }
+
+    if (Number.isFinite(Number(this.waveState.asteroidsKilled))) {
+      possibleKilledValues.push(Number(this.waveState.asteroidsKilled));
+    }
+
+    if (Number.isFinite(Number(this.waveState.totalAsteroids))) {
+      possibleKilledValues.push(Number(this.waveState.totalAsteroids));
+    }
+
+    if (possibleKilledValues.length > 0) {
+      this.waveState.asteroidsKilled = Math.max(...possibleKilledValues);
+    }
+
+    this.waveState.completedWaves = (this.waveState.completedWaves || 0) + 1;
+
+    this.grantWaveRewards();
+
+    this.emitWaveStateUpdate(true);
+  }
+
   // === GERENCIAMENTO DE ASTEROIDES ===
   updateAsteroids(deltaTime) {
     // NEW: Use movement component if enabled
@@ -2144,7 +2229,10 @@ class EnemySystem {
         this.waveState.asteroidsKilled >= this.waveState.totalAsteroids &&
         this.getActiveEnemyCount() === 0;
 
-      if (allAsteroidsKilled && this.waveState.timeRemaining > 0) {
+      const usingWaveManager =
+        this.useManagers && Boolean(CONSTANTS?.USE_WAVE_MANAGER) && this.waveManager;
+
+      if (!usingWaveManager && allAsteroidsKilled && this.waveState.timeRemaining > 0) {
         this.completeCurrentWave();
       }
     }
@@ -2847,6 +2935,7 @@ class EnemySystem {
     this.sessionActive = true;
     this.lastWaveBroadcast = null;
     this._snapshotFallbackWarningIssued = false;
+    this._lastWaveManagerCompletionHandled = null;
     this.pendingEnemyProjectiles = [];
 
     this.refreshInjectedServices({ force: true });
@@ -2884,6 +2973,7 @@ class EnemySystem {
     this.randomSequences = null;
     this._nextAsteroidPoolId = 1;
     this._snapshotFallbackWarningIssued = false;
+    this._lastWaveManagerCompletionHandled = null;
     console.log('[EnemySystem] Destroyed');
   }
 
