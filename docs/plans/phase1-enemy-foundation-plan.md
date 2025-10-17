@@ -389,60 +389,62 @@ A flag `USE_WAVE_MANAGER` será removida após:
 **Implementações Completas:**
 
 1. **Configurações de Recompensas (`RewardManager.loadRewardConfigurations()`):**
-   - **Drone:** 2 orbs base × 5 XP/orb = 10 XP base + wave bonus
-   - **Mine:** 1-2 orbs random × 5 XP/orb = 5-10 XP base + wave bonus
-   - **Hunter:** 3 orbs base × 5 XP/orb = 15 XP base + wave bonus
-   - **Boss:** 10 orbs base × 5 XP/orb = 50 XP base + wave bonus
-   - Todas as configs seguem padrão de asteroides (orbValue, baseOrbs, sizeFactor, variantMultiplier)
+   - **Drone:** 2 orbs base com XP redistribuído para totalizar **30 XP** por destruição (wave 1)
+   - **Mine:** 1-2 orbs base com XP redistribuído para totalizar **25 XP** (wave 1), mantendo variedade determinística
+   - **Hunter:** 3 orbs base com XP redistribuído para totalizar **50 XP** (wave 1)
+   - **Boss:** 10 orbs base com 50 XP por orb (**500 XP** total por destruição)
+   - Todas as configs seguem padrão de asteroides (baseOrbs, sizeFactor, variantMultiplier)
    - `sizeFactor` e `variantMultiplier` sempre 1.0 (novos inimigos não têm sizes/variants)
 
 2. **Sistema Orb-Based Preservado:**
    - Fórmula: `orbCount = baseOrbs × sizeFactor × variantMultiplier + waveBonus`
    - Wave bonus automático: +1 orb a cada 5 waves (1-10), depois +1 a cada 3 waves (10+)
-   - XP total = orbCount × orbValue (5)
-   - Sem criação de sistema paralelo de baseXP
+   - XP por orb é calculado dinamicamente a partir de `totalXP ÷ baseOrbCount`, com ajustes para garantir soma exata
+   - Sem criação de sistema paralelo de baseXP – apenas redistribuição dos valores existentes
 
 3. **Randomização para Mine:**
    - `baseOrbs()` usa `RandomService.int(1, 2)` para variedade
    - Determinismo preservado via random scope do RewardManager
-   - Garante 1-2 orbs por mine destruída
+   - Distribuição de XP ajustada para manter **25 XP** totais independentemente do resultado (ex.: [12,13])
 
 4. **Health Heart Drops Expandidos (`tryDropHealthHeart()`):**
    - **Hunters:** 3% de chance (inimigos médio-fortes, 48 HP)
    - **Bosses:** 25% de chance (inimigos épicos, 1500 HP)
    - **Drones/Mines:** 0% (muito fracos, 30 HP e 20 HP)
-   - Lógica de `isToughEnemy` atualizada para incluir novos tipos
+   - Taxas agora centralizadas em `GameConstants.ENEMY_REWARDS`, inclusive bônus por variante de asteroide
    - Logs de debug expandidos para incluir tipo de inimigo
 
 5. **Compatibilidade com `dropRewards()`:**
-   - Método `dropRewards()` **não modificado** (já genérico)
-   - Busca config via `enemy.type` → funciona automaticamente para novos tipos
-   - Delega para `createXPOrbs()` e `tryDropHealthHeart()` sem mudanças
-   - Sistema de estatísticas (`updateStats`) funciona para todos os tipos
+   - Método `dropRewards()` ajustado para redistribuir XP por orb com base em `totalXP`
+   - Continua buscando config via `enemy.type` e delegando para `createXPOrbs()` / `tryDropHealthHeart()`
+   - Sistema de estatísticas (`updateStats`) registra a soma real de XP distribuída
 
 **Tabela de Recompensas:**
 
-| Tipo | Base Orbs | XP Base | Wave 1 Total | Wave 5 Total | Wave 10 Total | Heart Drop |
-|------|-----------|---------|--------------|--------------|---------------|------------|
-| Drone | 2 | 10 XP | 10 XP | 15 XP (+1) | 20 XP (+2) | 0% |
-| Mine | 1-2 | 5-10 XP | 5-10 XP | 10-15 XP | 15-20 XP | 0% |
-| Hunter | 3 | 15 XP | 15 XP | 20 XP (+1) | 25 XP (+2) | 3% |
-| Boss | 10 | 50 XP | 50 XP | 55 XP (+1) | 60 XP (+2) | 25% |
-| Asteroid (large) | 3-4 | 15-20 XP | 15-20 XP | 20-25 XP | 25-30 XP | 5-8% |
+| Tipo | Base Orbs | XP Base (Wave 1) | Wave 5 Total* | Wave 10 Total* | Heart Drop |
+|------|-----------|------------------|---------------|----------------|------------|
+| Drone | 2 | 30 XP | 45 XP (+1 orb a 15 XP) | 60 XP (+2 orbs a 15 XP) | 0% |
+| Mine | 1-2 | 25 XP (distribuição ex.: [12,13]) | ~38 XP (+1 orb ≈ 13 XP)** | ~50 XP (+2 orbs ≈ 13 XP)** | 0% |
+| Hunter | 3 | 50 XP (distribuição ex.: [16,17,17]) | 67 XP (+1 orb a 17 XP) | 84 XP (+2 orbs a 17 XP) | 3% |
+| Boss | 10 | 500 XP (50 XP por orb) | 550 XP (+1 orb a 50 XP) | 600 XP (+2 orbs a 50 XP) | 25% |
+| Asteroid (large) | 3-4 | 15-20 XP | 20-30 XP | 25-35 XP | 5-8% +3% variante |
+
+*Wave bonus adiciona +1 orb nas waves 5/8 e +2 orbs a partir da wave 10 (1 orb extra a cada 3 waves).
+
+**Valor aproximado: a distribuição mantém 25 XP base e replica o valor médio (≈13 XP) para os orbs extras.
 
 **Nota sobre `BOSS_CONFIG.rewards.xp` (500):**
-- Valor de 500 XP em `BOSS_CONFIG.rewards.xp` (GameConstants linha 1273) é para **sistema de loot futuro** (core-upgrade, weapon-blueprint)
-- Sistema orb-based atual: 10 orbs × 5 XP = **50 XP base** (não 500)
-- Discrepância documentada e intencional: orbs são recompensa imediata, loot table é recompensa especial
-- Para atingir 500 XP via orbs, seria necessário 100 orbs (500 ÷ 5 = 100)
+- Valor de 500 XP em `BOSS_CONFIG.rewards.xp` agora é refletido diretamente nos orbs (10 orbs × 50 XP)
+- O sistema orb-based distribui 50 XP por orb para o boss, mantendo compatibilidade com futuros loot drops especiais
+- Wave bonus adiciona 50 XP por orb extra, mantendo escalonamento previsível
 
 **Testes Automatizados:**
 - Suite: `src/modules/enemies/managers/RewardManager.test.js`
 - Validações:
-  - Drone: 2 orbs × 5 XP = 10 XP
-  - Mine: 1-2 orbs random (determinístico) × 5 XP = 5-10 XP
-  - Hunter: 3 orbs × 5 XP = 15 XP
-  - Boss: 10 orbs × 5 XP = 50 XP
+- Drone: 2 orbs distribuídos para somar 30 XP (15 XP cada)
+- Mine: 1-2 orbs distribuídos para somar 25 XP (ex.: [12,13])
+- Hunter: 3 orbs distribuídos para somar 50 XP (ex.: [16,17,17])
+- Boss: 10 orbs com 50 XP cada (500 XP total)
   - Wave bonus aplicado corretamente (wave 5: +1 orb)
   - Unknown types logam warning e não crasham
   - Health hearts dropam de hunters e bosses
@@ -452,8 +454,9 @@ A flag `USE_WAVE_MANAGER` será removida após:
 2. Jogar até wave 8+ (quando drones começam a spawnar)
 3. Destruir drones, mines, hunters e verificar XP orbs dropados
 4. Verificar que quantidade de orbs corresponde à tabela acima
-5. Verificar que health hearts dropam ocasionalmente de hunters/bosses
-6. Verificar logs: `[RewardManager] Checking heart drop: hunter N/A common - chance: 3.0%`
+5. Confirmar que a soma do XP coletado por wave bate com os valores esperados (30/25/50/500 + bônus de wave)
+6. Verificar que health hearts dropam ocasionalmente de hunters/bosses
+7. Verificar logs: `[RewardManager] Checking heart drop: hunter N/A common - chance: 3.0%`
 
 **Critérios de Conclusão Atendidos:**
 - [x] Configurações adicionadas para drone, mine, hunter, boss

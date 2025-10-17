@@ -1099,25 +1099,36 @@ export const ENEMY_TYPES = Object.freeze({
 });
 
 export const ENEMY_REWARDS = Object.freeze({
+  asteroid: Object.freeze({
+    heartDrop: Object.freeze({
+      bySize: Object.freeze({
+        large: 0.05,
+        medium: 0.02,
+        small: 0,
+      }),
+      variantBonus: 0.03,
+      specialVariants: Object.freeze(['gold', 'crystal', 'volatile', 'parasite']),
+    }),
+  }),
   drone: Object.freeze({
     baseOrbs: 2,
-    orbValue: 5,
+    totalXP: 30,
     healthHeartChance: 0.0,
   }),
   mine: Object.freeze({
     baseOrbsMin: 1,
     baseOrbsMax: 2,
-    orbValue: 5,
+    totalXP: 25,
     healthHeartChance: 0.0,
   }),
   hunter: Object.freeze({
     baseOrbs: 3,
-    orbValue: 5,
+    totalXP: 50,
     healthHeartChance: 0.03,
   }),
   boss: Object.freeze({
     baseOrbs: 10,
-    orbValue: 5,
+    totalXP: 500,
     healthHeartChance: 0.25,
   }),
 });

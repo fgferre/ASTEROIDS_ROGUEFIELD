@@ -59,10 +59,10 @@ _A ser preenchido pelo validador_
 - [ ] `assertAccountingConsistency()` não dispara warnings
 
 ### 8. Reward System (WAVE-005)
-- [ ] Drones dropam 2 XP orbs ao serem destruídos
-- [ ] Mines dropam 1-2 XP orbs (randomizado)
-- [ ] Hunters dropam 3 XP orbs
-- [ ] Bosses dropam 10 XP orbs
+- [ ] Drones dropam 2 XP orbs totalizando 30 XP (wave 1)
+- [ ] Mines dropam 1-2 XP orbs com XP redistribuído (25 XP totais)
+- [ ] Hunters dropam 3 XP orbs totalizando 50 XP
+- [ ] Bosses dropam 10 XP orbs totalizando 500 XP
 - [ ] Wave bonus aplicado corretamente (+1 orb a cada 5 waves)
 - [ ] Health hearts dropam ocasionalmente de hunters (~3% observado)
 - [ ] Health hearts dropam frequentemente de bosses (~25% observado)
@@ -74,24 +74,24 @@ _A ser preenchido pelo validador_
 
 | Tipo | Orbs Esperados (Wave 1) | Orbs Observados | XP Esperado | XP Observado | Hearts Dropados |
 |------|-------------------------|-----------------|-------------|--------------|----------------|
-| Drone | 2 | | 10 XP | | 0 |
-| Mine | 1-2 | | 5-10 XP | | 0 |
-| Hunter | 3 | | 15 XP | | ___ / ___ (%) |
-| Boss | 10 | | 50 XP | | ___ / ___ (%) |
+| Drone | 2 | | 30 XP | | 0 |
+| Mine | 1-2 | | 25 XP | | 0 |
+| Hunter | 3 | | 50 XP | | ___ / ___ (%) |
+| Boss | 10 | | 500 XP | | ___ / ___ (%) |
 
 **Instruções de Validação:**
 1. Ativar `USE_WAVE_MANAGER=true`
 2. Jogar até wave 8+ (quando novos inimigos começam a spawnar)
 3. Destruir pelo menos 10 de cada tipo de inimigo
 4. Contar orbs dropados visualmente
-5. Verificar XP ganho no HUD (deve corresponder a orbCount × 5)
+5. Verificar XP ganho no HUD (deve corresponder aos totais esperados por tipo + bônus de wave)
 6. Anotar quantos health hearts droparam de hunters e bosses
 7. Calcular taxa de drop observada: (hearts dropados / inimigos destruídos) × 100%
 8. Comparar com taxas esperadas: hunters 3%, bosses 25%
 
 **Critério de Aprovação:**
 - Orbs dropados correspondem à tabela (±1 orb de tolerância para randomização de mines)
-- XP ganho = orbCount × 5 (verificar no HUD de progressão)
+- XP ganho corresponde aos totais esperados por tipo (30/25/50/500) mais bônus de wave
 - Health hearts dropam apenas de hunters e bosses (nunca de drones/mines)
 - Taxa de drop de hearts está dentro de ±10% do esperado (ex: bosses 15-35%)
 

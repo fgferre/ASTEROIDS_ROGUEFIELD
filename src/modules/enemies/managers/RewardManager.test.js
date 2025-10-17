@@ -79,9 +79,9 @@ describe('RewardManager', () => {
       rewardManager.dropRewards(createBaseEnemy({ type: 'drone', size: undefined, variant: undefined, wave: 1 }));
 
       expect(createXPOrb).toHaveBeenCalledTimes(2);
-      for (const call of createXPOrb.mock.calls) {
-        expect(call[2]).toBe(5);
-      }
+      const xpValues = createXPOrb.mock.calls.map((call) => call[2]);
+      expect(xpValues).toEqual([15, 15]);
+      expect(xpValues.reduce((sum, value) => sum + value, 0)).toBe(30);
     });
 
     it('drops randomized XP orbs for mines using deterministic random', () => {
@@ -96,9 +96,9 @@ describe('RewardManager', () => {
       rewardManager.dropRewards(createBaseEnemy({ type: 'mine', size: undefined, variant: undefined, wave: 1 }));
 
       expect(createXPOrb).toHaveBeenCalledTimes(2);
-      for (const call of createXPOrb.mock.calls) {
-        expect(call[2]).toBe(5);
-      }
+      const xpValues = createXPOrb.mock.calls.map((call) => call[2]);
+      expect(xpValues).toEqual([12, 13]);
+      expect(xpValues.reduce((sum, value) => sum + value, 0)).toBe(25);
     });
 
     it('drops 3 XP orbs for hunters at wave 1', () => {
@@ -113,9 +113,9 @@ describe('RewardManager', () => {
       rewardManager.dropRewards(createBaseEnemy({ type: 'hunter', size: undefined, variant: undefined, wave: 1 }));
 
       expect(createXPOrb).toHaveBeenCalledTimes(3);
-      for (const call of createXPOrb.mock.calls) {
-        expect(call[2]).toBe(5);
-      }
+      const xpValues = createXPOrb.mock.calls.map((call) => call[2]);
+      expect(xpValues).toEqual([16, 17, 17]);
+      expect(xpValues.reduce((sum, value) => sum + value, 0)).toBe(50);
     });
 
     it('drops 10 XP orbs for bosses at wave 1', () => {
@@ -130,9 +130,9 @@ describe('RewardManager', () => {
       rewardManager.dropRewards(createBaseEnemy({ type: 'boss', size: undefined, variant: undefined, wave: 1 }));
 
       expect(createXPOrb).toHaveBeenCalledTimes(10);
-      for (const call of createXPOrb.mock.calls) {
-        expect(call[2]).toBe(5);
-      }
+      const xpValues = createXPOrb.mock.calls.map((call) => call[2]);
+      expect(xpValues.every((value) => value === 50)).toBe(true);
+      expect(xpValues.reduce((sum, value) => sum + value, 0)).toBe(500);
     });
 
     it('applies wave bonus to drone rewards on wave 5', () => {
@@ -147,6 +147,9 @@ describe('RewardManager', () => {
       rewardManager.dropRewards(createBaseEnemy({ type: 'drone', size: undefined, variant: undefined, wave: 5 }));
 
       expect(createXPOrb).toHaveBeenCalledTimes(3);
+      const xpValues = createXPOrb.mock.calls.map((call) => call[2]);
+      expect(xpValues).toEqual([15, 15, 15]);
+      expect(xpValues.reduce((sum, value) => sum + value, 0)).toBe(45);
     });
 
     it('logs a warning when dropping rewards for unknown enemy types', () => {
