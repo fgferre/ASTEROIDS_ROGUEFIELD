@@ -60,6 +60,9 @@ export class WaveManager {
       resolveService('event-bus', this.dependencies) ||
       null;
 
+    this._onEnemyDestroyedHandler = null;
+    this._isEnemyDestroyedListenerActive = false;
+
     let resolvedRandom =
       this.dependencies.random ||
       (this.enemySystem &&
@@ -117,11 +120,14 @@ export class WaveManager {
     // Timers
     this.spawnTimer = 0;
     this.spawnDelay = CONSTANTS.WAVE_SPAWN_DELAY || 1.0;
-    this.waveDelay = CONSTANTS.WAVE_START_DELAY || 3.0;
+    this.spawnDelayMultiplier = 1;
+    this.waveDelay = CONSTANTS.WAVE_BREAK_TIME || 10.0; // WAVE-004: Usar WAVE_BREAK_TIME para paridade com sistema legado
     this.waveCountdown = 0;
 
     // Wave configurations
     this.waveConfigs = this.loadWaveConfigurations();
+
+    this.connectEventListeners();
 
     console.log('[WaveManager] Initialized');
   }
@@ -221,6 +227,38 @@ export class WaveManager {
     return configs;
   }
 
+  connectEventListeners() {
+    if (!this.eventBus || typeof this.eventBus.on !== 'function') {
+      return;
+    }
+
+    if (!this._onEnemyDestroyedHandler) {
+      this._onEnemyDestroyedHandler = (data) => this.onEnemyDestroyed(data);
+    }
+
+    if (this._isEnemyDestroyedListenerActive) {
+      return;
+    }
+
+    // WAVE-004: Conectar ao evento de destruição para progressão automática de ondas
+    this.eventBus.on('enemy-destroyed', this._onEnemyDestroyedHandler);
+    this._isEnemyDestroyedListenerActive = true;
+  }
+
+  disconnect() {
+    if (
+      !this.eventBus ||
+      typeof this.eventBus.off !== 'function' ||
+      !this._onEnemyDestroyedHandler ||
+      !this._isEnemyDestroyedListenerActive
+    ) {
+      return;
+    }
+
+    this.eventBus.off('enemy-destroyed', this._onEnemyDestroyedHandler);
+    this._isEnemyDestroyedListenerActive = false;
+  }
+
   cloneWaveConfig(config = {}) {
     if (!config || typeof config !== 'object') {
       return { isBossWave: false, enemies: [] };
@@ -280,6 +318,7 @@ export class WaveManager {
     const enemies = [];
     const variantRandom = this.getRandomScope('variants');
 
+    // WAVE-004: Distribuição ajustada para suportar múltiplos tipos de inimigos (não apenas asteroides)
     // Large asteroids
     enemies.push({
       type: 'asteroid',
@@ -403,8 +442,14 @@ export class WaveManager {
   }
 
   computeBaseEnemyCount(waveNumber) {
-    const difficulty = Math.floor(waveNumber / 5);
-    return 5 + difficulty * 2;
+    const baseCount =
+      (CONSTANTS.ASTEROIDS_PER_WAVE_BASE ?? 4) *
+      Math.pow(CONSTANTS.ASTEROIDS_PER_WAVE_MULTIPLIER ?? 1.3, Math.max(0, waveNumber - 1));
+
+    // WAVE-004: Usar parâmetros legados para preservar densidade de ondas (baseline WAVE-001)
+    const normalizedCount = Math.floor(baseCount);
+    const maxOnScreen = CONSTANTS.MAX_ASTEROIDS_ON_SCREEN ?? 20;
+    return Math.min(normalizedCount, maxOnScreen);
   }
 
   computeSupportWeights(waveNumber) {
@@ -651,6 +696,19 @@ export class WaveManager {
     const player = this.enemySystem.getCachedPlayer();
     const safeDistance = CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200;
 
+    const spawnDelayRandom = this.resolveScopedRandom(
+      this.randomScopes?.spawn,
+      'spawn',
+      'wave-spawn-delay'
+    );
+    const spawnDelayMultiplier =
+      spawnDelayRandom && typeof spawnDelayRandom.range === 'function'
+        ? spawnDelayRandom.range(0.5, 1)
+        : 1;
+
+    this.spawnDelayMultiplier = spawnDelayMultiplier;
+    const effectiveSpawnDelay = this.spawnDelay * this.spawnDelayMultiplier;
+
     for (const enemyGroup of waveConfig.enemies) {
       for (let i = 0; i < enemyGroup.count; i++) {
         const spawnContext = this.createScopedRandom('spawn', 'wave-spawn');
@@ -668,7 +726,9 @@ export class WaveManager {
           x: position.x,
           y: position.y,
           wave: this.currentWave,
-          spawnIndex: i
+          spawnIndex: i,
+          spawnDelay: effectiveSpawnDelay,
+          spawnDelayMultiplier: this.spawnDelayMultiplier
         };
 
         if (spawnContext.random?.fork) {
@@ -678,15 +738,41 @@ export class WaveManager {
 
         // Use factory if available, otherwise use legacy method
         let enemy;
+        let createdViaFactory = false;
         if (this.enemySystem.factory) {
           enemy = this.enemySystem.factory.create(enemyGroup.type, enemyConfig);
+          createdViaFactory = true;
         } else {
           // Legacy: Direct Asteroid creation
           enemy = this.enemySystem.acquireAsteroid(enemyConfig);
         }
 
+        let registeredEnemy = false;
+        if (createdViaFactory && enemy) {
+          if (this.enemySystem && typeof this.enemySystem.registerActiveEnemy === 'function') {
+            this.enemySystem.registerActiveEnemy(enemy, { skipDuplicateCheck: true });
+            registeredEnemy = true;
+          } else {
+            console.warn(
+              '[WaveManager] Cannot register enemy - registerActiveEnemy() not available on EnemySystem'
+            );
+          }
+        }
+
         if (enemy) {
           this.enemiesSpawnedThisWave++;
+          if (
+            createdViaFactory &&
+            registeredEnemy &&
+            typeof process !== 'undefined' &&
+            process.env?.NODE_ENV === 'development' &&
+            typeof console !== 'undefined' &&
+            typeof console.debug === 'function'
+          ) {
+            console.debug(
+              `[WaveManager] Registered enemy: type=${enemyGroup.type}, wave=${this.currentWave}, spawned=${this.enemiesSpawnedThisWave}/${this.totalEnemiesThisWave}`
+            );
+          }
         }
       }
     }
@@ -947,7 +1033,22 @@ export class WaveManager {
    * Called when an enemy is destroyed.
    */
   onEnemyDestroyed() {
+    if (!this.waveInProgress) {
+      return;
+    }
+
     this.enemiesKilledThisWave++;
+
+    if (
+      typeof process !== 'undefined' &&
+      process.env?.NODE_ENV === 'development' &&
+      typeof console !== 'undefined' &&
+      typeof console.debug === 'function'
+    ) {
+      console.debug(
+        `[WaveManager] Enemy destroyed: ${this.enemiesKilledThisWave}/${this.totalEnemiesThisWave}`
+      );
+    }
 
     // Development assertion: verify accounting consistency
     if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
@@ -1034,6 +1135,8 @@ export class WaveManager {
    * Resets the wave manager.
    */
   reset() {
+    this.disconnect();
+
     this.currentWave = 0;
     this.waveInProgress = false;
     this.wavePaused = false;
@@ -1045,11 +1148,14 @@ export class WaveManager {
     this.spawnQueue = [];
     this.spawnTimer = 0;
     this.waveCountdown = 0;
+    this.spawnDelayMultiplier = 1;
     if (this.randomSequences) {
       this.randomSequences.spawn = 0;
       this.randomSequences.variants = 0;
       this.randomSequences.fragments = 0;
     }
+
+    this.connectEventListeners();
 
     console.log('[WaveManager] Reset');
   }

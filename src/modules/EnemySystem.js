@@ -220,6 +220,18 @@ class EnemySystem {
           this.rewardManager.dropRewards(data.enemy);
         }
       });
+
+      if (this.waveManager) {
+        bus.on('wave-complete', (data) => {
+          if (Boolean(CONSTANTS?.USE_WAVE_MANAGER) && this.waveState) {
+            console.debug(
+              '[EnemySystem] Wave complete event received from WaveManager:',
+              data
+            );
+            // WaveManager já marcou a conclusão; evitar duplicar completeCurrentWave()
+          }
+        });
+      }
     }
 
     bus.on('boss-wave-started', (data) => {
@@ -1690,9 +1702,27 @@ class EnemySystem {
     wave.asteroidsKilled = managerState.killed ?? previousKilled;
     wave.totalAsteroids = managerState.total ?? previousTotal;
 
-    console.debug(
-      `[EnemySystem] WaveManager state synced: wave ${wave.current}, ${wave.asteroidsKilled}/${wave.totalAsteroids} enemies`
-    );
+    const stateChanged =
+      wave.current !== previousCurrent ||
+      wave.isActive !== previousIsActive ||
+      wave.asteroidsKilled !== previousKilled;
+
+    if (stateChanged) {
+      console.debug(
+        `[EnemySystem] WaveManager state synced: wave ${wave.current}, ${wave.asteroidsKilled}/${wave.totalAsteroids} enemies, active=${wave.isActive}`
+      );
+    }
+
+    // WAVE-004: Validação de consistência em desenvolvimento
+    if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+      const managerKilled = managerState.killed ?? 0;
+      const systemKilled = wave.asteroidsKilled ?? 0;
+      if (Math.abs(managerKilled - systemKilled) > 1) {
+        console.warn(
+          `[EnemySystem] Kill count mismatch: WaveManager=${managerKilled}, waveState=${systemKilled}`
+        );
+      }
+    }
   }
 
   // === GERENCIAMENTO DE ASTEROIDES ===
