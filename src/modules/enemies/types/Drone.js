@@ -1,4 +1,8 @@
-import { ENEMY_TYPES } from '../../../core/GameConstants.js';
+import {
+  ENEMY_EFFECT_COLORS,
+  ENEMY_RENDER_PRESETS,
+  ENEMY_TYPES,
+} from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
@@ -33,6 +37,7 @@ export class Drone extends BaseEnemy {
     this.acceleration = DRONE_DEFAULTS.acceleration ?? 220;
     this.contactDamage = DRONE_DEFAULTS.contactDamage ?? 12;
     this.destroyed = false;
+    this._renderThrust = 0;
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);
@@ -76,6 +81,7 @@ export class Drone extends BaseEnemy {
 
     this.fireTimer = this.computeNextFireInterval();
     this.destroyed = false;
+    this._renderThrust = 0;
 
     return this;
   }
@@ -291,6 +297,177 @@ export class Drone extends BaseEnemy {
     super.onDestroyed(source);
   }
 
+  onDraw(ctx) {
+    const palette = ENEMY_EFFECT_COLORS?.drone ?? {};
+    const presets = ENEMY_RENDER_PRESETS?.drone ?? {};
+    const hullPreset = presets.hull ?? {};
+    const finPreset = presets.fins ?? {};
+    const accentPreset = presets.accents ?? {};
+    const exhaustPreset = presets.exhaust ?? {};
+
+    const baseRadius = this.radius || ENEMY_TYPES?.drone?.radius || 12;
+    const maxSpeed = Math.max(1, this.maxSpeed || ENEMY_TYPES?.drone?.speed || 1);
+    const speed = Math.hypot(this.vx, this.vy);
+    const targetThrust = Math.min(1, Math.max(0, speed / maxSpeed));
+    const smoothing = Math.min(1, Math.max(0, exhaustPreset.smoothing ?? 0.2));
+    this._renderThrust += (targetThrust - this._renderThrust) * smoothing;
+    const thrust = Math.min(1, Math.max(0, this._renderThrust));
+
+    const payload = {
+      type: this.type,
+      id: this.id,
+      position: { x: this.x, y: this.y },
+      radius: baseRadius,
+      rotation: this.rotation,
+      thrust,
+      colors: {
+        body: palette.body,
+        highlight: palette.bodyHighlight,
+        shadow: palette.bodyShadow,
+        accent: palette.accent,
+        exhaust: palette.exhaust,
+      },
+    };
+
+    if (!ctx || typeof ctx.save !== 'function') {
+      return payload;
+    }
+
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation);
+
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'transparent';
+
+    const nose = baseRadius * (hullPreset.noseLengthMultiplier ?? 1.6);
+    const tail = -baseRadius * (hullPreset.tailLengthMultiplier ?? 1.05);
+    const halfWidth = baseRadius * (hullPreset.halfWidthMultiplier ?? 0.9);
+    const innerScale = hullPreset.innerScale ?? 0.58;
+
+    if (thrust > 0.001) {
+      const exhaustOffset = baseRadius * (exhaustPreset.offsetMultiplier ?? 0.5);
+      const exhaustLength = baseRadius * (exhaustPreset.lengthMultiplier ?? 1.55);
+      const exhaustWidth = baseRadius * (exhaustPreset.widthMultiplier ?? 1.05);
+      const blur = (exhaustPreset.blurBase ?? 6) + (exhaustPreset.blurRange ?? 0) * thrust;
+      const alphaMin = exhaustPreset.alphaMin ?? 0.28;
+      const alphaMax = exhaustPreset.alphaMax ?? 0.72;
+      const alpha = alphaMin + (alphaMax - alphaMin) * thrust;
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = alpha;
+      ctx.shadowBlur = blur;
+      ctx.shadowColor = palette.accentGlow || palette.exhaust || 'rgba(255,255,255,0.4)';
+      ctx.fillStyle = palette.exhaust || 'rgba(255,255,255,0.4)';
+      ctx.beginPath();
+      ctx.ellipse(
+        -exhaustOffset - exhaustLength * 0.5,
+        0,
+        exhaustLength * 0.5,
+        exhaustWidth * 0.5,
+        0,
+        0,
+        Math.PI * 2,
+      );
+      ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(nose, 0);
+    ctx.lineTo(tail, halfWidth);
+    ctx.lineTo(tail, -halfWidth);
+    ctx.closePath();
+    ctx.fillStyle = palette.bodyShadow || palette.body || '#5b6b7a';
+    ctx.fill();
+
+    const innerNose = nose * innerScale;
+    const innerTail = tail * innerScale;
+    const innerHalfWidth = halfWidth * innerScale;
+    ctx.beginPath();
+    ctx.moveTo(innerNose, 0);
+    ctx.lineTo(innerTail, innerHalfWidth);
+    ctx.lineTo(innerTail, -innerHalfWidth);
+    ctx.closePath();
+    ctx.fillStyle = palette.bodyHighlight || palette.body || '#7c8d9c';
+    ctx.fill();
+
+    const hullStrokeWidth = baseRadius * (hullPreset.strokeWidthMultiplier ?? 0.12);
+    ctx.lineWidth = hullStrokeWidth;
+    ctx.strokeStyle = palette.body || '#5b6b7a';
+    ctx.beginPath();
+    ctx.moveTo(nose, 0);
+    ctx.lineTo(tail, halfWidth);
+    ctx.lineTo(tail, -halfWidth);
+    ctx.closePath();
+    ctx.stroke();
+
+    const finLength = baseRadius * (finPreset.lengthMultiplier ?? 0.9);
+    const finWidth = baseRadius * (finPreset.widthMultiplier ?? 0.35);
+    const finOffset = baseRadius * (finPreset.offsetMultiplier ?? 0.55);
+    const finTaper = Math.max(0, finPreset.taperMultiplier ?? 0.6);
+
+    ctx.fillStyle = palette.body || '#5b6b7a';
+    ctx.beginPath();
+    ctx.moveTo(-finOffset, finWidth);
+    ctx.lineTo(-finOffset - finLength, finWidth * finTaper);
+    ctx.lineTo(-finOffset, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(-finOffset, -finWidth);
+    ctx.lineTo(-finOffset - finLength, -finWidth * finTaper);
+    ctx.lineTo(-finOffset, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    const accentStrokeWidth = baseRadius * (hullPreset.accentStrokeMultiplier ?? 0.08);
+    const ridgeForwardScale = accentPreset.ridgeForwardScale ?? innerScale;
+    const ridgeTailScale = accentPreset.ridgeTailScale ?? 0.85;
+    const ridgeHalfWidthScale = accentPreset.ridgeHalfWidthScale ?? 0.45;
+
+    ctx.lineWidth = accentStrokeWidth;
+    ctx.strokeStyle = palette.accent || '#a6e8ff';
+    ctx.beginPath();
+    ctx.moveTo(nose * ridgeForwardScale, halfWidth * ridgeHalfWidthScale);
+    ctx.lineTo(tail * ridgeTailScale, 0);
+    ctx.lineTo(nose * ridgeForwardScale, -halfWidth * ridgeHalfWidthScale);
+    ctx.stroke();
+
+    if (palette.accentGlow) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = accentPreset.glowAlpha ?? 0.45;
+      ctx.shadowBlur = baseRadius * (accentPreset.glowRadiusMultiplier ?? 0.6);
+      ctx.shadowColor = palette.accentGlow;
+      ctx.fillStyle = palette.accent || '#a6e8ff';
+      ctx.beginPath();
+      ctx.moveTo(innerNose, 0);
+      ctx.lineTo(innerTail, innerHalfWidth);
+      ctx.lineTo(innerTail, -innerHalfWidth);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'transparent';
+
+    ctx.restore();
+
+    return payload;
+  }
+
   resetForPool() {
     super.resetForPool();
 
@@ -310,6 +487,7 @@ export class Drone extends BaseEnemy {
     this.acceleration = DRONE_DEFAULTS.acceleration ?? 220;
     this.contactDamage = DRONE_DEFAULTS.contactDamage ?? 12;
     this.destroyed = false;
+    this._renderThrust = 0;
   }
 }
 

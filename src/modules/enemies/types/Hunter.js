@@ -1,4 +1,8 @@
-import { ENEMY_TYPES } from '../../../core/GameConstants.js';
+import {
+  ENEMY_EFFECT_COLORS,
+  ENEMY_RENDER_PRESETS,
+  ENEMY_TYPES,
+} from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
@@ -14,6 +18,22 @@ function normalize(x, y) {
     return { length: 0, nx: 0, ny: 0 };
   }
   return { length, nx: x / length, ny: y / length };
+}
+
+function normalizeAngle(angle) {
+  if (!Number.isFinite(angle)) {
+    return 0;
+  }
+
+  const twoPi = Math.PI * 2;
+  let normalized = angle % twoPi;
+  if (normalized <= -Math.PI) {
+    normalized += twoPi;
+  } else if (normalized > Math.PI) {
+    normalized -= twoPi;
+  }
+
+  return normalized;
 }
 
 export class Hunter extends BaseEnemy {
@@ -44,6 +64,9 @@ export class Hunter extends BaseEnemy {
 
     this.orbitDirection = 1;
     this.destroyed = false;
+    this.turretAngle = this.rotation;
+    this._hullGradient = null;
+    this._hullGradientKey = null;
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);
@@ -92,6 +115,9 @@ export class Hunter extends BaseEnemy {
     this.orbitDirection = config.orbitDirection ?? this.randomDirection();
     this.orbitPhase = config.orbitPhase ?? this.randomPhase();
     this.destroyed = false;
+    this.turretAngle = normalizeAngle(config.turretAngle ?? this.rotation);
+    this._hullGradient = null;
+    this._hullGradientKey = null;
 
     return this;
   }
@@ -217,10 +243,19 @@ export class Hunter extends BaseEnemy {
   }
 
   updateBurstCycle(deltaTime, player, playerPosition, distance) {
+    const aimSolution =
+      playerPosition && Number.isFinite(distance)
+        ? this.computeAimSolution(player, playerPosition, distance)
+        : null;
+    const withinRange = !this.fireRange || distance <= this.fireRange;
+    if (withinRange && aimSolution) {
+      this.turretAngle = normalizeAngle(aimSolution.angle);
+    }
+
     if (this.burstShotsRemaining > 0) {
       this.burstDelayTimer -= deltaTime;
       if (this.burstDelayTimer <= 0) {
-        this.fireAtPlayer(player, playerPosition, distance);
+        this.fireAtPlayer(player, playerPosition, distance, aimSolution);
         this.burstShotsRemaining -= 1;
         if (this.burstShotsRemaining > 0) {
           this.burstDelayTimer = this.burstDelay;
@@ -242,7 +277,7 @@ export class Hunter extends BaseEnemy {
     }
 
     this.startBurst();
-    this.fireAtPlayer(player, playerPosition, distance);
+    this.fireAtPlayer(player, playerPosition, distance, aimSolution);
     this.burstShotsRemaining -= 1;
     this.burstDelayTimer = this.burstDelay;
   }
@@ -253,7 +288,11 @@ export class Hunter extends BaseEnemy {
     this.orbitDirection *= this.randomDirection();
   }
 
-  fireAtPlayer(player, playerPosition, distance) {
+  computeAimSolution(player, playerPosition, distance) {
+    if (!playerPosition) {
+      return null;
+    }
+
     const projectileSpeed = Math.max(60, this.projectileSpeed || 0);
     const playerVelocity = this.extractPlayerVelocity(player);
     const leadTime = projectileSpeed > 0 ? distance / projectileSpeed : 0;
@@ -269,7 +308,27 @@ export class Hunter extends BaseEnemy {
       aimY = playerPosition.y - this.y;
     }
 
-    let angle = Math.atan2(aimY, aimX);
+    if (aimX === 0 && aimY === 0) {
+      return null;
+    }
+
+    return {
+      angle: Math.atan2(aimY, aimX),
+      projectileSpeed,
+    };
+  }
+
+  fireAtPlayer(player, playerPosition, distance, cachedAim = null) {
+    const solution =
+      cachedAim || this.computeAimSolution(player, playerPosition, distance);
+    if (!solution) {
+      return;
+    }
+
+    const { angle: baseAngle, projectileSpeed } = solution;
+    this.turretAngle = normalizeAngle(baseAngle);
+
+    let angle = baseAngle;
     const spread = Math.abs(this.fireSpread || 0);
     const randomSource = this.aimRandom || this.random;
     if (spread > 0 && randomSource && typeof randomSource.range === 'function') {
@@ -340,6 +399,188 @@ export class Hunter extends BaseEnemy {
     });
   }
 
+  onDraw(ctx) {
+    const palette = ENEMY_EFFECT_COLORS?.hunter ?? {};
+    const presets = ENEMY_RENDER_PRESETS?.hunter ?? {};
+    const hullPreset = presets.hull ?? {};
+    const turretPreset = presets.turret ?? {};
+    const shadingPreset = presets.shading ?? {};
+    const baseRadius = this.radius || ENEMY_TYPES?.hunter?.radius || 16;
+
+    const front = baseRadius * (hullPreset.lengthMultiplier ?? 1.9);
+    const rear = -front * (hullPreset.tailLengthRatio ?? 0.72);
+    const halfWidth = (baseRadius * (hullPreset.widthMultiplier ?? 1.2)) / 2;
+    const accentInset = baseRadius * (hullPreset.accentInsetMultiplier ?? 0.48);
+
+    const payload = {
+      type: this.type,
+      id: this.id,
+      position: { x: this.x, y: this.y },
+      radius: baseRadius,
+      rotation: this.rotation,
+      turretAngle: this.turretAngle,
+      colors: {
+        body: palette.body,
+        highlight: palette.bodyHighlight,
+        shadow: palette.bodyShadow,
+        accent: palette.accent,
+        turret: palette.turret,
+      },
+    };
+
+    if (!ctx || typeof ctx.save !== 'function') {
+      return payload;
+    }
+
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation);
+
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'transparent';
+
+    const hullGradient = this.ensureHullGradient(
+      ctx,
+      front,
+      rear,
+      palette,
+      shadingPreset,
+    );
+
+    ctx.beginPath();
+    ctx.moveTo(front, 0);
+    ctx.lineTo(0, halfWidth);
+    ctx.lineTo(rear, 0);
+    ctx.lineTo(0, -halfWidth);
+    ctx.closePath();
+    ctx.fillStyle = hullGradient || palette.body || '#64687a';
+    ctx.fill();
+
+    const hullStrokeWidth = baseRadius * (hullPreset.strokeWidthMultiplier ?? 0.14);
+    ctx.lineWidth = hullStrokeWidth;
+    ctx.strokeStyle = palette.bodyShadow || '#2c2f3b';
+    ctx.globalAlpha = 1;
+    ctx.stroke();
+
+    const accentFront = front - accentInset;
+    const accentRear = rear + accentInset;
+    const accentHalfWidth = Math.max(0, halfWidth - accentInset);
+    ctx.beginPath();
+    ctx.moveTo(accentFront, 0);
+    ctx.lineTo(0, accentHalfWidth);
+    ctx.lineTo(accentRear, 0);
+    ctx.lineTo(0, -accentHalfWidth);
+    ctx.closePath();
+    ctx.fillStyle = palette.bodyHighlight || palette.body || '#8f94aa';
+    ctx.fill();
+
+    const accentStrokeWidth = baseRadius * (hullPreset.accentStrokeMultiplier ?? 0.1);
+    ctx.lineWidth = accentStrokeWidth;
+    ctx.strokeStyle = palette.accent || '#f4b1ff';
+    ctx.stroke();
+
+    const relativeTurretAngle = normalizeAngle(this.turretAngle - this.rotation);
+    ctx.save();
+    ctx.rotate(relativeTurretAngle);
+
+    const turretLength = baseRadius * (turretPreset.lengthMultiplier ?? 1.25);
+    const turretHalfWidth = (baseRadius * (turretPreset.widthMultiplier ?? 0.28)) / 2;
+    const turretBaseRadius = baseRadius * (turretPreset.baseRadiusMultiplier ?? 0.34);
+    const turretBackset = turretBaseRadius * (turretPreset.baseBacksetMultiplier ?? 0.5);
+
+    ctx.beginPath();
+    ctx.moveTo(-turretBackset, turretHalfWidth);
+    ctx.lineTo(turretLength, turretHalfWidth);
+    ctx.lineTo(turretLength, -turretHalfWidth);
+    ctx.lineTo(-turretBackset, -turretHalfWidth);
+    ctx.closePath();
+    ctx.fillStyle = palette.turret || palette.bodyHighlight || '#b7a7d9';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(-turretBackset, 0, turretBaseRadius, 0, Math.PI * 2);
+    ctx.fillStyle = palette.turret || palette.bodyHighlight || '#b7a7d9';
+    ctx.fill();
+
+    const barrelWidth = baseRadius * (turretPreset.barrelWidthMultiplier ?? 0.18);
+    ctx.lineWidth = barrelWidth;
+    ctx.strokeStyle = palette.accent || '#f4b1ff';
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(turretLength, 0);
+    ctx.stroke();
+
+    const highlightPreset = turretPreset.highlight ?? {};
+    const highlightBackset = turretBackset * (highlightPreset.backsetRatio ?? 0.2);
+    const highlightLength = turretLength * (highlightPreset.lengthRatio ?? 0.7);
+    const highlightWidth = turretHalfWidth * (highlightPreset.widthRatio ?? 0.6);
+    const highlightHeight = turretHalfWidth * (highlightPreset.heightRatio ?? 0.4);
+    const highlightAlpha = highlightPreset.alpha ?? 0.45;
+    ctx.globalAlpha = highlightAlpha;
+    ctx.fillStyle = palette.bodyHighlight || '#8f94aa';
+    ctx.beginPath();
+    ctx.moveTo(-highlightBackset, -highlightWidth);
+    ctx.lineTo(highlightLength, -highlightHeight);
+    ctx.lineTo(-highlightBackset, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
+    ctx.restore();
+
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = 'transparent';
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = 'transparent';
+
+    ctx.restore();
+
+    return payload;
+  }
+
+  ensureHullGradient(ctx, front, rear, palette, shadingPreset) {
+    if (!ctx || typeof ctx.createLinearGradient !== 'function') {
+      return null;
+    }
+
+    const key = [
+      front,
+      rear,
+      palette.body,
+      palette.bodyHighlight,
+      palette.bodyShadow,
+      shadingPreset.shadowStop,
+      shadingPreset.midStop,
+      shadingPreset.highlightStop,
+    ].join(':');
+
+    if (this._hullGradient && this._hullGradientKey === key) {
+      return this._hullGradient;
+    }
+
+    const gradient = ctx.createLinearGradient(rear, 0, front, 0);
+    const shadowStop = Math.min(1, Math.max(0, shadingPreset.shadowStop ?? 0.12));
+    const midStop = Math.min(1, Math.max(shadowStop, shadingPreset.midStop ?? 0.48));
+    const highlightStop = Math.min(1, Math.max(midStop, shadingPreset.highlightStop ?? 0.88));
+
+    gradient.addColorStop(0, palette.bodyShadow || palette.body || '#2c2f3b');
+    gradient.addColorStop(shadowStop, palette.body || '#64687a');
+    gradient.addColorStop(midStop, palette.body || '#64687a');
+    gradient.addColorStop(highlightStop, palette.bodyHighlight || '#8f94aa');
+    gradient.addColorStop(1, palette.bodyHighlight || '#8f94aa');
+
+    this._hullGradient = gradient;
+    this._hullGradientKey = key;
+
+    return gradient;
+  }
+
   onDestroyed(source) {
     this.destroyed = true;
     super.onDestroyed(source);
@@ -372,6 +613,9 @@ export class Hunter extends BaseEnemy {
     this.orbitDirection = 1;
     this.orbitPhase = 0;
     this.destroyed = false;
+    this.turretAngle = 0;
+    this._hullGradient = null;
+    this._hullGradientKey = null;
   }
 }
 
