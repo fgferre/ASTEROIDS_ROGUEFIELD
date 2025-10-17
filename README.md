@@ -59,6 +59,46 @@ npm run test:baseline:watch
 
 Documentação completa: `docs/validation/asteroid-baseline-metrics.md`
 
+### Testes Visuais de Renderização
+
+Antes de ativar o spawn dos novos inimigos via WaveManager, execute a validação visual isolada:
+
+```bash
+npm run test:visual-enemies
+```
+
+O comando inicia o servidor de desenvolvimento e instrui a abrir `http://localhost:5173/scripts/visual-enemy-rendering-test.html`.
+
+**O que observar:**
+- **Drone:** nave triangular com exhaust glow reativo à velocidade
+- **Mine:** esfera pulsante com intensidade variável conforme estado `armed`
+- **Hunter:** diamante com turret rotacionando independentemente do hull
+
+**Checklist de validação:** `docs/validation/enemy-rendering-visual-checklist.md`
+
+O harness oferece:
+- Slider para controlar a velocidade do Drone
+- Botão para alternar o estado armed da Mine
+- Slider para ajustar a velocidade de rotação do turret do Hunter
+- Checkbox para exibir bounding circles e validar preservação de estado do canvas
+- Monitoramento de FPS, frame time e contagem de chamadas de renderização
+
+**Critérios de aprovação:**
+- Geometria e cores alinhadas às paletas de `ENEMY_EFFECT_COLORS`
+- Animações suaves (sem jitter/popping)
+- Performance estável (60 FPS com múltiplas instâncias)
+- Estado do canvas restaurado após cada `onDraw()`
+
+**Testes automatizados relacionados:**
+
+```bash
+npm test -- --run src/__tests__/rendering/enemy-types-rendering.test.js
+```
+
+Validam payloads, propriedades dinâmicas e preservação de estado do canvas.
+
+---
+
 ## Feature Flags
 
 O projeto utiliza feature flags para permitir ativação controlada de funcionalidades experimentais:
