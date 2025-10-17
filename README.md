@@ -28,6 +28,12 @@ Alguns experimentos e bancadas de desempenho são mantidos em `docs/reference/pr
 - O `RandomService` deve ser a única fonte de aleatoriedade após o bootstrap. Em modo desenvolvimento há um guardião que monkey patcha `Math.random()` depois da inicialização e emite `console.warn` sempre que um módulo ignora o serviço (mantendo um stack trace resumido para facilitar a correção).
 - Os testes de integração em `tests/integration/deterministic-systems.test.js` cobrem starfield, ondas e drops de orbes para garantir reprodutibilidade com seeds fixas. Execute `npm test` antes de abrir PRs.
 
+## Presets de renderização de inimigos
+
+- **Localização:** `src/core/GameConstants.js`
+- **Descrição:** o mapa `ENEMY_RENDER_PRESETS` concentra as dimensões, multiplicadores de brilho e constantes de desenho para cada inimigo jogável. Os efeitos de cor continuam definidos em `ENEMY_EFFECT_COLORS`.
+- **Boas práticas:** novas rotinas de `onDraw()` devem consumir exclusivamente esses presets para evitar números mágicos em módulos de renderização. Ajustes de estilo devem ser registrados no preset correspondente antes de editar os arquivos em `src/modules/enemies/types/`.
+
 ## Testes de Baseline (Golden Metrics)
 
 Antes de alterar o sistema de ondas ou integrar o `WaveManager`, execute a suite
