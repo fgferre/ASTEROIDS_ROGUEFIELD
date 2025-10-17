@@ -27,3 +27,28 @@ Alguns experimentos e bancadas de desempenho são mantidos em `docs/reference/pr
 - Para forçar uma seed específica durante o desenvolvimento, basta abrir o jogo com `?seed=<valor>` (ex.: `http://localhost:5173/?seed=1337`). O bootstrap registrará a origem da seed nos logs e reutilizará o mesmo valor em resets.
 - O `RandomService` deve ser a única fonte de aleatoriedade após o bootstrap. Em modo desenvolvimento há um guardião que monkey patcha `Math.random()` depois da inicialização e emite `console.warn` sempre que um módulo ignora o serviço (mantendo um stack trace resumido para facilitar a correção).
 - Os testes de integração em `tests/integration/deterministic-systems.test.js` cobrem starfield, ondas e drops de orbes para garantir reprodutibilidade com seeds fixas. Execute `npm test` antes de abrir PRs.
+
+## Testes de Baseline (Golden Metrics)
+
+Antes de alterar o sistema de ondas ou integrar o `WaveManager`, execute a suite
+de baseline para capturar o comportamento atual:
+
+```bash
+npm run test:baseline
+```
+
+Os testes validam:
+- Taxa de spawn de asteroides por wave (1-10)
+- Distribuição de tamanhos (large/medium/small)
+- Distribuição de variantes (common, iron, gold, volatile, etc.)
+- Regras de fragmentação e herança de velocidade
+- Contadores de `waveState`
+- Determinismo com seeds fixas
+
+Para desenvolvimento contínuo há um modo watch:
+
+```bash
+npm run test:baseline:watch
+```
+
+Documentação completa: `docs/validation/asteroid-baseline-metrics.md`

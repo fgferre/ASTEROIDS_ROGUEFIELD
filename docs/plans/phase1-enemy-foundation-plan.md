@@ -83,3 +83,28 @@ Criar a base de inimigos adicionais reutilizando `BaseEnemy`, registrando-os no 
 
 - A Fase 2 se apoia nessa fundação para introduzir o boss e reutiliza utilitários criados aqui (`getActiveEnemiesByType`, handlers de projéteis, generalização do PhysicsSystem`).
 - Efeitos visuais, áudio e HUD serão expandidos nas fases 3 a 5 usando os eventos e estruturas estabelecidos nesta etapa.
+
+## ✅ Baseline Metrics Captured (WAVE-001)
+
+**Status:** Concluído
+
+**Artefatos criados:**
+- Suite de testes: `src/__tests__/legacy/asteroid-baseline-metrics.test.js`
+- Documentação: `docs/validation/asteroid-baseline-metrics.md`
+- Scripts npm: `test:baseline`, `test:baseline:watch`
+
+**Métricas capturadas:**
+1. Taxa de spawn por wave (waves 1-10) – fórmula validada
+2. Distribuição de tamanhos (50/30/20) – validada estatisticamente
+3. Distribuição de variantes por tamanho e wave – com wave scaling documentado
+4. Regras de fragmentação por variante – verificadas para todos os tipos
+5. Contadores de `waveState` – ciclo de vida completo monitorado
+6. Determinismo – sequência idêntica com seed fixa
+
+**Próximos passos:**
+- Executar `npm run test:baseline` antes de iniciar a integração do WaveManager
+- Após cada alteração no WaveManager, reexecutar para confirmar paridade
+- Documentar qualquer desvio intencional nas métricas baseline
+
+**Critério de sucesso para migração:**
+Todos os testes em `asteroid-baseline-metrics.test.js` devem passar com o WaveManager ativado, garantindo preservação do comportamento legado.
