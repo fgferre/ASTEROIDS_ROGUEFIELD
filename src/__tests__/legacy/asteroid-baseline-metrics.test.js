@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from 'vitest';
+import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EnemySystem } from '../../modules/EnemySystem.js';
 import { ServiceRegistry } from '../../core/ServiceRegistry.js';
 import { GamePools } from '../../core/GamePools.js';
@@ -821,6 +821,100 @@ describe.sequential('Legacy Asteroid Baseline Metrics', () => {
       }
 
       expect(sequenceA).toEqual(sequenceB);
+    });
+  });
+
+  describe('Feature Flag: USE_WAVE_MANAGER', () => {
+    test('Legacy system remains functional when flag is false', () => {
+      expect(CONSTANTS.USE_WAVE_MANAGER).toBe(false);
+
+      const legacySpy = vi.spyOn(harness.enemySystem, 'updateWaveLogic');
+      const { waveState } = simulateWave(harness.enemySystem, 1, 400);
+
+      expect(waveState.totalAsteroids).toBe(4);
+      expect(waveState.asteroidsSpawned).toBeGreaterThan(0);
+      expect(legacySpy).toHaveBeenCalled();
+
+      legacySpy.mockRestore();
+    });
+
+    test('EnemySystem gracefully handles missing WaveManager', () => {
+      const originalDescriptor = Object.getOwnPropertyDescriptor(
+        CONSTANTS,
+        'USE_WAVE_MANAGER'
+      );
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const legacySpy = vi.spyOn(harness.enemySystem, 'updateWaveLogic');
+
+      harness.enemySystem.waveManager = null;
+      prepareWave(harness.enemySystem, 1);
+
+      try {
+        try {
+          Object.defineProperty(CONSTANTS, 'USE_WAVE_MANAGER', {
+            configurable: true,
+            get: () => true
+          });
+        } catch (error) {
+          globalThis.__USE_WAVE_MANAGER_OVERRIDE__ = true;
+        }
+
+        expect(() => harness.enemySystem.update(0.5)).not.toThrow();
+        expect(legacySpy).toHaveBeenCalled();
+
+        const warningEmitted = warnSpy.mock.calls.some(([message]) =>
+          String(message).includes('WaveManager indisponível')
+        );
+        expect(warningEmitted).toBe(true);
+      } finally {
+        if (originalDescriptor && originalDescriptor.configurable) {
+          Object.defineProperty(CONSTANTS, 'USE_WAVE_MANAGER', originalDescriptor);
+        }
+
+        delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
+
+        legacySpy.mockRestore();
+        warnSpy.mockRestore();
+      }
+    });
+
+    test('WaveManager counters sync into legacy waveState when enabled', () => {
+      const stubState = {
+        currentWave: 7,
+        inProgress: true,
+        spawned: 5,
+        killed: 3,
+        total: 11
+      };
+
+      prepareWave(harness.enemySystem, 2);
+
+      harness.enemySystem.waveManager = {
+        update: vi.fn(),
+        getState: vi.fn(() => ({ ...stubState }))
+      };
+
+      const initialWaveState = { ...harness.enemySystem.waveState };
+
+      try {
+        globalThis.__USE_WAVE_MANAGER_OVERRIDE__ = true;
+
+        harness.enemySystem.update(0.25);
+
+        expect(harness.enemySystem.waveManager.update).toHaveBeenCalledWith(0.25);
+
+        const syncedState = harness.enemySystem.waveState;
+        expect(syncedState.current).not.toBe(initialWaveState.current);
+        expect(syncedState.current).toBe(stubState.currentWave);
+        expect(syncedState.isActive).toBe(stubState.inProgress);
+        expect(syncedState.asteroidsSpawned).toBe(stubState.spawned);
+        expect(syncedState.asteroidsKilled).toBe(stubState.killed);
+        expect(syncedState.totalAsteroids).toBe(stubState.total);
+      } finally {
+        delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
+        harness.enemySystem.waveManager = null;
+      }
     });
   });
 });

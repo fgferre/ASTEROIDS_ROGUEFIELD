@@ -66,6 +66,9 @@ class EnemySystem {
     this.usesAsteroidPool = false;
     this._nextAsteroidPoolId = 1;
     this._snapshotFallbackWarningIssued = false;
+    this._waveSystemDebugLogged = false;
+    this._waveManagerFallbackWarningIssued = false;
+    this._waveManagerInvalidStateWarningIssued = false;
 
     // Factory (optional - new architecture)
     this.factory = null;
@@ -1574,10 +1577,33 @@ class EnemySystem {
 
     this.refreshInjectedServices();
 
+    const waveManagerOverride =
+      typeof globalThis !== 'undefined' &&
+      globalThis.__USE_WAVE_MANAGER_OVERRIDE__ === true;
+
+    const constantsFlag =
+      typeof CONSTANTS?.USE_WAVE_MANAGER === 'boolean'
+        ? CONSTANTS.USE_WAVE_MANAGER
+        : false;
+
+    const waveManagerEnabled = constantsFlag || waveManagerOverride;
+
+    if (!this._waveSystemDebugLogged) {
+      console.debug(
+        `[EnemySystem] Wave system: ${waveManagerEnabled ? 'WaveManager' : 'Legacy'}`
+      );
+      this._waveSystemDebugLogged = true;
+    }
+
     this.sessionStats.timeElapsed += deltaTime;
 
     this.updateAsteroids(deltaTime);
-    this.updateWaveLogic(deltaTime);
+    // FEATURE FLAG: Roteamento entre sistema legado e WaveManager
+    if (waveManagerEnabled) {
+      this.updateWaveManagerLogic(deltaTime);
+    } else {
+      this.updateWaveLogic(deltaTime);
+    }
     this.cleanupDestroyed();
 
     this.emitWaveStateUpdate();
@@ -1606,6 +1632,67 @@ class EnemySystem {
         this.startNextWave();
       }
     }
+  }
+
+  // EXPERIMENTAL: Delegação para WaveManager com sincronização de estado (docs/plans/phase1-enemy-foundation-plan.md)
+  updateWaveManagerLogic(deltaTime) {
+    const wave = this.waveState;
+
+    if (!wave) {
+      return;
+    }
+
+    if (!this.waveManager) {
+      if (!this._waveManagerFallbackWarningIssued) {
+        console.warn(
+          '[EnemySystem] WaveManager indisponível. Recuando para updateWaveLogic() enquanto USE_WAVE_MANAGER está ativo.'
+        );
+        this._waveManagerFallbackWarningIssued = true;
+      }
+      this.updateWaveLogic(deltaTime);
+      return;
+    }
+
+    this.waveManager.update(deltaTime);
+
+    const managerState = this.waveManager.getState ? this.waveManager.getState() : null;
+
+    const managerStateValid =
+      managerState &&
+      managerState.currentWave !== undefined &&
+      managerState.inProgress !== undefined &&
+      managerState.spawned !== undefined &&
+      managerState.killed !== undefined &&
+      managerState.total !== undefined;
+
+    if (!managerStateValid) {
+      if (!this._waveManagerInvalidStateWarningIssued) {
+        console.warn(
+          '[EnemySystem] WaveManager returned invalid state. Falling back to updateWaveLogic() while USE_WAVE_MANAGER is active.'
+        );
+        this._waveManagerInvalidStateWarningIssued = true;
+      }
+      this.updateWaveLogic(deltaTime);
+      return;
+    }
+
+    const {
+      current: previousCurrent,
+      isActive: previousIsActive,
+      asteroidsSpawned: previousSpawned,
+      asteroidsKilled: previousKilled,
+      totalAsteroids: previousTotal,
+    } = wave;
+
+    wave.current = managerState.currentWave ?? previousCurrent;
+    wave.isActive = managerState.inProgress ?? previousIsActive;
+    wave.asteroidsSpawned = managerState.spawned ?? previousSpawned;
+    wave.asteroidsKilled = managerState.killed ?? previousKilled;
+    wave.totalAsteroids = managerState.total ?? previousTotal;
+
+    console.debug(
+      `[EnemySystem] WaveManager state synced: wave ${wave.current}, ${wave.asteroidsKilled}/${wave.totalAsteroids} enemies`
+    );
   }
 
   // === GERENCIAMENTO DE ASTEROIDES ===
