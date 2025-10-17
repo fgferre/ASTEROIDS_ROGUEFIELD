@@ -290,7 +290,7 @@
       hunterSpeedSlider.addEventListener('input', (event) => {
         const degreesPerSecond = Number(event.target.value);
         hunterTurretSpeed = degreesPerSecond * (Math.PI / 180);
-        hunterSpeedValue.textContent = `${degreesPerSecond}\u00B0/s`;
+        hunterSpeedValue.textContent = `${degreesPerSecond}°/s`;
       });
 
       toggleMineArmed.addEventListener('click', () => {
