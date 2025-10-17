@@ -98,8 +98,9 @@ Criar a base de inimigos adicionais reutilizando `BaseEnemy`, registrando-os no 
 2. Distribuição de tamanhos (50/30/20) – validada estatisticamente
 3. Distribuição de variantes por tamanho e wave – com wave scaling documentado
 4. Regras de fragmentação por variante – verificadas para todos os tipos
-5. Contadores de `waveState` – ciclo de vida completo monitorado
-6. Determinismo – sequência idêntica com seed fixa
+5. Média de fragmentos por tamanho – baseline documentado
+6. Contadores de `waveState` – ciclo de vida completo monitorado
+7. Determinismo – sequência idêntica com seed fixa
 
 **Próximos passos:**
 - Executar `npm run test:baseline` antes de iniciar a integração do WaveManager

@@ -1,21 +1,24 @@
-import { describe, test, expect, beforeEach } from 'vitest';
+import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { EnemySystem } from '../../modules/EnemySystem.js';
 import { ServiceRegistry } from '../../core/ServiceRegistry.js';
+import { GamePools } from '../../core/GamePools.js';
 import * as CONSTANTS from '../../core/GameConstants.js';
 
 const TEST_SEED = 123456;
 const SAMPLE_ASTEROID_COUNT = 1000;
-const VARIANT_SAMPLE_COUNT = 500;
-const WAVE_VARIANT_SAMPLE_COUNT = 200;
-
-if (CONSTANTS.ASTEROID_VARIANTS?.parasite?.availability) {
-  CONSTANTS.ASTEROID_VARIANTS.parasite.availability = {
-    ...CONSTANTS.ASTEROID_VARIANTS.parasite.availability,
-    minWave: 1
-  };
-}
+const VARIANT_SAMPLE_COUNT = 5000;
+const WAVE_VARIANT_SAMPLE_COUNT = 3000;
+const FRAGMENT_SAMPLE_COUNT = 800;
+const FRAGMENT_ANALYSIS_WAVE = 6;
 
 function createEnemySystemHarness(seed = TEST_SEED) {
+  if (GamePools.asteroids?.releaseAll) {
+    GamePools.asteroids.releaseAll();
+  }
+  if (typeof GamePools.destroy === 'function') {
+    GamePools.destroy();
+  }
+
   const worldBounds = {
     width: CONSTANTS.GAME_WIDTH,
     height: CONSTANTS.GAME_HEIGHT
@@ -44,6 +47,12 @@ function createEnemySystemHarness(seed = TEST_SEED) {
     createXPOrb: () => {}
   };
 
+  const healthHearts = {
+    awardHeart: () => {},
+    removeHeart: () => {},
+    isEnabled: () => false
+  };
+
   const progression = {
     getDifficulty: () => 1,
     getCurrentWave: () => 1
@@ -63,7 +72,8 @@ function createEnemySystemHarness(seed = TEST_SEED) {
     player,
     progression,
     physics,
-    'xp-orbs': xpOrbs
+    'xp-orbs': xpOrbs,
+    healthHearts
   });
 
   const random = container.resolve('random');
@@ -92,6 +102,7 @@ function createEnemySystemHarness(seed = TEST_SEED) {
     player,
     progression,
     xpOrbs,
+    healthHearts,
     physics,
     random
   });
@@ -204,6 +215,112 @@ function sampleVariants(enemySystem, size, wave, count) {
   return results;
 }
 
+function computeExpectedVariantBreakdown(enemySystem, size, wave) {
+  const chanceConfig = CONSTANTS.ASTEROID_VARIANT_CHANCES[size];
+  if (!chanceConfig) {
+    return {
+      specialChance: 0,
+      probabilities: { common: 1 },
+      excluded: []
+    };
+  }
+
+  const variantConfig = CONSTANTS.ASTEROID_VARIANTS || {};
+  let specialChance = chanceConfig.baseChance ?? 0;
+  if (typeof enemySystem.computeVariantWaveBonus === 'function') {
+    specialChance += enemySystem.computeVariantWaveBonus(wave);
+  }
+  specialChance = Math.min(Math.max(specialChance, 0), 1);
+
+  const allowedEntries = [];
+  const excluded = [];
+  Object.entries(chanceConfig.distribution || {}).forEach(([variant, weight]) => {
+    const config = variantConfig[variant];
+    const allowedSizes = config?.allowedSizes;
+    const minWave = config?.availability?.minWave;
+    const sizeAllowed =
+      !Array.isArray(allowedSizes) || allowedSizes.includes(size);
+    const waveAllowed = typeof minWave !== 'number' || wave >= minWave;
+    const usable = weight > 0 && sizeAllowed && waveAllowed;
+    if (usable) {
+      allowedEntries.push([variant, weight]);
+    } else {
+      excluded.push(variant);
+    }
+  });
+
+  const totalWeight = allowedEntries.reduce(
+    (sum, [, weight]) => sum + weight,
+    0
+  );
+
+  if (!allowedEntries.length || totalWeight <= 0) {
+    return {
+      specialChance: 0,
+      probabilities: { common: 1 },
+      excluded
+    };
+  }
+
+  const probabilities = { common: 1 - specialChance };
+  allowedEntries.forEach(([variant, weight]) => {
+    probabilities[variant] = (weight / totalWeight) * specialChance;
+  });
+
+  excluded
+    .filter((variant) => !probabilities[variant])
+    .forEach((variant) => {
+      probabilities[variant] = 0;
+    });
+
+  return { specialChance, probabilities, excluded };
+}
+
+function expectWithinTolerance(actual, expected) {
+  const tolerance = Math.max(0.0025, Math.min(0.03, expected * 0.3));
+  expect(Math.abs(actual - expected)).toBeLessThanOrEqual(tolerance);
+}
+
+function computeAverageFragmentsForSize(enemySystem, size, wave, count) {
+  enemySystem.waveState = enemySystem.createInitialWaveState();
+  enemySystem.waveState.current = wave;
+  enemySystem.waveState.isActive = true;
+  enemySystem.reseedRandomScopes({ resetSequences: true });
+
+  let totalFragments = 0;
+
+  for (let i = 0; i < count; i += 1) {
+    const variant = enemySystem.decideVariant(size, {
+      wave,
+      spawnType: 'spawn'
+    });
+
+    const asteroid = enemySystem.acquireAsteroid({
+      x: 0,
+      y: 0,
+      size,
+      variant,
+      wave,
+      vx: 60,
+      vy: -40,
+      randomScope: 'spawn'
+    });
+
+    const fragments = enemySystem.destroyAsteroid(asteroid, {
+      createFragments: true,
+      triggerExplosion: false
+    });
+
+    totalFragments += fragments.length;
+
+    fragments.forEach((fragment) => {
+      enemySystem.destroyAsteroid(fragment, { createFragments: false });
+    });
+  }
+
+  return totalFragments / count;
+}
+
 function summarizeAsteroid(asteroid) {
   return {
     size: asteroid.size,
@@ -217,11 +334,24 @@ function summarizeAsteroid(asteroid) {
   };
 }
 
-describe('Legacy Asteroid Baseline Metrics', () => {
+describe.sequential('Legacy Asteroid Baseline Metrics', () => {
   let harness;
 
   beforeEach(() => {
     harness = createEnemySystemHarness(TEST_SEED);
+  });
+
+  afterEach(() => {
+    if (GamePools.asteroids?.releaseAll) {
+      GamePools.asteroids.releaseAll();
+    }
+    if (typeof GamePools.destroy === 'function') {
+      GamePools.destroy();
+    }
+    if (harness?.container?.dispose) {
+      harness.container.dispose();
+    }
+    harness = undefined;
   });
 
   describe('Wave Spawn Rate (Waves 1-10)', () => {
@@ -295,9 +425,9 @@ describe('Legacy Asteroid Baseline Metrics', () => {
       const { sizeCounts, total } = collectSpawnMetrics(spawnLog);
 
       expect(total).toBe(SAMPLE_ASTEROID_COUNT);
-      expect(sizeCounts.large / total).toBeCloseTo(0.5, 1);
-      expect(sizeCounts.medium / total).toBeCloseTo(0.3, 1);
-      expect(sizeCounts.small / total).toBeCloseTo(0.2, 1);
+      expectWithinTolerance(sizeCounts.large / total, 0.5);
+      expectWithinTolerance(sizeCounts.medium / total, 0.3);
+      expectWithinTolerance(sizeCounts.small / total, 0.2);
     });
   });
 
@@ -305,11 +435,12 @@ describe('Legacy Asteroid Baseline Metrics', () => {
     const sizes = ['large', 'medium', 'small'];
 
     sizes.forEach((size) => {
-      test(`${size} variant mix matches ASTEROID_VARIANT_CHANCES`, () => {
+      test(`${size} variant mix matches availability-aware distribution`, () => {
+        const wave = 1;
         const results = sampleVariants(
           harness.enemySystem,
           size,
-          1,
+          wave,
           VARIANT_SAMPLE_COUNT
         );
 
@@ -318,31 +449,64 @@ describe('Legacy Asteroid Baseline Metrics', () => {
           0
         );
 
-        const chanceConfig = CONSTANTS.ASTEROID_VARIANT_CHANCES[size];
-        const baseChance = chanceConfig.baseChance;
-        const expectedSpecial = baseChance;
+        expect(totalVariants).toBe(VARIANT_SAMPLE_COUNT);
+
+        const expected = computeExpectedVariantBreakdown(
+          harness.enemySystem,
+          size,
+          wave
+        );
+
         const actualSpecial = 1 - (results.common || 0) / totalVariants;
+        expectWithinTolerance(actualSpecial, expected.specialChance);
 
-        expect(actualSpecial).toBeCloseTo(expectedSpecial, 1);
-
-        Object.entries(chanceConfig.distribution).forEach(([variant, weight]) => {
-          if (weight === 0) {
-            expect(results[variant] || 0).toBe(0);
-            return;
-          }
-
-          const expected = weight * baseChance;
+        Object.entries(expected.probabilities).forEach(([variant, probability]) => {
           const actual = (results[variant] || 0) / totalVariants;
-          expect(actual).toBeCloseTo(expected, 1);
+          expectWithinTolerance(actual, probability);
+        });
+
+        expected.excluded.forEach((variant) => {
+          expect(results[variant] || 0).toBe(0);
         });
       });
+    });
+
+    test('parasite remains unavailable before wave 4', () => {
+      const results = sampleVariants(
+        harness.enemySystem,
+        'medium',
+        3,
+        VARIANT_SAMPLE_COUNT
+      );
+
+      expect(results.parasite || 0).toBe(0);
+    });
+
+    test('parasite participates in the distribution from wave 4 onward', () => {
+      const wave = 4;
+      const results = sampleVariants(
+        harness.enemySystem,
+        'medium',
+        wave,
+        VARIANT_SAMPLE_COUNT
+      );
+
+      const total = Object.values(results).reduce((sum, value) => sum + value, 0);
+      const expected = computeExpectedVariantBreakdown(
+        harness.enemySystem,
+        'medium',
+        wave
+      );
+
+      const actualParasite = (results.parasite || 0) / total;
+      expectWithinTolerance(actualParasite, expected.probabilities.parasite);
     });
 
     test('gold variant never spawns for large asteroids', () => {
       const results = sampleVariants(
         harness.enemySystem,
         'large',
-        1,
+        6,
         VARIANT_SAMPLE_COUNT
       );
 
@@ -353,7 +517,7 @@ describe('Legacy Asteroid Baseline Metrics', () => {
       const results = sampleVariants(
         harness.enemySystem,
         'small',
-        1,
+        6,
         VARIANT_SAMPLE_COUNT
       );
 
@@ -375,13 +539,20 @@ describe('Legacy Asteroid Baseline Metrics', () => {
         const total = Object.values(results).reduce((sum, value) => sum + value, 0);
         const actualSpecial = 1 - (results.common || 0) / total;
 
-        const expected = Math.min(
-          1,
-          CONSTANTS.ASTEROID_VARIANT_CHANCES.medium.baseChance +
-            harness.enemySystem.computeVariantWaveBonus(waveNumber)
+        const expected = computeExpectedVariantBreakdown(
+          harness.enemySystem,
+          'medium',
+          waveNumber
         );
 
-        expect(actualSpecial).toBeCloseTo(expected, 1);
+        const tolerance = Math.max(
+          0.003,
+          Math.min(0.02, expected.specialChance * 0.2)
+        );
+
+        expect(Math.abs(actualSpecial - expected.specialChance)).toBeLessThanOrEqual(
+          tolerance
+        );
       });
     });
   });
@@ -457,6 +628,29 @@ describe('Legacy Asteroid Baseline Metrics', () => {
           });
         });
       });
+    });
+  });
+
+  describe('Average fragments per destruction', () => {
+    test('mean fragment output per size is stable', () => {
+      const averages = ['large', 'medium', 'small'].reduce((acc, size) => {
+        const mean = computeAverageFragmentsForSize(
+          harness.enemySystem,
+          size,
+          FRAGMENT_ANALYSIS_WAVE,
+          FRAGMENT_SAMPLE_COUNT
+        );
+        acc[size] = Number(mean.toFixed(3));
+        return acc;
+      }, {});
+
+      expect(averages).toMatchInlineSnapshot(`
+        {
+          "large": 3.36,
+          "medium": 2.56,
+          "small": 0,
+        }
+      `);
     });
   });
 
