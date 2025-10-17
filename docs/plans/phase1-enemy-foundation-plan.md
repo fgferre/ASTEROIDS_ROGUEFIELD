@@ -109,3 +109,48 @@ Criar a base de inimigos adicionais reutilizando `BaseEnemy`, registrando-os no 
 
 **Critério de sucesso para migração:**
 Todos os testes em `asteroid-baseline-metrics.test.js` devem passar com o WaveManager ativado, garantindo preservação do comportamento legado.
+
+## ✅ Feature Flag Implementation (WAVE-002)
+
+**Status:** Concluído
+
+**Objetivo:** Permitir ativação controlada do WaveManager sem quebrar o sistema legado de ondas.
+
+**Implementação:**
+
+1. **GameConstants.js:**
+   - Adicionada constante `USE_WAVE_MANAGER = false` (default desativado)
+   - Localização: seção SISTEMA DE ONDAS (linha ~1607)
+   - Exportada para uso em outros módulos
+
+2. **EnemySystem.js:**
+   - Modificado método `update()` para rotear condicionalmente entre sistemas
+   - Criado método `updateWaveManagerLogic()` para delegação ao WaveManager
+   - Implementada sincronização de estado entre `WaveManager.getState()` e `waveState`
+   - Adicionados logs de debug para rastreamento do sistema ativo
+   - Guards de segurança: fallback para sistema legado se WaveManager não disponível
+
+**Mapeamento de estado (WaveManager → waveState):**
+- `currentWave` → `current`
+- `inProgress` → `isActive`
+- `spawned` → `asteroidsSpawned`
+- `killed` → `asteroidsKilled`
+- `total` → `totalAsteroids`
+
+**Validação:**
+- Com flag desativada (`false`): sistema legado permanece 100% funcional
+- Com flag ativada (`true`): WaveManager assume controle, estado sincronizado para HUD
+- Testes de baseline (`npm run test:baseline`) devem passar em ambos os modos
+
+**Próximos passos:**
+1. Validar que aplicação funciona com flag desativada (comportamento atual)
+2. Implementar renderização para Drone, Mine e Hunter (WAVE-003)
+3. Conectar WaveManager ao loop de spawn (WAVE-004)
+4. Ativar flag e validar paridade com baseline metrics
+
+**Critério de remoção da flag:**
+A flag `USE_WAVE_MANAGER` será removida após:
+- Todos os testes de baseline passarem com flag ativada
+- Validação em produção por pelo menos 2 semanas
+- Confirmação de que novos inimigos (Drone, Mine, Hunter, Boss) funcionam corretamente
+- Aprovação da equipe para deprecar sistema legado

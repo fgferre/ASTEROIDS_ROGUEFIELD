@@ -52,3 +52,44 @@ npm run test:baseline:watch
 ```
 
 Documentação completa: `docs/validation/asteroid-baseline-metrics.md`
+
+## Feature Flags
+
+O projeto utiliza feature flags para permitir ativação controlada de funcionalidades experimentais:
+
+### `USE_WAVE_MANAGER` (Experimental)
+
+**Localização:** `src/core/GameConstants.js`
+
+**Descrição:** Controla qual sistema de ondas é utilizado:
+- `false` (padrão): Sistema legado de ondas (100% estável)
+- `true`: Novo WaveManager com suporte a múltiplos tipos de inimigos
+
+**Como testar:**
+
+1. Validar comportamento padrão (flag desativada):
+
+   ```bash
+   npm run test:baseline
+   npm run dev
+   ```
+
+2. Ativar o WaveManager:
+   - Abrir `src/core/GameConstants.js`
+   - Alterar `USE_WAVE_MANAGER` para `true`
+   - Executar testes: `npm run test:baseline`
+   - Iniciar aplicação: `npm run dev`
+
+3. Verificar logs de debug:
+   - Abrir console do navegador
+   - Procurar por `[EnemySystem] Wave system: WaveManager` ou `Legacy`
+   - Confirmar que estado de ondas é sincronizado corretamente na HUD
+
+**Status:** Em desenvolvimento. O WaveManager está parcialmente integrado e requer:
+- Renderização de novos tipos de inimigos (Drone, Mine, Hunter)
+- Conexão completa do loop de spawn
+- Validação de paridade com métricas baseline
+
+**Documentação completa:** `docs/plans/phase1-enemy-foundation-plan.md`
+
+**Nota:** Esta flag será removida após validação completa da migração para o WaveManager.

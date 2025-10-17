@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from 'vitest';
+import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EnemySystem } from '../../modules/EnemySystem.js';
 import { ServiceRegistry } from '../../core/ServiceRegistry.js';
 import { GamePools } from '../../core/GamePools.js';
@@ -821,6 +821,62 @@ describe.sequential('Legacy Asteroid Baseline Metrics', () => {
       }
 
       expect(sequenceA).toEqual(sequenceB);
+    });
+  });
+
+  describe('Feature Flag: USE_WAVE_MANAGER', () => {
+    test('Legacy system remains functional when flag is false', () => {
+      expect(CONSTANTS.USE_WAVE_MANAGER).toBe(false);
+
+      const legacySpy = vi.spyOn(harness.enemySystem, 'updateWaveLogic');
+      const { waveState } = simulateWave(harness.enemySystem, 1, 400);
+
+      expect(waveState.totalAsteroids).toBe(4);
+      expect(waveState.asteroidsSpawned).toBeGreaterThan(0);
+      expect(legacySpy).toHaveBeenCalled();
+
+      legacySpy.mockRestore();
+    });
+
+    test('EnemySystem gracefully handles missing WaveManager', () => {
+      const originalDescriptor = Object.getOwnPropertyDescriptor(
+        CONSTANTS,
+        'USE_WAVE_MANAGER'
+      );
+
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const legacySpy = vi.spyOn(harness.enemySystem, 'updateWaveLogic');
+
+      harness.enemySystem.waveManager = null;
+      prepareWave(harness.enemySystem, 1);
+
+      try {
+        try {
+          Object.defineProperty(CONSTANTS, 'USE_WAVE_MANAGER', {
+            configurable: true,
+            get: () => true
+          });
+        } catch (error) {
+          globalThis.__USE_WAVE_MANAGER_OVERRIDE__ = true;
+        }
+
+        expect(() => harness.enemySystem.update(0.5)).not.toThrow();
+        expect(legacySpy).toHaveBeenCalled();
+
+        const warningEmitted = warnSpy.mock.calls.some(([message]) =>
+          String(message).includes('WaveManager indisponível')
+        );
+        expect(warningEmitted).toBe(true);
+      } finally {
+        if (originalDescriptor && originalDescriptor.configurable) {
+          Object.defineProperty(CONSTANTS, 'USE_WAVE_MANAGER', originalDescriptor);
+        }
+
+        delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
+
+        legacySpy.mockRestore();
+        warnSpy.mockRestore();
+      }
     });
   });
 });
