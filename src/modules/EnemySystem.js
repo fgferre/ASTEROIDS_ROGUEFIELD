@@ -1628,11 +1628,12 @@ class EnemySystem {
 
     this.sessionStats.timeElapsed += deltaTime;
 
-    this.updateAsteroids(deltaTime);
     // FEATURE FLAG: Roteamento entre sistema legado e WaveManager
     if (waveManagerEnabled) {
       this.updateWaveManagerLogic(deltaTime);
+      this.updateAsteroids(deltaTime);
     } else {
+      this.updateAsteroids(deltaTime);
       this.updateWaveLogic(deltaTime);
     }
     this.cleanupDestroyed();
@@ -2993,14 +2994,29 @@ class EnemySystem {
     wave.spawnTimer = 0;
     wave.initialSpawnDone = false;
 
-    this.grantWaveRewards();
+    const waveManagerActive =
+      this.useManagers && Boolean(CONSTANTS?.USE_WAVE_MANAGER) && this.waveManager;
 
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('wave-completed', {
-        wave: wave.current,
-        completedWaves: wave.completedWaves,
-        breakTimer: wave.breakTimer,
-      });
+    if (!waveManagerActive) {
+      this.grantWaveRewards();
+
+      if (typeof gameEvents !== 'undefined') {
+        gameEvents.emit('wave-completed', {
+          wave: wave.current,
+          completedWaves: wave.completedWaves,
+          breakTimer: wave.breakTimer,
+        });
+      }
+    } else if (
+      typeof process !== 'undefined' &&
+      process.env?.NODE_ENV === 'development' &&
+      typeof console !== 'undefined' &&
+      typeof console.debug === 'function'
+    ) {
+      console.debug(
+        '[EnemySystem] WaveManager active - skipping legacy wave-completed emit for Wave',
+        wave.current
+      );
     }
 
     this.emitWaveStateUpdate(true);

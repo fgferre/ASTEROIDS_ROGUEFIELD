@@ -771,17 +771,37 @@ export class WaveManager {
           enemyConfig.randomScope = 'spawn';
         }
 
-        // Use factory if available, otherwise use legacy method
+        // Use centralized acquisition path when available for factory-backed enemies
         let enemy;
-        if (this.enemySystem.factory) {
-          enemy = this.enemySystem.factory.create(enemyGroup.type, enemyConfig);
-        } else {
+        let registeredEnemy = false;
+
+        if (
+          this.enemySystem &&
+          typeof this.enemySystem.acquireEnemyViaFactory === 'function'
+        ) {
+          enemy = this.enemySystem.acquireEnemyViaFactory(enemyGroup.type, enemyConfig);
+          registeredEnemy = Boolean(enemy);
+        } else if (this.enemySystem?.factory) {
+          const factoryHasType =
+            typeof this.enemySystem.factory.hasType === 'function'
+              ? this.enemySystem.factory.hasType(enemyGroup.type)
+              : true;
+
+          if (factoryHasType && typeof this.enemySystem.factory.create === 'function') {
+            enemy = this.enemySystem.factory.create(enemyGroup.type, enemyConfig);
+          } else if (typeof this.enemySystem.acquireAsteroid === 'function') {
+            enemy = this.enemySystem.acquireAsteroid(enemyConfig);
+          }
+        } else if (typeof this.enemySystem?.acquireAsteroid === 'function') {
           // Legacy: Direct Asteroid creation
           enemy = this.enemySystem.acquireAsteroid(enemyConfig);
         }
 
-        let registeredEnemy = false;
-        if (enemy) {
+        if (!enemy && typeof this.enemySystem?.acquireAsteroid === 'function') {
+          enemy = this.enemySystem.acquireAsteroid(enemyConfig);
+        }
+
+        if (enemy && !registeredEnemy) {
           if (this.enemySystem && typeof this.enemySystem.registerActiveEnemy === 'function') {
             this.enemySystem.registerActiveEnemy(enemy, { skipDuplicateCheck: true });
             registeredEnemy = true;
