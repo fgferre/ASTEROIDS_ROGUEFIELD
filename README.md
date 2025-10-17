@@ -131,11 +131,32 @@ O projeto utiliza feature flags para permitir ativação controlada de funcional
    - Procurar por `[EnemySystem] Wave system: WaveManager` ou `Legacy`
    - Confirmar que estado de ondas é sincronizado corretamente na HUD
 
-**Status:** Em desenvolvimento. O WaveManager está parcialmente integrado e requer:
-- Renderização de novos tipos de inimigos (Drone, Mine, Hunter)
-- Conexão completa do loop de spawn
-- Validação de paridade com métricas baseline
+**Status:** Em validação. O WaveManager está totalmente integrado (WAVE-004 concluído). Requer validação de paridade com métricas baseline antes da ativação permanente.
 
-**Documentação completa:** `docs/plans/phase1-enemy-foundation-plan.md`
+**Funcionalidades implementadas:**
+- ✅ Listener de `enemy-destroyed` conectado para progressão automática de waves
+- ✅ Inimigos registrados via `registerActiveEnemy()` após spawn da factory
+- ✅ Parâmetros legados aplicados (`ASTEROIDS_PER_WAVE_BASE`, `ASTEROIDS_PER_WAVE_MULTIPLIER`, `WAVE_BREAK_TIME`)
+- ✅ Eventos `wave-started` e `wave-complete` sincronizados com HUD, áudio e efeitos
+
+**Como validar a integração:**
+
+1. Ativar flag: `USE_WAVE_MANAGER = true` em `src/core/GameConstants.js`
+2. Executar testes de baseline: `npm run test:baseline`
+3. Iniciar jogo: `npm run dev`
+4. Completar 3 waves e verificar:
+   - Inimigos aparecem e são atualizados corretamente
+   - HUD mostra contador de inimigos preciso
+   - Ondas progridem automaticamente após destruir todos os inimigos
+   - Intervalo entre waves é 10 segundos
+   - Logs de debug aparecem no console
+5. Reportar qualquer divergência em issue no GitHub
+
+**Critério para ativação permanente:**
+- Validação em produção por pelo menos 1 semana
+- Todos os testes de baseline passando
+- Aprovação formal da equipe
+
+**Documentação completa:** `docs/plans/phase1-enemy-foundation-plan.md` (seção WAVE-004)
 
 **Nota:** Esta flag será removida após validação completa da migração para o WaveManager.

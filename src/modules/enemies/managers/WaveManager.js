@@ -60,6 +60,10 @@ export class WaveManager {
       resolveService('event-bus', this.dependencies) ||
       null;
 
+    this._onEnemyDestroyedHandler = null;
+    this._isEnemyDestroyedListenerActive = false;
+    this._enemyDestroyedBus = null;
+
     let resolvedRandom =
       this.dependencies.random ||
       (this.enemySystem &&
@@ -117,11 +121,14 @@ export class WaveManager {
     // Timers
     this.spawnTimer = 0;
     this.spawnDelay = CONSTANTS.WAVE_SPAWN_DELAY || 1.0;
-    this.waveDelay = CONSTANTS.WAVE_START_DELAY || 3.0;
+    this.spawnDelayMultiplier = 1;
+    this.waveDelay = CONSTANTS.WAVE_BREAK_TIME || 10.0; // WAVE-004: Usar WAVE_BREAK_TIME para paridade com sistema legado
     this.waveCountdown = 0;
 
     // Wave configurations
     this.waveConfigs = this.loadWaveConfigurations();
+
+    this.connectEventListeners();
 
     console.log('[WaveManager] Initialized');
   }
@@ -221,6 +228,41 @@ export class WaveManager {
     return configs;
   }
 
+  connectEventListeners() {
+    const eventBus = this.eventBus;
+    if (!eventBus || typeof eventBus.on !== 'function') {
+      return;
+    }
+
+    if (!this._onEnemyDestroyedHandler) {
+      this._onEnemyDestroyedHandler = (data) => this.onEnemyDestroyed(data);
+    }
+
+    if (this._enemyDestroyedBus && this._enemyDestroyedBus !== eventBus) {
+      this.disconnect();
+    }
+
+    if (this._isEnemyDestroyedListenerActive) {
+      return;
+    }
+
+    // WAVE-004: Conectar ao evento de destruição para progressão automática de ondas
+    eventBus.on('enemy-destroyed', this._onEnemyDestroyedHandler);
+    this._enemyDestroyedBus = eventBus;
+    this._isEnemyDestroyedListenerActive = true;
+  }
+
+  disconnect() {
+    const bus = this._enemyDestroyedBus || this.eventBus;
+
+    if (bus && typeof bus.off === 'function' && this._onEnemyDestroyedHandler) {
+      bus.off('enemy-destroyed', this._onEnemyDestroyedHandler);
+    }
+
+    this._isEnemyDestroyedListenerActive = false;
+    this._enemyDestroyedBus = null;
+  }
+
   cloneWaveConfig(config = {}) {
     if (!config || typeof config !== 'object') {
       return { isBossWave: false, enemies: [] };
@@ -280,6 +322,7 @@ export class WaveManager {
     const enemies = [];
     const variantRandom = this.getRandomScope('variants');
 
+    // WAVE-004: Distribuição ajustada para suportar múltiplos tipos de inimigos (não apenas asteroides)
     // Large asteroids
     enemies.push({
       type: 'asteroid',
@@ -403,8 +446,14 @@ export class WaveManager {
   }
 
   computeBaseEnemyCount(waveNumber) {
-    const difficulty = Math.floor(waveNumber / 5);
-    return 5 + difficulty * 2;
+    const baseCount =
+      (CONSTANTS.ASTEROIDS_PER_WAVE_BASE ?? 4) *
+      Math.pow(CONSTANTS.ASTEROIDS_PER_WAVE_MULTIPLIER ?? 1.3, Math.max(0, waveNumber - 1));
+
+    // WAVE-004: Usar parâmetros legados para preservar densidade de ondas (baseline WAVE-001)
+    const normalizedCount = Math.floor(baseCount);
+    const maxOnScreen = CONSTANTS.MAX_ASTEROIDS_ON_SCREEN ?? 20;
+    return Math.min(normalizedCount, maxOnScreen);
   }
 
   computeSupportWeights(waveNumber) {
@@ -599,17 +648,30 @@ export class WaveManager {
 
     config.isBossWave = Boolean(config.isBossWave);
 
+    const sharedSpawnDelayMultiplier = this.resolveWaveSpawnDelayMultiplier(config);
+    config.spawnDelayMultiplier = sharedSpawnDelayMultiplier;
+
     this.totalEnemiesThisWave = this.computeTotalEnemies(config);
 
     const waveEventPayload = {
       wave: waveNumber,
       totalEnemies: this.totalEnemiesThisWave,
-      config: this.cloneWaveConfig(config),
       isBossWave: config.isBossWave,
+      spawnDelayMultiplier: sharedSpawnDelayMultiplier,
     };
 
     if (this.eventBus) {
       this.eventBus.emit('wave-started', waveEventPayload);
+
+      if (
+        typeof process !== 'undefined' &&
+        process.env?.NODE_ENV === 'development'
+      ) {
+        this.eventBus.emit('wave-started-debug', {
+          ...waveEventPayload,
+          config: this.cloneWaveConfig(config),
+        });
+      }
 
       if (config.isBossWave) {
         const supportGroups = Array.isArray(config.supportGroups)
@@ -641,6 +703,43 @@ export class WaveManager {
   }
 
   /**
+   * Resolves a deterministic spawn delay multiplier for the provided wave configuration.
+   * The multiplier is cached on the config object so boss support groups reuse the same pacing.
+   *
+   * @param {Object} waveConfig - Wave configuration
+   * @returns {number} Effective spawn delay multiplier
+   */
+  resolveWaveSpawnDelayMultiplier(waveConfig = {}) {
+    const existingMultiplier = Number(waveConfig?.spawnDelayMultiplier);
+
+    if (Number.isFinite(existingMultiplier) && existingMultiplier > 0) {
+      return existingMultiplier;
+    }
+
+    const spawnDelayRandom = this.resolveScopedRandom(
+      this.randomScopes?.spawn,
+      'spawn',
+      'wave-spawn-delay'
+    );
+
+    const generatedMultiplier =
+      spawnDelayRandom && typeof spawnDelayRandom.range === 'function'
+        ? spawnDelayRandom.range(0.5, 1)
+        : 1;
+
+    const sanitizedMultiplier =
+      Number.isFinite(generatedMultiplier) && generatedMultiplier > 0
+        ? generatedMultiplier
+        : 1;
+
+    if (waveConfig && typeof waveConfig === 'object') {
+      waveConfig.spawnDelayMultiplier = sanitizedMultiplier;
+    }
+
+    return sanitizedMultiplier;
+  }
+
+  /**
    * Spawns enemies for the current wave using the factory pattern.
    *
    * @param {Object} waveConfig - Wave configuration
@@ -650,6 +749,10 @@ export class WaveManager {
                        { width: 800, height: 600 };
     const player = this.enemySystem.getCachedPlayer();
     const safeDistance = CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200;
+
+    const spawnDelayMultiplier = this.resolveWaveSpawnDelayMultiplier(waveConfig);
+    this.spawnDelayMultiplier = spawnDelayMultiplier;
+    const effectiveSpawnDelay = this.spawnDelay * spawnDelayMultiplier;
 
     for (const enemyGroup of waveConfig.enemies) {
       for (let i = 0; i < enemyGroup.count; i++) {
@@ -668,7 +771,9 @@ export class WaveManager {
           x: position.x,
           y: position.y,
           wave: this.currentWave,
-          spawnIndex: i
+          spawnIndex: i,
+          spawnDelay: effectiveSpawnDelay,
+          spawnDelayMultiplier: this.spawnDelayMultiplier
         };
 
         if (spawnContext.random?.fork) {
@@ -676,17 +781,60 @@ export class WaveManager {
           enemyConfig.randomScope = 'spawn';
         }
 
-        // Use factory if available, otherwise use legacy method
+        // Use centralized acquisition path when available for factory-backed enemies
         let enemy;
-        if (this.enemySystem.factory) {
-          enemy = this.enemySystem.factory.create(enemyGroup.type, enemyConfig);
-        } else {
+        let registeredEnemy = false;
+
+        if (
+          this.enemySystem &&
+          typeof this.enemySystem.acquireEnemyViaFactory === 'function'
+        ) {
+          enemy = this.enemySystem.acquireEnemyViaFactory(enemyGroup.type, enemyConfig);
+          registeredEnemy = Boolean(enemy);
+        } else if (this.enemySystem?.factory) {
+          const factoryHasType =
+            typeof this.enemySystem.factory.hasType === 'function'
+              ? this.enemySystem.factory.hasType(enemyGroup.type)
+              : true;
+
+          if (factoryHasType && typeof this.enemySystem.factory.create === 'function') {
+            enemy = this.enemySystem.factory.create(enemyGroup.type, enemyConfig);
+          } else if (typeof this.enemySystem.acquireAsteroid === 'function') {
+            enemy = this.enemySystem.acquireAsteroid(enemyConfig);
+          }
+        } else if (typeof this.enemySystem?.acquireAsteroid === 'function') {
           // Legacy: Direct Asteroid creation
           enemy = this.enemySystem.acquireAsteroid(enemyConfig);
         }
 
+        if (!enemy && typeof this.enemySystem?.acquireAsteroid === 'function') {
+          enemy = this.enemySystem.acquireAsteroid(enemyConfig);
+        }
+
+        if (enemy && !registeredEnemy) {
+          if (this.enemySystem && typeof this.enemySystem.registerActiveEnemy === 'function') {
+            this.enemySystem.registerActiveEnemy(enemy, { skipDuplicateCheck: true });
+            registeredEnemy = true;
+          } else {
+            console.warn(
+              '[WaveManager] Cannot register enemy - registerActiveEnemy() not available on EnemySystem'
+            );
+          }
+        }
+
         if (enemy) {
           this.enemiesSpawnedThisWave++;
+          if (
+            registeredEnemy &&
+            typeof process !== 'undefined' &&
+            process.env?.NODE_ENV === 'development' &&
+            typeof console !== 'undefined' &&
+            typeof console.debug === 'function'
+          ) {
+            console.debug(
+              `[WaveManager] Registered enemy: type=${enemyGroup.type}, wave=${this.currentWave}, spawned=${this.enemiesSpawnedThisWave}/${this.totalEnemiesThisWave}`
+            );
+          }
         }
       }
     }
@@ -695,23 +843,29 @@ export class WaveManager {
   queueBossWaveSpawns(waveConfig = {}) {
     const queue = [];
 
-    const bossConfig = waveConfig.boss ? { ...waveConfig.boss } : null;
+    const sharedSpawnDelayMultiplier = this.resolveWaveSpawnDelayMultiplier(waveConfig);
+    const baseConfig = {
+      ...waveConfig,
+      spawnDelayMultiplier: sharedSpawnDelayMultiplier,
+    };
+
+    const bossConfig = baseConfig.boss ? { ...baseConfig.boss } : null;
     if (bossConfig) {
       queue.push({
         type: 'boss',
-        execute: () => this.spawnBossEnemy(bossConfig, waveConfig),
+        execute: () => this.spawnBossEnemy(bossConfig, baseConfig),
       });
     }
 
-    const supportGroups = Array.isArray(waveConfig.enemies)
-      ? waveConfig.enemies.map((group) => ({ ...group }))
+    const supportGroups = Array.isArray(baseConfig.enemies)
+      ? baseConfig.enemies.map((group) => ({ ...group }))
       : [];
 
     supportGroups.forEach((group) => {
       queue.push({
         type: 'support-group',
         group,
-        execute: () => this.spawnWave({ ...waveConfig, enemies: [group] }),
+        execute: () => this.spawnWave({ ...baseConfig, enemies: [group] }),
       });
     });
 
@@ -792,13 +946,14 @@ export class WaveManager {
       spawnOffset: bossConfig.spawnOffset,
       randomScope: bossConfig.randomScope || 'boss-spawn',
       randomParentScope: bossConfig.randomParentScope || 'spawn',
+      skipWaveAccounting: true,
       metadata,
     };
 
     const boss = this.enemySystem.spawnBoss(spawnConfig);
     if (boss) {
-      // EnemySystem.spawnBoss() already increments wave counters
-      // We mirror that in WaveManager for consistency
+      // EnemySystem.spawnBoss() will skip wave accounting when we pass the flag,
+      // so we track the spawn locally for wave metrics.
       this.enemiesSpawnedThisWave += 1;
     }
 
@@ -946,8 +1101,27 @@ export class WaveManager {
   /**
    * Called when an enemy is destroyed.
    */
-  onEnemyDestroyed() {
+  onEnemyDestroyed(data = {}) {
+    if (!this.waveInProgress || this.totalEnemiesThisWave <= 0) {
+      return;
+    }
+
+    if (Array.isArray(data?.fragments) && data.fragments.length > 0) {
+      this.totalEnemiesThisWave += data.fragments.length;
+    }
+
     this.enemiesKilledThisWave++;
+
+    if (
+      typeof process !== 'undefined' &&
+      process.env?.NODE_ENV === 'development' &&
+      typeof console !== 'undefined' &&
+      typeof console.debug === 'function'
+    ) {
+      console.debug(
+        `[WaveManager] Enemy destroyed: ${this.enemiesKilledThisWave}/${this.totalEnemiesThisWave}`
+      );
+    }
 
     // Development assertion: verify accounting consistency
     if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
@@ -955,7 +1129,17 @@ export class WaveManager {
     }
 
     // Check if wave is complete
-    if (this.enemiesKilledThisWave >= this.totalEnemiesThisWave) {
+    const killsCleared = this.enemiesKilledThisWave >= this.totalEnemiesThisWave;
+    let activeEnemiesCleared = true;
+
+    if (
+      this.enemySystem &&
+      typeof this.enemySystem.getActiveEnemyCount === 'function'
+    ) {
+      activeEnemiesCleared = this.enemySystem.getActiveEnemyCount() === 0;
+    }
+
+    if (killsCleared && activeEnemiesCleared) {
       this.completeWave();
     }
   }
@@ -1001,11 +1185,14 @@ export class WaveManager {
 
     // Emit wave complete event
     if (this.eventBus) {
-      this.eventBus.emit('wave-complete', {
+      const payload = {
         wave: this.currentWave,
         duration: duration,
         enemiesKilled: this.enemiesKilledThisWave
-      });
+      };
+
+      this.eventBus.emit('wave-complete', payload);
+      this.eventBus.emit('wave-completed', payload);
     }
 
     // Start countdown for next wave
@@ -1023,10 +1210,11 @@ export class WaveManager {
     // Handle wave countdown
     if (!this.waveInProgress && this.waveCountdown > 0) {
       this.waveCountdown -= deltaTime;
+      this.waveCountdown = Math.max(0, this.waveCountdown);
+    }
 
-      if (this.waveCountdown <= 0) {
-        this.startNextWave();
-      }
+    if (!this.waveInProgress && this.waveCountdown <= 0) {
+      this.startNextWave();
     }
   }
 
@@ -1034,6 +1222,8 @@ export class WaveManager {
    * Resets the wave manager.
    */
   reset() {
+    this.disconnect();
+
     this.currentWave = 0;
     this.waveInProgress = false;
     this.wavePaused = false;
@@ -1045,11 +1235,14 @@ export class WaveManager {
     this.spawnQueue = [];
     this.spawnTimer = 0;
     this.waveCountdown = 0;
+    this.spawnDelayMultiplier = 1;
     if (this.randomSequences) {
       this.randomSequences.spawn = 0;
       this.randomSequences.variants = 0;
       this.randomSequences.fragments = 0;
     }
+
+    this.connectEventListeners();
 
     console.log('[WaveManager] Reset');
   }
