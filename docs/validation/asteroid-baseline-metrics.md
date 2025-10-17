@@ -76,10 +76,11 @@ fixa `123456`.
 ## Average Fragment Output
 
 - Amostragem determinística com 800 destruições por tamanho (wave 6)
-- Médias observadas:
-  - **Large:** 3.36 fragmentos
-  - **Medium:** 2.56 fragmentos
-  - **Small:** 0 fragmentos (sem fragmentação)
+- Envelope teórico derivado de `ASTEROID_FRAGMENT_RULES` + distribuição de variantes:
+  - **Large:** média esperada ≈ **3.38** fragmentos com intervalo **[2.89, 3.87]**
+  - **Medium:** média esperada ≈ **2.61** fragmentos com intervalo **[2.16, 3.05]**
+  - **Small:** média esperada = **0** fragmentos (sem fragmentação)
+- As execuções baseline ficam dentro desses intervalos, com tolerância de ±0.25 sobre a média para acomodar ajustes mínimos nos pesos ou regras.
 
 ## Wave State Counters Behavior
 

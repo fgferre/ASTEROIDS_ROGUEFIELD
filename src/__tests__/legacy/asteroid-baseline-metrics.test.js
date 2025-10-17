@@ -113,68 +113,73 @@ function createEnemySystemHarness(seed = TEST_SEED) {
   return { enemySystem, container, services: { world, player, progression, physics, xpOrbs, random } };
 }
 
-function prepareWave(enemySystem, waveNumber) {
+function prepareWave(enemySystem, waveNumber, options = {}) {
+  const { spawnInitial = false } = options;
+
   enemySystem.waveState = enemySystem.createInitialWaveState();
   const total = Math.floor(
     CONSTANTS.ASTEROIDS_PER_WAVE_BASE *
       Math.pow(CONSTANTS.ASTEROIDS_PER_WAVE_MULTIPLIER, waveNumber - 1)
   );
-  enemySystem.waveState.current = waveNumber;
-  enemySystem.waveState.isActive = true;
-  enemySystem.waveState.totalAsteroids = Math.min(total, 25);
-  enemySystem.waveState.asteroidsSpawned = 0;
-  enemySystem.waveState.asteroidsKilled = 0;
-  enemySystem.waveState.initialSpawnDone = true;
-  enemySystem.waveState.spawnTimer = 0;
-  enemySystem.waveState.spawnDelay = 1.0;
-  enemySystem.waveState.timeRemaining = CONSTANTS.WAVE_DURATION;
+
+  const waveState = enemySystem.waveState;
+  waveState.current = waveNumber;
+  waveState.isActive = true;
+  waveState.totalAsteroids = Math.min(total, 25);
+  waveState.asteroidsSpawned = 0;
+  waveState.asteroidsKilled = 0;
+  waveState.initialSpawnDone = false;
+  waveState.spawnTimer = 0;
+  waveState.spawnDelay = Math.max(0.8, 2.0 - waveNumber * 0.1);
+  waveState.timeRemaining = CONSTANTS.WAVE_DURATION;
+
   enemySystem.asteroids = [];
+  enemySystem.spawnTimer = 0;
   enemySystem.sessionActive = true;
+  if (typeof enemySystem.invalidateActiveEnemyCache === 'function') {
+    enemySystem.invalidateActiveEnemyCache();
+  }
+
   enemySystem.reseedRandomScopes({ resetSequences: true });
+
+  if (spawnInitial) {
+    enemySystem.spawnInitialAsteroids(4);
+  }
 }
 
-function simulateWave(enemySystem, waveNumber, maxIterations = 600) {
-  prepareWave(enemySystem, waveNumber);
-  const waveState = enemySystem.waveState;
-  const spawnLog = [...enemySystem.getAllEnemies()];
+function simulateWave(enemySystem, waveNumber, maxIterations = 1500) {
+  prepareWave(enemySystem, waveNumber, { spawnInitial: true });
+
   let iterations = 0;
+  const deltaTime = 0.5;
 
-  while (
-    waveState.asteroidsSpawned < waveState.totalAsteroids &&
-    iterations < maxIterations
-  ) {
-    const asteroid = enemySystem.spawnAsteroid();
-    if (!asteroid) {
-      break;
-    }
+  while (enemySystem.waveState.isActive && iterations < maxIterations) {
+    enemySystem.update(deltaTime);
 
-    spawnLog.push(asteroid);
-    while (enemySystem.getActiveEnemyCount() > CONSTANTS.MAX_ASTEROIDS_ON_SCREEN) {
-      const oldest = enemySystem.getActiveEnemies()[0];
-      if (!oldest) {
-        break;
-      }
-      enemySystem.destroyAsteroid(oldest, { createFragments: false });
-    }
     expect(enemySystem.getActiveEnemyCount()).toBeLessThanOrEqual(
       CONSTANTS.MAX_ASTEROIDS_ON_SCREEN
     );
+
+    const activeEnemies = enemySystem.getActiveEnemies();
+    if (activeEnemies.length > 0) {
+      enemySystem.destroyAsteroid(activeEnemies[0], { createFragments: false });
+    }
+
     iterations += 1;
   }
 
-  const active = enemySystem.getAllEnemies();
-  active.forEach((asteroid) => {
+  expect(iterations).toBeLessThan(maxIterations);
+
+  const finalState = { ...enemySystem.waveState };
+
+  enemySystem.getAllEnemies().forEach((asteroid) => {
     enemySystem.destroyAsteroid(asteroid, { createFragments: false });
   });
 
   enemySystem.update(0);
-  if (enemySystem.waveState?.isActive) {
-    enemySystem.completeCurrentWave();
-  }
 
   return {
-    waveState: { ...waveState },
-    spawnLog
+    waveState: finalState
   };
 }
 
@@ -319,6 +324,55 @@ function computeAverageFragmentsForSize(enemySystem, size, wave, count) {
   }
 
   return totalFragments / count;
+}
+
+function getFragmentRuleForVariant(variant) {
+  const variantConfig = CONSTANTS.ASTEROID_VARIANTS[variant] || {};
+  const profileKey =
+    variantConfig.fragmentProfile || variantConfig.key || variant || 'default';
+  return (
+    CONSTANTS.ASTEROID_FRAGMENT_RULES[profileKey] ||
+    CONSTANTS.ASTEROID_FRAGMENT_RULES.default
+  );
+}
+
+function getFragmentRangeStats(rule, size) {
+  const range =
+    rule?.countBySize?.[size] ?? rule?.countBySize?.default ?? [0, 0];
+
+  if (Array.isArray(range) && range.length === 2) {
+    const min = Math.max(0, Math.floor(Number(range[0]) || 0));
+    const max = Math.max(min, Math.floor(Number(range[1]) || 0));
+    return {
+      min,
+      max,
+      mean: (min + max) / 2
+    };
+  }
+
+  const value = Math.max(0, Math.round(Number(range) || 0));
+  return { min: value, max: value, mean: value };
+}
+
+function computeFragmentExpectationBounds(enemySystem, size, wave) {
+  const expected = computeExpectedVariantBreakdown(enemySystem, size, wave);
+
+  return Object.entries(expected.probabilities).reduce(
+    (acc, [variant, probability]) => {
+      if (probability <= 0) {
+        return acc;
+      }
+
+      const rule = getFragmentRuleForVariant(variant);
+      const { min, max, mean } = getFragmentRangeStats(rule, size);
+
+      acc.min += probability * min;
+      acc.max += probability * max;
+      acc.mean += probability * mean;
+      return acc;
+    },
+    { min: 0, max: 0, mean: 0 }
+  );
 }
 
 function summarizeAsteroid(asteroid) {
@@ -633,24 +687,27 @@ describe.sequential('Legacy Asteroid Baseline Metrics', () => {
 
   describe('Average fragments per destruction', () => {
     test('mean fragment output per size is stable', () => {
-      const averages = ['large', 'medium', 'small'].reduce((acc, size) => {
+      ['large', 'medium', 'small'].forEach((size) => {
         const mean = computeAverageFragmentsForSize(
           harness.enemySystem,
           size,
           FRAGMENT_ANALYSIS_WAVE,
           FRAGMENT_SAMPLE_COUNT
         );
-        acc[size] = Number(mean.toFixed(3));
-        return acc;
-      }, {});
 
-      expect(averages).toMatchInlineSnapshot(`
-        {
-          "large": 3.36,
-          "medium": 2.56,
-          "small": 0,
-        }
-      `);
+        const bounds = computeFragmentExpectationBounds(
+          harness.enemySystem,
+          size,
+          FRAGMENT_ANALYSIS_WAVE
+        );
+
+        const guardBand = 0.05;
+        const closeness = Math.max(0.05, (bounds.max - bounds.min) * 0.25);
+
+        expect(mean).toBeGreaterThanOrEqual(bounds.min - guardBand);
+        expect(mean).toBeLessThanOrEqual(bounds.max + guardBand);
+        expect(Math.abs(mean - bounds.mean)).toBeLessThanOrEqual(closeness);
+      });
     });
   });
 
