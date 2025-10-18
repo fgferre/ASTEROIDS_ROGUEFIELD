@@ -1877,11 +1877,29 @@ class EnemySystem {
     this.waveState.spawnTimer = 0;
     this.waveState.initialSpawnDone = false;
 
-    if (
-      this.waveManager &&
-      Number.isFinite(Number(this.waveManager.totalEnemiesThisWave))
-    ) {
-      this.waveState.totalAsteroids = Number(this.waveManager.totalEnemiesThisWave);
+    if (this.waveManager) {
+      const waveManagerHandlesAsteroids =
+        (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
+        this._waveManagerRuntimeEnabled;
+      const legacyCompatibilityEnabled =
+        (CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true) &&
+        waveManagerHandlesAsteroids;
+
+      const managerAsteroidTotal = Number(
+        this.waveManager.totalAsteroidEnemiesThisWave
+      );
+      const managerAllEnemiesTotal = Number(
+        this.waveManager.totalEnemiesThisWave
+      );
+
+      if (
+        legacyCompatibilityEnabled &&
+        Number.isFinite(managerAsteroidTotal)
+      ) {
+        this.waveState.totalAsteroids = managerAsteroidTotal;
+      } else if (Number.isFinite(managerAllEnemiesTotal)) {
+        this.waveState.totalAsteroids = managerAllEnemiesTotal;
+      }
     }
 
     if (!Number.isFinite(Number(this.waveState.asteroidsSpawned))) {
