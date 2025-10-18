@@ -249,7 +249,10 @@ export class WaveManager {
       return;
     }
 
-    // WAVE-004: Conectar ao evento de destruição para progressão automática de ondas
+    // WAVE-004: Conectar ao evento de destruição para progressão automática
+    // Este listener é crítico para o funcionamento do WaveManager.
+    // Sem ele, enemiesKilledThisWave nunca incrementa e waves nunca completam.
+    // Ver onEnemyDestroyed() para lógica de contabilização de fragmentos.
     eventBus.on('enemy-destroyed', this._onEnemyDestroyedHandler);
     this._enemyDestroyedBus = eventBus;
     this._isEnemyDestroyedListenerActive = true;
@@ -318,7 +321,22 @@ export class WaveManager {
     const baseCount = this.computeBaseEnemyCount(waveNumber);
 
     const enemies = [];
-    // WAVE-006: Distribuição de tamanhos configurável via flag
+    // WAVE-006: Distribuição de tamanhos configurável
+    //
+    // PRESERVE_LEGACY_SIZE_DISTRIBUTION=true:
+    //   50% large, 30% medium, 20% small (baseline original)
+    //   Otimizado para asteroides puros
+    //
+    // PRESERVE_LEGACY_SIZE_DISTRIBUTION=false:
+    //   30% large, 40% medium, 30% small (otimizado)
+    //   Melhor balanceamento para mix com drones/mines/hunters
+    //
+    // Justificativa da divergência:
+    // Novos inimigos são menores (drone ~12px, mine ~18px) que asteroides
+    // médios/pequenos. Aumentar proporção de medium/small cria melhor
+    // distribuição visual quando misturando tipos.
+    //
+    // Ver docs/validation/asteroid-baseline-metrics.md (seção Distribuição)
     const useLegacyDistribution =
       CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
 
@@ -348,7 +366,11 @@ export class WaveManager {
           type: 'asteroid',
           count: normalizedBaseCount,
           size: null,
-          variant: null,
+          variant: null, // WAVE-006: Delegado para EnemySystem.decideVariant()
+                        // Preserva lógica complexa de wave bonus, allowed sizes,
+                        // e weighted distribution. Asteroid.initialize() chama
+                        // decideVariant() automaticamente quando variant=null.
+                        // Ver Asteroid.js linha ~144 e EnemySystem.js linha ~2244
           metadata: groupMetadata,
         });
 
@@ -375,7 +397,11 @@ export class WaveManager {
             type: 'asteroid',
             count: 1,
             size,
-            variant: null,
+            variant: null, // WAVE-006: Delegado para EnemySystem.decideVariant()
+                            // Preserva lógica complexa de wave bonus, allowed sizes,
+                            // e weighted distribution. Asteroid.initialize() chama
+                            // decideVariant() automaticamente quando variant=null.
+                            // Ver Asteroid.js linha ~144 e EnemySystem.js linha ~2244
             spawnIndexBase: index,
           });
         });
@@ -1256,6 +1282,23 @@ export class WaveManager {
           enemy = this.enemySystem.acquireAsteroid(enemyConfig);
         }
 
+        // WAVE-004: Registro de inimigos no sistema ativo
+        //
+        // Após criar inimigo via factory, DEVE chamar enemySystem.registerActiveEnemy()
+        // para integração completa:
+        //
+        // 1. Adiciona inimigo ao array asteroids[] do EnemySystem
+        // 2. Registra na física via PhysicsSystem.registerEnemy()
+        // 3. Invalida cache de inimigos ativos
+        // 4. Permite que inimigo seja atualizado, renderizado e colida
+        //
+        // Sem este registro:
+        // - Inimigo existe na memória mas não é atualizado
+        // - Não aparece na HUD (contador de inimigos)
+        // - Não colide com player ou projéteis
+        // - Não é rastreado pela física espacial
+        //
+        // Ver EnemySystem.registerActiveEnemy() (linha ~734) para detalhes
         if (enemy && !registeredEnemy) {
           if (this.enemySystem && typeof this.enemySystem.registerActiveEnemy === 'function') {
             this.enemySystem.registerActiveEnemy(enemy, { skipDuplicateCheck: true });
@@ -1530,12 +1573,31 @@ export class WaveManager {
   }
 
   /**
-   * Calculates spawn position on one of the 4 edges (legacy asteroid behavior).
-   * Replicates EnemySystem.spawnAsteroid() positioning logic (lines 2046-2083).
+   * WAVE-006: Posicionamento legado de asteroides nas 4 bordas
    *
-   * @param {Object} worldBounds - World dimensions {width, height}
-   * @param {Object} random - Random service instance
-   * @returns {Object} Position {x, y}
+   * Este método replica a lógica original de EnemySystem.spawnAsteroid()
+   * (linhas 2046-2083) para preservar comportamento baseline:
+   *
+   * - Seleciona uma das 4 bordas aleatoriamente (top/right/bottom/left)
+   * - Posiciona asteroide fora da tela com margin=80
+   * - Usa random scope 'spawn' para determinismo
+   *
+   * Ativado quando PRESERVE_LEGACY_POSITIONING=true (GameConstants linha 1744)
+   *
+   * Diferença vs. calculateSafeSpawnPosition():
+   * - Legacy: spawn nas bordas, pode estar próximo do player
+   * - Safe: spawn com distância mínima do player (melhor UX)
+   *
+   * NOTA: Este método será mantido mesmo após remoção do código legado,
+   * pois a mecânica de spawn nas bordas é parte do design do jogo.
+   *
+   * @param {Object} worldBounds - Dimensões do mundo {width, height}
+   * @param {Object} random - Instância de RandomService
+   * @returns {Object} Posição {x, y}
+   *
+   * @see EnemySystem.spawnAsteroid() para implementação original
+   * @see GameConstants.PRESERVE_LEGACY_POSITIONING
+   * @see docs/validation/asteroid-baseline-metrics.md (seção Posicionamento)
    */
   calculateEdgeSpawnPosition(
     worldBounds,
@@ -1626,7 +1688,39 @@ export class WaveManager {
   }
 
   /**
-   * Called when an enemy is destroyed.
+   * WAVE-004: Handler de destruição de inimigos para progressão automática de ondas
+   *
+   * Este método é chamado via evento 'enemy-destroyed' emitido por EnemySystem
+   * quando qualquer inimigo é destruído. Ele:
+   *
+   * 1. Incrementa enemiesKilledThisWave
+   * 2. Incrementa totalEnemiesThisWave se fragmentos foram criados
+   * 3. Verifica se wave está completa (killed >= total)
+   * 4. Chama completeWave() automaticamente quando condição satisfeita
+   *
+   * IMPORTANTE: Contabilização de fragmentos
+   * Quando um asteroide é destruído e gera fragmentos, o EnemySystem:
+   * - Cria N fragmentos via destroyAsteroid()
+   * - Registra cada fragmento via registerActiveEnemy()
+   * - Emite 'enemy-destroyed' com array de fragmentos
+   *
+   * Este método incrementa totalEnemiesThisWave += fragments.length para
+   * manter contabilidade correta. Sem isso, a wave nunca completaria pois
+   * killed nunca alcançaria total.
+   *
+   * Exemplo:
+   * - Wave 1 inicia com total=4 (4 asteroides large)
+   * - Asteroide 1 destruído → gera 3 fragmentos
+   * - totalEnemiesThisWave: 4 → 7 (4 + 3 fragmentos)
+   * - enemiesKilledThisWave: 0 → 1
+   * - Wave completa quando killed=7
+   *
+   * @param {Object} data - Evento de destruição
+   * @param {Object} data.enemy - Inimigo destruído
+   * @param {Array} data.fragments - Fragmentos criados (se houver)
+   *
+   * @see EnemySystem.destroyAsteroid() para geração de fragmentos
+   * @see docs/plans/phase1-enemy-foundation-plan.md (WAVE-004)
    */
   onEnemyDestroyed(data = {}) {
     if (!this.waveInProgress || this.totalEnemiesThisWave <= 0) {

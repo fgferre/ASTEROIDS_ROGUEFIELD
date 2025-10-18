@@ -69,6 +69,7 @@ class EnemySystem {
     this._waveSystemDebugLogged = false;
     this._waveManagerFallbackWarningIssued = false;
     this._waveManagerInvalidStateWarningIssued = false;
+    this._waveManagerWarningLogged = false;
     this._lastWaveManagerCompletionHandled = null;
     this._asteroidSpawnDebugLogged = false;
     this._waveManagerRuntimeEnabled = false;
@@ -1648,8 +1649,11 @@ class EnemySystem {
 
     this.sessionStats.timeElapsed += deltaTime;
 
-    // FEATURE FLAG: Roteamento entre sistema legado e WaveManager
-    if (waveManagerEnabled) {
+    // WAVE-002: Roteamento condicional baseado em feature flag
+    // USE_WAVE_MANAGER=true → updateWaveManagerLogic() (novo sistema)
+    // USE_WAVE_MANAGER=false → updateWaveLogic() (sistema legado)
+    // Ver docs/plans/phase1-enemy-foundation-plan.md (WAVE-002, WAVE-007)
+    if (waveManagerEnabled && this.waveManager) {
       if (!waveManagerControlsSpawn) {
         this.handleSpawning(deltaTime);
       }
@@ -1657,6 +1661,13 @@ class EnemySystem {
       this.updateWaveManagerLogic(deltaTime);
       this.updateAsteroids(deltaTime);
     } else {
+      if (!this._waveManagerWarningLogged && (!waveManagerEnabled || !this.waveManager)) {
+        console.warn(
+          '[EnemySystem] WaveManager indisponível, usando sistema legado'
+        );
+        this._waveManagerWarningLogged = true;
+      }
+
       this.updateAsteroids(deltaTime);
       this.updateWaveLogic(deltaTime);
     }
@@ -1665,6 +1676,22 @@ class EnemySystem {
     this.emitWaveStateUpdate();
   }
 
+  /**
+   * LEGACY: Sistema de ondas original (pré-WaveManager)
+   *
+   * Este método implementa a lógica de ondas original do jogo, incluindo:
+   * - Spawn de asteroides via handleSpawning()
+   * - Progressão de ondas via completeCurrentWave()
+   * - Contadores de waveState
+   *
+   * STATUS: Mantido como fallback quando USE_WAVE_MANAGER=false
+   *
+   * DEPRECATION: Será removido após validação completa do WaveManager
+   * em produção (WAVE-007 Fase 6). Não adicionar novas funcionalidades aqui.
+   *
+   * @see updateWaveManagerLogic() para nova implementação
+   * @see docs/validation/wave-007-rollback-plan.md para procedimento de rollback
+   */
   updateWaveLogic(deltaTime) {
     const wave = this.waveState;
 
@@ -1699,7 +1726,29 @@ class EnemySystem {
     }
   }
 
-  // EXPERIMENTAL: Delegação para WaveManager com sincronização de estado (docs/plans/phase1-enemy-foundation-plan.md)
+  /**
+   * WAVE-004: Sincronização bidirecional WaveManager ↔ waveState
+   *
+   * Este método é o ponto de integração principal entre o novo WaveManager
+   * e o sistema legado de ondas. Ele:
+   *
+   * 1. Delega atualização para WaveManager.update(deltaTime)
+   * 2. Sincroniza estado do WaveManager para waveState (compatibilidade com HUD)
+   * 3. Valida consistência de contadores em desenvolvimento
+   *
+   * Mapeamento de estado:
+   * - WaveManager.currentWave → waveState.current
+   * - WaveManager.inProgress → waveState.isActive
+   * - WaveManager.spawned → waveState.asteroidsSpawned
+   * - WaveManager.killed → waveState.asteroidsKilled
+   * - WaveManager.total → waveState.totalAsteroids
+   *
+   * IMPORTANTE: waveState é mantido para compatibilidade com sistemas que
+   * ainda não foram migrados para consumir WaveManager.getState() diretamente.
+   *
+   * @see WaveManager.getState() para estrutura de estado do WaveManager
+   * @see docs/plans/phase1-enemy-foundation-plan.md (WAVE-004)
+   */
   updateWaveManagerLogic(deltaTime) {
     const wave = this.waveState;
 
@@ -1999,7 +2048,22 @@ class EnemySystem {
     }
   }
 
-  // === SISTEMA DE SPAWNING ===
+  /**
+   * LEGACY: Controle de timing e spawn de asteroides (pré-WaveManager)
+   *
+   * Este método gerencia:
+   * - spawnTimer e spawnDelay com multiplicador random
+   * - Chamada a spawnAsteroid() quando timer expira
+   * - Respeito a MAX_ASTEROIDS_ON_SCREEN
+   *
+   * STATUS: Desativado quando WAVEMANAGER_HANDLES_ASTEROID_SPAWN=true
+   *
+   * DEPRECATION: Marcado para remoção em WAVE-007 Fase 6.
+   * WaveManager.spawnWave() substitui esta funcionalidade.
+   *
+   * @see WaveManager.spawnWave() para nova implementação
+   * @see GameConstants.WAVEMANAGER_HANDLES_ASTEROID_SPAWN
+   */
   handleSpawning(deltaTime) {
     // LEGACY: Used when WAVEMANAGER_HANDLES_ASTEROID_SPAWN=false
     const wave = this.waveState;
@@ -2100,6 +2164,27 @@ class EnemySystem {
     return boss;
   }
 
+  /**
+   * LEGACY: Spawn individual de asteroide (pré-WaveManager)
+   *
+   * Este método implementa:
+   * - Decisão de tamanho (50/30/20 distribution)
+   * - Posicionamento nas 4 bordas (top/right/bottom/left)
+   * - Decisão de variante via decideVariant()
+   * - Registro e emissão de evento
+   *
+   * STATUS: Usado como fallback quando WAVEMANAGER_HANDLES_ASTEROID_SPAWN=false
+   *
+   * DEPRECATION: Marcado para remoção em WAVE-007 Fase 6.
+   * WaveManager.generateDynamicWave() + spawnWave() substituem esta funcionalidade.
+   *
+   * NOTA: decideVariant() será mantido pois implementa lógica complexa
+   * de wave bonus e weighted distribution que é reutilizada pelo WaveManager.
+   *
+   * @see WaveManager.generateDynamicWave() para geração de configuração de wave
+   * @see WaveManager.spawnWave() para spawn via factory
+   * @see decideVariant() para lógica de variantes (mantida)
+   */
   spawnAsteroid() {
     if (!this.sessionActive) return null;
 

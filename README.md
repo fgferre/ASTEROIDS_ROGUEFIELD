@@ -103,118 +103,125 @@ Validam payloads, propriedades dinâmicas e preservação de estado do canvas.
 
 O projeto utiliza feature flags para permitir ativação controlada de funcionalidades experimentais:
 
-### `USE_WAVE_MANAGER` (Experimental)
+### `USE_WAVE_MANAGER` (Em Validação - WAVE-007)
 
-**Localização:** `src/core/GameConstants.js`
+**Localização:** `src/core/GameConstants.js` (linha 1742)
+
+**Status:** 🔄 **Em Validação Final** (WAVE-007)
 
 **Descrição:** Controla qual sistema de ondas é utilizado:
-- `false` (padrão): Sistema legado de ondas (100% estável)
-- `true`: Novo WaveManager com suporte a múltiplos tipos de inimigos
+- `false` (padrão atual): Sistema legado de ondas (100% estável)
+- `true` (em validação): Novo WaveManager com suporte a múltiplos tipos de inimigos
 
-**Como testar:**
+**Progresso da Integração:**
+- ✅ WAVE-001: Baseline metrics capturadas
+- ✅ WAVE-002: Feature flag implementada
+- ✅ WAVE-003: Renderização de Drone, Mine, Hunter completa
+- ✅ WAVE-004: WaveManager integrado ao loop principal
+- ✅ WAVE-005: RewardManager expandido para novos inimigos
+- ✅ WAVE-006: Spawn de asteroides migrado para WaveManager
+- 🔄 WAVE-007: Validação final em andamento
 
-1. Validar comportamento padrão (flag desativada):
+**Funcionalidades Implementadas:**
+- ✅ Listener de `enemy-destroyed` conectado para progressão automática
+- ✅ Inimigos spawned registrados no sistema ativo via `registerActiveEnemy()`
+- ✅ Parâmetros legados mapeados (spawn rate, delays, distribuição)
+- ✅ Eventos `wave-started` e `wave-complete` sincronizados
+- ✅ Renderização de novos inimigos (Drone, Mine, Hunter, Boss)
+- ✅ Reward system para todos os tipos de inimigos
+- ✅ Spawn de asteroides via WaveManager com flags de compatibilidade
 
-   ```bash
-   npm run test:baseline
-   npm run dev
-   ```
+**Como Validar (WAVE-007):**
 
-2. Ativar o WaveManager:
-   - Abrir `src/core/GameConstants.js`
-   - Alterar `USE_WAVE_MANAGER` para `true`
-   - Executar testes: `npm run test:baseline`
-   - Iniciar aplicação: `npm run dev`
-
-3. Verificar logs de debug:
-   - Abrir console do navegador
-   - Procurar por `[EnemySystem] Wave system: WaveManager` ou `Legacy`
-   - Confirmar que estado de ondas é sincronizado corretamente na HUD
-
-**Status:** Ativo (com flags de compatibilidade). WAVE-006 concluiu a migração de spawn de asteroides mantendo paridade com o sistema legado.
-
-**Funcionalidades implementadas:**
-- ✅ Listener de `enemy-destroyed` conectado para progressão automática de waves
-- ✅ Inimigos registrados via `registerActiveEnemy()` após spawn da factory
-- ✅ Parâmetros legados aplicados (`ASTEROIDS_PER_WAVE_BASE`, `ASTEROIDS_PER_WAVE_MULTIPLIER`, `WAVE_BREAK_TIME`)
-- ✅ Eventos `wave-started` e `wave-complete` sincronizados com HUD, áudio e efeitos
-- ✅ Migração de spawn de asteroides com flags de compatibilidade (WAVE-006)
-
-### Flags de Compatibilidade (WAVE-006)
-
-Para preservar comportamento baseline durante migração de asteroides:
-
-#### `WAVEMANAGER_HANDLES_ASTEROID_SPAWN`
-**Localização:** `src/core/GameConstants.js`  
-**Default:** `false`  
-**Descrição:** Ativa controle de spawn de asteroides pelo WaveManager (requer `USE_WAVE_MANAGER=true`).
-
-- `false`: EnemySystem usa `handleSpawning()` legado
-- `true`: WaveManager controla spawn via `generateDynamicWave()`
-
-#### `PRESERVE_LEGACY_SIZE_DISTRIBUTION`
-**Localização:** `src/core/GameConstants.js`  
-**Default:** `true`  
-**Descrição:** Controla distribuição de tamanhos de asteroides.
-
-- `true`: 50% large, 30% medium, 20% small (baseline)
-- `false`: 30% large, 40% medium, 30% small (otimizado para mix com outros inimigos)
-
-#### `PRESERVE_LEGACY_POSITIONING`
-**Localização:** `src/core/GameConstants.js`
-**Default:** `true`
-**Descrição:** Controla posicionamento de spawn de asteroides.
-
-- `true`: Spawn nas 4 bordas (top/right/bottom/left) com margin=80
-- `false`: Spawn com distância mínima do player (safe distance)
-
-#### `STRICT_LEGACY_SPAWN_SEQUENCE`
-**Localização:** `src/core/GameConstants.js`
-**Default:** `true`
-**Descrição:** Força posição e tamanho a compartilharem o mesmo stream `spawn`, reproduzindo a sequência determinística do legado.
-
-- `true`: Sequência idêntica à do EnemySystem para a mesma seed (recomendado para baseline)
-- `false`: Permite novas variações na ordem de spawn para experimentação
-
-**Como testar a migração completa:**
-
-1. Ativar todas as flags em `src/core/GameConstants.js`:
+1. **Ativar flags para validação:**
 
    ```javascript
+   // Em src/core/GameConstants.js
    USE_WAVE_MANAGER = true
    WAVEMANAGER_HANDLES_ASTEROID_SPAWN = true
    PRESERVE_LEGACY_SIZE_DISTRIBUTION = true
    PRESERVE_LEGACY_POSITIONING = true
-   STRICT_LEGACY_SPAWN_SEQUENCE = true
    ```
 
-2. Executar testes de baseline:
+2. **Executar testes automatizados:**
 
    ```bash
-   npm run test:baseline
+   npm run test:baseline  # Deve passar com 0 failures
+   npm test               # Suite completa
    ```
 
-3. Validação manual:
+3. **Validação manual in-game:**
 
    ```bash
    npm run dev
    ```
 
    - Jogar 10 waves completas
-   - Verificar que asteroides spawnam nas bordas
-   - Confirmar distribuição de tamanhos (50/30/20)
-   - Validar que variantes aparecem conforme esperado
+   - Validar boss wave (wave 5, 10)
+   - Validar novos inimigos (Drone, Mine, Hunter)
+   - Verificar rewards (XP orbs, health hearts)
+   - Monitorar performance (≥55 FPS)
+   - Verificar console (sem erros)
 
-4. Testar configuração otimizada (opcional):
-   - Desativar `PRESERVE_LEGACY_SIZE_DISTRIBUTION` e `PRESERVE_LEGACY_POSITIONING`
-   - Observar diferenças: mais asteroides médios/pequenos, spawn mais seguro
+4. **Preencher relatório de validação:**
+   - `docs/validation/wavemanager-integration-report.md`
 
-**Critério para ativação permanente:**
-- Validação em produção por pelo menos 1 semana com flags de compatibilidade ativas
-- Todos os testes de baseline passando
-- Aprovação formal da equipe
-- Remoção de `WAVEMANAGER_HANDLES_ASTEROID_SPAWN`, `PRESERVE_LEGACY_SIZE_DISTRIBUTION`, `PRESERVE_LEGACY_POSITIONING` e `STRICT_LEGACY_SPAWN_SEQUENCE` junto com `USE_WAVE_MANAGER`
+5. **Seguir checklist completo:**
+   - `docs/validation/wave-007-final-validation-checklist.md`
 
-**Documentação completa:** `docs/plans/phase1-enemy-foundation-plan.md` (seções WAVE-004 e WAVE-006)
+**Flags de Compatibilidade:**
 
-**Nota:** Estas flags serão removidas após validação completa e estabilização do WaveManager em produção.
+- `WAVEMANAGER_HANDLES_ASTEROID_SPAWN` (default: false)
+  - Ativa controle de spawn de asteroides pelo WaveManager
+  - Requer `USE_WAVE_MANAGER=true`
+
+- `PRESERVE_LEGACY_SIZE_DISTRIBUTION` (default: true)
+  - `true`: 50/30/20 (large/medium/small) - baseline original
+  - `false`: 30/40/30 - otimizado para mix com novos inimigos
+
+- `PRESERVE_LEGACY_POSITIONING` (default: true)
+  - `true`: Spawn nas 4 bordas (baseline original)
+  - `false`: Spawn com distância mínima do player
+
+**Critérios de Aprovação (WAVE-007):**
+- ✅ Todos os testes baseline passando
+- ✅ Métricas de spawn correspondem ao baseline (±2%)
+- ✅ Novos inimigos renderizam e funcionam corretamente
+- ✅ Boss spawns na wave 5, 10, 15 sem erros
+- ✅ Rewards dropam conforme especificado
+- ✅ Performance estável (≥55 FPS, sem memory leaks)
+- ✅ Console sem erros durante 10 waves
+
+**Procedimento de Rollback:**
+
+Se problemas críticos forem detectados:
+
+```javascript
+// Rollback rápido (2-5 min)
+USE_WAVE_MANAGER = false
+WAVEMANAGER_HANDLES_ASTEROID_SPAWN = false
+// Commit e redeploy
+```
+
+Ver `docs/validation/wave-007-rollback-plan.md` para procedimento completo.
+
+**Próximos Passos:**
+
+**Se WAVE-007 Aprovado:**
+1. Manter flags ativadas em produção
+2. Monitorar métricas por 1-2 semanas
+3. Após validação: remover código legado (Fase 6)
+4. Prosseguir para Phase 2: Boss System Enhancements
+
+**Se WAVE-007 Reprovado:**
+1. Desativar flags (rollback)
+2. Corrigir bloqueadores identificados
+3. Re-executar WAVE-007 completo
+
+**Documentação Completa:**
+- Plano de Fase 1: `docs/plans/phase1-enemy-foundation-plan.md`
+- Checklist WAVE-007: `docs/validation/wave-007-final-validation-checklist.md`
+- Baseline Metrics: `docs/validation/asteroid-baseline-metrics.md`
+- Plano de Rollback: `docs/validation/wave-007-rollback-plan.md`
+
+**Nota:** Esta seção será atualizada após conclusão de WAVE-007 com resultado final (Aprovado/Reprovado) e próximos passos.

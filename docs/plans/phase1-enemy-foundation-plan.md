@@ -629,3 +629,206 @@ A flag `USE_WAVE_MANAGER` será removida após:
 - Random scopes mantêm nomenclatura consistente para determinismo; `STRICT_LEGACY_SPAWN_SEQUENCE` garante que posição/tamanho usem o mesmo stream `spawn`
 - Flags podem ser removidas após validação completa e estabilização
 
+
+## ✅ Final Validation and Review (WAVE-007)
+
+**Status:** Em Execução → Atualizar após validação
+
+**Objetivo:** Validar integração completa do WaveManager com todas as feature flags ativadas, confirmar que novos inimigos funcionam corretamente, testar transições de ondas e boss spawns, e preparar sistema para ativação permanente.
+
+**Escopo da Validação:**
+
+1. **Validação Automatizada:**
+   - Executar `npm run test:baseline` com `USE_WAVE_MANAGER=true`
+   - Executar suite completa `npm test`
+   - Validar que todos os testes passam (0 failures)
+   - Confirmar métricas baseline preservadas (spawn rate, distribution, fragmentation)
+
+2. **Validação Manual In-Game:**
+   - Jogar 10 waves completas com flags ativadas
+   - Validar spawn de asteroides (waves 1-3)
+   - Validar boss wave (wave 5, 10)
+   - Validar novos inimigos (Drone wave 8+, Mine wave 6+, Hunter wave 9+)
+   - Validar reward system (XP orbs, health hearts)
+   - Validar performance (60 FPS, sem memory leaks)
+   - Validar ausência de erros no console
+
+3. **Análise de Resultados:**
+   - Preencher `docs/validation/wavemanager-integration-report.md`
+   - Classificar issues encontrados (bloqueador/crítico/não-bloqueador)
+   - Tomar decisão: Aprovado/Aprovado com ressalvas/Reprovado
+
+4. **Documentação e Preparação:**
+   - Adicionar comentários críticos no código
+   - Criar plano de rollback
+   - Preparar monitoramento em produção
+   - Atualizar documentação com status final
+
+**Checklist Detalhado:**
+- Documento completo: `docs/validation/wave-007-final-validation-checklist.md`
+- 6 fases: Preparação, Validação Automatizada, Validação Manual, Análise, Documentação, Limpeza (condicional)
+
+**Feature Flags para Validação:**
+```javascript
+USE_WAVE_MANAGER = true                      // Ativa WaveManager
+WAVEMANAGER_HANDLES_ASTEROID_SPAWN = true    // WaveManager controla spawn
+PRESERVE_LEGACY_SIZE_DISTRIBUTION = true     // Mantém 50/30/20
+PRESERVE_LEGACY_POSITIONING = true           // Mantém 4 bordas
+```
+
+**Critérios de Aprovação:**
+
+**Bloqueadores (impedem ativação):**
+- Qualquer teste baseline falhando
+- Crash ou erro crítico durante gameplay
+- Baseline metrics divergindo >5%
+- Boss não spawna ou quebra progressão
+- Performance <45 FPS ou memory leak detectado
+
+**Aprovado:**
+- Todos os testes passando
+- Métricas baseline preservadas (±2%)
+- Novos inimigos funcionando corretamente
+- Boss waves funcionais
+- Performance estável (≥55 FPS)
+- Console sem erros
+
+**Aprovado com Ressalvas:**
+- Testes passando com 1-3 issues não-bloqueadores
+- Issues documentados e agendados para correção
+- Monitoramento reforçado em produção
+
+**Comentários Críticos Adicionados:**
+
+1. **EnemySystem.js:**
+   - `updateWaveManagerLogic()` (linha ~1638): Explicação de sincronização bidirecional WaveManager ↔ waveState
+   - `updateWaveLogic()` (linha ~1644): Marcado como LEGACY, será removido após validação em produção
+   - `handleSpawning()` (linha ~1938): Marcado para remoção futura, mantido como fallback
+
+2. **WaveManager.js:**
+   - `onEnemyDestroyed()` (linha ~1627): Explicação de contabilização automática de fragmentos
+   - `spawnWave()` (linha ~1095): Explicação de registro via `registerActiveEnemy()` para integração com física/HUD
+   - `calculateEdgeSpawnPosition()` (linha ~1474): Referência à lógica legada de `EnemySystem.spawnAsteroid()`
+
+3. **GameConstants.js:**
+   - Feature flags (linha 1742-1747): Data de ativação, critérios de remoção, referência a WAVE-007
+
+**Plano de Rollback:**
+- Documento: `docs/validation/wave-007-rollback-plan.md`
+- Passos para desativar flags rapidamente
+- Comandos git para reverter
+- Checklist de validação pós-rollback
+
+**Monitoramento em Produção:**
+- Período: 1-2 semanas após ativação
+- Métricas: crash rate, FPS médio, tempo de wave, taxa de conclusão de boss waves
+- Critérios de rollback: crash rate >1%, FPS médio <50, feedback negativo consistente
+
+**Limpeza de Código Legado (Fase 6 - Condicional):**
+
+**⚠️ Executar APENAS após:**
+- Validação em produção por 1-2 semanas
+- Nenhum issue crítico reportado
+- Aprovação da equipe
+
+**Código a remover:**
+- `EnemySystem.handleSpawning()` (linha ~1938-1955)
+- `EnemySystem.spawnAsteroid()` (linha ~2037-2131)
+- `WaveManager.selectRandomVariant()` (linha ~921-951) se não usado
+- Feature flags: `USE_WAVE_MANAGER`, `WAVEMANAGER_HANDLES_ASTEROID_SPAWN`
+- Condicionais de flags em `update()` e `updateWaveLogic()`
+
+**Flags a manter como configurações:**
+- `PRESERVE_LEGACY_SIZE_DISTRIBUTION` - útil para balanceamento
+- `PRESERVE_LEGACY_POSITIONING` - útil para ajustes de gameplay
+
+**Resultados da Validação:**
+
+_A ser preenchido após execução de WAVE-007:_
+
+- **Data de Validação:** _____________
+- **Commit SHA Testado:** _____________
+- **Testes Automatizados:** ☐ Passou ☐ Falhou (detalhes: ___________)
+- **Validação Manual:** ☐ Passou ☐ Falhou (detalhes: ___________)
+- **Issues Encontrados:** _____________
+- **Decisão Final:** ☐ Aprovado ☐ Aprovado com ressalvas ☐ Reprovado
+- **Próximos Passos:** _____________
+
+**Critérios de Conclusão Atendidos:**
+- [ ] Checklist WAVE-007 executado completamente
+- [ ] Relatório de validação preenchido
+- [ ] Decisão tomada e documentada
+- [ ] Comentários críticos adicionados ao código
+- [ ] Plano de rollback criado
+- [ ] Documentação atualizada
+- [ ] Fase 6 (limpeza) executada OU agendada
+
+**Próximos Passos:**
+
+**Se Aprovado:**
+1. Manter flags ativadas em produção
+2. Monitorar métricas por 1-2 semanas
+3. Coletar feedback de usuários (se aplicável)
+4. Após período de monitoramento: executar Fase 6 (limpeza)
+5. Prosseguir para Phase 2: Boss System Enhancements (ver `phase2-boss-system-plan.md`)
+
+**Se Aprovado com Ressalvas:**
+1. Criar issues no GitHub para cada problema identificado
+2. Ativar flags em produção com monitoramento reforçado
+3. Corrigir issues não-bloqueadores em paralelo
+4. Re-validar após correções
+5. Prosseguir para limpeza após estabilização
+
+**Se Reprovado:**
+1. Desativar flags: `USE_WAVE_MANAGER = false`
+2. Criar issues para bloqueadores
+3. Corrigir bloqueadores
+4. Re-executar WAVE-007 completo
+5. Não prosseguir para Phase 2 até aprovação
+
+**Notas Técnicas:**
+- Sistema legado permanece 100% funcional como fallback
+- Rollback pode ser feito em <5 minutos (alterar flags + restart)
+- Determinismo preservado em ambos os sistemas (seeds compartilhados)
+- Performance validada em WAVE-003 (60 FPS com múltiplas instâncias)
+- Arquitetura modular permite correções cirúrgicas sem refatoração massiva
+
+---
+
+## 🎯 Conclusão da Phase 1: Enemy Foundation
+
+**Status Geral:** ✅ Implementação Completa → ⏳ Aguardando Validação Final (WAVE-007)
+
+**Fases Concluídas:**
+- ✅ WAVE-001: Baseline Metrics Captured
+- ✅ WAVE-002: Feature Flag Implementation
+- ✅ WAVE-003: Enemy Rendering Implementation
+- ✅ WAVE-004: WaveManager Integration
+- ✅ WAVE-005: Reward System Expansion
+- ✅ WAVE-006: Asteroid Spawn Migration
+- ⏳ WAVE-007: Final Validation and Review (em execução)
+
+**Conquistas:**
+- Sistema de ondas modular e escalável implementado
+- 4 novos tipos de inimigos (Drone, Mine, Hunter, Boss) prontos
+- Reward system expandido para todos os tipos
+- Baseline metrics preservadas com flags de compatibilidade
+- Arquitetura event-driven robusta
+- Determinismo garantido via RandomService
+- Performance otimizada (60 FPS, object pooling)
+- Cobertura de testes abrangente (920+ linhas de testes baseline)
+
+**Próxima Phase:**
+- **Phase 2: Boss System Enhancements** (ver `phase2-boss-system-plan.md`)
+- Melhorias em padrões de ataque do boss
+- Sistema de fases mais elaborado
+- Integração com VFX e áudio avançados
+- Boss loot table (core-upgrade, weapon-blueprint)
+
+**Lições Aprendidas:**
+- Feature flags são essenciais para migrações complexas
+- Baseline metrics devem ser capturados ANTES de qualquer mudança
+- Validação incremental (WAVE-001 a WAVE-006) reduz riscos
+- Manter código legado como fallback aumenta confiança
+- Documentação detalhada facilita manutenção futura
+- Testes automatizados são críticos para preservar comportamento

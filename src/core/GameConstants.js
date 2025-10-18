@@ -1739,11 +1739,78 @@ export const WAVE_DURATION = 60; // segundos
 export const WAVE_BREAK_TIME = 10; // segundos
 export const WAVE_BOSS_INTERVAL = 5;
 export const MAX_ASTEROIDS_ON_SCREEN = 20;
-export const USE_WAVE_MANAGER = false; // Feature flag para ativar o novo WaveManager (experimental). Consulte docs/plans/phase1-enemy-foundation-plan.md para critérios de remoção.
-export const PRESERVE_LEGACY_SIZE_DISTRIBUTION = true; // WAVE-006: Preservar distribuição legada de tamanhos de asteroides (50/30/20) para paridade com baseline
-export const PRESERVE_LEGACY_POSITIONING = true; // WAVE-006: Preservar posicionamento legado de asteroides (4 bordas) vs. safe distance
-export const WAVEMANAGER_HANDLES_ASTEROID_SPAWN = false; // WAVE-006: Ativar controle de spawn de asteroides pelo WaveManager (requer USE_WAVE_MANAGER=true)
-export const ASTEROID_EDGE_SPAWN_MARGIN = 80; // WAVE-006: Margem para posicionamento de spawn nas bordas (paridade com legado)
-export const STRICT_LEGACY_SPAWN_SEQUENCE = true; // WAVE-006: Garante que posição e tamanho reutilizem o mesmo stream de randomização
+
+// ============================================================================
+// WAVE MANAGER FEATURE FLAGS (WAVE-002, WAVE-006, WAVE-007)
+// ============================================================================
+//
+// Estas flags controlam a migração do sistema legado de ondas para o novo
+// WaveManager. Elas permitem ativação incremental e rollback rápido em caso
+// de problemas.
+//
+// STATUS ATUAL: Desativadas (aguardando validação WAVE-007)
+// DATA DE ATIVAÇÃO PLANEJADA: Após conclusão de WAVE-007
+//
+// CRITÉRIOS PARA ATIVAÇÃO PERMANENTE:
+// 1. Todos os testes baseline passando com flags ativadas
+// 2. Validação manual completa (10 waves + boss)
+// 3. Performance estável (≥55 FPS, sem memory leaks)
+// 4. Aprovação em WAVE-007 checklist
+// 5. Monitoramento em produção por 1-2 semanas sem issues críticos
+//
+// CRITÉRIOS PARA REMOÇÃO DAS FLAGS:
+// 1. Validação em produção bem-sucedida
+// 2. Nenhum issue crítico reportado
+// 3. Aprovação da equipe
+// 4. Código legado removido (WAVE-007 Fase 6)
+//
+// PROCEDIMENTO DE ROLLBACK:
+// Ver docs/validation/wave-007-rollback-plan.md
+//
+// DOCUMENTAÇÃO COMPLETA:
+// - Plano: docs/plans/phase1-enemy-foundation-plan.md (WAVE-001 a WAVE-007)
+// - Validação: docs/validation/wave-007-final-validation-checklist.md
+// - Baseline: docs/validation/asteroid-baseline-metrics.md
+// ============================================================================
+
+export const USE_WAVE_MANAGER = false;
+// Ativa o novo WaveManager em vez do sistema legado de ondas.
+// Quando true: WaveManager.update() controla progressão de ondas
+// Quando false: EnemySystem.updateWaveLogic() (sistema legado)
+// IMPACTO: Alto - afeta todo o sistema de ondas
+// ROLLBACK: Alterar para false e redeploy (2-5 min)
+
+export const PRESERVE_LEGACY_SIZE_DISTRIBUTION = true;
+// Controla distribuição de tamanhos de asteroides no WaveManager.
+// Quando true: 50% large, 30% medium, 20% small (baseline original)
+// Quando false: 30% large, 40% medium, 30% small (otimizado para mix)
+// IMPACTO: Médio - afeta balanceamento de ondas
+// NOTA: Pode ser mantida como configuração de balanceamento após remoção de outras flags
+
+export const PRESERVE_LEGACY_POSITIONING = true;
+// Controla posicionamento de spawn de asteroides.
+// Quando true: Spawn nas 4 bordas (top/right/bottom/left) com margin=80
+// Quando false: Spawn com distância mínima do player (safe distance)
+// IMPACTO: Médio - afeta gameplay e dificuldade
+// NOTA: Pode ser mantida como configuração de gameplay após remoção de outras flags
+
+export const WAVEMANAGER_HANDLES_ASTEROID_SPAWN = false;
+// Ativa controle de spawn de asteroides pelo WaveManager.
+// Requer USE_WAVE_MANAGER=true para ter efeito.
+// Quando true: WaveManager.spawnWave() controla spawn
+// Quando false: EnemySystem.handleSpawning() (sistema legado)
+// IMPACTO: Alto - afeta spawn de asteroides
+// ROLLBACK: Alterar para false e redeploy (2-5 min)
+
+export const ASTEROID_EDGE_SPAWN_MARGIN = 80;
+// Margem para posicionamento de spawn nas bordas (usado por calculateEdgeSpawnPosition).
+// Valor original do sistema legado, preservado para paridade com baseline.
+// NOTA: Esta constante será mantida mesmo após remoção de flags.
+
+export const STRICT_LEGACY_SPAWN_SEQUENCE = true;
+// Garante que posição e tamanho de asteroides reutilizem o mesmo stream de randomização.
+// Necessário para determinismo perfeito com baseline metrics.
+// IMPACTO: Baixo - afeta apenas determinismo de testes
+// NOTA: Pode ser removida se determinismo não for crítico
 
 console.log('[GameConstants] Loaded');
