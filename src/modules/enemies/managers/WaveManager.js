@@ -352,6 +352,11 @@ export class WaveManager {
           metadata: groupMetadata,
         });
 
+        // In strict legacy mode, asteroid size rolls happen during spawn to
+        // maintain the exact random call order used by the legacy
+        // EnemySystem. Consumers must therefore tolerate null/auto sizes in
+        // the wave configuration and rely on spawn-time resolution instead.
+
         metadata.spawnDistribution = distributionLabel;
         metadata.strictLegacySequence = true;
         metadata.targetAsteroidCount = normalizedBaseCount;
@@ -1196,6 +1201,15 @@ export class WaveManager {
           spawnDelay: effectiveSpawnDelay,
           spawnDelayMultiplier: this.spawnDelayMultiplier,
         };
+
+        if (
+          !isAsteroid &&
+          (enemyConfig.size === null ||
+            typeof enemyConfig.size === 'undefined' ||
+            enemyConfig.size === 'auto')
+        ) {
+          delete enemyConfig.size;
+        }
 
         if (groupMetadata && typeof groupMetadata === 'object') {
           enemyConfig.metadata = {
