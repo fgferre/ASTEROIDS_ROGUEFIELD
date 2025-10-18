@@ -13,7 +13,10 @@
     "test:visual-enemies": "echo 'Abra http://localhost:5173/scripts/visual-enemy-rendering-test.html no navegador' && npm run dev",
     "stress": "node scripts/run-stress-checks.mjs",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "update:history": "bash scripts/update-project-history.sh || powershell -ExecutionPolicy Bypass -File scripts/update-project-history.ps1",
+    "update:history:sh": "bash scripts/update-project-history.sh",
+    "update:history:ps1": "powershell -ExecutionPolicy Bypass -File scripts/update-project-history.ps1"
   },
   "devDependencies": {
     "grunt": "^1.6.1",

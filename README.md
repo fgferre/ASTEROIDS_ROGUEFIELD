@@ -36,3 +36,38 @@ WAVE-007 foi aprovado sem ressalvas. O código legado do sistema de ondas foi re
 comentários críticos foram atualizados e os novos contadores do HUD refletem todos os
 inimigos quando as flags de compatibilidade são desativadas.
 
+## Manutenção e Utilitários
+
+### Atualizar Histórico do Projeto
+
+O arquivo `docs/progress/historico_do_projeto.txt` contém o histórico completo de commits, branches e merges do projeto. Para mantê-lo atualizado:
+
+```bash
+npm run update:history
+```
+
+Este comando:
+- Extrai histórico completo do git
+- Formata de forma legível
+- Atualiza `docs/progress/historico_do_projeto.txt`
+- Lista branches disponíveis (incluindo wave-XX)
+- Mostra estatísticas do repositório
+
+**Quando executar:**
+- Após checkout para branch diferente
+- Após merge de branches wave-XX
+- Ao finalizar cada wave
+- Antes de criar documentação
+- Periodicamente (semanal/mensal)
+
+**Verificar atualização:**
+```bash
+# Ver data de geração
+head -5 docs/progress/historico_do_projeto.txt
+
+# Ver branches listados
+grep -A20 "Branches Disponíveis" docs/progress/historico_do_projeto.txt
+```
+
+**Nota:** O histórico também é atualizado automaticamente via GitHub Actions em cada push para main ou branches wave-*.
+
