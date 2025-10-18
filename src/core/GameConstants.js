@@ -1741,44 +1741,20 @@ export const WAVE_BOSS_INTERVAL = 5;
 export const MAX_ASTEROIDS_ON_SCREEN = 20;
 
 // ============================================================================
-// WAVE MANAGER FEATURE FLAGS (WAVE-002, WAVE-006, WAVE-007)
+// WAVE MANAGER CONFIGURATION (WAVE-007)
 // ============================================================================
 //
-// Estas flags controlam a migração do sistema legado de ondas para o novo
-// WaveManager. Elas permitem ativação incremental e rollback rápido em caso
-// de problemas.
-//
-// STATUS ATUAL: Desativadas (aguardando validação WAVE-007)
-// DATA DE ATIVAÇÃO PLANEJADA: Após conclusão de WAVE-007
-//
-// CRITÉRIOS PARA ATIVAÇÃO PERMANENTE:
-// 1. Todos os testes baseline passando com flags ativadas
-// 2. Validação manual completa (10 waves + boss)
-// 3. Performance estável (≥55 FPS, sem memory leaks)
-// 4. Aprovação em WAVE-007 checklist
-// 5. Monitoramento em produção por 1-2 semanas sem issues críticos
-//
-// CRITÉRIOS PARA REMOÇÃO DAS FLAGS:
-// 1. Validação em produção bem-sucedida
-// 2. Nenhum issue crítico reportado
-// 3. Aprovação da equipe
-// 4. Código legado removido (WAVE-007 Fase 6)
-//
-// PROCEDIMENTO DE ROLLBACK:
-// Ver docs/validation/wave-007-rollback-plan.md
+// O WaveManager é o controlador padrão de ondas desde WAVE-007. O código
+// legado foi removido e não existe feature flag para retornar ao sistema
+// anterior. Os parâmetros abaixo preservam compatibilidade visual e de
+// balanceamento com o baseline quando necessário.
 //
 // DOCUMENTAÇÃO COMPLETA:
 // - Plano: docs/plans/phase1-enemy-foundation-plan.md (WAVE-001 a WAVE-007)
 // - Validação: docs/validation/wave-007-final-validation-checklist.md
 // - Baseline: docs/validation/asteroid-baseline-metrics.md
+// - Rollback operacional: docs/validation/wave-007-rollback-plan.md
 // ============================================================================
-
-export const USE_WAVE_MANAGER = false;
-// Ativa o novo WaveManager em vez do sistema legado de ondas.
-// Quando true: WaveManager.update() controla progressão de ondas
-// Quando false: EnemySystem.updateWaveLogic() (sistema legado)
-// IMPACTO: Alto - afeta todo o sistema de ondas
-// ROLLBACK: Alterar para false e redeploy (2-5 min)
 
 export const PRESERVE_LEGACY_SIZE_DISTRIBUTION = true;
 // Controla distribuição de tamanhos de asteroides no WaveManager.
@@ -1793,14 +1769,6 @@ export const PRESERVE_LEGACY_POSITIONING = true;
 // Quando false: Spawn com distância mínima do player (safe distance)
 // IMPACTO: Médio - afeta gameplay e dificuldade
 // NOTA: Pode ser mantida como configuração de gameplay após remoção de outras flags
-
-export const WAVEMANAGER_HANDLES_ASTEROID_SPAWN = false;
-// Ativa controle de spawn de asteroides pelo WaveManager.
-// Requer USE_WAVE_MANAGER=true para ter efeito.
-// Quando true: WaveManager.spawnWave() controla spawn
-// Quando false: EnemySystem.handleSpawning() (sistema legado)
-// IMPACTO: Alto - afeta spawn de asteroides
-// ROLLBACK: Alterar para false e redeploy (2-5 min)
 
 export const ASTEROID_EDGE_SPAWN_MARGIN = 80;
 // Margem para posicionamento de spawn nas bordas (usado por calculateEdgeSpawnPosition).

@@ -20,144 +20,63 @@ Fornecer procedimento rápido e seguro para reverter a ativação do WaveManager
 
 ## Procedimento de Rollback
 
-### Opção 1: Rollback Rápido (Desativar Flags)
-
-**Tempo estimado:** 2-5 minutos
-
-**Passos:**
-
-1. **Desativar Feature Flags:**
-   ```bash
-   # Abrir GameConstants.js
-   code src/core/GameConstants.js
-
-   # Alterar linhas 1742-1745:
-   USE_WAVE_MANAGER = false
-   WAVEMANAGER_HANDLES_ASTEROID_SPAWN = false
-   # (manter outras flags inalteradas)
-   ```
-
-2. **Commit e Deploy:**
-   ```bash
-   git add src/core/GameConstants.js
-   git commit -m "ROLLBACK: Disable WaveManager flags (WAVE-007)"
-   git push origin main
-   # Executar deploy conforme processo da equipe
-   ```
-
-3. **Validar Rollback:**
-   - Abrir aplicação em produção
-   - Verificar console: deve aparecer `[EnemySystem] Wave system: Legacy`
-   - Jogar 2 waves completas
-   - Confirmar ausência de erros
-
-4. **Notificar Equipe:**
-   - Enviar mensagem: "WaveManager rollback executado. Sistema legado ativo."
-   - Registrar motivo do rollback
-   - Criar issue no GitHub com detalhes
-
-**Vantagens:**
-- Rápido (2-5 min)
-- Não requer rebuild
-- Preserva código do WaveManager para debug
-
-**Desvantagens:**
-- Flags permanecem no código
-- Requer novo deploy
-
-### Opção 2: Rollback Completo (Reverter Commit)
+### Caminho principal: Restaurar release estável anterior
 
 **Tempo estimado:** 5-10 minutos
 
 **Passos:**
 
-1. **Identificar Commit Anterior:**
+1. **Identificar o commit ou tag estável:**
    ```bash
-   git log --oneline -10
-   # Identificar commit ANTES de "WAVE-007: Activate feature flags"
-   # Exemplo: abc1234
+   git fetch origin --tags
+   git log --oneline origin/main | head -n 20
+   # Selecionar o commit imediatamente anterior à regressão (ex.: tag release-2025-10-10)
    ```
 
-2. **Reverter para Commit Anterior:**
+2. **Criar commit de rollback:**
    ```bash
-   # Opção A: Revert (cria novo commit)
-   git revert <commit-sha-wave-007>
-   git push origin main
-
-   # Opção B: Reset (reescreve histórico - usar com cautela)
-   git reset --hard <commit-sha-anterior>
-   git push origin main --force
+   # Mantendo histórico limpo
+   git revert <sha-problematico>..HEAD
+   # ou revert unitário se apenas um commit causou o problema
+   git push origin HEAD
    ```
 
-3. **Rebuild e Deploy:**
+   > ⚠️ Se múltiplos commits estiverem envolvidos, prefira abrir um branch de emergência e criar um PR com o revert agregado para revisão rápida.
+
+3. **Gerar build e publicar:**
    ```bash
-   npm install
+   npm ci
    npm run build
-   # Executar deploy conforme processo da equipe
+   # Executar pipeline/deploy conforme processo da equipe
    ```
 
-4. **Validar Rollback:**
-   - Executar `npm run test:baseline`
-   - Confirmar que todos os testes passam
-   - Abrir aplicação e jogar 2 waves
-   - Verificar ausência de erros
+4. **Validar ambiente restaurado:**
+   - Executar `npm test` (ou pipeline equivalente) para garantir sanidade.
+   - Abrir a aplicação e jogar 2 waves para verificar estabilidade.
+   - Confirmar ausência de erros de console ou travamentos.
 
-5. **Notificar Equipe:**
-   - Enviar mensagem: "Rollback completo executado. Código revertido para commit <sha>."
-   - Registrar motivo e lições aprendidas
+5. **Comunicar stakeholders:**
+   - Informar que o rollback foi executado e o commit/timeline envolvidos.
+   - Registrar o incidente e criar issue de acompanhamento com causa raiz.
 
-**Vantagens:**
-- Remove completamente código problemático
-- Histórico limpo (se usar revert)
+### Alternativa: Reimplantar artefato conhecido
 
-**Desvantagens:**
-- Mais lento (5-10 min)
-- Requer rebuild
-- Perde código do WaveManager (precisa re-aplicar depois)
+Caso exista um build estável arquivado (artefato CI/CD):
 
-### Opção 3: Rollback Parcial (Desativar Apenas Spawn)
-
-**Tempo estimado:** 2-5 minutos
-
-**Quando usar:** Se WaveManager funciona mas spawn de asteroides tem problemas.
-
-**Passos:**
-
-1. **Desativar Apenas Spawn de Asteroides:**
-   ```bash
-   # Alterar apenas linha 1745:
-   WAVEMANAGER_HANDLES_ASTEROID_SPAWN = false
-   # (manter USE_WAVE_MANAGER = true)
-   ```
-
-2. **Commit e Deploy:**
-   ```bash
-   git add src/core/GameConstants.js
-   git commit -m "PARTIAL ROLLBACK: Disable asteroid spawn via WaveManager"
-   git push origin main
-   ```
-
-3. **Validar:**
-   - WaveManager continua ativo para novos inimigos
-   - Asteroides usam sistema legado
-   - Jogar até wave 10 (incluindo boss)
-
-**Vantagens:**
-- Preserva novos inimigos (Drone, Mine, Hunter, Boss)
-- Isola problema de spawn de asteroides
-
-**Desvantagens:**
-- Sistema híbrido (pode ter inconsistências)
+1. Selecionar o artefato aprovado.
+2. Publicar novamente no ambiente afetado.
+3. Atualizar `main` com um commit "revert" equivalente para manter histórico consistente.
+4. Seguir as mesmas validações e comunicação descritas acima.
 
 ## Checklist Pós-Rollback
 
 ### Validação Técnica
 - [ ] Aplicação carrega sem erros
-- [ ] Console mostra sistema correto ativo (Legacy ou WaveManager)
-- [ ] Testes baseline passam: `npm run test:baseline`
-- [ ] Jogar 5 waves completas sem erros
+- [ ] Build revertido corresponde ao commit/tag planejado
+- [ ] Suite automatizada (ex.: `npm test`) passa sem falhas
+- [ ] Jogar 5 waves completas sem erros ou quedas de FPS
 - [ ] Performance estável (≥55 FPS)
-- [ ] Memory usage normal (<100MB após 5 waves)
+- [ ] Uso de memória dentro da linha base (<100MB após 5 waves)
 
 ### Comunicação
 - [ ] Equipe notificada sobre rollback
@@ -178,24 +97,22 @@ Fornecer procedimento rápido e seguro para reverter a ativação do WaveManager
 
 ## Prevenção de Rollbacks Futuros
 
-### Antes de Ativar Flags
-- [ ] Executar WAVE-007 checklist completo
-- [ ] Todos os testes automatizados passando
-- [ ] Validação manual em ambiente de staging
-- [ ] Code review por pelo menos 2 pessoas
-- [ ] Aprovação de stakeholders
+### Antes de promover nova versão
+- [ ] Executar checklist WAVE-007 (ou sucessor) completo
+- [ ] Garantir aprovação em code review e QA
+- [ ] Preparar ponto de restauração (tag ou artefato) antes do deploy
+- [ ] Comunicar janela de lançamento e plano de contingência
 
-### Durante Ativação
-- [ ] Ativar flags em horário de baixo tráfego
-- [ ] Monitorar métricas em tempo real (primeiros 30 min)
-- [ ] Ter equipe disponível para rollback rápido
-- [ ] Comunicar ativação para equipe
+### Durante o rollout
+- [ ] Monitorar métricas críticas em tempo real (primeiros 30 min)
+- [ ] Manter equipe de prontidão para revert imediato
+- [ ] Registrar qualquer anomalia observada
 
-### Após Ativação
-- [ ] Monitorar métricas por 24-48 horas
-- [ ] Coletar feedback de usuários
-- [ ] Revisar logs diariamente
-- [ ] Manter plano de rollback acessível
+### Após o rollout
+- [ ] Acompanhar métricas por 24-48 horas
+- [ ] Coletar feedback de usuários e moderadores
+- [ ] Revisar logs diariamente e arquivar incidentes
+- [ ] Manter este plano acessível e atualizado
 
 ## Contatos de Emergência
 
@@ -217,4 +134,4 @@ _Preencher com informações da equipe:_
 - Checklist de Validação: `docs/validation/wave-007-final-validation-checklist.md`
 - Plano de Fase 1: `docs/plans/phase1-enemy-foundation-plan.md`
 - Relatório de Integração: `docs/validation/wavemanager-integration-report.md`
-- GameConstants.js: `src/core/GameConstants.js` (linhas 1742-1747)
+- GameConstants.js: `src/core/GameConstants.js` (seção "WAVE MANAGER CONFIGURATION (WAVE-007)")

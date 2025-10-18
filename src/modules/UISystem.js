@@ -4255,6 +4255,9 @@ class UISystem {
 
     const force = Boolean(options.force);
 
+    const usesAllEnemyTotals = Boolean(waveData.usesAllEnemyTotals);
+    const countLabel = usesAllEnemyTotals ? 'Enemies' : 'Asteroides';
+
     const normalized = {
       current: Math.max(1, Math.floor(waveData.current ?? 1)),
       completedWaves: Math.max(0, Math.floor(waveData.completedWaves ?? 0)),
@@ -4373,7 +4376,16 @@ class UISystem {
 
       if (waveRefs.enemies.textContent !== enemiesText) {
         waveRefs.enemies.textContent = enemiesText;
-        waveRefs.enemies.title = enemiesText === '--' ? '' : enemiesText;
+      }
+
+      waveRefs.enemies.dataset.countLabel = countLabel;
+      if (enemiesText === '--') {
+        waveRefs.enemies.title = '';
+        waveRefs.enemies.removeAttribute('aria-label');
+      } else {
+        const labeledText = `${countLabel}: ${enemiesText}`;
+        waveRefs.enemies.title = labeledText;
+        waveRefs.enemies.setAttribute('aria-label', labeledText);
       }
 
       const newEnemiesLength = enemiesText.length;

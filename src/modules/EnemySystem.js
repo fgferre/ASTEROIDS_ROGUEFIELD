@@ -69,12 +69,8 @@ class EnemySystem {
     this._nextAsteroidPoolId = 1;
     this._snapshotFallbackWarningIssued = false;
     this._waveSystemDebugLogged = false;
-    this._waveManagerFallbackWarningIssued = false;
-    this._waveManagerInvalidStateWarningIssued = false;
     this._waveManagerWarningLogged = false;
     this._lastWaveManagerCompletionHandled = null;
-    this._asteroidSpawnDebugLogged = false;
-    this._waveManagerRuntimeEnabled = false;
 
     // Factory (optional - new architecture)
     this.factory = null;
@@ -229,7 +225,7 @@ class EnemySystem {
 
       if (this.waveManager) {
         bus.on('wave-complete', (data = {}) => {
-          if (Boolean(CONSTANTS?.USE_WAVE_MANAGER) && this.waveState) {
+          if (this.waveState) {
             const waveNumber = Number.isFinite(Number(data.wave))
               ? Number(data.wave)
               : Number.isFinite(this.waveState.current)
@@ -1528,6 +1524,7 @@ class EnemySystem {
       spawnTimer: 0,
       spawnDelay: 1.0,
       initialSpawnDone: false,
+      usesAllEnemyTotals: false,
     };
   }
 
@@ -1552,6 +1549,8 @@ class EnemySystem {
           breakTimer: Math.max(0, this.waveState.breakTimer),
           completedWaves: this.waveState.completedWaves,
           timeRemaining: Math.max(0, this.waveState.timeRemaining),
+          asteroidsSpawned: this.waveState.asteroidsSpawned,
+          usesAllEnemyTotals: Boolean(this.waveState.usesAllEnemyTotals),
         }
       : null;
 
@@ -1574,6 +1573,8 @@ class EnemySystem {
         ? Math.max(0, Math.ceil(wave?.breakTimer ?? 0))
         : 0,
       completedWaves: wave?.completedWaves ?? 0,
+      asteroidsSpawned: wave?.asteroidsSpawned ?? 0,
+      usesAllEnemyTotals: Boolean(wave?.usesAllEnemyTotals),
       totalKills: session?.totalKills ?? 0,
       sessionTimeSeconds: session
         ? Math.max(0, Math.floor(session.timeElapsed ?? 0))
@@ -1590,6 +1591,8 @@ class EnemySystem {
         prev.timeRemainingSeconds === snapshot.timeRemainingSeconds &&
         prev.breakTimerSeconds === snapshot.breakTimerSeconds &&
         prev.completedWaves === snapshot.completedWaves &&
+        prev.asteroidsSpawned === snapshot.asteroidsSpawned &&
+        prev.usesAllEnemyTotals === snapshot.usesAllEnemyTotals &&
         prev.totalKills === snapshot.totalKills &&
         prev.sessionTimeSeconds === snapshot.sessionTimeSeconds;
 
@@ -1614,130 +1617,61 @@ class EnemySystem {
 
     this.refreshInjectedServices();
 
-    const waveManagerOverride =
-      typeof globalThis !== 'undefined' &&
-      globalThis.__USE_WAVE_MANAGER_OVERRIDE__ === true;
-
-    const constantsFlag =
-      typeof CONSTANTS?.USE_WAVE_MANAGER === 'boolean'
-        ? CONSTANTS.USE_WAVE_MANAGER
-        : false;
-
-    const waveManagerEnabled = constantsFlag || waveManagerOverride;
+    const waveManagerActive = Boolean(this.waveManager);
 
     if (!this._waveSystemDebugLogged) {
       if (isDev) {
         console.debug(
           `[EnemySystem] Wave system: ${
-            waveManagerEnabled ? 'WaveManager' : 'Legacy'
+            waveManagerActive ? 'WaveManager' : 'Unavailable'
           }`
         );
       }
       this._waveSystemDebugLogged = true;
     }
 
-    this._waveManagerRuntimeEnabled = waveManagerEnabled;
-
-    const waveManagerHandlesSpawnFlag =
-      (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
-      this._waveManagerRuntimeEnabled;
-    const waveManagerControlsSpawn = Boolean(
-      waveManagerHandlesSpawnFlag && this.waveManager
-    );
-
-    if (!this._asteroidSpawnDebugLogged) {
+    if (!waveManagerActive && !this._waveManagerWarningLogged) {
       if (isDev) {
-        console.debug(
-          `[EnemySystem] Asteroid spawn: ${
-            waveManagerControlsSpawn ? 'WaveManager' : 'Legacy handleSpawning()'
-          }`
+        console.warn(
+          '[EnemySystem] WaveManager indisponível — fallback legado removido após WAVE-007'
         );
       }
-      this._asteroidSpawnDebugLogged = true;
+      this._waveManagerWarningLogged = true;
     }
 
     this.sessionStats.timeElapsed += deltaTime;
 
-    // WAVE-002: Roteamento condicional baseado em feature flag
-    // USE_WAVE_MANAGER=true → updateWaveManagerLogic() (novo sistema)
-    // USE_WAVE_MANAGER=false → updateWaveLogic() (sistema legado)
-    // Ver docs/plans/phase1-enemy-foundation-plan.md (WAVE-002, WAVE-007)
-    if (waveManagerEnabled && this.waveManager) {
-      if (!waveManagerControlsSpawn) {
-        this.handleSpawning(deltaTime);
-      }
-
+    if (waveManagerActive) {
       this.updateWaveManagerLogic(deltaTime);
-      this.updateAsteroids(deltaTime);
-    } else {
-      if (
-        !this._waveManagerWarningLogged &&
-        (!waveManagerEnabled || !this.waveManager)
-      ) {
-        if (isDev) {
-          console.warn(
-            '[EnemySystem] WaveManager indisponível, usando sistema legado'
-          );
-        }
-        this._waveManagerWarningLogged = true;
-      }
-
-      this.updateAsteroids(deltaTime);
-      this.updateWaveLogic(deltaTime);
     }
+
+    this.updateAsteroids(deltaTime);
     this.cleanupDestroyed();
 
     this.emitWaveStateUpdate();
   }
 
-  /**
-   * LEGACY: Sistema de ondas original (pré-WaveManager)
-   *
-   * Este método implementa a lógica de ondas original do jogo, incluindo:
-   * - Spawn de asteroides via handleSpawning()
-   * - Progressão de ondas via completeCurrentWave()
-   * - Contadores de waveState
-   *
-   * STATUS: Mantido como fallback quando USE_WAVE_MANAGER=false
-   *
-   * DEPRECATION: Será removido após validação completa do WaveManager
-   * em produção (WAVE-007 Fase 6). Não adicionar novas funcionalidades aqui.
-   *
-   * @see updateWaveManagerLogic() para nova implementação
-   * @see docs/validation/wave-007-rollback-plan.md para procedimento de rollback
-   */
-  updateWaveLogic(deltaTime) {
-    const wave = this.waveState;
-
-    if (!wave) return;
-
-    const waveManagerHandlesSpawn =
-      (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
-      this._waveManagerRuntimeEnabled &&
+  getLegacyAsteroidCompatibilityMode() {
+    if (
       this.waveManager &&
-      !this._waveManagerFallbackWarningIssued &&
-      !this._waveManagerInvalidStateWarningIssued;
-
-    if (wave.isActive) {
-      wave.timeRemaining = Math.max(0, wave.timeRemaining - deltaTime);
-      if (!waveManagerHandlesSpawn) {
-        this.handleSpawning(deltaTime);
-      }
-
-      const allAsteroidsKilled =
-        wave.asteroidsKilled >= wave.totalAsteroids &&
-        this.getActiveEnemyCount() === 0;
-
-      if (wave.timeRemaining <= 0 || allAsteroidsKilled) {
-        this.completeCurrentWave();
-      }
-    } else if (wave.breakTimer > 0) {
-      wave.breakTimer = Math.max(0, wave.breakTimer - deltaTime);
-
-      if (wave.breakTimer === 0) {
-        this.startNextWave();
+      typeof this.waveManager.isLegacyAsteroidCompatibilityEnabled === 'function'
+    ) {
+      try {
+        const result = this.waveManager.isLegacyAsteroidCompatibilityEnabled();
+        if (typeof result === 'boolean') {
+          return result;
+        }
+      } catch (error) {
+        if (isDev) {
+          console.warn(
+            '[EnemySystem] Falha ao consultar compatibilidade legado via WaveManager:',
+            error
+          );
+        }
       }
     }
+
+    return CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
   }
 
   /**
@@ -1770,25 +1704,13 @@ class EnemySystem {
       return;
     }
 
-    if (!this.waveManager) {
-      if (!this._waveManagerFallbackWarningIssued) {
-        if (isDev) {
-          console.warn(
-            '[EnemySystem] WaveManager indisponível. Recuando para updateWaveLogic() enquanto USE_WAVE_MANAGER está ativo.'
-          );
-        }
-        this._waveManagerFallbackWarningIssued = true;
-      }
-      this.updateWaveLogic(deltaTime);
-      return;
-    }
-
     this.waveManager.update(deltaTime);
 
     const managerState = this.waveManager.getState ? this.waveManager.getState() : null;
 
     const managerStateValid =
       managerState &&
+      typeof managerState === 'object' &&
       managerState.currentWave !== undefined &&
       managerState.inProgress !== undefined &&
       managerState.spawned !== undefined &&
@@ -1796,15 +1718,11 @@ class EnemySystem {
       managerState.total !== undefined;
 
     if (!managerStateValid) {
-      if (!this._waveManagerInvalidStateWarningIssued) {
-        if (isDev) {
-          console.warn(
-            '[EnemySystem] WaveManager returned invalid state. Falling back to updateWaveLogic() while USE_WAVE_MANAGER is active.'
-          );
-        }
-        this._waveManagerInvalidStateWarningIssued = true;
+      if (isDev) {
+        console.warn(
+          '[EnemySystem] WaveManager returned invalid state snapshot — aguardando próxima atualização.'
+        );
       }
-      this.updateWaveLogic(deltaTime);
       return;
     }
 
@@ -1818,12 +1736,7 @@ class EnemySystem {
 
     wave.current = managerState.currentWave ?? previousCurrent;
     wave.isActive = managerState.inProgress ?? previousIsActive;
-    const waveManagerHandlesAsteroids =
-      (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
-      this._waveManagerRuntimeEnabled;
-    const legacyCompatibilityEnabled =
-      (CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true) &&
-      waveManagerHandlesAsteroids;
+    const legacyCompatibilityEnabled = this.getLegacyAsteroidCompatibilityMode();
 
     const totals = managerState.totals || {};
     const counts = managerState.counts || {};
@@ -1878,6 +1791,10 @@ class EnemySystem {
       );
     }
 
+    // Quando usamos totais gerais (compatibilidade desativada) o HUD passa a exibir
+    // "Enemies" em vez de "Asteroides" para evitar confusão com novos inimigos.
+    wave.usesAllEnemyTotals = !legacyCompatibilityEnabled;
+
     const stateChanged =
       wave.current !== previousCurrent ||
       wave.isActive !== previousIsActive ||
@@ -1920,13 +1837,7 @@ class EnemySystem {
     this.waveState.initialSpawnDone = false;
 
     if (this.waveManager) {
-      const waveManagerHandlesAsteroids =
-        (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
-        this._waveManagerRuntimeEnabled;
-      const legacyCompatibilityEnabled =
-        (CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true) &&
-        waveManagerHandlesAsteroids;
-
+      const legacyCompatibilityEnabled = this.getLegacyAsteroidCompatibilityMode();
       const managerAsteroidTotal = Number(
         this.waveManager.totalAsteroidEnemiesThisWave
       );
@@ -1942,6 +1853,8 @@ class EnemySystem {
       } else if (Number.isFinite(managerAllEnemiesTotal)) {
         this.waveState.totalAsteroids = managerAllEnemiesTotal;
       }
+
+      this.waveState.usesAllEnemyTotals = !legacyCompatibilityEnabled;
     }
 
     if (!Number.isFinite(Number(this.waveState.asteroidsSpawned))) {
@@ -2115,54 +2028,6 @@ class EnemySystem {
     }
   }
 
-  /**
-   * LEGACY: Controle de timing e spawn de asteroides (pré-WaveManager)
-   *
-   * Este método gerencia:
-   * - spawnTimer e spawnDelay com multiplicador random
-   * - Chamada a spawnAsteroid() quando timer expira
-   * - Respeito a MAX_ASTEROIDS_ON_SCREEN
-   *
-   * STATUS: Desativado quando WAVEMANAGER_HANDLES_ASTEROID_SPAWN=true
-   *
-   * DEPRECATION: Marcado para remoção em WAVE-007 Fase 6.
-   * WaveManager.spawnWave() substitui esta funcionalidade.
-   *
-   * @see WaveManager.spawnWave() para nova implementação
-   * @see GameConstants.WAVEMANAGER_HANDLES_ASTEROID_SPAWN
-   */
-  handleSpawning(deltaTime) {
-    // LEGACY: Used when WAVEMANAGER_HANDLES_ASTEROID_SPAWN=false
-    const wave = this.waveState;
-    if (!wave || !wave.isActive) {
-      return;
-    }
-
-    this.spawnTimer -= deltaTime;
-
-    if (this.shouldSpawn() && this.spawnTimer <= 0) {
-      this.spawnAsteroid();
-      const spawnRandom = this.getRandomScope('spawn') || this.getRandomService();
-      const delayMultiplier =
-        spawnRandom && typeof spawnRandom.range === 'function'
-          ? spawnRandom.range(0.5, 1)
-          : 0.5 + spawnRandom.float() * 0.5;
-      this.spawnTimer = wave.spawnDelay * delayMultiplier;
-    }
-  }
-
-  shouldSpawn() {
-    const wave = this.waveState;
-    if (!wave || !wave.isActive) {
-      return false;
-    }
-
-    return (
-      wave.asteroidsSpawned < wave.totalAsteroids &&
-      this.getActiveEnemyCount() < CONSTANTS.MAX_ASTEROIDS_ON_SCREEN
-    );
-  }
-
   spawnBoss(config = {}) {
     const waveNumber = Number.isFinite(config.wave)
       ? config.wave
@@ -2229,126 +2094,6 @@ class EnemySystem {
     }
 
     return boss;
-  }
-
-  /**
-   * LEGACY: Spawn individual de asteroide (pré-WaveManager)
-   *
-   * Este método implementa:
-   * - Decisão de tamanho (50/30/20 distribution)
-   * - Posicionamento nas 4 bordas (top/right/bottom/left)
-   * - Decisão de variante via decideVariant()
-   * - Registro e emissão de evento
-   *
-   * STATUS: Usado como fallback quando WAVEMANAGER_HANDLES_ASTEROID_SPAWN=false
-   *
-   * DEPRECATION: Marcado para remoção em WAVE-007 Fase 6.
-   * WaveManager.generateDynamicWave() + spawnWave() substituem esta funcionalidade.
-   *
-   * NOTA: decideVariant() será mantido pois implementa lógica complexa
-   * de wave bonus e weighted distribution que é reutilizada pelo WaveManager.
-   *
-   * @see WaveManager.generateDynamicWave() para geração de configuração de wave
-   * @see WaveManager.spawnWave() para spawn via factory
-   * @see decideVariant() para lógica de variantes (mantida)
-   */
-  spawnAsteroid() {
-    if (!this.sessionActive) return null;
-
-    const spawnContext = this.createScopedRandom('spawn', 'asteroid-spawn');
-    const globalRandom = this.getRandomService();
-    const spawnRandom =
-      spawnContext.random || this.getRandomScope('spawn') || globalRandom;
-    const floatRandom =
-      spawnRandom && typeof spawnRandom.float === 'function' ? spawnRandom : globalRandom;
-    const side =
-      spawnRandom && typeof spawnRandom.int === 'function'
-        ? spawnRandom.int(0, 3)
-        : Math.floor(floatRandom.float() * 4);
-    let x;
-    let y;
-    const margin =
-      typeof CONSTANTS.ASTEROID_EDGE_SPAWN_MARGIN === 'number'
-        ? CONSTANTS.ASTEROID_EDGE_SPAWN_MARGIN
-        : 80;
-
-    switch (side) {
-      case 0:
-        x =
-          spawnRandom && typeof spawnRandom.range === 'function'
-            ? spawnRandom.range(0, CONSTANTS.GAME_WIDTH)
-            : floatRandom.float() * CONSTANTS.GAME_WIDTH;
-        y = -margin;
-        break;
-      case 1:
-        x = CONSTANTS.GAME_WIDTH + margin;
-        y =
-          spawnRandom && typeof spawnRandom.range === 'function'
-            ? spawnRandom.range(0, CONSTANTS.GAME_HEIGHT)
-            : floatRandom.float() * CONSTANTS.GAME_HEIGHT;
-        break;
-      case 2:
-        x =
-          spawnRandom && typeof spawnRandom.range === 'function'
-            ? spawnRandom.range(0, CONSTANTS.GAME_WIDTH)
-            : floatRandom.float() * CONSTANTS.GAME_WIDTH;
-        y = CONSTANTS.GAME_HEIGHT + margin;
-        break;
-      default:
-        x = -margin;
-        y =
-          spawnRandom && typeof spawnRandom.range === 'function'
-            ? spawnRandom.range(0, CONSTANTS.GAME_HEIGHT)
-            : floatRandom.float() * CONSTANTS.GAME_HEIGHT;
-        break;
-    }
-
-    let size;
-    const rand = floatRandom.float();
-    if (rand < 0.5) size = 'large';
-    else if (rand < 0.8) size = 'medium';
-    else size = 'small';
-
-    const waveNumber = this.waveState?.current || 1;
-    const variant = this.decideVariant(size, {
-      wave: waveNumber,
-      spawnType: 'spawn',
-      random: this.getRandomScope('variants'),
-    });
-
-    const asteroidRandom = spawnRandom?.fork
-      ? spawnRandom.fork('asteroid-core')
-      : null;
-
-    const asteroid = this.acquireAsteroid({
-      x,
-      y,
-      size,
-      variant,
-      wave: waveNumber,
-      random: asteroidRandom,
-      randomScope: 'spawn',
-    });
-
-    this.registerActiveEnemy(asteroid);
-
-    if (this.waveState && this.waveState.isActive) {
-      this.waveState.asteroidsSpawned += 1;
-    }
-
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('enemy-spawned', {
-        enemy: asteroid,
-        type: 'asteroid',
-        size,
-        variant,
-        wave: waveNumber,
-        maxHealth: asteroid.maxHealth,
-        position: { x, y },
-      });
-    }
-
-    return asteroid;
   }
 
   applyDamage(asteroid, damage, options = {}) {
@@ -2445,19 +2190,6 @@ class EnemySystem {
     }
 
     this.emitWaveStateUpdate();
-
-    if (this.waveState && this.waveState.isActive) {
-      const allAsteroidsKilled =
-        this.waveState.asteroidsKilled >= this.waveState.totalAsteroids &&
-        this.getActiveEnemyCount() === 0;
-
-      const usingWaveManager =
-        this.useManagers && Boolean(CONSTANTS?.USE_WAVE_MANAGER) && this.waveManager;
-
-      if (!usingWaveManager && allAsteroidsKilled && this.waveState.timeRemaining > 0) {
-        this.completeCurrentWave();
-      }
-    }
 
     return fragments;
   }
@@ -3127,25 +2859,6 @@ class EnemySystem {
     return this.importState(snapshot);
   }
 
-  // === INTERFACE PARA OUTROS SISTEMAS ===
-  spawnInitialAsteroids(count = 4) {
-    if (!this.waveState) return;
-
-    const remaining = Math.max(
-      0,
-      this.waveState.totalAsteroids - this.waveState.asteroidsSpawned
-    );
-
-    const spawnCount = Math.min(count, remaining);
-
-    for (let i = 0; i < spawnCount; i++) {
-      this.spawnAsteroid();
-    }
-
-    this.waveState.initialSpawnDone = true;
-    console.log(`[EnemySystem] Spawned ${spawnCount} initial asteroids`);
-  }
-
   // === RESET E CLEANUP ===
   reset() {
     this.releaseAllAsteroidsToPool();
@@ -3164,7 +2877,10 @@ class EnemySystem {
     this.refreshInjectedServices({ force: true });
     this.syncPhysicsIntegration(true);
 
-    this.spawnInitialAsteroids(4);
+    if (this.waveManager && typeof this.waveManager.reset === 'function') {
+      this.waveManager.reset();
+    }
+
     this.emitWaveStateUpdate(true);
     console.log('[EnemySystem] Reset');
   }
@@ -3202,77 +2918,6 @@ class EnemySystem {
 
   stop() {
     this.sessionActive = false;
-  }
-
-  completeCurrentWave() {
-    if (!this.waveState) return;
-
-    const wave = this.waveState;
-    if (!wave.isActive) return;
-
-    wave.isActive = false;
-    wave.breakTimer = CONSTANTS.WAVE_BREAK_TIME;
-    wave.completedWaves += 1;
-    wave.spawnTimer = 0;
-    wave.initialSpawnDone = false;
-
-    const waveManagerActive =
-      this.useManagers && Boolean(CONSTANTS?.USE_WAVE_MANAGER) && this.waveManager;
-
-    if (!waveManagerActive) {
-      this.grantWaveRewards();
-
-      if (typeof gameEvents !== 'undefined') {
-        gameEvents.emit('wave-completed', {
-          wave: wave.current,
-          completedWaves: wave.completedWaves,
-          breakTimer: wave.breakTimer,
-        });
-      }
-    } else if (
-      typeof process !== 'undefined' &&
-      process.env?.NODE_ENV === 'development' &&
-      typeof console !== 'undefined' &&
-      typeof console.debug === 'function'
-    ) {
-      console.debug(
-        '[EnemySystem] WaveManager active - skipping legacy wave-completed emit for Wave',
-        wave.current
-      );
-    }
-
-    this.emitWaveStateUpdate(true);
-  }
-
-  startNextWave() {
-    if (!this.waveState) return;
-
-    const wave = this.waveState;
-    wave.current += 1;
-    wave.totalAsteroids = Math.floor(
-      CONSTANTS.ASTEROIDS_PER_WAVE_BASE *
-        Math.pow(CONSTANTS.ASTEROIDS_PER_WAVE_MULTIPLIER, wave.current - 1)
-    );
-    wave.totalAsteroids = Math.min(wave.totalAsteroids, 25);
-    wave.asteroidsSpawned = 0;
-    wave.asteroidsKilled = 0;
-    wave.asteroidsKilledRaw = 0;
-    wave.isActive = true;
-    wave.timeRemaining = CONSTANTS.WAVE_DURATION;
-    wave.spawnTimer = 1.0;
-    wave.spawnDelay = Math.max(0.8, 2.0 - wave.current * 0.1);
-    wave.initialSpawnDone = false;
-
-    this.spawnInitialAsteroids(4);
-
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('wave-started', {
-        wave: wave.current,
-        totalAsteroids: wave.totalAsteroids,
-      });
-    }
-
-    this.emitWaveStateUpdate(true);
   }
 
   grantWaveRewards() {

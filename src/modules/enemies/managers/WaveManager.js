@@ -337,8 +337,7 @@ export class WaveManager {
     // distribuição visual quando misturando tipos.
     //
     // Ver docs/validation/asteroid-baseline-metrics.md (seção Distribuição)
-    const useLegacyDistribution =
-      CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
+    const useLegacyDistribution = this.isLegacyAsteroidCompatibilityEnabled();
 
     const normalizedBaseCount = Math.max(
       0,
@@ -441,7 +440,7 @@ export class WaveManager {
   }
 
   getAsteroidDistributionWeights(
-    useLegacy = CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true
+    useLegacy = this.isLegacyAsteroidCompatibilityEnabled()
   ) {
     if (useLegacy) {
       return { large: 0.5, medium: 0.3, small: 0.2 };
@@ -775,26 +774,18 @@ export class WaveManager {
   }
 
   shouldWaveManagerSpawnAsteroids() {
-    const waveManagerHandles = CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false;
-    const useWaveManager = CONSTANTS.USE_WAVE_MANAGER ?? false;
-
-    return Boolean(waveManagerHandles && useWaveManager);
+    // WAVE-007: WaveManager é agora responsável por todo spawn de asteroides.
+    // Mantemos o método para compatibilidade com a lógica existente,
+    // mas ele retorna sempre verdadeiro.
+    return true;
   }
 
   isLegacyAsteroidCompatibilityEnabled() {
     const preserveLegacy = CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
-    if (!preserveLegacy) {
-      return false;
-    }
-
-    return preserveLegacy && this.shouldWaveManagerSpawnAsteroids();
+    return Boolean(preserveLegacy);
   }
 
   isStrictLegacySpawnSequenceEnabled() {
-    if (!this.shouldWaveManagerSpawnAsteroids()) {
-      return false;
-    }
-
     if (typeof CONSTANTS.STRICT_LEGACY_SPAWN_SEQUENCE === 'boolean') {
       return CONSTANTS.STRICT_LEGACY_SPAWN_SEQUENCE;
     }
@@ -1130,7 +1121,7 @@ export class WaveManager {
     const player = this.enemySystem.getCachedPlayer();
     const safeDistance = CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200;
     const compatibilityMode = this.isLegacyAsteroidCompatibilityEnabled();
-    const useLegacyDistribution = CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
+    const useLegacyDistribution = compatibilityMode;
     const strictLegacySequence = this.isStrictLegacySpawnSequenceEnabled();
     const defaultDistributionWeights = this.getAsteroidDistributionWeights(
       useLegacyDistribution

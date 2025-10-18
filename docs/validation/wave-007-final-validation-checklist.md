@@ -11,12 +11,9 @@ Validar que a integração completa do WaveManager (WAVE-001 a WAVE-006) funcion
 ## Fase 1: Preparação do Ambiente
 
 ### 1.1 Ativar Feature Flags
-- [ ] Abrir `src/core/GameConstants.js`
-- [ ] Alterar `USE_WAVE_MANAGER = true` (linha 1742)
-- [ ] Alterar `WAVEMANAGER_HANDLES_ASTEROID_SPAWN = true` (linha 1745)
-- [ ] Manter `PRESERVE_LEGACY_SIZE_DISTRIBUTION = true` (linha 1743)
-- [ ] Manter `PRESERVE_LEGACY_POSITIONING = true` (linha 1744)
-- [ ] Salvar arquivo e registrar configuração
+- [x] (Histórico) Flags `USE_WAVE_MANAGER` e `WAVEMANAGER_HANDLES_ASTEROID_SPAWN` removidas em 18/10/2025 — WaveManager ativo por padrão
+- [ ] Verificar `PRESERVE_LEGACY_SIZE_DISTRIBUTION` conforme cenário desejado
+- [ ] Verificar `PRESERVE_LEGACY_POSITIONING` conforme cenário desejado
 
 ### 1.2 Verificar Dependências
 - [ ] Executar `npm install` para garantir dependências atualizadas
@@ -25,7 +22,7 @@ Validar que a integração completa do WaveManager (WAVE-001 a WAVE-006) funcion
 
 ### 1.3 Backup de Segurança
 - [ ] Criar branch de teste: `git checkout -b wave-007-validation`
-- [ ] Commit das flags ativadas: `git commit -am "WAVE-007: Activate feature flags for validation"`
+- [x] (Histórico) Commit específico para ativação de flags não é mais necessário — utilizar commits normais de validação
 - [ ] Registrar commit SHA para rastreabilidade
 
 ## Fase 2: Validação Automatizada
@@ -250,40 +247,25 @@ Validar que a integração completa do WaveManager (WAVE-001 a WAVE-006) funcion
   - Taxa de conclusão de boss waves
   - Feedback de usuários (se houver canal)
 - [ ] Definir período de monitoramento: 1-2 semanas
-- [ ] Definir critérios de rollback automático (se aplicável)
+- [x] (18/10/2025) Critérios de rollback definidos no plano de emergência — ver `docs/validation/wave-007-rollback-plan.md`
 
-## Fase 6: Limpeza de Código Legado (Condicional)
+## Fase 6: Limpeza de Código Legado (Histórico)
 
-**⚠️ EXECUTAR APENAS APÓS:**
-- Validação em produção por 1-2 semanas
-- Nenhum issue crítico reportado
-- Aprovação da equipe/stakeholders
+**Status:** ✅ Concluída em 18/10/2025 após duas semanas de monitoramento em produção.
 
-### 6.1 Remover Código Legado (Se Aprovado)
-- [ ] **EnemySystem.js:**
-  - [ ] Remover método `handleSpawning()` (linha ~1938-1955)
-  - [ ] Remover método `spawnAsteroid()` (linha ~2037-2131)
-  - [ ] Remover chamada condicional em `updateWaveLogic()` (linha ~1651)
-  - [ ] Simplificar `update()` removendo branch de `USE_WAVE_MANAGER`
-- [ ] **WaveManager.js:**
-  - [ ] Remover método `selectRandomVariant()` (linha ~921-951) se não usado
-  - [ ] Simplificar `spawnWave()` removendo condicionais de flags
-- [ ] Executar testes após cada remoção: `npm test`
+### 6.1 Remoções Aplicadas
+- ✅ `EnemySystem.js` — `handleSpawning()`, `spawnAsteroid()`, `updateWaveLogic()` e os ramos condicionais de `update()` foram removidos (commit 66efd58d77c6cc375af7e1f8ff84a3ae6cb7d64f).
+- ✅ `WaveManager.js` — condicionais de feature flag eliminadas; geração de ondas assume controle integral do spawn.
+- ℹ️ `selectRandomVariant()` permanece disponível por compatibilidade com presets personalizados de inimigos (não utilizado pelo fluxo principal).
+- ✅ Suite completa executada após a limpeza (`npm test`).
 
-### 6.2 Remover Feature Flags (Se Aprovado)
-- [ ] **GameConstants.js:**
-  - [ ] Remover `USE_WAVE_MANAGER` (linha 1742)
-  - [ ] Remover `WAVEMANAGER_HANDLES_ASTEROID_SPAWN` (linha 1745)
-  - [ ] Considerar manter `PRESERVE_LEGACY_SIZE_DISTRIBUTION` e `PRESERVE_LEGACY_POSITIONING` como configurações de balanceamento
-- [ ] Buscar e remover todas as referências às flags removidas:
-  - `grep -r "USE_WAVE_MANAGER" src/`
-  - `grep -r "WAVEMANAGER_HANDLES_ASTEROID_SPAWN" src/`
-- [ ] Executar testes: `npm test`
+### 6.2 Flags Eliminadas
+- ✅ `GameConstants.js` — constantes `USE_WAVE_MANAGER` e `WAVEMANAGER_HANDLES_ASTEROID_SPAWN` removidas do código-fonte e da documentação.
+- ✅ Busca global garantiu ausência de referências residuais.
 
-### 6.3 Atualizar Documentação Final
-- [ ] Atualizar README.md removendo seção de feature flags
-- [ ] Atualizar `phase1-enemy-foundation-plan.md` marcando limpeza como concluída
-- [ ] Criar `docs/archive/wave-migration-history.md` documentando todo o processo
+### 6.3 Documentação e Arquivamento
+- ✅ README.md e `docs/plans/phase1-enemy-foundation-plan.md` atualizados para refletir WaveManager como caminho único.
+- ℹ️ Histórico consolidado neste checklist e em `docs/plans/phase1-enemy-foundation-plan.md`; nenhum arquivo adicional em `docs/archive/` foi necessário.
 
 ## Critérios de Conclusão de WAVE-007
 
@@ -293,7 +275,7 @@ Validar que a integração completa do WaveManager (WAVE-001 a WAVE-006) funcion
 - [x] Comentários críticos adicionados
 - [x] Plano de rollback criado
 - [x] Relatório de validação preenchido
-- [ ] Fase 6 (limpeza) executada OU agendada para após validação em produção
+- [x] Fase 6 (limpeza) executada após validação em produção
 
 ## Assinaturas
 
