@@ -121,6 +121,7 @@ Para preservar comportamento baseline durante migração:
 - `WAVEMANAGER_HANDLES_ASTEROID_SPAWN = true` - WaveManager controla spawn de asteroides
 - `PRESERVE_LEGACY_SIZE_DISTRIBUTION = true` - Usa distribuição 50/30/20 (não 30/40/30)
 - `PRESERVE_LEGACY_POSITIONING = true` - Spawn nas 4 bordas (não safe distance)
+- `STRICT_LEGACY_SPAWN_SEQUENCE = true` - Reutiliza o mesmo stream de randomização para posição e tamanho (paridade com legado)
 
 ### Comportamento Esperado
 
@@ -129,6 +130,7 @@ Para preservar comportamento baseline durante migração:
 - Distribuição de tamanhos: 50/30/20 (large/medium/small)
 - Variant decision: via `EnemySystem.decideVariant()` (preserva wave bonus, allowed sizes)
 - Posicionamento: 4 bordas (top/right/bottom/left) com margin=80
+- Ordem de spawn: posição e tamanho utilizam o mesmo stream `spawn`, preservando a sequência determinística por seed
 - Fragmentação: contabilizada automaticamente por `WaveManager.onEnemyDestroyed()`
 - Random scopes: `spawn`, `variants`, `fragments` (determinismo preservado)
 
@@ -147,6 +149,7 @@ USE_WAVE_MANAGER = true
 WAVEMANAGER_HANDLES_ASTEROID_SPAWN = true
 PRESERVE_LEGACY_SIZE_DISTRIBUTION = true
 PRESERVE_LEGACY_POSITIONING = true
+STRICT_LEGACY_SPAWN_SEQUENCE = true
 
 # Executar testes
 npm run test:baseline

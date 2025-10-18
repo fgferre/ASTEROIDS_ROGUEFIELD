@@ -492,6 +492,7 @@ A flag `USE_WAVE_MANAGER` será removida após:
    - `WAVEMANAGER_HANDLES_ASTEROID_SPAWN` (default: false) - Ativa controle de spawn pelo WaveManager
    - `PRESERVE_LEGACY_SIZE_DISTRIBUTION` (default: true) - Usa distribuição 50/30/20 vs. 30/40/30
    - `PRESERVE_LEGACY_POSITIONING` (default: true) - Spawn nas 4 bordas vs. safe distance
+   - `STRICT_LEGACY_SPAWN_SEQUENCE` (default: true) - Compartilha o stream `spawn` para posição e tamanho, preservando sequência determinística
    - Todas as flags documentadas com comentários explicativos
 
 2. **Posicionamento Legado (WaveManager.calculateEdgeSpawnPosition()):**
@@ -504,6 +505,7 @@ A flag `USE_WAVE_MANAGER` será removida após:
    - Condicional baseada em `PRESERVE_LEGACY_SIZE_DISTRIBUTION`
    - Se true: 50% large, 30% medium, 20% small (baseline)
    - Se false: 30% large, 40% medium, 30% small (otimizado para mix)
+   - `STRICT_LEGACY_SPAWN_SEQUENCE` habilita amostragem por spawn usando o mesmo random de posicionamento
    - Passa `variant: null` para delegar decisão ao EnemySystem
 
 4. **Decisão de Variantes (Asteroid.initialize()):**
@@ -534,8 +536,8 @@ A flag `USE_WAVE_MANAGER` será removida após:
    ↓
 3. WaveManager.generateDynamicWave(waveNumber)
    ↓ (se PRESERVE_LEGACY_SIZE_DISTRIBUTION=true)
-4. Cria grupos: 50% large, 30% medium, 20% small
-   ↓ (variant=null para cada grupo)
+4. Monta plano de spawn de asteroides
+   ↓ (`STRICT_LEGACY_SPAWN_SEQUENCE=true` → sorteio por spawn usando stream `spawn` / caso contrário → sequência pré-calculada 50/30/20)
 5. WaveManager.spawnWave(config)
    ↓
 6. Para cada asteroid group:
@@ -564,6 +566,7 @@ A flag `USE_WAVE_MANAGER` será removida após:
 | Variant decision | `decideVariant()` | `decideVariant()` | ✅ Idêntico |
 | Wave bonus | +0.025/wave após wave 4 | +0.025/wave após wave 4 | ✅ Idêntico |
 | Posicionamento | 4 bordas, margin=80 | 4 bordas, margin=80 | ✅ Idêntico |
+| Ordem de spawn | Stream `spawn` compartilha posição/tamanho | Mesmo stream via `STRICT_LEGACY_SPAWN_SEQUENCE` | ✅ Idêntico |
 | Random scopes | spawn, variants, fragments | spawn, variants, fragments | ✅ Idêntico |
 | Fragmentação | Incrementa totalAsteroids | Incrementa totalEnemiesThisWave | ✅ Funcional |
 | Timing | spawnTimer + random multiplier | spawnDelay + spawnDelayMultiplier | ✅ Equivalente |
@@ -576,7 +579,7 @@ A flag `USE_WAVE_MANAGER` será removida após:
 **Testes de Validação:**
 
 1. **Teste de paridade com baseline:**
-   - Ativar todas as flags (WAVEMANAGER_HANDLES_ASTEROID_SPAWN, PRESERVE_LEGACY_SIZE_DISTRIBUTION, PRESERVE_LEGACY_POSITIONING)
+   - Ativar todas as flags (WAVEMANAGER_HANDLES_ASTEROID_SPAWN, PRESERVE_LEGACY_SIZE_DISTRIBUTION, PRESERVE_LEGACY_POSITIONING, STRICT_LEGACY_SPAWN_SEQUENCE)
    - Executar `npm run test:baseline`
    - Validar que todas as métricas correspondem ao baseline
 
@@ -623,6 +626,6 @@ A flag `USE_WAVE_MANAGER` será removida após:
 - `spawnAsteroid()` preservado intacto como fallback (não modificado)
 - `decideVariant()` permanece no EnemySystem (lógica complexa e bem testada)
 - Fragmentação já tratada por `WaveManager.onEnemyDestroyed()` (WAVE-004)
-- Random scopes mantêm nomenclatura consistente para determinismo
+- Random scopes mantêm nomenclatura consistente para determinismo; `STRICT_LEGACY_SPAWN_SEQUENCE` garante que posição/tamanho usem o mesmo stream `spawn`
 - Flags podem ser removidas após validação completa e estabilização
 

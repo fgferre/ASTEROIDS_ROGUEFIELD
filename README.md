@@ -161,12 +161,20 @@ Para preservar comportamento baseline durante migração de asteroides:
 - `false`: 30% large, 40% medium, 30% small (otimizado para mix com outros inimigos)
 
 #### `PRESERVE_LEGACY_POSITIONING`
-**Localização:** `src/core/GameConstants.js`  
-**Default:** `true`  
+**Localização:** `src/core/GameConstants.js`
+**Default:** `true`
 **Descrição:** Controla posicionamento de spawn de asteroides.
 
 - `true`: Spawn nas 4 bordas (top/right/bottom/left) com margin=80
 - `false`: Spawn com distância mínima do player (safe distance)
+
+#### `STRICT_LEGACY_SPAWN_SEQUENCE`
+**Localização:** `src/core/GameConstants.js`
+**Default:** `true`
+**Descrição:** Força posição e tamanho a compartilharem o mesmo stream `spawn`, reproduzindo a sequência determinística do legado.
+
+- `true`: Sequência idêntica à do EnemySystem para a mesma seed (recomendado para baseline)
+- `false`: Permite novas variações na ordem de spawn para experimentação
 
 **Como testar a migração completa:**
 
@@ -177,6 +185,7 @@ Para preservar comportamento baseline durante migração de asteroides:
    WAVEMANAGER_HANDLES_ASTEROID_SPAWN = true
    PRESERVE_LEGACY_SIZE_DISTRIBUTION = true
    PRESERVE_LEGACY_POSITIONING = true
+   STRICT_LEGACY_SPAWN_SEQUENCE = true
    ```
 
 2. Executar testes de baseline:
@@ -204,7 +213,7 @@ Para preservar comportamento baseline durante migração de asteroides:
 - Validação em produção por pelo menos 1 semana com flags de compatibilidade ativas
 - Todos os testes de baseline passando
 - Aprovação formal da equipe
-- Remoção de `WAVEMANAGER_HANDLES_ASTEROID_SPAWN`, `PRESERVE_LEGACY_SIZE_DISTRIBUTION` e `PRESERVE_LEGACY_POSITIONING` junto com `USE_WAVE_MANAGER`
+- Remoção de `WAVEMANAGER_HANDLES_ASTEROID_SPAWN`, `PRESERVE_LEGACY_SIZE_DISTRIBUTION`, `PRESERVE_LEGACY_POSITIONING` e `STRICT_LEGACY_SPAWN_SEQUENCE` junto com `USE_WAVE_MANAGER`
 
 **Documentação completa:** `docs/plans/phase1-enemy-foundation-plan.md` (seções WAVE-004 e WAVE-006)
 
