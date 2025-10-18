@@ -153,9 +153,18 @@ export class Asteroid extends BaseEnemy {
           wave: this.wave,
           spawnType: options.spawnedBy ? 'fragment' : 'spawn',
           parent: options.parent || null,
-          random: this.getRandomFor('variants') || baseRandom,
-          disallowedVariants: options.disallowedVariants || []
+          disallowedVariants: options.disallowedVariants || [],
         };
+
+        if (
+          this.system &&
+          typeof this.system.getRandomScope === 'function'
+        ) {
+          const systemVariantRandom = this.system.getRandomScope('variants');
+          if (systemVariantRandom) {
+            variantContext.random = systemVariantRandom;
+          }
+        }
 
         this.variant = this.system.decideVariant(this.size, variantContext);
       } else {

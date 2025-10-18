@@ -335,61 +335,10 @@ export class WaveManager {
         ? { large: 0.5, medium: 0.3, small: 0.2 }
         : { large: 0.3, medium: 0.4, small: 0.3 };
 
-      const asteroidCounts = {
-        large:
-          normalizedBaseCount > 0
-            ? Math.max(1, Math.floor(normalizedBaseCount * distribution.large))
-            : 0,
-        medium: Math.floor(normalizedBaseCount * distribution.medium),
-        small: Math.floor(normalizedBaseCount * distribution.small),
-      };
-
-      const priorityOrder = ['large', 'medium', 'small'];
-
-      let allocatedTotal =
-        asteroidCounts.large + asteroidCounts.medium + asteroidCounts.small;
-
-      if (allocatedTotal > normalizedBaseCount) {
-        let overflow = allocatedTotal - normalizedBaseCount;
-        const reductionOrder = ['small', 'medium', 'large'];
-
-        while (overflow > 0) {
-          let reducedInPass = false;
-
-          for (const key of reductionOrder) {
-            if (overflow <= 0) {
-              break;
-            }
-
-            const minimum =
-              key === 'large' && normalizedBaseCount > 0 ? 1 : 0;
-            if (asteroidCounts[key] > minimum) {
-              asteroidCounts[key] -= 1;
-              overflow -= 1;
-              reducedInPass = true;
-            }
-          }
-
-          if (!reducedInPass) {
-            break;
-          }
-        }
-
-        allocatedTotal =
-          asteroidCounts.large + asteroidCounts.medium + asteroidCounts.small;
-      }
-
-      let remainder = Math.max(0, normalizedBaseCount - allocatedTotal);
-
-      let priorityIndex = 0;
-      while (remainder > 0) {
-        const key = priorityOrder[priorityIndex % priorityOrder.length];
-        asteroidCounts[key] += 1;
-        remainder -= 1;
-        priorityIndex += 1;
-      }
-
-      const asteroidSequence = this.buildAsteroidSpawnSequence(asteroidCounts);
+      const {
+        sequence: asteroidSequence,
+        counts: asteroidCounts,
+      } = this.buildAsteroidSpawnSequence(normalizedBaseCount, distribution);
 
       asteroidSequence.forEach((size, index) => {
         enemies.push({
@@ -433,60 +382,92 @@ export class WaveManager {
     return config;
   }
 
-  buildAsteroidSpawnSequence(asteroidCounts = {}) {
-    const sanitizedCounts = {
-      large: Math.max(0, Math.floor(Number(asteroidCounts.large) || 0)),
-      medium: Math.max(0, Math.floor(Number(asteroidCounts.medium) || 0)),
-      small: Math.max(0, Math.floor(Number(asteroidCounts.small) || 0)),
+  /**
+   * Builds a deterministic asteroid spawn sequence by sampling individual spawns
+   * using the provided size distribution. Returns both the ordered sequence and
+   * aggregate counts to aid accounting/telemetry.
+   *
+   * @param {number} targetCount - Number of asteroids to spawn
+   * @param {Object} distribution - Size weights (e.g., { large: 0.5, medium: 0.3, small: 0.2 })
+   * @returns {{sequence: string[], counts: Object}}
+   */
+  buildAsteroidSpawnSequence(targetCount = 0, distribution = {}) {
+    const sanitizedCount = Math.max(0, Math.floor(Number(targetCount) || 0));
+    const weights = {
+      large: Math.max(0, Number(distribution.large) || 0),
+      medium: Math.max(0, Number(distribution.medium) || 0),
+      small: Math.max(0, Number(distribution.small) || 0),
+    };
+
+    const weightEntries = Object.entries(weights).filter(([, weight]) => weight > 0);
+    const totalWeight = weightEntries.reduce(
+      (sum, [, weight]) => sum + weight,
+      0
+    );
+
+    const scopedRandom = this.createScopedRandom('spawn', 'asteroid-size');
+    const sizeRandom =
+      (scopedRandom && scopedRandom.random) ||
+      this.resolveScopedRandom(this.getRandomScope('spawn'), 'spawn', 'asteroid-size');
+
+    let resolvedRandom = sizeRandom;
+    if (
+      !resolvedRandom ||
+      (typeof resolvedRandom.float !== 'function' &&
+        typeof resolvedRandom.range !== 'function')
+    ) {
+      if (!this._fallbackRandom) {
+        this._fallbackRandom = new RandomService('wave-manager:fallback');
+      }
+
+      resolvedRandom = this._fallbackRandom.fork('wave-manager:asteroid-size-fallback');
+    }
+
+    const selectSize = () => {
+      if (!weightEntries.length || totalWeight <= 0 || !resolvedRandom) {
+        return weightEntries.length ? weightEntries[0][0] : 'small';
+      }
+
+      let roll;
+      if (typeof resolvedRandom.range === 'function') {
+        roll = resolvedRandom.range(0, totalWeight);
+      } else {
+        const base =
+          typeof resolvedRandom.float === 'function'
+            ? resolvedRandom.float()
+            : 0;
+        roll = base * totalWeight;
+      }
+
+      for (let i = 0; i < weightEntries.length; i += 1) {
+        const [key, weight] = weightEntries[i];
+        if (weight <= 0) {
+          continue;
+        }
+
+        if (roll < weight) {
+          return key;
+        }
+
+        roll -= weight;
+      }
+
+      return weightEntries[weightEntries.length - 1][0];
     };
 
     const sequence = [];
+    const counts = { large: 0, medium: 0, small: 0 };
 
-    for (let i = 0; i < sanitizedCounts.large; i++) {
-      sequence.push('large');
-    }
-
-    for (let i = 0; i < sanitizedCounts.medium; i++) {
-      sequence.push('medium');
-    }
-
-    for (let i = 0; i < sanitizedCounts.small; i++) {
-      sequence.push('small');
-    }
-
-    if (sequence.length <= 1) {
-      return sequence;
-    }
-
-    const scopedRandom = this.createScopedRandom('spawn', 'asteroid-order');
-    const orderRandom =
-      (scopedRandom && scopedRandom.random) ||
-      this.resolveScopedRandom(this.getRandomScope('spawn'), 'spawn', 'asteroid-order');
-
-    const randomInt = (max) => {
-      if (!orderRandom) {
-        return 0;
+    for (let i = 0; i < sanitizedCount; i += 1) {
+      const size = selectSize();
+      sequence.push(size);
+      if (typeof counts[size] !== 'number') {
+        counts[size] = 0;
       }
-
-      if (typeof orderRandom.int === 'function') {
-        return orderRandom.int(0, max);
-      }
-
-      const base =
-        typeof orderRandom.float === 'function' ? orderRandom.float() : 0;
-      return Math.floor(Math.min(0.999999, Math.max(0, base)) * (max + 1));
-    };
-
-    for (let i = sequence.length - 1; i > 0; i--) {
-      const j = randomInt(i);
-      if (j !== i) {
-        const temp = sequence[i];
-        sequence[i] = sequence[j];
-        sequence[j] = temp;
-      }
+      counts[size] += 1;
     }
 
-    return sequence;
+    return { sequence, counts };
   }
 
   generateBossWave(waveNumber) {
