@@ -116,6 +116,9 @@ export class WaveManager {
     this.enemiesSpawnedThisWave = 0;
     this.enemiesKilledThisWave = 0;
     this.totalEnemiesThisWave = 0;
+    this.totalAsteroidEnemiesThisWave = 0;
+    this.asteroidsSpawnedThisWave = 0;
+    this.asteroidsKilledThisWave = 0;
     this.spawnQueue = [];
 
     // Timers
@@ -314,38 +317,75 @@ export class WaveManager {
   generateDynamicWave(waveNumber) {
     const baseCount = this.computeBaseEnemyCount(waveNumber);
 
-    // Variant distribution by difficulty
-    const variants = ['common', 'iron', 'gold', 'crystal'];
-    if (waveNumber >= 7) variants.push('volatile');
-    if (waveNumber >= 10) variants.push('parasite');
-
     const enemies = [];
-    const variantRandom = this.getRandomScope('variants');
+    // WAVE-006: Distribuição de tamanhos configurável via flag
+    const useLegacyDistribution =
+      CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
 
-    // WAVE-004: Distribuição ajustada para suportar múltiplos tipos de inimigos (não apenas asteroides)
-    // Large asteroids
-    enemies.push({
-      type: 'asteroid',
-      count: Math.max(1, Math.floor(baseCount * 0.3)),
-      size: 'large',
-      variant: this.selectRandomVariant(variants, waveNumber, variantRandom)
-    });
+    const normalizedBaseCount = Math.max(
+      0,
+      Number.isFinite(baseCount) ? baseCount : 0
+    );
 
-    // Medium asteroids
-    enemies.push({
-      type: 'asteroid',
-      count: Math.floor(baseCount * 0.4),
-      size: 'medium',
-      variant: this.selectRandomVariant(variants, waveNumber, variantRandom)
-    });
+    const metadata = {};
+    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
+    const strictLegacySequence = this.isStrictLegacySpawnSequenceEnabled();
+    const distributionWeights = this.getAsteroidDistributionWeights(useLegacyDistribution);
 
-    // Small asteroids
-    enemies.push({
-      type: 'asteroid',
-      count: Math.floor(baseCount * 0.3),
-      size: 'small',
-      variant: this.selectRandomVariant(variants, waveNumber, variantRandom)
-    });
+    if (waveManagerSpawnsAsteroids && normalizedBaseCount > 0) {
+      const distributionLabel = useLegacyDistribution
+        ? 'legacy-50-30-20'
+        : 'mixed-30-40-30';
+
+      if (strictLegacySequence) {
+        const groupMetadata = {
+          spawnDistribution: distributionLabel,
+          strictLegacySequence: true,
+          distributionWeights: { ...distributionWeights },
+        };
+
+        enemies.push({
+          type: 'asteroid',
+          count: normalizedBaseCount,
+          size: null,
+          variant: null,
+          metadata: groupMetadata,
+        });
+
+        // In strict legacy mode, asteroid size rolls happen during spawn to
+        // maintain the exact random call order used by the legacy
+        // EnemySystem. Consumers must therefore tolerate null/auto sizes in
+        // the wave configuration and rely on spawn-time resolution instead.
+
+        metadata.spawnDistribution = distributionLabel;
+        metadata.strictLegacySequence = true;
+        metadata.targetAsteroidCount = normalizedBaseCount;
+        metadata.distributionWeights = { ...distributionWeights };
+      } else {
+        const {
+          sequence: asteroidSequence,
+          counts: asteroidCounts,
+        } = this.buildAsteroidSpawnSequence(
+          normalizedBaseCount,
+          distributionWeights
+        );
+
+        asteroidSequence.forEach((size, index) => {
+          enemies.push({
+            type: 'asteroid',
+            count: 1,
+            size,
+            variant: null,
+            spawnIndexBase: index,
+          });
+        });
+
+        metadata.asteroidCounts = { ...asteroidCounts };
+        metadata.asteroidSpawnOrder = asteroidSequence.slice();
+        metadata.spawnDistribution = distributionLabel;
+        metadata.distributionWeights = { ...distributionWeights };
+      }
+    }
 
     const supportWeights = this.computeSupportWeights(waveNumber);
     for (const support of supportWeights) {
@@ -361,7 +401,201 @@ export class WaveManager {
       }
     }
 
-    return { isBossWave: false, enemies };
+    if (Object.keys(metadata).length > 0) {
+      metadata.generator = 'dynamic';
+    }
+
+    const config = { isBossWave: false, enemies };
+
+    if (Object.keys(metadata).length > 0) {
+      config.metadata = metadata;
+    }
+
+    return config;
+  }
+
+  getAsteroidDistributionWeights(
+    useLegacy = CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true
+  ) {
+    if (useLegacy) {
+      return { large: 0.5, medium: 0.3, small: 0.2 };
+    }
+
+    return { large: 0.3, medium: 0.4, small: 0.3 };
+  }
+
+  normalizeAsteroidDistribution(distribution = {}) {
+    const weights = {
+      large: Math.max(0, Number(distribution.large) || 0),
+      medium: Math.max(0, Number(distribution.medium) || 0),
+      small: Math.max(0, Number(distribution.small) || 0),
+    };
+
+    const total = weights.large + weights.medium + weights.small;
+
+    return { weights, total };
+  }
+
+  /**
+   * Builds a deterministic asteroid spawn sequence by sampling individual spawns
+   * using the provided size distribution. Returns both the ordered sequence and
+   * aggregate counts to aid accounting/telemetry.
+   *
+   * @param {number} targetCount - Number of asteroids to spawn
+   * @param {Object} distribution - Size weights (e.g., { large: 0.5, medium: 0.3, small: 0.2 })
+   * @returns {{sequence: string[], counts: Object}}
+   */
+  buildAsteroidSpawnSequence(targetCount = 0, distribution = {}) {
+    const sanitizedCount = Math.max(0, Math.floor(Number(targetCount) || 0));
+    const { weights, total } = this.normalizeAsteroidDistribution(distribution);
+
+    const weightEntries = Object.entries(weights).filter(([, weight]) => weight > 0);
+    const totalWeight = total > 0 ? total : weightEntries.reduce((sum, [, weight]) => sum + weight, 0);
+
+    const scopedRandom = this.createScopedRandom('spawn', 'asteroid-size');
+    const sizeRandom =
+      (scopedRandom && scopedRandom.random) ||
+      this.resolveScopedRandom(this.getRandomScope('spawn'), 'spawn', 'asteroid-size');
+
+    let resolvedRandom = sizeRandom;
+    if (
+      !resolvedRandom ||
+      (typeof resolvedRandom.float !== 'function' &&
+        typeof resolvedRandom.range !== 'function')
+    ) {
+      if (!this._fallbackRandom) {
+        this._fallbackRandom = new RandomService('wave-manager:fallback');
+      }
+
+      resolvedRandom = this._fallbackRandom.fork('wave-manager:asteroid-size-fallback');
+    }
+
+    const selectSize = () => {
+      if (!weightEntries.length || totalWeight <= 0 || !resolvedRandom) {
+        return weightEntries.length ? weightEntries[0][0] : 'small';
+      }
+
+      let roll;
+      if (typeof resolvedRandom.range === 'function') {
+        roll = resolvedRandom.range(0, totalWeight);
+      } else {
+        const base =
+          typeof resolvedRandom.float === 'function'
+            ? resolvedRandom.float()
+            : 0;
+        roll = base * totalWeight;
+      }
+
+      for (let i = 0; i < weightEntries.length; i += 1) {
+        const [key, weight] = weightEntries[i];
+        if (weight <= 0) {
+          continue;
+        }
+
+        if (roll < weight) {
+          return key;
+        }
+
+        roll -= weight;
+      }
+
+      return weightEntries[weightEntries.length - 1][0];
+    };
+
+    const sequence = [];
+    const counts = { large: 0, medium: 0, small: 0 };
+
+    for (let i = 0; i < sanitizedCount; i += 1) {
+      const size = selectSize();
+      sequence.push(size);
+      if (typeof counts[size] !== 'number') {
+        counts[size] = 0;
+      }
+      counts[size] += 1;
+    }
+
+    return { sequence, counts };
+  }
+
+  resolveAsteroidSpawnSize(
+    random,
+    {
+      distribution = this.getAsteroidDistributionWeights(),
+      strict = this.isStrictLegacySpawnSequenceEnabled(),
+    } = {}
+  ) {
+    const { weights, total } = this.normalizeAsteroidDistribution(distribution);
+    const fallbackRandom = this.getRandomService();
+
+    let spawnRandom = random;
+    if (
+      !spawnRandom ||
+      (typeof spawnRandom.float !== 'function' && typeof spawnRandom.range !== 'function')
+    ) {
+      spawnRandom = this.resolveScopedRandom(random, 'spawn', 'wave-spawn:size');
+    }
+
+    const drawFloat = () => {
+      if (spawnRandom && typeof spawnRandom.float === 'function') {
+        return spawnRandom.float();
+      }
+      if (spawnRandom && typeof spawnRandom.range === 'function') {
+        return spawnRandom.range(0, 1);
+      }
+      if (fallbackRandom && typeof fallbackRandom.float === 'function') {
+        return fallbackRandom.float();
+      }
+      return 0;
+    };
+
+    const sizeOrder = ['large', 'medium', 'small'];
+
+    if (strict) {
+      const normalizedTotal = total > 0 ? total : 1;
+      const roll = drawFloat();
+      let cumulative = 0;
+
+      for (const size of sizeOrder) {
+        const weight = weights[size] / normalizedTotal;
+        if (weight <= 0) {
+          continue;
+        }
+
+        cumulative += weight;
+        if (roll < cumulative) {
+          return size;
+        }
+      }
+
+      return sizeOrder[sizeOrder.length - 1];
+    }
+
+    const totalWeight = total > 0 ? total : sizeOrder.reduce((sum, key) => sum + weights[key], 0);
+    if (totalWeight <= 0) {
+      return sizeOrder[sizeOrder.length - 1];
+    }
+
+    let roll;
+    if (spawnRandom && typeof spawnRandom.range === 'function') {
+      roll = spawnRandom.range(0, totalWeight);
+    } else {
+      roll = drawFloat() * totalWeight;
+    }
+
+    for (const size of sizeOrder) {
+      const weight = weights[size];
+      if (weight <= 0) {
+        continue;
+      }
+
+      if (roll < weight) {
+        return size;
+      }
+
+      roll -= weight;
+    }
+
+    return sizeOrder[sizeOrder.length - 1];
   }
 
   generateBossWave(waveNumber) {
@@ -443,6 +677,103 @@ export class WaveManager {
       : 0;
 
     return supportTotal + bossCount;
+  }
+
+  computeAsteroidOnlyTotal(waveConfig) {
+    if (!waveConfig || typeof waveConfig !== 'object') {
+      return 0;
+    }
+
+    const groups = Array.isArray(waveConfig.enemies) ? waveConfig.enemies : [];
+
+    return groups.reduce((sum, group) => {
+      if (!group || group.type !== 'asteroid') {
+        return sum;
+      }
+
+      const count = Number(group.count);
+      return sum + (Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0);
+    }, 0);
+  }
+
+  filterForLegacyAsteroidFallback(waveConfig = {}) {
+    if (this.shouldWaveManagerSpawnAsteroids()) {
+      return waveConfig;
+    }
+
+    const originalEnemies = Array.isArray(waveConfig.enemies)
+      ? waveConfig.enemies
+      : [];
+
+    if (originalEnemies.length === 0) {
+      if (!waveConfig || typeof waveConfig !== 'object') {
+        return { enemies: [] };
+      }
+
+      return { ...waveConfig, enemies: [] };
+    }
+
+    const filteredEnemies = originalEnemies.filter(
+      (group) => group && group.type !== 'asteroid'
+    );
+
+    if (filteredEnemies.length === originalEnemies.length) {
+      return waveConfig;
+    }
+
+    const filteredConfig = {
+      ...waveConfig,
+      enemies: filteredEnemies.map((group) => ({ ...group })),
+    };
+
+    if (waveConfig.boss && typeof waveConfig.boss === 'object') {
+      filteredConfig.boss = { ...waveConfig.boss };
+    }
+
+    if (Array.isArray(waveConfig.supportGroups)) {
+      filteredConfig.supportGroups = waveConfig.supportGroups
+        .filter((group) => group && group.type !== 'asteroid')
+        .map((group) => ({ ...group }));
+    }
+
+    const filteredCount = originalEnemies.length - filteredEnemies.length;
+    const metadata = {
+      ...(waveConfig.metadata ? { ...waveConfig.metadata } : {}),
+      asteroidFallbackFiltered: true,
+      filteredAsteroidGroups: filteredCount,
+    };
+
+    filteredConfig.metadata = metadata;
+
+    return filteredConfig;
+  }
+
+  shouldWaveManagerSpawnAsteroids() {
+    const waveManagerHandles = CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false;
+    const useWaveManager = CONSTANTS.USE_WAVE_MANAGER ?? false;
+
+    return Boolean(waveManagerHandles && useWaveManager);
+  }
+
+  isLegacyAsteroidCompatibilityEnabled() {
+    const preserveLegacy = CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
+    if (!preserveLegacy) {
+      return false;
+    }
+
+    return preserveLegacy && this.shouldWaveManagerSpawnAsteroids();
+  }
+
+  isStrictLegacySpawnSequenceEnabled() {
+    if (!this.shouldWaveManagerSpawnAsteroids()) {
+      return false;
+    }
+
+    if (typeof CONSTANTS.STRICT_LEGACY_SPAWN_SEQUENCE === 'boolean') {
+      return CONSTANTS.STRICT_LEGACY_SPAWN_SEQUENCE;
+    }
+
+    return this.isLegacyAsteroidCompatibilityEnabled();
   }
 
   computeBaseEnemyCount(waveNumber) {
@@ -591,6 +922,10 @@ export class WaveManager {
   /**
    * Selects a random variant weighted by wave number.
    *
+   * @deprecated Asteroid variants are now delegated to EnemySystem.decideVariant().
+   * Retained for non-asteroid enemy types that still rely on the legacy
+   * WaveManager-driven variant rolls.
+   *
    * @param {Array<string>} variants - Available variants
    * @param {number} waveNumber - Current wave
    * @returns {string} Selected variant
@@ -631,32 +966,48 @@ export class WaveManager {
     this.waveStartTime = Date.now();
     this.enemiesSpawnedThisWave = 0;
     this.enemiesKilledThisWave = 0;
+    this.asteroidsSpawnedThisWave = 0;
+    this.asteroidsKilledThisWave = 0;
+    this.totalAsteroidEnemiesThisWave = 0;
     this.spawnQueue = [];
 
     const waveNumber = this.currentWave;
     let config;
 
+    const forceDynamicWaves = this.isLegacyAsteroidCompatibilityEnabled();
+
     if (this.isBossWave(waveNumber)) {
       config = this.generateBossWave(waveNumber);
     } else {
-      const predefined = this.waveConfigs.get(waveNumber);
-      config = predefined
-        ? this.cloneWaveConfig(predefined)
-        : this.generateDynamicWave(waveNumber);
+      if (forceDynamicWaves) {
+        config = this.generateDynamicWave(waveNumber);
+      } else {
+        const predefined = this.waveConfigs.get(waveNumber);
+        config = predefined
+          ? this.cloneWaveConfig(predefined)
+          : this.generateDynamicWave(waveNumber);
+      }
       config.isBossWave = false;
     }
 
     config.isBossWave = Boolean(config.isBossWave);
 
-    const sharedSpawnDelayMultiplier = this.resolveWaveSpawnDelayMultiplier(config);
-    config.spawnDelayMultiplier = sharedSpawnDelayMultiplier;
+    const effectiveConfig = this.filterForLegacyAsteroidFallback(config);
+    effectiveConfig.isBossWave = Boolean(effectiveConfig.isBossWave);
 
-    this.totalEnemiesThisWave = this.computeTotalEnemies(config);
+    const sharedSpawnDelayMultiplier =
+      this.resolveWaveSpawnDelayMultiplier(effectiveConfig);
+    effectiveConfig.spawnDelayMultiplier = sharedSpawnDelayMultiplier;
+
+    this.totalEnemiesThisWave = this.computeTotalEnemies(effectiveConfig);
+    const asteroidOnlyTotal = this.computeAsteroidOnlyTotal(effectiveConfig);
+    this.totalAsteroidEnemiesThisWave = asteroidOnlyTotal;
 
     const waveEventPayload = {
       wave: waveNumber,
       totalEnemies: this.totalEnemiesThisWave,
-      isBossWave: config.isBossWave,
+      asteroidTotal: asteroidOnlyTotal,
+      isBossWave: effectiveConfig.isBossWave,
       spawnDelayMultiplier: sharedSpawnDelayMultiplier,
     };
 
@@ -669,35 +1020,38 @@ export class WaveManager {
       ) {
         this.eventBus.emit('wave-started-debug', {
           ...waveEventPayload,
-          config: this.cloneWaveConfig(config),
+          config: this.cloneWaveConfig(effectiveConfig),
         });
       }
 
-      if (config.isBossWave) {
-        const supportGroups = Array.isArray(config.supportGroups)
-          ? config.supportGroups.map((group) => ({ ...group }))
-          : Array.isArray(config.enemies)
-            ? config.enemies.map((group) => ({ ...group }))
+      if (effectiveConfig.isBossWave) {
+        const supportGroups = Array.isArray(effectiveConfig.supportGroups)
+          ? effectiveConfig.supportGroups.map((group) => ({ ...group }))
+          : Array.isArray(effectiveConfig.enemies)
+            ? effectiveConfig.enemies.map((group) => ({ ...group }))
             : [];
 
         this.eventBus.emit('boss-wave-started', {
           wave: waveNumber,
           totalEnemies: this.totalEnemiesThisWave,
-          boss: config.boss ? { ...config.boss } : null,
+          asteroidTotal: asteroidOnlyTotal,
+          boss: effectiveConfig.boss ? { ...effectiveConfig.boss } : null,
           support: supportGroups,
-          config: this.cloneWaveConfig(config),
+          config: this.cloneWaveConfig(effectiveConfig),
         });
       }
     }
 
-    if (config.isBossWave) {
-      this.queueBossWaveSpawns(config);
+    if (effectiveConfig.isBossWave) {
+      this.queueBossWaveSpawns(effectiveConfig);
     } else {
-      this.spawnWave(config);
+      this.spawnWave(effectiveConfig);
     }
 
     console.log(
-      `[WaveManager] Started wave ${waveNumber} (${this.totalEnemiesThisWave} enemies${config.isBossWave ? ', boss wave' : ''})`
+      `[WaveManager] Started wave ${waveNumber} (${this.totalEnemiesThisWave} enemies${
+        effectiveConfig.isBossWave ? ', boss wave' : ''
+      })`
     );
     return true;
   }
@@ -749,32 +1103,123 @@ export class WaveManager {
                        { width: 800, height: 600 };
     const player = this.enemySystem.getCachedPlayer();
     const safeDistance = CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200;
+    const compatibilityMode = this.isLegacyAsteroidCompatibilityEnabled();
+    const useLegacyDistribution = CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
+    const strictLegacySequence = this.isStrictLegacySpawnSequenceEnabled();
+    const defaultDistributionWeights = this.getAsteroidDistributionWeights(
+      useLegacyDistribution
+    );
 
     const spawnDelayMultiplier = this.resolveWaveSpawnDelayMultiplier(waveConfig);
     this.spawnDelayMultiplier = spawnDelayMultiplier;
     const effectiveSpawnDelay = this.spawnDelay * spawnDelayMultiplier;
 
-    for (const enemyGroup of waveConfig.enemies) {
-      for (let i = 0; i < enemyGroup.count; i++) {
-        const spawnContext = this.createScopedRandom('spawn', 'wave-spawn');
-        // Calculate safe spawn position
-        const position = this.calculateSafeSpawnPosition(
-          worldBounds,
-          player,
-          safeDistance,
-          spawnContext.random
-        );
+    const enemyGroups = Array.isArray(waveConfig?.enemies)
+      ? waveConfig.enemies
+      : [];
 
-        // Create enemy configuration
+    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
+
+    for (const enemyGroup of enemyGroups) {
+      if (!enemyGroup || typeof enemyGroup !== 'object') {
+        continue;
+      }
+
+      const isAsteroid = enemyGroup.type === 'asteroid';
+
+      if (isAsteroid && !waveManagerSpawnsAsteroids) {
+        continue;
+      }
+
+      const groupCount = Math.max(0, Math.floor(Number(enemyGroup.count) || 0));
+      if (groupCount <= 0) {
+        continue;
+      }
+
+      for (let i = 0; i < groupCount; i++) {
+        const spawnContext =
+          strictLegacySequence && isAsteroid
+            ? this.createLegacyAsteroidScopedRandom()
+            : this.createScopedRandom('spawn', 'wave-spawn');
+        // WAVE-006: Posicionamento configurável via flag
+        const useLegacyPositioning =
+          CONSTANTS.PRESERVE_LEGACY_POSITIONING ?? true;
+
+        let position;
+        if (useLegacyPositioning && isAsteroid) {
+          // Legacy: spawn on one of 4 edges (matches baseline behavior)
+          position = this.calculateEdgeSpawnPosition(
+            worldBounds,
+            spawnContext.random
+          );
+        } else {
+          // Modern: spawn at safe distance from player
+          position = this.calculateSafeSpawnPosition(
+            worldBounds,
+            player,
+            safeDistance,
+            spawnContext.random
+          );
+        }
+
+        const {
+          count: _omittedCount,
+          spawnIndexBase: groupSpawnIndexBase,
+          metadata: groupMetadata,
+          ...groupConfig
+        } = enemyGroup;
+
+        const spawnIndexBase = Number.isFinite(groupSpawnIndexBase)
+          ? groupSpawnIndexBase
+          : 0;
+        const spawnIndex = spawnIndexBase + i;
+
+        let resolvedSize = groupConfig.size || enemyGroup.size;
+        if (isAsteroid && (!resolvedSize || resolvedSize === 'auto')) {
+          const distributionForGroup =
+            (groupMetadata && groupMetadata.distributionWeights) ||
+            defaultDistributionWeights;
+
+          resolvedSize = this.resolveAsteroidSpawnSize(spawnContext.random, {
+            distribution: distributionForGroup,
+            strict: strictLegacySequence,
+          });
+        }
+
         const enemyConfig = {
-          ...enemyGroup,
+          ...groupConfig,
+          type: groupConfig.type || enemyGroup.type,
+          size: resolvedSize,
+          variant:
+            Object.prototype.hasOwnProperty.call(groupConfig, 'variant')
+              ? groupConfig.variant
+              : enemyGroup.variant,
           x: position.x,
           y: position.y,
           wave: this.currentWave,
-          spawnIndex: i,
+          spawnIndex,
           spawnDelay: effectiveSpawnDelay,
-          spawnDelayMultiplier: this.spawnDelayMultiplier
+          spawnDelayMultiplier: this.spawnDelayMultiplier,
         };
+
+        if (
+          !isAsteroid &&
+          (enemyConfig.size === null ||
+            typeof enemyConfig.size === 'undefined' ||
+            enemyConfig.size === 'auto')
+        ) {
+          delete enemyConfig.size;
+        }
+
+        if (groupMetadata && typeof groupMetadata === 'object') {
+          enemyConfig.metadata = {
+            ...groupMetadata,
+            spawnIndex,
+            resolvedSize,
+          };
+        } else if (isAsteroid && strictLegacySequence) {
+          enemyConfig.metadata = { spawnIndex, resolvedSize };
+        }
 
         if (spawnContext.random?.fork) {
           enemyConfig.random = spawnContext.random.fork('asteroid-core');
@@ -824,6 +1269,9 @@ export class WaveManager {
 
         if (enemy) {
           this.enemiesSpawnedThisWave++;
+          if (compatibilityMode && isAsteroid) {
+            this.asteroidsSpawnedThisWave++;
+          }
           if (
             registeredEnemy &&
             typeof process !== 'undefined' &&
@@ -1081,6 +1529,85 @@ export class WaveManager {
     return { x, y };
   }
 
+  /**
+   * Calculates spawn position on one of the 4 edges (legacy asteroid behavior).
+   * Replicates EnemySystem.spawnAsteroid() positioning logic (lines 2046-2083).
+   *
+   * @param {Object} worldBounds - World dimensions {width, height}
+   * @param {Object} random - Random service instance
+   * @returns {Object} Position {x, y}
+   */
+  calculateEdgeSpawnPosition(
+    worldBounds,
+    random = this.getRandomScope('spawn')
+  ) {
+    const width = worldBounds?.width || CONSTANTS.GAME_WIDTH || 800;
+    const height = worldBounds?.height || CONSTANTS.GAME_HEIGHT || 600;
+    const margin =
+      typeof CONSTANTS.ASTEROID_EDGE_SPAWN_MARGIN === 'number'
+        ? CONSTANTS.ASTEROID_EDGE_SPAWN_MARGIN
+        : 80;
+
+    let spawnRandom = this.resolveScopedRandom(random, 'spawn', 'edge-position');
+
+    if (!spawnRandom || typeof spawnRandom.float !== 'function') {
+      const scopedFallback = this.createScopedRandom('spawn', 'edge-position');
+      if (scopedFallback?.random && typeof scopedFallback.random.float === 'function') {
+        spawnRandom = scopedFallback.random;
+      } else {
+        const baseRandom = this.getRandomService();
+        if (baseRandom && typeof baseRandom.fork === 'function') {
+          spawnRandom = baseRandom.fork(
+            'wave-manager:spawn:edge-position:fallback'
+          );
+        } else {
+          spawnRandom = new RandomService(0);
+        }
+      }
+    }
+
+    const getRange = (min, max) => {
+      if (typeof spawnRandom.range === 'function') {
+        return spawnRandom.range(min, max);
+      }
+      const span = max - min;
+      const base = typeof spawnRandom.float === 'function'
+        ? spawnRandom.float()
+        : 0;
+      return min + span * base;
+    };
+
+    // Select side: 0=top, 1=right, 2=bottom, 3=left
+    const side =
+      typeof spawnRandom.int === 'function'
+        ? spawnRandom.int(0, 3)
+        : Math.min(3, Math.floor(getRange(0, 4)));
+
+    let x;
+    let y;
+
+    switch (side) {
+      case 0: // Top
+        x = getRange(0, width);
+        y = -margin;
+        break;
+      case 1: // Right
+        x = width + margin;
+        y = getRange(0, height);
+        break;
+      case 2: // Bottom
+        x = getRange(0, width);
+        y = height + margin;
+        break;
+      default: // Left (case 3)
+        x = -margin;
+        y = getRange(0, height);
+        break;
+    }
+
+    return { x, y };
+  }
+
   resolveScopedRandom(random, scope = 'base', label = scope) {
     if (random && typeof random.float === 'function') {
       return random;
@@ -1106,11 +1633,34 @@ export class WaveManager {
       return;
     }
 
-    if (Array.isArray(data?.fragments) && data.fragments.length > 0) {
-      this.totalEnemiesThisWave += data.fragments.length;
+    const fragmentCount = Array.isArray(data?.fragments)
+      ? data.fragments.length
+      : 0;
+
+    if (fragmentCount > 0) {
+      this.totalEnemiesThisWave += fragmentCount;
+      this.enemiesSpawnedThisWave += fragmentCount;
+      this.totalAsteroidEnemiesThisWave += fragmentCount;
+      this.asteroidsSpawnedThisWave += fragmentCount;
     }
 
     this.enemiesKilledThisWave++;
+
+    const asteroidKey = this.enemyTypeKeys?.asteroid || 'asteroid';
+    const destroyedEnemyType =
+      data?.enemy?.type ||
+      data?.enemy?.enemyType ||
+      data?.enemy?.enemyKind ||
+      data?.enemy?.kind ||
+      data?.type ||
+      null;
+
+    if (
+      destroyedEnemyType &&
+      String(destroyedEnemyType).toLowerCase() === String(asteroidKey).toLowerCase()
+    ) {
+      this.asteroidsKilledThisWave++;
+    }
 
     if (
       typeof process !== 'undefined' &&
@@ -1154,8 +1704,17 @@ export class WaveManager {
       return;
     }
 
-    const waveManagerTotal = this.totalEnemiesThisWave;
-    const waveManagerSpawned = this.enemiesSpawnedThisWave;
+    const compatibilityMode = this.isLegacyAsteroidCompatibilityEnabled();
+    if (!compatibilityMode && !this.shouldWaveManagerSpawnAsteroids()) {
+      return;
+    }
+
+    const waveManagerTotal = compatibilityMode
+      ? this.totalAsteroidEnemiesThisWave
+      : this.totalEnemiesThisWave;
+    const waveManagerSpawned = compatibilityMode
+      ? this.asteroidsSpawnedThisWave
+      : this.enemiesSpawnedThisWave;
     const enemySystemTotal = this.enemySystem.waveState.totalAsteroids;
     const enemySystemSpawned = this.enemySystem.waveState.asteroidsSpawned;
 
@@ -1232,6 +1791,9 @@ export class WaveManager {
     this.enemiesSpawnedThisWave = 0;
     this.enemiesKilledThisWave = 0;
     this.totalEnemiesThisWave = 0;
+    this.totalAsteroidEnemiesThisWave = 0;
+    this.asteroidsSpawnedThisWave = 0;
+    this.asteroidsKilledThisWave = 0;
     this.spawnQueue = [];
     this.spawnTimer = 0;
     this.waveCountdown = 0;
@@ -1253,17 +1815,51 @@ export class WaveManager {
    * @returns {Object} Wave state
    */
   getState() {
+    const sanitizeCount = (value) =>
+      Number.isFinite(value) ? value : 0;
+
+    const compatibilityMode = this.isLegacyAsteroidCompatibilityEnabled();
+
+    const totals = {
+      all: sanitizeCount(this.totalEnemiesThisWave),
+      asteroids: sanitizeCount(this.totalAsteroidEnemiesThisWave),
+    };
+
+    const spawnedCounts = {
+      all: sanitizeCount(this.enemiesSpawnedThisWave),
+      asteroids: sanitizeCount(this.asteroidsSpawnedThisWave),
+    };
+
+    const killedCounts = {
+      all: sanitizeCount(this.enemiesKilledThisWave),
+      asteroids: sanitizeCount(this.asteroidsKilledThisWave),
+    };
+
+    const totalForState = compatibilityMode ? totals.asteroids : totals.all;
+    const spawnedForState = compatibilityMode
+      ? spawnedCounts.asteroids
+      : spawnedCounts.all;
+    const killedForState = compatibilityMode
+      ? killedCounts.asteroids
+      : killedCounts.all;
+
+    const progressDenominator = totalForState > 0 ? totalForState : 0;
+
     return {
       currentWave: this.currentWave,
       inProgress: this.waveInProgress,
       paused: this.wavePaused,
-      spawned: this.enemiesSpawnedThisWave,
-      killed: this.enemiesKilledThisWave,
-      total: this.totalEnemiesThisWave,
+      spawned: spawnedForState,
+      killed: killedForState,
+      total: totalForState,
+      totals,
+      counts: {
+        spawned: spawnedCounts,
+        killed: killedCounts,
+      },
       countdown: this.waveCountdown,
-      progress: this.totalEnemiesThisWave > 0
-        ? this.enemiesKilledThisWave / this.totalEnemiesThisWave
-        : 0
+      progress:
+        progressDenominator > 0 ? killedForState / progressDenominator : 0,
     };
   }
 
@@ -1319,6 +1915,34 @@ export class WaveManager {
     const sequence = this.randomSequences[scope];
     this.randomSequences[scope] += 1;
     return sequence;
+  }
+
+  createLegacyAsteroidScopedRandom() {
+    const generator = this.getRandomScope('spawn');
+    const sequence = this.nextRandomSequence('spawn');
+    const label = `enemy-system:asteroid-spawn:${sequence}`;
+
+    if (generator && typeof generator.fork === 'function') {
+      return {
+        random: generator.fork(label),
+        sequence,
+      };
+    }
+
+    const fallbackBase =
+      this.getRandomService() || this._fallbackRandom || new RandomService('wave-manager:fallback');
+
+    if (typeof fallbackBase.fork === 'function') {
+      return {
+        random: fallbackBase.fork(`${label}:fallback`),
+        sequence,
+      };
+    }
+
+    return {
+      random: fallbackBase,
+      sequence,
+    };
   }
 
   createScopedRandom(scope = 'spawn', label = scope) {

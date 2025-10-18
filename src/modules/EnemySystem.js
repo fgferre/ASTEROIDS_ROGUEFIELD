@@ -70,6 +70,8 @@ class EnemySystem {
     this._waveManagerFallbackWarningIssued = false;
     this._waveManagerInvalidStateWarningIssued = false;
     this._lastWaveManagerCompletionHandled = null;
+    this._asteroidSpawnDebugLogged = false;
+    this._waveManagerRuntimeEnabled = false;
 
     // Factory (optional - new architecture)
     this.factory = null;
@@ -1626,10 +1628,32 @@ class EnemySystem {
       this._waveSystemDebugLogged = true;
     }
 
+    this._waveManagerRuntimeEnabled = waveManagerEnabled;
+
+    const waveManagerHandlesSpawnFlag =
+      (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
+      this._waveManagerRuntimeEnabled;
+    const waveManagerControlsSpawn = Boolean(
+      waveManagerHandlesSpawnFlag && this.waveManager
+    );
+
+    if (!this._asteroidSpawnDebugLogged) {
+      console.debug(
+        `[EnemySystem] Asteroid spawn: ${
+          waveManagerControlsSpawn ? 'WaveManager' : 'Legacy handleSpawning()'
+        }`
+      );
+      this._asteroidSpawnDebugLogged = true;
+    }
+
     this.sessionStats.timeElapsed += deltaTime;
 
     // FEATURE FLAG: Roteamento entre sistema legado e WaveManager
     if (waveManagerEnabled) {
+      if (!waveManagerControlsSpawn) {
+        this.handleSpawning(deltaTime);
+      }
+
       this.updateWaveManagerLogic(deltaTime);
       this.updateAsteroids(deltaTime);
     } else {
@@ -1646,9 +1670,18 @@ class EnemySystem {
 
     if (!wave) return;
 
+    const waveManagerHandlesSpawn =
+      (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
+      this._waveManagerRuntimeEnabled &&
+      this.waveManager &&
+      !this._waveManagerFallbackWarningIssued &&
+      !this._waveManagerInvalidStateWarningIssued;
+
     if (wave.isActive) {
       wave.timeRemaining = Math.max(0, wave.timeRemaining - deltaTime);
-      this.handleSpawning(deltaTime);
+      if (!waveManagerHandlesSpawn) {
+        this.handleSpawning(deltaTime);
+      }
 
       const allAsteroidsKilled =
         wave.asteroidsKilled >= wave.totalAsteroids &&
@@ -1718,9 +1751,41 @@ class EnemySystem {
 
     wave.current = managerState.currentWave ?? previousCurrent;
     wave.isActive = managerState.inProgress ?? previousIsActive;
-    wave.asteroidsSpawned = managerState.spawned ?? previousSpawned;
-    wave.asteroidsKilled = managerState.killed ?? previousKilled;
-    wave.totalAsteroids = managerState.total ?? previousTotal;
+    const waveManagerHandlesAsteroids =
+      (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
+      this._waveManagerRuntimeEnabled;
+    const legacyCompatibilityEnabled =
+      (CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true) &&
+      waveManagerHandlesAsteroids;
+
+    const totals = managerState.totals || {};
+    const counts = managerState.counts || {};
+    const spawnedBreakdown = counts.spawned || {};
+    const killedBreakdown = counts.killed || {};
+
+    if (legacyCompatibilityEnabled) {
+      const managerSpawnedValue =
+        spawnedBreakdown.asteroids ?? managerState.spawned;
+      const managerKilledValue =
+        killedBreakdown.asteroids ?? managerState.killed;
+      const managerTotalValue = totals.asteroids ?? managerState.total;
+
+      const normalizeManagerValue = (value, fallback) =>
+        Number.isFinite(value) ? value : fallback;
+
+      wave.asteroidsSpawned = normalizeManagerValue(
+        managerSpawnedValue,
+        previousSpawned
+      );
+      wave.asteroidsKilled = normalizeManagerValue(
+        managerKilledValue,
+        previousKilled
+      );
+      wave.totalAsteroids = normalizeManagerValue(
+        managerTotalValue,
+        previousTotal
+      );
+    }
 
     const stateChanged =
       wave.current !== previousCurrent ||
@@ -1936,6 +2001,7 @@ class EnemySystem {
 
   // === SISTEMA DE SPAWNING ===
   handleSpawning(deltaTime) {
+    // LEGACY: Used when WAVEMANAGER_HANDLES_ASTEROID_SPAWN=false
     const wave = this.waveState;
     if (!wave || !wave.isActive) {
       return;
@@ -2049,7 +2115,10 @@ class EnemySystem {
         : Math.floor(floatRandom.float() * 4);
     let x;
     let y;
-    const margin = 80;
+    const margin =
+      typeof CONSTANTS.ASTEROID_EDGE_SPAWN_MARGIN === 'number'
+        ? CONSTANTS.ASTEROID_EDGE_SPAWN_MARGIN
+        : 80;
 
     switch (side) {
       case 0:
