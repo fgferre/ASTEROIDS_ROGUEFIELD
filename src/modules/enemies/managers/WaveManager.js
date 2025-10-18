@@ -319,51 +319,100 @@ export class WaveManager {
     const useLegacyDistribution =
       CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
 
+    const normalizedBaseCount = Math.max(
+      0,
+      Number.isFinite(baseCount) ? baseCount : 0
+    );
+
+    const asteroidCounts = {
+      large: 0,
+      medium: 0,
+      small: 0,
+    };
+
     if (useLegacyDistribution) {
       // Legacy distribution (50/30/20) - matches baseline metrics
-      enemies.push({
-        type: 'asteroid',
-        count: Math.max(1, Math.floor(baseCount * 0.5)), // 50% large
-        size: 'large',
-        variant: null // Variant will be decided by EnemySystem.decideVariant()
-      });
-
-      enemies.push({
-        type: 'asteroid',
-        count: Math.floor(baseCount * 0.3), // 30% medium
-        size: 'medium',
-        variant: null
-      });
-
-      enemies.push({
-        type: 'asteroid',
-        count: Math.floor(baseCount * 0.2), // 20% small
-        size: 'small',
-        variant: null
-      });
+      asteroidCounts.large =
+        normalizedBaseCount > 0
+          ? Math.max(1, Math.floor(normalizedBaseCount * 0.5))
+          : 0;
+      asteroidCounts.medium = Math.floor(normalizedBaseCount * 0.3);
+      asteroidCounts.small = Math.floor(normalizedBaseCount * 0.2);
     } else {
       // Optimized distribution (30/40/30) - better for mixed enemy types
-      enemies.push({
-        type: 'asteroid',
-        count: Math.max(1, Math.floor(baseCount * 0.3)),
-        size: 'large',
-        variant: null
-      });
-
-      enemies.push({
-        type: 'asteroid',
-        count: Math.floor(baseCount * 0.4),
-        size: 'medium',
-        variant: null
-      });
-
-      enemies.push({
-        type: 'asteroid',
-        count: Math.floor(baseCount * 0.3),
-        size: 'small',
-        variant: null
-      });
+      asteroidCounts.large =
+        normalizedBaseCount > 0
+          ? Math.max(1, Math.floor(normalizedBaseCount * 0.3))
+          : 0;
+      asteroidCounts.medium = Math.floor(normalizedBaseCount * 0.4);
+      asteroidCounts.small = Math.floor(normalizedBaseCount * 0.3);
     }
+
+    const priorityOrder = ['large', 'medium', 'small'];
+
+    let allocatedTotal =
+      asteroidCounts.large + asteroidCounts.medium + asteroidCounts.small;
+
+    if (allocatedTotal > normalizedBaseCount) {
+      let overflow = allocatedTotal - normalizedBaseCount;
+      const reductionOrder = ['small', 'medium', 'large'];
+
+      while (overflow > 0) {
+        let reducedInPass = false;
+
+        for (const key of reductionOrder) {
+          if (overflow <= 0) {
+            break;
+          }
+
+          const minimum =
+            key === 'large' && normalizedBaseCount > 0 ? 1 : 0;
+          if (asteroidCounts[key] > minimum) {
+            asteroidCounts[key] -= 1;
+            overflow -= 1;
+            reducedInPass = true;
+          }
+        }
+
+        if (!reducedInPass) {
+          break;
+        }
+      }
+
+      allocatedTotal =
+        asteroidCounts.large + asteroidCounts.medium + asteroidCounts.small;
+    }
+
+    let remainder = Math.max(0, normalizedBaseCount - allocatedTotal);
+
+    let priorityIndex = 0;
+    while (remainder > 0) {
+      const key = priorityOrder[priorityIndex % priorityOrder.length];
+      asteroidCounts[key] += 1;
+      remainder -= 1;
+      priorityIndex += 1;
+    }
+
+    enemies.push({
+      type: 'asteroid',
+      count: asteroidCounts.large,
+      size: 'large',
+      variant: null, // Variant will be decided by EnemySystem.decideVariant()
+    });
+
+    enemies.push({
+      type: 'asteroid',
+      count: asteroidCounts.medium,
+      size: 'medium',
+      variant: null,
+    });
+
+    enemies.push({
+      type: 'asteroid',
+      count: asteroidCounts.small,
+      size: 'small',
+      variant: null,
+    });
 
     const supportWeights = this.computeSupportWeights(waveNumber);
     for (const support of supportWeights) {
@@ -608,6 +657,10 @@ export class WaveManager {
 
   /**
    * Selects a random variant weighted by wave number.
+   *
+   * @deprecated Asteroid variants are now delegated to EnemySystem.decideVariant().
+   * Retained for non-asteroid enemy types that still rely on the legacy
+   * WaveManager-driven variant rolls.
    *
    * @param {Array<string>} variants - Available variants
    * @param {number} waveNumber - Current wave
@@ -1129,39 +1182,60 @@ export class WaveManager {
     const height = worldBounds?.height || CONSTANTS.GAME_HEIGHT || 600;
     const margin = 80;
 
-    const spawnRandom = this.resolveScopedRandom(random, 'spawn', 'edge-position');
+    let spawnRandom = this.resolveScopedRandom(random, 'spawn', 'edge-position');
 
-    const hasInt = spawnRandom && typeof spawnRandom.int === 'function';
-    const hasRange = spawnRandom && typeof spawnRandom.range === 'function';
-    const hasFloat = spawnRandom && typeof spawnRandom.float === 'function';
+    if (!spawnRandom || typeof spawnRandom.float !== 'function') {
+      const scopedFallback = this.createScopedRandom('spawn', 'edge-position');
+      if (scopedFallback?.random && typeof scopedFallback.random.float === 'function') {
+        spawnRandom = scopedFallback.random;
+      } else {
+        const baseRandom = this.getRandomService();
+        if (baseRandom && typeof baseRandom.fork === 'function') {
+          spawnRandom = baseRandom.fork(
+            'wave-manager:spawn:edge-position:fallback'
+          );
+        } else {
+          spawnRandom = new RandomService(0);
+        }
+      }
+    }
 
-    const nextFloat = hasFloat ? () => spawnRandom.float() : () => Math.random();
-    const nextRange = hasRange
-      ? (min, max) => spawnRandom.range(min, max)
-      : (min, max) => min + nextFloat() * (max - min);
+    const getRange = (min, max) => {
+      if (typeof spawnRandom.range === 'function') {
+        return spawnRandom.range(min, max);
+      }
+      const span = max - min;
+      const base = typeof spawnRandom.float === 'function'
+        ? spawnRandom.float()
+        : 0;
+      return min + span * base;
+    };
 
     // Select side: 0=top, 1=right, 2=bottom, 3=left
-    const side = hasInt ? spawnRandom.int(0, 3) : Math.floor(nextFloat() * 4);
+    const side =
+      typeof spawnRandom.int === 'function'
+        ? spawnRandom.int(0, 3)
+        : Math.floor(getRange(0, 4));
 
     let x;
     let y;
 
     switch (side) {
       case 0: // Top
-        x = nextRange(0, width);
+        x = getRange(0, width);
         y = -margin;
         break;
       case 1: // Right
         x = width + margin;
-        y = nextRange(0, height);
+        y = getRange(0, height);
         break;
       case 2: // Bottom
-        x = nextRange(0, width);
+        x = getRange(0, width);
         y = height + margin;
         break;
       default: // Left (case 3)
         x = -margin;
-        y = nextRange(0, height);
+        y = getRange(0, height);
         break;
     }
 
