@@ -1371,7 +1371,10 @@ export class WaveManager {
   ) {
     const width = worldBounds?.width || CONSTANTS.GAME_WIDTH || 800;
     const height = worldBounds?.height || CONSTANTS.GAME_HEIGHT || 600;
-    const margin = 80;
+    const margin =
+      typeof CONSTANTS.ASTEROID_EDGE_SPAWN_MARGIN === 'number'
+        ? CONSTANTS.ASTEROID_EDGE_SPAWN_MARGIN
+        : 80;
 
     let spawnRandom = this.resolveScopedRandom(random, 'spawn', 'edge-position');
 
@@ -1406,7 +1409,7 @@ export class WaveManager {
     const side =
       typeof spawnRandom.int === 'function'
         ? spawnRandom.int(0, 3)
-        : Math.floor(getRange(0, 4));
+        : Math.min(3, Math.floor(getRange(0, 4)));
 
     let x;
     let y;

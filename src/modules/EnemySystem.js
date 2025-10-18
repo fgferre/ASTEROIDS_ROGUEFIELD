@@ -2115,7 +2115,10 @@ class EnemySystem {
         : Math.floor(floatRandom.float() * 4);
     let x;
     let y;
-    const margin = 80;
+    const margin =
+      typeof CONSTANTS.ASTEROID_EDGE_SPAWN_MARGIN === 'number'
+        ? CONSTANTS.ASTEROID_EDGE_SPAWN_MARGIN
+        : 80;
 
     switch (side) {
       case 0:
