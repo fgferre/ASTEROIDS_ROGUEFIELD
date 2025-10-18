@@ -1650,6 +1650,10 @@ class EnemySystem {
 
     // FEATURE FLAG: Roteamento entre sistema legado e WaveManager
     if (waveManagerEnabled) {
+      if (!waveManagerControlsSpawn) {
+        this.handleSpawning(deltaTime);
+      }
+
       this.updateWaveManagerLogic(deltaTime);
       this.updateAsteroids(deltaTime);
     } else {
@@ -1747,41 +1751,41 @@ class EnemySystem {
 
     wave.current = managerState.currentWave ?? previousCurrent;
     wave.isActive = managerState.inProgress ?? previousIsActive;
+    const waveManagerHandlesAsteroids =
+      (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
+      this._waveManagerRuntimeEnabled;
     const legacyCompatibilityEnabled =
       (CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true) &&
-      (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
-      Boolean(CONSTANTS.USE_WAVE_MANAGER ?? false);
+      waveManagerHandlesAsteroids;
 
     const totals = managerState.totals || {};
     const counts = managerState.counts || {};
     const spawnedBreakdown = counts.spawned || {};
     const killedBreakdown = counts.killed || {};
 
-    const managerSpawnedValue = legacyCompatibilityEnabled
-      ? spawnedBreakdown.asteroids ?? managerState.spawned
-      : managerState.spawned;
-    const managerKilledValue = legacyCompatibilityEnabled
-      ? killedBreakdown.asteroids ?? managerState.killed
-      : managerState.killed;
-    const managerTotalValue = legacyCompatibilityEnabled
-      ? totals.asteroids ?? managerState.total
-      : managerState.total;
+    if (legacyCompatibilityEnabled) {
+      const managerSpawnedValue =
+        spawnedBreakdown.asteroids ?? managerState.spawned;
+      const managerKilledValue =
+        killedBreakdown.asteroids ?? managerState.killed;
+      const managerTotalValue = totals.asteroids ?? managerState.total;
 
-    const normalizeManagerValue = (value, fallback) =>
-      Number.isFinite(value) ? value : fallback;
+      const normalizeManagerValue = (value, fallback) =>
+        Number.isFinite(value) ? value : fallback;
 
-    wave.asteroidsSpawned = normalizeManagerValue(
-      managerSpawnedValue,
-      previousSpawned
-    );
-    wave.asteroidsKilled = normalizeManagerValue(
-      managerKilledValue,
-      previousKilled
-    );
-    wave.totalAsteroids = normalizeManagerValue(
-      managerTotalValue,
-      previousTotal
-    );
+      wave.asteroidsSpawned = normalizeManagerValue(
+        managerSpawnedValue,
+        previousSpawned
+      );
+      wave.asteroidsKilled = normalizeManagerValue(
+        managerKilledValue,
+        previousKilled
+      );
+      wave.totalAsteroids = normalizeManagerValue(
+        managerTotalValue,
+        previousTotal
+      );
+    }
 
     const stateChanged =
       wave.current !== previousCurrent ||
