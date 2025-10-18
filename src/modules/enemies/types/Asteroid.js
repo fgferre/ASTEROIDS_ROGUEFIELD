@@ -141,10 +141,32 @@ export class Asteroid extends BaseEnemy {
 
     this.id = options.id ?? baseRandom.uuid('asteroid');
     this.size = options.size || 'small';
-    this.variant = options.variant || 'common';
+    this.variant = options.variant ?? null;
     this.wave = options.wave || 1;
     this.spawnedBy = options.spawnedBy ?? null;
     this.generation = options.generation ?? 0;
+
+    // WAVE-006: Auto-decide variant if not provided (delegates to EnemySystem)
+    if (!this.variant || this.variant === 'auto') {
+      if (this.system && typeof this.system.decideVariant === 'function') {
+        const variantContext = {
+          wave: this.wave,
+          spawnType: options.spawnedBy ? 'fragment' : 'spawn',
+          parent: options.parent || null,
+          random: this.getRandomFor('variants') || baseRandom,
+          disallowedVariants: options.disallowedVariants || []
+        };
+
+        this.variant = this.system.decideVariant(this.size, variantContext);
+      } else {
+        // Fallback to common if decideVariant not available
+        this.variant = 'common';
+      }
+    }
+
+    if (!this.variant) {
+      this.variant = 'common';
+    }
 
     this.radius = CONSTANTS.ASTEROID_SIZES[this.size] || 12;
     this.variantConfig =

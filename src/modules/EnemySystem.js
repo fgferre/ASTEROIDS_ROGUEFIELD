@@ -70,6 +70,8 @@ class EnemySystem {
     this._waveManagerFallbackWarningIssued = false;
     this._waveManagerInvalidStateWarningIssued = false;
     this._lastWaveManagerCompletionHandled = null;
+    this._asteroidSpawnDebugLogged = false;
+    this._waveManagerRuntimeEnabled = false;
 
     // Factory (optional - new architecture)
     this.factory = null;
@@ -1626,6 +1628,24 @@ class EnemySystem {
       this._waveSystemDebugLogged = true;
     }
 
+    this._waveManagerRuntimeEnabled = waveManagerEnabled;
+
+    const waveManagerHandlesSpawnFlag =
+      (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
+      this._waveManagerRuntimeEnabled;
+    const waveManagerControlsSpawn = Boolean(
+      waveManagerHandlesSpawnFlag && this.waveManager
+    );
+
+    if (!this._asteroidSpawnDebugLogged) {
+      console.debug(
+        `[EnemySystem] Asteroid spawn: ${
+          waveManagerControlsSpawn ? 'WaveManager' : 'Legacy handleSpawning()'
+        }`
+      );
+      this._asteroidSpawnDebugLogged = true;
+    }
+
     this.sessionStats.timeElapsed += deltaTime;
 
     // FEATURE FLAG: Roteamento entre sistema legado e WaveManager
@@ -1646,9 +1666,18 @@ class EnemySystem {
 
     if (!wave) return;
 
+    const waveManagerHandlesSpawn =
+      (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
+      this._waveManagerRuntimeEnabled &&
+      this.waveManager &&
+      !this._waveManagerFallbackWarningIssued &&
+      !this._waveManagerInvalidStateWarningIssued;
+
     if (wave.isActive) {
       wave.timeRemaining = Math.max(0, wave.timeRemaining - deltaTime);
-      this.handleSpawning(deltaTime);
+      if (!waveManagerHandlesSpawn) {
+        this.handleSpawning(deltaTime);
+      }
 
       const allAsteroidsKilled =
         wave.asteroidsKilled >= wave.totalAsteroids &&
@@ -1936,6 +1965,7 @@ class EnemySystem {
 
   // === SISTEMA DE SPAWNING ===
   handleSpawning(deltaTime) {
+    // LEGACY: Used when WAVEMANAGER_HANDLES_ASTEROID_SPAWN=false
     const wave = this.waveState;
     if (!wave || !wave.isActive) {
       return;

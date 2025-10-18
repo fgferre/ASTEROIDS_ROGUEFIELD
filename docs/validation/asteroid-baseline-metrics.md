@@ -110,3 +110,61 @@ fixa `123456`.
 - `src/modules/EnemySystem.js`
 - `src/core/GameConstants.js`
 - `src/__tests__/legacy/asteroid-baseline-metrics.test.js`
+
+## Migração para WaveManager (WAVE-006)
+
+### Flags de Compatibilidade
+
+Para preservar comportamento baseline durante migração:
+
+- `USE_WAVE_MANAGER = true` - Ativa WaveManager (WAVE-002)
+- `WAVEMANAGER_HANDLES_ASTEROID_SPAWN = true` - WaveManager controla spawn de asteroides
+- `PRESERVE_LEGACY_SIZE_DISTRIBUTION = true` - Usa distribuição 50/30/20 (não 30/40/30)
+- `PRESERVE_LEGACY_POSITIONING = true` - Spawn nas 4 bordas (não safe distance)
+
+### Comportamento Esperado
+
+**Com todas as flags ativadas:**
+- Taxa de spawn: idêntica ao baseline (4 × 1.3^(wave-1))
+- Distribuição de tamanhos: 50/30/20 (large/medium/small)
+- Variant decision: via `EnemySystem.decideVariant()` (preserva wave bonus, allowed sizes)
+- Posicionamento: 4 bordas (top/right/bottom/left) com margin=80
+- Fragmentação: contabilizada automaticamente por `WaveManager.onEnemyDestroyed()`
+- Random scopes: `spawn`, `variants`, `fragments` (determinismo preservado)
+
+**Divergências Intencionais (quando flags desativadas):**
+- Distribuição 30/40/30: otimizada para mix com drones/mines/hunters
+- Safe distance positioning: evita spawn muito próximo do player
+- Variant decision simplificada: `WaveManager.selectRandomVariant()` (não recomendado)
+
+### Validação
+
+Executar testes baseline com flags ativadas:
+
+```
+# Ativar flags em GameConstants.js
+USE_WAVE_MANAGER = true
+WAVEMANAGER_HANDLES_ASTEROID_SPAWN = true
+PRESERVE_LEGACY_SIZE_DISTRIBUTION = true
+PRESERVE_LEGACY_POSITIONING = true
+
+# Executar testes
+npm run test:baseline
+```
+
+**Critério de sucesso:** Todos os testes devem passar com métricas idênticas ao baseline.
+
+### Próximos Passos
+
+Após validação completa:
+1. Manter flags ativadas por 1-2 semanas em produção
+2. Monitorar telemetria e feedback de usuários
+3. Considerar remoção de `handleSpawning()` legado
+4. Atualizar flags para valores otimizados (30/40/30, safe distance)
+5. Remover flags após estabilização
+
+### Referências
+
+- Plano de migração: `docs/plans/phase1-enemy-foundation-plan.md` (WAVE-006)
+- Código WaveManager: `src/modules/enemies/managers/WaveManager.js`
+- Código legado: `src/modules/EnemySystem.js` (handleSpawning linhas 1938-1955)

@@ -314,38 +314,56 @@ export class WaveManager {
   generateDynamicWave(waveNumber) {
     const baseCount = this.computeBaseEnemyCount(waveNumber);
 
-    // Variant distribution by difficulty
-    const variants = ['common', 'iron', 'gold', 'crystal'];
-    if (waveNumber >= 7) variants.push('volatile');
-    if (waveNumber >= 10) variants.push('parasite');
-
     const enemies = [];
-    const variantRandom = this.getRandomScope('variants');
+    // WAVE-006: Distribuição de tamanhos configurável via flag
+    const useLegacyDistribution =
+      CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
 
-    // WAVE-004: Distribuição ajustada para suportar múltiplos tipos de inimigos (não apenas asteroides)
-    // Large asteroids
-    enemies.push({
-      type: 'asteroid',
-      count: Math.max(1, Math.floor(baseCount * 0.3)),
-      size: 'large',
-      variant: this.selectRandomVariant(variants, waveNumber, variantRandom)
-    });
+    if (useLegacyDistribution) {
+      // Legacy distribution (50/30/20) - matches baseline metrics
+      enemies.push({
+        type: 'asteroid',
+        count: Math.max(1, Math.floor(baseCount * 0.5)), // 50% large
+        size: 'large',
+        variant: null // Variant will be decided by EnemySystem.decideVariant()
+      });
 
-    // Medium asteroids
-    enemies.push({
-      type: 'asteroid',
-      count: Math.floor(baseCount * 0.4),
-      size: 'medium',
-      variant: this.selectRandomVariant(variants, waveNumber, variantRandom)
-    });
+      enemies.push({
+        type: 'asteroid',
+        count: Math.floor(baseCount * 0.3), // 30% medium
+        size: 'medium',
+        variant: null
+      });
 
-    // Small asteroids
-    enemies.push({
-      type: 'asteroid',
-      count: Math.floor(baseCount * 0.3),
-      size: 'small',
-      variant: this.selectRandomVariant(variants, waveNumber, variantRandom)
-    });
+      enemies.push({
+        type: 'asteroid',
+        count: Math.floor(baseCount * 0.2), // 20% small
+        size: 'small',
+        variant: null
+      });
+    } else {
+      // Optimized distribution (30/40/30) - better for mixed enemy types
+      enemies.push({
+        type: 'asteroid',
+        count: Math.max(1, Math.floor(baseCount * 0.3)),
+        size: 'large',
+        variant: null
+      });
+
+      enemies.push({
+        type: 'asteroid',
+        count: Math.floor(baseCount * 0.4),
+        size: 'medium',
+        variant: null
+      });
+
+      enemies.push({
+        type: 'asteroid',
+        count: Math.floor(baseCount * 0.3),
+        size: 'small',
+        variant: null
+      });
+    }
 
     const supportWeights = this.computeSupportWeights(waveNumber);
     for (const support of supportWeights) {
@@ -757,13 +775,27 @@ export class WaveManager {
     for (const enemyGroup of waveConfig.enemies) {
       for (let i = 0; i < enemyGroup.count; i++) {
         const spawnContext = this.createScopedRandom('spawn', 'wave-spawn');
-        // Calculate safe spawn position
-        const position = this.calculateSafeSpawnPosition(
-          worldBounds,
-          player,
-          safeDistance,
-          spawnContext.random
-        );
+        // WAVE-006: Posicionamento configurável via flag
+        const useLegacyPositioning =
+          CONSTANTS.PRESERVE_LEGACY_POSITIONING ?? true;
+        const isAsteroid = enemyGroup.type === 'asteroid';
+
+        let position;
+        if (useLegacyPositioning && isAsteroid) {
+          // Legacy: spawn on one of 4 edges (matches baseline behavior)
+          position = this.calculateEdgeSpawnPosition(
+            worldBounds,
+            spawnContext.random
+          );
+        } else {
+          // Modern: spawn at safe distance from player
+          position = this.calculateSafeSpawnPosition(
+            worldBounds,
+            player,
+            safeDistance,
+            spawnContext.random
+          );
+        }
 
         // Create enemy configuration
         const enemyConfig = {
@@ -1077,6 +1109,61 @@ export class WaveManager {
       }
 
     } while (attempts < maxAttempts);
+
+    return { x, y };
+  }
+
+  /**
+   * Calculates spawn position on one of the 4 edges (legacy asteroid behavior).
+   * Replicates EnemySystem.spawnAsteroid() positioning logic (lines 2046-2083).
+   *
+   * @param {Object} worldBounds - World dimensions {width, height}
+   * @param {Object} random - Random service instance
+   * @returns {Object} Position {x, y}
+   */
+  calculateEdgeSpawnPosition(
+    worldBounds,
+    random = this.getRandomScope('spawn')
+  ) {
+    const width = worldBounds?.width || CONSTANTS.GAME_WIDTH || 800;
+    const height = worldBounds?.height || CONSTANTS.GAME_HEIGHT || 600;
+    const margin = 80;
+
+    const spawnRandom = this.resolveScopedRandom(random, 'spawn', 'edge-position');
+
+    const hasInt = spawnRandom && typeof spawnRandom.int === 'function';
+    const hasRange = spawnRandom && typeof spawnRandom.range === 'function';
+    const hasFloat = spawnRandom && typeof spawnRandom.float === 'function';
+
+    const nextFloat = hasFloat ? () => spawnRandom.float() : () => Math.random();
+    const nextRange = hasRange
+      ? (min, max) => spawnRandom.range(min, max)
+      : (min, max) => min + nextFloat() * (max - min);
+
+    // Select side: 0=top, 1=right, 2=bottom, 3=left
+    const side = hasInt ? spawnRandom.int(0, 3) : Math.floor(nextFloat() * 4);
+
+    let x;
+    let y;
+
+    switch (side) {
+      case 0: // Top
+        x = nextRange(0, width);
+        y = -margin;
+        break;
+      case 1: // Right
+        x = width + margin;
+        y = nextRange(0, height);
+        break;
+      case 2: // Bottom
+        x = nextRange(0, width);
+        y = height + margin;
+        break;
+      default: // Left (case 3)
+        x = -margin;
+        y = nextRange(0, height);
+        break;
+    }
 
     return { x, y };
   }

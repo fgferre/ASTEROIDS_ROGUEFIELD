@@ -131,32 +131,81 @@ O projeto utiliza feature flags para permitir ativação controlada de funcional
    - Procurar por `[EnemySystem] Wave system: WaveManager` ou `Legacy`
    - Confirmar que estado de ondas é sincronizado corretamente na HUD
 
-**Status:** Em validação. O WaveManager está totalmente integrado (WAVE-004 concluído). Requer validação de paridade com métricas baseline antes da ativação permanente.
+**Status:** Ativo (com flags de compatibilidade). WAVE-006 concluiu a migração de spawn de asteroides mantendo paridade com o sistema legado.
 
 **Funcionalidades implementadas:**
 - ✅ Listener de `enemy-destroyed` conectado para progressão automática de waves
 - ✅ Inimigos registrados via `registerActiveEnemy()` após spawn da factory
 - ✅ Parâmetros legados aplicados (`ASTEROIDS_PER_WAVE_BASE`, `ASTEROIDS_PER_WAVE_MULTIPLIER`, `WAVE_BREAK_TIME`)
 - ✅ Eventos `wave-started` e `wave-complete` sincronizados com HUD, áudio e efeitos
+- ✅ Migração de spawn de asteroides com flags de compatibilidade (WAVE-006)
 
-**Como validar a integração:**
+### Flags de Compatibilidade (WAVE-006)
 
-1. Ativar flag: `USE_WAVE_MANAGER = true` em `src/core/GameConstants.js`
-2. Executar testes de baseline: `npm run test:baseline`
-3. Iniciar jogo: `npm run dev`
-4. Completar 3 waves e verificar:
-   - Inimigos aparecem e são atualizados corretamente
-   - HUD mostra contador de inimigos preciso
-   - Ondas progridem automaticamente após destruir todos os inimigos
-   - Intervalo entre waves é 10 segundos
-   - Logs de debug aparecem no console
-5. Reportar qualquer divergência em issue no GitHub
+Para preservar comportamento baseline durante migração de asteroides:
+
+#### `WAVEMANAGER_HANDLES_ASTEROID_SPAWN`
+**Localização:** `src/core/GameConstants.js`  
+**Default:** `false`  
+**Descrição:** Ativa controle de spawn de asteroides pelo WaveManager (requer `USE_WAVE_MANAGER=true`).
+
+- `false`: EnemySystem usa `handleSpawning()` legado
+- `true`: WaveManager controla spawn via `generateDynamicWave()`
+
+#### `PRESERVE_LEGACY_SIZE_DISTRIBUTION`
+**Localização:** `src/core/GameConstants.js`  
+**Default:** `true`  
+**Descrição:** Controla distribuição de tamanhos de asteroides.
+
+- `true`: 50% large, 30% medium, 20% small (baseline)
+- `false`: 30% large, 40% medium, 30% small (otimizado para mix com outros inimigos)
+
+#### `PRESERVE_LEGACY_POSITIONING`
+**Localização:** `src/core/GameConstants.js`  
+**Default:** `true`  
+**Descrição:** Controla posicionamento de spawn de asteroides.
+
+- `true`: Spawn nas 4 bordas (top/right/bottom/left) com margin=80
+- `false`: Spawn com distância mínima do player (safe distance)
+
+**Como testar a migração completa:**
+
+1. Ativar todas as flags em `src/core/GameConstants.js`:
+
+   ```javascript
+   USE_WAVE_MANAGER = true
+   WAVEMANAGER_HANDLES_ASTEROID_SPAWN = true
+   PRESERVE_LEGACY_SIZE_DISTRIBUTION = true
+   PRESERVE_LEGACY_POSITIONING = true
+   ```
+
+2. Executar testes de baseline:
+
+   ```bash
+   npm run test:baseline
+   ```
+
+3. Validação manual:
+
+   ```bash
+   npm run dev
+   ```
+
+   - Jogar 10 waves completas
+   - Verificar que asteroides spawnam nas bordas
+   - Confirmar distribuição de tamanhos (50/30/20)
+   - Validar que variantes aparecem conforme esperado
+
+4. Testar configuração otimizada (opcional):
+   - Desativar `PRESERVE_LEGACY_SIZE_DISTRIBUTION` e `PRESERVE_LEGACY_POSITIONING`
+   - Observar diferenças: mais asteroides médios/pequenos, spawn mais seguro
 
 **Critério para ativação permanente:**
-- Validação em produção por pelo menos 1 semana
+- Validação em produção por pelo menos 1 semana com flags de compatibilidade ativas
 - Todos os testes de baseline passando
 - Aprovação formal da equipe
+- Remoção de `WAVEMANAGER_HANDLES_ASTEROID_SPAWN`, `PRESERVE_LEGACY_SIZE_DISTRIBUTION` e `PRESERVE_LEGACY_POSITIONING` junto com `USE_WAVE_MANAGER`
 
-**Documentação completa:** `docs/plans/phase1-enemy-foundation-plan.md` (seção WAVE-004)
+**Documentação completa:** `docs/plans/phase1-enemy-foundation-plan.md` (seções WAVE-004 e WAVE-006)
 
-**Nota:** Esta flag será removida após validação completa da migração para o WaveManager.
+**Nota:** Estas flags serão removidas após validação completa e estabilização do WaveManager em produção.
