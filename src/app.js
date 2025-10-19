@@ -11,6 +11,13 @@ import {
 } from './bootstrap/serviceManifest.js';
 import { installMathRandomGuard } from './utils/dev/mathRandomGuard.js';
 import GameSessionService from './services/GameSessionService.js';
+import {
+  loadFeatureFlags,
+  saveFeatureFlags,
+  applyFeatureFlagsToGlobal,
+  resetFeatureFlagsToDefaults,
+  logFeatureFlagStatus,
+} from './core/featureFlagManager.js';
 
 // Dependency Injection System (Phase 2.1)
 import { DIContainer } from './core/DIContainer.js';
@@ -32,6 +39,14 @@ const gameState = {
 };
 
 let garbageCollectionManager = null;
+
+const FEATURE_FLAG_KEY_TO_ID = {
+  useWaveManager: 'use-wave-manager',
+  asteroidSpawn: 'asteroid-spawn',
+  legacySizeDistribution: 'legacy-size-distribution',
+  legacyPositioning: 'legacy-positioning',
+  strictLegacySpawn: 'strict-legacy-spawn',
+};
 
 // Performance monitoring (Week 1: Balance & Feel)
 const performanceMonitor = new PerformanceMonitor();
@@ -146,6 +161,13 @@ function initializeDependencyInjection(manifestContext) {
       if (serviceLocatorAdapter) {
         window.gameServices = serviceLocatorAdapter;
       }
+      window.featureFlags = {
+        load: loadFeatureFlags,
+        save: saveFeatureFlags,
+        apply: applyFeatureFlagsToGlobal,
+        reset: resetFeatureFlagsToDefaults,
+        log: logFeatureFlagStatus,
+      };
 
       logServiceRegistrationFlow({ reason: 'development snapshot' });
 
@@ -181,6 +203,69 @@ function bootstrapDebugLogging() {
   applyDebugPreference(preference);
 }
 
+function initializeFeatureFlagsUI() {
+  const featureFlagsScreen = document.getElementById('feature-flags-screen');
+  const featureFlagsForm = document.getElementById('feature-flags-form');
+  const resetButton = document.getElementById('feature-flags-reset-btn');
+  const startButton = document.getElementById('feature-flags-start-btn');
+  const menuScreen = document.getElementById('menu-screen');
+
+  if (!featureFlagsScreen || !featureFlagsForm || !resetButton || !startButton || !menuScreen) {
+    menuScreen?.classList.remove('hidden');
+    featureFlagsScreen?.classList.add('hidden');
+    return;
+  }
+
+  const applyFlagsToForm = (flags) => {
+    Object.entries(FEATURE_FLAG_KEY_TO_ID).forEach(([flagKey, elementId]) => {
+      const checkbox = featureFlagsForm.querySelector(`#${elementId}`);
+      if (checkbox) {
+        checkbox.checked = Boolean(flags?.[flagKey]);
+      }
+    });
+  };
+
+  try {
+    const storedFlags = loadFeatureFlags();
+    applyFlagsToForm(storedFlags);
+  } catch (error) {
+    console.warn('[App] Failed to load feature flags for UI:', error);
+  }
+
+  resetButton.addEventListener('click', () => {
+    const defaults = resetFeatureFlagsToDefaults();
+    applyFlagsToForm(defaults);
+    logFeatureFlagStatus();
+  });
+
+  startButton.addEventListener('click', (event) => {
+    event.preventDefault();
+    const updatedFlags = {};
+
+    Object.entries(FEATURE_FLAG_KEY_TO_ID).forEach(([flagKey, elementId]) => {
+      const checkbox = featureFlagsForm.querySelector(`#${elementId}`);
+      updatedFlags[flagKey] = checkbox ? checkbox.checked : false;
+    });
+
+    const normalizedFlags = saveFeatureFlags(updatedFlags);
+    applyFeatureFlagsToGlobal(normalizedFlags);
+    logFeatureFlagStatus();
+
+    featureFlagsScreen.classList.add('hidden');
+    featureFlagsScreen.setAttribute('aria-hidden', 'true');
+
+    menuScreen.classList.remove('hidden');
+    menuScreen.removeAttribute('aria-hidden');
+
+    const menuFocusTarget = document.getElementById('start-game-btn');
+    menuFocusTarget?.focus();
+  });
+
+  featureFlagsScreen.classList.remove('hidden');
+  featureFlagsScreen.removeAttribute('aria-hidden');
+  menuScreen.setAttribute('aria-hidden', 'true');
+}
+
 function init() {
   try {
     if (process.env.NODE_ENV === 'development' && !mathRandomGuard) {
@@ -195,6 +280,14 @@ function init() {
     gameState.ctx = gameState.canvas.getContext('2d');
     if (!gameState.ctx) {
       throw new Error('Contexto 2D não disponível');
+    }
+
+    try {
+      const storedFlags = loadFeatureFlags();
+      applyFeatureFlagsToGlobal(storedFlags);
+      logFeatureFlagStatus();
+    } catch (featureFlagError) {
+      console.warn('[App] Failed to initialize feature flags:', featureFlagError);
     }
 
     const { seed: initialSeed, source: seedSource } = GameSessionService.deriveInitialSeed();
@@ -414,6 +507,7 @@ function renderGame() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  initializeFeatureFlagsUI();
   bootstrapDebugLogging();
   init();
   console.log('Aplicação inicializada com sucesso!');

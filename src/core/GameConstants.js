@@ -1732,6 +1732,25 @@ export const COMBAT_AIMING_UPGRADE_CONFIG = Object.freeze({
   },
 });
 
+const FEATURE_FLAG_OVERRIDE_DEFAULTS = {
+  __USE_WAVE_MANAGER_OVERRIDE__: false,
+  __PRESERVE_LEGACY_SIZE_DISTRIBUTION_OVERRIDE__: true,
+  __PRESERVE_LEGACY_POSITIONING_OVERRIDE__: true,
+  __WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__: false,
+  __STRICT_LEGACY_SPAWN_SEQUENCE_OVERRIDE__: true,
+};
+
+const featureFlagOverrideState = new Map();
+
+function getFeatureFlagValue(overrideName, defaultValue) {
+  if (typeof globalThis === 'undefined') {
+    return defaultValue;
+  }
+
+  const overrideValue = globalThis[overrideName];
+  return typeof overrideValue === 'undefined' ? defaultValue : Boolean(overrideValue);
+}
+
 // === SISTEMA DE ONDAS ===
 export const ASTEROIDS_PER_WAVE_BASE = 4;
 export const ASTEROIDS_PER_WAVE_MULTIPLIER = 1.3;
@@ -1739,11 +1758,63 @@ export const WAVE_DURATION = 60; // segundos
 export const WAVE_BREAK_TIME = 10; // segundos
 export const WAVE_BOSS_INTERVAL = 5;
 export const MAX_ASTEROIDS_ON_SCREEN = 20;
-export const USE_WAVE_MANAGER = false; // Feature flag para ativar o novo WaveManager (experimental). Consulte docs/plans/phase1-enemy-foundation-plan.md para critérios de remoção.
-export const PRESERVE_LEGACY_SIZE_DISTRIBUTION = true; // WAVE-006: Preservar distribuição legada de tamanhos de asteroides (50/30/20) para paridade com baseline
-export const PRESERVE_LEGACY_POSITIONING = true; // WAVE-006: Preservar posicionamento legado de asteroides (4 bordas) vs. safe distance
-export const WAVEMANAGER_HANDLES_ASTEROID_SPAWN = false; // WAVE-006: Ativar controle de spawn de asteroides pelo WaveManager (requer USE_WAVE_MANAGER=true)
+export let USE_WAVE_MANAGER = getFeatureFlagValue('__USE_WAVE_MANAGER_OVERRIDE__', false); // Feature flag para ativar o novo WaveManager (experimental). Consulte docs/plans/phase1-enemy-foundation-plan.md para critérios de remoção.
+export let PRESERVE_LEGACY_SIZE_DISTRIBUTION = getFeatureFlagValue('__PRESERVE_LEGACY_SIZE_DISTRIBUTION_OVERRIDE__', true); // WAVE-006: Preservar distribuição legada de tamanhos de asteroides (50/30/20) para paridade com baseline
+export let PRESERVE_LEGACY_POSITIONING = getFeatureFlagValue('__PRESERVE_LEGACY_POSITIONING_OVERRIDE__', true); // WAVE-006: Preservar posicionamento legado de asteroides (4 bordas) vs. safe distance
+export let WAVEMANAGER_HANDLES_ASTEROID_SPAWN = getFeatureFlagValue('__WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__', false); // WAVE-006: Ativar controle de spawn de asteroides pelo WaveManager (requer USE_WAVE_MANAGER=true)
 export const ASTEROID_EDGE_SPAWN_MARGIN = 80; // WAVE-006: Margem para posicionamento de spawn nas bordas (paridade com legado)
-export const STRICT_LEGACY_SPAWN_SEQUENCE = true; // WAVE-006: Garante que posição e tamanho reutilizem o mesmo stream de randomização
+export let STRICT_LEGACY_SPAWN_SEQUENCE = getFeatureFlagValue('__STRICT_LEGACY_SPAWN_SEQUENCE_OVERRIDE__', true); // WAVE-006: Garante que posição e tamanho reutilizem o mesmo stream de randomização
+
+export function refreshFeatureFlagConstants() {
+  USE_WAVE_MANAGER = getFeatureFlagValue('__USE_WAVE_MANAGER_OVERRIDE__', false);
+  PRESERVE_LEGACY_SIZE_DISTRIBUTION = getFeatureFlagValue(
+    '__PRESERVE_LEGACY_SIZE_DISTRIBUTION_OVERRIDE__',
+    true
+  );
+  PRESERVE_LEGACY_POSITIONING = getFeatureFlagValue(
+    '__PRESERVE_LEGACY_POSITIONING_OVERRIDE__',
+    true
+  );
+  WAVEMANAGER_HANDLES_ASTEROID_SPAWN = getFeatureFlagValue(
+    '__WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__',
+    false
+  );
+  STRICT_LEGACY_SPAWN_SEQUENCE = getFeatureFlagValue(
+    '__STRICT_LEGACY_SPAWN_SEQUENCE_OVERRIDE__',
+    true
+  );
+}
+
+function ensureFeatureFlagOverrides() {
+  if (typeof globalThis === 'undefined') {
+    return;
+  }
+
+  Object.entries(FEATURE_FLAG_OVERRIDE_DEFAULTS).forEach(([overrideName, defaultValue]) => {
+    if (!featureFlagOverrideState.has(overrideName)) {
+      const currentValue = globalThis[overrideName];
+      featureFlagOverrideState.set(
+        overrideName,
+        typeof currentValue === 'undefined' ? Boolean(defaultValue) : Boolean(currentValue)
+      );
+    }
+
+    Object.defineProperty(globalThis, overrideName, {
+      configurable: true,
+      enumerable: false,
+      get() {
+        return featureFlagOverrideState.get(overrideName);
+      },
+      set(value) {
+        featureFlagOverrideState.set(overrideName, Boolean(value));
+        refreshFeatureFlagConstants();
+      },
+    });
+  });
+
+  refreshFeatureFlagConstants();
+}
+
+ensureFeatureFlagOverrides();
 
 console.log('[GameConstants] Loaded');

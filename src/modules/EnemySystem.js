@@ -1785,6 +1785,22 @@ class EnemySystem {
         managerTotalValue,
         previousTotal
       );
+    } else {
+      const fallbackNormalize = (value, fallback) =>
+        Number.isFinite(value) ? value : fallback;
+
+      wave.asteroidsSpawned = fallbackNormalize(
+        managerState.spawned,
+        previousSpawned
+      );
+      wave.asteroidsKilled = fallbackNormalize(
+        managerState.killed,
+        previousKilled
+      );
+      wave.totalAsteroids = fallbackNormalize(
+        managerState.total,
+        previousTotal
+      );
     }
 
     const stateChanged =

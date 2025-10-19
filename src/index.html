@@ -19,8 +19,117 @@
   </head>
   <body>
     <div id="game-container">
+      <div
+        id="feature-flags-screen"
+        class="screen"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="feature-flags-title"
+      >
+        <div class="feature-flags-dialog">
+          <header class="feature-flags-header">
+            <h2 id="feature-flags-title" class="feature-flags-title">
+              Wave System Configuration
+            </h2>
+            <p class="feature-flags-subtitle">
+              Configure experimental features for testing
+            </p>
+          </header>
+          <div class="feature-flags-body">
+            <form id="feature-flags-form">
+              <div class="feature-flag-group">
+                <label for="use-wave-manager">
+                  <input
+                    id="use-wave-manager"
+                    name="use-wave-manager"
+                    type="checkbox"
+                  />
+                  Enable New Wave Manager
+                </label>
+                <p class="feature-flag-description">
+                  Activates the new enemy spawning system with support for
+                  drones, mines, hunters, and bosses
+                </p>
+              </div>
+              <div class="feature-flag-group">
+                <label for="asteroid-spawn">
+                  <input
+                    id="asteroid-spawn"
+                    name="asteroid-spawn"
+                    type="checkbox"
+                  />
+                  WaveManager Handles Asteroids
+                </label>
+                <p class="feature-flag-description">
+                  Let the new WaveManager control asteroid spawning (requires
+                  Wave Manager enabled)
+                </p>
+              </div>
+              <div class="feature-flag-group">
+                <label for="legacy-size-distribution">
+                  <input
+                    id="legacy-size-distribution"
+                    name="legacy-size-distribution"
+                    type="checkbox"
+                  />
+                  Preserve Legacy Size Distribution
+                </label>
+                <p class="feature-flag-description">
+                  Use original 50/30/20 asteroid size distribution instead of
+                  30/40/30
+                </p>
+              </div>
+              <div class="feature-flag-group">
+                <label for="legacy-positioning">
+                  <input
+                    id="legacy-positioning"
+                    name="legacy-positioning"
+                    type="checkbox"
+                  />
+                  Preserve Legacy Positioning
+                </label>
+                <p class="feature-flag-description">
+                  Spawn asteroids at screen edges (legacy) instead of safe
+                  distance from player
+                </p>
+              </div>
+              <div class="feature-flag-group">
+                <label for="strict-legacy-spawn">
+                  <input
+                    id="strict-legacy-spawn"
+                    name="strict-legacy-spawn"
+                    type="checkbox"
+                  />
+                  Strict Legacy Spawn Sequence
+                </label>
+                <p class="feature-flag-description">
+                  Maintain exact random number sequence from original
+                  implementation
+                </p>
+              </div>
+            </form>
+          </div>
+          <footer class="feature-flags-footer">
+            <button
+              id="feature-flags-reset-btn"
+              class="btn btn--outline"
+              type="button"
+            >
+              Reset to Defaults
+            </button>
+            <button
+              id="feature-flags-start-btn"
+              class="btn btn--primary"
+              type="button"
+            >
+              Start Game
+            </button>
+          </footer>
+        </div>
+      </div>
+
       <!-- Menu Principal -->
-      <div id="menu-screen" class="screen">
+      <div id="menu-screen" class="screen hidden">
         <canvas
           id="menu-background-canvas"
           class="menu-screen__canvas"

@@ -1581,6 +1581,115 @@ html[data-motion='reduced'] *::after {
   }
 }
 
+.feature-flags-dialog {
+  width: min(600px, 94vw);
+  margin: 8vh auto;
+  padding: var(--space-28) var(--space-32);
+  background: linear-gradient(
+    160deg,
+    rgba(6, 18, 36, 0.96),
+    rgba(18, 40, 78, 0.88)
+  );
+  border: 1px solid rgba(64, 150, 255, 0.35);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 24px 80px rgba(8, 20, 44, 0.65);
+  color: var(--color-text);
+}
+
+.feature-flags-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  margin-bottom: var(--space-20);
+  text-align: center;
+}
+
+.feature-flags-title {
+  margin: 0;
+  font-size: clamp(1.6rem, 1.3rem + 1vw, 2.2rem);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(120, 198, 255, 0.95);
+}
+
+.feature-flags-subtitle {
+  margin: 0;
+  font-size: var(--font-size-base);
+  color: var(--color-text-secondary);
+}
+
+.feature-flags-body {
+  padding: 0 var(--space-4);
+  max-height: min(50vh, 420px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+.feature-flag-group {
+  padding: var(--space-16) var(--space-20);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg);
+  background: rgba(12, 28, 54, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.feature-flag-group label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+}
+
+.feature-flag-group input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+}
+
+.feature-flag-description {
+  margin: var(--space-8) 0 0 calc(20px + var(--space-12));
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.feature-flags-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-16);
+  padding-top: var(--space-24);
+  margin-top: var(--space-24);
+  border-top: 1px solid rgba(82, 168, 255, 0.25);
+}
+
+.feature-flags-footer .btn {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .feature-flags-dialog {
+    margin: var(--space-24) auto;
+    padding: var(--space-20) var(--space-24);
+  }
+
+  .feature-flags-body {
+    max-height: min(60vh, 360px);
+  }
+
+  .feature-flags-footer {
+    flex-direction: column;
+  }
+
+  .feature-flags-footer .btn {
+    width: 100%;
+  }
+}
+
 .pause-title {
   font-size: 2.4rem;
   letter-spacing: 0.18em;
