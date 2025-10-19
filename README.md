@@ -11,6 +11,110 @@ Execute `npm run build` para gerar os arquivos finais em `dist/`.
 Use `npm run format` para aplicar o Prettier localmente.
 No CI, `npm run format:check` garante que os commits estejam formatados antes do build.
 
+## 🧪 Testing & Feature Flags
+
+O jogo possui **feature flags** que controlam o comportamento do sistema de ondas (WaveManager). Estes flags podem ser modificados em tempo de execução durante o desenvolvimento, sem necessidade de editar código ou recompilar.
+
+### Flags Disponíveis
+
+| Flag | Tipo | Padrão | Descrição |
+|------|------|--------|----------|
+| `USE_WAVE_MANAGER` | boolean | `false` | Ativa o novo WaveManager (substitui sistema legado) |
+| `WAVEMANAGER_HANDLES_ASTEROID_SPAWN` | boolean | `false` | WaveManager controla spawn de asteroides (requer `USE_WAVE_MANAGER=true`) |
+| `PRESERVE_LEGACY_SIZE_DISTRIBUTION` | boolean | `true` | Mantém distribuição legada de tamanhos (50/30/20) |
+| `PRESERVE_LEGACY_POSITIONING` | boolean | `true` | Asteroides spawnam nas bordas (legado) vs. distância segura |
+| `STRICT_LEGACY_SPAWN_SEQUENCE` | boolean | `true` | Garante sequência determinística de spawn |
+| `ASTEROID_EDGE_SPAWN_MARGIN` | number | `80` | Margem em pixels para spawn nas bordas (0-200) |
+
+### Modificar Flags via Console do Navegador
+
+1. Inicie o jogo em modo desenvolvimento: `npm run dev`
+2. Abra o DevTools do navegador (F12)
+3. No console, use os comandos:
+
+```javascript
+// Ver todos os flags disponíveis
+window.featureFlags.getAllFlags()
+
+// Ativar o WaveManager
+window.featureFlags.setFlag('USE_WAVE_MANAGER', true)
+
+// Ativar controle de spawn pelo WaveManager
+window.featureFlags.setFlag('WAVEMANAGER_HANDLES_ASTEROID_SPAWN', true)
+
+// Ver flags ativos (com overrides)
+window.featureFlags.getOverrides()
+
+// Resetar um flag específico
+window.featureFlags.resetFlag('USE_WAVE_MANAGER')
+
+// Resetar todos os flags
+window.featureFlags.resetAllFlags()
+```
+
+4. **Recarregue a página** (F5) para aplicar as mudanças
+5. Os overrides são salvos automaticamente no `localStorage` e persistem entre sessões
+
+### Cenários de Teste
+
+**Testar WaveManager (apenas progressão de ondas):**
+
+```javascript
+window.featureFlags.setFlag('USE_WAVE_MANAGER', true)
+// Spawn ainda controlado pelo sistema legado
+```
+
+**Testar WaveManager completo (com controle de spawn):**
+
+```javascript
+window.featureFlags.setFlag('USE_WAVE_MANAGER', true)
+window.featureFlags.setFlag('WAVEMANAGER_HANDLES_ASTEROID_SPAWN', true)
+```
+
+**Testar novos inimigos (Drone, Mine, Hunter):**
+
+```javascript
+window.featureFlags.setFlag('USE_WAVE_MANAGER', true)
+window.featureFlags.setFlag('WAVEMANAGER_HANDLES_ASTEROID_SPAWN', true)
+// Jogue até a onda 8+ para ver novos inimigos
+```
+
+**Testar sistema de Boss:**
+
+```javascript
+window.featureFlags.setFlag('USE_WAVE_MANAGER', true)
+window.featureFlags.setFlag('WAVEMANAGER_HANDLES_ASTEROID_SPAWN', true)
+// Boss aparece nas ondas 5, 10, 15, etc.
+```
+
+**Voltar ao sistema legado:**
+
+```javascript
+window.featureFlags.resetAllFlags()
+```
+
+### Guia Simplificado (Sem Programação)
+
+**Passo 1:** Abra o jogo no navegador (Chrome/Edge recomendado)
+
+**Passo 2:** Pressione **F12** para abrir as ferramentas de desenvolvedor
+
+**Passo 3:** Clique na aba **"Console"** (geralmente a segunda aba)
+
+**Passo 4:** Copie e cole um dos comandos acima e pressione **Enter**
+
+**Passo 5:** Pressione **F5** para recarregar o jogo com as novas configurações
+
+**Dica:** Os comandos ficam salvos automaticamente. Para voltar ao normal, use:
+
+```javascript
+window.featureFlags.resetAllFlags()
+```
+
+e recarregue a página (F5).
+
+**Nota sobre Feature Flags:** Todos os flags são persistidos no `localStorage` do navegador. Para limpar completamente, use `localStorage.clear()` no console ou `window.featureFlags.resetAllFlags()`.
+
 ## Protótipos de referência (fora do build oficial)
 
 Alguns experimentos e bancadas de desempenho são mantidos em `docs/reference/prototypes/`. Eles servem apenas como suporte de engenharia e **não fazem parte do build distribuído**. Consulte o [README dos protótipos](docs/reference/prototypes/README.md) para entender objetivo, dependências e passos de execução.
@@ -96,125 +200,3 @@ npm test -- --run src/__tests__/rendering/enemy-types-rendering.test.js
 ```
 
 Validam payloads, propriedades dinâmicas e preservação de estado do canvas.
-
----
-
-## Feature Flags
-
-O projeto utiliza feature flags para permitir ativação controlada de funcionalidades experimentais:
-
-### `USE_WAVE_MANAGER` (Experimental)
-
-**Localização:** `src/core/GameConstants.js`
-
-**Descrição:** Controla qual sistema de ondas é utilizado:
-- `false` (padrão): Sistema legado de ondas (100% estável)
-- `true`: Novo WaveManager com suporte a múltiplos tipos de inimigos
-
-**Como testar:**
-
-1. Validar comportamento padrão (flag desativada):
-
-   ```bash
-   npm run test:baseline
-   npm run dev
-   ```
-
-2. Ativar o WaveManager:
-   - Abrir `src/core/GameConstants.js`
-   - Alterar `USE_WAVE_MANAGER` para `true`
-   - Executar testes: `npm run test:baseline`
-   - Iniciar aplicação: `npm run dev`
-
-3. Verificar logs de debug:
-   - Abrir console do navegador
-   - Procurar por `[EnemySystem] Wave system: WaveManager` ou `Legacy`
-   - Confirmar que estado de ondas é sincronizado corretamente na HUD
-
-**Status:** Ativo (com flags de compatibilidade). WAVE-006 concluiu a migração de spawn de asteroides mantendo paridade com o sistema legado.
-
-**Funcionalidades implementadas:**
-- ✅ Listener de `enemy-destroyed` conectado para progressão automática de waves
-- ✅ Inimigos registrados via `registerActiveEnemy()` após spawn da factory
-- ✅ Parâmetros legados aplicados (`ASTEROIDS_PER_WAVE_BASE`, `ASTEROIDS_PER_WAVE_MULTIPLIER`, `WAVE_BREAK_TIME`)
-- ✅ Eventos `wave-started` e `wave-complete` sincronizados com HUD, áudio e efeitos
-- ✅ Migração de spawn de asteroides com flags de compatibilidade (WAVE-006)
-
-### Flags de Compatibilidade (WAVE-006)
-
-Para preservar comportamento baseline durante migração de asteroides:
-
-#### `WAVEMANAGER_HANDLES_ASTEROID_SPAWN`
-**Localização:** `src/core/GameConstants.js`  
-**Default:** `false`  
-**Descrição:** Ativa controle de spawn de asteroides pelo WaveManager (requer `USE_WAVE_MANAGER=true`).
-
-- `false`: EnemySystem usa `handleSpawning()` legado
-- `true`: WaveManager controla spawn via `generateDynamicWave()`
-
-#### `PRESERVE_LEGACY_SIZE_DISTRIBUTION`
-**Localização:** `src/core/GameConstants.js`  
-**Default:** `true`  
-**Descrição:** Controla distribuição de tamanhos de asteroides.
-
-- `true`: 50% large, 30% medium, 20% small (baseline)
-- `false`: 30% large, 40% medium, 30% small (otimizado para mix com outros inimigos)
-
-#### `PRESERVE_LEGACY_POSITIONING`
-**Localização:** `src/core/GameConstants.js`
-**Default:** `true`
-**Descrição:** Controla posicionamento de spawn de asteroides.
-
-- `true`: Spawn nas 4 bordas (top/right/bottom/left) com margin=80
-- `false`: Spawn com distância mínima do player (safe distance)
-
-#### `STRICT_LEGACY_SPAWN_SEQUENCE`
-**Localização:** `src/core/GameConstants.js`
-**Default:** `true`
-**Descrição:** Força posição e tamanho a compartilharem o mesmo stream `spawn`, reproduzindo a sequência determinística do legado.
-
-- `true`: Sequência idêntica à do EnemySystem para a mesma seed (recomendado para baseline)
-- `false`: Permite novas variações na ordem de spawn para experimentação
-
-**Como testar a migração completa:**
-
-1. Ativar todas as flags em `src/core/GameConstants.js`:
-
-   ```javascript
-   USE_WAVE_MANAGER = true
-   WAVEMANAGER_HANDLES_ASTEROID_SPAWN = true
-   PRESERVE_LEGACY_SIZE_DISTRIBUTION = true
-   PRESERVE_LEGACY_POSITIONING = true
-   STRICT_LEGACY_SPAWN_SEQUENCE = true
-   ```
-
-2. Executar testes de baseline:
-
-   ```bash
-   npm run test:baseline
-   ```
-
-3. Validação manual:
-
-   ```bash
-   npm run dev
-   ```
-
-   - Jogar 10 waves completas
-   - Verificar que asteroides spawnam nas bordas
-   - Confirmar distribuição de tamanhos (50/30/20)
-   - Validar que variantes aparecem conforme esperado
-
-4. Testar configuração otimizada (opcional):
-   - Desativar `PRESERVE_LEGACY_SIZE_DISTRIBUTION` e `PRESERVE_LEGACY_POSITIONING`
-   - Observar diferenças: mais asteroides médios/pequenos, spawn mais seguro
-
-**Critério para ativação permanente:**
-- Validação em produção por pelo menos 1 semana com flags de compatibilidade ativas
-- Todos os testes de baseline passando
-- Aprovação formal da equipe
-- Remoção de `WAVEMANAGER_HANDLES_ASTEROID_SPAWN`, `PRESERVE_LEGACY_SIZE_DISTRIBUTION`, `PRESERVE_LEGACY_POSITIONING` e `STRICT_LEGACY_SPAWN_SEQUENCE` junto com `USE_WAVE_MANAGER`
-
-**Documentação completa:** `docs/plans/phase1-enemy-foundation-plan.md` (seções WAVE-004 e WAVE-006)
-
-**Nota:** Estas flags serão removidas após validação completa e estabilização do WaveManager em produção.

@@ -11,6 +11,7 @@ import {
 } from './bootstrap/serviceManifest.js';
 import { installMathRandomGuard } from './utils/dev/mathRandomGuard.js';
 import GameSessionService from './services/GameSessionService.js';
+import FeatureFlagManager from './core/FeatureFlagManager.js';
 
 // Dependency Injection System (Phase 2.1)
 import { DIContainer } from './core/DIContainer.js';
@@ -41,6 +42,7 @@ let diContainer = null;
 let serviceLocatorAdapter = null;
 let mathRandomGuard = null;
 let gameSessionService = null;
+let featureFlagManager = null;
 
 function logServiceRegistrationFlow({ reason = 'bootstrap' } = {}) {
   if (!diContainer || typeof diContainer.getServiceNames !== 'function') {
@@ -146,6 +148,13 @@ function initializeDependencyInjection(manifestContext) {
       if (serviceLocatorAdapter) {
         window.gameServices = serviceLocatorAdapter;
       }
+      if (featureFlagManager) {
+        window.featureFlags = featureFlagManager;
+        console.log('[App] ℹ Feature flags available: window.featureFlags');
+        console.log('[App] ℹ Usage: window.featureFlags.setFlag("USE_WAVE_MANAGER", true)');
+        console.log('[App] ℹ View all: window.featureFlags.getAllFlags()');
+        console.log('[App] ℹ Reset: window.featureFlags.resetAllFlags()');
+      }
 
       logServiceRegistrationFlow({ reason: 'development snapshot' });
 
@@ -212,6 +221,19 @@ function init() {
       randomSeed: initialSeed,
       randomSeedSource: seedSource
     };
+
+    featureFlagManager = FeatureFlagManager.getInstance();
+
+    if (featureFlagManager?.hasOverrides()) {
+      const overrides = featureFlagManager.getOverrides();
+      const overrideKeys = Object.keys(overrides);
+      console.log(
+        `[App] Feature flag overrides active: ${overrideKeys.length} flag${
+          overrideKeys.length === 1 ? '' : 's'
+        }`
+      );
+      console.log('[App] Overrides:', overrides);
+    }
 
     // Initialize DI system first (Phase 2.1)
     const diInitialized = initializeDependencyInjection(manifestContext);

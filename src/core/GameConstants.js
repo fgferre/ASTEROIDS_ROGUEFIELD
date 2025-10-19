@@ -1739,11 +1739,42 @@ export const WAVE_DURATION = 60; // segundos
 export const WAVE_BREAK_TIME = 10; // segundos
 export const WAVE_BOSS_INTERVAL = 5;
 export const MAX_ASTEROIDS_ON_SCREEN = 20;
-export const USE_WAVE_MANAGER = false; // Feature flag para ativar o novo WaveManager (experimental). Consulte docs/plans/phase1-enemy-foundation-plan.md para critérios de remoção.
-export const PRESERVE_LEGACY_SIZE_DISTRIBUTION = true; // WAVE-006: Preservar distribuição legada de tamanhos de asteroides (50/30/20) para paridade com baseline
-export const PRESERVE_LEGACY_POSITIONING = true; // WAVE-006: Preservar posicionamento legado de asteroides (4 bordas) vs. safe distance
-export const WAVEMANAGER_HANDLES_ASTEROID_SPAWN = false; // WAVE-006: Ativar controle de spawn de asteroides pelo WaveManager (requer USE_WAVE_MANAGER=true)
-export const ASTEROID_EDGE_SPAWN_MARGIN = 80; // WAVE-006: Margem para posicionamento de spawn nas bordas (paridade com legado)
-export const STRICT_LEGACY_SPAWN_SEQUENCE = true; // WAVE-006: Garante que posição e tamanho reutilizem o mesmo stream de randomização
+
+// === FEATURE FLAGS (Runtime Configurable) ===
+// These flags can be overridden at runtime using FeatureFlagManager.
+// In development mode: window.featureFlags.setFlag('FLAG_NAME', value)
+// Changes require game restart to take effect.
+// See: src/core/FeatureFlagManager.js for API documentation
+
+// [FEATURE FLAG] Ativa o novo WaveManager (substitui sistema legado de ondas)
+// Default: false | Requer restart | Habilita suporte a novos tipos de inimigos
+// Docs: docs/plans/phase1-enemy-foundation-plan.md
+export const USE_WAVE_MANAGER = false;
+
+// [FEATURE FLAG] WaveManager controla spawn de asteroides (requer USE_WAVE_MANAGER=true)
+// Default: false | Requer restart | Dependency: USE_WAVE_MANAGER
+// Quando false: sistema legado controla spawn mesmo com WaveManager ativo
+export const WAVEMANAGER_HANDLES_ASTEROID_SPAWN = false;
+
+// [FEATURE FLAG] Preserva distribuição legada de tamanhos (50% large, 30% medium, 20% small)
+// Default: true | Requer restart | Usado para paridade com baseline metrics
+// Quando false: usa distribuição otimizada (30% large, 40% medium, 30% small)
+export const PRESERVE_LEGACY_SIZE_DISTRIBUTION = true;
+
+// [FEATURE FLAG] Asteroides spawnam nas 4 bordas (legado) vs. distância segura do player
+// Default: true | Requer restart | Afeta dificuldade inicial das ondas
+export const PRESERVE_LEGACY_POSITIONING = true;
+
+// [FEATURE FLAG] Garante sequência determinística de spawn (posição e tamanho no mesmo stream)
+// Default: true | Requer restart | Necessário para reprodutibilidade de testes
+export const STRICT_LEGACY_SPAWN_SEQUENCE = true;
+
+// [FEATURE FLAG] Margem em pixels para spawn nas bordas (usado com PRESERVE_LEGACY_POSITIONING)
+// Default: 80 | Requer restart | Range: 0-200 | Afeta distância mínima da borda
+export const ASTEROID_EDGE_SPAWN_MARGIN = 80;
+
+// Para modificar estes flags em runtime (dev mode):
+// window.featureFlags.setFlag('USE_WAVE_MANAGER', true)
+// window.featureFlags.getAllFlags() // Ver todos os flags disponíveis
 
 console.log('[GameConstants] Loaded');
