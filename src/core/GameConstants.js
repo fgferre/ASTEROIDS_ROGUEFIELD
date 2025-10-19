@@ -1,5 +1,65 @@
 // src/core/GameConstants.js
 
+import { readPersistedFeatureFlagOverrides } from './featureFlagStorage.js';
+
+// Runtime overrides persisted by FeatureFlagManager should be applied before
+// the rest of the systems evaluate their configuration. We resolve the
+// overrides once during module evaluation so that the exported constants already
+// reflect the developer's latest toggle selections.
+const RUNTIME_FEATURE_FLAG_OVERRIDES = loadRuntimeFeatureFlagOverrides();
+
+function loadRuntimeFeatureFlagOverrides() {
+  if (typeof globalThis !== 'undefined' && globalThis.__FEATURE_FLAG_OVERRIDES__) {
+    return { ...globalThis.__FEATURE_FLAG_OVERRIDES__ };
+  }
+
+  const persisted = readPersistedFeatureFlagOverrides();
+  if (!persisted || typeof persisted !== 'object') {
+    return {};
+  }
+
+  return persisted;
+}
+
+function resolveRuntimeFlag(flagKey, defaultValue) {
+  if (!Object.prototype.hasOwnProperty.call(RUNTIME_FEATURE_FLAG_OVERRIDES, flagKey)) {
+    return defaultValue;
+  }
+
+  const rawValue = RUNTIME_FEATURE_FLAG_OVERRIDES[flagKey];
+
+  if (typeof defaultValue === 'boolean') {
+    return Boolean(rawValue);
+  }
+
+  if (typeof defaultValue === 'number') {
+    const numericValue = Number(rawValue);
+    return Number.isFinite(numericValue) ? numericValue : defaultValue;
+  }
+
+  return rawValue ?? defaultValue;
+}
+
+function applyLegacySentinels() {
+  if (typeof globalThis === 'undefined') {
+    return;
+  }
+
+  if (resolveRuntimeFlag('USE_WAVE_MANAGER', false)) {
+    globalThis.__USE_WAVE_MANAGER_OVERRIDE__ = true;
+  } else if (Object.prototype.hasOwnProperty.call(globalThis, '__USE_WAVE_MANAGER_OVERRIDE__')) {
+    delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
+  }
+
+  if (Object.keys(RUNTIME_FEATURE_FLAG_OVERRIDES).length > 0) {
+    globalThis.__FEATURE_FLAG_OVERRIDES__ = {
+      ...RUNTIME_FEATURE_FLAG_OVERRIDES,
+    };
+  } else if (Object.prototype.hasOwnProperty.call(globalThis, '__FEATURE_FLAG_OVERRIDES__')) {
+    delete globalThis.__FEATURE_FLAG_OVERRIDES__;
+  }
+}
+
 // === DIMENSÕES DO JOGO ===
 export const GAME_WIDTH = 800;
 export const GAME_HEIGHT = 600;
@@ -1749,32 +1809,49 @@ export const MAX_ASTEROIDS_ON_SCREEN = 20;
 // [FEATURE FLAG] Ativa o novo WaveManager (substitui sistema legado de ondas)
 // Default: false | Requer restart | Habilita suporte a novos tipos de inimigos
 // Docs: docs/plans/phase1-enemy-foundation-plan.md
-export const USE_WAVE_MANAGER = false;
+export const USE_WAVE_MANAGER = resolveRuntimeFlag('USE_WAVE_MANAGER', false);
 
 // [FEATURE FLAG] WaveManager controla spawn de asteroides (requer USE_WAVE_MANAGER=true)
 // Default: false | Requer restart | Dependency: USE_WAVE_MANAGER
 // Quando false: sistema legado controla spawn mesmo com WaveManager ativo
-export const WAVEMANAGER_HANDLES_ASTEROID_SPAWN = false;
+export const WAVEMANAGER_HANDLES_ASTEROID_SPAWN = resolveRuntimeFlag(
+  'WAVEMANAGER_HANDLES_ASTEROID_SPAWN',
+  false
+);
 
 // [FEATURE FLAG] Preserva distribuição legada de tamanhos (50% large, 30% medium, 20% small)
 // Default: true | Requer restart | Usado para paridade com baseline metrics
 // Quando false: usa distribuição otimizada (30% large, 40% medium, 30% small)
-export const PRESERVE_LEGACY_SIZE_DISTRIBUTION = true;
+export const PRESERVE_LEGACY_SIZE_DISTRIBUTION = resolveRuntimeFlag(
+  'PRESERVE_LEGACY_SIZE_DISTRIBUTION',
+  true
+);
 
 // [FEATURE FLAG] Asteroides spawnam nas 4 bordas (legado) vs. distância segura do player
 // Default: true | Requer restart | Afeta dificuldade inicial das ondas
-export const PRESERVE_LEGACY_POSITIONING = true;
+export const PRESERVE_LEGACY_POSITIONING = resolveRuntimeFlag(
+  'PRESERVE_LEGACY_POSITIONING',
+  true
+);
 
 // [FEATURE FLAG] Garante sequência determinística de spawn (posição e tamanho no mesmo stream)
 // Default: true | Requer restart | Necessário para reprodutibilidade de testes
-export const STRICT_LEGACY_SPAWN_SEQUENCE = true;
+export const STRICT_LEGACY_SPAWN_SEQUENCE = resolveRuntimeFlag(
+  'STRICT_LEGACY_SPAWN_SEQUENCE',
+  true
+);
 
 // [FEATURE FLAG] Margem em pixels para spawn nas bordas (usado com PRESERVE_LEGACY_POSITIONING)
 // Default: 80 | Requer restart | Range: 0-200 | Afeta distância mínima da borda
-export const ASTEROID_EDGE_SPAWN_MARGIN = 80;
+export const ASTEROID_EDGE_SPAWN_MARGIN = resolveRuntimeFlag(
+  'ASTEROID_EDGE_SPAWN_MARGIN',
+  80
+);
 
 // Para modificar estes flags em runtime (dev mode):
 // window.featureFlags.setFlag('USE_WAVE_MANAGER', true)
 // window.featureFlags.getAllFlags() // Ver todos os flags disponíveis
+
+applyLegacySentinels();
 
 console.log('[GameConstants] Loaded');

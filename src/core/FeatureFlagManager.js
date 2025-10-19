@@ -6,8 +6,7 @@ import {
   STRICT_LEGACY_SPAWN_SEQUENCE,
   ASTEROID_EDGE_SPAWN_MARGIN,
 } from './GameConstants.js';
-
-const STORAGE_KEY = 'asteroids_feature_flags';
+import { FEATURE_FLAG_STORAGE_KEY } from './featureFlagStorage.js';
 
 const FEATURE_FLAGS = {
   USE_WAVE_MANAGER: {
@@ -126,6 +125,7 @@ export default class FeatureFlagManager {
     this._storageAvailable = isLocalStorageAvailable();
 
     this.loadFromLocalStorage();
+    this._applyAllRuntimeEffects();
 
     FeatureFlagManager._instance = this;
   }
@@ -151,12 +151,14 @@ export default class FeatureFlagManager {
         this.saveToLocalStorage();
         this._logDev(`Override removido para ${flagKey} (valor padrão restaurado)`);
       }
+      this._applyRuntimeEffects(flagKey, metadata.defaultValue);
       return true;
     }
 
     this._overrides.set(flagKey, normalizedValue);
     this.saveToLocalStorage();
     this._logDev(`Override aplicado: ${flagKey} = ${normalizedValue}`);
+    this._applyRuntimeEffects(flagKey, normalizedValue);
     return true;
   }
 
@@ -179,6 +181,7 @@ export default class FeatureFlagManager {
     this._overrides.delete(flagKey);
     this.saveToLocalStorage();
     this._logDev(`Override resetado: ${flagKey}`);
+    this._applyRuntimeEffects(flagKey, metadata.defaultValue);
     return metadata.defaultValue;
   }
 
@@ -190,6 +193,7 @@ export default class FeatureFlagManager {
     this._overrides.clear();
     this.saveToLocalStorage(true);
     this._logDev('Todos os overrides foram resetados.');
+    this._applyAllRuntimeEffects();
   }
 
   getAllFlags() {
@@ -220,7 +224,7 @@ export default class FeatureFlagManager {
     }
 
     try {
-      const serialized = window.localStorage.getItem(STORAGE_KEY);
+      const serialized = window.localStorage.getItem(FEATURE_FLAG_STORAGE_KEY);
       if (!serialized) {
         return;
       }
@@ -262,12 +266,12 @@ export default class FeatureFlagManager {
 
     try {
       if (removeEntry || this._overrides.size === 0) {
-        window.localStorage.removeItem(STORAGE_KEY);
+        window.localStorage.removeItem(FEATURE_FLAG_STORAGE_KEY);
         return;
       }
 
       const serialized = JSON.stringify(cloneOverrides(this._overrides));
-      window.localStorage.setItem(STORAGE_KEY, serialized);
+      window.localStorage.setItem(FEATURE_FLAG_STORAGE_KEY, serialized);
     } catch (error) {
       console.warn('[FeatureFlagManager] Não foi possível salvar overrides no localStorage:', error);
     }
@@ -371,6 +375,61 @@ export default class FeatureFlagManager {
       flags.forEach((entry) => {
         console.log(entry);
       });
+    }
+  }
+
+  _applyRuntimeEffects(flagKey, value, options = {}) {
+    const skipSnapshot = options.skipSnapshot === true;
+
+    if (flagKey === 'USE_WAVE_MANAGER') {
+      if (typeof globalThis === 'undefined') {
+        return;
+      }
+
+      if (value === true) {
+        globalThis.__USE_WAVE_MANAGER_OVERRIDE__ = true;
+      } else if (Object.prototype.hasOwnProperty.call(globalThis, '__USE_WAVE_MANAGER_OVERRIDE__')) {
+        delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
+      }
+    }
+
+    if (!skipSnapshot) {
+      this._syncGlobalOverrideSnapshot();
+    }
+  }
+
+  _applyAllRuntimeEffects() {
+    Object.keys(FEATURE_FLAGS).forEach((flagKey) => {
+      const metadata = FEATURE_FLAGS[flagKey];
+      const value = this._overrides.has(flagKey)
+        ? this._overrides.get(flagKey)
+        : metadata.defaultValue;
+      this._applyRuntimeEffects(flagKey, value, { skipSnapshot: true });
+    });
+
+    this._syncGlobalOverrideSnapshot();
+  }
+
+  _syncGlobalOverrideSnapshot() {
+    if (typeof globalThis === 'undefined') {
+      return;
+    }
+
+    if (this._overrides.size > 0) {
+      const snapshot = {};
+      Object.keys(FEATURE_FLAGS).forEach((key) => {
+        const metadata = FEATURE_FLAGS[key];
+        snapshot[key] = this._overrides.has(key)
+          ? this._overrides.get(key)
+          : metadata.defaultValue;
+      });
+
+      globalThis.__FEATURE_FLAG_OVERRIDES__ = snapshot;
+      return;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(globalThis, '__FEATURE_FLAG_OVERRIDES__')) {
+      delete globalThis.__FEATURE_FLAG_OVERRIDES__;
     }
   }
 }
