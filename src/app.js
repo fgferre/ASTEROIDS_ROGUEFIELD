@@ -507,8 +507,8 @@ function renderGame() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  initializeFeatureFlagsUI();
   bootstrapDebugLogging();
   init();
+  initializeFeatureFlagsUI();
   console.log('Aplicação inicializada com sucesso!');
 });
