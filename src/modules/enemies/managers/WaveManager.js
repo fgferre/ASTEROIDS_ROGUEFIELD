@@ -256,39 +256,6 @@ export class WaveManager {
     this._isEnemyDestroyedListenerActive = true;
   }
 
-  registerActiveEnemy(enemy, _options = {}) {
-    if (!enemy || !this.waveInProgress) {
-      return;
-    }
-
-    if (this._legacyRegisteredEnemies.has(enemy)) {
-      return;
-    }
-
-    this._legacyRegisteredEnemies.add(enemy);
-
-    this.totalEnemiesThisWave += 1;
-    this.enemiesSpawnedThisWave += 1;
-
-    const candidateType =
-      enemy?.type || enemy?.enemyType || enemy?.enemyKind || enemy?.kind || 'unknown';
-    const asteroidKey = this.enemyTypeKeys?.asteroid || 'asteroid';
-    const isAsteroid =
-      typeof candidateType === 'string' &&
-      candidateType.toLowerCase() === String(asteroidKey).toLowerCase();
-
-    if (isAsteroid) {
-      this.totalAsteroidEnemiesThisWave += 1;
-      this.asteroidsSpawnedThisWave += 1;
-    }
-
-    if (process?.env?.NODE_ENV === 'development') {
-      console.debug(
-        `[WaveManager] Registered enemy: type=${candidateType}, wave=${this.currentWave}`
-      );
-    }
-  }
-
   disconnect() {
     const bus = this._enemyDestroyedBus || this.eventBus;
 
@@ -1199,8 +1166,34 @@ export class WaveManager {
    * @param {Object} waveConfig - Wave configuration
    */
   spawnWave(waveConfig) {
-    const worldBounds = this.enemySystem.getCachedWorld()?.getBounds() ||
-                       { width: 800, height: 600 };
+    const enemyGroups = Array.isArray(waveConfig?.enemies)
+      ? waveConfig.enemies
+      : [];
+
+    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
+
+    if (!waveManagerSpawnsAsteroids) {
+      if (enemyGroups.length === 0) {
+        return;
+      }
+
+      const onlyAsteroids = enemyGroups.every(
+        (group) => (group?.type || '').toLowerCase() === 'asteroid'
+      );
+
+      if (onlyAsteroids) {
+        return;
+      }
+    }
+
+    const world = this.enemySystem?.getCachedWorld?.();
+    const worldBounds =
+      world && typeof world.getBounds === 'function'
+        ? world.getBounds()
+        : {
+            width: CONSTANTS.GAME_WIDTH || 800,
+            height: CONSTANTS.GAME_HEIGHT || 600,
+          };
     const player = this.enemySystem.getCachedPlayer();
     const playerSnapshot =
       this.enemySystem &&
@@ -1218,12 +1211,6 @@ export class WaveManager {
     const spawnDelayMultiplier = this.resolveWaveSpawnDelayMultiplier(waveConfig);
     this.spawnDelayMultiplier = spawnDelayMultiplier;
     const effectiveSpawnDelay = this.spawnDelay * spawnDelayMultiplier;
-
-    const enemyGroups = Array.isArray(waveConfig?.enemies)
-      ? waveConfig.enemies
-      : [];
-
-    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
 
     for (const enemyGroup of enemyGroups) {
       if (!enemyGroup || typeof enemyGroup !== 'object') {
@@ -1492,8 +1479,14 @@ export class WaveManager {
       return null;
     }
 
-    const worldBounds = this.enemySystem.getCachedWorld()?.getBounds() ||
-                       { width: 800, height: 600 };
+    const world = this.enemySystem?.getCachedWorld?.();
+    const worldBounds =
+      world && typeof world.getBounds === 'function'
+        ? world.getBounds()
+        : {
+            width: CONSTANTS.GAME_WIDTH || 800,
+            height: CONSTANTS.GAME_HEIGHT || 600,
+          };
     const player = this.enemySystem.getCachedPlayer();
     const playerSnapshot =
       typeof this.enemySystem.getPlayerPositionSnapshot === 'function'

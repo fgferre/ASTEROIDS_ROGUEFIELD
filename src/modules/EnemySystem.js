@@ -3244,7 +3244,7 @@ class EnemySystem {
 
     this.spawnInitialAsteroids(4);
 
-    if (typeof gameEvents !== 'undefined') {
+    if (!waveManagerActive && typeof gameEvents !== 'undefined') {
       gameEvents.emit('wave-started', {
         wave: wave.current,
         totalAsteroids: wave.totalAsteroids,
