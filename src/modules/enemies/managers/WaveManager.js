@@ -786,11 +786,16 @@ export class WaveManager {
       this._legacyRegisteredEnemies = new WeakSet();
     }
 
-    if (this._legacyRegisteredEnemies.has(enemy)) {
+    const bypassDuplicateCheck = Boolean(skipDuplicateCheck);
+    const alreadyRegistered = this._legacyRegisteredEnemies.has(enemy);
+
+    if (!bypassDuplicateCheck && alreadyRegistered) {
       return false;
     }
 
-    this._legacyRegisteredEnemies.add(enemy);
+    if (!alreadyRegistered) {
+      this._legacyRegisteredEnemies.add(enemy);
+    }
 
     const coerce = (value) => (Number.isFinite(value) ? value : 0);
 
@@ -1201,7 +1206,6 @@ export class WaveManager {
         ? this.enemySystem.getPlayerPositionSnapshot(player)
         : null;
     const safeDistance = CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200;
-    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
     const compatibilityMode =
       !waveManagerSpawnsAsteroids || this.isLegacyAsteroidCompatibilityEnabled();
     const useLegacyDistribution = CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
@@ -1906,6 +1910,8 @@ export class WaveManager {
     this.waveEndTime = Date.now();
     const duration = (this.waveEndTime - this.waveStartTime) / 1000;
 
+    this._legacyRegisteredEnemies = new WeakSet();
+
     // Emit wave complete event
     if (this.eventBus) {
       const payload = {
@@ -1989,6 +1995,7 @@ export class WaveManager {
     const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
     const compatibilityMode =
       !waveManagerSpawnsAsteroids || this.isLegacyAsteroidCompatibilityEnabled();
+    const preferAsteroidBreakdown = !waveManagerSpawnsAsteroids;
 
     const totals = {
       all: sanitizeCount(this.totalEnemiesThisWave),
@@ -2005,13 +2012,21 @@ export class WaveManager {
       asteroids: sanitizeCount(this.asteroidsKilledThisWave),
     };
 
-    const totalForState = compatibilityMode ? totals.asteroids : totals.all;
-    const spawnedForState = compatibilityMode
+    const totalForState = preferAsteroidBreakdown
+      ? totals.asteroids
+      : compatibilityMode
+        ? totals.asteroids
+        : totals.all;
+    const spawnedForState = preferAsteroidBreakdown
       ? spawnedCounts.asteroids
-      : spawnedCounts.all;
-    const killedForState = compatibilityMode
+      : compatibilityMode
+        ? spawnedCounts.asteroids
+        : spawnedCounts.all;
+    const killedForState = preferAsteroidBreakdown
       ? killedCounts.asteroids
-      : killedCounts.all;
+      : compatibilityMode
+        ? killedCounts.asteroids
+        : killedCounts.all;
 
     const progressDenominator = totalForState > 0 ? totalForState : 0;
 

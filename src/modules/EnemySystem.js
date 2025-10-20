@@ -3252,7 +3252,9 @@ class EnemySystem {
 
     const wave = this.waveState;
 
-    if (!waveManagerActive || waveStarted) {
+    if (!waveManagerActive) {
+      wave.isActive = true;
+    } else if (waveStarted === true) {
       wave.isActive = true;
     }
 
