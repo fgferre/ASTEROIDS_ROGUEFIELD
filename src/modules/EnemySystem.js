@@ -1891,7 +1891,9 @@ class EnemySystem {
       wave.initialSpawnDone = false;
       wave.breakTimer = 0;
 
-      this.spawnInitialAsteroids(4);
+      if (!waveManagerHandlesAsteroids) {
+        this.spawnInitialAsteroids(4);
+      }
     }
     const legacyCompatibilityEnabled =
       (CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true) &&

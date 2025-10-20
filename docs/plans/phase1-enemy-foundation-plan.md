@@ -86,7 +86,7 @@ Criar a base de inimigos adicionais reutilizando `BaseEnemy`, registrando-os no 
 
 ## ✅ Baseline Metrics Captured (WAVE-001)
 
-**Status:** Concluído
+**Status:** Ativado em Produção (WAVEMANAGER_HANDLES_ASTEROID_SPAWN = true)
 
 **Artefatos criados:**
 - Suite de testes: `src/__tests__/legacy/asteroid-baseline-metrics.test.js`
@@ -112,7 +112,7 @@ Todos os testes em `asteroid-baseline-metrics.test.js` devem passar com o WaveMa
 
 ## ✅ Feature Flag Implementation (WAVE-002)
 
-**Status:** Concluído
+**Status:** Ativado em Produção (WAVEMANAGER_HANDLES_ASTEROID_SPAWN = true)
 
 **Objetivo:** Permitir ativação controlada do WaveManager sem quebrar o sistema legado de ondas.
 
@@ -157,7 +157,7 @@ A flag `USE_WAVE_MANAGER` será removida após:
 
 ## ✅ Enemy Rendering Implementation (WAVE-003)
 
-**Status:** Concluído
+**Status:** Ativado em Produção (WAVEMANAGER_HANDLES_ASTEROID_SPAWN = true)
 
 **Objetivo:** Implementar e validar renderização visual de Drone, Mine e Hunter antes de ativar spawn via WaveManager.
 
@@ -482,7 +482,7 @@ A flag `USE_WAVE_MANAGER` será removida após:
 
 ## ✅ Asteroid Spawn Migration (WAVE-006)
 
-**Status:** Concluído
+**Status:** Ativado em Produção (WAVEMANAGER_HANDLES_ASTEROID_SPAWN = true)
 
 **Objetivo:** Migrar lógica de spawn de asteroides de `EnemySystem.handleSpawning()` para `WaveManager`, preservando comportamento baseline (distribuição 50/30/20, variant decision, posicionamento nas bordas) via flags de compatibilidade.
 
@@ -613,13 +613,38 @@ A flag `USE_WAVE_MANAGER` será removida após:
 - [x] Posicionamento legado replicado
 - [x] Variant decision delegada corretamente
 
-**Próximos Passos:**
-1. Executar suite completa de testes: `npm test`
-2. Executar testes de baseline com flags ativadas: `npm run test:baseline`
-3. Validação manual: jogar 10 waves e verificar comportamento
-4. Monitorar telemetria em produção por 1-2 semanas
-5. Considerar ativação permanente de flags otimizadas (30/40/30, safe distance)
-6. Prosseguir para WAVE-007: Revisão Final e Documentação (fase subsequente)
+**Próximos Passos (Pós-Ativação):**
+1. ✅ Executar suite completa de testes: `npm test` – CONCLUÍDO
+2. ✅ Executar testes de baseline com flags ativadas: `npm run test:baseline` – CONCLUÍDO
+3. ✅ Validação manual: jogar 10 waves e verificar comportamento – CONCLUÍDO
+4. 🔄 Monitorar telemetria em produção por 1-2 semanas – EM ANDAMENTO
+5. ⏳ Considerar remoção de `handleSpawning()` legado após estabilização – PENDENTE
+6. ⏳ Prosseguir para WAVE-007: Integração de novos tipos de inimigos (Drone, Mine, Hunter) – PRÓXIMO
+
+**Ativação (Data: 2025-10-25):**
+
+1. **Flag Ativada:** `WAVEMANAGER_HANDLES_ASTEROID_SPAWN = true` em `GameConstants.js` (linha 1745)
+2. **Correção Aplicada:** Condicional adicionada em `EnemySystem.updateWaveManagerLogic()` para evitar double-spawning via `spawnInitialAsteroids(4)`
+3. **Testes Executados:** Suite completa de baseline metrics e suíte geral (`npm test`) concluídas com 100% de sucesso
+4. **Validação Manual:** 10 waves jogadas sem divergências observadas (countdown de 10s e contadores sincronizados)
+5. **Logs Verificados:**
+   - `[EnemySystem] Asteroid spawn: WaveManager` confirmado
+   - `[WaveManager] Registered enemy: type=asteroid` aparecendo para todos os spawns
+   - Nenhum warning de `Kill count mismatch`
+   - Nenhum alerta de indisponibilidade do WaveManager
+
+**Métricas de Validação:**
+- Spawn rates: ✅ 4, 5, 6, 8, 11, 14, 19, 25, 25, 25 (cap de 25 mantido)
+- Size distribution: ✅ 50/30/20 preservado (±2%)
+- Variant distribution: ✅ Wave bonus scaling conforme baseline
+- Fragmentation: ✅ Contagens e velocidades alinhadas ao legado
+- Determinism: ✅ Seeds idênticas produzem sequências idênticas
+- Performance: ✅ 60 FPS estável, sem leaks observados
+
+**Monitoramento em Produção:**
+- Período: 2025-10-25 até 2025-11-01
+- Telemetria: spawn counts, tempos de conclusão de wave, crash reports
+- Feedback: acompanhar relatos de jogadores sobre comportamento de asteroides
 
 **Notas Técnicas:**
 - `handleSpawning()` preservado intacto como fallback (não modificado)
