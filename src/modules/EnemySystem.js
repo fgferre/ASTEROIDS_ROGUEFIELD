@@ -3164,6 +3164,23 @@ class EnemySystem {
   startNextWave() {
     if (!this.waveState) return;
 
+    const waveManagerActive =
+      this.useManagers && Boolean(CONSTANTS?.USE_WAVE_MANAGER) && this.waveManager;
+
+    if (waveManagerActive && !this.waveManager.waveInProgress) {
+      const waveStarted = this.waveManager.startNextWave();
+
+      if (
+        !waveStarted &&
+        typeof process !== 'undefined' &&
+        process.env?.NODE_ENV === 'development' &&
+        typeof console !== 'undefined' &&
+        typeof console.debug === 'function'
+      ) {
+        console.debug('[EnemySystem] WaveManager refused to start next wave');
+      }
+    }
+
     const wave = this.waveState;
     wave.current += 1;
     wave.totalAsteroids = Math.floor(
