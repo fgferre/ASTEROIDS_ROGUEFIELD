@@ -786,11 +786,16 @@ export class WaveManager {
       this._legacyRegisteredEnemies = new WeakSet();
     }
 
-    if (this._legacyRegisteredEnemies.has(enemy)) {
+    const bypassDuplicateCheck = Boolean(skipDuplicateCheck);
+    const alreadyRegistered = this._legacyRegisteredEnemies.has(enemy);
+
+    if (!bypassDuplicateCheck && alreadyRegistered) {
       return false;
     }
 
-    this._legacyRegisteredEnemies.add(enemy);
+    if (!alreadyRegistered) {
+      this._legacyRegisteredEnemies.add(enemy);
+    }
 
     const coerce = (value) => (Number.isFinite(value) ? value : 0);
 
@@ -1166,11 +1171,43 @@ export class WaveManager {
    * @param {Object} waveConfig - Wave configuration
    */
   spawnWave(waveConfig) {
-    const worldBounds = this.enemySystem.getCachedWorld()?.getBounds() ||
-                       { width: 800, height: 600 };
+    const enemyGroups = Array.isArray(waveConfig?.enemies)
+      ? waveConfig.enemies
+      : [];
+
+    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
+
+    if (!waveManagerSpawnsAsteroids) {
+      if (enemyGroups.length === 0) {
+        return;
+      }
+
+      const onlyAsteroids = enemyGroups.every(
+        (group) => (group?.type || '').toLowerCase() === 'asteroid'
+      );
+
+      if (onlyAsteroids) {
+        return;
+      }
+    }
+
+    const world = this.enemySystem?.getCachedWorld?.();
+    const worldBounds =
+      world && typeof world.getBounds === 'function'
+        ? world.getBounds()
+        : {
+            width: CONSTANTS.GAME_WIDTH || 800,
+            height: CONSTANTS.GAME_HEIGHT || 600,
+          };
     const player = this.enemySystem.getCachedPlayer();
+    const playerSnapshot =
+      this.enemySystem &&
+      typeof this.enemySystem.getPlayerPositionSnapshot === 'function'
+        ? this.enemySystem.getPlayerPositionSnapshot(player)
+        : null;
     const safeDistance = CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200;
-    const compatibilityMode = this.isLegacyAsteroidCompatibilityEnabled();
+    const compatibilityMode =
+      !waveManagerSpawnsAsteroids || this.isLegacyAsteroidCompatibilityEnabled();
     const useLegacyDistribution = CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
     const strictLegacySequence = this.isStrictLegacySpawnSequenceEnabled();
     const defaultDistributionWeights = this.getAsteroidDistributionWeights(
@@ -1180,12 +1217,6 @@ export class WaveManager {
     const spawnDelayMultiplier = this.resolveWaveSpawnDelayMultiplier(waveConfig);
     this.spawnDelayMultiplier = spawnDelayMultiplier;
     const effectiveSpawnDelay = this.spawnDelay * spawnDelayMultiplier;
-
-    const enemyGroups = Array.isArray(waveConfig?.enemies)
-      ? waveConfig.enemies
-      : [];
-
-    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
 
     for (const enemyGroup of enemyGroups) {
       if (!enemyGroup || typeof enemyGroup !== 'object') {
@@ -1220,13 +1251,21 @@ export class WaveManager {
             spawnContext.random
           );
         } else {
-          // Modern: spawn at safe distance from player
-          position = this.calculateSafeSpawnPosition(
-            worldBounds,
-            player,
-            safeDistance,
-            spawnContext.random
-          );
+          // Modern: spawn at safe distance from player when snapshot is available.
+          // Fall back to edge positioning if we cannot resolve the player snapshot.
+          if (!playerSnapshot) {
+            position = this.calculateEdgeSpawnPosition(
+              worldBounds,
+              spawnContext.random
+            );
+          } else {
+            position = this.calculateSafeSpawnPosition(
+              worldBounds,
+              playerSnapshot,
+              safeDistance,
+              spawnContext.random
+            );
+          }
         }
 
         const {
@@ -1418,26 +1457,67 @@ export class WaveManager {
   }
 
   spawnBossEnemy(bossConfig = {}, waveConfig = {}) {
-    if (!this.enemySystem || typeof this.enemySystem.spawnBoss !== 'function') {
-      console.warn('[WaveManager] Cannot spawn boss - spawnBoss() not available on enemy system');
+    if (typeof console !== 'undefined' && typeof console.log === 'function') {
+      console.log('[WaveManager] spawnBossEnemy() called', {
+        hasEnemySystem: !!this.enemySystem,
+        hasSpawnBoss: typeof this.enemySystem?.spawnBoss,
+        enemySystemKeys: this.enemySystem
+          ? Object.keys(this.enemySystem).slice(0, 10)
+          : [],
+      });
+    }
+
+    if (!this.enemySystem) {
+      if (typeof console !== 'undefined' && typeof console.error === 'function') {
+        console.error('[WaveManager] Cannot spawn boss - enemySystem is not defined');
+      }
       return null;
     }
 
-    const worldBounds = this.enemySystem.getCachedWorld()?.getBounds() ||
-                       { width: 800, height: 600 };
+    if (typeof this.enemySystem.spawnBoss !== 'function') {
+      if (typeof console !== 'undefined' && typeof console.error === 'function') {
+        console.error('[WaveManager] Cannot spawn boss - spawnBoss() not available', {
+          type: typeof this.enemySystem.spawnBoss,
+          hasMethod: 'spawnBoss' in this.enemySystem,
+          enemySystemConstructor: this.enemySystem.constructor?.name,
+        });
+      }
+      return null;
+    }
+
+    const world = this.enemySystem?.getCachedWorld?.();
+    const worldBounds =
+      world && typeof world.getBounds === 'function'
+        ? world.getBounds()
+        : {
+            width: CONSTANTS.GAME_WIDTH || 800,
+            height: CONSTANTS.GAME_HEIGHT || 600,
+          };
     const player = this.enemySystem.getCachedPlayer();
+    const playerSnapshot =
+      typeof this.enemySystem.getPlayerPositionSnapshot === 'function'
+        ? this.enemySystem.getPlayerPositionSnapshot(player)
+        : null;
     const safeDistance = Math.max(
       Number(bossConfig.safeDistance) || 0,
       (CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200) * 2,
       (bossConfig.radius || CONSTANTS.BOSS_CONFIG?.radius || 60) * 1.25
     );
 
-    const spawnPosition = this.resolveBossSpawnPosition(
-      bossConfig,
-      worldBounds,
-      player,
-      safeDistance
-    );
+    const hasValidPlayerSnapshot =
+      playerSnapshot && Number.isFinite(playerSnapshot.x) && Number.isFinite(playerSnapshot.y);
+
+    const spawnPosition = hasValidPlayerSnapshot || bossConfig?.spawnPosition
+      ? this.resolveBossSpawnPosition(
+          bossConfig,
+          worldBounds,
+          hasValidPlayerSnapshot ? playerSnapshot : null,
+          safeDistance
+        )
+      : this.calculateEdgeSpawnPosition(
+          worldBounds,
+          this.getRandomScope('spawn')
+        );
 
     const metadata = {
       ...(bossConfig.metadata || {}),
@@ -1466,6 +1546,15 @@ export class WaveManager {
     };
 
     const boss = this.enemySystem.spawnBoss(spawnConfig);
+
+    if (typeof console !== 'undefined' && typeof console.log === 'function') {
+      console.log('[WaveManager] Boss spawn result:', {
+        spawned: !!boss,
+        bossType: boss?.type,
+        bossId: boss?.id,
+      });
+    }
+
     if (boss) {
       // EnemySystem.spawnBoss() will skip wave accounting when we pass the flag,
       // so we track the spawn locally for wave metrics.
@@ -1704,7 +1793,9 @@ export class WaveManager {
       ? data.fragments.length
       : 0;
 
-    if (fragmentCount > 0) {
+    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
+
+    if (fragmentCount > 0 && waveManagerSpawnsAsteroids) {
       this.totalEnemiesThisWave += fragmentCount;
       this.enemiesSpawnedThisWave += fragmentCount;
       this.totalAsteroidEnemiesThisWave += fragmentCount;
@@ -1767,14 +1858,24 @@ export class WaveManager {
    * Only runs in development mode to avoid performance impact.
    */
   assertAccountingConsistency() {
+    if (
+      typeof process === 'undefined' ||
+      process.env?.NODE_ENV !== 'development'
+    ) {
+      return;
+    }
+
     if (!this.waveInProgress || !this.enemySystem?.waveState) {
       return;
     }
 
-    const compatibilityMode = this.isLegacyAsteroidCompatibilityEnabled();
-    if (!compatibilityMode && !this.shouldWaveManagerSpawnAsteroids()) {
+    if (!Boolean(CONSTANTS?.USE_WAVE_MANAGER)) {
       return;
     }
+
+    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
+    const compatibilityMode =
+      !waveManagerSpawnsAsteroids || this.isLegacyAsteroidCompatibilityEnabled();
 
     const waveManagerTotal = compatibilityMode
       ? this.totalAsteroidEnemiesThisWave
@@ -1808,6 +1909,8 @@ export class WaveManager {
     this.waveInProgress = false;
     this.waveEndTime = Date.now();
     const duration = (this.waveEndTime - this.waveStartTime) / 1000;
+
+    this._legacyRegisteredEnemies = new WeakSet();
 
     // Emit wave complete event
     if (this.eventBus) {
@@ -1889,7 +1992,10 @@ export class WaveManager {
     const sanitizeCount = (value) =>
       Number.isFinite(value) ? value : 0;
 
-    const compatibilityMode = this.isLegacyAsteroidCompatibilityEnabled();
+    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
+    const compatibilityMode =
+      !waveManagerSpawnsAsteroids || this.isLegacyAsteroidCompatibilityEnabled();
+    const preferAsteroidBreakdown = !waveManagerSpawnsAsteroids;
 
     const totals = {
       all: sanitizeCount(this.totalEnemiesThisWave),
@@ -1906,13 +2012,21 @@ export class WaveManager {
       asteroids: sanitizeCount(this.asteroidsKilledThisWave),
     };
 
-    const totalForState = compatibilityMode ? totals.asteroids : totals.all;
-    const spawnedForState = compatibilityMode
+    const totalForState = preferAsteroidBreakdown
+      ? totals.asteroids
+      : compatibilityMode
+        ? totals.asteroids
+        : totals.all;
+    const spawnedForState = preferAsteroidBreakdown
       ? spawnedCounts.asteroids
-      : spawnedCounts.all;
-    const killedForState = compatibilityMode
+      : compatibilityMode
+        ? spawnedCounts.asteroids
+        : spawnedCounts.all;
+    const killedForState = preferAsteroidBreakdown
       ? killedCounts.asteroids
-      : killedCounts.all;
+      : compatibilityMode
+        ? killedCounts.asteroids
+        : killedCounts.all;
 
     const progressDenominator = totalForState > 0 ? totalForState : 0;
 

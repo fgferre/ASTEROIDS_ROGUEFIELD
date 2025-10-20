@@ -103,6 +103,7 @@ class UISystem {
         breakTimerSeconds: null,
         labelLength: 0,
         enemiesTextLength: 0,
+        managerAllEnemiesTotal: null,
       },
       boss: this.createInitialBossCachedValues(),
       combo: {
@@ -808,6 +809,11 @@ class UISystem {
     this.cachedValues.boss = this.createInitialBossCachedValues();
   }
 
+  hideBossHud(force = false) {
+    this.hideBossBanner(force);
+    this.hideBossHealthBar(force);
+  }
+
   updateBossHealthBar(bossData = {}, options = {}) {
     const entry = this.hudElements.get('boss');
     if (!entry?.root) {
@@ -1140,6 +1146,9 @@ class UISystem {
     const canonicalEvent = 'wave-complete';
     const waveNumberCandidate = Number(payload?.wave);
     const hasWaveNumber = Number.isFinite(waveNumberCandidate);
+    const normalizedWaveNumber = hasWaveNumber
+      ? Math.max(1, Math.floor(waveNumberCandidate))
+      : null;
     const cacheKey = hasWaveNumber ? waveNumberCandidate : `unknown:${sourceEvent}`;
     const previousEntry = this._waveCompletionEventCache.get(cacheKey);
 
@@ -1161,6 +1170,26 @@ class UISystem {
       source: sourceEvent,
       timestamp: Date.now(),
     });
+
+    const bossInterval = Number(CONSTANTS.WAVE_BOSS_INTERVAL) || 0;
+    const isBossWaveCompletion =
+      Boolean(payload?.isBossWave) ||
+      (bossInterval > 0 && normalizedWaveNumber !== null
+        ? normalizedWaveNumber % bossInterval === 0
+        : false);
+
+    if (isBossWaveCompletion) {
+      const state = this.getBossHudState();
+      const bossVisible = Boolean(this.cachedValues.boss?.visible);
+      const bossNeverSpawned =
+        !state.active && !state.defeated && (state.upcoming || bossVisible);
+
+      if (bossNeverSpawned) {
+        this.hideBossHud(true);
+        this.resetBossHudState();
+        return;
+      }
+    }
 
     this.handleBossWaveCompletion(payload);
   }
@@ -2239,6 +2268,22 @@ class UISystem {
       this.resetTacticalHud();
       if (this._waveCompletionEventCache) {
         this._waveCompletionEventCache.clear();
+      }
+    });
+
+    gameEvents.on('wave-started', (payload = {}) => {
+      if (payload?.isBossWave) {
+        return;
+      }
+
+      const state = this.getBossHudState();
+      if (!state) {
+        return;
+      }
+
+      if (state.active || state.upcoming) {
+        this.hideBossHud(true);
+        this.resetBossHudState();
       }
     });
 
@@ -4297,9 +4342,18 @@ class UISystem {
 
     const force = Boolean(options.force);
 
+    const managerTotals = waveData?.managerTotals || null;
+    const managerAllEnemiesTotal = Number.isFinite(managerTotals?.all)
+      ? Math.max(0, Math.floor(managerTotals.all))
+      : null;
+
     const normalized = {
       current: Math.max(1, Math.floor(waveData.current ?? 1)),
       completedWaves: Math.max(0, Math.floor(waveData.completedWaves ?? 0)),
+      // NOTE: `totalAsteroids` maintains legacy parity and represents the
+      // asteroid-only total, even when the WaveManager tracks additional enemy
+      // types for the same wave. Support/boss totals can be derived from
+      // `managerTotals` when present without polluting the legacy HUD.
       totalAsteroids: Math.max(0, Math.floor(waveData.totalAsteroids ?? 0)),
       asteroidsKilled: Math.max(0, Math.floor(waveData.asteroidsKilled ?? 0)),
       isActive: Boolean(waveData.isActive ?? true),
@@ -4337,7 +4391,8 @@ class UISystem {
       lastWave.asteroidsKilled !== normalized.asteroidsKilled ||
       lastWave.isActive !== normalized.isActive ||
       lastWave.timeRemainingSeconds !== timeSeconds ||
-      lastWave.breakTimerSeconds !== breakSeconds;
+      lastWave.breakTimerSeconds !== breakSeconds ||
+      lastWave.managerAllEnemiesTotal !== managerAllEnemiesTotal;
 
     if (!hasChanged) {
       return;
@@ -4478,6 +4533,7 @@ class UISystem {
       breakTimerSeconds: breakSeconds,
       labelLength: nextLabelLength,
       enemiesTextLength: nextEnemiesLength,
+      managerAllEnemiesTotal,
     };
   }
 

@@ -66,12 +66,14 @@ export default class GameSessionService {
     this.domClickHandler = (event) => this.handleDocumentClick(event);
     this.domClickUnsubscribe = null;
     this.globalEventUnsubscribes = [];
+    this._suppressWaveKickoff = false;
     this.globalEventHandlers = {
       screenChanged: (data) => this.handleScreenChangedEvent(data),
       playerDied: (data) => this.handlePlayerDiedEvent(data),
       togglePause: (payload) => this.handleTogglePauseEvent(payload),
       exitToMenuRequested: (payload) => this.exitToMenu(payload || {}),
-      activateShieldPressed: () => this.handleActivateShieldPressedEvent()
+      activateShieldPressed: () => this.handleActivateShieldPressedEvent(),
+      progressionReset: (payload) => this.handleProgressionResetEvent(payload)
     };
 
     this.initializeSessionState();
@@ -475,6 +477,7 @@ export default class GameSessionService {
     register('toggle-pause', this.globalEventHandlers.togglePause);
     register('exit-to-menu-requested', this.globalEventHandlers.exitToMenuRequested);
     register('activate-shield-pressed', this.globalEventHandlers.activateShieldPressed);
+    register('progression-reset', this.globalEventHandlers.progressionReset);
   }
 
   teardownGlobalEventListeners() {
@@ -546,6 +549,73 @@ export default class GameSessionService {
     }
   }
 
+  handleProgressionResetEvent(payload = {}) {
+    if (this._suppressWaveKickoff) {
+      return;
+    }
+    this.ensureWaveKickoff({ reason: 'progression-reset', payload });
+  }
+
+  ensureWaveKickoff({ reason = 'unknown', payload = null } = {}) {
+    if (this._suppressWaveKickoff) {
+      return false;
+    }
+
+    const enemies = this.resolveServiceInstance('enemies');
+    if (!enemies || typeof enemies.startNextWave !== 'function') {
+      return false;
+    }
+
+    const waveManagerActive =
+      enemies.useManagers &&
+      Boolean(CONSTANTS?.USE_WAVE_MANAGER) &&
+      enemies.waveManager;
+
+    if (!waveManagerActive) {
+      return false;
+    }
+
+    if (reason === 'progression-reset') {
+      const screen = this.getScreen();
+      if (screen !== 'playing') {
+        return false;
+      }
+    }
+
+    if (enemies.waveManager?.waveInProgress) {
+      return false;
+    }
+
+    let started = false;
+    try {
+      started = enemies.startNextWave();
+    } catch (error) {
+      console.error('[GameSessionService] Failed to start wave via WaveManager:', error);
+      return false;
+    }
+
+    if (!started) {
+      return false;
+    }
+
+    const managerHandlesAsteroids = Boolean(CONSTANTS?.WAVEMANAGER_HANDLES_ASTEROID_SPAWN);
+    const waveState = enemies.waveState || null;
+
+    if (
+      !managerHandlesAsteroids &&
+      typeof enemies.spawnInitialAsteroids === 'function' &&
+      !(waveState && waveState.initialSpawnDone)
+    ) {
+      try {
+        enemies.spawnInitialAsteroids(4);
+      } catch (error) {
+        console.error('[GameSessionService] Failed to spawn initial asteroids after WaveManager kickoff:', error);
+      }
+    }
+
+    return true;
+  }
+
   startNewRun({ source = 'unknown' } = {}) {
     try {
       this.prepareRandomForScope('run.start', { mode: 'reset' });
@@ -561,11 +631,15 @@ export default class GameSessionService {
     this.setRetryCount(1);
     this.setRetryButtonEnabled(true);
 
+    this._suppressWaveKickoff = false;
+
     try {
       this.resetSystems({ manageRandom: false });
     } catch (error) {
       console.error('[GameSessionService] Failed to reset systems during start:', error);
     }
+
+    this.ensureWaveKickoff({ reason: 'session-start' });
 
     const ui = this.resolveServiceInstance('ui');
     if (ui && typeof ui.showGameUI === 'function') {
@@ -936,11 +1010,15 @@ export default class GameSessionService {
       console.warn('[GameSessionService] Failed to prepare RNG for menu exit:', error);
     }
 
+    this._suppressWaveKickoff = true;
+
     try {
       this.resetSystems({ manageRandom: false });
     } catch (error) {
       console.error('[GameSessionService] Failed to reset systems during exit:', error);
     }
+
+    this._suppressWaveKickoff = false;
 
     this.resetForMenu();
 
