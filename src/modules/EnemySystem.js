@@ -781,6 +781,31 @@ class EnemySystem {
     this.asteroids.push(enemy);
     this.invalidateActiveEnemyCache();
     this.registerEnemyWithPhysics(enemy);
+
+    const shouldBridgeToWaveManager =
+      this.useManagers &&
+      this.waveManager &&
+      this._waveManagerRuntimeEnabled &&
+      Boolean(CONSTANTS?.USE_WAVE_MANAGER) &&
+      !Boolean(CONSTANTS?.WAVEMANAGER_HANDLES_ASTEROID_SPAWN) &&
+      typeof this.waveManager.registerActiveEnemy === 'function';
+
+    if (shouldBridgeToWaveManager) {
+      const candidateType =
+        enemy?.type ||
+        enemy?.enemyType ||
+        enemy?.enemyKind ||
+        enemy?.kind ||
+        null;
+      const asteroidKey =
+        (this.waveManager.enemyTypeKeys && this.waveManager.enemyTypeKeys.asteroid) ||
+        'asteroid';
+      const normalizedCandidate =
+        typeof candidateType === 'string' ? candidateType.toLowerCase() : null;
+      if (normalizedCandidate === String(asteroidKey).toLowerCase()) {
+        this.waveManager.registerActiveEnemy(enemy, { skipDuplicateCheck: true });
+      }
+    }
     return enemy;
   }
 
@@ -1772,33 +1797,39 @@ class EnemySystem {
     const selectManagerValue = (value, fallback) =>
       Number.isFinite(value) ? value : fallback;
 
-    const managerSpawnedValue = legacyCompatibilityEnabled
-      ? spawnedBreakdown.asteroids ?? managerState.spawned
-      : managerState.spawned;
+    let nextSpawned = previousSpawned;
+    let nextTotal = previousTotal;
+    let nextKilled = previousKilled;
+
+    if (waveManagerHandlesAsteroids) {
+      const managerSpawnedValue = legacyCompatibilityEnabled
+        ? spawnedBreakdown.asteroids ?? managerState.spawned
+        : managerState.spawned;
+      const managerTotalValue = legacyCompatibilityEnabled
+        ? totals.asteroids ?? managerState.total
+        : managerState.total;
+
+      nextSpawned = selectManagerValue(managerSpawnedValue, previousSpawned);
+      nextTotal = selectManagerValue(managerTotalValue, previousTotal);
+
+      wave.asteroidsSpawned = nextSpawned;
+      wave.totalAsteroids = nextTotal;
+    }
+
     const managerKilledValue = legacyCompatibilityEnabled
       ? killedBreakdown.asteroids ?? managerState.killed
       : managerState.killed;
-    const managerTotalValue = legacyCompatibilityEnabled
-      ? totals.asteroids ?? managerState.total
-      : managerState.total;
+    const shouldSyncKilledCount = true; // WaveManager derives kills from enemy-destroyed events
 
-    wave.asteroidsSpawned = selectManagerValue(
-      managerSpawnedValue,
-      previousSpawned
-    );
-    wave.asteroidsKilled = selectManagerValue(
-      managerKilledValue,
-      previousKilled
-    );
-    wave.totalAsteroids = selectManagerValue(
-      managerTotalValue,
-      previousTotal
-    );
+    if (shouldSyncKilledCount) {
+      nextKilled = selectManagerValue(managerKilledValue, previousKilled);
+      wave.asteroidsKilled = nextKilled;
+    }
 
     const stateChanged =
       wave.current !== previousCurrent ||
       wave.isActive !== previousIsActive ||
-      wave.asteroidsKilled !== previousKilled;
+      (shouldSyncKilledCount && nextKilled !== previousKilled);
 
     if (stateChanged) {
       console.debug(

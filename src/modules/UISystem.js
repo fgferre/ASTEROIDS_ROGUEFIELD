@@ -59,6 +59,7 @@ class UISystem {
     this.currentHudAutoScale = 1;
     this.currentCanvasScale = 1;
     this.canvasBaseSize = { width: 0, height: 0 };
+    this._waveCompletionEventCache = new Map();
     this.handleResize = this.handleResize.bind(this);
     this.numberFormatter = this.createNumberFormatter('standard');
     this.compactNumberFormatter = this.createNumberFormatter('compact');
@@ -1129,6 +1130,39 @@ class UISystem {
     }
 
     this.updateBossHealthBar(state, { force });
+  }
+
+  handleWaveCompletionEvent(payload = {}, sourceEvent = 'wave-complete') {
+    if (!this._waveCompletionEventCache) {
+      this._waveCompletionEventCache = new Map();
+    }
+
+    const canonicalEvent = 'wave-complete';
+    const waveNumberCandidate = Number(payload?.wave);
+    const hasWaveNumber = Number.isFinite(waveNumberCandidate);
+    const cacheKey = hasWaveNumber ? waveNumberCandidate : `unknown:${sourceEvent}`;
+    const previousEntry = this._waveCompletionEventCache.get(cacheKey);
+
+    if (previousEntry) {
+      if (previousEntry.source === canonicalEvent && sourceEvent !== canonicalEvent) {
+        return;
+      }
+
+      if (previousEntry.source === sourceEvent) {
+        return;
+      }
+
+      if (sourceEvent !== canonicalEvent) {
+        return;
+      }
+    }
+
+    this._waveCompletionEventCache.set(cacheKey, {
+      source: sourceEvent,
+      timestamp: Date.now(),
+    });
+
+    this.handleBossWaveCompletion(payload);
   }
 
   handleBossWaveCompletion(payload = {}) {
@@ -2203,6 +2237,9 @@ class UISystem {
     gameEvents.on('progression-reset', () => {
       this.resetBossHudState();
       this.resetTacticalHud();
+      if (this._waveCompletionEventCache) {
+        this._waveCompletionEventCache.clear();
+      }
     });
 
     gameEvents.on('experience-changed', (data) => {
@@ -2257,9 +2294,14 @@ class UISystem {
       this.handleWaveStateUpdated(payload);
     });
 
-    gameEvents.on('wave-completed', (payload = {}) => {
-      this.handleBossWaveCompletion(payload);
-    });
+    const registerWaveCompletionListener = (eventName) => {
+      gameEvents.on(eventName, (payload = {}) => {
+        this.handleWaveCompletionEvent(payload, eventName);
+      });
+    };
+
+    registerWaveCompletionListener('wave-complete');
+    registerWaveCompletionListener('wave-completed');
 
     gameEvents.on('combo-updated', (payload = {}) => {
       this.updateComboMeter(payload);

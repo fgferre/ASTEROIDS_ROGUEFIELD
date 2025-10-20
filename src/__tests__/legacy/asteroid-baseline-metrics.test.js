@@ -934,9 +934,19 @@ describe.sequential('Legacy Asteroid Baseline Metrics', () => {
         expect(syncedState.current).not.toBe(initialWaveState.current);
         expect(syncedState.current).toBe(stubState.currentWave);
         expect(syncedState.isActive).toBe(stubState.inProgress);
-        expect(syncedState.asteroidsSpawned).toBe(stubState.spawned);
+        const managerHandlesSpawn = Boolean(
+          CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN
+        );
+
+        if (managerHandlesSpawn) {
+          expect(syncedState.asteroidsSpawned).toBe(stubState.spawned);
+          expect(syncedState.totalAsteroids).toBe(stubState.total);
+        } else {
+          expect(syncedState.asteroidsSpawned).not.toBe(stubState.spawned);
+          expect(syncedState.totalAsteroids).not.toBe(stubState.total);
+        }
+
         expect(syncedState.asteroidsKilled).toBe(stubState.killed);
-        expect(syncedState.totalAsteroids).toBe(stubState.total);
       } finally {
         delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
         harness.enemySystem.waveManager = null;
