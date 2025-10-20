@@ -120,6 +120,7 @@ export class WaveManager {
     this.asteroidsSpawnedThisWave = 0;
     this.asteroidsKilledThisWave = 0;
     this.spawnQueue = [];
+    this._legacyRegisteredEnemies = new WeakSet();
 
     // Timers
     this.spawnTimer = 0;
@@ -755,6 +756,64 @@ export class WaveManager {
     return Boolean(waveManagerHandles && useWaveManager);
   }
 
+  registerActiveEnemy(enemy, { skipDuplicateCheck = false } = {}) {
+    if (!enemy) {
+      return false;
+    }
+
+    if (!this.waveInProgress) {
+      return false;
+    }
+
+    if (this.shouldWaveManagerSpawnAsteroids()) {
+      return false;
+    }
+
+    const asteroidKey =
+      (this.enemyTypeKeys && this.enemyTypeKeys.asteroid)
+        ? String(this.enemyTypeKeys.asteroid).toLowerCase()
+        : 'asteroid';
+    const candidateType =
+      enemy?.type || enemy?.enemyType || enemy?.enemyKind || enemy?.kind || null;
+    const normalizedCandidate =
+      typeof candidateType === 'string' ? candidateType.toLowerCase() : null;
+
+    if (normalizedCandidate !== asteroidKey) {
+      return false;
+    }
+
+    if (!this._legacyRegisteredEnemies) {
+      this._legacyRegisteredEnemies = new WeakSet();
+    }
+
+    if (this._legacyRegisteredEnemies.has(enemy)) {
+      return false;
+    }
+
+    this._legacyRegisteredEnemies.add(enemy);
+
+    const coerce = (value) => (Number.isFinite(value) ? value : 0);
+
+    this.enemiesSpawnedThisWave = coerce(this.enemiesSpawnedThisWave) + 1;
+    this.totalEnemiesThisWave = coerce(this.totalEnemiesThisWave) + 1;
+    this.totalAsteroidEnemiesThisWave =
+      coerce(this.totalAsteroidEnemiesThisWave) + 1;
+    this.asteroidsSpawnedThisWave = coerce(this.asteroidsSpawnedThisWave) + 1;
+
+    if (
+      typeof process !== 'undefined' &&
+      process.env?.NODE_ENV === 'development' &&
+      typeof console !== 'undefined' &&
+      typeof console.debug === 'function'
+    ) {
+      console.debug(
+        `[WaveManager] (legacy bridge) Registered asteroid spawn ${this.asteroidsSpawnedThisWave}/${this.totalAsteroidEnemiesThisWave} for wave ${this.currentWave}`
+      );
+    }
+
+    return true;
+  }
+
   isLegacyAsteroidCompatibilityEnabled() {
     const preserveLegacy = CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
     if (!preserveLegacy) {
@@ -970,6 +1029,7 @@ export class WaveManager {
     this.asteroidsKilledThisWave = 0;
     this.totalAsteroidEnemiesThisWave = 0;
     this.spawnQueue = [];
+    this._legacyRegisteredEnemies = new WeakSet();
 
     const waveNumber = this.currentWave;
     let config;
@@ -1747,11 +1807,14 @@ export class WaveManager {
       const payload = {
         wave: this.currentWave,
         duration: duration,
-        enemiesKilled: this.enemiesKilledThisWave
+        enemiesKilled: this.enemiesKilledThisWave,
       };
 
       this.eventBus.emit('wave-complete', payload);
-      this.eventBus.emit('wave-completed', payload);
+
+      if (CONSTANTS.WAVE_MANAGER_EMIT_LEGACY_WAVE_COMPLETED ?? false) {
+        this.eventBus.emit('wave-completed', payload);
+      }
     }
 
     // Start countdown for next wave
@@ -1798,6 +1861,7 @@ export class WaveManager {
     this.spawnTimer = 0;
     this.waveCountdown = 0;
     this.spawnDelayMultiplier = 1;
+    this._legacyRegisteredEnemies = new WeakSet();
     if (this.randomSequences) {
       this.randomSequences.spawn = 0;
       this.randomSequences.variants = 0;
