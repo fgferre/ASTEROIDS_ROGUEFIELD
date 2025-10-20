@@ -3170,14 +3170,17 @@ class EnemySystem {
     if (waveManagerActive && !this.waveManager.waveInProgress) {
       const waveStarted = this.waveManager.startNextWave();
 
-      if (
-        !waveStarted &&
-        typeof process !== 'undefined' &&
-        process.env?.NODE_ENV === 'development' &&
-        typeof console !== 'undefined' &&
-        typeof console.debug === 'function'
-      ) {
-        console.debug('[EnemySystem] WaveManager refused to start next wave');
+      if (!waveStarted) {
+        if (
+          typeof process !== 'undefined' &&
+          process.env?.NODE_ENV === 'development' &&
+          typeof console !== 'undefined' &&
+          typeof console.debug === 'function'
+        ) {
+          console.debug('[EnemySystem] WaveManager refused to start next wave');
+        }
+
+        return;
       }
     }
 

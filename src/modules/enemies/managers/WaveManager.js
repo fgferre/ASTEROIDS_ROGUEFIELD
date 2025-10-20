@@ -1181,8 +1181,16 @@ export class WaveManager {
       }
     }
 
-    const worldBounds = this.enemySystem.getCachedWorld()?.getBounds() ||
-                       { width: 800, height: 600 };
+    const world =
+      this.enemySystem.getCachedWorld && this.enemySystem.getCachedWorld();
+    let worldBounds;
+    if (world && typeof world.getBounds === 'function') {
+      worldBounds = world.getBounds();
+    } else if (world && world.bounds) {
+      worldBounds = world.bounds;
+    } else {
+      worldBounds = { width: 800, height: 600 };
+    }
     const player = this.enemySystem.getCachedPlayer();
     const safeDistance = CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200;
     const compatibilityMode = this.isLegacyAsteroidCompatibilityEnabled();
