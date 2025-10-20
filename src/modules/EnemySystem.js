@@ -1831,7 +1831,10 @@ class EnemySystem {
     const managerKilledValue = legacyCompatibilityEnabled
       ? killedBreakdown.asteroids ?? managerState.killed
       : managerState.killed;
-    const shouldSyncKilledCount = true; // WaveManager derives kills from enemy-destroyed events
+    const managerSpawnedCount = Number(this.waveManager?.enemiesSpawnedThisWave);
+    const shouldSyncKilledCount =
+      waveManagerHandlesAsteroids ||
+      (Number.isFinite(managerSpawnedCount) && managerSpawnedCount > 0);
 
     if (shouldSyncKilledCount) {
       nextKilled = selectManagerValue(managerKilledValue, previousKilled);
@@ -3201,11 +3204,24 @@ class EnemySystem {
 
     this.spawnInitialAsteroids(4);
 
-    if (typeof gameEvents !== 'undefined') {
+    const shouldEmitLegacyWaveStarted =
+      typeof gameEvents !== 'undefined' && !waveManagerActive;
+
+    if (shouldEmitLegacyWaveStarted) {
       gameEvents.emit('wave-started', {
         wave: wave.current,
         totalAsteroids: wave.totalAsteroids,
       });
+    } else if (
+      typeof gameEvents !== 'undefined' &&
+      typeof process !== 'undefined' &&
+      process.env?.NODE_ENV === 'development' &&
+      typeof console !== 'undefined' &&
+      typeof console.debug === 'function'
+    ) {
+      console.debug(
+        '[EnemySystem] WaveManager active - skipping legacy wave-started emit'
+      );
     }
 
     this.emitWaveStateUpdate(true);

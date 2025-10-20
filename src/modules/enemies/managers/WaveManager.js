@@ -1763,7 +1763,7 @@ export class WaveManager {
     }
 
     // Check if wave is complete
-    const killsCleared = this.enemiesKilledThisWave >= this.totalEnemiesThisWave;
+    let killsCleared = this.enemiesKilledThisWave >= this.totalEnemiesThisWave;
     let activeEnemiesCleared = true;
 
     if (
@@ -1771,6 +1771,31 @@ export class WaveManager {
       typeof this.enemySystem.getActiveEnemyCount === 'function'
     ) {
       activeEnemiesCleared = this.enemySystem.getActiveEnemyCount() === 0;
+    }
+
+    if (
+      activeEnemiesCleared &&
+      this.enemiesSpawnedThisWave > 0 &&
+      this.enemiesKilledThisWave < this.totalEnemiesThisWave
+    ) {
+      if (
+        typeof process !== 'undefined' &&
+        process.env?.NODE_ENV === 'development' &&
+        typeof console !== 'undefined' &&
+        typeof console.warn === 'function'
+      ) {
+        console.warn(
+          '[WaveManager] Reconciliando contadores: kills excederam o total registrado; ajustando totais para liberar a wave.'
+        );
+      }
+
+      this.totalEnemiesThisWave = this.enemiesKilledThisWave;
+
+      if (this.isLegacyAsteroidCompatibilityEnabled()) {
+        this.totalAsteroidEnemiesThisWave = this.asteroidsKilledThisWave;
+      }
+
+      killsCleared = true;
     }
 
     if (killsCleared && activeEnemiesCleared) {
