@@ -1164,10 +1164,33 @@ export class WaveManager {
    * Spawns enemies for the current wave using the factory pattern.
    *
    * @param {Object} waveConfig - Wave configuration
-   */
+  */
   spawnWave(waveConfig) {
-    const worldBounds = this.enemySystem.getCachedWorld()?.getBounds() ||
-                       { width: 800, height: 600 };
+    const enemyGroups = Array.isArray(waveConfig?.enemies)
+      ? waveConfig.enemies
+      : [];
+    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
+
+    if (!waveManagerSpawnsAsteroids) {
+      const hasNonAsteroidEnemies = enemyGroups.some(
+        (group) => group && typeof group === 'object' && group.type !== 'asteroid'
+      );
+
+      if (!hasNonAsteroidEnemies) {
+        return; // Nothing to spawn; EnemySystem handles asteroid legacy mode
+      }
+    }
+
+    const world =
+      this.enemySystem.getCachedWorld && this.enemySystem.getCachedWorld();
+    let worldBounds;
+    if (world && typeof world.getBounds === 'function') {
+      worldBounds = world.getBounds();
+    } else if (world && world.bounds) {
+      worldBounds = world.bounds;
+    } else {
+      worldBounds = { width: 800, height: 600 };
+    }
     const player = this.enemySystem.getCachedPlayer();
     const safeDistance = CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200;
     const compatibilityMode = this.isLegacyAsteroidCompatibilityEnabled();
@@ -1180,12 +1203,6 @@ export class WaveManager {
     const spawnDelayMultiplier = this.resolveWaveSpawnDelayMultiplier(waveConfig);
     this.spawnDelayMultiplier = spawnDelayMultiplier;
     const effectiveSpawnDelay = this.spawnDelay * spawnDelayMultiplier;
-
-    const enemyGroups = Array.isArray(waveConfig?.enemies)
-      ? waveConfig.enemies
-      : [];
-
-    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
 
     for (const enemyGroup of enemyGroups) {
       if (!enemyGroup || typeof enemyGroup !== 'object') {
@@ -1746,7 +1763,7 @@ export class WaveManager {
     }
 
     // Check if wave is complete
-    const killsCleared = this.enemiesKilledThisWave >= this.totalEnemiesThisWave;
+    let killsCleared = this.enemiesKilledThisWave >= this.totalEnemiesThisWave;
     let activeEnemiesCleared = true;
 
     if (
@@ -1754,6 +1771,31 @@ export class WaveManager {
       typeof this.enemySystem.getActiveEnemyCount === 'function'
     ) {
       activeEnemiesCleared = this.enemySystem.getActiveEnemyCount() === 0;
+    }
+
+    if (
+      activeEnemiesCleared &&
+      this.enemiesSpawnedThisWave > 0 &&
+      this.enemiesKilledThisWave < this.totalEnemiesThisWave
+    ) {
+      if (
+        typeof process !== 'undefined' &&
+        process.env?.NODE_ENV === 'development' &&
+        typeof console !== 'undefined' &&
+        typeof console.warn === 'function'
+      ) {
+        console.warn(
+          '[WaveManager] Reconciliando contadores: kills excederam o total registrado; ajustando totais para liberar a wave.'
+        );
+      }
+
+      this.totalEnemiesThisWave = this.enemiesKilledThisWave;
+
+      if (this.isLegacyAsteroidCompatibilityEnabled()) {
+        this.totalAsteroidEnemiesThisWave = this.asteroidsKilledThisWave;
+      }
+
+      killsCleared = true;
     }
 
     if (killsCleared && activeEnemiesCleared) {
