@@ -1852,14 +1852,24 @@ export class WaveManager {
    * Only runs in development mode to avoid performance impact.
    */
   assertAccountingConsistency() {
+    if (
+      typeof process === 'undefined' ||
+      process.env?.NODE_ENV !== 'development'
+    ) {
+      return;
+    }
+
     if (!this.waveInProgress || !this.enemySystem?.waveState) {
       return;
     }
 
-    const compatibilityMode = this.isLegacyAsteroidCompatibilityEnabled();
-    if (!compatibilityMode && !this.shouldWaveManagerSpawnAsteroids()) {
+    if (!Boolean(CONSTANTS?.USE_WAVE_MANAGER)) {
       return;
     }
+
+    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
+    const compatibilityMode =
+      !waveManagerSpawnsAsteroids || this.isLegacyAsteroidCompatibilityEnabled();
 
     const waveManagerTotal = compatibilityMode
       ? this.totalAsteroidEnemiesThisWave
