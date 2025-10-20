@@ -808,6 +808,11 @@ class UISystem {
     this.cachedValues.boss = this.createInitialBossCachedValues();
   }
 
+  hideBossHud(force = false) {
+    this.hideBossBanner(force);
+    this.hideBossHealthBar(force);
+  }
+
   updateBossHealthBar(bossData = {}, options = {}) {
     const entry = this.hudElements.get('boss');
     if (!entry?.root) {
@@ -1140,6 +1145,9 @@ class UISystem {
     const canonicalEvent = 'wave-complete';
     const waveNumberCandidate = Number(payload?.wave);
     const hasWaveNumber = Number.isFinite(waveNumberCandidate);
+    const normalizedWaveNumber = hasWaveNumber
+      ? Math.max(1, Math.floor(waveNumberCandidate))
+      : null;
     const cacheKey = hasWaveNumber ? waveNumberCandidate : `unknown:${sourceEvent}`;
     const previousEntry = this._waveCompletionEventCache.get(cacheKey);
 
@@ -1161,6 +1169,26 @@ class UISystem {
       source: sourceEvent,
       timestamp: Date.now(),
     });
+
+    const bossInterval = Number(CONSTANTS.WAVE_BOSS_INTERVAL) || 0;
+    const isBossWaveCompletion =
+      Boolean(payload?.isBossWave) ||
+      (bossInterval > 0 && normalizedWaveNumber !== null
+        ? normalizedWaveNumber % bossInterval === 0
+        : false);
+
+    if (isBossWaveCompletion) {
+      const state = this.getBossHudState();
+      const bossVisible = Boolean(this.cachedValues.boss?.visible);
+      const bossNeverSpawned =
+        !state.active && !state.defeated && (state.upcoming || bossVisible);
+
+      if (bossNeverSpawned) {
+        this.hideBossHud(true);
+        this.resetBossHudState();
+        return;
+      }
+    }
 
     this.handleBossWaveCompletion(payload);
   }
