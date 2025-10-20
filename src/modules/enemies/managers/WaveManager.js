@@ -1032,14 +1032,14 @@ export class WaveManager {
     this._legacyRegisteredEnemies = new WeakSet();
 
     const waveNumber = this.currentWave;
+    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
+    const legacyCompatibilityEnabled = this.isLegacyAsteroidCompatibilityEnabled();
     let config;
-
-    const forceDynamicWaves = this.isLegacyAsteroidCompatibilityEnabled();
 
     if (this.isBossWave(waveNumber)) {
       config = this.generateBossWave(waveNumber);
     } else {
-      if (forceDynamicWaves) {
+      if (legacyCompatibilityEnabled) {
         config = this.generateDynamicWave(waveNumber);
       } else {
         const predefined = this.waveConfigs.get(waveNumber);
@@ -1059,8 +1059,15 @@ export class WaveManager {
       this.resolveWaveSpawnDelayMultiplier(effectiveConfig);
     effectiveConfig.spawnDelayMultiplier = sharedSpawnDelayMultiplier;
 
-    this.totalEnemiesThisWave = this.computeTotalEnemies(effectiveConfig);
-    const asteroidOnlyTotal = this.computeAsteroidOnlyTotal(effectiveConfig);
+    let computedTotalEnemies = this.computeTotalEnemies(effectiveConfig);
+    let asteroidOnlyTotal = this.computeAsteroidOnlyTotal(effectiveConfig);
+
+    if (legacyCompatibilityEnabled && !waveManagerSpawnsAsteroids) {
+      computedTotalEnemies = 0;
+      asteroidOnlyTotal = 0;
+    }
+
+    this.totalEnemiesThisWave = computedTotalEnemies;
     this.totalAsteroidEnemiesThisWave = asteroidOnlyTotal;
 
     const waveEventPayload = {
