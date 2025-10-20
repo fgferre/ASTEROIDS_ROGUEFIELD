@@ -1201,7 +1201,9 @@ export class WaveManager {
         ? this.enemySystem.getPlayerPositionSnapshot(player)
         : null;
     const safeDistance = CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200;
-    const compatibilityMode = this.isLegacyAsteroidCompatibilityEnabled();
+    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
+    const compatibilityMode =
+      !waveManagerSpawnsAsteroids || this.isLegacyAsteroidCompatibilityEnabled();
     const useLegacyDistribution = CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
     const strictLegacySequence = this.isStrictLegacySpawnSequenceEnabled();
     const defaultDistributionWeights = this.getAsteroidDistributionWeights(
@@ -1984,7 +1986,9 @@ export class WaveManager {
     const sanitizeCount = (value) =>
       Number.isFinite(value) ? value : 0;
 
-    const compatibilityMode = this.isLegacyAsteroidCompatibilityEnabled();
+    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
+    const compatibilityMode =
+      !waveManagerSpawnsAsteroids || this.isLegacyAsteroidCompatibilityEnabled();
 
     const totals = {
       all: sanitizeCount(this.totalEnemiesThisWave),

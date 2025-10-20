@@ -1852,8 +1852,15 @@ class EnemySystem {
     const spawnedBreakdown = counts.spawned || {};
     const killedBreakdown = counts.killed || {};
 
-    const selectManagerValue = (value, fallback) =>
-      Number.isFinite(value) ? value : fallback;
+    const coerceFiniteNumber = (value) => {
+      const numeric = Number(value);
+      return Number.isFinite(numeric) ? numeric : undefined;
+    };
+
+    const selectManagerValue = (value, fallback) => {
+      const numeric = coerceFiniteNumber(value);
+      return numeric !== undefined ? numeric : fallback;
+    };
 
     let nextSpawned = previousSpawned;
     let nextTotal = previousTotal;
@@ -1874,13 +1881,18 @@ class EnemySystem {
       wave.totalAsteroids = nextTotal;
     }
 
-    const managerKilledValue = legacyCompatibilityEnabled
-      ? killedBreakdown.asteroids ?? managerState.killed
+    const hasAsteroidKillBreakdown = Object.prototype.hasOwnProperty.call(
+      killedBreakdown,
+      'asteroids'
+    );
+    const managerKilledSource = hasAsteroidKillBreakdown
+      ? killedBreakdown.asteroids
       : managerState.killed;
+    const managerKilledValue = selectManagerValue(managerKilledSource, previousKilled);
     const shouldSyncKilledCount = true; // WaveManager derives kills from enemy-destroyed events
 
     if (shouldSyncKilledCount) {
-      nextKilled = selectManagerValue(managerKilledValue, previousKilled);
+      nextKilled = managerKilledValue;
       wave.asteroidsKilled = nextKilled;
     }
 
@@ -3213,22 +3225,36 @@ class EnemySystem {
     const waveManagerActive =
       this.useManagers && Boolean(CONSTANTS?.USE_WAVE_MANAGER) && this.waveManager;
 
-    if (waveManagerActive && !this.waveManager.waveInProgress) {
-      const waveStarted = this.waveManager.startNextWave();
+    let waveStarted = false;
 
-      if (
-        !waveStarted &&
-        typeof process !== 'undefined' &&
-        process.env?.NODE_ENV === 'development' &&
-        typeof console !== 'undefined' &&
-        typeof console.debug === 'function'
-      ) {
-        console.debug('[EnemySystem] WaveManager refused to start next wave');
+    if (waveManagerActive) {
+      if (!this.waveManager.waveInProgress) {
+        waveStarted = this.waveManager.startNextWave();
+
+        if (
+          !waveStarted &&
+          typeof process !== 'undefined' &&
+          process.env?.NODE_ENV === 'development' &&
+          typeof console !== 'undefined' &&
+          typeof console.debug === 'function'
+        ) {
+          console.debug('[EnemySystem] WaveManager refused to start next wave');
+        }
+      } else {
+        waveStarted = true;
+      }
+
+      if (!waveStarted) {
+        this.emitWaveStateUpdate(true);
+        return;
       }
     }
 
     const wave = this.waveState;
-    wave.isActive = true;
+
+    if (!waveManagerActive || waveStarted) {
+      wave.isActive = true;
+    }
 
     if (!waveManagerActive) {
       wave.current += 1;
