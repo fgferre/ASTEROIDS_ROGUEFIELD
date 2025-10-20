@@ -1665,7 +1665,10 @@ class EnemySystem {
       (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
       this._waveManagerRuntimeEnabled;
     const waveManagerControlsSpawn = Boolean(
-      waveManagerHandlesSpawnFlag && this.waveManager
+      waveManagerHandlesSpawnFlag &&
+        this.waveManager &&
+        !this._waveManagerFallbackWarningIssued &&
+        !this._waveManagerInvalidStateWarningIssued
     );
 
     if (!this._asteroidSpawnDebugLogged) {
@@ -1681,10 +1684,6 @@ class EnemySystem {
 
     // FEATURE FLAG: Roteamento entre sistema legado e WaveManager
     if (waveManagerEnabled) {
-      if (!waveManagerControlsSpawn) {
-        this.handleSpawning(deltaTime);
-      }
-
       this.updateWaveManagerLogic(deltaTime);
       this.updateAsteroids(deltaTime);
     } else {
@@ -1696,10 +1695,12 @@ class EnemySystem {
     this.emitWaveStateUpdate();
   }
 
-  updateWaveLogic(deltaTime) {
+  updateWaveLogic(deltaTime, { skipSpawning = false } = {}) {
     const wave = this.waveState;
 
-    if (!wave) return;
+    if (!wave) return false;
+
+    let spawnHandled = false;
 
     const waveManagerHandlesSpawn =
       (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
@@ -1710,8 +1711,9 @@ class EnemySystem {
 
     if (wave.isActive) {
       wave.timeRemaining = Math.max(0, wave.timeRemaining - deltaTime);
-      if (!waveManagerHandlesSpawn) {
+      if (!skipSpawning && !waveManagerHandlesSpawn) {
         this.handleSpawning(deltaTime);
+        spawnHandled = true;
       }
 
       const allAsteroidsKilled =
@@ -1728,6 +1730,8 @@ class EnemySystem {
         this.startNextWave();
       }
     }
+
+    return spawnHandled;
   }
 
   // EXPERIMENTAL: Delegação para WaveManager com sincronização de estado (docs/plans/phase1-enemy-foundation-plan.md)
@@ -1735,8 +1739,10 @@ class EnemySystem {
     const wave = this.waveState;
 
     if (!wave) {
-      return;
+      return false;
     }
+
+    let spawnHandled = false;
 
     if (!this.waveManager) {
       if (!this._waveManagerFallbackWarningIssued) {
@@ -1745,8 +1751,18 @@ class EnemySystem {
         );
         this._waveManagerFallbackWarningIssued = true;
       }
-      this.updateWaveLogic(deltaTime);
-      return;
+      return this.updateWaveLogic(deltaTime);
+    }
+
+    const waveManagerHandlesAsteroids =
+      (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
+      this._waveManagerRuntimeEnabled &&
+      !this._waveManagerFallbackWarningIssued &&
+      !this._waveManagerInvalidStateWarningIssued;
+
+    if (!waveManagerHandlesAsteroids) {
+      this.handleSpawning(deltaTime);
+      spawnHandled = true;
     }
 
     this.waveManager.update(deltaTime);
@@ -1768,8 +1784,7 @@ class EnemySystem {
         );
         this._waveManagerInvalidStateWarningIssued = true;
       }
-      this.updateWaveLogic(deltaTime);
-      return;
+      return this.updateWaveLogic(deltaTime, { skipSpawning: spawnHandled });
     }
 
     const {
@@ -1782,9 +1797,6 @@ class EnemySystem {
 
     wave.current = managerState.currentWave ?? previousCurrent;
     wave.isActive = managerState.inProgress ?? previousIsActive;
-    const waveManagerHandlesAsteroids =
-      (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
-      this._waveManagerRuntimeEnabled;
     const legacyCompatibilityEnabled =
       (CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true) &&
       waveManagerHandlesAsteroids;
@@ -1847,6 +1859,8 @@ class EnemySystem {
         );
       }
     }
+
+    return spawnHandled;
   }
 
   handleWaveManagerWaveComplete(data = {}) {
