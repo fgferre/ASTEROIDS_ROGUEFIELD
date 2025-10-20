@@ -1867,7 +1867,12 @@ class EnemySystem {
     this.waveState.spawnTimer = 0;
     this.waveState.initialSpawnDone = false;
 
+    const waveManagerControlsAsteroids =
+      (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
+      this._waveManagerRuntimeEnabled;
+
     if (
+      waveManagerControlsAsteroids &&
       this.waveManager &&
       Number.isFinite(Number(this.waveManager.totalEnemiesThisWave))
     ) {
@@ -1878,10 +1883,21 @@ class EnemySystem {
       this.waveState.asteroidsSpawned = 0;
     }
 
-    this.waveState.asteroidsSpawned = Math.max(
-      Number(this.waveState.asteroidsSpawned) || 0,
-      Number(this.waveState.totalAsteroids) || 0
-    );
+    if (waveManagerControlsAsteroids) {
+      const managerSpawned = Number(this.waveManager?.enemiesSpawnedThisWave);
+      if (Number.isFinite(managerSpawned)) {
+        this.waveState.asteroidsSpawned = Math.max(0, managerSpawned);
+      }
+      const enforcedTotal = Number(this.waveState.totalAsteroids) || 0;
+      if (this.waveState.asteroidsSpawned < enforcedTotal) {
+        this.waveState.asteroidsSpawned = enforcedTotal;
+      }
+    } else {
+      this.waveState.asteroidsSpawned = Math.max(
+        Number(this.waveState.asteroidsSpawned) || 0,
+        Number(this.waveState.totalAsteroids) || 0
+      );
+    }
 
     const possibleKilledValues = [];
     const payloadKilled = Number(data.enemiesKilled);

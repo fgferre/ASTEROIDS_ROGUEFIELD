@@ -40,6 +40,8 @@ Validar que a integração do WaveManager preserva o comportamento do sistema le
 - [ ] AudioSystem ajusta música de tensão (se implementado) _(não validado manualmente)_
 - [ ] Evento `wave-complete` emitido ao final de cada wave _(não validado manualmente)_
 
+> ℹ️ **Compatibilidade de eventos:** `wave-complete` é o evento canônico quando `USE_WAVE_MANAGER=true`. O emissor legado `wave-completed` permanece desativado (`WAVE_MANAGER_EMIT_LEGACY_WAVE_COMPLETED=false`), mas consumidores críticos como `UISystem` já escutam ambos os nomes para manter compatibilidade.
+
 ### 5. Paridade com Baseline Metrics
 - [x] Wave 1: 4 inimigos spawned (validado via testes automatizados)
 - [x] Wave 5: 11 inimigos spawned (validado via testes automatizados)

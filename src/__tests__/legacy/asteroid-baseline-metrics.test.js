@@ -11,6 +11,98 @@ const WAVE_VARIANT_SAMPLE_COUNT = 3000;
 const FRAGMENT_SAMPLE_COUNT = 800;
 const FRAGMENT_ANALYSIS_WAVE = 6;
 
+function createTestEventBus() {
+  const listeners = new Map();
+
+  const getListenerSet = (eventName) => {
+    if (!listeners.has(eventName)) {
+      listeners.set(eventName, new Set());
+    }
+    return listeners.get(eventName);
+  };
+
+  const bus = {
+    on(eventName, handler) {
+      if (typeof handler !== 'function') {
+        return () => {};
+      }
+
+      getListenerSet(eventName).add(handler);
+      return () => bus.off(eventName, handler);
+    },
+    off(eventName, handler) {
+      if (!listeners.has(eventName)) {
+        return;
+      }
+
+      if (typeof handler === 'function') {
+        const handlers = listeners.get(eventName);
+        handlers.delete(handler);
+        if (handlers.size === 0) {
+          listeners.delete(eventName);
+        }
+      } else {
+        listeners.delete(eventName);
+      }
+    },
+    emit(eventName, payload) {
+      const handlers = listeners.get(eventName);
+      if (!handlers || handlers.size === 0) {
+        return;
+      }
+
+      Array.from(handlers).forEach((handler) => {
+        try {
+          handler(payload);
+        } catch (error) {
+          if (
+            typeof console !== 'undefined' &&
+            typeof console.error === 'function'
+          ) {
+            console.error(
+              `[TestEventBus] Listener for ${eventName} threw an error`,
+              error
+            );
+          }
+        }
+      });
+    },
+    removeAllListeners(eventName) {
+      if (typeof eventName === 'string') {
+        listeners.delete(eventName);
+        return;
+      }
+
+      listeners.clear();
+    }
+  };
+
+  return bus;
+}
+
+function withLegacyWaveSystem(callback) {
+  const previousOverride =
+    typeof globalThis !== 'undefined'
+      ? globalThis.__USE_WAVE_MANAGER_OVERRIDE__
+      : undefined;
+
+  if (typeof globalThis !== 'undefined') {
+    globalThis.__USE_WAVE_MANAGER_OVERRIDE__ = false;
+  }
+
+  try {
+    return callback();
+  } finally {
+    if (typeof globalThis !== 'undefined') {
+      if (previousOverride === undefined) {
+        delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
+      } else {
+        globalThis.__USE_WAVE_MANAGER_OVERRIDE__ = previousOverride;
+      }
+    }
+  }
+}
+
 function createEnemySystemHarness(seed = TEST_SEED) {
   if (GamePools.asteroids?.releaseAll) {
     GamePools.asteroids.releaseAll();
@@ -148,39 +240,41 @@ function prepareWave(enemySystem, waveNumber, options = {}) {
 }
 
 function simulateWave(enemySystem, waveNumber, maxIterations = 1500) {
-  prepareWave(enemySystem, waveNumber, { spawnInitial: true });
+  return withLegacyWaveSystem(() => {
+    prepareWave(enemySystem, waveNumber, { spawnInitial: true });
 
-  let iterations = 0;
-  const deltaTime = 0.5;
+    let iterations = 0;
+    const deltaTime = 0.5;
 
-  while (enemySystem.waveState.isActive && iterations < maxIterations) {
-    enemySystem.update(deltaTime);
+    while (enemySystem.waveState.isActive && iterations < maxIterations) {
+      enemySystem.update(deltaTime);
 
-    expect(enemySystem.getActiveEnemyCount()).toBeLessThanOrEqual(
-      CONSTANTS.MAX_ASTEROIDS_ON_SCREEN
-    );
+      expect(enemySystem.getActiveEnemyCount()).toBeLessThanOrEqual(
+        CONSTANTS.MAX_ASTEROIDS_ON_SCREEN
+      );
 
-    const activeEnemies = enemySystem.getActiveEnemies();
-    if (activeEnemies.length > 0) {
-      enemySystem.destroyAsteroid(activeEnemies[0], { createFragments: false });
+      const activeEnemies = enemySystem.getActiveEnemies();
+      if (activeEnemies.length > 0) {
+        enemySystem.destroyAsteroid(activeEnemies[0], { createFragments: false });
+      }
+
+      iterations += 1;
     }
 
-    iterations += 1;
-  }
+    expect(iterations).toBeLessThan(maxIterations);
 
-  expect(iterations).toBeLessThan(maxIterations);
+    const finalState = { ...enemySystem.waveState };
 
-  const finalState = { ...enemySystem.waveState };
+    enemySystem.getAllEnemies().forEach((asteroid) => {
+      enemySystem.destroyAsteroid(asteroid, { createFragments: false });
+    });
 
-  enemySystem.getAllEnemies().forEach((asteroid) => {
-    enemySystem.destroyAsteroid(asteroid, { createFragments: false });
+    enemySystem.update(0);
+
+    return {
+      waveState: finalState
+    };
   });
-
-  enemySystem.update(0);
-
-  return {
-    waveState: finalState
-  };
 }
 
 function collectSpawnMetrics(spawnLog) {
@@ -390,8 +484,18 @@ function summarizeAsteroid(asteroid) {
 
 describe.sequential('Legacy Asteroid Baseline Metrics', () => {
   let harness;
+  let previousGameEvents;
+  let testEventBus;
 
   beforeEach(() => {
+    previousGameEvents =
+      typeof globalThis !== 'undefined' ? globalThis.gameEvents : undefined;
+    testEventBus = createTestEventBus();
+
+    if (typeof globalThis !== 'undefined') {
+      globalThis.gameEvents = testEventBus;
+    }
+
     harness = createEnemySystemHarness(TEST_SEED);
   });
 
@@ -402,10 +506,22 @@ describe.sequential('Legacy Asteroid Baseline Metrics', () => {
     if (typeof GamePools.destroy === 'function') {
       GamePools.destroy();
     }
+    if (testEventBus && typeof testEventBus.removeAllListeners === 'function') {
+      testEventBus.removeAllListeners();
+    }
     if (harness?.container?.dispose) {
       harness.container.dispose();
     }
+    if (typeof globalThis !== 'undefined') {
+      if (previousGameEvents === undefined) {
+        delete globalThis.gameEvents;
+      } else {
+        globalThis.gameEvents = previousGameEvents;
+      }
+    }
     harness = undefined;
+    testEventBus = undefined;
+    previousGameEvents = undefined;
   });
 
   describe('Wave Spawn Rate (Waves 1-10)', () => {
@@ -467,37 +583,38 @@ describe.sequential('Legacy Asteroid Baseline Metrics', () => {
     test(
       'spawned asteroids follow 50/30/20 distribution',
       { timeout: 15000 },
-      () => {
-        prepareWave(harness.enemySystem, 1);
-        harness.enemySystem.waveState.totalAsteroids = SAMPLE_ASTEROID_COUNT;
-        const spawnLog = [];
+      () =>
+        withLegacyWaveSystem(() => {
+          prepareWave(harness.enemySystem, 1);
+          harness.enemySystem.waveState.totalAsteroids = SAMPLE_ASTEROID_COUNT;
+          const spawnLog = [];
 
-        for (let i = 0; i < SAMPLE_ASTEROID_COUNT; i += 1) {
-          const asteroid = harness.enemySystem.spawnAsteroid();
-          if (asteroid) {
-            spawnLog.push(asteroid);
-          }
-        }
-
-        const { sizeCounts, total } = collectSpawnMetrics(spawnLog);
-
-        try {
-          expect(total).toBe(SAMPLE_ASTEROID_COUNT);
-          expectWithinTolerance(sizeCounts.large / total, 0.5);
-          expectWithinTolerance(sizeCounts.medium / total, 0.3);
-          expectWithinTolerance(sizeCounts.small / total, 0.2);
-        } finally {
-          spawnLog.forEach((asteroid) => {
+          for (let i = 0; i < SAMPLE_ASTEROID_COUNT; i += 1) {
+            const asteroid = harness.enemySystem.spawnAsteroid();
             if (asteroid) {
-              harness.enemySystem.destroyAsteroid(asteroid, { createFragments: false });
+              spawnLog.push(asteroid);
             }
-          });
-
-          if (typeof harness.enemySystem.cleanupDestroyed === 'function') {
-            harness.enemySystem.cleanupDestroyed();
           }
-        }
-      }
+
+          const { sizeCounts, total } = collectSpawnMetrics(spawnLog);
+
+          try {
+            expect(total).toBe(SAMPLE_ASTEROID_COUNT);
+            expectWithinTolerance(sizeCounts.large / total, 0.5);
+            expectWithinTolerance(sizeCounts.medium / total, 0.3);
+            expectWithinTolerance(sizeCounts.small / total, 0.2);
+          } finally {
+            spawnLog.forEach((asteroid) => {
+              if (asteroid) {
+                harness.enemySystem.destroyAsteroid(asteroid, { createFragments: false });
+              }
+            });
+
+            if (typeof harness.enemySystem.cleanupDestroyed === 'function') {
+              harness.enemySystem.cleanupDestroyed();
+            }
+          }
+        })
     );
   });
 
@@ -729,69 +846,75 @@ describe.sequential('Legacy Asteroid Baseline Metrics', () => {
 
   describe('Wave State Counters', () => {
     test('wave lifecycle updates counters correctly', () => {
-      prepareWave(harness.enemySystem, 1);
-      const startState = { ...harness.enemySystem.waveState };
+      withLegacyWaveSystem(() => {
+        prepareWave(harness.enemySystem, 1);
+        const startState = { ...harness.enemySystem.waveState };
 
-      expect(startState.isActive).toBe(true);
-      expect(startState.asteroidsSpawned).toBeGreaterThanOrEqual(0);
-      expect(startState.asteroidsKilled).toBe(0);
+        expect(startState.isActive).toBe(true);
+        expect(startState.asteroidsSpawned).toBeGreaterThanOrEqual(0);
+        expect(startState.asteroidsKilled).toBe(0);
 
-      const spawned = harness.enemySystem.spawnAsteroid();
-      const midState = { ...harness.enemySystem.waveState };
+        const spawned = harness.enemySystem.spawnAsteroid();
+        const midState = { ...harness.enemySystem.waveState };
 
-      expect(midState.asteroidsSpawned).toBeGreaterThan(startState.asteroidsSpawned);
-      expect(midState.isActive).toBe(true);
+        expect(midState.asteroidsSpawned).toBeGreaterThan(
+          startState.asteroidsSpawned
+        );
+        expect(midState.isActive).toBe(true);
 
-      const fragments = harness.enemySystem.destroyAsteroid(spawned, {
-        createFragments: true
-      });
-
-      const afterDestruction = { ...harness.enemySystem.waveState };
-
-      expect(afterDestruction.asteroidsKilled).toBeGreaterThan(midState.asteroidsKilled);
-      expect(afterDestruction.totalAsteroids).toBe(
-        midState.totalAsteroids + fragments.length
-      );
-      expect(afterDestruction.asteroidsSpawned).toBe(
-        midState.asteroidsSpawned + fragments.length
-      );
-
-      fragments.forEach((fragmentAsteroid) => {
-        harness.enemySystem.destroyAsteroid(fragmentAsteroid, {
-          createFragments: false
+        const fragments = harness.enemySystem.destroyAsteroid(spawned, {
+          createFragments: true
         });
-      });
 
-      while (
-        harness.enemySystem.waveState.asteroidsSpawned <
-        harness.enemySystem.waveState.totalAsteroids
-      ) {
-        const extra = harness.enemySystem.spawnAsteroid();
-        if (!extra) {
-          break;
-        }
-        harness.enemySystem.destroyAsteroid(extra, { createFragments: false });
-      }
+        const afterDestruction = { ...harness.enemySystem.waveState };
 
-      harness.enemySystem.getAllEnemies().forEach((asteroid) => {
-        if (!asteroid.destroyed) {
-          harness.enemySystem.destroyAsteroid(asteroid, {
+        expect(afterDestruction.asteroidsKilled).toBeGreaterThan(
+          midState.asteroidsKilled
+        );
+        expect(afterDestruction.totalAsteroids).toBe(
+          midState.totalAsteroids + fragments.length
+        );
+        expect(afterDestruction.asteroidsSpawned).toBe(
+          midState.asteroidsSpawned + fragments.length
+        );
+
+        fragments.forEach((fragmentAsteroid) => {
+          harness.enemySystem.destroyAsteroid(fragmentAsteroid, {
             createFragments: false
           });
+        });
+
+        while (
+          harness.enemySystem.waveState.asteroidsSpawned <
+          harness.enemySystem.waveState.totalAsteroids
+        ) {
+          const extra = harness.enemySystem.spawnAsteroid();
+          if (!extra) {
+            break;
+          }
+          harness.enemySystem.destroyAsteroid(extra, { createFragments: false });
         }
+
+        harness.enemySystem.getAllEnemies().forEach((asteroid) => {
+          if (!asteroid.destroyed) {
+            harness.enemySystem.destroyAsteroid(asteroid, {
+              createFragments: false
+            });
+          }
+        });
+
+        harness.enemySystem.update(0);
+        if (harness.enemySystem.waveState?.isActive) {
+          harness.enemySystem.completeCurrentWave();
+        }
+
+        const finalState = { ...harness.enemySystem.waveState };
+
+        expect(finalState.isActive).toBe(false);
+        expect(finalState.asteroidsKilled).toBeGreaterThanOrEqual(
+          finalState.totalAsteroids
+        );
       });
-
-      harness.enemySystem.update(0);
-      if (harness.enemySystem.waveState?.isActive) {
-        harness.enemySystem.completeCurrentWave();
-      }
-
-      const finalState = { ...harness.enemySystem.waveState };
-
-      expect(finalState.isActive).toBe(false);
-      expect(finalState.asteroidsKilled).toBeGreaterThanOrEqual(
-        finalState.totalAsteroids
-      );
     });
   });
 
@@ -902,6 +1025,124 @@ describe.sequential('Legacy Asteroid Baseline Metrics', () => {
 
         legacySpy.mockRestore();
         warnSpy.mockRestore();
+      }
+    });
+
+    test('WaveManager completion event schedules break timer and suppresses legacy emit', async () => {
+      expect(CONSTANTS.USE_WAVE_MANAGER).toBe(true);
+
+      const eventBus = globalThis?.gameEvents;
+      expect(eventBus).toBeTruthy();
+
+      const emitSpy = vi.spyOn(eventBus, 'emit');
+      const legacyListener = vi.fn();
+      eventBus.on('wave-completed', legacyListener);
+
+      const waitForWaveComplete = new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          eventBus.off('wave-complete', handler);
+          reject(new Error('wave-complete event was not emitted'));
+        }, 2000);
+
+        function handler(payload) {
+          clearTimeout(timeout);
+          eventBus.off('wave-complete', handler);
+          resolve(payload);
+        }
+
+        eventBus.on('wave-complete', handler);
+      });
+
+      const { enemySystem } = harness;
+
+      try {
+        enemySystem.sessionActive = true;
+        enemySystem.waveState = enemySystem.createInitialWaveState();
+        enemySystem.waveState.current = 0;
+        enemySystem.waveState.isActive = false;
+        enemySystem.waveState.breakTimer = 0;
+        enemySystem.waveState.totalAsteroids = 0;
+        enemySystem.waveState.asteroidsSpawned = 0;
+        enemySystem.waveState.asteroidsKilled = 0;
+        enemySystem.waveState.completedWaves = 0;
+        enemySystem.waveState.initialSpawnDone = false;
+        enemySystem.spawnTimer = 0;
+
+        enemySystem.update(0);
+
+        expect(enemySystem.waveManager).toBeTruthy();
+
+        if (!enemySystem.waveManager.waveInProgress) {
+          const started = enemySystem.waveManager.startNextWave();
+          expect(started).toBe(true);
+        }
+
+        enemySystem.update(0);
+
+        const currentWave = enemySystem.waveManager.currentWave;
+        expect(currentWave).toBeGreaterThan(0);
+
+        enemySystem.waveState.current = currentWave;
+        enemySystem.waveState.isActive = true;
+        enemySystem.waveState.breakTimer = 0;
+        enemySystem.waveState.totalAsteroids = 0;
+        enemySystem.waveState.asteroidsSpawned = 0;
+        enemySystem.waveState.asteroidsKilled = 0;
+
+        const spawnedAsteroids = [];
+        const spawnTarget = 4;
+
+        for (let i = 0; i < spawnTarget; i += 1) {
+          const asteroid = enemySystem.spawnAsteroid();
+          if (asteroid) {
+            spawnedAsteroids.push(asteroid);
+          }
+        }
+
+        expect(spawnedAsteroids.length).toBeGreaterThan(0);
+        expect(spawnedAsteroids.length).toBe(spawnTarget);
+
+        expect(enemySystem.waveManager.totalEnemiesThisWave).toBe(
+          spawnedAsteroids.length
+        );
+        expect(enemySystem.waveManager.enemiesSpawnedThisWave).toBe(
+          spawnedAsteroids.length
+        );
+        enemySystem.waveState.totalAsteroids = spawnTarget;
+
+        expect(enemySystem.waveManager.enemiesKilledThisWave).toBe(0);
+
+        spawnedAsteroids.forEach((asteroid) => {
+          enemySystem.destroyAsteroid(asteroid, { createFragments: false });
+        });
+
+        expect(enemySystem.waveManager.enemiesKilledThisWave).toBe(
+          spawnedAsteroids.length
+        );
+        expect(enemySystem.getActiveEnemyCount()).toBe(0);
+
+        const completionPayload = await waitForWaveComplete;
+
+        enemySystem.update(0);
+
+        expect(completionPayload?.wave).toBe(currentWave);
+        expect(enemySystem.waveState.isActive).toBe(false);
+        expect(enemySystem.waveState.breakTimer).toBe(CONSTANTS.WAVE_BREAK_TIME);
+        expect(enemySystem.waveState.completedWaves).toBe(1);
+
+        const waveCompleteEmits = emitSpy.mock.calls.filter(
+          ([eventName]) => eventName === 'wave-complete'
+        );
+        expect(waveCompleteEmits.length).toBeGreaterThan(0);
+
+        const waveCompletedEmits = emitSpy.mock.calls.filter(
+          ([eventName]) => eventName === 'wave-completed'
+        );
+        expect(waveCompletedEmits.length).toBe(0);
+        expect(legacyListener).not.toHaveBeenCalled();
+      } finally {
+        eventBus.off('wave-completed', legacyListener);
+        emitSpy.mockRestore();
       }
     });
 
