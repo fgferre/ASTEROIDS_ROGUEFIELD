@@ -2271,6 +2271,22 @@ class UISystem {
       }
     });
 
+    gameEvents.on('wave-started', (payload = {}) => {
+      if (payload?.isBossWave) {
+        return;
+      }
+
+      const state = this.getBossHudState();
+      if (!state) {
+        return;
+      }
+
+      if (state.active || state.upcoming) {
+        this.hideBossHud(true);
+        this.resetBossHudState();
+      }
+    });
+
     gameEvents.on('experience-changed', (data) => {
       this.updateXPBar(data);
     });

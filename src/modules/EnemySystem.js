@@ -3213,7 +3213,31 @@ class EnemySystem {
     this.refreshInjectedServices({ force: true });
     this.syncPhysicsIntegration(true);
 
-    this.spawnInitialAsteroids(4);
+    const waveManagerActive =
+      this.useManagers &&
+      Boolean(CONSTANTS?.USE_WAVE_MANAGER) &&
+      this.waveManager;
+
+    if (waveManagerActive) {
+      if (typeof this.waveManager.reset === 'function') {
+        try {
+          this.waveManager.reset();
+        } catch (error) {
+          console.error('[EnemySystem] Failed to reset WaveManager during system reset:', error);
+        }
+      }
+
+      if (this.waveState) {
+        this.waveState.isActive = false;
+        this.waveState.breakTimer = 0;
+        this.waveState.initialSpawnDone = false;
+        this.waveState.asteroidsSpawned = 0;
+        this.waveState.asteroidsKilled = 0;
+      }
+    } else {
+      this.spawnInitialAsteroids(4);
+    }
+
     this.emitWaveStateUpdate(true);
     console.log('[EnemySystem] Reset');
   }
