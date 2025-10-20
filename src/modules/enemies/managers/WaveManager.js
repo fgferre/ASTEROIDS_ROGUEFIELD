@@ -256,6 +256,39 @@ export class WaveManager {
     this._isEnemyDestroyedListenerActive = true;
   }
 
+  registerActiveEnemy(enemy, _options = {}) {
+    if (!enemy || !this.waveInProgress) {
+      return;
+    }
+
+    if (this._legacyRegisteredEnemies.has(enemy)) {
+      return;
+    }
+
+    this._legacyRegisteredEnemies.add(enemy);
+
+    this.totalEnemiesThisWave += 1;
+    this.enemiesSpawnedThisWave += 1;
+
+    const candidateType =
+      enemy?.type || enemy?.enemyType || enemy?.enemyKind || enemy?.kind || 'unknown';
+    const asteroidKey = this.enemyTypeKeys?.asteroid || 'asteroid';
+    const isAsteroid =
+      typeof candidateType === 'string' &&
+      candidateType.toLowerCase() === String(asteroidKey).toLowerCase();
+
+    if (isAsteroid) {
+      this.totalAsteroidEnemiesThisWave += 1;
+      this.asteroidsSpawnedThisWave += 1;
+    }
+
+    if (process?.env?.NODE_ENV === 'development') {
+      console.debug(
+        `[WaveManager] Registered enemy: type=${candidateType}, wave=${this.currentWave}`
+      );
+    }
+  }
+
   disconnect() {
     const bus = this._enemyDestroyedBus || this.eventBus;
 
