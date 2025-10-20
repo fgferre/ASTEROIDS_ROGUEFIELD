@@ -755,7 +755,14 @@ class EnemySystem {
       const enemy = this.factory.create(type, config);
       if (enemy) {
         this.assignAsteroidPoolId(enemy, config?.poolId);
-        this.registerActiveEnemy(enemy, { skipDuplicateCheck: true });
+        const registrationResult = this.registerActiveEnemy(enemy, {
+          skipDuplicateCheck: true,
+        });
+        this.warnIfWaveManagerRegistrationFailed(
+          registrationResult,
+          'factory-acquire',
+          enemy
+        );
       }
       return enemy;
     } catch (error) {
@@ -766,10 +773,12 @@ class EnemySystem {
 
   registerActiveEnemy(enemy, { skipDuplicateCheck = false } = {}) {
     if (!enemy) {
-      return null;
+      return false;
     }
 
-    if (!skipDuplicateCheck && this.asteroids.includes(enemy)) {
+    const alreadyTracked = this.asteroids.includes(enemy);
+
+    if (!skipDuplicateCheck && alreadyTracked) {
       return enemy;
     }
 
@@ -778,9 +787,11 @@ class EnemySystem {
       enemy.destroyed = false;
     }
 
-    this.asteroids.push(enemy);
-    this.invalidateActiveEnemyCache();
-    this.registerEnemyWithPhysics(enemy);
+    if (!alreadyTracked) {
+      this.asteroids.push(enemy);
+      this.invalidateActiveEnemyCache();
+      this.registerEnemyWithPhysics(enemy);
+    }
 
     const shouldBridgeToWaveManager =
       this.useManagers &&
@@ -789,6 +800,8 @@ class EnemySystem {
       Boolean(CONSTANTS?.USE_WAVE_MANAGER) &&
       !Boolean(CONSTANTS?.WAVEMANAGER_HANDLES_ASTEROID_SPAWN) &&
       typeof this.waveManager.registerActiveEnemy === 'function';
+
+    let waveManagerRegistered = true;
 
     if (shouldBridgeToWaveManager) {
       const candidateType =
@@ -803,10 +816,47 @@ class EnemySystem {
       const normalizedCandidate =
         typeof candidateType === 'string' ? candidateType.toLowerCase() : null;
       if (normalizedCandidate === String(asteroidKey).toLowerCase()) {
-        this.waveManager.registerActiveEnemy(enemy, { skipDuplicateCheck: true });
+        const result = this.waveManager.registerActiveEnemy(enemy, {
+          skipDuplicateCheck: true,
+        });
+        if (result === false) {
+          waveManagerRegistered = false;
+        }
       }
     }
-    return enemy;
+
+    return waveManagerRegistered ? enemy : false;
+  }
+
+  warnIfWaveManagerRegistrationFailed(result, context, enemy = null) {
+    if (result !== false) {
+      return;
+    }
+
+    const waveManagerEnabled =
+      this.useManagers &&
+      this._waveManagerRuntimeEnabled &&
+      Boolean(CONSTANTS?.USE_WAVE_MANAGER) &&
+      !Boolean(CONSTANTS?.WAVEMANAGER_HANDLES_ASTEROID_SPAWN) &&
+      this.waveManager;
+
+    const isDevelopment =
+      typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
+
+    if (!waveManagerEnabled || !isDevelopment) {
+      return;
+    }
+
+    if (typeof console === 'undefined' || typeof console.warn !== 'function') {
+      return;
+    }
+
+    console.warn('[EnemySystem] WaveManager registration failed', {
+      context,
+      enemyType: enemy?.type || enemy?.enemyType || null,
+      enemyId: enemy?.id ?? null,
+      wave: this.waveState?.current ?? null,
+    });
   }
 
   releaseAsteroid(asteroid) {
@@ -2191,7 +2241,14 @@ class EnemySystem {
       try {
         boss = new BossEnemy(this, spawnConfig);
         this.assignAsteroidPoolId(boss, spawnConfig.poolId);
-        this.registerActiveEnemy(boss, { skipDuplicateCheck: true });
+        const registrationResult = this.registerActiveEnemy(boss, {
+          skipDuplicateCheck: true,
+        });
+        this.warnIfWaveManagerRegistrationFailed(
+          registrationResult,
+          'boss-spawn',
+          boss
+        );
       } catch (error) {
         console.error('[EnemySystem] Failed to instantiate boss enemy', error);
         return null;
@@ -2305,7 +2362,12 @@ class EnemySystem {
       randomScope: 'spawn',
     });
 
-    this.registerActiveEnemy(asteroid);
+    const registrationResult = this.registerActiveEnemy(asteroid);
+    this.warnIfWaveManagerRegistrationFailed(
+      registrationResult,
+      'spawn-asteroid',
+      asteroid
+    );
 
     if (this.waveState && this.waveState.isActive) {
       this.waveState.asteroidsSpawned += 1;
@@ -2381,7 +2443,12 @@ class EnemySystem {
           random: fragmentRandom.random,
           randomScope: 'fragments',
         });
-        this.registerActiveEnemy(fragment);
+        const registrationResult = this.registerActiveEnemy(fragment);
+        this.warnIfWaveManagerRegistrationFailed(
+          registrationResult,
+          'fragment-spawn',
+          fragment
+        );
         fragments.push(fragment);
       });
 
@@ -3077,7 +3144,14 @@ class EnemySystem {
       for (let i = 0; i < asteroidSnapshots.length; i += 1) {
         const restored = this.applyAsteroidSnapshot(asteroidSnapshots[i]);
         if (restored) {
-          this.registerActiveEnemy(restored, { skipDuplicateCheck: true });
+          const registrationResult = this.registerActiveEnemy(restored, {
+            skipDuplicateCheck: true,
+          });
+          this.warnIfWaveManagerRegistrationFailed(
+            registrationResult,
+            'snapshot-restore',
+            restored
+          );
         }
       }
 
@@ -3366,7 +3440,14 @@ class EnemySystem {
     }
 
     if (!this.asteroids.includes(boss)) {
-      this.registerActiveEnemy(boss, { skipDuplicateCheck: true });
+      const registrationResult = this.registerActiveEnemy(boss, {
+        skipDuplicateCheck: true,
+      });
+      this.warnIfWaveManagerRegistrationFailed(
+        registrationResult,
+        'boss-event-spawn',
+        boss
+      );
     } else {
       this.trackBossEnemy(boss);
       this.registerEnemyWithPhysics(boss);

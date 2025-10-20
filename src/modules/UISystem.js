@@ -103,6 +103,7 @@ class UISystem {
         breakTimerSeconds: null,
         labelLength: 0,
         enemiesTextLength: 0,
+        managerAllEnemiesTotal: null,
       },
       boss: this.createInitialBossCachedValues(),
       combo: {
@@ -4325,9 +4326,18 @@ class UISystem {
 
     const force = Boolean(options.force);
 
+    const managerTotals = waveData?.managerTotals || null;
+    const managerAllEnemiesTotal = Number.isFinite(managerTotals?.all)
+      ? Math.max(0, Math.floor(managerTotals.all))
+      : null;
+
     const normalized = {
       current: Math.max(1, Math.floor(waveData.current ?? 1)),
       completedWaves: Math.max(0, Math.floor(waveData.completedWaves ?? 0)),
+      // NOTE: `totalAsteroids` maintains legacy parity and represents the
+      // asteroid-only total, even when the WaveManager tracks additional enemy
+      // types for the same wave. Support/boss totals can be derived from
+      // `managerTotals` when present without polluting the legacy HUD.
       totalAsteroids: Math.max(0, Math.floor(waveData.totalAsteroids ?? 0)),
       asteroidsKilled: Math.max(0, Math.floor(waveData.asteroidsKilled ?? 0)),
       isActive: Boolean(waveData.isActive ?? true),
@@ -4365,7 +4375,8 @@ class UISystem {
       lastWave.asteroidsKilled !== normalized.asteroidsKilled ||
       lastWave.isActive !== normalized.isActive ||
       lastWave.timeRemainingSeconds !== timeSeconds ||
-      lastWave.breakTimerSeconds !== breakSeconds;
+      lastWave.breakTimerSeconds !== breakSeconds ||
+      lastWave.managerAllEnemiesTotal !== managerAllEnemiesTotal;
 
     if (!hasChanged) {
       return;
@@ -4506,6 +4517,7 @@ class UISystem {
       breakTimerSeconds: breakSeconds,
       labelLength: nextLabelLength,
       enemiesTextLength: nextEnemiesLength,
+      managerAllEnemiesTotal,
     };
   }
 
