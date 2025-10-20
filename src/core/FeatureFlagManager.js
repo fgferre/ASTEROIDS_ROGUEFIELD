@@ -7,6 +7,7 @@ import {
   ASTEROID_EDGE_SPAWN_MARGIN,
 } from './GameConstants.js';
 import { FEATURE_FLAG_STORAGE_KEY } from './featureFlagStorage.js';
+import { normalizeFeatureFlagValue } from './featureFlagValidation.js';
 
 const FEATURE_FLAGS = {
   USE_WAVE_MANAGER: {
@@ -317,33 +318,24 @@ export default class FeatureFlagManager {
   }
 
   _validateValue(metadata, value) {
-    if (metadata.type === 'boolean') {
-      if (typeof value === 'boolean') {
-        return value;
-      }
-      console.warn(`[FeatureFlagManager] Valor inválido para ${metadata.key}. Esperado boolean.`);
+    const normalized = normalizeFeatureFlagValue(metadata.key, value, {
+      type: metadata.type,
+      defaultValue: metadata.defaultValue,
+    });
+
+    if (normalized === null) {
+      const expectedType = metadata.type || typeof metadata.defaultValue;
+      const message =
+        expectedType === 'boolean'
+          ? `Valor inválido para ${metadata.key}. Esperado boolean.`
+          : expectedType === 'number'
+          ? `Valor inválido para ${metadata.key}. Esperado número dentro dos limites.`
+          : `Tipo não suportado para ${metadata.key}.`;
+      console.warn(`[FeatureFlagManager] ${message}`);
       return null;
     }
 
-    if (metadata.type === 'number') {
-      const numericValue = Number(value);
-      if (!Number.isFinite(numericValue)) {
-        console.warn(`[FeatureFlagManager] Valor inválido para ${metadata.key}. Esperado número.`);
-        return null;
-      }
-
-      if (metadata.key === 'ASTEROID_EDGE_SPAWN_MARGIN') {
-        if (numericValue < 0 || numericValue > 200) {
-          console.warn('[FeatureFlagManager] ASTEROID_EDGE_SPAWN_MARGIN deve estar entre 0 e 200.');
-          return null;
-        }
-      }
-
-      return numericValue;
-    }
-
-    console.warn(`[FeatureFlagManager] Tipo não suportado para ${metadata.key}.`);
-    return null;
+    return normalized;
   }
 
   _logDev(message) {

@@ -224,6 +224,14 @@ function init() {
 
     featureFlagManager = FeatureFlagManager.getInstance();
 
+    if (
+      process.env.NODE_ENV === 'development' &&
+      typeof window !== 'undefined' &&
+      featureFlagManager
+    ) {
+      window.featureFlags = featureFlagManager;
+    }
+
     if (featureFlagManager?.hasOverrides()) {
       const overrides = featureFlagManager.getOverrides();
       const overrideKeys = Object.keys(overrides);

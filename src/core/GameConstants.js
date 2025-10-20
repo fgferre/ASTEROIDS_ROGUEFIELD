@@ -1,12 +1,22 @@
 // src/core/GameConstants.js
 
 import { readPersistedFeatureFlagOverrides } from './featureFlagStorage.js';
+import { normalizeFeatureFlagValue } from './featureFlagValidation.js';
 
 // Runtime overrides persisted by FeatureFlagManager should be applied before
 // the rest of the systems evaluate their configuration. We resolve the
 // overrides once during module evaluation so that the exported constants already
 // reflect the developer's latest toggle selections.
 const RUNTIME_FEATURE_FLAG_OVERRIDES = loadRuntimeFeatureFlagOverrides();
+
+const FEATURE_FLAG_DEFAULTS = Object.freeze({
+  USE_WAVE_MANAGER: false,
+  WAVEMANAGER_HANDLES_ASTEROID_SPAWN: false,
+  PRESERVE_LEGACY_SIZE_DISTRIBUTION: true,
+  PRESERVE_LEGACY_POSITIONING: true,
+  STRICT_LEGACY_SPAWN_SEQUENCE: true,
+  ASTEROID_EDGE_SPAWN_MARGIN: 80,
+});
 
 function loadRuntimeFeatureFlagOverrides() {
   if (typeof globalThis !== 'undefined' && globalThis.__FEATURE_FLAG_OVERRIDES__) {
@@ -28,16 +38,28 @@ function resolveRuntimeFlag(flagKey, defaultValue) {
 
   const rawValue = RUNTIME_FEATURE_FLAG_OVERRIDES[flagKey];
 
-  if (typeof defaultValue === 'boolean') {
-    return Boolean(rawValue);
+  const normalized = normalizeFeatureFlagValue(flagKey, rawValue, { defaultValue });
+  if (normalized === null) {
+    return defaultValue;
   }
 
-  if (typeof defaultValue === 'number') {
-    const numericValue = Number(rawValue);
-    return Number.isFinite(numericValue) ? numericValue : defaultValue;
-  }
+  return normalized;
+}
 
-  return rawValue ?? defaultValue;
+function buildResolvedFlagSnapshot() {
+  const snapshot = {};
+
+  Object.entries(FEATURE_FLAG_DEFAULTS).forEach(([flagKey, defaultValue]) => {
+    snapshot[flagKey] = resolveRuntimeFlag(flagKey, defaultValue);
+  });
+
+  Object.keys(RUNTIME_FEATURE_FLAG_OVERRIDES).forEach((flagKey) => {
+    if (!Object.prototype.hasOwnProperty.call(snapshot, flagKey)) {
+      snapshot[flagKey] = RUNTIME_FEATURE_FLAG_OVERRIDES[flagKey];
+    }
+  });
+
+  return snapshot;
 }
 
 function applyLegacySentinels() {
@@ -45,16 +67,19 @@ function applyLegacySentinels() {
     return;
   }
 
-  if (resolveRuntimeFlag('USE_WAVE_MANAGER', false)) {
+  const runtimeUseWave = resolveRuntimeFlag(
+    'USE_WAVE_MANAGER',
+    FEATURE_FLAG_DEFAULTS.USE_WAVE_MANAGER
+  );
+
+  if (runtimeUseWave === true) {
     globalThis.__USE_WAVE_MANAGER_OVERRIDE__ = true;
   } else if (Object.prototype.hasOwnProperty.call(globalThis, '__USE_WAVE_MANAGER_OVERRIDE__')) {
     delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
   }
 
   if (Object.keys(RUNTIME_FEATURE_FLAG_OVERRIDES).length > 0) {
-    globalThis.__FEATURE_FLAG_OVERRIDES__ = {
-      ...RUNTIME_FEATURE_FLAG_OVERRIDES,
-    };
+    globalThis.__FEATURE_FLAG_OVERRIDES__ = buildResolvedFlagSnapshot();
   } else if (Object.prototype.hasOwnProperty.call(globalThis, '__FEATURE_FLAG_OVERRIDES__')) {
     delete globalThis.__FEATURE_FLAG_OVERRIDES__;
   }
@@ -1852,6 +1877,12 @@ export const ASTEROID_EDGE_SPAWN_MARGIN = resolveRuntimeFlag(
 // window.featureFlags.setFlag('USE_WAVE_MANAGER', true)
 // window.featureFlags.getAllFlags() // Ver todos os flags disponíveis
 
-applyLegacySentinels();
+const shouldApplyLegacySentinels =
+  typeof globalThis !== 'undefined' &&
+  !Object.prototype.hasOwnProperty.call(globalThis, '__FEATURE_FLAG_OVERRIDES__');
+
+if (shouldApplyLegacySentinels) {
+  applyLegacySentinels();
+}
 
 console.log('[GameConstants] Loaded');
