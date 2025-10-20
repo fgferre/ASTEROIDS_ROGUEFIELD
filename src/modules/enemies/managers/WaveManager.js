@@ -1164,8 +1164,23 @@ export class WaveManager {
    * Spawns enemies for the current wave using the factory pattern.
    *
    * @param {Object} waveConfig - Wave configuration
-   */
+  */
   spawnWave(waveConfig) {
+    const enemyGroups = Array.isArray(waveConfig?.enemies)
+      ? waveConfig.enemies
+      : [];
+    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
+
+    if (!waveManagerSpawnsAsteroids) {
+      const hasNonAsteroidEnemies = enemyGroups.some(
+        (group) => group && typeof group === 'object' && group.type !== 'asteroid'
+      );
+
+      if (!hasNonAsteroidEnemies) {
+        return; // Nothing to spawn; EnemySystem handles asteroid legacy mode
+      }
+    }
+
     const worldBounds = this.enemySystem.getCachedWorld()?.getBounds() ||
                        { width: 800, height: 600 };
     const player = this.enemySystem.getCachedPlayer();
@@ -1180,12 +1195,6 @@ export class WaveManager {
     const spawnDelayMultiplier = this.resolveWaveSpawnDelayMultiplier(waveConfig);
     this.spawnDelayMultiplier = spawnDelayMultiplier;
     const effectiveSpawnDelay = this.spawnDelay * spawnDelayMultiplier;
-
-    const enemyGroups = Array.isArray(waveConfig?.enemies)
-      ? waveConfig.enemies
-      : [];
-
-    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
 
     for (const enemyGroup of enemyGroups) {
       if (!enemyGroup || typeof enemyGroup !== 'object') {
