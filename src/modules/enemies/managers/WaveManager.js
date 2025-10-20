@@ -1202,6 +1202,11 @@ export class WaveManager {
     const worldBounds = this.enemySystem.getCachedWorld()?.getBounds() ||
                        { width: 800, height: 600 };
     const player = this.enemySystem.getCachedPlayer();
+    const playerSnapshot =
+      this.enemySystem &&
+      typeof this.enemySystem.getPlayerPositionSnapshot === 'function'
+        ? this.enemySystem.getPlayerPositionSnapshot(player)
+        : null;
     const safeDistance = CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200;
     const compatibilityMode = this.isLegacyAsteroidCompatibilityEnabled();
     const useLegacyDistribution = CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
@@ -1253,13 +1258,21 @@ export class WaveManager {
             spawnContext.random
           );
         } else {
-          // Modern: spawn at safe distance from player
-          position = this.calculateSafeSpawnPosition(
-            worldBounds,
-            player,
-            safeDistance,
-            spawnContext.random
-          );
+          // Modern: spawn at safe distance from player when snapshot is available.
+          // Fall back to edge positioning if we cannot resolve the player snapshot.
+          if (!playerSnapshot) {
+            position = this.calculateEdgeSpawnPosition(
+              worldBounds,
+              spawnContext.random
+            );
+          } else {
+            position = this.calculateSafeSpawnPosition(
+              worldBounds,
+              playerSnapshot,
+              safeDistance,
+              spawnContext.random
+            );
+          }
         }
 
         const {
@@ -1737,7 +1750,9 @@ export class WaveManager {
       ? data.fragments.length
       : 0;
 
-    if (fragmentCount > 0) {
+    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
+
+    if (fragmentCount > 0 && waveManagerSpawnsAsteroids) {
       this.totalEnemiesThisWave += fragmentCount;
       this.enemiesSpawnedThisWave += fragmentCount;
       this.totalAsteroidEnemiesThisWave += fragmentCount;

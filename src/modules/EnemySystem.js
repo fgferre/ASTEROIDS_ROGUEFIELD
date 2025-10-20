@@ -1784,6 +1784,9 @@ class EnemySystem {
         );
         this._waveManagerInvalidStateWarningIssued = true;
       }
+      if (waveManagerHandlesAsteroids) {
+        return spawnHandled;
+      }
       return this.updateWaveLogic(deltaTime, { skipSpawning: spawnHandled });
     }
 
@@ -1795,8 +1798,51 @@ class EnemySystem {
       totalAsteroids: previousTotal,
     } = wave;
 
-    wave.current = managerState.currentWave ?? previousCurrent;
-    wave.isActive = managerState.inProgress ?? previousIsActive;
+    const nextWaveNumberCandidate = Number(managerState.currentWave);
+    const resolvedWaveNumber = Number.isFinite(nextWaveNumberCandidate)
+      ? nextWaveNumberCandidate
+      : Number.isFinite(previousCurrent)
+        ? previousCurrent
+        : 1;
+
+    const nextIsActive = Boolean(managerState.inProgress);
+    const becameActive = !previousIsActive && nextIsActive;
+
+    wave.current = resolvedWaveNumber;
+    wave.isActive = nextIsActive;
+
+    if (!nextIsActive) {
+      const countdownValue = Number(managerState.countdown) || 0;
+      wave.breakTimer = Math.max(0, countdownValue);
+    }
+
+    if (becameActive) {
+      const baseMultiplier = Number.isFinite(CONSTANTS.ASTEROIDS_PER_WAVE_MULTIPLIER)
+        ? CONSTANTS.ASTEROIDS_PER_WAVE_MULTIPLIER
+        : 1.3;
+      const baseCountValue = Number.isFinite(CONSTANTS.ASTEROIDS_PER_WAVE_BASE)
+        ? CONSTANTS.ASTEROIDS_PER_WAVE_BASE
+        : 4;
+      const normalizedWaveIndex = Math.max(0, resolvedWaveNumber - 1);
+      const computedTotal = Math.floor(
+        baseCountValue * Math.pow(baseMultiplier, normalizedWaveIndex)
+      );
+      const capValue = Number.isFinite(CONSTANTS.MAX_ASTEROIDS_ON_SCREEN)
+        ? CONSTANTS.MAX_ASTEROIDS_ON_SCREEN
+        : 25;
+
+      wave.totalAsteroids = Math.max(0, Math.min(computedTotal, capValue));
+      wave.asteroidsSpawned = 0;
+      wave.asteroidsKilled = 0;
+      wave.timeRemaining = Number.isFinite(Number(CONSTANTS.WAVE_DURATION))
+        ? Number(CONSTANTS.WAVE_DURATION)
+        : 60;
+      wave.spawnTimer = 0;
+      wave.initialSpawnDone = false;
+      wave.breakTimer = 0;
+
+      this.spawnInitialAsteroids(4);
+    }
     const legacyCompatibilityEnabled =
       (CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true) &&
       waveManagerHandlesAsteroids;
