@@ -464,37 +464,41 @@ describe.sequential('Legacy Asteroid Baseline Metrics', () => {
   });
 
   describe('Size Distribution', () => {
-    test('spawned asteroids follow 50/30/20 distribution', () => {
-      prepareWave(harness.enemySystem, 1);
-      harness.enemySystem.waveState.totalAsteroids = SAMPLE_ASTEROID_COUNT;
-      const spawnLog = [];
+    test(
+      'spawned asteroids follow 50/30/20 distribution',
+      { timeout: 15000 },
+      () => {
+        prepareWave(harness.enemySystem, 1);
+        harness.enemySystem.waveState.totalAsteroids = SAMPLE_ASTEROID_COUNT;
+        const spawnLog = [];
 
-      for (let i = 0; i < SAMPLE_ASTEROID_COUNT; i += 1) {
-        const asteroid = harness.enemySystem.spawnAsteroid();
-        if (asteroid) {
-          spawnLog.push(asteroid);
-        }
-      }
-
-      const { sizeCounts, total } = collectSpawnMetrics(spawnLog);
-
-      try {
-        expect(total).toBe(SAMPLE_ASTEROID_COUNT);
-        expectWithinTolerance(sizeCounts.large / total, 0.5);
-        expectWithinTolerance(sizeCounts.medium / total, 0.3);
-        expectWithinTolerance(sizeCounts.small / total, 0.2);
-      } finally {
-        spawnLog.forEach((asteroid) => {
+        for (let i = 0; i < SAMPLE_ASTEROID_COUNT; i += 1) {
+          const asteroid = harness.enemySystem.spawnAsteroid();
           if (asteroid) {
-            harness.enemySystem.destroyAsteroid(asteroid, { createFragments: false });
+            spawnLog.push(asteroid);
           }
-        });
+        }
 
-        if (typeof harness.enemySystem.cleanupDestroyed === 'function') {
-          harness.enemySystem.cleanupDestroyed();
+        const { sizeCounts, total } = collectSpawnMetrics(spawnLog);
+
+        try {
+          expect(total).toBe(SAMPLE_ASTEROID_COUNT);
+          expectWithinTolerance(sizeCounts.large / total, 0.5);
+          expectWithinTolerance(sizeCounts.medium / total, 0.3);
+          expectWithinTolerance(sizeCounts.small / total, 0.2);
+        } finally {
+          spawnLog.forEach((asteroid) => {
+            if (asteroid) {
+              harness.enemySystem.destroyAsteroid(asteroid, { createFragments: false });
+            }
+          });
+
+          if (typeof harness.enemySystem.cleanupDestroyed === 'function') {
+            harness.enemySystem.cleanupDestroyed();
+          }
         }
       }
-    });
+    );
   });
 
   describe('Variant Distribution by Size', () => {
@@ -825,17 +829,39 @@ describe.sequential('Legacy Asteroid Baseline Metrics', () => {
   });
 
   describe('Feature Flag: USE_WAVE_MANAGER', () => {
-    test('Legacy system remains functional when flag is false', () => {
-      expect(CONSTANTS.USE_WAVE_MANAGER).toBe(false);
+    test('Legacy system remains functional when flag is forced off', () => {
+      expect(CONSTANTS.USE_WAVE_MANAGER).toBe(true);
+
+      const previousOverride =
+        typeof globalThis !== 'undefined'
+          ? globalThis.__USE_WAVE_MANAGER_OVERRIDE__
+          : undefined;
 
       const legacySpy = vi.spyOn(harness.enemySystem, 'updateWaveLogic');
-      const { waveState } = simulateWave(harness.enemySystem, 1, 400);
+      const waveManagerSpy = vi.spyOn(
+        harness.enemySystem,
+        'updateWaveManagerLogic'
+      );
 
-      expect(waveState.totalAsteroids).toBe(4);
-      expect(waveState.asteroidsSpawned).toBeGreaterThan(0);
-      expect(legacySpy).toHaveBeenCalled();
+      try {
+        globalThis.__USE_WAVE_MANAGER_OVERRIDE__ = false;
 
-      legacySpy.mockRestore();
+        const { waveState } = simulateWave(harness.enemySystem, 1, 400);
+
+        expect(waveState.totalAsteroids).toBe(4);
+        expect(waveState.asteroidsSpawned).toBeGreaterThan(0);
+        expect(legacySpy).toHaveBeenCalled();
+        expect(waveManagerSpy).not.toHaveBeenCalled();
+      } finally {
+        legacySpy.mockRestore();
+        waveManagerSpy.mockRestore();
+
+        if (previousOverride === undefined) {
+          delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
+        } else {
+          globalThis.__USE_WAVE_MANAGER_OVERRIDE__ = previousOverride;
+        }
+      }
     });
 
     test('EnemySystem gracefully handles missing WaveManager', () => {

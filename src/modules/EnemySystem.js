@@ -1610,16 +1610,22 @@ class EnemySystem {
 
     this.refreshInjectedServices();
 
-    const waveManagerOverride =
-      typeof globalThis !== 'undefined' &&
-      globalThis.__USE_WAVE_MANAGER_OVERRIDE__ === true;
+    const overrideValue =
+      typeof globalThis !== 'undefined'
+        ? globalThis.__USE_WAVE_MANAGER_OVERRIDE__
+        : undefined;
 
     const constantsFlag =
       typeof CONSTANTS?.USE_WAVE_MANAGER === 'boolean'
         ? CONSTANTS.USE_WAVE_MANAGER
         : false;
 
-    const waveManagerEnabled = constantsFlag || waveManagerOverride;
+    let waveManagerEnabled = constantsFlag;
+    if (overrideValue === true) {
+      waveManagerEnabled = true;
+    } else if (overrideValue === false) {
+      waveManagerEnabled = false;
+    }
 
     if (!this._waveSystemDebugLogged) {
       console.debug(
@@ -1763,29 +1769,31 @@ class EnemySystem {
     const spawnedBreakdown = counts.spawned || {};
     const killedBreakdown = counts.killed || {};
 
-    if (legacyCompatibilityEnabled) {
-      const managerSpawnedValue =
-        spawnedBreakdown.asteroids ?? managerState.spawned;
-      const managerKilledValue =
-        killedBreakdown.asteroids ?? managerState.killed;
-      const managerTotalValue = totals.asteroids ?? managerState.total;
+    const selectManagerValue = (value, fallback) =>
+      Number.isFinite(value) ? value : fallback;
 
-      const normalizeManagerValue = (value, fallback) =>
-        Number.isFinite(value) ? value : fallback;
+    const managerSpawnedValue = legacyCompatibilityEnabled
+      ? spawnedBreakdown.asteroids ?? managerState.spawned
+      : managerState.spawned;
+    const managerKilledValue = legacyCompatibilityEnabled
+      ? killedBreakdown.asteroids ?? managerState.killed
+      : managerState.killed;
+    const managerTotalValue = legacyCompatibilityEnabled
+      ? totals.asteroids ?? managerState.total
+      : managerState.total;
 
-      wave.asteroidsSpawned = normalizeManagerValue(
-        managerSpawnedValue,
-        previousSpawned
-      );
-      wave.asteroidsKilled = normalizeManagerValue(
-        managerKilledValue,
-        previousKilled
-      );
-      wave.totalAsteroids = normalizeManagerValue(
-        managerTotalValue,
-        previousTotal
-      );
-    }
+    wave.asteroidsSpawned = selectManagerValue(
+      managerSpawnedValue,
+      previousSpawned
+    );
+    wave.asteroidsKilled = selectManagerValue(
+      managerKilledValue,
+      previousKilled
+    );
+    wave.totalAsteroids = selectManagerValue(
+      managerTotalValue,
+      previousTotal
+    );
 
     const stateChanged =
       wave.current !== previousCurrent ||
