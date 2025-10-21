@@ -2068,33 +2068,37 @@ class EnemySystem {
 
       // Update each asteroid using component
       this.asteroids.forEach((asteroid) => {
-        if (!asteroid.destroyed) {
-          // Component handles movement
-          this.movementComponent.update(asteroid, deltaTime, context);
+        if (asteroid.destroyed || asteroid.type !== 'asteroid') {
+          return;
+        }
 
-          // Asteroid handles its own state updates (non-movement)
-          asteroid.updateVisualState(deltaTime);
+        // Component handles movement
+        this.movementComponent.update(asteroid, deltaTime, context);
 
-          // Volatile behavior (timer, not movement)
-          if (asteroid.behavior?.type === 'volatile') {
-            asteroid.updateVolatileBehavior(deltaTime);
-          }
+        // Asteroid handles its own state updates (non-movement)
+        asteroid.updateVisualState(deltaTime);
 
-          // Timers
-          if (asteroid.lastDamageTime > 0) {
-            asteroid.lastDamageTime = Math.max(0, asteroid.lastDamageTime - deltaTime);
-          }
-          if (asteroid.shieldHitCooldown > 0) {
-            asteroid.shieldHitCooldown = Math.max(0, asteroid.shieldHitCooldown - deltaTime);
-          }
+        // Volatile behavior (timer, not movement)
+        if (asteroid.behavior?.type === 'volatile') {
+          asteroid.updateVolatileBehavior(deltaTime);
+        }
+
+        // Timers
+        if (asteroid.lastDamageTime > 0) {
+          asteroid.lastDamageTime = Math.max(0, asteroid.lastDamageTime - deltaTime);
+        }
+        if (asteroid.shieldHitCooldown > 0) {
+          asteroid.shieldHitCooldown = Math.max(0, asteroid.shieldHitCooldown - deltaTime);
         }
       });
     } else {
       // LEGACY: Asteroids handle their own update
       this.asteroids.forEach((asteroid) => {
-        if (!asteroid.destroyed) {
-          asteroid.update(deltaTime);
+        if (asteroid.destroyed || asteroid.type !== 'asteroid') {
+          return;
         }
+
+        asteroid.update(deltaTime);
       });
     }
 
@@ -2103,18 +2107,26 @@ class EnemySystem {
   }
 
   handleAsteroidCollisions() {
+    const activeAsteroids = this.asteroids.filter(
+      (asteroid) => asteroid && !asteroid.destroyed && asteroid.type === 'asteroid'
+    );
+
+    if (activeAsteroids.length < 2) {
+      return;
+    }
+
     // NEW: Use collision component if available
     if (this.useComponents && this.collisionComponent) {
-      this.collisionComponent.handleAsteroidCollisions(this.asteroids);
+      this.collisionComponent.handleAsteroidCollisions(activeAsteroids);
     } else {
       // LEGACY: Original collision logic
-      for (let i = 0; i < this.asteroids.length - 1; i++) {
-        const a1 = this.asteroids[i];
-        if (a1.destroyed) continue;
+      for (let i = 0; i < activeAsteroids.length - 1; i++) {
+        const a1 = activeAsteroids[i];
+        if (!a1 || a1.destroyed) continue;
 
-        for (let j = i + 1; j < this.asteroids.length; j++) {
-          const a2 = this.asteroids[j];
-          if (a2.destroyed) continue;
+        for (let j = i + 1; j < activeAsteroids.length; j++) {
+          const a2 = activeAsteroids[j];
+          if (!a2 || a2.destroyed) continue;
 
           this.checkAsteroidCollision(a1, a2);
         }

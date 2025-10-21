@@ -7,6 +7,7 @@ import {
   getHudLayoutItems,
 } from '../data/ui/hudLayout.js';
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
+import * as CONSTANTS from '../core/GameConstants.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
