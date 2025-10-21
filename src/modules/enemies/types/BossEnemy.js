@@ -1,6 +1,7 @@
 import * as CONSTANTS from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
+import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 
 const SOURCE_CONFIG = CONSTANTS?.BOSS_CONFIG || {};
 
@@ -8,6 +9,9 @@ const BASE_CONFIG = {
   key: 'boss',
   displayName: 'Apex Overlord',
   radius: 60,
+  safeDistance: 220,
+  entryPadding: 24,
+  entryDriftSpeed: 80,
   health: 1500,
   healthScaling: 1.2,
   speed: 60,
@@ -131,6 +135,7 @@ export class BossEnemy extends BaseEnemy {
     this.phaseColors = [...(BOSS_DEFAULTS.phaseColors || ['#ff6b6b'])];
     this.rewards = { ...BOSS_DEFAULTS.rewards };
     this.renderPayload = this.buildRenderPayload();
+    this._missingTargetLogged = false;
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);
@@ -145,6 +150,8 @@ export class BossEnemy extends BaseEnemy {
 
     this.type = 'boss';
     this.addTag('boss');
+    this._drawLogged = false;
+    this._missingTargetLogged = false;
 
     const waveNumber = Math.max(1, config.wave || this.wave || 1);
     this.wave = waveNumber;
@@ -164,6 +171,22 @@ export class BossEnemy extends BaseEnemy {
     this.acceleration = config.acceleration ?? defaults.acceleration ?? 120;
     this.contactDamage = config.contactDamage ?? defaults.contactDamage ?? 45;
     this.projectileDamage = config.projectileDamage ?? defaults.projectileDamage ?? 35;
+
+    this.safeDistance = Number.isFinite(config.safeDistance)
+      ? config.safeDistance
+      : Number.isFinite(defaults.safeDistance)
+        ? defaults.safeDistance
+        : this.radius * 2.5;
+    this.entryPadding = Number.isFinite(config.entryPadding)
+      ? Math.max(0, config.entryPadding)
+      : Number.isFinite(defaults.entryPadding)
+        ? Math.max(0, defaults.entryPadding)
+        : Math.max(16, this.radius * 0.35);
+    this.entryDriftSpeed = Number.isFinite(config.entryDriftSpeed)
+      ? config.entryDriftSpeed
+      : Number.isFinite(defaults.entryDriftSpeed)
+        ? defaults.entryDriftSpeed
+        : Math.max(45, (this.speed || 0) * 0.8);
 
     this.spreadProjectileCount = config.spreadProjectileCount ?? defaults.spreadProjectileCount ?? 7;
     this.spreadProjectileSpeed = config.spreadProjectileSpeed ?? defaults.spreadProjectileSpeed ?? 260;
@@ -247,10 +270,50 @@ export class BossEnemy extends BaseEnemy {
     this.chargeState = 'idle';
     this.chargeStateTimer = 0;
 
+    this._lastUpdateLog = 0;
+    this._drawLogged = false;
+
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;
 
     this.renderPayload = this.buildRenderPayload();
+
+    GameDebugLogger.log('SPAWN', 'BossEnemy initialized', {
+      id: this.id,
+      wave: this.wave,
+      position: { x: this.x, y: this.y },
+      health: this.health,
+      maxHealth: this.maxHealth,
+      radius: this.radius,
+      phaseCount: this.phaseCount,
+      phaseThresholds: [...this.phaseHealthThresholds],
+      safeDistance: this.safeDistance,
+      entryPadding: this.entryPadding,
+      entryDriftSpeed: this.entryDriftSpeed,
+    });
+
+    if (Number.isFinite(this.entryDriftSpeed) && this.entryDriftSpeed > 0) {
+      if (!Number.isFinite(this.vx)) {
+        this.vx = 0;
+      }
+      if (!Number.isFinite(this.vy)) {
+        this.vy = 0;
+      }
+
+      const entryBand = (this.entryPadding || 0) + (this.radius || 0);
+      if (this.y <= entryBand) {
+        const previousVy = this.vy;
+        this.vy = Math.max(this.vy, this.entryDriftSpeed);
+        if (this.vy !== previousVy) {
+          GameDebugLogger.log('STATE', 'Boss entry drift primed', {
+            id: this.id,
+            entryBand,
+            previousVy,
+            newVy: this.vy,
+          });
+        }
+      }
+    }
 
     return this;
   }
@@ -280,6 +343,32 @@ export class BossEnemy extends BaseEnemy {
   onUpdate(deltaTime) {
     if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
       return;
+    }
+
+    const now = Date.now();
+    if (!this._lastUpdateLog || now - this._lastUpdateLog > 2000) {
+      const velocity = {
+        vx: Number.isFinite(this.vx) ? Number(this.vx.toFixed(2)) : 0,
+        vy: Number.isFinite(this.vy) ? Number(this.vy.toFixed(2)) : 0,
+      };
+      const healthPercent =
+        Number.isFinite(this.maxHealth) && this.maxHealth > 0
+          ? Number(((this.health / this.maxHealth) * 100).toFixed(1))
+          : null;
+
+      GameDebugLogger.log('UPDATE', 'Boss.onUpdate()', {
+        id: this.id,
+        position: { x: Math.round(this.x ?? 0), y: Math.round(this.y ?? 0) },
+        velocity,
+        health: this.health,
+        maxHealth: this.maxHealth,
+        healthPercent,
+        currentPhase: this.currentPhase,
+        invulnerable: !!this.invulnerable,
+        chargeState: this.chargeState,
+      });
+
+      this._lastUpdateLog = now;
     }
 
     this.updateInvulnerability(deltaTime);
@@ -330,7 +419,22 @@ export class BossEnemy extends BaseEnemy {
 
   seekPlayer(target, deltaTime, intensity = 1) {
     if (!target?.position || !Number.isFinite(deltaTime)) {
+      if (!this._missingTargetLogged) {
+        GameDebugLogger.log('ERROR', 'Boss seekPlayer target unavailable', {
+          hasTarget: !!target,
+          hasPosition: !!target?.position,
+          deltaTime,
+        });
+        this._missingTargetLogged = true;
+      }
       return;
+    }
+
+    if (this._missingTargetLogged) {
+      GameDebugLogger.log('STATE', 'Boss seekPlayer target restored', {
+        targetPosition: target.position,
+      });
+      this._missingTargetLogged = false;
     }
 
     const { position } = target;
@@ -617,23 +721,55 @@ export class BossEnemy extends BaseEnemy {
         minion.addTag('minion');
       }
 
-      // Register the minion with the enemy system for tracking and updates
+      minion.spawnSource = 'boss-minion';
+      minion.spawnedBy = this.id;
+      minion.spawnedByBossId = this.id;
+      minion.isBossMinion = true;
+      minion.wave = this.wave;
+
+      if (minion.metadata && typeof minion.metadata === 'object') {
+        minion.metadata.spawnSource = 'boss-minion';
+        minion.metadata.spawnedByBossId = this.id;
+      } else {
+        minion.metadata = {
+          spawnSource: 'boss-minion',
+          spawnedByBossId: this.id,
+        };
+      }
+
+      let registered = false;
+
       if (typeof this.system.registerActiveEnemy === 'function') {
-        this.system.registerActiveEnemy(minion);
+        registered = Boolean(
+          this.system.registerActiveEnemy(minion, { skipDuplicateCheck: true })
+        );
       }
 
-      // Update wave accounting to include dynamically-spawned minions
-      // This ensures WaveManager's totalEnemiesThisWave accurately reflects all enemies
-      if (this.system.waveManager) {
-        this.system.waveManager.totalEnemiesThisWave += 1;
-        this.system.waveManager.enemiesSpawnedThisWave += 1;
+      if (!registered) {
+        GameDebugLogger.log('ERROR', 'Boss minion registration failed', {
+          bossId: this.id,
+          wave: this.wave,
+          minionType: type,
+          hasRegisterFunction: typeof this.system.registerActiveEnemy === 'function',
+        });
+        return;
       }
 
-      // Also update EnemySystem's wave state if active
-      if (this.system.waveState && this.system.waveState.isActive) {
-        this.system.waveState.totalAsteroids += 1;
-        this.system.waveState.asteroidsSpawned += 1;
+      if (this.system.waveManager &&
+          typeof this.system.waveManager.registerDynamicMinion === 'function') {
+        this.system.waveManager.registerDynamicMinion(minion, {
+          bossId: this.id,
+          minionType: type,
+        });
       }
+
+      GameDebugLogger.log('STATE', 'Boss minion spawned', {
+        bossId: this.id,
+        wave: this.wave,
+        minionId: minion.id,
+        minionType: type,
+        position: { x: Math.round(minion.x), y: Math.round(minion.y) },
+      });
     }
   }
 
@@ -656,10 +792,37 @@ export class BossEnemy extends BaseEnemy {
       this.system && typeof this.system.getCachedPlayer === 'function'
         ? this.system.getCachedPlayer()
         : null;
-    const position =
+    let position =
       this.system && typeof this.system.getPlayerPositionSnapshot === 'function'
         ? this.system.getPlayerPositionSnapshot(player)
-        : player?.position;
+        : null;
+
+    if (
+      (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) &&
+      player &&
+      Number.isFinite(player.x) &&
+      Number.isFinite(player.y)
+    ) {
+      position = { x: player.x, y: player.y };
+    }
+
+    if (
+      (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) &&
+      player &&
+      player.position &&
+      Number.isFinite(player.position.x) &&
+      Number.isFinite(player.position.y)
+    ) {
+      position = { x: player.position.x, y: player.position.y };
+    }
+
+    if (!position && !this._missingTargetLogged) {
+      GameDebugLogger.log('ERROR', 'Boss could not resolve player position', {
+        hasPlayer: !!player,
+        playerKeys: player ? Object.keys(player) : null,
+      });
+      this._missingTargetLogged = true;
+    }
 
     return { player, position: position || null };
   }
@@ -742,6 +905,7 @@ export class BossEnemy extends BaseEnemy {
       return;
     }
 
+    const previousPhase = this.currentPhase;
     this.currentPhase = Math.min(this.phaseCount - 1, this.currentPhase + 1);
     this.nextPhaseIndex += 1;
 
@@ -764,9 +928,33 @@ export class BossEnemy extends BaseEnemy {
         maxHealth: this.maxHealth,
       });
     }
+
+    const healthPercent =
+      Number.isFinite(this.maxHealth) && this.maxHealth > 0
+        ? Number(((this.health / this.maxHealth) * 100).toFixed(1))
+        : null;
+
+    GameDebugLogger.log('STATE', 'Boss phase transition', {
+      id: this.id,
+      oldPhase: previousPhase,
+      newPhase: this.currentPhase,
+      health: this.health,
+      maxHealth: this.maxHealth,
+      healthPercent,
+      invulnerable: !!this.invulnerable,
+      invulnerabilityDuration: this.invulnerabilityTimer,
+    });
   }
 
   onDestroyed(source) {
+    GameDebugLogger.log('STATE', 'Boss destroyed', {
+      id: this.id,
+      wave: this.wave,
+      finalPhase: this.currentPhase,
+      position: { x: this.x, y: this.y },
+      rewards: { ...this.rewards },
+    });
+
     const payload = {
       enemy: this,
       wave: this.wave,
@@ -786,6 +974,17 @@ export class BossEnemy extends BaseEnemy {
   }
 
   onDraw(ctx) {
+    if (!this._drawLogged) {
+      GameDebugLogger.log('RENDER', 'Boss.onDraw() first call', {
+        id: this.id,
+        position: { x: this.x, y: this.y },
+        radius: this.radius,
+        phase: this.currentPhase,
+        color: this.phaseColors[this.currentPhase] || null,
+      });
+      this._drawLogged = true;
+    }
+
     const payload = this.buildRenderPayload();
     this.renderPayload = payload;
 

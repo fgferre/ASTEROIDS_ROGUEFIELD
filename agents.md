@@ -72,6 +72,9 @@ Considere uma feature pronta quando:
 - Documentação, telemetria e planos relevantes foram atualizados (quando aplicável), mantendo `agents.md`, `README.md` e relatórios consistentes.
 - Os planos em `docs/plans/` foram consultados para alinhar a evolução da arquitetura e validar aderência a decisões anteriores.
 - Performance (60 FPS) e ausência de vazamentos são observadas, com uso racional de pools e serviços compartilhados.
+- Em modo dev, o log de debug foi analisado e não contém erros ou warnings inesperados.
+- Todos os eventos críticos aparecem no log na ordem correta (spawn → update → render → collision).
+- Não há gaps ou inconsistências no fluxo de eventos registrados.
 
 #### 7. **Fluxo de Trabalho e Planejamento Contínuo**
 
@@ -87,3 +90,228 @@ Considere uma feature pronta quando:
   3. Relate validações executadas, referenciando planos ou experimentos relevantes em `docs/plans/`.
 
 Esta política adaptada serve como um guia prático para manter a qualidade e a escalabilidade do seu projeto, respeitando a excelente arquitetura que você já implementou.
+
+#### 8. **Sistema de Logging Automático e Diagnóstico de Problemas**
+
+##### 8.1. Visão Geral
+
+O projeto possui um **sistema de logging automático** (`GameDebugLogger`) que registra todos os eventos críticos durante a execução do jogo. Este sistema é **obrigatório para diagnóstico de problemas** e deve ser a **primeira ferramenta consultada** por agentes de IA ao investigar bugs.
+
+##### 8.2. Ativação Automática
+
+O logging é ativado **automaticamente** quando o jogo roda em modo de desenvolvimento:
+
+**Como rodar em modo dev:**
+```bash
+npm run dev
+```
+
+Isso inicia o servidor Vite em `http://localhost:5173` e injeta `process.env.NODE_ENV = 'development'`, ativando o logger automaticamente.
+
+**Importante:** Modo dev ≠ Debugger do VS Code. Você não precisa usar o debugger do VS Code. Apenas execute `npm run dev` no terminal.
+
+##### 8.3. Onde o Log é Gravado
+
+O log é armazenado no **localStorage do navegador** (não no sistema de arquivos) porque browsers não podem escrever arquivos diretamente por segurança.
+
+- **Chave:** `localStorage.getItem('game-debug-log')`
+- **Formato:** Texto estruturado com timestamps
+- **Limite:** 50.000 entradas (~2-3MB, suficiente para ~30 waves)
+- **Persistência:** Mantido entre reloads do navegador
+- **Limpeza:** Sobrescrito ao iniciar nova sessão
+
+##### 8.4. Como Obter o Log
+
+**Método 1: Download via Console (RECOMENDADO)**
+
+1. Jogar o jogo normalmente até reproduzir o problema
+2. Abrir console do navegador (pressionar **F12**)
+3. Executar comando:
+   ```javascript
+   downloadDebugLog()
+   ```
+4. Arquivo `game-debug.log` será baixado para pasta Downloads
+5. Abrir arquivo em editor de texto (Notepad, VS Code, etc.)
+6. Copiar todo o conteúdo
+7. Colar no chat com o agente de IA
+
+**Método 2: Visualizar no Console**
+
+```javascript
+showDebugLog()
+```
+
+Isto exibe o log diretamente no console. Útil para verificação rápida.
+
+**Método 3: Copiar do localStorage**
+
+```javascript
+copy(localStorage.getItem('game-debug-log'))
+```
+
+Copia o log para área de transferência (função `copy()` disponível no Chrome DevTools).
+
+##### 8.5. Categorias de Log
+
+O log é organizado por categorias para facilitar análise:
+
+- **[INIT]** - Inicialização de sistemas, feature flags, configurações
+- **[WAVE]** - Progressão de waves, detecção de boss waves, wave completion
+- **[SPAWN]** - Spawn de todos os inimigos (asteroids, bosses, drones, mines, hunters)
+- **[UPDATE]** - Quais enemies estão sendo atualizados a cada segundo
+- **[RENDER]** - Quais enemies estão sendo renderizados a cada segundo
+- **[COLLISION]** - Detecção de colisões (bullets, player, enemies)
+- **[DAMAGE]** - Dano aplicado a enemies e player
+- **[EVENT]** - Eventos importantes do EventBus
+- **[ERROR]** - Erros, exceptions, warnings
+- **[STATE]** - Mudanças de estado (phase transitions, wave state, etc.)
+
+##### 8.6. Exemplo de Log
+
+```
+[00:00.000] [INIT] GameDebugLogger initialized
+[00:00.050] [INIT] Feature Flags - {"USE_WAVE_MANAGER":true,"WAVE_BOSS_INTERVAL":5}
+[00:00.051] [INIT] Systems initialized - {"waveManager":true,"factory":true}
+[00:05.234] [WAVE] Wave 1 started - {"totalEnemies":4,"isBossWave":false}
+[00:05.235] [SPAWN] Asteroid spawned - {"size":"large","position":{"x":750,"y":-80}}
+[01:30.123] [WAVE] Wave 5 started - {"totalEnemies":11,"isBossWave":true}
+[01:30.124] [WAVE] Boss wave detected - {"wave":5}
+[01:30.125] [SPAWN] Boss spawn attempted - {"entrance":"top-center"}
+[01:30.126] [SPAWN] Boss position calculated - {"x":400,"y":-100}
+[01:30.127] [SPAWN] Boss instance created - {"id":"boss-5-1","health":2592}
+[01:30.128] [STATE] Boss registered - {"activeEnemyCount":1}
+[01:30.150] [UPDATE] Enemy update loop - {"types":{"boss":1}}
+[01:30.151] [RENDER] Enemy render loop - {"types":{"boss":1}}
+[01:31.234] [COLLISION] Bullet hit boss - {"damage":10,"health":2582}
+[01:35.678] [STATE] Boss phase transition - {"oldPhase":0,"newPhase":1}
+[02:15.432] [STATE] Boss destroyed - {"wave":5,"phase":2}
+[02:15.433] [WAVE] Wave complete - {"wave":5,"duration":45.3}
+```
+
+##### 8.7. Protocolo Obrigatório para Agentes de IA
+
+**IMPORTANTE:** Ao receber um relatório de bug do usuário, agentes de IA devem **SEMPRE** seguir este protocolo:
+
+**Passo 1: Solicitar o Log**
+
+Resposta padrão ao receber bug report:
+
+```
+Para diagnosticar este problema, preciso do log de debug.
+
+Por favor:
+1. Abra o console do navegador (pressione F12)
+2. Execute o comando: downloadDebugLog()
+3. Abra o arquivo game-debug.log que foi baixado
+4. Copie todo o conteúdo do arquivo
+5. Cole aqui no chat
+
+Com o log, posso identificar exatamente onde o problema está ocorrendo.
+```
+
+**Passo 2: Ler e Analisar o Log**
+
+Quando o usuário compartilhar o log, ler na seguinte ordem:
+
+1. **Seção [INIT]:** Verificar feature flags e sistemas inicializados
+2. **Seção [WAVE]:** Entender progressão de waves e detecção de boss waves
+3. **Seção [SPAWN]:** Identificar se enemies foram spawned corretamente
+4. **Seção [ERROR]:** Procurar erros explícitos
+5. **Seção [UPDATE]:** Verificar se enemies estão sendo atualizados
+6. **Seção [RENDER]:** Verificar se enemies estão sendo renderizados
+7. **Seção [COLLISION]:** Verificar se colisões estão sendo detectadas
+
+**Passo 3: Identificar Padrão de Falha**
+
+Procurar por:
+- Eventos que deveriam acontecer mas não aconteceram
+- Sequências quebradas (ex: spawn → update → render, se faltar render, problema está no rendering)
+- Erros explícitos marcados como [ERROR]
+- Valores inválidos (position undefined, health NaN, etc.)
+- Gaps temporais (eventos que param de acontecer)
+
+**Passo 4: Propor Solução Baseada em Evidências**
+
+- Citar linhas específicas do log
+- Identificar exatamente onde o fluxo quebra
+- Propor correção cirúrgica no arquivo e linha específicos
+- Explicar a causa raiz baseado no log
+
+##### 8.8. Exemplo de Diagnóstico
+
+**Usuário reporta:**
+"Boss não aparece na wave 5"
+
+**Agente de IA solicita:**
+"Por favor, execute `downloadDebugLog()` no console (F12) e compartilhe o conteúdo do arquivo."
+
+**Usuário compartilha log:**
+```
+[01:30.125] [SPAWN] Boss spawn attempted - {"entrance":"top-center"}
+[01:30.126] [SPAWN] Boss position calculated - {"x":400,"y":-100}
+[01:30.127] [SPAWN] Boss instance created - {"id":"boss-5-1","health":2592}
+[01:30.128] [STATE] Boss registered - {"activeEnemyCount":1}
+[01:30.150] [UPDATE] Enemy update loop - {"types":{}}
+[01:30.151] [ERROR] Non-asteroid enemy filtered in update loop - {"type":"boss"}
+```
+
+**Agente de IA diagnostica:**
+
+"Analisando o log:
+
+✅ Linha 1-4: Boss foi criado e registrado com sucesso
+❌ Linha 5: Update loop mostra types:{} (vazio) - boss não está sendo atualizado
+❌ Linha 6: Erro explícito - boss está sendo filtrado no update loop
+
+**Causa Raiz:** `EnemySystem.updateAsteroids()` linha 2173 tem filtro `if (enemy.type !== 'asteroid') return;` que exclui o boss.
+
+**Solução:** Remover este filtro e adicionar lógica condicional para chamar `boss.onUpdate()` quando `enemy.type === 'boss'`.
+
+**Arquivo:** `src/modules/EnemySystem.js`
+**Linha:** 2173
+**Mudança:** Substituir filtro de tipo por lógica condicional"
+
+##### 8.9. Comandos de Debug Disponíveis
+
+Quando o jogo roda em modo dev (`npm run dev`), os seguintes comandos ficam disponíveis no console do navegador:
+
+```javascript
+downloadDebugLog()  // Baixa arquivo game-debug.log
+showDebugLog()      // Mostra log no console
+clearDebugLog()     // Limpa log atual
+```
+
+##### 8.10. Tamanho e Performance do Log
+
+- **Limite:** 50.000 entradas
+- **Tamanho estimado:** ~2-3MB em localStorage
+- **Cobertura:** ~30 waves ou ~15 minutos de gameplay
+- **Trimming:** Quando atingir 50.000, remove 10.000 mais antigas (preserva início)
+- **Overhead:** <0.5% do frame budget (desprezível)
+- **Produção:** Completamente desabilitado (zero overhead)
+
+##### 8.11. Fluxo de Trabalho com Logging
+
+**Durante Desenvolvimento:**
+1. Rodar `npm run dev` (logging ativa automaticamente)
+2. Jogar o jogo normalmente
+3. Reproduzir o bug
+4. Executar `downloadDebugLog()` no console
+5. Compartilhar arquivo com agente de IA
+
+**Durante Diagnóstico (Agente de IA):**
+1. Receber log do usuário
+2. Ler seções relevantes ([INIT], [WAVE], [SPAWN], [ERROR])
+3. Identificar onde o fluxo quebra
+4. Propor correção específica
+5. Usuário implementa correção via Codex
+6. Repetir até problema resolvido
+
+##### 8.12. Benefícios
+
+- **Zero Esforço do Usuário:** Log gerado automaticamente, sem configuração
+- **Diagnóstico Preciso:** IA vê exatamente o que aconteceu, não especulação
+- **Reproduzível:** Cada sessão gera seu próprio log
+- **Completo:** Captura todos os eventos críticos do jogo
+- **Eficiente:** Resolve problemas em minutos ao invés de horas
+- **Não Invasivo:** Apenas em modo dev, zero impacto em produção

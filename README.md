@@ -11,6 +11,80 @@ Execute `npm run build` para gerar os arquivos finais em `dist/`.
 Use `npm run format` para aplicar o Prettier localmente.
 No CI, `npm run format:check` garante que os commits estejam formatados antes do build.
 
+## Development & Debugging
+
+### Automatic Debug Logging
+
+The game includes an automatic debug logging system that captures all critical events during gameplay. This is essential for diagnosing issues.
+
+**How to Use:**
+
+1. **Start game in dev mode:**
+   ```bash
+   npm run dev
+   ```
+   Logging activates automatically (no configuration needed).
+
+2. **Play the game normally** until you encounter the issue.
+
+3. **Download the log:**
+   - Open browser console (press **F12**)
+   - Type: `downloadDebugLog()`
+   - File `game-debug.log` will download to your Downloads folder
+
+4. **Share the log:**
+   - Open `game-debug.log` in any text editor
+   - Copy the entire content
+   - Paste in chat when reporting a bug
+
+**Available Commands:**
+
+```javascript
+downloadDebugLog()  // Download game-debug.log file
+showDebugLog()      // Show log in console
+clearDebugLog()     // Clear current log
+```
+
+**What's Logged:**
+
+- System initialization and feature flags
+- Wave progression and boss wave detection
+- Enemy spawning (position, type, health)
+- Update loop (which enemies are being updated)
+- Render loop (which enemies are being drawn)
+- Collisions and damage
+- Errors and warnings
+- State changes (phase transitions, etc.)
+
+**Log Format:**
+
+```
+[01:30.123] [WAVE] Wave 5 started - {"isBossWave":true}
+[01:30.125] [SPAWN] Boss spawn attempted - {"entrance":"top-center"}
+[01:30.126] [SPAWN] Boss position: {"x":400,"y":-100}
+[01:30.127] [SPAWN] Boss created - {"health":2592}
+[01:30.150] [UPDATE] Updating enemies - {"types":{"boss":1}}
+[01:30.151] [RENDER] Rendering enemies - {"types":{"boss":1}}
+[01:31.234] [COLLISION] Bullet hit boss - {"damage":10}
+```
+
+**Troubleshooting:**
+
+If you encounter a bug:
+1. Run `npm run dev` (logging activates automatically)
+2. Reproduce the issue
+3. Execute `downloadDebugLog()` in console (F12)
+4. Share the `game-debug.log` file when reporting
+
+The log shows exactly where problems occur, making debugging much faster.
+
+**Log Capacity:**
+
+- **Limit:** 50,000 entries (~2-3MB)
+- **Coverage:** ~30 waves or ~15 minutes of gameplay
+- **Trimming:** When limit reached, removes 10,000 oldest entries (preserves beginning)
+- **Storage:** Browser localStorage (persists between reloads)
+
 ## Protótipos de referência (fora do build oficial)
 
 Alguns experimentos e bancadas de desempenho são mantidos em `docs/reference/prototypes/`. Eles servem apenas como suporte de engenharia e **não fazem parte do build distribuído**. Consulte o [README dos protótipos](docs/reference/prototypes/README.md) para entender objetivo, dependências e passos de execução.

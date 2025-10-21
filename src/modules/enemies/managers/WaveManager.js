@@ -22,6 +22,7 @@
 import * as CONSTANTS from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../../../core/serviceUtils.js';
+import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 
 export class WaveManager {
   /**
@@ -121,6 +122,7 @@ export class WaveManager {
     this.asteroidsKilledThisWave = 0;
     this.spawnQueue = [];
     this._legacyRegisteredEnemies = new WeakSet();
+    this._trackedDynamicMinions = new WeakSet();
     this.managerTotalsForWave = { all: 0, asteroids: 0 };
     this.compatibilityModeActive = false;
     this.legacyFallbackActive = false;
@@ -624,11 +626,17 @@ export class WaveManager {
       }
     }
 
+    const bossRadius = bossDefaults.radius || 60;
     const safeDistance = Math.max(
-      Number(bossDefaults.safeDistance) || 0,
-      (CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200) * 2,
-      (bossDefaults.radius || 60) * 2
+      Number.isFinite(bossDefaults.safeDistance) ? bossDefaults.safeDistance : 0,
+      bossRadius * 2.4
     );
+    const entryPadding = Number.isFinite(bossDefaults.entryPadding)
+      ? Math.max(0, bossDefaults.entryPadding)
+      : Math.max(20, bossRadius * 0.35);
+    const entryDriftSpeed = Number.isFinite(bossDefaults.entryDriftSpeed)
+      ? bossDefaults.entryDriftSpeed
+      : Math.max(45, (bossDefaults.speed || 60) * 0.85);
 
     const bossEntry = {
       type: this.bossEnemyKey || bossDefaults.key || 'boss',
@@ -641,7 +649,8 @@ export class WaveManager {
       spawnStrategy: 'scripted-entrance',
       entrance: 'top-center',
       safeDistance,
-      spawnOffset: Math.max(safeDistance, (bossDefaults.radius || 60) * 1.5),
+      entryPadding,
+      entryDriftSpeed,
       rewards: bossDefaults.rewards ? { ...bossDefaults.rewards } : undefined,
       randomScope: 'boss-spawn',
       randomParentScope: 'spawn',
@@ -853,6 +862,134 @@ export class WaveManager {
         `[WaveManager] (legacy bridge) Registered asteroid spawn ${this.asteroidsSpawnedThisWave}/${this.totalAsteroidEnemiesThisWave} for wave ${this.currentWave}`
       );
     }
+
+    return true;
+  }
+
+  getNormalizedEnemyType(enemy) {
+    if (!enemy) {
+      return null;
+    }
+
+    const rawType =
+      enemy.type ||
+      enemy.enemyType ||
+      enemy.enemyKind ||
+      enemy.kind ||
+      (typeof enemy === 'string' ? enemy : null);
+
+    return typeof rawType === 'string' ? rawType.toLowerCase() : null;
+  }
+
+  isAsteroidType(type) {
+    if (!type) {
+      return false;
+    }
+
+    const asteroidKey = this.enemyTypeKeys?.asteroid
+      ? String(this.enemyTypeKeys.asteroid).toLowerCase()
+      : 'asteroid';
+
+    return String(type).toLowerCase() === asteroidKey;
+  }
+
+  isBossMinionEnemy(enemy) {
+    if (!enemy) {
+      return false;
+    }
+
+    if (enemy.isBossMinion) {
+      return true;
+    }
+
+    if (typeof enemy.hasTag === 'function' && enemy.hasTag('minion')) {
+      return true;
+    }
+
+    const spawnSource =
+      (typeof enemy.spawnSource === 'string' && enemy.spawnSource) ||
+      (enemy.metadata && typeof enemy.metadata.spawnSource === 'string'
+        ? enemy.metadata.spawnSource
+        : null);
+
+    if (spawnSource && spawnSource.toLowerCase() === 'boss-minion') {
+      return true;
+    }
+
+    if (enemy.spawnedByBossId) {
+      return true;
+    }
+
+    return false;
+  }
+
+  registerDynamicMinion(enemy, context = {}) {
+    if (!enemy) {
+      return false;
+    }
+
+    if (!this.waveInProgress) {
+      GameDebugLogger.log('STATE', 'Boss minion spawn ignored - wave inactive', {
+        bossId: context?.bossId ?? null,
+        wave: this.currentWave,
+        minionId: enemy.id,
+      });
+      return false;
+    }
+
+    if (!this._trackedDynamicMinions) {
+      this._trackedDynamicMinions = new WeakSet();
+    }
+
+    if (this._trackedDynamicMinions.has(enemy)) {
+      return false;
+    }
+
+    this._trackedDynamicMinions.add(enemy);
+
+    const coerce = (value) => (Number.isFinite(value) ? value : 0);
+    const normalizedType = this.getNormalizedEnemyType(enemy);
+    const isAsteroid = this.isAsteroidType(normalizedType);
+
+    this.enemiesSpawnedThisWave = coerce(this.enemiesSpawnedThisWave) + 1;
+    this.totalEnemiesThisWave = coerce(this.totalEnemiesThisWave) + 1;
+
+    if (isAsteroid) {
+      this.totalAsteroidEnemiesThisWave =
+        coerce(this.totalAsteroidEnemiesThisWave) + 1;
+      this.asteroidsSpawnedThisWave = coerce(this.asteroidsSpawnedThisWave) + 1;
+    }
+
+    if (this.managerTotalsForWave) {
+      const managerAll = Number.isFinite(this.managerTotalsForWave.all)
+        ? this.managerTotalsForWave.all
+        : 0;
+      const managerAsteroids = Number.isFinite(this.managerTotalsForWave.asteroids)
+        ? this.managerTotalsForWave.asteroids
+        : 0;
+
+      this.managerTotalsForWave = {
+        all: managerAll + 1,
+        asteroids: managerAsteroids + (isAsteroid ? 1 : 0),
+      };
+    }
+
+    if (this.enemySystem?.waveState && this.enemySystem.waveState.isActive) {
+      const state = this.enemySystem.waveState;
+      state.totalAsteroids = coerce(state.totalAsteroids) + 1;
+      state.asteroidsSpawned = coerce(state.asteroidsSpawned) + 1;
+    }
+
+    GameDebugLogger.log('STATE', 'Boss minion accounted for wave totals', {
+      wave: this.currentWave,
+      minionId: enemy.id,
+      minionType: normalizedType || enemy.type || enemy.enemyType || null,
+      bossId: context?.bossId ?? enemy.spawnedByBossId ?? null,
+      totals: {
+        spawned: this.enemiesSpawnedThisWave,
+        total: this.totalEnemiesThisWave,
+      },
+    });
 
     return true;
   }
@@ -1106,6 +1243,7 @@ export class WaveManager {
     this.totalAsteroidEnemiesThisWave = 0;
     this.spawnQueue = [];
     this._legacyRegisteredEnemies = new WeakSet();
+    this._trackedDynamicMinions = new WeakSet();
 
     const waveNumber = this.currentWave;
     const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
@@ -1113,7 +1251,13 @@ export class WaveManager {
     let config;
 
     if (this.isBossWave(waveNumber)) {
+      GameDebugLogger.log('WAVE', 'Boss wave detected', { wave: waveNumber });
       config = this.generateBossWave(waveNumber);
+      GameDebugLogger.log('WAVE', 'Boss wave config generated', {
+        hasBoss: !!config?.boss,
+        bossType: config?.boss?.type,
+        supportGroups: config?.supportGroups?.length || 0,
+      });
     } else {
       if (legacyCompatibilityEnabled) {
         config = this.generateDynamicWave(waveNumber);
@@ -1551,20 +1695,19 @@ export class WaveManager {
   }
 
   spawnBossEnemy(bossConfig = {}, waveConfig = {}) {
-    if (typeof console !== 'undefined' && typeof console.log === 'function') {
-      console.log('[WaveManager] spawnBossEnemy() called', {
-        hasEnemySystem: !!this.enemySystem,
-        hasSpawnBoss: typeof this.enemySystem?.spawnBoss,
-        enemySystemKeys: this.enemySystem
-          ? Object.keys(this.enemySystem).slice(0, 10)
-          : [],
-      });
-    }
+    GameDebugLogger.log('SPAWN', 'Boss spawn attempted', {
+      type: bossConfig.type,
+      entrance: bossConfig.entrance,
+      wave: this.currentWave,
+    });
 
     if (!this.enemySystem) {
       if (typeof console !== 'undefined' && typeof console.error === 'function') {
         console.error('[WaveManager] Cannot spawn boss - enemySystem is not defined');
       }
+      GameDebugLogger.log('ERROR', 'Boss spawn failed - enemySystem unavailable', {
+        hasEnemySystem: false,
+      });
       return null;
     }
 
@@ -1576,6 +1719,9 @@ export class WaveManager {
           enemySystemConstructor: this.enemySystem.constructor?.name,
         });
       }
+      GameDebugLogger.log('ERROR', 'Boss spawn failed - spawnBoss() missing on enemySystem', {
+        hasSpawnBoss: typeof this.enemySystem.spawnBoss === 'function',
+      });
       return null;
     }
 
@@ -1587,31 +1733,63 @@ export class WaveManager {
             width: CONSTANTS.GAME_WIDTH || 800,
             height: CONSTANTS.GAME_HEIGHT || 600,
           };
+
     const player = this.enemySystem.getCachedPlayer();
     const playerSnapshot =
       typeof this.enemySystem.getPlayerPositionSnapshot === 'function'
         ? this.enemySystem.getPlayerPositionSnapshot(player)
         : null;
-    const safeDistance = Math.max(
-      Number(bossConfig.safeDistance) || 0,
-      (CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200) * 2,
-      (bossConfig.radius || CONSTANTS.BOSS_CONFIG?.radius || 60) * 1.25
+
+    const spawnRandom = this.resolveScopedRandom(
+      this.getRandomScope ? this.getRandomScope('boss-spawn') : null,
+      'spawn',
+      'boss-position'
     );
 
-    const hasValidPlayerSnapshot =
-      playerSnapshot && Number.isFinite(playerSnapshot.x) && Number.isFinite(playerSnapshot.y);
+    const baseRadius = bossConfig.radius || CONSTANTS.BOSS_CONFIG?.radius || 60;
+    const requestedSafeDistance = Number.isFinite(bossConfig.safeDistance)
+      ? bossConfig.safeDistance
+      : Number.isFinite(CONSTANTS.BOSS_CONFIG?.safeDistance)
+        ? CONSTANTS.BOSS_CONFIG.safeDistance
+        : 0;
+    const safeDistance = Math.max(baseRadius * 2, requestedSafeDistance);
+    const entryPadding = Number.isFinite(bossConfig.entryPadding)
+      ? Math.max(0, bossConfig.entryPadding)
+      : Number.isFinite(CONSTANTS.BOSS_CONFIG?.entryPadding)
+        ? Math.max(0, CONSTANTS.BOSS_CONFIG.entryPadding)
+        : Math.max(20, baseRadius * 0.35);
+    const entryDriftSpeed = Number.isFinite(bossConfig.entryDriftSpeed)
+      ? bossConfig.entryDriftSpeed
+      : Number.isFinite(CONSTANTS.BOSS_CONFIG?.entryDriftSpeed)
+        ? CONSTANTS.BOSS_CONFIG.entryDriftSpeed
+        : Math.max(45, (bossConfig.speed || CONSTANTS.BOSS_CONFIG?.speed || 60) * 0.85);
 
-    const spawnPosition = hasValidPlayerSnapshot || bossConfig?.spawnPosition
-      ? this.resolveBossSpawnPosition(
-          bossConfig,
-          worldBounds,
-          hasValidPlayerSnapshot ? playerSnapshot : null,
-          safeDistance
-        )
-      : this.calculateEdgeSpawnPosition(
-          worldBounds,
-          this.getRandomScope('spawn')
-        );
+    let spawnPosition;
+    if (
+      bossConfig?.spawnPosition &&
+      Number.isFinite(bossConfig.spawnPosition.x) &&
+      Number.isFinite(bossConfig.spawnPosition.y)
+    ) {
+      spawnPosition = { ...bossConfig.spawnPosition };
+    } else {
+      spawnPosition = this.calculateBossSpawnPosition(
+        worldBounds,
+        bossConfig.entrance || 'top-center',
+        { safeDistance, entryPadding },
+        playerSnapshot,
+        spawnRandom
+      );
+    }
+
+    GameDebugLogger.log('SPAWN', 'Boss position calculated', {
+      x: spawnPosition.x,
+      y: spawnPosition.y,
+      entrance: bossConfig.entrance || 'top-center',
+      worldBounds,
+      safeDistance,
+      entryPadding,
+      entryDriftSpeed,
+    });
 
     const metadata = {
       ...(bossConfig.metadata || {}),
@@ -1624,12 +1802,14 @@ export class WaveManager {
         : undefined,
     };
 
-    const spawnConfig = {
+    const bossSpawnConfig = {
       ...bossConfig,
       x: spawnPosition.x,
       y: spawnPosition.y,
       wave: this.currentWave,
       safeDistance,
+      entryPadding,
+      entryDriftSpeed,
       spawnStrategy: bossConfig.spawnStrategy || 'scripted-entrance',
       entrance: bossConfig.entrance || 'top-center',
       spawnOffset: bossConfig.spawnOffset,
@@ -1639,41 +1819,65 @@ export class WaveManager {
       metadata,
     };
 
-    const boss = this.enemySystem.spawnBoss(spawnConfig);
+    const boss = this.enemySystem.spawnBoss(bossSpawnConfig);
 
-    if (typeof console !== 'undefined' && typeof console.log === 'function') {
-      console.log('[WaveManager] Boss spawn result:', {
-        spawned: !!boss,
-        bossType: boss?.type,
-        bossId: boss?.id,
+    if (!boss) {
+      GameDebugLogger.log('ERROR', 'Boss spawn failed - no instance returned', {
+        config: bossSpawnConfig,
       });
+      return null;
     }
 
-    if (boss) {
-      // EnemySystem.spawnBoss() will skip wave accounting when we pass the flag,
-      // so we track the spawn locally for wave metrics.
-      this.enemiesSpawnedThisWave += 1;
-    }
+    GameDebugLogger.log('SPAWN', 'Boss spawned successfully', {
+      id: boss.id,
+      type: boss.type,
+      position: { x: boss.x, y: boss.y },
+      health: boss.health,
+      maxHealth: boss.maxHealth,
+      phase: boss.currentPhase,
+    });
+
+    this.enemiesSpawnedThisWave += 1;
 
     return boss;
   }
 
-  resolveBossSpawnPosition(
-    bossConfig = {},
-    bounds = { width: 800, height: 600 },
-    player,
-    safeDistance = (CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200) * 2
+  calculateBossSpawnPosition(
+    worldBounds = { width: 800, height: 600 },
+    entrance = 'top-center',
+    constraints = {},
+    playerSnapshot = null,
+    random = this.getRandomScope('spawn')
   ) {
-    const spawnPosition = bossConfig.spawnPosition || {};
-    if (Number.isFinite(spawnPosition.x) && Number.isFinite(spawnPosition.y)) {
-      return { x: spawnPosition.x, y: spawnPosition.y };
-    }
+    const bounds = {
+      width: worldBounds?.width || CONSTANTS.GAME_WIDTH || 800,
+      height: worldBounds?.height || CONSTANTS.GAME_HEIGHT || 600,
+    };
 
-    const entrance = bossConfig.entrance || 'top-center';
-    const offset = bossConfig.spawnOffset || Math.max(safeDistance, (bossConfig.radius || 60) * 1.5);
+    const generator = this.resolveScopedRandom(random, 'spawn', 'boss-position');
+    const bossRadius = CONSTANTS.BOSS_CONFIG?.radius || 60;
+    const safeDistance = Math.max(
+      Number(constraints?.safeDistance) || 0,
+      bossRadius * 2
+    );
+    const entryPadding = Math.max(
+      Number(constraints?.entryPadding) || 0,
+      Math.max(20, bossRadius * 0.35)
+    );
+    const horizontalMargin = Math.min(bounds.width / 2, entryPadding + bossRadius);
+    const verticalMargin = Math.min(bounds.height / 2, entryPadding + bossRadius);
+
+    const getRange = (min, max) => {
+      if (generator && typeof generator.range === 'function') {
+        return generator.range(min, max);
+      }
+      const span = max - min;
+      const value = generator && typeof generator.float === 'function' ? generator.float() : Math.random();
+      return min + span * value;
+    };
 
     let x = bounds.width / 2;
-    let y = -offset;
+    let y = verticalMargin;
 
     switch (entrance) {
       case 'center':
@@ -1682,40 +1886,153 @@ export class WaveManager {
         break;
       case 'bottom-center':
       case 'bottom':
-        x = bounds.width / 2;
-        y = bounds.height + offset;
+        x = getRange(horizontalMargin, bounds.width - horizontalMargin);
+        y = bounds.height - verticalMargin;
         break;
       case 'left':
       case 'left-center':
-        x = -offset;
-        y = bounds.height / 2;
+        x = horizontalMargin;
+        y = getRange(verticalMargin, bounds.height - verticalMargin);
         break;
       case 'right':
       case 'right-center':
-        x = bounds.width + offset;
-        y = bounds.height / 2;
+        x = bounds.width - horizontalMargin;
+        y = getRange(verticalMargin, bounds.height - verticalMargin);
         break;
       case 'top-center':
       default:
-        x = bounds.width / 2;
-        y = -offset;
+        x = getRange(horizontalMargin, bounds.width - horizontalMargin);
+        y = verticalMargin;
         break;
     }
 
-    if (player && Number.isFinite(player.x) && Number.isFinite(player.y)) {
-      const dx = x - player.x;
-      const dy = y - player.y;
+    if (playerSnapshot && Number.isFinite(playerSnapshot.x) && Number.isFinite(playerSnapshot.y)) {
+      const dx = x - playerSnapshot.x;
+      const dy = y - playerSnapshot.y;
       const distance = Math.hypot(dx, dy);
 
       if (distance < safeDistance) {
         if (distance === 0) {
-          x = player.x;
-          y = player.y - safeDistance;
+          x = playerSnapshot.x;
+          y = playerSnapshot.y - safeDistance;
         } else {
           const scale = safeDistance / distance;
-          x = player.x + dx * scale;
-          y = player.y + dy * scale;
+          x = playerSnapshot.x + dx * scale;
+          y = playerSnapshot.y + dy * scale;
         }
+      }
+    }
+
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+    const maxX = bounds.width - horizontalMargin;
+    const maxY = bounds.height - verticalMargin;
+    x = clamp(x, horizontalMargin, maxX);
+    y = clamp(y, verticalMargin, maxY);
+
+    if (
+      playerSnapshot &&
+      Number.isFinite(playerSnapshot.x) &&
+      Number.isFinite(playerSnapshot.y) &&
+      safeDistance > 0
+    ) {
+      let dx = x - playerSnapshot.x;
+      let dy = y - playerSnapshot.y;
+      let distance = Math.hypot(dx, dy);
+
+      if (distance < safeDistance) {
+        let dirX = dx;
+        let dirY = dy;
+        if (dirX === 0 && dirY === 0) {
+          dirX = 0;
+          dirY = -1;
+        }
+
+        const magnitude = Math.hypot(dirX, dirY) || 1;
+        dirX /= magnitude;
+        dirY /= magnitude;
+
+        const candidateX = playerSnapshot.x + dirX * safeDistance;
+        const candidateY = playerSnapshot.y + dirY * safeDistance;
+
+        let adjustedX = candidateX;
+        let adjustedY = candidateY;
+
+        const withinBand =
+          adjustedX >= horizontalMargin &&
+          adjustedX <= maxX &&
+          adjustedY >= verticalMargin &&
+          adjustedY <= maxY;
+
+        if (!withinBand) {
+          const boundaryTs = [];
+          if (dirX > 0) {
+            boundaryTs.push((maxX - playerSnapshot.x) / dirX);
+          } else if (dirX < 0) {
+            boundaryTs.push((horizontalMargin - playerSnapshot.x) / dirX);
+          }
+
+          if (dirY > 0) {
+            boundaryTs.push((maxY - playerSnapshot.y) / dirY);
+          } else if (dirY < 0) {
+            boundaryTs.push((verticalMargin - playerSnapshot.y) / dirY);
+          }
+
+          const validTs = boundaryTs.filter((t) => Number.isFinite(t) && t >= 0);
+          let finalT = safeDistance;
+
+          if (validTs.length > 0) {
+            const sorted = [...validTs].sort((a, b) => a - b);
+            const meetsSafeDistance = sorted.find((t) => t >= safeDistance - 1e-6);
+            if (Number.isFinite(meetsSafeDistance)) {
+              finalT = meetsSafeDistance;
+            } else {
+              finalT = sorted[sorted.length - 1];
+            }
+          }
+
+          adjustedX = playerSnapshot.x + dirX * finalT;
+          adjustedY = playerSnapshot.y + dirY * finalT;
+        }
+
+        adjustedX = clamp(adjustedX, horizontalMargin, maxX);
+        adjustedY = clamp(adjustedY, verticalMargin, maxY);
+
+        dx = adjustedX - playerSnapshot.x;
+        dy = adjustedY - playerSnapshot.y;
+        distance = Math.hypot(dx, dy);
+
+        if (distance < safeDistance) {
+          const fallbackMagnitude = Math.max(distance, 1e-6);
+          const scale = safeDistance / fallbackMagnitude;
+          adjustedX = playerSnapshot.x + dx * scale;
+          adjustedY = playerSnapshot.y + dy * scale;
+          adjustedX = clamp(adjustedX, horizontalMargin, maxX);
+          adjustedY = clamp(adjustedY, verticalMargin, maxY);
+          distance = Math.hypot(adjustedX - playerSnapshot.x, adjustedY - playerSnapshot.y);
+        }
+
+        x = adjustedX;
+        y = adjustedY;
+
+        const finalDistance = Math.hypot(
+          x - playerSnapshot.x,
+          y - playerSnapshot.y
+        );
+        const safeSatisfied = finalDistance >= safeDistance - 1e-3;
+
+        GameDebugLogger.log(
+          'STATE',
+          safeSatisfied
+            ? 'Boss spawn adjusted after clamp to respect safe distance'
+            : 'Boss spawn constrained by arena bounds',
+          {
+            player: { x: playerSnapshot.x, y: playerSnapshot.y },
+            position: { x, y },
+            safeDistance,
+            distance: finalDistance,
+            safeSatisfied,
+          }
+        );
       }
     }
 
@@ -1898,6 +2215,9 @@ export class WaveManager {
 
     this.enemiesKilledThisWave++;
 
+    const destroyedEnemy = data?.enemy || null;
+    const isBossMinion = this.isBossMinionEnemy(destroyedEnemy);
+
     const asteroidKey = this.enemyTypeKeys?.asteroid || 'asteroid';
     const destroyedEnemyType =
       data?.enemy?.type ||
@@ -1923,6 +2243,16 @@ export class WaveManager {
       console.debug(
         `[WaveManager] Enemy destroyed: ${this.enemiesKilledThisWave}/${this.totalEnemiesThisWave}`
       );
+    }
+
+    if (isBossMinion) {
+      GameDebugLogger.log('STATE', 'Boss minion destroyed', {
+        wave: this.currentWave,
+        minionId: destroyedEnemy?.id,
+        bossId: destroyedEnemy?.spawnedByBossId ?? destroyedEnemy?.spawnedBy ?? null,
+        kills: this.enemiesKilledThisWave,
+        total: this.totalEnemiesThisWave,
+      });
     }
 
     // Development assertion: verify accounting consistency
@@ -2005,7 +2335,16 @@ export class WaveManager {
     this.waveEndTime = Date.now();
     const duration = (this.waveEndTime - this.waveStartTime) / 1000;
 
+    GameDebugLogger.log('WAVE', 'Wave complete', {
+      wave: this.currentWave,
+      duration: Number.isFinite(duration) ? Number(duration.toFixed(3)) : duration,
+      enemiesKilled: this.enemiesKilledThisWave,
+      enemiesSpawned: this.enemiesSpawnedThisWave,
+      isBossWave: this.isBossWave(this.currentWave),
+    });
+
     this._legacyRegisteredEnemies = new WeakSet();
+    this._trackedDynamicMinions = new WeakSet();
 
     // Emit wave complete event
     if (this.eventBus) {
@@ -2067,6 +2406,7 @@ export class WaveManager {
     this.waveCountdown = 0;
     this.spawnDelayMultiplier = 1;
     this._legacyRegisteredEnemies = new WeakSet();
+    this._trackedDynamicMinions = new WeakSet();
     this.managerTotalsForWave = { all: 0, asteroids: 0 };
     this.compatibilityModeActive = false;
     this.legacyFallbackActive = false;

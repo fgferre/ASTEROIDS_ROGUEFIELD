@@ -15,6 +15,7 @@ import { RewardManager } from './enemies/managers/RewardManager.js';
 import { AsteroidMovement } from './enemies/components/AsteroidMovement.js';
 import { AsteroidCollision } from './enemies/components/AsteroidCollision.js';
 import { AsteroidRenderer } from './enemies/components/AsteroidRenderer.js';
+import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 
 const ASTEROID_POOL_ID = Symbol.for('ASTEROIDS_ROGUEFIELD:asteroidPoolId');
 
@@ -72,6 +73,7 @@ class EnemySystem {
     this._lastWaveManagerCompletionHandled = null;
     this._asteroidSpawnDebugLogged = false;
     this._waveManagerRuntimeEnabled = false;
+    this._lastEnemyUpdateLog = 0;
 
     // Factory (optional - new architecture)
     this.factory = null;
@@ -931,6 +933,10 @@ class EnemySystem {
       ) {
         return { x: fetchedPosition.x, y: fetchedPosition.y };
       }
+    }
+
+    if (Number.isFinite(player.x) && Number.isFinite(player.y)) {
+      return { x: player.x, y: player.y };
     }
 
     return null;
@@ -2131,52 +2137,77 @@ class EnemySystem {
 
   // === GERENCIAMENTO DE ASTEROIDES ===
   updateAsteroids(deltaTime) {
-    // NEW: Use movement component if enabled
-    if (this.useComponents && this.movementComponent) {
-      // Build context for movement component
-      const context = {
-        player: this.getCachedPlayer(),
-        worldBounds: {
-          width: CONSTANTS.GAME_WIDTH,
-          height: CONSTANTS.GAME_HEIGHT
-        }
-      };
+    if (!this._lastEnemyUpdateLog || Date.now() - this._lastEnemyUpdateLog > 1000) {
+      const enemyTypes = this.asteroids
+        .filter((enemy) => enemy && !enemy.destroyed)
+        .map((enemy) => enemy.type || 'unknown');
 
-      // Update each asteroid using component
-      this.asteroids.forEach((asteroid) => {
-        if (asteroid.destroyed || asteroid.type !== 'asteroid') {
-          return;
-        }
+      const typeCounts = enemyTypes.reduce((acc, type) => {
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {});
 
-        // Component handles movement
-        this.movementComponent.update(asteroid, deltaTime, context);
-
-        // Asteroid handles its own state updates (non-movement)
-        asteroid.updateVisualState(deltaTime);
-
-        // Volatile behavior (timer, not movement)
-        if (asteroid.behavior?.type === 'volatile') {
-          asteroid.updateVolatileBehavior(deltaTime);
-        }
-
-        // Timers
-        if (asteroid.lastDamageTime > 0) {
-          asteroid.lastDamageTime = Math.max(0, asteroid.lastDamageTime - deltaTime);
-        }
-        if (asteroid.shieldHitCooldown > 0) {
-          asteroid.shieldHitCooldown = Math.max(0, asteroid.shieldHitCooldown - deltaTime);
-        }
+      GameDebugLogger.log('UPDATE', 'Enemy update loop', {
+        totalEnemies: enemyTypes.length,
+        types: typeCounts,
       });
-    } else {
-      // LEGACY: Asteroids handle their own update
-      this.asteroids.forEach((asteroid) => {
-        if (asteroid.destroyed || asteroid.type !== 'asteroid') {
-          return;
-        }
 
-        asteroid.update(deltaTime);
-      });
+      this._lastEnemyUpdateLog = Date.now();
     }
+
+    const movementContext = this.useComponents && this.movementComponent
+      ? {
+          player: this.getCachedPlayer(),
+          worldBounds: {
+            width: CONSTANTS.GAME_WIDTH,
+            height: CONSTANTS.GAME_HEIGHT,
+          },
+        }
+      : null;
+
+    this.asteroids.forEach((enemy) => {
+      if (!enemy || enemy.destroyed) {
+        return;
+      }
+
+      if (enemy.type === 'boss') {
+        if (typeof enemy.onUpdate === 'function') {
+          enemy.onUpdate(deltaTime);
+        }
+        return;
+      }
+
+      if (enemy.type !== 'asteroid') {
+        if (typeof enemy.onUpdate === 'function') {
+          enemy.onUpdate(deltaTime);
+        }
+        return;
+      }
+
+      if (this.useComponents && this.movementComponent) {
+        this.movementComponent.update(enemy, deltaTime, movementContext);
+
+        if (typeof enemy.updateVisualState === 'function') {
+          enemy.updateVisualState(deltaTime);
+        }
+
+        if (enemy.behavior?.type === 'volatile' && typeof enemy.updateVolatileBehavior === 'function') {
+          enemy.updateVolatileBehavior(deltaTime);
+        }
+
+        if (enemy.lastDamageTime > 0) {
+          enemy.lastDamageTime = Math.max(0, enemy.lastDamageTime - deltaTime);
+        }
+        if (enemy.shieldHitCooldown > 0) {
+          enemy.shieldHitCooldown = Math.max(0, enemy.shieldHitCooldown - deltaTime);
+        }
+        return;
+      }
+
+      if (typeof enemy.update === 'function') {
+        enemy.update(deltaTime);
+      }
+    });
 
     // Física de colisão entre asteroides (always enabled)
     this.handleAsteroidCollisions();
@@ -2315,7 +2346,14 @@ class EnemySystem {
       randomParentScope: config.randomParentScope || 'spawn',
     };
 
+    GameDebugLogger.log('SPAWN', 'EnemySystem.spawnBoss() called', {
+      wave: waveNumber,
+      hasPosition: Number.isFinite(config.x) && Number.isFinite(config.y),
+      position: { x: config.x, y: config.y },
+    });
+
     let boss = null;
+    let registrationResult = null;
 
     if (this.useFactory && this.factory && typeof this.factory.hasType === 'function') {
       if (this.factory.hasType('boss')) {
@@ -2329,24 +2367,79 @@ class EnemySystem {
       try {
         boss = new BossEnemy(this, spawnConfig);
         this.assignAsteroidPoolId(boss, spawnConfig.poolId);
-        const registrationResult = this.registerActiveEnemy(boss, {
-          skipDuplicateCheck: true,
-        });
-        this.warnIfWaveManagerRegistrationFailed(
-          registrationResult,
-          'boss-spawn',
-          boss
-        );
       } catch (error) {
         console.error('[EnemySystem] Failed to instantiate boss enemy', error);
+        GameDebugLogger.log('ERROR', 'Boss creation failed', {
+          useFactory: this.useFactory,
+          hasFactory: !!this.factory,
+          factoryHasBossType: typeof this.factory?.hasType === 'function'
+            ? this.factory.hasType('boss')
+            : null,
+          error: error?.message,
+        });
         return null;
       }
     }
 
     if (!boss) {
       console.warn('[EnemySystem] Boss spawn failed: no instance created');
+      GameDebugLogger.log('ERROR', 'Boss creation failed', {
+        useFactory: this.useFactory,
+        hasFactory: !!this.factory,
+        factoryHasBossType: typeof this.factory?.hasType === 'function'
+          ? this.factory.hasType('boss')
+          : null,
+      });
       return null;
     }
+
+    if (!Number.isFinite(boss.x) || !Number.isFinite(boss.y)) {
+      GameDebugLogger.log('ERROR', 'Boss has invalid position', {
+        x: boss.x,
+        y: boss.y,
+        configX: config.x,
+        configY: config.y,
+      });
+
+      const fallbackX = Number.isFinite(config.x) ? config.x : (CONSTANTS.GAME_WIDTH || 800) / 2;
+      const fallbackY = Number.isFinite(config.y) ? config.y : -100;
+
+      boss.x = fallbackX;
+      boss.y = fallbackY;
+
+      GameDebugLogger.log('STATE', 'Boss position set to fallback', {
+        x: boss.x,
+        y: boss.y,
+      });
+    }
+
+    GameDebugLogger.log('SPAWN', 'Boss instance created', {
+      id: boss.id,
+      type: boss.type,
+      position: { x: boss.x, y: boss.y },
+      radius: boss.radius,
+      health: boss.health,
+      maxHealth: boss.maxHealth,
+    });
+
+    const alreadyTracked = this.asteroids.includes(boss);
+    if (!alreadyTracked) {
+      registrationResult = this.registerActiveEnemy(boss, {
+        skipDuplicateCheck: true,
+      });
+      this.warnIfWaveManagerRegistrationFailed(
+        registrationResult,
+        'boss-spawn',
+        boss
+      );
+    } else {
+      registrationResult = boss;
+    }
+
+    GameDebugLogger.log('STATE', 'Boss registered', {
+      success: !!registrationResult,
+      activeEnemyCount: this.asteroids.length,
+    });
 
     boss.destroyed = false;
 

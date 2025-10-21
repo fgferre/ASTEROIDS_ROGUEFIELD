@@ -4,6 +4,7 @@ import CanvasStateManager from '../core/CanvasStateManager.js';
 import GradientCache from '../core/GradientCache.js';
 import RandomService from '../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 
 const MAX_VISUAL_TILT = 0.3;
 const TILT_MULTIPLIER = 0.12;
@@ -706,6 +707,9 @@ class RenderingSystem {
     this.cachedEnemies = null;
     this.cachedUI = null;
 
+    this._lastEnemyRenderLog = 0;
+    this._loggedBossRenderIds = new Set();
+
     this.shieldVisualCache = {
       signature: '',
       path: null,
@@ -919,8 +923,13 @@ class RenderingSystem {
 
     // Enemies
     const enemies = this.cachedEnemies;
-    if (enemies && typeof enemies.render === 'function') {
-      enemies.render(ctx);
+    if (enemies) {
+      if (typeof enemies.render === 'function') {
+        enemies.render(ctx);
+      }
+
+      this.logEnemyRenderLoop(enemies);
+      this.renderBossEntities(ctx, enemies);
     }
 
     // Player
@@ -939,6 +948,143 @@ class RenderingSystem {
     if (effects && typeof effects.draw === 'function') {
       effects.draw(ctx);
     }
+  }
+
+  logEnemyRenderLoop(enemies) {
+    if (!enemies) {
+      return;
+    }
+
+    const now = Date.now();
+    if (this._lastEnemyRenderLog && now - this._lastEnemyRenderLog < 1000) {
+      return;
+    }
+
+    const collection = this.resolveEnemyCollection(enemies);
+    const enemyTypes = collection
+      .filter((enemy) => enemy && !enemy.destroyed)
+      .map((enemy) => enemy.type || 'unknown');
+
+    const typeCounts = enemyTypes.reduce((acc, type) => {
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    }, {});
+
+    GameDebugLogger.log('RENDER', 'Enemy render loop', {
+      totalEnemies: enemyTypes.length,
+      types: typeCounts,
+    });
+
+    this._lastEnemyRenderLog = now;
+  }
+
+  renderBossEntities(ctx, enemies) {
+    if (!ctx || !enemies) {
+      return;
+    }
+
+    const collection = this.resolveEnemyCollection(enemies);
+    if (!Array.isArray(collection) || collection.length === 0) {
+      this._loggedBossRenderIds.clear();
+      return;
+    }
+
+    const activeBosses = collection.filter(
+      (enemy) => enemy && !enemy.destroyed && enemy.type === 'boss'
+    );
+
+    if (activeBosses.length === 0) {
+      if (this._loggedBossRenderIds.size > 0) {
+        this._loggedBossRenderIds.clear();
+      }
+      return;
+    }
+
+    const activeIds = new Set(activeBosses.map((boss) => boss?.id));
+    this._loggedBossRenderIds.forEach((id) => {
+      if (!activeIds.has(id)) {
+        this._loggedBossRenderIds.delete(id);
+      }
+    });
+
+    activeBosses.forEach((boss) => {
+      if (!boss) return;
+
+      if (boss.id && !this._loggedBossRenderIds.has(boss.id)) {
+        GameDebugLogger.log('RENDER', 'Boss first render', {
+          id: boss.id,
+          position: { x: boss.x, y: boss.y },
+          radius: boss.radius,
+          phase: boss.currentPhase,
+          hasOnDraw: typeof boss.onDraw === 'function',
+        });
+        this._loggedBossRenderIds.add(boss.id);
+      }
+
+      if (typeof boss.onDraw === 'function') {
+        boss.onDraw(ctx);
+        return;
+      }
+
+      this.drawBossFallback(ctx, boss);
+    });
+  }
+
+  resolveEnemyCollection(enemies) {
+    if (!enemies) {
+      return [];
+    }
+
+    try {
+      if (typeof enemies.getAllEnemies === 'function') {
+        const all = enemies.getAllEnemies();
+        if (Array.isArray(all)) {
+          return all;
+        }
+      }
+    } catch (error) {
+      // Ignore errors when accessing enemy collections
+    }
+
+    const candidates = [enemies.asteroids, enemies.enemies, enemies.activeEnemies];
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate)) {
+        return candidate;
+      }
+    }
+
+    return [];
+  }
+
+  drawBossFallback(ctx, boss) {
+    if (!ctx || !boss) {
+      return;
+    }
+
+    ctx.save();
+    ctx.translate(boss.x ?? 0, boss.y ?? 0);
+
+    const phaseColors = Array.isArray(boss.phaseColors)
+      ? boss.phaseColors
+      : ['#ff6b6b', '#f9c74f', '#4d96ff'];
+    const color = phaseColors[boss.currentPhase || 0] || '#ffffff';
+    const radius = Number.isFinite(boss.radius) ? boss.radius : 60;
+
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+
+    ctx.restore();
+
+    GameDebugLogger.log('RENDER', 'Boss rendered (fallback)', {
+      id: boss.id,
+      position: { x: boss.x, y: boss.y },
+      phase: boss.currentPhase,
+    });
   }
 
   drawBackground(ctx, playerVelocity) {
