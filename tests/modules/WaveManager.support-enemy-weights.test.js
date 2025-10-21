@@ -103,7 +103,12 @@ describe('WaveManager support enemy weights', () => {
     });
   });
 
-  it('returns no support weights when the wave manager does not control asteroid spawns', () => {
+  it('still returns support weights when asteroid spawning is legacy-controlled', () => {
+    const expectedWeights = withWaveManagerControl(() => {
+      const manager = createWaveManager();
+      return manager.computeSupportWeights(20);
+    });
+
     const previousUseOverride = globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
     const previousHandlesOverride =
       globalThis.__WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__;
@@ -113,7 +118,7 @@ describe('WaveManager support enemy weights', () => {
 
     try {
       const manager = createWaveManager();
-      expect(manager.computeSupportWeights(20)).toEqual([]);
+      expect(manager.computeSupportWeights(20)).toEqual(expectedWeights);
     } finally {
       if (previousUseOverride === undefined) {
         delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;

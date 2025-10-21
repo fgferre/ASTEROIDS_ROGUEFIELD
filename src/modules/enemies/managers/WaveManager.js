@@ -887,10 +887,6 @@ export class WaveManager {
   }
 
   computeSupportWeights(waveNumber) {
-    if (!this.shouldWaveManagerSpawnAsteroids()) {
-      return [];
-    }
-
     const fallbackRules = {
       drone: { startWave: 8, baseWeight: 1, weightScaling: 0.08 },
       mine: { startWave: 10, baseWeight: 1, weightScaling: 0.07 },
