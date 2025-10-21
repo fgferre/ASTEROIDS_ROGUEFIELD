@@ -4,6 +4,7 @@ import RandomService from '../core/RandomService.js';
 import { ScreenShake, ShakePresets } from '../utils/ScreenShake.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
+import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 
 const MAIN_THRUSTER_FLASH_THRESHOLD = 0.85;
 const MAIN_THRUSTER_FLASH_COLOR = '#3399FF';
@@ -471,6 +472,11 @@ export default class EffectsSystem {
     });
 
     registerBossEvent('boss-defeated', (payload = {}) => {
+      GameDebugLogger.log('EVENT', 'Boss defeated - creating effects', {
+        bossId: this.resolveBossId(payload),
+        position: this.resolveBossPosition(payload),
+        wave: payload?.wave ?? null,
+      });
       this.clearBossEffectsState();
       this.createBossDefeatedExplosion(payload);
       this.triggerBossTransitionEffect('boss-defeated', payload);
@@ -1493,6 +1499,47 @@ export default class EffectsSystem {
       config.colors || {},
       'boss-defeated'
     );
+    const boss = payload?.enemy ?? null;
+
+    this.addFreezeFrame(0.5, 0.3);
+    this.addScreenShake(20, 1.0);
+    this.addScreenFlash('#ffffff', 0.8, 0.3);
+
+    const burstColor =
+      boss?.phaseColors?.[boss.currentPhase] ||
+      palette.core ||
+      '#ff6b6b';
+    const burstCount = 50;
+    const scheduleBurst = typeof setTimeout === 'function';
+
+    for (let i = 0; i < burstCount; i += 1) {
+      const emitBurst = () => {
+        const angle = this.randomFloat('boss') * Math.PI * 2;
+        const speed = this.randomRange(200, 400, 'boss');
+        const particle = this.createParticle(
+          origin.x,
+          origin.y,
+          Math.cos(angle) * speed,
+          Math.sin(angle) * speed,
+          burstColor,
+          this.randomRange(4, 12, 'boss'),
+          this.randomRange(1, 3, 'boss'),
+          'explosion'
+        );
+        if (!particle) {
+          return;
+        }
+        particle.rotationSpeed = this.randomCentered(6, 'boss');
+        this.tagBossParticle(particle, 'boss-defeat');
+        this.particles.push(particle);
+      };
+
+      if (scheduleBurst) {
+        setTimeout(emitBurst, i * 20);
+      } else {
+        emitBurst();
+      }
+    }
 
     const debris = config.debris || {};
     const debrisCount = this.getScaledParticleCount(debris.count ?? 60);
@@ -1638,6 +1685,12 @@ export default class EffectsSystem {
 
     this.applyBossScreenShake('defeated');
     this.applyBossEffectTimings(config, palette, 'boss-defeated');
+
+    GameDebugLogger.log('STATE', 'Boss defeat effects created', {
+      freezeDuration: 0.5,
+      shakeIntensity: 20,
+      particleCount: burstCount,
+    });
   }
 
   updateBossTransitions(deltaTime) {

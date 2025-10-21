@@ -1795,6 +1795,10 @@ class CombatSystem {
     bullet.type = 'enemy';
     bullet.isBossProjectile = isBossProjectile;
     bullet.color = this.resolveEnemyProjectileColor({ ...data, isBossProjectile }, projectile);
+    bullet.destroyed = false;
+    bullet.destroyReason = null;
+    bullet.destroyLogEmitted = false;
+    bullet.createdAt = Date.now();
 
     if (Number.isFinite(projectile.radius)) {
       bullet.radius = Math.max(0, projectile.radius);
@@ -1826,11 +1830,12 @@ class CombatSystem {
       : null;
 
     if (isBossProjectile) {
-      GameDebugLogger.log('EVENT', 'Boss fired projectile', {
+      GameDebugLogger.log('EVENT', 'Boss projectile created', {
         pattern: projectile.pattern || null,
         phase: projectile.phase ?? data.enemy?.currentPhase ?? null,
         damage: damage,
         position: { x: posX, y: posY },
+        velocity: { x: Number(vx.toFixed(2)), y: Number(vy.toFixed(2)) },
       });
     }
 
@@ -2031,6 +2036,10 @@ class CombatSystem {
 
       if (outOfBounds) {
         bullet.life = 0;
+        if (!bullet.destroyReason) {
+          bullet.destroyReason = 'out-of-bounds';
+        }
+        bullet.destroyed = true;
       }
 
       let collided = false;
@@ -2091,6 +2100,8 @@ class CombatSystem {
       if (collided) {
         bullet.hit = true;
         bullet.life = 0;
+        bullet.destroyed = true;
+        bullet.destroyReason = 'hit-player';
 
         if (bullet.isBossProjectile) {
           GameDebugLogger.log('COLLISION', 'Boss projectile hit player', {
@@ -2134,10 +2145,32 @@ class CombatSystem {
       if (bullet.life > 0 && !bullet.hit) {
         activeBullets.push(bullet);
       } else {
+        if (!bullet.destroyReason) {
+          bullet.destroyReason = bullet.hit ? 'hit-player' : 'expired';
+        }
+        if (!bullet.destroyed) {
+          bullet.destroyed = true;
+        }
+        if (bullet.isBossProjectile && !bullet.destroyLogEmitted) {
+          const lifetime =
+            typeof bullet.createdAt === 'number'
+              ? Math.max(0, Date.now() - bullet.createdAt)
+              : null;
+          GameDebugLogger.log('STATE', 'Boss projectile destroyed', {
+            reason: bullet.destroyReason,
+            position: { x: Math.round(bullet.x ?? 0), y: Math.round(bullet.y ?? 0) },
+            lifetime,
+          });
+          bullet.destroyLogEmitted = true;
+        }
         bullet.source = null;
         bullet.enemyId = null;
         bullet.enemyType = null;
         bullet.isBossProjectile = false;
+        bullet.destroyed = false;
+        bullet.destroyReason = null;
+        bullet.destroyLogEmitted = false;
+        bullet.createdAt = 0;
         if (Array.isArray(bullet.trail)) {
           bullet.trail.length = 0;
         }

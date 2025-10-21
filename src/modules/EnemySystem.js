@@ -39,6 +39,11 @@ class EnemySystem {
       ui: this.dependencies.ui || null,
     };
 
+    GameDebugLogger.log('INIT', 'EnemySystem player service', {
+      hasPlayerDependency: !!this.dependencies.player,
+      hasPlayerService: !!this.services.player,
+    });
+
     this.randomScopes = null;
     this.randomSequences = null;
     this.randomScopeSeeds = {};
@@ -74,6 +79,8 @@ class EnemySystem {
     this._asteroidSpawnDebugLogged = false;
     this._waveManagerRuntimeEnabled = false;
     this._lastEnemyUpdateLog = 0;
+    this._playerCacheLogged = false;
+    this._playerServiceRefreshWarning = false;
 
     // Factory (optional - new architecture)
     this.factory = null;
@@ -280,6 +287,7 @@ class EnemySystem {
 
   refreshInjectedServices({ force = false, suppressWarnings = false } = {}) {
     const options = { force, suppressWarnings };
+    const previousPlayerService = this.services.player;
     this.updateServiceCache('player', 'player', options);
     this.updateServiceCache('world', 'world', options);
     this.updateServiceCache('progression', 'progression', options);
@@ -293,6 +301,39 @@ class EnemySystem {
     const previousRandom = this.services.random;
     this.updateServiceCache('random', 'random', options);
     const randomServiceChanged = previousRandom !== this.services.random;
+
+    if (!this.services.player && typeof gameServices !== 'undefined') {
+      const locatorPlayer =
+        typeof gameServices?.resolve === 'function'
+          ? gameServices.resolve('player')
+          : null;
+      if (locatorPlayer) {
+        this.services.player = locatorPlayer;
+        this.dependencies.player = locatorPlayer;
+        GameDebugLogger.log('STATE', 'Player service refreshed', {
+          success: true,
+          source: 'service-locator',
+        });
+        this._playerCacheLogged = false;
+        this._playerServiceRefreshWarning = false;
+      } else if (!suppressWarnings && !this._playerServiceRefreshWarning) {
+        GameDebugLogger.log('STATE', 'Player service refreshed', {
+          success: false,
+          source: 'service-locator',
+        });
+        this._playerServiceRefreshWarning = true;
+      }
+    } else if (
+      force &&
+      this.services.player &&
+      this.services.player !== previousPlayerService
+    ) {
+      GameDebugLogger.log('STATE', 'Player service refreshed', {
+        success: true,
+        source: 'dependency-cache',
+      });
+      this._playerCacheLogged = false;
+    }
 
     if (randomServiceChanged) {
       this.randomScopes = null;
@@ -908,7 +949,20 @@ class EnemySystem {
 
   getCachedPlayer() {
     this.refreshInjectedServices();
-    return this.services.player;
+    const player = this.services.player || null;
+
+    if (!this._playerCacheLogged) {
+      GameDebugLogger.log('STATE', 'getCachedPlayer called', {
+        hasServices: !!this.services,
+        hasPlayer: !!player,
+        playerPosition: player?.position || null,
+        playerX: Number.isFinite(player?.x) ? player.x : null,
+        playerY: Number.isFinite(player?.y) ? player.y : null,
+      });
+      this._playerCacheLogged = true;
+    }
+
+    return player;
   }
 
   getPlayerPositionSnapshot(player) {

@@ -1461,7 +1461,14 @@ export class WaveManager {
         continue;
       }
 
-      const isAsteroid = enemyGroup.type === 'asteroid';
+      const typeKey = typeof enemyGroup.type === 'string'
+        ? enemyGroup.type.toLowerCase()
+        : '';
+      const isAsteroid = typeKey === 'asteroid';
+      const isDrone = typeKey === 'drone';
+      const isMine = typeKey === 'mine';
+      const isHunter = typeKey === 'hunter';
+      const isTacticalEnemy = isDrone || isMine || isHunter;
 
       if (isAsteroid && !waveManagerSpawnsAsteroids) {
         continue;
@@ -1488,6 +1495,26 @@ export class WaveManager {
             worldBounds,
             spawnContext.random
           );
+        } else if (isTacticalEnemy) {
+          if (playerSnapshot) {
+            position = this.calculateSafeSpawnPosition(
+              worldBounds,
+              playerSnapshot,
+              safeDistance,
+              spawnContext.random
+            );
+          } else {
+            position = this.calculateEdgeSpawnPosition(
+              worldBounds,
+              spawnContext.random
+            );
+          }
+          GameDebugLogger.log('SPAWN', `${typeKey} spawn position`, {
+            type: typeKey,
+            position,
+            playerPosition: playerSnapshot,
+            safeDistance,
+          });
         } else {
           // Modern: spawn at safe distance from player when snapshot is available.
           // Fall back to edge positioning if we cannot resolve the player snapshot.
@@ -1504,6 +1531,33 @@ export class WaveManager {
               spawnContext.random
             );
           }
+        }
+
+        if (
+          !position ||
+          !Number.isFinite(position.x) ||
+          !Number.isFinite(position.y)
+        ) {
+          position = {
+            x: worldBounds.width / 2,
+            y: worldBounds.height / 2,
+          };
+        }
+
+        if (
+          position.x < -100 ||
+          position.x > worldBounds.width + 100 ||
+          position.y < -100 ||
+          position.y > worldBounds.height + 100
+        ) {
+          GameDebugLogger.log('ERROR', 'Enemy spawn position out of bounds', {
+            type: typeKey,
+            position,
+            worldBounds,
+          });
+
+          position.x = worldBounds.width / 2;
+          position.y = worldBounds.height / 2;
         }
 
         const {

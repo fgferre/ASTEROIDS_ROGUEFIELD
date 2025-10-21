@@ -136,6 +136,9 @@ export class BossEnemy extends BaseEnemy {
     this.rewards = { ...BOSS_DEFAULTS.rewards };
     this.renderPayload = this.buildRenderPayload();
     this._missingTargetLogged = false;
+    this._playerResolveLogged = false;
+    this._seekFallbackLogged = false;
+    this._invulnLog = 0;
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);
@@ -152,6 +155,9 @@ export class BossEnemy extends BaseEnemy {
     this.addTag('boss');
     this._drawLogged = false;
     this._missingTargetLogged = false;
+    this._playerResolveLogged = false;
+    this._seekFallbackLogged = false;
+    this._invulnLog = 0;
 
     const waveNumber = Math.max(1, config.wave || this.wave || 1);
     this.wave = waveNumber;
@@ -162,10 +168,7 @@ export class BossEnemy extends BaseEnemy {
     const scaling = config.healthScaling ?? defaults.healthScaling ?? 1;
     const scaledHealth = baseHealth * Math.pow(Math.max(1, scaling), waveNumber - 1);
     this.maxHealth = Math.ceil(scaledHealth);
-    this.health = Math.min(
-      this.maxHealth,
-      config.currentHealth ?? config.health ?? this.maxHealth
-    );
+    this.health = config.currentHealth ?? this.maxHealth;
 
     this.speed = config.speed ?? defaults.speed ?? 60;
     this.acceleration = config.acceleration ?? defaults.acceleration ?? 120;
@@ -418,7 +421,17 @@ export class BossEnemy extends BaseEnemy {
   }
 
   seekPlayer(target, deltaTime, intensity = 1) {
-    if (!target?.position || !Number.isFinite(deltaTime)) {
+    if (!Number.isFinite(deltaTime)) {
+      return;
+    }
+
+    let targetPosition = target?.position;
+    const hasValidTarget =
+      targetPosition &&
+      Number.isFinite(targetPosition.x) &&
+      Number.isFinite(targetPosition.y);
+
+    if (!hasValidTarget) {
       if (!this._missingTargetLogged) {
         GameDebugLogger.log('ERROR', 'Boss seekPlayer target unavailable', {
           hasTarget: !!target,
@@ -427,19 +440,46 @@ export class BossEnemy extends BaseEnemy {
         });
         this._missingTargetLogged = true;
       }
+
+      const fallbackPosition = {
+        x: Number.isFinite(CONSTANTS.GAME_WIDTH)
+          ? CONSTANTS.GAME_WIDTH / 2
+          : 0,
+        y: Number.isFinite(CONSTANTS.GAME_HEIGHT)
+          ? CONSTANTS.GAME_HEIGHT / 2
+          : 0,
+      };
+
+      targetPosition = fallbackPosition;
+
+      if (!this._seekFallbackLogged) {
+        GameDebugLogger.log('UPDATE', 'Boss using fallback target (center)', {
+          fallbackPosition,
+        });
+        this._seekFallbackLogged = true;
+      }
+    } else {
+      if (this._missingTargetLogged) {
+        GameDebugLogger.log('STATE', 'Boss seekPlayer target restored', {
+          targetPosition,
+        });
+        this._missingTargetLogged = false;
+      }
+
+      if (this._seekFallbackLogged) {
+        GameDebugLogger.log('STATE', 'Boss seekPlayer fallback cleared', {
+          targetPosition,
+        });
+        this._seekFallbackLogged = false;
+      }
+    }
+
+    if (!targetPosition) {
       return;
     }
 
-    if (this._missingTargetLogged) {
-      GameDebugLogger.log('STATE', 'Boss seekPlayer target restored', {
-        targetPosition: target.position,
-      });
-      this._missingTargetLogged = false;
-    }
-
-    const { position } = target;
-    const dx = position.x - this.x;
-    const dy = position.y - this.y;
+    const dx = targetPosition.x - this.x;
+    const dy = targetPosition.y - this.y;
     const { nx, ny } = resolveVector(dx, dy);
 
     const accel = (this.acceleration || 0) * Math.max(intensity, 0);
@@ -472,13 +512,35 @@ export class BossEnemy extends BaseEnemy {
 
   updateInvulnerability(deltaTime) {
     if (!this.invulnerable) {
+      this._invulnLog = 0;
       return;
     }
 
+    if (!Number.isFinite(deltaTime)) {
+      return;
+    }
+
+    const oldTimer = this.invulnerabilityTimer;
     this.invulnerabilityTimer -= deltaTime;
+
     if (this.invulnerabilityTimer <= 0) {
       this.invulnerable = false;
       this.invulnerabilityTimer = 0;
+      this._invulnLog = 0;
+
+      GameDebugLogger.log('STATE', 'Boss invulnerability ended', {
+        id: this.id,
+        phase: this.currentPhase,
+        oldTimer: Number.isFinite(oldTimer) ? Number(oldTimer.toFixed(3)) : oldTimer,
+        newTimer: 0,
+      });
+    } else if (!this._invulnLog || Date.now() - this._invulnLog > 500) {
+      GameDebugLogger.log('STATE', 'Boss invulnerable', {
+        id: this.id,
+        phase: this.currentPhase,
+        timeRemaining: Number(this.invulnerabilityTimer.toFixed(3)),
+      });
+      this._invulnLog = Date.now();
     }
   }
 
@@ -795,7 +857,7 @@ export class BossEnemy extends BaseEnemy {
     let position =
       this.system && typeof this.system.getPlayerPositionSnapshot === 'function'
         ? this.system.getPlayerPositionSnapshot(player)
-        : null;
+        : player?.position || null;
 
     if (
       (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) &&
@@ -816,9 +878,22 @@ export class BossEnemy extends BaseEnemy {
       position = { x: player.position.x, y: player.position.y };
     }
 
+    const logPayload = {
+      hasSystem: !!this.system,
+      hasGetCachedPlayer: typeof this.system?.getCachedPlayer === 'function',
+      hasPlayer: !!player,
+      hasPosition: !!position,
+      playerPosition: position || player?.position || null,
+    };
+
+    if (!this._playerResolveLogged) {
+      GameDebugLogger.log('UPDATE', 'Boss resolvePlayerTarget', logPayload);
+      this._playerResolveLogged = true;
+    }
+
     if (!position && !this._missingTargetLogged) {
       GameDebugLogger.log('ERROR', 'Boss could not resolve player position', {
-        hasPlayer: !!player,
+        ...logPayload,
         playerKeys: player ? Object.keys(player) : null,
       });
       this._missingTargetLogged = true;
@@ -970,6 +1045,12 @@ export class BossEnemy extends BaseEnemy {
 
     if (typeof gameEvents !== 'undefined' && gameEvents?.emit) {
       gameEvents.emit('boss-defeated', payload);
+      GameDebugLogger.log('EVENT', 'boss-defeated event emitted', {
+        id: this.id,
+        wave: this.wave,
+        position: { x: this.x, y: this.y },
+        rewards: payload.rewards,
+      });
     }
   }
 
@@ -1068,6 +1149,10 @@ export class BossEnemy extends BaseEnemy {
     this.phaseColors = [...(BOSS_DEFAULTS.phaseColors || ['#ff6b6b'])];
     this.rewards = { ...BOSS_DEFAULTS.rewards };
     this.renderPayload = this.buildRenderPayload();
+    this._missingTargetLogged = false;
+    this._playerResolveLogged = false;
+    this._seekFallbackLogged = false;
+    this._invulnLog = 0;
   }
 }
 

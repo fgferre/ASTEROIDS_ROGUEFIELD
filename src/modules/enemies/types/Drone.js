@@ -2,9 +2,12 @@ import {
   ENEMY_EFFECT_COLORS,
   ENEMY_RENDER_PRESETS,
   ENEMY_TYPES,
+  GAME_WIDTH,
+  GAME_HEIGHT,
 } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
+import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 
 const DRONE_DEFAULTS = ENEMY_TYPES?.drone ?? {};
 
@@ -82,6 +85,57 @@ export class Drone extends BaseEnemy {
     this.fireTimer = this.computeNextFireInterval();
     this.destroyed = false;
     this._renderThrust = 0;
+
+    if (Number.isFinite(config.x)) {
+      this.x = config.x;
+    }
+    if (Number.isFinite(config.y)) {
+      this.y = config.y;
+    }
+
+    const boundsWidth = Number.isFinite(GAME_WIDTH) ? GAME_WIDTH : 0;
+    const boundsHeight = Number.isFinite(GAME_HEIGHT) ? GAME_HEIGHT : 0;
+    const inBounds =
+      this.x >= 0 &&
+      this.x <= boundsWidth &&
+      this.y >= 0 &&
+      this.y <= boundsHeight;
+
+    GameDebugLogger.log('SPAWN', 'Drone initialized', {
+      id: this.id,
+      position: { x: Math.round(this.x ?? 0), y: Math.round(this.y ?? 0) },
+      wave: this.wave,
+      isInBounds: inBounds,
+    });
+
+    const outOfPlayableBounds =
+      this.x < -100 ||
+      this.x > boundsWidth + 100 ||
+      this.y < -100 ||
+      this.y > boundsHeight + 100;
+
+    if (outOfPlayableBounds) {
+      GameDebugLogger.log('ERROR', 'Drone spawned out of bounds', {
+        position: { x: this.x, y: this.y },
+        bounds: { width: boundsWidth, height: boundsHeight },
+      });
+
+      const centerX = boundsWidth > 0 ? boundsWidth / 2 : 0;
+      const centerY = boundsHeight > 0 ? boundsHeight / 2 : 0;
+      const offsetGenerator =
+        this.random && typeof this.random.range === 'function'
+          ? () => this.random.range(-100, 100)
+          : () => (Math.random() - 0.5) * 200;
+      this.x = centerX + offsetGenerator();
+      this.y = centerY + offsetGenerator();
+
+      GameDebugLogger.log('STATE', 'Drone position corrected to center area', {
+        newPosition: {
+          x: Math.round(this.x ?? 0),
+          y: Math.round(this.y ?? 0),
+        },
+      });
+    }
 
     return this;
   }
