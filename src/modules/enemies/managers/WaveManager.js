@@ -1496,24 +1496,45 @@ export class WaveManager {
             spawnContext.random
           );
         } else if (isTacticalEnemy) {
-          if (playerSnapshot) {
-            position = this.calculateSafeSpawnPosition(
+          const anchor =
+            playerSnapshot &&
+            Number.isFinite(playerSnapshot.x) &&
+            Number.isFinite(playerSnapshot.y)
+              ? { x: playerSnapshot.x, y: playerSnapshot.y }
+              : {
+                  x: worldBounds.width / 2,
+                  y: worldBounds.height / 2,
+                };
+
+          const tacticalPosition = this.calculatePlayerSafeInboundsPosition(
+            worldBounds,
+            anchor,
+            safeDistance,
+            spawnContext.random
+          );
+
+          position = { x: tacticalPosition.x, y: tacticalPosition.y };
+
+          let isInBounds = this.isPositionWithinBounds(position, worldBounds);
+          let fallbackApplied = false;
+
+          if (!isInBounds) {
+            position = this.calculateCenterBandFallbackPosition(
               worldBounds,
-              playerSnapshot,
-              safeDistance,
               spawnContext.random
             );
-          } else {
-            position = this.calculateEdgeSpawnPosition(
-              worldBounds,
-              spawnContext.random
-            );
+            isInBounds = this.isPositionWithinBounds(position, worldBounds);
+            fallbackApplied = true;
           }
+
           GameDebugLogger.log('SPAWN', `${typeKey} spawn position`, {
             type: typeKey,
             position,
-            playerPosition: playerSnapshot,
+            playerPosition: anchor,
             safeDistance,
+            isInBounds,
+            usedFallback: fallbackApplied || Boolean(tacticalPosition.usedFallback),
+            clamped: Boolean(tacticalPosition.clamped),
           });
         } else {
           // Modern: spawn at safe distance from player when snapshot is available.
@@ -2101,6 +2122,166 @@ export class WaveManager {
    * @param {number} safeDistance - Minimum distance from player
    * @returns {Object} {x, y} position
    */
+  calculatePlayerSafeInboundsPosition(
+    bounds,
+    player,
+    safeDistance,
+    random = this.getRandomScope('spawn')
+  ) {
+    const width = bounds?.width || CONSTANTS.GAME_WIDTH || 800;
+    const height = bounds?.height || CONSTANTS.GAME_HEIGHT || 600;
+    const horizontalMargin = Math.max(40, Math.floor(width * 0.075));
+    const verticalMargin = Math.max(40, Math.floor(height * 0.075));
+    const spawnRandom = this.resolveScopedRandom(
+      random,
+      'spawn',
+      'tactical-position'
+    );
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+    const anchorX =
+      player && Number.isFinite(player.x) ? player.x : width / 2;
+    const anchorY =
+      player && Number.isFinite(player.y) ? player.y : height / 2;
+
+    const minRadius = Math.max(0, safeDistance);
+    const maxRadius = Math.max(minRadius + 80, minRadius * 1.5 || 120);
+    const attempts = 8;
+    let clamped = false;
+
+    const nextFloat = () =>
+      spawnRandom && typeof spawnRandom.float === 'function'
+        ? spawnRandom.float()
+        : Math.random();
+    const nextRange = (min, max) => {
+      if (
+        spawnRandom &&
+        typeof spawnRandom.range === 'function' &&
+        Number.isFinite(min) &&
+        Number.isFinite(max)
+      ) {
+        return spawnRandom.range(min, max);
+      }
+      const t = nextFloat();
+      return min + t * (max - min);
+    };
+
+    for (let i = 0; i < attempts; i += 1) {
+      const angle = nextFloat() * Math.PI * 2;
+      const radius = nextRange(minRadius, maxRadius);
+
+      let candidateX = anchorX + Math.cos(angle) * radius;
+      let candidateY = anchorY + Math.sin(angle) * radius;
+
+      const clampedX = clamp(candidateX, horizontalMargin, width - horizontalMargin);
+      const clampedY = clamp(candidateY, verticalMargin, height - verticalMargin);
+
+      if (clampedX !== candidateX || clampedY !== candidateY) {
+        clamped = true;
+      }
+
+      candidateX = clampedX;
+      candidateY = clampedY;
+
+      const dx = candidateX - anchorX;
+      const dy = candidateY - anchorY;
+      const distance = Math.hypot(dx, dy);
+
+      if (distance >= Math.max(0, safeDistance * 0.85)) {
+        return {
+          x: candidateX,
+          y: candidateY,
+          clamped,
+          usedFallback: false,
+        };
+      }
+    }
+
+    const centerMarginX = Math.max(horizontalMargin, Math.floor(width * 0.25));
+    const centerMarginY = Math.max(verticalMargin, Math.floor(height * 0.25));
+    const jitterXRange = Math.max(0, width - centerMarginX * 2);
+    const jitterYRange = Math.max(0, height - centerMarginY * 2);
+
+    const jitter = (range) => (nextFloat() - 0.5) * range * 0.5;
+
+    const fallbackX = clamp(
+      width / 2 + jitter(jitterXRange),
+      centerMarginX,
+      width - centerMarginX
+    );
+    const fallbackY = clamp(
+      height / 2 + jitter(jitterYRange),
+      centerMarginY,
+      height - centerMarginY
+    );
+
+    return {
+      x: fallbackX,
+      y: fallbackY,
+      clamped: true,
+      usedFallback: true,
+    };
+  }
+
+  calculateCenterBandFallbackPosition(
+    bounds,
+    random = this.getRandomScope('spawn')
+  ) {
+    const width = bounds?.width || CONSTANTS.GAME_WIDTH || 800;
+    const height = bounds?.height || CONSTANTS.GAME_HEIGHT || 600;
+    const horizontalMargin = Math.max(40, Math.floor(width * 0.25));
+    const verticalMargin = Math.max(40, Math.floor(height * 0.25));
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+    const spawnRandom = this.resolveScopedRandom(
+      random,
+      'spawn',
+      'tactical-center-fallback'
+    );
+
+    const nextFloat = () =>
+      spawnRandom && typeof spawnRandom.float === 'function'
+        ? spawnRandom.float()
+        : Math.random();
+
+    const jitter = (range) => (nextFloat() - 0.5) * range * 0.5;
+    const usableWidth = Math.max(0, width - horizontalMargin * 2);
+    const usableHeight = Math.max(0, height - verticalMargin * 2);
+
+    return {
+      x: clamp(width / 2 + jitter(usableWidth), horizontalMargin, width - horizontalMargin),
+      y: clamp(
+        height / 2 + jitter(usableHeight),
+        verticalMargin,
+        height - verticalMargin
+      ),
+    };
+  }
+
+  isPositionWithinBounds(position, bounds, extraMargin = 0) {
+    if (
+      !position ||
+      !Number.isFinite(position.x) ||
+      !Number.isFinite(position.y)
+    ) {
+      return false;
+    }
+
+    const width = bounds?.width || CONSTANTS.GAME_WIDTH || 800;
+    const height = bounds?.height || CONSTANTS.GAME_HEIGHT || 600;
+
+    const minX = 0 - extraMargin;
+    const maxX = width + extraMargin;
+    const minY = 0 - extraMargin;
+    const maxY = height + extraMargin;
+
+    return (
+      position.x >= minX &&
+      position.x <= maxX &&
+      position.y >= minY &&
+      position.y <= maxY
+    );
+  }
+
   calculateSafeSpawnPosition(bounds, player, safeDistance, random = this.getRandomScope('spawn')) {
     const spawnRandom = this.resolveScopedRandom(random, 'spawn', 'spawn-position');
     const margin = 50;

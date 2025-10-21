@@ -221,6 +221,34 @@ class EnemySystem {
       this.handleEnemyProjectile(data);
     });
 
+    bus.on('player-hit-by-projectile', (data = {}) => {
+      const damage = Number.isFinite(data.damage) ? data.damage : 0;
+      if (damage <= 0) {
+        return;
+      }
+
+      const position =
+        data.position &&
+        Number.isFinite(data.position.x) &&
+        Number.isFinite(data.position.y)
+          ? { x: data.position.x, y: data.position.y }
+          : null;
+
+      const result = this.applyDirectDamageToPlayer(damage, {
+        cause: 'enemy-projectile',
+        position,
+        source: data.source || null,
+      });
+
+      GameDebugLogger.log('COLLISION', 'Player hit by enemy projectile', {
+        damage,
+        applied: Boolean(result?.applied),
+        remaining: result?.remaining,
+        position,
+        source: data.source || null,
+      });
+    });
+
     bus.on('mine-exploded', (data) => {
       this.handleMineExplosion(data);
     });
@@ -2354,6 +2382,10 @@ class EnemySystem {
     // LEGACY: Used when WAVEMANAGER_HANDLES_ASTEROID_SPAWN=false
     const wave = this.waveState;
     if (!wave || !wave.isActive) {
+      return;
+    }
+
+    if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
       return;
     }
 
