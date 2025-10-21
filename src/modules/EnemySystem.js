@@ -935,6 +935,10 @@ class EnemySystem {
       }
     }
 
+    if (Number.isFinite(player.x) && Number.isFinite(player.y)) {
+      return { x: player.x, y: player.y };
+    }
+
     return null;
   }
 

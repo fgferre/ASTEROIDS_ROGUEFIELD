@@ -626,11 +626,17 @@ export class WaveManager {
       }
     }
 
+    const bossRadius = bossDefaults.radius || 60;
     const safeDistance = Math.max(
-      Number(bossDefaults.safeDistance) || 0,
-      (CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200) * 2,
-      (bossDefaults.radius || 60) * 2
+      Number.isFinite(bossDefaults.safeDistance) ? bossDefaults.safeDistance : 0,
+      bossRadius * 2.4
     );
+    const entryPadding = Number.isFinite(bossDefaults.entryPadding)
+      ? Math.max(0, bossDefaults.entryPadding)
+      : Math.max(20, bossRadius * 0.35);
+    const entryDriftSpeed = Number.isFinite(bossDefaults.entryDriftSpeed)
+      ? bossDefaults.entryDriftSpeed
+      : Math.max(45, (bossDefaults.speed || 60) * 0.85);
 
     const bossEntry = {
       type: this.bossEnemyKey || bossDefaults.key || 'boss',
@@ -643,7 +649,8 @@ export class WaveManager {
       spawnStrategy: 'scripted-entrance',
       entrance: 'top-center',
       safeDistance,
-      spawnOffset: Math.max(safeDistance, (bossDefaults.radius || 60) * 1.5),
+      entryPadding,
+      entryDriftSpeed,
       rewards: bossDefaults.rewards ? { ...bossDefaults.rewards } : undefined,
       randomScope: 'boss-spawn',
       randomParentScope: 'spawn',
@@ -1739,11 +1746,23 @@ export class WaveManager {
       'boss-position'
     );
 
-    const safeDistance = Math.max(
-      Number(bossConfig.safeDistance) || 0,
-      (CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200) * 2,
-      (bossConfig.radius || CONSTANTS.BOSS_CONFIG?.radius || 60) * 1.25
-    );
+    const baseRadius = bossConfig.radius || CONSTANTS.BOSS_CONFIG?.radius || 60;
+    const requestedSafeDistance = Number.isFinite(bossConfig.safeDistance)
+      ? bossConfig.safeDistance
+      : Number.isFinite(CONSTANTS.BOSS_CONFIG?.safeDistance)
+        ? CONSTANTS.BOSS_CONFIG.safeDistance
+        : 0;
+    const safeDistance = Math.max(baseRadius * 2, requestedSafeDistance);
+    const entryPadding = Number.isFinite(bossConfig.entryPadding)
+      ? Math.max(0, bossConfig.entryPadding)
+      : Number.isFinite(CONSTANTS.BOSS_CONFIG?.entryPadding)
+        ? Math.max(0, CONSTANTS.BOSS_CONFIG.entryPadding)
+        : Math.max(20, baseRadius * 0.35);
+    const entryDriftSpeed = Number.isFinite(bossConfig.entryDriftSpeed)
+      ? bossConfig.entryDriftSpeed
+      : Number.isFinite(CONSTANTS.BOSS_CONFIG?.entryDriftSpeed)
+        ? CONSTANTS.BOSS_CONFIG.entryDriftSpeed
+        : Math.max(45, (bossConfig.speed || CONSTANTS.BOSS_CONFIG?.speed || 60) * 0.85);
 
     let spawnPosition;
     if (
@@ -1756,7 +1775,7 @@ export class WaveManager {
       spawnPosition = this.calculateBossSpawnPosition(
         worldBounds,
         bossConfig.entrance || 'top-center',
-        safeDistance,
+        { safeDistance, entryPadding },
         playerSnapshot,
         spawnRandom
       );
@@ -1767,6 +1786,9 @@ export class WaveManager {
       y: spawnPosition.y,
       entrance: bossConfig.entrance || 'top-center',
       worldBounds,
+      safeDistance,
+      entryPadding,
+      entryDriftSpeed,
     });
 
     const metadata = {
@@ -1786,6 +1808,8 @@ export class WaveManager {
       y: spawnPosition.y,
       wave: this.currentWave,
       safeDistance,
+      entryPadding,
+      entryDriftSpeed,
       spawnStrategy: bossConfig.spawnStrategy || 'scripted-entrance',
       entrance: bossConfig.entrance || 'top-center',
       spawnOffset: bossConfig.spawnOffset,
@@ -1813,6 +1837,21 @@ export class WaveManager {
       phase: boss.currentPhase,
     });
 
+    if (Number.isFinite(entryDriftSpeed) && entryDriftSpeed > 0) {
+      const initialVy = Number.isFinite(boss.vy) ? boss.vy : 0;
+      const spawnHeightLimit = entryPadding + baseRadius;
+      if (boss.y <= spawnHeightLimit && initialVy < entryDriftSpeed * 0.5) {
+        boss.vy = entryDriftSpeed;
+        GameDebugLogger.log('STATE', 'Boss entry drift applied', {
+          id: boss.id,
+          entryDriftSpeed,
+          previousVy: initialVy,
+          newVy: boss.vy,
+          spawnHeightLimit,
+        });
+      }
+    }
+
     this.enemiesSpawnedThisWave += 1;
 
     return boss;
@@ -1821,7 +1860,7 @@ export class WaveManager {
   calculateBossSpawnPosition(
     worldBounds = { width: 800, height: 600 },
     entrance = 'top-center',
-    safeDistance = (CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200) * 2,
+    constraints = {},
     playerSnapshot = null,
     random = this.getRandomScope('spawn')
   ) {
@@ -1832,8 +1871,16 @@ export class WaveManager {
 
     const generator = this.resolveScopedRandom(random, 'spawn', 'boss-position');
     const bossRadius = CONSTANTS.BOSS_CONFIG?.radius || 60;
-    const fallbackOffset = bossRadius * 1.5;
-    const offset = Math.max(Number(safeDistance) || 0, fallbackOffset);
+    const safeDistance = Math.max(
+      Number(constraints?.safeDistance) || 0,
+      bossRadius * 2
+    );
+    const entryPadding = Math.max(
+      Number(constraints?.entryPadding) || 0,
+      Math.max(20, bossRadius * 0.35)
+    );
+    const horizontalMargin = Math.min(bounds.width / 2, entryPadding + bossRadius);
+    const verticalMargin = Math.min(bounds.height / 2, entryPadding + bossRadius);
 
     const getRange = (min, max) => {
       if (generator && typeof generator.range === 'function') {
@@ -1845,7 +1892,7 @@ export class WaveManager {
     };
 
     let x = bounds.width / 2;
-    let y = -offset;
+    let y = verticalMargin;
 
     switch (entrance) {
       case 'center':
@@ -1854,23 +1901,23 @@ export class WaveManager {
         break;
       case 'bottom-center':
       case 'bottom':
-        x = getRange(bounds.width * 0.25, bounds.width * 0.75);
-        y = bounds.height + offset;
+        x = getRange(horizontalMargin, bounds.width - horizontalMargin);
+        y = bounds.height - verticalMargin;
         break;
       case 'left':
       case 'left-center':
-        x = -offset;
-        y = getRange(bounds.height * 0.25, bounds.height * 0.75);
+        x = horizontalMargin;
+        y = getRange(verticalMargin, bounds.height - verticalMargin);
         break;
       case 'right':
       case 'right-center':
-        x = bounds.width + offset;
-        y = getRange(bounds.height * 0.25, bounds.height * 0.75);
+        x = bounds.width - horizontalMargin;
+        y = getRange(verticalMargin, bounds.height - verticalMargin);
         break;
       case 'top-center':
       default:
-        x = getRange(bounds.width * 0.25, bounds.width * 0.75);
-        y = -offset;
+        x = getRange(horizontalMargin, bounds.width - horizontalMargin);
+        y = verticalMargin;
         break;
     }
 
@@ -1879,17 +1926,23 @@ export class WaveManager {
       const dy = y - playerSnapshot.y;
       const distance = Math.hypot(dx, dy);
 
-      if (distance < offset) {
+      if (distance < safeDistance) {
         if (distance === 0) {
           x = playerSnapshot.x;
-          y = playerSnapshot.y - offset;
+          y = playerSnapshot.y - safeDistance;
         } else {
-          const scale = offset / distance;
+          const scale = safeDistance / distance;
           x = playerSnapshot.x + dx * scale;
           y = playerSnapshot.y + dy * scale;
         }
       }
     }
+
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+    const maxX = bounds.width - horizontalMargin;
+    const maxY = bounds.height - verticalMargin;
+    x = clamp(x, horizontalMargin, maxX);
+    y = clamp(y, verticalMargin, maxY);
 
     return { x, y };
   }

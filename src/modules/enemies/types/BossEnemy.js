@@ -9,6 +9,9 @@ const BASE_CONFIG = {
   key: 'boss',
   displayName: 'Apex Overlord',
   radius: 60,
+  safeDistance: 220,
+  entryPadding: 24,
+  entryDriftSpeed: 80,
   health: 1500,
   healthScaling: 1.2,
   speed: 60,
@@ -132,6 +135,7 @@ export class BossEnemy extends BaseEnemy {
     this.phaseColors = [...(BOSS_DEFAULTS.phaseColors || ['#ff6b6b'])];
     this.rewards = { ...BOSS_DEFAULTS.rewards };
     this.renderPayload = this.buildRenderPayload();
+    this._missingTargetLogged = false;
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);
@@ -147,6 +151,7 @@ export class BossEnemy extends BaseEnemy {
     this.type = 'boss';
     this.addTag('boss');
     this._drawLogged = false;
+    this._missingTargetLogged = false;
 
     const waveNumber = Math.max(1, config.wave || this.wave || 1);
     this.wave = waveNumber;
@@ -166,6 +171,22 @@ export class BossEnemy extends BaseEnemy {
     this.acceleration = config.acceleration ?? defaults.acceleration ?? 120;
     this.contactDamage = config.contactDamage ?? defaults.contactDamage ?? 45;
     this.projectileDamage = config.projectileDamage ?? defaults.projectileDamage ?? 35;
+
+    this.safeDistance = Number.isFinite(config.safeDistance)
+      ? config.safeDistance
+      : Number.isFinite(defaults.safeDistance)
+        ? defaults.safeDistance
+        : this.radius * 2.5;
+    this.entryPadding = Number.isFinite(config.entryPadding)
+      ? Math.max(0, config.entryPadding)
+      : Number.isFinite(defaults.entryPadding)
+        ? Math.max(0, defaults.entryPadding)
+        : Math.max(16, this.radius * 0.35);
+    this.entryDriftSpeed = Number.isFinite(config.entryDriftSpeed)
+      ? config.entryDriftSpeed
+      : Number.isFinite(defaults.entryDriftSpeed)
+        ? defaults.entryDriftSpeed
+        : Math.max(45, (this.speed || 0) * 0.8);
 
     this.spreadProjectileCount = config.spreadProjectileCount ?? defaults.spreadProjectileCount ?? 7;
     this.spreadProjectileSpeed = config.spreadProjectileSpeed ?? defaults.spreadProjectileSpeed ?? 260;
@@ -266,7 +287,33 @@ export class BossEnemy extends BaseEnemy {
       radius: this.radius,
       phaseCount: this.phaseCount,
       phaseThresholds: [...this.phaseHealthThresholds],
+      safeDistance: this.safeDistance,
+      entryPadding: this.entryPadding,
+      entryDriftSpeed: this.entryDriftSpeed,
     });
+
+    if (Number.isFinite(this.entryDriftSpeed) && this.entryDriftSpeed > 0) {
+      if (!Number.isFinite(this.vx)) {
+        this.vx = 0;
+      }
+      if (!Number.isFinite(this.vy)) {
+        this.vy = 0;
+      }
+
+      const entryBand = (this.entryPadding || 0) + (this.radius || 0);
+      if (this.y <= entryBand) {
+        const previousVy = this.vy;
+        this.vy = Math.max(this.vy, this.entryDriftSpeed);
+        if (this.vy !== previousVy) {
+          GameDebugLogger.log('STATE', 'Boss entry drift primed', {
+            id: this.id,
+            entryBand,
+            previousVy,
+            newVy: this.vy,
+          });
+        }
+      }
+    }
 
     return this;
   }
@@ -372,7 +419,22 @@ export class BossEnemy extends BaseEnemy {
 
   seekPlayer(target, deltaTime, intensity = 1) {
     if (!target?.position || !Number.isFinite(deltaTime)) {
+      if (!this._missingTargetLogged) {
+        GameDebugLogger.log('ERROR', 'Boss seekPlayer target unavailable', {
+          hasTarget: !!target,
+          hasPosition: !!target?.position,
+          deltaTime,
+        });
+        this._missingTargetLogged = true;
+      }
       return;
+    }
+
+    if (this._missingTargetLogged) {
+      GameDebugLogger.log('STATE', 'Boss seekPlayer target restored', {
+        targetPosition: target.position,
+      });
+      this._missingTargetLogged = false;
     }
 
     const { position } = target;
@@ -730,10 +792,37 @@ export class BossEnemy extends BaseEnemy {
       this.system && typeof this.system.getCachedPlayer === 'function'
         ? this.system.getCachedPlayer()
         : null;
-    const position =
+    let position =
       this.system && typeof this.system.getPlayerPositionSnapshot === 'function'
         ? this.system.getPlayerPositionSnapshot(player)
-        : player?.position;
+        : null;
+
+    if (
+      (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) &&
+      player &&
+      Number.isFinite(player.x) &&
+      Number.isFinite(player.y)
+    ) {
+      position = { x: player.x, y: player.y };
+    }
+
+    if (
+      (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) &&
+      player &&
+      player.position &&
+      Number.isFinite(player.position.x) &&
+      Number.isFinite(player.position.y)
+    ) {
+      position = { x: player.position.x, y: player.position.y };
+    }
+
+    if (!position && !this._missingTargetLogged) {
+      GameDebugLogger.log('ERROR', 'Boss could not resolve player position', {
+        hasPlayer: !!player,
+        playerKeys: player ? Object.keys(player) : null,
+      });
+      this._missingTargetLogged = true;
+    }
 
     return { player, position: position || null };
   }
