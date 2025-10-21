@@ -140,6 +140,7 @@ export class BossEnemy extends BaseEnemy {
     this._missingPlayerReferenceLogged = false;
     this._playerResolveLogged = false;
     this._seekFallbackLogged = false;
+    this._fallbackTargetActive = false;
     this._lastFallbackReason = null;
     this._invulnLog = 0;
     this._lastInvulnerabilityState = null;
@@ -162,6 +163,7 @@ export class BossEnemy extends BaseEnemy {
     this._missingPlayerReferenceLogged = false;
     this._playerResolveLogged = false;
     this._seekFallbackLogged = false;
+    this._fallbackTargetActive = false;
     this._lastFallbackReason = null;
     this._invulnLog = 0;
     this._lastInvulnerabilityState = null;
@@ -462,31 +464,34 @@ export class BossEnemy extends BaseEnemy {
 
       targetPosition = fallbackPosition;
 
-      if (!this._seekFallbackLogged || this._lastFallbackReason !== fallbackReason) {
-        GameDebugLogger.log('UPDATE', 'Boss using fallback target (center)', {
+      if (
+        !this._seekFallbackLogged ||
+        this._lastFallbackReason !== fallbackReason ||
+        !this._fallbackTargetActive
+      ) {
+        GameDebugLogger.log('STATE', 'Boss seekPlayer fallback engaged', {
           fallbackPosition,
           reason: fallbackReason,
         });
-        this._seekFallbackLogged = true;
-        this._lastFallbackReason = fallbackReason;
-      }
-    } else {
-      if (this._missingTargetLogged) {
-        GameDebugLogger.log('STATE', 'Boss seekPlayer target restored', {
-          targetPosition,
-          lastFallbackReason: this._lastFallbackReason,
-        });
-        this._missingTargetLogged = false;
       }
 
-      if (this._seekFallbackLogged) {
-        GameDebugLogger.log('STATE', 'Boss seekPlayer fallback cleared', {
+      this._seekFallbackLogged = true;
+      this._fallbackTargetActive = true;
+      this._lastFallbackReason = fallbackReason;
+    } else {
+      const hadFallback = this._fallbackTargetActive || this._seekFallbackLogged;
+      if (this._missingTargetLogged || hadFallback) {
+        GameDebugLogger.log('STATE', 'Boss seekPlayer target restored', {
           targetPosition,
+          fallbackPreviouslyActive: hadFallback,
           lastFallbackReason: this._lastFallbackReason,
         });
-        this._seekFallbackLogged = false;
-        this._lastFallbackReason = null;
       }
+
+      this._missingTargetLogged = false;
+      this._seekFallbackLogged = false;
+      this._fallbackTargetActive = false;
+      this._lastFallbackReason = null;
     }
 
     if (!targetPosition) {
@@ -1243,6 +1248,7 @@ export class BossEnemy extends BaseEnemy {
     this._missingPlayerReferenceLogged = false;
     this._playerResolveLogged = false;
     this._seekFallbackLogged = false;
+    this._fallbackTargetActive = false;
     this._lastFallbackReason = null;
     this._invulnLog = 0;
   }

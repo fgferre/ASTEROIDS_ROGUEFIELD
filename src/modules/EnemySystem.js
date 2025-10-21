@@ -335,6 +335,7 @@ class EnemySystem {
     const options = { force, suppressWarnings };
     if (force) {
       this._playerCacheLogged = false;
+      this._playerLazyResolveLogEmitted = false;
     }
     const previousPlayerService = this.services.player;
     this.updateServiceCache('player', 'player', options);
@@ -351,48 +352,69 @@ class EnemySystem {
     this.updateServiceCache('random', 'random', options);
     const randomServiceChanged = previousRandom !== this.services.random;
 
-    const shouldResolveFromLocator =
-      (force || !this.services.player) && typeof gameServices !== 'undefined';
+    let playerRefreshLogged = false;
+    if (this.services.player && this.services.player !== previousPlayerService) {
+      GameDebugLogger.log('STATE', 'Player service refreshed', {
+        success: true,
+        source: 'dependency-cache',
+        forced: Boolean(force),
+        changed: true,
+      });
+      this._playerCacheLogged = false;
+      this._playerLazyResolveLogEmitted = false;
+      this._playerServiceRefreshWarning = false;
+      playerRefreshLogged = true;
+    }
 
-    if (shouldResolveFromLocator) {
-      const locatorPlayer =
-        typeof gameServices?.resolve === 'function'
-          ? gameServices.resolve('player')
-          : null;
-      if (locatorPlayer) {
-        const playerChanged = this.services.player !== locatorPlayer;
-        this.services.player = locatorPlayer;
-        this.dependencies.player = locatorPlayer;
+    if (force && this.services.player && !playerRefreshLogged) {
+      this._playerServiceRefreshWarning = false;
+    }
+
+    if (!this.services.player) {
+      let resolvedPlayer = null;
+      let resolvedSource = null;
+
+      const locatorAvailable =
+        typeof gameServices !== 'undefined' &&
+        typeof gameServices.resolve === 'function';
+
+      if (locatorAvailable) {
+        const locatorPlayer = gameServices.resolve('player');
+        if (locatorPlayer) {
+          resolvedPlayer = locatorPlayer;
+          resolvedSource = 'service-locator';
+        }
+      }
+
+      if (!resolvedPlayer) {
+        const fallbackResolved = resolveService('player', this.dependencies);
+        if (fallbackResolved) {
+          resolvedPlayer = fallbackResolved;
+          resolvedSource = resolvedSource || 'resolveService-fallback';
+        }
+      }
+
+      if (resolvedPlayer) {
+        const changed = this.services.player !== resolvedPlayer;
+        this.services.player = resolvedPlayer;
+        this.dependencies.player = resolvedPlayer;
+        this._playerCacheLogged = false;
+        this._playerLazyResolveLogEmitted = false;
+        this._playerServiceRefreshWarning = false;
         GameDebugLogger.log('STATE', 'Player service refreshed', {
           success: true,
-          source: 'service-locator',
+          source: resolvedSource || 'player-fallback',
           forced: Boolean(force),
-          changed: playerChanged,
+          changed,
         });
-        this._playerCacheLogged = false;
-        this._playerServiceRefreshWarning = false;
-      } else if (
-        !this.services.player &&
-        !suppressWarnings &&
-        !this._playerServiceRefreshWarning
-      ) {
+      } else if (!suppressWarnings && !this._playerServiceRefreshWarning) {
         GameDebugLogger.log('STATE', 'Player service refreshed', {
           success: false,
-          source: 'service-locator',
+          source: 'player-fallback',
           forced: Boolean(force),
         });
         this._playerServiceRefreshWarning = true;
       }
-    } else if (
-      force &&
-      this.services.player &&
-      this.services.player !== previousPlayerService
-    ) {
-      GameDebugLogger.log('STATE', 'Player service refreshed', {
-        success: true,
-        source: 'dependency-cache',
-      });
-      this._playerCacheLogged = false;
     }
 
     if (randomServiceChanged) {
@@ -1030,20 +1052,22 @@ class EnemySystem {
         player = resolved;
         this._playerCacheLogged = false;
         if (this._playerLazyResolveLogEmitted !== 'success') {
-          GameDebugLogger.log(
-            'STATE',
-            'getCachedPlayer lazy-resolved player service',
-            {
-              source: 'resolveService',
-              success: true,
-            }
-          );
+        GameDebugLogger.log(
+          'STATE',
+          'getCachedPlayer lazy-resolved player service',
+          {
+            source: 'resolveService',
+            success: true,
+            fallback: true,
+          }
+        );
           this._playerLazyResolveLogEmitted = 'success';
         }
       } else if (this._playerLazyResolveLogEmitted !== 'failure') {
         GameDebugLogger.log('WARN', 'getCachedPlayer lazy resolve failed', {
           source: 'resolveService',
           success: false,
+          fallback: true,
         });
         this._playerLazyResolveLogEmitted = 'failure';
       }
