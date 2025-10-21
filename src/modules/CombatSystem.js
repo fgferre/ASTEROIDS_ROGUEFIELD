@@ -1952,13 +1952,21 @@ class CombatSystem {
     }
 
     const enemyType = data.enemyType ?? data.source?.type ?? data.enemy?.type;
+    const bossProjectileDamage = Number.isFinite(CONSTANTS?.BOSS_CONFIG?.projectileDamage)
+      ? CONSTANTS.BOSS_CONFIG.projectileDamage
+      : 35;
+
+    if (enemyType === 'boss') {
+      return bossProjectileDamage;
+    }
+
     const enemyConfig = enemyType ? CONSTANTS.ENEMY_TYPES?.[enemyType] : null;
     if (enemyConfig && Number.isFinite(enemyConfig.projectileDamage)) {
       return enemyConfig.projectileDamage;
     }
 
-    if (data.isBossProjectile) {
-      return 35;
+    if (data.isBossProjectile || data.source?.type === 'boss') {
+      return bossProjectileDamage;
     }
 
     return 10;

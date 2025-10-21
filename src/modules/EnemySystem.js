@@ -82,6 +82,7 @@ class EnemySystem {
     this._lastEnemyUpdateLog = 0;
     this._playerCacheLogged = false;
     this._playerServiceRefreshWarning = false;
+    this._playerLazyResolveLogEmitted = false;
 
     // Factory (optional - new architecture)
     this.factory = null;
@@ -304,10 +305,12 @@ class EnemySystem {
     }
 
     bus.on('boss-wave-started', (data) => {
+      this.refreshInjectedServices({ force: true, suppressWarnings: true });
       this.handleBossWaveStarted(data);
     });
 
     bus.on('boss-spawned', (data) => {
+      this.refreshInjectedServices({ force: true, suppressWarnings: true });
       this.handleBossSpawned(data);
     });
 
@@ -330,6 +333,9 @@ class EnemySystem {
 
   refreshInjectedServices({ force = false, suppressWarnings = false } = {}) {
     const options = { force, suppressWarnings };
+    if (force) {
+      this._playerCacheLogged = false;
+    }
     const previousPlayerService = this.services.player;
     this.updateServiceCache('player', 'player', options);
     this.updateServiceCache('world', 'world', options);
@@ -345,24 +351,35 @@ class EnemySystem {
     this.updateServiceCache('random', 'random', options);
     const randomServiceChanged = previousRandom !== this.services.random;
 
-    if (!this.services.player && typeof gameServices !== 'undefined') {
+    const shouldResolveFromLocator =
+      (force || !this.services.player) && typeof gameServices !== 'undefined';
+
+    if (shouldResolveFromLocator) {
       const locatorPlayer =
         typeof gameServices?.resolve === 'function'
           ? gameServices.resolve('player')
           : null;
       if (locatorPlayer) {
+        const playerChanged = this.services.player !== locatorPlayer;
         this.services.player = locatorPlayer;
         this.dependencies.player = locatorPlayer;
         GameDebugLogger.log('STATE', 'Player service refreshed', {
           success: true,
           source: 'service-locator',
+          forced: Boolean(force),
+          changed: playerChanged,
         });
         this._playerCacheLogged = false;
         this._playerServiceRefreshWarning = false;
-      } else if (!suppressWarnings && !this._playerServiceRefreshWarning) {
+      } else if (
+        !this.services.player &&
+        !suppressWarnings &&
+        !this._playerServiceRefreshWarning
+      ) {
         GameDebugLogger.log('STATE', 'Player service refreshed', {
           success: false,
           source: 'service-locator',
+          forced: Boolean(force),
         });
         this._playerServiceRefreshWarning = true;
       }
@@ -1003,7 +1020,44 @@ class EnemySystem {
 
   getCachedPlayer() {
     this.refreshInjectedServices();
-    const player = this.services.player || null;
+    let player = this.services.player || null;
+
+    if (!player) {
+      const resolved = resolveService('player', this.dependencies);
+      if (resolved) {
+        this.services.player = resolved;
+        this.dependencies.player = resolved;
+        player = resolved;
+        this._playerCacheLogged = false;
+        if (this._playerLazyResolveLogEmitted !== 'success') {
+          GameDebugLogger.log(
+            'STATE',
+            'getCachedPlayer lazy-resolved player service',
+            {
+              source: 'resolveService',
+              success: true,
+            }
+          );
+          this._playerLazyResolveLogEmitted = 'success';
+        }
+      } else if (this._playerLazyResolveLogEmitted !== 'failure') {
+        GameDebugLogger.log('WARN', 'getCachedPlayer lazy resolve failed', {
+          source: 'resolveService',
+          success: false,
+        });
+        this._playerLazyResolveLogEmitted = 'failure';
+      }
+    } else if (this._playerLazyResolveLogEmitted) {
+      GameDebugLogger.log(
+        'STATE',
+        'getCachedPlayer player reference confirmed after fallback',
+        {
+          playerPosition: this.getPlayerPositionSnapshot(player),
+          lastState: this._playerLazyResolveLogEmitted,
+        }
+      );
+      this._playerLazyResolveLogEmitted = false;
+    }
 
     if (!this._playerCacheLogged) {
       GameDebugLogger.log('STATE', 'getCachedPlayer called', {
@@ -3183,27 +3237,50 @@ class EnemySystem {
       }
     }
 
-    if (healthChanged && typeof gameEvents !== 'undefined') {
-      const eventPosition = playerPosition
-        ? { x: playerPosition.x, y: playerPosition.y }
+    const eventPosition = playerPosition
+      ? { x: playerPosition.x, y: playerPosition.y }
+      : null;
+    const damageSource =
+      context &&
+      context.position &&
+      Number.isFinite(context.position.x) &&
+      Number.isFinite(context.position.y)
+        ? { x: context.position.x, y: context.position.y }
         : null;
-      const damageSource =
-        context &&
-        context.position &&
-        Number.isFinite(context.position.x) &&
-        Number.isFinite(context.position.y)
-          ? { x: context.position.x, y: context.position.y }
-          : null;
+    const damageCause = context.cause || 'enemy';
 
-      gameEvents.emit('player-took-damage', {
+    if (typeof gameEvents !== 'undefined') {
+      const baseEventPayload = {
         damage: amount,
         remaining: Number.isFinite(currentHealth) ? currentHealth : remaining,
         max: Number.isFinite(player.maxHealth) ? player.maxHealth : undefined,
         position: eventPosition,
         playerPosition: eventPosition,
         damageSource,
-        cause: context.cause || 'enemy',
-      });
+        source: context.source || null,
+        cause: damageCause,
+        shieldAbsorbed,
+      };
+
+      if (healthChanged) {
+        const healthDamage =
+          Number.isFinite(previousHealth) && Number.isFinite(currentHealth)
+            ? previousHealth - currentHealth
+            : amount;
+        gameEvents.emit('player-took-damage', {
+          ...baseEventPayload,
+          applied: true,
+          absorbed: shieldAbsorbed > 0,
+          healthDamage,
+        });
+      } else if (shieldAbsorbed > 0) {
+        gameEvents.emit('player-took-damage', {
+          ...baseEventPayload,
+          applied: false,
+          absorbed: true,
+          healthDamage: 0,
+        });
+      }
     }
 
     if (healthChanged && Number.isFinite(currentHealth) && currentHealth <= 0) {
