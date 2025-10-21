@@ -460,19 +460,24 @@ class PlayerSystem {
   }
 
   shieldTookDamage(damageAmount) {
+    const incomingDamage = Math.max(0, damageAmount);
+
     if (!this.isShieldActive || this.shieldMaxHP <= 0) {
-      return false;
+      return incomingDamage;
     }
 
-    const actualDamage = Math.max(0, damageAmount);
-    this.shieldHP = Math.max(0, this.shieldHP - actualDamage);
+    const previousHP = Number.isFinite(this.shieldHP) ? this.shieldHP : 0;
+    const absorbed = Math.min(previousHP, incomingDamage);
+    const overflow = Math.max(0, incomingDamage - absorbed);
+
+    this.shieldHP = Math.max(0, previousHP - absorbed);
 
     if (typeof gameEvents !== 'undefined') {
       gameEvents.emit('shield-hit', {
         level: this.shieldUpgradeLevel,
         remainingHP: this.shieldHP,
         maxHP: this.shieldMaxHP,
-        damage: actualDamage,
+        damage: absorbed,
       });
     }
 
@@ -482,7 +487,7 @@ class PlayerSystem {
       this.emitShieldStats();
     }
 
-    return true;
+    return overflow;
   }
 
   breakShield() {
@@ -1014,15 +1019,19 @@ class PlayerSystem {
       return this.health;
     }
 
-    // Shield absorbs damage if active
+    let remainingDamage = damageAmount;
+
     if (this.isShieldActive) {
-      this.shieldTookDamage(damageAmount);
-      return undefined; // Shield absorbed all damage
+      const overflow = this.shieldTookDamage(damageAmount);
+      if (!Number.isFinite(overflow) || overflow <= 0) {
+        return this.health;
+      }
+
+      remainingDamage = Math.max(0, overflow);
     }
 
-    // Apply damage to health
     const previousHealth = this.health;
-    this.health = Math.max(0, this.health - damageAmount);
+    this.health = Math.max(0, this.health - remainingDamage);
 
     if (this.health !== previousHealth && typeof gameEvents !== 'undefined') {
       gameEvents.emit('player-health-changed', {

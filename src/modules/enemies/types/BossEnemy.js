@@ -131,11 +131,19 @@ export class BossEnemy extends BaseEnemy {
 
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;
+    this._lastInvulnerabilityState = null;
 
     this.phaseColors = [...(BOSS_DEFAULTS.phaseColors || ['#ff6b6b'])];
     this.rewards = { ...BOSS_DEFAULTS.rewards };
     this.renderPayload = this.buildRenderPayload();
     this._missingTargetLogged = false;
+    this._missingPlayerReferenceLogged = false;
+    this._playerResolveLogged = false;
+    this._seekFallbackLogged = false;
+    this._fallbackTargetActive = false;
+    this._lastFallbackReason = null;
+    this._invulnLog = 0;
+    this._lastInvulnerabilityState = null;
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);
@@ -152,6 +160,13 @@ export class BossEnemy extends BaseEnemy {
     this.addTag('boss');
     this._drawLogged = false;
     this._missingTargetLogged = false;
+    this._missingPlayerReferenceLogged = false;
+    this._playerResolveLogged = false;
+    this._seekFallbackLogged = false;
+    this._fallbackTargetActive = false;
+    this._lastFallbackReason = null;
+    this._invulnLog = 0;
+    this._lastInvulnerabilityState = null;
 
     const waveNumber = Math.max(1, config.wave || this.wave || 1);
     this.wave = waveNumber;
@@ -162,10 +177,7 @@ export class BossEnemy extends BaseEnemy {
     const scaling = config.healthScaling ?? defaults.healthScaling ?? 1;
     const scaledHealth = baseHealth * Math.pow(Math.max(1, scaling), waveNumber - 1);
     this.maxHealth = Math.ceil(scaledHealth);
-    this.health = Math.min(
-      this.maxHealth,
-      config.currentHealth ?? config.health ?? this.maxHealth
-    );
+    this.health = config.currentHealth ?? this.maxHealth;
 
     this.speed = config.speed ?? defaults.speed ?? 60;
     this.acceleration = config.acceleration ?? defaults.acceleration ?? 120;
@@ -418,28 +430,76 @@ export class BossEnemy extends BaseEnemy {
   }
 
   seekPlayer(target, deltaTime, intensity = 1) {
-    if (!target?.position || !Number.isFinite(deltaTime)) {
+    if (!Number.isFinite(deltaTime)) {
+      return;
+    }
+
+    let targetPosition = target?.position;
+    const hasValidTarget =
+      targetPosition &&
+      Number.isFinite(targetPosition.x) &&
+      Number.isFinite(targetPosition.y);
+
+    if (!hasValidTarget) {
+      const fallbackReason = !target?.player ? 'missing-player' : 'invalid-position';
+
       if (!this._missingTargetLogged) {
         GameDebugLogger.log('ERROR', 'Boss seekPlayer target unavailable', {
           hasTarget: !!target,
           hasPosition: !!target?.position,
           deltaTime,
+          reason: fallbackReason,
         });
         this._missingTargetLogged = true;
       }
+
+      const fallbackPosition = {
+        x: Number.isFinite(CONSTANTS.GAME_WIDTH)
+          ? CONSTANTS.GAME_WIDTH / 2
+          : 0,
+        y: Number.isFinite(CONSTANTS.GAME_HEIGHT)
+          ? CONSTANTS.GAME_HEIGHT / 2
+          : 0,
+      };
+
+      targetPosition = fallbackPosition;
+
+      if (
+        !this._seekFallbackLogged ||
+        this._lastFallbackReason !== fallbackReason ||
+        !this._fallbackTargetActive
+      ) {
+        GameDebugLogger.log('STATE', 'Boss seekPlayer fallback engaged', {
+          fallbackPosition,
+          reason: fallbackReason,
+        });
+      }
+
+      this._seekFallbackLogged = true;
+      this._fallbackTargetActive = true;
+      this._lastFallbackReason = fallbackReason;
+    } else {
+      const hadFallback = this._fallbackTargetActive || this._seekFallbackLogged;
+      if (this._missingTargetLogged || hadFallback) {
+        GameDebugLogger.log('STATE', 'Boss seekPlayer target restored', {
+          targetPosition,
+          fallbackPreviouslyActive: hadFallback,
+          lastFallbackReason: this._lastFallbackReason,
+        });
+      }
+
+      this._missingTargetLogged = false;
+      this._seekFallbackLogged = false;
+      this._fallbackTargetActive = false;
+      this._lastFallbackReason = null;
+    }
+
+    if (!targetPosition) {
       return;
     }
 
-    if (this._missingTargetLogged) {
-      GameDebugLogger.log('STATE', 'Boss seekPlayer target restored', {
-        targetPosition: target.position,
-      });
-      this._missingTargetLogged = false;
-    }
-
-    const { position } = target;
-    const dx = position.x - this.x;
-    const dy = position.y - this.y;
+    const dx = targetPosition.x - this.x;
+    const dy = targetPosition.y - this.y;
     const { nx, ny } = resolveVector(dx, dy);
 
     const accel = (this.acceleration || 0) * Math.max(intensity, 0);
@@ -472,14 +532,77 @@ export class BossEnemy extends BaseEnemy {
 
   updateInvulnerability(deltaTime) {
     if (!this.invulnerable) {
+      this._invulnLog = 0;
       return;
     }
 
+    if (!Number.isFinite(deltaTime)) {
+      return;
+    }
+
+    const oldTimer = this.invulnerabilityTimer;
     this.invulnerabilityTimer -= deltaTime;
+
     if (this.invulnerabilityTimer <= 0) {
       this.invulnerable = false;
       this.invulnerabilityTimer = 0;
+      this._invulnLog = 0;
+
+      this.emitInvulnerabilityState(false, {
+        reason: 'timer-expired',
+        timer: 0,
+        previous: Number.isFinite(oldTimer) ? Number(oldTimer.toFixed(3)) : oldTimer,
+        force: true,
+      });
+    } else if (!this._invulnLog || Date.now() - this._invulnLog > 500) {
+      GameDebugLogger.log('STATE', 'Boss invulnerable', {
+        id: this.id,
+        phase: this.currentPhase,
+        timeRemaining: Number(this.invulnerabilityTimer.toFixed(3)),
+      });
+      this._invulnLog = Date.now();
     }
+  }
+
+  emitInvulnerabilityState(invulnerable, context = {}) {
+    const force = Boolean(context.force);
+    const timer = Number.isFinite(context.timer)
+      ? Math.max(0, Number(context.timer))
+      : Number.isFinite(this.invulnerabilityTimer)
+      ? Math.max(0, Number(this.invulnerabilityTimer))
+      : null;
+
+    if (!force && this._lastInvulnerabilityState === invulnerable) {
+      return;
+    }
+
+    this._lastInvulnerabilityState = invulnerable;
+
+    const payload = {
+      enemy: this,
+      enemyId: this.id,
+      wave: this.wave,
+      phase: this.currentPhase,
+      invulnerable,
+      invulnerabilityTimer: timer,
+      remaining: timer,
+      reason: context.reason ?? null,
+      invulnerabilitySource: context.reason ?? null,
+      previousTimer: context.previous ?? null,
+    };
+
+    if (typeof gameEvents !== 'undefined' && gameEvents?.emit) {
+      gameEvents.emit('boss-invulnerability-changed', payload);
+    }
+
+    GameDebugLogger.log('STATE', 'Boss invulnerability state changed', {
+      id: this.id,
+      phase: this.currentPhase,
+      invulnerable,
+      remaining: timer,
+      reason: context.reason ?? null,
+      previous: context.previous ?? null,
+    });
   }
 
   updateVolleyCycle(deltaTime, target) {
@@ -795,7 +918,7 @@ export class BossEnemy extends BaseEnemy {
     let position =
       this.system && typeof this.system.getPlayerPositionSnapshot === 'function'
         ? this.system.getPlayerPositionSnapshot(player)
-        : null;
+        : player?.position || null;
 
     if (
       (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) &&
@@ -816,9 +939,36 @@ export class BossEnemy extends BaseEnemy {
       position = { x: player.position.x, y: player.position.y };
     }
 
+    const logPayload = {
+      hasSystem: !!this.system,
+      hasGetCachedPlayer: typeof this.system?.getCachedPlayer === 'function',
+      hasPlayer: !!player,
+      hasPosition: !!position,
+      playerPosition: position || player?.position || null,
+    };
+
+    if (!this._playerResolveLogged) {
+      GameDebugLogger.log('UPDATE', 'Boss resolvePlayerTarget', logPayload);
+      this._playerResolveLogged = true;
+    }
+
+    if (!player && !this._missingPlayerReferenceLogged) {
+      GameDebugLogger.log(
+        'ERROR',
+        'Boss resolvePlayerTarget missing player reference',
+        logPayload
+      );
+      this._missingPlayerReferenceLogged = true;
+    } else if (player && this._missingPlayerReferenceLogged) {
+      GameDebugLogger.log('STATE', 'Boss resolvePlayerTarget player reference restored', {
+        playerPosition: position || player?.position || null,
+      });
+      this._missingPlayerReferenceLogged = false;
+    }
+
     if (!position && !this._missingTargetLogged) {
       GameDebugLogger.log('ERROR', 'Boss could not resolve player position', {
-        hasPlayer: !!player,
+        ...logPayload,
         playerKeys: player ? Object.keys(player) : null,
       });
       this._missingTargetLogged = true;
@@ -912,6 +1062,11 @@ export class BossEnemy extends BaseEnemy {
     this.invulnerable = true;
     this.invulnerabilityTimer = this.invulnerabilityDuration || 0;
 
+    this.emitInvulnerabilityState(true, {
+      reason: 'phase-transition',
+      timer: this.invulnerabilityTimer,
+    });
+
     this.spreadTimer = this.computeSpreadInterval();
     this.volleyTimer = this.computeVolleyInterval();
     this.spawnTimer = this.computeSpawnInterval();
@@ -966,10 +1121,31 @@ export class BossEnemy extends BaseEnemy {
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;
 
-    super.onDestroyed(source);
+    this.emitInvulnerabilityState(false, {
+      reason: 'destroyed',
+      timer: 0,
+      force: true,
+    });
+
+    let destructionError = null;
+    try {
+      super.onDestroyed(source);
+    } catch (error) {
+      destructionError = error;
+    }
 
     if (typeof gameEvents !== 'undefined' && gameEvents?.emit) {
       gameEvents.emit('boss-defeated', payload);
+      GameDebugLogger.log('EVENT', 'boss-defeated event emitted', {
+        id: this.id,
+        wave: this.wave,
+        position: { x: this.x, y: this.y },
+        rewards: payload.rewards,
+      });
+    }
+
+    if (destructionError) {
+      throw destructionError;
     }
   }
 
@@ -1068,6 +1244,13 @@ export class BossEnemy extends BaseEnemy {
     this.phaseColors = [...(BOSS_DEFAULTS.phaseColors || ['#ff6b6b'])];
     this.rewards = { ...BOSS_DEFAULTS.rewards };
     this.renderPayload = this.buildRenderPayload();
+    this._missingTargetLogged = false;
+    this._missingPlayerReferenceLogged = false;
+    this._playerResolveLogged = false;
+    this._seekFallbackLogged = false;
+    this._fallbackTargetActive = false;
+    this._lastFallbackReason = null;
+    this._invulnLog = 0;
   }
 }
 

@@ -39,6 +39,11 @@ class EnemySystem {
       ui: this.dependencies.ui || null,
     };
 
+    GameDebugLogger.log('INIT', 'EnemySystem player service', {
+      hasPlayerDependency: !!this.dependencies.player,
+      hasPlayerService: !!this.services.player,
+    });
+
     this.randomScopes = null;
     this.randomSequences = null;
     this.randomScopeSeeds = {};
@@ -55,6 +60,7 @@ class EnemySystem {
     this.spawnTimer = 0;
     this.spawnDelay = 1.0;
     this.pendingEnemyProjectiles = [];
+    this.availableBossMinionTypes = [];
 
     // Legacy wave state (for backward compatibility during migration)
     this.waveState = this.createInitialWaveState();
@@ -74,6 +80,9 @@ class EnemySystem {
     this._asteroidSpawnDebugLogged = false;
     this._waveManagerRuntimeEnabled = false;
     this._lastEnemyUpdateLog = 0;
+    this._playerCacheLogged = false;
+    this._playerServiceRefreshWarning = false;
+    this._playerLazyResolveLogEmitted = false;
 
     // Factory (optional - new architecture)
     this.factory = null;
@@ -205,6 +214,10 @@ class EnemySystem {
       this.refreshInjectedServices({ force: true });
     });
 
+    bus.on('wave-started', () => {
+      this.refreshInjectedServices({ force: true, suppressWarnings: true });
+    });
+
     bus.on('physics-reset', () => {
       this.refreshInjectedServices({ force: true });
       this.syncPhysicsIntegration(true);
@@ -212,6 +225,40 @@ class EnemySystem {
 
     bus.on('enemy-fired', (data) => {
       this.handleEnemyProjectile(data);
+    });
+
+    bus.on('player-hit-by-projectile', (data = {}) => {
+      const damage = Number.isFinite(data.damage) ? data.damage : 0;
+      if (damage <= 0) {
+        return;
+      }
+
+      const position =
+        data.position &&
+        Number.isFinite(data.position.x) &&
+        Number.isFinite(data.position.y)
+          ? { x: data.position.x, y: data.position.y }
+          : null;
+
+      const result = this.applyDirectDamageToPlayer(damage, {
+        cause: 'enemy-projectile',
+        position,
+        source: data.source || null,
+      });
+
+      GameDebugLogger.log('COLLISION', 'Player hit by enemy projectile', {
+        damage,
+        applied: Boolean(result?.applied),
+        remaining: result?.remaining,
+        absorbedByShield: Number.isFinite(result?.shieldAbsorbed)
+          ? Number(result.shieldAbsorbed)
+          : 0,
+        healthDamage: Number.isFinite(result?.healthDamage)
+          ? Number(result.healthDamage)
+          : 0,
+        position,
+        source: data.source || null,
+      });
     });
 
     bus.on('mine-exploded', (data) => {
@@ -258,10 +305,12 @@ class EnemySystem {
     }
 
     bus.on('boss-wave-started', (data) => {
+      this.refreshInjectedServices({ force: true, suppressWarnings: true });
       this.handleBossWaveStarted(data);
     });
 
     bus.on('boss-spawned', (data) => {
+      this.refreshInjectedServices({ force: true, suppressWarnings: true });
       this.handleBossSpawned(data);
     });
 
@@ -276,10 +325,19 @@ class EnemySystem {
     bus.on('boss-attack', (data) => {
       this.handleBossAttackPayload(data);
     });
+
+    bus.on('boss-invulnerability-changed', (data) => {
+      this.handleBossInvulnerabilityChanged(data);
+    });
   }
 
   refreshInjectedServices({ force = false, suppressWarnings = false } = {}) {
     const options = { force, suppressWarnings };
+    if (force) {
+      this._playerCacheLogged = false;
+      this._playerLazyResolveLogEmitted = false;
+    }
+    const previousPlayerService = this.services.player;
     this.updateServiceCache('player', 'player', options);
     this.updateServiceCache('world', 'world', options);
     this.updateServiceCache('progression', 'progression', options);
@@ -293,6 +351,71 @@ class EnemySystem {
     const previousRandom = this.services.random;
     this.updateServiceCache('random', 'random', options);
     const randomServiceChanged = previousRandom !== this.services.random;
+
+    let playerRefreshLogged = false;
+    if (this.services.player && this.services.player !== previousPlayerService) {
+      GameDebugLogger.log('STATE', 'Player service refreshed', {
+        success: true,
+        source: 'dependency-cache',
+        forced: Boolean(force),
+        changed: true,
+      });
+      this._playerCacheLogged = false;
+      this._playerLazyResolveLogEmitted = false;
+      this._playerServiceRefreshWarning = false;
+      playerRefreshLogged = true;
+    }
+
+    if (force && this.services.player && !playerRefreshLogged) {
+      this._playerServiceRefreshWarning = false;
+    }
+
+    if (!this.services.player) {
+      let resolvedPlayer = null;
+      let resolvedSource = null;
+
+      const locatorAvailable =
+        typeof gameServices !== 'undefined' &&
+        typeof gameServices.resolve === 'function';
+
+      if (locatorAvailable) {
+        const locatorPlayer = gameServices.resolve('player');
+        if (locatorPlayer) {
+          resolvedPlayer = locatorPlayer;
+          resolvedSource = 'service-locator';
+        }
+      }
+
+      if (!resolvedPlayer) {
+        const fallbackResolved = resolveService('player', this.dependencies);
+        if (fallbackResolved) {
+          resolvedPlayer = fallbackResolved;
+          resolvedSource = resolvedSource || 'resolveService-fallback';
+        }
+      }
+
+      if (resolvedPlayer) {
+        const changed = this.services.player !== resolvedPlayer;
+        this.services.player = resolvedPlayer;
+        this.dependencies.player = resolvedPlayer;
+        this._playerCacheLogged = false;
+        this._playerLazyResolveLogEmitted = false;
+        this._playerServiceRefreshWarning = false;
+        GameDebugLogger.log('STATE', 'Player service refreshed', {
+          success: true,
+          source: resolvedSource || 'player-fallback',
+          forced: Boolean(force),
+          changed,
+        });
+      } else if (!suppressWarnings && !this._playerServiceRefreshWarning) {
+        GameDebugLogger.log('STATE', 'Player service refreshed', {
+          success: false,
+          source: 'player-fallback',
+          forced: Boolean(force),
+        });
+        this._playerServiceRefreshWarning = true;
+      }
+    }
 
     if (randomServiceChanged) {
       this.randomScopes = null;
@@ -627,10 +750,21 @@ class EnemySystem {
       }
 
       if (CONSTANTS?.BOSS_CONFIG) {
+        const bossDefaults = { ...CONSTANTS.BOSS_CONFIG };
+        const sanitizedMinions = this.getAvailableBossMinionTypes(
+          bossDefaults.minionTypes
+        );
+
+        if (Array.isArray(sanitizedMinions) && sanitizedMinions.length > 0) {
+          bossDefaults.minionTypes = [...sanitizedMinions];
+        } else {
+          delete bossDefaults.minionTypes;
+        }
+
         this.factory.registerType('boss', {
           class: BossEnemy,
           pool: GamePools?.bosses || null,
-          defaults: { ...CONSTANTS.BOSS_CONFIG },
+          defaults: bossDefaults,
           tags: ['enemy', 'boss', 'elite']
         });
       }
@@ -908,7 +1042,59 @@ class EnemySystem {
 
   getCachedPlayer() {
     this.refreshInjectedServices();
-    return this.services.player;
+    let player = this.services.player || null;
+
+    if (!player) {
+      const resolved = resolveService('player', this.dependencies);
+      if (resolved) {
+        this.services.player = resolved;
+        this.dependencies.player = resolved;
+        player = resolved;
+        this._playerCacheLogged = false;
+        if (this._playerLazyResolveLogEmitted !== 'success') {
+        GameDebugLogger.log(
+          'STATE',
+          'getCachedPlayer lazy-resolved player service',
+          {
+            source: 'resolveService',
+            success: true,
+            fallback: true,
+          }
+        );
+          this._playerLazyResolveLogEmitted = 'success';
+        }
+      } else if (this._playerLazyResolveLogEmitted !== 'failure') {
+        GameDebugLogger.log('WARN', 'getCachedPlayer lazy resolve failed', {
+          source: 'resolveService',
+          success: false,
+          fallback: true,
+        });
+        this._playerLazyResolveLogEmitted = 'failure';
+      }
+    } else if (this._playerLazyResolveLogEmitted) {
+      GameDebugLogger.log(
+        'STATE',
+        'getCachedPlayer player reference confirmed after fallback',
+        {
+          playerPosition: this.getPlayerPositionSnapshot(player),
+          lastState: this._playerLazyResolveLogEmitted,
+        }
+      );
+      this._playerLazyResolveLogEmitted = false;
+    }
+
+    if (!this._playerCacheLogged) {
+      GameDebugLogger.log('STATE', 'getCachedPlayer called', {
+        hasServices: !!this.services,
+        hasPlayer: !!player,
+        playerPosition: player?.position || null,
+        playerX: Number.isFinite(player?.x) ? player.x : null,
+        playerY: Number.isFinite(player?.y) ? player.y : null,
+      });
+      this._playerCacheLogged = true;
+    }
+
+    return player;
   }
 
   getPlayerPositionSnapshot(player) {
@@ -1164,7 +1350,90 @@ class EnemySystem {
       color: null,
       phaseColors: [],
       lastUpdate: null,
+      invulnerable: false,
+      invulnerabilityTimer: null,
+      invulnerabilitySource: null,
     };
+  }
+
+  getAvailableBossMinionTypes(preferredTypes = null) {
+    const rawCandidates = Array.isArray(preferredTypes) && preferredTypes.length
+      ? [...preferredTypes]
+      : Array.isArray(this.availableBossMinionTypes) && this.availableBossMinionTypes.length
+      ? [...this.availableBossMinionTypes]
+      : Array.isArray(CONSTANTS.BOSS_CONFIG?.minionTypes)
+      ? [...CONSTANTS.BOSS_CONFIG.minionTypes]
+      : [];
+
+    const factory = this.factory;
+    const hasFactoryCheck = factory && typeof factory.hasType === 'function';
+    const enabledTypes = factory && typeof factory.getEnabledTypes === 'function'
+      ? new Set(factory.getEnabledTypes())
+      : null;
+
+    const normalized = [];
+    const seen = new Set();
+
+    const isTypeAvailable = (value) => {
+      if (!value) {
+        return false;
+      }
+
+      const trimmed = String(value).trim();
+      if (!trimmed) {
+        return false;
+      }
+
+      const candidate = trimmed.toLowerCase();
+      if (candidate === 'boss' || seen.has(candidate)) {
+        return false;
+      }
+
+      if (hasFactoryCheck && !factory.hasType(candidate)) {
+        return false;
+      }
+
+      if (enabledTypes && !enabledTypes.has(candidate)) {
+        return false;
+      }
+
+      if (!ENEMY_TYPES?.[candidate] && candidate !== 'asteroid') {
+        return false;
+      }
+
+      return true;
+    };
+
+    for (let i = 0; i < rawCandidates.length; i += 1) {
+      const candidate = rawCandidates[i];
+      if (!isTypeAvailable(candidate)) {
+        continue;
+      }
+
+      const key = String(candidate).trim().toLowerCase();
+      seen.add(key);
+      normalized.push(key);
+    }
+
+    if (!normalized.length) {
+      if (isTypeAvailable('drone')) {
+        normalized.push('drone');
+      } else if (isTypeAvailable('hunter')) {
+        normalized.push('hunter');
+      } else if (hasFactoryCheck) {
+        const fallback = factory.getRegisteredTypes?.() || [];
+        for (let i = 0; i < fallback.length; i += 1) {
+          const candidate = fallback[i];
+          if (candidate && candidate !== 'boss' && isTypeAvailable(candidate)) {
+            normalized.push(String(candidate).trim().toLowerCase());
+            break;
+          }
+        }
+      }
+    }
+
+    this.availableBossMinionTypes = normalized;
+    return [...normalized];
   }
 
   emitBossHudUpdate(patch = null) {
@@ -1189,6 +1458,15 @@ class EnemySystem {
     }
 
     this.bossHudState.lastUpdate = timestamp;
+    this.bossHudState.invulnerable = Boolean(this.bossHudState.invulnerable);
+    if (Number.isFinite(this.bossHudState.invulnerabilityTimer)) {
+      this.bossHudState.invulnerabilityTimer = Math.max(
+        0,
+        Number(this.bossHudState.invulnerabilityTimer)
+      );
+    } else {
+      this.bossHudState.invulnerabilityTimer = null;
+    }
 
     const ui = this.getCachedUI();
     if (ui) {
@@ -2303,6 +2581,10 @@ class EnemySystem {
       return;
     }
 
+    if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
+      return;
+    }
+
     this.spawnTimer -= deltaTime;
 
     if (this.shouldSpawn() && this.spawnTimer <= 0) {
@@ -2345,6 +2627,11 @@ class EnemySystem {
       randomScope: scopeLabel,
       randomParentScope: config.randomParentScope || 'spawn',
     };
+
+    const minionTypes = this.getAvailableBossMinionTypes(config.minionTypes);
+    if (minionTypes.length > 0) {
+      spawnConfig.minionTypes = [...minionTypes];
+    }
 
     GameDebugLogger.log('SPAWN', 'EnemySystem.spawnBoss() called', {
       wave: waveNumber,
@@ -2950,41 +3237,77 @@ class EnemySystem {
       return { applied: false };
     }
 
+    const wasShieldActive = Boolean(player.isShieldActive);
+    const previousShieldHP = Number.isFinite(player.shieldHP) ? player.shieldHP : 0;
+    const previousHealth = Number.isFinite(player.health) ? player.health : null;
+
     const remaining = player.takeDamage(amount);
-    if (typeof remaining !== 'number') {
-      return { applied: false, absorbed: true };
+    const currentHealth = Number.isFinite(player.health) ? player.health : previousHealth;
+    const currentShieldHP = Number.isFinite(player.shieldHP) ? player.shieldHP : 0;
+
+    const healthChanged =
+      Number.isFinite(previousHealth) && Number.isFinite(currentHealth)
+        ? currentHealth < previousHealth
+        : false;
+    const shieldAbsorbed = wasShieldActive
+      ? Math.max(0, previousShieldHP - currentShieldHP)
+      : 0;
+
+    if (healthChanged && Number.isFinite(currentHealth) && currentHealth > 0) {
+      if (typeof player.setInvulnerableTimer === 'function') {
+        player.setInvulnerableTimer(0.5);
+      } else {
+        player.invulnerableTimer = 0.5;
+      }
     }
 
-    if (typeof player.setInvulnerableTimer === 'function') {
-      player.setInvulnerableTimer(0.5);
-    } else {
-      player.invulnerableTimer = 0.5;
-    }
+    const eventPosition = playerPosition
+      ? { x: playerPosition.x, y: playerPosition.y }
+      : null;
+    const damageSource =
+      context &&
+      context.position &&
+      Number.isFinite(context.position.x) &&
+      Number.isFinite(context.position.y)
+        ? { x: context.position.x, y: context.position.y }
+        : null;
+    const damageCause = context.cause || 'enemy';
 
     if (typeof gameEvents !== 'undefined') {
-      const eventPosition = playerPosition
-        ? { x: playerPosition.x, y: playerPosition.y }
-        : null;
-      const damageSource =
-        context &&
-        context.position &&
-        Number.isFinite(context.position.x) &&
-        Number.isFinite(context.position.y)
-          ? { x: context.position.x, y: context.position.y }
-          : null;
-
-      gameEvents.emit('player-took-damage', {
+      const baseEventPayload = {
         damage: amount,
-        remaining,
+        remaining: Number.isFinite(currentHealth) ? currentHealth : remaining,
         max: Number.isFinite(player.maxHealth) ? player.maxHealth : undefined,
         position: eventPosition,
         playerPosition: eventPosition,
         damageSource,
-        cause: context.cause || 'enemy',
-      });
+        source: context.source || null,
+        cause: damageCause,
+        shieldAbsorbed,
+      };
+
+      if (healthChanged) {
+        const healthDamage =
+          Number.isFinite(previousHealth) && Number.isFinite(currentHealth)
+            ? previousHealth - currentHealth
+            : amount;
+        gameEvents.emit('player-took-damage', {
+          ...baseEventPayload,
+          applied: true,
+          absorbed: shieldAbsorbed > 0,
+          healthDamage,
+        });
+      } else if (shieldAbsorbed > 0) {
+        gameEvents.emit('player-took-damage', {
+          ...baseEventPayload,
+          applied: false,
+          absorbed: true,
+          healthDamage: 0,
+        });
+      }
     }
 
-    if (remaining <= 0) {
+    if (healthChanged && Number.isFinite(currentHealth) && currentHealth <= 0) {
       const world = this.getCachedWorld();
       if (world && typeof world.handlePlayerDeath === 'function') {
         if (world.playerAlive !== false) {
@@ -2993,7 +3316,22 @@ class EnemySystem {
       }
     }
 
-    return { applied: true, remaining };
+    const applied = healthChanged || shieldAbsorbed > 0;
+
+    if (!applied) {
+      return { applied: false };
+    }
+
+    return {
+      applied: true,
+      remaining: Number.isFinite(currentHealth) ? currentHealth : remaining,
+      absorbed: !healthChanged && shieldAbsorbed > 0,
+      shieldAbsorbed,
+      healthDamage:
+        healthChanged && Number.isFinite(previousHealth) && Number.isFinite(currentHealth)
+          ? previousHealth - currentHealth
+          : 0,
+    };
   }
 
   cleanupDestroyed() {
@@ -3633,6 +3971,11 @@ class EnemySystem {
       phaseColors: Array.isArray(this.bossHudState.phaseColors)
         ? [...this.bossHudState.phaseColors]
         : [],
+      invulnerable: Boolean(this.bossHudState.invulnerable),
+      invulnerabilityTimer: Number.isFinite(this.bossHudState.invulnerabilityTimer)
+        ? Math.max(0, Number(this.bossHudState.invulnerabilityTimer))
+        : null,
+      invulnerabilitySource: this.bossHudState.invulnerabilitySource || null,
     };
   }
 
@@ -3659,6 +4002,9 @@ class EnemySystem {
       wave: waveNumber,
       name: data.name || this.bossHudState?.name || null,
       phaseColors,
+      invulnerable: false,
+      invulnerabilityTimer: null,
+      invulnerabilitySource: null,
     };
 
     this.emitBossHudUpdate();
@@ -3666,6 +4012,8 @@ class EnemySystem {
       ...data,
       wave: waveNumber,
       phaseColors,
+      invulnerable: false,
+      invulnerabilityTimer: null,
     });
   }
 
@@ -3701,6 +4049,15 @@ class EnemySystem {
     const phase = data.phase ?? boss.currentPhase ?? 0;
     const maxHealth = data.maxHealth ?? boss.maxHealth ?? boss.health ?? 0;
     const health = data.health ?? boss.health ?? maxHealth;
+    const invulnerable = Boolean(
+      data.invulnerable ?? boss.invulnerable ?? this.bossHudState?.invulnerable
+    );
+    const invulnerabilityTimer = Number.isFinite(data.invulnerabilityTimer)
+      ? Math.max(0, Number(data.invulnerabilityTimer))
+      : Number.isFinite(boss.invulnerabilityTimer)
+      ? Math.max(0, Number(boss.invulnerabilityTimer))
+      : null;
+    const invulnerabilitySource = data.invulnerabilitySource ?? null;
     const phaseColorsSource = Array.isArray(boss.phaseColors)
       ? boss.phaseColors
       : Array.isArray(data.phaseColors)
@@ -3727,6 +4084,9 @@ class EnemySystem {
       wave: waveNumber,
       color,
       phaseColors,
+      invulnerable,
+      invulnerabilityTimer,
+      invulnerabilitySource,
     };
 
     this.emitBossHudUpdate();
@@ -3739,6 +4099,8 @@ class EnemySystem {
       maxHealth,
       color,
       phaseColors,
+      invulnerable,
+      invulnerabilityTimer,
     });
   }
 
@@ -3756,6 +4118,15 @@ class EnemySystem {
     const phase = data.phase ?? boss?.currentPhase ?? this.bossHudState?.phase ?? 0;
     const maxHealth = data.maxHealth ?? boss?.maxHealth ?? this.bossHudState?.maxHealth ?? 0;
     const health = data.health ?? boss?.health ?? this.bossHudState?.health ?? maxHealth;
+    const invulnerable = Boolean(
+      data.invulnerable ?? boss?.invulnerable ?? this.bossHudState?.invulnerable
+    );
+    const invulnerabilityTimer = Number.isFinite(data.invulnerabilityTimer)
+      ? Math.max(0, Number(data.invulnerabilityTimer))
+      : Number.isFinite(boss?.invulnerabilityTimer)
+      ? Math.max(0, Number(boss.invulnerabilityTimer))
+      : null;
+    const invulnerabilitySource = data.invulnerabilitySource ?? null;
     const phaseColorsSource = boss && Array.isArray(boss.phaseColors)
       ? boss.phaseColors
       : Array.isArray(data.phaseColors)
@@ -3781,6 +4152,9 @@ class EnemySystem {
       wave: waveNumber,
       color,
       phaseColors,
+      invulnerable,
+      invulnerabilityTimer,
+      invulnerabilitySource,
     };
 
     this.emitBossHudUpdate();
@@ -3793,6 +4167,8 @@ class EnemySystem {
       maxHealth,
       color,
       phaseColors,
+      invulnerable,
+      invulnerabilityTimer,
     });
   }
 
@@ -3841,6 +4217,9 @@ class EnemySystem {
       wave: waveNumber,
       color: this.bossHudState?.color ?? null,
       phaseColors,
+      invulnerable: false,
+      invulnerabilityTimer: null,
+      invulnerabilitySource: 'defeated',
     };
 
     this.unregisterEnemyFromPhysics(boss);
@@ -3858,6 +4237,8 @@ class EnemySystem {
       position,
       color: nextHudState.color,
       phaseColors,
+      invulnerable: false,
+      invulnerabilityTimer: null,
     });
 
     this.releaseAsteroid(boss);
@@ -3868,6 +4249,56 @@ class EnemySystem {
     }
 
     this.emitWaveStateUpdate(true);
+  }
+
+  handleBossInvulnerabilityChanged(data = {}) {
+    const boss = this.resolveBossReference(data);
+
+    if (boss) {
+      this.trackBossEnemy(boss);
+    }
+
+    const waveNumber = Number.isFinite(data.wave)
+      ? Number(data.wave)
+      : boss?.wave ?? this.bossHudState?.wave ?? this.waveState?.current ?? null;
+    const invulnerable = Boolean(
+      data.invulnerable ?? boss?.invulnerable ?? this.bossHudState?.invulnerable
+    );
+    const timerValue =
+      data.remaining ?? data.invulnerabilityTimer ?? data.timer ?? data.timeRemaining;
+    const invulnerabilityTimer = Number.isFinite(timerValue)
+      ? Math.max(0, Number(timerValue))
+      : Number.isFinite(boss?.invulnerabilityTimer)
+      ? Math.max(0, Number(boss.invulnerabilityTimer))
+      : null;
+    const source = data.reason ?? data.invulnerabilitySource ?? null;
+
+    this.bossHudState = {
+      ...(this.bossHudState || this.createInitialBossHudState()),
+      invulnerable,
+      invulnerabilityTimer,
+      invulnerabilitySource: source,
+      wave: waveNumber ?? this.bossHudState?.wave ?? null,
+      active: invulnerable ? true : this.bossHudState?.active,
+      upcoming: invulnerable ? false : this.bossHudState?.upcoming,
+    };
+
+    GameDebugLogger.log('STATE', 'Boss invulnerability update received', {
+      invulnerable,
+      timer: invulnerabilityTimer,
+      wave: waveNumber,
+      source,
+    });
+
+    this.emitBossHudUpdate();
+    this.forwardBossEvent('boss-invulnerability-changed', {
+      ...data,
+      enemy: boss,
+      wave: waveNumber,
+      invulnerable,
+      invulnerabilityTimer,
+      invulnerabilitySource: source,
+    });
   }
 
   handleBossAttackPayload(data = {}) {
