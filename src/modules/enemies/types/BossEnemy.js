@@ -131,6 +131,7 @@ export class BossEnemy extends BaseEnemy {
 
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;
+    this._lastInvulnerabilityState = null;
 
     this.phaseColors = [...(BOSS_DEFAULTS.phaseColors || ['#ff6b6b'])];
     this.rewards = { ...BOSS_DEFAULTS.rewards };
@@ -139,6 +140,7 @@ export class BossEnemy extends BaseEnemy {
     this._playerResolveLogged = false;
     this._seekFallbackLogged = false;
     this._invulnLog = 0;
+    this._lastInvulnerabilityState = null;
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);
@@ -158,6 +160,7 @@ export class BossEnemy extends BaseEnemy {
     this._playerResolveLogged = false;
     this._seekFallbackLogged = false;
     this._invulnLog = 0;
+    this._lastInvulnerabilityState = null;
 
     const waveNumber = Math.max(1, config.wave || this.wave || 1);
     this.wave = waveNumber;
@@ -528,11 +531,11 @@ export class BossEnemy extends BaseEnemy {
       this.invulnerabilityTimer = 0;
       this._invulnLog = 0;
 
-      GameDebugLogger.log('STATE', 'Boss invulnerability ended', {
-        id: this.id,
-        phase: this.currentPhase,
-        oldTimer: Number.isFinite(oldTimer) ? Number(oldTimer.toFixed(3)) : oldTimer,
-        newTimer: 0,
+      this.emitInvulnerabilityState(false, {
+        reason: 'timer-expired',
+        timer: 0,
+        previous: Number.isFinite(oldTimer) ? Number(oldTimer.toFixed(3)) : oldTimer,
+        force: true,
       });
     } else if (!this._invulnLog || Date.now() - this._invulnLog > 500) {
       GameDebugLogger.log('STATE', 'Boss invulnerable', {
@@ -542,6 +545,47 @@ export class BossEnemy extends BaseEnemy {
       });
       this._invulnLog = Date.now();
     }
+  }
+
+  emitInvulnerabilityState(invulnerable, context = {}) {
+    const force = Boolean(context.force);
+    const timer = Number.isFinite(context.timer)
+      ? Math.max(0, Number(context.timer))
+      : Number.isFinite(this.invulnerabilityTimer)
+      ? Math.max(0, Number(this.invulnerabilityTimer))
+      : null;
+
+    if (!force && this._lastInvulnerabilityState === invulnerable) {
+      return;
+    }
+
+    this._lastInvulnerabilityState = invulnerable;
+
+    const payload = {
+      enemy: this,
+      enemyId: this.id,
+      wave: this.wave,
+      phase: this.currentPhase,
+      invulnerable,
+      invulnerabilityTimer: timer,
+      remaining: timer,
+      reason: context.reason ?? null,
+      invulnerabilitySource: context.reason ?? null,
+      previousTimer: context.previous ?? null,
+    };
+
+    if (typeof gameEvents !== 'undefined' && gameEvents?.emit) {
+      gameEvents.emit('boss-invulnerability-changed', payload);
+    }
+
+    GameDebugLogger.log('STATE', 'Boss invulnerability state changed', {
+      id: this.id,
+      phase: this.currentPhase,
+      invulnerable,
+      remaining: timer,
+      reason: context.reason ?? null,
+      previous: context.previous ?? null,
+    });
   }
 
   updateVolleyCycle(deltaTime, target) {
@@ -987,6 +1031,11 @@ export class BossEnemy extends BaseEnemy {
     this.invulnerable = true;
     this.invulnerabilityTimer = this.invulnerabilityDuration || 0;
 
+    this.emitInvulnerabilityState(true, {
+      reason: 'phase-transition',
+      timer: this.invulnerabilityTimer,
+    });
+
     this.spreadTimer = this.computeSpreadInterval();
     this.volleyTimer = this.computeVolleyInterval();
     this.spawnTimer = this.computeSpawnInterval();
@@ -1041,7 +1090,18 @@ export class BossEnemy extends BaseEnemy {
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;
 
-    super.onDestroyed(source);
+    this.emitInvulnerabilityState(false, {
+      reason: 'destroyed',
+      timer: 0,
+      force: true,
+    });
+
+    let destructionError = null;
+    try {
+      super.onDestroyed(source);
+    } catch (error) {
+      destructionError = error;
+    }
 
     if (typeof gameEvents !== 'undefined' && gameEvents?.emit) {
       gameEvents.emit('boss-defeated', payload);
@@ -1051,6 +1111,10 @@ export class BossEnemy extends BaseEnemy {
         position: { x: this.x, y: this.y },
         rewards: payload.rewards,
       });
+    }
+
+    if (destructionError) {
+      throw destructionError;
     }
   }
 

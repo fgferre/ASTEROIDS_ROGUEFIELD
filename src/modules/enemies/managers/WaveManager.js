@@ -604,8 +604,60 @@ export class WaveManager {
     return sizeOrder[sizeOrder.length - 1];
   }
 
+  filterAvailableMinionTypes(candidates) {
+    const list = Array.isArray(candidates) ? candidates : [];
+    const seen = new Set();
+    const result = [];
+    const availableKeys = new Set(
+      Object.values(this.enemyTypeKeys || {}).map((value) =>
+        typeof value === 'string' ? value.toLowerCase() : String(value || '').toLowerCase()
+      )
+    );
+
+    for (let i = 0; i < list.length; i += 1) {
+      const value = list[i];
+      if (!value) {
+        continue;
+      }
+
+      const key = String(value).trim().toLowerCase();
+      if (!key || key === 'boss' || seen.has(key)) {
+        continue;
+      }
+
+      if (availableKeys.size > 0 && !availableKeys.has(key)) {
+        continue;
+      }
+
+      seen.add(key);
+      result.push(key);
+    }
+
+    if (!result.length) {
+      if (availableKeys.has('drone')) {
+        result.push('drone');
+      } else if (availableKeys.has('hunter')) {
+        result.push('hunter');
+      }
+    }
+
+    return result;
+  }
+
+  resolveBossDefaults() {
+    const base = CONSTANTS.BOSS_CONFIG || {};
+    const enemySystem = this.enemySystem;
+
+    const minionTypes = enemySystem &&
+      typeof enemySystem.getAvailableBossMinionTypes === 'function'
+        ? enemySystem.getAvailableBossMinionTypes(base.minionTypes)
+        : this.filterAvailableMinionTypes(base.minionTypes);
+
+    return { ...base, minionTypes };
+  }
+
   generateBossWave(waveNumber) {
-    const bossDefaults = CONSTANTS.BOSS_CONFIG || {};
+    const bossDefaults = this.resolveBossDefaults();
     const baseCount = this.computeBaseEnemyCount(waveNumber);
 
     const supportGroups = [];

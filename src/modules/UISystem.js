@@ -304,6 +304,9 @@ class UISystem {
       phaseColors: [],
       lastEvent: null,
       lastUpdate: timestamp,
+      invulnerable: false,
+      invulnerabilityTimer: null,
+      invulnerabilitySource: null,
       timers: {
         phase: {
           remaining: null,
@@ -342,6 +345,9 @@ class UISystem {
       enrageTimerSeconds: null,
       enrageTimerText: null,
       bannerType: null,
+      invulnerable: false,
+      invulnerabilityTimer: null,
+      invulnerabilityLabel: null,
     };
   }
 
@@ -433,6 +439,11 @@ class UISystem {
         phase: { ...(state.timers?.phase || {}) },
         enrage: { ...(state.timers?.enrage || {}) },
       },
+      invulnerable: Boolean(state.invulnerable),
+      invulnerabilityTimer: Number.isFinite(state.invulnerabilityTimer)
+        ? Math.max(0, Number(state.invulnerabilityTimer))
+        : null,
+      invulnerabilitySource: state.invulnerabilitySource || null,
     };
   }
 
@@ -568,6 +579,30 @@ class UISystem {
       next.defeated = patch.defeated;
     }
 
+    if (patch.invulnerable !== undefined) {
+      next.invulnerable = Boolean(patch.invulnerable);
+    }
+
+    if (patch.invulnerabilityTimer !== undefined || patch.invulnerabilityRemaining !== undefined) {
+      const timerValue =
+        patch.invulnerabilityTimer !== undefined
+          ? patch.invulnerabilityTimer
+          : patch.invulnerabilityRemaining;
+
+      if (Number.isFinite(timerValue)) {
+        next.invulnerabilityTimer = Math.max(0, Number(timerValue));
+      } else if (timerValue === null) {
+        next.invulnerabilityTimer = null;
+      }
+    }
+
+    if (patch.invulnerabilitySource !== undefined) {
+      next.invulnerabilitySource =
+        patch.invulnerabilitySource === null
+          ? null
+          : String(patch.invulnerabilitySource);
+    }
+
     if (patch.lastEvent !== undefined && patch.lastEvent !== null) {
       next.lastEvent = patch.lastEvent;
     } else if (patch.event !== undefined && patch.event !== null) {
@@ -621,6 +656,8 @@ class UISystem {
       next.timers.phase.endsAt = null;
       next.timers.enrage.remaining = null;
       next.timers.enrage.endsAt = null;
+      next.invulnerable = false;
+      next.invulnerabilityTimer = null;
     }
 
     if (!next.color) {
@@ -655,6 +692,10 @@ class UISystem {
         patch.upcoming = false;
         patch.defeated = false;
         break;
+      case 'boss-invulnerability-changed':
+        patch.active = true;
+        patch.upcoming = false;
+        break;
       case 'boss-defeated':
         patch.defeated = true;
         patch.active = false;
@@ -676,6 +717,7 @@ class UISystem {
         break;
       case 'boss-spawned':
       case 'boss-phase-changed':
+      case 'boss-invulnerability-changed':
         this.hideBossBanner(true);
         this.showBossHealthBar(state, { skipUpdate: true });
         this.updateBossHealthBar(state, { force: true });
@@ -890,11 +932,24 @@ class UISystem {
     const isActive = Boolean(state.active && !state.defeated);
     const isUpcoming = Boolean(state.upcoming && !state.active && !state.defeated);
     const isDefeated = Boolean(state.defeated);
+    const isInvulnerable = Boolean(state.invulnerable);
+    const invulnerabilityTimer = Number.isFinite(state.invulnerabilityTimer)
+      ? Math.max(0, Number(state.invulnerabilityTimer))
+      : null;
 
     entry.root.classList.toggle('is-active', isActive);
     entry.root.classList.toggle('is-upcoming', isUpcoming);
     entry.root.classList.toggle('is-defeated', isDefeated);
     entry.root.classList.toggle('boss-has-phase-colors', phaseColors.length > 0);
+    entry.root.classList.toggle('is-invulnerable', isInvulnerable);
+    if (entry.barFill) {
+      entry.barFill.style.opacity = isInvulnerable ? '0.55' : '';
+    }
+    if (isInvulnerable) {
+      entry.root.dataset.bossInvulnerable = 'true';
+    } else {
+      delete entry.root.dataset.bossInvulnerable;
+    }
 
     if (phaseColors.length > 0 && normalizedPhaseIndex !== null) {
       entry.root.dataset.bossPhase = `${normalizedPhaseIndex + 1}`;
@@ -925,6 +980,8 @@ class UISystem {
       cached.phase = phaseText;
     }
 
+    const now = this.getHighResolutionTime();
+
     let statusText = '';
     if (isDefeated) {
       statusText = 'Defeated';
@@ -936,7 +993,28 @@ class UISystem {
       statusText = `Wave ${waveNumber}`;
     }
 
-    if (entry.status && (force || cached.status !== statusText)) {
+    let invulnerabilityLabel = null;
+    if (isInvulnerable && !isDefeated) {
+      const effectiveSeconds = Number.isFinite(invulnerabilityTimer)
+        ? Math.max(
+            0,
+            invulnerabilityTimer -
+              Math.max(0, (now - (Number.isFinite(state.lastUpdate) ? state.lastUpdate : now)) / 1000)
+          )
+        : null;
+      const formattedLockTimer = Number.isFinite(effectiveSeconds)
+        ? this.formatBossTimer(effectiveSeconds, { includeSecondsSuffix: true })
+        : null;
+      invulnerabilityLabel = formattedLockTimer
+        ? `🔒 Invulnerable (${formattedLockTimer})`
+        : '🔒 Invulnerable';
+      statusText = statusText ? `${statusText} • ${invulnerabilityLabel}` : invulnerabilityLabel;
+    }
+
+    if (
+      entry.status &&
+      (force || cached.status !== statusText || cached.invulnerable !== isInvulnerable || cached.invulnerabilityLabel !== invulnerabilityLabel)
+    ) {
       entry.status.textContent = statusText;
       cached.status = statusText;
     }
@@ -980,8 +1058,10 @@ class UISystem {
     cached.phaseCount = phaseCount;
     cached.phaseIndex = normalizedPhaseIndex;
     cached.phaseColors = phaseColors.slice();
+    cached.invulnerable = isInvulnerable;
+    cached.invulnerabilityTimer = invulnerabilityTimer;
+    cached.invulnerabilityLabel = invulnerabilityLabel;
 
-    const now = this.getHighResolutionTime();
     const phaseTimerState = state.timers?.phase || {};
     const enrageTimerState = state.timers?.enrage || {};
     const phaseSeconds = this.resolveBossTimerSeconds(phaseTimerState, now);
@@ -2256,7 +2336,14 @@ class UISystem {
       });
     };
 
-    ['boss-hud-update', 'boss-wave-started', 'boss-spawned', 'boss-phase-changed', 'boss-defeated'].forEach(
+    [
+      'boss-hud-update',
+      'boss-wave-started',
+      'boss-spawned',
+      'boss-phase-changed',
+      'boss-invulnerability-changed',
+      'boss-defeated',
+    ].forEach(
       registerBossEvent
     );
 
