@@ -1597,6 +1597,13 @@ class EnemySystem {
       spawnTimer: 0,
       spawnDelay: 1.0,
       initialSpawnDone: false,
+      managerTotals: { all: 0, asteroids: 0 },
+      managerCounts: {
+        spawned: { all: 0, asteroids: 0 },
+        killed: { all: 0, asteroids: 0 },
+      },
+      compatibilityMode: false,
+      legacyFallbackActive: false,
     };
   }
 
@@ -1612,6 +1619,16 @@ class EnemySystem {
       return;
     }
 
+    const managerTotals = this.waveState?.managerTotals || null;
+    const normalizedManagerTotals = managerTotals
+      ? {
+          all: Number.isFinite(managerTotals.all) ? managerTotals.all : 0,
+          asteroids: Number.isFinite(managerTotals.asteroids)
+            ? managerTotals.asteroids
+            : 0,
+        }
+      : null;
+
     const wave = this.waveState
       ? {
           current: this.waveState.current,
@@ -1621,6 +1638,9 @@ class EnemySystem {
           breakTimer: Math.max(0, this.waveState.breakTimer),
           completedWaves: this.waveState.completedWaves,
           timeRemaining: Math.max(0, this.waveState.timeRemaining),
+          managerTotals: normalizedManagerTotals,
+          compatibilityMode: Boolean(this.waveState.compatibilityMode),
+          legacyFallbackActive: Boolean(this.waveState.legacyFallbackActive),
         }
       : null;
 
@@ -1647,6 +1667,9 @@ class EnemySystem {
       sessionTimeSeconds: session
         ? Math.max(0, Math.floor(session.timeElapsed ?? 0))
         : 0,
+      managerAllEnemiesTotal: normalizedManagerTotals?.all ?? 0,
+      compatibilityMode: Boolean(this.waveState?.compatibilityMode),
+      legacyFallbackActive: Boolean(this.waveState?.legacyFallbackActive),
     };
 
     if (!force && this.lastWaveBroadcast) {
@@ -1660,7 +1683,10 @@ class EnemySystem {
         prev.breakTimerSeconds === snapshot.breakTimerSeconds &&
         prev.completedWaves === snapshot.completedWaves &&
         prev.totalKills === snapshot.totalKills &&
-        prev.sessionTimeSeconds === snapshot.sessionTimeSeconds;
+        prev.sessionTimeSeconds === snapshot.sessionTimeSeconds &&
+        prev.managerAllEnemiesTotal === snapshot.managerAllEnemiesTotal &&
+        prev.compatibilityMode === snapshot.compatibilityMode &&
+        prev.legacyFallbackActive === snapshot.legacyFallbackActive;
 
       if (unchanged) {
         return;
@@ -1738,9 +1764,28 @@ class EnemySystem {
       this.updateAsteroids(deltaTime);
       this.updateWaveLogic(deltaTime);
     }
+
+    this.updateSupportEnemies(deltaTime);
     this.cleanupDestroyed();
 
     this.emitWaveStateUpdate();
+  }
+
+  updateSupportEnemies(deltaTime) {
+    if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
+      return;
+    }
+
+    for (let i = 0; i < this.asteroids.length; i += 1) {
+      const enemy = this.asteroids[i];
+      if (!enemy || enemy.destroyed || enemy.type === 'asteroid') {
+        continue;
+      }
+
+      if (typeof enemy.onUpdate === 'function') {
+        enemy.onUpdate(deltaTime);
+      }
+    }
   }
 
   updateWaveLogic(deltaTime, { skipSpawning = false } = {}) {
@@ -1902,6 +1947,15 @@ class EnemySystem {
     const spawnedBreakdown = counts.spawned || {};
     const killedBreakdown = counts.killed || {};
 
+    const resolvedCompatibilityMode =
+      managerState.compatibilityMode ??
+      (!waveManagerHandlesAsteroids || legacyCompatibilityEnabled);
+    const resolvedFallbackActive =
+      managerState.legacyFallbackActive ?? !waveManagerHandlesAsteroids;
+
+    wave.compatibilityMode = Boolean(resolvedCompatibilityMode);
+    wave.legacyFallbackActive = Boolean(resolvedFallbackActive);
+
     const coerceFiniteNumber = (value) => {
       const numeric = Number(value);
       return Number.isFinite(numeric) ? numeric : undefined;
@@ -1915,6 +1969,28 @@ class EnemySystem {
     let nextSpawned = previousSpawned;
     let nextTotal = previousTotal;
     let nextKilled = previousKilled;
+
+    wave.managerTotals = {
+      all: selectManagerValue(totals.all, managerState.total),
+      asteroids: selectManagerValue(totals.asteroids, managerState.total),
+    };
+
+    wave.managerCounts = {
+      spawned: {
+        all: selectManagerValue(spawnedBreakdown.all, managerState.spawned),
+        asteroids: selectManagerValue(
+          spawnedBreakdown.asteroids,
+          managerState.spawned
+        ),
+      },
+      killed: {
+        all: selectManagerValue(killedBreakdown.all, managerState.killed),
+        asteroids: selectManagerValue(
+          killedBreakdown.asteroids,
+          managerState.killed
+        ),
+      },
+    };
 
     if (waveManagerHandlesAsteroids) {
       const managerSpawnedValue = legacyCompatibilityEnabled
@@ -2939,6 +3015,40 @@ class EnemySystem {
       spawnTimer: Number.isFinite(wave.spawnTimer) ? wave.spawnTimer : base.spawnTimer,
       spawnDelay: Number.isFinite(wave.spawnDelay) ? wave.spawnDelay : base.spawnDelay,
       initialSpawnDone: Boolean(wave.initialSpawnDone),
+      managerTotals: {
+        all: Number.isFinite(wave.managerTotals?.all)
+          ? wave.managerTotals.all
+          : base.managerTotals.all,
+        asteroids: Number.isFinite(wave.managerTotals?.asteroids)
+          ? wave.managerTotals.asteroids
+          : base.managerTotals.asteroids,
+      },
+      managerCounts: {
+        spawned: {
+          all: Number.isFinite(wave.managerCounts?.spawned?.all)
+            ? wave.managerCounts.spawned.all
+            : base.managerCounts.spawned.all,
+          asteroids: Number.isFinite(wave.managerCounts?.spawned?.asteroids)
+            ? wave.managerCounts.spawned.asteroids
+            : base.managerCounts.spawned.asteroids,
+        },
+        killed: {
+          all: Number.isFinite(wave.managerCounts?.killed?.all)
+            ? wave.managerCounts.killed.all
+            : base.managerCounts.killed.all,
+          asteroids: Number.isFinite(wave.managerCounts?.killed?.asteroids)
+            ? wave.managerCounts.killed.asteroids
+            : base.managerCounts.killed.asteroids,
+        },
+      },
+      compatibilityMode:
+        typeof wave.compatibilityMode === 'boolean'
+          ? wave.compatibilityMode
+          : base.compatibilityMode,
+      legacyFallbackActive:
+        typeof wave.legacyFallbackActive === 'boolean'
+          ? wave.legacyFallbackActive
+          : base.legacyFallbackActive,
     };
   }
 
