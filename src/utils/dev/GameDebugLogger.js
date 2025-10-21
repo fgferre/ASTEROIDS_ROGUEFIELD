@@ -18,6 +18,18 @@ const safeStringify = (value) => {
   }
 };
 
+export function isDevEnvironment() {
+  if (typeof process !== 'undefined' && process?.env?.NODE_ENV === 'development') {
+    return true;
+  }
+
+  try {
+    return Boolean(import.meta && import.meta.env && import.meta.env.DEV);
+  } catch (error) {
+    return false;
+  }
+}
+
 export class GameDebugLogger {
   static isEnabled = false;
   static entries = [];
@@ -32,7 +44,7 @@ export class GameDebugLogger {
       return;
     }
 
-    if (process.env.NODE_ENV !== 'development') {
+    if (!isDevEnvironment()) {
       return;
     }
 

@@ -12,7 +12,7 @@ import {
 } from './bootstrap/serviceManifest.js';
 import { installMathRandomGuard } from './utils/dev/mathRandomGuard.js';
 import GameSessionService from './services/GameSessionService.js';
-import { GameDebugLogger } from './utils/dev/GameDebugLogger.js';
+import { GameDebugLogger, isDevEnvironment } from './utils/dev/GameDebugLogger.js';
 
 // Dependency Injection System (Phase 2.1)
 import { DIContainer } from './core/DIContainer.js';
@@ -43,6 +43,11 @@ let diContainer = null;
 let serviceLocatorAdapter = null;
 let mathRandomGuard = null;
 let gameSessionService = null;
+
+const DEV_MODE = isDevEnvironment();
+
+let debugCommandsExposed = false;
+let debugBannerPrinted = false;
 
 function logServiceRegistrationFlow({ reason = 'bootstrap' } = {}) {
   if (!diContainer || typeof diContainer.getServiceNames !== 'function') {
@@ -89,6 +94,31 @@ function logServiceRegistrationFlow({ reason = 'bootstrap' } = {}) {
   }
 
   console.groupEnd();
+}
+
+function exposeDebugCommands({ showBanner = false } = {}) {
+  if (!DEV_MODE || typeof window === 'undefined') {
+    return;
+  }
+
+  if (!debugCommandsExposed) {
+    window.downloadDebugLog = () => GameDebugLogger.download();
+    window.clearDebugLog = () => GameDebugLogger.clear();
+    window.showDebugLog = () => console.log(GameDebugLogger.getLogContent());
+    debugCommandsExposed = true;
+  }
+
+  if (showBanner && !debugBannerPrinted) {
+    console.log('%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'color: #00ff00');
+    console.log('%c🎮 ASTEROIDS ROGUEFIELD - Debug Mode Active', 'color: #00ff00; font-weight: bold; font-size: 14px');
+    console.log('%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'color: #00ff00');
+    console.log('%cDebug Commands:', 'color: #ffff00; font-weight: bold');
+    console.log('%c  downloadDebugLog()  %c- Download game-debug.log file', 'color: #00ff00', 'color: #ffffff');
+    console.log('%c  showDebugLog()      %c- Show log in console', 'color: #00ff00', 'color: #ffffff');
+    console.log('%c  clearDebugLog()     %c- Clear current log', 'color: #00ff00', 'color: #ffffff');
+    console.log('%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'color: #00ff00');
+    debugBannerPrinted = true;
+  }
 }
 
 function initializeDependencyInjection(manifestContext) {
@@ -141,7 +171,7 @@ function initializeDependencyInjection(manifestContext) {
     // full constructor injection is introduced in Phase 2.2+.
 
     // Just expose container for debugging
-    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    if (typeof window !== 'undefined' && DEV_MODE) {
       window.diContainer = diContainer;
       window.performanceMonitor = performanceMonitor;
       window.serviceLocatorAdapter = serviceLocatorAdapter;
@@ -157,19 +187,7 @@ function initializeDependencyInjection(manifestContext) {
       console.log('[App] ℹ Performance monitor available: window.performanceMonitor');
       console.log('[App] ℹ Auto-logging enabled (logs saved to localStorage)');
       console.log('[App] ℹ Get logs: localStorage.getItem("performanceLog")');
-
-      window.downloadDebugLog = () => GameDebugLogger.download();
-      window.clearDebugLog = () => GameDebugLogger.clear();
-      window.showDebugLog = () => console.log(GameDebugLogger.getLogContent());
-
-      console.log('%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'color: #00ff00');
-      console.log('%c🎮 ASTEROIDS ROGUEFIELD - Debug Mode Active', 'color: #00ff00; font-weight: bold; font-size: 14px');
-      console.log('%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'color: #00ff00');
-      console.log('%cDebug Commands:', 'color: #ffff00; font-weight: bold');
-      console.log('%c  downloadDebugLog()  %c- Download game-debug.log file', 'color: #00ff00', 'color: #ffffff');
-      console.log('%c  showDebugLog()      %c- Show log in console', 'color: #00ff00', 'color: #ffffff');
-      console.log('%c  clearDebugLog()     %c- Clear current log', 'color: #00ff00', 'color: #ffffff');
-      console.log('%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'color: #00ff00');
+      exposeDebugCommands({ showBanner: true });
     }
 
     console.log('[App] ✓ DI system initialized successfully');
@@ -197,17 +215,18 @@ function bootstrapDebugLogging() {
 }
 
 function init() {
-  if (process.env.NODE_ENV === 'development') {
+  if (DEV_MODE) {
     GameDebugLogger.init();
     GameDebugLogger.log('INIT', 'Game starting', {
       timestamp: new Date().toISOString(),
       userAgent: navigator.userAgent,
       viewport: `${window.innerWidth}x${window.innerHeight}`,
     });
+    exposeDebugCommands({ showBanner: true });
   }
 
   try {
-    if (process.env.NODE_ENV === 'development' && !mathRandomGuard) {
+    if (DEV_MODE && !mathRandomGuard) {
       mathRandomGuard = installMathRandomGuard({ logger: console });
     }
 
@@ -237,7 +256,7 @@ function init() {
       randomSeedSource: seedSource
     };
 
-    if (process.env.NODE_ENV === 'development') {
+    if (DEV_MODE) {
       GameDebugLogger.log('INIT', 'Feature Flags', {
         USE_WAVE_MANAGER: CONSTANTS.USE_WAVE_MANAGER,
         WAVEMANAGER_HANDLES_ASTEROID_SPAWN: CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
@@ -298,7 +317,7 @@ function init() {
     const ui = services['ui'] || gameServices.get('ui');
     if (ui) ui.showScreen('menu');
 
-    if (process.env.NODE_ENV === 'development') {
+    if (DEV_MODE) {
       const playerSystem = services['player'] || gameServices.get('player');
       const enemySystem = services['enemies'] || gameServices.get('enemies');
       const physicsSystem = services['physics'] || gameServices.get('physics');
@@ -323,19 +342,19 @@ function init() {
 
     gameState.initialized = true;
 
-    if (process.env.NODE_ENV === 'development') {
+    if (DEV_MODE) {
       mathRandomGuard?.activate?.({ reason: 'bootstrap-complete' });
     }
 
     // Log DI statistics in development
-    if (process.env.NODE_ENV === 'development' && diInitialized) {
+    if (DEV_MODE && diInitialized) {
       console.group('📊 DI System Status');
       console.log('Container:', diContainer.getStats());
       console.log('Validation:', diContainer.validate());
       console.groupEnd();
     }
 
-    if (process.env.NODE_ENV === 'development') {
+    if (DEV_MODE) {
       window.addEventListener('beforeunload', () => {
         const enemySystem = gameServices.get('enemies');
         GameDebugLogger.log('STATE', 'Game closing', {

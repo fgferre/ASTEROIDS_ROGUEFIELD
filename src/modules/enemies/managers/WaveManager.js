@@ -122,6 +122,7 @@ export class WaveManager {
     this.asteroidsKilledThisWave = 0;
     this.spawnQueue = [];
     this._legacyRegisteredEnemies = new WeakSet();
+    this._trackedDynamicMinions = new WeakSet();
     this.managerTotalsForWave = { all: 0, asteroids: 0 };
     this.compatibilityModeActive = false;
     this.legacyFallbackActive = false;
@@ -858,6 +859,134 @@ export class WaveManager {
     return true;
   }
 
+  getNormalizedEnemyType(enemy) {
+    if (!enemy) {
+      return null;
+    }
+
+    const rawType =
+      enemy.type ||
+      enemy.enemyType ||
+      enemy.enemyKind ||
+      enemy.kind ||
+      (typeof enemy === 'string' ? enemy : null);
+
+    return typeof rawType === 'string' ? rawType.toLowerCase() : null;
+  }
+
+  isAsteroidType(type) {
+    if (!type) {
+      return false;
+    }
+
+    const asteroidKey = this.enemyTypeKeys?.asteroid
+      ? String(this.enemyTypeKeys.asteroid).toLowerCase()
+      : 'asteroid';
+
+    return String(type).toLowerCase() === asteroidKey;
+  }
+
+  isBossMinionEnemy(enemy) {
+    if (!enemy) {
+      return false;
+    }
+
+    if (enemy.isBossMinion) {
+      return true;
+    }
+
+    if (typeof enemy.hasTag === 'function' && enemy.hasTag('minion')) {
+      return true;
+    }
+
+    const spawnSource =
+      (typeof enemy.spawnSource === 'string' && enemy.spawnSource) ||
+      (enemy.metadata && typeof enemy.metadata.spawnSource === 'string'
+        ? enemy.metadata.spawnSource
+        : null);
+
+    if (spawnSource && spawnSource.toLowerCase() === 'boss-minion') {
+      return true;
+    }
+
+    if (enemy.spawnedByBossId) {
+      return true;
+    }
+
+    return false;
+  }
+
+  registerDynamicMinion(enemy, context = {}) {
+    if (!enemy) {
+      return false;
+    }
+
+    if (!this.waveInProgress) {
+      GameDebugLogger.log('STATE', 'Boss minion spawn ignored - wave inactive', {
+        bossId: context?.bossId ?? null,
+        wave: this.currentWave,
+        minionId: enemy.id,
+      });
+      return false;
+    }
+
+    if (!this._trackedDynamicMinions) {
+      this._trackedDynamicMinions = new WeakSet();
+    }
+
+    if (this._trackedDynamicMinions.has(enemy)) {
+      return false;
+    }
+
+    this._trackedDynamicMinions.add(enemy);
+
+    const coerce = (value) => (Number.isFinite(value) ? value : 0);
+    const normalizedType = this.getNormalizedEnemyType(enemy);
+    const isAsteroid = this.isAsteroidType(normalizedType);
+
+    this.enemiesSpawnedThisWave = coerce(this.enemiesSpawnedThisWave) + 1;
+    this.totalEnemiesThisWave = coerce(this.totalEnemiesThisWave) + 1;
+
+    if (isAsteroid) {
+      this.totalAsteroidEnemiesThisWave =
+        coerce(this.totalAsteroidEnemiesThisWave) + 1;
+      this.asteroidsSpawnedThisWave = coerce(this.asteroidsSpawnedThisWave) + 1;
+    }
+
+    if (this.managerTotalsForWave) {
+      const managerAll = Number.isFinite(this.managerTotalsForWave.all)
+        ? this.managerTotalsForWave.all
+        : 0;
+      const managerAsteroids = Number.isFinite(this.managerTotalsForWave.asteroids)
+        ? this.managerTotalsForWave.asteroids
+        : 0;
+
+      this.managerTotalsForWave = {
+        all: managerAll + 1,
+        asteroids: managerAsteroids + (isAsteroid ? 1 : 0),
+      };
+    }
+
+    if (this.enemySystem?.waveState && this.enemySystem.waveState.isActive) {
+      const state = this.enemySystem.waveState;
+      state.totalAsteroids = coerce(state.totalAsteroids) + 1;
+      state.asteroidsSpawned = coerce(state.asteroidsSpawned) + 1;
+    }
+
+    GameDebugLogger.log('STATE', 'Boss minion accounted for wave totals', {
+      wave: this.currentWave,
+      minionId: enemy.id,
+      minionType: normalizedType || enemy.type || enemy.enemyType || null,
+      bossId: context?.bossId ?? enemy.spawnedByBossId ?? null,
+      totals: {
+        spawned: this.enemiesSpawnedThisWave,
+        total: this.totalEnemiesThisWave,
+      },
+    });
+
+    return true;
+  }
+
   isLegacyAsteroidCompatibilityEnabled() {
     const preserveLegacy = CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
     if (!preserveLegacy) {
@@ -1107,6 +1236,7 @@ export class WaveManager {
     this.totalAsteroidEnemiesThisWave = 0;
     this.spawnQueue = [];
     this._legacyRegisteredEnemies = new WeakSet();
+    this._trackedDynamicMinions = new WeakSet();
 
     const waveNumber = this.currentWave;
     const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
@@ -1940,6 +2070,9 @@ export class WaveManager {
 
     this.enemiesKilledThisWave++;
 
+    const destroyedEnemy = data?.enemy || null;
+    const isBossMinion = this.isBossMinionEnemy(destroyedEnemy);
+
     const asteroidKey = this.enemyTypeKeys?.asteroid || 'asteroid';
     const destroyedEnemyType =
       data?.enemy?.type ||
@@ -1965,6 +2098,16 @@ export class WaveManager {
       console.debug(
         `[WaveManager] Enemy destroyed: ${this.enemiesKilledThisWave}/${this.totalEnemiesThisWave}`
       );
+    }
+
+    if (isBossMinion) {
+      GameDebugLogger.log('STATE', 'Boss minion destroyed', {
+        wave: this.currentWave,
+        minionId: destroyedEnemy?.id,
+        bossId: destroyedEnemy?.spawnedByBossId ?? destroyedEnemy?.spawnedBy ?? null,
+        kills: this.enemiesKilledThisWave,
+        total: this.totalEnemiesThisWave,
+      });
     }
 
     // Development assertion: verify accounting consistency
@@ -2056,6 +2199,7 @@ export class WaveManager {
     });
 
     this._legacyRegisteredEnemies = new WeakSet();
+    this._trackedDynamicMinions = new WeakSet();
 
     // Emit wave complete event
     if (this.eventBus) {
@@ -2117,6 +2261,7 @@ export class WaveManager {
     this.waveCountdown = 0;
     this.spawnDelayMultiplier = 1;
     this._legacyRegisteredEnemies = new WeakSet();
+    this._trackedDynamicMinions = new WeakSet();
     this.managerTotalsForWave = { all: 0, asteroids: 0 };
     this.compatibilityModeActive = false;
     this.legacyFallbackActive = false;

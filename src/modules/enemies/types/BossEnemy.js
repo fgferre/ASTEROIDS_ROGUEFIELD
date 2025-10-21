@@ -659,23 +659,55 @@ export class BossEnemy extends BaseEnemy {
         minion.addTag('minion');
       }
 
-      // Register the minion with the enemy system for tracking and updates
+      minion.spawnSource = 'boss-minion';
+      minion.spawnedBy = this.id;
+      minion.spawnedByBossId = this.id;
+      minion.isBossMinion = true;
+      minion.wave = this.wave;
+
+      if (minion.metadata && typeof minion.metadata === 'object') {
+        minion.metadata.spawnSource = 'boss-minion';
+        minion.metadata.spawnedByBossId = this.id;
+      } else {
+        minion.metadata = {
+          spawnSource: 'boss-minion',
+          spawnedByBossId: this.id,
+        };
+      }
+
+      let registered = false;
+
       if (typeof this.system.registerActiveEnemy === 'function') {
-        this.system.registerActiveEnemy(minion);
+        registered = Boolean(
+          this.system.registerActiveEnemy(minion, { skipDuplicateCheck: true })
+        );
       }
 
-      // Update wave accounting to include dynamically-spawned minions
-      // This ensures WaveManager's totalEnemiesThisWave accurately reflects all enemies
-      if (this.system.waveManager) {
-        this.system.waveManager.totalEnemiesThisWave += 1;
-        this.system.waveManager.enemiesSpawnedThisWave += 1;
+      if (!registered) {
+        GameDebugLogger.log('ERROR', 'Boss minion registration failed', {
+          bossId: this.id,
+          wave: this.wave,
+          minionType: type,
+          hasRegisterFunction: typeof this.system.registerActiveEnemy === 'function',
+        });
+        return;
       }
 
-      // Also update EnemySystem's wave state if active
-      if (this.system.waveState && this.system.waveState.isActive) {
-        this.system.waveState.totalAsteroids += 1;
-        this.system.waveState.asteroidsSpawned += 1;
+      if (this.system.waveManager &&
+          typeof this.system.waveManager.registerDynamicMinion === 'function') {
+        this.system.waveManager.registerDynamicMinion(minion, {
+          bossId: this.id,
+          minionType: type,
+        });
       }
+
+      GameDebugLogger.log('STATE', 'Boss minion spawned', {
+        bossId: this.id,
+        wave: this.wave,
+        minionId: minion.id,
+        minionType: type,
+        position: { x: Math.round(minion.x), y: Math.round(minion.y) },
+      });
     }
   }
 
