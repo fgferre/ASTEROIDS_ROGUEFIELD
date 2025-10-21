@@ -1837,21 +1837,6 @@ export class WaveManager {
       phase: boss.currentPhase,
     });
 
-    if (Number.isFinite(entryDriftSpeed) && entryDriftSpeed > 0) {
-      const initialVy = Number.isFinite(boss.vy) ? boss.vy : 0;
-      const spawnHeightLimit = entryPadding + baseRadius;
-      if (boss.y <= spawnHeightLimit && initialVy < entryDriftSpeed * 0.5) {
-        boss.vy = entryDriftSpeed;
-        GameDebugLogger.log('STATE', 'Boss entry drift applied', {
-          id: boss.id,
-          entryDriftSpeed,
-          previousVy: initialVy,
-          newVy: boss.vy,
-          spawnHeightLimit,
-        });
-      }
-    }
-
     this.enemiesSpawnedThisWave += 1;
 
     return boss;
@@ -1943,6 +1928,113 @@ export class WaveManager {
     const maxY = bounds.height - verticalMargin;
     x = clamp(x, horizontalMargin, maxX);
     y = clamp(y, verticalMargin, maxY);
+
+    if (
+      playerSnapshot &&
+      Number.isFinite(playerSnapshot.x) &&
+      Number.isFinite(playerSnapshot.y) &&
+      safeDistance > 0
+    ) {
+      let dx = x - playerSnapshot.x;
+      let dy = y - playerSnapshot.y;
+      let distance = Math.hypot(dx, dy);
+
+      if (distance < safeDistance) {
+        let dirX = dx;
+        let dirY = dy;
+        if (dirX === 0 && dirY === 0) {
+          dirX = 0;
+          dirY = -1;
+        }
+
+        const magnitude = Math.hypot(dirX, dirY) || 1;
+        dirX /= magnitude;
+        dirY /= magnitude;
+
+        const candidateX = playerSnapshot.x + dirX * safeDistance;
+        const candidateY = playerSnapshot.y + dirY * safeDistance;
+
+        let adjustedX = candidateX;
+        let adjustedY = candidateY;
+
+        const withinBand =
+          adjustedX >= horizontalMargin &&
+          adjustedX <= maxX &&
+          adjustedY >= verticalMargin &&
+          adjustedY <= maxY;
+
+        if (!withinBand) {
+          const boundaryTs = [];
+          if (dirX > 0) {
+            boundaryTs.push((maxX - playerSnapshot.x) / dirX);
+          } else if (dirX < 0) {
+            boundaryTs.push((horizontalMargin - playerSnapshot.x) / dirX);
+          }
+
+          if (dirY > 0) {
+            boundaryTs.push((maxY - playerSnapshot.y) / dirY);
+          } else if (dirY < 0) {
+            boundaryTs.push((verticalMargin - playerSnapshot.y) / dirY);
+          }
+
+          const validTs = boundaryTs.filter((t) => Number.isFinite(t) && t >= 0);
+          let finalT = safeDistance;
+
+          if (validTs.length > 0) {
+            const sorted = [...validTs].sort((a, b) => a - b);
+            const meetsSafeDistance = sorted.find((t) => t >= safeDistance - 1e-6);
+            if (Number.isFinite(meetsSafeDistance)) {
+              finalT = meetsSafeDistance;
+            } else {
+              finalT = sorted[sorted.length - 1];
+            }
+          }
+
+          adjustedX = playerSnapshot.x + dirX * finalT;
+          adjustedY = playerSnapshot.y + dirY * finalT;
+        }
+
+        adjustedX = clamp(adjustedX, horizontalMargin, maxX);
+        adjustedY = clamp(adjustedY, verticalMargin, maxY);
+
+        dx = adjustedX - playerSnapshot.x;
+        dy = adjustedY - playerSnapshot.y;
+        distance = Math.hypot(dx, dy);
+
+        if (distance < safeDistance) {
+          const fallbackMagnitude = Math.max(distance, 1e-6);
+          const scale = safeDistance / fallbackMagnitude;
+          adjustedX = playerSnapshot.x + dx * scale;
+          adjustedY = playerSnapshot.y + dy * scale;
+          adjustedX = clamp(adjustedX, horizontalMargin, maxX);
+          adjustedY = clamp(adjustedY, verticalMargin, maxY);
+          distance = Math.hypot(adjustedX - playerSnapshot.x, adjustedY - playerSnapshot.y);
+        }
+
+        x = adjustedX;
+        y = adjustedY;
+
+        const finalDistance = Math.hypot(
+          x - playerSnapshot.x,
+          y - playerSnapshot.y
+        );
+        const safeSatisfied = finalDistance >= safeDistance - 1e-3;
+
+        GameDebugLogger.log(
+          'STATE',
+          safeSatisfied
+            ? 'Boss spawn adjusted after clamp to respect safe distance'
+            : 'Boss spawn constrained by arena bounds',
+          {
+            player: { x: playerSnapshot.x, y: playerSnapshot.y },
+            position: { x, y },
+            safeDistance,
+            distance: finalDistance,
+            safeSatisfied,
+          }
+        );
+      }
+    }
 
     return { x, y };
   }
