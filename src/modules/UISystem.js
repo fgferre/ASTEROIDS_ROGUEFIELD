@@ -7,6 +7,7 @@ import {
   getHudLayoutItems,
 } from '../data/ui/hudLayout.js';
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
+import * as CONSTANTS from '../core/GameConstants.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
@@ -104,6 +105,7 @@ class UISystem {
         labelLength: 0,
         enemiesTextLength: 0,
         managerAllEnemiesTotal: null,
+        compatibilityMode: false,
       },
       boss: this.createInitialBossCachedValues(),
       combo: {
@@ -4342,11 +4344,6 @@ class UISystem {
 
     const force = Boolean(options.force);
 
-    const managerTotals = waveData?.managerTotals || null;
-    const managerAllEnemiesTotal = Number.isFinite(managerTotals?.all)
-      ? Math.max(0, Math.floor(managerTotals.all))
-      : null;
-
     const normalized = {
       current: Math.max(1, Math.floor(waveData.current ?? 1)),
       completedWaves: Math.max(0, Math.floor(waveData.completedWaves ?? 0)),
@@ -4360,6 +4357,15 @@ class UISystem {
       timeRemaining: Math.max(0, Number(waveData.timeRemaining ?? 0)),
       breakTimer: Math.max(0, Number(waveData.breakTimer ?? 0)),
     };
+
+    const managerTotals = waveData?.managerTotals || null;
+    const compatibilityMode = Boolean(waveData?.compatibilityMode);
+    const managerAllEnemiesTotal = Number.isFinite(managerTotals?.all)
+      ? Math.max(0, Math.floor(managerTotals.all))
+      : null;
+    const effectiveManagerTotal = compatibilityMode
+      ? Math.max(0, normalized.totalAsteroids)
+      : managerAllEnemiesTotal;
 
     const timeSeconds = normalized.isActive
       ? Math.max(0, Math.ceil(normalized.timeRemaining))
@@ -4392,7 +4398,8 @@ class UISystem {
       lastWave.isActive !== normalized.isActive ||
       lastWave.timeRemainingSeconds !== timeSeconds ||
       lastWave.breakTimerSeconds !== breakSeconds ||
-      lastWave.managerAllEnemiesTotal !== managerAllEnemiesTotal;
+      lastWave.managerAllEnemiesTotal !== effectiveManagerTotal ||
+      lastWave.compatibilityMode !== compatibilityMode;
 
     if (!hasChanged) {
       return;
@@ -4533,7 +4540,8 @@ class UISystem {
       breakTimerSeconds: breakSeconds,
       labelLength: nextLabelLength,
       enemiesTextLength: nextEnemiesLength,
-      managerAllEnemiesTotal,
+      managerAllEnemiesTotal: effectiveManagerTotal,
+      compatibilityMode,
     };
   }
 

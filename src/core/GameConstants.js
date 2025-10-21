@@ -1739,6 +1739,23 @@ export const WAVE_DURATION = 60; // segundos
 export const WAVE_BREAK_TIME = 10; // segundos
 export const WAVE_BOSS_INTERVAL = 5;
 export const MAX_ASTEROIDS_ON_SCREEN = 20;
+export const SUPPORT_ENEMY_PROGRESSION = Object.freeze({
+  drone: Object.freeze({
+    startWave: 8,
+    baseWeight: 1,
+    weightScaling: 0.08,
+  }),
+  mine: Object.freeze({
+    startWave: 10,
+    baseWeight: 1,
+    weightScaling: 0.07,
+  }),
+  hunter: Object.freeze({
+    startWave: 13,
+    baseWeight: 1,
+    weightScaling: 0.1,
+  }),
+});
 export const USE_WAVE_MANAGER = true; // Feature flag para ativar o novo WaveManager (experimental). Consulte docs/plans/phase1-enemy-foundation-plan.md para critérios de remoção.
 export const PRESERVE_LEGACY_SIZE_DISTRIBUTION = true; // WAVE-006: Preservar distribuição legada de tamanhos de asteroides (50/30/20) para paridade com baseline
 export const PRESERVE_LEGACY_POSITIONING = true; // WAVE-006: Preservar posicionamento legado de asteroides (4 bordas) vs. safe distance

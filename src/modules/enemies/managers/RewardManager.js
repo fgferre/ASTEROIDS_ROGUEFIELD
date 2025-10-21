@@ -569,7 +569,7 @@ export class RewardManager {
         console.error('[RewardManager] Failed to create wave bonus:', error);
       }
 
-      console.log(`[RewardManager] Wave ${waveNumber} bonus: ${totalXP} XP`);
+      console.log(`[RewardManager] Wave ${waveNumber} bonus: ${totalBonus} XP`);
     }
   }
 
