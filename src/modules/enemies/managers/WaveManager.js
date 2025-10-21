@@ -1548,45 +1548,42 @@ export class WaveManager {
             spawnContext.random
           );
         } else if (isTacticalEnemy) {
-          const anchor =
-            playerSnapshot &&
-            Number.isFinite(playerSnapshot.x) &&
-            Number.isFinite(playerSnapshot.y)
-              ? { x: playerSnapshot.x, y: playerSnapshot.y }
-              : {
-                  x: worldBounds.width / 2,
-                  y: worldBounds.height / 2,
-                };
-
-          const tacticalPosition = this.calculatePlayerSafeInboundsPosition(
-            worldBounds,
-            anchor,
-            safeDistance,
-            spawnContext.random
-          );
-
-          position = { x: tacticalPosition.x, y: tacticalPosition.y };
-
-          let isInBounds = this.isPositionWithinBounds(position, worldBounds);
-          let fallbackApplied = false;
-
-          if (!isInBounds) {
-            position = this.calculateCenterBandFallbackPosition(
+          if (playerSnapshot) {
+            position = this.calculateSafeSpawnPosition(
               worldBounds,
+              playerSnapshot,
+              safeDistance,
               spawnContext.random
             );
-            isInBounds = this.isPositionWithinBounds(position, worldBounds);
-            fallbackApplied = true;
+
+            const clampMargin = 50;
+            position.x = Math.max(
+              clampMargin,
+              Math.min(worldBounds.width - clampMargin, position.x)
+            );
+            position.y = Math.max(
+              clampMargin,
+              Math.min(worldBounds.height - clampMargin, position.y)
+            );
+          } else {
+            const randomRange =
+              spawnContext.random && typeof spawnContext.random.range === 'function'
+                ? (min, max) => spawnContext.random.range(min, max)
+                : (min, max) => Math.random() * (max - min) + min;
+
+            position = {
+              x: randomRange(100, Math.max(100, worldBounds.width - 100)),
+              y: randomRange(100, Math.max(100, worldBounds.height - 100)),
+            };
           }
 
-          GameDebugLogger.log('SPAWN', `${typeKey} spawn position`, {
-            type: typeKey,
-            position,
-            playerPosition: anchor,
-            safeDistance,
-            isInBounds,
-            usedFallback: fallbackApplied || Boolean(tacticalPosition.usedFallback),
-            clamped: Boolean(tacticalPosition.clamped),
+          const inBounds = this.isPositionWithinBounds(position, worldBounds);
+
+          GameDebugLogger.log('SPAWN', `${enemyGroup.type} position calculated`, {
+            type: enemyGroup.type,
+            position: { x: Math.round(position.x), y: Math.round(position.y) },
+            inBounds,
+            worldBounds,
           });
         } else {
           // Modern: spawn at safe distance from player when snapshot is available.

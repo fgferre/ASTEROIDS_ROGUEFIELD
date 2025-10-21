@@ -1055,6 +1055,7 @@ export const ENEMY_TYPES = Object.freeze({
     displayName: 'Assault Drone', // Human-readable label used in UI/debug output
     radius: 12, // Collision radius in world units (pixels)
     health: 30, // Base hit points before modifiers or scaling
+    maxHealth: 30, // Maximum health before modifiers
     speed: 180, // Maximum travel speed in units per second
     acceleration: 260, // Acceleration applied when chasing the player
     fireRate: 2.0, // Seconds between shots before variance is applied
@@ -1071,6 +1072,7 @@ export const ENEMY_TYPES = Object.freeze({
     displayName: 'Proximity Mine', // Label shown in logs, HUD and analytics
     radius: 18, // Collision radius while idle/armed
     health: 20, // Base durability before detonation
+    maxHealth: 20, // Maximum durability for UI calculations
     lifetime: 30, // Seconds before automatic detonation if untouched
     armTime: 0.5, // Seconds after spawn before the mine can trigger
     proximityRadius: 80, // Distance that arms detonation when the player enters
@@ -1084,6 +1086,7 @@ export const ENEMY_TYPES = Object.freeze({
     displayName: 'Hunter Frigate', // Friendly name for UI and telemetry
     radius: 16, // Collision radius used for physics checks
     health: 48, // Base health pool before modifiers
+    maxHealth: 48, // Maximum health reference used by HUD/UI
     speed: 120, // Maximum orbit speed while circling the player
     acceleration: 220, // Acceleration applied when correcting orbit path
     preferredDistance: 175, // Ideal distance maintained from the player
@@ -1766,5 +1769,16 @@ export const WAVEMANAGER_HANDLES_ASTEROID_SPAWN = false; // WAVE-006: Ativar con
 export const WAVE_MANAGER_EMIT_LEGACY_WAVE_COMPLETED = false; // WAVE-004: Emite evento legado 'wave-completed' somente quando compatibilidade for necessária
 export const ASTEROID_EDGE_SPAWN_MARGIN = 80; // WAVE-006: Margem para posicionamento de spawn nas bordas (paridade com legado)
 export const STRICT_LEGACY_SPAWN_SEQUENCE = true; // WAVE-006: Garante que posição e tamanho reutilizem o mesmo stream de randomização
+
+if (
+  typeof process !== 'undefined' &&
+  process?.env?.NODE_ENV === 'development'
+) {
+  console.log('[GameConstants] ENEMY_TYPES health values:', {
+    drone: ENEMY_TYPES?.drone?.health,
+    mine: ENEMY_TYPES?.mine?.health,
+    hunter: ENEMY_TYPES?.hunter?.health,
+  });
+}
 
 console.log('[GameConstants] Loaded');

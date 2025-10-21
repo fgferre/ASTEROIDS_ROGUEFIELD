@@ -41,6 +41,7 @@ export class Drone extends BaseEnemy {
     this.contactDamage = DRONE_DEFAULTS.contactDamage ?? 12;
     this.destroyed = false;
     this._renderThrust = 0;
+    this._updateLogged = false;
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);
@@ -54,8 +55,8 @@ export class Drone extends BaseEnemy {
     const defaults = ENEMY_TYPES?.drone ?? {};
 
     this.radius = config.radius ?? defaults.radius ?? 12;
-    this.maxHealth = config.maxHealth ?? config.health ?? defaults.health ?? 30;
-    this.health = config.health ?? this.maxHealth;
+    this.health = config.health ?? defaults.health ?? 30;
+    this.maxHealth = config.maxHealth ?? this.health;
     this.contactDamage = config.contactDamage ?? defaults.contactDamage ?? 12;
 
     this.maxSpeed = config.maxSpeed ?? defaults.speed ?? 180;
@@ -85,6 +86,7 @@ export class Drone extends BaseEnemy {
     this.fireTimer = this.computeNextFireInterval();
     this.destroyed = false;
     this._renderThrust = 0;
+    this._updateLogged = false;
 
     if (Number.isFinite(config.x)) {
       this.x = config.x;
@@ -106,6 +108,10 @@ export class Drone extends BaseEnemy {
       position: { x: Math.round(this.x ?? 0), y: Math.round(this.y ?? 0) },
       wave: this.wave,
       isInBounds: inBounds,
+      health: this.health,
+      maxHealth: this.maxHealth,
+      configHealth: config.health ?? null,
+      defaultsHealth: defaults.health ?? null,
     });
 
     const outOfPlayableBounds =
@@ -179,17 +185,68 @@ export class Drone extends BaseEnemy {
     return Math.max(0.15, baseInterval + offset);
   }
 
-  onUpdate(deltaTime) {
+  resolvePlayerTarget() {
+    if (!this.system) {
+      return null;
+    }
+
     const player =
-      this.system && typeof this.system.getCachedPlayer === 'function'
+      typeof this.system.getCachedPlayer === 'function'
         ? this.system.getCachedPlayer()
         : null;
+
+    if (!player && !this._missingPlayerReferenceLogged) {
+      GameDebugLogger.log('ERROR', 'Drone cannot find player target reference', {
+        id: this.id,
+        hasSystem: !!this.system,
+      });
+      this._missingPlayerReferenceLogged = true;
+    } else if (player && this._missingPlayerReferenceLogged) {
+      GameDebugLogger.log('STATE', 'Drone player target reference restored', {
+        id: this.id,
+      });
+      this._missingPlayerReferenceLogged = false;
+    }
+
+    return player;
+  }
+
+  onUpdate(deltaTime) {
+    if (!this._updateLogged) {
+      GameDebugLogger.log('UPDATE', 'Drone.onUpdate() first call', {
+        id: this.id,
+        position: { x: Math.round(this.x ?? 0), y: Math.round(this.y ?? 0) },
+        hasTarget: !!this.target,
+        speed: this.speed,
+        acceleration: this.acceleration,
+      });
+      this._updateLogged = true;
+    }
+
+    if (!this.target) {
+      this.target = this.resolvePlayerTarget();
+
+      if (!this.target) {
+        GameDebugLogger.log('ERROR', 'Drone cannot find player target', {
+          id: this.id,
+          hasSystem: !!this.system,
+        });
+        this.updateDrift(deltaTime);
+        return;
+      }
+    }
+
+    const player = this.target;
     const playerPosition =
       this.system && typeof this.system.getPlayerPositionSnapshot === 'function'
         ? this.system.getPlayerPositionSnapshot(player)
         : player?.position;
 
     if (!playerPosition) {
+      GameDebugLogger.log('ERROR', 'Drone cannot resolve player position', {
+        id: this.id,
+        hasTarget: !!this.target,
+      });
       this.updateDrift(deltaTime);
       return;
     }
@@ -346,9 +403,19 @@ export class Drone extends BaseEnemy {
     });
   }
 
-  onDestroyed(source) {
+  onDestroyed(source = null) {
+    const safeSource =
+      source || {
+        reason: 'unknown',
+        type: 'unknown',
+        context: {},
+      };
+
     this.destroyed = true;
-    super.onDestroyed(source);
+    super.onDestroyed({
+      ...safeSource,
+      reason: safeSource.reason || safeSource.cause || 'unknown',
+    });
   }
 
   onDraw(ctx) {

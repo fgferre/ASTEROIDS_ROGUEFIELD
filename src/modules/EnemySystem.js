@@ -39,9 +39,10 @@ class EnemySystem {
       ui: this.dependencies.ui || null,
     };
 
-    GameDebugLogger.log('INIT', 'EnemySystem player service', {
+    GameDebugLogger.log('INIT', 'EnemySystem dependencies', {
       hasPlayerDependency: !!this.dependencies.player,
       hasPlayerService: !!this.services.player,
+      allDependencies: Object.keys(this.dependencies || {}),
     });
 
     this.randomScopes = null;
@@ -83,6 +84,7 @@ class EnemySystem {
     this._playerCacheLogged = false;
     this._playerServiceRefreshWarning = false;
     this._playerLazyResolveLogEmitted = false;
+    this._playerLocatorResolveLogged = false;
 
     // Factory (optional - new architecture)
     this.factory = null;
@@ -726,7 +728,11 @@ class EnemySystem {
         this.factory.registerType('drone', {
           class: Drone,
           pool: GamePools?.drones || null,
-          defaults: { ...ENEMY_TYPES.drone },
+          defaults: {
+            ...ENEMY_TYPES.drone,
+            health: ENEMY_TYPES.drone?.health ?? 30,
+            maxHealth: ENEMY_TYPES.drone?.maxHealth ?? ENEMY_TYPES.drone?.health ?? 30,
+          },
           tags: ['enemy', 'hostile', 'ranged']
         });
       }
@@ -735,7 +741,11 @@ class EnemySystem {
         this.factory.registerType('mine', {
           class: Mine,
           pool: GamePools?.mines || null,
-          defaults: { ...ENEMY_TYPES.mine },
+          defaults: {
+            ...ENEMY_TYPES.mine,
+            health: ENEMY_TYPES.mine?.health ?? 20,
+            maxHealth: ENEMY_TYPES.mine?.maxHealth ?? ENEMY_TYPES.mine?.health ?? 20,
+          },
           tags: ['enemy', 'explosive', 'area-of-effect']
         });
       }
@@ -744,7 +754,12 @@ class EnemySystem {
         this.factory.registerType('hunter', {
           class: Hunter,
           pool: GamePools?.hunters || null,
-          defaults: { ...ENEMY_TYPES.hunter },
+          defaults: {
+            ...ENEMY_TYPES.hunter,
+            health: ENEMY_TYPES.hunter?.health ?? 60,
+            maxHealth:
+              ENEMY_TYPES.hunter?.maxHealth ?? ENEMY_TYPES.hunter?.health ?? 60,
+          },
           tags: ['enemy', 'hostile', 'ranged', 'elite']
         });
       }
@@ -1044,6 +1059,32 @@ class EnemySystem {
     this.refreshInjectedServices();
     let player = this.services.player || null;
 
+    if (!player && this.dependencies?.player) {
+      player = this.dependencies.player;
+      this.services.player = player;
+      this._playerCacheLogged = false;
+    }
+
+    if (
+      !player &&
+      typeof gameServices !== 'undefined' &&
+      typeof gameServices?.resolve === 'function'
+    ) {
+      const locatorPlayer = gameServices.resolve('player');
+      if (locatorPlayer) {
+        player = locatorPlayer;
+        this.services.player = locatorPlayer;
+        this.dependencies.player = locatorPlayer;
+        this._playerCacheLogged = false;
+        if (!this._playerLocatorResolveLogged) {
+          GameDebugLogger.log('STATE', 'getCachedPlayer resolved via gameServices', {
+            success: true,
+          });
+          this._playerLocatorResolveLogged = true;
+        }
+      }
+    }
+
     if (!player) {
       const resolved = resolveService('player', this.dependencies);
       if (resolved) {
@@ -1084,9 +1125,13 @@ class EnemySystem {
     }
 
     if (!this._playerCacheLogged) {
-      GameDebugLogger.log('STATE', 'getCachedPlayer called', {
-        hasServices: !!this.services,
-        hasPlayer: !!player,
+      GameDebugLogger.log('STATE', 'getCachedPlayer result', {
+        hasServicesPlayer: !!this.services?.player,
+        hasDependenciesPlayer: !!this.dependencies?.player,
+        hasGameServices:
+          typeof gameServices !== 'undefined' &&
+          typeof gameServices?.resolve === 'function',
+        finalPlayer: !!player,
         playerPosition: player?.position || null,
         playerX: Number.isFinite(player?.x) ? player.x : null,
         playerY: Number.isFinite(player?.y) ? player.y : null,
@@ -1992,6 +2037,21 @@ class EnemySystem {
     }
 
     this.refreshInjectedServices();
+
+    if (
+      !this.services.player &&
+      typeof gameServices !== 'undefined' &&
+      typeof gameServices?.resolve === 'function'
+    ) {
+      const lateBoundPlayer = gameServices.resolve('player');
+      if (lateBoundPlayer) {
+        this.services.player = lateBoundPlayer;
+        this.dependencies.player = lateBoundPlayer;
+        GameDebugLogger.log('STATE', 'Player service late-bound', {
+          success: true,
+        });
+      }
+    }
 
     const overrideValue =
       typeof globalThis !== 'undefined'

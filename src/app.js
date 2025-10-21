@@ -317,15 +317,46 @@ function init() {
     const ui = services['ui'] || gameServices.get('ui');
     if (ui) ui.showScreen('menu');
 
-    if (DEV_MODE) {
-      const playerSystem = services['player'] || gameServices.get('player');
-      const enemySystem = services['enemies'] || gameServices.get('enemies');
-      const physicsSystem = services['physics'] || gameServices.get('physics');
-      const combatSystem = services['combat'] || gameServices.get('combat');
-      const uiSystem = services['ui'] || gameServices.get('ui');
-      const effectsSystem = services['effects'] || gameServices.get('effects');
-      const audioSystem = services['audio'] || gameServices.get('audio');
+    const playerSystem = services['player'] || gameServices.get('player');
+    const enemySystem = services['enemies'] || gameServices.get('enemies');
+    const physicsSystem = services['physics'] || gameServices.get('physics');
+    const combatSystem = services['combat'] || gameServices.get('combat');
+    const uiSystem = services['ui'] || gameServices.get('ui');
+    const effectsSystem = services['effects'] || gameServices.get('effects');
+    const audioSystem = services['audio'] || gameServices.get('audio');
 
+    if (typeof gameServices !== 'undefined' && playerSystem) {
+      gameServices.register('player', playerSystem);
+      GameDebugLogger.log('INIT', 'Player registered in gameServices', {
+        success: true,
+        canResolve:
+          typeof gameServices.resolve === 'function'
+            ? !!gameServices.resolve('player')
+            : true,
+        playerPosition: playerSystem?.position || null,
+      });
+    }
+
+    if (enemySystem && typeof enemySystem.refreshInjectedServices === 'function') {
+      enemySystem.refreshInjectedServices();
+
+      if (DEV_MODE) {
+        GameDebugLogger.log('INIT', 'EnemySystem dependencies refreshed', {
+          hasPlayer: !!enemySystem.services?.player,
+          hasWorld: !!enemySystem.services?.world,
+          hasCombat: !!enemySystem.services?.combat,
+        });
+      }
+    }
+
+    if (DEV_MODE && enemySystem) {
+      GameDebugLogger.log('INIT', 'EnemySystem created with player', {
+        hasPlayerDependency: !!playerSystem,
+        enemySystemHasPlayer: !!enemySystem.services?.player,
+      });
+    }
+
+    if (DEV_MODE) {
       GameDebugLogger.log('INIT', 'Systems initialized', {
         player: !!playerSystem,
         enemies: !!enemySystem,

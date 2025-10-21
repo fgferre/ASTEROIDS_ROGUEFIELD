@@ -9,6 +9,7 @@ import {
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 import * as CONSTANTS from '../core/GameConstants.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
@@ -2346,6 +2347,35 @@ class UISystem {
     ].forEach(
       registerBossEvent
     );
+
+    gameEvents.on('boss-damaged', (data = {}) => {
+      if (!this.cachedValues?.boss?.visible) {
+        return;
+      }
+
+      const state = this.bossHudState || this.createInitialBossHudState();
+      const nextHealth = Number.isFinite(data.health) ? data.health : state.health;
+      const nextMaxHealth = Number.isFinite(data.maxHealth)
+        ? data.maxHealth
+        : state.maxHealth;
+
+      state.health = nextHealth;
+      state.maxHealth = nextMaxHealth;
+      state.lastEvent = 'boss-damaged';
+      state.lastUpdate = this.getHighResolutionTime();
+
+      this.bossHudState = state;
+      this.updateBossHealthBar(state);
+
+      GameDebugLogger.log('UI', 'Boss health bar updated', {
+        health: state.health,
+        maxHealth: state.maxHealth,
+        percent:
+          Number.isFinite(state.maxHealth) && state.maxHealth > 0
+            ? ((state.health / state.maxHealth) * 100).toFixed(1)
+            : null,
+      });
+    });
 
     gameEvents.on('player-reset', () => {
       this.resetBossHudState();

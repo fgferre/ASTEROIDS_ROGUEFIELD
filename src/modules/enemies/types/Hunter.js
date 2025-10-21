@@ -5,6 +5,7 @@ import {
 } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
+import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 
 const HUNTER_DEFAULTS = ENEMY_TYPES?.hunter ?? {};
 
@@ -67,6 +68,7 @@ export class Hunter extends BaseEnemy {
     this.turretAngle = this.rotation;
     this._hullGradient = null;
     this._hullGradientKey = null;
+    this._updateLogged = false;
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);
@@ -80,8 +82,8 @@ export class Hunter extends BaseEnemy {
     const defaults = ENEMY_TYPES?.hunter ?? {};
 
     this.radius = config.radius ?? defaults.radius ?? 16;
-    this.maxHealth = config.maxHealth ?? config.health ?? defaults.health ?? 48;
-    this.health = config.health ?? this.maxHealth;
+    this.health = config.health ?? defaults.health ?? 60;
+    this.maxHealth = config.maxHealth ?? this.health;
 
     this.preferredDistance =
       config.preferredDistance ?? defaults.preferredDistance ?? 175;
@@ -118,6 +120,17 @@ export class Hunter extends BaseEnemy {
     this.turretAngle = normalizeAngle(config.turretAngle ?? this.rotation);
     this._hullGradient = null;
     this._hullGradientKey = null;
+    this._updateLogged = false;
+
+    GameDebugLogger.log('SPAWN', 'Hunter initialized', {
+      id: this.id,
+      position: { x: Math.round(this.x ?? 0), y: Math.round(this.y ?? 0) },
+      wave: this.wave,
+      health: this.health,
+      maxHealth: this.maxHealth,
+      configHealth: config.health ?? null,
+      defaultsHealth: defaults.health ?? null,
+    });
 
     return this;
   }
@@ -168,21 +181,72 @@ export class Hunter extends BaseEnemy {
     return (min + max) * 0.5;
   }
 
+  resolvePlayerTarget() {
+    if (!this.system) {
+      return null;
+    }
+
+    const player =
+      typeof this.system.getCachedPlayer === 'function'
+        ? this.system.getCachedPlayer()
+        : null;
+
+    if (!player && !this._missingPlayerReferenceLogged) {
+      GameDebugLogger.log('ERROR', 'Hunter cannot find player target reference', {
+        id: this.id,
+        hasSystem: !!this.system,
+      });
+      this._missingPlayerReferenceLogged = true;
+    } else if (player && this._missingPlayerReferenceLogged) {
+      GameDebugLogger.log('STATE', 'Hunter player target reference restored', {
+        id: this.id,
+      });
+      this._missingPlayerReferenceLogged = false;
+    }
+
+    return player;
+  }
+
   onUpdate(deltaTime) {
     if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
       return;
     }
 
-    const player =
-      this.system && typeof this.system.getCachedPlayer === 'function'
-        ? this.system.getCachedPlayer()
-        : null;
+    if (!this._updateLogged) {
+      GameDebugLogger.log('UPDATE', 'Hunter.onUpdate() first call', {
+        id: this.id,
+        position: { x: Math.round(this.x ?? 0), y: Math.round(this.y ?? 0) },
+        hasTarget: !!this.target,
+        speed: this.speed,
+        acceleration: this.acceleration,
+      });
+      this._updateLogged = true;
+    }
+
+    if (!this.target) {
+      this.target = this.resolvePlayerTarget();
+
+      if (!this.target) {
+        GameDebugLogger.log('ERROR', 'Hunter cannot find player target', {
+          id: this.id,
+          hasSystem: !!this.system,
+        });
+        this.applyIdleDamping(deltaTime);
+        return;
+      }
+    }
+
+    const player = this.target;
     const playerPosition =
       this.system && typeof this.system.getPlayerPositionSnapshot === 'function'
         ? this.system.getPlayerPositionSnapshot(player)
         : player?.position;
 
     if (!playerPosition) {
+      GameDebugLogger.log('ERROR', 'Hunter cannot resolve player position', {
+        id: this.id,
+        hasTarget: !!this.target,
+      });
       this.applyIdleDamping(deltaTime);
       return;
     }
@@ -581,9 +645,19 @@ export class Hunter extends BaseEnemy {
     return gradient;
   }
 
-  onDestroyed(source) {
+  onDestroyed(source = null) {
+    const safeSource =
+      source || {
+        reason: 'unknown',
+        type: 'unknown',
+        context: {},
+      };
+
     this.destroyed = true;
-    super.onDestroyed(source);
+    super.onDestroyed({
+      ...safeSource,
+      reason: safeSource.reason || safeSource.cause || 'unknown',
+    });
   }
 
   resetForPool() {

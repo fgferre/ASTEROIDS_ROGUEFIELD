@@ -1,3 +1,5 @@
+import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
+
 /**
  * Enemy Factory
  *
@@ -139,10 +141,22 @@ export class EnemyFactory {
       return null;
     }
 
+    const mergedConfig = {
+      ...typeConfig.defaults,
+      ...config,
+      type,
+    };
+
+    GameDebugLogger.log('SPAWN', `Creating ${type} via factory`, {
+      type,
+      configHealth: config?.health ?? null,
+      defaultsHealth: typeConfig?.defaults?.health ?? null,
+      mergedHealth: mergedConfig?.health ?? null,
+    });
+
     let enemy = null;
     const stats = this.stats.get(type);
 
-    // Try to acquire from pool first
     if (typeConfig.pool) {
       enemy = typeConfig.pool.acquire();
       if (enemy) {
@@ -150,10 +164,9 @@ export class EnemyFactory {
       }
     }
 
-    // Create new instance if pool unavailable or empty
     if (!enemy) {
       try {
-        enemy = new typeConfig.class(this.system);
+        enemy = new typeConfig.class(this.system, mergedConfig);
         stats.created++;
       } catch (error) {
         console.error(`[EnemyFactory] Failed to create ${type}:`, error);
@@ -161,21 +174,10 @@ export class EnemyFactory {
       }
     }
 
-    // Merge configuration: defaults < provided config
-    const finalConfig = {
-      ...typeConfig.defaults,
-      ...config,
-      type: type  // Ensure type is set
-    };
-
     // Initialize enemy
     try {
       if (typeof enemy.initialize === 'function') {
-        if (enemy.initialize.length === 0) {
-          enemy.initialize(finalConfig);
-        } else {
-          enemy.initialize(this.system, finalConfig);
-        }
+        enemy.initialize(mergedConfig);
       }
 
       // Apply default tags
@@ -184,6 +186,12 @@ export class EnemyFactory {
       }
 
       stats.active++;
+
+      GameDebugLogger.log('SPAWN', `${type} created`, {
+        id: enemy?.id || null,
+        health: enemy?.health ?? null,
+        maxHealth: enemy?.maxHealth ?? null,
+      });
 
       return enemy;
     } catch (error) {

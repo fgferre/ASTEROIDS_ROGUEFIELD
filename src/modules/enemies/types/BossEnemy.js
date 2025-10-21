@@ -1022,6 +1022,16 @@ export class BossEnemy extends BaseEnemy {
 
     this.health -= actualDamage;
 
+    if (typeof gameEvents !== 'undefined' && gameEvents?.emit) {
+      gameEvents.emit('boss-damaged', {
+        enemy: this,
+        damage: actualDamage,
+        health: this.health,
+        maxHealth: this.maxHealth,
+        phase: this.currentPhase,
+      });
+    }
+
     if (typeof this.onDamaged === 'function') {
       this.onDamaged(actualDamage, source);
     }
