@@ -1,6 +1,7 @@
 import * as CONSTANTS from '../core/GameConstants.js';
 import { SpatialHash } from '../core/SpatialHash.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 
 const ASTEROID_POOL_ID = Symbol.for('ASTEROIDS_ROGUEFIELD:asteroidPoolId');
 
@@ -1362,6 +1363,31 @@ class PhysicsSystem {
       }
 
       if (closestMatch) {
+        if (closestMatch.type === 'boss') {
+          const bossRadius = this.resolveEnemyCollisionRadius(closestMatch);
+          const effectiveBossRadius = Number.isFinite(bossRadius)
+            ? bossRadius
+            : closestMatch.radius || 0;
+          const distance = Math.sqrt(Math.max(0, closestDistanceSq));
+          const hitRadius = (bulletRadius || 0) + effectiveBossRadius;
+
+          GameDebugLogger.log('COLLISION', 'Bullet hit boss', {
+            bulletPosition: {
+              x: Math.round(bullet.x ?? 0),
+              y: Math.round(bullet.y ?? 0),
+            },
+            bossPosition: {
+              x: Math.round(closestMatch.x ?? 0),
+              y: Math.round(closestMatch.y ?? 0),
+            },
+            distance: Number.isFinite(distance) ? Number(distance.toFixed(2)) : distance,
+            hitRadius: Number.isFinite(hitRadius) ? Number(hitRadius.toFixed(2)) : hitRadius,
+            damage: bullet.damage || 0,
+            bossHealth: closestMatch.health,
+            bossInvulnerable: !!closestMatch.invulnerable,
+          });
+        }
+
         handler(bullet, closestMatch);
       }
     }
@@ -1473,6 +1499,27 @@ class PhysicsSystem {
     result.collided = true;
     result.enemyRadius = asteroidRadius;
     result.maxDistance = maxDistance;
+
+    if (isBoss) {
+      const contactDamage = Number.isFinite(asteroid.contactDamage)
+        ? asteroid.contactDamage
+        : 45;
+
+      GameDebugLogger.log('COLLISION', 'Player collided with boss', {
+        playerPosition: {
+          x: Math.round(position.x ?? 0),
+          y: Math.round(position.y ?? 0),
+        },
+        bossPosition: {
+          x: Math.round(asteroid.x ?? 0),
+          y: Math.round(asteroid.y ?? 0),
+        },
+        distance: Number.isFinite(distanceSq)
+          ? Number(Math.sqrt(Math.max(0, distanceSq)).toFixed(2))
+          : null,
+        contactDamage,
+      });
+    }
 
     const distance = Math.sqrt(distanceSq);
     const nx = distance > 0 ? dx / distance : 0;

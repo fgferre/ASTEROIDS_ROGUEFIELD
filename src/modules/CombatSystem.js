@@ -3,6 +3,7 @@ import * as CONSTANTS from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 import { drawEnemyProjectile } from '../utils/drawEnemyProjectile.js';
+import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 
 class CombatSystem {
   constructor(dependencies = {}) {
@@ -1758,6 +1759,8 @@ class CombatSystem {
       return null;
     }
 
+    const isBossProjectile = this.isBossProjectileSource(data);
+
     const velocity = data.velocity || data.projectile?.velocity || {};
     const vx = Number.isFinite(velocity?.x) ? velocity.x : 0;
     const vy = Number.isFinite(velocity?.y) ? velocity.y : 0;
@@ -1775,7 +1778,11 @@ class CombatSystem {
     bullet.vx = vx;
     bullet.vy = vy;
     bullet.speed = bulletSpeed;
-    bullet.damage = this.resolveEnemyProjectileDamage(data, projectile);
+    const damage = this.resolveEnemyProjectileDamage(
+      { ...data, isBossProjectile },
+      projectile
+    );
+    bullet.damage = damage;
 
     const lifetime = Number.isFinite(projectile.lifetime)
       ? Math.max(0.05, projectile.lifetime)
@@ -1786,11 +1793,13 @@ class CombatSystem {
     bullet.hit = false;
     bullet.active = true;
     bullet.type = 'enemy';
-    bullet.isBossProjectile = this.isBossProjectileSource(data);
-    bullet.color = this.resolveEnemyProjectileColor(data, projectile);
+    bullet.isBossProjectile = isBossProjectile;
+    bullet.color = this.resolveEnemyProjectileColor({ ...data, isBossProjectile }, projectile);
 
     if (Number.isFinite(projectile.radius)) {
       bullet.radius = Math.max(0, projectile.radius);
+    } else if (isBossProjectile) {
+      bullet.radius = 6;
     } else if (!Number.isFinite(bullet.radius)) {
       bullet.radius = CONSTANTS.BULLET_SIZE || 0;
     }
@@ -1815,6 +1824,15 @@ class CombatSystem {
           wave: data.wave ?? data.enemy?.wave ?? null,
         }
       : null;
+
+    if (isBossProjectile) {
+      GameDebugLogger.log('EVENT', 'Boss fired projectile', {
+        pattern: projectile.pattern || null,
+        phase: projectile.phase ?? data.enemy?.currentPhase ?? null,
+        damage: damage,
+        position: { x: posX, y: posY },
+      });
+    }
 
     this.enemyBullets.push(bullet);
 
@@ -1896,6 +1914,10 @@ class CombatSystem {
       return projectile.color;
     }
 
+    if (data.isBossProjectile) {
+      return '#ff6b6b';
+    }
+
     const enemyType =
       data.enemyType ?? data.source?.type ?? data.enemy?.type ?? null;
 
@@ -1928,6 +1950,10 @@ class CombatSystem {
     const enemyConfig = enemyType ? CONSTANTS.ENEMY_TYPES?.[enemyType] : null;
     if (enemyConfig && Number.isFinite(enemyConfig.projectileDamage)) {
       return enemyConfig.projectileDamage;
+    }
+
+    if (data.isBossProjectile) {
+      return 35;
     }
 
     return 10;
@@ -2065,6 +2091,22 @@ class CombatSystem {
       if (collided) {
         bullet.hit = true;
         bullet.life = 0;
+
+        if (bullet.isBossProjectile) {
+          GameDebugLogger.log('COLLISION', 'Boss projectile hit player', {
+            projectilePosition: {
+              x: Math.round(bullet.x ?? 0),
+              y: Math.round(bullet.y ?? 0),
+            },
+            playerPosition: {
+              x: Math.round(playerPosition?.x ?? 0),
+              y: Math.round(playerPosition?.y ?? 0),
+            },
+            damage: Number.isFinite(bullet.damage) ? bullet.damage : 0,
+            enemyId: bullet.enemyId ?? null,
+            enemyType: bullet.enemyType ?? null,
+          });
+        }
 
         if (typeof gameEvents !== 'undefined') {
           hitsToEmit.push({
@@ -2231,6 +2273,27 @@ class CombatSystem {
           killed: Boolean(enemy.destroyed),
           remainingHealth: Math.max(0, enemy.health ?? 0),
         };
+
+    if (enemy.type === 'boss') {
+      const maxHealth = Number.isFinite(enemy.maxHealth) ? enemy.maxHealth : null;
+      const remainingHealth = Number.isFinite(damageResult.remainingHealth)
+        ? damageResult.remainingHealth
+        : enemy.health ?? null;
+      const healthPercent =
+        maxHealth && Number.isFinite(remainingHealth)
+          ? Number(((remainingHealth / maxHealth) * 100).toFixed(1))
+          : null;
+
+      GameDebugLogger.log('DAMAGE', 'Boss took damage', {
+        damage: Number.isFinite(bullet.damage) ? bullet.damage : 0,
+        killed: !!damageResult.killed,
+        newHealth: remainingHealth,
+        maxHealth,
+        healthPercent,
+        phase: enemy.currentPhase ?? null,
+        invulnerable: !!enemy.invulnerable,
+      });
+    }
 
     if (typeof gameEvents !== 'undefined') {
       gameEvents.emit('bullet-hit', {

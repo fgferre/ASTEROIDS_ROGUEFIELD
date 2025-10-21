@@ -22,6 +22,7 @@
 import * as CONSTANTS from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../../../core/serviceUtils.js';
+import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 
 export class WaveManager {
   /**
@@ -1113,7 +1114,13 @@ export class WaveManager {
     let config;
 
     if (this.isBossWave(waveNumber)) {
+      GameDebugLogger.log('WAVE', 'Boss wave detected', { wave: waveNumber });
       config = this.generateBossWave(waveNumber);
+      GameDebugLogger.log('WAVE', 'Boss wave config generated', {
+        hasBoss: !!config?.boss,
+        bossType: config?.boss?.type,
+        supportGroups: config?.supportGroups?.length || 0,
+      });
     } else {
       if (legacyCompatibilityEnabled) {
         config = this.generateDynamicWave(waveNumber);
@@ -1551,20 +1558,19 @@ export class WaveManager {
   }
 
   spawnBossEnemy(bossConfig = {}, waveConfig = {}) {
-    if (typeof console !== 'undefined' && typeof console.log === 'function') {
-      console.log('[WaveManager] spawnBossEnemy() called', {
-        hasEnemySystem: !!this.enemySystem,
-        hasSpawnBoss: typeof this.enemySystem?.spawnBoss,
-        enemySystemKeys: this.enemySystem
-          ? Object.keys(this.enemySystem).slice(0, 10)
-          : [],
-      });
-    }
+    GameDebugLogger.log('SPAWN', 'Boss spawn attempted', {
+      type: bossConfig.type,
+      entrance: bossConfig.entrance,
+      wave: this.currentWave,
+    });
 
     if (!this.enemySystem) {
       if (typeof console !== 'undefined' && typeof console.error === 'function') {
         console.error('[WaveManager] Cannot spawn boss - enemySystem is not defined');
       }
+      GameDebugLogger.log('ERROR', 'Boss spawn failed - enemySystem unavailable', {
+        hasEnemySystem: false,
+      });
       return null;
     }
 
@@ -1576,6 +1582,9 @@ export class WaveManager {
           enemySystemConstructor: this.enemySystem.constructor?.name,
         });
       }
+      GameDebugLogger.log('ERROR', 'Boss spawn failed - spawnBoss() missing on enemySystem', {
+        hasSpawnBoss: typeof this.enemySystem.spawnBoss === 'function',
+      });
       return null;
     }
 
@@ -1587,31 +1596,48 @@ export class WaveManager {
             width: CONSTANTS.GAME_WIDTH || 800,
             height: CONSTANTS.GAME_HEIGHT || 600,
           };
+
     const player = this.enemySystem.getCachedPlayer();
     const playerSnapshot =
       typeof this.enemySystem.getPlayerPositionSnapshot === 'function'
         ? this.enemySystem.getPlayerPositionSnapshot(player)
         : null;
+
+    const spawnRandom = this.resolveScopedRandom(
+      this.getRandomScope ? this.getRandomScope('boss-spawn') : null,
+      'spawn',
+      'boss-position'
+    );
+
     const safeDistance = Math.max(
       Number(bossConfig.safeDistance) || 0,
       (CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200) * 2,
       (bossConfig.radius || CONSTANTS.BOSS_CONFIG?.radius || 60) * 1.25
     );
 
-    const hasValidPlayerSnapshot =
-      playerSnapshot && Number.isFinite(playerSnapshot.x) && Number.isFinite(playerSnapshot.y);
+    let spawnPosition;
+    if (
+      bossConfig?.spawnPosition &&
+      Number.isFinite(bossConfig.spawnPosition.x) &&
+      Number.isFinite(bossConfig.spawnPosition.y)
+    ) {
+      spawnPosition = { ...bossConfig.spawnPosition };
+    } else {
+      spawnPosition = this.calculateBossSpawnPosition(
+        worldBounds,
+        bossConfig.entrance || 'top-center',
+        safeDistance,
+        playerSnapshot,
+        spawnRandom
+      );
+    }
 
-    const spawnPosition = hasValidPlayerSnapshot || bossConfig?.spawnPosition
-      ? this.resolveBossSpawnPosition(
-          bossConfig,
-          worldBounds,
-          hasValidPlayerSnapshot ? playerSnapshot : null,
-          safeDistance
-        )
-      : this.calculateEdgeSpawnPosition(
-          worldBounds,
-          this.getRandomScope('spawn')
-        );
+    GameDebugLogger.log('SPAWN', 'Boss position calculated', {
+      x: spawnPosition.x,
+      y: spawnPosition.y,
+      entrance: bossConfig.entrance || 'top-center',
+      worldBounds,
+    });
 
     const metadata = {
       ...(bossConfig.metadata || {}),
@@ -1624,7 +1650,7 @@ export class WaveManager {
         : undefined,
     };
 
-    const spawnConfig = {
+    const bossSpawnConfig = {
       ...bossConfig,
       x: spawnPosition.x,
       y: spawnPosition.y,
@@ -1639,38 +1665,54 @@ export class WaveManager {
       metadata,
     };
 
-    const boss = this.enemySystem.spawnBoss(spawnConfig);
+    const boss = this.enemySystem.spawnBoss(bossSpawnConfig);
 
-    if (typeof console !== 'undefined' && typeof console.log === 'function') {
-      console.log('[WaveManager] Boss spawn result:', {
-        spawned: !!boss,
-        bossType: boss?.type,
-        bossId: boss?.id,
+    if (!boss) {
+      GameDebugLogger.log('ERROR', 'Boss spawn failed - no instance returned', {
+        config: bossSpawnConfig,
       });
+      return null;
     }
 
-    if (boss) {
-      // EnemySystem.spawnBoss() will skip wave accounting when we pass the flag,
-      // so we track the spawn locally for wave metrics.
-      this.enemiesSpawnedThisWave += 1;
-    }
+    GameDebugLogger.log('SPAWN', 'Boss spawned successfully', {
+      id: boss.id,
+      type: boss.type,
+      position: { x: boss.x, y: boss.y },
+      health: boss.health,
+      maxHealth: boss.maxHealth,
+      phase: boss.currentPhase,
+    });
+
+    this.enemiesSpawnedThisWave += 1;
 
     return boss;
   }
 
-  resolveBossSpawnPosition(
-    bossConfig = {},
-    bounds = { width: 800, height: 600 },
-    player,
-    safeDistance = (CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200) * 2
+  calculateBossSpawnPosition(
+    worldBounds = { width: 800, height: 600 },
+    entrance = 'top-center',
+    safeDistance = (CONSTANTS.ASTEROID_SAFE_SPAWN_DISTANCE || 200) * 2,
+    playerSnapshot = null,
+    random = this.getRandomScope('spawn')
   ) {
-    const spawnPosition = bossConfig.spawnPosition || {};
-    if (Number.isFinite(spawnPosition.x) && Number.isFinite(spawnPosition.y)) {
-      return { x: spawnPosition.x, y: spawnPosition.y };
-    }
+    const bounds = {
+      width: worldBounds?.width || CONSTANTS.GAME_WIDTH || 800,
+      height: worldBounds?.height || CONSTANTS.GAME_HEIGHT || 600,
+    };
 
-    const entrance = bossConfig.entrance || 'top-center';
-    const offset = bossConfig.spawnOffset || Math.max(safeDistance, (bossConfig.radius || 60) * 1.5);
+    const generator = this.resolveScopedRandom(random, 'spawn', 'boss-position');
+    const bossRadius = CONSTANTS.BOSS_CONFIG?.radius || 60;
+    const fallbackOffset = bossRadius * 1.5;
+    const offset = Math.max(Number(safeDistance) || 0, fallbackOffset);
+
+    const getRange = (min, max) => {
+      if (generator && typeof generator.range === 'function') {
+        return generator.range(min, max);
+      }
+      const span = max - min;
+      const value = generator && typeof generator.float === 'function' ? generator.float() : Math.random();
+      return min + span * value;
+    };
 
     let x = bounds.width / 2;
     let y = -offset;
@@ -1682,39 +1724,39 @@ export class WaveManager {
         break;
       case 'bottom-center':
       case 'bottom':
-        x = bounds.width / 2;
+        x = getRange(bounds.width * 0.25, bounds.width * 0.75);
         y = bounds.height + offset;
         break;
       case 'left':
       case 'left-center':
         x = -offset;
-        y = bounds.height / 2;
+        y = getRange(bounds.height * 0.25, bounds.height * 0.75);
         break;
       case 'right':
       case 'right-center':
         x = bounds.width + offset;
-        y = bounds.height / 2;
+        y = getRange(bounds.height * 0.25, bounds.height * 0.75);
         break;
       case 'top-center':
       default:
-        x = bounds.width / 2;
+        x = getRange(bounds.width * 0.25, bounds.width * 0.75);
         y = -offset;
         break;
     }
 
-    if (player && Number.isFinite(player.x) && Number.isFinite(player.y)) {
-      const dx = x - player.x;
-      const dy = y - player.y;
+    if (playerSnapshot && Number.isFinite(playerSnapshot.x) && Number.isFinite(playerSnapshot.y)) {
+      const dx = x - playerSnapshot.x;
+      const dy = y - playerSnapshot.y;
       const distance = Math.hypot(dx, dy);
 
-      if (distance < safeDistance) {
+      if (distance < offset) {
         if (distance === 0) {
-          x = player.x;
-          y = player.y - safeDistance;
+          x = playerSnapshot.x;
+          y = playerSnapshot.y - offset;
         } else {
-          const scale = safeDistance / distance;
-          x = player.x + dx * scale;
-          y = player.y + dy * scale;
+          const scale = offset / distance;
+          x = playerSnapshot.x + dx * scale;
+          y = playerSnapshot.y + dy * scale;
         }
       }
     }
@@ -2004,6 +2046,14 @@ export class WaveManager {
     this.waveInProgress = false;
     this.waveEndTime = Date.now();
     const duration = (this.waveEndTime - this.waveStartTime) / 1000;
+
+    GameDebugLogger.log('WAVE', 'Wave complete', {
+      wave: this.currentWave,
+      duration: Number.isFinite(duration) ? Number(duration.toFixed(3)) : duration,
+      enemiesKilled: this.enemiesKilledThisWave,
+      enemiesSpawned: this.enemiesSpawnedThisWave,
+      isBossWave: this.isBossWave(this.currentWave),
+    });
 
     this._legacyRegisteredEnemies = new WeakSet();
 

@@ -1,4 +1,5 @@
 import { GamePools } from './core/GamePools.js';
+import * as CONSTANTS from './core/GameConstants.js';
 import {
   resolveDebugPreference,
   applyDebugPreference,
@@ -11,6 +12,7 @@ import {
 } from './bootstrap/serviceManifest.js';
 import { installMathRandomGuard } from './utils/dev/mathRandomGuard.js';
 import GameSessionService from './services/GameSessionService.js';
+import { GameDebugLogger } from './utils/dev/GameDebugLogger.js';
 
 // Dependency Injection System (Phase 2.1)
 import { DIContainer } from './core/DIContainer.js';
@@ -155,6 +157,19 @@ function initializeDependencyInjection(manifestContext) {
       console.log('[App] ℹ Performance monitor available: window.performanceMonitor');
       console.log('[App] ℹ Auto-logging enabled (logs saved to localStorage)');
       console.log('[App] ℹ Get logs: localStorage.getItem("performanceLog")');
+
+      window.downloadDebugLog = () => GameDebugLogger.download();
+      window.clearDebugLog = () => GameDebugLogger.clear();
+      window.showDebugLog = () => console.log(GameDebugLogger.getLogContent());
+
+      console.log('%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'color: #00ff00');
+      console.log('%c🎮 ASTEROIDS ROGUEFIELD - Debug Mode Active', 'color: #00ff00; font-weight: bold; font-size: 14px');
+      console.log('%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'color: #00ff00');
+      console.log('%cDebug Commands:', 'color: #ffff00; font-weight: bold');
+      console.log('%c  downloadDebugLog()  %c- Download game-debug.log file', 'color: #00ff00', 'color: #ffffff');
+      console.log('%c  showDebugLog()      %c- Show log in console', 'color: #00ff00', 'color: #ffffff');
+      console.log('%c  clearDebugLog()     %c- Clear current log', 'color: #00ff00', 'color: #ffffff');
+      console.log('%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'color: #00ff00');
     }
 
     console.log('[App] ✓ DI system initialized successfully');
@@ -182,6 +197,15 @@ function bootstrapDebugLogging() {
 }
 
 function init() {
+  if (process.env.NODE_ENV === 'development') {
+    GameDebugLogger.init();
+    GameDebugLogger.log('INIT', 'Game starting', {
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+      viewport: `${window.innerWidth}x${window.innerHeight}`,
+    });
+  }
+
   try {
     if (process.env.NODE_ENV === 'development' && !mathRandomGuard) {
       mathRandomGuard = installMathRandomGuard({ logger: console });
@@ -212,6 +236,17 @@ function init() {
       randomSeed: initialSeed,
       randomSeedSource: seedSource
     };
+
+    if (process.env.NODE_ENV === 'development') {
+      GameDebugLogger.log('INIT', 'Feature Flags', {
+        USE_WAVE_MANAGER: CONSTANTS.USE_WAVE_MANAGER,
+        WAVEMANAGER_HANDLES_ASTEROID_SPAWN: CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
+        WAVE_BOSS_INTERVAL: CONSTANTS.WAVE_BOSS_INTERVAL,
+        PRESERVE_LEGACY_SIZE_DISTRIBUTION: CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION,
+        PRESERVE_LEGACY_POSITIONING: CONSTANTS.PRESERVE_LEGACY_POSITIONING,
+        STRICT_LEGACY_SPAWN_SEQUENCE: CONSTANTS.STRICT_LEGACY_SPAWN_SEQUENCE,
+      });
+    }
 
     // Initialize DI system first (Phase 2.1)
     const diInitialized = initializeDependencyInjection(manifestContext);
@@ -263,6 +298,29 @@ function init() {
     const ui = services['ui'] || gameServices.get('ui');
     if (ui) ui.showScreen('menu');
 
+    if (process.env.NODE_ENV === 'development') {
+      const playerSystem = services['player'] || gameServices.get('player');
+      const enemySystem = services['enemies'] || gameServices.get('enemies');
+      const physicsSystem = services['physics'] || gameServices.get('physics');
+      const combatSystem = services['combat'] || gameServices.get('combat');
+      const uiSystem = services['ui'] || gameServices.get('ui');
+      const effectsSystem = services['effects'] || gameServices.get('effects');
+      const audioSystem = services['audio'] || gameServices.get('audio');
+
+      GameDebugLogger.log('INIT', 'Systems initialized', {
+        player: !!playerSystem,
+        enemies: !!enemySystem,
+        physics: !!physicsSystem,
+        combat: !!combatSystem,
+        ui: !!uiSystem,
+        effects: !!effectsSystem,
+        audio: !!audioSystem,
+        waveManager: !!enemySystem?.waveManager,
+        factory: !!enemySystem?.factory,
+        pools: !!GamePools,
+      });
+    }
+
     gameState.initialized = true;
 
     if (process.env.NODE_ENV === 'development') {
@@ -275,6 +333,16 @@ function init() {
       console.log('Container:', diContainer.getStats());
       console.log('Validation:', diContainer.validate());
       console.groupEnd();
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      window.addEventListener('beforeunload', () => {
+        const enemySystem = gameServices.get('enemies');
+        GameDebugLogger.log('STATE', 'Game closing', {
+          totalWaves: enemySystem?.waveState?.current || 0,
+          sessionDuration: (Date.now() - GameDebugLogger.sessionStart) / 1000,
+        });
+      });
     }
 
     requestAnimationFrame(gameLoop);

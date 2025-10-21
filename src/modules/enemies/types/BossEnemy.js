@@ -1,6 +1,7 @@
 import * as CONSTANTS from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
+import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 
 const SOURCE_CONFIG = CONSTANTS?.BOSS_CONFIG || {};
 
@@ -145,6 +146,7 @@ export class BossEnemy extends BaseEnemy {
 
     this.type = 'boss';
     this.addTag('boss');
+    this._drawLogged = false;
 
     const waveNumber = Math.max(1, config.wave || this.wave || 1);
     this.wave = waveNumber;
@@ -247,10 +249,24 @@ export class BossEnemy extends BaseEnemy {
     this.chargeState = 'idle';
     this.chargeStateTimer = 0;
 
+    this._lastUpdateLog = 0;
+    this._drawLogged = false;
+
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;
 
     this.renderPayload = this.buildRenderPayload();
+
+    GameDebugLogger.log('SPAWN', 'BossEnemy initialized', {
+      id: this.id,
+      wave: this.wave,
+      position: { x: this.x, y: this.y },
+      health: this.health,
+      maxHealth: this.maxHealth,
+      radius: this.radius,
+      phaseCount: this.phaseCount,
+      phaseThresholds: [...this.phaseHealthThresholds],
+    });
 
     return this;
   }
@@ -280,6 +296,32 @@ export class BossEnemy extends BaseEnemy {
   onUpdate(deltaTime) {
     if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
       return;
+    }
+
+    const now = Date.now();
+    if (!this._lastUpdateLog || now - this._lastUpdateLog > 2000) {
+      const velocity = {
+        vx: Number.isFinite(this.vx) ? Number(this.vx.toFixed(2)) : 0,
+        vy: Number.isFinite(this.vy) ? Number(this.vy.toFixed(2)) : 0,
+      };
+      const healthPercent =
+        Number.isFinite(this.maxHealth) && this.maxHealth > 0
+          ? Number(((this.health / this.maxHealth) * 100).toFixed(1))
+          : null;
+
+      GameDebugLogger.log('UPDATE', 'Boss.onUpdate()', {
+        id: this.id,
+        position: { x: Math.round(this.x ?? 0), y: Math.round(this.y ?? 0) },
+        velocity,
+        health: this.health,
+        maxHealth: this.maxHealth,
+        healthPercent,
+        currentPhase: this.currentPhase,
+        invulnerable: !!this.invulnerable,
+        chargeState: this.chargeState,
+      });
+
+      this._lastUpdateLog = now;
     }
 
     this.updateInvulnerability(deltaTime);
@@ -742,6 +784,7 @@ export class BossEnemy extends BaseEnemy {
       return;
     }
 
+    const previousPhase = this.currentPhase;
     this.currentPhase = Math.min(this.phaseCount - 1, this.currentPhase + 1);
     this.nextPhaseIndex += 1;
 
@@ -764,9 +807,33 @@ export class BossEnemy extends BaseEnemy {
         maxHealth: this.maxHealth,
       });
     }
+
+    const healthPercent =
+      Number.isFinite(this.maxHealth) && this.maxHealth > 0
+        ? Number(((this.health / this.maxHealth) * 100).toFixed(1))
+        : null;
+
+    GameDebugLogger.log('STATE', 'Boss phase transition', {
+      id: this.id,
+      oldPhase: previousPhase,
+      newPhase: this.currentPhase,
+      health: this.health,
+      maxHealth: this.maxHealth,
+      healthPercent,
+      invulnerable: !!this.invulnerable,
+      invulnerabilityDuration: this.invulnerabilityTimer,
+    });
   }
 
   onDestroyed(source) {
+    GameDebugLogger.log('STATE', 'Boss destroyed', {
+      id: this.id,
+      wave: this.wave,
+      finalPhase: this.currentPhase,
+      position: { x: this.x, y: this.y },
+      rewards: { ...this.rewards },
+    });
+
     const payload = {
       enemy: this,
       wave: this.wave,
@@ -786,6 +853,17 @@ export class BossEnemy extends BaseEnemy {
   }
 
   onDraw(ctx) {
+    if (!this._drawLogged) {
+      GameDebugLogger.log('RENDER', 'Boss.onDraw() first call', {
+        id: this.id,
+        position: { x: this.x, y: this.y },
+        radius: this.radius,
+        phase: this.currentPhase,
+        color: this.phaseColors[this.currentPhase] || null,
+      });
+      this._drawLogged = true;
+    }
+
     const payload = this.buildRenderPayload();
     this.renderPayload = payload;
 
