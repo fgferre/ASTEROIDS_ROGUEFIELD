@@ -1548,22 +1548,15 @@ export class WaveManager {
             spawnContext.random
           );
         } else if (isTacticalEnemy) {
+          const clampMarginX = Math.min(50, Math.max(0, worldBounds.width / 2));
+          const clampMarginY = Math.min(50, Math.max(0, worldBounds.height / 2));
+
           if (playerSnapshot) {
             position = this.calculateSafeSpawnPosition(
               worldBounds,
               playerSnapshot,
               safeDistance,
               spawnContext.random
-            );
-
-            const clampMargin = 50;
-            position.x = Math.max(
-              clampMargin,
-              Math.min(worldBounds.width - clampMargin, position.x)
-            );
-            position.y = Math.max(
-              clampMargin,
-              Math.min(worldBounds.height - clampMargin, position.y)
             );
           } else {
             const randomRange =
@@ -1577,11 +1570,30 @@ export class WaveManager {
             };
           }
 
+          if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) {
+            position = {
+              x: worldBounds.width / 2,
+              y: worldBounds.height / 2,
+            };
+          }
+
+          const minX = clampMarginX;
+          const maxX = Math.max(clampMarginX, worldBounds.width - clampMarginX);
+          const minY = clampMarginY;
+          const maxY = Math.max(clampMarginY, worldBounds.height - clampMarginY);
+
+          position.x = Math.min(Math.max(position.x, minX), maxX);
+          position.y = Math.min(Math.max(position.y, minY), maxY);
+
           const inBounds = this.isPositionWithinBounds(position, worldBounds);
 
           GameDebugLogger.log('SPAWN', `${enemyGroup.type} position calculated`, {
             type: enemyGroup.type,
             position: { x: Math.round(position.x), y: Math.round(position.y) },
+            clampRange: {
+              x: [Math.round(minX), Math.round(maxX)],
+              y: [Math.round(minY), Math.round(maxY)],
+            },
             inBounds,
             worldBounds,
           });

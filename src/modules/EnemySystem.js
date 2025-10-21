@@ -3270,6 +3270,10 @@ class EnemySystem {
     }
 
     const playerPosition = this.getPlayerPositionSnapshot(player);
+    const normalizedDamage = Math.max(
+      0,
+      Number.isFinite(amount) ? amount : 0
+    );
 
     const hasBlastRadius =
       context &&
@@ -3301,7 +3305,7 @@ class EnemySystem {
     const previousShieldHP = Number.isFinite(player.shieldHP) ? player.shieldHP : 0;
     const previousHealth = Number.isFinite(player.health) ? player.health : null;
 
-    const remaining = player.takeDamage(amount);
+    const remaining = player.takeDamage(normalizedDamage);
     const currentHealth = Number.isFinite(player.health) ? player.health : previousHealth;
     const currentShieldHP = Number.isFinite(player.shieldHP) ? player.shieldHP : 0;
 
@@ -3312,6 +3316,8 @@ class EnemySystem {
     const shieldAbsorbed = wasShieldActive
       ? Math.max(0, previousShieldHP - currentShieldHP)
       : 0;
+    const fullyAbsorbed =
+      !healthChanged && normalizedDamage > 0 && shieldAbsorbed >= normalizedDamage;
 
     if (healthChanged && Number.isFinite(currentHealth) && currentHealth > 0) {
       if (typeof player.setInvulnerableTimer === 'function') {
@@ -3335,7 +3341,7 @@ class EnemySystem {
 
     if (typeof gameEvents !== 'undefined') {
       const baseEventPayload = {
-        damage: amount,
+        damage: normalizedDamage,
         remaining: Number.isFinite(currentHealth) ? currentHealth : remaining,
         max: Number.isFinite(player.maxHealth) ? player.maxHealth : undefined,
         position: eventPosition,
@@ -3344,13 +3350,14 @@ class EnemySystem {
         source: context.source || null,
         cause: damageCause,
         shieldAbsorbed,
+        fullyAbsorbed,
       };
 
       if (healthChanged) {
         const healthDamage =
           Number.isFinite(previousHealth) && Number.isFinite(currentHealth)
             ? previousHealth - currentHealth
-            : amount;
+            : normalizedDamage;
         gameEvents.emit('player-took-damage', {
           ...baseEventPayload,
           applied: true,
