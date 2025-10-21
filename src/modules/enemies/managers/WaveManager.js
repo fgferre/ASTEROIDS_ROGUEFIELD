@@ -750,10 +750,40 @@ export class WaveManager {
   }
 
   shouldWaveManagerSpawnAsteroids() {
-    const waveManagerHandles = CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false;
-    const useWaveManager = CONSTANTS.USE_WAVE_MANAGER ?? false;
+    const handlesOverride =
+      typeof globalThis !== 'undefined'
+        ? globalThis.__WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__
+        : undefined;
 
-    return Boolean(waveManagerHandles && useWaveManager);
+    if (handlesOverride === true) {
+      return true;
+    }
+    if (handlesOverride === false) {
+      return false;
+    }
+
+    const useOverride =
+      typeof globalThis !== 'undefined'
+        ? globalThis.__USE_WAVE_MANAGER_OVERRIDE__
+        : undefined;
+
+    const waveManagerHandles =
+      typeof CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN === 'boolean'
+        ? CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN
+        : false;
+    const useWaveManagerFlag =
+      typeof CONSTANTS.USE_WAVE_MANAGER === 'boolean'
+        ? CONSTANTS.USE_WAVE_MANAGER
+        : false;
+
+    const resolvedUseWaveManager =
+      useOverride === true
+        ? true
+        : useOverride === false
+        ? false
+        : useWaveManagerFlag;
+
+    return Boolean(waveManagerHandles && resolvedUseWaveManager);
   }
 
   registerActiveEnemy(enemy, { skipDuplicateCheck = false } = {}) {
@@ -805,6 +835,11 @@ export class WaveManager {
       coerce(this.totalAsteroidEnemiesThisWave) + 1;
     this.asteroidsSpawnedThisWave = coerce(this.asteroidsSpawnedThisWave) + 1;
 
+    if (!this.shouldWaveManagerSpawnAsteroids()) {
+      this.totalEnemiesThisWave = this.enemiesSpawnedThisWave;
+      this.totalAsteroidEnemiesThisWave = this.asteroidsSpawnedThisWave;
+    }
+
     if (
       typeof process !== 'undefined' &&
       process.env?.NODE_ENV === 'development' &&
@@ -852,24 +887,61 @@ export class WaveManager {
   }
 
   computeSupportWeights(waveNumber) {
-    const weights = [];
-
-    if (waveNumber >= 8) {
-      const droneWeight = 1 + Math.max(0, (waveNumber - 8) * 0.08);
-      weights.push({ key: 'drone', weight: droneWeight });
+    if (!this.shouldWaveManagerSpawnAsteroids()) {
+      return [];
     }
 
-    if (waveNumber >= 10) {
-      const mineWeight = 1 + Math.max(0, (waveNumber - 10) * 0.07);
-      weights.push({ key: 'mine', weight: mineWeight });
+    const fallbackRules = {
+      drone: { startWave: 8, baseWeight: 1, weightScaling: 0.08 },
+      mine: { startWave: 10, baseWeight: 1, weightScaling: 0.07 },
+      hunter: { startWave: 13, baseWeight: 1, weightScaling: 0.1 },
+    };
+
+    const configuredRules = CONSTANTS.SUPPORT_ENEMY_PROGRESSION || {};
+    const ruleKeys = new Set([
+      ...Object.keys(fallbackRules),
+      ...Object.keys(configuredRules),
+    ]);
+
+    const weightedEntries = [];
+
+    for (const key of ruleKeys) {
+      const fallback = fallbackRules[key] || {};
+      const configured = configuredRules[key] || {};
+
+      const startWave = Number.isFinite(configured.startWave)
+        ? configured.startWave
+        : fallback.startWave;
+
+      if (!Number.isFinite(startWave) || waveNumber < startWave) {
+        continue;
+      }
+
+      const baseWeightValue = Number.isFinite(configured.baseWeight)
+        ? configured.baseWeight
+        : fallback.baseWeight ?? 1;
+      const normalizedBaseWeight = Math.max(0, baseWeightValue ?? 1);
+
+      const scalingValue = Number.isFinite(configured.weightScaling)
+        ? configured.weightScaling
+        : fallback.weightScaling ?? 0;
+      const normalizedScaling = Math.max(0, scalingValue);
+
+      const progression = Math.max(0, waveNumber - startWave);
+      const additionalWeight = progression * normalizedScaling;
+      const weight = normalizedBaseWeight + additionalWeight;
+
+      weightedEntries.push({ key, weight, startWave });
     }
 
-    if (waveNumber >= 13) {
-      const hunterWeight = 1 + Math.max(0, (waveNumber - 13) * 0.1);
-      weights.push({ key: 'hunter', weight: hunterWeight });
-    }
+    weightedEntries.sort((a, b) => {
+      if (a.startWave === b.startWave) {
+        return a.key.localeCompare(b.key);
+      }
+      return a.startWave - b.startWave;
+    });
 
-    return weights;
+    return weightedEntries.map(({ key, weight }) => ({ key, weight }));
   }
 
   getBaselineSupportCount(kind, waveNumber, baseCount = this.computeBaseEnemyCount(waveNumber)) {
@@ -1067,7 +1139,7 @@ export class WaveManager {
     let computedTotalEnemies = this.computeTotalEnemies(effectiveConfig);
     let asteroidOnlyTotal = this.computeAsteroidOnlyTotal(effectiveConfig);
 
-    if (legacyCompatibilityEnabled && !waveManagerSpawnsAsteroids) {
+    if (!waveManagerSpawnsAsteroids) {
       computedTotalEnemies = 0;
       asteroidOnlyTotal = 0;
     }

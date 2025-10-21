@@ -816,9 +816,7 @@ class EnemySystem {
       const normalizedCandidate =
         typeof candidateType === 'string' ? candidateType.toLowerCase() : null;
       if (normalizedCandidate === String(asteroidKey).toLowerCase()) {
-        const result = this.waveManager.registerActiveEnemy(enemy, {
-          skipDuplicateCheck: true,
-        });
+        const result = this.waveManager.registerActiveEnemy(enemy);
         if (result === false) {
           waveManagerRegistered = false;
         }
@@ -1891,7 +1889,9 @@ class EnemySystem {
       wave.initialSpawnDone = false;
       wave.breakTimer = 0;
 
-      this.spawnInitialAsteroids(4);
+      if (waveManagerHandlesAsteroids) {
+        this.spawnInitialAsteroids(4);
+      }
     }
     const legacyCompatibilityEnabled =
       (CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true) &&
