@@ -4,12 +4,10 @@ digraph Dependencies {
   "src/__tests__/balance/reward-mechanics.test.js" [];
   "src/__tests__/core/DIContainer.test.js" [];
   "src/__tests__/core/ObjectPool.test.js" [];
-  "src/__tests__/core/RandomService.test.js" [];
   "src/__tests__/core/SpatialHash.test.js" [];
   "src/__tests__/integration/mixed-enemy-waves.test.js" [];
   "src/__tests__/legacy/asteroid-baseline-metrics.test.js" [];
   "src/__tests__/physics/collision-accuracy.test.js" [];
-  "src/__tests__/progression/progression-determinism.test.js" [];
   "src/__tests__/rendering/enemy-types-rendering.test.js" [];
   "src/__tests__/rendering/menu-background-determinism.test.js" [];
   "src/__tests__/rendering/rendering-determinism.test.js" [];
@@ -87,7 +85,6 @@ digraph Dependencies {
   "src/__tests__/balance/reward-mechanics.test.js" -> "src/core/GameConstants.js";
   "src/__tests__/core/DIContainer.test.js" -> "src/core/DIContainer.js";
   "src/__tests__/core/ObjectPool.test.js" -> "src/core/ObjectPool.js";
-  "src/__tests__/core/RandomService.test.js" -> "src/core/RandomService.js";
   "src/__tests__/core/SpatialHash.test.js" -> "src/core/SpatialHash.js";
   "src/__tests__/integration/mixed-enemy-waves.test.js" -> "src/core/RandomService.js";
   "src/__tests__/integration/mixed-enemy-waves.test.js" -> "src/core/GameConstants.js";
@@ -102,8 +99,6 @@ digraph Dependencies {
   "src/__tests__/legacy/asteroid-baseline-metrics.test.js" -> "src/core/GamePools.js";
   "src/__tests__/legacy/asteroid-baseline-metrics.test.js" -> "src/core/GameConstants.js";
   "src/__tests__/physics/collision-accuracy.test.js" -> "src/core/SpatialHash.js";
-  "src/__tests__/progression/progression-determinism.test.js" -> "src/core/ServiceRegistry.js";
-  "src/__tests__/progression/progression-determinism.test.js" -> "src/modules/ProgressionSystem.js";
   "src/__tests__/rendering/enemy-types-rendering.test.js" -> "src/core/GameConstants.js";
   "src/__tests__/rendering/enemy-types-rendering.test.js" -> "src/modules/enemies/types/Drone.js";
   "src/__tests__/rendering/enemy-types-rendering.test.js" -> "src/modules/enemies/types/Mine.js";

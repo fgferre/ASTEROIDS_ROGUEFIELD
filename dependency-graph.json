@@ -44,16 +44,6 @@
       "isCritical": false
     },
     {
-      "path": "src/__tests__/core/RandomService.test.js",
-      "imports": [
-        "src/core/RandomService.js"
-      ],
-      "exports": [],
-      "dependents": [],
-      "isHub": false,
-      "isCritical": false
-    },
-    {
       "path": "src/__tests__/core/SpatialHash.test.js",
       "imports": [
         "src/core/SpatialHash.js"
@@ -97,17 +87,6 @@
       "path": "src/__tests__/physics/collision-accuracy.test.js",
       "imports": [
         "src/core/SpatialHash.js"
-      ],
-      "exports": [],
-      "dependents": [],
-      "isHub": false,
-      "isCritical": false
-    },
-    {
-      "path": "src/__tests__/progression/progression-determinism.test.js",
-      "imports": [
-        "src/core/ServiceRegistry.js",
-        "src/modules/ProgressionSystem.js"
       ],
       "exports": [],
       "dependents": [],
@@ -475,7 +454,6 @@
         "RandomService"
       ],
       "dependents": [
-        "src/__tests__/core/RandomService.test.js",
         "src/__tests__/integration/mixed-enemy-waves.test.js",
         "src/bootstrap/serviceManifest.js",
         "src/core/ServiceRegistry.js",
@@ -548,7 +526,6 @@
       "dependents": [
         "src/__tests__/audio/audio-determinism.test.js",
         "src/__tests__/legacy/asteroid-baseline-metrics.test.js",
-        "src/__tests__/progression/progression-determinism.test.js",
         "src/__tests__/rendering/menu-background-determinism.test.js",
         "src/__tests__/rendering/rendering-determinism.test.js",
         "src/__tests__/rendering/screen-shake-determinism.test.js",
@@ -876,7 +853,6 @@
       ],
       "exports": [],
       "dependents": [
-        "src/__tests__/progression/progression-determinism.test.js",
         "src/bootstrap/serviceManifest.js"
       ],
       "isHub": false,
@@ -1320,11 +1296,11 @@
     }
   ],
   "metrics": {
-    "totalFiles": 80,
-    "totalDependencies": 185,
+    "totalFiles": 78,
+    "totalDependencies": 182,
     "circularDependencies": 0,
     "hubFiles": 3,
-    "orphanFiles": 20
+    "orphanFiles": 18
   },
   "issues": {
     "cycles": [],
@@ -1338,12 +1314,10 @@
       "src/__tests__/balance/reward-mechanics.test.js",
       "src/__tests__/core/DIContainer.test.js",
       "src/__tests__/core/ObjectPool.test.js",
-      "src/__tests__/core/RandomService.test.js",
       "src/__tests__/core/SpatialHash.test.js",
       "src/__tests__/integration/mixed-enemy-waves.test.js",
       "src/__tests__/legacy/asteroid-baseline-metrics.test.js",
       "src/__tests__/physics/collision-accuracy.test.js",
-      "src/__tests__/progression/progression-determinism.test.js",
       "src/__tests__/rendering/enemy-types-rendering.test.js",
       "src/__tests__/rendering/menu-background-determinism.test.js",
       "src/__tests__/rendering/rendering-determinism.test.js",
