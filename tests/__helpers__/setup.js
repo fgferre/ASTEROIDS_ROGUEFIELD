@@ -2,11 +2,14 @@ import { vi } from 'vitest';
 import { ServiceRegistry } from '../../src/core/ServiceRegistry.js';
 import { createEventBusMock, createServiceRegistryMock } from './mocks.js';
 
+const hasOwn = Object.prototype.hasOwnProperty;
+let previousGlobals = null;
+
 /**
  * Configure globalThis with the default mocks used across integration tests.
  *
  * @param {{gameEvents?: any, gameServices?: any, performance?: {now: () => number}}} [options] - Optional overrides for the global mocks.
- * @returns {{gameEvents?: any, gameServices?: any, performance?: any}}
+ * @returns {{gameEvents?: any, gameServices?: any, performance?: any, hadGameEvents: boolean, hadGameServices: boolean, hadPerformance: boolean}}
  * @example
  * const snapshot = setupGlobalMocks();
  * // run test logic
@@ -23,11 +26,16 @@ export function setupGlobalMocks(options = {}) {
     gameEvents: globalThis.gameEvents,
     gameServices: globalThis.gameServices,
     performance: globalThis.performance,
+    hadGameEvents: hasOwn.call(globalThis, 'gameEvents'),
+    hadGameServices: hasOwn.call(globalThis, 'gameServices'),
+    hadPerformance: hasOwn.call(globalThis, 'performance'),
   };
 
   globalThis.gameEvents = gameEvents;
   globalThis.gameServices = gameServices;
   globalThis.performance = performance;
+
+  previousGlobals = previous;
 
   return previous;
 }
@@ -41,16 +49,39 @@ export function setupGlobalMocks(options = {}) {
  * });
  */
 export function cleanupGlobalState() {
-  delete globalThis.gameEvents;
-  delete globalThis.gameServices;
-  delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
-  delete globalThis.__WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__;
+  const snapshot =
+    previousGlobals ?? {
+      gameEvents: globalThis.gameEvents,
+      gameServices: globalThis.gameServices,
+      performance: globalThis.performance,
+      hadGameEvents: hasOwn.call(globalThis, 'gameEvents'),
+      hadGameServices: hasOwn.call(globalThis, 'gameServices'),
+      hadPerformance: hasOwn.call(globalThis, 'performance'),
+    };
 
-  if (globalThis.performance && typeof globalThis.performance.now !== 'function') {
+  if (snapshot.hadGameEvents) {
+    globalThis.gameEvents = snapshot.gameEvents;
+  } else {
+    delete globalThis.gameEvents;
+  }
+
+  if (snapshot.hadGameServices) {
+    globalThis.gameServices = snapshot.gameServices;
+  } else {
+    delete globalThis.gameServices;
+  }
+
+  if (snapshot.hadPerformance) {
+    globalThis.performance = snapshot.performance;
+  } else {
     delete globalThis.performance;
   }
 
+  delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
+  delete globalThis.__WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__;
+
   vi.restoreAllMocks();
+  previousGlobals = null;
 }
 
 /**

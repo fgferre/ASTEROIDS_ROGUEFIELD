@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import { createGainStub } from './stubs.js';
 
 /**
  * Create a lightweight in-memory EventBus mock for deterministic tests.
@@ -113,7 +114,7 @@ export function createRandomServiceStub(seed) {
 /**
  * Create a stubbed audio system matching the expectations in audio tests.
  *
- * @returns {{safePlay: ReturnType<typeof vi.fn>, pool: {getOscillator: ReturnType<typeof vi.fn>, getGain: ReturnType<typeof vi.fn>, returnGain: ReturnType<typeof vi.fn>}, connectGainNode: ReturnType<typeof vi.fn>, context: {currentTime: number}}}
+ * @returns {{safePlay: ReturnType<typeof vi.fn>, pool: {getOscillator: ReturnType<typeof vi.fn>, getGain: ReturnType<typeof vi.fn>, returnGain: ReturnType<typeof vi.fn>}, connectGainNode: ReturnType<typeof vi.fn>, context: {currentTime: number}, masterGain: ReturnType<typeof createGainStub>, effectsGain: ReturnType<typeof createGainStub>, batcher: {enqueue: ReturnType<typeof vi.fn>, flush: ReturnType<typeof vi.fn>}}}
  * @example
  * const audioSystem = createAudioSystemStub();
  * audioSystem.safePlay(() => {});
@@ -125,32 +126,47 @@ export function createAudioSystemStub() {
     }
   });
 
+  const masterGain = createGainStub();
+  const effectsGain = createGainStub();
+
   return {
     safePlay,
     pool: {
       getOscillator: vi.fn(),
-      getGain: vi.fn(),
+      getGain: vi.fn(() => createGainStub()),
       returnGain: vi.fn(),
     },
     connectGainNode: vi.fn(),
     context: { currentTime: 0 },
+    masterGain,
+    effectsGain,
+    batcher: {
+      enqueue: vi.fn(),
+      flush: vi.fn(),
+    },
   };
 }
 
 /**
- * Create a spy-friendly game events mock using vi.fn() wrappers.
+ * Create a spy-friendly game events mock backed by the event bus helpers.
  *
- * @returns {{on: ReturnType<typeof vi.fn>, emit: ReturnType<typeof vi.fn>, emitSilently: ReturnType<typeof vi.fn>, off: ReturnType<typeof vi.fn>, clear: ReturnType<typeof vi.fn>}}
+ * @returns {{listeners: Map<string, Set<Function>>, on: ReturnType<typeof vi.spyOn>, emit: ReturnType<typeof vi.spyOn>, off: ReturnType<typeof vi.spyOn>, clear: ReturnType<typeof vi.spyOn>, emitSilently: ReturnType<typeof vi.spyOn>}}
  * @example
  * const gameEvents = createGameEventsMock();
  * gameEvents.emit('player-moved', { x: 10 });
  */
 export function createGameEventsMock() {
-  return {
-    on: vi.fn(),
-    emit: vi.fn(),
-    emitSilently: vi.fn(),
-    off: vi.fn(),
-    clear: vi.fn(),
+  const eventBus = createEventBusMock();
+
+  eventBus.emitSilently = function emitSilently(event, payload) {
+    eventBus.emit(event, payload);
   };
+
+  vi.spyOn(eventBus, 'on');
+  vi.spyOn(eventBus, 'emit');
+  vi.spyOn(eventBus, 'off');
+  vi.spyOn(eventBus, 'clear');
+  vi.spyOn(eventBus, 'emitSilently');
+
+  return eventBus;
 }
