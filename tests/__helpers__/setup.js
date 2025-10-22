@@ -3,7 +3,7 @@ import { ServiceRegistry } from '../../src/core/ServiceRegistry.js';
 import { createEventBusMock, createServiceRegistryMock } from './mocks.js';
 
 const hasOwn = Object.prototype.hasOwnProperty;
-let previousGlobals = null;
+let previousGlobalsStack = null;
 
 /**
  * Configure globalThis with the default mocks used across integration tests.
@@ -35,7 +35,11 @@ export function setupGlobalMocks(options = {}) {
   globalThis.gameServices = gameServices;
   globalThis.performance = performance;
 
-  previousGlobals = previous;
+  if (previousGlobalsStack === null) {
+    previousGlobalsStack = [];
+  }
+
+  previousGlobalsStack.push(previous);
 
   return previous;
 }
@@ -49,8 +53,9 @@ export function setupGlobalMocks(options = {}) {
  * });
  */
 export function cleanupGlobalState() {
+  const stack = previousGlobalsStack;
   const snapshot =
-    previousGlobals ?? {
+    (stack && stack.length ? stack.pop() : null) ?? {
       gameEvents: globalThis.gameEvents,
       gameServices: globalThis.gameServices,
       performance: globalThis.performance,
@@ -81,7 +86,9 @@ export function cleanupGlobalState() {
   delete globalThis.__WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__;
 
   vi.restoreAllMocks();
-  previousGlobals = null;
+  if (stack && stack.length === 0) {
+    previousGlobalsStack = null;
+  }
 }
 
 /**
@@ -89,13 +96,13 @@ export function cleanupGlobalState() {
  *
  * @param {{useManager?: boolean, managerHandlesAsteroids?: boolean}} config - Flags to apply during the callback execution.
  * @param {() => Promise<any>|any} callback - Callback executed with overrides enabled.
- * @returns {Promise<any>|any}
+ * @returns {Promise<any>} Resolves with the callback result once overrides are restored.
  * @example
  * await withWaveOverrides({ useManager: true }, async () => {
  *   // assertions
  * });
  */
-export function withWaveOverrides(config, callback) {
+export async function withWaveOverrides(config, callback) {
   const {
     useManager = true,
     managerHandlesAsteroids = true,
@@ -108,7 +115,8 @@ export function withWaveOverrides(config, callback) {
   globalThis.__WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__ = managerHandlesAsteroids;
 
   try {
-    return callback();
+    const result = await callback();
+    return result;
   } finally {
     if (previousUseManager === undefined) {
       delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;

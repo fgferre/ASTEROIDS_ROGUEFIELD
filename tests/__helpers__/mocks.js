@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { createGainStub } from './stubs.js';
+import { createGainStub, createOscillatorStub, createBufferSourceStub } from './stubs.js';
 
 /**
  * Create a lightweight in-memory EventBus mock for deterministic tests.
@@ -49,11 +49,12 @@ export function createEventBusMock() {
 /**
  * Create a ServiceRegistry mock compatible with the existing tests.
  *
- * @returns {{serviceRegistry: Map<string, any>, register: ReturnType<typeof vi.fn>, get: ReturnType<typeof vi.fn>, has: ReturnType<typeof vi.fn>}}
+ * @returns {{serviceRegistry: Map<string, any>, register: ReturnType<typeof vi.fn>, get: ReturnType<typeof vi.fn>, has: ReturnType<typeof vi.fn>, resolve: (name: string) => any}}
  * @example
  * const registry = createServiceRegistryMock();
  * registry.register('physics', {});
  * expect(registry.get('physics')).toEqual({});
+ * expect(registry.resolve('physics')).toEqual({});
  */
 export function createServiceRegistryMock() {
   const serviceRegistry = new Map();
@@ -71,6 +72,9 @@ export function createServiceRegistryMock() {
     register,
     get,
     has,
+    resolve(name) {
+      return get(name);
+    },
   };
 }
 
@@ -114,7 +118,7 @@ export function createRandomServiceStub(seed) {
 /**
  * Create a stubbed audio system matching the expectations in audio tests.
  *
- * @returns {{safePlay: ReturnType<typeof vi.fn>, pool: {getOscillator: ReturnType<typeof vi.fn>, getGain: ReturnType<typeof vi.fn>, returnGain: ReturnType<typeof vi.fn>}, connectGainNode: ReturnType<typeof vi.fn>, context: {currentTime: number}, masterGain: ReturnType<typeof createGainStub>, effectsGain: ReturnType<typeof createGainStub>, batcher: {enqueue: ReturnType<typeof vi.fn>, flush: ReturnType<typeof vi.fn>}}}
+ * @returns {{safePlay: ReturnType<typeof vi.fn>, pool: {getOscillator: ReturnType<typeof vi.fn>, getGain: ReturnType<typeof vi.fn>, getBufferSource: ReturnType<typeof vi.fn>, returnGain: ReturnType<typeof vi.fn>}, connectGainNode: ReturnType<typeof vi.fn>, context: {currentTime: number}, masterGain: ReturnType<typeof createGainStub>, effectsGain: ReturnType<typeof createGainStub>, batcher: {enqueue: ReturnType<typeof vi.fn>, flush: ReturnType<typeof vi.fn>}}}
  * @example
  * const audioSystem = createAudioSystemStub();
  * audioSystem.safePlay(() => {});
@@ -132,8 +136,9 @@ export function createAudioSystemStub() {
   return {
     safePlay,
     pool: {
-      getOscillator: vi.fn(),
+      getOscillator: vi.fn(() => createOscillatorStub()),
       getGain: vi.fn(() => createGainStub()),
+      getBufferSource: vi.fn(() => createBufferSourceStub()),
       returnGain: vi.fn(),
     },
     connectGainNode: vi.fn(),

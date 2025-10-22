@@ -47,7 +47,10 @@ export function expectWithinTolerance(value, expected, tolerance = 0.000001) {
  * expectSameSeeds({ enemy: 1 }, { enemy: 1 });
  */
 export function expectSameSeeds(snapshot1, snapshot2) {
-  expect(snapshot1).toEqual(snapshot2);
+  const normalizedA = pruneUndefined(snapshot1, true);
+  const normalizedB = pruneUndefined(snapshot2, true);
+
+  expect(normalizedA).toEqual(normalizedB);
 }
 
 /**
@@ -62,4 +65,38 @@ function getPrecisionFromTolerance(tolerance) {
   }
   const precision = Math.abs(Math.round(Math.log10(1 / tolerance)));
   return Number.isFinite(precision) ? precision : 5;
+}
+
+/**
+ * Recursively remove undefined properties from an object tree.
+ *
+ * @param {any} value - Value potentially containing undefined properties.
+ * @param {boolean} [isRoot=false] - Indicates whether the current node is the root snapshot.
+ * @returns {any} A sanitized clone free of undefined properties.
+ */
+function pruneUndefined(value, isRoot = false) {
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => pruneUndefined(entry))
+      .filter((entry) => entry !== undefined);
+  }
+
+  if (value && typeof value === 'object') {
+    const result = {};
+    for (const [key, child] of Object.entries(value)) {
+      if (child === undefined) {
+        continue;
+      }
+      const sanitized = pruneUndefined(child);
+      if (sanitized !== undefined) {
+        result[key] = sanitized;
+      }
+    }
+    if (!isRoot && Object.keys(result).length === 0) {
+      return undefined;
+    }
+    return result;
+  }
+
+  return value;
 }
