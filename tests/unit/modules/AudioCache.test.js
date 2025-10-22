@@ -1,28 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import AudioCache from '../../../src/modules/AudioCache.js';
 import RandomService from '../../../src/core/RandomService.js';
-
-const createAudioContextStub = () => {
-  const createBuffer = vi.fn((channels, length, sampleRate) => {
-    const data = new Float32Array(length);
-    return {
-      numberOfChannels: channels,
-      length,
-      sampleRate,
-      getChannelData: vi.fn(() => data)
-    };
-  });
-
-  const createBufferSource = vi.fn(() => ({
-    buffer: null
-  }));
-
-  return {
-    sampleRate: 44100,
-    createBuffer,
-    createBufferSource
-  };
-};
+import { createAudioContextStub } from '../../__helpers__/stubs.js';
 
 describe('AudioCache deterministic noise buffers', () => {
   beforeEach(() => {
