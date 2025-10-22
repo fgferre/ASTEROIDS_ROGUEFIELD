@@ -24,7 +24,7 @@
 ## 3. Hubs Críticos (segundo DEPENDENCY_GRAPH.md)
 - `src/core/GameConstants.js` — 1.771 linhas, 27 dependentes diretos.
 - `src/core/RandomService.js` — 23 dependentes diretos.
-- `src/bootstrap/serviceUtils.js` — 16 dependentes diretos.
+- `src/bootstrap/bootstrapServices.js` — 1 dependente direto.
 - `src/core/EventBus.js` — utilizado em praticamente todos os sistemas.
 
 ## 4. Sistemas Principais
