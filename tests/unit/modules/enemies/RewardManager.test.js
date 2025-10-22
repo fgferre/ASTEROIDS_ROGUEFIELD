@@ -1,30 +1,7 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import { RewardManager } from './RewardManager.js';
-
-function createBaseEnemy(overrides = {}) {
-  return {
-    type: 'asteroid',
-    size: 'large',
-    variant: 'common',
-    radius: 24,
-    x: 100,
-    y: 150,
-    wave: 3,
-    ...overrides,
-  };
-}
-
-function createDeterministicRandom({ intValue = 1, chanceValue = false } = {}) {
-  const random = {
-    float: () => 0,
-    range: (min) => min,
-    int: () => intValue,
-    chance: () => chanceValue,
-  };
-
-  random.fork = () => random;
-  return random;
-}
+import { RewardManager } from '../../../../src/modules/enemies/managers/RewardManager.js';
+import { createDeterministicRandom } from '../../../__helpers__/stubs.js';
+import { createTestEnemy } from '../../../__helpers__/fixtures.js';
 
 describe('RewardManager', () => {
   afterEach(() => {
@@ -37,7 +14,7 @@ describe('RewardManager', () => {
       xpOrbSystem: { createXPOrb },
     });
 
-    rewardManager.dropRewards(createBaseEnemy());
+    rewardManager.dropRewards(createTestEnemy('asteroid', { wave: 3 }));
 
     expect(createXPOrb).toHaveBeenCalled();
   });
@@ -54,7 +31,9 @@ describe('RewardManager', () => {
       random: deterministicRandom,
     });
 
-    rewardManager.dropRewards(createBaseEnemy({ size: 'large', variant: 'gold' }));
+    rewardManager.dropRewards(
+      createTestEnemy('asteroid', { size: 'large', variant: 'gold', wave: 3 })
+    );
 
     expect(spawnHeart).toHaveBeenCalledWith(
       100,
@@ -76,7 +55,7 @@ describe('RewardManager', () => {
         random: deterministicRandom,
       });
 
-      rewardManager.dropRewards(createBaseEnemy({ type: 'drone', size: undefined, variant: undefined, wave: 1 }));
+      rewardManager.dropRewards(createTestEnemy('drone', { wave: 1 }));
 
       expect(createXPOrb).toHaveBeenCalledTimes(2);
       const xpValues = createXPOrb.mock.calls.map((call) => call[2]);
@@ -93,7 +72,7 @@ describe('RewardManager', () => {
         random: deterministicRandom,
       });
 
-      rewardManager.dropRewards(createBaseEnemy({ type: 'mine', size: undefined, variant: undefined, wave: 1 }));
+      rewardManager.dropRewards(createTestEnemy('mine', { wave: 1 }));
 
       expect(createXPOrb).toHaveBeenCalledTimes(2);
       const xpValues = createXPOrb.mock.calls.map((call) => call[2]);
@@ -110,7 +89,7 @@ describe('RewardManager', () => {
         random: deterministicRandom,
       });
 
-      rewardManager.dropRewards(createBaseEnemy({ type: 'hunter', size: undefined, variant: undefined, wave: 1 }));
+      rewardManager.dropRewards(createTestEnemy('hunter', { wave: 1 }));
 
       expect(createXPOrb).toHaveBeenCalledTimes(3);
       const xpValues = createXPOrb.mock.calls.map((call) => call[2]);
@@ -127,7 +106,7 @@ describe('RewardManager', () => {
         random: deterministicRandom,
       });
 
-      rewardManager.dropRewards(createBaseEnemy({ type: 'boss', size: undefined, variant: undefined, wave: 1 }));
+      rewardManager.dropRewards(createTestEnemy('boss', { wave: 1 }));
 
       expect(createXPOrb).toHaveBeenCalledTimes(10);
       const xpValues = createXPOrb.mock.calls.map((call) => call[2]);
@@ -144,7 +123,7 @@ describe('RewardManager', () => {
         random: deterministicRandom,
       });
 
-      rewardManager.dropRewards(createBaseEnemy({ type: 'drone', size: undefined, variant: undefined, wave: 5 }));
+      rewardManager.dropRewards(createTestEnemy('drone', { wave: 5 }));
 
       expect(createXPOrb).toHaveBeenCalledTimes(3);
       const xpValues = createXPOrb.mock.calls.map((call) => call[2]);
@@ -162,16 +141,23 @@ describe('RewardManager', () => {
         random: deterministicRandom,
       });
 
-      rewardManager.dropRewards(createBaseEnemy({ type: 'unknown-type', size: undefined, variant: undefined }));
+      rewardManager.dropRewards(
+        createTestEnemy('asteroid', { type: 'unknown-type', wave: 3 })
+      );
 
-      expect(warnSpy).toHaveBeenCalledWith('[RewardManager] No reward config for type: unknown-type');
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[RewardManager] No reward config for type: unknown-type'
+      );
       expect(createXPOrb).not.toHaveBeenCalled();
     });
 
     it('allows hunters to drop health hearts when the chance check succeeds', () => {
       const createXPOrb = vi.fn();
       const spawnHeart = vi.fn();
-      const deterministicRandom = createDeterministicRandom({ intValue: 3, chanceValue: true });
+      const deterministicRandom = createDeterministicRandom({
+        intValue: 3,
+        chanceValue: true,
+      });
 
       const rewardManager = new RewardManager({
         xpOrbSystem: { createXPOrb },
@@ -179,7 +165,7 @@ describe('RewardManager', () => {
         random: deterministicRandom,
       });
 
-      rewardManager.dropRewards(createBaseEnemy({ type: 'hunter', size: undefined, variant: undefined }));
+      rewardManager.dropRewards(createTestEnemy('hunter', { wave: 3 }));
 
       expect(spawnHeart).toHaveBeenCalledWith(
         100,
