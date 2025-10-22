@@ -15,13 +15,17 @@
     "test:visual-enemies": "echo 'Abra http://localhost:5173/scripts/visual-enemy-rendering-test.html no navegador' && npm run dev",
     "stress": "node scripts/run-stress-checks.mjs",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "analyze:deps": "node scripts/analyze-dependencies.js && node scripts/generate-mermaid-graph.js",
+    "analyze:deps:watch": "nodemon --watch src --exec npm run analyze:deps",
+    "validate:deps": "node scripts/analyze-dependencies.js --validate-only"
   },
   "devDependencies": {
     "grunt": "^1.6.1",
     "grunt-cli": "^1.5.0",
     "grunt-contrib-clean": "^2.0.1",
     "grunt-contrib-copy": "^1.0.0",
+    "nodemon": "^3.1.10",
     "prettier": "3.2.5",
     "vite": "^5.2.11",
     "vitest": "^3.2.4"

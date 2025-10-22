@@ -315,3 +315,82 @@ clearDebugLog()     // Limpa log atual
 - **Completo:** Captura todos os eventos críticos do jogo
 - **Eficiente:** Resolve problemas em minutos ao invés de horas
 - **Não Invasivo:** Apenas em modo dev, zero impacto em produção
+
+#### 9. **Sistema de Análise de Dependências e Arquivos Críticos**
+
+##### 9.1. Visão Geral
+
+- O pipeline de análise (`scripts/analyze-dependencies.js` + `scripts/generate-mermaid-graph.js`) monitora o grafo de imports/exports para prevenir regressões arquiteturais.
+- Artefatos gerados no modo completo (`npm run analyze:deps`): `dependency-graph.json`, `dependency-issues.json`, `dependency-graph.dot` e `docs/architecture/dependency-graph.mmd`.
+- Utilize `docs/architecture/DEPENDENCY_GRAPH.md` para visualizar os hubs, ciclos e agrupamentos gerados automaticamente.
+
+##### 9.2. Arquivos Críticos e Regras de Manutenção
+
+- **`src/core/GameConstants.js`**
+  - Nunca duplique constantes em sistemas; adicione chaves novas neste arquivo.
+  - Checklist rápido: (1) evitar números mágicos em módulos, (2) atualizar comentários/descrições relevantes, (3) validar que presets continuam consumidos pelos sistemas dependentes.
+- **`src/core/EventBus.js`**
+  - Proíba side effects durante importação; apenas exporte instância singleton.
+  - Checklist rápido: (1) novos eventos documentados com descrição, (2) handlers registrados/desregistrados no lifecycle correto, (3) evitar chamadas encadeadas que bloqueiem o loop principal.
+- **`src/bootstrap/serviceManifest.js`**
+  - Toda dependência deve ser explícita; não omitir serviços implícitos.
+  - Checklist rápido: (1) declarar ordem correta, (2) atualizar `ServiceRegistry.setupServices()` se um construtor mudar, (3) refletir alterações no manifesto antes de tocar em `src/app.js`.
+- **`src/app.js`**
+  - Mantém o bootstrap determinístico; qualquer novo serviço deve passar pelo manifesto.
+  - Checklist rápido: (1) preservar inicialização do `ServiceLocatorAdapter`, (2) garantir que seeds e RandomService sejam configurados antes de qualquer sistema consumir aleatoriedade, (3) manter logging de bootstrap intacto.
+
+##### 9.3. Execução e Interpretação
+
+- Rodar localmente: `npm run analyze:deps` (gera artefatos) ou `npm run validate:deps` (modo validação).
+- `dependency-issues.json` contém três chaves:
+  - `cycles`: lista cada ciclo em formato `A -> B -> C -> A`.
+  - `hubs`: arquivos com mais de 10 dependentes diretos (marcados como críticos no JSON e no Mermaid).
+  - `orphans`: módulos sem consumidores (excluindo entry points definidos no script).
+- Em caso de alerta, tratar a causa antes de abrir PR; se for falso positivo, documentar no corpo do PR com justificativa.
+
+##### 9.4. Workflow Codex/Claude Pré-PR
+
+1. Executar `npm run analyze:deps` e inspecionar `dependency-issues.json`.
+2. Atualizar documentação impactada (`agents.md`, `docs/architecture/DEPENDENCY_GRAPH.md`, outros planos) conforme necessário.
+3. Adicionar resultados relevantes na descrição do PR (ex.: "Nenhum ciclo detectado").
+4. Se surgirem novas dependências críticas, explicar a motivação na seção de resumo do PR.
+
+##### 9.5. Cobertura em CI
+
+- Workflow `validate-dependencies.yml` roda em `pull_request` para `main` quando arquivos em `src/**/*.js` ou `scripts/**/*.js` mudam.
+- Etapas: `npm ci`, `npm run analyze:deps` (gera artefatos para download) e validação customizada que falha somente se `dependency-issues.json` apontar ciclos.
+- Artefatos enviados: `dependency-graph.json`, `dependency-issues.json`, `dependency-graph.dot`, `docs/architecture/dependency-graph.mmd` + resumo no Job Summary do GitHub Actions.
+
+##### 9.6. Padrões de Import/Export
+
+- Preferir imports relativos curtos; reorganize arquivos para evitar cadeias `../../..` sempre que possível.
+- Reexportações centrais são proibidas (evite criar "index barrels" que escondem dependências reais).
+- Apenas exports nomeados para múltiplas entidades; usar `export default` somente quando houver um ponto de entrada claro para o módulo.
+
+##### 9.7. Adicionando Novos Sistemas
+
+1. Criar o módulo em `src/modules/<NomeDoSistema>.js` seguindo os padrões de serviço.
+2. Declarar o sistema e dependências em `src/bootstrap/serviceManifest.js`.
+3. Ajustar `docs/architecture/DEPENDENCY_GRAPH.md` se o novo sistema introduzir hubs propositais ou dependências cíclicas justificadas (explicar em nota).
+4. Rodar `npm run analyze:deps` para garantir que o grafo reflita o novo módulo.
+
+##### 9.8. Anti-padrões a Evitar
+
+- Instanciar serviços diretamente sem passar pelo manifesto.
+- Consumir `GameConstants` apenas parcialmente e replicar objetos internamente.
+- Importar arquivos do diretório `tests/` dentro do código de produção.
+- Criar dependências cruzadas entre sistemas (ex.: `EnemySystem` importando diretamente `PlayerSystem`). Utilize eventos ou serviços compartilhados.
+
+##### 9.9. Referências Cruzadas
+
+- Guia visual e histórico: `docs/architecture/DEPENDENCY_GRAPH.md`.
+- Checklist geral de validação: `docs/validation/test-checklist.md`.
+- Logs e métricas adicionais podem ser anexados em PRs na seção de "Validações" conforme a política de documentação viva.
+
+##### 9.10. Checklist Pré-PR (Dependências)
+
+- [ ] `npm run analyze:deps` executado após as alterações.
+- [ ] `dependency-issues.json` revisado (sem ciclos ou hubs inesperados, órfãos justificados).
+- [ ] Documentação relevante atualizada (`agents.md`, `docs/architecture/DEPENDENCY_GRAPH.md`, outros planos afetados).
+- [ ] CI (`validate-dependencies.yml`) passando ou com justificativa clara caso esteja em vermelho.
+- [ ] Resumo do PR menciona o estado da análise de dependências.
