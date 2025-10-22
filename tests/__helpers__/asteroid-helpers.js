@@ -148,8 +148,6 @@ export function createEnemySystemHarness(seed = TEST_SEED) {
     detachEnemySystem: () => {},
   };
 
-  const eventBus = createTestEventBus();
-
   const container = createTestContainer(seed);
 
   if (!container.has('world')) {
@@ -170,9 +168,13 @@ export function createEnemySystemHarness(seed = TEST_SEED) {
   if (!container.has('healthHearts')) {
     container.register('healthHearts', () => healthHearts);
   }
+
   if (!container.has('event-bus')) {
-    container.register('event-bus', () => eventBus);
+    const fallbackBus = createTestEventBus();
+    container.register('event-bus', () => fallbackBus);
   }
+
+  const eventBus = container.resolve('event-bus');
 
   const randomService = container.resolve('random');
 
@@ -218,8 +220,6 @@ export function createEnemySystemHarness(seed = TEST_SEED) {
     random: randomService,
     eventBus,
   });
-
-  enemySystem.eventBus = eventBus;
 
   enemySystem.refreshInjectedServices({ force: true, suppressWarnings: true });
   enemySystem.reseedRandomScopes({ seed, resetSequences: true });
