@@ -4,7 +4,10 @@ import { createGainStub, createOscillatorStub, createBufferSourceStub } from './
 /**
  * Create a lightweight in-memory EventBus mock for deterministic tests.
  *
- * @returns {{listeners: Map<string, Set<Function>>, on: (event: string, handler: Function) => void, off: (event: string, handler: Function) => void, emit: (event: string, payload?: any) => void, clear: () => void}}
+ * @param {{ withSpies?: boolean, includeEmitSilently?: boolean }} [options]
+ *        Configure whether helpers are wrapped in `vi.fn` spies and if
+ *        `emitSilently` should be exposed (mirroring the legacy helper).
+ * @returns {{listeners: Map<string, Set<Function>>, on: Function & ReturnType<typeof vi.fn>, off: Function & ReturnType<typeof vi.fn>, emit: Function & ReturnType<typeof vi.fn>, clear: Function & ReturnType<typeof vi.fn>, emitSilently?: Function & ReturnType<typeof vi.fn>}}
  * @example
  * const eventBus = createEventBusMock();
  * const handler = vi.fn();
@@ -12,38 +15,57 @@ import { createGainStub, createOscillatorStub, createBufferSourceStub } from './
  * eventBus.emit('test', { value: 1 });
  * expect(handler).toHaveBeenCalledWith({ value: 1 });
  */
-export function createEventBusMock() {
+export function createEventBusMock(options = {}) {
+  const { withSpies = true, includeEmitSilently = true } = options;
   const listeners = new Map();
 
-  return {
-    listeners,
-    on(event, handler) {
-      if (!listeners.has(event)) {
-        listeners.set(event, new Set());
-      }
-      listeners.get(event).add(handler);
-    },
-    off(event, handler) {
-      if (!listeners.has(event)) {
-        return;
-      }
-      listeners.get(event).delete(handler);
-      if (listeners.get(event).size === 0) {
-        listeners.delete(event);
-      }
-    },
-    emit(event, payload) {
-      if (!listeners.has(event)) {
-        return;
-      }
-      for (const handler of listeners.get(event)) {
-        handler(payload);
-      }
-    },
-    clear() {
-      listeners.clear();
-    },
+  const onImpl = (event, handler) => {
+    if (!listeners.has(event)) {
+      listeners.set(event, new Set());
+    }
+    listeners.get(event).add(handler);
   };
+
+  const offImpl = (event, handler) => {
+    if (!listeners.has(event)) {
+      return;
+    }
+    const handlers = listeners.get(event);
+    handlers.delete(handler);
+    if (handlers.size === 0) {
+      listeners.delete(event);
+    }
+  };
+
+  const emitImpl = (event, payload) => {
+    if (!listeners.has(event)) {
+      return;
+    }
+    for (const handler of listeners.get(event)) {
+      handler(payload);
+    }
+  };
+
+  const clearImpl = () => {
+    listeners.clear();
+  };
+
+  const createSpyWrapper = (impl) => (withSpies ? vi.fn(impl) : impl);
+
+  const eventBus = {
+    listeners,
+    on: createSpyWrapper(onImpl),
+    off: createSpyWrapper(offImpl),
+    emit: createSpyWrapper(emitImpl),
+    clear: createSpyWrapper(clearImpl),
+  };
+
+  if (includeEmitSilently) {
+    const emitSilentlyImpl = (event, payload) => eventBus.emit(event, payload);
+    eventBus.emitSilently = createSpyWrapper(emitSilentlyImpl);
+  }
+
+  return eventBus;
 }
 
 /**
@@ -161,17 +183,5 @@ export function createAudioSystemStub() {
  * gameEvents.emit('player-moved', { x: 10 });
  */
 export function createGameEventsMock() {
-  const eventBus = createEventBusMock();
-
-  eventBus.emitSilently = function emitSilently(event, payload) {
-    eventBus.emit(event, payload);
-  };
-
-  vi.spyOn(eventBus, 'on');
-  vi.spyOn(eventBus, 'emit');
-  vi.spyOn(eventBus, 'off');
-  vi.spyOn(eventBus, 'clear');
-  vi.spyOn(eventBus, 'emitSilently');
-
-  return eventBus;
+  return createEventBusMock({ includeEmitSilently: true, withSpies: true });
 }

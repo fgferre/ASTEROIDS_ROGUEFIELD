@@ -126,3 +126,36 @@ export function createSettingsStub(values = null) {
     getCategoryValues: vi.fn(() => values),
   };
 }
+
+/**
+ * Create an AudioContext stub compatible with the audio module tests.
+ *
+ * @param {{ sampleRate?: number }} [options] - Optional overrides for the stubbed context.
+ * @returns {{ sampleRate: number, createBuffer: ReturnType<typeof vi.fn>, createBufferSource: ReturnType<typeof vi.fn> }}
+ * @example
+ * const context = createAudioContextStub({ sampleRate: 48000 });
+ * const buffer = context.createBuffer(2, 256, 48000);
+ */
+export function createAudioContextStub(options = {}) {
+  const { sampleRate = 44100 } = options;
+
+  const createBuffer = vi.fn((channels, length, rate = sampleRate) => {
+    const data = new Float32Array(length);
+    return {
+      numberOfChannels: channels,
+      length,
+      sampleRate: rate,
+      getChannelData: vi.fn(() => data),
+    };
+  });
+
+  const createBufferSource = vi.fn(() => ({
+    buffer: null,
+  }));
+
+  return {
+    sampleRate,
+    createBuffer,
+    createBufferSource,
+  };
+}
