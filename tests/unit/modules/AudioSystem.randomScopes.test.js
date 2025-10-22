@@ -7,9 +7,6 @@ import { createSettingsStub } from '../../__helpers__/stubs.js';
 describe('AudioSystem random scope synchronization', () => {
   beforeEach(() => {
     setupGlobalMocks();
-    if (typeof globalThis.performance === 'undefined') {
-      globalThis.performance = { now: () => 0 };
-    }
   });
 
   afterEach(() => {

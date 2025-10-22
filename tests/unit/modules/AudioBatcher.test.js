@@ -1,13 +1,16 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import AudioBatcher from '../../../src/modules/AudioBatcher.js';
 import RandomService from '../../../src/core/RandomService.js';
 import { createAudioSystemStub } from '../../__helpers__/mocks.js';
+import { setupGlobalMocks, cleanupGlobalState } from '../../__helpers__/setup.js';
 
 describe('AudioBatcher random range determinism', () => {
   beforeEach(() => {
-    if (typeof globalThis.performance === 'undefined') {
-      globalThis.performance = { now: () => 0 };
-    }
+    setupGlobalMocks();
+  });
+
+  afterEach(() => {
+    cleanupGlobalState();
   });
 
   it('restores identical random range sequence after reseed when base RandomService resets', () => {

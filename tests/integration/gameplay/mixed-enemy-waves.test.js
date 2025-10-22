@@ -8,7 +8,7 @@ import { Drone } from '../../../src/modules/enemies/types/Drone.js';
 import { Mine } from '../../../src/modules/enemies/types/Mine.js';
 import { Hunter } from '../../../src/modules/enemies/types/Hunter.js';
 import { createDeterministicRandom } from '../../__helpers__/stubs.js';
-import { createGameEventsMock } from '../../__helpers__/mocks.js';
+import { createEventBusMock } from '../../__helpers__/mocks.js';
 import {
   setupGlobalMocks,
   cleanupGlobalState,
@@ -40,7 +40,7 @@ const getEventPayloads = (eventName) =>
     .map(([, payload]) => payload);
 
 beforeEach(() => {
-  setupGlobalMocks({ gameEvents: createGameEventsMock() });
+  setupGlobalMocks({ gameEvents: createEventBusMock() });
   eventBus = globalThis.gameEvents;
 });
 
@@ -259,8 +259,8 @@ describe('Deterministic wave generation', () => {
   it('produces identical support group compositions for identical seeds', () => {
     withWaveOverrides({ useManager: true, managerHandlesAsteroids: true }, () => {
       const seed = 'mixed-wave-seed';
-      const eventBusA = createGameEventsMock();
-      const eventBusB = createGameEventsMock();
+      const eventBusA = createEventBusMock();
+      const eventBusB = createEventBusMock();
       const randomA = createTestContainer(seed).resolve('random');
       const randomB = createTestContainer(seed).resolve('random');
 
