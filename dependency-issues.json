@@ -1,0 +1,30 @@
+{
+  "cycles": [],
+  "hubs": [
+    "src/core/GameConstants.js",
+    "src/core/RandomService.js",
+    "src/core/serviceUtils.js"
+  ],
+  "orphans": [
+    "src/__tests__/audio/audio-determinism.test.js",
+    "src/__tests__/balance/reward-mechanics.test.js",
+    "src/__tests__/core/DIContainer.test.js",
+    "src/__tests__/core/ObjectPool.test.js",
+    "src/__tests__/core/RandomService.test.js",
+    "src/__tests__/core/SpatialHash.test.js",
+    "src/__tests__/integration/mixed-enemy-waves.test.js",
+    "src/__tests__/legacy/asteroid-baseline-metrics.test.js",
+    "src/__tests__/physics/collision-accuracy.test.js",
+    "src/__tests__/progression/progression-determinism.test.js",
+    "src/__tests__/rendering/enemy-types-rendering.test.js",
+    "src/__tests__/rendering/menu-background-determinism.test.js",
+    "src/__tests__/rendering/rendering-determinism.test.js",
+    "src/__tests__/rendering/screen-shake-determinism.test.js",
+    "src/__tests__/services/game-session-service.test.js",
+    "src/core/EventBus.js",
+    "src/core/ServiceLocator.js",
+    "src/legacy/app-original.js",
+    "src/modules/enemies/managers/RewardManager.test.js",
+    "src/modules/enemies/types/index.js"
+  ]
+}
