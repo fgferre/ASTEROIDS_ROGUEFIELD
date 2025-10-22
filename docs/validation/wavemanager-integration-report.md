@@ -1555,13 +1555,13 @@ stderr | __tests__/rendering/menu-background-determinism.test.js > MenuBackgroun
 [MenuBackgroundSystem] Canvas element not found.
 
  ✓ __tests__/rendering/menu-background-determinism.test.js (2 tests) 22ms
-stdout | __tests__/progression/progression-determinism.test.js
+stdout | ../tests/unit/modules/ProgressionSystem.test.js
 [GameConstants] Loaded
 
-stdout | __tests__/progression/progression-determinism.test.js > ProgressionSystem RNG determinism > repeats upgrade options after seeded random resets
+stdout | ../tests/unit/modules/ProgressionSystem.test.js > ProgressionSystem determinism > produces identical upgrade options after RandomService reset
 [ProgressionSystem] Initialized - Level [33m1[39m
 
- ✓ __tests__/progression/progression-determinism.test.js (1 test) 19ms
+ ✓ ../tests/unit/modules/ProgressionSystem.test.js (3 tests) 41ms
 stdout | __tests__/audio/audio-determinism.test.js
 [GameConstants] Loaded
 
@@ -1570,17 +1570,17 @@ stdout | __tests__/audio/audio-determinism.test.js > AudioSystem RNG determinism
 [AudioBatcher] Initialized with batch window: [33m0[39m ms
 
  ✓ __tests__/audio/audio-determinism.test.js (1 test) 26ms
-stdout | ../tests/modules/ProgressionSystem.test.js
+stdout | ../tests/unit/modules/ProgressionSystem.test.js
 [GameConstants] Loaded
 
-stdout | ../tests/modules/ProgressionSystem.test.js > ProgressionSystem randomised upgrade selection > produces identical upgrade options after deterministic resets
+stdout | ../tests/unit/modules/ProgressionSystem.test.js > ProgressionSystem determinism > produces identical upgrade options after event-based resets
 [ProgressionSystem] Initialized - Level [33m1[39m
 
-stdout | ../tests/modules/ProgressionSystem.test.js > ProgressionSystem randomised upgrade selection > matches upgrade options for separate instances with the same seed
+stdout | ../tests/unit/modules/ProgressionSystem.test.js > ProgressionSystem determinism > matches upgrade options for separate instances with the same seed
 [ProgressionSystem] Initialized - Level [33m1[39m
 [ProgressionSystem] Initialized - Level [33m1[39m
 
- ✓ ../tests/modules/ProgressionSystem.test.js (2 tests) 26ms
+ ✓ ../tests/unit/modules/ProgressionSystem.test.js (3 tests) 41ms
  ✓ ../tests/utils/randomHelpers.test.js (1 test) 13ms
 stdout | __tests__/rendering/enemy-types-rendering.test.js
 [GameConstants] Loaded
