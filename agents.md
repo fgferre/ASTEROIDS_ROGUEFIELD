@@ -394,3 +394,23 @@ clearDebugLog()     // Limpa log atual
 - [ ] Documentação relevante atualizada (`agents.md`, `docs/architecture/DEPENDENCY_GRAPH.md`, outros planos afetados).
 - [ ] CI (`validate-dependencies.yml`) passando ou com justificativa clara caso esteja em vermelho.
 - [ ] Resumo do PR menciona o estado da análise de dependências.
+
+#### 10. **Documentação Arquitetural e Plano de Evolução**
+
+##### 10.1. Onde encontrar os detalhes
+
+- **Estrutura atual**: `docs/architecture/CURRENT_STRUCTURE.md`
+- **Estrutura ideal e princípios**: `docs/architecture/IDEAL_STRUCTURE.md`
+- **Plano de migração (FASE 6.x)**: `docs/architecture/MIGRATION_PLAN.md`
+
+##### 10.2. Ponto de partida rápido
+
+- **Hoje**: mantenha o fluxo atual (classe em `src/modules/enemies/types/` + registro no `EnemyFactory`) e use `docs/architecture/CURRENT_STRUCTURE.md#5-padroes-de-inimigos` para o passo a passo completo.
+- **Futuro**: planeje a migração para configs em `src/data/enemies/` após concluir a componentização descrita em `docs/architecture/IDEAL_STRUCTURE.md#4-sistema-de-componentes-reutilizaveis`.
+- **Antes de qualquer fase 6+**: valide o checklist em `docs/architecture/MIGRATION_PLAN.md#9-checklist-pre-migracao`.
+
+##### 10.3. Referências complementares
+
+- Plano arquitetural (Fases 1–5): `docs/plans/architecture-master-plan.md`
+- Grafo de dependências: `docs/architecture/DEPENDENCY_GRAPH.md`
+- Checklist geral de validação: `docs/validation/test-checklist.md`
