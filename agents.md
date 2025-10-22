@@ -394,3 +394,52 @@ clearDebugLog()     // Limpa log atual
 - [ ] Documentação relevante atualizada (`agents.md`, `docs/architecture/DEPENDENCY_GRAPH.md`, outros planos afetados).
 - [ ] CI (`validate-dependencies.yml`) passando ou com justificativa clara caso esteja em vermelho.
 - [ ] Resumo do PR menciona o estado da análise de dependências.
+
+#### 10. **Documentação Arquitetural e Plano de Evolução**
+
+##### 10.1. Estrutura Atual e Ideal
+
+- Documentação completa da estrutura atual do projeto: `docs/architecture/CURRENT_STRUCTURE.md`
+- Estrutura ideal baseada em best practices de jogos bullet-heaven: `docs/architecture/IDEAL_STRUCTURE.md`
+- Plano de migração incremental: `docs/architecture/MIGRATION_PLAN.md`
+
+##### 10.2. Princípios de Evolução Arquitetural
+
+- **Separação Engine/Game/Data**: Objetivo de longo prazo para facilitar reutilização e manutenção.
+- **Componentes Reutilizáveis**: Unificar o padrão de componentes para todos os inimigos (não apenas Asteroid).
+- **Data-Driven Configuration**: Maximizar configurações em `data/` para facilitar balanceamento sem tocar em código.
+- **Fases Incrementais**: Migração em fases seguras (FASE 6.1–6.7) após consolidação de DI (Fases 1–5).
+
+##### 10.3. Adicionando Novos Inimigos (Padrão Atual)
+
+1. Criar classe em `src/modules/enemies/types/NomeDoInimigo.js` estendendo `BaseEnemy`.
+2. Implementar métodos: `initialize()`, `onUpdate()`, `onDraw()`, `onDestroyed()`.
+3. Registrar no `EnemyFactory` em `src/modules/EnemySystem.js` (método `setupFactory`).
+4. Adicionar configurações em `src/core/GameConstants.js` (seção `ENEMY_TYPES`).
+5. Adicionar ao pool em `src/core/GamePools.js` se necessário.
+6. Registrar no `WaveManager` para spawning.
+7. Testar spawn, update, render, colisão e destruição.
+
+##### 10.4. Adicionando Novos Inimigos (Padrão Futuro — Pós FASE 6.3)
+
+1. Criar config em `src/data/enemies/nome-do-inimigo.js`.
+2. Definir componentes: movement, weapon, render, collision, health.
+3. Registrar no factory via manifesto.
+4. Adicionar ao wave config.
+5. Nenhuma mudança em `EnemySystem` necessária.
+
+##### 10.5. Workflow de Migração para AI Agents
+
+- **Antes de iniciar FASE 6+**: Confirmar que Fases 1–5 de `docs/plans/architecture-master-plan.md` foram concluídas.
+- **Durante a migração**: Seguir `docs/architecture/MIGRATION_PLAN.md` para ordem, critérios e checkpoints.
+- **Após cada fase**: Executar `npm run analyze:deps` e validar ausência de ciclos ou hubs inesperados.
+- **Documentação**: Atualizar `CURRENT_STRUCTURE.md` e `agents.md` conforme a arquitetura evoluir.
+
+##### 10.6. Referências Cruzadas
+
+- Estrutura atual detalhada: `docs/architecture/CURRENT_STRUCTURE.md`
+- Estrutura ideal e best practices: `docs/architecture/IDEAL_STRUCTURE.md`
+- Plano de migração incremental: `docs/architecture/MIGRATION_PLAN.md`
+- Plano arquitetural (Fases 1–5): `docs/plans/architecture-master-plan.md`
+- Grafo de dependências: `docs/architecture/DEPENDENCY_GRAPH.md`
+- Checklist de validação: `docs/validation/test-checklist.md`
