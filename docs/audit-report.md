@@ -36,8 +36,10 @@
 ### 3.1 ServiceLocator.js Incorrectly Marked as Orphaned
 **Location:** `dependency-issues.json` line 10
 **Claim:** `"src/core/ServiceLocator.js"` listed in `orphans` array
-**Reality:** Used by `ServiceLocatorAdapter.js` (imported line 1), referenced in `app.js` (lines 79-91, 195-207), and multiple systems register via `gameServices`
-**Evidence:** Grep search found 26 references across `CombatSystem.js`, `ProgressionSystem.js`, `PlayerSystem.js`, `EnemySystem.js`, `app.js`, `ServiceLocatorAdapter.js`
+**Reality:** Loaded globally via `src/index.html`, which exposes `gameServices` consumed by `src/app.js` when instantiating `new ServiceLocatorAdapter(diContainer)`
+**Evidence:**
+- `src/index.html` lines 313-316 load `./core/ServiceLocator.js` before `app.js`, keeping `gameServices` on the window
+- `src/app.js` lines 127-166 read `gameServices`, create the adapter, and re-expose the bridged locator
 **Recommendation:** **UPDATE** `dependency-issues.json` to remove `ServiceLocator.js` from orphans OR add note explaining it's a legacy bridge (not truly orphaned)
 **Impact:** Prevents incorrect architectural decisions based on false orphan status
 
