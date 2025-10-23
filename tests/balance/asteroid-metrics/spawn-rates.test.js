@@ -10,21 +10,24 @@ describe('Asteroid Metrics - Wave Spawn Rate', () => {
 
   beforeEach(() => {
     setupGlobalMocks();
+    // Optimization: recreate harness per test to guarantee isolated enemy system state
     harness = createEnemySystemHarness();
   });
 
   afterEach(() => {
+    harness?.container?.dispose?.();
+    harness = undefined;
     if (GamePools.asteroids?.releaseAll) {
       GamePools.asteroids.releaseAll();
     }
     if (typeof GamePools.destroy === 'function') {
       GamePools.destroy();
     }
-    harness?.container?.dispose?.();
     cleanupGlobalState();
   });
 
   describe('Wave Spawn Rate (Waves 1-10)', () => {
+    // Note: tests mutate global registries per wave; keep sequential execution
     Array.from({ length: 10 }, (_, index) => index + 1).forEach((waveNumber) => {
       test(`wave ${waveNumber} matches baseline formula`, () => {
         const { waveState } = simulateWave(harness.enemySystem, waveNumber, 800);
@@ -42,6 +45,7 @@ describe('Asteroid Metrics - Wave Spawn Rate', () => {
       });
     });
 
+    // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/setup.js)
     test('golden snapshot for waves 1, 5, and 10', () => {
       const snapshot = [1, 5, 10].map((waveNumber) => {
         const { waveState } = simulateWave(harness.enemySystem, waveNumber, 800);

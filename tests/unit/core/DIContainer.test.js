@@ -2,39 +2,46 @@
  * Tests for DIContainer
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
 import { DIContainer } from '../../../src/core/DIContainer.js';
 
 describe('DIContainer', () => {
-  let container;
-
-  beforeEach(() => {
-    container = new DIContainer();
+  const createContainer = () => {
+    const container = new DIContainer();
     container.verbose = false; // Disable logging in tests
-  });
+    return container;
+  };
 
-  describe('Registration', () => {
+  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/setup.js)
+
+  // Optimization: describe.concurrent (all describes are independent)
+  describe.concurrent('Registration', () => {
     it('should register a simple service', () => {
+      const container = createContainer();
       container.register('test', () => ({ value: 42 }));
 
       expect(container.has('test')).toBe(true);
     });
 
     it('should throw error for invalid service name', () => {
+      const container = createContainer();
       expect(() => container.register('', () => {})).toThrow();
       expect(() => container.register(null, () => {})).toThrow();
     });
 
     it('should throw error for non-function factory', () => {
+      const container = createContainer();
       expect(() => container.register('test', 'not-a-function')).toThrow();
     });
 
     it('should throw error for duplicate registration', () => {
+      const container = createContainer();
       container.register('test', () => ({}));
       expect(() => container.register('test', () => ({}))).toThrow();
     });
 
     it('should register service with dependencies', () => {
+      const container = createContainer();
       container.register('dep', () => ({ name: 'dependency' }));
       container.register('service', (dep) => ({ dep }), {
         dependencies: ['dep']
@@ -44,6 +51,7 @@ describe('DIContainer', () => {
     });
 
     it('should support method chaining', () => {
+      const container = createContainer();
       const result = container
         .register('a', () => ({}))
         .register('b', () => ({}))
@@ -54,8 +62,9 @@ describe('DIContainer', () => {
     });
   });
 
-  describe('Resolution', () => {
+  describe.concurrent('Resolution', () => {
     it('should resolve a simple service', () => {
+      const container = createContainer();
       container.register('test', () => ({ value: 42 }));
       const service = container.resolve('test');
 
@@ -64,6 +73,7 @@ describe('DIContainer', () => {
     });
 
     it('should return singleton instance on multiple resolves', () => {
+      const container = createContainer();
       container.register('test', () => ({ value: Math.random() }), {
         singleton: true
       });
@@ -76,6 +86,7 @@ describe('DIContainer', () => {
     });
 
     it('should return new instance for transient services', () => {
+      const container = createContainer();
       let counter = 0;
       container.register('test', () => ({ id: ++counter }), {
         singleton: false
@@ -90,6 +101,7 @@ describe('DIContainer', () => {
     });
 
     it('should resolve service with dependencies', () => {
+      const container = createContainer();
       container.register('logger', () => ({
         log: (msg) => msg
       }));
@@ -108,6 +120,7 @@ describe('DIContainer', () => {
     });
 
     it('should resolve deep dependency chains', () => {
+      const container = createContainer();
       container.register('a', () => ({ name: 'A' }));
       container.register('b', (a) => ({ name: 'B', a }), { dependencies: ['a'] });
       container.register('c', (b) => ({ name: 'C', b }), { dependencies: ['b'] });
@@ -120,17 +133,20 @@ describe('DIContainer', () => {
     });
 
     it('should throw error for unregistered service', () => {
+      const container = createContainer();
       expect(() => container.resolve('nonexistent')).toThrow();
     });
 
     it('should throw error for null/undefined factory return', () => {
+      const container = createContainer();
       container.register('test', () => null);
       expect(() => container.resolve('test')).toThrow();
     });
   });
 
-  describe('Circular Dependency Detection', () => {
+  describe.concurrent('Circular Dependency Detection', () => {
     it('should detect direct circular dependency', () => {
+      const container = createContainer();
       container.register('a', (b) => ({ b }), { dependencies: ['b'] });
       container.register('b', (a) => ({ a }), { dependencies: ['a'] });
 
@@ -138,6 +154,7 @@ describe('DIContainer', () => {
     });
 
     it('should detect indirect circular dependency', () => {
+      const container = createContainer();
       container.register('a', (b) => ({ b }), { dependencies: ['b'] });
       container.register('b', (c) => ({ c }), { dependencies: ['c'] });
       container.register('c', (a) => ({ a }), { dependencies: ['a'] });
@@ -146,14 +163,16 @@ describe('DIContainer', () => {
     });
 
     it('should handle self-dependency as circular', () => {
+      const container = createContainer();
       container.register('a', (a) => ({ a }), { dependencies: ['a'] });
 
       expect(() => container.resolve('a')).toThrow(/circular/i);
     });
   });
 
-  describe('Validation', () => {
+  describe.concurrent('Validation', () => {
     it('should validate correct configuration', () => {
+      const container = createContainer();
       container.register('a', () => ({}));
       container.register('b', (a) => ({ a }), { dependencies: ['a'] });
 
@@ -164,6 +183,7 @@ describe('DIContainer', () => {
     });
 
     it('should detect missing dependencies', () => {
+      const container = createContainer();
       container.register('a', (missing) => ({ missing }), {
         dependencies: ['missing']
       });
@@ -176,6 +196,7 @@ describe('DIContainer', () => {
     });
 
     it('should detect circular dependencies in validation', () => {
+      const container = createContainer();
       container.register('a', (b) => ({ b }), { dependencies: ['b'] });
       container.register('b', (a) => ({ a }), { dependencies: ['a'] });
 
@@ -186,8 +207,9 @@ describe('DIContainer', () => {
     });
   });
 
-  describe('Lifecycle Management', () => {
+  describe.concurrent('Lifecycle Management', () => {
     it('should check if service is instantiated', () => {
+      const container = createContainer();
       container.register('test', () => ({}), { singleton: true });
 
       expect(container.isInstantiated('test')).toBe(false);
@@ -198,6 +220,7 @@ describe('DIContainer', () => {
     });
 
     it('should replace singleton instance', () => {
+      const container = createContainer();
       container.register('test', () => ({ value: 1 }), { singleton: true });
 
       const original = container.resolve('test');
@@ -212,12 +235,14 @@ describe('DIContainer', () => {
     });
 
     it('should not allow replacing non-singleton', () => {
+      const container = createContainer();
       container.register('test', () => ({}), { singleton: false });
 
       expect(() => container.replaceSingleton('test', {})).toThrow();
     });
 
     it('should unregister services', () => {
+      const container = createContainer();
       container.register('test', () => ({}));
 
       expect(container.has('test')).toBe(true);
@@ -229,6 +254,7 @@ describe('DIContainer', () => {
     });
 
     it('should clear all services', () => {
+      const container = createContainer();
       container.register('a', () => ({}));
       container.register('b', () => ({}));
       container.register('c', () => ({}));
@@ -241,42 +267,48 @@ describe('DIContainer', () => {
     });
   });
 
-  describe('Statistics', () => {
+  describe.concurrent('Statistics', () => {
+    // Optimization: beforeAll instead of beforeEach (immutable setup for read-only tests)
+    let statsAfterRegistrations;
+    let statsAfterResolutions;
+    let statsAfterSingletonHits;
+
+    beforeAll(() => {
+      const registrationsContainer = createContainer();
+      registrationsContainer.register('a', () => ({}));
+      registrationsContainer.register('b', () => ({}));
+      statsAfterRegistrations = registrationsContainer.getStats();
+
+      const resolutionsContainer = createContainer();
+      resolutionsContainer.register('test', () => ({}));
+      resolutionsContainer.resolve('test');
+      resolutionsContainer.resolve('test');
+      statsAfterResolutions = resolutionsContainer.getStats();
+
+      const singletonContainer = createContainer();
+      singletonContainer.register('test', () => ({}), { singleton: true });
+      singletonContainer.resolve('test');
+      singletonContainer.resolve('test');
+      singletonContainer.resolve('test');
+      statsAfterSingletonHits = singletonContainer.getStats();
+    });
+
     it('should track registrations', () => {
-      container.register('a', () => ({}));
-      container.register('b', () => ({}));
-
-      const stats = container.getStats();
-
-      expect(stats.registrations).toBe(2);
+      expect(statsAfterRegistrations.registrations).toBe(2);
     });
 
     it('should track resolutions', () => {
-      container.register('test', () => ({}));
-
-      container.resolve('test');
-      container.resolve('test');
-
-      const stats = container.getStats();
-
-      expect(stats.resolutions).toBeGreaterThanOrEqual(1);
+      expect(statsAfterResolutions.resolutions).toBeGreaterThanOrEqual(1);
     });
 
     it('should track singleton hits', () => {
-      container.register('test', () => ({}), { singleton: true });
-
-      container.resolve('test'); // Miss
-      container.resolve('test'); // Hit
-      container.resolve('test'); // Hit
-
-      const stats = container.getStats();
-
-      expect(stats.singletonHits).toBe(2);
+      expect(statsAfterSingletonHits.singletonHits).toBe(2);
     });
   });
 
-  describe('Child Containers', () => {
+  describe.concurrent('Child Containers', () => {
     it('should create child container with inherited factories', () => {
+      const container = createContainer();
       container.register('a', () => ({ name: 'A' }));
       container.register('b', () => ({ name: 'B' }));
 
@@ -287,6 +319,7 @@ describe('DIContainer', () => {
     });
 
     it('should have separate singleton instances in child', () => {
+      const container = createContainer();
       container.register('test', () => ({ id: Math.random() }));
 
       const parentInstance = container.resolve('test');
@@ -297,31 +330,39 @@ describe('DIContainer', () => {
     });
   });
 
-  describe('Dependency Info', () => {
-    it('should get dependency information', () => {
-      container.register('logger', () => ({}));
-      container.register('service', (logger) => ({ logger }), {
+  describe.concurrent('Dependency Info', () => {
+    // Optimization: beforeAll instead of beforeEach (immutable setup for read-only tests)
+    let dependencyInfo;
+    let missingInfo;
+
+    beforeAll(() => {
+      const infoContainer = createContainer();
+      infoContainer.register('logger', () => ({}));
+      infoContainer.register('service', (logger) => ({ logger }), {
         dependencies: ['logger'],
         singleton: true
       });
+      dependencyInfo = infoContainer.getDependencies('service');
 
-      const info = container.getDependencies('service');
+      const missingContainer = createContainer();
+      missingInfo = missingContainer.getDependencies('nonexistent');
+    });
 
-      expect(info).toBeDefined();
-      expect(info.name).toBe('service');
-      expect(info.dependencies).toContain('logger');
-      expect(info.singleton).toBe(true);
+    it('should get dependency information', () => {
+      expect(dependencyInfo).toBeDefined();
+      expect(dependencyInfo.name).toBe('service');
+      expect(dependencyInfo.dependencies).toContain('logger');
+      expect(dependencyInfo.singleton).toBe(true);
     });
 
     it('should return null for non-existent service', () => {
-      const info = container.getDependencies('nonexistent');
-
-      expect(info).toBeNull();
+      expect(missingInfo).toBeNull();
     });
   });
 
-  describe('Eager Initialization', () => {
+  describe.concurrent('Eager Initialization', () => {
     it('should initialize non-lazy services immediately', () => {
+      const container = createContainer();
       let initialized = false;
 
       container.register('test', () => {
@@ -335,6 +376,7 @@ describe('DIContainer', () => {
     });
 
     it('should not initialize lazy services on registration', () => {
+      const container = createContainer();
       let initialized = false;
 
       container.register('test', () => {

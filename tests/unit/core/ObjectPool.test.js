@@ -1,24 +1,33 @@
 // src/__tests__/core/ObjectPool.test.js
-import { describe, test, expect, beforeEach } from 'vitest';
+import { describe, test, expect, beforeAll, afterEach, vi } from 'vitest';
 import { ObjectPool, TTLObjectPool } from '../../../src/core/ObjectPool.js';
 
 describe('ObjectPool', () => {
-  let pool;
-
-  beforeEach(() => {
-    pool = new ObjectPool(
+  const createPool = () =>
+    new ObjectPool(
       () => ({ x: 0, y: 0, active: true }),
-      (obj) => { obj.x = 0; obj.y = 0; obj.active = true; },
-      5, // initial size
-      20 // max size
+      (obj) => {
+        obj.x = 0;
+        obj.y = 0;
+        obj.active = true;
+      },
+      5,
+      20
     );
-  });
 
-  describe('Initialization', () => {
+  // Optimization: describe.concurrent for suites without fake timers
+  describe.concurrent('Initialization', () => {
+    // Optimization: beforeAll instead of beforeEach (immutable setup for read-only tests)
+    let initializationPool;
+
+    beforeAll(() => {
+      initializationPool = createPool();
+    });
+
     test('should create pool with initial objects', () => {
-      expect(pool.getStats().available).toBe(5);
-      expect(pool.getStats().inUse).toBe(0);
-      expect(pool.getStats().totalCreated).toBe(5);
+      expect(initializationPool.getStats().available).toBe(5);
+      expect(initializationPool.getStats().inUse).toBe(0);
+      expect(initializationPool.getStats().totalCreated).toBe(5);
     });
 
     test('should throw error with invalid factory function', () => {
@@ -34,8 +43,9 @@ describe('ObjectPool', () => {
     });
   });
 
-  describe('Object Lifecycle', () => {
+  describe.concurrent('Object Lifecycle', () => {
     test('should acquire object from pool', () => {
+      const pool = createPool();
       const obj = pool.acquire();
 
       expect(obj).toBeDefined();
@@ -46,6 +56,7 @@ describe('ObjectPool', () => {
     });
 
     test('should reuse objects when released', () => {
+      const pool = createPool();
       const obj1 = pool.acquire();
       obj1.x = 100;
       obj1.y = 200;
@@ -61,6 +72,7 @@ describe('ObjectPool', () => {
     });
 
     test('should create new object when pool exhausted', () => {
+      const pool = createPool();
       const objects = [];
 
       // Exhaust initial pool
@@ -75,6 +87,7 @@ describe('ObjectPool', () => {
     });
 
     test('should not release object not from this pool', () => {
+      const pool = createPool();
       const foreignObj = { x: 0, y: 0 };
       const result = pool.release(foreignObj);
 
@@ -82,8 +95,9 @@ describe('ObjectPool', () => {
     });
   });
 
-  describe('Pool Management', () => {
+  describe.concurrent('Pool Management', () => {
     test('should expand pool', () => {
+      const pool = createPool();
       const initialSize = pool.getStats().totalSize;
       pool.expand(3);
 
@@ -92,12 +106,14 @@ describe('ObjectPool', () => {
     });
 
     test('should shrink pool', () => {
+      const pool = createPool();
       pool.shrink(2);
 
       expect(pool.getStats().available).toBe(3);
     });
 
     test('should release all objects', () => {
+      const pool = createPool();
       const obj1 = pool.acquire();
       const obj2 = pool.acquire();
 
@@ -108,6 +124,7 @@ describe('ObjectPool', () => {
     });
 
     test('should clear pool', () => {
+      const pool = createPool();
       const obj = pool.acquire();
       pool.clear();
 
@@ -116,26 +133,54 @@ describe('ObjectPool', () => {
     });
   });
 
-  describe('Statistics', () => {
-    test('should track hit rate correctly', () => {
-      // Acquire and release to get objects from pool
-      const obj1 = pool.acquire();
-      pool.release(obj1);
-      const obj2 = pool.acquire(); // This should be from pool (hit)
+  describe.concurrent('Statistics', () => {
+    // Optimization: beforeAll instead of beforeEach (immutable setup for read-only tests)
+    let statsAfterHitRate;
+    let validationResult;
 
-      const stats = pool.getStats();
-      expect(stats.hitRate).toBe('50.0%'); // 1 hit out of 2 acquisitions
+    beforeAll(() => {
+      const statsPool = new ObjectPool(
+        () => ({ x: 0, y: 0, active: true }),
+        (obj) => {
+          obj.x = 0;
+          obj.y = 0;
+          obj.active = true;
+        },
+        5,
+        20
+      );
+
+      const first = statsPool.acquire();
+      statsPool.release(first);
+      statsPool.acquire();
+      statsAfterHitRate = statsPool.getStats();
+
+      const validationPool = new ObjectPool(
+        () => ({ x: 0, y: 0, active: true }),
+        (obj) => {
+          obj.x = 0;
+          obj.y = 0;
+          obj.active = true;
+        },
+        5,
+        20
+      );
+      validationResult = validationPool.validate();
+    });
+
+    test('should track hit rate correctly', () => {
+      expect(statsAfterHitRate.hitRate).toBe('50.0%'); // 1 hit out of 2 acquisitions
     });
 
     test('should validate pool integrity', () => {
-      const validation = pool.validate();
-      expect(validation.valid).toBe(true);
-      expect(validation.errors).toHaveLength(0);
+      expect(validationResult.valid).toBe(true);
+      expect(validationResult.errors).toHaveLength(0);
     });
   });
 
-  describe('Auto Management', () => {
+  describe.concurrent('Auto Management', () => {
     test('should auto-expand when utilization is high', () => {
+      const pool = createPool();
       // Acquire most objects to create high utilization
       for (let i = 0; i < 4; i++) {
         pool.acquire();
@@ -148,6 +193,7 @@ describe('ObjectPool', () => {
     });
 
     test('should auto-shrink when utilization is low', () => {
+      const pool = createPool();
       // Create many available objects
       pool.expand(10);
 
@@ -159,10 +205,13 @@ describe('ObjectPool', () => {
   });
 });
 
-describe('TTLObjectPool', () => {
+
+// Note: TTLObjectPool tests require sequential execution due to fake timer usage
+describe.sequential('TTLObjectPool', () => {
   let ttlPool;
 
   beforeEach(() => {
+    vi.useFakeTimers();
     ttlPool = new TTLObjectPool(
       () => ({ data: null }),
       (obj) => { obj.data = null; },
@@ -171,17 +220,26 @@ describe('TTLObjectPool', () => {
     );
   });
 
+  afterEach(() => {
+    try {
+      // no-op: pool state reset happens per test through fresh instantiation
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   test('should acquire object with TTL', () => {
     const obj = ttlPool.acquire(1000); // 1 second TTL
     expect(obj).toBeDefined();
     expect(ttlPool.getStats().objectsWithTTL).toBe(1);
   });
 
-  test('should release expired objects on update', async () => {
+  // Optimization: vi.useFakeTimers() to avoid real delays (60ms → instant)
+  test('should release expired objects on update', () => {
     const obj = ttlPool.acquire(50); // 50ms TTL
 
     // Wait for expiration
-    await new Promise(resolve => setTimeout(resolve, 60));
+    vi.advanceTimersByTime(60);
 
     ttlPool.update();
 

@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { afterEach, vi } from 'vitest';
 import { ServiceRegistry } from '../../src/core/ServiceRegistry.js';
 import { createEventBusMock, createServiceRegistryMock } from './mocks.js';
 
@@ -40,6 +40,7 @@ export function setupGlobalMocks(options = {}) {
   }
 
   previousGlobalsStack.push(previous);
+  globalThis.__HAS_GLOBAL_MOCKS__ = true;
 
   return previous;
 }
@@ -88,6 +89,12 @@ export function cleanupGlobalState() {
   vi.restoreAllMocks();
   if (stack && stack.length === 0) {
     previousGlobalsStack = null;
+  }
+
+  if (previousGlobalsStack && previousGlobalsStack.length > 0) {
+    globalThis.__HAS_GLOBAL_MOCKS__ = true;
+  } else {
+    delete globalThis.__HAS_GLOBAL_MOCKS__;
   }
 }
 
@@ -144,3 +151,11 @@ export async function withWaveOverrides(config, callback) {
 export function createTestContainer(seed = 'test-seed') {
   return ServiceRegistry.createTestContainer({ randomSeed: seed });
 }
+
+afterEach(() => {
+  while (globalThis.__HAS_GLOBAL_MOCKS__) {
+    cleanupGlobalState();
+  }
+
+  vi.restoreAllMocks();
+});

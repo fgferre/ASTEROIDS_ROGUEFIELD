@@ -7,7 +7,10 @@ function sampleSequence(random, count, sampler) {
 }
 
 describe('RandomService determinism', () => {
-  it('produces identical float sequences for the same seed', () => {
+  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/setup.js)
+  // Optimization: it.concurrent (all tests are completely independent)
+
+  it.concurrent('produces identical float sequences for the same seed', () => {
     const seed = 987654321;
     const randomA = new RandomService(seed);
     const randomB = new RandomService(seed);
@@ -19,7 +22,7 @@ describe('RandomService determinism', () => {
     expect(floatsB).toEqual(floatsA);
   });
 
-  it('produces identical range sequences for the same seed', () => {
+  it.concurrent('produces identical range sequences for the same seed', () => {
     const seed = 13579;
     const randomA = new RandomService(seed);
     const randomB = new RandomService(seed);
@@ -31,7 +34,7 @@ describe('RandomService determinism', () => {
     expect(rangesB).toEqual(rangesA);
   });
 
-  it('produces identical int sequences for the same seed', () => {
+  it.concurrent('produces identical int sequences for the same seed', () => {
     const seed = 111222;
     const randomA = new RandomService(seed);
     const randomB = new RandomService(seed);
@@ -46,7 +49,7 @@ describe('RandomService determinism', () => {
     });
   });
 
-  it('produces identical chance results for the same seed', () => {
+  it.concurrent('produces identical chance results for the same seed', () => {
     const seed = 333444;
     const randomA = new RandomService(seed);
     const randomB = new RandomService(seed);
@@ -60,7 +63,7 @@ describe('RandomService determinism', () => {
     });
   });
 
-  it('selects identical elements with pick for the same seed', () => {
+  it.concurrent('selects identical elements with pick for the same seed', () => {
     const seed = 424242;
     const randomA = new RandomService(seed);
     const randomB = new RandomService(seed);
@@ -72,7 +75,7 @@ describe('RandomService determinism', () => {
     expect(picksB).toEqual(picksA);
   });
 
-  it('selects identical elements with weightedPick for the same seed', () => {
+  it.concurrent('selects identical elements with weightedPick for the same seed', () => {
     const seed = 777;
     const randomA = new RandomService(seed);
     const randomB = new RandomService(seed);
@@ -89,7 +92,7 @@ describe('RandomService determinism', () => {
     expect(picksB).toEqual(picksA);
   });
 
-  it('generates identical UUIDs for the same seed', () => {
+  it.concurrent('generates identical UUIDs for the same seed', () => {
     const seed = 314159265;
     const randomA = new RandomService(seed);
     const randomB = new RandomService(seed);
@@ -100,7 +103,7 @@ describe('RandomService determinism', () => {
     expect(uuidsB).toEqual(uuidsA);
   });
 
-  it('fork produces deterministic child generators', () => {
+  it.concurrent('fork produces deterministic child generators', () => {
     const seed = 24680;
     const randomA = new RandomService(seed);
     const randomB = new RandomService(seed);
@@ -135,7 +138,7 @@ describe('RandomService determinism', () => {
     expect(forkDataB).toEqual(forkDataA);
   });
 
-  it('repeats sequences after resetting to the same seed', () => {
+  it.concurrent('repeats sequences after resetting to the same seed', () => {
     const seed = 55555;
     const random = new RandomService(seed);
     const values = ['north', 'south', 'east', 'west'];
@@ -154,7 +157,7 @@ describe('RandomService determinism', () => {
     expect(secondRun).toStrictEqual(firstRun);
   });
 
-  it('serialize and restore preserves deterministic state', () => {
+  it.concurrent('serialize and restore preserves deterministic state', () => {
     const seed = 999888;
     const random = new RandomService(seed);
 

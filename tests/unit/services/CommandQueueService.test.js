@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import CommandQueueService from '../../../src/services/CommandQueueService.js';
 
 describe('CommandQueueService', () => {
-  it('enqueues commands with sequential frame tags and consumes them in order', () => {
+  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/setup.js)
+  // Optimization: it.concurrent (tests are independent)
+
+  it.concurrent('enqueues commands with sequential frame tags and consumes them in order', () => {
     const queue = new CommandQueueService({ initialFrame: 0 });
 
     const first = queue.enqueue({ type: 'move', axes: { x: 1, y: 0 } });
@@ -21,7 +24,7 @@ describe('CommandQueueService', () => {
     expect(consumedSecond[0].frame).toBe(1);
   });
 
-  it('respects explicit frame overrides and filtering during consumption', () => {
+  it.concurrent('respects explicit frame overrides and filtering during consumption', () => {
     const queue = new CommandQueueService({ initialFrame: 0 });
 
     queue.enqueue({ type: 'move', axes: { x: 1, y: 1 } }, { frame: 5 });
@@ -37,7 +40,7 @@ describe('CommandQueueService', () => {
     expect(remaining.map((entry) => entry.type)).toStrictEqual(['move', 'firePrimary']);
   });
 
-  it('invokes instrumentation hooks on enqueue, consume and clear', () => {
+  it.concurrent('invokes instrumentation hooks on enqueue, consume and clear', () => {
     const onEnqueue = vi.fn();
     const onConsume = vi.fn();
     const onClear = vi.fn();
@@ -64,7 +67,7 @@ describe('CommandQueueService', () => {
     expect(onClear.mock.calls[0][0].reason).toBe('reset');
   });
 
-  it('retrieves the most recent matching entry via peekLast', () => {
+  it.concurrent('retrieves the most recent matching entry via peekLast', () => {
     const queue = new CommandQueueService();
 
     const first = queue.enqueue({ type: 'move', axes: { x: 0, y: 1 } });
@@ -86,7 +89,7 @@ describe('CommandQueueService', () => {
     expect(matchingPredicate).not.toBe(first);
   });
 
-  it('clears queued commands and reports queue size', () => {
+  it.concurrent('clears queued commands and reports queue size', () => {
     const queue = new CommandQueueService();
     queue.enqueue({ type: 'move', axes: { x: 0, y: 1 } });
     queue.enqueue({ type: 'firePrimary', phase: 'pressed' });
@@ -98,7 +101,7 @@ describe('CommandQueueService', () => {
     expect(queue.consume()).toHaveLength(0);
   });
 
-  it('creates deep snapshots of payloads and metadata to avoid mutation bleed', () => {
+  it.concurrent('creates deep snapshots of payloads and metadata to avoid mutation bleed', () => {
     const queue = new CommandQueueService({ initialFrame: 10 });
     const sharedAxes = { x: 1, y: 2 };
     const metadataEnvelope = { metadata: { origin: { id: 'player-1' } } };

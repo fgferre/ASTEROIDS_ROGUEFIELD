@@ -28,6 +28,9 @@ describe('WaveManager Integration - Feature Flags', () => {
     cleanupGlobalState();
   });
 
+  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/setup.js)
+  // Note: Tests modify globalThis and CONSTANTS, cannot be parallelized safely
+
   describe('Feature Flag: USE_WAVE_MANAGER', () => {
     test('Legacy system remains functional when flag is forced off', () => {
       expect(CONSTANTS.USE_WAVE_MANAGER).toBe(true);

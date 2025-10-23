@@ -1,27 +1,14 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 
 import GameSessionService from '../../../src/services/GameSessionService.js';
-
-function createEventBus() {
-  return {
-    emit: vi.fn(),
-    on: vi.fn(),
-    off: vi.fn()
-  };
-}
-
-function createRandomStub() {
-  return {
-    serialize: vi.fn(() => ({ scope: 'stub', value: 123 })),
-    restore: vi.fn(),
-    reset: vi.fn(),
-    seed: 123
-  };
-}
+import { createEventBusMock } from '../../__helpers__/mocks.js';
+// Optimization: use centralized createRandomServiceStatefulStub()
+import { createRandomServiceStatefulStub } from '../../__helpers__/stubs.js';
 
 function createServiceHarness() {
-  const eventBus = createEventBus();
-  const random = createRandomStub();
+  // Optimization: use centralized createEventBusMock() instead of inline helper
+  const eventBus = createEventBusMock();
+  const random = createRandomServiceStatefulStub();
 
   const player = {
     maxHealth: 100,
@@ -140,10 +127,7 @@ function createServiceHarness() {
 }
 
 describe('GameSessionService lifecycle flows', () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
+  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/setup.js)
   afterEach(() => {
     vi.useRealTimers();
   });

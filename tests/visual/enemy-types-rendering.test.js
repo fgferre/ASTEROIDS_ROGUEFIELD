@@ -113,7 +113,10 @@ function createMockContext() {
 }
 
 describe('Enemy renderer payloads', () => {
-  it('produces deterministic drone payload and resets context state', () => {
+  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/setup.js)
+  // Optimization: it.concurrent (tests are independent)
+
+  it.concurrent('produces deterministic drone payload and resets context state', () => {
     const drone = new Drone(null, {
       id: 'drone-test',
       radius: 12,
@@ -149,7 +152,7 @@ describe('Enemy renderer payloads', () => {
     expect(ctx.strokeStyle).toBe('transparent');
   });
 
-  it('returns mine pulse data and respects armed state', () => {
+  it.concurrent('returns mine pulse data and respects armed state', () => {
     const mine = new Mine(null, {
       id: 'mine-test',
       radius: 18,
@@ -173,7 +176,7 @@ describe('Enemy renderer payloads', () => {
     expect(ctx.strokeStyle).toBe('transparent');
   });
 
-  it('exposes hunter turret angle in payload and preserves canvas state', () => {
+  it.concurrent('exposes hunter turret angle in payload and preserves canvas state', () => {
     const hunter = new Hunter(null, {
       id: 'hunter-test',
       radius: 16,
