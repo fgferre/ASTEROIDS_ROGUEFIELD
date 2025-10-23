@@ -3,9 +3,11 @@ import RandomService from '../../../src/core/RandomService.js';
 import { ScreenShake } from '../../../src/utils/ScreenShake.js';
 
 describe('ScreenShake random seed behaviour', () => {
+  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/global-setup.js)
+  // Optimization: it.concurrent (tests are independent)
   const sampleCount = 8;
 
-  it('produces deterministic seeds when provided with the same RandomService seed', () => {
+  it.concurrent('produces deterministic seeds when provided with the same RandomService seed', () => {
     const baseSeed = 13579;
     const first = new ScreenShake(new RandomService(baseSeed));
     const second = new ScreenShake(new RandomService(baseSeed));
@@ -16,7 +18,7 @@ describe('ScreenShake random seed behaviour', () => {
     expect(seqA).toStrictEqual(seqB);
   });
 
-  it('uses a deterministic fallback generator when none is provided', () => {
+  it.concurrent('uses a deterministic fallback generator when none is provided', () => {
     const first = new ScreenShake();
     const second = new ScreenShake();
 
@@ -26,7 +28,7 @@ describe('ScreenShake random seed behaviour', () => {
     expect(seqA).toStrictEqual(seqB);
   });
 
-  it('restores captured seed state when reseeded with a stored snapshot', () => {
+  it.concurrent('restores captured seed state when reseeded with a stored snapshot', () => {
     const baseSeed = 24680;
     const generator = new RandomService(baseSeed);
     const shake = new ScreenShake(generator);

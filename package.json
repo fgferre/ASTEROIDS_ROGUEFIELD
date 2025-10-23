@@ -18,7 +18,9 @@
     "format:check": "prettier --check .",
     "analyze:deps": "node scripts/analyze-dependencies.js && node scripts/generate-mermaid-graph.js",
     "analyze:deps:watch": "nodemon --watch src --exec npm run analyze:deps",
-    "validate:deps": "node scripts/analyze-dependencies.js --validate-only"
+    "validate:deps": "node scripts/analyze-dependencies.js --validate-only",
+    "test:benchmark": "node scripts/benchmark-tests.js",
+    "test:validate-optimizations": "node scripts/validate-test-optimizations.js"
   },
   "devDependencies": {
     "grunt": "^1.6.1",

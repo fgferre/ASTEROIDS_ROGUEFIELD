@@ -1,14 +1,7 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 
 import GameSessionService from '../../../src/services/GameSessionService.js';
-
-function createEventBus() {
-  return {
-    emit: vi.fn(),
-    on: vi.fn(),
-    off: vi.fn()
-  };
-}
+import { createEventBusMock } from '../../__helpers__/mocks.js';
 
 function createRandomStub() {
   return {
@@ -20,7 +13,8 @@ function createRandomStub() {
 }
 
 function createServiceHarness() {
-  const eventBus = createEventBus();
+  // Optimization: use centralized createEventBusMock() instead of inline helper
+  const eventBus = createEventBusMock();
   const random = createRandomStub();
 
   const player = {
@@ -140,10 +134,7 @@ function createServiceHarness() {
 }
 
 describe('GameSessionService lifecycle flows', () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
+  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/global-setup.js)
   afterEach(() => {
     vi.useRealTimers();
   });

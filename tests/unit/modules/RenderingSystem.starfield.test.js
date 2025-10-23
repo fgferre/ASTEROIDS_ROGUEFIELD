@@ -15,7 +15,10 @@ function captureStarfieldLayout(spaceSky, sampleSize = 5) {
 }
 
 describe('RenderingSystem starfield determinism', () => {
-  it('restores identical star layout after reseed with the same base seed', () => {
+  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/global-setup.js)
+  // Optimization: it.concurrent (tests are independent)
+
+  it.concurrent('restores identical star layout after reseed with the same base seed', () => {
     const baseRandom = new RandomService('rendering:test-seed');
     const renderer = new RenderingSystem({ random: baseRandom });
 
@@ -35,7 +38,7 @@ describe('RenderingSystem starfield determinism', () => {
     expect(restoredLayout).toEqual(initialLayout);
   });
 
-  it('uses deterministic fallback random scopes when no dependency is provided', () => {
+  it.concurrent('uses deterministic fallback random scopes when no dependency is provided', () => {
     const firstRenderer = new RenderingSystem();
     firstRenderer.spaceSky.resize(640, 480);
     const firstLayout = captureStarfieldLayout(firstRenderer.spaceSky);

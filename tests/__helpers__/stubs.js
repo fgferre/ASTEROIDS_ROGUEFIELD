@@ -50,6 +50,31 @@ export function createDeterministicRandom(options = {}) {
 }
 
 /**
+ * Creates a stub of RandomService with serialize/restore/reset capabilities
+ *
+ * Used for tests that need to mock RandomService with state management.
+ *
+ * @param {Object} options - Configuration options
+ * @param {number} options.seed - Initial seed value (default: 123)
+ * @param {Object} options.serializedState - State to return from serialize() (default: { scope: 'stub', value: 123 })
+ * @returns {Object} RandomService stub with vi.fn() methods
+ *
+ * @example
+ * const random = createRandomServiceStub({ seed: 999 });
+ * expect(random.serialize()).toEqual({ scope: 'stub', value: 123 });
+ */
+export function createRandomServiceStub(options = {}) {
+  const { seed = 123, serializedState = { scope: 'stub', value: 123 } } = options;
+
+  return {
+    serialize: vi.fn(() => serializedState),
+    restore: vi.fn(),
+    reset: vi.fn(),
+    seed,
+  };
+}
+
+/**
  * Create a GainNode stub used across audio determinism tests.
  *
  * @returns {{connect: () => void, gain: {setValueAtTime: () => void, exponentialRampToValueAtTime: () => void}}}

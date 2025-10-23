@@ -7,6 +7,10 @@ export default defineConfig({
   },
   test: {
     include: ['**/__tests__/**/*.test.js', '**/*.{test,spec}.js', '../tests/**/*.{test,spec}.js'],
-    environment: 'node'
+    exclude: ['tests/__helpers__/**', 'tests/__fixtures__/**', 'node_modules/**'],
+    environment: 'node',
+    globals: true,
+    // Optimization: global setup eliminates 27 duplicated afterEach blocks
+    setupFiles: ['../tests/__helpers__/global-setup.js']
   },
 });

@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from 'vitest';
+import { describe, test, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import * as CONSTANTS from '../../../src/core/GameConstants.js';
 import { GamePools } from '../../../src/core/GamePools.js';
 import { setupGlobalMocks, cleanupGlobalState } from '../../__helpers__/setup.js';
@@ -8,9 +8,13 @@ describe('Asteroid Metrics - Wave Spawn Rate', () => {
   /** @type {{ enemySystem: any, container: any }} */
   let harness;
 
+  // Optimization: beforeAll for harness creation (immutable setup)
+  beforeAll(() => {
+    harness = createEnemySystemHarness();
+  });
+
   beforeEach(() => {
     setupGlobalMocks();
-    harness = createEnemySystemHarness();
   });
 
   afterEach(() => {
@@ -20,13 +24,16 @@ describe('Asteroid Metrics - Wave Spawn Rate', () => {
     if (typeof GamePools.destroy === 'function') {
       GamePools.destroy();
     }
-    harness?.container?.dispose?.();
     cleanupGlobalState();
+  });
+
+  afterAll(() => {
+    harness?.container?.dispose?.();
   });
 
   describe('Wave Spawn Rate (Waves 1-10)', () => {
     Array.from({ length: 10 }, (_, index) => index + 1).forEach((waveNumber) => {
-      test(`wave ${waveNumber} matches baseline formula`, () => {
+      test.concurrent(`wave ${waveNumber} matches baseline formula`, () => {
         const { waveState } = simulateWave(harness.enemySystem, waveNumber, 800);
         const formulaTotal =
           CONSTANTS.ASTEROIDS_PER_WAVE_BASE +
@@ -42,6 +49,7 @@ describe('Asteroid Metrics - Wave Spawn Rate', () => {
       });
     });
 
+    // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/global-setup.js)
     test('golden snapshot for waves 1, 5, and 10', () => {
       const snapshot = [1, 5, 10].map((waveNumber) => {
         const { waveState } = simulateWave(harness.enemySystem, waveNumber, 800);
