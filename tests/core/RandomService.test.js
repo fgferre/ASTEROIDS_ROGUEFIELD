@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import RandomService from '../../../src/core/RandomService.js';
-import { expectDeterministicSequence } from '../../__helpers__/assertions.js';
+import RandomService from '../../src/core/RandomService.js';
+import { expectDeterministicSequence } from '../__helpers__/assertions.js';
 
 function sampleSequence(random, count, sampler) {
   return Array.from({ length: count }, (_, index) => sampler(random, index));

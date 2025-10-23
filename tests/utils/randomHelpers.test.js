@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createRandomHelpers } from '../../../src/utils/randomHelpers.js';
+import { createRandomHelpers } from '../../src/utils/randomHelpers.js';
 
 const createForkStub = () => ({
   float: vi.fn(() => 0.42),

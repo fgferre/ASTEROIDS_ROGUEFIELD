@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import RandomService from '../../../src/core/RandomService.js';
-import EffectsSystem from '../../../src/modules/EffectsSystem.js';
-import MenuBackgroundSystem from '../../../src/modules/MenuBackgroundSystem.js';
+import RandomService from '../../src/core/RandomService.js';
+import EffectsSystem from '../../src/modules/EffectsSystem.js';
+import MenuBackgroundSystem from '../../src/modules/MenuBackgroundSystem.js';
 
 const createSettingsStub = () => ({
   getCategoryValues: vi.fn(() => null),

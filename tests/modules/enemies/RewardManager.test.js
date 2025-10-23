@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import { RewardManager } from '../../../../src/modules/enemies/managers/RewardManager.js';
-import { createDeterministicRandom } from '../../../__helpers__/stubs.js';
-import { createTestEnemy } from '../../../__helpers__/fixtures.js';
+import { RewardManager } from '../../../src/modules/enemies/managers/RewardManager.js';
+import { createDeterministicRandom } from '../../__helpers__/stubs.js';
+import { createTestEnemy } from '../../__helpers__/fixtures.js';
 
 describe('RewardManager', () => {
   afterEach(() => {

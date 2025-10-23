@@ -1,6 +1,6 @@
 // src/__tests__/core/ObjectPool.test.js
 import { describe, test, expect, beforeAll, afterEach, vi } from 'vitest';
-import { ObjectPool, TTLObjectPool } from '../../../src/core/ObjectPool.js';
+import { ObjectPool, TTLObjectPool } from '../../src/core/ObjectPool.js';
 
 describe('ObjectPool', () => {
   const createPool = () =>

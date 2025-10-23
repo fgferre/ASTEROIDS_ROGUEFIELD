@@ -67,26 +67,31 @@ O jogo segue uma **Arquitetura Modular baseada em Sistemas** com contratos expl�
 
 - **Localização:** Todos os testes em `/tests` (fora de `/src`)
 - **Organização:**
-  - `/tests/unit/`: Testes unitários isolados de módulos individuais
-    - `core/`: DIContainer, ObjectPool, SpatialHash, RandomService
-    - `modules/`: Audio (Batcher, Cache, System), Player, Rendering, Progression, Wave, Enemies
-    - `utils/`: ScreenShake, randomHelpers
-    - `services/`: GameSession, CommandQueue
+  - `/tests/core/`: Testes de infraestrutura central (`src/core/`)
+    - `DIContainer.test.js`, `ObjectPool.test.js`, `SpatialHash.test.js`, `RandomService.test.js`
+  - `/tests/modules/`: Testes de sistemas de gameplay (`src/modules/`)
+    - Audio: `AudioBatcher.test.js`, `AudioCache.test.js`, `AudioSystem.randomScopes.test.js`
+    - Player: `PlayerSystem.commandQueue.test.js`
+    - Rendering: `RenderingSystem.starfield.test.js`
+    - Progression: `ProgressionSystem.test.js`
+    - Wave: `WaveManager.test.js`
+    - Enemies: `enemies/RewardManager.test.js`
+    - Utils: `RandomHelperExposure.test.js`
+  - `/tests/utils/`: Testes de utilitários (`src/utils/`)
+    - `ScreenShake.test.js`, `randomHelpers.test.js`
+  - `/tests/services/`: Testes de serviços (`src/services/`)
+    - `GameSessionService.test.js`, `CommandQueueService.test.js`
   - `/tests/integration/`: Testes de integração entre múltiplos sistemas
     - `determinism/`: Testes de determinismo (systems, enemy-system, start-reset-cycle)
     - `gameplay/`: Testes de gameplay (mixed-enemy-waves)
     - `wavemanager/`: Testes de integração WaveManager (feature-flags)
   - `/tests/balance/`: Testes de balanceamento e métricas de jogo
     - `reward-mechanics.test.js`: Mecânicas de recompensa
-    - `asteroid-metrics/`: Métricas de asteroides (spawn-rates, size-distribution, variant-distribution, fragmentation, determinism)
+    - `asteroid-metrics/`: Métricas de asteroides (spawn-rates, size-distribution, variant-distribution, fragmentation, determinismo)
   - `/tests/physics/`: Testes de física e colisões
     - `collision-accuracy.test.js`: Precisão de colisões
   - `/tests/visual/`: Testes de rendering e determinismo visual/audio
-    - `rendering-determinism.test.js`: Determinismo de rendering
-    - `audio-determinism.test.js`: Determinismo de áudio
-    - `screen-shake-determinism.test.js`: Determinismo de screen shake
-    - `menu-background-determinism.test.js`: Determinismo de background
-    - `enemy-types-rendering.test.js`: Rendering de tipos de inimigos
+    - `rendering-determinism.test.js`, `audio-determinism.test.js`, `screen-shake-determinism.test.js`, `menu-background-determinism.test.js`, `enemy-types-rendering.test.js`
   - `/tests/__helpers__/`: Helpers compartilhados (NÃO são testes)
     - `mocks.js`: Mocks de EventBus, ServiceRegistry, RandomService, AudioSystem
     - `stubs.js`: Stubs determinísticos e de áudio
@@ -100,7 +105,7 @@ O jogo segue uma **Arquitetura Modular baseada em Sistemas** com contratos expl�
 
 - **Helpers Disponíveis:**
   - **Mocks:** `createEventBusMock()`, `createServiceRegistryMock()`, `createRandomServiceStub()`, `createAudioSystemStub()`, `createGameEventsMock()`
-  - **Stubs:** `createDeterministicRandom()`, `createGainStub()`, `createOscillatorStub()`, `createBufferSourceStub()`, `createSettingsStub()`, `createRandomServiceStub()`
+  - **Stubs:** `createDeterministicRandom()`, `createGainStub()`, `createOscillatorStub()`, `createBufferSourceStub()`, `createSettingsStub()`
   - **Fixtures:** `createTestAsteroid()`, `createTestEnemy()`, `createTestWorld()`, `createTestPlayer()`, `createTestPhysics()`, `createTestProgression()`
   - **Assertions:** `expectDeterministicSequence()`, `expectWithinTolerance()`, `expectSameSeeds()`
   - **Setup:** `setupGlobalMocks()`, `cleanupGlobalState()`, `withWaveOverrides()`, `createTestContainer()`
@@ -108,11 +113,14 @@ O jogo segue uma **Arquitetura Modular baseada em Sistemas** com contratos expl�
 
 - **Executar Testes:**
   - `npm test` - Todos os testes (~31 arquivos)
-  - `npm run test:unit` - Apenas unitários (core, modules, utils, services)
-  - `npm run test:integration` - Apenas integração (determinism, gameplay, wavemanager)
-  - `npm run test:balance` - Apenas balanceamento (reward-mechanics, asteroid-metrics)
-  - `npm run test:visual` - Apenas visual (rendering, audio, screen-shake determinism)
-  - `npm run test:physics` - Apenas física (collision-accuracy)
+  - `npm run test:core` - Testes de infraestrutura central (DIContainer, ObjectPool, SpatialHash, RandomService)
+  - `npm run test:modules` - Testes de sistemas de gameplay (Audio, Player, Rendering, Progression, Wave, Enemies)
+  - `npm run test:utils` - Testes de utilitários (ScreenShake, randomHelpers)
+  - `npm run test:services` - Testes de serviços (GameSession, CommandQueue)
+  - `npm run test:integration` - Testes de integração (determinism, gameplay, wavemanager)
+  - `npm run test:balance` - Testes de balanceamento (reward-mechanics, asteroid-metrics)
+  - `npm run test:visual` - Testes visuais (rendering, audio, screen-shake determinism)
+  - `npm run test:physics` - Testes de física (collision-accuracy)
   - `npm run test:watch` - Modo watch (re-executa ao salvar)
   - `npm run test:coverage` - Com relatório de cobertura
   - `npm run test:benchmark` - Benchmark de performance (5 runs)
@@ -124,7 +132,8 @@ O jogo segue uma **Arquitetura Modular baseada em Sistemas** com contratos expl�
   3. **Cleanup automático:** `vi.restoreAllMocks()` é executado automaticamente após cada teste via global-setup.js
   4. **Determinismo:** Use `createDeterministicRandom()` para testes determinísticos
   5. **Performance:** Use `beforeAll` para setup imutável, `vi.useFakeTimers()` para delays, `.concurrent` para paralelização
-  6. **Consulte o guia:** Veja `tests/OPTIMIZATION_GUIDE.md` para padrões de otimização aplicados
+  6. **Espelhamento:** Estrutura de testes espelha estrutura de código (`tests/core/` ↔ `src/core/`, `tests/modules/` ↔ `src/modules/`)
+  7. **Consulte o guia:** Veja `tests/OPTIMIZATION_GUIDE.md` para padrões de otimização aplicados
 
 #### 6. **"Definition of Done" (DoD) para uma Feature**
 

@@ -50,7 +50,7 @@
 ### 4.2 Monitoramento de performance (origem: `baseline-metrics.md`, `performance-monitor-guide.md`, `how-to-send-performance-data.md`, `phase-1-performance.md`, `test-batch-rendering.html`)
 | Item | Objetivo | Passos principais | Critério de aceite | Responsável |
 |------|----------|-------------------|--------------------|-------------|
-| 4.2.A Atualizar métricas base | Reexecutar benchmarks com build atual. | (1) Rodar `quick-performance-test.js` e `realistic-performance-test.js`; (2) registrar FPS, memória, CPU; (3) atualizar doc público. | Planilha com métricas 2025-Q4 anexada ao repositório. | Performance |
+| 4.2.A Atualizar métricas base | Reexecutar benchmarks com build atual. | (1) Rodar `npm run stress` (collision-stress.js) e `node scripts/benchmarks/performance-baseline.js`; (2) registrar FPS, memória, CPU; (3) atualizar doc público. | Planilha com métricas 2025-Q4 anexada ao repositório. | Performance |
 | 4.2.B Automação de coleta | Integrar monitoramento ao CI/manual. | (1) Expor CLI para `performanceMonitor`; (2) anexar logs automaticamente ao PR. | Workflow CI gerando artefatos de performance em cada PR relevante. | Engenharia |
 | 4.2.C Higienizar protótipos | Revisar protótipos legados (batch/audio). | (1) Documentar quais técnicas já estão no motor; (2) remover código redundante. | README curto anexado ao repositório de protótipos; itens obsoletos removidos do build. | Performance |
 

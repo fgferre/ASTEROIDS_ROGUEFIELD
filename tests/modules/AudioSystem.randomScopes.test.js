@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import AudioSystem from '../../../src/modules/AudioSystem.js';
-import RandomService from '../../../src/core/RandomService.js';
-import { setupGlobalMocks, cleanupGlobalState } from '../../__helpers__/setup.js';
-import { createSettingsStub } from '../../__helpers__/stubs.js';
+import AudioSystem from '../../src/modules/AudioSystem.js';
+import RandomService from '../../src/core/RandomService.js';
+import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
+import { createSettingsStub } from '../__helpers__/stubs.js';
 
 describe('AudioSystem random scope synchronization', () => {
   beforeEach(() => {

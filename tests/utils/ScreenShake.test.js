@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import RandomService from '../../../src/core/RandomService.js';
-import { ScreenShake } from '../../../src/utils/ScreenShake.js';
+import RandomService from '../../src/core/RandomService.js';
+import { ScreenShake } from '../../src/utils/ScreenShake.js';
 
 describe('ScreenShake random seed behaviour', () => {
   // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/setup.js)
