@@ -13,6 +13,6 @@ export default defineConfig({
     environment: 'node',
     globals: true,
     // Optimization: global setup eliminates 27 duplicated afterEach blocks
-    setupFiles: ['tests/__helpers__/setup.js']
+    setupFiles: ['tests/__helpers__/global-setup.js']
   },
 });
