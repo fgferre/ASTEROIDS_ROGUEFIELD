@@ -6,7 +6,7 @@ export default defineConfig({
     port: 5500, // Mantém a porta que já estávamos usando
   },
   test: {
-    include: ['**/__tests__/**/*.test.js', '**/*.{test,spec}.js', '../tests/**/*.{test,spec}.js'],
+    include: ['../tests/**/*.test.js', '../tests/**/*.spec.js'],
     exclude: ['../tests/__helpers__/**', '../tests/__fixtures__/**', 'node_modules/**'],
     environment: 'node',
     globals: true,

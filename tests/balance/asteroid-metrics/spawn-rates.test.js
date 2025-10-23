@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
+import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import * as CONSTANTS from '../../../src/core/GameConstants.js';
 import { GamePools } from '../../../src/core/GamePools.js';
 import { setupGlobalMocks, cleanupGlobalState } from '../../__helpers__/setup.js';
@@ -8,16 +8,15 @@ describe('Asteroid Metrics - Wave Spawn Rate', () => {
   /** @type {{ enemySystem: any, container: any }} */
   let harness;
 
-  // Optimization: beforeAll for harness creation (immutable setup)
-  beforeAll(() => {
+  beforeEach(() => {
+    setupGlobalMocks();
+    // Optimization: recreate harness per test to guarantee isolated enemy system state
     harness = createEnemySystemHarness();
   });
 
-  beforeEach(() => {
-    setupGlobalMocks();
-  });
-
   afterEach(() => {
+    harness?.container?.dispose?.();
+    harness = undefined;
     if (GamePools.asteroids?.releaseAll) {
       GamePools.asteroids.releaseAll();
     }
@@ -25,10 +24,6 @@ describe('Asteroid Metrics - Wave Spawn Rate', () => {
       GamePools.destroy();
     }
     cleanupGlobalState();
-  });
-
-  afterAll(() => {
-    harness?.container?.dispose?.();
   });
 
   describe('Wave Spawn Rate (Waves 1-10)', () => {

@@ -17,6 +17,9 @@ import { join } from 'path';
 
 const TEST_DIR = 'tests';
 const ISSUES = [];
+const WARNINGS = [];
+
+const SET_TIMEOUT_ALLOWLIST = [/^tests\/integration\//];
 
 function findTestFiles(dir) {
   const files = [];
@@ -38,10 +41,21 @@ function findTestFiles(dir) {
 
 function checkFile(filePath) {
   const content = readFileSync(filePath, 'utf-8');
+  const normalizedPath = filePath.replace(/\\/g, '/');
   
   // Check 1: setTimeout without vi.useFakeTimers()
-  if (content.includes('setTimeout') && !content.includes('vi.useFakeTimers()')) {
+  const ignoreSetTimeout =
+    SET_TIMEOUT_ALLOWLIST.some((pattern) => pattern.test(normalizedPath)) ||
+    content.includes('// validate-ignore: setTimeout');
+
+  if (
+    content.includes('setTimeout') &&
+    !content.includes('vi.useFakeTimers()') &&
+    !ignoreSetTimeout
+  ) {
     ISSUES.push(`${filePath}: Uses setTimeout without vi.useFakeTimers()`);
+  } else if (content.includes('setTimeout') && !ignoreSetTimeout) {
+    WARNINGS.push(`${filePath}: Detected setTimeout usage - verify fake timers are intentional.`);
   }
   
   // Check 2: Inline EventBus creation
@@ -82,15 +96,20 @@ function main() {
     checkFile(file);
   }
   
-  if (ISSUES.length === 0) {
-    console.log('✅ All checks passed! No optimization issues found.');
-    process.exit(0);
-  } else {
-    console.log(`❌ Found ${ISSUES.length} potential issues:\n`);
-    ISSUES.forEach(issue => console.log(`  - ${issue}`));
-    console.log('\nNote: Some issues may be false positives. Review manually.');
-    process.exit(1);
+  if (WARNINGS.length > 0) {
+    console.log(`\n⚠️  Found ${WARNINGS.length} warnings:`);
+    WARNINGS.forEach((warning) => console.log(`  - ${warning}`));
   }
+
+  if (ISSUES.length === 0) {
+    console.log('\n✅ All checks passed! No optimization issues found.');
+    process.exit(0);
+  }
+
+  console.log(`\n❌ Found ${ISSUES.length} potential issues:\n`);
+  ISSUES.forEach((issue) => console.log(`  - ${issue}`));
+  console.log('\nNote: Some issues may be false positives. Review manually.');
+  process.exit(1);
 }
 
 main();

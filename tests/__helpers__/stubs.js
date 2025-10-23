@@ -55,8 +55,10 @@ export function createDeterministicRandom(options = {}) {
  * Used for tests that need to mock RandomService with state management.
  *
  * @param {Object} options - Configuration options
- * @param {number} options.seed - Initial seed value (default: 123)
- * @param {Object} options.serializedState - State to return from serialize() (default: { scope: 'stub', value: 123 })
+ * @param {number} [options.seed=123] - Initial seed value
+ * @param {Object} [options.serializedState={ scope: 'stub', value: 123 }] - State returned from serialize()
+ * @param {Object} [options.deterministic={}] - Overrides forwarded to createDeterministicRandom()
+ * @param {string|(() => string)} [options.uuidValue='00000000-0000-0000-0000-000000000000'] - Stable UUID response or factory
  * @returns {Object} RandomService stub with vi.fn() methods
  *
  * @example
@@ -64,14 +66,38 @@ export function createDeterministicRandom(options = {}) {
  * expect(random.serialize()).toEqual({ scope: 'stub', value: 123 });
  */
 export function createRandomServiceStub(options = {}) {
-  const { seed = 123, serializedState = { scope: 'stub', value: 123 } } = options;
+  const {
+    seed = 123,
+    serializedState = { scope: 'stub', value: 123 },
+    deterministic = {},
+    uuidValue = '00000000-0000-0000-0000-000000000000',
+  } = options;
 
-  return {
+  const deterministicRandom = createDeterministicRandom(deterministic);
+
+  const stub = {
     serialize: vi.fn(() => serializedState),
     restore: vi.fn(),
     reset: vi.fn(),
     seed,
+    float: vi.fn(() => deterministicRandom.float()),
+    range: vi.fn((min, max) => deterministicRandom.range(min, max)),
+    int: vi.fn((min, max) => deterministicRandom.int(min, max)),
+    chance: vi.fn((probability) => deterministicRandom.chance(probability)),
+    pick: vi.fn((array) => deterministicRandom.pick(array)),
+    uuid: vi.fn(() => (typeof uuidValue === 'function' ? uuidValue() : uuidValue)),
   };
+
+  stub.fork = vi.fn(() =>
+    createRandomServiceStub({
+      seed,
+      serializedState,
+      deterministic,
+      uuidValue,
+    })
+  );
+
+  return stub;
 }
 
 /**
