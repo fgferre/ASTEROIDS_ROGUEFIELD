@@ -12,7 +12,7 @@ describe('DIContainer', () => {
     return container;
   };
 
-  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/global-setup.js)
+  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/setup.js)
 
   // Optimization: describe.concurrent (all describes are independent)
   describe.concurrent('Registration', () => {

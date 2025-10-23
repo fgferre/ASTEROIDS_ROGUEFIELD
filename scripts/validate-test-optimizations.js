@@ -20,6 +20,18 @@ const ISSUES = [];
 const WARNINGS = [];
 
 const SET_TIMEOUT_ALLOWLIST = [/^tests\/integration\//];
+const PRAGMA_PATTERNS = {
+  setTimeout: /validate-ignore:\s*setTimeout/,
+  beforeAll: /validate-ignore:\s*beforeAll-cannot-apply/,
+  concurrency: /validate-ignore:\s*concurrency-intentional/,
+  inlineEventBus: /validate-ignore:\s*inline-eventbus/,
+  inlineRandomStub: /validate-ignore:\s*inline-random-stub/,
+};
+
+function hasPragma(content, key) {
+  const pattern = PRAGMA_PATTERNS[key];
+  return pattern ? pattern.test(content) : false;
+}
 
 function findTestFiles(dir) {
   const files = [];
@@ -46,7 +58,7 @@ function checkFile(filePath) {
   // Check 1: setTimeout without vi.useFakeTimers()
   const ignoreSetTimeout =
     SET_TIMEOUT_ALLOWLIST.some((pattern) => pattern.test(normalizedPath)) ||
-    content.includes('// validate-ignore: setTimeout');
+    hasPragma(content, 'setTimeout');
 
   if (
     content.includes('setTimeout') &&
@@ -59,18 +71,28 @@ function checkFile(filePath) {
   }
   
   // Check 2: Inline EventBus creation
-  if (content.match(/const\s+\w+\s*=\s*\{\s*emit:\s*vi\.fn\(\)/)) {
+  if (
+    content.match(/const\s+\w+\s*=\s*\{\s*emit:\s*vi\.fn\(\)/) &&
+    !hasPragma(content, 'inlineEventBus')
+  ) {
     ISSUES.push(`${filePath}: Has inline EventBus mock, should use createEventBusMock()`);
   }
-  
+
   // Check 3: Inline Random stub
-  if (content.match(/const\s+\w+\s*=\s*\{\s*float:\s*\(\)\s*=>\s*0\.5/)) {
+  if (
+    content.match(/const\s+\w+\s*=\s*\{\s*float:\s*\(\)\s*=>\s*0\.5/) &&
+    !hasPragma(content, 'inlineRandomStub')
+  ) {
     ISSUES.push(`${filePath}: Has inline Random stub, should use createDeterministicRandom()`);
   }
-  
+
   // Check 4: beforeEach with immutable setup
   const beforeEachMatches = content.match(/beforeEach\(\(\)\s*=>\s*\{[^}]*new\s+\w+\(/g);
-  if (beforeEachMatches && beforeEachMatches.length > 0) {
+  if (
+    beforeEachMatches &&
+    beforeEachMatches.length > 0 &&
+    !hasPragma(content, 'beforeAll')
+  ) {
     // This is a heuristic - may need manual review
     ISSUES.push(`${filePath}: Has beforeEach with 'new' - consider beforeAll if setup is immutable`);
   }
@@ -80,7 +102,7 @@ function checkFile(filePath) {
   const hasConcurrent = content.includes('.concurrent');
   const hasGlobalThis = content.includes('globalThis');
   
-  if (hasDescribe && !hasConcurrent && !hasGlobalThis) {
+  if (hasDescribe && !hasConcurrent && !hasGlobalThis && !hasPragma(content, 'concurrency')) {
     // Heuristic: if no globalThis and has describes, might be parallelizable
     ISSUES.push(`${filePath}: Has describes without .concurrent - consider parallelization`);
   }

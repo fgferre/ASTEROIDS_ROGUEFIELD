@@ -15,7 +15,7 @@ function captureStarfieldLayout(spaceSky, sampleSize = 5) {
 }
 
 describe('RenderingSystem starfield determinism', () => {
-  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/global-setup.js)
+  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/setup.js)
   // Optimization: it.concurrent (tests are independent)
 
   it.concurrent('restores identical star layout after reseed with the same base seed', () => {

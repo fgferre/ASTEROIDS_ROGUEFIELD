@@ -34,7 +34,7 @@ describe('ProgressionSystem determinism', () => {
     cleanupGlobalState();
   });
 
-  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/global-setup.js)
+  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/setup.js)
 
   describe('with ServiceRegistry container', () => {
     // Ensures RandomService reset restores the exact upgrade sequence.

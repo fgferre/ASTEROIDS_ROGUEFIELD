@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import CommandQueueService from '../../../src/services/CommandQueueService.js';
 
 describe('CommandQueueService', () => {
-  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/global-setup.js)
+  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/setup.js)
   // Optimization: it.concurrent (tests are independent)
 
   it.concurrent('enqueues commands with sequential frame tags and consumes them in order', () => {

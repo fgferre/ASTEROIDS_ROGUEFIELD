@@ -7,7 +7,7 @@ function sampleSequence(random, count, sampler) {
 }
 
 describe('RandomService determinism', () => {
-  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/global-setup.js)
+  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/setup.js)
   // Optimization: it.concurrent (all tests are completely independent)
 
   it.concurrent('produces identical float sequences for the same seed', () => {

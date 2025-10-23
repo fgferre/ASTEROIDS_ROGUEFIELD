@@ -3,7 +3,7 @@ import RandomService from '../../../src/core/RandomService.js';
 import { ScreenShake } from '../../../src/utils/ScreenShake.js';
 
 describe('ScreenShake random seed behaviour', () => {
-  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/global-setup.js)
+  // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/setup.js)
   // Optimization: it.concurrent (tests are independent)
   const sampleCount = 8;
 

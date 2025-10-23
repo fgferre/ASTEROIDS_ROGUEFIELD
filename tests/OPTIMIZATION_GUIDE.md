@@ -8,7 +8,7 @@ Este guia documenta os padrões de otimização aplicados aos testes do projeto 
 
 **Problema:** Código duplicado de `afterEach(() => vi.restoreAllMocks())` em 27 arquivos.
 
-**Solução:** Setup global em `tests/__helpers__/global-setup.js` carregado via `vite.config.js`.
+**Solução:** Setup global em `tests/__helpers__/setup.js` carregado via `vite.config.js`.
 
 **Benefício:** Elimina 27 linhas duplicadas, garante cleanup automático para todos os testes.
 
@@ -122,6 +122,16 @@ Verifica anti-patterns e missing optimizations.
 - [ ] Usar `vi.useFakeTimers()` se teste tem delays
 - [ ] Usar `.concurrent` se testes são independentes
 - [ ] Não adicionar `afterEach(() => vi.restoreAllMocks())` (já está no global setup)
+
+## Validator Pragmas
+
+Algumas heurísticas do validador podem apontar falsos positivos. Utilize os pragmas abaixo para documentar exceções explícitas:
+
+- `// validate-ignore: setTimeout` – Ignora o aviso de `setTimeout` sem `vi.useFakeTimers()` quando atrasos reais são intencionais.
+- `// validate-ignore: beforeAll-cannot-apply` – Justifica o uso de `beforeEach` quando o setup precisa ser recriado para cada teste.
+- `// validate-ignore: concurrency-intentional` – Mantém suites sequenciais quando paralelização criaria condições de corrida.
+- `// validate-ignore: inline-eventbus` – Permite mocks locais de EventBus em casos altamente específicos.
+- `// validate-ignore: inline-random-stub` – Permite stubs de RandomService customizados que não podem reutilizar o helper compartilhado.
 
 ## Resultados
 
