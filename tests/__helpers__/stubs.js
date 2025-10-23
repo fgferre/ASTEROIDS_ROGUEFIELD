@@ -62,10 +62,10 @@ export function createDeterministicRandom(options = {}) {
  * @returns {Object} RandomService stub with vi.fn() methods
  *
  * @example
- * const random = createRandomServiceStub({ seed: 999 });
+ * const random = createRandomServiceStatefulStub({ seed: 999 });
  * expect(random.serialize()).toEqual({ scope: 'stub', value: 123 });
  */
-export function createRandomServiceStub(options = {}) {
+export function createRandomServiceStatefulStub(options = {}) {
   const {
     seed = 123,
     serializedState = { scope: 'stub', value: 123 },
@@ -89,7 +89,7 @@ export function createRandomServiceStub(options = {}) {
   };
 
   stub.fork = vi.fn(() =>
-    createRandomServiceStub({
+    createRandomServiceStatefulStub({
       seed,
       serializedState,
       deterministic,

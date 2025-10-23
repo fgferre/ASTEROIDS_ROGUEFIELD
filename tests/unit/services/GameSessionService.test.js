@@ -2,13 +2,13 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 
 import GameSessionService from '../../../src/services/GameSessionService.js';
 import { createEventBusMock } from '../../__helpers__/mocks.js';
-// Optimization: use centralized createRandomServiceStub()
-import { createRandomServiceStub } from '../../__helpers__/stubs.js';
+// Optimization: use centralized createRandomServiceStatefulStub()
+import { createRandomServiceStatefulStub } from '../../__helpers__/stubs.js';
 
 function createServiceHarness() {
   // Optimization: use centralized createEventBusMock() instead of inline helper
   const eventBus = createEventBusMock();
-  const random = createRandomServiceStub();
+  const random = createRandomServiceStatefulStub();
 
   const player = {
     maxHealth: 100,

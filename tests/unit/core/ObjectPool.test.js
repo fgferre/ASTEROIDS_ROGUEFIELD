@@ -15,8 +15,8 @@ describe('ObjectPool', () => {
       20
     );
 
-  // Note: suites remain sequential to prevent timer state from leaking into TTLObjectPool coverage
-  describe('Initialization', () => {
+  // Optimization: describe.concurrent for suites without fake timers
+  describe.concurrent('Initialization', () => {
     // Optimization: beforeAll instead of beforeEach (immutable setup for read-only tests)
     let initializationPool;
 
@@ -43,7 +43,7 @@ describe('ObjectPool', () => {
     });
   });
 
-  describe('Object Lifecycle', () => {
+  describe.concurrent('Object Lifecycle', () => {
     test('should acquire object from pool', () => {
       const pool = createPool();
       const obj = pool.acquire();
@@ -95,7 +95,7 @@ describe('ObjectPool', () => {
     });
   });
 
-  describe('Pool Management', () => {
+  describe.concurrent('Pool Management', () => {
     test('should expand pool', () => {
       const pool = createPool();
       const initialSize = pool.getStats().totalSize;
@@ -133,7 +133,7 @@ describe('ObjectPool', () => {
     });
   });
 
-  describe('Statistics', () => {
+  describe.concurrent('Statistics', () => {
     // Optimization: beforeAll instead of beforeEach (immutable setup for read-only tests)
     let statsAfterHitRate;
     let validationResult;
@@ -178,7 +178,7 @@ describe('ObjectPool', () => {
     });
   });
 
-  describe('Auto Management', () => {
+  describe.concurrent('Auto Management', () => {
     test('should auto-expand when utilization is high', () => {
       const pool = createPool();
       // Acquire most objects to create high utilization
