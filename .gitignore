@@ -5,3 +5,11 @@ exported-assets/
 # Performance logs
 performance-log.json
 "Cópia (1)asteroid_stats_by_wave.csv"
+
+# Test directories (old structure - should not exist)
+src/__tests__/
+tests/unit/
+
+# Temporary test scripts (if recreated)
+validate-*.js
+*-performance-test.js

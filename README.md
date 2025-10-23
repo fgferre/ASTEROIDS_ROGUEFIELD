@@ -13,6 +13,43 @@ Roguelike de asteroides focado em arquitetura modular e ferramentas de debug par
 | Checar formatação | `npm run format:check` |
 | Aplicar formatação | `npm run format` |
 
+## 🧪 Testes
+
+O projeto possui **31 testes automatizados** organizados em `tests/`, cobrindo core, modules, integration, balance, physics e visual.
+
+### Executar Testes
+
+```bash
+# Todos os testes
+npm test
+
+# Por categoria
+npm run test:core         # Infraestrutura central
+npm run test:modules      # Sistemas de gameplay
+npm run test:integration  # Integração entre sistemas
+npm run test:balance      # Balanceamento e métricas
+
+# Modo watch
+npm run test:watch
+
+# Com cobertura
+npm run test:coverage
+```
+
+### Estrutura
+
+```
+tests/
+├── core/          # Testes de src/core/
+├── modules/       # Testes de src/modules/
+├── integration/   # Testes de integração
+├── balance/       # Testes de balanceamento
+├── physics/       # Testes de física
+└── visual/        # Testes visuais
+```
+
+Veja `tests/README.md` para documentação completa.
+
 ## Debug logging em 1 minuto
 
 1. Rode `npm run dev`.
