@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
-import GameSessionService from '../../../src/services/GameSessionService.js';
-import { createEventBusMock } from '../../__helpers__/mocks.js';
+import GameSessionService from '../../src/services/GameSessionService.js';
+import { createEventBusMock } from '../__helpers__/mocks.js';
 // Optimization: use centralized createRandomServiceStatefulStub()
-import { createRandomServiceStatefulStub } from '../../__helpers__/stubs.js';
+import { createRandomServiceStatefulStub } from '../__helpers__/stubs.js';
 
 function createServiceHarness() {
   // Optimization: use centralized createEventBusMock() instead of inline helper

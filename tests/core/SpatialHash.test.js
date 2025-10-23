@@ -1,6 +1,6 @@
 // src/__tests__/core/SpatialHash.test.js
 import { describe, it, expect, beforeAll } from 'vitest';
-import { SpatialHash } from '../../../src/core/SpatialHash.js';
+import { SpatialHash } from '../../src/core/SpatialHash.js';
 
 describe('SpatialHash', () => {
   const createFixture = () => ({

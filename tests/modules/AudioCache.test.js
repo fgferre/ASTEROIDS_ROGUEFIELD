@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import AudioCache from '../../../src/modules/AudioCache.js';
-import RandomService from '../../../src/core/RandomService.js';
-import { createAudioContextStub } from '../../__helpers__/stubs.js';
+import AudioCache from '../../src/modules/AudioCache.js';
+import RandomService from '../../src/core/RandomService.js';
+import { createAudioContextStub } from '../__helpers__/stubs.js';
 
 describe('AudioCache deterministic noise buffers', () => {
   beforeEach(() => {

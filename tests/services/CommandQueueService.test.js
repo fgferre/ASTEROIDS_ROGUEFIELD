@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import CommandQueueService from '../../../src/services/CommandQueueService.js';
+import CommandQueueService from '../../src/services/CommandQueueService.js';
 
 describe('CommandQueueService', () => {
   // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/setup.js)

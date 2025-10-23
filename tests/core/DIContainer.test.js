@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
-import { DIContainer } from '../../../src/core/DIContainer.js';
+import { DIContainer } from '../../src/core/DIContainer.js';
 
 describe('DIContainer', () => {
   const createContainer = () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import RandomService from '../../../src/core/RandomService.js';
-import RenderingSystem from '../../../src/modules/RenderingSystem.js';
+import RandomService from '../../src/core/RandomService.js';
+import RenderingSystem from '../../src/modules/RenderingSystem.js';
 
 function captureStarfieldLayout(spaceSky, sampleSize = 5) {
   return spaceSky.layers.map((layer) => ({

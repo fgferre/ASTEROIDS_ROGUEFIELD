@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import AudioBatcher from '../../../src/modules/AudioBatcher.js';
-import RandomService from '../../../src/core/RandomService.js';
-import { createAudioSystemStub } from '../../__helpers__/mocks.js';
-import { setupGlobalMocks, cleanupGlobalState } from '../../__helpers__/setup.js';
+import AudioBatcher from '../../src/modules/AudioBatcher.js';
+import RandomService from '../../src/core/RandomService.js';
+import { createAudioSystemStub } from '../__helpers__/mocks.js';
+import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
 
 describe('AudioBatcher random range determinism', () => {
   beforeEach(() => {

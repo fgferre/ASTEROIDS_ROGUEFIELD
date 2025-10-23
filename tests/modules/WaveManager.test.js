@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { WaveManager } from '../../../src/modules/enemies/managers/WaveManager.js';
-import * as CONSTANTS from '../../../src/core/GameConstants.js';
-import { createDeterministicRandom } from '../../__helpers__/stubs.js';
-import { withWaveOverrides } from '../../__helpers__/setup.js';
+import { WaveManager } from '../../src/modules/enemies/managers/WaveManager.js';
+import * as CONSTANTS from '../../src/core/GameConstants.js';
+import { createDeterministicRandom } from '../__helpers__/stubs.js';
+import { withWaveOverrides } from '../__helpers__/setup.js';
 
 function createWaveManager() {
   const random = createDeterministicRandom({ floatValue: 0.5 });

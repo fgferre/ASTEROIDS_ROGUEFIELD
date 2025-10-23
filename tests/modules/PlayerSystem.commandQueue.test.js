@@ -1,8 +1,8 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import PlayerSystem from '../../../src/modules/PlayerSystem.js';
-import CommandQueueService from '../../../src/services/CommandQueueService.js';
-import { createEventBusMock } from '../../__helpers__/mocks.js';
-import { setupGlobalMocks, cleanupGlobalState } from '../../__helpers__/setup.js';
+import PlayerSystem from '../../src/modules/PlayerSystem.js';
+import CommandQueueService from '../../src/services/CommandQueueService.js';
+import { createEventBusMock } from '../__helpers__/mocks.js';
+import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
 
 const DELTA_TIME = 1 / 60;
 
