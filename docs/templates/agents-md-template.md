@@ -153,7 +153,6 @@ class Example {
 > **Anti-pattern:** Hardcoding values in system files (creates "magic numbers")
 > ````
 >
-> ```
 
 ---
 
@@ -258,7 +257,6 @@ class Example {
 > **Reference:** `docs/audit-report.md` §4.1 (ServiceLocatorAdapter Usage Patterns)
 > ````
 >
-> ```
 
 ---
 
