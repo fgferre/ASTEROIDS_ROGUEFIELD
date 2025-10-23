@@ -7,7 +7,7 @@ export default defineConfig({
   },
   test: {
     include: ['**/__tests__/**/*.test.js', '**/*.{test,spec}.js', '../tests/**/*.{test,spec}.js'],
-    exclude: ['tests/__helpers__/**', 'tests/__fixtures__/**', 'node_modules/**'],
+    exclude: ['../tests/__helpers__/**', '../tests/__fixtures__/**', 'node_modules/**'],
     environment: 'node',
     globals: true,
     // Optimization: global setup eliminates 27 duplicated afterEach blocks

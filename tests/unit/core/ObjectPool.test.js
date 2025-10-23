@@ -205,7 +205,8 @@ describe('ObjectPool', () => {
   });
 });
 
-describe('TTLObjectPool', () => {
+// Note: TTLObjectPool tests require sequential execution due to fake timer usage
+describe.sequential('TTLObjectPool', () => {
   let ttlPool;
 
   beforeEach(() => {
@@ -219,7 +220,11 @@ describe('TTLObjectPool', () => {
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    try {
+      // no-op: pool state reset happens per test through fresh instantiation
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   test('should acquire object with TTL', () => {

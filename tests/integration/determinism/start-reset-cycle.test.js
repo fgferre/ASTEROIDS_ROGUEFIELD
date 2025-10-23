@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, afterEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { GamePools } from '../../../src/core/GamePools.js';
 import EffectsSystem from '../../../src/modules/EffectsSystem.js';
 import XPOrbSystem from '../../../src/modules/XPOrbSystem.js';
@@ -16,12 +16,18 @@ beforeAll(() => {
   }
 });
 
+// Optimization: vi.useFakeTimers() to avoid real delays
 beforeEach(() => {
+  vi.useFakeTimers();
   setupGlobalMocks({ gameEvents: createEventBusMock() });
 });
 
 afterEach(() => {
-  cleanupGlobalState();
+  try {
+    cleanupGlobalState();
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 afterAll(() => {
@@ -109,7 +115,9 @@ function runStartResetCycle(seed) {
 describe('game start/reset cycle determinism', () => {
   it('replays the same state after start → reset → start with fixed seed', () => {
     const first = runStartResetCycle(2025);
+    vi.runAllTimers();
     const second = runStartResetCycle(2025);
+    vi.runAllTimers();
 
     expect(second).toEqual(first);
   });

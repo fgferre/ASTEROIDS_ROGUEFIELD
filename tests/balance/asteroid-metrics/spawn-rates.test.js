@@ -32,8 +32,9 @@ describe('Asteroid Metrics - Wave Spawn Rate', () => {
   });
 
   describe('Wave Spawn Rate (Waves 1-10)', () => {
+    // Note: tests mutate global registries per wave; keep sequential execution
     Array.from({ length: 10 }, (_, index) => index + 1).forEach((waveNumber) => {
-      test.concurrent(`wave ${waveNumber} matches baseline formula`, () => {
+      test(`wave ${waveNumber} matches baseline formula`, () => {
         const { waveState } = simulateWave(harness.enemySystem, waveNumber, 800);
         const formulaTotal =
           CONSTANTS.ASTEROIDS_PER_WAVE_BASE +

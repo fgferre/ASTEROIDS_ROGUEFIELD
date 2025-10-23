@@ -2,20 +2,13 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 
 import GameSessionService from '../../../src/services/GameSessionService.js';
 import { createEventBusMock } from '../../__helpers__/mocks.js';
-
-function createRandomStub() {
-  return {
-    serialize: vi.fn(() => ({ scope: 'stub', value: 123 })),
-    restore: vi.fn(),
-    reset: vi.fn(),
-    seed: 123
-  };
-}
+// Optimization: use centralized createRandomServiceStub()
+import { createRandomServiceStub } from '../../__helpers__/stubs.js';
 
 function createServiceHarness() {
   // Optimization: use centralized createEventBusMock() instead of inline helper
   const eventBus = createEventBusMock();
-  const random = createRandomStub();
+  const random = createRandomServiceStub();
 
   const player = {
     maxHealth: 100,
