@@ -20,7 +20,7 @@ This directory contains [PLACEHOLDER: high-level description].
 - [PLACEHOLDER: refer to other directories for X]
 
 > **Example (replace with directory-specific content):**
-> ```markdown
+> ````markdown
 > ## 1. Scope
 >
 > This directory contains the core infrastructure layer that provides foundational services to all game systems.
@@ -36,7 +36,7 @@ This directory contains [PLACEHOLDER: high-level description].
 > - Game logic (see `/src/modules`)
 > - Enemy-specific code (see `/src/modules/enemies`)
 > - UI rendering (see `/src/modules/UISystem.js`)
-> ```
+> ````
 
 ---
 
@@ -51,7 +51,7 @@ This directory contains [PLACEHOLDER: high-level description].
 > **Guidance:** List 3-8 files that define the directory. Include hub status (from `docs/architecture/DEPENDENCY_GRAPH.md`) and file size if >500 lines.
 >
 > **Example:**
-> ```markdown
+> ````markdown
 > ## 2. Key Files
 >
 > | File | Purpose | Notes |
@@ -64,7 +64,7 @@ This directory contains [PLACEHOLDER: high-level description].
 > | `ServiceLocatorAdapter.js` | Legacy bridge for backward compatibility | **Deprecation path** |
 > | `ObjectPool.js` | Generic object pooling for memory efficiency | Used by GamePools |
 > | `GamePools.js` | Pre-configured pools for entities | Registered in manifest |
-> ```
+> ````
 
 ---
 
@@ -89,7 +89,7 @@ class Example {
 > **Guidance:** Document 2-5 patterns used in this directory. Keep examples minimal and link to real files.
 >
 > **Example Pattern:**
-> ```markdown
+> ````markdown
 > ### 3.1 Singleton Export Pattern
 >
 > **When to use:** For shared infrastructure that must have exactly one instance (EventBus, ServiceLocator)
@@ -109,10 +109,10 @@ class Example {
 > **Example in codebase:** See `EventBus.js` lines 1-50
 >
 > **Anti-pattern:** Executing initialization logic during module import (breaks determinism)
-> ```
+> ````
 >
 > **Additional Example:**
-> ```markdown
+> ````markdown
 > ### 3.2 Service Registration Pattern
 >
 > **When to use:** When adding a new system or service to the game
@@ -131,9 +131,9 @@ class Example {
 > ```
 >
 > **Example in codebase:** See `src/bootstrap/serviceManifest.js` lines 20-150
-> ```
+> ````
 >
-> ```markdown
+> ````markdown
 > ### 3.3 Constants Organization Pattern
 >
 > **When to use:** When adding new game parameters or configuration
@@ -151,7 +151,7 @@ class Example {
 > **Example in codebase:** See `GameConstants.js` lines 100-200 (ENEMY_TYPES), lines 500-600 (AUDIO)
 >
 > **Anti-pattern:** Hardcoding values in system files (creates "magic numbers")
-> ```
+> ````
 >
 > ```
 
@@ -178,7 +178,7 @@ class Example {
 > **Guidance:** Capture 3-7 critical rules. Include rationale, violation, and correct approach. Cite audit findings when relevant.
 >
 > **Example Rule:**
-> ```markdown
+> ````markdown
 > ### ❌ Rule 1: Never duplicate constants from GameConstants.js in system files
 >
 > **Why:** Creates maintenance burden and drift between "source of truth" and usage sites. Breaks data-driven architecture principle.
@@ -197,9 +197,9 @@ class Example {
 > ```
 >
 > **Reference:** `agents.md` §1 (Princípios Fundamentais - Dados Centralizados)
-> ```
+> ````
 >
-> ```markdown
+> ````markdown
 > ### ❌ Rule 2: Never execute side effects during module import in EventBus.js or ServiceLocator.js
 >
 > **Why:** Breaks deterministic initialization order. Bootstrap phase must control when services activate.
@@ -222,9 +222,9 @@ class Example {
 > ```
 >
 > **Reference:** `agents.md` §9.2 (Arquivos Críticos - EventBus.js checklist)
-> ```
+> ````
 >
-> ```markdown
+> ````markdown
 > ### ❌ Rule 3: Never import test files (tests/__helpers__, tests/__fixtures__) in src/ code
 >
 > **Why:** Test utilities are not part of production bundle. Creates circular dependencies and bloats build.
@@ -243,9 +243,9 @@ class Example {
 > ```
 >
 > **Reference:** `agents.md` §9.8 (Anti-padrões a Evitar)
-> ```
+> ````
 >
-> ```markdown
+> ````markdown
 > ### ❌ Rule 4: Never modify ServiceLocator.js - use ServiceLocatorAdapter.js for legacy compatibility
 >
 > **Why:** ServiceLocator.js is frozen legacy code. ServiceLocatorAdapter.js is the bridge for migration to DI.
@@ -256,7 +256,7 @@ class Example {
 > - Migration: Replace `gameServices.get()` with constructor params over time
 >
 > **Reference:** `docs/audit-report.md` §4.1 (ServiceLocatorAdapter Usage Patterns)
-> ```
+> ````
 >
 > ```
 
@@ -299,7 +299,7 @@ class Example {
 - ❌ [PLACEHOLDER: common mistake 2]
 
 > **Example:**
-> ```markdown
+> ````markdown
 > ## 5. Adding New Core Service
 >
 > ### Step-by-Step Guide
@@ -357,7 +357,7 @@ class Example {
 > - ❌ Executing initialization logic during import (breaks determinism)
 > - ❌ Creating circular dependencies (service A depends on B, B depends on A)
 > - ❌ Not adding test file (violates Definition of Done)
-> ```
+> ````
 
 ---
 
@@ -385,7 +385,7 @@ class Example {
 - `tests/[PLACEHOLDER: directory]` - [PLACEHOLDER: related test suite]
 
 > **Example:**
-> ```markdown
+> ````markdown
 > ## 6. References
 >
 > ### Related Documentation
@@ -413,7 +413,7 @@ class Example {
 > ### Test Documentation
 > - `tests/README.md` - Complete test guide and helpers
 > - `tests/core/` - Test files for core infrastructure
-> ```
+> ````
 
 ---
 
