@@ -63,6 +63,69 @@ O jogo segue uma **Arquitetura Modular baseada em Sistemas** com contratos expl�
   - **GitHub Actions:** Para automação de CI/CD (verificação de formato, build e deploy).
 - **Testes (Objetivo):** Implementar `Vitest` para testes unitários da lógica dos sistemas e `Playwright` para testes de fumaça (E2E) que garantam que o jogo carrega e as telas principais funcionam.
 
+#### 5.1. **Estrutura de Testes**
+
+- **Localização:** Todos os testes em `/tests` (fora de `/src`)
+- **Organização:**
+  - `/tests/unit/`: Testes unitários isolados de módulos individuais
+    - `core/`: DIContainer, ObjectPool, SpatialHash, RandomService
+    - `modules/`: Audio (Batcher, Cache, System), Player, Rendering, Progression, Wave, Enemies
+    - `utils/`: ScreenShake, randomHelpers
+    - `services/`: GameSession, CommandQueue
+  - `/tests/integration/`: Testes de integração entre múltiplos sistemas
+    - `determinism/`: Testes de determinismo (systems, enemy-system, start-reset-cycle)
+    - `gameplay/`: Testes de gameplay (mixed-enemy-waves)
+    - `wavemanager/`: Testes de integração WaveManager (feature-flags)
+  - `/tests/balance/`: Testes de balanceamento e métricas de jogo
+    - `reward-mechanics.test.js`: Mecânicas de recompensa
+    - `asteroid-metrics/`: Métricas de asteroides (spawn-rates, size-distribution, variant-distribution, fragmentation, determinism)
+  - `/tests/physics/`: Testes de física e colisões
+    - `collision-accuracy.test.js`: Precisão de colisões
+  - `/tests/visual/`: Testes de rendering e determinismo visual/audio
+    - `rendering-determinism.test.js`: Determinismo de rendering
+    - `audio-determinism.test.js`: Determinismo de áudio
+    - `screen-shake-determinism.test.js`: Determinismo de screen shake
+    - `menu-background-determinism.test.js`: Determinismo de background
+    - `enemy-types-rendering.test.js`: Rendering de tipos de inimigos
+  - `/tests/__helpers__/`: Helpers compartilhados (NÃO são testes)
+    - `mocks.js`: Mocks de EventBus, ServiceRegistry, RandomService, AudioSystem
+    - `stubs.js`: Stubs determinísticos e de áudio
+    - `fixtures.js`: Fixtures de entidades (asteroid, enemy, world, player)
+    - `assertions.js`: Assertions customizadas para determinismo
+    - `setup.js`: Setup/cleanup de testes individuais
+    - `global-setup.js`: Setup global do Vitest (vi.restoreAllMocks)
+    - `asteroid-helpers.js`: Helpers específicos para testes de asteroides
+  - `/tests/__fixtures__/`: Fixtures reutilizáveis (NÃO são testes)
+    - `enemies.js`: Fixtures de inimigos e configurações de teste
+
+- **Helpers Disponíveis:**
+  - **Mocks:** `createEventBusMock()`, `createServiceRegistryMock()`, `createRandomServiceStub()`, `createAudioSystemStub()`, `createGameEventsMock()`
+  - **Stubs:** `createDeterministicRandom()`, `createGainStub()`, `createOscillatorStub()`, `createBufferSourceStub()`, `createSettingsStub()`, `createRandomServiceStub()`
+  - **Fixtures:** `createTestAsteroid()`, `createTestEnemy()`, `createTestWorld()`, `createTestPlayer()`, `createTestPhysics()`, `createTestProgression()`
+  - **Assertions:** `expectDeterministicSequence()`, `expectWithinTolerance()`, `expectSameSeeds()`
+  - **Setup:** `setupGlobalMocks()`, `cleanupGlobalState()`, `withWaveOverrides()`, `createTestContainer()`
+  - **Asteroid Helpers:** `createEnemySystemHarness()`, `simulateWave()`, `prepareWave()`, `collectSpawnMetrics()`, `sampleVariants()`, e outros 8 helpers especializados
+
+- **Executar Testes:**
+  - `npm test` - Todos os testes (~31 arquivos)
+  - `npm run test:unit` - Apenas unitários (core, modules, utils, services)
+  - `npm run test:integration` - Apenas integração (determinism, gameplay, wavemanager)
+  - `npm run test:balance` - Apenas balanceamento (reward-mechanics, asteroid-metrics)
+  - `npm run test:visual` - Apenas visual (rendering, audio, screen-shake determinism)
+  - `npm run test:physics` - Apenas física (collision-accuracy)
+  - `npm run test:watch` - Modo watch (re-executa ao salvar)
+  - `npm run test:coverage` - Com relatório de cobertura
+  - `npm run test:benchmark` - Benchmark de performance (5 runs)
+  - `npm run test:validate-optimizations` - Valida padrões de otimização
+
+- **Boas Práticas:**
+  1. **Use helpers centralizados:** Sempre use helpers de `__helpers__/` ao invés de criar mocks inline
+  2. **Use fixtures:** Sempre use fixtures de `__fixtures__/` ao invés de criar entidades inline
+  3. **Cleanup automático:** `vi.restoreAllMocks()` é executado automaticamente após cada teste via global-setup.js
+  4. **Determinismo:** Use `createDeterministicRandom()` para testes determinísticos
+  5. **Performance:** Use `beforeAll` para setup imutável, `vi.useFakeTimers()` para delays, `.concurrent` para paralelização
+  6. **Consulte o guia:** Veja `tests/OPTIMIZATION_GUIDE.md` para padrões de otimização aplicados
+
 #### 6. **"Definition of Done" (DoD) para uma Feature**
 
 Considere uma feature pronta quando:
