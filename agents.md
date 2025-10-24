@@ -12,7 +12,7 @@ para manter a arquitetura modular segura e rastreável.
 
 - **Escalabilidade por Design:** Novas armas, inimigos e funcionalidades devem ser integrados aos sistemas existentes sem exigir refatoração do núcleo.
 - **Dados Centralizados:** Comportamentos e parâmetros devem ser definidos em locais específicos (`/src/core/GameConstants.js`, `/src/data`), evitando números "mágicos" na lógica dos sistemas. Rotinas de renderização de inimigos devem consumir os presets documentados (`ENEMY_EFFECT_COLORS`, `ENEMY_RENDER_PRESETS`) em `GameConstants` em vez de hardcodes locais.
-- **Mudanças Atômicas e Verificáveis:** Pull Requests devem ser pequenos, focados em uma única responsabilidade e sempre acompanhados de validação (conforme `docs/validation/test-checklist.md`).
+- **Mudanças Atômicas e Verificáveis:** Pull Requests devem ser pequenos, focados em uma única responsabilidade e sempre acompanhados de validação local.
 - **Sem Dependências Desnecessárias:** Priorizar o uso de APIs nativas da web. Novas bibliotecas só devem ser adicionadas com uma justificativa clara de custo-benefício.
 - **Documentação Viva:** Manter a documentação (`agents.md`, `README.md`) atualizada e relevante.
 
@@ -65,40 +65,23 @@ Para documentação detalhada de padrões, regras e workflows específicos de ca
 - Modificando bootstrap → leia `/src/bootstrap/agents.md`
 - Trabalhando com sessão/comandos → leia `/src/services/agents.md`
 
-#### 4. **HTML & CSS**
+#### 4. **Regras Críticas (Curtas)**
 
-- **Estrutura:** O `index.html` define a estrutura das telas (menu, game over) e o contêiner do jogo. A UI é feita com elementos HTML nativos para melhor acessibilidade.
-- **Estilização:** O `style.css` utiliza práticas modernas como **design tokens** (`:root` com variáveis CSS) para facilitar a manutenção de temas e estilos.
+- **Sem efeitos colaterais em import:** inicialize serviços no bootstrap e não registre handlers durante `import`.
+- **Sem imports de testes em `/src/`:** mantenha código de produção isolado de fixtures e helpers de teste.
 
 #### 5. **Padrões e Ferramentas**
 
-- **ES6 Modules:** O projeto utiliza `import`/`export` para modularização. Cada arquivo tem uma única responsabilidade.
-- **Tooling:**
-  - **Vite:** Servidor de desenvolvimento rápido e build.
-  - **Grunt:** Usado para tarefas de build (cópia de arquivos).
-  - **Prettier:** Para formatação de código consistente.
-  - **GitHub Actions:** Para automação de CI/CD (verificação de formato, build e deploy).
-- **Testes (Objetivo):** Implementar `Vitest` para testes unitários da lógica dos sistemas e `Playwright` para testes de fumaça (E2E) que garantam que o jogo carrega e as telas principais funcionam.
-
-#### 5.1. **Testes**
-
-Para documentação completa sobre estrutura de testes, helpers, fixtures e comandos de execução, consulte:
-
-- **`tests/README.md`** - Guia completo de testes
-- **`tests/OPTIMIZATION_GUIDE.md`** - Padrões de otimização aplicados
+- **ES6 Modules:** o código é estruturado com `import`/`export` e responsabilidades únicas por arquivo.
+- Para testes, ver `tests/README.md` e `tests/OPTIMIZATION_GUIDE.md`.
 
 #### 6. **"Definition of Done" (DoD) para uma Feature**
 
 Considere uma feature pronta quando:
 
-- A entrega é atômica e compreensível em um PR isolado, com descrição clara do impacto.
-- A lógica reside nos sistemas apropriados e continua parametrizada por `GameConstants.js` e/ou arquivos em `/src/data`.
-- Documentação, telemetria e planos relevantes foram atualizados (quando aplicável), mantendo `agents.md`, `README.md` e relatórios consistentes.
-- Os planos em `docs/plans/` foram consultados para alinhar a evolução da arquitetura e validar aderência a decisões anteriores.
-- Performance (60 FPS) e ausência de vazamentos são observadas, com uso racional de pools e serviços compartilhados.
-- Em modo dev, o log de debug foi analisado e não contém erros ou warnings inesperados.
-- Todos os eventos críticos aparecem no log na ordem correta (spawn → update → render → collision).
-- Não há gaps ou inconsistências no fluxo de eventos registrados.
+- A mudança é atômica e compreensível em um PR isolado.
+- Toda lógica continua parametrizada por `GameConstants.js` e/ou arquivos em `/src/data`.
+- O log de debug não possui erros e os eventos críticos aparecem na ordem esperada.
 
 #### 7. **Fluxo de Trabalho e Planejamento Contínuo**
 
@@ -121,26 +104,11 @@ Esta política adaptada serve como um guia prático para manter a qualidade e a 
 
 #### 8. **Sistema de Logging Automático e Diagnóstico de Problemas**
 
-##### 8.1. Visão Geral e Ativação
+##### 8.1. Quick Start
 
-O projeto possui um **sistema de logging automático** (`GameDebugLogger`) que registra todos os eventos críticos durante a execução do jogo. Este sistema é **obrigatório para diagnóstico de problemas** e deve ser a **primeira ferramenta consultada** por agentes de IA ao investigar bugs.
+Execute `npm run dev`, reproduza o problema, abra o console (F12) e chame `downloadDebugLog()` para baixar `game-debug.log`; o logger (`GameDebugLogger`) grava até 50.000 eventos em `localStorage.getItem('game-debug-log')`, e você pode usar `downloadDebugLog()`, `showDebugLog()` ou `clearDebugLog()` para operar o histórico.
 
-**Ativação:** Execute `npm run dev` — o logging é ativado automaticamente em modo desenvolvimento.
-
-**Armazenamento:** Log gravado em `localStorage.getItem('game-debug-log')` (50.000 entradas, ~2-3MB, ~30 waves de cobertura).
-
-##### 8.2. Como Obter o Log
-
-**Método Recomendado:**
-1. Reproduzir o problema no jogo
-2. Abrir console do navegador (F12)
-3. Executar: `downloadDebugLog()`
-4. Abrir arquivo `game-debug.log` baixado
-5. Copiar conteúdo e compartilhar com agente de IA
-
-**Comandos disponíveis:** `downloadDebugLog()`, `showDebugLog()`, `clearDebugLog()`
-
-##### 8.3. Categorias de Log
+##### 8.2. Categorias de Log
 
 - **[INIT]** - Inicialização de sistemas, feature flags
 - **[WAVE]** - Progressão de waves, boss waves
@@ -153,7 +121,7 @@ O projeto possui um **sistema de logging automático** (`GameDebugLogger`) que r
 - **[ERROR]** - Erros, exceptions, warnings
 - **[STATE]** - Mudanças de estado (phase transitions, wave state)
 
-##### 8.4. Protocolo para Agentes de IA
+##### 8.3. Protocolo para Agentes de IA
 
 **Ao receber bug report:**
 
@@ -162,20 +130,11 @@ O projeto possui um **sistema de logging automático** (`GameDebugLogger`) que r
 3. **Identificar falha:** Procure eventos ausentes, sequências quebradas, erros explícitos, valores inválidos
 4. **Propor solução:** Cite linhas do log, identifique onde o fluxo quebra, proponha correção cirúrgica
 
-**Exemplo de análise:**
-- ✅ Boss criado e registrado (linhas [SPAWN], [STATE])
-- ❌ Update loop vazio (linha [UPDATE] mostra `types:{}`)
-- ❌ Erro explícito (linha [ERROR]: "Non-asteroid enemy filtered")
-- **Causa:** Filtro `if (enemy.type !== 'asteroid') return;` exclui boss
-- **Solução:** Remover filtro, adicionar lógica condicional para `boss.onUpdate()`
-
-##### 8.5. Workflow
+##### 8.4. Workflow
 
 **Durante desenvolvimento:** `npm run dev` → reproduzir bug → `downloadDebugLog()` → compartilhar com IA
 
 **Durante diagnóstico:** Receber log → ler seções relevantes → identificar quebra → propor correção → repetir até resolver
-
-**Benefícios:** Zero configuração, diagnóstico preciso, reproduzível, completo, eficiente, zero impacto em produção.
 
 #### 9. **Documentação Arquitetural e Plano de Evolução**
 
@@ -196,5 +155,4 @@ O projeto possui um **sistema de logging automático** (`GameDebugLogger`) que r
 
 - Plano arquitetural (Fases 1–5): `docs/plans/architecture-master-plan.md`
 - Grafo de dependências: `docs/architecture/DEPENDENCY_GRAPH.md`
-- Checklist geral de validação: `docs/validation/test-checklist.md`
 - Relatório de auditoria: `docs/audit-report.md`
