@@ -11,7 +11,7 @@ para manter a arquitetura modular segura e rastreável.
 #### 1. **Princípios Fundamentais**
 
 - **Escalabilidade por Design:** Novas armas, inimigos e funcionalidades devem ser integrados aos sistemas existentes sem exigir refatoração do núcleo.
-- **Dados Centralizados:** Comportamentos e parâmetros devem ser definidos em locais específicos (`/src/core/GameConstants.js`, `/src/data`), evitando números "mágicos" na lógica dos sistemas. Rotinas de renderização de inimigos devem consumir os presets documentados (`ENEMY_EFFECT_COLORS`, `ENEMY_RENDER_PRESETS`) em `GameConstants` em vez de hardcodes locais.
+- **Dados Centralizados:** Comportamentos e parâmetros devem ser definidos em locais específicos (`/src/data/constants/`, `/src/data/enemies/`, `/src/data`), evitando números "mágicos" na lógica dos sistemas. Constantes são organizadas por domínio: `physics.js` (física), `gameplay.js` (mecânicas), `visual.js` (renderização/efeitos), `asteroid-configs.js` (configuração de asteroides). `GameConstants.js` re-exporta tudo para compatibilidade. Rotinas de renderização de inimigos devem consumir os presets documentados (`ENEMY_EFFECT_COLORS`, `ENEMY_RENDER_PRESETS`) em vez de hardcodes locais.
 - **Mudanças Atômicas e Verificáveis:** Pull Requests devem ser pequenos, focados em uma única responsabilidade e sempre acompanhados de validação (conforme `docs/validation/test-checklist.md`).
 - **Sem Dependências Desnecessárias:** Priorizar o uso de APIs nativas da web. Novas bibliotecas só devem ser adicionadas com uma justificativa clara de custo-benefício.
 - **Documentação Viva:** Manter a documentação (`agents.md`, `README.md`) atualizada e relevante.
@@ -23,7 +23,11 @@ A estrutura do projeto está organizada por responsabilidade arquitetônica:
 - `/src`: Contém todo o código-fonte do jogo.
   - `/core`: Módulos centrais que fornecem a infraestrutura do jogo (`EventBus`, `ServiceLocator`, `GameConstants`).
   - `/modules`: Os "Sistemas" que contêm a lógica principal do jogo (`PlayerSystem`, `EnemySystem`, `CombatSystem`, etc.). **Esta é a principal área para adicionar e modificar a lógica de gameplay.**
-  - `/data`: Modelos de dados e configurações complexas (ex: `shipModels.js`). Ideal para expandir com configurações de inimigos, armas, etc.
+  - `/data`: Modelos de dados e configurações complexas organizadas por domínio:
+    - `/constants`: Constantes de física (`physics.js`), gameplay (`gameplay.js`), e visuais (`visual.js`)
+    - `/enemies`: Configurações de inimigos (`asteroid-configs.js`, futuramente `drone.js`, `boss.js`, etc.)
+    - `/ui`: Layouts de HUD e UI
+    - Arquivos raiz: `shipModels.js`, `upgrades.js`, `settingsSchema.js`
   - Histórico legado: consulte o histórico do Git para snapshots antigos (a pasta `/legacy` foi removida na limpeza de 2025).
   - `app.js`: O orquestrador principal. Inicializa os sistemas e executa o game loop.
 - `/docs`: Documentação, guias de refatoração e checklists de validação.
@@ -61,7 +65,7 @@ Ver `docs/architecture/CURRENT_STRUCTURE.md` para detalhes de implementação e 
 Considere uma feature pronta quando:
 
 - A entrega é atômica e compreensível em um PR isolado, com descrição clara do impacto.
-- A lógica reside nos sistemas apropriados e continua parametrizada por `GameConstants.js` e/ou arquivos em `/src/data`.
+- A lógica reside nos sistemas apropriados e continua parametrizada por constantes em `/src/data/constants/` e `/src/data/enemies/` (acessíveis via `GameConstants.js` ou imports diretos).
 - Documentação, telemetria e planos relevantes foram atualizados (quando aplicável), mantendo `agents.md`, `README.md` e relatórios consistentes.
 - Os planos em `docs/plans/` foram consultados para alinhar a evolução da arquitetura e validar aderência a decisões anteriores.
 - Performance (60 FPS) e ausência de vazamentos são observadas, com uso racional de pools e serviços compartilhados.
@@ -324,6 +328,8 @@ clearDebugLog()     // Limpa log atual
 - **Hoje**: mantenha o fluxo atual (classe em `src/modules/enemies/types/` + registro no `EnemyFactory`) e use `docs/architecture/CURRENT_STRUCTURE.md#5-padroes-de-inimigos` para o passo a passo completo.
 - **Futuro**: planeje a migração para configs em `src/data/enemies/` após concluir a componentização descrita em `docs/architecture/IDEAL_STRUCTURE.md#4-sistema-de-componentes-reutilizaveis`.
 - **Antes de qualquer fase 6+**: valide o checklist em `docs/architecture/MIGRATION_PLAN.md#9-checklist-pre-migracao`.
+
+**Organização de Constantes (REFACTOR-002):** Ver `docs/architecture/CURRENT_STRUCTURE.md` §3.6 para detalhes sobre a nova estrutura de constantes organizadas por domínio (`physics.js`, `gameplay.js`, `visual.js`, `asteroid-configs.js`).
 
 ##### 10.3. Referências complementares
 

@@ -1,10 +1,6 @@
 flowchart TD
-  subgraph services_group["Bootstrap & Services"]
-    src_bootstrap_serviceManifest_js["🔴 serviceManifest.js<br/>20 imports<br/>3 dependents"]
-    src_bootstrap_bootstrapServices_js["bootstrapServices.js<br/>1 imports<br/>1 dependents"]
-  end
   subgraph core_group["Core Infrastructure"]
-    src_core_GameConstants_js["🔴 GameConstants.js<br/>HUB: 23 deps<br/>0 imports<br/>23 dependents"]
+    src_core_GameConstants_js["🔴 GameConstants.js<br/>HUB: 23 deps<br/>4 imports<br/>23 dependents"]
     src_core_RandomService_js["🔴 RandomService.js<br/>HUB: 21 deps<br/>0 imports<br/>21 dependents"]
     src_core_serviceUtils_js["🔴 serviceUtils.js<br/>HUB: 16 deps<br/>0 imports<br/>16 dependents"]
     src_core_GamePools_js["GamePools.js<br/>5 imports<br/>6 dependents"]
@@ -15,6 +11,10 @@ flowchart TD
     src_core_EventBus_js["EventBus.js<br/>1 imports<br/>0 dependents"]
     src_core_GarbageCollectionManager_js["GarbageCollectionManager.js<br/>0 imports<br/>1 dependents"]
     src_core_GradientCache_js["GradientCache.js<br/>0 imports<br/>1 dependents"]
+  end
+  subgraph services_group["Bootstrap & Services"]
+    src_bootstrap_serviceManifest_js["🔴 serviceManifest.js<br/>20 imports<br/>3 dependents"]
+    src_bootstrap_bootstrapServices_js["bootstrapServices.js<br/>1 imports<br/>1 dependents"]
   end
   subgraph modules_group["Game Systems"]
     src_modules_EnemySystem_js["EnemySystem.js<br/>17 imports<br/>1 dependents"]
@@ -198,8 +198,8 @@ flowchart TD
   src_utils_ScreenShake_js --> src_core_RandomService_js
   src_utils_drawEnemyProjectile_js --> src_core_GameConstants_js
   src_core_EventBus_js --> src_core_debugLogging_js
-  style src_bootstrap_serviceManifest_js fill:#e5dbff,stroke:#7048e8,stroke-width:1.5px
   style src_core_GameConstants_js fill:#d3f9d8,stroke:#2f9e44,stroke-width:4px
+  style src_bootstrap_serviceManifest_js fill:#e5dbff,stroke:#7048e8,stroke-width:1.5px
   style src_core_RandomService_js fill:#d3f9d8,stroke:#2f9e44,stroke-width:4px
   style src_modules_EnemySystem_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_core_serviceUtils_js fill:#d3f9d8,stroke:#2f9e44,stroke-width:4px

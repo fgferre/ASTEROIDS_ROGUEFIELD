@@ -19,6 +19,10 @@ digraph Dependencies {
   "src/core/SpatialHash.js" [];
   "src/core/debugLogging.js" [];
   "src/core/serviceUtils.js" [color=red, penwidth=2];
+  "src/data/constants/gameplay.js" [];
+  "src/data/constants/physics.js" [];
+  "src/data/constants/visual.js" [];
+  "src/data/enemies/asteroid-configs.js" [];
   "src/data/settingsSchema.js" [];
   "src/data/shipModels.js" [];
   "src/data/ui/hudLayout.js" [];
@@ -96,6 +100,10 @@ digraph Dependencies {
   "src/bootstrap/serviceManifest.js" -> "src/services/GameSessionService.js";
   "src/bootstrap/serviceManifest.js" -> "src/services/CommandQueueService.js";
   "src/core/EventBus.js" -> "src/core/debugLogging.js";
+  "src/core/GameConstants.js" -> "src/data/constants/physics.js";
+  "src/core/GameConstants.js" -> "src/data/constants/gameplay.js";
+  "src/core/GameConstants.js" -> "src/data/constants/visual.js";
+  "src/core/GameConstants.js" -> "src/data/enemies/asteroid-configs.js";
   "src/core/GamePools.js" -> "src/core/ObjectPool.js";
   "src/core/GamePools.js" -> "src/modules/enemies/types/Drone.js";
   "src/core/GamePools.js" -> "src/modules/enemies/types/Mine.js";
