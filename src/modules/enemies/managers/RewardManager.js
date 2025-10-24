@@ -31,7 +31,13 @@
  * ```
  */
 
-import * as CONSTANTS from '../../../core/GameConstants.js';
+import {
+  ASTEROID_BASE_ORBS,
+  ASTEROID_SIZE_ORB_FACTOR,
+  ASTEROID_VARIANTS,
+  ORB_VALUE,
+} from '../../../data/enemies/asteroid-configs.js';
+import { ENEMY_REWARDS } from '../../../data/constants/visual.js';
 import RandomService from '../../../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../../../core/serviceUtils.js';
 
@@ -149,13 +155,13 @@ export class RewardManager {
     // Asteroid rewards (matches XPOrbSystem orb-based logic)
     // Uses ORB VALUE (5 XP) × ORB COUNT (based on size)
     configs.set('asteroid', {
-      orbValue: CONSTANTS.ORB_VALUE || 5, // Fixed XP per orb
+      orbValue: ORB_VALUE || 5, // Fixed XP per orb
       baseOrbs: (size) => {
-        const base = CONSTANTS.ASTEROID_BASE_ORBS?.[size] ?? 1;
+        const base = ASTEROID_BASE_ORBS?.[size] ?? 1;
         return base;
       },
       sizeFactor: (size) => {
-        const factors = CONSTANTS.ASTEROID_SIZE_ORB_FACTOR || {
+        const factors = ASTEROID_SIZE_ORB_FACTOR || {
           large: 3.0,
           medium: 2.0,
           small: 1.0
@@ -164,12 +170,12 @@ export class RewardManager {
       },
       variantMultiplier: (variant) => {
         // Use correct orbMultiplier from GameConstants
-        const variantConfig = CONSTANTS.ASTEROID_VARIANTS[variant];
+        const variantConfig = ASTEROID_VARIANTS[variant];
         return variantConfig?.orbMultiplier ?? 1.0;
       }
     });
 
-    const droneRewards = CONSTANTS.ENEMY_REWARDS?.drone;
+    const droneRewards = ENEMY_REWARDS?.drone;
     // Drone rewards: base orb count configured with total XP target
     configs.set('drone', {
       totalXP: droneRewards?.totalXP ?? 30,
@@ -178,7 +184,7 @@ export class RewardManager {
       variantMultiplier: () => 1.0, // No variant scaling (yet)
     });
 
-    const mineRewards = CONSTANTS.ENEMY_REWARDS?.mine;
+    const mineRewards = ENEMY_REWARDS?.mine;
     // Mine rewards: randomized base orb count with total XP target
     configs.set('mine', {
       totalXP: mineRewards?.totalXP ?? 25,
@@ -195,7 +201,7 @@ export class RewardManager {
       variantMultiplier: () => 1.0,
     });
 
-    const hunterRewards = CONSTANTS.ENEMY_REWARDS?.hunter;
+    const hunterRewards = ENEMY_REWARDS?.hunter;
     // Hunter rewards: base orb count configured with total XP target
     configs.set('hunter', {
       totalXP: hunterRewards?.totalXP ?? 50,
@@ -204,7 +210,7 @@ export class RewardManager {
       variantMultiplier: () => 1.0, // No variant scaling (yet)
     });
 
-    const bossRewards = CONSTANTS.ENEMY_REWARDS?.boss;
+    const bossRewards = ENEMY_REWARDS?.boss;
     // Boss rewards: base orb count configured with total XP target.
     configs.set('boss', {
       totalXP: bossRewards?.totalXP ?? 500,
@@ -262,7 +268,7 @@ export class RewardManager {
     const resolvedTotalXP = typeof config.totalXP === 'function'
       ? config.totalXP(enemy, baseOrbCount)
       : config.totalXP;
-    const fallbackOrbValue = config.orbValue ?? CONSTANTS.ORB_VALUE ?? 5;
+    const fallbackOrbValue = config.orbValue ?? ORB_VALUE ?? 5;
 
     const xpDistribution = this.buildXPDistribution({
       baseOrbCount,
@@ -305,7 +311,7 @@ export class RewardManager {
     const radius = Number.isFinite(enemy?.radius) ? enemy.radius : 0;
     const total = Math.max(count, 1);
     const fallbackXP = Math.max(1, Array.isArray(xpPerOrb)
-      ? (xpPerOrb[0] ?? CONSTANTS.ORB_VALUE ?? 5)
+      ? (xpPerOrb[0] ?? ORB_VALUE ?? 5)
       : xpPerOrb);
 
     for (let i = 0; i < count; i += 1) {
@@ -359,7 +365,7 @@ export class RewardManager {
   }) {
     const safeBaseCount = Math.max(1, Number.isFinite(baseOrbCount) ? Math.round(baseOrbCount) : 1);
     const safeExtraCount = Math.max(0, Number.isFinite(extraOrbCount) ? Math.round(extraOrbCount) : 0);
-    const safeFallback = Math.max(1, Math.round(fallbackOrbValue ?? CONSTANTS.ORB_VALUE ?? 5));
+    const safeFallback = Math.max(1, Math.round(fallbackOrbValue ?? ORB_VALUE ?? 5));
     const hasTargetXP = typeof totalXP === 'number' && Number.isFinite(totalXP) && totalXP > 0;
 
     if (!hasTargetXP) {
@@ -579,7 +585,7 @@ export class RewardManager {
    * @param {BaseEnemy} enemy - The destroyed enemy
    */
   tryDropHealthHeart(enemy, randomContext = null) {
-    const rewardConfig = CONSTANTS.ENEMY_REWARDS?.[enemy.type];
+    const rewardConfig = ENEMY_REWARDS?.[enemy.type];
     if (!rewardConfig) {
       return;
     }

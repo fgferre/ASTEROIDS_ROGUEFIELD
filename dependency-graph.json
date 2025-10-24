@@ -148,17 +148,12 @@
         "src/modules/PlayerSystem.js",
         "src/modules/ProgressionSystem.js",
         "src/modules/RenderingSystem.js",
-        "src/modules/UISystem.js",
         "src/modules/XPOrbSystem.js",
-        "src/modules/enemies/components/AsteroidCollision.js",
         "src/modules/enemies/components/AsteroidMovement.js",
-        "src/modules/enemies/managers/RewardManager.js",
         "src/modules/enemies/managers/WaveManager.js",
         "src/modules/enemies/types/Asteroid.js",
         "src/modules/enemies/types/BossEnemy.js",
         "src/modules/enemies/types/Drone.js",
-        "src/modules/enemies/types/Hunter.js",
-        "src/modules/enemies/types/Mine.js",
         "src/services/GameSessionService.js",
         "src/utils/drawEnemyProjectile.js"
       ],
@@ -370,7 +365,9 @@
     },
     {
       "path": "src/data/constants/gameplay.js",
-      "imports": [],
+      "imports": [
+        "src/utils/deepFreeze.js"
+      ],
       "exports": [
         "BULLET_SPEED",
         "COLLISION_BOUNCE",
@@ -408,6 +405,7 @@
         "ASTEROIDS_PER_WAVE_MULTIPLIER",
         "WAVE_DURATION",
         "WAVE_BREAK_TIME",
+        "WAVE_SPAWN_DELAY",
         "WAVE_BOSS_INTERVAL",
         "MAX_ASTEROIDS_ON_SCREEN",
         "SUPPORT_ENEMY_PROGRESSION",
@@ -417,10 +415,20 @@
         "WAVEMANAGER_HANDLES_ASTEROID_SPAWN",
         "WAVE_MANAGER_EMIT_LEGACY_WAVE_COMPLETED",
         "ASTEROID_EDGE_SPAWN_MARGIN",
+        "ASTEROID_SAFE_SPAWN_DISTANCE",
         "STRICT_LEGACY_SPAWN_SEQUENCE"
       ],
       "dependents": [
-        "src/core/GameConstants.js"
+        "src/core/GameConstants.js",
+        "src/modules/AudioSystem.js",
+        "src/modules/EnemySystem.js",
+        "src/modules/PlayerSystem.js",
+        "src/modules/RenderingSystem.js",
+        "src/modules/UISystem.js",
+        "src/modules/XPOrbSystem.js",
+        "src/modules/enemies/components/AsteroidCollision.js",
+        "src/modules/enemies/managers/WaveManager.js",
+        "src/services/GameSessionService.js"
       ],
       "isHub": false,
       "isCritical": false
@@ -440,14 +448,19 @@
         "ASTEROID_CRACK_GRAPH_RULES"
       ],
       "dependents": [
-        "src/core/GameConstants.js"
+        "src/core/GameConstants.js",
+        "src/modules/PlayerSystem.js",
+        "src/modules/RenderingSystem.js",
+        "src/modules/enemies/types/Asteroid.js"
       ],
       "isHub": false,
       "isCritical": false
     },
     {
       "path": "src/data/constants/visual.js",
-      "imports": [],
+      "imports": [
+        "src/utils/deepFreeze.js"
+      ],
       "exports": [
         "ENEMY_TYPES",
         "ENEMY_REWARDS",
@@ -459,14 +472,23 @@
         "BOSS_SCREEN_SHAKES"
       ],
       "dependents": [
-        "src/core/GameConstants.js"
+        "src/core/GameConstants.js",
+        "src/modules/EnemySystem.js",
+        "src/modules/enemies/managers/RewardManager.js",
+        "src/modules/enemies/managers/WaveManager.js",
+        "src/modules/enemies/types/BossEnemy.js",
+        "src/modules/enemies/types/Drone.js",
+        "src/modules/enemies/types/Hunter.js",
+        "src/modules/enemies/types/Mine.js"
       ],
       "isHub": false,
       "isCritical": false
     },
     {
       "path": "src/data/enemies/asteroid-configs.js",
-      "imports": [],
+      "imports": [
+        "src/utils/deepFreeze.js"
+      ],
       "exports": [
         "ASTEROID_CRACK_PROFILES",
         "ASTEROID_CRACK_LAYER_LOOKUP",
@@ -480,7 +502,11 @@
         "ASTEROID_VARIANT_CHANCES"
       ],
       "dependents": [
-        "src/core/GameConstants.js"
+        "src/core/GameConstants.js",
+        "src/modules/EnemySystem.js",
+        "src/modules/XPOrbSystem.js",
+        "src/modules/enemies/managers/RewardManager.js",
+        "src/modules/enemies/types/Asteroid.js"
       ],
       "isHub": false,
       "isCritical": false
@@ -585,7 +611,8 @@
         "src/modules/AudioBatcher.js",
         "src/core/RandomService.js",
         "src/core/serviceUtils.js",
-        "src/core/GameConstants.js"
+        "src/core/GameConstants.js",
+        "src/data/constants/gameplay.js"
       ],
       "exports": [],
       "dependents": [
@@ -634,7 +661,6 @@
       "path": "src/modules/EnemySystem.js",
       "imports": [
         "src/core/GameConstants.js",
-        "src/core/GameConstants.js",
         "src/core/GamePools.js",
         "src/core/RandomService.js",
         "src/core/serviceUtils.js",
@@ -649,7 +675,10 @@
         "src/modules/enemies/components/AsteroidMovement.js",
         "src/modules/enemies/components/AsteroidCollision.js",
         "src/modules/enemies/components/AsteroidRenderer.js",
-        "src/utils/dev/GameDebugLogger.js"
+        "src/utils/dev/GameDebugLogger.js",
+        "src/data/constants/gameplay.js",
+        "src/data/constants/visual.js",
+        "src/data/enemies/asteroid-configs.js"
       ],
       "exports": [],
       "dependents": [
@@ -705,7 +734,9 @@
       "imports": [
         "src/core/GameConstants.js",
         "src/data/shipModels.js",
-        "src/core/serviceUtils.js"
+        "src/core/serviceUtils.js",
+        "src/data/constants/physics.js",
+        "src/data/constants/gameplay.js"
       ],
       "exports": [],
       "dependents": [
@@ -738,7 +769,9 @@
         "src/core/GradientCache.js",
         "src/core/RandomService.js",
         "src/core/serviceUtils.js",
-        "src/utils/dev/GameDebugLogger.js"
+        "src/utils/dev/GameDebugLogger.js",
+        "src/data/constants/physics.js",
+        "src/data/constants/gameplay.js"
       ],
       "exports": [],
       "dependents": [
@@ -765,7 +798,7 @@
       "imports": [
         "src/data/ui/hudLayout.js",
         "src/data/settingsSchema.js",
-        "src/core/GameConstants.js",
+        "src/data/constants/gameplay.js",
         "src/core/serviceUtils.js"
       ],
       "exports": [],
@@ -791,6 +824,8 @@
       "path": "src/modules/XPOrbSystem.js",
       "imports": [
         "src/core/GameConstants.js",
+        "src/data/constants/gameplay.js",
+        "src/data/enemies/asteroid-configs.js",
         "src/core/GamePools.js",
         "src/core/RandomService.js",
         "src/core/serviceUtils.js"
@@ -862,7 +897,7 @@
     {
       "path": "src/modules/enemies/components/AsteroidCollision.js",
       "imports": [
-        "src/core/GameConstants.js"
+        "src/data/constants/gameplay.js"
       ],
       "exports": [
         "AsteroidCollision"
@@ -902,7 +937,8 @@
     {
       "path": "src/modules/enemies/managers/RewardManager.js",
       "imports": [
-        "src/core/GameConstants.js",
+        "src/data/enemies/asteroid-configs.js",
+        "src/data/constants/visual.js",
         "src/core/RandomService.js",
         "src/core/serviceUtils.js"
       ],
@@ -921,7 +957,9 @@
         "src/core/GameConstants.js",
         "src/core/RandomService.js",
         "src/core/serviceUtils.js",
-        "src/utils/dev/GameDebugLogger.js"
+        "src/utils/dev/GameDebugLogger.js",
+        "src/data/constants/gameplay.js",
+        "src/data/constants/visual.js"
       ],
       "exports": [
         "WaveManager"
@@ -937,7 +975,9 @@
       "imports": [
         "src/core/GameConstants.js",
         "src/core/RandomService.js",
-        "src/modules/enemies/base/BaseEnemy.js"
+        "src/modules/enemies/base/BaseEnemy.js",
+        "src/data/constants/physics.js",
+        "src/data/enemies/asteroid-configs.js"
       ],
       "exports": [
         "Asteroid"
@@ -952,6 +992,7 @@
       "path": "src/modules/enemies/types/BossEnemy.js",
       "imports": [
         "src/core/GameConstants.js",
+        "src/data/constants/visual.js",
         "src/core/RandomService.js",
         "src/modules/enemies/base/BaseEnemy.js",
         "src/utils/dev/GameDebugLogger.js"
@@ -969,6 +1010,7 @@
     {
       "path": "src/modules/enemies/types/Drone.js",
       "imports": [
+        "src/data/constants/visual.js",
         "src/core/GameConstants.js",
         "src/core/RandomService.js",
         "src/modules/enemies/base/BaseEnemy.js",
@@ -987,7 +1029,7 @@
     {
       "path": "src/modules/enemies/types/Hunter.js",
       "imports": [
-        "src/core/GameConstants.js",
+        "src/data/constants/visual.js",
         "src/core/RandomService.js",
         "src/modules/enemies/base/BaseEnemy.js"
       ],
@@ -1004,7 +1046,7 @@
     {
       "path": "src/modules/enemies/types/Mine.js",
       "imports": [
-        "src/core/GameConstants.js",
+        "src/data/constants/visual.js",
         "src/core/RandomService.js",
         "src/modules/enemies/base/BaseEnemy.js"
       ],
@@ -1033,7 +1075,8 @@
     {
       "path": "src/services/GameSessionService.js",
       "imports": [
-        "src/core/GameConstants.js"
+        "src/core/GameConstants.js",
+        "src/data/constants/gameplay.js"
       ],
       "exports": [
         "GameSessionService"
@@ -1068,6 +1111,20 @@
       ],
       "dependents": [
         "src/modules/EffectsSystem.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/utils/deepFreeze.js",
+      "imports": [],
+      "exports": [
+        "deepFreeze"
+      ],
+      "dependents": [
+        "src/data/constants/gameplay.js",
+        "src/data/constants/visual.js",
+        "src/data/enemies/asteroid-configs.js"
       ],
       "isHub": false,
       "isCritical": false
@@ -1137,8 +1194,8 @@
     }
   ],
   "metrics": {
-    "totalFiles": 66,
-    "totalDependencies": 153,
+    "totalFiles": 67,
+    "totalDependencies": 173,
     "circularDependencies": 0,
     "hubFiles": 3,
     "orphanFiles": 2

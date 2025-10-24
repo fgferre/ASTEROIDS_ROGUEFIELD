@@ -1,7 +1,24 @@
 // src/modules/enemies/types/Asteroid.js
-import * as CONSTANTS from '../../../core/GameConstants.js';
+import {
+  ASTEROID_BASE_HEALTH,
+  ASTEROID_HEALTH_SCALING,
+  ASTEROID_SIZES,
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  SHIP_SIZE,
+} from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
+import {
+  ASTEROID_CRACK_THRESHOLDS,
+  ASTEROID_CRACK_GRAPH_RULES,
+  ASTEROID_SPEEDS,
+} from '../../../data/constants/physics.js';
+import {
+  ASTEROID_CRACK_PROFILES,
+  ASTEROID_FRAGMENT_RULES,
+  ASTEROID_VARIANTS,
+} from '../../../data/enemies/asteroid-configs.js';
 
 /**
  * Asteroid Enemy Type
@@ -177,28 +194,28 @@ export class Asteroid extends BaseEnemy {
       this.variant = 'common';
     }
 
-    this.radius = CONSTANTS.ASTEROID_SIZES[this.size] || 12;
+    this.radius = ASTEROID_SIZES[this.size] || 12;
     this.variantConfig =
-      CONSTANTS.ASTEROID_VARIANTS[this.variant] ||
-      CONSTANTS.ASTEROID_VARIANTS.common;
+      ASTEROID_VARIANTS[this.variant] ||
+      ASTEROID_VARIANTS.common;
 
     this.crackProfileKey =
       this.variantConfig?.crackProfile || this.variant || 'default';
     this.fragmentProfileKey =
       this.variantConfig?.fragmentProfile || this.variant || 'default';
     this.crackProfile =
-      CONSTANTS.ASTEROID_CRACK_PROFILES[this.crackProfileKey] ||
-      CONSTANTS.ASTEROID_CRACK_PROFILES.default;
+      ASTEROID_CRACK_PROFILES[this.crackProfileKey] ||
+      ASTEROID_CRACK_PROFILES.default;
     this.fragmentProfile =
-      CONSTANTS.ASTEROID_FRAGMENT_RULES[this.fragmentProfileKey] ||
-      CONSTANTS.ASTEROID_FRAGMENT_RULES.default;
+      ASTEROID_FRAGMENT_RULES[this.fragmentProfileKey] ||
+      ASTEROID_FRAGMENT_RULES.default;
 
     this.behavior = this.variantConfig?.behavior || null;
 
     const baseMass = this.radius * this.radius * 0.05;
     this.mass = baseMass * (this.variantConfig?.massMultiplier ?? 1);
 
-    const baseSpeed = CONSTANTS.ASTEROID_SPEEDS[this.size] || 40;
+    const baseSpeed = ASTEROID_SPEEDS[this.size] || 40;
     const randomSpeed = baseSpeed * movementRandom.range(0.8, 1.2);
     const speedMultiplier = this.variantConfig?.speedMultiplier ?? 1;
     const finalSpeed = randomSpeed * speedMultiplier;
@@ -228,8 +245,8 @@ export class Asteroid extends BaseEnemy {
       baseRotationSpeed * (this.variantConfig?.rotationMultiplier ?? 1);
 
     const baseHealth =
-      CONSTANTS.ASTEROID_BASE_HEALTH[this.size] ??
-      CONSTANTS.ASTEROID_BASE_HEALTH.small ??
+      ASTEROID_BASE_HEALTH[this.size] ??
+      ASTEROID_BASE_HEALTH.small ??
       10;
     const waveMultiplier = this.computeWaveHealthMultiplier(this.wave);
     const variantHP = this.variantConfig?.hpMultiplier ?? 1;
@@ -309,7 +326,7 @@ export class Asteroid extends BaseEnemy {
   }
 
   computeWaveHealthMultiplier(wave) {
-    const scaling = CONSTANTS.ASTEROID_HEALTH_SCALING || {};
+    const scaling = ASTEROID_HEALTH_SCALING || {};
     const currentWave = wave || 1;
 
     // Waves 1-10: Original scaling with cap at 2.2x
@@ -533,7 +550,7 @@ export class Asteroid extends BaseEnemy {
   }
 
   generateCrackLayers() {
-    const thresholds = CONSTANTS.ASTEROID_CRACK_THRESHOLDS || [];
+    const thresholds = ASTEROID_CRACK_THRESHOLDS || [];
     if (!thresholds.length) {
       return { layers: [], segments: [], segmentLookup: {} };
     }
@@ -544,10 +561,10 @@ export class Asteroid extends BaseEnemy {
 
     const profile =
       this.crackProfile ||
-      CONSTANTS.ASTEROID_CRACK_PROFILES?.[this.crackProfileKey] ||
-      CONSTANTS.ASTEROID_CRACK_PROFILES.default;
+      ASTEROID_CRACK_PROFILES?.[this.crackProfileKey] ||
+      ASTEROID_CRACK_PROFILES.default;
 
-    const baseGraphRules = CONSTANTS.ASTEROID_CRACK_GRAPH_RULES || {};
+    const baseGraphRules = ASTEROID_CRACK_GRAPH_RULES || {};
     const profileGraphRules = profile?.graphRules || {};
 
     const graphRules = {
@@ -1206,10 +1223,10 @@ export class Asteroid extends BaseEnemy {
 
       // Screen wrapping
       const margin = this.radius;
-      if (this.x < -margin) this.x = CONSTANTS.GAME_WIDTH + margin;
-      if (this.x > CONSTANTS.GAME_WIDTH + margin) this.x = -margin;
-      if (this.y < -margin) this.y = CONSTANTS.GAME_HEIGHT + margin;
-      if (this.y > CONSTANTS.GAME_HEIGHT + margin) this.y = -margin;
+      if (this.x < -margin) this.x = GAME_WIDTH + margin;
+      if (this.x > GAME_WIDTH + margin) this.x = -margin;
+      if (this.y < -margin) this.y = GAME_HEIGHT + margin;
+      if (this.y > GAME_HEIGHT + margin) this.y = -margin;
     }
 
     // Timers (always update)
@@ -1389,7 +1406,7 @@ export class Asteroid extends BaseEnemy {
     const playerRadius =
       typeof player.getHullBoundingRadius === 'function'
         ? player.getHullBoundingRadius()
-        : CONSTANTS.SHIP_SIZE;
+        : SHIP_SIZE;
     const attackRange =
       (behavior.minDistance ?? 0) + this.radius + playerRadius + 6;
 
@@ -1412,7 +1429,7 @@ export class Asteroid extends BaseEnemy {
   }
 
   updateCrackStage() {
-    const thresholds = CONSTANTS.ASTEROID_CRACK_THRESHOLDS || [];
+    const thresholds = ASTEROID_CRACK_THRESHOLDS || [];
     if (!thresholds.length || this.maxHealth <= 0) {
       return;
     }
@@ -1845,8 +1862,8 @@ export class Asteroid extends BaseEnemy {
     const newSize = this.size === 'large' ? 'medium' : 'small';
     const rules =
       this.fragmentProfile ||
-      CONSTANTS.ASTEROID_FRAGMENT_RULES?.[this.fragmentProfileKey] ||
-      CONSTANTS.ASTEROID_FRAGMENT_RULES.default;
+      ASTEROID_FRAGMENT_RULES?.[this.fragmentProfileKey] ||
+      ASTEROID_FRAGMENT_RULES.default;
 
     const currentGeneration = this.generation ?? 0;
     const maxGeneration = rules?.maxGeneration;
@@ -1899,7 +1916,7 @@ export class Asteroid extends BaseEnemy {
     }
 
     const fragments = [];
-    const baseSpeed = CONSTANTS.ASTEROID_SPEEDS[newSize] || 40;
+    const baseSpeed = ASTEROID_SPEEDS[newSize] || 40;
     const speedRange =
       rules?.speedMultiplierBySize?.[this.size] ||
       rules?.speedMultiplierBySize?.default ||

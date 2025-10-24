@@ -1,13 +1,6 @@
 // src/data/constants/gameplay.js
 
-const deepFreeze = (obj) => {
-  Object.values(obj).forEach((value) => {
-    if (value && typeof value === 'object') {
-      deepFreeze(value);
-    }
-  });
-  return Object.freeze(obj);
-};
+import { deepFreeze } from '../../utils/deepFreeze.js';
 
 // === BULLETS & COLLISION ===
 export const BULLET_SPEED = 450;
@@ -144,6 +137,7 @@ export const ASTEROIDS_PER_WAVE_BASE = 4;
 export const ASTEROIDS_PER_WAVE_MULTIPLIER = 1.3;
 export const WAVE_DURATION = 60; // segundos
 export const WAVE_BREAK_TIME = 10; // segundos
+export const WAVE_SPAWN_DELAY = 1.0; // atraso base entre waves no sistema legado
 export const WAVE_BOSS_INTERVAL = 5;
 export const MAX_ASTEROIDS_ON_SCREEN = 20;
 export const SUPPORT_ENEMY_PROGRESSION = deepFreeze({
@@ -169,4 +163,5 @@ export const PRESERVE_LEGACY_POSITIONING = true; // WAVE-006: Preservar posicion
 export const WAVEMANAGER_HANDLES_ASTEROID_SPAWN = false; // WAVE-006: Ativar controle de spawn de asteroides pelo WaveManager (requer USE_WAVE_MANAGER=true)
 export const WAVE_MANAGER_EMIT_LEGACY_WAVE_COMPLETED = false; // WAVE-004: Emite evento legado 'wave-completed' somente quando compatibilidade for necessária
 export const ASTEROID_EDGE_SPAWN_MARGIN = 80; // WAVE-006: Margem para posicionamento de spawn nas bordas (paridade com legado)
+export const ASTEROID_SAFE_SPAWN_DISTANCE = 200; // Distância mínima do jogador ao spawn de asteroides
 export const STRICT_LEGACY_SPAWN_SEQUENCE = true; // WAVE-006: Garante que posição e tamanho reutilizem o mesmo stream de randomização

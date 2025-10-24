@@ -1,22 +1,22 @@
-import * as CONSTANTS from '../core/GameConstants.js';
+import { SHIP_SIZE } from '../core/GameConstants.js';
 
 const defaultHullOutline = [
-  { x: CONSTANTS.SHIP_SIZE, y: 0 },
-  { x: -CONSTANTS.SHIP_SIZE / 2, y: -CONSTANTS.SHIP_SIZE / 2 },
-  { x: -CONSTANTS.SHIP_SIZE / 3, y: 0 },
-  { x: -CONSTANTS.SHIP_SIZE / 2, y: CONSTANTS.SHIP_SIZE / 2 },
+  { x: SHIP_SIZE, y: 0 },
+  { x: -SHIP_SIZE / 2, y: -SHIP_SIZE / 2 },
+  { x: -SHIP_SIZE / 3, y: 0 },
+  { x: -SHIP_SIZE / 2, y: SHIP_SIZE / 2 },
 ];
 
 const defaultHullAccents = [
   [
-    { x: -CONSTANTS.SHIP_SIZE / 3, y: -CONSTANTS.SHIP_SIZE / 3 },
-    { x: -CONSTANTS.SHIP_SIZE, y: -CONSTANTS.SHIP_SIZE },
-    { x: -CONSTANTS.SHIP_SIZE / 2, y: -CONSTANTS.SHIP_SIZE / 2 },
+    { x: -SHIP_SIZE / 3, y: -SHIP_SIZE / 3 },
+    { x: -SHIP_SIZE, y: -SHIP_SIZE },
+    { x: -SHIP_SIZE / 2, y: -SHIP_SIZE / 2 },
   ],
   [
-    { x: -CONSTANTS.SHIP_SIZE / 3, y: CONSTANTS.SHIP_SIZE / 3 },
-    { x: -CONSTANTS.SHIP_SIZE, y: CONSTANTS.SHIP_SIZE },
-    { x: -CONSTANTS.SHIP_SIZE / 2, y: CONSTANTS.SHIP_SIZE / 2 },
+    { x: -SHIP_SIZE / 3, y: SHIP_SIZE / 3 },
+    { x: -SHIP_SIZE, y: SHIP_SIZE },
+    { x: -SHIP_SIZE / 2, y: SHIP_SIZE / 2 },
   ],
 ];
 
@@ -32,7 +32,7 @@ const defaultHull = Object.freeze({
     )
   ),
   cockpit: Object.freeze({
-    position: Object.freeze({ x: CONSTANTS.SHIP_SIZE / 3, y: 0 }),
+    position: Object.freeze({ x: SHIP_SIZE / 3, y: 0 }),
     radius: 3,
   }),
   shieldPadding: 12,

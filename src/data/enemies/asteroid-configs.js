@@ -1,13 +1,6 @@
 // src/data/enemies/asteroid-configs.js
 
-const deepFreeze = (obj) => {
-  Object.values(obj).forEach((value) => {
-    if (value && typeof value === 'object') {
-      deepFreeze(value);
-    }
-  });
-  return Object.freeze(obj);
-};
+import { deepFreeze } from '../../utils/deepFreeze.js';
 
 // === CRACK PROFILES ===
 

@@ -1,9 +1,9 @@
-import * as CONSTANTS from '../core/GameConstants.js';
+import { BULLET_SIZE } from '../core/GameConstants.js';
 
 const DEFAULT_ENEMY_COLOR = 'rgba(255, 150, 110, 0.9)';
 const DEFAULT_BOSS_COLOR = 'rgba(255, 120, 220, 0.95)';
-const DEFAULT_RADIUS = Number.isFinite(CONSTANTS.BULLET_SIZE)
-  ? Math.max(1, CONSTANTS.BULLET_SIZE)
+const DEFAULT_RADIUS = Number.isFinite(BULLET_SIZE)
+  ? Math.max(1, BULLET_SIZE)
   : 4;
 
 function clampChannel(value) {

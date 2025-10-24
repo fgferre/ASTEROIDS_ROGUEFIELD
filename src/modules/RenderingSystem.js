@@ -1,10 +1,16 @@
-import * as CONSTANTS from '../core/GameConstants.js';
+import {
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  SHIP_SIZE,
+} from '../core/GameConstants.js';
 import RenderBatch from '../core/RenderBatch.js';
 import CanvasStateManager from '../core/CanvasStateManager.js';
 import GradientCache from '../core/GradientCache.js';
 import RandomService from '../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
+import { SHIP_MAX_SPEED } from '../data/constants/physics.js';
+import { MAGNETISM_RADIUS } from '../data/constants/gameplay.js';
 
 const MAX_VISUAL_TILT = 0.3;
 const TILT_MULTIPLIER = 0.12;
@@ -262,7 +268,7 @@ class SpaceSkyBackground {
       factor: 0.06,
       tilt: 0.045,
       maxTilt: 0.06,
-      speedForMaxTilt: CONSTANTS.SHIP_MAX_SPEED || 220,
+      speedForMaxTilt: SHIP_MAX_SPEED || 220,
     };
     this.baseDrift = { vx: 0, vy: 0 };
 
@@ -578,7 +584,7 @@ class SpaceSkyBackground {
           EPSILON,
           Number.isFinite(this.parallax.speedForMaxTilt)
             ? this.parallax.speedForMaxTilt
-            : CONSTANTS.SHIP_MAX_SPEED || speed
+            : SHIP_MAX_SPEED || speed
         );
         const speedRatio = clamp(speed / referenceSpeed, 0, 1);
         const bankDirection = -rawVX / speed;
@@ -683,7 +689,7 @@ class RenderingSystem {
     this.captureRandomForkSeeds();
 
     this.spaceSky = new SpaceSkyBackground(this.randomForks.starfield);
-    this.spaceSky.setParallax(0.06, 0.05, 0.06, CONSTANTS.SHIP_MAX_SPEED);
+    this.spaceSky.setParallax(0.06, 0.05, 0.06, SHIP_MAX_SPEED);
 
     // Batch rendering optimization systems
     this.renderBatch = new RenderBatch();
@@ -713,7 +719,7 @@ class RenderingSystem {
     this.shieldVisualCache = {
       signature: '',
       path: null,
-      radius: CONSTANTS.SHIP_SIZE,
+      radius: SHIP_SIZE,
       padding: 0,
     };
     this.shieldGradientCache = {
@@ -1090,27 +1096,27 @@ class RenderingSystem {
   drawBackground(ctx, playerVelocity) {
     if (this.spaceSky) {
       this.spaceSky.render(ctx, {
-        width: ctx.canvas?.width ?? CONSTANTS.GAME_WIDTH,
-        height: ctx.canvas?.height ?? CONSTANTS.GAME_HEIGHT,
+        width: ctx.canvas?.width ?? GAME_WIDTH,
+        height: ctx.canvas?.height ?? GAME_HEIGHT,
         velocity: playerVelocity,
       });
       return;
     }
 
     const gradient = ctx.createRadialGradient(
-      CONSTANTS.GAME_WIDTH / 2,
-      CONSTANTS.GAME_HEIGHT / 2,
+      GAME_WIDTH / 2,
+      GAME_HEIGHT / 2,
       0,
-      CONSTANTS.GAME_WIDTH / 2,
-      CONSTANTS.GAME_HEIGHT / 2,
-      Math.max(CONSTANTS.GAME_WIDTH, CONSTANTS.GAME_HEIGHT)
+      GAME_WIDTH / 2,
+      GAME_HEIGHT / 2,
+      Math.max(GAME_WIDTH, GAME_HEIGHT)
     );
     gradient.addColorStop(0, '#0a0a1a');
     gradient.addColorStop(0.6, '#000510');
     gradient.addColorStop(1, '#000000');
 
     ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, CONSTANTS.GAME_WIDTH, CONSTANTS.GAME_HEIGHT);
+    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
   }
 
   drawMagnetismField(ctx, player, xpOrbs) {
@@ -1140,7 +1146,7 @@ class RenderingSystem {
         : null) ||
       (typeof xpOrbs.getMagnetismRadius === 'function'
         ? xpOrbs.getMagnetismRadius()
-        : CONSTANTS.MAGNETISM_RADIUS);
+        : MAGNETISM_RADIUS);
 
     ctx.save();
     ctx.strokeStyle = 'rgba(0, 221, 255, 0.25)';
@@ -1244,8 +1250,8 @@ class RenderingSystem {
       return;
     }
 
-    const canvasWidth = ctx.canvas?.width ?? CONSTANTS.GAME_WIDTH ?? 800;
-    const canvasHeight = ctx.canvas?.height ?? CONSTANTS.GAME_HEIGHT ?? 600;
+    const canvasWidth = ctx.canvas?.width ?? GAME_WIDTH ?? 800;
+    const canvasHeight = ctx.canvas?.height ?? GAME_HEIGHT ?? 600;
 
     const barWidth = Math.min(canvasWidth * 0.68, 520);
     const barHeight = Math.max(16, canvasHeight * 0.028);
@@ -1584,12 +1590,12 @@ class RenderingSystem {
     const hullRadius =
       typeof player.getHullBoundingRadius === 'function'
         ? player.getHullBoundingRadius()
-        : CONSTANTS.SHIP_SIZE;
+        : SHIP_SIZE;
     const fallback =
       typeof player.getShieldRadius === 'function'
         ? player.getShieldRadius()
         : hullRadius + padding;
-    return Math.max(fallback, CONSTANTS.SHIP_SIZE);
+    return Math.max(fallback, SHIP_SIZE);
   }
 
   ensureShieldGradientCanvas(radius, ratio) {

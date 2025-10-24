@@ -6,8 +6,8 @@ import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 import {
   BOSS_AUDIO_FREQUENCY_PRESETS,
   MUSIC_LAYER_CONFIG,
-  WAVE_BOSS_INTERVAL,
 } from '../core/GameConstants.js';
+import { WAVE_BOSS_INTERVAL } from '../data/constants/gameplay.js';
 
 class AudioSystem {
   constructor(dependencies = {}) {

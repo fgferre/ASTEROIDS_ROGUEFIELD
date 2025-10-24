@@ -2,7 +2,7 @@ import {
   ENEMY_EFFECT_COLORS,
   ENEMY_RENDER_PRESETS,
   ENEMY_TYPES,
-} from '../../../core/GameConstants.js';
+} from '../../../data/constants/visual.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
