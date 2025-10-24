@@ -1,7 +1,23 @@
-import * as CONSTANTS from '../core/GameConstants.js';
+import {
+  ASTEROID_SIZES,
+  BULLET_SIZE,
+  PHYSICS_CELL_SIZE,
+  SHIP_SIZE,
+} from '../core/GameConstants.js';
 import { SpatialHash } from '../core/SpatialHash.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
+import { SHIP_MASS } from '../data/constants/physics.js';
+import {
+  SHIELD_COLLISION_BOUNCE,
+  SHIELD_REFLECT_SPEED,
+  SHIELD_HIT_GRACE_TIME,
+} from '../data/constants/gameplay.js';
+import {
+  BOSS_CONFIG,
+  BOSS_PHYSICS_CONFIG,
+  ENEMY_TYPES,
+} from '../data/constants/visual.js';
 
 const ASTEROID_POOL_ID = Symbol.for('ASTEROIDS_ROGUEFIELD:asteroidPoolId');
 
@@ -9,7 +25,7 @@ class PhysicsSystem {
   constructor(dependencies = {}) {
     this.dependencies = normalizeDependencies(dependencies);
     this.enemySystem = null;
-    this.cellSize = CONSTANTS.PHYSICS_CELL_SIZE || 96;
+    this.cellSize = PHYSICS_CELL_SIZE || 96;
     this.maxEnemyRadius = this.computeMaxEnemyRadius();
     this.maxEnemyRadius = Math.max(this.maxEnemyRadius, this.getBossSpatialRadius());
     this.maxAsteroidRadius = this.maxEnemyRadius; // Legacy alias
@@ -78,14 +94,14 @@ class PhysicsSystem {
   computeMaxEnemyRadius() {
     const radii = [];
 
-    const asteroidSizes = CONSTANTS.ASTEROID_SIZES || {};
+    const asteroidSizes = ASTEROID_SIZES || {};
     for (const value of Object.values(asteroidSizes)) {
       if (Number.isFinite(value)) {
         radii.push(value);
       }
     }
 
-    const enemyTypes = CONSTANTS.ENEMY_TYPES || {};
+    const enemyTypes = ENEMY_TYPES || {};
     for (const config of Object.values(enemyTypes)) {
       if (!config || typeof config !== 'object') {
         continue;
@@ -104,7 +120,7 @@ class PhysicsSystem {
       }
     }
 
-    const bossRadius = CONSTANTS.BOSS_CONFIG?.radius;
+    const bossRadius = BOSS_CONFIG?.radius;
     if (Number.isFinite(bossRadius)) {
       radii.push(bossRadius);
       const bossSpatialPadding = this.getBossSpatialPadding();
@@ -408,7 +424,7 @@ class PhysicsSystem {
   }
 
   getBossPhysicsConfig() {
-    return CONSTANTS.BOSS_PHYSICS_CONFIG || {};
+    return BOSS_PHYSICS_CONFIG || {};
   }
 
   getBossBaseRadius(boss = null) {
@@ -417,7 +433,7 @@ class PhysicsSystem {
       return bossRadius;
     }
 
-    const configRadius = CONSTANTS.BOSS_CONFIG?.radius;
+    const configRadius = BOSS_CONFIG?.radius;
     if (Number.isFinite(configRadius)) {
       return configRadius;
     }
@@ -661,7 +677,7 @@ class PhysicsSystem {
       return config.areaDamage;
     }
 
-    const base = boss?.contactDamage ?? CONSTANTS.BOSS_CONFIG?.contactDamage;
+    const base = boss?.contactDamage ?? BOSS_CONFIG?.contactDamage;
     if (Number.isFinite(base)) {
       return base * 1.1;
     }
@@ -855,7 +871,7 @@ class PhysicsSystem {
       return null;
     }
 
-    const defaults = (CONSTANTS.ENEMY_TYPES && CONSTANTS.ENEMY_TYPES.mine) || {};
+    const defaults = (ENEMY_TYPES && ENEMY_TYPES.mine) || {};
     const position = data.position || {
       x: Number.isFinite(enemy.x) ? enemy.x : 0,
       y: Number.isFinite(enemy.y) ? enemy.y : 0,
@@ -1320,7 +1336,7 @@ class PhysicsSystem {
       return;
     }
 
-    const bulletRadius = CONSTANTS.BULLET_SIZE || 0;
+    const bulletRadius = BULLET_SIZE || 0;
     const maxCheckRadius = bulletRadius + this.maxEnemyRadius;
 
     for (let i = 0; i < bullets.length; i += 1) {
@@ -1423,7 +1439,7 @@ class PhysicsSystem {
     const hullRadius =
       typeof player.getHullBoundingRadius === 'function'
         ? player.getHullBoundingRadius()
-        : CONSTANTS.SHIP_SIZE;
+        : SHIP_SIZE;
     const padding =
       shieldActive && typeof player.getShieldPadding === 'function'
         ? player.getShieldPadding()
@@ -1551,15 +1567,15 @@ class PhysicsSystem {
     }
 
     const playerMass = context.shieldActive
-      ? CONSTANTS.SHIP_MASS * Math.max(context.impactProfile.forceMultiplier, 1)
-      : CONSTANTS.SHIP_MASS;
+      ? SHIP_MASS * Math.max(context.impactProfile.forceMultiplier, 1)
+      : SHIP_MASS;
     const rvx = asteroid.vx - player.velocity.vx;
     const rvy = asteroid.vy - player.velocity.vy;
     const velAlongNormal = rvx * nx + rvy * ny;
 
     if (velAlongNormal < 0) {
       const bounce = context.shieldActive
-        ? CONSTANTS.SHIELD_COLLISION_BOUNCE
+        ? SHIELD_COLLISION_BOUNCE
         : 0.2;
       const invMass1 = 1 / Math.max(playerMass, 1);
       const invMass2 = 1 / Math.max(asteroid.mass || 1, 1);
@@ -1650,12 +1666,12 @@ class PhysicsSystem {
 
     if (shieldAbsorbedHit) {
       const boost =
-        CONSTANTS.SHIELD_REFLECT_SPEED *
+        SHIELD_REFLECT_SPEED *
         Math.max(context.impactProfile.forceMultiplier, 1);
       asteroid.vx -= nx * boost;
       asteroid.vy -= ny * boost;
 
-      const cooldown = CONSTANTS.SHIELD_HIT_GRACE_TIME;
+      const cooldown = SHIELD_HIT_GRACE_TIME;
       if (
         asteroid.shieldHitCooldown === undefined ||
         !Number.isFinite(asteroid.shieldHitCooldown)
@@ -1887,8 +1903,8 @@ class PhysicsSystem {
           const nx = distance > 0 ? dx / Math.max(distance, 0.001) : 0;
           const ny = distance > 0 ? dy / Math.max(distance, 0.001) : 0;
           const playerMass = playerContext.shieldActive
-            ? CONSTANTS.SHIP_MASS * Math.max(playerContext.impactProfile.forceMultiplier, 1)
-            : CONSTANTS.SHIP_MASS;
+            ? SHIP_MASS * Math.max(playerContext.impactProfile.forceMultiplier, 1)
+            : SHIP_MASS;
 
           const playerResult = {
             player,

@@ -3,7 +3,9 @@
   "hubs": [
     "src/core/GameConstants.js",
     "src/core/RandomService.js",
-    "src/core/serviceUtils.js"
+    "src/core/serviceUtils.js",
+    "src/data/constants/gameplay.js",
+    "src/data/constants/visual.js"
   ],
   "orphans": [
     "src/core/EventBus.js",

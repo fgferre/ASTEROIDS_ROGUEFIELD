@@ -16,7 +16,7 @@ export const ASTEROID_SPEEDS = Object.freeze({
 });
 
 // === CRACK MECHANICS ===
-export const ASTEROID_CRACK_THRESHOLDS = [0.7, 0.4, 0.15];
+export const ASTEROID_CRACK_THRESHOLDS = Object.freeze([0.7, 0.4, 0.15]);
 
 export const ASTEROID_CRACK_GRAPH_RULES = Object.freeze({
   continuationBias: 0.82,

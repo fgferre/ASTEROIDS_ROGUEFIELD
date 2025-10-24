@@ -4,7 +4,7 @@
       "path": "src/app.js",
       "imports": [
         "src/core/GamePools.js",
-        "src/core/GameConstants.js",
+        "src/data/constants/gameplay.js",
         "src/core/debugLogging.js",
         "src/utils/PerformanceMonitor.js",
         "src/bootstrap/bootstrapServices.js",
@@ -138,7 +138,6 @@
         "MUSIC_LAYER_CONFIG"
       ],
       "dependents": [
-        "src/app.js",
         "src/data/shipModels.js",
         "src/modules/AudioSystem.js",
         "src/modules/CombatSystem.js",
@@ -419,10 +418,15 @@
         "STRICT_LEGACY_SPAWN_SEQUENCE"
       ],
       "dependents": [
+        "src/app.js",
         "src/core/GameConstants.js",
         "src/modules/AudioSystem.js",
+        "src/modules/CombatSystem.js",
+        "src/modules/EffectsSystem.js",
         "src/modules/EnemySystem.js",
+        "src/modules/PhysicsSystem.js",
         "src/modules/PlayerSystem.js",
+        "src/modules/ProgressionSystem.js",
         "src/modules/RenderingSystem.js",
         "src/modules/UISystem.js",
         "src/modules/XPOrbSystem.js",
@@ -430,8 +434,8 @@
         "src/modules/enemies/managers/WaveManager.js",
         "src/services/GameSessionService.js"
       ],
-      "isHub": false,
-      "isCritical": false
+      "isHub": true,
+      "isCritical": true
     },
     {
       "path": "src/data/constants/physics.js",
@@ -449,6 +453,7 @@
       ],
       "dependents": [
         "src/core/GameConstants.js",
+        "src/modules/PhysicsSystem.js",
         "src/modules/PlayerSystem.js",
         "src/modules/RenderingSystem.js",
         "src/modules/enemies/types/Asteroid.js"
@@ -473,7 +478,10 @@
       ],
       "dependents": [
         "src/core/GameConstants.js",
+        "src/modules/CombatSystem.js",
+        "src/modules/EffectsSystem.js",
         "src/modules/EnemySystem.js",
+        "src/modules/PhysicsSystem.js",
         "src/modules/enemies/managers/RewardManager.js",
         "src/modules/enemies/managers/WaveManager.js",
         "src/modules/enemies/types/BossEnemy.js",
@@ -481,8 +489,8 @@
         "src/modules/enemies/types/Hunter.js",
         "src/modules/enemies/types/Mine.js"
       ],
-      "isHub": false,
-      "isCritical": false
+      "isHub": true,
+      "isCritical": true
     },
     {
       "path": "src/data/enemies/asteroid-configs.js",
@@ -503,6 +511,8 @@
       ],
       "dependents": [
         "src/core/GameConstants.js",
+        "src/modules/CombatSystem.js",
+        "src/modules/EffectsSystem.js",
         "src/modules/EnemySystem.js",
         "src/modules/XPOrbSystem.js",
         "src/modules/enemies/managers/RewardManager.js",
@@ -628,7 +638,10 @@
         "src/core/GamePools.js",
         "src/core/serviceUtils.js",
         "src/utils/drawEnemyProjectile.js",
-        "src/utils/dev/GameDebugLogger.js"
+        "src/utils/dev/GameDebugLogger.js",
+        "src/data/constants/gameplay.js",
+        "src/data/constants/visual.js",
+        "src/data/enemies/asteroid-configs.js"
       ],
       "exports": [],
       "dependents": [
@@ -646,7 +659,10 @@
         "src/utils/ScreenShake.js",
         "src/core/serviceUtils.js",
         "src/utils/randomHelpers.js",
-        "src/utils/dev/GameDebugLogger.js"
+        "src/utils/dev/GameDebugLogger.js",
+        "src/data/constants/gameplay.js",
+        "src/data/constants/visual.js",
+        "src/data/enemies/asteroid-configs.js"
       ],
       "exports": [
         "EffectsSystem"
@@ -720,7 +736,10 @@
         "src/core/GameConstants.js",
         "src/core/SpatialHash.js",
         "src/core/serviceUtils.js",
-        "src/utils/dev/GameDebugLogger.js"
+        "src/utils/dev/GameDebugLogger.js",
+        "src/data/constants/physics.js",
+        "src/data/constants/gameplay.js",
+        "src/data/constants/visual.js"
       ],
       "exports": [],
       "dependents": [
@@ -751,7 +770,8 @@
         "src/core/GameConstants.js",
         "src/data/upgrades.js",
         "src/core/serviceUtils.js",
-        "src/core/RandomService.js"
+        "src/core/RandomService.js",
+        "src/data/constants/gameplay.js"
       ],
       "exports": [],
       "dependents": [
@@ -1195,9 +1215,9 @@
   ],
   "metrics": {
     "totalFiles": 67,
-    "totalDependencies": 173,
+    "totalDependencies": 183,
     "circularDependencies": 0,
-    "hubFiles": 3,
+    "hubFiles": 5,
     "orphanFiles": 2
   },
   "issues": {
@@ -1205,7 +1225,9 @@
     "hubs": [
       "src/core/GameConstants.js",
       "src/core/RandomService.js",
-      "src/core/serviceUtils.js"
+      "src/core/serviceUtils.js",
+      "src/data/constants/gameplay.js",
+      "src/data/constants/visual.js"
     ],
     "orphans": [
       "src/core/EventBus.js",

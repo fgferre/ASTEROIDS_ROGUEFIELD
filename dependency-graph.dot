@@ -19,9 +19,9 @@ digraph Dependencies {
   "src/core/SpatialHash.js" [];
   "src/core/debugLogging.js" [];
   "src/core/serviceUtils.js" [color=red, penwidth=2];
-  "src/data/constants/gameplay.js" [];
+  "src/data/constants/gameplay.js" [color=red, penwidth=2];
   "src/data/constants/physics.js" [];
-  "src/data/constants/visual.js" [];
+  "src/data/constants/visual.js" [color=red, penwidth=2];
   "src/data/enemies/asteroid-configs.js" [];
   "src/data/settingsSchema.js" [];
   "src/data/shipModels.js" [];
@@ -68,7 +68,7 @@ digraph Dependencies {
   "src/utils/drawEnemyProjectile.js" [];
   "src/utils/randomHelpers.js" [];
   "src/app.js" -> "src/core/GamePools.js";
-  "src/app.js" -> "src/core/GameConstants.js";
+  "src/app.js" -> "src/data/constants/gameplay.js";
   "src/app.js" -> "src/core/debugLogging.js";
   "src/app.js" -> "src/utils/PerformanceMonitor.js";
   "src/app.js" -> "src/bootstrap/bootstrapServices.js";
@@ -133,6 +133,9 @@ digraph Dependencies {
   "src/modules/CombatSystem.js" -> "src/core/serviceUtils.js";
   "src/modules/CombatSystem.js" -> "src/utils/drawEnemyProjectile.js";
   "src/modules/CombatSystem.js" -> "src/utils/dev/GameDebugLogger.js";
+  "src/modules/CombatSystem.js" -> "src/data/constants/gameplay.js";
+  "src/modules/CombatSystem.js" -> "src/data/constants/visual.js";
+  "src/modules/CombatSystem.js" -> "src/data/enemies/asteroid-configs.js";
   "src/modules/EffectsSystem.js" -> "src/core/GameConstants.js";
   "src/modules/EffectsSystem.js" -> "src/core/GamePools.js";
   "src/modules/EffectsSystem.js" -> "src/core/RandomService.js";
@@ -140,6 +143,9 @@ digraph Dependencies {
   "src/modules/EffectsSystem.js" -> "src/core/serviceUtils.js";
   "src/modules/EffectsSystem.js" -> "src/utils/randomHelpers.js";
   "src/modules/EffectsSystem.js" -> "src/utils/dev/GameDebugLogger.js";
+  "src/modules/EffectsSystem.js" -> "src/data/constants/gameplay.js";
+  "src/modules/EffectsSystem.js" -> "src/data/constants/visual.js";
+  "src/modules/EffectsSystem.js" -> "src/data/enemies/asteroid-configs.js";
   "src/modules/EnemySystem.js" -> "src/core/GameConstants.js";
   "src/modules/EnemySystem.js" -> "src/core/GamePools.js";
   "src/modules/EnemySystem.js" -> "src/core/RandomService.js";
@@ -168,6 +174,9 @@ digraph Dependencies {
   "src/modules/PhysicsSystem.js" -> "src/core/SpatialHash.js";
   "src/modules/PhysicsSystem.js" -> "src/core/serviceUtils.js";
   "src/modules/PhysicsSystem.js" -> "src/utils/dev/GameDebugLogger.js";
+  "src/modules/PhysicsSystem.js" -> "src/data/constants/physics.js";
+  "src/modules/PhysicsSystem.js" -> "src/data/constants/gameplay.js";
+  "src/modules/PhysicsSystem.js" -> "src/data/constants/visual.js";
   "src/modules/PlayerSystem.js" -> "src/core/GameConstants.js";
   "src/modules/PlayerSystem.js" -> "src/data/shipModels.js";
   "src/modules/PlayerSystem.js" -> "src/core/serviceUtils.js";
@@ -177,6 +186,7 @@ digraph Dependencies {
   "src/modules/ProgressionSystem.js" -> "src/data/upgrades.js";
   "src/modules/ProgressionSystem.js" -> "src/core/serviceUtils.js";
   "src/modules/ProgressionSystem.js" -> "src/core/RandomService.js";
+  "src/modules/ProgressionSystem.js" -> "src/data/constants/gameplay.js";
   "src/modules/RenderingSystem.js" -> "src/core/GameConstants.js";
   "src/modules/RenderingSystem.js" -> "src/core/RenderBatch.js";
   "src/modules/RenderingSystem.js" -> "src/core/CanvasStateManager.js";
