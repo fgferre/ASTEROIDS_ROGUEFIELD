@@ -1,6 +1,5 @@
 // src/modules/EnemySystem.js
-import * as CONSTANTS from '../core/GameConstants.js';
-import { ENEMY_TYPES } from '../core/GameConstants.js';
+import { ASTEROID_SIZES, GAME_HEIGHT, GAME_WIDTH, SHIP_SIZE } from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
 import RandomService from '../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
@@ -16,6 +15,27 @@ import { AsteroidMovement } from './enemies/components/AsteroidMovement.js';
 import { AsteroidCollision } from './enemies/components/AsteroidCollision.js';
 import { AsteroidRenderer } from './enemies/components/AsteroidRenderer.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
+import {
+  ASTEROIDS_PER_WAVE_BASE,
+  ASTEROIDS_PER_WAVE_MULTIPLIER,
+  ASTEROID_EDGE_SPAWN_MARGIN,
+  COLLISION_BOUNCE,
+  MAX_ASTEROIDS_ON_SCREEN,
+  PRESERVE_LEGACY_POSITIONING,
+  PRESERVE_LEGACY_SIZE_DISTRIBUTION,
+  SHIELD_SHOCKWAVE_FORCE,
+  SHIELD_SHOCKWAVE_RADIUS,
+  USE_WAVE_MANAGER,
+  WAVE_BREAK_TIME,
+  WAVE_DURATION,
+  WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
+} from '../data/constants/gameplay.js';
+import { ENEMY_TYPES, BOSS_CONFIG } from '../data/constants/visual.js';
+import {
+  ASTEROID_VARIANTS,
+  ASTEROID_VARIANT_CHANCES,
+  ORB_VALUE,
+} from '../data/enemies/asteroid-configs.js';
 
 const ASTEROID_POOL_ID = Symbol.for('ASTEROIDS_ROGUEFIELD:asteroidPoolId');
 
@@ -275,7 +295,7 @@ class EnemySystem {
 
       if (this.waveManager) {
         bus.on('wave-complete', (data = {}) => {
-          if (Boolean(CONSTANTS?.USE_WAVE_MANAGER) && this.waveState) {
+          if (Boolean(USE_WAVE_MANAGER) && this.waveState) {
             const waveNumber = Number.isFinite(Number(data.wave))
               ? Number(data.wave)
               : Number.isFinite(this.waveState.current)
@@ -749,8 +769,8 @@ class EnemySystem {
         });
       }
 
-      if (CONSTANTS?.BOSS_CONFIG) {
-        const bossDefaults = { ...CONSTANTS.BOSS_CONFIG };
+      if (BOSS_CONFIG) {
+        const bossDefaults = { ...BOSS_CONFIG };
         const sanitizedMinions = this.getAvailableBossMinionTypes(
           bossDefaults.minionTypes
         );
@@ -933,8 +953,8 @@ class EnemySystem {
       this.useManagers &&
       this.waveManager &&
       this._waveManagerRuntimeEnabled &&
-      Boolean(CONSTANTS?.USE_WAVE_MANAGER) &&
-      !Boolean(CONSTANTS?.WAVEMANAGER_HANDLES_ASTEROID_SPAWN) &&
+      Boolean(USE_WAVE_MANAGER) &&
+      !Boolean(WAVEMANAGER_HANDLES_ASTEROID_SPAWN) &&
       typeof this.waveManager.registerActiveEnemy === 'function';
 
     let waveManagerRegistered = true;
@@ -970,8 +990,8 @@ class EnemySystem {
     const waveManagerEnabled =
       this.useManagers &&
       this._waveManagerRuntimeEnabled &&
-      Boolean(CONSTANTS?.USE_WAVE_MANAGER) &&
-      !Boolean(CONSTANTS?.WAVEMANAGER_HANDLES_ASTEROID_SPAWN) &&
+      Boolean(USE_WAVE_MANAGER) &&
+      !Boolean(WAVEMANAGER_HANDLES_ASTEROID_SPAWN) &&
       this.waveManager;
 
     const isDevelopment =
@@ -1130,7 +1150,7 @@ class EnemySystem {
 
   getPlayerHullRadius(player) {
     if (!player) {
-      return CONSTANTS.SHIP_SIZE;
+      return SHIP_SIZE;
     }
 
     const rawHullRadius =
@@ -1142,7 +1162,7 @@ class EnemySystem {
       return Math.max(0, rawHullRadius);
     }
 
-    return CONSTANTS.SHIP_SIZE;
+    return SHIP_SIZE;
   }
 
   getCachedWorld() {
@@ -1361,8 +1381,8 @@ class EnemySystem {
       ? [...preferredTypes]
       : Array.isArray(this.availableBossMinionTypes) && this.availableBossMinionTypes.length
       ? [...this.availableBossMinionTypes]
-      : Array.isArray(CONSTANTS.BOSS_CONFIG?.minionTypes)
-      ? [...CONSTANTS.BOSS_CONFIG.minionTypes]
+      : Array.isArray(BOSS_CONFIG?.minionTypes)
+      ? [...BOSS_CONFIG.minionTypes]
       : [];
 
     const factory = this.factory;
@@ -1701,7 +1721,7 @@ class EnemySystem {
       return;
     }
 
-    const baseValue = CONSTANTS.ORB_VALUE || 5;
+    const baseValue = ORB_VALUE || 5;
     const safeBaseValue = Math.max(1, baseValue);
     const orbCount = Math.max(1, Math.round(xpAmount / safeBaseValue));
     const valuePerOrb = Math.max(1, Math.floor(xpAmount / orbCount));
@@ -1871,13 +1891,13 @@ class EnemySystem {
   createInitialWaveState() {
     return {
       current: 1,
-      totalAsteroids: CONSTANTS.ASTEROIDS_PER_WAVE_BASE,
+      totalAsteroids: ASTEROIDS_PER_WAVE_BASE,
       asteroidsSpawned: 0,
       asteroidsKilled: 0,
       isActive: true,
       breakTimer: 0,
       completedWaves: 0,
-      timeRemaining: CONSTANTS.WAVE_DURATION,
+      timeRemaining: WAVE_DURATION,
       spawnTimer: 0,
       spawnDelay: 1.0,
       initialSpawnDone: false,
@@ -1999,8 +2019,8 @@ class EnemySystem {
         : undefined;
 
     const constantsFlag =
-      typeof CONSTANTS?.USE_WAVE_MANAGER === 'boolean'
-        ? CONSTANTS.USE_WAVE_MANAGER
+      typeof USE_WAVE_MANAGER === 'boolean'
+        ? USE_WAVE_MANAGER
         : false;
 
     let waveManagerEnabled = constantsFlag;
@@ -2020,7 +2040,7 @@ class EnemySystem {
     this._waveManagerRuntimeEnabled = waveManagerEnabled;
 
     const waveManagerHandlesSpawnFlag =
-      (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
+      (WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
       this._waveManagerRuntimeEnabled;
     const waveManagerControlsSpawn = Boolean(
       waveManagerHandlesSpawnFlag &&
@@ -2080,7 +2100,7 @@ class EnemySystem {
     let spawnHandled = false;
 
     const waveManagerHandlesSpawn =
-      (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
+      (WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
       this._waveManagerRuntimeEnabled &&
       this.waveManager &&
       !this._waveManagerFallbackWarningIssued &&
@@ -2132,7 +2152,7 @@ class EnemySystem {
     }
 
     const waveManagerHandlesAsteroids =
-      (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
+      (WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
       this._waveManagerRuntimeEnabled &&
       !this._waveManagerFallbackWarningIssued &&
       !this._waveManagerInvalidStateWarningIssued;
@@ -2194,25 +2214,25 @@ class EnemySystem {
     }
 
     if (becameActive) {
-      const baseMultiplier = Number.isFinite(CONSTANTS.ASTEROIDS_PER_WAVE_MULTIPLIER)
-        ? CONSTANTS.ASTEROIDS_PER_WAVE_MULTIPLIER
+      const baseMultiplier = Number.isFinite(ASTEROIDS_PER_WAVE_MULTIPLIER)
+        ? ASTEROIDS_PER_WAVE_MULTIPLIER
         : 1.3;
-      const baseCountValue = Number.isFinite(CONSTANTS.ASTEROIDS_PER_WAVE_BASE)
-        ? CONSTANTS.ASTEROIDS_PER_WAVE_BASE
+      const baseCountValue = Number.isFinite(ASTEROIDS_PER_WAVE_BASE)
+        ? ASTEROIDS_PER_WAVE_BASE
         : 4;
       const normalizedWaveIndex = Math.max(0, resolvedWaveNumber - 1);
       const computedTotal = Math.floor(
         baseCountValue * Math.pow(baseMultiplier, normalizedWaveIndex)
       );
-      const capValue = Number.isFinite(CONSTANTS.MAX_ASTEROIDS_ON_SCREEN)
-        ? CONSTANTS.MAX_ASTEROIDS_ON_SCREEN
+      const capValue = Number.isFinite(MAX_ASTEROIDS_ON_SCREEN)
+        ? MAX_ASTEROIDS_ON_SCREEN
         : 25;
 
       wave.totalAsteroids = Math.max(0, Math.min(computedTotal, capValue));
       wave.asteroidsSpawned = 0;
       wave.asteroidsKilled = 0;
-      wave.timeRemaining = Number.isFinite(Number(CONSTANTS.WAVE_DURATION))
-        ? Number(CONSTANTS.WAVE_DURATION)
+      wave.timeRemaining = Number.isFinite(Number(WAVE_DURATION))
+        ? Number(WAVE_DURATION)
         : 60;
       wave.spawnTimer = 0;
       wave.initialSpawnDone = false;
@@ -2223,7 +2243,7 @@ class EnemySystem {
       }
     }
     const legacyCompatibilityEnabled =
-      (CONSTANTS.PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true) &&
+      (PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true) &&
       waveManagerHandlesAsteroids;
 
     const totals = managerState.totals || {};
@@ -2341,7 +2361,7 @@ class EnemySystem {
       this.waveState.current = waveNumberCandidate;
     }
 
-    const breakDuration = Number(CONSTANTS.WAVE_BREAK_TIME) || 0;
+    const breakDuration = Number(WAVE_BREAK_TIME) || 0;
 
     this.waveState.isActive = false;
     this.waveState.breakTimer = breakDuration;
@@ -2350,7 +2370,7 @@ class EnemySystem {
     this.waveState.initialSpawnDone = false;
 
     const waveManagerControlsAsteroids =
-      (CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
+      (WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
       this._waveManagerRuntimeEnabled;
 
     if (
@@ -2437,8 +2457,8 @@ class EnemySystem {
       ? {
           player: this.getCachedPlayer(),
           worldBounds: {
-            width: CONSTANTS.GAME_WIDTH,
-            height: CONSTANTS.GAME_HEIGHT,
+            width: GAME_WIDTH,
+            height: GAME_HEIGHT,
           },
         }
       : null;
@@ -2543,7 +2563,7 @@ class EnemySystem {
       const velAlongNormal = rvx * nx + rvy * ny;
 
       if (velAlongNormal < 0) {
-        const e = CONSTANTS.COLLISION_BOUNCE;
+        const e = COLLISION_BOUNCE;
         const invMass1 = 1 / a1.mass;
         const invMass2 = 1 / a2.mass;
         const j = (-(1 + e) * velAlongNormal) / (invMass1 + invMass2);
@@ -2606,7 +2626,7 @@ class EnemySystem {
 
     return (
       wave.asteroidsSpawned < wave.totalAsteroids &&
-      this.getActiveEnemyCount() < CONSTANTS.MAX_ASTEROIDS_ON_SCREEN
+      this.getActiveEnemyCount() < MAX_ASTEROIDS_ON_SCREEN
     );
   }
 
@@ -2688,7 +2708,7 @@ class EnemySystem {
         configY: config.y,
       });
 
-      const fallbackX = Number.isFinite(config.x) ? config.x : (CONSTANTS.GAME_WIDTH || 800) / 2;
+      const fallbackX = Number.isFinite(config.x) ? config.x : (GAME_WIDTH || 800) / 2;
       const fallbackY = Number.isFinite(config.y) ? config.y : -100;
 
       boss.x = fallbackX;
@@ -2768,38 +2788,38 @@ class EnemySystem {
     let x;
     let y;
     const margin =
-      typeof CONSTANTS.ASTEROID_EDGE_SPAWN_MARGIN === 'number'
-        ? CONSTANTS.ASTEROID_EDGE_SPAWN_MARGIN
+      typeof ASTEROID_EDGE_SPAWN_MARGIN === 'number'
+        ? ASTEROID_EDGE_SPAWN_MARGIN
         : 80;
 
     switch (side) {
       case 0:
         x =
           spawnRandom && typeof spawnRandom.range === 'function'
-            ? spawnRandom.range(0, CONSTANTS.GAME_WIDTH)
-            : floatRandom.float() * CONSTANTS.GAME_WIDTH;
+            ? spawnRandom.range(0, GAME_WIDTH)
+            : floatRandom.float() * GAME_WIDTH;
         y = -margin;
         break;
       case 1:
-        x = CONSTANTS.GAME_WIDTH + margin;
+        x = GAME_WIDTH + margin;
         y =
           spawnRandom && typeof spawnRandom.range === 'function'
-            ? spawnRandom.range(0, CONSTANTS.GAME_HEIGHT)
-            : floatRandom.float() * CONSTANTS.GAME_HEIGHT;
+            ? spawnRandom.range(0, GAME_HEIGHT)
+            : floatRandom.float() * GAME_HEIGHT;
         break;
       case 2:
         x =
           spawnRandom && typeof spawnRandom.range === 'function'
-            ? spawnRandom.range(0, CONSTANTS.GAME_WIDTH)
-            : floatRandom.float() * CONSTANTS.GAME_WIDTH;
-        y = CONSTANTS.GAME_HEIGHT + margin;
+            ? spawnRandom.range(0, GAME_WIDTH)
+            : floatRandom.float() * GAME_WIDTH;
+        y = GAME_HEIGHT + margin;
         break;
       default:
         x = -margin;
         y =
           spawnRandom && typeof spawnRandom.range === 'function'
-            ? spawnRandom.range(0, CONSTANTS.GAME_HEIGHT)
-            : floatRandom.float() * CONSTANTS.GAME_HEIGHT;
+            ? spawnRandom.range(0, GAME_HEIGHT)
+            : floatRandom.float() * GAME_HEIGHT;
         break;
     }
 
@@ -2962,7 +2982,7 @@ class EnemySystem {
         this.getActiveEnemyCount() === 0;
 
       const usingWaveManager =
-        this.useManagers && Boolean(CONSTANTS?.USE_WAVE_MANAGER) && this.waveManager;
+        this.useManagers && Boolean(USE_WAVE_MANAGER) && this.waveManager;
 
       if (!usingWaveManager && allAsteroidsKilled && this.waveState.timeRemaining > 0) {
         this.completeCurrentWave();
@@ -2977,8 +2997,8 @@ class EnemySystem {
       return context.forcedVariant;
     }
 
-    const chanceConfig = CONSTANTS.ASTEROID_VARIANT_CHANCES || {};
-    const variantConfig = CONSTANTS.ASTEROID_VARIANTS || {};
+    const chanceConfig = ASTEROID_VARIANT_CHANCES || {};
+    const variantConfig = ASTEROID_VARIANTS || {};
     const info = chanceConfig[size];
 
     if (!info) {
@@ -3048,7 +3068,7 @@ class EnemySystem {
   }
 
   computeVariantWaveBonus(wave) {
-    const config = CONSTANTS.ASTEROID_VARIANT_CHANCES?.waveBonus;
+    const config = ASTEROID_VARIANT_CHANCES?.waveBonus;
     if (!config) return 0;
 
     const startWave = config.startWave ?? Infinity;
@@ -3112,8 +3132,8 @@ class EnemySystem {
   isVolatileVariant(asteroid) {
     if (!asteroid) return false;
     const variant =
-      CONSTANTS.ASTEROID_VARIANTS?.[asteroid.variant] ||
-      CONSTANTS.ASTEROID_VARIANTS?.common;
+      ASTEROID_VARIANTS?.[asteroid.variant] ||
+      ASTEROID_VARIANTS?.common;
     return variant?.behavior?.type === 'volatile';
   }
 
@@ -3121,8 +3141,8 @@ class EnemySystem {
     if (!asteroid) return;
 
     const variant =
-      CONSTANTS.ASTEROID_VARIANTS?.[asteroid.variant] ||
-      CONSTANTS.ASTEROID_VARIANTS?.common;
+      ASTEROID_VARIANTS?.[asteroid.variant] ||
+      ASTEROID_VARIANTS?.common;
     const explosion = variant?.behavior?.explosion;
 
     if (!explosion) {
@@ -3519,7 +3539,7 @@ class EnemySystem {
       y: safeNumber(asteroid.y),
       vx: safeNumber(asteroid.vx),
       vy: safeNumber(asteroid.vy),
-      radius: safeNumber(asteroid.radius, CONSTANTS.ASTEROID_SIZES?.[asteroid.size] || 0),
+      radius: safeNumber(asteroid.radius, ASTEROID_SIZES?.[asteroid.size] || 0),
       rotation: safeNumber(asteroid.rotation),
       rotationSpeed: safeNumber(asteroid.rotationSpeed),
       health: safeNumber(asteroid.health),
@@ -3768,7 +3788,7 @@ class EnemySystem {
 
     const waveManagerActive =
       this.useManagers &&
-      Boolean(CONSTANTS?.USE_WAVE_MANAGER) &&
+      Boolean(USE_WAVE_MANAGER) &&
       this.waveManager;
 
     if (waveManagerActive) {
@@ -3837,13 +3857,13 @@ class EnemySystem {
     if (!wave.isActive) return;
 
     wave.isActive = false;
-    wave.breakTimer = CONSTANTS.WAVE_BREAK_TIME;
+    wave.breakTimer = WAVE_BREAK_TIME;
     wave.completedWaves += 1;
     wave.spawnTimer = 0;
     wave.initialSpawnDone = false;
 
     const waveManagerActive =
-      this.useManagers && Boolean(CONSTANTS?.USE_WAVE_MANAGER) && this.waveManager;
+      this.useManagers && Boolean(USE_WAVE_MANAGER) && this.waveManager;
 
     if (!waveManagerActive) {
       this.grantWaveRewards();
@@ -3874,7 +3894,7 @@ class EnemySystem {
     if (!this.waveState) return;
 
     const waveManagerActive =
-      this.useManagers && Boolean(CONSTANTS?.USE_WAVE_MANAGER) && this.waveManager;
+      this.useManagers && Boolean(USE_WAVE_MANAGER) && this.waveManager;
 
     let waveStarted = false;
 
@@ -3912,13 +3932,13 @@ class EnemySystem {
     if (!waveManagerActive) {
       wave.current += 1;
       wave.totalAsteroids = Math.floor(
-        CONSTANTS.ASTEROIDS_PER_WAVE_BASE *
-          Math.pow(CONSTANTS.ASTEROIDS_PER_WAVE_MULTIPLIER, wave.current - 1)
+        ASTEROIDS_PER_WAVE_BASE *
+          Math.pow(ASTEROIDS_PER_WAVE_MULTIPLIER, wave.current - 1)
       );
       wave.totalAsteroids = Math.min(wave.totalAsteroids, 25);
       wave.asteroidsSpawned = 0;
       wave.asteroidsKilled = 0;
-      wave.timeRemaining = CONSTANTS.WAVE_DURATION;
+      wave.timeRemaining = WAVE_DURATION;
       wave.spawnTimer = 1.0;
       wave.spawnDelay = Math.max(0.8, 2.0 - wave.current * 0.1);
       wave.initialSpawnDone = false;
@@ -4523,11 +4543,11 @@ class EnemySystem {
     const radius =
       typeof data.radius === 'number'
         ? data.radius
-        : CONSTANTS.SHIELD_SHOCKWAVE_RADIUS;
+        : SHIELD_SHOCKWAVE_RADIUS;
     const force =
       typeof data.force === 'number'
         ? data.force
-        : CONSTANTS.SHIELD_SHOCKWAVE_FORCE;
+        : SHIELD_SHOCKWAVE_FORCE;
 
     const radiusSq = radius * radius;
     const originX = data.position.x;

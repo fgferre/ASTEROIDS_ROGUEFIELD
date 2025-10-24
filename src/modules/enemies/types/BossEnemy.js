@@ -1,9 +1,10 @@
-import * as CONSTANTS from '../../../core/GameConstants.js';
+import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
+import { BOSS_CONFIG } from '../../../data/constants/visual.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 
-const SOURCE_CONFIG = CONSTANTS?.BOSS_CONFIG || {};
+const SOURCE_CONFIG = BOSS_CONFIG || {};
 
 const BASE_CONFIG = {
   key: 'boss',
@@ -454,11 +455,11 @@ export class BossEnemy extends BaseEnemy {
       }
 
       const fallbackPosition = {
-        x: Number.isFinite(CONSTANTS.GAME_WIDTH)
-          ? CONSTANTS.GAME_WIDTH / 2
+        x: Number.isFinite(GAME_WIDTH)
+          ? GAME_WIDTH / 2
           : 0,
-        y: Number.isFinite(CONSTANTS.GAME_HEIGHT)
-          ? CONSTANTS.GAME_HEIGHT / 2
+        y: Number.isFinite(GAME_HEIGHT)
+          ? GAME_HEIGHT / 2
           : 0,
       };
 

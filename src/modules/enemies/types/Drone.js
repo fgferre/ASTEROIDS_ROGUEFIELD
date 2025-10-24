@@ -2,9 +2,8 @@ import {
   ENEMY_EFFECT_COLORS,
   ENEMY_RENDER_PRESETS,
   ENEMY_TYPES,
-  GAME_WIDTH,
-  GAME_HEIGHT,
-} from '../../../core/GameConstants.js';
+} from '../../../data/constants/visual.js';
+import { GAME_WIDTH, GAME_HEIGHT } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';

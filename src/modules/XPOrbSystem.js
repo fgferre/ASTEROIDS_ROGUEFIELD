@@ -1,4 +1,27 @@
-import * as CONSTANTS from '../core/GameConstants.js';
+import { SHIP_SIZE, XP_ORB_SIZE } from '../core/GameConstants.js';
+import {
+  MAGNETISM_RADIUS,
+  MAGNETISM_FORCE,
+  ENHANCED_SHIP_MAGNETISM_FORCE,
+  ORB_MAGNETISM_RADIUS,
+  ORB_MAGNETISM_FORCE,
+  MIN_ORB_DISTANCE,
+  CLUSTER_FUSION_COUNT,
+  XP_ORB_MAX_PER_CLASS,
+  XP_ORB_BASE_VALUE,
+  XP_ORB_MAGNETISM_BOOST,
+  XP_ORB_COLLECTION_RADIUS_PADDING,
+  XP_ORB_FUSION_CHECK_INTERVAL,
+  XP_ORB_FUSION_ANIMATION_DURATION,
+  XP_ORB_CLUSTER_CONFIG,
+} from '../data/constants/gameplay.js';
+import {
+  ASTEROID_XP_BASE,
+  ASTEROID_VARIANTS,
+  ASTEROID_BASE_ORBS,
+  ASTEROID_SIZE_ORB_FACTOR,
+  ORB_VALUE,
+} from '../data/enemies/asteroid-configs.js';
 import { GamePools } from '../core/GamePools.js';
 import RandomService from '../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
@@ -103,35 +126,35 @@ class XPOrbSystem {
     this.orbClasses = [...ORB_CLASS_SEQUENCE];
     this.xpOrbs = [];
     this.xpOrbPools = this.createEmptyOrbPools();
-    this.maxOrbsPerClass = Number.isFinite(CONSTANTS.XP_ORB_MAX_PER_CLASS)
-      ? CONSTANTS.XP_ORB_MAX_PER_CLASS
+    this.maxOrbsPerClass = Number.isFinite(XP_ORB_MAX_PER_CLASS)
+      ? XP_ORB_MAX_PER_CLASS
       : 100;
-    this.baseOrbValue = Number.isFinite(CONSTANTS.XP_ORB_BASE_VALUE)
-      ? CONSTANTS.XP_ORB_BASE_VALUE
+    this.baseOrbValue = Number.isFinite(XP_ORB_BASE_VALUE)
+      ? XP_ORB_BASE_VALUE
       : 5;
 
-    this.orbMagnetismRadius = CONSTANTS.MAGNETISM_RADIUS;
+    this.orbMagnetismRadius = MAGNETISM_RADIUS;
     this.magnetismForce =
-      CONSTANTS.ENHANCED_SHIP_MAGNETISM_FORCE || CONSTANTS.MAGNETISM_FORCE;
-    this.magnetismBoost = Number.isFinite(CONSTANTS.XP_ORB_MAGNETISM_BOOST)
-      ? CONSTANTS.XP_ORB_MAGNETISM_BOOST
+      ENHANCED_SHIP_MAGNETISM_FORCE || MAGNETISM_FORCE;
+    this.magnetismBoost = Number.isFinite(XP_ORB_MAGNETISM_BOOST)
+      ? XP_ORB_MAGNETISM_BOOST
       : 2.2;
-    this.minOrbDistance = CONSTANTS.MIN_ORB_DISTANCE;
-    this.clusterFusionCount = CONSTANTS.CLUSTER_FUSION_COUNT;
+    this.minOrbDistance = MIN_ORB_DISTANCE;
+    this.clusterFusionCount = CLUSTER_FUSION_COUNT;
     this.clusterConfig =
-      typeof CONSTANTS.XP_ORB_CLUSTER_CONFIG === 'object'
-        ? CONSTANTS.XP_ORB_CLUSTER_CONFIG
+      typeof XP_ORB_CLUSTER_CONFIG === 'object'
+        ? XP_ORB_CLUSTER_CONFIG
         : {};
     this.collectionRadiusPadding = Number.isFinite(
-      CONSTANTS.XP_ORB_COLLECTION_RADIUS_PADDING
+      XP_ORB_COLLECTION_RADIUS_PADDING
     )
-      ? CONSTANTS.XP_ORB_COLLECTION_RADIUS_PADDING
+      ? XP_ORB_COLLECTION_RADIUS_PADDING
       : 0.1;
 
     this.fusionCheckInterval =
-      Number.isFinite(CONSTANTS.XP_ORB_FUSION_CHECK_INTERVAL) &&
-      CONSTANTS.XP_ORB_FUSION_CHECK_INTERVAL > 0
-        ? CONSTANTS.XP_ORB_FUSION_CHECK_INTERVAL
+      Number.isFinite(XP_ORB_FUSION_CHECK_INTERVAL) &&
+      XP_ORB_FUSION_CHECK_INTERVAL > 0
+        ? XP_ORB_FUSION_CHECK_INTERVAL
         : 0.3;
     this.fusionCheckTimer = 0;
     this.activeFusionAnimations = [];
@@ -141,9 +164,9 @@ class XPOrbSystem {
     this.fusionDetectionRadius = 0;
     this.fusionDetectionRadiusSq = 0;
     this.fusionAnimationDuration =
-      Number.isFinite(CONSTANTS.XP_ORB_FUSION_ANIMATION_DURATION) &&
-      CONSTANTS.XP_ORB_FUSION_ANIMATION_DURATION > 0
-        ? CONSTANTS.XP_ORB_FUSION_ANIMATION_DURATION
+      Number.isFinite(XP_ORB_FUSION_ANIMATION_DURATION) &&
+      XP_ORB_FUSION_ANIMATION_DURATION > 0
+        ? XP_ORB_FUSION_ANIMATION_DURATION
         : 0.82;
 
     this.spatialIndex = new Map();
@@ -650,8 +673,8 @@ class XPOrbSystem {
   }
 
   configureOrbClustering() {
-    const baseRadius = CONSTANTS.ORB_MAGNETISM_RADIUS || 35;
-    const baseForce = CONSTANTS.ORB_MAGNETISM_FORCE || 150;
+    const baseRadius = ORB_MAGNETISM_RADIUS || 35;
+    const baseForce = ORB_MAGNETISM_FORCE || 150;
 
     const radiusMultiplier = Number.isFinite(this.clusterConfig.radiusMultiplier)
       ? this.clusterConfig.radiusMultiplier
@@ -688,9 +711,9 @@ class XPOrbSystem {
     this.fusionDetectionRadiusSq =
       this.fusionDetectionRadius * this.fusionDetectionRadius;
     const baseDuration =
-      Number.isFinite(CONSTANTS.XP_ORB_FUSION_ANIMATION_DURATION) &&
-      CONSTANTS.XP_ORB_FUSION_ANIMATION_DURATION > 0
-        ? CONSTANTS.XP_ORB_FUSION_ANIMATION_DURATION
+      Number.isFinite(XP_ORB_FUSION_ANIMATION_DURATION) &&
+      XP_ORB_FUSION_ANIMATION_DURATION > 0
+        ? XP_ORB_FUSION_ANIMATION_DURATION
         : this.fusionAnimationDuration;
     this.fusionAnimationDuration = baseDuration;
     this.invalidateSpatialIndex();
@@ -1099,8 +1122,8 @@ class XPOrbSystem {
 
     const magnetismRadiusSq = magnetismRadius * magnetismRadius;
     const collectionRadius =
-      CONSTANTS.SHIP_SIZE +
-      CONSTANTS.XP_ORB_SIZE +
+      SHIP_SIZE +
+      XP_ORB_SIZE +
       this.minOrbDistance * this.collectionRadiusPadding;
     const collectionRadiusSq = collectionRadius * collectionRadius;
 
@@ -1807,7 +1830,7 @@ class XPOrbSystem {
     }
 
     const config = this.getOrbConfig(className);
-    const baseRadius = CONSTANTS.XP_ORB_SIZE * (1 + (tier - 1) * 0.2);
+    const baseRadius = XP_ORB_SIZE * (1 + (tier - 1) * 0.2);
     const glowRadius = baseRadius * 2.1;
     const highlightRadius = baseRadius * 0.35;
 
@@ -1899,7 +1922,7 @@ class XPOrbSystem {
   }
 
   getBaseXPValue(size, wave = 1) {
-    const baseLookup = CONSTANTS.ASTEROID_XP_BASE || {
+    const baseLookup = ASTEROID_XP_BASE || {
       large: 15,
       medium: 8,
       small: 5,
@@ -1923,7 +1946,7 @@ class XPOrbSystem {
   }
 
   getVariantConfig(variantKey = 'common') {
-    const variants = CONSTANTS.ASTEROID_VARIANTS || {};
+    const variants = ASTEROID_VARIANTS || {};
     return variants[variantKey] || variants.common || null;
   }
 
@@ -1942,9 +1965,9 @@ class XPOrbSystem {
 
     // === NEW ORB-BASED SYSTEM ===
     // Calculate number of orbs based on: BASE × SIZE × VARIANT × WAVE
-    const orbValue = CONSTANTS.ORB_VALUE || 5;  // Fixed 5 XP per orb
-    const baseOrbs = CONSTANTS.ASTEROID_BASE_ORBS?.[size] ?? 1;
-    const sizeFactor = CONSTANTS.ASTEROID_SIZE_ORB_FACTOR?.[size] ?? 1.0;
+    const orbValue = ORB_VALUE || 5;  // Fixed 5 XP per orb
+    const baseOrbs = ASTEROID_BASE_ORBS?.[size] ?? 1;
+    const sizeFactor = ASTEROID_SIZE_ORB_FACTOR?.[size] ?? 1.0;
 
     const variantConfig = this.getVariantConfig(variantKey);
     const orbMultiplier = variantConfig?.orbMultiplier ?? 1.0;
@@ -2011,11 +2034,11 @@ class XPOrbSystem {
     this.spatialIndexDirty = true;
     this.visualCache.clear();
 
-    this.orbMagnetismRadius = CONSTANTS.MAGNETISM_RADIUS;
+    this.orbMagnetismRadius = MAGNETISM_RADIUS;
     this.magnetismForce =
-      CONSTANTS.ENHANCED_SHIP_MAGNETISM_FORCE || CONSTANTS.MAGNETISM_FORCE;
-    this.minOrbDistance = CONSTANTS.MIN_ORB_DISTANCE;
-    this.clusterFusionCount = CONSTANTS.CLUSTER_FUSION_COUNT;
+      ENHANCED_SHIP_MAGNETISM_FORCE || MAGNETISM_FORCE;
+    this.minOrbDistance = MIN_ORB_DISTANCE;
+    this.clusterFusionCount = CLUSTER_FUSION_COUNT;
     this.configureOrbClustering();
 
     this.resolveCachedServices({ force: true });

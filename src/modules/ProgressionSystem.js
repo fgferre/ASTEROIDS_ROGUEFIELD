@@ -1,7 +1,17 @@
-import * as CONSTANTS from '../core/GameConstants.js';
+import {
+  PROGRESSION_INITIAL_LEVEL,
+  PROGRESSION_INITIAL_XP_REQUIREMENT,
+  PROGRESSION_COMBO_TIMEOUT,
+  PROGRESSION_COMBO_MULTIPLIER_STEP,
+  PROGRESSION_COMBO_MULTIPLIER_CAP,
+  PROGRESSION_LEVEL_SCALING,
+  PROGRESSION_UPGRADE_ROLL_COUNT,
+  PROGRESSION_UPGRADE_FALLBACK_COUNT,
+} from '../core/GameConstants.js';
 import UPGRADE_LIBRARY, { UPGRADE_CATEGORIES } from '../data/upgrades.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 import RandomService from '../core/RandomService.js';
+import { MAGNETISM_FORCE, MAGNETISM_RADIUS } from '../data/constants/gameplay.js';
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
 
@@ -23,15 +33,15 @@ class ProgressionSystem {
     this._fallbackRandomFork = null;
     this._fallbackRandomForkSeed = null;
     // === DADOS DE PROGRESSÃO ===
-    const initialLevel = Number.isFinite(CONSTANTS.PROGRESSION_INITIAL_LEVEL)
-      ? CONSTANTS.PROGRESSION_INITIAL_LEVEL
+    const initialLevel = Number.isFinite(PROGRESSION_INITIAL_LEVEL)
+      ? PROGRESSION_INITIAL_LEVEL
       : 1;
     this.level = Math.max(1, initialLevel);
     this.experience = 0;
     const initialRequirement = Number.isFinite(
-      CONSTANTS.PROGRESSION_INITIAL_XP_REQUIREMENT
+      PROGRESSION_INITIAL_XP_REQUIREMENT
     )
-      ? CONSTANTS.PROGRESSION_INITIAL_XP_REQUIREMENT
+      ? PROGRESSION_INITIAL_XP_REQUIREMENT
       : 100;
     this.experienceToNext = Math.max(1, Math.floor(initialRequirement));
     this.totalExperience = 0;
@@ -44,14 +54,14 @@ class ProgressionSystem {
     this.defaultUpgradeCategory = { ...DEFAULT_UPGRADE_CATEGORY };
     this.pendingUpgradeOptions = [];
 
-    const comboTimeout = Number.isFinite(CONSTANTS.PROGRESSION_COMBO_TIMEOUT)
-      ? Math.max(0, Number(CONSTANTS.PROGRESSION_COMBO_TIMEOUT))
+    const comboTimeout = Number.isFinite(PROGRESSION_COMBO_TIMEOUT)
+      ? Math.max(0, Number(PROGRESSION_COMBO_TIMEOUT))
       : 3;
-    const comboStep = Number.isFinite(CONSTANTS.PROGRESSION_COMBO_MULTIPLIER_STEP)
-      ? Math.max(0, Number(CONSTANTS.PROGRESSION_COMBO_MULTIPLIER_STEP))
+    const comboStep = Number.isFinite(PROGRESSION_COMBO_MULTIPLIER_STEP)
+      ? Math.max(0, Number(PROGRESSION_COMBO_MULTIPLIER_STEP))
       : 0.1;
-    const comboCap = Number.isFinite(CONSTANTS.PROGRESSION_COMBO_MULTIPLIER_CAP)
-      ? Math.max(1, Number(CONSTANTS.PROGRESSION_COMBO_MULTIPLIER_CAP))
+    const comboCap = Number.isFinite(PROGRESSION_COMBO_MULTIPLIER_CAP)
+      ? Math.max(1, Number(PROGRESSION_COMBO_MULTIPLIER_CAP))
       : 2;
 
     this.defaultComboTimeout = comboTimeout;
@@ -76,8 +86,8 @@ class ProgressionSystem {
 
     // === CONFIGURAÇÕES ===
 
-    const levelScaling = Number.isFinite(CONSTANTS.PROGRESSION_LEVEL_SCALING)
-      ? CONSTANTS.PROGRESSION_LEVEL_SCALING
+    const levelScaling = Number.isFinite(PROGRESSION_LEVEL_SCALING)
+      ? PROGRESSION_LEVEL_SCALING
       : 1;
     this.levelScaling = Math.max(1, levelScaling);
 
@@ -431,7 +441,7 @@ class ProgressionSystem {
     );
 
     const upgradeContext = this.prepareUpgradeOptions(
-      CONSTANTS.PROGRESSION_UPGRADE_ROLL_COUNT
+      PROGRESSION_UPGRADE_ROLL_COUNT
     );
 
     return {
@@ -466,15 +476,15 @@ class ProgressionSystem {
   }
 
   // === SISTEMA DE UPGRADES ===
-  prepareUpgradeOptions(count = CONSTANTS.PROGRESSION_UPGRADE_ROLL_COUNT) {
+  prepareUpgradeOptions(count = PROGRESSION_UPGRADE_ROLL_COUNT) {
     const eligible = asArray(this.upgradeDefinitions).filter((definition) =>
       this.isUpgradeSelectable(definition)
     );
 
     const fallbackCount = Number.isFinite(
-      CONSTANTS.PROGRESSION_UPGRADE_FALLBACK_COUNT
+      PROGRESSION_UPGRADE_FALLBACK_COUNT
     )
-      ? Math.max(1, Math.floor(CONSTANTS.PROGRESSION_UPGRADE_FALLBACK_COUNT))
+      ? Math.max(1, Math.floor(PROGRESSION_UPGRADE_FALLBACK_COUNT))
       : 3;
     const numericCount = Number(count);
     const requested = Number.isFinite(numericCount)
@@ -1215,7 +1225,7 @@ class ProgressionSystem {
       const current =
         typeof xpSystem.getMagnetismRadius === 'function'
           ? xpSystem.getMagnetismRadius()
-          : xpSystem.orbMagnetismRadius || CONSTANTS.MAGNETISM_RADIUS;
+          : xpSystem.orbMagnetismRadius || MAGNETISM_RADIUS;
       const nextRadius = applyNumericOperation(current, value);
       if (typeof xpSystem.setMagnetismRadius === 'function') {
         xpSystem.setMagnetismRadius(nextRadius);
@@ -1227,7 +1237,7 @@ class ProgressionSystem {
       const current =
         typeof xpSystem.getMagnetismForce === 'function'
           ? xpSystem.getMagnetismForce()
-          : xpSystem.magnetismForce || CONSTANTS.MAGNETISM_FORCE;
+          : xpSystem.magnetismForce || MAGNETISM_FORCE;
       const nextForce = applyNumericOperation(current, value);
       if (typeof xpSystem.setMagnetismForce === 'function') {
         xpSystem.setMagnetismForce(nextForce);

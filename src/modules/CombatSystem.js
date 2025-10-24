@@ -1,9 +1,32 @@
 // src/modules/CombatSystem.js
-import * as CONSTANTS from '../core/GameConstants.js';
+import {
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  SHIP_SIZE,
+  TRAIL_LENGTH,
+  BULLET_SIZE,
+} from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 import { drawEnemyProjectile } from '../utils/drawEnemyProjectile.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
+import {
+  COMBAT_SHOOT_COOLDOWN,
+  COMBAT_TARGETING_RANGE,
+  TARGET_UPDATE_INTERVAL,
+  BULLET_SPEED,
+  COMBAT_BULLET_LIFETIME,
+  COMBAT_PREDICTION_TIME,
+  COMBAT_AIMING_UPGRADE_CONFIG,
+  COMBAT_MULTISHOT_SPREAD_STEP,
+} from '../data/constants/gameplay.js';
+import { ENEMY_TYPES, BOSS_CONFIG } from '../data/constants/visual.js';
+import {
+  ASTEROID_VARIANTS,
+  ASTEROID_BASE_ORBS,
+  ASTEROID_SIZE_ORB_FACTOR,
+  ORB_VALUE,
+} from '../data/enemies/asteroid-configs.js';
 
 class CombatSystem {
   constructor(dependencies = {}) {
@@ -17,37 +40,37 @@ class CombatSystem {
     this.targetUpdateTimer = 0;
     this.lastShotTime = 0;
     this.shootCooldown =
-      Number.isFinite(CONSTANTS.COMBAT_SHOOT_COOLDOWN)
-        ? Math.max(0, CONSTANTS.COMBAT_SHOOT_COOLDOWN)
+      Number.isFinite(COMBAT_SHOOT_COOLDOWN)
+        ? Math.max(0, COMBAT_SHOOT_COOLDOWN)
         : 0.3;
 
     // === CONFIGURAÇÕES ===
     this.targetingRange =
-      Number.isFinite(CONSTANTS.COMBAT_TARGETING_RANGE)
-        ? Math.max(0, CONSTANTS.COMBAT_TARGETING_RANGE)
+      Number.isFinite(COMBAT_TARGETING_RANGE)
+        ? Math.max(0, COMBAT_TARGETING_RANGE)
         : 400;
     this.baseTargetUpdateInterval = Number.isFinite(
-      CONSTANTS.TARGET_UPDATE_INTERVAL
+      TARGET_UPDATE_INTERVAL
     )
-      ? Math.max(0.05, CONSTANTS.TARGET_UPDATE_INTERVAL)
+      ? Math.max(0.05, TARGET_UPDATE_INTERVAL)
       : 0.15;
     this.targetUpdateInterval = this.baseTargetUpdateInterval;
-    this.bulletSpeed = CONSTANTS.BULLET_SPEED;
+    this.bulletSpeed = BULLET_SPEED;
     this.bulletLifetime =
-      Number.isFinite(CONSTANTS.COMBAT_BULLET_LIFETIME)
-        ? Math.max(0, CONSTANTS.COMBAT_BULLET_LIFETIME)
+      Number.isFinite(COMBAT_BULLET_LIFETIME)
+        ? Math.max(0, COMBAT_BULLET_LIFETIME)
         : 1.8;
-    this.trailLength = CONSTANTS.TRAIL_LENGTH;
+    this.trailLength = TRAIL_LENGTH;
     this.enemyProjectileTrailLength = 10;
     this.bossProjectileTrailLength = 18;
     this.baseShootCooldown = this.shootCooldown;
     this.linearPredictionTime =
-      Number.isFinite(CONSTANTS.COMBAT_PREDICTION_TIME)
-        ? Math.max(0, CONSTANTS.COMBAT_PREDICTION_TIME)
+      Number.isFinite(COMBAT_PREDICTION_TIME)
+        ? Math.max(0, COMBAT_PREDICTION_TIME)
         : 0.5;
 
     // === CONFIGURAÇÕES DE MIRA AVANÇADA ===
-    this.aimingConfig = CONSTANTS.COMBAT_AIMING_UPGRADE_CONFIG || {};
+    this.aimingConfig = COMBAT_AIMING_UPGRADE_CONFIG || {};
     this.defaultDangerWeights = this.sanitizeDangerWeights(
       this.aimingConfig?.dangerWeights || {}
     );
@@ -298,7 +321,7 @@ class CombatSystem {
         ? player.getShieldRadius()
         : typeof player.getHullBoundingRadius === 'function'
         ? player.getHullBoundingRadius()
-        : CONSTANTS.SHIP_SIZE || 24;
+        : SHIP_SIZE || 24;
 
     const enemies = this.cachedEnemies;
     if (!enemies) {
@@ -635,8 +658,8 @@ class CombatSystem {
   }
 
   applyMultishotSpread(playerPos, targetPos, shotIndex, totalShots) {
-    const spreadStep = Number.isFinite(CONSTANTS.COMBAT_MULTISHOT_SPREAD_STEP)
-      ? CONSTANTS.COMBAT_MULTISHOT_SPREAD_STEP
+    const spreadStep = Number.isFinite(COMBAT_MULTISHOT_SPREAD_STEP)
+      ? COMBAT_MULTISHOT_SPREAD_STEP
       : 0.3;
     const spreadAngle = (shotIndex - (totalShots - 1) / 2) * spreadStep;
 
@@ -1481,7 +1504,7 @@ class CombatSystem {
       1,
       Number.isFinite(playerRadius)
         ? playerRadius
-        : CONSTANTS.SHIP_SIZE || 24
+        : SHIP_SIZE || 24
     );
     const distanceNormalization = Math.max(
       effectiveRadius * 2,
@@ -1557,8 +1580,8 @@ class CombatSystem {
     }
 
     const variantConfig =
-      CONSTANTS.ASTEROID_VARIANTS?.[variantKey] ||
-      CONSTANTS.ASTEROID_VARIANTS?.common ||
+      ASTEROID_VARIANTS?.[variantKey] ||
+      ASTEROID_VARIANTS?.common ||
       null;
     const behaviorType = variantConfig?.behavior?.type || 'default';
     const behaviorWeight = weights.behavior?.[behaviorType];
@@ -1572,14 +1595,14 @@ class CombatSystem {
 
   estimateRewardValue(enemy) {
     const size = enemy?.size || 'small';
-    const baseOrbs = CONSTANTS.ASTEROID_BASE_ORBS?.[size] ?? 1;
-    const sizeFactor = CONSTANTS.ASTEROID_SIZE_ORB_FACTOR?.[size] ?? 1;
+    const baseOrbs = ASTEROID_BASE_ORBS?.[size] ?? 1;
+    const sizeFactor = ASTEROID_SIZE_ORB_FACTOR?.[size] ?? 1;
     const variantConfig =
-      CONSTANTS.ASTEROID_VARIANTS?.[enemy?.variant] ||
-      CONSTANTS.ASTEROID_VARIANTS?.common ||
+      ASTEROID_VARIANTS?.[enemy?.variant] ||
+      ASTEROID_VARIANTS?.common ||
       null;
     const orbMultiplier = variantConfig?.orbMultiplier ?? 1;
-    const orbValue = CONSTANTS.ORB_VALUE ?? 5;
+    const orbValue = ORB_VALUE ?? 5;
 
     return baseOrbs * sizeFactor * orbMultiplier * orbValue;
   }
@@ -1805,7 +1828,7 @@ class CombatSystem {
     } else if (isBossProjectile) {
       bullet.radius = 6;
     } else if (!Number.isFinite(bullet.radius)) {
-      bullet.radius = CONSTANTS.BULLET_SIZE || 0;
+      bullet.radius = BULLET_SIZE || 0;
     }
 
     if (Array.isArray(bullet.trail)) {
@@ -1952,15 +1975,15 @@ class CombatSystem {
     }
 
     const enemyType = data.enemyType ?? data.source?.type ?? data.enemy?.type;
-    const bossProjectileDamage = Number.isFinite(CONSTANTS?.BOSS_CONFIG?.projectileDamage)
-      ? CONSTANTS.BOSS_CONFIG.projectileDamage
+    const bossProjectileDamage = Number.isFinite(BOSS_CONFIG?.projectileDamage)
+      ? BOSS_CONFIG.projectileDamage
       : 35;
 
     if (enemyType === 'boss') {
       return bossProjectileDamage;
     }
 
-    const enemyConfig = enemyType ? CONSTANTS.ENEMY_TYPES?.[enemyType] : null;
+    const enemyConfig = enemyType ? ENEMY_TYPES?.[enemyType] : null;
     if (enemyConfig && Number.isFinite(enemyConfig.projectileDamage)) {
       return enemyConfig.projectileDamage;
     }
@@ -1974,11 +1997,11 @@ class CombatSystem {
 
   resolveEnemyProjectileLifetime(speed) {
     if (Number.isFinite(speed) && speed > 0) {
-      const width = Number.isFinite(CONSTANTS.GAME_WIDTH)
-        ? CONSTANTS.GAME_WIDTH
+      const width = Number.isFinite(GAME_WIDTH)
+        ? GAME_WIDTH
         : 0;
-      const height = Number.isFinite(CONSTANTS.GAME_HEIGHT)
-        ? CONSTANTS.GAME_HEIGHT
+      const height = Number.isFinite(GAME_HEIGHT)
+        ? GAME_HEIGHT
         : 0;
       const diagonal = Math.sqrt(width * width + height * height);
 
@@ -1996,14 +2019,14 @@ class CombatSystem {
     }
 
     const physics = this.cachedPhysics;
-    const gameWidth = Number.isFinite(CONSTANTS.GAME_WIDTH)
-      ? CONSTANTS.GAME_WIDTH
+    const gameWidth = Number.isFinite(GAME_WIDTH)
+      ? GAME_WIDTH
       : Infinity;
-    const gameHeight = Number.isFinite(CONSTANTS.GAME_HEIGHT)
-      ? CONSTANTS.GAME_HEIGHT
+    const gameHeight = Number.isFinite(GAME_HEIGHT)
+      ? GAME_HEIGHT
       : Infinity;
-    const defaultBulletRadius = Number.isFinite(CONSTANTS.BULLET_SIZE)
-      ? CONSTANTS.BULLET_SIZE
+    const defaultBulletRadius = Number.isFinite(BULLET_SIZE)
+      ? BULLET_SIZE
       : 0;
 
     const playerAlive =
@@ -2079,7 +2102,7 @@ class CombatSystem {
             ? collisionContext.collisionRadius
             : typeof player.getHullBoundingRadius === 'function'
             ? player.getHullBoundingRadius()
-            : CONSTANTS.SHIP_SIZE || 0;
+            : SHIP_SIZE || 0;
 
           const bulletRadius = Number.isFinite(bullet.radius)
             ? bullet.radius
@@ -2239,9 +2262,9 @@ class CombatSystem {
       // Remover projéteis que saem da tela para evitar "ricochete"
       const outOfBounds =
         bullet.x < 0 ||
-        bullet.x > CONSTANTS.GAME_WIDTH ||
+        bullet.x > GAME_WIDTH ||
         bullet.y < 0 ||
-        bullet.y > CONSTANTS.GAME_HEIGHT;
+        bullet.y > GAME_HEIGHT;
 
       if (outOfBounds) {
         bullet.life = 0;
@@ -2294,7 +2317,7 @@ class CombatSystem {
         const dy = bullet.y - enemy.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
-        if (distance < CONSTANTS.BULLET_SIZE + enemy.radius) {
+        if (distance < BULLET_SIZE + enemy.radius) {
           this.processBulletHit(bullet, enemy, enemiesSystem);
         }
       });
@@ -2385,7 +2408,7 @@ class CombatSystem {
   }
 
   ensureBulletGlowCache() {
-    const glowRadius = (CONSTANTS.BULLET_SIZE || 0) * 3;
+    const glowRadius = (BULLET_SIZE || 0) * 3;
 
     if (!Number.isFinite(glowRadius) || glowRadius <= 0) {
       this.bulletGlowCache = null;
@@ -2497,7 +2520,7 @@ class CombatSystem {
           0,
           bullet.x,
           bullet.y,
-          CONSTANTS.BULLET_SIZE * 3
+          BULLET_SIZE * 3
         );
         gradient.addColorStop(0, '#FFFF00');
         gradient.addColorStop(0.5, 'rgba(255, 255, 0, 0.4)');
@@ -2505,13 +2528,13 @@ class CombatSystem {
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.arc(bullet.x, bullet.y, CONSTANTS.BULLET_SIZE * 3, 0, Math.PI * 2);
+        ctx.arc(bullet.x, bullet.y, BULLET_SIZE * 3, 0, Math.PI * 2);
         ctx.fill();
       }
 
       ctx.fillStyle = '#FFFFFF';
       ctx.beginPath();
-      ctx.arc(bullet.x, bullet.y, CONSTANTS.BULLET_SIZE, 0, Math.PI * 2);
+      ctx.arc(bullet.x, bullet.y, BULLET_SIZE, 0, Math.PI * 2);
       ctx.fill();
     });
 

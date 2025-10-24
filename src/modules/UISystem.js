@@ -7,7 +7,7 @@ import {
   getHudLayoutItems,
 } from '../data/ui/hudLayout.js';
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
-import * as CONSTANTS from '../core/GameConstants.js';
+import { WAVE_BOSS_INTERVAL } from '../data/constants/gameplay.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
@@ -1253,7 +1253,7 @@ class UISystem {
       timestamp: Date.now(),
     });
 
-    const bossInterval = Number(CONSTANTS.WAVE_BOSS_INTERVAL) || 0;
+    const bossInterval = Number(WAVE_BOSS_INTERVAL) || 0;
     const isBossWaveCompletion =
       Boolean(payload?.isBossWave) ||
       (bossInterval > 0 && normalizedWaveNumber !== null

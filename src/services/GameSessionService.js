@@ -1,6 +1,15 @@
 /* global gameServices */
 
-import * as CONSTANTS from '../core/GameConstants.js';
+import {
+  DEFAULT_SAFE_SPAWN_DISTANCE,
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  PLAYER_SAFE_SPAWN_DISTANCE,
+} from '../core/GameConstants.js';
+import {
+  USE_WAVE_MANAGER,
+  WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
+} from '../data/constants/gameplay.js';
 
 /**
  * GameSessionService orchestrates lifecycle state for a single game run.
@@ -568,7 +577,7 @@ export default class GameSessionService {
 
     const waveManagerActive =
       enemies.useManagers &&
-      Boolean(CONSTANTS?.USE_WAVE_MANAGER) &&
+      Boolean(USE_WAVE_MANAGER) &&
       enemies.waveManager;
 
     if (!waveManagerActive) {
@@ -598,7 +607,7 @@ export default class GameSessionService {
       return false;
     }
 
-    const managerHandlesAsteroids = Boolean(CONSTANTS?.WAVEMANAGER_HANDLES_ASTEROID_SPAWN);
+    const managerHandlesAsteroids = Boolean(WAVEMANAGER_HANDLES_ASTEROID_SPAWN);
     const waveState = enemies.waveState || null;
 
     if (
@@ -965,8 +974,8 @@ export default class GameSessionService {
             : player && player.position
               ? { ...player.position }
               : {
-                  x: CONSTANTS.GAME_WIDTH / 2,
-                  y: CONSTANTS.GAME_HEIGHT / 2
+                  x: GAME_WIDTH / 2,
+                  y: GAME_HEIGHT / 2
                 };
 
         if (effects && typeof effects.createEpicShipExplosion === 'function') {
@@ -1803,8 +1812,8 @@ export default class GameSessionService {
 
   findSafeSpawnPoint() {
     const fallback = {
-      x: CONSTANTS.GAME_WIDTH / 2,
-      y: CONSTANTS.GAME_HEIGHT / 2
+      x: GAME_WIDTH / 2,
+      y: GAME_HEIGHT / 2
     };
 
     const enemies = this.resolveServiceInstance('enemies');
@@ -1821,12 +1830,12 @@ export default class GameSessionService {
         ? enemies.getAsteroids()
         : [];
 
-    const width = Number.isFinite(canvas.width) ? canvas.width : CONSTANTS.GAME_WIDTH;
-    const height = Number.isFinite(canvas.height) ? canvas.height : CONSTANTS.GAME_HEIGHT;
+    const width = Number.isFinite(canvas.width) ? canvas.width : GAME_WIDTH;
+    const height = Number.isFinite(canvas.height) ? canvas.height : GAME_HEIGHT;
 
     const safeDistance =
-      CONSTANTS.PLAYER_SAFE_SPAWN_DISTANCE ??
-      CONSTANTS.DEFAULT_SAFE_SPAWN_DISTANCE ??
+      PLAYER_SAFE_SPAWN_DISTANCE ??
+      DEFAULT_SAFE_SPAWN_DISTANCE ??
       300;
 
     const center = { x: width / 2, y: height / 2 };

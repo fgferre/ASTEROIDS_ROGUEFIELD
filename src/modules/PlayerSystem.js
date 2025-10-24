@@ -1,7 +1,24 @@
 // src/modules/PlayerSystem.js
-import * as CONSTANTS from '../core/GameConstants.js';
+import {
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  SHIP_SIZE,
+} from '../core/GameConstants.js';
 import shipModels from '../data/shipModels.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import {
+  SHIP_ACCELERATION,
+  SHIP_ANGULAR_DAMPING,
+  SHIP_LINEAR_DAMPING,
+  SHIP_MAX_SPEED,
+  SHIP_ROTATION_SPEED,
+} from '../data/constants/physics.js';
+import {
+  MAGNETISM_RADIUS,
+  SHIELD_COOLDOWN_DURATION,
+  SHIELD_IMPACT_DAMAGE_BASE,
+  SHIELD_IMPACT_DAMAGE_PER_LEVEL,
+} from '../data/constants/gameplay.js';
 
 const DRIFT_SETTINGS = {
   rampSpeed: 2.8,
@@ -12,23 +29,23 @@ const DRIFT_SETTINGS = {
 const SHIELD_LEVEL_CONFIG = {
   1: {
     maxHP: 50,
-    cooldown: CONSTANTS.SHIELD_COOLDOWN_DURATION,
+    cooldown: SHIELD_COOLDOWN_DURATION,
   },
   2: {
     maxHP: 75,
-    cooldown: CONSTANTS.SHIELD_COOLDOWN_DURATION,
+    cooldown: SHIELD_COOLDOWN_DURATION,
   },
   3: {
     maxHP: 75,
-    cooldown: Math.max(5, CONSTANTS.SHIELD_COOLDOWN_DURATION - 5),
+    cooldown: Math.max(5, SHIELD_COOLDOWN_DURATION - 5),
   },
   4: {
     maxHP: 100,
-    cooldown: Math.max(5, CONSTANTS.SHIELD_COOLDOWN_DURATION - 5),
+    cooldown: Math.max(5, SHIELD_COOLDOWN_DURATION - 5),
   },
   5: {
     maxHP: 125,
-    cooldown: Math.max(4, CONSTANTS.SHIELD_COOLDOWN_DURATION - 7),
+    cooldown: Math.max(4, SHIELD_COOLDOWN_DURATION - 7),
   },
 };
 
@@ -67,10 +84,10 @@ class PlayerSystem {
     this.lastConsumedMovementCommand = null;
     const startX = Number.isFinite(position?.x)
       ? position.x
-      : CONSTANTS.GAME_WIDTH / 2;
+      : GAME_WIDTH / 2;
     const startY = Number.isFinite(position?.y)
       ? position.y
-      : CONSTANTS.GAME_HEIGHT / 2;
+      : GAME_HEIGHT / 2;
 
     // === APENAS MOVIMENTO E POSIÇÃO ===
     this.position = { x: startX, y: startY };
@@ -82,22 +99,22 @@ class PlayerSystem {
 
     // === CONFIGURAÇÕES DE MOVIMENTO ===
     // Usar constantes do arquivo separado
-    this.maxSpeed = CONSTANTS.SHIP_MAX_SPEED;
-    this.acceleration = CONSTANTS.SHIP_ACCELERATION;
-    this.rotationSpeed = CONSTANTS.SHIP_ROTATION_SPEED;
-    this.linearDamping = CONSTANTS.SHIP_LINEAR_DAMPING;
-    this.angularDamping = CONSTANTS.SHIP_ANGULAR_DAMPING;
+    this.maxSpeed = SHIP_MAX_SPEED;
+    this.acceleration = SHIP_ACCELERATION;
+    this.rotationSpeed = SHIP_ROTATION_SPEED;
+    this.linearDamping = SHIP_LINEAR_DAMPING;
+    this.angularDamping = SHIP_ANGULAR_DAMPING;
 
     // === STATS DO JOGADOR ===
     this.health = 100;
     this.maxHealth = 100;
     this.damage = 25;
     this.multishot = 1;
-    this.magnetismRadius = CONSTANTS.MAGNETISM_RADIUS;
+    this.magnetismRadius = MAGNETISM_RADIUS;
     this.currentHull = null;
     this._currentHullMetrics = {
       outline: [],
-      boundingRadius: CONSTANTS.SHIP_SIZE,
+      boundingRadius: SHIP_SIZE,
       shieldPadding: 0,
     };
     this.setHull(shipModels.defaultHull);
@@ -724,7 +741,7 @@ class PlayerSystem {
     // === EFEITOS DE THRUSTER ===
     // Emitir eventos para EffectsSystem
     if (thrMain > 0) {
-      const thrusterPos = this.getLocalToWorld(-CONSTANTS.SHIP_SIZE * 0.8, 0);
+      const thrusterPos = this.getLocalToWorld(-SHIP_SIZE * 0.8, 0);
       gameEvents.emit('thruster-effect', {
         position: thrusterPos,
         direction: { x: fwd.x, y: fwd.y },
@@ -735,7 +752,7 @@ class PlayerSystem {
     }
 
     if (thrAux > 0) {
-      const thrusterPos = this.getLocalToWorld(CONSTANTS.SHIP_SIZE * 0.8, 0);
+      const thrusterPos = this.getLocalToWorld(SHIP_SIZE * 0.8, 0);
       gameEvents.emit('thruster-effect', {
         position: thrusterPos,
         direction: { x: -fwd.x, y: -fwd.y },
@@ -747,7 +764,7 @@ class PlayerSystem {
 
     // Side thrusters
     if (thrSideL > 0) {
-      const thrusterPos = this.getLocalToWorld(0, -CONSTANTS.SHIP_SIZE * 0.52);
+      const thrusterPos = this.getLocalToWorld(0, -SHIP_SIZE * 0.52);
       const dir = this.getLocalDirection(0, 1);
       gameEvents.emit('thruster-effect', {
         position: thrusterPos,
@@ -759,7 +776,7 @@ class PlayerSystem {
     }
 
     if (thrSideR > 0) {
-      const thrusterPos = this.getLocalToWorld(0, CONSTANTS.SHIP_SIZE * 0.52);
+      const thrusterPos = this.getLocalToWorld(0, SHIP_SIZE * 0.52);
       const dir = this.getLocalDirection(0, -1);
       gameEvents.emit('thruster-effect', {
         position: thrusterPos,
@@ -777,10 +794,10 @@ class PlayerSystem {
     this.position.y += this.velocity.vy * deltaTime;
 
     // Screen wrapping
-    if (this.position.x < 0) this.position.x = CONSTANTS.GAME_WIDTH;
-    if (this.position.x > CONSTANTS.GAME_WIDTH) this.position.x = 0;
-    if (this.position.y < 0) this.position.y = CONSTANTS.GAME_HEIGHT;
-    if (this.position.y > CONSTANTS.GAME_HEIGHT) this.position.y = 0;
+    if (this.position.x < 0) this.position.x = GAME_WIDTH;
+    if (this.position.x > GAME_WIDTH) this.position.x = 0;
+    if (this.position.y < 0) this.position.y = GAME_HEIGHT;
+    if (this.position.y > GAME_HEIGHT) this.position.y = 0;
   }
 
   // === UTILITÁRIOS ===
@@ -788,7 +805,7 @@ class PlayerSystem {
     if (!hullDefinition) {
       return {
         outline: [],
-        boundingRadius: CONSTANTS.SHIP_SIZE,
+        boundingRadius: SHIP_SIZE,
         shieldPadding: 0,
       };
     }
@@ -809,7 +826,7 @@ class PlayerSystem {
     });
 
     if (boundingRadius <= 0) {
-      boundingRadius = CONSTANTS.SHIP_SIZE;
+      boundingRadius = SHIP_SIZE;
     }
 
     const shieldPadding =
@@ -891,7 +908,7 @@ class PlayerSystem {
       return this._currentHullMetrics.boundingRadius;
     }
 
-    return CONSTANTS.SHIP_SIZE;
+    return SHIP_SIZE;
   }
 
   getShieldPadding() {
@@ -916,8 +933,8 @@ class PlayerSystem {
 
     const level = this.shieldUpgradeLevel;
     const damage =
-      CONSTANTS.SHIELD_IMPACT_DAMAGE_BASE +
-      CONSTANTS.SHIELD_IMPACT_DAMAGE_PER_LEVEL * Math.max(0, level - 1);
+      SHIELD_IMPACT_DAMAGE_BASE +
+      SHIELD_IMPACT_DAMAGE_PER_LEVEL * Math.max(0, level - 1);
     const forceMultiplier = 1 + Math.max(0, level - 1) * 0.22;
 
     return { damage, forceMultiplier, level };
@@ -1079,7 +1096,7 @@ class PlayerSystem {
       this.currentHull = null;
       this._currentHullMetrics = {
         outline: [],
-        boundingRadius: CONSTANTS.SHIP_SIZE,
+        boundingRadius: SHIP_SIZE,
         shieldPadding: 0,
       };
       return false;
@@ -1114,12 +1131,12 @@ class PlayerSystem {
     this.maxHealth = 100;
     this.damage = 25;
     this.multishot = 1;
-    this.magnetismRadius = CONSTANTS.MAGNETISM_RADIUS;
-    this.maxSpeed = CONSTANTS.SHIP_MAX_SPEED;
-    this.acceleration = CONSTANTS.SHIP_ACCELERATION;
-    this.rotationSpeed = CONSTANTS.SHIP_ROTATION_SPEED;
-    this.linearDamping = CONSTANTS.SHIP_LINEAR_DAMPING;
-    this.angularDamping = CONSTANTS.SHIP_ANGULAR_DAMPING;
+    this.magnetismRadius = MAGNETISM_RADIUS;
+    this.maxSpeed = SHIP_MAX_SPEED;
+    this.acceleration = SHIP_ACCELERATION;
+    this.rotationSpeed = SHIP_ROTATION_SPEED;
+    this.linearDamping = SHIP_LINEAR_DAMPING;
+    this.angularDamping = SHIP_ANGULAR_DAMPING;
     this.invulnerableTimer = 0;
     this.driftFactor = 0;
 
@@ -1134,8 +1151,8 @@ class PlayerSystem {
   reset() {
     this.resetStats();
     this.position = {
-      x: CONSTANTS.GAME_WIDTH / 2,
-      y: CONSTANTS.GAME_HEIGHT / 2,
+      x: GAME_WIDTH / 2,
+      y: GAME_HEIGHT / 2,
     };
     this.velocity = { vx: 0, vy: 0 };
     this.angle = 0;

@@ -22,7 +22,7 @@
 - `/docs`: documentação, planos e checklists.
 
 ## 3. Hubs Críticos (segundo DEPENDENCY_GRAPH.md)
-- `src/core/GameConstants.js` — 1.771 linhas, 27 dependentes diretos.
+- `src/core/GameConstants.js` — agregador leve com 27 dependentes diretos (re-exporta constantes de `src/data/constants/` e `src/data/enemies/`).
 - `src/core/RandomService.js` — 23 dependentes diretos.
 - `src/bootstrap/bootstrapServices.js` — 1 dependente direto.
 - `src/core/EventBus.js` — utilizado em praticamente todos os sistemas.
@@ -33,6 +33,53 @@
 - **Resolução de Dependências:** Prefira injeção de dependências via construtor ou `resolveService()` fornecido pelo manifesto, mantendo `gameServices` apenas como fallback através do `ServiceLocatorAdapter`. Verifique `src/app.js` para ver como os serviços são instanciados.
 - **Randomização Determinística:** Utilize `RandomService` seedado pelo manifesto para gerar comportamentos reprodutíveis. Veja como `EnemySystem` consome o serviço para decisões de spawn controladas.
 - **Reuso de Recursos:** Reforce o uso de pools de entidades e objetos de apoio configurados no manifesto (veja `GamePools` em `src/bootstrap/serviceManifest.js`) e reutilizados por sistemas como o `EnemySystem`.
+
+### 3.6 Organização de Constantes
+
+As constantes do jogo foram organizadas por domínio funcional para facilitar manutenção e evolução:
+
+**`src/data/constants/physics.js`**
+- Física da nave (aceleração, velocidade, damping, massa)
+- Velocidades de asteroides por tamanho
+- Mecânica de rachaduras (thresholds, graph rules)
+
+**`src/data/constants/gameplay.js`**
+- Balas e colisão (velocidade, bounce)
+- Magnetismo (raios, forças, orbs)
+- Sistema de XP orbs (valores, fusão, clustering)
+- Sistema de escudo (hits, cooldown, shockwave)
+- Sistema de combate (cooldown, targeting, aiming upgrades)
+- Sistema de waves (progressão, boss intervals, feature flags)
+
+**`src/data/constants/visual.js`**
+- Tipos de inimigos (drone, mine, hunter) com stats completos
+- Recompensas de inimigos (orbs, XP, health hearts)
+- Paletas de cores de efeitos (body, highlights, glows, explosions)
+- Presets de renderização (hull, fins, turrets, shading)
+- Configuração de boss (stats, ataques, fases)
+- Física de boss (knockback, damage, shakes)
+- Presets de efeitos de boss (entrance, phase change, defeat)
+
+**`src/data/enemies/asteroid-configs.js`**
+- Perfis de rachaduras (default, denseCore, volatile, parasite, crystal)
+- Lookup de camadas de rachaduras
+- Regras de fragmentação por perfil
+- Sistema de valores de orbs
+- Variantes de asteroides (common, iron, denseCore, gold, volatile, parasite, crystal)
+- Chances de spawn de variantes por tamanho e wave
+
+**`src/core/GameConstants.js`** (agregador)
+- Mantém constantes core (dimensões, progressão, audio)
+- Re-exporta todas as constantes dos arquivos focados
+- Garante compatibilidade retroativa com imports existentes
+
+**Benefícios:**
+- Arquivos menores e mais focados (GameConstants reduzido de 1.771 para ~350 linhas)
+- Separação clara de responsabilidades por domínio
+- Facilita localização de constantes relacionadas
+- Prepara terreno para sistemas data-driven (REFACTOR-003+)
+- Mantém compatibilidade total com código existente via re-exports
+
 
 ## 4. Sistemas Principais
 - **EnemySystem.js** (4.593 linhas)
@@ -53,6 +100,7 @@
   - XP, combo, level-up, aplicação de upgrades lendo `data/upgrades.js`.
 
 ## 5. Padrões de Inimigos
+**Nota:** As configurações de asteroides agora residem em `src/data/enemies/asteroid-configs.js`. Para adicionar novos inimigos, consulte este arquivo como referência de estrutura de dados.
 - **BaseEnemy**
   - Template method: `initialize`, `onUpdate`, `onDraw`, `takeDamage`, `onDestroyed`.
   - Suporte a componentes (`this.components`) e tags.
@@ -72,21 +120,21 @@
 - Game loop: update → render, com sistemas consumindo `RandomService`, `EventBus`, pools.
 
 ## 7. Dados e Configurações
-- `src/core/GameConstants.js` (1.771 linhas)
-  - Mistura dimensões, física, presets de asteroides, inimigos, bosses, waves, áudio.
-  - Contém perfis de fissuras, regras de fragmentação, variantes.
+- `src/core/GameConstants.js` (agora re-exportador enxuto; dados residem em `src/data/constants/` e `src/data/enemies/`)
+  - Mantém dimensões, progressão e presets de áudio; re-exporta dados especializados de `src/data/constants/` e `src/data/enemies/`.
+  - Detalhes de fissuras, variantes e presets vivem nos arquivos especializados listados acima.
 - `src/data/upgrades.js` (939 linhas)
   - `UPGRADE_CATEGORIES` e `UPGRADE_LIBRARY` com múltiplos upgrades (50–150 linhas cada).
 - `src/data/shipModels.js`, `src/data/settingsSchema.js`: dados auxiliares.
 
 ## 8. Pontos de Complexidade
-- `EnemySystem.js`, `WaveManager.js`, `Asteroid.js`, `PhysicsSystem.js`, `GameConstants.js`, `upgrades.js`.
+- `EnemySystem.js`, `WaveManager.js`, `Asteroid.js`, `PhysicsSystem.js`, `src/data/constants/`, `src/data/enemies/`, `upgrades.js`.
 - Arquivos longos com múltiplas responsabilidades e lógica procedural complexa.
 
 ## 9. Inconsistências Arquiteturais
 - Asteroid utiliza componentes; demais inimigos não.
 - Componentes existentes são específicos, não reutilizáveis.
-- Dados misturados com lógica (especialmente em `GameConstants.js`).
+- Dados historicamente misturados com lógica (migração em andamento para `src/data/constants/` e `src/data/enemies/`).
 - Falta separação clara entre engine, gameplay e dados.
 
 ## 10. Pontos Fortes
@@ -103,4 +151,4 @@
 - `src/bootstrap/serviceManifest.js`
 - `docs/plans/architecture-master-plan.md`
 - `agents.md`
-- Arquivos destacados ao longo deste documento (`EnemySystem.js`, `WaveManager.js`, `Asteroid.js`, `GameConstants.js`, `upgrades.js`).
+- Arquivos destacados ao longo deste documento (`EnemySystem.js`, `WaveManager.js`, `Asteroid.js`, `src/data/constants/`, `src/data/enemies/`, `upgrades.js`).

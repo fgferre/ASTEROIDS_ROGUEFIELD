@@ -18,7 +18,7 @@
  * ```
  */
 
-import * as CONSTANTS from '../../../core/GameConstants.js';
+import { GAME_HEIGHT, GAME_WIDTH, SHIP_SIZE } from '../../../core/GameConstants.js';
 
 export class AsteroidMovement {
   constructor() {
@@ -168,8 +168,8 @@ export class AsteroidMovement {
    */
   wrapScreenEdges(asteroid, bounds) {
     // Use provided bounds or fallback to CONSTANTS
-    const width = bounds?.width ?? CONSTANTS.GAME_WIDTH;
-    const height = bounds?.height ?? CONSTANTS.GAME_HEIGHT;
+    const width = bounds?.width ?? GAME_WIDTH;
+    const height = bounds?.height ?? GAME_HEIGHT;
 
     const margin = asteroid.radius || 30;
 
@@ -231,7 +231,7 @@ export class AsteroidMovement {
     const playerRadius =
       typeof player.getHullBoundingRadius === 'function'
         ? player.getHullBoundingRadius()
-        : CONSTANTS.SHIP_SIZE;
+        : SHIP_SIZE;
     const attackRange =
       (behavior.minDistance ?? 0) + asteroid.radius + playerRadius + 6;
 

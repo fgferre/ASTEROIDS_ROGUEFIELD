@@ -1,18 +1,25 @@
-import * as CONSTANTS from '../core/GameConstants.js';
+import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
 import RandomService from '../core/RandomService.js';
 import { ScreenShake, ShakePresets } from '../utils/ScreenShake.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
+import { SHIELD_SHOCKWAVE_RADIUS } from '../data/constants/gameplay.js';
+import {
+  BOSS_EFFECTS_PRESETS,
+  BOSS_SCREEN_SHAKES,
+  ENEMY_EFFECT_COLORS,
+} from '../data/constants/visual.js';
+import { ASTEROID_VARIANTS } from '../data/enemies/asteroid-configs.js';
 
 const MAIN_THRUSTER_FLASH_THRESHOLD = 0.85;
 const MAIN_THRUSTER_FLASH_COLOR = '#3399FF';
 const MAIN_THRUSTER_FLASH_DURATION = 0.05;
 const MAIN_THRUSTER_FLASH_INTENSITY = 0.05;
 
-const BOSS_EFFECTS = CONSTANTS.BOSS_EFFECTS_PRESETS || {};
-const BOSS_SHAKES = CONSTANTS.BOSS_SCREEN_SHAKES || {};
+const BOSS_EFFECTS = BOSS_EFFECTS_PRESETS || {};
+const BOSS_SHAKES = BOSS_SCREEN_SHAKES || {};
 
 class SpaceParticle {
   constructor(x, y, vx, vy, color, size, life, type = 'normal', random = null) {
@@ -850,8 +857,8 @@ export default class EffectsSystem {
 
   applyScreenShake(ctx) {
     // Apply trauma-based screen shake
-    const centerX = CONSTANTS.GAME_WIDTH / 2;
-    const centerY = CONSTANTS.GAME_HEIGHT / 2;
+    const centerX = GAME_WIDTH / 2;
+    const centerY = GAME_HEIGHT / 2;
     this.screenShake.apply(ctx, centerX, centerY);
   }
 
@@ -1714,8 +1721,8 @@ export default class EffectsSystem {
     }
 
     const { width, height } = ctx.canvas || {
-      width: CONSTANTS.GAME_WIDTH || 800,
-      height: CONSTANTS.GAME_HEIGHT || 600,
+      width: GAME_WIDTH || 800,
+      height: GAME_HEIGHT || 600,
     };
 
     this.bossTransitionEffects.forEach((effect) => {
@@ -2162,7 +2169,7 @@ export default class EffectsSystem {
   }
 
   resolveEnemyEffectPalette(type, fallbackType = null) {
-    if (!CONSTANTS.ENEMY_EFFECT_COLORS) {
+    if (!ENEMY_EFFECT_COLORS) {
       return {};
     }
 
@@ -2171,8 +2178,8 @@ export default class EffectsSystem {
       typeof fallbackType === 'string' ? fallbackType.toLowerCase() : null;
 
     const palette =
-      (normalizedType && CONSTANTS.ENEMY_EFFECT_COLORS[normalizedType]) ||
-      (fallback && CONSTANTS.ENEMY_EFFECT_COLORS[fallback]) ||
+      (normalizedType && ENEMY_EFFECT_COLORS[normalizedType]) ||
+      (fallback && ENEMY_EFFECT_COLORS[fallback]) ||
       null;
 
     return palette || {};
@@ -2746,8 +2753,8 @@ export default class EffectsSystem {
 
     // Calculate screen edge position
     // Use half screen dimensions to position at edge
-    const halfWidth = CONSTANTS.GAME_WIDTH / 2;
-    const halfHeight = CONSTANTS.GAME_HEIGHT / 2;
+    const halfWidth = GAME_WIDTH / 2;
+    const halfHeight = GAME_HEIGHT / 2;
 
     // Find intersection with screen edge
     const cos = Math.cos(angle);
@@ -2759,11 +2766,11 @@ export default class EffectsSystem {
 
     if (tanAngle < halfHeight / halfWidth) {
       // Hit left or right edge
-      edgeX = cos > 0 ? CONSTANTS.GAME_WIDTH - 40 : 40;
+      edgeX = cos > 0 ? GAME_WIDTH - 40 : 40;
       edgeY = halfHeight + (edgeX - halfWidth) * (sin / cos);
     } else {
       // Hit top or bottom edge
-      edgeY = sin > 0 ? CONSTANTS.GAME_HEIGHT - 40 : 40;
+      edgeY = sin > 0 ? GAME_HEIGHT - 40 : 40;
       edgeX = halfWidth + (edgeY - halfHeight) * (cos / sin);
     }
 
@@ -2859,7 +2866,7 @@ export default class EffectsSystem {
     const radius =
       typeof data.radius === 'number'
         ? data.radius
-        : CONSTANTS.SHIELD_SHOCKWAVE_RADIUS;
+        : SHIELD_SHOCKWAVE_RADIUS;
 
     const duration =
       typeof data.duration === 'number' && data.duration > 0
@@ -3076,8 +3083,8 @@ export default class EffectsSystem {
     }
 
     // MASSIVE DESTRUCTIVE SHOCKWAVE (70% of screen)
-    const screenWidth = CONSTANTS.GAME_WIDTH || 1920;
-    const screenHeight = CONSTANTS.GAME_HEIGHT || 1080;
+    const screenWidth = GAME_WIDTH || 1920;
+    const screenHeight = GAME_HEIGHT || 1080;
     const maxDimension = Math.max(screenWidth, screenHeight);
     const shockwaveRadius = maxDimension * 0.7; // 70% of screen
 
@@ -3254,8 +3261,8 @@ export default class EffectsSystem {
       small: '#CD853F',
     };
     const config =
-      CONSTANTS.ASTEROID_VARIANTS?.[variant] ||
-      CONSTANTS.ASTEROID_VARIANTS?.common;
+      ASTEROID_VARIANTS?.[variant] ||
+      ASTEROID_VARIANTS?.common;
     const colors = config?.colors || {};
     const fallbackFill = fallbackBySize[size] || fallbackBySize.medium;
 

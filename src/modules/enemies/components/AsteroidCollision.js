@@ -22,11 +22,11 @@
  * ```
  */
 
-import * as CONSTANTS from '../../../core/GameConstants.js';
+import { COLLISION_BOUNCE } from '../../../data/constants/gameplay.js';
 
 export class AsteroidCollision {
   constructor() {
-    this.collisionBounce = CONSTANTS.COLLISION_BOUNCE || 0.8;
+    this.collisionBounce = COLLISION_BOUNCE || 0.8;
   }
 
   /**
