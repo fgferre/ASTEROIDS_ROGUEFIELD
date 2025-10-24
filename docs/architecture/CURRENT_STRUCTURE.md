@@ -17,7 +17,7 @@
 - `/src/data` (3 arquivos + `ui/`): `upgrades.js` (939 linhas), `shipModels.js`, `settingsSchema.js`.
 - `/src/services` (2 arquivos): `GameSessionService.js`, `CommandQueueService.js`.
 - `/src/utils` (3 arquivos): `ScreenShake.js`, `PerformanceMonitor.js`, utilitários de random.
-- `/src/legacy`: código original preservado (`app-original.js`).
+- Histórico legado: utilize o histórico do Git para acessar snapshots anteriores (a pasta `/src/legacy` foi removida durante a limpeza de 2025).
 - `src/app.js`: orquestra bootstrap e game loop.
 - `/docs`: documentação, planos e checklists.
 

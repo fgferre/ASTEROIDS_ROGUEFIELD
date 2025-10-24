@@ -29,27 +29,27 @@ flowchart TD
     src_modules_CombatSystem_js["CombatSystem.js<br/>5 imports<br/>1 dependents"]
     src_modules_enemies_types_BossEnemy_js["BossEnemy.js<br/>4 imports<br/>2 dependents"]
     src_modules_enemies_types_Drone_js["Drone.js<br/>4 imports<br/>2 dependents"]
-    src_modules_enemies_base_BaseEnemy_js["BaseEnemy.js<br/>0 imports<br/>5 dependents"]
-    src_modules_enemies_managers_WaveManager_js["WaveManager.js<br/>4 imports<br/>1 dependents"]
-    src_modules_enemies_types_Hunter_js["Hunter.js<br/>3 imports<br/>2 dependents"]
-    src_modules_enemies_types_Mine_js["Mine.js<br/>3 imports<br/>2 dependents"]
     src_modules_PhysicsSystem_js["PhysicsSystem.js<br/>4 imports<br/>1 dependents"]
     src_modules_ProgressionSystem_js["ProgressionSystem.js<br/>4 imports<br/>1 dependents"]
     src_modules_UISystem_js["UISystem.js<br/>4 imports<br/>1 dependents"]
     src_modules_XPOrbSystem_js["XPOrbSystem.js<br/>4 imports<br/>1 dependents"]
-    src_modules_enemies_managers_RewardManager_js["RewardManager.js<br/>3 imports<br/>1 dependents"]
-    src_modules_enemies_types_Asteroid_js["Asteroid.js<br/>3 imports<br/>1 dependents"]
+    src_modules_enemies_base_BaseEnemy_js["BaseEnemy.js<br/>0 imports<br/>5 dependents"]
+    src_modules_enemies_managers_WaveManager_js["WaveManager.js<br/>4 imports<br/>1 dependents"]
+    src_modules_enemies_types_Hunter_js["Hunter.js<br/>3 imports<br/>2 dependents"]
+    src_modules_enemies_types_Mine_js["Mine.js<br/>3 imports<br/>2 dependents"]
     src_modules_MenuBackgroundSystem_js["MenuBackgroundSystem.js<br/>3 imports<br/>1 dependents"]
     src_modules_PlayerSystem_js["PlayerSystem.js<br/>3 imports<br/>1 dependents"]
-    src_modules_collectibles_HealthHeartSystem_js["HealthHeartSystem.js<br/>2 imports<br/>1 dependents"]
+    src_modules_enemies_managers_RewardManager_js["RewardManager.js<br/>3 imports<br/>1 dependents"]
+    src_modules_enemies_types_Asteroid_js["Asteroid.js<br/>3 imports<br/>1 dependents"]
     src_modules_InputSystem_js["InputSystem.js<br/>2 imports<br/>1 dependents"]
     src_modules_SettingsSystem_js["SettingsSystem.js<br/>2 imports<br/>1 dependents"]
+    src_modules_collectibles_HealthHeartSystem_js["HealthHeartSystem.js<br/>2 imports<br/>1 dependents"]
     src_modules_AudioBatcher_js["AudioBatcher.js<br/>1 imports<br/>1 dependents"]
     src_modules_AudioCache_js["AudioCache.js<br/>1 imports<br/>1 dependents"]
+    src_modules_WorldSystem_js["WorldSystem.js<br/>1 imports<br/>1 dependents"]
     src_modules_collectibles_HealthHeart_js["HealthHeart.js<br/>1 imports<br/>1 dependents"]
     src_modules_enemies_components_AsteroidCollision_js["AsteroidCollision.js<br/>1 imports<br/>1 dependents"]
     src_modules_enemies_components_AsteroidMovement_js["AsteroidMovement.js<br/>1 imports<br/>1 dependents"]
-    src_modules_WorldSystem_js["WorldSystem.js<br/>1 imports<br/>1 dependents"]
   end
   subgraph misc_group["Miscellaneous"]
     src_app_js["🔴 app.js<br/>12 imports<br/>0 dependents"]
@@ -58,8 +58,8 @@ flowchart TD
   subgraph utils_group["Utilities"]
     src_utils_dev_GameDebugLogger_js["GameDebugLogger.js<br/>0 imports<br/>9 dependents"]
     src_utils_randomHelpers_js["randomHelpers.js<br/>1 imports<br/>2 dependents"]
-    src_utils_drawEnemyProjectile_js["drawEnemyProjectile.js<br/>1 imports<br/>1 dependents"]
     src_utils_ScreenShake_js["ScreenShake.js<br/>1 imports<br/>1 dependents"]
+    src_utils_drawEnemyProjectile_js["drawEnemyProjectile.js<br/>1 imports<br/>1 dependents"]
   end
   subgraph data_group["Data & Configuration"]
     src_data_settingsSchema_js["settingsSchema.js<br/>1 imports<br/>3 dependents"]
@@ -144,16 +144,6 @@ flowchart TD
   src_modules_enemies_types_Drone_js --> src_core_RandomService_js
   src_modules_enemies_types_Drone_js --> src_modules_enemies_base_BaseEnemy_js
   src_modules_enemies_types_Drone_js --> src_utils_dev_GameDebugLogger_js
-  src_modules_enemies_managers_WaveManager_js --> src_core_GameConstants_js
-  src_modules_enemies_managers_WaveManager_js --> src_core_RandomService_js
-  src_modules_enemies_managers_WaveManager_js --> src_core_serviceUtils_js
-  src_modules_enemies_managers_WaveManager_js --> src_utils_dev_GameDebugLogger_js
-  src_modules_enemies_types_Hunter_js --> src_core_GameConstants_js
-  src_modules_enemies_types_Hunter_js --> src_core_RandomService_js
-  src_modules_enemies_types_Hunter_js --> src_modules_enemies_base_BaseEnemy_js
-  src_modules_enemies_types_Mine_js --> src_core_GameConstants_js
-  src_modules_enemies_types_Mine_js --> src_core_RandomService_js
-  src_modules_enemies_types_Mine_js --> src_modules_enemies_base_BaseEnemy_js
   src_modules_PhysicsSystem_js --> src_core_GameConstants_js
   src_modules_PhysicsSystem_js --> src_core_serviceUtils_js
   src_modules_PhysicsSystem_js --> src_utils_dev_GameDebugLogger_js
@@ -168,40 +158,50 @@ flowchart TD
   src_modules_XPOrbSystem_js --> src_core_GamePools_js
   src_modules_XPOrbSystem_js --> src_core_RandomService_js
   src_modules_XPOrbSystem_js --> src_core_serviceUtils_js
+  src_modules_enemies_managers_WaveManager_js --> src_core_GameConstants_js
+  src_modules_enemies_managers_WaveManager_js --> src_core_RandomService_js
+  src_modules_enemies_managers_WaveManager_js --> src_core_serviceUtils_js
+  src_modules_enemies_managers_WaveManager_js --> src_utils_dev_GameDebugLogger_js
+  src_modules_enemies_types_Hunter_js --> src_core_GameConstants_js
+  src_modules_enemies_types_Hunter_js --> src_core_RandomService_js
+  src_modules_enemies_types_Hunter_js --> src_modules_enemies_base_BaseEnemy_js
+  src_modules_enemies_types_Mine_js --> src_core_GameConstants_js
+  src_modules_enemies_types_Mine_js --> src_core_RandomService_js
+  src_modules_enemies_types_Mine_js --> src_modules_enemies_base_BaseEnemy_js
   src_core_ServiceRegistry_js --> src_core_DIContainer_js
   src_core_ServiceRegistry_js --> src_bootstrap_serviceManifest_js
   src_core_ServiceRegistry_js --> src_core_RandomService_js
   src_data_settingsSchema_js --> src_data_ui_hudLayout_js
-  src_modules_enemies_managers_RewardManager_js --> src_core_GameConstants_js
-  src_modules_enemies_managers_RewardManager_js --> src_core_RandomService_js
-  src_modules_enemies_managers_RewardManager_js --> src_core_serviceUtils_js
-  src_modules_enemies_types_Asteroid_js --> src_core_GameConstants_js
-  src_modules_enemies_types_Asteroid_js --> src_core_RandomService_js
-  src_modules_enemies_types_Asteroid_js --> src_modules_enemies_base_BaseEnemy_js
   src_modules_MenuBackgroundSystem_js --> src_core_RandomService_js
   src_modules_MenuBackgroundSystem_js --> src_core_serviceUtils_js
   src_modules_MenuBackgroundSystem_js --> src_utils_randomHelpers_js
   src_modules_PlayerSystem_js --> src_core_GameConstants_js
   src_modules_PlayerSystem_js --> src_data_shipModels_js
   src_modules_PlayerSystem_js --> src_core_serviceUtils_js
-  src_modules_collectibles_HealthHeartSystem_js --> src_core_serviceUtils_js
-  src_modules_collectibles_HealthHeartSystem_js --> src_modules_collectibles_HealthHeart_js
+  src_modules_enemies_managers_RewardManager_js --> src_core_GameConstants_js
+  src_modules_enemies_managers_RewardManager_js --> src_core_RandomService_js
+  src_modules_enemies_managers_RewardManager_js --> src_core_serviceUtils_js
+  src_modules_enemies_types_Asteroid_js --> src_core_GameConstants_js
+  src_modules_enemies_types_Asteroid_js --> src_core_RandomService_js
+  src_modules_enemies_types_Asteroid_js --> src_modules_enemies_base_BaseEnemy_js
   src_modules_InputSystem_js --> src_data_settingsSchema_js
   src_modules_InputSystem_js --> src_core_serviceUtils_js
   src_modules_SettingsSystem_js --> src_data_settingsSchema_js
   src_modules_SettingsSystem_js --> src_data_ui_hudLayout_js
+  src_modules_collectibles_HealthHeartSystem_js --> src_core_serviceUtils_js
+  src_modules_collectibles_HealthHeartSystem_js --> src_modules_collectibles_HealthHeart_js
   src_services_GameSessionService_js --> src_core_GameConstants_js
   src_utils_randomHelpers_js --> src_core_RandomService_js
   src_bootstrap_bootstrapServices_js --> src_bootstrap_serviceManifest_js
   src_data_shipModels_js --> src_core_GameConstants_js
   src_modules_AudioBatcher_js --> src_core_RandomService_js
   src_modules_AudioCache_js --> src_core_RandomService_js
+  src_modules_WorldSystem_js --> src_core_serviceUtils_js
   src_modules_collectibles_HealthHeart_js --> src_core_RandomService_js
   src_modules_enemies_components_AsteroidCollision_js --> src_core_GameConstants_js
   src_modules_enemies_components_AsteroidMovement_js --> src_core_GameConstants_js
-  src_modules_WorldSystem_js --> src_core_serviceUtils_js
-  src_utils_drawEnemyProjectile_js --> src_core_GameConstants_js
   src_utils_ScreenShake_js --> src_core_RandomService_js
+  src_utils_drawEnemyProjectile_js --> src_core_GameConstants_js
   src_core_EventBus_js --> src_core_debugLogging_js
   style src_bootstrap_serviceManifest_js fill:#e5dbff,stroke:#7048e8,stroke-width:1.5px
   style src_core_GameConstants_js fill:#d3f9d8,stroke:#2f9e44,stroke-width:4px
@@ -217,25 +217,25 @@ flowchart TD
   style src_modules_CombatSystem_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_modules_enemies_types_BossEnemy_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_modules_enemies_types_Drone_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
-  style src_modules_enemies_base_BaseEnemy_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
-  style src_modules_enemies_managers_WaveManager_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
-  style src_modules_enemies_types_Hunter_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
-  style src_modules_enemies_types_Mine_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_modules_PhysicsSystem_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_modules_ProgressionSystem_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_modules_UISystem_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_modules_XPOrbSystem_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
+  style src_modules_enemies_base_BaseEnemy_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
+  style src_modules_enemies_managers_WaveManager_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
+  style src_modules_enemies_types_Hunter_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
+  style src_modules_enemies_types_Mine_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_core_ServiceRegistry_js fill:#d3f9d8,stroke:#2f9e44,stroke-width:1.5px
   style src_data_settingsSchema_js fill:#fff3bf,stroke:#f08c00,stroke-width:1.5px
-  style src_modules_enemies_managers_RewardManager_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
-  style src_modules_enemies_types_Asteroid_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_modules_MenuBackgroundSystem_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_modules_PlayerSystem_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
+  style src_modules_enemies_managers_RewardManager_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
+  style src_modules_enemies_types_Asteroid_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_core_debugLogging_js fill:#d3f9d8,stroke:#2f9e44,stroke-width:1.5px
   style src_data_ui_hudLayout_js fill:#fff3bf,stroke:#f08c00,stroke-width:1.5px
-  style src_modules_collectibles_HealthHeartSystem_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_modules_InputSystem_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_modules_SettingsSystem_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
+  style src_modules_collectibles_HealthHeartSystem_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_services_GameSessionService_js fill:#ffe3e3,stroke:#c92a2a,stroke-width:1.5px
   style src_utils_randomHelpers_js fill:#e9ecef,stroke:#495057,stroke-width:1.5px
   style src_bootstrap_bootstrapServices_js fill:#e5dbff,stroke:#7048e8,stroke-width:1.5px
@@ -243,12 +243,12 @@ flowchart TD
   style src_data_shipModels_js fill:#fff3bf,stroke:#f08c00,stroke-width:1.5px
   style src_modules_AudioBatcher_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_modules_AudioCache_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
+  style src_modules_WorldSystem_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_modules_collectibles_HealthHeart_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_modules_enemies_components_AsteroidCollision_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_modules_enemies_components_AsteroidMovement_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
-  style src_modules_WorldSystem_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
-  style src_utils_drawEnemyProjectile_js fill:#e9ecef,stroke:#495057,stroke-width:1.5px
   style src_utils_ScreenShake_js fill:#e9ecef,stroke:#495057,stroke-width:1.5px
+  style src_utils_drawEnemyProjectile_js fill:#e9ecef,stroke:#495057,stroke-width:1.5px
   style src_core_CanvasStateManager_js fill:#d3f9d8,stroke:#2f9e44,stroke-width:1.5px
   style src_core_EventBus_js fill:#d3f9d8,stroke:#2f9e44,stroke-width:1.5px
   style src_core_GarbageCollectionManager_js fill:#d3f9d8,stroke:#2f9e44,stroke-width:1.5px

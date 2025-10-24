@@ -24,7 +24,7 @@ A estrutura do projeto está organizada por responsabilidade arquitetônica:
   - `/core`: Módulos centrais que fornecem a infraestrutura do jogo (`EventBus`, `ServiceLocator`, `GameConstants`).
   - `/modules`: Os "Sistemas" que contêm a lógica principal do jogo (`PlayerSystem`, `EnemySystem`, `CombatSystem`, etc.). **Esta é a principal área para adicionar e modificar a lógica de gameplay.**
   - `/data`: Modelos de dados e configurações complexas (ex: `shipModels.js`). Ideal para expandir com configurações de inimigos, armas, etc.
-  - `/legacy`: Código original mantido como backup histórico (`app-original.js`).
+  - Histórico legado: consulte o histórico do Git para snapshots antigos (a pasta `/legacy` foi removida na limpeza de 2025).
   - `app.js`: O orquestrador principal. Inicializa os sistemas e executa o game loop.
 - `/docs`: Documentação, guias de refatoração e checklists de validação.
 - `index.html` e `style.css`: Estrutura da página e estilização da UI.
