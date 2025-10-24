@@ -17,7 +17,7 @@
 - `/src/data` (3 arquivos + `ui/`): `upgrades.js` (939 linhas), `shipModels.js`, `settingsSchema.js`.
 - `/src/services` (2 arquivos): `GameSessionService.js`, `CommandQueueService.js`.
 - `/src/utils` (3 arquivos): `ScreenShake.js`, `PerformanceMonitor.js`, utilitários de random.
-- `/src/legacy`: código original preservado (`app-original.js`).
+- Histórico legado: utilize o histórico do Git para acessar snapshots anteriores (a pasta `/src/legacy` foi removida durante a limpeza de 2025).
 - `src/app.js`: orquestra bootstrap e game loop.
 - `/docs`: documentação, planos e checklists.
 
@@ -26,6 +26,13 @@
 - `src/core/RandomService.js` — 23 dependentes diretos.
 - `src/bootstrap/bootstrapServices.js` — 1 dependente direto.
 - `src/core/EventBus.js` — utilizado em praticamente todos os sistemas.
+
+### 3.5. Recomendações de Implementação
+- **Registro via Manifesto:** Ao adicionar um novo sistema, inclua-o em `createServiceManifest()` com suas dependências explícitas. Observe como `src/bootstrap/serviceManifest.js` registra `EnemySystem` e `WorldSystem`.
+- **Comunicação por Eventos:** Use `gameEvents` para fluxo de informações. `EnemySystem` emite eventos como `enemy-spawned` e `enemy-destroyed`, enquanto `WorldSystem` consome eventos globais de reset.
+- **Resolução de Dependências:** Prefira injeção de dependências via construtor ou `resolveService()` fornecido pelo manifesto, mantendo `gameServices` apenas como fallback através do `ServiceLocatorAdapter`. Verifique `src/app.js` para ver como os serviços são instanciados.
+- **Randomização Determinística:** Utilize `RandomService` seedado pelo manifesto para gerar comportamentos reprodutíveis. Veja como `EnemySystem` consome o serviço para decisões de spawn controladas.
+- **Reuso de Recursos:** Reforce o uso de pools de entidades e objetos de apoio configurados no manifesto (veja `GamePools` em `src/bootstrap/serviceManifest.js`) e reutilizados por sistemas como o `EnemySystem`.
 
 ## 4. Sistemas Principais
 - **EnemySystem.js** (4.593 linhas)

@@ -5,10 +5,5 @@
     "src/core/RandomService.js",
     "src/core/serviceUtils.js"
   ],
-  "orphans": [
-    "src/core/EventBus.js",
-    "src/core/ServiceLocator.js",
-    "src/legacy/app-original.js",
-    "src/modules/enemies/types/index.js"
-  ]
+  "orphans": []
 }
