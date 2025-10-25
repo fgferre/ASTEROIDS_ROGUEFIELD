@@ -1,14 +1,14 @@
+import { DRONE_CONFIG } from '../../../data/enemies/drone.js';
 import {
   ENEMY_EFFECT_COLORS,
   ENEMY_RENDER_PRESETS,
-  ENEMY_TYPES,
 } from '../../../data/constants/visual.js';
 import { GAME_WIDTH, GAME_HEIGHT } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 
-const DRONE_DEFAULTS = ENEMY_TYPES?.drone ?? {};
+const DRONE_DEFAULTS = DRONE_CONFIG ?? {};
 
 function resolveVectorMagnitude(x, y) {
   const magnitude = Math.hypot(x, y);
@@ -50,7 +50,7 @@ export class Drone extends BaseEnemy {
     this.resetForPool();
     super.initialize(config);
 
-    const defaults = ENEMY_TYPES?.drone ?? {};
+    const defaults = DRONE_CONFIG ?? {};
 
     this.radius = config.radius ?? defaults.radius ?? 12;
     this.maxHealth = config.maxHealth ?? config.health ?? defaults.health ?? 30;
@@ -358,8 +358,8 @@ export class Drone extends BaseEnemy {
     const accentPreset = presets.accents ?? {};
     const exhaustPreset = presets.exhaust ?? {};
 
-    const baseRadius = this.radius || ENEMY_TYPES?.drone?.radius || 12;
-    const maxSpeed = Math.max(1, this.maxSpeed || ENEMY_TYPES?.drone?.speed || 1);
+    const baseRadius = this.radius || DRONE_CONFIG?.radius || 12;
+    const maxSpeed = Math.max(1, this.maxSpeed || DRONE_CONFIG?.speed || 1);
     const speed = Math.hypot(this.vx, this.vy);
     const targetThrust = Math.min(1, Math.max(0, speed / maxSpeed));
     const smoothing = Math.min(1, Math.max(0, exhaustPreset.smoothing ?? 0.2));

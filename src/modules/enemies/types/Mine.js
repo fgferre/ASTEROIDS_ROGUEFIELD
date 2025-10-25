@@ -1,12 +1,12 @@
+import { MINE_CONFIG } from '../../../data/enemies/mine.js';
 import {
   ENEMY_EFFECT_COLORS,
   ENEMY_RENDER_PRESETS,
-  ENEMY_TYPES,
 } from '../../../data/constants/visual.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
-const MINE_DEFAULTS = ENEMY_TYPES?.mine ?? {};
+const MINE_DEFAULTS = MINE_CONFIG ?? {};
 
 export class Mine extends BaseEnemy {
   constructor(system, config = {}) {
@@ -39,7 +39,7 @@ export class Mine extends BaseEnemy {
     this.resetForPool();
     super.initialize(config);
 
-    const defaults = ENEMY_TYPES?.mine ?? {};
+    const defaults = MINE_CONFIG ?? {};
 
     this.radius = config.radius ?? defaults.radius ?? 18;
     this.maxHealth = config.maxHealth ?? config.health ?? defaults.health ?? 20;
@@ -203,7 +203,7 @@ export class Mine extends BaseEnemy {
     const presets = ENEMY_RENDER_PRESETS?.mine ?? {};
     const bodyPreset = presets.body ?? {};
     const glowPreset = presets.glow ?? {};
-    const baseRadius = this.radius || ENEMY_TYPES?.mine?.radius || 18;
+    const baseRadius = this.radius || MINE_CONFIG?.radius || 18;
 
     const basePulse = 0.5 + 0.5 * Math.sin(this.pulsePhase || 0);
     const intensityMultiplier = this.armed

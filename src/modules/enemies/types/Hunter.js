@@ -1,12 +1,12 @@
+import { HUNTER_CONFIG } from '../../../data/enemies/hunter.js';
 import {
   ENEMY_EFFECT_COLORS,
   ENEMY_RENDER_PRESETS,
-  ENEMY_TYPES,
 } from '../../../data/constants/visual.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
-const HUNTER_DEFAULTS = ENEMY_TYPES?.hunter ?? {};
+const HUNTER_DEFAULTS = HUNTER_CONFIG ?? {};
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -77,7 +77,7 @@ export class Hunter extends BaseEnemy {
     this.resetForPool();
     super.initialize(config);
 
-    const defaults = ENEMY_TYPES?.hunter ?? {};
+    const defaults = HUNTER_CONFIG ?? {};
 
     this.radius = config.radius ?? defaults.radius ?? 16;
     this.maxHealth = config.maxHealth ?? config.health ?? defaults.health ?? 48;
@@ -405,7 +405,7 @@ export class Hunter extends BaseEnemy {
     const hullPreset = presets.hull ?? {};
     const turretPreset = presets.turret ?? {};
     const shadingPreset = presets.shading ?? {};
-    const baseRadius = this.radius || ENEMY_TYPES?.hunter?.radius || 16;
+    const baseRadius = this.radius || HUNTER_CONFIG?.radius || 16;
 
     const front = baseRadius * (hullPreset.lengthMultiplier ?? 1.9);
     const rear = -front * (hullPreset.tailLengthRatio ?? 0.72);

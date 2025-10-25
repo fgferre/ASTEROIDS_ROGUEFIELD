@@ -1,5 +1,5 @@
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
-import { BOSS_CONFIG } from '../../../data/constants/visual.js';
+import { BOSS_CONFIG } from '../../../data/enemies/boss.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';

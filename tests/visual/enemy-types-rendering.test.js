@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   ENEMY_EFFECT_COLORS,
   ENEMY_RENDER_PRESETS,
-  ENEMY_TYPES,
 } from '../../src/core/GameConstants.js';
+import { DRONE_CONFIG } from '../../src/data/enemies/drone.js';
 import { Drone } from '../../src/modules/enemies/types/Drone.js';
 import { Mine } from '../../src/modules/enemies/types/Mine.js';
 import { Hunter } from '../../src/modules/enemies/types/Hunter.js';
@@ -128,7 +128,7 @@ describe('Enemy renderer payloads', () => {
     const targetSpeedRatio = Math.min(
       1,
       Math.hypot(drone.vx, drone.vy) /
-        Math.max(1, drone.maxSpeed || ENEMY_TYPES.drone?.speed || 1),
+        Math.max(1, drone.maxSpeed || DRONE_CONFIG?.speed || 1),
     );
     const smoothing = ENEMY_RENDER_PRESETS.drone?.exhaust?.smoothing ?? 0;
 
