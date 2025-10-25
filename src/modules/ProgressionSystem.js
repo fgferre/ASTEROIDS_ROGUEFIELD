@@ -8,7 +8,7 @@ import {
   PROGRESSION_UPGRADE_ROLL_COUNT,
   PROGRESSION_UPGRADE_FALLBACK_COUNT,
 } from '../core/GameConstants.js';
-import UPGRADE_LIBRARY, { UPGRADE_CATEGORIES } from '../data/upgrades.js';
+import UPGRADE_LIBRARY, { UPGRADE_CATEGORIES } from '../data/upgrades/index.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 import RandomService from '../core/RandomService.js';
 import { MAGNETISM_FORCE, MAGNETISM_RADIUS } from '../data/constants/gameplay.js';
