@@ -81,6 +81,7 @@ export class BaseEnemy {
     this.components = new Map();
     this.componentState = {};
     this._componentsInvoked = false;
+    this.useComponents = false;
 
     // Metadata
     this.tags = new Set();  // For categorization: 'boss', 'minion', 'volatile'
@@ -126,9 +127,13 @@ export class BaseEnemy {
 
     this.age += deltaTime;
 
-    // Update position
-    this.x += this.vx * deltaTime;
-    this.y += this.vy * deltaTime;
+    const hasMovementComponent = this.useComponents && this.hasComponent('movement');
+
+    // Update position only when no movement component is responsible for integration
+    if (!hasMovementComponent) {
+      this.x += this.vx * deltaTime;
+      this.y += this.vy * deltaTime;
+    }
 
     // Update rotation
     this.rotation += this.rotationSpeed * deltaTime;
@@ -204,6 +209,12 @@ export class BaseEnemy {
   takeDamage(amount, source = null) {
     if (!this.alive) return false;
 
+    const healthComponent = this.getComponent('health');
+    if (healthComponent && typeof healthComponent.takeDamage === 'function') {
+      healthComponent.takeDamage(this, amount, source);
+      return this.health <= 0;
+    }
+
     // Apply armor reduction
     const actualDamage = Math.max(0, amount - this.armor);
 
@@ -236,16 +247,28 @@ export class BaseEnemy {
    *
    * @param {Object} source - What destroyed this enemy
    */
-  onDestroyed(source) {
+  onDestroyed(source, context = null) {
     this.alive = false;
 
-    // Emit destruction event
-    if (this.system && this.system.eventBus) {
-      this.system.eventBus.emit('enemy-destroyed', {
-        enemy: this,
-        type: this.type,
-        source: source
-      });
+    const eventContext = context || {};
+    const payload = {
+      enemy: this,
+      type: this.type,
+      source,
+      position:
+        Number.isFinite(this.x) && Number.isFinite(this.y)
+          ? { x: this.x, y: this.y }
+          : null,
+      context: eventContext,
+    };
+
+    if (!eventContext?.healthComponentManaged) {
+      const gameEvents = this.system?.gameEvents?.emit ? this.system.gameEvents : null;
+      if (gameEvents) {
+        gameEvents.emit('enemy-destroyed', payload);
+      } else if (this.system?.eventBus?.emit) {
+        this.system.eventBus.emit('enemy-destroyed', payload);
+      }
     }
 
     // Override in subclasses for death effects

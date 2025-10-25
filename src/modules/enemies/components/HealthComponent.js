@@ -130,8 +130,9 @@ export class HealthComponent {
 
   onDestroyed(enemy, source, context = {}) {
     const bus = getGameEvents(enemy.system);
+    const enrichedContext = { ...context, healthComponentManaged: true };
     if (typeof enemy.onDestroyed === 'function') {
-      enemy.onDestroyed(source, context);
+      enemy.onDestroyed(source, enrichedContext);
     }
     if (bus?.emit) {
       const hasPosition = Number.isFinite(enemy?.x) && Number.isFinite(enemy?.y);
@@ -142,7 +143,7 @@ export class HealthComponent {
         wave: enemy.wave,
         position: hasPosition ? { x: enemy.x, y: enemy.y } : null,
         source,
-        context,
+        context: enrichedContext,
       };
 
       bus.emit('enemy-destroyed', payload);
