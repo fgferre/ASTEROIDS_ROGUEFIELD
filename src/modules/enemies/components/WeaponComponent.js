@@ -381,12 +381,27 @@ const defaultPatterns = {
     if (config.triggerOnProximity && state.armedTime >= config.armTime) {
       const distance = Math.hypot(playerPos.x - enemy.x, playerPos.y - enemy.y);
       if (distance <= config.proximityRadius) {
-        component.fire(context, {
-          damage: config.damage,
-          pattern: 'proximity',
-          explosionRadius: config.explosionRadius,
-        });
         state.detonated = true;
+
+        if (typeof enemy.triggerDetonation === 'function') {
+          const payload = { reason: 'proximity', distance };
+          try {
+            enemy.triggerDetonation(payload);
+          } catch (error) {
+            enemy.triggerDetonation('proximity', { distance });
+          }
+        } else if (typeof enemy.takeDamage === 'function') {
+          const lethal = Number.isFinite(enemy.health)
+            ? enemy.health
+            : Number.isFinite(enemy.maxHealth)
+            ? enemy.maxHealth
+            : Infinity;
+          enemy.takeDamage(lethal, {
+            cause: 'mine-detonation',
+            reason: 'proximity',
+            distance,
+          });
+        }
       }
     }
   },

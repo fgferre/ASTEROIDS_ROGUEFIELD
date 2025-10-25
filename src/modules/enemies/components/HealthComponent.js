@@ -16,23 +16,37 @@ export class HealthComponent {
     this.config = { ...config };
   }
 
+  /**
+   * Initializes the enemy's health values.
+   * When an explicit `overrides.health` is provided it is applied directly to both
+   * `health` and `maxHealth` without wave or variant scaling. Otherwise the
+   * configured base value is scaled according to wave and variant multipliers.
+   *
+   * @param {Object} enemy
+   * @param {Object} overrides
+   */
   initialize(enemy, overrides = {}) {
     if (!enemy) {
       return;
     }
 
     const config = { ...this.config, ...overrides };
-    const waveMultiplier = this.resolveWaveMultiplier(enemy, config);
-    const variantMultiplier = config.variantMultiplier ?? 1;
+    const hasExplicitHealth = Number.isFinite(overrides.health);
+    const waveMultiplier = hasExplicitHealth ? 1 : this.resolveWaveMultiplier(enemy, config);
+    const variantMultiplier = hasExplicitHealth ? 1 : config.variantMultiplier ?? 1;
 
-    enemy.maxHealth = Math.max(
-      config.base ?? enemy.maxHealth ?? enemy.health ?? 1,
-      1,
-    );
-    enemy.maxHealth *= waveMultiplier * variantMultiplier;
-    enemy.health = Number.isFinite(overrides.health)
-      ? overrides.health
-      : enemy.maxHealth;
+    if (hasExplicitHealth) {
+      enemy.maxHealth = overrides.health;
+      enemy.health = overrides.health;
+    } else {
+      const baseValue = Math.max(
+        config.base ?? enemy.maxHealth ?? enemy.health ?? 1,
+        1,
+      );
+      const scaled = baseValue * waveMultiplier * variantMultiplier;
+      enemy.maxHealth = scaled;
+      enemy.health = scaled;
+    }
 
     enemy.armor = config.armor ?? enemy.armor ?? 0;
     enemy.shields = config.shields ?? enemy.shields ?? 0;

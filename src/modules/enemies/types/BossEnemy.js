@@ -160,8 +160,7 @@ export class BossEnemy extends BaseEnemy {
     super.initialize(config);
 
     const componentConfig = config.components ?? BOSS_COMPONENTS;
-    this.useComponents = Boolean(componentConfig);
-    if (this.useComponents) {
+    if (componentConfig) {
       this.weaponState = this.weaponState || {};
       this.movementStrategy = componentConfig?.movement?.strategy || 'seeking';
       this.renderStrategy = componentConfig?.render?.strategy || 'procedural-boss';
@@ -376,7 +375,7 @@ export class BossEnemy extends BaseEnemy {
       return;
     }
 
-    if (this.useComponents && !this._componentsInvoked) {
+    if (this.useComponents && this.components?.size > 0 && !this._componentsInvoked) {
       const context = this.buildComponentContext(deltaTime);
       this._componentsInvoked = true;
       this.runComponentUpdate(context);
@@ -425,7 +424,7 @@ export class BossEnemy extends BaseEnemy {
         break;
     }
 
-    if (this.chargeState !== 'charging' && !this.useComponents) {
+    if (this.chargeState !== 'charging' && !(this.useComponents && this.components?.size > 0)) {
       this.applyDamping(deltaTime);
     }
 
@@ -433,11 +432,11 @@ export class BossEnemy extends BaseEnemy {
   }
 
   handlePhaseIntro(deltaTime, target) {
-    if (!this.useComponents) {
+    if (!(this.useComponents && this.components?.size > 0)) {
       this.seekPlayer(target, deltaTime, 0.55);
     }
 
-    if (!this.useComponents) {
+    if (!(this.useComponents && this.components?.size > 0)) {
       this.spreadTimer -= deltaTime;
       if (this.spreadTimer <= 0 && target?.position) {
         this.fireSpreadPattern(target.position);
@@ -447,7 +446,7 @@ export class BossEnemy extends BaseEnemy {
   }
 
   handlePhaseAssault(deltaTime, target) {
-    if (!this.useComponents) {
+    if (!(this.useComponents && this.components?.size > 0)) {
       this.seekPlayer(target, deltaTime, 0.75);
       this.updateVolleyCycle(deltaTime, target);
     }
@@ -456,7 +455,7 @@ export class BossEnemy extends BaseEnemy {
 
   handlePhaseFinale(deltaTime, target) {
     this.updateChargeState(deltaTime, target);
-    if (this.chargeState !== 'charging' && !this.useComponents) {
+    if (this.chargeState !== 'charging' && !(this.useComponents && this.components?.size > 0)) {
       this.seekPlayer(target, deltaTime, 0.9);
     }
   }
@@ -1043,6 +1042,10 @@ export class BossEnemy extends BaseEnemy {
   }
 
   takeDamage(amount, source = null) {
+    if (this.getComponent && this.getComponent('health')) {
+      return super.takeDamage(amount, source);
+    }
+
     if (!this.alive || this.invulnerable) {
       return false;
     }
@@ -1066,6 +1069,23 @@ export class BossEnemy extends BaseEnemy {
     this.evaluatePhaseTransition();
 
     return false;
+  }
+
+  onDamaged(amount, source, context = {}) {
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return;
+    }
+
+    GameDebugLogger.log('STATE', 'Boss damaged', {
+      id: this.id,
+      wave: this.wave,
+      damage: amount,
+      remaining: this.health,
+      source: source ?? null,
+      context,
+    });
+
+    this.evaluatePhaseTransition();
   }
 
   evaluatePhaseTransition() {
@@ -1182,7 +1202,7 @@ export class BossEnemy extends BaseEnemy {
   }
 
   onDraw(ctx) {
-    if (this.useComponents) {
+    if (this.useComponents && this.components?.size > 0) {
       return;
     }
 

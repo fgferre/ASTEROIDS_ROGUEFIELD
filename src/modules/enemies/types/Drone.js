@@ -55,8 +55,7 @@ export class Drone extends BaseEnemy {
     super.initialize(config);
 
     const componentConfig = config.components ?? DRONE_COMPONENTS;
-    this.useComponents = Boolean(componentConfig);
-    if (this.useComponents) {
+    if (componentConfig) {
       this.weaponState = this.weaponState || {};
       this.movementStrategy = componentConfig?.movement?.strategy || 'tracking';
       this.renderStrategy = componentConfig?.render?.strategy || 'procedural-triangle';
@@ -193,7 +192,7 @@ export class Drone extends BaseEnemy {
   }
 
   onUpdate(deltaTime) {
-    if (this.useComponents) {
+    if (this.useComponents && this.components?.size > 0) {
       if (!this._componentsInvoked) {
         const context = this.buildComponentContext(deltaTime);
         this._componentsInvoked = true;
@@ -375,7 +374,7 @@ export class Drone extends BaseEnemy {
   }
 
   onDraw(ctx) {
-    if (this.useComponents) {
+    if (this.useComponents && this.components?.size > 0) {
       return;
     }
 

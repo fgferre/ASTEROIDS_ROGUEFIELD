@@ -44,8 +44,7 @@ export class Mine extends BaseEnemy {
     super.initialize(config);
 
     const componentConfig = config.components ?? MINE_COMPONENTS;
-    this.useComponents = Boolean(componentConfig);
-    if (this.useComponents) {
+    if (componentConfig) {
       this.weaponState = this.weaponState || {};
       this.movementStrategy = componentConfig?.movement?.strategy || 'proximity';
       this.renderStrategy = componentConfig?.render?.strategy || 'procedural-sphere';
@@ -108,7 +107,7 @@ export class Mine extends BaseEnemy {
       return;
     }
 
-    if (this.useComponents) {
+    if (this.useComponents && this.components?.size > 0) {
       if (!this._componentsInvoked) {
         const context = this.buildComponentContext(deltaTime);
         this._componentsInvoked = true;
@@ -166,19 +165,35 @@ export class Mine extends BaseEnemy {
     }
   }
 
-  triggerDetonation(reason, context = {}) {
+  triggerDetonation(reasonOrPayload, context = {}) {
     if (this.detonated || !this.alive) {
       return;
     }
 
+    let cause = reasonOrPayload;
+    let resolvedContext = context;
+
+    if (typeof reasonOrPayload === 'object' && reasonOrPayload !== null) {
+      const { reason, cause: causeOverride, ...rest } = reasonOrPayload;
+      cause = causeOverride ?? reason ?? 'detonation';
+      resolvedContext = { ...rest };
+      if (context && typeof context === 'object' && Object.keys(context).length > 0) {
+        resolvedContext = { ...resolvedContext, ...context };
+      }
+    }
+
+    if (typeof cause !== 'string' || !cause.length) {
+      cause = 'detonation';
+    }
+
     this.detonated = true;
-    this.explosionCause = { cause: reason, context };
+    this.explosionCause = { cause, context: resolvedContext };
 
     const lethalDamage = Math.max(1, this.health || this.maxHealth || 1);
     this.takeDamage(lethalDamage, {
       cause: 'mine-detonation',
-      reason,
-      context,
+      reason: cause,
+      context: resolvedContext,
     });
   }
 
@@ -221,7 +236,7 @@ export class Mine extends BaseEnemy {
   }
 
   onDraw(ctx) {
-    if (this.useComponents) {
+    if (this.useComponents && this.components?.size > 0) {
       return;
     }
 
