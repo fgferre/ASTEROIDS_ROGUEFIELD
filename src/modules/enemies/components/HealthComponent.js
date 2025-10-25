@@ -134,13 +134,18 @@ export class HealthComponent {
       enemy.onDestroyed(source, context);
     }
     if (bus?.emit) {
-      bus.emit('enemy-destroyed', {
+      const hasPosition = Number.isFinite(enemy?.x) && Number.isFinite(enemy?.y);
+      const payload = {
+        enemy,
         enemyId: enemy.id,
         enemyType: enemy.type,
         wave: enemy.wave,
+        position: hasPosition ? { x: enemy.x, y: enemy.y } : null,
         source,
         context,
-      });
+      };
+
+      bus.emit('enemy-destroyed', payload);
     }
   }
 }

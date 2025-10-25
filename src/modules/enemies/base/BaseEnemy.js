@@ -172,10 +172,10 @@ export class BaseEnemy {
         system: this.system,
       };
 
-      if (renderComponent.draw.length >= 2) {
-        renderComponent.draw(ctx, this, renderContext);
-      } else {
+      if (renderComponent.draw.length <= 1) {
         renderComponent.draw(renderContext);
+      } else {
+        renderComponent.draw(ctx, this, renderContext);
       }
       return;
     }
@@ -476,6 +476,26 @@ export class BaseEnemy {
     return ENEMY_RENDER_PRESETS?.[this.type] ?? {};
   }
 
+  runComponentUpdate(context) {
+    if (!this.components || this.components.size === 0) {
+      return;
+    }
+
+    for (const component of this.components.values()) {
+      if (typeof component?.update !== 'function') {
+        continue;
+      }
+
+      if (component.update.length >= 3) {
+        component.update(this, context?.deltaTime, context);
+      } else if (component.update.length === 2) {
+        component.update(this, context?.deltaTime);
+      } else {
+        component.update(context);
+      }
+    }
+  }
+
   /**
    * Hook for subclass-specific reset logic.
    */
@@ -511,19 +531,3 @@ export class BaseEnemy {
     return `${this.type}[${this.id}] (${Math.round(this.x)}, ${Math.round(this.y)}) HP:${this.health}/${this.maxHealth}`;
   }
 }
-  runComponentUpdate(context) {
-    for (const component of this.components.values()) {
-      if (typeof component?.update !== 'function') {
-        continue;
-      }
-
-      if (component.update.length >= 3) {
-        component.update(this, context?.deltaTime, context);
-      } else if (component.update.length === 2) {
-        component.update(this, context?.deltaTime);
-      } else {
-        component.update(context);
-      }
-    }
-  }
-
