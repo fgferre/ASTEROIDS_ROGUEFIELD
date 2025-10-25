@@ -128,6 +128,8 @@ export const BOSS_PHYSICS_CONFIG = deepFreeze({
 });
 
 // === BOSS EFFECTS PRESETS ===
+// NOTE: These presets are purely visual and remain colocated with the boss data for
+// easier balancing. visual.js re-exports them to preserve existing visual imports.
 
 /**
  * Visual effect presets applied during key boss events (entrance, phase
@@ -291,6 +293,8 @@ export const BOSS_EFFECTS_PRESETS = deepFreeze({
 });
 
 // === BOSS SCREEN SHAKES ===
+// NOTE: Screen shake presets stay alongside the boss configuration while being
+// re-exported by visual.js for backwards compatibility with rendering systems.
 
 /**
  * Screen shake presets triggered by boss events.
