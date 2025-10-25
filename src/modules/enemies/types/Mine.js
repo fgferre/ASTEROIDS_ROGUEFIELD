@@ -160,16 +160,23 @@ export class Mine extends BaseEnemy {
     });
   }
 
-  onDestroyed(source = {}) {
+  onDestroyed(source) {
+    const safeSource = source ?? {};
+
     this.destroyed = true;
-    super.onDestroyed(source);
+    super.onDestroyed(safeSource);
 
     if (typeof gameEvents === 'undefined' || !gameEvents?.emit) {
       return;
     }
 
-    const cause = source.reason || this.explosionCause?.cause || 'detonation';
-    const context = source.context || this.explosionCause?.context || {};
+    const cause =
+      safeSource.reason ??
+      safeSource.cause ??
+      this.explosionCause?.cause ??
+      'detonation';
+    const context =
+      safeSource.context ?? this.explosionCause?.context ?? {};
 
     gameEvents.emit('mine-exploded', {
       enemy: this,
