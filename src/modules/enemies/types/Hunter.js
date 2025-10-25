@@ -77,28 +77,29 @@ export class Hunter extends BaseEnemy {
     this.resetForPool();
     super.initialize(config);
 
-    const defaults = HUNTER_CONFIG ?? {};
-
-    this.radius = config.radius ?? defaults.radius ?? 16;
-    this.maxHealth = config.maxHealth ?? config.health ?? defaults.health ?? 48;
+    this.radius = config.radius ?? HUNTER_DEFAULTS.radius ?? 16;
+    this.maxHealth =
+      config.maxHealth ?? config.health ?? HUNTER_DEFAULTS.health ?? 48;
     this.health = config.health ?? this.maxHealth;
 
     this.preferredDistance =
-      config.preferredDistance ?? defaults.preferredDistance ?? 175;
-    this.maxSpeed = config.maxSpeed ?? defaults.speed ?? 120;
-    this.acceleration = config.acceleration ?? defaults.acceleration ?? 220;
+      config.preferredDistance ?? HUNTER_DEFAULTS.preferredDistance ?? 175;
+    this.maxSpeed = config.maxSpeed ?? HUNTER_DEFAULTS.speed ?? 120;
+    this.acceleration =
+      config.acceleration ?? HUNTER_DEFAULTS.acceleration ?? 220;
     this.projectileSpeed =
-      config.projectileSpeed ?? defaults.projectileSpeed ?? 420;
+      config.projectileSpeed ?? HUNTER_DEFAULTS.projectileSpeed ?? 420;
     this.projectileDamage =
-      config.projectileDamage ?? defaults.projectileDamage ?? 12;
+      config.projectileDamage ?? HUNTER_DEFAULTS.projectileDamage ?? 12;
     this.projectileLifetime =
-      config.projectileLifetime ?? defaults.projectileLifetime ?? 1.5;
-    this.fireRange = config.fireRange ?? defaults.fireRange ?? 520;
-    this.fireSpread = config.fireSpread ?? defaults.fireSpread ?? 0;
+      config.projectileLifetime ?? HUNTER_DEFAULTS.projectileLifetime ?? 1.5;
+    this.fireRange = config.fireRange ?? HUNTER_DEFAULTS.fireRange ?? 520;
+    this.fireSpread = config.fireSpread ?? HUNTER_DEFAULTS.fireSpread ?? 0;
 
-    this.burstCount = config.burstCount ?? defaults.burstCount ?? 3;
-    this.burstInterval = config.burstInterval ?? defaults.burstInterval ?? 3.5;
-    this.burstDelay = config.burstDelay ?? defaults.burstDelay ?? 0.15;
+    this.burstCount = config.burstCount ?? HUNTER_DEFAULTS.burstCount ?? 3;
+    this.burstInterval =
+      config.burstInterval ?? HUNTER_DEFAULTS.burstInterval ?? 3.5;
+    this.burstDelay = config.burstDelay ?? HUNTER_DEFAULTS.burstDelay ?? 0.15;
     this.burstCooldown = this.randomRange(0.5, this.burstInterval);
     this.burstShotsRemaining = 0;
     this.burstDelayTimer = 0;

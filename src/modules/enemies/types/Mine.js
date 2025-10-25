@@ -39,23 +39,22 @@ export class Mine extends BaseEnemy {
     this.resetForPool();
     super.initialize(config);
 
-    const defaults = MINE_CONFIG ?? {};
-
-    this.radius = config.radius ?? defaults.radius ?? 18;
-    this.maxHealth = config.maxHealth ?? config.health ?? defaults.health ?? 20;
+    this.radius = config.radius ?? MINE_DEFAULTS.radius ?? 18;
+    this.maxHealth =
+      config.maxHealth ?? config.health ?? MINE_DEFAULTS.health ?? 20;
     this.health = config.health ?? this.maxHealth;
 
-    this.armTimer = config.armTime ?? defaults.armTime ?? 0.5;
-    this.lifetime = config.lifetime ?? defaults.lifetime ?? 30;
+    this.armTimer = config.armTime ?? MINE_DEFAULTS.armTime ?? 0.5;
+    this.lifetime = config.lifetime ?? MINE_DEFAULTS.lifetime ?? 30;
     this.remainingLifetime = this.lifetime;
     this.proximityRadius =
-      config.proximityRadius ?? defaults.proximityRadius ?? 80;
+      config.proximityRadius ?? MINE_DEFAULTS.proximityRadius ?? 80;
     this.explosionRadius =
-      config.explosionRadius ?? defaults.explosionRadius ?? 120;
+      config.explosionRadius ?? MINE_DEFAULTS.explosionRadius ?? 120;
     this.explosionDamage =
-      config.explosionDamage ?? defaults.explosionDamage ?? 40;
-    this.pulseSpeed = config.pulseSpeed ?? defaults.pulseSpeed ?? 2.6;
-    this.pulseAmount = config.pulseAmount ?? defaults.pulseAmount ?? 0.3;
+      config.explosionDamage ?? MINE_DEFAULTS.explosionDamage ?? 40;
+    this.pulseSpeed = config.pulseSpeed ?? MINE_DEFAULTS.pulseSpeed ?? 2.6;
+    this.pulseAmount = config.pulseAmount ?? MINE_DEFAULTS.pulseAmount ?? 0.3;
     this.pulsePhase = 0;
     this._bodyGradient = null;
     this._bodyGradientKey = null;

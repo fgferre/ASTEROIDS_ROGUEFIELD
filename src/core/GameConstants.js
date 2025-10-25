@@ -70,7 +70,6 @@ export * from '../data/enemies/asteroid-configs.js';
 export * from '../data/enemies/drone.js';
 export * from '../data/enemies/hunter.js';
 export * from '../data/enemies/mine.js';
-export * from '../data/enemies/boss.js';
 
 // Namespace exports for optional direct module access
 export {

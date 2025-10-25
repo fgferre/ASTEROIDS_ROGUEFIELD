@@ -50,28 +50,29 @@ export class Drone extends BaseEnemy {
     this.resetForPool();
     super.initialize(config);
 
-    const defaults = DRONE_CONFIG ?? {};
-
-    this.radius = config.radius ?? defaults.radius ?? 12;
-    this.maxHealth = config.maxHealth ?? config.health ?? defaults.health ?? 30;
+    this.radius = config.radius ?? DRONE_DEFAULTS.radius ?? 12;
+    this.maxHealth =
+      config.maxHealth ?? config.health ?? DRONE_DEFAULTS.health ?? 30;
     this.health = config.health ?? this.maxHealth;
-    this.contactDamage = config.contactDamage ?? defaults.contactDamage ?? 12;
+    this.contactDamage =
+      config.contactDamage ?? DRONE_DEFAULTS.contactDamage ?? 12;
 
-    this.maxSpeed = config.maxSpeed ?? defaults.speed ?? 180;
-    this.acceleration = config.acceleration ?? defaults.acceleration ?? 220;
+    this.maxSpeed = config.maxSpeed ?? DRONE_DEFAULTS.speed ?? 180;
+    this.acceleration =
+      config.acceleration ?? DRONE_DEFAULTS.acceleration ?? 220;
 
     this.projectileSpeed =
-      config.projectileSpeed ?? defaults.projectileSpeed ?? 340;
+      config.projectileSpeed ?? DRONE_DEFAULTS.projectileSpeed ?? 340;
     this.projectileDamage =
-      config.projectileDamage ?? defaults.projectileDamage ?? 15;
+      config.projectileDamage ?? DRONE_DEFAULTS.projectileDamage ?? 15;
     this.projectileLifetime =
-      config.projectileLifetime ?? defaults.projectileLifetime ?? 2.0;
+      config.projectileLifetime ?? DRONE_DEFAULTS.projectileLifetime ?? 2.0;
 
-    this.fireInterval = config.fireRate ?? defaults.fireRate ?? 2;
-    this.fireVariance = config.fireVariance ?? defaults.fireVariance ?? 0;
-    this.fireSpread = config.fireSpread ?? defaults.fireSpread ?? 0;
+    this.fireInterval = config.fireRate ?? DRONE_DEFAULTS.fireRate ?? 2;
+    this.fireVariance = config.fireVariance ?? DRONE_DEFAULTS.fireVariance ?? 0;
+    this.fireSpread = config.fireSpread ?? DRONE_DEFAULTS.fireSpread ?? 0;
     this.targetingRange =
-      config.targetingRange ?? defaults.targetingRange ?? 460;
+      config.targetingRange ?? DRONE_DEFAULTS.targetingRange ?? 460;
 
     this.random = this.resolveRandom({ ...config, id: this.id });
     this.aimRandom = this.random?.fork
