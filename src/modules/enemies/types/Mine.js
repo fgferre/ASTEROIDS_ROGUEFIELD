@@ -1,4 +1,4 @@
-import { MINE_CONFIG } from '../../../data/enemies/mine.js';
+import { MINE_COMPONENTS, MINE_CONFIG } from '../../../data/enemies/mine.js';
 import {
   ENEMY_EFFECT_COLORS,
   ENEMY_RENDER_PRESETS,
@@ -23,12 +23,16 @@ export class Mine extends BaseEnemy {
     this.explosionRadius = MINE_DEFAULTS.explosionRadius ?? 120;
     this.explosionDamage = MINE_DEFAULTS.explosionDamage ?? 40;
     this.pulsePhase = 0;
-    this.pulseSpeed = MINE_DEFAULTS.pulseSpeed ?? 2.6;
-    this.pulseAmount = MINE_DEFAULTS.pulseAmount ?? 0.3;
-    this.explosionCause = null;
-    this.destroyed = false;
-    this._bodyGradient = null;
-    this._bodyGradientKey = null;
+   this.pulseSpeed = MINE_DEFAULTS.pulseSpeed ?? 2.6;
+   this.pulseAmount = MINE_DEFAULTS.pulseAmount ?? 0.3;
+   this.explosionCause = null;
+   this.destroyed = false;
+   this._bodyGradient = null;
+   this._bodyGradientKey = null;
+    this.weaponState = {};
+    this.movementStrategy = 'proximity';
+    this.renderStrategy = 'procedural-sphere';
+    this.useComponents = false;
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);
@@ -38,6 +42,15 @@ export class Mine extends BaseEnemy {
   initialize(config = {}) {
     this.resetForPool();
     super.initialize(config);
+
+    const componentConfig = config.components ?? MINE_COMPONENTS;
+    this.useComponents = Boolean(componentConfig);
+    if (this.useComponents) {
+      this.weaponState = this.weaponState || {};
+      this.movementStrategy = componentConfig?.movement?.strategy || 'proximity';
+      this.renderStrategy = componentConfig?.render?.strategy || 'procedural-sphere';
+      this.weaponPattern = componentConfig?.weapon?.pattern || this.weaponPattern;
+    }
 
     this.radius = config.radius ?? MINE_DEFAULTS.radius ?? 18;
     this.maxHealth =
@@ -92,6 +105,16 @@ export class Mine extends BaseEnemy {
 
   onUpdate(deltaTime) {
     if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
+      return;
+    }
+
+    if (this.useComponents) {
+      if (!this._componentsInvoked) {
+        const context = this.buildComponentContext(deltaTime);
+        this._componentsInvoked = true;
+        this.runComponentUpdate(context);
+        this._componentsInvoked = false;
+      }
       return;
     }
 
@@ -198,6 +221,10 @@ export class Mine extends BaseEnemy {
   }
 
   onDraw(ctx) {
+    if (this.useComponents) {
+      return;
+    }
+
     const palette = ENEMY_EFFECT_COLORS?.mine ?? {};
     const presets = ENEMY_RENDER_PRESETS?.mine ?? {};
     const bodyPreset = presets.body ?? {};

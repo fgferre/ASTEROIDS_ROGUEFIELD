@@ -1,4 +1,4 @@
-import { HUNTER_CONFIG } from '../../../data/enemies/hunter.js';
+import { HUNTER_COMPONENTS, HUNTER_CONFIG } from '../../../data/enemies/hunter.js';
 import {
   ENEMY_EFFECT_COLORS,
   ENEMY_RENDER_PRESETS,
@@ -67,6 +67,10 @@ export class Hunter extends BaseEnemy {
     this.turretAngle = this.rotation;
     this._hullGradient = null;
     this._hullGradientKey = null;
+    this.weaponState = {};
+    this.movementStrategy = 'orbit';
+    this.renderStrategy = 'procedural-diamond';
+    this.useComponents = false;
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);
@@ -75,7 +79,19 @@ export class Hunter extends BaseEnemy {
 
   initialize(config = {}) {
     this.resetForPool();
-    super.initialize(config);
+   super.initialize(config);
+
+    const componentConfig = config.components ?? HUNTER_COMPONENTS;
+    this.useComponents = Boolean(componentConfig);
+    if (this.useComponents) {
+      this.weaponState = this.weaponState || {};
+      this.movementStrategy = componentConfig?.movement?.strategy || 'orbit';
+      this.renderStrategy = componentConfig?.render?.strategy || 'procedural-diamond';
+      this.weaponPattern = componentConfig?.weapon?.pattern || this.weaponPattern;
+      if (componentConfig?.movement?.orbitDirection) {
+        this.orbitDirection = componentConfig.movement.orbitDirection;
+      }
+    }
 
     this.radius = config.radius ?? HUNTER_DEFAULTS.radius ?? 16;
     this.maxHealth =
@@ -171,6 +187,16 @@ export class Hunter extends BaseEnemy {
 
   onUpdate(deltaTime) {
     if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
+      return;
+    }
+
+    if (this.useComponents) {
+      if (!this._componentsInvoked) {
+        const context = this.buildComponentContext(deltaTime);
+        this._componentsInvoked = true;
+        this.runComponentUpdate(context);
+        this._componentsInvoked = false;
+      }
       return;
     }
 
@@ -401,6 +427,10 @@ export class Hunter extends BaseEnemy {
   }
 
   onDraw(ctx) {
+    if (this.useComponents) {
+      return;
+    }
+
     const palette = ENEMY_EFFECT_COLORS?.hunter ?? {};
     const presets = ENEMY_RENDER_PRESETS?.hunter ?? {};
     const hullPreset = presets.hull ?? {};

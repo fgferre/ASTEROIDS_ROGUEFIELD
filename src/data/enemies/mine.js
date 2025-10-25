@@ -34,6 +34,50 @@ export const MINE_CONFIG = deepFreeze({
   pulseAmount: 0.32,
 });
 
+/**
+ * Component configuration used to compose the proximity mine enemy from
+ * reusable behaviors. Each component definition mirrors the existing inline
+ * logic so the factory can attach the appropriate strategies at spawn time.
+ *
+ * @typedef {object} MineComponents
+ * @property {object} movement - Proximity / drift behavior
+ * @property {object} weapon - Proximity-triggered explosion behavior
+ * @property {object} render - Pulsing sphere renderer tuning
+ * @property {object} collision - Collision radius and trigger response
+ * @property {object} health - Base health/armor configuration
+ */
+export const MINE_COMPONENTS = deepFreeze({
+  movement: {
+    strategy: 'proximity',
+    driftSpeed: 0,
+    lifetime: 30,
+  },
+  weapon: {
+    pattern: 'proximity',
+    damage: 40,
+    explosionRadius: 120,
+    proximityRadius: 80,
+    armTime: 0.5,
+    triggerOnProximity: true,
+  },
+  render: {
+    strategy: 'procedural-sphere',
+    showPulse: true,
+    pulseSpeed: 2.6,
+    pulseAmount: 0.32,
+  },
+  collision: {
+    shape: 'circle',
+    radius: 18,
+    response: 'trigger',
+  },
+  health: {
+    base: 20,
+    armor: 0,
+    scaling: 1.0,
+  },
+});
+
 // === MINE REWARDS ===
 
 /**

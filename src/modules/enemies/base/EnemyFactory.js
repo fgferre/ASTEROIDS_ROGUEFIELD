@@ -1,3 +1,9 @@
+import { CollisionComponent } from '../components/CollisionComponent.js';
+import { HealthComponent } from '../components/HealthComponent.js';
+import { MovementComponent } from '../components/MovementComponent.js';
+import { RenderComponent } from '../components/RenderComponent.js';
+import { WeaponComponent } from '../components/WeaponComponent.js';
+
 /**
  * Enemy Factory
  *
@@ -168,6 +174,8 @@ export class EnemyFactory {
       type: type  // Ensure type is set
     };
 
+    const componentConfig = finalConfig.components;
+
     // Initialize enemy
     try {
       if (typeof enemy.initialize === 'function') {
@@ -176,6 +184,10 @@ export class EnemyFactory {
         } else {
           enemy.initialize(this.system, finalConfig);
         }
+      }
+
+      if (componentConfig) {
+        this.applyComponents(enemy, componentConfig, finalConfig);
       }
 
       // Apply default tags
@@ -452,5 +464,93 @@ export class EnemyFactory {
     }
 
     console.groupEnd();
+  }
+
+  applyComponents(enemy, components = {}, finalConfig = {}) {
+    if (!enemy || !components) {
+      return;
+    }
+
+    enemy.useComponents = true;
+    enemy.componentState = enemy.componentState || {};
+
+    if (components.movement) {
+      const movementComponent = this.createMovementComponent(components.movement, enemy, finalConfig);
+      enemy.movementStrategy = components.movement.strategy || enemy.movementStrategy || 'linear';
+      enemy.movementConfig = { ...components.movement };
+      enemy.addComponent('movement', movementComponent);
+    }
+
+    if (components.weapon) {
+      const weaponComponent = this.createWeaponComponent(components.weapon, enemy, finalConfig);
+      enemy.weaponConfig = { ...components.weapon };
+      if (Array.isArray(components.weapon.patterns)) {
+        enemy.weaponPatterns = [...components.weapon.patterns];
+        enemy.weaponPattern = enemy.weaponPattern || components.weapon.patterns[0];
+      } else if (components.weapon.pattern) {
+        enemy.weaponPattern = components.weapon.pattern;
+      }
+      enemy.weaponState = enemy.weaponState || {};
+      enemy.addComponent('weapon', weaponComponent);
+      if (typeof weaponComponent.reset === 'function') {
+        weaponComponent.reset(enemy);
+      }
+    }
+
+    if (components.render) {
+      const renderComponent = this.createRenderComponent(components.render, enemy, finalConfig);
+      enemy.renderStrategy = components.render.strategy || enemy.renderStrategy || 'delegate';
+      enemy.renderConfig = { ...components.render };
+      enemy.addComponent('render', renderComponent);
+    }
+
+    if (components.collision) {
+      const collisionComponent = this.createCollisionComponent(components.collision, enemy, finalConfig);
+      enemy.collisionConfig = { ...components.collision };
+      if (Number.isFinite(components.collision.radius)) {
+        enemy.collisionRadius = components.collision.radius;
+        enemy.radius = enemy.radius || components.collision.radius;
+      }
+      if (components.collision.response) {
+        enemy.collisionResponse = components.collision.response;
+      }
+      enemy.addComponent('collision', collisionComponent);
+    }
+
+    if (components.health) {
+      const healthComponent = this.createHealthComponent(components.health, enemy, finalConfig);
+      enemy.addComponent('health', healthComponent);
+      if (typeof healthComponent.initialize === 'function') {
+        healthComponent.initialize(enemy, components.health);
+      }
+    }
+  }
+
+  createMovementComponent(config = {}) {
+    const component = new MovementComponent(config);
+    if (typeof component.setStrategy === 'function' && config.strategy) {
+      component.setStrategy(config.strategy);
+    }
+    return component;
+  }
+
+  createWeaponComponent(config = {}) {
+    return new WeaponComponent(config);
+  }
+
+  createRenderComponent(config = {}) {
+    const component = new RenderComponent(config);
+    if (typeof component.setStrategy === 'function' && config.strategy) {
+      component.setStrategy(config.strategy);
+    }
+    return component;
+  }
+
+  createCollisionComponent(config = {}) {
+    return new CollisionComponent(config);
+  }
+
+  createHealthComponent(config = {}) {
+    return new HealthComponent(config);
   }
 }

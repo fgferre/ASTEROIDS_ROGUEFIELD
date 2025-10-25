@@ -25,6 +25,12 @@
  * ```
  */
 
+import {
+  ENEMY_EFFECT_COLORS,
+  ENEMY_RENDER_PRESETS,
+} from '../../../data/constants/visual.js';
+import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
+
 let fallbackEnemyIdSequence = 0;
 
 export class BaseEnemy {
@@ -73,6 +79,8 @@ export class BaseEnemy {
 
     // Components (to be set by subclasses)
     this.components = new Map();
+    this.componentState = {};
+    this._componentsInvoked = false;
 
     // Metadata
     this.tags = new Set();  // For categorization: 'boss', 'minion', 'volatile'
@@ -125,15 +133,13 @@ export class BaseEnemy {
     // Update rotation
     this.rotation += this.rotationSpeed * deltaTime;
 
-    // Update components
-    for (const component of this.components.values()) {
-      if (component.update) {
-        component.update(deltaTime);
-      }
-    }
+    const context = this.buildComponentContext(deltaTime);
+    this._componentsInvoked = true;
+    this.runComponentUpdate(context);
 
     // Subclass hook
     this.onUpdate(deltaTime);
+    this._componentsInvoked = false;
   }
 
   /**
@@ -158,7 +164,19 @@ export class BaseEnemy {
     // Delegate to render component if available
     const renderComponent = this.components.get('render');
     if (renderComponent && renderComponent.draw) {
-      renderComponent.draw(ctx);
+      const renderContext = {
+        enemy: this,
+        ctx,
+        colors: this.getColors(),
+        presets: this.getPresets(),
+        system: this.system,
+      };
+
+      if (renderComponent.draw.length >= 2) {
+        renderComponent.draw(ctx, this, renderContext);
+      } else {
+        renderComponent.draw(renderContext);
+      }
       return;
     }
 
@@ -297,6 +315,10 @@ export class BaseEnemy {
     }
   }
 
+  hasComponent(name) {
+    return this.components.has(name);
+  }
+
   /**
    * Gets a component by name.
    *
@@ -335,6 +357,7 @@ export class BaseEnemy {
     this.alive = false;
     this.initialized = false;
     this.visible = true;
+    this.useComponents = false;
 
     // Reset position & velocity
     this.x = 0;
@@ -363,12 +386,94 @@ export class BaseEnemy {
     // Reset components
     for (const component of this.components.values()) {
       if (component.reset) {
-        component.reset();
+        component.reset(this);
       }
     }
 
+    this.componentState = {};
+
     // Subclass hook
     this.onReset();
+  }
+
+  buildComponentContext(deltaTime) {
+    const system = this.system || null;
+    const player =
+      system && typeof system.getCachedPlayer === 'function'
+        ? system.getCachedPlayer()
+        : null;
+    const playerPosition =
+      player && typeof system?.getPlayerPositionSnapshot === 'function'
+        ? system.getPlayerPositionSnapshot(player)
+        : player?.position ||
+          (Number.isFinite(player?.x) && Number.isFinite(player?.y)
+            ? { x: player.x, y: player.y }
+            : null);
+
+    const validPlayerPosition =
+      playerPosition &&
+      Number.isFinite(playerPosition.x) &&
+      Number.isFinite(playerPosition.y)
+        ? playerPosition
+        : null;
+
+    const random =
+      this.random ||
+      (system && typeof system.getRandomService === 'function'
+        ? system.getRandomService()
+        : null);
+
+    const worldBounds = this.resolveWorldBounds(system);
+
+    return {
+      enemy: this,
+      deltaTime,
+      system,
+      player: validPlayerPosition
+        ? {
+            entity: player ?? null,
+            position: validPlayerPosition,
+          }
+        : null,
+      playerEntity: player ?? null,
+      playerPosition: validPlayerPosition,
+      random,
+      worldBounds,
+    };
+  }
+
+  resolveWorldBounds(system) {
+    const bounds =
+      system?.worldBounds ||
+      (typeof system?.getWorldBounds === 'function' ? system.getWorldBounds() : null);
+
+    if (bounds) {
+      return {
+        left: bounds.left ?? 0,
+        top: bounds.top ?? 0,
+        right: bounds.right ?? bounds.width ?? GAME_WIDTH,
+        bottom: bounds.bottom ?? bounds.height ?? GAME_HEIGHT,
+        width: bounds.width ?? (bounds.right ?? GAME_WIDTH) - (bounds.left ?? 0),
+        height: bounds.height ?? (bounds.bottom ?? GAME_HEIGHT) - (bounds.top ?? 0),
+      };
+    }
+
+    return {
+      left: 0,
+      top: 0,
+      right: GAME_WIDTH,
+      bottom: GAME_HEIGHT,
+      width: GAME_WIDTH,
+      height: GAME_HEIGHT,
+    };
+  }
+
+  getColors() {
+    return ENEMY_EFFECT_COLORS?.[this.type] ?? {};
+  }
+
+  getPresets() {
+    return ENEMY_RENDER_PRESETS?.[this.type] ?? {};
   }
 
   /**
@@ -406,3 +511,19 @@ export class BaseEnemy {
     return `${this.type}[${this.id}] (${Math.round(this.x)}, ${Math.round(this.y)}) HP:${this.health}/${this.maxHealth}`;
   }
 }
+  runComponentUpdate(context) {
+    for (const component of this.components.values()) {
+      if (typeof component?.update !== 'function') {
+        continue;
+      }
+
+      if (component.update.length >= 3) {
+        component.update(this, context?.deltaTime, context);
+      } else if (component.update.length === 2) {
+        component.update(this, context?.deltaTime);
+      } else {
+        component.update(context);
+      }
+    }
+  }
+
