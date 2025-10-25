@@ -1,5 +1,7 @@
 // src/data/upgrades/categories.js
 
+import { deepFreeze } from '../../utils/deepFreeze.js';
+
 /**
  * @typedef {Object} UpgradeCategory
  * @property {string} id Unique identifier for the category.
@@ -9,7 +11,7 @@
  * @property {string} themeColor Hex color used for UI theming.
  */
 
-export const UPGRADE_CATEGORIES = {
+export const UPGRADE_CATEGORIES = deepFreeze({
   offense: {
     id: 'offense',
     label: 'Ofensiva',
@@ -40,4 +42,4 @@ export const UPGRADE_CATEGORIES = {
     icon: '🧲',
     themeColor: '#C08BFF',
   },
-};
+});

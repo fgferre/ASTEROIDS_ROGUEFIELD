@@ -1,8 +1,10 @@
 // src/data/upgrades/defense.js
 
+import { deepFreeze } from '../../utils/deepFreeze.js';
+
 // === DEFENSIVE UPGRADES ===
 
-export const DEFENSE_UPGRADES = [
+export const DEFENSE_UPGRADES = deepFreeze([
   {
     id: 'shield',
     category: 'defense',
@@ -174,4 +176,4 @@ export const DEFENSE_UPGRADES = [
       },
     ],
   },
-];
+]);

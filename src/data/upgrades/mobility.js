@@ -1,8 +1,10 @@
 // src/data/upgrades/mobility.js
 
+import { deepFreeze } from '../../utils/deepFreeze.js';
+
 // === MOBILITY UPGRADES ===
 
-export const MOBILITY_UPGRADES = [
+export const MOBILITY_UPGRADES = deepFreeze([
   {
     id: 'propulsors',
     category: 'mobility',
@@ -402,4 +404,4 @@ export const MOBILITY_UPGRADES = [
       },
     ],
   },
-];
+]);

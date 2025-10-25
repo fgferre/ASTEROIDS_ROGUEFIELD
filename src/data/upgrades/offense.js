@@ -1,8 +1,10 @@
 // src/data/upgrades/offense.js
 
+import { deepFreeze } from '../../utils/deepFreeze.js';
+
 // === OFFENSIVE UPGRADES ===
 
-export const OFFENSE_UPGRADES = [
+export const OFFENSE_UPGRADES = deepFreeze([
   {
     id: 'plasma',
     category: 'offense',
@@ -227,4 +229,4 @@ export const OFFENSE_UPGRADES = [
       },
     ],
   },
-];
+]);

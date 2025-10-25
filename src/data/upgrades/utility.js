@@ -1,8 +1,10 @@
 // src/data/upgrades/utility.js
 
+import { deepFreeze } from '../../utils/deepFreeze.js';
+
 // === UTILITY UPGRADES ===
 
-export const UTILITY_UPGRADES = [
+export const UTILITY_UPGRADES = deepFreeze([
   {
     id: 'magfield',
     category: 'utility',
@@ -108,4 +110,4 @@ export const UTILITY_UPGRADES = [
       },
     ],
   },
-];
+]);
