@@ -494,12 +494,17 @@ export class Asteroid extends BaseEnemy {
   }
 
   generateCrackLayers() {
+    const crackRandomSeed = this.crackSeed ^ 0x9e3779;
+    const crackRng = this.createSeededRandom(crackRandomSeed);
+
     const context = {
       vertices: this.vertices,
       polygonEdges: this.polygonEdges,
       radius: this.radius,
       minSurfaceRadius: this.minSurfaceRadius,
       crackSeed: this.crackSeed,
+      randomSeed: crackRandomSeed,
+      rng: crackRng,
       crackProfileKey: this.crackProfileKey,
       id: this.id,
       generation: this.generation,

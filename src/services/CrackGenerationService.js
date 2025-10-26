@@ -166,6 +166,8 @@ class CrackGenerationService {
    * @param {string} context.crackProfileKey - Profile identifier.
    * @param {string} [context.id] - Entity identifier for debugging.
    * @param {number} [context.generation] - Fragment generation depth.
+   * @param {() => number} [context.rng] - Optional seeded RNG to reuse.
+   * @param {number} [context.randomSeed] - Optional override for RNG seeding.
    * @param {Object} [crackProfile] - Optional crack profile override.
    * @returns {{layers: Array, segments: Array, segmentLookup: Object}}
    */
@@ -191,6 +193,17 @@ class CrackGenerationService {
     const crackSeed = Number.isFinite(context?.crackSeed)
       ? context.crackSeed
       : 0;
+
+    const providedRandom =
+      typeof context?.rng === 'function'
+        ? context.rng
+        : typeof context?.seededRandom === 'function'
+        ? context.seededRandom
+        : null;
+
+    const baseSeed = Number.isFinite(context?.randomSeed)
+      ? context.randomSeed
+      : crackSeed ^ 0x9e3779;
 
     const profile =
       crackProfile ||
@@ -245,7 +258,7 @@ class CrackGenerationService {
         0.5,
     };
 
-    const seededRandom = this.createSeededRandom(crackSeed ^ 0x9e3779);
+    const seededRandom = providedRandom || this.createSeededRandom(baseSeed);
     const baseRotation = seededRandom() * Math.PI * 2;
     const rotationJitter = profile?.rotationJitter ?? 0.3;
 
@@ -454,6 +467,7 @@ class CrackGenerationService {
         });
 
         if (segment) {
+          segment.continuation = 0;
           trunkRecords.push({
             id: segment.id,
             segment,
@@ -527,6 +541,7 @@ class CrackGenerationService {
           trunk.continuation = continuationCount + 1;
           trunk.angle = angle;
           trunk.stage = stageNumber;
+          segment.continuation = trunk.continuation;
         } else {
           trunk.exhausted = true;
         }
