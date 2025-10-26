@@ -19,6 +19,7 @@ import {
   ASTEROID_FRAGMENT_RULES,
   ASTEROID_VARIANTS,
 } from '../../../data/enemies/asteroid-configs.js';
+import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 
 /**
  * Asteroid Enemy Type
@@ -204,6 +205,22 @@ export class Asteroid extends BaseEnemy {
     this.variantConfig =
       ASTEROID_VARIANTS[this.variant] ||
       ASTEROID_VARIANTS.common;
+
+    GameDebugLogger.log('STATE', 'Asteroid initialized', {
+      configReceived: {
+        size: options?.size,
+        variant: options?.variant,
+      },
+      propertiesSet: {
+        size: this.size,
+        variant: this.variant,
+        radius: this.radius,
+        variantKey: this.variantConfig?.key,
+      },
+      expectedRadius: ASTEROID_SIZES[this.size],
+      radiusMatch: this.radius === ASTEROID_SIZES[this.size],
+      configApplied: this.size === options?.size && this.variant === options?.variant,
+    });
 
     this.crackProfileKey =
       this.variantConfig?.crackProfile || this.variant || 'default';
@@ -1624,10 +1641,30 @@ export class Asteroid extends BaseEnemy {
    */
   draw(ctx) {
     ctx.save();
+    const colors = this.getVariantColors();
+
+    const now = Date.now();
+    if (
+      this._lastRenderLogTs === undefined ||
+      now - this._lastRenderLogTs >= 1000
+    ) {
+      GameDebugLogger.log('RENDER', 'Asteroid rendered', {
+        size: this.size,
+        variant: this.variant,
+        radius: this.radius,
+        colors: {
+          fill: colors?.fill,
+          stroke: colors?.stroke,
+        },
+        verticesLength: this.vertices?.length ?? 0,
+        renderMatch: this.radius === ASTEROID_SIZES[this.size],
+      });
+      this._lastRenderLogTs = now;
+    }
+
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rotation);
 
-    const colors = this.getVariantColors();
     const isFlashing = this.lastDamageTime > 0;
     const visual = this.variantConfig?.visual || {};
     const isVolatile = this.behavior?.type === 'volatile';

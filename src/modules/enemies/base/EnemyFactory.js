@@ -3,6 +3,7 @@ import { HealthComponent } from '../components/HealthComponent.js';
 import { MovementComponent } from '../components/MovementComponent.js';
 import { RenderComponent } from '../components/RenderComponent.js';
 import { WeaponComponent } from '../components/WeaponComponent.js';
+import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 
 /**
  * Enemy Factory
@@ -173,6 +174,27 @@ export class EnemyFactory {
       ...config,
       type: type  // Ensure type is set
     };
+
+    if (type === 'asteroid') {
+      GameDebugLogger.log('STATE', 'Factory config merge', {
+        type: 'asteroid',
+        defaults: {
+          size: typeConfig.defaults?.size,
+          variant: typeConfig.defaults?.variant,
+        },
+        provided: {
+          size: config?.size,
+          variant: config?.variant,
+        },
+        merged: {
+          size: finalConfig?.size,
+          variant: finalConfig?.variant,
+        },
+        mergeCorrect:
+          finalConfig?.size === (config?.size ?? typeConfig.defaults?.size) &&
+          finalConfig?.variant === (config?.variant ?? typeConfig.defaults?.variant),
+      });
+    }
 
     const componentConfig = finalConfig.components;
 
