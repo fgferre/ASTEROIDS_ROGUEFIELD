@@ -132,7 +132,7 @@ export class Asteroid extends BaseEnemy {
    * Initializes the asteroid with configuration.
    * Overrides BaseEnemy.initialize() to add asteroid-specific setup.
    */
-  initialize(system, config = {}) {
+  initialize(system, config) {
     const options = config || {};
 
     // Reset first
