@@ -1,5 +1,4 @@
 import { ASTEROID_SPEEDS } from '../../../data/constants/physics.js';
-import { ASTEROID_FRAGMENT_RULES } from '../../../data/enemies/asteroid-configs.js';
 
 /**
  * FragmentationSystem centralizes logic for generating enemy fragments.
@@ -103,11 +102,7 @@ export class FragmentationSystem {
     }
 
     const newSize = entity.size === 'large' ? 'medium' : 'small';
-    const rules =
-      fragmentRules ||
-      entity.fragmentProfile ||
-      ASTEROID_FRAGMENT_RULES?.[entity.fragmentProfileKey] ||
-      ASTEROID_FRAGMENT_RULES.default;
+    const rules = fragmentRules || entity.fragmentProfile || {};
 
     const currentGeneration = entity.generation ?? 0;
     const maxGeneration = rules?.maxGeneration;
@@ -124,15 +119,15 @@ export class FragmentationSystem {
       (entity.crackSeed ?? 0) ^ 0x5e17
     );
 
-    let fragmentCount = FragmentationSystem.resolveCount(countRange, seededRandom);
+    const fragmentCount = FragmentationSystem.resolveCount(countRange, seededRandom);
     if (fragmentCount <= 0) {
-      fragmentCount = 1;
+      return [];
     }
 
     const fragments = [];
     const baseSpeed = ASTEROID_SPEEDS[newSize] || 40;
     const speedRange =
-      rules?.speedMultiplierBySize?.[entity.size] ||
+      rules?.speedMultiplierBySize?.[newSize] ||
       rules?.speedMultiplierBySize?.default ||
       [0.85, 1.2];
     const inheritVelocity = rules?.inheritVelocity ?? 0.4;
