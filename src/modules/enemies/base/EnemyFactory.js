@@ -191,7 +191,8 @@ export class EnemyFactory {
           variant: finalConfig?.variant,
         },
         mergeCorrect:
-          finalConfig?.size === config?.size && finalConfig?.variant === config?.variant,
+          finalConfig?.size === (config?.size ?? typeConfig.defaults?.size) &&
+          finalConfig?.variant === (config?.variant ?? typeConfig.defaults?.variant),
       });
     }
 

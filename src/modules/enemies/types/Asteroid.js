@@ -1643,17 +1643,24 @@ export class Asteroid extends BaseEnemy {
     ctx.save();
     const colors = this.getVariantColors();
 
-    GameDebugLogger.log('RENDER', 'Asteroid rendered', {
-      size: this.size,
-      variant: this.variant,
-      radius: this.radius,
-      colors: {
-        fill: colors?.fill,
-        stroke: colors?.stroke,
-      },
-      verticesLength: this.vertices?.length ?? 0,
-      renderMatch: this.radius === ASTEROID_SIZES[this.size],
-    });
+    const now = Date.now();
+    if (
+      this._lastRenderLogTs === undefined ||
+      now - this._lastRenderLogTs >= 1000
+    ) {
+      GameDebugLogger.log('RENDER', 'Asteroid rendered', {
+        size: this.size,
+        variant: this.variant,
+        radius: this.radius,
+        colors: {
+          fill: colors?.fill,
+          stroke: colors?.stroke,
+        },
+        verticesLength: this.vertices?.length ?? 0,
+        renderMatch: this.radius === ASTEROID_SIZES[this.size],
+      });
+      this._lastRenderLogTs = now;
+    }
 
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rotation);
