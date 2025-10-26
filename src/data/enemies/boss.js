@@ -93,6 +93,68 @@ export const BOSS_CONFIG = deepFreeze({
   phaseColors: Object.freeze(['#ff6b6b', '#f9c74f', '#4d96ff']),
 });
 
+/**
+ * Component configuration that assembles the boss enemy from modular behaviors.
+ * Movement, weapon patterns, rendering, collision and health management are
+ * delegated to reusable components defined here so the boss class can focus on
+ * phase orchestration and minion control.
+ *
+ * @typedef {object} BossComponents
+ * @property {object} movement - Seeking movement strategy configuration
+ * @property {object} weapon - Multi-pattern weapon configuration
+ * @property {object} render - Procedural boss renderer tuning
+ * @property {object} collision - Collision radius/response parameters
+ * @property {object} health - Health/armor/phase configuration
+ */
+export const BOSS_COMPONENTS = deepFreeze({
+  movement: {
+    strategy: 'seeking',
+    speed: 60,
+    acceleration: 120,
+    maxSpeed: 60,
+    safeDistance: 240,
+    damping: 0.95,
+  },
+  weapon: {
+    patterns: ['spread', 'volley'],
+    spread: {
+      projectileCount: 7,
+      speed: 260,
+      interval: 2.4,
+      variance: 0.45,
+      arc: 0.85,
+      angleVariance: 0.12,
+    },
+    volley: {
+      burstSize: 5,
+      shotDelay: 0.16,
+      interval: 1.35,
+      variance: 0.2,
+      speed: 320,
+      spread: 0.12,
+    },
+    damage: 35,
+  },
+  render: {
+    strategy: 'procedural-boss',
+    showAura: true,
+    showPhaseColor: true,
+  },
+  collision: {
+    shape: 'circle',
+    radius: 60,
+    response: 'damage',
+    contactDamage: 45,
+  },
+  health: {
+    base: 1500,
+    armor: 0,
+    scaling: 1.2,
+    phaseThresholds: [0.66, 0.33],
+    invulnerabilityDuration: 2.0,
+  },
+});
+
 // === BOSS PHYSICS ===
 
 /**

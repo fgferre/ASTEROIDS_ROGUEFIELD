@@ -1,4 +1,4 @@
-import { DRONE_CONFIG } from '../../../data/enemies/drone.js';
+import { DRONE_COMPONENTS, DRONE_CONFIG } from '../../../data/enemies/drone.js';
 import {
   ENEMY_EFFECT_COLORS,
   ENEMY_RENDER_PRESETS,
@@ -40,6 +40,10 @@ export class Drone extends BaseEnemy {
     this.contactDamage = DRONE_DEFAULTS.contactDamage ?? 12;
     this.destroyed = false;
     this._renderThrust = 0;
+    this.weaponState = {};
+    this.movementStrategy = 'tracking';
+    this.renderStrategy = 'procedural-triangle';
+    this.useComponents = false;
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);
@@ -49,6 +53,14 @@ export class Drone extends BaseEnemy {
   initialize(config = {}) {
     this.resetForPool();
     super.initialize(config);
+
+    const componentConfig = config.components ?? DRONE_COMPONENTS;
+    if (componentConfig) {
+      this.weaponState = this.weaponState || {};
+      this.movementStrategy = componentConfig?.movement?.strategy || 'tracking';
+      this.renderStrategy = componentConfig?.render?.strategy || 'procedural-triangle';
+      this.weaponPattern = componentConfig?.weapon?.pattern || this.weaponPattern;
+    }
 
     this.radius = config.radius ?? DRONE_DEFAULTS.radius ?? 12;
     this.maxHealth =
@@ -180,6 +192,16 @@ export class Drone extends BaseEnemy {
   }
 
   onUpdate(deltaTime) {
+    if (this.useComponents && this.components?.size > 0) {
+      if (!this._componentsInvoked) {
+        const context = this.buildComponentContext(deltaTime);
+        this._componentsInvoked = true;
+        this.runComponentUpdate(context);
+        this._componentsInvoked = false;
+      }
+      return;
+    }
+
     const player =
       this.system && typeof this.system.getCachedPlayer === 'function'
         ? this.system.getCachedPlayer()
@@ -352,6 +374,10 @@ export class Drone extends BaseEnemy {
   }
 
   onDraw(ctx) {
+    if (this.useComponents && this.components?.size > 0) {
+      return;
+    }
+
     const palette = ENEMY_EFFECT_COLORS?.drone ?? {};
     const presets = ENEMY_RENDER_PRESETS?.drone ?? {};
     const hullPreset = presets.hull ?? {};

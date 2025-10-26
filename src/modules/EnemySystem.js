@@ -14,6 +14,11 @@ import { RewardManager } from './enemies/managers/RewardManager.js';
 import { AsteroidMovement } from './enemies/components/AsteroidMovement.js';
 import { AsteroidCollision } from './enemies/components/AsteroidCollision.js';
 import { AsteroidRenderer } from './enemies/components/AsteroidRenderer.js';
+import { CollisionComponent } from './enemies/components/CollisionComponent.js';
+import { HealthComponent } from './enemies/components/HealthComponent.js';
+import { MovementComponent } from './enemies/components/MovementComponent.js';
+import { RenderComponent } from './enemies/components/RenderComponent.js';
+import { WeaponComponent } from './enemies/components/WeaponComponent.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 import {
   ASTEROIDS_PER_WAVE_BASE,
@@ -31,6 +36,10 @@ import {
   WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
 } from '../data/constants/gameplay.js';
 import { ENEMY_TYPES, BOSS_CONFIG } from '../data/constants/visual.js';
+import { DRONE_COMPONENTS } from '../data/enemies/drone.js';
+import { HUNTER_COMPONENTS } from '../data/enemies/hunter.js';
+import { MINE_COMPONENTS } from '../data/enemies/mine.js';
+import { BOSS_COMPONENTS } from '../data/enemies/boss.js';
 import {
   ASTEROID_VARIANTS,
   ASTEROID_VARIANT_CHANCES,
@@ -117,6 +126,11 @@ class EnemySystem {
     this.movementComponent = null;
     this.collisionComponent = null;
     this.rendererComponent = null;
+    this.genericMovement = null;
+    this.genericWeapon = null;
+    this.genericRender = null;
+    this.genericCollision = null;
+    this.genericHealth = null;
     this.useComponents = true; // Feature flag to enable component system
 
     this.eventBus = typeof gameEvents !== 'undefined' ? gameEvents : null;
@@ -746,7 +760,7 @@ class EnemySystem {
         this.factory.registerType('drone', {
           class: Drone,
           pool: GamePools?.drones || null,
-          defaults: { ...ENEMY_TYPES.drone },
+          defaults: { ...ENEMY_TYPES.drone, components: DRONE_COMPONENTS },
           tags: ['enemy', 'hostile', 'ranged']
         });
       }
@@ -755,7 +769,7 @@ class EnemySystem {
         this.factory.registerType('mine', {
           class: Mine,
           pool: GamePools?.mines || null,
-          defaults: { ...ENEMY_TYPES.mine },
+          defaults: { ...ENEMY_TYPES.mine, components: MINE_COMPONENTS },
           tags: ['enemy', 'explosive', 'area-of-effect']
         });
       }
@@ -764,7 +778,7 @@ class EnemySystem {
         this.factory.registerType('hunter', {
           class: Hunter,
           pool: GamePools?.hunters || null,
-          defaults: { ...ENEMY_TYPES.hunter },
+          defaults: { ...ENEMY_TYPES.hunter, components: HUNTER_COMPONENTS },
           tags: ['enemy', 'hostile', 'ranged', 'elite']
         });
       }
@@ -784,7 +798,7 @@ class EnemySystem {
         this.factory.registerType('boss', {
           class: BossEnemy,
           pool: GamePools?.bosses || null,
-          defaults: bossDefaults,
+          defaults: { ...bossDefaults, components: BOSS_COMPONENTS },
           tags: ['enemy', 'boss', 'elite']
         });
       }
@@ -851,11 +865,24 @@ class EnemySystem {
       // Initialize renderer component
       this.rendererComponent = new AsteroidRenderer();
       console.log('[EnemySystem] AsteroidRenderer component initialized');
+
+      this.genericMovement = new MovementComponent();
+      this.genericWeapon = new WeaponComponent();
+      this.genericRender = new RenderComponent();
+      this.genericCollision = new CollisionComponent();
+      this.genericHealth = new HealthComponent();
+
+      console.log('[EnemySystem] Generic enemy components initialized');
     } catch (error) {
       console.warn('[EnemySystem] Failed to initialize components', error);
       this.movementComponent = null;
       this.collisionComponent = null;
       this.rendererComponent = null;
+      this.genericMovement = null;
+      this.genericWeapon = null;
+      this.genericRender = null;
+      this.genericCollision = null;
+      this.genericHealth = null;
       this.useComponents = false;
     }
   }
