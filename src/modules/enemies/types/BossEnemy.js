@@ -1,5 +1,5 @@
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
-import { BOSS_CONFIG } from '../../../data/constants/visual.js';
+import { BOSS_COMPONENTS, BOSS_CONFIG } from '../../../data/enemies/boss.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
@@ -145,6 +145,10 @@ export class BossEnemy extends BaseEnemy {
     this._lastFallbackReason = null;
     this._invulnLog = 0;
     this._lastInvulnerabilityState = null;
+    this.weaponState = {};
+    this.movementStrategy = 'seeking';
+    this.renderStrategy = 'procedural-boss';
+    this.useComponents = false;
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);
@@ -154,6 +158,19 @@ export class BossEnemy extends BaseEnemy {
   initialize(config = {}) {
     this.resetForPool();
     super.initialize(config);
+
+    const componentConfig = config.components ?? BOSS_COMPONENTS;
+    if (componentConfig) {
+      this.weaponState = this.weaponState || {};
+      this.movementStrategy = componentConfig?.movement?.strategy || 'seeking';
+      this.renderStrategy = componentConfig?.render?.strategy || 'procedural-boss';
+      if (Array.isArray(componentConfig?.weapon?.patterns)) {
+        this.weaponPatterns = [...componentConfig.weapon.patterns];
+        this.weaponPattern = this.weaponPattern || componentConfig.weapon.patterns[0];
+      } else if (componentConfig?.weapon?.pattern) {
+        this.weaponPattern = componentConfig.weapon.pattern;
+      }
+    }
 
     const defaults = BOSS_DEFAULTS;
 
@@ -358,6 +375,13 @@ export class BossEnemy extends BaseEnemy {
       return;
     }
 
+    if (this.useComponents && this.components?.size > 0 && !this._componentsInvoked) {
+      const context = this.buildComponentContext(deltaTime);
+      this._componentsInvoked = true;
+      this.runComponentUpdate(context);
+      this._componentsInvoked = false;
+    }
+
     const now = Date.now();
     if (!this._lastUpdateLog || now - this._lastUpdateLog > 2000) {
       const velocity = {
@@ -400,7 +424,7 @@ export class BossEnemy extends BaseEnemy {
         break;
     }
 
-    if (this.chargeState !== 'charging') {
+    if (this.chargeState !== 'charging' && !(this.useComponents && this.components?.size > 0)) {
       this.applyDamping(deltaTime);
     }
 
@@ -408,24 +432,30 @@ export class BossEnemy extends BaseEnemy {
   }
 
   handlePhaseIntro(deltaTime, target) {
-    this.seekPlayer(target, deltaTime, 0.55);
+    if (!(this.useComponents && this.components?.size > 0)) {
+      this.seekPlayer(target, deltaTime, 0.55);
+    }
 
-    this.spreadTimer -= deltaTime;
-    if (this.spreadTimer <= 0 && target?.position) {
-      this.fireSpreadPattern(target.position);
-      this.spreadTimer = this.computeSpreadInterval();
+    if (!(this.useComponents && this.components?.size > 0)) {
+      this.spreadTimer -= deltaTime;
+      if (this.spreadTimer <= 0 && target?.position) {
+        this.fireSpreadPattern(target.position);
+        this.spreadTimer = this.computeSpreadInterval();
+      }
     }
   }
 
   handlePhaseAssault(deltaTime, target) {
-    this.seekPlayer(target, deltaTime, 0.75);
-    this.updateVolleyCycle(deltaTime, target);
+    if (!(this.useComponents && this.components?.size > 0)) {
+      this.seekPlayer(target, deltaTime, 0.75);
+      this.updateVolleyCycle(deltaTime, target);
+    }
     this.updateMinionSpawns(deltaTime);
   }
 
   handlePhaseFinale(deltaTime, target) {
     this.updateChargeState(deltaTime, target);
-    if (this.chargeState !== 'charging') {
+    if (this.chargeState !== 'charging' && !(this.useComponents && this.components?.size > 0)) {
       this.seekPlayer(target, deltaTime, 0.9);
     }
   }
@@ -1012,6 +1042,10 @@ export class BossEnemy extends BaseEnemy {
   }
 
   takeDamage(amount, source = null) {
+    if (this.getComponent && this.getComponent('health')) {
+      return super.takeDamage(amount, source);
+    }
+
     if (!this.alive || this.invulnerable) {
       return false;
     }
@@ -1035,6 +1069,23 @@ export class BossEnemy extends BaseEnemy {
     this.evaluatePhaseTransition();
 
     return false;
+  }
+
+  onDamaged(amount, source, context = {}) {
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return;
+    }
+
+    GameDebugLogger.log('STATE', 'Boss damaged', {
+      id: this.id,
+      wave: this.wave,
+      damage: amount,
+      remaining: this.health,
+      source: source ?? null,
+      context,
+    });
+
+    this.evaluatePhaseTransition();
   }
 
   evaluatePhaseTransition() {
@@ -1151,6 +1202,10 @@ export class BossEnemy extends BaseEnemy {
   }
 
   onDraw(ctx) {
+    if (this.useComponents && this.components?.size > 0) {
+      return;
+    }
+
     if (!this._drawLogged) {
       GameDebugLogger.log('RENDER', 'Boss.onDraw() first call', {
         id: this.id,

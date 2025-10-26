@@ -1,12 +1,12 @@
+import { HUNTER_COMPONENTS, HUNTER_CONFIG } from '../../../data/enemies/hunter.js';
 import {
   ENEMY_EFFECT_COLORS,
   ENEMY_RENDER_PRESETS,
-  ENEMY_TYPES,
 } from '../../../data/constants/visual.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
-const HUNTER_DEFAULTS = ENEMY_TYPES?.hunter ?? {};
+const HUNTER_DEFAULTS = HUNTER_CONFIG ?? {};
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -67,6 +67,10 @@ export class Hunter extends BaseEnemy {
     this.turretAngle = this.rotation;
     this._hullGradient = null;
     this._hullGradientKey = null;
+    this.weaponState = {};
+    this.movementStrategy = 'orbit';
+    this.renderStrategy = 'procedural-diamond';
+    this.useComponents = false;
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);
@@ -75,30 +79,42 @@ export class Hunter extends BaseEnemy {
 
   initialize(config = {}) {
     this.resetForPool();
-    super.initialize(config);
+   super.initialize(config);
 
-    const defaults = ENEMY_TYPES?.hunter ?? {};
+    const componentConfig = config.components ?? HUNTER_COMPONENTS;
+    if (componentConfig) {
+      this.weaponState = this.weaponState || {};
+      this.movementStrategy = componentConfig?.movement?.strategy || 'orbit';
+      this.renderStrategy = componentConfig?.render?.strategy || 'procedural-diamond';
+      this.weaponPattern = componentConfig?.weapon?.pattern || this.weaponPattern;
+      if (componentConfig?.movement?.orbitDirection) {
+        this.orbitDirection = componentConfig.movement.orbitDirection;
+      }
+    }
 
-    this.radius = config.radius ?? defaults.radius ?? 16;
-    this.maxHealth = config.maxHealth ?? config.health ?? defaults.health ?? 48;
+    this.radius = config.radius ?? HUNTER_DEFAULTS.radius ?? 16;
+    this.maxHealth =
+      config.maxHealth ?? config.health ?? HUNTER_DEFAULTS.health ?? 48;
     this.health = config.health ?? this.maxHealth;
 
     this.preferredDistance =
-      config.preferredDistance ?? defaults.preferredDistance ?? 175;
-    this.maxSpeed = config.maxSpeed ?? defaults.speed ?? 120;
-    this.acceleration = config.acceleration ?? defaults.acceleration ?? 220;
+      config.preferredDistance ?? HUNTER_DEFAULTS.preferredDistance ?? 175;
+    this.maxSpeed = config.maxSpeed ?? HUNTER_DEFAULTS.speed ?? 120;
+    this.acceleration =
+      config.acceleration ?? HUNTER_DEFAULTS.acceleration ?? 220;
     this.projectileSpeed =
-      config.projectileSpeed ?? defaults.projectileSpeed ?? 420;
+      config.projectileSpeed ?? HUNTER_DEFAULTS.projectileSpeed ?? 420;
     this.projectileDamage =
-      config.projectileDamage ?? defaults.projectileDamage ?? 12;
+      config.projectileDamage ?? HUNTER_DEFAULTS.projectileDamage ?? 12;
     this.projectileLifetime =
-      config.projectileLifetime ?? defaults.projectileLifetime ?? 1.5;
-    this.fireRange = config.fireRange ?? defaults.fireRange ?? 520;
-    this.fireSpread = config.fireSpread ?? defaults.fireSpread ?? 0;
+      config.projectileLifetime ?? HUNTER_DEFAULTS.projectileLifetime ?? 1.5;
+    this.fireRange = config.fireRange ?? HUNTER_DEFAULTS.fireRange ?? 520;
+    this.fireSpread = config.fireSpread ?? HUNTER_DEFAULTS.fireSpread ?? 0;
 
-    this.burstCount = config.burstCount ?? defaults.burstCount ?? 3;
-    this.burstInterval = config.burstInterval ?? defaults.burstInterval ?? 3.5;
-    this.burstDelay = config.burstDelay ?? defaults.burstDelay ?? 0.15;
+    this.burstCount = config.burstCount ?? HUNTER_DEFAULTS.burstCount ?? 3;
+    this.burstInterval =
+      config.burstInterval ?? HUNTER_DEFAULTS.burstInterval ?? 3.5;
+    this.burstDelay = config.burstDelay ?? HUNTER_DEFAULTS.burstDelay ?? 0.15;
     this.burstCooldown = this.randomRange(0.5, this.burstInterval);
     this.burstShotsRemaining = 0;
     this.burstDelayTimer = 0;
@@ -170,6 +186,16 @@ export class Hunter extends BaseEnemy {
 
   onUpdate(deltaTime) {
     if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
+      return;
+    }
+
+    if (this.useComponents && this.components?.size > 0) {
+      if (!this._componentsInvoked) {
+        const context = this.buildComponentContext(deltaTime);
+        this._componentsInvoked = true;
+        this.runComponentUpdate(context);
+        this._componentsInvoked = false;
+      }
       return;
     }
 
@@ -400,12 +426,16 @@ export class Hunter extends BaseEnemy {
   }
 
   onDraw(ctx) {
+    if (this.useComponents && this.components?.size > 0) {
+      return;
+    }
+
     const palette = ENEMY_EFFECT_COLORS?.hunter ?? {};
     const presets = ENEMY_RENDER_PRESETS?.hunter ?? {};
     const hullPreset = presets.hull ?? {};
     const turretPreset = presets.turret ?? {};
     const shadingPreset = presets.shading ?? {};
-    const baseRadius = this.radius || ENEMY_TYPES?.hunter?.radius || 16;
+    const baseRadius = this.radius || HUNTER_CONFIG?.radius || 16;
 
     const front = baseRadius * (hullPreset.lengthMultiplier ?? 1.9);
     const rear = -front * (hullPreset.tailLengthRatio ?? 0.72);

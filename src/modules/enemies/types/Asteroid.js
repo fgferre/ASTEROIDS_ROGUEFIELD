@@ -132,7 +132,7 @@ export class Asteroid extends BaseEnemy {
    * Initializes the asteroid with configuration.
    * Overrides BaseEnemy.initialize() to add asteroid-specific setup.
    */
-  initialize(system, config = {}) {
+  initialize(system, config) {
     const options = config || {};
 
     // Reset first
@@ -157,7 +157,13 @@ export class Asteroid extends BaseEnemy {
     const cracksRandom = this.getRandomFor('cracks');
 
     this.id = options.id ?? baseRandom.uuid('asteroid');
-    this.size = options.size || 'small';
+    this.size = options.size ?? 'small';
+    if (
+      typeof this.size !== 'string' ||
+      !['small', 'medium', 'large'].includes(this.size)
+    ) {
+      this.size = 'small';
+    }
     this.variant = options.variant ?? null;
     this.wave = options.wave || 1;
     this.spawnedBy = options.spawnedBy ?? null;
@@ -287,8 +293,8 @@ export class Asteroid extends BaseEnemy {
     // Asteroid-specific resets
     this.system = null;
     this.id = 0;
-    this.size = 'small';
-    this.variant = 'common';
+    this.size = null;
+    this.variant = null;
     this.wave = 1;
     this.spawnedBy = null;
     this.generation = 0;

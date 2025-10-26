@@ -1,12 +1,12 @@
+import { MINE_COMPONENTS, MINE_CONFIG } from '../../../data/enemies/mine.js';
 import {
   ENEMY_EFFECT_COLORS,
   ENEMY_RENDER_PRESETS,
-  ENEMY_TYPES,
 } from '../../../data/constants/visual.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
-const MINE_DEFAULTS = ENEMY_TYPES?.mine ?? {};
+const MINE_DEFAULTS = MINE_CONFIG ?? {};
 
 export class Mine extends BaseEnemy {
   constructor(system, config = {}) {
@@ -23,12 +23,16 @@ export class Mine extends BaseEnemy {
     this.explosionRadius = MINE_DEFAULTS.explosionRadius ?? 120;
     this.explosionDamage = MINE_DEFAULTS.explosionDamage ?? 40;
     this.pulsePhase = 0;
-    this.pulseSpeed = MINE_DEFAULTS.pulseSpeed ?? 2.6;
-    this.pulseAmount = MINE_DEFAULTS.pulseAmount ?? 0.3;
-    this.explosionCause = null;
-    this.destroyed = false;
-    this._bodyGradient = null;
-    this._bodyGradientKey = null;
+   this.pulseSpeed = MINE_DEFAULTS.pulseSpeed ?? 2.6;
+   this.pulseAmount = MINE_DEFAULTS.pulseAmount ?? 0.3;
+   this.explosionCause = null;
+   this.destroyed = false;
+   this._bodyGradient = null;
+   this._bodyGradientKey = null;
+    this.weaponState = {};
+    this.movementStrategy = 'proximity';
+    this.renderStrategy = 'procedural-sphere';
+    this.useComponents = false;
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);
@@ -39,23 +43,30 @@ export class Mine extends BaseEnemy {
     this.resetForPool();
     super.initialize(config);
 
-    const defaults = ENEMY_TYPES?.mine ?? {};
+    const componentConfig = config.components ?? MINE_COMPONENTS;
+    if (componentConfig) {
+      this.weaponState = this.weaponState || {};
+      this.movementStrategy = componentConfig?.movement?.strategy || 'proximity';
+      this.renderStrategy = componentConfig?.render?.strategy || 'procedural-sphere';
+      this.weaponPattern = componentConfig?.weapon?.pattern || this.weaponPattern;
+    }
 
-    this.radius = config.radius ?? defaults.radius ?? 18;
-    this.maxHealth = config.maxHealth ?? config.health ?? defaults.health ?? 20;
+    this.radius = config.radius ?? MINE_DEFAULTS.radius ?? 18;
+    this.maxHealth =
+      config.maxHealth ?? config.health ?? MINE_DEFAULTS.health ?? 20;
     this.health = config.health ?? this.maxHealth;
 
-    this.armTimer = config.armTime ?? defaults.armTime ?? 0.5;
-    this.lifetime = config.lifetime ?? defaults.lifetime ?? 30;
+    this.armTimer = config.armTime ?? MINE_DEFAULTS.armTime ?? 0.5;
+    this.lifetime = config.lifetime ?? MINE_DEFAULTS.lifetime ?? 30;
     this.remainingLifetime = this.lifetime;
     this.proximityRadius =
-      config.proximityRadius ?? defaults.proximityRadius ?? 80;
+      config.proximityRadius ?? MINE_DEFAULTS.proximityRadius ?? 80;
     this.explosionRadius =
-      config.explosionRadius ?? defaults.explosionRadius ?? 120;
+      config.explosionRadius ?? MINE_DEFAULTS.explosionRadius ?? 120;
     this.explosionDamage =
-      config.explosionDamage ?? defaults.explosionDamage ?? 40;
-    this.pulseSpeed = config.pulseSpeed ?? defaults.pulseSpeed ?? 2.6;
-    this.pulseAmount = config.pulseAmount ?? defaults.pulseAmount ?? 0.3;
+      config.explosionDamage ?? MINE_DEFAULTS.explosionDamage ?? 40;
+    this.pulseSpeed = config.pulseSpeed ?? MINE_DEFAULTS.pulseSpeed ?? 2.6;
+    this.pulseAmount = config.pulseAmount ?? MINE_DEFAULTS.pulseAmount ?? 0.3;
     this.pulsePhase = 0;
     this._bodyGradient = null;
     this._bodyGradientKey = null;
@@ -93,6 +104,16 @@ export class Mine extends BaseEnemy {
 
   onUpdate(deltaTime) {
     if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
+      return;
+    }
+
+    if (this.useComponents && this.components?.size > 0) {
+      if (!this._componentsInvoked) {
+        const context = this.buildComponentContext(deltaTime);
+        this._componentsInvoked = true;
+        this.runComponentUpdate(context);
+        this._componentsInvoked = false;
+      }
       return;
     }
 
@@ -144,19 +165,35 @@ export class Mine extends BaseEnemy {
     }
   }
 
-  triggerDetonation(reason, context = {}) {
+  triggerDetonation(reasonOrPayload, context = {}) {
     if (this.detonated || !this.alive) {
       return;
     }
 
+    let cause = reasonOrPayload;
+    let resolvedContext = context;
+
+    if (typeof reasonOrPayload === 'object' && reasonOrPayload !== null) {
+      const { reason, cause: causeOverride, ...rest } = reasonOrPayload;
+      cause = causeOverride ?? reason ?? 'detonation';
+      resolvedContext = { ...rest };
+      if (context && typeof context === 'object' && Object.keys(context).length > 0) {
+        resolvedContext = { ...resolvedContext, ...context };
+      }
+    }
+
+    if (typeof cause !== 'string' || !cause.length) {
+      cause = 'detonation';
+    }
+
     this.detonated = true;
-    this.explosionCause = { cause: reason, context };
+    this.explosionCause = { cause, context: resolvedContext };
 
     const lethalDamage = Math.max(1, this.health || this.maxHealth || 1);
     this.takeDamage(lethalDamage, {
       cause: 'mine-detonation',
-      reason,
-      context,
+      reason: cause,
+      context: resolvedContext,
     });
   }
 
@@ -199,11 +236,15 @@ export class Mine extends BaseEnemy {
   }
 
   onDraw(ctx) {
+    if (this.useComponents && this.components?.size > 0) {
+      return;
+    }
+
     const palette = ENEMY_EFFECT_COLORS?.mine ?? {};
     const presets = ENEMY_RENDER_PRESETS?.mine ?? {};
     const bodyPreset = presets.body ?? {};
     const glowPreset = presets.glow ?? {};
-    const baseRadius = this.radius || ENEMY_TYPES?.mine?.radius || 18;
+    const baseRadius = this.radius || MINE_CONFIG?.radius || 18;
 
     const basePulse = 0.5 + 0.5 * Math.sin(this.pulsePhase || 0);
     const intensityMultiplier = this.armed

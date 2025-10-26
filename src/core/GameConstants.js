@@ -5,6 +5,10 @@ import * as PhysicsConstants from '../data/constants/physics.js';
 import * as GameplayConstants from '../data/constants/gameplay.js';
 import * as VisualConstants from '../data/constants/visual.js';
 import * as AsteroidConfigs from '../data/enemies/asteroid-configs.js';
+import * as DroneConfigs from '../data/enemies/drone.js';
+import * as HunterConfigs from '../data/enemies/hunter.js';
+import * as MineConfigs from '../data/enemies/mine.js';
+import * as BossConfigs from '../data/enemies/boss.js';
 
 // === DIMENSÕES DO JOGO ===
 export const GAME_WIDTH = 800;
@@ -63,9 +67,21 @@ export * from '../data/constants/physics.js';
 export * from '../data/constants/gameplay.js';
 export * from '../data/constants/visual.js';
 export * from '../data/enemies/asteroid-configs.js';
+export * from '../data/enemies/drone.js';
+export * from '../data/enemies/hunter.js';
+export * from '../data/enemies/mine.js';
 
 // Namespace exports for optional direct module access
-export { PhysicsConstants, GameplayConstants, VisualConstants, AsteroidConfigs };
+export {
+  PhysicsConstants,
+  GameplayConstants,
+  VisualConstants,
+  AsteroidConfigs,
+  DroneConfigs,
+  HunterConfigs,
+  MineConfigs,
+  BossConfigs,
+};
 
 
 // === AUDIO PRESETS ===

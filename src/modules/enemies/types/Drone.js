@@ -1,14 +1,14 @@
+import { DRONE_COMPONENTS, DRONE_CONFIG } from '../../../data/enemies/drone.js';
 import {
   ENEMY_EFFECT_COLORS,
   ENEMY_RENDER_PRESETS,
-  ENEMY_TYPES,
 } from '../../../data/constants/visual.js';
 import { GAME_WIDTH, GAME_HEIGHT } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 
-const DRONE_DEFAULTS = ENEMY_TYPES?.drone ?? {};
+const DRONE_DEFAULTS = DRONE_CONFIG ?? {};
 
 function resolveVectorMagnitude(x, y) {
   const magnitude = Math.hypot(x, y);
@@ -40,6 +40,10 @@ export class Drone extends BaseEnemy {
     this.contactDamage = DRONE_DEFAULTS.contactDamage ?? 12;
     this.destroyed = false;
     this._renderThrust = 0;
+    this.weaponState = {};
+    this.movementStrategy = 'tracking';
+    this.renderStrategy = 'procedural-triangle';
+    this.useComponents = false;
 
     if (Object.keys(config).length > 0) {
       this.initialize(config);
@@ -50,28 +54,37 @@ export class Drone extends BaseEnemy {
     this.resetForPool();
     super.initialize(config);
 
-    const defaults = ENEMY_TYPES?.drone ?? {};
+    const componentConfig = config.components ?? DRONE_COMPONENTS;
+    if (componentConfig) {
+      this.weaponState = this.weaponState || {};
+      this.movementStrategy = componentConfig?.movement?.strategy || 'tracking';
+      this.renderStrategy = componentConfig?.render?.strategy || 'procedural-triangle';
+      this.weaponPattern = componentConfig?.weapon?.pattern || this.weaponPattern;
+    }
 
-    this.radius = config.radius ?? defaults.radius ?? 12;
-    this.maxHealth = config.maxHealth ?? config.health ?? defaults.health ?? 30;
+    this.radius = config.radius ?? DRONE_DEFAULTS.radius ?? 12;
+    this.maxHealth =
+      config.maxHealth ?? config.health ?? DRONE_DEFAULTS.health ?? 30;
     this.health = config.health ?? this.maxHealth;
-    this.contactDamage = config.contactDamage ?? defaults.contactDamage ?? 12;
+    this.contactDamage =
+      config.contactDamage ?? DRONE_DEFAULTS.contactDamage ?? 12;
 
-    this.maxSpeed = config.maxSpeed ?? defaults.speed ?? 180;
-    this.acceleration = config.acceleration ?? defaults.acceleration ?? 220;
+    this.maxSpeed = config.maxSpeed ?? DRONE_DEFAULTS.speed ?? 180;
+    this.acceleration =
+      config.acceleration ?? DRONE_DEFAULTS.acceleration ?? 220;
 
     this.projectileSpeed =
-      config.projectileSpeed ?? defaults.projectileSpeed ?? 340;
+      config.projectileSpeed ?? DRONE_DEFAULTS.projectileSpeed ?? 340;
     this.projectileDamage =
-      config.projectileDamage ?? defaults.projectileDamage ?? 15;
+      config.projectileDamage ?? DRONE_DEFAULTS.projectileDamage ?? 15;
     this.projectileLifetime =
-      config.projectileLifetime ?? defaults.projectileLifetime ?? 2.0;
+      config.projectileLifetime ?? DRONE_DEFAULTS.projectileLifetime ?? 2.0;
 
-    this.fireInterval = config.fireRate ?? defaults.fireRate ?? 2;
-    this.fireVariance = config.fireVariance ?? defaults.fireVariance ?? 0;
-    this.fireSpread = config.fireSpread ?? defaults.fireSpread ?? 0;
+    this.fireInterval = config.fireRate ?? DRONE_DEFAULTS.fireRate ?? 2;
+    this.fireVariance = config.fireVariance ?? DRONE_DEFAULTS.fireVariance ?? 0;
+    this.fireSpread = config.fireSpread ?? DRONE_DEFAULTS.fireSpread ?? 0;
     this.targetingRange =
-      config.targetingRange ?? defaults.targetingRange ?? 460;
+      config.targetingRange ?? DRONE_DEFAULTS.targetingRange ?? 460;
 
     this.random = this.resolveRandom({ ...config, id: this.id });
     this.aimRandom = this.random?.fork
@@ -179,6 +192,16 @@ export class Drone extends BaseEnemy {
   }
 
   onUpdate(deltaTime) {
+    if (this.useComponents && this.components?.size > 0) {
+      if (!this._componentsInvoked) {
+        const context = this.buildComponentContext(deltaTime);
+        this._componentsInvoked = true;
+        this.runComponentUpdate(context);
+        this._componentsInvoked = false;
+      }
+      return;
+    }
+
     const player =
       this.system && typeof this.system.getCachedPlayer === 'function'
         ? this.system.getCachedPlayer()
@@ -351,6 +374,10 @@ export class Drone extends BaseEnemy {
   }
 
   onDraw(ctx) {
+    if (this.useComponents && this.components?.size > 0) {
+      return;
+    }
+
     const palette = ENEMY_EFFECT_COLORS?.drone ?? {};
     const presets = ENEMY_RENDER_PRESETS?.drone ?? {};
     const hullPreset = presets.hull ?? {};
@@ -358,8 +385,8 @@ export class Drone extends BaseEnemy {
     const accentPreset = presets.accents ?? {};
     const exhaustPreset = presets.exhaust ?? {};
 
-    const baseRadius = this.radius || ENEMY_TYPES?.drone?.radius || 12;
-    const maxSpeed = Math.max(1, this.maxSpeed || ENEMY_TYPES?.drone?.speed || 1);
+    const baseRadius = this.radius || DRONE_CONFIG?.radius || 12;
+    const maxSpeed = Math.max(1, this.maxSpeed || DRONE_CONFIG?.speed || 1);
     const speed = Math.hypot(this.vx, this.vy);
     const targetThrust = Math.min(1, Math.max(0, speed / maxSpeed));
     const smoothing = Math.min(1, Math.max(0, exhaustPreset.smoothing ?? 0.2));

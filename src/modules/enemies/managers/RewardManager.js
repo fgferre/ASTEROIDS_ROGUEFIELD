@@ -37,6 +37,10 @@ import {
   ASTEROID_VARIANTS,
   ORB_VALUE,
 } from '../../../data/enemies/asteroid-configs.js';
+import { DRONE_REWARDS } from '../../../data/enemies/drone.js';
+import { HUNTER_REWARDS } from '../../../data/enemies/hunter.js';
+import { MINE_REWARDS } from '../../../data/enemies/mine.js';
+import { BOSS_REWARDS } from '../../../data/enemies/boss.js';
 import { ENEMY_REWARDS } from '../../../data/constants/visual.js';
 import RandomService from '../../../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../../../core/serviceUtils.js';
@@ -175,7 +179,7 @@ export class RewardManager {
       }
     });
 
-    const droneRewards = ENEMY_REWARDS?.drone;
+    const droneRewards = DRONE_REWARDS;
     // Drone rewards: base orb count configured with total XP target
     configs.set('drone', {
       totalXP: droneRewards?.totalXP ?? 30,
@@ -184,7 +188,7 @@ export class RewardManager {
       variantMultiplier: () => 1.0, // No variant scaling (yet)
     });
 
-    const mineRewards = ENEMY_REWARDS?.mine;
+    const mineRewards = MINE_REWARDS;
     // Mine rewards: randomized base orb count with total XP target
     configs.set('mine', {
       totalXP: mineRewards?.totalXP ?? 25,
@@ -201,7 +205,7 @@ export class RewardManager {
       variantMultiplier: () => 1.0,
     });
 
-    const hunterRewards = ENEMY_REWARDS?.hunter;
+    const hunterRewards = HUNTER_REWARDS;
     // Hunter rewards: base orb count configured with total XP target
     configs.set('hunter', {
       totalXP: hunterRewards?.totalXP ?? 50,
@@ -210,7 +214,7 @@ export class RewardManager {
       variantMultiplier: () => 1.0, // No variant scaling (yet)
     });
 
-    const bossRewards = ENEMY_REWARDS?.boss;
+    const bossRewards = BOSS_REWARDS;
     // Boss rewards: base orb count configured with total XP target.
     configs.set('boss', {
       totalXP: bossRewards?.totalXP ?? 500,
