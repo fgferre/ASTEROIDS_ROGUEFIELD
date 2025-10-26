@@ -157,7 +157,7 @@ export class Asteroid extends BaseEnemy {
     const cracksRandom = this.getRandomFor('cracks');
 
     this.id = options.id ?? baseRandom.uuid('asteroid');
-    this.size = options.size || 'small';
+    this.size = options.size ?? 'small';
     this.variant = options.variant ?? null;
     this.wave = options.wave || 1;
     this.spawnedBy = options.spawnedBy ?? null;

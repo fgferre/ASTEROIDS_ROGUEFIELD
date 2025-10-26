@@ -384,12 +384,7 @@ const defaultPatterns = {
         state.detonated = true;
 
         if (typeof enemy.triggerDetonation === 'function') {
-          const payload = { reason: 'proximity', distance };
-          try {
-            enemy.triggerDetonation(payload);
-          } catch (error) {
-            enemy.triggerDetonation('proximity', { distance });
-          }
+          enemy.triggerDetonation({ reason: 'proximity', distance });
         } else if (typeof enemy.takeDamage === 'function') {
           const lethal = Number.isFinite(enemy.health)
             ? enemy.health
