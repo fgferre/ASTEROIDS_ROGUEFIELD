@@ -158,6 +158,12 @@ export class Asteroid extends BaseEnemy {
 
     this.id = options.id ?? baseRandom.uuid('asteroid');
     this.size = options.size ?? 'small';
+    if (
+      typeof this.size !== 'string' ||
+      !['small', 'medium', 'large'].includes(this.size)
+    ) {
+      this.size = 'small';
+    }
     this.variant = options.variant ?? null;
     this.wave = options.wave || 1;
     this.spawnedBy = options.spawnedBy ?? null;
@@ -287,8 +293,8 @@ export class Asteroid extends BaseEnemy {
     // Asteroid-specific resets
     this.system = null;
     this.id = 0;
-    this.size = 'small';
-    this.variant = 'common';
+    this.size = null;
+    this.variant = null;
     this.wave = 1;
     this.spawnedBy = null;
     this.generation = 0;
