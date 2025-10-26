@@ -488,6 +488,28 @@ export const ASTEROID_CRACK_LAYER_LOOKUP = Object.freeze(__crackLayerLookup);
 
 
 // === FRAGMENT RULES ===
+// Used by FragmentationSystem to generate fragments when enemies are destroyed.
+// Each variant defines fragmentation behavior (count, velocity, spread, etc.).
+/**
+ * Fragment generation rules for asteroid destruction.
+ *
+ * Used by FragmentationSystem.generateFragments(entity, rules)
+ *
+ * @property {string} key - Unique identifier for the rule set
+ * @property {number} inheritVelocity - Fraction of parent velocity inherited (0-1)
+ * @property {number} angleJitter - Angular spread of fragments in radians
+ * @property {[number, number]} radialDistanceRange - Spawn distance from parent [min, max] as fraction of radius
+ * @property {number} radialOffsetJitter - Random offset in spawn angle
+ * @property {Object} speedMultiplierBySize - Speed multiplier ranges per size
+ * @property {Object} countBySize - Fragment count ranges per size
+ * @property {number} maxGeneration - Maximum fragmentation depth
+ *
+ * @example
+ * const fragments = FragmentationSystem.generateFragments(
+ *   asteroid,
+ *   ASTEROID_FRAGMENT_RULES.volatile,
+ * );
+ */
 export const ASTEROID_FRAGMENT_RULES = deepFreeze({
   default: {
     key: 'default',
