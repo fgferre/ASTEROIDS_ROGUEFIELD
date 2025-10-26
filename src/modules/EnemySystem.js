@@ -2877,6 +2877,17 @@ class EnemySystem {
       randomScope: 'spawn',
     });
 
+    GameDebugLogger.log('SPAWN', 'Asteroid spawned', {
+      requested: { size, variant, wave: waveNumber },
+      actual: {
+        size: asteroid?.size,
+        variant: asteroid?.variant,
+        radius: asteroid?.radius,
+        variantKey: asteroid?.variantConfig?.key,
+      },
+      match: asteroid?.size === size && asteroid?.variant === variant,
+    });
+
     const registrationResult = this.registerActiveEnemy(asteroid);
     this.warnIfWaveManagerRegistrationFailed(
       registrationResult,
