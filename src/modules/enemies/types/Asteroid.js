@@ -9,6 +9,7 @@ import {
 } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
+import FragmentationSystem from '../systems/FragmentationSystem.js';
 import {
   ASTEROID_CRACK_THRESHOLDS,
   ASTEROID_CRACK_GRAPH_RULES,
@@ -32,7 +33,7 @@ import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
  * - Procedural shape generation with seeded randomness
  * - Multi-stage crack system with visual damage progression
  * - Variant system (common, iron, gold, crystal, volatile, parasite)
- * - Advanced fragmentation with inheritance
+ * - Advanced fragmentation with inheritance (delegated to FragmentationSystem)
  * - Behavior systems (parasite tracking, volatile explosion)
  * - Visual effects (glow, pulse, trails)
  *
@@ -1898,112 +1899,7 @@ export class Asteroid extends BaseEnemy {
   }
 
   generateFragments() {
-    if (this.size === 'small') {
-      return [];
-    }
-
-    const newSize = this.size === 'large' ? 'medium' : 'small';
-    const rules =
-      this.fragmentProfile ||
-      ASTEROID_FRAGMENT_RULES?.[this.fragmentProfileKey] ||
-      ASTEROID_FRAGMENT_RULES.default;
-
-    const currentGeneration = this.generation ?? 0;
-    const maxGeneration = rules?.maxGeneration;
-    if (Number.isFinite(maxGeneration) && currentGeneration + 1 > maxGeneration) {
-      return [];
-    }
-
-    const countRange =
-      rules?.countBySize?.[this.size] ||
-      rules?.countBySize?.default ||
-      [2, 3];
-
-    const seededRandom = this.createSeededRandom(this.crackSeed ^ 0x5e17);
-
-    const sampleRange = (range, fallback) => {
-      if (Array.isArray(range) && range.length === 2) {
-        const [min, max] = range;
-        const low = Number.isFinite(min) ? min : fallback ?? 0;
-        const high = Number.isFinite(max) ? max : low;
-        if (high <= low) {
-          return low;
-        }
-        return low + (high - low) * seededRandom();
-      }
-      if (Number.isFinite(range)) {
-        return range;
-      }
-      return fallback ?? 0;
-    };
-
-    const resolveCount = (range) => {
-      if (Array.isArray(range) && range.length === 2) {
-        const min = Math.floor(Number.isFinite(range[0]) ? range[0] : 0);
-        const max = Math.floor(Number.isFinite(range[1]) ? range[1] : min);
-        if (max <= min) {
-          return Math.max(0, min);
-        }
-        return min + Math.floor(seededRandom() * (max - min + 1));
-      }
-      const numeric = Number(range);
-      if (!Number.isFinite(numeric)) {
-        return 0;
-      }
-      return Math.max(0, Math.round(numeric));
-    };
-
-    let fragmentCount = resolveCount(countRange);
-    if (fragmentCount <= 0) {
-      fragmentCount = 1;
-    }
-
-    const fragments = [];
-    const baseSpeed = ASTEROID_SPEEDS[newSize] || 40;
-    const speedRange =
-      rules?.speedMultiplierBySize?.[this.size] ||
-      rules?.speedMultiplierBySize?.default ||
-      [0.85, 1.2];
-    const inheritVelocity = rules?.inheritVelocity ?? 0.4;
-    const angleJitter = rules?.angleJitter ?? Math.PI / 6;
-    const radialRange = rules?.radialDistanceRange || [0.45, 0.9];
-    const offsetJitter = rules?.radialOffsetJitter ?? 0.2;
-
-    const parentVx = Number.isFinite(this.vx) ? this.vx : 0;
-    const parentVy = Number.isFinite(this.vy) ? this.vy : 0;
-    const angleOffset = seededRandom() * Math.PI * 2;
-
-    for (let i = 0; i < fragmentCount; i += 1) {
-      const baseAngle =
-        angleOffset + (i / Math.max(1, fragmentCount)) * Math.PI * 2;
-      const travelAngle =
-        baseAngle + (seededRandom() - 0.5) * 2 * angleJitter;
-      const spawnAngle =
-        travelAngle + (seededRandom() - 0.5) * 2 * offsetJitter;
-      const distance =
-        this.radius *
-        sampleRange(radialRange, 0.6);
-      const speedMultiplier = sampleRange(speedRange, 1);
-      const vx =
-        Math.cos(travelAngle) * baseSpeed * speedMultiplier +
-        parentVx * inheritVelocity;
-      const vy =
-        Math.sin(travelAngle) * baseSpeed * speedMultiplier +
-        parentVy * inheritVelocity;
-
-      fragments.push({
-        x: this.x + Math.cos(spawnAngle) * distance,
-        y: this.y + Math.sin(spawnAngle) * distance,
-        vx,
-        vy,
-        size: newSize,
-        wave: this.wave,
-        spawnedBy: this.id,
-        generation: currentGeneration + 1,
-      });
-    }
-
-    return fragments;
+    return FragmentationSystem.generateFragments(this, this.fragmentProfile);
   }
 
   captureRandomScopeSeed(scope, generator) {
