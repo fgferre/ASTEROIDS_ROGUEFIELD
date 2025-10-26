@@ -18,6 +18,7 @@ import { GarbageCollectionManager } from '../core/GarbageCollectionManager.js';
 import RandomService from '../core/RandomService.js';
 import GameSessionService from '../services/GameSessionService.js';
 import CommandQueueService from '../services/CommandQueueService.js';
+import CrackGenerationService from '../services/CrackGenerationService.js';
 
 export const DEFAULT_POOL_CONFIG = {
   bullets: { initial: 25, max: 120 },
@@ -310,6 +311,29 @@ export function createServiceManifest(context = {}) {
           frameSource: manifestContext?.frameSource,
           hooks: manifestContext?.metrics?.commandQueue,
         })
+    },
+    {
+      name: 'crack-generation',
+      singleton: true,
+      lazy: false,
+      dependencies: [],
+      factory: () => {
+        if (
+          typeof gameServices !== 'undefined' &&
+          typeof gameServices.register === 'function'
+        ) {
+          const shouldRegister =
+            typeof gameServices.has === 'function'
+              ? !gameServices.has('crack-generation')
+              : true;
+
+          if (shouldRegister) {
+            gameServices.register('crack-generation', CrackGenerationService);
+          }
+        }
+
+        return CrackGenerationService;
+      }
     },
     {
       name: 'input',

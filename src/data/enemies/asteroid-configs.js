@@ -3,8 +3,36 @@
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
 // === CRACK PROFILES ===
+// Used by CrackGenerationService to generate procedural crack patterns.
+// Each variant defines crack appearance (rays, branches, rings, visual effects).
 
-
+/**
+ * Crack profile definitions for procedural crack generation.
+ *
+ * Used by CrackGenerationService.generateCrackLayers(context, profile)
+ *
+ * @property {string} key - Unique identifier for the profile
+ * @property {number} rotationJitter - Angular variation applied to base rotation (radians)
+ * @property {[number, number]} startRadiusRange - Starting radius range as a fraction of the asteroid radius
+ * @property {[number, number]} lineWidthRange - Range for crack line widths
+ * @property {Array<Object>} layers - Definitions for each crack stage (3 stages by default)
+ * @property {string} layers[].id - Layer identifier used for lookup
+ * @property {number} layers[].mainRays - Target number of main trunk rays for the layer
+ * @property {[number, number]} layers[].mainLengthRange - Length range for trunk segments as fraction of radius
+ * @property {[number, number]} layers[].startRadiusRange - Range for where trunks begin relative to radius
+ * @property {number} layers[].angularJitter - Angular randomness applied to trunk direction
+ * @property {Object} layers[].branch - Branch configuration for secondary cracks
+ * @property {Object} layers[].micro - Micro-branch configuration for fine cracks
+ * @property {Object|null} layers[].ring - Optional ring configuration for circular crack patterns
+ * @property {number} layers[].intensity - Visual intensity multiplier for rendering
+ * @property {Object} layers[].burst - Particle burst configuration when the layer activates
+ *
+ * @example
+ * const crackData = CrackGenerationService.generateCrackLayers(
+ *   context,
+ *   ASTEROID_CRACK_PROFILES.volatile
+ * );
+ */
 export const ASTEROID_CRACK_PROFILES = deepFreeze({
   default: {
     key: 'default',
