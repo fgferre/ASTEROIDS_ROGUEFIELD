@@ -14,6 +14,7 @@ import { RewardManager } from './enemies/managers/RewardManager.js';
 import { AsteroidMovement } from './enemies/components/AsteroidMovement.js';
 import { AsteroidCollision } from './enemies/components/AsteroidCollision.js';
 import { AsteroidRenderer } from './enemies/components/AsteroidRenderer.js';
+import { EnemyRenderSystem } from './enemies/systems/EnemyRenderSystem.js';
 import { CollisionComponent } from './enemies/components/CollisionComponent.js';
 import { HealthComponent } from './enemies/components/HealthComponent.js';
 import { MovementComponent } from './enemies/components/MovementComponent.js';
@@ -133,6 +134,8 @@ class EnemySystem {
     this.genericHealth = null;
     this.useComponents = true; // Feature flag to enable component system
 
+    this.renderSystem = null;
+
     this.eventBus = typeof gameEvents !== 'undefined' ? gameEvents : null;
 
     // Registrar no ServiceLocator
@@ -149,6 +152,7 @@ class EnemySystem {
     this.setupRandomGenerators();
     this.setupManagers(); // Initialize wave and reward managers
     this.setupComponents(); // Initialize components
+    this.setupRenderSystem(); // Initialize render sub-system
     this.setupEventListeners();
     this.syncPhysicsIntegration(true);
 
@@ -884,6 +888,30 @@ class EnemySystem {
       this.genericCollision = null;
       this.genericHealth = null;
       this.useComponents = false;
+    }
+  }
+
+  setupRenderSystem() {
+    try {
+      const facade = this;
+      const context = {
+        facade,
+        get asteroids() {
+          return facade.asteroids;
+        },
+        get rendererComponent() {
+          return facade.rendererComponent;
+        },
+        get useComponents() {
+          return facade.useComponents;
+        },
+      };
+
+      this.renderSystem = new EnemyRenderSystem(context);
+      console.log('[EnemySystem] EnemyRenderSystem initialized');
+    } catch (error) {
+      console.warn('[EnemySystem] Failed to initialize render system', error);
+      this.renderSystem = null;
     }
   }
 
@@ -3460,20 +3488,31 @@ class EnemySystem {
     return this.getActiveEnemyCount();
   }
 
+  /**
+   * Renders all registered enemies. Delegates to EnemyRenderSystem when
+   * available and falls back to the inline implementation if initialization
+   * fails, ensuring compatibility with legacy rendering paths.
+   *
+   * @param {CanvasRenderingContext2D} ctx
+   */
   render(ctx) {
     if (!ctx) return;
 
-    // NEW: Use renderer component if available
+    if (this.renderSystem) {
+      this.renderSystem.render(ctx);
+      return;
+    }
+
     if (this.useComponents && this.rendererComponent) {
       this.rendererComponent.renderAll(ctx, this.asteroids);
-    } else {
-      // LEGACY: Original render logic
-      this.asteroids.forEach((asteroid) => {
-        if (!asteroid.destroyed && typeof asteroid.draw === 'function') {
-          asteroid.draw(ctx);
-        }
-      });
+      return;
     }
+
+    this.asteroids.forEach((asteroid) => {
+      if (!asteroid.destroyed && typeof asteroid.draw === 'function') {
+        asteroid.draw(ctx);
+      }
+    });
   }
 
   cloneWaveStateForSnapshot(wave = this.waveState) {
