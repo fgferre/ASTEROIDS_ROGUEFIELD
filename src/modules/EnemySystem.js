@@ -1082,7 +1082,10 @@ class EnemySystem {
     }
   }
 
-  // NOTE: Delegated to EnemySpawnSystem when available.
+  /**
+   * Acquires an asteroid from the spawn sub-system.
+   * Throws if the spawn sub-system is not initialized.
+   */
   acquireAsteroid(config = {}) {
     if (!this.spawnSystem) {
       throw new Error('[EnemySystem] SpawnSystem not initialized');
@@ -1090,8 +1093,10 @@ class EnemySystem {
     return this.spawnSystem.acquireAsteroid(config);
   }
 
-  // NEW: Factory-based enemy acquisition (optional path)
-  // NOTE: Delegated to EnemySpawnSystem when available.
+  /**
+   * Acquires an enemy via the spawn factory.
+   * Throws if the spawn sub-system is not initialized.
+   */
   acquireEnemyViaFactory(type, config) {
     if (!this.spawnSystem) {
       throw new Error('[EnemySystem] SpawnSystem not initialized');
@@ -1099,7 +1104,10 @@ class EnemySystem {
     return this.spawnSystem.acquireEnemyViaFactory(type, config);
   }
 
-  // NOTE: Delegated to EnemySpawnSystem when available.
+  /**
+   * Registers an active enemy with the spawn sub-system.
+   * Throws if the spawn sub-system is not initialized.
+   */
   registerActiveEnemy(enemy, { skipDuplicateCheck = false } = {}) {
     if (!this.spawnSystem) {
       throw new Error('[EnemySystem] SpawnSystem not initialized');
@@ -1109,7 +1117,10 @@ class EnemySystem {
     });
   }
 
-  // NOTE: Delegated to EnemySpawnSystem when available.
+  /**
+   * Emits a warning when wave registration fails within the spawn sub-system.
+   * Throws if the spawn sub-system is not initialized.
+   */
   warnIfWaveManagerRegistrationFailed(result, context, enemy = null) {
     if (!this.spawnSystem) {
       throw new Error('[EnemySystem] SpawnSystem not initialized');
@@ -1318,7 +1329,10 @@ class EnemySystem {
     return this.services.ui;
   }
 
-  // NOTE: Delegated to EnemySpawnSystem when available.
+  /**
+   * Retrieves the pool identifier associated with an asteroid.
+   * Throws if the spawn sub-system is not initialized.
+   */
   getAsteroidPoolId(asteroid) {
     if (!this.spawnSystem) {
       throw new Error('[EnemySystem] SpawnSystem not initialized');
@@ -1326,7 +1340,10 @@ class EnemySystem {
     return this.spawnSystem.getAsteroidPoolId(asteroid);
   }
 
-  // NOTE: Delegated to EnemySpawnSystem when available.
+  /**
+   * Assigns a pool identifier to an asteroid.
+   * Throws if the spawn sub-system is not initialized.
+   */
   assignAsteroidPoolId(asteroid, preferredId = null) {
     if (!this.spawnSystem) {
       throw new Error('[EnemySystem] SpawnSystem not initialized');
@@ -1334,7 +1351,10 @@ class EnemySystem {
     return this.spawnSystem.assignAsteroidPoolId(asteroid, preferredId);
   }
 
-  // NOTE: Delegated to EnemySpawnSystem when available.
+  /**
+   * Clears the pool identifier stored on an asteroid.
+   * Throws if the spawn sub-system is not initialized.
+   */
   clearAsteroidPoolId(asteroid) {
     if (!this.spawnSystem) {
       throw new Error('[EnemySystem] SpawnSystem not initialized');
@@ -2096,8 +2116,8 @@ class EnemySystem {
 
   // === UPDATE PRINCIPAL ===
   /**
-   * Main update entry point. Delegates to EnemyUpdateSystem when available and
-   * falls back to the legacy inline implementation if initialization fails.
+   * Main update entry point routed through the update sub-system.
+   * Throws if the update sub-system is not initialized.
    */
   update(deltaTime) {
     if (!this.updateSystem) {
@@ -2107,8 +2127,9 @@ class EnemySystem {
   }
 
   /**
-   * Updates support enemies (drones, hunters, mines). Delegates to the update
-   * sub-system when available and preserves the legacy logic as a fallback.
+   * Updates support enemies (drones, hunters, mines) through the update
+   * sub-system.
+   * Throws if the update sub-system is not initialized.
    */
   updateSupportEnemies(deltaTime) {
     if (!this.updateSystem) {
@@ -2118,13 +2139,10 @@ class EnemySystem {
   }
 
   /**
-   * Legacy wave progression logic. Delegated to EnemyUpdateSystem but retains
-   * the original implementation for resilience.
+   * Updates wave progression through the update sub-system.
+   * Throws if the update sub-system is not initialized.
    */
-  updateWaveLogic(deltaTime, { skipSpawning = false } = {}, internal = false) {
-    if (internal) {
-      return false;
-    }
+  updateWaveLogic(deltaTime, { skipSpawning = false } = {}) {
     if (!this.updateSystem) {
       throw new Error('[EnemySystem] UpdateSystem not initialized');
     }
@@ -2132,19 +2150,20 @@ class EnemySystem {
   }
 
   /**
-   * WaveManager synchronization path. Delegates to EnemyUpdateSystem while the
-   * original method remains as a safety net when delegation is unavailable.
+   * Synchronizes with the wave manager through the update sub-system.
+   * Throws if the update sub-system is not initialized.
    */
-  updateWaveManagerLogic(deltaTime, internal = false) {
-    if (internal) {
-      return false;
-    }
+  updateWaveManagerLogic(deltaTime) {
     if (!this.updateSystem) {
       throw new Error('[EnemySystem] UpdateSystem not initialized');
     }
     return this.updateSystem.updateWaveManagerLogic(deltaTime);
   }
 
+  /**
+   * Updates asteroid entities through the update sub-system.
+   * Throws if the update sub-system is not initialized.
+   */
   updateAsteroids(deltaTime) {
     if (!this.updateSystem) {
       throw new Error('[EnemySystem] UpdateSystem not initialized');
@@ -2152,6 +2171,10 @@ class EnemySystem {
     return this.updateSystem.updateAsteroids(deltaTime);
   }
 
+  /**
+   * Resolves asteroid collisions through the update sub-system.
+   * Throws if the update sub-system is not initialized.
+   */
   handleAsteroidCollisions() {
     if (!this.updateSystem) {
       throw new Error('[EnemySystem] UpdateSystem not initialized');
@@ -2159,6 +2182,10 @@ class EnemySystem {
     return this.updateSystem.handleAsteroidCollisions();
   }
 
+  /**
+   * Checks for a collision between two asteroids via the update sub-system.
+   * Throws if the update sub-system is not initialized.
+   */
   checkAsteroidCollision(a1, a2) {
     if (!this.updateSystem) {
       throw new Error('[EnemySystem] UpdateSystem not initialized');
@@ -2168,7 +2195,10 @@ class EnemySystem {
 
   // === SISTEMA DE SPAWNING ===
   // === SISTEMA DE SPAWNING ===
-  // NOTE: Delegated to EnemySpawnSystem when available.
+  /**
+   * Handles spawning ticks via the spawn sub-system.
+   * Throws if the spawn sub-system is not initialized.
+   */
   handleSpawning(deltaTime) {
     if (!this.spawnSystem) {
       throw new Error('[EnemySystem] SpawnSystem not initialized');
@@ -2176,7 +2206,10 @@ class EnemySystem {
     return this.spawnSystem.handleSpawning(deltaTime);
   }
 
-  // NOTE: Delegated to EnemySpawnSystem when available.
+  /**
+   * Indicates whether a spawn should occur using the spawn sub-system rules.
+   * Throws if the spawn sub-system is not initialized.
+   */
   shouldSpawn() {
     if (!this.spawnSystem) {
       throw new Error('[EnemySystem] SpawnSystem not initialized');
@@ -2184,7 +2217,10 @@ class EnemySystem {
     return this.spawnSystem.shouldSpawn();
   }
 
-  // NOTE: Delegated to EnemySpawnSystem when available.
+  /**
+   * Spawns a boss enemy via the spawn sub-system.
+   * Throws if the spawn sub-system is not initialized.
+   */
   spawnBoss(config = {}) {
     if (!this.spawnSystem) {
       throw new Error('[EnemySystem] SpawnSystem not initialized');
@@ -2192,7 +2228,10 @@ class EnemySystem {
     return this.spawnSystem.spawnBoss(config);
   }
 
-  // NOTE: Delegated to EnemySpawnSystem when available.
+  /**
+   * Spawns a regular asteroid via the spawn sub-system.
+   * Throws if the spawn sub-system is not initialized.
+   */
   spawnAsteroid() {
     if (!this.spawnSystem) {
       throw new Error('[EnemySystem] SpawnSystem not initialized');
@@ -2201,8 +2240,8 @@ class EnemySystem {
   }
 
   /**
-   * Damage logic delegated to EnemyDamageSystem when available. Falls back to
-   * the legacy inline implementation if the sub-system fails to initialize.
+   * Applies damage through the damage sub-system.
+   * Throws if the damage sub-system is not initialized.
    */
   applyDamage(asteroid, damage, options = {}) {
     if (!this.damageSystem) {
@@ -2212,6 +2251,10 @@ class EnemySystem {
   }
 
   // === GERENCIAMENTO DE DESTRUIÇÃO ===
+  /**
+   * Destroys an asteroid via the damage sub-system.
+   * Throws if the damage sub-system is not initialized.
+   */
   destroyAsteroid(asteroid, options = {}) {
     if (!this.damageSystem) {
       throw new Error('[EnemySystem] DamageSystem not initialized');
@@ -2219,7 +2262,10 @@ class EnemySystem {
     return this.damageSystem.destroyAsteroid(asteroid, options);
   }
 
-  // NOTE: Delegated to EnemySpawnSystem when available.
+  /**
+   * Determines an asteroid variant via the spawn sub-system.
+   * Throws if the spawn sub-system is not initialized.
+   */
   decideVariant(size, context = {}) {
     if (!this.spawnSystem) {
       throw new Error('[EnemySystem] SpawnSystem not initialized');
@@ -2227,7 +2273,10 @@ class EnemySystem {
     return this.spawnSystem.decideVariant(size, context);
   }
 
-  // NOTE: Delegated to EnemySpawnSystem when available.
+  /**
+   * Computes the variant wave bonus via the spawn sub-system.
+   * Throws if the spawn sub-system is not initialized.
+   */
   computeVariantWaveBonus(wave) {
     if (!this.spawnSystem) {
       throw new Error('[EnemySystem] SpawnSystem not initialized');
@@ -2235,7 +2284,10 @@ class EnemySystem {
     return this.spawnSystem.computeVariantWaveBonus(wave);
   }
 
-  // NOTE: Delegated to EnemySpawnSystem when available.
+  /**
+   * Assigns variants to asteroid fragments via the spawn sub-system.
+   * Throws if the spawn sub-system is not initialized.
+   */
   assignVariantsToFragments(fragments, parent, wave) {
     if (!this.spawnSystem) {
       throw new Error('[EnemySystem] SpawnSystem not initialized');
@@ -2244,8 +2296,8 @@ class EnemySystem {
   }
 
   /**
-   * Volatile detection delegated to EnemyDamageSystem when available. Falls
-   * back to inline logic for compatibility.
+   * Determines if an asteroid is volatile via the damage sub-system.
+   * Throws if the damage sub-system is not initialized.
    */
   isVolatileVariant(asteroid) {
     if (!this.damageSystem) {
@@ -2255,8 +2307,8 @@ class EnemySystem {
   }
 
   /**
-   * Volatile explosions delegated to EnemyDamageSystem when available
-   * with inline fallback for legacy paths.
+   * Triggers volatile explosions via the damage sub-system.
+   * Throws if the damage sub-system is not initialized.
    */
   triggerVolatileExplosion(asteroid, cause = 'destroyed') {
     if (!this.damageSystem) {
@@ -2266,7 +2318,8 @@ class EnemySystem {
   }
 
   /**
-   * Delegates volatile timeout handling to EnemyDamageSystem when initialized.
+   * Handles volatile timeout via the damage sub-system.
+   * Throws if the damage sub-system is not initialized.
    */
   handleVolatileTimeout(asteroid) {
     if (!this.damageSystem) {
@@ -2276,7 +2329,8 @@ class EnemySystem {
   }
 
   /**
-   * Delegates player damage logic to EnemyDamageSystem when available.
+   * Applies direct damage to the player via the damage sub-system.
+   * Throws if the damage sub-system is not initialized.
    */
   applyDirectDamageToPlayer(amount, context = {}) {
     if (!this.damageSystem) {
@@ -2286,8 +2340,8 @@ class EnemySystem {
   }
 
   /**
-   * Releases destroyed enemies. Delegates to EnemyUpdateSystem with this
-   * method retained for resiliency.
+   * Releases destroyed enemies through the update sub-system.
+   * Throws if the update sub-system is not initialized.
    */
   cleanupDestroyed() {
     if (!this.updateSystem) {
@@ -2341,9 +2395,8 @@ class EnemySystem {
   }
 
   /**
-   * Renders all registered enemies. Delegates to EnemyRenderSystem when
-   * available and falls back to the inline implementation if initialization
-   * fails, ensuring compatibility with legacy rendering paths.
+   * Renders all registered enemies through the render sub-system.
+   * Throws if the render sub-system is not initialized.
    *
    * @param {CanvasRenderingContext2D} ctx
    */
@@ -3349,7 +3402,8 @@ class EnemySystem {
   }
 
   /**
-   * Delegates mine explosion handling to EnemyDamageSystem when available.
+   * Handles mine explosions via the damage sub-system.
+   * Throws if the damage sub-system is not initialized.
    */
   handleMineExplosion(data = null) {
     if (!this.damageSystem) {
@@ -3359,7 +3413,8 @@ class EnemySystem {
   }
 
   /**
-   * Delegates shield explosion damage to EnemyDamageSystem when available.
+   * Resolves shield explosion damage via the damage sub-system.
+   * Throws if the damage sub-system is not initialized.
    */
   handleShieldExplosionDamage(data) {
     if (!this.damageSystem) {
