@@ -628,7 +628,19 @@ class EnemyDamageSystem {
       const falloff = 1 - Math.min(distance / radius, 1);
       const actualDamage = damage * falloff;
 
-      asteroid.takeDamage(actualDamage);
+      if (actualDamage <= 0) {
+        continue;
+      }
+
+      const damageResult = this.applyDamage(asteroid, actualDamage, {
+        cause: 'shield-explosion',
+        createFragments: true,
+        triggerExplosion: false,
+      });
+
+      if (damageResult?.killed) {
+        continue;
+      }
 
       if (distanceSq > 0) {
         const impulse = (300 * falloff) / Math.max(asteroid.mass, 1);
