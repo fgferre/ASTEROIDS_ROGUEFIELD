@@ -16,6 +16,7 @@ import { AsteroidCollision } from './enemies/components/AsteroidCollision.js';
 import { AsteroidRenderer } from './enemies/components/AsteroidRenderer.js';
 import { EnemyRenderSystem } from './enemies/systems/EnemyRenderSystem.js';
 import { EnemySpawnSystem } from './enemies/systems/EnemySpawnSystem.js';
+import { EnemyDamageSystem } from './enemies/systems/EnemyDamageSystem.js';
 import { CollisionComponent } from './enemies/components/CollisionComponent.js';
 import { HealthComponent } from './enemies/components/HealthComponent.js';
 import { MovementComponent } from './enemies/components/MovementComponent.js';
@@ -137,6 +138,7 @@ class EnemySystem {
 
     this.renderSystem = null;
     this.spawnSystem = null;
+    this.damageSystem = null;
 
     this.eventBus = typeof gameEvents !== 'undefined' ? gameEvents : null;
 
@@ -156,6 +158,7 @@ class EnemySystem {
     this.setupComponents(); // Initialize components
     this.setupRenderSystem(); // Initialize render sub-system
     this.setupSpawnSystem(); // Initialize spawn sub-system
+    this.setupDamageSystem(); // Initialize damage sub-system
     this.setupEventListeners();
     this.syncPhysicsIntegration(true);
 
@@ -966,6 +969,48 @@ class EnemySystem {
     } catch (error) {
       console.warn('[EnemySystem] Failed to initialize spawn system', error);
       this.spawnSystem = null;
+    }
+  }
+
+  setupDamageSystem() {
+    try {
+      const facade = this;
+      const context = {
+        facade,
+        get spawnSystem() {
+          return facade.spawnSystem;
+        },
+        get asteroids() {
+          return facade.asteroids;
+        },
+        get waveState() {
+          return facade.waveState;
+        },
+        get sessionStats() {
+          return facade.sessionStats;
+        },
+        createScopedRandom: (...args) => facade.createScopedRandom?.(...args),
+        getRandomScope: (...args) => facade.getRandomScope?.(...args),
+        getRandomService: (...args) => facade.getRandomService?.(...args),
+        getCachedPlayer: (...args) => facade.getCachedPlayer?.(...args),
+        getCachedWorld: (...args) => facade.getCachedWorld?.(...args),
+        getCachedPhysics: (...args) => facade.getCachedPhysics?.(...args),
+        getPlayerPositionSnapshot: (...args) =>
+          facade.getPlayerPositionSnapshot?.(...args),
+        getPlayerHullRadius: (...args) => facade.getPlayerHullRadius?.(...args),
+        invalidateActiveEnemyCache: (...args) =>
+          facade.invalidateActiveEnemyCache?.(...args),
+        emitWaveStateUpdate: (...args) => facade.emitWaveStateUpdate?.(...args),
+        completeCurrentWave: (...args) => facade.completeCurrentWave?.(...args),
+        emitEvent: (...args) => facade.emitEvent?.(...args),
+        getActiveEnemyCount: (...args) => facade.getActiveEnemyCount?.(...args),
+      };
+
+      this.damageSystem = new EnemyDamageSystem(context);
+      console.log('[EnemySystem] EnemyDamageSystem initialized');
+    } catch (error) {
+      console.warn('[EnemySystem] Failed to initialize damage system', error);
+      this.damageSystem = null;
     }
   }
 
@@ -3079,7 +3124,15 @@ class EnemySystem {
     return asteroid;
   }
 
+  /**
+   * Damage logic delegated to EnemyDamageSystem when available. Falls back to
+   * the legacy inline implementation if the sub-system fails to initialize.
+   */
   applyDamage(asteroid, damage, options = {}) {
+    if (this.damageSystem) {
+      return this.damageSystem.applyDamage(asteroid, damage, options);
+    }
+
     if (!asteroid || typeof asteroid.takeDamage !== 'function') {
       return { killed: false, remainingHealth: 0, fragments: [] };
     }
@@ -3105,6 +3158,10 @@ class EnemySystem {
 
   // === GERENCIAMENTO DE DESTRUIÇÃO ===
   destroyAsteroid(asteroid, options = {}) {
+    if (this.damageSystem) {
+      return this.damageSystem.destroyAsteroid(asteroid, options);
+    }
+
     if (!asteroid || asteroid.destroyed) return [];
 
     const waveNumber = this.waveState?.current || asteroid.wave || 1;
@@ -3347,7 +3404,15 @@ class EnemySystem {
     return variants;
   }
 
+  /**
+   * Volatile detection delegated to EnemyDamageSystem when available. Falls
+   * back to inline logic for compatibility.
+   */
   isVolatileVariant(asteroid) {
+    if (this.damageSystem) {
+      return this.damageSystem.isVolatileVariant(asteroid);
+    }
+
     if (!asteroid) return false;
     const variant =
       ASTEROID_VARIANTS?.[asteroid.variant] ||
@@ -3355,7 +3420,15 @@ class EnemySystem {
     return variant?.behavior?.type === 'volatile';
   }
 
+  /**
+   * Volatile explosions delegated to EnemyDamageSystem when available with
+   * inline fallback for legacy paths.
+   */
   triggerVolatileExplosion(asteroid, cause = 'destroyed') {
+    if (this.damageSystem) {
+      return this.damageSystem.triggerVolatileExplosion(asteroid, cause);
+    }
+
     if (!asteroid) return;
 
     const variant =
@@ -3429,7 +3502,14 @@ class EnemySystem {
     }
   }
 
+  /**
+   * Delegates volatile timeout handling to EnemyDamageSystem when initialized.
+   */
   handleVolatileTimeout(asteroid) {
+    if (this.damageSystem) {
+      return this.damageSystem.handleVolatileTimeout(asteroid);
+    }
+
     if (!asteroid || asteroid.destroyed) {
       return;
     }
@@ -3441,7 +3521,14 @@ class EnemySystem {
     });
   }
 
+  /**
+   * Delegates player damage logic to EnemyDamageSystem when available.
+   */
   applyDirectDamageToPlayer(amount, context = {}) {
+    if (this.damageSystem) {
+      return this.damageSystem.applyDirectDamageToPlayer(amount, context);
+    }
+
     const player = this.getCachedPlayer();
     if (!player || typeof player.takeDamage !== 'function') {
       return { applied: false };
@@ -4664,7 +4751,14 @@ class EnemySystem {
     return false;
   }
 
+  /**
+   * Delegates mine explosion handling to EnemyDamageSystem when available.
+   */
   handleMineExplosion(data = null) {
+    if (this.damageSystem) {
+      return this.damageSystem.handleMineExplosion(data);
+    }
+
     if (!data || !data.position) {
       return;
     }
@@ -4694,7 +4788,14 @@ class EnemySystem {
     });
   }
 
+  /**
+   * Delegates shield explosion damage to EnemyDamageSystem when available.
+   */
   handleShieldExplosionDamage(data) {
+    if (this.damageSystem) {
+      return this.damageSystem.handleShieldExplosionDamage(data);
+    }
+
     if (!data || !data.position) {
       return;
     }
