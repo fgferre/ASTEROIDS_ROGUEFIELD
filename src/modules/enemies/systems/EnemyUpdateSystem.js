@@ -1,15 +1,16 @@
 /**
- * EnemyUpdateSystem coordinates the per-frame update responsibilities that used
- * to live directly inside EnemySystem. The class acts purely as an orchestrator
- * that delegates work to the spawn/damage subsystems and keeps the facade as
- * the single source of truth for state. Responsibilities covered here:
+ * Coordinates the per-frame update responsibilities that historically lived
+ * directly inside EnemySystem. EnemyUpdateSystem intentionally remains a pure
+ * orchestrator: it owns no gameplay state and simply delegates back to the
+ * facade (EnemySystem) for persistence, spawning, rewards, and event emission.
  *
+ * Responsibilities handled here:
  * - Route between legacy wave logic and the WaveManager integration
- * - Update asteroids, bosses and support enemies every frame
- * - Run collision detection while avoiding per-frame allocations
+ * - Update asteroids, bosses, and support enemies each frame
+ * - Execute collision detection while avoiding per-frame allocations
  * - Cleanup destroyed enemies and emit wave state snapshots
  *
- * Usage mirrors the other sub-systems (spawn, damage, render):
+ * Usage mirrors the other enemy sub-systems:
  *
  * ```js
  * import { EnemyUpdateSystem } from './EnemyUpdateSystem.js';
@@ -63,21 +64,21 @@ export class EnemyUpdateSystem {
     }
 
     /**
-     * Reusable buffer that stores active asteroids for collision detection in
-     * order to avoid allocating a new array every frame.
+     * Reusable buffer that stores active asteroids for collision detection to
+     * avoid allocating a fresh array every frame.
      * @type {import('../../enemies/types/Asteroid.js').Asteroid[]}
      */
     this._activeAsteroidsBuffer = [];
   }
 
   /**
-    * Main update entry point. Keeps the original flow from EnemySystem while
-    * delegating state reads/writes through the facade reference.
-    * @param {number} deltaTime
-    */
+   * Main update entry point. Mirrors the original EnemySystem.update() flow
+   * while delegating state reads and writes through the facade reference.
+   * @param {number} deltaTime
+   */
   update(deltaTime) {
     const facade = this.facade;
-    if (!facade?.sessionActive) {
+    if (!facade || !facade.sessionActive) {
       return;
     }
 
@@ -136,7 +137,7 @@ export class EnemyUpdateSystem {
       this.updateAsteroids(deltaTime);
     } else {
       if (typeof facade.updateWaveLogic === 'function') {
-        facade.updateWaveLogic(deltaTime, {}, true);
+        facade.updateWaveLogic(deltaTime, { skipSpawning: false }, true);
       }
       this.updateAsteroids(deltaTime);
       this.updateWaveLogic(deltaTime);
@@ -149,21 +150,20 @@ export class EnemyUpdateSystem {
   }
 
   /**
-   * Runs the legacy wave logic originally hosted inside EnemySystem.
+   * Executes the legacy wave flow. Returns whether spawning was handled.
    * @param {number} deltaTime
    * @param {{ skipSpawning?: boolean }} [options]
-   * @returns {boolean} Whether spawning was handled during the call.
+   * @returns {boolean}
    */
   updateWaveLogic(deltaTime, { skipSpawning = false } = {}) {
     const facade = this.facade;
+    if (typeof facade?.updateWaveLogic === 'function') {
+      facade.updateWaveLogic(deltaTime, { skipSpawning }, true);
+    }
     const wave = facade?.waveState;
 
     if (!wave) {
       return false;
-    }
-
-    if (typeof facade.updateWaveLogic === 'function') {
-      facade.updateWaveLogic(deltaTime, { skipSpawning }, true);
     }
 
     let spawnHandled = false;
@@ -201,20 +201,19 @@ export class EnemyUpdateSystem {
   }
 
   /**
-   * Synchronizes state with the WaveManager when active.
+   * Synchronizes state with WaveManager while keeping facade-owned flags.
    * @param {number} deltaTime
    * @returns {boolean}
    */
   updateWaveManagerLogic(deltaTime) {
     const facade = this.facade;
+    if (typeof facade?.updateWaveManagerLogic === 'function') {
+      facade.updateWaveManagerLogic(deltaTime, true);
+    }
     const wave = facade?.waveState;
 
     if (!wave) {
       return false;
-    }
-
-    if (typeof facade.updateWaveManagerLogic === 'function') {
-      facade.updateWaveManagerLogic(deltaTime, true);
     }
 
     let spawnHandled = false;
@@ -323,6 +322,7 @@ export class EnemyUpdateSystem {
         facade.spawnInitialAsteroids(4);
       }
     }
+
     const legacyCompatibilityEnabled =
       (PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true) &&
       waveManagerHandlesAsteroids;
@@ -435,15 +435,11 @@ export class EnemyUpdateSystem {
   }
 
   /**
-   * Updates asteroids, support enemies and handles collision detection.
+   * Updates asteroid movement / behavior, then triggers collision handling.
    * @param {number} deltaTime
    */
   updateAsteroids(deltaTime) {
     const facade = this.facade;
-
-    if (typeof facade.updateAsteroids === 'function') {
-      facade.updateAsteroids(deltaTime, true);
-    }
 
     if (!facade?._lastEnemyUpdateLog || Date.now() - facade._lastEnemyUpdateLog > 1000) {
       const enemyTypes = facade.asteroids
@@ -527,14 +523,11 @@ export class EnemyUpdateSystem {
   }
 
   /**
-   * Updates drones, hunters, mines and other support enemies.
+   * Updates non-asteroid support enemies (drones, hunters, mines, bosses).
    * @param {number} deltaTime
    */
   updateSupportEnemies(deltaTime) {
     const facade = this.facade;
-    if (typeof facade.updateSupportEnemies === 'function') {
-      facade.updateSupportEnemies(deltaTime, true);
-    }
     if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
       return;
     }
@@ -552,22 +545,24 @@ export class EnemyUpdateSystem {
   }
 
   /**
-   * Prepares a reusable list of asteroids and delegates to component or legacy
-   * collision handling.
+   * Performs asteroid-asteroid collision handling using a reusable buffer.
    */
   handleAsteroidCollisions() {
     const facade = this.facade;
-    if (typeof facade.handleAsteroidCollisions === 'function') {
-      facade.handleAsteroidCollisions(true);
-    }
     const buffer = this._activeAsteroidsBuffer;
     buffer.length = 0;
 
-    for (let i = 0; i < facade.asteroids.length; i += 1) {
-      const asteroid = facade.asteroids[i];
-      if (asteroid && !asteroid.destroyed && asteroid.type === 'asteroid') {
-        buffer.push(asteroid);
+    const source = facade?.asteroids;
+    if (!Array.isArray(source) || source.length < 2) {
+      return;
+    }
+
+    for (let i = 0; i < source.length; i += 1) {
+      const asteroid = source[i];
+      if (!asteroid || asteroid.destroyed || asteroid.type !== 'asteroid') {
+        continue;
       }
+      buffer.push(asteroid);
     }
 
     if (buffer.length < 2) {
@@ -576,17 +571,22 @@ export class EnemyUpdateSystem {
 
     if (facade.useComponents && facade.collisionComponent) {
       facade.collisionComponent.handleAsteroidCollisions(buffer);
-    } else {
-      for (let i = 0; i < buffer.length - 1; i += 1) {
-        const a1 = buffer[i];
-        if (!a1 || a1.destroyed) continue;
+      return;
+    }
 
-        for (let j = i + 1; j < buffer.length; j += 1) {
-          const a2 = buffer[j];
-          if (!a2 || a2.destroyed) continue;
+    for (let i = 0; i < buffer.length - 1; i += 1) {
+      const a1 = buffer[i];
+      if (!a1 || a1.destroyed) {
+        continue;
+      }
 
-          this.checkAsteroidCollision(a1, a2);
+      for (let j = i + 1; j < buffer.length; j += 1) {
+        const a2 = buffer[j];
+        if (!a2 || a2.destroyed) {
+          continue;
         }
+
+        this.checkAsteroidCollision(a1, a2);
       }
     }
   }
@@ -598,9 +598,6 @@ export class EnemyUpdateSystem {
    */
   checkAsteroidCollision(a1, a2) {
     const facade = this.facade;
-    if (typeof facade.checkAsteroidCollision === 'function') {
-      facade.checkAsteroidCollision(a1, a2, true);
-    }
     const dx = a2.x - a1.x;
     const dy = a2.y - a1.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
@@ -656,9 +653,6 @@ export class EnemyUpdateSystem {
    */
   cleanupDestroyed() {
     const facade = this.facade;
-    if (typeof facade.cleanupDestroyed === 'function') {
-      facade.cleanupDestroyed(true);
-    }
     if (!Array.isArray(facade?.asteroids) || facade.asteroids.length === 0) {
       return;
     }
@@ -684,17 +678,21 @@ export class EnemyUpdateSystem {
   }
 
   /**
-   * Helper that proxies spawning requests to the facade or the spawn system.
+   * Proxies spawning requests to the spawn sub-system or the facade fallback.
    * @param {number} deltaTime
    */
   handleSpawning(deltaTime) {
-    if (this.spawnSystem && typeof this.spawnSystem.handleSpawning === 'function') {
-      this.spawnSystem.handleSpawning(deltaTime);
+    const spawnSystem =
+      this.spawnSystem ?? this.facade?.spawnSystem ?? null;
+
+    if (spawnSystem && typeof spawnSystem.handleSpawning === 'function') {
+      spawnSystem.handleSpawning(deltaTime);
       return;
     }
 
-    if (this.facade && typeof this.facade.handleSpawning === 'function') {
-      this.facade.handleSpawning(deltaTime);
+    const facade = this.facade;
+    if (facade && typeof facade.handleSpawning === 'function') {
+      facade.handleSpawning(deltaTime);
     }
   }
 }

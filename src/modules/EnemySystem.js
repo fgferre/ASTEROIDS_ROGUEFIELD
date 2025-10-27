@@ -1028,6 +1028,49 @@ class EnemySystem {
         get damageSystem() {
           return facade.damageSystem;
         },
+        get asteroids() {
+          return facade.asteroids;
+        },
+        get waveState() {
+          return facade.waveState;
+        },
+        get sessionStats() {
+          return facade.sessionStats;
+        },
+        get spawnTimer() {
+          return facade.spawnTimer;
+        },
+        get useComponents() {
+          return facade.useComponents;
+        },
+        get movementComponent() {
+          return facade.movementComponent;
+        },
+        get collisionComponent() {
+          return facade.collisionComponent;
+        },
+        get waveManager() {
+          return facade.waveManager;
+        },
+        get useManagers() {
+          return facade.useManagers;
+        },
+        refreshInjectedServices: (...args) =>
+          facade.refreshInjectedServices?.(...args),
+        getCachedPlayer: (...args) => facade.getCachedPlayer?.(...args),
+        getCachedWorld: (...args) => facade.getCachedWorld?.(...args),
+        getCachedPhysics: (...args) => facade.getCachedPhysics?.(...args),
+        getRandomScope: (...args) => facade.getRandomScope?.(...args),
+        getRandomService: (...args) => facade.getRandomService?.(...args),
+        getActiveEnemyCount: (...args) => facade.getActiveEnemyCount?.(...args),
+        invalidateActiveEnemyCache: (...args) =>
+          facade.invalidateActiveEnemyCache?.(...args),
+        releaseAsteroid: (...args) => facade.releaseAsteroid?.(...args),
+        emitWaveStateUpdate: (...args) => facade.emitWaveStateUpdate?.(...args),
+        completeCurrentWave: (...args) => facade.completeCurrentWave?.(...args),
+        startNextWave: (...args) => facade.startNextWave?.(...args),
+        spawnInitialAsteroids: (...args) =>
+          facade.spawnInitialAsteroids?.(...args),
       };
 
       this.updateSystem = new EnemyUpdateSystem(context);
@@ -2328,13 +2371,9 @@ class EnemySystem {
    * Updates support enemies (drones, hunters, mines). Delegates to the update
    * sub-system when available and preserves the legacy logic as a fallback.
    */
-  updateSupportEnemies(deltaTime, internal = false) {
-    if (this.updateSystem && !internal) {
+  updateSupportEnemies(deltaTime) {
+    if (this.updateSystem) {
       return this.updateSystem.updateSupportEnemies(deltaTime);
-    }
-
-    if (internal) {
-      return;
     }
 
     if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
@@ -2723,13 +2762,9 @@ class EnemySystem {
    * Enemy movement update. Delegates to EnemyUpdateSystem but keeps the
    * original behavior for compatibility.
    */
-  updateAsteroids(deltaTime, internal = false) {
-    if (this.updateSystem && !internal) {
+  updateAsteroids(deltaTime) {
+    if (this.updateSystem) {
       return this.updateSystem.updateAsteroids(deltaTime);
-    }
-
-    if (internal) {
-      return;
     }
 
     if (!this._lastEnemyUpdateLog || Date.now() - this._lastEnemyUpdateLog > 1000) {
@@ -2812,13 +2847,9 @@ class EnemySystem {
    * Handles asteroid-on-asteroid collisions. Delegation mirrors
    * EnemyUpdateSystem with this legacy implementation as fallback.
    */
-  handleAsteroidCollisions(internal = false) {
-    if (this.updateSystem && !internal) {
+  handleAsteroidCollisions() {
+    if (this.updateSystem) {
       return this.updateSystem.handleAsteroidCollisions();
-    }
-
-    if (internal) {
-      return;
     }
 
     const activeAsteroids = this.asteroids.filter(
@@ -2829,11 +2860,9 @@ class EnemySystem {
       return;
     }
 
-    // NEW: Use collision component if available
     if (this.useComponents && this.collisionComponent) {
       this.collisionComponent.handleAsteroidCollisions(activeAsteroids);
     } else {
-      // LEGACY: Original collision logic
       for (let i = 0; i < activeAsteroids.length - 1; i++) {
         const a1 = activeAsteroids[i];
         if (!a1 || a1.destroyed) continue;
@@ -2851,13 +2880,9 @@ class EnemySystem {
   /**
    * Legacy collision response used when EnemyUpdateSystem is unavailable.
    */
-  checkAsteroidCollision(a1, a2, internal = false) {
-    if (this.updateSystem && !internal) {
+  checkAsteroidCollision(a1, a2) {
+    if (this.updateSystem) {
       return this.updateSystem.checkAsteroidCollision(a1, a2);
-    }
-
-    if (internal) {
-      return;
     }
 
     const dx = a2.x - a1.x;
@@ -3766,13 +3791,9 @@ class EnemySystem {
    * Releases destroyed enemies. Delegates to EnemyUpdateSystem with this
    * method retained for resiliency.
    */
-  cleanupDestroyed(internal = false) {
-    if (this.updateSystem && !internal) {
+  cleanupDestroyed() {
+    if (this.updateSystem) {
       return this.updateSystem.cleanupDestroyed();
-    }
-
-    if (internal) {
-      return;
     }
 
     if (!Array.isArray(this.asteroids) || this.asteroids.length === 0) {
