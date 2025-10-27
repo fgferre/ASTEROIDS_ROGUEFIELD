@@ -22,13 +22,9 @@ export class EnemyRenderSystem {
   /**
    * @param {{
    *   facade: import('../../EnemySystem.js').EnemySystem,
-   *   asteroids?: Array<object>,
-   *   rendererComponent?: import('../components/AsteroidRenderer.js').AsteroidRenderer,
-   *   useComponents?: boolean,
    * }} context
    */
   constructor(context = {}) {
-    this.context = context;
     this.facade = context.facade ?? null;
 
     if (!this.facade) {
@@ -51,12 +47,11 @@ export class EnemyRenderSystem {
       return;
     }
 
-    const asteroidsSource = this.context.asteroids ?? this.facade.asteroids;
-    const asteroids = Array.isArray(asteroidsSource) ? asteroidsSource : [];
-    const rendererComponent =
-      this.context.rendererComponent ?? this.facade.rendererComponent;
-    const useComponents =
-      this.context.useComponents ?? this.facade.useComponents;
+    const asteroids = Array.isArray(this.facade.asteroids)
+      ? this.facade.asteroids
+      : [];
+    const rendererComponent = this.facade.rendererComponent;
+    const useComponents = this.facade.useComponents;
 
     if (useComponents && rendererComponent) {
       rendererComponent.renderAll(ctx, asteroids);
@@ -64,7 +59,11 @@ export class EnemyRenderSystem {
     }
 
     asteroids.forEach((asteroid) => {
-      if (!asteroid.destroyed && typeof asteroid.draw === 'function') {
+      if (!asteroid || asteroid.destroyed) {
+        return;
+      }
+
+      if (typeof asteroid.draw === 'function') {
         asteroid.draw(ctx);
       }
     });

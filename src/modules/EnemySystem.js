@@ -3509,7 +3509,11 @@ class EnemySystem {
     }
 
     this.asteroids.forEach((asteroid) => {
-      if (!asteroid.destroyed && typeof asteroid.draw === 'function') {
+      if (!asteroid || asteroid.destroyed) {
+        return;
+      }
+
+      if (typeof asteroid.draw === 'function') {
         asteroid.draw(ctx);
       }
     });
