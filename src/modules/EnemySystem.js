@@ -17,6 +17,7 @@ import { AsteroidRenderer } from './enemies/components/AsteroidRenderer.js';
 import { EnemyRenderSystem } from './enemies/systems/EnemyRenderSystem.js';
 import { EnemySpawnSystem } from './enemies/systems/EnemySpawnSystem.js';
 import { EnemyDamageSystem } from './enemies/systems/EnemyDamageSystem.js';
+import { EnemyUpdateSystem } from './enemies/systems/EnemyUpdateSystem.js';
 import { CollisionComponent } from './enemies/components/CollisionComponent.js';
 import { HealthComponent } from './enemies/components/HealthComponent.js';
 import { MovementComponent } from './enemies/components/MovementComponent.js';
@@ -139,6 +140,7 @@ class EnemySystem {
     this.renderSystem = null;
     this.spawnSystem = null;
     this.damageSystem = null;
+    this.updateSystem = null;
 
     this.eventBus = typeof gameEvents !== 'undefined' ? gameEvents : null;
 
@@ -159,6 +161,7 @@ class EnemySystem {
     this.setupRenderSystem(); // Initialize render sub-system
     this.setupSpawnSystem(); // Initialize spawn sub-system
     this.setupDamageSystem(); // Initialize damage sub-system
+    this.setupUpdateSystem(); // Initialize update sub-system
     this.setupEventListeners();
     this.syncPhysicsIntegration(true);
 
@@ -1011,6 +1014,27 @@ class EnemySystem {
     } catch (error) {
       console.warn('[EnemySystem] Failed to initialize damage system', error);
       this.damageSystem = null;
+    }
+  }
+
+  setupUpdateSystem() {
+    try {
+      const facade = this;
+      const context = {
+        facade,
+        get spawnSystem() {
+          return facade.spawnSystem;
+        },
+        get damageSystem() {
+          return facade.damageSystem;
+        },
+      };
+
+      this.updateSystem = new EnemyUpdateSystem(context);
+      console.log('[EnemySystem] EnemyUpdateSystem initialized');
+    } catch (error) {
+      console.warn('[EnemySystem] Failed to initialize update system', error);
+      this.updateSystem = null;
     }
   }
 
@@ -2223,7 +2247,15 @@ class EnemySystem {
   }
 
   // === UPDATE PRINCIPAL ===
+  /**
+   * Main update entry point. Delegates to EnemyUpdateSystem when available and
+   * falls back to the legacy inline implementation if initialization fails.
+   */
   update(deltaTime) {
+    if (this.updateSystem) {
+      return this.updateSystem.update(deltaTime);
+    }
+
     if (!this.sessionActive) {
       return;
     }
@@ -2292,7 +2324,19 @@ class EnemySystem {
     this.emitWaveStateUpdate();
   }
 
-  updateSupportEnemies(deltaTime) {
+  /**
+   * Updates support enemies (drones, hunters, mines). Delegates to the update
+   * sub-system when available and preserves the legacy logic as a fallback.
+   */
+  updateSupportEnemies(deltaTime, internal = false) {
+    if (this.updateSystem && !internal) {
+      return this.updateSystem.updateSupportEnemies(deltaTime);
+    }
+
+    if (internal) {
+      return;
+    }
+
     if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
       return;
     }
@@ -2309,7 +2353,19 @@ class EnemySystem {
     }
   }
 
-  updateWaveLogic(deltaTime, { skipSpawning = false } = {}) {
+  /**
+   * Legacy wave progression logic. Delegated to EnemyUpdateSystem but retains
+   * the original implementation for resilience.
+   */
+  updateWaveLogic(deltaTime, { skipSpawning = false } = {}, internal = false) {
+    if (this.updateSystem && !internal) {
+      return this.updateSystem.updateWaveLogic(deltaTime, { skipSpawning });
+    }
+
+    if (internal) {
+      return false;
+    }
+
     const wave = this.waveState;
 
     if (!wave) return false;
@@ -2349,7 +2405,19 @@ class EnemySystem {
   }
 
   // EXPERIMENTAL: Delegação para WaveManager com sincronização de estado (docs/plans/phase1-enemy-foundation-plan.md)
-  updateWaveManagerLogic(deltaTime) {
+  /**
+   * WaveManager synchronization path. Delegates to EnemyUpdateSystem while the
+   * original method remains as a safety net when delegation is unavailable.
+   */
+  updateWaveManagerLogic(deltaTime, internal = false) {
+    if (this.updateSystem && !internal) {
+      return this.updateSystem.updateWaveManagerLogic(deltaTime);
+    }
+
+    if (internal) {
+      return false;
+    }
+
     const wave = this.waveState;
 
     if (!wave) {
@@ -2651,7 +2719,19 @@ class EnemySystem {
   }
 
   // === GERENCIAMENTO DE ASTEROIDES ===
-  updateAsteroids(deltaTime) {
+  /**
+   * Enemy movement update. Delegates to EnemyUpdateSystem but keeps the
+   * original behavior for compatibility.
+   */
+  updateAsteroids(deltaTime, internal = false) {
+    if (this.updateSystem && !internal) {
+      return this.updateSystem.updateAsteroids(deltaTime);
+    }
+
+    if (internal) {
+      return;
+    }
+
     if (!this._lastEnemyUpdateLog || Date.now() - this._lastEnemyUpdateLog > 1000) {
       const enemyTypes = this.asteroids
         .filter((enemy) => enemy && !enemy.destroyed)
@@ -2728,7 +2808,19 @@ class EnemySystem {
     this.handleAsteroidCollisions();
   }
 
-  handleAsteroidCollisions() {
+  /**
+   * Handles asteroid-on-asteroid collisions. Delegation mirrors
+   * EnemyUpdateSystem with this legacy implementation as fallback.
+   */
+  handleAsteroidCollisions(internal = false) {
+    if (this.updateSystem && !internal) {
+      return this.updateSystem.handleAsteroidCollisions();
+    }
+
+    if (internal) {
+      return;
+    }
+
     const activeAsteroids = this.asteroids.filter(
       (asteroid) => asteroid && !asteroid.destroyed && asteroid.type === 'asteroid'
     );
@@ -2756,7 +2848,18 @@ class EnemySystem {
     }
   }
 
-  checkAsteroidCollision(a1, a2) {
+  /**
+   * Legacy collision response used when EnemyUpdateSystem is unavailable.
+   */
+  checkAsteroidCollision(a1, a2, internal = false) {
+    if (this.updateSystem && !internal) {
+      return this.updateSystem.checkAsteroidCollision(a1, a2);
+    }
+
+    if (internal) {
+      return;
+    }
+
     const dx = a2.x - a1.x;
     const dy = a2.y - a1.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
@@ -3659,7 +3762,19 @@ class EnemySystem {
     };
   }
 
-  cleanupDestroyed() {
+  /**
+   * Releases destroyed enemies. Delegates to EnemyUpdateSystem with this
+   * method retained for resiliency.
+   */
+  cleanupDestroyed(internal = false) {
+    if (this.updateSystem && !internal) {
+      return this.updateSystem.cleanupDestroyed();
+    }
+
+    if (internal) {
+      return;
+    }
+
     if (!Array.isArray(this.asteroids) || this.asteroids.length === 0) {
       return;
     }
