@@ -121,12 +121,14 @@ export class EnemySpawnSystem {
     let boss = null;
     let registrationResult = null;
 
-    if (facade.useFactory && facade.factory && typeof facade.factory.hasType === 'function') {
-      if (facade.factory.hasType('boss')) {
+    if (facade.useFactory && facade.factory) {
+      const factory = facade.factory;
+      const canCheckType = typeof factory.hasType === 'function';
+      const supportsBoss = !canCheckType || factory.hasType('boss');
+
+      if (supportsBoss) {
         boss = this.acquireEnemyViaFactory('boss', spawnConfig);
       }
-    } else if (facade.useFactory && facade.factory) {
-      boss = this.acquireEnemyViaFactory('boss', spawnConfig);
     }
 
     if (!boss) {
@@ -220,7 +222,14 @@ export class EnemySpawnSystem {
 
     boss.destroyed = false;
 
-    if (facade.waveState && facade.waveState.isActive && config?.skipWaveAccounting !== true) {
+    const shouldApplyLegacyWaveAccounting =
+      config?.skipWaveAccounting !== true &&
+      (!facade.useManagers ||
+        !facade._waveManagerRuntimeEnabled ||
+        !Boolean(USE_WAVE_MANAGER) ||
+        WAVEMANAGER_HANDLES_ASTEROID_SPAWN === false);
+
+    if (facade.waveState && facade.waveState.isActive && shouldApplyLegacyWaveAccounting) {
       facade.waveState.totalAsteroids += 1;
       facade.waveState.asteroidsSpawned += 1;
     }
@@ -355,7 +364,13 @@ export class EnemySpawnSystem {
       );
     }
 
-    if (facade.waveState && facade.waveState.isActive) {
+    const shouldApplyLegacyWaveAccounting =
+      !facade.useManagers ||
+      !facade._waveManagerRuntimeEnabled ||
+      !Boolean(USE_WAVE_MANAGER) ||
+      WAVEMANAGER_HANDLES_ASTEROID_SPAWN === false;
+
+    if (facade.waveState && facade.waveState.isActive && shouldApplyLegacyWaveAccounting) {
       facade.waveState.asteroidsSpawned += 1;
     }
 
@@ -401,7 +416,6 @@ export class EnemySpawnSystem {
     if (facade.useFactory && facade.factory) {
       asteroid = this.acquireEnemyViaFactory('asteroid', asteroidConfig);
       if (asteroid) {
-        this.assignAsteroidPoolId(asteroid, config.poolId);
         return asteroid;
       }
     }
@@ -490,7 +504,6 @@ export class EnemySpawnSystem {
 
     if (facade.isBossEnemy(enemy)) {
       facade.trackBossEnemy(enemy);
-      enemy.destroyed = false;
     }
 
     if (!alreadyTracked) {
@@ -498,6 +511,8 @@ export class EnemySpawnSystem {
       facade.invalidateActiveEnemyCache();
       facade.registerEnemyWithPhysics(enemy);
     }
+
+    enemy.destroyed = false;
 
     const shouldBridgeToWaveManager =
       facade.useManagers &&
