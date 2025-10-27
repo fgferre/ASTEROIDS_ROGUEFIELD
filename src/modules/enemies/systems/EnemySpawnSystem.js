@@ -229,7 +229,12 @@ export class EnemySpawnSystem {
       position: { x: boss.x ?? 0, y: boss.y ?? 0 },
     };
 
-    if (typeof gameEvents !== 'undefined' && typeof gameEvents.emit === 'function') {
+    if (typeof facade.emitEvent === 'function') {
+      facade.emitEvent('boss-spawned', payload);
+    } else if (
+      typeof gameEvents !== 'undefined' &&
+      typeof gameEvents.emit === 'function'
+    ) {
       gameEvents.emit('boss-spawned', payload);
     } else {
       facade.handleBossSpawned(payload);
@@ -344,16 +349,23 @@ export class EnemySpawnSystem {
       facade.waveState.asteroidsSpawned += 1;
     }
 
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('enemy-spawned', {
-        enemy: asteroid,
-        type: 'asteroid',
-        size,
-        variant,
-        wave: waveNumber,
-        maxHealth: asteroid.maxHealth,
-        position: { x, y },
-      });
+    const payload = {
+      enemy: asteroid,
+      type: 'asteroid',
+      size,
+      variant,
+      wave: waveNumber,
+      maxHealth: asteroid.maxHealth,
+      position: { x, y },
+    };
+
+    if (typeof facade.emitEvent === 'function') {
+      facade.emitEvent('enemy-spawned', payload);
+    } else if (
+      typeof gameEvents !== 'undefined' &&
+      typeof gameEvents.emit === 'function'
+    ) {
+      gameEvents.emit('enemy-spawned', payload);
     }
 
     return asteroid;
@@ -406,10 +418,7 @@ export class EnemySpawnSystem {
     const facade = this.facade;
     if (!facade || !facade.factory) {
       console.warn('[EnemySystem] Factory not available, falling back to legacy');
-      if (type === 'asteroid') {
-        return this.acquireAsteroid(config);
-      }
-      return null;
+      return this.acquireAsteroid(config);
     }
 
     try {
