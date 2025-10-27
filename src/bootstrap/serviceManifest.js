@@ -464,6 +464,46 @@ export function createServiceManifest(context = {}) {
       }
     },
     {
+      name: 'enemy-spawn',
+      singleton: true,
+      lazy: true,
+      dependencies: ['enemies'],
+      factory: ({ resolved }) => {
+        const enemySystem = resolved['enemies'];
+        return enemySystem ? enemySystem.spawnSystem : null;
+      }
+    },
+    {
+      name: 'enemy-damage',
+      singleton: true,
+      lazy: true,
+      dependencies: ['enemies'],
+      factory: ({ resolved }) => {
+        const enemySystem = resolved['enemies'];
+        return enemySystem ? enemySystem.damageSystem : null;
+      }
+    },
+    {
+      name: 'enemy-update',
+      singleton: true,
+      lazy: true,
+      dependencies: ['enemies'],
+      factory: ({ resolved }) => {
+        const enemySystem = resolved['enemies'];
+        return enemySystem ? enemySystem.updateSystem : null;
+      }
+    },
+    {
+      name: 'enemy-render',
+      singleton: true,
+      lazy: true,
+      dependencies: ['enemies'],
+      factory: ({ resolved }) => {
+        const enemySystem = resolved['enemies'];
+        return enemySystem ? enemySystem.renderSystem : null;
+      }
+    },
+    {
       name: 'combat',
       singleton: true,
       lazy: false,

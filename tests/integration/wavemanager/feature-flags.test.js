@@ -36,8 +36,21 @@ describe('WaveManager Integration - Feature Flags', () => {
       expect(CONSTANTS.USE_WAVE_MANAGER).toBe(true);
 
       const previousOverride = globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
-      const legacySpy = vi.spyOn(harness.enemySystem, 'updateWaveLogic');
-      const waveManagerSpy = vi.spyOn(harness.enemySystem, 'updateWaveManagerLogic');
+      const legacySpies = [
+        vi.spyOn(harness.enemySystem, 'updateWaveLogic'),
+      ];
+      const waveManagerSpies = [
+        vi.spyOn(harness.enemySystem, 'updateWaveManagerLogic'),
+      ];
+
+      if (harness.enemySystem.updateSystem) {
+        legacySpies.push(
+          vi.spyOn(harness.enemySystem.updateSystem, 'updateWaveLogic')
+        );
+        waveManagerSpies.push(
+          vi.spyOn(harness.enemySystem.updateSystem, 'updateWaveManagerLogic')
+        );
+      }
 
       try {
         globalThis.__USE_WAVE_MANAGER_OVERRIDE__ = false;
@@ -46,11 +59,16 @@ describe('WaveManager Integration - Feature Flags', () => {
 
         expect(waveState.totalAsteroids).toBe(4);
         expect(waveState.asteroidsSpawned).toBeGreaterThan(0);
-        expect(legacySpy).toHaveBeenCalled();
-        expect(waveManagerSpy).not.toHaveBeenCalled();
+        const legacyCalled = legacySpies.some((spy) => spy.mock.calls.length);
+        const waveManagerCalled = waveManagerSpies.some(
+          (spy) => spy.mock.calls.length
+        );
+
+        expect(legacyCalled).toBe(true);
+        expect(waveManagerCalled).toBe(false);
       } finally {
-        legacySpy.mockRestore();
-        waveManagerSpy.mockRestore();
+        legacySpies.forEach((spy) => spy.mockRestore());
+        waveManagerSpies.forEach((spy) => spy.mockRestore());
 
         if (previousOverride === undefined) {
           delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
@@ -67,7 +85,14 @@ describe('WaveManager Integration - Feature Flags', () => {
       );
 
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const legacySpy = vi.spyOn(harness.enemySystem, 'updateWaveLogic');
+      const legacySpies = [
+        vi.spyOn(harness.enemySystem, 'updateWaveLogic'),
+      ];
+      if (harness.enemySystem.updateSystem) {
+        legacySpies.push(
+          vi.spyOn(harness.enemySystem.updateSystem, 'updateWaveLogic')
+        );
+      }
 
       harness.enemySystem.waveManager = null;
       prepareWave(harness.enemySystem, 1);
@@ -83,7 +108,8 @@ describe('WaveManager Integration - Feature Flags', () => {
         }
 
         expect(() => harness.enemySystem.update(0.5)).not.toThrow();
-        expect(legacySpy).toHaveBeenCalled();
+        const legacyCalled = legacySpies.some((spy) => spy.mock.calls.length);
+        expect(legacyCalled).toBe(true);
 
         const warningEmitted = warnSpy.mock.calls.some(([message]) =>
           String(message).includes('WaveManager indisponível'),
@@ -96,7 +122,7 @@ describe('WaveManager Integration - Feature Flags', () => {
 
         delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
 
-        legacySpy.mockRestore();
+        legacySpies.forEach((spy) => spy.mockRestore());
         warnSpy.mockRestore();
       }
     });

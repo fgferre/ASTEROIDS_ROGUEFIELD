@@ -17,6 +17,7 @@ import { AsteroidRenderer } from './enemies/components/AsteroidRenderer.js';
 import { EnemyRenderSystem } from './enemies/systems/EnemyRenderSystem.js';
 import { EnemySpawnSystem } from './enemies/systems/EnemySpawnSystem.js';
 import { EnemyDamageSystem } from './enemies/systems/EnemyDamageSystem.js';
+import { EnemyUpdateSystem } from './enemies/systems/EnemyUpdateSystem.js';
 import { CollisionComponent } from './enemies/components/CollisionComponent.js';
 import { HealthComponent } from './enemies/components/HealthComponent.js';
 import { MovementComponent } from './enemies/components/MovementComponent.js';
@@ -104,6 +105,7 @@ class EnemySystem {
     this.activeEnemyCacheDirty = true;
     this.usesAsteroidPool = false;
     this._nextAsteroidPoolId = 1;
+    this._activeAsteroidsBuffer = [];
     this._snapshotFallbackWarningIssued = false;
     this._waveSystemDebugLogged = false;
     this._waveManagerFallbackWarningIssued = false;
@@ -139,6 +141,7 @@ class EnemySystem {
     this.renderSystem = null;
     this.spawnSystem = null;
     this.damageSystem = null;
+    this.updateSystem = null;
 
     this.eventBus = typeof gameEvents !== 'undefined' ? gameEvents : null;
 
@@ -159,6 +162,7 @@ class EnemySystem {
     this.setupRenderSystem(); // Initialize render sub-system
     this.setupSpawnSystem(); // Initialize spawn sub-system
     this.setupDamageSystem(); // Initialize damage sub-system
+    this.setupUpdateSystem(); // Initialize update sub-system
     this.setupEventListeners();
     this.syncPhysicsIntegration(true);
 
@@ -1011,6 +1015,70 @@ class EnemySystem {
     } catch (error) {
       console.warn('[EnemySystem] Failed to initialize damage system', error);
       this.damageSystem = null;
+    }
+  }
+
+  setupUpdateSystem() {
+    try {
+      const facade = this;
+      const context = {
+        facade,
+        get spawnSystem() {
+          return facade.spawnSystem;
+        },
+        get damageSystem() {
+          return facade.damageSystem;
+        },
+        get asteroids() {
+          return facade.asteroids;
+        },
+        get waveState() {
+          return facade.waveState;
+        },
+        get sessionStats() {
+          return facade.sessionStats;
+        },
+        get spawnTimer() {
+          return facade.spawnTimer;
+        },
+        get useComponents() {
+          return facade.useComponents;
+        },
+        get movementComponent() {
+          return facade.movementComponent;
+        },
+        get collisionComponent() {
+          return facade.collisionComponent;
+        },
+        get waveManager() {
+          return facade.waveManager;
+        },
+        get useManagers() {
+          return facade.useManagers;
+        },
+        refreshInjectedServices: (...args) =>
+          facade.refreshInjectedServices?.(...args),
+        getCachedPlayer: (...args) => facade.getCachedPlayer?.(...args),
+        getCachedWorld: (...args) => facade.getCachedWorld?.(...args),
+        getCachedPhysics: (...args) => facade.getCachedPhysics?.(...args),
+        getRandomScope: (...args) => facade.getRandomScope?.(...args),
+        getRandomService: (...args) => facade.getRandomService?.(...args),
+        getActiveEnemyCount: (...args) => facade.getActiveEnemyCount?.(...args),
+        invalidateActiveEnemyCache: (...args) =>
+          facade.invalidateActiveEnemyCache?.(...args),
+        releaseAsteroid: (...args) => facade.releaseAsteroid?.(...args),
+        emitWaveStateUpdate: (...args) => facade.emitWaveStateUpdate?.(...args),
+        completeCurrentWave: (...args) => facade.completeCurrentWave?.(...args),
+        startNextWave: (...args) => facade.startNextWave?.(...args),
+        spawnInitialAsteroids: (...args) =>
+          facade.spawnInitialAsteroids?.(...args),
+      };
+
+      this.updateSystem = new EnemyUpdateSystem(context);
+      console.log('[EnemySystem] EnemyUpdateSystem initialized');
+    } catch (error) {
+      console.warn('[EnemySystem] Failed to initialize update system', error);
+      this.updateSystem = null;
     }
   }
 
@@ -2223,7 +2291,15 @@ class EnemySystem {
   }
 
   // === UPDATE PRINCIPAL ===
+  /**
+   * Main update entry point. Delegates to EnemyUpdateSystem when available and
+   * falls back to the legacy inline implementation if initialization fails.
+   */
   update(deltaTime) {
+    if (this.updateSystem) {
+      return this.updateSystem.update(deltaTime);
+    }
+
     if (!this.sessionActive) {
       return;
     }
@@ -2292,7 +2368,15 @@ class EnemySystem {
     this.emitWaveStateUpdate();
   }
 
+  /**
+   * Updates support enemies (drones, hunters, mines). Delegates to the update
+   * sub-system when available and preserves the legacy logic as a fallback.
+   */
   updateSupportEnemies(deltaTime) {
+    if (this.updateSystem) {
+      return this.updateSystem.updateSupportEnemies(deltaTime);
+    }
+
     if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
       return;
     }
@@ -2309,7 +2393,19 @@ class EnemySystem {
     }
   }
 
-  updateWaveLogic(deltaTime, { skipSpawning = false } = {}) {
+  /**
+   * Legacy wave progression logic. Delegated to EnemyUpdateSystem but retains
+   * the original implementation for resilience.
+   */
+  updateWaveLogic(deltaTime, { skipSpawning = false } = {}, internal = false) {
+    if (this.updateSystem && !internal) {
+      return this.updateSystem.updateWaveLogic(deltaTime, { skipSpawning });
+    }
+
+    if (internal) {
+      return false;
+    }
+
     const wave = this.waveState;
 
     if (!wave) return false;
@@ -2349,7 +2445,19 @@ class EnemySystem {
   }
 
   // EXPERIMENTAL: Delegação para WaveManager com sincronização de estado (docs/plans/phase1-enemy-foundation-plan.md)
-  updateWaveManagerLogic(deltaTime) {
+  /**
+   * WaveManager synchronization path. Delegates to EnemyUpdateSystem while the
+   * original method remains as a safety net when delegation is unavailable.
+   */
+  updateWaveManagerLogic(deltaTime, internal = false) {
+    if (this.updateSystem && !internal) {
+      return this.updateSystem.updateWaveManagerLogic(deltaTime);
+    }
+
+    if (internal) {
+      return false;
+    }
+
     const wave = this.waveState;
 
     if (!wave) {
@@ -2651,7 +2759,15 @@ class EnemySystem {
   }
 
   // === GERENCIAMENTO DE ASTEROIDES ===
+  /**
+   * Enemy movement update. Delegates to EnemyUpdateSystem but keeps the
+   * original behavior for compatibility.
+   */
   updateAsteroids(deltaTime) {
+    if (this.updateSystem) {
+      return this.updateSystem.updateAsteroids(deltaTime);
+    }
+
     if (!this._lastEnemyUpdateLog || Date.now() - this._lastEnemyUpdateLog > 1000) {
       const enemyTypes = this.asteroids
         .filter((enemy) => enemy && !enemy.destroyed)
@@ -2670,7 +2786,8 @@ class EnemySystem {
       this._lastEnemyUpdateLog = Date.now();
     }
 
-    const movementContext = this.useComponents && this.movementComponent
+    const useComponents = this.useComponents && this.movementComponent;
+    const movementContext = useComponents
       ? {
           player: this.getCachedPlayer(),
           worldBounds: {
@@ -2680,33 +2797,23 @@ class EnemySystem {
         }
       : null;
 
-    this.asteroids.forEach((enemy) => {
-      if (!enemy || enemy.destroyed) {
-        return;
+    for (let i = 0; i < this.asteroids.length; i += 1) {
+      const enemy = this.asteroids[i];
+      if (!enemy || enemy.destroyed || enemy.type !== 'asteroid') {
+        continue;
       }
 
-      if (enemy.type === 'boss') {
-        if (typeof enemy.onUpdate === 'function') {
-          enemy.onUpdate(deltaTime);
-        }
-        return;
-      }
-
-      if (enemy.type !== 'asteroid') {
-        if (typeof enemy.onUpdate === 'function') {
-          enemy.onUpdate(deltaTime);
-        }
-        return;
-      }
-
-      if (this.useComponents && this.movementComponent) {
+      if (useComponents) {
         this.movementComponent.update(enemy, deltaTime, movementContext);
 
         if (typeof enemy.updateVisualState === 'function') {
           enemy.updateVisualState(deltaTime);
         }
 
-        if (enemy.behavior?.type === 'volatile' && typeof enemy.updateVolatileBehavior === 'function') {
+        if (
+          enemy.behavior?.type === 'volatile' &&
+          typeof enemy.updateVolatileBehavior === 'function'
+        ) {
           enemy.updateVolatileBehavior(deltaTime);
         }
 
@@ -2714,49 +2821,77 @@ class EnemySystem {
           enemy.lastDamageTime = Math.max(0, enemy.lastDamageTime - deltaTime);
         }
         if (enemy.shieldHitCooldown > 0) {
-          enemy.shieldHitCooldown = Math.max(0, enemy.shieldHitCooldown - deltaTime);
+          enemy.shieldHitCooldown = Math.max(
+            0,
+            enemy.shieldHitCooldown - deltaTime
+          );
         }
-        return;
+        continue;
       }
 
       if (typeof enemy.update === 'function') {
         enemy.update(deltaTime);
       }
-    });
+    }
 
     // Física de colisão entre asteroides (always enabled)
     this.handleAsteroidCollisions();
   }
 
+  /**
+   * Handles asteroid-on-asteroid collisions. Delegation mirrors
+   * EnemyUpdateSystem with this legacy implementation as fallback.
+   */
   handleAsteroidCollisions() {
-    const activeAsteroids = this.asteroids.filter(
-      (asteroid) => asteroid && !asteroid.destroyed && asteroid.type === 'asteroid'
-    );
+    if (this.updateSystem) {
+      return this.updateSystem.handleAsteroidCollisions();
+    }
 
-    if (activeAsteroids.length < 2) {
+    const buffer = this._activeAsteroidsBuffer;
+    buffer.length = 0;
+
+    if (!Array.isArray(this.asteroids) || this.asteroids.length < 2) {
       return;
     }
 
-    // NEW: Use collision component if available
+    for (let i = 0; i < this.asteroids.length; i += 1) {
+      const asteroid = this.asteroids[i];
+      if (!asteroid || asteroid.destroyed || asteroid.type !== 'asteroid') {
+        continue;
+      }
+      buffer.push(asteroid);
+    }
+
+    if (buffer.length < 2) {
+      return;
+    }
+
     if (this.useComponents && this.collisionComponent) {
-      this.collisionComponent.handleAsteroidCollisions(activeAsteroids);
-    } else {
-      // LEGACY: Original collision logic
-      for (let i = 0; i < activeAsteroids.length - 1; i++) {
-        const a1 = activeAsteroids[i];
-        if (!a1 || a1.destroyed) continue;
+      this.collisionComponent.handleAsteroidCollisions(buffer);
+      return;
+    }
 
-        for (let j = i + 1; j < activeAsteroids.length; j++) {
-          const a2 = activeAsteroids[j];
-          if (!a2 || a2.destroyed) continue;
+    for (let i = 0; i < buffer.length - 1; i++) {
+      const a1 = buffer[i];
+      if (!a1 || a1.destroyed) continue;
 
-          this.checkAsteroidCollision(a1, a2);
-        }
+      for (let j = i + 1; j < buffer.length; j++) {
+        const a2 = buffer[j];
+        if (!a2 || a2.destroyed) continue;
+
+        this.checkAsteroidCollision(a1, a2);
       }
     }
   }
 
+  /**
+   * Legacy collision response used when EnemyUpdateSystem is unavailable.
+   */
   checkAsteroidCollision(a1, a2) {
+    if (this.updateSystem) {
+      return this.updateSystem.checkAsteroidCollision(a1, a2);
+    }
+
     const dx = a2.x - a1.x;
     const dy = a2.y - a1.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
@@ -3659,7 +3794,15 @@ class EnemySystem {
     };
   }
 
+  /**
+   * Releases destroyed enemies. Delegates to EnemyUpdateSystem with this
+   * method retained for resiliency.
+   */
   cleanupDestroyed() {
+    if (this.updateSystem) {
+      return this.updateSystem.cleanupDestroyed();
+    }
+
     if (!Array.isArray(this.asteroids) || this.asteroids.length === 0) {
       return;
     }
