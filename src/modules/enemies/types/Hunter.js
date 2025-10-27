@@ -1,77 +1,6 @@
 import { HUNTER_COMPONENTS, HUNTER_CONFIG } from '../../../data/enemies/hunter.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
-import { MovementComponent } from '../components/MovementComponent.js';
-import { WeaponComponent } from '../components/WeaponComponent.js';
-import { RenderComponent } from '../components/RenderComponent.js';
-
-const ensureHunterComponents = (hunter, componentConfig = {}) => {
-  if (!hunter?.components) {
-    return;
-  }
-
-  let attached = false;
-
-  if (componentConfig.movement) {
-    const existing = hunter.getComponent('movement');
-    if (!existing) {
-      const movement = new MovementComponent(componentConfig.movement);
-      if (typeof movement.setStrategy === 'function' && componentConfig.movement.strategy) {
-        movement.setStrategy(componentConfig.movement.strategy);
-      }
-      hunter.movementStrategy = componentConfig.movement.strategy || hunter.movementStrategy;
-      hunter.movementConfig = { ...componentConfig.movement };
-      hunter.addComponent('movement', movement);
-      attached = true;
-    } else if (componentConfig.movement.strategy && typeof existing.setStrategy === 'function') {
-      existing.setStrategy(componentConfig.movement.strategy);
-      hunter.movementConfig = { ...componentConfig.movement };
-    }
-  }
-
-  if (componentConfig.weapon) {
-    const existing = hunter.getComponent('weapon');
-    if (!existing) {
-      const weapon = new WeaponComponent(componentConfig.weapon);
-      hunter.weaponConfig = { ...componentConfig.weapon };
-      if (Array.isArray(componentConfig.weapon.patterns)) {
-        hunter.weaponPatterns = [...componentConfig.weapon.patterns];
-        hunter.weaponPattern = hunter.weaponPattern || componentConfig.weapon.patterns[0];
-      } else if (componentConfig.weapon.pattern) {
-        hunter.weaponPattern = componentConfig.weapon.pattern;
-      }
-      hunter.weaponState = hunter.weaponState || {};
-      hunter.addComponent('weapon', weapon);
-      if (typeof weapon.reset === 'function') {
-        weapon.reset(hunter);
-      }
-      attached = true;
-    } else {
-      existing.config = { ...existing.config, ...componentConfig.weapon };
-    }
-  }
-
-  if (componentConfig.render) {
-    const existing = hunter.getComponent('render');
-    if (!existing) {
-      const render = new RenderComponent(componentConfig.render);
-      if (typeof render.setStrategy === 'function' && componentConfig.render.strategy) {
-        render.setStrategy(componentConfig.render.strategy);
-      }
-      hunter.renderStrategy = componentConfig.render.strategy || hunter.renderStrategy;
-      hunter.renderConfig = { ...componentConfig.render };
-      hunter.addComponent('render', render);
-      attached = true;
-    } else if (componentConfig.render.strategy && typeof existing.setStrategy === 'function') {
-      existing.setStrategy(componentConfig.render.strategy);
-      hunter.renderConfig = { ...componentConfig.render };
-    }
-  }
-
-  if (attached || (hunter.components && hunter.components.size > 0)) {
-    hunter.useComponents = true;
-  }
-};
 
 const HUNTER_DEFAULTS = HUNTER_CONFIG ?? {};
 
@@ -116,7 +45,7 @@ export class Hunter extends BaseEnemy {
 
   initialize(config = {}) {
     this.resetForPool();
-   super.initialize(config);
+    super.initialize(config);
 
     const componentConfig = config.components ?? HUNTER_COMPONENTS;
     if (componentConfig) {
@@ -128,8 +57,6 @@ export class Hunter extends BaseEnemy {
         this.orbitDirection = componentConfig.movement.orbitDirection;
       }
     }
-
-    ensureHunterComponents(this, componentConfig);
 
     this.radius = config.radius ?? HUNTER_DEFAULTS.radius ?? 16;
     this.maxHealth =

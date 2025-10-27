@@ -3,77 +3,6 @@ import { GAME_WIDTH, GAME_HEIGHT } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
-import { MovementComponent } from '../components/MovementComponent.js';
-import { WeaponComponent } from '../components/WeaponComponent.js';
-import { RenderComponent } from '../components/RenderComponent.js';
-
-const ensureDroneComponents = (drone, componentConfig = {}) => {
-  if (!drone?.components) {
-    return;
-  }
-
-  let attached = false;
-
-  if (componentConfig.movement) {
-    const existing = drone.getComponent('movement');
-    if (!existing) {
-      const movement = new MovementComponent(componentConfig.movement);
-      if (typeof movement.setStrategy === 'function' && componentConfig.movement.strategy) {
-        movement.setStrategy(componentConfig.movement.strategy);
-      }
-      drone.movementStrategy = componentConfig.movement.strategy || drone.movementStrategy;
-      drone.movementConfig = { ...componentConfig.movement };
-      drone.addComponent('movement', movement);
-      attached = true;
-    } else if (componentConfig.movement.strategy && typeof existing.setStrategy === 'function') {
-      existing.setStrategy(componentConfig.movement.strategy);
-      drone.movementConfig = { ...componentConfig.movement };
-    }
-  }
-
-  if (componentConfig.weapon) {
-    const existing = drone.getComponent('weapon');
-    if (!existing) {
-      const weapon = new WeaponComponent(componentConfig.weapon);
-      drone.weaponConfig = { ...componentConfig.weapon };
-      if (Array.isArray(componentConfig.weapon.patterns)) {
-        drone.weaponPatterns = [...componentConfig.weapon.patterns];
-        drone.weaponPattern = drone.weaponPattern || componentConfig.weapon.patterns[0];
-      } else if (componentConfig.weapon.pattern) {
-        drone.weaponPattern = componentConfig.weapon.pattern;
-      }
-      drone.weaponState = drone.weaponState || {};
-      drone.addComponent('weapon', weapon);
-      if (typeof weapon.reset === 'function') {
-        weapon.reset(drone);
-      }
-      attached = true;
-    } else {
-      existing.config = { ...existing.config, ...componentConfig.weapon };
-    }
-  }
-
-  if (componentConfig.render) {
-    const existing = drone.getComponent('render');
-    if (!existing) {
-      const render = new RenderComponent(componentConfig.render);
-      if (typeof render.setStrategy === 'function' && componentConfig.render.strategy) {
-        render.setStrategy(componentConfig.render.strategy);
-      }
-      drone.renderStrategy = componentConfig.render.strategy || drone.renderStrategy;
-      drone.renderConfig = { ...componentConfig.render };
-      drone.addComponent('render', render);
-      attached = true;
-    } else if (componentConfig.render.strategy && typeof existing.setStrategy === 'function') {
-      existing.setStrategy(componentConfig.render.strategy);
-      drone.renderConfig = { ...componentConfig.render };
-    }
-  }
-
-  if (attached || (drone.components && drone.components.size > 0)) {
-    drone.useComponents = true;
-  }
-};
 
 const DRONE_DEFAULTS = DRONE_CONFIG ?? {};
 
@@ -120,8 +49,6 @@ export class Drone extends BaseEnemy {
       this.renderStrategy = componentConfig?.render?.strategy || 'procedural-triangle';
       this.weaponPattern = componentConfig?.weapon?.pattern || this.weaponPattern;
     }
-
-    ensureDroneComponents(this, componentConfig);
 
     this.radius = config.radius ?? DRONE_DEFAULTS.radius ?? 12;
     this.maxHealth =
