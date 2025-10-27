@@ -152,3 +152,56 @@ As constantes do jogo foram organizadas por domínio funcional para facilitar ma
 - `docs/plans/architecture-master-plan.md`
 - `agents.md`
 - Arquivos destacados ao longo deste documento (`EnemySystem.js`, `WaveManager.js`, `Asteroid.js`, `src/data/constants/`, `src/data/enemies/`, `upgrades.js`).
+
+## 12. Resultados da Refatoração
+
+### 12.5. REFACTOR-011: Remoção de Código de Fallback (Phase 1 Cleanup)
+
+**Objetivo**: Remover implementações de fallback redundantes dos métodos delegados no `EnemySystem.js`, confiando totalmente nos sub-sistemas especializados.
+
+**Mudanças Realizadas**:
+- **EnemySystem.js**: 31 métodos delegados transformados de fallback (20-150 linhas) para error-throwing (5-8 linhas)
+  - SpawnSystem: 14 métodos, ~681 linhas removidas
+  - DamageSystem: 8 métodos, ~460 linhas removidas
+  - UpdateSystem: 8 métodos, ~639 linhas removidas
+  - RenderSystem: 1 método, ~22 linhas removidas
+  - **Total removido**: ~1.802 linhas de código de fallback
+  - **Total mantido**: ~155 linhas de delegação (31 métodos × 5 linhas)
+  - **Redução líquida**: ~1.647 linhas (-92% nos métodos delegados)
+
+**Padrão de Transformação**:
+```javascript
+// ANTES (exemplo com 50 linhas de fallback)
+methodName(args) {
+  if (this.subSystem) {
+    return this.subSystem.methodName(args);
+  }
+  // 50 linhas de lógica de fallback
+}
+
+// DEPOIS (5 linhas com error-throwing)
+methodName(args) {
+  if (!this.subSystem) {
+    throw new Error('[EnemySystem] SubSystem not initialized');
+  }
+  return this.subSystem.methodName(args);
+}
+```
+
+**Impacto no Tamanho do Arquivo**:
+- **Antes**: ~5.089 linhas
+- **Depois**: ~3.442 linhas
+- **Redução**: -1.647 linhas (-32%)
+
+**Benefícios**:
+- ✅ Elimina duplicação de lógica entre facade e sub-sistemas
+- ✅ Fail-fast com mensagens de erro claras
+- ✅ Reduz superfície de manutenção (uma implementação por método)
+- ✅ Previne divergência entre implementações de fallback e sub-sistemas
+- ✅ Melhora legibilidade do `EnemySystem.js` (foco em orquestração, não implementação)
+
+**Riscos Mitigados**:
+- Sub-sistemas são inicializados no constructor com try-catch
+- Falhas de inicialização são logadas mas não travam o bootstrap
+- Erros em runtime identificam claramente qual sub-sistema falhou
+- Padrão consistente com arquitetura de sub-sistemas estabelecida em REFACTOR-004 a REFACTOR-007
