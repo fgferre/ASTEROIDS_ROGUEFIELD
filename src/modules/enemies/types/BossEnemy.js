@@ -364,13 +364,6 @@ export class BossEnemy extends BaseEnemy {
       return;
     }
 
-    if (this.useComponents && this.components?.size > 0 && !this._componentsInvoked) {
-      const context = this.buildComponentContext(deltaTime);
-      this._componentsInvoked = true;
-      this.runComponentUpdate(context);
-      this._componentsInvoked = false;
-    }
-
     const now = Date.now();
     if (!this._lastUpdateLog || now - this._lastUpdateLog > 2000) {
       const velocity = {
