@@ -1084,203 +1084,41 @@ class EnemySystem {
 
   // NOTE: Delegated to EnemySpawnSystem when available.
   acquireAsteroid(config = {}) {
-    if (this.spawnSystem) {
-      return this.spawnSystem.acquireAsteroid(config);
+    if (!this.spawnSystem) {
+      throw new Error('[EnemySystem] SpawnSystem not initialized');
     }
-
-    const scopeHint = config.randomScope || (config.spawnedBy ? 'fragments' : 'spawn');
-    const asteroidRandom =
-      config.random || this.createScopedRandom(scopeHint, 'asteroid').random;
-    const asteroidConfig = {
-      ...config,
-      random: asteroidRandom,
-      poolId: config.poolId,
-    };
-
-    let asteroid = null;
-
-    // NEW: Use factory if enabled (feature flag)
-    if (this.useFactory && this.factory) {
-      asteroid = this.acquireEnemyViaFactory('asteroid', asteroidConfig);
-      if (asteroid) {
-        this.assignAsteroidPoolId(asteroid, config.poolId);
-        return asteroid;
-      }
-    }
-
-    // LEGACY: Original implementation (default)
-    if (
-      this.usesAsteroidPool &&
-      GamePools?.asteroids &&
-      typeof GamePools.asteroids.acquire === 'function'
-    ) {
-      asteroid = GamePools.asteroids.acquire();
-      if (asteroid && typeof asteroid.initialize === 'function') {
-        asteroid.initialize(this, asteroidConfig);
-        this.assignAsteroidPoolId(asteroid, config.poolId);
-        return asteroid;
-      }
-    }
-
-    asteroid = new Asteroid(this, asteroidConfig);
-    this.assignAsteroidPoolId(asteroid, config.poolId);
-    return asteroid;
+    return this.spawnSystem.acquireAsteroid(config);
   }
 
   // NEW: Factory-based enemy acquisition (optional path)
   // NOTE: Delegated to EnemySpawnSystem when available.
   acquireEnemyViaFactory(type, config) {
-    if (this.spawnSystem) {
-      return this.spawnSystem.acquireEnemyViaFactory(type, config);
+    if (!this.spawnSystem) {
+      throw new Error('[EnemySystem] SpawnSystem not initialized');
     }
-
-    if (!this.factory) {
-      console.warn('[EnemySystem] Factory not available for acquireEnemyViaFactory');
-      return null;
-    }
-
-    const hasType =
-      typeof this.factory.hasType === 'function'
-        ? this.factory.hasType(type)
-        : true;
-
-    if (!hasType) {
-      console.warn(
-        `[EnemySystem] Factory does not provide enemy type '${type}'.`
-      );
-      return null;
-    }
-
-    if (typeof this.factory.create !== 'function') {
-      console.error('[EnemySystem] Factory missing create() method');
-      return null;
-    }
-
-    try {
-      const enemy = this.factory.create(type, config);
-      if (!enemy) {
-        return null;
-      }
-
-      this.assignAsteroidPoolId(enemy, config?.poolId);
-      const registrationResult = this.registerActiveEnemy(enemy, {
-        skipDuplicateCheck: true,
-      });
-      if (registrationResult !== false) {
-        enemy[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')] = true;
-      }
-      this.warnIfWaveManagerRegistrationFailed(
-        registrationResult,
-        'factory-acquire',
-        enemy
-      );
-      return enemy;
-    } catch (error) {
-      console.error('[EnemySystem] Factory creation failed:', error);
-      return null;
-    }
+    return this.spawnSystem.acquireEnemyViaFactory(type, config);
   }
 
   // NOTE: Delegated to EnemySpawnSystem when available.
   registerActiveEnemy(enemy, { skipDuplicateCheck = false } = {}) {
-    if (this.spawnSystem) {
-      return this.spawnSystem.registerActiveEnemy(enemy, {
-        skipDuplicateCheck,
-      });
+    if (!this.spawnSystem) {
+      throw new Error('[EnemySystem] SpawnSystem not initialized');
     }
-
-    if (!enemy) {
-      return false;
-    }
-
-    const alreadyTracked = this.asteroids.includes(enemy);
-
-    if (!skipDuplicateCheck && alreadyTracked) {
-      return enemy;
-    }
-
-    if (this.isBossEnemy(enemy)) {
-      this.trackBossEnemy(enemy);
-      enemy.destroyed = false;
-    }
-
-    if (!alreadyTracked) {
-      this.asteroids.push(enemy);
-      this.invalidateActiveEnemyCache();
-      this.registerEnemyWithPhysics(enemy);
-    }
-
-    const shouldBridgeToWaveManager =
-      this.useManagers &&
-      this.waveManager &&
-      this._waveManagerRuntimeEnabled &&
-      Boolean(USE_WAVE_MANAGER) &&
-      !Boolean(WAVEMANAGER_HANDLES_ASTEROID_SPAWN) &&
-      typeof this.waveManager.registerActiveEnemy === 'function';
-
-    let waveManagerRegistered = true;
-
-    if (shouldBridgeToWaveManager) {
-      const candidateType =
-        enemy?.type ||
-        enemy?.enemyType ||
-        enemy?.enemyKind ||
-        enemy?.kind ||
-        null;
-      const asteroidKey =
-        (this.waveManager.enemyTypeKeys && this.waveManager.enemyTypeKeys.asteroid) ||
-        'asteroid';
-      const normalizedCandidate =
-        typeof candidateType === 'string' ? candidateType.toLowerCase() : null;
-      if (normalizedCandidate === String(asteroidKey).toLowerCase()) {
-        const result = this.waveManager.registerActiveEnemy(enemy);
-        if (result === false) {
-          waveManagerRegistered = false;
-        }
-      }
-    }
-
-    return waveManagerRegistered ? enemy : false;
+    return this.spawnSystem.registerActiveEnemy(enemy, {
+      skipDuplicateCheck,
+    });
   }
 
   // NOTE: Delegated to EnemySpawnSystem when available.
   warnIfWaveManagerRegistrationFailed(result, context, enemy = null) {
-    if (this.spawnSystem) {
-      return this.spawnSystem.warnIfWaveManagerRegistrationFailed(
-        result,
-        context,
-        enemy
-      );
+    if (!this.spawnSystem) {
+      throw new Error('[EnemySystem] SpawnSystem not initialized');
     }
-
-    if (result !== false) {
-      return;
-    }
-
-    const waveManagerEnabled =
-      this.useManagers &&
-      this._waveManagerRuntimeEnabled &&
-      Boolean(USE_WAVE_MANAGER) &&
-      !Boolean(WAVEMANAGER_HANDLES_ASTEROID_SPAWN) &&
-      this.waveManager;
-
-    const isDevelopment =
-      typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-
-    if (!waveManagerEnabled || !isDevelopment) {
-      return;
-    }
-
-    if (typeof console === 'undefined' || typeof console.warn !== 'function') {
-      return;
-    }
-
-    console.warn('[EnemySystem] WaveManager registration failed', {
+    return this.spawnSystem.warnIfWaveManagerRegistrationFailed(
+      result,
       context,
-      enemyType: enemy?.type || enemy?.enemyType || null,
-      enemyId: enemy?.id ?? null,
-      wave: this.waveState?.current ?? null,
-    });
+      enemy
+    );
   }
 
   releaseAsteroid(asteroid) {
@@ -1482,60 +1320,26 @@ class EnemySystem {
 
   // NOTE: Delegated to EnemySpawnSystem when available.
   getAsteroidPoolId(asteroid) {
-    if (this.spawnSystem) {
-      return this.spawnSystem.getAsteroidPoolId(asteroid);
+    if (!this.spawnSystem) {
+      throw new Error('[EnemySystem] SpawnSystem not initialized');
     }
-
-    if (!asteroid) {
-      return null;
-    }
-
-    return asteroid[ASTEROID_POOL_ID] ?? null;
+    return this.spawnSystem.getAsteroidPoolId(asteroid);
   }
 
   // NOTE: Delegated to EnemySpawnSystem when available.
   assignAsteroidPoolId(asteroid, preferredId = null) {
-    if (this.spawnSystem) {
-      return this.spawnSystem.assignAsteroidPoolId(asteroid, preferredId);
+    if (!this.spawnSystem) {
+      throw new Error('[EnemySystem] SpawnSystem not initialized');
     }
-
-    if (!asteroid) {
-      return null;
-    }
-
-    let poolId = asteroid[ASTEROID_POOL_ID];
-    if (poolId == null) {
-      if (
-        Number.isFinite(preferredId) &&
-        preferredId > 0 &&
-        Math.floor(preferredId) === preferredId
-      ) {
-        poolId = preferredId;
-      } else {
-        poolId = this._nextAsteroidPoolId++;
-      }
-    }
-
-    asteroid[ASTEROID_POOL_ID] = poolId;
-
-    if (poolId >= this._nextAsteroidPoolId) {
-      this._nextAsteroidPoolId = poolId + 1;
-    }
-
-    return poolId;
+    return this.spawnSystem.assignAsteroidPoolId(asteroid, preferredId);
   }
 
   // NOTE: Delegated to EnemySpawnSystem when available.
   clearAsteroidPoolId(asteroid) {
-    if (this.spawnSystem) {
-      return this.spawnSystem.clearAsteroidPoolId(asteroid);
+    if (!this.spawnSystem) {
+      throw new Error('[EnemySystem] SpawnSystem not initialized');
     }
-
-    if (!asteroid || asteroid[ASTEROID_POOL_ID] == null) {
-      return;
-    }
-
-    delete asteroid[ASTEROID_POOL_ID];
+    return this.spawnSystem.clearAsteroidPoolId(asteroid);
   }
 
   isBossEnemy(enemy) {
@@ -2296,76 +2100,10 @@ class EnemySystem {
    * falls back to the legacy inline implementation if initialization fails.
    */
   update(deltaTime) {
-    if (this.updateSystem) {
-      return this.updateSystem.update(deltaTime);
+    if (!this.updateSystem) {
+      throw new Error('[EnemySystem] UpdateSystem not initialized');
     }
-
-    if (!this.sessionActive) {
-      return;
-    }
-
-    this.refreshInjectedServices();
-
-    const overrideValue =
-      typeof globalThis !== 'undefined'
-        ? globalThis.__USE_WAVE_MANAGER_OVERRIDE__
-        : undefined;
-
-    const constantsFlag =
-      typeof USE_WAVE_MANAGER === 'boolean'
-        ? USE_WAVE_MANAGER
-        : false;
-
-    let waveManagerEnabled = constantsFlag;
-    if (overrideValue === true) {
-      waveManagerEnabled = true;
-    } else if (overrideValue === false) {
-      waveManagerEnabled = false;
-    }
-
-    if (!this._waveSystemDebugLogged) {
-      console.debug(
-        `[EnemySystem] Wave system: ${waveManagerEnabled ? 'WaveManager' : 'Legacy'}`
-      );
-      this._waveSystemDebugLogged = true;
-    }
-
-    this._waveManagerRuntimeEnabled = waveManagerEnabled;
-
-    const waveManagerHandlesSpawnFlag =
-      (WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
-      this._waveManagerRuntimeEnabled;
-    const waveManagerControlsSpawn = Boolean(
-      waveManagerHandlesSpawnFlag &&
-        this.waveManager &&
-        !this._waveManagerFallbackWarningIssued &&
-        !this._waveManagerInvalidStateWarningIssued
-    );
-
-    if (!this._asteroidSpawnDebugLogged) {
-      console.debug(
-        `[EnemySystem] Asteroid spawn: ${
-          waveManagerControlsSpawn ? 'WaveManager' : 'Legacy handleSpawning()'
-        }`
-      );
-      this._asteroidSpawnDebugLogged = true;
-    }
-
-    this.sessionStats.timeElapsed += deltaTime;
-
-    // FEATURE FLAG: Roteamento entre sistema legado e WaveManager
-    if (waveManagerEnabled) {
-      this.updateWaveManagerLogic(deltaTime);
-      this.updateAsteroids(deltaTime);
-    } else {
-      this.updateAsteroids(deltaTime);
-      this.updateWaveLogic(deltaTime);
-    }
-
-    this.updateSupportEnemies(deltaTime);
-    this.cleanupDestroyed();
-
-    this.emitWaveStateUpdate();
+    return this.updateSystem.update(deltaTime);
   }
 
   /**
@@ -2373,24 +2111,10 @@ class EnemySystem {
    * sub-system when available and preserves the legacy logic as a fallback.
    */
   updateSupportEnemies(deltaTime) {
-    if (this.updateSystem) {
-      return this.updateSystem.updateSupportEnemies(deltaTime);
+    if (!this.updateSystem) {
+      throw new Error('[EnemySystem] UpdateSystem not initialized');
     }
-
-    if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
-      return;
-    }
-
-    for (let i = 0; i < this.asteroids.length; i += 1) {
-      const enemy = this.asteroids[i];
-      if (!enemy || enemy.destroyed || enemy.type === 'asteroid') {
-        continue;
-      }
-
-      if (typeof enemy.onUpdate === 'function') {
-        enemy.onUpdate(deltaTime);
-      }
-    }
+    return this.updateSystem.updateSupportEnemies(deltaTime);
   }
 
   /**
@@ -2398,865 +2122,82 @@ class EnemySystem {
    * the original implementation for resilience.
    */
   updateWaveLogic(deltaTime, { skipSpawning = false } = {}, internal = false) {
-    if (this.updateSystem && !internal) {
-      return this.updateSystem.updateWaveLogic(deltaTime, { skipSpawning });
-    }
-
     if (internal) {
       return false;
     }
-
-    const wave = this.waveState;
-
-    if (!wave) return false;
-
-    let spawnHandled = false;
-
-    const waveManagerHandlesSpawn =
-      (WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
-      this._waveManagerRuntimeEnabled &&
-      this.waveManager &&
-      !this._waveManagerFallbackWarningIssued &&
-      !this._waveManagerInvalidStateWarningIssued;
-
-    if (wave.isActive) {
-      wave.timeRemaining = Math.max(0, wave.timeRemaining - deltaTime);
-      if (!skipSpawning && !waveManagerHandlesSpawn) {
-        this.handleSpawning(deltaTime);
-        spawnHandled = true;
-      }
-
-      const allAsteroidsKilled =
-        wave.asteroidsKilled >= wave.totalAsteroids &&
-        this.getActiveEnemyCount() === 0;
-
-      if (wave.timeRemaining <= 0 || allAsteroidsKilled) {
-        this.completeCurrentWave();
-      }
-    } else if (wave.breakTimer > 0) {
-      wave.breakTimer = Math.max(0, wave.breakTimer - deltaTime);
-
-      if (wave.breakTimer === 0) {
-        this.startNextWave();
-      }
+    if (!this.updateSystem) {
+      throw new Error('[EnemySystem] UpdateSystem not initialized');
     }
-
-    return spawnHandled;
+    return this.updateSystem.updateWaveLogic(deltaTime, { skipSpawning });
   }
 
-  // EXPERIMENTAL: Delegação para WaveManager com sincronização de estado (docs/plans/phase1-enemy-foundation-plan.md)
   /**
    * WaveManager synchronization path. Delegates to EnemyUpdateSystem while the
    * original method remains as a safety net when delegation is unavailable.
    */
   updateWaveManagerLogic(deltaTime, internal = false) {
-    if (this.updateSystem && !internal) {
-      return this.updateSystem.updateWaveManagerLogic(deltaTime);
-    }
-
     if (internal) {
       return false;
     }
-
-    const wave = this.waveState;
-
-    if (!wave) {
-      return false;
+    if (!this.updateSystem) {
+      throw new Error('[EnemySystem] UpdateSystem not initialized');
     }
-
-    let spawnHandled = false;
-
-    if (!this.waveManager) {
-      if (!this._waveManagerFallbackWarningIssued) {
-        console.warn(
-          '[EnemySystem] WaveManager indisponível. Recuando para updateWaveLogic() enquanto USE_WAVE_MANAGER está ativo.'
-        );
-        this._waveManagerFallbackWarningIssued = true;
-      }
-      return this.updateWaveLogic(deltaTime);
-    }
-
-    const waveManagerHandlesAsteroids =
-      (WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
-      this._waveManagerRuntimeEnabled &&
-      !this._waveManagerFallbackWarningIssued &&
-      !this._waveManagerInvalidStateWarningIssued;
-
-    if (!waveManagerHandlesAsteroids) {
-      this.handleSpawning(deltaTime);
-      spawnHandled = true;
-    }
-
-    this.waveManager.update(deltaTime);
-
-    const managerState = this.waveManager.getState ? this.waveManager.getState() : null;
-
-    const managerStateValid =
-      managerState &&
-      managerState.currentWave !== undefined &&
-      managerState.inProgress !== undefined &&
-      managerState.spawned !== undefined &&
-      managerState.killed !== undefined &&
-      managerState.total !== undefined;
-
-    if (!managerStateValid) {
-      if (!this._waveManagerInvalidStateWarningIssued) {
-        console.warn(
-          '[EnemySystem] WaveManager returned invalid state. Falling back to updateWaveLogic() while USE_WAVE_MANAGER is active.'
-        );
-        this._waveManagerInvalidStateWarningIssued = true;
-      }
-      if (waveManagerHandlesAsteroids) {
-        return spawnHandled;
-      }
-      return this.updateWaveLogic(deltaTime, { skipSpawning: spawnHandled });
-    }
-
-    const {
-      current: previousCurrent,
-      isActive: previousIsActive,
-      asteroidsSpawned: previousSpawned,
-      asteroidsKilled: previousKilled,
-      totalAsteroids: previousTotal,
-    } = wave;
-
-    const nextWaveNumberCandidate = Number(managerState.currentWave);
-    const resolvedWaveNumber = Number.isFinite(nextWaveNumberCandidate)
-      ? nextWaveNumberCandidate
-      : Number.isFinite(previousCurrent)
-        ? previousCurrent
-        : 1;
-
-    const nextIsActive = Boolean(managerState.inProgress);
-    const becameActive = !previousIsActive && nextIsActive;
-
-    wave.current = resolvedWaveNumber;
-    wave.isActive = nextIsActive;
-
-    if (!nextIsActive) {
-      const countdownValue = Number(managerState.countdown) || 0;
-      wave.breakTimer = Math.max(0, countdownValue);
-    }
-
-    if (becameActive) {
-      const baseMultiplier = Number.isFinite(ASTEROIDS_PER_WAVE_MULTIPLIER)
-        ? ASTEROIDS_PER_WAVE_MULTIPLIER
-        : 1.3;
-      const baseCountValue = Number.isFinite(ASTEROIDS_PER_WAVE_BASE)
-        ? ASTEROIDS_PER_WAVE_BASE
-        : 4;
-      const normalizedWaveIndex = Math.max(0, resolvedWaveNumber - 1);
-      const computedTotal = Math.floor(
-        baseCountValue * Math.pow(baseMultiplier, normalizedWaveIndex)
-      );
-      const capValue = Number.isFinite(MAX_ASTEROIDS_ON_SCREEN)
-        ? MAX_ASTEROIDS_ON_SCREEN
-        : 25;
-
-      wave.totalAsteroids = Math.max(0, Math.min(computedTotal, capValue));
-      wave.asteroidsSpawned = 0;
-      wave.asteroidsKilled = 0;
-      wave.timeRemaining = Number.isFinite(Number(WAVE_DURATION))
-        ? Number(WAVE_DURATION)
-        : 60;
-      wave.spawnTimer = 0;
-      wave.initialSpawnDone = false;
-      wave.breakTimer = 0;
-
-      if (waveManagerHandlesAsteroids) {
-        this.spawnInitialAsteroids(4);
-      }
-    }
-    const legacyCompatibilityEnabled =
-      (PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true) &&
-      waveManagerHandlesAsteroids;
-
-    const totals = managerState.totals || {};
-    const counts = managerState.counts || {};
-    const spawnedBreakdown = counts.spawned || {};
-    const killedBreakdown = counts.killed || {};
-
-    const resolvedCompatibilityMode =
-      managerState.compatibilityMode ??
-      (!waveManagerHandlesAsteroids || legacyCompatibilityEnabled);
-    const resolvedFallbackActive =
-      managerState.legacyFallbackActive ?? !waveManagerHandlesAsteroids;
-
-    wave.compatibilityMode = Boolean(resolvedCompatibilityMode);
-    wave.legacyFallbackActive = Boolean(resolvedFallbackActive);
-
-    const coerceFiniteNumber = (value) => {
-      const numeric = Number(value);
-      return Number.isFinite(numeric) ? numeric : undefined;
-    };
-
-    const selectManagerValue = (value, fallback) => {
-      const numeric = coerceFiniteNumber(value);
-      return numeric !== undefined ? numeric : fallback;
-    };
-
-    let nextSpawned = previousSpawned;
-    let nextTotal = previousTotal;
-    let nextKilled = previousKilled;
-
-    wave.managerTotals = {
-      all: selectManagerValue(totals.all, managerState.total),
-      asteroids: selectManagerValue(totals.asteroids, managerState.total),
-    };
-
-    wave.managerCounts = {
-      spawned: {
-        all: selectManagerValue(spawnedBreakdown.all, managerState.spawned),
-        asteroids: selectManagerValue(
-          spawnedBreakdown.asteroids,
-          managerState.spawned
-        ),
-      },
-      killed: {
-        all: selectManagerValue(killedBreakdown.all, managerState.killed),
-        asteroids: selectManagerValue(
-          killedBreakdown.asteroids,
-          managerState.killed
-        ),
-      },
-    };
-
-    if (waveManagerHandlesAsteroids) {
-      const managerSpawnedValue = legacyCompatibilityEnabled
-        ? spawnedBreakdown.asteroids ?? managerState.spawned
-        : managerState.spawned;
-      const managerTotalValue = legacyCompatibilityEnabled
-        ? totals.asteroids ?? managerState.total
-        : managerState.total;
-
-      nextSpawned = selectManagerValue(managerSpawnedValue, previousSpawned);
-      nextTotal = selectManagerValue(managerTotalValue, previousTotal);
-
-      wave.asteroidsSpawned = nextSpawned;
-      wave.totalAsteroids = nextTotal;
-    }
-
-    const hasAsteroidKillBreakdown = Object.prototype.hasOwnProperty.call(
-      killedBreakdown,
-      'asteroids'
-    );
-    const managerKilledSource = hasAsteroidKillBreakdown
-      ? killedBreakdown.asteroids
-      : managerState.killed;
-    const managerKilledValue = selectManagerValue(managerKilledSource, previousKilled);
-    const shouldSyncKilledCount = true; // WaveManager derives kills from enemy-destroyed events
-
-    if (shouldSyncKilledCount) {
-      nextKilled = managerKilledValue;
-      wave.asteroidsKilled = nextKilled;
-    }
-
-    const stateChanged =
-      wave.current !== previousCurrent ||
-      wave.isActive !== previousIsActive ||
-      (shouldSyncKilledCount && nextKilled !== previousKilled);
-
-    if (stateChanged) {
-      console.debug(
-        `[EnemySystem] WaveManager state synced: wave ${wave.current}, ${wave.asteroidsKilled}/${wave.totalAsteroids} enemies, active=${wave.isActive}`
-      );
-    }
-
-    // WAVE-004: Validação de consistência em desenvolvimento
-    if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
-      const managerKilled = managerState.killed ?? 0;
-      const systemKilled = wave.asteroidsKilled ?? 0;
-      if (Math.abs(managerKilled - systemKilled) > 1) {
-        console.warn(
-          `[EnemySystem] Kill count mismatch: WaveManager=${managerKilled}, waveState=${systemKilled}`
-        );
-      }
-    }
-
-    return spawnHandled;
+    return this.updateSystem.updateWaveManagerLogic(deltaTime);
   }
 
-  handleWaveManagerWaveComplete(data = {}) {
-    if (!this.waveState) {
-      return;
-    }
-
-    const waveNumberCandidate = Number(data.wave);
-    if (Number.isFinite(waveNumberCandidate) && waveNumberCandidate > 0) {
-      this.waveState.current = waveNumberCandidate;
-    }
-
-    const breakDuration = Number(WAVE_BREAK_TIME) || 0;
-
-    this.waveState.isActive = false;
-    this.waveState.breakTimer = breakDuration;
-    this.waveState.timeRemaining = 0;
-    this.waveState.spawnTimer = 0;
-    this.waveState.initialSpawnDone = false;
-
-    const waveManagerControlsAsteroids =
-      (WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
-      this._waveManagerRuntimeEnabled;
-
-    if (
-      waveManagerControlsAsteroids &&
-      this.waveManager &&
-      Number.isFinite(Number(this.waveManager.totalEnemiesThisWave))
-    ) {
-      this.waveState.totalAsteroids = Number(this.waveManager.totalEnemiesThisWave);
-    }
-
-    if (!Number.isFinite(Number(this.waveState.asteroidsSpawned))) {
-      this.waveState.asteroidsSpawned = 0;
-    }
-
-    if (waveManagerControlsAsteroids) {
-      const managerSpawned = Number(this.waveManager?.enemiesSpawnedThisWave);
-      if (Number.isFinite(managerSpawned)) {
-        this.waveState.asteroidsSpawned = Math.max(0, managerSpawned);
-      }
-      const enforcedTotal = Number(this.waveState.totalAsteroids) || 0;
-      if (this.waveState.asteroidsSpawned < enforcedTotal) {
-        this.waveState.asteroidsSpawned = enforcedTotal;
-      }
-    } else {
-      this.waveState.asteroidsSpawned = Math.max(
-        Number(this.waveState.asteroidsSpawned) || 0,
-        Number(this.waveState.totalAsteroids) || 0
-      );
-    }
-
-    const possibleKilledValues = [];
-    const payloadKilled = Number(data.enemiesKilled);
-    if (Number.isFinite(payloadKilled)) {
-      possibleKilledValues.push(payloadKilled);
-    }
-
-    if (
-      this.waveManager &&
-      Number.isFinite(Number(this.waveManager.enemiesKilledThisWave))
-    ) {
-      possibleKilledValues.push(Number(this.waveManager.enemiesKilledThisWave));
-    }
-
-    if (Number.isFinite(Number(this.waveState.asteroidsKilled))) {
-      possibleKilledValues.push(Number(this.waveState.asteroidsKilled));
-    }
-
-    if (Number.isFinite(Number(this.waveState.totalAsteroids))) {
-      possibleKilledValues.push(Number(this.waveState.totalAsteroids));
-    }
-
-    if (possibleKilledValues.length > 0) {
-      this.waveState.asteroidsKilled = Math.max(...possibleKilledValues);
-    }
-
-    this.waveState.completedWaves = (this.waveState.completedWaves || 0) + 1;
-
-    this.grantWaveRewards();
-
-    this.emitWaveStateUpdate(true);
-  }
-
-  // === GERENCIAMENTO DE ASTEROIDES ===
-  /**
-   * Enemy movement update. Delegates to EnemyUpdateSystem but keeps the
-   * original behavior for compatibility.
-   */
   updateAsteroids(deltaTime) {
-    if (this.updateSystem) {
-      return this.updateSystem.updateAsteroids(deltaTime);
+    if (!this.updateSystem) {
+      throw new Error('[EnemySystem] UpdateSystem not initialized');
     }
-
-    if (!this._lastEnemyUpdateLog || Date.now() - this._lastEnemyUpdateLog > 1000) {
-      const enemyTypes = this.asteroids
-        .filter((enemy) => enemy && !enemy.destroyed)
-        .map((enemy) => enemy.type || 'unknown');
-
-      const typeCounts = enemyTypes.reduce((acc, type) => {
-        acc[type] = (acc[type] || 0) + 1;
-        return acc;
-      }, {});
-
-      GameDebugLogger.log('UPDATE', 'Enemy update loop', {
-        totalEnemies: enemyTypes.length,
-        types: typeCounts,
-      });
-
-      this._lastEnemyUpdateLog = Date.now();
-    }
-
-    const useComponents = this.useComponents && this.movementComponent;
-    const movementContext = useComponents
-      ? {
-          player: this.getCachedPlayer(),
-          worldBounds: {
-            width: GAME_WIDTH,
-            height: GAME_HEIGHT,
-          },
-        }
-      : null;
-
-    for (let i = 0; i < this.asteroids.length; i += 1) {
-      const enemy = this.asteroids[i];
-      if (!enemy || enemy.destroyed || enemy.type !== 'asteroid') {
-        continue;
-      }
-
-      if (useComponents) {
-        this.movementComponent.update(enemy, deltaTime, movementContext);
-
-        if (typeof enemy.updateVisualState === 'function') {
-          enemy.updateVisualState(deltaTime);
-        }
-
-        if (
-          enemy.behavior?.type === 'volatile' &&
-          typeof enemy.updateVolatileBehavior === 'function'
-        ) {
-          enemy.updateVolatileBehavior(deltaTime);
-        }
-
-        if (enemy.lastDamageTime > 0) {
-          enemy.lastDamageTime = Math.max(0, enemy.lastDamageTime - deltaTime);
-        }
-        if (enemy.shieldHitCooldown > 0) {
-          enemy.shieldHitCooldown = Math.max(
-            0,
-            enemy.shieldHitCooldown - deltaTime
-          );
-        }
-        continue;
-      }
-
-      if (typeof enemy.update === 'function') {
-        enemy.update(deltaTime);
-      }
-    }
-
-    // Física de colisão entre asteroides (always enabled)
-    this.handleAsteroidCollisions();
+    return this.updateSystem.updateAsteroids(deltaTime);
   }
 
-  /**
-   * Handles asteroid-on-asteroid collisions. Delegation mirrors
-   * EnemyUpdateSystem with this legacy implementation as fallback.
-   */
   handleAsteroidCollisions() {
-    if (this.updateSystem) {
-      return this.updateSystem.handleAsteroidCollisions();
+    if (!this.updateSystem) {
+      throw new Error('[EnemySystem] UpdateSystem not initialized');
     }
-
-    const buffer = this._activeAsteroidsBuffer;
-    buffer.length = 0;
-
-    if (!Array.isArray(this.asteroids) || this.asteroids.length < 2) {
-      return;
-    }
-
-    for (let i = 0; i < this.asteroids.length; i += 1) {
-      const asteroid = this.asteroids[i];
-      if (!asteroid || asteroid.destroyed || asteroid.type !== 'asteroid') {
-        continue;
-      }
-      buffer.push(asteroid);
-    }
-
-    if (buffer.length < 2) {
-      return;
-    }
-
-    if (this.useComponents && this.collisionComponent) {
-      this.collisionComponent.handleAsteroidCollisions(buffer);
-      return;
-    }
-
-    for (let i = 0; i < buffer.length - 1; i++) {
-      const a1 = buffer[i];
-      if (!a1 || a1.destroyed) continue;
-
-      for (let j = i + 1; j < buffer.length; j++) {
-        const a2 = buffer[j];
-        if (!a2 || a2.destroyed) continue;
-
-        this.checkAsteroidCollision(a1, a2);
-      }
-    }
+    return this.updateSystem.handleAsteroidCollisions();
   }
 
-  /**
-   * Legacy collision response used when EnemyUpdateSystem is unavailable.
-   */
   checkAsteroidCollision(a1, a2) {
-    if (this.updateSystem) {
-      return this.updateSystem.checkAsteroidCollision(a1, a2);
+    if (!this.updateSystem) {
+      throw new Error('[EnemySystem] UpdateSystem not initialized');
     }
-
-    const dx = a2.x - a1.x;
-    const dy = a2.y - a1.y;
-    const distance = Math.sqrt(dx * dx + dy * dy);
-    const minDistance = a1.radius + a2.radius;
-
-    if (distance < minDistance && distance > 0) {
-      const nx = dx / distance;
-      const ny = dy / distance;
-
-      // Correção de penetração
-      const overlap = minDistance - distance;
-      const percent = 0.5;
-      a1.x -= nx * overlap * percent;
-      a1.y -= ny * overlap * percent;
-      a2.x += nx * overlap * percent;
-      a2.y += ny * overlap * percent;
-
-      // Impulso elástico com massa
-      const rvx = a2.vx - a1.vx;
-      const rvy = a2.vy - a1.vy;
-      const velAlongNormal = rvx * nx + rvy * ny;
-
-      if (velAlongNormal < 0) {
-        const e = COLLISION_BOUNCE;
-        const invMass1 = 1 / a1.mass;
-        const invMass2 = 1 / a2.mass;
-        const j = (-(1 + e) * velAlongNormal) / (invMass1 + invMass2);
-
-        const jx = j * nx;
-        const jy = j * ny;
-
-        a1.vx -= jx * invMass1;
-        a1.vy -= jy * invMass1;
-        a2.vx += jx * invMass2;
-        a2.vy += jy * invMass2;
-      }
-
-      // Rotação adicional
-      const collisionRandom =
-        (typeof a1?.getRandomFor === 'function' && a1.getRandomFor('collision')) ||
-        (typeof a2?.getRandomFor === 'function' && a2.getRandomFor('collision')) ||
-        this.getRandomScope('fragments');
-      const rotationSource =
-        collisionRandom || this.getRandomScope('fragments') || this.getRandomService();
-      const rotationDelta =
-        rotationSource && typeof rotationSource.range === 'function'
-          ? rotationSource.range(-0.75, 0.75)
-          : (rotationSource.float() - 0.5) * 1.5;
-      a1.rotationSpeed += rotationDelta;
-      a2.rotationSpeed += rotationDelta;
-    }
+    return this.updateSystem.checkAsteroidCollision(a1, a2);
   }
 
   // === SISTEMA DE SPAWNING ===
+  // === SISTEMA DE SPAWNING ===
   // NOTE: Delegated to EnemySpawnSystem when available.
   handleSpawning(deltaTime) {
-    if (this.spawnSystem) {
-      return this.spawnSystem.handleSpawning(deltaTime);
+    if (!this.spawnSystem) {
+      throw new Error('[EnemySystem] SpawnSystem not initialized');
     }
-
-    // LEGACY: Used when WAVEMANAGER_HANDLES_ASTEROID_SPAWN=false
-    const wave = this.waveState;
-    if (!wave || !wave.isActive) {
-      return;
-    }
-
-    if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
-      return;
-    }
-
-    this.spawnTimer -= deltaTime;
-
-    if (this.shouldSpawn() && this.spawnTimer <= 0) {
-      this.spawnAsteroid();
-      const spawnRandom = this.getRandomScope('spawn') || this.getRandomService();
-      const delayMultiplier =
-        spawnRandom && typeof spawnRandom.range === 'function'
-          ? spawnRandom.range(0.5, 1)
-          : 0.5 + spawnRandom.float() * 0.5;
-      this.spawnTimer = wave.spawnDelay * delayMultiplier;
-    }
+    return this.spawnSystem.handleSpawning(deltaTime);
   }
 
   // NOTE: Delegated to EnemySpawnSystem when available.
   shouldSpawn() {
-    if (this.spawnSystem) {
-      return this.spawnSystem.shouldSpawn();
+    if (!this.spawnSystem) {
+      throw new Error('[EnemySystem] SpawnSystem not initialized');
     }
-
-    const wave = this.waveState;
-    if (!wave || !wave.isActive) {
-      return false;
-    }
-
-    return (
-      wave.asteroidsSpawned < wave.totalAsteroids &&
-      this.getActiveEnemyCount() < MAX_ASTEROIDS_ON_SCREEN
-    );
+    return this.spawnSystem.shouldSpawn();
   }
 
   // NOTE: Delegated to EnemySpawnSystem when available.
   spawnBoss(config = {}) {
-    if (this.spawnSystem) {
-      return this.spawnSystem.spawnBoss(config);
+    if (!this.spawnSystem) {
+      throw new Error('[EnemySystem] SpawnSystem not initialized');
     }
-
-    const waveNumber = Number.isFinite(config.wave)
-      ? config.wave
-      : this.waveState?.current ?? 1;
-
-    const scopeLabel = config.randomScope || 'boss-spawn';
-    const spawnContext = this.createScopedRandom(scopeLabel, `boss-${waveNumber}`);
-    const spawnRandom =
-      config.random || spawnContext.random || this.getRandomScope(scopeLabel) || this.getRandomService();
-
-    const spawnConfig = {
-      ...config,
-      wave: waveNumber,
-      random: spawnRandom,
-      randomScope: scopeLabel,
-      randomParentScope: config.randomParentScope || 'spawn',
-    };
-
-    const minionTypes = this.getAvailableBossMinionTypes(config.minionTypes);
-    if (minionTypes.length > 0) {
-      spawnConfig.minionTypes = [...minionTypes];
-    }
-
-    GameDebugLogger.log('SPAWN', 'EnemySystem.spawnBoss() called', {
-      wave: waveNumber,
-      hasPosition: Number.isFinite(config.x) && Number.isFinite(config.y),
-      position: { x: config.x, y: config.y },
-    });
-
-    let boss = null;
-    let registrationResult = null;
-
-    if (this.useFactory && this.factory && typeof this.factory.hasType === 'function') {
-      if (this.factory.hasType('boss')) {
-        boss = this.acquireEnemyViaFactory('boss', spawnConfig);
-      }
-    } else if (this.useFactory && this.factory) {
-      boss = this.acquireEnemyViaFactory('boss', spawnConfig);
-    }
-
-    if (!boss) {
-      try {
-        boss = new BossEnemy(this, spawnConfig);
-        this.assignAsteroidPoolId(boss, spawnConfig.poolId);
-      } catch (error) {
-        console.error('[EnemySystem] Failed to instantiate boss enemy', error);
-        GameDebugLogger.log('ERROR', 'Boss creation failed', {
-          useFactory: this.useFactory,
-          hasFactory: !!this.factory,
-          factoryHasBossType: typeof this.factory?.hasType === 'function'
-            ? this.factory.hasType('boss')
-            : null,
-          error: error?.message,
-        });
-        return null;
-      }
-    }
-
-    if (!boss) {
-      console.warn('[EnemySystem] Boss spawn failed: no instance created');
-      GameDebugLogger.log('ERROR', 'Boss creation failed', {
-        useFactory: this.useFactory,
-        hasFactory: !!this.factory,
-        factoryHasBossType: typeof this.factory?.hasType === 'function'
-          ? this.factory.hasType('boss')
-          : null,
-      });
-      return null;
-    }
-
-    if (!Number.isFinite(boss.x) || !Number.isFinite(boss.y)) {
-      GameDebugLogger.log('ERROR', 'Boss has invalid position', {
-        x: boss.x,
-        y: boss.y,
-        configX: config.x,
-        configY: config.y,
-      });
-
-      const fallbackX = Number.isFinite(config.x) ? config.x : (GAME_WIDTH || 800) / 2;
-      const fallbackY = Number.isFinite(config.y) ? config.y : -100;
-
-      boss.x = fallbackX;
-      boss.y = fallbackY;
-
-      GameDebugLogger.log('STATE', 'Boss position set to fallback', {
-        x: boss.x,
-        y: boss.y,
-      });
-    }
-
-    GameDebugLogger.log('SPAWN', 'Boss instance created', {
-      id: boss.id,
-      type: boss.type,
-      position: { x: boss.x, y: boss.y },
-      radius: boss.radius,
-      health: boss.health,
-      maxHealth: boss.maxHealth,
-    });
-
-    const alreadyTracked = this.asteroids.includes(boss);
-    if (!alreadyTracked) {
-      registrationResult = this.registerActiveEnemy(boss, {
-        skipDuplicateCheck: true,
-      });
-      this.warnIfWaveManagerRegistrationFailed(
-        registrationResult,
-        'boss-spawn',
-        boss
-      );
-    } else {
-      registrationResult = boss;
-    }
-
-    GameDebugLogger.log('STATE', 'Boss registered', {
-      success: !!registrationResult,
-      activeEnemyCount: this.asteroids.length,
-    });
-
-    boss.destroyed = false;
-
-    if (this.waveState && this.waveState.isActive && config?.skipWaveAccounting !== true) {
-      this.waveState.totalAsteroids += 1;
-      this.waveState.asteroidsSpawned += 1;
-    }
-
-    const payload = {
-      enemy: boss,
-      wave: waveNumber,
-      config: spawnConfig,
-      rewards: this.mergeBossRewards(boss, spawnConfig.rewards || {}),
-      position: { x: boss.x ?? 0, y: boss.y ?? 0 },
-    };
-
-    if (typeof gameEvents !== 'undefined' && typeof gameEvents.emit === 'function') {
-      gameEvents.emit('boss-spawned', payload);
-    } else {
-      this.handleBossSpawned(payload);
-    }
-
-    return boss;
+    return this.spawnSystem.spawnBoss(config);
   }
 
   // NOTE: Delegated to EnemySpawnSystem when available.
   spawnAsteroid() {
-    if (this.spawnSystem) {
-      return this.spawnSystem.spawnAsteroid();
+    if (!this.spawnSystem) {
+      throw new Error('[EnemySystem] SpawnSystem not initialized');
     }
-
-    if (!this.sessionActive) return null;
-
-    const spawnContext = this.createScopedRandom('spawn', 'asteroid-spawn');
-    const globalRandom = this.getRandomService();
-    const spawnRandom =
-      spawnContext.random || this.getRandomScope('spawn') || globalRandom;
-    const floatRandom =
-      spawnRandom && typeof spawnRandom.float === 'function' ? spawnRandom : globalRandom;
-    const side =
-      spawnRandom && typeof spawnRandom.int === 'function'
-        ? spawnRandom.int(0, 3)
-        : Math.floor(floatRandom.float() * 4);
-    let x;
-    let y;
-    const margin =
-      typeof ASTEROID_EDGE_SPAWN_MARGIN === 'number'
-        ? ASTEROID_EDGE_SPAWN_MARGIN
-        : 80;
-
-    switch (side) {
-      case 0:
-        x =
-          spawnRandom && typeof spawnRandom.range === 'function'
-            ? spawnRandom.range(0, GAME_WIDTH)
-            : floatRandom.float() * GAME_WIDTH;
-        y = -margin;
-        break;
-      case 1:
-        x = GAME_WIDTH + margin;
-        y =
-          spawnRandom && typeof spawnRandom.range === 'function'
-            ? spawnRandom.range(0, GAME_HEIGHT)
-            : floatRandom.float() * GAME_HEIGHT;
-        break;
-      case 2:
-        x =
-          spawnRandom && typeof spawnRandom.range === 'function'
-            ? spawnRandom.range(0, GAME_WIDTH)
-            : floatRandom.float() * GAME_WIDTH;
-        y = GAME_HEIGHT + margin;
-        break;
-      default:
-        x = -margin;
-        y =
-          spawnRandom && typeof spawnRandom.range === 'function'
-            ? spawnRandom.range(0, GAME_HEIGHT)
-            : floatRandom.float() * GAME_HEIGHT;
-        break;
-    }
-
-    let size;
-    const rand = floatRandom.float();
-    if (rand < 0.5) size = 'large';
-    else if (rand < 0.8) size = 'medium';
-    else size = 'small';
-
-    const waveNumber = this.waveState?.current || 1;
-    const variant = this.decideVariant(size, {
-      wave: waveNumber,
-      spawnType: 'spawn',
-      random: this.getRandomScope('variants'),
-    });
-
-    const asteroidRandom = spawnRandom?.fork
-      ? spawnRandom.fork('asteroid-core')
-      : null;
-
-    const asteroid = this.acquireAsteroid({
-      x,
-      y,
-      size,
-      variant,
-      wave: waveNumber,
-      random: asteroidRandom,
-      randomScope: 'spawn',
-    });
-
-    GameDebugLogger.log('SPAWN', 'Asteroid spawned', {
-      requested: { size, variant, wave: waveNumber },
-      actual: {
-        size: asteroid?.size,
-        variant: asteroid?.variant,
-        radius: asteroid?.radius,
-        variantKey: asteroid?.variantConfig?.key,
-      },
-      match: asteroid?.size === size && asteroid?.variant === variant,
-    });
-
-    const registrationResult = this.registerActiveEnemy(asteroid);
-    this.warnIfWaveManagerRegistrationFailed(
-      registrationResult,
-      'spawn-asteroid',
-      asteroid
-    );
-
-    if (this.waveState && this.waveState.isActive) {
-      this.waveState.asteroidsSpawned += 1;
-    }
-
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('enemy-spawned', {
-        enemy: asteroid,
-        type: 'asteroid',
-        size,
-        variant,
-        wave: waveNumber,
-        maxHealth: asteroid.maxHealth,
-        position: { x, y },
-      });
-    }
-
-    return asteroid;
+    return this.spawnSystem.spawnAsteroid();
   }
 
   /**
@@ -3264,279 +2205,42 @@ class EnemySystem {
    * the legacy inline implementation if the sub-system fails to initialize.
    */
   applyDamage(asteroid, damage, options = {}) {
-    if (this.damageSystem) {
-      return this.damageSystem.applyDamage(asteroid, damage, options);
+    if (!this.damageSystem) {
+      throw new Error('[EnemySystem] DamageSystem not initialized');
     }
-
-    if (!asteroid || typeof asteroid.takeDamage !== 'function') {
-      return { killed: false, remainingHealth: 0, fragments: [] };
-    }
-
-    if (asteroid.destroyed) {
-      return { killed: false, remainingHealth: 0, fragments: [] };
-    }
-
-    const killed = asteroid.takeDamage(damage);
-    const remainingHealth = Math.max(0, asteroid.health);
-
-    if (killed) {
-      const fragments = this.destroyAsteroid(asteroid, {
-        cause: options.cause || 'damage',
-        createFragments: options.createFragments !== false,
-        triggerExplosion: options.triggerExplosion,
-      });
-      return { killed: true, remainingHealth: 0, fragments };
-    }
-
-    return { killed: false, remainingHealth, fragments: [] };
+    return this.damageSystem.applyDamage(asteroid, damage, options);
   }
 
   // === GERENCIAMENTO DE DESTRUIÇÃO ===
   destroyAsteroid(asteroid, options = {}) {
-    if (this.damageSystem) {
-      return this.damageSystem.destroyAsteroid(asteroid, options);
+    if (!this.damageSystem) {
+      throw new Error('[EnemySystem] DamageSystem not initialized');
     }
-
-    if (!asteroid || asteroid.destroyed) return [];
-
-    const waveNumber = this.waveState?.current || asteroid.wave || 1;
-    const createFragments = options.createFragments !== false;
-
-    asteroid.destroyed = true;
-        this.invalidateActiveEnemyCache();
-
-      const fragmentDescriptors = createFragments
-      ? asteroid.generateFragments()
-      : [];
-    const fragments = [];
-
-    if (fragmentDescriptors.length > 0) {
-      const fragmentVariants = this.assignVariantsToFragments(
-        fragmentDescriptors,
-        asteroid,
-        waveNumber
-      );
-
-      fragmentDescriptors.forEach((descriptor, index) => {
-        const fragmentRandom = this.createScopedRandom('fragments', 'fragment');
-        const fragment = this.acquireAsteroid({
-          ...descriptor,
-          variant: fragmentVariants[index],
-          wave: descriptor.wave || waveNumber,
-          random: fragmentRandom.random,
-          randomScope: 'fragments',
-        });
-        const registrationResult = this.registerActiveEnemy(fragment);
-        this.warnIfWaveManagerRegistrationFailed(
-          registrationResult,
-          'fragment-spawn',
-          fragment
-        );
-        fragments.push(fragment);
-      });
-
-      if (this.waveState && this.waveState.isActive) {
-        this.waveState.totalAsteroids += fragments.length;
-        this.waveState.asteroidsSpawned += fragments.length;
-      }
-    }
-
-    if (this.waveState) {
-      this.waveState.asteroidsKilled += 1;
-    }
-
-    this.sessionStats.totalKills += 1;
-
-    const shouldExplode =
-      options.triggerExplosion === true ||
-      (options.triggerExplosion !== false && this.isVolatileVariant(asteroid));
-
-    if (shouldExplode) {
-      this.triggerVolatileExplosion(asteroid, options.cause || 'destroyed');
-    }
-
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('enemy-destroyed', {
-        enemy: asteroid,
-        fragments,
-        position: { x: asteroid.x, y: asteroid.y },
-        size: asteroid.size,
-        variant: asteroid.variant,
-        maxHealth: asteroid.maxHealth,
-        cause: options.cause || 'destroyed',
-        wave: waveNumber,
-        spawnedBy: asteroid.spawnedBy,
-      });
-    }
-
-    this.emitWaveStateUpdate();
-
-    if (this.waveState && this.waveState.isActive) {
-      const allAsteroidsKilled =
-        this.waveState.asteroidsKilled >= this.waveState.totalAsteroids &&
-        this.getActiveEnemyCount() === 0;
-
-      const usingWaveManager =
-        this.useManagers && Boolean(USE_WAVE_MANAGER) && this.waveManager;
-
-      if (!usingWaveManager && allAsteroidsKilled && this.waveState.timeRemaining > 0) {
-        this.completeCurrentWave();
-      }
-    }
-
-    return fragments;
+    return this.damageSystem.destroyAsteroid(asteroid, options);
   }
 
   // NOTE: Delegated to EnemySpawnSystem when available.
   decideVariant(size, context = {}) {
-    if (this.spawnSystem) {
-      return this.spawnSystem.decideVariant(size, context);
+    if (!this.spawnSystem) {
+      throw new Error('[EnemySystem] SpawnSystem not initialized');
     }
-
-    if (context.forcedVariant) {
-      return context.forcedVariant;
-    }
-
-    const chanceConfig = ASTEROID_VARIANT_CHANCES || {};
-    const variantConfig = ASTEROID_VARIANTS || {};
-    const info = chanceConfig[size];
-
-    if (!info) {
-      return 'common';
-    }
-
-    const wave = context.wave ?? this.waveState?.current ?? 1;
-    let chance = info.baseChance ?? 0;
-    chance += this.computeVariantWaveBonus(wave);
-    chance = Math.min(Math.max(chance, 0), 1);
-
-    const distribution = { ...(info.distribution || {}) };
-
-    Object.keys(distribution).forEach((key) => {
-      const variant = variantConfig[key];
-      const allowedSizes = variant?.allowedSizes;
-      const minWave = variant?.availability?.minWave;
-
-      const sizeAllowed =
-        !Array.isArray(allowedSizes) || allowedSizes.includes(size);
-      const waveAllowed = typeof minWave !== 'number' || wave >= minWave;
-      const disallowed =
-        Array.isArray(context.disallowedVariants) &&
-        context.disallowedVariants.includes(key);
-
-      if (!variant || !sizeAllowed || !waveAllowed || disallowed) {
-        delete distribution[key];
-      }
-    });
-
-    const availableKeys = Object.keys(distribution);
-    const variantRandom =
-      context.random || this.getRandomScope('variants') || this.getRandomService();
-    const shouldRoll =
-      variantRandom && typeof variantRandom.chance === 'function'
-        ? variantRandom.chance(chance)
-        : variantRandom.float() <= chance;
-
-    if (!availableKeys.length || !shouldRoll) {
-      return 'common';
-    }
-
-    const totalWeight = availableKeys.reduce(
-      (sum, key) => sum + (distribution[key] ?? 0),
-      0
-    );
-
-    if (totalWeight <= 0) {
-      return 'common';
-    }
-
-    let roll;
-    if (variantRandom && typeof variantRandom.range === 'function') {
-      roll = variantRandom.range(0, totalWeight);
-    } else {
-      roll = variantRandom.float() * totalWeight;
-    }
-    for (let i = 0; i < availableKeys.length; i += 1) {
-      const key = availableKeys[i];
-      roll -= distribution[key];
-      if (roll <= 0) {
-        return key;
-      }
-    }
-
-    return availableKeys[availableKeys.length - 1] || 'common';
+    return this.spawnSystem.decideVariant(size, context);
   }
 
   // NOTE: Delegated to EnemySpawnSystem when available.
   computeVariantWaveBonus(wave) {
-    if (this.spawnSystem) {
-      return this.spawnSystem.computeVariantWaveBonus(wave);
+    if (!this.spawnSystem) {
+      throw new Error('[EnemySystem] SpawnSystem not initialized');
     }
-
-    const config = ASTEROID_VARIANT_CHANCES?.waveBonus;
-    if (!config) return 0;
-
-    const startWave = config.startWave ?? Infinity;
-    if (wave < startWave) {
-      return 0;
-    }
-
-    const increment = config.increment ?? 0;
-    const maxBonus = config.maxBonus ?? 0;
-    const extraWaves = Math.max(0, wave - startWave + 1);
-    return Math.min(maxBonus, extraWaves * increment);
+    return this.spawnSystem.computeVariantWaveBonus(wave);
   }
 
   // NOTE: Delegated to EnemySpawnSystem when available.
   assignVariantsToFragments(fragments, parent, wave) {
-    if (this.spawnSystem) {
-      return this.spawnSystem.assignVariantsToFragments(fragments, parent, wave);
+    if (!this.spawnSystem) {
+      throw new Error('[EnemySystem] SpawnSystem not initialized');
     }
-
-    if (!Array.isArray(fragments) || fragments.length === 0) {
-      return [];
-    }
-
-    const variants = new Array(fragments.length).fill('common');
-    const variantRandom = this.getRandomScope('variants') || this.getRandomService();
-
-    if (parent?.size === 'large') {
-      const denseChance = Math.min(1, 0.3 + this.computeVariantWaveBonus(wave));
-      const shouldApplyDense =
-        variantRandom && typeof variantRandom.chance === 'function'
-          ? variantRandom.chance(denseChance)
-          : variantRandom.float() < denseChance;
-      if (shouldApplyDense) {
-        const denseIndex =
-          variantRandom && typeof variantRandom.int === 'function'
-            ? variantRandom.int(0, fragments.length - 1)
-            : Math.floor(variantRandom.float() * fragments.length);
-        variants[denseIndex] = 'denseCore';
-      }
-    }
-
-    for (let i = 0; i < fragments.length; i += 1) {
-      if (variants[i] !== 'common') {
-        continue;
-      }
-
-      const fragment = fragments[i];
-      const disallowed = [];
-
-      if (parent?.size === 'large' && variants.includes('denseCore')) {
-        disallowed.push('denseCore');
-      }
-
-      variants[i] = this.decideVariant(fragment.size, {
-        wave,
-        spawnType: 'fragment',
-        parent,
-        disallowedVariants: disallowed,
-        random: variantRandom,
-      });
-    }
-
-    return variants;
+    return this.spawnSystem.assignVariantsToFragments(fragments, parent, wave);
   }
 
   /**
@@ -3544,254 +2248,41 @@ class EnemySystem {
    * back to inline logic for compatibility.
    */
   isVolatileVariant(asteroid) {
-    if (this.damageSystem) {
-      return this.damageSystem.isVolatileVariant(asteroid);
+    if (!this.damageSystem) {
+      throw new Error('[EnemySystem] DamageSystem not initialized');
     }
-
-    if (!asteroid) return false;
-    const variant =
-      ASTEROID_VARIANTS?.[asteroid.variant] ||
-      ASTEROID_VARIANTS?.common;
-    return variant?.behavior?.type === 'volatile';
+    return this.damageSystem.isVolatileVariant(asteroid);
   }
 
   /**
-   * Volatile explosions delegated to EnemyDamageSystem when available with
-   * inline fallback for legacy paths.
+   * Volatile explosions delegated to EnemyDamageSystem when available
+   * with inline fallback for legacy paths.
    */
   triggerVolatileExplosion(asteroid, cause = 'destroyed') {
-    if (this.damageSystem) {
-      return this.damageSystem.triggerVolatileExplosion(asteroid, cause);
+    if (!this.damageSystem) {
+      throw new Error('[EnemySystem] DamageSystem not initialized');
     }
-
-    if (!asteroid) return;
-
-    const variant =
-      ASTEROID_VARIANTS?.[asteroid.variant] ||
-      ASTEROID_VARIANTS?.common;
-    const explosion = variant?.behavior?.explosion;
-
-    if (!explosion) {
-      return;
-    }
-
-    const radius = explosion.radius ?? 0;
-    const damage = explosion.damage ?? 0;
-    if (radius <= 0 || damage <= 0) {
-      return;
-    }
-
-    const radiusSq = radius * radius;
-
-    this.asteroids.forEach((target) => {
-      if (!target || target === asteroid || target.destroyed) {
-        return;
-      }
-
-      const dx = target.x - asteroid.x;
-      const dy = target.y - asteroid.y;
-      const distanceSq = dx * dx + dy * dy;
-
-      if (distanceSq <= radiusSq) {
-        this.applyDamage(target, damage, {
-          cause: 'volatile-explosion',
-          sourceId: asteroid.id,
-        });
-      }
-    });
-
-    let shouldDamagePlayer = false;
-
-    const player = this.getCachedPlayer();
-    const playerPos = player?.position;
-
-    if (
-      player &&
-      playerPos &&
-      Number.isFinite(playerPos.x) &&
-      Number.isFinite(playerPos.y)
-    ) {
-      const playerDx = playerPos.x - asteroid.x;
-      const playerDy = playerPos.y - asteroid.y;
-      const playerDistanceSq = playerDx * playerDx + playerDy * playerDy;
-
-      shouldDamagePlayer = playerDistanceSq <= radiusSq;
-    }
-
-    if (shouldDamagePlayer) {
-      this.applyDirectDamageToPlayer(damage, {
-        cause: 'volatile-explosion',
-        position: { x: asteroid.x, y: asteroid.y },
-        radius,
-      });
-    }
-
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('asteroid-volatile-exploded', {
-        asteroid,
-        position: { x: asteroid.x, y: asteroid.y },
-        radius,
-        damage,
-        cause,
-      });
-    }
+    return this.damageSystem.triggerVolatileExplosion(asteroid, cause);
   }
 
   /**
    * Delegates volatile timeout handling to EnemyDamageSystem when initialized.
    */
   handleVolatileTimeout(asteroid) {
-    if (this.damageSystem) {
-      return this.damageSystem.handleVolatileTimeout(asteroid);
+    if (!this.damageSystem) {
+      throw new Error('[EnemySystem] DamageSystem not initialized');
     }
-
-    if (!asteroid || asteroid.destroyed) {
-      return;
-    }
-
-    this.destroyAsteroid(asteroid, {
-      createFragments: false,
-      cause: 'self-destruct',
-      triggerExplosion: true,
-    });
+    return this.damageSystem.handleVolatileTimeout(asteroid);
   }
 
   /**
    * Delegates player damage logic to EnemyDamageSystem when available.
    */
   applyDirectDamageToPlayer(amount, context = {}) {
-    if (this.damageSystem) {
-      return this.damageSystem.applyDirectDamageToPlayer(amount, context);
+    if (!this.damageSystem) {
+      throw new Error('[EnemySystem] DamageSystem not initialized');
     }
-
-    const player = this.getCachedPlayer();
-    if (!player || typeof player.takeDamage !== 'function') {
-      return { applied: false };
-    }
-
-    const playerPosition = this.getPlayerPositionSnapshot(player);
-
-    const hasBlastRadius =
-      context &&
-      context.position &&
-      Number.isFinite(context.position.x) &&
-      Number.isFinite(context.position.y) &&
-      Number.isFinite(context.radius) &&
-      context.radius > 0;
-
-    if (hasBlastRadius && playerPosition) {
-      const hullRadius = this.getPlayerHullRadius(player);
-      const dx = playerPosition.x - context.position.x;
-      const dy = playerPosition.y - context.position.y;
-      const distance = Math.hypot(dx, dy);
-
-      if (distance > context.radius + hullRadius) {
-        return { applied: false };
-      }
-    }
-
-    if (
-      Number.isFinite(player.invulnerableTimer) &&
-      player.invulnerableTimer > 0
-    ) {
-      return { applied: false };
-    }
-
-    const wasShieldActive = Boolean(player.isShieldActive);
-    const previousShieldHP = Number.isFinite(player.shieldHP) ? player.shieldHP : 0;
-    const previousHealth = Number.isFinite(player.health) ? player.health : null;
-
-    const remaining = player.takeDamage(amount);
-    const currentHealth = Number.isFinite(player.health) ? player.health : previousHealth;
-    const currentShieldHP = Number.isFinite(player.shieldHP) ? player.shieldHP : 0;
-
-    const healthChanged =
-      Number.isFinite(previousHealth) && Number.isFinite(currentHealth)
-        ? currentHealth < previousHealth
-        : false;
-    const shieldAbsorbed = wasShieldActive
-      ? Math.max(0, previousShieldHP - currentShieldHP)
-      : 0;
-
-    if (healthChanged && Number.isFinite(currentHealth) && currentHealth > 0) {
-      if (typeof player.setInvulnerableTimer === 'function') {
-        player.setInvulnerableTimer(0.5);
-      } else {
-        player.invulnerableTimer = 0.5;
-      }
-    }
-
-    const eventPosition = playerPosition
-      ? { x: playerPosition.x, y: playerPosition.y }
-      : null;
-    const damageSource =
-      context &&
-      context.position &&
-      Number.isFinite(context.position.x) &&
-      Number.isFinite(context.position.y)
-        ? { x: context.position.x, y: context.position.y }
-        : null;
-    const damageCause = context.cause || 'enemy';
-
-    if (typeof gameEvents !== 'undefined') {
-      const baseEventPayload = {
-        damage: amount,
-        remaining: Number.isFinite(currentHealth) ? currentHealth : remaining,
-        max: Number.isFinite(player.maxHealth) ? player.maxHealth : undefined,
-        position: eventPosition,
-        playerPosition: eventPosition,
-        damageSource,
-        source: context.source || null,
-        cause: damageCause,
-        shieldAbsorbed,
-      };
-
-      if (healthChanged) {
-        const healthDamage =
-          Number.isFinite(previousHealth) && Number.isFinite(currentHealth)
-            ? previousHealth - currentHealth
-            : amount;
-        gameEvents.emit('player-took-damage', {
-          ...baseEventPayload,
-          applied: true,
-          absorbed: shieldAbsorbed > 0,
-          healthDamage,
-        });
-      } else if (shieldAbsorbed > 0) {
-        gameEvents.emit('player-took-damage', {
-          ...baseEventPayload,
-          applied: false,
-          absorbed: true,
-          healthDamage: 0,
-        });
-      }
-    }
-
-    if (healthChanged && Number.isFinite(currentHealth) && currentHealth <= 0) {
-      const world = this.getCachedWorld();
-      if (world && typeof world.handlePlayerDeath === 'function') {
-        if (world.playerAlive !== false) {
-          world.handlePlayerDeath();
-        }
-      }
-    }
-
-    const applied = healthChanged || shieldAbsorbed > 0;
-
-    if (!applied) {
-      return { applied: false };
-    }
-
-    return {
-      applied: true,
-      remaining: Number.isFinite(currentHealth) ? currentHealth : remaining,
-      absorbed: !healthChanged && shieldAbsorbed > 0,
-      shieldAbsorbed,
-      healthDamage:
-        healthChanged && Number.isFinite(previousHealth) && Number.isFinite(currentHealth)
-          ? previousHealth - currentHealth
-          : 0,
-    };
+    return this.damageSystem.applyDirectDamageToPlayer(amount, context);
   }
 
   /**
@@ -3799,34 +2290,13 @@ class EnemySystem {
    * method retained for resiliency.
    */
   cleanupDestroyed() {
-    if (this.updateSystem) {
-      return this.updateSystem.cleanupDestroyed();
+    if (!this.updateSystem) {
+      throw new Error('[EnemySystem] UpdateSystem not initialized');
     }
-
-    if (!Array.isArray(this.asteroids) || this.asteroids.length === 0) {
-      return;
-    }
-
-    const remaining = [];
-    let removed = 0;
-
-    for (let i = 0; i < this.asteroids.length; i += 1) {
-      const asteroid = this.asteroids[i];
-      if (!asteroid || asteroid.destroyed) {
-        this.releaseAsteroid(asteroid);
-        removed += 1;
-        continue;
-      }
-
-      remaining.push(asteroid);
-    }
-
-    if (removed > 0) {
-      this.asteroids = remaining;
-      this.invalidateActiveEnemyCache();
-    }
+    return this.updateSystem.cleanupDestroyed();
   }
 
+  // === GETTERS PÚBLICOS ===
   // === GETTERS PÚBLICOS ===
   getActiveEnemies() {
     this.rebuildActiveEnemyCache();
@@ -3879,26 +2349,10 @@ class EnemySystem {
    */
   render(ctx) {
     if (!ctx) return;
-
-    if (this.renderSystem) {
-      this.renderSystem.render(ctx);
-      return;
+    if (!this.renderSystem) {
+      throw new Error('[EnemySystem] RenderSystem not initialized');
     }
-
-    if (this.useComponents && this.rendererComponent) {
-      this.rendererComponent.renderAll(ctx, this.asteroids);
-      return;
-    }
-
-    this.asteroids.forEach((asteroid) => {
-      if (!asteroid || asteroid.destroyed) {
-        return;
-      }
-
-      if (typeof asteroid.draw === 'function') {
-        asteroid.draw(ctx);
-      }
-    });
+    return this.renderSystem.render(ctx);
   }
 
   cloneWaveStateForSnapshot(wave = this.waveState) {
@@ -4898,118 +3352,20 @@ class EnemySystem {
    * Delegates mine explosion handling to EnemyDamageSystem when available.
    */
   handleMineExplosion(data = null) {
-    if (this.damageSystem) {
-      return this.damageSystem.handleMineExplosion(data);
+    if (!this.damageSystem) {
+      throw new Error('[EnemySystem] DamageSystem not initialized');
     }
-
-    if (!data || !data.position) {
-      return;
-    }
-
-    const physics = this.getCachedPhysics();
-    if (physics) {
-      if (typeof physics.handleMineExplosion === 'function') {
-        physics.handleMineExplosion(data);
-        return;
-      }
-
-      if (typeof physics.applyAreaDamage === 'function') {
-        physics.applyAreaDamage(data);
-        return;
-      }
-
-      if (typeof physics.queueAreaDamage === 'function') {
-        physics.queueAreaDamage(data);
-        return;
-      }
-    }
-
-    this.handleShieldExplosionDamage({
-      position: data.position,
-      radius: data.radius,
-      damage: data.damage,
-    });
+    return this.damageSystem.handleMineExplosion(data);
   }
 
   /**
    * Delegates shield explosion damage to EnemyDamageSystem when available.
    */
   handleShieldExplosionDamage(data) {
-    if (this.damageSystem) {
-      return this.damageSystem.handleShieldExplosionDamage(data);
+    if (!this.damageSystem) {
+      throw new Error('[EnemySystem] DamageSystem not initialized');
     }
-
-    if (!data || !data.position) {
-      return;
-    }
-
-    const radius = typeof data.radius === 'number' ? data.radius : 200;
-    const damage = typeof data.damage === 'number' ? data.damage : 50;
-
-    const radiusSq = radius * radius;
-    const originX = data.position.x;
-    const originY = data.position.y;
-
-    const physics = this.getCachedPhysics();
-    let nearbyEnemies = null;
-    if (physics) {
-      if (typeof physics.getNearbyEnemies === 'function') {
-        nearbyEnemies = physics.getNearbyEnemies(originX, originY, radius);
-      } else if (typeof physics.getNearbyAsteroids === 'function') {
-        nearbyEnemies = physics.getNearbyAsteroids(originX, originY, radius);
-      }
-    }
-
-    if (!nearbyEnemies || nearbyEnemies.length === 0) {
-      nearbyEnemies = this.asteroids;
-    }
-
-    if (!nearbyEnemies || nearbyEnemies.length === 0) {
-      return;
-    }
-
-    for (let i = 0; i < nearbyEnemies.length; i += 1) {
-      const asteroid = nearbyEnemies[i];
-      if (!asteroid || asteroid.destroyed) {
-        continue;
-      }
-
-      const dx = asteroid.x - originX;
-      const dy = asteroid.y - originY;
-      const distanceSq = dx * dx + dy * dy;
-
-      if (distanceSq > radiusSq) {
-        continue;
-      }
-
-      // Apply damage with distance falloff
-      const distance = Math.sqrt(distanceSq);
-      const falloff = 1 - Math.min(distance / radius, 1);
-      const actualDamage = damage * falloff;
-
-      asteroid.takeDamage(actualDamage);
-
-      // Also apply knockback
-      if (distanceSq > 0) {
-        const impulse = (300 * falloff) / Math.max(asteroid.mass, 1);
-        const nx = dx / Math.max(distance, 0.001);
-        const ny = dy / Math.max(distance, 0.001);
-
-        asteroid.vx += nx * impulse;
-        asteroid.vy += ny * impulse;
-        const collisionRandom =
-          typeof asteroid.getRandomFor === 'function'
-            ? asteroid.getRandomFor('collision')
-            : null;
-        const rotationSource =
-          collisionRandom || this.getRandomScope('fragments') || this.getRandomService();
-        const rotationImpulse =
-          rotationSource && typeof rotationSource.range === 'function'
-            ? rotationSource.range(-1.5, 1.5)
-            : (rotationSource.float() - 0.5) * 3;
-        asteroid.rotationSpeed += rotationImpulse * falloff;
-      }
-    }
+    return this.damageSystem.handleShieldExplosionDamage(data);
   }
 
   handleShockwave(data) {
