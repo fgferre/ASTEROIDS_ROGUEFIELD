@@ -31,8 +31,21 @@ describe('Asteroid Metrics - Feature Flags', () => {
   test('legacy system remains functional when flag is forced off', async () => {
     expect(CONSTANTS.USE_WAVE_MANAGER).toBe(true);
 
-    const legacySpy = vi.spyOn(harness.enemySystem, 'updateWaveLogic');
-    const waveManagerSpy = vi.spyOn(harness.enemySystem, 'updateWaveManagerLogic');
+    const legacySpies = [
+      vi.spyOn(harness.enemySystem, 'updateWaveLogic'),
+    ];
+    const waveManagerSpies = [
+      vi.spyOn(harness.enemySystem, 'updateWaveManagerLogic'),
+    ];
+
+    if (harness.enemySystem.updateSystem) {
+      legacySpies.push(
+        vi.spyOn(harness.enemySystem.updateSystem, 'updateWaveLogic')
+      );
+      waveManagerSpies.push(
+        vi.spyOn(harness.enemySystem.updateSystem, 'updateWaveManagerLogic')
+      );
+    }
 
     try {
       await withWaveOverrides({ useManager: false }, () => {
@@ -40,12 +53,17 @@ describe('Asteroid Metrics - Feature Flags', () => {
 
         expect(waveState.totalAsteroids).toBe(4);
         expect(waveState.asteroidsSpawned).toBeGreaterThan(0);
-        expect(legacySpy).toHaveBeenCalled();
-        expect(waveManagerSpy).not.toHaveBeenCalled();
+        const legacyCalled = legacySpies.some((spy) => spy.mock.calls.length);
+        const waveManagerCalled = waveManagerSpies.some(
+          (spy) => spy.mock.calls.length
+        );
+
+        expect(legacyCalled).toBe(true);
+        expect(waveManagerCalled).toBe(false);
       });
     } finally {
-      legacySpy.mockRestore();
-      waveManagerSpy.mockRestore();
+      legacySpies.forEach((spy) => spy.mockRestore());
+      waveManagerSpies.forEach((spy) => spy.mockRestore());
     }
   });
 
@@ -57,7 +75,14 @@ describe('Asteroid Metrics - Feature Flags', () => {
     const originalWaveManager = harness.enemySystem.waveManager;
 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const legacySpy = vi.spyOn(harness.enemySystem, 'updateWaveLogic');
+    const legacySpies = [
+      vi.spyOn(harness.enemySystem, 'updateWaveLogic'),
+    ];
+    if (harness.enemySystem.updateSystem) {
+      legacySpies.push(
+        vi.spyOn(harness.enemySystem.updateSystem, 'updateWaveLogic')
+      );
+    }
 
     harness.enemySystem.waveManager = null;
     prepareWave(harness.enemySystem, 1);
@@ -74,7 +99,8 @@ describe('Asteroid Metrics - Feature Flags', () => {
         }
 
         expect(() => harness.enemySystem.update(0.5)).not.toThrow();
-        expect(legacySpy).toHaveBeenCalled();
+        const legacyCalled = legacySpies.some((spy) => spy.mock.calls.length);
+        expect(legacyCalled).toBe(true);
 
         const warningEmitted = warnSpy.mock.calls.some(([message]) =>
           String(message).includes('WaveManager indisponível'),
@@ -88,7 +114,7 @@ describe('Asteroid Metrics - Feature Flags', () => {
 
       harness.enemySystem.waveManager = originalWaveManager;
       warnSpy.mockRestore();
-      legacySpy.mockRestore();
+      legacySpies.forEach((spy) => spy.mockRestore());
     }
   });
 

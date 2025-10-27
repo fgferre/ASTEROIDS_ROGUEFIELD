@@ -105,6 +105,7 @@ class EnemySystem {
     this.activeEnemyCacheDirty = true;
     this.usesAsteroidPool = false;
     this._nextAsteroidPoolId = 1;
+    this._activeAsteroidsBuffer = [];
     this._snapshotFallbackWarningIssued = false;
     this._waveSystemDebugLogged = false;
     this._waveManagerFallbackWarningIssued = false;
@@ -2785,7 +2786,8 @@ class EnemySystem {
       this._lastEnemyUpdateLog = Date.now();
     }
 
-    const movementContext = this.useComponents && this.movementComponent
+    const useComponents = this.useComponents && this.movementComponent;
+    const movementContext = useComponents
       ? {
           player: this.getCachedPlayer(),
           worldBounds: {
@@ -2795,33 +2797,23 @@ class EnemySystem {
         }
       : null;
 
-    this.asteroids.forEach((enemy) => {
-      if (!enemy || enemy.destroyed) {
-        return;
+    for (let i = 0; i < this.asteroids.length; i += 1) {
+      const enemy = this.asteroids[i];
+      if (!enemy || enemy.destroyed || enemy.type !== 'asteroid') {
+        continue;
       }
 
-      if (enemy.type === 'boss') {
-        if (typeof enemy.onUpdate === 'function') {
-          enemy.onUpdate(deltaTime);
-        }
-        return;
-      }
-
-      if (enemy.type !== 'asteroid') {
-        if (typeof enemy.onUpdate === 'function') {
-          enemy.onUpdate(deltaTime);
-        }
-        return;
-      }
-
-      if (this.useComponents && this.movementComponent) {
+      if (useComponents) {
         this.movementComponent.update(enemy, deltaTime, movementContext);
 
         if (typeof enemy.updateVisualState === 'function') {
           enemy.updateVisualState(deltaTime);
         }
 
-        if (enemy.behavior?.type === 'volatile' && typeof enemy.updateVolatileBehavior === 'function') {
+        if (
+          enemy.behavior?.type === 'volatile' &&
+          typeof enemy.updateVolatileBehavior === 'function'
+        ) {
           enemy.updateVolatileBehavior(deltaTime);
         }
 
@@ -2829,15 +2821,18 @@ class EnemySystem {
           enemy.lastDamageTime = Math.max(0, enemy.lastDamageTime - deltaTime);
         }
         if (enemy.shieldHitCooldown > 0) {
-          enemy.shieldHitCooldown = Math.max(0, enemy.shieldHitCooldown - deltaTime);
+          enemy.shieldHitCooldown = Math.max(
+            0,
+            enemy.shieldHitCooldown - deltaTime
+          );
         }
-        return;
+        continue;
       }
 
       if (typeof enemy.update === 'function') {
         enemy.update(deltaTime);
       }
-    });
+    }
 
     // Física de colisão entre asteroides (always enabled)
     this.handleAsteroidCollisions();
@@ -2852,27 +2847,39 @@ class EnemySystem {
       return this.updateSystem.handleAsteroidCollisions();
     }
 
-    const activeAsteroids = this.asteroids.filter(
-      (asteroid) => asteroid && !asteroid.destroyed && asteroid.type === 'asteroid'
-    );
+    const buffer = this._activeAsteroidsBuffer;
+    buffer.length = 0;
 
-    if (activeAsteroids.length < 2) {
+    if (!Array.isArray(this.asteroids) || this.asteroids.length < 2) {
+      return;
+    }
+
+    for (let i = 0; i < this.asteroids.length; i += 1) {
+      const asteroid = this.asteroids[i];
+      if (!asteroid || asteroid.destroyed || asteroid.type !== 'asteroid') {
+        continue;
+      }
+      buffer.push(asteroid);
+    }
+
+    if (buffer.length < 2) {
       return;
     }
 
     if (this.useComponents && this.collisionComponent) {
-      this.collisionComponent.handleAsteroidCollisions(activeAsteroids);
-    } else {
-      for (let i = 0; i < activeAsteroids.length - 1; i++) {
-        const a1 = activeAsteroids[i];
-        if (!a1 || a1.destroyed) continue;
+      this.collisionComponent.handleAsteroidCollisions(buffer);
+      return;
+    }
 
-        for (let j = i + 1; j < activeAsteroids.length; j++) {
-          const a2 = activeAsteroids[j];
-          if (!a2 || a2.destroyed) continue;
+    for (let i = 0; i < buffer.length - 1; i++) {
+      const a1 = buffer[i];
+      if (!a1 || a1.destroyed) continue;
 
-          this.checkAsteroidCollision(a1, a2);
-        }
+      for (let j = i + 1; j < buffer.length; j++) {
+        const a2 = buffer[j];
+        if (!a2 || a2.destroyed) continue;
+
+        this.checkAsteroidCollision(a1, a2);
       }
     }
   }

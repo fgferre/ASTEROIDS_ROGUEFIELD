@@ -47,9 +47,31 @@ export class EnemyUpdateSystem {
    *   facade: import('../../EnemySystem.js').EnemySystem,
    *   spawnSystem?: import('./EnemySpawnSystem.js').EnemySpawnSystem,
    *   damageSystem?: import('./EnemyDamageSystem.js').EnemyDamageSystem,
-   * }} context
+   *   asteroids?: import('../../EnemySystem.js').EnemySystem['asteroids'],
+   *   waveState?: import('../../EnemySystem.js').EnemySystem['waveState'],
+   *   sessionStats?: import('../../EnemySystem.js').EnemySystem['sessionStats'],
+   *   spawnTimer?: import('../../EnemySystem.js').EnemySystem['spawnTimer'],
+   *   useComponents?: import('../../EnemySystem.js').EnemySystem['useComponents'],
+   *   movementComponent?: import('../../EnemySystem.js').EnemySystem['movementComponent'],
+   *   collisionComponent?: import('../../EnemySystem.js').EnemySystem['collisionComponent'],
+   *   waveManager?: import('../../EnemySystem.js').EnemySystem['waveManager'],
+   *   useManagers?: import('../../EnemySystem.js').EnemySystem['useManagers'],
+   *   refreshInjectedServices?: import('../../EnemySystem.js').EnemySystem['refreshInjectedServices'],
+   *   getCachedPlayer?: import('../../EnemySystem.js').EnemySystem['getCachedPlayer'],
+   *   getCachedWorld?: import('../../EnemySystem.js').EnemySystem['getCachedWorld'],
+   *   getCachedPhysics?: import('../../EnemySystem.js').EnemySystem['getCachedPhysics'],
+   *   getRandomScope?: import('../../EnemySystem.js').EnemySystem['getRandomScope'],
+   *   getRandomService?: import('../../EnemySystem.js').EnemySystem['getRandomService'],
+   *   getActiveEnemyCount?: import('../../EnemySystem.js').EnemySystem['getActiveEnemyCount'],
+   *   invalidateActiveEnemyCache?: import('../../EnemySystem.js').EnemySystem['invalidateActiveEnemyCache'],
+   *   releaseAsteroid?: import('../../EnemySystem.js').EnemySystem['releaseAsteroid'],
+   *   emitWaveStateUpdate?: import('../../EnemySystem.js').EnemySystem['emitWaveStateUpdate'],
+   *   completeCurrentWave?: import('../../EnemySystem.js').EnemySystem['completeCurrentWave'],
+   *   startNextWave?: import('../../EnemySystem.js').EnemySystem['startNextWave'],
+   *   spawnInitialAsteroids?: import('../../EnemySystem.js').EnemySystem['spawnInitialAsteroids'],
    */
   constructor(context = {}) {
+    this.ctx = context;
     this.facade = context.facade ?? null;
     this.spawnSystem = context.spawnSystem ?? null;
     this.damageSystem = context.damageSystem ?? null;
@@ -82,7 +104,11 @@ export class EnemyUpdateSystem {
       return;
     }
 
-    facade.refreshInjectedServices();
+    if (typeof this.ctx.refreshInjectedServices === 'function') {
+      this.ctx.refreshInjectedServices();
+    } else if (typeof facade.refreshInjectedServices === 'function') {
+      facade.refreshInjectedServices();
+    }
 
     const overrideValue =
       typeof globalThis !== 'undefined'
@@ -111,9 +137,10 @@ export class EnemyUpdateSystem {
     const waveManagerHandlesSpawnFlag =
       (WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
       facade._waveManagerRuntimeEnabled;
+    const waveManagerInstance = this.ctx?.waveManager ?? facade.waveManager;
     const waveManagerControlsSpawn = Boolean(
       waveManagerHandlesSpawnFlag &&
-        facade.waveManager &&
+        waveManagerInstance &&
         !facade._waveManagerFallbackWarningIssued &&
         !facade._waveManagerInvalidStateWarningIssued
     );
@@ -127,18 +154,15 @@ export class EnemyUpdateSystem {
       facade._asteroidSpawnDebugLogged = true;
     }
 
-    facade.sessionStats.timeElapsed += deltaTime;
+    const sessionStats = this.ctx?.sessionStats ?? facade.sessionStats;
+    if (sessionStats) {
+      sessionStats.timeElapsed += deltaTime;
+    }
 
     if (waveManagerEnabled) {
-      if (typeof facade.updateWaveManagerLogic === 'function') {
-        facade.updateWaveManagerLogic(deltaTime, true);
-      }
       this.updateWaveManagerLogic(deltaTime);
       this.updateAsteroids(deltaTime);
     } else {
-      if (typeof facade.updateWaveLogic === 'function') {
-        facade.updateWaveLogic(deltaTime, { skipSpawning: false }, true);
-      }
       this.updateAsteroids(deltaTime);
       this.updateWaveLogic(deltaTime);
     }
@@ -146,7 +170,11 @@ export class EnemyUpdateSystem {
     this.updateSupportEnemies(deltaTime);
     this.cleanupDestroyed();
 
-    facade.emitWaveStateUpdate();
+    if (typeof this.ctx.emitWaveStateUpdate === 'function') {
+      this.ctx.emitWaveStateUpdate();
+    } else {
+      facade.emitWaveStateUpdate();
+    }
   }
 
   /**
@@ -157,10 +185,7 @@ export class EnemyUpdateSystem {
    */
   updateWaveLogic(deltaTime, { skipSpawning = false } = {}) {
     const facade = this.facade;
-    if (typeof facade?.updateWaveLogic === 'function') {
-      facade.updateWaveLogic(deltaTime, { skipSpawning }, true);
-    }
-    const wave = facade?.waveState;
+    const wave = this.ctx?.waveState ?? facade?.waveState;
 
     if (!wave) {
       return false;
@@ -171,7 +196,7 @@ export class EnemyUpdateSystem {
     const waveManagerHandlesSpawn =
       (WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
       facade._waveManagerRuntimeEnabled &&
-      facade.waveManager &&
+      (this.ctx?.waveManager ?? facade.waveManager) &&
       !facade._waveManagerFallbackWarningIssued &&
       !facade._waveManagerInvalidStateWarningIssued;
 
@@ -182,9 +207,13 @@ export class EnemyUpdateSystem {
         spawnHandled = true;
       }
 
+      const activeEnemyCount =
+        typeof this.ctx?.getActiveEnemyCount === 'function'
+          ? this.ctx.getActiveEnemyCount()
+          : facade.getActiveEnemyCount?.();
       const allAsteroidsKilled =
         wave.asteroidsKilled >= wave.totalAsteroids &&
-        facade.getActiveEnemyCount() === 0;
+        (activeEnemyCount ?? 0) === 0;
 
       if (wave.timeRemaining <= 0 || allAsteroidsKilled) {
         facade.completeCurrentWave();
@@ -207,18 +236,16 @@ export class EnemyUpdateSystem {
    */
   updateWaveManagerLogic(deltaTime) {
     const facade = this.facade;
-    if (typeof facade?.updateWaveManagerLogic === 'function') {
-      facade.updateWaveManagerLogic(deltaTime, true);
-    }
-    const wave = facade?.waveState;
+    const wave = this.ctx?.waveState ?? facade?.waveState;
 
     if (!wave) {
       return false;
     }
 
     let spawnHandled = false;
+    const waveManager = this.ctx?.waveManager ?? facade?.waveManager ?? null;
 
-    if (!facade.waveManager) {
+    if (!waveManager) {
       if (!facade._waveManagerFallbackWarningIssued) {
         console.warn(
           '[EnemySystem] WaveManager indisponível. Recuando para updateWaveLogic() enquanto USE_WAVE_MANAGER está ativo.'
@@ -239,12 +266,12 @@ export class EnemyUpdateSystem {
       spawnHandled = true;
     }
 
-    facade.waveManager.update(deltaTime);
+    if (typeof waveManager.update === 'function') {
+      waveManager.update(deltaTime);
+    }
 
     const managerState =
-      typeof facade.waveManager.getState === 'function'
-        ? facade.waveManager.getState()
-        : null;
+      typeof waveManager.getState === 'function' ? waveManager.getState() : null;
 
     const managerStateValid =
       managerState &&
@@ -319,7 +346,11 @@ export class EnemyUpdateSystem {
       wave.breakTimer = 0;
 
       if (waveManagerHandlesAsteroids) {
-        facade.spawnInitialAsteroids(4);
+        if (typeof this.ctx?.spawnInitialAsteroids === 'function') {
+          this.ctx.spawnInitialAsteroids(4);
+        } else {
+          facade.spawnInitialAsteroids?.(4);
+        }
       }
     }
 
@@ -440,11 +471,17 @@ export class EnemyUpdateSystem {
    */
   updateAsteroids(deltaTime) {
     const facade = this.facade;
+    const asteroids = this.ctx?.asteroids ?? facade?.asteroids ?? [];
 
-    if (!facade?._lastEnemyUpdateLog || Date.now() - facade._lastEnemyUpdateLog > 1000) {
-      const enemyTypes = facade.asteroids
-        .filter((enemy) => enemy && !enemy.destroyed)
-        .map((enemy) => enemy.type || 'unknown');
+    if (
+      !facade?._lastEnemyUpdateLog ||
+      Date.now() - facade._lastEnemyUpdateLog > 1000
+    ) {
+      const enemyTypes = Array.isArray(asteroids)
+        ? asteroids
+            .filter((enemy) => enemy && !enemy.destroyed)
+            .map((enemy) => enemy.type || 'unknown')
+        : [];
 
       const typeCounts = enemyTypes.reduce((acc, type) => {
         acc[type] = (acc[type] || 0) + 1;
@@ -459,9 +496,16 @@ export class EnemyUpdateSystem {
       facade._lastEnemyUpdateLog = Date.now();
     }
 
-    const movementContext = facade.useComponents && facade.movementComponent
+    const useComponents = Boolean(
+      this.ctx?.useComponents ?? facade?.useComponents
+    );
+    const movementComponent = this.ctx?.movementComponent ?? facade?.movementComponent;
+    const movementContext = useComponents && movementComponent
       ? {
-          player: facade.getCachedPlayer(),
+          player:
+            typeof this.ctx?.getCachedPlayer === 'function'
+              ? this.ctx.getCachedPlayer()
+              : facade.getCachedPlayer?.(),
           worldBounds: {
             width: GAME_WIDTH,
             height: GAME_HEIGHT,
@@ -469,27 +513,19 @@ export class EnemyUpdateSystem {
         }
       : null;
 
-    facade.asteroids.forEach((enemy) => {
-      if (!enemy || enemy.destroyed) {
-        return;
+    if (!Array.isArray(asteroids) || asteroids.length === 0) {
+      this.handleAsteroidCollisions();
+      return;
+    }
+
+    for (let i = 0; i < asteroids.length; i += 1) {
+      const enemy = asteroids[i];
+      if (!enemy || enemy.destroyed || enemy.type !== 'asteroid') {
+        continue;
       }
 
-      if (enemy.type === 'boss') {
-        if (typeof enemy.onUpdate === 'function') {
-          enemy.onUpdate(deltaTime);
-        }
-        return;
-      }
-
-      if (enemy.type !== 'asteroid') {
-        if (typeof enemy.onUpdate === 'function') {
-          enemy.onUpdate(deltaTime);
-        }
-        return;
-      }
-
-      if (facade.useComponents && facade.movementComponent) {
-        facade.movementComponent.update(enemy, deltaTime, movementContext);
+      if (useComponents && movementComponent) {
+        movementComponent.update(enemy, deltaTime, movementContext);
 
         if (typeof enemy.updateVisualState === 'function') {
           enemy.updateVisualState(deltaTime);
@@ -511,13 +547,13 @@ export class EnemyUpdateSystem {
             enemy.shieldHitCooldown - deltaTime
           );
         }
-        return;
+        continue;
       }
 
       if (typeof enemy.update === 'function') {
         enemy.update(deltaTime);
       }
-    });
+    }
 
     this.handleAsteroidCollisions();
   }
@@ -532,8 +568,10 @@ export class EnemyUpdateSystem {
       return;
     }
 
-    for (let i = 0; i < facade.asteroids.length; i += 1) {
-      const enemy = facade.asteroids[i];
+    const asteroids = this.ctx?.asteroids ?? facade?.asteroids ?? [];
+
+    for (let i = 0; i < asteroids.length; i += 1) {
+      const enemy = asteroids[i];
       if (!enemy || enemy.destroyed || enemy.type === 'asteroid') {
         continue;
       }
@@ -552,7 +590,7 @@ export class EnemyUpdateSystem {
     const buffer = this._activeAsteroidsBuffer;
     buffer.length = 0;
 
-    const source = facade?.asteroids;
+    const source = this.ctx?.asteroids ?? facade?.asteroids;
     if (!Array.isArray(source) || source.length < 2) {
       return;
     }
@@ -569,8 +607,14 @@ export class EnemyUpdateSystem {
       return;
     }
 
-    if (facade.useComponents && facade.collisionComponent) {
-      facade.collisionComponent.handleAsteroidCollisions(buffer);
+    const useComponents = Boolean(
+      this.ctx?.useComponents ?? facade?.useComponents
+    );
+    const collisionComponent =
+      this.ctx?.collisionComponent ?? facade?.collisionComponent;
+
+    if (useComponents && collisionComponent) {
+      collisionComponent.handleAsteroidCollisions(buffer);
       return;
     }
 
@@ -597,7 +641,6 @@ export class EnemyUpdateSystem {
    * @param {import('../../enemies/types/Asteroid.js').Asteroid} a2
    */
   checkAsteroidCollision(a1, a2) {
-    const facade = this.facade;
     const dx = a2.x - a1.x;
     const dy = a2.y - a1.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
@@ -636,9 +679,17 @@ export class EnemyUpdateSystem {
       const collisionRandom =
         (typeof a1?.getRandomFor === 'function' && a1.getRandomFor('collision')) ||
         (typeof a2?.getRandomFor === 'function' && a2.getRandomFor('collision')) ||
-        facade.getRandomScope('fragments');
+        (typeof this.ctx?.getRandomScope === 'function'
+          ? this.ctx.getRandomScope('fragments')
+          : this.facade.getRandomScope?.('fragments'));
       const rotationSource =
-        collisionRandom || facade.getRandomScope('fragments') || facade.getRandomService();
+        collisionRandom ||
+        (typeof this.ctx?.getRandomScope === 'function'
+          ? this.ctx.getRandomScope('fragments')
+          : this.facade.getRandomScope?.('fragments')) ||
+        (typeof this.ctx?.getRandomService === 'function'
+          ? this.ctx.getRandomService()
+          : this.facade.getRandomService?.());
       const rotationDelta =
         rotationSource && typeof rotationSource.range === 'function'
           ? rotationSource.range(-0.75, 0.75)
@@ -653,17 +704,23 @@ export class EnemyUpdateSystem {
    */
   cleanupDestroyed() {
     const facade = this.facade;
-    if (!Array.isArray(facade?.asteroids) || facade.asteroids.length === 0) {
+    const asteroids = this.ctx?.asteroids ?? facade?.asteroids;
+
+    if (!Array.isArray(asteroids) || asteroids.length === 0) {
       return;
     }
 
     const remaining = [];
     let removed = 0;
 
-    for (let i = 0; i < facade.asteroids.length; i += 1) {
-      const asteroid = facade.asteroids[i];
+    for (let i = 0; i < asteroids.length; i += 1) {
+      const asteroid = asteroids[i];
       if (!asteroid || asteroid.destroyed) {
-        facade.releaseAsteroid(asteroid);
+        if (typeof this.ctx?.releaseAsteroid === 'function') {
+          this.ctx.releaseAsteroid(asteroid);
+        } else {
+          facade.releaseAsteroid(asteroid);
+        }
         removed += 1;
         continue;
       }
@@ -673,7 +730,11 @@ export class EnemyUpdateSystem {
 
     if (removed > 0) {
       facade.asteroids = remaining;
-      facade.invalidateActiveEnemyCache();
+      if (typeof this.ctx?.invalidateActiveEnemyCache === 'function') {
+        this.ctx.invalidateActiveEnemyCache();
+      } else {
+        facade.invalidateActiveEnemyCache();
+      }
     }
   }
 
@@ -683,7 +744,7 @@ export class EnemyUpdateSystem {
    */
   handleSpawning(deltaTime) {
     const spawnSystem =
-      this.spawnSystem ?? this.facade?.spawnSystem ?? null;
+      this.spawnSystem ?? this.ctx?.spawnSystem ?? this.facade?.spawnSystem ?? null;
 
     if (spawnSystem && typeof spawnSystem.handleSpawning === 'function') {
       spawnSystem.handleSpawning(deltaTime);
