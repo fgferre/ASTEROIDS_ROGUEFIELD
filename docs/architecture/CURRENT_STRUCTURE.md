@@ -205,3 +205,114 @@ methodName(args) {
 - Falhas de inicialização são logadas mas não travam o bootstrap
 - Erros em runtime identificam claramente qual sub-sistema falhou
 - Padrão consistente com arquitetura de sub-sistemas estabelecida em REFACTOR-004 a REFACTOR-007
+
+### 12.6. REFACTOR-012: Remoção de Lógica Inline dos Tipos de Inimigos (Phase 2 Cleanup)
+
+**Objetivo**: Remover lógica inline de movimento, arma e renderização dos tipos de inimigos, simplificando `onUpdate()` e `onDraw()` para delegação pura aos componentes.
+
+**Mudanças Realizadas**:
+
+1. **Drone.js**: 575 → ~196 linhas (-66%, -379 linhas)
+   - Removido: `updateDrift()`, `applyThrusters()`, `updateRotationFromVelocity()` (movimento inline)
+   - Removido: `computeNextFireInterval()`, `handleWeaponCycle()`, `fireAtPlayer()`, `extractPlayerVelocity()`, `emitEnemyFired()` (arma inline)
+   - Removido: Corpo completo de `onDraw()` com renderização de triângulo, fins, exaustão (renderização inline)
+   - Simplificado: `onUpdate()` para 8 linhas de delegação pura
+   - Simplificado: `onDraw()` para 5 linhas de delegação pura
+
+2. **Hunter.js**: 653 → ~309 linhas (-53%, -344 linhas)
+   - Removido: `applyIdleDamping()`, `updateOrbitVelocity()`, `updateRotationTowardsVelocity()` (movimento inline)
+   - Removido: `updateBurstCycle()`, `startBurst()`, `computeAimSolution()`, `fireAtPlayer()`, `extractPlayerVelocity()`, `emitEnemyFired()` (arma inline)
+   - Removido: Corpo completo de `onDraw()` com renderização de diamante, torreta, gradiente (renderização inline)
+   - Removido: `ensureHullGradient()` (helper de cache de gradiente)
+   - Removido: `clamp()`, `normalize()`, `normalizeAngle()` (utilitários duplicados)
+   - Simplificado: `onUpdate()` para 10 linhas de delegação pura
+   - Simplificado: `onDraw()` para 5 linhas de delegação pura
+
+3. **Mine.js**: 421 → ~299 linhas (-29%, -122 linhas)
+   - Removido: Corpo completo de `onDraw()` com renderização de esfera, pulso, halo (renderização inline)
+   - Removido: `ensureBodyGradient()` (helper de cache de gradiente)
+   - Mantido: `onUpdate()` completo (delegação de componentes + máquina de estados de proximidade)
+   - Mantido: `updateTimers()`, `triggerDetonation()` (lógica específica de mina)
+   - Simplificado: `onDraw()` para 5 linhas de delegação pura
+
+4. **BossEnemy.js**: 1.318 → ~1.215 linhas (-8%, -103 linhas)
+   - Removido: `seekPlayer()`, `applyDamping()` (movimento inline)
+   - Removido: Corpo completo de `onDraw()` com renderização de aura, hull, invulnerabilidade (renderização inline)
+   - Mantido: `onUpdate()` completo (delegação de componentes + lógica de coordenação)
+   - Mantido: Todos os métodos de gerenciamento de fases (`handlePhaseIntro()`, `handlePhaseAssault()`, `handlePhaseFinale()`, `evaluatePhaseTransition()`, `advancePhase()`)
+   - Mantido: Todos os métodos de spawn de minions (`updateMinionSpawns()`, `spawnMinion()`, `pickMinionType()`)
+   - Mantido: Todos os métodos de invulnerabilidade (`updateInvulnerability()`, `emitInvulnerabilityState()`)
+   - Mantido: Todos os métodos de ataque de carga (`updateChargeState()`, `beginCharge()`, `triggerChargeBurst()`)
+   - Mantido: Métodos de arma inline (`fireSpreadPattern()`, `fireVolleyShot()`, `emitBossProjectile()`, `updateVolleyCycle()`, `startVolley()`) - acoplados à lógica de fases, refatoração futura
+   - Mantido: `buildRenderPayload()` (usado pela lógica de coordenação)
+   - Simplificado: `onDraw()` para 5 linhas de delegação pura
+
+**Redução Total de Código**:
+- **Linhas removidas**: ~948 linhas
+- **Redução média**: -39% nos arquivos de tipos de inimigos
+
+**Padrão de Transformação**:
+
+**onUpdate() - Antes** (30-40 linhas com fallback inline):
+```javascript
+onUpdate(deltaTime) {
+  if (this.useComponents && this.components?.size > 0) {
+    // Component delegation
+    return;
+  }
+  // 20-30 linhas de lógica inline de movimento e arma
+}
+```
+
+**onUpdate() - Depois** (5-10 linhas, delegação pura):
+```javascript
+onUpdate(deltaTime) {
+  if (!this.useComponents || !this.components?.size) {
+    console.error('[EnemyType] Components not initialized.');
+    return;
+  }
+  const context = this.buildComponentContext(deltaTime);
+  this.runComponentUpdate(context);
+}
+```
+
+**onDraw() - Antes** (120-170 linhas com renderização inline):
+```javascript
+onDraw(ctx) {
+  if (this.useComponents && this.components?.size > 0) {
+    return;
+  }
+  // 120-170 linhas de renderização inline com canvas API
+}
+```
+
+**onDraw() - Depois** (5 linhas, delegação pura):
+```javascript
+onDraw(ctx) {
+  if (!this.useComponents || !this.components?.size) {
+    console.error('[EnemyType] Components not initialized.');
+    return;
+  }
+  // RenderComponent handles drawing via BaseEnemy.draw()
+}
+```
+
+**Benefícios**:
+- ✅ Elimina duplicação entre tipos de inimigos e componentes
+- ✅ Fonte única de verdade para movimento, arma e renderização (componentes)
+- ✅ Simplifica tipos de inimigos para coordenadores puros
+- ✅ Preserva lógica específica de tipo (fases do boss, proximidade da mina)
+- ✅ Melhora manutenibilidade (correções em um lugar)
+- ✅ Facilita adição de novos tipos (config + componentes)
+- ✅ Reduz superfície de teste (testar componentes, não tipos)
+
+**Lógica Específica de Tipo Preservada**:
+- **Drone**: Nenhuma (100% delegação)
+- **Hunter**: Nenhuma (100% delegação)
+- **Mine**: Máquina de estados de proximidade (armar, detectar, detonar)
+- **Boss**: Gerenciamento de fases, spawn de minions, invulnerabilidade, ataque de carga
+
+**Próximos Passos**:
+- **Phase 3**: Criar utilitários de combate compartilhados (`src/utils/combatHelpers.js`)
+- **Phase 4**: Consolidar estratégias de renderização (4 estratégias → 1 com parâmetro `shape`)
+- **Boss Weapon Refactor**: Desacoplar métodos de arma do boss da lógica de fases (tarefa futura)

@@ -1,8 +1,4 @@
 import { MINE_COMPONENTS, MINE_CONFIG } from '../../../data/enemies/mine.js';
-import {
-  ENEMY_EFFECT_COLORS,
-  ENEMY_RENDER_PRESETS,
-} from '../../../data/constants/visual.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
@@ -23,12 +19,10 @@ export class Mine extends BaseEnemy {
     this.explosionRadius = MINE_DEFAULTS.explosionRadius ?? 120;
     this.explosionDamage = MINE_DEFAULTS.explosionDamage ?? 40;
     this.pulsePhase = 0;
-   this.pulseSpeed = MINE_DEFAULTS.pulseSpeed ?? 2.6;
-   this.pulseAmount = MINE_DEFAULTS.pulseAmount ?? 0.3;
-   this.explosionCause = null;
-   this.destroyed = false;
-   this._bodyGradient = null;
-   this._bodyGradientKey = null;
+    this.pulseSpeed = MINE_DEFAULTS.pulseSpeed ?? 2.6;
+    this.pulseAmount = MINE_DEFAULTS.pulseAmount ?? 0.3;
+    this.explosionCause = null;
+    this.destroyed = false;
     this.weaponState = {};
     this.movementStrategy = 'proximity';
     this.renderStrategy = 'procedural-sphere';
@@ -68,8 +62,6 @@ export class Mine extends BaseEnemy {
     this.pulseSpeed = config.pulseSpeed ?? MINE_DEFAULTS.pulseSpeed ?? 2.6;
     this.pulseAmount = config.pulseAmount ?? MINE_DEFAULTS.pulseAmount ?? 0.3;
     this.pulsePhase = 0;
-    this._bodyGradient = null;
-    this._bodyGradientKey = null;
 
     this.random = this.resolveRandom({ ...config, id: this.id });
     this.armed = false;
@@ -104,16 +96,6 @@ export class Mine extends BaseEnemy {
 
   onUpdate(deltaTime) {
     if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
-      return;
-    }
-
-    if (this.useComponents && this.components?.size > 0) {
-      if (!this._componentsInvoked) {
-        const context = this.buildComponentContext(deltaTime);
-        this._componentsInvoked = true;
-        this.runComponentUpdate(context);
-        this._componentsInvoked = false;
-      }
       return;
     }
 
@@ -236,163 +218,13 @@ export class Mine extends BaseEnemy {
   }
 
   onDraw(ctx) {
-    if (this.useComponents && this.components?.size > 0) {
+    if (!this.useComponents || !this.components?.size) {
+      console.error('[Mine] Components not initialized. Mine cannot render.');
       return;
     }
 
-    const palette = ENEMY_EFFECT_COLORS?.mine ?? {};
-    const presets = ENEMY_RENDER_PRESETS?.mine ?? {};
-    const bodyPreset = presets.body ?? {};
-    const glowPreset = presets.glow ?? {};
-    const baseRadius = this.radius || MINE_CONFIG?.radius || 18;
-
-    const basePulse = 0.5 + 0.5 * Math.sin(this.pulsePhase || 0);
-    const intensityMultiplier = this.armed
-      ? glowPreset.armedIntensityMultiplier ?? 1.45
-      : 1;
-    const intensityBoost = this.armed ? glowPreset.armedAlphaBoost ?? 0.18 : 0;
-    const pulse = Math.min(1, Math.max(0, basePulse * intensityMultiplier + intensityBoost));
-    const haloExponent = glowPreset.haloPulseExponent ?? 1.4;
-    const haloStrength = Math.pow(Math.max(0, pulse), haloExponent);
-
-    const payload = {
-      type: this.type,
-      id: this.id,
-      position: { x: this.x, y: this.y },
-      radius: baseRadius,
-      armed: this.armed,
-      pulse,
-      colors: {
-        body: palette.body,
-        highlight: palette.bodyHighlight,
-        shadow: palette.bodyShadow,
-        glow: palette.flash,
-        halo: palette.halo,
-      },
-    };
-
-    if (!ctx || typeof ctx.save !== 'function') {
-      return payload;
-    }
-
-    ctx.save();
-    ctx.translate(this.x, this.y);
-
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = 1;
-    ctx.shadowBlur = 0;
-    ctx.shadowColor = 'transparent';
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = 'transparent';
-
-    const glowBlur = (glowPreset.blurBase ?? 10) + (glowPreset.blurRange ?? 0) * pulse;
-    const glowAlpha = Math.min(1, pulse);
-    if (glowAlpha > 0.001) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = glowAlpha;
-      ctx.shadowBlur = glowBlur;
-      ctx.shadowColor = palette.flash || palette.core || 'rgba(255, 147, 72, 0.45)';
-      ctx.fillStyle = palette.core || '#ff9348';
-      ctx.beginPath();
-      ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-
-    const haloRadius = baseRadius * (glowPreset.haloRadiusMultiplier ?? 1.45);
-    const haloAlpha = (glowPreset.haloAlpha ?? 0.32) * haloStrength;
-    if (haloAlpha > 0.01) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = haloAlpha;
-      ctx.shadowBlur = glowBlur * 0.6;
-      ctx.shadowColor = palette.halo || palette.flash || 'rgba(255, 196, 128, 0.25)';
-      ctx.lineWidth = baseRadius * (glowPreset.haloLineWidthMultiplier ?? 0.08);
-      ctx.strokeStyle = palette.halo || palette.flash || 'rgba(255, 190, 110, 0.4)';
-      ctx.beginPath();
-      ctx.arc(0, 0, haloRadius, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    const gradient = this.ensureBodyGradient(ctx, baseRadius, palette, bodyPreset);
-    const coreRadius = baseRadius * (bodyPreset.coreRadiusMultiplier ?? 1);
-    ctx.beginPath();
-    ctx.arc(0, 0, coreRadius, 0, Math.PI * 2);
-    ctx.fillStyle = gradient || palette.body || '#5a5046';
-    ctx.fill();
-
-    const rimWidth = baseRadius * (bodyPreset.rimWidthMultiplier ?? 0.16);
-    const rimAlphaRange = bodyPreset.rimAlphaRange || [0.55, 0.95];
-    const rimAlphaMin = rimAlphaRange[0] ?? 0.55;
-    const rimAlphaMax = rimAlphaRange[1] ?? 0.95;
-    const rimAlpha = Math.min(1, Math.max(0, rimAlphaMin + (rimAlphaMax - rimAlphaMin) * pulse));
-    ctx.lineWidth = rimWidth;
-    ctx.strokeStyle = palette.core || '#ff9348';
-    ctx.globalAlpha = rimAlpha;
-    ctx.beginPath();
-    ctx.arc(0, 0, coreRadius, 0, Math.PI * 2);
-    ctx.stroke();
-
-    const highlightInset = baseRadius * (bodyPreset.highlightInsetMultiplier ?? 0.46);
-    const highlightRadius = Math.max(0, coreRadius - highlightInset);
-    const highlightAlpha = bodyPreset.highlightAlpha ?? 0.85;
-    if (highlightRadius > 0) {
-      const highlightCompositeAlpha = Math.min(1, Math.max(0, highlightAlpha * pulse));
-      ctx.globalAlpha = highlightCompositeAlpha;
-      ctx.beginPath();
-      ctx.arc(0, 0, highlightRadius, 0, Math.PI * 2);
-      ctx.fillStyle = palette.bodyHighlight || palette.body || '#8e7b68';
-      ctx.fill();
-    }
-
-    ctx.globalAlpha = 1;
-    ctx.shadowBlur = 0;
-    ctx.shadowColor = 'transparent';
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = 'transparent';
-
-    ctx.restore();
-
-    return payload;
-  }
-
-  ensureBodyGradient(ctx, radius, palette, bodyPreset) {
-    if (!ctx || typeof ctx.createRadialGradient !== 'function') {
-      return null;
-    }
-
-    const highlightInsetMultiplier = bodyPreset.highlightInsetMultiplier ?? 0.46;
-    const coreRadiusMultiplier = bodyPreset.coreRadiusMultiplier ?? 1;
-    const keyParts = [
-      radius,
-      palette.body,
-      palette.bodyHighlight,
-      palette.bodyShadow,
-      highlightInsetMultiplier,
-      coreRadiusMultiplier,
-    ];
-    const key = keyParts.join(':');
-    if (this._bodyGradient && this._bodyGradientKey === key) {
-      return this._bodyGradient;
-    }
-
-    const coreRadius = Math.max(1e-3, radius * coreRadiusMultiplier);
-    const highlightInset = radius * highlightInsetMultiplier;
-    const highlightRadius = Math.max(0, coreRadius - highlightInset);
-    const highlightRatio = Math.min(0.95, Math.max(0, highlightRadius / coreRadius));
-
-    const gradient = ctx.createRadialGradient(0, 0, coreRadius * 0.15, 0, 0, coreRadius);
-    gradient.addColorStop(0, palette.bodyHighlight || palette.body || '#8e7b68');
-    gradient.addColorStop(highlightRatio, palette.body || '#5a5046');
-    gradient.addColorStop(1, palette.bodyShadow || '#2c2621');
-
-    this._bodyGradient = gradient;
-    this._bodyGradientKey = key;
-
-    return gradient;
+    // RenderComponent handles drawing via BaseEnemy.draw()
+    return;
   }
 
   resetForPool() {
@@ -412,9 +244,8 @@ export class Mine extends BaseEnemy {
     this.pulseAmount = MINE_DEFAULTS.pulseAmount ?? 0.3;
     this.explosionCause = null;
     this.destroyed = false;
-    this._bodyGradient = null;
-    this._bodyGradientKey = null;
   }
+
 }
 
 export default Mine;

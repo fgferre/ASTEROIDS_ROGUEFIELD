@@ -1,4 +1,3 @@
-import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import { BOSS_COMPONENTS, BOSS_CONFIG } from '../../../data/enemies/boss.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
@@ -66,14 +65,6 @@ const BOSS_DEFAULTS = {
     ? [...SOURCE_CONFIG.phaseThresholds]
     : [...BASE_CONFIG.phaseThresholds],
 };
-
-function resolveVector(dx, dy) {
-  const magnitude = Math.hypot(dx, dy);
-  if (magnitude === 0) {
-    return { magnitude: 0, nx: 0, ny: 0 };
-  }
-  return { magnitude, nx: dx / magnitude, ny: dy / magnitude };
-}
 
 export class BossEnemy extends BaseEnemy {
   constructor(system, config = {}) {
@@ -176,7 +167,6 @@ export class BossEnemy extends BaseEnemy {
 
     this.type = 'boss';
     this.addTag('boss');
-    this._drawLogged = false;
     this._missingTargetLogged = false;
     this._missingPlayerReferenceLogged = false;
     this._playerResolveLogged = false;
@@ -301,7 +291,6 @@ export class BossEnemy extends BaseEnemy {
     this.chargeStateTimer = 0;
 
     this._lastUpdateLog = 0;
-    this._drawLogged = false;
 
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;
@@ -375,13 +364,6 @@ export class BossEnemy extends BaseEnemy {
       return;
     }
 
-    if (this.useComponents && this.components?.size > 0 && !this._componentsInvoked) {
-      const context = this.buildComponentContext(deltaTime);
-      this._componentsInvoked = true;
-      this.runComponentUpdate(context);
-      this._componentsInvoked = false;
-    }
-
     const now = Date.now();
     if (!this._lastUpdateLog || now - this._lastUpdateLog > 2000) {
       const velocity = {
@@ -424,18 +406,10 @@ export class BossEnemy extends BaseEnemy {
         break;
     }
 
-    if (this.chargeState !== 'charging' && !(this.useComponents && this.components?.size > 0)) {
-      this.applyDamping(deltaTime);
-    }
-
     this.renderPayload = this.buildRenderPayload();
   }
 
   handlePhaseIntro(deltaTime, target) {
-    if (!(this.useComponents && this.components?.size > 0)) {
-      this.seekPlayer(target, deltaTime, 0.55);
-    }
-
     if (!(this.useComponents && this.components?.size > 0)) {
       this.spreadTimer -= deltaTime;
       if (this.spreadTimer <= 0 && target?.position) {
@@ -447,7 +421,6 @@ export class BossEnemy extends BaseEnemy {
 
   handlePhaseAssault(deltaTime, target) {
     if (!(this.useComponents && this.components?.size > 0)) {
-      this.seekPlayer(target, deltaTime, 0.75);
       this.updateVolleyCycle(deltaTime, target);
     }
     this.updateMinionSpawns(deltaTime);
@@ -455,110 +428,6 @@ export class BossEnemy extends BaseEnemy {
 
   handlePhaseFinale(deltaTime, target) {
     this.updateChargeState(deltaTime, target);
-    if (this.chargeState !== 'charging' && !(this.useComponents && this.components?.size > 0)) {
-      this.seekPlayer(target, deltaTime, 0.9);
-    }
-  }
-
-  seekPlayer(target, deltaTime, intensity = 1) {
-    if (!Number.isFinite(deltaTime)) {
-      return;
-    }
-
-    let targetPosition = target?.position;
-    const hasValidTarget =
-      targetPosition &&
-      Number.isFinite(targetPosition.x) &&
-      Number.isFinite(targetPosition.y);
-
-    if (!hasValidTarget) {
-      const fallbackReason = !target?.player ? 'missing-player' : 'invalid-position';
-
-      if (!this._missingTargetLogged) {
-        GameDebugLogger.log('ERROR', 'Boss seekPlayer target unavailable', {
-          hasTarget: !!target,
-          hasPosition: !!target?.position,
-          deltaTime,
-          reason: fallbackReason,
-        });
-        this._missingTargetLogged = true;
-      }
-
-      const fallbackPosition = {
-        x: Number.isFinite(GAME_WIDTH)
-          ? GAME_WIDTH / 2
-          : 0,
-        y: Number.isFinite(GAME_HEIGHT)
-          ? GAME_HEIGHT / 2
-          : 0,
-      };
-
-      targetPosition = fallbackPosition;
-
-      if (
-        !this._seekFallbackLogged ||
-        this._lastFallbackReason !== fallbackReason ||
-        !this._fallbackTargetActive
-      ) {
-        GameDebugLogger.log('STATE', 'Boss seekPlayer fallback engaged', {
-          fallbackPosition,
-          reason: fallbackReason,
-        });
-      }
-
-      this._seekFallbackLogged = true;
-      this._fallbackTargetActive = true;
-      this._lastFallbackReason = fallbackReason;
-    } else {
-      const hadFallback = this._fallbackTargetActive || this._seekFallbackLogged;
-      if (this._missingTargetLogged || hadFallback) {
-        GameDebugLogger.log('STATE', 'Boss seekPlayer target restored', {
-          targetPosition,
-          fallbackPreviouslyActive: hadFallback,
-          lastFallbackReason: this._lastFallbackReason,
-        });
-      }
-
-      this._missingTargetLogged = false;
-      this._seekFallbackLogged = false;
-      this._fallbackTargetActive = false;
-      this._lastFallbackReason = null;
-    }
-
-    if (!targetPosition) {
-      return;
-    }
-
-    const dx = targetPosition.x - this.x;
-    const dy = targetPosition.y - this.y;
-    const { nx, ny } = resolveVector(dx, dy);
-
-    const accel = (this.acceleration || 0) * Math.max(intensity, 0);
-    const maxSpeed = (this.speed || 0) * Math.max(intensity, 0.1);
-
-    this.vx += nx * accel * deltaTime;
-    this.vy += ny * accel * deltaTime;
-
-    const speed = Math.hypot(this.vx, this.vy);
-    if (speed > maxSpeed && maxSpeed > 0) {
-      const clamp = maxSpeed / speed;
-      this.vx *= clamp;
-      this.vy *= clamp;
-    }
-
-    if (speed > 0.1) {
-      this.rotation = Math.atan2(this.vy, this.vx);
-    }
-  }
-
-  applyDamping(deltaTime) {
-    if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
-      return;
-    }
-
-    const damping = 0.92 ** deltaTime;
-    this.vx *= damping;
-    this.vy *= damping;
   }
 
   updateInvulnerability(deltaTime) {
@@ -1206,58 +1075,13 @@ export class BossEnemy extends BaseEnemy {
   }
 
   onDraw(ctx) {
-    if (this.useComponents && this.components?.size > 0) {
+    if (!this.useComponents || !this.components?.size) {
+      console.error('[BossEnemy] Components not initialized. Boss cannot render.');
       return;
     }
 
-    if (!this._drawLogged) {
-      GameDebugLogger.log('RENDER', 'Boss.onDraw() first call', {
-        id: this.id,
-        position: { x: this.x, y: this.y },
-        radius: this.radius,
-        phase: this.currentPhase,
-        color: this.phaseColors[this.currentPhase] || null,
-      });
-      this._drawLogged = true;
-    }
-
-    const payload = this.buildRenderPayload();
-    this.renderPayload = payload;
-
-    if (!ctx || typeof ctx.save !== 'function') {
-      return payload;
-    }
-
-    const phaseIndex = Math.min(payload.phase, this.phaseColors.length - 1);
-    const color = this.phaseColors[phaseIndex] || '#ffffff';
-    const auraColor = this.invulnerable ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.3)';
-
-    ctx.save();
-    ctx.translate(this.x, this.y);
-
-    const scale = payload.scale;
-    const radius = this.radius * scale;
-
-    ctx.beginPath();
-    ctx.fillStyle = auraColor;
-    ctx.globalAlpha = 0.6 + (this.invulnerable ? 0.2 : 0);
-    ctx.arc(0, 0, radius * 1.3, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.fillStyle = color;
-    ctx.globalAlpha = 1;
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = '#ffffff';
-    ctx.globalAlpha = this.invulnerable ? 0.9 : 0.6;
-    ctx.stroke();
-
-    ctx.restore();
-
-    return payload;
+    // RenderComponent handles drawing via BaseEnemy.draw()
+    return;
   }
 
   buildRenderPayload() {
