@@ -236,13 +236,13 @@ export class Drone extends BaseEnemy {
   }
 
   onUpdate(deltaTime) {
-    if (!this.useComponents || !this.components?.size) {
-      console.error('[Drone] Components not initialized. Drone cannot update.');
+    if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
       return;
     }
 
-    const context = this.buildComponentContext(deltaTime);
-    this.runComponentUpdate(context);
+    if (!this.useComponents || !this.components?.size) {
+      console.error('[Drone] Components not initialized. Drone cannot update.');
+    }
   }
 
   onDestroyed(source) {

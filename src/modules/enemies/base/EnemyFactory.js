@@ -502,15 +502,23 @@ export class EnemyFactory {
     };
 
     if (components.movement) {
-      const movementComponent = this.createMovementComponent(components.movement, enemy, finalConfig);
+      const existingMovement = enemy.getComponent?.('movement') || null;
       enemy.movementStrategy = components.movement.strategy || enemy.movementStrategy || 'linear';
       enemy.movementConfig = { ...components.movement };
-      enemy.addComponent('movement', movementComponent);
-      attachedCount++;
+
+      if (existingMovement) {
+        if (typeof existingMovement.setStrategy === 'function' && components.movement.strategy) {
+          existingMovement.setStrategy(components.movement.strategy);
+        }
+      } else {
+        const movementComponent = this.createMovementComponent(components.movement, enemy, finalConfig);
+        enemy.addComponent('movement', movementComponent);
+        attachedCount++;
+      }
     }
 
     if (components.weapon) {
-      const weaponComponent = this.createWeaponComponent(components.weapon, enemy, finalConfig);
+      const existingWeapon = enemy.getComponent?.('weapon') || null;
       enemy.weaponConfig = { ...components.weapon };
       if (Array.isArray(components.weapon.patterns)) {
         enemy.weaponPatterns = [...components.weapon.patterns];
@@ -519,23 +527,39 @@ export class EnemyFactory {
         enemy.weaponPattern = components.weapon.pattern;
       }
       enemy.weaponState = enemy.weaponState || {};
-      enemy.addComponent('weapon', weaponComponent);
-      if (typeof weaponComponent.reset === 'function') {
-        weaponComponent.reset(enemy);
+
+      if (existingWeapon) {
+        if (typeof existingWeapon.reset === 'function') {
+          existingWeapon.reset(enemy);
+        }
+      } else {
+        const weaponComponent = this.createWeaponComponent(components.weapon, enemy, finalConfig);
+        enemy.addComponent('weapon', weaponComponent);
+        if (typeof weaponComponent.reset === 'function') {
+          weaponComponent.reset(enemy);
+        }
+        attachedCount++;
       }
-      attachedCount++;
     }
 
     if (components.render) {
-      const renderComponent = this.createRenderComponent(components.render, enemy, finalConfig);
+      const existingRender = enemy.getComponent?.('render') || null;
       enemy.renderStrategy = components.render.strategy || enemy.renderStrategy || 'delegate';
       enemy.renderConfig = { ...components.render };
-      enemy.addComponent('render', renderComponent);
-      attachedCount++;
+
+      if (existingRender) {
+        if (typeof existingRender.setStrategy === 'function' && components.render.strategy) {
+          existingRender.setStrategy(components.render.strategy);
+        }
+      } else {
+        const renderComponent = this.createRenderComponent(components.render, enemy, finalConfig);
+        enemy.addComponent('render', renderComponent);
+        attachedCount++;
+      }
     }
 
     if (components.collision) {
-      const collisionComponent = this.createCollisionComponent(components.collision, enemy, finalConfig);
+      const existingCollision = enemy.getComponent?.('collision') || null;
       enemy.collisionConfig = { ...components.collision };
       if (Number.isFinite(components.collision.radius)) {
         enemy.collisionRadius = components.collision.radius;
@@ -544,20 +568,34 @@ export class EnemyFactory {
       if (components.collision.response) {
         enemy.collisionResponse = components.collision.response;
       }
-      enemy.addComponent('collision', collisionComponent);
-      attachedCount++;
+
+      if (!existingCollision) {
+        const collisionComponent = this.createCollisionComponent(components.collision, enemy, finalConfig);
+        enemy.addComponent('collision', collisionComponent);
+        attachedCount++;
+      }
     }
 
     if (components.health) {
-      const healthComponent = this.createHealthComponent(components.health, enemy, finalConfig);
-      enemy.addComponent('health', healthComponent);
-      if (typeof healthComponent.initialize === 'function') {
-        healthComponent.initialize(enemy, components.health);
+      const existingHealth = enemy.getComponent?.('health') || null;
+
+      if (existingHealth) {
+        if (typeof existingHealth.initialize === 'function') {
+          existingHealth.initialize(enemy, components.health);
+        }
+      } else {
+        const healthComponent = this.createHealthComponent(components.health, enemy, finalConfig);
+        enemy.addComponent('health', healthComponent);
+        if (typeof healthComponent.initialize === 'function') {
+          healthComponent.initialize(enemy, components.health);
+        }
+        attachedCount++;
       }
-      attachedCount++;
     }
 
-    if (attachedCount > 0) {
+    const hasComponents = enemy.components && enemy.components.size > 0;
+
+    if (attachedCount > 0 || hasComponents) {
       ensureComponentState();
       enemy.useComponents = true;
     } else {

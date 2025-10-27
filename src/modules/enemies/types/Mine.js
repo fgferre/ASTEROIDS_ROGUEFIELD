@@ -99,16 +99,6 @@ export class Mine extends BaseEnemy {
       return;
     }
 
-    if (this.useComponents && this.components?.size > 0) {
-      if (!this._componentsInvoked) {
-        const context = this.buildComponentContext(deltaTime);
-        this._componentsInvoked = true;
-        this.runComponentUpdate(context);
-        this._componentsInvoked = false;
-      }
-      return;
-    }
-
     this.updateTimers(deltaTime);
 
     if (!this.alive || this.detonated) {

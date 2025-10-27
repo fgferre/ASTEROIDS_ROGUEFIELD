@@ -232,10 +232,7 @@ export class Hunter extends BaseEnemy {
 
     if (!this.useComponents || !this.components?.size) {
       console.error('[Hunter] Components not initialized. Hunter cannot update.');
-      return;
     }
-    const context = this.buildComponentContext(deltaTime);
-    this.runComponentUpdate(context);
   }
   onDraw(ctx) {
     if (!this.useComponents || !this.components?.size) {
