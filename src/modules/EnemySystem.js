@@ -15,6 +15,7 @@ import { AsteroidMovement } from './enemies/components/AsteroidMovement.js';
 import { AsteroidCollision } from './enemies/components/AsteroidCollision.js';
 import { AsteroidRenderer } from './enemies/components/AsteroidRenderer.js';
 import { EnemyRenderSystem } from './enemies/systems/EnemyRenderSystem.js';
+import { EnemySpawnSystem } from './enemies/systems/EnemySpawnSystem.js';
 import { CollisionComponent } from './enemies/components/CollisionComponent.js';
 import { HealthComponent } from './enemies/components/HealthComponent.js';
 import { MovementComponent } from './enemies/components/MovementComponent.js';
@@ -135,6 +136,7 @@ class EnemySystem {
     this.useComponents = true; // Feature flag to enable component system
 
     this.renderSystem = null;
+    this.spawnSystem = null;
 
     this.eventBus = typeof gameEvents !== 'undefined' ? gameEvents : null;
 
@@ -153,6 +155,7 @@ class EnemySystem {
     this.setupManagers(); // Initialize wave and reward managers
     this.setupComponents(); // Initialize components
     this.setupRenderSystem(); // Initialize render sub-system
+    this.setupSpawnSystem(); // Initialize spawn sub-system
     this.setupEventListeners();
     this.syncPhysicsIntegration(true);
 
@@ -915,7 +918,63 @@ class EnemySystem {
     }
   }
 
+  setupSpawnSystem() {
+    try {
+      const facade = this;
+      const context = {
+        facade,
+        get asteroids() {
+          return facade.asteroids;
+        },
+        get waveState() {
+          return facade.waveState;
+        },
+        get factory() {
+          return facade.factory;
+        },
+        get waveManager() {
+          return facade.waveManager;
+        },
+        get useFactory() {
+          return facade.useFactory;
+        },
+        get sessionActive() {
+          return facade.sessionActive;
+        },
+        get spawnTimer() {
+          return facade.spawnTimer;
+        },
+        createScopedRandom: (...args) => facade.createScopedRandom(...args),
+        getRandomScope: (...args) => facade.getRandomScope(...args),
+        getRandomService: (...args) => facade.getRandomService(...args),
+        isBossEnemy: (...args) => facade.isBossEnemy(...args),
+        trackBossEnemy: (...args) => facade.trackBossEnemy(...args),
+        getAvailableBossMinionTypes: (...args) =>
+          facade.getAvailableBossMinionTypes(...args),
+        invalidateActiveEnemyCache: (...args) =>
+          facade.invalidateActiveEnemyCache(...args),
+        registerEnemyWithPhysics: (...args) =>
+          facade.registerEnemyWithPhysics(...args),
+        emitEvent: (...args) => facade.emitEvent?.(...args),
+        handleBossSpawned: (...args) => facade.handleBossSpawned(...args),
+        mergeBossRewards: (...args) => facade.mergeBossRewards(...args),
+        getActiveEnemyCount: (...args) => facade.getActiveEnemyCount(...args),
+      };
+
+      this.spawnSystem = new EnemySpawnSystem(context);
+      console.log('[EnemySystem] EnemySpawnSystem initialized');
+    } catch (error) {
+      console.warn('[EnemySystem] Failed to initialize spawn system', error);
+      this.spawnSystem = null;
+    }
+  }
+
+  // NOTE: Delegated to EnemySpawnSystem when available.
   acquireAsteroid(config = {}) {
+    if (this.spawnSystem) {
+      return this.spawnSystem.acquireAsteroid(config);
+    }
+
     const scopeHint = config.randomScope || (config.spawnedBy ? 'fragments' : 'spawn');
     const asteroidRandom =
       config.random || this.createScopedRandom(scopeHint, 'asteroid').random;
@@ -956,7 +1015,12 @@ class EnemySystem {
   }
 
   // NEW: Factory-based enemy acquisition (optional path)
+  // NOTE: Delegated to EnemySpawnSystem when available.
   acquireEnemyViaFactory(type, config) {
+    if (this.spawnSystem) {
+      return this.spawnSystem.acquireEnemyViaFactory(type, config);
+    }
+
     if (!this.factory) {
       console.warn('[EnemySystem] Factory not available, falling back to legacy');
       return this.acquireAsteroid(config);
@@ -982,7 +1046,14 @@ class EnemySystem {
     }
   }
 
+  // NOTE: Delegated to EnemySpawnSystem when available.
   registerActiveEnemy(enemy, { skipDuplicateCheck = false } = {}) {
+    if (this.spawnSystem) {
+      return this.spawnSystem.registerActiveEnemy(enemy, {
+        skipDuplicateCheck,
+      });
+    }
+
     if (!enemy) {
       return false;
     }
@@ -1037,7 +1108,16 @@ class EnemySystem {
     return waveManagerRegistered ? enemy : false;
   }
 
+  // NOTE: Delegated to EnemySpawnSystem when available.
   warnIfWaveManagerRegistrationFailed(result, context, enemy = null) {
+    if (this.spawnSystem) {
+      return this.spawnSystem.warnIfWaveManagerRegistrationFailed(
+        result,
+        context,
+        enemy
+      );
+    }
+
     if (result !== false) {
       return;
     }
@@ -1265,7 +1345,12 @@ class EnemySystem {
     return this.services.ui;
   }
 
+  // NOTE: Delegated to EnemySpawnSystem when available.
   getAsteroidPoolId(asteroid) {
+    if (this.spawnSystem) {
+      return this.spawnSystem.getAsteroidPoolId(asteroid);
+    }
+
     if (!asteroid) {
       return null;
     }
@@ -1273,7 +1358,12 @@ class EnemySystem {
     return asteroid[ASTEROID_POOL_ID] ?? null;
   }
 
+  // NOTE: Delegated to EnemySpawnSystem when available.
   assignAsteroidPoolId(asteroid, preferredId = null) {
+    if (this.spawnSystem) {
+      return this.spawnSystem.assignAsteroidPoolId(asteroid, preferredId);
+    }
+
     if (!asteroid) {
       return null;
     }
@@ -1300,7 +1390,12 @@ class EnemySystem {
     return poolId;
   }
 
+  // NOTE: Delegated to EnemySpawnSystem when available.
   clearAsteroidPoolId(asteroid) {
+    if (this.spawnSystem) {
+      return this.spawnSystem.clearAsteroidPoolId(asteroid);
+    }
+
     if (!asteroid || asteroid[ASTEROID_POOL_ID] == null) {
       return;
     }
@@ -2649,7 +2744,12 @@ class EnemySystem {
   }
 
   // === SISTEMA DE SPAWNING ===
+  // NOTE: Delegated to EnemySpawnSystem when available.
   handleSpawning(deltaTime) {
+    if (this.spawnSystem) {
+      return this.spawnSystem.handleSpawning(deltaTime);
+    }
+
     // LEGACY: Used when WAVEMANAGER_HANDLES_ASTEROID_SPAWN=false
     const wave = this.waveState;
     if (!wave || !wave.isActive) {
@@ -2673,7 +2773,12 @@ class EnemySystem {
     }
   }
 
+  // NOTE: Delegated to EnemySpawnSystem when available.
   shouldSpawn() {
+    if (this.spawnSystem) {
+      return this.spawnSystem.shouldSpawn();
+    }
+
     const wave = this.waveState;
     if (!wave || !wave.isActive) {
       return false;
@@ -2685,7 +2790,12 @@ class EnemySystem {
     );
   }
 
+  // NOTE: Delegated to EnemySpawnSystem when available.
   spawnBoss(config = {}) {
+    if (this.spawnSystem) {
+      return this.spawnSystem.spawnBoss(config);
+    }
+
     const waveNumber = Number.isFinite(config.wave)
       ? config.wave
       : this.waveState?.current ?? 1;
@@ -2827,7 +2937,12 @@ class EnemySystem {
     return boss;
   }
 
+  // NOTE: Delegated to EnemySpawnSystem when available.
   spawnAsteroid() {
+    if (this.spawnSystem) {
+      return this.spawnSystem.spawnAsteroid();
+    }
+
     if (!this.sessionActive) return null;
 
     const spawnContext = this.createScopedRandom('spawn', 'asteroid-spawn');
@@ -3058,7 +3173,12 @@ class EnemySystem {
     return fragments;
   }
 
+  // NOTE: Delegated to EnemySpawnSystem when available.
   decideVariant(size, context = {}) {
+    if (this.spawnSystem) {
+      return this.spawnSystem.decideVariant(size, context);
+    }
+
     if (context.forcedVariant) {
       return context.forcedVariant;
     }
@@ -3133,7 +3253,12 @@ class EnemySystem {
     return availableKeys[availableKeys.length - 1] || 'common';
   }
 
+  // NOTE: Delegated to EnemySpawnSystem when available.
   computeVariantWaveBonus(wave) {
+    if (this.spawnSystem) {
+      return this.spawnSystem.computeVariantWaveBonus(wave);
+    }
+
     const config = ASTEROID_VARIANT_CHANCES?.waveBonus;
     if (!config) return 0;
 
@@ -3148,7 +3273,12 @@ class EnemySystem {
     return Math.min(maxBonus, extraWaves * increment);
   }
 
+  // NOTE: Delegated to EnemySpawnSystem when available.
   assignVariantsToFragments(fragments, parent, wave) {
+    if (this.spawnSystem) {
+      return this.spawnSystem.assignVariantsToFragments(fragments, parent, wave);
+    }
+
     if (!Array.isArray(fragments) || fragments.length === 0) {
       return [];
     }
