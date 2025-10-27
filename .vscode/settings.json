@@ -5,6 +5,7 @@
   "traycer.additionalAgents": [
     "Codex",
     "Claude Code",
-    "Gemini"
+    "Gemini",
+    "Codex Extension"
   ]
 }
