@@ -9,13 +9,15 @@ import {
   ASTEROID_VARIANTS,
   ASTEROID_VARIANT_CHANCES,
 } from '../../../data/enemies/asteroid-configs.js';
-import { BOSS_CONFIG } from '../../../data/constants/visual.js';
 import { GamePools } from '../../../core/GamePools.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { Asteroid } from '../types/Asteroid.js';
 import { BossEnemy } from '../types/BossEnemy.js';
 
 const ASTEROID_POOL_ID = Symbol.for('ASTEROIDS_ROGUEFIELD:asteroidPoolId');
+const FACTORY_REGISTERED_FLAG = Symbol.for(
+  'ASTEROIDS_ROGUEFIELD:factoryRegistered'
+);
 
 /**
  * EnemySpawnSystem centralizes spawning logic that originally lived inside
@@ -191,7 +193,12 @@ export class EnemySpawnSystem {
     const alreadyTracked = Array.isArray(facade.asteroids)
       ? facade.asteroids.includes(boss)
       : false;
-    if (!alreadyTracked) {
+    const factoryRegistered = boss?.[FACTORY_REGISTERED_FLAG] === true;
+
+    if (factoryRegistered) {
+      registrationResult = boss;
+      boss[FACTORY_REGISTERED_FLAG] = false;
+    } else if (!alreadyTracked) {
       registrationResult = this.registerActiveEnemy(boss, {
         skipDuplicateCheck: true,
       });
@@ -222,10 +229,7 @@ export class EnemySpawnSystem {
       enemy: boss,
       wave: waveNumber,
       config: spawnConfig,
-      rewards: facade.mergeBossRewards(
-        boss,
-        spawnConfig.rewards || BOSS_CONFIG?.defaultRewards || {}
-      ),
+      rewards: facade.mergeBossRewards(boss, spawnConfig.rewards || {}),
       position: { x: boss.x ?? 0, y: boss.y ?? 0 },
     };
 
@@ -338,12 +342,18 @@ export class EnemySpawnSystem {
       match: asteroid?.size === size && asteroid?.variant === variant,
     });
 
-    const registrationResult = this.registerActiveEnemy(asteroid);
-    this.warnIfWaveManagerRegistrationFailed(
-      registrationResult,
-      'spawn-asteroid',
-      asteroid
-    );
+    let registrationResult = null;
+    if (asteroid?.[FACTORY_REGISTERED_FLAG]) {
+      registrationResult = asteroid;
+      asteroid[FACTORY_REGISTERED_FLAG] = false;
+    } else {
+      registrationResult = this.registerActiveEnemy(asteroid);
+      this.warnIfWaveManagerRegistrationFailed(
+        registrationResult,
+        'spawn-asteroid',
+        asteroid
+      );
+    }
 
     if (facade.waveState && facade.waveState.isActive) {
       facade.waveState.asteroidsSpawned += 1;
@@ -414,26 +424,51 @@ export class EnemySpawnSystem {
     return asteroid;
   }
 
-  acquireEnemyViaFactory(type, config) {
+  acquireEnemyViaFactory(type, config = {}) {
     const facade = this.facade;
     if (!facade || !facade.factory) {
-      console.warn('[EnemySystem] Factory not available, falling back to legacy');
-      return this.acquireAsteroid(config);
+      GameDebugLogger.log(
+        'WARN',
+        'Factory unavailable for acquireEnemyViaFactory()',
+        { type }
+      );
+      return null;
+    }
+
+    const factory = facade.factory;
+    const hasType =
+      typeof factory.hasType === 'function' ? factory.hasType(type) : true;
+
+    if (!hasType) {
+      GameDebugLogger.log('WARN', 'Factory type missing', { type });
+      return null;
+    }
+
+    if (typeof factory.create !== 'function') {
+      GameDebugLogger.log('ERROR', 'Factory missing create() method', {
+        type,
+      });
+      return null;
     }
 
     try {
-      const enemy = facade.factory.create(type, config);
-      if (enemy) {
-        this.assignAsteroidPoolId(enemy, config?.poolId);
-        const registrationResult = this.registerActiveEnemy(enemy, {
-          skipDuplicateCheck: true,
-        });
-        this.warnIfWaveManagerRegistrationFailed(
-          registrationResult,
-          'factory-acquire',
-          enemy
-        );
+      const enemy = factory.create(type, config);
+      if (!enemy) {
+        return null;
       }
+
+      this.assignAsteroidPoolId(enemy, config?.poolId);
+      const registrationResult = this.registerActiveEnemy(enemy, {
+        skipDuplicateCheck: true,
+      });
+      if (registrationResult !== false) {
+        enemy[FACTORY_REGISTERED_FLAG] = true;
+      }
+      this.warnIfWaveManagerRegistrationFailed(
+        registrationResult,
+        'factory-acquire',
+        enemy
+      );
       return enemy;
     } catch (error) {
       console.error('[EnemySystem] Factory creation failed:', error);

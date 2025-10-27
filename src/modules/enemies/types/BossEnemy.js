@@ -891,13 +891,17 @@ export class BossEnemy extends BaseEnemy {
         };
       }
 
-      let registered = false;
+      const factoryRegistered =
+        minion?.[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')] === true;
+      let registered = factoryRegistered;
 
-      if (typeof this.system.registerActiveEnemy === 'function') {
+      if (!registered && typeof this.system.registerActiveEnemy === 'function') {
         registered = Boolean(
           this.system.registerActiveEnemy(minion, { skipDuplicateCheck: true })
         );
       }
+
+      minion[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')] = false;
 
       if (!registered) {
         GameDebugLogger.log('ERROR', 'Boss minion registration failed', {

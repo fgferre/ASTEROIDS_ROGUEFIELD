@@ -1022,23 +1022,45 @@ class EnemySystem {
     }
 
     if (!this.factory) {
-      console.warn('[EnemySystem] Factory not available, falling back to legacy');
-      return this.acquireAsteroid(config);
+      console.warn('[EnemySystem] Factory not available for acquireEnemyViaFactory');
+      return null;
+    }
+
+    const hasType =
+      typeof this.factory.hasType === 'function'
+        ? this.factory.hasType(type)
+        : true;
+
+    if (!hasType) {
+      console.warn(
+        `[EnemySystem] Factory does not provide enemy type '${type}'.`
+      );
+      return null;
+    }
+
+    if (typeof this.factory.create !== 'function') {
+      console.error('[EnemySystem] Factory missing create() method');
+      return null;
     }
 
     try {
       const enemy = this.factory.create(type, config);
-      if (enemy) {
-        this.assignAsteroidPoolId(enemy, config?.poolId);
-        const registrationResult = this.registerActiveEnemy(enemy, {
-          skipDuplicateCheck: true,
-        });
-        this.warnIfWaveManagerRegistrationFailed(
-          registrationResult,
-          'factory-acquire',
-          enemy
-        );
+      if (!enemy) {
+        return null;
       }
+
+      this.assignAsteroidPoolId(enemy, config?.poolId);
+      const registrationResult = this.registerActiveEnemy(enemy, {
+        skipDuplicateCheck: true,
+      });
+      if (registrationResult !== false) {
+        enemy[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')] = true;
+      }
+      this.warnIfWaveManagerRegistrationFailed(
+        registrationResult,
+        'factory-acquire',
+        enemy
+      );
       return enemy;
     } catch (error) {
       console.error('[EnemySystem] Factory creation failed:', error);

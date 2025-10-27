@@ -1724,8 +1724,14 @@ export class WaveManager {
           this.enemySystem &&
           typeof this.enemySystem.acquireEnemyViaFactory === 'function'
         ) {
-          enemy = this.enemySystem.acquireEnemyViaFactory(enemyGroup.type, enemyConfig);
-          registeredEnemy = Boolean(enemy);
+          enemy = this.enemySystem.acquireEnemyViaFactory(
+            enemyGroup.type,
+            enemyConfig
+          );
+          if (enemy?.[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')]) {
+            registeredEnemy = true;
+            enemy[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')] = false;
+          }
         } else if (this.enemySystem?.factory) {
           const factoryHasType =
             typeof this.enemySystem.factory.hasType === 'function'
@@ -1755,6 +1761,10 @@ export class WaveManager {
               '[WaveManager] Cannot register enemy - registerActiveEnemy() not available on EnemySystem'
             );
           }
+        }
+
+        if (enemy) {
+          enemy[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')] = false;
         }
 
         if (enemy) {
