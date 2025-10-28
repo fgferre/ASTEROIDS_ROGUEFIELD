@@ -585,11 +585,7 @@ class CombatSystem extends BaseSystem {
 
     this.lastShotTime = 0;
 
-    if (
-      firedTargets.length &&
-      typeof gameEvents !== 'undefined' &&
-      typeof gameEvents.emit === 'function'
-    ) {
+    if (firedTargets.length) {
       const firstTarget = firedTargets[0]?.position || null;
       gameEvents.emit('weapon-fired', {
         position: playerPos,

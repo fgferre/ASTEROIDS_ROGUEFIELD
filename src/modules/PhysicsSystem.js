@@ -727,10 +727,6 @@ class PhysicsSystem extends BaseSystem {
   }
 
   emitBossPhysicsEvent(eventName, payload = {}) {
-    if (typeof gameEvents === 'undefined' || !gameEvents?.emit) {
-      return;
-    }
-
     gameEvents.emit(eventName, { ...payload, processedBy: 'physics' });
   }
 
@@ -850,13 +846,11 @@ class PhysicsSystem extends BaseSystem {
     }
 
     // Fallback: emit event only if not already emitted by Mine itself
-    if (typeof gameEvents !== 'undefined' && typeof gameEvents.emit === 'function') {
-      // Prevent double-emission if Mine already emitted the event
-      if (data.__emittedByMine || payload.__emittedByMine) {
-        return;
-      }
-      gameEvents.emit('mine-exploded', payload);
+    // Prevent double-emission if Mine already emitted the event
+    if (data.__emittedByMine || payload.__emittedByMine) {
+      return;
     }
+    gameEvents.emit('mine-exploded', payload);
   }
 
   buildMineExplosionPayload(enemy, data = {}) {
@@ -1682,14 +1676,12 @@ class PhysicsSystem extends BaseSystem {
         asteroid.shieldHitCooldown = cooldown;
       }
 
-      if (typeof gameEvents !== 'undefined') {
-        gameEvents.emit('shield-deflected', {
-          position: { x: player.position.x, y: player.position.y },
-          normal: { x: nx, y: ny },
-          level: context.impactProfile.level || context.shieldState?.level || 0,
-          intensity: Math.max(context.impactProfile.forceMultiplier, 1),
-        });
-      }
+      gameEvents.emit('shield-deflected', {
+        position: { x: player.position.x, y: player.position.y },
+        normal: { x: nx, y: ny },
+        level: context.impactProfile.level || context.shieldState?.level || 0,
+        intensity: Math.max(context.impactProfile.forceMultiplier, 1),
+      });
     }
 
     if (typeof remaining !== 'number') {
@@ -1712,16 +1704,14 @@ class PhysicsSystem extends BaseSystem {
       });
     }
 
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('player-took-damage', {
-        damage,
-        remaining,
-        max: player.maxHealth,
-        position: { ...player.position },
-        playerPosition: { x: player.position.x, y: player.position.y },
-        damageSource: { x: asteroid.x, y: asteroid.y },
-      });
-    }
+    gameEvents.emit('player-took-damage', {
+      damage,
+      remaining,
+      max: player.maxHealth,
+      position: { ...player.position },
+      playerPosition: { x: player.position.x, y: player.position.y },
+      damageSource: { x: asteroid.x, y: asteroid.y },
+    });
 
     if (remaining <= 0) {
       result.playerDied = true;
@@ -1931,16 +1921,14 @@ class PhysicsSystem extends BaseSystem {
               player.invulnerableTimer = 0.4;
             }
 
-            if (typeof gameEvents !== 'undefined') {
-              gameEvents.emit('player-took-damage', {
-                damage: scaledDamage,
-                remaining,
-                max: player.maxHealth,
-                position: { ...player.position },
-                playerPosition: { x: player.position.x, y: player.position.y },
-                damageSource: { x: originX, y: originY },
-              });
-            }
+            gameEvents.emit('player-took-damage', {
+              damage: scaledDamage,
+              remaining,
+              max: player.maxHealth,
+              position: { ...player.position },
+              playerPosition: { x: player.position.x, y: player.position.y },
+              damageSource: { x: originX, y: originY },
+            });
 
             if (typeof remaining === 'number' && remaining <= 0) {
               playerResult.playerDied = true;

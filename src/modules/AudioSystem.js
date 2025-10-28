@@ -136,8 +136,6 @@ class AudioSystem extends BaseSystem {
 
       // Start performance monitoring
       this._startPerformanceMonitoring();
-
-      console.log('[AudioSystem] Fully initialized with optimizations');
     } catch (error) {
       console.warn('Áudio não disponível:', error);
       this.initialized = false;

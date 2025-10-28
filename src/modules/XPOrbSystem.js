@@ -190,10 +190,7 @@ class XPOrbSystem extends BaseSystem {
 
     this.missingDependencyWarnings = new Set();
 
-    this.resolveCachedServices(SERVICE_CACHE_MAP, {
-      force: true,
-      suppressWarnings: true,
-    });
+    super.resolveCachedServices(SERVICE_CACHE_MAP, { force: true });
   }
 
   attachProgression(progressionSystem) {
@@ -205,7 +202,7 @@ class XPOrbSystem extends BaseSystem {
     this.dependencies.progression = progressionSystem;
     this.cachedProgression = progressionSystem;
     this.missingDependencyWarnings.delete('progression');
-    this.resolveCachedServices(SERVICE_CACHE_MAP, { force: true });
+    super.resolveCachedServices(SERVICE_CACHE_MAP, { force: true });
   }
 
   logMissingDependency(name) {
@@ -354,37 +351,6 @@ class XPOrbSystem extends BaseSystem {
         : `${Date.now()}`;
 
     return `${scopeLabel}:${suffix}`;
-  }
-
-  resolveCachedServices(
-    serviceMap = SERVICE_CACHE_MAP,
-    { force = false, suppressWarnings = false } = {},
-  ) {
-    const normalizedMap =
-      serviceMap && typeof serviceMap === 'object' ? serviceMap : SERVICE_CACHE_MAP;
-
-    if (force) {
-      this.cachedPlayer = null;
-      this.cachedProgression = null;
-    }
-
-    super.resolveCachedServices(normalizedMap, { force });
-
-    if (this.cachedPlayer) {
-      this.dependencies.player = this.cachedPlayer;
-      this.missingDependencyWarnings.delete('player');
-    } else if (!suppressWarnings) {
-      this.logMissingDependency('player');
-    }
-
-    if (this.cachedProgression) {
-      this.dependencies.progression = this.cachedProgression;
-      this.missingDependencyWarnings.delete('progression');
-    } else if (!suppressWarnings) {
-      this.logMissingDependency('progression');
-    }
-
-    this.ensureRandom({ force });
   }
 
   createEmptyOrbPools() {
@@ -647,11 +613,11 @@ class XPOrbSystem extends BaseSystem {
     // Future systems (coins, etc.) will follow the same pattern
 
     this.registerEventListener('progression-reset', () => {
-      this.resolveCachedServices(SERVICE_CACHE_MAP, { force: true });
+      super.resolveCachedServices(SERVICE_CACHE_MAP, { force: true });
     });
 
     this.registerEventListener('player-reset', () => {
-      this.resolveCachedServices(SERVICE_CACHE_MAP, { force: true });
+      super.resolveCachedServices(SERVICE_CACHE_MAP, { force: true });
     });
   }
 
@@ -996,7 +962,7 @@ class XPOrbSystem extends BaseSystem {
       !this.cachedPlayer ||
       typeof this.cachedPlayer.getPosition !== 'function'
     ) {
-      this.resolveCachedServices();
+      super.resolveCachedServices(SERVICE_CACHE_MAP);
     }
 
     const player = this.cachedPlayer;
@@ -1854,7 +1820,7 @@ class XPOrbSystem extends BaseSystem {
     }
 
     if (!this.cachedProgression) {
-      this.resolveCachedServices();
+      super.resolveCachedServices(SERVICE_CACHE_MAP);
     }
 
     const size = data.size || data.enemy?.size || 'small';
@@ -1939,7 +1905,7 @@ class XPOrbSystem extends BaseSystem {
     this.clusterFusionCount = CLUSTER_FUSION_COUNT;
     this.configureOrbClustering();
 
-    this.resolveCachedServices(SERVICE_CACHE_MAP, { force: true });
+    super.resolveCachedServices(SERVICE_CACHE_MAP, { force: true });
   }
 }
 

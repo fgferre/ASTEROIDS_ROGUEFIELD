@@ -329,19 +329,17 @@ export default class EffectsSystem extends BaseSystem {
       }
     }
 
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.on('settings-accessibility-changed', (payload = {}) => {
-        if (payload?.values) {
-          this.applyAccessibilityPreferences(payload.values);
-        }
-      });
+    this.registerEventListener('settings-accessibility-changed', (payload = {}) => {
+      if (payload?.values) {
+        this.applyAccessibilityPreferences(payload.values);
+      }
+    });
 
-      gameEvents.on('settings-video-changed', (payload = {}) => {
-        if (payload?.values) {
-          this.applyVideoPreferences(payload.values);
-        }
-      });
-    }
+    this.registerEventListener('settings-video-changed', (payload = {}) => {
+      if (payload?.values) {
+        this.applyVideoPreferences(payload.values);
+      }
+    });
   }
 
   applyAccessibilityPreferences(values = {}) {
@@ -621,13 +619,11 @@ export default class EffectsSystem extends BaseSystem {
       this.addScreenFlash('rgba(0, 255, 255, 0.4)', 0.3, 0.2);
 
       // Emit damage event for enemies in radius
-      if (typeof gameEvents !== 'undefined') {
-        gameEvents.emit('shield-explosion-damage', {
-          position: data.position,
-          radius: 200,
-          damage: 50, // AoE damage amount
-        });
-      }
+      gameEvents.emit('shield-explosion-damage', {
+        position: data.position,
+        radius: 200,
+        damage: 50, // AoE damage amount
+      });
     });
 
     this.registerEventListener('shield-deflected', (data) => {
@@ -3790,12 +3786,10 @@ export default class EffectsSystem extends BaseSystem {
     }
   }
 
-  reseedRandomForks(options = {}) {
-    super.reseedRandomForks(options);
-
+  onReset() {
     if (this.screenShake && typeof this.screenShake.reseed === 'function') {
       const snapshot = this.screenShake.reseed(this.getRandomFork('screenShake'), {
-        seedState: this.screenShakeSeedState,
+        preserveTrauma: true,
       });
       if (snapshot && typeof snapshot === 'object') {
         this.screenShakeSeedState = { ...snapshot };

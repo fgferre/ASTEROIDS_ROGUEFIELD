@@ -11,26 +11,19 @@ import UpgradeSystem from './UpgradeSystem.js';
 
 class ProgressionSystem extends UpgradeSystem {
   constructor(dependencies = {}) {
-    super(dependencies);
+    super(dependencies, {
+      systemName: 'ProgressionSystem',
+      serviceName: 'progression',
+      randomForkLabels: {
+        base: 'progression.base',
+        selection: 'progression.selection',
+        progression: 'progression.levels',
+        rewards: 'progression.rewards',
+      },
+    });
 
-    this.systemName = 'ProgressionSystem';
     this._eventTopic = 'progression';
     this._upgradeEventTopic = 'upgrades';
-    this.randomForkLabels = {
-      base: 'progression.base',
-      selection: 'progression.selection',
-      progression: 'progression.levels',
-      rewards: 'progression.rewards',
-    };
-
-    if (this.random && typeof this.random.fork === 'function') {
-      this.randomForks = this.createRandomForks(this.random, this.randomForkLabels);
-      this.captureRandomForkSeeds();
-    }
-
-    if (typeof gameServices !== 'undefined' && gameServices?.register) {
-      gameServices.register('progression', this);
-    }
   }
 
   initialize() {
