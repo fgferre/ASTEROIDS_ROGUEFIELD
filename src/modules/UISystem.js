@@ -8,7 +8,8 @@ import {
 } from '../data/ui/hudLayout.js';
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 import { WAVE_BOSS_INTERVAL } from '../data/constants/gameplay.js';
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { BaseSystem } from '../core/BaseSystem.js';
+import { resolveService } from '../core/serviceUtils.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
@@ -42,13 +43,21 @@ const DEFAULT_MINIMAP_RANGE = 300;
 const DEFAULT_MINIMAP_DETECTION_MULTIPLIER = 1.5;
 const MAX_THREAT_INDICATORS = 8;
 
-class UISystem {
+class UISystem extends BaseSystem {
   constructor(dependencies = {}) {
-    this.dependencies = normalizeDependencies(dependencies);
-    if (typeof gameServices !== 'undefined') {
-      gameServices.register('ui', this);
-    }
+    super(dependencies, {
+      enableRandomManagement: true,
+      systemName: 'UISystem',
+      serviceName: 'ui',
+      randomForkLabels: {
+        base: 'ui.base',
+        animations: 'ui.animations',
+        transitions: 'ui.transitions',
+      },
+    });
+  }
 
+  initialize() {
     this.damageFlashTimeout = null;
     this.currentPauseState = false;
     this.shieldFailTimeout = null;
@@ -167,15 +176,12 @@ class UISystem {
     this.domRefs = this.cacheStaticNodes();
     this.setupHudLayout();
     this.updateHudLayoutClass(this.currentHudLayoutId);
-    this.setupEventListeners();
     this.bootstrapHudValues();
     this.bindPauseControls();
     this.bindSettingsControls();
     this.bindCreditsControls();
     this.bootstrapSettingsState();
     this.initializeViewportScaling();
-
-    console.log('[UISystem] Initialized');
   }
 
   getService(name) {
@@ -1544,7 +1550,7 @@ class UISystem {
 
     if (pauseRefs.resumeBtn) {
       pauseRefs.resumeBtn.addEventListener('click', () => {
-        if (!this.currentPauseState || typeof gameEvents === 'undefined') {
+        if (!this.currentPauseState) {
           return;
         }
 
@@ -1554,7 +1560,7 @@ class UISystem {
 
     if (pauseRefs.settingsBtn) {
       pauseRefs.settingsBtn.addEventListener('click', () => {
-        if (!this.currentPauseState || typeof gameEvents === 'undefined') {
+        if (!this.currentPauseState) {
           return;
         }
 
@@ -1564,7 +1570,7 @@ class UISystem {
 
     if (pauseRefs.exitBtn) {
       pauseRefs.exitBtn.addEventListener('click', () => {
-        if (!this.currentPauseState || typeof gameEvents === 'undefined') {
+        if (!this.currentPauseState) {
           return;
         }
 
@@ -2323,15 +2329,11 @@ class UISystem {
   }
 
   setupEventListeners() {
-    if (typeof gameEvents === 'undefined') {
-      return;
-    }
-
     const registerBossEvent = (eventName) => {
-      gameEvents.on(eventName, (payload = {}) => {
+      this.registerEventListener(eventName, (payload = {}) => {
         this.handleBossEvent(eventName, payload);
       });
-      gameEvents.on(`ui-${eventName}`, (payload = {}) => {
+      this.registerEventListener(`ui-${eventName}`, (payload = {}) => {
         this.handleBossEvent(eventName, payload);
       });
     };
@@ -2347,12 +2349,12 @@ class UISystem {
       registerBossEvent
     );
 
-    gameEvents.on('player-reset', () => {
+    this.registerEventListener('player-reset', () => {
       this.resetBossHudState();
       this.resetTacticalHud();
     });
 
-    gameEvents.on('progression-reset', () => {
+    this.registerEventListener('progression-reset', () => {
       this.resetBossHudState();
       this.resetTacticalHud();
       if (this._waveCompletionEventCache) {
@@ -2360,7 +2362,7 @@ class UISystem {
       }
     });
 
-    gameEvents.on('wave-started', (payload = {}) => {
+    this.registerEventListener('wave-started', (payload = {}) => {
       if (payload?.isBossWave) {
         return;
       }
@@ -2376,23 +2378,23 @@ class UISystem {
       }
     });
 
-    gameEvents.on('experience-changed', (data) => {
+    this.registerEventListener('experience-changed', (data) => {
       this.updateXPBar(data);
     });
 
-    gameEvents.on('player-health-changed', (data) => {
+    this.registerEventListener('player-health-changed', (data) => {
       this.handleHealthChange(data);
     });
 
-    gameEvents.on('player-leveled-up', (data) => {
+    this.registerEventListener('player-leveled-up', (data) => {
       this.updateLevelDisplay(data?.newLevel, { force: true });
     });
 
-    gameEvents.on('upgrade-options-ready', (payload = {}) => {
+    this.registerEventListener('upgrade-options-ready', (payload = {}) => {
       this.handleUpgradeOptions(payload);
     });
 
-    gameEvents.on('player-died', (data) => {
+    this.registerEventListener('player-died', (data) => {
       // Delay game over screen to show epic ship explosion
       // Explosion has: 0.35s freeze + 0.8s shockwave + particles flying for ~2s
       setTimeout(() => {
@@ -2401,35 +2403,35 @@ class UISystem {
       this.handleComboBroken({ silent: true });
     });
 
-    gameEvents.on('player-took-damage', () => {
+    this.registerEventListener('player-took-damage', () => {
       this.flashHealthDisplay();
     });
 
-    gameEvents.on('pause-state-changed', (data) => {
+    this.registerEventListener('pause-state-changed', (data) => {
       this.updatePauseScreen(Boolean(data?.isPaused));
     });
 
-    gameEvents.on('toggle-pause', () => {
+    this.registerEventListener('toggle-pause', () => {
       const appState = this.getService('game-state');
       if (appState && typeof appState.isPaused === 'function') {
         this.updatePauseScreen(Boolean(appState.isPaused()));
       }
     });
 
-    gameEvents.on('shield-activation-failed', () => {
+    this.registerEventListener('shield-activation-failed', () => {
       this.flashShieldFailure();
     });
 
-    gameEvents.on('shield-stats-changed', (shieldState) => {
+    this.registerEventListener('shield-stats-changed', (shieldState) => {
       this.updateShieldIndicator(shieldState);
     });
 
-    gameEvents.on('wave-state-updated', (payload) => {
+    this.registerEventListener('wave-state-updated', (payload) => {
       this.handleWaveStateUpdated(payload);
     });
 
     const registerWaveCompletionListener = (eventName) => {
-      gameEvents.on(eventName, (payload = {}) => {
+      this.registerEventListener(eventName, (payload = {}) => {
         this.handleWaveCompletionEvent(payload, eventName);
       });
     };
@@ -2437,33 +2439,33 @@ class UISystem {
     registerWaveCompletionListener('wave-complete');
     registerWaveCompletionListener('wave-completed');
 
-    gameEvents.on('combo-updated', (payload = {}) => {
+    this.registerEventListener('combo-updated', (payload = {}) => {
       this.updateComboMeter(payload);
     });
 
-    gameEvents.on('combo-broken', (payload = {}) => {
+    this.registerEventListener('combo-broken', (payload = {}) => {
       this.handleComboBroken(payload);
     });
 
-    gameEvents.on('ui-show-screen', (payload = {}) => {
+    this.registerEventListener('ui-show-screen', (payload = {}) => {
       if (payload?.screen) {
         this.showScreen(payload.screen, payload.options || {});
       }
     });
 
-    gameEvents.on('settings-menu-requested', (payload = {}) => {
+    this.registerEventListener('settings-menu-requested', (payload = {}) => {
       this.handleSettingsMenuRequest(payload);
     });
 
-    gameEvents.on('settings-changed', (change) => {
+    this.registerEventListener('settings-changed', (change) => {
       this.handleSettingsChange(change);
     });
 
-    gameEvents.on('credits-menu-requested', (payload = {}) => {
+    this.registerEventListener('credits-menu-requested', (payload = {}) => {
       this.handleCreditsMenuRequest(payload);
     });
 
-    gameEvents.on('settings-controls-changed', (payload = {}) => {
+    this.registerEventListener('settings-controls-changed', (payload = {}) => {
       if (
         this.settingsState.isOpen &&
         this.settingsState.activeCategory === 'controls' &&
@@ -2473,23 +2475,23 @@ class UISystem {
       }
     });
 
-    gameEvents.on('settings-visual-changed', (payload = {}) => {
+    this.registerEventListener('settings-visual-changed', (payload = {}) => {
       this.handleVisualPreferencesChange(payload);
     });
 
-    gameEvents.on('key-pressed', (payload) => {
+    this.registerEventListener('key-pressed', (payload) => {
       this.handleKeyPressForCapture(payload);
     });
 
-    gameEvents.on('gamepad-input-detected', (payload) => {
+    this.registerEventListener('gamepad-input-detected', (payload) => {
       this.handleGamepadInputForCapture(payload);
     });
 
-    gameEvents.on('input-action', (payload = {}) => {
+    this.registerEventListener('input-action', (payload = {}) => {
       this.handleLevelUpInputAction(payload);
     });
 
-    gameEvents.on('input-confirmed', () => {
+    this.registerEventListener('input-confirmed', () => {
       this.handleLevelUpConfirm();
     });
   }
@@ -3383,9 +3385,7 @@ class UISystem {
       element: button,
     };
 
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('input-binding-capture', { state: 'start' });
-    }
+    gameEvents.emit('input-binding-capture', { state: 'start' });
   }
 
   handleKeyPressForCapture(payload) {
@@ -3464,9 +3464,7 @@ class UISystem {
 
     this.settingsState.capture = null;
 
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('input-binding-capture', { state: 'end' });
-    }
+    gameEvents.emit('input-binding-capture', { state: 'end' });
 
     this.renderSettingsPanel(this.settingsState.activeCategory);
   }
@@ -3476,7 +3474,7 @@ class UISystem {
       this.settingsState.capture.element.classList.remove('is-listening');
     }
 
-    if (this.settingsState.capture && typeof gameEvents !== 'undefined') {
+    if (this.settingsState.capture) {
       gameEvents.emit('input-binding-capture', { state: 'end' });
     }
 
@@ -4859,7 +4857,7 @@ class UISystem {
 
       document.body?.classList.remove('is-credits-open');
 
-      if (typeof gameEvents !== 'undefined' && emitEvent) {
+      if (emitEvent) {
         gameEvents.emit('screen-changed', { screen: screenName });
       }
     } catch (error) {

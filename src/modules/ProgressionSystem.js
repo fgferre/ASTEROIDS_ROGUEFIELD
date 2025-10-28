@@ -9,8 +9,7 @@ import {
   PROGRESSION_UPGRADE_FALLBACK_COUNT,
 } from '../core/GameConstants.js';
 import UPGRADE_LIBRARY, { UPGRADE_CATEGORIES } from '../data/upgrades/index.js';
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
-import RandomService from '../core/RandomService.js';
+import { BaseSystem } from '../core/BaseSystem.js';
 import { MAGNETISM_FORCE, MAGNETISM_RADIUS } from '../data/constants/gameplay.js';
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
@@ -23,16 +22,22 @@ const DEFAULT_UPGRADE_CATEGORY = {
   themeColor: '#3399FF',
 };
 
-class ProgressionSystem {
+class ProgressionSystem extends BaseSystem {
   constructor(dependencies = {}) {
-    this.dependencies = normalizeDependencies(dependencies);
-    this.randomSource = null;
-    this.random = null;
-    this._fallbackRandom = null;
-    this._fallbackRandomSeed = null;
-    this._fallbackRandomFork = null;
-    this._fallbackRandomForkSeed = null;
-    // === DADOS DE PROGRESSÃO ===
+    super(dependencies, {
+      enableRandomManagement: true,
+      systemName: 'ProgressionSystem',
+      serviceName: 'progression',
+      randomForkLabels: {
+        base: 'progression.base',
+        selection: 'progression.selection',
+        progression: 'progression.levels',
+        rewards: 'progression.rewards',
+      },
+    });
+  }
+
+  initialize() {
     const initialLevel = Number.isFinite(PROGRESSION_INITIAL_LEVEL)
       ? PROGRESSION_INITIAL_LEVEL
       : 1;
@@ -46,7 +51,6 @@ class ProgressionSystem {
     this.experienceToNext = Math.max(1, Math.floor(initialRequirement));
     this.totalExperience = 0;
 
-    // === UPGRADES APLICADOS ===
     this.appliedUpgrades = new Map();
     this.upgradeDefinitions = this.buildUpgradeDefinitions(UPGRADE_LIBRARY);
     this.upgradeLookup = this.buildUpgradeLookup(this.upgradeDefinitions);
@@ -74,147 +78,57 @@ class ProgressionSystem {
     this.comboMultiplierStep = comboStep;
     this.comboMultiplierCap = comboCap;
 
-    // === CACHES DE SERVIÇOS ===
-    this.services = {
-      xpOrbs: this.dependencies['xp-orbs'] || null,
-      player: this.dependencies.player || null,
-      ui: this.dependencies.ui || null,
-      effects: this.dependencies.effects || null,
-    };
-
-    this.refreshRandom(true);
-
-    // === CONFIGURAÇÕES ===
+    this.xpOrbsService = null;
+    this.playerService = null;
+    this.uiService = null;
+    this.effectsService = null;
 
     const levelScaling = Number.isFinite(PROGRESSION_LEVEL_SCALING)
       ? PROGRESSION_LEVEL_SCALING
       : 1;
     this.levelScaling = Math.max(1, levelScaling);
 
-    // Registrar no ServiceLocator
-    if (typeof gameServices !== 'undefined') {
-      gameServices.register('progression', this);
-    }
-
-    // Escutar eventos
-    this.setupEventListeners();
-
-    console.log('[ProgressionSystem] Initialized - Level', this.level);
+    this.refreshInjectedServices({ force: true });
   }
 
-  ensureFallbackRandom(force = false) {
-    if (!this._fallbackRandom) {
-      this._fallbackRandom = new RandomService('progression:fallback');
-      this._fallbackRandomSeed = this._fallbackRandom.seed >>> 0;
-    } else if (
-      force &&
-      typeof this._fallbackRandom.reset === 'function' &&
-      this._fallbackRandomSeed !== null
-    ) {
-      this._fallbackRandom.reset(this._fallbackRandomSeed);
-    }
+  refreshInjectedServices(options = {}) {
+    const force = typeof options === 'boolean' ? options : Boolean(options.force);
 
-    if (!this._fallbackRandomFork) {
-      this._fallbackRandomFork = this._fallbackRandom.fork('progression.upgrades');
-      this._fallbackRandomForkSeed = this._fallbackRandomFork.seed >>> 0;
-    } else if (
-      force &&
-      typeof this._fallbackRandomFork.reset === 'function' &&
-      this._fallbackRandomForkSeed !== null
-    ) {
-      this._fallbackRandomFork.reset(this._fallbackRandomForkSeed);
-    }
-
-    return this._fallbackRandomFork;
-  }
-
-  refreshInjectedServices(force = false) {
-    if (force) {
-      this.services.xpOrbs = this.dependencies['xp-orbs'] || null;
-      this.services.player = this.dependencies.player || null;
-      this.services.ui = this.dependencies.ui || null;
-      this.services.effects = this.dependencies.effects || null;
-    }
-
-    if (!this.services.xpOrbs) {
-      this.services.xpOrbs = resolveService('xp-orbs', this.dependencies);
-    }
-
-    if (!this.services.player) {
-      this.services.player = resolveService('player', this.dependencies);
-    }
-
-    if (!this.services.ui) {
-      this.services.ui = resolveService('ui', this.dependencies);
-    }
-
-    if (!this.services.effects) {
-      this.services.effects = resolveService('effects', this.dependencies);
-    }
-
-    this.refreshRandom(force);
+    this.resolveCachedServices(
+      {
+        xpOrbsService: 'xp-orbs',
+        playerService: 'player',
+        uiService: 'ui',
+        effectsService: 'effects',
+      },
+      { force }
+    );
   }
 
   setupEventListeners() {
     this.refreshInjectedServices();
-    if (typeof gameEvents === 'undefined') {
-      return;
-    }
 
-    gameEvents.on('xp-orb-collected', (data) => {
+    this.registerEventListener('xp-orb-collected', (data) => {
       this.handleOrbCollected(data);
     });
 
-    gameEvents.on('enemy-destroyed', (data) => {
+    this.registerEventListener('enemy-destroyed', (data) => {
       this.handleEnemyDestroyed(data);
     });
 
-    gameEvents.on('progression-reset', (payload = {}) => {
-      this.refreshInjectedServices(true);
+    this.registerEventListener('progression-reset', (payload = {}) => {
+      this.refreshInjectedServices({ force: true });
       this.resetCombo({ reason: 'progression-reset', silent: true, force: true });
     });
 
-    gameEvents.on('player-reset', (payload = {}) => {
-      this.refreshInjectedServices(true);
+    this.registerEventListener('player-reset', (payload = {}) => {
+      this.refreshInjectedServices({ force: true });
       this.resetCombo({ reason: 'player-reset', silent: true, force: true });
     });
 
-    gameEvents.on('player-died', (payload = {}) => {
+    this.registerEventListener('player-died', (payload = {}) => {
       this.resetCombo({ reason: 'player-died', silent: false, force: true });
     });
-  }
-
-  refreshRandom(force = false) {
-    const resolvedRandom = resolveService('random', this.dependencies);
-
-    if (!resolvedRandom) {
-      const fallbackRandom = this.ensureFallbackRandom(force);
-      this.randomSource = this._fallbackRandom;
-      this.random = fallbackRandom;
-      return this.random;
-    }
-
-    const needsInitialization =
-      resolvedRandom !== this.randomSource || !this.random;
-
-    if (needsInitialization) {
-      this.randomSource = resolvedRandom;
-      if (resolvedRandom && typeof resolvedRandom.fork === 'function') {
-        this.random = resolvedRandom.fork('progression.upgrades');
-      } else {
-        this.random = resolvedRandom;
-      }
-    }
-
-    if ((force || needsInitialization) && this.random && typeof this.random.reset === 'function') {
-      if (Object.prototype.hasOwnProperty.call(this.random, 'seed')) {
-        this.random.reset(this.random.seed);
-      } else {
-        this.random.reset();
-      }
-    }
-
-    return this.random;
   }
 
   handleOrbCollected(data) {
@@ -316,10 +230,6 @@ class ProgressionSystem {
   }
 
   emitComboUpdated(extra = {}) {
-    if (typeof gameEvents === 'undefined') {
-      return;
-    }
-
     gameEvents.emit('combo-updated', {
       comboCount: this.currentCombo,
       multiplier: this.comboMultiplier,
@@ -345,7 +255,7 @@ class ProgressionSystem {
     this.comboTimer = 0;
     this.comboMultiplier = 1;
 
-    if (!emit || typeof gameEvents === 'undefined') {
+    if (!emit) {
       return;
     }
 
@@ -366,10 +276,6 @@ class ProgressionSystem {
   }
 
   emitExperienceChanged() {
-    if (typeof gameEvents === 'undefined') {
-      return;
-    }
-
     gameEvents.emit('experience-changed', {
       current: this.experience,
       needed: this.experienceToNext,
@@ -455,10 +361,6 @@ class ProgressionSystem {
   }
 
   emitLevelUp(context) {
-    if (typeof gameEvents === 'undefined') {
-      return;
-    }
-
     gameEvents.emit('player-leveled-up', {
       newLevel: context.level,
       previousRequirement: context.previousRequirement,
@@ -502,9 +404,9 @@ class ProgressionSystem {
       };
     }
 
-    let rng = this.refreshRandom() || this.random;
+    let rng = this.randomForks?.selection || this.random;
     if (!rng || typeof rng.int !== 'function') {
-      rng = this.ensureFallbackRandom();
+      rng = this.random;
     }
 
     const pool = [...eligible];
@@ -1134,17 +1036,15 @@ class ProgressionSystem {
 
     const summary = this.buildAppliedUpgradeSummary(definition, currentLevel);
 
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('upgrade-applied', {
-        upgradeId,
-        level: newLevel,
-        previousLevel: currentLevel,
-        maxLevel,
-        summary,
-        effects: this.cloneEffects(levelDefinition.effects),
-        prerequisites: this.describePrerequisites(definition),
-      });
-    }
+    gameEvents.emit('upgrade-applied', {
+      upgradeId,
+      level: newLevel,
+      previousLevel: currentLevel,
+      maxLevel,
+      summary,
+      effects: this.cloneEffects(levelDefinition.effects),
+      prerequisites: this.describePrerequisites(definition),
+    });
 
     console.log(
       '[ProgressionSystem] Applied upgrade:',
@@ -1174,15 +1074,13 @@ class ProgressionSystem {
       }
 
       if (type === 'event' && typeof effect.event === 'string') {
-        if (typeof gameEvents !== 'undefined') {
-          const payload = {
-            ...(effect.payload || {}),
-            upgradeId: definition.id,
-            level: newLevel,
-            category: definition.category,
-          };
-          gameEvents.emit(effect.event, payload);
-        }
+        const payload = {
+          ...(effect.payload || {}),
+          upgradeId: definition.id,
+          level: newLevel,
+          category: definition.category,
+        };
+        gameEvents.emit(effect.event, payload);
         return;
       }
 
@@ -1203,7 +1101,7 @@ class ProgressionSystem {
 
     const operation = effect.operation || 'set';
     this.refreshInjectedServices();
-    const xpSystem = this.services.xpOrbs;
+    const xpSystem = this.xpOrbsService;
 
     if (!xpSystem) {
       return;
@@ -1287,10 +1185,18 @@ class ProgressionSystem {
   }
 
   // === RESET E SAVE ===
-  reset() {
-    this.level = 1;
+  reset(options = {}) {
+    super.reset(options);
+
+    const initialLevel = Number.isFinite(PROGRESSION_INITIAL_LEVEL)
+      ? PROGRESSION_INITIAL_LEVEL
+      : 1;
+    this.level = Math.max(1, initialLevel);
     this.experience = 0;
-    this.experienceToNext = 100;
+    const initialRequirement = Number.isFinite(PROGRESSION_INITIAL_XP_REQUIREMENT)
+      ? PROGRESSION_INITIAL_XP_REQUIREMENT
+      : 100;
+    this.experienceToNext = Math.max(1, Math.floor(initialRequirement));
     this.totalExperience = 0;
     this.appliedUpgrades.clear();
     this.pendingUpgradeOptions = [];
@@ -1307,14 +1213,8 @@ class ProgressionSystem {
 
     this.resetCombo({ reason: 'progression-reset', silent: true, emit: false });
 
-    this.refreshInjectedServices(true);
+    this.refreshInjectedServices({ force: true });
     this.emitExperienceChanged();
-
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('progression-reset');
-    }
-
-    console.log('[ProgressionSystem] Reset');
   }
 
   // Para salvar progresso (futuro)
@@ -1400,7 +1300,7 @@ class ProgressionSystem {
   }
 
   restoreState(data) {
-    this.refreshInjectedServices(true);
+    this.refreshInjectedServices({ force: true });
     this.deserialize(data, { suppressEvents: true });
     this.emitExperienceChanged();
 
@@ -1410,29 +1310,25 @@ class ProgressionSystem {
       this.resetCombo({ reason: 'restore-state', silent: true, force: true });
     }
 
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('progression-restored', {
-        level: this.level,
-        experience: this.experience,
-        experienceToNext: this.experienceToNext,
-        totalExperience: this.totalExperience,
-      });
-    }
+    gameEvents.emit('progression-restored', {
+      level: this.level,
+      experience: this.experience,
+      experienceToNext: this.experienceToNext,
+      totalExperience: this.totalExperience,
+    });
 
     return true;
   }
 
   destroy() {
+    super.destroy();
     this.resetCombo({ emit: false });
     this.appliedUpgrades.clear();
     this.pendingUpgradeOptions = [];
-    this.services = {
-      xpOrbs: null,
-      player: null,
-      ui: null,
-      effects: null
-    };
-    console.log('[ProgressionSystem] Destroyed');
+    this.xpOrbsService = null;
+    this.playerService = null;
+    this.uiService = null;
+    this.effectsService = null;
   }
 }
 
