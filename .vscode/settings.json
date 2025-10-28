@@ -3,8 +3,7 @@
   "git.useForcePushWithLease": false,
   "CodeGPT.apiKey": "LM Studio",
   "traycer.additionalAgents": [
-    "Claude Code",
-    "Gemini",
+    "Claude Code Extension",
     "Codex"
   ]
 }
