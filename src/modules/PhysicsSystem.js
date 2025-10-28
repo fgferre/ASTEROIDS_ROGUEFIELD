@@ -2061,9 +2061,6 @@ class PhysicsSystem extends BaseSystem {
       frameTime: 0
     };
 
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('physics-reset');
-    }
   }
 
   /**

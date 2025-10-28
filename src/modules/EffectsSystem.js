@@ -3783,50 +3783,15 @@ export default class EffectsSystem extends BaseSystem {
   }
 
   captureRandomForkSeeds() {
-    if (!this.randomForks) {
-      this.randomForkSeeds = {};
-    }
-
-    if (!this.randomForkSeeds) {
-      this.randomForkSeeds = {};
-    }
-
-    if (this.randomForks) {
-      Object.entries(this.randomForks).forEach(([name, fork]) => {
-        if (fork && typeof fork.seed === 'number' && Number.isFinite(fork.seed)) {
-          this.randomForkSeeds[name] = fork.seed >>> 0;
-        }
-      });
-    }
+    super.captureRandomForkSeeds();
 
     if (this.screenShake && typeof this.screenShake.captureSeedState === 'function') {
       this.screenShakeSeedState = this.screenShake.captureSeedState();
     }
   }
 
-  reseedRandomForks() {
-    if (!this.randomForkSeeds) {
-      this.captureRandomForkSeeds();
-    }
-
-    if (this.randomForks) {
-      Object.entries(this.randomForks).forEach(([name, fork]) => {
-        if (!fork || typeof fork.reset !== 'function') {
-          return;
-        }
-
-        const storedSeed = this.randomForkSeeds?.[name];
-        if (storedSeed !== undefined) {
-          fork.reset(storedSeed);
-        } else if (this.random && this.randomForkLabels?.[name]) {
-          const replacement = this.random.fork(this.randomForkLabels[name]);
-          this.randomForks[name] = replacement;
-          if (replacement && typeof replacement.seed === 'number') {
-            this.randomForkSeeds[name] = replacement.seed >>> 0;
-          }
-        }
-      });
-    }
+  reseedRandomForks(options = {}) {
+    super.reseedRandomForks(options);
 
     if (this.screenShake && typeof this.screenShake.reseed === 'function') {
       const snapshot = this.screenShake.reseed(this.getRandomFork('screenShake'), {

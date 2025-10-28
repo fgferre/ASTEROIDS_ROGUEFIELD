@@ -713,6 +713,8 @@ npm run dev
 
 **Objetivo**: Finalizar a migração dos sistemas principais para `BaseSystem` refatorando os dois módulos restantes com padrões legados (`UISystem` e `ProgressionSystem`). Este ticket conclui a adoção do lifecycle padronizado iniciado no Ticket 1.
 
+> **Nota**: Não existe um `UpgradeSystem` independente no código atual — toda a lógica de upgrades vive no `ProgressionSystem`. Por isso, o escopo desta etapa foi ajustado para focar nesse módulo em conjunto com o `UISystem`.
+
 **Escopo**: 2 arquivos modificados
 **Linhas removidas**: ~200 linhas
 **Risco**: 🟡 Médio (UI complexa e árvore de upgrades)
