@@ -162,11 +162,34 @@ const shapeRenderers = {
     const hullPreset = presets.hull ?? {};
     const corePreset = presets.core ?? {};
     const showAura = config?.showAura !== false;
+    const showPhaseColor = config?.showPhaseColor !== false;
 
     const auraPulse = config?.auraPulse ?? auraPreset.pulse ?? 0.18;
     const pulseSpeed = config?.pulseSpeed ?? auraPreset.speed ?? 1.2;
     const time = enemy.system?.time ?? performance.now() / 1000;
     const pulse = 1 + Math.sin(time * pulseSpeed) * auraPulse;
+
+    let phaseColor = null;
+    if (showPhaseColor) {
+      const rawPhaseIndex = typeof enemy.getPhaseIndex === 'function'
+        ? enemy.getPhaseIndex()
+        : enemy.currentPhase ?? enemy.phase ?? null;
+
+      if (rawPhaseIndex !== null && rawPhaseIndex !== undefined && !Number.isNaN(rawPhaseIndex)) {
+        const palettes = [
+          config?.phaseColors,
+          presets?.phaseColors,
+          colors?.phaseColors,
+          enemy?.phaseColors,
+          enemy?.renderPayload?.phaseColors,
+        ].find((candidate) => Array.isArray(candidate) && candidate.length > 0);
+
+        if (palettes) {
+          const index = Math.max(0, Math.min(palettes.length - 1, Math.round(rawPhaseIndex)));
+          phaseColor = palettes[index] ?? null;
+        }
+      }
+    }
 
     if (showAura && auraPreset?.enabled !== false) {
       const gradient = ctx.createRadialGradient(0, 0, effectiveSize, 0, 0, effectiveSize * (1.5 * pulse));
@@ -182,7 +205,8 @@ const shapeRenderers = {
 
     ctx.beginPath();
     ctx.arc(0, 0, effectiveSize, 0, TAU);
-    ctx.fillStyle = hullPreset.fill ?? colors.body ?? '#8c4cff';
+    const baseHullFill = hullPreset.fill ?? colors.body ?? '#8c4cff';
+    ctx.fillStyle = phaseColor ?? baseHullFill;
     ctx.strokeStyle = hullPreset.stroke ?? colors.outline ?? '#2d0a57';
     ctx.lineWidth = hullPreset.strokeWidth ?? 6;
     ctx.fill();
@@ -190,44 +214,64 @@ const shapeRenderers = {
 
     ctx.beginPath();
     ctx.arc(0, 0, effectiveSize * 0.55, 0, TAU);
-    ctx.fillStyle = corePreset.fill ?? colors.core ?? '#ffffff';
+    const baseCoreFill = corePreset.fill ?? colors.core ?? '#ffffff';
+    ctx.fillStyle = phaseColor ? corePreset.fill ?? phaseColor : baseCoreFill;
     ctx.globalAlpha = 0.85;
     ctx.fill();
     ctx.globalAlpha = 1;
   },
 };
 
+const proceduralStrategy = ({ enemy, ctx, colors, presets, config }) => {
+  if (!ctx) return;
+
+  const palette = colors || resolvePalette(enemy);
+  const renderPreset = presets || resolvePresets(enemy);
+  const size = enemy.radius ?? enemy.size;
+  const shape = config?.shape ?? enemy.renderShape ?? 'triangle';
+  const renderer = shapeRenderers[shape];
+
+  if (!renderer) {
+    console.warn(`[RenderComponent] Unknown procedural shape: ${shape}`);
+    return;
+  }
+
+  ctx.save();
+  ctx.translate(enemy.x, enemy.y);
+  const rotation = enemy.rotation ?? 0;
+  if (rotation) {
+    ctx.rotate(rotation);
+  }
+
+  renderer({ enemy, ctx, colors: palette, presets: renderPreset, size, config });
+
+  ctx.restore();
+};
+
+const delegateStrategy = ({ enemy, ctx }) => {
+  if (typeof enemy?.onDraw === 'function') {
+    enemy.onDraw(ctx);
+  }
+};
+
+function createProceduralAlias(shape) {
+  return ({ enemy, ctx, colors, presets, config }) => {
+    const aliasConfig =
+      config?.shape === undefined
+        ? { ...(config || {}), shape }
+        : config;
+
+    return proceduralStrategy({ enemy, ctx, colors, presets, config: aliasConfig });
+  };
+}
+
 const defaultStrategies = {
-  procedural: ({ enemy, ctx, colors, presets, config }) => {
-    if (!ctx) return;
-
-    const palette = colors || resolvePalette(enemy);
-    const renderPreset = presets || resolvePresets(enemy);
-    const size = enemy.radius ?? enemy.size;
-    const shape = config?.shape ?? enemy.renderShape ?? 'triangle';
-    const renderer = shapeRenderers[shape];
-
-    if (!renderer) {
-      console.warn(`[RenderComponent] Unknown procedural shape: ${shape}`);
-      return;
-    }
-
-    ctx.save();
-    ctx.translate(enemy.x, enemy.y);
-    const rotation = enemy.rotation ?? 0;
-    if (rotation) {
-      ctx.rotate(rotation);
-    }
-
-    renderer({ enemy, ctx, colors: palette, presets: renderPreset, size, config });
-
-    ctx.restore();
-  },
-  delegate: ({ enemy, ctx }) => {
-    if (typeof enemy?.onDraw === 'function') {
-      enemy.onDraw(ctx);
-    }
-  },
+  procedural: proceduralStrategy,
+  'procedural-triangle': createProceduralAlias('triangle'),
+  'procedural-diamond': createProceduralAlias('diamond'),
+  'procedural-sphere': createProceduralAlias('sphere'),
+  'procedural-boss': createProceduralAlias('boss'),
+  delegate: delegateStrategy,
 };
 
 export class RenderComponent {
