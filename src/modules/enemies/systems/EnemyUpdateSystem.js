@@ -787,7 +787,12 @@ export class EnemyUpdateSystem {
     }
 
     wave.isActive = false;
-    wave.breakTimer = WAVE_BREAK_TIME;
+    wave.breakTimer = Number.isFinite(data?.countdown)
+      ? Math.max(0, data.countdown)
+      : WAVE_BREAK_TIME;
+    wave.completedWaves = (Number.isFinite(wave.completedWaves)
+      ? wave.completedWaves
+      : 0) + 1;
 
     if (typeof this.ctx?.emitWaveStateUpdate === 'function') {
       this.ctx.emitWaveStateUpdate(true);

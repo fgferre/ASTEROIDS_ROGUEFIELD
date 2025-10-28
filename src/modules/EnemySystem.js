@@ -1915,29 +1915,6 @@ class EnemySystem {
     return payload;
   }
 
-  /**
-   * Routes enemy projectile events to the CombatSystem.
-   * Called by the 'enemy-fired' event listener.
-   * @param {Object} data - Projectile data from enemy weapon
-   * @returns {boolean} True if routed successfully, false otherwise
-   */
-  handleEnemyProjectile(data) {
-    const combat = this.getCachedCombat();
-
-    if (!combat) {
-      console.warn('[EnemySystem] Cannot route enemy projectile - CombatSystem not available');
-      return false;
-    }
-
-    if (typeof combat.handleEnemyProjectile !== 'function') {
-      console.warn('[EnemySystem] CombatSystem.handleEnemyProjectile is not a function');
-      return false;
-    }
-
-    combat.handleEnemyProjectile(data);
-    return true;
-  }
-
   isBossProjectile(payload) {
     if (!payload) {
       return false;
