@@ -1,5 +1,10 @@
 import { GAME_HEIGHT, GAME_WIDTH, SHIP_SIZE } from '../../../core/GameConstants.js';
 
+// NOTE: Math helpers (clamp, length, normalize, lerp) defined below will be
+// extracted to src/utils/mathHelpers.js and src/utils/vectorHelpers.js in Phase 9
+// of the simplification plan. They are kept here temporarily to avoid disrupting
+// movement strategies that depend on them.
+
 const DEFAULT_BOUNDS = Object.freeze({
   left: 0,
   top: 0,

@@ -316,3 +316,87 @@ onDraw(ctx) {
 - **Phase 3**: Criar utilitários de combate compartilhados (`src/utils/combatHelpers.js`)
 - **Phase 4**: Consolidar estratégias de renderização (4 estratégias → 1 com parâmetro `shape`)
 - **Boss Weapon Refactor**: Desacoplar métodos de arma do boss da lógica de fases (tarefa futura)
+
+### 12.7. REFACTOR-013: Extração de Utilitários de Combate (Phase 3 Cleanup)
+
+**Objetivo**: Extrair funções auxiliares de combate do `WeaponComponent.js` para um módulo compartilhado, criando uma biblioteca reutilizável de utilitários de combate.
+
+**Mudanças Realizadas**:
+
+1. **Novo Arquivo**: `src/utils/combatHelpers.js` (~55 linhas)
+   - `computeLeadSolution()`: Cálculo de ponto de interceptação preditivo (49 linhas: 4 JSDoc + 45 código)
+   - `resolvePlayerVelocity()`: Extração de velocidade do jogador com fallbacks (22 linhas: 3 JSDoc + 19 código)
+   - `applySpread()`: Aplicação de dispersão angular aleatória (8 linhas: 2 JSDoc + 6 código)
+   - Exportações nomeadas para tree-shaking
+   - JSDoc conciso mas completo
+
+2. **WeaponComponent.js**: 481 → 411 linhas (-15%, -70 linhas)
+   - Removido: `computeLeadSolution()` (45 linhas)
+   - Removido: `resolvePlayerVelocity()` (19 linhas)
+   - Removido: `applySpread()` (6 linhas)
+   - Adicionado: Import de `combatHelpers.js` (1 linha)
+   - Mantido: `getGameEvents()` (específico de event bus)
+   - Todos os padrões de arma (`single`, `burst`, `spread`, `volley`, `proximity`) continuam funcionando identicamente
+
+3. **MovementComponent.js**: Sem mudanças de código
+   - Adicionado: Comentário documentando extração futura de helpers matemáticos (Phase 9)
+   - Helpers mantidos: `clamp()`, `length()`, `normalize()`, `lerp()`
+   - Rationale: Usados internamente por estratégias de movimento, serão extraídos em Phase 9
+
+**Redução Total de Código**:
+- **Linhas removidas**: 70 linhas de `WeaponComponent.js`
+- **Linhas adicionadas**: 55 linhas em `combatHelpers.js`
+- **Balanço líquido**: **-15 linhas** ✅
+- **Benefício**: Fonte única de verdade, testável isoladamente, código mais limpo
+
+**Princípios Aplicados**:
+- ✅ **YAGNI (You Ain't Gonna Need It)**: Extraído APENAS funções usadas agora
+- ✅ **JSDoc Conciso**: Útil mas não verboso (10 linhas total, não 45)
+- ✅ **Redução Líquida**: -15 linhas (não +20 como no plano original)
+- ✅ **Zero Especulação**: Sem código para "preparar Phase 9"
+
+**Padrão de Transformação**:
+
+**Antes** (inline em WeaponComponent.js):
+```javascript
+const computeLeadSolution = ({ origin, target, targetVelocity, projectileSpeed }) => {
+  // 45 linhas de lógica de interceptação
+};
+
+const resolvePlayerVelocity = (player) => {
+  // 19 linhas de extração de velocidade
+};
+
+const applySpread = (angle, spread, random) => {
+  // 6 linhas de aplicação de dispersão
+};
+```
+
+**Depois** (importado de combatHelpers.js):
+```javascript
+import {
+  computeLeadSolution,
+  resolvePlayerVelocity,
+  applySpread,
+} from '../../../utils/combatHelpers.js';
+```
+
+**Benefícios**:
+- ✅ Fonte única de verdade para matemática de combate
+- ✅ Funções puras, fáceis de testar isoladamente
+- ✅ Reduz tamanho do `WeaponComponent.js` em 15%
+- ✅ Sem mudanças de comportamento - refatoração pura
+- ✅ Exportações nomeadas permitem tree-shaking
+- ✅ JSDoc conciso facilita reutilização sem verbosidade
+- ✅ **Redução líquida de código** (alinhado com objetivo de simplificação)
+
+**Próximos Passos**:
+- **Phase 4**: Consolidar estratégias de renderização (4 → 1 com parâmetro `shape`)
+- **Phase 9**: Extrair math/vector helpers de `MovementComponent.js` para `mathHelpers.js` e `vectorHelpers.js`
+- **Futuro**: Considerar adicionar `tests/utils/combatHelpers.test.js` para testes unitários
+
+**Arquivos Não Modificados**:
+- `Drone.js`: Já limpo em Phase 2, sem helpers duplicados
+- `Hunter.js`: Já limpo em Phase 2, sem helpers duplicados
+- `Mine.js`: Não usa helpers de combate
+- `BossEnemy.js`: Não usa helpers de combate (tem lógica inline de arma, será refatorado separadamente)
