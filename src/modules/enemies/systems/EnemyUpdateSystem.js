@@ -763,4 +763,47 @@ export class EnemyUpdateSystem {
       facade.handleSpawning(deltaTime);
     }
   }
+
+  /**
+   * Handles wave completion event from WaveManager.
+   * Grants rewards and updates wave state when WaveManager completes a wave.
+   * @param {{
+   *   wave?: number,
+   *   asteroidsKilled?: number,
+   *   totalAsteroids?: number,
+   * }} data
+   */
+  handleWaveManagerWaveComplete(data) {
+    const facade = this.facade;
+    const wave = this.ctx?.waveState;
+
+    if (!wave) {
+      console.warn('[EnemyUpdateSystem] Cannot handle wave completion - no wave state');
+      return;
+    }
+
+    if (typeof facade?.grantWaveRewards === 'function') {
+      facade.grantWaveRewards();
+    }
+
+    wave.isActive = false;
+    wave.breakTimer = Number.isFinite(data?.countdown)
+      ? Math.max(0, data.countdown)
+      : WAVE_BREAK_TIME;
+    wave.completedWaves = (Number.isFinite(wave.completedWaves)
+      ? wave.completedWaves
+      : 0) + 1;
+
+    if (typeof this.ctx?.emitWaveStateUpdate === 'function') {
+      this.ctx.emitWaveStateUpdate(true);
+    } else if (typeof facade?.emitWaveStateUpdate === 'function') {
+      facade.emitWaveStateUpdate(true);
+    }
+
+    GameDebugLogger.log('WAVE', 'Wave complete handled by UpdateSystem', {
+      wave: data?.wave,
+      asteroidsKilled: data?.asteroidsKilled,
+      totalAsteroids: data?.totalAsteroids,
+    });
+  }
 }

@@ -317,6 +317,57 @@ onDraw(ctx) {
 - **Phase 4**: Consolidar estratégias de renderização (4 estratégias → 1 com parâmetro `shape`)
 - **Boss Weapon Refactor**: Desacoplar métodos de arma do boss da lógica de fases (tarefa futura)
 
+#### 12.6.1. HOTFIX: Restauração do handleWaveManagerWaveComplete (Phase 1 Bug Fix)
+
+**Problema Identificado**: Durante a limpeza da Phase 1 (REFACTOR-011), o método `handleWaveManagerWaveComplete()` foi completamente removido ao invés de ser transformado em delegação. O event listener na linha 349 de `EnemySystem.js` continuou chamando o método inexistente, causando crash na conclusão de waves.
+
+**Impacto**:
+- 🔴 **Severidade**: Crítica - quebra o loop principal do jogo
+- ❌ Waves não completam corretamente
+- ❌ Recompensas de XP não são concedidas
+- ❌ Progressão do jogador bloqueada
+- ❌ Console spam com `TypeError: this.handleWaveManagerWaveComplete is not a function`
+
+**Correção Aplicada**:
+
+1. **EnemySystem.js** (+8 linhas):
+   - Adicionado método de delegação `handleWaveManagerWaveComplete(data)` após linha 2927
+   - Segue padrão da Phase 1: error-throwing se sub-sistema ausente, então delega para `updateSystem`
+   - Localizado próximo a outros métodos de gerenciamento de wave (`completeCurrentWave`, `startNextWave`, `grantWaveRewards`)
+
+2. **EnemyUpdateSystem.js** (+35 linhas):
+   - Implementado `handleWaveManagerWaveComplete(data)` após linha 765
+   - Delega recompensas para `facade.grantWaveRewards()` (método existente)
+   - Atualiza estado da wave (`isActive = false`, `breakTimer = WAVE_BREAK_TIME`)
+   - Emite atualização de estado via `emitWaveStateUpdate(true)`
+   - Registra conclusão no debug log
+
+**Fluxo Corrigido**:
+```
+WaveManager.completeWave()
+  → emit('wave-complete', data)
+    → EnemySystem event listener (linha 349)
+      → this.handleWaveManagerWaveComplete(data)  ✅ AGORA EXISTE
+        → updateSystem.handleWaveManagerWaveComplete(data)
+          → facade.grantWaveRewards()  → XP orbs spawned
+          → wave.isActive = false
+          → emitWaveStateUpdate()
+```
+
+**Lição Aprendida**:
+- ✅ Antes de remover um método, buscar TODAS as referências (incluindo event listeners)
+- ✅ Event listeners são call sites indiretos que grep pode perder
+- ✅ Padrão de delegação requer AMBOS: método na facade E implementação no sub-sistema
+- ✅ Testar fluxo de eventos end-to-end após refatorações agressivas
+
+**Validação**:
+- ✅ Wave completion funciona corretamente
+- ✅ XP orbs são concedidos em círculo ao redor do jogador
+- ✅ Wave state transiciona para break period
+- ✅ UI atualiza corretamente
+- ✅ Sem erros no console
+- ✅ Debug log mostra `[WAVE] Wave complete handled by UpdateSystem`
+
 ### 12.7. REFACTOR-013: Extração de Utilitários de Combate (Phase 3 Cleanup)
 
 **Objetivo**: Extrair funções auxiliares de combate do `WeaponComponent.js` para um módulo compartilhado, criando uma biblioteca reutilizável de utilitários de combate.
