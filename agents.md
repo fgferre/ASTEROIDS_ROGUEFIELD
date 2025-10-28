@@ -88,6 +88,92 @@ Considere uma feature pronta quando:
 
 Esta política adaptada serve como um guia prático para manter a qualidade e a escalabilidade do seu projeto, respeitando a excelente arquitetura que você já implementou.
 
+#### 7.4. Creating New Systems with BaseSystem
+
+All new game systems should extend `BaseSystem` to maintain consistency and leverage automatic lifecycle management.
+
+##### Template Básico
+
+```javascript
+import { BaseSystem } from '../core/BaseSystem.js';
+
+class MySystem extends BaseSystem {
+  constructor(dependencies = {}) {
+    super(dependencies, {
+      systemName: 'MySystem',           // Nome para logs
+      serviceName: 'my-system',         // Chave no ServiceLocator
+      enableRandomManagement: true,     // Se precisa de randomness
+      randomForkLabels: ['base', 'feature1']  // Labels dos forks
+    });
+    
+    // Inicialização específica do sistema
+    this.myState = {};
+  }
+  
+  setupEventListeners() {
+    // Use registerEventListener ao invés de gameEvents.on()
+    this.registerEventListener('event:name', this.handleEvent.bind(this));
+  }
+  
+  handleEvent(data) {
+    // Lógica do handler
+  }
+  
+  reset() {
+    super.reset();  // SEMPRE chamar super primeiro
+    // Reset específico do sistema
+    this.myState = {};
+  }
+  
+  destroy() {
+    super.destroy();  // SEMPRE chamar super primeiro
+    // Cleanup específico do sistema
+    this.myState = null;
+  }
+}
+
+export default MySystem;
+```
+
+##### Opções do Constructor
+
+- **systemName** (obrigatório): Nome do sistema para logs e debugging
+- **serviceName** (obrigatório): Chave de registro no ServiceLocator
+- **enableRandomManagement** (opcional): `true` para habilitar random forks
+- **randomForkLabels** (opcional): Array de labels para random forks
+- **enablePerformanceMonitoring** (opcional): `true` para tracking de performance
+
+##### Regras Importantes
+
+1. **SEMPRE** chame `super()` primeiro no constructor
+2. **SEMPRE** chame `super.reset()` e `super.destroy()` primeiro nos overrides
+3. **USE** `this.registerEventListener()` ao invés de `gameEvents.on()` diretamente
+4. **USE** `this.getRandomFork(label)` para randomness determinística
+5. **DEIXE** BaseSystem gerenciar registro de serviços e cleanup
+6. **IMPLEMENTE** `setupEventListeners()` para registrar eventos
+
+##### Benefícios
+
+- ✅ Event listeners são automaticamente limpos no `destroy()`
+- ✅ Random management é centralizado e determinístico
+- ✅ Lifecycle é padronizado (reset, destroy)
+- ✅ Menos código boilerplate
+- ✅ Registro automático no ServiceLocator
+- ✅ Logs consistentes de inicialização
+
+##### Casos Especiais
+
+- **Sem randomness**: Use `enableRandomManagement: false` (ex: PhysicsSystem)
+- **Random customizado**: Implemente sua própria lógica se o fork model não servir (ex: AudioSystem)
+- **Lifecycle customizado**: Adicione métodos como `pause()`/`resume()` conforme necessário (ex: PlayerSystem)
+
+##### Referências
+
+- **Guia completo**: `docs/refactoring/REFACTOR-015-BASESYSTEM-MIGRATION.md`
+- **Código fonte**: `src/core/BaseSystem.js`
+- **Exemplos**: Todos os 12 sistemas principais em `src/modules/`
+
+
 #### 8. **Sistema de Logging Automático e Diagnóstico de Problemas**
 
 ##### 8.1. Visão Geral
