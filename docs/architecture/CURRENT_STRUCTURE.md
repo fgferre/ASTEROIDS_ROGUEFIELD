@@ -317,6 +317,104 @@ onDraw(ctx) {
 - **Phase 4**: Consolidar estratégias de renderização (4 estratégias → 1 com parâmetro `shape`)
 - **Boss Weapon Refactor**: Desacoplar métodos de arma do boss da lógica de fases (tarefa futura)
 
+#### 12.6.1. HOTFIX: Restauração de Métodos Removidos na Phase 1 (Comprehensive Verification)
+
+**Contexto**: Após identificar o bug crítico do `handleWaveManagerWaveComplete`, realizamos uma verificação sistemática de TODOS os event listeners em `EnemySystem.js` para garantir que nenhum outro método foi quebrado durante a limpeza da Phase 1.
+
+**Metodologia de Verificação**:
+1. Catalogar todos os 11 event listeners em `setupEventListeners()` (linhas 244-380)
+2. Para cada listener, verificar se o método handler existe no arquivo
+3. Buscar referências em testes para confirmar comportamento esperado
+4. Classificar como ✅ EXISTE ou ❌ AUSENTE
+
+**Resultados da Auditoria Completa**:
+
+**✅ VERIFICADOS - Métodos Existem (9 handlers):**
+- `handleShieldExplosionDamage` (linha 250) → Delega para `damageSystem` ✅
+- `handleMineExplosion` (linha 313) → Delega para `damageSystem` ✅
+- `handleWaveManagerWaveComplete` (linha 349) → **RESTAURADO** → Delega para `updateSystem` ✅
+- `handleBossWaveStarted` (linha 357) → Implementado (linha 2976) ✅
+- `handleBossSpawned` (linha 362) → Implementado (linha 3010) ✅
+- `handleBossPhaseChange` (linha 366) → Implementado (linha 3097) ✅
+- `handleBossDefeated` (linha 370) → Implementado (linha 3165) ✅
+- `handleBossAttackPayload` (linha 374) → Implementado (linha 3294) ✅
+- `handleBossInvulnerabilityChanged` (linha 378) → Implementado (linha 3244) ✅
+
+**❌ AUSENTES - Métodos Removidos Incorretamente (2 handlers):**
+1. **handleWaveManagerWaveComplete** (linha 349):
+   - **Impacto**: 🔴 Crítico - Quebra conclusão de waves e recompensas
+   - **Correção**: Delegação para `updateSystem.handleWaveManagerWaveComplete()`
+   - **Status**: ✅ CORRIGIDO (ver seção anterior)
+
+2. **handleEnemyProjectile** (linha 275):
+   - **Impacto**: 🟡 Alto - Quebra disparo de projéteis de inimigos
+   - **Correção**: Delegação para `combat.handleEnemyProjectile()`
+   - **Status**: ✅ CORRIGIDO (ver abaixo)
+
+**Correção 1: handleWaveManagerWaveComplete (já documentado acima)**
+- Adicionado em `EnemySystem.js` após linha 2927 (8 linhas)
+- Implementado em `EnemyUpdateSystem.js` após linha 765 (35 linhas)
+- Delega recompensas para `facade.grantWaveRewards()`
+- Atualiza estado da wave e emite eventos
+
+**Correção 2: handleEnemyProjectile (NOVO)**
+
+**Problema Identificado**: Event listener na linha 274-276 chama `this.handleEnemyProjectile(data)`, mas o método não existe.
+
+**Impacto**:
+- 🟡 **Severidade**: Alta - quebra disparo de projéteis de inimigos
+- ❌ Drones, Hunters e Bosses não conseguem atirar no jogador
+- ❌ Jogo fica muito fácil (inimigos inofensivos)
+- ❌ Console spam com `TypeError: this.handleEnemyProjectile is not a function`
+
+**Correção Aplicada**:
+
+1. **EnemySystem.js** (+25 linhas):
+   - Adicionado método `handleEnemyProjectile(data)` após linha 1916
+   - Localizado próximo a outros métodos de projéteis (`normalizeEnemyProjectilePayload`, `isBossProjectile`)
+   - Delega para `combat.handleEnemyProjectile(data)` (CombatSystem)
+   - Retorna boolean indicando sucesso/falha
+   - Null-safe: verifica se CombatSystem existe antes de chamar
+
+**Fluxo Corrigido**:
+```
+Enemy.fireAtPlayer()
+  → gameEvents.emit('enemy-fired', payload)
+    → EnemySystem event listener (linha 274-276)
+      → this.handleEnemyProjectile(data)  ✅ AGORA EXISTE
+        → combat.handleEnemyProjectile(data)
+          → combat.createEnemyBullet(data)
+            → Bullet created and added to game
+```
+
+**Diferença Arquitetural**:
+- `handleWaveManagerWaveComplete` → Delega para **sub-sistema** (UpdateSystem)
+- `handleEnemyProjectile` → Delega para **serviço externo** (CombatSystem)
+- Ambos seguem o padrão de delegação, mas para destinos diferentes
+
+**Lições Aprendidas Expandidas**:
+- ✅ Antes de remover um método, buscar TODAS as referências (incluindo event listeners)
+- ✅ Event listeners são call sites indiretos que grep pode perder
+- ✅ Verificar não apenas definições de métodos, mas também chamadas em testes
+- ✅ Realizar auditoria completa após refatorações agressivas
+- ✅ Testar fluxos de eventos end-to-end (spawn → update → fire → collision)
+- ✅ Documentar métodos que delegam para serviços externos vs. sub-sistemas
+
+**Validação Completa**:
+- ✅ Wave completion funciona (recompensas concedidas)
+- ✅ Enemy projectiles funcionam (Drones, Hunters, Bosses atiram)
+- ✅ Todos os 11 event listeners têm handlers válidos
+- ✅ Sem erros no console durante gameplay
+- ✅ Testes de integração passam (`mixed-enemy-waves.test.js`)
+- ✅ Debug log mostra eventos corretos: `[WAVE] Wave complete`, `[COLLISION] Bullet hit player`
+
+**Resumo de Impacto**:
+- **Métodos restaurados**: 2 (`handleWaveManagerWaveComplete`, `handleEnemyProjectile`)
+- **Linhas adicionadas**: 68 linhas (8 + 35 + 25)
+- **Bugs críticos corrigidos**: 2 (wave completion, enemy firing)
+- **Event listeners verificados**: 11/11 (100% coverage)
+- **Sistemas afetados**: WaveManager, CombatSystem, EnemySystem, UpdateSystem
+
 ### 12.7. REFACTOR-013: Extração de Utilitários de Combate (Phase 3 Cleanup)
 
 **Objetivo**: Extrair funções auxiliares de combate do `WeaponComponent.js` para um módulo compartilhado, criando uma biblioteca reutilizável de utilitários de combate.
