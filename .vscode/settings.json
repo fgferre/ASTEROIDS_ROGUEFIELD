@@ -5,5 +5,6 @@
   "traycer.additionalAgents": [
     "Claude Code Extension",
     "Codex"
-  ]
+  ],
+  "chatgpt.openOnStartup": true
 }
