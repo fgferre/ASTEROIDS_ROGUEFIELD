@@ -56,7 +56,7 @@ export class EnemyUpdateSystem {
    *   collisionComponent?: import('../../EnemySystem.js').EnemySystem['collisionComponent'],
    *   waveManager?: import('../../EnemySystem.js').EnemySystem['waveManager'],
    *   useManagers?: import('../../EnemySystem.js').EnemySystem['useManagers'],
-   *   refreshInjectedServices?: import('../../EnemySystem.js').EnemySystem['refreshInjectedServices'],
+   *   refreshServiceState?: import('../../EnemySystem.js').EnemySystem['refreshServiceState'],
    *   getCachedPlayer?: import('../../EnemySystem.js').EnemySystem['getCachedPlayer'],
    *   getCachedWorld?: import('../../EnemySystem.js').EnemySystem['getCachedWorld'],
    *   getCachedPhysics?: import('../../EnemySystem.js').EnemySystem['getCachedPhysics'],
@@ -104,8 +104,8 @@ export class EnemyUpdateSystem {
       return;
     }
 
-    if (typeof this.ctx.refreshInjectedServices === 'function') {
-      this.ctx.refreshInjectedServices();
+    if (typeof this.ctx.refreshServiceState === 'function') {
+      this.ctx.refreshServiceState();
     }
 
     const overrideValue =

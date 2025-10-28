@@ -185,7 +185,7 @@ class XPOrbSystem extends BaseSystem {
 
     this.missingDependencyWarnings = new Set();
 
-    this.resolveCachedServices({ cachedPlayer: 'player', cachedProgression: 'progression' }, { force: true });
+    this.resolveCachedServices({ force: true, suppressWarnings: true });
   }
 
   attachProgression(progressionSystem) {
@@ -197,6 +197,7 @@ class XPOrbSystem extends BaseSystem {
     this.dependencies.progression = progressionSystem;
     this.cachedProgression = progressionSystem;
     this.missingDependencyWarnings.delete('progression');
+    this.resolveCachedServices({ force: true });
   }
 
   logMissingDependency(name) {

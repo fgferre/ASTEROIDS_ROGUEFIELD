@@ -3,7 +3,7 @@ import { BaseSystem } from '../core/BaseSystem.js';
 import { ASTEROID_SIZES, GAME_HEIGHT, GAME_WIDTH, SHIP_SIZE } from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
 import RandomService from '../core/RandomService.js';
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { resolveService } from '../core/serviceUtils.js';
 import { Asteroid } from './enemies/types/Asteroid.js';
 import { Drone } from './enemies/types/Drone.js';
 import { Mine } from './enemies/types/Mine.js';
@@ -53,35 +53,30 @@ import {
 
 const ASTEROID_POOL_ID = Symbol.for('ASTEROIDS_ROGUEFIELD:asteroidPoolId');
 
+const ENEMY_SERVICE_MAP = {
+  player: 'player',
+  world: 'world',
+  progression: 'progression',
+  xpOrbs: 'xp-orbs',
+  physics: 'physics',
+  combat: 'combat',
+  healthHearts: 'healthHearts',
+  random: 'random',
+  effects: 'effects',
+  audio: 'audio',
+  ui: 'ui',
+};
+
 // === CLASSE ENEMYSYSTEM ===
 // Asteroid class moved to: ./enemies/types/Asteroid.js
 // === SISTEMA DE INIMIGOS ===
 class EnemySystem extends BaseSystem {
   constructor(dependencies = {}) {
-    super({
-      dependencies,
+    super(dependencies, {
       systemName: 'EnemySystem',
       serviceName: 'enemies',
+      enableRandomManagement: true,
     });
-    this.services = {
-      player: this.dependencies.player || null,
-      world: this.dependencies.world || null,
-      progression: this.dependencies.progression || null,
-      xpOrbs: this.dependencies['xp-orbs'] || null,
-      physics: this.dependencies.physics || null,
-      combat: this.dependencies.combat || null,
-      healthHearts: this.dependencies.healthHearts || null,
-      random: this.dependencies.random || null,
-      effects: this.dependencies.effects || null,
-      audio: this.dependencies.audio || null,
-      ui: this.dependencies.ui || null,
-    };
-
-    GameDebugLogger.log('INIT', 'EnemySystem player service', {
-      hasPlayerDependency: !!this.dependencies.player,
-      hasPlayerService: !!this.services.player,
-    });
-
     this.randomScopes = null;
     this.randomSequences = null;
     this.randomScopeSeeds = {};
@@ -155,7 +150,11 @@ class EnemySystem extends BaseSystem {
 
     this.setupAsteroidPoolIntegration();
     this.setupEnemyFactory(); // Initialize factory (optional)
-    this.refreshInjectedServices({ force: true, suppressWarnings: true });
+    this.refreshServiceState({ force: true, suppressWarnings: true });
+    GameDebugLogger.log('INIT', 'EnemySystem player service', {
+      hasPlayerDependency: !!this.dependencies.player,
+      hasPlayerService: !!this.player,
+    });
     this.setupRandomGenerators();
     this.setupManagers(); // Initialize wave and reward managers
     this.setupComponents(); // Initialize components
@@ -176,7 +175,7 @@ class EnemySystem extends BaseSystem {
     }
 
     this.dependencies.progression = progressionSystem;
-    this.refreshInjectedServices({ force: true });
+    this.refreshServiceState({ force: true });
   }
 
   attachWorld(worldSystem) {
@@ -187,7 +186,7 @@ class EnemySystem extends BaseSystem {
 
     this.dependencies.world = worldSystem;
     this.deferredDependencyWarnings.delete('world');
-    this.refreshInjectedServices({ force: true });
+    this.refreshServiceState({ force: true });
   }
 
   logMissingDependency(name) {
@@ -211,34 +210,6 @@ class EnemySystem extends BaseSystem {
     );
   }
 
-  updateServiceCache(targetKey, dependencyKey, { force = false, suppressWarnings = false } = {}) {
-    if (force) {
-      this.services[targetKey] = null;
-    }
-
-    const dependency = this.dependencies[dependencyKey];
-    if (dependency) {
-      this.services[targetKey] = dependency;
-      this.missingDependencyWarnings.delete(dependencyKey);
-      return;
-    }
-
-    const resolvedService = resolveService(dependencyKey, this.dependencies);
-    if (resolvedService) {
-      this.services[targetKey] = resolvedService;
-      this.dependencies[dependencyKey] = resolvedService;
-      this.missingDependencyWarnings.delete(dependencyKey);
-      return;
-    }
-
-    if (!this.services[targetKey] && !suppressWarnings) {
-      if (this.deferredDependencyWarnings.has(dependencyKey)) {
-        return;
-      }
-      this.logMissingDependency(dependencyKey);
-    }
-  }
-
   setupEventListeners() {
     // Handle level 5 shield deflective explosion (AoE damage)
     this.registerEventListener('shield-explosion-damage', (data) => {
@@ -246,23 +217,23 @@ class EnemySystem extends BaseSystem {
     });
 
     this.registerEventListener('player-reset', () => {
-      this.refreshInjectedServices({ force: true });
+      this.refreshServiceState({ force: true });
     });
 
     this.registerEventListener('progression-reset', () => {
-      this.refreshInjectedServices({ force: true });
+      this.refreshServiceState({ force: true });
     });
 
     this.registerEventListener('world-reset', () => {
-      this.refreshInjectedServices({ force: true });
+      this.refreshServiceState({ force: true });
     });
 
     this.registerEventListener('wave-started', () => {
-      this.refreshInjectedServices({ force: true, suppressWarnings: true });
+      this.refreshServiceState({ force: true, suppressWarnings: true });
     });
 
     this.registerEventListener('physics-reset', () => {
-      this.refreshInjectedServices({ force: true });
+      this.refreshServiceState({ force: true });
       this.syncPhysicsIntegration(true);
     });
 
@@ -348,12 +319,12 @@ class EnemySystem extends BaseSystem {
     }
 
     this.registerEventListener('boss-wave-started', (data) => {
-      this.refreshInjectedServices({ force: true, suppressWarnings: true });
+      this.refreshServiceState({ force: true, suppressWarnings: true });
       this.handleBossWaveStarted(data);
     });
 
     this.registerEventListener('boss-spawned', (data) => {
-      this.refreshInjectedServices({ force: true, suppressWarnings: true });
+      this.refreshServiceState({ force: true, suppressWarnings: true });
       this.handleBossSpawned(data);
     });
 
@@ -374,29 +345,33 @@ class EnemySystem extends BaseSystem {
     });
   }
 
-  refreshInjectedServices({ force = false, suppressWarnings = false } = {}) {
-    const options = { force, suppressWarnings };
+  refreshServiceState({ force = false, suppressWarnings = false } = {}) {
     if (force) {
       this._playerCacheLogged = false;
       this._playerLazyResolveLogEmitted = false;
     }
-    const previousPlayerService = this.services.player;
-    this.updateServiceCache('player', 'player', options);
-    this.updateServiceCache('world', 'world', options);
-    this.updateServiceCache('progression', 'progression', options);
-    this.updateServiceCache('xpOrbs', 'xp-orbs', options);
-    this.updateServiceCache('physics', 'physics', options);
-    this.updateServiceCache('combat', 'combat', options);
-    this.updateServiceCache('healthHearts', 'healthHearts', options);
-    this.updateServiceCache('effects', 'effects', options);
-    this.updateServiceCache('audio', 'audio', options);
-    this.updateServiceCache('ui', 'ui', options);
-    const previousRandom = this.services.random;
-    this.updateServiceCache('random', 'random', options);
-    const randomServiceChanged = previousRandom !== this.services.random;
+
+    const previousPlayer = this.player;
+    const previousRandom = this.random;
+
+    this.resolveCachedServices(ENEMY_SERVICE_MAP, { force });
+
+    Object.entries(ENEMY_SERVICE_MAP).forEach(([property, serviceName]) => {
+      const resolved = this[property] ?? null;
+
+      if (resolved) {
+        this.dependencies[serviceName] = resolved;
+        this.missingDependencyWarnings.delete(serviceName);
+        return;
+      }
+
+      if (!suppressWarnings && !this.deferredDependencyWarnings.has(serviceName)) {
+        this.logMissingDependency(serviceName);
+      }
+    });
 
     let playerRefreshLogged = false;
-    if (this.services.player && this.services.player !== previousPlayerService) {
+    if (this.player && this.player !== previousPlayer) {
       GameDebugLogger.log('STATE', 'Player service refreshed', {
         success: true,
         source: 'dependency-cache',
@@ -409,11 +384,11 @@ class EnemySystem extends BaseSystem {
       playerRefreshLogged = true;
     }
 
-    if (force && this.services.player && !playerRefreshLogged) {
+    if (force && this.player && !playerRefreshLogged) {
       this._playerServiceRefreshWarning = false;
     }
 
-    if (!this.services.player) {
+    if (!this.player) {
       let resolvedPlayer = null;
       let resolvedSource = null;
 
@@ -438,8 +413,8 @@ class EnemySystem extends BaseSystem {
       }
 
       if (resolvedPlayer) {
-        const changed = this.services.player !== resolvedPlayer;
-        this.services.player = resolvedPlayer;
+        const changed = this.player !== resolvedPlayer;
+        this.player = resolvedPlayer;
         this.dependencies.player = resolvedPlayer;
         this._playerCacheLogged = false;
         this._playerLazyResolveLogEmitted = false;
@@ -460,6 +435,8 @@ class EnemySystem extends BaseSystem {
       }
     }
 
+    const randomServiceChanged = previousRandom !== this.random;
+
     if (randomServiceChanged) {
       this.randomScopes = null;
       this.randomSequences = null;
@@ -471,13 +448,12 @@ class EnemySystem extends BaseSystem {
       this.reseedRandomScopes({ resetSequences: force || randomServiceChanged });
     }
 
-    // Flush pending enemy projectiles when CombatSystem becomes available
     if (this.pendingEnemyProjectiles.length > 0) {
-      const combat = this.services.combat;
+      const combat = this.combat;
       if (combat) {
         const pending = [...this.pendingEnemyProjectiles];
         this.pendingEnemyProjectiles = [];
-        pending.forEach(payload => this.handleEnemyProjectile(payload));
+        pending.forEach((payload) => this.handleEnemyProjectile(payload));
         if (process.env.NODE_ENV === 'development') {
           console.debug('[EnemySystem] Flushed pending projectiles', pending.length);
         }
@@ -495,13 +471,13 @@ class EnemySystem extends BaseSystem {
   }
 
   setupRandomGenerators() {
-    let randomService = this.services.random || this.dependencies.random;
+    let randomService = this.random || this.dependencies.random;
 
     if (!randomService) {
       randomService = resolveService('random', this.dependencies);
       if (randomService) {
         this.dependencies.random = randomService;
-        this.services.random = randomService;
+        this.random = randomService;
       }
     }
 
@@ -510,7 +486,7 @@ class EnemySystem extends BaseSystem {
         this._fallbackRandom = new RandomService('enemy-system:fallback');
       }
       randomService = this._fallbackRandom;
-      this.services.random = randomService;
+      this.random = randomService;
     }
 
     if (this.randomScopes && this.randomScopes.base === randomService) {
@@ -836,7 +812,7 @@ class EnemySystem extends BaseSystem {
       }
 
       // Initialize RewardManager
-      this.refreshInjectedServices();
+      this.refreshServiceState();
       const xpOrbSystem = this.getCachedXPOrbs();
       const healthHeartSystem = this.getCachedHealthHearts();
       if (xpOrbSystem) {
@@ -1051,8 +1027,8 @@ class EnemySystem extends BaseSystem {
         get useManagers() {
           return facade.useManagers;
         },
-        refreshInjectedServices: (...args) =>
-          facade.refreshInjectedServices?.(...args),
+        refreshServiceState: (...args) =>
+          facade.refreshServiceState?.(...args),
         getCachedPlayer: (...args) => facade.getCachedPlayer?.(...args),
         getCachedWorld: (...args) => facade.getCachedWorld?.(...args),
         getCachedPhysics: (...args) => facade.getCachedPhysics?.(...args),
@@ -1132,12 +1108,17 @@ class EnemySystem extends BaseSystem {
       return;
     }
 
-    if (this.isBossEnemy(asteroid)) {
+    const isBoss = this.isBossEnemy(asteroid);
+    if (isBoss) {
       this.untrackBossEnemy(asteroid);
     }
 
     this.unregisterEnemyFromPhysics(asteroid);
     this.clearAsteroidPoolId(asteroid);
+
+    if (isBoss) {
+      return;
+    }
 
     // NEW: Use factory release if enabled
     if (this.useFactory && this.factory) {
@@ -1175,13 +1156,13 @@ class EnemySystem extends BaseSystem {
   }
 
   getCachedPlayer() {
-    this.refreshInjectedServices();
-    let player = this.services.player || null;
+    this.refreshServiceState();
+    let player = this.player || null;
 
     if (!player) {
       const resolved = resolveService('player', this.dependencies);
       if (resolved) {
-        this.services.player = resolved;
+        this.player = resolved;
         this.dependencies.player = resolved;
         player = resolved;
         this._playerCacheLogged = false;
@@ -1219,7 +1200,7 @@ class EnemySystem extends BaseSystem {
 
     if (!this._playerCacheLogged) {
       GameDebugLogger.log('STATE', 'getCachedPlayer called', {
-        hasServices: !!this.services,
+        hasPlayerService: !!this.player,
         hasPlayer: !!player,
         playerPosition: player?.position || null,
         playerX: Number.isFinite(player?.x) ? player.x : null,
@@ -1280,48 +1261,48 @@ class EnemySystem extends BaseSystem {
   }
 
   getCachedWorld() {
-    this.refreshInjectedServices();
-    return this.services.world;
+    this.refreshServiceState();
+    return this.world;
   }
 
   getCachedProgression() {
-    this.refreshInjectedServices();
-    return this.services.progression;
+    this.refreshServiceState();
+    return this.progression;
   }
 
   getCachedXPOrbs() {
-    this.refreshInjectedServices();
-    return this.services.xpOrbs;
+    this.refreshServiceState();
+    return this.xpOrbs;
   }
 
   getCachedPhysics() {
-    this.refreshInjectedServices();
-    return this.services.physics;
+    this.refreshServiceState();
+    return this.physics;
   }
 
   getCachedCombat() {
-    this.refreshInjectedServices();
-    return this.services.combat;
+    this.refreshServiceState();
+    return this.combat;
   }
 
   getCachedHealthHearts() {
-    this.refreshInjectedServices();
-    return this.services.healthHearts;
+    this.refreshServiceState();
+    return this.healthHearts;
   }
 
   getCachedEffects() {
-    this.refreshInjectedServices();
-    return this.services.effects;
+    this.refreshServiceState();
+    return this.effects;
   }
 
   getCachedAudio() {
-    this.refreshInjectedServices();
-    return this.services.audio;
+    this.refreshServiceState();
+    return this.audio;
   }
 
   getCachedUI() {
-    this.refreshInjectedServices();
-    return this.services.ui;
+    this.refreshServiceState();
+    return this.ui;
   }
 
   /**
@@ -2750,7 +2731,7 @@ class EnemySystem extends BaseSystem {
     this._lastWaveManagerCompletionHandled = null;
     this.pendingEnemyProjectiles = [];
 
-    this.refreshInjectedServices({ force: true });
+    this.refreshServiceState({ force: true });
     this.syncPhysicsIntegration(true);
 
     const waveManagerActive =
@@ -2790,19 +2771,17 @@ class EnemySystem extends BaseSystem {
       this.activeBosses.clear();
     }
     this.bossHudState = this.createInitialBossHudState();
-    this.services = {
-      player: null,
-      world: null,
-      progression: null,
-      xpOrbs: null,
-      physics: null,
-      combat: null,
-      healthHearts: null,
-      random: null,
-      effects: null,
-      audio: null,
-      ui: null,
-    };
+    this.player = null;
+    this.world = null;
+    this.progression = null;
+    this.xpOrbs = null;
+    this.physics = null;
+    this.combat = null;
+    this.healthHearts = null;
+    this.random = null;
+    this.effects = null;
+    this.audio = null;
+    this.ui = null;
     this.activeEnemyCache = [];
     this.activeEnemyCacheDirty = true;
     this.randomScopes = null;

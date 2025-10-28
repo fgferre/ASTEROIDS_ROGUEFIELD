@@ -1,73 +1,48 @@
 import { BaseSystem } from '../core/BaseSystem.js';
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+
+const WORLD_SERVICE_MAP = {
+  player: 'player',
+  enemies: 'enemies',
+  physics: 'physics',
+  progression: 'progression',
+};
 
 class WorldSystem extends BaseSystem {
   constructor(dependencies = {}) {
-    super({
-      dependencies,
+    super(dependencies, {
       systemName: 'WorldSystem',
       serviceName: 'world',
+      enableRandomManagement: false,
     });
 
     this.playerAlive = true;
-    this.services = {
-      player: null,
-      enemies: null,
-      physics: null,
-      progression: null
-    };
 
     this.setupEventListeners();
-    this.refreshInjectedServices(true);
+    this.resolveCachedServices(WORLD_SERVICE_MAP, { force: true });
   }
 
   setupEventListeners() {
     this.registerEventListener('player-reset', () => {
-      this.refreshInjectedServices(true);
+      this.resolveCachedServices(WORLD_SERVICE_MAP, { force: true });
     });
 
     this.registerEventListener('progression-reset', () => {
-      this.refreshInjectedServices(true);
+      this.resolveCachedServices(WORLD_SERVICE_MAP, { force: true });
     });
 
     this.registerEventListener('physics-reset', () => {
-      this.refreshInjectedServices(true);
+      this.resolveCachedServices(WORLD_SERVICE_MAP, { force: true });
     });
-  }
-
-  refreshInjectedServices(force = false) {
-    if (force) {
-      this.services.player = null;
-      this.services.enemies = null;
-      this.services.physics = null;
-      this.services.progression = null;
-    }
-
-    if (!this.services.player) {
-      this.services.player = resolveService('player', this.dependencies);
-    }
-
-    if (!this.services.enemies) {
-      this.services.enemies = resolveService('enemies', this.dependencies);
-    }
-
-    if (!this.services.physics) {
-      this.services.physics = resolveService('physics', this.dependencies);
-    }
-
-    if (!this.services.progression) {
-      this.services.progression = resolveService('progression', this.dependencies);
-    }
   }
 
   update(deltaTime) {
     // DON'T return early - let game keep running even when player is dead
     // This allows asteroids to keep wandering while player is in death state
 
-    this.refreshInjectedServices();
+    this.resolveCachedServices(WORLD_SERVICE_MAP);
 
-    const player = this.services.player;
-    const enemies = this.services.enemies;
+    const player = this.player;
+    const enemies = this.enemies;
 
     if (!player || !enemies) {
       return;
@@ -78,7 +53,7 @@ class WorldSystem extends BaseSystem {
       return;
     }
 
-    const physics = this.services.physics;
+    const physics = this.physics;
 
     if (
       physics &&
@@ -157,11 +132,11 @@ class WorldSystem extends BaseSystem {
 
     console.log('[WorldSystem] Player died - triggering explosion');
 
-    this.refreshInjectedServices();
+    this.resolveCachedServices(WORLD_SERVICE_MAP);
 
-    const player = this.services.player;
-    const progression = this.services.progression;
-    const enemies = this.services.enemies;
+    const player = this.player;
+    const progression = this.progression;
+    const enemies = this.enemies;
 
     // Get player position BEFORE marking as dead
     const playerPosition = player && typeof player.getPosition === 'function'
@@ -191,11 +166,10 @@ class WorldSystem extends BaseSystem {
     // DON'T stop enemies - let them keep moving while player is dead/retrying
   }
 
-  reset() {
-    super.reset();
-
+  reset(options) {
+    super.reset(options);
     this.playerAlive = true;
-    this.refreshInjectedServices(true);
+    this.resolveCachedServices(WORLD_SERVICE_MAP, { force: true });
   }
 }
 

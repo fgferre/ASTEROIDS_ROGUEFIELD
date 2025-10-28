@@ -8,7 +8,6 @@ import {
   BULLET_SIZE,
 } from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 import { drawEnemyProjectile } from '../utils/drawEnemyProjectile.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 import {
@@ -29,15 +28,22 @@ import {
   ORB_VALUE,
 } from '../data/enemies/asteroid-configs.js';
 
+const COMBAT_SERVICE_MAP = {
+  cachedPlayer: 'player',
+  cachedEnemies: 'enemies',
+  cachedPhysics: 'physics',
+  commandQueue: 'command-queue',
+};
+
 class CombatSystem extends BaseSystem {
   constructor(dependencies = {}) {
-    super({
-      dependencies,
+    super(dependencies, {
       systemName: 'CombatSystem',
       serviceName: 'combat',
+      enableRandomManagement: false,
     });
 
-    this.commandQueue = resolveService('command-queue', this.dependencies) || null;
+    this.commandQueue = null;
     this.commandQueueConsumerId = 'combat-system';
     // === ESTADO DO SISTEMA DE COMBATE ===
     this.bullets = [];
@@ -126,18 +132,18 @@ class CombatSystem extends BaseSystem {
     this.resetAimingBranchState();
 
     // === CACHES DE SERVIÇOS ===
-    this.cachedPlayer = resolveService('player', this.dependencies);
-    this.cachedEnemies = resolveService('enemies', this.dependencies);
-    this.cachedPhysics = resolveService('physics', this.dependencies);
+    this.cachedPlayer = null;
+    this.cachedEnemies = null;
+    this.cachedPhysics = null;
     this.bulletGlowCache = null;
 
     this.setupEventListeners();
-    this.resolveCachedServices(true);
+    this.resolveCachedServices(COMBAT_SERVICE_MAP, { force: true });
   }
 
   setupEventListeners() {
     this.registerEventListener('player-reset', () => {
-      this.resolveCachedServices(true);
+      this.resolveCachedServices(COMBAT_SERVICE_MAP, { force: true });
       this.currentTarget = null;
       this.currentTargetLocks = [];
       this.currentLockAssignments = [];
@@ -152,14 +158,14 @@ class CombatSystem extends BaseSystem {
     });
 
     this.registerEventListener('progression-reset', () => {
-      this.resolveCachedServices(true);
+      this.resolveCachedServices(COMBAT_SERVICE_MAP, { force: true });
       this.resetAimingBranchState();
       this.targetThreatCache.clear();
       this.clearEnemyBullets();
     });
 
     this.registerEventListener('physics-reset', () => {
-      this.resolveCachedServices(true);
+      this.resolveCachedServices(COMBAT_SERVICE_MAP, { force: true });
       this.clearEnemyBullets();
     });
 
@@ -185,34 +191,16 @@ class CombatSystem extends BaseSystem {
     // Subscribing here would duplicate the handling and spawn two bullets.
   }
 
-  resolveCachedServices(force = false) {
-    if (force || !this.cachedPlayer) {
-      this.cachedPlayer = resolveService('player', this.dependencies);
-    }
-
-    if (force || !this.cachedEnemies) {
-      this.cachedEnemies = resolveService('enemies', this.dependencies);
-    }
-
-    if (force || !this.cachedPhysics) {
-      this.cachedPhysics = resolveService('physics', this.dependencies);
-    }
-
-    if (force || !this.commandQueue) {
-      this.commandQueue = resolveService('command-queue', this.dependencies) || null;
-    }
-  }
-
   getCachedPlayer() {
     if (!this.cachedPlayer) {
-      this.resolveCachedServices();
+      this.resolveCachedServices(COMBAT_SERVICE_MAP);
     }
     return this.cachedPlayer;
   }
 
   // === UPDATE PRINCIPAL ===
   update(deltaTime) {
-    this.resolveCachedServices();
+    this.resolveCachedServices(COMBAT_SERVICE_MAP);
 
     const player = this.cachedPlayer;
     const playerStats =
@@ -432,9 +420,8 @@ class CombatSystem extends BaseSystem {
         enemyId: newPrimaryId,
         variant: this.currentTarget.variant || 'common',
         score: sorted[0]?.score ?? 0,
-          lockCount: this.currentTargetLocks.length,
-        });
-      }
+        lockCount: this.currentTargetLocks.length,
+      });
     }
 
     this.lastPrimaryTargetId = newPrimaryId;
@@ -598,23 +585,28 @@ class CombatSystem extends BaseSystem {
 
     this.lastShotTime = 0;
 
+    if (
+      firedTargets.length &&
+      typeof gameEvents !== 'undefined' &&
+      typeof gameEvents.emit === 'function'
+    ) {
       const firstTarget = firedTargets[0]?.position || null;
       gameEvents.emit('weapon-fired', {
         position: playerPos,
         target: firstTarget,
-          weaponType: 'basic',
-          primaryTargetId: this.currentTarget ? this.currentTarget.id : null,
-          targeting: {
-            dynamicPrediction: this.usingDynamicPrediction(),
-            lockCount: lockTargets.length,
-            multiLockActive,
-            predictedPoints: firedTargets.map((entry) => ({
-              enemyId: entry.enemyId,
-              position: entry.position,
-            })),
-          },
-        });
-      }
+        weaponType: 'basic',
+        primaryTargetId: this.currentTarget ? this.currentTarget.id : null,
+        targeting: {
+          dynamicPrediction: this.usingDynamicPrediction(),
+          lockCount: lockTargets.length,
+          multiLockActive,
+          predictedPoints: firedTargets.map((entry) => ({
+            enemyId: entry.enemyId,
+            position: entry.position,
+          })),
+        },
+      });
+    }
   }
 
   canShoot() {
@@ -1744,11 +1736,10 @@ class CombatSystem extends BaseSystem {
 
     // Emitir evento para efeitos
     gameEvents.emit('bullet-created', {
-      bullet: bullet,
+      bullet,
       from: fromPos,
       to: toPos,
-      });
-    }
+    });
   }
 
   handleEnemyProjectile(data = {}) {
@@ -2146,22 +2137,21 @@ class CombatSystem extends BaseSystem {
           damage: Number.isFinite(bullet.damage) ? bullet.damage : 0,
           position: { x: bullet.x, y: bullet.y },
           velocity: { x: bullet.vx, y: bullet.vy },
-            projectile: {
-              type: bullet.type || 'enemy',
-              color: bullet.color,
-              radius: Number.isFinite(bullet.radius)
-                ? bullet.radius
-                : defaultBulletRadius,
-            },
-            source: bullet.source
-              ? { ...bullet.source }
-              : {
-                  enemyId: bullet.enemyId ?? null,
-                  enemyType: bullet.enemyType ?? null,
-                  wave: null,
-                },
-          });
-        }
+          projectile: {
+            type: bullet.type || 'enemy',
+            color: bullet.color,
+            radius: Number.isFinite(bullet.radius)
+              ? bullet.radius
+              : defaultBulletRadius,
+          },
+          source: bullet.source
+            ? { ...bullet.source }
+            : {
+                enemyId: bullet.enemyId ?? null,
+                enemyType: bullet.enemyType ?? null,
+                wave: null,
+              },
+        });
       }
 
       if (bullet.life > 0 && !bullet.hit) {
@@ -2349,14 +2339,13 @@ class CombatSystem extends BaseSystem {
     }
 
     gameEvents.emit('bullet-hit', {
-      bullet: bullet,
-      enemy: enemy,
+      bullet,
+      enemy,
       position: { x: bullet.x, y: bullet.y },
-        damage: bullet.damage,
-        killed: damageResult.killed,
-        remainingHealth: damageResult.remainingHealth,
-      });
-    }
+      damage: bullet.damage,
+      killed: damageResult.killed,
+      remainingHealth: damageResult.remainingHealth,
+    });
 
     return damageResult;
   }
@@ -2682,7 +2671,7 @@ class CombatSystem extends BaseSystem {
     }
     this.targetThreatCache.clear();
     this.lastShotTime = 0;
-    this.resolveCachedServices(true);
+    this.resolveCachedServices(COMBAT_SERVICE_MAP, { force: true });
     console.log('[CombatSystem] Reset');
   }
 

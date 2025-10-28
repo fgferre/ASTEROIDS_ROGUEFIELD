@@ -2,7 +2,7 @@
 
 import { BaseSystem } from '../core/BaseSystem.js';
 import RandomService from '../core/RandomService.js';
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { resolveService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
 
 const SIMPLEX_DEFAULT_RANDOM = new RandomService('menu-background:simplex-default');
@@ -57,8 +57,10 @@ class MenuBackgroundSystem extends BaseSystem {
     this._threeMathUtilsState = {
       originalMathUtils: null,
       originalMath: undefined,
+      originalMathRandom: undefined,
       deterministicMathUtils: null,
       deterministicUuidGenerator: null,
+      deterministicMathRandom: null,
       generateUuidDescriptors: new Map(),
       patchedMathUtilsTargets: new Set(),
     };
@@ -195,7 +197,7 @@ class MenuBackgroundSystem extends BaseSystem {
   }
 
   reset(options = {}) {
-    this.reseedRandomForks();
+    super.reset(options);
 
     const normalized =
       options && typeof options === 'object' && options !== null ? options : {};
@@ -217,6 +219,38 @@ class MenuBackgroundSystem extends BaseSystem {
     const mathUtilsCandidate = three.MathUtils ?? three.Math;
     if (!mathUtilsCandidate || typeof mathUtilsCandidate !== 'object') {
       return;
+    }
+
+    if (state.originalMathRandom === undefined) {
+      state.originalMathRandom = typeof Math.random === 'function' ? Math.random : null;
+    }
+
+    if (!state.deterministicMathRandom) {
+      const deterministicRandom = () => {
+        const fork = this.ensureThreeUuidRandom();
+        if (fork && typeof fork.float === 'function') {
+          return fork.float();
+        }
+        if (typeof state.originalMathRandom === 'function') {
+          return state.originalMathRandom();
+        }
+        return SIMPLEX_DEFAULT_RANDOM.float();
+      };
+
+      try {
+        Object.defineProperty(deterministicRandom, 'name', {
+          value: 'MenuBackgroundDeterministicRandom',
+          configurable: true,
+        });
+      } catch (error) {
+        // Ignore failure to label the function
+      }
+
+      state.deterministicMathRandom = deterministicRandom;
+    }
+
+    if (state.deterministicMathRandom && Math.random !== state.deterministicMathRandom) {
+      Math.random = state.deterministicMathRandom;
     }
 
     const aliasCandidate =
@@ -335,9 +369,22 @@ class MenuBackgroundSystem extends BaseSystem {
     }
 
     state.deterministicMathUtils = null;
+
+    if (state.deterministicMathRandom) {
+      if (typeof state.originalMathRandom === 'function') {
+        Math.random = state.originalMathRandom;
+      }
+      state.deterministicMathRandom = null;
+    }
   }
 
   destroy() {
+    if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+      window.removeEventListener('resize', this.handleResize);
+    }
+
+    super.destroy();
+
     this.stop();
     this.restoreOriginalThreeUuidGenerator();
   }

@@ -6,7 +6,7 @@ import {
   SHIP_SIZE,
 } from '../core/GameConstants.js';
 import shipModels from '../data/shipModels.js';
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { resolveService } from '../core/serviceUtils.js';
 import {
   SHIP_ACCELERATION,
   SHIP_ANGULAR_DAMPING,
@@ -54,10 +54,10 @@ class PlayerSystem extends BaseSystem {
   constructor(config = {}) {
     const { position, dependencies } = PlayerSystem.normalizeConfig(config);
 
-    super({
-      dependencies,
+    super(dependencies, {
       systemName: 'PlayerSystem',
       serviceName: 'player',
+      enableRandomManagement: false,
     });
 
     const normalizedDependencies = this.dependencies;

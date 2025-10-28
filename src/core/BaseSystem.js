@@ -270,11 +270,15 @@ class BaseSystem {
    * this.registerEventListener('player-hit', (data) => {
    *   this.handlePlayerHit(data);
    * });
-   */
+  */
   registerEventListener(eventName, handler, { context = this } = {}) {
     if (!eventName || typeof handler !== 'function') return;
 
     const boundHandler = context && context !== this ? handler.bind(context) : handler;
+
+    if (typeof gameEvents === 'undefined' || typeof gameEvents.on !== 'function') {
+      return;
+    }
 
     gameEvents.on(eventName, boundHandler);
 

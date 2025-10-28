@@ -12,6 +12,7 @@ const MOVEMENT_ACTIONS = new Set([
 ]);
 const MOVEMENT_ACTION_LIST = Array.from(MOVEMENT_ACTIONS);
 const DEFAULT_GAMEPAD_AXIS_THRESHOLD = 0.45;
+const PASSWORD_MANAGER_GUARD_CODES = new Set(['KeyS', 'ArrowDown']);
 
 function ensureArray(value) {
   return Array.isArray(value) ? value : [];
@@ -172,6 +173,25 @@ class InputSystem {
   }
 
   setupEventListeners() {
+    this.handleKeyDownCapture = (event) => {
+      if (!this.shouldBlockPasswordManager(event)) {
+        return;
+      }
+      event.stopPropagation();
+      this.onKeyDown(event);
+    };
+
+    this.handleKeyUpCapture = (event) => {
+      if (!this.shouldBlockPasswordManager(event)) {
+        return;
+      }
+      event.stopPropagation();
+      this.onKeyUp(event);
+    };
+
+    document.addEventListener('keydown', this.handleKeyDownCapture, true);
+    document.addEventListener('keyup', this.handleKeyUpCapture, true);
+
     document.addEventListener('keydown', (event) => this.onKeyDown(event));
     document.addEventListener('keyup', (event) => this.onKeyUp(event));
     document.addEventListener('mousemove', (event) => this.onMouseMove(event));
@@ -196,6 +216,42 @@ class InputSystem {
         this.isCapturingBinding = payload?.state === 'start';
       });
     }
+  }
+
+  shouldBlockPasswordManager(event) {
+    if (!PASSWORD_MANAGER_GUARD_CODES.has(event.code)) {
+      return false;
+    }
+
+    if (this.isCapturingBinding) {
+      return false;
+    }
+
+    const activeElement = document.activeElement;
+    if (!activeElement) {
+      return true;
+    }
+
+    const tagName = activeElement.tagName;
+    if (!tagName) {
+      return true;
+    }
+
+    const normalizedTag = tagName.toLowerCase();
+    if (normalizedTag === 'input' || normalizedTag === 'textarea') {
+      return false;
+    }
+
+    if (activeElement.isContentEditable) {
+      return false;
+    }
+
+    const role = activeElement.getAttribute?.('role');
+    if (role && role.toLowerCase() === 'textbox') {
+      return false;
+    }
+
+    return true;
   }
 
   onKeyDown(event) {
@@ -1023,6 +1079,13 @@ class InputSystem {
   }
 
   destroy() {
+    if (this.handleKeyDownCapture) {
+      document.removeEventListener('keydown', this.handleKeyDownCapture, true);
+    }
+    if (this.handleKeyUpCapture) {
+      document.removeEventListener('keyup', this.handleKeyUpCapture, true);
+    }
+
     console.log('[InputSystem] Destroyed');
   }
 }
