@@ -12,6 +12,10 @@ const computeLeadSolution = ({
   targetVelocity,
   projectileSpeed,
 }) => {
+  if (!Number.isFinite(projectileSpeed) || projectileSpeed <= 0) {
+    return { x: target.x, y: target.y };
+  }
+
   const toTargetX = target.x - origin.x;
   const toTargetY = target.y - origin.y;
 
@@ -23,7 +27,15 @@ const computeLeadSolution = ({
   const c = toTargetX * toTargetX + toTargetY * toTargetY;
 
   if (Math.abs(a) < 1e-6) {
+    if (Math.abs(b) < 1e-6) {
+      return { x: target.x, y: target.y };
+    }
+
     const time = Math.abs(projectileSpeed) > 1e-6 ? -c / b : 0;
+    if (!Number.isFinite(time) || time <= 0) {
+      return { x: target.x, y: target.y };
+    }
+
     if (time > 0) {
       return {
         x: target.x + targetVelocity.vx * time,
