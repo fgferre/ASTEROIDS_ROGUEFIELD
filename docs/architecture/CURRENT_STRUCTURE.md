@@ -711,9 +711,7 @@ npm run dev
 
 ### 12.11. REFACTOR-015 Ticket 4: Remaining Systems Refactoring
 
-**Objetivo**: Finalizar a migração dos sistemas principais para `BaseSystem` refatorando os dois módulos restantes com padrões legados (`UISystem` e `ProgressionSystem`). Este ticket conclui a adoção do lifecycle padronizado iniciado no Ticket 1.
-
-> **Nota**: Não existe um `UpgradeSystem` independente no código atual — toda a lógica de upgrades vive no `ProgressionSystem`. Por isso, o escopo desta etapa foi ajustado para focar nesse módulo em conjunto com o `UISystem`.
+**Objetivo**: Finalizar a migração dos sistemas principais para `BaseSystem` refatorando os módulos pendentes com padrões legados (`UISystem`, `UpgradeSystem` e `ProgressionSystem`). Este ticket conclui a adoção do lifecycle padronizado iniciado no Ticket 1, consolidando upgrades e progressão no mesmo alicerce.
 
 **Escopo**: 2 arquivos modificados
 **Linhas removidas**: ~200 linhas
@@ -730,13 +728,20 @@ npm run dev
    - Eliminado: verificações `typeof gameEvents` em controles de pausa e em emissão de eventos (`screen-changed`, captura de bindings)
    - **Complexidades especiais**: gerenciamento de DOM, múltiplos overlays, captura de input e atualizações de HUD em tempo real
 
-2. **ProgressionSystem** (1,445 → ~1,355 linhas, -90)
-   - Substituído caching manual por `resolveCachedServices()` (`xp-orbs`, `player`, `ui`, `effects`)
-   - Removido: fallback `RandomService`, `gameServices.register()`, console logs de lifecycle
-   - Atualizado: listeners (`xp-orb-collected`, `enemy-destroyed`, resets) com `registerEventListener()` e random forks (`selection`, `rewards`)
-   - Adicionado: `super.reset()` e `super.destroy()` garantindo reseed automático e cleanup de listeners
-   - Eliminado: verificações `typeof gameEvents` para emitir `combo`, `experience`, `upgrade-applied`, `progression-restored`
-   - **Complexidades especiais**: rolagem de upgrades, combo multipliers, progressão de níveis e reconstrução de opções pendentes
+2. **UpgradeSystem** (novo módulo compartilhado)
+   - Extende `BaseSystem` com `serviceName: 'upgrades'` e random forks dedicados (`upgrades.base`, `upgrades.selection`, `upgrades.progression`, `upgrades.rewards`)
+   - Centraliza catálogo, pré-requisitos, efeitos e serialização de upgrades reutilizando `resolveCachedServices()` para `xp-orbs`, `player`, `ui` e `effects`
+   - Normaliza eventos de aplicação emitindo `upgrade:purchased` e `upgrade-applied` com o mesmo payload, além de preparar opções determinísticas com `this.getRandomFork('selection')`
+   - Fornece helpers reutilizados pelo `ProgressionSystem` (`buildUpgradeDefinitions`, `prepareUpgradeOptions`, `describePrerequisites`, `getUpgradeProgressSnapshot`)
+
+3. **ProgressionSystem** (1,445 → ~1,368 linhas, -77)
+   - Passa a herdar `UpgradeSystem`, reaproveitando caching, random forks e APIs de upgrades
+   - Re-registra o mesmo objeto como serviços `progression` e `upgrades`, garantindo que `gameServices.get('upgrades')` continue funcional
+   - `reset()` delega a `super.reset()` (emitindo `progression-reset`) e emite manualmente `upgrades-reset` para consumidores legados
+   - Mantém lifecycle de XP/combo, mas agora `setupEventListeners()` chama `super.setupEventListeners()` antes de listeners específicos
+   - **Complexidades especiais**: rolagem de upgrades, combo multipliers, progressão de níveis, reconstrução de opções pendentes e sincronização de seeds com base compartilhada
+
+**Auditoria de eventos de reset**: `UISystem` (`ui-reset`), `PlayerSystem` (`player-reset`) e `ProgressionSystem` (`progression-reset` + `upgrades-reset`) agora alinham exatamente com os tópicos emitidos por `BaseSystem`. `RenderingSystem` continua emitindo `renderer-reset`; nenhum consumidor atual depende do tópico alternativo `rendering-reset`, e a decisão foi documentada para evitar confusões futuras.
 
 **Padrões Eliminados**:
 
