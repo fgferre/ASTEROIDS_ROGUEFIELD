@@ -136,7 +136,8 @@ export const BOSS_COMPONENTS = deepFreeze({
     damage: 35,
   },
   render: {
-    strategy: 'procedural-boss',
+    strategy: 'procedural',
+    shape: 'boss',
     showAura: true,
     showPhaseColor: true,
   },

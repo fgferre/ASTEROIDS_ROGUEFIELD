@@ -400,3 +400,76 @@ import {
 - `Hunter.js`: Já limpo em Phase 2, sem helpers duplicados
 - `Mine.js`: Não usa helpers de combate
 - `BossEnemy.js`: Não usa helpers de combate (tem lógica inline de arma, será refatorado separadamente)
+
+### 12.8. REFACTOR-014: Consolidação de Estratégias de Renderização (Phase 4 Cleanup)
+
+**Objetivo**: Consolidar quatro estratégias procedurais de renderização em uma única estratégia parametrizada por `shape`, eliminando duplicações e facilitando a adição de novas formas.
+
+**Mudanças Realizadas**:
+
+1. **RenderComponent.js**: 279 → ~231 linhas (-17%, -48 linhas)
+   - Removido: Estratégias `procedural-triangle`, `procedural-diamond`, `procedural-sphere`, `procedural-boss` (-198 linhas)
+   - Adicionado: Objeto `shapeRenderers` com renderers específicos para `triangle`, `diamond`, `sphere`, `boss` (~120 linhas)
+   - Adicionado: Estratégia unificada `procedural` que resolve paleta/presets, gerencia estado do canvas e delega para o renderer apropriado (~30 linhas)
+   - **Redução líquida**: -48 linhas
+
+2. **Configs de inimigos**: 4 arquivos atualizados (1 linha cada)
+   - `src/data/enemies/drone.js`: `strategy: 'procedural'`, `shape: 'triangle'`
+   - `src/data/enemies/hunter.js`: `strategy: 'procedural'`, `shape: 'diamond'`
+   - `src/data/enemies/mine.js`: `strategy: 'procedural'`, `shape: 'sphere'`
+   - `src/data/enemies/boss.js`: `strategy: 'procedural'`, `shape: 'boss'`
+
+**Padrão de Transformação**:
+
+**Antes** (4 estratégias quase idênticas, ~198 linhas duplicadas):
+```javascript
+'procedural-triangle': ({ enemy, ctx, colors, presets }) => {
+  // resolve palette/presets
+  // salvar estado / translate / rotate
+  // desenhar geometria da forma
+  // restaurar estado
+}
+// +3 variantes repetindo a mesma lógica-base
+```
+
+**Depois** (1 estratégia comum + renderers específicos, ~150 linhas totais):
+```javascript
+'procedural': ({ enemy, ctx, colors, presets, config }) => {
+  // resolve palette/presets uma vez
+  // configura estado do canvas (save/translate/rotate)
+  // seleciona renderer via config.shape
+  // delega geometria para shapeRenderers[shape]
+}
+
+const shapeRenderers = {
+  triangle: ({ enemy, ctx, colors, presets, size }) => { /* geometria do drone */ },
+  diamond: ({ enemy, ctx, colors, presets, size }) => { /* geometria do hunter */ },
+  sphere: ({ enemy, ctx, colors, presets, size }) => { /* geometria da mine */ },
+  boss: ({ enemy, ctx, colors, presets, size }) => { /* geometria do boss */ },
+};
+```
+
+**Benefícios**:
+- ✅ Fonte única de verdade para lógica compartilhada de renderização (paleta, presets, estado do canvas)
+- ✅ Renderers focados apenas na geometria de cada forma
+- ✅ Adição de novas formas requer apenas inserir novo renderer em `shapeRenderers`
+- ✅ Seleção dirigida por configuração (`shape`), sem alterações de código para novos inimigos
+- ✅ Redução de 70% de código duplicado nas estratégias procedurais
+- ✅ Saída visual permanece idêntica (refatoração sem mudança de comportamento)
+
+**Redução Total de Código**:
+- **Linhas removidas**: 198 linhas (4 estratégias duplicadas)
+- **Linhas adicionadas**: ~150 linhas (estratégia unificada + renderers)
+- **Balanço líquido**: **-48 linhas** (-17% em `RenderComponent.js`)
+- **Configs atualizados**: 4 arquivos, mudanças triviais de estratégia/shape
+
+**Validação**:
+- ✅ Renderização de drone, hunter, mine e boss revisada visualmente (pixel-perfect)
+- ✅ `tests/visual/enemy-types-rendering.test.js` continua passando
+- ✅ Sem warnings de formas desconhecidas
+- ✅ Thrust, turret, pulse e aura preservados
+
+**Próximos Passos**:
+- **Phase 5**: Criar `BaseSystem` centralizado para reduzir duplicações adicionais
+- **Phase 6**: Simplificar cadeia de resolução de serviços
+- **Futuro**: Adicionar novas formas (ex.: hexagon, star) reutilizando o padrão `shapeRenderers`

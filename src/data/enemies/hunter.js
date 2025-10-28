@@ -77,7 +77,8 @@ export const HUNTER_COMPONENTS = deepFreeze({
     predictive: true,
   },
   render: {
-    strategy: 'procedural-diamond',
+    strategy: 'procedural',
+    shape: 'diamond',
     showTurret: true,
   },
   collision: {
