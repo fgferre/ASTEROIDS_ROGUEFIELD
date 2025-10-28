@@ -2949,6 +2949,13 @@ class EnemySystem {
     this.emitWaveStateUpdate(true);
   }
 
+  handleWaveManagerWaveComplete(data) {
+    if (!this.updateSystem) {
+      throw new Error('[EnemySystem] UpdateSystem not initialized');
+    }
+    return this.updateSystem.handleWaveManagerWaveComplete(data);
+  }
+
   grantWaveRewards() {
     const xpOrbs = this.getCachedXPOrbs();
     const player = this.getCachedPlayer();
