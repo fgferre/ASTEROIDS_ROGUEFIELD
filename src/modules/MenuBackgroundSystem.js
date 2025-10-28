@@ -127,13 +127,16 @@ class MenuBackgroundSystem extends BaseSystem {
   captureRandomForkSeeds() {
     super.captureRandomForkSeeds();
 
-    Object.entries(this.randomForks || {}).forEach(([name, fork]) => {
-      this.storeRandomForkSeed(name, fork);
-    });
+    // Preserve deterministic UUID generation for Three.js helpers while
+    // delegating base fork management to BaseSystem.
+    const threeUuidFork = this.randomForks?.threeUuid;
+    if (threeUuidFork) {
+      this.storeRandomForkSeed('threeUuid', threeUuidFork);
+    }
   }
 
   storeRandomForkSeed(name, fork) {
-    if (!name || !fork || typeof fork !== 'object') {
+    if (name !== 'threeUuid' || !fork || typeof fork !== 'object') {
       return;
     }
 
@@ -169,31 +172,15 @@ class MenuBackgroundSystem extends BaseSystem {
     return fork;
   }
 
-  reseedRandomForks() {
-    if (!this.randomForks) {
-      return;
+  reseedRandomForks(options = {}) {
+    super.reseedRandomForks(options);
+
+    const threeUuidFork = this.ensureThreeUuidRandom();
+    const storedSeed = this.randomForkSeeds?.threeUuid;
+
+    if (threeUuidFork && storedSeed !== undefined && typeof threeUuidFork.reset === 'function') {
+      threeUuidFork.reset(storedSeed);
     }
-
-    if (!this.randomForkSeeds) {
-      this.captureRandomForkSeeds();
-    }
-
-    Object.entries(this.randomForks).forEach(([name, fork]) => {
-      if (!fork || typeof fork.reset !== 'function') {
-        return;
-      }
-
-      const storedSeed = this.randomForkSeeds?.[name];
-      if (storedSeed !== undefined) {
-        fork.reset(storedSeed);
-      } else if (this.random && this.randomForkLabels?.[name]) {
-        const replacement = this.random.fork(this.randomForkLabels[name]);
-        this.randomForks[name] = replacement;
-        if (replacement && typeof replacement.seed === 'number') {
-          this.randomForkSeeds[name] = replacement.seed >>> 0;
-        }
-      }
-    });
   }
 
   reset(options = {}) {

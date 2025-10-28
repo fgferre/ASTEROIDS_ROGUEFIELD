@@ -277,6 +277,19 @@ class BaseSystem {
     const boundHandler = context && context !== this ? handler.bind(context) : handler;
 
     if (typeof gameEvents === 'undefined' || typeof gameEvents.on !== 'function') {
+      const systemLabel = this.systemName ||
+        (this.constructor && this.constructor.name) ||
+        'UnknownSystem';
+      const warningMessage =
+        `[${systemLabel}] registerEventListener('${eventName}') skipped: gameEvents is unavailable.`;
+      const shouldWarn =
+        typeof process === 'undefined' ||
+        !process.env ||
+        process.env.NODE_ENV !== 'production';
+
+      if (shouldWarn && typeof console !== 'undefined' && typeof console.warn === 'function') {
+        console.warn(warningMessage);
+      }
       return;
     }
 

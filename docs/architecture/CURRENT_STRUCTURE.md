@@ -709,6 +709,66 @@ npm run dev
    - **Mantido**: Factory integration, WaveManager integration, RewardManager integration, custom random scope management (~239 lines)
    - Service caching: player, world, progression, xpOrbs, physics, combat, healthHearts, random, effects, audio, ui
 
+### 12.11. REFACTOR-015 Ticket 4: Remaining Systems Refactoring
+
+**Objetivo**: Finalizar a migração dos sistemas principais para `BaseSystem` refatorando os módulos pendentes com padrões legados (`UISystem`, `UpgradeSystem` e `ProgressionSystem`). Este ticket conclui a adoção do lifecycle padronizado iniciado no Ticket 1, consolidando upgrades e progressão no mesmo alicerce.
+
+**Escopo**: 2 arquivos modificados
+**Linhas removidas**: ~200 linhas
+**Risco**: 🟡 Médio (UI complexa e árvore de upgrades)
+**Tempo estimado**: 20-30 minutos
+**Dependências**: Ticket 1 (BaseSystem.js deve existir)
+
+**Sistemas Refatorados**:
+
+1. **UISystem** (2,456 → ~2,366 linhas, -90)
+   - Removido: constructor boilerplate, `gameServices.register()`, logs de inicialização
+   - Atualizado: `setupEventListeners()` usa `this.registerEventListener()` para bosses, wave, combo, settings e level-up
+   - Adicionado: `initialize()` para configurar DOM refs, layout HUD e preferências antes do registro de listeners
+   - Eliminado: verificações `typeof gameEvents` em controles de pausa e em emissão de eventos (`screen-changed`, captura de bindings)
+   - **Complexidades especiais**: gerenciamento de DOM, múltiplos overlays, captura de input e atualizações de HUD em tempo real
+
+2. **UpgradeSystem** (novo módulo compartilhado)
+   - Extende `BaseSystem` com `serviceName: 'upgrades'` e random forks dedicados (`upgrades.base`, `upgrades.selection`, `upgrades.progression`, `upgrades.rewards`)
+   - Centraliza catálogo, pré-requisitos, efeitos e serialização de upgrades reutilizando `resolveCachedServices()` para `xp-orbs`, `player`, `ui` e `effects`
+   - Normaliza eventos de aplicação emitindo `upgrade:purchased` e `upgrade-applied` com o mesmo payload, além de preparar opções determinísticas com `this.getRandomFork('selection')`
+   - Fornece helpers reutilizados pelo `ProgressionSystem` (`buildUpgradeDefinitions`, `prepareUpgradeOptions`, `describePrerequisites`, `getUpgradeProgressSnapshot`)
+
+3. **ProgressionSystem** (1,445 → ~1,368 linhas, -77)
+   - Passa a herdar `UpgradeSystem`, reaproveitando caching, random forks e APIs de upgrades
+   - Re-registra o mesmo objeto como serviços `progression` e `upgrades`, garantindo que `gameServices.get('upgrades')` continue funcional
+   - `reset()` delega a `super.reset()` (emitindo `progression-reset`) e emite manualmente `upgrades-reset` para consumidores legados
+   - Mantém lifecycle de XP/combo, mas agora `setupEventListeners()` chama `super.setupEventListeners()` antes de listeners específicos
+   - **Complexidades especiais**: rolagem de upgrades, combo multipliers, progressão de níveis, reconstrução de opções pendentes e sincronização de seeds com base compartilhada
+
+**Auditoria de eventos de reset**: `UISystem` (`ui-reset`), `PlayerSystem` (`player-reset`) e `ProgressionSystem` (`progression-reset` + `upgrades-reset`) agora alinham exatamente com os tópicos emitidos por `BaseSystem`. `RenderingSystem` continua emitindo `renderer-reset`; nenhum consumidor atual depende do tópico alternativo `rendering-reset`, e a decisão foi documentada para evitar confusões futuras.
+
+**Padrões Eliminados**:
+
+- Gerenciamento manual de random forks e seeds
+- Cache de serviços customizado (`this.services.*`)
+- Condicionais `typeof gameEvents` antes de `emit`/`on`
+- Boilerplate de constructor e registro manual no `gameServices`
+
+**Benefícios**:
+
+- Lifecycle unificado (`initialize`, `reset`, `destroy`) com limpeza automática de listeners
+- Serviços resolvidos via `BaseSystem`, reduzindo duplicação e possíveis inconsistências
+- Emissão de eventos simplificada e rastreável
+- Todos os 12 sistemas principais agora estendem `BaseSystem`, totalizando ~1.239 linhas removidas (Tickets 2 + 3 + 4)
+
+**Validação**:
+
+```bash
+npm run dev
+```
+
+1. Jogar 5 waves completas monitorando HUD (vida, escudo, combo, wave timer)
+2. Confirmar abertura/fechamento de menus (pause, settings, credits) e captura de bindings
+3. Subir de nível e verificar rolagem/aplicação de upgrades (eventos `upgrade-options-ready`, `upgrade-applied`)
+4. Observar resets (`progression-reset`, `player-reset`) garantindo combo/hud zerados e listeners re-registrados
+5. Revisar console para logs do `BaseSystem` e ausência de warnings/erros
+
 **Complexidades Especiais**:
 
 - **EnemySystem**: 4,234 linhas, maior sistema, ~30 event listeners (incluindo handlers para boss waves, mines, projectiles, shield explosions)
