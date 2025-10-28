@@ -1,11 +1,13 @@
+import { BaseSystem } from '../core/BaseSystem.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 
-class WorldSystem {
+class WorldSystem extends BaseSystem {
   constructor(dependencies = {}) {
-    this.dependencies = normalizeDependencies(dependencies);
-    if (typeof gameServices !== 'undefined') {
-      gameServices.register('world', this);
-    }
+    super({
+      dependencies,
+      systemName: 'WorldSystem',
+      serviceName: 'world',
+    });
 
     this.playerAlive = true;
     this.services = {
@@ -17,24 +19,18 @@ class WorldSystem {
 
     this.setupEventListeners();
     this.refreshInjectedServices(true);
-
-    console.log('[WorldSystem] Initialized');
   }
 
   setupEventListeners() {
-    if (typeof gameEvents === 'undefined') {
-      return;
-    }
-
-    gameEvents.on('player-reset', () => {
+    this.registerEventListener('player-reset', () => {
       this.refreshInjectedServices(true);
     });
 
-    gameEvents.on('progression-reset', () => {
+    this.registerEventListener('progression-reset', () => {
       this.refreshInjectedServices(true);
     });
 
-    gameEvents.on('physics-reset', () => {
+    this.registerEventListener('physics-reset', () => {
       this.refreshInjectedServices(true);
     });
   }
@@ -187,9 +183,7 @@ class WorldSystem {
     };
 
     // Emit player-died FIRST so explosion triggers
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('player-died', data);
-    }
+    gameEvents.emit('player-died', data);
 
     // Mark world state as player not alive (but DON'T stop enemies - they keep wandering)
     this.playerAlive = false;
@@ -198,6 +192,8 @@ class WorldSystem {
   }
 
   reset() {
+    super.reset();
+
     this.playerAlive = true;
     this.refreshInjectedServices(true);
   }

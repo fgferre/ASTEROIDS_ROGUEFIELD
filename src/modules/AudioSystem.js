@@ -1,3 +1,4 @@
+import { BaseSystem } from '../core/BaseSystem.js';
 import AudioPool from './AudioPool.js';
 import AudioCache from './AudioCache.js';
 import AudioBatcher from './AudioBatcher.js';
@@ -9,9 +10,12 @@ import {
 } from '../core/GameConstants.js';
 import { WAVE_BOSS_INTERVAL } from '../data/constants/gameplay.js';
 
-class AudioSystem {
+class AudioSystem extends BaseSystem {
   constructor(dependencies = {}) {
-    this.dependencies = normalizeDependencies(dependencies);
+    super(dependencies, {
+      systemName: 'AudioSystem',
+      serviceName: 'audio',
+    });
     this.context = null;
     this.masterGain = null;
     this.musicGain = null;
@@ -94,15 +98,9 @@ class AudioSystem {
       lastPhase: null,
     };
 
-    if (typeof gameServices !== 'undefined') {
-      gameServices.register('audio', this);
-    }
-
     this.captureRandomScopes();
-    this.setupEventListeners();
     this.bootstrapSettings();
     this._exposeRandomDebugControls();
-    console.log('[AudioSystem] Initialized');
   }
 
   async init() {
@@ -155,26 +153,24 @@ class AudioSystem {
    * while still allowing bespoke effects per archetype.
    */
   setupEventListeners() {
-    if (typeof gameEvents === 'undefined') return;
-
-    gameEvents.on('settings-audio-changed', (payload = {}) => {
+    this.registerEventListener('settings-audio-changed', (payload = {}) => {
       if (payload?.values) {
         this.updateVolumeState(payload.values);
       }
     });
 
-    gameEvents.on('weapon-fired', (data) => {
+    this.registerEventListener('weapon-fired', (data) => {
       this.playLaserShot(data || {});
     });
 
-    gameEvents.on('combat-target-lock', (data) => {
+    this.registerEventListener('combat-target-lock', (data) => {
       if (data?.lost) {
         return;
       }
       this.playTargetLock(data || {});
     });
 
-    gameEvents.on('enemy-destroyed', (data) => {
+    this.registerEventListener('enemy-destroyed', (data) => {
       if (!data) return;
 
       // Epic sound when Gold asteroid is destroyed
@@ -188,25 +184,25 @@ class AudioSystem {
       }
     });
 
-    gameEvents.on('asteroid-volatile-exploded', () => {
+    this.registerEventListener('asteroid-volatile-exploded', () => {
       this.playBigExplosion();
     });
 
-    gameEvents.on('player-leveled-up', () => {
+    this.registerEventListener('player-leveled-up', () => {
       this.playLevelUp();
     });
 
-    gameEvents.on('xp-collected', () => {
+    this.registerEventListener('xp-collected', () => {
       // All orbs play same sound (all are tier 1 blue)
       this.playXPCollect();
     });
 
-    gameEvents.on('xp-orb-fused', (data) => {
+    this.registerEventListener('xp-orb-fused', (data) => {
       // Play fusion sound based on tier
       this.playOrbFusion(data?.toClass);
     });
 
-    gameEvents.on('enemy-spawned', (data) => {
+    this.registerEventListener('enemy-spawned', (data) => {
       // Special sound for Gold spawn
       if (data?.enemy?.variant === 'gold') {
         this.playGoldSpawn();
@@ -215,7 +211,7 @@ class AudioSystem {
 
     // Enemy modules fire projectiles/explosions exclusively through events so
     // the audio layer can orchestrate batching and pooling.
-    gameEvents.on('enemy-fired', (data = {}) => {
+    this.registerEventListener('enemy-fired', (data = {}) => {
       const enemyType = (data?.enemyType || data?.enemy?.type || '').toLowerCase();
 
       if (enemyType === 'drone') {
@@ -229,68 +225,68 @@ class AudioSystem {
       }
     });
 
-    gameEvents.on('wave-started', (waveEvent = {}) => {
+    this.registerEventListener('wave-started', (waveEvent = {}) => {
       this.updateWaveMusicIntensity(waveEvent);
     });
 
-    gameEvents.on('mine-exploded', (data = {}) => {
+    this.registerEventListener('mine-exploded', (data = {}) => {
       this.playMineExplosion(data);
     });
 
-    gameEvents.on('boss-spawned', (data = {}) => {
+    this.registerEventListener('boss-spawned', (data = {}) => {
       this.playBossRoar(data);
       this._onBossFightStarted(data);
     });
 
-    gameEvents.on('boss-phase-changed', (data = {}) => {
+    this.registerEventListener('boss-phase-changed', (data = {}) => {
       this.playBossPhaseChange(data);
       this._onBossPhaseChanged(data);
     });
 
-    gameEvents.on('boss-defeated', (data = {}) => {
+    this.registerEventListener('boss-defeated', (data = {}) => {
       this.playBossDefeated(data);
       this._onBossDefeated(data);
     });
 
-    gameEvents.on('bullet-hit', (data) => {
+    this.registerEventListener('bullet-hit', (data) => {
       // Play hit confirm sound
       this.playBulletHit(data?.killed || false);
     });
 
-    gameEvents.on('player-took-damage', () => {
+    this.registerEventListener('player-took-damage', () => {
       this.playShipHit();
     });
 
-    gameEvents.on('shield-activated', () => {
+    this.registerEventListener('shield-activated', () => {
       this.playShieldActivate();
     });
 
-    gameEvents.on('shield-hit', () => {
+    this.registerEventListener('shield-hit', () => {
       this.playShieldImpact();
     });
 
-    gameEvents.on('shield-broken', () => {
+    this.registerEventListener('shield-broken', () => {
       this.playShieldBreak();
     });
 
-    gameEvents.on('shield-recharged', () => {
+    this.registerEventListener('shield-recharged', () => {
       this.playShieldRecharged();
     });
 
-    gameEvents.on('shield-activation-failed', () => {
+    this.registerEventListener('shield-activation-failed', () => {
       this.playShieldFail();
     });
 
-    gameEvents.on('shield-shockwave', () => {
+    this.registerEventListener('shield-shockwave', () => {
       this.playShieldShockwave();
     });
 
     // UI Sound Effects
-    gameEvents.on('upgrade-applied', (data) => {
+    this.registerEventListener('upgrade-applied', (data) => {
       this.playUpgradeSelect(data?.rarity || 'common');
     });
 
-    gameEvents.on('pause-state-changed', (data) => {
+    this.registerEventListener('pause-state-changed', (data) => {
       if (data?.isPaused) {
         this.playPauseOpen();
       } else {
@@ -298,16 +294,16 @@ class AudioSystem {
       }
     });
 
-    gameEvents.on('screen-changed', () => {
+    this.registerEventListener('screen-changed', () => {
       this.playMenuTransition();
     });
 
-    gameEvents.on('input-confirmed', () => {
+    this.registerEventListener('input-confirmed', () => {
       this.playButtonClick();
     });
 
     // Low health warning
-    gameEvents.on('player-health-changed', (data) => {
+    this.registerEventListener('player-health-changed', (data) => {
       const healthPercent = data?.health / data?.maxHealth;
       if (healthPercent <= 0.25 && healthPercent > 0) {
         // Only play if we just entered low health state

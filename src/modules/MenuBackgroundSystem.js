@@ -1,12 +1,13 @@
 // src/modules/MenuBackgroundSystem.js
 
+import { BaseSystem } from '../core/BaseSystem.js';
 import RandomService from '../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
 
 const SIMPLEX_DEFAULT_RANDOM = new RandomService('menu-background:simplex-default');
 
-class MenuBackgroundSystem {
+class MenuBackgroundSystem extends BaseSystem {
   constructor(dependencies = {}) {
     const input =
       dependencies && typeof dependencies === 'object' && !Array.isArray(dependencies)
@@ -14,35 +15,22 @@ class MenuBackgroundSystem {
         : {};
     const { random = null, ...rest } = input;
 
-    this.dependencies = normalizeDependencies(rest);
-    this.random = random ?? resolveService('random', this.dependencies);
-    if (!this.random) {
-      this.random = new RandomService('menu-background:fallback');
-    }
-
-    this.dependencies.random = this.random;
-    this.randomForkLabels = {
-      base: 'menu.base',
-      starfield: 'menu.starfield',
-      assets: 'menu.assets',
-      belt: 'menu.belt',
-      asteroids: 'menu.asteroids',
-      fragments: 'menu.fragments',
-      materials: 'menu.materials',
-      threeUuid: 'menu.three-uuid',
-    };
-    this.randomForks = {
-      base: this.random.fork(this.randomForkLabels.base),
-      starfield: this.random.fork(this.randomForkLabels.starfield),
-      assets: this.random.fork(this.randomForkLabels.assets),
-      belt: this.random.fork(this.randomForkLabels.belt),
-      asteroids: this.random.fork(this.randomForkLabels.asteroids),
-      fragments: this.random.fork(this.randomForkLabels.fragments),
-      materials: this.random.fork(this.randomForkLabels.materials),
-      threeUuid: this.random.fork(this.randomForkLabels.threeUuid),
-    };
-    this.randomForkSeeds = {};
-    this.captureRandomForkSeeds();
+    // Pass config to BaseSystem with random management options
+    super(rest, {
+      enableRandomManagement: true,
+      systemName: 'MenuBackgroundSystem',
+      serviceName: 'menu-background',
+      randomForkLabels: {
+        base: 'menu.base',
+        starfield: 'menu.starfield',
+        assets: 'menu.assets',
+        belt: 'menu.belt',
+        asteroids: 'menu.asteroids',
+        fragments: 'menu.fragments',
+        materials: 'menu.materials',
+        threeUuid: 'menu.three-uuid',
+      }
+    });
 
     const randomHelpers = createRandomHelpers({
       getRandomFork: (name) => this.getRandomFork(name),
@@ -132,31 +120,12 @@ class MenuBackgroundSystem {
         );
       }
     }
-
-    if (typeof gameServices !== 'undefined' && gameServices?.register) {
-      gameServices.register('menu-background', this);
-    }
-  }
-
-  getRandomFork(name = 'base') {
-    if (!this.randomForks) {
-      return null;
-    }
-
-    return this.randomForks[name] || this.randomForks.base || null;
   }
 
   captureRandomForkSeeds() {
-    if (!this.randomForks) {
-      this.randomForkSeeds = {};
-      return;
-    }
+    super.captureRandomForkSeeds();
 
-    if (!this.randomForkSeeds) {
-      this.randomForkSeeds = {};
-    }
-
-    Object.entries(this.randomForks).forEach(([name, fork]) => {
+    Object.entries(this.randomForks || {}).forEach(([name, fork]) => {
       this.storeRandomForkSeed(name, fork);
     });
   }
@@ -1695,10 +1664,8 @@ class MenuBackgroundSystem {
   registerEventHooks() {
     window.addEventListener('resize', this.handleResize, { passive: true });
 
-    if (typeof gameEvents !== 'undefined' && gameEvents?.on) {
-      gameEvents.on('screen-changed', this.handleScreenChanged);
-      gameEvents.on('settings-video-changed', this.handleVideoSettingsChanged);
-    }
+    this.registerEventListener('screen-changed', this.handleScreenChanged);
+    this.registerEventListener('settings-video-changed', this.handleVideoSettingsChanged);
   }
 
   syncInitialState() {

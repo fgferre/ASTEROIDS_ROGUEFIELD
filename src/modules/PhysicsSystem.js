@@ -1,3 +1,4 @@
+import { BaseSystem } from '../core/BaseSystem.js';
 import {
   ASTEROID_SIZES,
   BULLET_SIZE,
@@ -21,9 +22,12 @@ import {
 
 const ASTEROID_POOL_ID = Symbol.for('ASTEROIDS_ROGUEFIELD:asteroidPoolId');
 
-class PhysicsSystem {
+class PhysicsSystem extends BaseSystem {
   constructor(dependencies = {}) {
-    this.dependencies = normalizeDependencies(dependencies);
+    super(dependencies, {
+      systemName: 'PhysicsSystem',
+      serviceName: 'physics',
+    });
     this.enemySystem = null;
     this.cellSize = PHYSICS_CELL_SIZE || 96;
     this.maxEnemyRadius = this.computeMaxEnemyRadius();
@@ -65,14 +69,7 @@ class PhysicsSystem {
       frameTime: 0
     };
 
-    if (typeof gameServices !== 'undefined') {
-      gameServices.register('physics', this);
-    }
-
-    this.setupEventListeners();
     this.refreshEnemyReference({ suppressWarning: true });
-
-    console.log('[PhysicsSystem] Initialized');
   }
 
   attachEnemySystem(enemySystem, { force = false } = {}) {
@@ -141,11 +138,7 @@ class PhysicsSystem {
   }
 
   setupEventListeners() {
-    if (typeof gameEvents === 'undefined') {
-      return;
-    }
-
-    gameEvents.on('enemy-spawned', (data = {}) => {
+    this.registerEventListener('enemy-spawned', (data = {}) => {
       const enemy = data.enemy ?? data;
       if (!enemy || enemy.destroyed) {
         return;
@@ -163,7 +156,7 @@ class PhysicsSystem {
       }
     });
 
-    gameEvents.on('enemy-destroyed', (data = {}) => {
+    this.registerEventListener('enemy-destroyed', (data = {}) => {
       const enemy = data.enemy ?? null;
 
       if (enemy) {
@@ -185,15 +178,15 @@ class PhysicsSystem {
       }
     });
 
-    gameEvents.on('mine-exploded', (payload = {}) => {
+    this.registerEventListener('mine-exploded', (payload = {}) => {
       this.markMineExplosionHandled(payload.enemy, payload.enemyId);
     });
 
-    gameEvents.on('progression-reset', () => {
+    this.registerEventListener('progression-reset', () => {
       this.reset();
     });
 
-    gameEvents.on('boss-defeated', (data = {}) => {
+    this.registerEventListener('boss-defeated', (data = {}) => {
       const boss = this.resolveBossEntity(data);
       if (boss) {
         this.clearBossPhysicsState(boss);
@@ -2044,6 +2037,7 @@ class PhysicsSystem {
   }
 
   reset() {
+    super.reset();
     this.activeEnemies.clear();
     this.enemyIndex.clear();
     this.spatialHash.clear();
@@ -2070,8 +2064,6 @@ class PhysicsSystem {
     if (typeof gameEvents !== 'undefined') {
       gameEvents.emit('physics-reset');
     }
-
-    console.log('[PhysicsSystem] Reset');
   }
 
   /**

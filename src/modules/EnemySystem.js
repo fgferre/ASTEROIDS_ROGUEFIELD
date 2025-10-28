@@ -1,4 +1,5 @@
 // src/modules/EnemySystem.js
+import { BaseSystem } from '../core/BaseSystem.js';
 import { ASTEROID_SIZES, GAME_HEIGHT, GAME_WIDTH, SHIP_SIZE } from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
 import RandomService from '../core/RandomService.js';
@@ -55,9 +56,13 @@ const ASTEROID_POOL_ID = Symbol.for('ASTEROIDS_ROGUEFIELD:asteroidPoolId');
 // === CLASSE ENEMYSYSTEM ===
 // Asteroid class moved to: ./enemies/types/Asteroid.js
 // === SISTEMA DE INIMIGOS ===
-class EnemySystem {
+class EnemySystem extends BaseSystem {
   constructor(dependencies = {}) {
-    this.dependencies = normalizeDependencies(dependencies);
+    super({
+      dependencies,
+      systemName: 'EnemySystem',
+      serviceName: 'enemies',
+    });
     this.services = {
       player: this.dependencies.player || null,
       world: this.dependencies.world || null,
@@ -145,11 +150,6 @@ class EnemySystem {
 
     this.eventBus = typeof gameEvents !== 'undefined' ? gameEvents : null;
 
-    // Registrar no ServiceLocator
-    if (typeof gameServices !== 'undefined') {
-      gameServices.register('enemies', this);
-    }
-
     this.missingDependencyWarnings = new Set();
     this.deferredDependencyWarnings = new Set(['world', 'combat', 'effects', 'audio', 'ui']);
 
@@ -167,8 +167,6 @@ class EnemySystem {
     this.syncPhysicsIntegration(true);
 
     this.emitWaveStateUpdate(true);
-
-    console.log('[EnemySystem] Initialized');
   }
 
   attachProgression(progressionSystem) {
@@ -242,40 +240,37 @@ class EnemySystem {
   }
 
   setupEventListeners() {
-    const bus = this.eventBus || (typeof gameEvents !== 'undefined' ? gameEvents : null);
-    if (!bus) return;
-
     // Handle level 5 shield deflective explosion (AoE damage)
-    bus.on('shield-explosion-damage', (data) => {
+    this.registerEventListener('shield-explosion-damage', (data) => {
       this.handleShieldExplosionDamage(data);
     });
 
-    bus.on('player-reset', () => {
+    this.registerEventListener('player-reset', () => {
       this.refreshInjectedServices({ force: true });
     });
 
-    bus.on('progression-reset', () => {
+    this.registerEventListener('progression-reset', () => {
       this.refreshInjectedServices({ force: true });
     });
 
-    bus.on('world-reset', () => {
+    this.registerEventListener('world-reset', () => {
       this.refreshInjectedServices({ force: true });
     });
 
-    bus.on('wave-started', () => {
+    this.registerEventListener('wave-started', () => {
       this.refreshInjectedServices({ force: true, suppressWarnings: true });
     });
 
-    bus.on('physics-reset', () => {
+    this.registerEventListener('physics-reset', () => {
       this.refreshInjectedServices({ force: true });
       this.syncPhysicsIntegration(true);
     });
 
-    bus.on('enemy-fired', (data) => {
+    this.registerEventListener('enemy-fired', (data) => {
       this.handleEnemyProjectile(data);
     });
 
-    bus.on('player-hit-by-projectile', (data = {}) => {
+    this.registerEventListener('player-hit-by-projectile', (data = {}) => {
       const damage = Number.isFinite(data.damage) ? data.damage : 0;
       if (damage <= 0) {
         return;
@@ -309,20 +304,20 @@ class EnemySystem {
       });
     });
 
-    bus.on('mine-exploded', (data) => {
+    this.registerEventListener('mine-exploded', (data) => {
       this.handleMineExplosion(data);
     });
 
     // NEW: Integrate RewardManager with enemy destruction
     if (this.useManagers) {
-      bus.on('enemy-destroyed', (data) => {
+      this.registerEventListener('enemy-destroyed', (data) => {
         if (this.rewardManager && data.enemy) {
           this.rewardManager.dropRewards(data.enemy);
         }
       });
 
       if (this.waveManager) {
-        bus.on('wave-complete', (data = {}) => {
+        this.registerEventListener('wave-complete', (data = {}) => {
           if (Boolean(USE_WAVE_MANAGER) && this.waveState) {
             const waveNumber = Number.isFinite(Number(data.wave))
               ? Number(data.wave)
@@ -352,29 +347,29 @@ class EnemySystem {
       }
     }
 
-    bus.on('boss-wave-started', (data) => {
+    this.registerEventListener('boss-wave-started', (data) => {
       this.refreshInjectedServices({ force: true, suppressWarnings: true });
       this.handleBossWaveStarted(data);
     });
 
-    bus.on('boss-spawned', (data) => {
+    this.registerEventListener('boss-spawned', (data) => {
       this.refreshInjectedServices({ force: true, suppressWarnings: true });
       this.handleBossSpawned(data);
     });
 
-    bus.on('boss-phase-changed', (data) => {
+    this.registerEventListener('boss-phase-changed', (data) => {
       this.handleBossPhaseChange(data);
     });
 
-    bus.on('boss-defeated', (data) => {
+    this.registerEventListener('boss-defeated', (data) => {
       this.handleBossDefeated(data);
     });
 
-    bus.on('boss-attack', (data) => {
+    this.registerEventListener('boss-attack', (data) => {
       this.handleBossAttackPayload(data);
     });
 
-    bus.on('boss-invulnerability-changed', (data) => {
+    this.registerEventListener('boss-invulnerability-changed', (data) => {
       this.handleBossInvulnerabilityChanged(data);
     });
   }
@@ -2740,6 +2735,8 @@ class EnemySystem {
 
   // === RESET E CLEANUP ===
   reset() {
+    super.reset();
+
     this.releaseAllAsteroidsToPool();
     this.asteroids = [];
     this.invalidateActiveEnemyCache();

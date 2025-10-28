@@ -7,7 +7,8 @@ import RenderBatch from '../core/RenderBatch.js';
 import CanvasStateManager from '../core/CanvasStateManager.js';
 import GradientCache from '../core/GradientCache.js';
 import RandomService from '../core/RandomService.js';
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { BaseSystem } from '../core/BaseSystem.js';
+import { resolveService } from '../core/serviceUtils.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 import { SHIP_MAX_SPEED } from '../data/constants/physics.js';
 import { MAGNETISM_RADIUS } from '../data/constants/gameplay.js';
@@ -663,32 +664,20 @@ class SpaceSkyBackground {
   }
 }
 
-class RenderingSystem {
+class RenderingSystem extends BaseSystem {
   constructor(dependencies = {}) {
-    const input =
-      dependencies && typeof dependencies === 'object' && !Array.isArray(dependencies)
-        ? dependencies
-        : {};
-    const { random = null, ...rest } = input;
+    super(dependencies, {
+      enableRandomManagement: true,
+      systemName: 'RenderingSystem',
+      serviceName: 'renderer',
+      randomForkLabels: {
+        base: 'rendering.base',
+        starfield: 'rendering.starfield',
+        assets: 'rendering.assets',
+      },
+    });
 
-    this.dependencies = normalizeDependencies(rest);
-    this.randomForkLabels = {
-      base: 'rendering.base',
-      starfield: 'rendering.starfield',
-      assets: 'rendering.assets',
-    };
-    this.randomForkSeeds = {};
-
-    this.random = random ?? resolveService('random', this.dependencies);
-    if (!this.random || typeof this.random.fork !== 'function') {
-      this.random = new RandomService(RENDERING_RANDOM_FALLBACK_SEED);
-    }
-
-    this.dependencies.random = this.random;
-    this.randomForks = this.createRandomForks(this.random);
-    this.captureRandomForkSeeds();
-
-    this.spaceSky = new SpaceSkyBackground(this.randomForks.starfield);
+    this.spaceSky = new SpaceSkyBackground(this.getRandomFork('starfield'));
     this.spaceSky.setParallax(0.06, 0.05, 0.06, SHIP_MAX_SPEED);
 
     // Batch rendering optimization systems
@@ -731,7 +720,7 @@ class RenderingSystem {
     };
 
     this.spaceSky.bindVelocityProvider(() => {
-      this.resolveCachedServices();
+      this.resolveCachedServices({ cachedPlayer: 'player', cachedProgression: 'progression', cachedXPOrbs: 'xp-orbs', cachedHealthHearts: 'healthHearts', cachedEffects: 'effects', cachedCombat: 'combat', cachedEnemies: 'enemies', cachedUI: 'ui' });
       const player = this.cachedPlayer;
       if (!player) {
         return null;
@@ -748,10 +737,6 @@ class RenderingSystem {
       return null;
     });
 
-    if (typeof gameServices !== 'undefined') {
-      gameServices.register('renderer', this);
-    }
-
     // Initialize state manager with common presets
     this.stateManager.createPreset('starfield', {
       fillStyle: 'rgba(255, 255, 255, 0.8)',
@@ -760,110 +745,14 @@ class RenderingSystem {
       shadowBlur: 0
     });
 
-    this.resolveCachedServices(true);
-
-    console.log('[RenderingSystem] Initialized with batch rendering optimization');
+    this.resolveCachedServices({ cachedPlayer: 'player', cachedProgression: 'progression', cachedXPOrbs: 'xp-orbs', cachedHealthHearts: 'healthHearts', cachedEffects: 'effects', cachedCombat: 'combat', cachedEnemies: 'enemies', cachedUI: 'ui' }, { force: true });
   }
 
-  createRandomForks(random) {
-    let base = null;
-    if (random && typeof random.fork === 'function') {
-      base = random.fork(this.randomForkLabels.base);
-    }
-
-    if (!base || typeof base.fork !== 'function') {
-      base = new RandomService(`${this.randomForkLabels.base}:fallback`);
-    }
-
-    const starfield = base && typeof base.fork === 'function'
-      ? base.fork(this.randomForkLabels.starfield)
-      : new RandomService(this.randomForkLabels.starfield);
-    const assets = base && typeof base.fork === 'function'
-      ? base.fork(this.randomForkLabels.assets)
-      : new RandomService(this.randomForkLabels.assets);
-
-    return {
-      base,
-      starfield,
-      assets,
-    };
-  }
-
-  captureRandomForkSeeds(forks = this.randomForks) {
-    if (!forks) {
-      this.randomForkSeeds = {};
-      return;
-    }
-
-    if (!this.randomForkSeeds) {
-      this.randomForkSeeds = {};
-    }
-
-    Object.entries(forks).forEach(([name, fork]) => {
-      if (fork && typeof fork.seed === 'number' && Number.isFinite(fork.seed)) {
-        this.randomForkSeeds[name] = fork.seed >>> 0;
-      }
-    });
-  }
-
-  getRandomFork(name) {
-    if (!name || !this.randomForks) {
-      return null;
-    }
-
-    return this.randomForks[name] || null;
-  }
-
-  reseedRandomForks({ refreshForks = false } = {}) {
-    if (refreshForks || !this.randomForks) {
-      this.randomForks = this.createRandomForks(this.random);
-      this.captureRandomForkSeeds(this.randomForks);
-    } else {
-      if (!this.randomForkSeeds) {
-        this.captureRandomForkSeeds(this.randomForks);
-      }
-
-      Object.entries(this.randomForks).forEach(([name, fork]) => {
-        if (!fork || typeof fork.reset !== 'function') {
-          return;
-        }
-
-        const storedSeed = this.randomForkSeeds?.[name];
-        if (storedSeed !== undefined) {
-          fork.reset(storedSeed);
-        }
-      });
-
-      this.captureRandomForkSeeds(this.randomForks);
-    }
-
+  onReset() {
     if (this.spaceSky) {
       const starfieldRandom = this.getRandomFork('starfield');
       this.spaceSky.reseed(starfieldRandom);
     }
-  }
-
-  reset({ refreshForks = false } = {}) {
-    this.reseedRandomForks({ refreshForks });
-  }
-
-  resolveCachedServices(force = false) {
-    const assign = (property, serviceName) => {
-      if (!force && this[property]) {
-        return;
-      }
-
-      this[property] = resolveService(serviceName, this.dependencies);
-    };
-
-    assign('cachedPlayer', 'player');
-    assign('cachedProgression', 'progression');
-    assign('cachedXPOrbs', 'xp-orbs');
-    assign('cachedHealthHearts', 'healthHearts');
-    assign('cachedEffects', 'effects');
-    assign('cachedCombat', 'combat');
-    assign('cachedEnemies', 'enemies');
-    assign('cachedUI', 'ui');
   }
 
   render(ctx) {
@@ -879,7 +768,7 @@ class RenderingSystem {
 
     ctx.save();
 
-    this.resolveCachedServices();
+    this.resolveCachedServices({ cachedPlayer: 'player', cachedProgression: 'progression', cachedXPOrbs: 'xp-orbs', cachedHealthHearts: 'healthHearts', cachedEffects: 'effects', cachedCombat: 'combat', cachedEnemies: 'enemies', cachedUI: 'ui' });
 
     const effects = this.cachedEffects;
     if (effects && typeof effects.applyScreenShake === 'function') {

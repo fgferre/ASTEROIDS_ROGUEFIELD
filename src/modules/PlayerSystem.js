@@ -1,4 +1,5 @@
 // src/modules/PlayerSystem.js
+import { BaseSystem } from '../core/BaseSystem.js';
 import {
   GAME_HEIGHT,
   GAME_WIDTH,
@@ -49,10 +50,17 @@ const SHIELD_LEVEL_CONFIG = {
   },
 };
 
-class PlayerSystem {
+class PlayerSystem extends BaseSystem {
   constructor(config = {}) {
-    const { position, dependencies } = this.normalizeConfig(config);
-    const normalizedDependencies = normalizeDependencies(dependencies);
+    const { position, dependencies } = PlayerSystem.normalizeConfig(config);
+
+    super({
+      dependencies,
+      systemName: 'PlayerSystem',
+      serviceName: 'player',
+    });
+
+    const normalizedDependencies = this.dependencies;
 
     if (
       config &&
@@ -141,18 +149,11 @@ class PlayerSystem {
     this.isDead = false;
     this.isRetrying = false;
 
-    // Registrar no ServiceLocator
-    if (typeof gameServices !== 'undefined') {
-      gameServices.register('player', this);
-    }
-
     // Escutar eventos de upgrade
     this.setupEventListeners();
-
-    console.log('[PlayerSystem] Initialized at', this.position);
   }
 
-  normalizeConfig(config) {
+  static normalizeConfig(config) {
     if (!config || typeof config !== 'object' || Array.isArray(config)) {
       return { position: null, dependencies: {} };
     }
@@ -291,70 +292,68 @@ class PlayerSystem {
   }
 
   setupEventListeners() {
-    if (typeof gameEvents === 'undefined') return;
-
-    gameEvents.on('upgrade-damage-boost', (data) => {
+    this.registerEventListener('upgrade-damage-boost', (data) => {
       this.damage = Math.floor(this.damage * data.multiplier);
       console.log('[PlayerSystem] Damage boosted to', this.damage);
     });
 
-    gameEvents.on('upgrade-speed-boost', (data) => {
+    this.registerEventListener('upgrade-speed-boost', (data) => {
       this.maxSpeed = Math.floor(this.maxSpeed * data.multiplier);
       console.log('[PlayerSystem] Speed boosted to', this.maxSpeed);
     });
 
-    gameEvents.on('upgrade-acceleration-boost', (data) => {
+    this.registerEventListener('upgrade-acceleration-boost', (data) => {
       this.acceleration = this.acceleration * data.multiplier;
       console.log('[PlayerSystem] Acceleration boosted to', this.acceleration);
     });
 
-    gameEvents.on('upgrade-rotation-boost', (data) => {
+    this.registerEventListener('upgrade-rotation-boost', (data) => {
       this.rotationSpeed = this.rotationSpeed * data.multiplier;
       console.log('[PlayerSystem] Rotation speed boosted to', this.rotationSpeed);
     });
 
-    gameEvents.on('upgrade-angular-damping', (data) => {
+    this.registerEventListener('upgrade-angular-damping', (data) => {
       this.angularDamping = this.angularDamping * data.multiplier;
       console.log('[PlayerSystem] Angular damping adjusted to', this.angularDamping);
     });
 
-    gameEvents.on('upgrade-linear-damping', (data) => {
+    this.registerEventListener('upgrade-linear-damping', (data) => {
       this.linearDamping = this.linearDamping * data.multiplier;
       console.log('[PlayerSystem] Linear damping adjusted to', this.linearDamping);
     });
 
-    gameEvents.on('upgrade-thruster-visual', (data) => {
+    this.registerEventListener('upgrade-thruster-visual', (data) => {
       this.thrusterVisualLevel = data.level || 0;
       console.log('[PlayerSystem] Thruster visual level:', this.thrusterVisualLevel);
     });
 
-    gameEvents.on('upgrade-rcs-visual', (data) => {
+    this.registerEventListener('upgrade-rcs-visual', (data) => {
       this.rcsVisualLevel = data.level || 0;
       console.log('[PlayerSystem] RCS visual level:', this.rcsVisualLevel);
     });
 
-    gameEvents.on('upgrade-braking-visual', (data) => {
+    this.registerEventListener('upgrade-braking-visual', (data) => {
       this.brakingVisualLevel = data.level || 0;
       console.log('[PlayerSystem] Braking visual level:', this.brakingVisualLevel);
     });
 
-    gameEvents.on('upgrade-health-boost', (data) => {
+    this.registerEventListener('upgrade-health-boost', (data) => {
       this.maxHealth += data.bonus;
       this.health = Math.min(this.health + data.bonus, this.maxHealth);
       console.log('[PlayerSystem] Health boosted to', this.maxHealth);
     });
 
-    gameEvents.on('upgrade-multishot', (data) => {
+    this.registerEventListener('upgrade-multishot', (data) => {
       this.multishot += data.bonus;
       console.log('[PlayerSystem] Multishot boosted to', this.multishot);
     });
 
-    gameEvents.on('upgrade-magnetism', (data) => {
+    this.registerEventListener('upgrade-magnetism', (data) => {
       this.magnetismRadius = Math.floor(this.magnetismRadius * data.multiplier);
       console.log('[PlayerSystem] Magnetism boosted to', this.magnetismRadius);
     });
 
-    gameEvents.on('upgrade-deflector-shield', (data = {}) => {
+    this.registerEventListener('upgrade-deflector-shield', (data = {}) => {
       const level = Number(data.level);
       if (!Number.isFinite(level) || level <= 0) {
         return;
@@ -364,7 +363,7 @@ class PlayerSystem {
       console.log('[PlayerSystem] Deflector shield upgraded to level', level);
     });
 
-    gameEvents.on('weapon-fired', (data) => {
+    this.registerEventListener('weapon-fired', (data) => {
       // Apply recoil when weapon fires
       if (data?.position && data?.target) {
         const dx = data.target.x - data.position.x;
@@ -416,8 +415,6 @@ class PlayerSystem {
   }
 
   emitShieldStats() {
-    if (typeof gameEvents === 'undefined') return;
-
     gameEvents.emit('shield-stats-changed', {
       level: this.shieldUpgradeLevel,
       maxHP: this.shieldMaxHP,
@@ -432,8 +429,6 @@ class PlayerSystem {
   }
 
   emitShieldActivationFailed(reason) {
-    if (typeof gameEvents === 'undefined') return;
-
     gameEvents.emit('shield-activation-failed', {
       reason,
       level: this.shieldUpgradeLevel,
@@ -465,12 +460,10 @@ class PlayerSystem {
     this.shieldHP = this.shieldMaxHP;
     this.shieldWasInCooldown = false;
 
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('shield-activated', {
-        level: this.shieldUpgradeLevel,
-        maxHP: this.shieldMaxHP,
-      });
-    }
+    gameEvents.emit('shield-activated', {
+      level: this.shieldUpgradeLevel,
+      maxHP: this.shieldMaxHP,
+    });
 
     this.emitShieldStats();
     return true;
@@ -489,14 +482,12 @@ class PlayerSystem {
 
     this.shieldHP = Math.max(0, previousHP - absorbed);
 
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('shield-hit', {
-        level: this.shieldUpgradeLevel,
-        remainingHP: this.shieldHP,
-        maxHP: this.shieldMaxHP,
-        damage: absorbed,
-      });
-    }
+    gameEvents.emit('shield-hit', {
+      level: this.shieldUpgradeLevel,
+      remainingHP: this.shieldHP,
+      maxHP: this.shieldMaxHP,
+      damage: absorbed,
+    });
 
     if (this.shieldHP <= 0) {
       this.breakShield();
@@ -515,14 +506,12 @@ class PlayerSystem {
     this.isShieldActive = false;
     this.shieldHP = 0;
 
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('shield-broken', {
-        level: this.shieldUpgradeLevel,
-      });
-    }
+    gameEvents.emit('shield-broken', {
+      level: this.shieldUpgradeLevel,
+    });
 
     // Level 5: Deflective explosion on shield break
-    if (this.shieldUpgradeLevel >= 5 && typeof gameEvents !== 'undefined') {
+    if (this.shieldUpgradeLevel >= 5) {
       const position = this.getPosition();
       gameEvents.emit('shield-deflective-explosion', {
         position,
@@ -536,11 +525,9 @@ class PlayerSystem {
     } else {
       this.shieldCooldownTimer = 0;
       this.shieldWasInCooldown = false;
-      if (typeof gameEvents !== 'undefined') {
-        gameEvents.emit('shield-recharged', {
-          level: this.shieldUpgradeLevel,
-        });
-      }
+      gameEvents.emit('shield-recharged', {
+        level: this.shieldUpgradeLevel,
+      });
       this.shieldHP = this.shieldMaxHP;
     }
 
@@ -601,11 +588,9 @@ class PlayerSystem {
         if (this.shieldWasInCooldown) {
           this.shieldWasInCooldown = false;
           this.shieldHP = this.shieldMaxHP;
-          if (typeof gameEvents !== 'undefined') {
-            gameEvents.emit('shield-recharged', {
-              level: this.shieldUpgradeLevel,
-            });
-          }
+          gameEvents.emit('shield-recharged', {
+            level: this.shieldUpgradeLevel,
+          });
           this.emitShieldStats();
         } else {
           this.emitShieldStats(); // Emit stats during cooldown for UI progress bar
@@ -642,13 +627,11 @@ class PlayerSystem {
 
     // Emitir evento para outros sistemas
     // Usamos o método 'emitSilently' para não poluir o console a cada frame.
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emitSilently('player-moved', {
-        position: { ...this.position },
-        velocity: { ...this.velocity },
-        angle: this.angle,
-      });
-    }
+    gameEvents.emitSilently('player-moved', {
+      position: { ...this.position },
+      velocity: { ...this.velocity },
+      angle: this.angle,
+    });
   }
 
   // === LÓGICA DE MOVIMENTO (COPIADA DO ORIGINAL) ===
@@ -1050,7 +1033,7 @@ class PlayerSystem {
     const previousHealth = this.health;
     this.health = Math.max(0, this.health - remainingDamage);
 
-    if (this.health !== previousHealth && typeof gameEvents !== 'undefined') {
+    if (this.health !== previousHealth) {
       gameEvents.emit('player-health-changed', {
         current: this.health,
         max: this.maxHealth,
@@ -1066,12 +1049,10 @@ class PlayerSystem {
 
   heal(amount) {
     this.health = Math.min(this.maxHealth, this.health + Math.max(0, amount));
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('player-health-changed', {
-        current: this.health,
-        max: this.maxHealth,
-      });
-    }
+    gameEvents.emit('player-health-changed', {
+      current: this.health,
+      max: this.maxHealth,
+    });
     return this.health;
   }
 
@@ -1149,6 +1130,8 @@ class PlayerSystem {
   }
 
   reset() {
+    super.reset();
+
     this.resetStats();
     this.position = {
       x: GAME_WIDTH / 2,
@@ -1200,7 +1183,7 @@ class PlayerSystem {
     this.health = Math.min(this.maxHealth, this.health + amount);
     const actualHealing = this.health - oldHealth;
 
-    if (actualHealing > 0 && typeof gameEvents !== 'undefined') {
+    if (actualHealing > 0) {
       gameEvents.emit('player-healed', {
         amount: actualHealing,
         currentHealth: this.health,

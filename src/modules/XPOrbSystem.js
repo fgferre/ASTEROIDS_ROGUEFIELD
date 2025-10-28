@@ -24,7 +24,8 @@ import {
 } from '../data/enemies/asteroid-configs.js';
 import { GamePools } from '../core/GamePools.js';
 import RandomService from '../core/RandomService.js';
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { BaseSystem } from '../core/BaseSystem.js';
+import { resolveService } from '../core/serviceUtils.js';
 
 const ORB_CLASS_ORDER = [
   { name: 'blue', tier: 1 },
@@ -103,22 +104,20 @@ const ORB_NEXT_CLASS = ORB_CLASS_CONFIG.reduce(
 
 const ORB_SPATIAL_NEIGHBOURS = [-1, 0, 1];
 
-class XPOrbSystem {
+class XPOrbSystem extends BaseSystem {
   constructor({ player, progression, random } = {}) {
-    this.dependencies = normalizeDependencies({
-      player,
-      progression,
-      random,
+    super({ player, progression, random }, {
+      enableRandomManagement: true,
+      systemName: 'XPOrbSystem',
+      serviceName: 'xp-orbs',
+      randomForkLabels: {
+        base: 'xp-orbs.base',
+        creation: 'xp-orbs.creation',
+        clustering: 'xp-orbs.clustering',
+        fusion: 'xp-orbs.fusion',
+      },
     });
 
-    this.random = null;
-    this.randomForks = {
-      base: null,
-      creation: null,
-      clustering: null,
-      fusion: null,
-    };
-    this.randomForkSeeds = {};
     this._fallbackRandom = null;
     this._randomForkSource = null;
     this._randomForkSignature = null;
@@ -186,14 +185,7 @@ class XPOrbSystem {
 
     this.missingDependencyWarnings = new Set();
 
-    if (typeof gameServices !== 'undefined') {
-      gameServices.register('xp-orbs', this);
-    }
-
-    this.setupEventListeners();
-    this.resolveCachedServices({ force: true, suppressWarnings: true });
-
-    console.log('[XPOrbSystem] Initialized');
+    this.resolveCachedServices({ cachedPlayer: 'player', cachedProgression: 'progression' }, { force: true });
   }
 
   attachProgression(progressionSystem) {
@@ -240,7 +232,7 @@ class XPOrbSystem {
       signature !== undefined && signature !== this._randomForkSignature;
 
     if (force || this._randomForkSource !== candidate || signatureChanged) {
-      this.randomForks = this.createRandomForks(candidate);
+      this.randomForks = this.createRandomForks(candidate, this.randomForkLabels);
       this._randomForkSource = candidate;
       this._randomForkSignature = signature;
       this.captureRandomForkSeeds();
@@ -278,85 +270,6 @@ class XPOrbSystem {
         : 'unknown';
 
     return `${seedPart}:${resetPart}`;
-  }
-
-  createRandomForks(random) {
-    if (!random || typeof random.fork !== 'function') {
-      return {
-        base: null,
-        creation: null,
-        clustering: null,
-        fusion: null,
-      };
-    }
-
-    const base = random.fork('xp-orbs.base');
-    const creation =
-      base && typeof base.fork === 'function' ? base.fork('xp-orbs.creation') : null;
-    const clustering =
-      base && typeof base.fork === 'function' ? base.fork('xp-orbs.clustering') : null;
-    const fusion =
-      base && typeof base.fork === 'function' ? base.fork('xp-orbs.fusion') : null;
-
-    const forks = {
-      base,
-      creation,
-      clustering,
-      fusion,
-    };
-
-    this.captureRandomForkSeeds(forks);
-
-    return forks;
-  }
-
-  getRandomFork(name) {
-    if (!name || typeof name !== 'string') {
-      return null;
-    }
-
-    if (!this.randomForks) {
-      return null;
-    }
-
-    return this.randomForks[name] || null;
-  }
-
-  captureRandomForkSeeds(forks = this.randomForks) {
-    if (!forks) {
-      return;
-    }
-
-    if (!this.randomForkSeeds) {
-      this.randomForkSeeds = {};
-    }
-
-    Object.entries(forks).forEach(([name, fork]) => {
-      if (fork && typeof fork.seed === 'number' && Number.isFinite(fork.seed)) {
-        this.randomForkSeeds[name] = fork.seed >>> 0;
-      }
-    });
-  }
-
-  reseedRandomForks() {
-    if (!this.randomForks) {
-      return;
-    }
-
-    if (!this.randomForkSeeds) {
-      this.captureRandomForkSeeds();
-    }
-
-    Object.entries(this.randomForks).forEach(([name, fork]) => {
-      if (!fork || typeof fork.reset !== 'function') {
-        return;
-      }
-
-      const storedSeed = this.randomForkSeeds?.[name];
-      if (storedSeed !== undefined) {
-        fork.reset(storedSeed);
-      }
-    });
   }
 
   generateInitialFusionTimer() {
@@ -724,10 +637,6 @@ class XPOrbSystem {
   }
 
   setupEventListeners() {
-    if (typeof gameEvents === 'undefined') {
-      return;
-    }
-
     // ARCHITECTURE NOTE:
     // XPOrbSystem is responsible for MANAGING orbs (pooling, fusion, magnetism, rendering)
     // RewardManager is responsible for DECIDING what to drop (XP orbs, health hearts, coins, etc.)
@@ -742,11 +651,11 @@ class XPOrbSystem {
     // HealthHeartSystem handles health hearts
     // Future systems (coins, etc.) will follow the same pattern
 
-    gameEvents.on('progression-reset', () => {
+    this.registerEventListener('progression-reset', () => {
       this.resolveCachedServices({ force: true });
     });
 
-    gameEvents.on('player-reset', () => {
+    this.registerEventListener('player-reset', () => {
       this.resolveCachedServices({ force: true });
     });
   }
@@ -867,18 +776,16 @@ class XPOrbSystem {
     this.addOrbToPools(orb);
     this.enforceClassLimit(orb.class);
 
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('xp-orb-created', {
-        orb,
-        position: { x, y },
-        value,
-        class: orb.class,
-        tier: orb.tier,
-        source: options.source || 'drop',
-        color: resolvedConfig.baseColor,
-        glow: resolvedConfig.glowColor,
-      });
-    }
+    gameEvents.emit('xp-orb-created', {
+      orb,
+      position: { x, y },
+      value,
+      class: orb.class,
+      tier: orb.tier,
+      source: options.source || 'drop',
+      color: resolvedConfig.baseColor,
+      glow: resolvedConfig.glowColor,
+    });
 
     return orb;
   }
@@ -1682,20 +1589,18 @@ class XPOrbSystem {
       age: 0,
     });
 
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('xp-orb-fused', {
-        fromClass: className,
-        toClass: fusedOrb.class,
-        consumed: count,
-        value: totalValue,
-        position: { x: centerX, y: centerY },
-        tier: fusedOrb.tier,
-        reason,
-        color: targetConfig.baseColor,
-        glow: targetConfig.glowColor,
-        flash: targetConfig.fusionFlash,
-      });
-    }
+    gameEvents.emit('xp-orb-fused', {
+      fromClass: className,
+      toClass: fusedOrb.class,
+      consumed: count,
+      value: totalValue,
+      position: { x: centerX, y: centerY },
+      tier: fusedOrb.tier,
+      reason,
+      color: targetConfig.baseColor,
+      glow: targetConfig.glowColor,
+      flash: targetConfig.fusionFlash,
+    });
 
     this.enforceClassLimit(fusedOrb.class);
     this.invalidateSpatialIndex();
@@ -1777,22 +1682,20 @@ class XPOrbSystem {
 
     orb.collected = true;
 
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('xp-collected', {
-        orb,
-        position: { x: orb.x, y: orb.y },
-        value: orb.value,
-        class: orb.class,
-        tier: orb.tier,
-      });
+    gameEvents.emit('xp-collected', {
+      orb,
+      position: { x: orb.x, y: orb.y },
+      value: orb.value,
+      class: orb.class,
+      tier: orb.tier,
+    });
 
-      gameEvents.emit('xp-orb-collected', {
-        value: orb.value,
-        position: { x: orb.x, y: orb.y },
-        class: orb.class,
-        tier: orb.tier,
-      });
-    }
+    gameEvents.emit('xp-orb-collected', {
+      value: orb.value,
+      position: { x: orb.x, y: orb.y },
+      class: orb.class,
+      tier: orb.tier,
+    });
   }
 
   getMagnetismRadius() {
@@ -2023,7 +1926,7 @@ class XPOrbSystem {
   }
 
   reset() {
-    this.reseedRandomForks();
+    super.reset();
     this.releaseAllOrbsToPool();
     this.orbClasses = [...ORB_CLASS_SEQUENCE];
     this.xpOrbs = [];
@@ -2042,12 +1945,6 @@ class XPOrbSystem {
     this.configureOrbClustering();
 
     this.resolveCachedServices({ force: true });
-
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('xp-orbs-reset');
-    }
-
-    console.log('[XPOrbSystem] Reset');
   }
 }
 

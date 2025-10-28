@@ -1,3 +1,4 @@
+import { BaseSystem } from '../core/BaseSystem.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
 import RandomService from '../core/RandomService.js';
@@ -171,22 +172,18 @@ class HitMarker {
   }
 }
 
-export default class EffectsSystem {
+export default class EffectsSystem extends BaseSystem {
   constructor(config = {}) {
     const normalizedConfig =
       config && typeof config === 'object' && !Array.isArray(config) ? config : {};
     const { audio = null, random = null, ...dependencies } = normalizedConfig;
 
-    this.dependencies = normalizeDependencies(dependencies);
-    this.audio = audio ?? resolveService('audio', this.dependencies);
-    this.random = random ?? resolveService('random', this.dependencies);
-    if (!this.random) {
-      this.random = new RandomService('effects-system:fallback');
-    }
-
-    if (this.random) {
-      this.dependencies.random = this.random;
-      this.randomForkLabels = {
+    // Pass config to BaseSystem with random management options
+    super(dependencies, {
+      enableRandomManagement: true,
+      systemName: 'EffectsSystem',
+      serviceName: 'effects',
+      randomForkLabels: {
         base: 'effects.base',
         particles: 'effects.particles',
         thrusters: 'effects.thrusters',
@@ -197,26 +194,10 @@ export default class EffectsSystem {
         volatility: 'effects.volatility',
         screenShake: 'effects.screenShake',
         boss: 'effects.boss',
-      };
-      this.randomForks = {
-        base: this.random.fork(this.randomForkLabels.base),
-        particles: this.random.fork(this.randomForkLabels.particles),
-        thrusters: this.random.fork(this.randomForkLabels.thrusters),
-        colors: this.random.fork(this.randomForkLabels.colors),
-        muzzleFlash: this.random.fork(this.randomForkLabels.muzzleFlash),
-        hits: this.random.fork(this.randomForkLabels.hits),
-        explosions: this.random.fork(this.randomForkLabels.explosions),
-        volatility: this.random.fork(this.randomForkLabels.volatility),
-        screenShake: this.random.fork(this.randomForkLabels.screenShake),
-        boss: this.random.fork(this.randomForkLabels.boss),
-      };
-      this.randomForkSeeds = {};
-      this.captureRandomForkSeeds();
-    } else {
-      this.randomForks = null;
-      this.randomForkLabels = {};
-      this.randomForkSeeds = {};
-    }
+      }
+    });
+
+    this.audio = audio ?? resolveService('audio', this.dependencies);
 
     const randomHelpers = createRandomHelpers({
       getRandomFork: (name) => this.getRandomFork(name),
@@ -264,22 +245,7 @@ export default class EffectsSystem {
     this.damageFlashEnabled = true;
     this.particleDensity = 1;
 
-    if (typeof gameServices !== 'undefined') {
-      gameServices.register('effects', this);
-    }
-
     this.setupSettingsIntegration();
-    this.setupEventListeners();
-
-    console.log('[EffectsSystem] Initialized');
-  }
-
-  getRandomFork(name = 'base') {
-    if (!this.randomForks) {
-      return null;
-    }
-
-    return this.randomForks[name] || this.randomForks.base || null;
   }
 
   // === PARTICLE POOL HELPERS ===
@@ -433,8 +399,6 @@ export default class EffectsSystem {
   }
 
   setupEventListeners() {
-    if (typeof gameEvents === 'undefined') return;
-
     const registerBossEvent = (eventName, handler) => {
       if (typeof handler !== 'function') {
         return;
@@ -452,8 +416,8 @@ export default class EffectsSystem {
         }
       };
 
-      gameEvents.on(eventName, wrapped);
-      gameEvents.on(`effects-${eventName}`, wrapped);
+      this.registerEventListener(eventName, wrapped);
+      this.registerEventListener(`effects-${eventName}`, wrapped);
     };
 
     registerBossEvent('boss-spawned', (payload = {}) => {
@@ -491,7 +455,7 @@ export default class EffectsSystem {
     });
 
     // Weapon fire feedback (Week 1: Balance & Feel)
-    gameEvents.on('bullet-created', (data) => {
+    this.registerEventListener('bullet-created', (data) => {
       if (data?.from && data?.bullet) {
         // Calculate firing direction from bullet velocity
         const vx = data.bullet.vx || 0;
@@ -503,7 +467,7 @@ export default class EffectsSystem {
       }
     });
 
-    gameEvents.on('enemy-fired', (payload = {}) => {
+    this.registerEventListener('enemy-fired', (payload = {}) => {
       const type = this.resolveEnemyType(payload);
       switch (type) {
         case 'drone':
@@ -520,7 +484,7 @@ export default class EffectsSystem {
       }
     });
 
-    gameEvents.on('thruster-effect', (data) => {
+    this.registerEventListener('thruster-effect', (data) => {
       if (!data || !data.position || !data.direction) return;
 
       this.spawnThrusterVFX(
@@ -546,7 +510,7 @@ export default class EffectsSystem {
       }
     });
 
-    gameEvents.on('bullet-hit', (data) => {
+    this.registerEventListener('bullet-hit', (data) => {
       if (data?.position) {
         this.createHitMarker(data.position, data.killed || false, data.damage || 0);
         this.createBulletImpact(
@@ -557,13 +521,13 @@ export default class EffectsSystem {
       }
     });
 
-    gameEvents.on('enemy-destroyed', (data = {}) => {
+    this.registerEventListener('enemy-destroyed', (data = {}) => {
       if (data?.enemy) {
         this.createAsteroidExplosion(data.enemy, data);
       }
     });
 
-    gameEvents.on('enemy-spawned', (payload = {}) => {
+    this.registerEventListener('enemy-spawned', (payload = {}) => {
       const enemy = payload?.enemy;
       if (!enemy || !(this.processedMineExplosions instanceof WeakSet)) {
         return;
@@ -577,32 +541,32 @@ export default class EffectsSystem {
       this.processedMineExplosions.delete(enemy);
     });
 
-    gameEvents.on('mine-exploded', (payload = {}) => {
+    this.registerEventListener('mine-exploded', (payload = {}) => {
       this.createMineExplosion(payload);
     });
 
-    gameEvents.on('asteroid-crack-stage-changed', (data) => {
+    this.registerEventListener('asteroid-crack-stage-changed', (data) => {
       if (data?.position) {
         this.createCrackDebris(data);
       }
     });
 
-    gameEvents.on('asteroid-volatile-armed', (data) => {
+    this.registerEventListener('asteroid-volatile-armed', (data) => {
       if (data?.position) {
         this.addScreenFlash('rgba(255, 140, 60, 0.18)', 0.12, 0.08);
         this.spawnVolatileWarning(data.position);
       }
     });
 
-    gameEvents.on('asteroid-volatile-exploded', (data) => {
+    this.registerEventListener('asteroid-volatile-exploded', (data) => {
       this.createVolatileExplosionEffect(data);
     });
 
-    gameEvents.on('asteroid-volatile-trail', (data) => {
+    this.registerEventListener('asteroid-volatile-trail', (data) => {
       this.spawnVolatileTrail(data);
     });
 
-    gameEvents.on('player-leveled-up', () => {
+    this.registerEventListener('player-leveled-up', () => {
       this.addScreenShake(6, 0.4);
       this.addFreezeFrame(0.2, 0.4);
       this.addScreenFlash('#FFD700', 0.15, 0.2);
@@ -613,19 +577,19 @@ export default class EffectsSystem {
       }
     });
 
-    gameEvents.on('xp-collected', (data) => {
+    this.registerEventListener('xp-collected', (data) => {
       if (data?.position) {
         this.createXPCollectEffect(data.position.x, data.position.y);
       }
     });
 
-    gameEvents.on('xp-orb-fused', (data) => {
+    this.registerEventListener('xp-orb-fused', (data) => {
       if (data?.position) {
         this.createOrbFusionEffect(data);
       }
     });
 
-    gameEvents.on('player-took-damage', (data) => {
+    this.registerEventListener('player-took-damage', (data) => {
       // Intense screen shake
       this.addScreenShake(8, 0.3);
 
@@ -642,7 +606,7 @@ export default class EffectsSystem {
     });
 
     // Level 5 shield: deflective explosion when shield breaks
-    gameEvents.on('shield-deflective-explosion', (data) => {
+    this.registerEventListener('shield-deflective-explosion', (data) => {
       if (!data?.position) return;
 
       // Create cyan shockwave effect
@@ -666,11 +630,11 @@ export default class EffectsSystem {
       }
     });
 
-    gameEvents.on('shield-deflected', (data) => {
+    this.registerEventListener('shield-deflected', (data) => {
       this.createShieldHitEffect(data);
     });
 
-    gameEvents.on('player-died', (data) => {
+    this.registerEventListener('player-died', (data) => {
       if (data?.position) {
         this.createEpicShipExplosion(data.position);
       }
@@ -3877,11 +3841,27 @@ export default class EffectsSystem {
   }
 
   reset() {
-    this.reseedRandomForks();
+    super.reset();
     this.particles = [];
     this.shockwaves = [];
     this.hitMarkers = [];
-    this.screenShake.reset();
+    this.damageIndicators = [];
+    this.bossTransitionEffects = [];
+
+    // Custom ScreenShake reseeding
+    if (this.screenShake && typeof this.screenShake.reseed === 'function') {
+      const snapshot = this.screenShake.reseed(this.getRandomFork('screenShake'), {
+        seedState: this.screenShakeSeedState,
+      });
+      if (snapshot && typeof snapshot === 'object') {
+        this.screenShakeSeedState = { ...snapshot };
+      } else if (typeof this.screenShake.captureSeedState === 'function') {
+        this.screenShakeSeedState = this.screenShake.captureSeedState();
+      }
+    } else if (this.screenShake && typeof this.screenShake.reset === 'function') {
+      this.screenShake.reset();
+    }
+
     this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
     this.screenFlash = {
       timer: 0,

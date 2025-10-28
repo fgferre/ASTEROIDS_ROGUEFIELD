@@ -1,4 +1,5 @@
 // src/modules/CombatSystem.js
+import { BaseSystem } from '../core/BaseSystem.js';
 import {
   GAME_HEIGHT,
   GAME_WIDTH,
@@ -28,9 +29,14 @@ import {
   ORB_VALUE,
 } from '../data/enemies/asteroid-configs.js';
 
-class CombatSystem {
+class CombatSystem extends BaseSystem {
   constructor(dependencies = {}) {
-    this.dependencies = normalizeDependencies(dependencies);
+    super({
+      dependencies,
+      systemName: 'CombatSystem',
+      serviceName: 'combat',
+    });
+
     this.commandQueue = resolveService('command-queue', this.dependencies) || null;
     this.commandQueueConsumerId = 'combat-system';
     // === ESTADO DO SISTEMA DE COMBATE ===
@@ -125,23 +131,12 @@ class CombatSystem {
     this.cachedPhysics = resolveService('physics', this.dependencies);
     this.bulletGlowCache = null;
 
-    // Registrar no ServiceLocator
-    if (typeof gameServices !== 'undefined') {
-      gameServices.register('combat', this);
-    }
-
     this.setupEventListeners();
     this.resolveCachedServices(true);
-
-    console.log('[CombatSystem] Initialized');
   }
 
   setupEventListeners() {
-    if (typeof gameEvents === 'undefined') {
-      return;
-    }
-
-    gameEvents.on('player-reset', () => {
+    this.registerEventListener('player-reset', () => {
       this.resolveCachedServices(true);
       this.currentTarget = null;
       this.currentTargetLocks = [];
@@ -156,19 +151,19 @@ class CombatSystem {
       this.clearEnemyBullets();
     });
 
-    gameEvents.on('progression-reset', () => {
+    this.registerEventListener('progression-reset', () => {
       this.resolveCachedServices(true);
       this.resetAimingBranchState();
       this.targetThreatCache.clear();
       this.clearEnemyBullets();
     });
 
-    gameEvents.on('physics-reset', () => {
+    this.registerEventListener('physics-reset', () => {
       this.resolveCachedServices(true);
       this.clearEnemyBullets();
     });
 
-    gameEvents.on('player-died', () => {
+    this.registerEventListener('player-died', () => {
       // Clear target when player dies (bullets keep flying)
       this.currentTarget = null;
       this.currentTargetLocks = [];
@@ -182,7 +177,7 @@ class CombatSystem {
       this.clearEnemyBullets();
     });
 
-    gameEvents.on('upgrade-aiming-suite', (data) => {
+    this.registerEventListener('upgrade-aiming-suite', (data) => {
       this.applyAimingUpgrade(data || {});
     });
 
@@ -276,7 +271,7 @@ class CombatSystem {
       this.predictedAimPoints = [];
       this.predictedAimPointsMap.clear();
       this.targetThreatCache.clear();
-      if (this.lastPrimaryTargetId !== null && typeof gameEvents !== 'undefined') {
+      if (this.lastPrimaryTargetId !== null) {
         gameEvents.emit('combat-target-lock', { lost: true });
       }
       this.lastPrimaryTargetId = null;
@@ -401,7 +396,7 @@ class CombatSystem {
     }
 
     if (!candidates.length) {
-      if (this.currentTarget && typeof gameEvents !== 'undefined') {
+      if (this.currentTarget) {
         gameEvents.emit('combat-target-lock', { lost: true });
       }
       this.currentTarget = null;
@@ -433,11 +428,10 @@ class CombatSystem {
     const newPrimaryId = this.currentTarget ? this.currentTarget.id : null;
     if (this.currentTarget && newPrimaryId !== this.lastPrimaryTargetId) {
       this.targetIndicatorPulse = this.targetPulseDuration;
-      if (typeof gameEvents !== 'undefined') {
-        gameEvents.emit('combat-target-lock', {
-          enemyId: newPrimaryId,
-          variant: this.currentTarget.variant || 'common',
-          score: sorted[0]?.score ?? 0,
+      gameEvents.emit('combat-target-lock', {
+        enemyId: newPrimaryId,
+        variant: this.currentTarget.variant || 'common',
+        score: sorted[0]?.score ?? 0,
           lockCount: this.currentTargetLocks.length,
         });
       }
@@ -604,11 +598,10 @@ class CombatSystem {
 
     this.lastShotTime = 0;
 
-      if (typeof gameEvents !== 'undefined') {
-        const firstTarget = firedTargets[0]?.position || null;
-        gameEvents.emit('weapon-fired', {
-          position: playerPos,
-          target: firstTarget,
+      const firstTarget = firedTargets[0]?.position || null;
+      gameEvents.emit('weapon-fired', {
+        position: playerPos,
+        target: firstTarget,
           weaponType: 'basic',
           primaryTargetId: this.currentTarget ? this.currentTarget.id : null,
           targeting: {
@@ -1750,11 +1743,10 @@ class CombatSystem {
     this.bullets.push(bullet);
 
     // Emitir evento para efeitos
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('bullet-created', {
-        bullet: bullet,
-        from: fromPos,
-        to: toPos,
+    gameEvents.emit('bullet-created', {
+      bullet: bullet,
+      from: fromPos,
+      to: toPos,
       });
     }
   }
@@ -2150,11 +2142,10 @@ class CombatSystem {
           });
         }
 
-        if (typeof gameEvents !== 'undefined') {
-          hitsToEmit.push({
-            damage: Number.isFinite(bullet.damage) ? bullet.damage : 0,
-            position: { x: bullet.x, y: bullet.y },
-            velocity: { x: bullet.vx, y: bullet.vy },
+        hitsToEmit.push({
+          damage: Number.isFinite(bullet.damage) ? bullet.damage : 0,
+          position: { x: bullet.x, y: bullet.y },
+          velocity: { x: bullet.vx, y: bullet.vy },
             projectile: {
               type: bullet.type || 'enemy',
               color: bullet.color,
@@ -2212,10 +2203,8 @@ class CombatSystem {
 
     this.enemyBullets = activeBullets;
 
-    if (typeof gameEvents !== 'undefined') {
-      for (let i = 0; i < hitsToEmit.length; i += 1) {
-        gameEvents.emit('player-hit-by-projectile', hitsToEmit[i]);
-      }
+    for (let i = 0; i < hitsToEmit.length; i += 1) {
+      gameEvents.emit('player-hit-by-projectile', hitsToEmit[i]);
     }
   }
 
@@ -2359,11 +2348,10 @@ class CombatSystem {
       });
     }
 
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('bullet-hit', {
-        bullet: bullet,
-        enemy: enemy,
-        position: { x: bullet.x, y: bullet.y },
+    gameEvents.emit('bullet-hit', {
+      bullet: bullet,
+      enemy: enemy,
+      position: { x: bullet.x, y: bullet.y },
         damage: bullet.damage,
         killed: damageResult.killed,
         remainingHealth: damageResult.remainingHealth,
@@ -2677,6 +2665,8 @@ class CombatSystem {
 
   // === CLEANUP ===
   reset() {
+    super.reset();
+
     // Return all bullets to pool before clearing array
     for (const bullet of this.bullets) {
       GamePools.bullets.release(bullet);

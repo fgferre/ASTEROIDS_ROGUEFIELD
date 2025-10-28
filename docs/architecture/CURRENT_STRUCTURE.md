@@ -524,3 +524,320 @@ const shapeRenderers = {
 - **Phase 5**: Criar `BaseSystem` centralizado para reduzir duplicações adicionais
 - **Phase 6**: Simplificar cadeia de resolução de serviços
 - **Futuro**: Adicionar novas formas (ex.: hexagon, star) reutilizando o padrão `shapeRenderers`
+
+### 12.9. REFACTOR-015 Ticket 2: Core Systems Refactoring
+
+**Objetivo**: Refatorar 6 sistemas principais para estender `BaseSystem`, eliminando código duplicado e padrões redundantes. Este ticket depende do Ticket 1 (BaseSystem Foundation) estar completo.
+
+**Escopo**: 6 arquivos modificados
+**Linhas removidas**: ~645 linhas
+**Risco**: 🟡 Médio (modifica sistemas críticos)
+**Tempo estimado**: 30-40 minutos
+**Dependências**: Ticket 1 (BaseSystem.js deve existir)
+
+**Sistemas Refatorados**:
+
+1. **RenderingSystem** (1,739 → 1,649 linhas, -90)
+   - Removido: random management manual, service registration, event listener setup boilerplate
+   - Adicionado: `super()` call com random forks (base/starfield/assets), `onReset()` hook
+   - Simplificado: constructor agora delega para BaseSystem
+
+2. **XPOrbSystem** (2,052 → 1,942 linhas, -110)
+   - Removido: createRandomForks(), getRandomFork(), captureRandomForkSeeds(), reseedRandomForks() methods
+   - Mantido: ensureRandom() e captureRandomSignature() (XPOrbSystem-specific)
+   - Atualizado: setupEventListeners() usa this.registerEventListener(), reset() chama super.reset()
+   - Removido: typeof checks, manual event emission, console.log
+
+3. **EffectsSystem** (3,012 → 2,912 linhas, -100)
+   - Removido: getRandomFork() method, typeof checks, gameServices.register()
+   - Adicionado: reset() method que chama super.reset() e limpa arrays (particles, shockwaves, hitMarkers, damageIndicators, bossTransitionEffects)
+   - Atualizado: setupEventListeners() usa this.registerEventListener()
+   - Random forks: base, particles, thrusters, colors, muzzleFlash, hits, explosions, volatility, screenShake, boss
+
+4. **MenuBackgroundSystem** (1,726 → 1,631 linhas, -95)
+   - Removido: getRandomFork(), captureRandomForkSeeds(), storeRandomForkSeed(), reseedRandomForks() methods
+   - Mantido: ensureThreeUuidRandom() e applyDeterministicThreeUuidGenerator() (Three.js-specific)
+   - Atualizado: reset() chama super.reset(), registerEventHooks() usa this.registerEventListener()
+   - Adicionado: destroy() override para cleanup de window.removeEventListener('resize')
+   - Random forks: base, starfield, assets, belt, asteroids, fragments, materials, threeUuid
+
+5. **PhysicsSystem** (2,120 → 2,050 linhas, -70)
+   - Removido: dependency normalization, typeof checks, gameServices.register()
+   - Atualizado: setupEventListeners() usa this.registerEventListener()
+   - Adicionado: super.reset() e super.destroy() calls
+   - **Nota**: Não usa random management (enableRandomManagement: false)
+
+6. **AudioSystem** (3,119 → 3,039 linhas, -80)
+   - Removido: dependency normalization, typeof checks, gameServices.register()
+   - Atualizado: setupEventListeners() usa this.registerEventListener() (~20 calls)
+   - Adicionado: super.reset() call no início de reset()
+   - **Mantido**: Custom random scope management (~239 lines) - AudioSystem-specific para AudioPool, AudioCache, AudioBatcher
+
+**Padrões Eliminados**:
+
+- **Random management**: ~264 lines (exceto AudioSystem que mantém custom scopes)
+- **Service caching**: ~108 lines
+- **typeof checks**: ~240 lines
+- **Constructor boilerplate**: ~90 lines
+- **Total**: ~702 lines
+
+**Padrão de Transformação**:
+
+**Antes**:
+```javascript
+class System {
+  constructor(dependencies = {}) {
+    this.dependencies = normalizeDependencies(dependencies);
+    this.randomForks = this.createRandomForks(this.random);
+
+    if (typeof gameServices !== 'undefined') {
+      gameServices.register('service-name', this);
+    }
+
+    console.log('[System] Initialized');
+  }
+
+  setupEventListeners() {
+    if (typeof gameEvents === 'undefined') return;
+    gameEvents.on('event', handler);
+  }
+
+  createRandomForks() { /* ... */ }
+  getRandomFork() { /* ... */ }
+  reseedRandomForks() { /* ... */ }
+  reset() {
+    this.reseedRandomForks();
+    // reset logic
+  }
+}
+```
+
+**Depois**:
+```javascript
+class System extends BaseSystem {
+  constructor(dependencies = {}) {
+    super({
+      enableRandomManagement: true,
+      systemName: 'System',
+      serviceName: 'service-name',
+      randomForkLabels: { base: 'system.base', /* ... */ }
+    });
+
+    this.dependencies = { ...dependencies };
+    // system-specific initialization
+  }
+
+  setupEventListeners() {
+    this.registerEventListener('event', handler);
+  }
+
+  reset() {
+    super.reset();
+    // system-specific reset logic
+  }
+}
+```
+
+**Benefícios**:
+
+- ✅ **Event listener cleanup**: BaseSystem rastreia e limpa listeners automaticamente em destroy()
+- ✅ **Lifecycle padronizado**: reset(), destroy(), service registration consistentes
+- ✅ **Código mais limpo**: ~645 lines removed, constructor simplificado, menos boilerplate
+- ✅ **Random management centralizado**: forks gerenciados por BaseSystem (exceto custom scopes)
+- ✅ **Menos typeof checks**: BaseSystem assume gameEvents disponível
+- ✅ **Manutenibilidade**: Mudanças em lifecycle afetam todos os sistemas via BaseSystem
+
+**Casos Especiais**:
+
+- **AudioSystem**: Mantém custom random scopes para AudioPool, AudioCache, AudioBatcher (~239 lines)
+- **PhysicsSystem**: Não usa random management (enableRandomManagement: false)
+- **MenuBackgroundSystem**: Mantém Three.js UUID random management (~240 lines)
+
+**Validação**:
+
+```bash
+npm run dev
+```
+
+1. Jogar 3 waves completas
+2. Verificar rendering funcionando (starfield, nave, inimigos, efeitos)
+3. Verificar efeitos visuais (explosões, particles, muzzle flash, hit markers)
+4. Verificar física (colisões, spatial hash, boss physics)
+5. Verificar áudio (weapon fire, explosions, UI sounds, music layers)
+6. Verificar XP orbs (magnetism, fusion, collection)
+7. Verificar menu background (animated starfield, rotating asteroids)
+8. Verificar console logs: BaseSystem deve logar inicialização de cada sistema
+
+### 12.10. REFACTOR-015 Ticket 3: Specialized Systems Refactoring
+
+**Objetivo**: Refatorar 4 sistemas especializados (CombatSystem, PlayerSystem, WorldSystem, EnemySystem) para estender `BaseSystem`, lidando com casos especiais e padrões únicos. Este ticket depende do Ticket 1 (BaseSystem Foundation) estar completo.
+
+**Escopo**: 4 arquivos modificados
+**Linhas removidas**: ~380 linhas (estimado baseado nos padrões eliminados)
+**Risco**: 🟡 Médio (sistemas com padrões únicos)
+**Tempo estimado**: 25-35 minutos
+**Dependências**: Ticket 1 (BaseSystem.js deve existir)
+
+**Sistemas Refatorados**:
+
+1. **CombatSystem** (2,891 → ~2,801 linhas, -90)
+   - Removido: resolveCachedServices() method, typeof checks, gameServices.register(), console.log
+   - Atualizado: setupEventListeners() usa this.registerEventListener() (4 listeners)
+   - Adicionado: super.reset() no início de reset()
+   - **Nota**: CombatSystem não usa random management, apenas service caching
+   - Service caching: player, enemies, physics services
+
+2. **PlayerSystem** (1,225 → ~1,135 linhas, -90)
+   - Removido: typeof checks (~12 locations), gameServices.register(), console.log
+   - Atualizado: setupEventListeners() usa this.registerEventListener() (~15 upgrade listeners)
+   - Adicionado: super.reset() no início de reset()
+   - Atualizado: normalizeConfig() transformado em static method
+   - **Mantido**: Custom lifecycle (pause/resume), shield state management, hull metrics
+
+3. **WorldSystem** (210 → ~200 linhas, -10)
+   - Removido: typeof checks, gameServices.register(), console.log
+   - Atualizado: setupEventListeners() usa this.registerEventListener() (3 listeners)
+   - Adicionado: super.reset() no início de reset()
+   - **Nota**: Sistema mais simples, delega maior parte da lógica para PhysicsSystem
+   - Service caching: player, enemies, physics, progression services
+
+4. **EnemySystem** (4,234 → ~4,124 linhas, -110)
+   - Removido: typeof checks (~15 locations), gameServices.register(), console.log
+   - Atualizado: setupEventListeners() usa this.registerEventListener() (~13 listeners)
+   - Adicionado: super.reset() no início de reset()
+   - **Complexidades especiais**: Maior sistema do projeto, ~30 event listeners totais (incluindo condicionais para waveManager)
+   - **Mantido**: Factory integration, WaveManager integration, RewardManager integration, custom random scope management (~239 lines)
+   - Service caching: player, world, progression, xpOrbs, physics, combat, healthHearts, random, effects, audio, ui
+
+**Complexidades Especiais**:
+
+- **EnemySystem**: 4,234 linhas, maior sistema, ~30 event listeners (incluindo handlers para boss waves, mines, projectiles, shield explosions)
+- **PlayerSystem**: Custom lifecycle com pause/resume, shield activation/break logic, weapon recoil
+- **WorldSystem**: Custom reset com wave progression, delegação de collision handling para PhysicsSystem
+- **CombatSystem**: Damage calculation, collision handling, targeting system com multi-lock, aiming upgrades
+
+**Padrões Eliminados**:
+
+- **Service caching**: ~72 lines (resolveCachedServices() removido de CombatSystem)
+- **typeof checks**: ~120 lines (PlayerSystem: ~12, EnemySystem: ~15, CombatSystem: ~8, WorldSystem: ~1)
+- **Constructor boilerplate**: ~60 lines (gameServices.register, console.log, dependency normalization)
+- **Event listener setup boilerplate**: ~128 lines (typeof checks + old gameEvents.on() syntax)
+- **Total**: ~380 lines
+
+**Padrão de Transformação**:
+
+**Antes**:
+```javascript
+class CombatSystem {
+  constructor(dependencies = {}) {
+    this.dependencies = normalizeDependencies(dependencies);
+    this.cachedPlayer = resolveService('player', this.dependencies);
+    this.cachedEnemies = resolveService('enemies', this.dependencies);
+
+    if (typeof gameServices !== 'undefined') {
+      gameServices.register('combat', this);
+    }
+
+    this.setupEventListeners();
+    console.log('[CombatSystem] Initialized');
+  }
+
+  setupEventListeners() {
+    if (typeof gameEvents === 'undefined') return;
+    gameEvents.on('player-reset', () => {
+      this.resolveCachedServices(true);
+    });
+  }
+
+  resolveCachedServices(force = false) {
+    if (force || !this.cachedPlayer) {
+      this.cachedPlayer = resolveService('player', this.dependencies);
+    }
+    // ...
+  }
+
+  reset() {
+    this.bullets = [];
+    this.currentTarget = null;
+    this.resolveCachedServices(true);
+  }
+}
+```
+
+**Depois**:
+```javascript
+class CombatSystem extends BaseSystem {
+  constructor(dependencies = {}) {
+    super({
+      dependencies,
+      systemName: 'CombatSystem',
+      serviceName: 'combat',
+    });
+
+    this.cachedPlayer = resolveService('player', this.dependencies);
+    this.cachedEnemies = resolveService('enemies', this.dependencies);
+
+    this.setupEventListeners();
+  }
+
+  setupEventListeners() {
+    this.registerEventListener('player-reset', () => {
+      this.resolveCachedServices(true);
+    });
+  }
+
+  reset() {
+    super.reset();
+    this.bullets = [];
+    this.currentTarget = null;
+    this.resolveCachedServices(true);
+  }
+}
+```
+
+**Benefícios**:
+
+- ✅ **Event listener cleanup**: BaseSystem rastreia e limpa ~30+ listeners automaticamente em destroy()
+- ✅ **Lifecycle padronizado**: reset(), destroy(), service registration consistentes entre sistemas especializados
+- ✅ **Código mais limpo**: ~380 lines removed, menos typeof checks, menos boilerplate
+- ✅ **Integration points preservados**: EnemyFactory continua funcionando, PlayerSystem pause/resume preservado, WorldSystem wave progression intacto
+- ✅ **Manutenibilidade**: Mudanças em lifecycle afetam todos os sistemas via BaseSystem
+
+**Casos Especiais Mantidos**:
+
+- **PlayerSystem**: Custom pause()/resume() lifecycle preservado (jogador pode pausar durante gameplay)
+- **WorldSystem**: Custom reset() com wave progression e collision delegation
+- **EnemySystem**: Factory integration, WaveManager integration, RewardManager integration, complex event handling
+- **CombatSystem**: Advanced targeting system (danger scores, dynamic prediction, multi-lock)
+
+**Validação**:
+
+```bash
+npm run dev
+```
+
+1. Jogar 5 waves completas
+2. Verificar combate funcionando (targeting, shooting, damage, bullet collision)
+3. Verificar movimento do player (WASD, acceleration, rotation, drift, recoil)
+4. Verificar spawning de inimigos (asteroids, drones, hunters, mines, bosses)
+5. Verificar colisões (player-asteroid, bullet-asteroid, shield impacts)
+6. Verificar progressão de waves (wave start/complete, break timers, difficulty scaling)
+7. Verificar integração de factories (EnemyFactory, component systems)
+8. Verificar console logs: BaseSystem deve logar inicialização de sistemas especializados
+9. Verificar que EnemySystem gerencia ~30 event listeners sem memory leaks
+10. Verificar PlayerSystem lifecycle (death, retry, respawn, pause/resume)
+
+**Resultados**:
+
+- ✅ Todos os 6 sistemas refatorados com sucesso
+- ✅ ~645 linhas removidas (boilerplate, duplicação)
+- ✅ Event listeners rastreados e limpos automaticamente
+- ✅ Random management centralizado via BaseSystem
+- ✅ Lifecycle consistente através de todos os sistemas
+- ✅ Funcionalidade preservada (sem mudança de comportamento)
+
+**Próximos Passos**:
+
+- **Ticket 3**: Refatorar sistemas auxiliares (HealthHeartSystem, HUD, etc.)
+- **Ticket 4**: Migrar enemy types para BaseEnemy patterns
+- **Phase 6**: Simplificar cadeia de resolução de serviços
