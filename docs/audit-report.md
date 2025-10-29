@@ -43,6 +43,8 @@
 **Status:** ✅ COMPLETED: `dependency-issues.json` mantém a lista de órfãos vazia (EventBus.js e ServiceLocator.js são carregados via `index.html`).
 **Impact:** Prevents incorrect architectural decisions based on false orphan status
 
+**UPDATE (REFACTOR-016):** ServiceLocator.js and ServiceLocatorAdapter.js were removed after full migration to DIContainer. This section documents the historical state before removal. See `docs/architecture/CURRENT_STRUCTURE.md` §12.13 for details.
+
 ### 3.2 app-original.js Truly Orphaned
 **Location:** `agents.md` line 27, `dependency-issues.json` line 11
 **Claim:** "Código original mantido como backup histórico"
