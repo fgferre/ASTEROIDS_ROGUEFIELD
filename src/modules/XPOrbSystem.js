@@ -17,7 +17,6 @@ import {
 } from '../data/constants/gameplay.js';
 import { lerp, easeInOutCubic } from '../utils/mathHelpers.js';
 import {
-  ASTEROID_XP_BASE,
   ASTEROID_VARIANTS,
   ASTEROID_BASE_ORBS,
   ASTEROID_SIZE_ORB_FACTOR,
@@ -1773,7 +1772,9 @@ class XPOrbSystem extends BaseSystem {
   }
 
   getBaseXPValue(size, wave = 1) {
-    const baseLookup = ASTEROID_XP_BASE || {
+    // ASTEROID_XP_BASE was removed in REFACTOR-020 (replaced by ORB_VALUE system)
+    // Inline fallback for backward compatibility
+    const baseLookup = {
       large: 15,
       medium: 8,
       small: 5,

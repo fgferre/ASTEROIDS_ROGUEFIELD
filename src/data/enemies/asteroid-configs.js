@@ -663,13 +663,6 @@ export const ASTEROID_SIZE_ORB_FACTOR = Object.freeze({
   small: 1.0,   // 1x orbs
 });
 
-// DEPRECATED: Old XP-based system (kept for backward compatibility during migration)
-export const ASTEROID_XP_BASE = Object.freeze({
-  large: 15,
-  medium: 10,
-  small: 5,
-});
-
 export const ASTEROID_ORB_DROP_MULTIPLIER = Object.freeze({
   large: 2.0,
   medium: 1.0,
@@ -691,9 +684,6 @@ export const ASTEROID_VARIANTS = deepFreeze({
     orbMultiplier: 1.0,       // Base multiplier (size × stats × rarity)
     statsFactor: 1.0,         // HP × speed × danger = 1.0 × 1.0 × 1.0
     rarityBonus: 1.0,         // Common = baseline (70% spawn)
-
-    // DEPRECATED:
-    xpMultiplier: 1,
 
     crackProfile: 'default',
     fragmentProfile: 'default',
@@ -719,9 +709,6 @@ export const ASTEROID_VARIANTS = deepFreeze({
     orbMultiplier: 2.53,      // stats × rarity = 1.1 × 2.3
     statsFactor: 1.1,         // HP × speed × danger = 1.3 × 0.85 × 1.0
     rarityBonus: 2.3,         // 8% spawn rate
-
-    // DEPRECATED:
-    xpMultiplier: 1.4,
 
     crackProfile: 'default',
     fragmentProfile: 'default',
@@ -749,9 +736,6 @@ export const ASTEROID_VARIANTS = deepFreeze({
     statsFactor: 1.17,        // HP × speed × danger = 1.8 × 0.65 × 1.0
     rarityBonus: 2.5,         // 7% spawn rate
 
-    // DEPRECATED:
-    xpMultiplier: 2,
-
     crackProfile: 'denseCore',
     fragmentProfile: 'denseCore',
     colors: {
@@ -777,9 +761,6 @@ export const ASTEROID_VARIANTS = deepFreeze({
     orbMultiplier: 4.90,      // stats × rarity = 0.72 × 6.8
     statsFactor: 0.72,        // HP × speed × danger = 0.4 × 1.8 × 1.0
     rarityBonus: 6.8,         // 0.4% spawn rate (ULTRA RARO!)
-
-    // DEPRECATED:
-    xpMultiplier: 4.0,
 
     crackProfile: 'crystal',
     fragmentProfile: 'crystal',
@@ -820,9 +801,6 @@ export const ASTEROID_VARIANTS = deepFreeze({
     orbMultiplier: 5.46,      // stats × rarity = 2.1 × 2.6
     statsFactor: 2.1,         // HP × speed × danger = 0.6 × 1.4 × 2.5 (explosion!)
     rarityBonus: 2.6,         // 6.5% spawn rate
-
-    // DEPRECATED:
-    xpMultiplier: 3.2,
 
     crackProfile: 'volatile',
     fragmentProfile: 'volatile',
@@ -896,9 +874,6 @@ export const ASTEROID_VARIANTS = deepFreeze({
     statsFactor: 2.7,         // HP × speed × danger = 0.8 × 1.2 × 2.8 (persegue + contato!)
     rarityBonus: 3.0,         // 4.5% spawn rate
 
-    // DEPRECATED:
-    xpMultiplier: 3.5,
-
     crackProfile: 'parasite',
     fragmentProfile: 'parasite',
     colors: {
@@ -948,9 +923,6 @@ export const ASTEROID_VARIANTS = deepFreeze({
     orbMultiplier: 4.73,      // stats × rarity = 0.91 × 5.2
     statsFactor: 0.91,        // HP × speed × danger = 0.7 × 1.3 × 1.0
     rarityBonus: 5.2,         // 1.5% spawn rate (raro!)
-
-    // DEPRECATED:
-    xpMultiplier: 3.0,
 
     crackProfile: 'crystal',
     fragmentProfile: 'crystal',

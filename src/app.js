@@ -48,6 +48,7 @@ const performanceMonitor = new PerformanceMonitor();
 let diContainer = null;
 let mathRandomGuard = null;
 let gameSessionService = null;
+let gameSystemServices = null; // Services from bootstrapServices()
 
 const DEV_MODE = isDevEnvironment();
 
@@ -302,6 +303,22 @@ function init() {
       adapter: diContainer
     });
 
+    // Store services for use in game loop
+    gameSystemServices = services;
+
+    // Validate that all required services exist (DEV_MODE only)
+    if (DEV_MODE) {
+      const requiredServices = [
+        'input', 'player', 'enemies', 'physics', 'combat',
+        'xp-orbs', 'healthHearts', 'progression', 'world', 'ui',
+        'effects', 'renderer'
+      ];
+      const missingServices = requiredServices.filter(name => !gameSystemServices[name]);
+      if (missingServices.length > 0) {
+        console.warn('[App] ⚠️ Missing required services:', missingServices);
+      }
+    }
+
     garbageCollectionManager = services['garbage-collector'] || garbageCollectionManager;
 
     let resolvedGameSession = null;
@@ -340,17 +357,17 @@ function init() {
       );
     }
 
-    const ui = services['ui'] || gameServices.get('ui');
+    const ui = services['ui'];
     if (ui) ui.showScreen('menu');
 
     if (DEV_MODE) {
-      const playerSystem = services['player'] || gameServices.get('player');
-      const enemySystem = services['enemies'] || gameServices.get('enemies');
-      const physicsSystem = services['physics'] || gameServices.get('physics');
-      const combatSystem = services['combat'] || gameServices.get('combat');
-      const uiSystem = services['ui'] || gameServices.get('ui');
-      const effectsSystem = services['effects'] || gameServices.get('effects');
-      const audioSystem = services['audio'] || gameServices.get('audio');
+      const playerSystem = services['player'];
+      const enemySystem = services['enemies'];
+      const physicsSystem = services['physics'];
+      const combatSystem = services['combat'];
+      const uiSystem = services['ui'];
+      const effectsSystem = services['effects'];
+      const audioSystem = services['audio'];
 
       GameDebugLogger.log('INIT', 'Systems initialized', {
         player: !!playerSystem,
@@ -382,7 +399,7 @@ function init() {
 
     if (DEV_MODE) {
       window.addEventListener('beforeunload', () => {
-        const enemySystem = gameServices.get('enemies');
+        const enemySystem = gameSystemServices?.['enemies'];
         GameDebugLogger.log('STATE', 'Game closing', {
           totalWaves: enemySystem?.waveState?.current || 0,
           sessionDuration: (Date.now() - GameDebugLogger.sessionStart) / 1000,
@@ -459,7 +476,7 @@ function gameLoop(currentTime) {
     }
 
     let adjustedDelta = deltaTime;
-    const effects = gameServices.get('effects');
+    const effects = gameSystemServices?.['effects'];
     if (effects && typeof effects.update === 'function') {
       adjustedDelta = effects.update(shouldUpdateGame ? deltaTime : 0);
     }
@@ -470,10 +487,10 @@ function gameLoop(currentTime) {
 
     // Update performance metrics
     if (shouldUpdateGame) {
-      const enemies = gameServices.get('enemies');
-      const combat = gameServices.get('combat');
-      const xpOrbs = gameServices.get('xp-orbs');
-      const effects = gameServices.get('effects');
+      const enemies = gameSystemServices?.['enemies'];
+      const combat = gameSystemServices?.['combat'];
+      const xpOrbs = gameSystemServices?.['xp-orbs'];
+      const effects = gameSystemServices?.['effects'];
 
       performanceMonitor.updateMetrics({
         enemies: enemies?.asteroids?.length || 0,
@@ -510,7 +527,7 @@ function updateGame(deltaTime) {
   ];
 
   servicesToUpdate.forEach((serviceName) => {
-    const service = gameServices.get(serviceName);
+    const service = gameSystemServices?.[serviceName];
     if (service && typeof service.update === 'function') {
       service.update(deltaTime);
     }
@@ -520,7 +537,7 @@ function updateGame(deltaTime) {
 function renderGame() {
   if (!gameState.ctx) return;
 
-  const renderer = gameServices.get('renderer');
+  const renderer = gameSystemServices?.['renderer'];
   if (renderer && typeof renderer.render === 'function') {
     renderer.render(gameState.ctx);
   }
