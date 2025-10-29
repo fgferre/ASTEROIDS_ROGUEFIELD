@@ -17,8 +17,8 @@ const DEFAULT_UPGRADE_CATEGORY = {
 };
 
 class UpgradeSystem extends BaseSystem {
-  constructor(dependencies = {}) {
-    super(dependencies, {
+  constructor(dependencies = {}, options = {}) {
+    const defaultOptions = {
       enableRandomManagement: true,
       systemName: 'UpgradeSystem',
       serviceName: 'upgrades',
@@ -28,7 +28,19 @@ class UpgradeSystem extends BaseSystem {
         progression: 'upgrades.progression',
         rewards: 'upgrades.rewards',
       },
-    });
+    };
+
+    // Merge options, allowing subclasses to override
+    const mergedOptions = {
+      ...defaultOptions,
+      ...options,
+      randomForkLabels: {
+        ...defaultOptions.randomForkLabels,
+        ...(options.randomForkLabels || {}),
+      },
+    };
+
+    super(dependencies, mergedOptions);
   }
 
   initialize() {

@@ -143,7 +143,7 @@ class EnemySystem extends BaseSystem {
     this.damageSystem = null;
     this.updateSystem = null;
 
-    this.eventBus = typeof gameEvents !== 'undefined' ? gameEvents : null;
+    this.eventBus = gameEvents;
 
     this.missingDependencyWarnings = new Set();
     this.deferredDependencyWarnings = new Set(['world', 'combat', 'effects', 'audio', 'ui']);
@@ -787,8 +787,6 @@ class EnemySystem extends BaseSystem {
           tags: ['enemy', 'boss', 'elite']
         });
       }
-
-      console.log('[EnemySystem] EnemyFactory initialized (factory-enabled)');
     } catch (error) {
       console.warn('[EnemySystem] Failed to initialize EnemyFactory', error);
       this.factory = null;
@@ -798,18 +796,15 @@ class EnemySystem extends BaseSystem {
   setupManagers() {
     try {
       // Initialize WaveManager
-      if (typeof gameEvents !== 'undefined') {
-        const waveManagerRandom = this.getRandomScope('wave-manager', {
-          label: 'wave-manager',
-        });
+      const waveManagerRandom = this.getRandomScope('wave-manager', {
+        label: 'wave-manager',
+      });
 
-        this.waveManager = new WaveManager({
-          enemySystem: this,
-          eventBus: gameEvents,
-          random: waveManagerRandom,
-        });
-        console.log('[EnemySystem] WaveManager initialized');
-      }
+      this.waveManager = new WaveManager({
+        enemySystem: this,
+        eventBus: gameEvents,
+        random: waveManagerRandom,
+      });
 
       // Initialize RewardManager
       this.refreshServiceState();
@@ -827,7 +822,6 @@ class EnemySystem extends BaseSystem {
           healthHearts: healthHeartSystem,
           random: rewardRandom,
         });
-        console.log('[EnemySystem] RewardManager initialized');
       }
     } catch (error) {
       console.warn('[EnemySystem] Failed to initialize managers', error);
@@ -841,23 +835,18 @@ class EnemySystem extends BaseSystem {
     try {
       // Initialize movement component
       this.movementComponent = new AsteroidMovement();
-      console.log('[EnemySystem] AsteroidMovement component initialized');
 
       // Initialize collision component
       this.collisionComponent = new AsteroidCollision();
-      console.log('[EnemySystem] AsteroidCollision component initialized');
 
       // Initialize renderer component
       this.rendererComponent = new AsteroidRenderer();
-      console.log('[EnemySystem] AsteroidRenderer component initialized');
 
       this.genericMovement = new MovementComponent();
       this.genericWeapon = new WeaponComponent();
       this.genericRender = new RenderComponent();
       this.genericCollision = new CollisionComponent();
       this.genericHealth = new HealthComponent();
-
-      console.log('[EnemySystem] Generic enemy components initialized');
     } catch (error) {
       console.warn('[EnemySystem] Failed to initialize components', error);
       this.movementComponent = null;
@@ -889,7 +878,6 @@ class EnemySystem extends BaseSystem {
       };
 
       this.renderSystem = new EnemyRenderSystem(context);
-      console.log('[EnemySystem] EnemyRenderSystem initialized');
     } catch (error) {
       console.warn('[EnemySystem] Failed to initialize render system', error);
       this.renderSystem = null;
@@ -940,7 +928,6 @@ class EnemySystem extends BaseSystem {
       };
 
       this.spawnSystem = new EnemySpawnSystem(context);
-      console.log('[EnemySystem] EnemySpawnSystem initialized');
     } catch (error) {
       console.warn('[EnemySystem] Failed to initialize spawn system', error);
       this.spawnSystem = null;
@@ -982,7 +969,6 @@ class EnemySystem extends BaseSystem {
       };
 
       this.damageSystem = new EnemyDamageSystem(context);
-      console.log('[EnemySystem] EnemyDamageSystem initialized');
     } catch (error) {
       console.warn('[EnemySystem] Failed to initialize damage system', error);
       this.damageSystem = null;
@@ -1046,7 +1032,6 @@ class EnemySystem extends BaseSystem {
       };
 
       this.updateSystem = new EnemyUpdateSystem(context);
-      console.log('[EnemySystem] EnemyUpdateSystem initialized');
     } catch (error) {
       console.warn('[EnemySystem] Failed to initialize update system', error);
       this.updateSystem = null;
@@ -1732,7 +1717,7 @@ class EnemySystem extends BaseSystem {
   }
 
   emitBossSystemEvent(channel, eventName, payload) {
-    const bus = this.eventBus || (typeof gameEvents !== 'undefined' ? gameEvents : null);
+    const bus = this.eventBus || gameEvents;
     if (!bus || !eventName || !channel) {
       return;
     }
@@ -2004,10 +1989,6 @@ class EnemySystem extends BaseSystem {
   }
 
   emitWaveStateUpdate(force = false) {
-    if (typeof gameEvents === 'undefined') {
-      return;
-    }
-
     const managerTotals = this.waveState?.managerTotals || null;
     const normalizedManagerTotals = managerTotals
       ? {
@@ -2814,13 +2795,11 @@ class EnemySystem extends BaseSystem {
     if (!waveManagerActive) {
       this.grantWaveRewards();
 
-      if (typeof gameEvents !== 'undefined') {
-        gameEvents.emit('wave-completed', {
-          wave: wave.current,
-          completedWaves: wave.completedWaves,
-          breakTimer: wave.breakTimer,
-        });
-      }
+      gameEvents.emit('wave-completed', {
+        wave: wave.current,
+        completedWaves: wave.completedWaves,
+        breakTimer: wave.breakTimer,
+      });
     } else if (
       typeof process !== 'undefined' &&
       process.env?.NODE_ENV === 'development' &&
@@ -2891,12 +2870,10 @@ class EnemySystem extends BaseSystem {
 
       this.spawnInitialAsteroids(4);
 
-      if (typeof gameEvents !== 'undefined') {
-        gameEvents.emit('wave-started', {
-          wave: wave.current,
-          totalAsteroids: wave.totalAsteroids,
-        });
-      }
+      gameEvents.emit('wave-started', {
+        wave: wave.current,
+        totalAsteroids: wave.totalAsteroids,
+      });
     }
 
     this.emitWaveStateUpdate(true);
@@ -3370,7 +3347,7 @@ class EnemySystem extends BaseSystem {
       }
     }
 
-    const bus = this.eventBus || (typeof gameEvents !== 'undefined' ? gameEvents : null);
+    const bus = this.eventBus || gameEvents;
     if (bus) {
       bus.emit('combat-enemy-projectile', payload);
       return true;

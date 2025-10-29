@@ -172,14 +172,12 @@ class MenuBackgroundSystem extends BaseSystem {
     return fork;
   }
 
-  reseedRandomForks(options = {}) {
-    super.reseedRandomForks(options);
-
-    const threeUuidFork = this.ensureThreeUuidRandom();
+  onReset() {
+    const fork = this.ensureThreeUuidRandom();
     const storedSeed = this.randomForkSeeds?.threeUuid;
 
-    if (threeUuidFork && storedSeed !== undefined && typeof threeUuidFork.reset === 'function') {
-      threeUuidFork.reset(storedSeed);
+    if (fork && storedSeed !== undefined && typeof fork.reset === 'function') {
+      fork.reset(storedSeed);
     }
   }
 

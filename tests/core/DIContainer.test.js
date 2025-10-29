@@ -29,9 +29,15 @@ describe('DIContainer', () => {
       expect(() => container.register(null, () => {})).toThrow();
     });
 
-    it('should throw error for non-function factory', () => {
+    it('should support legacy instance registration (non-function)', () => {
       const container = createContainer();
-      expect(() => container.register('test', 'not-a-function')).toThrow();
+      const instance = { value: 42, type: 'legacy' };
+      const result = container.register('test', instance);
+
+      // Legacy registration also returns 'this' for method chaining
+      expect(result).toBe(container);
+      expect(container.has('test')).toBe(true);
+      expect(container.get('test')).toBe(instance);
     });
 
     it('should throw error for duplicate registration', () => {
@@ -391,6 +397,152 @@ describe('DIContainer', () => {
       container.resolve('test');
 
       expect(initialized).toBe(true);
+    });
+  });
+
+  describe.concurrent('Legacy Compatibility - syncInstance', () => {
+    it('should sync instance for unregistered service', () => {
+      const container = createContainer();
+      const legacyInstance = { value: 42, legacy: true };
+
+      container.syncInstance('legacyService', legacyInstance);
+
+      expect(container.has('legacyService')).toBe(true);
+      expect(container.isInstantiated('legacyService')).toBe(true);
+      expect(container.resolve('legacyService')).toBe(legacyInstance);
+      expect(container.resolve('legacyService').value).toBe(42);
+    });
+
+    it('should replace singleton instance when service already registered as singleton', () => {
+      const container = createContainer();
+      const originalInstance = { value: 1 };
+      const legacyInstance = { value: 42, legacy: true };
+
+      container.register('test', () => originalInstance, { singleton: true });
+      container.resolve('test'); // Initialize singleton
+
+      expect(container.resolve('test').value).toBe(1);
+
+      container.syncInstance('test', legacyInstance);
+
+      expect(container.resolve('test')).toBe(legacyInstance);
+      expect(container.resolve('test').value).toBe(42);
+    });
+
+    it('should not override transient service factory', () => {
+      const container = createContainer();
+      let factoryCallCount = 0;
+
+      container.register('transient', () => {
+        factoryCallCount++;
+        return { id: factoryCallCount };
+      }, {
+        singleton: false
+      });
+
+      const legacyInstance = { id: 999, legacy: true };
+      container.syncInstance('transient', legacyInstance);
+
+      // Factory should still be called, not the synced instance
+      const instance1 = container.resolve('transient');
+      const instance2 = container.resolve('transient');
+
+      expect(instance1).not.toBe(legacyInstance);
+      expect(instance2).not.toBe(legacyInstance);
+      expect(instance1.id).toBe(1);
+      expect(instance2.id).toBe(2);
+      expect(factoryCallCount).toBe(2);
+    });
+
+    it('should throw error for invalid service name', () => {
+      const container = createContainer();
+      const instance = {};
+
+      expect(() => container.syncInstance('', instance)).toThrow();
+      expect(() => container.syncInstance(null, instance)).toThrow();
+    });
+
+    it('should throw error for null/undefined instance', () => {
+      const container = createContainer();
+
+      expect(() => container.syncInstance('test', null)).toThrow(/null\/undefined/i);
+      expect(() => container.syncInstance('test', undefined)).toThrow(/null\/undefined/i);
+    });
+
+    it('should update stats when syncing new service', () => {
+      const container = createContainer();
+      const initialStats = container.getStats();
+
+      container.syncInstance('legacy', { value: 1 });
+
+      const updatedStats = container.getStats();
+
+      expect(updatedStats.registrations).toBe(initialStats.registrations + 1);
+      expect(updatedStats.totalServices).toBe(initialStats.totalServices + 1);
+    });
+  });
+
+  describe.concurrent('Legacy Compatibility - get', () => {
+    it('should resolve service via get() method', () => {
+      const container = createContainer();
+      container.register('test', () => ({ value: 42 }));
+
+      const instance = container.get('test');
+
+      expect(instance).toBeDefined();
+      expect(instance.value).toBe(42);
+    });
+
+    it('should return same instance as resolve()', () => {
+      const container = createContainer();
+      container.register('test', () => ({ value: 42 }), { singleton: true });
+
+      const viaResolve = container.resolve('test');
+      const viaGet = container.get('test');
+
+      expect(viaGet).toBe(viaResolve);
+    });
+  });
+
+  describe.concurrent('Migration Report', () => {
+    it('should generate migration report', () => {
+      const container = createContainer();
+      container.register('a', () => ({}), { singleton: true });
+      container.register('b', (a) => ({ a }), {
+        dependencies: ['a'],
+        singleton: true
+      });
+      container.resolve('a'); // Instantiate only 'a'
+
+      const report = container.getMigrationReport();
+
+      // New structure includes summary, legacyServices, containerServices, recommendations
+      expect(report.summary).toBeDefined();
+      expect(report.summary.totalServices).toBe(2);
+      expect(report.summary.instantiatedServices).toBe(1);
+      expect(report.legacyServices).toBeDefined();
+      expect(report.containerServices).toBeDefined();
+      expect(report.recommendations).toBeDefined();
+      expect(report.services).toHaveLength(2);
+      expect(report.services[0].name).toBe('a');
+      expect(report.services[0].instantiated).toBe(true);
+      expect(report.services[1].name).toBe('b');
+      expect(report.services[1].instantiated).toBe(false);
+    });
+
+    it('should include dependency information in report', () => {
+      const container = createContainer();
+      container.register('logger', () => ({}));
+      container.register('service', (logger) => ({ logger }), {
+        dependencies: ['logger']
+      });
+
+      const report = container.getMigrationReport();
+      const serviceInfo = report.services.find(s => s.name === 'service');
+
+      expect(serviceInfo).toBeDefined();
+      expect(serviceInfo.dependencies).toContain('logger');
+      expect(serviceInfo.singleton).toBe(true);
     });
   });
 });
