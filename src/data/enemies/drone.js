@@ -2,21 +2,30 @@
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
+/**
+ * Drone enemy configuration following canonical schema.
+ * See schema.js for complete field definitions and naming conventions.
+ *
+ * @typedef {import('./schema.js').EnemyConfigSchema} EnemyConfigSchema
+ */
+
 // === DRONE CONFIGURATION ===
 
 /**
  * Immutable configuration describing the base combat stats and behavior tuning
  * for the assault drone enemy archetype.
+ *
+ * @deprecated Use DRONE_COMPONENTS for component-based configs
+ *
  * @typedef {object} DroneConfig
  * @property {string} key
  * @property {string} displayName
  * @property {number} radius
  * @property {number} health
- * @property {number} speed
  * @property {number} acceleration
- * @property {number} fireRate
- * @property {number} fireVariance
- * @property {number} fireSpread
+ * @property {number} cooldown - Time between shots (replaces fireRate)
+ * @property {number} variance - Cooldown randomization (replaces fireVariance)
+ * @property {number} spread - Angular spread (replaces fireSpread)
  * @property {number} projectileSpeed
  * @property {number} projectileDamage
  * @property {number} projectileLifetime
@@ -28,11 +37,10 @@ export const DRONE_CONFIG = deepFreeze({
   displayName: 'Assault Drone',
   radius: 12,
   health: 30,
-  speed: 180,
   acceleration: 260,
-  fireRate: 2.0,
-  fireVariance: 0.35,
-  fireSpread: 0.06,
+  cooldown: 2.0,
+  variance: 0.35,
+  spread: 0.06,
   projectileSpeed: 340,
   projectileDamage: 15,
   projectileLifetime: 2.0,
@@ -55,7 +63,6 @@ export const DRONE_CONFIG = deepFreeze({
 export const DRONE_COMPONENTS = deepFreeze({
   movement: {
     strategy: 'tracking',
-    speed: 180,
     acceleration: 260,
     maxSpeed: 180,
     targetingRange: 460,

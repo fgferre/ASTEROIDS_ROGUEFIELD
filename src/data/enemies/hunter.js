@@ -2,17 +2,26 @@
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
+/**
+ * Hunter enemy configuration following canonical schema.
+ * See schema.js for complete field definitions and naming conventions.
+ *
+ * @typedef {import('./schema.js').EnemyConfigSchema} EnemyConfigSchema
+ */
+
 // === HUNTER CONFIGURATION ===
 
 /**
  * Immutable configuration describing stats and firing behavior for the hunter
  * frigate enemy archetype.
+ *
+ * @deprecated Use HUNTER_COMPONENTS for component-based configs
+ *
  * @typedef {object} HunterConfig
  * @property {string} key
  * @property {string} displayName
  * @property {number} radius
  * @property {number} health
- * @property {number} speed
  * @property {number} acceleration
  * @property {number} preferredDistance
  * @property {number} projectileSpeed
@@ -20,16 +29,15 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
  * @property {number} projectileLifetime
  * @property {number} fireRange
  * @property {number} burstCount
- * @property {number} burstInterval
+ * @property {number} cooldown - Time between bursts (replaces burstInterval)
  * @property {number} burstDelay
- * @property {number} fireSpread
+ * @property {number} spread - Angular spread (replaces fireSpread)
  */
 export const HUNTER_CONFIG = deepFreeze({
   key: 'hunter',
   displayName: 'Hunter Frigate',
   radius: 16,
   health: 48,
-  speed: 120,
   acceleration: 220,
   preferredDistance: 175,
   projectileSpeed: 420,
@@ -37,9 +45,9 @@ export const HUNTER_CONFIG = deepFreeze({
   projectileLifetime: 1.5,
   fireRange: 520,
   burstCount: 3,
-  burstInterval: 3.5,
+  cooldown: 3.5,
   burstDelay: 0.15,
-  fireSpread: 0.045,
+  spread: 0.045,
 });
 
 /**
@@ -58,7 +66,6 @@ export const HUNTER_CONFIG = deepFreeze({
 export const HUNTER_COMPONENTS = deepFreeze({
   movement: {
     strategy: 'orbit',
-    speed: 120,
     acceleration: 220,
     maxSpeed: 120,
     preferredDistance: 175,
@@ -71,7 +78,7 @@ export const HUNTER_COMPONENTS = deepFreeze({
     lifetime: 1.5,
     burstCount: 3,
     burstDelay: 0.15,
-    burstInterval: 3.5,
+    cooldown: 3.5,
     spread: 0.045,
     fireRange: 520,
     predictive: true,

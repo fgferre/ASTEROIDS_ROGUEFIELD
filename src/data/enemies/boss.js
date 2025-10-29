@@ -2,11 +2,21 @@
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
+/**
+ * Boss enemy configuration following canonical schema.
+ * See schema.js for complete field definitions and naming conventions.
+ *
+ * @typedef {import('./schema.js').EnemyConfigSchema} EnemyConfigSchema
+ */
+
 // === BOSS CONFIGURATION ===
 
 /**
  * Immutable configuration describing the boss enemy's combat phases,
  * behaviors, and scaling parameters.
+ *
+ * @deprecated Use BOSS_COMPONENTS for component-based configs
+ *
  * @typedef {object} BossConfig
  * @property {string} key
  * @property {string} displayName
@@ -16,24 +26,23 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
  * @property {number} entryDriftSpeed
  * @property {number} health
  * @property {number} healthScaling
- * @property {number} speed
  * @property {number} acceleration
  * @property {number} contactDamage
  * @property {number} projectileDamage
  * @property {number} spreadProjectileCount
  * @property {number} spreadProjectileSpeed
- * @property {number} spreadInterval
+ * @property {number} spreadCooldown - Spread pattern cooldown (replaces spreadInterval)
  * @property {number} spreadVariance
  * @property {number} spreadArc
  * @property {number} spreadAngleVariance
  * @property {number} volleyBurstSize
  * @property {number} volleyShotDelay
- * @property {number} volleyInterval
+ * @property {number} volleyCooldown - Volley pattern cooldown (replaces volleyInterval)
  * @property {number} volleyVariance
  * @property {number} volleyProjectileSpeed
  * @property {number} volleySpread
  * @property {string[]} minionTypes
- * @property {number} spawnInterval
+ * @property {number} spawnCooldown - Minion spawn cooldown (replaces spawnInterval)
  * @property {number} spawnVariance
  * @property {number} chargeCooldown
  * @property {number} chargeDuration
@@ -46,8 +55,11 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
  * @property {number[]} phaseThresholds
  * @property {number} phaseCount
  * @property {number} invulnerabilityDuration
+ * @property {number} [spreadInterval] - @deprecated Use spreadCooldown instead
+ * @property {number} [volleyInterval] - @deprecated Use volleyCooldown instead
+ * @property {number} [spawnInterval] - @deprecated Use spawnCooldown instead
  */
-export const BOSS_CONFIG = deepFreeze({
+const _bossConfigBase = {
   key: 'boss',
   displayName: 'Apex Overlord',
   radius: 60,
@@ -56,24 +68,23 @@ export const BOSS_CONFIG = deepFreeze({
   entryDriftSpeed: 85,
   health: 1500,
   healthScaling: 1.2,
-  speed: 60,
   acceleration: 120,
   contactDamage: 45,
   projectileDamage: 35,
   spreadProjectileCount: 7,
   spreadProjectileSpeed: 260,
-  spreadInterval: 2.4,
+  spreadCooldown: 2.4,
   spreadVariance: 0.45,
   spreadArc: 0.85,
   spreadAngleVariance: 0.12,
   volleyBurstSize: 5,
   volleyShotDelay: 0.16,
-  volleyInterval: 1.35,
+  volleyCooldown: 1.35,
   volleyVariance: 0.2,
   volleyProjectileSpeed: 320,
   volleySpread: 0.12,
   minionTypes: ['drone', 'hunter'],
-  spawnInterval: 6.5,
+  spawnCooldown: 6.5,
   spawnVariance: 1.1,
   chargeCooldown: 6.2,
   chargeDuration: 1.1,
@@ -91,7 +102,15 @@ export const BOSS_CONFIG = deepFreeze({
     lootTable: Object.freeze(['core-upgrade', 'weapon-blueprint']),
   }),
   phaseColors: Object.freeze(['#ff6b6b', '#f9c74f', '#4d96ff']),
-});
+};
+
+// Add deprecated aliases for backward compatibility
+// TODO: Remove these aliases after dependent code migrates to new field names
+_bossConfigBase.spreadInterval = _bossConfigBase.spreadCooldown;
+_bossConfigBase.volleyInterval = _bossConfigBase.volleyCooldown;
+_bossConfigBase.spawnInterval = _bossConfigBase.spawnCooldown;
+
+export const BOSS_CONFIG = deepFreeze(_bossConfigBase);
 
 /**
  * Component configuration that assembles the boss enemy from modular behaviors.
@@ -109,7 +128,6 @@ export const BOSS_CONFIG = deepFreeze({
 export const BOSS_COMPONENTS = deepFreeze({
   movement: {
     strategy: 'seeking',
-    speed: 60,
     acceleration: 120,
     maxSpeed: 60,
     safeDistance: 240,
@@ -120,7 +138,7 @@ export const BOSS_COMPONENTS = deepFreeze({
     spread: {
       projectileCount: 7,
       speed: 260,
-      interval: 2.4,
+      cooldown: 2.4,
       variance: 0.45,
       arc: 0.85,
       angleVariance: 0.12,
@@ -128,7 +146,7 @@ export const BOSS_COMPONENTS = deepFreeze({
     volley: {
       burstSize: 5,
       shotDelay: 0.16,
-      interval: 1.35,
+      cooldown: 1.35,
       variance: 0.2,
       speed: 320,
       spread: 0.12,

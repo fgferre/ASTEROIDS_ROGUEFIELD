@@ -2,6 +2,17 @@
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
+/**
+ * Asteroid configurations use a variant-based system rather than the
+ * component-based system used by other enemies (drone, hunter, mine, boss).
+ *
+ * However, field naming follows the same conventions defined in schema.js:
+ * - Movement: Use `maxSpeed` (not `speed`)
+ * - Weapon/Behavior: Use `cooldown` (not `interval` or `fireRate`)
+ *
+ * See schema.js for complete field definitions and naming conventions.
+ */
+
 // === CRACK PROFILES ===
 // Used by CrackGenerationService to generate procedural crack patterns.
 // Each variant defines crack appearance (rays, branches, rings, visual effects).

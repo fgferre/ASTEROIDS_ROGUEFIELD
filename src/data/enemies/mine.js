@@ -2,17 +2,26 @@
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
+/**
+ * Mine enemy configuration following canonical schema.
+ * See schema.js for complete field definitions and naming conventions.
+ *
+ * @typedef {import('./schema.js').EnemyConfigSchema} EnemyConfigSchema
+ */
+
 // === MINE CONFIGURATION ===
 
 /**
  * Immutable configuration describing lifetime and explosion behavior for the
  * proximity mine enemy archetype.
+ *
+ * @deprecated Use MINE_COMPONENTS for component-based configs
+ *
  * @typedef {object} MineConfig
  * @property {string} key
  * @property {string} displayName
  * @property {number} radius
  * @property {number} health
- * @property {number} lifetime
  * @property {number} armTime
  * @property {number} proximityRadius
  * @property {number} explosionRadius
@@ -25,7 +34,6 @@ export const MINE_CONFIG = deepFreeze({
   displayName: 'Proximity Mine',
   radius: 18,
   health: 20,
-  lifetime: 30,
   armTime: 0.5,
   proximityRadius: 80,
   explosionRadius: 120,

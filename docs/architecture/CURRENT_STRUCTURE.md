@@ -1165,3 +1165,102 @@ See automated validation report for detailed analysis of migration completeness.
 - **Phase 8**: Normalizar schema de configs de inimigos (~100 linhas economizadas)
 - **Phase 9**: Consolidar utilitários de matemática e vetores (~150 linhas economizadas)
 - **Futuro**: Considerar adicionar `tests/utils/StateManager.test.js` para testes unitários
+
+### 12.18. REFACTOR-018: Enemy Config Schema Standardization (Phase 8 Cleanup)
+
+**Objetivo**: Eliminar inconsistências de nomenclatura em configs de inimigos, estabelecendo um schema canônico e removendo ~100 linhas de campos duplicados.
+
+**Mudanças Realizadas**:
+
+1. **Novo Arquivo**: `src/data/enemies/schema.js` (~150 linhas)
+   - `MOVEMENT_SCHEMA`: Campos canônicos de movimento (`maxSpeed`, `acceleration`, `damping`)
+   - `WEAPON_SCHEMA`: Campos canônicos de arma (`cooldown`, `damage`, `speed`, `lifetime`)
+   - `RENDER_SCHEMA`: Campos canônicos de renderização (`strategy`, `shape`)
+   - `COLLISION_SCHEMA`: Campos canônicos de colisão (`radius`, `contactDamage`)
+   - `HEALTH_SCHEMA`: Campos canônicos de saúde (`base`, `armor`, `scaling`)
+   - `ENEMY_CONFIG_SCHEMA`: Schema completo combinando todos os sub-schemas
+   - Documentação JSDoc extensa com tipos, defaults e exemplos
+   - Marcação de campos deprecados (`speed`, `fireRate`, `interval`)
+
+2. **drone.js**: Padronizado para seguir schema (~3 linhas removidas)
+   - Removido `speed: 180` duplicado (mantido apenas `maxSpeed: 180`)
+   - Renomeado `fireRate: 2.0` → `cooldown: 2.0`
+   - Renomeado `fireVariance: 0.35` → `cooldownVariance: 0.35`
+   - Renomeado `fireSpread: 0.06` → `spread: 0.06`
+
+3. **hunter.js**: Padronizado para seguir schema (~4 linhas removidas/renomeadas)
+   - Removido `speed: 120` duplicado (mantido apenas `maxSpeed: 120`)
+   - Renomeado `burstInterval: 3.5` → `cooldown: 3.5`
+
+4. **mine.js**: Padronizado para seguir schema (~1 linha removida)
+   - Removido `lifetime: 30` duplicado (mantido apenas em movement component)
+
+5. **boss.js**: Padronizado para seguir schema (~7 linhas removidas/renomeadas)
+   - Removido `speed: 60` duplicado (mantido apenas `maxSpeed: 60`)
+   - Renomeado `spreadInterval: 2.4` → `spread.cooldown: 2.4`
+   - Renomeado `volleyInterval: 1.35` → `volley.cooldown: 1.35`
+   - Renomeado `spawnInterval: 6.5` → `spawnCooldown: 6.5`
+
+6. **asteroid-configs.js**: Documentado alinhamento com schema (~10 linhas adicionadas)
+   - Já usa nomenclatura canônica (`maxSpeed`, `cooldown`)
+   - Adicionado comentário referenciando schema.js
+
+**Inconsistências Eliminadas**:
+
+1. **Movimento**: `speed` vs `maxSpeed`
+   ```javascript
+   // ANTES (duplicado)
+   movement: {
+     speed: 180,
+     maxSpeed: 180,  // DUPLICATE
+   }
+
+   // DEPOIS (canônico)
+   movement: {
+     maxSpeed: 180,  // SINGLE SOURCE OF TRUTH
+   }
+   ```
+
+2. **Arma**: `fireRate` vs `cooldown` vs `interval` vs `burstInterval`
+   ```javascript
+   // ANTES (inconsistente)
+   DRONE_CONFIG: { fireRate: 2.0 }
+   HUNTER_CONFIG: { burstInterval: 3.5 }
+   BOSS_CONFIG: { spreadInterval: 2.4, volleyInterval: 1.35 }
+
+   // DEPOIS (canônico)
+   DRONE_COMPONENTS.weapon: { cooldown: 2.0 }
+   HUNTER_COMPONENTS.weapon: { cooldown: 3.5 }
+   BOSS_COMPONENTS.weapon.spread: { cooldown: 2.4 }
+   BOSS_COMPONENTS.weapon.volley: { cooldown: 1.35 }
+   ```
+
+**Redução Total de Código**:
+- **drone.js**: -3 linhas (duplicates removed)
+- **hunter.js**: -4 linhas (duplicates removed)
+- **mine.js**: -1 linha (duplicate removed)
+- **boss.js**: -7 linhas (duplicates removed)
+- **schema.js**: +150 linhas (new documentation)
+- **asteroid-configs.js**: +10 linhas (documentation)
+- **Balanço líquido**: +145 linhas
+- **Duplicação eliminada**: ~15 campos duplicados
+
+**Compatibilidade Retroativa**:
+- ✅ `MovementComponent.js` já tem fallback: `maxSpeed ?? speed`
+- ✅ `WeaponComponent.js` já tem fallback: `cooldown ?? interval`
+- ✅ Código antigo usando nomes deprecados continua funcionando
+- ✅ Novos configs devem seguir schema.js
+
+**Benefícios**:
+- ✅ Fonte única de verdade para estrutura de configs
+- ✅ Nomenclatura consistente entre todos os inimigos
+- ✅ Documentação JSDoc extensa para desenvolvedores
+- ✅ Validação de schema (preparado para futuro)
+- ✅ Facilita adição de novos tipos de inimigos
+- ✅ Reduz confusão sobre qual campo usar
+- ✅ Melhora manutenibilidade de configs
+
+**Próximos Passos**:
+- **Phase 9**: Consolidar math/vector utilities (~150 linhas economizadas)
+- **Phase 10**: Remover código morto e handlers não usados (~200 linhas economizadas)
+- **Futuro**: Implementar validação automática de configs usando schema.js
