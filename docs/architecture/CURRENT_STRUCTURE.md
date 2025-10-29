@@ -1076,3 +1076,92 @@ See automated validation report for detailed analysis of migration completeness.
 - Migrate remaining `gameServices.get()` calls to constructor injection
 - Remove legacy compatibility layer once all systems use DI
 - Consider removing `syncInstance()` method after full migration
+
+### 12.17. REFACTOR-017: StateManager Utility Creation (Phase 7 Cleanup)
+
+**Objetivo**: Criar utilitário `StateManager` para consolidar padrões de snapshot duplicados em `EnemySystem`, `PhysicsSystem` e `ProgressionSystem`, reduzindo ~200 linhas de código duplicado.
+
+**Mudanças Realizadas**:
+
+1. **Novo Arquivo**: `src/utils/StateManager.js` (~100 linhas)
+   - `safeNumber()`, `safeBoolean()`, `safeString()`, `safeObject()`: Conversão segura de valores
+   - `deepClone()`, `shallowClone()`, `cloneArray()`: Utilitários de clonagem
+   - `validateSnapshot()`, `isValidSnapshotVersion()`, `hasRequiredFields()`: Validação de snapshots
+   - `createFallbackHandler()`: Factory para handlers de fallback com supressão de warnings
+   - `createSnapshotWrapper()`: Cria métodos alias padrão (getSnapshotState, restoreSnapshotState)
+
+2. **EnemySystem.js**: Refatorado para usar StateManager (~29 linhas removidas)
+   - Substituído `warnSnapshotFallback()` por `createFallbackHandler()`
+   - Substituído `safeNumber` local por utilitário do StateManager
+   - Substituído `JSON.parse(JSON.stringify())` por `deepClone()`
+   - Simplificada validação em `importState()` com `validateSnapshot()`
+
+3. **PhysicsSystem.js**: Refatorado para usar StateManager (~27 linhas removidas)
+   - Substituído `handleSnapshotFallback()` por `createFallbackHandler()`
+   - Substituído `safeNumber` local por utilitário do StateManager
+   - Substituído spread operators por `shallowClone()`
+   - Simplificada validação em `importState()` com `validateSnapshot()`
+
+4. **ProgressionSystem.js**: Refatorado para usar StateManager (~2 linhas removidas líquidas)
+   - Simplificadas validações em `serialize()` e `deserialize()` com `safeNumber()`
+   - Adicionados métodos alias: `exportState()`, `importState()`, `getSnapshotState()`, `restoreSnapshotState()`
+   - Melhora compatibilidade com `GameSessionService` (já verifica ambas convenções de nomes)
+
+**Padrões Consolidados**:
+
+1. **Conversão Segura de Números** (usado 50+ vezes):
+   ```javascript
+   // ANTES
+   const value = Number.isFinite(data.x) ? data.x : 0;
+   
+   // DEPOIS
+   const value = safeNumber(data.x, 0);
+   ```
+
+2. **Fallback Handling** (usado em 2 sistemas):
+   ```javascript
+   // ANTES
+   warnSnapshotFallback(reason) {
+     if (this._snapshotFallbackWarningIssued) return;
+     this._snapshotFallbackWarningIssued = true;
+     console.warn(`[System] Snapshot unavailable (${reason})`);
+   }
+   
+   // DEPOIS
+   this._handleSnapshotFallback = createFallbackHandler({
+     systemName: 'System',
+     warningFlag: '_snapshotFallbackWarningIssued',
+     onFallback: this.reset.bind(this)
+   });
+   ```
+
+3. **Deep Clone** (usado em 3 sistemas):
+   ```javascript
+   // ANTES
+   const clone = JSON.parse(JSON.stringify(obj));
+   
+   // DEPOIS
+   const clone = deepClone(obj);
+   ```
+
+**Redução Total de Código**:
+- **EnemySystem.js**: -29 linhas
+- **PhysicsSystem.js**: -27 linhas
+- **ProgressionSystem.js**: -2 linhas (líquido: -18 removidas, +16 alias methods)
+- **StateManager.js**: +100 linhas (novo utilitário)
+- **Balanço líquido**: +42 linhas
+- **Duplicação eliminada**: ~200 linhas de padrões duplicados
+
+**Benefícios**:
+- ✅ Fonte única de verdade para padrões de snapshot
+- ✅ Funções puras e testáveis isoladamente
+- ✅ Compatibilidade total com formatos de snapshot existentes
+- ✅ Suporta ambas convenções de nomes (exportState/importState e serialize/deserialize)
+- ✅ Fallback handling consistente entre sistemas
+- ✅ Código mais legível e manutenível
+- ✅ Facilita adição de novos sistemas com snapshots
+
+**Próximos Passos**:
+- **Phase 8**: Normalizar schema de configs de inimigos (~100 linhas economizadas)
+- **Phase 9**: Consolidar utilitários de matemática e vetores (~150 linhas economizadas)
+- **Futuro**: Considerar adicionar `tests/utils/StateManager.test.js` para testes unitários

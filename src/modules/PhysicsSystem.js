@@ -8,6 +8,12 @@ import {
 import { SpatialHash } from '../core/SpatialHash.js';
 import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
+import {
+  safeNumber,
+  shallowClone,
+  createFallbackHandler,
+  validateSnapshot,
+} from '../utils/StateManager.js';
 import { SHIP_MASS } from '../data/constants/physics.js';
 import {
   SHIELD_COLLISION_BOUNCE,
@@ -60,6 +66,11 @@ class PhysicsSystem extends BaseSystem {
     this.lastSpatialHashMaintenance = performance.now();
     this.missingEnemyWarningLogged = false;
     this._snapshotFallbackWarningIssued = false;
+    this._handleSnapshotFallback = createFallbackHandler({
+      systemName: 'PhysicsSystem',
+      warningFlag: '_snapshotFallbackWarningIssued',
+      onFallback: this.reset.bind(this),
+    });
 
     // Performance tracking
     this.performanceMetrics = {
@@ -1039,9 +1050,6 @@ class PhysicsSystem extends BaseSystem {
       return null;
     }
 
-    const safeNumber = (value, fallback = 0) =>
-      Number.isFinite(value) ? value : fallback;
-
     return {
       poolId: asteroid[ASTEROID_POOL_ID] ?? null,
       id: asteroid.id ?? null,
@@ -1057,7 +1065,7 @@ class PhysicsSystem extends BaseSystem {
           ? asteroid.random.seed >>> 0
           : null,
       randomScopes: asteroid.randomScopeSeeds
-        ? { ...asteroid.randomScopeSeeds }
+        ? shallowClone(asteroid.randomScopeSeeds)
         : null,
     };
   }
@@ -1077,22 +1085,9 @@ class PhysicsSystem extends BaseSystem {
     };
   }
 
-  handleSnapshotFallback(reason) {
-    if (!this._snapshotFallbackWarningIssued) {
-      const detail = reason ? ` (${reason})` : '';
-      console.warn(
-        `[PhysicsSystem] Snapshot data unavailable, performing full reset${detail}`
-      );
-      this._snapshotFallbackWarningIssued = true;
-    }
-
-    this.reset();
-    return false;
-  }
-
   importState(snapshot) {
-    if (!snapshot || typeof snapshot !== 'object') {
-      return this.handleSnapshotFallback('invalid snapshot payload');
+    if (!validateSnapshot(snapshot, ['asteroids'])) {
+      return this._handleSnapshotFallback('invalid snapshot payload');
     }
 
     const asteroidSnapshots = Array.isArray(snapshot.asteroids)
@@ -1100,13 +1095,13 @@ class PhysicsSystem extends BaseSystem {
       : null;
 
     if (!asteroidSnapshots) {
-      return this.handleSnapshotFallback('missing asteroid list');
+      return this._handleSnapshotFallback('missing asteroid list');
     }
 
     this.refreshEnemyReference({ suppressWarning: true });
     const enemySystem = this.enemySystem;
     if (!enemySystem) {
-      return this.handleSnapshotFallback('enemy system unavailable');
+      return this._handleSnapshotFallback('enemy system unavailable');
     }
 
     const availableAsteroids =
@@ -1173,12 +1168,15 @@ class PhysicsSystem extends BaseSystem {
       }
 
       if (entry.randomScopes && typeof entry.randomScopes === 'object') {
-        asteroid.randomScopeSeeds = { ...entry.randomScopes };
-        if (typeof asteroid.ensureRandomScopes === 'function') {
-          asteroid.ensureRandomScopes();
-        }
-        if (typeof asteroid.reseedRandomScopes === 'function') {
-          asteroid.reseedRandomScopes();
+        const randomScopesClone = shallowClone(entry.randomScopes);
+        if (randomScopesClone) {
+          asteroid.randomScopeSeeds = randomScopesClone;
+          if (typeof asteroid.ensureRandomScopes === 'function') {
+            asteroid.ensureRandomScopes();
+          }
+          if (typeof asteroid.reseedRandomScopes === 'function') {
+            asteroid.reseedRandomScopes();
+          }
         }
       }
 
@@ -1187,7 +1185,7 @@ class PhysicsSystem extends BaseSystem {
     }
 
     if (asteroidSnapshots.length > 0 && restored === 0) {
-      return this.handleSnapshotFallback('no asteroids restored');
+      return this._handleSnapshotFallback('no asteroids restored');
     }
 
     this.bootstrapCompleted = true;
@@ -1201,7 +1199,15 @@ class PhysicsSystem extends BaseSystem {
     return this.exportState();
   }
 
+  captureSnapshot() {
+    return this.exportState();
+  }
+
   restoreSnapshotState(snapshot) {
+    return this.importState(snapshot);
+  }
+
+  applySnapshot(snapshot) {
     return this.importState(snapshot);
   }
 

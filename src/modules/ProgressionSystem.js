@@ -8,6 +8,12 @@ import {
   PROGRESSION_UPGRADE_ROLL_COUNT,
 } from '../core/GameConstants.js';
 import UpgradeSystem from './UpgradeSystem.js';
+import {
+  safeNumber,
+  safeBoolean,
+  deepClone,
+  createFallbackHandler,
+} from '../utils/StateManager.js';
 
 class ProgressionSystem extends UpgradeSystem {
   constructor(dependencies = {}) {
@@ -24,6 +30,12 @@ class ProgressionSystem extends UpgradeSystem {
 
     this._eventTopic = 'progression';
     this._upgradeEventTopic = 'upgrades';
+    this._snapshotFallbackWarningIssued = false;
+    this._handleSnapshotFallback = createFallbackHandler({
+      systemName: 'ProgressionSystem',
+      warningFlag: '_snapshotFallbackWarningIssued',
+      onFallback: this.reset.bind(this),
+    });
   }
 
   initialize() {
@@ -411,6 +423,7 @@ class ProgressionSystem extends UpgradeSystem {
     this.totalExperience = 0;
     this.appliedUpgrades.clear();
     this.pendingUpgradeOptions = [];
+    this._snapshotFallbackWarningIssued = false;
 
     if (Number.isFinite(this.defaultComboTimeout)) {
       this.comboTimeout = this.defaultComboTimeout;
@@ -435,43 +448,53 @@ class ProgressionSystem extends UpgradeSystem {
   // Para salvar progresso (futuro)
   serialize() {
     return {
-      level: this.level,
-      experience: this.experience,
-      experienceToNext: this.experienceToNext,
-      totalExperience: this.totalExperience,
+      level: safeNumber(this.level, 1),
+      experience: safeNumber(this.experience, 0),
+      experienceToNext: safeNumber(this.experienceToNext, 100),
+      totalExperience: safeNumber(this.totalExperience, 0),
       appliedUpgrades: Array.from(this.appliedUpgrades.entries()),
       comboState: {
-        comboCount: this.currentCombo,
-        comboTimer: this.comboTimer,
-        comboTimeout: this.comboTimeout,
-        comboMultiplier: this.comboMultiplier,
+        comboCount: safeNumber(this.currentCombo, 0),
+        comboTimer: safeNumber(this.comboTimer, 0),
+        comboTimeout: safeNumber(
+          this.comboTimeout,
+          safeNumber(this.defaultComboTimeout, 0)
+        ),
+        comboMultiplier: safeNumber(this.comboMultiplier, 1),
       },
     };
   }
 
   deserialize(data, options = {}) {
-    this.level = data?.level || 1;
-    this.experience = data?.experience || 0;
-    this.experienceToNext = data?.experienceToNext || 100;
-    this.totalExperience = data?.totalExperience || 0;
+    const snapshot = data && typeof data === 'object' ? data : {};
+    this.level = safeNumber(snapshot.level, 1);
+    this.experience = safeNumber(snapshot.experience, 0);
+    this.experienceToNext = safeNumber(snapshot.experienceToNext, 100);
+    this.totalExperience = safeNumber(snapshot.totalExperience, 0);
 
-    const entries = Array.isArray(data?.appliedUpgrades)
-      ? data.appliedUpgrades
+    const entries = Array.isArray(snapshot.appliedUpgrades)
+      ? snapshot.appliedUpgrades
       : [];
     this.appliedUpgrades = new Map(entries);
     this.pendingUpgradeOptions = [];
 
     if (Number.isFinite(this.defaultComboTimeout)) {
-      this.comboTimeout = this.defaultComboTimeout;
+      this.comboTimeout = safeNumber(this.defaultComboTimeout, this.comboTimeout);
     }
     if (Number.isFinite(this.defaultComboMultiplierStep)) {
-      this.comboMultiplierStep = this.defaultComboMultiplierStep;
+      this.comboMultiplierStep = safeNumber(
+        this.defaultComboMultiplierStep,
+        this.comboMultiplierStep
+      );
     }
     if (Number.isFinite(this.defaultComboMultiplierCap)) {
-      this.comboMultiplierCap = this.defaultComboMultiplierCap;
+      this.comboMultiplierCap = safeNumber(
+        this.defaultComboMultiplierCap,
+        this.comboMultiplierCap
+      );
     }
 
-    const comboData = data?.comboState || {};
+    const comboData = deepClone(snapshot.comboState) || {};
     if (Number.isFinite(comboData?.comboTimeout) && comboData.comboTimeout >= 0) {
       this.comboTimeout = comboData.comboTimeout;
     }
@@ -504,7 +527,8 @@ class ProgressionSystem extends UpgradeSystem {
       this.currentCombo = 0;
     }
 
-    if (!options?.suppressEvents) {
+    const suppressEvents = safeBoolean(options?.suppressEvents, false);
+    if (!suppressEvents) {
       this.emitExperienceChanged();
       if (this.currentCombo > 0) {
         this.emitComboUpdated({ reason: 'deserialize', silent: true });
@@ -512,6 +536,41 @@ class ProgressionSystem extends UpgradeSystem {
         this.resetCombo({ reason: 'deserialize', silent: true, force: true });
       }
     }
+  }
+
+  exportState() {
+    return this.serialize();
+  }
+
+  importState(snapshot) {
+    try {
+      this.deserialize(snapshot);
+      this._snapshotFallbackWarningIssued = false;
+      return true;
+    } catch (error) {
+      console.error('[ProgressionSystem] Failed to import snapshot state', error);
+      if (this._handleSnapshotFallback) {
+        return this._handleSnapshotFallback('exception during import');
+      }
+
+      return false;
+    }
+  }
+
+  getSnapshotState() {
+    return this.exportState();
+  }
+
+  captureSnapshot() {
+    return this.exportState();
+  }
+
+  restoreSnapshotState(snapshot) {
+    return this.importState(snapshot);
+  }
+
+  applySnapshot(snapshot) {
+    return this.importState(snapshot);
   }
 
   restoreState(data) {
