@@ -8,7 +8,12 @@ import {
   PROGRESSION_UPGRADE_ROLL_COUNT,
 } from '../core/GameConstants.js';
 import UpgradeSystem from './UpgradeSystem.js';
-import { safeNumber, safeBoolean, deepClone } from '../utils/StateManager.js';
+import {
+  safeNumber,
+  safeBoolean,
+  deepClone,
+  createFallbackHandler,
+} from '../utils/StateManager.js';
 
 class ProgressionSystem extends UpgradeSystem {
   constructor(dependencies = {}) {
@@ -25,6 +30,12 @@ class ProgressionSystem extends UpgradeSystem {
 
     this._eventTopic = 'progression';
     this._upgradeEventTopic = 'upgrades';
+    this._snapshotFallbackWarningIssued = false;
+    this._handleSnapshotFallback = createFallbackHandler({
+      systemName: 'ProgressionSystem',
+      warningFlag: '_snapshotFallbackWarningIssued',
+      onFallback: this.reset.bind(this),
+    });
   }
 
   initialize() {
@@ -412,6 +423,7 @@ class ProgressionSystem extends UpgradeSystem {
     this.totalExperience = 0;
     this.appliedUpgrades.clear();
     this.pendingUpgradeOptions = [];
+    this._snapshotFallbackWarningIssued = false;
 
     if (Number.isFinite(this.defaultComboTimeout)) {
       this.comboTimeout = this.defaultComboTimeout;
@@ -531,15 +543,33 @@ class ProgressionSystem extends UpgradeSystem {
   }
 
   importState(snapshot) {
-    this.deserialize(snapshot);
-    return true;
+    try {
+      this.deserialize(snapshot);
+      this._snapshotFallbackWarningIssued = false;
+      return true;
+    } catch (error) {
+      console.error('[ProgressionSystem] Failed to import snapshot state', error);
+      if (this._handleSnapshotFallback) {
+        return this._handleSnapshotFallback('exception during import');
+      }
+
+      return false;
+    }
   }
 
   getSnapshotState() {
     return this.exportState();
   }
 
+  captureSnapshot() {
+    return this.exportState();
+  }
+
   restoreSnapshotState(snapshot) {
+    return this.importState(snapshot);
+  }
+
+  applySnapshot(snapshot) {
     return this.importState(snapshot);
   }
 

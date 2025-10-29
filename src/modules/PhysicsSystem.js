@@ -1199,7 +1199,15 @@ class PhysicsSystem extends BaseSystem {
     return this.exportState();
   }
 
+  captureSnapshot() {
+    return this.exportState();
+  }
+
   restoreSnapshotState(snapshot) {
+    return this.importState(snapshot);
+  }
+
+  applySnapshot(snapshot) {
     return this.importState(snapshot);
   }
 

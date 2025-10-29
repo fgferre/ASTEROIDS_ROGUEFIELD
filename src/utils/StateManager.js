@@ -76,7 +76,12 @@ export function isValidSnapshotVersion(snapshot, expectedVersion = 1) {
     return true;
   }
 
-  return safeNumber(snapshot.version, expectedVersion) === expectedVersion;
+  const versionNumber = Number(snapshot.version);
+  if (!Number.isFinite(versionNumber)) {
+    return false;
+  }
+
+  return versionNumber === expectedVersion;
 }
 
 export function validateSnapshot(snapshot, requiredFields = []) {
