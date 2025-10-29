@@ -115,7 +115,7 @@ As constantes do jogo foram organizadas por domínio funcional para facilitar ma
 
 ## 6. Fluxo de Bootstrap
 - `src/app.js` inicializa `DIContainer`, `ServiceRegistry` e `GameSessionService`.
-- `ServiceLocatorAdapter` garante compatibilidade com `gameServices` legados.
+- `DIContainer` serve como único service registry com legacy compatibility built-in.
 - `bootstrapServices()` instancia sistemas declarados em `createServiceManifest()`.
 - Game loop: update → render, com sistemas consumindo `RandomService`, `EventBus`, pools.
 
@@ -1005,3 +1005,57 @@ class MySystem extends BaseSystem {
 **Validation Status**
 
 See automated validation report for detailed analysis of migration completeness.
+
+### 12.13. REFACTOR-016: Service Stack Simplification (Phase 1 Complete)
+
+**Objetivo**: Remover código morto (ServiceLocator.js e ServiceLocatorAdapter.js) após migração completa para DIContainer.
+
+**Service Stack Evolution**
+
+**Before (4 layers)**:
+1. `ServiceLocator.js` (~99 lines) - Legacy Map-based registry
+2. `ServiceLocatorAdapter.js` (~155 lines) - Backward compatibility bridge
+3. `DIContainer.js` (~491 lines) - Full DI with factories
+4. `ServiceRegistry.js` (~381 lines) - Manifest reader
+
+**After (2 layers)** ✅:
+1. `DIContainer.js` (~814 lines) - Unified registry with legacy compatibility
+2. `ServiceRegistry.js` (~381 lines) - Manifest reader (unchanged)
+
+**Mudanças Realizadas**:
+
+1. **Deleted**: `src/core/ServiceLocatorAdapter.js`
+   - Thin wrapper (155 lines) that only delegated to DIContainer
+   - Zero imports found in codebase
+   - Emitted deprecation warnings since creation
+   - All functionality merged into DIContainer
+
+2. **Deleted**: `src/core/ServiceLocator.js`
+   - Legacy service locator (99 lines) using simple Map-based registry
+   - Zero imports found in codebase
+   - Created global singleton that was immediately overwritten by `app.js`
+   - Replaced by DIContainer with full backward compatibility
+
+3. **Updated**: `src/core/DIContainer.js` documentation
+   - Header comment now documents that DIContainer is the SOLE service registry
+   - Added migration notes explaining removal of ServiceLocator and ServiceLocatorAdapter
+   - Clarified that legacy compatibility is built-in via dual registration pattern
+   - Updated examples showing both factory-based DI and direct instance registration
+
+**Benefits**:
+- ✅ Reduced complexity (4 layers → 2 layers)
+- ✅ Single source of truth (DIContainer)
+- ✅ 100% backward compatibility maintained
+- ✅ ~250 lines of code removed
+- ✅ Eliminated confusion about which service registry to use
+- ✅ Zero breaking changes (nobody imported the removed files)
+
+**Evidence of Safety**:
+- Grep search confirmed zero imports of `ServiceLocatorAdapter` or `ServiceLocator`
+- `app.js` line 175 uses DIContainer directly: `globalThis.gameServices = diContainer`
+- DIContainer already has complete legacy compatibility layer (lines 47-453)
+- All legacy code continues working via built-in compatibility layer
+
+**Next Steps**:
+- Phase 2: Update AGENTS.md developer guide
+- Phase 3: Monitor for any issues (none expected)

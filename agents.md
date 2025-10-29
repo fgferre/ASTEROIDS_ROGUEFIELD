@@ -21,7 +21,7 @@ para manter a arquitetura modular segura e rastreável.
 A estrutura do projeto está organizada por responsabilidade arquitetônica:
 
 - `/src`: Contém todo o código-fonte do jogo.
-  - `/core`: Módulos centrais que fornecem a infraestrutura do jogo (`EventBus`, `ServiceLocator`, `GameConstants`).
+  - `/core`: Módulos centrais que fornecem a infraestrutura do jogo (`EventBus`, `DIContainer`, `GameConstants`).
   - `/modules`: Os "Sistemas" que contêm a lógica principal do jogo (`PlayerSystem`, `EnemySystem`, `CombatSystem`, etc.). **Esta é a principal área para adicionar e modificar a lógica de gameplay.**
   - `/data`: Modelos de dados e configurações complexas organizadas por domínio:
     - `/constants`: Constantes de física (`physics.js`), gameplay (`gameplay.js`), e visuais (`visual.js`)
@@ -38,13 +38,48 @@ A estrutura do projeto está organizada por responsabilidade arquitetônica:
 O jogo segue uma **Arquitetura Modular baseada em Sistemas** com contratos explícitos de serviços e eventos. A orquestração acontece em torno do manifesto criado por `createServiceManifest()` e aplicado em `ServiceRegistry.setupServices()`, garantindo que cada sistema declare dependências formais desde o bootstrap.
 
 - **Manifesto e Registro:** O arquivo `src/bootstrap/serviceManifest.js` exporta `createServiceManifest()` com os serviços disponíveis e suas dependências declaradas. `ServiceRegistry.setupServices()` consome esse manifesto para registrar os sistemas reais na inicialização, preservando a ordem de carregamento e habilitando validações automáticas.
-- **Ponte de Compatibilidade:** `ServiceLocatorAdapter` (instanciado em `src/app.js`) conecta o manifesto estável ao legado `gameServices`, permitindo que sistemas antigos continuem usando o locator enquanto novos módulos podem optar por injeção direta. Ele deve ser encarado apenas como ponte de compatibilidade.
+- **Service Registry (DIContainer):** O projeto usa **DIContainer** como único service registry (`globalThis.gameServices`). Ele suporta tanto factory-based DI (recomendado) quanto direct instance registration (legacy compatibility). O DIContainer detecta automaticamente qual padrão usar baseado no tipo do segundo argumento em `register()`.
 - **Event Bus (`gameEvents`):** Continua sendo o canal primário de comunicação desacoplada. Sistemas emitem (`gameEvents.emit(...)`) e consomem (`gameEvents.on(...)`) eventos sem acoplamento direto.
 - **Sistemas:** Cada arquivo em `/src/modules` encapsula um domínio (ex.: `EnemySystem`, `WorldSystem`, `CombatSystem`). Eles são registrados via manifesto, consomem serviços via injeção ou `resolveService()` e se comunicam por eventos.
 - **PhysicsSystem:** Centraliza a malha espacial de asteroides e disponibiliza utilitários reutilizáveis (por exemplo, `forEachNearbyAsteroid`, `forEachBulletCollision`), evitando percursos completos em hot paths.
 - **Data-Driven:** Parâmetros operacionais residem em `GameConstants.js` e nos arquivos de `/data`. Evite valores fixos na lógica dos sistemas.
 
 Ver `docs/architecture/CURRENT_STRUCTURE.md` para detalhes de implementação e recomendações práticas.
+
+#### 3.1. **Service Registry (DIContainer)**
+
+O projeto usa **DIContainer** como único service registry. Ele suporta dois padrões de registro:
+
+1. **Factory-based DI** (recomendado):
+   ```javascript
+   gameServices.register('audio', (events) => new AudioSystem(events), {
+     dependencies: ['events'],
+     singleton: true
+   });
+   ```
+
+2. **Direct instance registration** (legacy compatibility):
+   ```javascript
+   gameServices.register('input', inputInstance);
+   ```
+
+O DIContainer detecta automaticamente qual padrão usar baseado no tipo do segundo argumento (`typeof` check).
+
+**Arquivos Removidos** (REFACTOR-016):
+- ❌ `ServiceLocator.js` - Substituído por DIContainer
+- ❌ `ServiceLocatorAdapter.js` - Funcionalidade merged em DIContainer
+
+**Benefícios**:
+- ✅ Single source of truth para service registry
+- ✅ 100% backward compatibility via built-in legacy support
+- ✅ Código mais simples (4 layers → 2 layers)
+- ✅ Menos confusão sobre qual registry usar
+
+**Uso**:
+- `globalThis.gameServices` é o DIContainer
+- Acesso via `gameServices.get('service-name')` (legacy)
+- Acesso via `gameServices.resolve('service-name')` (DI)
+- Registro automático via BaseSystem
 
 #### 4. **HTML & CSS**
 
@@ -101,7 +136,7 @@ class MySystem extends BaseSystem {
   constructor(dependencies = {}) {
     super(dependencies, {
       systemName: 'MySystem',           // Nome para logs
-      serviceName: 'my-system',         // Chave no ServiceLocator
+      serviceName: 'my-system',         // Chave no DIContainer (gameServices)
       enableRandomManagement: true,     // Se precisa de randomness
       randomForkLabels: ['base', 'feature1']  // Labels dos forks
     });
@@ -138,7 +173,7 @@ export default MySystem;
 ##### Opções do Constructor
 
 - **systemName** (obrigatório): Nome do sistema para logs e debugging
-- **serviceName** (obrigatório): Chave de registro no ServiceLocator
+- **serviceName** (obrigatório): Chave de registro no DIContainer (gameServices)
 - **enableRandomManagement** (opcional): `true` para habilitar random forks
 - **randomForkLabels** (opcional): Array de labels para random forks
 - **enablePerformanceMonitoring** (opcional): `true` para tracking de performance
@@ -158,7 +193,7 @@ export default MySystem;
 - ✅ Random management é centralizado e determinístico
 - ✅ Lifecycle é padronizado (reset, destroy)
 - ✅ Menos código boilerplate
-- ✅ Registro automático no ServiceLocator
+- ✅ Registro automático no DIContainer (gameServices)
 - ✅ Logs consistentes de inicialização
 
 ##### Casos Especiais

@@ -24,7 +24,6 @@ import { GameDebugLogger, isDevEnvironment } from './utils/dev/GameDebugLogger.j
 // Dependency Injection System (Phase 2.1)
 import { DIContainer } from './core/DIContainer.js';
 import { ServiceRegistry } from './core/ServiceRegistry.js';
-import { ServiceLocatorAdapter } from './core/ServiceLocatorAdapter.js';
 
 const gameState = {
   screen: 'menu',
@@ -47,7 +46,6 @@ const performanceMonitor = new PerformanceMonitor();
 
 // Initialize DI Container (Phase 2.1)
 let diContainer = null;
-let serviceLocatorAdapter = null;
 let mathRandomGuard = null;
 let gameSessionService = null;
 
@@ -83,13 +81,13 @@ function logServiceRegistrationFlow({ reason = 'bootstrap' } = {}) {
 
   console.groupCollapsed(`[App] Service registration flow (${reason})`);
   console.log(
-    '1) gameServices (ServiceLocator) recebe instâncias concretas registradas pelos sistemas legados.'
+    '1) DIContainer serves as the enhanced service registry with legacy compatibility.'
   );
   console.log(
-    '2) ServiceRegistry.setupServices(diContainer) cria placeholders na DI para acompanhar os serviços existentes.'
+    '2) ServiceRegistry.setupServices(diContainer) registers all services from manifest.'
   );
   console.log(
-    '3) ServiceLocatorAdapter monitora o ServiceLocator legado e prepara a sincronização para fases futuras.'
+    '3) Legacy services are synced directly into DIContainer via syncInstance().'
   );
 
   if (typeof console.table === 'function') {
@@ -142,12 +140,11 @@ function initializeDependencyInjection(manifestContext) {
     // Register all services
     ServiceRegistry.setupServices(diContainer, manifestContext);
 
+    // Synchronize any existing legacy services directly into DIContainer
     if (typeof gameServices !== 'undefined') {
       const legacyLocator = gameServices;
       legacyLocatorSnapshot = legacyLocator;
-      serviceLocatorAdapter = new ServiceLocatorAdapter(diContainer);
 
-      // Synchronize already-registered legacy services into the adapter
       try {
         const legacyEntries = legacyLocator?.services instanceof Map
           ? Array.from(legacyLocator.services.entries())
@@ -156,35 +153,37 @@ function initializeDependencyInjection(manifestContext) {
         legacyEntries.forEach(([name, instance]) => {
           if (!name) return;
           try {
-            serviceLocatorAdapter.syncInstance(name, instance);
+            diContainer.syncInstance(name, instance);
           } catch (syncError) {
-            console.warn(`[App] Failed to sync legacy service '${name}' to adapter:`, syncError);
+            console.warn(`[App] Failed to sync legacy service '${name}' to DIContainer:`, syncError);
           }
         });
       } catch (syncError) {
         console.warn('[App] Could not synchronize existing legacy services:', syncError);
       }
 
+      // Preserve legacy locator for reference
       if (typeof globalThis !== 'undefined') {
         if (!globalThis.__legacyGameServices) {
           globalThis.__legacyGameServices = legacyLocator;
         }
-        globalThis.gameServices = serviceLocatorAdapter;
       }
     }
 
-    // The adapter keeps legacy APIs operational while mirroring DI instances.
-    // Systems continue to call gameServices.register/get() transparently until
+    // Set DIContainer as the global gameServices
+    if (typeof globalThis !== 'undefined') {
+      globalThis.gameServices = diContainer;
+    }
+
+    // DIContainer now handles both factory-based DI and legacy direct registration.
+    // Systems can continue to call gameServices.register/get() transparently until
     // full constructor injection is introduced in Phase 2.2+.
 
     // Just expose container for debugging
     if (typeof window !== 'undefined' && DEV_MODE) {
       window.diContainer = diContainer;
+      window.gameServices = diContainer;
       window.performanceMonitor = performanceMonitor;
-      window.serviceLocatorAdapter = serviceLocatorAdapter;
-      if (serviceLocatorAdapter) {
-        window.gameServices = serviceLocatorAdapter;
-      }
 
       logServiceRegistrationFlow({ reason: 'development snapshot' });
 
@@ -192,6 +191,7 @@ function initializeDependencyInjection(manifestContext) {
       performanceMonitor.enableAutoLog(10000);
 
       console.log('[App] ℹ Performance monitor available: window.performanceMonitor');
+      console.log('[App] ℹ DIContainer available: window.gameServices, window.diContainer');
       console.log('[App] ℹ Auto-logging enabled (logs saved to localStorage)');
       console.log('[App] ℹ Get logs: localStorage.getItem("performanceLog")');
       exposeDebugCommands({ showBanner: true });
@@ -199,9 +199,9 @@ function initializeDependencyInjection(manifestContext) {
 
     console.log('[App] ✓ DI system initialized successfully');
     console.log(`[App] ✓ ${diContainer.getServiceNames().length} services registered`);
-    console.log('[App] ℹ ServiceLocator adapter will be enabled in Phase 2.2');
+    console.log('[App] ℹ DIContainer serves as unified service registry (factory + legacy)');
 
-    if (process.env.NODE_ENV === 'production') {
+    if (!DEV_MODE) {
       logServiceRegistrationFlow({ reason: 'production snapshot' });
     }
 
@@ -277,10 +277,29 @@ function init() {
     // Initialize DI system first (Phase 2.1)
     const diInitialized = initializeDependencyInjection(manifestContext);
 
+    // Early exit if DI bootstrap failed
+    if (!diInitialized) {
+      if (DEV_MODE) {
+        GameDebugLogger.log('ERROR', 'DI bootstrap failed; aborting init');
+      }
+      alert('Falha na inicialização dos serviços. Recarregue a página.');
+
+      // Set safe no-op stub to prevent accidental usage
+      if (typeof globalThis !== 'undefined') {
+        globalThis.gameServices = {
+          get: () => null,
+          register: () => {},
+          has: () => false
+        };
+      }
+
+      return;
+    }
+
     const { services } = bootstrapServices({
       container: diContainer,
       manifestContext,
-      adapter: serviceLocatorAdapter
+      adapter: diContainer
     });
 
     garbageCollectionManager = services['garbage-collector'] || garbageCollectionManager;
