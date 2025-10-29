@@ -50,6 +50,25 @@ let mathRandomGuard = null;
 let gameSessionService = null;
 let gameSystemServices = null; // Services from bootstrapServices()
 
+// Performance and state cache (OPTIMIZATION)
+let metricsCache = null;
+let metricsCacheFrameCount = 0;
+let servicesCache = {
+  input: null,
+  player: null,
+  enemies: null,
+  physics: null,
+  combat: null,
+  'xp-orbs': null,
+  healthHearts: null,
+  progression: null,
+  world: null,
+  ui: null
+};
+let servicesCacheInitialized = false;
+let stateDirty = false;
+let lastSyncTime = 0;
+
 const DEV_MODE = isDevEnvironment();
 
 let debugCommandsExposed = false;
@@ -407,6 +426,27 @@ function init() {
       });
     }
 
+    // Register cache invalidation listeners (OPTIMIZATION #3)
+    if (diContainer) {
+      try {
+        const gameEvents = diContainer.resolve('events');
+        if (gameEvents && typeof gameEvents.on === 'function') {
+          gameEvents.on('screen-changed', () => {
+            stateDirty = true;
+            servicesCacheInitialized = false;
+          });
+          gameEvents.on('pause-state-changed', () => {
+            stateDirty = true;
+          });
+          gameEvents.on('session-state-changed', () => {
+            stateDirty = true;
+          });
+        }
+      } catch (error) {
+        console.warn('[App] Failed to register cache invalidation listeners:', error);
+      }
+    }
+
     requestAnimationFrame(gameLoop);
   } catch (error) {
     console.error('Erro na inicialização:', error);
@@ -426,11 +466,17 @@ function gameLoop(currentTime) {
   try {
     const session = gameSessionService;
 
+    // OPTIMIZATION #3: Lazy State Sync - only sync when necessary
     if (session && typeof session.synchronizeLegacyState === 'function') {
-      try {
-        session.synchronizeLegacyState();
-      } catch (syncError) {
-        console.warn('[App] Failed to synchronize legacy state:', syncError);
+      const shouldSync = stateDirty || (currentTime - lastSyncTime) > 100;
+      if (shouldSync) {
+        try {
+          session.synchronizeLegacyState();
+          stateDirty = false;
+          lastSyncTime = currentTime;
+        } catch (syncError) {
+          console.warn('[App] Failed to synchronize legacy state:', syncError);
+        }
       }
     } else if (session) {
       try {
@@ -485,20 +531,25 @@ function gameLoop(currentTime) {
       updateGame(adjustedDelta);
     }
 
-    // Update performance metrics
+    // OPTIMIZATION #1: PerformanceMonitor Cache - recalculate only every 5 frames
     if (shouldUpdateGame) {
-      const enemies = gameSystemServices?.['enemies'];
-      const combat = gameSystemServices?.['combat'];
-      const xpOrbs = gameSystemServices?.['xp-orbs'];
-      const effects = gameSystemServices?.['effects'];
+      if (metricsCacheFrameCount % 5 === 0 || metricsCache === null) {
+        const enemies = gameSystemServices?.['enemies'];
+        const combat = gameSystemServices?.['combat'];
+        const xpOrbs = gameSystemServices?.['xp-orbs'];
+        const effects = gameSystemServices?.['effects'];
 
-      performanceMonitor.updateMetrics({
-        enemies: enemies?.asteroids?.length || 0,
-        bullets: combat?.bullets?.length || 0,
-        orbs: xpOrbs?.orbs?.length || 0,
-        particles: effects?.particles?.length || 0,
-        wave: enemies?.waveManager?.currentWave || 0,
-      });
+        metricsCache = {
+          enemies: enemies?.asteroids?.length || 0,
+          bullets: combat?.bullets?.length || 0,
+          orbs: xpOrbs?.orbs?.length || 0,
+          particles: effects?.particles?.length || 0,
+          wave: enemies?.waveManager?.currentWave || 0,
+        };
+      }
+
+      performanceMonitor.updateMetrics(metricsCache);
+      metricsCacheFrameCount++;
     }
 
     renderGame();
@@ -513,25 +564,52 @@ function gameLoop(currentTime) {
 }
 
 function updateGame(deltaTime) {
-  const servicesToUpdate = [
-    'input',
-    'player',
-    'enemies',
-    'physics',
-    'combat',
-    'xp-orbs',
-    'healthHearts',
-    'progression',
-    'world',
-    'ui',
-  ];
+  // OPTIMIZATION #2: Services Lookup Cache - initialize cache on first run or after invalidation
+  if (!servicesCacheInitialized) {
+    servicesCache.input = gameSystemServices?.['input'];
+    servicesCache.player = gameSystemServices?.['player'];
+    servicesCache.enemies = gameSystemServices?.['enemies'];
+    servicesCache.physics = gameSystemServices?.['physics'];
+    servicesCache.combat = gameSystemServices?.['combat'];
+    servicesCache['xp-orbs'] = gameSystemServices?.['xp-orbs'];
+    servicesCache.healthHearts = gameSystemServices?.['healthHearts'];
+    servicesCache.progression = gameSystemServices?.['progression'];
+    servicesCache.world = gameSystemServices?.['world'];
+    servicesCache.ui = gameSystemServices?.['ui'];
+    servicesCacheInitialized = true;
+  }
 
-  servicesToUpdate.forEach((serviceName) => {
-    const service = gameSystemServices?.[serviceName];
-    if (service && typeof service.update === 'function') {
-      service.update(deltaTime);
-    }
-  });
+  // Use cached service references directly (10 direct lookups instead of forEach)
+  if (servicesCache.input && typeof servicesCache.input.update === 'function') {
+    servicesCache.input.update(deltaTime);
+  }
+  if (servicesCache.player && typeof servicesCache.player.update === 'function') {
+    servicesCache.player.update(deltaTime);
+  }
+  if (servicesCache.enemies && typeof servicesCache.enemies.update === 'function') {
+    servicesCache.enemies.update(deltaTime);
+  }
+  if (servicesCache.physics && typeof servicesCache.physics.update === 'function') {
+    servicesCache.physics.update(deltaTime);
+  }
+  if (servicesCache.combat && typeof servicesCache.combat.update === 'function') {
+    servicesCache.combat.update(deltaTime);
+  }
+  if (servicesCache['xp-orbs'] && typeof servicesCache['xp-orbs'].update === 'function') {
+    servicesCache['xp-orbs'].update(deltaTime);
+  }
+  if (servicesCache.healthHearts && typeof servicesCache.healthHearts.update === 'function') {
+    servicesCache.healthHearts.update(deltaTime);
+  }
+  if (servicesCache.progression && typeof servicesCache.progression.update === 'function') {
+    servicesCache.progression.update(deltaTime);
+  }
+  if (servicesCache.world && typeof servicesCache.world.update === 'function') {
+    servicesCache.world.update(deltaTime);
+  }
+  if (servicesCache.ui && typeof servicesCache.ui.update === 'function') {
+    servicesCache.ui.update(deltaTime);
+  }
 }
 
 function renderGame() {

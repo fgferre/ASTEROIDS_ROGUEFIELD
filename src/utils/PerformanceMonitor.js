@@ -261,7 +261,18 @@ export class PerformanceMonitor {
   /**
    * Updates gameplay metrics.
    *
-   * @param {Object} metrics - Metrics object
+   * This method is optimized to be called with externally cached metrics.
+   * Object.assign() is fast (~0.5ms) and doesn't need internal caching.
+   * Cache implementation should be done in the caller (app.js) to control
+   * collection frequency and reduce optional chaining overhead.
+   *
+   * @param {Object} metrics - Metrics object (can be cached externally)
+   * @example
+   * // Caller (app.js) implements cache to reduce collection frequency:
+   * if (frameCount % 5 === 0) {
+   *   metricsCache = { enemies: enemies?.asteroids?.length || 0, ... };
+   * }
+   * performanceMonitor.updateMetrics(metricsCache);
    */
   updateMetrics(metrics) {
     Object.assign(this.metrics, metrics);
