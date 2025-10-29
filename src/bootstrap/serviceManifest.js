@@ -116,10 +116,6 @@ function ensureGameStateService(gameState) {
     writable: false
   });
 
-  if (typeof gameServices !== 'undefined') {
-    gameServices.register('game-state', service);
-  }
-
   return service;
 }
 
@@ -152,15 +148,6 @@ function createGarbageCollector(options) {
     },
     { interval: 7000, priority: 1 }
   );
-
-  if (
-    typeof gameServices !== 'undefined' &&
-    typeof gameServices.has === 'function' &&
-    typeof gameServices.register === 'function' &&
-    !gameServices.has('garbage-collector')
-  ) {
-    gameServices.register('garbage-collector', manager);
-  }
 
   return manager;
 }
@@ -267,7 +254,15 @@ export function createServiceManifest(context = {}) {
       singleton: true,
       lazy: false,
       dependencies: [],
-      factory: () => ensureGameStateService(gameState)
+      factory: ({ container }) => {
+        const service = ensureGameStateService(gameState);
+
+        if (typeof container?.syncInstance === 'function') {
+          container.syncInstance('game-state', service);
+        }
+
+        return service;
+      }
     },
     {
       name: 'game-pools',
@@ -281,7 +276,15 @@ export function createServiceManifest(context = {}) {
       singleton: true,
       lazy: false,
       dependencies: ['game-pools'],
-      factory: () => createGarbageCollector(garbageCollectorOptions)
+      factory: ({ container }) => {
+        const manager = createGarbageCollector(garbageCollectorOptions);
+
+        if (typeof container?.syncInstance === 'function') {
+          container.syncInstance('garbage-collector', manager);
+        }
+
+        return manager;
+      }
     },
     {
       name: 'settings',
@@ -317,19 +320,9 @@ export function createServiceManifest(context = {}) {
       singleton: true,
       lazy: false,
       dependencies: [],
-      factory: () => {
-        if (
-          typeof gameServices !== 'undefined' &&
-          typeof gameServices.register === 'function'
-        ) {
-          const shouldRegister =
-            typeof gameServices.has === 'function'
-              ? !gameServices.has('crack-generation')
-              : true;
-
-          if (shouldRegister) {
-            gameServices.register('crack-generation', CrackGenerationService);
-          }
+      factory: ({ container }) => {
+        if (typeof container?.syncInstance === 'function') {
+          container.syncInstance('crack-generation', CrackGenerationService);
         }
 
         return CrackGenerationService;
@@ -555,7 +548,7 @@ export function createServiceManifest(context = {}) {
         'world',
         'effects'
       ],
-      factory: ({ resolved, context }) => {
+      factory: ({ resolved, context, container }) => {
         const instance = new GameSessionService({
           eventBus: resolved['event-bus'],
           random: resolved['random'],
@@ -575,11 +568,8 @@ export function createServiceManifest(context = {}) {
           gameState: context.gameState
         });
 
-        if (
-          typeof gameServices !== 'undefined' &&
-          typeof gameServices.register === 'function'
-        ) {
-          gameServices.register('game-session', instance);
+        if (typeof container?.syncInstance === 'function') {
+          container.syncInstance('game-session', instance);
         }
 
         if (

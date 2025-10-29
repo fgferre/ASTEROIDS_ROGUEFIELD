@@ -22,7 +22,7 @@
 - Game UI with canvas and HUD regions (top-left, top-middle, top-right, bottom-left, bottom-center, bottom-right)
 - Wave countdown overlay
 
-**Global script loading (lines 313-314):** `EventBus.js` and `ServiceLocator.js` are loaded as modules before `app.js` to ensure availability throughout the application.
+**Global script loading (line 313):** `EventBus.js` is loaded as a module before `app.js` to ensure availability throughout the application. DIContainer is instantiated directly in `app.js` (see line 175).
 
 ## CSS Architecture
 `style.css` uses:
