@@ -4,6 +4,7 @@ import {
   ASTEROID_CRACK_GRAPH_RULES,
 } from '../data/constants/physics.js';
 import { ASTEROID_CRACK_PROFILES } from '../data/enemies/asteroid-configs.js';
+import { clamp } from '../utils/mathHelpers.js';
 
 /**
  * CrackGenerationService
@@ -277,8 +278,6 @@ class CrackGenerationService {
       }
       return fallback ?? 0;
     };
-
-    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
     const stageTemplates = thresholds.map(
       (_, index) =>

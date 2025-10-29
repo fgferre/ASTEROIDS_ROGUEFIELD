@@ -12,20 +12,13 @@ import { resolveService } from '../core/serviceUtils.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 import { SHIP_MAX_SPEED } from '../data/constants/physics.js';
 import { MAGNETISM_RADIUS } from '../data/constants/gameplay.js';
+import { clamp } from '../utils/mathHelpers.js';
+import { normalize as normalizeVector } from '../utils/vectorHelpers.js';
 
 const MAX_VISUAL_TILT = 0.3;
 const TILT_MULTIPLIER = 0.12;
 const MIN_OUTLINE_POINTS = 3;
 const EPSILON = 1e-6;
-
-function normalizeVector(x, y) {
-  const length = Math.hypot(x, y);
-  if (length < EPSILON) {
-    return { x: 0, y: 0, length: 0 };
-  }
-
-  return { x: x / length, y: y / length, length };
-}
 
 function computePolygonArea(points) {
   if (!Array.isArray(points) || points.length < MIN_OUTLINE_POINTS) {
@@ -149,10 +142,6 @@ function computeOutlineRadius(points) {
     const radius = Math.hypot(point.x, point.y);
     return radius > max ? radius : max;
   }, 0);
-}
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
 }
 
 const SPACE_SKY_RANDOM_SEED = 'rendering:starfield';

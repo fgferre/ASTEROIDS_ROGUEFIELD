@@ -1,9 +1,6 @@
 import { GAME_HEIGHT, GAME_WIDTH, SHIP_SIZE } from '../../../core/GameConstants.js';
-
-// NOTE: Math helpers (clamp, length, normalize, lerp) defined below will be
-// extracted to src/utils/mathHelpers.js and src/utils/vectorHelpers.js in Phase 9
-// of the simplification plan. They are kept here temporarily to avoid disrupting
-// movement strategies that depend on them.
+import { clamp, lerp } from '../../../utils/mathHelpers.js';
+import { length, normalizeSimple as normalize } from '../../../utils/vectorHelpers.js';
 
 const DEFAULT_BOUNDS = Object.freeze({
   left: 0,
@@ -11,20 +8,6 @@ const DEFAULT_BOUNDS = Object.freeze({
   right: GAME_WIDTH,
   bottom: GAME_HEIGHT,
 });
-
-const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
-
-const length = (vx, vy) => Math.sqrt(vx * vx + vy * vy) || 0;
-
-const normalize = (vx, vy) => {
-  const len = length(vx, vy);
-  if (!len) {
-    return { x: 0, y: 0 };
-  }
-  return { x: vx / len, y: vy / len };
-};
-
-const lerp = (start, end, t) => start + (end - start) * clamp(t, 0, 1);
 
 const createDefaultStrategies = () => ({
   linear: ({ enemy, deltaTime, bounds }) => {

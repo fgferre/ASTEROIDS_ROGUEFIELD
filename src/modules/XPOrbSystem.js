@@ -15,6 +15,7 @@ import {
   XP_ORB_FUSION_ANIMATION_DURATION,
   XP_ORB_CLUSTER_CONFIG,
 } from '../data/constants/gameplay.js';
+import { lerp, easeInOutCubic } from '../utils/mathHelpers.js';
 import {
   ASTEROID_XP_BASE,
   ASTEROID_VARIANTS,
@@ -830,7 +831,7 @@ class XPOrbSystem extends BaseSystem {
 
       animation.elapsed = (animation.elapsed || 0) + deltaTime;
       const progress = Math.min(animation.elapsed / animation.duration, 1);
-      const eased = this.easeInOutCubic(progress);
+      const eased = easeInOutCubic(progress);
 
       let activeCount = 0;
 
@@ -842,8 +843,8 @@ class XPOrbSystem extends BaseSystem {
         }
 
         activeCount += 1;
-        orb.x = this.lerp(entry.startX, animation.center.x, eased);
-        orb.y = this.lerp(entry.startY, animation.center.y, eased);
+        orb.x = lerp(entry.startX, animation.center.x, eased);
+        orb.y = lerp(entry.startY, animation.center.y, eased);
       }
 
       if (activeCount < this.clusterFusionCount) {
@@ -888,20 +889,6 @@ class XPOrbSystem extends BaseSystem {
         }
       }
     }
-  }
-
-  lerp(start, end, t) {
-    return start + (end - start) * t;
-  }
-
-  easeInOutCubic(t) {
-    if (t <= 0) {
-      return 0;
-    }
-    if (t >= 1) {
-      return 1;
-    }
-    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   }
 
   ensureSpatialIndex() {

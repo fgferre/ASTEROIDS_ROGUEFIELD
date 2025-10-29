@@ -2,6 +2,7 @@
 
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 import { DEFAULT_HUD_LAYOUT_ID } from '../data/ui/hudLayout.js';
+import { clamp } from '../utils/mathHelpers.js';
 
 const VISUAL_CATEGORIES = new Set(['accessibility', 'video']);
 
@@ -17,13 +18,6 @@ function deepClone(value) {
     console.warn('[SettingsSystem] Failed to clone value:', error);
     return value;
   }
-}
-
-function clamp(value, min, max) {
-  if (!Number.isFinite(value)) {
-    return min;
-  }
-  return Math.min(max, Math.max(min, value));
 }
 
 function ensureArray(value) {

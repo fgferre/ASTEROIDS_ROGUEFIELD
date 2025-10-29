@@ -23,6 +23,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { normalizeDependencies, resolveService } from '../../../core/serviceUtils.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
+import { clamp } from '../../../utils/mathHelpers.js';
 import {
   ASTEROID_EDGE_SPAWN_MARGIN,
   ASTEROID_SAFE_SPAWN_DISTANCE,
@@ -2079,7 +2080,6 @@ export class WaveManager {
       }
     }
 
-    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
     const maxX = bounds.width - horizontalMargin;
     const maxY = bounds.height - verticalMargin;
     x = clamp(x, horizontalMargin, maxX);
@@ -2218,7 +2218,6 @@ export class WaveManager {
       'spawn',
       'tactical-position'
     );
-    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
 
     const anchorX =
       player && Number.isFinite(player.x) ? player.x : width / 2;
@@ -2312,7 +2311,6 @@ export class WaveManager {
     const height = bounds?.height || GAME_HEIGHT || 600;
     const horizontalMargin = Math.max(40, Math.floor(width * 0.25));
     const verticalMargin = Math.max(40, Math.floor(height * 0.25));
-    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
     const spawnRandom = this.resolveScopedRandom(
       random,
       'spawn',
