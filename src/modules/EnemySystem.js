@@ -26,6 +26,13 @@ import { RenderComponent } from './enemies/components/RenderComponent.js';
 import { WeaponComponent } from './enemies/components/WeaponComponent.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 import {
+  safeNumber,
+  deepClone,
+  shallowClone,
+  createFallbackHandler,
+  validateSnapshot,
+} from '../utils/StateManager.js';
+import {
   ASTEROIDS_PER_WAVE_BASE,
   ASTEROIDS_PER_WAVE_MULTIPLIER,
   ASTEROID_EDGE_SPAWN_MARGIN,
@@ -77,6 +84,7 @@ class EnemySystem extends BaseSystem {
       serviceName: 'enemies',
       enableRandomManagement: true,
     });
+    this.services = this.dependencies;
     this.randomScopes = null;
     this.randomSequences = null;
     this.randomScopeSeeds = {};
@@ -107,6 +115,11 @@ class EnemySystem extends BaseSystem {
     this._nextAsteroidPoolId = 1;
     this._activeAsteroidsBuffer = [];
     this._snapshotFallbackWarningIssued = false;
+    this._handleSnapshotFallback = createFallbackHandler({
+      systemName: 'EnemySystem',
+      warningFlag: '_snapshotFallbackWarningIssued',
+      onFallback: this.reset.bind(this),
+    });
     this._waveSystemDebugLogged = false;
     this._waveManagerFallbackWarningIssued = false;
     this._waveManagerInvalidStateWarningIssued = false;
@@ -143,7 +156,8 @@ class EnemySystem extends BaseSystem {
     this.damageSystem = null;
     this.updateSystem = null;
 
-    this.eventBus = gameEvents;
+    this.eventBus =
+      typeof gameEvents !== 'undefined' && gameEvents ? gameEvents : null;
 
     this.missingDependencyWarnings = new Set();
     this.deferredDependencyWarnings = new Set(['world', 'combat', 'effects', 'audio', 'ui']);
@@ -196,18 +210,6 @@ class EnemySystem extends BaseSystem {
 
     this.missingDependencyWarnings.add(name);
     console.warn(`[EnemySystem] Missing dependency: ${name}`);
-  }
-
-  warnSnapshotFallback(reason) {
-    if (this._snapshotFallbackWarningIssued) {
-      return;
-    }
-
-    this._snapshotFallbackWarningIssued = true;
-    const detail = reason ? ` (${reason})` : '';
-    console.warn(
-      `[EnemySystem] Snapshot data unavailable, performing full reset${detail}`
-    );
   }
 
   setupEventListeners() {
@@ -345,6 +347,17 @@ class EnemySystem extends BaseSystem {
     });
   }
 
+  refreshInjectedServices(options = {}) {
+    const force =
+      typeof options === 'boolean' ? options : Boolean(options.force);
+    const suppressWarnings =
+      typeof options === 'object' && options !== null
+        ? Boolean(options.suppressWarnings)
+        : false;
+
+    this.refreshServiceState({ force, suppressWarnings });
+  }
+
   refreshServiceState({ force = false, suppressWarnings = false } = {}) {
     if (force) {
       this._playerCacheLogged = false;
@@ -353,8 +366,14 @@ class EnemySystem extends BaseSystem {
 
     const previousPlayer = this.player;
     const previousRandom = this.random;
+    const globalEventBus =
+      typeof gameEvents !== 'undefined' && gameEvents ? gameEvents : null;
 
     this.resolveCachedServices(ENEMY_SERVICE_MAP, { force });
+
+    if (force || !this.eventBus) {
+      this.eventBus = globalEventBus;
+    }
 
     Object.entries(ENEMY_SERVICE_MAP).forEach(([property, serviceName]) => {
       const resolved = this[property] ?? null;
@@ -802,7 +821,9 @@ class EnemySystem extends BaseSystem {
 
       this.waveManager = new WaveManager({
         enemySystem: this,
-        eventBus: gameEvents,
+        eventBus:
+          this.eventBus ||
+          (typeof gameEvents !== 'undefined' ? gameEvents : null),
         random: waveManagerRandom,
       });
 
@@ -1717,7 +1738,9 @@ class EnemySystem extends BaseSystem {
   }
 
   emitBossSystemEvent(channel, eventName, payload) {
-    const bus = this.eventBus || gameEvents;
+    const bus =
+      this.eventBus ||
+      (typeof gameEvents !== 'undefined' && gameEvents ? gameEvents : null);
     if (!bus || !eventName || !channel) {
       return;
     }
@@ -2065,10 +2088,16 @@ class EnemySystem extends BaseSystem {
 
     this.lastWaveBroadcast = snapshot;
 
-    gameEvents.emit('wave-state-updated', {
-      wave,
-      session,
-    });
+    const bus =
+      this.eventBus ||
+      (typeof gameEvents !== 'undefined' && gameEvents ? gameEvents : null);
+
+    if (bus && typeof bus.emit === 'function') {
+      bus.emit('wave-state-updated', {
+        wave,
+        session,
+      });
+    }
   }
 
   // === UPDATE PRINCIPAL ===
@@ -2372,51 +2401,47 @@ class EnemySystem extends BaseSystem {
 
     const base = this.createInitialWaveState();
     return {
-      current: Number.isFinite(wave.current) ? wave.current : base.current,
-      totalAsteroids: Number.isFinite(wave.totalAsteroids)
-        ? wave.totalAsteroids
-        : base.totalAsteroids,
-      asteroidsSpawned: Number.isFinite(wave.asteroidsSpawned)
-        ? wave.asteroidsSpawned
-        : base.asteroidsSpawned,
-      asteroidsKilled: Number.isFinite(wave.asteroidsKilled)
-        ? wave.asteroidsKilled
-        : base.asteroidsKilled,
+      current: safeNumber(wave.current, base.current),
+      totalAsteroids: safeNumber(wave.totalAsteroids, base.totalAsteroids),
+      asteroidsSpawned: safeNumber(
+        wave.asteroidsSpawned,
+        base.asteroidsSpawned
+      ),
+      asteroidsKilled: safeNumber(wave.asteroidsKilled, base.asteroidsKilled),
       isActive: Boolean(wave.isActive),
-      breakTimer: Number.isFinite(wave.breakTimer) ? wave.breakTimer : base.breakTimer,
-      completedWaves: Number.isFinite(wave.completedWaves)
-        ? wave.completedWaves
-        : base.completedWaves,
-      timeRemaining: Number.isFinite(wave.timeRemaining)
-        ? wave.timeRemaining
-        : base.timeRemaining,
-      spawnTimer: Number.isFinite(wave.spawnTimer) ? wave.spawnTimer : base.spawnTimer,
-      spawnDelay: Number.isFinite(wave.spawnDelay) ? wave.spawnDelay : base.spawnDelay,
+      breakTimer: safeNumber(wave.breakTimer, base.breakTimer),
+      completedWaves: safeNumber(wave.completedWaves, base.completedWaves),
+      timeRemaining: safeNumber(wave.timeRemaining, base.timeRemaining),
+      spawnTimer: safeNumber(wave.spawnTimer, base.spawnTimer),
+      spawnDelay: safeNumber(wave.spawnDelay, base.spawnDelay),
       initialSpawnDone: Boolean(wave.initialSpawnDone),
       managerTotals: {
-        all: Number.isFinite(wave.managerTotals?.all)
-          ? wave.managerTotals.all
-          : base.managerTotals.all,
-        asteroids: Number.isFinite(wave.managerTotals?.asteroids)
-          ? wave.managerTotals.asteroids
-          : base.managerTotals.asteroids,
+        all: safeNumber(wave.managerTotals?.all, base.managerTotals.all),
+        asteroids: safeNumber(
+          wave.managerTotals?.asteroids,
+          base.managerTotals.asteroids
+        ),
       },
       managerCounts: {
         spawned: {
-          all: Number.isFinite(wave.managerCounts?.spawned?.all)
-            ? wave.managerCounts.spawned.all
-            : base.managerCounts.spawned.all,
-          asteroids: Number.isFinite(wave.managerCounts?.spawned?.asteroids)
-            ? wave.managerCounts.spawned.asteroids
-            : base.managerCounts.spawned.asteroids,
+          all: safeNumber(
+            wave.managerCounts?.spawned?.all,
+            base.managerCounts.spawned.all
+          ),
+          asteroids: safeNumber(
+            wave.managerCounts?.spawned?.asteroids,
+            base.managerCounts.spawned.asteroids
+          ),
         },
         killed: {
-          all: Number.isFinite(wave.managerCounts?.killed?.all)
-            ? wave.managerCounts.killed.all
-            : base.managerCounts.killed.all,
-          asteroids: Number.isFinite(wave.managerCounts?.killed?.asteroids)
-            ? wave.managerCounts.killed.asteroids
-            : base.managerCounts.killed.asteroids,
+          all: safeNumber(
+            wave.managerCounts?.killed?.all,
+            base.managerCounts.killed.all
+          ),
+          asteroids: safeNumber(
+            wave.managerCounts?.killed?.asteroids,
+            base.managerCounts.killed.asteroids
+          ),
         },
       },
       compatibilityMode:
@@ -2437,10 +2462,8 @@ class EnemySystem extends BaseSystem {
 
     const base = this.createInitialSessionStats();
     return {
-      totalKills: Number.isFinite(stats.totalKills) ? stats.totalKills : base.totalKills,
-      timeElapsed: Number.isFinite(stats.timeElapsed)
-        ? stats.timeElapsed
-        : base.timeElapsed,
+      totalKills: safeNumber(stats.totalKills, base.totalKills),
+      timeElapsed: safeNumber(stats.timeElapsed, base.timeElapsed),
     };
   }
 
@@ -2450,9 +2473,6 @@ class EnemySystem extends BaseSystem {
     }
 
     const poolId = this.assignAsteroidPoolId(asteroid);
-    const safeNumber = (value, fallback = 0) =>
-      Number.isFinite(value) ? value : fallback;
-
     const snapshot = {
       poolId,
       id: asteroid.id || null,
@@ -2480,14 +2500,10 @@ class EnemySystem extends BaseSystem {
           ? asteroid.random.seed >>> 0
           : null,
       randomScopes: asteroid.randomScopeSeeds
-        ? { ...asteroid.randomScopeSeeds }
+        ? shallowClone(asteroid.randomScopeSeeds)
         : null,
-      variantState: asteroid.variantState
-        ? JSON.parse(JSON.stringify(asteroid.variantState))
-        : null,
-      visualState: asteroid.visualState
-        ? JSON.parse(JSON.stringify(asteroid.visualState))
-        : null,
+      variantState: asteroid.variantState ? deepClone(asteroid.variantState) : null,
+      visualState: asteroid.visualState ? deepClone(asteroid.visualState) : null,
     };
 
     return snapshot;
@@ -2505,19 +2521,15 @@ class EnemySystem extends BaseSystem {
       id: snapshot.id || undefined,
       size: snapshot.size || 'small',
       variant: snapshot.variant || 'common',
-      wave: Number.isFinite(snapshot.wave)
-        ? snapshot.wave
-        : this.waveState?.current || 1,
-      generation: Number.isFinite(snapshot.generation) ? snapshot.generation : 0,
+      wave: safeNumber(snapshot.wave, this.waveState?.current || 1),
+      generation: safeNumber(snapshot.generation, 0),
       spawnedBy: snapshot.spawnedBy ?? null,
-      x: Number.isFinite(snapshot.x) ? snapshot.x : 0,
-      y: Number.isFinite(snapshot.y) ? snapshot.y : 0,
-      vx: Number.isFinite(snapshot.vx) ? snapshot.vx : 0,
-      vy: Number.isFinite(snapshot.vy) ? snapshot.vy : 0,
-      rotation: Number.isFinite(snapshot.rotation) ? snapshot.rotation : 0,
-      rotationSpeed: Number.isFinite(snapshot.rotationSpeed)
-        ? snapshot.rotationSpeed
-        : 0,
+      x: safeNumber(snapshot.x, 0),
+      y: safeNumber(snapshot.y, 0),
+      vx: safeNumber(snapshot.vx, 0),
+      vy: safeNumber(snapshot.vy, 0),
+      rotation: safeNumber(snapshot.rotation, 0),
+      rotationSpeed: safeNumber(snapshot.rotationSpeed, 0),
       random: randomInstance,
       randomScope: 'snapshot',
       poolId: snapshot.poolId,
@@ -2528,44 +2540,49 @@ class EnemySystem extends BaseSystem {
       return null;
     }
 
-    if (Number.isFinite(snapshot.radius)) {
-      asteroid.radius = snapshot.radius;
+    const radius = safeNumber(snapshot.radius, null);
+    if (radius !== null) {
+      asteroid.radius = radius;
     }
-    if (Number.isFinite(snapshot.maxHealth)) {
-      asteroid.maxHealth = snapshot.maxHealth;
+    const maxHealth = safeNumber(snapshot.maxHealth, null);
+    if (maxHealth !== null) {
+      asteroid.maxHealth = maxHealth;
     }
-    if (Number.isFinite(snapshot.health)) {
-      asteroid.health = snapshot.health;
+    const health = safeNumber(snapshot.health, null);
+    if (health !== null) {
+      asteroid.health = health;
     }
     asteroid.destroyed = Boolean(snapshot.destroyed);
 
-    if (Number.isFinite(snapshot.spawnTime)) {
-      asteroid.spawnTime = snapshot.spawnTime;
+    const spawnTime = safeNumber(snapshot.spawnTime, null);
+    if (spawnTime !== null) {
+      asteroid.spawnTime = spawnTime;
     }
 
     if (Number.isFinite(snapshot.crackSeed)) {
       asteroid.crackSeed = snapshot.crackSeed;
     }
 
-    if (Number.isFinite(snapshot.crackStage)) {
-      asteroid.crackStage = snapshot.crackStage;
-    }
+    asteroid.crackStage = safeNumber(snapshot.crackStage, 0);
 
     if (snapshot.variantState && typeof snapshot.variantState === 'object') {
-      asteroid.variantState = JSON.parse(JSON.stringify(snapshot.variantState));
+      asteroid.variantState = deepClone(snapshot.variantState);
     }
 
     if (snapshot.visualState && typeof snapshot.visualState === 'object') {
-      asteroid.visualState = JSON.parse(JSON.stringify(snapshot.visualState));
+      asteroid.visualState = deepClone(snapshot.visualState);
     }
 
     if (snapshot.randomScopes && typeof snapshot.randomScopes === 'object') {
-      asteroid.randomScopeSeeds = { ...snapshot.randomScopes };
-      if (typeof asteroid.ensureRandomScopes === 'function') {
-        asteroid.ensureRandomScopes();
-      }
-      if (typeof asteroid.reseedRandomScopes === 'function') {
-        asteroid.reseedRandomScopes();
+      const randomScopesClone = shallowClone(snapshot.randomScopes);
+      if (randomScopesClone) {
+        asteroid.randomScopeSeeds = randomScopesClone;
+        if (typeof asteroid.ensureRandomScopes === 'function') {
+          asteroid.ensureRandomScopes();
+        }
+        if (typeof asteroid.reseedRandomScopes === 'function') {
+          asteroid.reseedRandomScopes();
+        }
       }
     }
 
@@ -2597,10 +2614,8 @@ class EnemySystem extends BaseSystem {
   }
 
   importState(snapshot) {
-    if (!snapshot || typeof snapshot !== 'object') {
-      this.warnSnapshotFallback('invalid snapshot payload');
-      this.reset();
-      return false;
+    if (!validateSnapshot(snapshot, ['waveState', 'sessionStats', 'asteroids'])) {
+      return this._handleSnapshotFallback('invalid snapshot payload');
     }
 
     try {
@@ -2611,9 +2626,7 @@ class EnemySystem extends BaseSystem {
         : null;
 
       if (!waveSnapshot || !sessionSnapshot || !asteroidSnapshots) {
-        this.warnSnapshotFallback('missing fields');
-        this.reset();
-        return false;
+        return this._handleSnapshotFallback('missing fields');
       }
 
       this.releaseAllAsteroidsToPool();
@@ -2631,7 +2644,7 @@ class EnemySystem extends BaseSystem {
         ...this.cloneSessionStatsForSnapshot(sessionSnapshot),
       };
 
-      this.spawnTimer = Number.isFinite(snapshot.spawnTimer) ? snapshot.spawnTimer : 0;
+      this.spawnTimer = safeNumber(snapshot.spawnTimer, 0);
       this.sessionActive = snapshot.sessionActive !== false;
       this._lastWaveManagerCompletionHandled = null;
 
@@ -2662,9 +2675,7 @@ class EnemySystem extends BaseSystem {
       return true;
     } catch (error) {
       console.error('[EnemySystem] Failed to restore snapshot state', error);
-      this.warnSnapshotFallback('exception during restore');
-      this.reset();
-      return false;
+      return this._handleSnapshotFallback('exception during restore');
     }
   }
 
@@ -2795,11 +2806,17 @@ class EnemySystem extends BaseSystem {
     if (!waveManagerActive) {
       this.grantWaveRewards();
 
-      gameEvents.emit('wave-completed', {
-        wave: wave.current,
-        completedWaves: wave.completedWaves,
-        breakTimer: wave.breakTimer,
-      });
+      const bus =
+        this.eventBus ||
+        (typeof gameEvents !== 'undefined' && gameEvents ? gameEvents : null);
+
+      if (bus && typeof bus.emit === 'function') {
+        bus.emit('wave-completed', {
+          wave: wave.current,
+          completedWaves: wave.completedWaves,
+          breakTimer: wave.breakTimer,
+        });
+      }
     } else if (
       typeof process !== 'undefined' &&
       process.env?.NODE_ENV === 'development' &&
@@ -2870,10 +2887,16 @@ class EnemySystem extends BaseSystem {
 
       this.spawnInitialAsteroids(4);
 
-      gameEvents.emit('wave-started', {
-        wave: wave.current,
-        totalAsteroids: wave.totalAsteroids,
-      });
+      const bus =
+        this.eventBus ||
+        (typeof gameEvents !== 'undefined' && gameEvents ? gameEvents : null);
+
+      if (bus && typeof bus.emit === 'function') {
+        bus.emit('wave-started', {
+          wave: wave.current,
+          totalAsteroids: wave.totalAsteroids,
+        });
+      }
     }
 
     this.emitWaveStateUpdate(true);
@@ -3347,7 +3370,9 @@ class EnemySystem extends BaseSystem {
       }
     }
 
-    const bus = this.eventBus || gameEvents;
+    const bus =
+      this.eventBus ||
+      (typeof gameEvents !== 'undefined' && gameEvents ? gameEvents : null);
     if (bus) {
       bus.emit('combat-enemy-projectile', payload);
       return true;
