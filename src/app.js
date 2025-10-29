@@ -429,7 +429,7 @@ function init() {
     // Register cache invalidation listeners (OPTIMIZATION #3)
     if (diContainer) {
       try {
-        const gameEvents = diContainer.resolve('events');
+        const gameEvents = diContainer.resolve('event-bus');
         if (gameEvents && typeof gameEvents.on === 'function') {
           gameEvents.on('screen-changed', () => {
             stateDirty = true;
