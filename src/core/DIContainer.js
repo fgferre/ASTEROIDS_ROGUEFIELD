@@ -302,12 +302,15 @@ export class DIContainer {
   /**
    * Gets a service by name (backward compatible with ServiceLocator).
    * Checks legacy services first, then resolves from DI container.
-   */
+  */
   get(name) {
-    // Track caller for migration metrics
-    const caller = this._getCaller();
-    if (caller) {
-      this.stats.uniqueCallers.add(caller);
+    // Track caller for migration metrics (dev-only to avoid prod overhead)
+    let caller = null;
+    if (this.showDeprecationWarnings) {
+      caller = this._getCaller();
+      if (caller) {
+        this.stats.uniqueCallers.add(caller);
+      }
     }
 
     // Check legacy services first (direct registrations)
@@ -494,6 +497,10 @@ export class DIContainer {
     }
 
     this.singletons.set(name, instance);
+
+    if (this.legacyServices.has(name)) {
+      this.legacyServices.set(name, instance);
+    }
 
     if (this.verbose) {
       console.log(`[DIContainer] Replaced singleton '${name}'`);
