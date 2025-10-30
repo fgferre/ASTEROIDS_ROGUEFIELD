@@ -4,7 +4,10 @@
   "CodeGPT.apiKey": "LM Studio",
   "traycer.additionalAgents": [
     "Claude Code Extension",
-    "Codex"
+    "Codex",
+    "Codex Extension",
+    "Claude Code",
+    "Gemini"
   ],
   "chatgpt.openOnStartup": true
 }
