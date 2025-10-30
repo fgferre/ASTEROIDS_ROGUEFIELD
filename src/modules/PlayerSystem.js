@@ -132,6 +132,14 @@ class PlayerSystem extends BaseSystem {
     this.rcsVisualLevel = 0;
     this.brakingVisualLevel = 0;
 
+    // === THRUSTER STATE TRACKING (for audio) ===
+    this.lastThrusterState = {
+      main: 0,
+      aux: 0,
+      sideL: 0,
+      sideR: 0,
+    };
+
     // === WEAPON RECOIL ===
     this.recoilOffset = { x: 0, y: 0 };
     this.recoilDecay = 0.85; // Fast decay for snappy feel
@@ -649,6 +657,10 @@ class PlayerSystem extends BaseSystem {
     let thrSideR = input.left ? 1 : 0; // CCW torque
     let thrSideL = input.right ? 1 : 0; // CW torque
 
+    // Track if thrusters are manually controlled (for audio distinction)
+    const isMainManual = input.up;
+    const isAuxManual = input.down;
+
     // Auto-brake quando não há input linear
     const noLinearInput = !input.up && !input.down;
     const speed = Math.hypot(this.velocity.vx, this.velocity.vy);
@@ -668,6 +680,7 @@ class PlayerSystem extends BaseSystem {
     const driftBrakeScale =
       1 - this.driftFactor * DRIFT_SETTINGS.brakeReduction;
 
+    // Auto-damping thrusters (activate without manual input)
     if (noLinearInput && speed > 2) {
       const proj = this.velocity.vx * fwd.x + this.velocity.vy * fwd.y;
       const kBase = Math.max(
@@ -722,8 +735,11 @@ class PlayerSystem extends BaseSystem {
     this.angle = this.wrapAngle(this.angle + this.angularVelocity * deltaTime);
 
     // === EFEITOS DE THRUSTER ===
-    // Emitir eventos para EffectsSystem
-    if (thrMain > 0) {
+    // Emitir eventos SEMPRE (não só na mudança) para manter visuais funcionando
+    // AudioSystem usa timeout de inatividade para detectar quando parar os loops
+
+    // Main thruster (forward)
+    if (thrMain > 0 || this.lastThrusterState.main > 0) {
       const thrusterPos = this.getLocalToWorld(-SHIP_SIZE * 0.8, 0);
       gameEvents.emit('thruster-effect', {
         position: thrusterPos,
@@ -731,10 +747,13 @@ class PlayerSystem extends BaseSystem {
         intensity: thrMain,
         type: 'main',
         visualLevel: this.thrusterVisualLevel,
+        isAutomatic: !isMainManual, // Flag para distinguir auto-damping de input manual
       });
+      this.lastThrusterState.main = thrMain;
     }
 
-    if (thrAux > 0) {
+    // Aux thruster (braking)
+    if (thrAux > 0 || this.lastThrusterState.aux > 0) {
       const thrusterPos = this.getLocalToWorld(SHIP_SIZE * 0.8, 0);
       gameEvents.emit('thruster-effect', {
         position: thrusterPos,
@@ -742,11 +761,13 @@ class PlayerSystem extends BaseSystem {
         intensity: thrAux,
         type: 'aux',
         visualLevel: this.brakingVisualLevel,
+        isAutomatic: !isAuxManual, // Flag para distinguir auto-damping de input manual
       });
+      this.lastThrusterState.aux = thrAux;
     }
 
-    // Side thrusters
-    if (thrSideL > 0) {
+    // Side thrusters (emit both L and R for visuals, audio will aggregate)
+    if (thrSideL > 0 || this.lastThrusterState.sideL > 0) {
       const thrusterPos = this.getLocalToWorld(0, -SHIP_SIZE * 0.52);
       const dir = this.getLocalDirection(0, 1);
       gameEvents.emit('thruster-effect', {
@@ -756,9 +777,10 @@ class PlayerSystem extends BaseSystem {
         type: 'side',
         visualLevel: this.rcsVisualLevel,
       });
+      this.lastThrusterState.sideL = thrSideL;
     }
 
-    if (thrSideR > 0) {
+    if (thrSideR > 0 || this.lastThrusterState.sideR > 0) {
       const thrusterPos = this.getLocalToWorld(0, SHIP_SIZE * 0.52);
       const dir = this.getLocalDirection(0, -1);
       gameEvents.emit('thruster-effect', {
@@ -768,6 +790,7 @@ class PlayerSystem extends BaseSystem {
         type: 'side',
         visualLevel: this.rcsVisualLevel,
       });
+      this.lastThrusterState.sideR = thrSideR;
     }
   }
 
@@ -1132,6 +1155,9 @@ class PlayerSystem extends BaseSystem {
   reset() {
     super.reset();
 
+    // Force stop all thruster sounds before reset
+    this._stopAllThrusterSounds();
+
     this.resetStats();
     this.position = {
       x: GAME_WIDTH / 2,
@@ -1149,7 +1175,60 @@ class PlayerSystem extends BaseSystem {
   markDead() {
     this.isDead = true;
     this.isRetrying = false;
+
+    // Force stop all thruster sounds
+    this._stopAllThrusterSounds();
+
     console.log('[PlayerSystem] Player marked as dead');
+  }
+
+  /**
+   * Force stops all thruster sounds by emitting events with intensity 0
+   * Called when player dies or game resets
+   */
+  _stopAllThrusterSounds() {
+    const gameEvents = this.getEventBus();
+    if (!gameEvents) return;
+
+    // Emit stop events for all thruster types
+    if (this.lastThrusterState.main > 0) {
+      gameEvents.emit('thruster-effect', {
+        position: this.position,
+        direction: { x: 0, y: -1 },
+        intensity: 0,
+        type: 'main',
+        visualLevel: this.thrusterVisualLevel,
+      });
+    }
+
+    if (this.lastThrusterState.aux > 0) {
+      gameEvents.emit('thruster-effect', {
+        position: this.position,
+        direction: { x: 0, y: 1 },
+        intensity: 0,
+        type: 'aux',
+        visualLevel: this.brakingVisualLevel,
+      });
+    }
+
+    const sideIntensity = Math.max(this.lastThrusterState.sideL, this.lastThrusterState.sideR);
+    if (sideIntensity > 0) {
+      gameEvents.emit('thruster-effect', {
+        position: this.position,
+        direction: { x: 1, y: 0 },
+        intensity: 0,
+        type: 'side',
+        visualLevel: this.rcsVisualLevel,
+      });
+    }
+
+    // Reset state
+    this.lastThrusterState = {
+      main: 0,
+      aux: 0,
+      sideL: 0,
+      sideR: 0,
+    };
   }
 
   respawn(position, invulnerabilityDuration = 3) {
@@ -1166,6 +1245,14 @@ class PlayerSystem extends BaseSystem {
     this.velocity.vy = 0;
     this.angularVelocity = 0;
     this.driftFactor = 0;
+
+    // Reset thruster state to stop any active sounds
+    this.lastThrusterState = {
+      main: 0,
+      aux: 0,
+      sideL: 0,
+      sideR: 0,
+    };
 
     // Give invulnerability
     this.invulnerableTimer = invulnerabilityDuration;

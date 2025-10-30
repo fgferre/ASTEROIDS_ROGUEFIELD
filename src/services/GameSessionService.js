@@ -270,6 +270,14 @@ export default class GameSessionService {
     });
   }
 
+  emitGameStarted(meta = {}) {
+    if (!this.eventBus || typeof this.eventBus.emit !== 'function') {
+      return;
+    }
+
+    this.eventBus.emit('game-started', { ...meta });
+  }
+
   setSessionState(state, meta = {}) {
     const nextState = state || 'unknown';
     const previous = this.sessionState;
@@ -674,6 +682,9 @@ export default class GameSessionService {
 
     this.setScreen('playing');
     this.emitScreenChanged('playing', { source: 'session.start' });
+
+    // Emit game-started event for audio feedback
+    this.emitGameStarted({ source, timestamp: Date.now() });
 
     const wasPaused = this.isPaused();
     this.setPaused(false);

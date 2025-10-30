@@ -180,6 +180,7 @@ class UISystem extends BaseSystem {
     this.bindPauseControls();
     this.bindSettingsControls();
     this.bindCreditsControls();
+    this.bindMainMenuControls();
     this.bootstrapSettingsState();
     this.initializeViewportScaling();
   }
@@ -1549,6 +1550,9 @@ class UISystem extends BaseSystem {
     }
 
     if (pauseRefs.resumeBtn) {
+      pauseRefs.resumeBtn.addEventListener('mouseenter', () => {
+        gameEvents.emit('ui-hover', { source: 'pause-menu', button: 'resume' });
+      });
       pauseRefs.resumeBtn.addEventListener('click', () => {
         if (!this.currentPauseState) {
           return;
@@ -1559,6 +1563,9 @@ class UISystem extends BaseSystem {
     }
 
     if (pauseRefs.settingsBtn) {
+      pauseRefs.settingsBtn.addEventListener('mouseenter', () => {
+        gameEvents.emit('ui-hover', { source: 'pause-menu', button: 'settings' });
+      });
       pauseRefs.settingsBtn.addEventListener('click', () => {
         if (!this.currentPauseState) {
           return;
@@ -1569,6 +1576,9 @@ class UISystem extends BaseSystem {
     }
 
     if (pauseRefs.exitBtn) {
+      pauseRefs.exitBtn.addEventListener('mouseenter', () => {
+        gameEvents.emit('ui-hover', { source: 'pause-menu', button: 'exit' });
+      });
       pauseRefs.exitBtn.addEventListener('click', () => {
         if (!this.currentPauseState) {
           return;
@@ -1586,6 +1596,16 @@ class UISystem extends BaseSystem {
     }
 
     if (settingsRefs.tabs) {
+      settingsRefs.tabs.addEventListener('mouseenter', (event) => {
+        // Only emit if settings menu is visible
+        if (settingsRefs.overlay && settingsRefs.overlay.classList.contains('hidden')) {
+          return;
+        }
+        const button = event.target.closest('[data-settings-category]');
+        if (button) {
+          gameEvents.emit('ui-hover', { source: 'settings-menu', element: 'tab' });
+        }
+      }, true); // Use capture phase for delegation
       settingsRefs.tabs.addEventListener('click', (event) => {
         const button = event.target.closest('[data-settings-category]');
         if (!button) {
@@ -1608,6 +1628,13 @@ class UISystem extends BaseSystem {
     }
 
     ensureArray(settingsRefs.closeButtons).forEach((button) => {
+      button.addEventListener('mouseenter', () => {
+        // Only emit if settings menu is visible
+        if (settingsRefs.overlay && settingsRefs.overlay.classList.contains('hidden')) {
+          return;
+        }
+        gameEvents.emit('ui-hover', { source: 'settings-menu', element: 'close' });
+      });
       button.addEventListener('click', (event) => {
         event.preventDefault();
         this.closeSettingsPanel();
@@ -1615,6 +1642,13 @@ class UISystem extends BaseSystem {
     });
 
     if (settingsRefs.resetBtn) {
+      settingsRefs.resetBtn.addEventListener('mouseenter', () => {
+        // Only emit if settings menu is visible
+        if (settingsRefs.overlay && settingsRefs.overlay.classList.contains('hidden')) {
+          return;
+        }
+        gameEvents.emit('ui-hover', { source: 'settings-menu', element: 'reset' });
+      });
       settingsRefs.resetBtn.addEventListener('click', (event) => {
         event.preventDefault();
         this.resetActiveSettingsCategory();
@@ -1655,11 +1689,39 @@ class UISystem extends BaseSystem {
     }
 
     ensureArray(creditsRefs.closeButtons).forEach((button) => {
+      button.addEventListener('mouseenter', () => {
+        // Only emit if credits menu is visible
+        if (creditsRefs.overlay && creditsRefs.overlay.classList.contains('hidden')) {
+          return;
+        }
+        gameEvents.emit('ui-hover', { source: 'credits-menu', element: 'close' });
+      });
       button.addEventListener('click', (event) => {
         event.preventDefault();
         this.closeCreditsOverlay({ restoreFocus: true });
       });
     });
+  }
+
+  bindMainMenuControls() {
+    // Bind main menu buttons (start-game-btn, restart-game-btn)
+    // These buttons exist in the HTML but are managed by GameSessionService
+    // We add hover sound feedback here
+    if (typeof document !== 'undefined') {
+      const startBtn = document.getElementById('start-game-btn');
+      if (startBtn) {
+        startBtn.addEventListener('mouseenter', () => {
+          gameEvents.emit('ui-hover', { source: 'main-menu', button: 'start' });
+        });
+      }
+
+      const restartBtn = document.getElementById('restart-game-btn');
+      if (restartBtn) {
+        restartBtn.addEventListener('mouseenter', () => {
+          gameEvents.emit('ui-hover', { source: 'gameover-menu', button: 'restart' });
+        });
+      }
+    }
   }
 
   setupHudLayout() {
@@ -4962,9 +5024,10 @@ class UISystem extends BaseSystem {
 
     button.innerHTML = this.buildUpgradeOptionMarkup(option);
     button.addEventListener('click', () => this.selectUpgrade(option.id));
-    button.addEventListener('mouseenter', () =>
-      this.focusLevelUpOption(index, { preventFocus: true, fromPointer: true })
-    );
+    button.addEventListener('mouseenter', () => {
+      gameEvents.emit('ui-hover', { source: 'upgrade-selection', index });
+      this.focusLevelUpOption(index, { preventFocus: true, fromPointer: true });
+    });
     button.addEventListener('focus', () =>
       this.focusLevelUpOption(index, { preventFocus: false })
     );

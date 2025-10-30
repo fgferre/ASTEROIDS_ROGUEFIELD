@@ -13,8 +13,7 @@
         "src/services/GameSessionService.js",
         "src/utils/dev/GameDebugLogger.js",
         "src/core/DIContainer.js",
-        "src/core/ServiceRegistry.js",
-        "src/core/ServiceLocatorAdapter.js"
+        "src/core/ServiceRegistry.js"
       ],
       "exports": [],
       "dependents": [],
@@ -57,7 +56,8 @@
         "src/core/GarbageCollectionManager.js",
         "src/core/RandomService.js",
         "src/services/GameSessionService.js",
-        "src/services/CommandQueueService.js"
+        "src/services/CommandQueueService.js",
+        "src/services/CrackGenerationService.js"
       ],
       "exports": [
         "DEFAULT_POOL_CONFIG",
@@ -73,6 +73,30 @@
       "isCritical": true
     },
     {
+      "path": "src/core/BaseSystem.js",
+      "imports": [
+        "src/core/serviceUtils.js",
+        "src/core/RandomService.js"
+      ],
+      "exports": [],
+      "dependents": [
+        "src/modules/AudioSystem.js",
+        "src/modules/CombatSystem.js",
+        "src/modules/EffectsSystem.js",
+        "src/modules/EnemySystem.js",
+        "src/modules/MenuBackgroundSystem.js",
+        "src/modules/PhysicsSystem.js",
+        "src/modules/PlayerSystem.js",
+        "src/modules/RenderingSystem.js",
+        "src/modules/UISystem.js",
+        "src/modules/UpgradeSystem.js",
+        "src/modules/WorldSystem.js",
+        "src/modules/XPOrbSystem.js"
+      ],
+      "isHub": true,
+      "isCritical": true
+    },
+    {
       "path": "src/core/CanvasStateManager.js",
       "imports": [],
       "exports": [],
@@ -83,8 +107,33 @@
       "isCritical": false
     },
     {
-      "path": "src/core/DIContainer.js",
+      "path": "src/core/debugLogging.js",
       "imports": [],
+      "exports": [
+        "DEBUG_LOGGING_QUERY_PARAM",
+        "DEBUG_LOGGING_STORAGE_KEY",
+        "DEBUG_LOGGING_DEFAULT",
+        "DEBUG_LOGGING_GLOBAL_FLAG",
+        "parseBoolean",
+        "resolveDebugPreference",
+        "isDebugLoggingEnabled",
+        "applyDebugPreference",
+        "registerDebugLoggingController",
+        "unregisterDebugLoggingController",
+        "getRegisteredDebugLoggingControllers"
+      ],
+      "dependents": [
+        "src/app.js",
+        "src/core/EventBus.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/core/DIContainer.js",
+      "imports": [
+        "src/utils/dev/GameDebugLogger.js"
+      ],
       "exports": [
         "DIContainer"
       ],
@@ -111,7 +160,11 @@
         "src/data/constants/physics.js",
         "src/data/constants/gameplay.js",
         "src/data/constants/visual.js",
-        "src/data/enemies/asteroid-configs.js"
+        "src/data/enemies/asteroid-configs.js",
+        "src/data/enemies/drone.js",
+        "src/data/enemies/hunter.js",
+        "src/data/enemies/mine.js",
+        "src/data/enemies/boss.js"
       ],
       "exports": [
         "GAME_WIDTH",
@@ -142,17 +195,21 @@
         "src/modules/AudioSystem.js",
         "src/modules/CombatSystem.js",
         "src/modules/EffectsSystem.js",
+        "src/modules/enemies/base/BaseEnemy.js",
+        "src/modules/enemies/components/AsteroidMovement.js",
+        "src/modules/enemies/components/MovementComponent.js",
+        "src/modules/enemies/managers/WaveManager.js",
+        "src/modules/enemies/systems/EnemySpawnSystem.js",
+        "src/modules/enemies/systems/EnemyUpdateSystem.js",
+        "src/modules/enemies/types/Asteroid.js",
+        "src/modules/enemies/types/Drone.js",
         "src/modules/EnemySystem.js",
         "src/modules/PhysicsSystem.js",
         "src/modules/PlayerSystem.js",
         "src/modules/ProgressionSystem.js",
         "src/modules/RenderingSystem.js",
+        "src/modules/UpgradeSystem.js",
         "src/modules/XPOrbSystem.js",
-        "src/modules/enemies/components/AsteroidMovement.js",
-        "src/modules/enemies/managers/WaveManager.js",
-        "src/modules/enemies/types/Asteroid.js",
-        "src/modules/enemies/types/BossEnemy.js",
-        "src/modules/enemies/types/Drone.js",
         "src/services/GameSessionService.js",
         "src/utils/drawEnemyProjectile.js"
       ],
@@ -176,6 +233,7 @@
         "src/bootstrap/serviceManifest.js",
         "src/modules/CombatSystem.js",
         "src/modules/EffectsSystem.js",
+        "src/modules/enemies/systems/EnemySpawnSystem.js",
         "src/modules/EnemySystem.js",
         "src/modules/XPOrbSystem.js"
       ],
@@ -225,17 +283,13 @@
       ],
       "dependents": [
         "src/bootstrap/serviceManifest.js",
+        "src/core/BaseSystem.js",
         "src/core/ServiceRegistry.js",
         "src/modules/AudioBatcher.js",
         "src/modules/AudioCache.js",
         "src/modules/AudioSystem.js",
-        "src/modules/EffectsSystem.js",
-        "src/modules/EnemySystem.js",
-        "src/modules/MenuBackgroundSystem.js",
-        "src/modules/ProgressionSystem.js",
-        "src/modules/RenderingSystem.js",
-        "src/modules/XPOrbSystem.js",
         "src/modules/collectibles/HealthHeart.js",
+        "src/modules/EffectsSystem.js",
         "src/modules/enemies/managers/RewardManager.js",
         "src/modules/enemies/managers/WaveManager.js",
         "src/modules/enemies/types/Asteroid.js",
@@ -243,8 +297,12 @@
         "src/modules/enemies/types/Drone.js",
         "src/modules/enemies/types/Hunter.js",
         "src/modules/enemies/types/Mine.js",
-        "src/utils/ScreenShake.js",
-        "src/utils/randomHelpers.js"
+        "src/modules/EnemySystem.js",
+        "src/modules/MenuBackgroundSystem.js",
+        "src/modules/RenderingSystem.js",
+        "src/modules/XPOrbSystem.js",
+        "src/utils/randomHelpers.js",
+        "src/utils/ScreenShake.js"
       ],
       "isHub": true,
       "isCritical": true
@@ -255,28 +313,6 @@
       "exports": [],
       "dependents": [
         "src/modules/RenderingSystem.js"
-      ],
-      "isHub": false,
-      "isCritical": false
-    },
-    {
-      "path": "src/core/ServiceLocator.js",
-      "imports": [
-        "src/core/debugLogging.js"
-      ],
-      "exports": [],
-      "dependents": [],
-      "isHub": false,
-      "isCritical": false
-    },
-    {
-      "path": "src/core/ServiceLocatorAdapter.js",
-      "imports": [],
-      "exports": [
-        "ServiceLocatorAdapter"
-      ],
-      "dependents": [
-        "src/app.js"
       ],
       "isHub": false,
       "isCritical": false
@@ -299,6 +335,32 @@
       "isCritical": false
     },
     {
+      "path": "src/core/serviceUtils.js",
+      "imports": [],
+      "exports": [
+        "normalizeDependencies",
+        "resolveService"
+      ],
+      "dependents": [
+        "src/core/BaseSystem.js",
+        "src/modules/AudioSystem.js",
+        "src/modules/collectibles/HealthHeartSystem.js",
+        "src/modules/EffectsSystem.js",
+        "src/modules/enemies/managers/RewardManager.js",
+        "src/modules/enemies/managers/WaveManager.js",
+        "src/modules/EnemySystem.js",
+        "src/modules/InputSystem.js",
+        "src/modules/MenuBackgroundSystem.js",
+        "src/modules/PhysicsSystem.js",
+        "src/modules/PlayerSystem.js",
+        "src/modules/RenderingSystem.js",
+        "src/modules/UISystem.js",
+        "src/modules/XPOrbSystem.js"
+      ],
+      "isHub": true,
+      "isCritical": true
+    },
+    {
       "path": "src/core/SpatialHash.js",
       "imports": [],
       "exports": [
@@ -309,58 +371,6 @@
       ],
       "isHub": false,
       "isCritical": false
-    },
-    {
-      "path": "src/core/debugLogging.js",
-      "imports": [],
-      "exports": [
-        "DEBUG_LOGGING_QUERY_PARAM",
-        "DEBUG_LOGGING_STORAGE_KEY",
-        "DEBUG_LOGGING_DEFAULT",
-        "DEBUG_LOGGING_GLOBAL_FLAG",
-        "parseBoolean",
-        "resolveDebugPreference",
-        "isDebugLoggingEnabled",
-        "applyDebugPreference",
-        "registerDebugLoggingController",
-        "unregisterDebugLoggingController",
-        "getRegisteredDebugLoggingControllers"
-      ],
-      "dependents": [
-        "src/app.js",
-        "src/core/EventBus.js",
-        "src/core/ServiceLocator.js"
-      ],
-      "isHub": false,
-      "isCritical": false
-    },
-    {
-      "path": "src/core/serviceUtils.js",
-      "imports": [],
-      "exports": [
-        "normalizeDependencies",
-        "resolveService"
-      ],
-      "dependents": [
-        "src/modules/AudioSystem.js",
-        "src/modules/CombatSystem.js",
-        "src/modules/EffectsSystem.js",
-        "src/modules/EnemySystem.js",
-        "src/modules/InputSystem.js",
-        "src/modules/MenuBackgroundSystem.js",
-        "src/modules/PhysicsSystem.js",
-        "src/modules/PlayerSystem.js",
-        "src/modules/ProgressionSystem.js",
-        "src/modules/RenderingSystem.js",
-        "src/modules/UISystem.js",
-        "src/modules/WorldSystem.js",
-        "src/modules/XPOrbSystem.js",
-        "src/modules/collectibles/HealthHeartSystem.js",
-        "src/modules/enemies/managers/RewardManager.js",
-        "src/modules/enemies/managers/WaveManager.js"
-      ],
-      "isHub": true,
-      "isCritical": true
     },
     {
       "path": "src/data/constants/gameplay.js",
@@ -423,15 +433,19 @@
         "src/modules/AudioSystem.js",
         "src/modules/CombatSystem.js",
         "src/modules/EffectsSystem.js",
+        "src/modules/enemies/components/AsteroidCollision.js",
+        "src/modules/enemies/components/CollisionComponent.js",
+        "src/modules/enemies/managers/WaveManager.js",
+        "src/modules/enemies/systems/EnemyDamageSystem.js",
+        "src/modules/enemies/systems/EnemySpawnSystem.js",
+        "src/modules/enemies/systems/EnemyUpdateSystem.js",
         "src/modules/EnemySystem.js",
         "src/modules/PhysicsSystem.js",
         "src/modules/PlayerSystem.js",
-        "src/modules/ProgressionSystem.js",
         "src/modules/RenderingSystem.js",
         "src/modules/UISystem.js",
+        "src/modules/UpgradeSystem.js",
         "src/modules/XPOrbSystem.js",
-        "src/modules/enemies/components/AsteroidCollision.js",
-        "src/modules/enemies/managers/WaveManager.js",
         "src/services/GameSessionService.js"
       ],
       "isHub": true,
@@ -453,10 +467,12 @@
       ],
       "dependents": [
         "src/core/GameConstants.js",
+        "src/modules/enemies/systems/FragmentationSystem.js",
+        "src/modules/enemies/types/Asteroid.js",
         "src/modules/PhysicsSystem.js",
         "src/modules/PlayerSystem.js",
         "src/modules/RenderingSystem.js",
-        "src/modules/enemies/types/Asteroid.js"
+        "src/services/CrackGenerationService.js"
       ],
       "isHub": false,
       "isCritical": false
@@ -464,33 +480,31 @@
     {
       "path": "src/data/constants/visual.js",
       "imports": [
-        "src/utils/deepFreeze.js"
+        "src/utils/deepFreeze.js",
+        "src/data/enemies/drone.js",
+        "src/data/enemies/hunter.js",
+        "src/data/enemies/mine.js",
+        "src/data/enemies/boss.js"
       ],
       "exports": [
         "ENEMY_TYPES",
         "ENEMY_REWARDS",
         "ENEMY_EFFECT_COLORS",
-        "ENEMY_RENDER_PRESETS",
-        "BOSS_CONFIG",
-        "BOSS_PHYSICS_CONFIG",
-        "BOSS_EFFECTS_PRESETS",
-        "BOSS_SCREEN_SHAKES"
+        "ENEMY_RENDER_PRESETS"
       ],
       "dependents": [
         "src/core/GameConstants.js",
         "src/modules/CombatSystem.js",
         "src/modules/EffectsSystem.js",
-        "src/modules/EnemySystem.js",
-        "src/modules/PhysicsSystem.js",
+        "src/modules/enemies/base/BaseEnemy.js",
+        "src/modules/enemies/components/RenderComponent.js",
         "src/modules/enemies/managers/RewardManager.js",
         "src/modules/enemies/managers/WaveManager.js",
-        "src/modules/enemies/types/BossEnemy.js",
-        "src/modules/enemies/types/Drone.js",
-        "src/modules/enemies/types/Hunter.js",
-        "src/modules/enemies/types/Mine.js"
+        "src/modules/EnemySystem.js",
+        "src/modules/PhysicsSystem.js"
       ],
-      "isHub": true,
-      "isCritical": true
+      "isHub": false,
+      "isCritical": false
     },
     {
       "path": "src/data/enemies/asteroid-configs.js",
@@ -504,7 +518,6 @@
         "ORB_VALUE",
         "ASTEROID_BASE_ORBS",
         "ASTEROID_SIZE_ORB_FACTOR",
-        "ASTEROID_XP_BASE",
         "ASTEROID_ORB_DROP_MULTIPLIER",
         "ASTEROID_VARIANTS",
         "ASTEROID_VARIANT_CHANCES"
@@ -513,11 +526,116 @@
         "src/core/GameConstants.js",
         "src/modules/CombatSystem.js",
         "src/modules/EffectsSystem.js",
+        "src/modules/enemies/managers/RewardManager.js",
+        "src/modules/enemies/systems/EnemyDamageSystem.js",
+        "src/modules/enemies/systems/EnemySpawnSystem.js",
+        "src/modules/enemies/types/Asteroid.js",
         "src/modules/EnemySystem.js",
         "src/modules/XPOrbSystem.js",
-        "src/modules/enemies/managers/RewardManager.js",
-        "src/modules/enemies/types/Asteroid.js"
+        "src/services/CrackGenerationService.js"
       ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/data/enemies/boss.js",
+      "imports": [
+        "src/utils/deepFreeze.js"
+      ],
+      "exports": [
+        "BOSS_CONFIG",
+        "BOSS_COMPONENTS",
+        "BOSS_PHYSICS_CONFIG",
+        "BOSS_EFFECTS_PRESETS",
+        "BOSS_SCREEN_SHAKES",
+        "BOSS_REWARDS"
+      ],
+      "dependents": [
+        "src/core/GameConstants.js",
+        "src/data/constants/visual.js",
+        "src/modules/enemies/managers/RewardManager.js",
+        "src/modules/enemies/types/BossEnemy.js",
+        "src/modules/EnemySystem.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/data/enemies/drone.js",
+      "imports": [
+        "src/utils/deepFreeze.js"
+      ],
+      "exports": [
+        "DRONE_CONFIG",
+        "DRONE_COMPONENTS",
+        "DRONE_REWARDS"
+      ],
+      "dependents": [
+        "src/core/GameConstants.js",
+        "src/data/constants/visual.js",
+        "src/modules/enemies/managers/RewardManager.js",
+        "src/modules/enemies/types/Drone.js",
+        "src/modules/EnemySystem.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/data/enemies/hunter.js",
+      "imports": [
+        "src/utils/deepFreeze.js"
+      ],
+      "exports": [
+        "HUNTER_CONFIG",
+        "HUNTER_COMPONENTS",
+        "HUNTER_REWARDS"
+      ],
+      "dependents": [
+        "src/core/GameConstants.js",
+        "src/data/constants/visual.js",
+        "src/modules/enemies/managers/RewardManager.js",
+        "src/modules/enemies/types/Hunter.js",
+        "src/modules/EnemySystem.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/data/enemies/mine.js",
+      "imports": [
+        "src/utils/deepFreeze.js"
+      ],
+      "exports": [
+        "MINE_CONFIG",
+        "MINE_COMPONENTS",
+        "MINE_REWARDS"
+      ],
+      "dependents": [
+        "src/core/GameConstants.js",
+        "src/data/constants/visual.js",
+        "src/modules/enemies/managers/RewardManager.js",
+        "src/modules/enemies/types/Mine.js",
+        "src/modules/EnemySystem.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/data/enemies/schema.js",
+      "imports": [
+        "src/utils/deepFreeze.js"
+      ],
+      "exports": [
+        "MOVEMENT_SCHEMA",
+        "WEAPON_SCHEMA",
+        "RENDER_SCHEMA",
+        "COLLISION_SCHEMA",
+        "HEALTH_SCHEMA",
+        "MY_ENEMY_COMPONENTS",
+        "ENEMY_CONFIG_SCHEMA",
+        "validateEnemyConfig"
+      ],
+      "dependents": [],
       "isHub": false,
       "isCritical": false
     },
@@ -568,14 +686,97 @@
       "isCritical": false
     },
     {
-      "path": "src/data/upgrades.js",
-      "imports": [],
+      "path": "src/data/upgrades/categories.js",
+      "imports": [
+        "src/utils/deepFreeze.js"
+      ],
       "exports": [
         "UPGRADE_CATEGORIES"
       ],
       "dependents": [
-        "src/modules/ProgressionSystem.js"
+        "src/data/upgrades/index.js"
       ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/data/upgrades/defense.js",
+      "imports": [
+        "src/utils/deepFreeze.js"
+      ],
+      "exports": [
+        "DEFENSE_UPGRADES"
+      ],
+      "dependents": [
+        "src/data/upgrades/index.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/data/upgrades/index.js",
+      "imports": [
+        "src/utils/deepFreeze.js",
+        "src/data/upgrades/categories.js",
+        "src/data/upgrades/offense.js",
+        "src/data/upgrades/defense.js",
+        "src/data/upgrades/mobility.js",
+        "src/data/upgrades/utility.js"
+      ],
+      "exports": [],
+      "dependents": [
+        "src/modules/UpgradeSystem.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/data/upgrades/mobility.js",
+      "imports": [
+        "src/utils/deepFreeze.js"
+      ],
+      "exports": [
+        "MOBILITY_UPGRADES"
+      ],
+      "dependents": [
+        "src/data/upgrades/index.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/data/upgrades/offense.js",
+      "imports": [
+        "src/utils/deepFreeze.js"
+      ],
+      "exports": [
+        "OFFENSE_UPGRADES"
+      ],
+      "dependents": [
+        "src/data/upgrades/index.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/data/upgrades/utility.js",
+      "imports": [
+        "src/utils/deepFreeze.js"
+      ],
+      "exports": [
+        "UTILITY_UPGRADES"
+      ],
+      "dependents": [
+        "src/data/upgrades/index.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/data/upgrades.js",
+      "imports": [],
+      "exports": [],
+      "dependents": [],
       "isHub": false,
       "isCritical": false
     },
@@ -616,6 +817,7 @@
     {
       "path": "src/modules/AudioSystem.js",
       "imports": [
+        "src/core/BaseSystem.js",
         "src/modules/AudioPool.js",
         "src/modules/AudioCache.js",
         "src/modules/AudioBatcher.js",
@@ -623,232 +825,6 @@
         "src/core/serviceUtils.js",
         "src/core/GameConstants.js",
         "src/data/constants/gameplay.js"
-      ],
-      "exports": [],
-      "dependents": [
-        "src/bootstrap/serviceManifest.js"
-      ],
-      "isHub": false,
-      "isCritical": false
-    },
-    {
-      "path": "src/modules/CombatSystem.js",
-      "imports": [
-        "src/core/GameConstants.js",
-        "src/core/GamePools.js",
-        "src/core/serviceUtils.js",
-        "src/utils/drawEnemyProjectile.js",
-        "src/utils/dev/GameDebugLogger.js",
-        "src/data/constants/gameplay.js",
-        "src/data/constants/visual.js",
-        "src/data/enemies/asteroid-configs.js"
-      ],
-      "exports": [],
-      "dependents": [
-        "src/bootstrap/serviceManifest.js"
-      ],
-      "isHub": false,
-      "isCritical": false
-    },
-    {
-      "path": "src/modules/EffectsSystem.js",
-      "imports": [
-        "src/core/GameConstants.js",
-        "src/core/GamePools.js",
-        "src/core/RandomService.js",
-        "src/utils/ScreenShake.js",
-        "src/core/serviceUtils.js",
-        "src/utils/randomHelpers.js",
-        "src/utils/dev/GameDebugLogger.js",
-        "src/data/constants/gameplay.js",
-        "src/data/constants/visual.js",
-        "src/data/enemies/asteroid-configs.js"
-      ],
-      "exports": [
-        "EffectsSystem"
-      ],
-      "dependents": [
-        "src/bootstrap/serviceManifest.js"
-      ],
-      "isHub": false,
-      "isCritical": false
-    },
-    {
-      "path": "src/modules/EnemySystem.js",
-      "imports": [
-        "src/core/GameConstants.js",
-        "src/core/GamePools.js",
-        "src/core/RandomService.js",
-        "src/core/serviceUtils.js",
-        "src/modules/enemies/types/Asteroid.js",
-        "src/modules/enemies/types/Drone.js",
-        "src/modules/enemies/types/Mine.js",
-        "src/modules/enemies/types/Hunter.js",
-        "src/modules/enemies/types/BossEnemy.js",
-        "src/modules/enemies/base/EnemyFactory.js",
-        "src/modules/enemies/managers/WaveManager.js",
-        "src/modules/enemies/managers/RewardManager.js",
-        "src/modules/enemies/components/AsteroidMovement.js",
-        "src/modules/enemies/components/AsteroidCollision.js",
-        "src/modules/enemies/components/AsteroidRenderer.js",
-        "src/utils/dev/GameDebugLogger.js",
-        "src/data/constants/gameplay.js",
-        "src/data/constants/visual.js",
-        "src/data/enemies/asteroid-configs.js"
-      ],
-      "exports": [],
-      "dependents": [
-        "src/bootstrap/serviceManifest.js"
-      ],
-      "isHub": false,
-      "isCritical": false
-    },
-    {
-      "path": "src/modules/InputSystem.js",
-      "imports": [
-        "src/data/settingsSchema.js",
-        "src/core/serviceUtils.js"
-      ],
-      "exports": [],
-      "dependents": [
-        "src/bootstrap/serviceManifest.js"
-      ],
-      "isHub": false,
-      "isCritical": false
-    },
-    {
-      "path": "src/modules/MenuBackgroundSystem.js",
-      "imports": [
-        "src/core/RandomService.js",
-        "src/core/serviceUtils.js",
-        "src/utils/randomHelpers.js"
-      ],
-      "exports": [],
-      "dependents": [
-        "src/bootstrap/serviceManifest.js"
-      ],
-      "isHub": false,
-      "isCritical": false
-    },
-    {
-      "path": "src/modules/PhysicsSystem.js",
-      "imports": [
-        "src/core/GameConstants.js",
-        "src/core/SpatialHash.js",
-        "src/core/serviceUtils.js",
-        "src/utils/dev/GameDebugLogger.js",
-        "src/data/constants/physics.js",
-        "src/data/constants/gameplay.js",
-        "src/data/constants/visual.js"
-      ],
-      "exports": [],
-      "dependents": [
-        "src/bootstrap/serviceManifest.js"
-      ],
-      "isHub": false,
-      "isCritical": false
-    },
-    {
-      "path": "src/modules/PlayerSystem.js",
-      "imports": [
-        "src/core/GameConstants.js",
-        "src/data/shipModels.js",
-        "src/core/serviceUtils.js",
-        "src/data/constants/physics.js",
-        "src/data/constants/gameplay.js"
-      ],
-      "exports": [],
-      "dependents": [
-        "src/bootstrap/serviceManifest.js"
-      ],
-      "isHub": false,
-      "isCritical": false
-    },
-    {
-      "path": "src/modules/ProgressionSystem.js",
-      "imports": [
-        "src/core/GameConstants.js",
-        "src/data/upgrades.js",
-        "src/core/serviceUtils.js",
-        "src/core/RandomService.js",
-        "src/data/constants/gameplay.js"
-      ],
-      "exports": [],
-      "dependents": [
-        "src/bootstrap/serviceManifest.js"
-      ],
-      "isHub": false,
-      "isCritical": false
-    },
-    {
-      "path": "src/modules/RenderingSystem.js",
-      "imports": [
-        "src/core/GameConstants.js",
-        "src/core/RenderBatch.js",
-        "src/core/CanvasStateManager.js",
-        "src/core/GradientCache.js",
-        "src/core/RandomService.js",
-        "src/core/serviceUtils.js",
-        "src/utils/dev/GameDebugLogger.js",
-        "src/data/constants/physics.js",
-        "src/data/constants/gameplay.js"
-      ],
-      "exports": [],
-      "dependents": [
-        "src/bootstrap/serviceManifest.js"
-      ],
-      "isHub": false,
-      "isCritical": false
-    },
-    {
-      "path": "src/modules/SettingsSystem.js",
-      "imports": [
-        "src/data/settingsSchema.js",
-        "src/data/ui/hudLayout.js"
-      ],
-      "exports": [],
-      "dependents": [
-        "src/bootstrap/serviceManifest.js"
-      ],
-      "isHub": false,
-      "isCritical": false
-    },
-    {
-      "path": "src/modules/UISystem.js",
-      "imports": [
-        "src/data/ui/hudLayout.js",
-        "src/data/settingsSchema.js",
-        "src/data/constants/gameplay.js",
-        "src/core/serviceUtils.js"
-      ],
-      "exports": [],
-      "dependents": [
-        "src/bootstrap/serviceManifest.js"
-      ],
-      "isHub": false,
-      "isCritical": false
-    },
-    {
-      "path": "src/modules/WorldSystem.js",
-      "imports": [
-        "src/core/serviceUtils.js"
-      ],
-      "exports": [],
-      "dependents": [
-        "src/bootstrap/serviceManifest.js"
-      ],
-      "isHub": false,
-      "isCritical": false
-    },
-    {
-      "path": "src/modules/XPOrbSystem.js",
-      "imports": [
-        "src/core/GameConstants.js",
-        "src/data/constants/gameplay.js",
-        "src/data/enemies/asteroid-configs.js",
-        "src/core/GamePools.js",
-        "src/core/RandomService.js",
-        "src/core/serviceUtils.js"
       ],
       "exports": [],
       "dependents": [
@@ -887,8 +863,54 @@
       "isCritical": false
     },
     {
+      "path": "src/modules/CombatSystem.js",
+      "imports": [
+        "src/core/BaseSystem.js",
+        "src/core/GameConstants.js",
+        "src/core/GamePools.js",
+        "src/utils/drawEnemyProjectile.js",
+        "src/utils/dev/GameDebugLogger.js",
+        "src/data/constants/gameplay.js",
+        "src/data/constants/visual.js",
+        "src/data/enemies/asteroid-configs.js"
+      ],
+      "exports": [],
+      "dependents": [
+        "src/bootstrap/serviceManifest.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/modules/EffectsSystem.js",
+      "imports": [
+        "src/core/BaseSystem.js",
+        "src/core/GameConstants.js",
+        "src/core/GamePools.js",
+        "src/core/RandomService.js",
+        "src/utils/ScreenShake.js",
+        "src/core/serviceUtils.js",
+        "src/utils/randomHelpers.js",
+        "src/utils/dev/GameDebugLogger.js",
+        "src/data/constants/gameplay.js",
+        "src/data/constants/visual.js",
+        "src/data/enemies/asteroid-configs.js"
+      ],
+      "exports": [
+        "EffectsSystem"
+      ],
+      "dependents": [
+        "src/bootstrap/serviceManifest.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
       "path": "src/modules/enemies/base/BaseEnemy.js",
-      "imports": [],
+      "imports": [
+        "src/data/constants/visual.js",
+        "src/core/GameConstants.js"
+      ],
       "exports": [
         "BaseEnemy"
       ],
@@ -904,7 +926,14 @@
     },
     {
       "path": "src/modules/enemies/base/EnemyFactory.js",
-      "imports": [],
+      "imports": [
+        "src/modules/enemies/components/CollisionComponent.js",
+        "src/modules/enemies/components/HealthComponent.js",
+        "src/modules/enemies/components/MovementComponent.js",
+        "src/modules/enemies/components/RenderComponent.js",
+        "src/modules/enemies/components/WeaponComponent.js",
+        "src/utils/dev/GameDebugLogger.js"
+      ],
       "exports": [
         "EnemyFactory"
       ],
@@ -955,9 +984,89 @@
       "isCritical": false
     },
     {
+      "path": "src/modules/enemies/components/CollisionComponent.js",
+      "imports": [
+        "src/data/constants/gameplay.js"
+      ],
+      "exports": [
+        "CollisionComponent"
+      ],
+      "dependents": [
+        "src/modules/enemies/base/EnemyFactory.js",
+        "src/modules/EnemySystem.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/modules/enemies/components/HealthComponent.js",
+      "imports": [],
+      "exports": [
+        "HealthComponent"
+      ],
+      "dependents": [
+        "src/modules/enemies/base/EnemyFactory.js",
+        "src/modules/EnemySystem.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/modules/enemies/components/MovementComponent.js",
+      "imports": [
+        "src/core/GameConstants.js",
+        "src/utils/mathHelpers.js",
+        "src/utils/vectorHelpers.js"
+      ],
+      "exports": [
+        "MovementComponent",
+        "wrapScreenEdges"
+      ],
+      "dependents": [
+        "src/modules/enemies/base/EnemyFactory.js",
+        "src/modules/EnemySystem.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/modules/enemies/components/RenderComponent.js",
+      "imports": [
+        "src/data/constants/visual.js"
+      ],
+      "exports": [
+        "RenderComponent"
+      ],
+      "dependents": [
+        "src/modules/enemies/base/EnemyFactory.js",
+        "src/modules/EnemySystem.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/modules/enemies/components/WeaponComponent.js",
+      "imports": [
+        "src/utils/combatHelpers.js"
+      ],
+      "exports": [
+        "WeaponComponent"
+      ],
+      "dependents": [
+        "src/modules/enemies/base/EnemyFactory.js",
+        "src/modules/EnemySystem.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
       "path": "src/modules/enemies/managers/RewardManager.js",
       "imports": [
         "src/data/enemies/asteroid-configs.js",
+        "src/data/enemies/drone.js",
+        "src/data/enemies/hunter.js",
+        "src/data/enemies/mine.js",
+        "src/data/enemies/boss.js",
         "src/data/constants/visual.js",
         "src/core/RandomService.js",
         "src/core/serviceUtils.js"
@@ -978,6 +1087,7 @@
         "src/core/RandomService.js",
         "src/core/serviceUtils.js",
         "src/utils/dev/GameDebugLogger.js",
+        "src/utils/mathHelpers.js",
         "src/data/constants/gameplay.js",
         "src/data/constants/visual.js"
       ],
@@ -991,16 +1101,26 @@
       "isCritical": false
     },
     {
-      "path": "src/modules/enemies/types/Asteroid.js",
+      "path": "src/modules/enemies/systems/EnemyDamageSystem.js",
       "imports": [
-        "src/core/GameConstants.js",
-        "src/core/RandomService.js",
-        "src/modules/enemies/base/BaseEnemy.js",
-        "src/data/constants/physics.js",
-        "src/data/enemies/asteroid-configs.js"
+        "src/utils/dev/GameDebugLogger.js",
+        "src/data/enemies/asteroid-configs.js",
+        "src/data/constants/gameplay.js"
+      ],
+      "exports": [],
+      "dependents": [
+        "src/modules/EnemySystem.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/modules/enemies/systems/EnemyRenderSystem.js",
+      "imports": [
+        "src/utils/dev/GameDebugLogger.js"
       ],
       "exports": [
-        "Asteroid"
+        "EnemyRenderSystem"
       ],
       "dependents": [
         "src/modules/EnemySystem.js"
@@ -1009,10 +1129,83 @@
       "isCritical": false
     },
     {
-      "path": "src/modules/enemies/types/BossEnemy.js",
+      "path": "src/modules/enemies/systems/EnemySpawnSystem.js",
+      "imports": [
+        "src/data/constants/gameplay.js",
+        "src/core/GameConstants.js",
+        "src/data/enemies/asteroid-configs.js",
+        "src/core/GamePools.js",
+        "src/utils/dev/GameDebugLogger.js",
+        "src/modules/enemies/types/Asteroid.js",
+        "src/modules/enemies/types/BossEnemy.js"
+      ],
+      "exports": [
+        "EnemySpawnSystem"
+      ],
+      "dependents": [
+        "src/modules/EnemySystem.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/modules/enemies/systems/EnemyUpdateSystem.js",
+      "imports": [
+        "src/modules/enemies/systems/EnemyUpdateSystem.js",
+        "src/core/GameConstants.js",
+        "src/data/constants/gameplay.js",
+        "src/utils/dev/GameDebugLogger.js"
+      ],
+      "exports": [
+        "EnemyUpdateSystem"
+      ],
+      "dependents": [
+        "src/modules/enemies/systems/EnemyUpdateSystem.js",
+        "src/modules/EnemySystem.js"
+      ],
+      "isHub": false,
+      "isCritical": true
+    },
+    {
+      "path": "src/modules/enemies/systems/FragmentationSystem.js",
+      "imports": [
+        "src/data/constants/physics.js"
+      ],
+      "exports": [
+        "FragmentationSystem"
+      ],
+      "dependents": [
+        "src/modules/enemies/types/Asteroid.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/modules/enemies/types/Asteroid.js",
       "imports": [
         "src/core/GameConstants.js",
-        "src/data/constants/visual.js",
+        "src/core/RandomService.js",
+        "src/modules/enemies/base/BaseEnemy.js",
+        "src/modules/enemies/systems/FragmentationSystem.js",
+        "src/services/CrackGenerationService.js",
+        "src/data/constants/physics.js",
+        "src/data/enemies/asteroid-configs.js",
+        "src/utils/dev/GameDebugLogger.js"
+      ],
+      "exports": [
+        "Asteroid"
+      ],
+      "dependents": [
+        "src/modules/enemies/systems/EnemySpawnSystem.js",
+        "src/modules/EnemySystem.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/modules/enemies/types/BossEnemy.js",
+      "imports": [
+        "src/data/enemies/boss.js",
         "src/core/RandomService.js",
         "src/modules/enemies/base/BaseEnemy.js",
         "src/utils/dev/GameDebugLogger.js"
@@ -1022,6 +1215,7 @@
       ],
       "dependents": [
         "src/core/GamePools.js",
+        "src/modules/enemies/systems/EnemySpawnSystem.js",
         "src/modules/EnemySystem.js"
       ],
       "isHub": false,
@@ -1030,7 +1224,7 @@
     {
       "path": "src/modules/enemies/types/Drone.js",
       "imports": [
-        "src/data/constants/visual.js",
+        "src/data/enemies/drone.js",
         "src/core/GameConstants.js",
         "src/core/RandomService.js",
         "src/modules/enemies/base/BaseEnemy.js",
@@ -1049,7 +1243,7 @@
     {
       "path": "src/modules/enemies/types/Hunter.js",
       "imports": [
-        "src/data/constants/visual.js",
+        "src/data/enemies/hunter.js",
         "src/core/RandomService.js",
         "src/modules/enemies/base/BaseEnemy.js"
       ],
@@ -1066,7 +1260,7 @@
     {
       "path": "src/modules/enemies/types/Mine.js",
       "imports": [
-        "src/data/constants/visual.js",
+        "src/data/enemies/mine.js",
         "src/core/RandomService.js",
         "src/modules/enemies/base/BaseEnemy.js"
       ],
@@ -1081,6 +1275,229 @@
       "isCritical": false
     },
     {
+      "path": "src/modules/EnemySystem.js",
+      "imports": [
+        "src/core/BaseSystem.js",
+        "src/core/GameConstants.js",
+        "src/core/GamePools.js",
+        "src/core/RandomService.js",
+        "src/core/serviceUtils.js",
+        "src/modules/enemies/types/Asteroid.js",
+        "src/modules/enemies/types/Drone.js",
+        "src/modules/enemies/types/Mine.js",
+        "src/modules/enemies/types/Hunter.js",
+        "src/modules/enemies/types/BossEnemy.js",
+        "src/modules/enemies/base/EnemyFactory.js",
+        "src/modules/enemies/managers/WaveManager.js",
+        "src/modules/enemies/managers/RewardManager.js",
+        "src/modules/enemies/components/AsteroidMovement.js",
+        "src/modules/enemies/components/AsteroidCollision.js",
+        "src/modules/enemies/components/AsteroidRenderer.js",
+        "src/modules/enemies/systems/EnemyRenderSystem.js",
+        "src/modules/enemies/systems/EnemySpawnSystem.js",
+        "src/modules/enemies/systems/EnemyDamageSystem.js",
+        "src/modules/enemies/systems/EnemyUpdateSystem.js",
+        "src/modules/enemies/components/CollisionComponent.js",
+        "src/modules/enemies/components/HealthComponent.js",
+        "src/modules/enemies/components/MovementComponent.js",
+        "src/modules/enemies/components/RenderComponent.js",
+        "src/modules/enemies/components/WeaponComponent.js",
+        "src/utils/dev/GameDebugLogger.js",
+        "src/utils/StateManager.js",
+        "src/data/constants/gameplay.js",
+        "src/data/constants/visual.js",
+        "src/data/enemies/drone.js",
+        "src/data/enemies/hunter.js",
+        "src/data/enemies/mine.js",
+        "src/data/enemies/boss.js",
+        "src/data/enemies/asteroid-configs.js"
+      ],
+      "exports": [],
+      "dependents": [
+        "src/bootstrap/serviceManifest.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/modules/InputSystem.js",
+      "imports": [
+        "src/data/settingsSchema.js",
+        "src/core/serviceUtils.js"
+      ],
+      "exports": [],
+      "dependents": [
+        "src/bootstrap/serviceManifest.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/modules/MenuBackgroundSystem.js",
+      "imports": [
+        "src/core/BaseSystem.js",
+        "src/core/RandomService.js",
+        "src/core/serviceUtils.js",
+        "src/utils/randomHelpers.js"
+      ],
+      "exports": [],
+      "dependents": [
+        "src/bootstrap/serviceManifest.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/modules/PhysicsSystem.js",
+      "imports": [
+        "src/core/BaseSystem.js",
+        "src/core/GameConstants.js",
+        "src/core/SpatialHash.js",
+        "src/core/serviceUtils.js",
+        "src/utils/dev/GameDebugLogger.js",
+        "src/utils/StateManager.js",
+        "src/data/constants/physics.js",
+        "src/data/constants/gameplay.js",
+        "src/data/constants/visual.js"
+      ],
+      "exports": [],
+      "dependents": [
+        "src/bootstrap/serviceManifest.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/modules/PlayerSystem.js",
+      "imports": [
+        "src/core/BaseSystem.js",
+        "src/core/GameConstants.js",
+        "src/data/shipModels.js",
+        "src/core/serviceUtils.js",
+        "src/data/constants/physics.js",
+        "src/data/constants/gameplay.js"
+      ],
+      "exports": [],
+      "dependents": [
+        "src/bootstrap/serviceManifest.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/modules/ProgressionSystem.js",
+      "imports": [
+        "src/core/GameConstants.js",
+        "src/modules/UpgradeSystem.js",
+        "src/utils/StateManager.js"
+      ],
+      "exports": [],
+      "dependents": [
+        "src/bootstrap/serviceManifest.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/modules/RenderingSystem.js",
+      "imports": [
+        "src/core/GameConstants.js",
+        "src/core/RenderBatch.js",
+        "src/core/CanvasStateManager.js",
+        "src/core/GradientCache.js",
+        "src/core/RandomService.js",
+        "src/core/BaseSystem.js",
+        "src/core/serviceUtils.js",
+        "src/utils/dev/GameDebugLogger.js",
+        "src/data/constants/physics.js",
+        "src/data/constants/gameplay.js",
+        "src/utils/mathHelpers.js",
+        "src/utils/vectorHelpers.js"
+      ],
+      "exports": [],
+      "dependents": [
+        "src/bootstrap/serviceManifest.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/modules/SettingsSystem.js",
+      "imports": [
+        "src/data/settingsSchema.js",
+        "src/data/ui/hudLayout.js",
+        "src/utils/mathHelpers.js"
+      ],
+      "exports": [],
+      "dependents": [
+        "src/bootstrap/serviceManifest.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/modules/UISystem.js",
+      "imports": [
+        "src/data/ui/hudLayout.js",
+        "src/data/settingsSchema.js",
+        "src/data/constants/gameplay.js",
+        "src/core/BaseSystem.js",
+        "src/core/serviceUtils.js"
+      ],
+      "exports": [],
+      "dependents": [
+        "src/bootstrap/serviceManifest.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/modules/UpgradeSystem.js",
+      "imports": [
+        "src/core/GameConstants.js",
+        "src/data/upgrades/index.js",
+        "src/core/BaseSystem.js",
+        "src/data/constants/gameplay.js"
+      ],
+      "exports": [],
+      "dependents": [
+        "src/modules/ProgressionSystem.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/modules/WorldSystem.js",
+      "imports": [
+        "src/core/BaseSystem.js"
+      ],
+      "exports": [],
+      "dependents": [
+        "src/bootstrap/serviceManifest.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/modules/XPOrbSystem.js",
+      "imports": [
+        "src/core/GameConstants.js",
+        "src/data/constants/gameplay.js",
+        "src/utils/mathHelpers.js",
+        "src/data/enemies/asteroid-configs.js",
+        "src/core/GamePools.js",
+        "src/core/RandomService.js",
+        "src/core/BaseSystem.js",
+        "src/core/serviceUtils.js"
+      ],
+      "exports": [],
+      "dependents": [
+        "src/bootstrap/serviceManifest.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
       "path": "src/services/CommandQueueService.js",
       "imports": [],
       "exports": [
@@ -1088,6 +1505,21 @@
       ],
       "dependents": [
         "src/bootstrap/serviceManifest.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/services/CrackGenerationService.js",
+      "imports": [
+        "src/data/constants/physics.js",
+        "src/data/enemies/asteroid-configs.js",
+        "src/utils/mathHelpers.js"
+      ],
+      "exports": [],
+      "dependents": [
+        "src/bootstrap/serviceManifest.js",
+        "src/modules/enemies/types/Asteroid.js"
       ],
       "isHub": false,
       "isCritical": false
@@ -1109,28 +1541,11 @@
       "isCritical": false
     },
     {
-      "path": "src/utils/PerformanceMonitor.js",
+      "path": "src/utils/combatHelpers.js",
       "imports": [],
-      "exports": [
-        "PerformanceMonitor"
-      ],
+      "exports": [],
       "dependents": [
-        "src/app.js"
-      ],
-      "isHub": false,
-      "isCritical": false
-    },
-    {
-      "path": "src/utils/ScreenShake.js",
-      "imports": [
-        "src/core/RandomService.js"
-      ],
-      "exports": [
-        "ScreenShake",
-        "ShakePresets"
-      ],
-      "dependents": [
-        "src/modules/EffectsSystem.js"
+        "src/modules/enemies/components/WeaponComponent.js"
       ],
       "isHub": false,
       "isCritical": false
@@ -1144,10 +1559,21 @@
       "dependents": [
         "src/data/constants/gameplay.js",
         "src/data/constants/visual.js",
-        "src/data/enemies/asteroid-configs.js"
+        "src/data/enemies/asteroid-configs.js",
+        "src/data/enemies/boss.js",
+        "src/data/enemies/drone.js",
+        "src/data/enemies/hunter.js",
+        "src/data/enemies/mine.js",
+        "src/data/enemies/schema.js",
+        "src/data/upgrades/categories.js",
+        "src/data/upgrades/defense.js",
+        "src/data/upgrades/index.js",
+        "src/data/upgrades/mobility.js",
+        "src/data/upgrades/offense.js",
+        "src/data/upgrades/utility.js"
       ],
-      "isHub": false,
-      "isCritical": false
+      "isHub": true,
+      "isCritical": true
     },
     {
       "path": "src/utils/dev/GameDebugLogger.js",
@@ -1158,17 +1584,24 @@
       ],
       "dependents": [
         "src/app.js",
+        "src/core/DIContainer.js",
         "src/modules/CombatSystem.js",
         "src/modules/EffectsSystem.js",
+        "src/modules/enemies/base/EnemyFactory.js",
+        "src/modules/enemies/managers/WaveManager.js",
+        "src/modules/enemies/systems/EnemyDamageSystem.js",
+        "src/modules/enemies/systems/EnemyRenderSystem.js",
+        "src/modules/enemies/systems/EnemySpawnSystem.js",
+        "src/modules/enemies/systems/EnemyUpdateSystem.js",
+        "src/modules/enemies/types/Asteroid.js",
+        "src/modules/enemies/types/BossEnemy.js",
+        "src/modules/enemies/types/Drone.js",
         "src/modules/EnemySystem.js",
         "src/modules/PhysicsSystem.js",
-        "src/modules/RenderingSystem.js",
-        "src/modules/enemies/managers/WaveManager.js",
-        "src/modules/enemies/types/BossEnemy.js",
-        "src/modules/enemies/types/Drone.js"
+        "src/modules/RenderingSystem.js"
       ],
-      "isHub": false,
-      "isCritical": false
+      "isHub": true,
+      "isCritical": true
     },
     {
       "path": "src/utils/dev/mathRandomGuard.js",
@@ -1198,6 +1631,38 @@
       "isCritical": false
     },
     {
+      "path": "src/utils/mathHelpers.js",
+      "imports": [],
+      "exports": [
+        "clamp",
+        "lerp",
+        "easeInOutCubic",
+        "normalizeAngle"
+      ],
+      "dependents": [
+        "src/modules/enemies/components/MovementComponent.js",
+        "src/modules/enemies/managers/WaveManager.js",
+        "src/modules/RenderingSystem.js",
+        "src/modules/SettingsSystem.js",
+        "src/modules/XPOrbSystem.js",
+        "src/services/CrackGenerationService.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/utils/PerformanceMonitor.js",
+      "imports": [],
+      "exports": [
+        "PerformanceMonitor"
+      ],
+      "dependents": [
+        "src/app.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
       "path": "src/utils/randomHelpers.js",
       "imports": [
         "src/core/RandomService.js"
@@ -1211,27 +1676,90 @@
       ],
       "isHub": false,
       "isCritical": false
+    },
+    {
+      "path": "src/utils/ScreenShake.js",
+      "imports": [
+        "src/core/RandomService.js"
+      ],
+      "exports": [
+        "ScreenShake",
+        "ShakePresets"
+      ],
+      "dependents": [
+        "src/modules/EffectsSystem.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/utils/StateManager.js",
+      "imports": [],
+      "exports": [
+        "safeNumber",
+        "safeBoolean",
+        "safeString",
+        "safeObject",
+        "deepClone",
+        "shallowClone",
+        "cloneArray",
+        "hasRequiredFields",
+        "isValidSnapshotVersion",
+        "validateSnapshot",
+        "createFallbackHandler",
+        "createSnapshotWrapper"
+      ],
+      "dependents": [
+        "src/modules/EnemySystem.js",
+        "src/modules/PhysicsSystem.js",
+        "src/modules/ProgressionSystem.js"
+      ],
+      "isHub": false,
+      "isCritical": false
+    },
+    {
+      "path": "src/utils/vectorHelpers.js",
+      "imports": [],
+      "exports": [
+        "length",
+        "normalize",
+        "normalizeSimple",
+        "magnitude",
+        "dot",
+        "distance"
+      ],
+      "dependents": [
+        "src/modules/enemies/components/MovementComponent.js",
+        "src/modules/RenderingSystem.js"
+      ],
+      "isHub": false,
+      "isCritical": false
     }
   ],
   "metrics": {
-    "totalFiles": 67,
-    "totalDependencies": 183,
-    "circularDependencies": 0,
-    "hubFiles": 5,
-    "orphanFiles": 2
+    "totalFiles": 93,
+    "totalDependencies": 279,
+    "circularDependencies": 1,
+    "hubFiles": 7,
+    "orphanFiles": 3
   },
   "issues": {
-    "cycles": [],
+    "cycles": [
+      "src/modules/enemies/systems/EnemyUpdateSystem.js"
+    ],
     "hubs": [
+      "src/core/BaseSystem.js",
       "src/core/GameConstants.js",
       "src/core/RandomService.js",
       "src/core/serviceUtils.js",
       "src/data/constants/gameplay.js",
-      "src/data/constants/visual.js"
+      "src/utils/deepFreeze.js",
+      "src/utils/dev/GameDebugLogger.js"
     ],
     "orphans": [
       "src/core/EventBus.js",
-      "src/core/ServiceLocator.js"
+      "src/data/enemies/schema.js",
+      "src/data/upgrades.js"
     ]
   }
 }

@@ -671,6 +671,7 @@ class AudioBatcher {
     if (soundType.includes('Shield') || soundType.includes('shield')) return 'shield';
     if (soundType.includes('XP') || soundType.includes('xp')) return 'xp';
     if (soundType.includes('Level') || soundType.includes('level')) return 'levelup';
+    if (soundType.includes('UI') || soundType.includes('ui')) return 'ui';
     return 'other';
   }
 

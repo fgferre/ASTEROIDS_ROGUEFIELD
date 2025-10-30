@@ -10,6 +10,301 @@ import {
 } from '../core/GameConstants.js';
 import { WAVE_BOSS_INTERVAL } from '../data/constants/gameplay.js';
 
+/**
+ * ThrusterLoopManager - Manages continuous thruster loop sounds
+ * Handles start→loop→stop lifecycle for main, retro, and side thrusters
+ */
+class ThrusterLoopManager {
+  constructor() {
+    // Map of active loops: type → {oscillators, gains, sources, filters, startTime, variation, intensity}
+    this.activeLoops = new Map();
+  }
+
+  /**
+   * Starts a thruster loop for given type
+   * @param {string} type - Thruster type: 'main', 'retro', or 'side'
+   * @param {number} variation - Variation index for deterministic sound
+   * @param {number} intensity - Loop intensity (0-1)
+   * @param {AudioContext} context - Web Audio context
+   * @param {AudioPool} pool - Audio node pool
+   * @param {AudioCache} cache - Audio buffer cache
+   * @param {object} randomScope - Random service scope for this thruster type
+   * @param {function} connectFn - Function to connect gain node to destination
+   * @returns {object} Loop state object
+   */
+  startLoop(type, variation, intensity, context, pool, cache, randomScope, connectFn) {
+    // Prevent duplicate loops
+    if (this.activeLoops.has(type)) {
+      console.warn(`[ThrusterLoopManager] Loop already active for type: ${type}`);
+      return this.activeLoops.get(type);
+    }
+
+    const now = context.currentTime;
+    const loopState = { type, variation, intensity, startTime: now };
+
+    // Create oscillators (saw + square mix for rich timbre)
+    const sawOsc = pool ? pool.getOscillator() : context.createOscillator();
+    const squareOsc = pool ? pool.getOscillator() : context.createOscillator();
+    const sawGain = pool ? pool.getGain() : context.createGain();
+    const squareGain = pool ? pool.getGain() : context.createGain();
+
+    sawOsc.type = 'sawtooth';
+    squareOsc.type = 'square';
+
+    // Frequency varies by thruster type
+    let baseFreq, freqVariation, noiseDuration;
+    if (type === 'main') {
+      baseFreq = 85;
+      freqVariation = randomScope?.range ? randomScope.range(-3, 3) : 0;
+      noiseDuration = 1.2 + (randomScope?.range ? randomScope.range(-0.2, 0.3) : 0);
+    } else if (type === 'retro') {
+      baseFreq = 95;
+      freqVariation = randomScope?.range ? randomScope.range(-4, 4) : 0;
+      noiseDuration = 1.0 + (randomScope?.range ? randomScope.range(-0.2, 0.2) : 0);
+    } else {
+      // side
+      baseFreq = 110;
+      freqVariation = randomScope?.range ? randomScope.range(-5, 5) : 0;
+      noiseDuration = 0.8 + (randomScope?.range ? randomScope.range(-0.1, 0.2) : 0);
+    }
+
+    const freq = baseFreq + freqVariation;
+    sawOsc.frequency.setValueAtTime(freq, now);
+    squareOsc.frequency.setValueAtTime(freq, now);
+
+    // Component gains calibrated to sum to -6dB peak at intensity=1.0
+    // saw: 0.2, square: 0.3, noise: 0.25 → total ~0.4 linear (before masterGain)
+    sawGain.gain.setValueAtTime(0.2, now);
+    squareGain.gain.setValueAtTime(0.3, now);
+
+    sawOsc.connect(sawGain);
+    squareOsc.connect(squareGain);
+
+    // Create noise component with tileable buffer
+    const familyName = type === 'main' ? 'thrusterMain' : type === 'retro' ? 'thrusterRetro' : 'thrusterSide';
+    let noiseBuffer = null;
+
+    if (cache) {
+      noiseBuffer = cache.getNoiseBuffer(noiseDuration, false, 'linear', {
+        family: familyName,
+        random: randomScope,
+      });
+    } else {
+      // Fallback: create simple noise buffer
+      const bufferSize = Math.floor(context.sampleRate * noiseDuration);
+      noiseBuffer = context.createBuffer(1, bufferSize, context.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = (randomScope?.range ? randomScope.range(-1, 1) : Math.random() * 2 - 1);
+      }
+    }
+
+    const noiseSource = pool ? pool.getBufferSource() : context.createBufferSource();
+    noiseSource.buffer = noiseBuffer;
+    noiseSource.loop = true; // CRITICAL: enable looping
+
+    const noiseGain = pool ? pool.getGain() : context.createGain();
+    noiseGain.gain.setValueAtTime(0.25, now);
+    noiseSource.connect(noiseGain);
+
+    // Create band-pass filter (1.2-6kHz for thruster characteristic)
+    const bpFilter = context.createBiquadFilter();
+    bpFilter.type = 'bandpass';
+    bpFilter.frequency.setValueAtTime(type === 'main' ? 3000 : type === 'retro' ? 2500 : 3500, now);
+    bpFilter.Q.setValueAtTime(1.2, now);
+
+    // Create EQ chain: highpass → peaking (low) → peaking (high)
+    const hpf = context.createBiquadFilter();
+    hpf.type = 'highpass';
+    hpf.frequency.setValueAtTime(70, now);
+
+    const peakLow = context.createBiquadFilter();
+    peakLow.type = 'peaking';
+    peakLow.frequency.setValueAtTime(250, now);
+    peakLow.Q.setValueAtTime(1.0, now);
+    peakLow.gain.setValueAtTime(type === 'main' ? 3 : type === 'retro' ? 2 : 2.5, now); // +2-3dB warmth
+
+    const peakHigh = context.createBiquadFilter();
+    peakHigh.type = 'peaking';
+    peakHigh.frequency.setValueAtTime(3000, now);
+    peakHigh.Q.setValueAtTime(1.0, now);
+    peakHigh.gain.setValueAtTime(type === 'main' ? 2 : type === 'retro' ? 1.5 : 2, now); // +1.5-2dB presence
+
+    // Create master gain for this loop (clamp to 0.5 = -6dB at intensity=1.0)
+    const masterGain = pool ? pool.getGain() : context.createGain();
+    const clampedIntensity = Math.min(intensity, 1.0) * 0.5; // Max -6dB
+    masterGain.gain.setValueAtTime(clampedIntensity, now);
+
+    // Connect chain: oscillators → BP filter → HPF → peakLow → peakHigh → master gain
+    sawGain.connect(bpFilter);
+    squareGain.connect(bpFilter);
+    noiseGain.connect(bpFilter);
+    bpFilter.connect(hpf);
+    hpf.connect(peakLow);
+    peakLow.connect(peakHigh);
+    peakHigh.connect(masterGain);
+
+    // Connect to destination
+    if (connectFn && typeof connectFn === 'function') {
+      connectFn(masterGain);
+    }
+
+    // Start all sources
+    sawOsc.start(now);
+    squareOsc.start(now);
+    noiseSource.start(now);
+
+    // Store loop state
+    loopState.oscillators = [sawOsc, squareOsc];
+    loopState.gains = [sawGain, squareGain, noiseGain, masterGain];
+    loopState.source = noiseSource;
+    loopState.filters = [bpFilter, hpf, peakLow, peakHigh]; // Store all filters for cleanup
+
+    this.activeLoops.set(type, loopState);
+
+    return loopState;
+  }
+
+  /**
+   * Updates loop intensity smoothly
+   * @param {string} type - Thruster type
+   * @param {number} intensity - New intensity (0-1)
+   */
+  updateLoop(type, intensity) {
+    const loop = this.activeLoops.get(type);
+    if (!loop) {
+      console.warn(`[ThrusterLoopManager] Cannot update: no active loop for type ${type}`);
+      return;
+    }
+
+    // Store new intensity
+    loop.intensity = intensity;
+
+    // Update master gain smoothly (clamp to -6dB)
+    if (loop.gains && loop.gains[3]) {
+      const masterGain = loop.gains[3];
+      const now = masterGain.context.currentTime;
+      const clampedIntensity = Math.min(intensity, 1.0) * 0.5; // Max -6dB
+      masterGain.gain.cancelScheduledValues(now);
+      masterGain.gain.setValueAtTime(masterGain.gain.value, now);
+      masterGain.gain.linearRampToValueAtTime(clampedIntensity, now + 0.05);
+    }
+  }
+
+  /**
+   * Stops a thruster loop
+   * @param {string} type - Thruster type
+   * @param {AudioPool} pool - Audio pool to return nodes to
+   */
+  stopLoop(type, pool) {
+    const loop = this.activeLoops.get(type);
+    if (!loop) {
+      return;
+    }
+
+    const now = loop.oscillators[0].context.currentTime;
+
+    // Stop oscillators and source
+    loop.oscillators.forEach(osc => {
+      try {
+        osc.stop(now + 0.01);
+      } catch (e) {
+        // Already stopped
+      }
+    });
+
+    try {
+      loop.source.stop(now + 0.01);
+    } catch (e) {
+      // Already stopped
+    }
+
+    // Disconnect all filters
+    if (loop.filters && Array.isArray(loop.filters)) {
+      loop.filters.forEach(filter => {
+        try {
+          filter.disconnect();
+        } catch (e) {
+          // Already disconnected
+        }
+      });
+    }
+
+    // Return gains to pool after sounds finish
+    if (pool) {
+      setTimeout(() => {
+        loop.gains.forEach(gain => {
+          try {
+            gain.disconnect();
+            pool.returnGain(gain);
+          } catch (e) {
+            // Ignore
+          }
+        });
+      }, 50);
+    }
+
+    this.activeLoops.delete(type);
+  }
+
+  /**
+   * Checks if a loop is currently active
+   * @param {string} type - Thruster type
+   * @returns {boolean}
+   */
+  isActive(type) {
+    return this.activeLoops.has(type);
+  }
+
+  /**
+   * Cleanup all active loops (called on reset)
+   * @param {AudioPool} pool - Audio pool to return nodes to
+   */
+  cleanup(pool) {
+    for (const [type, loop] of this.activeLoops) {
+      // Stop all oscillators and sources
+      loop.oscillators.forEach(osc => {
+        try {
+          osc.stop();
+        } catch (e) {
+          // Already stopped
+        }
+      });
+
+      try {
+        loop.source.stop();
+      } catch (e) {
+        // Already stopped
+      }
+
+      // Disconnect and return gains
+      if (pool) {
+        loop.gains.forEach(gain => {
+          try {
+            gain.disconnect();
+            pool.returnGain(gain);
+          } catch (e) {
+            // Ignore
+          }
+        });
+      }
+
+      // Disconnect all filters
+      if (loop.filters && Array.isArray(loop.filters)) {
+        loop.filters.forEach(filter => {
+          try {
+            filter.disconnect();
+          } catch (e) {
+            // Ignore
+          }
+        });
+      }
+    }
+
+    this.activeLoops.clear();
+  }
+}
+
 class AudioSystem extends BaseSystem {
   constructor(dependencies = {}) {
     super(dependencies, {
@@ -64,6 +359,9 @@ class AudioSystem extends BaseSystem {
     // Low health warning state
     this.lowHealthWarning = false;
 
+    // UI sound debouncing
+    this.lastUIHoverTime = 0;
+
     const initialIntensityLevel =
       typeof MUSIC_LAYER_CONFIG?.initialIntensity === 'number'
         ? MUSIC_LAYER_CONFIG.initialIntensity
@@ -98,9 +396,48 @@ class AudioSystem extends BaseSystem {
       lastPhase: null,
     };
 
+    // Thruster sound system
+    this.thrusterLoopManager = new ThrusterLoopManager();
+    this.thrusterState = {
+      lastIntensity: { main: 0, retro: 0, side: 0 },
+      lastEventTime: { main: 0, retro: 0, side: 0 }, // Timestamp of last event per type
+      startThreshold: 0.1, // Intensity threshold to start thruster sound
+      stopThreshold: 0.05, // Hysteresis: lower threshold to stop (prevents flapping)
+      inactivityTimeout: 150, // ms: stop loop if no event received for this duration
+    };
+    this.thrusterInactivityCheckInterval = null;
+
     this.captureRandomScopes();
     this.bootstrapSettings();
     this._exposeRandomDebugControls();
+    this._setupEarlyInit();
+  }
+
+  /**
+   * Sets up early audio initialization on first user interaction
+   * This ensures audio works immediately, even before game starts
+   */
+  _setupEarlyInit() {
+    if (typeof document === 'undefined') return;
+
+    const initOnInteraction = async () => {
+      if (!this.initialized) {
+        try {
+          await this.init();
+        } catch (e) {
+          console.warn('[AudioSystem] Early init failed:', e);
+        }
+      }
+      // Remove listeners after first interaction
+      document.removeEventListener('click', initOnInteraction, true);
+      document.removeEventListener('keydown', initOnInteraction, true);
+      document.removeEventListener('touchstart', initOnInteraction, true);
+    };
+
+    // Use capture phase to catch events early
+    document.addEventListener('click', initOnInteraction, true);
+    document.addEventListener('keydown', initOnInteraction, true);
+    document.addEventListener('touchstart', initOnInteraction, true);
   }
 
   async init() {
@@ -136,6 +473,9 @@ class AudioSystem extends BaseSystem {
 
       // Start performance monitoring
       this._startPerformanceMonitoring();
+
+      // Start thruster inactivity checker
+      this._startThrusterInactivityChecker();
     } catch (error) {
       console.warn('Áudio não disponível:', error);
       this.initialized = false;
@@ -297,7 +637,22 @@ class AudioSystem extends BaseSystem {
     });
 
     this.registerEventListener('input-confirmed', () => {
-      this.playButtonClick();
+      this.playUISelect();
+    });
+
+    // UI hover (debounced to prevent accumulation)
+    this.registerEventListener('ui-hover', () => {
+      const now = performance.now();
+      // Simple debouncing: only play if 80ms have passed since last hover sound
+      if (now - this.lastUIHoverTime > 80) {
+        this.lastUIHoverTime = now;
+        this.playUIHover();
+      }
+    });
+
+    // Game started
+    this.registerEventListener('game-started', () => {
+      this.playUIStartGame();
     });
 
     // Low health warning
@@ -312,6 +667,11 @@ class AudioSystem extends BaseSystem {
       } else {
         this.lowHealthWarning = false;
       }
+    });
+
+    // Thruster sounds (continuous loops)
+    this.registerEventListener('thruster-effect', (data) => {
+      this.handleThrusterEffect(data || {});
     });
   }
 
@@ -2531,6 +2891,13 @@ class AudioSystem extends BaseSystem {
         impact: baseRandom.fork('audio:family:impact'),
         music: baseRandom.fork('audio:family:music'),
         ui: baseRandom.fork('audio:family:ui'),
+        uiHover: baseRandom.fork('audio:family:ui:hover'),
+        uiSelect: baseRandom.fork('audio:family:ui:select'),
+        uiStartGame: baseRandom.fork('audio:family:ui:startgame'),
+        thruster: baseRandom.fork('audio:family:thruster'),
+        thrusterMain: baseRandom.fork('audio:family:thruster:main'),
+        thrusterRetro: baseRandom.fork('audio:family:thruster:retro'),
+        thrusterSide: baseRandom.fork('audio:family:thruster:side'),
       };
 
       cacheRandom = baseRandom.fork('audio:cache');
@@ -2815,6 +3182,7 @@ class AudioSystem extends BaseSystem {
 
   /**
    * Play button click sound - quick blip
+   * @deprecated Use playUISelect() instead - provides better feedback with "down-up" structure
    */
   playButtonClick() {
     this.safePlay(() => {
@@ -2939,6 +3307,682 @@ class AudioSystem extends BaseSystem {
     });
   }
 
+  /**
+   * Play UI hover sound - brief "ting" for button mouseenter
+   * 5 variations, 80-150ms, fundamental + harmonic with presence boost
+   */
+  playUIHover() {
+    this._trackPerformance('playUIHover');
+    this.safePlay(() => {
+      const randomScope = this.randomScopes.families.uiHover;
+      if (!randomScope) {
+        console.warn('[AudioSystem] playUIHover: uiHover random scope not available');
+        return;
+      }
+
+      const now = this.context.currentTime;
+      const variation = Math.floor(randomScope.range(0, 5));
+      const duration = randomScope.range(0.08, 0.15);
+
+      // Base frequency with pitch variation per variation
+      const baseFreq = randomScope.range(1200, 2400);
+      const pitchVar = 1 + (variation - 2) * 0.01; // ±2% variation
+      const freq = baseFreq * pitchVar;
+
+      // Create oscillators and gains from pool
+      const osc1 = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
+      const osc2 = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
+      const gain1 = this.pool ? this.pool.getGain() : this.context.createGain();
+      const gain2 = this.pool ? this.pool.getGain() : this.context.createGain();
+
+      // Fundamental (sine)
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(freq, now);
+
+      // Harmonic (2× frequency)
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(freq * 2, now);
+
+      // Connect oscillators to gains
+      osc1.connect(gain1);
+      osc2.connect(gain2);
+
+      // Create filters
+      const hpf = this.context.createBiquadFilter();
+      hpf.type = 'highpass';
+      hpf.frequency.setValueAtTime(120, now);
+
+      const peaking = this.context.createBiquadFilter();
+      peaking.type = 'peaking';
+      peaking.frequency.setValueAtTime(randomScope.range(2000, 4000), now);
+      peaking.Q.setValueAtTime(1.0, now);
+      peaking.gain.setValueAtTime(2, now); // +2dB presence boost
+
+      // Master gain to ensure -10dB peak (0.316) when signals sum
+      const masterGain = this.pool ? this.pool.getGain() : this.context.createGain();
+      masterGain.gain.setValueAtTime(0.316, now);
+
+      // Connect filter chain
+      gain1.connect(hpf);
+      gain2.connect(hpf);
+      hpf.connect(peaking);
+      peaking.connect(masterGain);
+      this.connectGainNode(masterGain);
+
+      // Envelope (adjusted so components sum to ~1.0 before master gain)
+      const attackTime = randomScope.range(0, 0.008);
+      const decayTime = randomScope.range(0.07, 0.12);
+      const fundamentalGain = 0.67; // ~67% of total
+      const harmonicGain = 0.33; // ~33% of total
+
+      // Fundamental envelope
+      gain1.gain.setValueAtTime(0, now);
+      gain1.gain.linearRampToValueAtTime(fundamentalGain, now + attackTime);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + decayTime);
+
+      // Harmonic envelope
+      gain2.gain.setValueAtTime(0, now);
+      gain2.gain.linearRampToValueAtTime(harmonicGain, now + attackTime);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + decayTime);
+
+      // Start and stop
+      osc1.start(now);
+      osc1.stop(now + duration);
+      osc2.start(now);
+      osc2.stop(now + duration);
+
+      // Cleanup: disconnect all nodes and return gains to pool
+      setTimeout(() => {
+        try {
+          // Disconnect filter chain
+          gain1.disconnect();
+          gain2.disconnect();
+          hpf.disconnect();
+          peaking.disconnect();
+          masterGain.disconnect();
+
+          // Return gains to pool
+          if (this.pool) {
+            this.pool.returnGain(gain1);
+            this.pool.returnGain(gain2);
+            this.pool.returnGain(masterGain);
+          }
+        } catch (e) {
+          console.warn('[AudioSystem] Cleanup error in playUIHover:', e);
+        }
+      }, duration * 1000 + 50);
+    });
+  }
+
+  /**
+   * Play UI select/confirm sound - "down-up" button click
+   * 5 variations, 120-180ms, with exciter for presence
+   */
+  playUISelect() {
+    this._trackPerformance('playUISelect');
+    this.safePlay(() => {
+      const randomScope = this.randomScopes.families.uiSelect;
+      if (!randomScope) {
+        console.warn('[AudioSystem] playUISelect: uiSelect random scope not available');
+        return;
+      }
+
+      const now = this.context.currentTime;
+      const variation = Math.floor(randomScope.range(0, 5));
+      const duration = randomScope.range(0.12, 0.18);
+
+      // Base frequency with pitch variation
+      const baseFreq = randomScope.range(700, 900);
+      const pitchVar = 1 + (variation - 2) * 0.01; // ±2% variation
+      const freq = baseFreq * pitchVar;
+
+      // Create oscillator and gain from pool
+      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
+      const gain = this.pool ? this.pool.getGain() : this.context.createGain();
+
+      // Single oscillator with frequency modulation curve
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.linearRampToValueAtTime(freq * 0.95, now + duration * 0.4); // down
+      osc.frequency.linearRampToValueAtTime(freq * 1.05, now + duration);       // up
+
+      osc.connect(gain);
+
+      // Create filters
+      const hpf = this.context.createBiquadFilter();
+      hpf.type = 'highpass';
+      hpf.frequency.setValueAtTime(120, now);
+
+      const exciter = this.context.createBiquadFilter();
+      exciter.type = 'peaking';
+      exciter.frequency.setValueAtTime(4000, now);
+      exciter.Q.setValueAtTime(2.0, now);
+      exciter.gain.setValueAtTime(3, now); // +3dB exciter for 3-5kHz presence
+
+      // Connect filter chain
+      gain.connect(hpf);
+      hpf.connect(exciter);
+      this.connectGainNode(exciter);
+
+      // Envelope (down-up gain curve matching frequency)
+      const peakGain = 0.355; // -9dB peak
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(peakGain, now + 0.005);                 // attack
+      gain.gain.linearRampToValueAtTime(peakGain * 0.5, now + duration * 0.4);  // dip
+      gain.gain.linearRampToValueAtTime(peakGain, now + duration * 0.7);        // peak
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);            // decay
+
+      // Start and stop
+      osc.start(now);
+      osc.stop(now + duration);
+
+      // Cleanup: disconnect all nodes and return gain to pool
+      setTimeout(() => {
+        try {
+          // Disconnect filter chain
+          gain.disconnect();
+          hpf.disconnect();
+          exciter.disconnect();
+
+          // Return gain to pool
+          if (this.pool) {
+            this.pool.returnGain(gain);
+          }
+        } catch (e) {
+          console.warn('[AudioSystem] Cleanup error in playUISelect:', e);
+        }
+      }, duration * 1000 + 50);
+    });
+  }
+
+  /**
+   * Play UI start game sound - ascending ping + whoosh with delay-based reverb
+   * 2 variations, 300-450ms, creates sense of space and excitement
+   */
+  playUIStartGame() {
+    this._trackPerformance('playUIStartGame');
+    this.safePlay(() => {
+      const randomScope = this.randomScopes.families.uiStartGame;
+      if (!randomScope) {
+        console.warn('[AudioSystem] playUIStartGame: uiStartGame random scope not available');
+        return;
+      }
+
+      const now = this.context.currentTime;
+      const variation = Math.floor(randomScope.range(0, 2));
+      const duration = randomScope.range(0.3, 0.45);
+
+      // === PING COMPONENT ===
+      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
+      const oscGain = this.pool ? this.pool.getGain() : this.context.createGain();
+
+      osc.type = variation === 0 ? 'sine' : 'triangle';
+
+      const baseFreq = randomScope.range(1000, 1500);
+      const pitchRise = Math.pow(2, randomScope.range(2, 3) / 12); // 2-3 semitones
+      osc.frequency.setValueAtTime(baseFreq, now);
+      osc.frequency.exponentialRampToValueAtTime(baseFreq * pitchRise, now + duration * 0.6);
+
+      osc.connect(oscGain);
+
+      // === WHOOSH COMPONENT ===
+      const noiseBuffer = this.cache.getNoiseBuffer(duration * 0.6, 0.05, 'white',
+        { family: 'uiStartGame', random: randomScope });
+      const noise = this.pool ? this.pool.getBufferSource() : this.context.createBufferSource();
+      const noiseGain = this.pool ? this.pool.getGain() : this.context.createGain();
+      noise.buffer = noiseBuffer;
+
+      noise.connect(noiseGain);
+
+      // Band-pass filter for whoosh (1-6kHz)
+      const bpf = this.context.createBiquadFilter();
+      bpf.type = 'bandpass';
+      bpf.frequency.setValueAtTime(3500, now); // Center of 1-6kHz range
+      bpf.Q.setValueAtTime(1.0, now);
+
+      noiseGain.connect(bpf);
+
+      // === DELAY-BASED REVERB (simplified approach) ===
+      const delay = this.context.createDelay();
+      const delayGain = this.pool ? this.pool.getGain() : this.context.createGain();
+      const feedbackGain = this.pool ? this.pool.getGain() : this.context.createGain();
+
+      delay.delayTime.setValueAtTime(0.08, now); // 80ms delay
+      feedbackGain.gain.setValueAtTime(0.3, now); // 30% feedback for tail
+      delayGain.gain.setValueAtTime(0.25, now);   // -12dB wet signal
+
+      // Delay feedback loop
+      delay.connect(feedbackGain);
+      feedbackGain.connect(delay); // Create feedback loop
+      delay.connect(delayGain);
+      this.connectGainNode(delayGain);
+
+      // Send both ping and whoosh to delay
+      oscGain.connect(delay);
+      bpf.connect(delay);
+
+      // === MASTER GAIN ===
+      const masterGain = this.pool ? this.pool.getGain() : this.context.createGain();
+      masterGain.gain.setValueAtTime(0.5, now); // -6dB peak
+
+      // Connect dry signals to master
+      oscGain.connect(masterGain);
+      bpf.connect(masterGain);
+      this.connectGainNode(masterGain);
+
+      // === ENVELOPES ===
+
+      // Ping envelope
+      oscGain.gain.setValueAtTime(0, now);
+      oscGain.gain.linearRampToValueAtTime(0.5, now + 0.01);           // attack
+      oscGain.gain.setValueAtTime(0.5, now + duration * 0.5);          // sustain
+      oscGain.gain.exponentialRampToValueAtTime(0.001, now + duration); // decay
+
+      // Whoosh envelope (starts later, at 200ms offset)
+      noiseGain.gain.setValueAtTime(0, now + 0.2);
+      noiseGain.gain.linearRampToValueAtTime(0.2, now + 0.22);         // quick attack
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      // === START/STOP ===
+      osc.start(now);
+      osc.stop(now + duration);
+      noise.start(now + 0.2); // Whoosh starts at 200ms
+      noise.stop(now + duration);
+
+      // === CLEANUP (longer tail for delay reverb) ===
+      setTimeout(() => {
+        try {
+          // CRITICAL: Break feedback loop first to prevent runaway oscillation
+          feedbackGain.disconnect();
+          delay.disconnect();
+
+          // Disconnect all other nodes
+          oscGain.disconnect();
+          noiseGain.disconnect();
+          bpf.disconnect();
+          delayGain.disconnect();
+          masterGain.disconnect();
+
+          // Return gains to pool
+          if (this.pool) {
+            this.pool.returnGain(oscGain);
+            this.pool.returnGain(noiseGain);
+            this.pool.returnGain(delayGain);
+            this.pool.returnGain(feedbackGain);
+            this.pool.returnGain(masterGain);
+          }
+        } catch (e) {
+          console.warn('[AudioSystem] Cleanup error in playUIStartGame:', e);
+        }
+      }, duration * 1000 + 200);
+    });
+  }
+
+  // === THRUSTER SOUNDS ===
+
+  /**
+   * Handles thruster-effect events from PlayerSystem
+   * Manages start→loop→stop lifecycle based on intensity changes
+   * Uses timestamp-based inactivity detection to stop loops
+   * Distinguishes between manual and automatic thrusters
+   */
+  handleThrusterEffect(data) {
+    if (!this.initialized || !this.context) return;
+
+    const { type, intensity, isAutomatic } = data;
+    if (!type || typeof intensity !== 'number') return;
+
+    // Map PlayerSystem event types to internal thruster keys
+    // PlayerSystem emits: 'main', 'aux' (braking), 'side'
+    let thrusterKey = type;
+    if (type === 'aux') {
+      thrusterKey = 'retro'; // Aux thruster = retro/braking thruster
+    }
+
+    const currentIntensity = intensity;
+    const lastIntensity = this.thrusterState.lastIntensity[thrusterKey] || 0;
+    const isActive = this.thrusterLoopManager.isActive(thrusterKey);
+    const now = performance.now();
+
+    // Update last event time
+    this.thrusterState.lastEventTime[thrusterKey] = now;
+
+    // State machine: determine action based on intensity thresholds
+    if (currentIntensity > this.thrusterState.startThreshold && !isActive) {
+      // START: intensity crossed start threshold and loop not active
+      this._startThrusterSound(thrusterKey, currentIntensity, isAutomatic || false);
+    } else if (currentIntensity > this.thrusterState.stopThreshold && isActive) {
+      // UPDATE: intensity changed but still above stop threshold
+      this._updateThrusterSound(thrusterKey, currentIntensity);
+    } else if (currentIntensity <= this.thrusterState.stopThreshold && isActive) {
+      // STOP: intensity dropped below stop threshold (hysteresis)
+      this._stopThrusterSound(thrusterKey);
+    }
+
+    // Update last intensity
+    this.thrusterState.lastIntensity[thrusterKey] = currentIntensity;
+  }
+
+  /**
+   * Starts thruster sound (plays start burst + begins loop)
+   * @param {string} type - Thruster type
+   * @param {number} intensity - Intensity 0-1
+   * @param {boolean} isAutomatic - If true, skip burst (auto-damping thrusters)
+   */
+  _startThrusterSound(type, intensity, isAutomatic = false) {
+    this._trackPerformance(`_startThrusterSound:${type}`);
+
+    // For automatic damping thrusters: skip burst, go straight to loop with lower volume
+    if (isAutomatic) {
+      // Immediate loop start, no burst
+      const randomScope = this._getThrusterRandomScope(type);
+      const variation = Math.floor((randomScope?.range ? randomScope.range(0, 3) : Math.random() * 3));
+
+      // Reduce intensity for automatic thrusters (softer spray sound)
+      const autoIntensity = intensity * 0.4; // 60% reduction for subtle auto-damping
+
+      this.thrusterLoopManager.startLoop(
+        type,
+        variation,
+        autoIntensity,
+        this.context,
+        this.pool,
+        this.cache,
+        randomScope,
+        (node) => this.connectGainNode(node)
+      );
+      return;
+    }
+
+    // Manual thrusters: play burst then loop
+    this._playThrusterStartBurst(type);
+
+    // Then start continuous loop after a short delay
+    setTimeout(() => {
+      if (!this.initialized || !this.context) return;
+
+      const randomScope = this._getThrusterRandomScope(type);
+      const variation = Math.floor((randomScope?.range ? randomScope.range(0, 3) : Math.random() * 3));
+
+      this.thrusterLoopManager.startLoop(
+        type,
+        variation,
+        intensity,
+        this.context,
+        this.pool,
+        this.cache,
+        randomScope,
+        (node) => this.connectGainNode(node)
+      );
+    }, type === 'side' ? 80 : type === 'retro' ? 140 : 160); // Delay ajustado para burst mais longo
+  }
+
+  /**
+   * Updates thruster loop intensity
+   */
+  _updateThrusterSound(type, intensity) {
+    this.thrusterLoopManager.updateLoop(type, intensity);
+  }
+
+  /**
+   * Stops thruster sound (plays stop release + ends loop)
+   * @param {string} type - Thruster type
+   * @param {boolean} skipRelease - If true, skip release sound (for automatic thrusters)
+   */
+  _stopThrusterSound(type, skipRelease = false) {
+    this._trackPerformance(`_stopThrusterSound:${type}`);
+
+    // Stop loop first
+    this.thrusterLoopManager.stopLoop(type, this.pool);
+
+    // Play stop release sound only for manual thrusters
+    if (!skipRelease) {
+      this._playThrusterStopRelease(type);
+    }
+  }
+
+  /**
+   * Plays thruster start burst sound
+   */
+  _playThrusterStartBurst(type) {
+    this.safePlay(() => {
+      const randomScope = this._getThrusterRandomScope(type);
+      const now = this.context.currentTime;
+
+      // Duration varies by thruster type
+      // Ajustado para sons graves, suaves e realistas de ignição (como release)
+      let duration, pitchStart, pitchEnd, gainPeak;
+      if (type === 'main') {
+        duration = 0.24 + (randomScope?.range ? randomScope.range(-0.02, 0.06) : 0);
+        pitchStart = 90; // MUITO mais grave (era 140)
+        pitchEnd = 120; // Ramp suave e grave (era 170)
+        gainPeak = 0.15; // Mais suave ainda (-16dB, era -9dB)
+      } else if (type === 'retro') {
+        duration = 0.20 + (randomScope?.range ? randomScope.range(-0.02, 0.05) : 0);
+        pitchStart = 100; // Muito mais grave (era 180)
+        pitchEnd = 130; // Descending suave (era 150)
+        gainPeak = 0.12; // Mais suave (-18dB, era -10dB)
+      } else {
+        // side
+        duration = 0.14 + (randomScope?.range ? randomScope.range(-0.01, 0.04) : 0);
+        pitchStart = 140 + (randomScope?.range ? randomScope.range(-10, 10) : 0); // Mais grave (era 220)
+        pitchEnd = 110; // Muito mais grave (era 180)
+        gainPeak = 0.10; // Mais suave (-20dB, era -12dB)
+      }
+
+      // Create oscillator - Triangle wave para suavidade (meio termo entre sine e sawtooth)
+      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
+      const oscGain = this.pool ? this.pool.getGain() : this.context.createGain();
+
+      osc.type = 'triangle'; // Triangle é mais suave que sawtooth/square mas com mais corpo que sine
+      osc.frequency.setValueAtTime(pitchStart, now);
+      osc.frequency.linearRampToValueAtTime(pitchEnd, now + duration);
+
+      osc.connect(oscGain);
+
+      // Create noise burst
+      let noiseBuffer;
+      const familyName = type === 'main' ? 'thrusterMain' : type === 'retro' ? 'thrusterRetro' : 'thrusterSide';
+
+      if (this.cache) {
+        noiseBuffer = this.cache.getNoiseBuffer(duration * 0.8, true, 'linear', {
+          family: familyName,
+          random: randomScope,
+        });
+      } else {
+        const bufferSize = Math.floor(this.context.sampleRate * duration * 0.8);
+        noiseBuffer = this.context.createBuffer(1, bufferSize, this.context.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          const progress = i / bufferSize;
+          output[i] = (randomScope?.range ? randomScope.range(-1, 1) : Math.random() * 2 - 1) * (1 - progress);
+        }
+      }
+
+      const noise = this.pool ? this.pool.getBufferSource() : this.context.createBufferSource();
+      noise.buffer = noiseBuffer;
+      const noiseGain = this.pool ? this.pool.getGain() : this.context.createGain();
+      noise.connect(noiseGain);
+
+      // Apply EQ filter chain (muito suave, grave e warm)
+      const hpf = this.context.createBiquadFilter();
+      hpf.type = 'highpass';
+      hpf.frequency.setValueAtTime(70, now); // Deixa passar graves (era 80)
+
+      const peaking1 = this.context.createBiquadFilter();
+      peaking1.type = 'peaking';
+      peaking1.frequency.setValueAtTime(150, now); // Mais grave/warmth (era 200)
+      peaking1.Q.setValueAtTime(0.6, now); // Q menor = mais suave (era 0.8)
+      peaking1.gain.setValueAtTime(1.5, now); // +1.5dB bump suave (era 2)
+
+      const peaking2 = this.context.createBiquadFilter();
+      peaking2.type = 'peaking';
+      peaking2.frequency.setValueAtTime(1800, now); // Bem menos harsh (era 2500)
+      peaking2.Q.setValueAtTime(0.5, now); // Q menor = mais suave (era 0.7)
+      peaking2.gain.setValueAtTime(0.5, now); // +0.5dB presence mínima (era 1)
+
+      // Lowpass agressivo para remover todas as frequências altas
+      const lpf = this.context.createBiquadFilter();
+      lpf.type = 'lowpass';
+      lpf.frequency.setValueAtTime(2800, now); // Remove muito mais altas (era 5000)
+      lpf.Q.setValueAtTime(0.5, now);
+
+      // Connect filter chain
+      oscGain.connect(hpf);
+      noiseGain.connect(hpf);
+      hpf.connect(peaking1);
+      peaking1.connect(peaking2);
+      peaking2.connect(lpf);
+      this.connectGainNode(lpf);
+
+      // Envelope (attack ainda mais longo para ignição muito suave)
+      const attackTime = type === 'side' ? 0.025 : 0.080 + (randomScope?.range ? randomScope.range(0, 0.030) : 0);
+
+      // Balance osc/noise: ainda menos noise, mais oscillator para som tonal e suave
+      oscGain.gain.setValueAtTime(0, now);
+      oscGain.gain.linearRampToValueAtTime(gainPeak * 0.75, now + attackTime); // 75% osc (era 70%)
+      oscGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      noiseGain.gain.setValueAtTime(0, now);
+      noiseGain.gain.linearRampToValueAtTime(gainPeak * 0.25, now + attackTime); // 25% noise (era 30%)
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      // Start and stop
+      osc.start(now);
+      osc.stop(now + duration);
+      noise.start(now);
+      noise.stop(now + duration);
+
+      // Return gains to pool
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(oscGain);
+          this.pool.returnGain(noiseGain);
+        }, duration * 1000 + 50);
+      }
+    });
+  }
+
+  /**
+   * Plays thruster stop release sound
+   * Ajustado para ser muito mais suave, grave e sutil (como um suspiro)
+   */
+  _playThrusterStopRelease(type) {
+    this.safePlay(() => {
+      const randomScope = this._getThrusterRandomScope(type);
+      const now = this.context.currentTime;
+
+      // Duration varies by thruster type - mais longo para fade suave
+      let duration, pitchStart, pitchEnd, gainPeak;
+      if (type === 'main') {
+        duration = 0.20 + (randomScope?.range ? randomScope.range(0, 0.08) : 0);
+        pitchStart = 110; // Muito mais grave (era 180)
+        pitchEnd = 70; // Drop suave e grave (era 150)
+        gainPeak = 0.12; // MUITO mais suave (era 0.707 = -3dB, agora ~-18dB)
+      } else if (type === 'retro') {
+        duration = 0.18 + (randomScope?.range ? randomScope.range(0, 0.06) : 0);
+        pitchStart = 120;
+        pitchEnd = 75;
+        gainPeak = 0.10; // Muito mais suave (era 0.63, agora ~-20dB)
+      } else {
+        // side
+        duration = 0.15 + (randomScope?.range ? randomScope.range(0, 0.04) : 0);
+        pitchStart = 140;
+        pitchEnd = 85;
+        gainPeak = 0.08; // Muito mais suave (era 0.5, agora ~-22dB)
+      }
+
+      // Create oscillator - SINE wave para suavidade máxima
+      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
+      const gain = this.pool ? this.pool.getGain() : this.context.createGain();
+
+      osc.type = 'sine'; // Sine é muito mais suave que sawtooth/square
+      osc.frequency.setValueAtTime(pitchStart, now);
+      osc.frequency.exponentialRampToValueAtTime(pitchEnd, now + duration);
+
+      osc.connect(gain);
+
+      // Apply lowpass filter agressivo - remove todas as frequências altas
+      const lpf = this.context.createBiquadFilter();
+      lpf.type = 'lowpass';
+      lpf.frequency.setValueAtTime(1200, now); // Começa já bem baixo (era 4000)
+      lpf.frequency.exponentialRampToValueAtTime(400, now + duration); // Termina muito baixo (era 800)
+      lpf.Q.setValueAtTime(0.5, now); // Q baixo = rolloff suave
+
+      gain.connect(lpf);
+      this.connectGainNode(lpf);
+
+      // Gentle release envelope - fade out muito gradual
+      gain.gain.setValueAtTime(gainPeak, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      osc.start(now);
+      osc.stop(now + duration);
+
+      // Return gain to pool
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(gain);
+        }, duration * 1000 + 50);
+      }
+    });
+  }
+
+  /**
+   * Gets the appropriate random scope for a thruster type
+   */
+  _getThrusterRandomScope(type) {
+    if (type === 'main') {
+      return this.randomScopes?.families?.thrusterMain || this.randomScopes?.families?.thruster || this.randomScopes?.base;
+    } else if (type === 'retro') {
+      return this.randomScopes?.families?.thrusterRetro || this.randomScopes?.families?.thruster || this.randomScopes?.base;
+    } else {
+      // side
+      return this.randomScopes?.families?.thrusterSide || this.randomScopes?.families?.thruster || this.randomScopes?.base;
+    }
+  }
+
+  /**
+   * Starts interval to check for thruster inactivity
+   * Stops loops that haven't received events within timeout period
+   */
+  _startThrusterInactivityChecker() {
+    if (this.thrusterInactivityCheckInterval) {
+      clearInterval(this.thrusterInactivityCheckInterval);
+    }
+
+    // Check every 50ms
+    this.thrusterInactivityCheckInterval = setInterval(() => {
+      this._checkThrusterInactivity();
+    }, 50);
+  }
+
+  /**
+   * Checks if any active thruster loops have timed out due to inactivity
+   * Stops loops that haven't received events in the last 150ms
+   */
+  _checkThrusterInactivity() {
+    if (!this.initialized || !this.thrusterLoopManager) return;
+
+    const now = performance.now();
+    const timeout = this.thrusterState.inactivityTimeout;
+
+    // Check each thruster type
+    ['main', 'retro', 'side'].forEach(type => {
+      const isActive = this.thrusterLoopManager.isActive(type);
+      if (!isActive) return;
+
+      const lastEventTime = this.thrusterState.lastEventTime[type] || 0;
+      const timeSinceLastEvent = now - lastEventTime;
+
+      // If no event received within timeout period, stop the loop
+      // Skip release sound since this is typically automatic damping
+      if (timeSinceLastEvent > timeout) {
+        this._stopThrusterSound(type, true); // skipRelease = true
+      }
+    });
+  }
+
   reset() {
     // Cleanup optimization systems
     if (this.pool) {
@@ -2952,6 +3996,19 @@ class AudioSystem extends BaseSystem {
     if (this.batcher) {
       this.batcher.flushPendingBatches();
       this.batcher.resetStats();
+    }
+
+    // Cleanup thruster loops
+    if (this.thrusterLoopManager) {
+      this.thrusterLoopManager.cleanup(this.pool);
+    }
+    if (this.thrusterInactivityCheckInterval) {
+      clearInterval(this.thrusterInactivityCheckInterval);
+      this.thrusterInactivityCheckInterval = null;
+    }
+    if (this.thrusterState) {
+      this.thrusterState.lastIntensity = { main: 0, retro: 0, side: 0 };
+      this.thrusterState.lastEventTime = { main: 0, retro: 0, side: 0 };
     }
 
     // Reset performance monitoring
