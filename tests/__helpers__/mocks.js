@@ -108,6 +108,10 @@ export function createServiceRegistryMock() {
  * @example
  * const random = createRandomServiceStub('example-seed');
  * random.float(); // 0.5
+ *
+ * @note The `fork()` method returns `this`, meaning all forks share the same state.
+ *       This intentionally simplifies tests that don't require independent RNG sequences.
+ *       For tests requiring independent forks, use `createRandomServiceStatefulStub()` from stubs.js instead.
  */
 export function createRandomServiceStub(seed) {
   void seed;

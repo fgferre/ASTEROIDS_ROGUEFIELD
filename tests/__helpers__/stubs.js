@@ -8,6 +8,10 @@ import { vi } from 'vitest';
  * @example
  * const random = createDeterministicRandom({ intValue: 5, chanceValue: true });
  * random.int(0, 10); // 5
+ *
+ * @note The `fork()` method returns `this`, meaning all forks share the same state.
+ *       This intentionally simplifies tests that don't require independent RNG sequences.
+ *       For tests requiring independent forks, use `createRandomServiceStatefulStub()` instead.
  */
 export function createDeterministicRandom(options = {}) {
   const {
@@ -142,6 +146,7 @@ export function createOscillatorStub(options = {}) {
           frequencyLog.push(value);
         }
       },
+      exponentialRampToValueAtTime() {},
     },
   };
 }

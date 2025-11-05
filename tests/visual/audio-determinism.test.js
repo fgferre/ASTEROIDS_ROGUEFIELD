@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import AudioSystem from '../../src/modules/AudioSystem.js';
 import AudioBatcher from '../../src/modules/AudioBatcher.js';
-import { createGainStub, createBufferSourceStub } from '../__helpers__/stubs.js';
+import { createGainStub, createBufferSourceStub, createOscillatorStub } from '../__helpers__/stubs.js';
 import { createTestContainer } from '../__helpers__/setup.js';
 
 describe('AudioSystem RNG determinism', () => {
@@ -15,15 +15,14 @@ describe('AudioSystem RNG determinism', () => {
     });
 
     const frequencyLog = [];
-    const createOscillatorStub = () => ({
-      connect: () => {},
-      start: () => {},
-      stop: () => {},
-      frequency: {
-        setValueAtTime: (value) => {
-          frequencyLog.push(Number(value.toFixed(6)));
-        },
-        exponentialRampToValueAtTime: () => {},
+    const roundedFrequencyLog = new Proxy(frequencyLog, {
+      get(target, prop) {
+        if (prop === 'push') {
+          return function(value) {
+            return target.push(Number(value.toFixed(6)));
+          };
+        }
+        return target[prop];
       },
     });
 
@@ -36,7 +35,7 @@ describe('AudioSystem RNG determinism', () => {
     audioSystem.masterGain = createGainStub();
     audioSystem.effectsGain = createGainStub();
     audioSystem.pool = {
-      getOscillator: () => createOscillatorStub(),
+      getOscillator: () => createOscillatorStub({ frequencyLog: roundedFrequencyLog }),
       getGain: () => createGainStub(),
       getBufferSource: () => createBufferSourceStub(),
       returnGain: () => {},

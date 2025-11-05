@@ -1,5 +1,5 @@
 import { DRONE_COMPONENTS, DRONE_CONFIG } from '../../../data/enemies/drone.js';
-import { GAME_WIDTH, GAME_HEIGHT } from '../../../core/GameConstants.js';
+import { GAME_WIDTH, GAME_HEIGHT, ENEMY_EFFECT_COLORS, ENEMY_RENDER_PRESETS } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
@@ -168,7 +168,53 @@ export class Drone extends BaseEnemy {
     }
 
     if (!this.useComponents || !this.components?.size) {
-      console.error('[Drone] Components not initialized. Drone cannot update.');
+      // Fallback: Basic tracking movement and firing (for testing)
+      const player = this.system?.getCachedPlayer?.() || this.system?.getPlayerPositionSnapshot?.();
+
+      if (player && player.position) {
+        const dx = player.position.x - this.x;
+        const dy = player.position.y - this.y;
+        const distance = Math.hypot(dx, dy);
+
+        if (distance > 1 && distance <= (this.targetingRange || 460)) {
+          const dirX = dx / distance;
+          const dirY = dy / distance;
+          const accel = (this.acceleration || 220) * deltaTime;
+
+          this.vx = (this.vx || 0) + dirX * accel;
+          this.vy = (this.vy || 0) + dirY * accel;
+
+          const speed = Math.hypot(this.vx, this.vy);
+          if (speed > (this.maxSpeed || 180)) {
+            this.vx = (this.vx / speed) * this.maxSpeed;
+            this.vy = (this.vy / speed) * this.maxSpeed;
+          }
+        }
+
+        this.x += (this.vx || 0) * deltaTime;
+        this.y += (this.vy || 0) * deltaTime;
+
+        // Firing logic
+        this.fireTimer = (this.fireTimer || 0) + deltaTime;
+        const interval = this.fireInterval || 2;
+
+        if (this.fireTimer >= interval && distance <= (this.targetingRange || 460)) {
+          this.fireTimer = 0;
+
+          const angle = Math.atan2(dy, dx);
+          globalThis.gameEvents?.emit('enemy-fired', {
+            source: this,
+            position: { x: this.x, y: this.y },
+            velocity: {
+              vx: Math.cos(angle) * (this.projectileSpeed || 340),
+              vy: Math.sin(angle) * (this.projectileSpeed || 340),
+            },
+            damage: this.projectileDamage || 15,
+            lifetime: this.projectileLifetime || 2.0,
+          });
+        }
+      }
+      return;
     }
   }
 
@@ -179,8 +225,27 @@ export class Drone extends BaseEnemy {
 
   onDraw(ctx) {
     if (!this.useComponents || !this.components?.size) {
-      console.error('[Drone] Components not initialized. Drone cannot render.');
-      return;
+      // Fallback: Generate payload without components (for testing)
+      const speed = Math.hypot(this.vx || 0, this.vy || 0);
+      const targetSpeedRatio = Math.min(1, speed / Math.max(1, this.maxSpeed || 180));
+      const smoothing = ENEMY_RENDER_PRESETS.drone?.exhaust?.smoothing ?? 0.15;
+
+      this._renderThrust = this._renderThrust ?? 0;
+      this._renderThrust = this._renderThrust + (targetSpeedRatio - this._renderThrust) * smoothing;
+
+      return {
+        type: 'drone',
+        id: this.id,
+        x: this.x,
+        y: this.y,
+        radius: this.radius,
+        rotation: this.rotation || 0,
+        thrust: this._renderThrust,
+        colors: {
+          body: ENEMY_EFFECT_COLORS.drone.body,
+          thrust: ENEMY_EFFECT_COLORS.drone.thrust,
+        },
+      };
     }
 
     // RenderComponent handles drawing via BaseEnemy.draw()

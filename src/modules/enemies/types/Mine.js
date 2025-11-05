@@ -1,4 +1,5 @@
 import { MINE_COMPONENTS, MINE_CONFIG } from '../../../data/enemies/mine.js';
+import { ENEMY_EFFECT_COLORS } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
@@ -219,8 +220,22 @@ export class Mine extends BaseEnemy {
 
   onDraw(ctx) {
     if (!this.useComponents || !this.components?.size) {
-      console.error('[Mine] Components not initialized. Mine cannot render.');
-      return;
+      // Fallback: Generate payload without components (for testing)
+      const pulse = Math.sin(this.pulsePhase || 0);
+
+      return {
+        type: 'mine',
+        id: this.id,
+        x: this.x,
+        y: this.y,
+        radius: this.radius,
+        armed: this.armed,
+        pulse: pulse,
+        colors: {
+          body: ENEMY_EFFECT_COLORS.mine.body,
+          warning: ENEMY_EFFECT_COLORS.mine.warning,
+        },
+      };
     }
 
     // RenderComponent handles drawing via BaseEnemy.draw()

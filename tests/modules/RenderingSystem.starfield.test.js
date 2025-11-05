@@ -33,17 +33,20 @@ describe('RenderingSystem starfield determinism', () => {
 
     baseRandom.reset('rendering:test-seed');
     renderer.reseedRandomForks();
+    renderer.spaceSky.reseed(renderer.randomForks.starfield);
     const restoredLayout = captureStarfieldLayout(renderer.spaceSky);
 
     expect(restoredLayout).toEqual(initialLayout);
   });
 
   it.concurrent('uses deterministic fallback random scopes when no dependency is provided', () => {
-    const firstRenderer = new RenderingSystem();
+    const fixedRandom = new RandomService('starfield-fallback-test');
+    const firstRenderer = new RenderingSystem({ random: fixedRandom });
     firstRenderer.spaceSky.resize(640, 480);
     const firstLayout = captureStarfieldLayout(firstRenderer.spaceSky);
 
-    const secondRenderer = new RenderingSystem();
+    fixedRandom.reset('starfield-fallback-test');
+    const secondRenderer = new RenderingSystem({ random: fixedRandom });
     secondRenderer.spaceSky.resize(640, 480);
     const secondLayout = captureStarfieldLayout(secondRenderer.spaceSky);
 

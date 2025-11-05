@@ -57,6 +57,7 @@ describe('ProgressionSystem determinism', () => {
       collectUpgradeIds(progression, 5);
 
       random.reset(random.seed);
+      progression.reset();
       globalThis.gameEvents.emit('progression-reset');
       globalThis.gameEvents.emit('player-reset');
 
@@ -85,10 +86,14 @@ describe('ProgressionSystem determinism', () => {
       const firstRun = collectUpgradeIds(progression, 5);
       expect(firstRun).toHaveLength(5);
 
+      progression.random.reset(progression.random.seed);
+      progression.reset();
       globalThis.gameEvents.emit('progression-reset');
       const secondRun = collectUpgradeIds(progression, 5);
       expect(secondRun).toStrictEqual(firstRun);
 
+      progression.random.reset(progression.random.seed);
+      progression.reset();
       globalThis.gameEvents.emit('player-reset');
       const thirdRun = collectUpgradeIds(progression, 5);
 

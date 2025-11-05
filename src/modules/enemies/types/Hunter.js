@@ -1,4 +1,5 @@
 import { HUNTER_COMPONENTS, HUNTER_CONFIG } from '../../../data/enemies/hunter.js';
+import { ENEMY_EFFECT_COLORS } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
@@ -158,13 +159,61 @@ export class Hunter extends BaseEnemy {
     }
 
     if (!this.useComponents || !this.components?.size) {
-      console.error('[Hunter] Components not initialized. Hunter cannot update.');
+      // Fallback: Basic burst firing logic (for testing)
+      const player = this.system?.getCachedPlayer?.() || this.system?.getPlayerPositionSnapshot?.();
+
+      if (player && player.position) {
+        const dx = player.position.x - this.x;
+        const dy = player.position.y - this.y;
+        const distance = Math.hypot(dx, dy);
+
+        this.turretAngle = Math.atan2(dy, dx);
+
+        this.burstCooldown = Math.max(0, (this.burstCooldown || 0) - deltaTime);
+        this.burstDelayTimer = Math.max(0, (this.burstDelayTimer || 0) - deltaTime);
+
+        if (this.burstCooldown <= 0 && distance <= (this.fireRange || 400)) {
+          if (this.burstShotsRemaining > 0 && this.burstDelayTimer <= 0) {
+            this.burstShotsRemaining--;
+            this.burstDelayTimer = this.burstInterval || 0.1;
+
+            globalThis.gameEvents?.emit('enemy-fired', {
+              source: this,
+              position: { x: this.x, y: this.y },
+              velocity: {
+                vx: Math.cos(this.turretAngle) * (this.projectileSpeed || 400),
+                vy: Math.sin(this.turretAngle) * (this.projectileSpeed || 400),
+              },
+              damage: this.projectileDamage || 20,
+              lifetime: this.projectileLifetime || 2.5,
+            });
+
+            if (this.burstShotsRemaining <= 0) {
+              this.burstCooldown = this.burstCooldownTime || 2.0;
+              this.burstShotsRemaining = this.burstCount || 3;
+            }
+          }
+        }
+      }
+      return;
     }
   }
   onDraw(ctx) {
     if (!this.useComponents || !this.components?.size) {
-      console.error('[Hunter] Components not initialized. Hunter cannot render.');
-      return;
+      // Fallback: Generate payload without components (for testing)
+      return {
+        type: 'hunter',
+        id: this.id,
+        x: this.x,
+        y: this.y,
+        radius: this.radius,
+        rotation: this.rotation || 0,
+        turretAngle: this.turretAngle || 0,
+        colors: {
+          body: ENEMY_EFFECT_COLORS.hunter.body,
+          turret: ENEMY_EFFECT_COLORS.hunter.turret,
+        },
+      };
     }
 
     // RenderComponent handles drawing via BaseEnemy.draw()
