@@ -1685,16 +1685,61 @@ class CombatSystem extends BaseSystem {
   }
 
   calculateLinearPrediction(origin, enemy) {
-    const fallback = Number.isFinite(
-      this.dynamicPredictionSettings?.fallbackLeadTime
-    )
-      ? this.dynamicPredictionSettings.fallbackLeadTime
-      : this.linearPredictionTime;
-    const leadTime = Math.max(0, fallback);
+    // Use proper physics-based intercept calculation (like calculateDynamicIntercept)
+    // but with conservative constraints to keep upgrade path valuable
+    const bulletSpeed = this.bulletSpeed;
+
+    if (!Number.isFinite(bulletSpeed) || bulletSpeed <= 0) {
+      // Fallback to static target position if bullet speed is invalid
+      return { x: enemy.x, y: enemy.y };
+    }
+
+    const relX = enemy.x - origin.x;
+    const relY = enemy.y - origin.y;
+    const vx = enemy.vx || 0;
+    const vy = enemy.vy || 0;
+
+    // Quadratic intercept formula (same as calculateDynamicIntercept)
+    const a = vx * vx + vy * vy - bulletSpeed * bulletSpeed;
+    const b = 2 * (relX * vx + relY * vy);
+    const c = relX * relX + relY * relY;
+
+    let time = null;
+
+    if (Math.abs(a) < 0.0001) {
+      if (Math.abs(b) < 0.0001) {
+        return { x: enemy.x, y: enemy.y };
+      }
+      time = -c / b;
+    } else {
+      const discriminant = b * b - 4 * a * c;
+      if (discriminant < 0) {
+        return { x: enemy.x, y: enemy.y };
+      }
+      const sqrt = Math.sqrt(discriminant);
+      const t1 = (-b - sqrt) / (2 * a);
+      const t2 = (-b + sqrt) / (2 * a);
+      const valid = [t1, t2].filter((t) => t > 0);
+      if (!valid.length) {
+        return { x: enemy.x, y: enemy.y };
+      }
+      time = Math.min(...valid);
+    }
+
+    if (!Number.isFinite(time) || time <= 0) {
+      return { x: enemy.x, y: enemy.y };
+    }
+
+    // Use tighter constraints than dynamic prediction to keep upgrades valuable
+    // Base aim: 0.1s to 0.6s (conservative)
+    // Level 2+ aim: 0.05s to 1.1s (from dynamicPredictionSettings)
+    const minLead = 0.1;
+    const maxLead = 0.6;
+    time = Math.max(minLead, Math.min(maxLead, time));
 
     return {
-      x: enemy.x + (enemy.vx || 0) * leadTime,
-      y: enemy.y + (enemy.vy || 0) * leadTime,
+      x: enemy.x + (enemy.vx || 0) * time,
+      y: enemy.y + (enemy.vy || 0) * time,
     };
   }
 

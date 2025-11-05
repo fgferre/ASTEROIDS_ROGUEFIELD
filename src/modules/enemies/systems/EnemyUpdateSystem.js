@@ -507,7 +507,7 @@ export class EnemyUpdateSystem {
     }
 
     const useComponents = Boolean(this.ctx?.useComponents);
-    const movementComponent = this.ctx?.movementComponent;
+    const movementComponent = this.ctx?.genericMovement;
     const movementContext = useComponents && movementComponent
       ? {
           player:
@@ -518,6 +518,7 @@ export class EnemyUpdateSystem {
             width: GAME_WIDTH,
             height: GAME_HEIGHT,
           },
+          random: this.ctx?.getRandomScope?.('movement'),
         }
       : null;
 
@@ -533,7 +534,14 @@ export class EnemyUpdateSystem {
       }
 
       if (useComponents && movementComponent) {
-        movementComponent.update(enemy, deltaTime, movementContext);
+        movementComponent.update({
+          enemy,
+          deltaTime,
+          player: movementContext.player,
+          playerPosition: movementContext.player?.position,
+          worldBounds: movementContext.worldBounds,
+          random: movementContext.random,
+        });
 
         if (typeof enemy.updateVisualState === 'function') {
           enemy.updateVisualState(deltaTime);
@@ -544,6 +552,13 @@ export class EnemyUpdateSystem {
           typeof enemy.updateVolatileBehavior === 'function'
         ) {
           enemy.updateVolatileBehavior(deltaTime);
+        }
+
+        if (
+          enemy.behavior?.type === 'parasite' &&
+          typeof enemy.updateParasiteAttack === 'function'
+        ) {
+          enemy.updateParasiteAttack(deltaTime);
         }
 
         if (enemy.lastDamageTime > 0) {

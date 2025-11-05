@@ -1,6 +1,6 @@
 flowchart TD
   subgraph modules_group["Game Systems"]
-    src_modules_EnemySystem_js["EnemySystem.js<br/>34 imports<br/>1 dependents"]
+    src_modules_EnemySystem_js["EnemySystem.js<br/>33 imports<br/>1 dependents"]
     src_modules_RenderingSystem_js["RenderingSystem.js<br/>12 imports<br/>1 dependents"]
     src_modules_EffectsSystem_js["EffectsSystem.js<br/>11 imports<br/>1 dependents"]
     src_modules_enemies_types_Asteroid_js["Asteroid.js<br/>8 imports<br/>2 dependents"]
@@ -17,10 +17,10 @@ flowchart TD
     src_modules_enemies_types_Drone_js["Drone.js<br/>5 imports<br/>2 dependents"]
     src_modules_PlayerSystem_js["PlayerSystem.js<br/>6 imports<br/>1 dependents"]
     src_modules_enemies_systems_EnemyUpdateSystem_js["🔴 EnemyUpdateSystem.js<br/>4 imports<br/>2 dependents"]
+    src_modules_enemies_types_Hunter_js["Hunter.js<br/>4 imports<br/>2 dependents"]
+    src_modules_enemies_types_Mine_js["Mine.js<br/>4 imports<br/>2 dependents"]
     src_modules_UISystem_js["UISystem.js<br/>5 imports<br/>1 dependents"]
     src_modules_enemies_components_MovementComponent_js["MovementComponent.js<br/>3 imports<br/>2 dependents"]
-    src_modules_enemies_types_Hunter_js["Hunter.js<br/>3 imports<br/>2 dependents"]
-    src_modules_enemies_types_Mine_js["Mine.js<br/>3 imports<br/>2 dependents"]
     src_modules_MenuBackgroundSystem_js["MenuBackgroundSystem.js<br/>4 imports<br/>1 dependents"]
     src_modules_UpgradeSystem_js["UpgradeSystem.js<br/>4 imports<br/>1 dependents"]
     src_modules_enemies_systems_EnemyDamageSystem_js["EnemyDamageSystem.js<br/>3 imports<br/>1 dependents"]
@@ -28,7 +28,7 @@ flowchart TD
     src_modules_SettingsSystem_js["SettingsSystem.js<br/>3 imports<br/>1 dependents"]
   end
   subgraph core_group["Core Infrastructure"]
-    src_core_GameConstants_js["🔴 GameConstants.js<br/>HUB: 21 deps<br/>8 imports<br/>21 dependents"]
+    src_core_GameConstants_js["🔴 GameConstants.js<br/>HUB: 22 deps<br/>8 imports<br/>22 dependents"]
     src_core_RandomService_js["🔴 RandomService.js<br/>HUB: 21 deps<br/>0 imports<br/>21 dependents"]
     src_core_BaseSystem_js["🔴 BaseSystem.js<br/>HUB: 12 deps<br/>2 imports<br/>12 dependents"]
     src_core_serviceUtils_js["🔴 serviceUtils.js<br/>HUB: 14 deps<br/>0 imports<br/>14 dependents"]
@@ -230,18 +230,20 @@ flowchart TD
   src_modules_enemies_systems_EnemyUpdateSystem_js --> src_core_GameConstants_js
   src_modules_enemies_systems_EnemyUpdateSystem_js --> src_data_constants_gameplay_js
   src_modules_enemies_systems_EnemyUpdateSystem_js --> src_utils_dev_GameDebugLogger_js
+  src_modules_enemies_types_Hunter_js --> src_data_enemies_hunter_js
+  src_modules_enemies_types_Hunter_js --> src_core_GameConstants_js
+  src_modules_enemies_types_Hunter_js --> src_core_RandomService_js
+  src_modules_enemies_types_Hunter_js --> src_modules_enemies_base_BaseEnemy_js
+  src_modules_enemies_types_Mine_js --> src_data_enemies_mine_js
+  src_modules_enemies_types_Mine_js --> src_core_GameConstants_js
+  src_modules_enemies_types_Mine_js --> src_core_RandomService_js
+  src_modules_enemies_types_Mine_js --> src_modules_enemies_base_BaseEnemy_js
   src_modules_UISystem_js --> src_data_settingsSchema_js
   src_modules_UISystem_js --> src_data_constants_gameplay_js
   src_modules_UISystem_js --> src_core_BaseSystem_js
   src_modules_UISystem_js --> src_core_serviceUtils_js
   src_modules_enemies_components_MovementComponent_js --> src_core_GameConstants_js
   src_modules_enemies_components_MovementComponent_js --> src_utils_mathHelpers_js
-  src_modules_enemies_types_Hunter_js --> src_data_enemies_hunter_js
-  src_modules_enemies_types_Hunter_js --> src_core_RandomService_js
-  src_modules_enemies_types_Hunter_js --> src_modules_enemies_base_BaseEnemy_js
-  src_modules_enemies_types_Mine_js --> src_data_enemies_mine_js
-  src_modules_enemies_types_Mine_js --> src_core_RandomService_js
-  src_modules_enemies_types_Mine_js --> src_modules_enemies_base_BaseEnemy_js
   src_modules_MenuBackgroundSystem_js --> src_core_BaseSystem_js
   src_modules_MenuBackgroundSystem_js --> src_core_RandomService_js
   src_modules_MenuBackgroundSystem_js --> src_core_serviceUtils_js
@@ -300,11 +302,11 @@ flowchart TD
   style src_data_enemies_hunter_js fill:#fff3bf,stroke:#f08c00,stroke-width:1.5px
   style src_data_enemies_mine_js fill:#fff3bf,stroke:#f08c00,stroke-width:1.5px
   style src_modules_enemies_systems_EnemyUpdateSystem_js fill:#d0ebff,stroke:#c92a2a,stroke-width:3px
+  style src_modules_enemies_types_Hunter_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
+  style src_modules_enemies_types_Mine_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_modules_UISystem_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_utils_mathHelpers_js fill:#e9ecef,stroke:#495057,stroke-width:1.5px
   style src_modules_enemies_components_MovementComponent_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
-  style src_modules_enemies_types_Hunter_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
-  style src_modules_enemies_types_Mine_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_modules_MenuBackgroundSystem_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_modules_UpgradeSystem_js fill:#d0ebff,stroke:#4263eb,stroke-width:1.5px
   style src_services_CrackGenerationService_js fill:#ffe3e3,stroke:#c92a2a,stroke-width:1.5px

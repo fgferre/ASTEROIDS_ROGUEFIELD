@@ -196,13 +196,14 @@
         "src/modules/CombatSystem.js",
         "src/modules/EffectsSystem.js",
         "src/modules/enemies/base/BaseEnemy.js",
-        "src/modules/enemies/components/AsteroidMovement.js",
         "src/modules/enemies/components/MovementComponent.js",
         "src/modules/enemies/managers/WaveManager.js",
         "src/modules/enemies/systems/EnemySpawnSystem.js",
         "src/modules/enemies/systems/EnemyUpdateSystem.js",
         "src/modules/enemies/types/Asteroid.js",
         "src/modules/enemies/types/Drone.js",
+        "src/modules/enemies/types/Hunter.js",
+        "src/modules/enemies/types/Mine.js",
         "src/modules/EnemySystem.js",
         "src/modules/PhysicsSystem.js",
         "src/modules/PlayerSystem.js",
@@ -958,20 +959,6 @@
       "isCritical": false
     },
     {
-      "path": "src/modules/enemies/components/AsteroidMovement.js",
-      "imports": [
-        "src/core/GameConstants.js"
-      ],
-      "exports": [
-        "AsteroidMovement"
-      ],
-      "dependents": [
-        "src/modules/EnemySystem.js"
-      ],
-      "isHub": false,
-      "isCritical": false
-    },
-    {
       "path": "src/modules/enemies/components/AsteroidRenderer.js",
       "imports": [],
       "exports": [
@@ -1244,6 +1231,7 @@
       "path": "src/modules/enemies/types/Hunter.js",
       "imports": [
         "src/data/enemies/hunter.js",
+        "src/core/GameConstants.js",
         "src/core/RandomService.js",
         "src/modules/enemies/base/BaseEnemy.js"
       ],
@@ -1261,6 +1249,7 @@
       "path": "src/modules/enemies/types/Mine.js",
       "imports": [
         "src/data/enemies/mine.js",
+        "src/core/GameConstants.js",
         "src/core/RandomService.js",
         "src/modules/enemies/base/BaseEnemy.js"
       ],
@@ -1290,7 +1279,6 @@
         "src/modules/enemies/base/EnemyFactory.js",
         "src/modules/enemies/managers/WaveManager.js",
         "src/modules/enemies/managers/RewardManager.js",
-        "src/modules/enemies/components/AsteroidMovement.js",
         "src/modules/enemies/components/AsteroidCollision.js",
         "src/modules/enemies/components/AsteroidRenderer.js",
         "src/modules/enemies/systems/EnemyRenderSystem.js",
@@ -1737,7 +1725,7 @@
     }
   ],
   "metrics": {
-    "totalFiles": 93,
+    "totalFiles": 92,
     "totalDependencies": 279,
     "circularDependencies": 1,
     "hubFiles": 7,

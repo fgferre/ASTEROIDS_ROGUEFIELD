@@ -12,7 +12,6 @@ import { BossEnemy } from './enemies/types/BossEnemy.js';
 import { EnemyFactory } from './enemies/base/EnemyFactory.js';
 import { WaveManager } from './enemies/managers/WaveManager.js';
 import { RewardManager } from './enemies/managers/RewardManager.js';
-import { AsteroidMovement } from './enemies/components/AsteroidMovement.js';
 import { AsteroidCollision } from './enemies/components/AsteroidCollision.js';
 import { AsteroidRenderer } from './enemies/components/AsteroidRenderer.js';
 import { EnemyRenderSystem } from './enemies/systems/EnemyRenderSystem.js';
@@ -854,9 +853,6 @@ class EnemySystem extends BaseSystem {
 
   setupComponents() {
     try {
-      // Initialize movement component
-      this.movementComponent = new AsteroidMovement();
-
       // Initialize collision component
       this.collisionComponent = new AsteroidCollision();
 
@@ -870,7 +866,6 @@ class EnemySystem extends BaseSystem {
       this.genericHealth = new HealthComponent();
     } catch (error) {
       console.warn('[EnemySystem] Failed to initialize components', error);
-      this.movementComponent = null;
       this.collisionComponent = null;
       this.rendererComponent = null;
       this.genericMovement = null;
@@ -1027,6 +1022,9 @@ class EnemySystem extends BaseSystem {
         },
         get collisionComponent() {
           return facade.collisionComponent;
+        },
+        get genericMovement() {
+          return facade.genericMovement;
         },
         get waveManager() {
           return facade.waveManager;

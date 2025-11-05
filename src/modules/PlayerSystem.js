@@ -1187,8 +1187,8 @@ class PlayerSystem extends BaseSystem {
    * Called when player dies or game resets
    */
   _stopAllThrusterSounds() {
-    const gameEvents = this.getEventBus();
-    if (!gameEvents) return;
+    // Check if global gameEvents is available
+    if (typeof gameEvents === 'undefined' || !gameEvents) return;
 
     // Emit stop events for all thruster types
     if (this.lastThrusterState.main > 0) {

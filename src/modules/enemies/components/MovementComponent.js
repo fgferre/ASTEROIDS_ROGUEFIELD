@@ -11,18 +11,19 @@ const DEFAULT_BOUNDS = Object.freeze({
 
 const createDefaultStrategies = () => ({
   linear: ({ enemy, deltaTime, bounds }) => {
-    if (!enemy.velocity) {
-      enemy.velocity = { x: enemy.vx ?? 0, y: enemy.vy ?? 0 };
-    }
+    // Always sync velocity from vx/vy properties to handle external modifications
+    // (e.g., shield explosions, impulses, etc.)
+    const vx = enemy.vx ?? 0;
+    const vy = enemy.vy ?? 0;
 
-    const vx = enemy.velocity.x ?? enemy.vx ?? 0;
-    const vy = enemy.velocity.y ?? enemy.vy ?? 0;
+    // Keep velocity object in sync for components that read it
+    enemy.velocity = { vx, vy };
 
     enemy.x += vx * deltaTime;
     enemy.y += vy * deltaTime;
 
     if (!enemy.rotationLocked) {
-      enemy.rotation = Math.atan2(vy, vx);
+      enemy.rotation += (enemy.rotationSpeed || 0) * deltaTime;
     }
 
     wrapScreenEdges(enemy, bounds);
@@ -34,7 +35,7 @@ const createDefaultStrategies = () => ({
       return defaultStrategies.linear({ enemy, deltaTime, bounds });
     }
 
-    const movement = enemy.velocity || { x: enemy.vx ?? 0, y: enemy.vy ?? 0 };
+    const movement = enemy.velocity || { vx: enemy.vx ?? 0, vy: enemy.vy ?? 0 };
     const enemyPos = { x: enemy.x ?? 0, y: enemy.y ?? 0 };
     const desired = {
       x: targetPosition.x - enemyPos.x,
@@ -52,26 +53,26 @@ const createDefaultStrategies = () => ({
       const dir = normalize(desired.x, desired.y);
       const variance = (random?.float?.() ?? random?.() ?? Math.random()) - 0.5;
       const acceleration = stats.acceleration + variance * (config.variance ?? 12);
-      movement.x += dir.x * acceleration * deltaTime;
-      movement.y += dir.y * acceleration * deltaTime;
+      movement.vx += dir.x * acceleration * deltaTime;
+      movement.vy += dir.y * acceleration * deltaTime;
     }
 
-    const speed = length(movement.x, movement.y);
+    const speed = length(movement.vx, movement.vy);
     const maxSpeed = stats.maxSpeed;
     if (speed > maxSpeed) {
-      const dir = normalize(movement.x, movement.y);
-      movement.x = dir.x * maxSpeed;
-      movement.y = dir.y * maxSpeed;
+      const dir = normalize(movement.vx, movement.vy);
+      movement.vx = dir.x * maxSpeed;
+      movement.vy = dir.y * maxSpeed;
     }
 
     enemy.velocity = movement;
-    enemy.vx = movement.x;
-    enemy.vy = movement.y;
+    enemy.vx = movement.vx;
+    enemy.vy = movement.vy;
 
-    enemy.x += movement.x * deltaTime;
-    enemy.y += movement.y * deltaTime;
+    enemy.x += movement.vx * deltaTime;
+    enemy.y += movement.vy * deltaTime;
 
-    enemy.rotation = Math.atan2(movement.y, movement.x);
+    enemy.rotation = Math.atan2(movement.vy, movement.vx);
     wrapScreenEdges(enemy, bounds);
   },
   orbit: ({ enemy, deltaTime, player, playerPosition, random, config }) => {
@@ -101,31 +102,31 @@ const createDefaultStrategies = () => ({
     const radialError = distance - options.preferredDistance;
     const radialAdjustment = clamp(radialError / Math.max(options.preferredDistance, 1), -1, 1);
 
-    const movement = enemy.velocity || { x: enemy.vx ?? 0, y: enemy.vy ?? 0 };
+    const movement = enemy.velocity || { vx: enemy.vx ?? 0, vy: enemy.vy ?? 0 };
 
     // Apply tangential orbit force
-    movement.x += tangent.x * options.acceleration * enemy.orbitDirection * deltaTime;
-    movement.y += tangent.y * options.acceleration * enemy.orbitDirection * deltaTime;
+    movement.vx += tangent.x * options.acceleration * enemy.orbitDirection * deltaTime;
+    movement.vy += tangent.y * options.acceleration * enemy.orbitDirection * deltaTime;
 
     // Apply radial correction to maintain preferred distance
-    movement.x += dirToCenter.x * options.acceleration * -radialAdjustment * 0.65 * deltaTime;
-    movement.y += dirToCenter.y * options.acceleration * -radialAdjustment * 0.65 * deltaTime;
+    movement.vx += dirToCenter.x * options.acceleration * -radialAdjustment * 0.65 * deltaTime;
+    movement.vy += dirToCenter.y * options.acceleration * -radialAdjustment * 0.65 * deltaTime;
 
-    const speed = length(movement.x, movement.y);
+    const speed = length(movement.vx, movement.vy);
     if (speed > options.maxSpeed) {
-      const dir = normalize(movement.x, movement.y);
-      movement.x = dir.x * options.maxSpeed;
-      movement.y = dir.y * options.maxSpeed;
+      const dir = normalize(movement.vx, movement.vy);
+      movement.vx = dir.x * options.maxSpeed;
+      movement.vy = dir.y * options.maxSpeed;
     }
 
     enemy.velocity = movement;
-    enemy.vx = movement.x;
-    enemy.vy = movement.y;
+    enemy.vx = movement.vx;
+    enemy.vy = movement.vy;
 
-    enemy.x += movement.x * deltaTime;
-    enemy.y += movement.y * deltaTime;
+    enemy.x += movement.vx * deltaTime;
+    enemy.y += movement.vy * deltaTime;
 
-    enemy.rotation = Math.atan2(movement.y, movement.x);
+    enemy.rotation = Math.atan2(movement.vy, movement.vx);
   },
   proximity: ({ enemy, deltaTime, random, config }) => {
     const state = enemy.movementState || (enemy.movementState = {});
@@ -169,7 +170,7 @@ const createDefaultStrategies = () => ({
       jitter: config.jitter ?? 0.1,
     };
 
-    const velocity = enemy.velocity || { x: enemy.vx ?? 0, y: enemy.vy ?? 0 };
+    const velocity = enemy.velocity || { vx: enemy.vx ?? 0, vy: enemy.vy ?? 0 };
     const toTarget = { x: snapshot.x - enemy.x, y: snapshot.y - enemy.y };
     const distance = length(toTarget.x, toTarget.y);
     const desired = normalize(toTarget.x, toTarget.y);
@@ -189,27 +190,119 @@ const createDefaultStrategies = () => ({
       y: desired.y * desiredSpeed + jitter.y,
     };
 
-    velocity.x = lerp(velocity.x, desiredVelocity.x, clamp(options.acceleration * deltaTime / Math.max(options.maxSpeed, 1), 0, 1));
-    velocity.y = lerp(velocity.y, desiredVelocity.y, clamp(options.acceleration * deltaTime / Math.max(options.maxSpeed, 1), 0, 1));
+    velocity.vx = lerp(velocity.vx, desiredVelocity.x, clamp(options.acceleration * deltaTime / Math.max(options.maxSpeed, 1), 0, 1));
+    velocity.vy = lerp(velocity.vy, desiredVelocity.y, clamp(options.acceleration * deltaTime / Math.max(options.maxSpeed, 1), 0, 1));
 
-    velocity.x *= options.damping;
-    velocity.y *= options.damping;
+    velocity.vx *= options.damping;
+    velocity.vy *= options.damping;
 
-    const speed = length(velocity.x, velocity.y);
+    const speed = length(velocity.vx, velocity.vy);
     if (speed > options.maxSpeed) {
-      const dir = normalize(velocity.x, velocity.y);
-      velocity.x = dir.x * options.maxSpeed;
-      velocity.y = dir.y * options.maxSpeed;
+      const dir = normalize(velocity.vx, velocity.vy);
+      velocity.vx = dir.x * options.maxSpeed;
+      velocity.vy = dir.y * options.maxSpeed;
     }
 
     enemy.velocity = velocity;
-    enemy.vx = velocity.x;
-    enemy.vy = velocity.y;
+    enemy.vx = velocity.vx;
+    enemy.vy = velocity.vy;
 
-    enemy.x += velocity.x * deltaTime;
-    enemy.y += velocity.y * deltaTime;
+    enemy.x += velocity.vx * deltaTime;
+    enemy.y += velocity.vy * deltaTime;
 
-    enemy.rotation = Math.atan2(velocity.y, velocity.x);
+    enemy.rotation = Math.atan2(velocity.vy, velocity.vx);
+  },
+
+  // Parasite movement: tracking with repulsion when too close
+  // Ported from AsteroidMovement.parasiteMovement (lines 89-131)
+  parasite: ({ enemy, deltaTime, player, playerPosition, random, config, bounds }) => {
+    // Initialize velocity properties to prevent NaN
+    enemy.vx = enemy.vx ?? 0;
+    enemy.vy = enemy.vy ?? 0;
+
+    const targetPos = playerPosition || player?.position || player;
+    if (!targetPos) {
+      // Fallback to linear if no target
+      enemy.x += enemy.vx * deltaTime;
+      enemy.y += enemy.vy * deltaTime;
+
+      if (!enemy.rotationLocked) {
+        enemy.rotation += (enemy.rotationSpeed || 0) * deltaTime;
+      }
+
+      enemy.velocity = { vx: enemy.vx, vy: enemy.vy };
+      wrapScreenEdges(enemy, bounds);
+      return;
+    }
+
+    // Calculate direction to player
+    const dx = targetPos.x - enemy.x;
+    const dy = targetPos.y - enemy.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance > 0) {
+      const dirX = dx / distance;
+      const dirY = dy / distance;
+
+      // Apply acceleration toward player
+      const acceleration = config.acceleration || 180;
+      enemy.vx += dirX * acceleration * deltaTime;
+      enemy.vy += dirY * acceleration * deltaTime;
+
+      // Limit speed to maxSpeed
+      const maxSpeed = config.maxSpeed || 160;
+      const currentSpeed = Math.sqrt(enemy.vx * enemy.vx + enemy.vy * enemy.vy);
+      if (currentSpeed > maxSpeed) {
+        enemy.vx = (enemy.vx / currentSpeed) * maxSpeed;
+        enemy.vy = (enemy.vy / currentSpeed) * maxSpeed;
+      }
+
+      // Apply repulsion when too close to prevent sticking
+      const minDistance = config.minDistance || 60;
+      if (distance < minDistance) {
+        const repelStrength = (minDistance - distance) / minDistance;
+        enemy.vx -= dirX * acceleration * repelStrength * 1.2 * deltaTime;
+        enemy.vy -= dirY * acceleration * repelStrength * 1.2 * deltaTime;
+      }
+    }
+
+    // Apply movement
+    enemy.x += enemy.vx * deltaTime;
+    enemy.y += enemy.vy * deltaTime;
+    enemy.rotation += (enemy.rotationSpeed || 0) * deltaTime;
+
+    // Sync velocity object
+    enemy.velocity = { vx: enemy.vx, vy: enemy.vy };
+
+    wrapScreenEdges(enemy, bounds);
+  },
+
+  // Volatile movement: linear with rotation jitter when armed
+  // Ported from AsteroidMovement.volatileMovement (lines 141-161)
+  volatile: ({ enemy, deltaTime, player, playerPosition, random, config, bounds }) => {
+    // Initialize velocity properties to prevent NaN
+    enemy.vx = enemy.vx ?? 0;
+    enemy.vy = enemy.vy ?? 0;
+
+    // Apply linear movement
+    enemy.x += enemy.vx * deltaTime;
+    enemy.y += enemy.vy * deltaTime;
+
+    // Add rotation jitter if armed (only with deterministic RNG)
+    if (enemy.variantState?.armed && random?.range) {
+      const jitterChance = random.range(-0.5, 0.5);
+      if (Math.abs(jitterChance) > 0.3) {
+        const jitter = jitterChance * 0.3;
+        enemy.rotationSpeed = (enemy.rotationSpeed || 0) + jitter;
+      }
+    }
+
+    enemy.rotation += (enemy.rotationSpeed || 0) * deltaTime;
+
+    // Sync velocity object
+    enemy.velocity = { vx: enemy.vx, vy: enemy.vy };
+
+    wrapScreenEdges(enemy, bounds);
   },
 });
 
@@ -264,14 +357,24 @@ export class MovementComponent {
 export const wrapScreenEdges = (enemy, bounds = DEFAULT_BOUNDS) => {
   if (!enemy) return;
 
-  const width = bounds?.width ?? bounds?.right ?? GAME_WIDTH;
-  const height = bounds?.height ?? bounds?.bottom ?? GAME_HEIGHT;
-  const margin = enemy.wrapMargin ?? (enemy.size ?? SHIP_SIZE * 0.5);
+  const left = bounds.left ?? 0;
+  const top = bounds.top ?? 0;
+  const right = bounds.right ?? bounds.width ?? GAME_WIDTH;
+  const bottom = bounds.bottom ?? bounds.height ?? GAME_HEIGHT;
 
-  if (enemy.x < (bounds.left ?? 0) - margin) enemy.x = width + (bounds.left ?? 0) + margin;
-  if (enemy.x > (bounds.right ?? width) + margin) enemy.x = (bounds.left ?? 0) - margin;
-  if (enemy.y < (bounds.top ?? 0) - margin) enemy.y = height + (bounds.top ?? 0) + margin;
-  if (enemy.y > (bounds.bottom ?? height) + margin) enemy.y = (bounds.top ?? 0) - margin;
+  // Use larger wrap threshold to prevent immediate wrapping after spawn (asteroids spawn at ±80px)
+  const wrapThreshold = enemy.wrapMargin ?? Math.max(enemy.radius ?? enemy.size ?? 40, 100);
+
+  // Wrap destination should be close to visible edge so asteroids can drift into view
+  const wrapDestination = enemy.radius ?? enemy.size ?? 40;
+
+  // Wrap horizontally: if goes off left, appear on right (and vice versa)
+  if (enemy.x < left - wrapThreshold) enemy.x = right + wrapDestination;
+  if (enemy.x > right + wrapThreshold) enemy.x = left - wrapDestination;
+
+  // Wrap vertically: if goes off top, appear on bottom (and vice versa)
+  if (enemy.y < top - wrapThreshold) enemy.y = bottom + wrapDestination;
+  if (enemy.y > bottom + wrapThreshold) enemy.y = top - wrapDestination;
 };
 
 const resolveBounds = (worldBounds) => {

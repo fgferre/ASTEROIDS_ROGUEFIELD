@@ -679,6 +679,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
     hpMultiplier: 1.0,
     speedMultiplier: 1.0,
     massMultiplier: 1.0,
+    movementStrategy: 'linear',
 
     // NEW ORB SYSTEM:
     orbMultiplier: 1.0,       // Base multiplier (size × stats × rarity)
@@ -704,6 +705,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
     hpMultiplier: 1.3,
     speedMultiplier: 0.85,
     massMultiplier: 1.2,
+    movementStrategy: 'linear',
 
     // NEW ORB SYSTEM:
     orbMultiplier: 2.53,      // stats × rarity = 1.1 × 2.3
@@ -730,6 +732,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
     hpMultiplier: 1.8,
     speedMultiplier: 0.65,
     massMultiplier: 1.4,
+    movementStrategy: 'linear',
 
     // NEW ORB SYSTEM:
     orbMultiplier: 2.93,      // stats × rarity = 1.17 × 2.5
@@ -756,6 +759,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
     hpMultiplier: 0.4,        // ULTRA FRÁGIL (vidro!)
     speedMultiplier: 1.8,     // ULTRA RÁPIDO (foge!)
     massMultiplier: 0.6,
+    movementStrategy: 'linear',
 
     // NEW ORB SYSTEM:
     orbMultiplier: 4.90,      // stats × rarity = 0.72 × 6.8
@@ -796,6 +800,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
     hpMultiplier: 0.6,
     speedMultiplier: 1.4,
     massMultiplier: 0.7,
+    movementStrategy: 'volatile',
 
     // NEW ORB SYSTEM:
     orbMultiplier: 5.46,      // stats × rarity = 2.1 × 2.6
@@ -868,6 +873,12 @@ export const ASTEROID_VARIANTS = deepFreeze({
     hpMultiplier: 0.8,
     speedMultiplier: 1.2,
     massMultiplier: 0.9,
+    movementStrategy: 'parasite',
+    movementConfig: {
+      acceleration: 180,
+      maxSpeed: 160,
+      minDistance: 60,  // Repulsion distance (behavior.minDistance: 25 is attack range)
+    },
 
     // NEW ORB SYSTEM:
     orbMultiplier: 8.10,      // stats × rarity = 2.7 × 3.0
@@ -918,6 +929,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
     hpMultiplier: 0.7,
     speedMultiplier: 1.3,     // AUMENTADO de 0.8 para 1.3 (ágil!)
     massMultiplier: 0.95,
+    movementStrategy: 'linear',
 
     // NEW ORB SYSTEM:
     orbMultiplier: 4.73,      // stats × rarity = 0.91 × 5.2

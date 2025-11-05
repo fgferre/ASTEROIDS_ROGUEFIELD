@@ -237,6 +237,13 @@ export class Asteroid extends BaseEnemy {
 
     this.behavior = this.variantConfig?.behavior || null;
 
+    // Copy movement strategy and config from variant config
+    this.movementStrategy = this.variantConfig?.movementStrategy || this.movementStrategy || 'linear';
+    this.movementConfig = {
+      ...(this.movementConfig || {}),
+      ...(this.variantConfig?.movementConfig || {})
+    };
+
     const baseMass = this.radius * this.radius * 0.05;
     this.mass = baseMass * (this.variantConfig?.massMultiplier ?? 1);
 
@@ -745,36 +752,64 @@ export class Asteroid extends BaseEnemy {
       this.vy -= dirY * acceleration * repelStrength * deltaTime * 1.2;
     }
 
+    // Handle attack logic via separate method (works with both internal and external movement)
+    this.updateParasiteAttack(deltaTime);
+  }
+
+  /**
+   * Updates parasite attack behavior (cooldown + contact damage)
+   * Separated from movement logic to work with external movement components
+   * @param {number} deltaTime - Time elapsed since last frame
+   */
+  updateParasiteAttack(deltaTime) {
+    if (this.behavior?.type !== 'parasite') return;
+
+    const player =
+      this.system && typeof this.system.getCachedPlayer === 'function'
+        ? this.system.getCachedPlayer()
+        : this.system?.getPlayer?.();
+
+    if (!player) return;
+
+    // Initialize attack cooldown if needed
     if (!this.variantState) {
-      this.variantState = { attackCooldown: 0 };
+      this.variantState = {};
+    }
+    if (this.variantState.attackCooldown === undefined) {
+      this.variantState.attackCooldown = 0;
     }
 
-    this.variantState.attackCooldown = Math.max(
-      0,
-      (this.variantState.attackCooldown || 0) - deltaTime
-    );
+    // Update cooldown timer
+    if (this.variantState.attackCooldown > 0) {
+      this.variantState.attackCooldown -= deltaTime;
+    }
 
+    // Calculate distance to player
+    const playerPos = player.position || player;
+    const dx = playerPos.x - this.x;
+    const dy = playerPos.y - this.y;
+    const distance = Math.hypot(dx, dy) || 0.0001;
+
+    // Attack range from behavior config (default 25)
     const playerRadius =
       typeof player.getHullBoundingRadius === 'function'
         ? player.getHullBoundingRadius()
         : SHIP_SIZE;
-    const attackRange =
-      (behavior.minDistance ?? 0) + this.radius + playerRadius + 6;
+    const attackRange = (this.behavior.minDistance || 25) + this.radius + playerRadius + 6;
+    const cooldown = this.behavior.cooldown || 1.2;
 
-    if (
-      distance <= attackRange &&
-      this.variantState.attackCooldown === 0 &&
-      this.system &&
-      typeof this.system.applyDirectDamageToPlayer === 'function'
-    ) {
-      const damage = behavior.contactDamage ?? 20;
-      const result = this.system.applyDirectDamageToPlayer(damage, {
-        cause: 'parasite',
-        position: { x: this.x, y: this.y },
-      });
+    // Execute contact attack if in range and off cooldown
+    if (distance <= attackRange && this.variantState.attackCooldown <= 0) {
+      if (this.system && typeof this.system.applyDirectDamageToPlayer === 'function') {
+        const damage = this.behavior.contactDamage || 20;
+        const result = this.system.applyDirectDamageToPlayer(damage, {
+          cause: 'parasite',
+          position: { x: this.x, y: this.y },
+        });
 
-      if (result?.applied) {
-        this.variantState.attackCooldown = behavior.cooldown ?? 1.2;
+        if (result?.applied) {
+          this.variantState.attackCooldown = cooldown;
+        }
       }
     }
   }

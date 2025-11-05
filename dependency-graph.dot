@@ -48,7 +48,6 @@ digraph Dependencies {
   "src/modules/enemies/base/BaseEnemy.js" [];
   "src/modules/enemies/base/EnemyFactory.js" [];
   "src/modules/enemies/components/AsteroidCollision.js" [];
-  "src/modules/enemies/components/AsteroidMovement.js" [];
   "src/modules/enemies/components/AsteroidRenderer.js" [];
   "src/modules/enemies/components/CollisionComponent.js" [];
   "src/modules/enemies/components/HealthComponent.js" [];
@@ -212,7 +211,6 @@ digraph Dependencies {
   "src/modules/enemies/base/EnemyFactory.js" -> "src/modules/enemies/components/WeaponComponent.js";
   "src/modules/enemies/base/EnemyFactory.js" -> "src/utils/dev/GameDebugLogger.js";
   "src/modules/enemies/components/AsteroidCollision.js" -> "src/data/constants/gameplay.js";
-  "src/modules/enemies/components/AsteroidMovement.js" -> "src/core/GameConstants.js";
   "src/modules/enemies/components/CollisionComponent.js" -> "src/data/constants/gameplay.js";
   "src/modules/enemies/components/MovementComponent.js" -> "src/core/GameConstants.js";
   "src/modules/enemies/components/MovementComponent.js" -> "src/utils/mathHelpers.js";
@@ -268,9 +266,11 @@ digraph Dependencies {
   "src/modules/enemies/types/Drone.js" -> "src/modules/enemies/base/BaseEnemy.js";
   "src/modules/enemies/types/Drone.js" -> "src/utils/dev/GameDebugLogger.js";
   "src/modules/enemies/types/Hunter.js" -> "src/data/enemies/hunter.js";
+  "src/modules/enemies/types/Hunter.js" -> "src/core/GameConstants.js";
   "src/modules/enemies/types/Hunter.js" -> "src/core/RandomService.js";
   "src/modules/enemies/types/Hunter.js" -> "src/modules/enemies/base/BaseEnemy.js";
   "src/modules/enemies/types/Mine.js" -> "src/data/enemies/mine.js";
+  "src/modules/enemies/types/Mine.js" -> "src/core/GameConstants.js";
   "src/modules/enemies/types/Mine.js" -> "src/core/RandomService.js";
   "src/modules/enemies/types/Mine.js" -> "src/modules/enemies/base/BaseEnemy.js";
   "src/modules/EnemySystem.js" -> "src/core/BaseSystem.js";
@@ -286,7 +286,6 @@ digraph Dependencies {
   "src/modules/EnemySystem.js" -> "src/modules/enemies/base/EnemyFactory.js";
   "src/modules/EnemySystem.js" -> "src/modules/enemies/managers/WaveManager.js";
   "src/modules/EnemySystem.js" -> "src/modules/enemies/managers/RewardManager.js";
-  "src/modules/EnemySystem.js" -> "src/modules/enemies/components/AsteroidMovement.js";
   "src/modules/EnemySystem.js" -> "src/modules/enemies/components/AsteroidCollision.js";
   "src/modules/EnemySystem.js" -> "src/modules/enemies/components/AsteroidRenderer.js";
   "src/modules/EnemySystem.js" -> "src/modules/enemies/systems/EnemyRenderSystem.js";
