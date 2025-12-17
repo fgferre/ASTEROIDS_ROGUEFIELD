@@ -7,7 +7,9 @@
     "Codex",
     "Codex Extension",
     "Claude Code",
-    "Gemini"
+    "Gemini",
+    "Export as Markdown"
   ],
-  "chatgpt.openOnStartup": true
+  "chatgpt.openOnStartup": true,
+  "claude-code.useTerminal": false
 }
