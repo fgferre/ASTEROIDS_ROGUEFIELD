@@ -1,14 +1,474 @@
-<!doctype html>
-<html lang="pt-br">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AAA Space Shooter HUD - Modulo Final (Crystal Clean)</title>
+// src/modules/ui/AAAHudLayout.js
 
-    <!-- DEPENDÊNCIA: Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+export class AAAHudLayout {
+  constructor() {
+    this._mounted = false;
+    this._styleElement = null;
+    this._root = null;
+    this.els = null;
+  }
 
-    <style>
+  mount(container) {
+    if (this._mounted) {
+      return;
+    }
+
+    if (!(container instanceof HTMLElement)) {
+      throw new Error(
+        '[AAAHudLayout] mount(container) requires an HTMLElement.'
+      );
+    }
+
+    this._styleElement = document.createElement('style');
+    this._styleElement.dataset.hudLayout = 'aaa_tactical';
+    this._styleElement.textContent = this._getCSS();
+    document.head.appendChild(this._styleElement);
+
+    this._root = document.createElement('div');
+    this._root.dataset.hudLayoutRoot = 'aaa_tactical';
+    this._root.innerHTML = this._getHTML();
+    container.appendChild(this._root);
+
+    this._cacheElements();
+    this._initializeBars();
+
+    if (
+      typeof globalThis !== 'undefined' &&
+      globalThis.lucide &&
+      typeof globalThis.lucide.createIcons === 'function'
+    ) {
+      globalThis.lucide.createIcons();
+    }
+
+    this._mounted = true;
+  }
+
+  unmount() {
+    if (this._root && this._root.parentNode) {
+      this._root.parentNode.removeChild(this._root);
+    }
+
+    if (this._styleElement && this._styleElement.parentNode) {
+      this._styleElement.parentNode.removeChild(this._styleElement);
+    }
+
+    this._mounted = false;
+    this._styleElement = null;
+    this._root = null;
+    this.els = null;
+  }
+
+  _cacheElements() {
+    const root = this._root;
+    if (!root) {
+      this.els = null;
+      return;
+    }
+
+    const query = (selector) => root.querySelector(selector);
+
+    this.els = {
+      timer: query('#ui-timer'),
+      kills: query('#ui-kills'),
+      combo: query('#ui-combo'),
+      bossPanel: query('#ui-boss-panel'),
+      bossName: query('#ui-boss-name'),
+      bossFill: query('#ui-boss-fill'),
+      radarContainer: query('#ui-radar-blips'),
+      shieldRow: query('#ui-shield-row'),
+      shieldText: query('#ui-shield-text'),
+      hullRow: query('#ui-hull-row'),
+      hullText: query('#ui-hull-text'),
+      wave: query('#ui-wave-num'),
+      xpFill: query('#ui-xp-fill'),
+      xpText: query('#ui-xp-text'),
+      lvlText: query('#ui-lvl-text'),
+      coordX: query('#ui-coord-x'),
+      coordY: query('#ui-coord-y'),
+      vel: query('#ui-velocity'),
+    };
+  }
+
+  _initializeBars() {
+    if (!this.els) {
+      return;
+    }
+
+    this.createSegments(this.els.shieldRow, 20);
+    this.createSegments(this.els.hullRow, 20);
+    this.updateVitals(100, 100, 100, 100);
+  }
+
+  /** Cria as divs de segmentos para as barras de vida/escudo */
+  createSegments(container, count) {
+    if (!container) {
+      return;
+    }
+
+    container.innerHTML = '';
+    for (let index = 0; index < count; index += 1) {
+      const div = document.createElement('div');
+      div.className = 'bar-segment filled';
+      container.appendChild(div);
+    }
+  }
+
+  /** Atualiza tempo, abates e combo */
+  updateStats(timeStr, kills, combo) {
+    if (!this.els) {
+      return;
+    }
+
+    if (timeStr) this.els.timer.innerText = timeStr;
+    if (kills !== undefined) this.els.kills.innerText = kills;
+    if (combo !== undefined) this.els.combo.innerText = 'x' + combo;
+  }
+
+  /** Atualiza telemetria de navega‡Æo */
+  updateTelemetry(x, y, speed) {
+    if (!this.els) {
+      return;
+    }
+
+    const safeX = Number.isFinite(x) ? x : 0;
+    const safeY = Number.isFinite(y) ? y : 0;
+    const safeSpeed = Number.isFinite(speed) ? speed : 0;
+
+    this.els.coordX.innerText = safeX.toFixed(2);
+    this.els.coordY.innerText = safeY.toFixed(2);
+    this.els.vel.innerText = Math.floor(safeSpeed);
+  }
+
+  /** Atualiza barras de vida e escudo */
+  updateVitals(shield, maxShield, hull, maxHull) {
+    if (!this.els) {
+      return;
+    }
+
+    const safeMaxShield =
+      Number.isFinite(maxShield) && maxShield > 0 ? maxShield : 1;
+    const safeMaxHull = Number.isFinite(maxHull) && maxHull > 0 ? maxHull : 1;
+    const safeShield = Number.isFinite(shield) ? Math.max(0, shield) : 0;
+    const safeHull = Number.isFinite(hull) ? Math.max(0, hull) : 0;
+
+    this._updateBar(this.els.shieldRow, safeShield, safeMaxShield);
+    this._updateBar(this.els.hullRow, safeHull, safeMaxHull);
+
+    const shieldPercent = Math.floor((safeShield / safeMaxShield) * 100);
+    this.els.shieldText.innerText = shieldPercent + '%';
+
+    const hpPercent = Math.floor((safeHull / safeMaxHull) * 100);
+    this.els.hullText.innerText = hpPercent + '%';
+
+    // Feedback visual de dano cr¡tico
+    if (hpPercent < 30) {
+      this.els.hullText.style.color = 'var(--danger-red)';
+      this.els.hullText.classList.add('glitch-text');
+    } else {
+      this.els.hullText.style.color = 'var(--health-green)';
+      this.els.hullText.classList.remove('glitch-text');
+    }
+  }
+
+  /** Helper interno para preencher segmentos */
+  _updateBar(container, value, max) {
+    if (!container) {
+      return;
+    }
+
+    const segments = container.children;
+    const total = segments.length;
+    if (!total) {
+      return;
+    }
+
+    const safeMax = Number.isFinite(max) && max > 0 ? max : 1;
+    const safeValue = Number.isFinite(value) ? Math.max(0, value) : 0;
+
+    const filledCount = Math.ceil((safeValue / safeMax) * total);
+    for (let index = 0; index < total; index += 1) {
+      if (index < filledCount) segments[index].classList.add('filled');
+      else segments[index].classList.remove('filled');
+    }
+  }
+
+  /** Mostra/Esconde e atualiza Boss Bar */
+  updateBoss(active, name, healthPercent) {
+    if (!this.els) {
+      return;
+    }
+
+    if (!active) {
+      this.els.bossPanel.classList.remove('active');
+      return;
+    }
+
+    this.els.bossPanel.classList.add('active');
+    if (name) this.els.bossName.innerText = name;
+    if (healthPercent !== undefined)
+      this.els.bossFill.style.width = healthPercent + '%';
+  }
+
+  /** Atualiza XP, N¡vel e Onda */
+  updateExperience(level, currentXP, requiredXP, waveNum) {
+    if (!this.els) {
+      return;
+    }
+
+    if (waveNum !== undefined) this.els.wave.innerText = waveNum;
+
+    const safeRequired =
+      Number.isFinite(requiredXP) && requiredXP > 0 ? requiredXP : 1;
+    const safeCurrent = Number.isFinite(currentXP) ? Math.max(0, currentXP) : 0;
+
+    const xpPercent = Math.min(
+      100,
+      Math.floor((safeCurrent / safeRequired) * 100)
+    );
+    this.els.xpFill.style.width = xpPercent + '%';
+
+    this.els.xpText.innerText = `${Math.floor(safeCurrent)} / ${Math.floor(
+      safeRequired
+    )}`;
+    this.els.lvlText.innerText = `Lvl ${level}`;
+  }
+
+  /**
+   * Atualiza Radar
+   * @param {Array} blips - [{x: -1..1, y: -1..1, type: 'enemy'|'ally'}]
+   */
+  updateRadar(blips) {
+    if (!this.els) {
+      return;
+    }
+
+    this.els.radarContainer.innerHTML = '<div class="blip player"></div>';
+    (Array.isArray(blips) ? blips : []).forEach((b) => {
+      const el = document.createElement('div');
+      el.className = 'blip ' + (b.type || 'enemy');
+      const left = (b.x + 1) * 50;
+      const top = (b.y + 1) * 50;
+      el.style.left = left + '%';
+      el.style.top = top + '%';
+      this.els.radarContainer.appendChild(el);
+    });
+  }
+
+  _getHTML() {
+    return `
+<!-- Apenas o Frame Decorativo nas bordas foi mantido -->
+    <div class="cockpit-frame"></div>
+
+    <div id="hud-layer">
+      <!-- ESQUERDA SUPERIOR: ESTATÍSTICAS -->
+      <div class="stats-area hud-panel">
+        <div class="stats-grid">
+          <div class="stat-block">
+            <div class="stat-label">
+              <i data-lucide="clock" size="14"></i> TIME
+            </div>
+            <div class="stat-value" id="ui-timer">00:00:00</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-label">
+              <i data-lucide="crosshair" size="14"></i> KILLS
+            </div>
+            <div class="stat-value" id="ui-kills">0</div>
+          </div>
+        </div>
+
+        <div class="combo-box">
+          <div class="combo-label">COMBO</div>
+          <div class="combo-val" id="ui-combo">x0</div>
+        </div>
+      </div>
+
+      <!-- CENTRO SUPERIOR: BOSS BAR -->
+      <div class="boss-area hud-panel" id="ui-boss-panel">
+        <div class="warning-strip">
+          <span class="warning-light"
+            ><i data-lucide="alert-triangle" size="16"></i> WARNING</span
+          >
+          <span class="warning-light"
+            >WARNING <i data-lucide="alert-triangle" size="16"></i
+          ></span>
+        </div>
+        <div class="boss-bar-container">
+          <div class="boss-name" id="ui-boss-name">BOSS NAME</div>
+          <div class="boss-skull"><i data-lucide="skull" size="24"></i></div>
+          <div class="boss-fill" id="ui-boss-fill"></div>
+        </div>
+      </div>
+
+      <!-- DIREITA SUPERIOR: RADAR -->
+      <div class="radar-area hud-panel">
+        <div class="radar-structure">
+          <svg class="radar-svg-layer" viewBox="0 0 200 200">
+            <circle
+              cx="100"
+              cy="100"
+              r="98"
+              fill="none"
+              stroke="var(--secondary-blue)"
+              stroke-width="2"
+              stroke-dasharray="30 15 5 15"
+              opacity="0.6"
+            />
+            <circle
+              cx="100"
+              cy="100"
+              r="92"
+              fill="none"
+              stroke="var(--primary-cyan)"
+              stroke-width="1"
+              opacity="0.2"
+            />
+            <polygon
+              points="100,10 177.9,55 177.9,145 100,190 22.1,145 22.1,55"
+              fill="rgba(0, 10, 20, 0.7)"
+              stroke="var(--primary-cyan)"
+              stroke-width="1.5"
+            />
+          </svg>
+          <div class="radar-internal-mask">
+            <div class="radar-sweep"></div>
+          </div>
+          <svg class="radar-grid-svg" viewBox="0 0 200 200">
+            <line
+              x1="100"
+              y1="10"
+              x2="100"
+              y2="190"
+              stroke="var(--secondary-blue)"
+              stroke-width="1"
+            />
+            <line
+              x1="22.1"
+              y1="55"
+              x2="177.9"
+              y2="145"
+              stroke="var(--secondary-blue)"
+              stroke-width="1"
+            />
+            <line
+              x1="177.9"
+              y1="55"
+              x2="22.1"
+              y2="145"
+              stroke="var(--secondary-blue)"
+              stroke-width="1"
+            />
+            <polygon
+              points="100,40 151.9,70 151.9,130 100,160 48.1,130 48.1,70"
+              fill="none"
+              stroke="var(--secondary-blue)"
+              stroke-width="1"
+              opacity="0.5"
+            />
+            <circle
+              cx="100"
+              cy="100"
+              r="10"
+              fill="var(--primary-cyan)"
+              opacity="0.3"
+            />
+          </svg>
+          <div class="blip-container" id="ui-radar-blips">
+            <div class="blip player"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ESQUERDA INFERIOR: VITAIS -->
+      <div class="status-area hud-panel">
+        <div class="locked-msg" id="ui-weapon-msg">
+          <div style="color: var(--secondary-blue)">
+            <i data-lucide="lock" size="24"></i>
+          </div>
+          <div>
+            <div style="font-size: 0.6rem; color: #88ccff; letter-spacing: 1px">
+              WEAPON SYSTEM
+            </div>
+            <div style="font-weight: bold; color: #fff">
+              LOCKED // LVL 5 REQ
+            </div>
+          </div>
+        </div>
+
+        <div class="bars-container">
+          <div class="system-label" style="color: var(--secondary-blue)">
+            ❖ SHIELDS
+          </div>
+          <div class="bar-wrapper" style="margin-bottom: 2px">
+            <div class="health-bar-row shield" id="ui-shield-row"></div>
+            <div
+              class="numeric-text"
+              id="ui-shield-text"
+              style="color: var(--secondary-blue)"
+            >
+              100%
+            </div>
+          </div>
+
+          <div class="bar-wrapper">
+            <div class="health-bar-row" id="ui-hull-row"></div>
+            <div
+              class="numeric-text"
+              id="ui-hull-text"
+              style="color: var(--health-green)"
+            >
+              100%
+            </div>
+          </div>
+          <div class="system-label" style="color: var(--health-green)">
+            ♥ HULL INTEGRITY
+          </div>
+        </div>
+      </div>
+
+      <!-- CENTRO INFERIOR: PROGRESSÃO -->
+      <div class="bottom-center hud-panel">
+        <div class="wave-indicator">
+          <div class="wave-content">
+            <div class="wave-label">WAVE</div>
+            <div class="wave-num" id="ui-wave-num">1</div>
+          </div>
+        </div>
+
+        <div class="xp-bar-container">
+          <div class="xp-label">
+            <i data-lucide="zap" size="12" fill="#ddaaff"></i> XP
+          </div>
+          <div class="xp-fill" id="ui-xp-fill"></div>
+        </div>
+        <div class="xp-details">
+          <div class="xp-values" id="ui-xp-text">0 / 1000</div>
+          <div class="lvl-indicator" id="ui-lvl-text">Lvl 1</div>
+        </div>
+      </div>
+
+      <!-- DIREITA INFERIOR: NAVEGAÇÃO -->
+      <div class="systems-area hud-panel">
+        <div class="nav-block">
+          <div class="nav-label">
+            NAV SYSTEMS <i data-lucide="compass" size="14"></i>
+          </div>
+          <div class="micro-data">
+            COORD: <span class="data-val" id="ui-coord-x">000.00</span> /
+            <span class="data-val" id="ui-coord-y">000.00</span><br />
+            VELOCITY: <span class="data-val" id="ui-velocity">0</span> km/h
+          </div>
+        </div>
+      </div>
+    </div>
+
+    
+    `;
+  }
+
+  _getCSS() {
+    return `
+
       /* ==========================================================================
            1. CORE & LAYOUT
            ========================================================================== */
@@ -287,19 +747,18 @@
       }
       .radar-sweep {
         position: absolute;
-        top: -50%;
-        left: -50%;
-        width: 200%;
-        height: 200%;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
         background: conic-gradient(
-          from 0deg,
+          from 0deg at 50% 50%,
           transparent 0%,
           transparent 60%,
           rgba(0, 240, 255, 0.05) 80%,
           rgba(0, 240, 255, 0.4) 100%
         );
         animation: radar-sweep-anim 4s linear infinite;
-        border-radius: 50%;
         mix-blend-mode: screen;
       }
       .radar-grid-svg {
@@ -713,356 +1172,7 @@
           width: 300px;
         }
       }
-    </style>
-  </head>
-  <body>
-    <!-- Apenas o Frame Decorativo nas bordas foi mantido -->
-    <div class="cockpit-frame"></div>
-
-    <div id="hud-layer">
-      <!-- ESQUERDA SUPERIOR: ESTATÍSTICAS -->
-      <div class="stats-area hud-panel">
-        <div class="stats-grid">
-          <div class="stat-block">
-            <div class="stat-label">
-              <i data-lucide="clock" size="14"></i> TIME
-            </div>
-            <div class="stat-value" id="ui-timer">00:00:00</div>
-          </div>
-          <div class="stat-block">
-            <div class="stat-label">
-              <i data-lucide="crosshair" size="14"></i> KILLS
-            </div>
-            <div class="stat-value" id="ui-kills">0</div>
-          </div>
-        </div>
-
-        <div class="combo-box">
-          <div class="combo-label">COMBO</div>
-          <div class="combo-val" id="ui-combo">x0</div>
-        </div>
-      </div>
-
-      <!-- CENTRO SUPERIOR: BOSS BAR -->
-      <div class="boss-area hud-panel" id="ui-boss-panel">
-        <div class="warning-strip">
-          <span class="warning-light"
-            ><i data-lucide="alert-triangle" size="16"></i> WARNING</span
-          >
-          <span class="warning-light"
-            >WARNING <i data-lucide="alert-triangle" size="16"></i
-          ></span>
-        </div>
-        <div class="boss-bar-container">
-          <div class="boss-name" id="ui-boss-name">BOSS NAME</div>
-          <div class="boss-skull"><i data-lucide="skull" size="24"></i></div>
-          <div class="boss-fill" id="ui-boss-fill"></div>
-        </div>
-      </div>
-
-      <!-- DIREITA SUPERIOR: RADAR -->
-      <div class="radar-area hud-panel">
-        <div class="radar-structure">
-          <svg class="radar-svg-layer" viewBox="0 0 200 200">
-            <circle
-              cx="100"
-              cy="100"
-              r="98"
-              fill="none"
-              stroke="var(--secondary-blue)"
-              stroke-width="2"
-              stroke-dasharray="30 15 5 15"
-              opacity="0.6"
-            />
-            <circle
-              cx="100"
-              cy="100"
-              r="92"
-              fill="none"
-              stroke="var(--primary-cyan)"
-              stroke-width="1"
-              opacity="0.2"
-            />
-            <polygon
-              points="100,10 177.9,55 177.9,145 100,190 22.1,145 22.1,55"
-              fill="rgba(0, 10, 20, 0.7)"
-              stroke="var(--primary-cyan)"
-              stroke-width="1.5"
-            />
-          </svg>
-          <div class="radar-internal-mask">
-            <div class="radar-sweep"></div>
-          </div>
-          <svg class="radar-grid-svg" viewBox="0 0 200 200">
-            <line
-              x1="100"
-              y1="10"
-              x2="100"
-              y2="190"
-              stroke="var(--secondary-blue)"
-              stroke-width="1"
-            />
-            <line
-              x1="22.1"
-              y1="55"
-              x2="177.9"
-              y2="145"
-              stroke="var(--secondary-blue)"
-              stroke-width="1"
-            />
-            <line
-              x1="177.9"
-              y1="55"
-              x2="22.1"
-              y2="145"
-              stroke="var(--secondary-blue)"
-              stroke-width="1"
-            />
-            <polygon
-              points="100,40 151.9,70 151.9,130 100,160 48.1,130 48.1,70"
-              fill="none"
-              stroke="var(--secondary-blue)"
-              stroke-width="1"
-              opacity="0.5"
-            />
-            <circle
-              cx="100"
-              cy="100"
-              r="10"
-              fill="var(--primary-cyan)"
-              opacity="0.3"
-            />
-          </svg>
-          <div class="blip-container" id="ui-radar-blips">
-            <div class="blip player"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ESQUERDA INFERIOR: VITAIS -->
-      <div class="status-area hud-panel">
-        <div class="locked-msg" id="ui-weapon-msg">
-          <div style="color: var(--secondary-blue)">
-            <i data-lucide="lock" size="24"></i>
-          </div>
-          <div>
-            <div style="font-size: 0.6rem; color: #88ccff; letter-spacing: 1px">
-              WEAPON SYSTEM
-            </div>
-            <div style="font-weight: bold; color: #fff">
-              LOCKED // LVL 5 REQ
-            </div>
-          </div>
-        </div>
-
-        <div class="bars-container">
-          <div class="system-label" style="color: var(--secondary-blue)">
-            ❖ SHIELDS
-          </div>
-          <div class="bar-wrapper" style="margin-bottom: 2px">
-            <div class="health-bar-row shield" id="ui-shield-row"></div>
-            <div
-              class="numeric-text"
-              id="ui-shield-text"
-              style="color: var(--secondary-blue)"
-            >
-              100%
-            </div>
-          </div>
-
-          <div class="bar-wrapper">
-            <div class="health-bar-row" id="ui-hull-row"></div>
-            <div
-              class="numeric-text"
-              id="ui-hull-text"
-              style="color: var(--health-green)"
-            >
-              100%
-            </div>
-          </div>
-          <div class="system-label" style="color: var(--health-green)">
-            ♥ HULL INTEGRITY
-          </div>
-        </div>
-      </div>
-
-      <!-- CENTRO INFERIOR: PROGRESSÃO -->
-      <div class="bottom-center hud-panel">
-        <div class="wave-indicator">
-          <div class="wave-content">
-            <div class="wave-label">WAVE</div>
-            <div class="wave-num" id="ui-wave-num">1</div>
-          </div>
-        </div>
-
-        <div class="xp-bar-container">
-          <div class="xp-label">
-            <i data-lucide="zap" size="12" fill="#ddaaff"></i> XP
-          </div>
-          <div class="xp-fill" id="ui-xp-fill"></div>
-        </div>
-        <div class="xp-details">
-          <div class="xp-values" id="ui-xp-text">0 / 1000</div>
-          <div class="lvl-indicator" id="ui-lvl-text">Lvl 1</div>
-        </div>
-      </div>
-
-      <!-- DIREITA INFERIOR: NAVEGAÇÃO -->
-      <div class="systems-area hud-panel">
-        <div class="nav-block">
-          <div class="nav-label">
-            NAV SYSTEMS <i data-lucide="compass" size="14"></i>
-          </div>
-          <div class="micro-data">
-            COORD: <span class="data-val" id="ui-coord-x">000.00</span> /
-            <span class="data-val" id="ui-coord-y">000.00</span><br />
-            VELOCITY: <span class="data-val" id="ui-velocity">0</span> km/h
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <script>
-      lucide.createIcons();
-
-      /**
-       * CLASS: SpaceHUD
-       * Interface de controle para o layout "AAA Space Shooter".
-       * Instancie esta classe e chame seus métodos no loop do seu jogo.
-       */
-      class SpaceHUD {
-        constructor() {
-          // Mapeamento de Elementos DOM
-          this.els = {
-            timer: document.getElementById('ui-timer'),
-            kills: document.getElementById('ui-kills'),
-            combo: document.getElementById('ui-combo'),
-            bossPanel: document.getElementById('ui-boss-panel'),
-            bossName: document.getElementById('ui-boss-name'),
-            bossFill: document.getElementById('ui-boss-fill'),
-            radarContainer: document.getElementById('ui-radar-blips'),
-            shieldRow: document.getElementById('ui-shield-row'),
-            shieldText: document.getElementById('ui-shield-text'),
-            hullRow: document.getElementById('ui-hull-row'),
-            hullText: document.getElementById('ui-hull-text'),
-            wave: document.getElementById('ui-wave-num'),
-            xpFill: document.getElementById('ui-xp-fill'),
-            xpText: document.getElementById('ui-xp-text'),
-            lvlText: document.getElementById('ui-lvl-text'),
-            coordX: document.getElementById('ui-coord-x'),
-            coordY: document.getElementById('ui-coord-y'),
-            vel: document.getElementById('ui-velocity'),
-          };
-
-          // Inicializa segmentos das barras
-          this.createSegments(this.els.shieldRow, 20);
-          this.createSegments(this.els.hullRow, 20);
-          this.updateVitals(100, 100, 100, 100);
-        }
-
-        /** Cria as divs de segmentos para as barras de vida/escudo */
-        createSegments(container, count) {
-          container.innerHTML = '';
-          for (let i = 0; i < count; i++) {
-            const div = document.createElement('div');
-            div.className = 'bar-segment filled';
-            container.appendChild(div);
-          }
-        }
-
-        // --- MÉTODOS PÚBLICOS DE ATUALIZAÇÃO ---
-
-        /** Atualiza tempo, abates e combo */
-        updateStats(timeStr, kills, combo) {
-          if (timeStr) this.els.timer.innerText = timeStr;
-          if (kills !== undefined) this.els.kills.innerText = kills;
-          if (combo !== undefined) this.els.combo.innerText = 'x' + combo;
-        }
-
-        /** Atualiza telemetria de navegação */
-        updateTelemetry(x, y, speed) {
-          this.els.coordX.innerText = x.toFixed(2);
-          this.els.coordY.innerText = y.toFixed(2);
-          this.els.vel.innerText = Math.floor(speed);
-        }
-
-        /** Atualiza barras de vida e escudo */
-        updateVitals(shield, maxShield, hull, maxHull) {
-          this._updateBar(this.els.shieldRow, shield, maxShield);
-          this._updateBar(this.els.hullRow, hull, maxHull);
-
-          const shieldPercent = Math.floor((shield / maxShield) * 100);
-          this.els.shieldText.innerText = shieldPercent + '%';
-
-          const hpPercent = Math.floor((hull / maxHull) * 100);
-          this.els.hullText.innerText = hpPercent + '%';
-
-          // Feedback visual de dano crítico
-          if (hpPercent < 30) {
-            this.els.hullText.style.color = 'var(--danger-red)';
-            this.els.hullText.classList.add('glitch-text');
-          } else {
-            this.els.hullText.style.color = 'var(--health-green)';
-            this.els.hullText.classList.remove('glitch-text');
-          }
-        }
-
-        /** Helper interno para preencher segmentos */
-        _updateBar(container, value, max) {
-          const segments = container.children;
-          const total = segments.length;
-          const filledCount = Math.ceil((value / max) * total);
-          for (let i = 0; i < total; i++) {
-            if (i < filledCount) segments[i].classList.add('filled');
-            else segments[i].classList.remove('filled');
-          }
-        }
-
-        /** Mostra/Esconde e atualiza Boss Bar */
-        updateBoss(active, name, healthPercent) {
-          if (!active) {
-            this.els.bossPanel.classList.remove('active');
-            return;
-          }
-          this.els.bossPanel.classList.add('active');
-          if (name) this.els.bossName.innerText = name;
-          if (healthPercent !== undefined)
-            this.els.bossFill.style.width = healthPercent + '%';
-        }
-
-        /** Atualiza XP, Nível e Onda */
-        updateExperience(level, currentXP, requiredXP, waveNum) {
-          if (waveNum !== undefined) this.els.wave.innerText = waveNum;
-
-          const xpPercent = Math.min(
-            100,
-            Math.floor((currentXP / requiredXP) * 100)
-          );
-          this.els.xpFill.style.width = xpPercent + '%';
-
-          this.els.xpText.innerText = `${currentXP} / ${requiredXP}`;
-          this.els.lvlText.innerText = `Lvl ${level}`;
-        }
-
-        /** * Atualiza Radar
-         * @param {Array} blips - [{x: -1..1, y: -1..1, type: 'enemy'|'ally'}]
-         */
-        updateRadar(blips) {
-          this.els.radarContainer.innerHTML = '<div class="blip player"></div>';
-          blips.forEach((b) => {
-            const el = document.createElement('div');
-            el.className = 'blip ' + (b.type || 'enemy');
-            const left = (b.x + 1) * 50;
-            const top = (b.y + 1) * 50;
-            el.style.left = left + '%';
-            el.style.top = top + '%';
-            this.els.radarContainer.appendChild(el);
-          });
-        }
-      }
-
-      // Instancia a classe globalmente para ser acessada pelo seu jogo
-      window.spaceHUD = new SpaceHUD();
-    </script>
-  </body>
-</html>
+    
+    `;
+  }
+}

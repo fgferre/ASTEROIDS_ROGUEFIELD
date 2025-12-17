@@ -2,6 +2,7 @@
 
 import {
   DEFAULT_HUD_LAYOUT_ID,
+  HUD_LAYOUT_IDS,
   HUD_LAYOUT_OPTIONS,
   getHudLayoutDefinition,
   getHudLayoutItems,
@@ -10,6 +11,7 @@ import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 import { WAVE_BOSS_INTERVAL } from '../data/constants/gameplay.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
+import { AAAHudLayout } from './ui/AAAHudLayout.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
@@ -85,6 +87,10 @@ class UISystem extends BaseSystem {
     this.hudLayout = getHudLayoutItems(this.currentHudLayoutId);
     this.hudElements = new Map();
     this.hudGroups = new Map();
+    this.aaaTacticalHud = null;
+    this.aaaTacticalHudDefinition = null;
+    this.aaaTacticalHudMountTarget = null;
+    this.aaaTacticalHudRestoreState = null;
     this.cachedValues = {
       health: { current: null, max: null },
       shield: {
@@ -1946,17 +1952,30 @@ class UISystem extends BaseSystem {
     const definition = getHudLayoutDefinition(layoutId);
     const resolvedId = definition?.id || DEFAULT_HUD_LAYOUT_ID;
     const force = Boolean(options.force);
+    const isAAATactical = resolvedId === HUD_LAYOUT_IDS.AAA_TACTICAL;
 
     if (!force && resolvedId === this.currentHudLayoutId) {
       this.updateHudLayoutClass(resolvedId);
+      if (isAAATactical && !this.aaaTacticalHud) {
+        this.activateAAATacticalHud(definition);
+      }
       return;
     }
 
     this.currentHudLayoutId = resolvedId;
+    this.updateHudLayoutClass(resolvedId);
+
+    if (isAAATactical) {
+      this.activateAAATacticalHud(definition);
+      this.updateAAATacticalHudFromServices({ force: true });
+      return;
+    }
+
+    this.deactivateAAATacticalHud();
+
     this.hudLayout = getHudLayoutItems(resolvedId);
     this.hudGroups.clear();
     this.setupHudLayout();
-    this.updateHudLayoutClass(resolvedId);
     this.refreshHudFromServices(true);
     this.renderBossHud(true);
   }
@@ -1976,6 +1995,285 @@ class UISystem extends BaseSystem {
     const hudRoot = this.domRefs.root;
     if (hudRoot) {
       hudRoot.dataset.hudLayout = layoutId;
+    }
+  }
+
+  resolveAAATacticalMountTarget() {
+    const gameField = this.domRefs.gameField;
+    if (gameField && typeof gameField.querySelector === 'function') {
+      const overlay = gameField.querySelector('.game-field__overlay');
+      if (overlay instanceof HTMLElement) {
+        return overlay;
+      }
+    }
+
+    const gameUi = this.domRefs.gameUi;
+    if (gameUi && typeof gameUi.querySelector === 'function') {
+      const overlay = gameUi.querySelector('.game-field__overlay');
+      if (overlay instanceof HTMLElement) {
+        return overlay;
+      }
+    }
+
+    return null;
+  }
+
+  activateAAATacticalHud(definition = null) {
+    if (this.aaaTacticalHud) {
+      this.aaaTacticalHudDefinition = definition;
+      return;
+    }
+
+    const mountTarget = this.resolveAAATacticalMountTarget();
+    if (!mountTarget) {
+      console.warn('[UISystem] AAA tactical HUD mount target not found.');
+      return;
+    }
+
+    const hudRoot = this.domRefs.root;
+    const countdown = this.domRefs.wave?.countdown || null;
+
+    this.aaaTacticalHudRestoreState = {
+      mountTarget,
+      mountPadding: mountTarget.style.padding,
+      hudRootDisplay: hudRoot?.style.display ?? null,
+      hudRootAriaHidden: hudRoot?.getAttribute('aria-hidden') ?? null,
+      countdownDisplay: countdown?.style.display ?? null,
+      countdownAriaHidden: countdown?.getAttribute('aria-hidden') ?? null,
+    };
+
+    mountTarget.style.padding = '0px';
+
+    if (hudRoot) {
+      hudRoot.style.display = 'none';
+      hudRoot.setAttribute('aria-hidden', 'true');
+    }
+
+    if (countdown) {
+      countdown.style.display = 'none';
+      countdown.setAttribute('aria-hidden', 'true');
+    }
+
+    this.aaaTacticalHud = new AAAHudLayout();
+    this.aaaTacticalHudDefinition = definition;
+    this.aaaTacticalHudMountTarget = mountTarget;
+    this.aaaTacticalHud.mount(mountTarget);
+  }
+
+  deactivateAAATacticalHud() {
+    if (this.aaaTacticalHud && typeof this.aaaTacticalHud.unmount === 'function') {
+      this.aaaTacticalHud.unmount();
+    }
+
+    const restore = this.aaaTacticalHudRestoreState;
+    if (restore?.mountTarget instanceof HTMLElement) {
+      restore.mountTarget.style.padding =
+        typeof restore.mountPadding === 'string' ? restore.mountPadding : '';
+    }
+
+    const hudRoot = this.domRefs.root;
+    if (hudRoot) {
+      hudRoot.style.display =
+        typeof restore?.hudRootDisplay === 'string' ? restore.hudRootDisplay : '';
+      if (restore?.hudRootAriaHidden === null) {
+        hudRoot.removeAttribute('aria-hidden');
+      } else if (typeof restore?.hudRootAriaHidden === 'string') {
+        hudRoot.setAttribute('aria-hidden', restore.hudRootAriaHidden);
+      }
+    }
+
+    const countdown = this.domRefs.wave?.countdown || null;
+    if (countdown) {
+      countdown.style.display =
+        typeof restore?.countdownDisplay === 'string' ? restore.countdownDisplay : '';
+      if (restore?.countdownAriaHidden === null) {
+        countdown.removeAttribute('aria-hidden');
+      } else if (typeof restore?.countdownAriaHidden === 'string') {
+        countdown.setAttribute('aria-hidden', restore.countdownAriaHidden);
+      }
+    }
+
+    this.aaaTacticalHud = null;
+    this.aaaTacticalHudDefinition = null;
+    this.aaaTacticalHudMountTarget = null;
+    this.aaaTacticalHudRestoreState = null;
+  }
+
+  formatAAATacticalClock(totalSeconds) {
+    const seconds = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const remainder = seconds % 60;
+    const pad = (value) => `${Math.max(0, value)}`.padStart(2, '0');
+    return `${pad(hours)}:${pad(minutes)}:${pad(remainder)}`;
+  }
+
+  updateAAATacticalHudFromServices(options = {}) {
+    const hud = this.aaaTacticalHud;
+    if (!hud) {
+      return;
+    }
+
+    const force = Boolean(options.force);
+
+    const player = this.getService('player');
+    const enemies = this.getService('enemies');
+    const progression = this.getService('progression');
+
+    const playerPosition =
+      player && typeof player.getPosition === 'function'
+        ? player.getPosition()
+        : player?.position && typeof player.position === 'object'
+          ? { x: player.position.x ?? 0, y: player.position.y ?? 0 }
+          : { x: 0, y: 0 };
+
+    const playerVelocity =
+      player && typeof player.getVelocity === 'function'
+        ? player.getVelocity()
+        : player?.velocity && typeof player.velocity === 'object'
+          ? player.velocity
+          : { vx: 0, vy: 0 };
+
+    const velocityX = Number(playerVelocity.vx ?? playerVelocity.x ?? 0) || 0;
+    const velocityY = Number(playerVelocity.vy ?? playerVelocity.y ?? 0) || 0;
+    const speed = Math.hypot(velocityX, velocityY);
+
+    if (player || force) {
+      const hull = Number(player?.health ?? 0) || 0;
+      const maxHull = Number(player?.maxHealth ?? 0) || 0;
+
+      let shield = 0;
+      let maxShield = 0;
+
+      if (player && typeof player.getShieldState === 'function') {
+        const shieldState = player.getShieldState() || {};
+        shield = Number(shieldState.currentHP ?? shieldState.currentHits ?? 0) || 0;
+        maxShield = Number(shieldState.maxHP ?? shieldState.maxHits ?? 0) || 0;
+      } else {
+        shield = Number(player?.shieldHP ?? 0) || 0;
+        maxShield = Number(player?.shieldMaxHP ?? 0) || 0;
+      }
+
+      hud.updateVitals(shield, maxShield, hull, maxHull);
+      hud.updateTelemetry(
+        Number(playerPosition.x ?? 0) || 0,
+        Number(playerPosition.y ?? 0) || 0,
+        speed
+      );
+    }
+
+    if (enemies && typeof enemies.getSessionStats === 'function') {
+      const session = enemies.getSessionStats() || {};
+      const timeElapsed = session.timeElapsed ?? session.sessionTimeSeconds ?? 0;
+      const totalKills = session.totalKills ?? session.kills ?? 0;
+
+      hud.updateStats(this.formatAAATacticalClock(timeElapsed), totalKills, undefined);
+    }
+
+    if (progression && typeof progression.getComboState === 'function') {
+      const comboState = progression.getComboState() || {};
+      const comboCount = Number(comboState.comboCount ?? 0) || 0;
+      hud.updateStats(null, undefined, comboCount);
+    }
+
+    const waveState =
+      enemies && typeof enemies.getWaveState === 'function'
+        ? enemies.getWaveState() || null
+        : null;
+
+    if (progression) {
+      const level =
+        typeof progression.getLevel === 'function'
+          ? progression.getLevel()
+          : Number(progression.level ?? 1) || 1;
+      const xp =
+        typeof progression.getExperience === 'function'
+          ? progression.getExperience()
+          : null;
+
+      hud.updateExperience(
+        level,
+        xp?.current ?? 0,
+        xp?.needed ?? 1,
+        waveState?.current ?? 1
+      );
+    }
+
+    const physics = this.getService('physics');
+    if (
+      (physics && typeof physics.getNearbyEnemies === 'function' && player) ||
+      (enemies && typeof enemies.getActiveEnemies === 'function' && player)
+    ) {
+      const pluginConfig = this.aaaTacticalHudDefinition?.plugin || {};
+      const radarRange = Math.max(1, Number(pluginConfig.radarRange) || 1500);
+
+      let radarEnemies = [];
+      if (physics && typeof physics.getNearbyEnemies === 'function') {
+        try {
+          radarEnemies = physics.getNearbyEnemies(
+            Number(playerPosition.x) || 0,
+            Number(playerPosition.y) || 0,
+            radarRange
+          );
+        } catch (error) {
+          radarEnemies = [];
+        }
+      } else if (enemies && typeof enemies.getActiveEnemies === 'function') {
+        radarEnemies = enemies.getActiveEnemies() || [];
+      }
+
+      const blips = [];
+      const originX = Number(playerPosition.x) || 0;
+      const originY = Number(playerPosition.y) || 0;
+      const limit = 80;
+
+      for (let index = 0; index < radarEnemies.length; index += 1) {
+        if (blips.length >= limit) {
+          break;
+        }
+
+        const enemy = radarEnemies[index];
+        if (!enemy) {
+          continue;
+        }
+
+        const enemyX = Number(enemy?.position?.x ?? enemy?.x ?? 0);
+        const enemyY = Number(enemy?.position?.y ?? enemy?.y ?? 0);
+        if (!Number.isFinite(enemyX) || !Number.isFinite(enemyY)) {
+          continue;
+        }
+
+        const dx = enemyX - originX;
+        const dy = enemyY - originY;
+        const distance = Math.hypot(dx, dy);
+        if (!Number.isFinite(distance) || distance > radarRange) {
+          continue;
+        }
+
+        blips.push({
+          x: dx / radarRange,
+          y: dy / radarRange,
+          type: 'enemy',
+        });
+      }
+
+      hud.updateRadar(blips);
+    }
+
+    const bossState = this.getBossHudState();
+    const cachedBossVisible = Boolean(this.cachedValues.boss?.visible);
+    const bossActive =
+      cachedBossVisible || Boolean(bossState.active) || Boolean(bossState.upcoming);
+
+    if (!bossActive) {
+      hud.updateBoss(false);
+    } else {
+      const bossName = bossState.name || 'BOSS';
+      const maxHealth = Number(bossState.maxHealth ?? 0) || 0;
+      const currentHealth = Number(bossState.health ?? 0) || 0;
+      const percent =
+        maxHealth > 0 ? Math.max(0, Math.min(100, (currentHealth / maxHealth) * 100)) : 100;
+      hud.updateBoss(true, bossName, percent);
     }
   }
 
@@ -2759,8 +3057,8 @@ class UISystem extends BaseSystem {
       label.className = 'wave-label';
       label.textContent = 'WAVE';
 
-      content.appendChild(num);
-      content.appendChild(label);
+      content.appendChild(label); // WAVE label first (top)
+      content.appendChild(num); // Number second (bottom)
       indicator.appendChild(content);
       root.appendChild(indicator);
 
@@ -4163,6 +4461,11 @@ class UISystem extends BaseSystem {
   }
 
   update() {
+    if (this.aaaTacticalHud) {
+      this.updateAAATacticalHudFromServices({ force: false });
+      return;
+    }
+
     this.refreshHudFromServices(false);
     this.renderBossHud();
     this.updateTacticalHud();

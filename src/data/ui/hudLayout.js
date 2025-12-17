@@ -634,9 +634,23 @@ const HUD_LAYOUTS = {
       'Interface avançada com visual Sci-Fi, glassmorphism e efeitos de neon.',
     items: AAA_LAYOUT_ITEMS,
   },
+  aaa_tactical: {
+    id: 'aaa_tactical',
+    label: 'AAA Tactical (Mockup)',
+    description: 'HUD tático AAA integrado via módulo (layoutmockupstudy.html).',
+    plugin: {
+      module: 'AAAHudLayout',
+      radarRange: 1500,
+    },
+    items: [],
+  },
 };
 
 export const DEFAULT_HUD_LAYOUT_ID = 'aaa'; // Switch default to AAA for testing
+
+export const HUD_LAYOUT_IDS = {
+  AAA_TACTICAL: 'aaa_tactical',
+};
 
 export const HUD_LAYOUT_OPTIONS = Object.values(HUD_LAYOUTS).map(
   ({ id, label, description }) => ({
