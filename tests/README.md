@@ -98,6 +98,7 @@ npm run test:validate-optimizations  # Valida padrões de otimização
 Todos os helpers vivem em `tests/__helpers__/`. Utilize-os para evitar código duplicado:
 
 ### Mocks (`mocks.js`)
+
 ```javascript
 import { createEventBusMock } from '../__helpers__/mocks.js';
 
@@ -106,6 +107,7 @@ eventBus.emit('enemy-spawned', { id: 'test' });
 ```
 
 ### Stubs (`stubs.js`)
+
 ```javascript
 import { createDeterministicRandom } from '../__helpers__/stubs.js';
 
@@ -114,6 +116,7 @@ expect(random.float()).toBe(0.5);
 ```
 
 ### Fixtures (`fixtures.js`)
+
 ```javascript
 import { createTestEnemy } from '../__helpers__/fixtures.js';
 
@@ -122,6 +125,7 @@ expect(enemy.type).toBe('drone');
 ```
 
 ### Assertions (`assertions.js`)
+
 ```javascript
 import { expectDeterministicSequence } from '../__helpers__/assertions.js';
 
@@ -129,6 +133,7 @@ expectDeterministicSequence([0.1, 0.2], [0.1, 0.2]);
 ```
 
 ### Setup (`setup.js`)
+
 ```javascript
 import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
 
@@ -137,6 +142,7 @@ afterEach(() => cleanupGlobalState());
 ```
 
 ### Asteroid helpers (`asteroid-helpers.js`)
+
 ```javascript
 import { createEnemySystemHarness } from '../__helpers__/asteroid-helpers.js';
 
@@ -148,18 +154,21 @@ expect(result.spawnedEnemies).toHaveLength(8);
 ## 5. Boas Práticas
 
 ### ❌ Anti-padrão: mocks inline
+
 ```javascript
 // Evite criar mocks manualmente em cada teste
 const eventBus = { emit: vi.fn(), on: vi.fn() };
 ```
 
 ### ✅ Padrão recomendado
+
 ```javascript
 import { createEventBusMock } from '../__helpers__/mocks.js';
 const eventBus = createEventBusMock();
 ```
 
 ### Checklist rápido
+
 1. Use helpers centralizados (`mocks`, `stubs`, `fixtures`).
 2. Prefira fixtures a objetos literais.
 3. Confie no `global-setup.js` para `vi.restoreAllMocks()` – não duplique `afterEach`.

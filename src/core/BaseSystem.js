@@ -73,7 +73,10 @@ class BaseSystem {
 
       // Create random forks if labels provided
       if (Object.keys(this.randomForkLabels).length > 0) {
-        this.randomForks = this.createRandomForks(this.random, this.randomForkLabels);
+        this.randomForks = this.createRandomForks(
+          this.random,
+          this.randomForkLabels
+        );
       }
 
       // Capture initial seeds
@@ -85,13 +88,17 @@ class BaseSystem {
       this.performanceMetrics = {
         enabled: true,
         frameCount: 0,
-        lastFrameTime: performance.now()
+        lastFrameTime: performance.now(),
       };
     }
 
     // Auto-register with gameServices
     const serviceKey = options.serviceName ?? options.systemName;
-    if (serviceKey && typeof gameServices !== 'undefined' && gameServices?.register) {
+    if (
+      serviceKey &&
+      typeof gameServices !== 'undefined' &&
+      gameServices?.register
+    ) {
       gameServices.register(serviceKey, this);
     }
 
@@ -100,7 +107,11 @@ class BaseSystem {
     this.setupEventListeners();
 
     // Log initialization
-    if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') {
+    if (
+      typeof process !== 'undefined' &&
+      process.env &&
+      process.env.NODE_ENV === 'development'
+    ) {
       console.log(`[${this.systemName}] Initialized via BaseSystem`);
     }
   }
@@ -233,7 +244,10 @@ class BaseSystem {
     if (!this.randomForks) return;
 
     if (refreshForks) {
-      this.randomForks = this.createRandomForks(this.random, this.randomForkLabels);
+      this.randomForks = this.createRandomForks(
+        this.random,
+        this.randomForkLabels
+      );
       this.captureRandomForkSeeds();
       return;
     }
@@ -270,24 +284,32 @@ class BaseSystem {
    * this.registerEventListener('player-hit', (data) => {
    *   this.handlePlayerHit(data);
    * });
-  */
+   */
   registerEventListener(eventName, handler, { context = this } = {}) {
     if (!eventName || typeof handler !== 'function') return;
 
-    const boundHandler = context && context !== this ? handler.bind(context) : handler;
+    const boundHandler =
+      context && context !== this ? handler.bind(context) : handler;
 
-    if (typeof gameEvents === 'undefined' || typeof gameEvents.on !== 'function') {
-      const systemLabel = this.systemName ||
+    if (
+      typeof gameEvents === 'undefined' ||
+      typeof gameEvents.on !== 'function'
+    ) {
+      const systemLabel =
+        this.systemName ||
         (this.constructor && this.constructor.name) ||
         'UnknownSystem';
-      const warningMessage =
-        `[${systemLabel}] registerEventListener('${eventName}') skipped: gameEvents is unavailable.`;
+      const warningMessage = `[${systemLabel}] registerEventListener('${eventName}') skipped: gameEvents is unavailable.`;
       const shouldWarn =
         typeof process === 'undefined' ||
         !process.env ||
         process.env.NODE_ENV !== 'production';
 
-      if (shouldWarn && typeof console !== 'undefined' && typeof console.warn === 'function') {
+      if (
+        shouldWarn &&
+        typeof console !== 'undefined' &&
+        typeof console.warn === 'function'
+      ) {
         console.warn(warningMessage);
       }
       return;
@@ -297,7 +319,7 @@ class BaseSystem {
 
     this._eventListeners.push({
       eventName,
-      handler: boundHandler
+      handler: boundHandler,
     });
   }
 
@@ -368,7 +390,7 @@ class BaseSystem {
     this.performanceMetrics = {
       enabled,
       frameCount: 0,
-      lastFrameTime: performance.now()
+      lastFrameTime: performance.now(),
     };
   }
 
@@ -467,7 +489,11 @@ class BaseSystem {
     this.onDestroy();
 
     // Log destruction
-    if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') {
+    if (
+      typeof process !== 'undefined' &&
+      process.env &&
+      process.env.NODE_ENV === 'development'
+    ) {
       console.log(`[${this.systemName}] Destroyed`);
     }
   }
@@ -501,7 +527,11 @@ class BaseSystem {
    * this.log('System initialized', { config: this.config });
    */
   log(message, data = null) {
-    if (typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'development') {
+    if (
+      typeof process !== 'undefined' &&
+      process.env &&
+      process.env.NODE_ENV === 'development'
+    ) {
       const prefix = `[${this.systemName || 'BaseSystem'}]`;
       if (data) {
         console.log(prefix, message, data);

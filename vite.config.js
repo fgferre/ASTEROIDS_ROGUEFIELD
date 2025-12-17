@@ -12,10 +12,14 @@ export default defineConfig({
   test: {
     root: resolve(__dirname),
     include: ['tests/**/*.test.js', 'tests/**/*.spec.js'],
-    exclude: ['tests/__helpers__/**', 'tests/__fixtures__/**', 'node_modules/**'],
+    exclude: [
+      'tests/__helpers__/**',
+      'tests/__fixtures__/**',
+      'node_modules/**',
+    ],
     environment: 'node',
     globals: true,
     // Optimization: global setup eliminates 27 duplicated afterEach blocks
-    setupFiles: ['tests/__helpers__/global-setup.js']
+    setupFiles: ['tests/__helpers__/global-setup.js'],
   },
 });

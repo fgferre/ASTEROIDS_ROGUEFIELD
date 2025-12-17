@@ -21,6 +21,7 @@ import {
   ASTEROID_VARIANTS,
 } from '../../../data/enemies/asteroid-configs.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
+import { NeonGraphics } from '../../../utils/NeonGraphics.js';
 
 /**
  * Asteroid Enemy Type
@@ -142,9 +143,14 @@ export class Asteroid extends BaseEnemy {
     this.resetForPool();
 
     this.system = system;
-    const scopeHint = options.randomScope || (options.spawnedBy ? 'fragments' : 'spawn');
+    const scopeHint =
+      options.randomScope || (options.spawnedBy ? 'fragments' : 'spawn');
     let randomSource = options.random;
-    if (!randomSource && this.system && typeof this.system.getRandomScope === 'function') {
+    if (
+      !randomSource &&
+      this.system &&
+      typeof this.system.getRandomScope === 'function'
+    ) {
       const scopedRandom = this.system.getRandomScope(scopeHint, {
         label: `asteroid-fallback:${scopeHint}`,
       });
@@ -182,10 +188,7 @@ export class Asteroid extends BaseEnemy {
           disallowedVariants: options.disallowedVariants || [],
         };
 
-        if (
-          this.system &&
-          typeof this.system.getRandomScope === 'function'
-        ) {
+        if (this.system && typeof this.system.getRandomScope === 'function') {
           const systemVariantRandom = this.system.getRandomScope('variants');
           if (systemVariantRandom) {
             variantContext.random = systemVariantRandom;
@@ -205,8 +208,7 @@ export class Asteroid extends BaseEnemy {
 
     this.radius = ASTEROID_SIZES[this.size] || 12;
     this.variantConfig =
-      ASTEROID_VARIANTS[this.variant] ||
-      ASTEROID_VARIANTS.common;
+      ASTEROID_VARIANTS[this.variant] || ASTEROID_VARIANTS.common;
 
     GameDebugLogger.log('STATE', 'Asteroid initialized', {
       configReceived: {
@@ -221,7 +223,8 @@ export class Asteroid extends BaseEnemy {
       },
       expectedRadius: ASTEROID_SIZES[this.size],
       radiusMatch: this.radius === ASTEROID_SIZES[this.size],
-      configApplied: this.size === options?.size && this.variant === options?.variant,
+      configApplied:
+        this.size === options?.size && this.variant === options?.variant,
     });
 
     this.crackProfileKey =
@@ -238,10 +241,11 @@ export class Asteroid extends BaseEnemy {
     this.behavior = this.variantConfig?.behavior || null;
 
     // Copy movement strategy and config from variant config
-    this.movementStrategy = this.variantConfig?.movementStrategy || this.movementStrategy || 'linear';
+    this.movementStrategy =
+      this.variantConfig?.movementStrategy || this.movementStrategy || 'linear';
     this.movementConfig = {
       ...(this.movementConfig || {}),
-      ...(this.variantConfig?.movementConfig || {})
+      ...(this.variantConfig?.movementConfig || {}),
     };
 
     const baseMass = this.radius * this.radius * 0.05;
@@ -277,9 +281,7 @@ export class Asteroid extends BaseEnemy {
       baseRotationSpeed * (this.variantConfig?.rotationMultiplier ?? 1);
 
     const baseHealth =
-      ASTEROID_BASE_HEALTH[this.size] ??
-      ASTEROID_BASE_HEALTH.small ??
-      10;
+      ASTEROID_BASE_HEALTH[this.size] ?? ASTEROID_BASE_HEALTH.small ?? 10;
     const waveMultiplier = this.computeWaveHealthMultiplier(this.wave);
     const variantHP = this.variantConfig?.hpMultiplier ?? 1;
 
@@ -386,7 +388,7 @@ export class Asteroid extends BaseEnemy {
 
     // Before soft cap: linear scaling
     if (currentWave < softCapWave) {
-      const multiplier = baseMultiplier + (wavesAboveStart * increment);
+      const multiplier = baseMultiplier + wavesAboveStart * increment;
       return Math.min(multiplier, hardCap);
     }
 
@@ -517,7 +519,10 @@ export class Asteroid extends BaseEnemy {
       generation: this.generation,
     };
 
-    return CrackGenerationService.generateCrackLayers(context, this.crackProfile);
+    return CrackGenerationService.generateCrackLayers(
+      context,
+      this.crackProfile
+    );
   }
 
   updateVisualState(deltaTime) {
@@ -532,7 +537,10 @@ export class Asteroid extends BaseEnemy {
     const pulse = this.variantConfig.visual.pulse;
     if (pulse) {
       if (typeof this.visualState.glowTime !== 'number') {
-        this.visualState.glowTime = this.getRandomFor('visual').range(0, Math.PI * 2);
+        this.visualState.glowTime = this.getRandomFor('visual').range(
+          0,
+          Math.PI * 2
+        );
       }
 
       const speed = Math.max(0, pulse.speed ?? 1);
@@ -557,7 +565,8 @@ export class Asteroid extends BaseEnemy {
     }
 
     // Check if using external movement component
-    const useExternalMovement = this.system?.useComponents && this.system?.movementComponent;
+    const useExternalMovement =
+      this.system?.useComponents && this.system?.movementComponent;
 
     // Always update visual state
     this.updateVisualState(deltaTime);
@@ -795,12 +804,16 @@ export class Asteroid extends BaseEnemy {
       typeof player.getHullBoundingRadius === 'function'
         ? player.getHullBoundingRadius()
         : SHIP_SIZE;
-    const attackRange = (this.behavior.minDistance || 25) + this.radius + playerRadius + 6;
+    const attackRange =
+      (this.behavior.minDistance || 25) + this.radius + playerRadius + 6;
     const cooldown = this.behavior.cooldown || 1.2;
 
     // Execute contact attack if in range and off cooldown
     if (distance <= attackRange && this.variantState.attackCooldown <= 0) {
-      if (this.system && typeof this.system.applyDirectDamageToPlayer === 'function') {
+      if (
+        this.system &&
+        typeof this.system.applyDirectDamageToPlayer === 'function'
+      ) {
         const damage = this.behavior.contactDamage || 20;
         const result = this.system.applyDirectDamageToPlayer(damage, {
           cause: 'parasite',
@@ -869,9 +882,7 @@ export class Asteroid extends BaseEnemy {
                 rootId: segment.rootId ?? null,
                 stage: segment.stage ?? this.crackStage,
                 type: segment.type || 'line',
-                width: Number.isFinite(segment.width)
-                  ? segment.width
-                  : 1,
+                width: Number.isFinite(segment.width) ? segment.width : 1,
                 length,
                 start: { x: startX, y: startY },
                 end: { x: endX, y: endY },
@@ -1003,201 +1014,62 @@ export class Asteroid extends BaseEnemy {
    * Overrides BaseEnemy.draw() to provide asteroid-specific rendering.
    */
   draw(ctx) {
-    ctx.save();
-    const colors = this.getVariantColors();
+    if (!ctx) return;
 
-    const now = Date.now();
-    if (
-      this._lastRenderLogTs === undefined ||
-      now - this._lastRenderLogTs >= 1000
-    ) {
-      GameDebugLogger.log('RENDER', 'Asteroid rendered', {
-        size: this.size,
-        variant: this.variant,
-        radius: this.radius,
-        colors: {
-          fill: colors?.fill,
-          stroke: colors?.stroke,
-        },
-        verticesLength: this.vertices?.length ?? 0,
-        renderMatch: this.radius === ASTEROID_SIZES[this.size],
+    // [NEO-ARCADE] Use NeonGraphics for Asteroid rendering
+    ctx.save();
+
+    // Prepare geometry
+    const path = new Path2D();
+    if (this.vertices.length > 0) {
+      this.vertices.forEach((v, i) => {
+        if (i === 0) path.moveTo(v.x, v.y);
+        else path.lineTo(v.x, v.y);
       });
-      this._lastRenderLogTs = now;
+      path.closePath();
     }
+
+    // Determine color based on variant
+    const colors = this.getVariantColors();
+    // Default to Neon Pink for common if not specified (just for contrast), or keep original logic
+    const baseColor = colors.stroke || '#8B4513';
+
+    // Map variant colors to Neon Palette overrides if desired, or just use the stroke color
+    // Standard Asteroid: Neon Pink/Red -> #FF0055? Or stick to Rock-like #A0522D but neon?
+    // Let's stick to the color provided by getVariantColors but boost it
+    const neonColor = baseColor; // Use the variant's stroke color as the neon color
 
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rotation);
 
-    const isFlashing = this.lastDamageTime > 0;
-    const visual = this.variantConfig?.visual || {};
-    const isVolatile = this.behavior?.type === 'volatile';
-    const fuseProgress = isVolatile ? this.getVolatileFuseProgress() : 0;
-    const pulseConfig = visual.pulse;
-    const glowConfig = visual.glow || {};
+    // Draw main body
+    NeonGraphics.drawShape(ctx, path, neonColor, 2.0, true);
 
-    let basePulse = 0;
-    let fillStyle = colors.fill;
-    const strokeStyle = colors.stroke;
-
-    if (!isFlashing) {
-      if (pulseConfig) {
-        if (!this.visualState) {
-          this.visualState = {};
-        }
-
-        if (typeof this.visualState.glowTime !== 'number') {
-          this.visualState.glowTime = this.getRandomFor('visual').range(0, Math.PI * 2);
-        }
-
-        basePulse = (Math.sin(this.visualState.glowTime) + 1) / 2;
-        const dynamicFactor = basePulse * (pulseConfig.amount ?? 0);
-        const fuseFactor = isVolatile
-          ? fuseProgress * (pulseConfig.fuseBoost ?? 0)
-          : 0;
-        const armedFactor =
-          isVolatile && this.variantState?.armed
-            ? pulseConfig.armedBoost ?? 0
-            : 0;
-        const pulseMix = Math.min(1, dynamicFactor + fuseFactor + armedFactor);
-
-        const pulseColor =
-          pulseConfig.color || colors.pulse || colors.glow || colors.innerGlow;
-        if (pulseColor) {
-          fillStyle = this.mixColor(fillStyle, pulseColor, pulseMix);
-        }
-      } else if (isVolatile && colors.pulse) {
-        basePulse = fuseProgress;
-        const pulseMix = Math.min(1, fuseProgress * 0.8);
-        fillStyle = this.mixColor(fillStyle, colors.pulse, pulseMix);
-      }
-    }
-
-    if (isFlashing) {
-      ctx.fillStyle = '#FFFFFF';
-      ctx.strokeStyle = '#FFFFFF';
-    } else {
-      ctx.fillStyle = fillStyle;
-      ctx.strokeStyle = strokeStyle;
-
-      if (colors.glow || colors.innerGlow) {
-        const baseGlowColor = colors.glow || colors.innerGlow;
-        const shadowBlurBase = Number.isFinite(glowConfig.baseBlur)
-          ? glowConfig.baseBlur
-          : 12;
-        const blurPulse = Number.isFinite(glowConfig.pulseBlur)
-          ? glowConfig.pulseBlur
-          : 0;
-        const blurFuse =
-          isVolatile && Number.isFinite(glowConfig.fuseBlur)
-            ? glowConfig.fuseBlur * fuseProgress
-            : 0;
-        const blurArmed =
-          isVolatile &&
-          this.variantState?.armed &&
-          Number.isFinite(glowConfig.armedBlur)
-            ? glowConfig.armedBlur
-            : 0;
-        ctx.shadowBlur =
-          shadowBlurBase + blurPulse * basePulse + blurFuse + blurArmed;
-
-        if (Number.isFinite(glowConfig.baseAlpha)) {
-          const baseAlpha = glowConfig.baseAlpha ?? 0.6;
-          const pulseAlpha = glowConfig.pulseAlpha ?? 0;
-          const fuseAlpha =
-            isVolatile && Number.isFinite(glowConfig.fuseAlpha)
-              ? glowConfig.fuseAlpha * fuseProgress
-              : 0;
-          const armedAlpha =
-            isVolatile &&
-            this.variantState?.armed &&
-            Number.isFinite(glowConfig.armedAlpha)
-              ? glowConfig.armedAlpha
-              : 0;
-
-          const totalAlpha = Math.min(
-            1,
-            baseAlpha + pulseAlpha * basePulse + fuseAlpha + armedAlpha
-          );
-          ctx.shadowColor = this.withAlpha(baseGlowColor, totalAlpha);
-        } else {
-          ctx.shadowColor = baseGlowColor;
-        }
-      }
-    }
-
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-
-    for (let i = 0; i < this.vertices.length; i += 1) {
-      const vertex = this.vertices[i];
-      if (i === 0) {
-        ctx.moveTo(vertex.x, vertex.y);
-      } else {
-        ctx.lineTo(vertex.x, vertex.y);
-      }
-    }
-
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    if (!isFlashing && colors.innerGlow) {
-      const gradient = ctx.createRadialGradient(
-        0,
-        0,
-        Math.max(2, this.radius * 0.2),
-        0,
-        0,
-        this.radius * 1.1
-      );
-
-      const armedBonus = isVolatile && this.variantState?.armed ? 0.25 : 0;
-      const innerIntensity = Math.min(
-        1,
-        0.35 + basePulse * 0.35 + fuseProgress * 0.6 + armedBonus
-      );
-
-      gradient.addColorStop(
-        0,
-        this.withAlpha(colors.innerGlow, innerIntensity)
-      );
-      gradient.addColorStop(
-        0.7,
-        this.withAlpha(colors.innerGlow, innerIntensity * 0.4)
-      );
-      gradient.addColorStop(1, this.withAlpha(colors.innerGlow, 0));
-
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = gradient;
-      ctx.beginPath();
-      ctx.arc(0, 0, this.radius * 1.05, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalCompositeOperation = 'source-over';
-    }
-
-    if (this.crackStage > 0 && !isFlashing) {
-      ctx.strokeStyle = colors.cracks || 'rgba(255, 255, 255, 0.45)';
-
+    // Draw cracks
+    if (this.crackStage > 0) {
       for (let stage = 0; stage < this.crackStage; stage += 1) {
         const layer = this.crackLayers[stage];
         if (!layer) continue;
+        const segments = layer.segments || layer.lines || [];
 
-        const segments = Array.isArray(layer?.segments)
-          ? layer.segments
-          : Array.isArray(layer?.lines)
-            ? layer.lines
-            : [];
         segments.forEach((line) => {
-          const width = Math.max(
-            0.45,
-            Number.isFinite(line?.width) ? line.width : 1.2
-          );
-          ctx.beginPath();
-          ctx.moveTo(line.x1, line.y1);
-          ctx.lineTo(line.x2, line.y2);
-          ctx.lineWidth = width;
-          ctx.stroke();
+          const crackPath = new Path2D();
+          crackPath.moveTo(line.x1, line.y1);
+          crackPath.lineTo(line.x2, line.y2);
+          // Cracks are white/bright
+          NeonGraphics.drawPath(ctx, crackPath, '#FFFFFF', 1.0, 1.5);
         });
+      }
+    }
+
+    // Handle Volatile/Pulse effects via inner glow handled by drawShape naturally?
+    // Or add specific overlay
+    const isVolatile = this.behavior?.type === 'volatile';
+    if (isVolatile && this.variantState?.armed) {
+      // Blink red
+      const blink = Math.sin(Date.now() * 0.02) > 0;
+      if (blink) {
+        NeonGraphics.drawShape(ctx, path, '#FF0000', 4.0, false);
       }
     }
 
@@ -1295,7 +1167,11 @@ export class Asteroid extends BaseEnemy {
     }
 
     Object.entries(this.randomScopes).forEach(([scope, generator]) => {
-      if (scope === 'core' || !generator || typeof generator.reset !== 'function') {
+      if (
+        scope === 'core' ||
+        !generator ||
+        typeof generator.reset !== 'function'
+      ) {
         return;
       }
 

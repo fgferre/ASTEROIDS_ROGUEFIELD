@@ -1,7 +1,5 @@
 {
-  "cycles": [
-    "src/modules/enemies/systems/EnemyUpdateSystem.js"
-  ],
+  "cycles": ["src/modules/enemies/systems/EnemyUpdateSystem.js"],
   "hubs": [
     "src/core/BaseSystem.js",
     "src/core/GameConstants.js",

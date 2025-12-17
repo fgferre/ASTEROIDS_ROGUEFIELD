@@ -38,7 +38,10 @@ export class ServiceRegistry {
         return {};
       }
 
-      if (options.manifestContext && typeof options.manifestContext === 'object') {
+      if (
+        options.manifestContext &&
+        typeof options.manifestContext === 'object'
+      ) {
         return { ...options.manifestContext };
       }
 
@@ -46,7 +49,10 @@ export class ServiceRegistry {
     })();
 
     if (options && typeof options === 'object') {
-      if (Object.prototype.hasOwnProperty.call(options, 'seed') && manifestContext.seed === undefined) {
+      if (
+        Object.prototype.hasOwnProperty.call(options, 'seed') &&
+        manifestContext.seed === undefined
+      ) {
         manifestContext.seed = options.seed;
       }
 
@@ -67,7 +73,7 @@ export class ServiceRegistry {
         factory,
         dependencies = [],
         singleton = true,
-        lazy = true
+        lazy = true,
       } = entry;
 
       if (!name || typeof name !== 'string') {
@@ -75,15 +81,21 @@ export class ServiceRegistry {
       }
 
       if (registeredNames.has(name)) {
-        throw new Error(`[ServiceRegistry] Duplicate service definition: ${name}`);
+        throw new Error(
+          `[ServiceRegistry] Duplicate service definition: ${name}`
+        );
       }
 
       if (typeof factory !== 'function') {
-        throw new Error(`[ServiceRegistry] Service '${name}' is missing a factory function`);
+        throw new Error(
+          `[ServiceRegistry] Service '${name}' is missing a factory function`
+        );
       }
 
       dependencies.forEach((dependency) => {
-        const dependencyExists = manifest.some((candidate) => candidate.name === dependency);
+        const dependencyExists = manifest.some(
+          (candidate) => candidate.name === dependency
+        );
         if (!dependencyExists) {
           throw new Error(
             `[ServiceRegistry] Service '${name}' depends on unknown service '${dependency}'`
@@ -105,18 +117,20 @@ export class ServiceRegistry {
             resolved,
             container,
             context: manifestContext,
-            manifestEntry: entry
+            manifestEntry: entry,
           });
         },
         {
           dependencies,
           singleton,
-          lazy
+          lazy,
         }
       );
     });
 
-    console.log(`[ServiceRegistry] Registered ${registeredNames.size} services in DI container`);
+    console.log(
+      `[ServiceRegistry] Registered ${registeredNames.size} services in DI container`
+    );
   }
 
   /**
@@ -152,8 +166,7 @@ export class ServiceRegistry {
 
     container.register(
       'event-bus',
-      () =>
-        eventBusOverride || { on: () => {}, emit: () => {}, off: () => {} }
+      () => eventBusOverride || { on: () => {}, emit: () => {}, off: () => {} }
     );
     container.register(
       'settings',
@@ -194,18 +207,25 @@ export class ServiceRegistry {
       seed: null,
       seedSource: 'unknown',
       randomScope: 'uninitialized',
-      randomSnapshot: null
+      randomSnapshot: null,
     };
 
     const defaultSessionStub = {
       initialize: ({ seedInfo, seed, source } = {}) => {
-        const normalizedSeedInfo = typeof seedInfo === 'object' && seedInfo !== null ? seedInfo : {};
+        const normalizedSeedInfo =
+          typeof seedInfo === 'object' && seedInfo !== null ? seedInfo : {};
 
-        if (typeof normalizedSeedInfo.seed === 'undefined' && typeof seed !== 'undefined') {
+        if (
+          typeof normalizedSeedInfo.seed === 'undefined' &&
+          typeof seed !== 'undefined'
+        ) {
           normalizedSeedInfo.seed = seed;
         }
 
-        if (typeof normalizedSeedInfo.source === 'undefined' && typeof source === 'string') {
+        if (
+          typeof normalizedSeedInfo.source === 'undefined' &&
+          typeof source === 'string'
+        ) {
           normalizedSeedInfo.source = source;
         }
 
@@ -229,7 +249,8 @@ export class ServiceRegistry {
         sessionState.screen = screen;
         return sessionState.screen;
       },
-      isRunning: () => sessionState.screen === 'playing' && !sessionState.paused,
+      isRunning: () =>
+        sessionState.screen === 'playing' && !sessionState.paused,
       setSessionState: (state) => {
         sessionState.sessionState = state;
         return sessionState.sessionState;
@@ -311,28 +332,28 @@ export class ServiceRegistry {
           sessionState.randomSnapshot = {
             seed: sessionState.seed,
             scope,
-            mode
+            mode,
           };
         }
         return {
           scope,
           mode,
-          snapshot: sessionState.randomSnapshot
+          snapshot: sessionState.randomSnapshot,
         };
       },
       getRandomSnapshot: () => sessionState.randomSnapshot,
       getSeedInfo: () => ({
         seed: sessionState.seed,
-        source: sessionState.seedSource
+        source: sessionState.seedSource,
       }),
-      synchronizeLegacyState: () => undefined
+      synchronizeLegacyState: () => undefined,
     };
 
     const resolvedGameSession = (() => {
       if (typeof gameSessionOverride === 'function') {
         const produced = gameSessionOverride({
           defaults: defaultSessionStub,
-          state: sessionState
+          state: sessionState,
         });
 
         if (produced && typeof produced === 'object') {

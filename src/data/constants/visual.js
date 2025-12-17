@@ -30,7 +30,6 @@ export {
   BOSS_REWARDS,
 };
 
-
 // === ENEMY REWARDS ===
 export const ENEMY_REWARDS = deepFreeze({
   asteroid: Object.freeze({
@@ -41,7 +40,12 @@ export const ENEMY_REWARDS = deepFreeze({
         small: 0,
       }),
       variantBonus: 0.03,
-      specialVariants: Object.freeze(['gold', 'crystal', 'volatile', 'parasite']),
+      specialVariants: Object.freeze([
+        'gold',
+        'crystal',
+        'volatile',
+        'parasite',
+      ]),
     }),
   }),
   drone: DRONE_REWARDS,
@@ -49,7 +53,6 @@ export const ENEMY_REWARDS = deepFreeze({
   hunter: HUNTER_REWARDS,
   boss: BOSS_REWARDS,
 });
-
 
 // === ENEMY EFFECT COLORS ===
 export const ENEMY_EFFECT_COLORS = deepFreeze({
@@ -101,7 +104,6 @@ export const ENEMY_EFFECT_COLORS = deepFreeze({
     smoke: 'rgba(60, 20, 60, 0.35)',
   }),
 });
-
 
 // === ENEMY RENDER PRESETS ===
 export const ENEMY_RENDER_PRESETS = deepFreeze({
@@ -188,5 +190,3 @@ export const ENEMY_RENDER_PRESETS = deepFreeze({
     }),
   }),
 });
-
-

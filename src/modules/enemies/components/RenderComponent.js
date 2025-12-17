@@ -29,13 +29,15 @@ const shapeRenderers = {
     const accentPreset = presets.accents ?? {};
     const exhaustPreset = presets.exhaust ?? {};
 
-    const thrust = typeof enemy.getThrustIntensity === 'function'
-      ? enemy.getThrustIntensity()
-      : enemy.thrustIntensity ?? enemy._renderThrust ?? 0;
+    const thrust =
+      typeof enemy.getThrustIntensity === 'function'
+        ? enemy.getThrustIntensity()
+        : enemy.thrustIntensity ?? enemy._renderThrust ?? 0;
     const showThrust = config?.showThrust !== false;
 
     if (showThrust && exhaustPreset.enabled !== false && thrust > 0) {
-      const exhaustColor = exhaustPreset.color ?? colors.exhaust ?? 'rgba(255, 200, 120, 0.65)';
+      const exhaustColor =
+        exhaustPreset.color ?? colors.exhaust ?? 'rgba(255, 200, 120, 0.65)';
       ctx.beginPath();
       ctx.moveTo(-effectiveSize * 0.2, effectiveSize * 0.65);
       ctx.lineTo(-effectiveSize * (0.7 + thrust * 0.5), 0);
@@ -119,7 +121,7 @@ const shapeRenderers = {
         -effectiveSize * 0.15,
         effectiveSize * 0.9,
         effectiveSize * 0.3,
-        effectiveSize * 0.1,
+        effectiveSize * 0.1
       );
       ctx.fillStyle = turretPreset.fill ?? colors.turret ?? '#ffe6a6';
       ctx.fill();
@@ -132,12 +134,21 @@ const shapeRenderers = {
     const pulsePreset = presets.pulse ?? {};
     const showPulse = config?.showPulse !== false;
 
-    const pulseSpeed = config?.pulseSpeed ?? pulsePreset.speed ?? enemy.pulseSpeed ?? 2.2;
-    const pulseAmount = config?.pulseAmount ?? pulsePreset.amount ?? enemy.pulseAmount ?? 0.25;
+    const pulseSpeed =
+      config?.pulseSpeed ?? pulsePreset.speed ?? enemy.pulseSpeed ?? 2.2;
+    const pulseAmount =
+      config?.pulseAmount ?? pulsePreset.amount ?? enemy.pulseAmount ?? 0.25;
     const time = enemy.system?.time ?? performance.now() / 1000;
     const pulse = 1 + Math.sin(time * pulseSpeed) * pulseAmount;
 
-    const gradient = ctx.createRadialGradient(0, 0, effectiveSize * 0.2, 0, 0, effectiveSize * pulse);
+    const gradient = ctx.createRadialGradient(
+      0,
+      0,
+      effectiveSize * 0.2,
+      0,
+      0,
+      effectiveSize * pulse
+    );
     gradient.addColorStop(0, bodyPreset.core ?? colors.core ?? '#fff1b8');
     gradient.addColorStop(1, bodyPreset.edge ?? colors.body ?? '#ffad33');
     ctx.fillStyle = gradient;
@@ -149,7 +160,8 @@ const shapeRenderers = {
     if (showPulse && pulsePreset?.enabled !== false) {
       ctx.beginPath();
       ctx.arc(0, 0, effectiveSize * (pulse + 0.25), 0, TAU);
-      ctx.strokeStyle = pulsePreset.stroke ?? colors.halo ?? 'rgba(255, 200, 120, 0.35)';
+      ctx.strokeStyle =
+        pulsePreset.stroke ?? colors.halo ?? 'rgba(255, 200, 120, 0.35)';
       ctx.lineWidth = pulsePreset.strokeWidth ?? 2;
       ctx.globalAlpha = 0.7;
       ctx.stroke();
@@ -171,11 +183,16 @@ const shapeRenderers = {
 
     let phaseColor = null;
     if (showPhaseColor) {
-      const rawPhaseIndex = typeof enemy.getPhaseIndex === 'function'
-        ? enemy.getPhaseIndex()
-        : enemy.currentPhase ?? enemy.phase ?? null;
+      const rawPhaseIndex =
+        typeof enemy.getPhaseIndex === 'function'
+          ? enemy.getPhaseIndex()
+          : enemy.currentPhase ?? enemy.phase ?? null;
 
-      if (rawPhaseIndex !== null && rawPhaseIndex !== undefined && !Number.isNaN(rawPhaseIndex)) {
+      if (
+        rawPhaseIndex !== null &&
+        rawPhaseIndex !== undefined &&
+        !Number.isNaN(rawPhaseIndex)
+      ) {
         const palettes = [
           config?.phaseColors,
           presets?.phaseColors,
@@ -185,15 +202,26 @@ const shapeRenderers = {
         ].find((candidate) => Array.isArray(candidate) && candidate.length > 0);
 
         if (palettes) {
-          const index = Math.max(0, Math.min(palettes.length - 1, Math.round(rawPhaseIndex)));
+          const index = Math.max(
+            0,
+            Math.min(palettes.length - 1, Math.round(rawPhaseIndex))
+          );
           phaseColor = palettes[index] ?? null;
         }
       }
     }
 
     if (showAura && auraPreset?.enabled !== false) {
-      const gradient = ctx.createRadialGradient(0, 0, effectiveSize, 0, 0, effectiveSize * (1.5 * pulse));
-      const innerColor = auraPreset.inner ?? colors.aura ?? 'rgba(255, 120, 90, 0.4)';
+      const gradient = ctx.createRadialGradient(
+        0,
+        0,
+        effectiveSize,
+        0,
+        0,
+        effectiveSize * (1.5 * pulse)
+      );
+      const innerColor =
+        auraPreset.inner ?? colors.aura ?? 'rgba(255, 120, 90, 0.4)';
       const outerColor = auraPreset.outer ?? 'rgba(120, 20, 10, 0)';
       gradient.addColorStop(0, innerColor);
       gradient.addColorStop(1, outerColor);
@@ -243,7 +271,14 @@ const proceduralStrategy = ({ enemy, ctx, colors, presets, config }) => {
     ctx.rotate(rotation);
   }
 
-  renderer({ enemy, ctx, colors: palette, presets: renderPreset, size, config });
+  renderer({
+    enemy,
+    ctx,
+    colors: palette,
+    presets: renderPreset,
+    size,
+    config,
+  });
 
   ctx.restore();
 };
@@ -257,11 +292,15 @@ const delegateStrategy = ({ enemy, ctx }) => {
 function createProceduralAlias(shape) {
   return ({ enemy, ctx, colors, presets, config }) => {
     const aliasConfig =
-      config?.shape === undefined
-        ? { ...(config || {}), shape }
-        : config;
+      config?.shape === undefined ? { ...(config || {}), shape } : config;
 
-    return proceduralStrategy({ enemy, ctx, colors, presets, config: aliasConfig });
+    return proceduralStrategy({
+      enemy,
+      ctx,
+      colors,
+      presets,
+      config: aliasConfig,
+    });
   };
 }
 
@@ -300,7 +339,8 @@ export class RenderComponent {
     }
 
     const strategyName = enemy.renderStrategy || this.strategy;
-    const handler = this.strategies.get(strategyName) || this.strategies.get('delegate');
+    const handler =
+      this.strategies.get(strategyName) || this.strategies.get('delegate');
 
     const colors = context.colors ?? resolvePalette(enemy);
     const presets = context.presets ?? resolvePresets(enemy);

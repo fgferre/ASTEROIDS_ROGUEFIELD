@@ -5,12 +5,16 @@ import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
 
-const SIMPLEX_DEFAULT_RANDOM = new RandomService('menu-background:simplex-default');
+const SIMPLEX_DEFAULT_RANDOM = new RandomService(
+  'menu-background:simplex-default'
+);
 
 class MenuBackgroundSystem extends BaseSystem {
   constructor(dependencies = {}) {
     const input =
-      dependencies && typeof dependencies === 'object' && !Array.isArray(dependencies)
+      dependencies &&
+      typeof dependencies === 'object' &&
+      !Array.isArray(dependencies)
         ? dependencies
         : {};
     const { random = null, ...rest } = input;
@@ -29,7 +33,7 @@ class MenuBackgroundSystem extends BaseSystem {
         fragments: 'menu.fragments',
         materials: 'menu.materials',
         threeUuid: 'menu.three-uuid',
-      }
+      },
     });
 
     const randomHelpers = createRandomHelpers({
@@ -95,13 +99,15 @@ class MenuBackgroundSystem extends BaseSystem {
     };
 
     this.spawnedBeltAsteroids = 0;
-    this.stats = this.ready && typeof window.stats !== 'undefined' ? window.stats : null;
+    this.stats =
+      this.ready && typeof window.stats !== 'undefined' ? window.stats : null;
     this.alphaToCoverageEnabled = false;
 
     this.normalIntensity = this.resolveInitialNormalIntensity();
     this.unsubscribeFromSettings = null;
 
-    this.handleVideoSettingsChanged = this.handleVideoSettingsChanged.bind(this);
+    this.handleVideoSettingsChanged =
+      this.handleVideoSettingsChanged.bind(this);
 
     this.handleResize = this.handleResize.bind(this);
     this.handleScreenChanged = this.handleScreenChanged.bind(this);
@@ -207,7 +213,8 @@ class MenuBackgroundSystem extends BaseSystem {
     }
 
     if (state.originalMathRandom === undefined) {
-      state.originalMathRandom = typeof Math.random === 'function' ? Math.random : null;
+      state.originalMathRandom =
+        typeof Math.random === 'function' ? Math.random : null;
     }
 
     if (!state.deterministicMathRandom) {
@@ -234,14 +241,20 @@ class MenuBackgroundSystem extends BaseSystem {
       state.deterministicMathRandom = deterministicRandom;
     }
 
-    if (state.deterministicMathRandom && Math.random !== state.deterministicMathRandom) {
+    if (
+      state.deterministicMathRandom &&
+      Math.random !== state.deterministicMathRandom
+    ) {
       Math.random = state.deterministicMathRandom;
     }
 
     const aliasCandidate =
       typeof three.Math === 'object' && three.Math !== null ? three.Math : null;
 
-    if (state.deterministicMathUtils && mathUtilsCandidate === state.deterministicMathUtils) {
+    if (
+      state.deterministicMathUtils &&
+      mathUtilsCandidate === state.deterministicMathUtils
+    ) {
       if (
         state.deterministicMathUtils &&
         aliasCandidate !== state.deterministicMathUtils &&
@@ -325,7 +338,10 @@ class MenuBackgroundSystem extends BaseSystem {
     this.restorePatchedMathUtilsTargets();
 
     const three = this.THREE;
-    if (state.deterministicMathUtils && three.MathUtils === state.deterministicMathUtils) {
+    if (
+      state.deterministicMathUtils &&
+      three.MathUtils === state.deterministicMathUtils
+    ) {
       if (state.originalMathUtils) {
         three.MathUtils = state.originalMathUtils;
       }
@@ -333,7 +349,9 @@ class MenuBackgroundSystem extends BaseSystem {
 
     if (state.deterministicMathUtils) {
       const aliasCandidate =
-        typeof three.Math === 'object' && three.Math !== null ? three.Math : null;
+        typeof three.Math === 'object' && three.Math !== null
+          ? three.Math
+          : null;
 
       if (aliasCandidate === state.deterministicMathUtils) {
         if (state.originalMath === null) {
@@ -364,7 +382,10 @@ class MenuBackgroundSystem extends BaseSystem {
   }
 
   destroy() {
-    if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') {
+    if (
+      typeof window !== 'undefined' &&
+      typeof window.removeEventListener === 'function'
+    ) {
       window.removeEventListener('resize', this.handleResize);
     }
 
@@ -389,10 +410,12 @@ class MenuBackgroundSystem extends BaseSystem {
       if (key === 'generateUUID') {
         const enumerable = descriptor.enumerable ?? false;
         const configurable = descriptor.configurable ?? true;
-        const writable =
-          Object.prototype.hasOwnProperty.call(descriptor, 'writable')
-            ? Boolean(descriptor.writable)
-            : true;
+        const writable = Object.prototype.hasOwnProperty.call(
+          descriptor,
+          'writable'
+        )
+          ? Boolean(descriptor.writable)
+          : true;
 
         Object.defineProperty(clone, key, {
           configurable,
@@ -543,7 +566,11 @@ class MenuBackgroundSystem extends BaseSystem {
   }
 
   patchMathUtilsGenerateUuid(target, uuidGenerator) {
-    if (!target || typeof target !== 'object' || typeof uuidGenerator !== 'function') {
+    if (
+      !target ||
+      typeof target !== 'object' ||
+      typeof uuidGenerator !== 'function'
+    ) {
       return false;
     }
 
@@ -557,7 +584,10 @@ class MenuBackgroundSystem extends BaseSystem {
     }
 
     if (!state.generateUuidDescriptors.has(target)) {
-      state.generateUuidDescriptors.set(target, this.copyGenerateUuidDescriptor(target));
+      state.generateUuidDescriptors.set(
+        target,
+        this.copyGenerateUuidDescriptor(target)
+      );
     }
 
     const patched = this.overwriteGenerateUuid(target, uuidGenerator);
@@ -671,7 +701,11 @@ class MenuBackgroundSystem extends BaseSystem {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setClearColor(0x050916, 1);
     this.renderer.shadowMap.enabled = true;
-    if (typeof this.renderer.outputEncoding !== 'undefined' && THREE && THREE.sRGBEncoding) {
+    if (
+      typeof this.renderer.outputEncoding !== 'undefined' &&
+      THREE &&
+      THREE.sRGBEncoding
+    ) {
       this.renderer.outputEncoding = THREE.sRGBEncoding;
     }
     if (
@@ -712,7 +746,10 @@ class MenuBackgroundSystem extends BaseSystem {
         this.alphaToCoverageEnabled = true;
       }
     } catch (error) {
-      console.warn('[MenuBackgroundSystem] Failed to enable alpha-to-coverage.', error);
+      console.warn(
+        '[MenuBackgroundSystem] Failed to enable alpha-to-coverage.',
+        error
+      );
       this.alphaToCoverageEnabled = false;
     }
   }
@@ -759,10 +796,16 @@ class MenuBackgroundSystem extends BaseSystem {
         positions[offset + 2] = z;
       }
 
-      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute(
+        'position',
+        new THREE.BufferAttribute(positions, 3)
+      );
       const material = new THREE.PointsMaterial({
         color: 0xffffff,
-        size: this.computeWorldSpacePointSize(config.distance, config.pixelSize),
+        size: this.computeWorldSpacePointSize(
+          config.distance,
+          config.pixelSize
+        ),
         transparent: true,
         opacity: this.randomFloat('starfield') * 0.35 + 0.55,
         fog: false,
@@ -792,7 +835,9 @@ class MenuBackgroundSystem extends BaseSystem {
     const pixelRatio =
       (typeof this.renderer?.getPixelRatio === 'function'
         ? this.renderer.getPixelRatio()
-        : null) || window.devicePixelRatio || 1;
+        : null) ||
+      window.devicePixelRatio ||
+      1;
 
     const effectivePixelSize = pixelSize * pixelRatio;
     const fovInRadians = (fov * Math.PI) / 180;
@@ -827,7 +872,9 @@ class MenuBackgroundSystem extends BaseSystem {
     for (let i = 0; i < count; i += 1) {
       const geometry = this.createDeformedIcosahedron();
       this.baseGeometries.push(geometry);
-      this.baseMaterials.push(this.createProceduralMaterial(this.randomFloat('assets') * 100));
+      this.baseMaterials.push(
+        this.createProceduralMaterial(this.randomFloat('assets') * 100)
+      );
     }
   }
 
@@ -836,10 +883,7 @@ class MenuBackgroundSystem extends BaseSystem {
 
     try {
       const settings = this.getSettingsService();
-      if (
-        settings &&
-        typeof settings.getCategoryValues === 'function'
-      ) {
+      if (settings && typeof settings.getCategoryValues === 'function') {
         const videoValues = settings.getCategoryValues('video');
         const stored = videoValues?.menuAsteroidNormalIntensity;
         if (typeof stored === 'number' && Number.isFinite(stored)) {
@@ -893,9 +937,7 @@ class MenuBackgroundSystem extends BaseSystem {
         amplitude *= 0.5;
       }
 
-      vertex
-        .normalize()
-        .multiplyScalar(1 + totalNoise * distortion);
+      vertex.normalize().multiplyScalar(1 + totalNoise * distortion);
       positions.setXYZ(i, vertex.x, vertex.y, vertex.z);
     }
 
@@ -908,25 +950,28 @@ class MenuBackgroundSystem extends BaseSystem {
       geometry.normalizeNormals();
     }
 
-      const hasTangentPrerequisites =
-        geometry.index &&
-        geometry.attributes &&
-        geometry.attributes.position &&
-        geometry.attributes.normal &&
-        geometry.attributes.uv;
+    const hasTangentPrerequisites =
+      geometry.index &&
+      geometry.attributes &&
+      geometry.attributes.position &&
+      geometry.attributes.normal &&
+      geometry.attributes.uv;
 
-      if (hasTangentPrerequisites && typeof geometry.computeTangents === 'function') {
-        try {
-          geometry.computeTangents();
-        } catch (error) {
-          console.warn(
-            '[MenuBackgroundSystem] Failed to compute tangents for asteroid geometry:',
-            error
-          );
-        }
+    if (
+      hasTangentPrerequisites &&
+      typeof geometry.computeTangents === 'function'
+    ) {
+      try {
+        geometry.computeTangents();
+      } catch (error) {
+        console.warn(
+          '[MenuBackgroundSystem] Failed to compute tangents for asteroid geometry:',
+          error
+        );
       }
-      return geometry;
     }
+    return geometry;
+  }
 
   createProceduralMaterial(seed) {
     const { THREE } = this;
@@ -1052,7 +1097,10 @@ class MenuBackgroundSystem extends BaseSystem {
     return material;
   }
 
-  applyNormalIntensityToMaterial(material, targetIntensity = this.normalIntensity) {
+  applyNormalIntensityToMaterial(
+    material,
+    targetIntensity = this.normalIntensity
+  ) {
     const { THREE } = this;
     if (!material || !THREE) {
       return;
@@ -1062,7 +1110,10 @@ class MenuBackgroundSystem extends BaseSystem {
       ? Math.max(0, Math.min(2.5, targetIntensity))
       : 1;
 
-    if (!material.normalScale || typeof material.normalScale.set !== 'function') {
+    if (
+      !material.normalScale ||
+      typeof material.normalScale.set !== 'function'
+    ) {
       material.normalScale = new THREE.Vector2(intensity, intensity);
     } else {
       material.normalScale.set(intensity, intensity);
@@ -1109,7 +1160,8 @@ class MenuBackgroundSystem extends BaseSystem {
           }
 
           if (change.type === 'snapshot') {
-            const snapshotValue = change.value?.video?.menuAsteroidNormalIntensity;
+            const snapshotValue =
+              change.value?.video?.menuAsteroidNormalIntensity;
             if (typeof snapshotValue === 'number') {
               this.updateNormalIntensity(snapshotValue);
             }
@@ -1255,7 +1307,8 @@ class MenuBackgroundSystem extends BaseSystem {
     const belt = { innerRadius: 40, outerRadius: 150, height: 30 };
     const angle = this.randomFloat('belt') * Math.PI * 2;
     const radius =
-      belt.innerRadius + this.randomFloat('belt') * (belt.outerRadius - belt.innerRadius);
+      belt.innerRadius +
+      this.randomFloat('belt') * (belt.outerRadius - belt.innerRadius);
     const position = new THREE.Vector3(
       Math.cos(angle) * radius,
       (this.randomFloat('belt') - 0.5) * belt.height,
@@ -1263,7 +1316,9 @@ class MenuBackgroundSystem extends BaseSystem {
     );
 
     const shouldSpawnLarge =
-      forceLarge || this.spawnedBeltAsteroids <= 20 || this.randomFloat('belt') < 0.25;
+      forceLarge ||
+      this.spawnedBeltAsteroids <= 20 ||
+      this.randomFloat('belt') < 0.25;
     const scaleVal = shouldSpawnLarge
       ? this.randomFloat('belt') * 5 + 5
       : this.randomFloat('belt') * 3 + 2;
@@ -1299,9 +1354,10 @@ class MenuBackgroundSystem extends BaseSystem {
     }
 
     const { THREE, CANNON } = this;
-    const target = this.activeAsteroids[
-      Math.floor(this.randomFloat('asteroids') * this.activeAsteroids.length)
-    ];
+    const target =
+      this.activeAsteroids[
+        Math.floor(this.randomFloat('asteroids') * this.activeAsteroids.length)
+      ];
 
     const spawnDirection = new THREE.Vector3(
       this.randomFloat('asteroids') - 0.5,
@@ -1349,9 +1405,14 @@ class MenuBackgroundSystem extends BaseSystem {
     }
 
     const { mesh, body } = asteroid;
-    const geometry = this.baseGeometries[Math.floor(this.randomFloat('asteroids') * this.baseGeometries.length)];
+    const geometry =
+      this.baseGeometries[
+        Math.floor(this.randomFloat('asteroids') * this.baseGeometries.length)
+      ];
     const baseMaterial =
-      this.baseMaterials[Math.floor(this.randomFloat('asteroids') * this.baseMaterials.length)];
+      this.baseMaterials[
+        Math.floor(this.randomFloat('asteroids') * this.baseMaterials.length)
+      ];
 
     mesh.geometry = geometry;
     if (!asteroid.material) {
@@ -1359,10 +1420,7 @@ class MenuBackgroundSystem extends BaseSystem {
     } else {
       asteroid.material.copy(baseMaterial);
     }
-    asteroid.material.userData = Object.assign(
-      {},
-      baseMaterial.userData || {}
-    );
+    asteroid.material.userData = Object.assign({}, baseMaterial.userData || {});
     this.applyNormalIntensityToMaterial(asteroid.material);
     this.applyEdgeFeather(asteroid.material);
     asteroid.material.transparent = true;
@@ -1372,7 +1430,11 @@ class MenuBackgroundSystem extends BaseSystem {
     mesh.visible = true;
     mesh.position.copy(position);
     mesh.scale.copy(scale);
-    mesh.rotation.set(this.randomFloat('asteroids') * Math.PI, this.randomFloat('asteroids') * Math.PI, this.randomFloat('asteroids') * Math.PI);
+    mesh.rotation.set(
+      this.randomFloat('asteroids') * Math.PI,
+      this.randomFloat('asteroids') * Math.PI,
+      this.randomFloat('asteroids') * Math.PI
+    );
 
     const avgRadius = (scale.x + scale.y + scale.z) / 3;
     if (body.shapes[0]) {
@@ -1480,7 +1542,9 @@ class MenuBackgroundSystem extends BaseSystem {
 
     for (let i = 0; i < fragments; i += 1) {
       const scaleMultiplier = this.randomFloat('fragments') * 0.3 + 0.4;
-      const newScale = parent.mesh.scale.clone().multiplyScalar(scaleMultiplier);
+      const newScale = parent.mesh.scale
+        .clone()
+        .multiplyScalar(scaleMultiplier);
 
       if (newScale.x < 1 && newScale.y < 1 && newScale.z < 1) {
         continue;
@@ -1492,9 +1556,15 @@ class MenuBackgroundSystem extends BaseSystem {
         this.randomFloat('fragments') - 0.5
       ).normalize();
 
-      const offset = parent.mesh.position.clone().add(direction.clone().multiplyScalar(radius));
+      const offset = parent.mesh.position
+        .clone()
+        .add(direction.clone().multiplyScalar(radius));
 
-      const explosionImpulse = new CANNON.Vec3(direction.x, direction.y, direction.z);
+      const explosionImpulse = new CANNON.Vec3(
+        direction.x,
+        direction.y,
+        direction.z
+      );
       explosionImpulse.scale(15, explosionImpulse);
 
       const velocity = new CANNON.Vec3(
@@ -1541,7 +1611,8 @@ class MenuBackgroundSystem extends BaseSystem {
 
       const progress = Math.max(explosion.life, 0) / explosion.maxLife;
       explosion.light.intensity = explosion.initialIntensity * progress;
-      explosion.light.distance = explosion.initialDistance * (0.7 + progress * 0.3);
+      explosion.light.distance =
+        explosion.initialDistance * (0.7 + progress * 0.3);
 
       if (explosion.life <= 0) {
         this.scene.remove(explosion.light);
@@ -1697,7 +1768,10 @@ class MenuBackgroundSystem extends BaseSystem {
     window.addEventListener('resize', this.handleResize, { passive: true });
 
     this.registerEventListener('screen-changed', this.handleScreenChanged);
-    this.registerEventListener('settings-video-changed', this.handleVideoSettingsChanged);
+    this.registerEventListener(
+      'settings-video-changed',
+      this.handleVideoSettingsChanged
+    );
   }
 
   syncInitialState() {
@@ -1714,7 +1788,10 @@ class MenuBackgroundSystem extends BaseSystem {
         return state.getScreen();
       }
     } catch (error) {
-      console.warn('[MenuBackgroundSystem] Unable to resolve current screen:', error);
+      console.warn(
+        '[MenuBackgroundSystem] Unable to resolve current screen:',
+        error
+      );
     }
     return null;
   }
@@ -1874,51 +1951,13 @@ class SimplexNoise {
 
   dot(grad3, index, x, y, z) {
     const offset = index * 3;
-    return (
-      grad3[offset] * x +
-      grad3[offset + 1] * y +
-      grad3[offset + 2] * z
-    );
+    return grad3[offset] * x + grad3[offset + 1] * y + grad3[offset + 2] * z;
   }
 }
 
 SimplexNoise.grad3 = new Float32Array([
-  1,
-  1,
-  0,
-  -1,
-  1,
-  0,
-  1,
-  -1,
-  0,
-  -1,
-  -1,
-  0,
-  1,
-  0,
-  1,
-  -1,
-  0,
-  1,
-  1,
-  0,
-  -1,
-  -1,
-  0,
-  -1,
-  0,
-  1,
-  1,
-  0,
-  -1,
-  1,
-  0,
-  1,
-  -1,
-  0,
-  -1,
-  -1,
+  1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1, 0, 1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0,
+  -1, 0, 1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1,
 ]);
 
 export default MenuBackgroundSystem;

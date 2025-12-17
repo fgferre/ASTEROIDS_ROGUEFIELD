@@ -66,7 +66,10 @@ export class ScreenShake {
     if (!this._fallbackRandom) {
       this._fallbackRandom = new RandomService('screen-shake:fallback');
       this._fallbackSeed = this._fallbackRandom.seed >>> 0;
-    } else if (resetFallback && typeof this._fallbackRandom.reset === 'function') {
+    } else if (
+      resetFallback &&
+      typeof this._fallbackRandom.reset === 'function'
+    ) {
       this._fallbackRandom.reset(this._fallbackSeed);
     }
 
@@ -202,7 +205,9 @@ export class ScreenShake {
    */
   noise(t) {
     // Simple smooth noise using sine waves
-    return Math.sin(t) * 0.5 + Math.sin(t * 2.3) * 0.3 + Math.sin(t * 4.7) * 0.2;
+    return (
+      Math.sin(t) * 0.5 + Math.sin(t * 2.3) * 0.3 + Math.sin(t * 4.7) * 0.2
+    );
   }
 
   /**

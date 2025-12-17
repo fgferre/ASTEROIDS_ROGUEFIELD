@@ -205,7 +205,6 @@ describe('ObjectPool', () => {
   });
 });
 
-
 // Note: TTLObjectPool tests require sequential execution due to fake timer usage
 describe.sequential('TTLObjectPool', () => {
   let ttlPool;
@@ -214,7 +213,9 @@ describe.sequential('TTLObjectPool', () => {
     vi.useFakeTimers();
     ttlPool = new TTLObjectPool(
       () => ({ data: null }),
-      (obj) => { obj.data = null; },
+      (obj) => {
+        obj.data = null;
+      },
       3,
       10
     );

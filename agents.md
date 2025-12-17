@@ -51,10 +51,11 @@ Ver `docs/architecture/CURRENT_STRUCTURE.md` para detalhes de implementação e 
 O projeto usa **DIContainer** como único service registry. Ele suporta dois padrões de registro:
 
 1. **Factory-based DI** (recomendado):
+
    ```javascript
    gameServices.register('audio', (events) => new AudioSystem(events), {
      dependencies: ['events'],
-     singleton: true
+     singleton: true,
    });
    ```
 
@@ -66,16 +67,19 @@ O projeto usa **DIContainer** como único service registry. Ele suporta dois pad
 O DIContainer detecta automaticamente qual padrão usar baseado no tipo do segundo argumento (`typeof` check).
 
 **Arquivos Removidos** (REFACTOR-016):
+
 - ❌ `ServiceLocator.js` - Substituído por DIContainer
 - ❌ `ServiceLocatorAdapter.js` - Funcionalidade merged em DIContainer
 
 **Benefícios**:
+
 - ✅ Single source of truth para service registry
 - ✅ 100% backward compatibility via built-in legacy support
 - ✅ Código mais simples (4 layers → 2 layers)
 - ✅ Menos confusão sobre qual registry usar
 
 **Uso**:
+
 - `globalThis.gameServices` é o DIContainer
 - Acesso via `gameServices.get('service-name')` (legacy)
 - Acesso via `gameServices.resolve('service-name')` (DI)
@@ -135,33 +139,33 @@ import { BaseSystem } from '../core/BaseSystem.js';
 class MySystem extends BaseSystem {
   constructor(dependencies = {}) {
     super(dependencies, {
-      systemName: 'MySystem',           // Nome para logs
-      serviceName: 'my-system',         // Chave no DIContainer (gameServices)
-      enableRandomManagement: true,     // Se precisa de randomness
-      randomForkLabels: ['base', 'feature1']  // Labels dos forks
+      systemName: 'MySystem', // Nome para logs
+      serviceName: 'my-system', // Chave no DIContainer (gameServices)
+      enableRandomManagement: true, // Se precisa de randomness
+      randomForkLabels: ['base', 'feature1'], // Labels dos forks
     });
-    
+
     // Inicialização específica do sistema
     this.myState = {};
   }
-  
+
   setupEventListeners() {
     // Use registerEventListener ao invés de gameEvents.on()
     this.registerEventListener('event:name', this.handleEvent.bind(this));
   }
-  
+
   handleEvent(data) {
     // Lógica do handler
   }
-  
+
   reset() {
-    super.reset();  // SEMPRE chamar super primeiro
+    super.reset(); // SEMPRE chamar super primeiro
     // Reset específico do sistema
     this.myState = {};
   }
-  
+
   destroy() {
-    super.destroy();  // SEMPRE chamar super primeiro
+    super.destroy(); // SEMPRE chamar super primeiro
     // Cleanup específico do sistema
     this.myState = null;
   }
@@ -208,7 +212,6 @@ export default MySystem;
 - **Código fonte**: `src/core/BaseSystem.js`
 - **Exemplos**: Todos os 12 sistemas principais em `src/modules/`
 
-
 #### 8. **Sistema de Logging Automático e Diagnóstico de Problemas**
 
 ##### 8.1. Visão Geral
@@ -220,6 +223,7 @@ O projeto possui um **sistema de logging automático** (`GameDebugLogger`) que r
 O logging é ativado **automaticamente** quando o jogo roda em modo de desenvolvimento:
 
 **Como rodar em modo dev:**
+
 ```bash
 npm run dev
 ```
@@ -246,7 +250,7 @@ O log é armazenado no **localStorage do navegador** (não no sistema de arquivo
 2. Abrir console do navegador (pressionar **F12**)
 3. Executar comando:
    ```javascript
-   downloadDebugLog()
+   downloadDebugLog();
    ```
 4. Arquivo `game-debug.log` será baixado para pasta Downloads
 5. Abrir arquivo em editor de texto (Notepad, VS Code, etc.)
@@ -256,7 +260,7 @@ O log é armazenado no **localStorage do navegador** (não no sistema de arquivo
 **Método 2: Visualizar no Console**
 
 ```javascript
-showDebugLog()
+showDebugLog();
 ```
 
 Isto exibe o log diretamente no console. Útil para verificação rápida.
@@ -264,7 +268,7 @@ Isto exibe o log diretamente no console. Útil para verificação rápida.
 **Método 3: Copiar do localStorage**
 
 ```javascript
-copy(localStorage.getItem('game-debug-log'))
+copy(localStorage.getItem('game-debug-log'));
 ```
 
 Copia o log para área de transferência (função `copy()` disponível no Chrome DevTools).
@@ -342,6 +346,7 @@ Quando o usuário compartilhar o log, ler na seguinte ordem:
 **Passo 3: Identificar Padrão de Falha**
 
 Procurar por:
+
 - Eventos que deveriam acontecer mas não aconteceram
 - Sequências quebradas (ex: spawn → update → render, se faltar render, problema está no rendering)
 - Erros explícitos marcados como [ERROR]
@@ -364,6 +369,7 @@ Procurar por:
 "Por favor, execute `downloadDebugLog()` no console (F12) e compartilhe o conteúdo do arquivo."
 
 **Usuário compartilha log:**
+
 ```
 [01:30.125] [SPAWN] Boss spawn attempted - {"entrance":"top-center"}
 [01:30.126] [SPAWN] Boss position calculated - {"x":400,"y":-100}
@@ -394,9 +400,9 @@ Procurar por:
 Quando o jogo roda em modo dev (`npm run dev`), os seguintes comandos ficam disponíveis no console do navegador:
 
 ```javascript
-downloadDebugLog()  // Baixa arquivo game-debug.log
-showDebugLog()      // Mostra log no console
-clearDebugLog()     // Limpa log atual
+downloadDebugLog(); // Baixa arquivo game-debug.log
+showDebugLog(); // Mostra log no console
+clearDebugLog(); // Limpa log atual
 ```
 
 ##### 8.10. Tamanho e Performance do Log
@@ -411,6 +417,7 @@ clearDebugLog()     // Limpa log atual
 ##### 8.11. Fluxo de Trabalho com Logging
 
 **Durante Desenvolvimento:**
+
 1. Rodar `npm run dev` (logging ativa automaticamente)
 2. Jogar o jogo normalmente
 3. Reproduzir o bug
@@ -418,6 +425,7 @@ clearDebugLog()     // Limpa log atual
 5. Compartilhar arquivo com agente de IA
 
 **Durante Diagnóstico (Agente de IA):**
+
 1. Receber log do usuário
 2. Ler seções relevantes ([INIT], [WAVE], [SPAWN], [ERROR])
 3. Identificar onde o fluxo quebra

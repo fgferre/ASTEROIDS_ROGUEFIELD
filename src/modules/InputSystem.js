@@ -835,13 +835,14 @@ class InputSystem {
       }
     }
 
-    const source = hasKeyboard && hasGamepad
-      ? 'mixed'
-      : hasGamepad
-        ? 'gamepad'
-        : hasKeyboard
-          ? 'keyboard'
-          : 'none';
+    const source =
+      hasKeyboard && hasGamepad
+        ? 'mixed'
+        : hasGamepad
+          ? 'gamepad'
+          : hasKeyboard
+            ? 'keyboard'
+            : 'none';
 
     return {
       source,
@@ -889,8 +890,7 @@ class InputSystem {
     return {
       axes: { x: normalizedX, y: normalizedY },
       rawMagnitude,
-      normalizedMagnitude:
-        rawMagnitude > 1 ? 1 : rawMagnitude,
+      normalizedMagnitude: rawMagnitude > 1 ? 1 : rawMagnitude,
     };
   }
 

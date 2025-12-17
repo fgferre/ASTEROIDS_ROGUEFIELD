@@ -12,13 +12,24 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@500;700&display=swap"
       rel="stylesheet"
     />
+    <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="aaa-hud-theme.css" />
   </head>
   <body>
-    <div id="game-container">
+    <div id="game-container" class="chromatic-aberration">
+      <!-- [NEO-ARCADE] CRT / Atmosphere Filters -->
+      <div class="crt-overlay">
+        <div class="crt-scanlines"></div>
+        <div class="crt-vignette"></div>
+      </div>
+      <!-- AAA FX Layers -->
+      <div class="scanlines"></div>
+      <div class="cockpit-overlay"></div>
+      <div class="cockpit-frame"></div>
       <!-- Menu Principal -->
       <div id="menu-screen" class="screen">
         <canvas
@@ -194,8 +205,8 @@
             <p class="credits-description">
               Asteroid Roguefield is an independent project focused on exploring
               modular space combat systems. This prototype brings together
-              contributions in design, code, and sound effects to enable
-              rapid iteration cycles.
+              contributions in design, code, and sound effects to enable rapid
+              iteration cycles.
             </p>
             <dl class="credits-list">
               <div class="credits-entry">
@@ -271,11 +282,20 @@
                 aria-live="polite"
               ></div>
 
-              <div id="hud-region-bottom-left" class="hud-region hud-region--bottom-left"></div>
+              <div
+                id="hud-region-bottom-left"
+                class="hud-region hud-region--bottom-left"
+              ></div>
 
-              <div id="hud-region-bottom-center" class="hud-region hud-region--bottom-center"></div>
+              <div
+                id="hud-region-bottom-center"
+                class="hud-region hud-region--bottom-center"
+              ></div>
 
-              <div id="hud-region-bottom-right" class="hud-region hud-region--bottom-right"></div>
+              <div
+                id="hud-region-bottom-right"
+                class="hud-region hud-region--bottom-right"
+              ></div>
             </div>
             <div
               id="wave-countdown"
@@ -292,22 +312,30 @@
       </div>
     </div>
 
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/r16/Stats.min.js"></script>
-      <script>
-        if (typeof window !== 'undefined' && typeof Stats !== 'undefined' && !window.stats) {
-          const statsPanel = new Stats();
-          statsPanel.showPanel(0);
-          const statsElement = statsPanel.dom || statsPanel.domElement;
-          if (statsElement instanceof Node) {
-            document.body.appendChild(statsElement);
-            window.stats = statsPanel;
-          } else {
-            console.warn('[bootstrap] Stats panel element was not available for DOM attachment.');
-          }
+    <!-- GSAP Animation Library (AAA Overhaul) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/r16/Stats.min.js"></script>
+    <script>
+      if (
+        typeof window !== 'undefined' &&
+        typeof Stats !== 'undefined' &&
+        !window.stats
+      ) {
+        const statsPanel = new Stats();
+        statsPanel.showPanel(0);
+        const statsElement = statsPanel.dom || statsPanel.domElement;
+        if (statsElement instanceof Node) {
+          document.body.appendChild(statsElement);
+          window.stats = statsPanel;
+        } else {
+          console.warn(
+            '[bootstrap] Stats panel element was not available for DOM attachment.'
+          );
         }
-      </script>
+      }
+    </script>
 
     <!-- Módulos Core (carregados primeiro para estarem disponíveis globalmente) -->
     <script type="module" src="./core/EventBus.js"></script>

@@ -1,11 +1,13 @@
 # Current Structure Overview
 
 ## 1. Visão Geral
+
 - Organização atual com mais de 120 arquivos dentro de `src/`.
 - Padrões arquiteturais existentes: Injeção de Dependências, EventBus desacoplado, pooling extensivo, componentes reutilizados apenas para Asteroid e serviços determinísticos.
 - Referência ao grafo de dependências: consulte `docs/architecture/DEPENDENCY_GRAPH.md` para hubs, ciclos e agrupamentos detectados automaticamente.
 
 ## 2. Estrutura de Diretórios
+
 - `/src/core` (18 arquivos): infraestrutura central (`EventBus`, `DIContainer`, `GameConstants`, `RandomService`, pools).
 - `/src/bootstrap` (2 arquivos): manifesto de serviços e bootstrap inicial.
 - `/src/modules` (15+ arquivos): sistemas de gameplay (`EnemySystem`, `PlayerSystem`, `CombatSystem`, `WorldSystem`, `PhysicsSystem`, `ProgressionSystem`, `AudioSystem`, etc.).
@@ -22,12 +24,14 @@
 - `/docs`: documentação, planos e checklists.
 
 ## 3. Hubs Críticos (segundo DEPENDENCY_GRAPH.md)
+
 - `src/core/GameConstants.js` — agregador leve com 27 dependentes diretos (re-exporta constantes de `src/data/constants/` e `src/data/enemies/`).
 - `src/core/RandomService.js` — 23 dependentes diretos.
 - `src/bootstrap/bootstrapServices.js` — 1 dependente direto.
 - `src/core/EventBus.js` — utilizado em praticamente todos os sistemas.
 
 ### 3.5. Recomendações de Implementação
+
 - **Registro via Manifesto:** Ao adicionar um novo sistema, inclua-o em `createServiceManifest()` com suas dependências explícitas. Observe como `src/bootstrap/serviceManifest.js` registra `EnemySystem` e `WorldSystem`.
 - **Comunicação por Eventos:** Use `gameEvents` para fluxo de informações. `EnemySystem` emite eventos como `enemy-spawned` e `enemy-destroyed`, enquanto `WorldSystem` consome eventos globais de reset.
 - **Resolução de Dependências:** Prefira injeção de dependências via construtor ou `resolveService()` fornecido pelo manifesto, mantendo `gameServices` apenas como fallback através do `ServiceLocatorAdapter`. Verifique `src/app.js` para ver como os serviços são instanciados.
@@ -39,11 +43,13 @@
 As constantes do jogo foram organizadas por domínio funcional para facilitar manutenção e evolução:
 
 **`src/data/constants/physics.js`**
+
 - Física da nave (aceleração, velocidade, damping, massa)
 - Velocidades de asteroides por tamanho
 - Mecânica de rachaduras (thresholds, graph rules)
 
 **`src/data/constants/gameplay.js`**
+
 - Balas e colisão (velocidade, bounce)
 - Magnetismo (raios, forças, orbs)
 - Sistema de XP orbs (valores, fusão, clustering)
@@ -52,6 +58,7 @@ As constantes do jogo foram organizadas por domínio funcional para facilitar ma
 - Sistema de waves (progressão, boss intervals, feature flags)
 
 **`src/data/constants/visual.js`**
+
 - Tipos de inimigos (drone, mine, hunter) com stats completos
 - Recompensas de inimigos (orbs, XP, health hearts)
 - Paletas de cores de efeitos (body, highlights, glows, explosions)
@@ -61,6 +68,7 @@ As constantes do jogo foram organizadas por domínio funcional para facilitar ma
 - Presets de efeitos de boss (entrance, phase change, defeat)
 
 **`src/data/enemies/asteroid-configs.js`**
+
 - Perfis de rachaduras (default, denseCore, volatile, parasite, crystal)
 - Lookup de camadas de rachaduras
 - Regras de fragmentação por perfil
@@ -69,19 +77,21 @@ As constantes do jogo foram organizadas por domínio funcional para facilitar ma
 - Chances de spawn de variantes por tamanho e wave
 
 **`src/core/GameConstants.js`** (agregador)
+
 - Mantém constantes core (dimensões, progressão, audio)
 - Re-exporta todas as constantes dos arquivos focados
 - Garante compatibilidade retroativa com imports existentes
 
 **Benefícios:**
+
 - Arquivos menores e mais focados (GameConstants reduzido de 1.771 para ~350 linhas)
 - Separação clara de responsabilidades por domínio
 - Facilita localização de constantes relacionadas
 - Prepara terreno para sistemas data-driven (REFACTOR-003+)
 - Mantém compatibilidade total com código existente via re-exports
 
-
 ## 4. Sistemas Principais
+
 - **EnemySystem.js** (4.593 linhas)
   - Monolítico: spawning, dano, rendering, ondas, bosses, colisões.
   - Gerencia `WaveManager`, `RewardManager`, `EnemyFactory` e integra com `PhysicsSystem`, `PlayerSystem`, `ProgressionSystem`.
@@ -100,7 +110,9 @@ As constantes do jogo foram organizadas por domínio funcional para facilitar ma
   - XP, combo, level-up, aplicação de upgrades lendo `data/upgrades.js`.
 
 ## 5. Padrões de Inimigos
+
 **Nota:** As configurações de asteroides agora residem em `src/data/enemies/asteroid-configs.js`. Para adicionar novos inimigos, consulte este arquivo como referência de estrutura de dados.
+
 - **BaseEnemy**
   - Template method: `initialize`, `onUpdate`, `onDraw`, `takeDamage`, `onDestroyed`.
   - Suporte a componentes (`this.components`) e tags.
@@ -114,12 +126,14 @@ As constantes do jogo foram organizadas por domínio funcional para facilitar ma
   - `factory.create(type, config)` devolve instância configurada, com tags e defaults.
 
 ## 6. Fluxo de Bootstrap
+
 - `src/app.js` inicializa `DIContainer`, `ServiceRegistry` e `GameSessionService`.
 - `DIContainer` serve como único service registry com legacy compatibility built-in.
 - `bootstrapServices()` instancia sistemas declarados em `createServiceManifest()`.
 - Game loop: update → render, com sistemas consumindo `RandomService`, `EventBus`, pools.
 
 ## 7. Dados e Configurações
+
 - `src/core/GameConstants.js` (agora re-exportador enxuto; dados residem em `src/data/constants/` e `src/data/enemies/`)
   - Mantém dimensões, progressão e presets de áudio; re-exporta dados especializados de `src/data/constants/` e `src/data/enemies/`.
   - Detalhes de fissuras, variantes e presets vivem nos arquivos especializados listados acima.
@@ -128,16 +142,19 @@ As constantes do jogo foram organizadas por domínio funcional para facilitar ma
 - `src/data/shipModels.js`, `src/data/settingsSchema.js`: dados auxiliares.
 
 ## 8. Pontos de Complexidade
+
 - `EnemySystem.js`, `WaveManager.js`, `Asteroid.js`, `PhysicsSystem.js`, `src/data/constants/`, `src/data/enemies/`, `upgrades.js`.
 - Arquivos longos com múltiplas responsabilidades e lógica procedural complexa.
 
 ## 9. Inconsistências Arquiteturais
+
 - Asteroid utiliza componentes; demais inimigos não.
 - Componentes existentes são específicos, não reutilizáveis.
 - Dados historicamente misturados com lógica (migração em andamento para `src/data/constants/` e `src/data/enemies/`).
 - Falta separação clara entre engine, gameplay e dados.
 
 ## 10. Pontos Fortes
+
 - Injeção de dependências via manifesto bem estruturado.
 - EventBus desacoplado e robusto.
 - Pooling eficiente (`GamePools`, `ObjectPool`).
@@ -147,6 +164,7 @@ As constantes do jogo foram organizadas por domínio funcional para facilitar ma
 - `BaseEnemy` e `EnemyFactory` fornecem base extensível para inimigos.
 
 ## 11. Referências
+
 - `docs/architecture/DEPENDENCY_GRAPH.md`
 - `src/bootstrap/serviceManifest.js`
 - `docs/plans/architecture-master-plan.md`
@@ -160,6 +178,7 @@ As constantes do jogo foram organizadas por domínio funcional para facilitar ma
 **Objetivo**: Remover implementações de fallback redundantes dos métodos delegados no `EnemySystem.js`, confiando totalmente nos sub-sistemas especializados.
 
 **Mudanças Realizadas**:
+
 - **EnemySystem.js**: 31 métodos delegados transformados de fallback (20-150 linhas) para error-throwing (5-8 linhas)
   - SpawnSystem: 14 métodos, ~681 linhas removidas
   - DamageSystem: 8 métodos, ~460 linhas removidas
@@ -170,6 +189,7 @@ As constantes do jogo foram organizadas por domínio funcional para facilitar ma
   - **Redução líquida**: ~1.647 linhas (-92% nos métodos delegados)
 
 **Padrão de Transformação**:
+
 ```javascript
 // ANTES (exemplo com 50 linhas de fallback)
 methodName(args) {
@@ -189,11 +209,13 @@ methodName(args) {
 ```
 
 **Impacto no Tamanho do Arquivo**:
+
 - **Antes**: ~5.089 linhas
 - **Depois**: ~3.442 linhas
 - **Redução**: -1.647 linhas (-32%)
 
 **Benefícios**:
+
 - ✅ Elimina duplicação de lógica entre facade e sub-sistemas
 - ✅ Fail-fast com mensagens de erro claras
 - ✅ Reduz superfície de manutenção (uma implementação por método)
@@ -201,6 +223,7 @@ methodName(args) {
 - ✅ Melhora legibilidade do `EnemySystem.js` (foco em orquestração, não implementação)
 
 **Riscos Mitigados**:
+
 - Sub-sistemas são inicializados no constructor com try-catch
 - Falhas de inicialização são logadas mas não travam o bootstrap
 - Erros em runtime identificam claramente qual sub-sistema falhou
@@ -213,6 +236,7 @@ methodName(args) {
 **Mudanças Realizadas**:
 
 1. **Drone.js**: 575 → ~196 linhas (-66%, -379 linhas)
+
    - Removido: `updateDrift()`, `applyThrusters()`, `updateRotationFromVelocity()` (movimento inline)
    - Removido: `computeNextFireInterval()`, `handleWeaponCycle()`, `fireAtPlayer()`, `extractPlayerVelocity()`, `emitEnemyFired()` (arma inline)
    - Removido: Corpo completo de `onDraw()` com renderização de triângulo, fins, exaustão (renderização inline)
@@ -220,6 +244,7 @@ methodName(args) {
    - Simplificado: `onDraw()` para 5 linhas de delegação pura
 
 2. **Hunter.js**: 653 → ~309 linhas (-53%, -344 linhas)
+
    - Removido: `applyIdleDamping()`, `updateOrbitVelocity()`, `updateRotationTowardsVelocity()` (movimento inline)
    - Removido: `updateBurstCycle()`, `startBurst()`, `computeAimSolution()`, `fireAtPlayer()`, `extractPlayerVelocity()`, `emitEnemyFired()` (arma inline)
    - Removido: Corpo completo de `onDraw()` com renderização de diamante, torreta, gradiente (renderização inline)
@@ -229,6 +254,7 @@ methodName(args) {
    - Simplificado: `onDraw()` para 5 linhas de delegação pura
 
 3. **Mine.js**: 421 → ~299 linhas (-29%, -122 linhas)
+
    - Removido: Corpo completo de `onDraw()` com renderização de esfera, pulso, halo (renderização inline)
    - Removido: `ensureBodyGradient()` (helper de cache de gradiente)
    - Mantido: `onUpdate()` completo (delegação de componentes + máquina de estados de proximidade)
@@ -248,12 +274,14 @@ methodName(args) {
    - Simplificado: `onDraw()` para 5 linhas de delegação pura
 
 **Redução Total de Código**:
+
 - **Linhas removidas**: ~948 linhas
 - **Redução média**: -39% nos arquivos de tipos de inimigos
 
 **Padrão de Transformação**:
 
 **onUpdate() - Antes** (30-40 linhas com fallback inline):
+
 ```javascript
 onUpdate(deltaTime) {
   if (this.useComponents && this.components?.size > 0) {
@@ -265,6 +293,7 @@ onUpdate(deltaTime) {
 ```
 
 **onUpdate() - Depois** (5-10 linhas, delegação pura):
+
 ```javascript
 onUpdate(deltaTime) {
   if (!this.useComponents || !this.components?.size) {
@@ -277,6 +306,7 @@ onUpdate(deltaTime) {
 ```
 
 **onDraw() - Antes** (120-170 linhas com renderização inline):
+
 ```javascript
 onDraw(ctx) {
   if (this.useComponents && this.components?.size > 0) {
@@ -287,6 +317,7 @@ onDraw(ctx) {
 ```
 
 **onDraw() - Depois** (5 linhas, delegação pura):
+
 ```javascript
 onDraw(ctx) {
   if (!this.useComponents || !this.components?.size) {
@@ -298,6 +329,7 @@ onDraw(ctx) {
 ```
 
 **Benefícios**:
+
 - ✅ Elimina duplicação entre tipos de inimigos e componentes
 - ✅ Fonte única de verdade para movimento, arma e renderização (componentes)
 - ✅ Simplifica tipos de inimigos para coordenadores puros
@@ -307,12 +339,14 @@ onDraw(ctx) {
 - ✅ Reduz superfície de teste (testar componentes, não tipos)
 
 **Lógica Específica de Tipo Preservada**:
+
 - **Drone**: Nenhuma (100% delegação)
 - **Hunter**: Nenhuma (100% delegação)
 - **Mine**: Máquina de estados de proximidade (armar, detectar, detonar)
 - **Boss**: Gerenciamento de fases, spawn de minions, invulnerabilidade, ataque de carga
 
 **Próximos Passos**:
+
 - **Phase 3**: Criar utilitários de combate compartilhados (`src/utils/combatHelpers.js`)
 - **Phase 4**: Consolidar estratégias de renderização (4 estratégias → 1 com parâmetro `shape`)
 - **Boss Weapon Refactor**: Desacoplar métodos de arma do boss da lógica de fases (tarefa futura)
@@ -322,6 +356,7 @@ onDraw(ctx) {
 **Problema Identificado**: Durante a limpeza da Phase 1 (REFACTOR-011), o método `handleWaveManagerWaveComplete()` foi completamente removido ao invés de ser transformado em delegação. O event listener na linha 349 de `EnemySystem.js` continuou chamando o método inexistente, causando crash na conclusão de waves.
 
 **Impacto**:
+
 - 🔴 **Severidade**: Crítica - quebra o loop principal do jogo
 - ❌ Waves não completam corretamente
 - ❌ Recompensas de XP não são concedidas
@@ -331,6 +366,7 @@ onDraw(ctx) {
 **Correção Aplicada**:
 
 1. **EnemySystem.js** (+8 linhas):
+
    - Adicionado método de delegação `handleWaveManagerWaveComplete(data)` após linha 2927
    - Segue padrão da Phase 1: error-throwing se sub-sistema ausente, então delega para `updateSystem`
    - Localizado próximo a outros métodos de gerenciamento de wave (`completeCurrentWave`, `startNextWave`, `grantWaveRewards`)
@@ -343,6 +379,7 @@ onDraw(ctx) {
    - Registra conclusão no debug log
 
 **Fluxo Corrigido**:
+
 ```
 WaveManager.completeWave()
   → emit('wave-complete', data)
@@ -355,12 +392,14 @@ WaveManager.completeWave()
 ```
 
 **Lição Aprendida**:
+
 - ✅ Antes de remover um método, buscar TODAS as referências (incluindo event listeners)
 - ✅ Event listeners são call sites indiretos que grep pode perder
 - ✅ Padrão de delegação requer AMBOS: método na facade E implementação no sub-sistema
 - ✅ Testar fluxo de eventos end-to-end após refatorações agressivas
 
 **Validação**:
+
 - ✅ Wave completion funciona corretamente
 - ✅ XP orbs são concedidos em círculo ao redor do jogador
 - ✅ Wave state transiciona para break period
@@ -375,6 +414,7 @@ WaveManager.completeWave()
 **Mudanças Realizadas**:
 
 1. **Novo Arquivo**: `src/utils/combatHelpers.js` (~55 linhas)
+
    - `computeLeadSolution()`: Cálculo de ponto de interceptação preditivo (49 linhas: 4 JSDoc + 45 código)
    - `resolvePlayerVelocity()`: Extração de velocidade do jogador com fallbacks (22 linhas: 3 JSDoc + 19 código)
    - `applySpread()`: Aplicação de dispersão angular aleatória (8 linhas: 2 JSDoc + 6 código)
@@ -382,6 +422,7 @@ WaveManager.completeWave()
    - JSDoc conciso mas completo
 
 2. **WeaponComponent.js**: 481 → 411 linhas (-15%, -70 linhas)
+
    - Removido: `computeLeadSolution()` (45 linhas)
    - Removido: `resolvePlayerVelocity()` (19 linhas)
    - Removido: `applySpread()` (6 linhas)
@@ -395,12 +436,14 @@ WaveManager.completeWave()
    - Rationale: Usados internamente por estratégias de movimento, serão extraídos em Phase 9
 
 **Redução Total de Código**:
+
 - **Linhas removidas**: 70 linhas de `WeaponComponent.js`
 - **Linhas adicionadas**: 55 linhas em `combatHelpers.js`
 - **Balanço líquido**: **-15 linhas** ✅
 - **Benefício**: Fonte única de verdade, testável isoladamente, código mais limpo
 
 **Princípios Aplicados**:
+
 - ✅ **YAGNI (You Ain't Gonna Need It)**: Extraído APENAS funções usadas agora
 - ✅ **JSDoc Conciso**: Útil mas não verboso (10 linhas total, não 45)
 - ✅ **Redução Líquida**: -15 linhas (não +20 como no plano original)
@@ -409,8 +452,14 @@ WaveManager.completeWave()
 **Padrão de Transformação**:
 
 **Antes** (inline em WeaponComponent.js):
+
 ```javascript
-const computeLeadSolution = ({ origin, target, targetVelocity, projectileSpeed }) => {
+const computeLeadSolution = ({
+  origin,
+  target,
+  targetVelocity,
+  projectileSpeed,
+}) => {
   // 45 linhas de lógica de interceptação
 };
 
@@ -424,6 +473,7 @@ const applySpread = (angle, spread, random) => {
 ```
 
 **Depois** (importado de combatHelpers.js):
+
 ```javascript
 import {
   computeLeadSolution,
@@ -433,6 +483,7 @@ import {
 ```
 
 **Benefícios**:
+
 - ✅ Fonte única de verdade para matemática de combate
 - ✅ Funções puras, fáceis de testar isoladamente
 - ✅ Reduz tamanho do `WeaponComponent.js` em 15%
@@ -442,11 +493,13 @@ import {
 - ✅ **Redução líquida de código** (alinhado com objetivo de simplificação)
 
 **Próximos Passos**:
+
 - **Phase 4**: Consolidar estratégias de renderização (4 → 1 com parâmetro `shape`)
 - **Phase 9**: Extrair math/vector helpers de `MovementComponent.js` para `mathHelpers.js` e `vectorHelpers.js`
 - **Futuro**: Considerar adicionar `tests/utils/combatHelpers.test.js` para testes unitários
 
 **Arquivos Não Modificados**:
+
 - `Drone.js`: Já limpo em Phase 2, sem helpers duplicados
 - `Hunter.js`: Já limpo em Phase 2, sem helpers duplicados
 - `Mine.js`: Não usa helpers de combate
@@ -459,6 +512,7 @@ import {
 **Mudanças Realizadas**:
 
 1. **RenderComponent.js**: 279 → ~231 linhas (-17%, -48 linhas)
+
    - Removido: Estratégias `procedural-triangle`, `procedural-diamond`, `procedural-sphere`, `procedural-boss` (-198 linhas)
    - Adicionado: Objeto `shapeRenderers` com renderers específicos para `triangle`, `diamond`, `sphere`, `boss` (~120 linhas)
    - Adicionado: Estratégia unificada `procedural` que resolve paleta/presets, gerencia estado do canvas e delega para o renderer apropriado (~30 linhas)
@@ -473,6 +527,7 @@ import {
 **Padrão de Transformação**:
 
 **Antes** (4 estratégias quase idênticas, ~198 linhas duplicadas):
+
 ```javascript
 'procedural-triangle': ({ enemy, ctx, colors, presets }) => {
   // resolve palette/presets
@@ -484,6 +539,7 @@ import {
 ```
 
 **Depois** (1 estratégia comum + renderers específicos, ~150 linhas totais):
+
 ```javascript
 'procedural': ({ enemy, ctx, colors, presets, config }) => {
   // resolve palette/presets uma vez
@@ -501,6 +557,7 @@ const shapeRenderers = {
 ```
 
 **Benefícios**:
+
 - ✅ Fonte única de verdade para lógica compartilhada de renderização (paleta, presets, estado do canvas)
 - ✅ Renderers focados apenas na geometria de cada forma
 - ✅ Adição de novas formas requer apenas inserir novo renderer em `shapeRenderers`
@@ -509,18 +566,21 @@ const shapeRenderers = {
 - ✅ Saída visual permanece idêntica (refatoração sem mudança de comportamento)
 
 **Redução Total de Código**:
+
 - **Linhas removidas**: 198 linhas (4 estratégias duplicadas)
 - **Linhas adicionadas**: ~150 linhas (estratégia unificada + renderers)
 - **Balanço líquido**: **-48 linhas** (-17% em `RenderComponent.js`)
 - **Configs atualizados**: 4 arquivos, mudanças triviais de estratégia/shape
 
 **Validação**:
+
 - ✅ Renderização de drone, hunter, mine e boss revisada visualmente (pixel-perfect)
 - ✅ `tests/visual/enemy-types-rendering.test.js` continua passando
 - ✅ Sem warnings de formas desconhecidas
 - ✅ Thrust, turret, pulse e aura preservados
 
 **Próximos Passos**:
+
 - **Phase 5**: Criar `BaseSystem` centralizado para reduzir duplicações adicionais
 - **Phase 6**: Simplificar cadeia de resolução de serviços
 - **Futuro**: Adicionar novas formas (ex.: hexagon, star) reutilizando o padrão `shapeRenderers`
@@ -538,23 +598,27 @@ const shapeRenderers = {
 **Sistemas Refatorados**:
 
 1. **RenderingSystem** (1,739 → 1,649 linhas, -90)
+
    - Removido: random management manual, service registration, event listener setup boilerplate
    - Adicionado: `super()` call com random forks (base/starfield/assets), `onReset()` hook
    - Simplificado: constructor agora delega para BaseSystem
 
 2. **XPOrbSystem** (2,052 → 1,942 linhas, -110)
+
    - Removido: createRandomForks(), getRandomFork(), captureRandomForkSeeds(), reseedRandomForks() methods
    - Mantido: ensureRandom() e captureRandomSignature() (XPOrbSystem-specific)
    - Atualizado: setupEventListeners() usa this.registerEventListener(), reset() chama super.reset()
    - Removido: typeof checks, manual event emission, console.log
 
 3. **EffectsSystem** (3,012 → 2,912 linhas, -100)
+
    - Removido: getRandomFork() method, typeof checks, gameServices.register()
    - Adicionado: reset() method que chama super.reset() e limpa arrays (particles, shockwaves, hitMarkers, damageIndicators, bossTransitionEffects)
    - Atualizado: setupEventListeners() usa this.registerEventListener()
    - Random forks: base, particles, thrusters, colors, muzzleFlash, hits, explosions, volatility, screenShake, boss
 
 4. **MenuBackgroundSystem** (1,726 → 1,631 linhas, -95)
+
    - Removido: getRandomFork(), captureRandomForkSeeds(), storeRandomForkSeed(), reseedRandomForks() methods
    - Mantido: ensureThreeUuidRandom() e applyDeterministicThreeUuidGenerator() (Three.js-specific)
    - Atualizado: reset() chama super.reset(), registerEventHooks() usa this.registerEventListener()
@@ -562,6 +626,7 @@ const shapeRenderers = {
    - Random forks: base, starfield, assets, belt, asteroids, fragments, materials, threeUuid
 
 5. **PhysicsSystem** (2,120 → 2,050 linhas, -70)
+
    - Removido: dependency normalization, typeof checks, gameServices.register()
    - Atualizado: setupEventListeners() usa this.registerEventListener()
    - Adicionado: super.reset() e super.destroy() calls
@@ -584,6 +649,7 @@ const shapeRenderers = {
 **Padrão de Transformação**:
 
 **Antes**:
+
 ```javascript
 class System {
   constructor(dependencies = {}) {
@@ -602,9 +668,15 @@ class System {
     gameEvents.on('event', handler);
   }
 
-  createRandomForks() { /* ... */ }
-  getRandomFork() { /* ... */ }
-  reseedRandomForks() { /* ... */ }
+  createRandomForks() {
+    /* ... */
+  }
+  getRandomFork() {
+    /* ... */
+  }
+  reseedRandomForks() {
+    /* ... */
+  }
   reset() {
     this.reseedRandomForks();
     // reset logic
@@ -613,6 +685,7 @@ class System {
 ```
 
 **Depois**:
+
 ```javascript
 class System extends BaseSystem {
   constructor(dependencies = {}) {
@@ -620,7 +693,7 @@ class System extends BaseSystem {
       enableRandomManagement: true,
       systemName: 'System',
       serviceName: 'service-name',
-      randomForkLabels: { base: 'system.base', /* ... */ }
+      randomForkLabels: { base: 'system.base' /* ... */ },
     });
 
     this.dependencies = { ...dependencies };
@@ -681,6 +754,7 @@ npm run dev
 **Sistemas Refatorados**:
 
 1. **CombatSystem** (2,891 → ~2,801 linhas, -90)
+
    - Removido: resolveCachedServices() method, typeof checks, gameServices.register(), console.log
    - Atualizado: setupEventListeners() usa this.registerEventListener() (4 listeners)
    - Adicionado: super.reset() no início de reset()
@@ -688,6 +762,7 @@ npm run dev
    - Service caching: player, enemies, physics services
 
 2. **PlayerSystem** (1,225 → ~1,135 linhas, -90)
+
    - Removido: typeof checks (~12 locations), gameServices.register(), console.log
    - Atualizado: setupEventListeners() usa this.registerEventListener() (~15 upgrade listeners)
    - Adicionado: super.reset() no início de reset()
@@ -695,6 +770,7 @@ npm run dev
    - **Mantido**: Custom lifecycle (pause/resume), shield state management, hull metrics
 
 3. **WorldSystem** (210 → ~200 linhas, -10)
+
    - Removido: typeof checks, gameServices.register(), console.log
    - Atualizado: setupEventListeners() usa this.registerEventListener() (3 listeners)
    - Adicionado: super.reset() no início de reset()
@@ -722,6 +798,7 @@ npm run dev
 **Sistemas Refatorados**:
 
 1. **UISystem** (2,456 → ~2,366 linhas, -90)
+
    - Removido: constructor boilerplate, `gameServices.register()`, logs de inicialização
    - Atualizado: `setupEventListeners()` usa `this.registerEventListener()` para bosses, wave, combo, settings e level-up
    - Adicionado: `initialize()` para configurar DOM refs, layout HUD e preferências antes do registro de listeners
@@ -729,6 +806,7 @@ npm run dev
    - **Complexidades especiais**: gerenciamento de DOM, múltiplos overlays, captura de input e atualizações de HUD em tempo real
 
 2. **UpgradeSystem** (novo módulo compartilhado)
+
    - Extende `BaseSystem` com `serviceName: 'upgrades'` e random forks dedicados (`upgrades.base`, `upgrades.selection`, `upgrades.progression`, `upgrades.rewards`)
    - Centraliza catálogo, pré-requisitos, efeitos e serialização de upgrades reutilizando `resolveCachedServices()` para `xp-orbs`, `player`, `ui` e `effects`
    - Normaliza eventos de aplicação emitindo `upgrade:purchased` e `upgrade-applied` com o mesmo payload, além de preparar opções determinísticas com `this.getRandomFork('selection')`
@@ -787,6 +865,7 @@ npm run dev
 **Padrão de Transformação**:
 
 **Antes**:
+
 ```javascript
 class CombatSystem {
   constructor(dependencies = {}) {
@@ -825,6 +904,7 @@ class CombatSystem {
 ```
 
 **Depois**:
+
 ```javascript
 class CombatSystem extends BaseSystem {
   constructor(dependencies = {}) {
@@ -909,6 +989,7 @@ npm run dev
 Completed migration of all 12 core systems to extend `BaseSystem`, eliminating ~875 lines of duplicated code while standardizing lifecycle management.
 
 **Timeline**: 5 tickets completed
+
 - Ticket 1: BaseSystem Foundation
 - Ticket 2: Core Systems (6 systems)
 - Ticket 3: Specialized Systems (4 systems)
@@ -917,39 +998,43 @@ Completed migration of all 12 core systems to extend `BaseSystem`, eliminating ~
 
 **Systems Migrated**
 
-| System | Before | After | Reduction | Notes |
-|--------|--------|-------|-----------|-------|
-| RenderingSystem | 1,739 | 1,649 | -90 | |
-| XPOrbSystem | 2,052 | 1,942 | -110 | |
-| EffectsSystem | 3,012 | 2,912 | -100 | |
-| MenuBackgroundSystem | 1,726 | 1,631 | -95 | |
-| PhysicsSystem | 2,120 | 2,050 | -70 | No random mgmt |
-| AudioSystem | 3,119 | 3,039 | -80 | Custom random scopes |
-| CombatSystem | 2,891 | 2,801 | -90 | |
-| PlayerSystem | 3,012 | 2,922 | -90 | Custom pause/resume |
-| WorldSystem | 2,456 | 2,366 | -90 | |
-| EnemySystem | 4,234 | 4,124 | -110 | Largest system |
-| UISystem | 2,456 | 2,366 | -90 | DOM manipulation |
-| UpgradeSystem | 3,234 | 3,124 | -110 | State management |
-| **TOTAL** | **31,051** | **29,826** | **-1,225** | **+350 (BaseSystem)** |
+| System               | Before     | After      | Reduction  | Notes                 |
+| -------------------- | ---------- | ---------- | ---------- | --------------------- |
+| RenderingSystem      | 1,739      | 1,649      | -90        |                       |
+| XPOrbSystem          | 2,052      | 1,942      | -110       |                       |
+| EffectsSystem        | 3,012      | 2,912      | -100       |                       |
+| MenuBackgroundSystem | 1,726      | 1,631      | -95        |                       |
+| PhysicsSystem        | 2,120      | 2,050      | -70        | No random mgmt        |
+| AudioSystem          | 3,119      | 3,039      | -80        | Custom random scopes  |
+| CombatSystem         | 2,891      | 2,801      | -90        |                       |
+| PlayerSystem         | 3,012      | 2,922      | -90        | Custom pause/resume   |
+| WorldSystem          | 2,456      | 2,366      | -90        |                       |
+| EnemySystem          | 4,234      | 4,124      | -110       | Largest system        |
+| UISystem             | 2,456      | 2,366      | -90        | DOM manipulation      |
+| UpgradeSystem        | 3,234      | 3,124      | -110       | State management      |
+| **TOTAL**            | **31,051** | **29,826** | **-1,225** | **+350 (BaseSystem)** |
 
 **Net Reduction**: ~875 lines
 
 **Patterns Eliminated**
 
 1. **Random Management Boilerplate** (~264 lines)
+
    - `createRandomForks()`, `getRandomFork()`, `reseedRandomForks()`
    - Now centralized in BaseSystem
 
 2. **Service Caching** (~108 lines)
+
    - `resolveCachedServices()` removed
    - Direct service access preferred
 
 3. **`typeof` Checks** (~240 lines)
+
    - Defensive `typeof gameEvents !== 'undefined'` removed
    - EventBus always available
 
 4. **Constructor Boilerplate** (~90 lines)
+
    - `normalizeDependencies()`, `gameServices.register()`, `console.log`
    - Handled by BaseSystem
 
@@ -976,19 +1061,19 @@ class MySystem extends BaseSystem {
       systemName: 'MySystem',
       serviceName: 'my-system',
       enableRandomManagement: true,
-      randomForkLabels: ['base', 'feature1']
+      randomForkLabels: ['base', 'feature1'],
     });
   }
-  
+
   setupEventListeners() {
     this.registerEventListener('event:name', this.handleEvent.bind(this));
   }
-  
+
   reset() {
     super.reset();
     // System-specific reset
   }
-  
+
   destroy() {
     super.destroy();
     // System-specific cleanup
@@ -1013,24 +1098,28 @@ See automated validation report for detailed analysis of migration completeness.
 **Service Stack Evolution**
 
 **Before (4 layers)**:
+
 1. `ServiceLocator.js` (~99 lines) - Legacy Map-based registry
 2. `ServiceLocatorAdapter.js` (~155 lines) - Backward compatibility bridge
 3. `DIContainer.js` (~491 lines) - Full DI with factories
 4. `ServiceRegistry.js` (~381 lines) - Manifest reader
 
 **After (2 layers)** ✅:
+
 1. `DIContainer.js` (~814 lines) - Unified registry with legacy compatibility
 2. `ServiceRegistry.js` (~381 lines) - Manifest reader (unchanged)
 
 **Mudanças Realizadas**:
 
 1. **Deleted**: `src/core/ServiceLocatorAdapter.js`
+
    - Thin wrapper (155 lines) that only delegated to DIContainer
    - Zero imports found in codebase
    - Emitted deprecation warnings since creation
    - All functionality merged into DIContainer
 
 2. **Deleted**: `src/core/ServiceLocator.js`
+
    - Legacy service locator (99 lines) using simple Map-based registry
    - Zero imports found in codebase
    - Created global singleton that was immediately overwritten by `app.js`
@@ -1043,6 +1132,7 @@ See automated validation report for detailed analysis of migration completeness.
    - Updated examples showing both factory-based DI and direct instance registration
 
 **Benefits**:
+
 - ✅ Reduced complexity (4 layers → 2 layers)
 - ✅ Single source of truth (DIContainer)
 - ✅ 100% backward compatibility maintained
@@ -1051,28 +1141,33 @@ See automated validation report for detailed analysis of migration completeness.
 - ✅ Zero breaking changes (nobody imported the removed files)
 
 **Evidence of Safety**:
+
 - Grep search confirmed zero imports of `ServiceLocatorAdapter` or `ServiceLocator`
 - `app.js` line 175 uses DIContainer directly: `globalThis.gameServices = diContainer`
 - DIContainer already has complete legacy compatibility layer (lines 47-453)
 - All legacy code continues working via built-in compatibility layer
 
 **Phase 2 Status**: ✅ Complete
+
 - AGENTS.md updated with ServiceLocator/ServiceLocatorAdapter removal notes
 - Developer guide reflects new 2-layer architecture
 - All references to removed files documented as deprecated/removed
 
 **Phase 3 Status**: ✅ Complete
+
 - No issues detected in production
 - All systems continue working with DIContainer
 - Zero breaking changes confirmed
 
 **Completion Summary**:
+
 - ✅ Phase 1: Files removed, DIContainer enhanced (Complete)
 - ✅ Phase 2: Documentation updated (Complete)
 - ✅ Phase 3: Monitoring period passed (Complete)
 - ✅ REFACTOR-016 is now **100% complete**
 
 **Future Work** (separate from REFACTOR-016):
+
 - Migrate remaining `gameServices.get()` calls to constructor injection
 - Remove legacy compatibility layer once all systems use DI
 - Consider removing `syncInstance()` method after full migration
@@ -1084,6 +1179,7 @@ See automated validation report for detailed analysis of migration completeness.
 **Mudanças Realizadas**:
 
 1. **Novo Arquivo**: `src/utils/StateManager.js` (~100 linhas)
+
    - `safeNumber()`, `safeBoolean()`, `safeString()`, `safeObject()`: Conversão segura de valores
    - `deepClone()`, `shallowClone()`, `cloneArray()`: Utilitários de clonagem
    - `validateSnapshot()`, `isValidSnapshotVersion()`, `hasRequiredFields()`: Validação de snapshots
@@ -1091,12 +1187,14 @@ See automated validation report for detailed analysis of migration completeness.
    - `createSnapshotWrapper()`: Cria métodos alias padrão (getSnapshotState, restoreSnapshotState)
 
 2. **EnemySystem.js**: Refatorado para usar StateManager (~29 linhas removidas)
+
    - Substituído `warnSnapshotFallback()` por `createFallbackHandler()`
    - Substituído `safeNumber` local por utilitário do StateManager
    - Substituído `JSON.parse(JSON.stringify())` por `deepClone()`
    - Simplificada validação em `importState()` com `validateSnapshot()`
 
 3. **PhysicsSystem.js**: Refatorado para usar StateManager (~27 linhas removidas)
+
    - Substituído `handleSnapshotFallback()` por `createFallbackHandler()`
    - Substituído `safeNumber` local por utilitário do StateManager
    - Substituído spread operators por `shallowClone()`
@@ -1110,15 +1208,17 @@ See automated validation report for detailed analysis of migration completeness.
 **Padrões Consolidados**:
 
 1. **Conversão Segura de Números** (usado 50+ vezes):
+
    ```javascript
    // ANTES
    const value = Number.isFinite(data.x) ? data.x : 0;
-   
+
    // DEPOIS
    const value = safeNumber(data.x, 0);
    ```
 
 2. **Fallback Handling** (usado em 2 sistemas):
+
    ```javascript
    // ANTES
    warnSnapshotFallback(reason) {
@@ -1126,7 +1226,7 @@ See automated validation report for detailed analysis of migration completeness.
      this._snapshotFallbackWarningIssued = true;
      console.warn(`[System] Snapshot unavailable (${reason})`);
    }
-   
+
    // DEPOIS
    this._handleSnapshotFallback = createFallbackHandler({
      systemName: 'System',
@@ -1136,15 +1236,17 @@ See automated validation report for detailed analysis of migration completeness.
    ```
 
 3. **Deep Clone** (usado em 3 sistemas):
+
    ```javascript
    // ANTES
    const clone = JSON.parse(JSON.stringify(obj));
-   
+
    // DEPOIS
    const clone = deepClone(obj);
    ```
 
 **Redução Total de Código**:
+
 - **EnemySystem.js**: -29 linhas
 - **PhysicsSystem.js**: -27 linhas
 - **ProgressionSystem.js**: -2 linhas (líquido: -18 removidas, +16 alias methods)
@@ -1153,6 +1255,7 @@ See automated validation report for detailed analysis of migration completeness.
 - **Duplicação eliminada**: ~200 linhas de padrões duplicados
 
 **Benefícios**:
+
 - ✅ Fonte única de verdade para padrões de snapshot
 - ✅ Funções puras e testáveis isoladamente
 - ✅ Compatibilidade total com formatos de snapshot existentes
@@ -1162,6 +1265,7 @@ See automated validation report for detailed analysis of migration completeness.
 - ✅ Facilita adição de novos sistemas com snapshots
 
 **Próximos Passos**:
+
 - **Phase 8**: Normalizar schema de configs de inimigos (~100 linhas economizadas)
 - **Phase 9**: Consolidar utilitários de matemática e vetores (~150 linhas economizadas)
 - **Futuro**: Considerar adicionar `tests/utils/StateManager.test.js` para testes unitários
@@ -1173,6 +1277,7 @@ See automated validation report for detailed analysis of migration completeness.
 **Mudanças Realizadas**:
 
 1. **Novo Arquivo**: `src/data/enemies/schema.js` (~150 linhas)
+
    - `MOVEMENT_SCHEMA`: Campos canônicos de movimento (`maxSpeed`, `acceleration`, `damping`)
    - `WEAPON_SCHEMA`: Campos canônicos de arma (`cooldown`, `damage`, `speed`, `lifetime`)
    - `RENDER_SCHEMA`: Campos canônicos de renderização (`strategy`, `shape`)
@@ -1183,19 +1288,23 @@ See automated validation report for detailed analysis of migration completeness.
    - Marcação de campos deprecados (`speed`, `fireRate`, `interval`)
 
 2. **drone.js**: Padronizado para seguir schema (~3 linhas removidas)
+
    - Removido `speed: 180` duplicado (mantido apenas `maxSpeed: 180`)
    - Renomeado `fireRate: 2.0` → `cooldown: 2.0`
    - Renomeado `fireVariance: 0.35` → `cooldownVariance: 0.35`
    - Renomeado `fireSpread: 0.06` → `spread: 0.06`
 
 3. **hunter.js**: Padronizado para seguir schema (~4 linhas removidas/renomeadas)
+
    - Removido `speed: 120` duplicado (mantido apenas `maxSpeed: 120`)
    - Renomeado `burstInterval: 3.5` → `cooldown: 3.5`
 
 4. **mine.js**: Padronizado para seguir schema (~1 linha removida)
+
    - Removido `lifetime: 30` duplicado (mantido apenas em movement component)
 
 5. **boss.js**: Padronizado para seguir schema (~7 linhas removidas/renomeadas)
+
    - Removido `speed: 60` duplicado (mantido apenas `maxSpeed: 60`)
    - Renomeado `spreadInterval: 2.4` → `spread.cooldown: 2.4`
    - Renomeado `volleyInterval: 1.35` → `volley.cooldown: 1.35`
@@ -1208,6 +1317,7 @@ See automated validation report for detailed analysis of migration completeness.
 **Inconsistências Eliminadas**:
 
 1. **Movimento**: `speed` vs `maxSpeed`
+
    ```javascript
    // ANTES (duplicado)
    movement: {
@@ -1222,6 +1332,7 @@ See automated validation report for detailed analysis of migration completeness.
    ```
 
 2. **Arma**: `fireRate` vs `cooldown` vs `interval` vs `burstInterval`
+
    ```javascript
    // ANTES (inconsistente)
    DRONE_CONFIG: { fireRate: 2.0 }
@@ -1236,6 +1347,7 @@ See automated validation report for detailed analysis of migration completeness.
    ```
 
 **Redução Total de Código**:
+
 - **drone.js**: -3 linhas (duplicates removed)
 - **hunter.js**: -4 linhas (duplicates removed)
 - **mine.js**: -1 linha (duplicate removed)
@@ -1246,12 +1358,14 @@ See automated validation report for detailed analysis of migration completeness.
 - **Duplicação eliminada**: ~15 campos duplicados
 
 **Compatibilidade Retroativa**:
+
 - ✅ `MovementComponent.js` já tem fallback: `maxSpeed ?? speed`
 - ✅ `WeaponComponent.js` já tem fallback: `cooldown ?? interval`
 - ✅ Código antigo usando nomes deprecados continua funcionando
 - ✅ Novos configs devem seguir schema.js
 
 **Benefícios**:
+
 - ✅ Fonte única de verdade para estrutura de configs
 - ✅ Nomenclatura consistente entre todos os inimigos
 - ✅ Documentação JSDoc extensa para desenvolvedores
@@ -1261,6 +1375,7 @@ See automated validation report for detailed analysis of migration completeness.
 - ✅ Melhora manutenibilidade de configs
 
 **Próximos Passos**:
+
 - **Phase 9**: Consolidar math/vector utilities (~150 linhas economizadas) ✅ COMPLETED
 - **Phase 10**: Remover código morto e handlers não usados (~200 linhas economizadas)
 - **Futuro**: Implementar validação automática de configs usando schema.js
@@ -1272,6 +1387,7 @@ See automated validation report for detailed analysis of migration completeness.
 **Mudanças Realizadas**:
 
 1. **Novo Arquivo**: `src/utils/mathHelpers.js` (61 linhas)
+
    - `clamp(value, min, max)`: Limita valor entre min e max com validação `Number.isFinite()`
    - `lerp(start, end, t)`: Interpolação linear com clamping automático de t
    - `easeInOutCubic(t)`: Função de easing cúbica (ease-in-out) para animações
@@ -1280,6 +1396,7 @@ See automated validation report for detailed analysis of migration completeness.
    - Exportações nomeadas para tree-shaking
 
 2. **Novo Arquivo**: `src/utils/vectorHelpers.js` (81 linhas)
+
    - `length(vx, vy)`: Calcula magnitude de vetor 2D usando `Math.hypot()`
    - `normalize(vx, vy)`: Normaliza vetor retornando `{x, y, length}`
    - `normalizeSimple(vx, vy)`: Normaliza vetor retornando apenas `{x, y}`
@@ -1290,28 +1407,33 @@ See automated validation report for detailed analysis of migration completeness.
    - Funções puras sem dependências externas
 
 3. **MovementComponent.js**: Refatorado para usar utilitários compartilhados (-15 linhas)
+
    - Removido: `clamp()`, `length()`, `normalize()`, `lerp()` (13 linhas)
    - Removido: Comentário sobre extração futura (4 linhas)
    - Adicionado: Imports de `mathHelpers.js` e `vectorHelpers.js` (2 linhas)
    - Usa `normalizeSimple` como `normalize` para compatibilidade
 
 4. **RenderingSystem.js**: Refatorado para usar utilitários compartilhados (-9 linhas)
+
    - Removido: `normalizeVector()` (8 linhas), `clamp()` (3 linhas)
    - Adicionado: Imports de `mathHelpers.js` e `vectorHelpers.js` (2 linhas)
    - Usa `normalize` como `normalizeVector` para compatibilidade
    - Mantido: `EPSILON` local (usado por outras funções)
 
 5. **XPOrbSystem.js**: Refatorado para usar utilitários compartilhados (-12 linhas)
+
    - Removido: `lerp()` método (3 linhas), `easeInOutCubic()` método (9 linhas)
    - Adicionado: Import de `mathHelpers.js` (1 linha)
    - Atualizado: Chamadas de `this.easeInOutCubic()` para `easeInOutCubic()`
 
 6. **SettingsSystem.js**: Refatorado para usar utilitários compartilhados (-5 linhas)
+
    - Removido: `clamp()` função (6 linhas)
    - Adicionado: Import de `mathHelpers.js` (1 linha)
    - Implementação de SettingsSystem foi base para utilitário compartilhado (mais robusta)
 
 7. **WaveManager.js**: Refatorado para usar utilitários compartilhados (-2 linhas)
+
    - Removido: 3 definições locais de `clamp()` (linhas 2082, 2221, 2315) - 3 linhas
    - Adicionado: Import de `mathHelpers.js` (1 linha)
    - ~10 chamadas a `clamp()` agora usam implementação compartilhada mais robusta
@@ -1324,6 +1446,7 @@ See automated validation report for detailed analysis of migration completeness.
 **Funções Consolidadas**:
 
 1. **clamp()** - 7 implementações duplicadas eliminadas:
+
    ```javascript
    // ANTES (7 locais diferentes)
    MovementComponent: const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
@@ -1337,6 +1460,7 @@ See automated validation report for detailed analysis of migration completeness.
    ```
 
 2. **lerp()** - 2 implementações duplicadas eliminadas:
+
    ```javascript
    // ANTES (2 locais diferentes)
    MovementComponent: const lerp = (start, end, t) => start + (end - start) * clamp(t, 0, 1);
@@ -1347,6 +1471,7 @@ See automated validation report for detailed analysis of migration completeness.
    ```
 
 3. **normalize()** - 2 implementações duplicadas eliminadas:
+
    ```javascript
    // ANTES (2 locais diferentes)
    MovementComponent: const normalize = (vx, vy) => { ... return { x, y }; }
@@ -1358,6 +1483,7 @@ See automated validation report for detailed analysis of migration completeness.
    ```
 
 4. **easeInOutCubic()** - 1 implementação extraída:
+
    ```javascript
    // ANTES (1 local)
    XPOrbSystem: easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : ... }
@@ -1367,6 +1493,7 @@ See automated validation report for detailed analysis of migration completeness.
    ```
 
 **Redução Total de Código**:
+
 - **MovementComponent.js**: -15 linhas
 - **RenderingSystem.js**: -9 linhas
 - **XPOrbSystem.js**: -12 linhas
@@ -1383,6 +1510,7 @@ See automated validation report for detailed analysis of migration completeness.
 **Nota sobre Balanço Positivo**: Embora o balanço líquido seja positivo (+99 linhas), a refatoração eliminou ~50 linhas de duplicação e adicionou funções utilitárias extras (`normalizeAngle`, `magnitude`, `dot`, `distance`) que serão úteis para features futuras. O benefício real está na **eliminação de duplicação** e **fonte única de verdade**, não apenas na contagem de linhas.
 
 **Benefícios**:
+
 - ✅ Fonte única de verdade para operações matemáticas e vetoriais
 - ✅ Funções puras e testáveis isoladamente
 - ✅ Implementações mais robustas (validação `Number.isFinite()`, uso de `EPSILON`)
@@ -1393,12 +1521,14 @@ See automated validation report for detailed analysis of migration completeness.
 - ✅ Funções extras adicionadas para uso futuro (normalizeAngle, dot, distance, magnitude)
 
 **Compatibilidade Retroativa**:
+
 - ✅ Todas as assinaturas de função preservadas
 - ✅ Imports com aliases mantêm nomes originais (`normalizeSimple as normalize`)
 - ✅ Algoritmos idênticos (mesma precisão numérica)
 - ✅ Zero breaking changes
 
 **Inline Clamps Legítimos (NÃO refatorados)**:
+
 - AudioSystem.js: `Math.max(0, Math.min(0.95, value))` - clamping de modulação de áudio
 - EffectsSystem.js: `Math.max(0, Math.min(1, value))` - clamping de alpha/fade
 - UISystem.js: `Math.max(0, Math.min(maxHealth, health))` - clamping de health
@@ -1406,6 +1536,7 @@ See automated validation report for detailed analysis of migration completeness.
 - **Decisão**: Manter inline clamps triviais para casos específicos (RGB, alpha, etc.)
 
 **Próximos Passos**:
+
 - **Phase 10**: Remover código morto e handlers não usados (~200 linhas economizadas)
 - **Review**: Validar resultados de simplificação e atualizar métricas finais
 - **Futuro**: Considerar adicionar `tests/utils/mathHelpers.test.js` e `tests/utils/vectorHelpers.test.js`
@@ -1417,15 +1548,18 @@ See automated validation report for detailed analysis of migration completeness.
 **Análise Realizada**:
 
 1. **Busca por @deprecated**: 21 ocorrências encontradas
+
    - 18 são tags JSDoc documentando compatibilidade retroativa (schema.js, configs) - MANTIDAS
    - 3 são código morto real (ASTEROID_XP_BASE + xpMultiplier fields) - REMOVIDAS
 
 2. **Análise de warnings de deprecação no console**:
+
    - 13 warnings únicos originados de `app.js` chamando `gameServices.get()`
    - Warnings ocorrem em hot paths (60 FPS = 600+ warnings/segundo)
    - Padrão legado (service locator) vs padrão alvo (constructor injection)
 
 3. **Busca por gameServices.get()**: 17 ocorrências em `app.js`
+
    - `updateGame()` loop: 10 chamadas (input, player, enemies, physics, combat, xp-orbs, healthHearts, progression, world, ui)
    - `gameLoop()`: 2 chamadas (effects, renderer)
    - `init()`: 1 chamada (ui)
@@ -1439,6 +1573,7 @@ See automated validation report for detailed analysis of migration completeness.
 **Código Morto Identificado e Removido**:
 
 1. **ASTEROID_XP_BASE Export** (asteroid-configs.js linha 667, ~7 linhas removidas)
+
    - Sistema XP antigo substituído por sistema ORB_VALUE
    - Marcado "DEPRECATED: Old XP-based system (kept for backward compatibility during migration)"
    - **Export removido** de asteroid-configs.js
@@ -1467,17 +1602,20 @@ See automated validation report for detailed analysis of migration completeness.
 **Mudanças em app.js** (~15 linhas alteradas):
 
 1. **Armazenar services em escopo de módulo**:
+
    ```javascript
    let gameSystemServices = null; // Services from bootstrapServices()
    ```
 
 2. **Capturar services de bootstrapServices()**:
+
    ```javascript
    const { services } = bootstrapServices(...);
    gameSystemServices = services; // Store for game loop
    ```
 
 3. **Substituir gameServices.get() por acesso direto**:
+
    - **Antes**: `const service = gameServices.get(serviceName);`
    - **Depois**: `const service = gameSystemServices?.[serviceName];`
 
@@ -1488,6 +1626,7 @@ See automated validation report for detailed analysis of migration completeness.
    - `renderGame()`: 1 chamada (renderer)
 
 **Benefícios da Migração**:
+
 - ✅ **Console limpo**: Elimina 13 warnings únicos (600+ warnings/segundo)
 - ✅ **Padrão correto**: Usa constructor injection ao invés de service locator anti-pattern
 - ✅ **Performance**: Acesso direto a propriedade vs chamada de função
@@ -1497,17 +1636,20 @@ See automated validation report for detailed analysis of migration completeness.
 **Padrão de Lazy Resolution Documentado**:
 
 **Quando usar `resolveService()`** (33 ocorrências mantidas):
+
 - Dependências **opcionais** que podem não estar disponíveis
 - Dependências **late-bound** resolvidas após inicialização
 - Exemplo: `EffectsSystem` resolvendo `audio` apenas quando necessário
 - Padrão **recomendado** pela arquitetura BaseSystem
 
 **Quando usar constructor injection** (padrão em `app.js`):
+
 - Dependências **obrigatórias** conhecidas no bootstrap
 - Hot paths (game loop, render loop)
 - Código que roda a cada frame
 
 **Redução Total de Código**:
+
 - **ASTEROID_XP_BASE export**: -7 linhas
 - **xpMultiplier fields**: -21 linhas (7 campos × 3 linhas cada)
 - **Total removido**: **-28 linhas**
@@ -1516,6 +1658,7 @@ See automated validation report for detailed analysis of migration completeness.
 - **Deprecation warnings**: ZERO (todos eliminados)
 
 **Validação**:
+
 - ✅ **ASTEROID_XP_BASE**: Export removido de asteroid-configs.js; sem imports nomeados; XPOrbSystem.js mantém referência condicional via namespace import como fallback seguro (não quebra se undefined)
 - ✅ **xpMultiplier**: Grep confirmou ZERO ocorrências de `xpMultiplier:` em `/src` (remoção completa das 7 variantes: common, iron, denseCore, gold, volatile, parasite, crystal)
 - ✅ Todos os cálculos de recompensa usam `ORB_VALUE`, `statsFactor`, `rarityBonus` como sistema primário
@@ -1528,6 +1671,7 @@ See automated validation report for detailed analysis of migration completeness.
 **Conclusão da Refatoração de Simplificação**:
 
 Após 10 fases de refatoração (REFACTOR-011 a REFACTOR-020), o codebase está:
+
 - ✅ **Limpo**: Zero código morto, zero warnings de deprecação
 - ✅ **Consistente**: Padrão de DI correto (constructor injection em hot paths, lazy resolution para opcionais)
 - ✅ **Modular**: Componentes compartilhados, utilitários consolidados, sub-sistemas especializados
@@ -1536,6 +1680,7 @@ Após 10 fases de refatoração (REFACTOR-011 a REFACTOR-020), o codebase está:
 - ✅ **Performático**: Acesso direto a serviços em hot paths, zero overhead de service locator
 
 **Próximos Passos**:
+
 - **Review Final**: Executar suite de testes completa, medir contagens finais de linhas
 - **Validação**: Verificar que todos os sistemas funcionam corretamente
 - **Documentação**: Atualizar métricas finais em CURRENT_STRUCTURE.md

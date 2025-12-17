@@ -129,8 +129,10 @@ export class AsteroidCollision {
     // === ROTATION EFFECTS ===
     // Add some rotational spin from collision
     const collisionRandom =
-      (typeof a1?.getRandomFor === 'function' && a1.getRandomFor('collision')) ||
-      (typeof a2?.getRandomFor === 'function' && a2.getRandomFor('collision')) ||
+      (typeof a1?.getRandomFor === 'function' &&
+        a1.getRandomFor('collision')) ||
+      (typeof a2?.getRandomFor === 'function' &&
+        a2.getRandomFor('collision')) ||
       null;
 
     if (collisionRandom?.range) {

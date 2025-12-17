@@ -1,6 +1,7 @@
 # Plano da Fase 4 – Áudio Dinâmico e Camadas Musicais
 
 ## Objetivo
+
 Expandir `AudioSystem` com novos efeitos sonoros para drones, mines, hunters e boss, além de introduzir um sistema de trilha musical em camadas que reage à intensidade das ondas e lutas contra bosses.
 
 ## Componentes Principais
@@ -12,6 +13,7 @@ Expandir `AudioSystem` com novos efeitos sonoros para drones, mines, hunters e b
 ## Passos Detalhados
 
 1. **Eventos e Handlers:**
+
    - Registrar listeners para: `enemy-fired`, `mine-exploded`, `boss-spawned`, `boss-phase-changed`, `boss-defeated`, `wave-started`.
    - Métodos específicos:
      - `playDroneFire(data)` – laser agudo 600-800Hz, duração ~0.1s.
@@ -22,6 +24,7 @@ Expandir `AudioSystem` com novos efeitos sonoros para drones, mines, hunters e b
      - `playBossDefeated()` – fanfarra crescente de 2.0s.
 
 2. **Sistema de Camadas Musicais:**
+
    - Criar propriedade `musicLayers` contendo osciladores/loops: base (110Hz drone), intensidade1 (220Hz), intensidade2 (330Hz), intensidade3 (440Hz).
    - Implementar `startBackgroundMusic()` inicializando layers e gains individuais.
    - Implementar `setMusicIntensity(level)` (0-3) ajustando gains gradualmente, mantendo layer base sempre ativo.
@@ -30,6 +33,7 @@ Expandir `AudioSystem` com novos efeitos sonoros para drones, mines, hunters e b
      - `boss-spawned` força intensidade máxima; `boss-defeated` reduz gradualmente.
 
 3. **Integração com Pools de Áudio:**
+
    - Garantir reutilização via `AudioBatcher` para disparos rápidos (drones/hunters).
    - Cachear buffers recorrentes (explosões, fanfarra) em `AudioCache` para evitar custos extras.
 
@@ -50,12 +54,14 @@ Implemented procedural thruster sounds with start→loop→stop architecture dir
 ### Implementation Details
 
 **ThrusterLoopManager Class:**
+
 - Internal class managing active loop state per thruster type (main, retro, side)
 - Tracks loop nodes: oscillators (saw+square mix), gains, noise sources, filters
 - Methods: `startLoop()`, `updateLoop()`, `stopLoop()`, `isActive()`, `cleanup()`
 - Prevents duplicate loops and handles edge cases (multiple starts, stop without start)
 
 **Thruster Types:**
+
 - **Main Thruster (forward acceleration):**
   - Start burst: 180-260ms, sawtooth oscillator, pitch ramp 180→220Hz
   - Loop: 1.0-1.5s tileable noise buffer, saw (40%) + square (60%) mix at ~85Hz
@@ -73,22 +79,26 @@ Implemented procedural thruster sounds with start→loop→stop architecture dir
   - Band-pass filter: 3.5kHz center
 
 **Audio Architecture:**
+
 - **Start Phase:** Plays short burst sound (180-260ms for main, 160-220ms for retro, 90-150ms for side) with pitch ramp and noise component
 - **Loop Phase:** Continuous tileable sound using oscillator mix (saw 40% + square 60%) + band-passed noise, set to `noiseSource.loop = true`
 - **Stop Phase:** Release sound with pitch drop and filter sweep, cleanup of loop nodes
 
 **EQ Filter Chain (Start Bursts):**
+
 - HPF: 70Hz (remove subsonic rumble)
 - Peaking: 250Hz, +3dB (body/warmth)
 - Peaking: 3kHz, +2dB (presence/clarity)
 
 **State Management:**
+
 - Event handler: `handleThrusterEffect(data)` receives events from PlayerSystem
 - Type mapping: `'aux'` → `'retro'`, `'main'` stays `'main'`, `'side'` stays `'side'`
 - Intensity thresholds: `startThreshold: 0.1`, `stopThreshold: 0.05` (hysteresis prevents flapping)
 - Tracks last intensity per type to detect state changes
 
 **Integration:**
+
 - Event listener: `'thruster-effect'` from PlayerSystem (lines 728-771)
 - Uses existing `AudioPool` for node pooling (oscillators, gains, buffer sources)
 - Uses `AudioCache` for tileable noise buffer generation with family-based scoping
@@ -97,6 +107,7 @@ Implemented procedural thruster sounds with start→loop→stop architecture dir
 - Cleanup: `thrusterLoopManager.cleanup()` called in `AudioSystem.reset()`
 
 **Key Design Decisions:**
+
 1. **Tileable Loops:** Noise buffers use `loop = true` on AudioBufferSourceNode for seamless continuous playback
 2. **Hysteresis:** Start threshold (0.1) > stop threshold (0.05) prevents rapid on/off cycling
 3. **Simplified Side Thrusters:** Single mono sound instead of stereo left/right (game handles spatial audio)
@@ -104,6 +115,7 @@ Implemented procedural thruster sounds with start→loop→stop architecture dir
 5. **Safeguards:** ThrusterLoopManager prevents duplicate loops, handles cleanup edge cases
 
 **Performance Optimizations:**
+
 - Loops reuse pooled nodes (not returned until stop)
 - Noise buffers cached per family (thrusterMain, thrusterRetro, thrusterSide)
 - Intensity updates without recreating nodes (smooth gain ramp)
@@ -118,6 +130,7 @@ Implemented procedural UI sounds with deterministic variations for enhanced user
 **UI Sound Types:**
 
 **1. UI Hover (button mouseenter):**
+
 - **Purpose:** Brief audio feedback when hovering over interactive buttons
 - **Variations:** 5 deterministic variations via `uiHover` random scope
 - **Duration:** 80-150ms (randomized per variation)
@@ -134,6 +147,7 @@ Implemented procedural UI sounds with deterministic variations for enhanced user
 - **Batching:** Integrated with AudioBatcher using overlap prevention (~80ms minInterval)
 
 **2. UI Select/Confirm (button click):**
+
 - **Purpose:** Distinctive feedback for button activation (replaces deprecated `playButtonClick()`)
 - **Variations:** 5 deterministic variations via `uiSelect` random scope
 - **Duration:** 120-180ms (randomized per variation)
@@ -152,6 +166,7 @@ Implemented procedural UI sounds with deterministic variations for enhanced user
 - **Gain:** -9dB peak (0.355 linear)
 
 **3. UI StartGame (game start action):**
+
 - **Purpose:** Exciting audio signature when starting/restarting game
 - **Variations:** 2 deterministic variations via `uiStartGame` random scope (sine vs triangle)
 - **Duration:** 300-450ms (randomized)
@@ -175,12 +190,14 @@ Implemented procedural UI sounds with deterministic variations for enhanced user
 **Technical Architecture:**
 
 **Random Scopes:**
+
 - `uiHover`: Forked from `'audio:family:ui:hover'`
 - `uiSelect`: Forked from `'audio:family:ui:select'`
 - `uiStartGame`: Forked from `'audio:family:ui:startgame'`
 - All scopes provide deterministic variations for consistent playback across game resets
 
 **Event Integration:**
+
 - **AudioSystem listeners:**
   - `'ui-hover'` → Schedules `playUIHover()` via AudioBatcher (overlap prevention)
   - `'input-confirmed'` → Calls `playUISelect()` directly
@@ -197,11 +214,13 @@ Implemented procedural UI sounds with deterministic variations for enhanced user
   - Payload: `{ source, timestamp: Date.now() }`
 
 **AudioBatcher Integration:**
+
 - Added `'playUIHover'` to `batchableSounds` array (line 221)
 - Added UI category to `_getSoundCategory()`: Returns `'ui'` for sounds containing 'UI' or 'ui' (line 675)
 - Overlap prevention: Hover sounds use minInterval ~80ms to prevent accumulation during rapid navigation
 
 **Performance Characteristics:**
+
 - **playUIHover:** <1ms synthesis time, dual-oscillator with 2 filters
 - **playUISelect:** <2ms synthesis time, single-oscillator with modulation
 - **playUIStartGame:** <5ms synthesis time (includes delay setup, no convolution)
@@ -212,36 +231,43 @@ Implemented procedural UI sounds with deterministic variations for enhanced user
 **Design Decisions:**
 
 **ADAPTATION 1 - Simplified Reverb:**
+
 - Replaced complex ConvolverNode + impulse response generation with delay-based feedback reverb
 - Rationale: Convolution impulse generation causes GC pressure and potential audio glitches
 - Result: Same spatial effect with simpler, more performant implementation
 
 **ADAPTATION 2 - GameSessionService Pattern:**
+
 - Used wrapper method `emitGameStarted()` instead of direct `gameEvents.emit()`
 - Follows established pattern (matches `emitPauseState`, `emitScreenChanged`)
 - Maintains consistency with service architecture
 
 **ADAPTATION 3 - AudioBatcher Category:**
+
 - Added explicit 'ui' category for proper overlap tracking
 - Ensures hover sounds batch correctly with appropriate minInterval
 
 **ADAPTATION 5 - Simplified playUISelect:**
+
 - Single oscillator with frequency modulation instead of two separate transients
 - Achieves same "down-up" feel with less code complexity
 - More efficient node usage (1 oscillator vs 2)
 
 **Backward Compatibility:**
+
 - `playButtonClick()` method retained with `@deprecated` JSDoc tag
 - Existing references (if any) continue to work
 - New code should use `playUISelect()` for better UX
 
 **Accessibility:**
+
 - Brief durations (80-450ms) don't interfere with screen readers
 - AudioBatcher prevents sound accumulation during keyboard navigation
 - No changes to ARIA attributes or focus management required
 - Hover sounds provide optional feedback, not critical information
 
 **Code Locations:**
+
 - [AudioSystem.js:2848-2850](../src/modules/AudioSystem.js#L2848-L2850) - Random scope creation
 - [AudioSystem.js:608-620](../src/modules/AudioSystem.js#L608-L620) - Event listeners
 - [AudioSystem.js:3273-3538](../src/modules/AudioSystem.js#L3273-L3538) - Sound methods (playUIHover, playUISelect, playUIStartGame)

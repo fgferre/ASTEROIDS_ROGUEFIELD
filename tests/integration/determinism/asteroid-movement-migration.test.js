@@ -11,7 +11,11 @@
 import { describe, expect, it } from 'vitest';
 import { createTestContainer } from '../../__helpers__/setup.js';
 import { EnemySystem } from '../../../src/modules/EnemySystem.js';
-import { GAME_WIDTH, GAME_HEIGHT, SHIP_SIZE } from '../../../src/core/GameConstants.js';
+import {
+  GAME_WIDTH,
+  GAME_HEIGHT,
+  SHIP_SIZE,
+} from '../../../src/core/GameConstants.js';
 
 /**
  * Creates an EnemySystem instance with deterministic random seed
@@ -134,7 +138,7 @@ describe('Asteroid movement migration to generic MovementComponent', () => {
         x: spacing * (index + 1), // Evenly spaced horizontally
         y: GAME_HEIGHT / 2, // Centered vertically
         size: 'large',
-        variant: variant
+        variant: variant,
       });
       if (asteroid) {
         system1.registerActiveEnemy(asteroid);
@@ -153,7 +157,7 @@ describe('Asteroid movement migration to generic MovementComponent', () => {
         x: spacing * (index + 1),
         y: GAME_HEIGHT / 2,
         size: 'large',
-        variant: variant
+        variant: variant,
       });
       if (asteroid) {
         system2.registerActiveEnemy(asteroid);
@@ -173,13 +177,14 @@ describe('Asteroid movement migration to generic MovementComponent', () => {
     const frameCount = 50;
 
     // First run
-    const { system: system1, player: player1 } = createEnemySystemWithSeed(seed);
+    const { system: system1, player: player1 } =
+      createEnemySystemWithSeed(seed);
 
     const asteroid1 = system1.acquireAsteroid({
       x: 100,
       y: 100,
       size: 'large',
-      variant: 'parasite'
+      variant: 'parasite',
     });
     if (asteroid1) {
       system1.registerActiveEnemy(asteroid1);
@@ -201,13 +206,14 @@ describe('Asteroid movement migration to generic MovementComponent', () => {
     }
 
     // Second run with same seed
-    const { system: system2, player: player2 } = createEnemySystemWithSeed(seed);
+    const { system: system2, player: player2 } =
+      createEnemySystemWithSeed(seed);
 
     const asteroid2 = system2.acquireAsteroid({
       x: 100,
       y: 100,
       size: 'large',
-      variant: 'parasite'
+      variant: 'parasite',
     });
     if (asteroid2) {
       system2.registerActiveEnemy(asteroid2);
@@ -242,7 +248,7 @@ describe('Asteroid movement migration to generic MovementComponent', () => {
       x: GAME_WIDTH / 2,
       y: GAME_HEIGHT / 2,
       size: 'large',
-      variant: 'volatile'
+      variant: 'volatile',
     });
     if (volatileAsteroid1) {
       system1.registerActiveEnemy(volatileAsteroid1);
@@ -258,7 +264,7 @@ describe('Asteroid movement migration to generic MovementComponent', () => {
       x: GAME_WIDTH / 2,
       y: GAME_HEIGHT / 2,
       size: 'large',
-      variant: 'volatile'
+      variant: 'volatile',
     });
     if (volatileAsteroid2) {
       system2.registerActiveEnemy(volatileAsteroid2);

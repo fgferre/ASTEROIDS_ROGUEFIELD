@@ -25,11 +25,13 @@ describe('Reward Mechanics - Orb Drops', () => {
     mockXPOrbSystem = {
       createXPOrb: vi.fn((x, y, value, options) => {
         droppedOrbs.push({ x, y, value, options });
-      })
+      }),
     };
 
     mockEnemySystem = {
-      getCachedWorld: () => ({ getBounds: () => ({ width: 800, height: 600 }) })
+      getCachedWorld: () => ({
+        getBounds: () => ({ width: 800, height: 600 }),
+      }),
     };
 
     rewardManager = new RewardManager(mockEnemySystem, mockXPOrbSystem);
@@ -48,13 +50,13 @@ describe('Reward Mechanics - Orb Drops', () => {
         wave: 1,
         x: 100,
         y: 100,
-        radius: 12
+        radius: 12,
       };
 
       rewardManager.dropRewards(enemy);
 
       // All orbs should have value of 5
-      droppedOrbs.forEach(orb => {
+      droppedOrbs.forEach((orb) => {
         expect(orb.value).toBe(5);
       });
     });
@@ -69,7 +71,7 @@ describe('Reward Mechanics - Orb Drops', () => {
         wave: 1,
         x: 100,
         y: 100,
-        radius: 35
+        radius: 35,
       };
 
       rewardManager.dropRewards(enemy);
@@ -87,7 +89,7 @@ describe('Reward Mechanics - Orb Drops', () => {
         wave: 1,
         x: 100,
         y: 100,
-        radius: 22
+        radius: 22,
       };
 
       rewardManager.dropRewards(enemy);
@@ -105,7 +107,7 @@ describe('Reward Mechanics - Orb Drops', () => {
         wave: 1,
         x: 100,
         y: 100,
-        radius: 12
+        radius: 12,
       };
 
       rewardManager.dropRewards(enemy);
@@ -123,7 +125,9 @@ describe('Reward Mechanics - Orb Drops', () => {
         size: 'medium',
         variant: 'common',
         wave: 1,
-        x: 100, y: 100, radius: 22
+        x: 100,
+        y: 100,
+        radius: 22,
       };
 
       rewardManager.dropRewards(enemy);
@@ -139,7 +143,9 @@ describe('Reward Mechanics - Orb Drops', () => {
         size: 'medium',
         variant: 'iron',
         wave: 1,
-        x: 100, y: 100, radius: 22
+        x: 100,
+        y: 100,
+        radius: 22,
       };
 
       rewardManager.dropRewards(enemy);
@@ -155,7 +161,9 @@ describe('Reward Mechanics - Orb Drops', () => {
         size: 'medium',
         variant: 'gold',
         wave: 1,
-        x: 100, y: 100, radius: 22
+        x: 100,
+        y: 100,
+        radius: 22,
       };
 
       rewardManager.dropRewards(enemy);
@@ -171,7 +179,9 @@ describe('Reward Mechanics - Orb Drops', () => {
         size: 'medium',
         variant: 'volatile',
         wave: 1,
-        x: 100, y: 100, radius: 22
+        x: 100,
+        y: 100,
+        radius: 22,
       };
 
       rewardManager.dropRewards(enemy);
@@ -187,7 +197,9 @@ describe('Reward Mechanics - Orb Drops', () => {
         size: 'medium',
         variant: 'parasite',
         wave: 1,
-        x: 100, y: 100, radius: 22
+        x: 100,
+        y: 100,
+        radius: 22,
       };
 
       rewardManager.dropRewards(enemy);
@@ -203,7 +215,9 @@ describe('Reward Mechanics - Orb Drops', () => {
         size: 'medium',
         variant: 'crystal',
         wave: 1,
-        x: 100, y: 100, radius: 22
+        x: 100,
+        y: 100,
+        radius: 22,
       };
 
       rewardManager.dropRewards(enemy);
@@ -219,7 +233,9 @@ describe('Reward Mechanics - Orb Drops', () => {
         size: 'medium',
         variant: 'denseCore',
         wave: 1,
-        x: 100, y: 100, radius: 22
+        x: 100,
+        y: 100,
+        radius: 22,
       };
 
       rewardManager.dropRewards(enemy);
@@ -234,14 +250,16 @@ describe('Reward Mechanics - Orb Drops', () => {
     test('Wave 1-4: +0 bonus orbs', () => {
       const waves = [1, 2, 3, 4];
 
-      waves.forEach(wave => {
+      waves.forEach((wave) => {
         droppedOrbs = [];
         const enemy = {
           type: 'asteroid',
           size: 'medium',
           variant: 'common',
           wave: wave,
-          x: 100, y: 100, radius: 22
+          x: 100,
+          y: 100,
+          radius: 22,
         };
 
         rewardManager.dropRewards(enemy);
@@ -254,14 +272,16 @@ describe('Reward Mechanics - Orb Drops', () => {
     test('Wave 5-9: +1 bonus orb', () => {
       const waves = [5, 6, 7, 8, 9];
 
-      waves.forEach(wave => {
+      waves.forEach((wave) => {
         droppedOrbs = [];
         const enemy = {
           type: 'asteroid',
           size: 'medium',
           variant: 'common',
           wave: wave,
-          x: 100, y: 100, radius: 22
+          x: 100,
+          y: 100,
+          radius: 22,
         };
 
         rewardManager.dropRewards(enemy);
@@ -277,7 +297,9 @@ describe('Reward Mechanics - Orb Drops', () => {
         size: 'medium',
         variant: 'common',
         wave: 10,
-        x: 100, y: 100, radius: 22
+        x: 100,
+        y: 100,
+        radius: 22,
       };
 
       rewardManager.dropRewards(enemy);
@@ -300,7 +322,9 @@ describe('Reward Mechanics - Orb Drops', () => {
           size: 'medium',
           variant: 'common',
           wave: wave,
-          x: 100, y: 100, radius: 22
+          x: 100,
+          y: 100,
+          radius: 22,
         };
 
         rewardManager.dropRewards(enemy);
@@ -318,7 +342,9 @@ describe('Reward Mechanics - Orb Drops', () => {
         size: 'small',
         variant: 'common',
         wave: 1,
-        x: 100, y: 100, radius: 12
+        x: 100,
+        y: 100,
+        radius: 12,
       };
 
       rewardManager.dropRewards(enemy);
@@ -342,7 +368,9 @@ describe('Reward Mechanics - Orb Drops', () => {
         size: 'medium',
         variant: 'common',
         wave: 1,
-        x: 100, y: 100, radius: 22
+        x: 100,
+        y: 100,
+        radius: 22,
       };
 
       rewardManager.dropRewards(enemy);
@@ -359,7 +387,9 @@ describe('Reward Mechanics - Orb Drops', () => {
         size: 'large',
         variant: 'common',
         wave: 1,
-        x: 100, y: 100, radius: 35
+        x: 100,
+        y: 100,
+        radius: 35,
       };
 
       rewardManager.dropRewards(enemy);
@@ -375,7 +405,9 @@ describe('Reward Mechanics - Orb Drops', () => {
         size: 'large',
         variant: 'parasite',
         wave: 1,
-        x: 100, y: 100, radius: 35
+        x: 100,
+        y: 100,
+        radius: 35,
       };
 
       rewardManager.dropRewards(enemy);
@@ -394,7 +426,9 @@ describe('Reward Mechanics - Orb Drops', () => {
         size: 'medium',
         variant: 'gold',
         wave: 1,
-        x: 100, y: 100, radius: 22
+        x: 100,
+        y: 100,
+        radius: 22,
       };
 
       rewardManager.dropRewards(enemy);
@@ -412,7 +446,9 @@ describe('Reward Mechanics - Orb Drops', () => {
         size: 'medium',
         variant: 'common',
         wave: 1,
-        x: 100, y: 100, radius: 22
+        x: 100,
+        y: 100,
+        radius: 22,
       };
 
       rewardManager.dropRewards(enemy);
@@ -428,7 +464,9 @@ describe('Reward Mechanics - Orb Drops', () => {
         size: 'large',
         variant: 'parasite',
         wave: 1,
-        x: 100, y: 100, radius: 35
+        x: 100,
+        y: 100,
+        radius: 35,
       };
 
       rewardManager.dropRewards(enemy);
@@ -449,13 +487,13 @@ describe('Reward Mechanics - Orb Drops', () => {
         wave: 1,
         x: 400,
         y: 300,
-        radius: 22
+        radius: 22,
       };
 
       rewardManager.dropRewards(enemy);
 
       // All orbs should be near the enemy
-      droppedOrbs.forEach(orb => {
+      droppedOrbs.forEach((orb) => {
         const distance = Math.hypot(orb.x - 400, orb.y - 300);
         expect(distance).toBeLessThan(100); // Within reasonable scatter range
       });
@@ -467,13 +505,15 @@ describe('Reward Mechanics - Orb Drops', () => {
         size: 'medium',
         variant: 'common',
         wave: 1,
-        x: 400, y: 300, radius: 22
+        x: 400,
+        y: 300,
+        radius: 22,
       };
 
       rewardManager.dropRewards(enemy);
 
       // All orbs should have velocity
-      droppedOrbs.forEach(orb => {
+      droppedOrbs.forEach((orb) => {
         expect(orb.options.vx).toBeDefined();
         expect(orb.options.vy).toBeDefined();
 

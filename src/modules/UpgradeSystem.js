@@ -4,7 +4,10 @@ import {
 } from '../core/GameConstants.js';
 import UPGRADE_LIBRARY, { UPGRADE_CATEGORIES } from '../data/upgrades/index.js';
 import { BaseSystem } from '../core/BaseSystem.js';
-import { MAGNETISM_FORCE, MAGNETISM_RADIUS } from '../data/constants/gameplay.js';
+import {
+  MAGNETISM_FORCE,
+  MAGNETISM_RADIUS,
+} from '../data/constants/gameplay.js';
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
 
@@ -54,7 +57,8 @@ class UpgradeSystem extends BaseSystem {
   }
 
   refreshInjectedServices(options = {}) {
-    const force = typeof options === 'boolean' ? options : Boolean(options.force);
+    const force =
+      typeof options === 'boolean' ? options : Boolean(options.force);
 
     this.resolveCachedServices(
       {
@@ -97,9 +101,7 @@ class UpgradeSystem extends BaseSystem {
       this.isUpgradeSelectable(definition)
     );
 
-    const fallbackCount = Number.isFinite(
-      PROGRESSION_UPGRADE_FALLBACK_COUNT
-    )
+    const fallbackCount = Number.isFinite(PROGRESSION_UPGRADE_FALLBACK_COUNT)
       ? Math.max(1, Math.floor(PROGRESSION_UPGRADE_FALLBACK_COUNT))
       : 3;
     const numericCount = Number(count);
@@ -726,7 +728,10 @@ class UpgradeSystem extends BaseSystem {
     }
 
     if (!this.isUpgradeSelectable(definition)) {
-      console.warn(`[${systemLabel}] Upgrade prerequisites not met:`, upgradeId);
+      console.warn(
+        `[${systemLabel}] Upgrade prerequisites not met:`,
+        upgradeId
+      );
       return false;
     }
 
@@ -806,7 +811,10 @@ class UpgradeSystem extends BaseSystem {
         return;
       }
 
-      console.warn(`[${this.getSystemLabel()}] Unknown upgrade effect type:`, type);
+      console.warn(
+        `[${this.getSystemLabel()}] Unknown upgrade effect type:`,
+        type
+      );
     });
   }
 
@@ -865,7 +873,10 @@ class UpgradeSystem extends BaseSystem {
       return;
     }
 
-    console.warn(`[${this.getSystemLabel()}] Unknown progression property:`, property);
+    console.warn(
+      `[${this.getSystemLabel()}] Unknown progression property:`,
+      property
+    );
   }
 
   getUpgradeProgressSnapshot() {
@@ -874,8 +885,6 @@ class UpgradeSystem extends BaseSystem {
       level,
     }));
   }
-
-  
 }
 
 export default UpgradeSystem;

@@ -16,7 +16,7 @@ class RenderBatch {
       globalAlpha: null,
       shadowBlur: null,
       shadowColor: null,
-      globalCompositeOperation: null
+      globalCompositeOperation: null,
     };
 
     // Batch collections
@@ -28,7 +28,7 @@ class RenderBatch {
       totalDrawCalls: 0,
       batchedDrawCalls: 0,
       stateChanges: 0,
-      savedStates: 0
+      savedStates: 0,
     };
 
     // Cache for common patterns
@@ -50,7 +50,7 @@ class RenderBatch {
         state: { ...state },
         operations: [],
         key: batchKey,
-        reused: 0
+        reused: 0,
       });
     }
 
@@ -83,9 +83,11 @@ class RenderBatch {
   addCircle(x, y, radius, fillStyle = null, strokeStyle = null) {
     this.addOperation({
       type: 'circle',
-      x, y, radius,
+      x,
+      y,
+      radius,
       fillStyle,
-      strokeStyle
+      strokeStyle,
     });
   }
 
@@ -95,9 +97,12 @@ class RenderBatch {
   addLine(x1, y1, x2, y2, strokeStyle = null, lineWidth = null) {
     this.addOperation({
       type: 'line',
-      x1, y1, x2, y2,
+      x1,
+      y1,
+      x2,
+      y2,
       strokeStyle,
-      lineWidth
+      lineWidth,
     });
   }
 
@@ -107,9 +112,12 @@ class RenderBatch {
   addRect(x, y, width, height, fillStyle = null, strokeStyle = null) {
     this.addOperation({
       type: 'rect',
-      x, y, width, height,
+      x,
+      y,
+      width,
+      height,
       fillStyle,
-      strokeStyle
+      strokeStyle,
     });
   }
 
@@ -121,7 +129,7 @@ class RenderBatch {
       type: 'path',
       pathData,
       fillStyle,
-      strokeStyle
+      strokeStyle,
     });
   }
 
@@ -299,7 +307,10 @@ class RenderBatch {
 
     this.stats.stateChanges += changes;
     if (changes > 0) {
-      this.stats.savedStates += Math.max(0, Object.keys(state).length - changes);
+      this.stats.savedStates += Math.max(
+        0,
+        Object.keys(state).length - changes
+      );
     }
   }
 
@@ -402,7 +413,7 @@ class RenderBatch {
       operation.type,
       operation.fillStyle || 'null',
       operation.strokeStyle || 'null',
-      operation.lineWidth || 'null'
+      operation.lineWidth || 'null',
     ].join('|');
   }
 
@@ -410,9 +421,12 @@ class RenderBatch {
    * Get performance statistics
    */
   getStats() {
-    const efficiency = this.stats.totalDrawCalls > 0
-      ? (this.stats.savedStates / this.stats.totalDrawCalls * 100).toFixed(1)
-      : 0;
+    const efficiency =
+      this.stats.totalDrawCalls > 0
+        ? ((this.stats.savedStates / this.stats.totalDrawCalls) * 100).toFixed(
+            1
+          )
+        : 0;
 
     return {
       ...this.stats,
@@ -420,8 +434,8 @@ class RenderBatch {
       activeBatches: this.batches.size,
       cacheHits: {
         gradients: this.gradientCache.size,
-        paths: this.pathCache.size
-      }
+        paths: this.pathCache.size,
+      },
     };
   }
 
@@ -433,7 +447,7 @@ class RenderBatch {
       totalDrawCalls: 0,
       batchedDrawCalls: 0,
       stateChanges: 0,
-      savedStates: 0
+      savedStates: 0,
     };
   }
 

@@ -184,7 +184,10 @@ export default class RandomService {
       throw new TypeError('weightedPick expects a Map, array, or object');
     }
 
-    const total = entries.reduce((sum, { weight }) => sum + (Number(weight) || 0), 0);
+    const total = entries.reduce(
+      (sum, { weight }) => sum + (Number(weight) || 0),
+      0
+    );
     if (!Number.isFinite(total) || total <= 0) {
       return undefined;
     }
@@ -219,7 +222,10 @@ export default class RandomService {
 
     if (scopeOrSeed === undefined) {
       derivedSeed = this._nextUint32();
-    } else if (typeof scopeOrSeed === 'number' || typeof scopeOrSeed === 'bigint') {
+    } else if (
+      typeof scopeOrSeed === 'number' ||
+      typeof scopeOrSeed === 'bigint'
+    ) {
       derivedSeed = this._normalizeSeed(scopeOrSeed);
       scopeLabel = `seed:${String(scopeOrSeed)}`;
     } else {

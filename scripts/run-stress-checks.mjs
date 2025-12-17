@@ -138,9 +138,7 @@ globalThis.gameServices.register('enemies', enemiesStub);
 const { default: ProgressionSystem } = await import(
   '../src/modules/ProgressionSystem.js'
 );
-const { default: XPOrbSystem } = await import(
-  '../src/modules/XPOrbSystem.js'
-);
+const { default: XPOrbSystem } = await import('../src/modules/XPOrbSystem.js');
 const { default: PhysicsSystem } = await import(
   '../src/modules/PhysicsSystem.js'
 );

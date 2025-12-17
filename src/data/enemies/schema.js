@@ -37,18 +37,18 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
  * @deprecated {number} speed - Use 'maxSpeed' instead (backward compatible via fallback)
  */
 export const MOVEMENT_SCHEMA = deepFreeze({
-  strategy: 'tracking',       // Required: movement behavior type
-  maxSpeed: 180,              // Required: maximum velocity (NOT 'speed')
-  acceleration: 260,          // Required: acceleration rate
-  damping: 1.0,               // Optional: velocity damping (0-1)
-  targetingRange: 460,        // Optional: player detection range
-  preferredDistance: 175,     // Optional: orbit distance
-  orbitDirection: 1,          // Optional: orbit clockwise/counter
-  safeDistance: 240,          // Optional: seeking minimum distance
-  jitter: 0.1,                // Optional: seeking jitter multiplier
-  driftSpeed: 0,              // Optional: proximity drift velocity
-  driftVariance: 12,          // Optional: proximity drift variance
-  lifetime: 30,               // Optional: proximity lifetime
+  strategy: 'tracking', // Required: movement behavior type
+  maxSpeed: 180, // Required: maximum velocity (NOT 'speed')
+  acceleration: 260, // Required: acceleration rate
+  damping: 1.0, // Optional: velocity damping (0-1)
+  targetingRange: 460, // Optional: player detection range
+  preferredDistance: 175, // Optional: orbit distance
+  orbitDirection: 1, // Optional: orbit clockwise/counter
+  safeDistance: 240, // Optional: seeking minimum distance
+  jitter: 0.1, // Optional: seeking jitter multiplier
+  driftSpeed: 0, // Optional: proximity drift velocity
+  driftVariance: 12, // Optional: proximity drift variance
+  lifetime: 30, // Optional: proximity lifetime
 });
 
 /**
@@ -82,23 +82,23 @@ export const MOVEMENT_SCHEMA = deepFreeze({
  * @deprecated {number} burstInterval - Use 'cooldown' instead (backward compatible via fallback)
  */
 export const WEAPON_SCHEMA = deepFreeze({
-  pattern: 'single',          // Required: attack pattern type
-  damage: 14,                 // Required: projectile damage
-  speed: 320,                 // Required: projectile velocity
-  lifetime: 3.5,              // Required: projectile lifetime
-  cooldown: 2.0,              // Required: time between attacks (NOT 'fireRate'/'interval')
-  variance: 0.35,             // Optional: cooldown randomization
-  spread: 0.06,               // Optional: aiming variance
-  predictive: true,           // Optional: lead targeting
-  fireRange: 520,             // Optional: maximum range
-  burstCount: 3,              // Optional: burst shots
-  burstDelay: 0.15,           // Optional: burst shot delay
-  projectileCount: 5,         // Optional: spread projectiles
-  arc: Math.PI / 4,           // Optional: spread arc
-  explosionRadius: 120,       // Optional: proximity explosion
-  proximityRadius: 80,        // Optional: proximity trigger
-  armTime: 0.5,               // Optional: proximity arm delay
-  triggerOnProximity: true,   // Optional: proximity auto-trigger
+  pattern: 'single', // Required: attack pattern type
+  damage: 14, // Required: projectile damage
+  speed: 320, // Required: projectile velocity
+  lifetime: 3.5, // Required: projectile lifetime
+  cooldown: 2.0, // Required: time between attacks (NOT 'fireRate'/'interval')
+  variance: 0.35, // Optional: cooldown randomization
+  spread: 0.06, // Optional: aiming variance
+  predictive: true, // Optional: lead targeting
+  fireRange: 520, // Optional: maximum range
+  burstCount: 3, // Optional: burst shots
+  burstDelay: 0.15, // Optional: burst shot delay
+  projectileCount: 5, // Optional: spread projectiles
+  arc: Math.PI / 4, // Optional: spread arc
+  explosionRadius: 120, // Optional: proximity explosion
+  proximityRadius: 80, // Optional: proximity trigger
+  armTime: 0.5, // Optional: proximity arm delay
+  triggerOnProximity: true, // Optional: proximity auto-trigger
 });
 
 /**
@@ -118,15 +118,15 @@ export const WEAPON_SCHEMA = deepFreeze({
  * @property {boolean} [showPhaseColor] - Boss: phase-based coloring
  */
 export const RENDER_SCHEMA = deepFreeze({
-  strategy: 'procedural',     // Required: render approach
-  shape: 'triangle',          // Required (procedural): visual shape
-  showThrust: true,           // Optional: triangle exhaust
-  showTurret: true,           // Optional: diamond turret
-  showPulse: true,            // Optional: sphere pulse
-  pulseSpeed: 2.0,            // Optional: pulse frequency
-  pulseAmount: 0.15,          // Optional: pulse amplitude
-  showAura: true,             // Optional: boss aura
-  showPhaseColor: true,       // Optional: boss phase colors
+  strategy: 'procedural', // Required: render approach
+  shape: 'triangle', // Required (procedural): visual shape
+  showThrust: true, // Optional: triangle exhaust
+  showTurret: true, // Optional: diamond turret
+  showPulse: true, // Optional: sphere pulse
+  pulseSpeed: 2.0, // Optional: pulse frequency
+  pulseAmount: 0.15, // Optional: pulse amplitude
+  showAura: true, // Optional: boss aura
+  showPhaseColor: true, // Optional: boss phase colors
 });
 
 /**
@@ -141,10 +141,10 @@ export const RENDER_SCHEMA = deepFreeze({
  * @property {number} [contactDamage] - Damage dealt on collision
  */
 export const COLLISION_SCHEMA = deepFreeze({
-  shape: 'circle',            // Required: collision shape
-  radius: 20,                 // Required: collision radius
-  response: 'damage',         // Required: collision behavior
-  contactDamage: 50,          // Optional: collision damage
+  shape: 'circle', // Required: collision shape
+  radius: 20, // Required: collision radius
+  response: 'damage', // Required: collision behavior
+  contactDamage: 50, // Optional: collision damage
 });
 
 /**
@@ -160,11 +160,11 @@ export const COLLISION_SCHEMA = deepFreeze({
  * @property {number} [invulnerabilityDuration] - Boss: phase transition invulnerability time
  */
 export const HEALTH_SCHEMA = deepFreeze({
-  base: 50,                   // Required: base health
-  armor: 0,                   // Optional: damage reduction
-  scaling: 1.5,               // Optional: wave scaling
+  base: 50, // Required: base health
+  armor: 0, // Optional: damage reduction
+  scaling: 1.5, // Optional: wave scaling
   phaseThresholds: [0.66, 0.33], // Optional: boss phase thresholds
-  invulnerabilityDuration: 1.0,  // Optional: boss phase invuln
+  invulnerabilityDuration: 1.0, // Optional: boss phase invuln
 });
 
 /**
@@ -235,20 +235,28 @@ export function validateEnemyConfig(config) {
   // Check movement component
   if (config.movement) {
     if ('speed' in config.movement) {
-      warnings.push('movement.speed is deprecated, use movement.maxSpeed instead');
+      warnings.push(
+        'movement.speed is deprecated, use movement.maxSpeed instead'
+      );
     }
   }
 
   // Check weapon component
   if (config.weapon) {
     if ('fireRate' in config.weapon) {
-      warnings.push('weapon.fireRate is deprecated, use weapon.cooldown instead');
+      warnings.push(
+        'weapon.fireRate is deprecated, use weapon.cooldown instead'
+      );
     }
     if ('interval' in config.weapon) {
-      warnings.push('weapon.interval is deprecated, use weapon.cooldown instead');
+      warnings.push(
+        'weapon.interval is deprecated, use weapon.cooldown instead'
+      );
     }
     if ('burstInterval' in config.weapon) {
-      warnings.push('weapon.burstInterval is deprecated, use weapon.cooldown instead');
+      warnings.push(
+        'weapon.burstInterval is deprecated, use weapon.cooldown instead'
+      );
     }
   }
 

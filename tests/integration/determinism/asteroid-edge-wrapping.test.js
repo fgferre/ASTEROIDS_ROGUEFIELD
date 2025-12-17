@@ -21,8 +21,18 @@ describe('Asteroid edge wrapping', () => {
     // Test all 4 edges at spawn margin (80px outside screen)
     const testCases = [
       { name: 'top edge', x: GAME_WIDTH / 2, y: -80, radius: 40 },
-      { name: 'right edge', x: GAME_WIDTH + 80, y: GAME_HEIGHT / 2, radius: 40 },
-      { name: 'bottom edge', x: GAME_WIDTH / 2, y: GAME_HEIGHT + 80, radius: 40 },
+      {
+        name: 'right edge',
+        x: GAME_WIDTH + 80,
+        y: GAME_HEIGHT / 2,
+        radius: 40,
+      },
+      {
+        name: 'bottom edge',
+        x: GAME_WIDTH / 2,
+        y: GAME_HEIGHT + 80,
+        radius: 40,
+      },
       { name: 'left edge', x: -80, y: GAME_HEIGHT / 2, radius: 40 },
     ];
 
@@ -95,7 +105,13 @@ describe('Asteroid edge wrapping', () => {
     };
 
     // Simulate asteroid spawning at right edge and drifting left (into screen)
-    const asteroid = { x: GAME_WIDTH + 80, y: GAME_HEIGHT / 2, radius: 40, vx: -100, vy: 0 };
+    const asteroid = {
+      x: GAME_WIDTH + 80,
+      y: GAME_HEIGHT / 2,
+      radius: 40,
+      vx: -100,
+      vy: 0,
+    };
     const deltaTime = 0.016; // 60 FPS
 
     // Simulate 120 frames (2 seconds) to ensure asteroid enters screen

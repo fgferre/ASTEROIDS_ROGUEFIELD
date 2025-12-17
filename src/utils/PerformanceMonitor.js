@@ -83,7 +83,9 @@ export class PerformanceMonitor {
   enableAutoLog(interval = 10000) {
     this.autoLogEnabled = true;
     this.autoLogInterval = interval;
-    console.log(`[PerformanceMonitor] Auto-logging enabled (every ${interval}ms)`);
+    console.log(
+      `[PerformanceMonitor] Auto-logging enabled (every ${interval}ms)`
+    );
   }
 
   /**
@@ -111,15 +113,21 @@ export class PerformanceMonitor {
       const logEntry = {
         timestamp: new Date().toISOString(),
         elapsed: elapsed.toFixed(0),
-        ...report
+        ...report,
       };
 
       this.sessionLogs.push(logEntry);
 
       // Save to localStorage for persistence
       try {
-        localStorage.setItem('performanceLog', JSON.stringify(this.sessionLogs));
-        console.log(`[PerformanceMonitor] Auto-log #${this.sessionLogs.length}:`, report);
+        localStorage.setItem(
+          'performanceLog',
+          JSON.stringify(this.sessionLogs)
+        );
+        console.log(
+          `[PerformanceMonitor] Auto-log #${this.sessionLogs.length}:`,
+          report
+        );
       } catch (e) {
         console.warn('[PerformanceMonitor] Failed to save log:', e);
       }

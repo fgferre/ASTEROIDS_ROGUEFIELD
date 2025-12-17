@@ -51,35 +51,29 @@ class CombatSystem extends BaseSystem {
     this.currentTarget = null;
     this.targetUpdateTimer = 0;
     this.lastShotTime = 0;
-    this.shootCooldown =
-      Number.isFinite(COMBAT_SHOOT_COOLDOWN)
-        ? Math.max(0, COMBAT_SHOOT_COOLDOWN)
-        : 0.3;
+    this.shootCooldown = Number.isFinite(COMBAT_SHOOT_COOLDOWN)
+      ? Math.max(0, COMBAT_SHOOT_COOLDOWN)
+      : 0.3;
 
     // === CONFIGURAÇÕES ===
-    this.targetingRange =
-      Number.isFinite(COMBAT_TARGETING_RANGE)
-        ? Math.max(0, COMBAT_TARGETING_RANGE)
-        : 400;
-    this.baseTargetUpdateInterval = Number.isFinite(
-      TARGET_UPDATE_INTERVAL
-    )
+    this.targetingRange = Number.isFinite(COMBAT_TARGETING_RANGE)
+      ? Math.max(0, COMBAT_TARGETING_RANGE)
+      : 400;
+    this.baseTargetUpdateInterval = Number.isFinite(TARGET_UPDATE_INTERVAL)
       ? Math.max(0.05, TARGET_UPDATE_INTERVAL)
       : 0.15;
     this.targetUpdateInterval = this.baseTargetUpdateInterval;
     this.bulletSpeed = BULLET_SPEED;
-    this.bulletLifetime =
-      Number.isFinite(COMBAT_BULLET_LIFETIME)
-        ? Math.max(0, COMBAT_BULLET_LIFETIME)
-        : 1.8;
+    this.bulletLifetime = Number.isFinite(COMBAT_BULLET_LIFETIME)
+      ? Math.max(0, COMBAT_BULLET_LIFETIME)
+      : 1.8;
     this.trailLength = TRAIL_LENGTH;
     this.enemyProjectileTrailLength = 10;
     this.bossProjectileTrailLength = 18;
     this.baseShootCooldown = this.shootCooldown;
-    this.linearPredictionTime =
-      Number.isFinite(COMBAT_PREDICTION_TIME)
-        ? Math.max(0, COMBAT_PREDICTION_TIME)
-        : 0.5;
+    this.linearPredictionTime = Number.isFinite(COMBAT_PREDICTION_TIME)
+      ? Math.max(0, COMBAT_PREDICTION_TIME)
+      : 0.5;
 
     // === CONFIGURAÇÕES DE MIRA AVANÇADA ===
     this.aimingConfig = COMBAT_AIMING_UPGRADE_CONFIG || {};
@@ -92,9 +86,7 @@ class CombatSystem extends BaseSystem {
         this.aimingConfig?.dynamicPrediction || {}
       );
     if (
-      !Number.isFinite(
-        this.defaultDynamicPredictionSettings?.fallbackLeadTime
-      )
+      !Number.isFinite(this.defaultDynamicPredictionSettings?.fallbackLeadTime)
     ) {
       this.defaultDynamicPredictionSettings.fallbackLeadTime =
         this.linearPredictionTime;
@@ -210,7 +202,12 @@ class CombatSystem extends BaseSystem {
     this.lastKnownPlayerStats = playerStats || null;
 
     // Only target and shoot when ship hull exists (visible and alive)
-    if (player && !player.isDead && !player.isRetrying && !player._quitExplosionHidden) {
+    if (
+      player &&
+      !player.isDead &&
+      !player.isRetrying &&
+      !player._quitExplosionHidden
+    ) {
       this.updateTargeting(deltaTime);
 
       if (playerStats) {
@@ -303,8 +300,8 @@ class CombatSystem extends BaseSystem {
       typeof player.getShieldRadius === 'function'
         ? player.getShieldRadius()
         : typeof player.getHullBoundingRadius === 'function'
-        ? player.getHullBoundingRadius()
-        : SHIP_SIZE || 24;
+          ? player.getHullBoundingRadius()
+          : SHIP_SIZE || 24;
 
     const enemies = this.cachedEnemies;
     if (!enemies) {
@@ -341,9 +338,10 @@ class CombatSystem extends BaseSystem {
       const candidateEntry = {
         enemy,
         distance,
-        score: scoringEnabled && score && typeof score === 'object'
-          ? score.total
-          : score,
+        score:
+          scoringEnabled && score && typeof score === 'object'
+            ? score.total
+            : score,
       };
 
       if (scoringEnabled && score && typeof score === 'object') {
@@ -455,14 +453,19 @@ class CombatSystem extends BaseSystem {
     const playerPos = player.getPosition();
     if (!playerPos) return;
 
+    // [SMART AUTO-FIRE] If no targets locked, fire forward!
     const lockTargets =
       this.currentTargetLocks && this.currentTargetLocks.length
         ? this.currentTargetLocks
         : this.currentTarget
-        ? [this.currentTarget]
-        : [];
+          ? [this.currentTarget]
+          : [];
 
+    // [SMART AUTO-FIRE] Fallback to forward fire if no lock
     if (!lockTargets.length) {
+      const rotation =
+        typeof player.getAngle === 'function' ? player.getAngle() : 0;
+      this.fireForward(playerPos, rotation, playerStats);
       return;
     }
 
@@ -470,27 +473,29 @@ class CombatSystem extends BaseSystem {
     const usingAdvancedBattery = this.targetingUpgradeLevel >= 3;
 
     const assignments = usingAdvancedBattery
-      ? (Array.isArray(this.currentLockAssignments) &&
-          this.currentLockAssignments.length
-          ? this.currentLockAssignments
-          : lockTargets.map((enemy, index) => ({
-              enemy,
-              predictedAim:
-                this.predictedAimPointsMap.get(enemy.id) ||
-                this.getPredictedTargetPosition(enemy, playerPos) ||
-                { x: enemy.x, y: enemy.y },
-              fireOrigin: { ...playerPos },
-              fireOffset: { x: 0, y: 0 },
-              duplicateIndex: index,
-              duplicateCount: lockTargets.length,
-              index,
-            })))
+      ? Array.isArray(this.currentLockAssignments) &&
+        this.currentLockAssignments.length
+        ? this.currentLockAssignments
+        : lockTargets.map((enemy, index) => ({
+            enemy,
+            predictedAim: this.predictedAimPointsMap.get(enemy.id) ||
+              this.getPredictedTargetPosition(enemy, playerPos) || {
+                x: enemy.x,
+                y: enemy.y,
+              },
+            fireOrigin: { ...playerPos },
+            fireOffset: { x: 0, y: 0 },
+            duplicateIndex: index,
+            duplicateCount: lockTargets.length,
+            index,
+          }))
       : lockTargets.map((enemy, index) => ({
           enemy,
-          predictedAim:
-            this.predictedAimPointsMap.get(enemy.id) ||
-            this.getPredictedTargetPosition(enemy, playerPos) ||
-            { x: enemy.x, y: enemy.y },
+          predictedAim: this.predictedAimPointsMap.get(enemy.id) ||
+            this.getPredictedTargetPosition(enemy, playerPos) || {
+              x: enemy.x,
+              y: enemy.y,
+            },
           fireOrigin: { ...playerPos },
           fireOffset: { x: 0, y: 0 },
           duplicateIndex: index,
@@ -499,6 +504,8 @@ class CombatSystem extends BaseSystem {
         }));
 
     if (!assignments.length) {
+      // Should not happen due to check above, but safely fire forward just in case
+      this.fireForward(playerPos, player.getRotation(), playerStats);
       return;
     }
 
@@ -527,9 +534,10 @@ class CombatSystem extends BaseSystem {
         : null;
 
       if (!aimPoint) {
-        const predicted =
-          this.getPredictedTargetPosition(assignment.enemy, playerPos) ||
-          { x: assignment.enemy.x, y: assignment.enemy.y };
+        const predicted = this.getPredictedTargetPosition(
+          assignment.enemy,
+          playerPos
+        ) || { x: assignment.enemy.x, y: assignment.enemy.y };
         if (usingAdvancedBattery) {
           const offset = this.computeParallelOffset(
             playerPos,
@@ -558,8 +566,8 @@ class CombatSystem extends BaseSystem {
           y: playerPos.y + assignment.fireOffset.y,
         };
         aimPoint = {
-          x: (assignment.predictedAim?.x ?? aimPoint.x),
-          y: (assignment.predictedAim?.y ?? aimPoint.y),
+          x: assignment.predictedAim?.x ?? aimPoint.x,
+          y: assignment.predictedAim?.y ?? aimPoint.y,
         };
       }
 
@@ -606,12 +614,63 @@ class CombatSystem extends BaseSystem {
   }
 
   canShoot() {
-    return (
-      this.lastShotTime >= this.shootCooldown &&
-      this.currentTarget &&
-      !this.currentTarget.destroyed &&
-      this.isValidTarget(this.currentTarget)
-    );
+    // [SMART AUTO-FIRE] Allow firing if cooldown is ready.
+    // We no longer require a forced target lock.
+    return this.lastShotTime >= this.shootCooldown;
+  }
+
+  // [SMART AUTO-FIRE] Helper: Fire forward relative to ship rotation
+  fireForward(playerPos, rotation, playerStats) {
+    const totalShots = Math.max(1, Math.floor(playerStats?.multishot ?? 1));
+    const angle = Number.isFinite(rotation) ? rotation : 0;
+
+    // Calculate a point far in front
+    const range = 1000;
+    const baseAim = {
+      x: playerPos.x + Math.cos(angle) * range,
+      y: playerPos.y + Math.sin(angle) * range,
+    };
+
+    const firedTargets = [];
+
+    for (let shotIndex = 0; shotIndex < totalShots; shotIndex++) {
+      let aimPoint = { ...baseAim };
+
+      if (totalShots > 1) {
+        aimPoint = this.applyMultishotSpread(
+          playerPos,
+          aimPoint,
+          shotIndex,
+          totalShots
+        );
+      }
+
+      this.createBullet(playerPos, aimPoint, playerStats.damage);
+      firedTargets.push({
+        enemyId: null,
+        position: { ...aimPoint },
+      });
+    }
+
+    this.lastShotTime = 0;
+
+    if (firedTargets.length) {
+      gameEvents.emit('weapon-fired', {
+        position: playerPos,
+        target: firedTargets[0].position,
+        weaponType: 'basic',
+        primaryTargetId: null,
+        targeting: {
+          dynamicPrediction: false,
+          lockCount: 0,
+          multiLockActive: false,
+          predictedPoints: firedTargets.map((entry) => ({
+            enemyId: null,
+            position: entry.position,
+          })),
+        },
+      });
+    }
   }
 
   getPredictedTargetPosition(enemy = this.currentTarget, playerPos = null) {
@@ -761,7 +820,10 @@ class CombatSystem extends BaseSystem {
   sanitizeDynamicPredictionSettings(config = {}) {
     const minLead = this.toNumber(config.minLeadTime, 0.05);
     const maxLead = this.toNumber(config.maxLeadTime, 1.2);
-    const fallback = this.toNumber(config.fallbackLeadTime, this.linearPredictionTime);
+    const fallback = this.toNumber(
+      config.fallbackLeadTime,
+      this.linearPredictionTime
+    );
 
     const settings = {
       minLeadTime: Math.max(0, minLead),
@@ -846,9 +908,12 @@ class CombatSystem extends BaseSystem {
       const cooldownMultiplier = Number(data?.cooldownMultiplier);
       if (Number.isFinite(cooldownMultiplier) && cooldownMultiplier > 0) {
         this.setShootCooldown(this.baseShootCooldown * cooldownMultiplier);
-      } else if (Number.isFinite(this.aimingConfig?.multiLock?.cooldownMultiplier)) {
+      } else if (
+        Number.isFinite(this.aimingConfig?.multiLock?.cooldownMultiplier)
+      ) {
         this.setShootCooldown(
-          this.baseShootCooldown * this.aimingConfig.multiLock.cooldownMultiplier
+          this.baseShootCooldown *
+            this.aimingConfig.multiLock.cooldownMultiplier
         );
       }
     }
@@ -898,7 +963,10 @@ class CombatSystem extends BaseSystem {
     if (overrides.rewardNormalization !== undefined) {
       this.dangerWeights.rewardNormalization = Math.max(
         1,
-        this.toNumber(overrides.rewardNormalization, this.dangerWeights.rewardNormalization)
+        this.toNumber(
+          overrides.rewardNormalization,
+          this.dangerWeights.rewardNormalization
+        )
       );
     }
 
@@ -926,7 +994,10 @@ class CombatSystem extends BaseSystem {
     if (overrides.speedReference !== undefined) {
       this.dangerWeights.speedReference = Math.max(
         1,
-        this.toNumber(overrides.speedReference, this.dangerWeights.speedReference)
+        this.toNumber(
+          overrides.speedReference,
+          this.dangerWeights.speedReference
+        )
       );
     }
 
@@ -954,11 +1025,17 @@ class CombatSystem extends BaseSystem {
     const settings = { ...this.dynamicPredictionSettings };
 
     if (overrides.minLeadTime !== undefined) {
-      settings.minLeadTime = Math.max(0, this.toNumber(overrides.minLeadTime, settings.minLeadTime));
+      settings.minLeadTime = Math.max(
+        0,
+        this.toNumber(overrides.minLeadTime, settings.minLeadTime)
+      );
     }
 
     if (overrides.maxLeadTime !== undefined) {
-      settings.maxLeadTime = Math.max(0.05, this.toNumber(overrides.maxLeadTime, settings.maxLeadTime));
+      settings.maxLeadTime = Math.max(
+        0.05,
+        this.toNumber(overrides.maxLeadTime, settings.maxLeadTime)
+      );
     }
 
     if (overrides.fallbackLeadTime !== undefined) {
@@ -979,9 +1056,7 @@ class CombatSystem extends BaseSystem {
     const intervals = this.aimingConfig?.targetUpdateIntervals || {};
 
     const pick = (value) =>
-      Number.isFinite(Number(value))
-        ? Math.max(0.05, Number(value))
-        : null;
+      Number.isFinite(Number(value)) ? Math.max(0.05, Number(value)) : null;
 
     if (this.targetingUpgradeLevel >= 3) {
       const chosen = pick(intervals.multiLock);
@@ -1100,7 +1175,8 @@ class CombatSystem extends BaseSystem {
     const stats = validEntries.map((entry, index) => {
       const enemy = entry.enemy;
       const threat = this.targetThreatCache.get(enemy.id) || {};
-      const breakdown = threat.breakdown?.impact ||
+      const breakdown =
+        threat.breakdown?.impact ||
         (threat.breakdown ? threat.breakdown.impact : null) ||
         entry.breakdown?.impact ||
         null;
@@ -1118,8 +1194,8 @@ class CombatSystem extends BaseSystem {
       const urgency = Number.isFinite(breakdown?.urgency)
         ? breakdown.urgency
         : Number.isFinite(threat.breakdown?.impact?.urgency)
-        ? threat.breakdown.impact.urgency
-        : entry.score ?? 0;
+          ? threat.breakdown.impact.urgency
+          : entry.score ?? 0;
       return {
         enemy,
         index,
@@ -1157,7 +1233,9 @@ class CombatSystem extends BaseSystem {
       );
       const remainingBias = Math.max(0, stat.remaining || 0);
       const scoreBias = Number.isFinite(stat.score) ? stat.score : 0;
-      return urgency * (1 + stackMultiplier * 0.5 + remainingBias) + scoreBias * 0.01;
+      return (
+        urgency * (1 + stackMultiplier * 0.5 + remainingBias) + scoreBias * 0.01
+      );
     };
 
     while (remaining > 0 && stats.length) {
@@ -1175,12 +1253,12 @@ class CombatSystem extends BaseSystem {
         break;
       }
 
-      counts.set(
-        bestStat.id,
-        (counts.get(bestStat.id) || 0) + 1
-      );
+      counts.set(bestStat.id, (counts.get(bestStat.id) || 0) + 1);
       bestStat.assigned += 1;
-      bestStat.remaining = Math.max(0, bestStat.recommended - bestStat.assigned);
+      bestStat.remaining = Math.max(
+        0,
+        bestStat.recommended - bestStat.assigned
+      );
       remaining -= 1;
     }
 
@@ -1261,15 +1339,15 @@ class CombatSystem extends BaseSystem {
       this.currentLockAssignments.length
         ? this.currentLockAssignments
         : this.currentTarget
-        ? [
-            {
-              enemy: this.currentTarget,
-              priorityIndex: 0,
-              duplicateIndex: 0,
-              duplicateCount: 1,
-            },
-          ]
-        : [];
+          ? [
+              {
+                enemy: this.currentTarget,
+                priorityIndex: 0,
+                duplicateIndex: 0,
+                duplicateCount: 1,
+              },
+            ]
+          : [];
 
     if (!assignments.length) {
       this.predictedAimPoints = [];
@@ -1288,9 +1366,10 @@ class CombatSystem extends BaseSystem {
         return;
       }
 
-      const predicted =
-        this.getPredictedTargetPosition(enemy, playerPos) ||
-        { x: enemy.x, y: enemy.y };
+      const predicted = this.getPredictedTargetPosition(enemy, playerPos) || {
+        x: enemy.x,
+        y: enemy.y,
+      };
       const duplicateIndex = Number.isFinite(assignment.duplicateIndex)
         ? assignment.duplicateIndex
         : 0;
@@ -1389,8 +1468,7 @@ class CombatSystem extends BaseSystem {
       (weights.reward || 0);
     const directionScore =
       this.computeDirectionFactor(enemy, playerPos) * (weights.direction || 0);
-    const speedScore =
-      this.computeSpeedFactor(enemy) * (weights.speed || 0);
+    const speedScore = this.computeSpeedFactor(enemy) * (weights.speed || 0);
     const sizeScore = weights.size?.[enemy?.size] ?? 0;
     const distanceScore =
       this.computeDistanceFactor(distance) * (weights.distance || 0);
@@ -1483,9 +1561,7 @@ class CombatSystem extends BaseSystem {
 
     const effectiveRadius = Math.max(
       1,
-      Number.isFinite(playerRadius)
-        ? playerRadius
-        : SHIP_SIZE || 24
+      Number.isFinite(playerRadius) ? playerRadius : SHIP_SIZE || 24
     );
     const distanceNormalization = Math.max(
       effectiveRadius * 2,
@@ -1501,10 +1577,13 @@ class CombatSystem extends BaseSystem {
       Number.isFinite(enemy?.health)
         ? enemy.health
         : Number.isFinite(enemy?.maxHealth)
-        ? enemy.maxHealth
-        : 0
+          ? enemy.maxHealth
+          : 0
     );
-    const maxHealth = Math.max(remainingHealth, enemy?.maxHealth || remainingHealth);
+    const maxHealth = Math.max(
+      remainingHealth,
+      enemy?.maxHealth || remainingHealth
+    );
     const hpNormalization = Math.max(
       1,
       weights.hpNormalization || maxHealth || 1
@@ -1516,7 +1595,9 @@ class CombatSystem extends BaseSystem {
 
     const urgencyDistance =
       (weights.urgencyDistance ?? weights.distanceWeight ?? 0) *
-      (distanceComponent > 0 ? distanceComponent / (weights.distanceWeight || 1) : 0);
+      (distanceComponent > 0
+        ? distanceComponent / (weights.distanceWeight || 1)
+        : 0);
     const urgencyTime =
       (weights.urgencyTime ?? weights.timeWeight ?? 0) *
       (timeComponent > 0 ? timeComponent / (weights.timeWeight || 1) : 0);
@@ -1561,9 +1642,7 @@ class CombatSystem extends BaseSystem {
     }
 
     const variantConfig =
-      ASTEROID_VARIANTS?.[variantKey] ||
-      ASTEROID_VARIANTS?.common ||
-      null;
+      ASTEROID_VARIANTS?.[variantKey] || ASTEROID_VARIANTS?.common || null;
     const behaviorType = variantConfig?.behavior?.type || 'default';
     const behaviorWeight = weights.behavior?.[behaviorType];
     if (Number.isFinite(behaviorWeight)) {
@@ -1579,9 +1658,7 @@ class CombatSystem extends BaseSystem {
     const baseOrbs = ASTEROID_BASE_ORBS?.[size] ?? 1;
     const sizeFactor = ASTEROID_SIZE_ORB_FACTOR?.[size] ?? 1;
     const variantConfig =
-      ASTEROID_VARIANTS?.[enemy?.variant] ||
-      ASTEROID_VARIANTS?.common ||
-      null;
+      ASTEROID_VARIANTS?.[enemy?.variant] || ASTEROID_VARIANTS?.common || null;
     const orbMultiplier = variantConfig?.orbMultiplier ?? 1;
     const orbValue = ORB_VALUE ?? 5;
 
@@ -1671,7 +1748,10 @@ class CombatSystem extends BaseSystem {
       return null;
     }
 
-    const minLead = Math.max(0, this.dynamicPredictionSettings?.minLeadTime ?? 0);
+    const minLead = Math.max(
+      0,
+      this.dynamicPredictionSettings?.minLeadTime ?? 0
+    );
     const maxLead = Math.max(
       minLead,
       this.dynamicPredictionSettings?.maxLeadTime ?? minLead
@@ -1841,7 +1921,10 @@ class CombatSystem extends BaseSystem {
     bullet.active = true;
     bullet.type = 'enemy';
     bullet.isBossProjectile = isBossProjectile;
-    bullet.color = this.resolveEnemyProjectileColor({ ...data, isBossProjectile }, projectile);
+    bullet.color = this.resolveEnemyProjectileColor(
+      { ...data, isBossProjectile },
+      projectile
+    );
     bullet.destroyed = false;
     bullet.destroyReason = null;
     bullet.destroyLogEmitted = false;
@@ -1861,7 +1944,11 @@ class CombatSystem extends BaseSystem {
       bullet.trail = [];
     }
 
-    bullet.trailMax = this.resolveEnemyProjectileTrailLength(data, projectile, bullet);
+    bullet.trailMax = this.resolveEnemyProjectileTrailLength(
+      data,
+      projectile,
+      bullet
+    );
 
     bullet.enemyId = data.enemyId ?? data.source?.id ?? data.enemy?.id ?? null;
     bullet.enemyType =
@@ -1869,12 +1956,12 @@ class CombatSystem extends BaseSystem {
     bullet.source = data.source
       ? { ...data.source }
       : bullet.enemyId || bullet.enemyType
-      ? {
-          id: bullet.enemyId,
-          type: bullet.enemyType,
-          wave: data.wave ?? data.enemy?.wave ?? null,
-        }
-      : null;
+        ? {
+            id: bullet.enemyId,
+            type: bullet.enemyType,
+            wave: data.wave ?? data.enemy?.wave ?? null,
+          }
+        : null;
 
     if (isBossProjectile) {
       GameDebugLogger.log('EVENT', 'Boss projectile created', {
@@ -1941,7 +2028,8 @@ class CombatSystem extends BaseSystem {
       return Math.max(2, bullet.trailMax);
     }
 
-    const isBoss = bullet?.isBossProjectile ?? this.isBossProjectileSource(data);
+    const isBoss =
+      bullet?.isBossProjectile ?? this.isBossProjectileSource(data);
     return isBoss
       ? Math.max(2, this.bossProjectileTrailLength)
       : Math.max(2, this.enemyProjectileTrailLength);
@@ -2021,12 +2109,8 @@ class CombatSystem extends BaseSystem {
 
   resolveEnemyProjectileLifetime(speed) {
     if (Number.isFinite(speed) && speed > 0) {
-      const width = Number.isFinite(GAME_WIDTH)
-        ? GAME_WIDTH
-        : 0;
-      const height = Number.isFinite(GAME_HEIGHT)
-        ? GAME_HEIGHT
-        : 0;
+      const width = Number.isFinite(GAME_WIDTH) ? GAME_WIDTH : 0;
+      const height = Number.isFinite(GAME_HEIGHT) ? GAME_HEIGHT : 0;
       const diagonal = Math.sqrt(width * width + height * height);
 
       if (diagonal > 0) {
@@ -2043,15 +2127,9 @@ class CombatSystem extends BaseSystem {
     }
 
     const physics = this.cachedPhysics;
-    const gameWidth = Number.isFinite(GAME_WIDTH)
-      ? GAME_WIDTH
-      : Infinity;
-    const gameHeight = Number.isFinite(GAME_HEIGHT)
-      ? GAME_HEIGHT
-      : Infinity;
-    const defaultBulletRadius = Number.isFinite(BULLET_SIZE)
-      ? BULLET_SIZE
-      : 0;
+    const gameWidth = Number.isFinite(GAME_WIDTH) ? GAME_WIDTH : Infinity;
+    const gameHeight = Number.isFinite(GAME_HEIGHT) ? GAME_HEIGHT : Infinity;
+    const defaultBulletRadius = Number.isFinite(BULLET_SIZE) ? BULLET_SIZE : 0;
 
     const playerAlive =
       player &&
@@ -2104,7 +2182,9 @@ class CombatSystem extends BaseSystem {
           const candidatePosition =
             (typeof player.getPosition === 'function'
               ? player.getPosition()
-              : null) || player.position || null;
+              : null) ||
+            player.position ||
+            null;
 
           if (
             candidatePosition &&
@@ -2116,7 +2196,11 @@ class CombatSystem extends BaseSystem {
         }
 
         if (playerPosition) {
-          if (!collisionContext && physics && physics.buildPlayerCollisionContext) {
+          if (
+            !collisionContext &&
+            physics &&
+            physics.buildPlayerCollisionContext
+          ) {
             collisionContext = physics.buildPlayerCollisionContext(player);
           }
 
@@ -2125,8 +2209,8 @@ class CombatSystem extends BaseSystem {
           )
             ? collisionContext.collisionRadius
             : typeof player.getHullBoundingRadius === 'function'
-            ? player.getHullBoundingRadius()
-            : SHIP_SIZE || 0;
+              ? player.getHullBoundingRadius()
+              : SHIP_SIZE || 0;
 
           const bulletRadius = Number.isFinite(bullet.radius)
             ? bullet.radius
@@ -2211,7 +2295,10 @@ class CombatSystem extends BaseSystem {
               : null;
           GameDebugLogger.log('STATE', 'Boss projectile destroyed', {
             reason: bullet.destroyReason,
-            position: { x: Math.round(bullet.x ?? 0), y: Math.round(bullet.y ?? 0) },
+            position: {
+              x: Math.round(bullet.x ?? 0),
+              y: Math.round(bullet.y ?? 0),
+            },
             lifetime,
           });
           bullet.destroyLogEmitted = true;
@@ -2359,7 +2446,9 @@ class CombatSystem extends BaseSystem {
         };
 
     if (enemy.type === 'boss') {
-      const maxHealth = Number.isFinite(enemy.maxHealth) ? enemy.maxHealth : null;
+      const maxHealth = Number.isFinite(enemy.maxHealth)
+        ? enemy.maxHealth
+        : null;
       const remainingHealth = Number.isFinite(damageResult.remainingHealth)
         ? damageResult.remainingHealth
         : enemy.health ?? null;
@@ -2475,7 +2564,7 @@ class CombatSystem extends BaseSystem {
 
     this.bulletGlowCache = {
       canvas: offscreen,
-      radius: glowRadius
+      radius: glowRadius,
     };
 
     return this.bulletGlowCache;
@@ -2486,6 +2575,10 @@ class CombatSystem extends BaseSystem {
 
     const player = this.getCachedPlayer();
 
+    // [NEO-ARCADE] Additive Blending for Bullet Glow
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
     // Always render bullets - they keep flying
     this.bullets.forEach((bullet) => {
       if (bullet.hit) return;
@@ -2494,11 +2587,15 @@ class CombatSystem extends BaseSystem {
         ctx.save();
         ctx.lineCap = 'round';
 
+        // [NEO-ARCADE] Enhanced Trail Glow
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#FFFF00';
+
         // Draw glow layer (wider, softer)
         for (let i = 1; i < bullet.trail.length; i++) {
-          const alpha = (i / bullet.trail.length) * 0.4; // Fade toward tail
-          ctx.strokeStyle = `rgba(255, 255, 100, ${alpha})`;
-          ctx.lineWidth = 4;
+          const alpha = (i / bullet.trail.length) * 0.6; // Stronger tail
+          ctx.strokeStyle = `rgba(255, 220, 100, ${alpha})`;
+          ctx.lineWidth = 6; // Wider glow
           ctx.globalAlpha = alpha;
 
           ctx.beginPath();
@@ -2509,9 +2606,9 @@ class CombatSystem extends BaseSystem {
 
         // Draw core trail (bright, thin)
         for (let i = 1; i < bullet.trail.length; i++) {
-          const alpha = (i / bullet.trail.length) * 0.8; // Fade toward tail
+          const alpha = (i / bullet.trail.length) * 1.0;
           ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-          ctx.lineWidth = 2;
+          ctx.lineWidth = 3;
           ctx.globalAlpha = alpha;
 
           ctx.beginPath();
@@ -2538,23 +2635,27 @@ class CombatSystem extends BaseSystem {
           0,
           bullet.x,
           bullet.y,
-          BULLET_SIZE * 3
+          BULLET_SIZE * 4 // Larger bloom
         );
-        gradient.addColorStop(0, '#FFFF00');
-        gradient.addColorStop(0.5, 'rgba(255, 255, 0, 0.4)');
+        gradient.addColorStop(0, '#FFFFFF'); // Hot core
+        gradient.addColorStop(0.3, '#FFFF00'); // Inner yellow
+        gradient.addColorStop(0.6, 'rgba(255, 100, 0, 0.4)'); // Outer orange
         gradient.addColorStop(1, 'transparent');
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.arc(bullet.x, bullet.y, BULLET_SIZE * 3, 0, Math.PI * 2);
+        ctx.arc(bullet.x, bullet.y, BULLET_SIZE * 4, 0, Math.PI * 2);
         ctx.fill();
       }
 
+      // Solid White Core
       ctx.fillStyle = '#FFFFFF';
       ctx.beginPath();
       ctx.arc(bullet.x, bullet.y, BULLET_SIZE, 0, Math.PI * 2);
       ctx.fill();
     });
+
+    ctx.restore(); // End 'lighter' mode
 
     if (Array.isArray(this.enemyBullets) && this.enemyBullets.length) {
       for (let i = 0; i < this.enemyBullets.length; i += 1) {
@@ -2579,15 +2680,15 @@ class CombatSystem extends BaseSystem {
       this.currentLockAssignments.length
         ? this.currentLockAssignments
         : this.currentTarget
-        ? [
-            {
-              enemy: this.currentTarget,
-              index: 0,
-              duplicateIndex: 0,
-              duplicateCount: 1,
-            },
-          ]
-        : [];
+          ? [
+              {
+                enemy: this.currentTarget,
+                index: 0,
+                duplicateIndex: 0,
+                duplicateCount: 1,
+              },
+            ]
+          : [];
 
     if (
       lockAssignments.length &&
@@ -2669,16 +2770,16 @@ class CombatSystem extends BaseSystem {
           ctx.setLineDash([]);
           ctx.lineWidth = 2;
           ctx.strokeStyle = `hsla(${hue}, 95%, 72%, ${alpha})`;
-        ctx.beginPath();
-        ctx.arc(position.x, position.y, radius, 0, Math.PI * 2);
-        ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(position.x, position.y, radius, 0, Math.PI * 2);
+          ctx.stroke();
 
-        ctx.globalAlpha = alpha * 0.45;
-        ctx.fillStyle = `hsla(${hue}, 95%, 65%, ${alpha * 0.35})`;
-        ctx.beginPath();
-        ctx.arc(position.x, position.y, radius * 0.45, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+          ctx.globalAlpha = alpha * 0.45;
+          ctx.fillStyle = `hsla(${hue}, 95%, 65%, ${alpha * 0.35})`;
+          ctx.beginPath();
+          ctx.arc(position.x, position.y, radius * 0.45, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
         }
       );
     }

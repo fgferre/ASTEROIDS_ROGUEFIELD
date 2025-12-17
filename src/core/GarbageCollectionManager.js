@@ -9,7 +9,7 @@ export class GarbageCollectionManager {
       defaultInterval: 4000,
       idleTimeout: 150,
       maxTasksPerFrame: 3,
-      ...options
+      ...options,
     };
 
     this.tasks = new Map();
@@ -17,7 +17,10 @@ export class GarbageCollectionManager {
     this.initialized = false;
     this.idleHandle = null;
     this.useIdleCallback = typeof requestIdleCallback === 'function';
-    this.performance = typeof performance !== 'undefined' ? performance : { now: () => Date.now() };
+    this.performance =
+      typeof performance !== 'undefined'
+        ? performance
+        : { now: () => Date.now() };
 
     this.tryRegisterService();
   }
@@ -47,7 +50,10 @@ export class GarbageCollectionManager {
       try {
         gameServices.register('garbage-collector', this);
       } catch (error) {
-        console.warn('[GarbageCollectionManager] Failed to register in service locator', error);
+        console.warn(
+          '[GarbageCollectionManager] Failed to register in service locator',
+          error
+        );
       }
     }
   }
@@ -64,13 +70,20 @@ export class GarbageCollectionManager {
    */
   registerPeriodicTask(name, callback, options = {}) {
     if (!name) {
-      throw new Error('GarbageCollectionManager.registerPeriodicTask requires a name');
+      throw new Error(
+        'GarbageCollectionManager.registerPeriodicTask requires a name'
+      );
     }
     if (typeof callback !== 'function') {
-      throw new Error('GarbageCollectionManager.registerPeriodicTask requires a function');
+      throw new Error(
+        'GarbageCollectionManager.registerPeriodicTask requires a function'
+      );
     }
 
-    const interval = Math.max(0, options.interval ?? this.options.defaultInterval);
+    const interval = Math.max(
+      0,
+      options.interval ?? this.options.defaultInterval
+    );
     const priority = options.priority ?? 0;
 
     this.tasks.set(name, {
@@ -78,7 +91,7 @@ export class GarbageCollectionManager {
       interval,
       priority,
       lastRun: this.performance.now(),
-      pending: false
+      pending: false,
     });
 
     if (options.runImmediately) {
@@ -103,7 +116,7 @@ export class GarbageCollectionManager {
       name: null,
       callback,
       priority,
-      once: true
+      once: true,
     });
     this.sortQueue();
     this.scheduleIdlePass();
@@ -145,7 +158,7 @@ export class GarbageCollectionManager {
       name,
       callback: task.callback,
       priority: task.priority,
-      once: false
+      once: false,
     });
 
     this.sortQueue();
@@ -162,10 +175,13 @@ export class GarbageCollectionManager {
     }
 
     if (this.useIdleCallback) {
-      this.idleHandle = requestIdleCallback((deadline) => {
-        this.idleHandle = null;
-        this.processQueue(deadline);
-      }, { timeout: this.options.idleTimeout });
+      this.idleHandle = requestIdleCallback(
+        (deadline) => {
+          this.idleHandle = null;
+          this.processQueue(deadline);
+        },
+        { timeout: this.options.idleTimeout }
+      );
     } else {
       this.idleHandle = setTimeout(() => {
         this.idleHandle = null;
@@ -213,7 +229,10 @@ export class GarbageCollectionManager {
     try {
       callback({ manager: this });
     } catch (error) {
-      console.error(`[GarbageCollectionManager] Error running task "${label}"`, error);
+      console.error(
+        `[GarbageCollectionManager] Error running task "${label}"`,
+        error
+      );
     }
   }
 
@@ -248,8 +267,8 @@ export class GarbageCollectionManager {
         name,
         interval: task.interval,
         priority: task.priority,
-        pending: task.pending
-      }))
+        pending: task.pending,
+      })),
     };
   }
 }

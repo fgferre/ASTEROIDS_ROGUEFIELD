@@ -20,9 +20,7 @@ const noop = () => {};
 function collectUpgradeIds(progression, count) {
   const { options } = progression.prepareUpgradeOptions(count);
 
-  return options
-    .map((option) => option?.id)
-    .filter(Boolean);
+  return options.map((option) => option?.id).filter(Boolean);
 }
 
 describe('ProgressionSystem determinism', () => {

@@ -30,7 +30,7 @@ export class AsteroidRenderer {
     // Rendering statistics
     this.stats = {
       lastFrameCount: 0,
-      lastFrameTime: 0
+      lastFrameTime: 0,
     };
   }
 

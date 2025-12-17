@@ -5,7 +5,10 @@
  * Hearts persist until collected or game over (not cleared on death/retry).
  */
 
-import { normalizeDependencies, resolveService } from '../../core/serviceUtils.js';
+import {
+  normalizeDependencies,
+  resolveService,
+} from '../../core/serviceUtils.js';
 import HealthHeart from './HealthHeart.js';
 
 export class HealthHeartSystem {
@@ -27,7 +30,7 @@ export class HealthHeartSystem {
     this.resolveCachedServices();
 
     // Update all hearts
-    this.hearts.forEach(heart => {
+    this.hearts.forEach((heart) => {
       heart.update(deltaTime);
     });
 
@@ -38,16 +41,20 @@ export class HealthHeartSystem {
     }
 
     // Remove collected hearts
-    this.hearts = this.hearts.filter(heart => !heart.isCollected());
+    this.hearts = this.hearts.filter((heart) => !heart.isCollected());
   }
 
   checkHeartCollection(playerPosition) {
     // Skip collection if player is dead
-    if (this.cachedPlayer.isDead || this.cachedPlayer.isRetrying || this.cachedPlayer._quitExplosionHidden) {
+    if (
+      this.cachedPlayer.isDead ||
+      this.cachedPlayer.isRetrying ||
+      this.cachedPlayer._quitExplosionHidden
+    ) {
       return;
     }
 
-    this.hearts.forEach(heart => {
+    this.hearts.forEach((heart) => {
       if (heart.checkCollision(playerPosition, this.collectionRadius)) {
         this.collectHeart(heart);
       }
@@ -59,19 +66,23 @@ export class HealthHeartSystem {
 
     // Heal player 25% of max HP
     if (this.cachedPlayer && typeof this.cachedPlayer.heal === 'function') {
-      const stats = this.cachedPlayer.getStats ? this.cachedPlayer.getStats() : {};
+      const stats = this.cachedPlayer.getStats
+        ? this.cachedPlayer.getStats()
+        : {};
       const maxHP = stats.maxHP || 100;
       const healAmount = Math.floor(maxHP * 0.25);
 
       this.cachedPlayer.heal(healAmount);
 
-      console.log(`[HealthHeartSystem] Heart collected - healed ${healAmount} HP (25% of ${maxHP})`);
+      console.log(
+        `[HealthHeartSystem] Heart collected - healed ${healAmount} HP (25% of ${maxHP})`
+      );
 
       // Emit event for effects/audio
       if (typeof gameEvents !== 'undefined') {
         gameEvents.emit('health-heart-collected', {
           healAmount,
-          position: { x: heart.x, y: heart.y }
+          position: { x: heart.x, y: heart.y },
         });
       }
     }
@@ -85,7 +96,7 @@ export class HealthHeartSystem {
   }
 
   render(ctx) {
-    this.hearts.forEach(heart => heart.render(ctx));
+    this.hearts.forEach((heart) => heart.render(ctx));
   }
 
   getPlayerPosition() {

@@ -32,10 +32,21 @@ class ThrusterLoopManager {
    * @param {function} connectFn - Function to connect gain node to destination
    * @returns {object} Loop state object
    */
-  startLoop(type, variation, intensity, context, pool, cache, randomScope, connectFn) {
+  startLoop(
+    type,
+    variation,
+    intensity,
+    context,
+    pool,
+    cache,
+    randomScope,
+    connectFn
+  ) {
     // Prevent duplicate loops
     if (this.activeLoops.has(type)) {
-      console.warn(`[ThrusterLoopManager] Loop already active for type: ${type}`);
+      console.warn(
+        `[ThrusterLoopManager] Loop already active for type: ${type}`
+      );
       return this.activeLoops.get(type);
     }
 
@@ -52,36 +63,55 @@ class ThrusterLoopManager {
     squareOsc.type = 'square';
 
     // Frequency varies by thruster type
-    let baseFreq, freqVariation, noiseDuration;
+    // [NEO-ARCADE AUDIO] Bass Boost & Rumble
+    // Filter chain created later (bpFilter etc)
+
+    // Frequency varies by thruster type but stays low for weight
+    let baseFreq, freqVariation, noiseDuration, filterCutoff;
     if (type === 'main') {
-      baseFreq = 85;
+      baseFreq = 55; // Lowerfreq (was 85)
+      filterCutoff = 600; // Muffled rumble
       freqVariation = randomScope?.range ? randomScope.range(-3, 3) : 0;
-      noiseDuration = 1.2 + (randomScope?.range ? randomScope.range(-0.2, 0.3) : 0);
+      noiseDuration =
+        1.2 + (randomScope?.range ? randomScope.range(-0.2, 0.3) : 0);
     } else if (type === 'retro') {
-      baseFreq = 95;
+      baseFreq = 65; // (was 95)
+      filterCutoff = 800;
       freqVariation = randomScope?.range ? randomScope.range(-4, 4) : 0;
-      noiseDuration = 1.0 + (randomScope?.range ? randomScope.range(-0.2, 0.2) : 0);
+      noiseDuration =
+        1.0 + (randomScope?.range ? randomScope.range(-0.2, 0.2) : 0);
     } else {
       // side
-      baseFreq = 110;
+      baseFreq = 90; // (was 110)
+      filterCutoff = 1200; // Hissier for side thrusters
       freqVariation = randomScope?.range ? randomScope.range(-5, 5) : 0;
-      noiseDuration = 0.8 + (randomScope?.range ? randomScope.range(-0.1, 0.2) : 0);
+      noiseDuration =
+        0.8 + (randomScope?.range ? randomScope.range(-0.1, 0.2) : 0);
     }
 
     const freq = baseFreq + freqVariation;
     sawOsc.frequency.setValueAtTime(freq, now);
     squareOsc.frequency.setValueAtTime(freq, now);
 
-    // Component gains calibrated to sum to -6dB peak at intensity=1.0
-    // saw: 0.2, square: 0.3, noise: 0.25 → total ~0.4 linear (before masterGain)
-    sawGain.gain.setValueAtTime(0.2, now);
-    squareGain.gain.setValueAtTime(0.3, now);
+    // Configure Filter (Removed dead lowPass)
 
+    // Component gains calibrated to sum to -6dB peak at intensity=1.0
+    sawGain.gain.setValueAtTime(0.35, now); // Boosted
+    squareGain.gain.setValueAtTime(0.25, now);
+
+    // Chain: Osc -(connect)-> OscGain -> [BP Filter] -> ...
     sawOsc.connect(sawGain);
     squareOsc.connect(squareGain);
 
+    // lowPass was dead code here (connected but output nowhere). Removed.
+
     // Create noise component with tileable buffer
-    const familyName = type === 'main' ? 'thrusterMain' : type === 'retro' ? 'thrusterRetro' : 'thrusterSide';
+    const familyName =
+      type === 'main'
+        ? 'thrusterMain'
+        : type === 'retro'
+          ? 'thrusterRetro'
+          : 'thrusterSide';
     let noiseBuffer = null;
 
     if (cache) {
@@ -95,11 +125,15 @@ class ThrusterLoopManager {
       noiseBuffer = context.createBuffer(1, bufferSize, context.sampleRate);
       const output = noiseBuffer.getChannelData(0);
       for (let i = 0; i < bufferSize; i++) {
-        output[i] = (randomScope?.range ? randomScope.range(-1, 1) : Math.random() * 2 - 1);
+        output[i] = randomScope?.range
+          ? randomScope.range(-1, 1)
+          : Math.random() * 2 - 1;
       }
     }
 
-    const noiseSource = pool ? pool.getBufferSource() : context.createBufferSource();
+    const noiseSource = pool
+      ? pool.getBufferSource()
+      : context.createBufferSource();
     noiseSource.buffer = noiseBuffer;
     noiseSource.loop = true; // CRITICAL: enable looping
 
@@ -110,7 +144,10 @@ class ThrusterLoopManager {
     // Create band-pass filter (1.2-6kHz for thruster characteristic)
     const bpFilter = context.createBiquadFilter();
     bpFilter.type = 'bandpass';
-    bpFilter.frequency.setValueAtTime(type === 'main' ? 3000 : type === 'retro' ? 2500 : 3500, now);
+    bpFilter.frequency.setValueAtTime(
+      type === 'main' ? 3000 : type === 'retro' ? 2500 : 3500,
+      now
+    );
     bpFilter.Q.setValueAtTime(1.2, now);
 
     // Create EQ chain: highpass → peaking (low) → peaking (high)
@@ -122,13 +159,19 @@ class ThrusterLoopManager {
     peakLow.type = 'peaking';
     peakLow.frequency.setValueAtTime(250, now);
     peakLow.Q.setValueAtTime(1.0, now);
-    peakLow.gain.setValueAtTime(type === 'main' ? 3 : type === 'retro' ? 2 : 2.5, now); // +2-3dB warmth
+    peakLow.gain.setValueAtTime(
+      type === 'main' ? 3 : type === 'retro' ? 2 : 2.5,
+      now
+    ); // +2-3dB warmth
 
     const peakHigh = context.createBiquadFilter();
     peakHigh.type = 'peaking';
     peakHigh.frequency.setValueAtTime(3000, now);
     peakHigh.Q.setValueAtTime(1.0, now);
-    peakHigh.gain.setValueAtTime(type === 'main' ? 2 : type === 'retro' ? 1.5 : 2, now); // +1.5-2dB presence
+    peakHigh.gain.setValueAtTime(
+      type === 'main' ? 2 : type === 'retro' ? 1.5 : 2,
+      now
+    ); // +1.5-2dB presence
 
     // Create master gain for this loop (clamp to 0.5 = -6dB at intensity=1.0)
     const masterGain = pool ? pool.getGain() : context.createGain();
@@ -173,7 +216,9 @@ class ThrusterLoopManager {
   updateLoop(type, intensity) {
     const loop = this.activeLoops.get(type);
     if (!loop) {
-      console.warn(`[ThrusterLoopManager] Cannot update: no active loop for type ${type}`);
+      console.warn(
+        `[ThrusterLoopManager] Cannot update: no active loop for type ${type}`
+      );
       return;
     }
 
@@ -205,7 +250,7 @@ class ThrusterLoopManager {
     const now = loop.oscillators[0].context.currentTime;
 
     // Stop oscillators and source
-    loop.oscillators.forEach(osc => {
+    loop.oscillators.forEach((osc) => {
       try {
         osc.stop(now + 0.01);
       } catch (e) {
@@ -221,7 +266,7 @@ class ThrusterLoopManager {
 
     // Disconnect all filters
     if (loop.filters && Array.isArray(loop.filters)) {
-      loop.filters.forEach(filter => {
+      loop.filters.forEach((filter) => {
         try {
           filter.disconnect();
         } catch (e) {
@@ -233,7 +278,7 @@ class ThrusterLoopManager {
     // Return gains to pool after sounds finish
     if (pool) {
       setTimeout(() => {
-        loop.gains.forEach(gain => {
+        loop.gains.forEach((gain) => {
           try {
             gain.disconnect();
             pool.returnGain(gain);
@@ -263,7 +308,7 @@ class ThrusterLoopManager {
   cleanup(pool) {
     for (const [type, loop] of this.activeLoops) {
       // Stop all oscillators and sources
-      loop.oscillators.forEach(osc => {
+      loop.oscillators.forEach((osc) => {
         try {
           osc.stop();
         } catch (e) {
@@ -279,7 +324,7 @@ class ThrusterLoopManager {
 
       // Disconnect and return gains
       if (pool) {
-        loop.gains.forEach(gain => {
+        loop.gains.forEach((gain) => {
           try {
             gain.disconnect();
             pool.returnGain(gain);
@@ -291,7 +336,7 @@ class ThrusterLoopManager {
 
       // Disconnect all filters
       if (loop.filters && Array.isArray(loop.filters)) {
-        loop.filters.forEach(filter => {
+        loop.filters.forEach((filter) => {
           try {
             filter.disconnect();
           } catch (e) {
@@ -349,7 +394,7 @@ class AudioSystem extends BaseSystem {
       averageCallsPerFrame: 0,
       peakCallsPerFrame: 0,
       lastFrameTime: performance.now(),
-      totalAudioCalls: 0
+      totalAudioCalls: 0,
     };
 
     // AudioContext resume coordination
@@ -550,7 +595,11 @@ class AudioSystem extends BaseSystem {
     // Enemy modules fire projectiles/explosions exclusively through events so
     // the audio layer can orchestrate batching and pooling.
     this.registerEventListener('enemy-fired', (data = {}) => {
-      const enemyType = (data?.enemyType || data?.enemy?.type || '').toLowerCase();
+      const enemyType = (
+        data?.enemyType ||
+        data?.enemy?.type ||
+        ''
+      ).toLowerCase();
 
       if (enemyType === 'drone') {
         this.playDroneFire(data);
@@ -766,9 +815,7 @@ class AudioSystem extends BaseSystem {
       MUSIC_LAYER_CONFIG?.intensityProgressionWindow
     );
 
-    let wavesPerStep = Number.isFinite(configuredStep)
-      ? configuredStep
-      : null;
+    let wavesPerStep = Number.isFinite(configuredStep) ? configuredStep : null;
 
     if (!wavesPerStep || wavesPerStep <= 0) {
       const fallbackWindow =
@@ -937,10 +984,7 @@ class AudioSystem extends BaseSystem {
         }
 
         if (typeof filterConfig.Q === 'number') {
-          filterNode.Q.setValueAtTime(
-            Math.max(0.0001, filterConfig.Q),
-            now
-          );
+          filterNode.Q.setValueAtTime(Math.max(0.0001, filterConfig.Q), now);
         }
 
         if (
@@ -960,7 +1004,10 @@ class AudioSystem extends BaseSystem {
           ? Math.max(0, Math.min(0.95, layerConfig.modulationDepth))
           : 0;
 
-      if (depthMultiplier > 0 && typeof this.context.createOscillator === 'function') {
+      if (
+        depthMultiplier > 0 &&
+        typeof this.context.createOscillator === 'function'
+      ) {
         const lfo = this.context.createOscillator();
         const depthGain = this.context.createGain();
         const rate =
@@ -1090,10 +1137,7 @@ class AudioSystem extends BaseSystem {
             : targetGain;
 
         gainNode.gain.setValueAtTime(currentValue, now);
-        gainNode.gain.linearRampToValueAtTime(
-          targetGain,
-          now + rampDuration
-        );
+        gainNode.gain.linearRampToValueAtTime(targetGain, now + rampDuration);
       }
 
       const modulator = layer?.modulator;
@@ -1235,7 +1279,11 @@ class AudioSystem extends BaseSystem {
   }
 
   safePlay(soundFunction) {
-    if (!this.initialized || !this.context || typeof soundFunction !== 'function') {
+    if (
+      !this.initialized ||
+      !this.context ||
+      typeof soundFunction !== 'function'
+    ) {
       return;
     }
 
@@ -1253,11 +1301,16 @@ class AudioSystem extends BaseSystem {
   }
 
   _ensureContextResumed() {
-    if (!this.context || this.context.state === 'running' || this.resumePromise) {
+    if (
+      !this.context ||
+      this.context.state === 'running' ||
+      this.resumePromise
+    ) {
       return;
     }
 
-    this.resumePromise = this.context.resume()
+    this.resumePromise = this.context
+      .resume()
       .catch((error) => {
         console.warn('Erro ao retomar contexto de áudio:', error);
       })
@@ -1299,10 +1352,7 @@ class AudioSystem extends BaseSystem {
     if (
       this._scheduleBatchedSound(
         'playLaserShot',
-        [
-          Math.round(params.pitchMultiplier * 1000),
-          params.lockCount,
-        ],
+        [Math.round(params.pitchMultiplier * 1000), params.lockCount],
         { allowOverlap: true, priority: 1 }
       )
     ) {
@@ -1358,7 +1408,11 @@ class AudioSystem extends BaseSystem {
       gain: 0.1 + intensity * 0.04,
       intensity,
       wave,
-      enemyType: (data?.enemyType || data?.enemy?.type || 'drone').toLowerCase(),
+      enemyType: (
+        data?.enemyType ||
+        data?.enemy?.type ||
+        'drone'
+      ).toLowerCase(),
     };
   }
 
@@ -1400,7 +1454,11 @@ class AudioSystem extends BaseSystem {
         burst.id !== undefined
           ? `hunter:${burst.id}`
           : `hunter:${data?.enemyId ?? 'unknown'}:${data?.wave ?? 'w0'}`,
-      enemyType: (data?.enemyType || data?.enemy?.type || 'hunter').toLowerCase(),
+      enemyType: (
+        data?.enemyType ||
+        data?.enemy?.type ||
+        'hunter'
+      ).toLowerCase(),
     };
   }
 
@@ -1410,8 +1468,7 @@ class AudioSystem extends BaseSystem {
     const normalizedRadius = Number.isFinite(radius) ? radius : 120;
     const normalizedDamage = Number.isFinite(damage) ? damage : 40;
 
-    const intensityBase =
-      normalizedRadius / 160 + normalizedDamage / 140;
+    const intensityBase = normalizedRadius / 160 + normalizedDamage / 140;
     const intensity = Math.min(1.5, Math.max(0.5, intensityBase));
     const duration = 0.42 + Math.min(0.16, intensity * 0.12);
 
@@ -1491,11 +1548,10 @@ class AudioSystem extends BaseSystem {
     const lockCount = Math.max(1, Math.floor(data.lockCount || 1));
 
     if (
-      this._scheduleBatchedSound(
-        'playTargetLock',
-        [lockCount],
-        { allowOverlap: false, priority: 2 }
-      )
+      this._scheduleBatchedSound('playTargetLock', [lockCount], {
+        allowOverlap: false,
+        priority: 2,
+      })
     ) {
       return;
     }
@@ -1506,7 +1562,12 @@ class AudioSystem extends BaseSystem {
   playAsteroidBreak(size) {
     this._trackPerformance('playAsteroidBreak');
 
-    if (this._scheduleBatchedSound('playAsteroidBreak', [size], { allowOverlap: false, priority: 2 })) {
+    if (
+      this._scheduleBatchedSound('playAsteroidBreak', [size], {
+        allowOverlap: false,
+        priority: 2,
+      })
+    ) {
       return;
     }
 
@@ -1517,24 +1578,50 @@ class AudioSystem extends BaseSystem {
     this._trackPerformance('playBigExplosion');
 
     this.safePlay(() => {
-      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
-      const oscGain = this.pool ? this.pool.getGain() : this.context.createGain();
-      osc.connect(oscGain);
+      // [NEO-ARCADE AUDIO] Cinematic Explosion
+      // Layer 1: Sub-Bass Sine (The "Thud")
+      const subOsc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
+      const subGain = this.pool
+        ? this.pool.getGain()
+        : this.context.createGain();
+      subOsc.connect(subGain);
+
+      // Layer 2: Mid-Range Punch (The "Crack")
+      const midOsc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
+      const midGain = this.pool
+        ? this.pool.getGain()
+        : this.context.createGain();
+      midOsc.connect(midGain);
+
+      // Layer 3: Filtered Noise (The "Debris")
+      // Use proper LPF on noise to avoid cheap "hiss"
+      const noiseFilter = this.pool
+        ? this.pool.getFilter()
+        : this.context.createBiquadFilter();
+      noiseFilter.type = 'lowpass';
+      noiseFilter.frequency.value = 1200; // Muffled debris
+
       const destination = this.getEffectsDestination();
       if (destination) {
-        oscGain.connect(destination);
+        subGain.connect(destination);
+        midGain.connect(destination);
+        noiseFilter.connect(destination); // Noise -> Filter -> Dest
       }
 
       // Use cached noise buffer if available
       let noiseBuffer;
       if (this.cache) {
-        noiseBuffer = this.cache.getNoiseBuffer(0.5, true, 'exponential', {
+        noiseBuffer = this.cache.getNoiseBuffer(0.8, true, 'exponential', {
           family: 'explosion',
           random: this.randomScopes.bufferFamilies.explosion,
         });
       } else {
-        // Fallback to creating buffer
-        const bufferSize = this.context.sampleRate * 0.5;
+        // Fallback
+        const bufferSize = this.context.sampleRate * 0.8;
         noiseBuffer = this.context.createBuffer(
           1,
           bufferSize,
@@ -1542,56 +1629,61 @@ class AudioSystem extends BaseSystem {
         );
         const output = noiseBuffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
-          const bufferRandom =
-            this.randomScopes.bufferFamilies.explosion ||
-            this.randomScopes.families.explosion ||
-            this.randomScopes.base ||
-            null;
-          const rng = this._resolveRandom(
-            bufferRandom,
-            this.randomScopes.base,
-            this.random
-          );
-          const sample =
-            typeof rng.range === 'function'
-              ? rng.range(-1, 1)
-              : rng.float() * 2 - 1;
-          output[i] = sample;
+          output[i] = Math.random() * 2 - 1;
         }
       }
 
-      const noise = this.pool ? this.pool.getBufferSource() : this.context.createBufferSource();
+      const noise = this.pool
+        ? this.pool.getBufferSource()
+        : this.context.createBufferSource();
       noise.buffer = noiseBuffer;
-      const noiseGain = this.pool ? this.pool.getGain() : this.context.createGain();
+      const noiseGain = this.pool
+        ? this.pool.getGain()
+        : this.context.createGain();
+
       noise.connect(noiseGain);
-      if (destination) {
-        noiseGain.connect(destination);
-      }
+      noiseGain.connect(noiseFilter); // Route noise through filter
 
       const now = this.context.currentTime;
 
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(60, now);
-      osc.frequency.exponentialRampToValueAtTime(30, now + 0.5);
+      // 1. SUB-BASS (Physical Impact) - Tuned for audibility
+      subOsc.type = 'sine';
+      subOsc.frequency.setValueAtTime(120, now); // Higher start (was 80)
+      subOsc.frequency.exponentialRampToValueAtTime(30, now + 0.6); // (was 10)
+      subGain.gain.setValueAtTime(1.0, now); // Max volume
+      subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
 
-      oscGain.gain.setValueAtTime(0.2, now);
-      oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+      // 2. MID-RANGE (Texture) - Tuned for punch
+      midOsc.type = 'triangle';
+      midOsc.frequency.setValueAtTime(250, now); // (was 200)
+      midOsc.frequency.exponentialRampToValueAtTime(60, now + 0.3);
+      midGain.gain.setValueAtTime(0.4, now); // (was 0.3)
+      midGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
 
-      noiseGain.gain.setValueAtTime(0.5, now);
-      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+      // 3. NOISE (Explosion body)
+      noiseGain.gain.setValueAtTime(0.6, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+      // Sweep filter down slightly
+      noiseFilter.frequency.setValueAtTime(1500, now);
+      noiseFilter.frequency.exponentialRampToValueAtTime(200, now + 0.7);
 
-      osc.start(now);
-      osc.stop(now + 0.5);
+      subOsc.start(now);
+      subOsc.stop(now + 0.61);
+
+      midOsc.start(now);
+      midOsc.stop(now + 0.31);
 
       noise.start(now);
-      noise.stop(now + 0.4);
+      noise.stop(now + 0.81);
 
-      // Return gains to pool after use if using pool
+      // Return nodes to pool
       if (this.pool) {
         setTimeout(() => {
-          this.pool.returnGain(oscGain);
+          this.pool.returnGain(subGain);
+          this.pool.returnGain(midGain);
           this.pool.returnGain(noiseGain);
-        }, 510);
+          this.pool.returnFilter(noiseFilter); // If we implemented returnFilter
+        }, 900);
       }
     });
   }
@@ -1599,7 +1691,12 @@ class AudioSystem extends BaseSystem {
   playXPCollect() {
     this._trackPerformance('playXPCollect');
 
-    if (this._scheduleBatchedSound('playXPCollect', [], { allowOverlap: true, priority: 1 })) {
+    if (
+      this._scheduleBatchedSound('playXPCollect', [], {
+        allowOverlap: true,
+        priority: 1,
+      })
+    ) {
       return;
     }
 
@@ -1615,7 +1712,8 @@ class AudioSystem extends BaseSystem {
   }
 
   _resolveEnemySoundPriority(enemyType, data = {}) {
-    const normalizedType = typeof enemyType === 'string' ? enemyType.toLowerCase() : '';
+    const normalizedType =
+      typeof enemyType === 'string' ? enemyType.toLowerCase() : '';
     const caps = {
       drone: 2,
       hunter: 3,
@@ -1678,7 +1776,9 @@ class AudioSystem extends BaseSystem {
 
   _playLaserShotDirect(params = {}) {
     this.safePlay(() => {
-      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
+      const osc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
       const gain = this.pool ? this.pool.getGain() : this.context.createGain();
 
       osc.connect(gain);
@@ -1770,9 +1870,12 @@ class AudioSystem extends BaseSystem {
         osc.stop(voiceStart + duration);
 
         if (this.pool) {
-          setTimeout(() => {
-            this.pool.returnGain(gain);
-          }, (voiceStart + duration - now) * 1000 + 20);
+          setTimeout(
+            () => {
+              this.pool.returnGain(gain);
+            },
+            (voiceStart + duration - now) * 1000 + 20
+          );
         }
       }
     });
@@ -1836,9 +1939,12 @@ class AudioSystem extends BaseSystem {
         osc.stop(shotStart + duration);
 
         if (this.pool) {
-          setTimeout(() => {
-            this.pool.returnGain(gain);
-          }, (shotStart + duration - now) * 1000 + 20);
+          setTimeout(
+            () => {
+              this.pool.returnGain(gain);
+            },
+            (shotStart + duration - now) * 1000 + 20
+          );
         }
       }
     });
@@ -1922,7 +2028,9 @@ class AudioSystem extends BaseSystem {
         );
         for (let i = 0; i < bufferSize; i += 1) {
           const sample =
-            typeof rng.range === 'function' ? rng.range(-1, 1) : rng.float() * 2 - 1;
+            typeof rng.range === 'function'
+              ? rng.range(-1, 1)
+              : rng.float() * 2 - 1;
           output[i] = sample;
         }
       }
@@ -1955,17 +2063,22 @@ class AudioSystem extends BaseSystem {
       noiseSource.stop(now + duration * 0.85);
 
       if (this.pool) {
-        setTimeout(() => {
-          this.pool.returnGain(rumbleGain);
-          this.pool.returnGain(noiseGain);
-        }, duration * 1000 + 40);
+        setTimeout(
+          () => {
+            this.pool.returnGain(rumbleGain);
+            this.pool.returnGain(noiseGain);
+          },
+          duration * 1000 + 40
+        );
       }
     });
   }
 
   _playTargetLockDirect(params = {}) {
     this.safePlay(() => {
-      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
+      const osc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
       const gain = this.pool ? this.pool.getGain() : this.context.createGain();
 
       osc.connect(gain);
@@ -1973,7 +2086,10 @@ class AudioSystem extends BaseSystem {
 
       const lockCount = Math.max(1, Math.floor(params.lockCount || 1));
       const baseFrequency = 720;
-      const frequency = Math.min(1200, baseFrequency * (1 + (lockCount - 1) * 0.12));
+      const frequency = Math.min(
+        1200,
+        baseFrequency * (1 + (lockCount - 1) * 0.12)
+      );
       const peakGain = 0.08 + Math.min(0.05, 0.018 * (lockCount - 1));
       const now = this.context.currentTime;
 
@@ -1997,24 +2113,47 @@ class AudioSystem extends BaseSystem {
 
   _playAsteroidBreakDirect(size) {
     this.safePlay(() => {
-      const baseFreq = size === 'large' ? 70 : size === 'medium' ? 110 : 150;
-      const duration =
-        size === 'large' ? 0.35 : size === 'medium' ? 0.25 : 0.18;
+      // [NEO-ARCADE AUDIO] Crunchy Explosion
+      const baseFreq = size === 'large' ? 100 : size === 'medium' ? 140 : 200; // Higher freq for clarity
+      const duration = size === 'large' ? 0.4 : size === 'medium' ? 0.3 : 0.2;
 
-      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
+      const osc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
       const gain = this.pool ? this.pool.getGain() : this.context.createGain();
 
-      osc.connect(gain);
-      this.connectGainNode(gain);
-
-      osc.type = 'sawtooth';
-      osc.frequency.setValueAtTime(baseFreq, this.context.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(
-        baseFreq * 0.4,
+      // Filter for weight
+      const filter = this.pool
+        ? this.pool.getFilter()
+        : this.context.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(800, this.context.currentTime); // Open filter slightly
+      filter.frequency.exponentialRampToValueAtTime(
+        100,
         this.context.currentTime + duration
       );
 
-      gain.gain.setValueAtTime(0.15, this.context.currentTime);
+      osc.connect(gain);
+      gain.connect(filter);
+
+      const destination = this.getEffectsDestination();
+      if (destination) {
+        filter.connect(destination);
+      } else {
+        // Fallback connection if getEffectsDestination fails
+        this.connectGainNode(filter);
+      }
+
+      // Square wave for 8-bit crunch
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(baseFreq, this.context.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(
+        baseFreq * 0.2, // Deep drop
+        this.context.currentTime + duration
+      );
+
+      // Louder initial impact
+      gain.gain.setValueAtTime(0.3, this.context.currentTime);
       gain.gain.exponentialRampToValueAtTime(
         0.001,
         this.context.currentTime + duration
@@ -2024,16 +2163,22 @@ class AudioSystem extends BaseSystem {
       osc.stop(this.context.currentTime + duration);
 
       if (this.pool) {
-        setTimeout(() => {
-          this.pool.returnGain(gain);
-        }, duration * 1000 + 10);
+        setTimeout(
+          () => {
+            this.pool.returnGain(gain);
+            this.pool.returnFilter(filter); // Assuming returnFilter exists or ignoring if leak is acceptable for now
+          },
+          duration * 1000 + 50
+        );
       }
     });
   }
 
   _playXPCollectDirect() {
     this.safePlay(() => {
-      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
+      const osc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
       const gain = this.pool ? this.pool.getGain() : this.context.createGain();
 
       osc.connect(gain);
@@ -2094,7 +2239,9 @@ class AudioSystem extends BaseSystem {
         break;
       }
       default:
-        console.warn(`[AudioSystem] No direct handler registered for "${soundType}"`);
+        console.warn(
+          `[AudioSystem] No direct handler registered for "${soundType}"`
+        );
         break;
     }
   }
@@ -2127,10 +2274,10 @@ class AudioSystem extends BaseSystem {
     this.safePlay(() => {
       // Map tier classes to base frequencies
       const tierFrequencies = {
-        'xp-green': 523,    // C5 (tier 2)
-        'xp-yellow': 659,   // E5 (tier 3)
-        'xp-purple': 784,   // G5 (tier 4)
-        'xp-red': 988,      // B5 (tier 5)
+        'xp-green': 523, // C5 (tier 2)
+        'xp-yellow': 659, // E5 (tier 3)
+        'xp-purple': 784, // G5 (tier 4)
+        'xp-red': 988, // B5 (tier 5)
         'xp-crystal': 1175, // D6 (tier 6)
       };
 
@@ -2214,7 +2361,10 @@ class AudioSystem extends BaseSystem {
       noise.frequency.setValueAtTime(100, this.context.currentTime);
 
       noiseGain.gain.setValueAtTime(0.2, this.context.currentTime);
-      noiseGain.gain.exponentialRampToValueAtTime(0.001, this.context.currentTime + 0.05);
+      noiseGain.gain.exponentialRampToValueAtTime(
+        0.001,
+        this.context.currentTime + 0.05
+      );
 
       noise.start();
       noise.stop(this.context.currentTime + 0.05);
@@ -2263,10 +2413,7 @@ class AudioSystem extends BaseSystem {
 
       baseOsc.type = 'sawtooth';
       baseOsc.frequency.setValueAtTime(sweepStart, now);
-      baseOsc.frequency.linearRampToValueAtTime(
-        sweepEnd,
-        now + sweepDuration
-      );
+      baseOsc.frequency.linearRampToValueAtTime(sweepEnd, now + sweepDuration);
 
       filter.type = config.filter?.type || 'lowpass';
       filter.frequency.setValueAtTime(config.filter?.frequency ?? 420, now);
@@ -2276,7 +2423,8 @@ class AudioSystem extends BaseSystem {
         config.attackGain ?? 0.25,
         now + 0.12
       );
-      const sustainTime = now + Math.max(0.2, duration - (config.releaseDuration ?? 0.5));
+      const sustainTime =
+        now + Math.max(0.2, duration - (config.releaseDuration ?? 0.5));
       baseGain.gain.linearRampToValueAtTime(
         config.sustainGain ?? 0.18,
         sustainTime
@@ -2294,14 +2442,8 @@ class AudioSystem extends BaseSystem {
         const vibratoOsc = this.context.createOscillator();
         const vibratoGain = this.context.createGain();
         vibratoOsc.type = 'sine';
-        vibratoOsc.frequency.setValueAtTime(
-          config.vibrato.speed ?? 5,
-          now
-        );
-        vibratoGain.gain.setValueAtTime(
-          config.vibrato.depth ?? 6,
-          now
-        );
+        vibratoOsc.frequency.setValueAtTime(config.vibrato.speed ?? 5, now);
+        vibratoGain.gain.setValueAtTime(config.vibrato.depth ?? 6, now);
         vibratoOsc.connect(vibratoGain);
         vibratoGain.connect(baseOsc.frequency);
         vibratoOsc.start(now);
@@ -2319,10 +2461,7 @@ class AudioSystem extends BaseSystem {
 
           gain.gain.setValueAtTime(0, startTime);
           const harmonicGain = (config.sustainGain ?? 0.18) * 0.4;
-          gain.gain.linearRampToValueAtTime(
-            harmonicGain,
-            startTime + 0.1
-          );
+          gain.gain.linearRampToValueAtTime(harmonicGain, startTime + 0.1);
           gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
           osc.connect(gain);
@@ -2380,17 +2519,11 @@ class AudioSystem extends BaseSystem {
 
       sweepOsc.type = 'triangle';
       sweepOsc.frequency.setValueAtTime(startFreq, now);
-      sweepOsc.frequency.exponentialRampToValueAtTime(
-        endFreq,
-        now + duration
-      );
+      sweepOsc.frequency.exponentialRampToValueAtTime(endFreq, now + duration);
 
       sweepGain.gain.setValueAtTime(0, now);
       sweepGain.gain.linearRampToValueAtTime(0.16, now + 0.08);
-      sweepGain.gain.exponentialRampToValueAtTime(
-        0.001,
-        now + duration + 0.25
-      );
+      sweepGain.gain.exponentialRampToValueAtTime(0.001, now + duration + 0.25);
 
       sweepOsc.connect(sweepGain);
       this.connectGainNode(sweepGain);
@@ -2450,10 +2583,7 @@ class AudioSystem extends BaseSystem {
           config.swell.gain ?? 0.12,
           now + 0.1
         );
-        swellGain.gain.exponentialRampToValueAtTime(
-          0.001,
-          now + swellDuration
-        );
+        swellGain.gain.exponentialRampToValueAtTime(0.001, now + swellDuration);
 
         swellOsc.connect(swellGain);
         this.connectGainNode(swellGain);
@@ -2487,10 +2617,7 @@ class AudioSystem extends BaseSystem {
           const noteDuration = note.duration ?? 0.6;
 
           osc.type = 'sine';
-          osc.frequency.setValueAtTime(
-            note.frequency ?? 440,
-            startTime
-          );
+          osc.frequency.setValueAtTime(note.frequency ?? 440, startTime);
 
           gain.gain.setValueAtTime(0, startTime);
           gain.gain.linearRampToValueAtTime(
@@ -2544,10 +2671,7 @@ class AudioSystem extends BaseSystem {
         const choirDuration = config.choir.duration ?? 1.8;
 
         choirOsc.type = 'sawtooth';
-        choirOsc.frequency.setValueAtTime(
-          config.choir.frequency,
-          choirStart
-        );
+        choirOsc.frequency.setValueAtTime(config.choir.frequency, choirStart);
         choirOsc.frequency.linearRampToValueAtTime(
           config.choir.frequency * 0.75,
           choirStart + choirDuration
@@ -2584,10 +2708,7 @@ class AudioSystem extends BaseSystem {
           osc.frequency.setValueAtTime(frequency, startTime);
 
           gain.gain.setValueAtTime(0, startTime);
-          gain.gain.linearRampToValueAtTime(
-            sparkleGain,
-            startTime + 0.03
-          );
+          gain.gain.linearRampToValueAtTime(sparkleGain, startTime + 0.03);
           gain.gain.exponentialRampToValueAtTime(
             0.001,
             startTime + sparkleDuration
@@ -2677,8 +2798,10 @@ class AudioSystem extends BaseSystem {
 
   playShieldActivate() {
     this.safePlay(() => {
-      const osc = this.context.createOscillator();
-      const gain = this.context.createGain();
+      const osc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
+      const gain = this.pool ? this.pool.getGain() : this.context.createGain();
 
       osc.connect(gain);
       this.connectGainNode(gain);
@@ -2693,34 +2816,63 @@ class AudioSystem extends BaseSystem {
 
       osc.start(now);
       osc.stop(now + 0.18);
+
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(gain);
+        }, 200);
+      }
     });
   }
 
   playShieldImpact() {
     this.safePlay(() => {
-      const osc = this.context.createOscillator();
-      const gain = this.context.createGain();
+      // [NEO-ARCADE AUDIO] Punchy Blaster Shot
+      const osc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
+      const gain = this.pool ? this.pool.getGain() : this.context.createGain();
 
       osc.connect(gain);
       this.connectGainNode(gain);
 
       const now = this.context.currentTime;
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(520, now);
-      osc.frequency.exponentialRampToValueAtTime(220, now + 0.1);
+      const params = {}; // Assuming params might be passed or defined elsewhere, defaulting to empty for now
+      // const pitchMult = 1.0; // Fixed base, modulated by params
 
-      gain.gain.setValueAtTime(0.18, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      // Square wave for retro 'pixel' crunch
+      osc.type = 'square';
+
+      // Rapid pitch drop (Blaster effect)
+      // Start high (880Hz) and drop quickly to low (110Hz)
+      const startFreq = 880 * (params.pitchMultiplier || 1);
+      const endFreq = 110;
+
+      osc.frequency.setValueAtTime(startFreq, now);
+      osc.frequency.exponentialRampToValueAtTime(endFreq, now + 0.15);
+
+      // Tight amplitude envelope
+      gain.gain.setValueAtTime(0.15, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
 
       osc.start(now);
-      osc.stop(now + 0.12);
+      osc.stop(now + 0.16);
+
+      // Return to pool using timeout
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(gain);
+        }, 180);
+      }
     });
   }
 
   playShieldBreak() {
     this.safePlay(() => {
-      const osc = this.context.createOscillator();
-      const gain = this.context.createGain();
+      const osc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
+      const gain = this.pool ? this.pool.getGain() : this.context.createGain();
 
       osc.connect(gain);
       this.connectGainNode(gain);
@@ -2735,13 +2887,21 @@ class AudioSystem extends BaseSystem {
 
       osc.start(now);
       osc.stop(now + 0.25);
+
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(gain);
+        }, 300);
+      }
     });
   }
 
   playShieldRecharged() {
     this.safePlay(() => {
-      const osc = this.context.createOscillator();
-      const gain = this.context.createGain();
+      const osc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
+      const gain = this.pool ? this.pool.getGain() : this.context.createGain();
 
       osc.connect(gain);
       this.connectGainNode(gain);
@@ -2757,13 +2917,21 @@ class AudioSystem extends BaseSystem {
 
       osc.start(now);
       osc.stop(now + 0.18);
+
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(gain);
+        }, 220);
+      }
     });
   }
 
   playShieldFail() {
     this.safePlay(() => {
-      const osc = this.context.createOscillator();
-      const gain = this.context.createGain();
+      const osc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
+      const gain = this.pool ? this.pool.getGain() : this.context.createGain();
 
       osc.connect(gain);
       this.connectGainNode(gain);
@@ -2778,6 +2946,12 @@ class AudioSystem extends BaseSystem {
 
       osc.start(now);
       osc.stop(now + 0.15);
+
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(gain);
+        }, 200);
+      }
     });
   }
 
@@ -2819,12 +2993,20 @@ class AudioSystem extends BaseSystem {
         }
       }
 
-      const noise = this.pool ? this.pool.getBufferSource() : this.context.createBufferSource();
+      const noise = this.pool
+        ? this.pool.getBufferSource()
+        : this.context.createBufferSource();
       noise.buffer = noiseBuffer;
-      const noiseGain = this.pool ? this.pool.getGain() : this.context.createGain();
+      const noiseGain = this.pool
+        ? this.pool.getGain()
+        : this.context.createGain();
 
-      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
-      const oscGain = this.pool ? this.pool.getGain() : this.context.createGain();
+      const osc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
+      const oscGain = this.pool
+        ? this.pool.getGain()
+        : this.context.createGain();
 
       noise.connect(noiseGain);
       this.connectGainNode(noiseGain);
@@ -3040,11 +3222,7 @@ class AudioSystem extends BaseSystem {
     }
 
     const applySeed = (rng, seed) => {
-      if (
-        rng &&
-        typeof rng.reset === 'function' &&
-        typeof seed === 'number'
-      ) {
+      if (rng && typeof rng.reset === 'function' && typeof seed === 'number') {
         rng.reset(seed);
       }
     };
@@ -3060,9 +3238,11 @@ class AudioSystem extends BaseSystem {
       applySeed(this.randomScopes?.cache, seeds.cache);
       applySeed(this.randomScopes?.batcher, seeds.batcher);
 
-      Object.entries(this.randomScopes?.families || {}).forEach(([name, rng]) => {
-        applySeed(rng, seeds.families?.[name]);
-      });
+      Object.entries(this.randomScopes?.families || {}).forEach(
+        ([name, rng]) => {
+          applySeed(rng, seeds.families?.[name]);
+        }
+      );
 
       Object.entries(this.randomScopes?.bufferFamilies || {}).forEach(
         ([name, rng]) => {
@@ -3152,89 +3332,115 @@ class AudioSystem extends BaseSystem {
    */
   playUpgradeSelect(rarity = 'common') {
     const frequencies = {
-      'common': 440,      // A4
-      'uncommon': 554,    // C#5
-      'rare': 659,        // E5
-      'epic': 784         // G5
+      common: 440, // A4
+      uncommon: 554, // C#5
+      rare: 659, // E5
+      epic: 784, // G5
     };
 
     const freq = frequencies[rarity] || 440;
 
     this.safePlay(() => {
-      const osc = this.context.createOscillator();
-      const gain = this.context.createGain();
+      const osc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
+      const gain = this.pool ? this.pool.getGain() : this.context.createGain();
+      const filter = this.context.createBiquadFilter();
 
+      // Chain: Osc -> Gain -> Filter -> Out
       osc.connect(gain);
-      this.connectGainNode(gain);
+      gain.connect(filter);
+      this.connectGainNode(filter);
 
       const now = this.context.currentTime;
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, now);
-      osc.frequency.exponentialRampToValueAtTime(freq * 1.5, now + 0.15);
 
-      gain.gain.setValueAtTime(0.12, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+      // Filter for smoothness
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(800, now);
+      filter.frequency.exponentialRampToValueAtTime(2000, now + 0.15); // Open up
+
+      osc.type = 'triangle'; // Richer than sine
+      osc.frequency.setValueAtTime(freq, now);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.5, now + 0.2);
+
+      // Envelope
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.1, now + 0.05);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
 
       osc.start(now);
-      osc.stop(now + 0.15);
+      osc.stop(now + 0.2);
+
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(gain);
+          // Auto cleanup for osc
+        }, 250);
+      }
     });
   }
 
   /**
    * Play button click sound - quick blip
-   * @deprecated Use playUISelect() instead - provides better feedback with "down-up" structure
+   * @deprecated Use playUISelect() instead
    */
   playButtonClick() {
-    this.safePlay(() => {
-      const osc = this.context.createOscillator();
-      const gain = this.context.createGain();
-
-      osc.connect(gain);
-      this.connectGainNode(gain);
-
-      const now = this.context.currentTime;
-      osc.type = 'square';
-      osc.frequency.setValueAtTime(880, now);
-
-      gain.gain.setValueAtTime(0.06, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
-
-      osc.start(now);
-      osc.stop(now + 0.04);
-    });
+    this.playUISelect(); // Redirect to the new high-quality handler
   }
 
   /**
-   * Play pause menu open sound - descending "dum"
+   * Play pause menu open sound - descending "dum" (Optimized)
    */
   playPauseOpen() {
     this.safePlay(() => {
-      const osc = this.context.createOscillator();
-      const gain = this.context.createGain();
+      const osc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
+      const gain = this.pool ? this.pool.getGain() : this.context.createGain();
+      const filter = this.context.createBiquadFilter();
 
       osc.connect(gain);
-      this.connectGainNode(gain);
+      gain.connect(filter);
+      this.connectGainNode(filter);
 
       const now = this.context.currentTime;
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(400, now);
-      osc.frequency.exponentialRampToValueAtTime(300, now + 0.12);
 
-      gain.gain.setValueAtTime(0.15, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      // Lowpass to make it heavy but soft
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(600, now);
+      filter.frequency.exponentialRampToValueAtTime(200, now + 0.15);
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(300, now); // Lower start
+      osc.frequency.exponentialRampToValueAtTime(150, now + 0.15); // Drop down
+
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.15, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
 
       osc.start(now);
-      osc.stop(now + 0.12);
+      osc.stop(now + 0.15);
+
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(gain);
+        }, 200);
+      }
     });
   }
 
   /**
    * Play pause menu close sound - ascending "boop"
    */
+  /**
+   * Play pause menu close sound - ascending "boop" (Optimized)
+   */
   playPauseClose() {
     this.safePlay(() => {
-      const osc = this.context.createOscillator();
-      const gain = this.context.createGain();
+      const osc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
+      const gain = this.pool ? this.pool.getGain() : this.context.createGain();
 
       osc.connect(gain);
       this.connectGainNode(gain);
@@ -3242,40 +3448,63 @@ class AudioSystem extends BaseSystem {
       const now = this.context.currentTime;
       osc.type = 'sine';
       osc.frequency.setValueAtTime(300, now);
-      osc.frequency.exponentialRampToValueAtTime(400, now + 0.1);
+      osc.frequency.exponentialRampToValueAtTime(450, now + 0.12);
 
-      gain.gain.setValueAtTime(0.12, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.1, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
 
       osc.start(now);
-      osc.stop(now + 0.1);
+      osc.stop(now + 0.12);
+
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(gain);
+        }, 150);
+      }
     });
   }
 
   /**
-   * Play menu transition sound - soft whoosh
+   * Play menu transition sound - soft glassy swipe
    */
   playMenuTransition() {
     this.safePlay(() => {
       const osc = this.context.createOscillator();
       const gain = this.context.createGain();
+      const filter = this.context.createBiquadFilter();
 
+      // Chain: Osc -> Gain -> Filter -> Out
       osc.connect(gain);
-      this.connectGainNode(gain);
+      gain.connect(filter);
+      this.connectGainNode(filter);
 
       const now = this.context.currentTime;
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(600, now);
-      osc.frequency.exponentialRampToValueAtTime(800, now + 0.08);
 
-      gain.gain.setValueAtTime(0.08, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+      // Filter sweep for "whoosh" effect
+      filter.type = 'lowpass';
+      filter.Q.value = 1;
+      filter.frequency.setValueAtTime(400, now);
+      filter.frequency.exponentialRampToValueAtTime(2000, now + 0.15);
+
+      // Triangle wave for body
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(100, now);
+      osc.frequency.linearRampToValueAtTime(50, now + 0.2); // Pitch drop
+
+      // Smooth volume envelope
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.06, now + 0.05); // Soft attack
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
 
       osc.start(now);
-      osc.stop(now + 0.08);
+      osc.stop(now + 0.25);
     });
   }
 
+  /**
+   * Play low health warning sound - urgent alarm
+   */
   /**
    * Play low health warning sound - urgent alarm
    */
@@ -3283,22 +3512,28 @@ class AudioSystem extends BaseSystem {
     this.safePlay(() => {
       const now = this.context.currentTime;
 
-      // Two-tone alarm pattern
+      // Two-tone alarm pattern - Triangle waves for less harshness
       for (let i = 0; i < 2; i++) {
         const osc = this.context.createOscillator();
         const gain = this.context.createGain();
+        const filter = this.context.createBiquadFilter();
 
         osc.connect(gain);
-        this.connectGainNode(gain);
+        gain.connect(filter);
+        this.connectGainNode(filter);
 
         const offset = i * 0.15; // Stagger the beeps
         const freq = i === 0 ? 880 : 660; // High-low pattern
 
-        osc.type = 'square';
+        osc.type = 'triangle'; // Softer than square
         osc.frequency.setValueAtTime(freq, now + offset);
 
+        // Lowpass to dampen
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(1200, now + offset);
+
         gain.gain.setValueAtTime(0, now + offset);
-        gain.gain.linearRampToValueAtTime(0.18, now + offset + 0.02);
+        gain.gain.linearRampToValueAtTime(0.12, now + offset + 0.02); // Slightly lower volume
         gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.12);
 
         osc.start(now + offset);
@@ -3308,190 +3543,105 @@ class AudioSystem extends BaseSystem {
   }
 
   /**
-   * Play UI hover sound - brief "ting" for button mouseenter
-   * 5 variations, 80-150ms, fundamental + harmonic with presence boost
+   * Play UI hover sound - Extremely subtle "tick" for presence
+   * Non-intrusive, low volume, filtered high end
    */
   playUIHover() {
-    this._trackPerformance('playUIHover');
+    // No tracking needed for such freq event
     this.safePlay(() => {
-      const randomScope = this.randomScopes.families.uiHover;
-      if (!randomScope) {
-        console.warn('[AudioSystem] playUIHover: uiHover random scope not available');
-        return;
+      const now = this.context.currentTime;
+
+      // Use a single oscillator for a clean "thip"
+      const osc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
+      const gain = this.pool ? this.pool.getGain() : this.context.createGain();
+
+      // Filter to remove sharp edges
+      const filter = this.context.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 1200; // Cut off harsh high sheen
+
+      osc.connect(gain);
+      gain.connect(filter);
+
+      const destination = this.getEffectsDestination();
+      if (destination) {
+        filter.connect(destination);
+      } else {
+        this.connectGainNode(filter);
       }
 
-      const now = this.context.currentTime;
-      const variation = Math.floor(randomScope.range(0, 5));
-      const duration = randomScope.range(0.08, 0.15);
+      // Sine wave - naturally soft
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(600, now);
+      osc.frequency.exponentialRampToValueAtTime(300, now + 0.03); // Quick pitch drop
 
-      // Base frequency with pitch variation per variation
-      const baseFreq = randomScope.range(1200, 2400);
-      const pitchVar = 1 + (variation - 2) * 0.01; // ±2% variation
-      const freq = baseFreq * pitchVar;
+      // Very low volume and short duration
+      gain.gain.setValueAtTime(0.1, now); // Increased from 0.015 to 0.1 for visibility
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
 
-      // Create oscillators and gains from pool
-      const osc1 = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
-      const osc2 = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
-      const gain1 = this.pool ? this.pool.getGain() : this.context.createGain();
-      const gain2 = this.pool ? this.pool.getGain() : this.context.createGain();
+      osc.start(now);
+      osc.stop(now + 0.04);
 
-      // Fundamental (sine)
-      osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(freq, now);
-
-      // Harmonic (2× frequency)
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(freq * 2, now);
-
-      // Connect oscillators to gains
-      osc1.connect(gain1);
-      osc2.connect(gain2);
-
-      // Create filters
-      const hpf = this.context.createBiquadFilter();
-      hpf.type = 'highpass';
-      hpf.frequency.setValueAtTime(120, now);
-
-      const peaking = this.context.createBiquadFilter();
-      peaking.type = 'peaking';
-      peaking.frequency.setValueAtTime(randomScope.range(2000, 4000), now);
-      peaking.Q.setValueAtTime(1.0, now);
-      peaking.gain.setValueAtTime(2, now); // +2dB presence boost
-
-      // Master gain to ensure -10dB peak (0.316) when signals sum
-      const masterGain = this.pool ? this.pool.getGain() : this.context.createGain();
-      masterGain.gain.setValueAtTime(0.316, now);
-
-      // Connect filter chain
-      gain1.connect(hpf);
-      gain2.connect(hpf);
-      hpf.connect(peaking);
-      peaking.connect(masterGain);
-      this.connectGainNode(masterGain);
-
-      // Envelope (adjusted so components sum to ~1.0 before master gain)
-      const attackTime = randomScope.range(0, 0.008);
-      const decayTime = randomScope.range(0.07, 0.12);
-      const fundamentalGain = 0.67; // ~67% of total
-      const harmonicGain = 0.33; // ~33% of total
-
-      // Fundamental envelope
-      gain1.gain.setValueAtTime(0, now);
-      gain1.gain.linearRampToValueAtTime(fundamentalGain, now + attackTime);
-      gain1.gain.exponentialRampToValueAtTime(0.001, now + decayTime);
-
-      // Harmonic envelope
-      gain2.gain.setValueAtTime(0, now);
-      gain2.gain.linearRampToValueAtTime(harmonicGain, now + attackTime);
-      gain2.gain.exponentialRampToValueAtTime(0.001, now + decayTime);
-
-      // Start and stop
-      osc1.start(now);
-      osc1.stop(now + duration);
-      osc2.start(now);
-      osc2.stop(now + duration);
-
-      // Cleanup: disconnect all nodes and return gains to pool
-      setTimeout(() => {
-        try {
-          // Disconnect filter chain
-          gain1.disconnect();
-          gain2.disconnect();
-          hpf.disconnect();
-          peaking.disconnect();
-          masterGain.disconnect();
-
-          // Return gains to pool
-          if (this.pool) {
-            this.pool.returnGain(gain1);
-            this.pool.returnGain(gain2);
-            this.pool.returnGain(masterGain);
-          }
-        } catch (e) {
-          console.warn('[AudioSystem] Cleanup error in playUIHover:', e);
-        }
-      }, duration * 1000 + 50);
+      // Cleanup
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(gain);
+          // Oscillators are disposable and automatically cleaned up by AudioPool hook
+        }, 50);
+      }
     });
   }
 
   /**
-   * Play UI select/confirm sound - "down-up" button click
-   * 5 variations, 120-180ms, with exciter for presence
+   * Play UI select/confirm sound - "Glassy" tech click
+   * Replaces the harsh "beep" with a polished tone
    */
   playUISelect() {
     this._trackPerformance('playUISelect');
     this.safePlay(() => {
-      const randomScope = this.randomScopes.families.uiSelect;
-      if (!randomScope) {
-        console.warn('[AudioSystem] playUISelect: uiSelect random scope not available');
-        return;
-      }
-
       const now = this.context.currentTime;
-      const variation = Math.floor(randomScope.range(0, 5));
-      const duration = randomScope.range(0.12, 0.18);
 
-      // Base frequency with pitch variation
-      const baseFreq = randomScope.range(700, 900);
-      const pitchVar = 1 + (variation - 2) * 0.01; // ±2% variation
-      const freq = baseFreq * pitchVar;
-
-      // Create oscillator and gain from pool
-      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
+      const osc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
       const gain = this.pool ? this.pool.getGain() : this.context.createGain();
 
-      // Single oscillator with frequency modulation curve
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(freq, now);
-      osc.frequency.linearRampToValueAtTime(freq * 0.95, now + duration * 0.4); // down
-      osc.frequency.linearRampToValueAtTime(freq * 1.05, now + duration);       // up
+      // Filter for glass texture
+      const filter = this.context.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.value = 400;
 
       osc.connect(gain);
+      gain.connect(filter);
 
-      // Create filters
-      const hpf = this.context.createBiquadFilter();
-      hpf.type = 'highpass';
-      hpf.frequency.setValueAtTime(120, now);
+      const destination = this.getEffectsDestination();
+      if (destination) {
+        filter.connect(destination);
+      } else {
+        this.connectGainNode(filter);
+      }
 
-      const exciter = this.context.createBiquadFilter();
-      exciter.type = 'peaking';
-      exciter.frequency.setValueAtTime(4000, now);
-      exciter.Q.setValueAtTime(2.0, now);
-      exciter.gain.setValueAtTime(3, now); // +3dB exciter for 3-5kHz presence
+      // Sine wave for clean tone
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, now);
+      osc.frequency.exponentialRampToValueAtTime(1200, now + 0.05); // Upward chirp
 
-      // Connect filter chain
-      gain.connect(hpf);
-      hpf.connect(exciter);
-      this.connectGainNode(exciter);
-
-      // Envelope (down-up gain curve matching frequency)
-      const peakGain = 0.355; // -9dB peak
+      // Quick snappy envelope
       gain.gain.setValueAtTime(0, now);
-      gain.gain.linearRampToValueAtTime(peakGain, now + 0.005);                 // attack
-      gain.gain.linearRampToValueAtTime(peakGain * 0.5, now + duration * 0.4);  // dip
-      gain.gain.linearRampToValueAtTime(peakGain, now + duration * 0.7);        // peak
-      gain.gain.exponentialRampToValueAtTime(0.001, now + duration);            // decay
+      gain.gain.linearRampToValueAtTime(0.12, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
 
-      // Start and stop
       osc.start(now);
-      osc.stop(now + duration);
+      osc.stop(now + 0.12);
 
-      // Cleanup: disconnect all nodes and return gain to pool
-      setTimeout(() => {
-        try {
-          // Disconnect filter chain
-          gain.disconnect();
-          hpf.disconnect();
-          exciter.disconnect();
-
-          // Return gain to pool
-          if (this.pool) {
-            this.pool.returnGain(gain);
-          }
-        } catch (e) {
-          console.warn('[AudioSystem] Cleanup error in playUISelect:', e);
-        }
-      }, duration * 1000 + 50);
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(gain);
+          // Oscillators are disposable
+        }, 150);
+      }
     });
   }
 
@@ -3504,7 +3654,9 @@ class AudioSystem extends BaseSystem {
     this.safePlay(() => {
       const randomScope = this.randomScopes.families.uiStartGame;
       if (!randomScope) {
-        console.warn('[AudioSystem] playUIStartGame: uiStartGame random scope not available');
+        console.warn(
+          '[AudioSystem] playUIStartGame: uiStartGame random scope not available'
+        );
         return;
       }
 
@@ -3513,23 +3665,38 @@ class AudioSystem extends BaseSystem {
       const duration = randomScope.range(0.3, 0.45);
 
       // === PING COMPONENT ===
-      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
-      const oscGain = this.pool ? this.pool.getGain() : this.context.createGain();
+      const osc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
+      const oscGain = this.pool
+        ? this.pool.getGain()
+        : this.context.createGain();
 
       osc.type = variation === 0 ? 'sine' : 'triangle';
 
       const baseFreq = randomScope.range(1000, 1500);
       const pitchRise = Math.pow(2, randomScope.range(2, 3) / 12); // 2-3 semitones
       osc.frequency.setValueAtTime(baseFreq, now);
-      osc.frequency.exponentialRampToValueAtTime(baseFreq * pitchRise, now + duration * 0.6);
+      osc.frequency.exponentialRampToValueAtTime(
+        baseFreq * pitchRise,
+        now + duration * 0.6
+      );
 
       osc.connect(oscGain);
 
       // === WHOOSH COMPONENT ===
-      const noiseBuffer = this.cache.getNoiseBuffer(duration * 0.6, 0.05, 'white',
-        { family: 'uiStartGame', random: randomScope });
-      const noise = this.pool ? this.pool.getBufferSource() : this.context.createBufferSource();
-      const noiseGain = this.pool ? this.pool.getGain() : this.context.createGain();
+      const noiseBuffer = this.cache.getNoiseBuffer(
+        duration * 0.6,
+        0.05,
+        'white',
+        { family: 'uiStartGame', random: randomScope }
+      );
+      const noise = this.pool
+        ? this.pool.getBufferSource()
+        : this.context.createBufferSource();
+      const noiseGain = this.pool
+        ? this.pool.getGain()
+        : this.context.createGain();
       noise.buffer = noiseBuffer;
 
       noise.connect(noiseGain);
@@ -3544,12 +3711,16 @@ class AudioSystem extends BaseSystem {
 
       // === DELAY-BASED REVERB (simplified approach) ===
       const delay = this.context.createDelay();
-      const delayGain = this.pool ? this.pool.getGain() : this.context.createGain();
-      const feedbackGain = this.pool ? this.pool.getGain() : this.context.createGain();
+      const delayGain = this.pool
+        ? this.pool.getGain()
+        : this.context.createGain();
+      const feedbackGain = this.pool
+        ? this.pool.getGain()
+        : this.context.createGain();
 
       delay.delayTime.setValueAtTime(0.08, now); // 80ms delay
       feedbackGain.gain.setValueAtTime(0.3, now); // 30% feedback for tail
-      delayGain.gain.setValueAtTime(0.25, now);   // -12dB wet signal
+      delayGain.gain.setValueAtTime(0.25, now); // -12dB wet signal
 
       // Delay feedback loop
       delay.connect(feedbackGain);
@@ -3562,7 +3733,9 @@ class AudioSystem extends BaseSystem {
       bpf.connect(delay);
 
       // === MASTER GAIN ===
-      const masterGain = this.pool ? this.pool.getGain() : this.context.createGain();
+      const masterGain = this.pool
+        ? this.pool.getGain()
+        : this.context.createGain();
       masterGain.gain.setValueAtTime(0.5, now); // -6dB peak
 
       // Connect dry signals to master
@@ -3574,13 +3747,13 @@ class AudioSystem extends BaseSystem {
 
       // Ping envelope
       oscGain.gain.setValueAtTime(0, now);
-      oscGain.gain.linearRampToValueAtTime(0.5, now + 0.01);           // attack
-      oscGain.gain.setValueAtTime(0.5, now + duration * 0.5);          // sustain
+      oscGain.gain.linearRampToValueAtTime(0.5, now + 0.01); // attack
+      oscGain.gain.setValueAtTime(0.5, now + duration * 0.5); // sustain
       oscGain.gain.exponentialRampToValueAtTime(0.001, now + duration); // decay
 
       // Whoosh envelope (starts later, at 200ms offset)
       noiseGain.gain.setValueAtTime(0, now + 0.2);
-      noiseGain.gain.linearRampToValueAtTime(0.2, now + 0.22);         // quick attack
+      noiseGain.gain.linearRampToValueAtTime(0.2, now + 0.22); // quick attack
       noiseGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
       // === START/STOP ===
@@ -3590,31 +3763,34 @@ class AudioSystem extends BaseSystem {
       noise.stop(now + duration);
 
       // === CLEANUP (longer tail for delay reverb) ===
-      setTimeout(() => {
-        try {
-          // CRITICAL: Break feedback loop first to prevent runaway oscillation
-          feedbackGain.disconnect();
-          delay.disconnect();
+      setTimeout(
+        () => {
+          try {
+            // CRITICAL: Break feedback loop first to prevent runaway oscillation
+            feedbackGain.disconnect();
+            delay.disconnect();
 
-          // Disconnect all other nodes
-          oscGain.disconnect();
-          noiseGain.disconnect();
-          bpf.disconnect();
-          delayGain.disconnect();
-          masterGain.disconnect();
+            // Disconnect all other nodes
+            oscGain.disconnect();
+            noiseGain.disconnect();
+            bpf.disconnect();
+            delayGain.disconnect();
+            masterGain.disconnect();
 
-          // Return gains to pool
-          if (this.pool) {
-            this.pool.returnGain(oscGain);
-            this.pool.returnGain(noiseGain);
-            this.pool.returnGain(delayGain);
-            this.pool.returnGain(feedbackGain);
-            this.pool.returnGain(masterGain);
+            // Return gains to pool
+            if (this.pool) {
+              this.pool.returnGain(oscGain);
+              this.pool.returnGain(noiseGain);
+              this.pool.returnGain(delayGain);
+              this.pool.returnGain(feedbackGain);
+              this.pool.returnGain(masterGain);
+            }
+          } catch (e) {
+            console.warn('[AudioSystem] Cleanup error in playUIStartGame:', e);
           }
-        } catch (e) {
-          console.warn('[AudioSystem] Cleanup error in playUIStartGame:', e);
-        }
-      }, duration * 1000 + 200);
+        },
+        duration * 1000 + 200
+      );
     });
   }
 
@@ -3650,11 +3826,21 @@ class AudioSystem extends BaseSystem {
     // State machine: determine action based on intensity thresholds
     if (currentIntensity > this.thrusterState.startThreshold && !isActive) {
       // START: intensity crossed start threshold and loop not active
-      this._startThrusterSound(thrusterKey, currentIntensity, isAutomatic || false);
-    } else if (currentIntensity > this.thrusterState.stopThreshold && isActive) {
+      this._startThrusterSound(
+        thrusterKey,
+        currentIntensity,
+        isAutomatic || false
+      );
+    } else if (
+      currentIntensity > this.thrusterState.stopThreshold &&
+      isActive
+    ) {
       // UPDATE: intensity changed but still above stop threshold
       this._updateThrusterSound(thrusterKey, currentIntensity);
-    } else if (currentIntensity <= this.thrusterState.stopThreshold && isActive) {
+    } else if (
+      currentIntensity <= this.thrusterState.stopThreshold &&
+      isActive
+    ) {
       // STOP: intensity dropped below stop threshold (hysteresis)
       this._stopThrusterSound(thrusterKey);
     }
@@ -3676,7 +3862,9 @@ class AudioSystem extends BaseSystem {
     if (isAutomatic) {
       // Immediate loop start, no burst
       const randomScope = this._getThrusterRandomScope(type);
-      const variation = Math.floor((randomScope?.range ? randomScope.range(0, 3) : Math.random() * 3));
+      const variation = Math.floor(
+        randomScope?.range ? randomScope.range(0, 3) : Math.random() * 3
+      );
 
       // Reduce intensity for automatic thrusters (softer spray sound)
       const autoIntensity = intensity * 0.4; // 60% reduction for subtle auto-damping
@@ -3698,23 +3886,28 @@ class AudioSystem extends BaseSystem {
     this._playThrusterStartBurst(type);
 
     // Then start continuous loop after a short delay
-    setTimeout(() => {
-      if (!this.initialized || !this.context) return;
+    setTimeout(
+      () => {
+        if (!this.initialized || !this.context) return;
 
-      const randomScope = this._getThrusterRandomScope(type);
-      const variation = Math.floor((randomScope?.range ? randomScope.range(0, 3) : Math.random() * 3));
+        const randomScope = this._getThrusterRandomScope(type);
+        const variation = Math.floor(
+          randomScope?.range ? randomScope.range(0, 3) : Math.random() * 3
+        );
 
-      this.thrusterLoopManager.startLoop(
-        type,
-        variation,
-        intensity,
-        this.context,
-        this.pool,
-        this.cache,
-        randomScope,
-        (node) => this.connectGainNode(node)
-      );
-    }, type === 'side' ? 80 : type === 'retro' ? 140 : 160); // Delay ajustado para burst mais longo
+        this.thrusterLoopManager.startLoop(
+          type,
+          variation,
+          intensity,
+          this.context,
+          this.pool,
+          this.cache,
+          randomScope,
+          (node) => this.connectGainNode(node)
+        );
+      },
+      type === 'side' ? 80 : type === 'retro' ? 140 : 160
+    ); // Delay ajustado para burst mais longo
   }
 
   /**
@@ -3753,26 +3946,34 @@ class AudioSystem extends BaseSystem {
       // Ajustado para sons graves, suaves e realistas de ignição (como release)
       let duration, pitchStart, pitchEnd, gainPeak;
       if (type === 'main') {
-        duration = 0.24 + (randomScope?.range ? randomScope.range(-0.02, 0.06) : 0);
+        duration =
+          0.24 + (randomScope?.range ? randomScope.range(-0.02, 0.06) : 0);
         pitchStart = 90; // MUITO mais grave (era 140)
         pitchEnd = 120; // Ramp suave e grave (era 170)
         gainPeak = 0.15; // Mais suave ainda (-16dB, era -9dB)
       } else if (type === 'retro') {
-        duration = 0.20 + (randomScope?.range ? randomScope.range(-0.02, 0.05) : 0);
+        duration =
+          0.2 + (randomScope?.range ? randomScope.range(-0.02, 0.05) : 0);
         pitchStart = 100; // Muito mais grave (era 180)
         pitchEnd = 130; // Descending suave (era 150)
         gainPeak = 0.12; // Mais suave (-18dB, era -10dB)
       } else {
         // side
-        duration = 0.14 + (randomScope?.range ? randomScope.range(-0.01, 0.04) : 0);
-        pitchStart = 140 + (randomScope?.range ? randomScope.range(-10, 10) : 0); // Mais grave (era 220)
+        duration =
+          0.14 + (randomScope?.range ? randomScope.range(-0.01, 0.04) : 0);
+        pitchStart =
+          140 + (randomScope?.range ? randomScope.range(-10, 10) : 0); // Mais grave (era 220)
         pitchEnd = 110; // Muito mais grave (era 180)
-        gainPeak = 0.10; // Mais suave (-20dB, era -12dB)
+        gainPeak = 0.1; // Mais suave (-20dB, era -12dB)
       }
 
       // Create oscillator - Triangle wave para suavidade (meio termo entre sine e sawtooth)
-      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
-      const oscGain = this.pool ? this.pool.getGain() : this.context.createGain();
+      const osc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
+      const oscGain = this.pool
+        ? this.pool.getGain()
+        : this.context.createGain();
 
       osc.type = 'triangle'; // Triangle é mais suave que sawtooth/square mas com mais corpo que sine
       osc.frequency.setValueAtTime(pitchStart, now);
@@ -3782,26 +3983,48 @@ class AudioSystem extends BaseSystem {
 
       // Create noise burst
       let noiseBuffer;
-      const familyName = type === 'main' ? 'thrusterMain' : type === 'retro' ? 'thrusterRetro' : 'thrusterSide';
+      const familyName =
+        type === 'main'
+          ? 'thrusterMain'
+          : type === 'retro'
+            ? 'thrusterRetro'
+            : 'thrusterSide';
 
       if (this.cache) {
-        noiseBuffer = this.cache.getNoiseBuffer(duration * 0.8, true, 'linear', {
-          family: familyName,
-          random: randomScope,
-        });
+        noiseBuffer = this.cache.getNoiseBuffer(
+          duration * 0.8,
+          true,
+          'linear',
+          {
+            family: familyName,
+            random: randomScope,
+          }
+        );
       } else {
         const bufferSize = Math.floor(this.context.sampleRate * duration * 0.8);
-        noiseBuffer = this.context.createBuffer(1, bufferSize, this.context.sampleRate);
+        noiseBuffer = this.context.createBuffer(
+          1,
+          bufferSize,
+          this.context.sampleRate
+        );
         const output = noiseBuffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
           const progress = i / bufferSize;
-          output[i] = (randomScope?.range ? randomScope.range(-1, 1) : Math.random() * 2 - 1) * (1 - progress);
+          output[i] =
+            (randomScope?.range
+              ? randomScope.range(-1, 1)
+              : Math.random() * 2 - 1) *
+            (1 - progress);
         }
       }
 
-      const noise = this.pool ? this.pool.getBufferSource() : this.context.createBufferSource();
+      const noise = this.pool
+        ? this.pool.getBufferSource()
+        : this.context.createBufferSource();
       noise.buffer = noiseBuffer;
-      const noiseGain = this.pool ? this.pool.getGain() : this.context.createGain();
+      const noiseGain = this.pool
+        ? this.pool.getGain()
+        : this.context.createGain();
       noise.connect(noiseGain);
 
       // Apply EQ filter chain (muito suave, grave e warm)
@@ -3836,7 +4059,10 @@ class AudioSystem extends BaseSystem {
       this.connectGainNode(lpf);
 
       // Envelope (attack ainda mais longo para ignição muito suave)
-      const attackTime = type === 'side' ? 0.025 : 0.080 + (randomScope?.range ? randomScope.range(0, 0.030) : 0);
+      const attackTime =
+        type === 'side'
+          ? 0.025
+          : 0.08 + (randomScope?.range ? randomScope.range(0, 0.03) : 0);
 
       // Balance osc/noise: ainda menos noise, mais oscillator para som tonal e suave
       oscGain.gain.setValueAtTime(0, now);
@@ -3855,10 +4081,13 @@ class AudioSystem extends BaseSystem {
 
       // Return gains to pool
       if (this.pool) {
-        setTimeout(() => {
-          this.pool.returnGain(oscGain);
-          this.pool.returnGain(noiseGain);
-        }, duration * 1000 + 50);
+        setTimeout(
+          () => {
+            this.pool.returnGain(oscGain);
+            this.pool.returnGain(noiseGain);
+          },
+          duration * 1000 + 50
+        );
       }
     });
   }
@@ -3875,7 +4104,7 @@ class AudioSystem extends BaseSystem {
       // Duration varies by thruster type - mais longo para fade suave
       let duration, pitchStart, pitchEnd, gainPeak;
       if (type === 'main') {
-        duration = 0.20 + (randomScope?.range ? randomScope.range(0, 0.08) : 0);
+        duration = 0.2 + (randomScope?.range ? randomScope.range(0, 0.08) : 0);
         pitchStart = 110; // Muito mais grave (era 180)
         pitchEnd = 70; // Drop suave e grave (era 150)
         gainPeak = 0.12; // MUITO mais suave (era 0.707 = -3dB, agora ~-18dB)
@@ -3883,7 +4112,7 @@ class AudioSystem extends BaseSystem {
         duration = 0.18 + (randomScope?.range ? randomScope.range(0, 0.06) : 0);
         pitchStart = 120;
         pitchEnd = 75;
-        gainPeak = 0.10; // Muito mais suave (era 0.63, agora ~-20dB)
+        gainPeak = 0.1; // Muito mais suave (era 0.63, agora ~-20dB)
       } else {
         // side
         duration = 0.15 + (randomScope?.range ? randomScope.range(0, 0.04) : 0);
@@ -3893,7 +4122,9 @@ class AudioSystem extends BaseSystem {
       }
 
       // Create oscillator - SINE wave para suavidade máxima
-      const osc = this.pool ? this.pool.getOscillator() : this.context.createOscillator();
+      const osc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
       const gain = this.pool ? this.pool.getGain() : this.context.createGain();
 
       osc.type = 'sine'; // Sine é muito mais suave que sawtooth/square
@@ -3921,9 +4152,12 @@ class AudioSystem extends BaseSystem {
 
       // Return gain to pool
       if (this.pool) {
-        setTimeout(() => {
-          this.pool.returnGain(gain);
-        }, duration * 1000 + 50);
+        setTimeout(
+          () => {
+            this.pool.returnGain(gain);
+          },
+          duration * 1000 + 50
+        );
       }
     });
   }
@@ -3933,12 +4167,24 @@ class AudioSystem extends BaseSystem {
    */
   _getThrusterRandomScope(type) {
     if (type === 'main') {
-      return this.randomScopes?.families?.thrusterMain || this.randomScopes?.families?.thruster || this.randomScopes?.base;
+      return (
+        this.randomScopes?.families?.thrusterMain ||
+        this.randomScopes?.families?.thruster ||
+        this.randomScopes?.base
+      );
     } else if (type === 'retro') {
-      return this.randomScopes?.families?.thrusterRetro || this.randomScopes?.families?.thruster || this.randomScopes?.base;
+      return (
+        this.randomScopes?.families?.thrusterRetro ||
+        this.randomScopes?.families?.thruster ||
+        this.randomScopes?.base
+      );
     } else {
       // side
-      return this.randomScopes?.families?.thrusterSide || this.randomScopes?.families?.thruster || this.randomScopes?.base;
+      return (
+        this.randomScopes?.families?.thrusterSide ||
+        this.randomScopes?.families?.thruster ||
+        this.randomScopes?.base
+      );
     }
   }
 
@@ -3968,7 +4214,7 @@ class AudioSystem extends BaseSystem {
     const timeout = this.thrusterState.inactivityTimeout;
 
     // Check each thruster type
-    ['main', 'retro', 'side'].forEach(type => {
+    ['main', 'retro', 'side'].forEach((type) => {
       const isActive = this.thrusterLoopManager.isActive(type);
       if (!isActive) return;
 
@@ -4067,7 +4313,8 @@ class AudioSystem extends BaseSystem {
     const now = performance.now();
     const deltaTime = now - this.performanceMonitor.lastFrameTime;
 
-    if (deltaTime >= 1000) { // Update every second
+    if (deltaTime >= 1000) {
+      // Update every second
       this.performanceMonitor.frameCount++;
 
       // Calculate average calls per frame
@@ -4103,11 +4350,12 @@ class AudioSystem extends BaseSystem {
 
     console.log('[AudioSystem] Performance Stats:', {
       totalAudioCalls: this.performanceMonitor.totalAudioCalls,
-      averageCallsPerFrame: this.performanceMonitor.averageCallsPerFrame.toFixed(1),
+      averageCallsPerFrame:
+        this.performanceMonitor.averageCallsPerFrame.toFixed(1),
       peakCallsPerFrame: this.performanceMonitor.peakCallsPerFrame,
       pool: poolStats,
       cache: cacheStats,
-      batcher: batcherStats
+      batcher: batcherStats,
     });
   }
 
@@ -4122,7 +4370,7 @@ class AudioSystem extends BaseSystem {
       averageCallsPerFrame: 0,
       peakCallsPerFrame: 0,
       lastFrameTime: performance.now(),
-      totalAudioCalls: 0
+      totalAudioCalls: 0,
     };
 
     if (this.pool) this.pool.resetStats();
@@ -4144,8 +4392,8 @@ class AudioSystem extends BaseSystem {
       optimizationsEnabled: {
         pooling: !!this.pool,
         caching: !!this.cache,
-        batching: !!this.batcher
-      }
+        batching: !!this.batcher,
+      },
     };
   }
 

@@ -22,7 +22,9 @@ describe('PlayerSystem command queue integration', () => {
     const baselineInput = { up: true, down: false, left: true, right: false };
 
     const legacyQueue = new CommandQueueService();
-    const legacyInputService = { getMovementInput: vi.fn(() => ({ ...baselineInput })) };
+    const legacyInputService = {
+      getMovementInput: vi.fn(() => ({ ...baselineInput })),
+    };
 
     const baselinePlayer = new PlayerSystem({
       input: legacyInputService,
@@ -60,7 +62,12 @@ describe('PlayerSystem command queue integration', () => {
 
     const commandQueue = new CommandQueueService();
     const commandInputService = {
-      getMovementInput: vi.fn(() => ({ up: false, down: false, left: false, right: false })),
+      getMovementInput: vi.fn(() => ({
+        up: false,
+        down: false,
+        left: false,
+        right: false,
+      })),
     };
 
     const queuePlayer = new PlayerSystem({
@@ -100,7 +107,10 @@ describe('PlayerSystem command queue integration', () => {
     queuePlayer.update(DELTA_TIME);
 
     expect(queuePlayer.velocity).toEqual(legacyState.velocity);
-    expect(queuePlayer.angularVelocity).toBeCloseTo(legacyState.angularVelocity, 10);
+    expect(queuePlayer.angularVelocity).toBeCloseTo(
+      legacyState.angularVelocity,
+      10
+    );
     expect(queuePlayer.angle).toBeCloseTo(legacyState.angle, 10);
     expect(queuePlayer.position).toEqual(legacyState.position);
     expect(thrusterEventsQueue).toEqual(thrusterEventsLegacy);
@@ -110,7 +120,12 @@ describe('PlayerSystem command queue integration', () => {
   it('falls back to cached movement when no command is available', () => {
     const commandQueue = new CommandQueueService();
     const inputService = {
-      getMovementInput: vi.fn(() => ({ up: false, down: false, left: false, right: false })),
+      getMovementInput: vi.fn(() => ({
+        up: false,
+        down: false,
+        left: false,
+        right: false,
+      })),
     };
 
     const player = new PlayerSystem({

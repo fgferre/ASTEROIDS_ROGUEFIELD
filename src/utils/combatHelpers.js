@@ -19,7 +19,9 @@ const computeLeadSolution = ({
   const toTargetX = target.x - origin.x;
   const toTargetY = target.y - origin.y;
 
-  const targetSpeedSq = targetVelocity.vx * targetVelocity.vx + targetVelocity.vy * targetVelocity.vy;
+  const targetSpeedSq =
+    targetVelocity.vx * targetVelocity.vx +
+    targetVelocity.vy * targetVelocity.vy;
   const projectileSpeedSq = projectileSpeed * projectileSpeed;
 
   const a = targetSpeedSq - projectileSpeedSq;
@@ -54,7 +56,10 @@ const computeLeadSolution = ({
   const time1 = (-b - sqrt) / (2 * a);
   const time2 = (-b + sqrt) / (2 * a);
 
-  const time = Math.min(time1, time2) > 0 ? Math.min(time1, time2) : Math.max(time1, time2);
+  const time =
+    Math.min(time1, time2) > 0
+      ? Math.min(time1, time2)
+      : Math.max(time1, time2);
   if (time <= 0) {
     return { x: target.x, y: target.y };
   }
@@ -79,12 +84,20 @@ const resolvePlayerVelocity = (player) => {
 
   if (typeof entity.getVelocity === 'function') {
     const velocity = entity.getVelocity();
-    if (velocity && Number.isFinite(velocity.vx) && Number.isFinite(velocity.vy)) {
+    if (
+      velocity &&
+      Number.isFinite(velocity.vx) &&
+      Number.isFinite(velocity.vy)
+    ) {
       return { vx: velocity.vx, vy: velocity.vy };
     }
   }
 
-  if (entity.velocity && Number.isFinite(entity.velocity.x) && Number.isFinite(entity.velocity.y)) {
+  if (
+    entity.velocity &&
+    Number.isFinite(entity.velocity.x) &&
+    Number.isFinite(entity.velocity.y)
+  ) {
     return { vx: entity.velocity.x, vy: entity.velocity.y };
   }
 

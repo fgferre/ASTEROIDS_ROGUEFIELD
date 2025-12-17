@@ -6,7 +6,7 @@ console.log('===============================\n');
 
 // Initialize pools
 GamePools.initialize({
-  particles: { initial: 5, max: 20 }
+  particles: { initial: 5, max: 20 },
 });
 
 console.log('1. Testing particle creation with methods...');
@@ -15,8 +15,14 @@ console.log('1. Testing particle creation with methods...');
 const particle = GamePools.particles.acquire();
 
 console.log('   Particle acquired:', !!particle ? '✅' : '❌');
-console.log('   Has update method:', typeof particle.update === 'function' ? '✅' : '❌');
-console.log('   Has draw method:', typeof particle.draw === 'function' ? '✅' : '❌');
+console.log(
+  '   Has update method:',
+  typeof particle.update === 'function' ? '✅' : '❌'
+);
+console.log(
+  '   Has draw method:',
+  typeof particle.draw === 'function' ? '✅' : '❌'
+);
 
 // Test configuring particle
 particle.x = 100;
@@ -37,10 +43,16 @@ const deltaTime = 0.016; // 60 FPS
 const initialX = particle.x;
 const isAlive = particle.update(deltaTime);
 
-console.log('   Update returned boolean:', typeof isAlive === 'boolean' ? '✅' : '❌');
+console.log(
+  '   Update returned boolean:',
+  typeof isAlive === 'boolean' ? '✅' : '❌'
+);
 console.log('   Position changed:', particle.x !== initialX ? '✅' : '❌');
 console.log('   Life decreased:', particle.life < 1000 ? '✅' : '❌');
-console.log('   Alpha calculated:', particle.alpha > 0 && particle.alpha <= 1 ? '✅' : '❌');
+console.log(
+  '   Alpha calculated:',
+  particle.alpha > 0 && particle.alpha <= 1 ? '✅' : '❌'
+);
 
 // Test draw method (mock canvas context)
 console.log('\n3. Testing particle draw method...');
@@ -56,7 +68,7 @@ const mockCtx = {
   strokeStyle: '',
   lineWidth: 0,
   lineCap: '',
-  globalAlpha: 1
+  globalAlpha: 1,
 };
 
 try {
@@ -76,7 +88,10 @@ console.log('   Particle released successfully:', releaseResult ? '✅' : '❌')
 const particle2 = GamePools.particles.acquire();
 const isSameObject = particle === particle2;
 console.log('   Same object reused:', isSameObject ? '✅' : '❌');
-console.log('   Object reset correctly:', particle2.x === 0 && particle2.y === 0 ? '✅' : '❌');
+console.log(
+  '   Object reset correctly:',
+  particle2.x === 0 && particle2.y === 0 ? '✅' : '❌'
+);
 
 // Test multiple particles
 console.log('\n5. Testing multiple particles...');

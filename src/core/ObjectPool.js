@@ -67,7 +67,10 @@ export class ObjectPool {
     this.expand(initialSize);
 
     // Track pool for debugging
-    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    if (
+      typeof window !== 'undefined' &&
+      process.env.NODE_ENV === 'development'
+    ) {
       if (!window.__objectPools) {
         window.__objectPools = [];
       }
@@ -94,7 +97,9 @@ export class ObjectPool {
       this.totalCreated++;
 
       if (process.env.NODE_ENV === 'development') {
-        console.debug(`[ObjectPool] Created new object (total: ${this.totalCreated})`);
+        console.debug(
+          `[ObjectPool] Created new object (total: ${this.totalCreated})`
+        );
       }
     }
 
@@ -116,7 +121,9 @@ export class ObjectPool {
   release(obj) {
     if (!this.inUse.has(obj)) {
       if (process.env.NODE_ENV === 'development') {
-        console.warn('[ObjectPool] Attempted to release object not acquired from this pool');
+        console.warn(
+          '[ObjectPool] Attempted to release object not acquired from this pool'
+        );
       }
       return false;
     }
@@ -204,10 +211,11 @@ export class ObjectPool {
       totalCreated: this.totalCreated,
       totalAcquired: this.totalAcquired,
       totalReleased: this.totalReleased,
-      hitRate: this.totalAcquired > 0
-        ? ((this.totalHits / this.totalAcquired) * 100).toFixed(1) + '%'
-        : '0%',
-      maxSize: this.maxSize
+      hitRate:
+        this.totalAcquired > 0
+          ? ((this.totalHits / this.totalAcquired) * 100).toFixed(1) + '%'
+          : '0%',
+      maxSize: this.maxSize,
     };
   }
 
@@ -251,22 +259,31 @@ export class ObjectPool {
     const {
       targetUtilization = 0.7,
       maxExpansion = 10,
-      maxShrinkage = 5
+      maxShrinkage = 5,
     } = options;
 
     const utilization = this.inUse.size / this.getTotalSize();
 
     if (utilization > targetUtilization && this.available.length < 3) {
       // High utilization and low availability - expand
-      const expansion = Math.min(maxExpansion, Math.ceil(this.inUse.size * 0.2));
+      const expansion = Math.min(
+        maxExpansion,
+        Math.ceil(this.inUse.size * 0.2)
+      );
       this.expand(expansion);
 
       if (process.env.NODE_ENV === 'development') {
         console.debug(`[ObjectPool] Auto-expanded by ${expansion} objects`);
       }
-    } else if (utilization < targetUtilization * 0.5 && this.available.length > 10) {
+    } else if (
+      utilization < targetUtilization * 0.5 &&
+      this.available.length > 10
+    ) {
       // Low utilization and high availability - shrink
-      const shrinkage = Math.min(maxShrinkage, Math.floor(this.available.length * 0.2));
+      const shrinkage = Math.min(
+        maxShrinkage,
+        Math.floor(this.available.length * 0.2)
+      );
       this.shrink(shrinkage);
 
       if (process.env.NODE_ENV === 'development') {
@@ -294,13 +311,15 @@ export class ObjectPool {
     // Check total created vs managed
     const managed = this.getTotalSize();
     if (managed > this.totalCreated) {
-      errors.push(`More objects managed (${managed}) than created (${this.totalCreated})`);
+      errors.push(
+        `More objects managed (${managed}) than created (${this.totalCreated})`
+      );
     }
 
     return {
       valid: errors.length === 0,
       errors,
-      stats: this.getStats()
+      stats: this.getStats(),
     };
   }
 
@@ -324,13 +343,22 @@ export class ObjectPool {
    * @param {number} [initialSize=this.available.length] - Objects to pre-create
    * @param {number} [maxSize=this.maxSize] - New maximum pool size
    */
-  reconfigure(createFn, resetFn, initialSize = this.available.length, maxSize = this.maxSize) {
+  reconfigure(
+    createFn,
+    resetFn,
+    initialSize = this.available.length,
+    maxSize = this.maxSize
+  ) {
     if (typeof createFn !== 'function') {
-      throw new Error('reconfigure(createFn, resetFn, ...) requires a create function');
+      throw new Error(
+        'reconfigure(createFn, resetFn, ...) requires a create function'
+      );
     }
 
     if (typeof resetFn !== 'function') {
-      throw new Error('reconfigure(createFn, resetFn, ...) requires a reset function');
+      throw new Error(
+        'reconfigure(createFn, resetFn, ...) requires a reset function'
+      );
     }
 
     if (this.inUse.size > 0) {
@@ -449,7 +477,9 @@ export class TTLObjectPool extends ObjectPool {
     this.lastCleanup = currentTime;
 
     if (process.env.NODE_ENV === 'development' && expiredObjects.length > 0) {
-      console.debug(`[TTLObjectPool] Released ${expiredObjects.length} expired objects`);
+      console.debug(
+        `[TTLObjectPool] Released ${expiredObjects.length} expired objects`
+      );
     }
   }
 
@@ -472,9 +502,10 @@ export class TTLObjectPool extends ObjectPool {
     return {
       ...baseStats,
       objectsWithTTL: this.ttlMap.size,
-      nextExpiration: typeof nextExpiration === 'number'
-        ? nextExpiration - performance.now()
-        : null
+      nextExpiration:
+        typeof nextExpiration === 'number'
+          ? nextExpiration - performance.now()
+          : null,
     };
   }
 
@@ -503,7 +534,9 @@ export class TTLObjectPool extends ObjectPool {
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   window.__poolDebug = {
     getAllPools: () => window.__objectPools || [],
-    getPoolStats: () => (window.__objectPools || []).map(pool => pool.getStats()),
-    validateAllPools: () => (window.__objectPools || []).map(pool => pool.validate())
+    getPoolStats: () =>
+      (window.__objectPools || []).map((pool) => pool.getStats()),
+    validateAllPools: () =>
+      (window.__objectPools || []).map((pool) => pool.validate()),
   };
 }

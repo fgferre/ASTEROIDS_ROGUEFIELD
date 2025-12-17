@@ -108,7 +108,12 @@ export function createEnemySystemHarness(seed = TEST_SEED) {
   }
 
   const { GAME_WIDTH, GAME_HEIGHT } = CONSTANTS;
-  const worldBounds = { left: 0, top: 0, right: GAME_WIDTH, bottom: GAME_HEIGHT };
+  const worldBounds = {
+    left: 0,
+    top: 0,
+    right: GAME_WIDTH,
+    bottom: GAME_HEIGHT,
+  };
 
   const world = {
     getBounds: () => worldBounds,
@@ -245,13 +250,13 @@ export function prepareWave(enemySystem, waveNumber, options = {}) {
     ? CONSTANTS.ASTEROIDS_PER_WAVE_BASE
     : 0;
   const perWaveIncrement = Number.isFinite(
-    CONSTANTS.ASTEROIDS_PER_WAVE_MULTIPLIER,
+    CONSTANTS.ASTEROIDS_PER_WAVE_MULTIPLIER
   )
     ? CONSTANTS.ASTEROIDS_PER_WAVE_MULTIPLIER
     : 0;
 
   const computedTotal = Math.floor(
-    baseCount + (normalizedWave - 1) * perWaveIncrement,
+    baseCount + (normalizedWave - 1) * perWaveIncrement
   );
   const clampedTotal = Math.min(computedTotal, 25);
 
@@ -309,7 +314,9 @@ export function simulateWave(enemySystem, waveNumber, maxIterations = 1500) {
     while (enemySystem.waveState.isActive && iterations < maxIterations) {
       enemySystem.update(deltaTime);
 
-      if (enemySystem.getActiveEnemyCount?.() > CONSTANTS.MAX_ASTEROIDS_ON_SCREEN) {
+      if (
+        enemySystem.getActiveEnemyCount?.() > CONSTANTS.MAX_ASTEROIDS_ON_SCREEN
+      ) {
         throw new Error('Active asteroid count exceeded screen limit.');
       }
 
@@ -393,7 +400,10 @@ export function sampleVariants(enemySystem, size, wave, count) {
 
   const results = {};
   for (let index = 0; index < count; index += 1) {
-    const variant = enemySystem.decideVariant(size, { wave, spawnType: 'spawn' });
+    const variant = enemySystem.decideVariant(size, {
+      wave,
+      spawnType: 'spawn',
+    });
     results[variant] = (results[variant] ?? 0) + 1;
   }
   return results;
@@ -417,7 +427,10 @@ export function computeExpectedVariantBreakdown(enemySystem, size, wave) {
 
   const variantConfig = CONSTANTS.ASTEROID_VARIANTS || {};
   const baseChance =
-    chanceConfig.baseChance ?? chanceConfig.base ?? chanceConfig.specialChance ?? 0;
+    chanceConfig.baseChance ??
+    chanceConfig.base ??
+    chanceConfig.specialChance ??
+    0;
   const waveBonus =
     typeof enemySystem.computeVariantWaveBonus === 'function'
       ? enemySystem.computeVariantWaveBonus(wave)
@@ -431,7 +444,8 @@ export function computeExpectedVariantBreakdown(enemySystem, size, wave) {
   for (const [variant, weight] of Object.entries(distribution)) {
     const config = variantConfig[variant] || {};
     const { allowedSizes, availability } = config;
-    const sizeAllowed = !Array.isArray(allowedSizes) || allowedSizes.includes(size);
+    const sizeAllowed =
+      !Array.isArray(allowedSizes) || allowedSizes.includes(size);
     const minWave = availability?.minWave;
     const waveAllowed = typeof minWave !== 'number' || wave >= minWave;
     const usable = Number(weight) > 0 && sizeAllowed && waveAllowed;
@@ -442,7 +456,10 @@ export function computeExpectedVariantBreakdown(enemySystem, size, wave) {
     }
   }
 
-  const totalWeight = allowedEntries.reduce((sum, [, weight]) => sum + weight, 0);
+  const totalWeight = allowedEntries.reduce(
+    (sum, [, weight]) => sum + weight,
+    0
+  );
   if (!allowedEntries.length || totalWeight <= 0) {
     return { specialChance: 0, probabilities: { common: 1 }, excluded };
   }
@@ -481,7 +498,10 @@ export function computeAverageFragmentsForSize(enemySystem, size, wave, count) {
   enemySystem.reseedRandomScopes?.({ resetSequences: true });
 
   for (let index = 0; index < count; index += 1) {
-    const variant = enemySystem.decideVariant(size, { wave, spawnType: 'spawn' });
+    const variant = enemySystem.decideVariant(size, {
+      wave,
+      spawnType: 'spawn',
+    });
     const asteroid = enemySystem.acquireAsteroid({
       size,
       variant,
@@ -525,7 +545,10 @@ export function getFragmentRuleForVariant(variant) {
   const variantConfig = CONSTANTS.ASTEROID_VARIANTS[variant] ?? {};
   const profileKey =
     variantConfig.fragmentProfile ?? variantConfig.key ?? variant ?? 'default';
-  return CONSTANTS.ASTEROID_FRAGMENT_RULES[profileKey] ?? CONSTANTS.ASTEROID_FRAGMENT_RULES.default;
+  return (
+    CONSTANTS.ASTEROID_FRAGMENT_RULES[profileKey] ??
+    CONSTANTS.ASTEROID_FRAGMENT_RULES.default
+  );
 }
 
 /**
@@ -538,7 +561,8 @@ export function getFragmentRuleForVariant(variant) {
  * const stats = getFragmentRangeStats(rule, 'medium');
  */
 export function getFragmentRangeStats(rule, size) {
-  const range = rule?.countBySize?.[size] ?? rule?.countBySize?.default ?? [0, 0];
+  const range = rule?.countBySize?.[size] ??
+    rule?.countBySize?.default ?? [0, 0];
 
   if (Array.isArray(range) && range.length === 2) {
     const min = Math.max(0, Math.floor(Number(range[0]) || 0));
@@ -564,7 +588,9 @@ export function computeFragmentExpectationBounds(enemySystem, size, wave) {
   const breakdown = computeExpectedVariantBreakdown(enemySystem, size, wave);
   const contributions = { min: 0, max: 0, mean: 0 };
 
-  for (const [variant, probability] of Object.entries(breakdown.probabilities)) {
+  for (const [variant, probability] of Object.entries(
+    breakdown.probabilities
+  )) {
     if (probability <= 0) {
       continue;
     }
@@ -596,7 +622,10 @@ export function summarizeAsteroid(asteroid) {
     y: Number(asteroid.y.toFixed(2)),
     vx: Number(asteroid.vx.toFixed(4)),
     vy: Number(asteroid.vy.toFixed(4)),
-    radius: typeof asteroid.getBoundingRadius === 'function' ? asteroid.getBoundingRadius() : asteroid.radius ?? 0,
+    radius:
+      typeof asteroid.getBoundingRadius === 'function'
+        ? asteroid.getBoundingRadius()
+        : asteroid.radius ?? 0,
     wave: asteroid.wave ?? 0,
   };
 }

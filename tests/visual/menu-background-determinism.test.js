@@ -8,7 +8,9 @@ function createFrozenMathUtilsStub() {
     RAD2DEG: 180 / Math.PI,
   };
 
-  const originalGenerator = vi.fn(() => `cdn-${Math.random().toString(16).slice(2)}`);
+  const originalGenerator = vi.fn(
+    () => `cdn-${Math.random().toString(16).slice(2)}`
+  );
 
   Object.defineProperty(mathUtils, 'generateUUID', {
     configurable: false,
@@ -28,7 +30,9 @@ function createConfigurableMathUtilsStub() {
     RAD2DEG: 180 / Math.PI,
   };
 
-  const originalGenerator = vi.fn(() => `module-${Math.random().toString(16).slice(2)}`);
+  const originalGenerator = vi.fn(
+    () => `module-${Math.random().toString(16).slice(2)}`
+  );
 
   Object.defineProperty(mathUtils, 'generateUUID', {
     configurable: true,

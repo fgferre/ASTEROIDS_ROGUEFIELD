@@ -8,6 +8,7 @@
 ---
 
 ## Table of Contents
+
 1. [Visão Geral do Sistema](#1-visão-geral-do-sistema)
 2. [Estrutura de Dados do Sistema](#2-estrutura-de-dados-do-sistema)
 3. [XP Collection (Coleta de XP)](#3-xp-collection-coleta-de-xp)
@@ -29,29 +30,34 @@
 ## 1. Visão Geral do Sistema
 
 ### Conceito
+
 O sistema de progressão gerencia a experiência (XP), níveis e multiplicador de combo do player, recompensando habilidade através de combos baseados em kills consecutivos e fornecendo progressão contínua através de levels e upgrades.
 
 ### Três Subsistemas Integrados
 
 #### **XP System**
+
 - Coleta de XP via orbs deixados por inimigos
 - Acumulação até threshold (experienceToNext)
 - Level-up automático ao atingir threshold
 - Suporte a múltiplos level-ups simultâneos
 
 #### **Level System**
+
 - Scaling exponencial de XP requirement (1.2x por nível)
 - Cálculo dinâmico de XP necessário para próximo nível
 - Recompensas de upgrade a cada level-up
 - Preparação de N opções (padrão: 3) via weighted random
 
 #### **Combo System**
+
 - Contador de kills consecutivos (incrementa a cada enemy-destroyed)
 - Multiplicador de XP crescente (1.0x → 2.0x)
 - Timeout de 3 segundos (reseta sem kills)
 - Visual feedback em tempo real (timer circular decrescente)
 
 ### Propósito no Gameplay
+
 - **Recompensar Skill**: Combos altos = mais XP = level-ups mais rápidos
 - **Progressão Contínua**: Levels fornecem upgrades permanentes
 - **Risk/Reward**: Manter combo requer agressividade, mas timeout pune passividade
@@ -65,26 +71,26 @@ O sistema de progressão gerencia a experiência (XP), níveis e multiplicador d
 
 Baseado em `ProgressionSystem.js` linhas 18-88:
 
-| Campo | Tipo | Valor Inicial | Descrição |
-|-------|------|---------------|-----------|
-| **Progression State** |
-| `level` | int | 1 | Nível atual do player |
-| `experience` | int | 0 | XP acumulado no nível atual (0 a experienceToNext) |
-| `experienceToNext` | int | 100 | XP necessário para próximo nível |
-| `totalExperience` | int | 0 | XP total coletado desde o início da sessão |
-| **Combo State** |
-| `currentCombo` | int | 0 | Contador de kills consecutivos |
-| `comboTimer` | float | 0.0 | Timer de timeout do combo (decrementa com delta) |
-| `comboTimeout` | float | 3.0 | Duração do timeout (configurável) |
-| `comboMultiplier` | float | 1.0 | Multiplicador de XP baseado em combo (1.0 a 2.0) |
-| `comboMultiplierStep` | float | 0.1 | Incremento por kill |
-| `comboMultiplierCap` | float | 2.0 | Cap do multiplicador |
-| **Configuration** |
-| `levelScaling` | float | 1.2 | Fator de scaling exponencial |
-| `upgradeRollCount` | int | 3 | Número de opções de upgrade no level-up |
-| **Upgrade State** |
-| `appliedUpgrades` | Dictionary | {} | Mapa de upgradeId → level aplicado |
-| `pendingUpgradeOptions` | Array | [] | Opções de upgrade disponíveis no level-up atual |
+| Campo                   | Tipo       | Valor Inicial | Descrição                                          |
+| ----------------------- | ---------- | ------------- | -------------------------------------------------- |
+| **Progression State**   |
+| `level`                 | int        | 1             | Nível atual do player                              |
+| `experience`            | int        | 0             | XP acumulado no nível atual (0 a experienceToNext) |
+| `experienceToNext`      | int        | 100           | XP necessário para próximo nível                   |
+| `totalExperience`       | int        | 0             | XP total coletado desde o início da sessão         |
+| **Combo State**         |
+| `currentCombo`          | int        | 0             | Contador de kills consecutivos                     |
+| `comboTimer`            | float      | 0.0           | Timer de timeout do combo (decrementa com delta)   |
+| `comboTimeout`          | float      | 3.0           | Duração do timeout (configurável)                  |
+| `comboMultiplier`       | float      | 1.0           | Multiplicador de XP baseado em combo (1.0 a 2.0)   |
+| `comboMultiplierStep`   | float      | 0.1           | Incremento por kill                                |
+| `comboMultiplierCap`    | float      | 2.0           | Cap do multiplicador                               |
+| **Configuration**       |
+| `levelScaling`          | float      | 1.2           | Fator de scaling exponencial                       |
+| `upgradeRollCount`      | int        | 3             | Número de opções de upgrade no level-up            |
+| **Upgrade State**       |
+| `appliedUpgrades`       | Dictionary | {}            | Mapa de upgradeId → level aplicado                 |
+| `pendingUpgradeOptions` | Array      | []            | Opções de upgrade disponíveis no level-up atual    |
 
 ### Mapeamento GDScript
 
@@ -215,6 +221,7 @@ func emit_experience_changed() -> void:
 ### Implementação Godot
 
 **Event Connection:**
+
 ```gdscript
 func _ready() -> void:
     # Conecta ao evento de coleta de XP orb
@@ -227,11 +234,13 @@ func _on_xp_orb_collected(data: Dictionary) -> void:
 ```
 
 **UI Update:**
+
 - Conectar signal `experience_changed` para atualizar progress bar
 - Usar `Tween` para animar fill (duration: 0.3s)
 - Exibir label com "Level X" + "XP: current/needed"
 
 **Exemplo de Uso:**
+
 ```gdscript
 # Orb coletado com valor base 45 XP
 # Combo atual: 5 kills (multiplier = 1.4x)
@@ -261,6 +270,7 @@ Baseado em `ProgressionSystem.js` linhas 338-374:
 ### Fórmula de Scaling
 
 **Fórmula Recursiva:**
+
 ```
 XP(n+1) = XP(n) × levelScaling
 
@@ -271,16 +281,16 @@ levelScaling = PROGRESSION_LEVEL_SCALING (1.2)
 
 **Exemplo de Progressão (levelScaling = 1.2):**
 
-| Level | XP Necessário | XP Acumulado | Incremento |
-|-------|---------------|--------------|------------|
-| 1 → 2 | 100 | 100 | - |
-| 2 → 3 | 120 | 220 | +20 |
-| 3 → 4 | 144 | 364 | +24 |
-| 4 → 5 | 172 | 536 | +28 |
-| 5 → 6 | 206 | 742 | +34 |
-| 10 → 11 | 516 | 2577 | +85 |
-| 15 → 16 | 1270 | 8064 | +212 |
-| 20 → 21 | 3211 | 24154 | +535 |
+| Level   | XP Necessário | XP Acumulado | Incremento |
+| ------- | ------------- | ------------ | ---------- |
+| 1 → 2   | 100           | 100          | -          |
+| 2 → 3   | 120           | 220          | +20        |
+| 3 → 4   | 144           | 364          | +24        |
+| 4 → 5   | 172           | 536          | +28        |
+| 5 → 6   | 206           | 742          | +34        |
+| 10 → 11 | 516           | 2577         | +85        |
+| 15 → 16 | 1270          | 8064         | +212       |
+| 20 → 21 | 3211          | 24154        | +535       |
 
 ### Pseudocódigo GDScript
 
@@ -331,6 +341,7 @@ func emit_level_up(context: Dictionary) -> void:
 ### Implementação Godot
 
 **Pause Logic:**
+
 ```gdscript
 # Pausar jogo ao exibir upgrade menu
 func show_upgrade_menu(options: Array) -> void:
@@ -344,6 +355,7 @@ func _on_upgrade_selected(upgrade_id: String) -> void:
 ```
 
 **Level-Up Animation:**
+
 - Screen flash branco (alpha: 0.3, duration: 0.2s)
 - Text "LEVEL UP!" com scale animation (1.0 → 1.5 → 1.0)
 - Burst de partículas douradas ao redor do player
@@ -365,12 +377,14 @@ Baseado em `ProgressionSystem.js` linhas 202-272, 320-336:
 ### 5.1. Increment Combo
 
 **Algoritmo:**
+
 1. Incrementa `currentCombo` (floor + 1)
 2. Reseta `comboTimer` para `comboTimeout` (3s)
 3. Recalcula `comboMultiplier`
 4. Emite `combo-updated`
 
 **Pseudocódigo GDScript:**
+
 ```gdscript
 func increment_combo(context: Dictionary = {}) -> void:
     # Incrementa combo (sempre inteiro)
@@ -410,6 +424,7 @@ func emit_combo_updated(extra: Dictionary = {}) -> void:
 ```
 
 **Fórmula de Multiplier:**
+
 ```
 multiplier = 1 + (combo - 1) × step
 
@@ -424,12 +439,14 @@ Combo 11+: 1 + (11-1) × 0.1 = 2.0x (capped)
 ### 5.2. Combo Timeout
 
 **Algoritmo:**
+
 1. A cada frame, decrementa `comboTimer` por `delta`
 2. Se `comboTimer <= 0` e `currentCombo > 0`:
    - Chama `resetCombo()`
    - Emite `combo-broken`
 
 **Pseudocódigo GDScript:**
+
 ```gdscript
 func _process(delta: float) -> void:
     update_combo_timer(delta)
@@ -481,6 +498,7 @@ func reset_combo(options: Dictionary = {}) -> void:
 ```
 
 **Implementação Godot (Alternativa com Timer Node):**
+
 ```gdscript
 # Nodes
 @onready var combo_timer_node: Timer = $ComboTimer
@@ -503,11 +521,13 @@ func _on_combo_timeout() -> void:
 ### 5.3. Enemy Destroyed Handler
 
 **Algoritmo:**
+
 1. Escuta evento `enemy-destroyed`
 2. Valida se player é responsável pela morte (verifica `cause`, `source.type`, `source.owner`)
 3. Se sim, chama `incrementCombo()`
 
 **Pseudocódigo GDScript:**
+
 ```gdscript
 func _ready() -> void:
     EventBus.enemy_destroyed.connect(_on_enemy_destroyed)
@@ -575,6 +595,7 @@ Baseado em `UpgradeSystem.js` linhas 95-143, 150-187:
 ### 6.1. Prepare Upgrade Options
 
 **Algoritmo:**
+
 1. Filtra `upgradeDefinitions` usando `isUpgradeSelectable()`
 2. Se pool vazio, retorna array vazio
 3. Shuffles pool usando Fisher-Yates com seeded RNG
@@ -584,6 +605,7 @@ Baseado em `UpgradeSystem.js` linhas 95-143, 150-187:
 7. Retorna `{options, poolSize, totalDefinitions}`
 
 **Pseudocódigo GDScript:**
+
 ```gdscript
 func prepare_upgrade_options(count: int = 3) -> Dictionary:
     # Filtra elegíveis
@@ -654,6 +676,7 @@ func build_upgrade_option(definition: Dictionary) -> Dictionary:
 ### 6.2. Is Upgrade Selectable
 
 **Algoritmo:**
+
 1. Valida se definition é válido
 2. Verifica se upgrade já está maxado (`currentLevel >= maxLevel`)
 3. Verifica se player atingiu `unlockLevel`
@@ -662,6 +685,7 @@ func build_upgrade_option(definition: Dictionary) -> Dictionary:
 6. Retorna `true` se todas as validações passarem
 
 **Pseudocódigo GDScript:**
+
 ```gdscript
 func is_upgrade_selectable(definition: Dictionary) -> bool:
     if not definition or definition.is_empty():
@@ -729,6 +753,7 @@ func collect_level_prerequisites(definition: Dictionary, current_level: int) -> 
 ### Tipos de Prerequisites
 
 **1. Player Level**
+
 ```gdscript
 {
     "type": "player-level",
@@ -738,6 +763,7 @@ func collect_level_prerequisites(definition: Dictionary, current_level: int) -> 
 ```
 
 **2. Upgrade**
+
 ```gdscript
 {
     "type": "upgrade",
@@ -778,6 +804,7 @@ func collect_level_prerequisites(definition: Dictionary, current_level: int) -> 
 ```
 
 **Validação:**
+
 - Tier 1: Disponível no level 3+ (unlock_level)
 - Tier 2: Disponível após aplicar Tier 1
 - Tier 3: Disponível após aplicar Tier 2 **E** ter Multishot nível 1+
@@ -874,6 +901,7 @@ func import_state(snapshot: Dictionary) -> bool:
 ### Implementação Godot
 
 **Save to Disk (opcional):**
+
 ```gdscript
 func save_to_file(file_path: String) -> bool:
     var config = ConfigFile.new()
@@ -901,6 +929,7 @@ func load_from_file(file_path: String) -> bool:
 ```
 
 **Retry System Integration:**
+
 ```gdscript
 # GameSessionManager.gd
 func create_checkpoint() -> void:
@@ -1408,22 +1437,23 @@ func import_state(snapshot: Dictionary) -> bool:
 
 ## 9. Tabela de Parâmetros Configuráveis
 
-| Parâmetro | Valor Padrão | Descrição | Arquivo Origem |
-|-----------|--------------|-----------|----------------|
-| **Progression** |
-| `PROGRESSION_INITIAL_LEVEL` | 1 | Nível inicial do player | `GameConstants.js:56` |
-| `PROGRESSION_INITIAL_XP_REQUIREMENT` | 100 | XP necessário para level 2 | `GameConstants.js:57` |
-| `PROGRESSION_LEVEL_SCALING` | 1.2 | Fator de scaling exponencial | `GameConstants.js:58` |
-| `PROGRESSION_UPGRADE_ROLL_COUNT` | 3 | Número de opções de upgrade | `GameConstants.js:59` |
-| `PROGRESSION_UPGRADE_FALLBACK_COUNT` | 3 | Fallback se roll count inválido | `GameConstants.js:60` |
-| **Combo System** |
-| `PROGRESSION_COMBO_TIMEOUT` | 3.0 | Timeout do combo (segundos) | `GameConstants.js:61` |
-| `PROGRESSION_COMBO_MULTIPLIER_STEP` | 0.1 | Incremento por kill | `GameConstants.js:62` |
-| `PROGRESSION_COMBO_MULTIPLIER_CAP` | 2.0 | Cap do multiplicador | `GameConstants.js:63` |
+| Parâmetro                            | Valor Padrão | Descrição                       | Arquivo Origem        |
+| ------------------------------------ | ------------ | ------------------------------- | --------------------- |
+| **Progression**                      |
+| `PROGRESSION_INITIAL_LEVEL`          | 1            | Nível inicial do player         | `GameConstants.js:56` |
+| `PROGRESSION_INITIAL_XP_REQUIREMENT` | 100          | XP necessário para level 2      | `GameConstants.js:57` |
+| `PROGRESSION_LEVEL_SCALING`          | 1.2          | Fator de scaling exponencial    | `GameConstants.js:58` |
+| `PROGRESSION_UPGRADE_ROLL_COUNT`     | 3            | Número de opções de upgrade     | `GameConstants.js:59` |
+| `PROGRESSION_UPGRADE_FALLBACK_COUNT` | 3            | Fallback se roll count inválido | `GameConstants.js:60` |
+| **Combo System**                     |
+| `PROGRESSION_COMBO_TIMEOUT`          | 3.0          | Timeout do combo (segundos)     | `GameConstants.js:61` |
+| `PROGRESSION_COMBO_MULTIPLIER_STEP`  | 0.1          | Incremento por kill             | `GameConstants.js:62` |
+| `PROGRESSION_COMBO_MULTIPLIER_CAP`   | 2.0          | Cap do multiplicador            | `GameConstants.js:63` |
 
 ### Implementação em Godot
 
 **GameConstants.gd (autoload):**
+
 ```gdscript
 extends Node
 
@@ -1441,6 +1471,7 @@ const PROGRESSION_COMBO_MULTIPLIER_CAP = 2.0
 ```
 
 **Nota sobre Level Scaling:**
+
 - O código JavaScript atual usa **1.2x** (`GameConstants.js:58`)
 - Valor mais agressivo (1.3x) resultaria em progressão mais rápida
 - Recomendação: Testar ambos valores durante balancing
@@ -1452,6 +1483,7 @@ const PROGRESSION_COMBO_MULTIPLIER_CAP = 2.0
 ### 10.1. XP Requirement Scaling (Exponencial)
 
 **Fórmula Recursiva:**
+
 ```
 XP(n+1) = XP(n) × levelScaling
 
@@ -1461,6 +1493,7 @@ levelScaling = PROGRESSION_LEVEL_SCALING (1.2)
 ```
 
 **Fórmula Fechada:**
+
 ```
 XP(n) = XP(1) × levelScaling^(n-1)
 
@@ -1471,24 +1504,25 @@ XP(20) = 100 × 1.2^19 = 100 × 32.11 = 3211 XP
 
 **Tabela de Progressão (levelScaling = 1.2):**
 
-| Level | XP Necessário | XP Acumulado | Incremento |
-|-------|---------------|--------------|------------|
-| 1 → 2 | 100 | 100 | - |
-| 2 → 3 | 120 | 220 | +20 (20%) |
-| 3 → 4 | 144 | 364 | +24 (20%) |
-| 4 → 5 | 172 | 536 | +28 (19.4%) |
-| 5 → 6 | 206 | 742 | +34 (19.8%) |
-| 6 → 7 | 247 | 989 | +41 (19.9%) |
-| 7 → 8 | 296 | 1285 | +49 (19.8%) |
-| 8 → 9 | 355 | 1640 | +59 (19.9%) |
-| 9 → 10 | 426 | 2066 | +71 (20%) |
-| 10 → 11 | 511 | 2577 | +85 (19.9%) |
-| 15 → 16 | 1270 | 8064 | +212 (20%) |
-| 20 → 21 | 3211 | 24154 | +535 (20%) |
+| Level   | XP Necessário | XP Acumulado | Incremento  |
+| ------- | ------------- | ------------ | ----------- |
+| 1 → 2   | 100           | 100          | -           |
+| 2 → 3   | 120           | 220          | +20 (20%)   |
+| 3 → 4   | 144           | 364          | +24 (20%)   |
+| 4 → 5   | 172           | 536          | +28 (19.4%) |
+| 5 → 6   | 206           | 742          | +34 (19.8%) |
+| 6 → 7   | 247           | 989          | +41 (19.9%) |
+| 7 → 8   | 296           | 1285         | +49 (19.8%) |
+| 8 → 9   | 355           | 1640         | +59 (19.9%) |
+| 9 → 10  | 426           | 2066         | +71 (20%)   |
+| 10 → 11 | 511           | 2577         | +85 (19.9%) |
+| 15 → 16 | 1270          | 8064         | +212 (20%)  |
+| 20 → 21 | 3211          | 24154        | +535 (20%)  |
 
 ### 10.2. Combo Multiplier (Linear com Cap)
 
 **Fórmula:**
+
 ```
 multiplier = min(cap, 1 + (combo - 1) × step)
 
@@ -1500,24 +1534,25 @@ cap = PROGRESSION_COMBO_MULTIPLIER_CAP (2.0)
 **Tabela de Progressão (step = 0.1, cap = 2.0):**
 
 | Combo | Multiplier | XP Boost | Exemplo (100 XP base) |
-|-------|------------|----------|----------------------|
-| 1 | 1.0x | +0% | 100 XP |
-| 2 | 1.1x | +10% | 110 XP |
-| 3 | 1.2x | +20% | 120 XP |
-| 4 | 1.3x | +30% | 130 XP |
-| 5 | 1.4x | +40% | 140 XP |
-| 6 | 1.5x | +50% | 150 XP |
-| 7 | 1.6x | +60% | 160 XP |
-| 8 | 1.7x | +70% | 170 XP |
-| 9 | 1.8x | +80% | 180 XP |
-| 10 | 1.9x | +90% | 190 XP |
-| 11+ | 2.0x | +100% | 200 XP (capped) |
+| ----- | ---------- | -------- | --------------------- |
+| 1     | 1.0x       | +0%      | 100 XP                |
+| 2     | 1.1x       | +10%     | 110 XP                |
+| 3     | 1.2x       | +20%     | 120 XP                |
+| 4     | 1.3x       | +30%     | 130 XP                |
+| 5     | 1.4x       | +40%     | 140 XP                |
+| 6     | 1.5x       | +50%     | 150 XP                |
+| 7     | 1.6x       | +60%     | 160 XP                |
+| 8     | 1.7x       | +70%     | 170 XP                |
+| 9     | 1.8x       | +80%     | 180 XP                |
+| 10    | 1.9x       | +90%     | 190 XP                |
+| 11+   | 2.0x       | +100%    | 200 XP (capped)       |
 
 **Observação:** Combo cap é atingido em **11 kills consecutivos** (sem timeout de 3s).
 
 ### 10.3. Adjusted XP (Com Combo)
 
 **Fórmula:**
+
 ```
 adjustedXP = max(1, round(baseXP × comboMultiplier))
 
@@ -1528,6 +1563,7 @@ adjustedXP = max(1, round(45 × 1.4)) = 63 XP
 ```
 
 **Implementação GDScript:**
+
 ```gdscript
 var adjusted_value = max(1, int(round(base_xp * combo_multiplier)))
 ```
@@ -1688,6 +1724,7 @@ flowchart TD
 ### 12.1. XP Orb System
 
 **Interface necessária:**
+
 ```gdscript
 # XPOrbManager.gd
 signal xp_orb_collected(value: int, orb_class: String, position: Vector3)
@@ -1701,6 +1738,7 @@ func _on_orb_collected(orb: XPOrb) -> void:
 ```
 
 **Consumo:**
+
 ```gdscript
 # ProgressionSystem.gd
 func _ready() -> void:
@@ -1714,6 +1752,7 @@ func _on_xp_orb_collected(data: Dictionary) -> void:
 ### 12.2. Enemy System
 
 **Interface necessária:**
+
 ```gdscript
 # EnemyManager.gd
 signal enemy_destroyed(enemy_id: String, cause: String, source: Dictionary)
@@ -1727,6 +1766,7 @@ func _on_enemy_destroyed(enemy: Enemy) -> void:
 ```
 
 **Consumo:**
+
 ```gdscript
 # ProgressionSystem.gd
 func _ready() -> void:
@@ -1740,6 +1780,7 @@ func _on_enemy_destroyed(data: Dictionary) -> void:
 ### 12.3. UI System
 
 **Eventos consumidos:**
+
 ```gdscript
 # UIManager.gd
 func _ready() -> void:
@@ -1775,6 +1816,7 @@ func _on_upgrade_options_ready(level: int, options: Array, pool_size: int, total
 ### 12.4. Upgrade Manager
 
 **Interface necessária:**
+
 ```gdscript
 # UpgradeManager.gd
 func apply_upgrade(upgrade_id: String) -> bool:
@@ -1805,6 +1847,7 @@ func apply_upgrade(upgrade_id: String) -> bool:
 ### 12.5. Player System
 
 **Interface necessária:**
+
 ```gdscript
 # Player.gd
 func get_stats() -> Dictionary:
@@ -1819,6 +1862,7 @@ func get_stats() -> Dictionary:
 ```
 
 **Consumo (via UpgradeSystem):**
+
 ```gdscript
 # ProgressionSystem.gd
 func evaluate_prerequisite(prerequisite: Dictionary) -> bool:
@@ -1834,6 +1878,7 @@ func evaluate_prerequisite(prerequisite: Dictionary) -> bool:
 ### 13.1. XP Bar (Progress Bar)
 
 **Especificações:**
+
 - **Tipo**: `ProgressBar` (linear) ou `TextureProgressBar` (circular)
 - **Range**: 0-100 (percentage)
 - **Fill Direction**: Left to Right (linear) ou Clockwise (circular)
@@ -1842,6 +1887,7 @@ func evaluate_prerequisite(prerequisite: Dictionary) -> bool:
 - **Label**: "Level X" + "XP: current/needed"
 
 **Implementação:**
+
 ```gdscript
 # HUD.gd
 @onready var xp_bar: ProgressBar = $XPBar
@@ -1860,6 +1906,7 @@ func _on_experience_changed(current: int, needed: int, level: int, percentage: f
 ### 13.2. Combo Display (Counter + Timer)
 
 **Especificações:**
+
 - **Combo Count**: Label com "x5" (combo count)
 - **Multiplier**: Label com "(1.4x)" (multiplier)
 - **Timer Visual**: Circular progress bar decrescente (3s → 0s)
@@ -1867,6 +1914,7 @@ func _on_experience_changed(current: int, needed: int, level: int, percentage: f
 - **Animation**: Pulse ao incrementar combo, shake ao quebrar
 
 **Implementação:**
+
 ```gdscript
 # HUD.gd
 @onready var combo_label: Label = $ComboLabel
@@ -1903,6 +1951,7 @@ func _on_combo_broken(previous_combo: int, previous_multiplier: float, reason: S
 ### 13.3. Level-Up Animation
 
 **Especificações:**
+
 - **Flash**: Screen flash branco (alpha: 0.3, duration: 0.2s)
 - **Text**: "LEVEL UP!" com scale animation (1.0 → 1.5 → 1.0)
 - **Particles**: Burst de partículas douradas ao redor do player
@@ -1910,6 +1959,7 @@ func _on_combo_broken(previous_combo: int, previous_multiplier: float, reason: S
 - **Duration**: 1.5s total antes de exibir upgrade menu
 
 **Implementação:**
+
 ```gdscript
 # UIManager.gd
 func show_level_up_animation(new_level: int) -> void:
@@ -1946,6 +1996,7 @@ func show_level_up_animation(new_level: int) -> void:
 ### 13.4. Upgrade Menu (Cards)
 
 **Especificações:**
+
 - **Layout**: 3-4 cards horizontais (center screen)
 - **Card Content**: Icon, Name, Description, Level ("Nv. 1/3"), Highlights
 - **Hover Effect**: Scale 1.05, glow border
@@ -1953,6 +2004,7 @@ func show_level_up_animation(new_level: int) -> void:
 - **Background**: Semi-transparent overlay (alpha: 0.7)
 
 **Implementação:**
+
 ```gdscript
 # UpgradeMenu.gd
 class_name UpgradeMenu
@@ -1984,6 +2036,7 @@ func _on_card_selected(upgrade_id: String) -> void:
 ```
 
 **Card Structure:**
+
 ```
 UpgradeCard (PanelContainer)
 ├─ VBoxContainer
@@ -2004,21 +2057,25 @@ UpgradeCard (PanelContainer)
 ### Otimizações Implementadas
 
 1. **Event-Driven Architecture**
+
    - Usa signals ao invés de polling
    - Zero overhead quando idle
    - Apenas processa quando eventos relevantes ocorrem
 
 2. **Lazy Evaluation**
+
    - Upgrade eligibility só é calculada no level-up
    - Não valida prerequisites todo frame
    - Cacheia resultados quando possível
 
 3. **Cached Services**
+
    - Resolve services uma vez no `_ready()`
    - Cacheia referências de UpgradeManager, Player, UI
    - Evita lookups repetidos
 
 4. **Integer Math**
+
    - Usa `int(floor())` para XP e combo
    - Evita floating point drift
    - Garante determinismo em serialization
@@ -2031,16 +2088,19 @@ UpgradeCard (PanelContainer)
 ### Godot-Specific Optimizations
 
 1. **Timer Node**
+
    - Usar `Timer` node ao invés de manual delta tracking
    - Engine-level optimization
    - Mais eficiente que `_process()` manual
 
 2. **Resource Files**
+
    - Usar `Resource` files (.tres) para upgrade definitions
    - Carregamento lazy via `ResourceLoader`
    - Cacheia automaticamente
 
 3. **Dictionary Lookup**
+
    - Cachear upgrade lookup em `Dictionary`
    - O(1) access time
    - Evitar linear search em arrays
@@ -2052,24 +2112,24 @@ UpgradeCard (PanelContainer)
 
 ### Profiling Estimates
 
-| Operação | Custo Estimado | Frequência |
-|----------|----------------|------------|
-| XP Collection | ~0.1ms | Por orb coletado |
-| Level-Up | ~1-2ms | Por level ganho |
-| Combo Update | ~0.05ms | Por frame (se combo > 0) |
-| Upgrade Selection | ~2-5ms | Por level-up |
-| Serialization | ~0.5ms | On-demand |
+| Operação          | Custo Estimado | Frequência               |
+| ----------------- | -------------- | ------------------------ |
+| XP Collection     | ~0.1ms         | Por orb coletado         |
+| Level-Up          | ~1-2ms         | Por level ganho          |
+| Combo Update      | ~0.05ms        | Por frame (se combo > 0) |
+| Upgrade Selection | ~2-5ms         | Por level-up             |
+| Serialization     | ~0.5ms         | On-demand                |
 
 **Total overhead**: <0.2ms por frame (desprezível para 60fps)
 
 ### Memory Usage
 
-| Componente | Tamanho | Observações |
-|------------|---------|-------------|
-| ProgressionSystem | ~200 bytes | State básico |
-| appliedUpgrades | ~50 bytes/upgrade | Dictionary overhead |
-| pendingUpgradeOptions | ~500 bytes | Array de 3 options |
-| **Total** | **<2KB** | Negligível |
+| Componente            | Tamanho           | Observações         |
+| --------------------- | ----------------- | ------------------- |
+| ProgressionSystem     | ~200 bytes        | State básico        |
+| appliedUpgrades       | ~50 bytes/upgrade | Dictionary overhead |
+| pendingUpgradeOptions | ~500 bytes        | Array de 3 options  |
+| **Total**             | **<2KB**          | Negligível          |
 
 ---
 
@@ -2077,36 +2137,37 @@ UpgradeCard (PanelContainer)
 
 ### Arquivos JavaScript Analisados
 
-| Arquivo | Linhas | Descrição |
-|---------|--------|-----------|
-| **src/modules/ProgressionSystem.js** | 1-616 | Sistema completo de progressão |
-| `constructor()` | 18-88 | Inicialização de state |
-| `setupEventListeners()` | 104-128 | Event handlers setup |
-| `handleEnemyDestroyed()` | 132-142 | Enemy kill handler |
-| `isPlayerResponsibleForEnemyDeath()` | 144-200 | Validação de causa |
-| `incrementCombo()` | 202-237 | Incremento de combo |
-| `updateComboMultiplier()` | 239-254 | Cálculo de multiplier |
-| `resetCombo()` | 256-272 | Reset de combo |
-| `handleXPOrbCollected()` | 274-285 | XP orb handler |
-| `collectXP()` | 287-318 | Coleta de XP com loop de level-up |
-| `updateComboTimer()` | 320-336 | Timer decrement |
-| `applyLevelUp()` | 338-374 | Level-up logic |
-| `serialize()` | 449-475 | Serialization |
-| `deserialize()` | 477-595 | Deserialization |
-| **src/modules/UpgradeSystem.js** | 1-886 | Sistema base de upgrades |
-| `prepareUpgradeOptions()` | 95-143 | Upgrade selection |
-| `isUpgradeSelectable()` | 150-187 | Eligibility check |
-| `collectRawPrerequisites()` | 189-197 | Global prerequisites |
-| `collectLevelPrerequisites()` | 199-214 | Level prerequisites |
-| `evaluatePrerequisite()` | 216-320 | Prerequisite validation |
-| `applyUpgrade()` | 702-811 | Upgrade application |
-| **src/core/GameConstants.js** | 56-63 | Constantes de progressão |
-| **src/data/constants/gameplay.js** | - | Constantes adicionais |
-| **src/data/upgrades/offense.js** | 1-232 | Upgrade definitions (exemplo) |
+| Arquivo                              | Linhas  | Descrição                         |
+| ------------------------------------ | ------- | --------------------------------- |
+| **src/modules/ProgressionSystem.js** | 1-616   | Sistema completo de progressão    |
+| `constructor()`                      | 18-88   | Inicialização de state            |
+| `setupEventListeners()`              | 104-128 | Event handlers setup              |
+| `handleEnemyDestroyed()`             | 132-142 | Enemy kill handler                |
+| `isPlayerResponsibleForEnemyDeath()` | 144-200 | Validação de causa                |
+| `incrementCombo()`                   | 202-237 | Incremento de combo               |
+| `updateComboMultiplier()`            | 239-254 | Cálculo de multiplier             |
+| `resetCombo()`                       | 256-272 | Reset de combo                    |
+| `handleXPOrbCollected()`             | 274-285 | XP orb handler                    |
+| `collectXP()`                        | 287-318 | Coleta de XP com loop de level-up |
+| `updateComboTimer()`                 | 320-336 | Timer decrement                   |
+| `applyLevelUp()`                     | 338-374 | Level-up logic                    |
+| `serialize()`                        | 449-475 | Serialization                     |
+| `deserialize()`                      | 477-595 | Deserialization                   |
+| **src/modules/UpgradeSystem.js**     | 1-886   | Sistema base de upgrades          |
+| `prepareUpgradeOptions()`            | 95-143  | Upgrade selection                 |
+| `isUpgradeSelectable()`              | 150-187 | Eligibility check                 |
+| `collectRawPrerequisites()`          | 189-197 | Global prerequisites              |
+| `collectLevelPrerequisites()`        | 199-214 | Level prerequisites               |
+| `evaluatePrerequisite()`             | 216-320 | Prerequisite validation           |
+| `applyUpgrade()`                     | 702-811 | Upgrade application               |
+| **src/core/GameConstants.js**        | 56-63   | Constantes de progressão          |
+| **src/data/constants/gameplay.js**   | -       | Constantes adicionais             |
+| **src/data/upgrades/offense.js**     | 1-232   | Upgrade definitions (exemplo)     |
 
 ### Eventos Importantes
 
 **Emitidos:**
+
 - `experience-changed(current, needed, level, percentage)` - XP atualizado
 - `combo-updated(count, multiplier, remaining, timeout)` - Combo atualizado
 - `combo-broken(prevCombo, prevMultiplier, reason, silent)` - Combo quebrado
@@ -2114,6 +2175,7 @@ UpgradeCard (PanelContainer)
 - `upgrade-options-ready(level, options, poolSize, total)` - Opções prontas
 
 **Consumidos:**
+
 - `xp-orb-collected(value, orbClass, position)` - Orb coletado
 - `enemy-destroyed(enemy, cause, source)` - Inimigo morto
 - `progression-reset()` - Reset solicitado
@@ -2134,6 +2196,7 @@ UpgradeCard (PanelContainer)
 
 **Documento criado a partir de análise detalhada do código JavaScript original.**
 **Para mais informações sobre sistemas relacionados, consulte:**
+
 - [XP Orbs System](mechanics-xp-orbs.md)
 - [Combat & Targeting](mechanics-combat-targeting.md)
 - Upgrade System (a ser documentado)

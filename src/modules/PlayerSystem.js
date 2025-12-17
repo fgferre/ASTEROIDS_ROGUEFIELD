@@ -1,10 +1,7 @@
 // src/modules/PlayerSystem.js
 import { BaseSystem } from '../core/BaseSystem.js';
-import {
-  GAME_HEIGHT,
-  GAME_WIDTH,
-  SHIP_SIZE,
-} from '../core/GameConstants.js';
+import { NeonGraphics } from '../utils/NeonGraphics.js';
+import { GAME_HEIGHT, GAME_WIDTH, SHIP_SIZE } from '../core/GameConstants.js';
 import shipModels from '../data/shipModels.js';
 import { resolveService } from '../core/serviceUtils.js';
 import {
@@ -62,22 +59,12 @@ class PlayerSystem extends BaseSystem {
 
     const normalizedDependencies = this.dependencies;
 
-    if (
-      config &&
-      typeof config === 'object' &&
-      !Array.isArray(config)
-    ) {
-      if (
-        config['command-queue'] &&
-        !normalizedDependencies['command-queue']
-      ) {
+    if (config && typeof config === 'object' && !Array.isArray(config)) {
+      if (config['command-queue'] && !normalizedDependencies['command-queue']) {
         normalizedDependencies['command-queue'] = config['command-queue'];
       }
 
-      if (
-        config.commandQueue &&
-        !normalizedDependencies['command-queue']
-      ) {
+      if (config.commandQueue && !normalizedDependencies['command-queue']) {
         normalizedDependencies['command-queue'] = config.commandQueue;
       }
     }
@@ -90,12 +77,8 @@ class PlayerSystem extends BaseSystem {
     this.commandQueueConsumerId = 'player-system';
     this.cachedMovementInput = this.getDefaultMovementBinary();
     this.lastConsumedMovementCommand = null;
-    const startX = Number.isFinite(position?.x)
-      ? position.x
-      : GAME_WIDTH / 2;
-    const startY = Number.isFinite(position?.y)
-      ? position.y
-      : GAME_HEIGHT / 2;
+    const startX = Number.isFinite(position?.x) ? position.x : GAME_WIDTH / 2;
+    const startY = Number.isFinite(position?.y) ? position.y : GAME_HEIGHT / 2;
 
     // === APENAS MOVIMENTO E POSIÇÃO ===
     this.position = { x: startX, y: startY };
@@ -168,7 +151,11 @@ class PlayerSystem extends BaseSystem {
 
     const { position = null, dependencies = null, ...rest } = config;
 
-    if (dependencies && typeof dependencies === 'object' && !Array.isArray(dependencies)) {
+    if (
+      dependencies &&
+      typeof dependencies === 'object' &&
+      !Array.isArray(dependencies)
+    ) {
       return { position, dependencies };
     }
 
@@ -185,7 +172,8 @@ class PlayerSystem extends BaseSystem {
       return this.commandQueue;
     }
 
-    this.commandQueue = resolveService('command-queue', this.dependencies) || null;
+    this.commandQueue =
+      resolveService('command-queue', this.dependencies) || null;
 
     if (this.commandQueue && this.dependencies) {
       this.dependencies['command-queue'] = this.commandQueue;
@@ -293,7 +281,10 @@ class PlayerSystem extends BaseSystem {
         return this.normalizeMovementBinary(legacy);
       }
     } catch (error) {
-      console.warn('[PlayerSystem] Failed to read legacy movement input:', error);
+      console.warn(
+        '[PlayerSystem] Failed to read legacy movement input:',
+        error
+      );
     }
 
     return null;
@@ -317,22 +308,34 @@ class PlayerSystem extends BaseSystem {
 
     this.registerEventListener('upgrade-rotation-boost', (data) => {
       this.rotationSpeed = this.rotationSpeed * data.multiplier;
-      console.log('[PlayerSystem] Rotation speed boosted to', this.rotationSpeed);
+      console.log(
+        '[PlayerSystem] Rotation speed boosted to',
+        this.rotationSpeed
+      );
     });
 
     this.registerEventListener('upgrade-angular-damping', (data) => {
       this.angularDamping = this.angularDamping * data.multiplier;
-      console.log('[PlayerSystem] Angular damping adjusted to', this.angularDamping);
+      console.log(
+        '[PlayerSystem] Angular damping adjusted to',
+        this.angularDamping
+      );
     });
 
     this.registerEventListener('upgrade-linear-damping', (data) => {
       this.linearDamping = this.linearDamping * data.multiplier;
-      console.log('[PlayerSystem] Linear damping adjusted to', this.linearDamping);
+      console.log(
+        '[PlayerSystem] Linear damping adjusted to',
+        this.linearDamping
+      );
     });
 
     this.registerEventListener('upgrade-thruster-visual', (data) => {
       this.thrusterVisualLevel = data.level || 0;
-      console.log('[PlayerSystem] Thruster visual level:', this.thrusterVisualLevel);
+      console.log(
+        '[PlayerSystem] Thruster visual level:',
+        this.thrusterVisualLevel
+      );
     });
 
     this.registerEventListener('upgrade-rcs-visual', (data) => {
@@ -342,7 +345,10 @@ class PlayerSystem extends BaseSystem {
 
     this.registerEventListener('upgrade-braking-visual', (data) => {
       this.brakingVisualLevel = data.level || 0;
-      console.log('[PlayerSystem] Braking visual level:', this.brakingVisualLevel);
+      console.log(
+        '[PlayerSystem] Braking visual level:',
+        this.brakingVisualLevel
+      );
     });
 
     this.registerEventListener('upgrade-health-boost', (data) => {
@@ -403,10 +409,7 @@ class PlayerSystem extends BaseSystem {
     } else if (this.shieldCooldownTimer <= 0) {
       this.shieldHP = this.shieldMaxHP;
     } else {
-      this.shieldHP = Math.min(
-        this.shieldHP,
-        this.shieldMaxHP
-      );
+      this.shieldHP = Math.min(this.shieldHP, this.shieldMaxHP);
     }
 
     if (level === 1) {
@@ -546,7 +549,8 @@ class PlayerSystem extends BaseSystem {
     return {
       level: this.shieldUpgradeLevel,
       maxHits: this.shieldMaxHP, // For backward compatibility with rendering
-      currentHits: this.isShieldActive || this.shieldCooldownTimer > 0
+      currentHits:
+        this.isShieldActive || this.shieldCooldownTimer > 0
           ? this.shieldHP
           : this.shieldMaxHP, // For backward compatibility with rendering
       maxHP: this.shieldMaxHP,
@@ -740,7 +744,8 @@ class PlayerSystem extends BaseSystem {
 
     // Main thruster (forward)
     if (thrMain > 0 || this.lastThrusterState.main > 0) {
-      const thrusterPos = this.getLocalToWorld(-SHIP_SIZE * 0.8, 0);
+      // Pushed out to 0.95 to be at the rear nozzle
+      const thrusterPos = this.getLocalToWorld(-SHIP_SIZE * 0.95, 0);
       gameEvents.emit('thruster-effect', {
         position: thrusterPos,
         direction: { x: fwd.x, y: fwd.y },
@@ -754,7 +759,8 @@ class PlayerSystem extends BaseSystem {
 
     // Aux thruster (braking)
     if (thrAux > 0 || this.lastThrusterState.aux > 0) {
-      const thrusterPos = this.getLocalToWorld(SHIP_SIZE * 0.8, 0);
+      // Pushed out to 0.95 to be at the front/retro nozzles
+      const thrusterPos = this.getLocalToWorld(SHIP_SIZE * 0.95, 0);
       gameEvents.emit('thruster-effect', {
         position: thrusterPos,
         direction: { x: -fwd.x, y: -fwd.y },
@@ -768,7 +774,8 @@ class PlayerSystem extends BaseSystem {
 
     // Side thrusters (emit both L and R for visuals, audio will aggregate)
     if (thrSideL > 0 || this.lastThrusterState.sideL > 0) {
-      const thrusterPos = this.getLocalToWorld(0, -SHIP_SIZE * 0.52);
+      // Pushed out to 0.95 to appear on the hull edge/wingtip
+      const thrusterPos = this.getLocalToWorld(0, -SHIP_SIZE * 0.95);
       const dir = this.getLocalDirection(0, 1);
       gameEvents.emit('thruster-effect', {
         position: thrusterPos,
@@ -781,7 +788,7 @@ class PlayerSystem extends BaseSystem {
     }
 
     if (thrSideR > 0 || this.lastThrusterState.sideR > 0) {
-      const thrusterPos = this.getLocalToWorld(0, SHIP_SIZE * 0.52);
+      const thrusterPos = this.getLocalToWorld(0, SHIP_SIZE * 0.95);
       const dir = this.getLocalDirection(0, -1);
       gameEvents.emit('thruster-effect', {
         position: thrusterPos,
@@ -948,8 +955,6 @@ class PlayerSystem extends BaseSystem {
 
   render(ctx, options = {}) {
     if (!ctx) return;
-
-    // Hide ship when dead or during quit explosion
     if (this.isDead || this._quitExplosionHidden) return;
 
     const tilt = typeof options.tilt === 'number' ? options.tilt : 0;
@@ -962,74 +967,64 @@ class PlayerSystem extends BaseSystem {
       ctx.transform(1, 0, tilt, 1, 0, 0);
     }
 
-    ctx.fillStyle = '#00FF88';
-    ctx.strokeStyle = '#00DD77';
-    ctx.lineWidth = 2;
-
+    // Prepare paths (caching these would be better, but for now we build per frame)
     const hull = this.currentHull;
-    const outline = Array.isArray(this._currentHullMetrics?.outline)
+    const outlineData = Array.isArray(this._currentHullMetrics?.outline)
       ? this._currentHullMetrics.outline
       : Array.isArray(hull?.outline)
         ? hull.outline
         : [];
 
-    if (outline.length >= 3) {
-      ctx.beginPath();
+    if (outlineData.length >= 3) {
+      const path = new Path2D();
       let hasMoved = false;
-      outline.forEach((vertex) => {
+      outlineData.forEach((vertex) => {
         if (!vertex) return;
         if (!hasMoved) {
-          ctx.moveTo(vertex.x, vertex.y);
+          path.moveTo(vertex.x, vertex.y);
           hasMoved = true;
         } else {
-          ctx.lineTo(vertex.x, vertex.y);
+          path.lineTo(vertex.x, vertex.y);
         }
       });
+      path.closePath();
 
-      if (hasMoved) {
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-      }
+      // [NEO-ARCADE] Use NeonGraphics
+      // Color depends on health state? Maybe later. For now, solid Neon Green.
+      NeonGraphics.drawShape(ctx, path, '#00FF88', 1.5);
     }
 
     const accents = Array.isArray(hull?.accents) ? hull.accents : [];
     if (accents.length > 0) {
-      ctx.fillStyle = '#0088DD';
       accents.forEach((polygon) => {
-        if (!Array.isArray(polygon) || polygon.length === 0) {
-          return;
-        }
-        ctx.beginPath();
-        let accentHasMoved = false;
+        if (!Array.isArray(polygon) || polygon.length === 0) return;
+        const path = new Path2D();
+        let hasMoved = false;
         polygon.forEach((vertex) => {
           if (!vertex) return;
-          if (!accentHasMoved) {
-            ctx.moveTo(vertex.x, vertex.y);
-            accentHasMoved = true;
+          if (!hasMoved) {
+            path.moveTo(vertex.x, vertex.y);
+            hasMoved = true;
           } else {
-            ctx.lineTo(vertex.x, vertex.y);
+            path.lineTo(vertex.x, vertex.y);
           }
         });
-        if (accentHasMoved) {
-          ctx.closePath();
-          ctx.fill();
-        }
+        path.closePath();
+        NeonGraphics.drawShape(ctx, path, '#0088DD', 1.2);
       });
     }
 
     const cockpit = hull?.cockpit;
     if (cockpit?.position && typeof cockpit.radius === 'number') {
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.arc(
+      const path = new Path2D();
+      path.arc(
         cockpit.position.x,
         cockpit.position.y,
         Math.max(0, cockpit.radius),
         0,
         Math.PI * 2
       );
-      ctx.fill();
+      NeonGraphics.drawShape(ctx, path, '#FFFFFF', 2.0);
     }
 
     ctx.restore();
@@ -1130,6 +1125,15 @@ class PlayerSystem extends BaseSystem {
     this.isShieldActive = false;
   }
 
+  getShieldState() {
+    return {
+      isActive: this.isShieldActive,
+      maxHits: this.shieldMaxHP,
+      currentHits: this.shieldHP,
+      isCooldown: this.shieldCooldownTimer > 0,
+    };
+  }
+
   resetStats() {
     this.health = 100;
     this.maxHealth = 100;
@@ -1211,7 +1215,10 @@ class PlayerSystem extends BaseSystem {
       });
     }
 
-    const sideIntensity = Math.max(this.lastThrusterState.sideL, this.lastThrusterState.sideR);
+    const sideIntensity = Math.max(
+      this.lastThrusterState.sideL,
+      this.lastThrusterState.sideR
+    );
     if (sideIntensity > 0) {
       gameEvents.emit('thruster-effect', {
         position: this.position,
@@ -1260,7 +1267,13 @@ class PlayerSystem extends BaseSystem {
     // Show ship again
     this._quitExplosionHidden = false;
 
-    console.log('[PlayerSystem] Player respawned at', position, 'with', invulnerabilityDuration, 's invulnerability');
+    console.log(
+      '[PlayerSystem] Player respawned at',
+      position,
+      'with',
+      invulnerabilityDuration,
+      's invulnerability'
+    );
   }
 
   heal(amount) {
@@ -1274,7 +1287,7 @@ class PlayerSystem extends BaseSystem {
       gameEvents.emit('player-healed', {
         amount: actualHealing,
         currentHealth: this.health,
-        maxHealth: this.maxHealth
+        maxHealth: this.maxHealth,
       });
     }
 

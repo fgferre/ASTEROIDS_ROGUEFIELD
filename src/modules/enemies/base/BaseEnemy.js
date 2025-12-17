@@ -68,9 +68,9 @@ export class BaseEnemy {
     this.armor = 0;
 
     // Lifecycle
-    this.age = 0;           // Time since spawn
-    this.wave = 0;          // Wave number
-    this.generation = 0;    // For fragments
+    this.age = 0; // Time since spawn
+    this.wave = 0; // Wave number
+    this.generation = 0; // For fragments
 
     // Rendering
     this.rotation = 0;
@@ -84,8 +84,8 @@ export class BaseEnemy {
     this.useComponents = false;
 
     // Metadata
-    this.tags = new Set();  // For categorization: 'boss', 'minion', 'volatile'
-    this.spawnedBy = null;  // Parent enemy reference
+    this.tags = new Set(); // For categorization: 'boss', 'minion', 'volatile'
+    this.spawnedBy = null; // Parent enemy reference
   }
 
   /**
@@ -127,7 +127,8 @@ export class BaseEnemy {
 
     this.age += deltaTime;
 
-    const hasMovementComponent = this.useComponents && this.hasComponent('movement');
+    const hasMovementComponent =
+      this.useComponents && this.hasComponent('movement');
 
     // Update position only when no movement component is responsible for integration
     if (!hasMovementComponent) {
@@ -263,7 +264,9 @@ export class BaseEnemy {
     };
 
     if (!eventContext?.healthComponentManaged) {
-      const gameEvents = this.system?.gameEvents?.emit ? this.system.gameEvents : null;
+      const gameEvents = this.system?.gameEvents?.emit
+        ? this.system.gameEvents
+        : null;
       if (gameEvents) {
         gameEvents.emit('enemy-destroyed', payload);
       } else if (this.system?.eventBus?.emit) {
@@ -468,7 +471,9 @@ export class BaseEnemy {
   resolveWorldBounds(system) {
     const bounds =
       system?.worldBounds ||
-      (typeof system?.getWorldBounds === 'function' ? system.getWorldBounds() : null);
+      (typeof system?.getWorldBounds === 'function'
+        ? system.getWorldBounds()
+        : null);
 
     if (bounds) {
       return {
@@ -476,8 +481,10 @@ export class BaseEnemy {
         top: bounds.top ?? 0,
         right: bounds.right ?? bounds.width ?? GAME_WIDTH,
         bottom: bounds.bottom ?? bounds.height ?? GAME_HEIGHT,
-        width: bounds.width ?? (bounds.right ?? GAME_WIDTH) - (bounds.left ?? 0),
-        height: bounds.height ?? (bounds.bottom ?? GAME_HEIGHT) - (bounds.top ?? 0),
+        width:
+          bounds.width ?? (bounds.right ?? GAME_WIDTH) - (bounds.left ?? 0),
+        height:
+          bounds.height ?? (bounds.bottom ?? GAME_HEIGHT) - (bounds.top ?? 0),
       };
     }
 

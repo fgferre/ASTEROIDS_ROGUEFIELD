@@ -21,7 +21,10 @@
 
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
-import { normalizeDependencies, resolveService } from '../../../core/serviceUtils.js';
+import {
+  normalizeDependencies,
+  resolveService,
+} from '../../../core/serviceUtils.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { clamp } from '../../../utils/mathHelpers.js';
 import {
@@ -87,8 +90,7 @@ export class WaveManager {
 
     let resolvedRandom =
       this.dependencies.random ||
-      (this.enemySystem &&
-        typeof this.enemySystem.getRandomScope === 'function'
+      (this.enemySystem && typeof this.enemySystem.getRandomScope === 'function'
         ? this.enemySystem.getRandomScope('wave-manager', {
             label: 'wave-manager',
           })
@@ -180,9 +182,9 @@ export class WaveManager {
             type: 'asteroid',
             count: 3 + i,
             size: 'small',
-            variant: 'common'
-          }
-        ]
+            variant: 'common',
+          },
+        ],
       });
     }
 
@@ -195,15 +197,15 @@ export class WaveManager {
             type: 'asteroid',
             count: 2 + i,
             size: 'medium',
-            variant: 'common'
+            variant: 'common',
           },
           {
             type: 'asteroid',
             count: 2,
             size: 'small',
-            variant: 'common'
-          }
-        ]
+            variant: 'common',
+          },
+        ],
       });
     }
 
@@ -214,20 +216,20 @@ export class WaveManager {
           type: 'asteroid',
           count: 3,
           size: 'large',
-          variant: 'common'
+          variant: 'common',
         },
         {
           type: 'asteroid',
           count: 2,
           size: 'medium',
-          variant: 'iron'
+          variant: 'iron',
         },
         {
           type: 'asteroid',
           count: Math.floor(i / 3),
           size: 'small',
-          variant: 'volatile'
-        }
+          variant: 'volatile',
+        },
       ];
 
       const baseCount = this.computeBaseEnemyCount(i);
@@ -309,7 +311,9 @@ export class WaveManager {
     }
 
     if (Array.isArray(config.supportGroups)) {
-      cloned.supportGroups = config.supportGroups.map((group) => ({ ...group }));
+      cloned.supportGroups = config.supportGroups.map((group) => ({
+        ...group,
+      }));
     }
 
     if (config.metadata && typeof config.metadata === 'object') {
@@ -345,8 +349,7 @@ export class WaveManager {
 
     const enemies = [];
     // WAVE-006: Distribuição de tamanhos configurável via flag
-    const useLegacyDistribution =
-      PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
+    const useLegacyDistribution = PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
 
     const normalizedBaseCount = Math.max(
       0,
@@ -356,7 +359,9 @@ export class WaveManager {
     const metadata = {};
     const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
     const strictLegacySequence = this.isStrictLegacySpawnSequenceEnabled();
-    const distributionWeights = this.getAsteroidDistributionWeights(useLegacyDistribution);
+    const distributionWeights = this.getAsteroidDistributionWeights(
+      useLegacyDistribution
+    );
 
     if (waveManagerSpawnsAsteroids && normalizedBaseCount > 0) {
       const distributionLabel = useLegacyDistribution
@@ -388,13 +393,11 @@ export class WaveManager {
         metadata.targetAsteroidCount = normalizedBaseCount;
         metadata.distributionWeights = { ...distributionWeights };
       } else {
-        const {
-          sequence: asteroidSequence,
-          counts: asteroidCounts,
-        } = this.buildAsteroidSpawnSequence(
-          normalizedBaseCount,
-          distributionWeights
-        );
+        const { sequence: asteroidSequence, counts: asteroidCounts } =
+          this.buildAsteroidSpawnSequence(
+            normalizedBaseCount,
+            distributionWeights
+          );
 
         asteroidSequence.forEach((size, index) => {
           enemies.push({
@@ -475,13 +478,22 @@ export class WaveManager {
     const sanitizedCount = Math.max(0, Math.floor(Number(targetCount) || 0));
     const { weights, total } = this.normalizeAsteroidDistribution(distribution);
 
-    const weightEntries = Object.entries(weights).filter(([, weight]) => weight > 0);
-    const totalWeight = total > 0 ? total : weightEntries.reduce((sum, [, weight]) => sum + weight, 0);
+    const weightEntries = Object.entries(weights).filter(
+      ([, weight]) => weight > 0
+    );
+    const totalWeight =
+      total > 0
+        ? total
+        : weightEntries.reduce((sum, [, weight]) => sum + weight, 0);
 
     const scopedRandom = this.createScopedRandom('spawn', 'asteroid-size');
     const sizeRandom =
       (scopedRandom && scopedRandom.random) ||
-      this.resolveScopedRandom(this.getRandomScope('spawn'), 'spawn', 'asteroid-size');
+      this.resolveScopedRandom(
+        this.getRandomScope('spawn'),
+        'spawn',
+        'asteroid-size'
+      );
 
     let resolvedRandom = sizeRandom;
     if (
@@ -493,7 +505,9 @@ export class WaveManager {
         this._fallbackRandom = new RandomService('wave-manager:fallback');
       }
 
-      resolvedRandom = this._fallbackRandom.fork('wave-manager:asteroid-size-fallback');
+      resolvedRandom = this._fallbackRandom.fork(
+        'wave-manager:asteroid-size-fallback'
+      );
     }
 
     const selectSize = () => {
@@ -556,9 +570,14 @@ export class WaveManager {
     let spawnRandom = random;
     if (
       !spawnRandom ||
-      (typeof spawnRandom.float !== 'function' && typeof spawnRandom.range !== 'function')
+      (typeof spawnRandom.float !== 'function' &&
+        typeof spawnRandom.range !== 'function')
     ) {
-      spawnRandom = this.resolveScopedRandom(random, 'spawn', 'wave-spawn:size');
+      spawnRandom = this.resolveScopedRandom(
+        random,
+        'spawn',
+        'wave-spawn:size'
+      );
     }
 
     const drawFloat = () => {
@@ -596,7 +615,8 @@ export class WaveManager {
       return sizeOrder[sizeOrder.length - 1];
     }
 
-    const totalWeight = total > 0 ? total : sizeOrder.reduce((sum, key) => sum + weights[key], 0);
+    const totalWeight =
+      total > 0 ? total : sizeOrder.reduce((sum, key) => sum + weights[key], 0);
     if (totalWeight <= 0) {
       return sizeOrder[sizeOrder.length - 1];
     }
@@ -630,7 +650,9 @@ export class WaveManager {
     const result = [];
     const availableKeys = new Set(
       Object.values(this.enemyTypeKeys || {}).map((value) =>
-        typeof value === 'string' ? value.toLowerCase() : String(value || '').toLowerCase()
+        typeof value === 'string'
+          ? value.toLowerCase()
+          : String(value || '').toLowerCase()
       )
     );
 
@@ -668,7 +690,8 @@ export class WaveManager {
     const base = BOSS_CONFIG || {};
     const enemySystem = this.enemySystem;
 
-    const minionTypes = enemySystem &&
+    const minionTypes =
+      enemySystem &&
       typeof enemySystem.getAvailableBossMinionTypes === 'function'
         ? enemySystem.getAvailableBossMinionTypes(base.minionTypes)
         : this.filterAvailableMinionTypes(base.minionTypes);
@@ -690,7 +713,11 @@ export class WaveManager {
       }
     }
 
-    const hunterCount = this.computeSupportCount('hunter', waveNumber, baseCount);
+    const hunterCount = this.computeSupportCount(
+      'hunter',
+      waveNumber,
+      baseCount
+    );
     if (hunterCount > 0) {
       const hunterGroup = this.createSupportGroup('hunter', hunterCount);
       if (hunterGroup) {
@@ -700,7 +727,9 @@ export class WaveManager {
 
     const bossRadius = bossDefaults.radius || 60;
     const safeDistance = Math.max(
-      Number.isFinite(bossDefaults.safeDistance) ? bossDefaults.safeDistance : 0,
+      Number.isFinite(bossDefaults.safeDistance)
+        ? bossDefaults.safeDistance
+        : 0,
       bossRadius * 2.4
     );
     const entryPadding = Number.isFinite(bossDefaults.entryPadding)
@@ -752,14 +781,14 @@ export class WaveManager {
       return 0;
     }
 
-    const supportTotal = (Array.isArray(waveConfig.enemies) ? waveConfig.enemies : []).reduce(
-      (sum, group) => sum + (Number(group?.count) || 0),
-      0
-    );
+    const supportTotal = (
+      Array.isArray(waveConfig.enemies) ? waveConfig.enemies : []
+    ).reduce((sum, group) => sum + (Number(group?.count) || 0), 0);
 
-    const bossCount = waveConfig.boss && Number.isFinite(waveConfig.boss.count)
-      ? Math.max(0, Math.floor(waveConfig.boss.count))
-      : 0;
+    const bossCount =
+      waveConfig.boss && Number.isFinite(waveConfig.boss.count)
+        ? Math.max(0, Math.floor(waveConfig.boss.count))
+        : 0;
 
     return supportTotal + bossCount;
   }
@@ -777,7 +806,9 @@ export class WaveManager {
       }
 
       const count = Number(group.count);
-      return sum + (Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0);
+      return (
+        sum + (Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0)
+      );
     }, 0);
   }
 
@@ -856,16 +887,14 @@ export class WaveManager {
         ? WAVEMANAGER_HANDLES_ASTEROID_SPAWN
         : false;
     const useWaveManagerFlag =
-      typeof USE_WAVE_MANAGER === 'boolean'
-        ? USE_WAVE_MANAGER
-        : false;
+      typeof USE_WAVE_MANAGER === 'boolean' ? USE_WAVE_MANAGER : false;
 
     const resolvedUseWaveManager =
       useOverride === true
         ? true
         : useOverride === false
-        ? false
-        : useWaveManagerFlag;
+          ? false
+          : useWaveManagerFlag;
 
     return Boolean(waveManagerHandles && resolvedUseWaveManager);
   }
@@ -884,11 +913,15 @@ export class WaveManager {
     }
 
     const asteroidKey =
-      (this.enemyTypeKeys && this.enemyTypeKeys.asteroid)
+      this.enemyTypeKeys && this.enemyTypeKeys.asteroid
         ? String(this.enemyTypeKeys.asteroid).toLowerCase()
         : 'asteroid';
     const candidateType =
-      enemy?.type || enemy?.enemyType || enemy?.enemyKind || enemy?.kind || null;
+      enemy?.type ||
+      enemy?.enemyType ||
+      enemy?.enemyKind ||
+      enemy?.kind ||
+      null;
     const normalizedCandidate =
       typeof candidateType === 'string' ? candidateType.toLowerCase() : null;
 
@@ -1001,11 +1034,15 @@ export class WaveManager {
     }
 
     if (!this.waveInProgress) {
-      GameDebugLogger.log('STATE', 'Boss minion spawn ignored - wave inactive', {
-        bossId: context?.bossId ?? null,
-        wave: this.currentWave,
-        minionId: enemy.id,
-      });
+      GameDebugLogger.log(
+        'STATE',
+        'Boss minion spawn ignored - wave inactive',
+        {
+          bossId: context?.bossId ?? null,
+          wave: this.currentWave,
+          minionId: enemy.id,
+        }
+      );
       return false;
     }
 
@@ -1036,7 +1073,9 @@ export class WaveManager {
       const managerAll = Number.isFinite(this.managerTotalsForWave.all)
         ? this.managerTotalsForWave.all
         : 0;
-      const managerAsteroids = Number.isFinite(this.managerTotalsForWave.asteroids)
+      const managerAsteroids = Number.isFinite(
+        this.managerTotalsForWave.asteroids
+      )
         ? this.managerTotalsForWave.asteroids
         : 0;
 
@@ -1090,7 +1129,10 @@ export class WaveManager {
   computeBaseEnemyCount(waveNumber) {
     const baseCount =
       (ASTEROIDS_PER_WAVE_BASE ?? 4) *
-      Math.pow(ASTEROIDS_PER_WAVE_MULTIPLIER ?? 1.3, Math.max(0, waveNumber - 1));
+      Math.pow(
+        ASTEROIDS_PER_WAVE_MULTIPLIER ?? 1.3,
+        Math.max(0, waveNumber - 1)
+      );
 
     // WAVE-004: Usar parâmetros legados para preservar densidade de ondas (baseline WAVE-001)
     const normalizedCount = Math.floor(baseCount);
@@ -1152,7 +1194,11 @@ export class WaveManager {
     return weightedEntries.map(({ key, weight }) => ({ key, weight }));
   }
 
-  getBaselineSupportCount(kind, waveNumber, baseCount = this.computeBaseEnemyCount(waveNumber)) {
+  getBaselineSupportCount(
+    kind,
+    waveNumber,
+    baseCount = this.computeBaseEnemyCount(waveNumber)
+  ) {
     switch (kind) {
       case 'drone':
         if (waveNumber < 8) return 0;
@@ -1274,8 +1320,16 @@ export class WaveManager {
    * @param {number} waveNumber - Current wave
    * @returns {string} Selected variant
    */
-  selectRandomVariant(variants, waveNumber, random = this.getRandomScope('variants')) {
-    const variantRandom = this.resolveScopedRandom(random, 'variants', 'variant-roll');
+  selectRandomVariant(
+    variants,
+    waveNumber,
+    random = this.getRandomScope('variants')
+  ) {
+    const variantRandom = this.resolveScopedRandom(
+      random,
+      'variants',
+      'variant-roll'
+    );
 
     // Higher waves have more chance of rare variants
     const roll = variantRandom.float();
@@ -1301,7 +1355,9 @@ export class WaveManager {
    */
   startNextWave() {
     if (this.waveInProgress) {
-      console.warn('[WaveManager] Cannot start wave - wave already in progress');
+      console.warn(
+        '[WaveManager] Cannot start wave - wave already in progress'
+      );
       return false;
     }
 
@@ -1319,7 +1375,8 @@ export class WaveManager {
 
     const waveNumber = this.currentWave;
     const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
-    const legacyCompatibilityEnabled = this.isLegacyAsteroidCompatibilityEnabled();
+    const legacyCompatibilityEnabled =
+      this.isLegacyAsteroidCompatibilityEnabled();
     let config;
 
     if (this.isBossWave(waveNumber)) {
@@ -1517,14 +1574,16 @@ export class WaveManager {
     const safeDistance = ASTEROID_SAFE_SPAWN_DISTANCE || 200;
     const compatibilityMode =
       this.compatibilityModeActive ??
-      (!waveManagerSpawnsAsteroids || this.isLegacyAsteroidCompatibilityEnabled());
+      (!waveManagerSpawnsAsteroids ||
+        this.isLegacyAsteroidCompatibilityEnabled());
     const useLegacyDistribution = PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
     const strictLegacySequence = this.isStrictLegacySpawnSequenceEnabled();
     const defaultDistributionWeights = this.getAsteroidDistributionWeights(
       useLegacyDistribution
     );
 
-    const spawnDelayMultiplier = this.resolveWaveSpawnDelayMultiplier(waveConfig);
+    const spawnDelayMultiplier =
+      this.resolveWaveSpawnDelayMultiplier(waveConfig);
     this.spawnDelayMultiplier = spawnDelayMultiplier;
     const effectiveSpawnDelay = this.spawnDelay * spawnDelayMultiplier;
 
@@ -1533,9 +1592,10 @@ export class WaveManager {
         continue;
       }
 
-      const typeKey = typeof enemyGroup.type === 'string'
-        ? enemyGroup.type.toLowerCase()
-        : '';
+      const typeKey =
+        typeof enemyGroup.type === 'string'
+          ? enemyGroup.type.toLowerCase()
+          : '';
       const isAsteroid = typeKey === 'asteroid';
       const isDrone = typeKey === 'drone';
       const isMine = typeKey === 'mine';
@@ -1557,8 +1617,7 @@ export class WaveManager {
             ? this.createLegacyAsteroidScopedRandom()
             : this.createScopedRandom('spawn', 'wave-spawn');
         // WAVE-006: Posicionamento configurável via flag
-        const useLegacyPositioning =
-          PRESERVE_LEGACY_POSITIONING ?? true;
+        const useLegacyPositioning = PRESERVE_LEGACY_POSITIONING ?? true;
 
         let position;
         if (useLegacyPositioning && isAsteroid) {
@@ -1605,7 +1664,8 @@ export class WaveManager {
             playerPosition: anchor,
             safeDistance,
             isInBounds,
-            usedFallback: fallbackApplied || Boolean(tacticalPosition.usedFallback),
+            usedFallback:
+              fallbackApplied || Boolean(tacticalPosition.usedFallback),
             clamped: Boolean(tacticalPosition.clamped),
           });
         } else {
@@ -1681,10 +1741,9 @@ export class WaveManager {
           ...groupConfig,
           type: groupConfig.type || enemyGroup.type,
           size: resolvedSize,
-          variant:
-            Object.prototype.hasOwnProperty.call(groupConfig, 'variant')
-              ? groupConfig.variant
-              : enemyGroup.variant,
+          variant: Object.prototype.hasOwnProperty.call(groupConfig, 'variant')
+            ? groupConfig.variant
+            : enemyGroup.variant,
           x: position.x,
           y: position.y,
           wave: this.currentWave,
@@ -1739,8 +1798,14 @@ export class WaveManager {
               ? this.enemySystem.factory.hasType(enemyGroup.type)
               : true;
 
-          if (factoryHasType && typeof this.enemySystem.factory.create === 'function') {
-            enemy = this.enemySystem.factory.create(enemyGroup.type, enemyConfig);
+          if (
+            factoryHasType &&
+            typeof this.enemySystem.factory.create === 'function'
+          ) {
+            enemy = this.enemySystem.factory.create(
+              enemyGroup.type,
+              enemyConfig
+            );
           } else if (typeof this.enemySystem.acquireAsteroid === 'function') {
             enemy = this.enemySystem.acquireAsteroid(enemyConfig);
           }
@@ -1754,8 +1819,13 @@ export class WaveManager {
         }
 
         if (enemy && !registeredEnemy) {
-          if (this.enemySystem && typeof this.enemySystem.registerActiveEnemy === 'function') {
-            this.enemySystem.registerActiveEnemy(enemy, { skipDuplicateCheck: true });
+          if (
+            this.enemySystem &&
+            typeof this.enemySystem.registerActiveEnemy === 'function'
+          ) {
+            this.enemySystem.registerActiveEnemy(enemy, {
+              skipDuplicateCheck: true,
+            });
             registeredEnemy = true;
           } else {
             console.warn(
@@ -1792,7 +1862,8 @@ export class WaveManager {
   queueBossWaveSpawns(waveConfig = {}) {
     const queue = [];
 
-    const sharedSpawnDelayMultiplier = this.resolveWaveSpawnDelayMultiplier(waveConfig);
+    const sharedSpawnDelayMultiplier =
+      this.resolveWaveSpawnDelayMultiplier(waveConfig);
     const baseConfig = {
       ...waveConfig,
       spawnDelayMultiplier: sharedSpawnDelayMultiplier,
@@ -1844,7 +1915,10 @@ export class WaveManager {
           entry.execute();
         }
       } catch (error) {
-        console.error('[WaveManager] Failed to process spawn queue entry', error);
+        console.error(
+          '[WaveManager] Failed to process spawn queue entry',
+          error
+        );
       }
     }
 
@@ -1859,26 +1933,45 @@ export class WaveManager {
     });
 
     if (!this.enemySystem) {
-      if (typeof console !== 'undefined' && typeof console.error === 'function') {
-        console.error('[WaveManager] Cannot spawn boss - enemySystem is not defined');
+      if (
+        typeof console !== 'undefined' &&
+        typeof console.error === 'function'
+      ) {
+        console.error(
+          '[WaveManager] Cannot spawn boss - enemySystem is not defined'
+        );
       }
-      GameDebugLogger.log('ERROR', 'Boss spawn failed - enemySystem unavailable', {
-        hasEnemySystem: false,
-      });
+      GameDebugLogger.log(
+        'ERROR',
+        'Boss spawn failed - enemySystem unavailable',
+        {
+          hasEnemySystem: false,
+        }
+      );
       return null;
     }
 
     if (typeof this.enemySystem.spawnBoss !== 'function') {
-      if (typeof console !== 'undefined' && typeof console.error === 'function') {
-        console.error('[WaveManager] Cannot spawn boss - spawnBoss() not available', {
-          type: typeof this.enemySystem.spawnBoss,
-          hasMethod: 'spawnBoss' in this.enemySystem,
-          enemySystemConstructor: this.enemySystem.constructor?.name,
-        });
+      if (
+        typeof console !== 'undefined' &&
+        typeof console.error === 'function'
+      ) {
+        console.error(
+          '[WaveManager] Cannot spawn boss - spawnBoss() not available',
+          {
+            type: typeof this.enemySystem.spawnBoss,
+            hasMethod: 'spawnBoss' in this.enemySystem,
+            enemySystemConstructor: this.enemySystem.constructor?.name,
+          }
+        );
       }
-      GameDebugLogger.log('ERROR', 'Boss spawn failed - spawnBoss() missing on enemySystem', {
-        hasSpawnBoss: typeof this.enemySystem.spawnBoss === 'function',
-      });
+      GameDebugLogger.log(
+        'ERROR',
+        'Boss spawn failed - spawnBoss() missing on enemySystem',
+        {
+          hasSpawnBoss: typeof this.enemySystem.spawnBoss === 'function',
+        }
+      );
       return null;
     }
 
@@ -1955,7 +2048,10 @@ export class WaveManager {
       spawnSource: 'wave-manager',
       entrance: bossConfig.entrance || 'top-center',
       supportPlan: Array.isArray(waveConfig.enemies)
-        ? waveConfig.enemies.map((group) => ({ type: group.type, count: group.count }))
+        ? waveConfig.enemies.map((group) => ({
+            type: group.type,
+            count: group.count,
+          }))
         : undefined,
     };
 
@@ -2011,7 +2107,11 @@ export class WaveManager {
       height: worldBounds?.height || GAME_HEIGHT || 600,
     };
 
-    const generator = this.resolveScopedRandom(random, 'spawn', 'boss-position');
+    const generator = this.resolveScopedRandom(
+      random,
+      'spawn',
+      'boss-position'
+    );
     const bossRadius = BOSS_CONFIG?.radius || 60;
     const safeDistance = Math.max(
       Number(constraints?.safeDistance) || 0,
@@ -2021,15 +2121,24 @@ export class WaveManager {
       Number(constraints?.entryPadding) || 0,
       Math.max(20, bossRadius * 0.35)
     );
-    const horizontalMargin = Math.min(bounds.width / 2, entryPadding + bossRadius);
-    const verticalMargin = Math.min(bounds.height / 2, entryPadding + bossRadius);
+    const horizontalMargin = Math.min(
+      bounds.width / 2,
+      entryPadding + bossRadius
+    );
+    const verticalMargin = Math.min(
+      bounds.height / 2,
+      entryPadding + bossRadius
+    );
 
     const getRange = (min, max) => {
       if (generator && typeof generator.range === 'function') {
         return generator.range(min, max);
       }
       const span = max - min;
-      const value = generator && typeof generator.float === 'function' ? generator.float() : Math.random();
+      const value =
+        generator && typeof generator.float === 'function'
+          ? generator.float()
+          : Math.random();
       return min + span * value;
     };
 
@@ -2063,7 +2172,11 @@ export class WaveManager {
         break;
     }
 
-    if (playerSnapshot && Number.isFinite(playerSnapshot.x) && Number.isFinite(playerSnapshot.y)) {
+    if (
+      playerSnapshot &&
+      Number.isFinite(playerSnapshot.x) &&
+      Number.isFinite(playerSnapshot.y)
+    ) {
       const dx = x - playerSnapshot.x;
       const dy = y - playerSnapshot.y;
       const distance = Math.hypot(dx, dy);
@@ -2133,12 +2246,16 @@ export class WaveManager {
             boundaryTs.push((verticalMargin - playerSnapshot.y) / dirY);
           }
 
-          const validTs = boundaryTs.filter((t) => Number.isFinite(t) && t >= 0);
+          const validTs = boundaryTs.filter(
+            (t) => Number.isFinite(t) && t >= 0
+          );
           let finalT = safeDistance;
 
           if (validTs.length > 0) {
             const sorted = [...validTs].sort((a, b) => a - b);
-            const meetsSafeDistance = sorted.find((t) => t >= safeDistance - 1e-6);
+            const meetsSafeDistance = sorted.find(
+              (t) => t >= safeDistance - 1e-6
+            );
             if (Number.isFinite(meetsSafeDistance)) {
               finalT = meetsSafeDistance;
             } else {
@@ -2164,7 +2281,10 @@ export class WaveManager {
           adjustedY = playerSnapshot.y + dy * scale;
           adjustedX = clamp(adjustedX, horizontalMargin, maxX);
           adjustedY = clamp(adjustedY, verticalMargin, maxY);
-          distance = Math.hypot(adjustedX - playerSnapshot.x, adjustedY - playerSnapshot.y);
+          distance = Math.hypot(
+            adjustedX - playerSnapshot.x,
+            adjustedY - playerSnapshot.y
+          );
         }
 
         x = adjustedX;
@@ -2219,10 +2339,8 @@ export class WaveManager {
       'tactical-position'
     );
 
-    const anchorX =
-      player && Number.isFinite(player.x) ? player.x : width / 2;
-    const anchorY =
-      player && Number.isFinite(player.y) ? player.y : height / 2;
+    const anchorX = player && Number.isFinite(player.x) ? player.x : width / 2;
+    const anchorY = player && Number.isFinite(player.y) ? player.y : height / 2;
 
     const minRadius = Math.max(0, safeDistance);
     const maxRadius = Math.max(minRadius + 80, minRadius * 1.5 || 120);
@@ -2253,8 +2371,16 @@ export class WaveManager {
       let candidateX = anchorX + Math.cos(angle) * radius;
       let candidateY = anchorY + Math.sin(angle) * radius;
 
-      const clampedX = clamp(candidateX, horizontalMargin, width - horizontalMargin);
-      const clampedY = clamp(candidateY, verticalMargin, height - verticalMargin);
+      const clampedX = clamp(
+        candidateX,
+        horizontalMargin,
+        width - horizontalMargin
+      );
+      const clampedY = clamp(
+        candidateY,
+        verticalMargin,
+        height - verticalMargin
+      );
 
       if (clampedX !== candidateX || clampedY !== candidateY) {
         clamped = true;
@@ -2327,7 +2453,11 @@ export class WaveManager {
     const usableHeight = Math.max(0, height - verticalMargin * 2);
 
     return {
-      x: clamp(width / 2 + jitter(usableWidth), horizontalMargin, width - horizontalMargin),
+      x: clamp(
+        width / 2 + jitter(usableWidth),
+        horizontalMargin,
+        width - horizontalMargin
+      ),
       y: clamp(
         height / 2 + jitter(usableHeight),
         verticalMargin,
@@ -2361,10 +2491,21 @@ export class WaveManager {
     );
   }
 
-  calculateSafeSpawnPosition(bounds, player, safeDistance, random = this.getRandomScope('spawn')) {
-    const spawnRandom = this.resolveScopedRandom(random, 'spawn', 'spawn-position');
+  calculateSafeSpawnPosition(
+    bounds,
+    player,
+    safeDistance,
+    random = this.getRandomScope('spawn')
+  ) {
+    const spawnRandom = this.resolveScopedRandom(
+      random,
+      'spawn',
+      'spawn-position'
+    );
     const margin = 50;
-    let x, y, attempts = 0;
+    let x,
+      y,
+      attempts = 0;
     const maxAttempts = 10;
 
     do {
@@ -2404,7 +2545,6 @@ export class WaveManager {
       } else {
         break; // No player, position is fine
       }
-
     } while (attempts < maxAttempts);
 
     return { x, y };
@@ -2429,11 +2569,18 @@ export class WaveManager {
         ? ASTEROID_EDGE_SPAWN_MARGIN
         : 80;
 
-    let spawnRandom = this.resolveScopedRandom(random, 'spawn', 'edge-position');
+    let spawnRandom = this.resolveScopedRandom(
+      random,
+      'spawn',
+      'edge-position'
+    );
 
     if (!spawnRandom || typeof spawnRandom.float !== 'function') {
       const scopedFallback = this.createScopedRandom('spawn', 'edge-position');
-      if (scopedFallback?.random && typeof scopedFallback.random.float === 'function') {
+      if (
+        scopedFallback?.random &&
+        typeof scopedFallback.random.float === 'function'
+      ) {
         spawnRandom = scopedFallback.random;
       } else {
         const baseRandom = this.getRandomService();
@@ -2452,9 +2599,8 @@ export class WaveManager {
         return spawnRandom.range(min, max);
       }
       const span = max - min;
-      const base = typeof spawnRandom.float === 'function'
-        ? spawnRandom.float()
-        : 0;
+      const base =
+        typeof spawnRandom.float === 'function' ? spawnRandom.float() : 0;
       return min + span * base;
     };
 
@@ -2543,7 +2689,8 @@ export class WaveManager {
 
     if (
       destroyedEnemyType &&
-      String(destroyedEnemyType).toLowerCase() === String(asteroidKey).toLowerCase()
+      String(destroyedEnemyType).toLowerCase() ===
+        String(asteroidKey).toLowerCase()
     ) {
       this.asteroidsKilledThisWave++;
     }
@@ -2563,19 +2710,24 @@ export class WaveManager {
       GameDebugLogger.log('STATE', 'Boss minion destroyed', {
         wave: this.currentWave,
         minionId: destroyedEnemy?.id,
-        bossId: destroyedEnemy?.spawnedByBossId ?? destroyedEnemy?.spawnedBy ?? null,
+        bossId:
+          destroyedEnemy?.spawnedByBossId ?? destroyedEnemy?.spawnedBy ?? null,
         kills: this.enemiesKilledThisWave,
         total: this.totalEnemiesThisWave,
       });
     }
 
     // Development assertion: verify accounting consistency
-    if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+    if (
+      typeof process !== 'undefined' &&
+      process.env?.NODE_ENV === 'development'
+    ) {
       this.assertAccountingConsistency();
     }
 
     // Check if wave is complete
-    const killsCleared = this.enemiesKilledThisWave >= this.totalEnemiesThisWave;
+    const killsCleared =
+      this.enemiesKilledThisWave >= this.totalEnemiesThisWave;
     let activeEnemiesCleared = true;
 
     if (
@@ -2614,7 +2766,8 @@ export class WaveManager {
     const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
     const compatibilityMode =
       this.compatibilityModeActive ??
-      (!waveManagerSpawnsAsteroids || this.isLegacyAsteroidCompatibilityEnabled());
+      (!waveManagerSpawnsAsteroids ||
+        this.isLegacyAsteroidCompatibilityEnabled());
 
     const waveManagerTotal = compatibilityMode
       ? this.totalAsteroidEnemiesThisWave
@@ -2632,9 +2785,9 @@ export class WaveManager {
     if (totalDelta > 1 || spawnedDelta > 1) {
       console.warn(
         `[WaveManager] Accounting discrepancy detected!\n` +
-        `  WaveManager: ${waveManagerSpawned}/${waveManagerTotal}\n` +
-        `  EnemySystem: ${enemySystemSpawned}/${enemySystemTotal}\n` +
-        `  Wave: ${this.currentWave}`
+          `  WaveManager: ${waveManagerSpawned}/${waveManagerTotal}\n` +
+          `  EnemySystem: ${enemySystemSpawned}/${enemySystemTotal}\n` +
+          `  Wave: ${this.currentWave}`
       );
     }
   }
@@ -2651,7 +2804,9 @@ export class WaveManager {
 
     GameDebugLogger.log('WAVE', 'Wave complete', {
       wave: this.currentWave,
-      duration: Number.isFinite(duration) ? Number(duration.toFixed(3)) : duration,
+      duration: Number.isFinite(duration)
+        ? Number(duration.toFixed(3))
+        : duration,
       enemiesKilled: this.enemiesKilledThisWave,
       enemiesSpawned: this.enemiesSpawnedThisWave,
       isBossWave: this.isBossWave(this.currentWave),
@@ -2678,7 +2833,9 @@ export class WaveManager {
     // Start countdown for next wave
     this.waveCountdown = this.waveDelay;
 
-    console.log(`[WaveManager] Wave ${this.currentWave} complete in ${duration.toFixed(1)}s`);
+    console.log(
+      `[WaveManager] Wave ${this.currentWave} complete in ${duration.toFixed(1)}s`
+    );
   }
 
   /**
@@ -2741,13 +2898,13 @@ export class WaveManager {
    * @returns {Object} Wave state
    */
   getState() {
-    const sanitizeCount = (value) =>
-      Number.isFinite(value) ? value : 0;
+    const sanitizeCount = (value) => (Number.isFinite(value) ? value : 0);
 
     const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
     const compatibilityMode =
       this.compatibilityModeActive ??
-      (!waveManagerSpawnsAsteroids || this.isLegacyAsteroidCompatibilityEnabled());
+      (!waveManagerSpawnsAsteroids ||
+        this.isLegacyAsteroidCompatibilityEnabled());
     const preferAsteroidBreakdown = !waveManagerSpawnsAsteroids;
 
     const totals = {
@@ -2755,7 +2912,8 @@ export class WaveManager {
         this.managerTotalsForWave?.all ?? this.totalEnemiesThisWave
       ),
       asteroids: sanitizeCount(
-        this.managerTotalsForWave?.asteroids ?? this.totalAsteroidEnemiesThisWave
+        this.managerTotalsForWave?.asteroids ??
+          this.totalAsteroidEnemiesThisWave
       ),
     };
 
@@ -2817,8 +2975,10 @@ export class WaveManager {
     }
 
     const spawnLabel = this.randomScopeLabels?.spawn || 'wave-manager:spawn';
-    const variantLabel = this.randomScopeLabels?.variants || 'wave-manager:variants';
-    const fragmentLabel = this.randomScopeLabels?.fragments || 'wave-manager:fragments';
+    const variantLabel =
+      this.randomScopeLabels?.variants || 'wave-manager:variants';
+    const fragmentLabel =
+      this.randomScopeLabels?.fragments || 'wave-manager:fragments';
 
     const scopes = {
       base: baseRandom,
@@ -2876,7 +3036,9 @@ export class WaveManager {
     }
 
     const fallbackBase =
-      this.getRandomService() || this._fallbackRandom || new RandomService('wave-manager:fallback');
+      this.getRandomService() ||
+      this._fallbackRandom ||
+      new RandomService('wave-manager:fallback');
 
     if (typeof fallbackBase.fork === 'function') {
       return {
@@ -2944,7 +3106,11 @@ export class WaveManager {
     }
 
     Object.entries(this.randomScopes).forEach(([scope, generator]) => {
-      if (scope === 'base' || !generator || typeof generator.reset !== 'function') {
+      if (
+        scope === 'base' ||
+        !generator ||
+        typeof generator.reset !== 'function'
+      ) {
         return;
       }
 

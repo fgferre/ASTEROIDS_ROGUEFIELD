@@ -89,7 +89,9 @@ export function createRandomServiceStatefulStub(options = {}) {
     int: vi.fn((min, max) => deterministicRandom.int(min, max)),
     chance: vi.fn((probability) => deterministicRandom.chance(probability)),
     pick: vi.fn((array) => deterministicRandom.pick(array)),
-    uuid: vi.fn(() => (typeof uuidValue === 'function' ? uuidValue() : uuidValue)),
+    uuid: vi.fn(() =>
+      typeof uuidValue === 'function' ? uuidValue() : uuidValue
+    ),
   };
 
   stub.fork = vi.fn(() =>

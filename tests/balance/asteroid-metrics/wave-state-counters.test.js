@@ -1,7 +1,14 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { GamePools } from '../../../src/core/GamePools.js';
-import { setupGlobalMocks, cleanupGlobalState, withWaveOverrides } from '../../__helpers__/setup.js';
-import { createEnemySystemHarness, prepareWave } from '../../__helpers__/asteroid-helpers.js';
+import {
+  setupGlobalMocks,
+  cleanupGlobalState,
+  withWaveOverrides,
+} from '../../__helpers__/setup.js';
+import {
+  createEnemySystemHarness,
+  prepareWave,
+} from '../../__helpers__/asteroid-helpers.js';
 
 describe('Asteroid Metrics - Wave State Counters', () => {
   /** @type {{ enemySystem: any, container: any }} */
@@ -36,21 +43,31 @@ describe('Asteroid Metrics - Wave State Counters', () => {
       expect(spawned).toBeTruthy();
 
       const midState = { ...harness.enemySystem.waveState };
-      expect(midState.asteroidsSpawned).toBeGreaterThan(startState.asteroidsSpawned);
+      expect(midState.asteroidsSpawned).toBeGreaterThan(
+        startState.asteroidsSpawned
+      );
       expect(midState.isActive).toBe(true);
 
-      const fragments = harness.enemySystem.destroyAsteroid(spawned, { createFragments: true });
+      const fragments = harness.enemySystem.destroyAsteroid(spawned, {
+        createFragments: true,
+      });
       expect(Array.isArray(fragments)).toBe(true);
 
       const afterDestruction = { ...harness.enemySystem.waveState };
-      expect(afterDestruction.asteroidsKilled).toBeGreaterThan(midState.asteroidsKilled);
-      expect(afterDestruction.totalAsteroids).toBe(midState.totalAsteroids + fragments.length);
+      expect(afterDestruction.asteroidsKilled).toBeGreaterThan(
+        midState.asteroidsKilled
+      );
+      expect(afterDestruction.totalAsteroids).toBe(
+        midState.totalAsteroids + fragments.length
+      );
       expect(afterDestruction.asteroidsSpawned).toBe(
-        midState.asteroidsSpawned + fragments.length,
+        midState.asteroidsSpawned + fragments.length
       );
 
       fragments.forEach((fragmentAsteroid) => {
-        harness.enemySystem.destroyAsteroid(fragmentAsteroid, { createFragments: false });
+        harness.enemySystem.destroyAsteroid(fragmentAsteroid, {
+          createFragments: false,
+        });
       });
 
       while (
@@ -71,7 +88,9 @@ describe('Asteroid Metrics - Wave State Counters', () => {
 
       remainingEnemies.forEach((asteroid) => {
         if (!asteroid.destroyed) {
-          harness.enemySystem.destroyAsteroid(asteroid, { createFragments: false });
+          harness.enemySystem.destroyAsteroid(asteroid, {
+            createFragments: false,
+          });
         }
       });
 
@@ -84,7 +103,9 @@ describe('Asteroid Metrics - Wave State Counters', () => {
       const finalState = { ...harness.enemySystem.waveState };
 
       expect(finalState.isActive).toBe(false);
-      expect(finalState.asteroidsKilled).toBeGreaterThanOrEqual(finalState.totalAsteroids);
+      expect(finalState.asteroidsKilled).toBeGreaterThanOrEqual(
+        finalState.totalAsteroids
+      );
     });
   });
 });

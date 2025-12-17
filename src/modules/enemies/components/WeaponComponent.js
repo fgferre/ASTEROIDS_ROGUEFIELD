@@ -33,22 +33,31 @@ const resolvePattern = (component, enemy) => {
   if (enemy?.weaponPattern) {
     return enemy.weaponPattern;
   }
-  if (Array.isArray(component.config.patterns) && component.config.patterns.length > 0) {
+  if (
+    Array.isArray(component.config.patterns) &&
+    component.config.patterns.length > 0
+  ) {
     const state = ensureWeaponState(enemy);
     if (!Number.isInteger(state.patternIndex)) {
       state.patternIndex = 0;
     }
-    return component.config.patterns[state.patternIndex % component.config.patterns.length];
+    return component.config.patterns[
+      state.patternIndex % component.config.patterns.length
+    ];
   }
   return component.config.pattern || 'single';
 };
 
 const rotatePattern = (component, enemy) => {
-  if (!Array.isArray(component.config.patterns) || component.config.patterns.length <= 1) {
+  if (
+    !Array.isArray(component.config.patterns) ||
+    component.config.patterns.length <= 1
+  ) {
     return;
   }
   const state = ensureWeaponState(enemy);
-  state.patternIndex = ((state.patternIndex ?? 0) + 1) % component.config.patterns.length;
+  state.patternIndex =
+    ((state.patternIndex ?? 0) + 1) % component.config.patterns.length;
 };
 
 const defaultPatterns = {
@@ -62,7 +71,8 @@ const defaultPatterns = {
       variance: component.config.variance ?? 0,
       spread: component.config.spread ?? 0,
       predictive: component.config.predictive !== false,
-      fireRange: component.config.fireRange ?? component.config.targetingRange ?? 500,
+      fireRange:
+        component.config.fireRange ?? component.config.targetingRange ?? 500,
     };
 
     state.cooldown = Math.max((state.cooldown ?? 0) - context.deltaTime, 0);
@@ -119,7 +129,8 @@ const defaultPatterns = {
       lifetime: component.config.lifetime ?? enemy.projectileLifetime ?? 1.5,
       burstCount: component.config.burstCount ?? 3,
       burstDelay: component.config.burstDelay ?? 0.15,
-      burstInterval: component.config.cooldown ?? component.config.burstInterval ?? 3,
+      burstInterval:
+        component.config.cooldown ?? component.config.burstInterval ?? 3,
       spread: component.config.spread ?? 0,
       predictive: component.config.predictive !== false,
       fireRange: component.config.fireRange ?? 520,
@@ -187,10 +198,15 @@ const defaultPatterns = {
       projectileCount: patternConfig.projectileCount ?? 5,
       speed: patternConfig.speed ?? component.config.speed ?? 260,
       lifetime: patternConfig.lifetime ?? component.config.lifetime ?? 2.2,
-      interval: patternConfig.cooldown ?? patternConfig.interval ?? component.config.cooldown ?? 2.4,
+      interval:
+        patternConfig.cooldown ??
+        patternConfig.interval ??
+        component.config.cooldown ??
+        2.4,
       variance: patternConfig.variance ?? component.config.variance ?? 0.2,
       arc: patternConfig.arc ?? Math.PI / 2,
-      angleVariance: patternConfig.angleVariance ?? component.config.spread ?? 0,
+      angleVariance:
+        patternConfig.angleVariance ?? component.config.spread ?? 0,
       damage: component.config.damage ?? enemy.projectileDamage ?? 20,
     };
 
@@ -211,7 +227,9 @@ const defaultPatterns = {
     const startAngle = baseAngle - config.arc / 2;
 
     for (let i = 0; i < config.projectileCount; i += 1) {
-      const randomOffset = ((context.random?.float?.() ?? Math.random()) - 0.5) * config.angleVariance;
+      const randomOffset =
+        ((context.random?.float?.() ?? Math.random()) - 0.5) *
+        config.angleVariance;
       const shotAngle = startAngle + offset * i + randomOffset;
       const vx = Math.cos(shotAngle) * config.speed;
       const vy = Math.sin(shotAngle) * config.speed;
@@ -236,7 +254,11 @@ const defaultPatterns = {
     const config = {
       burstSize: patternConfig.burstSize ?? 5,
       shotDelay: patternConfig.shotDelay ?? 0.12,
-      interval: patternConfig.cooldown ?? patternConfig.interval ?? component.config.cooldown ?? 1.35,
+      interval:
+        patternConfig.cooldown ??
+        patternConfig.interval ??
+        component.config.cooldown ??
+        1.35,
       variance: patternConfig.variance ?? 0.15,
       speed: patternConfig.speed ?? component.config.speed ?? 320,
       spread: patternConfig.spread ?? component.config.spread ?? 0.1,
@@ -319,8 +341,8 @@ const defaultPatterns = {
           const lethal = Number.isFinite(enemy.health)
             ? enemy.health
             : Number.isFinite(enemy.maxHealth)
-            ? enemy.maxHealth
-            : Infinity;
+              ? enemy.maxHealth
+              : Infinity;
           enemy.takeDamage(lethal, {
             cause: 'mine-detonation',
             reason: 'proximity',
@@ -380,7 +402,12 @@ export class WeaponComponent {
       return;
     }
 
-    const damage = payload.damage ?? this.config.damage ?? enemy.projectileDamage ?? enemy.contactDamage ?? 10;
+    const damage =
+      payload.damage ??
+      this.config.damage ??
+      enemy.projectileDamage ??
+      enemy.contactDamage ??
+      10;
     const vx = payload.vx ?? 0;
     const vy = payload.vy ?? 0;
     const projectileSpeed = payload.projectileSpeed ?? Math.hypot(vx, vy);

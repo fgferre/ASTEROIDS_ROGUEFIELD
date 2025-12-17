@@ -9,8 +9,8 @@ describe('SpatialHash', () => {
       bullet: { id: 'bullet1', type: 'bullet' },
       asteroid: { id: 'asteroid1', type: 'asteroid' },
       player: { id: 'player1', type: 'player' },
-      enemy: { id: 'enemy1', type: 'enemy' }
-    }
+      enemy: { id: 'enemy1', type: 'enemy' },
+    },
   });
 
   const withInsertedObjects = () => {
@@ -46,7 +46,7 @@ describe('SpatialHash', () => {
       const hash = new SpatialHash(128, {
         maxObjects: 20,
         maxDepth: 6,
-        dynamicResize: false
+        dynamicResize: false,
       });
       expect(hash.baseCellSize).toBe(128);
       expect(hash.cellSize).toBe(128);
@@ -253,7 +253,10 @@ describe('SpatialHash', () => {
       const { spatialHash, testObjects } = createFixture();
       spatialHash.insert(testObjects.bullet, 50, 50, 5);
       spatialHash.insert(testObjects.asteroid, 55, 55, 10);
-      const collision = spatialHash.checkCollision(testObjects.bullet, testObjects.asteroid);
+      const collision = spatialHash.checkCollision(
+        testObjects.bullet,
+        testObjects.asteroid
+      );
 
       expect(collision).toBe(true);
     });
@@ -262,7 +265,10 @@ describe('SpatialHash', () => {
       const { spatialHash, testObjects } = createFixture();
       spatialHash.insert(testObjects.bullet, 50, 50, 5);
       spatialHash.insert(testObjects.player, 100, 100, 8);
-      const collision = spatialHash.checkCollision(testObjects.bullet, testObjects.player);
+      const collision = spatialHash.checkCollision(
+        testObjects.bullet,
+        testObjects.player
+      );
 
       expect(collision).toBe(false);
     });
@@ -270,7 +276,10 @@ describe('SpatialHash', () => {
     it('should handle non-existent objects in collision check', () => {
       const { spatialHash, testObjects } = createFixture();
       spatialHash.insert(testObjects.bullet, 50, 50, 5);
-      const collision = spatialHash.checkCollision(testObjects.bullet, testObjects.enemy);
+      const collision = spatialHash.checkCollision(
+        testObjects.bullet,
+        testObjects.enemy
+      );
 
       expect(collision).toBe(false);
     });
@@ -284,7 +293,9 @@ describe('SpatialHash', () => {
 
       expect(collisions.length).toBeGreaterThan(0);
       const bulletAsteroidPair = collisions.find(
-        pair => pair.includes(testObjects.bullet) && pair.includes(testObjects.asteroid)
+        (pair) =>
+          pair.includes(testObjects.bullet) &&
+          pair.includes(testObjects.asteroid)
       );
       expect(bulletAsteroidPair).toBeDefined();
     });
@@ -294,7 +305,8 @@ describe('SpatialHash', () => {
       spatialHash.insert(testObjects.bullet, 50, 50, 5);
       spatialHash.insert(testObjects.asteroid, 55, 55, 10);
       spatialHash.insert(testObjects.player, 100, 100, 8);
-      const filter = (objA, objB) => objA.type === 'bullet' || objB.type === 'bullet';
+      const filter = (objA, objB) =>
+        objA.type === 'bullet' || objB.type === 'bullet';
       const collisions = spatialHash.findAllCollisions({ filter });
 
       expect(collisions.length).toBeGreaterThan(0);
@@ -325,13 +337,18 @@ describe('SpatialHash', () => {
     beforeAll(() => {
       const boundsHash = new SpatialHash(32);
       calculatedBounds = boundsHash.calculateBounds(50, 50, 10);
-      cellsForBounds = boundsHash.getCellsForBounds({ minX: 30, minY: 30, maxX: 70, maxY: 70 });
+      cellsForBounds = boundsHash.getCellsForBounds({
+        minX: 30,
+        minY: 30,
+        maxX: 70,
+        maxY: 70,
+      });
       const boundsA = { minX: 0, minY: 0, maxX: 50, maxY: 50 };
       const boundsB = { minX: 25, minY: 25, maxX: 75, maxY: 75 };
       const boundsC = { minX: 100, minY: 100, maxX: 150, maxY: 150 };
       intersectionResults = {
         ab: boundsHash.boundsIntersect(boundsA, boundsB),
-        ac: boundsHash.boundsIntersect(boundsA, boundsC)
+        ac: boundsHash.boundsIntersect(boundsA, boundsC),
       };
     });
 
@@ -340,7 +357,7 @@ describe('SpatialHash', () => {
         minX: 40,
         minY: 40,
         maxX: 60,
-        maxY: 60
+        maxY: 60,
       });
     });
 
@@ -382,7 +399,10 @@ describe('SpatialHash', () => {
     it('should remove orphaned object data on cleanup', () => {
       const { spatialHash } = withRemovalSetup();
       // Manually corrupt data to test cleanup
-      spatialHash.objects.set({ id: 'orphan' }, { x: 0, y: 0, radius: 5, cells: new Set() });
+      spatialHash.objects.set(
+        { id: 'orphan' },
+        { x: 0, y: 0, radius: 5, cells: new Set() }
+      );
       const initialObjectCount = spatialHash.objects.size;
 
       spatialHash.cleanup();
@@ -553,14 +573,21 @@ describe('SpatialHash', () => {
       const endTime = performance.now();
 
       expect(endTime - startTime).toBeLessThan(50); // Should be fast
-      expect(spatialHash.stats.objectChecks).toBeLessThan(objects.length * objects.length); // Better than O(n²)
+      expect(spatialHash.stats.objectChecks).toBeLessThan(
+        objects.length * objects.length
+      ); // Better than O(n²)
     });
 
     it('should maintain reasonable memory usage', () => {
       const spatialHash = new SpatialHash(32);
       // Add many objects
       for (let i = 0; i < 1000; i++) {
-        spatialHash.insert({ id: `obj${i}` }, Math.random() * 1000, Math.random() * 1000, 5);
+        spatialHash.insert(
+          { id: `obj${i}` },
+          Math.random() * 1000,
+          Math.random() * 1000,
+          5
+        );
       }
 
       const stats = spatialHash.getStats();

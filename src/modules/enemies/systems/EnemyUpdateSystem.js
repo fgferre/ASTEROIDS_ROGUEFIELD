@@ -24,10 +24,7 @@
  * updateSystem.update(deltaTime);
  * ```
  */
-import {
-  GAME_WIDTH,
-  GAME_HEIGHT,
-} from '../../../core/GameConstants.js';
+import { GAME_WIDTH, GAME_HEIGHT } from '../../../core/GameConstants.js';
 import {
   USE_WAVE_MANAGER,
   WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
@@ -209,10 +206,9 @@ export class EnemyUpdateSystem {
         typeof this.ctx?.getActiveEnemyCount === 'function'
           ? this.ctx.getActiveEnemyCount()
           : Array.isArray(this.ctx?.asteroids)
-          ? this.ctx.asteroids.filter(
-              (enemy) => enemy && !enemy.destroyed
-            ).length
-          : 0;
+            ? this.ctx.asteroids.filter((enemy) => enemy && !enemy.destroyed)
+                .length
+            : 0;
       const allAsteroidsKilled =
         wave.asteroidsKilled >= wave.totalAsteroids &&
         (activeEnemyCount ?? 0) === 0;
@@ -281,7 +277,9 @@ export class EnemyUpdateSystem {
     }
 
     const managerState =
-      typeof waveManager.getState === 'function' ? waveManager.getState() : null;
+      typeof waveManager.getState === 'function'
+        ? waveManager.getState()
+        : null;
 
     const managerStateValid =
       managerState &&
@@ -316,8 +314,8 @@ export class EnemyUpdateSystem {
     const resolvedWaveNumber = Number.isFinite(nextWaveNumberCandidate)
       ? nextWaveNumberCandidate
       : Number.isFinite(previousCurrent)
-      ? previousCurrent
-      : 1;
+        ? previousCurrent
+        : 1;
 
     const nextIsActive = Boolean(managerState.inProgress);
     const becameActive = !previousIsActive && nextIsActive;
@@ -462,7 +460,10 @@ export class EnemyUpdateSystem {
       );
     }
 
-    if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+    if (
+      typeof process !== 'undefined' &&
+      process.env?.NODE_ENV === 'development'
+    ) {
       const managerKilled = managerState.killed ?? 0;
       const systemKilled = wave.asteroidsKilled ?? 0;
       if (Math.abs(managerKilled - systemKilled) > 1) {
@@ -508,19 +509,20 @@ export class EnemyUpdateSystem {
 
     const useComponents = Boolean(this.ctx?.useComponents);
     const movementComponent = this.ctx?.genericMovement;
-    const movementContext = useComponents && movementComponent
-      ? {
-          player:
-            typeof this.ctx?.getCachedPlayer === 'function'
-              ? this.ctx.getCachedPlayer()
-              : undefined,
-          worldBounds: {
-            width: GAME_WIDTH,
-            height: GAME_HEIGHT,
-          },
-          random: this.ctx?.getRandomScope?.('movement'),
-        }
-      : null;
+    const movementContext =
+      useComponents && movementComponent
+        ? {
+            player:
+              typeof this.ctx?.getCachedPlayer === 'function'
+                ? this.ctx.getCachedPlayer()
+                : undefined,
+            worldBounds: {
+              width: GAME_WIDTH,
+              height: GAME_HEIGHT,
+            },
+            random: this.ctx?.getRandomScope?.('movement'),
+          }
+        : null;
 
     if (!Array.isArray(asteroids) || asteroids.length === 0) {
       this.handleAsteroidCollisions();
@@ -697,8 +699,10 @@ export class EnemyUpdateSystem {
       }
 
       const collisionRandom =
-        (typeof a1?.getRandomFor === 'function' && a1.getRandomFor('collision')) ||
-        (typeof a2?.getRandomFor === 'function' && a2.getRandomFor('collision')) ||
+        (typeof a1?.getRandomFor === 'function' &&
+          a1.getRandomFor('collision')) ||
+        (typeof a2?.getRandomFor === 'function' &&
+          a2.getRandomFor('collision')) ||
         (typeof this.ctx?.getRandomScope === 'function'
           ? this.ctx.getRandomScope('fragments')
           : undefined);
@@ -714,8 +718,8 @@ export class EnemyUpdateSystem {
         rotationSource && typeof rotationSource.range === 'function'
           ? rotationSource.range(-0.75, 0.75)
           : rotationSource && typeof rotationSource.float === 'function'
-          ? (rotationSource.float() - 0.5) * 1.5
-          : 0;
+            ? (rotationSource.float() - 0.5) * 1.5
+            : 0;
       a1.rotationSpeed += rotationDelta;
       a2.rotationSpeed += rotationDelta;
     }
@@ -766,7 +770,10 @@ export class EnemyUpdateSystem {
    */
   handleSpawning(deltaTime) {
     const spawnSystem =
-      this.spawnSystem ?? this.ctx?.spawnSystem ?? this.facade?.spawnSystem ?? null;
+      this.spawnSystem ??
+      this.ctx?.spawnSystem ??
+      this.facade?.spawnSystem ??
+      null;
 
     if (spawnSystem && typeof spawnSystem.handleSpawning === 'function') {
       spawnSystem.handleSpawning(deltaTime);
@@ -793,7 +800,9 @@ export class EnemyUpdateSystem {
     const wave = this.ctx?.waveState;
 
     if (!wave) {
-      console.warn('[EnemyUpdateSystem] Cannot handle wave completion - no wave state');
+      console.warn(
+        '[EnemyUpdateSystem] Cannot handle wave completion - no wave state'
+      );
       return;
     }
 
@@ -805,9 +814,8 @@ export class EnemyUpdateSystem {
     wave.breakTimer = Number.isFinite(data?.countdown)
       ? Math.max(0, data.countdown)
       : WAVE_BREAK_TIME;
-    wave.completedWaves = (Number.isFinite(wave.completedWaves)
-      ? wave.completedWaves
-      : 0) + 1;
+    wave.completedWaves =
+      (Number.isFinite(wave.completedWaves) ? wave.completedWaves : 0) + 1;
 
     if (typeof this.ctx?.emitWaveStateUpdate === 'function') {
       this.ctx.emitWaveStateUpdate(true);

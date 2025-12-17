@@ -1,6 +1,7 @@
 # Plano da Fase 3 – Efeitos Visuais e Feedback de Tela
 
 ## Objetivo
+
 Aprimorar `EffectsSystem` e utilitários relacionados para oferecer feedback visual diferenciado aos novos inimigos e ao boss, incluindo partículas dedicadas, presets de screen shake e suporte a efeitos de câmera lenta.
 
 ## Componentes Principais
@@ -12,6 +13,7 @@ Aprimorar `EffectsSystem` e utilitários relacionados para oferecer feedback vis
 ## Passos Detalhados
 
 1. **Estender `EffectsSystem`:**
+
    - Registrar listeners para: `enemy-fired`, `mine-exploded`, `boss-spawned`, `boss-phase-changed`, `boss-defeated`.
    - Implementar métodos específicos:
      - `createDroneMuzzleFlash(position, direction)` – flash azul/branco curto.
@@ -23,10 +25,12 @@ Aprimorar `EffectsSystem` e utilitários relacionados para oferecer feedback vis
    - Atualizar `createAsteroidExplosion()` para aceitar tipo de inimigo e variar cor/intensidade conforme Drone/Mine/Hunter/Boss.
 
 2. **Gerenciamento de Camera Slow/Fast:**
+
    - Garantir que `EffectsSystem.update(deltaTime)` suporte congelamentos curtos (freeze frame) retornando `modifiedDeltaTime` quando ativo.
    - Resetar estados de freeze ao fim da duração, mantendo compatibilidade com outros efeitos existentes.
 
 3. **Adicionar Presets em `ScreenShake.js`:**
+
    - Estender `ShakePresets` com: `droneDestroyed`, `mineExplosion`, `hunterDestroyed`, `bossSpawn`, `bossPhaseChange`, `bossDefeated`, `bossAttack` (valores definidos no plano original).
    - Documentar uso em comentários para orientar futuros gatilhos.
 

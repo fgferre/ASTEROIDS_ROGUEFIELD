@@ -205,7 +205,8 @@ const CLASSIC_LAYOUT_ITEMS = [
     group: 'status-alerts',
     layout: 'custom',
     label: '',
-    description: 'Directional indicators highlighting off-screen hostile contacts.',
+    description:
+      'Directional indicators highlighting off-screen hostile contacts.',
     icon: {
       type: 'svg',
       viewBox: '0 0 24 24',
@@ -416,7 +417,8 @@ const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
     group: 'tactical-intel',
     layout: 'custom',
     label: '',
-    description: 'Compact tactical minimap showing entities within a 300 unit radius.',
+    description:
+      'Compact tactical minimap showing entities within a 300 unit radius.',
     icon: {
       type: 'svg',
       viewBox: '0 0 24 24',
@@ -462,7 +464,8 @@ const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
     group: 'tactical-alerts',
     layout: 'custom',
     label: '',
-    description: 'Directional threat indicators for enemies outside the camera view.',
+    description:
+      'Directional threat indicators for enemies outside the camera view.',
     icon: {
       type: 'svg',
       viewBox: '0 0 24 24',
@@ -494,7 +497,8 @@ const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
     position: 'top-left',
     group: 'tactical-vitals',
     layout: 'inline-value',
-    description: 'Current combo streak and multiplier earned from consecutive hits.',
+    description:
+      'Current combo streak and multiplier earned from consecutive hits.',
     icon: {
       type: 'text',
       value: '🔥',
@@ -513,6 +517,101 @@ const MINIMAL_TACTICAL_LAYOUT_ITEMS = [
   },
 ];
 
+const AAA_LAYOUT_ITEMS = [
+  // --- TOP LEFT: Stats ---
+  {
+    key: 'comboMeter',
+    type: 'combo',
+    position: 'top-left',
+    group: 'aaa-stats',
+    layout: 'aaa-combo', // Custom layout for Phase 3
+    description: 'Active combo streak',
+    rootId: 'hud-combo',
+    valueId: 'combo-display',
+    initialValue: 'x0',
+    ariaLive: 'polite',
+  },
+  {
+    key: 'statsWidget',
+    type: 'composite',
+    position: 'top-left',
+    group: 'aaa-stats-grid',
+    layout: 'aaa-stats-widget',
+    rootId: 'hud-stats-grid',
+  },
+
+  // --- TOP MIDDLE: Boss & Threats ---
+  {
+    key: 'boss',
+    type: 'boss',
+    position: 'top-middle',
+    layout: 'aaa-boss', // Custom skull layout
+    rootId: 'hud-boss',
+  },
+  {
+    key: 'threatIndicators',
+    type: 'threat-indicators',
+    position: 'top-middle',
+    rootId: 'threat-indicators-container',
+  },
+
+  // --- TOP RIGHT: Radar ---
+  {
+    key: 'minimap',
+    type: 'minimap',
+    position: 'top-right',
+    layout: 'aaa-radar', // Custom radar layout
+    rootId: 'hud-minimap',
+    custom: {
+      element: 'div', // Changed to div wrapper structure
+      id: 'radar-root',
+      classes: ['radar-structure'],
+    },
+  },
+
+  // --- BOTTOM LEFT: Vitals (Unified Status Widget) ---
+  {
+    key: 'statusWidget',
+    type: 'composite', // Special type for multi-data widget
+    position: 'bottom-left',
+    group: 'aaa-vitals',
+    layout: 'aaa-status-widget',
+    rootId: 'hud-status-area',
+  },
+
+  // --- BOTTOM CENTER: Wave & XP ---
+  {
+    key: 'wave',
+    type: 'wave',
+    position: 'bottom-center',
+    layout: 'aaa-wave-circle', // Rotating circle layout
+    rootId: 'hud-wave',
+    valueId: 'wave-current',
+    initialValue: '0',
+  },
+  {
+    key: 'xp',
+    type: 'xp',
+    position: 'bottom-center',
+    layout: 'aaa-xp-bar', // Styled XP bar
+    rootId: 'hud-xp',
+    valueId: 'xp-display',
+    initialValue: '0%',
+  },
+
+  // --- BOTTOM RIGHT: Systems ---
+  {
+    key: 'nav',
+    type: 'stat', // Generic stat for now
+    position: 'bottom-right',
+    layout: 'aaa-nav-block', // Skewed block layout
+    label: 'NAV SYSTEMS',
+    rootId: 'hud-nav',
+    valueId: 'nav-display',
+    initialValue: 'ONLINE',
+  },
+];
+
 const HUD_LAYOUTS = {
   classic: {
     id: 'classic',
@@ -528,9 +627,16 @@ const HUD_LAYOUTS = {
       'Faixa superior compacta, XP à esquerda, minimapa central e onda à direita no rodapé.',
     items: MINIMAL_TACTICAL_LAYOUT_ITEMS,
   },
+  aaa: {
+    id: 'aaa',
+    label: 'AAA High-Fidelity',
+    description:
+      'Interface avançada com visual Sci-Fi, glassmorphism e efeitos de neon.',
+    items: AAA_LAYOUT_ITEMS,
+  },
 };
 
-export const DEFAULT_HUD_LAYOUT_ID = 'minimal';
+export const DEFAULT_HUD_LAYOUT_ID = 'aaa'; // Switch default to AAA for testing
 
 export const HUD_LAYOUT_OPTIONS = Object.values(HUD_LAYOUTS).map(
   ({ id, label, description }) => ({

@@ -19,7 +19,10 @@ const safeStringify = (value) => {
 };
 
 export function isDevEnvironment() {
-  if (typeof process !== 'undefined' && process?.env?.NODE_ENV === 'development') {
+  if (
+    typeof process !== 'undefined' &&
+    process?.env?.NODE_ENV === 'development'
+  ) {
     return true;
   }
 
@@ -40,7 +43,10 @@ export class GameDebugLogger {
       return;
     }
 
-    if (typeof window === 'undefined' || typeof window.localStorage === 'undefined') {
+    if (
+      typeof window === 'undefined' ||
+      typeof window.localStorage === 'undefined'
+    ) {
       return;
     }
 
@@ -85,8 +91,12 @@ export class GameDebugLogger {
 
     const timestamp = this.getTimestamp();
     const normalizedCategory = category || 'LOG';
-    const safeMessage = typeof message === 'string' ? message : safeStringify(message);
-    const hasData = data !== undefined && data !== null && (typeof data !== 'object' || Object.keys(data).length > 0);
+    const safeMessage =
+      typeof message === 'string' ? message : safeStringify(message);
+    const hasData =
+      data !== undefined &&
+      data !== null &&
+      (typeof data !== 'object' || Object.keys(data).length > 0);
     const serializedData = hasData ? ` - ${safeStringify(data)}` : '';
     const entry = `[${timestamp}] [${normalizedCategory}] ${safeMessage}${serializedData}`;
 
@@ -109,7 +119,10 @@ export class GameDebugLogger {
     try {
       window.localStorage.setItem(STORAGE_KEY, this.entries.join('\n'));
     } catch (error) {
-      console.warn('[GameDebugLogger] Failed to persist log to localStorage', error);
+      console.warn(
+        '[GameDebugLogger] Failed to persist log to localStorage',
+        error
+      );
     }
   }
 
@@ -161,4 +174,3 @@ export class GameDebugLogger {
     this.log('STATE', 'Debug log cleared');
   }
 }
-

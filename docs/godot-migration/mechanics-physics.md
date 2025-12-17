@@ -5,6 +5,7 @@
 This document provides a complete technical reference for migrating the JavaScript physics system to Godot 3D. It covers spatial hash implementation, collision detection, bounce physics, screen wrapping, boss-specific mechanics, and damage calculation with practical GDScript pseudocode.
 
 **Important Corrections:**
+
 - Cell size: **96px** (PHYSICS_CELL_SIZE), not 100px
 - Bounce coefficient: **0.85** (shield), **0.2** (hull), not 0.6
 - Screen wrapping: Implemented in **PlayerSystem**, not PhysicsSystem
@@ -14,29 +15,34 @@ This document provides a complete technical reference for migrating the JavaScri
 ## 1. System Overview
 
 ### Concept
+
 The physics system implements **top-down 2D physics projected into 3D space** (XZ plane) with spatial hashing for efficient collision detection. The system reduces collision detection complexity from O(n²) to O(n) through grid-based partitioning.
 
 ### Five Integrated Subsystems
 
 1. **Spatial Hash System**
+
    - Grid-based partitioning with 96px cell size
    - Dynamic resize based on object density
    - Efficient O(n) spatial queries
    - Supports objects spanning multiple cells
 
 2. **Collision Detection**
+
    - Optimized circle-circle collision (squared distance)
    - Bullet vs enemies collision
    - Player vs enemies collision
    - Boss-specific collision handling
 
 3. **Bounce Physics**
+
    - Momentum conservation via impulse
    - Coefficient of restitution: 0.85 (shield), 0.2 (hull)
    - Mass-proportional impulse distribution
    - Shield force multiplier support
 
 4. **Screen Wrapping**
+
    - Seamless teleport at screen boundaries
    - Preserves velocity and rotation
    - Implemented in PlayerSystem (not PhysicsSystem)
@@ -48,6 +54,7 @@ The physics system implements **top-down 2D physics projected into 3D space** (X
    - Knockback and damage modifiers
 
 ### Purpose
+
 - Reduce collision detection from O(n²) to O(n)
 - Provide responsive and deterministic physics
 - Support complex mechanics (shields, boss attacks, mine explosions)
@@ -188,6 +195,7 @@ var resize_check_interval: int = 2000  # ms
 The spatial hash divides the game world into a grid of cells (96px × 96px). Each cell contains an array of objects within that region. Objects with radius larger than cell size can occupy multiple cells.
 
 **Benefits:**
+
 - Query only checks adjacent cells (9 cells for typical radius)
 - Reduces collision checks from O(n²) to O(n)
 - Dynamic resize adapts to object density
@@ -197,6 +205,7 @@ The spatial hash divides the game world into a grid of cells (96px × 96px). Eac
 Based on `SpatialHash.js` lines 89-155:
 
 **Steps:**
+
 1. Check if object already exists (if so, call update)
 2. Calculate bounds: `{minX: x-radius, minY: y-radius, maxX: x+radius, maxY: y+radius}`
 3. Determine cells that intersect bounds
@@ -268,6 +277,7 @@ func get_cells_for_bounds(bounds: Dictionary) -> Array:
 Based on `SpatialHash.js` lines 157-192:
 
 **Steps:**
+
 1. Retrieve object metadata
 2. Remove from all cells
 3. Mark cells as dirty
@@ -309,6 +319,7 @@ func remove(object: Variant) -> bool:
 Based on `SpatialHash.js` lines 194-270:
 
 **Steps:**
+
 1. Retrieve current metadata
 2. Calculate new bounds and cells
 3. Determine cells to remove from and add to
@@ -369,6 +380,7 @@ func update(object: Variant, x: float, y: float, radius: float) -> bool:
 Based on `SpatialHash.js` lines 272-389:
 
 **Steps:**
+
 1. Calculate bounds for query radius
 2. Determine cells that intersect bounds
 3. For each cell:
@@ -452,6 +464,7 @@ func bounds_intersect(bounds_a: Dictionary, bounds_b: Dictionary) -> bool:
 Based on `SpatialHash.js` lines 445-500:
 
 **Steps:**
+
 1. Calculate average objects per cell
 2. If avg > maxObjects × 1.5: reduce cell size (× 0.8, min: baseCellSize × 0.5)
 3. If avg < maxObjects × 0.3 and activeCells > 20: increase cell size (× 1.25, max: baseCellSize × 2)
@@ -541,6 +554,7 @@ func cleanup() -> void:
 Based on `PhysicsSystem.js` lines 1409-1416:
 
 **Algorithm:**
+
 - Avoids expensive `sqrt()` by comparing squared distances
 - Early exit if no collision
 
@@ -564,6 +578,7 @@ func check_circle_collision(
 Based on `PhysicsSystem.js` lines 1323-1403:
 
 **Algorithm:**
+
 1. For each bullet (if not already hit):
    - Query spatial hash with radius = bulletRadius + maxEnemyRadius
    - Filter: only active, non-destroyed enemies
@@ -627,6 +642,7 @@ func for_each_bullet_collision(bullets: Array, handler: Callable) -> void:
 Based on `PhysicsSystem.js` lines 1453-1699:
 
 **Algorithm:**
+
 1. Validate player position (finite check)
 2. Build collision context (shield state, radii, impact profile)
 3. Calculate collision distance
@@ -830,27 +846,27 @@ func for_each_nearby_enemy(
 
 ### 5.1. Layer Definitions
 
-| Layer | Name | Objects | Collision Mask |
-|-------|------|---------|----------------|
-| 1 | Player | Player ship | Layers 2, 4, 5, 7 |
-| 2 | Enemies | Asteroids, Drones, Mines, Hunters, Boss | Layers 1, 2, 3, 6, 7 |
-| 3 | Bullets | Player bullets | Layer 2 |
-| 4 | Collectibles | XP orbs, Health hearts | Layer 1 |
-| 5 | EnemyBullets | Enemy projectiles | Layer 1 |
-| 6 | Shields | Player shield area | Layer 2 |
-| 7 | Explosions | Mine explosions, Volatile explosions | Layers 1, 2 |
+| Layer | Name         | Objects                                 | Collision Mask       |
+| ----- | ------------ | --------------------------------------- | -------------------- |
+| 1     | Player       | Player ship                             | Layers 2, 4, 5, 7    |
+| 2     | Enemies      | Asteroids, Drones, Mines, Hunters, Boss | Layers 1, 2, 3, 6, 7 |
+| 3     | Bullets      | Player bullets                          | Layer 2              |
+| 4     | Collectibles | XP orbs, Health hearts                  | Layer 1              |
+| 5     | EnemyBullets | Enemy projectiles                       | Layer 1              |
+| 6     | Shields      | Player shield area                      | Layer 2              |
+| 7     | Explosions   | Mine explosions, Volatile explosions    | Layers 1, 2          |
 
 ### 5.2. Collision Matrix
 
-|   | Player (1) | Enemies (2) | Bullets (3) | Collectibles (4) | EnemyBullets (5) | Shields (6) | Explosions (7) |
-|---|------------|-------------|-------------|------------------|------------------|-------------|----------------|
-| **Player (1)** | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ |
-| **Enemies (2)** | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ |
-| **Bullets (3)** | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Collectibles (4)** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **EnemyBullets (5)** | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Shields (6)** | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
-| **Explosions (7)** | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
+|                      | Player (1) | Enemies (2) | Bullets (3) | Collectibles (4) | EnemyBullets (5) | Shields (6) | Explosions (7) |
+| -------------------- | ---------- | ----------- | ----------- | ---------------- | ---------------- | ----------- | -------------- |
+| **Player (1)**       | ❌         | ✅          | ❌          | ✅               | ✅               | ❌          | ✅             |
+| **Enemies (2)**      | ✅         | ✅          | ✅          | ❌               | ❌               | ✅          | ✅             |
+| **Bullets (3)**      | ❌         | ✅          | ❌          | ❌               | ❌               | ❌          | ❌             |
+| **Collectibles (4)** | ✅         | ❌          | ❌          | ❌               | ❌               | ❌          | ❌             |
+| **EnemyBullets (5)** | ✅         | ❌          | ❌          | ❌               | ❌               | ❌          | ❌             |
+| **Shields (6)**      | ❌         | ✅          | ❌          | ❌               | ❌               | ❌          | ❌             |
+| **Explosions (7)**   | ✅         | ✅          | ❌          | ❌               | ❌               | ❌          | ❌             |
 
 ### 5.3. GDScript Configuration
 
@@ -900,6 +916,7 @@ func _ready() -> void:
 Based on `PhysicsSystem.js` lines 1562-1587:
 
 Bounce uses **impulse-based momentum conservation** with coefficient of restitution:
+
 - **Shield active:** e = 0.85 (elastic bounce)
 - **Hull collision:** e = 0.2 (inelastic bounce)
 
@@ -1020,6 +1037,7 @@ rigid_body.physics_material_override = material
 When an entity exits one side of the screen, it seamlessly teleports to the opposite side while preserving velocity and rotation.
 
 **Steps:**
+
 1. If `position.x < 0`: teleport to `x = GAME_WIDTH`
 2. If `position.x > GAME_WIDTH`: teleport to `x = 0`
 3. If `position.y < 0`: teleport to `y = GAME_HEIGHT` (in 3D: position.z)
@@ -1071,6 +1089,7 @@ func _physics_process(delta: float) -> void:
 ```
 
 Apply to all entities that should wrap:
+
 - Player ship
 - Enemies (asteroids, drones, mines)
 - Bullets (optional, usually destroyed at edge)
@@ -1119,6 +1138,7 @@ func play_wrap_effect() -> void:
 Based on `PhysicsSystem.js` lines 430-782:
 
 Boss enemies have special physics handling:
+
 - **Collision cooldowns** prevent event spam
 - **Spatial padding** (0) and **collision padding** (0) are configurable
 - **Screen shake** triggered on collision with intensity/duration based on attack type
@@ -1126,17 +1146,18 @@ Boss enemies have special physics handling:
 
 ### 8.2. Collision Cooldowns
 
-| Type | Cooldown | Trigger | Screen Shake |
-|------|----------|---------|-------------|
-| `boss-contact` | 120ms | Player touches boss | Light (intensity: 0.15, duration: 0.1s) |
-| `boss-charge` | 240ms | Boss dash attack | Medium (intensity: 0.25, duration: 0.15s) |
-| `boss-area` | 300ms | Boss shockwave | Heavy (intensity: 0.35, duration: 0.2s) |
+| Type           | Cooldown | Trigger             | Screen Shake                              |
+| -------------- | -------- | ------------------- | ----------------------------------------- |
+| `boss-contact` | 120ms    | Player touches boss | Light (intensity: 0.15, duration: 0.1s)   |
+| `boss-charge`  | 240ms    | Boss dash attack    | Medium (intensity: 0.25, duration: 0.15s) |
+| `boss-area`    | 300ms    | Boss shockwave      | Heavy (intensity: 0.35, duration: 0.2s)   |
 
 ### 8.3. Algorithm: shouldEmitBossCollision
 
 Based on `PhysicsSystem.js` lines 576-605:
 
 **Steps:**
+
 1. Get current timestamp
 2. Get cooldown for collision type
 3. Check if enough time has passed since last collision of this type
@@ -1330,13 +1351,15 @@ Mine explosions can damage multiple entities but should only damage each entity 
 
 ```javascript
 // PhysicsSystem.js
-this._handledMineExplosions = new WeakSet();  // explosion objects
-this._handledMineExplosionIds = new Set();    // explosion IDs
+this._handledMineExplosions = new WeakSet(); // explosion objects
+this._handledMineExplosionIds = new Set(); // explosion IDs
 
 // Check if already processed
-if (this._handledMineExplosions.has(explosion) ||
-    this._handledMineExplosionIds.has(explosion.id)) {
-  return;  // Skip duplicate
+if (
+  this._handledMineExplosions.has(explosion) ||
+  this._handledMineExplosionIds.has(explosion.id)
+) {
+  return; // Skip duplicate
 }
 
 // Mark as processed
@@ -1566,6 +1589,7 @@ func take_damage(amount: int) -> int:
 ### 11.1. Scene Hierarchy
 
 **PhysicsSystem.tscn:**
+
 ```
 PhysicsSystem (Node3D)
 └─ (script: PhysicsSystem.gd)
@@ -1730,53 +1754,53 @@ func _ready() -> void:
 
 ### 12.1. Complete Parameter Table
 
-| Parameter | Default Value | Description | Source File |
-|-----------|---------------|-------------|-------------|
-| **Spatial Hash** |
-| `PHYSICS_CELL_SIZE` | 96 | Grid cell size (px) | `GameConstants.js` |
-| `MAX_OBJECTS_PER_CELL` | 8 | Objects per cell before resize | `PhysicsSystem.js:55` |
-| `MAX_SUBDIVISION_DEPTH` | 4 | Max subdivision depth | `PhysicsSystem.js:56` |
-| `DYNAMIC_RESIZE_ENABLED` | true | Auto-adjust cell size | `PhysicsSystem.js:57` |
-| `RESIZE_CHECK_INTERVAL` | 2000 | Resize check interval (ms) | `SpatialHash.js:59` |
-| **Collision** |
-| `BULLET_SIZE` | 4 | Bullet radius (px) | `GameConstants.js` |
-| `SHIP_SIZE` | 24 | Ship radius (px) | `GameConstants.js` |
-| `ASTEROID_SIZES.large` | 48 | Large asteroid radius (px) | `GameConstants.js` |
-| `ASTEROID_SIZES.medium` | 32 | Medium asteroid radius (px) | `GameConstants.js` |
-| `ASTEROID_SIZES.small` | 16 | Small asteroid radius (px) | `GameConstants.js` |
-| **Bounce Physics** |
-| `SHIELD_COLLISION_BOUNCE` | 0.85 | Shield bounce coefficient | `gameplay.js:53` |
-| `HULL_COLLISION_BOUNCE` | 0.2 | Hull bounce coefficient | `PhysicsSystem.js:1572` |
-| `SHIELD_REFLECT_SPEED` | 95 | Reflect velocity boost (px/s) | `gameplay.js:54` |
-| `SHIELD_HIT_GRACE_TIME` | 0.28 | Grace time between hits (s) | `gameplay.js:52` |
-| **Damage** |
-| `BASE_COLLISION_DAMAGE` | 12 | Base collision damage | `PhysicsSystem.js:1635` |
-| `MOMENTUM_DIVISOR` | 120 | Momentum factor divisor | `PhysicsSystem.js:1636` |
-| `MIN_COLLISION_DAMAGE` | 3 | Minimum damage | `PhysicsSystem.js:1638` |
-| `INVULNERABILITY_DURATION` | 0.5 | Invulnerability after hit (s) | `PhysicsSystem.js:1698` |
-| **Boss Physics** |
-| `BOSS_CONTACT_COOLDOWN` | 120 | Contact cooldown (ms) | `PhysicsSystem.js:576` |
-| `BOSS_CHARGE_COOLDOWN` | 240 | Charge cooldown (ms) | `PhysicsSystem.js:569` |
-| `BOSS_AREA_COOLDOWN` | 300 | Area cooldown (ms) | `PhysicsSystem.js:573` |
-| `BOSS_SPATIAL_PADDING` | 0 | Spatial query padding (px) | `visual.js` |
-| `BOSS_COLLISION_PADDING` | 0 | Collision padding (px) | `visual.js` |
-| `BOSS_AREA_RADIUS_MULTIPLIER` | 2.2 | Area attack radius multiplier | `visual.js` |
-| `BOSS_CHARGE_KNOCKBACK` | 150 | Charge knockback force | `visual.js` |
-| `BOSS_CHARGE_BOSS_SLOW` | 0.6 | Boss speed after charge | `visual.js` |
-| `BOSS_CHARGE_DAMAGE_BONUS` | 10 | Charge damage bonus | `visual.js` |
-| `BOSS_AREA_DAMAGE` | 20 | Area attack damage | `visual.js` |
-| `BOSS_AREA_FORCE` | 200 | Area attack force | `visual.js` |
-| **Ship Physics** |
-| `SHIP_MASS` | 60 | Ship mass (kg) | `physics.js:9` |
-| `SHIP_ACCELERATION` | 280 | Acceleration (px/s²) | `physics.js:4` |
-| `SHIP_MAX_SPEED` | 220 | Max speed (px/s) | `physics.js:5` |
-| `SHIP_LINEAR_DAMPING` | 3.1 | Linear damping (s⁻¹) | `physics.js:6` |
-| `SHIP_ROTATION_SPEED` | 8 | Rotation speed (rad/s) | `physics.js:7` |
-| `SHIP_ANGULAR_DAMPING` | 6.2 | Angular damping (s⁻¹) | `physics.js:8` |
-| **Asteroid Physics** |
-| `ASTEROID_SPEED.large` | 25 | Large asteroid speed (px/s) | `physics.js:13` |
-| `ASTEROID_SPEED.medium` | 45 | Medium asteroid speed (px/s) | `physics.js:14` |
-| `ASTEROID_SPEED.small` | 70 | Small asteroid speed (px/s) | `physics.js:15` |
+| Parameter                     | Default Value | Description                    | Source File             |
+| ----------------------------- | ------------- | ------------------------------ | ----------------------- |
+| **Spatial Hash**              |
+| `PHYSICS_CELL_SIZE`           | 96            | Grid cell size (px)            | `GameConstants.js`      |
+| `MAX_OBJECTS_PER_CELL`        | 8             | Objects per cell before resize | `PhysicsSystem.js:55`   |
+| `MAX_SUBDIVISION_DEPTH`       | 4             | Max subdivision depth          | `PhysicsSystem.js:56`   |
+| `DYNAMIC_RESIZE_ENABLED`      | true          | Auto-adjust cell size          | `PhysicsSystem.js:57`   |
+| `RESIZE_CHECK_INTERVAL`       | 2000          | Resize check interval (ms)     | `SpatialHash.js:59`     |
+| **Collision**                 |
+| `BULLET_SIZE`                 | 4             | Bullet radius (px)             | `GameConstants.js`      |
+| `SHIP_SIZE`                   | 24            | Ship radius (px)               | `GameConstants.js`      |
+| `ASTEROID_SIZES.large`        | 48            | Large asteroid radius (px)     | `GameConstants.js`      |
+| `ASTEROID_SIZES.medium`       | 32            | Medium asteroid radius (px)    | `GameConstants.js`      |
+| `ASTEROID_SIZES.small`        | 16            | Small asteroid radius (px)     | `GameConstants.js`      |
+| **Bounce Physics**            |
+| `SHIELD_COLLISION_BOUNCE`     | 0.85          | Shield bounce coefficient      | `gameplay.js:53`        |
+| `HULL_COLLISION_BOUNCE`       | 0.2           | Hull bounce coefficient        | `PhysicsSystem.js:1572` |
+| `SHIELD_REFLECT_SPEED`        | 95            | Reflect velocity boost (px/s)  | `gameplay.js:54`        |
+| `SHIELD_HIT_GRACE_TIME`       | 0.28          | Grace time between hits (s)    | `gameplay.js:52`        |
+| **Damage**                    |
+| `BASE_COLLISION_DAMAGE`       | 12            | Base collision damage          | `PhysicsSystem.js:1635` |
+| `MOMENTUM_DIVISOR`            | 120           | Momentum factor divisor        | `PhysicsSystem.js:1636` |
+| `MIN_COLLISION_DAMAGE`        | 3             | Minimum damage                 | `PhysicsSystem.js:1638` |
+| `INVULNERABILITY_DURATION`    | 0.5           | Invulnerability after hit (s)  | `PhysicsSystem.js:1698` |
+| **Boss Physics**              |
+| `BOSS_CONTACT_COOLDOWN`       | 120           | Contact cooldown (ms)          | `PhysicsSystem.js:576`  |
+| `BOSS_CHARGE_COOLDOWN`        | 240           | Charge cooldown (ms)           | `PhysicsSystem.js:569`  |
+| `BOSS_AREA_COOLDOWN`          | 300           | Area cooldown (ms)             | `PhysicsSystem.js:573`  |
+| `BOSS_SPATIAL_PADDING`        | 0             | Spatial query padding (px)     | `visual.js`             |
+| `BOSS_COLLISION_PADDING`      | 0             | Collision padding (px)         | `visual.js`             |
+| `BOSS_AREA_RADIUS_MULTIPLIER` | 2.2           | Area attack radius multiplier  | `visual.js`             |
+| `BOSS_CHARGE_KNOCKBACK`       | 150           | Charge knockback force         | `visual.js`             |
+| `BOSS_CHARGE_BOSS_SLOW`       | 0.6           | Boss speed after charge        | `visual.js`             |
+| `BOSS_CHARGE_DAMAGE_BONUS`    | 10            | Charge damage bonus            | `visual.js`             |
+| `BOSS_AREA_DAMAGE`            | 20            | Area attack damage             | `visual.js`             |
+| `BOSS_AREA_FORCE`             | 200           | Area attack force              | `visual.js`             |
+| **Ship Physics**              |
+| `SHIP_MASS`                   | 60            | Ship mass (kg)                 | `physics.js:9`          |
+| `SHIP_ACCELERATION`           | 280           | Acceleration (px/s²)           | `physics.js:4`          |
+| `SHIP_MAX_SPEED`              | 220           | Max speed (px/s)               | `physics.js:5`          |
+| `SHIP_LINEAR_DAMPING`         | 3.1           | Linear damping (s⁻¹)           | `physics.js:6`          |
+| `SHIP_ROTATION_SPEED`         | 8             | Rotation speed (rad/s)         | `physics.js:7`          |
+| `SHIP_ANGULAR_DAMPING`        | 6.2           | Angular damping (s⁻¹)          | `physics.js:8`          |
+| **Asteroid Physics**          |
+| `ASTEROID_SPEED.large`        | 25            | Large asteroid speed (px/s)    | `physics.js:13`         |
+| `ASTEROID_SPEED.medium`       | 45            | Medium asteroid speed (px/s)   | `physics.js:14`         |
+| `ASTEROID_SPEED.small`        | 70            | Small asteroid speed (px/s)    | `physics.js:15`         |
 
 ### 12.2. GDScript Constants File
 
@@ -1872,6 +1896,7 @@ Applied impulse:
 ```
 
 **Derivation:**
+
 ```
 Conservation of momentum: m₁v₁' + m₂v₂' = m₁v₁ + m₂v₂
 Coefficient of restitution: e = -(v₁' - v₂') / (v₁ - v₂)
@@ -1909,6 +1934,7 @@ where:
 ```
 
 **Example:**
+
 ```
 Enemy: mass = 100, velocity = (50, 0)
 Player: mass = 60, velocity = (100, 0)
@@ -1925,6 +1951,7 @@ cellKey = "%d,%d" % [floor(x / cellSize), floor(y / cellSize)]
 ```
 
 **Example:**
+
 ```
 cellSize = 96
 position = (150, 250)
@@ -1950,6 +1977,7 @@ cells = {(floor(minX/cellSize), floor(minY/cellSize)),
 ```
 
 **Example:**
+
 ```
 cellSize = 96
 object = {x: 150, y: 120, radius: 80}
@@ -2177,6 +2205,7 @@ func get_performance_stats() -> Dictionary:
 ### 15.2. Optimization Tips
 
 **1. Adjust Cell Size Based on Object Density:**
+
 ```gdscript
 # If most objects are small (radius ~20px):
 cell_size = 64  # Smaller cells = fewer objects per cell
@@ -2186,6 +2215,7 @@ cell_size = 128  # Larger cells = fewer cell checks
 ```
 
 **2. Limit Query Radius:**
+
 ```gdscript
 # Bad: Query entire screen
 var enemies = spatial_hash.query(x, y, 1000, {})  # Checks hundreds of cells
@@ -2196,6 +2226,7 @@ var enemies = spatial_hash.query(x, y, max_radius, {})  # Checks ~9 cells
 ```
 
 **3. Use Filters to Reduce Candidates:**
+
 ```gdscript
 # Bad: Check all objects, filter later
 var all = spatial_hash.query(x, y, radius, {})
@@ -2208,6 +2239,7 @@ var valid = spatial_hash.query(x, y, radius, {
 ```
 
 **4. Disable Sorting When Not Needed:**
+
 ```gdscript
 # Bad: Sort when order doesn't matter
 var enemies = spatial_hash.query(x, y, radius, {"sorted": true})
@@ -2217,6 +2249,7 @@ var enemies = spatial_hash.query(x, y, radius, {"sorted": false})
 ```
 
 **5. Use maxResults to Limit Processing:**
+
 ```gdscript
 # Only need closest 5 enemies
 var nearest = spatial_hash.query(x, y, radius, {
@@ -2251,11 +2284,13 @@ func _physics_process(delta: float) -> void:
 ```
 
 **Expected Performance (60 FPS):**
+
 - **100 enemies:** ~0.5ms per frame
 - **500 enemies:** ~2ms per frame
 - **1000 enemies:** ~5ms per frame
 
 If exceeding 16.67ms (60 FPS budget), consider:
+
 - Increase cell size (reduce cell checks)
 - Disable dynamic resize (static cell size)
 - Use Godot built-in physics (see section 17)
@@ -2403,6 +2438,7 @@ func _on_screen_shake(data: Dictionary) -> void:
 ### 17.1. Custom Spatial Hash (JavaScript Approach)
 
 **Pros:**
+
 - ✅ Full control over collision detection logic
 - ✅ Deterministic (same seed = same collisions, important for replay)
 - ✅ Optimized for top-down 2D projected into 3D
@@ -2411,12 +2447,14 @@ func _on_screen_shake(data: Dictionary) -> void:
 - ✅ Lightweight (minimal memory footprint)
 
 **Cons:**
+
 - ❌ More code to maintain (spatial hash, collision detection, queries)
 - ❌ Doesn't leverage Godot built-in optimizations (BVH tree, broad phase)
 - ❌ Requires manual implementation of dynamic resize, cleanup, etc.
 - ❌ No built-in support for complex shapes (only circles)
 
 **When to Use:**
+
 - Exact JavaScript behavior replication
 - Replay system (determinism critical)
 - Simple collision shapes (circles)
@@ -2425,6 +2463,7 @@ func _on_screen_shake(data: Dictionary) -> void:
 ### 17.2. Godot Built-in Physics Queries
 
 **Pros:**
+
 - ✅ Less code (use `PhysicsDirectSpaceState3D.intersect_shape()`)
 - ✅ Optimized by engine (BVH tree, broad/narrow phase separation)
 - ✅ Collision layers/masks built-in
@@ -2433,12 +2472,14 @@ func _on_screen_shake(data: Dictionary) -> void:
 - ✅ Easier to debug with built-in tools
 
 **Cons:**
+
 - ❌ Less control over determinism (floating point, engine internals)
 - ❌ Overhead from full 3D physics engine (may be unnecessary)
 - ❌ Harder to replicate exact JavaScript behavior
 - ❌ Collision queries may be slower for simple circle-circle checks
 
 **When to Use:**
+
 - Prototyping (faster to implement)
 - Complex collision shapes needed
 - Don't need exact JavaScript parity
@@ -2498,20 +2539,21 @@ func for_each_bullet_collision_hybrid(bullets: Array, handler: Callable) -> void
 ```
 
 **Benefits:**
+
 - Godot handles broad phase (efficient BVH tree)
 - Custom code handles narrow phase (exact behavior, determinism)
 - Best of both worlds
 
 ### 17.5. Recommendation
 
-| Use Case | Recommendation |
-|----------|----------------|
-| **Exact JavaScript parity** | Custom spatial hash |
-| **Replay system (determinism)** | Custom spatial hash |
-| **Rapid prototyping** | Godot built-in |
-| **Complex collision shapes** | Godot built-in |
-| **Performance critical (1000+ objects)** | Hybrid approach |
-| **Simple 2D physics** | Custom spatial hash |
+| Use Case                                 | Recommendation      |
+| ---------------------------------------- | ------------------- |
+| **Exact JavaScript parity**              | Custom spatial hash |
+| **Replay system (determinism)**          | Custom spatial hash |
+| **Rapid prototyping**                    | Godot built-in      |
+| **Complex collision shapes**             | Godot built-in      |
+| **Performance critical (1000+ objects)** | Hybrid approach     |
+| **Simple 2D physics**                    | Custom spatial hash |
 
 **For this migration:** Start with **custom spatial hash** to match JavaScript behavior, then benchmark and consider hybrid approach if needed.
 
@@ -2522,6 +2564,7 @@ func for_each_bullet_collision_hybrid(bullets: Array, handler: Callable) -> void
 ### 18.1. JavaScript Files Analyzed
 
 **PhysicsSystem.js** (2103 lines total):
+
 - Lines 31-84: Constructor (spatial hash, state, performance metrics)
 - Lines 151-209: Event listeners (enemy-spawned, enemy-destroyed, boss-defeated)
 - Lines 300-357: `registerEnemy()`, `unregisterEnemy()`
@@ -2534,6 +2577,7 @@ func for_each_bullet_collision_hybrid(bullets: Array, handler: Callable) -> void
 - Lines 1701-1752: Mine explosion tracking (WeakSet, duplicate prevention)
 
 **SpatialHash.js** (597 lines total):
+
 - Lines 35-78: Constructor (grid, objects, config, stats)
 - Lines 89-155: `insert()` (bounds, cells, grid update)
 - Lines 157-192: `remove()` (cleanup, dirty cells)
@@ -2544,45 +2588,43 @@ func for_each_bullet_collision_hybrid(bullets: Array, handler: Callable) -> void
 - Lines 507-530: `getStats()` (performance metrics)
 
 **physics.js** (33 lines total):
+
 - Lines 4-9: Ship constants (acceleration: 280, max speed: 220, mass: 60, dampings)
 - Lines 13-15: Asteroid speeds (large: 25, medium: 45, small: 70)
 - Lines 18-33: Crack thresholds and graph rules
 
 **gameplay.js** (relevant constants):
+
 - Line 52: `SHIELD_HIT_GRACE_TIME = 0.28`
 - Line 53: `SHIELD_COLLISION_BOUNCE = 0.85`
 - Line 54: `SHIELD_REFLECT_SPEED = 95`
 
 **visual.js** (boss physics config):
+
 - BOSS_PHYSICS_CONFIG object: spatial padding (0), collision padding (0), cooldowns (120/240/300ms), knockback, damage, shake configs
 
 **PlayerSystem.js**:
+
 - Lines 797-807: Screen wrapping implementation (NOT in PhysicsSystem!)
 
 ### 18.2. Key Functions to Implement
 
 **Priority 1 (Core):**
+
 1. `SpatialHash.insert()` - Add objects to grid
 2. `SpatialHash.query()` - Find nearby objects
 3. `PhysicsSystem.checkCircleCollision()` - Circle-circle test
 4. `PhysicsSystem.forEachBulletCollision()` - Bullet vs enemies
 5. `PhysicsSystem.handlePlayerEnemyCollision()` - Player collision logic
 
-**Priority 2 (Polish):**
-6. `SpatialHash.update()` - Update object positions
-7. `SpatialHash.remove()` - Clean up destroyed objects
-8. `PhysicsSystem.shouldEmitBossCollision()` - Cooldown checks
-9. `Player.updateScreenWrapping()` - Edge teleport
-10. `PhysicsSystem.hasMineExplosion()` - Duplicate prevention
+**Priority 2 (Polish):** 6. `SpatialHash.update()` - Update object positions 7. `SpatialHash.remove()` - Clean up destroyed objects 8. `PhysicsSystem.shouldEmitBossCollision()` - Cooldown checks 9. `Player.updateScreenWrapping()` - Edge teleport 10. `PhysicsSystem.hasMineExplosion()` - Duplicate prevention
 
-**Priority 3 (Optimization):**
-11. `SpatialHash.checkDynamicResize()` - Density-based resizing
-12. `SpatialHash.cleanup()` - Remove empty cells
-13. `PhysicsSystem.getPerformanceMetrics()` - Profiling
+**Priority 3 (Optimization):** 11. `SpatialHash.checkDynamicResize()` - Density-based resizing 12. `SpatialHash.cleanup()` - Remove empty cells 13. `PhysicsSystem.getPerformanceMetrics()` - Profiling
 
 ### 18.3. Events to Implement
 
 **EventBus signals:**
+
 ```gdscript
 # EventBus.gd
 signal enemy_spawned(enemy: Enemy)
@@ -2607,6 +2649,7 @@ This document provides a complete blueprint for implementing the physics system 
 6. **Damage:** Base 12 + momentum factor, shield absorption, invulnerability
 
 **Next Steps:**
+
 1. Implement `SpatialHash` class (insert, query, update, remove)
 2. Implement `PhysicsSystem` class (collision detection, bounce, damage)
 3. Configure collision layers/masks in Godot
@@ -2615,6 +2658,7 @@ This document provides a complete blueprint for implementing the physics system 
 6. Consider hybrid approach if needed (Godot broad phase + custom narrow phase)
 
 **Important Reminders:**
+
 - Cell size is **96px**, not 100px
 - Bounce coefficient is **0.85** (shield), not 0.6
 - Screen wrapping is in **PlayerSystem**, not PhysicsSystem

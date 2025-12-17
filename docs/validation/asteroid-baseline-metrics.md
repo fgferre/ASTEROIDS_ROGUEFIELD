@@ -11,14 +11,14 @@ fixa `123456`.
 ## Wave Spawn Rate (Waves 1-10)
 
 | Wave | Total Asteroids | Fórmula                                |
-|------|-----------------|-----------------------------------------|
-| 1    | 4               | 4 × 1.3^0 = 4                           |
-| 2    | 5               | 4 × 1.3^1 = 5.20 → floor = 5            |
-| 3    | 6               | 4 × 1.3^2 = 6.76 → floor = 6            |
-| 4    | 8               | 4 × 1.3^3 = 8.79 → floor = 8            |
-| 5    | 11              | 4 × 1.3^4 = 11.43 → floor = 11          |
-| 6    | 14              | 4 × 1.3^5 = 14.85 → floor = 14          |
-| 7    | 19              | 4 × 1.3^6 = 19.31 → floor = 19          |
+| ---- | --------------- | -------------------------------------- |
+| 1    | 4               | 4 × 1.3^0 = 4                          |
+| 2    | 5               | 4 × 1.3^1 = 5.20 → floor = 5           |
+| 3    | 6               | 4 × 1.3^2 = 6.76 → floor = 6           |
+| 4    | 8               | 4 × 1.3^3 = 8.79 → floor = 8           |
+| 5    | 11              | 4 × 1.3^4 = 11.43 → floor = 11         |
+| 6    | 14              | 4 × 1.3^5 = 14.85 → floor = 14         |
+| 7    | 19              | 4 × 1.3^6 = 19.31 → floor = 19         |
 | 8    | 25              | 4 × 1.3^7 = 25.10 → floor = 25 → clamp |
 | 9    | 25              | 4 × 1.3^8 = 32.63 → floor = 32 → clamp |
 | 10   | 25              | 4 × 1.3^9 = 42.41 → floor = 42 → clamp |
@@ -37,11 +37,11 @@ fixa `123456`.
 
 ### Wave 1 (baseline, Parasite bloqueado)
 
-| Size  | Special Chance | Common | Iron  | Dense Core | Volatile | Gold  | Crystal |
-|-------|----------------|--------|-------|------------|----------|-------|---------|
-| Large | 35%            | 65.00% | 11.25%| 12.50%     | 9.17%    | 0%    | 2.08%   |
-| Medium| 25%            | 75.00% | 8.82% | 5.88%      | 7.35%    | 0.59% | 2.35%   |
-| Small | 15%            | 85.00% | 6.56% | –          | 5.62%    | 0.38% | 2.44%   |
+| Size   | Special Chance | Common | Iron   | Dense Core | Volatile | Gold  | Crystal |
+| ------ | -------------- | ------ | ------ | ---------- | -------- | ----- | ------- |
+| Large  | 35%            | 65.00% | 11.25% | 12.50%     | 9.17%    | 0%    | 2.08%   |
+| Medium | 25%            | 75.00% | 8.82%  | 5.88%      | 7.35%    | 0.59% | 2.35%   |
+| Small  | 15%            | 85.00% | 6.56%  | –          | 5.62%    | 0.38% | 2.44%   |
 
 ### Wave Scaling
 
@@ -53,21 +53,21 @@ fixa `123456`.
 
 ### Wave 4 (Parasite habilitado, +0.025 de bônus)
 
-| Size  | Special Chance | Common | Iron  | Dense Core | Volatile | Parasite | Gold  | Crystal |
-|-------|----------------|--------|-------|------------|----------|----------|-------|---------|
-| Large | 37.5%          | 62.50% | 10.13%| 11.25%     | 8.25%    | 6.00%    | 0%    | 1.88%   |
-| Medium| 27.5%          | 72.50% | 8.25% | 5.50%      | 6.88%    | 4.13%    | 0.55% | 2.20%   |
-| Small | 17.5%          | 82.50% | 6.13% | –          | 5.25%    | 3.50%    | 0.35% | 2.28%   |
+| Size   | Special Chance | Common | Iron   | Dense Core | Volatile | Parasite | Gold  | Crystal |
+| ------ | -------------- | ------ | ------ | ---------- | -------- | -------- | ----- | ------- |
+| Large  | 37.5%          | 62.50% | 10.13% | 11.25%     | 8.25%    | 6.00%    | 0%    | 1.88%   |
+| Medium | 27.5%          | 72.50% | 8.25%  | 5.50%      | 6.88%    | 4.13%    | 0.55% | 2.20%   |
+| Small  | 17.5%          | 82.50% | 6.13%  | –          | 5.25%    | 3.50%    | 0.35% | 2.28%   |
 
 ## Fragmentation Rules by Variant
 
-| Variant   | Large       | Medium      | Small |
-|-----------|-------------|-------------|-------|
-| default   | [3, 4]      | [2, 3]      | [0, 0]|
-| denseCore | [2, 3]      | [2, 2]      | [0, 0]|
-| volatile  | [3, 4]      | [3, 4]      | [0, 0]|
-| parasite  | [3, 4]      | [3, 3]      | [0, 0]|
-| crystal   | [4, 4]      | [3, 4]      | [0, 0]|
+| Variant   | Large  | Medium | Small  |
+| --------- | ------ | ------ | ------ |
+| default   | [3, 4] | [2, 3] | [0, 0] |
+| denseCore | [2, 3] | [2, 2] | [0, 0] |
+| volatile  | [3, 4] | [3, 4] | [0, 0] |
+| parasite  | [3, 4] | [3, 3] | [0, 0] |
+| crystal   | [4, 4] | [3, 4] | [0, 0] |
 
 - Velocidade herdada: `inheritVelocity` aplicado sobre `vx/vy` do asteroide pai
 - `radialDistanceRange` e `speedMultiplierBySize` definem o envelope das
@@ -126,6 +126,7 @@ Para preservar comportamento baseline durante migração:
 ### Comportamento Esperado
 
 **Com todas as flags ativadas:**
+
 - Taxa de spawn: idêntica ao baseline (4 × 1.3^(wave-1))
 - Distribuição de tamanhos: 50/30/20 (large/medium/small)
 - Variant decision: via `EnemySystem.decideVariant()` (preserva wave bonus, allowed sizes)
@@ -135,6 +136,7 @@ Para preservar comportamento baseline durante migração:
 - Random scopes: `spawn`, `variants`, `fragments` (determinismo preservado)
 
 **Divergências Intencionais (quando flags desativadas):**
+
 - Distribuição 30/40/30: otimizada para mix com drones/mines/hunters
 - Safe distance positioning: evita spawn muito próximo do player
 - Variant decision simplificada: `WaveManager.selectRandomVariant()` (não recomendado)
@@ -160,6 +162,7 @@ npm run test:baseline
 ### Próximos Passos
 
 Após validação completa:
+
 1. Manter flags ativadas por 1-2 semanas em produção
 2. Monitorar telemetria e feedback de usuários
 3. Considerar remoção de `handleSpawning()` legado

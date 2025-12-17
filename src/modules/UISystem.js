@@ -65,6 +65,7 @@ class UISystem extends BaseSystem {
     this.killsPulseTimeout = null;
     this.levelPulseTimeout = null;
     this.resizeRaf = null;
+    this._lastHoverTarget = null; // Track hover state for delegation
     this.currentHudBaseScale = 1;
     this.currentHudAutoScale = 1;
     this.currentCanvasScale = 1;
@@ -292,7 +293,8 @@ class UISystem extends BaseSystem {
 
   createInitialBossHudState() {
     const timestamp =
-      typeof performance !== 'undefined' && typeof performance.now === 'function'
+      typeof performance !== 'undefined' &&
+      typeof performance.now === 'function'
         ? performance.now()
         : Date.now();
 
@@ -366,8 +368,8 @@ class UISystem extends BaseSystem {
     const collection = Array.isArray(input)
       ? input
       : typeof input[Symbol.iterator] === 'function'
-      ? [...input]
-      : [];
+        ? [...input]
+        : [];
 
     return collection
       .map((value) => (typeof value === 'string' ? value.trim() : null))
@@ -375,7 +377,10 @@ class UISystem extends BaseSystem {
   }
 
   getHighResolutionTime() {
-    if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+    if (
+      typeof performance !== 'undefined' &&
+      typeof performance.now === 'function'
+    ) {
       return performance.now();
     }
 
@@ -393,7 +398,9 @@ class UISystem extends BaseSystem {
     const remainingSeconds = Math.max(0, Math.floor(clamped - minutes * 60));
 
     if (minutes <= 0) {
-      return includeSecondsSuffix ? `${remainingSeconds}s` : `${remainingSeconds.toString().padStart(2, '0')}s`;
+      return includeSecondsSuffix
+        ? `${remainingSeconds}s`
+        : `${remainingSeconds.toString().padStart(2, '0')}s`;
     }
 
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
@@ -441,7 +448,9 @@ class UISystem extends BaseSystem {
     const state = this.bossHudState || this.createInitialBossHudState();
     return {
       ...state,
-      phaseColors: Array.isArray(state.phaseColors) ? [...state.phaseColors] : [],
+      phaseColors: Array.isArray(state.phaseColors)
+        ? [...state.phaseColors]
+        : [],
       timers: {
         phase: { ...(state.timers?.phase || {}) },
         enrage: { ...(state.timers?.enrage || {}) },
@@ -494,7 +503,10 @@ class UISystem extends BaseSystem {
       }
 
       const totalValue =
-        timerPatch.total ?? timerPatch.duration ?? timerPatch.max ?? timerPatch.timeTotal;
+        timerPatch.total ??
+        timerPatch.duration ??
+        timerPatch.max ??
+        timerPatch.timeTotal;
       if (totalValue !== undefined) {
         if (Number.isFinite(totalValue)) {
           timer.total = Math.max(0, Number(totalValue));
@@ -504,7 +516,10 @@ class UISystem extends BaseSystem {
       }
 
       const remainingValue =
-        timerPatch.remaining ?? timerPatch.timeRemaining ?? timerPatch.seconds ?? timerPatch.value;
+        timerPatch.remaining ??
+        timerPatch.timeRemaining ??
+        timerPatch.seconds ??
+        timerPatch.value;
       if (remainingValue !== undefined) {
         if (Number.isFinite(remainingValue)) {
           const normalized = Math.max(0, Number(remainingValue));
@@ -550,7 +565,10 @@ class UISystem extends BaseSystem {
     if (Number.isFinite(patch.phase)) {
       const normalizedPhase = Math.max(0, Math.floor(Number(patch.phase)));
       if (next.phaseCount > 0) {
-        next.phase = Math.min(normalizedPhase, Math.max(0, next.phaseCount - 1));
+        next.phase = Math.min(
+          normalizedPhase,
+          Math.max(0, next.phaseCount - 1)
+        );
       } else {
         next.phase = normalizedPhase;
       }
@@ -590,7 +608,10 @@ class UISystem extends BaseSystem {
       next.invulnerable = Boolean(patch.invulnerable);
     }
 
-    if (patch.invulnerabilityTimer !== undefined || patch.invulnerabilityRemaining !== undefined) {
+    if (
+      patch.invulnerabilityTimer !== undefined ||
+      patch.invulnerabilityRemaining !== undefined
+    ) {
       const timerValue =
         patch.invulnerabilityTimer !== undefined
           ? patch.invulnerabilityTimer
@@ -791,7 +812,8 @@ class UISystem extends BaseSystem {
 
   hideBossHealthBar(force = false) {
     const entry = this.hudElements.get('boss');
-    const cached = this.cachedValues.boss || this.createInitialBossCachedValues();
+    const cached =
+      this.cachedValues.boss || this.createInitialBossCachedValues();
 
     if (!entry?.root) {
       this.cachedValues.boss = this.createInitialBossCachedValues();
@@ -877,10 +899,15 @@ class UISystem extends BaseSystem {
 
     const cached = this.cachedValues.boss;
     const force = Boolean(options.force);
-    const hasPayload = bossData && typeof bossData === 'object' && Object.keys(bossData).length > 0;
+    const hasPayload =
+      bossData &&
+      typeof bossData === 'object' &&
+      Object.keys(bossData).length > 0;
     const state = hasPayload ? bossData : this.getBossHudState();
 
-    const shouldDisplay = Boolean(state.active || state.upcoming || state.defeated);
+    const shouldDisplay = Boolean(
+      state.active || state.upcoming || state.defeated
+    );
     if (!shouldDisplay) {
       this.hideBossHealthBar(force);
       return;
@@ -888,13 +915,19 @@ class UISystem extends BaseSystem {
 
     this.showBossHealthBar();
 
-    const phaseColors = Array.isArray(state.phaseColors) ? state.phaseColors : [];
+    const phaseColors = Array.isArray(state.phaseColors)
+      ? state.phaseColors
+      : [];
 
-    const waveNumber = Number.isFinite(state.wave) ? Math.max(1, Math.floor(state.wave)) : null;
+    const waveNumber = Number.isFinite(state.wave)
+      ? Math.max(1, Math.floor(state.wave))
+      : null;
     const phaseCount = Number.isFinite(state.phaseCount)
       ? Math.max(0, Math.floor(state.phaseCount))
       : 0;
-    const phaseIndex = Number.isFinite(state.phase) ? Math.max(0, Math.floor(state.phase)) : null;
+    const phaseIndex = Number.isFinite(state.phase)
+      ? Math.max(0, Math.floor(state.phase))
+      : null;
     const normalizedPhaseIndex = phaseIndex !== null ? phaseIndex : null;
 
     let color = null;
@@ -924,11 +957,15 @@ class UISystem extends BaseSystem {
         } else if (trimmedColor.startsWith('rgba')) {
           softColor = trimmedColor.replace(/\)$/u, ', 0.35)');
         } else if (trimmedColor.startsWith('rgb')) {
-          softColor = trimmedColor.replace('rgb', 'rgba').replace(/\)$/u, ', 0.35)');
+          softColor = trimmedColor
+            .replace('rgb', 'rgba')
+            .replace(/\)$/u, ', 0.35)');
         } else if (trimmedColor.startsWith('hsla')) {
           softColor = trimmedColor.replace(/\)$/u, ', 0.35)');
         } else if (trimmedColor.startsWith('hsl')) {
-          softColor = trimmedColor.replace('hsl', 'hsla').replace(/\)$/u, ', 0.35)');
+          softColor = trimmedColor
+            .replace('hsl', 'hsla')
+            .replace(/\)$/u, ', 0.35)');
         }
       }
 
@@ -937,7 +974,9 @@ class UISystem extends BaseSystem {
     }
 
     const isActive = Boolean(state.active && !state.defeated);
-    const isUpcoming = Boolean(state.upcoming && !state.active && !state.defeated);
+    const isUpcoming = Boolean(
+      state.upcoming && !state.active && !state.defeated
+    );
     const isDefeated = Boolean(state.defeated);
     const isInvulnerable = Boolean(state.invulnerable);
     const invulnerabilityTimer = Number.isFinite(state.invulnerabilityTimer)
@@ -947,7 +986,10 @@ class UISystem extends BaseSystem {
     entry.root.classList.toggle('is-active', isActive);
     entry.root.classList.toggle('is-upcoming', isUpcoming);
     entry.root.classList.toggle('is-defeated', isDefeated);
-    entry.root.classList.toggle('boss-has-phase-colors', phaseColors.length > 0);
+    entry.root.classList.toggle(
+      'boss-has-phase-colors',
+      phaseColors.length > 0
+    );
     entry.root.classList.toggle('is-invulnerable', isInvulnerable);
     if (entry.barFill) {
       entry.barFill.style.opacity = isInvulnerable ? '0.55' : '';
@@ -993,9 +1035,13 @@ class UISystem extends BaseSystem {
     if (isDefeated) {
       statusText = 'Defeated';
     } else if (isActive) {
-      statusText = waveNumber !== null ? `Wave ${waveNumber} • Engaged` : 'Engaged';
+      statusText =
+        waveNumber !== null ? `Wave ${waveNumber} • Engaged` : 'Engaged';
     } else if (isUpcoming) {
-      statusText = waveNumber !== null ? `Wave ${waveNumber} • Approaching` : 'Approaching';
+      statusText =
+        waveNumber !== null
+          ? `Wave ${waveNumber} • Approaching`
+          : 'Approaching';
     } else if (waveNumber !== null) {
       statusText = `Wave ${waveNumber}`;
     }
@@ -1006,7 +1052,14 @@ class UISystem extends BaseSystem {
         ? Math.max(
             0,
             invulnerabilityTimer -
-              Math.max(0, (now - (Number.isFinite(state.lastUpdate) ? state.lastUpdate : now)) / 1000)
+              Math.max(
+                0,
+                (now -
+                  (Number.isFinite(state.lastUpdate)
+                    ? state.lastUpdate
+                    : now)) /
+                  1000
+              )
           )
         : null;
       const formattedLockTimer = Number.isFinite(effectiveSeconds)
@@ -1015,28 +1068,40 @@ class UISystem extends BaseSystem {
       invulnerabilityLabel = formattedLockTimer
         ? `🔒 Invulnerable (${formattedLockTimer})`
         : '🔒 Invulnerable';
-      statusText = statusText ? `${statusText} • ${invulnerabilityLabel}` : invulnerabilityLabel;
+      statusText = statusText
+        ? `${statusText} • ${invulnerabilityLabel}`
+        : invulnerabilityLabel;
     }
 
     if (
       entry.status &&
-      (force || cached.status !== statusText || cached.invulnerable !== isInvulnerable || cached.invulnerabilityLabel !== invulnerabilityLabel)
+      (force ||
+        cached.status !== statusText ||
+        cached.invulnerable !== isInvulnerable ||
+        cached.invulnerabilityLabel !== invulnerabilityLabel)
     ) {
       entry.status.textContent = statusText;
       cached.status = statusText;
     }
 
-    const health = Number.isFinite(state.health) ? Math.max(0, Math.floor(state.health)) : 0;
+    const health = Number.isFinite(state.health)
+      ? Math.max(0, Math.floor(state.health))
+      : 0;
     const maxHealth = Number.isFinite(state.maxHealth)
       ? Math.max(0, Math.floor(state.maxHealth))
       : 0;
-    const ratio = maxHealth > 0 ? Math.max(0, Math.min(1, health / maxHealth)) : 0;
+    const ratio =
+      maxHealth > 0 ? Math.max(0, Math.min(1, health / maxHealth)) : 0;
 
-    const healthText = maxHealth > 0
-      ? `${this.formatCount(health, { allowCompact: false })} / ${this.formatCount(maxHealth, {
-          allowCompact: false,
-        })}`
-      : this.formatCount(health, { allowCompact: false });
+    const healthText =
+      maxHealth > 0
+        ? `${this.formatCount(health, { allowCompact: false })} / ${this.formatCount(
+            maxHealth,
+            {
+              allowCompact: false,
+            }
+          )}`
+        : this.formatCount(health, { allowCompact: false });
 
     if (entry.health && (force || cached.healthText !== healthText)) {
       entry.health.textContent = healthText;
@@ -1049,9 +1114,10 @@ class UISystem extends BaseSystem {
 
     if (entry.bar) {
       entry.bar.setAttribute('aria-valuenow', `${Math.round(ratio * 100)}`);
-      const ariaText = maxHealth > 0
-        ? `Boss health ${health} of ${maxHealth}`
-        : `Boss health ${health}`;
+      const ariaText =
+        maxHealth > 0
+          ? `Boss health ${health} of ${maxHealth}`
+          : `Boss health ${health}`;
       if (force || cached.healthRatio !== ratio) {
         entry.bar.setAttribute('aria-valuetext', ariaText);
       }
@@ -1120,7 +1186,10 @@ class UISystem extends BaseSystem {
     if (entry.timers) {
       const timersVisible = Boolean(phaseTimerText || enrageTimerText);
       entry.timers.style.display = timersVisible ? '' : 'none';
-      entry.timers.setAttribute('aria-hidden', timersVisible ? 'false' : 'true');
+      entry.timers.setAttribute(
+        'aria-hidden',
+        timersVisible ? 'false' : 'true'
+      );
     }
 
     cached.phaseTimerSeconds = phaseSeconds;
@@ -1145,7 +1214,9 @@ class UISystem extends BaseSystem {
     }
 
     const bossName = state?.name || 'Boss';
-    const waveNumber = Number.isFinite(state?.wave) ? Math.max(1, Math.floor(state.wave)) : null;
+    const waveNumber = Number.isFinite(state?.wave)
+      ? Math.max(1, Math.floor(state.wave))
+      : null;
 
     let text = options?.text;
     if (!text) {
@@ -1212,7 +1283,9 @@ class UISystem extends BaseSystem {
 
   renderBossHud(force = false) {
     const state = this.getBossHudState();
-    const shouldDisplay = Boolean(state.active || state.upcoming || state.defeated);
+    const shouldDisplay = Boolean(
+      state.active || state.upcoming || state.defeated
+    );
 
     if (!shouldDisplay) {
       this.hideBossHealthBar(force);
@@ -1238,11 +1311,16 @@ class UISystem extends BaseSystem {
     const normalizedWaveNumber = hasWaveNumber
       ? Math.max(1, Math.floor(waveNumberCandidate))
       : null;
-    const cacheKey = hasWaveNumber ? waveNumberCandidate : `unknown:${sourceEvent}`;
+    const cacheKey = hasWaveNumber
+      ? waveNumberCandidate
+      : `unknown:${sourceEvent}`;
     const previousEntry = this._waveCompletionEventCache.get(cacheKey);
 
     if (previousEntry) {
-      if (previousEntry.source === canonicalEvent && sourceEvent !== canonicalEvent) {
+      if (
+        previousEntry.source === canonicalEvent &&
+        sourceEvent !== canonicalEvent
+      ) {
         return;
       }
 
@@ -1564,7 +1642,10 @@ class UISystem extends BaseSystem {
 
     if (pauseRefs.settingsBtn) {
       pauseRefs.settingsBtn.addEventListener('mouseenter', () => {
-        gameEvents.emit('ui-hover', { source: 'pause-menu', button: 'settings' });
+        gameEvents.emit('ui-hover', {
+          source: 'pause-menu',
+          button: 'settings',
+        });
       });
       pauseRefs.settingsBtn.addEventListener('click', () => {
         if (!this.currentPauseState) {
@@ -1596,16 +1677,26 @@ class UISystem extends BaseSystem {
     }
 
     if (settingsRefs.tabs) {
-      settingsRefs.tabs.addEventListener('mouseenter', (event) => {
-        // Only emit if settings menu is visible
-        if (settingsRefs.overlay && settingsRefs.overlay.classList.contains('hidden')) {
-          return;
-        }
-        const button = event.target.closest('[data-settings-category]');
-        if (button) {
-          gameEvents.emit('ui-hover', { source: 'settings-menu', element: 'tab' });
-        }
-      }, true); // Use capture phase for delegation
+      settingsRefs.tabs.addEventListener(
+        'mouseenter',
+        (event) => {
+          // Only emit if settings menu is visible
+          if (
+            settingsRefs.overlay &&
+            settingsRefs.overlay.classList.contains('hidden')
+          ) {
+            return;
+          }
+          const button = event.target.closest('[data-settings-category]');
+          if (button) {
+            gameEvents.emit('ui-hover', {
+              source: 'settings-menu',
+              element: 'tab',
+            });
+          }
+        },
+        true
+      ); // Use capture phase for delegation
       settingsRefs.tabs.addEventListener('click', (event) => {
         const button = event.target.closest('[data-settings-category]');
         if (!button) {
@@ -1630,10 +1721,16 @@ class UISystem extends BaseSystem {
     ensureArray(settingsRefs.closeButtons).forEach((button) => {
       button.addEventListener('mouseenter', () => {
         // Only emit if settings menu is visible
-        if (settingsRefs.overlay && settingsRefs.overlay.classList.contains('hidden')) {
+        if (
+          settingsRefs.overlay &&
+          settingsRefs.overlay.classList.contains('hidden')
+        ) {
           return;
         }
-        gameEvents.emit('ui-hover', { source: 'settings-menu', element: 'close' });
+        gameEvents.emit('ui-hover', {
+          source: 'settings-menu',
+          element: 'close',
+        });
       });
       button.addEventListener('click', (event) => {
         event.preventDefault();
@@ -1644,10 +1741,16 @@ class UISystem extends BaseSystem {
     if (settingsRefs.resetBtn) {
       settingsRefs.resetBtn.addEventListener('mouseenter', () => {
         // Only emit if settings menu is visible
-        if (settingsRefs.overlay && settingsRefs.overlay.classList.contains('hidden')) {
+        if (
+          settingsRefs.overlay &&
+          settingsRefs.overlay.classList.contains('hidden')
+        ) {
           return;
         }
-        gameEvents.emit('ui-hover', { source: 'settings-menu', element: 'reset' });
+        gameEvents.emit('ui-hover', {
+          source: 'settings-menu',
+          element: 'reset',
+        });
       });
       settingsRefs.resetBtn.addEventListener('click', (event) => {
         event.preventDefault();
@@ -1691,10 +1794,16 @@ class UISystem extends BaseSystem {
     ensureArray(creditsRefs.closeButtons).forEach((button) => {
       button.addEventListener('mouseenter', () => {
         // Only emit if credits menu is visible
-        if (creditsRefs.overlay && creditsRefs.overlay.classList.contains('hidden')) {
+        if (
+          creditsRefs.overlay &&
+          creditsRefs.overlay.classList.contains('hidden')
+        ) {
           return;
         }
-        gameEvents.emit('ui-hover', { source: 'credits-menu', element: 'close' });
+        gameEvents.emit('ui-hover', {
+          source: 'credits-menu',
+          element: 'close',
+        });
       });
       button.addEventListener('click', (event) => {
         event.preventDefault();
@@ -1704,23 +1813,50 @@ class UISystem extends BaseSystem {
   }
 
   bindMainMenuControls() {
-    // Bind main menu buttons (start-game-btn, restart-game-btn)
-    // These buttons exist in the HTML but are managed by GameSessionService
-    // We add hover sound feedback here
+    // Generic UI Hover Sound Delegation
+    // Listens for all menu buttons and interactive elements
     if (typeof document !== 'undefined') {
-      const startBtn = document.getElementById('start-game-btn');
-      if (startBtn) {
-        startBtn.addEventListener('mouseenter', () => {
-          gameEvents.emit('ui-hover', { source: 'main-menu', button: 'start' });
-        });
-      }
+      document.addEventListener(
+        'mouseover',
+        (event) => {
+          // Check for common button classes or interactive elements
+          const target = event.target.closest(
+            '.menu-screen__button, .btn, .settings-tab-button, [role="button"]'
+          );
 
-      const restartBtn = document.getElementById('restart-game-btn');
-      if (restartBtn) {
-        restartBtn.addEventListener('mouseenter', () => {
-          gameEvents.emit('ui-hover', { source: 'gameover-menu', button: 'restart' });
-        });
-      }
+          // Debounce/Check if it's a new hover target to avoid spam
+          if (target && target !== this._lastHoverTarget) {
+            this._lastHoverTarget = target;
+
+            // Determine source based on context
+            let source = 'ui';
+            if (target.closest('#main-menu')) source = 'main-menu';
+            else if (target.closest('#pause-screen')) source = 'pause-menu';
+            else if (target.closest('#settings-screen'))
+              source = 'settings-menu';
+            else if (target.closest('#gameover-screen'))
+              source = 'gameover-menu';
+            else if (target.closest('#levelup-screen')) source = 'levelup-menu';
+
+            gameEvents.emit('ui-hover', {
+              source,
+              button: target.id || target.className || 'unknown',
+            });
+          }
+        },
+        { passive: true }
+      );
+
+      // Reset last hover target when mouse leaves
+      document.addEventListener(
+        'mouseout',
+        (event) => {
+          if (event.target === this._lastHoverTarget) {
+            this._lastHoverTarget = null;
+          }
+        },
+        { passive: true }
+      );
     }
   }
 
@@ -1791,6 +1927,13 @@ class UISystem extends BaseSystem {
 
     this.refreshWaveDomRefs();
     this.refreshTacticalDomRefs();
+
+    if (
+      typeof lucide !== 'undefined' &&
+      typeof lucide.createIcons === 'function'
+    ) {
+      lucide.createIcons();
+    }
   }
 
   applyHudLayoutPreference(layoutId) {
@@ -1865,6 +2008,10 @@ class UISystem extends BaseSystem {
       return this.createBossHudItem(config);
     }
 
+    if (config.layout && config.layout.startsWith('aaa-')) {
+      return this.createAAAHudItem(config);
+    }
+
     if (config.layout === 'custom') {
       root.classList.add('hud-item--custom');
 
@@ -1935,7 +2082,10 @@ class UISystem extends BaseSystem {
       }
 
       const progressFill = document.createElement('div');
-      progressFill.classList.add('hud-bar__fill', `hud-bar__fill--${config.key}`);
+      progressFill.classList.add(
+        'hud-bar__fill',
+        `hud-bar__fill--${config.key}`
+      );
       if (config.progressFillId) {
         progressFill.id = config.progressFillId;
       }
@@ -2069,7 +2219,8 @@ class UISystem extends BaseSystem {
     }
 
     const elementName =
-      typeof customConfig.element === 'string' && customConfig.element.trim().length > 0
+      typeof customConfig.element === 'string' &&
+      customConfig.element.trim().length > 0
         ? customConfig.element.trim().toLowerCase()
         : 'div';
 
@@ -2104,7 +2255,8 @@ class UISystem extends BaseSystem {
     }
 
     const isCanvasElement =
-      typeof HTMLCanvasElement !== 'undefined' && element instanceof HTMLCanvasElement;
+      typeof HTMLCanvasElement !== 'undefined' &&
+      element instanceof HTMLCanvasElement;
 
     if (isCanvasElement) {
       if (Number.isFinite(customConfig.width)) {
@@ -2123,7 +2275,10 @@ class UISystem extends BaseSystem {
       });
     }
 
-    if (customConfig.attributes && typeof customConfig.attributes === 'object') {
+    if (
+      customConfig.attributes &&
+      typeof customConfig.attributes === 'object'
+    ) {
       Object.entries(customConfig.attributes).forEach(([key, value]) => {
         if (key) {
           element.setAttribute(key, `${value}`);
@@ -2230,6 +2385,413 @@ class UISystem extends BaseSystem {
       phaseTimer,
       enrageTimer,
     };
+  }
+
+  createAAAHudItem(config) {
+    const root = document.createElement('div');
+    root.classList.add('hud-item', `hud-item--${config.key}`);
+    root.dataset.hudKey = config.key;
+
+    if (config.rootId) root.id = config.rootId;
+
+    // --- AAA STAT BLOCK ---
+    if (config.layout === 'aaa-stat') {
+      const block = document.createElement('div');
+      block.className = 'stat-block';
+
+      const label = document.createElement('div');
+      label.className = 'stat-label';
+
+      // Icon
+      if (config.icon) {
+        if (config.icon.type === 'lucide') {
+          const i = document.createElement('i');
+          i.dataset.lucide = config.icon.value;
+          i.setAttribute('size', '14');
+          label.appendChild(i);
+        }
+      }
+      label.appendChild(
+        document.createTextNode(
+          ' ' + (config.label || config.key.toUpperCase())
+        )
+      );
+
+      const value = document.createElement('div');
+      value.className = 'stat-value';
+      if (config.valueId) value.id = config.valueId;
+      value.textContent = config.initialValue || '--';
+
+      block.appendChild(label);
+      block.appendChild(value);
+      root.appendChild(block);
+
+      return { key: config.key, config, root, value };
+    }
+
+    // --- AAA STATS WIDGET (Composite Time & Kills) ---
+    if (config.layout === 'aaa-stats-widget') {
+      const container = document.createElement('div');
+      container.className = 'stats-grid';
+
+      // 1. Time Block
+      const timeBlock = document.createElement('div');
+      timeBlock.className = 'stat-block';
+      timeBlock.innerHTML = `
+        <div class="stat-label"><i data-lucide="clock" size="14"></i> TIME</div>
+      `;
+      const timeVal = document.createElement('div');
+      timeVal.className = 'stat-value';
+      timeVal.id = 'timer'; // Match mockup ID
+      timeVal.textContent = '00:00:00';
+      timeBlock.appendChild(timeVal);
+
+      // 2. Kills Block
+      const killsBlock = document.createElement('div');
+      killsBlock.className = 'stat-block';
+      killsBlock.innerHTML = `
+        <div class="stat-label"><i data-lucide="crosshair" size="14"></i> KILLS</div>
+      `;
+      const killsVal = document.createElement('div');
+      killsVal.className = 'stat-value';
+      killsVal.textContent = '0';
+      killsBlock.appendChild(killsVal);
+
+      container.appendChild(timeBlock);
+      container.appendChild(killsBlock);
+      root.appendChild(container);
+
+      // Manual Bindings
+      this.hudElements.set('time', {
+        key: 'time',
+        config: { ...config, key: 'time' },
+        root,
+        value: timeVal,
+      });
+
+      this.hudElements.set('kills', {
+        key: 'kills',
+        config: { ...config, key: 'kills' },
+        root,
+        value: killsVal,
+      });
+
+      return { key: config.key, config, root };
+    }
+
+    // --- AAA COMBO ---
+    if (config.layout === 'aaa-combo') {
+      const box = document.createElement('div');
+      box.className = 'combo-box';
+
+      const label = document.createElement('div');
+      label.className = 'combo-label';
+      label.textContent = 'COMBO';
+
+      const val = document.createElement('div');
+      val.className = 'combo-val';
+      if (config.valueId) val.id = config.valueId;
+      val.textContent = config.initialValue || 'x0';
+
+      box.appendChild(label);
+      box.appendChild(val);
+      root.appendChild(box);
+
+      return { key: config.key, config, root, value: val };
+    }
+
+    // --- AAA BOSS ---
+    if (config.layout === 'aaa-boss') {
+      const container = document.createElement('div');
+      container.className = 'boss-bar-container';
+
+      // Skull
+      const skull = document.createElement('div');
+      skull.className = 'boss-skull';
+      // Simple skull ASCII or SVG? Mockup had SVG or just styled div?
+      // Mockup had complex clip-path polygon. CSS handles it.
+      const skullIcon = document.createElement('i');
+      skullIcon.dataset.lucide = 'skull'; // Use Lucide skull
+      skullIcon.setAttribute('size', '24');
+      skull.appendChild(skullIcon);
+
+      // Fill
+      const fill = document.createElement('div');
+      fill.className = 'boss-fill';
+      // Provide ref for width update
+
+      // Name
+      const name = document.createElement('div');
+      name.className = 'boss-name';
+      name.textContent = '---';
+
+      // Warning Strip (above container)
+      const warning = document.createElement('div');
+      warning.className = 'warning-strip';
+      warning.innerHTML = `
+        <span class="warning-light"><i data-lucide="alert-triangle" size="16"></i> WARNING</span>
+        <span class="warning-light">WARNING <i data-lucide="alert-triangle" size="16"></i></span>
+      `;
+      root.appendChild(warning);
+
+      container.appendChild(skull);
+      container.appendChild(fill);
+      container.appendChild(name);
+      root.appendChild(container);
+
+      return {
+        key: config.key,
+        config,
+        root,
+        barFill: fill,
+        name: name,
+        // Map other standard boss refs to null or mocks to avoid errors
+        bar: null,
+        health: null,
+        phase: null,
+        status: null,
+      };
+    }
+
+    // --- AAA RADAR ---
+    if (config.layout === 'aaa-radar') {
+      // Wrapper matches .radar-structure
+      const structure = document.createElement('div');
+      structure.className = 'radar-structure';
+      if (config.custom && config.custom.id) structure.id = config.custom.id;
+
+      // 1. Bottom SVG Layer (Compass/Background)
+      const svgLayer = document.createElement('div');
+      svgLayer.className = 'radar-svg-layer';
+      svgLayer.innerHTML = `
+        <svg viewBox="0 0 200 200" style="width:100%; height:100%;">
+          <circle cx="100" cy="100" r="98" fill="none" stroke="var(--secondary-blue)" stroke-width="2" stroke-dasharray="30 15 5 15" opacity="0.6" />
+          <circle cx="100" cy="100" r="92" fill="none" stroke="var(--primary-cyan)" stroke-width="1" opacity="0.2" />
+          <polygon points="100,10 177.9,55 177.9,145 100,190 22.1,145 22.1,55" fill="rgba(0, 10, 20, 0.7)" stroke="var(--primary-cyan)" stroke-width="1.5" />
+        </svg>
+      `;
+
+      // 2. Internal Mask (Canvas)
+      const mask = document.createElement('div');
+      mask.className = 'radar-internal-mask';
+
+      const canvas = document.createElement('canvas');
+      canvas.id = 'minimap-canvas';
+      canvas.width = 180;
+      canvas.height = 180;
+
+      // Sweep Animation (inside mask)
+      const sweep = document.createElement('div');
+      sweep.className = 'radar-sweep';
+
+      mask.appendChild(canvas);
+      mask.appendChild(sweep);
+
+      // 3. Top Grid SVG (Overlay)
+      const grid = document.createElement('div');
+      grid.className = 'radar-grid-svg';
+      grid.innerHTML = `
+        <svg viewBox="0 0 200 200" style="width:100%; height:100%;">
+          <line x1="100" y1="10" x2="100" y2="190" stroke="var(--secondary-blue)" stroke-width="1" />
+          <line x1="22.1" y1="55" x2="177.9" y2="145" stroke="var(--secondary-blue)" stroke-width="1" />
+          <line x1="177.9" y1="55" x2="22.1" y2="145" stroke="var(--secondary-blue)" stroke-width="1" />
+          <polygon points="100,40 151.9,70 151.9,130 100,160 48.1,130 48.1,70" fill="none" stroke="var(--secondary-blue)" stroke-width="1" opacity="0.5" />
+          <circle cx="100" cy="100" r="10" fill="var(--primary-cyan)" opacity="0.3" />
+        </svg>
+      `;
+
+      // Assemble
+      structure.appendChild(svgLayer);
+      structure.appendChild(mask);
+      structure.appendChild(grid);
+
+      root.appendChild(structure);
+
+      return { key: config.key, config, root, canvas };
+    }
+
+    // --- AAA STATUS WIDGET (Unified Health & Shield) ---
+    if (config.layout === 'aaa-status-widget') {
+      // 1. Locked Msg (Top)
+      const locked = document.createElement('div');
+      locked.className = 'locked-msg glitch-text';
+      locked.innerHTML = `
+        <div style="color: var(--secondary-blue)"><i data-lucide="lock" size="24"></i></div>
+        <div>
+          <div style="font-size: 0.6rem; color: #88ccff; letter-spacing: 1px">WEAPON SYSTEM</div>
+          <div style="font-weight: bold; color: #fff">LOCKED // LVL 5 REQ</div>
+        </div>
+      `;
+      root.appendChild(locked);
+
+      // 2. Shield Label
+      const shieldLabel = document.createElement('span');
+      shieldLabel.className = 'shield-label';
+      shieldLabel.textContent = '❖ SHIELDS';
+      root.appendChild(shieldLabel);
+
+      // 3. Bars Container (Skewed Wrapper)
+      const barsContainer = document.createElement('div');
+      barsContainer.className = 'bars-container';
+
+      // --- SHIELD ROW (Top Row) ---
+      const shieldRow = document.createElement('div');
+      shieldRow.className = 'health-bar-row shield';
+      shieldRow.id = 'shield-row'; // Match mockup ID for reference logic
+      const shieldSegments = [];
+      for (let i = 0; i < 20; i++) {
+        const seg = document.createElement('div');
+        seg.className = 'bar-segment filled';
+        shieldRow.appendChild(seg);
+        shieldSegments.push(seg);
+      }
+      barsContainer.appendChild(shieldRow);
+
+      // --- HULL ROW (Bottom Row) ---
+      const hullRow = document.createElement('div');
+      hullRow.className = 'health-bar-row';
+      hullRow.id = 'hp-row';
+      const hullSegments = [];
+      for (let i = 0; i < 20; i++) {
+        const seg = document.createElement('div');
+        seg.className = 'bar-segment filled';
+        hullRow.appendChild(seg);
+        hullSegments.push(seg);
+      }
+      barsContainer.appendChild(hullRow);
+
+      // --- Hull Text & Integrity Label (Inside Container) ---
+      const hullText = document.createElement('div');
+      hullText.className = 'health-text';
+      hullText.id = 'hp-text';
+      hullText.textContent = '100%';
+      barsContainer.appendChild(hullText);
+
+      const integrity = document.createElement('div');
+      integrity.style.cssText = `
+         color: var(--health-green);
+         font-weight: bold;
+         margin-top: 5px;
+         transform: skewX(-15deg);
+         margin-left: 5px;
+      `;
+      integrity.innerHTML = `
+         <i data-lucide="heart" size="12" style="fill: var(--health-green); display: inline-block;"></i> HULL INTEGRITY
+      `;
+      barsContainer.appendChild(integrity);
+
+      root.appendChild(barsContainer);
+
+      // --- MANUAL REGISTRATION FOR UI UPDATES ---
+      // We manually populate the map for 'health' and 'shield' so existing logic finds them.
+      // This item itself returns a dummy or the container, but we inject the real data bindings.
+      this.hudElements.set('health', {
+        key: 'health',
+        config: { ...config, key: 'health' }, // Mock config
+        root,
+        value: hullText,
+        segments: hullSegments,
+      });
+
+      this.hudElements.set('shield', {
+        key: 'shield',
+        config: { ...config, key: 'shield' }, // Mock config
+        root,
+        value: null, // Shield usually doesn't have text val in standard logic, or if it does we add it. Mockup has label.
+        segments: shieldSegments,
+      });
+
+      // Return the widget itself as the 'statusWidget' item
+      return { key: config.key, config, root };
+    }
+
+    // --- AAA XP BAR ---
+    if (config.layout === 'aaa-xp-bar') {
+      const container = document.createElement('div');
+      container.className = 'xp-bar-container';
+
+      const fill = document.createElement('div');
+      fill.className = 'xp-fill';
+      fill.style.width = '0%';
+      if (config.valueId) fill.id = config.valueId; // Potentially used for text? No, logic sets style.width on fill?
+      // Wait, standard logic sets text on valueId. We need a separate ref for width.
+      // XP logic updates `updateXPBar` sets style.width on something?
+      // UISystem's updateXPBar needs to be checked.
+
+      const label = document.createElement('div');
+      label.className = 'xp-label';
+      label.textContent = ' XP GAIN';
+      const zap = document.createElement('i');
+      zap.dataset.lucide = 'zap';
+      zap.setAttribute('size', '12');
+      zap.setAttribute('fill', '#ddaaff');
+      label.prepend(zap);
+
+      container.appendChild(fill);
+      container.appendChild(label);
+      root.appendChild(container);
+
+      return {
+        key: config.key,
+        config,
+        root,
+        barFill: fill,
+        label,
+        bar: container,
+        value: label,
+      };
+    }
+
+    // --- AAA WAVE CIRCLE ---
+    if (config.layout === 'aaa-wave-circle') {
+      const indicator = document.createElement('div');
+      indicator.className = 'wave-indicator';
+
+      const content = document.createElement('div');
+      content.className = 'wave-content';
+
+      const num = document.createElement('div');
+      num.className = 'wave-num';
+      if (config.valueId) num.id = config.valueId;
+      num.textContent = config.initialValue || '0';
+
+      const label = document.createElement('div');
+      label.className = 'wave-label';
+      label.textContent = 'WAVE';
+
+      content.appendChild(num);
+      content.appendChild(label);
+      indicator.appendChild(content);
+      root.appendChild(indicator);
+
+      return { key: config.key, config, root, value: num };
+    }
+
+    // --- AAA NAV BLOCK ---
+    if (config.layout === 'aaa-nav-block') {
+      const block = document.createElement('div');
+      block.className = 'nav-block';
+
+      const label = document.createElement('div');
+      label.className = 'nav-label';
+      label.innerHTML = `NAV SYSTEMS <i data-lucide="compass" size="14"></i>`;
+
+      const data = document.createElement('div');
+      data.className = 'micro-data';
+      // Mocked coords or empty spans to be filled? Mock for visual fidelity.
+      data.innerHTML = `
+        COORD: <span class="data-val">451.21</span> / <span class="data-val">-89.02</span><br>
+        VELOCITY: <span class="data-val">2450</span> km/h
+      `;
+
+      block.appendChild(label);
+      block.appendChild(data);
+      root.appendChild(block);
+
+      return { key: config.key, config, root };
+    }
+
+    return this.createHudItem({ ...config, layout: 'default' }); // Fallback
   }
 
   createMetaElement(metaConfig) {
@@ -2353,9 +2915,10 @@ class UISystem extends BaseSystem {
   refreshTacticalDomRefs() {
     const minimapRefs = this.domRefs.minimap || {};
     const canvas = document.getElementById('minimap-canvas');
-    const context = canvas && typeof canvas.getContext === 'function'
-      ? canvas.getContext('2d')
-      : null;
+    const context =
+      canvas && typeof canvas.getContext === 'function'
+        ? canvas.getContext('2d')
+        : null;
 
     const rangeElement = document.getElementById('minimap-range');
     const container = document.getElementById('hud-minimap');
@@ -2368,7 +2931,9 @@ class UISystem extends BaseSystem {
       context,
     };
 
-    const threatContainer = document.getElementById('threat-indicators-container');
+    const threatContainer = document.getElementById(
+      'threat-indicators-container'
+    );
     const threatOverlay = document.getElementById('threat-indicators-overlay');
 
     this.domRefs.threatIndicators = {
@@ -2407,9 +2972,7 @@ class UISystem extends BaseSystem {
       'boss-phase-changed',
       'boss-invulnerability-changed',
       'boss-defeated',
-    ].forEach(
-      registerBossEvent
-    );
+    ].forEach(registerBossEvent);
 
     this.registerEventListener('player-reset', () => {
       this.resetBossHudState();
@@ -3654,7 +4217,11 @@ class UISystem extends BaseSystem {
         : 0;
 
     let contacts = [];
-    if (physics && playerPosition && typeof physics.getNearbyEnemies === 'function') {
+    if (
+      physics &&
+      playerPosition &&
+      typeof physics.getNearbyEnemies === 'function'
+    ) {
       try {
         contacts = physics.getNearbyEnemies(
           playerPosition.x,
@@ -3713,7 +4280,10 @@ class UISystem extends BaseSystem {
           enemy.uuid ??
           enemy.__id ??
           null;
-        const id = idCandidate !== null ? idCandidate : `${type}:${Math.round(x)}:${Math.round(y)}`;
+        const id =
+          idCandidate !== null
+            ? idCandidate
+            : `${type}:${Math.round(x)}:${Math.round(y)}`;
 
         normalized.push({
           id,
@@ -3728,8 +4298,8 @@ class UISystem extends BaseSystem {
           radius: Number.isFinite(enemy.radius)
             ? Number(enemy.radius)
             : Number.isFinite(enemy.hitRadius)
-            ? Number(enemy.hitRadius)
-            : null,
+              ? Number(enemy.hitRadius)
+              : null,
           isBoss:
             type === 'boss' ||
             enemy.isBoss === true ||
@@ -3766,7 +4336,8 @@ class UISystem extends BaseSystem {
     const canvas = minimapRefs.canvas;
 
     if (canvas) {
-      const datasetRange = canvas.dataset?.range ?? canvas.getAttribute?.('data-range');
+      const datasetRange =
+        canvas.dataset?.range ?? canvas.getAttribute?.('data-range');
       const parsedDataset = Number(datasetRange);
       if (Number.isFinite(parsedDataset) && parsedDataset > 0) {
         return parsedDataset;
@@ -3993,12 +4564,16 @@ class UISystem extends BaseSystem {
 
     const data = contactsData || this.tacticalState.contactsCache;
     const contacts = data?.contacts || [];
-    const range = data?.range ?? this.cachedValues.minimap.range ?? DEFAULT_MINIMAP_RANGE;
+    const range =
+      data?.range ?? this.cachedValues.minimap.range ?? DEFAULT_MINIMAP_RANGE;
     const detectionRange =
       data?.detectionRange ?? this.cachedValues.minimap.detectionRange ?? range;
 
     const offscreen = contacts
-      .filter((contact) => Number.isFinite(contact.distance) && contact.distance > range)
+      .filter(
+        (contact) =>
+          Number.isFinite(contact.distance) && contact.distance > range
+      )
       .sort((a, b) => a.distance - b.distance)
       .slice(0, MAX_THREAT_INDICATORS);
 
@@ -4036,7 +4611,10 @@ class UISystem extends BaseSystem {
       element.dataset.severity = severity;
       element.style.setProperty('--threat-color', color);
       element.classList.toggle('threat-indicator--high', severity === 'high');
-      element.classList.toggle('threat-indicator--medium', severity === 'medium');
+      element.classList.toggle(
+        'threat-indicator--medium',
+        severity === 'medium'
+      );
       element.classList.toggle('threat-indicator--low', severity === 'low');
       element.classList.toggle('threat-pulse', severity !== 'low');
 
@@ -4096,7 +4674,10 @@ class UISystem extends BaseSystem {
 
   resetComboMeter(options = {}) {
     const silent = Boolean(options?.silent);
-    this.updateComboMeter({ comboCount: 0, multiplier: 1 }, { force: true, silent, reset: true });
+    this.updateComboMeter(
+      { comboCount: 0, multiplier: 1 },
+      { force: true, silent, reset: true }
+    );
   }
 
   updateComboMeter(comboData = {}, options = {}) {
@@ -4120,11 +4701,20 @@ class UISystem extends BaseSystem {
 
     const force = Boolean(options.force);
     const rawCount =
-      comboData.comboCount ?? comboData.count ?? comboData.value ?? comboData.current ?? 0;
+      comboData.comboCount ??
+      comboData.count ??
+      comboData.value ??
+      comboData.current ??
+      0;
     const rawMultiplier =
-      comboData.multiplier ?? comboData.comboMultiplier ?? comboData.multiplierValue ?? 1;
+      comboData.multiplier ??
+      comboData.comboMultiplier ??
+      comboData.multiplierValue ??
+      1;
 
-    const count = Number.isFinite(rawCount) ? Math.max(0, Math.floor(rawCount)) : 0;
+    const count = Number.isFinite(rawCount)
+      ? Math.max(0, Math.floor(rawCount))
+      : 0;
     const multiplier = Number.isFinite(rawMultiplier)
       ? Math.max(1, Number(rawMultiplier))
       : 1;
@@ -4135,12 +4725,18 @@ class UISystem extends BaseSystem {
     const valueText = isActive ? `${count} ${hitsLabel}` : '0 Hits';
     const multiplierText = `x${multiplier.toFixed(1)}`;
 
-    if (valueNode && (force || this.cachedValues.combo.valueText !== valueText)) {
+    if (
+      valueNode &&
+      (force || this.cachedValues.combo.valueText !== valueText)
+    ) {
       valueNode.textContent = valueText;
       this.cachedValues.combo.valueText = valueText;
     }
 
-    if (multiplierNode && (force || this.cachedValues.combo.multiplierText !== multiplierText)) {
+    if (
+      multiplierNode &&
+      (force || this.cachedValues.combo.multiplierText !== multiplierText)
+    ) {
       multiplierNode.textContent = multiplierText;
       this.cachedValues.combo.multiplierText = multiplierText;
     }
@@ -4152,11 +4748,23 @@ class UISystem extends BaseSystem {
         container.classList.remove('combo-broken');
       }
 
-      if (!options.silent && isActive && count !== this.cachedValues.combo.count) {
+      if (
+        !options.silent &&
+        isActive &&
+        count !== this.cachedValues.combo.count
+      ) {
         container.classList.remove('combo-pulse');
         void container.offsetWidth; // restart animation
         container.classList.add('combo-pulse');
       }
+    }
+
+    // AAA Combo specific update
+    if (entry && entry.config && entry.config.layout === 'aaa-combo') {
+      if (entry.value) {
+        entry.value.textContent = `x${multiplier.toFixed(1)}`;
+      }
+      // AAA mockup doesn't explicitly show hit count, only multiplier.
     }
 
     this.cachedValues.combo.count = count;
@@ -4167,15 +4775,20 @@ class UISystem extends BaseSystem {
 
   handleComboBroken(payload = {}) {
     const silent = Boolean(payload?.silent);
-    const nextCount = Number.isFinite(payload?.comboCount) ? payload.comboCount : 0;
-    const nextMultiplier = Number.isFinite(payload?.multiplier) ? payload.multiplier : 1;
+    const nextCount = Number.isFinite(payload?.comboCount)
+      ? payload.comboCount
+      : 0;
+    const nextMultiplier = Number.isFinite(payload?.multiplier)
+      ? payload.multiplier
+      : 1;
 
     this.updateComboMeter(
       { comboCount: nextCount, multiplier: nextMultiplier },
       { force: true, broken: !silent, silent }
     );
 
-    const container = this.domRefs.combo?.container || this.hudElements.get('comboMeter')?.root;
+    const container =
+      this.domRefs.combo?.container || this.hudElements.get('comboMeter')?.root;
     if (!container) {
       return;
     }
@@ -4230,7 +4843,23 @@ class UISystem extends BaseSystem {
     entry.root.classList.toggle('is-danger', isDanger);
     entry.root.classList.toggle('is-warning', isWarning);
     entry.root.classList.toggle('is-low-health', isLowHealth);
+    entry.root.classList.toggle('is-low-health', isLowHealth);
     entry.root.style.setProperty('--hud-health-ratio', ratio.toFixed(3));
+
+    // AAA Segmented Bar Support
+    if (Array.isArray(entry.segments)) {
+      const totalSegments = entry.segments.length;
+      const filledCount = Math.ceil((percentage / 100) * totalSegments);
+      for (let i = 0; i < totalSegments; i++) {
+        if (i < filledCount) {
+          entry.segments[i].classList.add('filled');
+          entry.segments[i].classList.remove('empty');
+        } else {
+          entry.segments[i].classList.remove('filled');
+          entry.segments[i].classList.add('empty');
+        }
+      }
+    }
 
     if (entry.bar) {
       entry.bar.setAttribute('aria-valuenow', `${Math.round(percentage)}`);
@@ -4310,7 +4939,8 @@ class UISystem extends BaseSystem {
 
   updateXPBar(data = {}, options = {}) {
     const entry = this.hudElements.get('xp');
-    if (!entry?.value || !entry.bar || !entry.barFill) {
+    // Loose check to support layouts that might not have 'bar' but have 'barFill'
+    if (!entry || (!entry.value && !entry.barFill)) {
       return;
     }
 
@@ -4338,10 +4968,18 @@ class UISystem extends BaseSystem {
       this.cachedValues.xp.percentage = percentage;
     }
 
-    entry.bar.setAttribute('aria-valuenow', `${Math.round(percentage * 100)}`);
+    if (entry.bar) {
+      entry.bar.setAttribute(
+        'aria-valuenow',
+        `${Math.round(percentage * 100)}`
+      );
+      const isMaxed = percentage >= 1;
+      entry.bar.classList.toggle('is-maxed', isMaxed);
+    }
     const isMaxed = percentage >= 1;
-    entry.bar.classList.toggle('is-maxed', isMaxed);
-    entry.barFill.classList.toggle('is-maxed', isMaxed);
+    if (entry.barFill) {
+      entry.barFill.classList.toggle('is-maxed', isMaxed);
+    }
     entry.root.classList.toggle('is-maxed', isMaxed);
 
     const cachedLevel = Number.isFinite(this.cachedValues.level)
@@ -4350,11 +4988,7 @@ class UISystem extends BaseSystem {
     const levelFromData = Math.max(
       1,
       Math.floor(
-        data.level ??
-          data.currentLevel ??
-          data.playerLevel ??
-          cachedLevel ??
-          1
+        data.level ?? data.currentLevel ?? data.playerLevel ?? cachedLevel ?? 1
       )
     );
     const level = cachedLevel ?? levelFromData;
@@ -4601,13 +5235,32 @@ class UISystem extends BaseSystem {
       }
     }
 
+    // AAA Wave Circle Support
+    if (
+      waveRefs.container &&
+      waveRefs.container.classList.contains('wave-indicator')
+    ) {
+      // Calculate progress logic for circle
+      const progress = normalized.totalAsteroids
+        ? Math.min(1, normalized.asteroidsKilled / normalized.totalAsteroids)
+        : normalized.isActive
+          ? 0
+          : 1;
+      const percent = Math.round(progress * 100);
+      waveRefs.container.style.setProperty('--wave-progress', `${percent}%`);
+    }
+
     const inBreak = !normalized.isActive && breakSeconds > 0;
     const waveCompleted =
-      !normalized.isActive && breakSeconds === 0 && normalized.totalAsteroids > 0;
+      !normalized.isActive &&
+      breakSeconds === 0 &&
+      normalized.totalAsteroids > 0;
 
     const justCompleted =
       waveCompleted &&
-      (Boolean(lastWave?.isActive) || (Number.isFinite(lastWave?.breakTimerSeconds) && lastWave.breakTimerSeconds > 0));
+      (Boolean(lastWave?.isActive) ||
+        (Number.isFinite(lastWave?.breakTimerSeconds) &&
+          lastWave.breakTimerSeconds > 0));
 
     if (waveRefs.enemies) {
       let enemiesText = '--';
@@ -4642,7 +5295,10 @@ class UISystem extends BaseSystem {
         'aria-hidden',
         shouldShowCountdown ? 'false' : 'true'
       );
-      waveRefs.countdown.classList.toggle('is-alert', breakSeconds > 0 && breakSeconds <= 5);
+      waveRefs.countdown.classList.toggle(
+        'is-alert',
+        breakSeconds > 0 && breakSeconds <= 5
+      );
       if (waveRefs.countdownValue) {
         const { countdownValue } = waveRefs;
         if (shouldShowCountdown) {
@@ -4665,7 +5321,10 @@ class UISystem extends BaseSystem {
 
     if (waveRefs.container) {
       waveRefs.container.classList.toggle('hud-panel--wave-break', inBreak);
-      waveRefs.container.classList.toggle('hud-panel--wave-complete', waveCompleted);
+      waveRefs.container.classList.toggle(
+        'hud-panel--wave-complete',
+        waveCompleted
+      );
     }
 
     waveRefs.container.classList.toggle(
@@ -4727,7 +5386,8 @@ class UISystem extends BaseSystem {
 
     const cooldownRatio =
       state.isOnCooldown && state.cooldownDuration > 0
-        ? 1 - Math.max(0, Math.min(1, state.cooldownTimer / state.cooldownDuration))
+        ? 1 -
+          Math.max(0, Math.min(1, state.cooldownTimer / state.cooldownDuration))
         : 0;
 
     const maxHP = Math.max(0, state.maxHP);
@@ -4803,6 +5463,26 @@ class UISystem extends BaseSystem {
 
     entry.root.classList.toggle('is-low', isLowShield);
     entry.root.style.setProperty('--hud-shield-ratio', hpRatio.toFixed(3));
+
+    // AAA Segmented Shield Support
+    if (Array.isArray(entry.segments)) {
+      const totalSegments = entry.segments.length;
+      const filledCount = Math.ceil(hpRatio * totalSegments);
+      for (let i = 0; i < totalSegments; i++) {
+        // For shield, handle cooldown visual?
+        // Maybe dim segments if cooldown?
+        const seg = entry.segments[i];
+        if (i < filledCount) {
+          seg.classList.add('filled');
+          seg.classList.remove('empty');
+          if (state.isOnCooldown) seg.style.opacity = '0.5';
+          else seg.style.opacity = '1';
+        } else {
+          seg.classList.remove('filled');
+          seg.classList.add('empty');
+        }
+      }
+    }
 
     this.cachedValues.shield = {
       level: state.level,

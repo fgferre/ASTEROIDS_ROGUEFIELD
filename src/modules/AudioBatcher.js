@@ -27,10 +27,14 @@ class AudioBatcher {
       batched: 0,
       individual: 0,
       prevented: 0, // sobreposições evitadas
-      batchReduction: 0
+      batchReduction: 0,
     };
 
-    console.log('[AudioBatcher] Initialized with batch window:', batchWindow, 'ms');
+    console.log(
+      '[AudioBatcher] Initialized with batch window:',
+      batchWindow,
+      'ms'
+    );
   }
 
   _extractBatchParams(raw) {
@@ -46,7 +50,7 @@ class AudioBatcher {
 
   _playBatchedDroneFire(batch) {
     const options = batch
-      .map(item => this._extractBatchParams(item.params))
+      .map((item) => this._extractBatchParams(item.params))
       .filter(Boolean);
 
     if (!options.length) {
@@ -81,7 +85,7 @@ class AudioBatcher {
 
   _playBatchedHunterBurst(batch) {
     const options = batch
-      .map(item => this._extractBatchParams(item.params))
+      .map((item) => this._extractBatchParams(item.params))
       .filter(Boolean);
 
     if (!options.length) {
@@ -89,7 +93,7 @@ class AudioBatcher {
     }
 
     const grouped = new Map();
-    options.forEach(opt => {
+    options.forEach((opt) => {
       const key = opt.burstId ?? `hunter:${grouped.size}`;
       if (!grouped.has(key)) {
         grouped.set(key, []);
@@ -118,7 +122,7 @@ class AudioBatcher {
 
   _playBatchedMineExplosions(batch) {
     const options = batch
-      .map(item => this._extractBatchParams(item.params))
+      .map((item) => this._extractBatchParams(item.params))
       .filter(Boolean);
 
     if (!options.length) {
@@ -192,17 +196,17 @@ class AudioBatcher {
 
     // Define minimum intervals between same sounds
     const minIntervals = {
-      'laser': 50,      // Rapid fire allowed
-      'asteroid': 100,  // Medium spacing
-      'explosion': 200, // Slower spacing
-      'shield': 150,    // Medium spacing
-      'xp': 80,         // Quick succession allowed
-      'levelup': 1000   // Prevent spam
+      laser: 50, // Rapid fire allowed
+      asteroid: 100, // Medium spacing
+      explosion: 200, // Slower spacing
+      shield: 150, // Medium spacing
+      xp: 80, // Quick succession allowed
+      levelup: 1000, // Prevent spam
     };
 
     const minInterval = minIntervals[category] || 100;
 
-    return (now - lastPlay) < minInterval;
+    return now - lastPlay < minInterval;
   }
 
   /**
@@ -217,7 +221,7 @@ class AudioBatcher {
       'playShieldImpact',
       'playDroneFire',
       'playHunterBurst',
-      'playMineExplosion'
+      'playMineExplosion',
     ];
 
     return batchableSounds.includes(soundType);
@@ -234,7 +238,7 @@ class AudioBatcher {
     this.pendingBatches.get(soundType).push({
       params,
       timestamp,
-      priority
+      priority,
     });
 
     this._scheduleBatchExecution(soundType);
@@ -329,7 +333,7 @@ class AudioBatcher {
         break;
       default:
         // Fallback to individual sounds
-        batch.forEach(item => {
+        batch.forEach((item) => {
           this._playImmediate(soundType, item.params);
         });
     }
@@ -356,16 +360,22 @@ class AudioBatcher {
         this.audioSystem.connectGainNode(gain);
 
         // Slight frequency variation
-        const freq = baseFreq + (i * freqVariation / count) - (freqVariation / 2);
+        const freq = baseFreq + (i * freqVariation) / count - freqVariation / 2;
         const delay = i * 0.01; // Small stagger
 
-        osc.frequency.setValueAtTime(freq, this.audioSystem.context.currentTime + delay);
+        osc.frequency.setValueAtTime(
+          freq,
+          this.audioSystem.context.currentTime + delay
+        );
         osc.frequency.exponentialRampToValueAtTime(
           freq * 0.2,
           this.audioSystem.context.currentTime + delay + 0.08
         );
 
-        gain.gain.setValueAtTime(0.12 / count, this.audioSystem.context.currentTime + delay);
+        gain.gain.setValueAtTime(
+          0.12 / count,
+          this.audioSystem.context.currentTime + delay
+        );
         gain.gain.exponentialRampToValueAtTime(
           0.001,
           this.audioSystem.context.currentTime + delay + 0.08
@@ -375,9 +385,12 @@ class AudioBatcher {
         osc.stop(this.audioSystem.context.currentTime + delay + 0.08);
 
         // Return gain to pool after use
-        setTimeout(() => {
-          this.audioSystem.pool.returnGain(gain);
-        }, (delay + 0.08) * 1000 + 10);
+        setTimeout(
+          () => {
+            this.audioSystem.pool.returnGain(gain);
+          },
+          (delay + 0.08) * 1000 + 10
+        );
       }
     });
   }
@@ -407,7 +420,8 @@ class AudioBatcher {
 
     this.audioSystem.safePlay(() => {
       const baseFreq = size === 'large' ? 70 : size === 'medium' ? 110 : 150;
-      const duration = size === 'large' ? 0.35 : size === 'medium' ? 0.25 : 0.18;
+      const duration =
+        size === 'large' ? 0.35 : size === 'medium' ? 0.25 : 0.18;
 
       for (let i = 0; i < count; i++) {
         const osc = this.audioSystem.pool.getOscillator();
@@ -417,18 +431,28 @@ class AudioBatcher {
         this.audioSystem.connectGainNode(gain);
 
         const freqVariation = baseFreq * 0.3;
-        const freqOffset = this._getRandomRange('asteroid', -freqVariation / 2, freqVariation / 2);
+        const freqOffset = this._getRandomRange(
+          'asteroid',
+          -freqVariation / 2,
+          freqVariation / 2
+        );
         const freq = baseFreq + freqOffset;
         const delay = i * 0.02;
 
         osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(freq, this.audioSystem.context.currentTime + delay);
+        osc.frequency.setValueAtTime(
+          freq,
+          this.audioSystem.context.currentTime + delay
+        );
         osc.frequency.exponentialRampToValueAtTime(
           freq * 0.4,
           this.audioSystem.context.currentTime + delay + duration
         );
 
-        gain.gain.setValueAtTime(0.15 / count, this.audioSystem.context.currentTime + delay);
+        gain.gain.setValueAtTime(
+          0.15 / count,
+          this.audioSystem.context.currentTime + delay
+        );
         gain.gain.exponentialRampToValueAtTime(
           0.001,
           this.audioSystem.context.currentTime + delay + duration
@@ -438,9 +462,12 @@ class AudioBatcher {
         osc.stop(this.audioSystem.context.currentTime + delay + duration);
 
         // Return gain to pool after use
-        setTimeout(() => {
-          this.audioSystem.pool.returnGain(gain);
-        }, (delay + duration) * 1000 + 10);
+        setTimeout(
+          () => {
+            this.audioSystem.pool.returnGain(gain);
+          },
+          (delay + duration) * 1000 + 10
+        );
       }
     });
   }
@@ -482,7 +509,9 @@ class AudioBatcher {
       return min + (max - min) * emergency.float();
     }
 
-    throw new Error('AudioBatcher could not resolve deterministic RNG instance');
+    throw new Error(
+      'AudioBatcher could not resolve deterministic RNG instance'
+    );
   }
 
   _ensureFallbackRandomFork(family) {
@@ -532,9 +561,10 @@ class AudioBatcher {
   }
 
   reseedRandomForks() {
-    const seeds = this._randomForkSeeds && Object.keys(this._randomForkSeeds).length
-      ? this._randomForkSeeds
-      : this.captureRandomForkSeeds();
+    const seeds =
+      this._randomForkSeeds && Object.keys(this._randomForkSeeds).length
+        ? this._randomForkSeeds
+        : this.captureRandomForkSeeds();
 
     Object.entries(this.randomForks || {}).forEach(([name, rng]) => {
       const seed = seeds[`family:${name}`];
@@ -543,7 +573,10 @@ class AudioBatcher {
       }
     });
 
-    if (this._fallbackRandom && typeof this._fallbackRandom.reset === 'function') {
+    if (
+      this._fallbackRandom &&
+      typeof this._fallbackRandom.reset === 'function'
+    ) {
       const fallbackSeed = seeds['fallback:root'];
       if (fallbackSeed !== undefined) {
         this._fallbackRandom.reset(fallbackSeed);
@@ -576,16 +609,22 @@ class AudioBatcher {
         osc.connect(gain);
         this.audioSystem.connectGainNode(gain);
 
-        const freq = baseFreq + (i * 50); // Ascending notes
+        const freq = baseFreq + i * 50; // Ascending notes
         const delay = i * 0.015;
 
-        osc.frequency.setValueAtTime(freq, this.audioSystem.context.currentTime + delay);
+        osc.frequency.setValueAtTime(
+          freq,
+          this.audioSystem.context.currentTime + delay
+        );
         osc.frequency.exponentialRampToValueAtTime(
           freq * 2,
           this.audioSystem.context.currentTime + delay + 0.12
         );
 
-        gain.gain.setValueAtTime(0.08 / Math.sqrt(count), this.audioSystem.context.currentTime + delay);
+        gain.gain.setValueAtTime(
+          0.08 / Math.sqrt(count),
+          this.audioSystem.context.currentTime + delay
+        );
         gain.gain.exponentialRampToValueAtTime(
           0.001,
           this.audioSystem.context.currentTime + delay + 0.12
@@ -595,9 +634,12 @@ class AudioBatcher {
         osc.stop(this.audioSystem.context.currentTime + delay + 0.12);
 
         // Return gain to pool after use
-        setTimeout(() => {
-          this.audioSystem.pool.returnGain(gain);
-        }, (delay + 0.12) * 1000 + 10);
+        setTimeout(
+          () => {
+            this.audioSystem.pool.returnGain(gain);
+          },
+          (delay + 0.12) * 1000 + 10
+        );
       }
     });
   }
@@ -617,17 +659,23 @@ class AudioBatcher {
         this.audioSystem.connectGainNode(gain);
 
         const baseFreq = 520;
-        const freq = baseFreq + (i * 40);
+        const freq = baseFreq + i * 40;
         const delay = i * 0.01;
 
         osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, this.audioSystem.context.currentTime + delay);
+        osc.frequency.setValueAtTime(
+          freq,
+          this.audioSystem.context.currentTime + delay
+        );
         osc.frequency.exponentialRampToValueAtTime(
           freq * 0.4,
           this.audioSystem.context.currentTime + delay + 0.1
         );
 
-        gain.gain.setValueAtTime(0.18 / count, this.audioSystem.context.currentTime + delay);
+        gain.gain.setValueAtTime(
+          0.18 / count,
+          this.audioSystem.context.currentTime + delay
+        );
         gain.gain.exponentialRampToValueAtTime(
           0.001,
           this.audioSystem.context.currentTime + delay + 0.12
@@ -637,9 +685,12 @@ class AudioBatcher {
         osc.stop(this.audioSystem.context.currentTime + delay + 0.12);
 
         // Return gain to pool after use
-        setTimeout(() => {
-          this.audioSystem.pool.returnGain(gain);
-        }, (delay + 0.12) * 1000 + 10);
+        setTimeout(
+          () => {
+            this.audioSystem.pool.returnGain(gain);
+          },
+          (delay + 0.12) * 1000 + 10
+        );
       }
     });
   }
@@ -664,13 +715,19 @@ class AudioBatcher {
    * Determina categoria do som para tracking
    */
   _getSoundCategory(soundType) {
-    if (soundType.includes('Laser') || soundType.includes('laser')) return 'laser';
-    if (soundType.includes('Drone') || soundType.includes('Hunter')) return 'laser';
-    if (soundType.includes('Asteroid') || soundType.includes('asteroid')) return 'asteroid';
-    if (soundType.includes('Explosion') || soundType.includes('explosion')) return 'explosion';
-    if (soundType.includes('Shield') || soundType.includes('shield')) return 'shield';
+    if (soundType.includes('Laser') || soundType.includes('laser'))
+      return 'laser';
+    if (soundType.includes('Drone') || soundType.includes('Hunter'))
+      return 'laser';
+    if (soundType.includes('Asteroid') || soundType.includes('asteroid'))
+      return 'asteroid';
+    if (soundType.includes('Explosion') || soundType.includes('explosion'))
+      return 'explosion';
+    if (soundType.includes('Shield') || soundType.includes('shield'))
+      return 'shield';
     if (soundType.includes('XP') || soundType.includes('xp')) return 'xp';
-    if (soundType.includes('Level') || soundType.includes('level')) return 'levelup';
+    if (soundType.includes('Level') || soundType.includes('level'))
+      return 'levelup';
     if (soundType.includes('UI') || soundType.includes('ui')) return 'ui';
     return 'other';
   }
@@ -679,7 +736,9 @@ class AudioBatcher {
    * Força execução de todos os batches pendentes
    */
   flushPendingBatches() {
-    for (const [soundType, handle] of Array.from(this.pendingFlushes.entries())) {
+    for (const [soundType, handle] of Array.from(
+      this.pendingFlushes.entries()
+    )) {
       if (typeof handle === 'number') {
         clearTimeout(handle);
       }
@@ -697,14 +756,15 @@ class AudioBatcher {
    */
   getStats() {
     const totalSounds = this.stats.batched + this.stats.individual;
-    const batchEfficiency = totalSounds > 0 ? (this.stats.batchReduction / totalSounds) * 100 : 0;
+    const batchEfficiency =
+      totalSounds > 0 ? (this.stats.batchReduction / totalSounds) * 100 : 0;
 
     return {
       ...this.stats,
       totalSounds,
       batchEfficiency,
       pendingBatches: this.pendingBatches.size,
-      activeSounds: this.activeSounds.size
+      activeSounds: this.activeSounds.size,
     };
   }
 
@@ -717,7 +777,7 @@ class AudioBatcher {
       batched: 0,
       individual: 0,
       prevented: 0,
-      batchReduction: 0
+      batchReduction: 0,
     };
   }
 }

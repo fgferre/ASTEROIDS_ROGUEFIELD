@@ -11,6 +11,7 @@ class AudioPool {
     this.oscillatorPool = [];
     this.gainPool = [];
     this.bufferSourcePool = [];
+    this.biquadFilterPool = [];
 
     // Tracking de nodes ativos
     this.activeNodes = new Set();
@@ -20,7 +21,7 @@ class AudioPool {
       created: 0,
       reused: 0,
       poolHits: 0,
-      poolMisses: 0
+      poolMisses: 0,
     };
 
     console.log('[AudioPool] Initialized with max pool size:', maxPoolSize);
@@ -93,6 +94,31 @@ class AudioPool {
   }
 
   /**
+   * Obtém um BiquadFilterNode do pool ou cria um novo
+   */
+  getBiquadFilter() {
+    let filter;
+
+    if (this.biquadFilterPool.length > 0) {
+      filter = this.biquadFilterPool.pop();
+      this.stats.reused++;
+      this.stats.poolHits++;
+    } else {
+      filter = this.context.createBiquadFilter();
+      this.stats.created++;
+      this.stats.poolMisses++;
+    }
+
+    this.activeNodes.add(filter);
+    return filter;
+  }
+
+  // Alias for legacy support/easier refactoring
+  getFilter() {
+    return this.getBiquadFilter();
+  }
+
+  /**
    * Retorna um GainNode para o pool
    */
   returnGain(gain) {
@@ -114,6 +140,32 @@ class AudioPool {
   }
 
   /**
+   * Retorna um BiquadFilterNode para o pool
+   */
+  returnBiquadFilter(filter) {
+    if (!filter || !this.activeNodes.has(filter)) return;
+
+    this.activeNodes.delete(filter);
+
+    // Disconnect
+    try {
+      filter.disconnect();
+    } catch (e) {}
+
+    // Make sure to reset params if needed, or caller handles it
+    // For filters, we usually reset heavily on get/use, so simple return is fine.
+
+    if (this.biquadFilterPool.length < this.maxPoolSize) {
+      this.biquadFilterPool.push(filter);
+    }
+  }
+
+  // Alias
+  returnFilter(filter) {
+    return this.returnBiquadFilter(filter);
+  }
+
+  /**
    * Setup automático de cleanup para oscillators
    */
   _setupOscillatorCleanup(oscillator) {
@@ -124,15 +176,18 @@ class AudioPool {
 
       // Schedule cleanup após o stop
       const cleanupTime = when || this.context.currentTime;
-      setTimeout(() => {
-        this.activeNodes.delete(oscillator);
-        try {
-          oscillator.disconnect();
-        } catch (e) {
-          // Node might already be disconnected
-        }
-        // Oscillators não podem ser reutilizados após stop()
-      }, (cleanupTime - this.context.currentTime) * 1000 + 10);
+      setTimeout(
+        () => {
+          this.activeNodes.delete(oscillator);
+          try {
+            oscillator.disconnect();
+          } catch (e) {
+            // Node might already be disconnected
+          }
+          // Oscillators não podem ser reutilizados após stop()
+        },
+        (cleanupTime - this.context.currentTime) * 1000 + 10
+      );
     };
   }
 
@@ -147,15 +202,18 @@ class AudioPool {
 
       // Schedule cleanup após o stop
       const cleanupTime = when || this.context.currentTime;
-      setTimeout(() => {
-        this.activeNodes.delete(source);
-        try {
-          source.disconnect();
-        } catch (e) {
-          // Node might already be disconnected
-        }
-        // BufferSources não podem ser reutilizados após stop()
-      }, (cleanupTime - this.context.currentTime) * 1000 + 10);
+      setTimeout(
+        () => {
+          this.activeNodes.delete(source);
+          try {
+            source.disconnect();
+          } catch (e) {
+            // Node might already be disconnected
+          }
+          // BufferSources não podem ser reutilizados após stop()
+        },
+        (cleanupTime - this.context.currentTime) * 1000 + 10
+      );
     };
   }
 
@@ -178,13 +236,16 @@ class AudioPool {
     this.oscillatorPool = [];
     this.gainPool = [];
     this.bufferSourcePool = [];
+    this.biquadFilterPool = [];
   }
 
   /**
    * Obtém estatísticas de performance do pool
    */
   getStats() {
-    const poolEfficiency = this.stats.poolHits / (this.stats.poolHits + this.stats.poolMisses) * 100;
+    const poolEfficiency =
+      (this.stats.poolHits / (this.stats.poolHits + this.stats.poolMisses)) *
+      100;
 
     return {
       ...this.stats,
@@ -193,8 +254,9 @@ class AudioPool {
       poolSizes: {
         oscillator: this.oscillatorPool.length,
         gain: this.gainPool.length,
-        bufferSource: this.bufferSourcePool.length
-      }
+        bufferSource: this.bufferSourcePool.length,
+        biquadFilter: this.biquadFilterPool.length,
+      },
     };
   }
 
@@ -206,7 +268,7 @@ class AudioPool {
       created: 0,
       reused: 0,
       poolHits: 0,
-      poolMisses: 0
+      poolMisses: 0,
     };
   }
 }

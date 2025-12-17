@@ -55,7 +55,8 @@ function parseColor(color) {
       const r = clampChannel(parts[0]);
       const g = clampChannel(parts[1]);
       const b = clampChannel(parts[2]);
-      const a = parts.length >= 4 ? Math.max(0, Math.min(1, Number(parts[3]))) : 1;
+      const a =
+        parts.length >= 4 ? Math.max(0, Math.min(1, Number(parts[3]))) : 1;
       return { r, g, b, a: Number.isFinite(a) ? a : 1 };
     }
   }
@@ -90,11 +91,15 @@ function resolveTrailRgb(bullet) {
 
   if (bullet?.isBossProjectile) {
     const bossParsed = parseColor(DEFAULT_BOSS_COLOR);
-    return bossParsed ? `${bossParsed.r}, ${bossParsed.g}, ${bossParsed.b}` : '255, 120, 220';
+    return bossParsed
+      ? `${bossParsed.r}, ${bossParsed.g}, ${bossParsed.b}`
+      : '255, 120, 220';
   }
 
   const enemyParsed = parseColor(DEFAULT_ENEMY_COLOR);
-  return enemyParsed ? `${enemyParsed.r}, ${enemyParsed.g}, ${enemyParsed.b}` : '255, 150, 110';
+  return enemyParsed
+    ? `${enemyParsed.r}, ${enemyParsed.g}, ${enemyParsed.b}`
+    : '255, 150, 110';
 }
 
 function resolveRadius(bullet) {
@@ -175,7 +180,10 @@ export function drawEnemyProjectile(ctx, bullet) {
   drawTrail(ctx, bullet, radius);
 
   const baseColor = resolveBaseColor(bullet);
-  const glowRadius = Math.max(radius * (bullet?.isBossProjectile ? 4.5 : 3.2), radius + 6);
+  const glowRadius = Math.max(
+    radius * (bullet?.isBossProjectile ? 4.5 : 3.2),
+    radius + 6
+  );
   const centerX = bullet.x ?? 0;
   const centerY = bullet.y ?? 0;
   const gradient = ctx.createRadialGradient(
@@ -189,11 +197,17 @@ export function drawEnemyProjectile(ctx, bullet) {
 
   if (bullet?.isBossProjectile) {
     gradient.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-    gradient.addColorStop(0.35, colorWithAlpha(baseColor, 0.9, DEFAULT_BOSS_COLOR));
+    gradient.addColorStop(
+      0.35,
+      colorWithAlpha(baseColor, 0.9, DEFAULT_BOSS_COLOR)
+    );
     gradient.addColorStop(1, colorWithAlpha(baseColor, 0, DEFAULT_BOSS_COLOR));
   } else {
     gradient.addColorStop(0, 'rgba(255, 255, 255, 0.85)');
-    gradient.addColorStop(0.4, colorWithAlpha(baseColor, 0.75, DEFAULT_ENEMY_COLOR));
+    gradient.addColorStop(
+      0.4,
+      colorWithAlpha(baseColor, 0.75, DEFAULT_ENEMY_COLOR)
+    );
     gradient.addColorStop(1, colorWithAlpha(baseColor, 0, DEFAULT_ENEMY_COLOR));
   }
 

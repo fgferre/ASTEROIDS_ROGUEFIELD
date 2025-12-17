@@ -3,9 +3,11 @@
 ## 1. Visão Geral do Sistema
 
 ### Conceito
+
 O sistema de collectibles gerencia itens que aparecem no espaço quando inimigos são destruídos. O jogador pode coletar esses itens ao passar próximo deles, recebendo benefícios imediatos (healing, power-ups temporários).
 
 ### Estado Atual (JavaScript)
+
 - **1 tipo implementado**: Health Hearts (healing)
 - **Drop condicional**: Baseado em enemy type/size/variant
 - **Collection automática**: Radius-based (25px)
@@ -13,12 +15,14 @@ O sistema de collectibles gerencia itens que aparecem no espaço quando inimigos
 - **Persistence**: NÃO persiste entre death/retry
 
 ### Features Novas para Godot
+
 - **Lifetime system**: Hearts desaparecem após 30s
 - **Fade animation**: Últimos 5s (25s → 30s)
 - **Drop position offset**: Offset radial da posição do enemy
 - **Power-ups temporários**: Speed boost, damage boost, invincibility (slots para implementação futura)
 
 ### Propósito no Gameplay
+
 - **Risk/reward**: Jogador deve se posicionar estrategicamente para coletar hearts antes que desapareçam
 - **Health management**: Alternativa ao regeneration natural (se houver)
 - **Visual feedback**: Indicação clara de progresso/recompensa
@@ -30,6 +34,7 @@ O sistema de collectibles gerencia itens que aparecem no espaço quando inimigos
 ### HealthHeartSystem (Manager)
 
 **JavaScript (src/modules/collectibles/HealthHeartSystem.js):**
+
 ```javascript
 {
   hearts: [],              // Array de HealthHeart instances
@@ -40,6 +45,7 @@ O sistema de collectibles gerencia itens que aparecem no espaço quando inimigos
 ```
 
 **Godot (GDScript):**
+
 ```gdscript
 extends Node3D
 class_name HealthHeartSystem
@@ -54,6 +60,7 @@ const COLLECTION_RADIUS: float = 25.0  # px convertido para units
 ### HealthHeart (Individual Item)
 
 **JavaScript (src/modules/collectibles/HealthHeart.js):**
+
 ```javascript
 {
   x: Number,              // Position X
@@ -66,6 +73,7 @@ const COLLECTION_RADIUS: float = 25.0  # px convertido para units
 ```
 
 **Godot (GDScript):**
+
 ```gdscript
 extends Area3D
 class_name HealthHeart
@@ -91,12 +99,14 @@ const FADE_DURATION: float = 5.0  # fade over 5s
 **⚠️ IMPORTANTE**: Healing é **25% do max HP**, não valor fixo de 25 HP.
 
 **JavaScript (HealthHeartSystem.js:57-78):**
+
 ```javascript
 const healAmount = Math.floor(playerStats.maxHP * 0.25);
 playerStats.HP = Math.min(playerStats.HP + healAmount, playerStats.maxHP);
 ```
 
 **Godot (GDScript):**
+
 ```gdscript
 func heal_player(heart: HealthHeart) -> void:
     var player_stats = player.get_stats()
@@ -111,17 +121,18 @@ func heal_player(heart: HealthHeart) -> void:
 
 **JavaScript (src/data/constants/visual.js:193):**
 
-| Enemy Type | Size | Base Rate | Special Variant Bonus | Total Rate |
-|------------|------|-----------|----------------------|------------|
-| Asteroid   | Large | 5% (0.05) | +3% (0.03) | 8% special |
-| Asteroid   | Medium | 2% (0.02) | +3% (0.03) | 5% special |
-| Asteroid   | Small | 0% (0.00) | +3% (0.03) | 3% special |
+| Enemy Type | Size   | Base Rate | Special Variant Bonus | Total Rate |
+| ---------- | ------ | --------- | --------------------- | ---------- |
+| Asteroid   | Large  | 5% (0.05) | +3% (0.03)            | 8% special |
+| Asteroid   | Medium | 2% (0.02) | +3% (0.03)            | 5% special |
+| Asteroid   | Small  | 0% (0.00) | +3% (0.03)            | 3% special |
 
 **Special Variants**: gold, crystal, volatile, parasite
 
 ### Visual Design
 
 **Rendering (JavaScript - HealthHeart.js:80-120):**
+
 1. **Outer glow**: Red gradient (radius × 2.5)
 2. **Body gradient**: Red fill (radius × 1.0)
 3. **Inner highlight**: Lighter red (radius × 0.6)
@@ -136,6 +147,7 @@ func heal_player(heart: HealthHeart) -> void:
 ### Drop Decision Logic
 
 **Pseudocódigo GDScript:**
+
 ```gdscript
 func should_drop_heart(enemy: Enemy) -> bool:
     var base_rate: float = 0.0
@@ -170,6 +182,7 @@ func calculate_drop_position(enemy_position: Vector3, enemy_radius: float) -> Ve
 ### Drop Trigger Integration
 
 **Enemy System Integration:**
+
 ```gdscript
 # Em Enemy.gd, quando destruído:
 signal destroyed(position: Vector3, type: Type, size: Size, is_special: bool)
@@ -199,6 +212,7 @@ func _on_enemy_destroyed(position: Vector3, type: int, size: int, is_special: bo
 **⚠️ Feature nova**: Não implementado no JavaScript atual.
 
 ### Conceito
+
 - Hearts vivem **30 segundos** após spawn
 - **Fade animation** nos últimos 5 segundos (25s → 30s)
 - **Auto-expire** ao atingir max lifetime
@@ -260,15 +274,17 @@ func spawn_expire_particles() -> void:
 **⚠️ IMPORTANTE**: Collection radius é **25px** (constante fixa), não "collision radius + padding".
 
 **JavaScript (HealthHeartSystem.js:44-55):**
+
 ```javascript
-const collectionRadiusSq = 25 * 25;  // 625
+const collectionRadiusSq = 25 * 25; // 625
 const distSq = (heart.x - player.x) ** 2 + (heart.y - player.y) ** 2;
 if (distSq < collectionRadiusSq) {
-    collectHeart(heart);
+  collectHeart(heart);
 }
 ```
 
 **Godot (GDScript):**
+
 ```gdscript
 # HealthHeart.gd - Area3D signals
 func _ready() -> void:
@@ -341,18 +357,20 @@ add_child(collision_shape)
 ### Algorithm
 
 **JavaScript (HealthHeart.js:26-45):**
+
 ```javascript
 // Seeded RNG para phase inicial
 this.pulsePhase = seedRandom() * Math.PI * 2;
 
 // Update loop
-this.pulsePhase += 3.0 * deltaTime;  // 3 rad/s
+this.pulsePhase += 3.0 * deltaTime; // 3 rad/s
 
 // Scale calculation
-const pulseScale = 1.0 + Math.sin(this.pulsePhase) * 0.2;  // 1.0 ± 0.2
+const pulseScale = 1.0 + Math.sin(this.pulsePhase) * 0.2; // 1.0 ± 0.2
 ```
 
 **Godot (GDScript):**
+
 ```gdscript
 func _ready() -> void:
     # Seeded RNG para evitar todos os hearts pulsando em sincronia
@@ -405,11 +423,11 @@ void fragment() {
 
 ### Power-up Types
 
-| Type | Duration | Effect | Visual | Drop Rate |
-|------|----------|--------|--------|-----------|
-| **Speed Boost** | 10s | +50% move speed | Blue glow | 1% boss, 0.5% special |
-| **Damage Boost** | 8s | +100% damage | Red glow | 1% boss, 0.5% special |
-| **Invincibility** | 5s | Immune to damage | Golden glow | 0.5% boss only |
+| Type              | Duration | Effect           | Visual      | Drop Rate             |
+| ----------------- | -------- | ---------------- | ----------- | --------------------- |
+| **Speed Boost**   | 10s      | +50% move speed  | Blue glow   | 1% boss, 0.5% special |
+| **Damage Boost**  | 8s       | +100% damage     | Red glow    | 1% boss, 0.5% special |
+| **Invincibility** | 5s       | Immune to damage | Golden glow | 0.5% boss only        |
 
 ### Pseudocódigo GDScript
 
@@ -738,20 +756,20 @@ void fragment() {
 
 ## 10. Tabela de Parâmetros
 
-| Parâmetro | Valor | Descrição | Origem |
-|-----------|-------|-----------|--------|
-| `COLLECTION_RADIUS` | 25.0 | Radius de collection (units) | HealthHeartSystem.js:16 |
-| `HEART_RADIUS` | 14.0 | Radius visual do heart (units) | HealthHeart.js:12 |
-| `HEAL_PERCENTAGE` | 0.25 | Healing como % do max HP | HealthHeartSystem.js:57 |
-| `PULSE_SPEED` | 3.0 | Velocidade da pulse animation (rad/s) | HealthHeart.js:28 |
-| `PULSE_AMPLITUDE` | 0.2 | Amplitude do pulse (±20% scale) | HealthHeart.js:30 |
-| `MAX_LIFETIME` | 30.0 | Tempo de vida máximo (seconds) | **NOVO** |
-| `FADE_START_TIME` | 25.0 | Início do fade (seconds) | **NOVO** |
-| `FADE_DURATION` | 5.0 | Duração do fade (seconds) | **NOVO** |
-| `DROP_RATE_LARGE` | 0.05 | Drop rate asteroid large (5%) | visual.js:193 |
-| `DROP_RATE_MEDIUM` | 0.02 | Drop rate asteroid medium (2%) | visual.js:193 |
-| `DROP_RATE_SMALL` | 0.0 | Drop rate asteroid small (0%) | visual.js:193 |
-| `VARIANT_BONUS` | 0.03 | Bonus drop rate special variants (+3%) | visual.js:193 |
+| Parâmetro           | Valor | Descrição                              | Origem                  |
+| ------------------- | ----- | -------------------------------------- | ----------------------- |
+| `COLLECTION_RADIUS` | 25.0  | Radius de collection (units)           | HealthHeartSystem.js:16 |
+| `HEART_RADIUS`      | 14.0  | Radius visual do heart (units)         | HealthHeart.js:12       |
+| `HEAL_PERCENTAGE`   | 0.25  | Healing como % do max HP               | HealthHeartSystem.js:57 |
+| `PULSE_SPEED`       | 3.0   | Velocidade da pulse animation (rad/s)  | HealthHeart.js:28       |
+| `PULSE_AMPLITUDE`   | 0.2   | Amplitude do pulse (±20% scale)        | HealthHeart.js:30       |
+| `MAX_LIFETIME`      | 30.0  | Tempo de vida máximo (seconds)         | **NOVO**                |
+| `FADE_START_TIME`   | 25.0  | Início do fade (seconds)               | **NOVO**                |
+| `FADE_DURATION`     | 5.0   | Duração do fade (seconds)              | **NOVO**                |
+| `DROP_RATE_LARGE`   | 0.05  | Drop rate asteroid large (5%)          | visual.js:193           |
+| `DROP_RATE_MEDIUM`  | 0.02  | Drop rate asteroid medium (2%)         | visual.js:193           |
+| `DROP_RATE_SMALL`   | 0.0   | Drop rate asteroid small (0%)          | visual.js:193           |
+| `VARIANT_BONUS`     | 0.03  | Bonus drop rate special variants (+3%) | visual.js:193           |
 
 ---
 
@@ -759,16 +777,17 @@ void fragment() {
 
 ### Base Rates
 
-| Enemy Type | Size | Base Drop Rate | Special Variant? | Final Drop Rate |
-|------------|------|----------------|------------------|-----------------|
-| Asteroid   | Large | 5% (0.05) | No | 5% |
-| Asteroid   | Large | 5% (0.05) | **Yes** (gold/crystal/volatile/parasite) | **8%** (0.05 + 0.03) |
-| Asteroid   | Medium | 2% (0.02) | No | 2% |
-| Asteroid   | Medium | 2% (0.02) | **Yes** | **5%** (0.02 + 0.03) |
-| Asteroid   | Small | 0% (0.00) | No | 0% |
-| Asteroid   | Small | 0% (0.00) | **Yes** | **3%** (0.00 + 0.03) |
+| Enemy Type | Size   | Base Drop Rate | Special Variant?                         | Final Drop Rate      |
+| ---------- | ------ | -------------- | ---------------------------------------- | -------------------- |
+| Asteroid   | Large  | 5% (0.05)      | No                                       | 5%                   |
+| Asteroid   | Large  | 5% (0.05)      | **Yes** (gold/crystal/volatile/parasite) | **8%** (0.05 + 0.03) |
+| Asteroid   | Medium | 2% (0.02)      | No                                       | 2%                   |
+| Asteroid   | Medium | 2% (0.02)      | **Yes**                                  | **5%** (0.02 + 0.03) |
+| Asteroid   | Small  | 0% (0.00)      | No                                       | 0%                   |
+| Asteroid   | Small  | 0% (0.00)      | **Yes**                                  | **3%** (0.00 + 0.03) |
 
 ### Special Variants
+
 - **Gold**: +3% drop rate
 - **Crystal**: +3% drop rate
 - **Volatile**: +3% drop rate
@@ -776,13 +795,13 @@ void fragment() {
 
 ### Future Power-ups (Sugestão)
 
-| Enemy Type | Power-up Type | Drop Rate |
-|------------|---------------|-----------|
-| Boss | Speed Boost | 1% |
-| Boss | Damage Boost | 1% |
-| Boss | Invincibility | 0.5% |
-| Special Enemy | Speed Boost | 0.5% |
-| Special Enemy | Damage Boost | 0.5% |
+| Enemy Type    | Power-up Type | Drop Rate |
+| ------------- | ------------- | --------- |
+| Boss          | Speed Boost   | 1%        |
+| Boss          | Damage Boost  | 1%        |
+| Boss          | Invincibility | 0.5%      |
+| Special Enemy | Speed Boost   | 0.5%      |
+| Special Enemy | Damage Boost  | 0.5%      |
 
 ---
 
@@ -949,21 +968,23 @@ flowchart TD
 
 **JavaScript (HealthHeart.js:80-120):**
 
-| Layer | Radius | Color (RGB) | Color (HSL) | Specs |
-|-------|--------|-------------|-------------|-------|
-| **Outer Glow** | radius × 2.5 (35px) | `rgba(255, 0, 0, 0.3)` | `hsl(0, 100%, 50%)` + alpha 0.3 | Radial gradient: center (r=0, alpha=0.3) → edge (r=35, alpha=0) |
-| **Body Gradient** | radius × 1.0 (14px) | Center: `rgb(255, 100, 100)` → Edge: `rgb(200, 0, 0)` | Center: `hsl(0, 100%, 70%)` → Edge: `hsl(0, 100%, 39%)` | Radial gradient fill |
-| **Inner Highlight** | radius × 0.6 (8.4px) | `rgba(255, 150, 150, 0.6)` | `hsl(0, 100%, 79%)` + alpha 0.6 | Radial gradient: center (alpha=0.6) → edge (alpha=0) |
-| **Cross Symbol** | Width: 2px, Length: radius × 1.2 (16.8px) | `rgb(255, 255, 255)` | `hsl(0, 0%, 100%)` | Two lines: horizontal + vertical, centered |
+| Layer               | Radius                                    | Color (RGB)                                           | Color (HSL)                                             | Specs                                                           |
+| ------------------- | ----------------------------------------- | ----------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------- |
+| **Outer Glow**      | radius × 2.5 (35px)                       | `rgba(255, 0, 0, 0.3)`                                | `hsl(0, 100%, 50%)` + alpha 0.3                         | Radial gradient: center (r=0, alpha=0.3) → edge (r=35, alpha=0) |
+| **Body Gradient**   | radius × 1.0 (14px)                       | Center: `rgb(255, 100, 100)` → Edge: `rgb(200, 0, 0)` | Center: `hsl(0, 100%, 70%)` → Edge: `hsl(0, 100%, 39%)` | Radial gradient fill                                            |
+| **Inner Highlight** | radius × 0.6 (8.4px)                      | `rgba(255, 150, 150, 0.6)`                            | `hsl(0, 100%, 79%)` + alpha 0.6                         | Radial gradient: center (alpha=0.6) → edge (alpha=0)            |
+| **Cross Symbol**    | Width: 2px, Length: radius × 1.2 (16.8px) | `rgb(255, 255, 255)`                                  | `hsl(0, 0%, 100%)`                                      | Two lines: horizontal + vertical, centered                      |
 
 ### Godot 3D Equivalent
 
 **Approach 1: Sprite3D + Texture**
+
 - Criar texture 64×64 PNG pré-renderizada com as 4 layers
 - Aplicar a Sprite3D com billboard mode
 - Shader para pulse/fade
 
 **Approach 2: Sprite3D + Shader (Procedural)**
+
 ```gdshader
 shader_type spatial;
 render_mode blend_mix, unshaded;
@@ -999,9 +1020,11 @@ void fragment() {
 ```
 
 **Approach 3: MeshInstance3D + QuadMesh**
+
 - Similar ao Sprite3D, mas com mais controle sobre geometry/UV
 
 ### Recomendação
+
 - **Approach 1** (Sprite3D + Texture): Melhor performance, visual consistente
 - **Approach 2** (Shader procedural): Mais flexível, permite variações dinâmicas
 
@@ -1012,12 +1035,14 @@ void fragment() {
 ### Collection SFX
 
 **Características:**
+
 - **Sound design**: Bright, short "bling" (100-150ms)
 - **Pitch**: Base C6 (1046 Hz), variação ±10% (randf_range(0.9, 1.1))
 - **Volume**: -5 dB (audível mas não intrusivo)
 - **Spatial**: 3D audio com attenuation (max distance: 100 units)
 
 **Godot Implementation:**
+
 ```gdscript
 func play_collection_sfx() -> void:
     var audio_player = AudioStreamPlayer3D.new()
@@ -1037,6 +1062,7 @@ func play_collection_sfx() -> void:
 ### Expire SFX (Opcional)
 
 **Características:**
+
 - **Sound design**: Soft "poof" (80ms)
 - **Pitch**: Base A4 (440 Hz)
 - **Volume**: -15 dB (muito sutil)
@@ -1049,7 +1075,9 @@ func play_collection_sfx() -> void:
 ### Interfaces Necessárias
 
 #### Enemy System
+
 **Signal emitido pelo Enemy:**
+
 ```gdscript
 signal destroyed(data: Dictionary)
 # data = {
@@ -1062,6 +1090,7 @@ signal destroyed(data: Dictionary)
 ```
 
 **HealthHeartSystem conecta:**
+
 ```gdscript
 func _ready() -> void:
     for enemy in get_tree().get_nodes_in_group("enemies"):
@@ -1069,7 +1098,9 @@ func _ready() -> void:
 ```
 
 #### Player System
+
 **Métodos necessários no Player:**
+
 ```gdscript
 func get_stats() -> Dictionary:
     return {
@@ -1087,13 +1118,16 @@ func show_heal_popup(amount: int) -> void:
 ```
 
 **Propriedades necessárias:**
+
 ```gdscript
 var is_dead: bool = false
 var is_retrying: bool = false
 ```
 
 #### Effects System
+
 **GPUParticles3D configuration:**
+
 ```gdscript
 # Collection particles
 var particles = GPUParticles3D.new()
@@ -1115,7 +1149,9 @@ particles.process_material = material
 ```
 
 #### Audio System
+
 **Método necessário:**
+
 ```gdscript
 # Global AudioSystem autoload
 static func play_sfx(sfx_name: String, position: Vector3, pitch: float = 1.0, volume_db: float = 0.0) -> void:
@@ -1124,12 +1160,15 @@ static func play_sfx(sfx_name: String, position: Vector3, pitch: float = 1.0, vo
 ```
 
 #### UI System
+
 **Signal emitido pelo HealthHeart:**
+
 ```gdscript
 signal collected(position: Vector3, heal_amount: int)
 ```
 
 **UI conecta para criar popup:**
+
 ```gdscript
 func _on_heart_collected(position: Vector3, heal_amount: int) -> void:
     var popup = FloatingText.new()
@@ -1145,43 +1184,43 @@ func _on_heart_collected(position: Vector3, heal_amount: int) -> void:
 
 ### Arquivos Analisados
 
-| Arquivo | Linhas | Descrição |
-|---------|--------|-----------|
-| [src/modules/collectibles/HealthHeartSystem.js](../../../src/modules/collectibles/HealthHeartSystem.js) | 122 | Manager: spawn, update, collection check, healing |
-| [src/modules/collectibles/HealthHeart.js](../../../src/modules/collectibles/HealthHeart.js) | 128 | Individual heart: pulse, render, collision |
-| [src/data/constants/visual.js](../../../src/data/constants/visual.js) | 193 | Drop rates por enemy type/size/variant |
+| Arquivo                                                                                                 | Linhas | Descrição                                         |
+| ------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------- |
+| [src/modules/collectibles/HealthHeartSystem.js](../../../src/modules/collectibles/HealthHeartSystem.js) | 122    | Manager: spawn, update, collection check, healing |
+| [src/modules/collectibles/HealthHeart.js](../../../src/modules/collectibles/HealthHeart.js)             | 128    | Individual heart: pulse, render, collision        |
+| [src/data/constants/visual.js](../../../src/data/constants/visual.js)                                   | 193    | Drop rates por enemy type/size/variant            |
 
 ### Funções-Chave (JavaScript)
 
-| Função | Arquivo | Linhas | Descrição |
-|--------|---------|--------|-----------|
-| `update(deltaTime)` | HealthHeartSystem.js | 26-42 | Update loop: hearts, collection, cleanup |
-| `checkCollision(player)` | HealthHeartSystem.js | 44-55 | Circle-circle collision check (radius 25px) |
-| `collectHeart(heart)` | HealthHeartSystem.js | 57-78 | Healing (25% max HP), feedback, remove |
-| `spawn(x, y)` | HealthHeartSystem.js | 80-88 | Create HealthHeart instance, add to array |
-| `render(ctx, camera)` | HealthHeart.js | 80-120 | Canvas 2D rendering (4 layers) |
-| `update(deltaTime)` | HealthHeart.js | 26-45 | Pulse animation update |
+| Função                   | Arquivo              | Linhas | Descrição                                   |
+| ------------------------ | -------------------- | ------ | ------------------------------------------- |
+| `update(deltaTime)`      | HealthHeartSystem.js | 26-42  | Update loop: hearts, collection, cleanup    |
+| `checkCollision(player)` | HealthHeartSystem.js | 44-55  | Circle-circle collision check (radius 25px) |
+| `collectHeart(heart)`    | HealthHeartSystem.js | 57-78  | Healing (25% max HP), feedback, remove      |
+| `spawn(x, y)`            | HealthHeartSystem.js | 80-88  | Create HealthHeart instance, add to array   |
+| `render(ctx, camera)`    | HealthHeart.js       | 80-120 | Canvas 2D rendering (4 layers)              |
+| `update(deltaTime)`      | HealthHeart.js       | 26-45  | Pulse animation update                      |
 
 ### Eventos
 
-| Evento | Emitido por | Consumido por | Dados |
-|--------|-------------|---------------|-------|
-| `destroyed` | Enemy | HealthHeartSystem | `{position, type, size, is_special, radius}` |
-| `collected` | HealthHeart | UI System | `{position, heal_amount}` |
-| `healed` | Player | UI System, Audio System | `{amount}` |
+| Evento      | Emitido por | Consumido por           | Dados                                        |
+| ----------- | ----------- | ----------------------- | -------------------------------------------- |
+| `destroyed` | Enemy       | HealthHeartSystem       | `{position, type, size, is_special, radius}` |
+| `collected` | HealthHeart | UI System               | `{position, heal_amount}`                    |
+| `healed`    | Player      | UI System, Audio System | `{amount}`                                   |
 
 ### Constantes Importantes
 
 ```javascript
 // JavaScript (valores exatos)
-COLLECTION_RADIUS = 25         // px
-HEART_RADIUS = 14              // px
-HEAL_PERCENTAGE = 0.25         // 25% max HP
-PULSE_SPEED = 3.0              // rad/s
-PULSE_AMPLITUDE = 0.2          // ±20% scale
-DROP_RATE_LARGE = 0.05         // 5%
-DROP_RATE_MEDIUM = 0.02        // 2%
-VARIANT_BONUS = 0.03           // +3%
+COLLECTION_RADIUS = 25; // px
+HEART_RADIUS = 14; // px
+HEAL_PERCENTAGE = 0.25; // 25% max HP
+PULSE_SPEED = 3.0; // rad/s
+PULSE_AMPLITUDE = 0.2; // ±20% scale
+DROP_RATE_LARGE = 0.05; // 5%
+DROP_RATE_MEDIUM = 0.02; // 2%
+VARIANT_BONUS = 0.03; // +3%
 ```
 
 ```gdscript
@@ -1203,15 +1242,18 @@ const FADE_DURATION: float = 5.0       # NOVO
 ### Correções de Informações Iniciais
 
 1. **Healing**: 25% do max HP (não valor fixo de 25 HP)
+
    - Fórmula: `floor(maxHP × 0.25)`
    - Exemplo: Player com 100 HP max → heal 25 HP
    - Exemplo: Player com 150 HP max → heal 37 HP
 
 2. **Collection Radius**: 25px constante (não "collision radius + padding")
+
    - Definido em HealthHeartSystem.js:16
    - Circle-circle check: `distSq < collectionRadiusSq` (625)
 
 3. **Drop Position**: Exata posição do enemy no código atual
+
    - Offset radial é feature nova sugerida para Godot
    - JavaScript: `new HealthHeart(enemy.x, enemy.y)`
 

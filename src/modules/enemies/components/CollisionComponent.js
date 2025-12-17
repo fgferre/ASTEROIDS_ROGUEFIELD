@@ -42,13 +42,15 @@ export class CollisionComponent {
       return [];
     }
     return entities.filter((entity) =>
-      this.checkCircleCollision(enemy, entity.x ?? 0, entity.y ?? 0, radius),
+      this.checkCircleCollision(enemy, entity.x ?? 0, entity.y ?? 0, radius)
     );
   }
 
   handleCollision(context) {
     const { enemy, other } = context;
-    const handler = this.responses.get(enemy.collisionResponse || this.response);
+    const handler = this.responses.get(
+      enemy.collisionResponse || this.response
+    );
     handler?.(context);
   }
 
@@ -83,8 +85,12 @@ export class CollisionComponent {
         return;
       }
 
-      const restitution = Math.min(enemy.bounce ?? COLLISION_BOUNCE, other.bounce ?? COLLISION_BOUNCE);
-      const impulseScalar = (-(1 + restitution) * velAlongNormal) / (1 / massA + 1 / massB);
+      const restitution = Math.min(
+        enemy.bounce ?? COLLISION_BOUNCE,
+        other.bounce ?? COLLISION_BOUNCE
+      );
+      const impulseScalar =
+        (-(1 + restitution) * velAlongNormal) / (1 / massA + 1 / massB);
 
       const impulseX = impulseScalar * nx;
       const impulseY = impulseScalar * ny;
@@ -130,7 +136,12 @@ export class CollisionComponent {
     this.resolveCollision(enemy, other);
   }
 
-  handleDamage({ enemy, other, damage = this.config.contactDamage ?? enemy.contactDamage ?? 10, source }) {
+  handleDamage({
+    enemy,
+    other,
+    damage = this.config.contactDamage ?? enemy.contactDamage ?? 10,
+    source,
+  }) {
     if (!enemy || !other) {
       return;
     }

@@ -32,8 +32,12 @@ export class HealthComponent {
 
     const config = { ...this.config, ...overrides };
     const hasExplicitHealth = Number.isFinite(overrides.health);
-    const waveMultiplier = hasExplicitHealth ? 1 : this.resolveWaveMultiplier(enemy, config);
-    const variantMultiplier = hasExplicitHealth ? 1 : config.variantMultiplier ?? 1;
+    const waveMultiplier = hasExplicitHealth
+      ? 1
+      : this.resolveWaveMultiplier(enemy, config);
+    const variantMultiplier = hasExplicitHealth
+      ? 1
+      : config.variantMultiplier ?? 1;
 
     if (hasExplicitHealth) {
       enemy.maxHealth = overrides.health;
@@ -41,7 +45,7 @@ export class HealthComponent {
     } else {
       const baseValue = Math.max(
         config.base ?? enemy.maxHealth ?? enemy.health ?? 1,
-        1,
+        1
       );
       const scaled = baseValue * waveMultiplier * variantMultiplier;
       enemy.maxHealth = scaled;
@@ -51,7 +55,8 @@ export class HealthComponent {
     enemy.armor = config.armor ?? enemy.armor ?? 0;
     enemy.shields = config.shields ?? enemy.shields ?? 0;
     enemy.invulnerable = Boolean(config.invulnerable ?? enemy.invulnerable);
-    enemy.invulnerabilityTimer = config.invulnerabilityDuration ?? enemy.invulnerabilityTimer ?? 0;
+    enemy.invulnerabilityTimer =
+      config.invulnerabilityDuration ?? enemy.invulnerabilityTimer ?? 0;
     enemy.healthConfig = config;
   }
 
@@ -91,7 +96,10 @@ export class HealthComponent {
       }
     }
 
-    enemy.health = Math.max((enemy.health ?? this.config.base ?? 1) - remaining, 0);
+    enemy.health = Math.max(
+      (enemy.health ?? this.config.base ?? 1) - remaining,
+      0
+    );
     this.emitDamageEvent(enemy, effectiveDamage, source, context);
 
     if (enemy.health <= 0) {
@@ -108,7 +116,10 @@ export class HealthComponent {
       return 0;
     }
     const previous = enemy.health ?? 0;
-    enemy.health = Math.min(previous + amount, enemy.maxHealth ?? previous + amount);
+    enemy.health = Math.min(
+      previous + amount,
+      enemy.maxHealth ?? previous + amount
+    );
     return enemy.health - previous;
   }
 
@@ -120,7 +131,10 @@ export class HealthComponent {
     if (!enemy?.invulnerabilityTimer) {
       return;
     }
-    enemy.invulnerabilityTimer = Math.max(enemy.invulnerabilityTimer - deltaTime, 0);
+    enemy.invulnerabilityTimer = Math.max(
+      enemy.invulnerabilityTimer - deltaTime,
+      0
+    );
     if (enemy.invulnerabilityTimer === 0) {
       enemy.invulnerable = false;
     }
@@ -149,7 +163,8 @@ export class HealthComponent {
       enemy.onDestroyed(source, enrichedContext);
     }
     if (bus?.emit) {
-      const hasPosition = Number.isFinite(enemy?.x) && Number.isFinite(enemy?.y);
+      const hasPosition =
+        Number.isFinite(enemy?.x) && Number.isFinite(enemy?.y);
       const payload = {
         enemy,
         enemyId: enemy.id,

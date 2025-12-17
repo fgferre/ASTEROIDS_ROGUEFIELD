@@ -28,7 +28,10 @@ export class EnemyRenderSystem {
     this.facade = context.facade ?? null;
 
     if (!this.facade) {
-      GameDebugLogger.log('ERROR', 'EnemyRenderSystem missing facade reference');
+      GameDebugLogger.log(
+        'ERROR',
+        'EnemyRenderSystem missing facade reference'
+      );
     }
   }
 

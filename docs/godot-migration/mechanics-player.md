@@ -1,6 +1,7 @@
 # Player System - Godot 3D Migration Guide
 
 ## Table of Contents
+
 1. [System Overview](#1-system-overview)
 2. [Data Structure](#2-data-structure)
 3. [Movement System](#3-movement-system)
@@ -25,11 +26,13 @@
 ## 1. System Overview
 
 ### Concept
+
 The Player System controls a spaceship in a top-down physics-based environment using WASD input. The ship uses acceleration-based movement (not velocity-based), features an activatable shield with HP-based absorption, and includes a new directional dash mechanic for enhanced mobility.
 
 ### Six Integrated Subsystems
 
 #### 1. Movement System
+
 - WASD input for directional control
 - Acceleration-based physics with linear damping
 - Angular rotation with acceleration and damping
@@ -37,6 +40,7 @@ The Player System controls a spaceship in a top-down physics-based environment u
 - Seamless screen wrapping teleportation
 
 #### 2. Shield System
+
 - Activatable via E key
 - HP-based damage absorption (50-125 HP depending on upgrade level)
 - Cooldown system (20s-13s, reduced with upgrades)
@@ -44,6 +48,7 @@ The Player System controls a spaceship in a top-down physics-based environment u
 - 5 progressive upgrade levels
 
 #### 3. Health System
+
 - Base HP pool (100, upgradeable)
 - Damage absorption priority: Shield → HP
 - Invulnerability timer (0.5s after damage, 3s after respawn)
@@ -51,17 +56,20 @@ The Player System controls a spaceship in a top-down physics-based environment u
 - Death state management
 
 #### 4. Thruster System
+
 - 4 independent thrusters: Main (forward), Aux (backward), SideL (CW rotation), SideR (CCW rotation)
 - Intensity tracking (0-1 range) for visual/audio feedback
 - Visual upgrade levels (0-5) control appearance
 - Automatic activation for drift-braking
 
 #### 5. Weapon Recoil
+
 - Visual offset feedback when firing
 - Exponential decay (0.85 rate) for snappy feel
 - Applied as position offset to ship rendering
 
 #### 6. Dash System (NEW)
+
 - Directional dash mechanic (Shift key)
 - Cooldown-based (2.0s suggested)
 - Invulnerability frames during dash (0.15s suggested)
@@ -69,6 +77,7 @@ The Player System controls a spaceship in a top-down physics-based environment u
 - Fixed velocity (500, ~2.3x max speed)
 
 ### Gameplay Purpose
+
 Provides responsive, tactile ship control with multiple defensive layers (shield + HP + invulnerability) and enhanced mobility through dash, creating engaging combat and evasion mechanics.
 
 ---
@@ -78,6 +87,7 @@ Provides responsive, tactile ship control with multiple defensive layers (shield
 This section maps the JavaScript `PlayerSystem` data structure to GDScript equivalents for Godot 3D implementation.
 
 ### JavaScript Structure Reference
+
 Source: `src/modules/PlayerSystem.js` lines 100-158
 
 ### GDScript Implementation
@@ -204,23 +214,25 @@ var dash_direction: Vector3 = Vector3.ZERO
 
 ### JS to GDScript Type Mapping
 
-| JavaScript | GDScript | Notes |
-|------------|----------|-------|
-| `{x, y}` (Vector2) | `Vector3(x, 0, z)` | 2D→3D: XY plane → XZ plane (y=0) |
-| `position` (object) | `global_position` (Vector3) | Built-in property |
-| `velocity` (object) | `velocity` (Vector3) | CharacterBody3D property |
-| `angle` (float) | `angle` (float) or `rotation.y` | Rotation around Y-axis |
-| `boolean` | `bool` | Direct mapping |
-| `number` | `float`/`int` | Context-dependent |
+| JavaScript          | GDScript                        | Notes                            |
+| ------------------- | ------------------------------- | -------------------------------- |
+| `{x, y}` (Vector2)  | `Vector3(x, 0, z)`              | 2D→3D: XY plane → XZ plane (y=0) |
+| `position` (object) | `global_position` (Vector3)     | Built-in property                |
+| `velocity` (object) | `velocity` (Vector3)            | CharacterBody3D property         |
+| `angle` (float)     | `angle` (float) or `rotation.y` | Rotation around Y-axis           |
+| `boolean`           | `bool`                          | Direct mapping                   |
+| `number`            | `float`/`int`                   | Context-dependent                |
 
 ---
 
 ## 3. Movement System
 
 ### Concept
+
 Movement is **acceleration-based** rather than velocity-based. WASD input controls thrusters that apply forces to the ship each frame. Rotation uses angular velocity (not instantaneous). When no linear input is detected, an automatic drift-brake system activates. Screen wrapping provides seamless teleportation at boundaries.
 
 ### Source Reference
+
 `src/modules/PlayerSystem.js` lines 646-716 (`updateMovement`)
 
 ### Algorithm Flow
@@ -349,18 +361,20 @@ func update_movement(delta: float, input: Dictionary) -> void:
 ## 4. Drift System
 
 ### Concept
+
 When the player releases W/S keys (no linear input), the `drift_factor` increases progressively, automatically activating thrusters to brake the ship. A `brake_reduction` parameter allows for controlled drifting. When the player resumes input, `drift_factor` decays rapidly.
 
 ### Source Reference
+
 `src/modules/PlayerSystem.js` lines 664-693 and constants lines 24-28
 
 ### Parameters
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `DRIFT_RAMP_SPEED` | 2.8 | Speed of drift factor increase |
-| `DRIFT_DECAY_SPEED` | 5.2 | Speed of drift factor decrease |
-| `DRIFT_BRAKE_REDUCTION` | 0.4 | Brake effectiveness reduction (allows drift) |
+| Parameter               | Default | Description                                  |
+| ----------------------- | ------- | -------------------------------------------- |
+| `DRIFT_RAMP_SPEED`      | 2.8     | Speed of drift factor increase               |
+| `DRIFT_DECAY_SPEED`     | 5.2     | Speed of drift factor decrease               |
+| `DRIFT_BRAKE_REDUCTION` | 0.4     | Brake effectiveness reduction (allows drift) |
 
 ### Algorithm
 
@@ -424,9 +438,11 @@ func update_drift_auto_brake(delta: float, input: Dictionary, forward: Vector3) 
 ## 5. Rotation System
 
 ### Concept
+
 Rotation uses **angular velocity** rather than instantaneous rotation. A/D input applies **angular acceleration**. Angular damping naturally decelerates rotation when no input is active. Angular velocity is clamped to `rotationSpeed`.
 
 ### Source Reference
+
 `src/modules/PlayerSystem.js` lines 718-735
 
 ### Algorithm
@@ -488,34 +504,36 @@ func wrap_angle(a: float) -> float:
 ## 6. Shield System
 
 ### Concept
+
 An activatable shield (E key) that absorbs damage before HP. The shield is **HP-based** (not hit-based), ranging from 50-125 HP depending on upgrade level. After breaking, it enters cooldown (20s-13s, reduced with upgrades). On damage absorption, it generates a shockwave that knocks back nearby enemies. The system features 5 progressive upgrade levels.
 
 ### Source Reference
+
 - `src/modules/PlayerSystem.js` lines 391-563
 - `src/data/constants/gameplay.js` lines 30-51
 
 ### Shield Level Configuration
 
-| Level | Max HP | Cooldown | Impact Damage | Special Feature |
-|-------|--------|----------|---------------|-----------------|
-| 1 | 50 | 20s | 10 | Unlock shield ability |
-| 2 | 75 | 20s | 14 | +25 HP |
-| 3 | 75 | 15s | 18 | -5s cooldown |
-| 4 | 100 | 15s | 22 | +25 HP |
-| 5 | 125 | 13s | 26 | +25 HP, -2s cooldown, deflective explosion on break |
+| Level | Max HP | Cooldown | Impact Damage | Special Feature                                     |
+| ----- | ------ | -------- | ------------- | --------------------------------------------------- |
+| 1     | 50     | 20s      | 10            | Unlock shield ability                               |
+| 2     | 75     | 20s      | 14            | +25 HP                                              |
+| 3     | 75     | 15s      | 18            | -5s cooldown                                        |
+| 4     | 100    | 15s      | 22            | +25 HP                                              |
+| 5     | 125    | 13s      | 26            | +25 HP, -2s cooldown, deflective explosion on break |
 
 ### Constants
 
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `SHIELD_COOLDOWN_DURATION` | 20s | Base cooldown duration |
-| `SHIELD_SHOCKWAVE_RADIUS` | 300 | Shockwave effect radius |
-| `SHIELD_SHOCKWAVE_FORCE` | 350 | Knockback force |
-| `SHIELD_HIT_GRACE_TIME` | 0.28s | Time between consecutive absorptions |
-| `SHIELD_COLLISION_BOUNCE` | 0.85 | Bounce coefficient |
-| `SHIELD_REFLECT_SPEED` | 95 | Velocity increment on impact |
-| `SHIELD_IMPACT_DAMAGE_BASE` | 10 | Base impact damage |
-| `SHIELD_IMPACT_DAMAGE_PER_LEVEL` | 4 | Additional damage per level |
+| Constant                         | Value | Description                          |
+| -------------------------------- | ----- | ------------------------------------ |
+| `SHIELD_COOLDOWN_DURATION`       | 20s   | Base cooldown duration               |
+| `SHIELD_SHOCKWAVE_RADIUS`        | 300   | Shockwave effect radius              |
+| `SHIELD_SHOCKWAVE_FORCE`         | 350   | Knockback force                      |
+| `SHIELD_HIT_GRACE_TIME`          | 0.28s | Time between consecutive absorptions |
+| `SHIELD_COLLISION_BOUNCE`        | 0.85  | Bounce coefficient                   |
+| `SHIELD_REFLECT_SPEED`           | 95    | Velocity increment on impact         |
+| `SHIELD_IMPACT_DAMAGE_BASE`      | 10    | Base impact damage                   |
+| `SHIELD_IMPACT_DAMAGE_PER_LEVEL` | 4     | Additional damage per level          |
 
 ### Activation Algorithm
 
@@ -626,23 +644,25 @@ func emit_shield_activation_failed(reason: String) -> void:
 ## 7. Shield Shockwave
 
 ### Concept
+
 When the shield absorbs damage, it emits a shockwave that pushes nearby enemies radially and deals impact damage. A grace timer prevents shockwave spam from rapid consecutive hits.
 
 ### Source Reference
+
 `src/data/constants/gameplay.js` lines 50-56
 `src/modules/PhysicsSystem.js` (shockwave implementation)
 
 ### Parameters
 
-| Parameter | Value | Description |
-|-----------|-------|-------------|
-| `SHIELD_SHOCKWAVE_RADIUS` | 300 | Shockwave detection radius |
-| `SHIELD_SHOCKWAVE_FORCE` | 350 | Knockback force magnitude |
-| `SHIELD_IMPACT_DAMAGE_BASE` | 10 | Base impact damage |
-| `SHIELD_IMPACT_DAMAGE_PER_LEVEL` | 4 | Damage scaling per level |
-| `SHIELD_HIT_GRACE_TIME` | 0.28s | Minimum time between shockwaves |
-| `SHIELD_COLLISION_BOUNCE` | 0.85 | Bounce coefficient |
-| `SHIELD_REFLECT_SPEED` | 95 | Speed boost on reflection |
+| Parameter                        | Value | Description                     |
+| -------------------------------- | ----- | ------------------------------- |
+| `SHIELD_SHOCKWAVE_RADIUS`        | 300   | Shockwave detection radius      |
+| `SHIELD_SHOCKWAVE_FORCE`         | 350   | Knockback force magnitude       |
+| `SHIELD_IMPACT_DAMAGE_BASE`      | 10    | Base impact damage              |
+| `SHIELD_IMPACT_DAMAGE_PER_LEVEL` | 4     | Damage scaling per level        |
+| `SHIELD_HIT_GRACE_TIME`          | 0.28s | Minimum time between shockwaves |
+| `SHIELD_COLLISION_BOUNCE`        | 0.85  | Bounce coefficient              |
+| `SHIELD_REFLECT_SPEED`           | 95    | Speed boost on reflection       |
 
 ### Damage Absorption Algorithm
 
@@ -817,18 +837,20 @@ func update_timers(delta: float) -> void:
 ## 8. Health System
 
 ### Concept
+
 HP pool system (100 base, upgradeable) where damage is absorbed by the shield first, with overflow passing to HP. Invulnerability timer (0.5s) prevents multi-hit damage. Healing is possible via collectibles. Death occurs when HP reaches 0.
 
 ### Source Reference
+
 `src/modules/PlayerSystem.js` lines 1039-1096
 
 ### Constants
 
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `PLAYER_INITIAL_HEALTH` | 100 | Starting HP |
-| `PLAYER_INVULNERABILITY_DURATION` | 0.5s | Invulnerability after taking damage |
-| `PLAYER_RESPAWN_INVULNERABILITY` | 3.0s | Invulnerability after respawn |
+| Constant                          | Value | Description                         |
+| --------------------------------- | ----- | ----------------------------------- |
+| `PLAYER_INITIAL_HEALTH`           | 100   | Starting HP                         |
+| `PLAYER_INVULNERABILITY_DURATION` | 0.5s  | Invulnerability after taking damage |
+| `PLAYER_RESPAWN_INVULNERABILITY`  | 3.0s  | Invulnerability after respawn       |
 
 ### Damage Algorithm
 
@@ -999,19 +1021,21 @@ func stop_all_thruster_sounds() -> void:
 ## 9. Thruster System
 
 ### Concept
+
 Four independent thrusters provide propulsion: Main (forward), Aux (backward), SideL (CW rotation), SideR (CCW rotation). Each thruster has an intensity value (0-1) calculated from input and auto-brake. Visual upgrade levels (0-5) control appearance. Audio feedback modulates pitch/volume based on intensity.
 
 ### Source Reference
+
 `src/modules/PlayerSystem.js` lines 737-795
 
 ### Thruster Configuration
 
-| Thruster | Function | Position | Direction | Visual Level Range |
-|----------|----------|----------|-----------|-------------------|
-| **Main** | Forward thrust (W) | Rear of ship (-0.8 × size) | Forward | 0-5 (thrusterVisualLevel) |
-| **Aux** | Backward thrust (S) | Front of ship (+0.8 × size) | Backward | 0-3 (brakingVisualLevel) |
-| **SideL** | CW rotation (D) | Left side (-0.52 × size) | Perpendicular right | 0-5 (rcsVisualLevel) |
-| **SideR** | CCW rotation (A) | Right side (+0.52 × size) | Perpendicular left | 0-5 (rcsVisualLevel) |
+| Thruster  | Function            | Position                    | Direction           | Visual Level Range        |
+| --------- | ------------------- | --------------------------- | ------------------- | ------------------------- |
+| **Main**  | Forward thrust (W)  | Rear of ship (-0.8 × size)  | Forward             | 0-5 (thrusterVisualLevel) |
+| **Aux**   | Backward thrust (S) | Front of ship (+0.8 × size) | Backward            | 0-3 (brakingVisualLevel)  |
+| **SideL** | CW rotation (D)     | Left side (-0.52 × size)    | Perpendicular right | 0-5 (rcsVisualLevel)      |
+| **SideR** | CCW rotation (A)    | Right side (+0.52 × size)   | Perpendicular left  | 0-5 (rcsVisualLevel)      |
 
 ### Algorithm
 
@@ -1163,17 +1187,19 @@ func get_thruster_color(intensity: float) -> Color:
 ## 10. Weapon Recoil
 
 ### Concept
+
 When firing weapons, the ship recoils slightly (visual offset only, no physics). The recoil offset decays exponentially over time for a snappy feel. Offset is cleared when very small to prevent jitter.
 
 ### Source Reference
+
 `src/modules/PlayerSystem.js` lines 143-145, 617-623
 
 ### Constants
 
-| Constant | Value | Description |
-|----------|-------|-------------|
-| `RECOIL_DECAY` | 0.85 | Exponential decay rate (fast) |
-| `RECOIL_THRESHOLD` | 0.01 | Clear threshold to prevent jitter |
+| Constant           | Value | Description                       |
+| ------------------ | ----- | --------------------------------- |
+| `RECOIL_DECAY`     | 0.85  | Exponential decay rate (fast)     |
+| `RECOIL_THRESHOLD` | 0.01  | Clear threshold to prevent jitter |
 
 ### Algorithm
 
@@ -1234,17 +1260,18 @@ func _on_weapon_fired(weapon_data: Dictionary) -> void:
 ## 11. Dash System (NEW FEATURE)
 
 ### Concept
+
 A directional dash ability (Shift key) that propels the player in the movement direction. This feature **does not exist in the JavaScript codebase** and is a new addition for the Godot implementation. It includes cooldown management, invulnerability frames, trail visual effects, and fixed velocity during dash.
 
 ### Design Specifications
 
-| Parameter | Suggested Value | Description |
-|-----------|----------------|-------------|
-| `DASH_COOLDOWN` | 2.0s | Time between dashes |
-| `DASH_DURATION` | 0.2s | How long dash lasts |
-| `DASH_SPEED` | 500 | Velocity during dash (~2.3x max speed) |
-| `DASH_INVULNERABILITY` | 0.15s | Invulnerability frames |
-| `DASH_TRAIL_LIFETIME` | 0.5s | Trail particle lifetime |
+| Parameter              | Suggested Value | Description                            |
+| ---------------------- | --------------- | -------------------------------------- |
+| `DASH_COOLDOWN`        | 2.0s            | Time between dashes                    |
+| `DASH_DURATION`        | 0.2s            | How long dash lasts                    |
+| `DASH_SPEED`           | 500             | Velocity during dash (~2.3x max speed) |
+| `DASH_INVULNERABILITY` | 0.15s           | Invulnerability frames                 |
+| `DASH_TRAIL_LIFETIME`  | 0.5s            | Trail particle lifetime                |
 
 ### Activation Algorithm
 
@@ -1423,9 +1450,11 @@ func create_dash_color_ramp() -> Gradient:
 ## 12. Screen Wrapping
 
 ### Concept
+
 When the player exits one side of the game area, they seamlessly reappear on the opposite side. Velocity and rotation are preserved (no physics disruption).
 
 ### Source Reference
+
 `src/modules/PlayerSystem.js` lines 797-807
 
 ### Algorithm
@@ -1555,6 +1584,7 @@ Player (CharacterBody3D)
 ### Material Setup
 
 #### Player Shader (player_shader.gdshader)
+
 ```glsl
 shader_type spatial;
 
@@ -1582,6 +1612,7 @@ void fragment() {
 ```
 
 #### Shield Shader (shield_shader.gdshader)
+
 ```glsl
 shader_type spatial;
 render_mode blend_add, depth_draw_never, cull_disabled, unshaded;
@@ -1671,15 +1702,15 @@ func _process(delta: float) -> void:
 
 Configure in Project Settings → Input Map:
 
-| Action | Key Binding | Description |
-|--------|-------------|-------------|
-| `move_up` | W | Forward thrust |
-| `move_down` | S | Backward thrust |
-| `move_left` | A | Rotate left (CCW) |
-| `move_right` | D | Rotate right (CW) |
-| `activate_shield` | E | Toggle shield |
-| `dash` | Shift | Dash ability |
-| `fire_weapon` | Space / Mouse Left | Fire weapon |
+| Action            | Key Binding        | Description       |
+| ----------------- | ------------------ | ----------------- |
+| `move_up`         | W                  | Forward thrust    |
+| `move_down`       | S                  | Backward thrust   |
+| `move_left`       | A                  | Rotate left (CCW) |
+| `move_right`      | D                  | Rotate right (CW) |
+| `activate_shield` | E                  | Toggle shield     |
+| `dash`            | Shift              | Dash ability      |
+| `fire_weapon`     | Space / Mouse Left | Fire weapon       |
 
 ---
 
@@ -1689,78 +1720,78 @@ Complete reference of all configurable parameters from the JavaScript codebase.
 
 ### Movement Parameters
 
-| Parameter | Default Value | Unit | Description | Source |
-|-----------|--------------|------|-------------|--------|
-| `SHIP_ACCELERATION` | 280 | px/s² | Linear acceleration | `physics.js:4` |
-| `SHIP_MAX_SPEED` | 220 | px/s | Maximum velocity | `physics.js:5` |
-| `SHIP_LINEAR_DAMPING` | 3.1 | s⁻¹ | Linear velocity damping | `physics.js:6` |
-| `SHIP_ROTATION_SPEED` | 8 | rad/s | Angular acceleration | `physics.js:7` |
-| `SHIP_ANGULAR_DAMPING` | 6.2 | s⁻¹ | Angular velocity damping | `physics.js:8` |
-| `SHIP_MASS` | 60 | kg | Ship mass (physics) | `physics.js:9` |
+| Parameter              | Default Value | Unit  | Description              | Source         |
+| ---------------------- | ------------- | ----- | ------------------------ | -------------- |
+| `SHIP_ACCELERATION`    | 280           | px/s² | Linear acceleration      | `physics.js:4` |
+| `SHIP_MAX_SPEED`       | 220           | px/s  | Maximum velocity         | `physics.js:5` |
+| `SHIP_LINEAR_DAMPING`  | 3.1           | s⁻¹   | Linear velocity damping  | `physics.js:6` |
+| `SHIP_ROTATION_SPEED`  | 8             | rad/s | Angular acceleration     | `physics.js:7` |
+| `SHIP_ANGULAR_DAMPING` | 6.2           | s⁻¹   | Angular velocity damping | `physics.js:8` |
+| `SHIP_MASS`            | 60            | kg    | Ship mass (physics)      | `physics.js:9` |
 
 ### Drift Parameters
 
-| Parameter | Default Value | Unit | Description | Source |
-|-----------|--------------|------|-------------|--------|
-| `DRIFT_RAMP_SPEED` | 2.8 | s⁻¹ | Drift factor increase rate | `PlayerSystem.js:25` |
-| `DRIFT_DECAY_SPEED` | 5.2 | s⁻¹ | Drift factor decrease rate | `PlayerSystem.js:26` |
-| `DRIFT_BRAKE_REDUCTION` | 0.4 | - | Brake effectiveness reduction | `PlayerSystem.js:27` |
+| Parameter               | Default Value | Unit | Description                   | Source               |
+| ----------------------- | ------------- | ---- | ----------------------------- | -------------------- |
+| `DRIFT_RAMP_SPEED`      | 2.8           | s⁻¹  | Drift factor increase rate    | `PlayerSystem.js:25` |
+| `DRIFT_DECAY_SPEED`     | 5.2           | s⁻¹  | Drift factor decrease rate    | `PlayerSystem.js:26` |
+| `DRIFT_BRAKE_REDUCTION` | 0.4           | -    | Brake effectiveness reduction | `PlayerSystem.js:27` |
 
 ### Shield Parameters
 
-| Parameter | Default Value | Unit | Description | Source |
-|-----------|--------------|------|-------------|--------|
-| `SHIELD_DEFAULT_HITS` | 3 | hits | Legacy hit-based (unused) | `gameplay.js:48` |
-| `SHIELD_COOLDOWN_DURATION` | 20 | s | Base cooldown duration | `gameplay.js:49` |
-| `SHIELD_SHOCKWAVE_RADIUS` | 300 | px | Shockwave detection radius | `gameplay.js:50` |
-| `SHIELD_SHOCKWAVE_FORCE` | 350 | - | Knockback force magnitude | `gameplay.js:51` |
-| `SHIELD_HIT_GRACE_TIME` | 0.28 | s | Time between shockwaves | `gameplay.js:52` |
-| `SHIELD_COLLISION_BOUNCE` | 0.85 | - | Bounce coefficient | `gameplay.js:53` |
-| `SHIELD_REFLECT_SPEED` | 95 | px/s | Velocity boost on reflect | `gameplay.js:54` |
-| `SHIELD_IMPACT_DAMAGE_BASE` | 10 | dmg | Base impact damage | `gameplay.js:55` |
-| `SHIELD_IMPACT_DAMAGE_PER_LEVEL` | 4 | dmg | Damage scaling per level | `gameplay.js:56` |
+| Parameter                        | Default Value | Unit | Description                | Source           |
+| -------------------------------- | ------------- | ---- | -------------------------- | ---------------- |
+| `SHIELD_DEFAULT_HITS`            | 3             | hits | Legacy hit-based (unused)  | `gameplay.js:48` |
+| `SHIELD_COOLDOWN_DURATION`       | 20            | s    | Base cooldown duration     | `gameplay.js:49` |
+| `SHIELD_SHOCKWAVE_RADIUS`        | 300           | px   | Shockwave detection radius | `gameplay.js:50` |
+| `SHIELD_SHOCKWAVE_FORCE`         | 350           | -    | Knockback force magnitude  | `gameplay.js:51` |
+| `SHIELD_HIT_GRACE_TIME`          | 0.28          | s    | Time between shockwaves    | `gameplay.js:52` |
+| `SHIELD_COLLISION_BOUNCE`        | 0.85          | -    | Bounce coefficient         | `gameplay.js:53` |
+| `SHIELD_REFLECT_SPEED`           | 95            | px/s | Velocity boost on reflect  | `gameplay.js:54` |
+| `SHIELD_IMPACT_DAMAGE_BASE`      | 10            | dmg  | Base impact damage         | `gameplay.js:55` |
+| `SHIELD_IMPACT_DAMAGE_PER_LEVEL` | 4             | dmg  | Damage scaling per level   | `gameplay.js:56` |
 
 ### Shield Level Progression
 
-| Level | Max HP | Cooldown (s) | Impact Damage | Source |
-|-------|--------|--------------|---------------|--------|
-| 1 | 50 | 20 | 10 | `PlayerSystem.js:31-34` |
-| 2 | 75 | 20 | 14 | `PlayerSystem.js:35-38` |
-| 3 | 75 | 15 | 18 | `PlayerSystem.js:39-42` |
-| 4 | 100 | 15 | 22 | `PlayerSystem.js:43-46` |
-| 5 | 125 | 13 | 26 | `PlayerSystem.js:47-50` |
+| Level | Max HP | Cooldown (s) | Impact Damage | Source                  |
+| ----- | ------ | ------------ | ------------- | ----------------------- |
+| 1     | 50     | 20           | 10            | `PlayerSystem.js:31-34` |
+| 2     | 75     | 20           | 14            | `PlayerSystem.js:35-38` |
+| 3     | 75     | 15           | 18            | `PlayerSystem.js:39-42` |
+| 4     | 100    | 15           | 22            | `PlayerSystem.js:43-46` |
+| 5     | 125    | 13           | 26            | `PlayerSystem.js:47-50` |
 
 ### Health Parameters
 
-| Parameter | Default Value | Unit | Description | Source |
-|-----------|--------------|------|-------------|--------|
-| `PLAYER_INITIAL_HEALTH` | 100 | HP | Starting health | `PlayerSystem.js:117` |
-| `PLAYER_INVULNERABILITY_DURATION` | 0.5 | s | Invulnerability after damage | `PhysicsSystem.js:1632` |
-| `PLAYER_RESPAWN_INVULNERABILITY` | 3.0 | s | Invulnerability after respawn | `PlayerSystem.js:1234` |
+| Parameter                         | Default Value | Unit | Description                   | Source                  |
+| --------------------------------- | ------------- | ---- | ----------------------------- | ----------------------- |
+| `PLAYER_INITIAL_HEALTH`           | 100           | HP   | Starting health               | `PlayerSystem.js:117`   |
+| `PLAYER_INVULNERABILITY_DURATION` | 0.5           | s    | Invulnerability after damage  | `PhysicsSystem.js:1632` |
+| `PLAYER_RESPAWN_INVULNERABILITY`  | 3.0           | s    | Invulnerability after respawn | `PlayerSystem.js:1234`  |
 
 ### Recoil Parameters
 
-| Parameter | Default Value | Unit | Description | Source |
-|-----------|--------------|------|-------------|--------|
-| `RECOIL_DECAY` | 0.85 | - | Exponential decay rate | `PlayerSystem.js:145` |
-| `RECOIL_THRESHOLD` | 0.01 | px | Clear threshold | `PlayerSystem.js:621` |
+| Parameter          | Default Value | Unit | Description            | Source                |
+| ------------------ | ------------- | ---- | ---------------------- | --------------------- |
+| `RECOIL_DECAY`     | 0.85          | -    | Exponential decay rate | `PlayerSystem.js:145` |
+| `RECOIL_THRESHOLD` | 0.01          | px   | Clear threshold        | `PlayerSystem.js:621` |
 
 ### Dash Parameters (NEW)
 
-| Parameter | Suggested Value | Unit | Description | Source |
-|-----------|----------------|------|-------------|--------|
-| `DASH_COOLDOWN` | 2.0 | s | Cooldown duration | New |
-| `DASH_DURATION` | 0.2 | s | Dash active duration | New |
-| `DASH_SPEED` | 500 | px/s | Velocity during dash | New |
-| `DASH_INVULNERABILITY` | 0.15 | s | Invulnerability frames | New |
-| `DASH_TRAIL_LIFETIME` | 0.5 | s | Trail particle lifetime | New |
+| Parameter              | Suggested Value | Unit | Description             | Source |
+| ---------------------- | --------------- | ---- | ----------------------- | ------ |
+| `DASH_COOLDOWN`        | 2.0             | s    | Cooldown duration       | New    |
+| `DASH_DURATION`        | 0.2             | s    | Dash active duration    | New    |
+| `DASH_SPEED`           | 500             | px/s | Velocity during dash    | New    |
+| `DASH_INVULNERABILITY` | 0.15            | s    | Invulnerability frames  | New    |
+| `DASH_TRAIL_LIFETIME`  | 0.5             | s    | Trail particle lifetime | New    |
 
 ### Screen Wrapping Parameters
 
-| Parameter | Default Value | Unit | Description | Source |
-|-----------|--------------|------|-------------|--------|
-| `GAME_WIDTH` | 800 | px | Game area width | `GameSystem.js` |
-| `GAME_HEIGHT` | 600 | px | Game area height | `GameSystem.js` |
+| Parameter     | Default Value | Unit | Description      | Source          |
+| ------------- | ------------- | ---- | ---------------- | --------------- |
+| `GAME_WIDTH`  | 800           | px   | Game area width  | `GameSystem.js` |
+| `GAME_HEIGHT` | 600           | px   | Game area height | `GameSystem.js` |
 
 ---
 
@@ -1769,23 +1800,28 @@ Complete reference of all configurable parameters from the JavaScript codebase.
 ### Linear Motion
 
 **Acceleration Integration:**
+
 ```
 v(t + Δt) = v(t) + a · Δt
 ```
 
 **Linear Damping:**
+
 ```
 v(t + Δt) = v(t) · e^(-λ · Δt)
 ```
+
 Where `λ = linear_damping = 3.1 s⁻¹`
 
 **Combined Motion (Euler Integration):**
+
 ```
 v_new = (v_old + a · Δt) · e^(-λ · Δt)
 x_new = x_old + v_new · Δt
 ```
 
 **Velocity Clamping:**
+
 ```
 if |v| > v_max:
     v = (v / |v|) · v_max
@@ -1794,17 +1830,21 @@ if |v| > v_max:
 ### Angular Motion
 
 **Angular Acceleration:**
+
 ```
 ω(t + Δt) = ω(t) + α · Δt
 ```
 
 **Angular Damping:**
+
 ```
 ω(t + Δt) = ω(t) · e^(-λ_angular · Δt)
 ```
+
 Where `λ_angular = angular_damping = 6.2 s⁻¹`
 
 **Angle Integration:**
+
 ```
 θ(t + Δt) = wrap(θ(t) + ω(t) · Δt, -π, π)
 ```
@@ -1812,15 +1852,18 @@ Where `λ_angular = angular_damping = 6.2 s⁻¹`
 ### Drift System
 
 **Drift Factor Update:**
+
 ```
 if no_input:
     f_drift(t + Δt) = min(1, f_drift(t) + k_ramp · Δt)
 else:
     f_drift(t + Δt) = max(0, f_drift(t) - k_decay · Δt)
 ```
+
 Where `k_ramp = 2.8`, `k_decay = 5.2`
 
 **Auto-Brake Intensity:**
+
 ```
 proj = v · forward
 k_base = clamp(|proj| / (0.8 · v_max), 0.35, 1.0)
@@ -1830,6 +1873,7 @@ k_brake = k_base · (1 - f_drift · brake_reduction)
 ### Shield Damage Absorption
 
 **Damage Distribution:**
+
 ```
 absorbed = min(shield_HP, incoming_damage)
 overflow = max(0, incoming_damage - absorbed)
@@ -1838,6 +1882,7 @@ health_new = max(0, health - overflow)
 ```
 
 **Impact Damage Scaling:**
+
 ```
 damage_impact = damage_base + damage_per_level · max(0, level - 1)
 damage_impact = 10 + 4 · max(0, level - 1)
@@ -1846,6 +1891,7 @@ damage_impact = 10 + 4 · max(0, level - 1)
 ### Shockwave Knockback
 
 **Radial Force Application:**
+
 ```
 Δr = enemy_pos - player_pos
 distance = |Δr|
@@ -1857,12 +1903,14 @@ impulse = direction · force_base · force_multiplier
 ### Recoil Decay
 
 **Exponential Decay:**
+
 ```
 offset(t + Δt) = offset(t) · decay_rate
 offset(t + Δt) = offset(t) · 0.85
 ```
 
 **Threshold Clamping:**
+
 ```
 if |offset_x| < threshold:
     offset_x = 0
@@ -1873,11 +1921,13 @@ if |offset_y| < threshold:
 ### Coordinate Transformations (2D → 3D)
 
 **JavaScript (2D) → Godot (3D):**
+
 ```
 JS: {x, y}  →  Godot: Vector3(x, 0, y)
 ```
 
 **Local to World Position:**
+
 ```
 cos_a = cos(angle)
 sin_a = sin(angle)
@@ -1886,6 +1936,7 @@ world_z = pos.z + (local_x · sin_a + local_y · cos_a)
 ```
 
 **Local to World Direction:**
+
 ```
 world_dir.x = local_x · cos_a - local_y · sin_a
 world_dir.z = local_x · sin_a + local_y · cos_a
@@ -2042,33 +2093,33 @@ The Player System emits and listens to the following signals for integration wit
 
 #### Emitted Signals
 
-| Signal | Parameters | Description | Listeners |
-|--------|-----------|-------------|-----------|
-| `health_changed` | `current: int, max: int` | Player HP changed | UI, AudioSystem |
-| `shield_activated` | `level: int, max_hp: int` | Shield activated | UI, EffectsSystem, AudioSystem |
-| `shield_hit` | `remaining_hp: int, max_hp: int, damage: int` | Shield absorbed damage | UI, EffectsSystem, AudioSystem |
-| `shield_broken` | `level: int` | Shield broke | UI, EffectsSystem, AudioSystem |
-| `shield_recharged` | `level: int` | Shield cooldown completed | UI, AudioSystem |
-| `shield_shockwave` | `position: Vector3, radius: float, force: float, damage: int, level: int` | Shockwave triggered | EffectsSystem, AudioSystem |
-| `player_died` | `position: Vector3, stats: Dictionary` | Player death | GameSystem, UI, AudioSystem |
-| `player_respawned` | `position: Vector3` | Player respawn | EffectsSystem, AudioSystem, EnemySystem |
-| `player_dashed` | `position: Vector3, direction: Vector3, speed: float` | Dash activated | EffectsSystem, AudioSystem, Camera |
-| `thruster_effect` | `position: Vector3, direction: Vector3, intensity: float, type: String, visual_level: int` | Thruster activation | EffectsSystem, AudioSystem |
-| `player_healed` | `amount: int, current_health: int, max_health: int` | Player healed | UI, EffectsSystem, AudioSystem |
+| Signal             | Parameters                                                                                 | Description               | Listeners                               |
+| ------------------ | ------------------------------------------------------------------------------------------ | ------------------------- | --------------------------------------- |
+| `health_changed`   | `current: int, max: int`                                                                   | Player HP changed         | UI, AudioSystem                         |
+| `shield_activated` | `level: int, max_hp: int`                                                                  | Shield activated          | UI, EffectsSystem, AudioSystem          |
+| `shield_hit`       | `remaining_hp: int, max_hp: int, damage: int`                                              | Shield absorbed damage    | UI, EffectsSystem, AudioSystem          |
+| `shield_broken`    | `level: int`                                                                               | Shield broke              | UI, EffectsSystem, AudioSystem          |
+| `shield_recharged` | `level: int`                                                                               | Shield cooldown completed | UI, AudioSystem                         |
+| `shield_shockwave` | `position: Vector3, radius: float, force: float, damage: int, level: int`                  | Shockwave triggered       | EffectsSystem, AudioSystem              |
+| `player_died`      | `position: Vector3, stats: Dictionary`                                                     | Player death              | GameSystem, UI, AudioSystem             |
+| `player_respawned` | `position: Vector3`                                                                        | Player respawn            | EffectsSystem, AudioSystem, EnemySystem |
+| `player_dashed`    | `position: Vector3, direction: Vector3, speed: float`                                      | Dash activated            | EffectsSystem, AudioSystem, Camera      |
+| `thruster_effect`  | `position: Vector3, direction: Vector3, intensity: float, type: String, visual_level: int` | Thruster activation       | EffectsSystem, AudioSystem              |
+| `player_healed`    | `amount: int, current_health: int, max_health: int`                                        | Player healed             | UI, EffectsSystem, AudioSystem          |
 
 #### Subscribed Signals
 
-| Signal | Source | Handler | Action |
-|--------|--------|---------|--------|
-| `upgrade_damage_boost` | UpgradeSystem | `_on_damage_boost` | Increase damage stat |
-| `upgrade_speed_boost` | UpgradeSystem | `_on_speed_boost` | Increase max_speed |
-| `upgrade_acceleration_boost` | UpgradeSystem | `_on_acceleration_boost` | Increase acceleration |
-| `upgrade_rotation_boost` | UpgradeSystem | `_on_rotation_boost` | Increase rotation_speed |
-| `upgrade_health_boost` | UpgradeSystem | `_on_health_boost` | Increase max_health |
-| `upgrade_deflector_shield` | UpgradeSystem | `_on_deflector_shield` | Apply shield level |
-| `weapon_fired` | CombatSystem | `_on_weapon_fired` | Apply recoil |
-| `xp_orb_collected` | XPSystem | `_on_xp_collected` | Update XP |
-| `health_pickup_collected` | PickupSystem | `_on_health_pickup` | Heal player |
+| Signal                       | Source        | Handler                  | Action                  |
+| ---------------------------- | ------------- | ------------------------ | ----------------------- |
+| `upgrade_damage_boost`       | UpgradeSystem | `_on_damage_boost`       | Increase damage stat    |
+| `upgrade_speed_boost`        | UpgradeSystem | `_on_speed_boost`        | Increase max_speed      |
+| `upgrade_acceleration_boost` | UpgradeSystem | `_on_acceleration_boost` | Increase acceleration   |
+| `upgrade_rotation_boost`     | UpgradeSystem | `_on_rotation_boost`     | Increase rotation_speed |
+| `upgrade_health_boost`       | UpgradeSystem | `_on_health_boost`       | Increase max_health     |
+| `upgrade_deflector_shield`   | UpgradeSystem | `_on_deflector_shield`   | Apply shield level      |
+| `weapon_fired`               | CombatSystem  | `_on_weapon_fired`       | Apply recoil            |
+| `xp_orb_collected`           | XPSystem      | `_on_xp_collected`       | Update XP               |
+| `health_pickup_collected`    | PickupSystem  | `_on_health_pickup`      | Heal player             |
 
 ### System Dependencies
 
@@ -2162,49 +2213,51 @@ func _on_health_pickup(amount: int) -> void:
 
 ### JavaScript Source Files Analyzed
 
-| File | Lines Analyzed | Key Content |
-|------|----------------|-------------|
-| `src/modules/PlayerSystem.js` | 1-1287 (full) | Complete player system implementation |
-| `src/data/constants/physics.js` | 1-20 | Movement physics constants |
-| `src/data/constants/gameplay.js` | 30-57 | Shield and combat constants |
-| `src/modules/PhysicsSystem.js` | 1630-1640 | Invulnerability duration |
-| `src/modules/EffectsSystem.js` | - | Shield shockwave visual effects |
+| File                             | Lines Analyzed | Key Content                           |
+| -------------------------------- | -------------- | ------------------------------------- |
+| `src/modules/PlayerSystem.js`    | 1-1287 (full)  | Complete player system implementation |
+| `src/data/constants/physics.js`  | 1-20           | Movement physics constants            |
+| `src/data/constants/gameplay.js` | 30-57          | Shield and combat constants           |
+| `src/modules/PhysicsSystem.js`   | 1630-1640      | Invulnerability duration              |
+| `src/modules/EffectsSystem.js`   | -              | Shield shockwave visual effects       |
 
 ### Key JavaScript Functions Referenced
 
 #### PlayerSystem.js
 
-| Function | Lines | Description |
-|----------|-------|-------------|
-| `constructor` | 53-162 | Initialization, data structure setup |
-| `setupEventListeners` | 302-389 | Event subscriptions |
-| `activateShield` | 391-428 | Shield activation logic |
-| `shieldTookDamage` | 430-497 | Damage absorption algorithm |
-| `breakShield` | 499-540 | Shield breaking logic |
-| `applyShieldLevel` | 542-563 | Shield upgrade application |
-| `update` | 565-615 | Main update loop |
-| `updateMovement` | 646-716 | Movement physics |
-| `updateAngularMovement` | 718-735 | Rotation physics |
-| `emitThrusterEffects` | 737-795 | Thruster emission |
-| `updateScreenWrapping` | 797-807 | Boundary wrapping |
-| `takeDamage` | 1039-1096 | Damage handling |
-| `heal` | 1098-1121 | Healing logic |
-| `markDead` | 1155-1184 | Death state |
-| `doRespawn` | 1186-1264 | Respawn logic |
+| Function                | Lines     | Description                          |
+| ----------------------- | --------- | ------------------------------------ |
+| `constructor`           | 53-162    | Initialization, data structure setup |
+| `setupEventListeners`   | 302-389   | Event subscriptions                  |
+| `activateShield`        | 391-428   | Shield activation logic              |
+| `shieldTookDamage`      | 430-497   | Damage absorption algorithm          |
+| `breakShield`           | 499-540   | Shield breaking logic                |
+| `applyShieldLevel`      | 542-563   | Shield upgrade application           |
+| `update`                | 565-615   | Main update loop                     |
+| `updateMovement`        | 646-716   | Movement physics                     |
+| `updateAngularMovement` | 718-735   | Rotation physics                     |
+| `emitThrusterEffects`   | 737-795   | Thruster emission                    |
+| `updateScreenWrapping`  | 797-807   | Boundary wrapping                    |
+| `takeDamage`            | 1039-1096 | Damage handling                      |
+| `heal`                  | 1098-1121 | Healing logic                        |
+| `markDead`              | 1155-1184 | Death state                          |
+| `doRespawn`             | 1186-1264 | Respawn logic                        |
 
 ### Constants Summary
 
 #### Movement (physics.js)
+
 ```javascript
-SHIP_ACCELERATION: 280         // px/s²
-SHIP_MAX_SPEED: 220           // px/s
-SHIP_LINEAR_DAMPING: 3.1      // s⁻¹
-SHIP_ROTATION_SPEED: 8        // rad/s
-SHIP_ANGULAR_DAMPING: 6.2     // s⁻¹
-SHIP_MASS: 60                 // kg
+SHIP_ACCELERATION: 280; // px/s²
+SHIP_MAX_SPEED: 220; // px/s
+SHIP_LINEAR_DAMPING: 3.1; // s⁻¹
+SHIP_ROTATION_SPEED: 8; // rad/s
+SHIP_ANGULAR_DAMPING: 6.2; // s⁻¹
+SHIP_MASS: 60; // kg
 ```
 
 #### Drift (PlayerSystem.js:24-28)
+
 ```javascript
 DRIFT_SETTINGS: {
     rampSpeed: 2.8,            // s⁻¹
@@ -2214,19 +2267,21 @@ DRIFT_SETTINGS: {
 ```
 
 #### Shield (gameplay.js:48-56)
+
 ```javascript
-SHIELD_DEFAULT_HITS: 3                  // legacy
-SHIELD_COOLDOWN_DURATION: 20           // s
-SHIELD_SHOCKWAVE_RADIUS: 300           // px
-SHIELD_SHOCKWAVE_FORCE: 350            // -
-SHIELD_HIT_GRACE_TIME: 0.28            // s
-SHIELD_COLLISION_BOUNCE: 0.85          // -
-SHIELD_REFLECT_SPEED: 95               // px/s
-SHIELD_IMPACT_DAMAGE_BASE: 10          // dmg
-SHIELD_IMPACT_DAMAGE_PER_LEVEL: 4      // dmg
+SHIELD_DEFAULT_HITS: 3; // legacy
+SHIELD_COOLDOWN_DURATION: 20; // s
+SHIELD_SHOCKWAVE_RADIUS: 300; // px
+SHIELD_SHOCKWAVE_FORCE: 350; // -
+SHIELD_HIT_GRACE_TIME: 0.28; // s
+SHIELD_COLLISION_BOUNCE: 0.85; // -
+SHIELD_REFLECT_SPEED: 95; // px/s
+SHIELD_IMPACT_DAMAGE_BASE: 10; // dmg
+SHIELD_IMPACT_DAMAGE_PER_LEVEL: 4; // dmg
 ```
 
 #### Shield Levels (PlayerSystem.js:30-51)
+
 ```javascript
 SHIELD_LEVEL_CONFIG: {
     1: { maxHP: 50,  cooldown: 20 },
@@ -2259,6 +2314,7 @@ SHIELD_LEVEL_CONFIG: {
 This document provides a comprehensive technical reference for implementing the Player System in Godot 3D. All algorithms, formulas, and implementation details have been extracted from the JavaScript codebase (`PlayerSystem.js`, `physics.js`, `gameplay.js`) and adapted for Godot's 3D environment with the XZ plane for top-down gameplay.
 
 **Next Steps:**
+
 1. Create Player scene hierarchy in Godot
 2. Implement `Player.gd` script with all subsystems
 3. Configure particle systems for thrusters and dash trail

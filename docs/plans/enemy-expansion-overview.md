@@ -10,6 +10,7 @@
 6. **Dependency Injection:** Sistema de DI (Fase 2.1) com `ServiceManifest` declarando serviços e dependências.
 
 **Conclusões-chave:**
+
 - `BaseEnemy` oferece base para novos inimigos (Drone, Mine, Hunter).
 - `GamePools` precisa ser estendido para os novos tipos.
 - `WaveManager` permite integração de lógica de boss via configs.

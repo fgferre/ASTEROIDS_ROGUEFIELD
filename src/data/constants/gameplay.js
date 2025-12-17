@@ -3,11 +3,11 @@
 import { deepFreeze } from '../../utils/deepFreeze.js';
 
 // === BULLETS & COLLISION ===
-export const BULLET_SPEED = 450;
+export const BULLET_SPEED = 550; // [NEO-ARCADE] Faster bullets (was 450)
 export const COLLISION_BOUNCE = 0.6;
 
 // === MAGNETISM ===
-export const MAGNETISM_RADIUS = 70;
+export const MAGNETISM_RADIUS = 110; // [NEO-ARCADE] Increased range (was 70)
 export const MAGNETISM_FORCE = 120;
 export const ENHANCED_SHIP_MAGNETISM_FORCE = 300;
 export const ORB_MAGNETISM_RADIUS = 35;
@@ -46,17 +46,17 @@ export const XP_ORB_CLUSTER_CONFIG = deepFreeze({
 
 // === SHIELD SYSTEM ===
 export const SHIELD_DEFAULT_HITS = 3;
-export const SHIELD_COOLDOWN_DURATION = 20; // segundos
+export const SHIELD_COOLDOWN_DURATION = 15; // [NEO-ARCADE] Faster shield regen (was 20)
 export const SHIELD_SHOCKWAVE_RADIUS = 300;
 export const SHIELD_SHOCKWAVE_FORCE = 350;
 export const SHIELD_HIT_GRACE_TIME = 0.28; // segundos entre absorções consecutivas
 export const SHIELD_COLLISION_BOUNCE = 0.85;
 export const SHIELD_REFLECT_SPEED = 95; // incremento de velocidade aplicado no impacto
-export const SHIELD_IMPACT_DAMAGE_BASE = 10;
+export const SHIELD_IMPACT_DAMAGE_BASE = 15; // [NEO-ARCADE] Buffed impact (was 10)
 export const SHIELD_IMPACT_DAMAGE_PER_LEVEL = 4;
 
 // === COMBAT ===
-export const COMBAT_SHOOT_COOLDOWN = 0.3;
+export const COMBAT_SHOOT_COOLDOWN = 0.25; // [NEO-ARCADE] Faster fire rate (was 0.3)
 export const COMBAT_TARGETING_RANGE = 400;
 export const COMBAT_BULLET_LIFETIME = 1.8;
 export const COMBAT_PREDICTION_TIME = 0.5;
@@ -139,7 +139,7 @@ export const WAVE_DURATION = 60; // segundos
 export const WAVE_BREAK_TIME = 10; // segundos
 export const WAVE_SPAWN_DELAY = 1.0; // atraso base entre waves no sistema legado
 export const WAVE_BOSS_INTERVAL = 5;
-export const MAX_ASTEROIDS_ON_SCREEN = 20;
+export const MAX_ASTEROIDS_ON_SCREEN = 35; // [NEO-ARCADE] Increased density (was 20)
 export const SUPPORT_ENEMY_PROGRESSION = deepFreeze({
   drone: deepFreeze({
     startWave: 8,

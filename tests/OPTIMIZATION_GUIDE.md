@@ -19,6 +19,7 @@ Este guia documenta os padrões de otimização aplicados aos testes do projeto 
 **Solução:** Usar `beforeAll` em describes onde testes não compartilham estado mutável.
 
 **Exemplo:**
+
 ```javascript
 // ❌ Antes (setup desnecessário)
 beforeEach(() => {
@@ -40,9 +41,10 @@ beforeAll(() => {
 **Solução:** Usar `vi.useFakeTimers()` e `vi.advanceTimersByTime()`.
 
 **Exemplo:**
+
 ```javascript
 // ❌ Antes (delay real de 60ms)
-await new Promise(resolve => setTimeout(resolve, 60));
+await new Promise((resolve) => setTimeout(resolve, 60));
 
 // ✅ Depois (instant)
 vi.useFakeTimers();
@@ -59,6 +61,7 @@ vi.useRealTimers();
 **Solução:** Usar `.concurrent` para paralelizar testes independentes.
 
 **Exemplo:**
+
 ```javascript
 // ❌ Antes (sequencial)
 describe('RandomService', () => {
@@ -82,12 +85,13 @@ describe('RandomService', () => {
 **Solução:** Usar helpers de `tests/__helpers__/`.
 
 **Exemplo:**
+
 ```javascript
 // ❌ Antes (inline)
 const eventBus = {
   emit: vi.fn(),
   on: vi.fn(),
-  off: vi.fn()
+  off: vi.fn(),
 };
 
 // ✅ Depois (centralizado)

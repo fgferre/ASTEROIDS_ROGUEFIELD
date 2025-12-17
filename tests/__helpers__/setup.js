@@ -55,15 +55,14 @@ export function setupGlobalMocks(options = {}) {
  */
 export function cleanupGlobalState() {
   const stack = previousGlobalsStack;
-  const snapshot =
-    (stack && stack.length ? stack.pop() : null) ?? {
-      gameEvents: globalThis.gameEvents,
-      gameServices: globalThis.gameServices,
-      performance: globalThis.performance,
-      hadGameEvents: hasOwn.call(globalThis, 'gameEvents'),
-      hadGameServices: hasOwn.call(globalThis, 'gameServices'),
-      hadPerformance: hasOwn.call(globalThis, 'performance'),
-    };
+  const snapshot = (stack && stack.length ? stack.pop() : null) ?? {
+    gameEvents: globalThis.gameEvents,
+    gameServices: globalThis.gameServices,
+    performance: globalThis.performance,
+    hadGameEvents: hasOwn.call(globalThis, 'gameEvents'),
+    hadGameServices: hasOwn.call(globalThis, 'gameServices'),
+    hadPerformance: hasOwn.call(globalThis, 'performance'),
+  };
 
   if (snapshot.hadGameEvents) {
     globalThis.gameEvents = snapshot.gameEvents;
@@ -110,16 +109,15 @@ export function cleanupGlobalState() {
  * });
  */
 export async function withWaveOverrides(config, callback) {
-  const {
-    useManager = true,
-    managerHandlesAsteroids = true,
-  } = config ?? {};
+  const { useManager = true, managerHandlesAsteroids = true } = config ?? {};
 
   const previousUseManager = globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
-  const previousManagerHandles = globalThis.__WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__;
+  const previousManagerHandles =
+    globalThis.__WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__;
 
   globalThis.__USE_WAVE_MANAGER_OVERRIDE__ = useManager;
-  globalThis.__WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__ = managerHandlesAsteroids;
+  globalThis.__WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__ =
+    managerHandlesAsteroids;
 
   try {
     const result = await callback();
@@ -134,7 +132,8 @@ export async function withWaveOverrides(config, callback) {
     if (previousManagerHandles === undefined) {
       delete globalThis.__WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__;
     } else {
-      globalThis.__WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__ = previousManagerHandles;
+      globalThis.__WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__ =
+        previousManagerHandles;
     }
   }
 }

@@ -23,7 +23,9 @@ describe('RewardManager', () => {
     const spawnHeart = vi.fn();
     const createXPOrb = vi.fn();
 
-    const deterministicRandom = createDeterministicRandom({ chanceValue: true });
+    const deterministicRandom = createDeterministicRandom({
+      chanceValue: true,
+    });
 
     const rewardManager = new RewardManager({
       xpOrbSystem: { createXPOrb },

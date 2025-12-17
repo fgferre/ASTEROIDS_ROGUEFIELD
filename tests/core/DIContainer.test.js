@@ -50,7 +50,7 @@ describe('DIContainer', () => {
       const container = createContainer();
       container.register('dep', () => ({ name: 'dependency' }));
       container.register('service', (dep) => ({ dep }), {
-        dependencies: ['dep']
+        dependencies: ['dep'],
       });
 
       expect(container.has('service')).toBe(true);
@@ -81,7 +81,7 @@ describe('DIContainer', () => {
     it('should return singleton instance on multiple resolves', () => {
       const container = createContainer();
       container.register('test', () => ({ value: Math.random() }), {
-        singleton: true
+        singleton: true,
       });
 
       const instance1 = container.resolve('test');
@@ -95,7 +95,7 @@ describe('DIContainer', () => {
       const container = createContainer();
       let counter = 0;
       container.register('test', () => ({ id: ++counter }), {
-        singleton: false
+        singleton: false,
       });
 
       const instance1 = container.resolve('test');
@@ -109,15 +109,19 @@ describe('DIContainer', () => {
     it('should resolve service with dependencies', () => {
       const container = createContainer();
       container.register('logger', () => ({
-        log: (msg) => msg
+        log: (msg) => msg,
       }));
 
-      container.register('service', (logger) => ({
-        logger,
-        doSomething: () => logger.log('test')
-      }), {
-        dependencies: ['logger']
-      });
+      container.register(
+        'service',
+        (logger) => ({
+          logger,
+          doSomething: () => logger.log('test'),
+        }),
+        {
+          dependencies: ['logger'],
+        }
+      );
 
       const service = container.resolve('service');
 
@@ -128,8 +132,12 @@ describe('DIContainer', () => {
     it('should resolve deep dependency chains', () => {
       const container = createContainer();
       container.register('a', () => ({ name: 'A' }));
-      container.register('b', (a) => ({ name: 'B', a }), { dependencies: ['a'] });
-      container.register('c', (b) => ({ name: 'C', b }), { dependencies: ['b'] });
+      container.register('b', (a) => ({ name: 'B', a }), {
+        dependencies: ['a'],
+      });
+      container.register('c', (b) => ({ name: 'C', b }), {
+        dependencies: ['b'],
+      });
 
       const c = container.resolve('c');
 
@@ -191,7 +199,7 @@ describe('DIContainer', () => {
     it('should detect missing dependencies', () => {
       const container = createContainer();
       container.register('a', (missing) => ({ missing }), {
-        dependencies: ['missing']
+        dependencies: ['missing'],
       });
 
       const validation = container.validate();
@@ -209,7 +217,7 @@ describe('DIContainer', () => {
       const validation = container.validate();
 
       expect(validation.valid).toBe(false);
-      expect(validation.errors.some(e => e.match(/circular/i))).toBe(true);
+      expect(validation.errors.some((e) => e.match(/circular/i))).toBe(true);
     });
   });
 
@@ -346,7 +354,7 @@ describe('DIContainer', () => {
       infoContainer.register('logger', () => ({}));
       infoContainer.register('service', (logger) => ({ logger }), {
         dependencies: ['logger'],
-        singleton: true
+        singleton: true,
       });
       dependencyInfo = infoContainer.getDependencies('service');
 
@@ -371,12 +379,16 @@ describe('DIContainer', () => {
       const container = createContainer();
       let initialized = false;
 
-      container.register('test', () => {
-        initialized = true;
-        return {};
-      }, {
-        lazy: false
-      });
+      container.register(
+        'test',
+        () => {
+          initialized = true;
+          return {};
+        },
+        {
+          lazy: false,
+        }
+      );
 
       expect(initialized).toBe(true);
     });
@@ -385,12 +397,16 @@ describe('DIContainer', () => {
       const container = createContainer();
       let initialized = false;
 
-      container.register('test', () => {
-        initialized = true;
-        return {};
-      }, {
-        lazy: true
-      });
+      container.register(
+        'test',
+        () => {
+          initialized = true;
+          return {};
+        },
+        {
+          lazy: true,
+        }
+      );
 
       expect(initialized).toBe(false);
 
@@ -433,12 +449,16 @@ describe('DIContainer', () => {
       const container = createContainer();
       let factoryCallCount = 0;
 
-      container.register('transient', () => {
-        factoryCallCount++;
-        return { id: factoryCallCount };
-      }, {
-        singleton: false
-      });
+      container.register(
+        'transient',
+        () => {
+          factoryCallCount++;
+          return { id: factoryCallCount };
+        },
+        {
+          singleton: false,
+        }
+      );
 
       const legacyInstance = { id: 999, legacy: true };
       container.syncInstance('transient', legacyInstance);
@@ -465,8 +485,12 @@ describe('DIContainer', () => {
     it('should throw error for null/undefined instance', () => {
       const container = createContainer();
 
-      expect(() => container.syncInstance('test', null)).toThrow(/null\/undefined/i);
-      expect(() => container.syncInstance('test', undefined)).toThrow(/null\/undefined/i);
+      expect(() => container.syncInstance('test', null)).toThrow(
+        /null\/undefined/i
+      );
+      expect(() => container.syncInstance('test', undefined)).toThrow(
+        /null\/undefined/i
+      );
     });
 
     it('should update stats when syncing new service', () => {
@@ -510,7 +534,7 @@ describe('DIContainer', () => {
       container.register('a', () => ({}), { singleton: true });
       container.register('b', (a) => ({ a }), {
         dependencies: ['a'],
-        singleton: true
+        singleton: true,
       });
       container.resolve('a'); // Instantiate only 'a'
 
@@ -534,11 +558,11 @@ describe('DIContainer', () => {
       const container = createContainer();
       container.register('logger', () => ({}));
       container.register('service', (logger) => ({ logger }), {
-        dependencies: ['logger']
+        dependencies: ['logger'],
       });
 
       const report = container.getMigrationReport();
-      const serviceInfo = report.services.find(s => s.name === 'service');
+      const serviceInfo = report.services.find((s) => s.name === 'service');
 
       expect(serviceInfo).toBeDefined();
       expect(serviceInfo.dependencies).toContain('logger');

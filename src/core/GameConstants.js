@@ -83,7 +83,6 @@ export {
   BossConfigs,
 };
 
-
 // === AUDIO PRESETS ===
 export const BOSS_AUDIO_FREQUENCY_PRESETS = Object.freeze({
   roar: Object.freeze({
@@ -112,9 +111,24 @@ export const BOSS_AUDIO_FREQUENCY_PRESETS = Object.freeze({
     fanfare: Object.freeze({
       notes: Object.freeze([
         Object.freeze({ frequency: 392, delay: 0, duration: 0.5, gain: 0.16 }),
-        Object.freeze({ frequency: 523, delay: 0.18, duration: 0.6, gain: 0.18 }),
-        Object.freeze({ frequency: 659, delay: 0.38, duration: 0.7, gain: 0.18 }),
-        Object.freeze({ frequency: 784, delay: 0.58, duration: 0.75, gain: 0.2 }),
+        Object.freeze({
+          frequency: 523,
+          delay: 0.18,
+          duration: 0.6,
+          gain: 0.18,
+        }),
+        Object.freeze({
+          frequency: 659,
+          delay: 0.38,
+          duration: 0.7,
+          gain: 0.18,
+        }),
+        Object.freeze({
+          frequency: 784,
+          delay: 0.58,
+          duration: 0.75,
+          gain: 0.2,
+        }),
       ]),
       harmony: Object.freeze({
         frequencies: Object.freeze([196, 294, 392]),

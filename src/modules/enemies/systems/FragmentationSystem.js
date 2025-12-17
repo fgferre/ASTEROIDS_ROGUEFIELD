@@ -106,30 +106,32 @@ export class FragmentationSystem {
 
     const currentGeneration = entity.generation ?? 0;
     const maxGeneration = rules?.maxGeneration;
-    if (Number.isFinite(maxGeneration) && currentGeneration + 1 > maxGeneration) {
+    if (
+      Number.isFinite(maxGeneration) &&
+      currentGeneration + 1 > maxGeneration
+    ) {
       return [];
     }
 
-    const countRange =
-      rules?.countBySize?.[entity.size] ||
-      rules?.countBySize?.default ||
-      [2, 3];
+    const countRange = rules?.countBySize?.[entity.size] ||
+      rules?.countBySize?.default || [2, 3];
 
     const seededRandom = FragmentationSystem.createSeededRandom(
       (entity.crackSeed ?? 0) ^ 0x5e17
     );
 
-    const fragmentCount = FragmentationSystem.resolveCount(countRange, seededRandom);
+    const fragmentCount = FragmentationSystem.resolveCount(
+      countRange,
+      seededRandom
+    );
     if (fragmentCount <= 0) {
       return [];
     }
 
     const fragments = [];
     const baseSpeed = ASTEROID_SPEEDS[newSize] || 40;
-    const speedRange =
-      rules?.speedMultiplierBySize?.[newSize] ||
-      rules?.speedMultiplierBySize?.default ||
-      [0.85, 1.2];
+    const speedRange = rules?.speedMultiplierBySize?.[newSize] ||
+      rules?.speedMultiplierBySize?.default || [0.85, 1.2];
     const inheritVelocity = rules?.inheritVelocity ?? 0.4;
     const angleJitter = rules?.angleJitter ?? Math.PI / 6;
     const radialRange = rules?.radialDistanceRange || [0.45, 0.9];
@@ -142,8 +144,7 @@ export class FragmentationSystem {
     for (let i = 0; i < fragmentCount; i += 1) {
       const baseAngle =
         angleOffset + (i / Math.max(1, fragmentCount)) * Math.PI * 2;
-      const travelAngle =
-        baseAngle + (seededRandom() - 0.5) * 2 * angleJitter;
+      const travelAngle = baseAngle + (seededRandom() - 0.5) * 2 * angleJitter;
       const spawnAngle =
         travelAngle + (seededRandom() - 0.5) * 2 * offsetJitter;
       const distance =

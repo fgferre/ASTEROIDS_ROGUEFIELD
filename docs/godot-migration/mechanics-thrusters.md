@@ -3,18 +3,22 @@
 ## 1. Visão Geral do Sistema
 
 ### Conceito
+
 Sistema de propulsão visual e sonoro que responde dinamicamente ao movimento do player e evolui com upgrades. Fornece feedback tátil através de efeitos visuais (particles) e sonoros (síntese procedural) que reforçam a sensação de controle e progressão de poder.
 
 ### Componentes Principais
+
 - **4 thrusters independentes**: main (forward), aux (backward), sideL (CW rotation), sideR (CCW rotation)
 - **5 níveis visuais progressivos**: blue basic (0) → enhanced blue (1-2) → bright yellow (3) → bright cyan (4) → electric cyan-blue (5)
 - **3 fases de audio**: start burst (ignição) → continuous loop (sustain) → stop release (fade)
 - **Ion trail damage** (tier 5): Trail que causa dano a inimigos (5 DPS sugerido)
 
 ### Propósito
+
 Feedback visual/sonoro tátil que reforça sensação de controle e progressão de poder através de efeitos visuais e sonoros que evoluem com upgrades de mobilidade.
 
 ### ⚠️ CORREÇÃO IMPORTANTE
+
 **Tier 5 usa Electric Cyan-Blue (HSL 190-210°), NÃO "white plasma"**. O código JavaScript usa cores cyan brilhantes, não branco.
 
 ---
@@ -22,6 +26,7 @@ Feedback visual/sonoro tátil que reforça sensação de controle e progressão 
 ## 2. Estrutura de Dados do Sistema
 
 ### Thruster Event Payload
+
 Estrutura emitida a cada frame para cada thruster ativo:
 
 ```gdscript
@@ -36,6 +41,7 @@ Estrutura emitida a cada frame para cada thruster ativo:
 ```
 
 ### Thruster State (PlayerSystem)
+
 Estado interno do sistema de thrusters no player:
 
 ```gdscript
@@ -53,6 +59,7 @@ Estado interno do sistema de thrusters no player:
 ```
 
 ### Thruster Loop State (AudioSystem)
+
 Estado de um loop de audio ativo:
 
 ```gdscript
@@ -112,29 +119,30 @@ var thruster_loop_active: Dictionary = {}    # type -> bool
 
 ### 3.1. Main Thruster (Forward)
 
-| Propriedade | Valor |
-|-------------|-------|
-| **Posição** | `getLocalToWorld(-SHIP_SIZE × 0.8, 0)` (traseira da nave) |
-| **Direção** | `forward` vector {cos(angle), sin(angle)} |
-| **Ativação** | Input W (up) OU auto-brake backward |
-| **Visual Level** | `thrusterVisualLevel` (0-5) |
-| **Audio Type** | 'main' |
-| **Frequency** | 85 Hz ± 3 Hz |
+| Propriedade      | Valor                                                     |
+| ---------------- | --------------------------------------------------------- |
+| **Posição**      | `getLocalToWorld(-SHIP_SIZE × 0.8, 0)` (traseira da nave) |
+| **Direção**      | `forward` vector {cos(angle), sin(angle)}                 |
+| **Ativação**     | Input W (up) OU auto-brake backward                       |
+| **Visual Level** | `thrusterVisualLevel` (0-5)                               |
+| **Audio Type**   | 'main'                                                    |
+| **Frequency**    | 85 Hz ± 3 Hz                                              |
 
 ### 3.2. Aux Thruster (Backward/Braking)
 
-| Propriedade | Valor |
-|-------------|-------|
-| **Posição** | `getLocalToWorld(SHIP_SIZE × 0.8, 0)` (frente da nave) |
-| **Direção** | `-forward` vector {-cos(angle), -sin(angle)} |
-| **Ativação** | Input S (down) OU auto-brake forward |
-| **Visual Level** | `brakingVisualLevel` (0-3) |
-| **Audio Type** | 'retro' |
-| **Frequency** | 95 Hz ± 4 Hz |
+| Propriedade      | Valor                                                  |
+| ---------------- | ------------------------------------------------------ |
+| **Posição**      | `getLocalToWorld(SHIP_SIZE × 0.8, 0)` (frente da nave) |
+| **Direção**      | `-forward` vector {-cos(angle), -sin(angle)}           |
+| **Ativação**     | Input S (down) OU auto-brake forward                   |
+| **Visual Level** | `brakingVisualLevel` (0-3)                             |
+| **Audio Type**   | 'retro'                                                |
+| **Frequency**    | 95 Hz ± 4 Hz                                           |
 
 ### 3.3. Side Thrusters (Rotation)
 
 #### SideL (Right rotation - CW)
+
 - **Posição:** `getLocalToWorld(0, -SHIP_SIZE × 0.52)` (lado esquerdo)
 - **Direção:** `getLocalDirection(0, 1)` (perpendicular)
 - **Ativação:** Input D (right)
@@ -143,6 +151,7 @@ var thruster_loop_active: Dictionary = {}    # type -> bool
 - **Frequency:** 110 Hz ± 5 Hz
 
 #### SideR (Left rotation - CCW)
+
 - **Posição:** `getLocalToWorld(0, SHIP_SIZE × 0.52)` (lado direito)
 - **Direção:** `getLocalDirection(0, -1)` (perpendicular)
 - **Ativação:** Input A (left)
@@ -180,14 +189,14 @@ func get_local_direction(local: Vector2) -> Vector3:
 
 ### Tabela de Progressão Visual
 
-| Tier | Nome | Color (Main) | Color (Side) | Particle Mult | Size Mult | Life Mult | Speed Mult | Spark Prob | Special |
-|------|------|--------------|--------------|---------------|-----------|-----------|------------|------------|----------|
-| 0 | Blue Basic | Orange HSL(18-40, 100%, 60-76%) | Blue HSL(200-225, 100%, 70-88%) | 1.0x | 1.0x | 1.0x | 1.0x | 25% | - |
-| 1 | Enhanced Blue | Brighter Orange HSL(25-45, 100%, 63-77%) | Blue HSL(200-225, 100%, 70-88%) | 1.3x | 1.2x | 1.1x | 1.1x | 34% | - |
-| 2 | Enhanced Blue | Brighter Orange HSL(25-45, 100%, 63-77%) | Blue HSL(200-225, 100%, 70-88%) | 1.6x | 1.4x | 1.2x | 1.2x | 43% | - |
-| 3 | Bright Yellow | Yellow HSL(45-60, 100%, 68-82%) | Bright Cyan HSL(180-200, 100%, 75-90%) | 1.9x | 1.6x | 1.3x | 1.3x | 52% | - |
-| 4 | Bright Cyan | Cyan HSL(185-210, 100%, 68-82%) | Bright Cyan HSL(180-200, 100%, 75-90%) | 2.2x | 1.8x | 1.4x | 1.4x | 61% | - |
-| 5 | Electric Cyan-Blue | Electric Cyan HSL(190-210, 100%, 70-82%) | ELECTRIC CYAN HSL(180-190, 100%, 80-95%) | 2.5x | 2.0x | 1.5x | 1.5x | 70% | Ion Trail Damage |
+| Tier | Nome               | Color (Main)                             | Color (Side)                             | Particle Mult | Size Mult | Life Mult | Speed Mult | Spark Prob | Special          |
+| ---- | ------------------ | ---------------------------------------- | ---------------------------------------- | ------------- | --------- | --------- | ---------- | ---------- | ---------------- |
+| 0    | Blue Basic         | Orange HSL(18-40, 100%, 60-76%)          | Blue HSL(200-225, 100%, 70-88%)          | 1.0x          | 1.0x      | 1.0x      | 1.0x       | 25%        | -                |
+| 1    | Enhanced Blue      | Brighter Orange HSL(25-45, 100%, 63-77%) | Blue HSL(200-225, 100%, 70-88%)          | 1.3x          | 1.2x      | 1.1x      | 1.1x       | 34%        | -                |
+| 2    | Enhanced Blue      | Brighter Orange HSL(25-45, 100%, 63-77%) | Blue HSL(200-225, 100%, 70-88%)          | 1.6x          | 1.4x      | 1.2x      | 1.2x       | 43%        | -                |
+| 3    | Bright Yellow      | Yellow HSL(45-60, 100%, 68-82%)          | Bright Cyan HSL(180-200, 100%, 75-90%)   | 1.9x          | 1.6x      | 1.3x      | 1.3x       | 52%        | -                |
+| 4    | Bright Cyan        | Cyan HSL(185-210, 100%, 68-82%)          | Bright Cyan HSL(180-200, 100%, 75-90%)   | 2.2x          | 1.8x      | 1.4x      | 1.4x       | 61%        | -                |
+| 5    | Electric Cyan-Blue | Electric Cyan HSL(190-210, 100%, 70-82%) | ELECTRIC CYAN HSL(180-190, 100%, 80-95%) | 2.5x          | 2.0x      | 1.5x      | 1.5x       | 70%        | Ion Trail Damage |
 
 ### Fórmulas de Scaling
 
@@ -200,6 +209,7 @@ sparkProbability = 0.25 + (visualLevel × 0.09)
 ```
 
 **Exemplo (Tier 5):**
+
 ```
 visualBoost = 1 + (5 × 0.3) = 2.5x particles
 sizeBoost = 1 + (5 × 0.2) = 2.0x size
@@ -209,6 +219,7 @@ sparkProbability = 0.25 + (5 × 0.09) = 0.70 (70%)
 ```
 
 ### Implementação Godot
+
 - Usar `GPUParticles3D` para cada thruster
 - Modular `amount`, `lifetime`, `initial_velocity` baseado em visual level
 - Usar `ParticleProcessMaterial` com `color_ramp` para gradient
@@ -221,6 +232,7 @@ sparkProbability = 0.25 + (5 × 0.09) = 0.70 (70%)
 ## 5. VFX Algorithm (Spawn de Particles)
 
 ### Conceito
+
 - Spawna N particles por thruster event (3-8 baseado em type e visual level)
 - Cada particle tem: position, velocity, color, size, lifetime, type
 - Spark particles adicionais (probability 25%-70%)
@@ -339,6 +351,7 @@ func spawn_thruster_vfx(
 ```
 
 ### Implementação Godot
+
 - Usar `GPUParticles3D` com `one_shot = false` (continuous emission)
 - Modular `emitting` baseado em intensity > 0
 - Usar `ParticleProcessMaterial` com:
@@ -354,6 +367,7 @@ func spawn_thruster_vfx(
 ## 6. Audio Architecture (ThrusterLoopManager)
 
 ### Conceito
+
 - Gerencia loops contínuos de thruster (não one-shot sounds)
 - Cada loop usa: 2 oscillators (sawtooth + square) + 1 noise buffer + 4 filters
 - Master gain clamped a 0.5 (-6dB) no intensity máximo
@@ -362,14 +376,17 @@ func spawn_thruster_vfx(
 ### Componentes de um Loop
 
 1. **Oscillators:**
+
    - Sawtooth: gain 0.2, frequency baseFreq
    - Square: gain 0.3, frequency baseFreq
 
 2. **Noise:**
+
    - Buffer looping (duration 0.8-1.2s)
    - Gain 0.25
 
 3. **Filters:**
+
    - Bandpass: 1.2-6kHz (Q: 1.2)
    - Highpass: 70Hz
    - Peaking EQ Low: 250Hz, +2-3dB (warmth)
@@ -438,7 +455,9 @@ func stop_loop() -> void:
 ```
 
 ### Nota sobre Godot
+
 Godot não tem Web Audio API. Alternativas:
+
 1. **AudioStreamGenerator**: Síntese procedural em tempo real (complexo)
 2. **Pre-rendered loops**: Renderizar loops offline, usar AudioStreamPlayer com pitch_scale (recomendado)
 3. **Hybrid**: Usar AudioStreamPlayer para loop base + AudioStreamGenerator para modulação
@@ -450,6 +469,7 @@ Godot não tem Web Audio API. Alternativas:
 ## 7. Audio Modulation (Pitch/Volume)
 
 ### Conceito
+
 - Pitch e volume modulados por intensity (0-1)
 - Intensity 0: silêncio
 - Intensity 0.5: volume médio, pitch base
@@ -485,6 +505,7 @@ func update_loop_intensity(type: String, new_intensity: float) -> void:
 ```
 
 ### Implementação Godot
+
 - Usar `AudioStreamPlayer.pitch_scale` para pitch modulation
 - Usar `AudioStreamPlayer.volume_db` para volume modulation
 - Usar `Tween` para smooth ramps (evita clicks)
@@ -496,6 +517,7 @@ func update_loop_intensity(type: String, new_intensity: float) -> void:
 ## 8. Ion Trail System (Tier 5) - FEATURE NOVA
 
 ### Conceito
+
 - Tier 5 upgrade ativa ion trail damage
 - Trail segue player, causa dano a inimigos que tocam
 - Damage over time: 5 DPS (sugestão)
@@ -573,6 +595,7 @@ func apply_trail_damage() -> void:
 ```
 
 ### Implementação Godot
+
 - Criar `Area3D` como child do player (position relativa)
 - Usar `CylinderShape3D` (radius: 8, height: 2) para collision
 - Usar `GPUParticles3D` para trail visual (cyan glow)
@@ -586,18 +609,21 @@ func apply_trail_damage() -> void:
 ## 9. Thruster States (Estados de Thruster)
 
 ### 9.1. Idle (Sem Input)
+
 - **Intensities:** main=0, aux=0, sideL=0, sideR=0
 - **Visual:** Nenhum particle
 - **Audio:** Loops parados
 - **Transição:** Input detectado → Moving
 
 ### 9.2. Moving (Com Input Linear)
+
 - **Intensities:** main=1 (W) OU aux=1 (S)
 - **Visual:** Particles spawning continuamente
 - **Audio:** Loop ativo com intensity 1.0
 - **Transição:** Input parado → Auto-brake OU Dash pressed → Dashing
 
 ### 9.3. Auto-brake (Drift System)
+
 - **Intensities:** main=0.35-1.0 OU aux=0.35-1.0 (calculado por drift factor)
 - **Visual:** Particles com intensity reduzida
 - **Audio:** Loop ativo com intensity × 0.4 (60% reduction), sem burst/release
@@ -605,12 +631,14 @@ func apply_trail_damage() -> void:
 - **Transição:** Input detectado → Moving OU speed < 2 → Idle
 
 ### 9.4. Dashing (NOVO - não existe no JS)
+
 - **Intensities:** main=1.0 (max intensity)
 - **Visual:** Particles com max intensity + special trail
 - **Audio:** Loop ativo com intensity 1.0 + pitch boost
 - **Transição:** Dash expired → Moving
 
 ### 9.5. Braking (Input S)
+
 - **Intensities:** aux=1.0
 - **Visual:** Aux thruster particles (reverse direction)
 - **Audio:** Retro loop ativo
@@ -641,12 +669,14 @@ stateDiagram-v2
 ### Algoritmo
 
 1. **Input-based:**
+
    - W (up): `thrMain = 1.0`
    - S (down): `thrAux = 1.0`
    - A (left): `thrSideR = 1.0`
    - D (right): `thrSideL = 1.0`
 
 2. **Auto-brake (drift system):**
+
    - Se sem input linear E speed > 2:
      - Calcula projeção: `proj = velocity · forward`
      - Calcula kBase: `max(0.35, min(1, |proj| / (maxSpeed × 0.8)))`
@@ -707,6 +737,7 @@ func calculate_thruster_intensities(input: Dictionary, is_dashing: bool) -> Dict
 ```
 
 ### Implementação Godot
+
 - Executar a cada frame em `_physics_process()`
 - Emitir eventos thruster-effect para cada thruster ativo
 - Usar `max()` para combinar auto-brake com input manual
@@ -844,71 +875,71 @@ func update_thruster_particles(thruster: GPUParticles3D, intensity: float) -> vo
 
 ## 12. Tabela de Parâmetros Configuráveis
 
-| Parâmetro | Valor Padrão | Descrição | Arquivo Origem |
-|-----------|--------------|-----------|----------------|
-| **Visual Scaling** |
-| `VISUAL_BOOST_PARTICLES` | 0.3 | Scaling de particles por level | `EffectsSystem.js:1961` |
-| `VISUAL_BOOST_SIZE` | 0.2 | Scaling de size por level | `EffectsSystem.js:1962` |
-| `VISUAL_BOOST_LIFETIME` | 0.1 | Scaling de lifetime por level | `EffectsSystem.js:1963` |
-| `VISUAL_BOOST_SPEED` | 0.1 | Scaling de speed por level | `EffectsSystem.js:1964` |
-| **Main Thruster VFX** |
-| `MAIN_BASE_COUNT` | 3 | Particle count base | `EffectsSystem.js:1970` |
-| `MAIN_SPEED_BASE` | 120 | Velocidade base (px/s) | `EffectsSystem.js:1971` |
-| `MAIN_SIZE_RANGE` | [2.0, 3.2] | Range de tamanho (px) | `EffectsSystem.js:1972` |
-| `MAIN_LIFE_RANGE` | [0.22, 0.28] | Range de lifetime (s) | `EffectsSystem.js:1973` |
-| **Aux Thruster VFX** |
-| `AUX_BASE_COUNT` | 2 | Particle count base | `EffectsSystem.js:1994` |
-| `AUX_SPEED_BASE` | 105 | Velocidade base (px/s) | `EffectsSystem.js:1995` |
-| `AUX_SIZE_RANGE` | [1.8, 2.6] | Range de tamanho (px) | `EffectsSystem.js:1996` |
-| `AUX_LIFE_RANGE` | [0.18, 0.26] | Range de lifetime (s) | `EffectsSystem.js:1997` |
-| **Side Thruster VFX** |
-| `SIDE_BASE_COUNT` | 2 | Particle count base | `EffectsSystem.js:2007` |
-| `SIDE_SPEED_BASE` | 110 | Velocidade base (px/s) | `EffectsSystem.js:2008` |
-| `SIDE_SIZE_RANGE` | [1.6, 2.2] | Range de tamanho (px) | `EffectsSystem.js:2009` |
-| `SIDE_LIFE_RANGE` | [0.16, 0.22] | Range de lifetime (s) | `EffectsSystem.js:2010` |
-| **Spark Particles** |
-| `SPARK_PROBABILITY_BASE` | 0.25 | Probabilidade base (25%) | `EffectsSystem.js:2050` |
-| `SPARK_PROBABILITY_PER_LEVEL` | 0.09 | Incremento por level (9%) | `EffectsSystem.js:2050` |
-| **Audio Frequencies** |
-| `MAIN_BASE_FREQ` | 85 | Frequência base (Hz) | `AudioSystem.js:57` |
-| `MAIN_FREQ_VARIATION` | [-3, 3] | Variação (Hz) | `AudioSystem.js:58` |
-| `RETRO_BASE_FREQ` | 95 | Frequência base (Hz) | `AudioSystem.js:61` |
-| `RETRO_FREQ_VARIATION` | [-4, 4] | Variação (Hz) | `AudioSystem.js:62` |
-| `SIDE_BASE_FREQ` | 110 | Frequência base (Hz) | `AudioSystem.js:66` |
-| `SIDE_FREQ_VARIATION` | [-5, 5] | Variação (Hz) | `AudioSystem.js:67` |
-| **Audio Durations** |
-| `MAIN_NOISE_DURATION` | 1.2 | Noise buffer duration (s) | `AudioSystem.js:59` |
-| `RETRO_NOISE_DURATION` | 1.0 | Noise buffer duration (s) | `AudioSystem.js:63` |
-| `SIDE_NOISE_DURATION` | 0.8 | Noise buffer duration (s) | `AudioSystem.js:68` |
-| **Audio Start Burst** |
-| `MAIN_BURST_DURATION` | 0.24 | Burst duration (s) | `AudioSystem.js:3756` |
-| `MAIN_BURST_PITCH_START` | 90 | Pitch inicial (Hz) | `AudioSystem.js:3757` |
-| `MAIN_BURST_PITCH_END` | 120 | Pitch final (Hz) | `AudioSystem.js:3758` |
-| `MAIN_BURST_GAIN` | 0.15 | Gain peak | `AudioSystem.js:3759` |
-| **Audio Stop Release** |
-| `MAIN_RELEASE_DURATION` | 0.20 | Release duration (s) | `AudioSystem.js:3878` |
-| `MAIN_RELEASE_PITCH_START` | 110 | Pitch inicial (Hz) | `AudioSystem.js:3879` |
-| `MAIN_RELEASE_PITCH_END` | 70 | Pitch final (Hz) | `AudioSystem.js:3880` |
-| `MAIN_RELEASE_GAIN` | 0.12 | Gain peak | `AudioSystem.js:3881` |
-| **Audio Filters** |
-| `BANDPASS_FREQ_MAIN` | 3000 | Bandpass frequency (Hz) | `AudioSystem.js:113` |
-| `BANDPASS_FREQ_RETRO` | 2500 | Bandpass frequency (Hz) | `AudioSystem.js:113` |
-| `BANDPASS_FREQ_SIDE` | 3500 | Bandpass frequency (Hz) | `AudioSystem.js:113` |
-| `BANDPASS_Q` | 1.2 | Bandpass Q factor | `AudioSystem.js:114` |
-| `HIGHPASS_FREQ` | 70 | Highpass frequency (Hz) | `AudioSystem.js:119` |
-| `PEAKING_LOW_FREQ` | 250 | Peaking EQ low (Hz) | `AudioSystem.js:123` |
-| `PEAKING_LOW_GAIN` | 2-3 | Peaking EQ low gain (dB) | `AudioSystem.js:125` |
-| `PEAKING_HIGH_FREQ` | 3000 | Peaking EQ high (Hz) | `AudioSystem.js:129` |
-| `PEAKING_HIGH_GAIN` | 1.5-2 | Peaking EQ high gain (dB) | `AudioSystem.js:131` |
-| `LOWPASS_FREQ` | 2800 | Lowpass frequency (Hz) | `AudioSystem.js:3827` |
-| **Audio Intensity** |
-| `MASTER_GAIN_CLAMP` | 0.5 | Max gain (-6dB) | `AudioSystem.js:135` |
-| `AUTO_BRAKE_INTENSITY_MULT` | 0.4 | Auto-brake reduction (60%) | `AudioSystem.js:3682` |
-| **Ion Trail (Tier 5)** |
-| `ION_TRAIL_DAMAGE` | 5.0 | Damage per second (DPS) | Sugestão |
-| `ION_TRAIL_RADIUS` | 8.0 | Trail radius (px) | Sugestão |
-| `ION_TRAIL_LIFETIME` | 0.5 | Particle lifetime (s) | Sugestão |
-| `ION_TRAIL_CHECK_INTERVAL` | 0.1 | Damage tick rate (s) | Sugestão |
+| Parâmetro                     | Valor Padrão | Descrição                      | Arquivo Origem          |
+| ----------------------------- | ------------ | ------------------------------ | ----------------------- |
+| **Visual Scaling**            |
+| `VISUAL_BOOST_PARTICLES`      | 0.3          | Scaling de particles por level | `EffectsSystem.js:1961` |
+| `VISUAL_BOOST_SIZE`           | 0.2          | Scaling de size por level      | `EffectsSystem.js:1962` |
+| `VISUAL_BOOST_LIFETIME`       | 0.1          | Scaling de lifetime por level  | `EffectsSystem.js:1963` |
+| `VISUAL_BOOST_SPEED`          | 0.1          | Scaling de speed por level     | `EffectsSystem.js:1964` |
+| **Main Thruster VFX**         |
+| `MAIN_BASE_COUNT`             | 3            | Particle count base            | `EffectsSystem.js:1970` |
+| `MAIN_SPEED_BASE`             | 120          | Velocidade base (px/s)         | `EffectsSystem.js:1971` |
+| `MAIN_SIZE_RANGE`             | [2.0, 3.2]   | Range de tamanho (px)          | `EffectsSystem.js:1972` |
+| `MAIN_LIFE_RANGE`             | [0.22, 0.28] | Range de lifetime (s)          | `EffectsSystem.js:1973` |
+| **Aux Thruster VFX**          |
+| `AUX_BASE_COUNT`              | 2            | Particle count base            | `EffectsSystem.js:1994` |
+| `AUX_SPEED_BASE`              | 105          | Velocidade base (px/s)         | `EffectsSystem.js:1995` |
+| `AUX_SIZE_RANGE`              | [1.8, 2.6]   | Range de tamanho (px)          | `EffectsSystem.js:1996` |
+| `AUX_LIFE_RANGE`              | [0.18, 0.26] | Range de lifetime (s)          | `EffectsSystem.js:1997` |
+| **Side Thruster VFX**         |
+| `SIDE_BASE_COUNT`             | 2            | Particle count base            | `EffectsSystem.js:2007` |
+| `SIDE_SPEED_BASE`             | 110          | Velocidade base (px/s)         | `EffectsSystem.js:2008` |
+| `SIDE_SIZE_RANGE`             | [1.6, 2.2]   | Range de tamanho (px)          | `EffectsSystem.js:2009` |
+| `SIDE_LIFE_RANGE`             | [0.16, 0.22] | Range de lifetime (s)          | `EffectsSystem.js:2010` |
+| **Spark Particles**           |
+| `SPARK_PROBABILITY_BASE`      | 0.25         | Probabilidade base (25%)       | `EffectsSystem.js:2050` |
+| `SPARK_PROBABILITY_PER_LEVEL` | 0.09         | Incremento por level (9%)      | `EffectsSystem.js:2050` |
+| **Audio Frequencies**         |
+| `MAIN_BASE_FREQ`              | 85           | Frequência base (Hz)           | `AudioSystem.js:57`     |
+| `MAIN_FREQ_VARIATION`         | [-3, 3]      | Variação (Hz)                  | `AudioSystem.js:58`     |
+| `RETRO_BASE_FREQ`             | 95           | Frequência base (Hz)           | `AudioSystem.js:61`     |
+| `RETRO_FREQ_VARIATION`        | [-4, 4]      | Variação (Hz)                  | `AudioSystem.js:62`     |
+| `SIDE_BASE_FREQ`              | 110          | Frequência base (Hz)           | `AudioSystem.js:66`     |
+| `SIDE_FREQ_VARIATION`         | [-5, 5]      | Variação (Hz)                  | `AudioSystem.js:67`     |
+| **Audio Durations**           |
+| `MAIN_NOISE_DURATION`         | 1.2          | Noise buffer duration (s)      | `AudioSystem.js:59`     |
+| `RETRO_NOISE_DURATION`        | 1.0          | Noise buffer duration (s)      | `AudioSystem.js:63`     |
+| `SIDE_NOISE_DURATION`         | 0.8          | Noise buffer duration (s)      | `AudioSystem.js:68`     |
+| **Audio Start Burst**         |
+| `MAIN_BURST_DURATION`         | 0.24         | Burst duration (s)             | `AudioSystem.js:3756`   |
+| `MAIN_BURST_PITCH_START`      | 90           | Pitch inicial (Hz)             | `AudioSystem.js:3757`   |
+| `MAIN_BURST_PITCH_END`        | 120          | Pitch final (Hz)               | `AudioSystem.js:3758`   |
+| `MAIN_BURST_GAIN`             | 0.15         | Gain peak                      | `AudioSystem.js:3759`   |
+| **Audio Stop Release**        |
+| `MAIN_RELEASE_DURATION`       | 0.20         | Release duration (s)           | `AudioSystem.js:3878`   |
+| `MAIN_RELEASE_PITCH_START`    | 110          | Pitch inicial (Hz)             | `AudioSystem.js:3879`   |
+| `MAIN_RELEASE_PITCH_END`      | 70           | Pitch final (Hz)               | `AudioSystem.js:3880`   |
+| `MAIN_RELEASE_GAIN`           | 0.12         | Gain peak                      | `AudioSystem.js:3881`   |
+| **Audio Filters**             |
+| `BANDPASS_FREQ_MAIN`          | 3000         | Bandpass frequency (Hz)        | `AudioSystem.js:113`    |
+| `BANDPASS_FREQ_RETRO`         | 2500         | Bandpass frequency (Hz)        | `AudioSystem.js:113`    |
+| `BANDPASS_FREQ_SIDE`          | 3500         | Bandpass frequency (Hz)        | `AudioSystem.js:113`    |
+| `BANDPASS_Q`                  | 1.2          | Bandpass Q factor              | `AudioSystem.js:114`    |
+| `HIGHPASS_FREQ`               | 70           | Highpass frequency (Hz)        | `AudioSystem.js:119`    |
+| `PEAKING_LOW_FREQ`            | 250          | Peaking EQ low (Hz)            | `AudioSystem.js:123`    |
+| `PEAKING_LOW_GAIN`            | 2-3          | Peaking EQ low gain (dB)       | `AudioSystem.js:125`    |
+| `PEAKING_HIGH_FREQ`           | 3000         | Peaking EQ high (Hz)           | `AudioSystem.js:129`    |
+| `PEAKING_HIGH_GAIN`           | 1.5-2        | Peaking EQ high gain (dB)      | `AudioSystem.js:131`    |
+| `LOWPASS_FREQ`                | 2800         | Lowpass frequency (Hz)         | `AudioSystem.js:3827`   |
+| **Audio Intensity**           |
+| `MASTER_GAIN_CLAMP`           | 0.5          | Max gain (-6dB)                | `AudioSystem.js:135`    |
+| `AUTO_BRAKE_INTENSITY_MULT`   | 0.4          | Auto-brake reduction (60%)     | `AudioSystem.js:3682`   |
+| **Ion Trail (Tier 5)**        |
+| `ION_TRAIL_DAMAGE`            | 5.0          | Damage per second (DPS)        | Sugestão                |
+| `ION_TRAIL_RADIUS`            | 8.0          | Trail radius (px)              | Sugestão                |
+| `ION_TRAIL_LIFETIME`          | 0.5          | Particle lifetime (s)          | Sugestão                |
+| `ION_TRAIL_CHECK_INTERVAL`    | 0.1          | Damage tick rate (s)           | Sugestão                |
 
 ---
 
@@ -1076,28 +1107,28 @@ sequenceDiagram
 
 ### Main Thruster (Forward)
 
-| Tier | Color Name | HSL Range | RGB Approx | Visual Description |
-|------|------------|-----------|------------|--------------------|
-| 0 | Standard Orange | H: 18-40°, S: 100%, L: 60-76% | #F26522 | Laranja padrão |
-| 1-2 | Brighter Orange | H: 25-45°, S: 100%, L: 63-77% | #F57C22 | Laranja mais brilhante |
-| 3 | Bright Yellow | H: 45-60°, S: 100%, L: 68-82% | #FFD633 | Amarelo brilhante |
-| 4 | Bright Cyan | H: 185-210°, S: 100%, L: 68-82% | #33D4FF | Cyan brilhante |
-| 5 | Electric Cyan-Blue | H: 190-210°, S: 100%, L: 70-82% | #33DDFF | Cyan elétrico azulado |
+| Tier | Color Name         | HSL Range                       | RGB Approx | Visual Description     |
+| ---- | ------------------ | ------------------------------- | ---------- | ---------------------- |
+| 0    | Standard Orange    | H: 18-40°, S: 100%, L: 60-76%   | #F26522    | Laranja padrão         |
+| 1-2  | Brighter Orange    | H: 25-45°, S: 100%, L: 63-77%   | #F57C22    | Laranja mais brilhante |
+| 3    | Bright Yellow      | H: 45-60°, S: 100%, L: 68-82%   | #FFD633    | Amarelo brilhante      |
+| 4    | Bright Cyan        | H: 185-210°, S: 100%, L: 68-82% | #33D4FF    | Cyan brilhante         |
+| 5    | Electric Cyan-Blue | H: 190-210°, S: 100%, L: 70-82% | #33DDFF    | Cyan elétrico azulado  |
 
 ### Aux Thruster (Braking)
 
-| Tier | Color Name | HSL Range | RGB Approx |
-|------|------------|-----------|------------|
-| 0-2 | Standard Blue | H: 200-225°, S: 100%, L: 68-86% | #33A3FF |
-| 3+ | Bright Cyan | H: 190-210°, S: 100%, L: 75-90% | #66E6FF |
+| Tier | Color Name    | HSL Range                       | RGB Approx |
+| ---- | ------------- | ------------------------------- | ---------- |
+| 0-2  | Standard Blue | H: 200-225°, S: 100%, L: 68-86% | #33A3FF    |
+| 3+   | Bright Cyan   | H: 190-210°, S: 100%, L: 75-90% | #66E6FF    |
 
 ### Side Thrusters (RCS)
 
-| Tier | Color Name | HSL Range | RGB Approx |
-|------|------------|-----------|------------|
-| 0-2 | Standard Blue | H: 200-225°, S: 100%, L: 70-88% | #33AAFF |
-| 3-4 | Bright Cyan | H: 180-200°, S: 100%, L: 75-90% | #66EEFF |
-| 5 | ELECTRIC CYAN | H: 180-190°, S: 100%, L: 80-95% | #99F5FF |
+| Tier | Color Name    | HSL Range                       | RGB Approx |
+| ---- | ------------- | ------------------------------- | ---------- |
+| 0-2  | Standard Blue | H: 200-225°, S: 100%, L: 70-88% | #33AAFF    |
+| 3-4  | Bright Cyan   | H: 180-200°, S: 100%, L: 75-90% | #66EEFF    |
+| 5    | ELECTRIC CYAN | H: 180-190°, S: 100%, L: 80-95% | #99F5FF    |
 
 ### Conversão HSL → Godot
 
@@ -1133,13 +1164,13 @@ Input (Osc + Noise) → Bandpass → Highpass → Peaking Low → Peaking High �
 
 ### Especificações
 
-| Filter | Type | Frequency | Q | Gain | Purpose |
-|--------|------|-----------|---|------|----------|
-| Bandpass | bandpass | 3000 Hz (main), 2500 Hz (retro), 3500 Hz (side) | 1.2 | - | Isola faixa característica de thruster |
-| Highpass | highpass | 70 Hz | - | - | Remove rumble subsônico |
-| Peaking Low | peaking | 250 Hz | 1.0 | +2-3 dB | Adiciona warmth (graves) |
-| Peaking High | peaking | 3000 Hz | 1.0 | +1.5-2 dB | Adiciona presence (médios-altos) |
-| Lowpass (burst/release) | lowpass | 1200-2800 Hz | 0.5 | - | Remove harshness (apenas em burst/release) |
+| Filter                  | Type     | Frequency                                       | Q   | Gain      | Purpose                                    |
+| ----------------------- | -------- | ----------------------------------------------- | --- | --------- | ------------------------------------------ |
+| Bandpass                | bandpass | 3000 Hz (main), 2500 Hz (retro), 3500 Hz (side) | 1.2 | -         | Isola faixa característica de thruster     |
+| Highpass                | highpass | 70 Hz                                           | -   | -         | Remove rumble subsônico                    |
+| Peaking Low             | peaking  | 250 Hz                                          | 1.0 | +2-3 dB   | Adiciona warmth (graves)                   |
+| Peaking High            | peaking  | 3000 Hz                                         | 1.0 | +1.5-2 dB | Adiciona presence (médios-altos)           |
+| Lowpass (burst/release) | lowpass  | 1200-2800 Hz                                    | 0.5 | -         | Remove harshness (apenas em burst/release) |
 
 ### Frequency Response (aproximado)
 
@@ -1158,6 +1189,7 @@ Input (Osc + Noise) → Bandpass → Highpass → Peaking Low → Peaking High �
 ### Implementação Godot
 
 Godot não tem Web Audio API. Alternativas:
+
 1. **AudioEffectFilter**: Usar `AudioEffectHighPassFilter`, `AudioEffectLowPassFilter`, `AudioEffectEQ` no AudioBus
 2. **Pre-processing**: Aplicar filters offline ao renderizar loops, usar AudioStreamPlayer
 3. **Shader Audio**: Usar compute shader para síntese (avançado)
@@ -1351,68 +1383,68 @@ func _physics_process(delta: float) -> void:
 
 ### Arquivos JavaScript Analisados
 
-| Arquivo | Linhas Relevantes | Descrição |
-|---------|-------------------|-----------|
-| **PlayerSystem.js** | 100-158 | Estrutura de dados do thruster state |
-| **PlayerSystem.js** | 646-693 | Intensity calculation (input + auto-brake) |
-| **PlayerSystem.js** | 741-794 | Thruster emission (4 thrusters, positions, directions) |
-| **EffectsSystem.js** | 1954-2068 | VFX spawn algorithm (particles, colors, sparks) |
-| **EffectsSystem.js** | 1959-2023 | Visual progression scaling (5 tiers) |
-| **EffectsSystem.js** | 1975-2022 | Color palettes (HSL ranges) |
-| **AudioSystem.js** | 17-306 | ThrusterLoopManager (oscillators, noise, filters) |
-| **AudioSystem.js** | 110-145 | Audio filter chain (bandpass, highpass, peaking EQ) |
-| **AudioSystem.js** | 173-191 | Audio modulation (pitch/volume formulas) |
-| **AudioSystem.js** | 3624-3923 | Thruster sound management (3 fases: burst, loop, release) |
-| **AudioSystem.js** | 3672-3725 | Audio intensity modulation |
-| **AudioSystem.js** | 3756-3881 | Burst/release parameters (pitch, duration, gain) |
-| **mobility.js** | 48-153 | Upgrade progression (5 tiers) |
-| **mobility.js** | 143-153 | Tier 5 ion trail event emission |
+| Arquivo              | Linhas Relevantes | Descrição                                                 |
+| -------------------- | ----------------- | --------------------------------------------------------- |
+| **PlayerSystem.js**  | 100-158           | Estrutura de dados do thruster state                      |
+| **PlayerSystem.js**  | 646-693           | Intensity calculation (input + auto-brake)                |
+| **PlayerSystem.js**  | 741-794           | Thruster emission (4 thrusters, positions, directions)    |
+| **EffectsSystem.js** | 1954-2068         | VFX spawn algorithm (particles, colors, sparks)           |
+| **EffectsSystem.js** | 1959-2023         | Visual progression scaling (5 tiers)                      |
+| **EffectsSystem.js** | 1975-2022         | Color palettes (HSL ranges)                               |
+| **AudioSystem.js**   | 17-306            | ThrusterLoopManager (oscillators, noise, filters)         |
+| **AudioSystem.js**   | 110-145           | Audio filter chain (bandpass, highpass, peaking EQ)       |
+| **AudioSystem.js**   | 173-191           | Audio modulation (pitch/volume formulas)                  |
+| **AudioSystem.js**   | 3624-3923         | Thruster sound management (3 fases: burst, loop, release) |
+| **AudioSystem.js**   | 3672-3725         | Audio intensity modulation                                |
+| **AudioSystem.js**   | 3756-3881         | Burst/release parameters (pitch, duration, gain)          |
+| **mobility.js**      | 48-153            | Upgrade progression (5 tiers)                             |
+| **mobility.js**      | 143-153           | Tier 5 ion trail event emission                           |
 
 ### Funções-Chave
 
 ```javascript
 // PlayerSystem.js
-getLocalToWorld(x, y)              // Converte posição local → world
-getLocalDirection(x, y)            // Converte direção local → world
-calculateThrusterIntensities()     // Calcula intensidades (input + auto-brake)
-emitThrusterEffects()              // Emite eventos thruster-effect
+getLocalToWorld(x, y); // Converte posição local → world
+getLocalDirection(x, y); // Converte direção local → world
+calculateThrusterIntensities(); // Calcula intensidades (input + auto-brake)
+emitThrusterEffects(); // Emite eventos thruster-effect
 
 // EffectsSystem.js
-handleThrusterEffect(event)        // Handler de evento thruster-effect
-spawnThrusterParticles()           // Spawna particles com scaling
-calculateVisualBoost(level)        // Calcula multipliers de visual level
-getThrusterColor(type, level)      // Retorna cor HSL baseado em type/level
+handleThrusterEffect(event); // Handler de evento thruster-effect
+spawnThrusterParticles(); // Spawna particles com scaling
+calculateVisualBoost(level); // Calcula multipliers de visual level
+getThrusterColor(type, level); // Retorna cor HSL baseado em type/level
 
 // AudioSystem.js
-ThrusterLoopManager.createLoop()   // Cria loop de audio (osc + noise + filters)
-ThrusterLoopManager.updateLoop()   // Atualiza intensity do loop
-handleThrusterEffect(event)        // Handler de evento thruster-effect (audio)
-playStartBurst()                   // Play start burst (triangle wave)
-playStopRelease()                  // Play stop release (sine wave)
+ThrusterLoopManager.createLoop(); // Cria loop de audio (osc + noise + filters)
+ThrusterLoopManager.updateLoop(); // Atualiza intensity do loop
+handleThrusterEffect(event); // Handler de evento thruster-effect (audio)
+playStartBurst(); // Play start burst (triangle wave)
+playStopRelease(); // Play stop release (sine wave)
 ```
 
 ### Eventos Emitidos/Consumidos
 
-| Evento | Emissor | Consumidor | Payload |
-|--------|---------|------------|---------|
-| `thruster-effect` | PlayerSystem | EffectsSystem, AudioSystem | {position, direction, intensity, type, visual_level, is_automatic} |
-| `upgrade-thruster-visual` | Upgrade System | PlayerSystem | {level: 0-5} |
-| `upgrade-ion-trail` | Upgrade System | PlayerSystem | {enabled: true} |
-| `ion-trail-damage-applied` | IonTrailDamage | VFX System | {enemy, damage, position} |
+| Evento                     | Emissor        | Consumidor                 | Payload                                                            |
+| -------------------------- | -------------- | -------------------------- | ------------------------------------------------------------------ |
+| `thruster-effect`          | PlayerSystem   | EffectsSystem, AudioSystem | {position, direction, intensity, type, visual_level, is_automatic} |
+| `upgrade-thruster-visual`  | Upgrade System | PlayerSystem               | {level: 0-5}                                                       |
+| `upgrade-ion-trail`        | Upgrade System | PlayerSystem               | {enabled: true}                                                    |
+| `ion-trail-damage-applied` | IonTrailDamage | VFX System                 | {enemy, damage, position}                                          |
 
 ### Conceitos JS → Godot
 
-| JavaScript | Godot | Notas |
-|------------|-------|-------|
-| `Particle` object | `GPUParticles3D` | Usar ParticleProcessMaterial para config |
-| `AudioContext` | `AudioStreamPlayer` | Pre-renderizar loops OU usar AudioStreamGenerator |
-| `OscillatorNode` | `AudioStreamGenerator` | Síntese procedural (complexo) |
-| `BiquadFilterNode` | `AudioEffectFilter` | Aplicar no AudioBus |
-| `GainNode` | `volume_db` property | Converter linear → dB |
-| `EventEmitter` | `Signal` | Sistema de sinais Godot |
-| `setTimeout` | `Timer` node | Criar Timer para delays |
-| `getLocalToWorld()` | `Transform3D.origin` | Usar transform do Node3D |
-| HSL color | `Color.from_hsv()` | Converter HSL → HSV primeiro |
+| JavaScript          | Godot                  | Notas                                             |
+| ------------------- | ---------------------- | ------------------------------------------------- |
+| `Particle` object   | `GPUParticles3D`       | Usar ParticleProcessMaterial para config          |
+| `AudioContext`      | `AudioStreamPlayer`    | Pre-renderizar loops OU usar AudioStreamGenerator |
+| `OscillatorNode`    | `AudioStreamGenerator` | Síntese procedural (complexo)                     |
+| `BiquadFilterNode`  | `AudioEffectFilter`    | Aplicar no AudioBus                               |
+| `GainNode`          | `volume_db` property   | Converter linear → dB                             |
+| `EventEmitter`      | `Signal`               | Sistema de sinais Godot                           |
+| `setTimeout`        | `Timer` node           | Criar Timer para delays                           |
+| `getLocalToWorld()` | `Transform3D.origin`   | Usar transform do Node3D                          |
+| HSL color           | `Color.from_hsv()`     | Converter HSL → HSV primeiro                      |
 
 ### Recursos Adicionais
 
@@ -1444,6 +1476,7 @@ Este documento fornece uma referência completa para implementar o sistema de th
 ✅ **Referências** completas aos arquivos JavaScript
 
 **Próximos Passos:**
+
 1. Implementar `ThrusterSystem.gd` baseado na estrutura de dados (seção 2)
 2. Criar scene `Player.tscn` com 4 GPUParticles3D nodes (seção 11)
 3. Implementar `spawn_thruster_vfx()` function (seção 5)

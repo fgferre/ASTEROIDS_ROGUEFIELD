@@ -1,11 +1,13 @@
 # Plano de Execução – Fase 2 (RandomService seedado e eliminação de `Math.random()`)
 
 ## 1. Objetivos da fase
+
 - Substituir chamadas diretas a `Math.random()` nos sistemas centrais de gameplay e feedback (combate, inimigos, efeitos, background, coleta, áudio) por um serviço determinístico registrado no contêiner DI, preservando fallback para o Service Locator durante a transição.【F:src/modules/EffectsSystem.js†L11-L204】【F:src/modules/EnemySystem.js†L663-L740】【F:src/modules/AudioSystem.js†L420-L444】【F:src/modules/MenuBackgroundSystem.js†L200-L333】
 - Permitir inicializar runs com seeds estáveis e reiniciar sequências de aleatoriedade em `startGame()`/`resetGameSystems()` sem recriar instâncias, garantindo replays e depuração reproduzíveis.【F:src/app.js†L136-L168】【F:src/app.js†L420-L447】
 - Oferecer APIs de alto nível (range, escolha ponderada, UUID determinístico, fork por escopo) para cobrir todos os padrões atuais de uso (`Date.now() + Math.random()`, shuffles, jitter procedural), prevenindo regressões quando módulos forem migrados para injeção por construtor em fases futuras.【F:src/modules/XPOrbSystem.js†L582-L598】【F:src/modules/enemies/types/Asteroid.js†L68-L145】【F:src/modules/RenderingSystem.js†L148-L359】
 
 ## 2. Diagnóstico atual (evidências)
+
 1. **Feedback visual usa `Math.random()` diretamente.** `EffectsSystem` instancia partículas com rotação aleatória, jitter de cores e explosões procedurais, enquanto `ScreenShake` gera seeds randômicos no construtor, impossibilitando resultados repetíveis.【F:src/modules/EffectsSystem.js†L11-L204】【F:src/modules/EffectsSystem.js†L700-L740】【F:src/modules/EffectsSystem.js†L1820-L1856】【F:src/utils/ScreenShake.js†L25-L44】
 2. **Spawn e IA dependem de sorte global.** `EnemySystem`, `WaveManager` e componentes associados decidem laterais de spawn, variantes, fragmentos e rotações através de `Math.random()`, espalhando probabilidade implícita pelo código.【F:src/modules/EnemySystem.js†L663-L740】【F:src/modules/EnemySystem.js†L906-L979】【F:src/modules/EnemySystem.js†L1392-L1465】【F:src/modules/enemies/managers/WaveManager.js†L141-L210】
 3. **IDs e animações são não determinísticos.** Asteroides, orbes de XP e animações de fusão somam `Math.random()` a `Date.now()`, o que impede reproduzir uma mesma run mesmo com seed conhecida.【F:src/modules/enemies/types/Asteroid.js†L68-L145】【F:src/modules/XPOrbSystem.js†L582-L598】【F:src/modules/XPOrbSystem.js†L1248-L1268】【F:src/modules/enemies/base/BaseEnemy.js†L379-L386】
@@ -15,6 +17,7 @@
 7. **Infraestrutura DI não conhece um serviço de aleatoriedade.** O manifesto DI não registra `random` nem expõe forma de definir seeds, e o `ServiceRegistry.createTestContainer` não fornece stub para testes, dificultando instrumentar o pipeline atual.【F:src/bootstrap/serviceManifest.js†L1-L160】【F:src/core/ServiceRegistry.js†L30-L119】
 
 ## 3. Estratégia geral
+
 - Introduzir `RandomService` em `/src/core`, com PRNG determinístico (ex.: Mulberry32) e API declarada (`float()`, `int()`, `range()`, `chance()`, `pick()`, `weightedPick()`, `uuid(scope)`, `fork(scope|seed)`). O serviço mantém estado e estatísticas para depuração.
 - Registrar o serviço no manifesto com suporte a contexto (`manifestContext.seed`, `manifestContext.randomOverrides`) e publicar snapshot no `gameServices` via `ServiceLocatorAdapter` até a eliminação total do locator.
 - Ajustar bootstrap para capturar seed inicial (param de query, `crypto.getRandomValues`, fallback) e reiniciar fluxos nos pontos de reset (`startGame`, `exitToMenu`, `executeRetryRespawn`) através de métodos como `random.reset(seed)` ou `random.fork('run')`.
@@ -24,17 +27,19 @@
 - Atualizar ferramentas de teste (`ServiceRegistry.createTestContainer`) para aceitar seed fixo e expor API simples para fixtures.
 
 ## 4. Sequenciamento detalhado
-| Ordem | Passo | Descrição | Pré-requisito | Critério de aceite |
-|-------|-------|-----------|---------------|--------------------|
-| 1 | Definir `RandomService` | Criar módulo com PRNG determinístico, API documentada e suporte a `fork`, `serialize`/`restore` para snapshots. | — | Testes unitários validam repetibilidade de `float()`, `range()`, `pick()` e `uuid()` com seed fixo. |
-| 2 | Integrar ao manifesto | Registrar `random` em `createServiceManifest`, adicionar fallback de registro no `ServiceLocatorAdapter` e expor seed atual via `window.diContainer` (dev). Atualizar `ServiceRegistry.createTestContainer` para aceitar overrides de RNG. | Passo 1 | `diContainer.getServiceNames()` inclui `random`; testes conseguem substituir RNG facilmente. |
-| 3 | Ajustar bootstrap/sessão | Estender `manifestContext` com `seed`, armazenar `gameState.randomSeed` e reinicializar fluxos nos resets (`resetGameSystems`, `startGame`, `exitToMenu`). Registrar seed em snapshot de morte para possibilitar replay completo. | Passo 2 | Logs de inicialização exibem seed, novas runs geram seeds distintos mas reproducíveis quando forçado. |
-| 4 | Migração utilitária | Atualizar `ScreenShake`, `RenderingSystem`, helpers de partículas (`EffectsSystem`) e `MenuBackgroundSystem` para aceitar `random` via dependências, criando subgeradores por escopo (ex.: `random.fork('effects.thrusters')`). | Passo 3 | Efeitos visuais renderizam igual ao comparar duas execuções com mesma seed; `MenuBackgroundSystem` pode ser inicializado determinísticamente ao reiniciar. |
-| 5 | Migração gameplay | Refatorar `EnemySystem`, `WaveManager`, `RewardManager`, `Asteroid`/componentes, `XPOrbSystem` e coletáveis para usar o RNG injetado, substituindo geração de IDs, timers e probabilidades. Introduzir utilitários no serviço (`weightedPick`, `distribution`, `uuid`). | Passo 4 | Spawns, drops e clusters de XP são reproduzidos frame a frame com seed fixa; snapshots + seed restauram estado idêntico. |
-| 6 | Migração áudio | Fazer `AudioSystem`, `AudioCache`, `AudioBatcher` receberem `random`, cachearem forks dedicados e exporem opção de seed no modo debug para validar paisagens sonoras. | Passo 4 | Buffers de ruído e variações tonais permanecem estáveis entre execuções seedadas; quedas de FPS não aumentam. |
-| 7 | Telemetria & testes | Adicionar logs condensados (`random.debugSnapshot()`) e adaptar suites existentes para injetar RNG determinístico. Atualizar checklists de validação para cobrir reinício com seed fixa. | Passos 4–6 | Testes automatizados conseguem reproduzir cenários com seed conhecida; checklist inclui verificação de seed. |
+
+| Ordem | Passo                    | Descrição                                                                                                                                                                                                                                                               | Pré-requisito | Critério de aceite                                                                                                                                         |
+| ----- | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | Definir `RandomService`  | Criar módulo com PRNG determinístico, API documentada e suporte a `fork`, `serialize`/`restore` para snapshots.                                                                                                                                                         | —             | Testes unitários validam repetibilidade de `float()`, `range()`, `pick()` e `uuid()` com seed fixo.                                                        |
+| 2     | Integrar ao manifesto    | Registrar `random` em `createServiceManifest`, adicionar fallback de registro no `ServiceLocatorAdapter` e expor seed atual via `window.diContainer` (dev). Atualizar `ServiceRegistry.createTestContainer` para aceitar overrides de RNG.                              | Passo 1       | `diContainer.getServiceNames()` inclui `random`; testes conseguem substituir RNG facilmente.                                                               |
+| 3     | Ajustar bootstrap/sessão | Estender `manifestContext` com `seed`, armazenar `gameState.randomSeed` e reinicializar fluxos nos resets (`resetGameSystems`, `startGame`, `exitToMenu`). Registrar seed em snapshot de morte para possibilitar replay completo.                                       | Passo 2       | Logs de inicialização exibem seed, novas runs geram seeds distintos mas reproducíveis quando forçado.                                                      |
+| 4     | Migração utilitária      | Atualizar `ScreenShake`, `RenderingSystem`, helpers de partículas (`EffectsSystem`) e `MenuBackgroundSystem` para aceitar `random` via dependências, criando subgeradores por escopo (ex.: `random.fork('effects.thrusters')`).                                         | Passo 3       | Efeitos visuais renderizam igual ao comparar duas execuções com mesma seed; `MenuBackgroundSystem` pode ser inicializado determinísticamente ao reiniciar. |
+| 5     | Migração gameplay        | Refatorar `EnemySystem`, `WaveManager`, `RewardManager`, `Asteroid`/componentes, `XPOrbSystem` e coletáveis para usar o RNG injetado, substituindo geração de IDs, timers e probabilidades. Introduzir utilitários no serviço (`weightedPick`, `distribution`, `uuid`). | Passo 4       | Spawns, drops e clusters de XP são reproduzidos frame a frame com seed fixa; snapshots + seed restauram estado idêntico.                                   |
+| 6     | Migração áudio           | Fazer `AudioSystem`, `AudioCache`, `AudioBatcher` receberem `random`, cachearem forks dedicados e exporem opção de seed no modo debug para validar paisagens sonoras.                                                                                                   | Passo 4       | Buffers de ruído e variações tonais permanecem estáveis entre execuções seedadas; quedas de FPS não aumentam.                                              |
+| 7     | Telemetria & testes      | Adicionar logs condensados (`random.debugSnapshot()`) e adaptar suites existentes para injetar RNG determinístico. Atualizar checklists de validação para cobrir reinício com seed fixa.                                                                                | Passos 4–6    | Testes automatizados conseguem reproduzir cenários com seed conhecida; checklist inclui verificação de seed.                                               |
 
 ## 5. Ajustes específicos por serviço
+
 - **EffectsSystem / ScreenShake:** aceitar `{ random }`, criar subgeradores para partículas, thrusters e explosões, e evitar acessar `Math.random()` ao reconfigurar partículas do pool.【F:src/modules/EffectsSystem.js†L11-L204】【F:src/modules/EffectsSystem.js†L700-L740】【F:src/modules/EffectsSystem.js†L1820-L1856】【F:src/utils/ScreenShake.js†L25-L44】
 - **RenderingSystem:** injetar RNG para `randomRange`/`makeStar`, permitindo reset de parallax quando janela é redimensionada sem alterar sequência global.【F:src/modules/RenderingSystem.js†L148-L359】
 - **MenuBackgroundSystem:** fornecer RNG escopado para geração de estrelas, geometrias, belt spawns e fragmentos, substituindo `createRandomGenerator(seed = Math.random() * ...)` por forks provenientes do serviço principal.【F:src/modules/MenuBackgroundSystem.js†L200-L333】【F:src/modules/MenuBackgroundSystem.js†L703-L820】
@@ -45,22 +50,26 @@
 - **app.js / fluxo de sessão:** armazenar `randomSeed` no `gameState`, incluir seed em snapshots e reinstanciar forks a cada `startGame`, `executeRetryRespawn` e `exitToMenu` antes de resetar sistemas.【F:src/app.js†L136-L168】【F:src/app.js†L420-L447】
 
 ## 6. Riscos e mitigação
+
 - **Desalinhamento entre forks:** documentar convenção de nomes de escopo (`random.fork('effects.trails')`) e adicionar validação para detectar acessos diretos a `Math.random()` (lint custom ou monkey patch em dev).
 - **IDs em caches persistentes:** substituir uso de `Date.now()` quando combinado com RNG por um helper que aceita seed + contador; atualizar serialização de snapshots para armazenar estado do RNG.
 - **Performance:** medir custo adicional do PRNG ao migrar loops críticos (ex.: partículas) e, se necessário, expor métodos especializados (`fastFloat()` sem checagens) para hot paths.
 - **Integração com áudio Web:** validar que partilhar buffers determinísticos não introduz artefatos audíveis; oferecer opção de recalc em hot reload apenas em dev.
 
 ### Convenção de nomes para forks do `RandomService`
+
 - Prefixe o domínio (sistema ou módulo) seguido de subescopos hierárquicos usando pontos (`wave-manager.spawn`, `xp-orbs.creation`, `rendering.starfield`).
 - Use substantivos/verbos descritivos para o segundo nível (ex.: `effects.explosions`, `enemy-rewards.velocity`) e evite números mágicos; para sequências repetidas, acrescente um sufixo semântico (`.shards`, `.boss-phase`).
 - Quando um sistema delegar forks para dependentes, derive do nome recebido (ex.: `random.fork(parentScope + '.fragments')`) para preservar rastreabilidade nos logs do `RandomService`.
 - Seeds customizadas devem ser anexadas via `fork(scope, seed)` apenas em ferramentas (debug/teste); produção deve depender de nomes estáveis para permitir restauração pelo snapshot do serviço.
 
 ### Monitoramento em desenvolvimento
+
 - Ativar um guardião de desenvolvimento que monkey patcha `Math.random()` após o bootstrap determinístico e emite `console.warn` com o stack trace resumido. O objetivo é identificar rapidamente chamadas não migradas para o `RandomService`.
 - O guardião deve ser habilitado automaticamente quando `process.env.NODE_ENV === 'development'` e ser silencioso durante o bootstrap inicial (antes do seed ser travado) para evitar falsos positivos.
 
 ## 7. Checklist de saída da Fase 2
+
 - [ ] `RandomService` registrado no manifesto, acessível via DI e `gameServices`, com API documentada e testes cobrindo repetibilidade.
 - [ ] `app.js` inicializa e reinicia seeds de maneira previsível, armazenando valor atual no `gameState` e nos snapshots de retry.
 - [ ] Todos os módulos que usavam `Math.random()` foram migrados para o RNG injetado, com forks por domínio e sem regressões visuais/sonoras perceptíveis.

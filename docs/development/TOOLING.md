@@ -3,6 +3,7 @@
 ## Build & Development
 
 ### Vite
+
 - **Purpose:** Fast development server with HMR (Hot Module Replacement)
 - **Commands:**
   - `npm run dev`: Start development server at `http://localhost:5173`
@@ -11,6 +12,7 @@
 - **Configuration:** `vite.config.js`
 
 ### Grunt
+
 - **Purpose:** Build automation and file copying
 - **Commands:**
   - `npm run build`: Execute build tasks
@@ -20,6 +22,7 @@
 ## Code Quality
 
 ### Prettier
+
 - **Purpose:** Consistent code formatting
 - **Commands:**
   - `npm run format`: Format all files
@@ -29,6 +32,7 @@
 ## Testing
 
 ### Vitest
+
 - **Purpose:** Unit and integration testing
 - **Commands:** See `tests/README.md` for complete list
   - `npm test`: Run all tests
@@ -42,6 +46,7 @@
 ## CI/CD
 
 ### GitHub Actions
+
 - **Workflows:**
   - Format check: Runs `prettier --check` on push/PR
   - Build validation: Runs `npm run build` on push/PR
@@ -52,6 +57,7 @@
 ## Dependency Analysis
 
 ### Scripts
+
 - **`npm run analyze:deps`:** Generate dependency graph, issues report, and Mermaid diagram
   - Outputs: `dependency-graph.json`, `dependency-issues.json`, `dependency-graph.dot`, `docs/architecture/dependency-graph.mmd`
 - **`npm run validate:deps`:** Validation-only mode (fails on cycles)
@@ -61,12 +67,14 @@
 ## Performance
 
 ### Benchmarking
+
 - **`npm run test:benchmark`:** Run performance benchmarks (5 runs)
 - **`npm run test:validate-optimizations`:** Validate optimization patterns
 - **`npm run stress`:** Run stress tests
 - **Scripts:** `scripts/benchmark-tests.js`, `scripts/run-stress-checks.mjs`
 
 ## Module System
+
 - **ES6 Modules:** All code uses `import`/`export`
 - **Type:** `"type": "module"` in `package.json`
 - **Entry point:** `src/app.js`

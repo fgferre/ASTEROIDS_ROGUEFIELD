@@ -26,13 +26,13 @@ export const DEFAULT_POOL_CONFIG = {
   asteroids: { initial: 20, max: 100 },
   xpOrbs: { initial: 40, max: 250 },
   shockwaves: { initial: 8, max: 25 },
-  tempObjects: { initial: 15, max: 60 }
+  tempObjects: { initial: 15, max: 60 },
 };
 
 export const DEFAULT_GC_OPTIONS = {
   defaultInterval: 4500,
   idleTimeout: 120,
-  maxTasksPerFrame: 2
+  maxTasksPerFrame: 2,
 };
 
 function ensureGameStateService(gameState) {
@@ -48,7 +48,10 @@ function ensureGameStateService(gameState) {
         try {
           return Boolean(sessionDelegate.isPaused());
         } catch (error) {
-          console.warn('[serviceManifest] Falling back to raw pause state:', error);
+          console.warn(
+            '[serviceManifest] Falling back to raw pause state:',
+            error
+          );
         }
       }
       return Boolean(gameState.isPaused);
@@ -58,7 +61,10 @@ function ensureGameStateService(gameState) {
         try {
           return sessionDelegate.getScreen();
         } catch (error) {
-          console.warn('[serviceManifest] Falling back to raw screen state:', error);
+          console.warn(
+            '[serviceManifest] Falling back to raw screen state:',
+            error
+          );
         }
       }
       return gameState.screen;
@@ -67,7 +73,9 @@ function ensureGameStateService(gameState) {
       if (sessionDelegate && typeof sessionDelegate.setScreen === 'function') {
         sessionDelegate.setScreen(screen);
         const delegatedScreen =
-          typeof sessionDelegate.getScreen === 'function' ? sessionDelegate.getScreen() : undefined;
+          typeof sessionDelegate.getScreen === 'function'
+            ? sessionDelegate.getScreen()
+            : undefined;
         if (delegatedScreen !== undefined) {
           gameState.screen = delegatedScreen;
           return;
@@ -80,7 +88,9 @@ function ensureGameStateService(gameState) {
       if (sessionDelegate && typeof sessionDelegate.setPaused === 'function') {
         sessionDelegate.setPaused(value);
         const delegatedState =
-          typeof sessionDelegate.isPaused === 'function' ? sessionDelegate.isPaused() : undefined;
+          typeof sessionDelegate.isPaused === 'function'
+            ? sessionDelegate.isPaused()
+            : undefined;
         if (delegatedState !== undefined) {
           gameState.isPaused = Boolean(delegatedState);
           return;
@@ -89,7 +99,7 @@ function ensureGameStateService(gameState) {
 
       gameState.isPaused = Boolean(value);
     },
-    getRawState: () => gameState
+    getRawState: () => gameState,
   };
 
   Object.defineProperty(service, '__attachSessionService', {
@@ -113,7 +123,7 @@ function ensureGameStateService(gameState) {
       }
     },
     enumerable: false,
-    writable: false
+    writable: false,
   });
 
   return service;
@@ -143,7 +153,11 @@ function createGarbageCollector(options) {
     () => {
       const tempPool = GamePools.tempObjects;
       if (tempPool && typeof tempPool.autoManage === 'function') {
-        tempPool.autoManage({ targetUtilization: 0.55, maxShrinkage: 10, maxExpansion: 6 });
+        tempPool.autoManage({
+          targetUtilization: 0.55,
+          maxShrinkage: 10,
+          maxExpansion: 6,
+        });
       }
     },
     { interval: 7000, priority: 1 }
@@ -156,7 +170,9 @@ function createRandomService(context = {}) {
   const { randomOverrides, seed } = context;
 
   const baseSeed =
-    (randomOverrides && typeof randomOverrides === 'object' && 'seed' in randomOverrides)
+    randomOverrides &&
+    typeof randomOverrides === 'object' &&
+    'seed' in randomOverrides
       ? randomOverrides.seed
       : seed;
 
@@ -203,14 +219,24 @@ function createRandomService(context = {}) {
   }
 
   const ServiceCtor =
-    (randomOverrides && typeof randomOverrides === 'object' && randomOverrides.Service)
-      || (randomOverrides && typeof randomOverrides === 'object' && randomOverrides.RandomService)
-      || (randomOverrides && typeof randomOverrides === 'object' && randomOverrides.constructorOverride)
-      || RandomService;
+    (randomOverrides &&
+      typeof randomOverrides === 'object' &&
+      randomOverrides.Service) ||
+    (randomOverrides &&
+      typeof randomOverrides === 'object' &&
+      randomOverrides.RandomService) ||
+    (randomOverrides &&
+      typeof randomOverrides === 'object' &&
+      randomOverrides.constructorOverride) ||
+    RandomService;
 
   const service = new ServiceCtor(baseSeed);
 
-  if (randomOverrides && typeof randomOverrides === 'object' && typeof randomOverrides.configure === 'function') {
+  if (
+    randomOverrides &&
+    typeof randomOverrides === 'object' &&
+    typeof randomOverrides.configure === 'function'
+  ) {
     randomOverrides.configure(service, {
       seed: baseSeed,
       context,
@@ -222,11 +248,7 @@ function createRandomService(context = {}) {
 }
 
 export function createServiceManifest(context = {}) {
-  const {
-    gameState,
-    poolConfig,
-    garbageCollectorOptions
-  } = context;
+  const { gameState, poolConfig, garbageCollectorOptions } = context;
 
   return [
     {
@@ -236,10 +258,12 @@ export function createServiceManifest(context = {}) {
       dependencies: [],
       factory: () => {
         if (typeof gameEvents === 'undefined') {
-          throw new Error('[serviceManifest] Global event bus is not available');
+          throw new Error(
+            '[serviceManifest] Global event bus is not available'
+          );
         }
         return gameEvents;
-      }
+      },
     },
     {
       name: 'random',
@@ -247,7 +271,7 @@ export function createServiceManifest(context = {}) {
       lazy: false,
       dependencies: [],
       factory: ({ context: manifestContext }) =>
-        createRandomService({ ...manifestContext })
+        createRandomService({ ...manifestContext }),
     },
     {
       name: 'game-state',
@@ -262,14 +286,14 @@ export function createServiceManifest(context = {}) {
         }
 
         return service;
-      }
+      },
     },
     {
       name: 'game-pools',
       singleton: true,
       lazy: false,
       dependencies: [],
-      factory: () => initializeGamePools(poolConfig)
+      factory: () => initializeGamePools(poolConfig),
     },
     {
       name: 'garbage-collector',
@@ -284,14 +308,14 @@ export function createServiceManifest(context = {}) {
         }
 
         return manager;
-      }
+      },
     },
     {
       name: 'settings',
       singleton: true,
       lazy: false,
       dependencies: [],
-      factory: () => new SettingsSystem()
+      factory: () => new SettingsSystem(),
     },
     {
       name: 'audio',
@@ -299,7 +323,10 @@ export function createServiceManifest(context = {}) {
       lazy: true,
       dependencies: ['settings', 'random'],
       factory: ({ resolved }) =>
-        new AudioSystem({ settings: resolved['settings'], random: resolved['random'] })
+        new AudioSystem({
+          settings: resolved['settings'],
+          random: resolved['random'],
+        }),
     },
     {
       name: 'command-queue',
@@ -313,7 +340,7 @@ export function createServiceManifest(context = {}) {
             : 0,
           frameSource: manifestContext?.frameSource,
           hooks: manifestContext?.metrics?.commandQueue,
-        })
+        }),
     },
     {
       name: 'crack-generation',
@@ -326,7 +353,7 @@ export function createServiceManifest(context = {}) {
         }
 
         return CrackGenerationService;
-      }
+      },
     },
     {
       name: 'input',
@@ -337,7 +364,7 @@ export function createServiceManifest(context = {}) {
         new InputSystem({
           settings: resolved['settings'],
           'command-queue': resolved['command-queue'],
-        })
+        }),
     },
     {
       name: 'player',
@@ -348,7 +375,7 @@ export function createServiceManifest(context = {}) {
         new PlayerSystem({
           input: resolved['input'],
           'command-queue': resolved['command-queue'],
-        })
+        }),
     },
     {
       name: 'xp-orbs',
@@ -359,14 +386,15 @@ export function createServiceManifest(context = {}) {
         new XPOrbSystem({
           player: resolved['player'],
           random: resolved['random'],
-        })
+        }),
     },
     {
       name: 'healthHearts',
       singleton: true,
       lazy: false,
       dependencies: ['player'],
-      factory: ({ resolved }) => new HealthHeartSystem({ player: resolved['player'] })
+      factory: ({ resolved }) =>
+        new HealthHeartSystem({ player: resolved['player'] }),
     },
     {
       name: 'physics',
@@ -378,7 +406,8 @@ export function createServiceManifest(context = {}) {
 
         const enemyInstance =
           resolved['enemies'] ||
-          (typeof container?.isInstantiated === 'function' && container.isInstantiated('enemies')
+          (typeof container?.isInstantiated === 'function' &&
+          container.isInstantiated('enemies')
             ? container.resolve('enemies')
             : null);
 
@@ -387,14 +416,15 @@ export function createServiceManifest(context = {}) {
         }
 
         return physics;
-      }
+      },
     },
     {
       name: 'ui',
       singleton: true,
       lazy: false,
       dependencies: ['settings'],
-      factory: ({ resolved }) => new UISystem({ settings: resolved['settings'] })
+      factory: ({ resolved }) =>
+        new UISystem({ settings: resolved['settings'] }),
     },
     {
       name: 'effects',
@@ -406,7 +436,7 @@ export function createServiceManifest(context = {}) {
           audio: resolved['audio'],
           settings: resolved['settings'],
           random: resolved['random'],
-        })
+        }),
     },
     {
       name: 'progression',
@@ -423,18 +453,28 @@ export function createServiceManifest(context = {}) {
         });
 
         const xpOrbSystem = resolved['xp-orbs'];
-        if (xpOrbSystem && typeof xpOrbSystem.attachProgression === 'function') {
+        if (
+          xpOrbSystem &&
+          typeof xpOrbSystem.attachProgression === 'function'
+        ) {
           xpOrbSystem.attachProgression(progression);
         }
 
         return progression;
-      }
+      },
     },
     {
       name: 'enemies',
       singleton: true,
       lazy: false,
-      dependencies: ['player', 'xp-orbs', 'progression', 'physics', 'healthHearts', 'random'],
+      dependencies: [
+        'player',
+        'xp-orbs',
+        'progression',
+        'physics',
+        'healthHearts',
+        'random',
+      ],
       factory: ({ resolved }) => {
         const enemySystem = new EnemySystem({
           player: resolved['player'],
@@ -445,16 +485,22 @@ export function createServiceManifest(context = {}) {
           random: resolved['random'],
         });
 
-        if (resolved['progression'] && typeof enemySystem.attachProgression === 'function') {
+        if (
+          resolved['progression'] &&
+          typeof enemySystem.attachProgression === 'function'
+        ) {
           enemySystem.attachProgression(resolved['progression']);
         }
 
-        if (resolved['physics'] && typeof resolved['physics'].attachEnemySystem === 'function') {
+        if (
+          resolved['physics'] &&
+          typeof resolved['physics'].attachEnemySystem === 'function'
+        ) {
           resolved['physics'].attachEnemySystem(enemySystem);
         }
 
         return enemySystem;
-      }
+      },
     },
     {
       name: 'enemy-spawn',
@@ -464,7 +510,7 @@ export function createServiceManifest(context = {}) {
       factory: ({ resolved }) => {
         const enemySystem = resolved['enemies'];
         return enemySystem ? enemySystem.spawnSystem : null;
-      }
+      },
     },
     {
       name: 'enemy-damage',
@@ -474,7 +520,7 @@ export function createServiceManifest(context = {}) {
       factory: ({ resolved }) => {
         const enemySystem = resolved['enemies'];
         return enemySystem ? enemySystem.damageSystem : null;
-      }
+      },
     },
     {
       name: 'enemy-update',
@@ -484,7 +530,7 @@ export function createServiceManifest(context = {}) {
       factory: ({ resolved }) => {
         const enemySystem = resolved['enemies'];
         return enemySystem ? enemySystem.updateSystem : null;
-      }
+      },
     },
     {
       name: 'enemy-render',
@@ -494,7 +540,7 @@ export function createServiceManifest(context = {}) {
       factory: ({ resolved }) => {
         const enemySystem = resolved['enemies'];
         return enemySystem ? enemySystem.renderSystem : null;
-      }
+      },
     },
     {
       name: 'combat',
@@ -506,8 +552,8 @@ export function createServiceManifest(context = {}) {
           player: resolved['player'],
           enemies: resolved['enemies'],
           physics: resolved['physics'],
-          'command-queue': resolved['command-queue']
-        })
+          'command-queue': resolved['command-queue'],
+        }),
     },
     {
       name: 'world',
@@ -519,15 +565,18 @@ export function createServiceManifest(context = {}) {
           player: resolved['player'],
           enemies: resolved['enemies'],
           physics: resolved['physics'],
-          progression: resolved['progression']
+          progression: resolved['progression'],
         });
 
-        if (resolved['enemies'] && typeof resolved['enemies'].attachWorld === 'function') {
+        if (
+          resolved['enemies'] &&
+          typeof resolved['enemies'].attachWorld === 'function'
+        ) {
           resolved['enemies'].attachWorld(world);
         }
 
         return world;
-      }
+      },
     },
     {
       name: 'game-session',
@@ -546,7 +595,7 @@ export function createServiceManifest(context = {}) {
         'xp-orbs',
         'healthHearts',
         'world',
-        'effects'
+        'effects',
       ],
       factory: ({ resolved, context, container }) => {
         const instance = new GameSessionService({
@@ -563,9 +612,9 @@ export function createServiceManifest(context = {}) {
             xpOrbs: resolved['xp-orbs'],
             healthHearts: resolved['healthHearts'],
             world: resolved['world'],
-            effects: resolved['effects']
+            effects: resolved['effects'],
           },
-          gameState: context.gameState
+          gameState: context.gameState,
         });
 
         if (typeof container?.syncInstance === 'function') {
@@ -580,7 +629,7 @@ export function createServiceManifest(context = {}) {
         }
 
         return instance;
-      }
+      },
     },
     {
       name: 'renderer',
@@ -594,7 +643,7 @@ export function createServiceManifest(context = {}) {
         'effects',
         'combat',
         'enemies',
-        'random'
+        'random',
       ],
       factory: ({ resolved }) =>
         new RenderingSystem({
@@ -606,7 +655,7 @@ export function createServiceManifest(context = {}) {
           combat: resolved['combat'],
           enemies: resolved['enemies'],
           random: resolved['random'],
-        })
+        }),
     },
     {
       name: 'menu-background',
@@ -617,7 +666,7 @@ export function createServiceManifest(context = {}) {
         new MenuBackgroundSystem({
           settings: resolved['settings'],
           random: resolved['random'],
-        })
-    }
+        }),
+    },
   ];
 }

@@ -4,14 +4,14 @@ Roguelike de asteroides focado em arquitetura modular e ferramentas de debug par
 
 ## Início rápido
 
-| Ação | Comando |
-| --- | --- |
-| Instalar dependências | `npm ci` |
-| Ambiente de desenvolvimento | `npm run dev` |
-| Build de produção | `npm run build` |
-| Testes principais | `npm test` |
-| Checar formatação | `npm run format:check` |
-| Aplicar formatação | `npm run format` |
+| Ação                        | Comando                |
+| --------------------------- | ---------------------- |
+| Instalar dependências       | `npm ci`               |
+| Ambiente de desenvolvimento | `npm run dev`          |
+| Build de produção           | `npm run build`        |
+| Testes principais           | `npm test`             |
+| Checar formatação           | `npm run format:check` |
+| Aplicar formatação          | `npm run format`       |
 
 ## 🧪 Testes
 
@@ -70,4 +70,3 @@ Comandos adicionais: `showDebugLog()` exibe o buffer atual e `clearDebugLog()` r
 - `npm run stress` &rarr; Executa cenários de carga adicionais descritos em `docs/validation/`.
 
 Diagramas e detalhes adicionais sobre dependências: `docs/architecture/DEPENDENCY_GRAPH.md`.
-

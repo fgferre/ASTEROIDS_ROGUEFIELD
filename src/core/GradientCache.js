@@ -27,7 +27,7 @@ class GradientCache {
       patternMisses: 0,
       canvasHits: 0,
       canvasMisses: 0,
-      cleanupRuns: 0
+      cleanupRuns: 0,
     };
 
     // Common gradient presets
@@ -38,8 +38,8 @@ class GradientCache {
         colorStops: [
           [0, '#FFFFFF'],
           [0.3, '#FFFF77'],
-          [1, 'rgba(255, 255, 0, 0)']
-        ]
+          [1, 'rgba(255, 255, 0, 0)'],
+        ],
       },
       shieldGlow: {
         type: 'radial',
@@ -47,8 +47,8 @@ class GradientCache {
         colorStops: [
           [0, 'rgba(120, 240, 255, 0.22)'],
           [0.55, 'rgba(0, 190, 255, 0.55)'],
-          [1, 'rgba(0, 150, 255, 0)']
-        ]
+          [1, 'rgba(0, 150, 255, 0)'],
+        ],
       },
       explosion: {
         type: 'radial',
@@ -57,8 +57,8 @@ class GradientCache {
           [0, '#FFFFFF'],
           [0.2, '#FFAA00'],
           [0.6, '#FF4400'],
-          [1, 'rgba(255, 0, 0, 0)']
-        ]
+          [1, 'rgba(255, 0, 0, 0)'],
+        ],
       },
       background: {
         type: 'radial',
@@ -66,12 +66,16 @@ class GradientCache {
         colorStops: [
           [0, '#0a0a1a'],
           [0.6, '#000510'],
-          [1, '#000000']
-        ]
-      }
+          [1, '#000000'],
+        ],
+      },
     };
 
-    console.log('[GradientCache] Initialized with', Object.keys(this.presets).length, 'presets');
+    console.log(
+      '[GradientCache] Initialized with',
+      Object.keys(this.presets).length,
+      'presets'
+    );
   }
 
   /**
@@ -107,12 +111,18 @@ class GradientCache {
       return null;
     }
 
-    const params = preset.params.map(p => p * scale);
+    const params = preset.params.map((p) => p * scale);
     const colorStops = preset.colorStops;
 
     // Apply overrides
     if (overrides.colorStops) {
-      return this.getGradient(ctx, preset.type, params, overrides.colorStops, scale);
+      return this.getGradient(
+        ctx,
+        preset.type,
+        params,
+        overrides.colorStops,
+        scale
+      );
     }
 
     return this.getGradient(ctx, preset.type, params, colorStops, scale);
@@ -124,7 +134,9 @@ class GradientCache {
   createGradient(ctx, type, params, colorStops, scale = 1) {
     try {
       let gradient;
-      const scaledParams = params.map(p => typeof p === 'number' ? p * scale : p);
+      const scaledParams = params.map((p) =>
+        typeof p === 'number' ? p * scale : p
+      );
 
       if (type === 'radial') {
         gradient = ctx.createRadialGradient(...scaledParams);
@@ -247,30 +259,43 @@ class GradientCache {
   createShieldGradient(ctx, radius, ratio) {
     const key = `shield_${Math.round(radius)}_${Math.round(ratio * 100)}`;
 
-    return this.getCachedCanvas(key, radius * 2.5, radius * 2.5, (canvasCtx, width, height) => {
-      const center = width / 2;
-      const gradient = canvasCtx.createRadialGradient(
-        center, center, radius * 0.35,
-        center, center, radius * 1.25
-      );
+    return this.getCachedCanvas(
+      key,
+      radius * 2.5,
+      radius * 2.5,
+      (canvasCtx, width, height) => {
+        const center = width / 2;
+        const gradient = canvasCtx.createRadialGradient(
+          center,
+          center,
+          radius * 0.35,
+          center,
+          center,
+          radius * 1.25
+        );
 
-      gradient.addColorStop(0, `rgba(120, 240, 255, ${0.08 + ratio * 0.14})`);
-      gradient.addColorStop(0.55, `rgba(0, 190, 255, ${0.25 + ratio * 0.3})`);
-      gradient.addColorStop(1, 'rgba(0, 150, 255, 0)');
+        gradient.addColorStop(0, `rgba(120, 240, 255, ${0.08 + ratio * 0.14})`);
+        gradient.addColorStop(0.55, `rgba(0, 190, 255, ${0.25 + ratio * 0.3})`);
+        gradient.addColorStop(1, 'rgba(0, 150, 255, 0)');
 
-      canvasCtx.fillStyle = gradient;
-      canvasCtx.beginPath();
-      canvasCtx.arc(center, center, radius * 1.25, 0, Math.PI * 2);
-      canvasCtx.fill();
-    });
+        canvasCtx.fillStyle = gradient;
+        canvasCtx.beginPath();
+        canvasCtx.arc(center, center, radius * 1.25, 0, Math.PI * 2);
+        canvasCtx.fill();
+      }
+    );
   }
 
   /**
    * Generate cache key for gradients
    */
   generateGradientKey(type, params, colorStops, scale) {
-    const paramsStr = params.map(p => (typeof p === 'number' ? p.toFixed(2) : p)).join(',');
-    const stopsStr = colorStops.map(([pos, color]) => `${pos.toFixed(2)}:${color}`).join('|');
+    const paramsStr = params
+      .map((p) => (typeof p === 'number' ? p.toFixed(2) : p))
+      .join(',');
+    const stopsStr = colorStops
+      .map(([pos, color]) => `${pos.toFixed(2)}:${color}`)
+      .join('|');
     return `${type}_${paramsStr}_${stopsStr}_${scale.toFixed(2)}`;
   }
 
@@ -354,23 +379,32 @@ class GradientCache {
     const patternTotal = this.stats.patternHits + this.stats.patternMisses;
     const canvasTotal = this.stats.canvasHits + this.stats.canvasMisses;
 
-    const gradientHitRate = gradientTotal > 0 ? (this.stats.gradientHits / gradientTotal * 100).toFixed(1) : 0;
-    const patternHitRate = patternTotal > 0 ? (this.stats.patternHits / patternTotal * 100).toFixed(1) : 0;
-    const canvasHitRate = canvasTotal > 0 ? (this.stats.canvasHits / canvasTotal * 100).toFixed(1) : 0;
+    const gradientHitRate =
+      gradientTotal > 0
+        ? ((this.stats.gradientHits / gradientTotal) * 100).toFixed(1)
+        : 0;
+    const patternHitRate =
+      patternTotal > 0
+        ? ((this.stats.patternHits / patternTotal) * 100).toFixed(1)
+        : 0;
+    const canvasHitRate =
+      canvasTotal > 0
+        ? ((this.stats.canvasHits / canvasTotal) * 100).toFixed(1)
+        : 0;
 
     return {
       ...this.stats,
       cacheSize: {
         gradients: this.gradientCache.size,
         patterns: this.patternCache.size,
-        canvases: this.canvasCache.size
+        canvases: this.canvasCache.size,
       },
       hitRates: {
         gradients: `${gradientHitRate}%`,
         patterns: `${patternHitRate}%`,
-        canvases: `${canvasHitRate}%`
+        canvases: `${canvasHitRate}%`,
       },
-      presetsAvailable: Object.keys(this.presets).length
+      presetsAvailable: Object.keys(this.presets).length,
     };
   }
 
@@ -391,7 +425,7 @@ class GradientCache {
       patternMisses: 0,
       canvasHits: 0,
       canvasMisses: 0,
-      cleanupRuns: 0
+      cleanupRuns: 0,
     };
 
     console.log('[GradientCache] Reset complete');

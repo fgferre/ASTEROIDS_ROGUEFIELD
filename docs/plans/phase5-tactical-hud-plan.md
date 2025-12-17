@@ -1,6 +1,7 @@
 # Plano da Fase 5 – HUD Tático e Feedback de Progressão
 
 ## Objetivo
+
 Estender a HUD com componentes táticos (minimapa, indicadores de ameaça, combo meter e barra de vida do boss), sincronizando-os com os eventos e dados introduzidos nas fases anteriores.
 
 ## Componentes Principais
@@ -13,6 +14,7 @@ Estender a HUD com componentes táticos (minimapa, indicadores de ameaça, combo
 ## Passos Detalhados
 
 1. **Atualizar `hudLayout.js`:**
+
    - Adicionar itens ao layout minimal e classic:
      - `minimap` (canvas 120x120 no canto superior direito, range 300, `rootId: 'hud-minimap'`).
      - `threatIndicators` (overlay central com `rootId: 'threat-indicators-container'`).
@@ -20,6 +22,7 @@ Estender a HUD com componentes táticos (minimapa, indicadores de ameaça, combo
    - Incluir metadados necessários (descrições, acessibilidade via `ariaLive`, referências de classes CSS).
 
 2. **Evoluir `UISystem`:**
+
    - Listeners: `enemy-destroyed`, `combo-updated`, `combo-broken`, `boss-spawned`, `boss-phase-changed`, `boss-defeated`.
    - Implementar métodos:
      - `updateComboMeter(comboCount, multiplier)` – atualiza valor exibido, aplica classe `combo-high` para combos ≥5, animação pulsante.
@@ -30,6 +33,7 @@ Estender a HUD com componentes táticos (minimapa, indicadores de ameaça, combo
    - Manter limpeza dos elementos ao reset ou fim da luta (`boss-defeated`).
 
 3. **Adicionar Combo ao `ProgressionSystem`:**
+
    - Propriedades: `currentCombo`, `comboTimer`, `comboTimeout` (3s), `comboMultiplier`.
    - Eventos: escutar `enemy-destroyed` para incrementar combo e resetar timer; emitir `combo-updated` com { comboCount, multiplier }.
    - `update(deltaTime)`: decrementar `comboTimer`, emitir `combo-broken` e resetar quando tempo expirar.

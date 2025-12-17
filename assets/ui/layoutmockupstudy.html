@@ -1,0 +1,1342 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AAA Space Shooter HUD Interface v4.0 (Live Systems)</title>
+    <!-- Lucide Icons for AAA look -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
+
+      :root {
+        --primary-cyan: #00f0ff;
+        --secondary-blue: #00aaff;
+        --danger-red: #ff003c;
+        --health-green: #00ff66;
+        --xp-purple: #aa00ff;
+        --hud-bg: rgba(12, 20, 31, 0.65);
+        --glass: rgba(0, 240, 255, 0.05);
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #000;
+        font-family: 'Rajdhani', sans-serif;
+        color: white;
+        user-select: none;
+      }
+
+      /* --- 3D Canvas Layer --- */
+      #game-canvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 0;
+      }
+
+      /* --- FX Layers --- */
+      .scanlines {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          to bottom,
+          rgba(255, 255, 255, 0),
+          rgba(255, 255, 255, 0) 50%,
+          rgba(0, 0, 0, 0.2) 50%,
+          rgba(0, 0, 0, 0.2)
+        );
+        background-size: 100% 4px;
+        z-index: 15;
+        pointer-events: none;
+        opacity: 0.6;
+      }
+
+      .cockpit-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: 10;
+        background: radial-gradient(
+            circle at center,
+            transparent 50%,
+            rgba(0, 10, 20, 0.9) 100%
+          ),
+          url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIj48ZmlsdGVyIGlkPSJnoiPjxmZVR1cmJ1bGVuY2UgdHlwZT0iZnJhY3RhbE5vaXNlIiBiYXNlRnJlcXVlbmN5PSIwLjY1IiBudW1PY3RhdmVzPSIzIiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI2cpIiBvcGFjaXR5PSIwLjAzIi8+PC9zdmc+');
+        box-shadow: inset 0 0 100px rgba(0, 100, 255, 0.05);
+      }
+
+      .cockpit-frame {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        z-index: 11;
+        pointer-events: none;
+        background: linear-gradient(135deg, #050505 2%, transparent 10%),
+          linear-gradient(-135deg, #050505 2%, transparent 10%),
+          linear-gradient(45deg, #050505 2%, transparent 10%),
+          linear-gradient(-45deg, #050505 2%, transparent 10%);
+      }
+
+      /* --- HUD Container --- */
+      #hud-layer {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 20;
+        padding: 20px;
+        box-sizing: border-box;
+        display: grid;
+        grid-template-columns: 320px 1fr 320px;
+        grid-template-rows: 150px 1fr 180px;
+        pointer-events: none;
+        text-shadow: 0 0 5px rgba(0, 240, 255, 0.5);
+      }
+
+      .hud-panel {
+        text-transform: uppercase;
+        pointer-events: auto;
+        transition: opacity 0.3s;
+      }
+
+      h1,
+      h2,
+      h3 {
+        margin: 0;
+        font-family: 'Orbitron', sans-serif;
+      }
+
+      /* --- TOP LEFT: Stats --- */
+      .stats-area {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        padding-top: 20px;
+      }
+      .combo-box {
+        animation: pulse-text 2s infinite;
+        margin-bottom: 5px;
+      }
+      .combo-label {
+        font-size: 1.2rem;
+        color: var(--primary-cyan);
+        letter-spacing: 2px;
+        font-weight: 700;
+      }
+      .combo-val {
+        font-size: 4rem;
+        line-height: 0.8;
+        font-family: 'Orbitron', sans-serif;
+        background: linear-gradient(to bottom, #fff, #ffae00);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 900;
+        filter: drop-shadow(0 0 10px rgba(255, 174, 0, 0.6));
+        margin-left: -2px;
+      }
+
+      .stats-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+      }
+
+      .stat-block {
+        display: flex;
+        flex-direction: column;
+        background: linear-gradient(
+          90deg,
+          rgba(0, 20, 40, 0.6) 0%,
+          transparent 100%
+        );
+        padding: 5px 10px 5px 15px;
+        border-left: 3px solid var(--secondary-blue);
+        position: relative;
+        width: fit-content;
+        min-width: 180px;
+      }
+      .stat-block::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 10px;
+        height: 1px;
+        background: var(--secondary-blue);
+      }
+
+      .stat-label {
+        font-size: 0.7rem;
+        color: var(--secondary-blue);
+        letter-spacing: 1px;
+        margin-bottom: 2px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-weight: 700;
+      }
+
+      .stat-value {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 1.6rem;
+        color: #fff;
+        line-height: 1.1;
+        text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
+      }
+
+      /* --- TOP CENTER: Boss Bar --- */
+      .boss-area {
+        grid-column: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding-top: 15px;
+      }
+
+      .warning-strip {
+        display: flex;
+        gap: 50px;
+        margin-bottom: 5px;
+        opacity: 0.9;
+      }
+      .warning-light {
+        color: var(--danger-red);
+        font-weight: bold;
+        font-size: 1.1rem;
+        animation: blink 0.5s infinite alternate;
+        letter-spacing: 3px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        text-shadow: 0 0 10px var(--danger-red);
+      }
+
+      .boss-bar-container {
+        position: relative;
+        width: 70%;
+        height: 35px;
+        background: rgba(20, 0, 0, 0.6);
+        border: 1px solid #662222;
+        transform: perspective(500px) rotateX(15deg);
+        display: flex;
+        align-items: center;
+        margin-top: 10px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+      }
+
+      .boss-skull {
+        width: 45px;
+        height: 45px;
+        background: #1a0505;
+        border: 2px solid var(--danger-red);
+        position: absolute;
+        left: -22px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        clip-path: polygon(
+          25% 0%,
+          75% 0%,
+          100% 25%,
+          100% 75%,
+          75% 100%,
+          25% 100%,
+          0% 75%,
+          0% 25%
+        );
+        box-shadow: 0 0 15px var(--danger-red);
+        color: var(--danger-red);
+        z-index: 5;
+        animation: pulse-border 2s infinite;
+      }
+
+      .boss-fill {
+        height: 100%;
+        width: 75%;
+        background: repeating-linear-gradient(
+          45deg,
+          var(--danger-red),
+          var(--danger-red) 10px,
+          #880020 10px,
+          #880020 20px
+        );
+        box-shadow: 0 0 20px var(--danger-red);
+        transition: width 0.5s ease-out;
+        position: relative;
+      }
+
+      .boss-fill::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 2px;
+        background: #fff;
+        box-shadow: 0 0 10px #fff;
+      }
+
+      .boss-name {
+        position: absolute;
+        top: -22px;
+        width: 100%;
+        text-align: center;
+        font-size: 1rem;
+        letter-spacing: 4px;
+        color: #ffcccc;
+        text-shadow: 0 0 5px var(--danger-red);
+        font-weight: 700;
+      }
+
+      /* --- TOP RIGHT: Radar Area --- */
+      .radar-area {
+        display: flex;
+        justify-content: flex-end;
+        padding-right: 20px;
+        padding-top: 20px;
+      }
+
+      .radar-structure {
+        width: 200px;
+        height: 200px;
+        position: relative;
+      }
+
+      .radar-svg-layer {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 1;
+        filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.3));
+      }
+
+      .radar-internal-mask {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        width: 180px;
+        height: 180px;
+        z-index: 2;
+        clip-path: polygon(50% 2%, 93% 25%, 93% 75%, 50% 98%, 7% 75%, 7% 25%);
+      }
+
+      .radar-sweep {
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: conic-gradient(
+          from 0deg,
+          transparent 0%,
+          transparent 60%,
+          rgba(0, 240, 255, 0.05) 80%,
+          rgba(0, 240, 255, 0.4) 100%
+        );
+        animation: radar-sweep-anim 4s linear infinite;
+        border-radius: 50%;
+        mix-blend-mode: screen;
+      }
+
+      .radar-grid-svg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 3;
+        opacity: 0.5;
+      }
+
+      .blip-container {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 10;
+      }
+
+      .blip {
+        position: absolute;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        transition:
+          top 0.1s,
+          left 0.1s;
+      }
+      .blip.enemy {
+        background: var(--danger-red);
+        box-shadow: 0 0 6px var(--danger-red);
+      }
+      .blip.player {
+        background: #fff;
+        top: 50%;
+        left: 50%;
+        width: 8px;
+        height: 8px;
+        border: 1px solid var(--primary-cyan);
+        box-shadow: 0 0 10px #fff;
+        z-index: 15;
+      }
+
+      /* --- BOTTOM LEFT: Shield & Health --- */
+      .status-area {
+        grid-row: 3;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        padding-bottom: 20px;
+      }
+
+      .locked-msg {
+        border-left: 3px solid var(--secondary-blue);
+        background: linear-gradient(
+          90deg,
+          rgba(0, 170, 255, 0.15),
+          transparent
+        );
+        padding: 8px 15px;
+        margin-bottom: 25px;
+        width: 220px;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        position: relative;
+      }
+      .glitch-text {
+        animation: glitch 3s infinite;
+      }
+
+      .bars-container {
+        transform: skewX(-15deg);
+        margin-left: 20px;
+        position: relative;
+      }
+
+      .health-bar-row {
+        display: flex;
+        height: 25px;
+        gap: 4px;
+        margin-bottom: 6px;
+        position: relative;
+      }
+      .health-bar-row.shield {
+        height: 15px;
+        opacity: 0.9;
+        margin-bottom: 4px;
+      }
+
+      .bar-segment {
+        flex: 1;
+        background: rgba(0, 255, 102, 0.1);
+        border: 1px solid rgba(0, 255, 102, 0.3);
+        transition: all 0.2s;
+      }
+      .bar-segment.filled {
+        background: var(--health-green);
+        box-shadow: 0 0 8px var(--health-green);
+        border-color: #fff;
+      }
+      /* Shield color override */
+      .shield .bar-segment.filled {
+        background: var(--secondary-blue);
+        box-shadow: 0 0 8px var(--secondary-blue);
+        border-color: #aaf;
+      }
+
+      .shield-label {
+        color: var(--secondary-blue);
+        font-size: 0.8rem;
+        margin-bottom: 2px;
+        display: block;
+        transform: skewX(-15deg);
+        margin-left: 20px;
+        font-weight: 700;
+        letter-spacing: 1px;
+      }
+
+      .health-text {
+        position: absolute;
+        right: -60px;
+        bottom: 0px;
+        font-size: 2rem;
+        font-family: 'Orbitron';
+        color: var(--health-green);
+        font-weight: bold;
+        transform: skewX(15deg);
+        text-shadow: 0 0 10px var(--health-green);
+        transition: color 0.3s;
+      }
+
+      /* --- BOTTOM CENTER: Wave & XP --- */
+      .bottom-center {
+        grid-row: 3;
+        grid-column: 2;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        align-items: center;
+        padding-bottom: 30px;
+      }
+
+      .wave-indicator {
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        border-top: 2px solid var(--primary-cyan);
+        border-bottom: 2px solid var(--primary-cyan);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background: radial-gradient(
+          circle,
+          rgba(0, 240, 255, 0.1),
+          rgba(0, 0, 0, 0.8)
+        );
+        box-shadow: 0 0 20px rgba(0, 240, 255, 0.1);
+        margin-bottom: 15px;
+        animation: rotate-border 4s infinite linear reverse;
+      }
+      .wave-content {
+        animation: rotate-border 4s infinite linear;
+        text-align: center;
+      }
+      .wave-num {
+        font-size: 1.8rem;
+        color: #fff;
+        font-family: 'Orbitron';
+        line-height: 1;
+      }
+      .wave-label {
+        font-size: 0.6rem;
+        color: var(--secondary-blue);
+        letter-spacing: 1px;
+      }
+
+      .xp-bar-container {
+        width: 100%;
+        max-width: 500px;
+        height: 8px;
+        background: #0a0a0a;
+        border: 1px solid #333;
+        border-radius: 4px;
+        overflow: visible;
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+      .xp-fill {
+        height: 100%;
+        width: 65%;
+        background: linear-gradient(90deg, #5500aa, var(--xp-purple));
+        box-shadow: 0 0 10px var(--xp-purple);
+        border-radius: 2px;
+        position: relative;
+        transition: width 1s ease-in-out;
+      }
+      .xp-fill::after {
+        content: '';
+        position: absolute;
+        right: 0;
+        top: -2px;
+        bottom: -2px;
+        width: 2px;
+        background: #fff;
+        box-shadow: 0 0 5px #fff;
+      }
+      .xp-label {
+        position: absolute;
+        left: 0;
+        top: -18px;
+        font-size: 0.75rem;
+        color: #ddaaff;
+        font-weight: bold;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      /* --- BOTTOM RIGHT: Navigation/Systems --- */
+      .systems-area {
+        grid-row: 3;
+        grid-column: 3;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        align-items: flex-end;
+        padding-bottom: 20px;
+        padding-right: 20px;
+      }
+
+      .nav-block {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        background: linear-gradient(to left, rgba(0, 20, 40, 0.8), transparent);
+        padding: 10px 15px 10px 30px;
+        border-right: 3px solid var(--primary-cyan);
+        position: relative;
+        transform: skewX(15deg);
+        margin-right: 20px;
+      }
+      .nav-block::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 30%;
+        height: 2px;
+        background: var(--primary-cyan);
+      }
+
+      .nav-label {
+        font-size: 0.8rem;
+        color: var(--primary-cyan);
+        font-weight: 700;
+        letter-spacing: 2px;
+        margin-bottom: 5px;
+        transform: skewX(-15deg);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .micro-data {
+        font-family: 'Consolas', monospace;
+        font-size: 0.85rem;
+        color: rgba(200, 240, 255, 0.9);
+        text-align: right;
+        transform: skewX(-15deg);
+        line-height: 1.4;
+      }
+      .data-val {
+        color: #fff;
+        font-weight: bold;
+        text-shadow: 0 0 5px var(--primary-cyan);
+      }
+
+      /* --- Animations --- */
+      @keyframes pulse-text {
+        0%,
+        100% {
+          transform: scale(1);
+          opacity: 1;
+          filter: brightness(1);
+        }
+        50% {
+          transform: scale(1.02);
+          opacity: 0.9;
+          filter: brightness(1.2);
+        }
+      }
+      @keyframes pulse-border {
+        0%,
+        100% {
+          border-color: var(--danger-red);
+          box-shadow: 0 0 15px var(--danger-red);
+        }
+        50% {
+          border-color: #ff5555;
+          box-shadow: 0 0 25px #ff5555;
+        }
+      }
+      @keyframes blink {
+        0% {
+          opacity: 0.3;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+      @keyframes rotate-border {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes radar-sweep-anim {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes glitch {
+        0% {
+          transform: translate(0, 0);
+          opacity: 1;
+        }
+        92% {
+          transform: translate(0, 0);
+          opacity: 1;
+        }
+        93% {
+          transform: translate(-2px, 2px);
+          opacity: 0.8;
+        }
+        94% {
+          transform: translate(2px, -2px);
+          opacity: 0.8;
+        }
+        95% {
+          transform: translate(0, 0);
+          opacity: 1;
+        }
+        96% {
+          transform: translate(1px, 2px);
+          opacity: 0.9;
+        }
+        97% {
+          transform: translate(-1px, -1px);
+          opacity: 0.9;
+        }
+        100% {
+          transform: translate(0, 0);
+          opacity: 1;
+        }
+      }
+
+      @media (max-width: 900px) {
+        #hud-layer {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto 1fr auto;
+        }
+        .stats-area {
+          position: absolute;
+          top: 10px;
+          left: 10px;
+        }
+        .radar-area {
+          position: absolute;
+          top: 10px;
+          right: 10px;
+        }
+        .boss-area {
+          margin-top: 60px;
+          transform: scale(0.8);
+        }
+        .status-area {
+          position: absolute;
+          bottom: 20px;
+          left: 10px;
+          transform: scale(0.9);
+          transform-origin: bottom left;
+        }
+        .systems-area {
+          position: absolute;
+          bottom: 20px;
+          right: 10px;
+          transform: scale(0.9);
+          transform-origin: bottom right;
+        }
+        .bottom-center {
+          position: absolute;
+          bottom: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 300px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game-canvas"></canvas>
+    <div class="scanlines"></div>
+    <div class="cockpit-overlay"></div>
+    <div class="cockpit-frame"></div>
+
+    <div id="hud-layer">
+      <!-- Top Left -->
+      <div class="stats-area hud-panel">
+        <div class="combo-box">
+          <div class="combo-label">COMBO</div>
+          <div class="combo-val">x42</div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-block">
+            <div class="stat-label">
+              <i data-lucide="clock" size="14"></i> TIME
+            </div>
+            <div class="stat-value" id="timer">04:21:55</div>
+          </div>
+          <div class="stat-block">
+            <div class="stat-label">
+              <i data-lucide="crosshair" size="14"></i> KILLS
+            </div>
+            <div class="stat-value">342</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Center -->
+      <div class="boss-area hud-panel">
+        <div class="warning-strip">
+          <span class="warning-light"
+            ><i data-lucide="alert-triangle" size="16"></i> WARNING</span
+          >
+          <span class="warning-light"
+            >WARNING <i data-lucide="alert-triangle" size="16"></i
+          ></span>
+        </div>
+        <div class="boss-bar-container">
+          <div class="boss-name">WARLORD ZARKON</div>
+          <div class="boss-skull"><i data-lucide="skull" size="24"></i></div>
+          <div class="boss-fill" id="boss-fill"></div>
+        </div>
+      </div>
+
+      <!-- Top Right -->
+      <div class="radar-area hud-panel">
+        <div class="radar-structure" id="radar-container">
+          <svg class="radar-svg-layer" viewBox="0 0 200 200">
+            <circle
+              cx="100"
+              cy="100"
+              r="98"
+              fill="none"
+              stroke="var(--secondary-blue)"
+              stroke-width="2"
+              stroke-dasharray="30 15 5 15"
+              opacity="0.6"
+            />
+            <circle
+              cx="100"
+              cy="100"
+              r="92"
+              fill="none"
+              stroke="var(--primary-cyan)"
+              stroke-width="1"
+              opacity="0.2"
+            />
+            <polygon
+              points="100,10 177.9,55 177.9,145 100,190 22.1,145 22.1,55"
+              fill="rgba(0, 10, 20, 0.7)"
+              stroke="var(--primary-cyan)"
+              stroke-width="1.5"
+            />
+          </svg>
+          <div class="radar-internal-mask">
+            <div class="radar-sweep"></div>
+          </div>
+          <svg class="radar-grid-svg" viewBox="0 0 200 200">
+            <line
+              x1="100"
+              y1="10"
+              x2="100"
+              y2="190"
+              stroke="var(--secondary-blue)"
+              stroke-width="1"
+            />
+            <line
+              x1="22.1"
+              y1="55"
+              x2="177.9"
+              y2="145"
+              stroke="var(--secondary-blue)"
+              stroke-width="1"
+            />
+            <line
+              x1="177.9"
+              y1="55"
+              x2="22.1"
+              y2="145"
+              stroke="var(--secondary-blue)"
+              stroke-width="1"
+            />
+            <polygon
+              points="100,40 151.9,70 151.9,130 100,160 48.1,130 48.1,70"
+              fill="none"
+              stroke="var(--secondary-blue)"
+              stroke-width="1"
+              opacity="0.5"
+            />
+            <circle
+              cx="100"
+              cy="100"
+              r="10"
+              fill="var(--primary-cyan)"
+              opacity="0.3"
+            />
+          </svg>
+          <div class="blip-container" id="blip-layer">
+            <div class="blip player"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Left -->
+      <div class="status-area hud-panel">
+        <div class="locked-msg glitch-text">
+          <div style="color: var(--secondary-blue)">
+            <i data-lucide="lock" size="24"></i>
+          </div>
+          <div>
+            <div style="font-size: 0.6rem; color: #88ccff; letter-spacing: 1px">
+              WEAPON SYSTEM
+            </div>
+            <div style="font-weight: bold; color: #fff">
+              LOCKED // LVL 5 REQ
+            </div>
+          </div>
+        </div>
+
+        <span class="shield-label">❖ SHIELDS</span>
+        <div class="bars-container">
+          <div class="health-bar-row shield" id="shield-row">
+            <!-- Shield Segments (Auto generated via JS to match logic if needed, but keeping static for now) -->
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment"></div>
+            <div class="bar-segment"></div>
+            <div class="bar-segment"></div>
+            <div class="bar-segment"></div>
+            <div class="bar-segment"></div>
+          </div>
+
+          <div class="health-bar-row" id="hp-row">
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment filled"></div>
+            <div class="bar-segment"></div>
+            <div class="bar-segment"></div>
+          </div>
+
+          <div class="health-text" id="hp-text">85%</div>
+          <div
+            style="
+              color: var(--health-green);
+              font-weight: bold;
+              margin-top: 5px;
+              transform: skewX(-15deg);
+              margin-left: 5px;
+            "
+          >
+            <i
+              data-lucide="heart"
+              size="12"
+              style="fill: var(--health-green); display: inline-block"
+            ></i>
+            HULL INTEGRITY
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Center -->
+      <div class="bottom-center hud-panel">
+        <div class="wave-indicator">
+          <div class="wave-content">
+            <div class="wave-label">WAVE</div>
+            <div class="wave-num">4</div>
+          </div>
+        </div>
+        <div class="xp-bar-container">
+          <div class="xp-label">
+            <i data-lucide="zap" size="12" fill="#ddaaff"></i> XP GAIN
+          </div>
+          <div class="xp-fill" id="xp-fill"></div>
+        </div>
+      </div>
+
+      <!-- Bottom Right -->
+      <div class="systems-area hud-panel">
+        <div class="nav-block">
+          <div class="nav-label">
+            NAV SYSTEMS <i data-lucide="compass" size="14"></i>
+          </div>
+          <div class="micro-data">
+            COORD: <span class="data-val" id="coord-x">451.21</span> /
+            <span class="data-val" id="coord-y">-89.02</span><br />
+            VELOCITY: <span class="data-val" id="velocity">2450</span> km/h
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+      // Initialize Icons
+      lucide.createIcons();
+
+      // --- 1. Three.js Setup ---
+      const canvas = document.getElementById('game-canvas');
+      const renderer = new THREE.WebGLRenderer({
+        canvas,
+        alpha: false,
+        antialias: true,
+      });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+
+      const scene = new THREE.Scene();
+      scene.fog = new THREE.FogExp2(0x050a14, 0.002);
+
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      camera.position.z = 5;
+
+      // Lights
+      const ambientLight = new THREE.AmbientLight(0x404040, 1.0);
+      scene.add(ambientLight);
+      const dirLight = new THREE.DirectionalLight(0xffaa00, 1.5);
+      dirLight.position.set(10, 10, 5);
+      scene.add(dirLight);
+      const blueLight = new THREE.PointLight(0x00aaff, 2, 80);
+      blueLight.position.set(-10, -5, 10);
+      scene.add(blueLight);
+
+      // --- 2. Assets ---
+
+      // Stars
+      const starGeo = new THREE.BufferGeometry();
+      const starCount = 3000;
+      const starPos = new Float32Array(starCount * 3);
+      for (let i = 0; i < starCount * 3; i++) {
+        starPos[i] = (Math.random() - 0.5) * 800;
+      }
+      starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+      const starMat = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 0.8,
+        transparent: true,
+        opacity: 0.8,
+      });
+      const starField = new THREE.Points(starGeo, starMat);
+      scene.add(starField);
+
+      // Asteroids & Radar Logic
+      const asteroids = [];
+      const asteroidGeo = new THREE.DodecahedronGeometry(1, 0);
+      const asteroidMat = new THREE.MeshStandardMaterial({
+        color: 0x555566,
+        roughness: 0.8,
+        flatShading: true,
+      });
+
+      const blipLayer = document.getElementById('blip-layer');
+
+      for (let i = 0; i < 60; i++) {
+        const mesh = new THREE.Mesh(asteroidGeo, asteroidMat);
+        // Spawn deeper in Z
+        mesh.position.set(
+          (Math.random() - 0.5) * 150,
+          (Math.random() - 0.5) * 100,
+          (Math.random() - 0.5) * 100 - 50
+        );
+        const scale = Math.random() * 2 + 0.5;
+        mesh.scale.set(scale, scale, scale);
+
+        // Setup DOM Blip
+        const blip = document.createElement('div');
+        blip.classList.add('blip', 'enemy');
+        blip.style.display = 'none'; // Hidden initially
+        blipLayer.appendChild(blip);
+
+        mesh.userData = {
+          rotX: (Math.random() - 0.5) * 0.01,
+          rotY: (Math.random() - 0.5) * 0.01,
+          velZ: Math.random() * 0.3 + 0.1,
+          blip: blip, // Reference to the DOM element
+        };
+        asteroids.push(mesh);
+        scene.add(mesh);
+      }
+
+      // Lasers
+      const lasers = [];
+      const laserGeo = new THREE.CylinderGeometry(0.1, 0.1, 8, 8);
+      laserGeo.rotateX(Math.PI / 2);
+      const laserMat = new THREE.MeshBasicMaterial({
+        color: 0xff003c,
+        transparent: true,
+        opacity: 0.9,
+        blending: THREE.AdditiveBlending,
+      });
+
+      function spawnLaser() {
+        const laser = new THREE.Mesh(laserGeo, laserMat);
+        const side = Math.random() > 0.5 ? 4 : -4;
+        laser.position.set(side + (Math.random() - 0.5), -3, 6);
+        laser.userData = { velZ: -4 };
+        lasers.push(laser);
+        scene.add(laser);
+      }
+
+      // Mouse Parallax
+      let mouseX = 0;
+      let mouseY = 0;
+      document.addEventListener('mousemove', (e) => {
+        mouseX = (e.clientX - window.innerWidth / 2) / 1000;
+        mouseY = (e.clientY - window.innerHeight / 2) / 1000;
+      });
+
+      // Camera Shake Function
+      let shakeIntensity = 0;
+      function addTrauma(amount) {
+        shakeIntensity = Math.min(shakeIntensity + amount, 1.0);
+      }
+      function updateShake() {
+        if (shakeIntensity > 0) {
+          const rx = (Math.random() * 2 - 1) * shakeIntensity * 0.2;
+          const ry = (Math.random() * 2 - 1) * shakeIntensity * 0.2;
+          camera.position.x += rx;
+          camera.position.y += ry;
+          shakeIntensity -= 0.03; // decay
+          if (shakeIntensity < 0) shakeIntensity = 0;
+        }
+      }
+
+      // --- 3. Animation Loop ---
+      function animate() {
+        requestAnimationFrame(animate);
+
+        // Basic flight movement
+        camera.position.x += (mouseX - camera.position.x) * 0.05;
+        camera.position.y += (-mouseY - camera.position.y) * 0.05;
+        camera.rotation.z = mouseX * 0.5;
+        camera.rotation.x = mouseY * 0.2;
+
+        updateShake();
+
+        // --- RADAR & ASTEROIDS UPDATE ---
+        const radarRange = 80; // How far the radar sees in game units
+
+        asteroids.forEach((ast) => {
+          // Move Asteroid
+          ast.rotation.x += ast.userData.rotX;
+          ast.rotation.y += ast.userData.rotY;
+          ast.position.z += ast.userData.velZ + 0.1;
+
+          // Reset if passes camera
+          if (ast.position.z > 20) {
+            ast.position.z = -150;
+            ast.position.x = (Math.random() - 0.5) * 150;
+            ast.position.y = (Math.random() - 0.5) * 100;
+          }
+
+          // Update Radar Blip
+          const relX = ast.position.x - camera.position.x;
+          const relZ = ast.position.z - camera.position.z;
+
+          if (Math.abs(relX) < radarRange && Math.abs(relZ) < radarRange) {
+            const percentX = 50 + (relX / radarRange) * 50;
+            const percentY = 50 + (relZ / radarRange) * 50;
+
+            ast.userData.blip.style.display = 'block';
+            ast.userData.blip.style.left = percentX + '%';
+            ast.userData.blip.style.top = percentY + '%';
+
+            const dist = Math.sqrt(relX * relX + relZ * relZ);
+            const size = Math.max(2, 6 - (dist / radarRange) * 4);
+            ast.userData.blip.style.width = size + 'px';
+            ast.userData.blip.style.height = size + 'px';
+          } else {
+            ast.userData.blip.style.display = 'none';
+          }
+        });
+
+        // Stars
+        starField.position.z += 0.5;
+        if (starField.position.z > 50) starField.position.z = 0;
+
+        // Lasers
+        if (Math.random() > 0.96) {
+          spawnLaser();
+        }
+
+        for (let i = lasers.length - 1; i >= 0; i--) {
+          let l = lasers[i];
+          l.position.z += l.userData.velZ;
+          if (l.position.z < -150) {
+            scene.remove(l);
+            lasers.splice(i, 1);
+          }
+        }
+
+        renderer.render(scene, camera);
+      }
+
+      animate();
+
+      // --- 4. Live Data Simulation ---
+
+      // Timer
+      const timerEl = document.getElementById('timer');
+      setInterval(() => {
+        const d = new Date();
+        timerEl.innerText = d.toLocaleTimeString('pt-BR');
+      }, 1000);
+
+      // Coordinates Update
+      const coordX = document.getElementById('coord-x');
+      const coordY = document.getElementById('coord-y');
+      const velocity = document.getElementById('velocity');
+
+      setInterval(() => {
+        coordX.innerText = (400 + Math.random() * 100).toFixed(2);
+        coordY.innerText = (-50 - Math.random() * 50).toFixed(2);
+        velocity.innerText = Math.floor(2400 + Math.random() * 100);
+      }, 200);
+
+      // Dynamic Boss Bar
+      const bossFill = document.getElementById('boss-fill');
+      let bossHealth = 75;
+      let bossDirection = 1;
+      setInterval(() => {
+        bossHealth += bossDirection * Math.random();
+        if (bossHealth > 90) bossDirection = -1;
+        if (bossHealth < 60) bossDirection = 1;
+        bossFill.style.width = bossHealth + '%';
+      }, 100);
+
+      // Dynamic XP Bar
+      const xpFill = document.getElementById('xp-fill');
+      setInterval(() => {
+        const currentW = parseFloat(xpFill.style.width) || 65;
+        const newW = (currentW + 5) % 100;
+        xpFill.style.width = newW + '%';
+      }, 3000);
+
+      // --- 5. DAMAGE SIMULATION LOGIC ---
+
+      let shield = 100;
+      let hull = 100;
+      const maxShield = 100;
+      const maxHull = 100;
+      let lastHitTime = 0;
+
+      const shieldRow = document.getElementById('shield-row');
+      const hullRow = document.getElementById('hp-row');
+      const hullText = document.getElementById('hp-text');
+
+      // Helper to update segment bars
+      function updateSegments(element, value, maxValue) {
+        const segments = element.children;
+        const total = segments.length;
+        const filledCount = Math.ceil((value / maxValue) * total);
+
+        for (let i = 0; i < total; i++) {
+          if (i < filledCount) {
+            segments[i].classList.add('filled');
+          } else {
+            segments[i].classList.remove('filled');
+          }
+        }
+      }
+
+      // Main Simulation Loop
+      setInterval(() => {
+        const now = Date.now();
+
+        // Random Damage Event (8% chance per 100ms)
+        if (Math.random() > 0.92) {
+          const damage = Math.floor(Math.random() * 15) + 5;
+
+          // Screen Shake (Visual Impact)
+          addTrauma(0.4);
+
+          // Damage Logic: Shield absorbs first
+          if (shield > 0) {
+            shield = Math.max(0, shield - damage);
+          } else {
+            hull = Math.max(0, hull - damage * 0.4); // Hull takes reduced damage
+          }
+
+          lastHitTime = now;
+          updateUI();
+
+          // Low Hull Warning
+          if (hull < 30) {
+            hullText.style.color = 'var(--danger-red)';
+            hullText.classList.add('glitch-text');
+          }
+        }
+
+        // Shield Regeneration (after 3s of no damage)
+        if (now - lastHitTime > 3000 && shield < maxShield) {
+          shield = Math.min(maxShield, shield + 2); // Fast regen
+          updateUI();
+        }
+
+        // Hull Repair (very slow, just so user doesn't die forever)
+        if (now - lastHitTime > 8000 && hull < maxHull) {
+          hull = Math.min(maxHull, hull + 0.1); // Slow repair
+          if (hull > 30) {
+            hullText.style.color = 'var(--health-green)';
+            hullText.classList.remove('glitch-text');
+          }
+          updateUI();
+        }
+      }, 100);
+
+      function updateUI() {
+        updateSegments(shieldRow, shield, maxShield);
+        updateSegments(hullRow, hull, maxHull);
+        hullText.innerText = Math.floor(hull) + '%';
+      }
+
+      // Resize
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    </script>
+  </body>
+</html>

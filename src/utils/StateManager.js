@@ -108,7 +108,10 @@ export function createFallbackHandler({
         context[warningFlag] = true;
       }
 
-      if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+      if (
+        typeof console !== 'undefined' &&
+        typeof console.warn === 'function'
+      ) {
         console.warn(
           `[${systemName}] Snapshot data unavailable, performing full reset${detail}`
         );

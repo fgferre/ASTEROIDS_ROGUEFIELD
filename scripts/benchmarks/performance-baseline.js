@@ -6,7 +6,7 @@ class PerformanceBaseline {
     this.results = {
       timestamp: new Date().toISOString(),
       phase: 'baseline',
-      metrics: {}
+      metrics: {},
     };
   }
 
@@ -19,7 +19,7 @@ class PerformanceBaseline {
       particleCreation: 0,
       asteroidCreation: 0,
       memoryBefore: 0,
-      memoryAfter: 0
+      memoryAfter: 0,
     };
 
     // Capture initial memory if available
@@ -38,7 +38,7 @@ class PerformanceBaseline {
         vx: Math.random() * 200 - 100,
         vy: Math.random() * 200 - 100,
         life: 2000,
-        damage: 25
+        damage: 25,
       });
     }
 
@@ -59,7 +59,7 @@ class PerformanceBaseline {
         life: Math.random() * 1000,
         maxLife: 1000,
         alpha: 1,
-        type: 'normal'
+        type: 'normal',
       });
     }
 
@@ -79,7 +79,7 @@ class PerformanceBaseline {
         angularVelocity: Math.random() * 2 - 1,
         size: ['small', 'medium', 'large'][Math.floor(Math.random() * 3)],
         health: 100,
-        variant: 'normal'
+        variant: 'normal',
       });
     }
 
@@ -97,12 +97,19 @@ class PerformanceBaseline {
 
     this.results.metrics.objectCreation = results;
 
-    console.log(`   Bullets: ${results.bulletCreation.toFixed(2)}ms for ${iterations} objects`);
-    console.log(`   Particles: ${results.particleCreation.toFixed(2)}ms for ${iterations} objects`);
-    console.log(`   Asteroids: ${results.asteroidCreation.toFixed(2)}ms for ${iterations} objects`);
+    console.log(
+      `   Bullets: ${results.bulletCreation.toFixed(2)}ms for ${iterations} objects`
+    );
+    console.log(
+      `   Particles: ${results.particleCreation.toFixed(2)}ms for ${iterations} objects`
+    );
+    console.log(
+      `   Asteroids: ${results.asteroidCreation.toFixed(2)}ms for ${iterations} objects`
+    );
 
     if (results.memoryBefore && results.memoryAfter) {
-      const memoryUsed = (results.memoryAfter - results.memoryBefore) / 1024 / 1024;
+      const memoryUsed =
+        (results.memoryAfter - results.memoryBefore) / 1024 / 1024;
       console.log(`   Memory used: ${memoryUsed.toFixed(2)}MB`);
     }
   }
@@ -121,7 +128,7 @@ class PerformanceBaseline {
           x: Math.random() * 800,
           y: Math.random() * 600,
           radius: Math.random() * 20 + 10,
-          id: i
+          id: i,
         });
       }
 
@@ -148,10 +155,12 @@ class PerformanceBaseline {
       results[`${count}_objects`] = {
         time: detectionTime,
         collisions: collisionPairs.length,
-        comparisons: (count * (count - 1)) / 2
+        comparisons: (count * (count - 1)) / 2,
       };
 
-      console.log(`   ${count} objects: ${detectionTime.toFixed(2)}ms, ${collisionPairs.length} collisions`);
+      console.log(
+        `   ${count} objects: ${detectionTime.toFixed(2)}ms, ${collisionPairs.length} collisions`
+      );
     }
 
     this.results.metrics.collisionDetection = results;
@@ -178,7 +187,7 @@ class PerformanceBaseline {
           y: Math.random() * 600,
           radius: Math.random() * 20 + 5,
           color: `hsl(${Math.random() * 360}, 70%, 50%)`,
-          strokeColor: `hsl(${Math.random() * 360}, 70%, 30%)`
+          strokeColor: `hsl(${Math.random() * 360}, 70%, 30%)`,
         });
       }
 
@@ -205,10 +214,12 @@ class PerformanceBaseline {
       const renderTime = performance.now() - startTime;
       results[`${count}_objects`] = {
         time: renderTime,
-        objectsPerMs: count / renderTime
+        objectsPerMs: count / renderTime,
       };
 
-      console.log(`   ${count} objects: ${renderTime.toFixed(2)}ms (${(count / renderTime).toFixed(1)} obj/ms)`);
+      console.log(
+        `   ${count} objects: ${renderTime.toFixed(2)}ms (${(count / renderTime).toFixed(1)} obj/ms)`
+      );
     }
 
     this.results.metrics.rendering = results;
@@ -227,7 +238,7 @@ class PerformanceBaseline {
       initial: performance.memory.usedJSHeapSize,
       afterObjectCreation: 0,
       afterGC: 0,
-      measurements: []
+      measurements: [],
     };
 
     // Create many objects to stress memory
@@ -236,7 +247,7 @@ class PerformanceBaseline {
       objects.push({
         id: i,
         data: new Array(100).fill(Math.random()),
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
     }
 
@@ -250,14 +261,15 @@ class PerformanceBaseline {
 
     // Take memory measurements over time
     for (let i = 0; i < 10; i++) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       results.measurements.push({
         time: i * 100,
-        memory: performance.memory.usedJSHeapSize
+        memory: performance.memory.usedJSHeapSize,
       });
     }
 
-    const memoryIncrease = (results.afterObjectCreation - results.initial) / 1024 / 1024;
+    const memoryIncrease =
+      (results.afterObjectCreation - results.initial) / 1024 / 1024;
     console.log(`   Memory increase: ${memoryIncrease.toFixed(2)}MB`);
 
     if (results.afterGC) {
@@ -303,39 +315,58 @@ class PerformanceBaseline {
       totalObjectCreationTime: 0,
       averageCollisionTime: 0,
       averageRenderTime: 0,
-      memoryEfficiency: 'unknown'
+      memoryEfficiency: 'unknown',
     };
 
     // Object creation summary
     if (this.results.metrics.objectCreation) {
-      const { bulletCreation, particleCreation, asteroidCreation } = this.results.metrics.objectCreation;
-      summary.totalObjectCreationTime = bulletCreation + particleCreation + asteroidCreation;
+      const { bulletCreation, particleCreation, asteroidCreation } =
+        this.results.metrics.objectCreation;
+      summary.totalObjectCreationTime =
+        bulletCreation + particleCreation + asteroidCreation;
     }
 
     // Collision detection average
     if (this.results.metrics.collisionDetection) {
-      const times = Object.values(this.results.metrics.collisionDetection).map(r => r.time);
-      summary.averageCollisionTime = times.reduce((a, b) => a + b, 0) / times.length;
+      const times = Object.values(this.results.metrics.collisionDetection).map(
+        (r) => r.time
+      );
+      summary.averageCollisionTime =
+        times.reduce((a, b) => a + b, 0) / times.length;
     }
 
     // Rendering average
     if (this.results.metrics.rendering) {
-      const times = Object.values(this.results.metrics.rendering).map(r => r.time);
-      summary.averageRenderTime = times.reduce((a, b) => a + b, 0) / times.length;
+      const times = Object.values(this.results.metrics.rendering).map(
+        (r) => r.time
+      );
+      summary.averageRenderTime =
+        times.reduce((a, b) => a + b, 0) / times.length;
     }
 
     // Memory efficiency
-    if (this.results.metrics.memory && this.results.metrics.memory.available !== false) {
-      const increase = this.results.metrics.memory.afterObjectCreation - this.results.metrics.memory.initial;
+    if (
+      this.results.metrics.memory &&
+      this.results.metrics.memory.available !== false
+    ) {
+      const increase =
+        this.results.metrics.memory.afterObjectCreation -
+        this.results.metrics.memory.initial;
       summary.memoryEfficiency = `${(increase / 1024 / 1024).toFixed(2)}MB for 50k objects`;
     }
 
     this.results.summary = summary;
 
     console.log('📊 SUMMARY METRICS:');
-    console.log(`   Object Creation: ${summary.totalObjectCreationTime.toFixed(2)}ms total`);
-    console.log(`   Collision Detection: ${summary.averageCollisionTime.toFixed(2)}ms average`);
-    console.log(`   Rendering: ${summary.averageRenderTime.toFixed(2)}ms average`);
+    console.log(
+      `   Object Creation: ${summary.totalObjectCreationTime.toFixed(2)}ms total`
+    );
+    console.log(
+      `   Collision Detection: ${summary.averageCollisionTime.toFixed(2)}ms average`
+    );
+    console.log(
+      `   Rendering: ${summary.averageRenderTime.toFixed(2)}ms average`
+    );
     console.log(`   Memory Efficiency: ${summary.memoryEfficiency}`);
   }
 
@@ -364,7 +395,7 @@ if (typeof window !== 'undefined') {
   window.PerformanceBaseline = PerformanceBaseline;
 
   // Add a global function to run baseline
-  window.runPerformanceBaseline = async function() {
+  window.runPerformanceBaseline = async function () {
     const baseline = new PerformanceBaseline();
     return await baseline.runAllBenchmarks();
   };

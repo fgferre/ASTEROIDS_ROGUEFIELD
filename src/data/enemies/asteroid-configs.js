@@ -49,7 +49,7 @@ export const ASTEROID_CRACK_PROFILES = deepFreeze({
     key: 'default',
     rotationJitter: 0.28,
     startRadiusRange: [0.18, 0.32],
-    lineWidthRange: [0.85, 1.25],
+    lineWidthRange: [1.2, 1.8], // [NEO-ARCADE] Thicker, bolder cracks
     layers: [
       {
         id: 'default-stage-1',
@@ -69,10 +69,10 @@ export const ASTEROID_CRACK_PROFILES = deepFreeze({
           spread: 0.5,
         },
         ring: null,
-        intensity: 0.6,
+        intensity: 0.8, // [NEO-ARCADE] Higher intensity
         burst: {
           cracks: 4,
-          sparks: 1,
+          sparks: 2, // More sparks
           shards: 0,
         },
       },
@@ -98,10 +98,10 @@ export const ASTEROID_CRACK_PROFILES = deepFreeze({
           radiusRange: [0.45, 0.62],
           width: 0.58,
         },
-        intensity: 0.85,
+        intensity: 1.0, // Brighter
         burst: {
           cracks: 6,
-          sparks: 2,
+          sparks: 4,
           shards: 1,
         },
       },
@@ -127,11 +127,11 @@ export const ASTEROID_CRACK_PROFILES = deepFreeze({
           radiusRange: [0.5, 0.72],
           width: 0.62,
         },
-        intensity: 1,
+        intensity: 1.2, // Very bright
         burst: {
           cracks: 8,
-          sparks: 3,
-          shards: 2,
+          sparks: 6,
+          shards: 3,
         },
       },
     ],
@@ -525,7 +525,6 @@ Object.values(ASTEROID_CRACK_PROFILES).forEach((profile) => {
 });
 export const ASTEROID_CRACK_LAYER_LOOKUP = Object.freeze(__crackLayerLookup);
 
-
 // === FRAGMENT RULES ===
 // Used by FragmentationSystem to generate fragments when enemies are destroyed.
 // Each variant defines fragmentation behavior (count, velocity, spread, etc.).
@@ -642,7 +641,6 @@ export const ASTEROID_FRAGMENT_RULES = deepFreeze({
   },
 });
 
-
 // === ORB VALUE SYSTEM ===
 // Each orb has FIXED value of 5 XP (tier 1 blue orb)
 // Reward is calculated by NUMBER OF ORBS, not XP directly
@@ -658,9 +656,9 @@ export const ASTEROID_BASE_ORBS = Object.freeze({
 
 // Size factor: how many orbs each size drops (multiplicative)
 export const ASTEROID_SIZE_ORB_FACTOR = Object.freeze({
-  large: 3.0,   // 3x orbs
-  medium: 2.0,  // 2x orbs (baseline)
-  small: 1.0,   // 1x orbs
+  large: 3.0, // 3x orbs
+  medium: 2.0, // 2x orbs (baseline)
+  small: 1.0, // 1x orbs
 });
 
 export const ASTEROID_ORB_DROP_MULTIPLIER = Object.freeze({
@@ -668,7 +666,6 @@ export const ASTEROID_ORB_DROP_MULTIPLIER = Object.freeze({
   medium: 1.0,
   small: 0.6,
 });
-
 
 // === ASTEROID VARIANTS ===
 export const ASTEROID_VARIANTS = deepFreeze({
@@ -682,9 +679,9 @@ export const ASTEROID_VARIANTS = deepFreeze({
     movementStrategy: 'linear',
 
     // NEW ORB SYSTEM:
-    orbMultiplier: 1.0,       // Base multiplier (size × stats × rarity)
-    statsFactor: 1.0,         // HP × speed × danger = 1.0 × 1.0 × 1.0
-    rarityBonus: 1.0,         // Common = baseline (70% spawn)
+    orbMultiplier: 1.0, // Base multiplier (size × stats × rarity)
+    statsFactor: 1.0, // HP × speed × danger = 1.0 × 1.0 × 1.0
+    rarityBonus: 1.0, // Common = baseline (70% spawn)
 
     crackProfile: 'default',
     fragmentProfile: 'default',
@@ -708,9 +705,9 @@ export const ASTEROID_VARIANTS = deepFreeze({
     movementStrategy: 'linear',
 
     // NEW ORB SYSTEM:
-    orbMultiplier: 2.53,      // stats × rarity = 1.1 × 2.3
-    statsFactor: 1.1,         // HP × speed × danger = 1.3 × 0.85 × 1.0
-    rarityBonus: 2.3,         // 8% spawn rate
+    orbMultiplier: 2.53, // stats × rarity = 1.1 × 2.3
+    statsFactor: 1.1, // HP × speed × danger = 1.3 × 0.85 × 1.0
+    rarityBonus: 2.3, // 8% spawn rate
 
     crackProfile: 'default',
     fragmentProfile: 'default',
@@ -735,17 +732,17 @@ export const ASTEROID_VARIANTS = deepFreeze({
     movementStrategy: 'linear',
 
     // NEW ORB SYSTEM:
-    orbMultiplier: 2.93,      // stats × rarity = 1.17 × 2.5
-    statsFactor: 1.17,        // HP × speed × danger = 1.8 × 0.65 × 1.0
-    rarityBonus: 2.5,         // 7% spawn rate
+    orbMultiplier: 2.93, // stats × rarity = 1.17 × 2.5
+    statsFactor: 1.17, // HP × speed × danger = 1.8 × 0.65 × 1.0
+    rarityBonus: 2.5, // 7% spawn rate
 
     crackProfile: 'denseCore',
     fragmentProfile: 'denseCore',
     colors: {
-      fill: '#2F8CA3',
-      stroke: '#1F5E6F',
-      cracks: 'rgba(163, 227, 255, 0.6)',
-      innerGlow: 'rgba(90, 220, 255, 0.35)',
+      fill: 'rgba(47, 140, 163, 0.15)', // [NEO-ARCADE] Holographic Transparency
+      stroke: 'rgba(31, 94, 111, 0.9)', // Solid Frame
+      cracks: 'rgba(163, 227, 255, 0.8)', // Bright Cracks
+      innerGlow: 'rgba(90, 220, 255, 0.4)',
     },
     drops: {
       baseSplit: 2,
@@ -756,41 +753,41 @@ export const ASTEROID_VARIANTS = deepFreeze({
     key: 'gold',
     displayName: 'Tesouro Dourado 💰',
     allowedSizes: ['medium', 'small'],
-    hpMultiplier: 0.4,        // ULTRA FRÁGIL (vidro!)
-    speedMultiplier: 1.8,     // ULTRA RÁPIDO (foge!)
+    hpMultiplier: 0.4, // ULTRA FRÁGIL (vidro!)
+    speedMultiplier: 1.8, // ULTRA RÁPIDO (foge!)
     massMultiplier: 0.6,
     movementStrategy: 'linear',
 
     // NEW ORB SYSTEM:
-    orbMultiplier: 4.90,      // stats × rarity = 0.72 × 6.8
-    statsFactor: 0.72,        // HP × speed × danger = 0.4 × 1.8 × 1.0
-    rarityBonus: 6.8,         // 0.4% spawn rate (ULTRA RARO!)
+    orbMultiplier: 4.9, // stats × rarity = 0.72 × 6.8
+    statsFactor: 0.72, // HP × speed × danger = 0.4 × 1.8 × 1.0
+    rarityBonus: 6.8, // 0.4% spawn rate (ULTRA RARO!)
 
     crackProfile: 'crystal',
     fragmentProfile: 'crystal',
     colors: {
       fill: '#FFD700',
-      stroke: '#DAA520',
-      cracks: 'rgba(255, 250, 205, 0.95)',
-      glow: 'rgba(255, 223, 0, 0.8)',  // Glow intenso!
+      stroke: '#FFFFFF', // [NEO-ARCADE] White stroke for pop
+      cracks: 'rgba(255, 255, 255, 0.9)', // Brighter cracks
+      glow: 'rgba(255, 223, 0, 0.9)', // Intense glow
     },
     visual: {
       pulse: {
-        speed: 3.0,           // Pulso RÁPIDO (atenção!)
-        amount: 0.6,          // Pulso FORTE
-        color: 'rgba(255, 240, 150, 1.0)',
+        speed: 4.0, // Faster pulse
+        amount: 0.8,
+        color: 'rgba(255, 250, 200, 1.0)', // Brighter pulse
       },
       glow: {
-        baseBlur: 20,         // Glow GRANDE
-        pulseBlur: 15,
-        baseAlpha: 0.6,       // MUITO visível
-        pulseAlpha: 0.4,
+        baseBlur: 25,
+        pulseBlur: 20,
+        baseAlpha: 0.7,
+        pulseAlpha: 0.5,
       },
     },
     drops: {
       baseSplit: 1,
       extraOrbs: [],
-      dropPattern: 'explosion',  // Mecânica especial: orbs explodem radialmente!
+      dropPattern: 'explosion',
     },
   },
   volatile: {
@@ -803,9 +800,9 @@ export const ASTEROID_VARIANTS = deepFreeze({
     movementStrategy: 'volatile',
 
     // NEW ORB SYSTEM:
-    orbMultiplier: 5.46,      // stats × rarity = 2.1 × 2.6
-    statsFactor: 2.1,         // HP × speed × danger = 0.6 × 1.4 × 2.5 (explosion!)
-    rarityBonus: 2.6,         // 6.5% spawn rate
+    orbMultiplier: 5.46, // stats × rarity = 2.1 × 2.6
+    statsFactor: 2.1, // HP × speed × danger = 0.6 × 1.4 × 2.5 (explosion!)
+    rarityBonus: 2.6, // 6.5% spawn rate
 
     crackProfile: 'volatile',
     fragmentProfile: 'volatile',
@@ -877,13 +874,13 @@ export const ASTEROID_VARIANTS = deepFreeze({
     movementConfig: {
       acceleration: 180,
       maxSpeed: 160,
-      minDistance: 60,  // Repulsion distance (behavior.minDistance: 25 is attack range)
+      minDistance: 60, // Repulsion distance (behavior.minDistance: 25 is attack range)
     },
 
     // NEW ORB SYSTEM:
-    orbMultiplier: 8.10,      // stats × rarity = 2.7 × 3.0
-    statsFactor: 2.7,         // HP × speed × danger = 0.8 × 1.2 × 2.8 (persegue + contato!)
-    rarityBonus: 3.0,         // 4.5% spawn rate
+    orbMultiplier: 8.1, // stats × rarity = 2.7 × 3.0
+    statsFactor: 2.7, // HP × speed × danger = 0.8 × 1.2 × 2.8 (persegue + contato!)
+    rarityBonus: 3.0, // 4.5% spawn rate
 
     crackProfile: 'parasite',
     fragmentProfile: 'parasite',
@@ -907,11 +904,16 @@ export const ASTEROID_VARIANTS = deepFreeze({
         amount: 0.38,
         color: 'rgba(190, 120, 255, 0.75)',
       },
+      colors: {
+        fill: 'rgba(120, 120, 130, 0.12)', // [NEO-ARCADE] Darker Hologram
+        stroke: 'rgba(180, 180, 190, 0.8)', // Bright Edge
+        cracks: 'rgba(255, 255, 255, 0.7)',
+      },
       glow: {
-        baseBlur: 10,
-        pulseBlur: 6,
-        baseAlpha: 0.38,
-        pulseAlpha: 0.22,
+        baseBlur: 15,
+        pulseBlur: 8,
+        baseAlpha: 0.15,
+        pulseAlpha: 0.1,
       },
     },
     availability: {
@@ -927,14 +929,14 @@ export const ASTEROID_VARIANTS = deepFreeze({
     displayName: 'Cristal Energético',
     allowedSizes: ['large', 'medium', 'small'],
     hpMultiplier: 0.7,
-    speedMultiplier: 1.3,     // AUMENTADO de 0.8 para 1.3 (ágil!)
+    speedMultiplier: 1.3, // AUMENTADO de 0.8 para 1.3 (ágil!)
     massMultiplier: 0.95,
     movementStrategy: 'linear',
 
     // NEW ORB SYSTEM:
-    orbMultiplier: 4.73,      // stats × rarity = 0.91 × 5.2
-    statsFactor: 0.91,        // HP × speed × danger = 0.7 × 1.3 × 1.0
-    rarityBonus: 5.2,         // 1.5% spawn rate (raro!)
+    orbMultiplier: 4.73, // stats × rarity = 0.91 × 5.2
+    statsFactor: 0.91, // HP × speed × danger = 0.7 × 1.3 × 1.0
+    rarityBonus: 5.2, // 1.5% spawn rate (raro!)
 
     crackProfile: 'crystal',
     fragmentProfile: 'crystal',
@@ -971,39 +973,38 @@ export const ASTEROID_VARIANTS = deepFreeze({
   },
 });
 
-
 // === VARIANT SPAWN CHANCES ===
 export const ASTEROID_VARIANT_CHANCES = deepFreeze({
   large: {
     baseChance: 0.35,
     distribution: {
-      iron: 0.27,       // 9.45% total
-      denseCore: 0.30,  // 10.5% total
-      volatile: 0.22,   // 7.7% total
-      parasite: 0.16,   // 5.6% total
-      gold: 0.00,       // Gold não spawna em large
-      crystal: 0.05,    // 1.75% total (raro!)
+      iron: 0.27, // 9.45% total
+      denseCore: 0.3, // 10.5% total
+      volatile: 0.22, // 7.7% total
+      parasite: 0.16, // 5.6% total
+      gold: 0.0, // Gold não spawna em large
+      crystal: 0.05, // 1.75% total (raro!)
     },
   },
   medium: {
     baseChance: 0.25,
     distribution: {
-      iron: 0.30,       // 7.5% total
-      denseCore: 0.20,  // 5% total
-      volatile: 0.25,   // 6.25% total
-      parasite: 0.15,   // 3.75% total
-      gold: 0.02,       // 0.5% total (ULTRA RARO! 💰)
-      crystal: 0.08,    // 2% total (raro)
+      iron: 0.3, // 7.5% total
+      denseCore: 0.2, // 5% total
+      volatile: 0.25, // 6.25% total
+      parasite: 0.15, // 3.75% total
+      gold: 0.02, // 0.5% total (ULTRA RARO! 💰)
+      crystal: 0.08, // 2% total (raro)
     },
   },
   small: {
     baseChance: 0.15,
     distribution: {
-      iron: 0.35,       // 5.25% total
-      volatile: 0.30,   // 4.5% total
-      parasite: 0.20,   // 3% total
-      gold: 0.02,       // 0.3% total (ULTRA RARO! 💰)
-      crystal: 0.13,    // 1.95% total (raro)
+      iron: 0.35, // 5.25% total
+      volatile: 0.3, // 4.5% total
+      parasite: 0.2, // 3% total
+      gold: 0.02, // 0.3% total (ULTRA RARO! 💰)
+      crystal: 0.13, // 1.95% total (raro)
     },
   },
   waveBonus: {

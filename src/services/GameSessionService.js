@@ -20,7 +20,7 @@ import {
  */
 const RANDOM_STORAGE_KEYS = {
   override: 'roguefield.seedOverride',
-  last: 'roguefield.lastSeed'
+  last: 'roguefield.lastSeed',
 };
 
 const GAME_OVER_SCREEN_DELAY_MS = 3000;
@@ -54,7 +54,7 @@ export default class GameSessionService {
     this.ctx = null;
     this.seedInfo = {
       seed: null,
-      source: 'unknown'
+      source: 'unknown',
     };
     this.currentRandomSnapshot = null;
     this.currentRandomScope = 'uninitialized';
@@ -82,7 +82,7 @@ export default class GameSessionService {
       togglePause: (payload) => this.handleTogglePauseEvent(payload),
       exitToMenuRequested: (payload) => this.exitToMenu(payload || {}),
       activateShieldPressed: () => this.handleActivateShieldPressedEvent(),
-      progressionReset: (payload) => this.handleProgressionResetEvent(payload)
+      progressionReset: (payload) => this.handleProgressionResetEvent(payload),
     };
 
     this.initializeSessionState();
@@ -104,11 +104,15 @@ export default class GameSessionService {
       this.gameState.randomSeed = null;
     }
 
-    if (!Object.prototype.hasOwnProperty.call(this.gameState, 'randomSeedSource')) {
+    if (
+      !Object.prototype.hasOwnProperty.call(this.gameState, 'randomSeedSource')
+    ) {
       this.gameState.randomSeedSource = 'unknown';
     }
 
-    if (!Object.prototype.hasOwnProperty.call(this.gameState, 'randomSnapshot')) {
+    if (
+      !Object.prototype.hasOwnProperty.call(this.gameState, 'randomSnapshot')
+    ) {
       this.gameState.randomSnapshot = null;
     }
 
@@ -140,7 +144,10 @@ export default class GameSessionService {
       const element = document.getElementById(id);
       return element || null;
     } catch (error) {
-      console.warn(`[GameSessionService] Failed to lookup DOM element "${id}":`, error);
+      console.warn(
+        `[GameSessionService] Failed to lookup DOM element "${id}":`,
+        error
+      );
       return null;
     }
   }
@@ -155,15 +162,20 @@ export default class GameSessionService {
    * @param {CanvasRenderingContext2D} [options.ctx]
    */
   initialize({ seed, source, seedInfo, canvas, ctx } = {}) {
-    const normalizedSeedInfo = typeof seedInfo === 'object' && seedInfo !== null
-      ? { ...seedInfo }
-      : {};
+    const normalizedSeedInfo =
+      typeof seedInfo === 'object' && seedInfo !== null ? { ...seedInfo } : {};
 
-    if (typeof normalizedSeedInfo.seed === 'undefined' && typeof seed !== 'undefined') {
+    if (
+      typeof normalizedSeedInfo.seed === 'undefined' &&
+      typeof seed !== 'undefined'
+    ) {
       normalizedSeedInfo.seed = seed;
     }
 
-    if (typeof normalizedSeedInfo.source === 'undefined' && typeof source === 'string') {
+    if (
+      typeof normalizedSeedInfo.source === 'undefined' &&
+      typeof source === 'string'
+    ) {
       normalizedSeedInfo.source = source;
     }
 
@@ -190,9 +202,17 @@ export default class GameSessionService {
       this.ctx = ctx;
     }
 
-    if (typeof this.seedInfo.seed !== 'undefined' && this.seedInfo.seed !== null) {
-      GameSessionService.persistLastSeed(this.seedInfo.seed, this.seedInfo.source);
-      console.log(`[Random] Boot seed (${this.seedInfo.source}): ${String(this.seedInfo.seed)}`);
+    if (
+      typeof this.seedInfo.seed !== 'undefined' &&
+      this.seedInfo.seed !== null
+    ) {
+      GameSessionService.persistLastSeed(
+        this.seedInfo.seed,
+        this.seedInfo.source
+      );
+      console.log(
+        `[Random] Boot seed (${this.seedInfo.source}): ${String(this.seedInfo.seed)}`
+      );
     }
 
     this.setupDomEventListeners();
@@ -266,7 +286,7 @@ export default class GameSessionService {
 
     this.eventBus.emit('pause-state-changed', {
       isPaused: this.isPaused(),
-      ...meta
+      ...meta,
     });
   }
 
@@ -299,7 +319,7 @@ export default class GameSessionService {
     this.eventBus.emit('session-state-changed', {
       state: nextState,
       previousState: previous,
-      ...meta
+      ...meta,
     });
 
     return nextState;
@@ -366,7 +386,10 @@ export default class GameSessionService {
       try {
         this.domClickUnsubscribe();
       } catch (error) {
-        console.warn('[GameSessionService] Failed to remove DOM listener:', error);
+        console.warn(
+          '[GameSessionService] Failed to remove DOM listener:',
+          error
+        );
       }
     }
 
@@ -389,9 +412,10 @@ export default class GameSessionService {
 
     const elementTarget = /** @type {Element} */ (target);
 
-    const button = typeof elementTarget.closest === 'function'
-      ? elementTarget.closest('button')
-      : null;
+    const button =
+      typeof elementTarget.closest === 'function'
+        ? elementTarget.closest('button')
+        : null;
     if (!button) {
       return;
     }
@@ -405,7 +429,10 @@ export default class GameSessionService {
       try {
         event.preventDefault();
       } catch (error) {
-        console.warn('[GameSessionService] Failed to prevent default action:', error);
+        console.warn(
+          '[GameSessionService] Failed to prevent default action:',
+          error
+        );
       }
     };
 
@@ -439,7 +466,7 @@ export default class GameSessionService {
         this.emitCreditsMenuRequest({
           open: true,
           source: 'menu',
-          triggerId: 'menu-credits-btn'
+          triggerId: 'menu-credits-btn',
         });
         break;
       }
@@ -448,7 +475,12 @@ export default class GameSessionService {
     }
   }
 
-  emitCreditsMenuRequest({ open, source, restoreFocus = false, triggerId } = {}) {
+  emitCreditsMenuRequest({
+    open,
+    source,
+    restoreFocus = false,
+    triggerId,
+  } = {}) {
     if (!this.eventBus || typeof this.eventBus.emit !== 'function') {
       return;
     }
@@ -457,7 +489,7 @@ export default class GameSessionService {
       open,
       restoreFocus,
       source,
-      triggerId
+      triggerId,
     });
   }
 
@@ -492,8 +524,14 @@ export default class GameSessionService {
     register('screen-changed', this.globalEventHandlers.screenChanged);
     register('player-died', this.globalEventHandlers.playerDied);
     register('toggle-pause', this.globalEventHandlers.togglePause);
-    register('exit-to-menu-requested', this.globalEventHandlers.exitToMenuRequested);
-    register('activate-shield-pressed', this.globalEventHandlers.activateShieldPressed);
+    register(
+      'exit-to-menu-requested',
+      this.globalEventHandlers.exitToMenuRequested
+    );
+    register(
+      'activate-shield-pressed',
+      this.globalEventHandlers.activateShieldPressed
+    );
     register('progression-reset', this.globalEventHandlers.progressionReset);
   }
 
@@ -509,7 +547,10 @@ export default class GameSessionService {
           unsubscribe();
         }
       } catch (error) {
-        console.warn('[GameSessionService] Failed to remove event listener:', error);
+        console.warn(
+          '[GameSessionService] Failed to remove event listener:',
+          error
+        );
       }
     });
 
@@ -584,9 +625,7 @@ export default class GameSessionService {
     }
 
     const waveManagerActive =
-      enemies.useManagers &&
-      Boolean(USE_WAVE_MANAGER) &&
-      enemies.waveManager;
+      enemies.useManagers && Boolean(USE_WAVE_MANAGER) && enemies.waveManager;
 
     if (!waveManagerActive) {
       return false;
@@ -607,7 +646,10 @@ export default class GameSessionService {
     try {
       started = enemies.startNextWave();
     } catch (error) {
-      console.error('[GameSessionService] Failed to start wave via WaveManager:', error);
+      console.error(
+        '[GameSessionService] Failed to start wave via WaveManager:',
+        error
+      );
       return false;
     }
 
@@ -626,7 +668,10 @@ export default class GameSessionService {
       try {
         enemies.spawnInitialAsteroids(4);
       } catch (error) {
-        console.error('[GameSessionService] Failed to spawn initial asteroids after WaveManager kickoff:', error);
+        console.error(
+          '[GameSessionService] Failed to spawn initial asteroids after WaveManager kickoff:',
+          error
+        );
       }
     }
 
@@ -637,7 +682,10 @@ export default class GameSessionService {
     try {
       this.prepareRandomForScope('run.start', { mode: 'reset' });
     } catch (error) {
-      console.warn('[GameSessionService] Failed to prepare RNG for run start:', error);
+      console.warn(
+        '[GameSessionService] Failed to prepare RNG for run start:',
+        error
+      );
     }
 
     this.clearRetryCountdownTimers();
@@ -653,7 +701,10 @@ export default class GameSessionService {
     try {
       this.resetSystems({ manageRandom: false });
     } catch (error) {
-      console.error('[GameSessionService] Failed to reset systems during start:', error);
+      console.error(
+        '[GameSessionService] Failed to reset systems during start:',
+        error
+      );
     }
 
     this.ensureWaveKickoff({ reason: 'session-start' });
@@ -676,7 +727,10 @@ export default class GameSessionService {
       try {
         audio.init();
       } catch (error) {
-        console.error('[GameSessionService] Failed to initialize audio:', error);
+        console.error(
+          '[GameSessionService] Failed to initialize audio:',
+          error
+        );
       }
     }
 
@@ -695,7 +749,8 @@ export default class GameSessionService {
     this.setSessionState('running', { reason: 'start-new-run' });
 
     if (this.gameState) {
-      this.gameState.lastTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      this.gameState.lastTime =
+        typeof performance !== 'undefined' ? performance.now() : Date.now();
     }
 
     console.log('[GameSessionService] Run started successfully!', { source });
@@ -725,13 +780,15 @@ export default class GameSessionService {
 
     this.setSessionState('player-died', {
       reason: 'player-died',
-      data
+      data,
     });
   }
 
   requestRetry({ source = 'unknown' } = {}) {
     if (this.isRetryCountdownActive) {
-      console.warn('[Retry] Countdown already active - ignoring duplicate request.');
+      console.warn(
+        '[Retry] Countdown already active - ignoring duplicate request.'
+      );
       return false;
     }
 
@@ -740,7 +797,7 @@ export default class GameSessionService {
       this.emitSessionRetryCountdown({
         phase: 'aborted',
         reason: 'validation-failed',
-        source
+        source,
       });
     }
 
@@ -773,7 +830,7 @@ export default class GameSessionService {
     this.emitSessionRetryCountdown({
       phase: 'start',
       total: 3,
-      source
+      source,
     });
 
     const gameoverScreen = this.lookupDomElement('gameover-screen');
@@ -809,7 +866,7 @@ export default class GameSessionService {
         index,
         remaining: countdownValues.length - index - 1,
         total: countdownValues.length,
-        source
+        source,
       });
 
       this.showRetryCountdownNumber(value, () => advanceCountdown(index + 1));
@@ -843,7 +900,7 @@ export default class GameSessionService {
       if (snapshot.random) {
         this.prepareRandomForScope('retry.respawn', {
           mode: 'restore',
-          snapshot: snapshot.random
+          snapshot: snapshot.random,
         });
       } else {
         this.prepareRandomForScope('retry.respawn', { mode: 'reset' });
@@ -959,7 +1016,9 @@ export default class GameSessionService {
           return;
         }
 
-        console.log('[GameSessionService] Quit from pause - triggering epic explosion...');
+        console.log(
+          '[GameSessionService] Quit from pause - triggering epic explosion...'
+        );
 
         const player = this.resolveServiceInstance('player');
         const effects = this.resolveServiceInstance('effects');
@@ -975,7 +1034,10 @@ export default class GameSessionService {
           try {
             ui.showScreen('playing', { emitEvent: false });
           } catch (error) {
-            console.warn('[GameSessionService] Failed to show playing screen before quit:', error);
+            console.warn(
+              '[GameSessionService] Failed to show playing screen before quit:',
+              error
+            );
           }
         }
 
@@ -986,14 +1048,17 @@ export default class GameSessionService {
               ? { ...player.position }
               : {
                   x: GAME_WIDTH / 2,
-                  y: GAME_HEIGHT / 2
+                  y: GAME_HEIGHT / 2,
                 };
 
         if (effects && typeof effects.createEpicShipExplosion === 'function') {
           try {
             effects.createEpicShipExplosion(playerPosition);
           } catch (error) {
-            console.warn('[GameSessionService] Failed to create quit explosion:', error);
+            console.warn(
+              '[GameSessionService] Failed to create quit explosion:',
+              error
+            );
           }
         }
 
@@ -1027,7 +1092,10 @@ export default class GameSessionService {
     try {
       this.prepareRandomForScope('menu.exit', { mode: 'reset' });
     } catch (error) {
-      console.warn('[GameSessionService] Failed to prepare RNG for menu exit:', error);
+      console.warn(
+        '[GameSessionService] Failed to prepare RNG for menu exit:',
+        error
+      );
     }
 
     this._suppressWaveKickoff = true;
@@ -1035,7 +1103,10 @@ export default class GameSessionService {
     try {
       this.resetSystems({ manageRandom: false });
     } catch (error) {
-      console.error('[GameSessionService] Failed to reset systems during exit:', error);
+      console.error(
+        '[GameSessionService] Failed to reset systems during exit:',
+        error
+      );
     }
 
     this._suppressWaveKickoff = false;
@@ -1048,7 +1119,10 @@ export default class GameSessionService {
         try {
           ui.resetLevelUpState();
         } catch (error) {
-          console.warn('[GameSessionService] Failed to reset UI level-up state:', error);
+          console.warn(
+            '[GameSessionService] Failed to reset UI level-up state:',
+            error
+          );
         }
       }
 
@@ -1056,7 +1130,10 @@ export default class GameSessionService {
         try {
           ui.showScreen('menu', { emitEvent: false });
         } catch (error) {
-          console.error('[GameSessionService] Failed to show menu screen:', error);
+          console.error(
+            '[GameSessionService] Failed to show menu screen:',
+            error
+          );
         }
       }
     }
@@ -1077,7 +1154,10 @@ export default class GameSessionService {
       console.log('Retornando ao menu.');
     }
 
-    this.setSessionState('menu', { reason: 'exit-to-menu', source: payload?.source });
+    this.setSessionState('menu', {
+      reason: 'exit-to-menu',
+      source: payload?.source,
+    });
   }
 
   /**
@@ -1141,7 +1221,9 @@ export default class GameSessionService {
    */
   prepareRandomForScope(scope, { mode = 'reset', snapshot } = {}) {
     if (!this.random || typeof this.random.serialize !== 'function') {
-      console.warn(`[Random] Cannot prepare RNG for scope "${scope}" - service unavailable.`);
+      console.warn(
+        `[Random] Cannot prepare RNG for scope "${scope}" - service unavailable.`
+      );
       return null;
     }
 
@@ -1152,7 +1234,10 @@ export default class GameSessionService {
       try {
         this.random.restore(snapshot);
       } catch (error) {
-        console.warn(`[Random] Failed to restore RNG snapshot for scope "${scope}":`, error);
+        console.warn(
+          `[Random] Failed to restore RNG snapshot for scope "${scope}":`,
+          error
+        );
         if (typeof this.random.reset === 'function') {
           this.random.reset(seed);
         }
@@ -1199,13 +1284,16 @@ export default class GameSessionService {
       world: 'world',
       effects: 'effects',
       combat: 'combat',
-      renderer: 'renderer'
+      renderer: 'renderer',
     };
 
     const directKey = aliasMap[name] || name;
     let instance = null;
 
-    if (this.services && Object.prototype.hasOwnProperty.call(this.services, directKey)) {
+    if (
+      this.services &&
+      Object.prototype.hasOwnProperty.call(this.services, directKey)
+    ) {
       instance = this.services[directKey];
     }
 
@@ -1227,7 +1315,10 @@ export default class GameSessionService {
           instance = gameServices[name];
         }
       } catch (error) {
-        console.warn(`[GameSessionService] Failed to resolve service "${name}":`, error);
+        console.warn(
+          `[GameSessionService] Failed to resolve service "${name}":`,
+          error
+        );
         return null;
       }
     }
@@ -1255,7 +1346,11 @@ export default class GameSessionService {
   scheduleGameOverScreenTransition(data = {}) {
     if (typeof setTimeout !== 'function') {
       this.setScreen('gameover');
-      this.emitScreenChanged('gameover', { source: 'player-died', data, immediate: true });
+      this.emitScreenChanged('gameover', {
+        source: 'player-died',
+        data,
+        immediate: true,
+      });
       return;
     }
 
@@ -1302,7 +1397,9 @@ export default class GameSessionService {
       return;
     }
 
-    const numeric = Number.isFinite(value) ? value : parseInt(String(value || '0'), 10);
+    const numeric = Number.isFinite(value)
+      ? value
+      : parseInt(String(value || '0'), 10);
     const safeValue = Number.isFinite(numeric) ? Math.max(0, numeric) : 0;
     element.textContent = String(safeValue);
   }
@@ -1407,7 +1504,7 @@ export default class GameSessionService {
 
       if (snapshot) {
         this.logRandomSnapshot('systems.reset (pre-managed)', snapshot, {
-          mode: 'snapshot'
+          mode: 'snapshot',
         });
       }
     }
@@ -1423,7 +1520,7 @@ export default class GameSessionService {
       'effects',
       'renderer',
       'world',
-      'audio'
+      'audio',
     ];
 
     servicesToReset.forEach((serviceName) => {
@@ -1435,7 +1532,10 @@ export default class GameSessionService {
       try {
         instance.reset();
       } catch (error) {
-        console.warn(`Não foi possível resetar o serviço "${serviceName}":`, error);
+        console.warn(
+          `Não foi possível resetar o serviço "${serviceName}":`,
+          error
+        );
       }
     });
   }
@@ -1447,7 +1547,9 @@ export default class GameSessionService {
     const progression = this.resolveServiceInstance('progression');
 
     if (!player || !enemies || !physics || !progression) {
-      console.warn('[Retry] Unable to capture snapshot - required services unavailable.');
+      console.warn(
+        '[Retry] Unable to capture snapshot - required services unavailable.'
+      );
       return null;
     }
 
@@ -1456,16 +1558,22 @@ export default class GameSessionService {
       try {
         randomSnapshot = this.random.serialize();
       } catch (error) {
-        console.warn('[Random] Failed to serialize RNG during death snapshot:', error);
+        console.warn(
+          '[Random] Failed to serialize RNG during death snapshot:',
+          error
+        );
       }
     }
 
     if (!randomSnapshot) {
-      randomSnapshot = this.currentRandomSnapshot || this.gameState?.randomSnapshot || null;
+      randomSnapshot =
+        this.currentRandomSnapshot || this.gameState?.randomSnapshot || null;
     }
 
     if (randomSnapshot) {
-      this.logRandomSnapshot('death.snapshot', randomSnapshot, { mode: 'snapshot' });
+      this.logRandomSnapshot('death.snapshot', randomSnapshot, {
+        mode: 'snapshot',
+      });
     }
 
     const playerSnapshot = {
@@ -1479,7 +1587,9 @@ export default class GameSessionService {
     }
 
     const progressionSnapshot =
-      typeof progression.serialize === 'function' ? progression.serialize() : null;
+      typeof progression.serialize === 'function'
+        ? progression.serialize()
+        : null;
 
     const enemySnapshot =
       typeof enemies.getSnapshotState === 'function'
@@ -1520,7 +1630,8 @@ export default class GameSessionService {
   }
 
   restoreFromSnapshot({ snapshot } = {}) {
-    const payload = snapshot || this.deathSnapshot || this.gameState?.deathSnapshot;
+    const payload =
+      snapshot || this.deathSnapshot || this.gameState?.deathSnapshot;
 
     if (!payload) {
       console.warn('[Retry] No snapshot available');
@@ -1538,12 +1649,15 @@ export default class GameSessionService {
     }
 
     const rngSnapshot =
-      payload.random || this.randomSnapshot || this.currentRandomSnapshot || null;
+      payload.random ||
+      this.randomSnapshot ||
+      this.currentRandomSnapshot ||
+      null;
 
     if (rngSnapshot) {
       this.prepareRandomForScope('snapshot.restore', {
         mode: 'restore',
-        snapshot: rngSnapshot
+        snapshot: rngSnapshot,
       });
     } else {
       this.prepareRandomForScope('snapshot.restore', { mode: 'reset' });
@@ -1555,7 +1669,10 @@ export default class GameSessionService {
       try {
         player.reset();
       } catch (error) {
-        console.warn('[Retry] Failed to reset player before restoration:', error);
+        console.warn(
+          '[Retry] Failed to reset player before restoration:',
+          error
+        );
       }
     }
 
@@ -1599,28 +1716,39 @@ export default class GameSessionService {
       }
     } else {
       hadFallback = true;
-      console.warn('[Retry] Player snapshot missing - player reset to defaults.');
+      console.warn(
+        '[Retry] Player snapshot missing - player reset to defaults.'
+      );
     }
 
     let progressionRestored = false;
     if (payload.progression && typeof progression.restoreState === 'function') {
       try {
-        progressionRestored = progression.restoreState(payload.progression) !== false;
+        progressionRestored =
+          progression.restoreState(payload.progression) !== false;
       } catch (error) {
         console.warn('[Retry] Failed to restore progression snapshot:', error);
       }
-    } else if (payload.progression && typeof progression.deserialize === 'function') {
+    } else if (
+      payload.progression &&
+      typeof progression.deserialize === 'function'
+    ) {
       try {
         progression.deserialize(payload.progression, { suppressEvents: false });
         progressionRestored = true;
       } catch (error) {
-        console.warn('[Retry] Failed to deserialize progression snapshot:', error);
+        console.warn(
+          '[Retry] Failed to deserialize progression snapshot:',
+          error
+        );
       }
     }
 
     if (!progressionRestored) {
       hadFallback = true;
-      console.warn('[Retry] Progression snapshot unavailable - performing reset.');
+      console.warn(
+        '[Retry] Progression snapshot unavailable - performing reset.'
+      );
       if (typeof progression.reset === 'function') {
         progression.reset();
       }
@@ -1630,10 +1758,10 @@ export default class GameSessionService {
       const {
         reapplied: reappliedUpgrades,
         total: totalUpgradeLevels,
-        errors: upgradeReapplyErrors
+        errors: upgradeReapplyErrors,
       } = this.reapplyProgressionUpgrades({
         progression,
-        snapshot: payload.progression
+        snapshot: payload.progression,
       });
 
       if (totalUpgradeLevels > 0) {
@@ -1644,7 +1772,7 @@ export default class GameSessionService {
             {
               reapplied: reappliedUpgrades,
               total: totalUpgradeLevels,
-              errors: upgradeReapplyErrors
+              errors: upgradeReapplyErrors,
             }
           );
         } else {
@@ -1659,7 +1787,8 @@ export default class GameSessionService {
     let enemiesRestored = false;
     if (payload.enemies && typeof enemies.restoreSnapshotState === 'function') {
       try {
-        enemiesRestored = enemies.restoreSnapshotState(payload.enemies) !== false;
+        enemiesRestored =
+          enemies.restoreSnapshotState(payload.enemies) !== false;
       } catch (error) {
         console.warn('[Retry] Failed to restore enemy snapshot:', error);
       }
@@ -1682,7 +1811,8 @@ export default class GameSessionService {
     let physicsRestored = false;
     if (payload.physics && typeof physics.restoreSnapshotState === 'function') {
       try {
-        physicsRestored = physics.restoreSnapshotState(payload.physics) !== false;
+        physicsRestored =
+          physics.restoreSnapshotState(payload.physics) !== false;
       } catch (error) {
         console.warn('[Retry] Failed to restore physics snapshot:', error);
       }
@@ -1742,7 +1872,10 @@ export default class GameSessionService {
         .filter((entry) => entry && typeof entry[0] === 'string');
     }
 
-    if (entries.length === 0 && typeof progression.getAllUpgrades === 'function') {
+    if (
+      entries.length === 0 &&
+      typeof progression.getAllUpgrades === 'function'
+    ) {
       entries = Array.from(progression.getAllUpgrades().entries());
     }
 
@@ -1754,7 +1887,10 @@ export default class GameSessionService {
       try {
         progression.refreshInjectedServices(true);
       } catch (error) {
-        console.warn('[Retry] Failed to refresh progression services before reapply:', error);
+        console.warn(
+          '[Retry] Failed to refresh progression services before reapply:',
+          error
+        );
       }
     }
 
@@ -1781,7 +1917,10 @@ export default class GameSessionService {
       if (!definition) {
         total += normalizedLevel;
         errors += normalizedLevel;
-        console.warn('[Retry] Missing upgrade definition during reapply:', upgradeId);
+        console.warn(
+          '[Retry] Missing upgrade definition during reapply:',
+          upgradeId
+        );
         return;
       }
 
@@ -1803,7 +1942,11 @@ export default class GameSessionService {
         }
 
         try {
-          progression.applyUpgradeEffects(definition, levelDefinition, index + 1);
+          progression.applyUpgradeEffects(
+            definition,
+            levelDefinition,
+            index + 1
+          );
           reapplied += 1;
         } catch (error) {
           errors += 1;
@@ -1824,7 +1967,7 @@ export default class GameSessionService {
   findSafeSpawnPoint() {
     const fallback = {
       x: GAME_WIDTH / 2,
-      y: GAME_HEIGHT / 2
+      y: GAME_HEIGHT / 2,
     };
 
     const enemies = this.resolveServiceInstance('enemies');
@@ -1838,16 +1981,14 @@ export default class GameSessionService {
       typeof enemies.getActiveEnemies === 'function'
         ? enemies.getActiveEnemies()
         : typeof enemies.getAsteroids === 'function'
-        ? enemies.getAsteroids()
-        : [];
+          ? enemies.getAsteroids()
+          : [];
 
     const width = Number.isFinite(canvas.width) ? canvas.width : GAME_WIDTH;
     const height = Number.isFinite(canvas.height) ? canvas.height : GAME_HEIGHT;
 
     const safeDistance =
-      PLAYER_SAFE_SPAWN_DISTANCE ??
-      DEFAULT_SAFE_SPAWN_DISTANCE ??
-      300;
+      PLAYER_SAFE_SPAWN_DISTANCE ?? DEFAULT_SAFE_SPAWN_DISTANCE ?? 300;
 
     const center = { x: width / 2, y: height / 2 };
 
@@ -1877,7 +2018,7 @@ export default class GameSessionService {
       { x: width * 0.25, y: height * 0.25 },
       { x: width * 0.75, y: height * 0.25 },
       { x: width * 0.25, y: height * 0.75 },
-      { x: width * 0.75, y: height * 0.75 }
+      { x: width * 0.75, y: height * 0.75 },
     ];
 
     for (let index = 0; index < quadrants.length; index += 1) {
@@ -1952,7 +2093,8 @@ export default class GameSessionService {
         const storage = window.localStorage;
         if (storage) {
           const override = storage.getItem(RANDOM_STORAGE_KEYS.override);
-          const parsedOverride = GameSessionService.parseSeedCandidate(override);
+          const parsedOverride =
+            GameSessionService.parseSeedCandidate(override);
           if (parsedOverride !== null) {
             source = 'localStorage';
             seed = parsedOverride;
@@ -1960,10 +2102,16 @@ export default class GameSessionService {
           }
         }
       } catch (error) {
-        console.warn('[Random] Failed to read seed override from localStorage:', error);
+        console.warn(
+          '[Random] Failed to read seed override from localStorage:',
+          error
+        );
       }
 
-      if (window.crypto && typeof window.crypto.getRandomValues === 'function') {
+      if (
+        window.crypto &&
+        typeof window.crypto.getRandomValues === 'function'
+      ) {
         const buffer = new Uint32Array(1);
         window.crypto.getRandomValues(buffer);
         seed = buffer[0];
@@ -1992,7 +2140,7 @@ export default class GameSessionService {
         JSON.stringify({
           seed: typeof seed === 'number' ? seed : String(seed),
           source: source || 'unknown',
-          timestamp: Date.now()
+          timestamp: Date.now(),
         })
       );
     } catch (error) {
@@ -2014,7 +2162,9 @@ export default class GameSessionService {
 
     const { seed, state } = snapshot;
     const stateHex =
-      typeof state === 'number' ? `0x${state.toString(16).padStart(8, '0')}` : state;
+      typeof state === 'number'
+        ? `0x${state.toString(16).padStart(8, '0')}`
+        : state;
     console.log(`[Random] ${scope} (${mode}) → seed=${seed} state=${stateHex}`);
   }
 }

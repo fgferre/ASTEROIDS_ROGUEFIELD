@@ -1,6 +1,11 @@
 // src/modules/EnemySystem.js
 import { BaseSystem } from '../core/BaseSystem.js';
-import { ASTEROID_SIZES, GAME_HEIGHT, GAME_WIDTH, SHIP_SIZE } from '../core/GameConstants.js';
+import {
+  ASTEROID_SIZES,
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  SHIP_SIZE,
+} from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
 import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
@@ -159,7 +164,13 @@ class EnemySystem extends BaseSystem {
       typeof gameEvents !== 'undefined' && gameEvents ? gameEvents : null;
 
     this.missingDependencyWarnings = new Set();
-    this.deferredDependencyWarnings = new Set(['world', 'combat', 'effects', 'audio', 'ui']);
+    this.deferredDependencyWarnings = new Set([
+      'world',
+      'combat',
+      'effects',
+      'audio',
+      'ui',
+    ]);
 
     this.setupAsteroidPoolIntegration();
     this.setupEnemyFactory(); // Initialize factory (optional)
@@ -294,8 +305,8 @@ class EnemySystem extends BaseSystem {
             const waveNumber = Number.isFinite(Number(data.wave))
               ? Number(data.wave)
               : Number.isFinite(this.waveState.current)
-              ? this.waveState.current
-              : null;
+                ? this.waveState.current
+                : null;
 
             if (
               waveNumber !== null &&
@@ -383,7 +394,10 @@ class EnemySystem extends BaseSystem {
         return;
       }
 
-      if (!suppressWarnings && !this.deferredDependencyWarnings.has(serviceName)) {
+      if (
+        !suppressWarnings &&
+        !this.deferredDependencyWarnings.has(serviceName)
+      ) {
         this.logMissingDependency(serviceName);
       }
     });
@@ -463,7 +477,9 @@ class EnemySystem extends BaseSystem {
     this.setupRandomGenerators();
 
     if (force || randomServiceChanged) {
-      this.reseedRandomScopes({ resetSequences: force || randomServiceChanged });
+      this.reseedRandomScopes({
+        resetSequences: force || randomServiceChanged,
+      });
     }
 
     if (this.pendingEnemyProjectiles.length > 0) {
@@ -473,7 +489,10 @@ class EnemySystem extends BaseSystem {
         this.pendingEnemyProjectiles = [];
         pending.forEach((payload) => this.handleEnemyProjectile(payload));
         if (process.env.NODE_ENV === 'development') {
-          console.debug('[EnemySystem] Flushed pending projectiles', pending.length);
+          console.debug(
+            '[EnemySystem] Flushed pending projectiles',
+            pending.length
+          );
         }
       }
     }
@@ -605,7 +624,10 @@ class EnemySystem extends BaseSystem {
       };
     }
 
-    const fallbackBase = this.getRandomService() || this._fallbackRandom || new RandomService('enemy-system:fallback');
+    const fallbackBase =
+      this.getRandomService() ||
+      this._fallbackRandom ||
+      new RandomService('enemy-system:fallback');
     return {
       random:
         typeof fallbackBase.fork === 'function'
@@ -658,7 +680,11 @@ class EnemySystem extends BaseSystem {
     }
 
     Object.entries(this.randomScopes).forEach(([scope, generator]) => {
-      if (scope === 'base' || !generator || typeof generator.reset !== 'function') {
+      if (
+        scope === 'base' ||
+        !generator ||
+        typeof generator.reset !== 'function'
+      ) {
         return;
       }
 
@@ -674,11 +700,17 @@ class EnemySystem extends BaseSystem {
       });
     }
 
-    if (this.waveManager && typeof this.waveManager.reseedRandomScopes === 'function') {
+    if (
+      this.waveManager &&
+      typeof this.waveManager.reseedRandomScopes === 'function'
+    ) {
       this.waveManager.reseedRandomScopes({ resetSequences });
     }
 
-    if (this.rewardManager && typeof this.rewardManager.reseedRandom === 'function') {
+    if (
+      this.rewardManager &&
+      typeof this.rewardManager.reseedRandom === 'function'
+    ) {
       const rewardRandom = this.randomScopes?.['enemy-rewards'];
       this.rewardManager.reseedRandom(rewardRandom);
     }
@@ -691,9 +723,7 @@ class EnemySystem extends BaseSystem {
 
     return {
       baseSeed,
-      scopeSeeds: this.randomScopeSeeds
-        ? { ...this.randomScopeSeeds }
-        : null,
+      scopeSeeds: this.randomScopeSeeds ? { ...this.randomScopeSeeds } : null,
       sequences: this.randomSequences ? { ...this.randomSequences } : null,
     };
   }
@@ -723,7 +753,10 @@ class EnemySystem extends BaseSystem {
   }
 
   setupAsteroidPoolIntegration() {
-    if (!GamePools || typeof GamePools.configureAsteroidLifecycle !== 'function') {
+    if (
+      !GamePools ||
+      typeof GamePools.configureAsteroidLifecycle !== 'function'
+    ) {
       this.usesAsteroidPool = false;
       return;
     }
@@ -735,12 +768,15 @@ class EnemySystem extends BaseSystem {
           if (asteroid && typeof asteroid.resetForPool === 'function') {
             asteroid.resetForPool();
           }
-        }
+        },
       });
       this.usesAsteroidPool = true;
     } catch (error) {
       this.usesAsteroidPool = false;
-      console.warn('[EnemySystem] Failed to configure asteroid pool lifecycle', error);
+      console.warn(
+        '[EnemySystem] Failed to configure asteroid pool lifecycle',
+        error
+      );
     }
   }
 
@@ -754,9 +790,9 @@ class EnemySystem extends BaseSystem {
         pool: GamePools?.asteroids || null,
         defaults: {
           size: 'medium',
-          variant: 'common'
+          variant: 'common',
         },
-        tags: ['destructible', 'enemy']
+        tags: ['destructible', 'enemy'],
       });
 
       if (ENEMY_TYPES?.drone) {
@@ -764,7 +800,7 @@ class EnemySystem extends BaseSystem {
           class: Drone,
           pool: GamePools?.drones || null,
           defaults: { ...ENEMY_TYPES.drone, components: DRONE_COMPONENTS },
-          tags: ['enemy', 'hostile', 'ranged']
+          tags: ['enemy', 'hostile', 'ranged'],
         });
       }
 
@@ -773,7 +809,7 @@ class EnemySystem extends BaseSystem {
           class: Mine,
           pool: GamePools?.mines || null,
           defaults: { ...ENEMY_TYPES.mine, components: MINE_COMPONENTS },
-          tags: ['enemy', 'explosive', 'area-of-effect']
+          tags: ['enemy', 'explosive', 'area-of-effect'],
         });
       }
 
@@ -782,7 +818,7 @@ class EnemySystem extends BaseSystem {
           class: Hunter,
           pool: GamePools?.hunters || null,
           defaults: { ...ENEMY_TYPES.hunter, components: HUNTER_COMPONENTS },
-          tags: ['enemy', 'hostile', 'ranged', 'elite']
+          tags: ['enemy', 'hostile', 'ranged', 'elite'],
         });
       }
 
@@ -802,7 +838,7 @@ class EnemySystem extends BaseSystem {
           class: BossEnemy,
           pool: GamePools?.bosses || null,
           defaults: { ...bossDefaults, components: BOSS_COMPONENTS },
-          tags: ['enemy', 'boss', 'elite']
+          tags: ['enemy', 'boss', 'elite'],
         });
       }
     } catch (error) {
@@ -1032,8 +1068,7 @@ class EnemySystem extends BaseSystem {
         get useManagers() {
           return facade.useManagers;
         },
-        refreshServiceState: (...args) =>
-          facade.refreshServiceState?.(...args),
+        refreshServiceState: (...args) => facade.refreshServiceState?.(...args),
         getCachedPlayer: (...args) => facade.getCachedPlayer?.(...args),
         getCachedWorld: (...args) => facade.getCachedWorld?.(...args),
         getCachedPhysics: (...args) => facade.getCachedPhysics?.(...args),
@@ -1171,15 +1206,15 @@ class EnemySystem extends BaseSystem {
         player = resolved;
         this._playerCacheLogged = false;
         if (this._playerLazyResolveLogEmitted !== 'success') {
-        GameDebugLogger.log(
-          'STATE',
-          'getCachedPlayer lazy-resolved player service',
-          {
-            source: 'resolveService',
-            success: true,
-            fallback: true,
-          }
-        );
+          GameDebugLogger.log(
+            'STATE',
+            'getCachedPlayer lazy-resolved player service',
+            {
+              source: 'resolveService',
+              success: true,
+              fallback: true,
+            }
+          );
           this._playerLazyResolveLogEmitted = 'success';
         }
       } else if (this._playerLazyResolveLogEmitted !== 'failure') {
@@ -1402,7 +1437,11 @@ class EnemySystem extends BaseSystem {
     }
 
     const candidateId =
-      payload?.enemyId ?? payload?.id ?? payload?.source?.id ?? payload?.bossId ?? null;
+      payload?.enemyId ??
+      payload?.id ??
+      payload?.source?.id ??
+      payload?.bossId ??
+      null;
 
     if (candidateId != null) {
       return this.getTrackedBoss(candidateId);
@@ -1466,19 +1505,22 @@ class EnemySystem extends BaseSystem {
   }
 
   getAvailableBossMinionTypes(preferredTypes = null) {
-    const rawCandidates = Array.isArray(preferredTypes) && preferredTypes.length
-      ? [...preferredTypes]
-      : Array.isArray(this.availableBossMinionTypes) && this.availableBossMinionTypes.length
-      ? [...this.availableBossMinionTypes]
-      : Array.isArray(BOSS_CONFIG?.minionTypes)
-      ? [...BOSS_CONFIG.minionTypes]
-      : [];
+    const rawCandidates =
+      Array.isArray(preferredTypes) && preferredTypes.length
+        ? [...preferredTypes]
+        : Array.isArray(this.availableBossMinionTypes) &&
+            this.availableBossMinionTypes.length
+          ? [...this.availableBossMinionTypes]
+          : Array.isArray(BOSS_CONFIG?.minionTypes)
+            ? [...BOSS_CONFIG.minionTypes]
+            : [];
 
     const factory = this.factory;
     const hasFactoryCheck = factory && typeof factory.hasType === 'function';
-    const enabledTypes = factory && typeof factory.getEnabledTypes === 'function'
-      ? new Set(factory.getEnabledTypes())
-      : null;
+    const enabledTypes =
+      factory && typeof factory.getEnabledTypes === 'function'
+        ? new Set(factory.getEnabledTypes())
+        : null;
 
     const normalized = [];
     const seen = new Set();
@@ -1546,9 +1588,11 @@ class EnemySystem extends BaseSystem {
   }
 
   emitBossHudUpdate(patch = null) {
-    const timestamp = typeof performance !== 'undefined' && typeof performance.now === 'function'
-      ? performance.now()
-      : Date.now();
+    const timestamp =
+      typeof performance !== 'undefined' &&
+      typeof performance.now === 'function'
+        ? performance.now()
+        : Date.now();
 
     if (!this.bossHudState) {
       this.bossHudState = this.createInitialBossHudState();
@@ -1626,7 +1670,10 @@ class EnemySystem extends BaseSystem {
     if (ui) {
       if (typeof ui.handleBossEvent === 'function') {
         ui.handleBossEvent(eventName, eventData);
-      } else if (typeof ui.updateBossHud === 'function' && eventName !== 'boss-hud-update') {
+      } else if (
+        typeof ui.updateBossHud === 'function' &&
+        eventName !== 'boss-hud-update'
+      ) {
         ui.updateBossHud({ ...this.bossHudState, ...eventData });
       }
     }
@@ -1644,11 +1691,18 @@ class EnemySystem extends BaseSystem {
       return;
     }
 
-    const flash = typeof target.addScreenFlash === 'function' ? target.addScreenFlash.bind(target) : null;
-    const shake = typeof target.addScreenShake === 'function' ? target.addScreenShake.bind(target) : null;
-    const shockwave = typeof target.createShockwaveEffect === 'function'
-      ? target.createShockwaveEffect.bind(target)
-      : null;
+    const flash =
+      typeof target.addScreenFlash === 'function'
+        ? target.addScreenFlash.bind(target)
+        : null;
+    const shake =
+      typeof target.addScreenShake === 'function'
+        ? target.addScreenShake.bind(target)
+        : null;
+    const shockwave =
+      typeof target.createShockwaveEffect === 'function'
+        ? target.createShockwaveEffect.bind(target)
+        : null;
 
     switch (eventName) {
       case 'boss-wave-started':
@@ -1678,9 +1732,9 @@ class EnemySystem extends BaseSystem {
         }
         if (shockwave) {
           const enemy = payload?.enemy;
-          const position = payload?.position || (enemy
-            ? { x: enemy.x ?? 0, y: enemy.y ?? 0 }
-            : null);
+          const position =
+            payload?.position ||
+            (enemy ? { x: enemy.x ?? 0, y: enemy.y ?? 0 } : null);
           if (position) {
             shockwave({
               position,
@@ -1747,9 +1801,10 @@ class EnemySystem extends BaseSystem {
   }
 
   mergeBossRewards(boss, override = {}) {
-    const baseRewards = boss && boss.rewards && typeof boss.rewards === 'object'
-      ? { ...boss.rewards }
-      : {};
+    const baseRewards =
+      boss && boss.rewards && typeof boss.rewards === 'object'
+        ? { ...boss.rewards }
+        : {};
 
     if (override && typeof override === 'object') {
       if (override.xp != null) {
@@ -1788,10 +1843,17 @@ class EnemySystem extends BaseSystem {
       this.rewardManager &&
       typeof this.rewardManager.createMilestoneReward === 'function'
     ) {
-      this.rewardManager.createMilestoneReward(boss.x ?? 0, boss.y ?? 0, 'boss_kill');
+      this.rewardManager.createMilestoneReward(
+        boss.x ?? 0,
+        boss.y ?? 0,
+        'boss_kill'
+      );
     }
 
-    if (Array.isArray(mergedRewards.lootTable) && mergedRewards.lootTable.length > 0) {
+    if (
+      Array.isArray(mergedRewards.lootTable) &&
+      mergedRewards.lootTable.length > 0
+    ) {
       this.emitBossSystemEvent('boss', 'loot-dropped', {
         enemy: boss,
         loot: [...mergedRewards.lootTable],
@@ -1871,14 +1933,18 @@ class EnemySystem extends BaseSystem {
     }
 
     payload.enemyId = payload.enemyId ?? payload.enemy?.id ?? source.id ?? null;
-    payload.enemyType = payload.enemyType || payload.enemy?.type || source.type || null;
+    payload.enemyType =
+      payload.enemyType || payload.enemy?.type || source.type || null;
 
-    const projectile = payload.projectile && typeof payload.projectile === 'object'
-      ? { ...payload.projectile }
-      : {};
+    const projectile =
+      payload.projectile && typeof payload.projectile === 'object'
+        ? { ...payload.projectile }
+        : {};
 
     const meta = {
-      ...(projectile.meta && typeof projectile.meta === 'object' ? projectile.meta : {}),
+      ...(projectile.meta && typeof projectile.meta === 'object'
+        ? projectile.meta
+        : {}),
       ...(payload.meta && typeof payload.meta === 'object' ? payload.meta : {}),
     };
 
@@ -1902,12 +1968,18 @@ class EnemySystem extends BaseSystem {
       return false;
     }
 
-    const enemyType = typeof payload.enemyType === 'string' ? payload.enemyType.toLowerCase() : null;
+    const enemyType =
+      typeof payload.enemyType === 'string'
+        ? payload.enemyType.toLowerCase()
+        : null;
     if (enemyType === 'boss') {
       return true;
     }
 
-    const sourceType = typeof payload.source?.type === 'string' ? payload.source.type.toLowerCase() : null;
+    const sourceType =
+      typeof payload.source?.type === 'string'
+        ? payload.source.type.toLowerCase()
+        : null;
     if (sourceType === 'boss') {
       return true;
     }
@@ -1920,7 +1992,12 @@ class EnemySystem extends BaseSystem {
       return true;
     }
 
-    if (payload.meta && (payload.meta.pattern || payload.meta.phase != null || payload.meta.stage != null)) {
+    if (
+      payload.meta &&
+      (payload.meta.pattern ||
+        payload.meta.phase != null ||
+        payload.meta.stage != null)
+    ) {
       return true;
     }
 
@@ -2349,9 +2426,8 @@ class EnemySystem extends BaseSystem {
 
     const normalized = type.toLowerCase();
     return enemies.filter((enemy) => {
-      const enemyType = typeof enemy?.type === 'string'
-        ? enemy.type.toLowerCase()
-        : null;
+      const enemyType =
+        typeof enemy?.type === 'string' ? enemy.type.toLowerCase() : null;
       return enemyType === normalized;
     });
   }
@@ -2491,8 +2567,12 @@ class EnemySystem extends BaseSystem {
       maxHealth: safeNumber(asteroid.maxHealth),
       destroyed: Boolean(asteroid.destroyed),
       spawnTime: safeNumber(asteroid.spawnTime),
-      crackSeed: Number.isFinite(asteroid.crackSeed) ? asteroid.crackSeed : null,
-      crackStage: Number.isFinite(asteroid.crackStage) ? asteroid.crackStage : 0,
+      crackSeed: Number.isFinite(asteroid.crackSeed)
+        ? asteroid.crackSeed
+        : null,
+      crackStage: Number.isFinite(asteroid.crackStage)
+        ? asteroid.crackStage
+        : 0,
       randomSeed:
         asteroid.random && typeof asteroid.random.seed === 'number'
           ? asteroid.random.seed >>> 0
@@ -2500,8 +2580,12 @@ class EnemySystem extends BaseSystem {
       randomScopes: asteroid.randomScopeSeeds
         ? shallowClone(asteroid.randomScopeSeeds)
         : null,
-      variantState: asteroid.variantState ? deepClone(asteroid.variantState) : null,
-      visualState: asteroid.visualState ? deepClone(asteroid.visualState) : null,
+      variantState: asteroid.variantState
+        ? deepClone(asteroid.variantState)
+        : null,
+      visualState: asteroid.visualState
+        ? deepClone(asteroid.visualState)
+        : null,
     };
 
     return snapshot;
@@ -2512,8 +2596,11 @@ class EnemySystem extends BaseSystem {
       return null;
     }
 
-    const randomSeed = Number.isFinite(snapshot.randomSeed) ? snapshot.randomSeed : null;
-    const randomInstance = randomSeed !== null ? new RandomService(randomSeed) : null;
+    const randomSeed = Number.isFinite(snapshot.randomSeed)
+      ? snapshot.randomSeed
+      : null;
+    const randomInstance =
+      randomSeed !== null ? new RandomService(randomSeed) : null;
 
     const config = {
       id: snapshot.id || undefined,
@@ -2612,7 +2699,9 @@ class EnemySystem extends BaseSystem {
   }
 
   importState(snapshot) {
-    if (!validateSnapshot(snapshot, ['waveState', 'sessionStats', 'asteroids'])) {
+    if (
+      !validateSnapshot(snapshot, ['waveState', 'sessionStats', 'asteroids'])
+    ) {
       return this._handleSnapshotFallback('invalid snapshot payload');
     }
 
@@ -2733,16 +2822,17 @@ class EnemySystem extends BaseSystem {
     this.syncPhysicsIntegration(true);
 
     const waveManagerActive =
-      this.useManagers &&
-      Boolean(USE_WAVE_MANAGER) &&
-      this.waveManager;
+      this.useManagers && Boolean(USE_WAVE_MANAGER) && this.waveManager;
 
     if (waveManagerActive) {
       if (typeof this.waveManager.reset === 'function') {
         try {
           this.waveManager.reset();
         } catch (error) {
-          console.error('[EnemySystem] Failed to reset WaveManager during system reset:', error);
+          console.error(
+            '[EnemySystem] Failed to reset WaveManager during system reset:',
+            error
+          );
         }
       }
 
@@ -2951,7 +3041,9 @@ class EnemySystem extends BaseSystem {
         ? [...this.bossHudState.phaseColors]
         : [],
       invulnerable: Boolean(this.bossHudState.invulnerable),
-      invulnerabilityTimer: Number.isFinite(this.bossHudState.invulnerabilityTimer)
+      invulnerabilityTimer: Number.isFinite(
+        this.bossHudState.invulnerabilityTimer
+      )
         ? Math.max(0, Number(this.bossHudState.invulnerabilityTimer))
         : null,
       invulnerabilitySource: this.bossHudState.invulnerabilitySource || null,
@@ -2970,8 +3062,8 @@ class EnemySystem extends BaseSystem {
     const phaseColors = Array.isArray(data.phaseColors)
       ? [...data.phaseColors]
       : Array.isArray(this.bossHudState?.phaseColors)
-      ? [...this.bossHudState.phaseColors]
-      : [];
+        ? [...this.bossHudState.phaseColors]
+        : [];
 
     this.bossHudState = {
       ...this.createInitialBossHudState(),
@@ -3034,14 +3126,14 @@ class EnemySystem extends BaseSystem {
     const invulnerabilityTimer = Number.isFinite(data.invulnerabilityTimer)
       ? Math.max(0, Number(data.invulnerabilityTimer))
       : Number.isFinite(boss.invulnerabilityTimer)
-      ? Math.max(0, Number(boss.invulnerabilityTimer))
-      : null;
+        ? Math.max(0, Number(boss.invulnerabilityTimer))
+        : null;
     const invulnerabilitySource = data.invulnerabilitySource ?? null;
     const phaseColorsSource = Array.isArray(boss.phaseColors)
       ? boss.phaseColors
       : Array.isArray(data.phaseColors)
-      ? data.phaseColors
-      : this.bossHudState?.phaseColors;
+        ? data.phaseColors
+        : this.bossHudState?.phaseColors;
     const phaseColors = Array.isArray(phaseColorsSource)
       ? [...phaseColorsSource]
       : [];
@@ -3094,23 +3186,27 @@ class EnemySystem extends BaseSystem {
       ? data.wave
       : boss?.wave ?? this.waveState?.current ?? null;
 
-    const phase = data.phase ?? boss?.currentPhase ?? this.bossHudState?.phase ?? 0;
-    const maxHealth = data.maxHealth ?? boss?.maxHealth ?? this.bossHudState?.maxHealth ?? 0;
-    const health = data.health ?? boss?.health ?? this.bossHudState?.health ?? maxHealth;
+    const phase =
+      data.phase ?? boss?.currentPhase ?? this.bossHudState?.phase ?? 0;
+    const maxHealth =
+      data.maxHealth ?? boss?.maxHealth ?? this.bossHudState?.maxHealth ?? 0;
+    const health =
+      data.health ?? boss?.health ?? this.bossHudState?.health ?? maxHealth;
     const invulnerable = Boolean(
       data.invulnerable ?? boss?.invulnerable ?? this.bossHudState?.invulnerable
     );
     const invulnerabilityTimer = Number.isFinite(data.invulnerabilityTimer)
       ? Math.max(0, Number(data.invulnerabilityTimer))
       : Number.isFinite(boss?.invulnerabilityTimer)
-      ? Math.max(0, Number(boss.invulnerabilityTimer))
-      : null;
+        ? Math.max(0, Number(boss.invulnerabilityTimer))
+        : null;
     const invulnerabilitySource = data.invulnerabilitySource ?? null;
-    const phaseColorsSource = boss && Array.isArray(boss.phaseColors)
-      ? boss.phaseColors
-      : Array.isArray(data.phaseColors)
-      ? data.phaseColors
-      : this.bossHudState?.phaseColors;
+    const phaseColorsSource =
+      boss && Array.isArray(boss.phaseColors)
+        ? boss.phaseColors
+        : Array.isArray(data.phaseColors)
+          ? data.phaseColors
+          : this.bossHudState?.phaseColors;
     const phaseColors = Array.isArray(phaseColorsSource)
       ? [...phaseColorsSource]
       : [];
@@ -3123,7 +3219,8 @@ class EnemySystem extends BaseSystem {
       active: true,
       upcoming: false,
       bossId: boss?.id ?? this.bossHudState?.bossId ?? null,
-      name: boss?.displayName || boss?.name || this.bossHudState?.name || 'Boss',
+      name:
+        boss?.displayName || boss?.name || this.bossHudState?.name || 'Boss',
       phase,
       phaseCount: boss?.phaseCount ?? this.bossHudState?.phaseCount ?? 0,
       health,
@@ -3176,8 +3273,8 @@ class EnemySystem extends BaseSystem {
     const phaseColorsSource = Array.isArray(this.bossHudState?.phaseColors)
       ? this.bossHudState.phaseColors
       : Array.isArray(boss.phaseColors)
-      ? boss.phaseColors
-      : null;
+        ? boss.phaseColors
+        : null;
     const phaseColors = Array.isArray(phaseColorsSource)
       ? [...phaseColorsSource]
       : [];
@@ -3192,7 +3289,11 @@ class EnemySystem extends BaseSystem {
       phase: boss.currentPhase ?? this.bossHudState?.phase ?? 0,
       phaseCount: boss.phaseCount ?? this.bossHudState?.phaseCount ?? 0,
       health: 0,
-      maxHealth: rewards?.maxHealth ?? boss.maxHealth ?? this.bossHudState?.maxHealth ?? 0,
+      maxHealth:
+        rewards?.maxHealth ??
+        boss.maxHealth ??
+        this.bossHudState?.maxHealth ??
+        0,
       wave: waveNumber,
       color: this.bossHudState?.color ?? null,
       phaseColors,
@@ -3239,17 +3340,23 @@ class EnemySystem extends BaseSystem {
 
     const waveNumber = Number.isFinite(data.wave)
       ? Number(data.wave)
-      : boss?.wave ?? this.bossHudState?.wave ?? this.waveState?.current ?? null;
+      : boss?.wave ??
+        this.bossHudState?.wave ??
+        this.waveState?.current ??
+        null;
     const invulnerable = Boolean(
       data.invulnerable ?? boss?.invulnerable ?? this.bossHudState?.invulnerable
     );
     const timerValue =
-      data.remaining ?? data.invulnerabilityTimer ?? data.timer ?? data.timeRemaining;
+      data.remaining ??
+      data.invulnerabilityTimer ??
+      data.timer ??
+      data.timeRemaining;
     const invulnerabilityTimer = Number.isFinite(timerValue)
       ? Math.max(0, Number(timerValue))
       : Number.isFinite(boss?.invulnerabilityTimer)
-      ? Math.max(0, Number(boss.invulnerabilityTimer))
-      : null;
+        ? Math.max(0, Number(boss.invulnerabilityTimer))
+        : null;
     const source = data.reason ?? data.invulnerabilitySource ?? null;
 
     this.bossHudState = {
@@ -3339,7 +3446,10 @@ class EnemySystem extends BaseSystem {
           break;
         }
 
-        if (payload.radius && typeof physics.applyBossAreaDamage === 'function') {
+        if (
+          payload.radius &&
+          typeof physics.applyBossAreaDamage === 'function'
+        ) {
           physics.applyBossAreaDamage(payload);
         }
         break;
@@ -3355,7 +3465,10 @@ class EnemySystem extends BaseSystem {
     const combat = this.getCachedCombat();
 
     if (combat) {
-      if (this.isBossProjectile(payload) && typeof combat.handleBossProjectile === 'function') {
+      if (
+        this.isBossProjectile(payload) &&
+        typeof combat.handleBossProjectile === 'function'
+      ) {
         combat.handleBossProjectile(payload);
         return true;
       }
@@ -3387,7 +3500,10 @@ class EnemySystem extends BaseSystem {
     // Last-resort: queue payload when both combat and bus are unavailable
     this.pendingEnemyProjectiles.push(payload);
     if (process.env.NODE_ENV === 'development') {
-      console.debug('[EnemySystem] Queued enemy projectile (combat/bus unavailable)', payload);
+      console.debug(
+        '[EnemySystem] Queued enemy projectile (combat/bus unavailable)',
+        payload
+      );
     }
     return false;
   }
@@ -3420,13 +3536,9 @@ class EnemySystem extends BaseSystem {
     }
 
     const radius =
-      typeof data.radius === 'number'
-        ? data.radius
-        : SHIELD_SHOCKWAVE_RADIUS;
+      typeof data.radius === 'number' ? data.radius : SHIELD_SHOCKWAVE_RADIUS;
     const force =
-      typeof data.force === 'number'
-        ? data.force
-        : SHIELD_SHOCKWAVE_FORCE;
+      typeof data.force === 'number' ? data.force : SHIELD_SHOCKWAVE_FORCE;
 
     const radiusSq = radius * radius;
     const originX = data.position.x;
@@ -3477,9 +3589,12 @@ class EnemySystem extends BaseSystem {
           ? asteroid.getRandomFor('collision')
           : null;
       const rotationImpulseSource =
-        collisionRandom || this.getRandomScope('fragments') || this.getRandomService();
+        collisionRandom ||
+        this.getRandomScope('fragments') ||
+        this.getRandomService();
       const rotationImpulse =
-        rotationImpulseSource && typeof rotationImpulseSource.range === 'function'
+        rotationImpulseSource &&
+        typeof rotationImpulseSource.range === 'function'
           ? rotationImpulseSource.range(-2, 2)
           : (rotationImpulseSource.float() - 0.5) * 4;
       asteroid.rotationSpeed += rotationImpulse * falloff;

@@ -36,7 +36,10 @@ class EnemyDamageSystem {
     const { facade = null, spawnSystem = null } = context;
 
     if (!facade) {
-      GameDebugLogger.log('ERROR', 'EnemyDamageSystem missing facade reference');
+      GameDebugLogger.log(
+        'ERROR',
+        'EnemyDamageSystem missing facade reference'
+      );
       throw new Error('EnemyDamageSystem requires a facade reference');
     }
 
@@ -131,7 +134,10 @@ class EnemyDamageSystem {
 
     if (fragmentDescriptors.length > 0) {
       let fragmentVariants = [];
-      if (this.spawnSystem && typeof this.spawnSystem.assignVariantsToFragments === 'function') {
+      if (
+        this.spawnSystem &&
+        typeof this.spawnSystem.assignVariantsToFragments === 'function'
+      ) {
         fragmentVariants = this.spawnSystem.assignVariantsToFragments(
           fragmentDescriptors,
           asteroid,
@@ -152,7 +158,10 @@ class EnemyDamageSystem {
         );
 
         let fragment = null;
-        if (this.spawnSystem && typeof this.spawnSystem.acquireAsteroid === 'function') {
+        if (
+          this.spawnSystem &&
+          typeof this.spawnSystem.acquireAsteroid === 'function'
+        ) {
           fragment = this.spawnSystem.acquireAsteroid({
             ...descriptor,
             variant: fragmentVariants?.[index],
@@ -175,13 +184,20 @@ class EnemyDamageSystem {
         }
 
         let registrationResult = null;
-        if (this.spawnSystem && typeof this.spawnSystem.registerActiveEnemy === 'function') {
+        if (
+          this.spawnSystem &&
+          typeof this.spawnSystem.registerActiveEnemy === 'function'
+        ) {
           registrationResult = this.spawnSystem.registerActiveEnemy(fragment);
         } else if (typeof this.facade.registerActiveEnemy === 'function') {
           registrationResult = this.facade.registerActiveEnemy(fragment);
         }
 
-        if (this.spawnSystem && typeof this.spawnSystem.warnIfWaveManagerRegistrationFailed === 'function') {
+        if (
+          this.spawnSystem &&
+          typeof this.spawnSystem.warnIfWaveManagerRegistrationFailed ===
+            'function'
+        ) {
           this.spawnSystem.warnIfWaveManagerRegistrationFailed(
             registrationResult,
             'fragment-spawn',
@@ -255,12 +271,19 @@ class EnemyDamageSystem {
           : this.facade.getActiveEnemyCount?.() ?? 0;
 
       const allAsteroidsKilled =
-        waveState.asteroidsKilled >= waveState.totalAsteroids && activeCount === 0;
+        waveState.asteroidsKilled >= waveState.totalAsteroids &&
+        activeCount === 0;
 
       const usingWaveManager =
-        this.facade.useManagers && Boolean(USE_WAVE_MANAGER) && this.facade.waveManager;
+        this.facade.useManagers &&
+        Boolean(USE_WAVE_MANAGER) &&
+        this.facade.waveManager;
 
-      if (!usingWaveManager && allAsteroidsKilled && waveState.timeRemaining > 0) {
+      if (
+        !usingWaveManager &&
+        allAsteroidsKilled &&
+        waveState.timeRemaining > 0
+      ) {
         this.context.completeCurrentWave?.();
       }
     }
@@ -428,8 +451,12 @@ class EnemyDamageSystem {
     }
 
     const wasShieldActive = Boolean(player.isShieldActive);
-    const previousShieldHP = Number.isFinite(player.shieldHP) ? player.shieldHP : 0;
-    const previousHealth = Number.isFinite(player.health) ? player.health : null;
+    const previousShieldHP = Number.isFinite(player.shieldHP)
+      ? player.shieldHP
+      : 0;
+    const previousHealth = Number.isFinite(player.health)
+      ? player.health
+      : null;
 
     const remaining = player.takeDamage(amount);
     const currentHealth = Number.isFinite(player.health)

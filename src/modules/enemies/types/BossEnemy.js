@@ -58,12 +58,16 @@ const BOSS_DEFAULTS = {
   phaseColors: Array.isArray(SOURCE_CONFIG?.phaseColors)
     ? [...SOURCE_CONFIG.phaseColors]
     : [...BASE_CONFIG.phaseColors],
-  minionTypes: Array.isArray(SOURCE_CONFIG?.minionTypes) && SOURCE_CONFIG.minionTypes.length
-    ? [...SOURCE_CONFIG.minionTypes]
-    : [...BASE_CONFIG.minionTypes],
-  phaseThresholds: Array.isArray(SOURCE_CONFIG?.phaseThresholds) && SOURCE_CONFIG.phaseThresholds.length
-    ? [...SOURCE_CONFIG.phaseThresholds]
-    : [...BASE_CONFIG.phaseThresholds],
+  minionTypes:
+    Array.isArray(SOURCE_CONFIG?.minionTypes) &&
+    SOURCE_CONFIG.minionTypes.length
+      ? [...SOURCE_CONFIG.minionTypes]
+      : [...BASE_CONFIG.minionTypes],
+  phaseThresholds:
+    Array.isArray(SOURCE_CONFIG?.phaseThresholds) &&
+    SOURCE_CONFIG.phaseThresholds.length
+      ? [...SOURCE_CONFIG.phaseThresholds]
+      : [...BASE_CONFIG.phaseThresholds],
 };
 
 export class BossEnemy extends BaseEnemy {
@@ -154,10 +158,12 @@ export class BossEnemy extends BaseEnemy {
     if (componentConfig) {
       this.weaponState = this.weaponState || {};
       this.movementStrategy = componentConfig?.movement?.strategy || 'seeking';
-      this.renderStrategy = componentConfig?.render?.strategy || 'procedural-boss';
+      this.renderStrategy =
+        componentConfig?.render?.strategy || 'procedural-boss';
       if (Array.isArray(componentConfig?.weapon?.patterns)) {
         this.weaponPatterns = [...componentConfig.weapon.patterns];
-        this.weaponPattern = this.weaponPattern || componentConfig.weapon.patterns[0];
+        this.weaponPattern =
+          this.weaponPattern || componentConfig.weapon.patterns[0];
       } else if (componentConfig?.weapon?.pattern) {
         this.weaponPattern = componentConfig.weapon.pattern;
       }
@@ -183,14 +189,16 @@ export class BossEnemy extends BaseEnemy {
 
     const baseHealth = config.health ?? defaults.health ?? 1500;
     const scaling = config.healthScaling ?? defaults.healthScaling ?? 1;
-    const scaledHealth = baseHealth * Math.pow(Math.max(1, scaling), waveNumber - 1);
+    const scaledHealth =
+      baseHealth * Math.pow(Math.max(1, scaling), waveNumber - 1);
     this.maxHealth = Math.ceil(scaledHealth);
     this.health = config.currentHealth ?? this.maxHealth;
 
     this.speed = config.speed ?? defaults.speed ?? 60;
     this.acceleration = config.acceleration ?? defaults.acceleration ?? 120;
     this.contactDamage = config.contactDamage ?? defaults.contactDamage ?? 45;
-    this.projectileDamage = config.projectileDamage ?? defaults.projectileDamage ?? 35;
+    this.projectileDamage =
+      config.projectileDamage ?? defaults.projectileDamage ?? 35;
 
     this.safeDistance = Number.isFinite(config.safeDistance)
       ? config.safeDistance
@@ -208,31 +216,43 @@ export class BossEnemy extends BaseEnemy {
         ? defaults.entryDriftSpeed
         : Math.max(45, (this.speed || 0) * 0.8);
 
-    this.spreadProjectileCount = config.spreadProjectileCount ?? defaults.spreadProjectileCount ?? 7;
-    this.spreadProjectileSpeed = config.spreadProjectileSpeed ?? defaults.spreadProjectileSpeed ?? 260;
-    this.spreadInterval = config.spreadInterval ?? defaults.spreadInterval ?? 2.4;
-    this.spreadIntervalVariance = config.spreadVariance ?? defaults.spreadVariance ?? 0;
+    this.spreadProjectileCount =
+      config.spreadProjectileCount ?? defaults.spreadProjectileCount ?? 7;
+    this.spreadProjectileSpeed =
+      config.spreadProjectileSpeed ?? defaults.spreadProjectileSpeed ?? 260;
+    this.spreadInterval =
+      config.spreadInterval ?? defaults.spreadInterval ?? 2.4;
+    this.spreadIntervalVariance =
+      config.spreadVariance ?? defaults.spreadVariance ?? 0;
     this.spreadArc = config.spreadArc ?? defaults.spreadArc ?? 0.85;
     this.spreadAngleVariance =
       config.spreadAngleVariance ?? defaults.spreadAngleVariance ?? 0;
 
-    this.volleyBurstSize = config.volleyBurstSize ?? defaults.volleyBurstSize ?? 5;
-    this.volleyShotDelay = config.volleyShotDelay ?? defaults.volleyShotDelay ?? 0.16;
-    this.volleyInterval = config.volleyInterval ?? defaults.volleyInterval ?? 1.35;
-    this.volleyIntervalVariance = config.volleyVariance ?? defaults.volleyVariance ?? 0;
+    this.volleyBurstSize =
+      config.volleyBurstSize ?? defaults.volleyBurstSize ?? 5;
+    this.volleyShotDelay =
+      config.volleyShotDelay ?? defaults.volleyShotDelay ?? 0.16;
+    this.volleyInterval =
+      config.volleyInterval ?? defaults.volleyInterval ?? 1.35;
+    this.volleyIntervalVariance =
+      config.volleyVariance ?? defaults.volleyVariance ?? 0;
     this.volleyProjectileSpeed =
       config.volleyProjectileSpeed ?? defaults.volleyProjectileSpeed ?? 320;
     this.volleySpread = config.volleySpread ?? defaults.volleySpread ?? 0.12;
 
-    this.minionTypes = Array.isArray(config.minionTypes) && config.minionTypes.length
-      ? [...config.minionTypes]
-      : [...(defaults.minionTypes || ['drone'])];
+    this.minionTypes =
+      Array.isArray(config.minionTypes) && config.minionTypes.length
+        ? [...config.minionTypes]
+        : [...(defaults.minionTypes || ['drone'])];
     this.spawnInterval = config.spawnInterval ?? defaults.spawnInterval ?? 6.5;
     this.spawnVariance = config.spawnVariance ?? defaults.spawnVariance ?? 0;
 
-    this.chargeCooldown = config.chargeCooldown ?? defaults.chargeCooldown ?? 6.2;
-    this.chargeDuration = config.chargeDuration ?? defaults.chargeDuration ?? 1.1;
-    this.chargeRecovery = config.chargeRecovery ?? defaults.chargeRecovery ?? 1.4;
+    this.chargeCooldown =
+      config.chargeCooldown ?? defaults.chargeCooldown ?? 6.2;
+    this.chargeDuration =
+      config.chargeDuration ?? defaults.chargeDuration ?? 1.1;
+    this.chargeRecovery =
+      config.chargeRecovery ?? defaults.chargeRecovery ?? 1.4;
     this.chargeSpeedMultiplier =
       config.chargeSpeedMultiplier ?? defaults.chargeSpeedMultiplier ?? 3.1;
     this.chargeProjectileCount =
@@ -241,14 +261,16 @@ export class BossEnemy extends BaseEnemy {
       config.chargeProjectileSpeed ?? defaults.chargeProjectileSpeed ?? 420;
     this.chargeProjectileVariance =
       config.chargeProjectileVariance ?? defaults.chargeProjectileVariance ?? 0;
-    this.chargeAimVariance = config.chargeAimVariance ?? defaults.chargeAimVariance ?? 0;
+    this.chargeAimVariance =
+      config.chargeAimVariance ?? defaults.chargeAimVariance ?? 0;
 
     this.invulnerabilityDuration =
       config.invulnerabilityDuration ?? defaults.invulnerabilityDuration ?? 2;
 
-    this.phaseColors = Array.isArray(config.phaseColors) && config.phaseColors.length
-      ? [...config.phaseColors]
-      : [...(defaults.phaseColors || ['#ff6b6b'])];
+    this.phaseColors =
+      Array.isArray(config.phaseColors) && config.phaseColors.length
+        ? [...config.phaseColors]
+        : [...(defaults.phaseColors || ['#ff6b6b'])];
 
     this.rewards = {
       ...defaults.rewards,
@@ -271,12 +293,14 @@ export class BossEnemy extends BaseEnemy {
       ? [...thresholds].filter((value) => Number.isFinite(value))
       : [];
     this.phaseThresholds.sort((a, b) => b - a);
-    this.phaseHealthThresholds = this.phaseThresholds.map((ratio) =>
-      this.maxHealth * Math.min(Math.max(ratio, 0), 1)
+    this.phaseHealthThresholds = this.phaseThresholds.map(
+      (ratio) => this.maxHealth * Math.min(Math.max(ratio, 0), 1)
     );
     this.phaseCount = Math.max(
       1,
-      config.phaseCount ?? defaults.phaseCount ?? this.phaseThresholds.length + 1
+      config.phaseCount ??
+        defaults.phaseCount ??
+        this.phaseThresholds.length + 1
     );
     this.currentPhase = 0;
     this.nextPhaseIndex = 0;
@@ -451,7 +475,9 @@ export class BossEnemy extends BaseEnemy {
       this.emitInvulnerabilityState(false, {
         reason: 'timer-expired',
         timer: 0,
-        previous: Number.isFinite(oldTimer) ? Number(oldTimer.toFixed(3)) : oldTimer,
+        previous: Number.isFinite(oldTimer)
+          ? Number(oldTimer.toFixed(3))
+          : oldTimer,
         force: true,
       });
     } else if (!this._invulnLog || Date.now() - this._invulnLog > 500) {
@@ -469,8 +495,8 @@ export class BossEnemy extends BaseEnemy {
     const timer = Number.isFinite(context.timer)
       ? Math.max(0, Number(context.timer))
       : Number.isFinite(this.invulnerabilityTimer)
-      ? Math.max(0, Number(this.invulnerabilityTimer))
-      : null;
+        ? Math.max(0, Number(this.invulnerabilityTimer))
+        : null;
 
     if (!force && this._lastInvulnerabilityState === invulnerable) {
       return;
@@ -624,7 +650,8 @@ export class BossEnemy extends BaseEnemy {
     const step = count > 1 ? arc / (count - 1) : 0;
 
     for (let i = 0; i < count; i += 1) {
-      const angle = startAngle + step * i + this.sampleVariance(this.spreadAngleVariance);
+      const angle =
+        startAngle + step * i + this.sampleVariance(this.spreadAngleVariance);
       this.emitBossProjectile({
         angle,
         speed: this.spreadProjectileSpeed,
@@ -710,11 +737,17 @@ export class BossEnemy extends BaseEnemy {
     let minion = null;
 
     // Special handling for asteroid type
-    if (type === 'asteroid' && typeof this.system.acquireAsteroid === 'function') {
+    if (
+      type === 'asteroid' &&
+      typeof this.system.acquireAsteroid === 'function'
+    ) {
       minion = this.system.acquireAsteroid(spawnConfig);
     } else if (typeof this.system.acquireEnemyViaFactory === 'function') {
       // Check if factory has the type registered
-      if (this.system.factory && typeof this.system.factory.hasType === 'function') {
+      if (
+        this.system.factory &&
+        typeof this.system.factory.hasType === 'function'
+      ) {
         if (!this.system.factory.hasType(type)) {
           console.warn(
             `[BossEnemy] Minion type '${type}' not registered in factory. Minion spawn skipped.`
@@ -764,7 +797,10 @@ export class BossEnemy extends BaseEnemy {
         minion?.[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')] === true;
       let registered = factoryRegistered;
 
-      if (!registered && typeof this.system.registerActiveEnemy === 'function') {
+      if (
+        !registered &&
+        typeof this.system.registerActiveEnemy === 'function'
+      ) {
         registered = Boolean(
           this.system.registerActiveEnemy(minion, { skipDuplicateCheck: true })
         );
@@ -777,13 +813,16 @@ export class BossEnemy extends BaseEnemy {
           bossId: this.id,
           wave: this.wave,
           minionType: type,
-          hasRegisterFunction: typeof this.system.registerActiveEnemy === 'function',
+          hasRegisterFunction:
+            typeof this.system.registerActiveEnemy === 'function',
         });
         return;
       }
 
-      if (this.system.waveManager &&
-          typeof this.system.waveManager.registerDynamicMinion === 'function') {
+      if (
+        this.system.waveManager &&
+        typeof this.system.waveManager.registerDynamicMinion === 'function'
+      ) {
         this.system.waveManager.registerDynamicMinion(minion, {
           bossId: this.id,
           minionType: type,
@@ -825,7 +864,9 @@ export class BossEnemy extends BaseEnemy {
         : player?.position || null;
 
     if (
-      (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) &&
+      (!position ||
+        !Number.isFinite(position.x) ||
+        !Number.isFinite(position.y)) &&
       player &&
       Number.isFinite(player.x) &&
       Number.isFinite(player.y)
@@ -834,7 +875,9 @@ export class BossEnemy extends BaseEnemy {
     }
 
     if (
-      (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) &&
+      (!position ||
+        !Number.isFinite(position.x) ||
+        !Number.isFinite(position.y)) &&
       player &&
       player.position &&
       Number.isFinite(player.position.x) &&
@@ -864,9 +907,13 @@ export class BossEnemy extends BaseEnemy {
       );
       this._missingPlayerReferenceLogged = true;
     } else if (player && this._missingPlayerReferenceLogged) {
-      GameDebugLogger.log('STATE', 'Boss resolvePlayerTarget player reference restored', {
-        playerPosition: position || player?.position || null,
-      });
+      GameDebugLogger.log(
+        'STATE',
+        'Boss resolvePlayerTarget player reference restored',
+        {
+          playerPosition: position || player?.position || null,
+        }
+      );
       this._missingPlayerReferenceLogged = false;
     }
 
@@ -883,12 +930,18 @@ export class BossEnemy extends BaseEnemy {
 
   computeSpreadInterval() {
     const base = Math.max(0.6, this.spreadInterval || 0);
-    return Math.max(0.45, base + this.sampleVariance(this.spreadIntervalVariance));
+    return Math.max(
+      0.45,
+      base + this.sampleVariance(this.spreadIntervalVariance)
+    );
   }
 
   computeVolleyInterval() {
     const base = Math.max(0.45, this.volleyInterval || 0);
-    return Math.max(0.3, base + this.sampleVariance(this.volleyIntervalVariance));
+    return Math.max(
+      0.3,
+      base + this.sampleVariance(this.volleyIntervalVariance)
+    );
   }
 
   computeSpawnInterval() {
@@ -1076,7 +1129,9 @@ export class BossEnemy extends BaseEnemy {
 
   onDraw(ctx) {
     if (!this.useComponents || !this.components?.size) {
-      console.error('[BossEnemy] Components not initialized. Boss cannot render.');
+      console.error(
+        '[BossEnemy] Components not initialized. Boss cannot render.'
+      );
       return;
     }
 
@@ -1086,7 +1141,9 @@ export class BossEnemy extends BaseEnemy {
 
   buildRenderPayload() {
     const phase = Math.max(0, Math.min(this.currentPhase, this.phaseCount - 1));
-    const pulse = this.invulnerable ? 1 + Math.sin(this.age * 9) * 0.12 : 1 + Math.sin(this.age * 4) * 0.08;
+    const pulse = this.invulnerable
+      ? 1 + Math.sin(this.age * 9) * 0.12
+      : 1 + Math.sin(this.age * 4) * 0.08;
 
     return {
       type: this.type,

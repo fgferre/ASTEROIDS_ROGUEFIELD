@@ -65,11 +65,14 @@ export class SpatialHash {
       queries: 0,
       cellHits: 0,
       objectChecks: 0,
-      dynamicResizes: 0
+      dynamicResizes: 0,
     };
 
     // Development debugging
-    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+    if (
+      typeof window !== 'undefined' &&
+      process.env.NODE_ENV === 'development'
+    ) {
       if (!window.__spatialHashes) {
         window.__spatialHashes = [];
       }
@@ -97,7 +100,11 @@ export class SpatialHash {
 
     // Store object metadata
     this.objects.set(object, {
-      x, y, radius, bounds, cells: new Set(cells)
+      x,
+      y,
+      radius,
+      bounds,
+      cells: new Set(cells),
     });
 
     // Add to grid cells
@@ -112,7 +119,10 @@ export class SpatialHash {
     this.stats.insertions++;
 
     // Check for dynamic resize periodically
-    if (this.dynamicResize && performance.now() - this.lastResizeCheck > this.resizeCheckInterval) {
+    if (
+      this.dynamicResize &&
+      performance.now() - this.lastResizeCheck > this.resizeCheckInterval
+    ) {
       this.checkDynamicResize();
     }
 
@@ -173,8 +183,9 @@ export class SpatialHash {
 
     // Check if object moved to different cells
     const oldCells = objectData.cells;
-    const cellsChanged = oldCells.size !== newCellSet.size ||
-      [...oldCells].some(cell => !newCellSet.has(cell));
+    const cellsChanged =
+      oldCells.size !== newCellSet.size ||
+      [...oldCells].some((cell) => !newCellSet.has(cell));
 
     if (cellsChanged) {
       // Remove from old cells
@@ -257,8 +268,9 @@ export class SpatialHash {
       return Array.from(results.keys());
     }
 
-    const sortedEntries = Array.from(results.entries())
-      .sort((a, b) => a[1] - b[1]);
+    const sortedEntries = Array.from(results.entries()).sort(
+      (a, b) => a[1] - b[1]
+    );
 
     const objects = sortedEntries.map(([object]) => object);
 
@@ -288,7 +300,7 @@ export class SpatialHash {
     const distance = Math.sqrt(dx * dx + dy * dy);
 
     // Check if distance is less than sum of radii
-    return distance < (dataA.radius + dataB.radius);
+    return distance < dataA.radius + dataB.radius;
   }
 
   /**
@@ -394,7 +406,7 @@ export class SpatialHash {
       minX: x - radius,
       minY: y - radius,
       maxX: x + radius,
-      maxY: y + radius
+      maxY: y + radius,
     };
   }
 
@@ -431,10 +443,12 @@ export class SpatialHash {
    * @returns {boolean} True if bounds intersect
    */
   boundsIntersect(boundsA, boundsB) {
-    return !(boundsA.maxX < boundsB.minX ||
-             boundsB.maxX < boundsA.minX ||
-             boundsA.maxY < boundsB.minY ||
-             boundsB.maxY < boundsA.minY);
+    return !(
+      boundsA.maxX < boundsB.minX ||
+      boundsB.maxX < boundsA.minX ||
+      boundsA.maxY < boundsB.minY ||
+      boundsB.maxY < boundsA.minY
+    );
   }
 
   /**
@@ -495,7 +509,9 @@ export class SpatialHash {
     this.stats.dynamicResizes++;
 
     if (process.env.NODE_ENV === 'development') {
-      console.debug(`[SpatialHash] Resized to cell size ${newCellSize} (objects: ${this.objectCount})`);
+      console.debug(
+        `[SpatialHash] Resized to cell size ${newCellSize} (objects: ${this.objectCount})`
+      );
     }
   }
 
@@ -506,26 +522,34 @@ export class SpatialHash {
    */
   getStats() {
     const activeCells = this.grid.size;
-    const totalCellObjects = Array.from(this.grid.values())
-      .reduce((sum, cell) => sum + cell.size, 0);
+    const totalCellObjects = Array.from(this.grid.values()).reduce(
+      (sum, cell) => sum + cell.size,
+      0
+    );
 
     return {
       objectCount: this.objectCount,
       activeCells,
       cellSize: this.cellSize,
-      avgObjectsPerCell: activeCells > 0 ? (totalCellObjects / activeCells).toFixed(2) : 0,
+      avgObjectsPerCell:
+        activeCells > 0 ? (totalCellObjects / activeCells).toFixed(2) : 0,
       memoryUsage: {
         gridCells: this.grid.size,
         objectEntries: this.objects.size,
-        dirtyCells: this.dirtyCells.size
+        dirtyCells: this.dirtyCells.size,
       },
       performance: { ...this.stats },
       efficiency: {
-        queryHitRate: this.stats.queries > 0 ?
-          ((this.stats.cellHits / this.stats.queries) * 100).toFixed(1) + '%' : '0%',
-        avgChecksPerQuery: this.stats.queries > 0 ?
-          (this.stats.objectChecks / this.stats.queries).toFixed(1) : '0'
-      }
+        queryHitRate:
+          this.stats.queries > 0
+            ? ((this.stats.cellHits / this.stats.queries) * 100).toFixed(1) +
+              '%'
+            : '0%',
+        avgChecksPerQuery:
+          this.stats.queries > 0
+            ? (this.stats.objectChecks / this.stats.queries).toFixed(1)
+            : '0',
+      },
     };
   }
 
@@ -550,7 +574,9 @@ export class SpatialHash {
     actualObjectCount = objectsInCells.size;
 
     if (actualObjectCount !== this.objectCount) {
-      errors.push(`Object count mismatch: stored ${this.objectCount}, actual ${actualObjectCount}`);
+      errors.push(
+        `Object count mismatch: stored ${this.objectCount}, actual ${actualObjectCount}`
+      );
     }
 
     // Check object metadata consistency
@@ -563,8 +589,10 @@ export class SpatialHash {
       const expectedCells = this.getCellsForBounds(data.bounds);
       const actualCells = Array.from(data.cells);
 
-      if (expectedCells.length !== actualCells.length ||
-          expectedCells.some(cell => !data.cells.has(cell))) {
+      if (
+        expectedCells.length !== actualCells.length ||
+        expectedCells.some((cell) => !data.cells.has(cell))
+      ) {
         errors.push(`Object in wrong cells: ${object}`);
       }
     }
@@ -572,7 +600,7 @@ export class SpatialHash {
     return {
       valid: errors.length === 0,
       errors,
-      stats: this.getStats()
+      stats: this.getStats(),
     };
   }
 
@@ -591,7 +619,9 @@ export class SpatialHash {
 if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
   window.__spatialHashDebug = {
     getAllHashes: () => window.__spatialHashes || [],
-    getHashStats: () => (window.__spatialHashes || []).map(hash => hash.getStats()),
-    validateAllHashes: () => (window.__spatialHashes || []).map(hash => hash.validate())
+    getHashStats: () =>
+      (window.__spatialHashes || []).map((hash) => hash.getStats()),
+    validateAllHashes: () =>
+      (window.__spatialHashes || []).map((hash) => hash.validate()),
   };
 }

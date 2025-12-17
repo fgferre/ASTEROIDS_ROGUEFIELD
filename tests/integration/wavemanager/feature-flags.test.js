@@ -1,7 +1,10 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as CONSTANTS from '../../../src/core/GameConstants.js';
 import { GamePools } from '../../../src/core/GamePools.js';
-import { setupGlobalMocks, cleanupGlobalState } from '../../__helpers__/setup.js';
+import {
+  setupGlobalMocks,
+  cleanupGlobalState,
+} from '../../__helpers__/setup.js';
 import {
   createEnemySystemHarness,
   simulateWave,
@@ -36,9 +39,7 @@ describe('WaveManager Integration - Feature Flags', () => {
       expect(CONSTANTS.USE_WAVE_MANAGER).toBe(true);
 
       const previousOverride = globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
-      const legacySpies = [
-        vi.spyOn(harness.enemySystem, 'updateWaveLogic'),
-      ];
+      const legacySpies = [vi.spyOn(harness.enemySystem, 'updateWaveLogic')];
       const waveManagerSpies = [
         vi.spyOn(harness.enemySystem, 'updateWaveManagerLogic'),
       ];
@@ -81,13 +82,11 @@ describe('WaveManager Integration - Feature Flags', () => {
     test('EnemySystem gracefully handles missing WaveManager', () => {
       const originalDescriptor = Object.getOwnPropertyDescriptor(
         CONSTANTS,
-        'USE_WAVE_MANAGER',
+        'USE_WAVE_MANAGER'
       );
 
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const legacySpies = [
-        vi.spyOn(harness.enemySystem, 'updateWaveLogic'),
-      ];
+      const legacySpies = [vi.spyOn(harness.enemySystem, 'updateWaveLogic')];
       if (harness.enemySystem.updateSystem) {
         legacySpies.push(
           vi.spyOn(harness.enemySystem.updateSystem, 'updateWaveLogic')
@@ -112,12 +111,16 @@ describe('WaveManager Integration - Feature Flags', () => {
         expect(legacyCalled).toBe(true);
 
         const warningEmitted = warnSpy.mock.calls.some(([message]) =>
-          String(message).includes('WaveManager indisponível'),
+          String(message).includes('WaveManager indisponível')
         );
         expect(warningEmitted).toBe(true);
       } finally {
         if (originalDescriptor && originalDescriptor.configurable) {
-          Object.defineProperty(CONSTANTS, 'USE_WAVE_MANAGER', originalDescriptor);
+          Object.defineProperty(
+            CONSTANTS,
+            'USE_WAVE_MANAGER',
+            originalDescriptor
+          );
         }
 
         delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
@@ -201,9 +204,11 @@ describe('WaveManager Integration - Feature Flags', () => {
         expect(spawnedAsteroids.length).toBeGreaterThan(0);
         expect(spawnedAsteroids.length).toBe(spawnTarget);
 
-        expect(enemySystem.waveManager.totalEnemiesThisWave).toBe(spawnedAsteroids.length);
+        expect(enemySystem.waveManager.totalEnemiesThisWave).toBe(
+          spawnedAsteroids.length
+        );
         expect(enemySystem.waveManager.enemiesSpawnedThisWave).toBe(
-          spawnedAsteroids.length,
+          spawnedAsteroids.length
         );
         enemySystem.waveState.totalAsteroids = spawnTarget;
 
@@ -214,7 +219,7 @@ describe('WaveManager Integration - Feature Flags', () => {
         });
 
         expect(enemySystem.waveManager.enemiesKilledThisWave).toBe(
-          spawnedAsteroids.length,
+          spawnedAsteroids.length
         );
         expect(enemySystem.getActiveEnemyCount()).toBe(0);
 
@@ -224,16 +229,18 @@ describe('WaveManager Integration - Feature Flags', () => {
 
         expect(completionPayload?.wave).toBe(currentWave);
         expect(enemySystem.waveState.isActive).toBe(false);
-        expect(enemySystem.waveState.breakTimer).toBe(CONSTANTS.WAVE_BREAK_TIME);
+        expect(enemySystem.waveState.breakTimer).toBe(
+          CONSTANTS.WAVE_BREAK_TIME
+        );
         expect(enemySystem.waveState.completedWaves).toBe(1);
 
         const waveCompleteEmits = emitSpy.mock.calls.filter(
-          ([eventName]) => eventName === 'wave-complete',
+          ([eventName]) => eventName === 'wave-complete'
         );
         expect(waveCompleteEmits.length).toBeGreaterThan(0);
 
         const waveCompletedEmits = emitSpy.mock.calls.filter(
-          ([eventName]) => eventName === 'wave-completed',
+          ([eventName]) => eventName === 'wave-completed'
         );
         expect(waveCompletedEmits.length).toBe(0);
         expect(legacyListener).not.toHaveBeenCalled();
@@ -266,13 +273,17 @@ describe('WaveManager Integration - Feature Flags', () => {
 
         harness.enemySystem.update(0.25);
 
-        expect(harness.enemySystem.waveManager.update).toHaveBeenCalledWith(0.25);
+        expect(harness.enemySystem.waveManager.update).toHaveBeenCalledWith(
+          0.25
+        );
 
         const syncedState = harness.enemySystem.waveState;
         expect(syncedState.current).not.toBe(initialWaveState.current);
         expect(syncedState.current).toBe(stubState.currentWave);
         expect(syncedState.isActive).toBe(stubState.inProgress);
-        const managerHandlesSpawn = Boolean(CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN);
+        const managerHandlesSpawn = Boolean(
+          CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN
+        );
 
         if (managerHandlesSpawn) {
           expect(syncedState.asteroidsSpawned).toBe(stubState.spawned);

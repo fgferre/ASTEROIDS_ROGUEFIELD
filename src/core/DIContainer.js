@@ -85,7 +85,7 @@ export class DIContainer {
       getLegacyCalls: 0,
       getContainerCalls: 0,
       directRegistrations: 0,
-      uniqueCallers: new Set()
+      uniqueCallers: new Set(),
     };
 
     if (this.verbose) {
@@ -131,15 +131,13 @@ export class DIContainer {
     }
 
     // Parse options
-    const {
-      dependencies = [],
-      singleton = true,
-      lazy = true
-    } = options;
+    const { dependencies = [], singleton = true, lazy = true } = options;
 
     // Validate dependencies
     if (!Array.isArray(dependencies)) {
-      throw new Error(`[DIContainer] Dependencies for '${name}' must be an array`);
+      throw new Error(
+        `[DIContainer] Dependencies for '${name}' must be an array`
+      );
     }
 
     // Store factory configuration
@@ -147,7 +145,7 @@ export class DIContainer {
       factory,
       dependencies,
       singleton,
-      lazy
+      lazy,
     });
 
     // Update dependency graph
@@ -157,7 +155,8 @@ export class DIContainer {
     this.stats.registrations++;
 
     if (this.verbose) {
-      const depsStr = dependencies.length > 0 ? ` (deps: ${dependencies.join(', ')})` : '';
+      const depsStr =
+        dependencies.length > 0 ? ` (deps: ${dependencies.join(', ')})` : '';
       console.log(`[DIContainer] Registered '${name}'${depsStr}`);
     }
 
@@ -166,7 +165,10 @@ export class DIContainer {
       try {
         this.resolve(name);
       } catch (error) {
-        console.error(`[DIContainer] Failed to eagerly initialize '${name}':`, error);
+        console.error(
+          `[DIContainer] Failed to eagerly initialize '${name}':`,
+          error
+        );
       }
     }
 
@@ -187,7 +189,7 @@ export class DIContainer {
     if (this.showDeprecationWarnings) {
       console.warn(
         `[DEPRECATED] gameServices.register('${name}', instance) - ` +
-        `Use DIContainer factory registration instead`
+          `Use DIContainer factory registration instead`
       );
     }
 
@@ -207,7 +209,9 @@ export class DIContainer {
 
     // Store in legacy map
     if (this.legacyServices.has(name)) {
-      console.warn(`[DIContainer] Service '${name}' already exists. Overwriting.`);
+      console.warn(
+        `[DIContainer] Service '${name}' already exists. Overwriting.`
+      );
     }
 
     this.legacyServices.set(name, instance);
@@ -257,7 +261,7 @@ export class DIContainer {
 
     try {
       // Resolve all dependencies first
-      const resolvedDeps = config.dependencies.map(depName => {
+      const resolvedDeps = config.dependencies.map((depName) => {
         try {
           return this.resolve(depName);
         } catch (error) {
@@ -271,7 +275,9 @@ export class DIContainer {
       const instance = config.factory(...resolvedDeps);
 
       if (instance === null || instance === undefined) {
-        throw new Error(`[DIContainer] Factory for '${name}' returned null/undefined`);
+        throw new Error(
+          `[DIContainer] Factory for '${name}' returned null/undefined`
+        );
       }
 
       // Cache if singleton
@@ -283,16 +289,16 @@ export class DIContainer {
       this.stats.resolutions++;
 
       if (this.verbose) {
-        console.log(`[DIContainer] Resolved '${name}' (singleton: ${config.singleton})`);
+        console.log(
+          `[DIContainer] Resolved '${name}' (singleton: ${config.singleton})`
+        );
       }
 
       return instance;
-
     } catch (error) {
       // Log error with context
       console.error(`[DIContainer] Error resolving '${name}':`, error);
       throw error;
-
     } finally {
       // Always remove from initializing set
       this.initializing.delete(name);
@@ -302,7 +308,7 @@ export class DIContainer {
   /**
    * Gets a service by name (backward compatible with ServiceLocator).
    * Checks legacy services first, then resolves from DI container.
-  */
+   */
   get(name) {
     // Track caller for migration metrics (dev-only to avoid prod overhead)
     let caller = null;
@@ -388,7 +394,9 @@ export class DIContainer {
     }
 
     if (instance === null || instance === undefined) {
-      throw new Error(`[DIContainer] Cannot sync null/undefined instance for '${name}'`);
+      throw new Error(
+        `[DIContainer] Cannot sync null/undefined instance for '${name}'`
+      );
     }
 
     let syncedWithContainer = false;
@@ -402,11 +410,15 @@ export class DIContainer {
         this.singletons.set(name, instance);
         syncedWithContainer = true;
         if (this.verbose) {
-          console.log(`[DIContainer] Synced legacy instance '${name}' (replaced singleton)`);
+          console.log(
+            `[DIContainer] Synced legacy instance '${name}' (replaced singleton)`
+          );
         }
       } else {
         // Cannot sync transient service - would override factory behavior
-        console.warn(`[DIContainer] Cannot sync legacy instance for transient service '${name}'`);
+        console.warn(
+          `[DIContainer] Cannot sync legacy instance for transient service '${name}'`
+        );
       }
     } else {
       // If not registered, create factory placeholder
@@ -414,7 +426,7 @@ export class DIContainer {
         factory: () => instance,
         dependencies: [],
         singleton: true,
-        lazy: false
+        lazy: false,
       });
 
       this.singletons.set(name, instance);
@@ -423,7 +435,9 @@ export class DIContainer {
       syncedWithContainer = true;
 
       if (this.verbose) {
-        console.log(`[DIContainer] Synced legacy instance '${name}' (new registration)`);
+        console.log(
+          `[DIContainer] Synced legacy instance '${name}' (new registration)`
+        );
       }
     }
 
@@ -446,8 +460,8 @@ export class DIContainer {
     const callerInfo = caller ? ` (called from: ${caller})` : '';
     console.warn(
       `%c[DEPRECATED]%c gameServices.get('${serviceName}')${callerInfo}\n` +
-      `Migrate to constructor injection instead:\n` +
-      `  constructor(${serviceName}) { this.${serviceName} = ${serviceName}; }`,
+        `Migrate to constructor injection instead:\n` +
+        `  constructor(${serviceName}) { this.${serviceName} = ${serviceName}; }`,
       'color: orange; font-weight: bold',
       'color: inherit'
     );
@@ -489,11 +503,15 @@ export class DIContainer {
     const config = this.factories.get(name);
 
     if (!config) {
-      throw new Error(`[DIContainer] Cannot replace '${name}': service not registered`);
+      throw new Error(
+        `[DIContainer] Cannot replace '${name}': service not registered`
+      );
     }
 
     if (!config.singleton) {
-      throw new Error(`[DIContainer] Cannot replace '${name}': not a singleton`);
+      throw new Error(
+        `[DIContainer] Cannot replace '${name}': not a singleton`
+      );
     }
 
     this.singletons.set(name, instance);
@@ -573,7 +591,7 @@ export class DIContainer {
       name,
       dependencies: config.dependencies,
       singleton: config.singleton,
-      instantiated: this.singletons.has(name)
+      instantiated: this.singletons.has(name),
     };
   }
 
@@ -590,7 +608,9 @@ export class DIContainer {
     for (const [serviceName, deps] of this.dependencyGraph.entries()) {
       for (const dep of deps) {
         if (!this.factories.has(dep)) {
-          errors.push(`Service '${serviceName}' depends on unregistered service '${dep}'`);
+          errors.push(
+            `Service '${serviceName}' depends on unregistered service '${dep}'`
+          );
         }
       }
     }
@@ -627,12 +647,14 @@ export class DIContainer {
     // Check for unused services (no dependents)
     const allDeps = new Set();
     for (const deps of this.dependencyGraph.values()) {
-      deps.forEach(dep => allDeps.add(dep));
+      deps.forEach((dep) => allDeps.add(dep));
     }
 
     for (const serviceName of this.factories.keys()) {
       if (!allDeps.has(serviceName)) {
-        warnings.push(`Service '${serviceName}' has no dependents (root service)`);
+        warnings.push(
+          `Service '${serviceName}' has no dependents (root service)`
+        );
       }
     }
 
@@ -641,7 +663,7 @@ export class DIContainer {
       errors,
       warnings,
       services: this.factories.size,
-      instantiated: this.singletons.size
+      instantiated: this.singletons.size,
     };
   }
 
@@ -676,25 +698,29 @@ export class DIContainer {
    */
   getStats() {
     const totalCalls = this.stats.getLegacyCalls + this.stats.getContainerCalls;
-    const migrationProgress = totalCalls > 0
-      ? ((this.stats.getContainerCalls / totalCalls) * 100).toFixed(1)
-      : '0';
+    const migrationProgress =
+      totalCalls > 0
+        ? ((this.stats.getContainerCalls / totalCalls) * 100).toFixed(1)
+        : '0';
 
     return {
       ...this.stats,
       totalServices: this.factories.size,
       instantiatedServices: this.singletons.size,
       legacyServicesRemaining: this.legacyServices.size,
-      hitRate: this.stats.resolutions > 0
-        ? ((this.stats.singletonHits / this.stats.resolutions) * 100).toFixed(1) + '%'
-        : '0%',
+      hitRate:
+        this.stats.resolutions > 0
+          ? ((this.stats.singletonHits / this.stats.resolutions) * 100).toFixed(
+              1
+            ) + '%'
+          : '0%',
       // Legacy compatibility stats
       totalGetCalls: totalCalls,
       legacyServiceCalls: this.stats.getLegacyCalls,
       containerServiceCalls: this.stats.getContainerCalls,
       directRegistrations: this.stats.directRegistrations,
       uniqueCallers: this.stats.uniqueCallers.size,
-      migrationProgress: `${migrationProgress}%`
+      migrationProgress: `${migrationProgress}%`,
     };
   }
 
@@ -713,13 +739,13 @@ export class DIContainer {
       legacyServices,
       containerServices,
       recommendations: [],
-      services: services.map(name => ({
+      services: services.map((name) => ({
         name,
         registered: this.has(name),
         instantiated: this.isInstantiated(name),
         dependencies: this.getDependencies(name)?.dependencies || [],
-        singleton: this.factories.get(name)?.singleton || false
-      }))
+        singleton: this.factories.get(name)?.singleton || false,
+      })),
     };
 
     // Generate recommendations
@@ -728,7 +754,7 @@ export class DIContainer {
         type: 'migrate-legacy',
         priority: 'high',
         message: `${legacyServices.length} legacy service(s) should be migrated to DI container`,
-        services: legacyServices
+        services: legacyServices,
       });
     }
 
@@ -737,7 +763,7 @@ export class DIContainer {
         type: 'refactor-callers',
         priority: 'medium',
         message: `${this.stats.uniqueCallers.size} location(s) still use gameServices.get()`,
-        locations: Array.from(this.stats.uniqueCallers)
+        locations: Array.from(this.stats.uniqueCallers),
       });
     }
 
@@ -746,7 +772,7 @@ export class DIContainer {
       report.recommendations.push({
         type: 'migration-complete',
         priority: 'low',
-        message: 'Migration complete! All services use DI container'
+        message: 'Migration complete! All services use DI container',
       });
     }
 
@@ -787,9 +813,10 @@ export class DIContainer {
     console.group('📦 Factory-Based Services');
     for (const [name, config] of this.factories.entries()) {
       const instantiated = this.singletons.has(name) ? '✅' : '⏳';
-      const depsStr = config.dependencies.length > 0
-        ? ` → [${config.dependencies.join(', ')}]`
-        : ' (no deps)';
+      const depsStr =
+        config.dependencies.length > 0
+          ? ` → [${config.dependencies.join(', ')}]`
+          : ' (no deps)';
       console.log(`${instantiated} ${name}${depsStr}`);
     }
     console.groupEnd();
@@ -803,21 +830,26 @@ export class DIContainer {
     const validation = this.validate();
     if (validation.errors.length > 0) {
       console.group('⚠️ Validation Errors');
-      validation.errors.forEach(err => console.error(err));
+      validation.errors.forEach((err) => console.error(err));
       console.groupEnd();
     }
 
     if (validation.warnings.length > 0) {
       console.group('⚡ Warnings');
-      validation.warnings.forEach(warn => console.warn(warn));
+      validation.warnings.forEach((warn) => console.warn(warn));
       console.groupEnd();
     }
 
     const report = this.getMigrationReport();
     if (report.recommendations.length > 0) {
       console.group('💡 Migration Recommendations');
-      report.recommendations.forEach(rec => {
-        const emoji = rec.priority === 'high' ? '🔴' : rec.priority === 'medium' ? '🟡' : '🟢';
+      report.recommendations.forEach((rec) => {
+        const emoji =
+          rec.priority === 'high'
+            ? '🔴'
+            : rec.priority === 'medium'
+              ? '🟡'
+              : '🟢';
         console.log(`${emoji} [${rec.priority}] ${rec.message}`);
       });
       console.groupEnd();
@@ -834,7 +866,7 @@ if (typeof window !== 'undefined' && DEV_MODE) {
     validate: () => window.diContainer?.validate(),
     debugLog: () => window.diContainer?.debugLog(),
     generateGraph: () => window.diContainer?.generateDependencyGraph(),
-    getMigrationReport: () => window.diContainer?.getMigrationReport()
+    getMigrationReport: () => window.diContainer?.getMigrationReport(),
   };
 
   // Alias for backward compatibility

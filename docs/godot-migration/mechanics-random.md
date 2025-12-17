@@ -10,28 +10,33 @@
 ## 1. Visão Geral do Sistema
 
 ### Conceito
+
 O sistema de randomness do ASTEROIDS_ROGUEFIELD é um **RNG (Random Number Generator) determinístico** baseado em seeds que garante **reprodutibilidade total** de gameplay. Isso significa que, dada a mesma seed inicial e a mesma sequência de inputs do jogador, o jogo sempre produzirá exatamente os mesmos resultados.
 
 ### Características Principais
 
 **Deterministic Replay:**
+
 - Mesma seed + mesmos inputs = mesma sequência de eventos
 - Útil para debugging (reproduzir bugs exatamente)
 - Útil para balancing (testar mudanças com mesma sequência)
 - Útil para replay (compartilhar runs com outros jogadores)
 
 **Fork System:**
+
 - Cada subsistema tem seu próprio fork de RNG (independente)
 - Master RNG não é afetado por calls dos forks
 - Derived seeds garantem independência e reprodutibilidade
 - Scope labels identificam cada fork ("wave:spawn", "upgrades.selection")
 
 **Serialization:**
+
 - Save/load completo de RNG state para retry system
 - Snapshot inclui: seed, state interno, estatísticas de uso
 - Integração com death snapshot para retry após morte
 
 **Propósitos:**
+
 1. **Debugging**: Reproduzir bugs exatamente com mesma seed
 2. **Balancing**: Testar mudanças de design com mesma sequência
 3. **Replay**: Compartilhar runs interessantes
@@ -88,24 +93,24 @@ func _init(initial_seed: int = Time.get_ticks_msec()) -> void:
 
 ### Constantes do Sistema
 
-| Constante | Valor | Descrição |
-|-----------|-------|-----------|
-| `UINT32_MAX` | 0xFFFFFFFF | Máximo valor uint32 (4,294,967,295) |
-| `UINT32_FACTOR` | 1 / (2^32) | Fator de conversão para [0,1) |
-| `SEED_HISTORY_LIMIT` | 10 | Tamanho do histórico de seeds (FIFO) |
-| `MULBERRY32_MAGIC` | 0x6d2b79f5 | Constante mágica do Mulberry32 algorithm |
+| Constante            | Valor      | Descrição                                |
+| -------------------- | ---------- | ---------------------------------------- |
+| `UINT32_MAX`         | 0xFFFFFFFF | Máximo valor uint32 (4,294,967,295)      |
+| `UINT32_FACTOR`      | 1 / (2^32) | Fator de conversão para [0,1)            |
+| `SEED_HISTORY_LIMIT` | 10         | Tamanho do histórico de seeds (FIFO)     |
+| `MULBERRY32_MAGIC`   | 0x6d2b79f5 | Constante mágica do Mulberry32 algorithm |
 
 ### Mapeamento JS → GDScript
 
-| JavaScript | GDScript | Notas |
-|------------|----------|-------|
-| `class RandomService` | `class_name RandomService extends RefCounted` | RefCounted para auto-cleanup |
-| `this.seed` | `var seed: int` | Seed inicial |
-| `this._state` | `var _state: int` | Estado interno privado |
-| `this._stats` | `var _stats: Dictionary` | Stats de uso |
-| `Map<string, number>` | `Dictionary` | Godot usa Dictionary |
-| `>>> 0` (unsigned shift) | `& UINT32_MAX` | Godot não tem >>> |
-| `Math.imul(a, b)` | `_imul(a, b)` | Implementação customizada |
+| JavaScript               | GDScript                                      | Notas                        |
+| ------------------------ | --------------------------------------------- | ---------------------------- |
+| `class RandomService`    | `class_name RandomService extends RefCounted` | RefCounted para auto-cleanup |
+| `this.seed`              | `var seed: int`                               | Seed inicial                 |
+| `this._state`            | `var _state: int`                             | Estado interno privado       |
+| `this._stats`            | `var _stats: Dictionary`                      | Stats de uso                 |
+| `Map<string, number>`    | `Dictionary`                                  | Godot usa Dictionary         |
+| `>>> 0` (unsigned shift) | `& UINT32_MAX`                                | Godot não tem >>>            |
+| `Math.imul(a, b)`        | `_imul(a, b)`                                 | Implementação customizada    |
 
 ---
 
@@ -135,6 +140,7 @@ return (t ^ (t >>> 14)) >>> 0           // 4. Final XOR shift
 ```
 
 **Passo a passo:**
+
 1. **Incremento**: Adiciona constante mágica e força uint32
 2. **Mix 1**: XOR shift de 15 bits + multiplicação com número ímpar
 3. **Mix 2**: XOR shift de 7 bits + multiplicação com 61
@@ -182,13 +188,13 @@ func randf() -> float:
 
 ### Comparação com Godot Built-in
 
-| Feature | Mulberry32 (Custom) | PCG32 (Godot) |
-|---------|---------------------|---------------|
-| Período | 2^32 (~4.3B) | 2^64 (muito maior) |
-| Velocidade | Rápido | Rápido |
-| Qualidade | Boa | Excelente |
+| Feature                     | Mulberry32 (Custom)            | PCG32 (Godot)                |
+| --------------------------- | ------------------------------ | ---------------------------- |
+| Período                     | 2^32 (~4.3B)                   | 2^64 (muito maior)           |
+| Velocidade                  | Rápido                         | Rápido                       |
+| Qualidade                   | Boa                            | Excelente                    |
 | Determinismo cross-platform | ✅ Sim (se implementado igual) | ❌ Não (implementação varia) |
-| Compatibilidade com JS | ✅ 100% | ❌ Sequências diferentes |
+| Compatibilidade com JS      | ✅ 100%                        | ❌ Sequências diferentes     |
 
 **Recomendação**: Implementar Mulberry32 customizado para garantir **100% compatibilidade** com o projeto JavaScript original.
 
@@ -218,6 +224,7 @@ return hash >>> 0                                // Unsigned
 ```
 
 **Características:**
+
 - **DJB2 variant**: Dan Bernstein hash (muito usado)
 - **Collision-resistant**: Boa distribuição para strings
 - **Rápido**: O(n) linear no tamanho da string
@@ -310,6 +317,7 @@ Baseado em `RandomService.js` linhas 215-236.
 ```
 
 **Por que XOR?**
+
 - Combina randomness do master com scope label
 - Garante seeds diferentes para scopes diferentes
 - Operação rápida e reversível
@@ -438,6 +446,7 @@ func randf() -> float:
 ```
 
 **Exemplo:**
+
 ```gdscript
 var rng = RandomService.new(12345)
 print(rng.randf())  # Ex: 0.7234
@@ -475,6 +484,7 @@ func randi_range(min_val: int, max_val: int) -> int:
 ```
 
 **Exemplo:**
+
 ```gdscript
 var rng = RandomService.new(12345)
 print(rng.randi_range(1, 10))   # Ex: 7
@@ -483,6 +493,7 @@ print(rng.randi_range(0, 1))    # Ex: 0 (coin flip)
 ```
 
 **Por que não usar modulo?**
+
 - `value % span` introduz **modulo bias** (distribuição não uniforme)
 - Multiplicação por span é **matematicamente mais justo**
 
@@ -516,6 +527,7 @@ func randf_range(min_val: float, max_val: float) -> float:
 ```
 
 **Exemplo:**
+
 ```gdscript
 var rng = RandomService.new(12345)
 print(rng.randf_range(0.0, 1.0))     # Ex: 0.7234
@@ -554,6 +566,7 @@ func chance(probability: float) -> bool:
 ```
 
 **Exemplo:**
+
 ```gdscript
 var rng = RandomService.new(12345)
 
@@ -597,6 +610,7 @@ func pick(array: Array) -> Variant:
 ```
 
 **Exemplo:**
+
 ```gdscript
 var rng = RandomService.new(12345)
 
@@ -678,6 +692,7 @@ func weighted_pick(weights: Variant) -> Variant:
 ```
 
 **Exemplo:**
+
 ```gdscript
 var rng = RandomService.new(12345)
 
@@ -711,6 +726,7 @@ print(rng.weighted_pick(variants))  # Ex: "iron"
 ```
 
 **Algoritmo Threshold:**
+
 ```
 total = 70 + 20 + 10 = 100
 threshold = randf_range(0, 100) = 45.3
@@ -748,6 +764,7 @@ func uuid(scope: String = "global") -> String:
 ```
 
 **Exemplo:**
+
 ```gdscript
 var rng = RandomService.new(12345)
 
@@ -757,6 +774,7 @@ print(rng.uuid("particle"))          # Ex: "particle-12345678-9abcdef0"
 ```
 
 **Uso Típico:**
+
 - Identificadores de entidades geradas proceduralmente
 - Cache keys para sistemas de pooling
 - Debug labels para tracking de objetos
@@ -768,8 +786,9 @@ print(rng.uuid("particle"))          # Ex: "particle-12345678-9abcdef0"
 ### Conceito
 
 O sistema de serialização permite **salvar e restaurar** o estado completo do RNG, incluindo:
+
 - Seed inicial
-- Estado interno (_state)
+- Estado interno (\_state)
 - Estatísticas de uso (calls, seeds history, forks)
 
 Usado principalmente pelo **retry system** para restaurar RNG exato após morte do jogador.
@@ -948,6 +967,7 @@ Baseado em `GameSessionService.js` linhas 1905-2019.
 ```
 
 **Prioridades:**
+
 1. **URL params** (mais alta): Permite forçar seed específica para testes
 2. **localStorage**: Permite replay da última sessão
 3. **crypto.getRandomValues**: Seed verdadeiramente aleatória (segura)
@@ -1230,6 +1250,7 @@ func prepare_options() -> Array:
 **Arquivo origem**: `CrackGenerationService.js` linhas 26-34, 262-263
 
 **Implementação GDScript:**
+
 ```gdscript
 # CrackGenerationService.gd
 
@@ -1280,6 +1301,7 @@ func generate_crack_pattern(asteroid_id: int, wave: int, generation: int) -> Arr
 **Arquivo origem**: `UpgradeSystem.js` linhas 95-143
 
 **Implementação GDScript:**
+
 ```gdscript
 # UpgradeSystem.gd
 
@@ -1331,6 +1353,7 @@ func filter_eligible_upgrades() -> Array:
 **Arquivo origem**: `asteroid-configs.js` linhas 964-1002
 
 **Implementação GDScript:**
+
 ```gdscript
 # EnemySystem.gd
 
@@ -1374,6 +1397,7 @@ func spawn_random_asteroid(position: Vector3) -> void:
 **Arquivo origem**: `FragmentationSystem.js` linhas 99-177
 
 **Implementação GDScript:**
+
 ```gdscript
 # FragmentationSystem.gd
 
@@ -1419,6 +1443,7 @@ func fragment_asteroid(asteroid: Node3D, crack_seed: int) -> void:
 **Arquivo origem**: `XPOrbSystem.js` linhas 1265-1397
 
 **Implementação GDScript:**
+
 ```gdscript
 # XPOrbSystem.gd
 
@@ -1481,6 +1506,7 @@ func find_orb_clusters(tier: String, required_count: int) -> Array:
 **Arquivo origem**: `AudioSystem.js` linhas 57-68
 
 **Implementação GDScript:**
+
 ```gdscript
 # AudioSystem.gd
 
@@ -1535,6 +1561,7 @@ func generate_noise_buffer(size: int) -> PackedFloat32Array:
 **Arquivo origem**: `EffectsSystem.js` linhas 1954-2068
 
 **Implementação GDScript:**
+
 ```gdscript
 # EffectsSystem.gd
 
@@ -1589,6 +1616,7 @@ func spawn_explosion_particles(position: Vector3, particle_count: int) -> void:
 **Deterministic replay** garante que, dada a **mesma seed** e os **mesmos inputs**, o jogo produzirá **exatamente os mesmos resultados**.
 
 **Aplicações:**
+
 - **Debugging**: Reproduzir bugs exatamente como ocorreram
 - **Balancing**: Testar mudanças de design com mesma sequência de eventos
 - **Competitive play**: Comparar runs diferentes na mesma seed
@@ -1597,6 +1625,7 @@ func spawn_explosion_particles(position: Vector3, particle_count: int) -> void:
 ### Exemplo de Replay Scenario Completo
 
 **Configuração:**
+
 - Seed: `12345`
 - Inputs: `[W, Space, W, W, D, Space, ...]` (sequência exata de teclas e timing)
 
@@ -1824,12 +1853,14 @@ GameSession (Node)
 ### Opção 1: Autoload Singleton (Recomendado)
 
 **Project.godot:**
+
 ```ini
 [autoload]
 RandomService="*res://core/RandomService.gd"
 ```
 
 **Script: res://core/RandomService.gd**
+
 ```gdscript
 class_name RandomService
 extends Node
@@ -1847,6 +1878,7 @@ func _ready() -> void:
 ```
 
 **Uso Global:**
+
 ```gdscript
 # Qualquer script pode acessar diretamente
 var value = RandomService.randf()
@@ -1855,11 +1887,13 @@ var wave_rng = RandomService.fork("wave:spawn")
 ```
 
 **Prós:**
+
 - Acesso global simples
 - Singleton pattern (1 instância)
 - Fácil de usar
 
 **Contras:**
+
 - Acoplamento global
 - Dificulta testing unitário
 
@@ -1868,6 +1902,7 @@ var wave_rng = RandomService.fork("wave:spawn")
 ### Opção 2: Service Locator / Dependency Injection
 
 **GameSessionService.gd:**
+
 ```gdscript
 class_name GameSessionService
 extends Node
@@ -1890,6 +1925,7 @@ func get_subsystem_rng(scope: String) -> RandomService:
 ```
 
 **Uso:**
+
 ```gdscript
 # WaveManager.gd
 @onready var game_session: GameSessionService = get_node("/root/GameSession")
@@ -1900,11 +1936,13 @@ func _ready() -> void:
 ```
 
 **Prós:**
+
 - Melhor testabilidade
 - Injeção de dependência explícita
 - Facilita mocking em testes
 
 **Contras:**
+
 - Mais verboso
 - Requer referências explícitas
 
@@ -1913,6 +1951,7 @@ func _ready() -> void:
 ### Recomendação Final
 
 **Para ASTEROIDS_ROGUEFIELD**: Usar **Opção 1 (Autoload Singleton)** porque:
+
 - Simplifica acesso em todos os sistemas
 - RNG é serviço fundamental usado em todos os lugares
 - Godot design patterns favorecem Autoloads para serviços globais
@@ -1922,32 +1961,32 @@ func _ready() -> void:
 
 ## 13. Tabela de Parâmetros Configuráveis
 
-| Categoria | Parâmetro | Valor Padrão | Tipo | Descrição | Arquivo Origem |
-|-----------|-----------|--------------|------|-----------|----------------|
-| **Algorithm** |
-| | `MULBERRY32_MAGIC` | `0x6d2b79f5` | `const int` | Constante mágica do Mulberry32 algorithm | `RandomService.js:77` |
-| | `UINT32_MAX` | `0xFFFFFFFF` | `const int` | Máximo valor uint32 (4,294,967,295) | `RandomService.js:1` |
-| | `UINT32_FACTOR` | `1/(2^32)` | `const float` | Fator de conversão uint32 → [0,1) | `RandomService.js:2` |
-| **Stats** |
-| | `SEED_HISTORY_LIMIT` | `10` | `const int` | Tamanho do histórico de seeds (FIFO) | `RandomService.js:3` |
+| Categoria       | Parâmetro                   | Valor Padrão                 | Tipo           | Descrição                                | Arquivo Origem             |
+| --------------- | --------------------------- | ---------------------------- | -------------- | ---------------------------------------- | -------------------------- |
+| **Algorithm**   |
+|                 | `MULBERRY32_MAGIC`          | `0x6d2b79f5`                 | `const int`    | Constante mágica do Mulberry32 algorithm | `RandomService.js:77`      |
+|                 | `UINT32_MAX`                | `0xFFFFFFFF`                 | `const int`    | Máximo valor uint32 (4,294,967,295)      | `RandomService.js:1`       |
+|                 | `UINT32_FACTOR`             | `1/(2^32)`                   | `const float`  | Fator de conversão uint32 → [0,1)        | `RandomService.js:2`       |
+| **Stats**       |
+|                 | `SEED_HISTORY_LIMIT`        | `10`                         | `const int`    | Tamanho do histórico de seeds (FIFO)     | `RandomService.js:3`       |
 | **Persistence** |
-| | `STORAGE_PATH` | `"user://game_settings.cfg"` | `const String` | Path do ConfigFile para persistência | - |
-| | `STORAGE_SECTION` | `"rng"` | `const String` | Seção do ConfigFile | - |
-| | `STORAGE_KEY_LAST_SEED` | `"last_seed"` | `const String` | Chave para última seed | `GameSessionService.js:11` |
-| | `STORAGE_KEY_SEED_SNAPSHOT` | `"seed_snapshot"` | `const String` | Chave para snapshot completo | `GameSessionService.js:12` |
+|                 | `STORAGE_PATH`              | `"user://game_settings.cfg"` | `const String` | Path do ConfigFile para persistência     | -                          |
+|                 | `STORAGE_SECTION`           | `"rng"`                      | `const String` | Seção do ConfigFile                      | -                          |
+|                 | `STORAGE_KEY_LAST_SEED`     | `"last_seed"`                | `const String` | Chave para última seed                   | `GameSessionService.js:11` |
+|                 | `STORAGE_KEY_SEED_SNAPSHOT` | `"seed_snapshot"`            | `const String` | Chave para snapshot completo             | `GameSessionService.js:12` |
 | **Fork Scopes** |
-| | Wave Spawning | `"wave:spawn"` | `String` | Scope label para WaveManager | - |
-| | Enemy Movement | `"enemy:movement"` | `String` | Scope label para EnemySystem | - |
-| | Combat Targeting | `"combat:targeting"` | `String` | Scope label para CombatSystem | - |
-| | Upgrade Selection | `"upgrades.selection"` | `String` | Scope label para UpgradeSystem | - |
-| | Crack Generation | `"crack:generation"` | `String` | Scope label para CrackGenerationService | - |
-| | Fragmentation | `"fragmentation"` | `String` | Scope label para FragmentationSystem | - |
-| | XP Orbs Fusion | `"xp-orbs:fusion"` | `String` | Scope label para XPOrbSystem | - |
-| | Audio Variation | `"audio:variation"` | `String` | Scope label para AudioSystem | - |
-| | Effects Particles | `"effects:particles"` | `String` | Scope label para EffectsSystem | - |
-| | Menu Background | `"menu-background"` | `String` | Scope label para MenuBackgroundSystem | - |
-| | Player Respawn | `"player:respawn"` | `String` | Scope label para PlayerSystem | - |
-| | Session Retry | `"session:retry"` | `String` | Scope label para GameSessionService | - |
+|                 | Wave Spawning               | `"wave:spawn"`               | `String`       | Scope label para WaveManager             | -                          |
+|                 | Enemy Movement              | `"enemy:movement"`           | `String`       | Scope label para EnemySystem             | -                          |
+|                 | Combat Targeting            | `"combat:targeting"`         | `String`       | Scope label para CombatSystem            | -                          |
+|                 | Upgrade Selection           | `"upgrades.selection"`       | `String`       | Scope label para UpgradeSystem           | -                          |
+|                 | Crack Generation            | `"crack:generation"`         | `String`       | Scope label para CrackGenerationService  | -                          |
+|                 | Fragmentation               | `"fragmentation"`            | `String`       | Scope label para FragmentationSystem     | -                          |
+|                 | XP Orbs Fusion              | `"xp-orbs:fusion"`           | `String`       | Scope label para XPOrbSystem             | -                          |
+|                 | Audio Variation             | `"audio:variation"`          | `String`       | Scope label para AudioSystem             | -                          |
+|                 | Effects Particles           | `"effects:particles"`        | `String`       | Scope label para EffectsSystem           | -                          |
+|                 | Menu Background             | `"menu-background"`          | `String`       | Scope label para MenuBackgroundSystem    | -                          |
+|                 | Player Respawn              | `"player:respawn"`           | `String`       | Scope label para PlayerSystem            | -                          |
+|                 | Session Retry               | `"session:retry"`            | `String`       | Scope label para GameSessionService      | -                          |
 
 ---
 
@@ -2122,6 +2161,7 @@ sequenceDiagram
 ### Conceito
 
 O sistema rastreia **estatísticas de uso** para debugging e análise:
+
 - Número de calls de cada método
 - Histórico de seeds usadas
 - Forks criados e suas derived seeds
@@ -2516,23 +2556,24 @@ func initialize_rng_forks() -> void:
 
 ### Tabela Comparativa Completa
 
-| Feature | Mulberry32 (Master) | xorshift32 (Local) | PCG32 (Godot) |
-|---------|---------------------|-------------------|---------------|
-| **Algorithm** | Mulberry32 (T. Ettinger) | xorshift32 variant | PCG (O'Neill) |
-| **Período** | ~2^32 (~4.3B) | 2^32-1 | 2^64 (~18 quintillion) |
-| **State Size** | 32-bit (4 bytes) | 32-bit (4 bytes) | 128-bit (16 bytes) |
-| **Speed** | Fast (~2-3x Math.random) | Very Fast (fastest) | Fast |
-| **Qualidade** | Good (passa testes básicos) | Good (menos que Mulberry32) | Excellent (passa TestU01) |
-| **Uniformidade** | Boa distribuição | Boa distribuição | Excelente distribuição |
-| **Crypto-secure** | ❌ Não | ❌ Não | ❌ Não |
-| **Usado Em** | RandomService (master, forks) | CrackGen, Fragmentation | Godot built-in |
-| **Compatibilidade JS** | ✅ 100% (se implementado igual) | ✅ 100% (se implementado igual) | ❌ Sequências diferentes |
-| **Implementação** | Custom class | Local callable | Godot class built-in |
-| **Memory Overhead** | Baixo (1 int) | Muito baixo (closure) | Médio (object + 128-bit state) |
+| Feature                | Mulberry32 (Master)             | xorshift32 (Local)              | PCG32 (Godot)                  |
+| ---------------------- | ------------------------------- | ------------------------------- | ------------------------------ |
+| **Algorithm**          | Mulberry32 (T. Ettinger)        | xorshift32 variant              | PCG (O'Neill)                  |
+| **Período**            | ~2^32 (~4.3B)                   | 2^32-1                          | 2^64 (~18 quintillion)         |
+| **State Size**         | 32-bit (4 bytes)                | 32-bit (4 bytes)                | 128-bit (16 bytes)             |
+| **Speed**              | Fast (~2-3x Math.random)        | Very Fast (fastest)             | Fast                           |
+| **Qualidade**          | Good (passa testes básicos)     | Good (menos que Mulberry32)     | Excellent (passa TestU01)      |
+| **Uniformidade**       | Boa distribuição                | Boa distribuição                | Excelente distribuição         |
+| **Crypto-secure**      | ❌ Não                          | ❌ Não                          | ❌ Não                         |
+| **Usado Em**           | RandomService (master, forks)   | CrackGen, Fragmentation         | Godot built-in                 |
+| **Compatibilidade JS** | ✅ 100% (se implementado igual) | ✅ 100% (se implementado igual) | ❌ Sequências diferentes       |
+| **Implementação**      | Custom class                    | Local callable                  | Godot class built-in           |
+| **Memory Overhead**    | Baixo (1 int)                   | Muito baixo (closure)           | Médio (object + 128-bit state) |
 
 ### Quando Usar Cada Um
 
 **Mulberry32:**
+
 - ✅ Master RNG e forks principais
 - ✅ Quando precisa de 100% compatibilidade com JS
 - ✅ Quando precisa de serialization/replay
@@ -2541,6 +2582,7 @@ func initialize_rng_forks() -> void:
 - ❌ Quando precisa de segurança criptográfica
 
 **xorshift32:**
+
 - ✅ Scopes locais (crack generation, fragmentation)
 - ✅ Quando precisa de máxima performance
 - ✅ Quando não precisa de serialization
@@ -2549,6 +2591,7 @@ func initialize_rng_forks() -> void:
 - ❌ Quando precisa de fork system
 
 **PCG32 (Godot):**
+
 - ✅ Quando não precisa de compatibilidade com JS
 - ✅ Quando precisa de período muito longo
 - ✅ Quando precisa de qualidade estatística máxima
@@ -2559,6 +2602,7 @@ func initialize_rng_forks() -> void:
 ### Implementação Comparativa
 
 **Mulberry32 (Custom):**
+
 ```gdscript
 func _next_uint32() -> int:
     _state = (_state + 0x6d2b79f5) & UINT32_MAX
@@ -2569,6 +2613,7 @@ func _next_uint32() -> int:
 ```
 
 **xorshift32 (Callable):**
+
 ```gdscript
 static func create_seeded_random(seed: int) -> Callable:
     var state = seed & 0xFFFFFFFF
@@ -2580,6 +2625,7 @@ static func create_seeded_random(seed: int) -> Callable:
 ```
 
 **PCG32 (Godot):**
+
 ```gdscript
 var rng = RandomNumberGenerator.new()
 rng.seed = 12345
@@ -2589,6 +2635,7 @@ var value = rng.randf()  # Sequência DIFERENTE de Mulberry32!
 ### Recomendação Final
 
 Para ASTEROIDS_ROGUEFIELD:
+
 1. **Usar Mulberry32** para master RNG e todos os forks principais (garantir compatibilidade JS)
 2. **Usar xorshift32** para scopes locais (crack generation, fragmentation - como no original)
 3. **Não usar PCG32** (Godot built-in) para nada que afete gameplay determinístico
@@ -2600,6 +2647,7 @@ Para ASTEROIDS_ROGUEFIELD:
 ### Arquivos JavaScript Analisados
 
 **RandomService.js** (275 linhas):
+
 - **Linhas 1-3**: Constantes (UINT32_MAX, UINT32_FACTOR, SEED_HISTORY_LIMIT)
 - **Linhas 5-12**: `hashString(input)` - DJB2-like hash para strings
 - **Linhas 18-43**: Constructor e stats initialization
@@ -2621,45 +2669,47 @@ Para ASTEROIDS_ROGUEFIELD:
 - **Linhas 267-273**: `debugSnapshot()` - Debug info
 
 **GameSessionService.js** (~2020 linhas):
+
 - **Linhas 11-12**: Storage keys ("last-seed", "seed-snapshot")
 - **Linhas 1905-1977**: `deriveInitialSeed()` - **Seed derivation chain**
   - URL params → localStorage → crypto → Math.random
 - **Linhas 1978-2019**: `persistLastSeed()`, `logRNGSnapshot()`
 
 **CrackGenerationService.js** (26-34):
+
 - **Linhas 26-34**: `createSeededRandom(seed)` - **xorshift32 variant**
 - **Linha 262-263**: Uso em `generateCrackPattern()`
 
 ### Funções-Chave Mapeadas
 
-| Função JS | Função GDScript | Descrição |
-|-----------|-----------------|-----------|
-| `_nextUint32()` | `_next_uint32()` | Mulberry32 core (state mutation) |
-| `float()` | `randf()` | Random float [0,1) |
-| `int(min, max)` | `randi_range(min, max)` | Random integer [min,max] |
-| `range(min, max)` | `randf_range(min, max)` | Random float [min,max] |
-| `chance(prob)` | `chance(prob)` | Boolean roll |
-| `pick(array)` | `pick(array)` | Random element |
-| `weightedPick(weights)` | `weighted_pick(weights)` | Weighted selection |
-| `uuid(scope)` | `uuid(scope)` | Unique ID |
-| `fork(scope)` | `fork(scope)` | Create child RNG |
-| `serialize()` | `serialize()` | Export state |
-| `restore(snapshot)` | `restore(snapshot)` | Import state |
-| `hashString(input)` | `_hash_string(input)` | DJB2 hash |
-| `_normalizeSeed(seed)` | `_normalize_seed(seed)` | Seed normalization |
+| Função JS               | Função GDScript          | Descrição                        |
+| ----------------------- | ------------------------ | -------------------------------- |
+| `_nextUint32()`         | `_next_uint32()`         | Mulberry32 core (state mutation) |
+| `float()`               | `randf()`                | Random float [0,1)               |
+| `int(min, max)`         | `randi_range(min, max)`  | Random integer [min,max]         |
+| `range(min, max)`       | `randf_range(min, max)`  | Random float [min,max]           |
+| `chance(prob)`          | `chance(prob)`           | Boolean roll                     |
+| `pick(array)`           | `pick(array)`            | Random element                   |
+| `weightedPick(weights)` | `weighted_pick(weights)` | Weighted selection               |
+| `uuid(scope)`           | `uuid(scope)`            | Unique ID                        |
+| `fork(scope)`           | `fork(scope)`            | Create child RNG                 |
+| `serialize()`           | `serialize()`            | Export state                     |
+| `restore(snapshot)`     | `restore(snapshot)`      | Import state                     |
+| `hashString(input)`     | `_hash_string(input)`    | DJB2 hash                        |
+| `_normalizeSeed(seed)`  | `_normalize_seed(seed)`  | Seed normalization               |
 
 ### Fork Labels Usados no Projeto
 
-| Scope Label | Sistema | Arquivo |
-|-------------|---------|---------|
-| `"wave:spawn"` | WaveManager | `WaveManager.js` |
-| `"enemy:movement"` | EnemySystem | `EnemySystem.js` |
-| `"combat:targeting"` | CombatSystem | `CombatSystem.js` |
-| `"upgrades.selection"` | UpgradeSystem | `UpgradeSystem.js` |
-| `"xp-orbs:fusion"` | XPOrbSystem | `XPOrbSystem.js` |
-| `"audio:variation"` | AudioSystem | `AudioSystem.js` |
-| `"effects:particles"` | EffectsSystem | `EffectsSystem.js` |
-| `"menu-background"` | MenuBackgroundSystem | `MenuBackgroundSystem.js` |
+| Scope Label            | Sistema              | Arquivo                   |
+| ---------------------- | -------------------- | ------------------------- |
+| `"wave:spawn"`         | WaveManager          | `WaveManager.js`          |
+| `"enemy:movement"`     | EnemySystem          | `EnemySystem.js`          |
+| `"combat:targeting"`   | CombatSystem         | `CombatSystem.js`         |
+| `"upgrades.selection"` | UpgradeSystem        | `UpgradeSystem.js`        |
+| `"xp-orbs:fusion"`     | XPOrbSystem          | `XPOrbSystem.js`          |
+| `"audio:variation"`    | AudioSystem          | `AudioSystem.js`          |
+| `"effects:particles"`  | EffectsSystem        | `EffectsSystem.js`        |
+| `"menu-background"`    | MenuBackgroundSystem | `MenuBackgroundSystem.js` |
 
 ### Eventos
 
@@ -2678,17 +2728,17 @@ const MULBERRY32_MAGIC: int = 0x6d2b79f5     # Constante do algoritmo
 
 ### Mapeamento de Conceitos JS → Godot
 
-| Conceito JavaScript | Equivalente Godot | Notas |
-|---------------------|-------------------|-------|
-| `Math.imul(a, b)` | `_imul(a, b)` custom | Godot não tem imul built-in |
-| `>>> 0` (unsigned shift) | `& UINT32_MAX` | Godot não tem >>> operator |
-| `Map<K,V>` | `Dictionary` | Godot usa Dictionary |
-| `Set<T>` | `Array` (manual) | Godot não tem Set nativo |
-| `JSON.parse(JSON.stringify(obj))` | `obj.duplicate(true)` | Deep clone |
-| `localStorage.getItem()` | `ConfigFile.get_value()` | Persistência |
-| `localStorage.setItem()` | `ConfigFile.set_value()` | Persistência |
-| `crypto.getRandomValues()` | `RandomNumberGenerator.randomize()` | Crypto random |
-| `URLSearchParams` | `JavaScriptBridge.eval()` | Web export only |
+| Conceito JavaScript               | Equivalente Godot                   | Notas                       |
+| --------------------------------- | ----------------------------------- | --------------------------- |
+| `Math.imul(a, b)`                 | `_imul(a, b)` custom                | Godot não tem imul built-in |
+| `>>> 0` (unsigned shift)          | `& UINT32_MAX`                      | Godot não tem >>> operator  |
+| `Map<K,V>`                        | `Dictionary`                        | Godot usa Dictionary        |
+| `Set<T>`                          | `Array` (manual)                    | Godot não tem Set nativo    |
+| `JSON.parse(JSON.stringify(obj))` | `obj.duplicate(true)`               | Deep clone                  |
+| `localStorage.getItem()`          | `ConfigFile.get_value()`            | Persistência                |
+| `localStorage.setItem()`          | `ConfigFile.set_value()`            | Persistência                |
+| `crypto.getRandomValues()`        | `RandomNumberGenerator.randomize()` | Crypto random               |
+| `URLSearchParams`                 | `JavaScriptBridge.eval()`           | Web export only             |
 
 ---
 

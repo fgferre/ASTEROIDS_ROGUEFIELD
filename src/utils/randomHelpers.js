@@ -2,7 +2,9 @@ import RandomService from '../core/RandomService.js';
 
 function assertGetRandomFork(getRandomFork) {
   if (typeof getRandomFork !== 'function') {
-    throw new TypeError('createRandomHelpers requires a getRandomFork function');
+    throw new TypeError(
+      'createRandomHelpers requires a getRandomFork function'
+    );
   }
 }
 
@@ -21,7 +23,9 @@ export function createRandomHelpers({
       if (random && typeof random.fork === 'function') {
         fallbackRandom = random.fork(`${fallbackSeedPrefix}:fallback-base`);
       } else {
-        fallbackRandom = new RandomService(`${fallbackSeedPrefix}:fallback-base`);
+        fallbackRandom = new RandomService(
+          `${fallbackSeedPrefix}:fallback-base`
+        );
       }
     }
     return fallbackRandom;

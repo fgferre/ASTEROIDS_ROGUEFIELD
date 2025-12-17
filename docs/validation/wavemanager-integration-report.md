@@ -1,12 +1,15 @@
 # Relatório de Validação: Integração do WaveManager (WAVE-004)
 
 ## Objetivo
+
 Validar que a integração do WaveManager preserva o comportamento do sistema legado de ondas, conforme métricas baseline capturadas em WAVE-001.
 
 ## Data de Validação
+
 2025-10-20
 
 ## Ambiente de Teste
+
 - **Navegador:** Não executado (ambiente headless/CLI)
 - **Versão do Node.js:** v22.19.0
 - **Commit SHA:** 5cf99b2e620464a497f3da0aad5b9fc688e469b3
@@ -15,11 +18,13 @@ Validar que a integração do WaveManager preserva o comportamento do sistema le
 ## Checklist de Validação
 
 ### 1. Testes Automatizados
+
 - [x] `npm test` - Todos os testes passando
 - [x] `npm run test:baseline` - Métricas baseline preservadas
 - [x] Nenhum erro de console durante execução dos testes (apenas warnings esperados de dependências mockadas como `healthHearts`)
 
 ### 2. Spawn e Registro de Inimigos
+
 - [ ] Inimigos aparecem na tela após início da wave _(não validado neste ciclo headless)_
 - [ ] Contador de inimigos na HUD corresponde a `totalEnemiesThisWave` _(não validado neste ciclo)_
 - [ ] Log `[WaveManager] Registered enemy: type=X, wave=Y` aparece no console _(não validado manualmente)_
@@ -27,6 +32,7 @@ Validar que a integração do WaveManager preserva o comportamento do sistema le
 - [ ] Colisões player↔inimigo funcionam corretamente _(não validado manualmente)_
 
 ### 3. Progressão Automática de Ondas
+
 - [ ] Destruir todos os inimigos dispara `completeWave()` automaticamente _(não validado manualmente)_
 - [ ] Log `[WaveManager] Enemy destroyed: X/Y` aparece a cada destruição _(não validado manualmente)_
 - [ ] Log `[WaveManager] Wave N complete in Xs` aparece ao final da wave _(não validado manualmente)_
@@ -34,6 +40,7 @@ Validar que a integração do WaveManager preserva o comportamento do sistema le
 - [ ] Próxima wave inicia automaticamente após countdown _(não validado manualmente)_
 
 ### 4. Sincronização de Eventos
+
 - [ ] Evento `wave-started` emitido no início de cada wave _(não validado manualmente)_
 - [ ] HUD atualiza ao receber `wave-started` (número da wave, total de inimigos) _(não validado manualmente)_
 - [ ] EffectsSystem cria transições visuais (se implementado) _(não validado manualmente)_
@@ -43,6 +50,7 @@ Validar que a integração do WaveManager preserva o comportamento do sistema le
 > ℹ️ **Compatibilidade de eventos:** `wave-complete` é o evento canônico quando `USE_WAVE_MANAGER=true`. O emissor legado `wave-completed` permanece desativado (`WAVE_MANAGER_EMIT_LEGACY_WAVE_COMPLETED=false`), mas consumidores críticos como `UISystem` já escutam ambos os nomes para manter compatibilidade.
 
 ### 5. Paridade com Baseline Metrics
+
 - [x] Wave 1: 4 inimigos spawned (validado via testes automatizados)
 - [x] Wave 5: 11 inimigos spawned (validado via testes automatizados)
 - [x] Wave 10: 25 inimigos spawned (cap aplicado; validado via testes)
@@ -50,17 +58,20 @@ Validar que a integração do WaveManager preserva o comportamento do sistema le
 - [x] Fórmula de spawn: `4 * 1.3^(wave-1)` validada (via testes)
 
 ### 6. Performance e Estabilidade
+
 - [ ] 60 FPS estável durante 5 waves completas _(não medido em ambiente headless)_
 - [ ] Sem memory leaks (DevTools Memory tab) _(não medido)_
 - [x] Sem erros de console durante gameplay automatizado (apenas warnings esperados)
 - [x] Sem warnings de desincronização de contadores (nenhum `Kill count mismatch` observado nos testes)
 
 ### 7. Validação de Consistência (Desenvolvimento)
+
 - [x] Logs de sincronização aparecem: `[EnemySystem] WaveManager state synced: wave X, Y/Z enemies`
 - [x] Nenhum warning de mismatch: `Kill count mismatch: WaveManager=X, waveState=Y`
 - [x] `assertAccountingConsistency()` não dispara warnings
 
 ### 8. Reward System (WAVE-005)
+
 - [x] Drones dropam 2 XP orbs totalizando 30 XP (validado via `modules/enemies/managers/RewardManager.test.js`)
 - [x] Mines dropam 1-2 XP orbs com XP redistribuído (25 XP totais) (validado via testes automatizados)
 - [x] Hunters dropam 3 XP orbs totalizando 50 XP (validado via testes)
@@ -74,14 +85,15 @@ Validar que a integração do WaveManager preserva o comportamento do sistema le
 
 **Tabela de Validação de Recompensas:**
 
-| Tipo | Orbs Esperados (Wave 1) | Orbs Observados | XP Esperado | XP Observado | Hearts Dropados |
-|------|-------------------------|-----------------|-------------|--------------|----------------|
-| Drone | 2 | Validado via testes automatizados | 30 XP | Validado via testes | 0 (não observado manualmente) |
-| Mine | 1-2 | Validado via testes automatizados | 25 XP | Validado via testes | 0 (não observado manualmente) |
-| Hunter | 3 | Validado via testes automatizados | 50 XP | Validado via testes | Automação registrou drop (~3%) |
-| Boss | 10 | Validado via testes automatizados | 500 XP | Validado via testes | Automação registrou drop (~25%) |
+| Tipo   | Orbs Esperados (Wave 1) | Orbs Observados                   | XP Esperado | XP Observado        | Hearts Dropados                 |
+| ------ | ----------------------- | --------------------------------- | ----------- | ------------------- | ------------------------------- |
+| Drone  | 2                       | Validado via testes automatizados | 30 XP       | Validado via testes | 0 (não observado manualmente)   |
+| Mine   | 1-2                     | Validado via testes automatizados | 25 XP       | Validado via testes | 0 (não observado manualmente)   |
+| Hunter | 3                       | Validado via testes automatizados | 50 XP       | Validado via testes | Automação registrou drop (~3%)  |
+| Boss   | 10                      | Validado via testes automatizados | 500 XP      | Validado via testes | Automação registrou drop (~25%) |
 
 **Instruções de Validação:**
+
 1. Ativar `USE_WAVE_MANAGER=true`
 2. Jogar até wave 8+ (quando novos inimigos começam a spawnar)
 3. Destruir pelo menos 10 de cada tipo de inimigo
@@ -92,6 +104,7 @@ Validar que a integração do WaveManager preserva o comportamento do sistema le
 8. Comparar com taxas esperadas: hunters 3%, bosses 25%
 
 **Critério de Aprovação:**
+
 - Orbs dropados correspondem à tabela (±1 orb de tolerância para randomização de mines)
 - XP ganho corresponde aos totais esperados por tipo (30/25/50/500) mais bônus de wave
 - Health hearts dropam apenas de hunters e bosses (nunca de drones/mines)
@@ -102,6 +115,7 @@ Validar que a integração do WaveManager preserva o comportamento do sistema le
 ## Resultados dos Testes
 
 ### Testes Automatizados
+
 ```
 npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
 
@@ -1629,6 +1643,7 @@ stdout | __tests__/rendering/screen-shake-determinism.test.js > EffectsSystem sc
 ```
 
 ### Testes de Baseline
+
 ```
 npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
 
@@ -2579,15 +2594,16 @@ stdout | __tests__/legacy/asteroid-baseline-metrics.test.js > Legacy Asteroid Ba
 
 ### Gameplay Manual (5 Waves)
 
-| Wave | Inimigos Spawned | Inimigos Killed | Tempo (s) | Intervalo (s) | Observações |
-|------|------------------|-----------------|-----------|---------------|-------------|
-| 1    | N/A (não executado) | N/A | N/A | N/A | Ambiente headless impossibilitou validação manual |
-| 2    | N/A (não executado) | N/A | N/A | N/A | Ambiente headless impossibilitou validação manual |
-| 3    | N/A (não executado) | N/A | N/A | N/A | Ambiente headless impossibilitou validação manual |
-| 4    | N/A (não executado) | N/A | N/A | N/A | Ambiente headless impossibilitou validação manual |
-| 5    | N/A (não executado) | N/A | N/A | N/A | Ambiente headless impossibilitou validação manual |
+| Wave | Inimigos Spawned    | Inimigos Killed | Tempo (s) | Intervalo (s) | Observações                                       |
+| ---- | ------------------- | --------------- | --------- | ------------- | ------------------------------------------------- |
+| 1    | N/A (não executado) | N/A             | N/A       | N/A           | Ambiente headless impossibilitou validação manual |
+| 2    | N/A (não executado) | N/A             | N/A       | N/A           | Ambiente headless impossibilitou validação manual |
+| 3    | N/A (não executado) | N/A             | N/A       | N/A           | Ambiente headless impossibilitou validação manual |
+| 4    | N/A (não executado) | N/A             | N/A       | N/A           | Ambiente headless impossibilitou validação manual |
+| 5    | N/A (não executado) | N/A             | N/A       | N/A           | Ambiente headless impossibilitou validação manual |
 
 ### Performance
+
 - **FPS médio:** Não medido (ambiente headless)
 - **FPS mínimo:** Não medido
 - **Memory usage inicial:** Não medido
@@ -2597,19 +2613,23 @@ stdout | __tests__/legacy/asteroid-baseline-metrics.test.js > Legacy Asteroid Ba
 ## Divergências Identificadas
 
 ### Divergências Esperadas (Documentadas)
+
 1. **Distribuição de tamanhos:** Configuração atual mantém 50/30/20 graças aos flags de compatibilidade. Divergência planejada (30/40/30) não se aplica nesta fase.
    - **Justificativa:** Objetivo desta fase é paridade com legado.
    - **Impacto:** Nenhum.
 
 ### Divergências Inesperadas
+
 _Nenhuma divergência inesperada observada durante os testes automatizados._
 
 ## Issues Encontrados
 
 ### Bloqueadores (Impedem ativação)
+
 - [ ] Nenhum bloqueador identificado
 
 ### Não-Bloqueadores (Podem ser corrigidos depois)
+
 - [x] Validação manual e medições de performance pendentes (requer ambiente com renderização)
 
 ## Recomendação Final
@@ -2617,21 +2637,24 @@ _Nenhuma divergência inesperada observada durante os testes automatizados._
 ☐ **Aprovado para ativação permanente**
 
 ☒ **Aprovado com ressalvas**
-  - Testes passando com divergências menores documentadas
-  - Validações manuais pendentes
-  - Requer monitoramento em ambiente com HUD/UI
+
+- Testes passando com divergências menores documentadas
+- Validações manuais pendentes
+- Requer monitoramento em ambiente com HUD/UI
 
 ☐ **Reprovado**
 
 ## Próximos Passos
 
 **Se aprovado:**
+
 1. Manter `USE_WAVE_MANAGER=true` por 1 semana em produção
 2. Monitorar telemetria e feedback de usuários
 3. Após validação em produção, remover flag e deprecar sistema legado
 4. Prosseguir para WAVE-005 (Expandir RewardManager)
 
 **Se reprovado:**
+
 1. Criar issues no GitHub para cada bloqueador
 2. Corrigir bloqueadores
 3. Re-executar validação completa
@@ -2647,6 +2670,7 @@ _Nenhuma divergência inesperada observada durante os testes automatizados._
 ---
 
 **Referências:**
+
 - Baseline Metrics: `docs/validation/asteroid-baseline-metrics.md`
 - Plano de Fase: `docs/plans/phase1-enemy-foundation-plan.md` (WAVE-004)
 - Testes Automatizados: `src/__tests__/legacy/asteroid-baseline-metrics.test.js`

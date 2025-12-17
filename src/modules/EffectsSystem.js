@@ -68,14 +68,47 @@ class SpaceParticle {
     ctx.translate(this.x, this.y);
     ctx.rotate(this.rotation);
 
+    // [NEO-ARCADE] Additive Blending for Glow
+    ctx.globalCompositeOperation = 'lighter';
+
     if (this.type === 'spark') {
-      ctx.strokeStyle = this.color;
-      ctx.lineWidth = this.size * this.alpha;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(-this.size, 0);
-      ctx.lineTo(this.size, 0);
-      ctx.stroke();
+      // [NEO-ARCADE] Stretched Spark Effect
+      const speed = Math.hypot(this.vx, this.vy);
+
+      if (speed > 10) {
+        // Alignment for high speed sparks (Compensate for particle rotation)
+        const angle = Math.atan2(this.vy, this.vx);
+        const stretch = Math.max(1, Math.min(3, speed * 0.01));
+
+        ctx.beginPath();
+        // We are already translated to x,y and rotated by this.rotation
+        // Un-rotate first, then rotate to velocity
+        ctx.rotate(angle - this.rotation);
+        ctx.scale(stretch, 1);
+
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = this.size * this.alpha;
+        ctx.lineCap = 'round';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = this.color;
+
+        ctx.moveTo(-this.size, 0);
+        ctx.lineTo(this.size, 0);
+        ctx.stroke();
+
+        ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset
+      } else {
+        // Standard slow spark
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = this.size * this.alpha;
+        ctx.lineCap = 'round';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = this.color;
+        ctx.beginPath();
+        ctx.moveTo(-this.size * 1.5, 0);
+        ctx.lineTo(this.size * 1.5, 0);
+        ctx.stroke();
+      }
     } else if (this.type === 'crack') {
       ctx.strokeStyle = this.color;
       ctx.lineWidth = Math.max(0.6, this.size * 0.4);
@@ -91,11 +124,40 @@ class SpaceParticle {
       const s = this.size * this.alpha;
       ctx.rect(-s / 2, -s / 2, s, s);
       ctx.fill();
-    } else {
+    } else if (this.type === 'thruster') {
+      // [NEO-ARCADE] Stretched Afterburner Effect
+      // Align with velocity
+      const speed = Math.hypot(this.vx, this.vy);
+      const angle = Math.atan2(this.vy, this.vx);
+
+      // Stretch factor increases with speed
+      const stretch = Math.max(1, Math.min(6, speed * 0.04));
+
       ctx.fillStyle = this.color;
+
+      // Core
       ctx.beginPath();
+      ctx.translate(0, 0); // Already at x,y
+      ctx.rotate(angle);
+      ctx.scale(stretch, 1);
       ctx.arc(0, 0, this.size * this.alpha, 0, Math.PI * 2);
       ctx.fill();
+
+      // Reset transform for next particle
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    } else {
+      // [NEO-ARCADE] Glowing Orb
+      const radius = this.size * this.alpha;
+      if (radius > 0.5) {
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+        gradient.addColorStop(0, '#FFFFFF'); // Hot white center
+        gradient.addColorStop(0.4, this.color); // Core color
+        gradient.addColorStop(1, 'transparent'); // Fade out
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(0, 0, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
 
     ctx.restore();
@@ -110,7 +172,9 @@ SpaceParticle.resolveRandom = function resolveRandom(random) {
   }
 
   if (!SpaceParticle._fallbackRandom) {
-    SpaceParticle._fallbackRandom = new RandomService('effects-system:particle:fallback');
+    SpaceParticle._fallbackRandom = new RandomService(
+      'effects-system:particle:fallback'
+    );
   }
 
   return SpaceParticle._fallbackRandom;
@@ -175,7 +239,9 @@ class HitMarker {
 export default class EffectsSystem extends BaseSystem {
   constructor(config = {}) {
     const normalizedConfig =
-      config && typeof config === 'object' && !Array.isArray(config) ? config : {};
+      config && typeof config === 'object' && !Array.isArray(config)
+        ? config
+        : {};
     const { audio = null, random = null, ...dependencies } = normalizedConfig;
 
     // Pass config to BaseSystem with random management options
@@ -194,7 +260,7 @@ export default class EffectsSystem extends BaseSystem {
         volatility: 'effects.volatility',
         screenShake: 'effects.screenShake',
         boss: 'effects.boss',
-      }
+      },
     });
 
     this.audio = audio ?? resolveService('audio', this.dependencies);
@@ -216,7 +282,8 @@ export default class EffectsSystem extends BaseSystem {
     // Upgraded screen shake (Week 1: Balance & Feel)
     this.screenShake = new ScreenShake(this.getRandomFork('screenShake'));
     this.screenShakeSeedState =
-      this.screenShake && typeof this.screenShake.captureSeedState === 'function'
+      this.screenShake &&
+      typeof this.screenShake.captureSeedState === 'function'
         ? this.screenShake.captureSeedState()
         : null;
     this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
@@ -303,7 +370,9 @@ export default class EffectsSystem extends BaseSystem {
         try {
           GamePools.particles.release(particle);
         } catch (error) {
-          console.debug('[EffectsSystem] Particle not from pool, skipping release');
+          console.debug(
+            '[EffectsSystem] Particle not from pool, skipping release'
+          );
         }
       }
     }
@@ -329,11 +398,14 @@ export default class EffectsSystem extends BaseSystem {
       }
     }
 
-    this.registerEventListener('settings-accessibility-changed', (payload = {}) => {
-      if (payload?.values) {
-        this.applyAccessibilityPreferences(payload.values);
+    this.registerEventListener(
+      'settings-accessibility-changed',
+      (payload = {}) => {
+        if (payload?.values) {
+          this.applyAccessibilityPreferences(payload.values);
+        }
       }
-    });
+    );
 
     this.registerEventListener('settings-video-changed', (payload = {}) => {
       if (payload?.values) {
@@ -460,7 +532,12 @@ export default class EffectsSystem extends BaseSystem {
         const vy = data.bullet.vy || 0;
         const speed = Math.sqrt(vx * vx + vy * vy);
         if (speed > 0) {
-          this.createMuzzleFlash(data.from.x, data.from.y, vx / speed, vy / speed);
+          this.createMuzzleFlash(
+            data.from.x,
+            data.from.y,
+            vx / speed,
+            vy / speed
+          );
         }
       }
     });
@@ -510,7 +587,11 @@ export default class EffectsSystem extends BaseSystem {
 
     this.registerEventListener('bullet-hit', (data) => {
       if (data?.position) {
-        this.createHitMarker(data.position, data.killed || false, data.damage || 0);
+        this.createHitMarker(
+          data.position,
+          data.killed || false,
+          data.damage || 0
+        );
         this.createBulletImpact(
           data.position,
           { x: data.enemy?.vx || 0, y: data.enemy?.vy || 0 },
@@ -599,7 +680,10 @@ export default class EffectsSystem extends BaseSystem {
 
       // Directional damage indicator
       if (data?.damageSource && data?.playerPosition) {
-        this.createDirectionalDamageIndicator(data.damageSource, data.playerPosition);
+        this.createDirectionalDamageIndicator(
+          data.damageSource,
+          data.playerPosition
+        );
       }
     });
 
@@ -669,11 +753,13 @@ export default class EffectsSystem extends BaseSystem {
   }
 
   updateHitMarkers(deltaTime) {
-    this.hitMarkers = this.hitMarkers.filter(marker => marker.update(deltaTime));
+    this.hitMarkers = this.hitMarkers.filter((marker) =>
+      marker.update(deltaTime)
+    );
   }
 
   updateDamageIndicators(deltaTime) {
-    this.damageIndicators = this.damageIndicators.filter(indicator => {
+    this.damageIndicators = this.damageIndicators.filter((indicator) => {
       indicator.life -= deltaTime;
       indicator.expansion += deltaTime * 30; // Expand at 30px/s
       return indicator.life > 0;
@@ -688,7 +774,8 @@ export default class EffectsSystem extends BaseSystem {
     const frame = this.freezeFrame;
     frame.timer = Math.max(0, frame.timer - baseDelta);
 
-    const duration = frame.duration > 0 ? frame.duration : Math.max(frame.timer, 0);
+    const duration =
+      frame.duration > 0 ? frame.duration : Math.max(frame.timer, 0);
     if (duration <= 0) {
       frame.timer = 0;
       return 1;
@@ -726,7 +813,8 @@ export default class EffectsSystem extends BaseSystem {
 
     if (state.timer > 0 && state.duration > 0) {
       state.timer = Math.max(0, state.timer - baseDelta);
-      const progress = state.duration > 0 ? 1 - state.timer / state.duration : 1;
+      const progress =
+        state.duration > 0 ? 1 - state.timer / state.duration : 1;
       const eased = this.easeValue(state.easing, progress);
       const start = Number.isFinite(state.startScale) ? state.startScale : 1;
       const end = Number.isFinite(state.endScale) ? state.endScale : 1;
@@ -772,7 +860,11 @@ export default class EffectsSystem extends BaseSystem {
     // Update particles and return expired ones to pool
     const activeParticles = [];
     for (const particle of this.particles) {
-      if (particle && typeof particle.update === 'function' && particle.update(deltaTime)) {
+      if (
+        particle &&
+        typeof particle.update === 'function' &&
+        particle.update(deltaTime)
+      ) {
         activeParticles.push(particle);
       } else if (particle) {
         this.releaseParticle(particle);
@@ -782,7 +874,10 @@ export default class EffectsSystem extends BaseSystem {
 
     // Return oldest particles to pool if we have too many
     if (this.particles.length > 150) {
-      const excessParticles = this.particles.splice(0, this.particles.length - 100);
+      const excessParticles = this.particles.splice(
+        0,
+        this.particles.length - 100
+      );
       for (const particle of excessParticles) {
         if (particle) {
           this.releaseParticle(particle);
@@ -854,28 +949,48 @@ export default class EffectsSystem extends BaseSystem {
       if (!wave) return;
 
       ctx.save();
+      // [NEO-ARCADE] Shockwave Rendering
+      // Use additive blending for "light" effect
+      ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = wave.alpha;
-      ctx.strokeStyle = wave.color || 'rgba(0, 191, 255, 1)';
-      ctx.lineWidth = Math.max(0.5, wave.lineWidth);
 
-      if (wave.shadowColor) {
-        const blurBase = Number.isFinite(wave.shadowBlur)
-          ? wave.shadowBlur
-          : 25;
-        ctx.shadowColor = wave.shadowColor;
-        ctx.shadowBlur = blurBase * wave.alpha;
-      } else {
-        ctx.shadowColor = 'rgba(0, 0, 0, 0)';
-        ctx.shadowBlur = 0;
-      }
+      const centerX = wave.x;
+      const centerY = wave.y;
+      const radius = wave.radius;
 
+      // 1. Colored Glow Ring (Thick, blurred)
       ctx.beginPath();
-      ctx.arc(wave.x, wave.y, wave.radius, 0, Math.PI * 2);
-      if (wave.fillColor) {
-        ctx.fillStyle = wave.fillColor;
-        ctx.fill();
-      }
+      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      ctx.lineWidth = Math.max(2, wave.lineWidth * 3);
+      ctx.strokeStyle = wave.color || 'rgba(100, 200, 255, 0.5)';
+      ctx.shadowColor = wave.color;
+      ctx.shadowBlur = 20;
       ctx.stroke();
+
+      // 2. White Hot Core Ring (Thin, sharp)
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+      ctx.lineWidth = Math.max(1, wave.lineWidth);
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.shadowBlur = 0;
+      ctx.stroke();
+
+      // 3. Optional: Chromatic Distortion Echo (very subtle)
+      if (wave.radius > 50) {
+        ctx.globalAlpha = wave.alpha * 0.5;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius - 4, 0, Math.PI * 2);
+        ctx.lineWidth = wave.lineWidth * 0.5;
+        ctx.strokeStyle = '#FF00FF'; // Magenta inner echo
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, radius + 4, 0, Math.PI * 2);
+        ctx.lineWidth = wave.lineWidth * 0.5;
+        ctx.strokeStyle = '#00FFFF'; // Cyan outer echo
+        ctx.stroke();
+      }
+
       ctx.restore();
     });
   }
@@ -888,10 +1003,10 @@ export default class EffectsSystem extends BaseSystem {
     const palette = Array.isArray(payload.phaseColors)
       ? payload.phaseColors
       : Array.isArray(payload?.enemy?.phaseColors)
-      ? payload.enemy.phaseColors
-      : Array.isArray(payload?.boss?.phaseColors)
-      ? payload.boss.phaseColors
-      : null;
+        ? payload.enemy.phaseColors
+        : Array.isArray(payload?.boss?.phaseColors)
+          ? payload.boss.phaseColors
+          : null;
 
     if (palette && palette.length) {
       const phaseIndex = Math.max(
@@ -976,7 +1091,8 @@ export default class EffectsSystem extends BaseSystem {
       return null;
     }
 
-    return BOSS_EFFECTS && Object.prototype.hasOwnProperty.call(BOSS_EFFECTS, name)
+    return BOSS_EFFECTS &&
+      Object.prototype.hasOwnProperty.call(BOSS_EFFECTS, name)
       ? BOSS_EFFECTS[name]
       : null;
   }
@@ -986,7 +1102,8 @@ export default class EffectsSystem extends BaseSystem {
       return null;
     }
 
-    return BOSS_SHAKES && Object.prototype.hasOwnProperty.call(BOSS_SHAKES, name)
+    return BOSS_SHAKES &&
+      Object.prototype.hasOwnProperty.call(BOSS_SHAKES, name)
       ? BOSS_SHAKES[name]
       : null;
   }
@@ -1022,14 +1139,21 @@ export default class EffectsSystem extends BaseSystem {
       presetName = fallbackMap[name];
     }
 
-    if (presetName && Object.prototype.hasOwnProperty.call(ShakePresets, presetName)) {
+    if (
+      presetName &&
+      Object.prototype.hasOwnProperty.call(ShakePresets, presetName)
+    ) {
       this.addScreenShake(presetName, presetOptions);
       return;
     }
 
     if (config && typeof config === 'object') {
-      const intensity = Number.isFinite(config.intensity) ? config.intensity : null;
-      const duration = Number.isFinite(config.duration) ? config.duration : null;
+      const intensity = Number.isFinite(config.intensity)
+        ? config.intensity
+        : null;
+      const duration = Number.isFinite(config.duration)
+        ? config.duration
+        : null;
 
       if (intensity != null && duration != null) {
         this.addScreenShake(intensity, duration);
@@ -1159,24 +1283,32 @@ export default class EffectsSystem extends BaseSystem {
     return null;
   }
 
-  resolveBossPalette(payload = {}, configColors = {}, eventName = 'boss-spawned') {
+  resolveBossPalette(
+    payload = {},
+    configColors = {},
+    eventName = 'boss-spawned'
+  ) {
     const colors = configColors || {};
     const coreColor =
-      this.resolveBossTransitionColor(eventName, payload) || colors.core || '#ff6b9c';
+      this.resolveBossTransitionColor(eventName, payload) ||
+      colors.core ||
+      '#ff6b9c';
 
     const phaseColorsSource = Array.isArray(payload.phaseColors)
       ? payload.phaseColors
       : Array.isArray(payload.enemy?.phaseColors)
-      ? payload.enemy.phaseColors
-      : Array.isArray(payload.boss?.phaseColors)
-      ? payload.boss.phaseColors
-      : null;
+        ? payload.enemy.phaseColors
+        : Array.isArray(payload.boss?.phaseColors)
+          ? payload.boss.phaseColors
+          : null;
 
     const phaseValue = Number(payload.phase);
     const fallbackPhase = Number.isFinite(this.activeBoss?.lastPhase)
       ? this.activeBoss.lastPhase
       : 0;
-    const selectedPhase = Number.isFinite(phaseValue) ? phaseValue : fallbackPhase;
+    const selectedPhase = Number.isFinite(phaseValue)
+      ? phaseValue
+      : fallbackPhase;
 
     let accentColor = colors.accent || null;
     if (phaseColorsSource && phaseColorsSource.length) {
@@ -1207,13 +1339,19 @@ export default class EffectsSystem extends BaseSystem {
     }
 
     const config = this.getBossEffectConfig('entrance') || {};
-    const palette = this.resolveBossPalette(payload, config.colors || {}, 'boss-spawned');
+    const palette = this.resolveBossPalette(
+      payload,
+      config.colors || {},
+      'boss-spawned'
+    );
 
     const swirl = config.swirl || {};
     const swirlCount = this.getScaledParticleCount(swirl.count ?? 48, {
       allowZero: true,
     });
-    const innerRadius = Number.isFinite(swirl.innerRadius) ? swirl.innerRadius : 36;
+    const innerRadius = Number.isFinite(swirl.innerRadius)
+      ? swirl.innerRadius
+      : 36;
     const outerRadius = Number.isFinite(swirl.outerRadius)
       ? swirl.outerRadius
       : Math.max(innerRadius + 40, 120);
@@ -1230,7 +1368,8 @@ export default class EffectsSystem extends BaseSystem {
       const offsetX = Math.cos(angle) * radius;
       const offsetY = Math.sin(angle) * radius;
       const speed = this.randomRange(swirlSpeedMin, swirlSpeedMax, 'boss');
-      const velocityAngle = angle + Math.PI / 2 + this.randomCentered(0.4, 'boss');
+      const velocityAngle =
+        angle + Math.PI / 2 + this.randomCentered(0.4, 'boss');
       const particle = this.createParticle(
         origin.x + offsetX,
         origin.y + offsetY,
@@ -1249,7 +1388,9 @@ export default class EffectsSystem extends BaseSystem {
     const burst = config.burst || {};
     const rings = Math.max(1, burst.rings ?? 2);
     const perRing = Math.max(1, burst.particlesPerRing ?? 24);
-    const radiusStep = Number.isFinite(burst.radiusStep) ? burst.radiusStep : 44;
+    const radiusStep = Number.isFinite(burst.radiusStep)
+      ? burst.radiusStep
+      : 44;
     const burstSpeedMin = burst.speed?.min ?? 140;
     const burstSpeedMax = burst.speed?.max ?? 220;
     const burstSizeMin = burst.size?.min ?? 2.8;
@@ -1473,9 +1614,7 @@ export default class EffectsSystem extends BaseSystem {
     this.addScreenFlash('#ffffff', 0.8, 0.3);
 
     const burstColor =
-      boss?.phaseColors?.[boss.currentPhase] ||
-      palette.core ||
-      '#ff6b6b';
+      boss?.phaseColors?.[boss.currentPhase] || palette.core || '#ff6b6b';
     const burstCount = 50;
     const scheduleBurst = typeof setTimeout === 'function';
 
@@ -1661,7 +1800,10 @@ export default class EffectsSystem extends BaseSystem {
   }
 
   updateBossTransitions(deltaTime) {
-    if (!Array.isArray(this.bossTransitionEffects) || !this.bossTransitionEffects.length) {
+    if (
+      !Array.isArray(this.bossTransitionEffects) ||
+      !this.bossTransitionEffects.length
+    ) {
       return;
     }
 
@@ -1721,7 +1863,8 @@ export default class EffectsSystem extends BaseSystem {
         ctx.restore();
       }
 
-      const overlayAlpha = effect.overlayAlpha * fade * Math.min(1, pulse + 0.15);
+      const overlayAlpha =
+        effect.overlayAlpha * fade * Math.min(1, pulse + 0.15);
       if (overlayAlpha > 0.01) {
         ctx.save();
         ctx.globalAlpha = overlayAlpha;
@@ -1739,7 +1882,7 @@ export default class EffectsSystem extends BaseSystem {
     let trauma = 0;
     let finalDuration = 0;
 
-    const isPlainObject = value =>
+    const isPlainObject = (value) =>
       value && typeof value === 'object' && !Array.isArray(value);
 
     if (typeof presetOrIntensity === 'string') {
@@ -1809,7 +1952,9 @@ export default class EffectsSystem extends BaseSystem {
         finalDuration = options.duration;
       }
     } else {
-      const intensity = Number.isFinite(presetOrIntensity) ? presetOrIntensity : 0;
+      const intensity = Number.isFinite(presetOrIntensity)
+        ? presetOrIntensity
+        : 0;
       const inputDuration = Number.isFinite(durationOrOptions)
         ? durationOrOptions
         : 0;
@@ -1894,13 +2039,13 @@ export default class EffectsSystem extends BaseSystem {
     const optionDuration = Number.isFinite(options.duration)
       ? Math.max(0, options.duration)
       : Number.isFinite(options.transition)
-      ? Math.max(0, options.transition)
-      : 0.45;
+        ? Math.max(0, options.transition)
+        : 0.45;
     const optionHold = Number.isFinite(options.holdDuration)
       ? Math.max(0, options.holdDuration)
       : Number.isFinite(options.hold)
-      ? Math.max(0, options.hold)
-      : 0;
+        ? Math.max(0, options.hold)
+        : 0;
     let duration = optionDuration;
     let holdDuration = optionHold;
 
@@ -1914,7 +2059,8 @@ export default class EffectsSystem extends BaseSystem {
       return;
     }
 
-    const easing = typeof options.easing === 'string' ? options.easing : 'outCubic';
+    const easing =
+      typeof options.easing === 'string' ? options.easing : 'outCubic';
 
     this.timeDilation.holdScale = scale;
     this.timeDilation.holdTimer = holdDuration;
@@ -1951,157 +2097,179 @@ export default class EffectsSystem extends BaseSystem {
     this.screenFlash.intensity = finalIntensity;
   }
 
-  spawnThrusterVFX(worldX, worldY, dirX, dirY, intensity = 1, type = 'main', visualLevel = 0) {
+  spawnThrusterVFX(
+    worldX,
+    worldY,
+    dirX,
+    dirY,
+    intensity = 1,
+    type = 'main',
+    visualLevel = 0
+  ) {
+    if (this.particleDensity < 0.1) return; // Optimization
+
     const i = Math.max(0, Math.min(1, intensity));
     const thrusterFork = 'thrusters';
-    const colorFork = 'colors';
 
-    // AGGRESSIVE Visual upgrade scaling matching design doc v3:
-    // Rank 5 = +150% particles (2.5x), +100% size (2x), +50% lifetime (1.5x), +50% speed (creates longer trail)
-    const visualBoost = 1 + (visualLevel * 0.3); // 30% per level = 2.5x at rank 5
-    const sizeBoost = 1 + (visualLevel * 0.2); // 20% per level = 2x at rank 5
-    const lifeBoost = 1 + (visualLevel * 0.1); // 10% per level = 1.5x at rank 5
-    const speedBoost = 1 + (visualLevel * 0.1); // 10% per level = 1.5x at rank 5 (creates "length")
+    // === UPGRADE SCALING: SPRAY -> AFTERBURNER ===
+    // We want a massive feeling of power at high levels.
 
-    let baseCount, speedBase, sizeRange, lifeRange, colorFn;
+    let countMultiplier = 1;
+    let speedMultiplier = 1;
+    let spreadFactor = 1;
+    let lifeMultiplier = 1;
+    let colorPalette = 'orange'; // orange, blue, neon
 
-    switch (type) {
-      case 'main':
-        baseCount = 3 * visualBoost;
-        speedBase = 120 * speedBoost; // Faster particles = longer visible trail
-        sizeRange = [2.0 * sizeBoost, 3.2 * sizeBoost];
-        lifeRange = [0.22 * lifeBoost, 0.28 * lifeBoost];
-        // Color progression: Orange → Yellow → Cyan-blue (no white plasma)
-        colorFn = () => {
-          if (visualLevel >= 5) {
-            // RANK 5: Electric cyan-blue (no white)
-            return `hsl(${190 + this.randomFloat(colorFork) * 20}, 100%, ${70 + this.randomFloat(colorFork) * 12}%)`;
-          } else if (visualLevel >= 4) {
-            // RANK 4: Bright cyan
-            return `hsl(${185 + this.randomFloat(colorFork) * 25}, 100%, ${68 + this.randomFloat(colorFork) * 14}%)`;
-          } else if (visualLevel >= 3) {
-            // RANK 3: Bright yellow
-            return `hsl(${45 + this.randomFloat(colorFork) * 15}, 100%, ${68 + this.randomFloat(colorFork) * 14}%)`;
-          } else if (visualLevel >= 1) {
-            // RANK 1-2: Brighter orange
-            return `hsl(${25 + this.randomFloat(colorFork) * 20}, 100%, ${63 + this.randomFloat(colorFork) * 14}%)`;
-          }
-          // Base: Standard orange
-          return `hsl(${18 + this.randomFloat(colorFork) * 22}, 100%, ${60 + this.randomFloat(colorFork) * 16}%)`;
-        };
-        break;
-      case 'aux':
-        baseCount = 2 * visualBoost;
-        speedBase = 105 * speedBoost;
-        sizeRange = [1.8 * sizeBoost, 2.6 * sizeBoost];
-        lifeRange = [0.18 * lifeBoost, 0.26 * lifeBoost];
-        // Braking thrusters get brighter with upgrades
-        colorFn = () => {
-          if (visualLevel >= 3) {
-            return `hsl(${190 + this.randomFloat(colorFork) * 20}, 100%, ${75 + this.randomFloat(colorFork) * 15}%)`;
-          }
-          return `hsl(${200 + this.randomFloat(colorFork) * 25}, 100%, ${68 + this.randomFloat(colorFork) * 18}%)`;
-        };
-        break;
-      default: // 'side'
-        baseCount = 2 * visualBoost;
-        speedBase = 110 * speedBoost;
-        sizeRange = [1.6 * sizeBoost, 2.2 * sizeBoost];
-        lifeRange = [0.16 * lifeBoost, 0.22 * lifeBoost];
-        // RCS thrusters: Blue → BRIGHT CYAN
-        colorFn = () => {
-          if (visualLevel >= 5) {
-            // RANK 5: ELECTRIC CYAN
-            return `hsl(${180 + this.randomFloat(colorFork) * 10}, 100%, ${80 + this.randomFloat(colorFork) * 15}%)`;
-          } else if (visualLevel >= 3) {
-            // RANK 3+: Bright cyan
-            return `hsl(${180 + this.randomFloat(colorFork) * 20}, 100%, ${75 + this.randomFloat(colorFork) * 15}%)`;
-          }
-          // Base: Standard blue
-          return `hsl(${200 + this.randomFloat(colorFork) * 25}, 100%, ${70 + this.randomFloat(colorFork) * 18}%)`;
-        };
+    // Scale based on Visual Level (0 to 5+)
+    if (type === 'main') {
+      if (visualLevel >= 5) {
+        // ULTRA AFTERBURNER
+        countMultiplier = 4.0; // Huge density
+        speedMultiplier = 2.5; // Very fast jets
+        spreadFactor = 0.3; // Tight focused beam
+        lifeMultiplier = 0.6; // Short intense life
+        colorPalette = 'neon';
+      } else if (visualLevel >= 3) {
+        // PLASMA JET
+        countMultiplier = 2.5;
+        speedMultiplier = 1.8;
+        spreadFactor = 0.6;
+        colorPalette = 'blue';
+      } else {
+        // STANDARD SPRAY
+        countMultiplier = 1.0;
+        speedMultiplier = 1.0;
+        spreadFactor = 1.2; // Loose spray
+        colorPalette = 'orange';
+      }
+    } else {
+      // Side/Aux thrusters - also need juice!
+      if (visualLevel >= 5) {
+        // PRECISION JETS (Rank 5+)
+        countMultiplier = 3.0;
+        speedMultiplier = 2.0;
+        spreadFactor = 0.4; // Very tight
+        colorPalette = 'neon';
+      } else if (visualLevel >= 3) {
+        // ION BURSTS (Rank 3-4)
+        countMultiplier = 1.8;
+        speedMultiplier = 1.4;
+        spreadFactor = 0.8;
+        colorPalette = 'blue';
+      } else {
+        // GAS PUFFS (Rank 0-2)
+        countMultiplier = 1.0;
+        speedMultiplier = 1.0;
+        spreadFactor = 1.5; // Wide gas cloud
+        colorPalette = 'orange'; // Or white/grey for gas? Keep orange for consistency
+      }
     }
 
-    const rawCount = baseCount * (0.8 + i * 2.0);
-    const count = this.getScaledParticleCount(rawCount);
+    // Base Configuration
+    let baseCount = (type === 'main' ? 2 : 1) * countMultiplier * intensity;
+    // Fractional parts accumulation (simple probabalistic check)
+    if (Math.random() > baseCount % 1) baseCount = Math.floor(baseCount);
+    else baseCount = Math.ceil(baseCount);
 
-    for (let c = 0; c < count; c++) {
-      const jitter = (this.randomFloat(thrusterFork) - 0.5) * 0.35;
-      const spd = speedBase * (0.8 + i * 1.6) * (0.85 + this.randomFloat(thrusterFork) * 0.3);
-      const vx = (-dirX + jitter) * spd + (this.randomFloat(thrusterFork) - 0.5) * 20;
-      const vy = (-dirY + jitter) * spd + (this.randomFloat(thrusterFork) - 0.5) * 20;
-      const size = sizeRange[0] + this.randomFloat(thrusterFork) * (sizeRange[1] - sizeRange[0]);
-      const life = lifeRange[0] + this.randomFloat(thrusterFork) * (lifeRange[1] - lifeRange[0]);
+    const baseSpeed = (type === 'main' ? 140 : 100) * speedMultiplier;
+
+    for (let c = 0; c < baseCount; c++) {
+      const spread = (this.randomFloat(thrusterFork) - 0.5) * spreadFactor;
+
+      // Calculate velocity vector with spread
+      // Main thrusters point opposite to direction
+      const angleBase = Math.atan2(-dirY, -dirX);
+      const angle = angleBase + spread * 0.5; // +/- 0.25 radians approx
+
+      const speed = baseSpeed * (0.8 + this.randomFloat(thrusterFork) * 0.5);
+
+      const vx = Math.cos(angle) * speed;
+      const vy = Math.sin(angle) * speed;
+
+      // Color Logic
+      let color;
+      const t = this.randomFloat(thrusterFork);
+
+      if (colorPalette === 'neon') {
+        // Cyan / Magenta / White hot core
+        if (t > 0.7)
+          color = '#FFFFFF'; // White core
+        else if (t > 0.4)
+          color = '#00FFFF'; // Cyan
+        else color = '#FF00FF'; // Magenta
+      } else if (colorPalette === 'blue') {
+        // Blue / Cyan / White
+        if (t > 0.8) color = '#FFFFFF';
+        else if (t > 0.3) color = '#00CCFF';
+        else color = '#0066FF';
+      } else {
+        // Orange / Yellow / Red
+        if (t > 0.7)
+          color = '#FFFF00'; // Yellow
+        else if (t > 0.3)
+          color = '#FF8800'; // Orange
+        else color = '#FF4400'; // Reddish
+      }
 
       this.particles.push(
         this.createParticle(
-          worldX + (this.randomFloat(thrusterFork) - 0.5) * 3,
-          worldY + (this.randomFloat(thrusterFork) - 0.5) * 3,
-          vx,
-          vy,
-          colorFn(),
-          size,
-          life,
+          worldX + (Math.random() - 0.5) * 4,
+          worldY + (Math.random() - 0.5) * 4,
+          vx + (Math.random() - 0.5) * 10,
+          vy + (Math.random() - 0.5) * 10,
+          color,
+          (1.5 + Math.random() * 2) * (type === 'main' ? 1.5 : 1), // Size
+          (0.2 + Math.random() * 0.3) * lifeMultiplier, // Life
           'thruster'
         )
       );
-
-      // Spark probability increases with visual level (25% → 70% at rank 5)
-      const sparkProbability = 0.25 + (visualLevel * 0.09);
-      if (this.randomFloat(thrusterFork) < this.getScaledProbability(sparkProbability)) {
-        const sparkSpd = spd * (0.9 + this.randomFloat(thrusterFork) * 0.3);
-        const sparkSize = (1.2 + this.randomFloat(thrusterFork) * 0.8) * sizeBoost;
-        this.particles.push(
-          this.createParticle(
-            worldX,
-            worldY,
-            -dirX * sparkSpd,
-            -dirY * sparkSpd,
-            '#FFFFFF',
-            sparkSize,
-            0.08 + this.randomFloat(thrusterFork) * 0.06,
-            'spark'
-          )
-        );
-      }
     }
   }
 
   createMuzzleFlash(x, y, dirX, dirY) {
-    // Create 5-8 bright particles shooting forward from weapon barrel
-    const particleCount = this.getScaledParticleCount(5 + this.randomFloat('muzzleFlash') * 3);
+    // [NEO-ARCADE] Punchy Muzzle Flash - TUNED
+
+    // 1. Core Flash (Bright, Stationary, Short)
+    // Offset increased to 22 (SHIP_SIZE 15 + margin) to clear nose
+    this.particles.push(
+      this.createParticle(
+        x + dirX * 22,
+        y + dirY * 22,
+        dirX * 30, // Drift with ship
+        dirY * 30,
+        '#FFFFFF',
+        5 + Math.random() * 4, // Tuned Size: 5-9px (was 18+)
+        0.06, // Fast pop
+        'spark'
+      )
+    );
+
+    // 2. High-Velocity Sparks (Directional)
+    const particleCount = this.getScaledParticleCount(
+      5 + this.randomFloat('muzzleFlash') * 3 // Reduced count slightly
+    );
 
     for (let i = 0; i < particleCount; i++) {
-      // Cone spread: ±20° from firing direction (wider cone)
-      const spreadAngle = (this.randomFloat('muzzleFlash') - 0.5) * 0.35; // ~20° in radians
+      // Very tight cone (±10°)
+      const spreadAngle = (this.randomFloat('muzzleFlash') - 0.5) * 0.18;
       const angle = Math.atan2(dirY, dirX) + spreadAngle;
 
-      // Speed: 200-350 px/s in firing direction (FASTER, more visible)
-      const speed = 200 + this.randomFloat('muzzleFlash') * 150;
+      const speed = 250 + this.randomFloat('muzzleFlash') * 200;
       const vx = Math.cos(angle) * speed;
       const vy = Math.sin(angle) * speed;
 
-      // Color: BRIGHT white-yellow (more visible)
-      const useWhite = this.randomFloat('muzzleFlash') > 0.5;
-      const color = useWhite
-        ? '#FFFFFF' // Pure white
-        : `hsl(${50 + this.randomFloat('muzzleFlash') * 10}, 100%, 95%)`; // Very bright yellow
-
-      // Size: 3-6px (BIGGER sparks, more visible)
-      const size = 3 + this.randomFloat('muzzleFlash') * 3;
-
-      // Lifetime: 0.12-0.20s (longer duration)
-      const life = 0.12 + this.randomFloat('muzzleFlash') * 0.08;
+      const color =
+        this.randomFloat('muzzleFlash') > 0.3 ? '#FFFF00' : '#FFFFFF';
 
       this.particles.push(
         this.createParticle(
-          x + dirX * 10, // Spawn further ahead (more visible separation)
-          y + dirY * 10,
+          x + dirX * 24, // Spawn at tip
+          y + dirY * 24,
           vx,
           vy,
           color,
-          size,
-          life,
+          1.5 + Math.random() * 2, // Finer sparks
+          0.1 + Math.random() * 0.12,
           'spark'
         )
       );
@@ -2153,17 +2321,17 @@ export default class EffectsSystem extends BaseSystem {
     const x = Number.isFinite(positionCandidate?.x)
       ? positionCandidate.x
       : Number.isFinite(enemy?.x)
-      ? enemy.x
-      : Number.isFinite(enemy?.position?.x)
-      ? enemy.position.x
-      : null;
+        ? enemy.x
+        : Number.isFinite(enemy?.position?.x)
+          ? enemy.position.x
+          : null;
     const y = Number.isFinite(positionCandidate?.y)
       ? positionCandidate.y
       : Number.isFinite(enemy?.y)
-      ? enemy.y
-      : Number.isFinite(enemy?.position?.y)
-      ? enemy.position.y
-      : null;
+        ? enemy.y
+        : Number.isFinite(enemy?.position?.y)
+          ? enemy.position.y
+          : null;
 
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
       return null;
@@ -2186,8 +2354,8 @@ export default class EffectsSystem extends BaseSystem {
       const angle = Number.isFinite(projectile?.angle)
         ? projectile.angle
         : Number.isFinite(payload?.angle)
-        ? payload.angle
-        : null;
+          ? payload.angle
+          : null;
 
       if (Number.isFinite(angle)) {
         const speed = Number.isFinite(projectile?.speed)
@@ -2228,9 +2396,12 @@ export default class EffectsSystem extends BaseSystem {
     const exhaustColor = palette.exhaust || 'rgba(110, 200, 255, 0.45)';
     const flashColor = palette.flash || 'rgba(150, 220, 255, 0.35)';
 
-    const particleCount = this.getScaledParticleCount(4 + this.randomFloat('muzzleFlash') * 3, {
-      minimum: 2,
-    });
+    const particleCount = this.getScaledParticleCount(
+      4 + this.randomFloat('muzzleFlash') * 3,
+      {
+        minimum: 2,
+      }
+    );
 
     const baseAngle = Math.atan2(direction.y, direction.x);
     for (let i = 0; i < particleCount; i += 1) {
@@ -2262,8 +2433,12 @@ export default class EffectsSystem extends BaseSystem {
         this.createParticle(
           origin.x,
           origin.y,
-          -direction.x * backSpeed * (0.7 + this.randomFloat('muzzleFlash') * 0.5),
-          -direction.y * backSpeed * (0.7 + this.randomFloat('muzzleFlash') * 0.5),
+          -direction.x *
+            backSpeed *
+            (0.7 + this.randomFloat('muzzleFlash') * 0.5),
+          -direction.y *
+            backSpeed *
+            (0.7 + this.randomFloat('muzzleFlash') * 0.5),
           exhaustColor,
           2.6 + this.randomFloat('muzzleFlash') * 2.4,
           0.16 + this.randomFloat('muzzleFlash') * 0.12,
@@ -2332,8 +2507,12 @@ export default class EffectsSystem extends BaseSystem {
         this.createParticle(
           origin.x,
           origin.y,
-          -direction.x * backSpeed * (0.6 + this.randomFloat('muzzleFlash') * 0.4),
-          -direction.y * backSpeed * (0.6 + this.randomFloat('muzzleFlash') * 0.4),
+          -direction.x *
+            backSpeed *
+            (0.6 + this.randomFloat('muzzleFlash') * 0.4),
+          -direction.y *
+            backSpeed *
+            (0.6 + this.randomFloat('muzzleFlash') * 0.4),
           trailColor,
           2.8 + this.randomFloat('muzzleFlash') * 2.6,
           0.18 + this.randomFloat('muzzleFlash') * 0.1,
@@ -2407,13 +2586,18 @@ export default class EffectsSystem extends BaseSystem {
       this.processedMineExplosions.add(enemy);
     }
 
-    const positionCandidate = payload.position || (enemy ? { x: enemy.x, y: enemy.y } : null);
+    const positionCandidate =
+      payload.position || (enemy ? { x: enemy.x, y: enemy.y } : null);
     if (!positionCandidate) {
       return;
     }
 
-    const posX = Number.isFinite(positionCandidate.x) ? positionCandidate.x : null;
-    const posY = Number.isFinite(positionCandidate.y) ? positionCandidate.y : null;
+    const posX = Number.isFinite(positionCandidate.x)
+      ? positionCandidate.x
+      : null;
+    const posY = Number.isFinite(positionCandidate.y)
+      ? positionCandidate.y
+      : null;
     if (!Number.isFinite(posX) || !Number.isFinite(posY)) {
       return;
     }
@@ -2423,8 +2607,8 @@ export default class EffectsSystem extends BaseSystem {
     const radius = Number.isFinite(payload.radius)
       ? payload.radius
       : Number.isFinite(enemy?.explosionRadius)
-      ? enemy.explosionRadius
-      : 120;
+        ? enemy.explosionRadius
+        : 120;
     const velocity = payload.velocity || {
       x: Number.isFinite(enemy?.vx) ? enemy.vx : 0,
       y: Number.isFinite(enemy?.vy) ? enemy.vy : 0,
@@ -2432,7 +2616,8 @@ export default class EffectsSystem extends BaseSystem {
 
     const radiusFactor = Math.max(1, radius / 110);
     const flashColor = palette.flash || 'rgba(255, 190, 110, 0.4)';
-    const shockwaveColor = palette.shockwave || palette.flash || 'rgba(255, 160, 70, 0.35)';
+    const shockwaveColor =
+      palette.shockwave || palette.flash || 'rgba(255, 160, 70, 0.35)';
     const debrisColor = palette.debris || '#7A3B16';
     const sparkColor = palette.sparks || '#FFD27F';
     const smokeColor = palette.smoke || 'rgba(90, 40, 20, 0.45)';
@@ -2476,7 +2661,8 @@ export default class EffectsSystem extends BaseSystem {
     for (let i = 0; i < sparkCount; i += 1) {
       const angle = this.randomFloat('explosions') * Math.PI * 2;
       const speed =
-        (140 + this.randomFloat('explosions') * 180) * (0.9 + radiusFactor * 0.25);
+        (140 + this.randomFloat('explosions') * 180) *
+        (0.9 + radiusFactor * 0.25);
       this.particles.push(
         this.createParticle(
           position.x,
@@ -2491,7 +2677,9 @@ export default class EffectsSystem extends BaseSystem {
       );
     }
 
-    const debrisCount = this.getScaledParticleCount(14 + Math.round(radius / 6));
+    const debrisCount = this.getScaledParticleCount(
+      14 + Math.round(radius / 6)
+    );
     for (let i = 0; i < debrisCount; i += 1) {
       const angle = this.randomFloat('explosions') * Math.PI * 2;
       const speed = 90 + this.randomFloat('explosions') * 110;
@@ -2509,9 +2697,12 @@ export default class EffectsSystem extends BaseSystem {
       );
     }
 
-    const smokeCount = this.getScaledParticleCount(10 + Math.round(radius / 10), {
-      allowZero: true,
-    });
+    const smokeCount = this.getScaledParticleCount(
+      10 + Math.round(radius / 10),
+      {
+        allowZero: true,
+      }
+    );
     for (let i = 0; i < smokeCount; i += 1) {
       const angle = this.randomFloat('explosions') * Math.PI * 2;
       const speed = 40 + this.randomFloat('explosions') * 60;
@@ -2536,8 +2727,16 @@ export default class EffectsSystem extends BaseSystem {
     }
 
     const position = {
-      x: Number.isFinite(enemy.x) ? enemy.x : Number.isFinite(context?.position?.x) ? context.position.x : null,
-      y: Number.isFinite(enemy.y) ? enemy.y : Number.isFinite(context?.position?.y) ? context.position.y : null,
+      x: Number.isFinite(enemy.x)
+        ? enemy.x
+        : Number.isFinite(context?.position?.x)
+          ? context.position.x
+          : null,
+      y: Number.isFinite(enemy.y)
+        ? enemy.y
+        : Number.isFinite(context?.position?.y)
+          ? context.position.y
+          : null,
     };
 
     if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) {
@@ -2552,7 +2751,11 @@ export default class EffectsSystem extends BaseSystem {
     };
 
     this.addScreenShake('droneDestroyed');
-    this.addScreenFlash(palette.flash || 'rgba(150, 220, 255, 0.35)', 0.12, 0.1);
+    this.addScreenFlash(
+      palette.flash || 'rgba(150, 220, 255, 0.35)',
+      0.12,
+      0.1
+    );
 
     const sparkCount = this.getScaledParticleCount(14 + Math.round(radius));
     for (let i = 0; i < sparkCount; i += 1) {
@@ -2615,8 +2818,16 @@ export default class EffectsSystem extends BaseSystem {
     }
 
     const position = {
-      x: Number.isFinite(enemy.x) ? enemy.x : Number.isFinite(context?.position?.x) ? context.position.x : null,
-      y: Number.isFinite(enemy.y) ? enemy.y : Number.isFinite(context?.position?.y) ? context.position.y : null,
+      x: Number.isFinite(enemy.x)
+        ? enemy.x
+        : Number.isFinite(context?.position?.x)
+          ? context.position.x
+          : null,
+      y: Number.isFinite(enemy.y)
+        ? enemy.y
+        : Number.isFinite(context?.position?.y)
+          ? context.position.y
+          : null,
     };
 
     if (!Number.isFinite(position.x) || !Number.isFinite(position.y)) {
@@ -2631,7 +2842,11 @@ export default class EffectsSystem extends BaseSystem {
     };
 
     this.addScreenShake('hunterDestroyed');
-    this.addScreenFlash(palette.flash || 'rgba(255, 200, 255, 0.38)', 0.14, 0.14);
+    this.addScreenFlash(
+      palette.flash || 'rgba(255, 200, 255, 0.38)',
+      0.14,
+      0.14
+    );
     this.createShockwaveEffect({
       position,
       radius: radius * 2.4,
@@ -2643,13 +2858,16 @@ export default class EffectsSystem extends BaseSystem {
       shadowBlur: 22,
     });
 
-    const sparkCount = this.getScaledParticleCount(18 + Math.round(radius * 1.5));
+    const sparkCount = this.getScaledParticleCount(
+      18 + Math.round(radius * 1.5)
+    );
     for (let i = 0; i < sparkCount; i += 1) {
       const angle = this.randomFloat('explosions') * Math.PI * 2;
       const speed = 150 + this.randomFloat('explosions') * 170;
-      const color = i % 3 === 0
-        ? palette.explosionCore || 'rgba(250, 150, 255, 0.5)'
-        : palette.explosionSpark || '#FFE8FF';
+      const color =
+        i % 3 === 0
+          ? palette.explosionCore || 'rgba(250, 150, 255, 0.5)'
+          : palette.explosionSpark || '#FFE8FF';
       this.particles.push(
         this.createParticle(
           position.x,
@@ -2790,15 +3008,21 @@ export default class EffectsSystem extends BaseSystem {
 
       // Spark color: BRIGHT red if killed, BRIGHT cyan/blue if hit (different from muzzle)
       const color = killed
-        ? (this.randomFloat('hits') > 0.3 ? '#FF3333' : '#FFAA00') // Red/orange mix for kills
-        : (this.randomFloat('hits') > 0.5 ? '#00FFFF' : '#88FFFF'); // Cyan for hits (contrast with yellow muzzle)
+        ? this.randomFloat('hits') > 0.3
+          ? '#FF3333'
+          : '#FFAA00' // Red/orange mix for kills
+        : this.randomFloat('hits') > 0.5
+          ? '#00FFFF'
+          : '#88FFFF'; // Cyan for hits (contrast with yellow muzzle)
 
       // Inherit some momentum from the enemy
       const vx = Math.cos(angle) * speed + enemyVelocity.x * 0.3;
       const vy = Math.sin(angle) * speed + enemyVelocity.y * 0.3;
 
       // BIGGER sparks (more visible)
-      const size = killed ? 3 + this.randomFloat('hits') * 2.5 : 2.5 + this.randomFloat('hits') * 2;
+      const size = killed
+        ? 3 + this.randomFloat('hits') * 2.5
+        : 2.5 + this.randomFloat('hits') * 2;
 
       // Longer lifetime
       const life = 0.18 + this.randomFloat('hits') * 0.12; // 0.18-0.30s
@@ -2824,9 +3048,7 @@ export default class EffectsSystem extends BaseSystem {
     }
 
     const radius =
-      typeof data.radius === 'number'
-        ? data.radius
-        : SHIELD_SHOCKWAVE_RADIUS;
+      typeof data.radius === 'number' ? data.radius : SHIELD_SHOCKWAVE_RADIUS;
 
     const duration =
       typeof data.duration === 'number' && data.duration > 0
@@ -2949,7 +3171,9 @@ export default class EffectsSystem extends BaseSystem {
     );
 
     for (let i = 0; i < particleCount; i += 1) {
-      const angle = (Math.PI * 2 * i) / particleCount + this.randomFloat('explosions') * 0.3;
+      const angle =
+        (Math.PI * 2 * i) / particleCount +
+        this.randomFloat('explosions') * 0.3;
       const speed = 60 + this.randomFloat('explosions') * 80;
       const particle = this.createParticle(
         x,
@@ -3008,7 +3232,9 @@ export default class EffectsSystem extends BaseSystem {
     this.addScreenFlash('rgba(255, 255, 255, 0.8)', 0.4, 0.6);
 
     // HIGH VELOCITY FRAGMENTS (50-80 particles)
-    const fragmentCount = this.getScaledParticleCount(50 + this.randomFloat('explosions') * 30);
+    const fragmentCount = this.getScaledParticleCount(
+      50 + this.randomFloat('explosions') * 30
+    );
     for (let i = 0; i < fragmentCount; i++) {
       const angle = this.randomFloat('explosions') * Math.PI * 2;
       // HIGH VELOCITY: 250-500 px/s
@@ -3017,9 +3243,12 @@ export default class EffectsSystem extends BaseSystem {
       // Mix of colors: white, yellow, orange, red
       const colorChoice = this.randomFloat('explosions');
       let color;
-      if (colorChoice < 0.25) color = '#FFFFFF'; // White hot
-      else if (colorChoice < 0.5) color = '#FFFF00'; // Yellow
-      else if (colorChoice < 0.75) color = '#FF8800'; // Orange
+      if (colorChoice < 0.25)
+        color = '#FFFFFF'; // White hot
+      else if (colorChoice < 0.5)
+        color = '#FFFF00'; // Yellow
+      else if (colorChoice < 0.75)
+        color = '#FF8800'; // Orange
       else color = '#FF3333'; // Red
 
       // Large fragments
@@ -3054,7 +3283,7 @@ export default class EffectsSystem extends BaseSystem {
       duration: 0.8, // Longer duration
       color: 'rgba(255, 100, 50, 0.6)', // Orange-red
       baseWidth: 8, // Thick wave
-      maxAlpha: 0.8 // Very visible
+      maxAlpha: 0.8, // Very visible
     });
 
     // Secondary inner shockwave (more intense)
@@ -3065,7 +3294,7 @@ export default class EffectsSystem extends BaseSystem {
         duration: 0.5,
         color: 'rgba(255, 200, 100, 0.7)', // Bright yellow-orange
         baseWidth: 6,
-        maxAlpha: 0.9
+        maxAlpha: 0.9,
       });
     }, 100);
   }
@@ -3116,7 +3345,10 @@ export default class EffectsSystem extends BaseSystem {
           y: Number.isFinite(asteroid.y) ? asteroid.y : 0,
         };
       }
-      if (!Number.isFinite(minePayload.radius) && Number.isFinite(asteroid.explosionRadius)) {
+      if (
+        !Number.isFinite(minePayload.radius) &&
+        Number.isFinite(asteroid.explosionRadius)
+      ) {
         minePayload.radius = asteroid.explosionRadius;
       }
       if (!minePayload.velocity) {
@@ -3143,12 +3375,17 @@ export default class EffectsSystem extends BaseSystem {
       variantColors?.glow ||
       variantColors?.pulse ||
       `hsl(${this.randomFloat('explosions') * 20 + 30}, 100%, 70%)`;
-    const secondarySparkColor = variantColors?.cracks || 'rgba(255, 220, 170, 0.85)';
+    const secondarySparkColor =
+      variantColors?.cracks || 'rgba(255, 220, 170, 0.85)';
 
     const baseCount = { large: 12, medium: 8, small: 5 }[asteroid.size] || 6;
-    const radius = Number.isFinite(asteroid.radius) ? Math.max(asteroid.radius, 12) : 20;
+    const radius = Number.isFinite(asteroid.radius)
+      ? Math.max(asteroid.radius, 12)
+      : 20;
     const densityFactor = Math.max(1, radius / 22);
-    const particleCount = this.getScaledParticleCount(Math.round(baseCount * densityFactor));
+    const particleCount = this.getScaledParticleCount(
+      Math.round(baseCount * densityFactor)
+    );
 
     const parentVx = Number.isFinite(asteroid.vx) ? asteroid.vx : 0;
     const parentVy = Number.isFinite(asteroid.vy) ? asteroid.vy : 0;
@@ -3157,12 +3394,36 @@ export default class EffectsSystem extends BaseSystem {
 
     if (asteroid.size === 'small') {
       this.addScreenShake(2 + radius * 0.01, 0.12);
+      // Small shockwave
+      this.createShockwaveEffect({
+        position: { x: asteroid.x, y: asteroid.y },
+        radius: 60,
+        duration: 0.3,
+        color: sparkColor,
+        baseWidth: 6,
+      });
     } else if (asteroid.size === 'medium') {
       this.addScreenShake(4 + radius * 0.012, 0.18);
+      // Medium shockwave
+      this.createShockwaveEffect({
+        position: { x: asteroid.x, y: asteroid.y },
+        radius: 120,
+        duration: 0.4,
+        color: sparkColor,
+        baseWidth: 10,
+      });
     } else if (asteroid.size === 'large') {
       this.addScreenShake(8 + radius * 0.015, 0.28);
       this.addFreezeFrame(0.18, 0.24);
       this.addScreenFlash(variantColors?.glow || '#FF6B6B', 0.22, 0.12);
+      // Massive shockwave
+      this.createShockwaveEffect({
+        position: { x: asteroid.x, y: asteroid.y },
+        radius: 250,
+        duration: 0.6,
+        color: sparkColor,
+        baseWidth: 20,
+      });
     }
 
     for (let i = 0; i < particleCount; i += 1) {
@@ -3220,18 +3481,13 @@ export default class EffectsSystem extends BaseSystem {
       medium: '#A0522D',
       small: '#CD853F',
     };
-    const config =
-      ASTEROID_VARIANTS?.[variant] ||
-      ASTEROID_VARIANTS?.common;
+    const config = ASTEROID_VARIANTS?.[variant] || ASTEROID_VARIANTS?.common;
     const colors = config?.colors || {};
     const fallbackFill = fallbackBySize[size] || fallbackBySize.medium;
 
     return {
       cracks: colors.cracks || 'rgba(255, 235, 200, 0.92)',
-      glow:
-        colors.innerGlow ||
-        colors.glow ||
-        'rgba(255, 255, 255, 0.28)',
+      glow: colors.innerGlow || colors.glow || 'rgba(255, 255, 255, 0.28)',
       debris: colors.fill || fallbackFill,
     };
   }
@@ -3371,7 +3627,10 @@ export default class EffectsSystem extends BaseSystem {
       const worldEnd = toWorldPoint(segment.end);
       const midX = (worldStart.x + worldEnd.x) * 0.5;
       const midY = (worldStart.y + worldEnd.y) * 0.5;
-      const angle = Math.atan2(worldEnd.y - worldStart.y, worldEnd.x - worldStart.x);
+      const angle = Math.atan2(
+        worldEnd.y - worldStart.y,
+        worldEnd.x - worldStart.x
+      );
       const crackLength = Math.max(0.5, segment.length);
 
       const crack = new SpaceParticle(
@@ -3455,7 +3714,11 @@ export default class EffectsSystem extends BaseSystem {
     for (let i = 0; i < sparkCount; i += 1) {
       const segment =
         selectedSegments.length > 0
-          ? selectedSegments[Math.floor(this.randomFloat('explosions') * selectedSegments.length)]
+          ? selectedSegments[
+              Math.floor(
+                this.randomFloat('explosions') * selectedSegments.length
+              )
+            ]
           : null;
       const t = this.randomFloat('explosions');
       const localOrigin = segment
@@ -3571,7 +3834,8 @@ export default class EffectsSystem extends BaseSystem {
       const spawnY = position.y + Math.sin(angle + Math.PI) * offsetMag;
 
       const emberSpeed =
-        this.randomRange(speedRange[0], speedRange[1], 'volatility') * speedScale;
+        this.randomRange(speedRange[0], speedRange[1], 'volatility') *
+        speedScale;
       const emberLife =
         this.randomRange(lifeRange[0], lifeRange[1], 'volatility') *
         (0.7 + totalIntensity * 0.5);
@@ -3714,7 +3978,8 @@ export default class EffectsSystem extends BaseSystem {
     );
     for (let i = 0; i < particleTotal; i += 1) {
       const angle = this.randomFloat('volatility') * Math.PI * 2;
-      const speed = (70 + this.randomFloat('volatility') * 150) * (0.8 + intensity * 0.4);
+      const speed =
+        (70 + this.randomFloat('volatility') * 150) * (0.8 + intensity * 0.4);
 
       const flame = new SpaceParticle(
         position.x,
@@ -3781,16 +4046,22 @@ export default class EffectsSystem extends BaseSystem {
   captureRandomForkSeeds() {
     super.captureRandomForkSeeds();
 
-    if (this.screenShake && typeof this.screenShake.captureSeedState === 'function') {
+    if (
+      this.screenShake &&
+      typeof this.screenShake.captureSeedState === 'function'
+    ) {
       this.screenShakeSeedState = this.screenShake.captureSeedState();
     }
   }
 
   onReset() {
     if (this.screenShake && typeof this.screenShake.reseed === 'function') {
-      const snapshot = this.screenShake.reseed(this.getRandomFork('screenShake'), {
-        preserveTrauma: true,
-      });
+      const snapshot = this.screenShake.reseed(
+        this.getRandomFork('screenShake'),
+        {
+          preserveTrauma: true,
+        }
+      );
       if (snapshot && typeof snapshot === 'object') {
         this.screenShakeSeedState = { ...snapshot };
       } else if (typeof this.screenShake.captureSeedState === 'function') {
@@ -3809,15 +4080,21 @@ export default class EffectsSystem extends BaseSystem {
 
     // Custom ScreenShake reseeding
     if (this.screenShake && typeof this.screenShake.reseed === 'function') {
-      const snapshot = this.screenShake.reseed(this.getRandomFork('screenShake'), {
-        seedState: this.screenShakeSeedState,
-      });
+      const snapshot = this.screenShake.reseed(
+        this.getRandomFork('screenShake'),
+        {
+          seedState: this.screenShakeSeedState,
+        }
+      );
       if (snapshot && typeof snapshot === 'object') {
         this.screenShakeSeedState = { ...snapshot };
       } else if (typeof this.screenShake.captureSeedState === 'function') {
         this.screenShakeSeedState = this.screenShake.captureSeedState();
       }
-    } else if (this.screenShake && typeof this.screenShake.reset === 'function') {
+    } else if (
+      this.screenShake &&
+      typeof this.screenShake.reset === 'function'
+    ) {
       this.screenShake.reset();
     }
 

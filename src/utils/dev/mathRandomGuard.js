@@ -2,7 +2,7 @@ const guardState = {
   installed: false,
   activate: null,
   deactivate: null,
-  restore: null
+  restore: null,
 };
 
 function formatStack(stack) {
@@ -26,7 +26,7 @@ export function installMathRandomGuard({ logger = console } = {}) {
     return {
       activate: guardState.activate,
       deactivate: guardState.deactivate,
-      restore: guardState.restore
+      restore: guardState.restore,
     };
   }
 
@@ -34,7 +34,7 @@ export function installMathRandomGuard({ logger = console } = {}) {
     return {
       activate: () => {},
       deactivate: () => {},
-      restore: () => {}
+      restore: () => {},
     };
   }
 
@@ -44,8 +44,7 @@ export function installMathRandomGuard({ logger = console } = {}) {
   function emitViolation() {
     const stack = formatStack(new Error().stack);
     const context = stack ? `\nStack: ${stack}` : '';
-    const message =
-      `[RandomGuard] Math.random() invoked after deterministic bootstrap. Use RandomService forks instead.${context}`;
+    const message = `[RandomGuard] Math.random() invoked after deterministic bootstrap. Use RandomService forks instead.${context}`;
 
     if (logger && typeof logger.error === 'function') {
       logger.error(message);
@@ -62,7 +61,10 @@ export function installMathRandomGuard({ logger = console } = {}) {
   }
 
   try {
-    Object.defineProperty(patchedRandom, 'name', { value: 'MathRandomGuarded', configurable: true });
+    Object.defineProperty(patchedRandom, 'name', {
+      value: 'MathRandomGuarded',
+      configurable: true,
+    });
   } catch (error) {
     // Ignore errors from defineProperty in older environments
   }
@@ -89,7 +91,7 @@ export function installMathRandomGuard({ logger = console } = {}) {
   return {
     activate: guardState.activate,
     deactivate: guardState.deactivate,
-    restore: guardState.restore
+    restore: guardState.restore,
   };
 }
 

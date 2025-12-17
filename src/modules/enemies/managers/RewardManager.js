@@ -43,7 +43,10 @@ import { MINE_REWARDS } from '../../../data/enemies/mine.js';
 import { BOSS_REWARDS } from '../../../data/enemies/boss.js';
 import { ENEMY_REWARDS } from '../../../data/constants/visual.js';
 import RandomService from '../../../core/RandomService.js';
-import { normalizeDependencies, resolveService } from '../../../core/serviceUtils.js';
+import {
+  normalizeDependencies,
+  resolveService,
+} from '../../../core/serviceUtils.js';
 
 /**
  * @typedef {import('../base/BaseEnemy.js').BaseEnemy} BaseEnemy
@@ -72,7 +75,7 @@ import { normalizeDependencies, resolveService } from '../../../core/serviceUtil
 const TWO_PI = Math.PI * 2;
 
 export class RewardManager {
- /**
+  /**
    * Creates a new Reward Manager.
    *
    * @param {Object} dependencies - Object containing injected services
@@ -111,8 +114,7 @@ export class RewardManager {
 
     this.random =
       this.dependencies.random ||
-      (this.enemySystem &&
-        typeof this.enemySystem.getRandomScope === 'function'
+      (this.enemySystem && typeof this.enemySystem.getRandomScope === 'function'
         ? this.enemySystem.getRandomScope('enemy-rewards', {
             parentScope: 'fragments',
             label: 'enemy-rewards',
@@ -142,7 +144,7 @@ export class RewardManager {
     this.stats = {
       totalOrbsDropped: 0,
       totalXPDropped: 0,
-      dropsByType: new Map()
+      dropsByType: new Map(),
     };
 
     console.log('[RewardManager] Initialized');
@@ -168,7 +170,7 @@ export class RewardManager {
         const factors = ASTEROID_SIZE_ORB_FACTOR || {
           large: 3.0,
           medium: 2.0,
-          small: 1.0
+          small: 1.0,
         };
         return factors[size] || 1.0;
       },
@@ -176,7 +178,7 @@ export class RewardManager {
         // Use correct orbMultiplier from GameConstants
         const variantConfig = ASTEROID_VARIANTS[variant];
         return variantConfig?.orbMultiplier ?? 1.0;
-      }
+      },
     });
 
     const droneRewards = DRONE_REWARDS;
@@ -247,31 +249,34 @@ export class RewardManager {
     }
 
     // Calculate orb count using orb-based system (matches XPOrbSystem logic)
-    const baseOrbsRaw = typeof config.baseOrbs === 'function'
-      ? config.baseOrbs(enemy.size, enemy)
-      : (config.baseOrbs ?? 1);
-    const sizeFactor = typeof config.sizeFactor === 'function'
-      ? config.sizeFactor(enemy.size, enemy)
-      : 1.0;
-    const variantMultiplier = typeof config.variantMultiplier === 'function'
-      ? config.variantMultiplier(enemy.variant, enemy)
-      : 1.0;
+    const baseOrbsRaw =
+      typeof config.baseOrbs === 'function'
+        ? config.baseOrbs(enemy.size, enemy)
+        : config.baseOrbs ?? 1;
+    const sizeFactor =
+      typeof config.sizeFactor === 'function'
+        ? config.sizeFactor(enemy.size, enemy)
+        : 1.0;
+    const variantMultiplier =
+      typeof config.variantMultiplier === 'function'
+        ? config.variantMultiplier(enemy.variant, enemy)
+        : 1.0;
 
     const baseOrbProduct = (baseOrbsRaw ?? 1) * sizeFactor * variantMultiplier;
     const baseOrbCount = Math.max(1, Math.round(baseOrbProduct));
 
     // Wave scaling: +1 orb per 5 waves (same as XPOrbSystem)
     const wave = enemy.wave || 1;
-    const waveBonus = wave <= 10
-      ? Math.floor(wave / 5)
-      : Math.floor((wave - 10) / 3) + 2;
+    const waveBonus =
+      wave <= 10 ? Math.floor(wave / 5) : Math.floor((wave - 10) / 3) + 2;
 
     // Final orb count including wave bonus
     const orbCount = Math.max(1, baseOrbCount + Math.max(0, waveBonus));
 
-    const resolvedTotalXP = typeof config.totalXP === 'function'
-      ? config.totalXP(enemy, baseOrbCount)
-      : config.totalXP;
+    const resolvedTotalXP =
+      typeof config.totalXP === 'function'
+        ? config.totalXP(enemy, baseOrbCount)
+        : config.totalXP;
     const fallbackOrbValue = config.orbValue ?? ORB_VALUE ?? 5;
 
     const xpDistribution = this.buildXPDistribution({
@@ -314,17 +319,21 @@ export class RewardManager {
     const velocityRandom = context?.velocity || context?.base;
     const radius = Number.isFinite(enemy?.radius) ? enemy.radius : 0;
     const total = Math.max(count, 1);
-    const fallbackXP = Math.max(1, Array.isArray(xpPerOrb)
-      ? (xpPerOrb[0] ?? ORB_VALUE ?? 5)
-      : xpPerOrb);
+    const fallbackXP = Math.max(
+      1,
+      Array.isArray(xpPerOrb) ? xpPerOrb[0] ?? ORB_VALUE ?? 5 : xpPerOrb
+    );
 
     for (let i = 0; i < count; i += 1) {
-      const orbPlacementRandom = this.forkRandom(placementRandom, `orb-${i}`) || placementRandom;
-      const orbVelocityRandom = this.forkRandom(velocityRandom, `orb-${i}`) || velocityRandom;
+      const orbPlacementRandom =
+        this.forkRandom(placementRandom, `orb-${i}`) || placementRandom;
+      const orbVelocityRandom =
+        this.forkRandom(velocityRandom, `orb-${i}`) || velocityRandom;
 
       const angleOffset = this.randomRange(orbPlacementRandom, 0, 0.3);
       const angle = (TWO_PI * i) / total + angleOffset;
-      const distance = radius * 0.5 + this.randomRange(orbPlacementRandom, 0, radius);
+      const distance =
+        radius * 0.5 + this.randomRange(orbPlacementRandom, 0, radius);
 
       const orbX = enemy.x + Math.cos(angle) * distance;
       const orbY = enemy.y + Math.sin(angle) * distance;
@@ -343,7 +352,7 @@ export class RewardManager {
           vy: vy,
           fromEnemy: enemy.type,
           enemySize: enemy.size,
-          enemyVariant: enemy.variant
+          enemyVariant: enemy.variant,
         });
       } catch (error) {
         console.error('[RewardManager] Failed to create XP orb:', error);
@@ -367,10 +376,20 @@ export class RewardManager {
     totalXP,
     fallbackOrbValue,
   }) {
-    const safeBaseCount = Math.max(1, Number.isFinite(baseOrbCount) ? Math.round(baseOrbCount) : 1);
-    const safeExtraCount = Math.max(0, Number.isFinite(extraOrbCount) ? Math.round(extraOrbCount) : 0);
-    const safeFallback = Math.max(1, Math.round(fallbackOrbValue ?? ORB_VALUE ?? 5));
-    const hasTargetXP = typeof totalXP === 'number' && Number.isFinite(totalXP) && totalXP > 0;
+    const safeBaseCount = Math.max(
+      1,
+      Number.isFinite(baseOrbCount) ? Math.round(baseOrbCount) : 1
+    );
+    const safeExtraCount = Math.max(
+      0,
+      Number.isFinite(extraOrbCount) ? Math.round(extraOrbCount) : 0
+    );
+    const safeFallback = Math.max(
+      1,
+      Math.round(fallbackOrbValue ?? ORB_VALUE ?? 5)
+    );
+    const hasTargetXP =
+      typeof totalXP === 'number' && Number.isFinite(totalXP) && totalXP > 0;
 
     if (!hasTargetXP) {
       return new Array(safeBaseCount + safeExtraCount).fill(safeFallback);
@@ -415,7 +434,10 @@ export class RewardManager {
     }
 
     const result = [...distribution];
-    const extraValue = distribution.length > 0 ? distribution[distribution.length - 1] : safeFallback;
+    const extraValue =
+      distribution.length > 0
+        ? distribution[distribution.length - 1]
+        : safeFallback;
     for (let i = 0; i < safeExtraCount; i += 1) {
       result.push(Math.max(1, extraValue));
     }
@@ -437,7 +459,7 @@ export class RewardManager {
     if (!this.stats.dropsByType.has(type)) {
       this.stats.dropsByType.set(type, {
         orbs: 0,
-        xp: 0
+        xp: 0,
       });
     }
 
@@ -455,7 +477,7 @@ export class RewardManager {
     return {
       totalOrbsDropped: this.stats.totalOrbsDropped,
       totalXPDropped: this.stats.totalXPDropped,
-      dropsByType: Object.fromEntries(this.stats.dropsByType)
+      dropsByType: Object.fromEntries(this.stats.dropsByType),
     };
   }
 
@@ -482,7 +504,7 @@ export class RewardManager {
 
     // Combo bonus
     if (context.combo && context.combo > 1) {
-      multiplier *= Math.min(1 + (context.combo * 0.1), 2.0);
+      multiplier *= Math.min(1 + context.combo * 0.1, 2.0);
     }
 
     // Perfect wave bonus (no damage taken)
@@ -515,11 +537,11 @@ export class RewardManager {
     if (!xpOrbSystem) return;
 
     const milestoneRewards = {
-      'first_kill': 50,
-      'wave_complete': 100,
-      'perfect_wave': 200,
-      'boss_kill': 500,
-      'achievement': 150
+      first_kill: 50,
+      wave_complete: 100,
+      perfect_wave: 200,
+      boss_kill: 500,
+      achievement: 150,
     };
 
     const xpValue = milestoneRewards[milestone] || 100;
@@ -529,10 +551,13 @@ export class RewardManager {
         special: true,
         milestone: milestone,
         vx: 0,
-        vy: 0
+        vy: 0,
       });
     } catch (error) {
-      console.error('[RewardManager] Failed to create milestone reward:', error);
+      console.error(
+        '[RewardManager] Failed to create milestone reward:',
+        error
+      );
     }
   }
 
@@ -544,15 +569,16 @@ export class RewardManager {
    */
   handleWaveRewards(waveNumber, waveStats = {}) {
     // Base wave completion bonus
-    const baseBonus = 50 + (waveNumber * 10);
+    const baseBonus = 50 + waveNumber * 10;
 
     // Perfect wave bonus
     const perfectBonus = waveStats.damageTaken === 0 ? baseBonus : 0;
 
     // Time bonus (faster completion)
-    const timeBonus = waveStats.duration && waveStats.duration < 30
-      ? Math.floor(baseBonus * 0.5)
-      : 0;
+    const timeBonus =
+      waveStats.duration && waveStats.duration < 30
+        ? Math.floor(baseBonus * 0.5)
+        : 0;
 
     const totalBonus = baseBonus + perfectBonus + timeBonus;
 
@@ -561,8 +587,10 @@ export class RewardManager {
 
     if (totalBonus > 0 && xpOrbSystem) {
       // Create bonus orb at screen center
-      const worldBounds = enemySystem?.getCachedWorld()?.getBounds() ||
-                         { width: 800, height: 600 };
+      const worldBounds = enemySystem?.getCachedWorld()?.getBounds() || {
+        width: 800,
+        height: 600,
+      };
 
       try {
         xpOrbSystem.createXPOrb(
@@ -572,7 +600,7 @@ export class RewardManager {
           {
             special: true,
             waveBonus: true,
-            wave: waveNumber
+            wave: waveNumber,
           }
         );
       } catch (error) {
@@ -617,11 +645,13 @@ export class RewardManager {
         return;
       }
     } else {
-      const chance = typeof rewardConfig.healthHeartChance === 'number'
-        ? rewardConfig.healthHeartChance
-        : (rewardConfig.heartDrop && typeof rewardConfig.heartDrop.chance === 'number'
-          ? rewardConfig.heartDrop.chance
-          : 0);
+      const chance =
+        typeof rewardConfig.healthHeartChance === 'number'
+          ? rewardConfig.healthHeartChance
+          : rewardConfig.heartDrop &&
+              typeof rewardConfig.heartDrop.chance === 'number'
+            ? rewardConfig.heartDrop.chance
+            : 0;
 
       if (chance <= 0) {
         return;
@@ -632,7 +662,9 @@ export class RewardManager {
 
     const sizeLabel = enemy.size || 'N/A';
     const variantLabel = enemy.variant || 'common';
-    console.log(`[RewardManager] Checking heart drop: ${enemy.type} ${sizeLabel} ${variantLabel} - chance: ${(dropChance * 100).toFixed(1)}%`);
+    console.log(
+      `[RewardManager] Checking heart drop: ${enemy.type} ${sizeLabel} ${variantLabel} - chance: ${(dropChance * 100).toFixed(1)}%`
+    );
 
     const context = randomContext || this.createDropRandomContext(enemy);
     const heartRandom = context?.heart || context?.base;
@@ -641,7 +673,10 @@ export class RewardManager {
     if (shouldDrop) {
       const healthHeartSystem = this.getHealthHeartSystem();
 
-      if (healthHeartSystem && typeof healthHeartSystem.spawnHeart === 'function') {
+      if (
+        healthHeartSystem &&
+        typeof healthHeartSystem.spawnHeart === 'function'
+      ) {
         const pulsePhase = this.randomRange(heartRandom, 0, TWO_PI);
         healthHeartSystem.spawnHeart(enemy.x, enemy.y, {
           random: heartRandom,
@@ -650,7 +685,9 @@ export class RewardManager {
           enemyType: enemy.type,
           enemySize: enemy.size,
         });
-        console.log(`[RewardManager] ❤️ Health heart dropped from ${enemy.type} (${sizeLabel} ${variantLabel})!`);
+        console.log(
+          `[RewardManager] ❤️ Health heart dropped from ${enemy.type} (${sizeLabel} ${variantLabel})!`
+        );
       } else {
         console.error('[RewardManager] HealthHeartSystem not available!');
       }
@@ -734,7 +771,7 @@ export class RewardManager {
       enemy?.variant || 'common',
       enemy?.size || 'unknown',
       identifier,
-      `wave-${enemy?.wave ?? 0}`
+      `wave-${enemy?.wave ?? 0}`,
     ];
     const label = labelParts.filter(Boolean).join(':');
     const base = this.createDropRandom(label);
@@ -769,7 +806,10 @@ export class RewardManager {
   }
 
   randomRange(random, min, max) {
-    const rng = random && typeof random.range === 'function' ? random : this.getRandomService();
+    const rng =
+      random && typeof random.range === 'function'
+        ? random
+        : this.getRandomService();
     if (!rng || typeof rng.range !== 'function') {
       const fallback = this.getRandomService();
       if (fallback && typeof fallback.range === 'function') {
@@ -790,7 +830,10 @@ export class RewardManager {
   }
 
   randomChance(random, probability) {
-    const rng = random && typeof random.chance === 'function' ? random : this.getRandomService();
+    const rng =
+      random && typeof random.chance === 'function'
+        ? random
+        : this.getRandomService();
     if (!rng || typeof rng.chance !== 'function') {
       if (!this._fallbackRandom) {
         this._fallbackRandom = new RandomService();

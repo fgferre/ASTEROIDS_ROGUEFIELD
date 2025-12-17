@@ -1,6 +1,7 @@
 # UI/HUD System - JavaScript to Godot 3D Migration Guide
 
 ## Document Purpose
+
 This document provides a comprehensive technical reference for migrating the JavaScript UI/HUD system to Godot 3D. It includes complete specifications, algorithms, GDScript pseudocode, layout mockups, and DOM→Godot node mappings.
 
 ---
@@ -8,9 +9,11 @@ This document provides a comprehensive technical reference for migrating the Jav
 ## 1. Visão Geral do Sistema
 
 ### Conceito
+
 Sistema de HUD minimalista que fornece feedback visual crítico sem poluir a tela, suportando decisões táticas através de minimap e indicadores de ameaça.
 
 ### Componentes Principais
+
 1. **Health Bar** - Barra de vida com estados de cor (verde→amarelo→vermelho)
 2. **Shield Indicator** - Indicador de escudo com 4 states (locked, ready, active, cooldown)
 3. **XP Bar** - Barra de experiência com indicador de nível
@@ -26,11 +29,13 @@ Sistema de HUD minimalista que fornece feedback visual crítico sem poluir a tel
 ### Layouts Configuráveis
 
 **Classic Layout:**
+
 - **Top-Left**: health, shield, xp, wave, kills, combo
 - **Top-Right**: time, minimap
 - **Top-Middle**: boss, threat indicators
 
 **Minimal Tactical Layout (Padrão):**
+
 - **Top-Left**: health, shield, combo, kills
 - **Top-Right**: time
 - **Bottom-Left**: xp
@@ -218,6 +223,7 @@ Screen Layout:
 ```
 
 **Posicionamento:**
+
 - **Top-Left**: health, shield, combo, kills (VBoxContainer)
 - **Top-Right**: time (VBoxContainer)
 - **Top-Middle**: boss HUD, threat indicators (Control)
@@ -226,6 +232,7 @@ Screen Layout:
 - **Bottom-Center**: minimap (Control)
 
 **Características:**
+
 - Faixa superior compacta com vitals + session stats
 - Progression info no rodapé (xp, wave)
 - Minimap centralizado no rodapé para fácil consulta
@@ -248,11 +255,13 @@ Screen Layout:
 ```
 
 **Posicionamento:**
+
 - **Top-Left**: health, shield, xp, wave, kills, combo (VBoxContainer)
 - **Top-Right**: time, minimap (VBoxContainer)
 - **Top-Middle**: boss HUD, threat indicators (Control)
 
 **Características:**
+
 - Colunas laterais com indicadores empilhados
 - Minimap no canto superior direito
 - Layout tradicional, mais vertical
@@ -337,10 +346,12 @@ func stop_low_health_pulse() -> void:
 ### Integration
 
 **Event Listeners:**
+
 - `player_health_changed(current, max)` → `update_health_bar()`
 - `player_damaged(amount)` → `flash_health_damage()`
 
 **Connected Systems:**
+
 - PlayerSystem → Health updates
 - CombatSystem → Damage flash
 
@@ -475,6 +486,7 @@ func stop_low_shield_pulse() -> void:
 ### Integration
 
 **Event Listeners:**
+
 - `shield_state_changed(state)` → `update_shield_indicator()`
 - `shield_activated()` → Update to active state
 - `shield_hit(damage, remaining)` → Update HP
@@ -482,6 +494,7 @@ func stop_low_shield_pulse() -> void:
 - `shield_recharged()` → Update to ready state
 
 **Connected Systems:**
+
 - PlayerSystem → Shield state updates
 - ShieldSystem → State changes, cooldown updates
 
@@ -554,10 +567,12 @@ func start_level_up_pulse() -> void:
 ### Integration
 
 **Event Listeners:**
+
 - `experience_changed(current, needed, level)` → `update_xp_bar()`
 - `level_up(new_level)` → Trigger pulse animation
 
 **Connected Systems:**
+
 - ProgressionSystem → XP updates, level-ups
 
 ---
@@ -616,11 +631,13 @@ func handle_wave_complete() -> void:
 ### Integration
 
 **Event Listeners:**
+
 - `wave_state_updated(number, killed, total, isBossWave)` → `update_wave_display()`
 - `wave_complete()` → `handle_wave_complete()`
 - `wave_start(number)` → Reset display
 
 **Connected Systems:**
+
 - WaveManager → Wave progress updates
 
 ---
@@ -704,11 +721,13 @@ func handle_combo_broken(silent: bool = false) -> void:
 ### Integration
 
 **Event Listeners:**
+
 - `combo_updated(count, multiplier)` → `update_combo_meter()`
 - `combo_broken(silent)` → `handle_combo_broken()`
 - `combo_timeout()` → `handle_combo_broken(false)`
 
 **Connected Systems:**
+
 - CombatSystem → Combo updates, breaks
 
 ---
@@ -842,10 +861,12 @@ func update_range_label() -> void:
 ### Integration
 
 **Event Listeners:**
+
 - `tactical_contacts_updated(contacts, playerAngle)` → `update_contacts()`
 - `minimap_range_changed(newRange)` → Update range, redraw
 
 **Connected Systems:**
+
 - PhysicsSystem → Contact detection
 - PlayerSystem → Player rotation
 
@@ -1008,9 +1029,11 @@ func create_threat_indicator() -> ThreatIndicator:
 ### Integration
 
 **Event Listeners:**
+
 - `tactical_contacts_updated(contacts, range, detectionRange)` → `update_threat_indicators()`
 
 **Connected Systems:**
+
 - PhysicsSystem → Contact detection
 - Minimap → Shared contact data
 
@@ -1200,6 +1223,7 @@ func handle_boss_defeated() -> void:
 ### Integration
 
 **Event Listeners:**
+
 - `boss_spawned(bossData)` → `handle_boss_spawned()`
 - `boss_health_changed(health, maxHealth)` → Update health bar
 - `boss_phase_changed(newPhase)` → `handle_boss_phase_changed()`
@@ -1208,6 +1232,7 @@ func handle_boss_defeated() -> void:
 - `boss_defeated()` → `handle_boss_defeated()`
 
 **Connected Systems:**
+
 - BossSystem → Boss state updates
 - WaveManager → Boss spawn triggers
 
@@ -1488,10 +1513,12 @@ func _input(event: InputEvent) -> void:
 ### Integration
 
 **Event Listeners:**
+
 - `upgrade_options_ready(level, options)` → `show_level_up_screen()`
 - `upgrade_applied(upgradeId)` → Close screen, resume game
 
 **Connected Systems:**
+
 - ProgressionSystem → Upgrade options generation, upgrade application
 
 ---
@@ -1788,65 +1815,65 @@ const SEVERITY_COLORS = {
 
 ### Health Bar
 
-| Animation | Duration | Easing | Trigger |
-|-----------|----------|--------|---------|
-| Damage flash | 280ms | ease-out cubic | `player_damaged` |
-| Low health pulse | 500ms loop | linear | HP ≤ 25% |
-| Bar fill update | 150ms | ease-out | HP changed |
+| Animation        | Duration   | Easing         | Trigger          |
+| ---------------- | ---------- | -------------- | ---------------- |
+| Damage flash     | 280ms      | ease-out cubic | `player_damaged` |
+| Low health pulse | 500ms loop | linear         | HP ≤ 25%         |
+| Bar fill update  | 150ms      | ease-out       | HP changed       |
 
 ### Shield Indicator
 
-| Animation | Duration | Easing | Trigger |
-|-----------|----------|--------|---------|
-| Low shield pulse | 400ms loop | linear | HP ≤ 30% active |
-| Cooldown bar fill | realtime | linear | cooldown timer |
-| State transition | 200ms | ease-out | state changed |
+| Animation         | Duration   | Easing   | Trigger         |
+| ----------------- | ---------- | -------- | --------------- |
+| Low shield pulse  | 400ms loop | linear   | HP ≤ 30% active |
+| Cooldown bar fill | realtime   | linear   | cooldown timer  |
+| State transition  | 200ms      | ease-out | state changed   |
 
 ### XP Bar
 
-| Animation | Duration | Easing | Trigger |
-|-----------|----------|--------|---------|
-| Level-up pulse (scale) | 300ms | ease-out elastic | level increased |
-| Level-up flash (color) | 600ms | ease-out | level increased |
-| Bar fill update | 200ms | ease-out | XP changed |
+| Animation              | Duration | Easing           | Trigger         |
+| ---------------------- | -------- | ---------------- | --------------- |
+| Level-up pulse (scale) | 300ms    | ease-out elastic | level increased |
+| Level-up flash (color) | 600ms    | ease-out         | level increased |
+| Bar fill update        | 200ms    | ease-out         | XP changed      |
 
 ### Combo Meter
 
-| Animation | Duration | Easing | Trigger |
-|-----------|----------|--------|---------|
-| Increment pulse | 200ms | ease-out back | combo incremented |
-| Break fade | 650ms | ease-out | combo broken |
-| Color gradient | 100ms | linear | multiplier changed |
+| Animation       | Duration | Easing        | Trigger            |
+| --------------- | -------- | ------------- | ------------------ |
+| Increment pulse | 200ms    | ease-out back | combo incremented  |
+| Break fade      | 650ms    | ease-out      | combo broken       |
+| Color gradient  | 100ms    | linear        | multiplier changed |
 
 ### Threat Indicators
 
-| Animation | Duration | Easing | Trigger |
-|-----------|----------|--------|---------|
-| High severity pulse | 500ms loop | ease-in-out | severity = high |
+| Animation             | Duration    | Easing      | Trigger           |
+| --------------------- | ----------- | ----------- | ----------------- |
+| High severity pulse   | 500ms loop  | ease-in-out | severity = high   |
 | Medium severity pulse | 1000ms loop | ease-in-out | severity = medium |
-| Position update | 100ms | ease-out | contact moved |
-| Spawn fade-in | 200ms | ease-out | new threat |
-| Remove fade-out | 200ms | ease-in | threat removed |
+| Position update       | 100ms       | ease-out    | contact moved     |
+| Spawn fade-in         | 200ms       | ease-out    | new threat        |
+| Remove fade-out       | 200ms       | ease-in     | threat removed    |
 
 ### Boss HUD
 
-| Animation | Duration | Easing | Trigger |
-|-----------|----------|--------|---------|
-| Invulnerability pulse | 600ms loop | ease-in-out | invulnerable = true |
-| Banner spawn | 300ms fade-in<br>2000ms hold<br>300ms fade-out | ease-out | boss spawned |
-| Banner phase change | 300ms fade-in<br>1500ms hold<br>300ms fade-out | ease-out | phase changed |
-| Banner defeat | 300ms fade-in<br>3000ms hold<br>300ms fade-out | ease-out | boss defeated |
-| Health bar update | 200ms | ease-out | boss HP changed |
+| Animation             | Duration                                       | Easing      | Trigger             |
+| --------------------- | ---------------------------------------------- | ----------- | ------------------- |
+| Invulnerability pulse | 600ms loop                                     | ease-in-out | invulnerable = true |
+| Banner spawn          | 300ms fade-in<br>2000ms hold<br>300ms fade-out | ease-out    | boss spawned        |
+| Banner phase change   | 300ms fade-in<br>1500ms hold<br>300ms fade-out | ease-out    | phase changed       |
+| Banner defeat         | 300ms fade-in<br>3000ms hold<br>300ms fade-out | ease-out    | boss defeated       |
+| Health bar update     | 200ms                                          | ease-out    | boss HP changed     |
 
 ### Level-Up Screen
 
-| Animation | Duration | Easing | Trigger |
-|-----------|----------|--------|---------|
-| Screen fade-in | 300ms | ease-out | level-up triggered |
-| Screen fade-out | 300ms | ease-in | upgrade selected |
-| Card hover scale | 150ms | ease-out | mouse enter |
-| Card unhover scale | 150ms | ease-in | mouse exit |
-| Card select pulse | 300ms | ease-out back | card clicked |
+| Animation          | Duration | Easing        | Trigger            |
+| ------------------ | -------- | ------------- | ------------------ |
+| Screen fade-in     | 300ms    | ease-out      | level-up triggered |
+| Screen fade-out    | 300ms    | ease-in       | upgrade selected   |
+| Card hover scale   | 150ms    | ease-out      | mouse enter        |
+| Card unhover scale | 150ms    | ease-in       | mouse exit         |
+| Card select pulse  | 300ms    | ease-out back | card clicked       |
 
 ---
 
@@ -2222,6 +2249,7 @@ func apply_high_contrast() -> void:
 ### Arquivos JavaScript Analisados
 
 1. **src/modules/UISystem.js** (~5374 linhas)
+
    - Linhas 60-186: HUD state structure
    - Linhas 293-676: Boss HUD state e rendering
    - Linhas 3803-3920: Minimap rendering (Canvas 2D)
@@ -2235,6 +2263,7 @@ func apply_high_contrast() -> void:
    - Linhas 16-45: Constants (MINIMAP_RANGE, MAX_THREAT_INDICATORS, etc.)
 
 2. **src/data/ui/hudLayout.js** (562 linhas)
+
    - Linhas 3-514: HUD layout definitions (classic, minimal tactical)
    - HUD item configs (key, type, position, group, layout, icon, thresholds)
 
@@ -2259,11 +2288,13 @@ func apply_high_contrast() -> void:
 ### Eventos Principais
 
 **Player Events:**
+
 - `player_health_changed`
 - `player_damaged`
 - `player_died`
 
 **Shield Events:**
+
 - `shield_state_changed`
 - `shield_activated`
 - `shield_hit`
@@ -2271,23 +2302,27 @@ func apply_high_contrast() -> void:
 - `shield_recharged`
 
 **Progression Events:**
+
 - `experience_changed`
 - `level_up`
 - `upgrade_options_ready`
 - `upgrade_applied`
 
 **Combat Events:**
+
 - `combo_updated`
 - `combo_broken`
 - `combo_timeout`
 - `enemy_killed`
 
 **Wave Events:**
+
 - `wave_state_updated`
 - `wave_complete`
 - `wave_start`
 
 **Boss Events:**
+
 - `boss_spawned`
 - `boss_health_changed`
 - `boss_phase_changed`
@@ -2296,6 +2331,7 @@ func apply_high_contrast() -> void:
 - `boss_defeated`
 
 **Tactical Events:**
+
 - `tactical_contacts_updated`
 
 ### Constantes Importantes
@@ -2335,19 +2371,19 @@ const COLOR_ASSIST_ACCENTS = {
 
 ### Conceitos-Chave JS→Godot
 
-| JavaScript | Godot 3D |
-|------------|----------|
-| DOM elements | Control nodes (Label, ProgressBar, etc.) |
-| CSS classes | Theme overrides, modulate, custom properties |
-| Canvas 2D rendering | Control._draw() ou SubViewport |
-| Event listeners | Godot signals |
+| JavaScript             | Godot 3D                                       |
+| ---------------------- | ---------------------------------------------- |
+| DOM elements           | Control nodes (Label, ProgressBar, etc.)       |
+| CSS classes            | Theme overrides, modulate, custom properties   |
+| Canvas 2D rendering    | Control.\_draw() ou SubViewport                |
+| Event listeners        | Godot signals                                  |
 | setTimeout/setInterval | Timer nodes ou await get_tree().create_timer() |
-| requestAnimationFrame | _process(delta) ou _physics_process(delta) |
-| Tween.js | Godot Tween (create_tween()) |
-| CSS animations | AnimationPlayer ou Tween |
-| Position (%, px) | Anchors, margins, Control.position |
-| z-index | CanvasItem.z_index ou Control.z_index |
-| Flexbox | VBoxContainer, HBoxContainer, GridContainer |
+| requestAnimationFrame  | \_process(delta) ou \_physics_process(delta)   |
+| Tween.js               | Godot Tween (create_tween())                   |
+| CSS animations         | AnimationPlayer ou Tween                       |
+| Position (%, px)       | Anchors, margins, Control.position             |
+| z-index                | CanvasItem.z_index ou Control.z_index          |
+| Flexbox                | VBoxContainer, HBoxContainer, GridContainer    |
 
 ### GDScript Best Practices para UI
 
@@ -2367,9 +2403,10 @@ const COLOR_ASSIST_ACCENTS = {
 Este documento fornece uma especificação completa para migrar o sistema de UI/HUD do JavaScript para Godot 3D. Todos os algoritmos principais foram traduzidos para pseudocódigo GDScript, layouts foram mapeados para estruturas de cena Godot, e todos os componentes HUD foram documentados com especificações visuais e comportamentais.
 
 **Próximos Passos:**
+
 1. Criar scene HUD.tscn com estrutura de nodes conforme Seção 13
 2. Implementar classe UISystem.gd com todos os métodos documentados
-3. Criar Minimap.gd com custom _draw() conforme Seção 9
+3. Criar Minimap.gd com custom \_draw() conforme Seção 9
 4. Implementar level-up screen conforme Seção 12
 5. Conectar signals de todos os sistemas (Player, Shield, Progression, Combat, Wave, Boss)
 6. Testar cada componente HUD isoladamente
@@ -2377,6 +2414,7 @@ Este documento fornece uma especificação completa para migrar o sistema de UI/
 8. Implementar accessibility features conforme Seção 19
 
 **Arquivos a Criar:**
+
 - `scenes/ui/HUD.tscn`
 - `scenes/ui/LevelUpScreen.tscn`
 - `scripts/ui/UISystem.gd`

@@ -20,7 +20,7 @@ class CanvasStateManager {
       shadowOffsetY: 0,
       textAlign: 'start',
       textBaseline: 'alphabetic',
-      font: '10px sans-serif'
+      font: '10px sans-serif',
     };
 
     // State stack for save/restore optimization
@@ -31,7 +31,7 @@ class CanvasStateManager {
       stateChanges: 0,
       stateSaves: 0,
       stateRestores: 0,
-      redundantChanges: 0
+      redundantChanges: 0,
     };
 
     // Commonly used state presets
@@ -41,21 +41,21 @@ class CanvasStateManager {
         strokeStyle: '#FFFF00',
         lineWidth: 1,
         globalAlpha: 1,
-        shadowBlur: 0
+        shadowBlur: 0,
       },
       particle: {
         fillStyle: '#FFA500',
         strokeStyle: 'transparent',
         lineWidth: 1,
         globalAlpha: 0.8,
-        shadowBlur: 3
+        shadowBlur: 3,
       },
       enemy: {
         fillStyle: '#FF4444',
         strokeStyle: '#FF0000',
         lineWidth: 2,
         globalAlpha: 1,
-        shadowBlur: 0
+        shadowBlur: 0,
       },
       ui: {
         fillStyle: '#FFFFFF',
@@ -64,7 +64,7 @@ class CanvasStateManager {
         globalAlpha: 1,
         shadowBlur: 0,
         textAlign: 'left',
-        textBaseline: 'top'
+        textBaseline: 'top',
       },
       shield: {
         fillStyle: 'transparent',
@@ -73,11 +73,15 @@ class CanvasStateManager {
         globalAlpha: 1,
         shadowBlur: 10,
         shadowColor: 'rgba(90, 200, 255, 0.75)',
-        globalCompositeOperation: 'source-over'
-      }
+        globalCompositeOperation: 'source-over',
+      },
     };
 
-    console.log('[CanvasStateManager] Initialized with', Object.keys(this.presets).length, 'presets');
+    console.log(
+      '[CanvasStateManager] Initialized with',
+      Object.keys(this.presets).length,
+      'presets'
+    );
   }
 
   /**
@@ -253,7 +257,7 @@ class CanvasStateManager {
       shadowOffsetY: 0,
       textAlign: 'start',
       textBaseline: 'alphabetic',
-      font: '10px sans-serif'
+      font: '10px sans-serif',
     };
 
     this.applyState(ctx, defaultState);
@@ -265,14 +269,15 @@ class CanvasStateManager {
    */
   getStats() {
     const total = this.stats.stateChanges + this.stats.redundantChanges;
-    const efficiency = total > 0 ? ((this.stats.redundantChanges / total) * 100).toFixed(1) : 0;
+    const efficiency =
+      total > 0 ? ((this.stats.redundantChanges / total) * 100).toFixed(1) : 0;
 
     return {
       ...this.stats,
       totalOperations: total,
       efficiency: `${efficiency}% redundant changes avoided`,
       stackDepth: this.stateStack.length,
-      presetsAvailable: Object.keys(this.presets).length
+      presetsAvailable: Object.keys(this.presets).length,
     };
   }
 
@@ -284,7 +289,7 @@ class CanvasStateManager {
       stateChanges: 0,
       stateSaves: 0,
       stateRestores: 0,
-      redundantChanges: 0
+      redundantChanges: 0,
     };
   }
 
@@ -298,7 +303,7 @@ class CanvasStateManager {
       if (this.currentState[key] !== value) {
         diff[key] = {
           current: this.currentState[key],
-          target: value
+          target: value,
         };
       }
     }
@@ -340,13 +345,13 @@ class CanvasStateManager {
         return this.applyState(ctx, {
           globalCompositeOperation: 'source-over',
           globalAlpha: 1,
-          shadowBlur: 0
+          shadowBlur: 0,
         });
 
       case 'effects':
         return this.applyState(ctx, {
           globalCompositeOperation: 'lighter',
-          globalAlpha: 0.8
+          globalAlpha: 0.8,
         });
 
       case 'ui':

@@ -1,6 +1,9 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { GamePools } from '../../../src/core/GamePools.js';
-import { setupGlobalMocks, cleanupGlobalState } from '../../__helpers__/setup.js';
+import {
+  setupGlobalMocks,
+  cleanupGlobalState,
+} from '../../__helpers__/setup.js';
 import {
   createEnemySystemHarness,
   summarizeAsteroid,

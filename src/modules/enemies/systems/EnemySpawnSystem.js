@@ -105,9 +105,7 @@ export class EnemySpawnSystem {
       randomParentScope: config.randomParentScope || 'spawn',
     };
 
-    const minionTypes = facade.getAvailableBossMinionTypes(
-      config.minionTypes
-    );
+    const minionTypes = facade.getAvailableBossMinionTypes(config.minionTypes);
     if (minionTypes.length > 0) {
       spawnConfig.minionTypes = [...minionTypes];
     }
@@ -171,7 +169,9 @@ export class EnemySpawnSystem {
         configY: config.y,
       });
 
-      const fallbackX = Number.isFinite(config.x) ? config.x : (GAME_WIDTH || 800) / 2;
+      const fallbackX = Number.isFinite(config.x)
+        ? config.x
+        : (GAME_WIDTH || 800) / 2;
       const fallbackY = Number.isFinite(config.y) ? config.y : -100;
 
       boss.x = fallbackX;
@@ -229,7 +229,11 @@ export class EnemySpawnSystem {
         !Boolean(USE_WAVE_MANAGER) ||
         WAVEMANAGER_HANDLES_ASTEROID_SPAWN === false);
 
-    if (facade.waveState && facade.waveState.isActive && shouldApplyLegacyWaveAccounting) {
+    if (
+      facade.waveState &&
+      facade.waveState.isActive &&
+      shouldApplyLegacyWaveAccounting
+    ) {
       facade.waveState.totalAsteroids += 1;
       facade.waveState.asteroidsSpawned += 1;
     }
@@ -370,7 +374,11 @@ export class EnemySpawnSystem {
       !Boolean(USE_WAVE_MANAGER) ||
       WAVEMANAGER_HANDLES_ASTEROID_SPAWN === false;
 
-    if (facade.waveState && facade.waveState.isActive && shouldApplyLegacyWaveAccounting) {
+    if (
+      facade.waveState &&
+      facade.waveState.isActive &&
+      shouldApplyLegacyWaveAccounting
+    ) {
       facade.waveState.asteroidsSpawned += 1;
     }
 
@@ -402,7 +410,8 @@ export class EnemySpawnSystem {
       return null;
     }
 
-    const scopeHint = config.randomScope || (config.spawnedBy ? 'fragments' : 'spawn');
+    const scopeHint =
+      config.randomScope || (config.spawnedBy ? 'fragments' : 'spawn');
     const asteroidRandom =
       config.random || facade.createScopedRandom(scopeHint, 'asteroid').random;
     const asteroidConfig = {

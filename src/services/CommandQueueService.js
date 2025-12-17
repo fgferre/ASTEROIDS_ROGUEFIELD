@@ -14,16 +14,19 @@ export default class CommandQueueService {
       initialFrame = 0,
       frameSource = null,
       clock = null,
-      hooks = null
+      hooks = null,
     } = options || {};
 
-    this.capacity = Number.isFinite(capacity) && capacity > 0 ? Math.floor(capacity) : null;
+    this.capacity =
+      Number.isFinite(capacity) && capacity > 0 ? Math.floor(capacity) : null;
     this.frameSource = typeof frameSource === 'function' ? frameSource : null;
     this.clock = typeof clock === 'function' ? clock : this.defaultClock;
     this.hooks = {
-      onEnqueue: typeof hooks?.onEnqueue === 'function' ? hooks.onEnqueue : null,
-      onConsume: typeof hooks?.onConsume === 'function' ? hooks.onConsume : null,
-      onClear: typeof hooks?.onClear === 'function' ? hooks.onClear : null
+      onEnqueue:
+        typeof hooks?.onEnqueue === 'function' ? hooks.onEnqueue : null,
+      onConsume:
+        typeof hooks?.onConsume === 'function' ? hooks.onConsume : null,
+      onClear: typeof hooks?.onClear === 'function' ? hooks.onClear : null,
     };
 
     this.frameCounter = Number.isFinite(initialFrame) ? initialFrame : 0;
@@ -35,17 +38,23 @@ export default class CommandQueueService {
       consumed: 0,
       cleared: 0,
       dropped: 0,
-      lastFrameTagged: this.frameCounter
+      lastFrameTagged: this.frameCounter,
     };
     this.nextDefaultFrame = this.frameCounter;
 
-    if (typeof gameServices !== 'undefined' && typeof gameServices.register === 'function') {
+    if (
+      typeof gameServices !== 'undefined' &&
+      typeof gameServices.register === 'function'
+    ) {
       gameServices.register('command-queue', this);
     }
   }
 
   defaultClock() {
-    if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
+    if (
+      typeof performance !== 'undefined' &&
+      typeof performance.now === 'function'
+    ) {
       return performance.now();
     }
 
@@ -64,11 +73,17 @@ export default class CommandQueueService {
         const suppliedFrame = this.frameSource();
         if (Number.isFinite(suppliedFrame)) {
           this.frameCounter = Math.max(this.frameCounter, suppliedFrame);
-          this.nextDefaultFrame = Math.max(this.nextDefaultFrame, suppliedFrame);
+          this.nextDefaultFrame = Math.max(
+            this.nextDefaultFrame,
+            suppliedFrame
+          );
           return suppliedFrame;
         }
       } catch (error) {
-        console.warn('[CommandQueueService] frameSource threw an error:', error);
+        console.warn(
+          '[CommandQueueService] frameSource threw an error:',
+          error
+        );
       }
     }
 
@@ -88,13 +103,19 @@ export default class CommandQueueService {
       try {
         const suppliedFrame = this.frameSource();
         if (Number.isFinite(suppliedFrame)) {
-          const normalized = Math.max(suppliedFrame, this.lastConsumedFrame + 1);
+          const normalized = Math.max(
+            suppliedFrame,
+            this.lastConsumedFrame + 1
+          );
           this.frameCounter = Math.max(this.frameCounter, normalized);
           this.nextDefaultFrame = Math.max(this.nextDefaultFrame, normalized);
           return normalized;
         }
       } catch (error) {
-        console.warn('[CommandQueueService] frameSource threw an error during consume:', error);
+        console.warn(
+          '[CommandQueueService] frameSource threw an error during consume:',
+          error
+        );
       }
     }
 
@@ -109,11 +130,12 @@ export default class CommandQueueService {
       throw new Error('[CommandQueueService] Cannot enqueue empty command');
     }
 
-    const normalizedType = typeof command.type === 'string'
-      ? command.type
-      : typeof metadata.type === 'string'
-        ? metadata.type
-        : 'unknown';
+    const normalizedType =
+      typeof command.type === 'string'
+        ? command.type
+        : typeof metadata.type === 'string'
+          ? metadata.type
+          : 'unknown';
 
     const frameTag = this.normalizeFrame(metadata.frame);
     this.stats.lastFrameTagged = frameTag;
@@ -125,7 +147,9 @@ export default class CommandQueueService {
       source: metadata.source || command.source || 'unknown',
       enqueuedAt: this.clock(),
       payload: this.deepClone(command),
-      metadata: metadata.metadata ? this.deepClone(metadata.metadata) : undefined
+      metadata: metadata.metadata
+        ? this.deepClone(metadata.metadata)
+        : undefined,
     };
 
     this.queue.push(entry);
@@ -138,7 +162,10 @@ export default class CommandQueueService {
 
     if (this.hooks.onEnqueue) {
       try {
-        this.hooks.onEnqueue({ entry: this.cloneEntry(entry), stats: this.getStats() });
+        this.hooks.onEnqueue({
+          entry: this.cloneEntry(entry),
+          stats: this.getStats(),
+        });
       } catch (error) {
         console.warn('[CommandQueueService] onEnqueue hook failed:', error);
       }
@@ -148,7 +175,12 @@ export default class CommandQueueService {
   }
 
   consume(options = {}) {
-    const { frame, types = null, predicate = null, consumerId = 'default' } = options || {};
+    const {
+      frame,
+      types = null,
+      predicate = null,
+      consumerId = 'default',
+    } = options || {};
 
     if (this.queue.length === 0) {
       const resolvedFrame = this.resolveConsumeFrame(frame);
@@ -158,7 +190,8 @@ export default class CommandQueueService {
     }
 
     const targetFrame = this.resolveConsumeFrame(frame);
-    const typeFilter = Array.isArray(types) && types.length > 0 ? new Set(types) : null;
+    const typeFilter =
+      Array.isArray(types) && types.length > 0 ? new Set(types) : null;
     const shouldInclude = typeof predicate === 'function' ? predicate : null;
 
     const consumed = [];
@@ -194,7 +227,7 @@ export default class CommandQueueService {
           frame: targetFrame,
           entries: clonedEntries,
           stats: this.getStats(),
-          consumerId
+          consumerId,
         });
       } catch (error) {
         console.warn('[CommandQueueService] onConsume hook failed:', error);
@@ -215,7 +248,8 @@ export default class CommandQueueService {
 
     const { type = null, types = null, predicate = null } = options || {};
     const matchType = typeof type === 'string' ? type : null;
-    const typeSet = Array.isArray(types) && types.length > 0 ? new Set(types) : null;
+    const typeSet =
+      Array.isArray(types) && types.length > 0 ? new Set(types) : null;
     const shouldInclude = typeof predicate === 'function' ? predicate : null;
 
     for (let index = this.queue.length - 1; index >= 0; index -= 1) {
@@ -263,7 +297,7 @@ export default class CommandQueueService {
     return {
       ...this.stats,
       queueSize: this.queue.length,
-      lastConsumedFrame: this.lastConsumedFrame
+      lastConsumedFrame: this.lastConsumedFrame,
     };
   }
 
@@ -274,7 +308,7 @@ export default class CommandQueueService {
       frame: entry.frame,
       source: entry.source,
       enqueuedAt: entry.enqueuedAt,
-      payload: this.deepClone(entry.payload)
+      payload: this.deepClone(entry.payload),
     };
 
     if (entry.metadata) {
@@ -293,14 +327,20 @@ export default class CommandQueueService {
       try {
         return structuredClone(value);
       } catch (error) {
-        console.warn('[CommandQueueService] structuredClone failed, falling back to JSON/manual clone:', error);
+        console.warn(
+          '[CommandQueueService] structuredClone failed, falling back to JSON/manual clone:',
+          error
+        );
       }
     }
 
     try {
       return JSON.parse(JSON.stringify(value));
     } catch (error) {
-      console.warn('[CommandQueueService] JSON clone failed, performing manual deep clone:', error);
+      console.warn(
+        '[CommandQueueService] JSON clone failed, performing manual deep clone:',
+        error
+      );
     }
 
     return this.manualDeepClone(value, new WeakMap());

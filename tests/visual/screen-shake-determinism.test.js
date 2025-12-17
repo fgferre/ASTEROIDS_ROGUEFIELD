@@ -16,7 +16,11 @@ describe('EffectsSystem screen shake determinism', () => {
     const { effects, random } = createEffectsHarness(seed);
 
     const initialSnapshot = { ...effects.screenShakeSeedState };
-    expect(initialSnapshot).toMatchObject({ x: expect.any(Number), y: expect.any(Number), angle: expect.any(Number) });
+    expect(initialSnapshot).toMatchObject({
+      x: expect.any(Number),
+      y: expect.any(Number),
+      angle: expect.any(Number),
+    });
 
     // Mutate the internal RNG state
     effects.screenShake.reseed(effects.getRandomFork('screenShake'));

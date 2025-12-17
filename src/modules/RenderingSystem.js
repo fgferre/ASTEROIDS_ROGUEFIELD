@@ -1,8 +1,4 @@
-import {
-  GAME_HEIGHT,
-  GAME_WIDTH,
-  SHIP_SIZE,
-} from '../core/GameConstants.js';
+import { GAME_HEIGHT, GAME_WIDTH, SHIP_SIZE } from '../core/GameConstants.js';
 import RenderBatch from '../core/RenderBatch.js';
 import CanvasStateManager from '../core/CanvasStateManager.js';
 import GradientCache from '../core/GradientCache.js';
@@ -14,6 +10,13 @@ import { SHIP_MAX_SPEED } from '../data/constants/physics.js';
 import { MAGNETISM_RADIUS } from '../data/constants/gameplay.js';
 import { clamp } from '../utils/mathHelpers.js';
 import { normalize as normalizeVector } from '../utils/vectorHelpers.js';
+import { NeonGraphics } from '../utils/NeonGraphics.js';
+
+// [NEO-ARCADE] Shield Visual Constants
+const SHIELD_HEX_SIZE = 24;
+const SHIELD_RIM_WIDTH = 2;
+const SHIELD_RIM_COLOR = '#00ffff';
+const SHIELD_FILL_COLOR = 'rgba(0, 255, 255, 0.1)';
 
 const MAX_VISUAL_TILT = 0.3;
 const TILT_MULTIPLIER = 0.12;
@@ -230,426 +233,231 @@ function extractVelocityComponent(velocity, primaryKey, fallbackKey) {
   return 0;
 }
 
+// [NEO-ARCADE] Multi-Plane 2.5D Parallax Starfield
+// Replaces 3D projection with robust 2D layer scrolling for guaranteed visibility
 class SpaceSkyBackground {
   constructor(randomGenerator = null) {
-    this.dpr = resolveDevicePixelRatio();
     this.random = this.resolveRandomGenerator(randomGenerator);
-    this.randomSeed = undefined;
-    this.captureRandomSeed(this.random);
-    this.layers = SPACE_SKY_LAYERS.map((layer) => ({
-      density: layer.density,
-      vx: layer.vx,
-      vy: layer.vy,
-      size: layer.size,
-      glow: layer.glow,
-      stars: [],
-    }));
-
     this.width = 0;
     this.height = 0;
-    this.areaMP = 0;
 
-    this.densityK = 1;
-    this.twinkleHz = 0.9;
-    this.twinkleAmp = 0.55;
-    this.tint = { r: 225, g: 236, b: 255 };
-    this.parallax = {
-      enabled: true,
-      factor: 0.06,
-      tilt: 0.045,
-      maxTilt: 0.06,
-      speedForMaxTilt: SHIP_MAX_SPEED || 220,
-    };
-    this.baseDrift = { vx: 0, vy: 0 };
+    // Configuration
+    this.layers = [
+      { speed: 0.1, count: 150, sizeMin: 1.5, sizeMax: 2.5, colorRate: 0.1 }, // Background (Slow, Small)
+      { speed: 0.3, count: 200, sizeMin: 2.5, sizeMax: 4.0, colorRate: 0.3 }, // Midground
+      { speed: 0.6, count: 100, sizeMin: 4.0, sizeMax: 6.0, colorRate: 0.6 }, // Foreground (Fast, Big)
+    ];
 
-    this.velocityProvider = null;
-    this.lastTime = resolveTimestamp();
-    this.currentPreset = null;
-
-    this.applyPreset('cinematic');
+    this.stars = [];
+    this.initialized = false;
   }
 
   resolveRandomGenerator(randomGenerator) {
-    if (
-      randomGenerator &&
-      typeof randomGenerator.float === 'function' &&
-      typeof randomGenerator.range === 'function'
-    ) {
+    if (randomGenerator && typeof randomGenerator.float === 'function') {
       return randomGenerator;
     }
-
-    if (randomGenerator && typeof randomGenerator.float === 'function') {
-      const seedCandidate =
-        typeof randomGenerator.seed === 'number' && Number.isFinite(randomGenerator.seed)
-          ? randomGenerator.seed
-          : SPACE_SKY_RANDOM_SEED;
-      return new RandomService(seedCandidate);
-    }
-
     return new RandomService(SPACE_SKY_RANDOM_SEED);
   }
 
-  captureRandomSeed(randomGenerator = this.random) {
-    if (
-      randomGenerator &&
-      typeof randomGenerator.seed === 'number' &&
-      Number.isFinite(randomGenerator.seed)
-    ) {
-      this.randomSeed = randomGenerator.seed >>> 0;
-      return this.randomSeed;
-    }
-
-    this.randomSeed = undefined;
-    return undefined;
-  }
-
-  reseed(randomGenerator = null) {
-    if (randomGenerator) {
-      this.random = this.resolveRandomGenerator(randomGenerator);
-      this.captureRandomSeed(this.random);
-    } else if (this.random && typeof this.random.reset === 'function') {
-      if (this.randomSeed !== undefined) {
-        this.random.reset(this.randomSeed);
-      } else {
-        this.random.reset();
-        this.captureRandomSeed(this.random);
-      }
-    } else {
-      this.random = this.resolveRandomGenerator(null);
-      this.captureRandomSeed(this.random);
-    }
-
-    this.layers.forEach((layer) => {
-      layer.stars.length = 0;
-    });
-
-    this.lastTime = resolveTimestamp();
-    this.rebuild();
-  }
-
-  getRandomFloat() {
-    if (!this.random || typeof this.random.float !== 'function') {
-      this.random = this.resolveRandomGenerator(null);
-      this.captureRandomSeed(this.random);
-    }
-
-    return this.random.float();
-  }
-
-  getRandomRange(min, max) {
-    if (this.random && typeof this.random.range === 'function') {
-      return this.random.range(min, max);
-    }
-
-    return min + (max - min) * this.getRandomFloat();
-  }
-
-  bindVelocityProvider(fn) {
-    this.velocityProvider = typeof fn === 'function' ? fn : null;
-  }
-
-  setParallax(factor, tilt, maxTilt, speedForMaxTilt) {
-    if (Number.isFinite(factor)) {
-      this.parallax.factor = factor;
-    }
-
-    if (Number.isFinite(tilt)) {
-      this.parallax.tilt = Math.abs(tilt);
-    }
-
-    if (Number.isFinite(maxTilt)) {
-      this.parallax.maxTilt = Math.abs(maxTilt);
-    }
-
-    if (Number.isFinite(speedForMaxTilt) && speedForMaxTilt > EPSILON) {
-      this.parallax.speedForMaxTilt = speedForMaxTilt;
-    }
-
-    if (this.parallax.tilt > this.parallax.maxTilt) {
-      this.parallax.tilt = this.parallax.maxTilt;
-    }
-  }
-
-  enableParallax(enabled) {
-    this.parallax.enabled = Boolean(enabled);
+  // Required by RenderingSystem.onReset() - reassigns random generator and rebuilds stars
+  reseed(randomGenerator) {
+    this.random = this.resolveRandomGenerator(randomGenerator);
+    this.initialized = false; // Force rebuild on next render
   }
 
   resize(width, height) {
-    const newWidth = Math.max(1, Math.floor(width));
-    const newHeight = Math.max(1, Math.floor(height));
+    // Rebuild if: not initialized, or dimensions changed significantly
+    const dimensionsChanged =
+      Math.abs(this.width - width) > 10 || Math.abs(this.height - height) > 10;
 
-    if (newWidth === this.width && newHeight === this.height) {
-      return;
+    if (!this.initialized || dimensionsChanged) {
+      this.width = width;
+      this.height = height;
+      this.rebuild();
     }
-
-    const previousWidth = this.width || newWidth;
-    const previousHeight = this.height || newHeight;
-    const scaleX = previousWidth > 0 ? newWidth / previousWidth : 1;
-    const scaleY = previousHeight > 0 ? newHeight / previousHeight : 1;
-
-    this.width = newWidth;
-    this.height = newHeight;
-    this.areaMP = (this.width * this.height) / 1_000_000;
-
-    if (previousWidth === 0 || previousHeight === 0) {
-      this.layers.forEach((layer) => {
-        layer.stars.length = 0;
-      });
-    } else {
-      this.layers.forEach((layer) => {
-        layer.stars.forEach((star) => {
-          star.x *= scaleX;
-          star.y *= scaleY;
-        });
-      });
-    }
-
-    this.rebuild();
   }
 
   rebuild() {
-    if (!this.width || !this.height) {
-      return;
-    }
+    // Use actual dimensions with fallback
+    const w = this.width > 0 ? this.width : 800;
+    const h = this.height > 0 ? this.height : 600;
 
-    const areaFactor = Math.max(0.6, this.areaMP);
-    this.layers.forEach((layer) => {
-      const target = Math.floor(layer.density * this.densityK * areaFactor);
-      const { stars } = layer;
-
-      if (stars.length < target) {
-        for (let i = stars.length; i < target; i += 1) {
-          stars.push(this.makeStar());
-        }
-      } else if (stars.length > target) {
-        stars.length = target;
+    // 1. Rebuild Stars
+    this.stars = [];
+    this.layers.forEach((layer, layerIndex) => {
+      for (let i = 0; i < layer.count; i++) {
+        this.stars.push({
+          x: Math.random() * w,
+          y: Math.random() * h,
+          size: layer.sizeMin + Math.random() * (layer.sizeMax - layer.sizeMin),
+          speed: layer.speed,
+          layerIndex: layerIndex,
+          color: this.pickNeonColor(layer.colorRate),
+          phase: Math.random() * Math.PI * 2,
+          blinkSpeed: 1 + Math.random() * 2,
+        });
       }
     });
+
+    // 2. Generate Nebula Clouds (Deep Atmosphere)
+    this.nebulaClouds = [];
+    const cloudCount = 15;
+    const colors = [
+      'rgba(60, 0, 100, 0.04)', // Deep Purple
+      'rgba(0, 40, 100, 0.04)', // Deep Blue
+      'rgba(100, 0, 60, 0.03)', // Magenta Haze
+      'rgba(0, 80, 80, 0.03)', // Cyan Haze
+    ];
+
+    for (let i = 0; i < cloudCount; i++) {
+      this.nebulaClouds.push({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        radius: 300 + Math.random() * 500,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        vx: (Math.random() - 0.5) * 5, // Very slow drift
+        vy: (Math.random() - 0.5) * 5,
+        phase: Math.random() * Math.PI * 2,
+      });
+    }
+
+    this.initialized = true;
   }
 
-  makeStar() {
-    return {
-      x: this.getRandomRange(0, this.width),
-      y: this.getRandomRange(0, this.height),
-      phase: this.getRandomRange(0, Math.PI * 2),
-      jitter: this.getRandomRange(0.6, 1.4),
-    };
+  // Generate neon colors with Math.random() to avoid RandomService issues
+  pickNeonColor(vibranceChance) {
+    if (Math.random() < vibranceChance) {
+      const palette = [
+        { r: 0, g: 255, b: 255 }, // Cyan
+        { r: 255, g: 0, b: 255 }, // Magenta
+        { r: 100, g: 255, b: 100 }, // Neon Green
+        { r: 255, g: 200, b: 50 }, // Gold
+      ];
+      return palette[Math.floor(Math.random() * palette.length)];
+    }
+    // White/blue tinted stars
+    return { r: 220, g: 235, b: 255 };
   }
 
-  applyPreset(name, overrides = {}) {
-    const preset = SPACE_SKY_PRESETS[name];
-    if (!preset) {
-      return false;
-    }
-
-    this.densityK =
-      Number.isFinite(preset.densityK) && preset.densityK > 0
-        ? preset.densityK
-        : this.densityK;
-    this.twinkleHz = Number.isFinite(preset.twinkleHz)
-      ? Math.max(0, preset.twinkleHz)
-      : this.twinkleHz;
-    this.twinkleAmp = Number.isFinite(preset.twinkleAmp)
-      ? Math.max(0, preset.twinkleAmp)
-      : this.twinkleAmp;
-
-    if (preset.tint) {
-      this.tint = {
-        r: normalizeTintValue(preset.tint.r, this.tint.r),
-        g: normalizeTintValue(preset.tint.g, this.tint.g),
-        b: normalizeTintValue(preset.tint.b, this.tint.b),
-      };
-    }
-
-    if (preset.drift) {
-      this.baseDrift = {
-        vx: Number.isFinite(preset.drift.vx) ? preset.drift.vx : 0,
-        vy: Number.isFinite(preset.drift.vy) ? preset.drift.vy : 0,
-      };
-    } else {
-      this.baseDrift = { vx: 0, vy: 0 };
-    }
-
-    if (overrides.tint) {
-      this.tint = {
-        r: normalizeTintValue(overrides.tint.r, this.tint.r),
-        g: normalizeTintValue(overrides.tint.g, this.tint.g),
-        b: normalizeTintValue(overrides.tint.b, this.tint.b),
-      };
-    }
-
-    if (overrides.densityK != null && Number.isFinite(overrides.densityK)) {
-      this.densityK = Math.max(0.2, Math.min(4, overrides.densityK));
-    }
-
-    if (overrides.twinkleHz != null && Number.isFinite(overrides.twinkleHz)) {
-      this.twinkleHz = Math.max(0, overrides.twinkleHz);
-    }
-
-    if (overrides.twinkleAmp != null && Number.isFinite(overrides.twinkleAmp)) {
-      this.twinkleAmp = Math.max(0, overrides.twinkleAmp);
-    }
-
-    if (overrides.drift) {
-      this.baseDrift = {
-        vx: Number.isFinite(overrides.drift.vx)
-          ? overrides.drift.vx
-          : this.baseDrift.vx,
-        vy: Number.isFinite(overrides.drift.vy)
-          ? overrides.drift.vy
-          : this.baseDrift.vy,
-      };
-    }
-
-    this.currentPreset = name;
-    this.rebuild();
-    return true;
-  }
-
-  resolveVelocity(options) {
-    const provided = options?.velocity;
-    if (provided) {
-      return provided;
-    }
-
-    if (typeof this.velocityProvider === 'function') {
-      return this.velocityProvider();
-    }
-
-    return null;
-  }
-
-  detectVisualPreset() {
-    if (typeof document === 'undefined' || !document.body) {
-      return null;
-    }
-
-    const reduced = document.body.classList.contains('particles-reduced');
-    return reduced ? 'minimal' : 'cinematic';
+  pickStarColor(vibranceChance) {
+    return this.pickNeonColor(vibranceChance);
   }
 
   render(ctx, options = {}) {
     if (!ctx) return;
 
-    const canvasWidth = Number.isFinite(options.width)
-      ? options.width
-      : ctx.canvas?.width;
-    const canvasHeight = Number.isFinite(options.height)
-      ? options.height
-      : ctx.canvas?.height;
+    const width = options.width || ctx.canvas.width;
+    const height = options.height || ctx.canvas.height;
 
-    if (canvasWidth && canvasHeight) {
-      this.resize(canvasWidth, canvasHeight);
+    if (!this.initialized || this.width !== width || this.height !== height) {
+      this.resize(width, height);
     }
 
-    const preset = this.detectVisualPreset();
-    if (preset && preset !== this.currentPreset) {
-      this.applyPreset(preset);
-    }
+    // 1. Clear background - deep space
+    ctx.fillStyle = '#030810';
+    ctx.fillRect(0, 0, width, height);
 
-    const now = resolveTimestamp();
-    const delta = now - this.lastTime;
-    const safeDelta = Number.isFinite(delta) ? Math.max(0, delta) : 0;
-    const dt = Math.min(34, safeDelta);
-    this.lastTime = now;
+    // 2. Draw subtle nebula clouds
+    this.drawNebula(ctx);
 
-    const velocity = this.resolveVelocity(options);
-    const rawVX = extractVelocityComponent(velocity, 'vx', 'x');
-    const rawVY = extractVelocityComponent(velocity, 'vy', 'y');
+    // 3. Update & draw stars
+    // Safeguard against NaN velocity - check both {vx,vy} and {x,y} formats
+    const rawVelocity = options.velocity || {};
+    const vx = Number.isFinite(rawVelocity.vx)
+      ? rawVelocity.vx
+      : Number.isFinite(rawVelocity.x)
+        ? rawVelocity.x
+        : 0;
+    const vy = Number.isFinite(rawVelocity.vy)
+      ? rawVelocity.vy
+      : Number.isFinite(rawVelocity.y)
+        ? rawVelocity.y
+        : 0;
 
-    let driftVX = this.baseDrift.vx;
-    let driftVY = this.baseDrift.vy;
-    let tilt = 0;
-
-    if (velocity && this.parallax.enabled) {
-      const vxMs = Number.isFinite(rawVX) ? rawVX / 1000 : 0;
-      const vyMs = Number.isFinite(rawVY) ? rawVY / 1000 : 0;
-
-      driftVX += -vxMs * this.parallax.factor;
-      driftVY += -vyMs * this.parallax.factor;
-
-      const speed = Math.hypot(rawVX, rawVY);
-      if (speed > EPSILON) {
-        const referenceSpeed = Math.max(
-          EPSILON,
-          Number.isFinite(this.parallax.speedForMaxTilt)
-            ? this.parallax.speedForMaxTilt
-            : SHIP_MAX_SPEED || speed
-        );
-        const speedRatio = clamp(speed / referenceSpeed, 0, 1);
-        const bankDirection = -rawVX / speed;
-        const desiredTilt = bankDirection * this.parallax.tilt * speedRatio;
-
-        tilt = clamp(
-          desiredTilt,
-          -this.parallax.maxTilt,
-          this.parallax.maxTilt
-        );
-      }
-    }
+    const dt = 16 / 1000;
+    const time = Date.now() / 1000;
 
     ctx.save();
+    ctx.globalCompositeOperation = 'lighter'; // Additive blending for neon glow
 
-    if (tilt !== 0) {
-      ctx.translate(this.width / 2, this.height / 2);
-      ctx.rotate(tilt);
-      ctx.translate(-this.width / 2, -this.height / 2);
-    }
+    this.stars.forEach((star) => {
+      // Parallax movement - opposite to player velocity
+      star.x -= vx * star.speed * dt;
+      star.y -= vy * star.speed * dt;
 
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, this.width, this.height);
+      // Wrap around screen edges
+      if (star.x < -10) star.x += width + 20;
+      if (star.x > width + 10) star.x -= width + 20;
+      if (star.y < -10) star.y += height + 20;
+      if (star.y > height + 10) star.y -= height + 20;
 
-    const gradient = ctx.createRadialGradient(
-      this.width / 2,
-      this.height / 2,
-      Math.min(this.width, this.height) * 0.2,
-      this.width / 2,
-      this.height / 2,
-      Math.hypot(this.width, this.height) * 0.55
-    );
-    gradient.addColorStop(0, 'rgba(0,0,0,0)');
-    gradient.addColorStop(1, 'rgba(0,0,0,0.35)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, this.width, this.height);
+      // Twinkle effect
+      const blink = Math.sin(time * star.blinkSpeed + star.phase);
+      const alpha = 0.6 + 0.4 * blink;
 
-    const twinkleStep = this.twinkleHz * 2 * Math.PI * (dt / 1000);
+      // Neon color with glow
+      const c = star.color;
+      ctx.fillStyle = `rgba(${c.r}, ${c.g}, ${c.b}, ${alpha})`;
 
-    this.layers.forEach((layer) => {
-      const vx = (layer.vx + driftVX) * this.dpr;
-      const vy = (layer.vy + driftVY) * this.dpr;
-
-      layer.stars.forEach((star) => {
-        star.x += vx * dt;
-        star.y += vy * dt;
-
-        if (star.x < 0) star.x += this.width;
-        else if (star.x >= this.width) star.x -= this.width;
-        if (star.y < 0) star.y += this.height;
-        else if (star.y >= this.height) star.y -= this.height;
-
-        star.phase += twinkleStep * star.jitter;
-
-        const twinkle =
-          1 -
-          this.twinkleAmp * 0.5 +
-          Math.sin(star.phase) * (this.twinkleAmp * 0.5);
-        const alpha = Math.min(1, layer.glow * 1.05 * twinkle);
-        const radius = Math.max(
-          0.5,
-          layer.size *
-            (0.9 + 0.2 * Math.sin(star.phase * 0.7)) *
-            star.jitter *
-            this.dpr
-        );
-
-        ctx.fillStyle = `rgba(${this.tint.r}, ${this.tint.g}, ${this.tint.b}, ${alpha})`;
-        ctx.beginPath();
-        ctx.arc(star.x, star.y, radius, 0, Math.PI * 2);
-        ctx.fill();
-      });
+      // Draw diamond shape
+      const r = star.size / 2;
+      ctx.beginPath();
+      ctx.moveTo(star.x, star.y - r);
+      ctx.lineTo(star.x + r, star.y);
+      ctx.lineTo(star.x, star.y + r);
+      ctx.lineTo(star.x - r, star.y);
+      ctx.closePath();
+      ctx.fill();
     });
 
     ctx.restore();
+
+    // 4. Vignette overlay
+    this.drawVignette(ctx, width, height);
+  }
+
+  drawNebula(ctx) {
+    if (!this.nebulaClouds) return;
+
+    const time = Date.now() / 1000;
+    const width = this.width;
+    const height = this.height;
+
+    this.nebulaClouds.forEach((cloud) => {
+      // Slow drift
+      let x = cloud.x + cloud.vx * time;
+      let y = cloud.y + cloud.vy * time;
+
+      // Wrap
+      x = ((x % width) + width) % width;
+      y = ((y % height) + height) % height;
+
+      // Pulse size slightly
+      const r = cloud.radius * (0.9 + 0.2 * Math.sin(time * 0.2 + cloud.phase));
+
+      const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+      grad.addColorStop(0, cloud.color);
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+      ctx.fillStyle = grad;
+      // Draw larger rect to cover gradient area
+      ctx.fillRect(x - r, y - r, r * 2, r * 2);
+    });
+  }
+
+  drawVignette(ctx, width, height) {
+    const gradient = ctx.createRadialGradient(
+      width / 2,
+      height / 2,
+      Math.min(width, height) * 0.4,
+      width / 2,
+      height / 2,
+      Math.hypot(width, height) * 0.7
+    );
+    gradient.addColorStop(0, 'rgba(0,0,0,0)');
+    gradient.addColorStop(1, 'rgba(0,0,0,0.6)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, width, height);
   }
 }
 
@@ -667,7 +475,7 @@ class RenderingSystem extends BaseSystem {
     });
 
     this.spaceSky = new SpaceSkyBackground(this.getRandomFork('starfield'));
-    this.spaceSky.setParallax(0.06, 0.05, 0.06, SHIP_MAX_SPEED);
+    // [NEO-ARCADE] New 3D Starfield does not require legacy parallax/velocity configuration
 
     // Batch rendering optimization systems
     this.renderBatch = new RenderBatch();
@@ -679,7 +487,7 @@ class RenderingSystem extends BaseSystem {
       frameCount: 0,
       lastStatsTime: performance.now(),
       avgFrameTime: 0,
-      batchEfficiency: 0
+      batchEfficiency: 0,
     };
 
     this.cachedPlayer = null;
@@ -694,8 +502,11 @@ class RenderingSystem extends BaseSystem {
     this._lastEnemyRenderLog = 0;
     this._loggedBossRenderIds = new Set();
 
+    this._loggedBossRenderIds = new Set();
+
     this.shieldVisualCache = {
       signature: '',
+      patternCanvas: null, // [NEO-ARCADE] Cache for hex pattern
       path: null,
       radius: SHIP_SIZE,
       padding: 0,
@@ -708,33 +519,27 @@ class RenderingSystem extends BaseSystem {
       size: 0,
     };
 
-    this.spaceSky.bindVelocityProvider(() => {
-      this.resolveCachedServices({ cachedPlayer: 'player', cachedProgression: 'progression', cachedXPOrbs: 'xp-orbs', cachedHealthHearts: 'healthHearts', cachedEffects: 'effects', cachedCombat: 'combat', cachedEnemies: 'enemies', cachedUI: 'ui' });
-      const player = this.cachedPlayer;
-      if (!player) {
-        return null;
-      }
-
-      if (typeof player.getVelocity === 'function') {
-        return player.getVelocity();
-      }
-
-      if (player.velocity) {
-        return { ...player.velocity };
-      }
-
-      return null;
-    });
-
     // Initialize state manager with common presets
     this.stateManager.createPreset('starfield', {
       fillStyle: 'rgba(255, 255, 255, 0.8)',
       strokeStyle: 'transparent',
       globalAlpha: 1,
-      shadowBlur: 0
+      shadowBlur: 0,
     });
 
-    this.resolveCachedServices({ cachedPlayer: 'player', cachedProgression: 'progression', cachedXPOrbs: 'xp-orbs', cachedHealthHearts: 'healthHearts', cachedEffects: 'effects', cachedCombat: 'combat', cachedEnemies: 'enemies', cachedUI: 'ui' }, { force: true });
+    this.resolveCachedServices(
+      {
+        cachedPlayer: 'player',
+        cachedProgression: 'progression',
+        cachedXPOrbs: 'xp-orbs',
+        cachedHealthHearts: 'healthHearts',
+        cachedEffects: 'effects',
+        cachedCombat: 'combat',
+        cachedEnemies: 'enemies',
+        cachedUI: 'ui',
+      },
+      { force: true }
+    );
   }
 
   onReset() {
@@ -757,7 +562,16 @@ class RenderingSystem extends BaseSystem {
 
     ctx.save();
 
-    this.resolveCachedServices({ cachedPlayer: 'player', cachedProgression: 'progression', cachedXPOrbs: 'xp-orbs', cachedHealthHearts: 'healthHearts', cachedEffects: 'effects', cachedCombat: 'combat', cachedEnemies: 'enemies', cachedUI: 'ui' });
+    this.resolveCachedServices({
+      cachedPlayer: 'player',
+      cachedProgression: 'progression',
+      cachedXPOrbs: 'xp-orbs',
+      cachedHealthHearts: 'healthHearts',
+      cachedEffects: 'effects',
+      cachedCombat: 'combat',
+      cachedEnemies: 'enemies',
+      cachedUI: 'ui',
+    });
 
     const effects = this.cachedEffects;
     if (effects && typeof effects.applyScreenShake === 'function') {
@@ -930,7 +744,11 @@ class RenderingSystem extends BaseSystem {
       // Ignore errors when accessing enemy collections
     }
 
-    const candidates = [enemies.asteroids, enemies.enemies, enemies.activeEnemies];
+    const candidates = [
+      enemies.asteroids,
+      enemies.enemies,
+      enemies.activeEnemies,
+    ];
     for (const candidate of candidates) {
       if (Array.isArray(candidate)) {
         return candidate;
@@ -1006,9 +824,7 @@ class RenderingSystem extends BaseSystem {
     }
 
     const orbs =
-      typeof xpOrbs.getActiveOrbs === 'function'
-        ? xpOrbs.getActiveOrbs()
-        : [];
+      typeof xpOrbs.getActiveOrbs === 'function' ? xpOrbs.getActiveOrbs() : [];
     const hasActiveOrb = orbs.some((orb) => !orb.collected);
     if (!hasActiveOrb) return;
 
@@ -1031,7 +847,13 @@ class RenderingSystem extends BaseSystem {
     ctx.lineWidth = 1;
     ctx.setLineDash([3, 3]);
     ctx.beginPath();
-    ctx.arc(playerPosition.x, playerPosition.y, magnetismRadius, 0, Math.PI * 2);
+    ctx.arc(
+      playerPosition.x,
+      playerPosition.y,
+      magnetismRadius,
+      0,
+      Math.PI * 2
+    );
     ctx.stroke();
     ctx.restore();
   }
@@ -1101,12 +923,11 @@ class RenderingSystem extends BaseSystem {
     }
 
     const now =
-      typeof performance !== 'undefined' && typeof performance.now === 'function'
+      typeof performance !== 'undefined' &&
+      typeof performance.now === 'function'
         ? performance.now()
         : Date.now();
-    const lastUpdate = Number.isFinite(hud.lastUpdate)
-      ? hud.lastUpdate
-      : now;
+    const lastUpdate = Number.isFinite(hud.lastUpdate) ? hud.lastUpdate : now;
     const elapsed = Math.max(0, (now - lastUpdate) / 1000);
 
     const isActive = Boolean(hud.active) || (hud.health > 0 && !hud.defeated);
@@ -1154,9 +975,10 @@ class RenderingSystem extends BaseSystem {
       typeof hud.color === 'string' && hud.color.trim().length > 0
         ? hud.color
         : '#ff6b6b';
-    const clampedHealthRatio = hud.maxHealth > 0
-      ? Math.max(0, Math.min(1, Number(hud.health) / Number(hud.maxHealth)))
-      : 0;
+    const clampedHealthRatio =
+      hud.maxHealth > 0
+        ? Math.max(0, Math.min(1, Number(hud.health) / Number(hud.maxHealth)))
+        : 0;
 
     ctx.save();
 
@@ -1236,7 +1058,12 @@ class RenderingSystem extends BaseSystem {
     ctx.save();
     ctx.globalAlpha = alpha * 0.2;
     ctx.fillStyle = 'rgba(6, 10, 22, 0.85)';
-    ctx.fillRect(startX - gap * 0.5, baseY - indicatorHeight * 0.5, totalWidth + gap, indicatorHeight * 1.6);
+    ctx.fillRect(
+      startX - gap * 0.5,
+      baseY - indicatorHeight * 0.5,
+      totalWidth + gap,
+      indicatorHeight * 1.6
+    );
     ctx.restore();
 
     const activePhase = hud.defeated
@@ -1294,11 +1121,12 @@ class RenderingSystem extends BaseSystem {
 
     const tilt = Math.max(
       -MAX_VISUAL_TILT,
-      Math.min(MAX_VISUAL_TILT, angularVelocity * TILT_MULTIPLIER),
+      Math.min(MAX_VISUAL_TILT, angularVelocity * TILT_MULTIPLIER)
     );
 
     // Get recoil offset from player stats
-    const playerStats = typeof player.getStats === 'function' ? player.getStats() : null;
+    const playerStats =
+      typeof player.getStats === 'function' ? player.getStats() : null;
     const recoilOffset = playerStats?.recoilOffset || { x: 0, y: 0 };
 
     // Apply recoil by translating the context
@@ -1311,11 +1139,12 @@ class RenderingSystem extends BaseSystem {
         : null;
 
     // Only render shield when ship hull exists
-    const hullExists = !player.isDead && !player.isRetrying && !player._quitExplosionHidden;
+    const hullExists =
+      !player.isDead && !player.isRetrying && !player._quitExplosionHidden;
     if (hullExists && shieldState?.isActive && shieldState.maxHits > 0) {
       const ratio = Math.max(
         0,
-        Math.min(1, shieldState.currentHits / shieldState.maxHits),
+        Math.min(1, shieldState.currentHits / shieldState.maxHits)
       );
       const position =
         typeof player.getPosition === 'function'
@@ -1327,7 +1156,7 @@ class RenderingSystem extends BaseSystem {
           0,
           typeof player.getShieldPadding === 'function'
             ? player.getShieldPadding()
-            : 0,
+            : 0
         );
 
         const visuals = this.resolveShieldVisual(player, padding);
@@ -1342,64 +1171,116 @@ class RenderingSystem extends BaseSystem {
 
           ctx.save();
           ctx.translate(position.x, position.y);
+          // [NEO-ARCADE] Rotate shield slightly independently for "floating field" feel
+          const time = Date.now() / 1000;
           ctx.rotate(angle);
+
+          // Counter-rotate pattern for stability or rotate for effect?
+          // Let's rotate the field slowly
+          const fieldRotation = Math.sin(time * 0.5) * 0.1;
+
           if (tilt !== 0) {
             ctx.transform(1, 0, tilt, 1, 0, 0);
           }
 
-          const now =
-            typeof performance !== 'undefined' &&
-            typeof performance.now === 'function'
-              ? performance.now()
-              : Date.now();
-          const pulse = 0.6 + 0.4 * Math.sin(now / 180);
-
-          const gradientCanvas = this.ensureShieldGradientCanvas(
-            radiusForGradient,
-            ratio,
-          );
-
-          ctx.globalCompositeOperation = 'lighter';
-
-          if (gradientCanvas) {
-            const offset = gradientCanvas.width / 2;
-            ctx.drawImage(gradientCanvas, -offset, -offset);
-          } else {
-            const glowGradient = ctx.createRadialGradient(
-              0,
-              0,
-              radiusForGradient * 0.35,
-              0,
-              0,
-              radiusForGradient * 1.25,
-            );
-            glowGradient.addColorStop(
-              0,
-              `rgba(120, 240, 255, ${0.08 + ratio * 0.14})`,
-            );
-            glowGradient.addColorStop(
-              0.55,
-              `rgba(0, 190, 255, ${0.25 + ratio * 0.3})`,
-            );
-            glowGradient.addColorStop(1, 'rgba(0, 150, 255, 0)');
-            ctx.fillStyle = glowGradient;
-            ctx.fill(shieldPath);
-          }
+          // === SOAP BUBBLE V3 (Vibrant Rainbow Reference) ===
 
           ctx.globalCompositeOperation = 'source-over';
-          ctx.lineJoin = 'round';
-          ctx.lineCap = 'round';
-          ctx.shadowColor = `rgba(90, 200, 255, ${0.75 + ratio * 0.15})`;
-          ctx.shadowBlur = 10 + ratio * 16 + pulse * 4;
-          ctx.lineWidth = 2.4 + ratio * 2.2 + pulse * 0.35;
-          ctx.strokeStyle = `rgba(160, 245, 255, ${0.52 + ratio * 0.35})`;
-          ctx.stroke(shieldPath);
 
-          ctx.shadowBlur = 0;
-          ctx.lineWidth = 1 + ratio * 1.4;
-          ctx.strokeStyle = `rgba(255, 255, 255, ${0.28 + ratio * 0.3})`;
-          ctx.globalAlpha = 0.9;
-          ctx.stroke(shieldPath);
+          // 1. Base Bubble (Oil Slick Fill)
+          const bubbleRadius = radiusForGradient;
+          const oilGrad = ctx.createRadialGradient(
+            bubbleRadius * 0.3,
+            -bubbleRadius * 0.3,
+            0,
+            0,
+            0,
+            bubbleRadius
+          );
+          // Stronger colors for "Rainbow Effect"
+          oilGrad.addColorStop(0, 'rgba(255, 255, 255, 0.1)');
+          oilGrad.addColorStop(0.3, 'rgba(0, 255, 255, 0.15)'); // Cyan
+          oilGrad.addColorStop(0.5, 'rgba(255, 0, 255, 0.15)'); // Magenta
+          oilGrad.addColorStop(0.7, 'rgba(255, 255, 0, 0.12)'); // Yellow
+          oilGrad.addColorStop(
+            0.95,
+            `rgba(255, 255, 255, ${0.2 + ratio * 0.2})`
+          ); // Rim catch
+
+          ctx.beginPath();
+          ctx.arc(0, 0, bubbleRadius, 0, Math.PI * 2);
+          ctx.fillStyle = oilGrad;
+          ctx.fill();
+
+          // 2. The RIM (Rainbow Ring)
+          const rimGrad = ctx.createLinearGradient(
+            -bubbleRadius,
+            -bubbleRadius,
+            bubbleRadius,
+            bubbleRadius
+          );
+          rimGrad.addColorStop(0, 'rgba(0, 255, 255, 0.8)');
+          rimGrad.addColorStop(0.33, 'rgba(255, 0, 255, 0.8)');
+          rimGrad.addColorStop(0.66, 'rgba(255, 255, 0, 0.8)');
+          rimGrad.addColorStop(1, 'rgba(0, 255, 255, 0.8)');
+
+          ctx.lineWidth = 1.5;
+          ctx.strokeStyle = rimGrad;
+          ctx.beginPath();
+          ctx.arc(0, 0, bubbleRadius, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // 3. Window Reflection (Primary Top Left)
+          ctx.save();
+          ctx.translate(-bubbleRadius * 0.5, -bubbleRadius * 0.5);
+          ctx.rotate(-Math.PI / 6);
+
+          ctx.beginPath();
+          // Softbox shape
+          ctx.ellipse(
+            0,
+            0,
+            bubbleRadius * 0.35,
+            bubbleRadius * 0.2,
+            0,
+            0,
+            Math.PI * 2
+          );
+
+          const windowGrad = ctx.createLinearGradient(0, -20, 0, 20);
+          windowGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+          windowGrad.addColorStop(1, 'rgba(255, 255, 255, 0.1)');
+
+          ctx.fillStyle = windowGrad;
+          ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
+          ctx.shadowBlur = 10;
+          ctx.fill();
+          ctx.restore();
+
+          // 4. Bottom Reflection (Bounce Light)
+          ctx.save();
+          ctx.translate(bubbleRadius * 0.5, bubbleRadius * 0.5);
+          ctx.rotate(Math.PI / 6);
+          ctx.beginPath();
+          ctx.ellipse(
+            0,
+            0,
+            bubbleRadius * 0.25,
+            bubbleRadius * 0.1,
+            0,
+            0,
+            Math.PI * 2
+          );
+
+          const botGrad = ctx.createLinearGradient(0, -10, 0, 10);
+          botGrad.addColorStop(0, 'rgba(0, 255, 255, 0.1)');
+          botGrad.addColorStop(1, 'rgba(0, 255, 255, 0.5)');
+
+          ctx.fillStyle = botGrad;
+          ctx.filter = 'blur(4px)';
+          ctx.fill();
+          ctx.restore();
+
           ctx.restore();
         }
       }
@@ -1419,7 +1300,10 @@ class RenderingSystem extends BaseSystem {
         : null;
 
     let signature = `circle:${padding}`;
-    if (Array.isArray(hullOutline) && hullOutline.length >= MIN_OUTLINE_POINTS) {
+    if (
+      Array.isArray(hullOutline) &&
+      hullOutline.length >= MIN_OUTLINE_POINTS
+    ) {
       const keyParts = [padding, hullOutline.length];
       for (let i = 0; i < Math.min(4, hullOutline.length); i += 1) {
         const vertex = hullOutline[i] || { x: 0, y: 0 };
@@ -1432,7 +1316,10 @@ class RenderingSystem extends BaseSystem {
     if (cache.signature !== signature) {
       const fallbackRadius = this.resolveShieldFallbackRadius(player, padding);
 
-      if (Array.isArray(hullOutline) && hullOutline.length >= MIN_OUTLINE_POINTS) {
+      if (
+        Array.isArray(hullOutline) &&
+        hullOutline.length >= MIN_OUTLINE_POINTS
+      ) {
         const expanded = expandHullOutline(hullOutline, padding);
         const outlineToUse =
           expanded && expanded.length >= MIN_OUTLINE_POINTS
@@ -1518,11 +1405,15 @@ class RenderingSystem extends BaseSystem {
     const stateStats = this.stateManager.getStats();
     const gradientStats = this.gradientCache.getStats();
 
-    console.log(`[RenderingSystem] Performance Stats - Frames: ${renderStats.frameCount}`);
+    console.log(
+      `[RenderingSystem] Performance Stats - Frames: ${renderStats.frameCount}`
+    );
     console.log(`  Avg Frame Time: ${renderStats.avgFrameTime.toFixed(2)}ms`);
     console.log(`  Batch Efficiency: ${batchStats.efficiency}`);
     console.log(`  State Efficiency: ${stateStats.efficiency}`);
-    console.log(`  Gradient Cache: ${gradientStats.hitRates.gradients} hit rate`);
+    console.log(
+      `  Gradient Cache: ${gradientStats.hitRates.gradients} hit rate`
+    );
     console.log(`  Canvas Cache: ${gradientStats.hitRates.canvases} hit rate`);
   }
 
@@ -1536,7 +1427,7 @@ class RenderingSystem extends BaseSystem {
       batchEfficiency: this.renderStats.batchEfficiency,
       batchStats: this.renderBatch.getStats(),
       stateStats: this.stateManager.getStats(),
-      gradientStats: this.gradientCache.getStats()
+      gradientStats: this.gradientCache.getStats(),
     };
   }
 
@@ -1549,7 +1440,7 @@ class RenderingSystem extends BaseSystem {
     const batch = this.renderBatch.beginBatch('circles', {
       fillStyle,
       strokeStyle,
-      globalAlpha: 1
+      globalAlpha: 1,
     });
 
     for (const circle of circles) {
@@ -1573,7 +1464,7 @@ class RenderingSystem extends BaseSystem {
 
     const batch = this.renderBatch.beginBatch('lines', {
       strokeStyle,
-      lineWidth
+      lineWidth,
     });
 
     for (const line of lines) {
@@ -1598,7 +1489,7 @@ class RenderingSystem extends BaseSystem {
       frameCount: 0,
       lastStatsTime: performance.now(),
       avgFrameTime: 0,
-      batchEfficiency: 0
+      batchEfficiency: 0,
     };
 
     this.renderBatch.resetStats();
@@ -1606,6 +1497,35 @@ class RenderingSystem extends BaseSystem {
     this.gradientCache.reset();
 
     console.log('[RenderingSystem] Performance tracking reset');
+  }
+
+  // [NEO-ARCADE] Procedural Hexagon Pattern Generation
+  createHexagonPattern() {
+    const size = SHIELD_HEX_SIZE;
+    const canvas = document.createElement('canvas');
+    canvas.width = size * 2;
+    canvas.height = size * Math.sqrt(3);
+    const tempCtx = canvas.getContext('2d');
+
+    tempCtx.strokeStyle = 'rgba(255, 255, 255, 0.15)'; // Very subtle white/cyan
+    tempCtx.lineWidth = 1;
+    tempCtx.lineCap = 'round';
+
+    // Draw Hexagon (approximated for tiling)
+    tempCtx.beginPath();
+    const w = size;
+    const h = (size * Math.sqrt(3)) / 2;
+
+    tempCtx.moveTo(0, h);
+    tempCtx.lineTo(w / 2, 0);
+    tempCtx.lineTo(w * 1.5, 0);
+    tempCtx.lineTo(w * 2, h);
+    tempCtx.lineTo(w * 1.5, h * 2);
+    tempCtx.lineTo(w / 2, h * 2);
+    tempCtx.lineTo(0, h);
+    tempCtx.stroke();
+
+    return canvas;
   }
 }
 

@@ -1,13 +1,28 @@
-import { afterAll, beforeAll, beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  afterEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest';
 import { GamePools } from '../../../src/core/GamePools.js';
 import EffectsSystem from '../../../src/modules/EffectsSystem.js';
 import XPOrbSystem from '../../../src/modules/XPOrbSystem.js';
 import { EnemySystem } from '../../../src/modules/EnemySystem.js';
 import { createEventBusMock } from '../../__helpers__/mocks.js';
-import { setupGlobalMocks, cleanupGlobalState, createTestContainer } from '../../__helpers__/setup.js';
+import {
+  setupGlobalMocks,
+  cleanupGlobalState,
+  createTestContainer,
+} from '../../__helpers__/setup.js';
 
 function cloneSeeds(seeds = {}) {
-  return Object.fromEntries(Object.entries(seeds).map(([key, value]) => [key, value]));
+  return Object.fromEntries(
+    Object.entries(seeds).map(([key, value]) => [key, value])
+  );
 }
 
 beforeAll(() => {
@@ -62,8 +77,16 @@ function runStartResetCycle(seed) {
     spawnHeart: () => {},
   };
 
-  const effects = new EffectsSystem({ random, audio: audioStub, settings: settingsStub });
-  const xpOrbSystem = new XPOrbSystem({ random, player: playerStub, progression: progressionStub });
+  const effects = new EffectsSystem({
+    random,
+    audio: audioStub,
+    settings: settingsStub,
+  });
+  const xpOrbSystem = new XPOrbSystem({
+    random,
+    player: playerStub,
+    progression: progressionStub,
+  });
   const enemySystem = new EnemySystem({
     random,
     player: playerStub,
@@ -79,16 +102,18 @@ function runStartResetCycle(seed) {
   xpOrbSystem.reset();
   enemySystem.reset();
 
-  const asteroidSnapshot = enemySystem.asteroids.slice(0, 4).map((asteroid) => ({
-    id: asteroid.id,
-    x: Number(asteroid.x.toFixed(4)),
-    y: Number(asteroid.y.toFixed(4)),
-    vx: Number(asteroid.vx.toFixed(6)),
-    vy: Number(asteroid.vy.toFixed(6)),
-    rotation: Number(asteroid.rotation.toFixed(6)),
-    rotationSpeed: Number(asteroid.rotationSpeed.toFixed(6)),
-    crackSeed: asteroid.crackSeed,
-  }));
+  const asteroidSnapshot = enemySystem.asteroids
+    .slice(0, 4)
+    .map((asteroid) => ({
+      id: asteroid.id,
+      x: Number(asteroid.x.toFixed(4)),
+      y: Number(asteroid.y.toFixed(4)),
+      vx: Number(asteroid.vx.toFixed(6)),
+      vy: Number(asteroid.vy.toFixed(6)),
+      rotation: Number(asteroid.rotation.toFixed(6)),
+      rotationSpeed: Number(asteroid.rotationSpeed.toFixed(6)),
+      crackSeed: asteroid.crackSeed,
+    }));
 
   const snapshot = {
     effectsSeeds: cloneSeeds(effects.randomForkSeeds),

@@ -102,7 +102,9 @@ export class EnemyFactory {
     }
 
     if (this.registry.has(type)) {
-      console.warn(`[EnemyFactory] Type '${type}' already registered. Overwriting.`);
+      console.warn(
+        `[EnemyFactory] Type '${type}' already registered. Overwriting.`
+      );
     }
 
     // Store configuration
@@ -111,14 +113,14 @@ export class EnemyFactory {
       pool: config.pool || null,
       defaults: config.defaults || {},
       tags: config.tags || [],
-      enabled: config.enabled !== false
+      enabled: config.enabled !== false,
     });
 
     // Initialize stats
     this.stats.set(type, {
       created: 0,
       pooled: 0,
-      active: 0
+      active: 0,
     });
 
     console.log(`[EnemyFactory] Registered type: ${type}`);
@@ -172,7 +174,7 @@ export class EnemyFactory {
     const finalConfig = {
       ...typeConfig.defaults,
       ...config,
-      type: type  // Ensure type is set
+      type: type, // Ensure type is set
     };
 
     if (type === 'asteroid') {
@@ -192,7 +194,8 @@ export class EnemyFactory {
         },
         mergeCorrect:
           finalConfig?.size === (config?.size ?? typeConfig.defaults?.size) &&
-          finalConfig?.variant === (config?.variant ?? typeConfig.defaults?.variant),
+          finalConfig?.variant ===
+            (config?.variant ?? typeConfig.defaults?.variant),
       });
     }
 
@@ -245,9 +248,10 @@ export class EnemyFactory {
 
     for (let i = 0; i < count; i++) {
       // Allow config to be a function for dynamic generation
-      const enemyConfig = typeof config === 'function'
-        ? config(i, count)
-        : { ...config, batchIndex: i };
+      const enemyConfig =
+        typeof config === 'function'
+          ? config(i, count)
+          : { ...config, batchIndex: i };
 
       const enemy = this.create(type, enemyConfig);
 
@@ -256,7 +260,9 @@ export class EnemyFactory {
       }
     }
 
-    console.log(`[EnemyFactory] Created batch of ${enemies.length}/${count} ${type}s`);
+    console.log(
+      `[EnemyFactory] Created batch of ${enemies.length}/${count} ${type}s`
+    );
     return enemies;
   }
 
@@ -288,7 +294,10 @@ export class EnemyFactory {
         typeConfig.pool.release(enemy);
         return true;
       } catch (error) {
-        console.error(`[EnemyFactory] Failed to release ${enemy.type} to pool:`, error);
+        console.error(
+          `[EnemyFactory] Failed to release ${enemy.type} to pool:`,
+          error
+        );
       }
     }
 
@@ -351,7 +360,9 @@ export class EnemyFactory {
     }
 
     typeConfig.enabled = enabled;
-    console.log(`[EnemyFactory] Type '${type}' ${enabled ? 'enabled' : 'disabled'}`);
+    console.log(
+      `[EnemyFactory] Type '${type}' ${enabled ? 'enabled' : 'disabled'}`
+    );
     return true;
   }
 
@@ -411,7 +422,9 @@ export class EnemyFactory {
 
       // Warn if no pool configured
       if (!config.pool) {
-        warnings.push(`Type '${type}' has no pool configured (will create new instances every time)`);
+        warnings.push(
+          `Type '${type}' has no pool configured (will create new instances every time)`
+        );
       }
 
       // Check if defaults are an object
@@ -424,7 +437,7 @@ export class EnemyFactory {
       valid: errors.length === 0,
       errors,
       warnings,
-      registeredTypes: this.registry.size
+      registeredTypes: this.registry.size,
     };
   }
 
@@ -448,14 +461,14 @@ export class EnemyFactory {
       type,
       enabled: config.enabled,
       hasPool: !!config.pool,
-      defaultTags: config.tags
+      defaultTags: config.tags,
     }));
 
     return {
       totalTypes: this.registry.size,
       enabledTypes: this.getEnabledTypes().length,
       types,
-      stats: this.getStats()
+      stats: this.getStats(),
     };
   }
 
@@ -475,13 +488,13 @@ export class EnemyFactory {
     const validation = this.validate();
     if (validation.errors.length > 0) {
       console.group('⚠️ Errors');
-      validation.errors.forEach(err => console.error(err));
+      validation.errors.forEach((err) => console.error(err));
       console.groupEnd();
     }
 
     if (validation.warnings.length > 0) {
       console.group('⚡ Warnings');
-      validation.warnings.forEach(warn => console.warn(warn));
+      validation.warnings.forEach((warn) => console.warn(warn));
       console.groupEnd();
     }
 
@@ -503,15 +516,23 @@ export class EnemyFactory {
 
     if (components.movement) {
       const existingMovement = enemy.getComponent?.('movement') || null;
-      enemy.movementStrategy = components.movement.strategy || enemy.movementStrategy || 'linear';
+      enemy.movementStrategy =
+        components.movement.strategy || enemy.movementStrategy || 'linear';
       enemy.movementConfig = { ...components.movement };
 
       if (existingMovement) {
-        if (typeof existingMovement.setStrategy === 'function' && components.movement.strategy) {
+        if (
+          typeof existingMovement.setStrategy === 'function' &&
+          components.movement.strategy
+        ) {
           existingMovement.setStrategy(components.movement.strategy);
         }
       } else {
-        const movementComponent = this.createMovementComponent(components.movement, enemy, finalConfig);
+        const movementComponent = this.createMovementComponent(
+          components.movement,
+          enemy,
+          finalConfig
+        );
         enemy.addComponent('movement', movementComponent);
         attachedCount++;
       }
@@ -522,7 +543,8 @@ export class EnemyFactory {
       enemy.weaponConfig = { ...components.weapon };
       if (Array.isArray(components.weapon.patterns)) {
         enemy.weaponPatterns = [...components.weapon.patterns];
-        enemy.weaponPattern = enemy.weaponPattern || components.weapon.patterns[0];
+        enemy.weaponPattern =
+          enemy.weaponPattern || components.weapon.patterns[0];
       } else if (components.weapon.pattern) {
         enemy.weaponPattern = components.weapon.pattern;
       }
@@ -533,7 +555,11 @@ export class EnemyFactory {
           existingWeapon.reset(enemy);
         }
       } else {
-        const weaponComponent = this.createWeaponComponent(components.weapon, enemy, finalConfig);
+        const weaponComponent = this.createWeaponComponent(
+          components.weapon,
+          enemy,
+          finalConfig
+        );
         enemy.addComponent('weapon', weaponComponent);
         if (typeof weaponComponent.reset === 'function') {
           weaponComponent.reset(enemy);
@@ -544,15 +570,23 @@ export class EnemyFactory {
 
     if (components.render) {
       const existingRender = enemy.getComponent?.('render') || null;
-      enemy.renderStrategy = components.render.strategy || enemy.renderStrategy || 'delegate';
+      enemy.renderStrategy =
+        components.render.strategy || enemy.renderStrategy || 'delegate';
       enemy.renderConfig = { ...components.render };
 
       if (existingRender) {
-        if (typeof existingRender.setStrategy === 'function' && components.render.strategy) {
+        if (
+          typeof existingRender.setStrategy === 'function' &&
+          components.render.strategy
+        ) {
           existingRender.setStrategy(components.render.strategy);
         }
       } else {
-        const renderComponent = this.createRenderComponent(components.render, enemy, finalConfig);
+        const renderComponent = this.createRenderComponent(
+          components.render,
+          enemy,
+          finalConfig
+        );
         enemy.addComponent('render', renderComponent);
         attachedCount++;
       }
@@ -570,7 +604,11 @@ export class EnemyFactory {
       }
 
       if (!existingCollision) {
-        const collisionComponent = this.createCollisionComponent(components.collision, enemy, finalConfig);
+        const collisionComponent = this.createCollisionComponent(
+          components.collision,
+          enemy,
+          finalConfig
+        );
         enemy.addComponent('collision', collisionComponent);
         attachedCount++;
       }
@@ -584,7 +622,11 @@ export class EnemyFactory {
           existingHealth.initialize(enemy, components.health);
         }
       } else {
-        const healthComponent = this.createHealthComponent(components.health, enemy, finalConfig);
+        const healthComponent = this.createHealthComponent(
+          components.health,
+          enemy,
+          finalConfig
+        );
         enemy.addComponent('health', healthComponent);
         if (typeof healthComponent.initialize === 'function') {
           healthComponent.initialize(enemy, components.health);

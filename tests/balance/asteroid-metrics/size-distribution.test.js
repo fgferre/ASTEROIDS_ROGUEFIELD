@@ -1,6 +1,10 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import { GamePools } from '../../../src/core/GamePools.js';
-import { setupGlobalMocks, cleanupGlobalState, withWaveOverrides } from '../../__helpers__/setup.js';
+import {
+  setupGlobalMocks,
+  cleanupGlobalState,
+  withWaveOverrides,
+} from '../../__helpers__/setup.js';
 import { expectWithinTolerance } from '../../__helpers__/assertions.js';
 import {
   createEnemySystemHarness,
@@ -61,6 +65,6 @@ describe('Asteroid Metrics - Size Distribution', () => {
           }
           harness.enemySystem.cleanupDestroyed?.();
         }
-      }),
+      })
   );
 });

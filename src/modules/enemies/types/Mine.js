@@ -41,9 +41,12 @@ export class Mine extends BaseEnemy {
     const componentConfig = config.components ?? MINE_COMPONENTS;
     if (componentConfig) {
       this.weaponState = this.weaponState || {};
-      this.movementStrategy = componentConfig?.movement?.strategy || 'proximity';
-      this.renderStrategy = componentConfig?.render?.strategy || 'procedural-sphere';
-      this.weaponPattern = componentConfig?.weapon?.pattern || this.weaponPattern;
+      this.movementStrategy =
+        componentConfig?.movement?.strategy || 'proximity';
+      this.renderStrategy =
+        componentConfig?.render?.strategy || 'procedural-sphere';
+      this.weaponPattern =
+        componentConfig?.weapon?.pattern || this.weaponPattern;
     }
 
     this.radius = config.radius ?? MINE_DEFAULTS.radius ?? 18;
@@ -141,7 +144,8 @@ export class Mine extends BaseEnemy {
     this.age += deltaTime;
     this.armTimer -= deltaTime;
     this.remainingLifetime -= deltaTime;
-    this.pulsePhase = (this.pulsePhase + this.pulseSpeed * deltaTime) % (Math.PI * 2);
+    this.pulsePhase =
+      (this.pulsePhase + this.pulseSpeed * deltaTime) % (Math.PI * 2);
 
     if (!this.armed && this.armTimer <= 0) {
       this.armed = true;
@@ -160,7 +164,11 @@ export class Mine extends BaseEnemy {
       const { reason, cause: causeOverride, ...rest } = reasonOrPayload;
       cause = causeOverride ?? reason ?? 'detonation';
       resolvedContext = { ...rest };
-      if (context && typeof context === 'object' && Object.keys(context).length > 0) {
+      if (
+        context &&
+        typeof context === 'object' &&
+        Object.keys(context).length > 0
+      ) {
         resolvedContext = { ...resolvedContext, ...context };
       }
     }
@@ -195,8 +203,7 @@ export class Mine extends BaseEnemy {
       safeSource.cause ??
       this.explosionCause?.cause ??
       'detonation';
-    const context =
-      safeSource.context ?? this.explosionCause?.context ?? {};
+    const context = safeSource.context ?? this.explosionCause?.context ?? {};
 
     gameEvents.emit('mine-exploded', {
       enemy: this,
@@ -260,7 +267,6 @@ export class Mine extends BaseEnemy {
     this.explosionCause = null;
     this.destroyed = false;
   }
-
 }
 
 export default Mine;

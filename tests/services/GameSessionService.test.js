@@ -18,7 +18,7 @@ function createServiceHarness() {
     respawn: vi.fn(),
     reset: vi.fn(),
     getPosition: vi.fn(() => ({ x: 10, y: 15 })),
-    activateShield: vi.fn()
+    activateShield: vi.fn(),
   };
 
   const world = { reset: vi.fn() };
@@ -28,39 +28,39 @@ function createServiceHarness() {
     reset: vi.fn(),
     applyUpgradeEffects: vi.fn(),
     getAllUpgrades: vi.fn(() => []),
-    refreshInjectedServices: vi.fn()
+    refreshInjectedServices: vi.fn(),
   };
 
   const enemies = {
     getSnapshotState: vi.fn(() => ({ waves: [] })),
     restoreSnapshotState: vi.fn(() => true),
     reset: vi.fn(),
-    getAsteroids: vi.fn(() => [])
+    getAsteroids: vi.fn(() => []),
   };
 
   const physics = {
     getSnapshotState: vi.fn(() => ({ active: [] })),
     restoreSnapshotState: vi.fn(() => true),
-    reset: vi.fn()
+    reset: vi.fn(),
   };
 
   const audio = {
     init: vi.fn(),
     reset: vi.fn(),
-    reseedRandomScopes: vi.fn()
+    reseedRandomScopes: vi.fn(),
   };
 
   const ui = {
     showGameUI: vi.fn(),
     showScreen: vi.fn(),
-    resetLevelUpState: vi.fn()
+    resetLevelUpState: vi.fn(),
   };
 
   const xpOrbs = { reset: vi.fn() };
   const healthHearts = { reset: vi.fn() };
   const effects = {
     reset: vi.fn(),
-    createEpicShipExplosion: vi.fn()
+    createEpicShipExplosion: vi.fn(),
   };
 
   const combat = { reset: vi.fn() };
@@ -72,7 +72,7 @@ function createServiceHarness() {
     ctx: null,
     screen: 'menu',
     isPaused: false,
-    sessionState: 'menu'
+    sessionState: 'menu',
   };
 
   const service = new GameSessionService({
@@ -91,21 +91,25 @@ function createServiceHarness() {
       world,
       effects,
       combat,
-      renderer
+      renderer,
     },
-    gameState
+    gameState,
   });
 
   service.initialize({ seedInfo: { seed: 99, source: 'test' } });
   service.retryCountElement = { textContent: '0', isConnected: true };
-  service.retryButtonElement = { disabled: false, style: {}, isConnected: true };
+  service.retryButtonElement = {
+    disabled: false,
+    style: {},
+    isConnected: true,
+  };
   service.retryCountdownElement = {
     textContent: '',
     isConnected: true,
     classList: {
       add: vi.fn(),
-      remove: vi.fn()
-    }
+      remove: vi.fn(),
+    },
   };
 
   return {
@@ -122,7 +126,7 @@ function createServiceHarness() {
     effects,
     combat,
     renderer,
-    gameState
+    gameState,
   };
 }
 
@@ -146,7 +150,7 @@ describe('GameSessionService lifecycle flows', () => {
         .map((call) => call[1]);
 
     expect(getScreenEvents()).toEqual([
-      expect.objectContaining({ screen: 'playing', source: 'session.start' })
+      expect.objectContaining({ screen: 'playing', source: 'session.start' }),
     ]);
     service.setRetryCount(2);
     vi.useFakeTimers();
@@ -155,7 +159,7 @@ describe('GameSessionService lifecycle flows', () => {
 
     expect(service.getScreen()).toBe('playing');
     expect(getScreenEvents()).toEqual([
-      expect.objectContaining({ screen: 'playing', source: 'session.start' })
+      expect.objectContaining({ screen: 'playing', source: 'session.start' }),
     ]);
 
     vi.advanceTimersByTime(3000);
@@ -166,8 +170,8 @@ describe('GameSessionService lifecycle flows', () => {
       expect.objectContaining({
         screen: 'gameover',
         source: 'player-died',
-        data: { reason: 'spec' }
-      })
+        data: { reason: 'spec' },
+      }),
     ]);
 
     expect(service.hasDeathSnapshot()).toBe(true);
@@ -194,9 +198,9 @@ describe('GameSessionService lifecycle flows', () => {
       expect.objectContaining({
         screen: 'gameover',
         source: 'player-died',
-        data: { reason: 'spec' }
+        data: { reason: 'spec' },
       }),
-      expect.objectContaining({ screen: 'playing', source: 'retry-complete' })
+      expect.objectContaining({ screen: 'playing', source: 'retry-complete' }),
     ]);
   });
 
@@ -215,7 +219,9 @@ describe('GameSessionService lifecycle flows', () => {
     const result = service.completeRetryRespawn();
 
     expect(result).toBe(false);
-    expect(restoreSpy).toHaveBeenCalledWith({ snapshot: service.deathSnapshot });
+    expect(restoreSpy).toHaveBeenCalledWith({
+      snapshot: service.deathSnapshot,
+    });
     expect(player.isRetrying).toBe(false);
     expect(service.retryButtonElement.disabled).toBe(false);
     expect(service.retryButtonElement.style.opacity).toBe('1');
@@ -255,7 +261,10 @@ describe('GameSessionService lifecycle flows', () => {
 
     service.exitToMenu({ source: 'pause-menu' });
 
-    expect(effects.createEpicShipExplosion).toHaveBeenCalledWith({ x: 10, y: 15 });
+    expect(effects.createEpicShipExplosion).toHaveBeenCalledWith({
+      x: 10,
+      y: 15,
+    });
     expect(player._quitExplosionHidden).toBe(true);
     expect(exitSpy).not.toHaveBeenCalled();
 

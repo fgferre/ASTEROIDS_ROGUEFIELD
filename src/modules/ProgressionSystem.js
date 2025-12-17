@@ -88,7 +88,8 @@ class ProgressionSystem extends UpgradeSystem {
   }
 
   refreshInjectedServices(options = {}) {
-    const force = typeof options === 'boolean' ? options : Boolean(options.force);
+    const force =
+      typeof options === 'boolean' ? options : Boolean(options.force);
 
     this.resolveCachedServices(
       {
@@ -114,7 +115,11 @@ class ProgressionSystem extends UpgradeSystem {
 
     this.registerEventListener('progression-reset', (payload = {}) => {
       this.refreshInjectedServices({ force: true });
-      this.resetCombo({ reason: 'progression-reset', silent: true, force: true });
+      this.resetCombo({
+        reason: 'progression-reset',
+        silent: true,
+        force: true,
+      });
     });
 
     this.registerEventListener('player-reset', (payload = {}) => {
@@ -236,7 +241,12 @@ class ProgressionSystem extends UpgradeSystem {
   }
 
   resetCombo(options = {}) {
-    const { silent = false, reason = 'reset', force = false, emit = true } = options;
+    const {
+      silent = false,
+      reason = 'reset',
+      force = false,
+      emit = true,
+    } = options;
 
     const previousCombo = Math.max(0, Math.floor(this.currentCombo));
     const previousMultiplier = Number.isFinite(this.comboMultiplier)
@@ -277,9 +287,7 @@ class ProgressionSystem extends UpgradeSystem {
       needed: this.experienceToNext,
       level: this.level,
       percentage:
-        this.experienceToNext > 0
-          ? this.experience / this.experienceToNext
-          : 0,
+        this.experienceToNext > 0 ? this.experience / this.experienceToNext : 0,
     });
   }
 
@@ -339,7 +347,7 @@ class ProgressionSystem extends UpgradeSystem {
     this.level += 1;
     const previousRequirement = this.experienceToNext;
     this.experienceToNext = Math.floor(
-      this.experienceToNext * this.levelScaling,
+      this.experienceToNext * this.levelScaling
     );
 
     const upgradeContext = this.prepareUpgradeOptions(
@@ -376,7 +384,7 @@ class ProgressionSystem extends UpgradeSystem {
   // === SISTEMA DE UPGRADES ===
   // Upgrade handling provided by UpgradeSystem base class.
 
-// === GETTERS PÚBLICOS ===
+  // === GETTERS PÚBLICOS ===
   getLevel() {
     return this.level;
   }
@@ -416,7 +424,9 @@ class ProgressionSystem extends UpgradeSystem {
       : 1;
     this.level = Math.max(1, initialLevel);
     this.experience = 0;
-    const initialRequirement = Number.isFinite(PROGRESSION_INITIAL_XP_REQUIREMENT)
+    const initialRequirement = Number.isFinite(
+      PROGRESSION_INITIAL_XP_REQUIREMENT
+    )
       ? PROGRESSION_INITIAL_XP_REQUIREMENT
       : 100;
     this.experienceToNext = Math.max(1, Math.floor(initialRequirement));
@@ -479,7 +489,10 @@ class ProgressionSystem extends UpgradeSystem {
     this.pendingUpgradeOptions = [];
 
     if (Number.isFinite(this.defaultComboTimeout)) {
-      this.comboTimeout = safeNumber(this.defaultComboTimeout, this.comboTimeout);
+      this.comboTimeout = safeNumber(
+        this.defaultComboTimeout,
+        this.comboTimeout
+      );
     }
     if (Number.isFinite(this.defaultComboMultiplierStep)) {
       this.comboMultiplierStep = safeNumber(
@@ -495,7 +508,10 @@ class ProgressionSystem extends UpgradeSystem {
     }
 
     const comboData = deepClone(snapshot.comboState) || {};
-    if (Number.isFinite(comboData?.comboTimeout) && comboData.comboTimeout >= 0) {
+    if (
+      Number.isFinite(comboData?.comboTimeout) &&
+      comboData.comboTimeout >= 0
+    ) {
       this.comboTimeout = comboData.comboTimeout;
     }
 
@@ -516,7 +532,7 @@ class ProgressionSystem extends UpgradeSystem {
           Math.max(1, restoredMultiplier),
           Number.isFinite(this.comboMultiplierCap)
             ? Math.max(1, this.comboMultiplierCap)
-            : restoredMultiplier,
+            : restoredMultiplier
         );
       } else {
         this.updateComboMultiplier();
@@ -548,7 +564,10 @@ class ProgressionSystem extends UpgradeSystem {
       this._snapshotFallbackWarningIssued = false;
       return true;
     } catch (error) {
-      console.error('[ProgressionSystem] Failed to import snapshot state', error);
+      console.error(
+        '[ProgressionSystem] Failed to import snapshot state',
+        error
+      );
       if (this._handleSnapshotFallback) {
         return this._handleSnapshotFallback('exception during import');
       }
@@ -605,7 +624,6 @@ class ProgressionSystem extends UpgradeSystem {
     this.effectsService = null;
   }
 }
-
 
 export default ProgressionSystem;
 

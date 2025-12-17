@@ -65,7 +65,7 @@ export class GamePools {
       xpOrbs: { initial: 30, max: 200 },
       shockwaves: { initial: 5, max: 20 },
       tempObjects: { initial: 10, max: 50 },
-      ...options
+      ...options,
     };
 
     this.poolConfig = config;
@@ -113,7 +113,7 @@ export class GamePools {
         color: '#FFFF00',
         active: true,
         type: 'player',
-        trail: null
+        trail: null,
       }),
 
       // Reset function
@@ -162,11 +162,11 @@ export class GamePools {
           rotation: 0,
           rotationSpeed: 0,
           type: 'normal',
-          active: true
+          active: true,
         };
 
         // Add SpaceParticle methods
-        particle.update = function(deltaTime) {
+        particle.update = function (deltaTime) {
           this.x += this.vx * deltaTime;
           this.y += this.vy * deltaTime;
           this.life -= deltaTime;
@@ -180,7 +180,7 @@ export class GamePools {
           return this.life > 0;
         };
 
-        particle.draw = function(ctx) {
+        particle.draw = function (ctx) {
           if (this.alpha <= 0) return;
 
           ctx.save();
@@ -272,7 +272,7 @@ export class GamePools {
         segments: [],
         crackProfile: null,
         lastDamageTime: 0,
-        spawnTime: 0
+        spawnTime: 0,
       }),
 
       // Reset function
@@ -443,8 +443,14 @@ export class GamePools {
    * @param {number} [lifecycle.max] - Optional max size override
    */
   static configureAsteroidLifecycle(lifecycle = {}) {
-    if (!lifecycle || typeof lifecycle.create !== 'function' || typeof lifecycle.reset !== 'function') {
-      console.warn('[GamePools] Invalid asteroid lifecycle configuration provided');
+    if (
+      !lifecycle ||
+      typeof lifecycle.create !== 'function' ||
+      typeof lifecycle.reset !== 'function'
+    ) {
+      console.warn(
+        '[GamePools] Invalid asteroid lifecycle configuration provided'
+      );
       return;
     }
 
@@ -455,17 +461,33 @@ export class GamePools {
 
     const initialSize = Number.isFinite(lifecycle.initial)
       ? lifecycle.initial
-      : this.poolConfig?.asteroids?.initial ?? this.asteroids.available?.length ?? 0;
+      : this.poolConfig?.asteroids?.initial ??
+        this.asteroids.available?.length ??
+        0;
     const maxSize = Number.isFinite(lifecycle.max)
       ? lifecycle.max
       : this.poolConfig?.asteroids?.max ?? this.asteroids.maxSize;
 
     try {
-      this.asteroids.reconfigure(lifecycle.create, lifecycle.reset, initialSize, maxSize);
-      this.lifecycleOverrides.asteroids = { ...lifecycle, initial: initialSize, max: maxSize };
-      console.log('[GamePools] Asteroid pool lifecycle configured via EnemySystem');
+      this.asteroids.reconfigure(
+        lifecycle.create,
+        lifecycle.reset,
+        initialSize,
+        maxSize
+      );
+      this.lifecycleOverrides.asteroids = {
+        ...lifecycle,
+        initial: initialSize,
+        max: maxSize,
+      };
+      console.log(
+        '[GamePools] Asteroid pool lifecycle configured via EnemySystem'
+      );
     } catch (error) {
-      console.error('[GamePools] Failed to configure asteroid lifecycle:', error);
+      console.error(
+        '[GamePools] Failed to configure asteroid lifecycle:',
+        error
+      );
     }
   }
 
@@ -492,7 +514,7 @@ export class GamePools {
         magnetized: false,
         collected: false,
         pulsePhase: 0,
-        active: true
+        active: true,
       }),
 
       // Reset function
@@ -528,8 +550,14 @@ export class GamePools {
    * @param {number} [lifecycle.max] - Optional max size override
    */
   static configureXPOrbLifecycle(lifecycle = {}) {
-    if (!lifecycle || typeof lifecycle.create !== 'function' || typeof lifecycle.reset !== 'function') {
-      console.warn('[GamePools] Invalid XP orb lifecycle configuration provided');
+    if (
+      !lifecycle ||
+      typeof lifecycle.create !== 'function' ||
+      typeof lifecycle.reset !== 'function'
+    ) {
+      console.warn(
+        '[GamePools] Invalid XP orb lifecycle configuration provided'
+      );
       return;
     }
 
@@ -546,9 +574,20 @@ export class GamePools {
       : this.poolConfig?.xpOrbs?.max ?? this.xpOrbs.maxSize;
 
     try {
-      this.xpOrbs.reconfigure(lifecycle.create, lifecycle.reset, initialSize, maxSize);
-      this.lifecycleOverrides.xpOrbs = { ...lifecycle, initial: initialSize, max: maxSize };
-      console.log('[GamePools] XP orb pool lifecycle configured via XPOrbSystem');
+      this.xpOrbs.reconfigure(
+        lifecycle.create,
+        lifecycle.reset,
+        initialSize,
+        maxSize
+      );
+      this.lifecycleOverrides.xpOrbs = {
+        ...lifecycle,
+        initial: initialSize,
+        max: maxSize,
+      };
+      console.log(
+        '[GamePools] XP orb pool lifecycle configured via XPOrbSystem'
+      );
     } catch (error) {
       console.error('[GamePools] Failed to configure XP orb lifecycle:', error);
     }
@@ -573,7 +612,7 @@ export class GamePools {
         growthSpeed: 120,
         life: 1,
         maxLife: 1,
-        active: true
+        active: true,
       }),
 
       // Reset function
@@ -608,7 +647,7 @@ export class GamePools {
         data: null,
         timestamp: 0,
         type: 'generic',
-        active: true
+        active: true,
       }),
 
       // Reset function
@@ -632,7 +671,9 @@ export class GamePools {
    */
   static update(deltaTime) {
     if (!this.initialized) {
-      console.warn('[GamePools] Not initialized - call GamePools.initialize() first');
+      console.warn(
+        '[GamePools] Not initialized - call GamePools.initialize() first'
+      );
       return;
     }
 
@@ -665,7 +706,7 @@ export class GamePools {
       this.bosses,
       this.xpOrbs,
       this.shockwaves,
-      this.tempObjects
+      this.tempObjects,
     ];
 
     for (const pool of pools) {
@@ -692,7 +733,7 @@ export class GamePools {
       this.bosses,
       this.xpOrbs,
       this.shockwaves,
-      this.tempObjects
+      this.tempObjects,
     ];
 
     for (const pool of pools) {
@@ -725,7 +766,7 @@ export class GamePools {
       bosses: this.bosses?.getStats() || null,
       xpOrbs: this.xpOrbs?.getStats() || null,
       shockwaves: this.shockwaves?.getStats() || null,
-      tempObjects: this.tempObjects?.getStats() || null
+      tempObjects: this.tempObjects?.getStats() || null,
     };
   }
 
@@ -744,7 +785,7 @@ export class GamePools {
       initialized: true,
       valid: true,
       errors: [],
-      poolResults: {}
+      poolResults: {},
     };
 
     const pools = {
@@ -757,7 +798,7 @@ export class GamePools {
       bosses: this.bosses,
       xpOrbs: this.xpOrbs,
       shockwaves: this.shockwaves,
-      tempObjects: this.tempObjects
+      tempObjects: this.tempObjects,
     };
 
     for (const [name, pool] of Object.entries(pools)) {
@@ -767,7 +808,9 @@ export class GamePools {
 
         if (!validation.valid) {
           results.valid = false;
-          results.errors.push(...validation.errors.map(err => `${name}: ${err}`));
+          results.errors.push(
+            ...validation.errors.map((err) => `${name}: ${err}`)
+          );
         }
       }
     }
@@ -846,7 +889,7 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
     debugLog: () => GamePools.debugLog(),
     releaseAll: () => GamePools.releaseAll(),
     autoManage: () => GamePools.autoManageAll(),
-    bosses: () => GamePools.bosses
+    bosses: () => GamePools.bosses,
   };
 }
 
@@ -861,5 +904,5 @@ export const {
   bosses: BossPool,
   xpOrbs: XPOrbPool,
   shockwaves: ShockwavePool,
-  tempObjects: TempObjectPool
+  tempObjects: TempObjectPool,
 } = GamePools;

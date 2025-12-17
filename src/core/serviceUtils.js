@@ -1,5 +1,9 @@
 export function normalizeDependencies(dependencies) {
-  if (!dependencies || typeof dependencies !== 'object' || Array.isArray(dependencies)) {
+  if (
+    !dependencies ||
+    typeof dependencies !== 'object' ||
+    Array.isArray(dependencies)
+  ) {
     return {};
   }
 

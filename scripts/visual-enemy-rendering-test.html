@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
@@ -47,7 +47,11 @@
       }
 
       .control-panel {
-        background: linear-gradient(180deg, rgba(24, 32, 48, 0.88), rgba(8, 12, 20, 0.92));
+        background: linear-gradient(
+          180deg,
+          rgba(24, 32, 48, 0.88),
+          rgba(8, 12, 20, 0.92)
+        );
         border: 1px solid rgba(96, 124, 168, 0.35);
         border-radius: 16px;
         padding: 20px;
@@ -89,7 +93,9 @@
         color: #f6f8ff;
         font-weight: 600;
         cursor: pointer;
-        transition: transform 0.12s ease, box-shadow 0.12s ease;
+        transition:
+          transform 0.12s ease,
+          box-shadow 0.12s ease;
       }
 
       .control-group button:hover {
@@ -156,8 +162,9 @@
     <header>
       <h1>Visual Enemy Rendering Harness</h1>
       <p>
-        Valide manualmente as animações e materiais dos inimigos antes de ativar o
-        WaveManager. Ajuste os controles, observe o FPS e preencha a checklist em
+        Valide manualmente as animações e materiais dos inimigos antes de ativar
+        o WaveManager. Ajuste os controles, observe o FPS e preencha a checklist
+        em
         <code>docs/validation/enemy-rendering-visual-checklist.md</code>.
       </p>
     </header>
@@ -280,7 +287,10 @@
       let droneRotationDrift = 0;
 
       const exhaustPreset = ENEMY_RENDER_PRESETS?.drone?.exhaust ?? {};
-      const droneMaxSpeed = Math.max(1, drone.maxSpeed || ENEMY_TYPES?.drone?.speed || 180);
+      const droneMaxSpeed = Math.max(
+        1,
+        drone.maxSpeed || ENEMY_TYPES?.drone?.speed || 180
+      );
 
       droneSpeedSlider.addEventListener('input', (event) => {
         droneSpeedControl = Number(event.target.value) / 100;
@@ -349,7 +359,8 @@
         drone.vx = Math.cos(drone.rotation) * targetSpeed;
         drone.vy = Math.sin(drone.rotation) * targetSpeed;
 
-        mine.pulsePhase = (mine.pulsePhase + mine.pulseSpeed * deltaTime) % (Math.PI * 2);
+        mine.pulsePhase =
+          (mine.pulsePhase + mine.pulseSpeed * deltaTime) % (Math.PI * 2);
         autoMineToggleTimer += deltaTime;
         if (autoMineToggleTimer >= 3) {
           mine.armed = !mine.armed;
@@ -358,7 +369,9 @@
         }
 
         hunter.rotation = wrapAngle(hunter.rotation + deltaTime * 0.35);
-        hunter.turretAngle = wrapAngle(hunter.turretAngle + hunterTurretSpeed * deltaTime);
+        hunter.turretAngle = wrapAngle(
+          hunter.turretAngle + hunterTurretSpeed * deltaTime
+        );
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.fillStyle = '#0a0e14';
@@ -430,22 +443,23 @@
         ctx.fillStyle = '#9fb6d4';
         ctx.fillText(
           `Thrust: ${dronePayload.thrust?.toFixed(2) ?? '0.00'} | Speed: ${formatPercent(
-            Math.min(1, Math.hypot(drone.vx, drone.vy) / droneMaxSpeed),
+            Math.min(1, Math.hypot(drone.vx, drone.vy) / droneMaxSpeed)
           )}`,
           drone.x - areaWidth * 0.45,
-          drone.y + dronePayload.radius + 24,
+          drone.y + dronePayload.radius + 24
         );
         ctx.fillText(
           `Pulse: ${minePayload.pulse?.toFixed(2) ?? '0.00'} | Armed: ${minePayload.armed ? 'Yes' : 'No'}`,
           mine.x - areaWidth * 0.45,
-          mine.y + minePayload.radius + 24,
+          mine.y + minePayload.radius + 24
         );
         ctx.fillText(
-          `Hull: ${(wrapAngle(hunter.rotation) * (180 / Math.PI)).toFixed(1)}° | Turret: ${(wrapAngle(
-            hunter.turretAngle,
-          ) * (180 / Math.PI)).toFixed(1)}°`,
+          `Hull: ${(wrapAngle(hunter.rotation) * (180 / Math.PI)).toFixed(1)}° | Turret: ${(
+            wrapAngle(hunter.turretAngle) *
+            (180 / Math.PI)
+          ).toFixed(1)}°`,
           hunter.x - areaWidth * 0.45,
-          hunter.y + hunterPayload.radius + 24,
+          hunter.y + hunterPayload.radius + 24
         );
         ctx.restore();
 

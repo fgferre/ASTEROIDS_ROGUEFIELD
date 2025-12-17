@@ -1,7 +1,11 @@
-import { HUNTER_COMPONENTS, HUNTER_CONFIG } from '../../../data/enemies/hunter.js';
+import {
+  HUNTER_COMPONENTS,
+  HUNTER_CONFIG,
+} from '../../../data/enemies/hunter.js';
 import { ENEMY_EFFECT_COLORS } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
+import { NeonGraphics } from '../../../utils/NeonGraphics.js';
 
 const HUNTER_DEFAULTS = HUNTER_CONFIG ?? {};
 
@@ -52,8 +56,10 @@ export class Hunter extends BaseEnemy {
     if (componentConfig) {
       this.weaponState = this.weaponState || {};
       this.movementStrategy = componentConfig?.movement?.strategy || 'orbit';
-      this.renderStrategy = componentConfig?.render?.strategy || 'procedural-diamond';
-      this.weaponPattern = componentConfig?.weapon?.pattern || this.weaponPattern;
+      this.renderStrategy =
+        componentConfig?.render?.strategy || 'procedural-diamond';
+      this.weaponPattern =
+        componentConfig?.weapon?.pattern || this.weaponPattern;
       if (componentConfig?.movement?.orbitDirection) {
         this.orbitDirection = componentConfig.movement.orbitDirection;
       }
@@ -160,7 +166,9 @@ export class Hunter extends BaseEnemy {
 
     if (!this.useComponents || !this.components?.size) {
       // Fallback: Basic burst firing logic (for testing)
-      const player = this.system?.getCachedPlayer?.() || this.system?.getPlayerPositionSnapshot?.();
+      const player =
+        this.system?.getCachedPlayer?.() ||
+        this.system?.getPlayerPositionSnapshot?.();
 
       if (player && player.position) {
         const dx = player.position.x - this.x;
@@ -170,7 +178,10 @@ export class Hunter extends BaseEnemy {
         this.turretAngle = Math.atan2(dy, dx);
 
         this.burstCooldown = Math.max(0, (this.burstCooldown || 0) - deltaTime);
-        this.burstDelayTimer = Math.max(0, (this.burstDelayTimer || 0) - deltaTime);
+        this.burstDelayTimer = Math.max(
+          0,
+          (this.burstDelayTimer || 0) - deltaTime
+        );
 
         if (this.burstCooldown <= 0 && distance <= (this.fireRange || 400)) {
           if (this.burstShotsRemaining > 0 && this.burstDelayTimer <= 0) {
@@ -198,6 +209,27 @@ export class Hunter extends BaseEnemy {
       return;
     }
   }
+  draw(ctx) {
+    if (!ctx) return;
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation);
+
+    // Diamond/Aggressive shape for Hunter
+    const path = new Path2D();
+    const r = this.radius;
+    path.moveTo(r, 0);
+    path.lineTo(0, r * 0.8);
+    path.lineTo(-r, 0);
+    path.lineTo(0, -r * 0.8);
+    path.closePath();
+
+    // Neon Red/Orange
+    NeonGraphics.drawShape(ctx, path, '#FF4400', 2.0);
+
+    ctx.restore();
+  }
+
   onDraw(ctx) {
     if (!this.useComponents || !this.components?.size) {
       // Fallback: Generate payload without components (for testing)
@@ -254,7 +286,6 @@ export class Hunter extends BaseEnemy {
     this.destroyed = false;
     this.turretAngle = 0;
   }
-
 }
 
 export default Hunter;

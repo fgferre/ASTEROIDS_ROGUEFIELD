@@ -116,41 +116,44 @@ describe('Enemy renderer payloads', () => {
   // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/setup.js)
   // Optimization: it.concurrent (tests are independent)
 
-  it.concurrent('produces deterministic drone payload and resets context state', () => {
-    const drone = new Drone(null, {
-      id: 'drone-test',
-      radius: 12,
-      maxSpeed: 180,
-    });
-    drone.vx = 90;
-    drone.vy = 45;
+  it.concurrent(
+    'produces deterministic drone payload and resets context state',
+    () => {
+      const drone = new Drone(null, {
+        id: 'drone-test',
+        radius: 12,
+        maxSpeed: 180,
+      });
+      drone.vx = 90;
+      drone.vy = 45;
 
-    const targetSpeedRatio = Math.min(
-      1,
-      Math.hypot(drone.vx, drone.vy) /
-        Math.max(1, drone.maxSpeed || DRONE_CONFIG?.speed || 1),
-    );
-    const smoothing = ENEMY_RENDER_PRESETS.drone?.exhaust?.smoothing ?? 0;
+      const targetSpeedRatio = Math.min(
+        1,
+        Math.hypot(drone.vx, drone.vy) /
+          Math.max(1, drone.maxSpeed || DRONE_CONFIG?.speed || 1)
+      );
+      const smoothing = ENEMY_RENDER_PRESETS.drone?.exhaust?.smoothing ?? 0;
 
-    const payload = drone.onDraw(null);
-    expect(payload.type).toBe('drone');
-    expect(payload.id).toBe('drone-test');
-    expect(payload.radius).toBe(12);
-    expect(payload.colors.body).toBe(ENEMY_EFFECT_COLORS.drone.body);
-    expect(payload.thrust).toBeCloseTo(targetSpeedRatio * smoothing, 6);
+      const payload = drone.onDraw(null);
+      expect(payload.type).toBe('drone');
+      expect(payload.id).toBe('drone-test');
+      expect(payload.radius).toBe(12);
+      expect(payload.colors.body).toBe(ENEMY_EFFECT_COLORS.drone.body);
+      expect(payload.thrust).toBeCloseTo(targetSpeedRatio * smoothing, 6);
 
-    const ctx = createMockContext();
-    const secondPayload = drone.onDraw(ctx);
-    const expectedSecondThrust =
-      payload.thrust + (targetSpeedRatio - payload.thrust) * smoothing;
-    expect(secondPayload.thrust).toBeCloseTo(expectedSecondThrust, 6);
-    expect(ctx.globalAlpha).toBe(1);
-    expect(ctx.shadowBlur).toBe(0);
-    expect(ctx.shadowColor).toBe('transparent');
-    expect(ctx.globalCompositeOperation).toBe('source-over');
-    expect(ctx.lineWidth).toBe(1);
-    expect(ctx.strokeStyle).toBe('transparent');
-  });
+      const ctx = createMockContext();
+      const secondPayload = drone.onDraw(ctx);
+      const expectedSecondThrust =
+        payload.thrust + (targetSpeedRatio - payload.thrust) * smoothing;
+      expect(secondPayload.thrust).toBeCloseTo(expectedSecondThrust, 6);
+      expect(ctx.globalAlpha).toBe(1);
+      expect(ctx.shadowBlur).toBe(0);
+      expect(ctx.shadowColor).toBe('transparent');
+      expect(ctx.globalCompositeOperation).toBe('source-over');
+      expect(ctx.lineWidth).toBe(1);
+      expect(ctx.strokeStyle).toBe('transparent');
+    }
+  );
 
   it.concurrent('returns mine pulse data and respects armed state', () => {
     const mine = new Mine(null, {
@@ -176,26 +179,29 @@ describe('Enemy renderer payloads', () => {
     expect(ctx.strokeStyle).toBe('transparent');
   });
 
-  it.concurrent('exposes hunter turret angle in payload and preserves canvas state', () => {
-    const hunter = new Hunter(null, {
-      id: 'hunter-test',
-      radius: 16,
-      rotation: Math.PI / 6,
-    });
-    hunter.turretAngle = Math.PI / 3;
+  it.concurrent(
+    'exposes hunter turret angle in payload and preserves canvas state',
+    () => {
+      const hunter = new Hunter(null, {
+        id: 'hunter-test',
+        radius: 16,
+        rotation: Math.PI / 6,
+      });
+      hunter.turretAngle = Math.PI / 3;
 
-    const payload = hunter.onDraw(null);
-    expect(payload.type).toBe('hunter');
-    expect(payload.turretAngle).toBeCloseTo(Math.PI / 3, 6);
-    expect(payload.colors.body).toBe(ENEMY_EFFECT_COLORS.hunter.body);
+      const payload = hunter.onDraw(null);
+      expect(payload.type).toBe('hunter');
+      expect(payload.turretAngle).toBeCloseTo(Math.PI / 3, 6);
+      expect(payload.colors.body).toBe(ENEMY_EFFECT_COLORS.hunter.body);
 
-    const ctx = createMockContext();
-    hunter.onDraw(ctx);
-    expect(ctx.globalAlpha).toBe(1);
-    expect(ctx.shadowBlur).toBe(0);
-    expect(ctx.shadowColor).toBe('transparent');
-    expect(ctx.globalCompositeOperation).toBe('source-over');
-    expect(ctx.lineWidth).toBe(1);
-    expect(ctx.strokeStyle).toBe('transparent');
-  });
+      const ctx = createMockContext();
+      hunter.onDraw(ctx);
+      expect(ctx.globalAlpha).toBe(1);
+      expect(ctx.shadowBlur).toBe(0);
+      expect(ctx.shadowColor).toBe('transparent');
+      expect(ctx.globalCompositeOperation).toBe('source-over');
+      expect(ctx.lineWidth).toBe(1);
+      expect(ctx.strokeStyle).toBe('transparent');
+    }
+  );
 });

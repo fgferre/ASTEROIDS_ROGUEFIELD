@@ -10,9 +10,11 @@
 ## 1. Visão Geral do Sistema
 
 ### Conceito
+
 Sistema de input flexível que suporta keyboard, gamepad e rebinding dinâmico de controles, permitindo aos jogadores customizar completamente suas preferências de input.
 
 ### Características Principais
+
 - **8 Input Actions**: moveUp/Down/Left/Right, firePrimary, activateShield, pause, openSettings, confirm
 - **Keyboard Support**: WASD/Arrow keys, Space, E, Escape, F10, Enter com rebinding completo
 - **Gamepad Support**: Analog sticks (threshold: 0.45), buttons, detecção automática de connect/disconnect
@@ -21,6 +23,7 @@ Sistema de input flexível que suporta keyboard, gamepad e rebinding dinâmico d
 - **Multiple Bindings**: Até 2 bindings por action (ex: W + Arrow Up para moveUp)
 
 ### Propósito
+
 Fornecer controles responsivos e customizáveis que funcionam perfeitamente tanto com keyboard quanto com gamepad, garantindo acessibilidade e conforto para todos os jogadores.
 
 ---
@@ -80,18 +83,18 @@ var last_movement_command: Dictionary = {}
 
 ### Campos Principais
 
-| Campo JavaScript | Tipo GDScript | Descrição |
-|-----------------|---------------|-----------|
-| `keys` | `Dictionary` | Mapa de teclas pressionadas (key → bool) |
-| `codes` | `Dictionary` | Mapa de key codes pressionados (code → bool) |
-| `keyboardBindingMap` | `Dictionary` | Mapa de tecla normalizada → actions |
-| `gamepadButtonMap` | `Dictionary` | Mapa de "button:N" → actions |
-| `gamepadAxisMap` | `Dictionary` | Mapa de "axis:N:direction" → actions |
-| `actionBindings` | `Dictionary` | Mapa de action → {keyboard, gamepad} bindings |
-| `activeKeyboardActions` | `Array` | Lista de actions ativas via keyboard |
-| `activeGamepadActions` | `Array` | Lista de actions ativas via gamepad |
-| `isCapturingBinding` | `bool` | Flag de rebinding em progresso |
-| `gamepadAxisThreshold` | `float` | Threshold para analog sticks (0.45) |
+| Campo JavaScript        | Tipo GDScript | Descrição                                     |
+| ----------------------- | ------------- | --------------------------------------------- |
+| `keys`                  | `Dictionary`  | Mapa de teclas pressionadas (key → bool)      |
+| `codes`                 | `Dictionary`  | Mapa de key codes pressionados (code → bool)  |
+| `keyboardBindingMap`    | `Dictionary`  | Mapa de tecla normalizada → actions           |
+| `gamepadButtonMap`      | `Dictionary`  | Mapa de "button:N" → actions                  |
+| `gamepadAxisMap`        | `Dictionary`  | Mapa de "axis:N:direction" → actions          |
+| `actionBindings`        | `Dictionary`  | Mapa de action → {keyboard, gamepad} bindings |
+| `activeKeyboardActions` | `Array`       | Lista de actions ativas via keyboard          |
+| `activeGamepadActions`  | `Array`       | Lista de actions ativas via gamepad           |
+| `isCapturingBinding`    | `bool`        | Flag de rebinding em progresso                |
+| `gamepadAxisThreshold`  | `float`       | Threshold para analog sticks (0.45)           |
 
 ---
 
@@ -101,35 +104,39 @@ var last_movement_command: Dictionary = {}
 
 Baseado em `settingsSchema.js` linhas 76-188:
 
-| Action | Label | Keyboard Default | Gamepad Default | Categoria | Description |
-|--------|-------|------------------|-----------------|-----------|-------------|
-| **moveUp** | Mover-se para cima | KeyW, ArrowUp | axis:1:-, button:12 | Movement | Acelerar a nave adiante |
-| **moveDown** | Mover-se para baixo | KeyS, ArrowDown | axis:1:+, button:13 | Movement | Acionar propulsores traseiros |
-| **moveLeft** | Derivar para esquerda | KeyA, ArrowLeft | axis:0:-, button:14 | Movement | Controle lateral (esquerda) |
-| **moveRight** | Derivar para direita | KeyD, ArrowRight | axis:0:+, button:15 | Movement | Controle lateral (direita) |
-| **activateShield** | Ativar escudo | KeyE, ShiftLeft | button:2, button:4 | Ability | Dispara proteção energética |
-| **pause** | Pausar / Retomar | Escape, KeyP | button:9 | System | Congela o jogo |
-| **openSettings** | Abrir configurações | F10 | button:8 | System | Atalho para settings |
-| **confirm** | Confirmar / Interagir | Enter, Space | button:0 | UI | Confirma seleções |
+| Action             | Label                 | Keyboard Default | Gamepad Default     | Categoria | Description                   |
+| ------------------ | --------------------- | ---------------- | ------------------- | --------- | ----------------------------- |
+| **moveUp**         | Mover-se para cima    | KeyW, ArrowUp    | axis:1:-, button:12 | Movement  | Acelerar a nave adiante       |
+| **moveDown**       | Mover-se para baixo   | KeyS, ArrowDown  | axis:1:+, button:13 | Movement  | Acionar propulsores traseiros |
+| **moveLeft**       | Derivar para esquerda | KeyA, ArrowLeft  | axis:0:-, button:14 | Movement  | Controle lateral (esquerda)   |
+| **moveRight**      | Derivar para direita  | KeyD, ArrowRight | axis:0:+, button:15 | Movement  | Controle lateral (direita)    |
+| **activateShield** | Ativar escudo         | KeyE, ShiftLeft  | button:2, button:4  | Ability   | Dispara proteção energética   |
+| **pause**          | Pausar / Retomar      | Escape, KeyP     | button:9            | System    | Congela o jogo                |
+| **openSettings**   | Abrir configurações   | F10              | button:8            | System    | Atalho para settings          |
+| **confirm**        | Confirmar / Interagir | Enter, Space     | button:0            | UI        | Confirma seleções             |
 
 ### Notas Importantes
 
 ⚠️ **`firePrimary` (Space) NÃO está em settingsSchema** mas é usado no código (legacy ou hardcoded).
 
 **Movement Actions**: moveUp, moveDown, moveLeft, moveRight são tratados especialmente:
+
 - Combinados para gerar movimento direcional
 - Enviados como comandos `{type: 'move'}` para CommandQueue
 - Normalizados para magnitude 1.0 em diagonais
 
 **Ability Actions**: activateShield
+
 - Enviado como comando `{type: 'ability'}`
 - Evento direto para PlayerSystem
 
 **System Actions**: pause, openSettings
+
 - Emitem eventos no EventBus
 - Não passam por CommandQueue
 
 **UI Actions**: confirm
+
 - Emite evento `input-confirmed`
 - Usado em menus e diálogos
 
@@ -142,10 +149,12 @@ Baseado em `settingsSchema.js` linhas 76-188:
 Baseado em `InputSystem.js` linhas 175-323:
 
 **KeyDown (Capture Phase)**:
+
 - Bloqueia password manager se necessário (web-specific)
 - Previne auto-fill em campos não-input
 
 **KeyDown (Bubble Phase)**:
+
 - Processa input normal
 - Normaliza key/code
 - Atualiza `keys` e `codes` dictionaries
@@ -153,6 +162,7 @@ Baseado em `InputSystem.js` linhas 175-323:
 - Handle action press
 
 **KeyUp**:
+
 - Libera keys/codes
 - Handle action release
 
@@ -255,6 +265,7 @@ func add_keyboard_binding(normalized_key: String, action: String) -> void:
 ⚠️ **Não aplicável a Godot (desktop app)**
 
 No JavaScript original (linhas 11-13):
+
 ```javascript
 const PASSWORD_MANAGER_GUARD_CODES = ['KeyS', 'ArrowDown'];
 ```
@@ -382,10 +393,12 @@ func clear_gamepad_actions() -> void:
 ### Gamepad Binding Format
 
 **Button Binding**:
+
 - Format: `"button:N"` onde N = 0-15
 - Exemplo: `"button:0"` (A/Cross), `"button:1"` (B/Circle)
 
 **Axis Binding**:
+
 - Format: `"axis:N:direction"` onde N = 0-3, direction = "+" ou "-"
 - Exemplo: `"axis:0:+"` (left stick right), `"axis:1:-"` (left stick up)
 
@@ -453,6 +466,7 @@ func parse_gamepad_binding(binding: String) -> Dictionary:
 ### Gamepad Events
 
 **Connect/Disconnect**:
+
 ```gdscript
 func on_gamepad_connected(device_id: int, connected: bool) -> void:
     if connected:
@@ -474,10 +488,12 @@ func on_gamepad_connected(device_id: int, connected: bool) -> void:
 **3 Maps Principais**:
 
 1. **keyboardBindingMap**: `normalized_key → Array[action]`
+
    - Exemplo: `"w" → ["moveUp"]`, `"keyw" → ["moveUp"]`
    - Suporta synonyms (múltiplas keys para mesma action)
 
 2. **gamepadButtonMap**: `"button:N" → Array[action]`
+
    - Exemplo: `"button:0" → ["confirm"]`, `"button:9" → ["pause"]`
 
 3. **gamepadAxisMap**: `"axis:N:direction" → Array[action]`
@@ -629,6 +645,7 @@ func on_input_binding_capture(data: Dictionary) -> void:
 ### Capture Flow
 
 **Durante captura** (`is_capturing_binding = true`):
+
 1. Input normal é **bloqueado** (não processa actions)
 2. Inputs são **detectados e emitidos** via eventos:
    - Keyboard: `key-pressed` com `{key, code, type: "down"}`
@@ -808,6 +825,7 @@ func command_changed(a: Dictionary, b: Dictionary) -> bool:
 ### Command Types
 
 **Movement Command**:
+
 ```gdscript
 {
     "type": "move",
@@ -819,6 +837,7 @@ func command_changed(a: Dictionary, b: Dictionary) -> bool:
 ```
 
 **Ability Command**:
+
 ```gdscript
 {
     "type": "ability",
@@ -829,6 +848,7 @@ func command_changed(a: Dictionary, b: Dictionary) -> bool:
 ```
 
 **Action Command** (generic):
+
 ```gdscript
 {
     "type": "action",
@@ -937,6 +957,7 @@ func _process(delta: float) -> void:
 ### Opção A: Godot InputMap (Recomendado ✅)
 
 **Características**:
+
 - Built-in no engine (zero código de input handling)
 - Rebinding via `ProjectSettings.set_setting()`
 - `Input.get_vector()` automático e normalizado
@@ -1043,6 +1064,7 @@ func load_input_mapping() -> void:
 ```
 
 **Prós**:
+
 - ✅ Reduz código de ~1100 linhas para ~100 linhas
 - ✅ Usa otimizações do Godot engine
 - ✅ Gamepad support automático (sem polling)
@@ -1051,6 +1073,7 @@ func load_input_mapping() -> void:
 - ✅ Dead zones built-in
 
 **Contras**:
+
 - ❌ Menos controle sobre normalization (mas Godot é suficiente)
 - ❌ Rebinding UI precisa ser customizado
 - ❌ Não tem command queue integration (mas pode não ser necessário)
@@ -1060,18 +1083,21 @@ func load_input_mapping() -> void:
 ### Opção B: Custom Input System (JavaScript Approach)
 
 **Características**:
+
 - 100% compatível com JS (mesma lógica)
 - Controle total sobre normalization
 - Command queue integration preservado
 - Password manager guard (se necessário)
 
 **Prós**:
+
 - ✅ 100% compatível com sistema atual
 - ✅ Controle total sobre normalization
 - ✅ Command queue integration preservado
 - ✅ Mesma lógica de rebinding
 
 **Contras**:
+
 - ❌ Mais código para manter (~1100 linhas)
 - ❌ Precisa implementar gamepad polling
 - ❌ Precisa implementar rebinding UI
@@ -1082,6 +1108,7 @@ func load_input_mapping() -> void:
 ### Recomendação Final: Opção A (Godot InputMap) ✅
 
 **Justificativa**:
+
 1. **Simplicidade**: Reduz 90% do código (1100 → 100 linhas)
 2. **Performance**: Engine-optimized, sem polling overhead
 3. **Manutenção**: Menos bugs, menos código para debugar
@@ -1089,12 +1116,14 @@ func load_input_mapping() -> void:
 5. **Command Queue é Legacy**: PlayerSystem pode ler Input diretamente
 
 **O que remover**:
+
 - ❌ Command queue integration (desnecessário)
 - ❌ Password manager guard (web-specific)
 - ❌ Manual gamepad polling (engine faz automático)
 - ❌ Custom normalization (engine faz melhor)
 
 **O que implementar**:
+
 - ✅ Rebinding UI customizado (única parte necessária)
 - ✅ ConfigFile persistence (simples)
 - ✅ Conflict validation (opcional, mas útil)
@@ -1105,15 +1134,15 @@ func load_input_mapping() -> void:
 
 ### Tabela de Constantes
 
-| Constante | Valor Default | Tipo | Descrição |
-|-----------|--------------|------|-----------|
-| `MOVEMENT_ACTIONS` | `["moveUp", "moveDown", "moveLeft", "moveRight"]` | `Array[String]` | Lista de actions de movimento |
-| `DEFAULT_GAMEPAD_AXIS_THRESHOLD` | `0.45` | `float` | Threshold para analog sticks |
-| `PASSWORD_MANAGER_GUARD_CODES` | `["KeyS", "ArrowDown"]` | `Array[String]` | Keys bloqueadas para password manager (web) |
-| `DEFAULT_BINDING_MAX_KEYBOARD` | `2` | `int` | Máximo de keyboard bindings por action |
-| `DEFAULT_BINDING_MAX_GAMEPAD` | `2` | `int` | Máximo de gamepad bindings por action |
-| `GAMEPAD_BUTTON_COUNT` | `16` | `int` | Número de buttons em gamepad padrão |
-| `GAMEPAD_AXIS_COUNT` | `4` | `int` | Número de axes em gamepad padrão (2 sticks) |
+| Constante                        | Valor Default                                     | Tipo            | Descrição                                   |
+| -------------------------------- | ------------------------------------------------- | --------------- | ------------------------------------------- |
+| `MOVEMENT_ACTIONS`               | `["moveUp", "moveDown", "moveLeft", "moveRight"]` | `Array[String]` | Lista de actions de movimento               |
+| `DEFAULT_GAMEPAD_AXIS_THRESHOLD` | `0.45`                                            | `float`         | Threshold para analog sticks                |
+| `PASSWORD_MANAGER_GUARD_CODES`   | `["KeyS", "ArrowDown"]`                           | `Array[String]` | Keys bloqueadas para password manager (web) |
+| `DEFAULT_BINDING_MAX_KEYBOARD`   | `2`                                               | `int`           | Máximo de keyboard bindings por action      |
+| `DEFAULT_BINDING_MAX_GAMEPAD`    | `2`                                               | `int`           | Máximo de gamepad bindings por action       |
+| `GAMEPAD_BUTTON_COUNT`           | `16`                                              | `int`           | Número de buttons em gamepad padrão         |
+| `GAMEPAD_AXIS_COUNT`             | `4`                                               | `int`           | Número de axes em gamepad padrão (2 sticks) |
 
 ### Binding Metadata
 
@@ -1138,46 +1167,46 @@ const DEFAULT_BINDING_METADATA = {
 
 ### Tabela Completa
 
-| Action | Keyboard Primary | Keyboard Secondary | Gamepad Primary | Gamepad Secondary | Category | Notes |
-|--------|------------------|-------------------|-----------------|-------------------|----------|-------|
-| **moveUp** | W | Arrow Up | Axis 1 Negative | Button 12 (D-pad Up) | Movement | Left Stick Up |
-| **moveDown** | S | Arrow Down | Axis 1 Positive | Button 13 (D-pad Down) | Movement | Left Stick Down |
-| **moveLeft** | A | Arrow Left | Axis 0 Negative | Button 14 (D-pad Left) | Movement | Left Stick Left |
-| **moveRight** | D | Arrow Right | Axis 0 Positive | Button 15 (D-pad Right) | Movement | Left Stick Right |
-| **activateShield** | E | Shift Left | Button 2 (X/Square) | Button 4 (LB) | Ability | Shield toggle |
-| **pause** | Escape | P | Button 9 (Start) | - | System | Pause menu |
-| **openSettings** | F10 | - | Button 8 (Select) | - | System | Settings UI |
-| **confirm** | Enter | Space | Button 0 (A/Cross) | - | UI | Confirm/Interact |
+| Action             | Keyboard Primary | Keyboard Secondary | Gamepad Primary     | Gamepad Secondary       | Category | Notes            |
+| ------------------ | ---------------- | ------------------ | ------------------- | ----------------------- | -------- | ---------------- |
+| **moveUp**         | W                | Arrow Up           | Axis 1 Negative     | Button 12 (D-pad Up)    | Movement | Left Stick Up    |
+| **moveDown**       | S                | Arrow Down         | Axis 1 Positive     | Button 13 (D-pad Down)  | Movement | Left Stick Down  |
+| **moveLeft**       | A                | Arrow Left         | Axis 0 Negative     | Button 14 (D-pad Left)  | Movement | Left Stick Left  |
+| **moveRight**      | D                | Arrow Right        | Axis 0 Positive     | Button 15 (D-pad Right) | Movement | Left Stick Right |
+| **activateShield** | E                | Shift Left         | Button 2 (X/Square) | Button 4 (LB)           | Ability  | Shield toggle    |
+| **pause**          | Escape           | P                  | Button 9 (Start)    | -                       | System   | Pause menu       |
+| **openSettings**   | F10              | -                  | Button 8 (Select)   | -                       | System   | Settings UI      |
+| **confirm**        | Enter            | Space              | Button 0 (A/Cross)  | -                       | UI       | Confirm/Interact |
 
 ### Gamepad Button Reference (Standard Layout)
 
-| Button Index | Xbox | PlayStation | Usage |
-|--------------|------|-------------|-------|
-| 0 | A | Cross | Confirm |
-| 1 | B | Circle | Back/Cancel |
-| 2 | X | Square | Shield |
-| 3 | Y | Triangle | Special |
-| 4 | LB | L1 | Shield (alt) |
-| 5 | RB | R1 | Fire (primary) |
-| 6 | LT | L2 | Analog trigger |
-| 7 | RT | R2 | Analog trigger |
-| 8 | Select | Share | Settings |
-| 9 | Start | Options | Pause |
-| 10 | L3 | L3 | Left stick press |
-| 11 | R3 | R3 | Right stick press |
-| 12 | D-pad Up | D-pad Up | Move up |
-| 13 | D-pad Down | D-pad Down | Move down |
-| 14 | D-pad Left | D-pad Left | Move left |
-| 15 | D-pad Right | D-pad Right | Move right |
+| Button Index | Xbox        | PlayStation | Usage             |
+| ------------ | ----------- | ----------- | ----------------- |
+| 0            | A           | Cross       | Confirm           |
+| 1            | B           | Circle      | Back/Cancel       |
+| 2            | X           | Square      | Shield            |
+| 3            | Y           | Triangle    | Special           |
+| 4            | LB          | L1          | Shield (alt)      |
+| 5            | RB          | R1          | Fire (primary)    |
+| 6            | LT          | L2          | Analog trigger    |
+| 7            | RT          | R2          | Analog trigger    |
+| 8            | Select      | Share       | Settings          |
+| 9            | Start       | Options     | Pause             |
+| 10           | L3          | L3          | Left stick press  |
+| 11           | R3          | R3          | Right stick press |
+| 12           | D-pad Up    | D-pad Up    | Move up           |
+| 13           | D-pad Down  | D-pad Down  | Move down         |
+| 14           | D-pad Left  | D-pad Left  | Move left         |
+| 15           | D-pad Right | D-pad Right | Move right        |
 
 ### Gamepad Axis Reference
 
-| Axis Index | Control | Negative (-1.0) | Positive (+1.0) | Usage |
-|------------|---------|----------------|-----------------|-------|
-| 0 | Left Stick Horizontal | Left | Right | moveLeft / moveRight |
-| 1 | Left Stick Vertical | Up | Down | moveUp / moveDown |
-| 2 | Right Stick Horizontal | Left | Right | Camera/Aim (unused) |
-| 3 | Right Stick Vertical | Up | Down | Camera/Aim (unused) |
+| Axis Index | Control                | Negative (-1.0) | Positive (+1.0) | Usage                |
+| ---------- | ---------------------- | --------------- | --------------- | -------------------- |
+| 0          | Left Stick Horizontal  | Left            | Right           | moveLeft / moveRight |
+| 1          | Left Stick Vertical    | Up              | Down            | moveUp / moveDown    |
+| 2          | Right Stick Horizontal | Left            | Right           | Camera/Aim (unused)  |
+| 3          | Right Stick Vertical   | Up              | Down            | Camera/Aim (unused)  |
 
 ---
 
@@ -1402,6 +1431,7 @@ shouldBlockPasswordManager(event) {
 ### Godot Considerations
 
 **Por que não é necessário**:
+
 1. Godot é desktop app (não tem password managers do browser)
 2. Não há DOM/HTML input fields (apenas Godot UI nodes)
 3. Input events não são capturados por software externo
@@ -1416,26 +1446,26 @@ shouldBlockPasswordManager(event) {
 
 **Eventos Emitidos pelo InputSystem**:
 
-| Evento | Payload | Descrição |
-|--------|---------|-----------|
-| `key-pressed` | `{key, code, type, event, actions}` | Tecla pressionada/liberada |
-| `mouse-pressed` | `{button, type, pos}` | Mouse clicado |
-| `gamepad-input-detected` | `{type, index, direction?, value?}` | Gamepad input detectado (rebinding) |
-| `input-action` | `{action, phase, source, context}` | Action ativada (generic) |
-| `toggle-pause` | `{}` | Pause pressionado |
-| `activate-shield-pressed` | `{}` | Shield pressionado |
-| `activate-shield-released` | `{}` | Shield liberado |
-| `settings-menu-requested` | `{}` | Settings pressionado |
-| `input-confirmed` | `{}` | Confirm pressionado |
-| `gamepad-connected` | `{deviceId}` | Gamepad conectado |
-| `gamepad-disconnected` | `{deviceId}` | Gamepad desconectado |
+| Evento                     | Payload                             | Descrição                           |
+| -------------------------- | ----------------------------------- | ----------------------------------- |
+| `key-pressed`              | `{key, code, type, event, actions}` | Tecla pressionada/liberada          |
+| `mouse-pressed`            | `{button, type, pos}`               | Mouse clicado                       |
+| `gamepad-input-detected`   | `{type, index, direction?, value?}` | Gamepad input detectado (rebinding) |
+| `input-action`             | `{action, phase, source, context}`  | Action ativada (generic)            |
+| `toggle-pause`             | `{}`                                | Pause pressionado                   |
+| `activate-shield-pressed`  | `{}`                                | Shield pressionado                  |
+| `activate-shield-released` | `{}`                                | Shield liberado                     |
+| `settings-menu-requested`  | `{}`                                | Settings pressionado                |
+| `input-confirmed`          | `{}`                                | Confirm pressionado                 |
+| `gamepad-connected`        | `{deviceId}`                        | Gamepad conectado                   |
+| `gamepad-disconnected`     | `{deviceId}`                        | Gamepad desconectado                |
 
 **Eventos Consumidos pelo InputSystem**:
 
-| Evento | Payload | Descrição |
-|--------|---------|-----------|
+| Evento                      | Payload    | Descrição                                   |
+| --------------------------- | ---------- | ------------------------------------------- |
 | `settings-controls-changed` | `{values}` | Settings de controle mudaram (rebuild maps) |
-| `input-binding-capture` | `{state}` | Inicia/para captura de rebinding |
+| `input-binding-capture`     | `{state}`  | Inicia/para captura de rebinding            |
 
 ### SettingsSystem
 
@@ -1517,13 +1547,16 @@ func _physics_process(delta: float) -> void:
 ### UI Systems
 
 **RebindingUI** consome eventos:
+
 - `gamepad-input-detected`: Captura gamepad input para rebinding
 - `key-pressed`: Captura keyboard input para rebinding
 
 **PauseMenu** consome eventos:
+
 - `toggle-pause`: Abre/fecha pause menu
 
 **SettingsMenu** consome eventos:
+
 - `settings-menu-requested`: Abre settings menu
 
 ---
@@ -1532,26 +1565,27 @@ func _physics_process(delta: float) -> void:
 
 ### Tabela Comparativa
 
-| Feature | Custom System (JS) | Godot InputMap | Winner |
-|---------|-------------------|----------------|---------|
-| **Setup** | Manual event listeners, polling | Automático (ProjectSettings) | ✅ Godot |
-| **Normalization** | Manual (computeMovementVector) | Automático (Input.get_vector) | ✅ Godot |
-| **Rebinding** | Custom UI + localStorage | Custom UI + ProjectSettings | 🟰 Empate |
-| **Gamepad** | Manual polling (navigator.getGamepads) | Automático (Input.is_joy_*) | ✅ Godot |
-| **Dead Zones** | Manual threshold check (0.45) | Built-in (deadzone property) | ✅ Godot |
-| **Persistence** | localStorage (JSON) | ConfigFile (INI) | ✅ Godot |
-| **Code Complexity** | ~1100 linhas | ~100 linhas | ✅ Godot |
-| **Flexibility** | Total controle sobre tudo | Limitado a InputMap API | ⚠️ JS |
-| **Performance** | Polling overhead a cada frame | Otimizado pelo engine | ✅ Godot |
-| **Maintenance** | Alto (bugs, edge cases) | Baixo (engine-tested) | ✅ Godot |
-| **Command Queue** | Integrado | Não existe (mas pode não ser necessário) | ⚠️ JS |
-| **Synonyms** | Suportado (Space = " ") | Não suportado (mas pode não ser necessário) | ⚠️ JS |
+| Feature             | Custom System (JS)                     | Godot InputMap                              | Winner    |
+| ------------------- | -------------------------------------- | ------------------------------------------- | --------- |
+| **Setup**           | Manual event listeners, polling        | Automático (ProjectSettings)                | ✅ Godot  |
+| **Normalization**   | Manual (computeMovementVector)         | Automático (Input.get_vector)               | ✅ Godot  |
+| **Rebinding**       | Custom UI + localStorage               | Custom UI + ProjectSettings                 | 🟰 Empate |
+| **Gamepad**         | Manual polling (navigator.getGamepads) | Automático (Input.is*joy*\*)                | ✅ Godot  |
+| **Dead Zones**      | Manual threshold check (0.45)          | Built-in (deadzone property)                | ✅ Godot  |
+| **Persistence**     | localStorage (JSON)                    | ConfigFile (INI)                            | ✅ Godot  |
+| **Code Complexity** | ~1100 linhas                           | ~100 linhas                                 | ✅ Godot  |
+| **Flexibility**     | Total controle sobre tudo              | Limitado a InputMap API                     | ⚠️ JS     |
+| **Performance**     | Polling overhead a cada frame          | Otimizado pelo engine                       | ✅ Godot  |
+| **Maintenance**     | Alto (bugs, edge cases)                | Baixo (engine-tested)                       | ✅ Godot  |
+| **Command Queue**   | Integrado                              | Não existe (mas pode não ser necessário)    | ⚠️ JS     |
+| **Synonyms**        | Suportado (Space = " ")                | Não suportado (mas pode não ser necessário) | ⚠️ JS     |
 
 ### Feature-by-Feature Analysis
 
 #### 1. Input Detection
 
 **Custom System**:
+
 ```gdscript
 func _input(event: InputEvent) -> void:
     if event is InputEventKey:
@@ -1562,6 +1596,7 @@ func _input(event: InputEvent) -> void:
 ```
 
 **Godot InputMap**:
+
 ```gdscript
 func _input(event: InputEvent) -> void:
     if event.is_action_pressed("move_up"):
@@ -1576,6 +1611,7 @@ func _input(event: InputEvent) -> void:
 #### 2. Movement Input
 
 **Custom System**:
+
 ```gdscript
 func _process(delta: float) -> void:
     poll_gamepad()
@@ -1585,6 +1621,7 @@ func _process(delta: float) -> void:
 ```
 
 **Godot InputMap**:
+
 ```gdscript
 func _physics_process(delta: float) -> void:
     var input = Input.get_vector("move_left", "move_right", "move_up", "move_down")
@@ -1599,6 +1636,7 @@ func _physics_process(delta: float) -> void:
 #### 3. Rebinding
 
 **Custom System**:
+
 ```gdscript
 # Captura input manualmente
 func capture_binding() -> void:
@@ -1614,6 +1652,7 @@ func apply_control_settings(values: Dictionary) -> void:
 ```
 
 **Godot InputMap**:
+
 ```gdscript
 # Captura input
 func capture_binding() -> void:
@@ -1633,6 +1672,7 @@ func _input(event: InputEvent) -> void:
 #### 4. Gamepad Support
 
 **Custom System**:
+
 ```gdscript
 func poll_gamepad() -> void:
     var gamepads = Input.get_connected_joypads()
@@ -1655,6 +1695,7 @@ func poll_gamepad() -> void:
 ```
 
 **Godot InputMap**:
+
 ```gdscript
 # Nada! Engine faz tudo automaticamente.
 # Apenas usa Input.is_action_pressed() ou Input.get_vector()
@@ -1667,6 +1708,7 @@ func poll_gamepad() -> void:
 ### Conclusão: Godot InputMap Vence 🏆
 
 **Pontuação**:
+
 - ✅ Godot: 9 features
 - ⚠️ Custom: 2 features (flexibility, command queue)
 - 🟰 Empate: 1 feature (rebinding UI)
@@ -1674,6 +1716,7 @@ func poll_gamepad() -> void:
 **Recomendação Final**: **Usar Godot InputMap** (Opção A)
 
 **Benefícios**:
+
 - ✅ Reduz código de ~1100 linhas para ~100 linhas
 - ✅ Usa otimizações do Godot engine
 - ✅ Gamepad support automático (sem polling)
@@ -1683,6 +1726,7 @@ func poll_gamepad() -> void:
 - ✅ Mais fácil de manter
 
 **Trade-offs Aceitáveis**:
+
 - ❌ Perde 100% compatibilidade com JS (mas não é necessário)
 - ❌ Menos controle sobre normalization (mas Godot é suficiente)
 - ❌ Command queue precisa ser removido (mas é legacy)
@@ -1697,6 +1741,7 @@ func poll_gamepad() -> void:
 #### src/modules/InputSystem.js (1098 linhas)
 
 **Estrutura Principal**:
+
 - **Linhas 1-5**: Imports
 - **Linhas 6-15**: Constantes (MOVEMENT_ACTIONS, DEFAULT_GAMEPAD_AXIS_THRESHOLD, PASSWORD_MANAGER_GUARD_CODES)
 - **Linhas 17-31**: Class declaration
@@ -1737,6 +1782,7 @@ func poll_gamepad() -> void:
 #### src/data/settingsSchema.js (292 linhas)
 
 **Estrutura Principal**:
+
 - **Linhas 1-7**: Imports
 - **Linhas 9-20**: DEFAULT_BINDING_METADATA
 - **Linhas 22-285**: SETTINGS_SCHEMA (4 categorias)
@@ -1755,45 +1801,45 @@ func poll_gamepad() -> void:
 
 ### Funções-Chave
 
-| Função | Arquivo | Linhas | Descrição |
-|--------|---------|--------|-----------|
-| `normalizeKeyboardBinding(value)` | InputSystem.js | 657-662 | toLowerCase + trim |
-| `getKeyboardSynonyms(binding)` | InputSystem.js | 664-697 | Gera synonyms (Space → [" ", "spacebar"]) |
-| `parseGamepadBinding(binding)` | InputSystem.js | N/A | Parse "button:0" ou "axis:1:-" (inline) |
-| `registerKeyboardBindings(action, bindings)` | InputSystem.js | 715-727 | Popula keyboardBindingMap |
-| `registerGamepadBindings(action, bindings)` | InputSystem.js | 729-751 | Popula gamepadButtonMap/gamepadAxisMap |
-| `computeMovementVector(binary)` | InputSystem.js | 867-895 | Normaliza diagonal movement |
-| `pollGamepad()` | InputSystem.js | 497-591 | Poll gamepad state, sync actions |
-| `buildMovementCommandPayload()` | InputSystem.js | 897-924 | Constrói command para queue |
-| `applyControlSettings(values)` | InputSystem.js | 144-162 | Rebuild binding maps de settings |
-| `handleActionPress(action, source)` | InputSystem.js | 799-865 | Processa action press (emit events, enqueue commands) |
-| `syncKeyboardActions(newActive)` | InputSystem.js | 407-443 | Detecta press/release de keyboard actions |
-| `syncGamepadActions(newActive)` | InputSystem.js | 593-607 | Detecta press/release de gamepad actions |
+| Função                                       | Arquivo        | Linhas  | Descrição                                             |
+| -------------------------------------------- | -------------- | ------- | ----------------------------------------------------- |
+| `normalizeKeyboardBinding(value)`            | InputSystem.js | 657-662 | toLowerCase + trim                                    |
+| `getKeyboardSynonyms(binding)`               | InputSystem.js | 664-697 | Gera synonyms (Space → [" ", "spacebar"])             |
+| `parseGamepadBinding(binding)`               | InputSystem.js | N/A     | Parse "button:0" ou "axis:1:-" (inline)               |
+| `registerKeyboardBindings(action, bindings)` | InputSystem.js | 715-727 | Popula keyboardBindingMap                             |
+| `registerGamepadBindings(action, bindings)`  | InputSystem.js | 729-751 | Popula gamepadButtonMap/gamepadAxisMap                |
+| `computeMovementVector(binary)`              | InputSystem.js | 867-895 | Normaliza diagonal movement                           |
+| `pollGamepad()`                              | InputSystem.js | 497-591 | Poll gamepad state, sync actions                      |
+| `buildMovementCommandPayload()`              | InputSystem.js | 897-924 | Constrói command para queue                           |
+| `applyControlSettings(values)`               | InputSystem.js | 144-162 | Rebuild binding maps de settings                      |
+| `handleActionPress(action, source)`          | InputSystem.js | 799-865 | Processa action press (emit events, enqueue commands) |
+| `syncKeyboardActions(newActive)`             | InputSystem.js | 407-443 | Detecta press/release de keyboard actions             |
+| `syncGamepadActions(newActive)`              | InputSystem.js | 593-607 | Detecta press/release de gamepad actions              |
 
 ### Eventos
 
 **Emitidos pelo InputSystem**:
 
-| Evento | Linhas | Payload | Quando |
-|--------|--------|---------|--------|
-| `key-pressed` | 279, 315 | `{key, code, type, event, actions}` | Tecla pressionada/liberada |
-| `mouse-pressed` | 332, 345 | `{button, type, pos}` | Mouse clicado |
-| `gamepad-input-detected` | 531, 569 | `{type, index, direction?, value?}` | Gamepad input detectado |
-| `input-action` | 814, 859 | `{action, phase, source, context}` | Action ativada |
-| `toggle-pause` | 822 | `{}` | Pause pressionado |
-| `activate-shield-pressed` | 827 | `{}` | Shield pressionado |
-| `activate-shield-released` | 851 | `{}` | Shield liberado |
-| `settings-menu-requested` | 835 | `{}` | Settings pressionado |
-| `input-confirmed` | 839 | `{}` | Confirm pressionado |
-| `gamepad-connected` | 358 | `{deviceId}` | Gamepad conectado |
-| `gamepad-disconnected` | 362 | `{deviceId}` | Gamepad desconectado |
+| Evento                     | Linhas   | Payload                             | Quando                     |
+| -------------------------- | -------- | ----------------------------------- | -------------------------- |
+| `key-pressed`              | 279, 315 | `{key, code, type, event, actions}` | Tecla pressionada/liberada |
+| `mouse-pressed`            | 332, 345 | `{button, type, pos}`               | Mouse clicado              |
+| `gamepad-input-detected`   | 531, 569 | `{type, index, direction?, value?}` | Gamepad input detectado    |
+| `input-action`             | 814, 859 | `{action, phase, source, context}`  | Action ativada             |
+| `toggle-pause`             | 822      | `{}`                                | Pause pressionado          |
+| `activate-shield-pressed`  | 827      | `{}`                                | Shield pressionado         |
+| `activate-shield-released` | 851      | `{}`                                | Shield liberado            |
+| `settings-menu-requested`  | 835      | `{}`                                | Settings pressionado       |
+| `input-confirmed`          | 839      | `{}`                                | Confirm pressionado        |
+| `gamepad-connected`        | 358      | `{deviceId}`                        | Gamepad conectado          |
+| `gamepad-disconnected`     | 362      | `{deviceId}`                        | Gamepad desconectado       |
 
 **Consumidos pelo InputSystem**:
 
-| Evento | Linhas | Payload | Ação |
-|--------|--------|---------|------|
-| `settings-controls-changed` | 158 | `{values}` | Rebuild binding maps |
-| `input-binding-capture` | 240-248 | `{state}` | Inicia/para captura de rebinding |
+| Evento                      | Linhas  | Payload    | Ação                             |
+| --------------------------- | ------- | ---------- | -------------------------------- |
+| `settings-controls-changed` | 158     | `{values}` | Rebuild binding maps             |
+| `input-binding-capture`     | 240-248 | `{state}`  | Inicia/para captura de rebinding |
 
 ### Constantes Importantes
 
@@ -1805,8 +1851,8 @@ const PASSWORD_MANAGER_GUARD_CODES = ['KeyS', 'ArrowDown'];
 
 // settingsSchema.js linhas 9-20
 const DEFAULT_BINDING_METADATA = {
-    keyboard: { max: 2 },
-    gamepad: { max: 2, threshold: 0.45, allowAxis: true }
+  keyboard: { max: 2 },
+  gamepad: { max: 2, threshold: 0.45, allowAxis: true },
 };
 ```
 
@@ -1814,36 +1860,36 @@ const DEFAULT_BINDING_METADATA = {
 
 ```javascript
 // moveUp (linhas 77-89)
-keyboard: ['KeyW', 'ArrowUp']
-gamepad: ['axis:1:-', 'button:12']
+keyboard: ['KeyW', 'ArrowUp'];
+gamepad: ['axis:1:-', 'button:12'];
 
 // moveDown (linhas 90-102)
-keyboard: ['KeyS', 'ArrowDown']
-gamepad: ['axis:1:+', 'button:13']
+keyboard: ['KeyS', 'ArrowDown'];
+gamepad: ['axis:1:+', 'button:13'];
 
 // moveLeft (linhas 103-115)
-keyboard: ['KeyA', 'ArrowLeft']
-gamepad: ['axis:0:-', 'button:14']
+keyboard: ['KeyA', 'ArrowLeft'];
+gamepad: ['axis:0:-', 'button:14'];
 
 // moveRight (linhas 116-128)
-keyboard: ['KeyD', 'ArrowRight']
-gamepad: ['axis:0:+', 'button:15']
+keyboard: ['KeyD', 'ArrowRight'];
+gamepad: ['axis:0:+', 'button:15'];
 
 // activateShield (linhas 129-141)
-keyboard: ['KeyE', 'ShiftLeft']
-gamepad: ['button:2', 'button:4']
+keyboard: ['KeyE', 'ShiftLeft'];
+gamepad: ['button:2', 'button:4'];
 
 // pause (linhas 142-154)
-keyboard: ['Escape', 'KeyP']
-gamepad: ['button:9']
+keyboard: ['Escape', 'KeyP'];
+gamepad: ['button:9'];
 
 // openSettings (linhas 155-167)
-keyboard: ['F10']
-gamepad: ['button:8']
+keyboard: ['F10'];
+gamepad: ['button:8'];
 
 // confirm (linhas 168-188)
-keyboard: ['Enter', 'Space']
-gamepad: ['button:0']
+keyboard: ['Enter', 'Space'];
+gamepad: ['button:0'];
 ```
 
 ---
@@ -1853,6 +1899,7 @@ gamepad: ['button:0']
 ### O Que Documentamos
 
 ✅ **Sistema de Input Completo**:
+
 - 8 input actions (moveUp/Down/Left/Right, activateShield, pause, openSettings, confirm)
 - Keyboard support (WASD/Arrows, rebinding, synonyms)
 - Gamepad support (analog sticks, buttons, threshold 0.45)
@@ -1867,18 +1914,21 @@ gamepad: ['button:0']
 **Recomendação Principal: Usar Godot InputMap** ✅
 
 **Justificativa**:
+
 1. **Reduz complexidade**: 1100 linhas → 100 linhas (~91% redução)
 2. **Usa engine features**: Gamepad polling, normalization, dead zones automáticos
 3. **Menos bugs**: Engine-tested, otimizado
 4. **Mais fácil de manter**: Menos código custom
 
 **O que implementar**:
+
 - ✅ Godot InputMap configuration (project.godot)
 - ✅ Rebinding UI customizado (única parte necessária)
 - ✅ ConfigFile persistence (simples)
 - ✅ Conflict validation (opcional, mas útil)
 
 **O que remover**:
+
 - ❌ Command queue integration (PlayerSystem lê Input diretamente)
 - ❌ Password manager guard (web-specific)
 - ❌ Manual gamepad polling (engine faz automático)

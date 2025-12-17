@@ -18,9 +18,9 @@ function captureStarfieldSnapshot(seed) {
         x: Number(star.x.toFixed(4)),
         y: Number(star.y.toFixed(4)),
         phase: Number(star.phase.toFixed(6)),
-        jitter: Number(star.jitter.toFixed(6))
+        jitter: Number(star.jitter.toFixed(6)),
       }))
-    )
+    ),
   };
 }
 
@@ -31,7 +31,7 @@ function createEnemySystemStub(random) {
   const world = {
     getBounds() {
       return { ...worldBounds };
-    }
+    },
   };
 
   const enemySystem = {
@@ -41,10 +41,10 @@ function createEnemySystemStub(random) {
         created.push({
           type,
           x: Number(config.x.toFixed(4)),
-          y: Number(config.y.toFixed(4))
+          y: Number(config.y.toFixed(4)),
         });
         return { type, ...config };
-      }
+      },
     },
     getCachedWorld() {
       return world;
@@ -57,7 +57,7 @@ function createEnemySystemStub(random) {
         randomScopes.set(scope, random.fork(`enemy.${scope}`));
       }
       return randomScopes.get(scope);
-    }
+    },
   };
 
   return enemySystem;
@@ -72,7 +72,7 @@ function captureWaveSpawnSnapshot(seed) {
   const waveManager = new WaveManager({
     random,
     enemySystem,
-    eventBus
+    eventBus,
   });
 
   waveManager.startNextWave();
@@ -80,7 +80,7 @@ function captureWaveSpawnSnapshot(seed) {
   return {
     wave: waveManager.currentWave,
     totalSpawned: enemySystem.created.length,
-    sampleSpawns: enemySystem.created.slice(0, 6)
+    sampleSpawns: enemySystem.created.slice(0, 6),
   };
 }
 
@@ -95,15 +95,15 @@ function captureOrbDropSnapshot(seed) {
         y: Number(y.toFixed(4)),
         value,
         vx: Number((options.vx ?? 0).toFixed(4)),
-        vy: Number((options.vy ?? 0).toFixed(4))
+        vy: Number((options.vy ?? 0).toFixed(4)),
       });
       return {
         id: `${x}:${y}`,
         x,
         y,
-        value
+        value,
       };
-    }
+    },
   };
 
   const rewardManager = new RewardManager({ random, xpOrbSystem });
@@ -116,14 +116,14 @@ function captureOrbDropSnapshot(seed) {
     x: 512,
     y: 384,
     radius: 48,
-    wave: 3
+    wave: 3,
   };
 
   rewardManager.createXPOrbs(enemy, 5, 12);
 
   return {
     totalDrops: xpOrbCalls.length,
-    sampleDrops: xpOrbCalls
+    sampleDrops: xpOrbCalls,
   };
 }
 

@@ -37,7 +37,10 @@ class PhysicsSystem extends BaseSystem {
     this.enemySystem = null;
     this.cellSize = PHYSICS_CELL_SIZE || 96;
     this.maxEnemyRadius = this.computeMaxEnemyRadius();
-    this.maxEnemyRadius = Math.max(this.maxEnemyRadius, this.getBossSpatialRadius());
+    this.maxEnemyRadius = Math.max(
+      this.maxEnemyRadius,
+      this.getBossSpatialRadius()
+    );
     this.maxAsteroidRadius = this.maxEnemyRadius; // Legacy alias
     const activeEnemies = new Set();
     this.activeEnemies = activeEnemies;
@@ -54,7 +57,7 @@ class PhysicsSystem extends BaseSystem {
     this.spatialHash = new SpatialHash(this.cellSize, {
       maxObjects: 8,
       maxDepth: 4,
-      dynamicResize: true
+      dynamicResize: true,
     });
 
     // Legacy spatial index for backward compatibility
@@ -77,7 +80,7 @@ class PhysicsSystem extends BaseSystem {
       lastUpdateTime: 0,
       collisionChecks: 0,
       spatialQueries: 0,
-      frameTime: 0
+      frameTime: 0,
     };
 
     this.refreshEnemyReference({ suppressWarning: true });
@@ -86,7 +89,9 @@ class PhysicsSystem extends BaseSystem {
   attachEnemySystem(enemySystem, { force = false } = {}) {
     if (!enemySystem) {
       if (!this.missingEnemyWarningLogged) {
-        console.warn('[PhysicsSystem] attachEnemySystem called without enemy system instance');
+        console.warn(
+          '[PhysicsSystem] attachEnemySystem called without enemy system instance'
+        );
         this.missingEnemyWarningLogged = true;
       }
       return;
@@ -228,7 +233,9 @@ class PhysicsSystem extends BaseSystem {
     if (enemyService) {
       const changed = this.enemySystem !== enemyService;
       this.enemySystem = enemyService;
-      this.bootstrapFromEnemySystem(this.enemySystem, { force: force || changed });
+      this.bootstrapFromEnemySystem(this.enemySystem, {
+        force: force || changed,
+      });
       this.missingEnemyWarningLogged = false;
       return;
     }
@@ -393,7 +400,12 @@ class PhysicsSystem extends BaseSystem {
     }
 
     const radiusCandidates = [];
-    const radiusKeys = ['radius', 'explosionRadius', 'proximityRadius', 'collisionRadius'];
+    const radiusKeys = [
+      'radius',
+      'explosionRadius',
+      'proximityRadius',
+      'collisionRadius',
+    ];
 
     for (let i = 0; i < radiusKeys.length; i += 1) {
       const value = payload[radiusKeys[i]];
@@ -408,7 +420,10 @@ class PhysicsSystem extends BaseSystem {
         if (Number.isFinite(bossRadius)) {
           radiusCandidates.push(bossRadius);
         }
-      } else if (payload && (payload.type === 'boss' || payload.enemyType === 'boss')) {
+      } else if (
+        payload &&
+        (payload.type === 'boss' || payload.enemyType === 'boss')
+      ) {
         const bossRadius = this.getBossSpatialRadius();
         if (Number.isFinite(bossRadius)) {
           radiusCandidates.push(bossRadius);
@@ -421,7 +436,10 @@ class PhysicsSystem extends BaseSystem {
     }
 
     const candidateMax = Math.max(...radiusCandidates);
-    if (!Number.isFinite(this.maxEnemyRadius) || candidateMax > this.maxEnemyRadius) {
+    if (
+      !Number.isFinite(this.maxEnemyRadius) ||
+      candidateMax > this.maxEnemyRadius
+    ) {
       this.maxEnemyRadius = candidateMax;
       this.maxAsteroidRadius = this.maxEnemyRadius;
     }
@@ -432,7 +450,8 @@ class PhysicsSystem extends BaseSystem {
   }
 
   getBossBaseRadius(boss = null) {
-    const bossRadius = boss && Number.isFinite(boss.radius) ? Math.max(0, boss.radius) : NaN;
+    const bossRadius =
+      boss && Number.isFinite(boss.radius) ? Math.max(0, boss.radius) : NaN;
     if (Number.isFinite(bossRadius)) {
       return bossRadius;
     }
@@ -452,7 +471,9 @@ class PhysicsSystem extends BaseSystem {
 
   getBossCollisionPadding() {
     const config = this.getBossPhysicsConfig();
-    return Number.isFinite(config.collisionPadding) ? config.collisionPadding : 0;
+    return Number.isFinite(config.collisionPadding)
+      ? config.collisionPadding
+      : 0;
   }
 
   getBossSpatialRadius(boss = null) {
@@ -466,7 +487,10 @@ class PhysicsSystem extends BaseSystem {
     }
 
     if (this.isBossEnemy(enemy)) {
-      const base = Math.max(this.getBossBaseRadius(enemy), Number.isFinite(enemy.radius) ? Math.max(0, enemy.radius) : 0);
+      const base = Math.max(
+        this.getBossBaseRadius(enemy),
+        Number.isFinite(enemy.radius) ? Math.max(0, enemy.radius) : 0
+      );
       return base + this.getBossSpatialPadding();
     }
 
@@ -483,7 +507,10 @@ class PhysicsSystem extends BaseSystem {
     }
 
     if (this.isBossEnemy(enemy) && includeBossPadding) {
-      const base = Math.max(this.getBossBaseRadius(enemy), Number.isFinite(enemy.radius) ? Math.max(0, enemy.radius) : 0);
+      const base = Math.max(
+        this.getBossBaseRadius(enemy),
+        Number.isFinite(enemy.radius) ? Math.max(0, enemy.radius) : 0
+      );
       return base + this.getBossCollisionPadding();
     }
 
@@ -544,7 +571,12 @@ class PhysicsSystem extends BaseSystem {
     }
 
     const bossId =
-      payload.bossId ?? payload.enemyId ?? payload.id ?? payload.source?.bossId ?? payload.source?.id ?? null;
+      payload.bossId ??
+      payload.enemyId ??
+      payload.id ??
+      payload.source?.bossId ??
+      payload.source?.id ??
+      null;
 
     if (bossId == null) {
       return null;
@@ -566,14 +598,20 @@ class PhysicsSystem extends BaseSystem {
   getBossCollisionCooldown(type) {
     const config = this.getBossPhysicsConfig();
     if (type === 'boss-charge') {
-      return Number.isFinite(config.chargeCooldownMs) ? config.chargeCooldownMs : 240;
+      return Number.isFinite(config.chargeCooldownMs)
+        ? config.chargeCooldownMs
+        : 240;
     }
 
     if (type === 'boss-area') {
-      return Number.isFinite(config.areaCooldownMs) ? config.areaCooldownMs : 300;
+      return Number.isFinite(config.areaCooldownMs)
+        ? config.areaCooldownMs
+        : 300;
     }
 
-    return Number.isFinite(config.contactCooldownMs) ? config.contactCooldownMs : 120;
+    return Number.isFinite(config.contactCooldownMs)
+      ? config.contactCooldownMs
+      : 120;
   }
 
   shouldEmitBossCollision(boss, type) {
@@ -654,17 +692,27 @@ class PhysicsSystem extends BaseSystem {
     }
 
     const config = this.getBossPhysicsConfig();
-    return Number.isFinite(config.chargeDamageBonus) ? config.chargeDamageBonus : 0;
+    return Number.isFinite(config.chargeDamageBonus)
+      ? config.chargeDamageBonus
+      : 0;
   }
 
   getBossChargeShake(override) {
-    if (override && Number.isFinite(override.intensity) && Number.isFinite(override.duration)) {
+    if (
+      override &&
+      Number.isFinite(override.intensity) &&
+      Number.isFinite(override.duration)
+    ) {
       return override;
     }
 
     const config = this.getBossPhysicsConfig();
     const shake = config.chargeShake;
-    if (shake && Number.isFinite(shake.intensity) && Number.isFinite(shake.duration)) {
+    if (
+      shake &&
+      Number.isFinite(shake.intensity) &&
+      Number.isFinite(shake.duration)
+    ) {
       return shake;
     }
 
@@ -705,18 +753,28 @@ class PhysicsSystem extends BaseSystem {
 
     const baseRadius = this.getBossBaseRadius(boss);
     const config = this.getBossPhysicsConfig();
-    const multiplier = Number.isFinite(config.areaRadiusMultiplier) ? config.areaRadiusMultiplier : 2.2;
+    const multiplier = Number.isFinite(config.areaRadiusMultiplier)
+      ? config.areaRadiusMultiplier
+      : 2.2;
     return baseRadius * multiplier;
   }
 
   getBossAreaShake(override) {
-    if (override && Number.isFinite(override.intensity) && Number.isFinite(override.duration)) {
+    if (
+      override &&
+      Number.isFinite(override.intensity) &&
+      Number.isFinite(override.duration)
+    ) {
       return override;
     }
 
     const config = this.getBossPhysicsConfig();
     const shake = config.areaShake;
-    if (shake && Number.isFinite(shake.intensity) && Number.isFinite(shake.duration)) {
+    if (
+      shake &&
+      Number.isFinite(shake.intensity) &&
+      Number.isFinite(shake.duration)
+    ) {
       return shake;
     }
 
@@ -724,13 +782,21 @@ class PhysicsSystem extends BaseSystem {
   }
 
   getBossContactShake(override) {
-    if (override && Number.isFinite(override.intensity) && Number.isFinite(override.duration)) {
+    if (
+      override &&
+      Number.isFinite(override.intensity) &&
+      Number.isFinite(override.duration)
+    ) {
       return override;
     }
 
     const config = this.getBossPhysicsConfig();
     const shake = config.contactShake;
-    if (shake && Number.isFinite(shake.intensity) && Number.isFinite(shake.duration)) {
+    if (
+      shake &&
+      Number.isFinite(shake.intensity) &&
+      Number.isFinite(shake.duration)
+    ) {
       return shake;
     }
 
@@ -759,8 +825,18 @@ class PhysicsSystem extends BaseSystem {
     return null;
   }
 
-  triggerScreenShake(intensity, duration, reason = 'boss-impact', payload = {}) {
-    if (!Number.isFinite(intensity) || intensity <= 0 || !Number.isFinite(duration) || duration <= 0) {
+  triggerScreenShake(
+    intensity,
+    duration,
+    reason = 'boss-impact',
+    payload = {}
+  ) {
+    if (
+      !Number.isFinite(intensity) ||
+      intensity <= 0 ||
+      !Number.isFinite(duration) ||
+      duration <= 0
+    ) {
       return;
     }
 
@@ -802,13 +878,18 @@ class PhysicsSystem extends BaseSystem {
     }
 
     if (shakeConfig) {
-      this.triggerScreenShake(shakeConfig.intensity, shakeConfig.duration, type, {
-        bossId: boss?.id ?? null,
-        playerId: context.player?.id ?? null,
-        impactPosition: context.impactPosition || null,
-        overlap: context.overlap ?? null,
-        relativeSpeed: context.relativeSpeed ?? null,
-      });
+      this.triggerScreenShake(
+        shakeConfig.intensity,
+        shakeConfig.duration,
+        type,
+        {
+          bossId: boss?.id ?? null,
+          playerId: context.player?.id ?? null,
+          impactPosition: context.impactPosition || null,
+          overlap: context.overlap ?? null,
+          relativeSpeed: context.relativeSpeed ?? null,
+        }
+      );
     }
 
     let eventName = 'boss-contact-collision';
@@ -897,10 +978,10 @@ class PhysicsSystem extends BaseSystem {
     const fallbackRadius = Number.isFinite(defaults.explosionRadius)
       ? defaults.explosionRadius
       : Number.isFinite(defaults.radius)
-      ? defaults.radius
-      : Number.isFinite(enemy.radius)
-      ? enemy.radius
-      : 0;
+        ? defaults.radius
+        : Number.isFinite(enemy.radius)
+          ? enemy.radius
+          : 0;
     const radius = radiusCandidates.length
       ? Math.max(...radiusCandidates)
       : fallbackRadius;
@@ -908,9 +989,11 @@ class PhysicsSystem extends BaseSystem {
     const fallbackDamage = Number.isFinite(defaults.explosionDamage)
       ? defaults.explosionDamage
       : Number.isFinite(enemy.explosionDamage)
-      ? enemy.explosionDamage
-      : 0;
-    const damage = damageCandidates.length ? damageCandidates[0] : fallbackDamage;
+        ? enemy.explosionDamage
+        : 0;
+    const damage = damageCandidates.length
+      ? damageCandidates[0]
+      : fallbackDamage;
 
     return {
       enemy,
@@ -923,13 +1006,11 @@ class PhysicsSystem extends BaseSystem {
       damage,
       cause: data.cause ?? enemy.explosionCause?.cause ?? 'detonation',
       context: data.context ?? enemy.explosionCause?.context ?? {},
-      source:
-        data.source ??
-        {
-          id: enemy.id,
-          type: enemy.type,
-          wave: enemy.wave,
-        },
+      source: data.source ?? {
+        id: enemy.id,
+        type: enemy.type,
+        wave: enemy.wave,
+      },
     };
   }
 
@@ -1034,7 +1115,12 @@ class PhysicsSystem extends BaseSystem {
         Number.isFinite(asteroid.y) &&
         Number.isFinite(spatialRadius)
       ) {
-        this.spatialHash.update(asteroid, asteroid.x, asteroid.y, spatialRadius);
+        this.spatialHash.update(
+          asteroid,
+          asteroid.x,
+          asteroid.y,
+          spatialRadius
+        );
       }
     }
 
@@ -1108,8 +1194,8 @@ class PhysicsSystem extends BaseSystem {
       typeof enemySystem.getAllAsteroids === 'function'
         ? enemySystem.getAllAsteroids()
         : Array.isArray(enemySystem.asteroids)
-        ? enemySystem.asteroids
-        : [];
+          ? enemySystem.asteroids
+          : [];
 
     const asteroidByPoolId = new Map();
     for (let i = 0; i < availableAsteroids.length; i += 1) {
@@ -1163,7 +1249,11 @@ class PhysicsSystem extends BaseSystem {
         asteroid.rotationSpeed = entry.rotationSpeed;
       }
 
-      if (entry.randomSeed != null && asteroid.random && typeof asteroid.random.reset === 'function') {
+      if (
+        entry.randomSeed != null &&
+        asteroid.random &&
+        typeof asteroid.random.reset === 'function'
+      ) {
         asteroid.random.reset(entry.randomSeed);
       }
 
@@ -1251,7 +1341,7 @@ class PhysicsSystem extends BaseSystem {
         // Filter for active enemies only
         return this.activeEnemies.has(obj) && !obj.destroyed;
       },
-      sorted: false
+      sorted: false,
     });
 
     const candidateList = Array.isArray(candidates) ? candidates : [];
@@ -1339,10 +1429,15 @@ class PhysicsSystem extends BaseSystem {
       }
 
       // Use spatial hash for efficient collision detection
-      const candidates = this.spatialHash.query(bullet.x, bullet.y, maxCheckRadius, {
-        filter: (obj) => this.activeEnemies.has(obj) && !obj.destroyed,
-        sorted: false
-      });
+      const candidates = this.spatialHash.query(
+        bullet.x,
+        bullet.y,
+        maxCheckRadius,
+        {
+          filter: (obj) => this.activeEnemies.has(obj) && !obj.destroyed,
+          sorted: false,
+        }
+      );
 
       this.performanceMetrics.collisionChecks += candidates.length;
 
@@ -1356,10 +1451,16 @@ class PhysicsSystem extends BaseSystem {
         }
 
         // Precise collision detection
-        if (this.checkCircleCollision(
-          bullet.x, bullet.y, bulletRadius,
-          asteroid.x, asteroid.y, asteroid.radius || 0
-        )) {
+        if (
+          this.checkCircleCollision(
+            bullet.x,
+            bullet.y,
+            bulletRadius,
+            asteroid.x,
+            asteroid.y,
+            asteroid.radius || 0
+          )
+        ) {
           const dx = bullet.x - asteroid.x;
           const dy = bullet.y - asteroid.y;
           const distanceSq = dx * dx + dy * dy;
@@ -1389,8 +1490,12 @@ class PhysicsSystem extends BaseSystem {
               x: Math.round(closestMatch.x ?? 0),
               y: Math.round(closestMatch.y ?? 0),
             },
-            distance: Number.isFinite(distance) ? Number(distance.toFixed(2)) : distance,
-            hitRadius: Number.isFinite(hitRadius) ? Number(hitRadius.toFixed(2)) : hitRadius,
+            distance: Number.isFinite(distance)
+              ? Number(distance.toFixed(2))
+              : distance,
+            hitRadius: Number.isFinite(hitRadius)
+              ? Number(hitRadius.toFixed(2))
+              : hitRadius,
             damage: bullet.damage || 0,
             bossHealth: closestMatch.health,
             bossInvulnerable: !!closestMatch.invulnerable,
@@ -1412,7 +1517,7 @@ class PhysicsSystem extends BaseSystem {
     const totalRadius = r1 + r2;
 
     // Use squared distance to avoid expensive sqrt operation
-    return (dx * dx + dy * dy) <= (totalRadius * totalRadius);
+    return dx * dx + dy * dy <= totalRadius * totalRadius;
   }
 
   buildPlayerCollisionContext(player) {
@@ -1468,7 +1573,8 @@ class PhysicsSystem extends BaseSystem {
     } = options || {};
 
     const isBoss = this.isBossEnemy(asteroid);
-    const collisionLabel = collisionType || (isBoss ? 'boss-contact' : 'enemy-contact');
+    const collisionLabel =
+      collisionType || (isBoss ? 'boss-contact' : 'enemy-contact');
 
     result.collisionType = collisionLabel;
     result.enemy = asteroid || null;
@@ -1567,9 +1673,7 @@ class PhysicsSystem extends BaseSystem {
     const velAlongNormal = rvx * nx + rvy * ny;
 
     if (velAlongNormal < 0) {
-      const bounce = context.shieldActive
-        ? SHIELD_COLLISION_BOUNCE
-        : 0.2;
+      const bounce = context.shieldActive ? SHIELD_COLLISION_BOUNCE : 0.2;
       const invMass1 = 1 / Math.max(playerMass, 1);
       const invMass2 = 1 / Math.max(asteroid.mass || 1, 1);
       let j = (-(1 + bounce) * velAlongNormal) / (invMass1 + invMass2);
@@ -1634,7 +1738,10 @@ class PhysicsSystem extends BaseSystem {
 
     const baseDamage = 12;
     const momentumFactor = (asteroid.mass * relSpeed) / 120;
-    let rawDamage = baseDamage + momentumFactor + (Number.isFinite(damageBonus) ? damageBonus : 0);
+    let rawDamage =
+      baseDamage +
+      momentumFactor +
+      (Number.isFinite(damageBonus) ? damageBonus : 0);
     let damage = Math.max(3, Math.floor(rawDamage));
     if (Number.isFinite(damageOverride)) {
       damage = Math.max(0, Math.floor(damageOverride));
@@ -1673,10 +1780,7 @@ class PhysicsSystem extends BaseSystem {
       }
 
       if (asteroid.shieldHitCooldown <= 0) {
-        if (
-          enemiesSystem &&
-          typeof enemiesSystem.applyDamage === 'function'
-        ) {
+        if (enemiesSystem && typeof enemiesSystem.applyDamage === 'function') {
           enemiesSystem.applyDamage(asteroid, context.impactProfile.damage);
         }
         asteroid.shieldHitCooldown = cooldown;
@@ -1702,12 +1806,22 @@ class PhysicsSystem extends BaseSystem {
 
     finalizeBossFeedback(damage);
 
-    if (!isBoss && screenShake && Number.isFinite(screenShake.intensity) && Number.isFinite(screenShake.duration)) {
-      this.triggerScreenShake(screenShake.intensity, screenShake.duration, screenShake.reason || collisionLabel, {
-        playerId: player?.id ?? null,
-        enemyId: asteroid?.id ?? null,
-        impactPosition: result.impactPosition,
-      });
+    if (
+      !isBoss &&
+      screenShake &&
+      Number.isFinite(screenShake.intensity) &&
+      Number.isFinite(screenShake.duration)
+    ) {
+      this.triggerScreenShake(
+        screenShake.intensity,
+        screenShake.duration,
+        screenShake.reason || collisionLabel,
+        {
+          playerId: player?.id ?? null,
+          enemyId: asteroid?.id ?? null,
+          impactPosition: result.impactPosition,
+        }
+      );
     }
 
     gameEvents.emit('player-took-damage', {
@@ -1753,8 +1867,8 @@ class PhysicsSystem extends BaseSystem {
       radiusOverride: Number.isFinite(payload.radius)
         ? payload.radius
         : Number.isFinite(payload.collisionRadius)
-        ? payload.collisionRadius
-        : null,
+          ? payload.collisionRadius
+          : null,
       screenShake: payload.screenShake || null,
     };
 
@@ -1774,10 +1888,8 @@ class PhysicsSystem extends BaseSystem {
 
   applyBossAreaDamage(payload = {}) {
     const boss = this.resolveBossEntity(payload);
-    const basePosition = payload.position ||
-      (boss
-        ? { x: boss.x ?? 0, y: boss.y ?? 0 }
-        : null);
+    const basePosition =
+      payload.position || (boss ? { x: boss.x ?? 0, y: boss.y ?? 0 } : null);
 
     const summary = {
       type: 'boss-area',
@@ -1791,7 +1903,11 @@ class PhysicsSystem extends BaseSystem {
       processedBy: 'physics',
     };
 
-    if (!basePosition || !Number.isFinite(basePosition.x) || !Number.isFinite(basePosition.y)) {
+    if (
+      !basePosition ||
+      !Number.isFinite(basePosition.x) ||
+      !Number.isFinite(basePosition.y)
+    ) {
       summary.reason = 'invalid-position';
       return summary;
     }
@@ -1840,7 +1956,9 @@ class PhysicsSystem extends BaseSystem {
 
       const distance = Math.sqrt(distanceSq);
       const falloffDistance = Math.max(0, distance - effectiveRadius);
-      const falloff = disableFalloff ? 1 : 1 - Math.min(falloffDistance / radius, 1);
+      const falloff = disableFalloff
+        ? 1
+        : 1 - Math.min(falloffDistance / radius, 1);
       const scaledDamage = Math.max(0, damage * falloff);
       if (scaledDamage <= 0) {
         continue;
@@ -1852,7 +1970,10 @@ class PhysicsSystem extends BaseSystem {
         } catch (error) {
           // ignore individual enemy damage errors
         }
-      } else if (enemiesSystem && typeof enemiesSystem.applyDamage === 'function') {
+      } else if (
+        enemiesSystem &&
+        typeof enemiesSystem.applyDamage === 'function'
+      ) {
         enemiesSystem.applyDamage(enemy, scaledDamage);
       }
 
@@ -1875,7 +1996,12 @@ class PhysicsSystem extends BaseSystem {
       });
     }
 
-    if (player && player.position && Number.isFinite(player.position.x) && Number.isFinite(player.position.y)) {
+    if (
+      player &&
+      player.position &&
+      Number.isFinite(player.position.x) &&
+      Number.isFinite(player.position.y)
+    ) {
       const playerContext = this.buildPlayerCollisionContext(player);
       const playerRadius = playerContext.collisionRadius;
       if (playerRadius > 0) {
@@ -1887,12 +2013,15 @@ class PhysicsSystem extends BaseSystem {
         if (distanceSq <= threshold * threshold) {
           const distance = Math.sqrt(distanceSq);
           const falloffDistance = Math.max(0, distance - playerRadius);
-          const falloff = disableFalloff ? 1 : 1 - Math.min(falloffDistance / radius, 1);
+          const falloff = disableFalloff
+            ? 1
+            : 1 - Math.min(falloffDistance / radius, 1);
           const scaledDamage = Math.max(0, Math.floor(damage * falloff));
           const nx = distance > 0 ? dx / Math.max(distance, 0.001) : 0;
           const ny = distance > 0 ? dy / Math.max(distance, 0.001) : 0;
           const playerMass = playerContext.shieldActive
-            ? SHIP_MASS * Math.max(playerContext.impactProfile.forceMultiplier, 1)
+            ? SHIP_MASS *
+              Math.max(playerContext.impactProfile.forceMultiplier, 1)
             : SHIP_MASS;
 
           const playerResult = {
@@ -2052,9 +2181,8 @@ class PhysicsSystem extends BaseSystem {
       lastUpdateTime: 0,
       collisionChecks: 0,
       spatialQueries: 0,
-      frameTime: 0
+      frameTime: 0,
     };
-
   }
 
   /**
@@ -2066,7 +2194,7 @@ class PhysicsSystem extends BaseSystem {
       spatialHashStats: this.spatialHash.getStats(),
       activeEnemies: this.activeEnemies.size,
       activeAsteroids: this.activeEnemies.size,
-      indexCells: this.enemyIndex.size
+      indexCells: this.enemyIndex.size,
     };
   }
 
@@ -2080,14 +2208,16 @@ class PhysicsSystem extends BaseSystem {
     // Check if all active asteroids are in spatial hash
     for (const asteroid of this.activeEnemies) {
       if (!asteroid.destroyed && !this.spatialHash.objects.has(asteroid)) {
-        errors.push(`Active asteroid not in spatial hash: ${asteroid.id || 'unknown'}`);
+        errors.push(
+          `Active asteroid not in spatial hash: ${asteroid.id || 'unknown'}`
+        );
       }
     }
 
     return {
       valid: errors.length === 0,
       errors,
-      spatialHashValidation: validation
+      spatialHashValidation: validation,
     };
   }
 

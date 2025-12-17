@@ -1,5 +1,9 @@
 import { vi } from 'vitest';
-import { createGainStub, createOscillatorStub, createBufferSourceStub } from './stubs.js';
+import {
+  createGainStub,
+  createOscillatorStub,
+  createBufferSourceStub,
+} from './stubs.js';
 
 /**
  * Create a lightweight in-memory EventBus mock for deterministic tests.

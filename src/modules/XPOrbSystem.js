@@ -111,17 +111,20 @@ const SERVICE_CACHE_MAP = Object.freeze({
 
 class XPOrbSystem extends BaseSystem {
   constructor({ player, progression, random } = {}) {
-    super({ player, progression, random }, {
-      enableRandomManagement: true,
-      systemName: 'XPOrbSystem',
-      serviceName: 'xp-orbs',
-      randomForkLabels: {
-        base: 'xp-orbs.base',
-        creation: 'xp-orbs.creation',
-        clustering: 'xp-orbs.clustering',
-        fusion: 'xp-orbs.fusion',
-      },
-    });
+    super(
+      { player, progression, random },
+      {
+        enableRandomManagement: true,
+        systemName: 'XPOrbSystem',
+        serviceName: 'xp-orbs',
+        randomForkLabels: {
+          base: 'xp-orbs.base',
+          creation: 'xp-orbs.creation',
+          clustering: 'xp-orbs.clustering',
+          fusion: 'xp-orbs.fusion',
+        },
+      }
+    );
 
     this._fallbackRandom = null;
     this._randomForkSource = null;
@@ -138,17 +141,14 @@ class XPOrbSystem extends BaseSystem {
       : 5;
 
     this.orbMagnetismRadius = MAGNETISM_RADIUS;
-    this.magnetismForce =
-      ENHANCED_SHIP_MAGNETISM_FORCE || MAGNETISM_FORCE;
+    this.magnetismForce = ENHANCED_SHIP_MAGNETISM_FORCE || MAGNETISM_FORCE;
     this.magnetismBoost = Number.isFinite(XP_ORB_MAGNETISM_BOOST)
       ? XP_ORB_MAGNETISM_BOOST
       : 2.2;
     this.minOrbDistance = MIN_ORB_DISTANCE;
     this.clusterFusionCount = CLUSTER_FUSION_COUNT;
     this.clusterConfig =
-      typeof XP_ORB_CLUSTER_CONFIG === 'object'
-        ? XP_ORB_CLUSTER_CONFIG
-        : {};
+      typeof XP_ORB_CLUSTER_CONFIG === 'object' ? XP_ORB_CLUSTER_CONFIG : {};
     this.collectionRadiusPadding = Number.isFinite(
       XP_ORB_COLLECTION_RADIUS_PADDING
     )
@@ -238,7 +238,10 @@ class XPOrbSystem extends BaseSystem {
       signature !== undefined && signature !== this._randomForkSignature;
 
     if (force || this._randomForkSource !== candidate || signatureChanged) {
-      this.randomForks = this.createRandomForks(candidate, this.randomForkLabels);
+      this.randomForks = this.createRandomForks(
+        candidate,
+        this.randomForkLabels
+      );
       this._randomForkSource = candidate;
       this._randomForkSignature = signature;
       this.captureRandomForkSeeds();
@@ -279,7 +282,10 @@ class XPOrbSystem extends BaseSystem {
   }
 
   generateInitialFusionTimer() {
-    if (!Number.isFinite(this.fusionCheckInterval) || this.fusionCheckInterval <= 0) {
+    if (
+      !Number.isFinite(this.fusionCheckInterval) ||
+      this.fusionCheckInterval <= 0
+    ) {
       return 0;
     }
 
@@ -342,12 +348,14 @@ class XPOrbSystem extends BaseSystem {
       fusionRandom && typeof fusionRandom.range === 'function'
         ? fusionRandom
         : randomSource && typeof randomSource.range === 'function'
-        ? randomSource
-        : fallback;
+          ? randomSource
+          : fallback;
 
     const suffix =
       suffixSource && typeof suffixSource.range === 'function'
-        ? Math.floor(suffixSource.range(0, Number.MAX_SAFE_INTEGER)).toString(16)
+        ? Math.floor(suffixSource.range(0, Number.MAX_SAFE_INTEGER)).toString(
+            16
+          )
         : `${Date.now()}`;
 
     return `${scopeLabel}:${suffix}`;
@@ -369,12 +377,15 @@ class XPOrbSystem extends BaseSystem {
     try {
       GamePools.configureXPOrbLifecycle({
         create: () => this.createPooledOrb(),
-        reset: (orb) => this.resetOrbForPool(orb)
+        reset: (orb) => this.resetOrbForPool(orb),
       });
       this.usesOrbPool = true;
     } catch (error) {
       this.usesOrbPool = false;
-      console.warn('[XPOrbSystem] Failed to configure XP orb pool lifecycle', error);
+      console.warn(
+        '[XPOrbSystem] Failed to configure XP orb pool lifecycle',
+        error
+      );
     }
   }
 
@@ -394,7 +405,7 @@ class XPOrbSystem extends BaseSystem {
       clusterId: null,
       source: 'drop',
       pendingRemoval: false,
-      active: false
+      active: false,
     };
   }
 
@@ -550,7 +561,9 @@ class XPOrbSystem extends BaseSystem {
     const baseRadius = ORB_MAGNETISM_RADIUS || 35;
     const baseForce = ORB_MAGNETISM_FORCE || 150;
 
-    const radiusMultiplier = Number.isFinite(this.clusterConfig.radiusMultiplier)
+    const radiusMultiplier = Number.isFinite(
+      this.clusterConfig.radiusMultiplier
+    )
       ? this.clusterConfig.radiusMultiplier
       : 1.55;
     const minRadius = Number.isFinite(this.clusterConfig.minRadius)
@@ -1017,11 +1030,7 @@ class XPOrbSystem extends BaseSystem {
       const centerCellY = Math.floor(playerY / cellSize);
 
       for (let offsetX = -searchRange; offsetX <= searchRange; offsetX += 1) {
-        for (
-          let offsetY = -searchRange;
-          offsetY <= searchRange;
-          offsetY += 1
-        ) {
+        for (let offsetY = -searchRange; offsetY <= searchRange; offsetY += 1) {
           const key = `${centerCellX + offsetX}:${centerCellY + offsetY}`;
           const bucket = classData.cells.get(key);
           if (!bucket || bucket.length === 0) {
@@ -1187,7 +1196,8 @@ class XPOrbSystem extends BaseSystem {
                   : 0.5;
 
                 const baseStrength =
-                  this.orbClusterForce * (forceBase + closeness * forceCloseness) +
+                  this.orbClusterForce *
+                    (forceBase + closeness * forceCloseness) +
                   forceOffset;
                 const step = Math.min(
                   baseStrength * deltaTime,
@@ -1227,7 +1237,8 @@ class XPOrbSystem extends BaseSystem {
                   : 0.5;
 
                 const baseStrength =
-                  this.orbClusterForce * (forceBase + closeness * forceCloseness) +
+                  this.orbClusterForce *
+                    (forceBase + closeness * forceCloseness) +
                   forceOffset;
                 const step = Math.min(
                   baseStrength * deltaTime,
@@ -1784,7 +1795,7 @@ class XPOrbSystem extends BaseSystem {
 
     // Wave scaling: matches HP difficulty (+12% per wave, cap at wave 10)
     const effectiveWave = Math.max(1, Math.min(wave, 10));
-    const waveMultiplier = 1 + ((effectiveWave - 1) * 0.12);
+    const waveMultiplier = 1 + (effectiveWave - 1) * 0.12;
 
     // Player level bonus (small extra reward for progression)
     const progression = this.cachedProgression;
@@ -1817,7 +1828,7 @@ class XPOrbSystem extends BaseSystem {
 
     // === NEW ORB-BASED SYSTEM ===
     // Calculate number of orbs based on: BASE × SIZE × VARIANT × WAVE
-    const orbValue = ORB_VALUE || 5;  // Fixed 5 XP per orb
+    const orbValue = ORB_VALUE || 5; // Fixed 5 XP per orb
     const baseOrbs = ASTEROID_BASE_ORBS?.[size] ?? 1;
     const sizeFactor = ASTEROID_SIZE_ORB_FACTOR?.[size] ?? 1.0;
 
@@ -1825,12 +1836,14 @@ class XPOrbSystem extends BaseSystem {
     const orbMultiplier = variantConfig?.orbMultiplier ?? 1.0;
 
     // Wave scaling: +1 orb per 5 waves (wave 1-4: +0, wave 5-9: +1, wave 10+: +2)
-    const waveBonus = wave <= 10
-      ? Math.floor(wave / 5)
-      : Math.floor((wave - 10) / 3) + 2;
+    const waveBonus =
+      wave <= 10 ? Math.floor(wave / 5) : Math.floor((wave - 10) / 3) + 2;
 
     // Final orb count (rounded)
-    const numOrbs = Math.max(1, Math.round(baseOrbs * sizeFactor * orbMultiplier + waveBonus));
+    const numOrbs = Math.max(
+      1,
+      Math.round(baseOrbs * sizeFactor * orbMultiplier + waveBonus)
+    );
     const totalValue = numOrbs * orbValue;
 
     // === SIMPLIFIED ORB DISTRIBUTION ===
@@ -1838,7 +1851,7 @@ class XPOrbSystem extends BaseSystem {
     // Each orb gets orbValue (5 XP), but may vary slightly due to rounding
     const drops = [];
     const valuePerOrb = Math.floor(totalValue / numOrbs);
-    let remainder = totalValue - (valuePerOrb * numOrbs);
+    let remainder = totalValue - valuePerOrb * numOrbs;
 
     for (let i = 0; i < numOrbs; i += 1) {
       let value = valuePerOrb;
@@ -1850,10 +1863,10 @@ class XPOrbSystem extends BaseSystem {
       }
 
       drops.push({
-        value: Math.max(1, value),  // Each orb should be at least 1 XP
+        value: Math.max(1, value), // Each orb should be at least 1 XP
         options: {
           variant: variantKey,
-          tier: 1,  // Always tier 1 (blue) for fusion system
+          tier: 1, // Always tier 1 (blue) for fusion system
         },
       });
     }
@@ -1887,8 +1900,7 @@ class XPOrbSystem extends BaseSystem {
     this.visualCache.clear();
 
     this.orbMagnetismRadius = MAGNETISM_RADIUS;
-    this.magnetismForce =
-      ENHANCED_SHIP_MAGNETISM_FORCE || MAGNETISM_FORCE;
+    this.magnetismForce = ENHANCED_SHIP_MAGNETISM_FORCE || MAGNETISM_FORCE;
     this.minOrbDistance = MIN_ORB_DISTANCE;
     this.clusterFusionCount = CLUSTER_FUSION_COUNT;
     this.configureOrbClustering();

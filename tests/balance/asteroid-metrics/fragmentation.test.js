@@ -1,7 +1,10 @@
 import { describe, test, expect, beforeEach, afterEach } from 'vitest';
 import * as CONSTANTS from '../../../src/core/GameConstants.js';
 import { GamePools } from '../../../src/core/GamePools.js';
-import { setupGlobalMocks, cleanupGlobalState } from '../../__helpers__/setup.js';
+import {
+  setupGlobalMocks,
+  cleanupGlobalState,
+} from '../../__helpers__/setup.js';
 import {
   createEnemySystemHarness,
   computeAverageFragmentsForSize,
@@ -41,7 +44,8 @@ describe('Asteroid Metrics - Fragmentation', () => {
       ['large', 'medium'].forEach((size) => {
         test(`${variant} ${size} fragmentation count matches rules`, () => {
           const rules =
-            getFragmentRuleForVariant(variant) ?? CONSTANTS.ASTEROID_FRAGMENT_RULES.default;
+            getFragmentRuleForVariant(variant) ??
+            CONSTANTS.ASTEROID_FRAGMENT_RULES.default;
           if (!rules) {
             return;
           }
@@ -64,7 +68,8 @@ describe('Asteroid Metrics - Fragmentation', () => {
             triggerExplosion: false,
           });
 
-          const countRange = rules.countBySize?.[size] ?? rules.countBySize?.default ?? [0, 0];
+          const countRange = rules.countBySize?.[size] ??
+            rules.countBySize?.default ?? [0, 0];
           const [minRaw, maxRaw] = Array.isArray(countRange)
             ? countRange
             : [countRange, countRange];
@@ -107,13 +112,13 @@ describe('Asteroid Metrics - Fragmentation', () => {
           harness.enemySystem,
           size,
           FRAGMENT_ANALYSIS_WAVE,
-          FRAGMENT_SAMPLE_COUNT,
+          FRAGMENT_SAMPLE_COUNT
         );
 
         const bounds = computeFragmentExpectationBounds(
           harness.enemySystem,
           size,
-          FRAGMENT_ANALYSIS_WAVE,
+          FRAGMENT_ANALYSIS_WAVE
         );
 
         const guardBand = 0.05;

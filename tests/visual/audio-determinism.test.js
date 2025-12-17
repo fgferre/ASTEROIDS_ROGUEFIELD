@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import AudioSystem from '../../src/modules/AudioSystem.js';
 import AudioBatcher from '../../src/modules/AudioBatcher.js';
-import { createGainStub, createBufferSourceStub, createOscillatorStub } from '../__helpers__/stubs.js';
+import {
+  createGainStub,
+  createBufferSourceStub,
+  createOscillatorStub,
+} from '../__helpers__/stubs.js';
 import { createTestContainer } from '../__helpers__/setup.js';
 
 describe('AudioSystem RNG determinism', () => {
@@ -18,7 +22,7 @@ describe('AudioSystem RNG determinism', () => {
     const roundedFrequencyLog = new Proxy(frequencyLog, {
       get(target, prop) {
         if (prop === 'push') {
-          return function(value) {
+          return function (value) {
             return target.push(Number(value.toFixed(6)));
           };
         }
@@ -35,7 +39,8 @@ describe('AudioSystem RNG determinism', () => {
     audioSystem.masterGain = createGainStub();
     audioSystem.effectsGain = createGainStub();
     audioSystem.pool = {
-      getOscillator: () => createOscillatorStub({ frequencyLog: roundedFrequencyLog }),
+      getOscillator: () =>
+        createOscillatorStub({ frequencyLog: roundedFrequencyLog }),
       getGain: () => createGainStub(),
       getBufferSource: () => createBufferSourceStub(),
       returnGain: () => {},
@@ -64,7 +69,8 @@ describe('AudioSystem RNG determinism', () => {
 
   it('restores identical batched asteroid frequencies after reseeding', async () => {
     const seed = 2024;
-    const { audioSystem, random, captureAsteroidFrequencies } = createAudioHarness(seed);
+    const { audioSystem, random, captureAsteroidFrequencies } =
+      createAudioHarness(seed);
 
     const firstFrequencies = await captureAsteroidFrequencies(3);
     expect(firstFrequencies.length).toBeGreaterThan(0);

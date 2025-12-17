@@ -10,7 +10,7 @@ import { SpatialHash } from '../../src/core/SpatialHash.js';
 // Mock performance API for Node.js if needed
 if (typeof performance === 'undefined') {
   global.performance = {
-    now: () => Date.now()
+    now: () => Date.now(),
   };
 }
 
@@ -18,7 +18,7 @@ class CollisionStressTest {
   constructor() {
     this.spatialHash = new SpatialHash(64, {
       maxObjects: 8,
-      dynamicResize: true
+      dynamicResize: true,
     });
 
     this.asteroids = [];
@@ -26,7 +26,7 @@ class CollisionStressTest {
     this.results = {
       spatialHashResults: {},
       naiveResults: {},
-      comparison: {}
+      comparison: {},
     };
 
     console.log('🚀 Collision Detection Stress Test Initialized');
@@ -36,7 +36,9 @@ class CollisionStressTest {
    * Creates test objects with realistic game-like distribution
    */
   createTestObjects(asteroidCount = 200, bulletCount = 50) {
-    console.log(`\n📦 Creating ${asteroidCount} asteroids and ${bulletCount} bullets...`);
+    console.log(
+      `\n📦 Creating ${asteroidCount} asteroids and ${bulletCount} bullets...`
+    );
 
     // Clear existing objects
     this.asteroids = [];
@@ -64,11 +66,16 @@ class CollisionStressTest {
         vy: (Math.random() - 0.5) * 100,
         radius: radius,
         destroyed: false,
-        type: 'asteroid'
+        type: 'asteroid',
       };
 
       this.asteroids.push(asteroid);
-      this.spatialHash.insert(asteroid, asteroid.x, asteroid.y, asteroid.radius);
+      this.spatialHash.insert(
+        asteroid,
+        asteroid.x,
+        asteroid.y,
+        asteroid.radius
+      );
     }
 
     // Create bullets
@@ -81,19 +88,22 @@ class CollisionStressTest {
         vy: (Math.random() - 0.5) * 200,
         radius: 2,
         hit: false,
-        type: 'bullet'
+        type: 'bullet',
       };
 
       this.bullets.push(bullet);
     }
 
-    console.log(`✅ Created ${this.asteroids.length} asteroids and ${this.bullets.length} bullets`);
+    console.log(
+      `✅ Created ${this.asteroids.length} asteroids and ${this.bullets.length} bullets`
+    );
   }
 
   /**
    * Simulates object movement for realistic collision testing
    */
-  updatePositions(deltaTime = 16.67) { // 60 FPS = 16.67ms per frame
+  updatePositions(deltaTime = 16.67) {
+    // 60 FPS = 16.67ms per frame
     // Update asteroid positions
     for (const asteroid of this.asteroids) {
       if (asteroid.destroyed) continue;
@@ -108,7 +118,12 @@ class CollisionStressTest {
       if (asteroid.y > 2000) asteroid.y -= 2000;
 
       // Update spatial hash
-      this.spatialHash.update(asteroid, asteroid.x, asteroid.y, asteroid.radius);
+      this.spatialHash.update(
+        asteroid,
+        asteroid.x,
+        asteroid.y,
+        asteroid.radius
+      );
     }
 
     // Update bullet positions
@@ -119,7 +134,12 @@ class CollisionStressTest {
       bullet.y += bullet.vy * deltaTime * 0.001;
 
       // Remove bullets that go off-screen
-      if (bullet.x < -100 || bullet.x > 2100 || bullet.y < -100 || bullet.y > 2100) {
+      if (
+        bullet.x < -100 ||
+        bullet.x > 2100 ||
+        bullet.y < -100 ||
+        bullet.y > 2100
+      ) {
         bullet.hit = true;
       }
     }
@@ -137,7 +157,7 @@ class CollisionStressTest {
       if (bullet.hit) continue;
 
       const candidates = this.spatialHash.query(bullet.x, bullet.y, 50, {
-        filter: (obj) => obj.type === 'asteroid' && !obj.destroyed
+        filter: (obj) => obj.type === 'asteroid' && !obj.destroyed,
       });
 
       checksPerformed += candidates.length;
@@ -161,7 +181,7 @@ class CollisionStressTest {
       collisions: collisions.length,
       checksPerformed,
       timeMs: endTime - startTime,
-      spatial: this.spatialHash.getStats()
+      spatial: this.spatialHash.getStats(),
     };
   }
 
@@ -198,14 +218,18 @@ class CollisionStressTest {
     return {
       collisions: collisions.length,
       checksPerformed,
-      timeMs: endTime - startTime
+      timeMs: endTime - startTime,
     };
   }
 
   /**
    * Runs performance comparison between spatial hash and naive approaches
    */
-  async runPerformanceComparison(asteroidCount = 200, bulletCount = 50, frames = 100) {
+  async runPerformanceComparison(
+    asteroidCount = 200,
+    bulletCount = 50,
+    frames = 100
+  ) {
     console.log(`\n⚡ Running Performance Comparison:`);
     console.log(`   - ${asteroidCount} asteroids`);
     console.log(`   - ${bulletCount} bullets`);
@@ -220,21 +244,24 @@ class CollisionStressTest {
       totalCollisions: 0,
       totalChecks: 0,
       maxFrameTime: 0,
-      frameResults: []
+      frameResults: [],
     };
 
     for (let frame = 0; frame < frames; frame++) {
       this.updatePositions();
 
       // Reset bullet hit states for consistent testing
-      this.bullets.forEach(b => b.hit = false);
+      this.bullets.forEach((b) => (b.hit = false));
 
       const result = this.spatialHashCollisionDetection();
 
       spatialResults.totalTime += result.timeMs;
       spatialResults.totalCollisions += result.collisions;
       spatialResults.totalChecks += result.checksPerformed;
-      spatialResults.maxFrameTime = Math.max(spatialResults.maxFrameTime, result.timeMs);
+      spatialResults.maxFrameTime = Math.max(
+        spatialResults.maxFrameTime,
+        result.timeMs
+      );
       spatialResults.frameResults.push(result.timeMs);
 
       if (frame % 20 === 0) {
@@ -252,21 +279,24 @@ class CollisionStressTest {
       totalCollisions: 0,
       totalChecks: 0,
       maxFrameTime: 0,
-      frameResults: []
+      frameResults: [],
     };
 
     for (let frame = 0; frame < frames; frame++) {
       this.updatePositions();
 
       // Reset bullet hit states for consistent testing
-      this.bullets.forEach(b => b.hit = false);
+      this.bullets.forEach((b) => (b.hit = false));
 
       const result = this.naiveCollisionDetection();
 
       naiveResults.totalTime += result.timeMs;
       naiveResults.totalCollisions += result.collisions;
       naiveResults.totalChecks += result.checksPerformed;
-      naiveResults.maxFrameTime = Math.max(naiveResults.maxFrameTime, result.timeMs);
+      naiveResults.maxFrameTime = Math.max(
+        naiveResults.maxFrameTime,
+        result.timeMs
+      );
       naiveResults.frameResults.push(result.timeMs);
 
       if (frame % 20 === 0) {
@@ -279,19 +309,30 @@ class CollisionStressTest {
     // Calculate comparison metrics
     const comparison = {
       speedup: naiveResults.totalTime / spatialResults.totalTime,
-      checksReduction: ((naiveResults.totalChecks - spatialResults.totalChecks) / naiveResults.totalChecks * 100),
+      checksReduction:
+        ((naiveResults.totalChecks - spatialResults.totalChecks) /
+          naiveResults.totalChecks) *
+        100,
       spatialAvgFrameTime: spatialResults.totalTime / frames,
       naiveAvgFrameTime: naiveResults.totalTime / frames,
       spatialFPS: 1000 / (spatialResults.totalTime / frames),
       naiveFPS: 1000 / (naiveResults.totalTime / frames),
-      collisionAccuracy: Math.abs(spatialResults.totalCollisions - naiveResults.totalCollisions) / Math.max(spatialResults.totalCollisions, naiveResults.totalCollisions) * 100
+      collisionAccuracy:
+        (Math.abs(
+          spatialResults.totalCollisions - naiveResults.totalCollisions
+        ) /
+          Math.max(
+            spatialResults.totalCollisions,
+            naiveResults.totalCollisions
+          )) *
+        100,
     };
 
     this.results = {
       spatialHashResults: spatialResults,
       naiveResults: naiveResults,
       comparison: comparison,
-      testParams: { asteroidCount, bulletCount, frames }
+      testParams: { asteroidCount, bulletCount, frames },
     };
 
     return this.results;
@@ -309,13 +350,15 @@ class CollisionStressTest {
       { asteroids: 200, bullets: 40 },
       { asteroids: 300, bullets: 60 },
       { asteroids: 400, bullets: 80 },
-      { asteroids: 500, bullets: 100 }
+      { asteroids: 500, bullets: 100 },
     ];
 
     const scalabilityResults = [];
 
     for (const testCase of testCases) {
-      console.log(`\n🔬 Testing: ${testCase.asteroids} asteroids, ${testCase.bullets} bullets`);
+      console.log(
+        `\n🔬 Testing: ${testCase.asteroids} asteroids, ${testCase.bullets} bullets`
+      );
 
       const result = await this.runPerformanceComparison(
         testCase.asteroids,
@@ -328,7 +371,7 @@ class CollisionStressTest {
         spatialFPS: result.comparison.spatialFPS,
         naiveFPS: result.comparison.naiveFPS,
         speedup: result.comparison.speedup,
-        checksReduction: result.comparison.checksReduction
+        checksReduction: result.comparison.checksReduction,
       });
 
       console.log(`   Spatial FPS: ${result.comparison.spatialFPS.toFixed(1)}`);
@@ -353,15 +396,18 @@ class CollisionStressTest {
 
     for (let frame = 0; frame < frames; frame++) {
       this.updatePositions();
-      this.bullets.forEach(b => b.hit = false);
+      this.bullets.forEach((b) => (b.hit = false));
 
       const result = this.spatialHashCollisionDetection();
       frameResults.push(result.timeMs);
     }
 
-    const avgFrameTime = frameResults.reduce((a, b) => a + b, 0) / frameResults.length;
+    const avgFrameTime =
+      frameResults.reduce((a, b) => a + b, 0) / frameResults.length;
     const maxFrameTime = Math.max(...frameResults);
-    const framesUnder16ms = frameResults.filter(t => t <= targetFrameTime).length;
+    const framesUnder16ms = frameResults.filter(
+      (t) => t <= targetFrameTime
+    ).length;
     const successRate = (framesUnder16ms / frames) * 100;
 
     const validation = {
@@ -370,7 +416,7 @@ class CollisionStressTest {
       targetFrameTime,
       successRate,
       passed: successRate >= 95, // 95% of frames should be under 16.67ms
-      estimatedFPS: 1000 / avgFrameTime
+      estimatedFPS: 1000 / avgFrameTime,
     };
 
     console.log(`\n📊 60 FPS Validation Results:`);
@@ -379,7 +425,9 @@ class CollisionStressTest {
     console.log(`   Target frame time: ${targetFrameTime}ms`);
     console.log(`   Success rate: ${successRate.toFixed(1)}%`);
     console.log(`   Estimated FPS: ${validation.estimatedFPS.toFixed(1)}`);
-    console.log(`   Target achieved: ${validation.passed ? '✅ YES' : '❌ NO'}`);
+    console.log(
+      `   Target achieved: ${validation.passed ? '✅ YES' : '❌ NO'}`
+    );
 
     return validation;
   }
@@ -393,7 +441,8 @@ class CollisionStressTest {
       return;
     }
 
-    const { spatialHashResults, naiveResults, comparison, testParams } = this.results;
+    const { spatialHashResults, naiveResults, comparison, testParams } =
+      this.results;
 
     console.log('\n' + '='.repeat(60));
     console.log('📊 COLLISION DETECTION STRESS TEST RESULTS');
@@ -406,37 +455,74 @@ class CollisionStressTest {
 
     console.log(`\n⚡ Spatial Hash Performance:`);
     console.log(`   Total time: ${spatialHashResults.totalTime.toFixed(2)}ms`);
-    console.log(`   Average frame time: ${comparison.spatialAvgFrameTime.toFixed(2)}ms`);
-    console.log(`   Maximum frame time: ${spatialHashResults.maxFrameTime.toFixed(2)}ms`);
+    console.log(
+      `   Average frame time: ${comparison.spatialAvgFrameTime.toFixed(2)}ms`
+    );
+    console.log(
+      `   Maximum frame time: ${spatialHashResults.maxFrameTime.toFixed(2)}ms`
+    );
     console.log(`   Estimated FPS: ${comparison.spatialFPS.toFixed(1)}`);
-    console.log(`   Total collision checks: ${spatialHashResults.totalChecks.toLocaleString()}`);
-    console.log(`   Collisions detected: ${spatialHashResults.totalCollisions}`);
+    console.log(
+      `   Total collision checks: ${spatialHashResults.totalChecks.toLocaleString()}`
+    );
+    console.log(
+      `   Collisions detected: ${spatialHashResults.totalCollisions}`
+    );
 
     console.log(`\n🐌 Naive Approach Performance:`);
     console.log(`   Total time: ${naiveResults.totalTime.toFixed(2)}ms`);
-    console.log(`   Average frame time: ${comparison.naiveAvgFrameTime.toFixed(2)}ms`);
-    console.log(`   Maximum frame time: ${naiveResults.maxFrameTime.toFixed(2)}ms`);
+    console.log(
+      `   Average frame time: ${comparison.naiveAvgFrameTime.toFixed(2)}ms`
+    );
+    console.log(
+      `   Maximum frame time: ${naiveResults.maxFrameTime.toFixed(2)}ms`
+    );
     console.log(`   Estimated FPS: ${comparison.naiveFPS.toFixed(1)}`);
-    console.log(`   Total collision checks: ${naiveResults.totalChecks.toLocaleString()}`);
+    console.log(
+      `   Total collision checks: ${naiveResults.totalChecks.toLocaleString()}`
+    );
     console.log(`   Collisions detected: ${naiveResults.totalCollisions}`);
 
     console.log(`\n🚀 Performance Improvement:`);
-    console.log(`   Speed improvement: ${comparison.speedup.toFixed(2)}x faster`);
-    console.log(`   Collision checks reduction: ${comparison.checksReduction.toFixed(1)}%`);
-    console.log(`   Collision accuracy: ${(100 - comparison.collisionAccuracy).toFixed(1)}%`);
+    console.log(
+      `   Speed improvement: ${comparison.speedup.toFixed(2)}x faster`
+    );
+    console.log(
+      `   Collision checks reduction: ${comparison.checksReduction.toFixed(1)}%`
+    );
+    console.log(
+      `   Collision accuracy: ${(100 - comparison.collisionAccuracy).toFixed(1)}%`
+    );
 
     console.log(`\n🎯 60 FPS Target:`);
     const fpsTarget = comparison.spatialFPS >= 60;
-    console.log(`   Target FPS (60): ${fpsTarget ? '✅ ACHIEVED' : '❌ NOT ACHIEVED'}`);
-    console.log(`   Frame budget (16.67ms): ${comparison.spatialAvgFrameTime <= 16.67 ? '✅ WITHIN BUDGET' : '❌ OVER BUDGET'}`);
+    console.log(
+      `   Target FPS (60): ${fpsTarget ? '✅ ACHIEVED' : '❌ NOT ACHIEVED'}`
+    );
+    console.log(
+      `   Frame budget (16.67ms): ${comparison.spatialAvgFrameTime <= 16.67 ? '✅ WITHIN BUDGET' : '❌ OVER BUDGET'}`
+    );
 
-    if (comparison.speedup >= 3 && comparison.checksReduction >= 70 && fpsTarget) {
+    if (
+      comparison.speedup >= 3 &&
+      comparison.checksReduction >= 70 &&
+      fpsTarget
+    ) {
       console.log(`\n🎉 ALL PERFORMANCE TARGETS ACHIEVED! 🎉`);
     } else {
       console.log(`\n⚠️  Some performance targets not met:`);
-      if (comparison.speedup < 3) console.log(`   - Need 3x speedup (got ${comparison.speedup.toFixed(2)}x)`);
-      if (comparison.checksReduction < 70) console.log(`   - Need 70% checks reduction (got ${comparison.checksReduction.toFixed(1)}%)`);
-      if (!fpsTarget) console.log(`   - Need 60+ FPS (got ${comparison.spatialFPS.toFixed(1)} FPS)`);
+      if (comparison.speedup < 3)
+        console.log(
+          `   - Need 3x speedup (got ${comparison.speedup.toFixed(2)}x)`
+        );
+      if (comparison.checksReduction < 70)
+        console.log(
+          `   - Need 70% checks reduction (got ${comparison.checksReduction.toFixed(1)}%)`
+        );
+      if (!fpsTarget)
+        console.log(
+          `   - Need 60+ FPS (got ${comparison.spatialFPS.toFixed(1)} FPS)`
+        );
     }
 
     console.log('\n' + '='.repeat(60));
@@ -464,8 +550,10 @@ async function runStressTest() {
     const scalabilityResults = await test.runScalabilityTest();
 
     console.log('\n📈 Scalability Results:');
-    scalabilityResults.forEach(result => {
-      console.log(`   ${result.asteroids} objects: ${result.spatialFPS.toFixed(1)} FPS (${result.speedup.toFixed(2)}x speedup)`);
+    scalabilityResults.forEach((result) => {
+      console.log(
+        `   ${result.asteroids} objects: ${result.spatialFPS.toFixed(1)} FPS (${result.speedup.toFixed(2)}x speedup)`
+      );
     });
 
     // Final summary
@@ -474,21 +562,23 @@ async function runStressTest() {
     console.log('='.repeat(60));
 
     const mainResult = test.results.comparison;
-    const allTargetsMet = (
+    const allTargetsMet =
       mainResult.speedup >= 3 &&
       mainResult.checksReduction >= 70 &&
       mainResult.spatialFPS >= 60 &&
-      fpsValidation.passed
-    );
+      fpsValidation.passed;
 
     if (allTargetsMet) {
-      console.log('🎉 ALL TARGETS ACHIEVED - SPATIAL HASH OPTIMIZATION SUCCESSFUL! 🎉');
+      console.log(
+        '🎉 ALL TARGETS ACHIEVED - SPATIAL HASH OPTIMIZATION SUCCESSFUL! 🎉'
+      );
       process.exit(0);
     } else {
-      console.log('⚠️  Some targets not met - optimization may need further work');
+      console.log(
+        '⚠️  Some targets not met - optimization may need further work'
+      );
       process.exit(1);
     }
-
   } catch (error) {
     console.error('❌ Stress test failed:', error);
     process.exit(1);

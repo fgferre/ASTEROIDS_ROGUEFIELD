@@ -387,7 +387,11 @@ export const BOSS_SCREEN_SHAKES = deepFreeze({
     duration: 0.5,
     preset: 'bossPhaseChange',
   }),
-  defeated: Object.freeze({ intensity: 24, duration: 0.85, preset: 'bossDefeated' }),
+  defeated: Object.freeze({
+    intensity: 24,
+    duration: 0.85,
+    preset: 'bossDefeated',
+  }),
 });
 
 // === BOSS REWARDS ===

@@ -10,14 +10,14 @@ function createEnemySystemWithSeed(seed) {
   const world = {
     getBounds() {
       return { width: CONSTANTS.GAME_WIDTH, height: CONSTANTS.GAME_HEIGHT };
-    }
+    },
   };
 
   const player = {
     position: { x: CONSTANTS.GAME_WIDTH / 2, y: CONSTANTS.GAME_HEIGHT / 2 },
     getHullBoundingRadius() {
       return CONSTANTS.SHIP_SIZE;
-    }
+    },
   };
 
   const physics = {
@@ -62,12 +62,12 @@ function summarizeAsteroid(asteroid) {
     variant: asteroid.variant,
     position: {
       x: Number(asteroid.x.toFixed(4)),
-      y: Number(asteroid.y.toFixed(4))
+      y: Number(asteroid.y.toFixed(4)),
     },
     velocity: {
       vx: Number(asteroid.vx.toFixed(6)),
-      vy: Number(asteroid.vy.toFixed(6))
-    }
+      vy: Number(asteroid.vy.toFixed(6)),
+    },
   };
 }
 
@@ -76,13 +76,16 @@ function snapshotRandomSeeds(system) {
     base: system.services.random?.seed ?? null,
     spawn: system.randomScopeSeeds?.spawn ?? null,
     variants: system.randomScopeSeeds?.variants ?? null,
-    fragments: system.randomScopeSeeds?.fragments ?? null
+    fragments: system.randomScopeSeeds?.fragments ?? null,
   };
 }
 
 function snapshotRandomSequences(system) {
   return Object.fromEntries(
-    Object.entries(system.randomSequences || {}).map(([key, value]) => [key, value])
+    Object.entries(system.randomSequences || {}).map(([key, value]) => [
+      key,
+      value,
+    ])
   );
 }
 
@@ -92,7 +95,7 @@ function captureResetSnapshot(system) {
     wave: system.waveState.current,
     randomSeeds: snapshotRandomSeeds(system),
     randomSequences: snapshotRandomSequences(system),
-    asteroids: system.asteroids.map(summarizeAsteroid)
+    asteroids: system.asteroids.map(summarizeAsteroid),
   };
 }
 

@@ -5,21 +5,24 @@
 O sistema de XP Orbs é um mecanismo de progressão visual e tátil que recompensa o jogador por agrupar orbs espacialmente, permitindo fusões em tiers superiores. Os orbs são coletáveis que spawnam quando inimigos são destruídos, são atraídos magneticamente ao jogador e se agrupam entre si da mesma classe, fundindo-se em orbs de maior valor quando formam clusters suficientes.
 
 ### Conceito
+
 - **Orbs como coletáveis dinâmicos**: Diferente de itens estáticos, os orbs se movem ativamente no mundo, criando uma experiência interativa
 - **Progressão geométrica**: Cada tier concede 3x mais XP que o anterior (5 → 15 → 45 → 135 → 405 → 1215)
 - **Recompensa por habilidade**: Agrupar orbs manualmente requer timing e posicionamento, tornando a coleta mais engajante
 
 ### 6 Tiers Progressivos
-| Tier | Classe | Valor XP | Cor | Descrição |
-|------|--------|----------|-----|-----------|
-| 1 | Blue | 5 | #4A90E2 | Orb básico, spawna de inimigos pequenos |
-| 2 | Green | 15 | #50C878 | Fusão de 10 blues |
-| 3 | Yellow | 45 | #FFD700 | Fusão de 10 greens |
-| 4 | Purple | 135 | #9B59B6 | Fusão de 10 yellows |
-| 5 | Red | 405 | #E74C3C | Fusão de 10 purples |
-| 6 | Crystal | 1215 | #00FFFF | Fusão de 10 reds |
+
+| Tier | Classe  | Valor XP | Cor     | Descrição                               |
+| ---- | ------- | -------- | ------- | --------------------------------------- |
+| 1    | Blue    | 5        | #4A90E2 | Orb básico, spawna de inimigos pequenos |
+| 2    | Green   | 15       | #50C878 | Fusão de 10 blues                       |
+| 3    | Yellow  | 45       | #FFD700 | Fusão de 10 greens                      |
+| 4    | Purple  | 135      | #9B59B6 | Fusão de 10 yellows                     |
+| 5    | Red     | 405      | #E74C3C | Fusão de 10 purples                     |
+| 6    | Crystal | 1215     | #00FFFF | Fusão de 10 reds                        |
 
 ### Propósito no Gameplay
+
 - **Sistema de progressão**: XP concede experiência para upgrades
 - **Feedback visual**: Animações de fusão criam satisfação imediata
 - **Recompensa por eficiência**: Jogadores habilidosos ganham mais XP agrupando orbs
@@ -31,22 +34,22 @@ Baseado em `XPOrbSystem.js` linhas 382-398, cada orb possui 17 campos que contro
 
 ### Campos Principais
 
-| Campo | Tipo | Descrição | Valor Padrão |
-|-------|------|-----------|---------------|
-| `id` | String | UUID único gerado por RandomService | - |
-| `x, y` | float | Posição 2D no mundo (plane XZ no Godot 3D) | - |
-| `value` | int | XP concedido ao ser coletado | 5 |
-| `class` | String | Classe visual ("blue", "green", etc.) | "blue" |
-| `tier` | int | Tier numérico (1-6) | 1 |
-| `collected` | bool | Flag de coleta (pendente remoção) | false |
-| `age` | float | Tempo de vida em segundos | 0.0 |
-| `isFusing` | bool | Em animação de fusão | false |
-| `fusionTimer` | float | Timer da animação (0 a duration) | 0.0 |
-| `pulsePhase` | float | Fase da animação de pulso (0-2π) | 0.0 |
-| `clusterId` | String/null | ID do cluster atual | null |
-| `source` | String | Origem ("drop" ou "fusion") | "drop" |
-| `pendingRemoval` | bool | Flag de remoção pendente | false |
-| `active` | bool | Orb ativo no jogo | false |
+| Campo            | Tipo        | Descrição                                  | Valor Padrão |
+| ---------------- | ----------- | ------------------------------------------ | ------------ |
+| `id`             | String      | UUID único gerado por RandomService        | -            |
+| `x, y`           | float       | Posição 2D no mundo (plane XZ no Godot 3D) | -            |
+| `value`          | int         | XP concedido ao ser coletado               | 5            |
+| `class`          | String      | Classe visual ("blue", "green", etc.)      | "blue"       |
+| `tier`           | int         | Tier numérico (1-6)                        | 1            |
+| `collected`      | bool        | Flag de coleta (pendente remoção)          | false        |
+| `age`            | float       | Tempo de vida em segundos                  | 0.0          |
+| `isFusing`       | bool        | Em animação de fusão                       | false        |
+| `fusionTimer`    | float       | Timer da animação (0 a duration)           | 0.0          |
+| `pulsePhase`     | float       | Fase da animação de pulso (0-2π)           | 0.0          |
+| `clusterId`      | String/null | ID do cluster atual                        | null         |
+| `source`         | String      | Origem ("drop" ou "fusion")                | "drop"       |
+| `pendingRemoval` | bool        | Flag de remoção pendente                   | false        |
+| `active`         | bool        | Orb ativo no jogo                          | false        |
 
 ### Mapeamento GDScript
 
@@ -70,6 +73,7 @@ var is_active: bool = false
 ```
 
 ### Notas de Implementação
+
 - **Posição 2D→3D**: Campos `x,y` mapeiam para `position.x,z` (Y=0 para plano)
 - **UUID**: Gerar via `RandomService` ou Godot's `UUIDTools`
 - **Pooling**: Campos `active` e `pendingRemoval` controlam lifecycle
@@ -80,6 +84,7 @@ var is_active: bool = false
 Algoritmo baseado em `XPOrbSystem.js` linhas 893-940 para detecção eficiente de vizinhos.
 
 ### Conceito
+
 - **Grid-based partitioning**: Divide espaço em células quadradas
 - **Cell size dinâmico**: `max(fusionDetectionRadius, 24)` pixels
 - **Separação por classe**: Orbs agrupados por classe ("blue", "green", etc.)
@@ -91,36 +96,37 @@ Algoritmo baseado em `XPOrbSystem.js` linhas 893-940 para detecção eficiente d
 func build_spatial_index() -> Dictionary:
     var index = {}
     var cell_size = max(fusion_detection_radius, 24.0)
-    
+
     for orb_class in ORB_CLASSES:
         var pool = orb_pools[orb_class]
         var active_orbs = pool.filter(func(o): return is_orb_active(o))
-        
+
         if active_orbs.is_empty():
             continue
-        
+
         var class_data = {
             "cell_size": cell_size,
             "cells": {},
             "orbs": active_orbs
         }
-        
+
         for orb in active_orbs:
             var cell_x = int(orb.position.x / cell_size)
             var cell_z = int(orb.position.z / cell_size)  # Z no Godot 3D
             var key = "%d:%d" % [cell_x, cell_z]
-            
+
             if not class_data.cells.has(key):
                 class_data.cells[key] = []
             class_data.cells[key].append(orb)
-        
+
         index[orb_class] = class_data
-    
+
     spatial_index_dirty = false
     return index
 ```
 
 ### Implementação Godot
+
 - **Dictionary como Map**: Equivalente ao `Map` do JavaScript
 - **Reconstrução lazy**: Só quando `spatial_index_dirty = true`
 - **Cell size configurável**: Baseado em raio de fusão
@@ -131,12 +137,14 @@ func build_spatial_index() -> Dictionary:
 Algoritmo baseado em `XPOrbSystem.js` linhas 942-1086 para atração ao jogador.
 
 ### Conceito
+
 - **Atração progressiva**: Orbs atraídos dentro de raio configurável (70px)
 - **Boost de proximidade**: Força aumenta quanto mais próximo do jogador
 - **Coleta automática**: Quando entra em raio de coleta (ship + orb + padding)
 - **Spatial queries**: Usa index para eficiência com centenas de orbs
 
 ### Parâmetros
+
 - `magnetismRadius`: Raio de atração (70px, upgradável)
 - `magnetismForce`: Força base (150)
 - `magnetismBoost`: Multiplicador de proximidade (2.2)
@@ -151,36 +159,36 @@ func update_ship_magnetism(delta: float) -> void:
     var magnetism_radius_sq = magnetism_radius * magnetism_radius
     var collection_radius = SHIP_SIZE + ORB_SIZE + (MIN_ORB_DISTANCE * COLLECTION_PADDING)
     var collection_radius_sq = collection_radius * collection_radius
-    
+
     var index = ensure_spatial_index()
     var cell_size = magnetism_radius  # Aproximação
     var search_range = int(ceil((magnetism_radius + MIN_ORB_DISTANCE) / cell_size))
     var center_cell_x = int(player_pos.x / cell_size)
     var center_cell_z = int(player_pos.z / cell_size)
-    
+
     for orb_class in index.keys():
         var class_data = index[orb_class]
-        
+
         for offset_x in range(-search_range, search_range + 1):
             for offset_z in range(-search_range, search_range + 1):
                 var key = "%d:%d" % [center_cell_x + offset_x, center_cell_z + offset_z]
                 if not class_data.cells.has(key):
                     continue
-                
+
                 var bucket = class_data.cells[key]
                 for orb in bucket:
                     if not is_orb_active(orb) or orb.is_fusing:
                         continue
-                    
+
                     var dx = player_pos.x - orb.position.x
                     var dz = player_pos.z - orb.position.z
                     var distance_sq = dx * dx + dz * dz
-                    
+
                     # Coleta imediata se muito próximo
                     if distance_sq <= collection_radius_sq:
                         collect_orb(orb)
                         continue
-                    
+
                     # Aplica magnetismo se dentro do raio
                     if distance_sq > 0 and distance_sq <= magnetism_radius_sq:
                         var distance = sqrt(distance_sq)
@@ -190,20 +198,21 @@ func update_ship_magnetism(delta: float) -> void:
                         var magnet_boost = 1.0 + proximity * MAGNETISM_BOOST
                         var speed = MAGNETISM_FORCE * magnet_boost
                         var step = speed * delta
-                        
+
                         orb.position.x += normalized_dx * step
                         orb.position.z += normalized_dz * step
-                        
+
                         # Verifica coleta após movimento
                         var post_dx = player_pos.x - orb.position.x
                         var post_dz = player_pos.z - orb.position.z
                         if post_dx * post_dx + post_dz * post_dz <= collection_radius_sq:
                             collect_orb(orb)
-    
+
     invalidate_spatial_index()
 ```
 
 ### Implementação Godot
+
 - **Area3D para coleta**: Signal `body_entered` detecta player
 - **Movimento manual**: Via `position.x/z` (sem física)
 - **Spatial queries customizadas**: Mais eficiente que `get_overlapping_bodies`
@@ -213,9 +222,10 @@ func update_ship_magnetism(delta: float) -> void:
 Algoritmo baseado em `XPOrbSystem.js` linhas 1088-1263 para agrupamento.
 
 ### Conceito
+
 - **3 zonas de spacing**: Baseadas em `minOrbDistance` (18px)
   - **Comfortable** (>1.12x min): Atração forte
-  - **Ideal** (0.95x-1.12x min): Atração suave  
+  - **Ideal** (0.95x-1.12x min): Atração suave
   - **Dense** (<0.75x min): Repulsão
 - **Forças proporcionais**: Closeness aumenta intensidade
 - **Movimento simétrico**: Ambos orbs se movem
@@ -224,26 +234,26 @@ Algoritmo baseado em `XPOrbSystem.js` linhas 1088-1263 para agrupamento.
 
 ```javascript
 XP_ORB_CLUSTER_CONFIG = {
-  radiusMultiplier: 1.55,           // Raio de clustering = minOrbDistance * 1.55
-  minRadius: 52,                    // Raio mínimo absoluto
-  forceMultiplier: 2.4,             // Multiplicador de força base
-  detectionRadiusFactor: 0.85,      // Fator para raio de detecção de fusão
-  detectionMinRadius: 48,           // Raio mínimo de detecção
-  comfortableSpacingFactor: 1.12,   // Zona comfortable
-  idealSpacingFactor: 0.95,         // Zona ideal
-  denseSpacingFactor: 0.75,         // Zona dense
-  comfortableForceBase: 0.5,        // Força base comfortable
-  comfortableForceCloseness: 1.5,   // Multiplicador de proximidade
-  comfortableForceOffset: 30,       // Offset de força
-  comfortableStepClamp: 0.9,        // Clamp de movimento
-  comfortableMovementFactor: 0.5,   // Fator de movimento
-  idealForceBase: 0.3,              // Força base ideal
+  radiusMultiplier: 1.55, // Raio de clustering = minOrbDistance * 1.55
+  minRadius: 52, // Raio mínimo absoluto
+  forceMultiplier: 2.4, // Multiplicador de força base
+  detectionRadiusFactor: 0.85, // Fator para raio de detecção de fusão
+  detectionMinRadius: 48, // Raio mínimo de detecção
+  comfortableSpacingFactor: 1.12, // Zona comfortable
+  idealSpacingFactor: 0.95, // Zona ideal
+  denseSpacingFactor: 0.75, // Zona dense
+  comfortableForceBase: 0.5, // Força base comfortable
+  comfortableForceCloseness: 1.5, // Multiplicador de proximidade
+  comfortableForceOffset: 30, // Offset de força
+  comfortableStepClamp: 0.9, // Clamp de movimento
+  comfortableMovementFactor: 0.5, // Fator de movimento
+  idealForceBase: 0.3, // Força base ideal
   idealForceCloseness: 1.1,
   idealForceOffset: 18,
   idealStepClamp: 0.6,
   idealMovementFactor: 0.5,
-  densePushFactor: 0.5              // Fator de repulsão dense
-}
+  densePushFactor: 0.5, // Fator de repulsão dense
+};
 ```
 
 ### Pseudocódigo GDScript
@@ -252,89 +262,90 @@ XP_ORB_CLUSTER_CONFIG = {
 func update_orb_clustering(delta: float) -> void:
     if orb_cluster_radius <= 0 or orb_cluster_force <= 0:
         return
-    
+
     var index = ensure_spatial_index()
     var cluster_radius_sq = orb_cluster_radius * orb_cluster_radius
     var comfortable_spacing = MIN_ORB_DISTANCE * COMFORTABLE_SPACING_FACTOR
     var ideal_spacing = MIN_ORB_DISTANCE * IDEAL_SPACING_FACTOR
     var dense_spacing = MIN_ORB_DISTANCE * DENSE_SPACING_FACTOR
-    
+
     for orb_class in index.keys():
         var class_data = index[orb_class]
         var orbs = class_data.orbs
         var cells = class_data.cells
         var cell_size = class_data.cell_size
-        
+
         if orbs.size() < 2:
             continue
-        
+
         for orb_a in orbs:
             if not is_orb_eligible_for_fusion(orb_a):
                 continue
-            
+
             var cell_x = int(orb_a.position.x / cell_size)
             var cell_z = int(orb_a.position.z / cell_size)
-            
+
             # Itera células vizinhas (3x3 grid)
             for offset_x in [-1, 0, 1]:
                 for offset_z in [-1, 0, 1]:
                     var key = "%d:%d" % [cell_x + offset_x, cell_z + offset_z]
                     if not cells.has(key):
                         continue
-                    
+
                     var neighbors = cells[key]
                     for orb_b in neighbors:
                         if orb_a == orb_b or not is_orb_eligible_for_fusion(orb_b):
                             continue
-                        
+
                         var dx = orb_b.position.x - orb_a.position.x
                         var dz = orb_b.position.z - orb_a.position.z
                         var distance_sq = dx * dx + dz * dz
-                        
+
                         if distance_sq <= 0 or distance_sq > cluster_radius_sq:
                             continue
-                        
+
                         var distance = sqrt(distance_sq)
                         var normalized_dx = dx / distance
                         var normalized_dz = dz / distance
                         var closeness = max(1.0 - distance / orb_cluster_radius, 0.0)
-                        
+
                         # ZONA COMFORTABLE: Atração forte
                         if distance > comfortable_spacing:
                             var base_strength = orb_cluster_force * (COMFORTABLE_FORCE_BASE + closeness * COMFORTABLE_FORCE_CLOSENESS) + COMFORTABLE_FORCE_OFFSET
                             var step = min(base_strength * delta, distance * COMFORTABLE_STEP_CLAMP)
                             var movement = step * COMFORTABLE_MOVEMENT_FACTOR
-                            
+
                             orb_a.position.x += normalized_dx * movement
                             orb_a.position.z += normalized_dz * movement
                             orb_b.position.x -= normalized_dx * movement
                             orb_b.position.z -= normalized_dz * movement
-                        
+
                         # ZONA IDEAL: Atração suave
                         elif distance > ideal_spacing:
                             var base_strength = orb_cluster_force * (IDEAL_FORCE_BASE + closeness * IDEAL_FORCE_CLOSENESS) + IDEAL_FORCE_OFFSET
                             var step = min(base_strength * delta, distance * IDEAL_STEP_CLAMP)
                             var movement = step * IDEAL_MOVEMENT_FACTOR
-                            
+
                             orb_a.position.x += normalized_dx * movement
                             orb_a.position.z += normalized_dz * movement
                             orb_b.position.x -= normalized_dx * movement
                             orb_b.position.z -= normalized_dz * movement
-                        
+
                         # ZONA DENSE: Repulsão
                         elif distance < dense_spacing:
                             var overlap = dense_spacing - distance
                             var push = overlap * DENSE_PUSH_FACTOR
-                            
+
                             orb_a.position.x -= normalized_dx * push
                             orb_a.position.z -= normalized_dz * push
                             orb_b.position.x += normalized_dx * push
                             orb_b.position.z += normalized_dz * push
-    
+
     invalidate_spatial_index()
 ```
 
 ### Implementação Godot
+
 - **Execução pós-magnetismo**: No update loop
 - **Movimento manual**: Sem física para orbs
 - **Invalidar index**: Após modificar posições
@@ -344,6 +355,7 @@ func update_orb_clustering(delta: float) -> void:
 Algoritmo baseado em `XPOrbSystem.js` linhas 1265-1397 usando connected components.
 
 ### Conceito
+
 - **Connected components**: DFS com stack encontra grupos conectados
 - **Para cada seed não visitado**: Inicia componente da mesma classe
 - **Adiciona vizinhos**: Dentro de `fusionDetectionRadius` (~48px)
@@ -355,61 +367,61 @@ Algoritmo baseado em `XPOrbSystem.js` linhas 1265-1397 usando connected componen
 func find_orb_clusters(orb_class: String, max_clusters: int = 1) -> Array:
     var index = ensure_spatial_index()
     var class_data = index.get(orb_class)
-    
+
     if not class_data or class_data.orbs.is_empty():
         return []
-    
+
     var candidates = class_data.orbs.filter(func(o): return is_orb_eligible_for_fusion(o))
     if candidates.size() < CLUSTER_FUSION_COUNT:
         return []
-    
+
     var cell_size = class_data.cell_size
     var cells = class_data.cells
     var detection_radius_sq = fusion_detection_radius * fusion_detection_radius
     var visited = {}
     var clusters = []
-    
+
     for seed in candidates:
         if visited.has(seed):
             continue
-        
+
         # DFS para encontrar componente conectado
         var stack = [seed]
         var component = []
         visited[seed] = true
-        
+
         while not stack.is_empty():
             var current = stack.pop_back()
             if not is_orb_eligible_for_fusion(current):
                 continue
-            
+
             component.append(current)
-            
+
             var cell_x = int(current.position.x / cell_size)
             var cell_z = int(current.position.z / cell_size)
-            
+
             # Itera células vizinhas (3x3 grid)
             for offset_x in [-1, 0, 1]:
                 for offset_z in [-1, 0, 1]:
                     var key = "%d:%d" % [cell_x + offset_x, cell_z + offset_z]
                     if not cells.has(key):
                         continue
-                    
+
                     var neighbors = cells[key]
                     for neighbor in neighbors:
                         if visited.has(neighbor) or not is_orb_eligible_for_fusion(neighbor):
                             continue
-                        
+
                         var dx = neighbor.position.x - current.position.x
                         var dz = neighbor.position.z - current.position.z
                         if dx * dx + dz * dz <= detection_radius_sq:
                             visited[neighbor] = true
                             stack.append(neighbor)
-        
+
         # Se componente tem orbs suficientes, cria cluster
         if component.size() < CLUSTER_FUSION_COUNT:
             continue
-        
+
         # Calcula centro do cluster
         var sum_x = 0.0
         var sum_z = 0.0
@@ -418,7 +430,7 @@ func find_orb_clusters(orb_class: String, max_clusters: int = 1) -> Array:
             sum_z += orb.position.z
         var center_x = sum_x / component.size()
         var center_z = sum_z / component.size()
-        
+
         # Ordena orbs por distância ao centro (mais próximos primeiro)
         var ordered = component.map(func(orb):
             var dx = orb.position.x - center_x
@@ -430,7 +442,7 @@ func find_orb_clusters(orb_class: String, max_clusters: int = 1) -> Array:
                 return b.age > a.age  # Mais velhos primeiro em caso de empate
             return a.distance_sq < b.distance_sq
         )
-        
+
         # Calcula raio do cluster (distância do orb mais distante)
         var radius_sq = 0.0
         var sample_count = min(ordered.size(), CLUSTER_FUSION_COUNT)
@@ -438,25 +450,26 @@ func find_orb_clusters(orb_class: String, max_clusters: int = 1) -> Array:
             var dist_sq = ordered[i].distance_sq
             if dist_sq > radius_sq:
                 radius_sq = dist_sq
-        
+
         clusters.append({
             "orbs": ordered.map(func(entry): return entry.orb),
             "center": Vector3(center_x, 0, center_z),
             "radius": sqrt(radius_sq),
             "size": component.size()
         })
-    
+
     # Ordena clusters por raio (menores primeiro) e depois por tamanho
     clusters.sort_custom(func(a, b):
         if a.radius == b.radius:
             return b.size > a.size
         return a.radius < b.radius
     )
-    
+
     return clusters.slice(0, max_clusters)
 ```
 
 ### Implementação Godot
+
 - **Execução periódica**: A cada `fusionCheckInterval` (0.3s)
 - **Dictionary para visited**: Set de visitados
 - **Retornar N clusters**: Padrão 1 por classe por check
@@ -466,11 +479,13 @@ func find_orb_clusters(orb_class: String, max_clusters: int = 1) -> Array:
 Algoritmo baseado em `XPOrbSystem.js` linhas 1399-1554.
 
 ### Conceito
+
 - **Fase 1 - Iniciação**: Seleciona 10 orbs, marca `isFusing`, cria animação
 - **Fase 2 - Animação**: Convergência para centro ao longo de 0.82s com easing cubic
 - **Fase 3 - Execução**: Remove orbs consumidos, spawna orb superior
 
 ### Parâmetros
+
 - `clusterFusionCount`: 10 orbs necessários
 - `fusionAnimationDuration`: 0.82s
 - `fusionCheckInterval`: 0.3s
@@ -481,7 +496,7 @@ Algoritmo baseado em `XPOrbSystem.js` linhas 1399-1554.
 func initiate_orb_fusion(orb_class: String, target_class: String, cluster: Dictionary, reason: String = "interval") -> bool:
     if not cluster or cluster.orbs.is_empty() or not target_class:
         return false
-    
+
     # Seleciona N orbs mais próximos do centro
     var selected = []
     for orb in cluster.orbs:
@@ -490,10 +505,10 @@ func initiate_orb_fusion(orb_class: String, target_class: String, cluster: Dicti
         selected.append(orb)
         if selected.size() >= CLUSTER_FUSION_COUNT:
             break
-    
+
     if selected.size() < CLUSTER_FUSION_COUNT:
         return false
-    
+
     # Cria animação
     var animation_id = generate_fusion_animation_id(orb_class)
     var animation = {
@@ -506,7 +521,7 @@ func initiate_orb_fusion(orb_class: String, target_class: String, cluster: Dicti
         "center": cluster.center,
         "orbs": []
     }
-    
+
     # Recalcula centro baseado nos orbs selecionados
     var sum_x = 0.0
     var sum_z = 0.0
@@ -520,7 +535,7 @@ func initiate_orb_fusion(orb_class: String, target_class: String, cluster: Dicti
         })
         sum_x += orb.position.x
         sum_z += orb.position.z
-    
+
     animation.center = Vector3(sum_x / selected.size(), 0, sum_z / selected.size())
     active_fusion_animations.append(animation)
     return true
@@ -535,18 +550,18 @@ func update_fusion_animations(delta: float) -> void:
         animation.elapsed += delta
         var progress = min(animation.elapsed / animation.duration, 1.0)
         var eased = ease_in_out_cubic(progress)  # Easing suave
-        
+
         var active_count = 0
         for entry in animation.orbs:
             var orb = entry.orb
             if not is_orb_active(orb):
                 continue
-            
+
             active_count += 1
             # Interpola posição (lerp)
             orb.position.x = lerp(entry.start_x, animation.center.x, eased)
             orb.position.z = lerp(entry.start_z, animation.center.z, eased)
-        
+
         # Cancela animação se orbs insuficientes
         if active_count < CLUSTER_FUSION_COUNT:
             active_fusion_animations.remove_at(i)
@@ -555,12 +570,12 @@ func update_fusion_animations(delta: float) -> void:
                     entry.orb.is_fusing = false
                     entry.orb.fusion_id = ""
             continue
-        
+
         # Executa fusão ao completar animação
         if progress >= 1.0:
             active_fusion_animations.remove_at(i)
             var orbs_to_fuse = animation.orbs.map(func(e): return e.orb).filter(func(o): return is_orb_active(o))
-            
+
             if orbs_to_fuse.size() >= CLUSTER_FUSION_COUNT:
                 fuse_orbs(animation.class, animation.target_class, orbs_to_fuse, animation.reason, {"center": animation.center})
             else:
@@ -583,7 +598,7 @@ func ease_in_out_cubic(t: float) -> float:
 func fuse_orbs(orb_class: String, target_class: String, orbs: Array, reason: String = "interval", options: Dictionary = {}) -> void:
     if orbs.is_empty():
         return
-    
+
     var valid_orbs = orbs.filter(func(o): return is_orb_active(o))
     if valid_orbs.size() < CLUSTER_FUSION_COUNT:
         # Cancela fusão
@@ -591,7 +606,7 @@ func fuse_orbs(orb_class: String, target_class: String, orbs: Array, reason: Str
             orb.is_fusing = false
             orb.fusion_id = ""
         return
-    
+
     # Calcula valor total e centro
     var total_value = 0
     var center_x = 0.0
@@ -603,14 +618,14 @@ func fuse_orbs(orb_class: String, target_class: String, orbs: Array, reason: Str
         orb.collected = true  # Marca para remoção
         orb.is_fusing = false
         orb.fusion_id = ""
-    
+
     if options.has("center"):
         center_x = options.center.x
         center_z = options.center.z
     else:
         center_x /= valid_orbs.size()
         center_z /= valid_orbs.size()
-    
+
     # Spawna orb do tier superior
     var target_config = get_orb_config(target_class)
     var fused_orb = create_xp_orb(Vector3(center_x, 0, center_z), total_value, {
@@ -619,7 +634,7 @@ func fuse_orbs(orb_class: String, target_class: String, orbs: Array, reason: Str
         "source": "fusion",
         "age": 0.0
     })
-    
+
     # Emite evento de fusão
     EventBus.emit_signal("xp_orb_fused", {
         "from_class": orb_class,
@@ -630,13 +645,14 @@ func fuse_orbs(orb_class: String, target_class: String, orbs: Array, reason: Str
         "tier": fused_orb.tier,
         "reason": reason
     })
-    
+
     # Enforce class limit (evita spam de orbs)
     enforce_class_limit(fused_orb.orb_class)
     invalidate_spatial_index()
 ```
 
 ### Implementação Godot
+
 - **Tween para animação**: Alternativa ao lerp manual
 - **Signal `xp_orb_fused`**: Para VFX (particles, flash, sound)
 - **Limitar por classe**: Máximo 100 orbs por classe
@@ -646,6 +662,7 @@ func fuse_orbs(orb_class: String, target_class: String, orbs: Array, reason: Str
 Algoritmo baseado em `XPOrbSystem.js` linhas 1774-1875.
 
 ### Conceito
+
 - **XP base**: Calculado por size, wave, level
 - **Distribuição**: Múltiplos orbs de tiers variados
 - **Scaling**: Wave aumenta XP (+10% por wave)
@@ -660,11 +677,11 @@ func calculate_base_xp(enemy_size: String, wave: int, player_level: int) -> int:
         "medium": 2.0,
         "small": 1.0
     }
-    
+
     var base = XP_ORB_BASE_VALUE * size_multiplier.get(enemy_size, 1.0)
     var wave_scaling = 1.0 + (wave - 1) * 0.1  # +10% por wave
     var level_scaling = 1.0 + player_level * 0.05  # +5% por level
-    
+
     return int(base * wave_scaling * level_scaling)
 ```
 
@@ -679,22 +696,22 @@ func build_orb_drop_plan(base_xp: int, variant: String = "common") -> Array:
         "crystal": 3.0
     }
     var total_xp = int(base_xp * variant_multipliers.get(variant, 1.0))
-    
+
     # Distribui XP em orbs (prioriza tiers maiores)
     var drops = []
     var remaining_xp = total_xp
-    
+
     # Tenta criar orbs de tiers maiores primeiro
     for tier in range(6, 0, -1):  # Crystal → Blue
         var orb_value = get_orb_value_for_tier(tier)
         while remaining_xp >= orb_value:
             drops.append({"tier": tier, "value": orb_value})
             remaining_xp -= orb_value
-    
+
     # XP residual vira orb blue
     if remaining_xp > 0:
         drops.append({"tier": 1, "value": remaining_xp})
-    
+
     return drops
 
 func get_orb_value_for_tier(tier: int) -> int:
@@ -707,12 +724,12 @@ func get_orb_value_for_tier(tier: int) -> int:
 ```gdscript
 func spawn_orb_drops(position: Vector3, drops: Array) -> void:
     var offsets = calculate_drop_offsets(drops.size())
-    
+
     for i in range(drops.size()):
         var drop = drops[i]
         var offset = offsets[i]
         var spawn_pos = position + offset
-        
+
         create_xp_orb(spawn_pos, drop.value, {
             "tier": drop.tier,
             "source": "drop"
@@ -721,11 +738,11 @@ func spawn_orb_drops(position: Vector3, drops: Array) -> void:
 func calculate_drop_offsets(count: int) -> Array:
     if count == 1:
         return [Vector3.ZERO]
-    
+
     var offsets = []
     var radius = 20.0  # Raio de dispersão
     var angle_step = TAU / count
-    
+
     for i in range(count):
         var angle = i * angle_step
         offsets.append(Vector3(
@@ -733,11 +750,12 @@ func calculate_drop_offsets(count: int) -> Array:
             0,
             sin(angle) * radius
         ))
-    
+
     return offsets
 ```
 
 ### Implementação Godot
+
 - **Chamar quando enemy morre**: `build_orb_drop_plan`
 - **Spawn com offset radial**: Para dispersão visual
 - **Impulso inicial opcional**: Movimento orgânico
@@ -747,6 +765,7 @@ func calculate_drop_offsets(count: int) -> Array:
 Sistema baseado em `XPOrbSystem.js` linhas 460-547, 1718-1773.
 
 ### Conceito
+
 - **Sprites cacheados**: Gradientes radiais offscreen
 - **Cores por tier**: Blue→Green→Yellow→Purple→Red→Crystal
 - **Glow radius**: Aumenta com tier
@@ -787,7 +806,7 @@ func _process(delta: float) -> void:
     pulse_phase += delta * 2.0  # 2 rad/s
     if pulse_phase > TAU:
         pulse_phase -= TAU
-    
+
     material.set_shader_parameter("pulse_phase", pulse_phase)
 ```
 
@@ -854,12 +873,12 @@ func _ready() -> void:
 func _process(delta: float) -> void:
     if not is_active or collected:
         return
-    
+
     age += delta
     pulse_phase += delta * 2.0
     if pulse_phase > TAU:
         pulse_phase -= TAU
-    
+
     var material = mesh_instance.get_surface_override_material(0)
     if material:
         material.set_shader_parameter("pulse_phase", pulse_phase)
@@ -871,7 +890,7 @@ func initialize(config: Dictionary) -> void:
     tier = config.get("tier", 1)
     source = config.get("source", "drop")
     is_active = true
-    
+
     # Aplica cores
     var colors = ORB_COLORS.get(tier, ORB_COLORS[1])
     var material = mesh_instance.get_surface_override_material(0)
@@ -920,7 +939,7 @@ func _process(delta: float) -> void:
 func spawn_orb_drop(position: Vector3, base_xp: int, variant: String = "common") -> void:
     var drops = build_orb_drop_plan(base_xp, variant)
     var offsets = calculate_drop_offsets(drops.size())
-    
+
     for i in range(drops.size()):
         var drop = drops[i]
         var offset = offsets[i]
@@ -931,28 +950,28 @@ func spawn_orb_drop(position: Vector3, base_xp: int, variant: String = "common")
 
 ## 11. Tabela de Parâmetros Configuráveis
 
-| Parâmetro | Valor Padrão | Descrição | Arquivo Origem |
-|-----------|--------------|-----------|----------------|
-| `XP_ORB_BASE_VALUE` | 5 | Valor base de XP (tier 1) | `gameplay.js:19` |
-| `XP_ORB_MAX_PER_CLASS` | 100 | Limite de orbs por classe | `gameplay.js:20` |
-| `XP_ORB_FUSION_CHECK_INTERVAL` | 0.3s | Intervalo entre checks de fusão | `gameplay.js:21` |
-| `XP_ORB_FUSION_ANIMATION_DURATION` | 0.82s | Duração da animação de fusão | `gameplay.js:22` |
-| `XP_ORB_MAGNETISM_BOOST` | 2.2 | Multiplicador de proximidade | `gameplay.js:23` |
-| `XP_ORB_COLLECTION_RADIUS_PADDING` | 0.1 | Padding do raio de coleta | `gameplay.js:24` |
-| `MAGNETISM_RADIUS` | 70px | Raio de atração ao player | `gameplay.js:10` |
-| `MAGNETISM_FORCE` | 120 | Força base de atração | `gameplay.js:11` |
-| `ORB_MAGNETISM_RADIUS` | 35px | Raio de magnetismo entre orbs | `gameplay.js:13` |
-| `ORB_MAGNETISM_FORCE` | 150 | Força de clustering | `gameplay.js:14` |
-| `MIN_ORB_DISTANCE` | 18px | Distância mínima entre orbs | `gameplay.js:15` |
-| `CLUSTER_FUSION_COUNT` | 10 | Orbs necessários para fusão | `gameplay.js:16` |
-| `radiusMultiplier` | 1.55 | Multiplicador de raio de cluster | `gameplay.js:26` |
-| `minRadius` | 52px | Raio mínimo de cluster | `gameplay.js:27` |
-| `forceMultiplier` | 2.4 | Multiplicador de força de cluster | `gameplay.js:28` |
-| `detectionRadiusFactor` | 0.85 | Fator de raio de detecção | `gameplay.js:29` |
-| `detectionMinRadius` | 48px | Raio mínimo de detecção | `gameplay.js:30` |
-| `comfortableSpacingFactor` | 1.12 | Fator de zona comfortable | `gameplay.js:31` |
-| `idealSpacingFactor` | 0.95 | Fator de zona ideal | `gameplay.js:32` |
-| `denseSpacingFactor` | 0.75 | Fator de zona dense | `gameplay.js:33` |
+| Parâmetro                          | Valor Padrão | Descrição                         | Arquivo Origem   |
+| ---------------------------------- | ------------ | --------------------------------- | ---------------- |
+| `XP_ORB_BASE_VALUE`                | 5            | Valor base de XP (tier 1)         | `gameplay.js:19` |
+| `XP_ORB_MAX_PER_CLASS`             | 100          | Limite de orbs por classe         | `gameplay.js:20` |
+| `XP_ORB_FUSION_CHECK_INTERVAL`     | 0.3s         | Intervalo entre checks de fusão   | `gameplay.js:21` |
+| `XP_ORB_FUSION_ANIMATION_DURATION` | 0.82s        | Duração da animação de fusão      | `gameplay.js:22` |
+| `XP_ORB_MAGNETISM_BOOST`           | 2.2          | Multiplicador de proximidade      | `gameplay.js:23` |
+| `XP_ORB_COLLECTION_RADIUS_PADDING` | 0.1          | Padding do raio de coleta         | `gameplay.js:24` |
+| `MAGNETISM_RADIUS`                 | 70px         | Raio de atração ao player         | `gameplay.js:10` |
+| `MAGNETISM_FORCE`                  | 120          | Força base de atração             | `gameplay.js:11` |
+| `ORB_MAGNETISM_RADIUS`             | 35px         | Raio de magnetismo entre orbs     | `gameplay.js:13` |
+| `ORB_MAGNETISM_FORCE`              | 150          | Força de clustering               | `gameplay.js:14` |
+| `MIN_ORB_DISTANCE`                 | 18px         | Distância mínima entre orbs       | `gameplay.js:15` |
+| `CLUSTER_FUSION_COUNT`             | 10           | Orbs necessários para fusão       | `gameplay.js:16` |
+| `radiusMultiplier`                 | 1.55         | Multiplicador de raio de cluster  | `gameplay.js:26` |
+| `minRadius`                        | 52px         | Raio mínimo de cluster            | `gameplay.js:27` |
+| `forceMultiplier`                  | 2.4          | Multiplicador de força de cluster | `gameplay.js:28` |
+| `detectionRadiusFactor`            | 0.85         | Fator de raio de detecção         | `gameplay.js:29` |
+| `detectionMinRadius`               | 48px         | Raio mínimo de detecção           | `gameplay.js:30` |
+| `comfortableSpacingFactor`         | 1.12         | Fator de zona comfortable         | `gameplay.js:31` |
+| `idealSpacingFactor`               | 0.95         | Fator de zona ideal               | `gameplay.js:32` |
+| `denseSpacingFactor`               | 0.75         | Fator de zona dense               | `gameplay.js:33` |
 
 ## 12. Diagramas de Fluxo
 

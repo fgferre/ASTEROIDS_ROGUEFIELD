@@ -1,7 +1,11 @@
 import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as CONSTANTS from '../../../src/core/GameConstants.js';
 import { GamePools } from '../../../src/core/GamePools.js';
-import { setupGlobalMocks, cleanupGlobalState, withWaveOverrides } from '../../__helpers__/setup.js';
+import {
+  setupGlobalMocks,
+  cleanupGlobalState,
+  withWaveOverrides,
+} from '../../__helpers__/setup.js';
 import {
   createEnemySystemHarness,
   simulateWave,
@@ -31,9 +35,7 @@ describe('Asteroid Metrics - Feature Flags', () => {
   test('legacy system remains functional when flag is forced off', async () => {
     expect(CONSTANTS.USE_WAVE_MANAGER).toBe(true);
 
-    const legacySpies = [
-      vi.spyOn(harness.enemySystem, 'updateWaveLogic'),
-    ];
+    const legacySpies = [vi.spyOn(harness.enemySystem, 'updateWaveLogic')];
     const waveManagerSpies = [
       vi.spyOn(harness.enemySystem, 'updateWaveManagerLogic'),
     ];
@@ -70,14 +72,12 @@ describe('Asteroid Metrics - Feature Flags', () => {
   test('EnemySystem gracefully handles missing WaveManager', async () => {
     const originalDescriptor = Object.getOwnPropertyDescriptor(
       CONSTANTS,
-      'USE_WAVE_MANAGER',
+      'USE_WAVE_MANAGER'
     );
     const originalWaveManager = harness.enemySystem.waveManager;
 
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const legacySpies = [
-      vi.spyOn(harness.enemySystem, 'updateWaveLogic'),
-    ];
+    const legacySpies = [vi.spyOn(harness.enemySystem, 'updateWaveLogic')];
     if (harness.enemySystem.updateSystem) {
       legacySpies.push(
         vi.spyOn(harness.enemySystem.updateSystem, 'updateWaveLogic')
@@ -103,13 +103,17 @@ describe('Asteroid Metrics - Feature Flags', () => {
         expect(legacyCalled).toBe(true);
 
         const warningEmitted = warnSpy.mock.calls.some(([message]) =>
-          String(message).includes('WaveManager indisponível'),
+          String(message).includes('WaveManager indisponível')
         );
         expect(warningEmitted).toBe(true);
       });
     } finally {
       if (originalDescriptor && originalDescriptor.configurable) {
-        Object.defineProperty(CONSTANTS, 'USE_WAVE_MANAGER', originalDescriptor);
+        Object.defineProperty(
+          CONSTANTS,
+          'USE_WAVE_MANAGER',
+          originalDescriptor
+        );
       }
 
       harness.enemySystem.waveManager = originalWaveManager;
@@ -146,92 +150,103 @@ describe('Asteroid Metrics - Feature Flags', () => {
     try {
       const { enemySystem } = harness;
 
-        enemySystem.sessionActive = true;
-        enemySystem.waveState = enemySystem.createInitialWaveState();
-        enemySystem.waveState.current = 0;
-        enemySystem.waveState.isActive = false;
-        enemySystem.waveState.breakTimer = 0;
-        enemySystem.waveState.totalAsteroids = 0;
-        enemySystem.waveState.asteroidsSpawned = 0;
-        enemySystem.waveState.asteroidsKilled = 0;
-        enemySystem.waveState.completedWaves = 0;
-        enemySystem.waveState.initialSpawnDone = false;
-        enemySystem.spawnTimer = 0;
+      enemySystem.sessionActive = true;
+      enemySystem.waveState = enemySystem.createInitialWaveState();
+      enemySystem.waveState.current = 0;
+      enemySystem.waveState.isActive = false;
+      enemySystem.waveState.breakTimer = 0;
+      enemySystem.waveState.totalAsteroids = 0;
+      enemySystem.waveState.asteroidsSpawned = 0;
+      enemySystem.waveState.asteroidsKilled = 0;
+      enemySystem.waveState.completedWaves = 0;
+      enemySystem.waveState.initialSpawnDone = false;
+      enemySystem.spawnTimer = 0;
 
-        enemySystem.update(0);
+      enemySystem.update(0);
 
-        expect(enemySystem.waveManager).toBeTruthy();
+      expect(enemySystem.waveManager).toBeTruthy();
 
-        if (!enemySystem.waveManager.waveInProgress) {
-          const started = enemySystem.waveManager.startNextWave();
-          expect(started).toBe(true);
+      if (!enemySystem.waveManager.waveInProgress) {
+        const started = enemySystem.waveManager.startNextWave();
+        expect(started).toBe(true);
+      }
+
+      enemySystem.update(0);
+
+      const currentWave = enemySystem.waveManager.currentWave;
+      expect(currentWave).toBeGreaterThan(0);
+
+      enemySystem.waveState.current = currentWave;
+      enemySystem.waveState.isActive = true;
+      enemySystem.waveState.breakTimer = 0;
+      enemySystem.waveState.totalAsteroids = 0;
+      enemySystem.waveState.asteroidsSpawned = 0;
+      enemySystem.waveState.asteroidsKilled = 0;
+
+      const spawnedAsteroids = [];
+      const spawnTarget = 4;
+
+      for (let index = 0; index < spawnTarget; index += 1) {
+        const asteroid = enemySystem.spawnAsteroid();
+        if (asteroid) {
+          spawnedAsteroids.push(asteroid);
         }
+      }
 
-        enemySystem.update(0);
+      expect(spawnedAsteroids.length).toBe(spawnTarget);
+      expect(enemySystem.waveManager.totalEnemiesThisWave).toBe(
+        spawnedAsteroids.length
+      );
+      expect(enemySystem.waveManager.enemiesSpawnedThisWave).toBe(
+        spawnedAsteroids.length
+      );
 
-        const currentWave = enemySystem.waveManager.currentWave;
-        expect(currentWave).toBeGreaterThan(0);
+      enemySystem.waveState.totalAsteroids = spawnTarget;
+      expect(enemySystem.waveManager.enemiesKilledThisWave).toBe(0);
 
-        enemySystem.waveState.current = currentWave;
-        enemySystem.waveState.isActive = true;
-        enemySystem.waveState.breakTimer = 0;
-        enemySystem.waveState.totalAsteroids = 0;
-        enemySystem.waveState.asteroidsSpawned = 0;
-        enemySystem.waveState.asteroidsKilled = 0;
+      spawnedAsteroids.forEach((asteroid) => {
+        enemySystem.destroyAsteroid(asteroid, { createFragments: false });
+      });
 
-        const spawnedAsteroids = [];
-        const spawnTarget = 4;
+      expect(enemySystem.waveManager.enemiesKilledThisWave).toBe(
+        spawnedAsteroids.length
+      );
 
-        for (let index = 0; index < spawnTarget; index += 1) {
-          const asteroid = enemySystem.spawnAsteroid();
-          if (asteroid) {
-            spawnedAsteroids.push(asteroid);
-          }
-        }
+      const maxSettlingIterations = 50;
+      let iterations = 0;
+      while (
+        enemySystem.waveState.isActive &&
+        iterations < maxSettlingIterations
+      ) {
+        enemySystem.update(0.5);
+        iterations += 1;
+      }
 
-        expect(spawnedAsteroids.length).toBe(spawnTarget);
-        expect(enemySystem.waveManager.totalEnemiesThisWave).toBe(spawnedAsteroids.length);
-        expect(enemySystem.waveManager.enemiesSpawnedThisWave).toBe(spawnedAsteroids.length);
+      enemySystem.update(0);
 
-        enemySystem.waveState.totalAsteroids = spawnTarget;
-        expect(enemySystem.waveManager.enemiesKilledThisWave).toBe(0);
+      expect(emitSpy).toHaveBeenCalled();
+      const completionPayload = await waitForWaveComplete;
 
-        spawnedAsteroids.forEach((asteroid) => {
-          enemySystem.destroyAsteroid(asteroid, { createFragments: false });
-        });
+      enemySystem.update(0);
 
-        expect(enemySystem.waveManager.enemiesKilledThisWave).toBe(spawnedAsteroids.length);
+      expect(completionPayload?.wave).toBe(
+        enemySystem.waveState.completedWaves
+      );
 
-        const maxSettlingIterations = 50;
-        let iterations = 0;
-        while (enemySystem.waveState.isActive && iterations < maxSettlingIterations) {
-          enemySystem.update(0.5);
-          iterations += 1;
-        }
+      const waveCompleteEmits = emitSpy.mock.calls.filter(
+        ([eventName]) => eventName === 'wave-complete'
+      );
+      expect(waveCompleteEmits.length).toBeGreaterThan(0);
+      const waveCompletedEmits = emitSpy.mock.calls.filter(
+        ([eventName]) => eventName === 'wave-completed'
+      );
+      expect(waveCompletedEmits.length).toBe(0);
 
-        enemySystem.update(0);
-
-        expect(emitSpy).toHaveBeenCalled();
-        const completionPayload = await waitForWaveComplete;
-
-        enemySystem.update(0);
-
-        expect(completionPayload?.wave).toBe(enemySystem.waveState.completedWaves);
-
-        const waveCompleteEmits = emitSpy.mock.calls.filter(
-          ([eventName]) => eventName === 'wave-complete',
-        );
-        expect(waveCompleteEmits.length).toBeGreaterThan(0);
-        const waveCompletedEmits = emitSpy.mock.calls.filter(
-          ([eventName]) => eventName === 'wave-completed',
-        );
-        expect(waveCompletedEmits.length).toBe(0);
-
-        expect(enemySystem.getActiveEnemyCount()).toBe(0);
-        expect(enemySystem.waveState.isActive).toBe(false);
-        expect(enemySystem.waveState.breakTimer).toBe(CONSTANTS.WAVE_BREAK_TIME);
-        expect(enemySystem.waveState.completedWaves).toBe(1);
-        expect(legacyListener).not.toHaveBeenCalled();
+      expect(enemySystem.getActiveEnemyCount()).toBe(0);
+      expect(enemySystem.waveState.isActive).toBe(false);
+      expect(enemySystem.waveState.breakTimer).toBe(CONSTANTS.WAVE_BREAK_TIME);
+      expect(enemySystem.waveState.completedWaves).toBe(1);
+      expect(legacyListener).not.toHaveBeenCalled();
     } finally {
       eventBus.off('wave-completed', legacyListener);
       emitSpy.mockRestore();
@@ -269,7 +284,9 @@ describe('Asteroid Metrics - Feature Flags', () => {
       expect(syncedState.current).toBe(stubState.currentWave);
       expect(syncedState.isActive).toBe(stubState.inProgress);
 
-      const managerHandlesSpawn = Boolean(CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN);
+      const managerHandlesSpawn = Boolean(
+        CONSTANTS.WAVEMANAGER_HANDLES_ASTEROID_SPAWN
+      );
 
       if (managerHandlesSpawn) {
         expect(syncedState.asteroidsSpawned).toBe(stubState.spawned);

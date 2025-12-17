@@ -6,7 +6,7 @@ export function bootstrapServices({
   seed,
   randomOverrides,
   logger = console,
-  adapter = null
+  adapter = null,
 } = {}) {
   if (!container) {
     throw new Error('[bootstrapServices] DI container instance is required');
@@ -37,7 +37,9 @@ export function bootstrapServices({
         adapter.syncInstance(entry.name, instance);
       }
     } catch (error) {
-      throw new Error(`Failed to bootstrap service '${entry.name}': ${error.message}`);
+      throw new Error(
+        `Failed to bootstrap service '${entry.name}': ${error.message}`
+      );
     }
   });
 
@@ -47,7 +49,7 @@ export function bootstrapServices({
       Object.entries(resolvedServices).map(([name, instance]) => ({
         name,
         type: instance?.constructor?.name || typeof instance,
-        hasReset: typeof instance?.reset === 'function'
+        hasReset: typeof instance?.reset === 'function',
       }))
     );
     logger.groupEnd();
@@ -55,6 +57,6 @@ export function bootstrapServices({
 
   return {
     manifest,
-    services: resolvedServices
+    services: resolvedServices,
   };
 }

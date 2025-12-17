@@ -1,8 +1,14 @@
 import { DRONE_COMPONENTS, DRONE_CONFIG } from '../../../data/enemies/drone.js';
-import { GAME_WIDTH, GAME_HEIGHT, ENEMY_EFFECT_COLORS, ENEMY_RENDER_PRESETS } from '../../../core/GameConstants.js';
+import {
+  GAME_WIDTH,
+  GAME_HEIGHT,
+  ENEMY_EFFECT_COLORS,
+  ENEMY_RENDER_PRESETS,
+} from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
+import { NeonGraphics } from '../../../utils/NeonGraphics.js';
 
 const DRONE_DEFAULTS = DRONE_CONFIG ?? {};
 
@@ -46,8 +52,10 @@ export class Drone extends BaseEnemy {
     if (componentConfig) {
       this.weaponState = this.weaponState || {};
       this.movementStrategy = componentConfig?.movement?.strategy || 'tracking';
-      this.renderStrategy = componentConfig?.render?.strategy || 'procedural-triangle';
-      this.weaponPattern = componentConfig?.weapon?.pattern || this.weaponPattern;
+      this.renderStrategy =
+        componentConfig?.render?.strategy || 'procedural-triangle';
+      this.weaponPattern =
+        componentConfig?.weapon?.pattern || this.weaponPattern;
     }
 
     this.radius = config.radius ?? DRONE_DEFAULTS.radius ?? 12;
@@ -169,7 +177,9 @@ export class Drone extends BaseEnemy {
 
     if (!this.useComponents || !this.components?.size) {
       // Fallback: Basic tracking movement and firing (for testing)
-      const player = this.system?.getCachedPlayer?.() || this.system?.getPlayerPositionSnapshot?.();
+      const player =
+        this.system?.getCachedPlayer?.() ||
+        this.system?.getPlayerPositionSnapshot?.();
 
       if (player && player.position) {
         const dx = player.position.x - this.x;
@@ -198,7 +208,10 @@ export class Drone extends BaseEnemy {
         this.fireTimer = (this.fireTimer || 0) + deltaTime;
         const interval = this.fireInterval || 2;
 
-        if (this.fireTimer >= interval && distance <= (this.targetingRange || 460)) {
+        if (
+          this.fireTimer >= interval &&
+          distance <= (this.targetingRange || 460)
+        ) {
           this.fireTimer = 0;
 
           const angle = Math.atan2(dy, dx);
@@ -223,15 +236,40 @@ export class Drone extends BaseEnemy {
     super.onDestroyed(source);
   }
 
+  draw(ctx) {
+    if (!ctx) return;
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.rotation);
+
+    // Triangle shape for Drone
+    const path = new Path2D();
+    const r = this.radius;
+    path.moveTo(r, 0);
+    path.lineTo(-r * 0.6, r * 0.7);
+    path.lineTo(-r * 0.6, -r * 0.7);
+    path.closePath();
+
+    // Neon Cyan
+    NeonGraphics.drawShape(ctx, path, '#00FFFF', 2.0);
+
+    ctx.restore();
+  }
+
   onDraw(ctx) {
     if (!this.useComponents || !this.components?.size) {
       // Fallback: Generate payload without components (for testing)
       const speed = Math.hypot(this.vx || 0, this.vy || 0);
-      const targetSpeedRatio = Math.min(1, speed / Math.max(1, this.maxSpeed || 180));
+      const targetSpeedRatio = Math.min(
+        1,
+        speed / Math.max(1, this.maxSpeed || 180)
+      );
       const smoothing = ENEMY_RENDER_PRESETS.drone?.exhaust?.smoothing ?? 0.15;
 
       this._renderThrust = this._renderThrust ?? 0;
-      this._renderThrust = this._renderThrust + (targetSpeedRatio - this._renderThrust) * smoothing;
+      this._renderThrust =
+        this._renderThrust +
+        (targetSpeedRatio - this._renderThrust) * smoothing;
 
       return {
         type: 'drone',

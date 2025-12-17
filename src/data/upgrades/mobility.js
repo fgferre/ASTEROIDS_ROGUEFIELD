@@ -20,7 +20,8 @@ export const MOBILITY_UPGRADES = deepFreeze([
       levels: [
         {
           title: 'Bicos Otimizados',
-          description: 'Aumenta aceleração em +12% e velocidade máxima em +10%.',
+          description:
+            'Aumenta aceleração em +12% e velocidade máxima em +10%.',
           highlights: ['Resposta ligeiramente mais rápida aos comandos.'],
         },
         {
@@ -57,7 +58,7 @@ export const MOBILITY_UPGRADES = deepFreeze([
           {
             type: 'event',
             event: 'upgrade-speed-boost',
-            payload: { multiplier: 1.10 },
+            payload: { multiplier: 1.1 },
           },
           {
             type: 'event',
@@ -336,7 +337,8 @@ export const MOBILITY_UPGRADES = deepFreeze([
         },
         {
           title: 'Retroimpulsores',
-          description: 'Amortecimento linear +60%. Reversões quase instantâneas.',
+          description:
+            'Amortecimento linear +60%. Reversões quase instantâneas.',
           highlights: [
             'Paradas muito rápidas. Ideal para combate corpo-a-corpo.',
           ],

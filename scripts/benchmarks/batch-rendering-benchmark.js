@@ -15,8 +15,8 @@ const TEST_CONFIG = {
     light: { bullets: 50, particles: 100, enemies: 20 },
     medium: { bullets: 150, particles: 300, enemies: 50 },
     heavy: { bullets: 300, particles: 600, enemies: 100 },
-    stress: { bullets: 500, particles: 1000, enemies: 200 }
-  }
+    stress: { bullets: 500, particles: 1000, enemies: 200 },
+  },
 };
 
 // Mock objects for testing
@@ -26,7 +26,7 @@ function createMockBullet(x, y) {
     y: y || Math.random() * TEST_CONFIG.CANVAS_HEIGHT,
     radius: 2 + Math.random() * 3,
     color: '#FFFFFF',
-    glow: '#FFFF00'
+    glow: '#FFFF00',
   };
 }
 
@@ -36,7 +36,7 @@ function createMockParticle(x, y) {
     y: y || Math.random() * TEST_CONFIG.CANVAS_HEIGHT,
     radius: 1 + Math.random() * 2,
     color: `hsl(${Math.random() * 60 + 20}, 70%, 60%)`,
-    alpha: 0.4 + Math.random() * 0.6
+    alpha: 0.4 + Math.random() * 0.6,
   };
 }
 
@@ -46,7 +46,7 @@ function createMockEnemy(x, y) {
     y: y || Math.random() * TEST_CONFIG.CANVAS_HEIGHT,
     radius: 8 + Math.random() * 12,
     color: '#FF4444',
-    strokeColor: '#FF0000'
+    strokeColor: '#FF0000',
   };
 }
 
@@ -55,8 +55,12 @@ function renderLegacyBullets(ctx, bullets) {
   for (const bullet of bullets) {
     // Glow
     const gradient = ctx.createRadialGradient(
-      bullet.x, bullet.y, 0,
-      bullet.x, bullet.y, bullet.radius * 3
+      bullet.x,
+      bullet.y,
+      0,
+      bullet.x,
+      bullet.y,
+      bullet.radius * 3
     );
     gradient.addColorStop(0, bullet.glow);
     gradient.addColorStop(1, 'rgba(255, 255, 0, 0)');
@@ -136,7 +140,7 @@ class PerformanceMeasurer {
       p95: sorted[Math.floor(sorted.length * 0.95)],
       p99: sorted[Math.floor(sorted.length * 0.99)],
       fps: 1000 / (sum / this.measurements.length),
-      count: this.measurements.length
+      count: this.measurements.length,
     };
   }
 }
@@ -156,7 +160,9 @@ async function runBenchmark() {
   let RenderBatch, CanvasStateManager, GradientCache;
   try {
     const renderBatchModule = await import('../../src/core/RenderBatch.js');
-    const stateManagerModule = await import('../../src/core/CanvasStateManager.js');
+    const stateManagerModule = await import(
+      '../../src/core/CanvasStateManager.js'
+    );
     const gradientCacheModule = await import('../../src/core/GradientCache.js');
 
     RenderBatch = renderBatchModule.default;
@@ -180,12 +186,20 @@ async function runBenchmark() {
   // Test each scenario
   for (const [scenarioName, config] of Object.entries(TEST_CONFIG.SCENARIOS)) {
     console.log(`\n📊 Testing scenario: ${scenarioName.toUpperCase()}`);
-    console.log(`   Bullets: ${config.bullets}, Particles: ${config.particles}, Enemies: ${config.enemies}`);
+    console.log(
+      `   Bullets: ${config.bullets}, Particles: ${config.particles}, Enemies: ${config.enemies}`
+    );
 
     // Generate test data
-    const bullets = Array.from({ length: config.bullets }, () => createMockBullet());
-    const particles = Array.from({ length: config.particles }, () => createMockParticle());
-    const enemies = Array.from({ length: config.enemies }, () => createMockEnemy());
+    const bullets = Array.from({ length: config.bullets }, () =>
+      createMockBullet()
+    );
+    const particles = Array.from({ length: config.particles }, () =>
+      createMockParticle()
+    );
+    const enemies = Array.from({ length: config.enemies }, () =>
+      createMockEnemy()
+    );
 
     // Test legacy rendering
     console.log('   🐌 Testing legacy rendering...');
@@ -195,7 +209,10 @@ async function runBenchmark() {
     let frameCount = 0;
     const legacyStartTime = performance.now();
 
-    while (performance.now() - legacyStartTime < TEST_CONFIG.TEST_DURATION / 2 && frameCount < TEST_CONFIG.FRAME_SAMPLE_SIZE) {
+    while (
+      performance.now() - legacyStartTime < TEST_CONFIG.TEST_DURATION / 2 &&
+      frameCount < TEST_CONFIG.FRAME_SAMPLE_SIZE
+    ) {
       const frameStart = performance.now();
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -217,7 +234,10 @@ async function runBenchmark() {
     frameCount = 0;
     const optimizedStartTime = performance.now();
 
-    while (performance.now() - optimizedStartTime < TEST_CONFIG.TEST_DURATION / 2 && frameCount < TEST_CONFIG.FRAME_SAMPLE_SIZE) {
+    while (
+      performance.now() - optimizedStartTime < TEST_CONFIG.TEST_DURATION / 2 &&
+      frameCount < TEST_CONFIG.FRAME_SAMPLE_SIZE
+    ) {
       const frameStart = performance.now();
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -231,13 +251,24 @@ async function runBenchmark() {
 
       renderBatch.beginBatch('particles', { globalAlpha: 0.8 });
       for (const particle of particles) {
-        renderBatch.addCircle(particle.x, particle.y, particle.radius, particle.color);
+        renderBatch.addCircle(
+          particle.x,
+          particle.y,
+          particle.radius,
+          particle.color
+        );
       }
       renderBatch.flushBatch(ctx);
 
       renderBatch.beginBatch('enemies', { lineWidth: 2 });
       for (const enemy of enemies) {
-        renderBatch.addCircle(enemy.x, enemy.y, enemy.radius, enemy.color, enemy.strokeColor);
+        renderBatch.addCircle(
+          enemy.x,
+          enemy.y,
+          enemy.radius,
+          enemy.color,
+          enemy.strokeColor
+        );
       }
       renderBatch.flushBatch(ctx);
 
@@ -249,21 +280,36 @@ async function runBenchmark() {
 
     // Calculate improvements
     const improvement = {
-      frameTime: ((legacyStats.avg - optimizedStats.avg) / legacyStats.avg * 100).toFixed(1),
-      fps: ((optimizedStats.fps - legacyStats.fps) / legacyStats.fps * 100).toFixed(1),
-      p95: ((legacyStats.p95 - optimizedStats.p95) / legacyStats.p95 * 100).toFixed(1)
+      frameTime: (
+        ((legacyStats.avg - optimizedStats.avg) / legacyStats.avg) *
+        100
+      ).toFixed(1),
+      fps: (
+        ((optimizedStats.fps - legacyStats.fps) / legacyStats.fps) *
+        100
+      ).toFixed(1),
+      p95: (
+        ((legacyStats.p95 - optimizedStats.p95) / legacyStats.p95) *
+        100
+      ).toFixed(1),
     };
 
     results[scenarioName] = {
       legacy: legacyStats,
       optimized: optimizedStats,
-      improvement
+      improvement,
     };
 
     console.log(`   📈 Results:`);
-    console.log(`      Legacy:    ${legacyStats.avg.toFixed(2)}ms avg, ${legacyStats.fps.toFixed(1)} FPS`);
-    console.log(`      Optimized: ${optimizedStats.avg.toFixed(2)}ms avg, ${optimizedStats.fps.toFixed(1)} FPS`);
-    console.log(`      📊 Improvement: ${improvement.frameTime}% faster, ${improvement.fps}% FPS increase`);
+    console.log(
+      `      Legacy:    ${legacyStats.avg.toFixed(2)}ms avg, ${legacyStats.fps.toFixed(1)} FPS`
+    );
+    console.log(
+      `      Optimized: ${optimizedStats.avg.toFixed(2)}ms avg, ${optimizedStats.fps.toFixed(1)} FPS`
+    );
+    console.log(
+      `      📊 Improvement: ${improvement.frameTime}% faster, ${improvement.fps}% FPS increase`
+    );
   }
 
   // Final summary
@@ -278,7 +324,9 @@ async function runBenchmark() {
     totalImprovement += frameTimeImprovement;
     scenarioCount++;
 
-    console.log(`${scenario.toUpperCase()}: ${data.improvement.frameTime}% faster (${data.optimized.fps.toFixed(1)} FPS)`);
+    console.log(
+      `${scenario.toUpperCase()}: ${data.improvement.frameTime}% faster (${data.optimized.fps.toFixed(1)} FPS)`
+    );
   }
 
   const avgImprovement = totalImprovement / scenarioCount;
@@ -286,7 +334,9 @@ async function runBenchmark() {
 
   // Check if we met our target
   const targetMet = avgImprovement >= 30;
-  console.log(`🎯 TARGET (30%+ improvement): ${targetMet ? '✅ ACHIEVED' : '❌ NOT MET'}`);
+  console.log(
+    `🎯 TARGET (30%+ improvement): ${targetMet ? '✅ ACHIEVED' : '❌ NOT MET'}`
+  );
 
   // Get detailed stats from optimization systems
   console.log('\n📊 OPTIMIZATION SYSTEM STATS');
@@ -307,8 +357,8 @@ async function runBenchmark() {
     systemStats: {
       batch: batchStats,
       state: stateStats,
-      gradient: gradientStats
-    }
+      gradient: gradientStats,
+    },
   };
 }
 
@@ -327,6 +377,6 @@ if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     runBenchmark,
     TEST_CONFIG,
-    PerformanceMeasurer
+    PerformanceMeasurer,
   };
 }

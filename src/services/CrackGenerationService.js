@@ -199,8 +199,8 @@ class CrackGenerationService {
       typeof context?.rng === 'function'
         ? context.rng
         : typeof context?.seededRandom === 'function'
-        ? context.seededRandom
-        : null;
+          ? context.seededRandom
+          : null;
 
     const baseSeed = Number.isFinite(context?.randomSeed)
       ? context.randomSeed
@@ -220,13 +220,9 @@ class CrackGenerationService {
         baseGraphRules.continuationBias ??
         0.82,
       newRootChance:
-        profileGraphRules.newRootChance ??
-        baseGraphRules.newRootChance ??
-        0.2,
+        profileGraphRules.newRootChance ?? baseGraphRules.newRootChance ?? 0.2,
       childPenalty:
-        profileGraphRules.childPenalty ??
-        baseGraphRules.childPenalty ??
-        0.45,
+        profileGraphRules.childPenalty ?? baseGraphRules.childPenalty ?? 0.45,
       branchParentPenalty:
         profileGraphRules.branchParentPenalty ??
         baseGraphRules.branchParentPenalty ??
@@ -242,9 +238,7 @@ class CrackGenerationService {
           0.12
       ),
       surfaceMargin:
-        profileGraphRules.surfaceMargin ??
-        baseGraphRules.surfaceMargin ??
-        0.65,
+        profileGraphRules.surfaceMargin ?? baseGraphRules.surfaceMargin ?? 0.65,
       branchAnchorJitter:
         profileGraphRules.branchAnchorJitter ??
         baseGraphRules.branchAnchorJitter ??
@@ -306,35 +300,32 @@ class CrackGenerationService {
     const countMainSegments = (list) =>
       list.filter(
         (segment) =>
-          segment &&
-          (segment.type === 'trunk' || segment.type === 'extension')
+          segment && (segment.type === 'trunk' || segment.type === 'extension')
       ).length;
 
-    for (let stageIndex = 0; stageIndex < stageTemplates.length; stageIndex += 1) {
+    for (
+      let stageIndex = 0;
+      stageIndex < stageTemplates.length;
+      stageIndex += 1
+    ) {
       const stageNumber = stageIndex + 1;
       const template = stageTemplates[stageIndex] || {};
 
-      const widthRange =
-        template.lineWidthRange ||
-        profile?.lineWidthRange ||
-        [0.8, 1.25];
+      const widthRange = template.lineWidthRange ||
+        profile?.lineWidthRange || [0.8, 1.25];
       const angularJitter = template.angularJitter ?? 0.25;
       const mainCountTarget = Math.max(
         1,
         Math.round(
-          template.mainRays ??
-            (stageIndex === 0 ? 3 : trunkRecords.length || 3)
+          template.mainRays ?? (stageIndex === 0 ? 3 : trunkRecords.length || 3)
         )
       );
-      const startRadiusRange =
-        template.startRadiusRange ||
-        profile?.startRadiusRange ||
-        [0.2, 0.32];
+      const startRadiusRange = template.startRadiusRange ||
+        profile?.startRadiusRange || [0.2, 0.32];
       const mainLengthRange = template.mainLengthRange || [0.5, 0.7];
 
       const stageRotation =
-        baseRotation +
-        (seededRandom() - 0.5) * 2 * rotationJitter;
+        baseRotation + (seededRandom() - 0.5) * 2 * rotationJitter;
 
       const stageSegments = [];
 
@@ -413,12 +404,8 @@ class CrackGenerationService {
       const createRootSegment = () => {
         const baseAngle =
           stageRotation +
-          (trunkRecords.length / Math.max(1, mainCountTarget)) *
-            Math.PI *
-            2;
-        const angle =
-          baseAngle +
-          (seededRandom() - 0.5) * 2 * angularJitter;
+          (trunkRecords.length / Math.max(1, mainCountTarget)) * Math.PI * 2;
+        const angle = baseAngle + (seededRandom() - 0.5) * 2 * angularJitter;
 
         let maxReach = measureSurface(0, 0, angle);
         if (maxReach <= minSegmentLength * 1.1) {
@@ -487,10 +474,12 @@ class CrackGenerationService {
         }
 
         const lastSegment = trunk.segment;
-        const baseAngle = lastSegment.angle ?? Math.atan2(
-          lastSegment.y2 - lastSegment.y1,
-          lastSegment.x2 - lastSegment.x1
-        );
+        const baseAngle =
+          lastSegment.angle ??
+          Math.atan2(
+            lastSegment.y2 - lastSegment.y1,
+            lastSegment.x2 - lastSegment.x1
+          );
 
         const continuationCount = trunk.continuation || 0;
         let angle =
@@ -510,11 +499,7 @@ class CrackGenerationService {
           trunk.maxReach,
           lastSegment.length * (0.7 + seededRandom() * 0.5)
         );
-        let length = clamp(
-          desiredLength,
-          minSegmentLength * 0.7,
-          maxReach
-        );
+        let length = clamp(desiredLength, minSegmentLength * 0.7, maxReach);
         if (length < minSegmentLength * 0.6) {
           trunk.exhausted = true;
           return null;
@@ -610,10 +595,9 @@ class CrackGenerationService {
           return null;
         }
 
-        const baseAngle = parent.angle ?? Math.atan2(
-          parent.y2 - parent.y1,
-          parent.x2 - parent.x1
-        );
+        const baseAngle =
+          parent.angle ??
+          Math.atan2(parent.y2 - parent.y1, parent.x2 - parent.x1);
         const spread = config.spread ?? (isMicro ? 0.45 : 0.32);
         const offset = (seededRandom() - 0.5) * 2 * spread;
 
@@ -635,12 +619,9 @@ class CrackGenerationService {
           return null;
         }
 
-        const lengthFactor =
-          config.lengthMultiplier ?? (isMicro ? 0.28 : 0.5);
+        const lengthFactor = config.lengthMultiplier ?? (isMicro ? 0.28 : 0.5);
         const desiredLength =
-          parent.length *
-          lengthFactor *
-          (0.7 + seededRandom() * 0.5);
+          parent.length * lengthFactor * (0.7 + seededRandom() * 0.5);
         const minLength = minSegmentLength * (isMicro ? 0.55 : 0.8);
         const maxLength = Math.max(
           minSegmentLength * (isMicro ? 0.9 : 1.1),
@@ -685,10 +666,7 @@ class CrackGenerationService {
         let producedMain = countMainSegments(stageSegments);
         let guard = 0;
 
-        while (
-          producedMain < mainCountTarget &&
-          guard < mainCountTarget * 4
-        ) {
+        while (producedMain < mainCountTarget && guard < mainCountTarget * 4) {
           guard += 1;
           const viableTrunks = trunkRecords.filter((trunk) => !trunk.exhausted);
           const preferContinuation =
@@ -724,10 +702,7 @@ class CrackGenerationService {
       if (branchCount > 0) {
         let created = 0;
         let attempts = 0;
-        while (
-          created < branchCount &&
-          attempts < branchCount * 5
-        ) {
+        while (created < branchCount && attempts < branchCount * 5) {
           attempts += 1;
           if (createBranchSegment(branchConfig, false)) {
             created += 1;
@@ -741,10 +716,7 @@ class CrackGenerationService {
       if (microCount > 0) {
         let created = 0;
         let attempts = 0;
-        while (
-          created < microCount &&
-          attempts < microCount * 5
-        ) {
+        while (created < microCount && attempts < microCount * 5) {
           attempts += 1;
           if (createBranchSegment(microConfig, true)) {
             created += 1;
@@ -798,8 +770,7 @@ class CrackGenerationService {
         id: template.id || `${profile.key}-stage-${stageNumber}`,
         intensity: template.intensity ?? stageNumber,
         burst: {
-          cracks:
-            burstConfig.cracks ?? Math.max(stageSegments.length, 4),
+          cracks: burstConfig.cracks ?? Math.max(stageSegments.length, 4),
           sparks:
             burstConfig.sparks ??
             Math.ceil(Math.max(stageSegments.length, 1) / 3),
@@ -821,4 +792,3 @@ class CrackGenerationService {
 }
 
 export default CrackGenerationService;
-

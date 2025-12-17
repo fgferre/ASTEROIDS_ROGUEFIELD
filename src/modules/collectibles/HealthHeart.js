@@ -14,8 +14,7 @@ export class HealthHeart {
     this.x = x;
     this.y = y;
     this.radius = 14;
-    this.random =
-      random && typeof random.range === 'function' ? random : null;
+    this.random = random && typeof random.range === 'function' ? random : null;
     this.pulsePhase = this.resolvePulsePhase(pulsePhase);
     this.collected = false;
     this.lifetime = 0;

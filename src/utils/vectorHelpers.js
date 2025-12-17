@@ -27,7 +27,7 @@ export function normalize(vx, vy) {
   return {
     x: vx / len,
     y: vy / len,
-    length: len
+    length: len,
   };
 }
 

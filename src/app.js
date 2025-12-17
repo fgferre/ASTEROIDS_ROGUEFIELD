@@ -15,11 +15,14 @@ import { PerformanceMonitor } from './utils/PerformanceMonitor.js';
 import { bootstrapServices } from './bootstrap/bootstrapServices.js';
 import {
   DEFAULT_POOL_CONFIG,
-  DEFAULT_GC_OPTIONS
+  DEFAULT_GC_OPTIONS,
 } from './bootstrap/serviceManifest.js';
 import { installMathRandomGuard } from './utils/dev/mathRandomGuard.js';
 import GameSessionService from './services/GameSessionService.js';
-import { GameDebugLogger, isDevEnvironment } from './utils/dev/GameDebugLogger.js';
+import {
+  GameDebugLogger,
+  isDevEnvironment,
+} from './utils/dev/GameDebugLogger.js';
 
 // Dependency Injection System (Phase 2.1)
 import { DIContainer } from './core/DIContainer.js';
@@ -63,7 +66,7 @@ let servicesCache = {
   healthHearts: null,
   progression: null,
   world: null,
-  ui: null
+  ui: null,
 };
 let servicesCacheInitialized = false;
 let stateDirty = false;
@@ -80,20 +83,25 @@ function logServiceRegistrationFlow({ reason = 'bootstrap' } = {}) {
   }
 
   const legacyHas =
-    typeof gameServices !== 'undefined' && typeof gameServices.has === 'function'
+    typeof gameServices !== 'undefined' &&
+    typeof gameServices.has === 'function'
       ? (name) => gameServices.has(name)
       : () => false;
 
   const serviceSnapshot = diContainer.getServiceNames().map((name) => ({
     service: name,
-    placeholder: typeof diContainer.has === 'function' ? diContainer.has(name) : false,
+    placeholder:
+      typeof diContainer.has === 'function' ? diContainer.has(name) : false,
     legacyRegistered: legacyHas(name),
-    diSingleton: typeof diContainer.isInstantiated === 'function'
-      ? diContainer.isInstantiated(name)
-      : false,
+    diSingleton:
+      typeof diContainer.isInstantiated === 'function'
+        ? diContainer.isInstantiated(name)
+        : false,
   }));
 
-  const shouldLog = typeof console !== 'undefined' && typeof console.groupCollapsed === 'function';
+  const shouldLog =
+    typeof console !== 'undefined' &&
+    typeof console.groupCollapsed === 'function';
 
   if (!shouldLog) {
     return;
@@ -114,7 +122,9 @@ function logServiceRegistrationFlow({ reason = 'bootstrap' } = {}) {
     console.table(serviceSnapshot);
   } else {
     serviceSnapshot.forEach((row) => {
-      console.log(` - ${row.service}: placeholder=${row.placeholder}, legacy=${row.legacyRegistered}, singleton=${row.diSingleton}`);
+      console.log(
+        ` - ${row.service}: placeholder=${row.placeholder}, legacy=${row.legacyRegistered}, singleton=${row.diSingleton}`
+      );
     });
   }
 
@@ -134,14 +144,38 @@ function exposeDebugCommands({ showBanner = false } = {}) {
   }
 
   if (showBanner && !debugBannerPrinted) {
-    console.log('%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'color: #00ff00');
-    console.log('%c🎮 ASTEROIDS ROGUEFIELD - Debug Mode Active', 'color: #00ff00; font-weight: bold; font-size: 14px');
-    console.log('%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'color: #00ff00');
+    console.log(
+      '%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      'color: #00ff00'
+    );
+    console.log(
+      '%c🎮 ASTEROIDS ROGUEFIELD - Debug Mode Active',
+      'color: #00ff00; font-weight: bold; font-size: 14px'
+    );
+    console.log(
+      '%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      'color: #00ff00'
+    );
     console.log('%cDebug Commands:', 'color: #ffff00; font-weight: bold');
-    console.log('%c  downloadDebugLog()  %c- Download game-debug.log file', 'color: #00ff00', 'color: #ffffff');
-    console.log('%c  showDebugLog()      %c- Show log in console', 'color: #00ff00', 'color: #ffffff');
-    console.log('%c  clearDebugLog()     %c- Clear current log', 'color: #00ff00', 'color: #ffffff');
-    console.log('%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'color: #00ff00');
+    console.log(
+      '%c  downloadDebugLog()  %c- Download game-debug.log file',
+      'color: #00ff00',
+      'color: #ffffff'
+    );
+    console.log(
+      '%c  showDebugLog()      %c- Show log in console',
+      'color: #00ff00',
+      'color: #ffffff'
+    );
+    console.log(
+      '%c  clearDebugLog()     %c- Clear current log',
+      'color: #00ff00',
+      'color: #ffffff'
+    );
+    console.log(
+      '%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+      'color: #00ff00'
+    );
     debugBannerPrinted = true;
   }
 }
@@ -166,20 +200,27 @@ function initializeDependencyInjection(manifestContext) {
       legacyLocatorSnapshot = legacyLocator;
 
       try {
-        const legacyEntries = legacyLocator?.services instanceof Map
-          ? Array.from(legacyLocator.services.entries())
-          : [];
+        const legacyEntries =
+          legacyLocator?.services instanceof Map
+            ? Array.from(legacyLocator.services.entries())
+            : [];
 
         legacyEntries.forEach(([name, instance]) => {
           if (!name) return;
           try {
             diContainer.syncInstance(name, instance);
           } catch (syncError) {
-            console.warn(`[App] Failed to sync legacy service '${name}' to DIContainer:`, syncError);
+            console.warn(
+              `[App] Failed to sync legacy service '${name}' to DIContainer:`,
+              syncError
+            );
           }
         });
       } catch (syncError) {
-        console.warn('[App] Could not synchronize existing legacy services:', syncError);
+        console.warn(
+          '[App] Could not synchronize existing legacy services:',
+          syncError
+        );
       }
 
       // Preserve legacy locator for reference
@@ -210,16 +251,24 @@ function initializeDependencyInjection(manifestContext) {
       // Enable auto-logging every 10 seconds
       performanceMonitor.enableAutoLog(10000);
 
-      console.log('[App] ℹ Performance monitor available: window.performanceMonitor');
-      console.log('[App] ℹ DIContainer available: window.gameServices, window.diContainer');
+      console.log(
+        '[App] ℹ Performance monitor available: window.performanceMonitor'
+      );
+      console.log(
+        '[App] ℹ DIContainer available: window.gameServices, window.diContainer'
+      );
       console.log('[App] ℹ Auto-logging enabled (logs saved to localStorage)');
       console.log('[App] ℹ Get logs: localStorage.getItem("performanceLog")');
       exposeDebugCommands({ showBanner: true });
     }
 
     console.log('[App] ✓ DI system initialized successfully');
-    console.log(`[App] ✓ ${diContainer.getServiceNames().length} services registered`);
-    console.log('[App] ℹ DIContainer serves as unified service registry (factory + legacy)');
+    console.log(
+      `[App] ✓ ${diContainer.getServiceNames().length} services registered`
+    );
+    console.log(
+      '[App] ℹ DIContainer serves as unified service registry (factory + legacy)'
+    );
 
     if (!DEV_MODE) {
       logServiceRegistrationFlow({ reason: 'production snapshot' });
@@ -267,7 +316,8 @@ function init() {
       throw new Error('Contexto 2D não disponível');
     }
 
-    const { seed: initialSeed, source: seedSource } = GameSessionService.deriveInitialSeed();
+    const { seed: initialSeed, source: seedSource } =
+      GameSessionService.deriveInitialSeed();
     const seedInfo = { seed: initialSeed, source: seedSource };
     gameState.randomSeed = initialSeed;
     gameState.randomSeedSource = seedSource;
@@ -275,12 +325,15 @@ function init() {
     const manifestContext = {
       gameState,
       poolConfig: Object.fromEntries(
-        Object.entries(DEFAULT_POOL_CONFIG).map(([key, value]) => [key, { ...value }])
+        Object.entries(DEFAULT_POOL_CONFIG).map(([key, value]) => [
+          key,
+          { ...value },
+        ])
       ),
       garbageCollectorOptions: { ...DEFAULT_GC_OPTIONS },
       seed: initialSeed,
       randomSeed: initialSeed,
-      randomSeedSource: seedSource
+      randomSeedSource: seedSource,
     };
 
     if (DEV_MODE) {
@@ -309,7 +362,7 @@ function init() {
         globalThis.gameServices = {
           get: () => null,
           register: () => {},
-          has: () => false
+          has: () => false,
         };
       }
 
@@ -319,7 +372,7 @@ function init() {
     const { services } = bootstrapServices({
       container: diContainer,
       manifestContext,
-      adapter: diContainer
+      adapter: diContainer,
     });
 
     // Store services for use in game loop
@@ -328,42 +381,65 @@ function init() {
     // Validate that all required services exist (DEV_MODE only)
     if (DEV_MODE) {
       const requiredServices = [
-        'input', 'player', 'enemies', 'physics', 'combat',
-        'xp-orbs', 'healthHearts', 'progression', 'world', 'ui',
-        'effects', 'renderer'
+        'input',
+        'player',
+        'enemies',
+        'physics',
+        'combat',
+        'xp-orbs',
+        'healthHearts',
+        'progression',
+        'world',
+        'ui',
+        'effects',
+        'renderer',
       ];
-      const missingServices = requiredServices.filter(name => !gameSystemServices[name]);
+      const missingServices = requiredServices.filter(
+        (name) => !gameSystemServices[name]
+      );
       if (missingServices.length > 0) {
         console.warn('[App] ⚠️ Missing required services:', missingServices);
       }
     }
 
-    garbageCollectionManager = services['garbage-collector'] || garbageCollectionManager;
+    garbageCollectionManager =
+      services['garbage-collector'] || garbageCollectionManager;
 
     let resolvedGameSession = null;
     if (diContainer && typeof diContainer.resolve === 'function') {
       try {
         resolvedGameSession = diContainer.resolve('game-session');
       } catch (error) {
-        console.warn('[App] Failed to resolve GameSessionService from DI:', error);
+        console.warn(
+          '[App] Failed to resolve GameSessionService from DI:',
+          error
+        );
       }
     }
 
-    gameSessionService = resolvedGameSession || services['game-session'] || null;
+    gameSessionService =
+      resolvedGameSession || services['game-session'] || null;
 
-    if (gameSessionService && typeof gameSessionService.initialize === 'function') {
+    if (
+      gameSessionService &&
+      typeof gameSessionService.initialize === 'function'
+    ) {
       gameSessionService.initialize({
         canvas: gameState.canvas,
         ctx: gameState.ctx,
-        seedInfo
+        seedInfo,
       });
     }
 
     const bootRandom =
-      gameSessionService?.prepareRandomForScope?.('bootstrap', { mode: 'reset' }) || null;
+      gameSessionService?.prepareRandomForScope?.('bootstrap', {
+        mode: 'reset',
+      }) || null;
 
     if (!bootRandom) {
-      console.warn('[Random] GameSessionService could not prepare bootstrap scope deterministically.');
+      console.warn(
+        '[Random] GameSessionService could not prepare bootstrap scope deterministically.'
+      );
       if (!gameSessionService) {
         GameSessionService.persistLastSeed(seedInfo.seed, seedInfo.source);
       }
@@ -443,7 +519,10 @@ function init() {
           });
         }
       } catch (error) {
-        console.warn('[App] Failed to register cache invalidation listeners:', error);
+        console.warn(
+          '[App] Failed to register cache invalidation listeners:',
+          error
+        );
       }
     }
 
@@ -468,7 +547,7 @@ function gameLoop(currentTime) {
 
     // OPTIMIZATION #3: Lazy State Sync - only sync when necessary
     if (session && typeof session.synchronizeLegacyState === 'function') {
-      const shouldSync = stateDirty || (currentTime - lastSyncTime) > 100;
+      const shouldSync = stateDirty || currentTime - lastSyncTime > 100;
       if (shouldSync) {
         try {
           session.synchronizeLegacyState();
@@ -480,12 +559,18 @@ function gameLoop(currentTime) {
       }
     } else if (session) {
       try {
-        const screen = typeof session.getScreen === 'function' ? session.getScreen() : undefined;
+        const screen =
+          typeof session.getScreen === 'function'
+            ? session.getScreen()
+            : undefined;
         if (typeof screen === 'string') {
           gameState.screen = screen;
         }
 
-        const paused = typeof session.isPaused === 'function' ? session.isPaused() : undefined;
+        const paused =
+          typeof session.isPaused === 'function'
+            ? session.isPaused()
+            : undefined;
         if (typeof paused === 'boolean') {
           gameState.isPaused = paused;
         }
@@ -504,8 +589,14 @@ function gameLoop(currentTime) {
             }
           }
 
-          const screen = typeof session.getScreen === 'function' ? session.getScreen() : gameState.screen;
-          const paused = typeof session.isPaused === 'function' ? session.isPaused() : gameState.isPaused;
+          const screen =
+            typeof session.getScreen === 'function'
+              ? session.getScreen()
+              : gameState.screen;
+          const paused =
+            typeof session.isPaused === 'function'
+              ? session.isPaused()
+              : gameState.isPaused;
           return screen === 'playing' && !paused;
         } catch (stateError) {
           console.warn('[App] Failed to evaluate session state:', stateError);
@@ -517,7 +608,10 @@ function gameLoop(currentTime) {
 
     // Update object pools (always, for TTL and auto-management)
     GamePools.update(deltaTime);
-    if (garbageCollectionManager && typeof garbageCollectionManager.update === 'function') {
+    if (
+      garbageCollectionManager &&
+      typeof garbageCollectionManager.update === 'function'
+    ) {
       garbageCollectionManager.update(deltaTime);
     }
 
@@ -583,25 +677,46 @@ function updateGame(deltaTime) {
   if (servicesCache.input && typeof servicesCache.input.update === 'function') {
     servicesCache.input.update(deltaTime);
   }
-  if (servicesCache.player && typeof servicesCache.player.update === 'function') {
+  if (
+    servicesCache.player &&
+    typeof servicesCache.player.update === 'function'
+  ) {
     servicesCache.player.update(deltaTime);
   }
-  if (servicesCache.enemies && typeof servicesCache.enemies.update === 'function') {
+  if (
+    servicesCache.enemies &&
+    typeof servicesCache.enemies.update === 'function'
+  ) {
     servicesCache.enemies.update(deltaTime);
   }
-  if (servicesCache.physics && typeof servicesCache.physics.update === 'function') {
+  if (
+    servicesCache.physics &&
+    typeof servicesCache.physics.update === 'function'
+  ) {
     servicesCache.physics.update(deltaTime);
   }
-  if (servicesCache.combat && typeof servicesCache.combat.update === 'function') {
+  if (
+    servicesCache.combat &&
+    typeof servicesCache.combat.update === 'function'
+  ) {
     servicesCache.combat.update(deltaTime);
   }
-  if (servicesCache['xp-orbs'] && typeof servicesCache['xp-orbs'].update === 'function') {
+  if (
+    servicesCache['xp-orbs'] &&
+    typeof servicesCache['xp-orbs'].update === 'function'
+  ) {
     servicesCache['xp-orbs'].update(deltaTime);
   }
-  if (servicesCache.healthHearts && typeof servicesCache.healthHearts.update === 'function') {
+  if (
+    servicesCache.healthHearts &&
+    typeof servicesCache.healthHearts.update === 'function'
+  ) {
     servicesCache.healthHearts.update(deltaTime);
   }
-  if (servicesCache.progression && typeof servicesCache.progression.update === 'function') {
+  if (
+    servicesCache.progression &&
+    typeof servicesCache.progression.update === 'function'
+  ) {
     servicesCache.progression.update(deltaTime);
   }
   if (servicesCache.world && typeof servicesCache.world.update === 'function') {

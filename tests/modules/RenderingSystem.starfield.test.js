@@ -18,38 +18,44 @@ describe('RenderingSystem starfield determinism', () => {
   // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/setup.js)
   // Optimization: it.concurrent (tests are independent)
 
-  it.concurrent('restores identical star layout after reseed with the same base seed', () => {
-    const baseRandom = new RandomService('rendering:test-seed');
-    const renderer = new RenderingSystem({ random: baseRandom });
+  it.concurrent(
+    'restores identical star layout after reseed with the same base seed',
+    () => {
+      const baseRandom = new RandomService('rendering:test-seed');
+      const renderer = new RenderingSystem({ random: baseRandom });
 
-    renderer.spaceSky.resize(640, 480);
-    const initialLayout = captureStarfieldLayout(renderer.spaceSky);
+      renderer.spaceSky.resize(640, 480);
+      const initialLayout = captureStarfieldLayout(renderer.spaceSky);
 
-    // Advance the starfield RNG to alter the layout
-    renderer.randomForks.starfield.float();
-    renderer.spaceSky.reseed(renderer.randomForks.starfield);
-    const mutatedLayout = captureStarfieldLayout(renderer.spaceSky);
-    expect(mutatedLayout).not.toEqual(initialLayout);
+      // Advance the starfield RNG to alter the layout
+      renderer.randomForks.starfield.float();
+      renderer.spaceSky.reseed(renderer.randomForks.starfield);
+      const mutatedLayout = captureStarfieldLayout(renderer.spaceSky);
+      expect(mutatedLayout).not.toEqual(initialLayout);
 
-    baseRandom.reset('rendering:test-seed');
-    renderer.reseedRandomForks();
-    renderer.spaceSky.reseed(renderer.randomForks.starfield);
-    const restoredLayout = captureStarfieldLayout(renderer.spaceSky);
+      baseRandom.reset('rendering:test-seed');
+      renderer.reseedRandomForks();
+      renderer.spaceSky.reseed(renderer.randomForks.starfield);
+      const restoredLayout = captureStarfieldLayout(renderer.spaceSky);
 
-    expect(restoredLayout).toEqual(initialLayout);
-  });
+      expect(restoredLayout).toEqual(initialLayout);
+    }
+  );
 
-  it.concurrent('uses deterministic fallback random scopes when no dependency is provided', () => {
-    const fixedRandom = new RandomService('starfield-fallback-test');
-    const firstRenderer = new RenderingSystem({ random: fixedRandom });
-    firstRenderer.spaceSky.resize(640, 480);
-    const firstLayout = captureStarfieldLayout(firstRenderer.spaceSky);
+  it.concurrent(
+    'uses deterministic fallback random scopes when no dependency is provided',
+    () => {
+      const fixedRandom = new RandomService('starfield-fallback-test');
+      const firstRenderer = new RenderingSystem({ random: fixedRandom });
+      firstRenderer.spaceSky.resize(640, 480);
+      const firstLayout = captureStarfieldLayout(firstRenderer.spaceSky);
 
-    fixedRandom.reset('starfield-fallback-test');
-    const secondRenderer = new RenderingSystem({ random: fixedRandom });
-    secondRenderer.spaceSky.resize(640, 480);
-    const secondLayout = captureStarfieldLayout(secondRenderer.spaceSky);
+      fixedRandom.reset('starfield-fallback-test');
+      const secondRenderer = new RenderingSystem({ random: fixedRandom });
+      secondRenderer.spaceSky.resize(640, 480);
+      const secondLayout = captureStarfieldLayout(secondRenderer.spaceSky);
 
-    expect(secondLayout).toEqual(firstLayout);
-  });
+      expect(secondLayout).toEqual(firstLayout);
+    }
+  );
 });

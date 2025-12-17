@@ -1,6 +1,7 @@
 # Source Code Overview
 
 ## Directory Structure
+
 - `/core`: Infrastructure (EventBus, DIContainer, GameConstants, RandomService, pools)
 - `/bootstrap`: Service manifest and initialization
 - `/modules`: Game systems (EnemySystem, PlayerSystem, CombatSystem, etc.)
@@ -12,7 +13,9 @@
 - `app.js`: Main orchestrator and game loop
 
 ## HTML Structure
+
 `index.html` defines:
+
 - Menu screen with background canvas
 - Level-up screen for upgrade selection
 - Pause screen with resume/settings/quit options
@@ -25,7 +28,9 @@
 **Global script loading (line 313):** `EventBus.js` is loaded as a module before `app.js` to ensure availability throughout the application. DIContainer is instantiated directly in `app.js` (see line 175).
 
 ## CSS Architecture
+
 `style.css` uses:
+
 - **Design tokens:** CSS custom properties in `:root` for colors, spacing, typography, and timing
 - **Component-based classes:** `.menu-screen`, `.levelup-content`, `.pause-content`, `.settings-container`, `.hud`, etc.
 - **Utility classes:** `.hidden`, `.screen`, `.btn`, `.btn--primary`, `.btn--secondary`, `.btn--outline`

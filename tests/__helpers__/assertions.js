@@ -12,7 +12,9 @@ import { expect } from 'vitest';
  */
 export function expectDeterministicSequence(seq1, seq2, tolerance = 0.000001) {
   if (seq1.length !== seq2.length) {
-    throw new Error(`Sequences differ in length: ${seq1.length} !== ${seq2.length}`);
+    throw new Error(
+      `Sequences differ in length: ${seq1.length} !== ${seq2.length}`
+    );
   }
 
   seq1.forEach((value, index) => {
@@ -20,7 +22,9 @@ export function expectDeterministicSequence(seq1, seq2, tolerance = 0.000001) {
     try {
       expectWithinTolerance(value, expected, tolerance);
     } catch (error) {
-      throw new Error(`Sequence mismatch at index ${index}: ${value} !== ${expected}. ${(error && error.message) || ''}`);
+      throw new Error(
+        `Sequence mismatch at index ${index}: ${value} !== ${expected}. ${(error && error.message) || ''}`
+      );
     }
   });
 }

@@ -20,7 +20,9 @@ describe('AudioCache deterministic noise buffers', () => {
     audioCache.clearCache('noise');
 
     const createSnapshotAndBuffer = () => {
-      const buffer = audioCache.getNoiseBuffer(0.05, true, 'exponential', { family: 'test' });
+      const buffer = audioCache.getNoiseBuffer(0.05, true, 'exponential', {
+        family: 'test',
+      });
       const clone = new Float32Array(buffer.getChannelData(0));
       const snapshot = audioCache.captureNoiseSeeds();
       return { snapshot, clone };
@@ -28,7 +30,7 @@ describe('AudioCache deterministic noise buffers', () => {
 
     const firstRun = createSnapshotAndBuffer();
 
-    const runWithReset = previousSnapshot => {
+    const runWithReset = (previousSnapshot) => {
       audioCache.clearCache('noise');
       baseRandom.reset('audio-cache:test-seed');
       audioCache.reseedNoiseGenerators(previousSnapshot);

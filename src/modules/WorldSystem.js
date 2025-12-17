@@ -55,10 +55,7 @@ class WorldSystem extends BaseSystem {
 
     const physics = this.physics;
 
-    if (
-      physics &&
-      typeof physics.processPlayerCollisions === 'function'
-    ) {
+    if (physics && typeof physics.processPlayerCollisions === 'function') {
       const collisionSummary = physics.processPlayerCollisions(player, enemies);
       if (collisionSummary?.playerDied) {
         this.handlePlayerDeath();
@@ -96,17 +93,15 @@ class WorldSystem extends BaseSystem {
     if (
       physics &&
       typeof physics.handlePlayerAsteroidCollision === 'function' &&
-      (
-        typeof enemies.getActiveEnemies === 'function' ||
-        typeof enemies.getAsteroids === 'function'
-      )
+      (typeof enemies.getActiveEnemies === 'function' ||
+        typeof enemies.getAsteroids === 'function')
     ) {
       const asteroids =
         typeof enemies.getActiveEnemies === 'function'
           ? enemies.getActiveEnemies()
           : typeof enemies.getAsteroids === 'function'
-          ? enemies.getAsteroids()
-          : [];
+            ? enemies.getAsteroids()
+            : [];
       if (Array.isArray(asteroids)) {
         for (let i = 0; i < asteroids.length; i += 1) {
           if (!this.playerAlive) {
@@ -139,9 +134,12 @@ class WorldSystem extends BaseSystem {
     const enemies = this.enemies;
 
     // Get player position BEFORE marking as dead
-    const playerPosition = player && typeof player.getPosition === 'function'
-      ? player.getPosition()
-      : (player ? player.position : { x: 960, y: 540 }); // Fallback to center
+    const playerPosition =
+      player && typeof player.getPosition === 'function'
+        ? player.getPosition()
+        : player
+          ? player.position
+          : { x: 960, y: 540 }; // Fallback to center
 
     // Mark player as dead (but keep game running)
     if (player && typeof player.markDead === 'function') {

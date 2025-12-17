@@ -1,11 +1,13 @@
 # Ideal Structure Proposal
 
 ## 1. Visão Geral
+
 - Inspirações diretas: Brotato (Godot), Vampire Survivors (Unity) e padrões gerais de jogos bullet-heaven.
 - Princípios: separação clara entre engine, gameplay e dados; componentes reutilizáveis; configuração orientada a dados; expansão segura de conteúdo.
 - Objetivo: permitir adicionar inimigos, armas e mapas criando configurações, sem tocar em sistemas monolíticos.
 
 ## 2. Estrutura de Diretórios Proposta
+
 ```
 src/
 ├── engine/
@@ -95,12 +97,14 @@ src/
 ```
 
 ## 3. Separação Engine/Game/Data
+
 - **Engine**: serviços e sistemas genéricos reutilizáveis em qualquer jogo (eventos, DI, física, render, áudio, input, pooling).
 - **Game**: lógica específica deste título (sistemas de gameplay, entidades base, inimigos concretos).
 - **Data**: configurações data-driven (inimigos, armas, upgrades, waves, constantes, layout de UI).
 - Benefícios: engine pode virar biblioteca independente; game foca em regras de gameplay; dados podem ser mantidos por game designers.
 
 ## 4. Sistema de Componentes Reutilizáveis
+
 - **MovementComponent**: estratégias (`linear`, `tracking`, `patrol`, `orbit`, `zigzag`) configuradas por velocidade, aceleração, limites.
 - **WeaponComponent**: padrões de disparo (`single`, `burst`, `spread`, `spiral`) com dano, velocidade de projétil, cooldown, spread.
 - **BehaviorComponent**: comportamentos de IA (`aggressive`, `defensive`, `support`, `kamikaze`) com máquinas de estado.
@@ -109,6 +113,7 @@ src/
 - **HealthComponent**: vida base, armadura, escudos, modificadores de dano, invulnerabilidade temporária.
 
 ## 5. Exemplo de Criação de Inimigo Data-Driven
+
 ```javascript
 // data/enemies/drone.js
 export default {
@@ -120,14 +125,14 @@ export default {
       type: 'tracking',
       speed: 180,
       acceleration: 220,
-      maxSpeed: 200
+      maxSpeed: 200,
     },
     weapon: {
       pattern: 'single',
       damage: 15,
       speed: 340,
       cooldown: 2,
-      spread: 0.1
+      spread: 0.1,
     },
     render: {
       type: 'procedural',
@@ -135,27 +140,28 @@ export default {
       size: 12,
       colors: {
         body: '#5b6b7a',
-        accent: '#a6e8ff'
-      }
+        accent: '#a6e8ff',
+      },
     },
     collision: {
       shape: 'circle',
       radius: 12,
-      damage: 12
+      damage: 12,
     },
     health: {
       base: 30,
-      scaling: 1.15
-    }
+      scaling: 1.15,
+    },
   },
   rewards: {
     xp: 10,
-    dropChance: 0.15
-  }
+    dropChance: 0.15,
+  },
 };
 ```
 
 ## 6. Configuração Orientada a Dados
+
 - Inimigos: cada tipo define componentes e recompensas em `data/enemies/*`.
 - Armas: padrões de fogo, modificadores e evoluções em `data/weapons/*`.
 - Upgrades: categorias e níveis em `data/upgrades/*`.
@@ -164,8 +170,10 @@ export default {
 - Benefício: balanceamento e ajustes sem alterações em código de sistemas.
 
 ## 7. Sistema de Fragmentação Reutilizável
+
 - Extrair lógica de fragmentação para `game/systems/FragmentationSystem.js`.
 - Configuração exemplo:
+
 ```javascript
 fragmentation: {
   enabled: true,
@@ -176,9 +184,11 @@ fragmentation: {
   velocitySpread: 50
 }
 ```
+
 - Permite que qualquer inimigo (não só asteroides) utilize fragmentação com parâmetros customizados.
 
 ## 8. Fluxo para Adicionar Novo Inimigo
+
 1. Criar arquivo em `data/enemies/nome-do-inimigo.js` com componentes e recompensas.
 2. Registrar configuração no índice de inimigos (`data/enemies/index.js`).
 3. Registrar no `EnemyFactory` via manifesto para pooling.
@@ -186,6 +196,7 @@ fragmentation: {
 5. Nenhuma mudança em `EnemySystem` ou criação de novas classes é necessária.
 
 ## 9. Comparação com Jogos Similares
+
 - **Brotato**
   - `singletons/` ↔ `engine/core/`.
   - `items/`, `weapons/` ↔ `data/weapons/`, `data/upgrades/`.
@@ -196,6 +207,7 @@ fragmentation: {
   - Event/observer ↔ `engine/core/EventBus.js`.
 
 ## 10. Benefícios Esperados
+
 - Escalabilidade: adicionar conteúdo com pouca fricção.
 - Manutenibilidade: arquivos menores, responsabilidades claras.
 - Reutilização: componentes e sistemas genéricos.
@@ -204,6 +216,7 @@ fragmentation: {
 - Colaboração: agentes e pessoas sabem exatamente onde trabalhar.
 
 ## 11. Referências
+
 - Estrutura atual: `docs/architecture/CURRENT_STRUCTURE.md`.
 - Arquivos base: `src/modules/enemies/types/Asteroid.js`, `src/modules/enemies/base/BaseEnemy.js`, `src/modules/enemies/base/EnemyFactory.js`, `src/data/upgrades.js`.
 - Inspirações externas: Brotato Modding Notes, arquitetura de bullet-heaven, padrões observados em Vampire Survivors.
