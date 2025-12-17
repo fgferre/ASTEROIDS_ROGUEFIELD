@@ -646,7 +646,7 @@ const HUD_LAYOUTS = {
   },
 };
 
-export const DEFAULT_HUD_LAYOUT_ID = 'aaa'; // Switch default to AAA for testing
+export const DEFAULT_HUD_LAYOUT_ID = 'aaa_tactical'; // Switch default to AAA for testing
 
 export const HUD_LAYOUT_IDS = {
   AAA_TACTICAL: 'aaa_tactical',

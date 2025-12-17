@@ -728,10 +728,95 @@ class MenuBackgroundSystem extends BaseSystem {
 
     this.createLighting();
     this.createStarLayers();
+    this.createAtmosphere(); // Phase 3: Atmospheric Depth
     this.createBaseAssets(5);
+    this.setupPostProcessing(); // Phase 2: Post-Processing Core
     this.updateNormalIntensity(this.normalIntensity);
     this.ensurePoolSize(this.config.maxAsteroids);
     this.prepareInitialField();
+  }
+
+  setupPostProcessing() {
+    const { THREE, scene, camera, renderer } = this;
+    if (!THREE || !renderer || !THREE.EffectComposer) return;
+
+    this.composer = new THREE.EffectComposer(renderer);
+
+    const renderPass = new THREE.RenderPass(scene, camera);
+    this.composer.addPass(renderPass);
+
+    // 1. Unreal Bloom Pass
+    if (THREE.UnrealBloomPass) {
+      this.bloomPass = new THREE.UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        0.8, // Strength: moderate for that "glowy" space feel
+        0.3, // Radius
+        0.85 // Threshold: only bright spots bloom
+      );
+      this.composer.addPass(this.bloomPass);
+    }
+
+    // 2. Custom FX: Chromatic Aberration + Filmic Grain
+    if (THREE.ShaderPass) {
+      this.customFX = this.createCustomFXPass();
+      this.composer.addPass(this.customFX);
+    }
+
+    // 3. SMAA Anti-aliasing
+    if (THREE.SMAAPass) {
+      const pixelRatio = renderer.getPixelRatio();
+      this.smaaPass = new THREE.SMAAPass(
+        window.innerWidth * pixelRatio,
+        window.innerHeight * pixelRatio
+      );
+      this.composer.addPass(this.smaaPass);
+    }
+  }
+
+  createCustomFXPass() {
+    const { THREE } = this;
+    const shader = {
+      uniforms: {
+        tDiffuse: { value: null },
+        amount: { value: 0.0012 },
+        time: { value: 0.0 },
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform float amount;
+        uniform float time;
+        varying vec2 vUv;
+
+        float random(vec2 p) {
+          return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+        }
+
+        void main() {
+          vec2 uv = vUv;
+          
+          // Subtle Chromatic Aberration (R/B shift)
+          float r = texture2D(tDiffuse, uv + vec2(amount, 0.0)).r;
+          float g = texture2D(tDiffuse, uv).g;
+          float b = texture2D(tDiffuse, uv - vec2(amount, 0.0)).b;
+          
+          vec3 color = vec3(r, g, b);
+          
+          // Subtle Filmic Grain (adds texture to space)
+          float noise = (random(uv + time * 0.01) - 0.5) * 0.035;
+          color += noise;
+          
+          gl_FragColor = vec4(color, 1.0);
+        }
+      `,
+    };
+    return new THREE.ShaderPass(shader);
   }
 
   enableAlphaToCoverage() {
@@ -822,6 +907,95 @@ class MenuBackgroundSystem extends BaseSystem {
         config: { ...config },
       };
     });
+  }
+
+  createAtmosphere() {
+    const { THREE } = this;
+    if (!THREE) return;
+
+    // 1. Nebula Layers (Gaseous backdrops)
+    this.nebulas = [];
+    const nebulaConfigs = [
+      { size: 2000, color: 0x0a1835, opacity: 0.15, z: -1200, speed: 0.02 },
+      { size: 1800, color: 0x1a0a25, opacity: 0.12, z: -1500, speed: -0.015 },
+    ];
+
+    nebulaConfigs.forEach((cfg) => {
+      const geometry = new THREE.PlaneGeometry(cfg.size, cfg.size);
+      const material = new THREE.ShaderMaterial({
+        uniforms: {
+          time: { value: 0 },
+          color: { value: new THREE.Color(cfg.color) },
+          opacity: { value: cfg.opacity },
+        },
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        vertexShader: `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform float time;
+          uniform float opacity;
+          uniform vec3 color;
+          varying vec2 vUv;
+
+          float noise(vec2 p) {
+            return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+          }
+
+          void main() {
+            vec2 uv = (vUv - 0.5) * 2.0;
+            float dist = length(uv);
+            float mask = smoothstep(1.0, 0.2, dist);
+            
+            float n = noise(vUv * 4.0 + time * 0.02);
+            n += noise(vUv * 8.0 - time * 0.01) * 0.5;
+            
+            gl_FragColor = vec4(color * (n * 0.6 + 0.4), mask * opacity);
+          }
+        `,
+      });
+
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.z = cfg.z;
+      mesh.rotation.z = Math.random() * Math.PI * 2;
+      mesh.userData.rotateSpeed = cfg.speed;
+      this.scene.add(mesh);
+      this.nebulas.push(mesh);
+    });
+
+    // 2. Space Dust (Foreground particles)
+    const dustCount = 800;
+    const dustGeometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(dustCount * 3);
+
+    for (let i = 0; i < dustCount; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * 500;
+      positions[i * 3 + 1] = (Math.random() - 0.5) * 500;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 500;
+    }
+
+    dustGeometry.setAttribute(
+      'position',
+      new THREE.BufferAttribute(positions, 3)
+    );
+
+    const dustMaterial = new THREE.PointsMaterial({
+      size: 0.7,
+      color: 0x66aaff,
+      transparent: true,
+      opacity: 0.35,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+
+    this.dustSystem = new THREE.Points(dustGeometry, dustMaterial);
+    this.scene.add(this.dustSystem);
   }
 
   computeWorldSpacePointSize(distance, pixelSize = 1) {
@@ -1213,47 +1387,69 @@ class MenuBackgroundSystem extends BaseSystem {
     }
   }
 
-  applyEdgeFeather(material) {
-    if (!material) {
-      return;
-    }
+  patchAsteroidMaterial(material) {
+    if (!material) return;
+    if (material.userData.aaaPatched) return;
+    material.userData.aaaPatched = true;
 
-    if (!material.userData) {
-      material.userData = {};
-    }
-
-    if (material.userData.edgeFeatherApplied) {
-      return;
-    }
-
-    material.userData.edgeFeatherApplied = true;
     material.transparent = true;
     material.dithering = true;
 
     const uniforms = {
-      edgeFeatherStrength: { value: 0.55 },
+      bevelStrength: { value: 0.4 },
+      bevelSharpness: { value: 2.0 },
+      iridIntensity: { value: 0.4 },
       edgeFeatherPower: { value: 1.6 },
+      edgeFeatherStrength: { value: 0.55 },
     };
 
     material.onBeforeCompile = (shader) => {
-      shader.uniforms.edgeFeatherStrength = uniforms.edgeFeatherStrength;
-      shader.uniforms.edgeFeatherPower = uniforms.edgeFeatherPower;
+      Object.assign(shader.uniforms, uniforms);
+
+      shader.fragmentShader = `
+        uniform float bevelStrength;
+        uniform float bevelSharpness;
+        uniform float iridIntensity;
+        uniform float edgeFeatherPower;
+        uniform float edgeFeatherStrength;
+        ${shader.fragmentShader}
+      `;
+
+      // 1. Experimental Beveling: Rounding edges via normal manipulation
       shader.fragmentShader = shader.fragmentShader.replace(
-        'uniform float opacity;',
-        'uniform float opacity;\nuniform float edgeFeatherStrength;\nuniform float edgeFeatherPower;'
+        '#include <normal_fragment_begin>',
+        `
+        #include <normal_fragment_begin>
+        // Detect geometric edge sharpness using derivatives
+        vec3 faceNormal = normalize(cross(dFdx(vViewPosition), dFdy(vViewPosition)));
+        float edgeCurvature = 1.0 - clamp(dot(normal, faceNormal), 0.0, 1.0);
+        // Warp normal towards face normal to "round" the sharp transition
+        normal = normalize(mix(normal, faceNormal, -edgeCurvature * bevelStrength * bevelSharpness));
+        `
       );
+
+      // 2. Iridiscence & Alpha Feathering
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <alphamap_fragment>',
-        `#include <alphamap_fragment>\n` +
-          'float viewDot = dot(normalize(vNormal), normalize(-vViewPosition));\n' +
-          'float fresnel = pow(1.0 - abs(viewDot), edgeFeatherPower);\n' +
-          'fresnel = smoothstep(0.0, 1.0, fresnel);\n' +
-          'float alphaFeather = clamp(1.0 - fresnel * edgeFeatherStrength, 0.35, 1.0);\n' +
-          'diffuseColor.a *= alphaFeather;\n'
+        `
+        #include <alphamap_fragment>
+        
+        vec3 viewDir = normalize(vViewPosition);
+        float vDotN = dot(normalize(vNormal), -viewDir);
+        float fresnel = pow(1.0 - clamp(abs(vDotN), 0.0, 1.0), edgeFeatherPower);
+        
+        // Rim Iridescence (Cyan/Blue glow)
+        vec3 iridColor = vec3(0.1, 0.7, 1.0) * pow(fresnel, 2.5) * iridIntensity;
+        diffuseColor.rgb += iridColor;
+        
+        // Edge Feathering
+        float alphaFeather = clamp(1.0 - fresnel * edgeFeatherStrength, 0.35, 1.0);
+        diffuseColor.a *= alphaFeather;
+        `
       );
     };
 
-    material.customProgramCacheKey = () => 'menu-background-asteroid-feather';
+    material.customProgramCacheKey = () => 'aaa-asteroid-material-v2';
     material.needsUpdate = true;
   }
 
@@ -1422,7 +1618,7 @@ class MenuBackgroundSystem extends BaseSystem {
     }
     asteroid.material.userData = Object.assign({}, baseMaterial.userData || {});
     this.applyNormalIntensityToMaterial(asteroid.material);
-    this.applyEdgeFeather(asteroid.material);
+    this.patchAsteroidMaterial(asteroid.material);
     asteroid.material.transparent = true;
     asteroid.material.opacity = 1;
     asteroid.material.needsUpdate = true;
@@ -1689,17 +1885,51 @@ class MenuBackgroundSystem extends BaseSystem {
 
     const timer = this.elapsedTime * 0.03;
     const orbitalRadius = 70;
-    this.camera.position.x = Math.cos(timer) * orbitalRadius;
-    this.camera.position.z = Math.sin(timer) * orbitalRadius;
-    this.camera.position.y = Math.sin(timer * 0.7) * 15;
+
+    // Cinematic Damping & Lens Float
+    const driftX = Math.sin(this.elapsedTime * 0.4) * 3;
+    const driftY = Math.cos(this.elapsedTime * 0.25) * 2;
+
+    const targetPosX = Math.cos(timer) * orbitalRadius + driftX;
+    const targetPosZ = Math.sin(timer) * orbitalRadius;
+    const targetPosY = Math.sin(timer * 0.7) * 15 + driftY;
+
+    // Smooth lerp for "weighty" camera feel
+    const camLerp = 0.04;
+    this.camera.position.x += (targetPosX - this.camera.position.x) * camLerp;
+    this.camera.position.y += (targetPosY - this.camera.position.y) * camLerp;
+    this.camera.position.z += (targetPosZ - this.camera.position.z) * camLerp;
+
     this.camera.lookAt(0, 0, 0);
+
+    // Update Atmosphere
+    if (this.nebulas) {
+      this.nebulas.forEach((neb) => {
+        neb.material.uniforms.time.value = this.elapsedTime;
+        neb.rotation.z += neb.userData.rotateSpeed * delta;
+      });
+    }
+
+    if (this.dustSystem) {
+      this.dustSystem.rotation.y += delta * 0.02;
+    }
 
     this.starLayers.forEach((layer) => {
       layer.mesh.rotation.y = -timer * layer.speedFactor;
     });
 
     this.updateExplosions(delta);
-    this.renderer.render(this.scene, this.camera);
+
+    if (this.customFX && this.customFX.uniforms) {
+      this.customFX.uniforms.time.value = this.elapsedTime;
+    }
+
+    if (this.composer) {
+      this.composer.render();
+    } else {
+      this.renderer.render(this.scene, this.camera);
+    }
+
     if (this.stats) {
       this.stats.end();
     }
@@ -1749,6 +1979,11 @@ class MenuBackgroundSystem extends BaseSystem {
     this.camera.aspect = this.getAspectRatio(width, height);
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
+
+    if (this.composer) {
+      this.composer.setSize(width, height);
+    }
+
     this.updateStarLayerSizes();
   }
 

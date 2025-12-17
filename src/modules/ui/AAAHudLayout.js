@@ -26,8 +26,20 @@ export class AAAHudLayout {
 
     this._root = document.createElement('div');
     this._root.dataset.hudLayoutRoot = 'aaa_tactical';
-    this._root.innerHTML = this._getHTML();
     container.appendChild(this._root);
+
+    const hudLayer = document.createElement('div');
+    hudLayer.id = 'hud-layer';
+    hudLayer.innerHTML = this._getHTML();
+    const cockpitFrame = hudLayer.querySelector('.cockpit-frame');
+    if (cockpitFrame) {
+      cockpitFrame.remove();
+    }
+
+    this._root.appendChild(hudLayer);
+    if (cockpitFrame) {
+      this._root.appendChild(cockpitFrame);
+    }
 
     this._cacheElements();
     this._initializeBars();
@@ -253,926 +265,240 @@ export class AAAHudLayout {
       this.els.radarContainer.appendChild(el);
     });
   }
-
-  _getHTML() {
-    return `
-<!-- Apenas o Frame Decorativo nas bordas foi mantido -->
-    <div class="cockpit-frame"></div>
-
-    <div id="hud-layer">
-      <!-- ESQUERDA SUPERIOR: ESTATÍSTICAS -->
-      <div class="stats-area hud-panel">
-        <div class="stats-grid">
-          <div class="stat-block">
-            <div class="stat-label">
-              <i data-lucide="clock" size="14"></i> TIME
+    _getHTML() {
+        return `
+            <!-- STATS (Top Left) -->
+            <div class="stats-area hud-panel">
+                <div class="stats-grid">
+                    <div class="stat-block">
+                        <div class="stat-label"><i data-lucide="clock" size="14"></i> TIME</div>
+                        <div class="stat-value" id="ui-timer">00:00</div>
+                    </div>
+                    <div class="stat-block">
+                        <div class="stat-label"><i data-lucide="crosshair" size="14"></i> KILLS</div>
+                        <div class="stat-value" id="ui-kills">0</div>
+                    </div>
+                </div>
+                <div class="combo-box">
+                    <div class="combo-label">COMBO</div>
+                    <div class="combo-val" id="ui-combo">x0</div>
+                </div>
             </div>
-            <div class="stat-value" id="ui-timer">00:00:00</div>
-          </div>
-          <div class="stat-block">
-            <div class="stat-label">
-              <i data-lucide="crosshair" size="14"></i> KILLS
+
+            <!-- BOSS (Top Center) -->
+            <div class="boss-area hud-panel" id="ui-boss-panel">
+                <div class="warning-strip">
+                    <span class="warning-light"><i data-lucide="alert-triangle" size="16"></i> WARNING</span>
+                    <span class="warning-light">WARNING <i data-lucide="alert-triangle" size="16"></i></span>
+                </div>
+                <div class="boss-bar-container">
+                    <div class="boss-name" id="ui-boss-name">BOSS</div>
+                    <div class="boss-skull"><i data-lucide="skull" size="24"></i></div>
+                    <div class="boss-fill" id="ui-boss-fill"></div>
+                </div>
             </div>
-            <div class="stat-value" id="ui-kills">0</div>
-          </div>
-        </div>
 
-        <div class="combo-box">
-          <div class="combo-label">COMBO</div>
-          <div class="combo-val" id="ui-combo">x0</div>
-        </div>
-      </div>
-
-      <!-- CENTRO SUPERIOR: BOSS BAR -->
-      <div class="boss-area hud-panel" id="ui-boss-panel">
-        <div class="warning-strip">
-          <span class="warning-light"
-            ><i data-lucide="alert-triangle" size="16"></i> WARNING</span
-          >
-          <span class="warning-light"
-            >WARNING <i data-lucide="alert-triangle" size="16"></i
-          ></span>
-        </div>
-        <div class="boss-bar-container">
-          <div class="boss-name" id="ui-boss-name">BOSS NAME</div>
-          <div class="boss-skull"><i data-lucide="skull" size="24"></i></div>
-          <div class="boss-fill" id="ui-boss-fill"></div>
-        </div>
-      </div>
-
-      <!-- DIREITA SUPERIOR: RADAR -->
-      <div class="radar-area hud-panel">
-        <div class="radar-structure">
-          <svg class="radar-svg-layer" viewBox="0 0 200 200">
-            <circle
-              cx="100"
-              cy="100"
-              r="98"
-              fill="none"
-              stroke="var(--secondary-blue)"
-              stroke-width="2"
-              stroke-dasharray="30 15 5 15"
-              opacity="0.6"
-            />
-            <circle
-              cx="100"
-              cy="100"
-              r="92"
-              fill="none"
-              stroke="var(--primary-cyan)"
-              stroke-width="1"
-              opacity="0.2"
-            />
-            <polygon
-              points="100,10 177.9,55 177.9,145 100,190 22.1,145 22.1,55"
-              fill="rgba(0, 10, 20, 0.7)"
-              stroke="var(--primary-cyan)"
-              stroke-width="1.5"
-            />
-          </svg>
-          <div class="radar-internal-mask">
-            <div class="radar-sweep"></div>
-          </div>
-          <svg class="radar-grid-svg" viewBox="0 0 200 200">
-            <line
-              x1="100"
-              y1="10"
-              x2="100"
-              y2="190"
-              stroke="var(--secondary-blue)"
-              stroke-width="1"
-            />
-            <line
-              x1="22.1"
-              y1="55"
-              x2="177.9"
-              y2="145"
-              stroke="var(--secondary-blue)"
-              stroke-width="1"
-            />
-            <line
-              x1="177.9"
-              y1="55"
-              x2="22.1"
-              y2="145"
-              stroke="var(--secondary-blue)"
-              stroke-width="1"
-            />
-            <polygon
-              points="100,40 151.9,70 151.9,130 100,160 48.1,130 48.1,70"
-              fill="none"
-              stroke="var(--secondary-blue)"
-              stroke-width="1"
-              opacity="0.5"
-            />
-            <circle
-              cx="100"
-              cy="100"
-              r="10"
-              fill="var(--primary-cyan)"
-              opacity="0.3"
-            />
-          </svg>
-          <div class="blip-container" id="ui-radar-blips">
-            <div class="blip player"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ESQUERDA INFERIOR: VITAIS -->
-      <div class="status-area hud-panel">
-        <div class="locked-msg" id="ui-weapon-msg">
-          <div style="color: var(--secondary-blue)">
-            <i data-lucide="lock" size="24"></i>
-          </div>
-          <div>
-            <div style="font-size: 0.6rem; color: #88ccff; letter-spacing: 1px">
-              WEAPON SYSTEM
+            <!-- RADAR (Top Right - FIXED GLASS & ROUND) -->
+            <div class="radar-area hud-panel">
+                <div class="radar-structure">
+                    <!-- SVG Grid Circular -->
+                    <svg class="radar-svg-layer" viewBox="0 0 200 200">
+                        <circle cx="100" cy="100" r="98" fill="none" stroke="var(--secondary-blue)" stroke-width="1.5" stroke-dasharray="20 10" opacity="0.8" />
+                        <circle cx="100" cy="100" r="66" fill="none" stroke="var(--primary-cyan)" stroke-width="0.5" opacity="0.3" />
+                        <circle cx="100" cy="100" r="33" fill="none" stroke="var(--primary-cyan)" stroke-width="0.5" opacity="0.3" />
+                        <line x1="100" y1="5" x2="100" y2="195" stroke="var(--primary-cyan)" stroke-width="0.5" opacity="0.2" />
+                        <line x1="5" y1="100" x2="195" y2="100" stroke="var(--primary-cyan)" stroke-width="0.5" opacity="0.2" />
+                    </svg>
+                    
+                    <div class="radar-internal-mask">
+                        <div class="radar-sweep"></div>
+                        <div class="blip-container" id="ui-radar-blips">
+                            <div class="blip player"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div style="font-weight: bold; color: #fff">
-              LOCKED // LVL 5 REQ
+
+            <!-- VITALS (Bottom Left) -->
+            <div class="status-area hud-panel">
+                <div class="locked-msg" id="ui-weapon-msg">
+                    <div style="color: var(--secondary-blue);"><i data-lucide="lock" size="24"></i></div>
+                    <div>
+                        <div style="font-size:0.6rem; color:#88ccff; letter-spacing: 1px;">WEAPON SYSTEM</div>
+                        <div style="font-weight: bold; color: #fff;">LOCKED // LVL 5 REQ</div>
+                    </div>
+                </div>
+                <div class="bars-container">
+                    <div class="system-label" style="color: var(--secondary-blue)">❖ SHIELDS</div>
+                    <div class="bar-wrapper" style="margin-bottom: 2px;">
+                        <div class="health-bar-row shield" id="ui-shield-row"></div>
+                        <div class="numeric-text" id="ui-shield-text" style="color: var(--secondary-blue)">100%</div>
+                    </div>
+                    <div class="bar-wrapper">
+                        <div class="health-bar-row" id="ui-hull-row"></div>
+                        <div class="numeric-text" id="ui-hull-text" style="color: var(--health-green)">100%</div>
+                    </div>
+                    <div class="system-label" style="color: var(--health-green)">♥ HULL INTEGRITY</div>
+                </div>
             </div>
-          </div>
-        </div>
 
-        <div class="bars-container">
-          <div class="system-label" style="color: var(--secondary-blue)">
-            ❖ SHIELDS
-          </div>
-          <div class="bar-wrapper" style="margin-bottom: 2px">
-            <div class="health-bar-row shield" id="ui-shield-row"></div>
-            <div
-              class="numeric-text"
-              id="ui-shield-text"
-              style="color: var(--secondary-blue)"
-            >
-              100%
+            <!-- PROGRESS (Bottom Center) -->
+            <div class="bottom-center hud-panel">
+                <div class="wave-indicator">
+                    <div class="wave-content">
+                        <div class="wave-label">WAVE</div>
+                        <div class="wave-num" id="ui-wave-num">1</div>
+                    </div>
+                </div>
+                <div class="xp-bar-container">
+                    <div class="xp-label"><i data-lucide="zap" size="12" fill="#ddaaff"></i> XP</div>
+                    <div class="xp-fill" id="ui-xp-fill"></div>
+                </div>
+                <div class="xp-details">
+                    <div class="xp-values" id="ui-xp-text">0 / 1000</div>
+                    <div class="lvl-indicator" id="ui-lvl-text">Lvl 1</div>
+                </div>
             </div>
-          </div>
 
-          <div class="bar-wrapper">
-            <div class="health-bar-row" id="ui-hull-row"></div>
-            <div
-              class="numeric-text"
-              id="ui-hull-text"
-              style="color: var(--health-green)"
-            >
-              100%
+            <!-- NAV (Bottom Right) -->
+            <div class="systems-area hud-panel">
+                <div class="nav-block">
+                    <div class="nav-label">NAV SYSTEMS <i data-lucide="compass" size="14"></i></div>
+                    <div class="micro-data">
+                        COORD: <span class="data-val" id="ui-coord-x">000.00</span> / <span class="data-val" id="ui-coord-y">000.00</span><br>
+                        VELOCITY: <span class="data-val" id="ui-velocity">0</span> km/h
+                    </div>
+                </div>
             </div>
-          </div>
-          <div class="system-label" style="color: var(--health-green)">
-            ♥ HULL INTEGRITY
-          </div>
-        </div>
-      </div>
-
-      <!-- CENTRO INFERIOR: PROGRESSÃO -->
-      <div class="bottom-center hud-panel">
-        <div class="wave-indicator">
-          <div class="wave-content">
-            <div class="wave-label">WAVE</div>
-            <div class="wave-num" id="ui-wave-num">1</div>
-          </div>
-        </div>
-
-        <div class="xp-bar-container">
-          <div class="xp-label">
-            <i data-lucide="zap" size="12" fill="#ddaaff"></i> XP
-          </div>
-          <div class="xp-fill" id="ui-xp-fill"></div>
-        </div>
-        <div class="xp-details">
-          <div class="xp-values" id="ui-xp-text">0 / 1000</div>
-          <div class="lvl-indicator" id="ui-lvl-text">Lvl 1</div>
-        </div>
-      </div>
-
-      <!-- DIREITA INFERIOR: NAVEGAÇÃO -->
-      <div class="systems-area hud-panel">
-        <div class="nav-block">
-          <div class="nav-label">
-            NAV SYSTEMS <i data-lucide="compass" size="14"></i>
-          </div>
-          <div class="micro-data">
-            COORD: <span class="data-val" id="ui-coord-x">000.00</span> /
-            <span class="data-val" id="ui-coord-y">000.00</span><br />
-            VELOCITY: <span class="data-val" id="ui-velocity">0</span> km/h
-          </div>
-        </div>
-      </div>
-    </div>
-
-    
-    `;
-  }
-
-  _getCSS() {
-    return `
-
-      /* ==========================================================================
-           1. CORE & LAYOUT
-           ========================================================================== */
-      @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
-
-      :root {
-        --primary-cyan: #00f0ff;
-        --secondary-blue: #00aaff;
-        --danger-red: #ff003c;
-        --health-green: #00ff66;
-        --xp-purple: #aa00ff;
-        --hud-bg: rgba(12, 20, 31, 0.65);
-      }
-
-      * {
-        box-sizing: border-box;
-      }
-
-      body {
-        margin: 0;
-        overflow: hidden;
-        /* NOTA PARA INTEGRAÇÃO:
-               Mantenha 'transparent' para ver o jogo. 
-               Usei #000 aqui apenas para você visualizar o contraste no preview. 
-            */
-        background: #000;
-        font-family: 'Rajdhani', sans-serif;
-        color: white;
-        user-select: none;
-      }
-
-      /* Container Principal do HUD */
-      #hud-layer {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 20;
-        padding: 20px;
-        display: grid;
-        grid-template-columns: 320px 1fr 320px;
-        grid-template-rows: 150px 1fr 180px;
-        pointer-events: none;
-        text-shadow: 0 0 5px rgba(0, 240, 255, 0.5);
-      }
-
-      .hud-panel {
-        pointer-events: auto;
-        transition: opacity 0.3s;
-      }
-
-      /* ==========================================================================
-           2. EFEITOS VISUAIS (FX)
-           Apenas o frame decorativo nos cantos foi mantido para "fechar" a tela.
-           ========================================================================== */
-      .cockpit-frame {
-        position: absolute;
-        width: 100%;
-        height: 100%;
-        z-index: 11;
-        pointer-events: none;
-        background: linear-gradient(
-            135deg,
-            rgba(5, 5, 5, 0.5) 2%,
-            transparent 10%
-          ),
-          linear-gradient(-135deg, rgba(5, 5, 5, 0.5) 2%, transparent 10%),
-          linear-gradient(45deg, rgba(5, 5, 5, 0.5) 2%, transparent 10%),
-          linear-gradient(-45deg, rgba(5, 5, 5, 0.5) 2%, transparent 10%);
-      }
-
-      /* ==========================================================================
-           3. MÓDULO: ESTATÍSTICAS (Canto Superior Esquerdo)
-           ========================================================================== */
-      .stats-area {
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
-        padding-top: 20px;
-        padding-left: 20px;
-      }
-
-      .stats-grid {
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
-      }
-
-      .stat-block {
-        display: flex;
-        flex-direction: column;
-        background: linear-gradient(
-          90deg,
-          rgba(0, 20, 40, 0.6) 0%,
-          transparent 100%
-        );
-        padding: 5px 10px 5px 15px;
-        border-left: 3px solid var(--secondary-blue);
-        position: relative;
-        width: fit-content;
-        min-width: 180px;
-      }
-      .stat-block::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 10px;
-        height: 1px;
-        background: var(--secondary-blue);
-      }
-
-      .stat-label {
-        font-size: 0.7rem;
-        color: var(--secondary-blue);
-        letter-spacing: 1px;
-        margin-bottom: 2px;
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-weight: 700;
-      }
-      .stat-value {
-        font-family: 'Orbitron';
-        font-size: 1.6rem;
-        color: #fff;
-        line-height: 1.1;
-      }
-
-      .combo-box {
-        margin-top: 10px;
-        opacity: 0.8;
-        animation: pulse-text 2s infinite;
-      }
-      .combo-label {
-        font-size: 0.9rem;
-        color: var(--primary-cyan);
-        letter-spacing: 2px;
-        font-weight: 700;
-      }
-      .combo-val {
-        font-size: 2.5rem;
-        line-height: 0.8;
-        font-family: 'Orbitron';
-        background: linear-gradient(to bottom, #fff, #ffae00);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        font-weight: 900;
-        margin-left: -2px;
-      }
-
-      /* ==========================================================================
-           4. MÓDULO: BOSS BAR (Topo Central)
-           ========================================================================== */
-      .boss-area {
-        grid-column: 2;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        padding-top: 20px;
-        opacity: 0;
-        transition: opacity 0.5s;
-      }
-      .boss-area.active {
-        opacity: 1;
-      }
-
-      .warning-strip {
-        display: flex;
-        gap: 50px;
-        margin-bottom: 5px;
-        opacity: 0.9;
-      }
-      .warning-light {
-        color: var(--danger-red);
-        font-weight: bold;
-        font-size: 1.1rem;
-        animation: blink 0.5s infinite alternate;
-        letter-spacing: 3px;
-      }
-
-      .boss-bar-container {
-        position: relative;
-        width: 70%;
-        height: 35px;
-        background: rgba(20, 0, 0, 0.6);
-        border: 1px solid #662222;
-        transform: perspective(500px) rotateX(15deg);
-        display: flex;
-        align-items: center;
-        margin-top: 10px;
-      }
-      .boss-skull {
-        width: 45px;
-        height: 45px;
-        background: #1a0505;
-        border: 2px solid var(--danger-red);
-        position: absolute;
-        left: -22px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        clip-path: polygon(
-          25% 0%,
-          75% 0%,
-          100% 25%,
-          100% 75%,
-          75% 100%,
-          25% 100%,
-          0% 75%,
-          0% 25%
-        );
-        box-shadow: 0 0 15px var(--danger-red);
-        color: var(--danger-red);
-        z-index: 5;
-        animation: pulse-border 2s infinite;
-      }
-      .boss-fill {
-        height: 100%;
-        width: 100%;
-        background: repeating-linear-gradient(
-          45deg,
-          var(--danger-red),
-          var(--danger-red) 10px,
-          #880020 10px,
-          #880020 20px
-        );
-        box-shadow: 0 0 20px var(--danger-red);
-        transition: width 0.3s ease-out;
-        position: relative;
-      }
-      .boss-name {
-        position: absolute;
-        top: -22px;
-        width: 100%;
-        text-align: center;
-        font-size: 1rem;
-        letter-spacing: 4px;
-        color: #ffcccc;
-        font-weight: 700;
-      }
-
-      /* ==========================================================================
-           5. MÓDULO: RADAR (Canto Superior Direito)
-           ========================================================================== */
-      .radar-area {
-        display: flex;
-        justify-content: flex-end;
-        padding-right: 20px;
-        padding-top: 20px;
-      }
-      .radar-structure {
-        width: 200px;
-        height: 200px;
-        position: relative;
-      }
-
-      .radar-svg-layer {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 1;
-        filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.3));
-      }
-      .radar-internal-mask {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        width: 180px;
-        height: 180px;
-        z-index: 2;
-        clip-path: polygon(50% 2%, 93% 25%, 93% 75%, 50% 98%, 7% 75%, 7% 25%);
-      }
-      .radar-sweep {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: conic-gradient(
-          from 0deg at 50% 50%,
-          transparent 0%,
-          transparent 60%,
-          rgba(0, 240, 255, 0.05) 80%,
-          rgba(0, 240, 255, 0.4) 100%
-        );
-        animation: radar-sweep-anim 4s linear infinite;
-        mix-blend-mode: screen;
-      }
-      .radar-grid-svg {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 3;
-        opacity: 0.5;
-      }
-      .blip-container {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 10;
-      }
-
-      .blip {
-        position: absolute;
-        border-radius: 50%;
-        transform: translate(-50%, -50%);
-        transition:
-          top 0.1s,
-          left 0.1s;
-      }
-      .blip.enemy {
-        width: 6px;
-        height: 6px;
-        background: var(--danger-red);
-        box-shadow: 0 0 6px var(--danger-red);
-      }
-      .blip.player {
-        top: 50%;
-        left: 50%;
-        width: 8px;
-        height: 8px;
-        background: #fff;
-        border: 1px solid var(--primary-cyan);
-        box-shadow: 0 0 10px #fff;
-        z-index: 15;
-      }
-
-      /* ==========================================================================
-           6. MÓDULO: VITALS (Canto Inferior Esquerdo)
-           ========================================================================== */
-      .status-area {
-        grid-row: 3;
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-end;
-        padding-bottom: 20px;
-        padding-left: 20px;
-      }
-
-      .locked-msg {
-        border-left: 3px solid var(--secondary-blue);
-        background: linear-gradient(
-          90deg,
-          rgba(0, 170, 255, 0.15),
-          transparent
-        );
-        padding: 8px 15px;
-        margin-bottom: 25px;
-        width: 220px;
-        font-size: 0.9rem;
-        display: flex;
-        align-items: center;
-        gap: 15px;
-      }
-
-      .bars-container {
-        transform: skewX(-15deg);
-      }
-
-      /* Layout Horizontal: Barra + Numero */
-      .bar-wrapper {
-        display: flex;
-        align-items: center;
-        margin-bottom: 2px;
-      }
-      .health-bar-row {
-        display: flex;
-        height: 20px;
-        gap: 4px;
-        flex-grow: 1;
-        min-width: 180px;
-      }
-      .health-bar-row.shield {
-        height: 15px;
-        opacity: 0.9;
-      }
-
-      .bar-segment {
-        flex: 1;
-        background: rgba(0, 255, 102, 0.1);
-        border: 1px solid rgba(0, 255, 102, 0.3);
-        transition: all 0.2s;
-      }
-      .bar-segment.filled {
-        background: var(--health-green);
-        box-shadow: 0 0 8px var(--health-green);
-        border-color: #fff;
-      }
-      .shield .bar-segment.filled {
-        background: var(--secondary-blue);
-        box-shadow: 0 0 8px var(--secondary-blue);
-        border-color: #aaf;
-      }
-
-      .system-label {
-        font-size: 0.75rem;
-        font-weight: 700;
-        letter-spacing: 1px;
-        margin-bottom: 2px;
-        margin-top: 2px;
-      }
-      .numeric-text {
-        font-family: 'Orbitron';
-        font-size: 1.2rem;
-        font-weight: bold;
-        transform: skewX(15deg);
-        margin-left: 12px;
-        min-width: 50px;
-        text-shadow: 0 0 5px currentColor;
-        transition: color 0.3s;
-      }
-
-      /* ==========================================================================
-           7. MÓDULO: PROGRESSÃO (Centro Inferior)
-           ========================================================================== */
-      .bottom-center {
-        grid-row: 3;
-        grid-column: 2;
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-end;
-        align-items: center;
-        padding-bottom: 20px;
-      }
-
-      .wave-indicator {
-        width: 70px;
-        height: 70px;
-        border-radius: 50%;
-        border: 2px solid rgba(255, 255, 255, 0.1);
-        border-top: 2px solid var(--primary-cyan);
-        border-bottom: 2px solid var(--primary-cyan);
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        background: radial-gradient(
-          circle,
-          rgba(0, 240, 255, 0.1),
-          rgba(0, 0, 0, 0.8)
-        );
-        box-shadow: 0 0 20px rgba(0, 240, 255, 0.1);
-        margin-bottom: 10px;
-        animation: rotate-border 4s infinite linear reverse;
-      }
-      .wave-content {
-        animation: rotate-border 4s infinite linear;
-        text-align: center;
-      }
-      .wave-num {
-        font-size: 1.8rem;
-        color: #fff;
-        font-family: 'Orbitron';
-        line-height: 1;
-      }
-      .wave-label {
-        font-size: 0.6rem;
-        color: var(--secondary-blue);
-        letter-spacing: 1px;
-      }
-
-      .xp-bar-container {
-        width: 100%;
-        max-width: 300px;
-        height: 6px;
-        background: #0a0a0a;
-        border: 1px solid #333;
-        border-radius: 4px;
-        position: relative;
-        display: flex;
-        align-items: center;
-        margin-bottom: 2px;
-      }
-      .xp-fill {
-        height: 100%;
-        width: 0%;
-        background: linear-gradient(90deg, #5500aa, var(--xp-purple));
-        box-shadow: 0 0 10px var(--xp-purple);
-        border-radius: 2px;
-        transition: width 0.5s ease-out;
-      }
-      .xp-label {
-        position: absolute;
-        left: 0;
-        top: -18px;
-        font-size: 0.7rem;
-        color: #ddaaff;
-        font-weight: bold;
-        z-index: 2;
-        display: flex;
-        align-items: center;
-        gap: 5px;
-      }
-
-      .xp-details {
-        display: flex;
-        justify-content: space-between;
-        width: 100%;
-        max-width: 300px;
-        margin-top: 2px;
-      }
-      .xp-values {
-        font-family: 'Consolas', monospace;
-        font-size: 0.8rem;
-        color: #ccc;
-        text-shadow: 0 0 5px var(--xp-purple);
-        letter-spacing: 1px;
-      }
-      .lvl-indicator {
-        font-family: 'Orbitron';
-        font-size: 0.9rem;
-        font-weight: 700;
-        color: #fff;
-        text-shadow: 0 0 10px var(--primary-cyan);
-        letter-spacing: 1px;
-      }
-
-      /* ==========================================================================
-           8. MÓDULO: NAVEGAÇÃO (Canto Inferior Direito)
-           ========================================================================== */
-      .systems-area {
-        grid-row: 3;
-        grid-column: 3;
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-end;
-        align-items: flex-end;
-        padding-bottom: 20px;
-        padding-right: 20px;
-      }
-
-      .nav-block {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        background: linear-gradient(to left, rgba(0, 20, 40, 0.8), transparent);
-        padding: 10px 15px 10px 30px;
-        border-right: 3px solid var(--primary-cyan);
-        position: relative;
-        transform: skewX(15deg);
-      }
-      .nav-block::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        right: 0;
-        width: 30%;
-        height: 2px;
-        background: var(--primary-cyan);
-      }
-
-      .nav-label {
-        font-size: 0.8rem;
-        color: var(--primary-cyan);
-        font-weight: 700;
-        letter-spacing: 2px;
-        margin-bottom: 5px;
-        transform: skewX(-15deg);
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-      .micro-data {
-        font-family: 'Consolas', monospace;
-        font-size: 0.85rem;
-        color: rgba(200, 240, 255, 0.9);
-        text-align: right;
-        transform: skewX(-15deg);
-        line-height: 1.4;
-      }
-      .data-val {
-        color: #fff;
-        font-weight: bold;
-        text-shadow: 0 0 5px var(--primary-cyan);
-      }
-
-      /* ==========================================================================
-           9. ANIMAÇÕES & RESPONSIVIDADE
-           ========================================================================== */
-      @keyframes pulse-text {
-        0%,
-        100% {
-          transform: scale(1);
-          filter: brightness(1);
-        }
-        50% {
-          transform: scale(1.02);
-          filter: brightness(1.2);
-        }
-      }
-      @keyframes pulse-border {
-        0%,
-        100% {
-          border-color: var(--danger-red);
-          box-shadow: 0 0 15px var(--danger-red);
-        }
-        50% {
-          border-color: #ff5555;
-          box-shadow: 0 0 25px #ff5555;
-        }
-      }
-      @keyframes blink {
-        0% {
-          opacity: 0.3;
-        }
-        100% {
-          opacity: 1;
-        }
-      }
-      @keyframes rotate-border {
-        0% {
-          transform: rotate(0deg);
-        }
-        100% {
-          transform: rotate(360deg);
-        }
-      }
-      @keyframes radar-sweep-anim {
-        from {
-          transform: rotate(0deg);
-        }
-        to {
-          transform: rotate(360deg);
-        }
-      }
-      @keyframes glitch {
-        0%,
-        92%,
-        95%,
-        100% {
-          transform: translate(0, 0);
-          opacity: 1;
-        }
-        93% {
-          transform: translate(-2px, 2px);
-          opacity: 0.8;
-        }
-        94% {
-          transform: translate(2px, -2px);
-          opacity: 0.8;
-        }
-        96% {
-          transform: translate(1px, 2px);
-          opacity: 0.9;
-        }
-        97% {
-          transform: translate(-1px, -1px);
-          opacity: 0.9;
-        }
-      }
-      .glitch-text {
-        animation: glitch 3s infinite;
-      }
-
-      @media (max-width: 900px) {
-        #hud-layer {
-          grid-template-columns: 1fr;
-          grid-template-rows: auto 1fr auto;
-        }
-        .stats-area {
-          position: absolute;
-          top: 10px;
-          left: 10px;
-        }
-        .radar-area {
-          position: absolute;
-          top: 10px;
-          right: 10px;
-        }
-        .boss-area {
-          margin-top: 60px;
-          transform: scale(0.8);
-        }
-        .status-area {
-          position: absolute;
-          bottom: 20px;
-          left: 10px;
-          transform: scale(0.9);
-          transform-origin: bottom left;
-        }
-        .systems-area {
-          position: absolute;
-          bottom: 20px;
-          right: 10px;
-          transform: scale(0.9);
-          transform-origin: bottom right;
-        }
-        .bottom-center {
-          position: absolute;
-          bottom: 20px;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 300px;
-        }
-      }
-    
-    `;
-  }
+            
+            <div class="cockpit-frame"></div>
+        `;
+    }
+    _getCSS() {
+        return `
+            @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
+            
+            :root { 
+                --primary-cyan: #00f0ff; 
+                --secondary-blue: #00aaff; 
+                --danger-red: #ff003c; 
+                --health-green: #00ff66; 
+                --xp-purple: #aa00ff; 
+                --hud-bg: rgba(12, 20, 31, 0.65); 
+            }
+            
+            #hud-layer { 
+                position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 20; 
+                padding: 20px; /* Safe Area Global */
+                display: grid; 
+                grid-template-columns: 320px 1fr 320px; 
+                grid-template-rows: 150px 1fr 180px; 
+                pointer-events: none; 
+                text-shadow: 0 0 5px rgba(0, 240, 255, 0.5); 
+                font-family: 'Rajdhani', sans-serif; 
+                color: white; 
+            }
+            .hud-panel { pointer-events: auto; transition: opacity 0.3s; }
+            
+            .cockpit-frame { 
+                position: absolute; width: 100%; height: 100%; z-index: 11; pointer-events: none; 
+                background: linear-gradient(135deg, rgba(5,5,5,0.5) 2%, transparent 10%), 
+                            linear-gradient(-135deg, rgba(5,5,5,0.5) 2%, transparent 10%), 
+                            linear-gradient(45deg, rgba(5,5,5,0.5) 2%, transparent 10%), 
+                            linear-gradient(-45deg, rgba(5,5,5,0.5) 2%, transparent 10%); 
+            }
+            
+            /* STATS */
+            .stats-area { display: flex; flex-direction: column; gap: 15px; padding-top: 20px; padding-left: 20px; }
+            .stats-grid { display: flex; flex-direction: column; gap: 15px; }
+            .stat-block { display: flex; flex-direction: column; background: linear-gradient(90deg, rgba(0, 20, 40, 0.6) 0%, transparent 100%); padding: 5px 10px 5px 15px; border-left: 3px solid var(--secondary-blue); position: relative; width: fit-content; min-width: 180px; }
+            .stat-block::before { content: ''; position: absolute; top: 0; left: 0; width: 10px; height: 1px; background: var(--secondary-blue); }
+            .stat-label { font-size: 0.7rem; color: var(--secondary-blue); letter-spacing: 1px; margin-bottom: 2px; display: flex; align-items: center; gap: 6px; font-weight: 700; }
+            .stat-value { font-family: 'Orbitron'; font-size: 1.6rem; color: #fff; line-height: 1.1; }
+            .combo-box { margin-top: 10px; opacity: 0.8; animation: pulse-text 2s infinite; }
+            .combo-label { font-size: 0.9rem; color: var(--primary-cyan); letter-spacing: 2px; font-weight: 700; }
+            .combo-val { font-size: 2.5rem; line-height: 0.8; font-family: 'Orbitron'; background: linear-gradient(to bottom, #fff, #ffae00); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 900; margin-left: -2px; }
+            
+            /* BOSS */
+            .boss-area { grid-column: 2; display: flex; flex-direction: column; align-items: center; padding-top: 20px; opacity: 0; transition: opacity 0.5s; }
+            .boss-area.active { opacity: 1; }
+            .warning-strip { display: flex; gap: 50px; margin-bottom: 5px; opacity: 0.9; }
+            .warning-light { color: var(--danger-red); font-weight: bold; font-size: 1.1rem; animation: blink 0.5s infinite alternate; letter-spacing: 3px; }
+            .boss-bar-container { position: relative; width: 70%; height: 35px; background: rgba(20, 0, 0, 0.6); border: 1px solid #662222; transform: perspective(500px) rotateX(15deg); display: flex; align-items: center; margin-top: 10px; }
+            .boss-skull { width: 45px; height: 45px; background: #1a0505; border: 2px solid var(--danger-red); position: absolute; left: -22px; display: flex; justify-content: center; align-items: center; clip-path: polygon(25% 0%, 75% 0%, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0% 75%, 0% 25%); box-shadow: 0 0 15px var(--danger-red); color: var(--danger-red); z-index: 5; animation: pulse-border 2s infinite; }
+            .boss-fill { height: 100%; width: 100%; background: repeating-linear-gradient(45deg, var(--danger-red), var(--danger-red) 10px, #880020 10px, #880020 20px); box-shadow: 0 0 20px var(--danger-red); transition: width 0.3s ease-out; position: relative; }
+            .boss-name { position: absolute; top: -22px; width: 100%; text-align: center; font-size: 1rem; letter-spacing: 4px; color: #ffcccc; font-weight: 700; }
+            
+            /* RADAR - Round Glass Design */
+            .radar-area { display: flex; justify-content: flex-end; padding-right: 20px; padding-top: 20px; }
+            .radar-structure { 
+                width: 200px; height: 200px; position: relative; 
+                border-radius: 50%;
+                background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.05), rgba(0, 20, 40, 0.6) 80%);
+                box-shadow: 
+                    0 0 15px rgba(0, 240, 255, 0.1),
+                    inset 0 0 20px rgba(0, 240, 255, 0.05),
+                    inset 1px 1px 2px rgba(255, 255, 255, 0.1);
+                backdrop-filter: blur(4px);
+                border: 1px solid rgba(0, 240, 255, 0.3);
+            }
+            .radar-svg-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.3)); border-radius: 50%; }
+            .radar-internal-mask { 
+                position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; 
+                border-radius: 50%; overflow: hidden;
+            }
+            .radar-sweep { position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: conic-gradient(from 0deg, transparent 0%, transparent 60%, rgba(0, 240, 255, 0.05) 80%, rgba(0, 240, 255, 0.4) 100%); animation: radar-sweep-anim 4s linear infinite; border-radius: 50%; mix-blend-mode: screen; }
+            .radar-grid-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; opacity: 0.5; border-radius: 50%; }
+            .blip-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; border-radius: 50%; }
+            .blip { position: absolute; border-radius: 50%; transform: translate(-50%, -50%); transition: top 0.1s, left 0.1s; }
+            .blip.enemy { width: 6px; height: 6px; background: var(--danger-red); box-shadow: 0 0 6px var(--danger-red); }
+            .blip.player { top: 50%; left: 50%; width: 8px; height: 8px; background: #fff; border: 1px solid var(--primary-cyan); box-shadow: 0 0 10px #fff; z-index: 15; }
+            
+            /* VITALS */
+            .status-area { grid-row: 3; display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 20px; padding-left: 20px; }
+            .locked-msg { border-left: 3px solid var(--secondary-blue); background: linear-gradient(90deg, rgba(0,170,255,0.15), transparent); padding: 8px 15px; margin-bottom: 25px; width: 220px; font-size: 0.9rem; display: flex; align-items: center; gap: 15px; }
+            .bars-container { transform: skewX(-15deg); }
+            .bar-wrapper { display: flex; align-items: center; margin-bottom: 2px; }
+            .health-bar-row { display: flex; height: 20px; gap: 4px; flex-grow: 1; min-width: 180px; }
+            .health-bar-row.shield { height: 15px; opacity: 0.9; }
+            .bar-segment { flex: 1; background: rgba(0, 255, 102, 0.1); border: 1px solid rgba(0, 255, 102, 0.3); transition: all 0.2s; }
+            .bar-segment.filled { background: var(--health-green); box-shadow: 0 0 8px var(--health-green); border-color: #fff; }
+            .shield .bar-segment.filled { background: var(--secondary-blue); box-shadow: 0 0 8px var(--secondary-blue); border-color: #aaf; }
+            .system-label { font-size: 0.75rem; font-weight: 700; letter-spacing: 1px; margin-bottom: 2px; margin-top: 2px; }
+            .numeric-text { font-family: 'Orbitron'; font-size: 1.2rem; font-weight: bold; transform: skewX(15deg); margin-left: 12px; min-width: 50px; text-shadow: 0 0 5px currentColor; transition: color 0.3s; }
+            
+            /* PROGRESS */
+            .bottom-center { grid-row: 3; grid-column: 2; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 20px; }
+            .wave-indicator { width: 70px; height: 70px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.1); border-top: 2px solid var(--primary-cyan); border-bottom: 2px solid var(--primary-cyan); display: flex; flex-direction: column; justify-content: center; align-items: center; background: radial-gradient(circle, rgba(0,240,255,0.1), rgba(0,0,0,0.8)); box-shadow: 0 0 20px rgba(0, 240, 255, 0.1); margin-bottom: 10px; animation: rotate-border 4s infinite linear reverse; }
+            .wave-content { animation: rotate-border 4s infinite linear; text-align: center; }
+            .wave-num { font-size: 1.8rem; color: #fff; font-family: 'Orbitron'; line-height: 1; }
+            .wave-label { font-size: 0.6rem; color: var(--secondary-blue); letter-spacing: 1px; }
+            .xp-bar-container { width: 100%; max-width: 300px; height: 6px; background: #0a0a0a; border: 1px solid #333; border-radius: 4px; position: relative; display: flex; align-items: center; margin-bottom: 2px; }
+            .xp-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #5500aa, var(--xp-purple)); box-shadow: 0 0 10px var(--xp-purple); border-radius: 2px; transition: width 0.5s ease-out; }
+            .xp-label { position: absolute; left: 0; top: -18px; font-size: 0.7rem; color: #ddaaff; font-weight: bold; z-index: 2; display: flex; align-items: center; gap: 5px; }
+            .xp-details { display: flex; justify-content: space-between; width: 100%; max-width: 300px; margin-top: 2px; }
+            .xp-values { font-family: 'Consolas', monospace; font-size: 0.8rem; color: #ccc; text-shadow: 0 0 5px var(--xp-purple); letter-spacing: 1px; }
+            .lvl-indicator { font-family: 'Orbitron'; font-size: 0.9rem; font-weight: 700; color: #fff; text-shadow: 0 0 10px var(--primary-cyan); letter-spacing: 1px; }
+            
+            /* NAV */
+            .systems-area { grid-row: 3; grid-column: 3; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end; padding-bottom: 20px; padding-right: 20px; }
+            .nav-block { display: flex; flex-direction: column; align-items: flex-end; background: linear-gradient(to left, rgba(0, 20, 40, 0.8), transparent); padding: 10px 15px 10px 30px; border-right: 3px solid var(--primary-cyan); position: relative; transform: skewX(15deg); }
+            .nav-block::before { content: ''; position: absolute; top: 0; right: 0; width: 30%; height: 2px; background: var(--primary-cyan); }
+            .nav-label { font-size: 0.8rem; color: var(--primary-cyan); font-weight: 700; letter-spacing: 2px; margin-bottom: 5px; transform: skewX(-15deg); display: flex; align-items: center; gap: 8px; }
+            .micro-data { font-family: 'Consolas', monospace; font-size: 0.85rem; color: rgba(200, 240, 255, 0.9); text-align: right; transform: skewX(-15deg); line-height: 1.4; }
+            .data-val { color: #fff; font-weight: bold; text-shadow: 0 0 5px var(--primary-cyan); }
+            
+            /* ANIMATIONS */
+            @keyframes pulse-text { 0%, 100% { transform: scale(1); filter: brightness(1); } 50% { transform: scale(1.02); filter: brightness(1.2); } }
+            @keyframes pulse-border { 0%, 100% { border-color: var(--danger-red); box-shadow: 0 0 15px var(--danger-red); } 50% { border-color: #ff5555; box-shadow: 0 0 25px #ff5555; } }
+            @keyframes blink { 0% { opacity: 0.3; } 100% { opacity: 1; } }
+            @keyframes rotate-border { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            @keyframes radar-sweep-anim { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+            @keyframes glitch { 0%, 92%, 95%, 100% { transform: translate(0, 0); opacity: 1; } 93% { transform: translate(-2px, 2px); opacity: 0.8; } 94% { transform: translate(2px, -2px); opacity: 0.8; } 96% { transform: translate(1px, 2px); opacity: 0.9; } 97% { transform: translate(-1px, -1px); opacity: 0.9; } }
+            .glitch-text { animation: glitch 3s infinite; }
+            
+            @media (max-width: 900px) { #hud-layer { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; } .stats-area { position: absolute; top: 10px; left: 10px; } .radar-area { position: absolute; top: 10px; right: 10px; } .boss-area { margin-top: 60px; transform: scale(0.8); } .status-area { position: absolute; bottom: 20px; left: 10px; transform: scale(0.9); transform-origin: bottom left; } .systems-area { position: absolute; bottom: 20px; right: 10px; transform: scale(0.9); transform-origin: bottom right; } .bottom-center { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 300px; } }
+        `;
+    }
 }
+

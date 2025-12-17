@@ -2869,20 +2869,13 @@ class UISystem extends BaseSystem {
         </svg>
       `;
 
-      // 2. Internal Mask (Canvas)
+      // 2. Internal Mask (DOM Blips)
       const mask = document.createElement('div');
       mask.className = 'radar-internal-mask';
-
-      const canvas = document.createElement('canvas');
-      canvas.id = 'minimap-canvas';
-      canvas.width = 180;
-      canvas.height = 180;
 
       // Sweep Animation (inside mask)
       const sweep = document.createElement('div');
       sweep.className = 'radar-sweep';
-
-      mask.appendChild(canvas);
       mask.appendChild(sweep);
 
       // 3. Top Grid SVG (Overlay)
@@ -2898,14 +2891,22 @@ class UISystem extends BaseSystem {
         </svg>
       `;
 
+      // 4. Blip Container
+      const blipContainer = document.createElement('div');
+      blipContainer.className = 'blip-container';
+      blipContainer.id = 'ui-radar-blips';
+      // Initialize with player blip
+      blipContainer.innerHTML = '<div class="blip player"></div>';
+
       // Assemble
       structure.appendChild(svgLayer);
       structure.appendChild(mask);
       structure.appendChild(grid);
+      structure.appendChild(blipContainer);
 
       root.appendChild(structure);
 
-      return { key: config.key, config, root, canvas };
+      return { key: config.key, config, root };
     }
 
     // --- AAA STATUS WIDGET (Unified Health & Shield) ---
@@ -3218,6 +3219,7 @@ class UISystem extends BaseSystem {
         ? canvas.getContext('2d')
         : null;
 
+    const blipContainer = document.getElementById('ui-radar-blips');
     const rangeElement = document.getElementById('minimap-range');
     const container = document.getElementById('hud-minimap');
 
@@ -3225,6 +3227,7 @@ class UISystem extends BaseSystem {
       ...minimapRefs,
       container: container || null,
       canvas: canvas || null,
+      blipContainer: blipContainer || null,
       range: rangeElement || null,
       context,
     };
@@ -3249,8 +3252,8 @@ class UISystem extends BaseSystem {
       multiplier: comboMultiplier || null,
     };
 
-    // Update tactical readiness flag: tactical HUD is ready when minimap context is valid
-    this.tacticalState.isReady = !!(canvas && context && container);
+    // Update tactical readiness flag: tactical HUD is ready when minimap context is valid OR blip container is ready
+    this.tacticalState.isReady = !!((canvas && context) || blipContainer) && !!container;
   }
 
   setupEventListeners() {
@@ -4676,12 +4679,94 @@ class UISystem extends BaseSystem {
 
   renderMinimap(contactsData = null) {
     const minimapRefs = this.domRefs.minimap || {};
+    const container = minimapRefs.container;
+    const blipContainer = minimapRefs.blipContainer;
+
+    // Guard: Ensure container is valid
+    if (!container) {
+      return;
+    }
+
+    const data = contactsData || this.tacticalState.contactsCache;
+    if (!data) {
+      return;
+    }
+
+    const { range, contacts, playerAngle } = data;
+
+    // --- DOM-BASED RENDERING (AAA) ---
+    if (blipContainer) {
+      // Re-initialize with just player (this clears previous frame's enemies)
+      // Note: In a highly optimized loop, we might diff/patch DOM elements, 
+      // but setting innerHTML is sufficient for the requested "copy implementation" scope.
+      blipContainer.innerHTML = '<div class="blip player"></div>';
+      
+      if (Array.isArray(contacts) && contacts.length > 0) {
+        // Mockup logic: (x + 1) * 50 to convert -1..1 range to 0..100%
+        // But our contacts logic returns dx/distance. 
+        // We need normalized coordinates relative to radar radius.
+        // contactsCache provides dx, dy which are absolute offsets.
+        // We also have data.width/height if using canvas, but for DOM we assume 
+        // the blip container is 100% width/height of the radar area (e.g. 200x200 or similar).
+        // Let's assume the container is square and centered.
+        
+        for (let i = 0; i < contacts.length; i += 1) {
+          const contact = contacts[i];
+          const distance = Number(contact.distance);
+          if (!Number.isFinite(distance)) continue;
+          
+          const dx = Number(contact.dx) || 0;
+          const dy = Number(contact.dy) || 0;
+          
+          // Clamp distance to range for radar bounds
+          // Actually, typical radar shows things getting closer. 
+          // If distance > range, it shouldn't be shown or clamped to edge?
+          // Mockup logic: blips.forEach with x, y in -1..1
+          
+          if (distance > range) continue; // Or clamp? Let's hide if out of range for clean look.
+          
+          const normalizedX = dx / range;
+          const normalizedY = dy / range;
+          
+          const left = (normalizedX + 1) * 50;
+          const top = (normalizedY + 1) * 50;
+          
+          const el = document.createElement('div');
+          // Determine type class
+          const type = contact.type ? contact.type.toLowerCase() : 'enemy';
+          el.className = `blip ${type}`;
+          if (contact.isBoss) el.classList.add('boss');
+          
+          el.style.left = `${left.toFixed(1)}%`;
+          el.style.top = `${top.toFixed(1)}%`;
+          
+          // Optional: Color override if CSS doesn't match type
+          const color = this.resolveMinimapContactColor(contact);
+          if (color) {
+            el.style.backgroundColor = color;
+            el.style.boxShadow = `0 0 6px ${color}`;
+          }
+          
+          blipContainer.appendChild(el);
+        }
+      }
+      
+      const rangeNode = minimapRefs.range;
+      if (rangeNode) {
+        const label = `Range ${Math.round(range)}u`;
+        if (rangeNode.textContent !== label) {
+          rangeNode.textContent = label;
+          rangeNode.setAttribute('aria-label', label);
+        }
+      }
+      return;
+    }
+
+    // --- CANVAS-BASED RENDERING (Legacy/Minimal) ---
     const canvas = minimapRefs.canvas;
     const context = minimapRefs.context;
-    const container = minimapRefs.container;
 
-    // Guard: Ensure all required DOM refs are valid before rendering
-    if (!canvas || !context || !container) {
+    if (!canvas || !context) {
       return;
     }
 
@@ -4695,12 +4780,6 @@ class UISystem extends BaseSystem {
 
     context.clearRect(0, 0, width, height);
 
-    const data = contactsData || this.tacticalState.contactsCache;
-    if (!data) {
-      return;
-    }
-
-    const { range, contacts, playerAngle } = data;
     const radius = Math.max(8, Math.min(width, height) / 2 - 4);
     const centerX = width / 2;
     const centerY = height / 2;

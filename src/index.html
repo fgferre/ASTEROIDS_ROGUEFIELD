@@ -20,17 +20,8 @@
     <link rel="stylesheet" href="aaa-hud-theme.css" />
   </head>
   <body>
-    <div id="game-container" class="chromatic-aberration">
-      <!-- [NEO-ARCADE] CRT / Atmosphere Filters -->
-      <div class="crt-overlay">
-        <div class="crt-scanlines"></div>
-        <div class="crt-vignette"></div>
-      </div>
-      <!-- AAA FX Layers -->
-      <div class="scanlines"></div>
-      <div class="cockpit-overlay"></div>
-      <div class="cockpit-frame"></div>
-      <!-- Menu Principal -->
+    <div id="game-container">
+      <!-- High-Fidelity FX Pipeline handled by MenuBackgroundSystem (Three.js) -->
       <div id="menu-screen" class="screen">
         <canvas
           id="menu-background-canvas"
@@ -315,6 +306,16 @@
     <!-- GSAP Animation Library (AAA Overhaul) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <!-- Three.js Post-processing (r128) -->
+    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/shaders/SMAAShader.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/postprocessing/SMAAPass.js"></script>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/stats.js/r16/Stats.min.js"></script>
     <script>
