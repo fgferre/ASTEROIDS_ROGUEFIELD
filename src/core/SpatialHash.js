@@ -71,6 +71,7 @@ export class SpatialHash {
     // Development debugging
     if (
       typeof window !== 'undefined' &&
+      typeof process !== 'undefined' &&
       process.env.NODE_ENV === 'development'
     ) {
       if (!window.__spatialHashes) {
@@ -508,7 +509,10 @@ export class SpatialHash {
 
     this.stats.dynamicResizes++;
 
-    if (process.env.NODE_ENV === 'development') {
+    if (
+      typeof process !== 'undefined' &&
+      process.env.NODE_ENV === 'development'
+    ) {
       console.debug(
         `[SpatialHash] Resized to cell size ${newCellSize} (objects: ${this.objectCount})`
       );
@@ -616,7 +620,11 @@ export class SpatialHash {
 }
 
 // Development tools
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+if (
+  typeof window !== 'undefined' &&
+  typeof process !== 'undefined' &&
+  process.env.NODE_ENV === 'development'
+) {
   window.__spatialHashDebug = {
     getAllHashes: () => window.__spatialHashes || [],
     getHashStats: () =>

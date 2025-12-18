@@ -85,7 +85,10 @@ export class GamePools {
     this.lastAutoManageTime = performance.now();
 
     console.log('[GamePools] All pools initialized successfully');
-    if (process.env.NODE_ENV === 'development') {
+    if (
+      typeof process !== 'undefined' &&
+      process.env.NODE_ENV === 'development'
+    ) {
       console.log('Pool configuration:', this.getPoolStats());
     }
   }

@@ -69,6 +69,7 @@ export class ObjectPool {
     // Track pool for debugging
     if (
       typeof window !== 'undefined' &&
+      typeof process !== 'undefined' &&
       process.env.NODE_ENV === 'development'
     ) {
       if (!window.__objectPools) {
@@ -96,7 +97,10 @@ export class ObjectPool {
       obj = this.createFn();
       this.totalCreated++;
 
-      if (process.env.NODE_ENV === 'development') {
+      if (
+        typeof process !== 'undefined' &&
+        process.env.NODE_ENV === 'development'
+      ) {
         console.debug(
           `[ObjectPool] Created new object (total: ${this.totalCreated})`
         );
@@ -120,7 +124,10 @@ export class ObjectPool {
    */
   release(obj) {
     if (!this.inUse.has(obj)) {
-      if (process.env.NODE_ENV === 'development') {
+      if (
+        typeof process !== 'undefined' &&
+        process.env.NODE_ENV === 'development'
+      ) {
         console.warn(
           '[ObjectPool] Attempted to release object not acquired from this pool'
         );
@@ -272,7 +279,10 @@ export class ObjectPool {
       );
       this.expand(expansion);
 
-      if (process.env.NODE_ENV === 'development') {
+      if (
+        typeof process !== 'undefined' &&
+        process.env.NODE_ENV === 'development'
+      ) {
         console.debug(`[ObjectPool] Auto-expanded by ${expansion} objects`);
       }
     } else if (
@@ -286,7 +296,10 @@ export class ObjectPool {
       );
       this.shrink(shrinkage);
 
-      if (process.env.NODE_ENV === 'development') {
+      if (
+        typeof process !== 'undefined' &&
+        process.env.NODE_ENV === 'development'
+      ) {
         console.debug(`[ObjectPool] Auto-shrunk by ${shrinkage} objects`);
       }
     }
@@ -476,7 +489,11 @@ export class TTLObjectPool extends ObjectPool {
 
     this.lastCleanup = currentTime;
 
-    if (process.env.NODE_ENV === 'development' && expiredObjects.length > 0) {
+    if (
+      typeof process !== 'undefined' &&
+      process.env.NODE_ENV === 'development' &&
+      expiredObjects.length > 0
+    ) {
       console.debug(
         `[TTLObjectPool] Released ${expiredObjects.length} expired objects`
       );
@@ -531,7 +548,11 @@ export class TTLObjectPool extends ObjectPool {
 }
 
 // Development tools
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+if (
+  typeof window !== 'undefined' &&
+  typeof process !== 'undefined' &&
+  process.env.NODE_ENV === 'development'
+) {
   window.__poolDebug = {
     getAllPools: () => window.__objectPools || [],
     getPoolStats: () =>
