@@ -1,9 +1,8 @@
 name: Update Project History
 
 on:
-  push:
-    branches:
-      - main
+  # Desabilitado temporariamente devido a problemas de permissão
+  workflow_dispatch:
 
 jobs:
   update_history:
