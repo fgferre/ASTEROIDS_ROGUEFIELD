@@ -6,6 +6,16 @@ const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   root: 'src', // Define a pasta raiz do projeto
+  base: '/ASTEROIDS_ROGUEFIELD/', // Caminho base para GitHub Pages
+  build: {
+    outDir: '../dist', // Build para a pasta dist na raiz
+    emptyOutDir: true, // Limpa a pasta antes do build
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'src/index.html'),
+      },
+    },
+  },
   server: {
     port: 5500, // Mantém a porta que já estávamos usando
   },

@@ -6,7 +6,7 @@
   "main": "app.js",
   "scripts": {
     "dev": "vite",
-    "build": "grunt build",
+    "build": "vite build",
     "test": "vitest run",
     "test:watch": "vitest watch",
     "test:ui": "vitest --ui",
