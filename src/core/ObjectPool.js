@@ -70,6 +70,7 @@ export class ObjectPool {
     if (
       typeof window !== 'undefined' &&
       typeof process !== 'undefined' &&
+      process.env &&
       process.env.NODE_ENV === 'development'
     ) {
       if (!window.__objectPools) {
@@ -99,6 +100,7 @@ export class ObjectPool {
 
       if (
         typeof process !== 'undefined' &&
+        process.env &&
         process.env.NODE_ENV === 'development'
       ) {
         console.debug(
@@ -126,6 +128,7 @@ export class ObjectPool {
     if (!this.inUse.has(obj)) {
       if (
         typeof process !== 'undefined' &&
+        process.env &&
         process.env.NODE_ENV === 'development'
       ) {
         console.warn(
@@ -281,6 +284,7 @@ export class ObjectPool {
 
       if (
         typeof process !== 'undefined' &&
+        process.env &&
         process.env.NODE_ENV === 'development'
       ) {
         console.debug(`[ObjectPool] Auto-expanded by ${expansion} objects`);
@@ -298,6 +302,7 @@ export class ObjectPool {
 
       if (
         typeof process !== 'undefined' &&
+        process.env &&
         process.env.NODE_ENV === 'development'
       ) {
         console.debug(`[ObjectPool] Auto-shrunk by ${shrinkage} objects`);
@@ -491,6 +496,7 @@ export class TTLObjectPool extends ObjectPool {
 
     if (
       typeof process !== 'undefined' &&
+      process.env &&
       process.env.NODE_ENV === 'development' &&
       expiredObjects.length > 0
     ) {
@@ -551,6 +557,7 @@ export class TTLObjectPool extends ObjectPool {
 if (
   typeof window !== 'undefined' &&
   typeof process !== 'undefined' &&
+  process.env &&
   process.env.NODE_ENV === 'development'
 ) {
   window.__poolDebug = {

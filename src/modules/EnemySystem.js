@@ -490,6 +490,7 @@ class EnemySystem extends BaseSystem {
         pending.forEach((payload) => this.handleEnemyProjectile(payload));
         if (
           typeof process !== 'undefined' &&
+          process.env &&
           process.env.NODE_ENV === 'development'
         ) {
           console.debug(

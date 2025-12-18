@@ -72,6 +72,7 @@ export class SpatialHash {
     if (
       typeof window !== 'undefined' &&
       typeof process !== 'undefined' &&
+      process.env &&
       process.env.NODE_ENV === 'development'
     ) {
       if (!window.__spatialHashes) {

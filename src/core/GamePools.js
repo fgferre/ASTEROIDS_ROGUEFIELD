@@ -87,6 +87,7 @@ export class GamePools {
     console.log('[GamePools] All pools initialized successfully');
     if (
       typeof process !== 'undefined' &&
+      process.env &&
       process.env.NODE_ENV === 'development'
     ) {
       console.log('Pool configuration:', this.getPoolStats());
