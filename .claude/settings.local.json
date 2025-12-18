@@ -21,7 +21,9 @@
       "Bash(git log:*)",
       "Bash(git show:*)",
       "Bash(xargs -I {} sh -c \"grep -l ''''fork'''' {} 2>/dev/null && echo {} || true\")",
-      "Bash(test:*)"
+      "Bash(test:*)",
+      "Bash(gh run list:*)",
+      "Bash(rm:*)"
     ],
     "deny": [],
     "ask": []
