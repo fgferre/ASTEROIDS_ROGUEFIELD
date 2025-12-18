@@ -2061,7 +2061,10 @@ class UISystem extends BaseSystem {
   }
 
   deactivateAAATacticalHud() {
-    if (this.aaaTacticalHud && typeof this.aaaTacticalHud.unmount === 'function') {
+    if (
+      this.aaaTacticalHud &&
+      typeof this.aaaTacticalHud.unmount === 'function'
+    ) {
       this.aaaTacticalHud.unmount();
     }
 
@@ -2074,7 +2077,9 @@ class UISystem extends BaseSystem {
     const hudRoot = this.domRefs.root;
     if (hudRoot) {
       hudRoot.style.display =
-        typeof restore?.hudRootDisplay === 'string' ? restore.hudRootDisplay : '';
+        typeof restore?.hudRootDisplay === 'string'
+          ? restore.hudRootDisplay
+          : '';
       if (restore?.hudRootAriaHidden === null) {
         hudRoot.removeAttribute('aria-hidden');
       } else if (typeof restore?.hudRootAriaHidden === 'string') {
@@ -2085,7 +2090,9 @@ class UISystem extends BaseSystem {
     const countdown = this.domRefs.wave?.countdown || null;
     if (countdown) {
       countdown.style.display =
-        typeof restore?.countdownDisplay === 'string' ? restore.countdownDisplay : '';
+        typeof restore?.countdownDisplay === 'string'
+          ? restore.countdownDisplay
+          : '';
       if (restore?.countdownAriaHidden === null) {
         countdown.removeAttribute('aria-hidden');
       } else if (typeof restore?.countdownAriaHidden === 'string') {
@@ -2147,7 +2154,8 @@ class UISystem extends BaseSystem {
 
       if (player && typeof player.getShieldState === 'function') {
         const shieldState = player.getShieldState() || {};
-        shield = Number(shieldState.currentHP ?? shieldState.currentHits ?? 0) || 0;
+        shield =
+          Number(shieldState.currentHP ?? shieldState.currentHits ?? 0) || 0;
         maxShield = Number(shieldState.maxHP ?? shieldState.maxHits ?? 0) || 0;
       } else {
         shield = Number(player?.shieldHP ?? 0) || 0;
@@ -2164,10 +2172,15 @@ class UISystem extends BaseSystem {
 
     if (enemies && typeof enemies.getSessionStats === 'function') {
       const session = enemies.getSessionStats() || {};
-      const timeElapsed = session.timeElapsed ?? session.sessionTimeSeconds ?? 0;
+      const timeElapsed =
+        session.timeElapsed ?? session.sessionTimeSeconds ?? 0;
       const totalKills = session.totalKills ?? session.kills ?? 0;
 
-      hud.updateStats(this.formatAAATacticalClock(timeElapsed), totalKills, undefined);
+      hud.updateStats(
+        this.formatAAATacticalClock(timeElapsed),
+        totalKills,
+        undefined
+      );
     }
 
     if (progression && typeof progression.getComboState === 'function') {
@@ -2263,7 +2276,9 @@ class UISystem extends BaseSystem {
     const bossState = this.getBossHudState();
     const cachedBossVisible = Boolean(this.cachedValues.boss?.visible);
     const bossActive =
-      cachedBossVisible || Boolean(bossState.active) || Boolean(bossState.upcoming);
+      cachedBossVisible ||
+      Boolean(bossState.active) ||
+      Boolean(bossState.upcoming);
 
     if (!bossActive) {
       hud.updateBoss(false);
@@ -2272,7 +2287,9 @@ class UISystem extends BaseSystem {
       const maxHealth = Number(bossState.maxHealth ?? 0) || 0;
       const currentHealth = Number(bossState.health ?? 0) || 0;
       const percent =
-        maxHealth > 0 ? Math.max(0, Math.min(100, (currentHealth / maxHealth) * 100)) : 100;
+        maxHealth > 0
+          ? Math.max(0, Math.min(100, (currentHealth / maxHealth) * 100))
+          : 100;
       hud.updateBoss(true, bossName, percent);
     }
   }
@@ -2347,115 +2364,6 @@ class UISystem extends BaseSystem {
         config,
         root,
         custom: customElement,
-        meta: metaElement,
-      };
-    }
-
-    if (config.layout === 'inline-progress') {
-      root.classList.add('hud-item--progress');
-
-      if (iconElement) {
-        iconElement.classList.add('hud-item__icon');
-        root.appendChild(iconElement);
-      }
-
-      if (leadingElement) {
-        root.appendChild(leadingElement);
-      }
-
-      const progressWrapper = document.createElement('div');
-      progressWrapper.classList.add('hud-progress');
-
-      const progressBar = document.createElement('div');
-      progressBar.classList.add('hud-bar', 'hud-progress__track');
-      if (config.progressBarId) {
-        progressBar.id = config.progressBarId;
-      }
-      progressBar.setAttribute('role', 'progressbar');
-      progressBar.setAttribute('aria-valuemin', '0');
-      progressBar.setAttribute('aria-valuemax', '100');
-      progressBar.setAttribute('aria-valuenow', '0');
-      if (config.description) {
-        progressBar.setAttribute('aria-label', config.description);
-      }
-
-      const progressFill = document.createElement('div');
-      progressFill.classList.add(
-        'hud-bar__fill',
-        `hud-bar__fill--${config.key}`
-      );
-      if (config.progressFillId) {
-        progressFill.id = config.progressFillId;
-      }
-      progressFill.style.width = '0%';
-      progressBar.appendChild(progressFill);
-
-      const valueNumber = document.createElement('span');
-      valueNumber.classList.add(
-        'hud-item__value-number',
-        'hud-progress__value',
-        'hud-item__value'
-      );
-      valueNumber.textContent = config.initialValue ?? '--';
-      if (config.valueId) {
-        valueNumber.id = config.valueId;
-      }
-
-      progressWrapper.append(progressBar, valueNumber);
-
-      if (metaElement && metaPosition === 'after-value') {
-        metaElement.classList.add('hud-progress__meta');
-        progressWrapper.appendChild(metaElement);
-      }
-
-      root.appendChild(progressWrapper);
-
-      if (metaElement && metaPosition !== 'after-value') {
-        root.appendChild(metaElement);
-      }
-
-      if (config.key === 'shield') {
-        root.classList.add('locked');
-      }
-
-      return {
-        key: config.key,
-        config,
-        root,
-        value: valueNumber,
-        bar: progressBar,
-        barFill: progressFill,
-        meta: metaElement,
-        leading: leadingElement,
-      };
-    }
-
-    if (config.layout === 'inline-value') {
-      root.classList.add('hud-item--inline-value');
-
-      if (iconElement) {
-        iconElement.classList.add('hud-item__icon');
-        root.appendChild(iconElement);
-      }
-
-      const valueNumber = document.createElement('span');
-      valueNumber.classList.add('hud-item__value-number', 'hud-inline-value');
-      valueNumber.textContent = config.initialValue ?? '--';
-      if (config.valueId) {
-        valueNumber.id = config.valueId;
-      }
-
-      root.appendChild(valueNumber);
-
-      if (metaElement && metaPosition !== 'after-value') {
-        root.appendChild(metaElement);
-      }
-
-      return {
-        key: config.key,
-        config,
-        root,
-        value: valueNumber,
         meta: metaElement,
       };
     }
@@ -3253,7 +3161,8 @@ class UISystem extends BaseSystem {
     };
 
     // Update tactical readiness flag: tactical HUD is ready when minimap context is valid OR blip container is ready
-    this.tacticalState.isReady = !!((canvas && context) || blipContainer) && !!container;
+    this.tacticalState.isReady =
+      !!((canvas && context) || blipContainer) && !!container;
   }
 
   setupEventListeners() {
@@ -4471,587 +4380,10 @@ class UISystem extends BaseSystem {
 
     this.refreshHudFromServices(false);
     this.renderBossHud();
-    this.updateTacticalHud();
-  }
-
-  updateTacticalHud() {
-    // Guard: Skip tactical updates if DOM refs are not ready
-    // This prevents null reference errors during initialization or layout transitions
-    if (!this.tacticalState.isReady) {
-      return;
-    }
-
-    const minimapRefs = this.domRefs.minimap || {};
-    if (!minimapRefs.context || !minimapRefs.container) {
-      return;
-    }
-
-    const contactsData = this.collectTacticalContacts();
-    this.renderMinimap(contactsData);
-    this.updateThreatIndicators(contactsData);
-  }
-
-  collectTacticalContacts() {
-    const minimapRefs = this.domRefs.minimap || {};
-    const canvas = minimapRefs.canvas;
-    const context = minimapRefs.context;
-
-    if (!canvas || !context) {
-      this.tacticalState.contactsCache = null;
-      return null;
-    }
-
-    const range = this.resolveMinimapRange();
-    const detectionRange = Math.max(
-      range,
-      range * DEFAULT_MINIMAP_DETECTION_MULTIPLIER
-    );
-
-    const width = Number(canvas.width) || canvas.clientWidth || 0;
-    const height = Number(canvas.height) || canvas.clientHeight || 0;
-
-    const playerService = this.getService('player');
-    const physics = this.getService('physics');
-
-    const playerPosition =
-      playerService && typeof playerService.getPosition === 'function'
-        ? playerService.getPosition()
-        : null;
-    const playerAngle =
-      playerService && typeof playerService.getAngle === 'function'
-        ? playerService.getAngle()
-        : 0;
-
-    let contacts = [];
-    if (
-      physics &&
-      playerPosition &&
-      typeof physics.getNearbyEnemies === 'function'
-    ) {
-      try {
-        contacts = physics.getNearbyEnemies(
-          playerPosition.x,
-          playerPosition.y,
-          detectionRange
-        );
-      } catch (error) {
-        console.warn('[UISystem] Failed to gather tactical contacts:', error);
-        contacts = [];
-      }
-    }
-
-    const normalized = [];
-    if (playerPosition && Array.isArray(contacts)) {
-      for (let i = 0; i < contacts.length; i += 1) {
-        const enemy = contacts[i];
-        if (!enemy) {
-          continue;
-        }
-
-        const rawX =
-          enemy.x ??
-          enemy.position?.x ??
-          (Array.isArray(enemy.position) ? enemy.position[0] : null);
-        const rawY =
-          enemy.y ??
-          enemy.position?.y ??
-          (Array.isArray(enemy.position) ? enemy.position[1] : null);
-
-        const x = Number(rawX);
-        const y = Number(rawY);
-        if (!Number.isFinite(x) || !Number.isFinite(y)) {
-          continue;
-        }
-
-        const dx = x - playerPosition.x;
-        const dy = y - playerPosition.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const angle = Math.atan2(dy, dx);
-
-        const rawType =
-          enemy.enemyType ||
-          enemy.type ||
-          enemy.category ||
-          enemy.kind ||
-          'asteroid';
-        const type =
-          typeof rawType === 'string' && rawType.length > 0
-            ? rawType.toLowerCase()
-            : 'asteroid';
-
-        const idCandidate =
-          enemy.id ??
-          enemy.enemyId ??
-          enemy.uid ??
-          enemy.uuid ??
-          enemy.__id ??
-          null;
-        const id =
-          idCandidate !== null
-            ? idCandidate
-            : `${type}:${Math.round(x)}:${Math.round(y)}`;
-
-        normalized.push({
-          id,
-          type,
-          enemy,
-          x,
-          y,
-          dx,
-          dy,
-          distance,
-          angle,
-          radius: Number.isFinite(enemy.radius)
-            ? Number(enemy.radius)
-            : Number.isFinite(enemy.hitRadius)
-              ? Number(enemy.hitRadius)
-              : null,
-          isBoss:
-            type === 'boss' ||
-            enemy.isBoss === true ||
-            enemy.category === 'boss' ||
-            enemy.boss === true,
-        });
-      }
-    }
-
-    const result = {
-      player: playerPosition,
-      playerAngle,
-      range,
-      detectionRange,
-      width,
-      height,
-      contacts: normalized,
-    };
-
-    this.tacticalState.contactsCache = result;
-    this.cachedValues.minimap = {
-      ...this.cachedValues.minimap,
-      range,
-      detectionRange,
-      width,
-      height,
-    };
-
-    return result;
-  }
-
-  resolveMinimapRange() {
-    const minimapRefs = this.domRefs.minimap || {};
-    const canvas = minimapRefs.canvas;
-
-    if (canvas) {
-      const datasetRange =
-        canvas.dataset?.range ?? canvas.getAttribute?.('data-range');
-      const parsedDataset = Number(datasetRange);
-      if (Number.isFinite(parsedDataset) && parsedDataset > 0) {
-        return parsedDataset;
-      }
-    }
-
-    const rangeNode = minimapRefs.range;
-    if (rangeNode && typeof rangeNode.textContent === 'string') {
-      const match = rangeNode.textContent.match(/(\d+(?:\.\d+)?)\s*u?/i);
-      if (match) {
-        const parsed = Number(match[1]);
-        if (Number.isFinite(parsed) && parsed > 0) {
-          return parsed;
-        }
-      }
-    }
-
-    return DEFAULT_MINIMAP_RANGE;
-  }
-
-  resolveMinimapContactColor(contact = {}) {
-    const type =
-      typeof contact.type === 'string' && contact.type.length > 0
-        ? contact.type.toLowerCase()
-        : 'default';
-
-    if (MINIMAP_ENTITY_COLORS[type]) {
-      return MINIMAP_ENTITY_COLORS[type];
-    }
-
-    return MINIMAP_ENTITY_COLORS.default;
-  }
-
-  renderMinimap(contactsData = null) {
-    const minimapRefs = this.domRefs.minimap || {};
-    const container = minimapRefs.container;
-    const blipContainer = minimapRefs.blipContainer;
-
-    // Guard: Ensure container is valid
-    if (!container) {
-      return;
-    }
-
-    const data = contactsData || this.tacticalState.contactsCache;
-    if (!data) {
-      return;
-    }
-
-    const { range, contacts, playerAngle } = data;
-
-    // --- DOM-BASED RENDERING (AAA) ---
-    if (blipContainer) {
-      // Re-initialize with just player (this clears previous frame's enemies)
-      // Note: In a highly optimized loop, we might diff/patch DOM elements, 
-      // but setting innerHTML is sufficient for the requested "copy implementation" scope.
-      blipContainer.innerHTML = '<div class="blip player"></div>';
-      
-      if (Array.isArray(contacts) && contacts.length > 0) {
-        // Mockup logic: (x + 1) * 50 to convert -1..1 range to 0..100%
-        // But our contacts logic returns dx/distance. 
-        // We need normalized coordinates relative to radar radius.
-        // contactsCache provides dx, dy which are absolute offsets.
-        // We also have data.width/height if using canvas, but for DOM we assume 
-        // the blip container is 100% width/height of the radar area (e.g. 200x200 or similar).
-        // Let's assume the container is square and centered.
-        
-        for (let i = 0; i < contacts.length; i += 1) {
-          const contact = contacts[i];
-          const distance = Number(contact.distance);
-          if (!Number.isFinite(distance)) continue;
-          
-          const dx = Number(contact.dx) || 0;
-          const dy = Number(contact.dy) || 0;
-          
-          // Clamp distance to range for radar bounds
-          // Actually, typical radar shows things getting closer. 
-          // If distance > range, it shouldn't be shown or clamped to edge?
-          // Mockup logic: blips.forEach with x, y in -1..1
-          
-          if (distance > range) continue; // Or clamp? Let's hide if out of range for clean look.
-          
-          const normalizedX = dx / range;
-          const normalizedY = dy / range;
-          
-          const left = (normalizedX + 1) * 50;
-          const top = (normalizedY + 1) * 50;
-          
-          const el = document.createElement('div');
-          // Determine type class
-          const type = contact.type ? contact.type.toLowerCase() : 'enemy';
-          el.className = `blip ${type}`;
-          if (contact.isBoss) el.classList.add('boss');
-          
-          el.style.left = `${left.toFixed(1)}%`;
-          el.style.top = `${top.toFixed(1)}%`;
-          
-          // Optional: Color override if CSS doesn't match type
-          const color = this.resolveMinimapContactColor(contact);
-          if (color) {
-            el.style.backgroundColor = color;
-            el.style.boxShadow = `0 0 6px ${color}`;
-          }
-          
-          blipContainer.appendChild(el);
-        }
-      }
-      
-      const rangeNode = minimapRefs.range;
-      if (rangeNode) {
-        const label = `Range ${Math.round(range)}u`;
-        if (rangeNode.textContent !== label) {
-          rangeNode.textContent = label;
-          rangeNode.setAttribute('aria-label', label);
-        }
-      }
-      return;
-    }
-
-    // --- CANVAS-BASED RENDERING (Legacy/Minimal) ---
-    const canvas = minimapRefs.canvas;
-    const context = minimapRefs.context;
-
-    if (!canvas || !context) {
-      return;
-    }
-
-    const width = Number(canvas.width) || canvas.clientWidth || 0;
-    const height = Number(canvas.height) || canvas.clientHeight || 0;
-
-    // Additional safety: Validate canvas dimensions
-    if (width <= 0 || height <= 0) {
-      return;
-    }
-
-    context.clearRect(0, 0, width, height);
-
-    const radius = Math.max(8, Math.min(width, height) / 2 - 4);
-    const centerX = width / 2;
-    const centerY = height / 2;
-    const scale = radius / Math.max(1, range);
-
-    context.save();
-    context.translate(centerX, centerY);
-
-    context.beginPath();
-    context.fillStyle = 'rgba(10, 16, 28, 0.55)';
-    context.arc(0, 0, radius, 0, Math.PI * 2);
-    context.fill();
-
-    context.beginPath();
-    context.strokeStyle = 'rgba(255, 255, 255, 0.25)';
-    context.lineWidth = 2;
-    context.arc(0, 0, radius, 0, Math.PI * 2);
-    context.stroke();
-
-    context.beginPath();
-    context.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-    context.lineWidth = 1;
-    context.moveTo(-radius, 0);
-    context.lineTo(radius, 0);
-    context.moveTo(0, -radius);
-    context.lineTo(0, radius);
-    context.stroke();
-
-    context.save();
-    const heading = Number.isFinite(playerAngle) ? playerAngle : 0;
-    context.rotate(heading);
-    context.fillStyle = '#FFFFFF';
-    context.strokeStyle = 'rgba(255, 255, 255, 0.55)';
-    context.lineWidth = 1.5;
-    context.beginPath();
-    context.moveTo(6, 0);
-    context.lineTo(-5, 4.5);
-    context.lineTo(-5, -4.5);
-    context.closePath();
-    context.fill();
-    context.stroke();
-    context.restore();
-
-    if (Array.isArray(contacts) && contacts.length > 0) {
-      const sorted = contacts.slice().sort((a, b) => a.distance - b.distance);
-      for (let i = 0; i < sorted.length; i += 1) {
-        const contact = sorted[i];
-        const distance = Number(contact.distance);
-        if (!Number.isFinite(distance)) {
-          continue;
-        }
-
-        const dx = Number(contact.dx) || 0;
-        const dy = Number(contact.dy) || 0;
-        const magnitude = distance > 0 ? distance : 1;
-        const normalizedX = dx / magnitude;
-        const normalizedY = dy / magnitude;
-        const clampedDistance = Math.min(distance, range);
-        const drawX = normalizedX * clampedDistance * scale;
-        const drawY = normalizedY * clampedDistance * scale;
-        const color = this.resolveMinimapContactColor(contact);
-
-        const baseSize = contact.isBoss ? 5 : contact.type === 'hunter' ? 4 : 3;
-        context.fillStyle = color;
-        context.beginPath();
-        context.arc(drawX, drawY, baseSize, 0, Math.PI * 2);
-        context.fill();
-
-        if (distance > range) {
-          context.beginPath();
-          context.strokeStyle = color;
-          context.lineWidth = 1.5;
-          const boundaryX = normalizedX * radius;
-          const boundaryY = normalizedY * radius;
-          context.arc(boundaryX, boundaryY, baseSize + 1.5, 0, Math.PI * 2);
-          context.stroke();
-        }
-      }
-    }
-
-    context.restore();
-
-    const rangeNode = minimapRefs.range;
-    if (rangeNode) {
-      const label = `Range ${Math.round(range)}u`;
-      if (rangeNode.textContent !== label) {
-        rangeNode.textContent = label;
-        rangeNode.setAttribute('aria-label', label);
-      }
-    }
-  }
-
-  clearMinimapCanvas() {
-    const minimapRefs = this.domRefs.minimap || {};
-    const canvas = minimapRefs.canvas;
-    const context = minimapRefs.context;
-
-    if (canvas && context) {
-      const width = Number(canvas.width) || canvas.clientWidth || 0;
-      const height = Number(canvas.height) || canvas.clientHeight || 0;
-      context.clearRect(0, 0, width, height);
-    }
-
-    this.tacticalState.contactsCache = null;
-  }
-
-  resolveThreatId(contact = {}) {
-    if (contact.id !== undefined && contact.id !== null) {
-      return contact.id;
-    }
-
-    const keyParts = [contact.type || 'unknown'];
-    if (Number.isFinite(contact.distance)) {
-      keyParts.push(Math.round(contact.distance));
-    }
-    if (Number.isFinite(contact.angle)) {
-      keyParts.push(Math.round(contact.angle * 100));
-    }
-    return keyParts.join(':');
-  }
-
-  resolveThreatSeverity(distance, range, detectionRange) {
-    if (!Number.isFinite(distance)) {
-      return 'low';
-    }
-
-    if (!Number.isFinite(range) || range <= 0) {
-      return 'medium';
-    }
-
-    const effectiveDetection = Math.max(range, detectionRange || range);
-    const distanceBeyond = Math.max(0, distance - range);
-    const windowSize = Math.max(1, effectiveDetection - range);
-    const ratio = distanceBeyond / windowSize;
-
-    if (ratio <= 0.25) {
-      return 'high';
-    }
-
-    if (ratio <= 0.6) {
-      return 'medium';
-    }
-
-    return 'low';
-  }
-
-  resolveThreatIcon(type, isBoss = false) {
-    if (isBoss) {
-      return THREAT_ICON_LOOKUP.boss;
-    }
-
-    const normalized = typeof type === 'string' ? type.toLowerCase() : '';
-    return THREAT_ICON_LOOKUP[normalized] || THREAT_ICON_LOOKUP.default;
-  }
-
-  updateThreatIndicators(contactsData = null) {
-    const refs = this.domRefs.threatIndicators || {};
-    const container = refs.overlay || refs.container;
-
-    if (!container) {
-      this.resetThreatIndicators();
-      return;
-    }
-
-    const data = contactsData || this.tacticalState.contactsCache;
-    const contacts = data?.contacts || [];
-    const range =
-      data?.range ?? this.cachedValues.minimap.range ?? DEFAULT_MINIMAP_RANGE;
-    const detectionRange =
-      data?.detectionRange ?? this.cachedValues.minimap.detectionRange ?? range;
-
-    const offscreen = contacts
-      .filter(
-        (contact) =>
-          Number.isFinite(contact.distance) && contact.distance > range
-      )
-      .sort((a, b) => a.distance - b.distance)
-      .slice(0, MAX_THREAT_INDICATORS);
-
-    const seen = new Set();
-
-    for (let i = 0; i < offscreen.length; i += 1) {
-      const contact = offscreen[i];
-      const id = this.resolveThreatId(contact);
-      seen.add(id);
-
-      let entry = this.tacticalState.threats.get(id);
-      if (!entry) {
-        const element = document.createElement('div');
-        element.classList.add('threat-indicator');
-
-        const icon = document.createElement('span');
-        icon.classList.add('threat-indicator__icon');
-        element.appendChild(icon);
-
-        container.appendChild(element);
-        entry = { element, icon };
-        this.tacticalState.threats.set(id, entry);
-      }
-
-      const { element, icon } = entry;
-      const severity = this.resolveThreatSeverity(
-        contact.distance,
-        range,
-        detectionRange
-      );
-      const color = this.resolveMinimapContactColor(contact);
-      const iconSymbol = this.resolveThreatIcon(contact.type, contact.isBoss);
-
-      element.dataset.type = contact.type || 'unknown';
-      element.dataset.severity = severity;
-      element.style.setProperty('--threat-color', color);
-      element.classList.toggle('threat-indicator--high', severity === 'high');
-      element.classList.toggle(
-        'threat-indicator--medium',
-        severity === 'medium'
-      );
-      element.classList.toggle('threat-indicator--low', severity === 'low');
-      element.classList.toggle('threat-pulse', severity !== 'low');
-
-      if (icon && icon.textContent !== iconSymbol) {
-        icon.textContent = iconSymbol;
-      }
-
-      if (Number.isFinite(contact.angle)) {
-        const angleDeg = (contact.angle * 180) / Math.PI;
-        const distanceBeyond = Math.max(0, contact.distance - range);
-        const windowSize = Math.max(1, detectionRange - range);
-        const normalizedOffset = Math.min(1, distanceBeyond / windowSize);
-        const radiusPercent = 42 + normalizedOffset * 18;
-        const x = 50 + Math.cos(contact.angle) * radiusPercent;
-        const y = 50 + Math.sin(contact.angle) * radiusPercent;
-        element.style.left = `${x}%`;
-        element.style.top = `${y}%`;
-        element.style.transform = `translate(-50%, -50%) rotate(${angleDeg}deg)`;
-        element.style.setProperty('--threat-angle', `${angleDeg}deg`);
-      }
-    }
-
-    for (const [id, entry] of this.tacticalState.threats.entries()) {
-      if (!seen.has(id)) {
-        if (entry?.element?.parentElement) {
-          entry.element.parentElement.removeChild(entry.element);
-        }
-        this.tacticalState.threats.delete(id);
-      }
-    }
-
-    container.classList.toggle('is-active', offscreen.length > 0);
-  }
-
-  resetThreatIndicators() {
-    if (this.tacticalState?.threats instanceof Map) {
-      for (const [, entry] of this.tacticalState.threats.entries()) {
-        if (entry?.element?.parentElement) {
-          entry.element.parentElement.removeChild(entry.element);
-        }
-      }
-      this.tacticalState.threats.clear();
-    }
-
-    const refs = this.domRefs.threatIndicators || {};
-    const container = refs.overlay || refs.container;
-    if (container) {
-      container.classList.remove('is-active');
-    }
   }
 
   resetTacticalHud() {
     this.resetComboMeter({ silent: true });
-    this.resetThreatIndicators();
-    this.clearMinimapCanvas();
   }
 
   resetComboMeter(options = {}) {
