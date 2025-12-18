@@ -2290,7 +2290,12 @@ class UISystem extends BaseSystem {
         maxHealth > 0
           ? Math.max(0, Math.min(100, (currentHealth / maxHealth) * 100))
           : 100;
-      hud.updateBoss(true, bossName, percent);
+      const phaseInfo = {
+        phase: bossState.phase ?? 0,
+        phaseCount: bossState.phaseCount ?? 1,
+        phaseColors: bossState.phaseColors || [],
+      };
+      hud.updateBoss(true, bossName, percent, phaseInfo);
     }
   }
 

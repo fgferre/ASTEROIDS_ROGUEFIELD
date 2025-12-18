@@ -205,20 +205,64 @@ export class AAAHudLayout {
   }
 
   /** Mostra/Esconde e atualiza Boss Bar */
-  updateBoss(active, name, healthPercent) {
+  updateBoss(active, name, healthPercent, phaseInfo) {
     if (!this.els) {
       return;
     }
 
     if (!active) {
       this.els.bossPanel.classList.remove('active');
+      this._resetBossColors();
       return;
     }
 
     this.els.bossPanel.classList.add('active');
-    if (name) this.els.bossName.innerText = name;
-    if (healthPercent !== undefined)
+
+    // Phase text: "BOSS NAME • PHASE 2/3"
+    const phase = phaseInfo?.phase;
+    const phaseCount = phaseInfo?.phaseCount;
+    const hasPhases = typeof phase === 'number' && phaseCount > 1;
+    const displayName = hasPhases
+      ? `${name || 'BOSS'} • PHASE ${phase + 1}/${phaseCount}`
+      : name || 'BOSS';
+    this.els.bossName.innerText = displayName;
+
+    // Phase color: change bar color based on current phase
+    const phaseColors = phaseInfo?.phaseColors;
+    if (
+      Array.isArray(phaseColors) &&
+      phaseColors.length > 0 &&
+      typeof phase === 'number'
+    ) {
+      const color =
+        phaseColors[Math.min(phase, phaseColors.length - 1)] || '#ff003c';
+      const darkColor = this._darkenColor(color, 0.4);
+      this.els.bossFill.style.background = `repeating-linear-gradient(45deg, ${color}, ${color} 10px, ${darkColor} 10px, ${darkColor} 20px)`;
+      this.els.bossFill.style.boxShadow = `0 0 20px ${color}`;
+    }
+
+    if (healthPercent !== undefined) {
       this.els.bossFill.style.width = healthPercent + '%';
+    }
+  }
+
+  /** Reset boss bar colors to default */
+  _resetBossColors() {
+    if (!this.els?.bossFill) return;
+    this.els.bossFill.style.background = '';
+    this.els.bossFill.style.boxShadow = '';
+  }
+
+  /** Darken a hex color by a factor (0-1) */
+  _darkenColor(hex, factor) {
+    if (!hex || typeof hex !== 'string') return '#880020';
+    const clean = hex.replace('#', '');
+    if (clean.length !== 6) return '#880020';
+    const num = parseInt(clean, 16);
+    const r = Math.max(0, Math.floor(((num >> 16) & 0xff) * (1 - factor)));
+    const g = Math.max(0, Math.floor(((num >> 8) & 0xff) * (1 - factor)));
+    const b = Math.max(0, Math.floor((num & 0xff) * (1 - factor)));
+    return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
   }
 
   /** Atualiza XP, N¡vel e Onda */
@@ -265,8 +309,8 @@ export class AAAHudLayout {
       this.els.radarContainer.appendChild(el);
     });
   }
-    _getHTML() {
-        return `
+  _getHTML() {
+    return `
             <!-- STATS (Top Left) -->
             <div class="stats-area hud-panel">
                 <div class="stats-grid">
@@ -373,9 +417,9 @@ export class AAAHudLayout {
             
             <div class="cockpit-frame"></div>
         `;
-    }
-    _getCSS() {
-        return `
+  }
+  _getCSS() {
+    return `
             @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
             
             :root { 
@@ -499,6 +543,5 @@ export class AAAHudLayout {
             
             @media (max-width: 900px) { #hud-layer { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; } .stats-area { position: absolute; top: 10px; left: 10px; } .radar-area { position: absolute; top: 10px; right: 10px; } .boss-area { margin-top: 60px; transform: scale(0.8); } .status-area { position: absolute; bottom: 20px; left: 10px; transform: scale(0.9); transform-origin: bottom left; } .systems-area { position: absolute; bottom: 20px; right: 10px; transform: scale(0.9); transform-origin: bottom right; } .bottom-center { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 300px; } }
         `;
-    }
+  }
 }
-
