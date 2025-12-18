@@ -234,16 +234,6 @@ const SETTINGS_SCHEMA = [
         step: 0.05,
       },
       {
-        key: 'hudLayout',
-        type: 'select',
-        label: 'Layout do HUD',
-        description:
-          'Alterne entre o visual clássico e o HUD tático minimalista.',
-        default: DEFAULT_HUD_LAYOUT_ID,
-        options: HUD_LAYOUT_OPTIONS.map((option) => option.value),
-        optionLabels: HUD_LAYOUT_OPTION_LABELS,
-      },
-      {
         key: 'screenShakeIntensity',
         type: 'range',
         label: 'Intensidade do impacto',
