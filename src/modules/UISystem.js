@@ -2049,10 +2049,11 @@ class UISystem extends BaseSystem {
       hudRoot.setAttribute('aria-hidden', 'true');
     }
 
-    if (countdown) {
-      countdown.style.display = 'none';
-      countdown.setAttribute('aria-hidden', 'true');
-    }
+    // Keep countdown visible - AAA Tactical HUD doesn't have its own countdown
+    // if (countdown) {
+    //   countdown.style.display = 'none';
+    //   countdown.setAttribute('aria-hidden', 'true');
+    // }
 
     this.aaaTacticalHud = new AAAHudLayout();
     this.aaaTacticalHudDefinition = definition;
