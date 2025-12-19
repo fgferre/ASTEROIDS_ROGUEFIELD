@@ -3,7 +3,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
 import RandomService from '../core/RandomService.js';
 import { ScreenShake, ShakePresets } from '../utils/ScreenShake.js';
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { resolveService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 import { SHIELD_SHOCKWAVE_RADIUS } from '../data/constants/gameplay.js';

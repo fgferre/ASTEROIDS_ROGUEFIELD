@@ -3,7 +3,7 @@ import AudioPool from './AudioPool.js';
 import AudioCache from './AudioCache.js';
 import AudioBatcher from './AudioBatcher.js';
 import RandomService from '../core/RandomService.js';
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { resolveService } from '../core/serviceUtils.js';
 import {
   BOSS_AUDIO_FREQUENCY_PRESETS,
   MUSIC_LAYER_CONFIG,

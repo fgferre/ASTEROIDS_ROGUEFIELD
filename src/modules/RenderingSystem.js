@@ -6,17 +6,12 @@ import RandomService from '../core/RandomService.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
-import { SHIP_MAX_SPEED } from '../data/constants/physics.js';
 import { MAGNETISM_RADIUS } from '../data/constants/gameplay.js';
 import { clamp } from '../utils/mathHelpers.js';
 import { normalize as normalizeVector } from '../utils/vectorHelpers.js';
-import { NeonGraphics } from '../utils/NeonGraphics.js';
 
 // [NEO-ARCADE] Shield Visual Constants
 const SHIELD_HEX_SIZE = 24;
-const SHIELD_RIM_WIDTH = 2;
-const SHIELD_RIM_COLOR = '#00ffff';
-const SHIELD_FILL_COLOR = 'rgba(0, 255, 255, 0.1)';
 
 const MAX_VISUAL_TILT = 0.3;
 const TILT_MULTIPLIER = 0.12;

@@ -4,7 +4,6 @@
  */
 
 const MAX_BATCH_SIZE = 1000;
-const REUSE_THRESHOLD = 0.8; // Reuse batch if 80% similar
 
 class RenderBatch {
   constructor() {

@@ -6,7 +6,7 @@ import {
   SHIP_SIZE,
 } from '../core/GameConstants.js';
 import { SpatialHash } from '../core/SpatialHash.js';
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import { resolveService } from '../core/serviceUtils.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 import {
   safeNumber,
