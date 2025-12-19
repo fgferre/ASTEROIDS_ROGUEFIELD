@@ -1,0 +1,209 @@
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\core\CanvasStateManager.js
+   97:16  warning  'e' is defined but never used         no-unused-vars
+  317:58  warning  'cacheKey' is defined but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\core\DIContainer.js
+  487:14  warning  'e' is defined but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\core\GamePools.js
+  676:17  warning  'deltaTime' is defined but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\core\GradientCache.js
+  266:26  warning  'height' is defined but never used           no-unused-vars
+  440:23  warning  'preset' is assigned a value but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\core\RandomService.js
+  167:36  warning  'index' is defined but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\core\RenderBatch.js
+    7:7   warning  'REUSE_THRESHOLD' is assigned a value but never used  no-unused-vars
+  400:17  warning  'key' is defined but never used                       no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\core\SpatialHash.js
+  320:17  warning  'cellKey' is assigned a value but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\data\settingsSchema.js
+  3:10  warning  'DEFAULT_HUD_LAYOUT_ID' is defined but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\AudioBatcher.js
+  215:27  warning  'params' is defined but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\AudioCache.js
+  336:14  warning  'error' is defined but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\AudioPool.js
+  132:14  warning  'e' is defined but never used  no-unused-vars
+  153:14  warning  'e' is defined but never used  no-unused-vars
+  184:20  warning  'e' is defined but never used  no-unused-vars
+  210:20  warning  'e' is defined but never used  no-unused-vars
+  230:16  warning  'e' is defined but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\AudioSystem.js
+     6:10  warning  'normalizeDependencies' is defined but never used   no-unused-vars
+    86:7   warning  'filterCutoff' is assigned a value but never used   no-unused-vars
+   256:16  warning  'e' is defined but never used                       no-unused-vars
+   263:14  warning  'e' is defined but never used                       no-unused-vars
+   272:18  warning  'e' is defined but never used                       no-unused-vars
+   285:20  warning  'e' is defined but never used                       no-unused-vars
+   309:17  warning  'type' is assigned a value but never used           no-unused-vars
+   314:18  warning  'e' is defined but never used                       no-unused-vars
+   321:16  warning  'e' is defined but never used                       no-unused-vars
+   331:20  warning  'e' is defined but never used                       no-unused-vars
+   342:20  warning  'e' is defined but never used                       no-unused-vars
+  1127:16  warning  'error' is defined but never used                   no-unused-vars
+  1153:16  warning  'error' is defined but never used                   no-unused-vars
+  1246:19  warning  'payload' is assigned a value but never used        no-unused-vars
+  2395:16  warning  'payload' is assigned a value but never used        no-unused-vars
+  2597:20  warning  'payload' is assigned a value but never used        no-unused-vars
+  3819:11  warning  'lastIntensity' is assigned a value but never used  no-unused-vars
+  4302:21  warning  'methodName' is defined but never used              no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\CombatSystem.js
+  2724:15  warning  'duplicateCount' is assigned a value but never used  no-unused-vars
+  2758:45  warning  'duplicateCount' is defined but never used           no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\EffectsSystem.js
+     6:10  warning  'normalizeDependencies' is defined but never used  no-unused-vars
+   245:27  warning  'random' is assigned a value but never used        no-unused-vars
+   372:18  warning  'error' is defined but never used                  no-unused-vars
+  1164:53  warning  'eventName' is assigned a value but never used     no-unused-vars
+  2111:11  warning  'i' is assigned a value but never used             no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\EnemySystem.js
+   5:3  warning  'GAME_HEIGHT' is defined but never used                         no-unused-vars
+   6:3  warning  'GAME_WIDTH' is defined but never used                          no-unused-vars
+  42:3  warning  'ASTEROID_EDGE_SPAWN_MARGIN' is defined but never used          no-unused-vars
+  43:3  warning  'COLLISION_BOUNCE' is defined but never used                    no-unused-vars
+  44:3  warning  'MAX_ASTEROIDS_ON_SCREEN' is defined but never used             no-unused-vars
+  45:3  warning  'PRESERVE_LEGACY_POSITIONING' is defined but never used         no-unused-vars
+  46:3  warning  'PRESERVE_LEGACY_SIZE_DISTRIBUTION' is defined but never used   no-unused-vars
+  52:3  warning  'WAVEMANAGER_HANDLES_ASTEROID_SPAWN' is defined but never used  no-unused-vars
+  60:3  warning  'ASTEROID_VARIANTS' is defined but never used                   no-unused-vars
+  61:3  warning  'ASTEROID_VARIANT_CHANCES' is defined but never used            no-unused-vars
+  65:7  warning  'ASTEROID_POOL_ID' is assigned a value but never used           no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\InputSystem.js
+  715:51  warning  'field' is defined but never used           no-unused-vars
+  804:13  warning  'event' is assigned a value but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\MenuBackgroundSystem.js
+   20:13  warning  'random' is assigned a value but never used  no-unused-vars
+  237:16  warning  'error' is defined but never used            no-unused-vars
+  503:16  warning  'error' is defined but never used            no-unused-vars
+  515:16  warning  'error' is defined but never used            no-unused-vars
+  538:16  warning  'error' is defined but never used            no-unused-vars
+  549:16  warning  'error' is defined but never used            no-unused-vars
+  560:16  warning  'error' is defined but never used            no-unused-vars
+  623:18  warning  'error' is defined but never used            no-unused-vars
+  626:20  warning  'innerError' is defined but never used       no-unused-vars
+  637:14  warning  'error' is defined but never used            no-unused-vars
+  641:18  warning  'innerError' is defined but never used       no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\PhysicsSystem.js
+     9:10  warning  'normalizeDependencies' is defined but never used  no-unused-vars
+   228:16  warning  'error' is defined but never used                  no-unused-vars
+   538:16  warning  'error' is defined but never used                  no-unused-vars
+   821:14  warning  'error' is defined but never used                  no-unused-vars
+   847:16  warning  'error' is defined but never used                  no-unused-vars
+  1934:11  warning  'radiusSq' is assigned a value but never used      no-unused-vars
+  1970:18  warning  'error' is defined but never used                  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\ProgressionSystem.js
+  116:54  warning  'payload' is assigned a value but never used  no-unused-vars
+  125:49  warning  'payload' is assigned a value but never used  no-unused-vars
+  130:48  warning  'payload' is assigned a value but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\RenderingSystem.js
+     7:10  warning  'resolveService' is defined but never used                           no-unused-vars
+     9:10  warning  'SHIP_MAX_SPEED' is defined but never used                           no-unused-vars
+    13:10  warning  'NeonGraphics' is defined but never used                             no-unused-vars
+    17:7   warning  'SHIELD_RIM_WIDTH' is assigned a value but never used                no-unused-vars
+    18:7   warning  'SHIELD_RIM_COLOR' is assigned a value but never used                no-unused-vars
+    19:7   warning  'SHIELD_FILL_COLOR' is assigned a value but never used               no-unused-vars
+   152:7   warning  'RENDERING_RANDOM_FALLBACK_SEED' is assigned a value but never used  no-unused-vars
+   154:7   warning  'SPACE_SKY_LAYERS' is assigned a value but never used                no-unused-vars
+   161:7   warning  'SPACE_SKY_PRESETS' is assigned a value but never used               no-unused-vars
+   192:10  warning  'resolveDevicePixelRatio' is defined but never used                  no-unused-vars
+   201:10  warning  'resolveTimestamp' is defined but never used                         no-unused-vars
+   212:10  warning  'normalizeTintValue' is defined but never used                       no-unused-vars
+   220:10  warning  'extractVelocityComponent' is defined but never used                 no-unused-vars
+   742:14  warning  'error' is defined but never used                                    no-unused-vars
+   926:17  warning  'fieldRotation' is assigned a value but never used                   no-unused-vars
+  1186:11  warning  'batch' is assigned a value but never used                           no-unused-vars
+  1211:11  warning  'batch' is assigned a value but never used                           no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\UISystem.js
+    26:7   warning  'MINIMAP_ENTITY_COLORS' is assigned a value but never used                 no-unused-vars
+    35:7   warning  'THREAT_ICON_LOOKUP' is assigned a value but never used                    no-unused-vars
+    44:7   warning  'DEFAULT_MINIMAP_RANGE' is assigned a value but never used                 no-unused-vars
+    45:7   warning  'DEFAULT_MINIMAP_DETECTION_MULTIPLIER' is assigned a value but never used  no-unused-vars
+    46:7   warning  'MAX_THREAT_INDICATORS' is assigned a value but never used                 no-unused-vars
+  1370:28  warning  'payload' is assigned a value but never used                               no-unused-vars
+  2231:18  warning  'error' is defined but never used                                          no-unused-vars
+  5765:22  warning  'data' is defined but never used                                           no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\UpgradeSystem.js
+  77:54  warning  'payload' is assigned a value but never used  no-unused-vars
+  81:49  warning  'payload' is assigned a value but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\WorldSystem.js
+  38:10  warning  'deltaTime' is defined but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\enemies\base\BaseEnemy.js
+   43:23  warning  'config' is assigned a value but never used  no-unused-vars
+  157:12  warning  'deltaTime' is defined but never used        no-unused-vars
+  199:10  warning  'ctx' is defined but never used              no-unused-vars
+  242:13  warning  'amount' is defined but never used           no-unused-vars
+  242:21  warning  'source' is defined but never used           no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\enemies\base\EnemyFactory.js
+  343:17  warning  '_' is defined but never used  no-unused-vars
+  344:20  warning  '_' is defined but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\enemies\components\CollisionComponent.js
+  50:20  warning  'other' is assigned a value but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\enemies\components\MovementComponent.js
+  275:5  warning  'random' is defined but never used          no-unused-vars
+  345:5  warning  'player' is defined but never used          no-unused-vars
+  346:5  warning  'playerPosition' is defined but never used  no-unused-vars
+  348:5  warning  'config' is defined but never used          no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\enemies\managers\RewardManager.js
+  225:27  warning  'variant' is defined but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\enemies\managers\WaveManager.js
+    43:3   warning  'WAVE_DURATION' is defined but never used           no-unused-vars
+  1717:18  warning  '_omittedCount' is assigned a value but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\enemies\systems\EnemyUpdateSystem.js
+  591:11  warning  'facade' is assigned a value but never used  no-unused-vars
+  614:11  warning  'facade' is assigned a value but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\enemies\types\BossEnemy.js
+  1130:10  warning  'ctx' is defined but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\enemies\types\Drone.js
+  259:10  warning  'ctx' is defined but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\enemies\types\Hunter.js
+  233:10  warning  'ctx' is defined but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\modules\enemies\types\Mine.js
+  228:10  warning  'ctx' is defined but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\services\GameSessionService.js
+  617:43  warning  'payload' is assigned a value but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\utils\PerformanceMonitor.js
+  181:14  warning  'e' is defined but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\utils\dev\GameDebugLogger.js
+  31:12  warning  'error' is defined but never used  no-unused-vars
+
+C:\Users\fgfer\OneDrive\Documents\GitHub\ASTEROIDS_ROGUEFIELD\src\utils\dev\mathRandomGuard.js
+  68:12  warning  'error' is defined but never used  no-unused-vars
+
+Ô£û 130 problems (0 errors, 130 warnings)
+

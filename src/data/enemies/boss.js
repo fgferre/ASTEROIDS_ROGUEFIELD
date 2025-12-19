@@ -104,12 +104,6 @@ const _bossConfigBase = {
   phaseColors: Object.freeze(['#ff6b6b', '#f9c74f', '#4d96ff']),
 };
 
-// Add deprecated aliases for backward compatibility
-// TODO: Remove these aliases after dependent code migrates to new field names
-_bossConfigBase.spreadInterval = _bossConfigBase.spreadCooldown;
-_bossConfigBase.volleyInterval = _bossConfigBase.volleyCooldown;
-_bossConfigBase.spawnInterval = _bossConfigBase.spawnCooldown;
-
 export const BOSS_CONFIG = deepFreeze(_bossConfigBase);
 
 /**

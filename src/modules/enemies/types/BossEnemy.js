@@ -20,18 +20,18 @@ const BASE_CONFIG = {
   projectileDamage: 35,
   spreadProjectileCount: 7,
   spreadProjectileSpeed: 260,
-  spreadInterval: 2.4,
+  spreadCooldown: 2.4,
   spreadVariance: 0.45,
   spreadArc: 0.85,
   spreadAngleVariance: 0.12,
   volleyBurstSize: 5,
   volleyShotDelay: 0.16,
-  volleyInterval: 1.35,
+  volleyCooldown: 1.35,
   volleyVariance: 0.2,
   volleyProjectileSpeed: 320,
   volleySpread: 0.12,
   minionTypes: ['drone', 'hunter'],
-  spawnInterval: 6.5,
+  spawnCooldown: 6.5,
   spawnVariance: 1.1,
   chargeCooldown: 6.2,
   chargeDuration: 1.1,
@@ -86,21 +86,21 @@ export class BossEnemy extends BaseEnemy {
     this.phaseHealthThresholds = [];
     this.nextPhaseIndex = 0;
 
-    this.spreadInterval = BOSS_DEFAULTS.spreadInterval;
-    this.spreadIntervalVariance = BOSS_DEFAULTS.spreadVariance ?? 0;
+    this.spreadCooldown = BOSS_DEFAULTS.spreadCooldown;
+    this.spreadCooldownVariance = BOSS_DEFAULTS.spreadVariance ?? 0;
     this.spreadProjectileCount = BOSS_DEFAULTS.spreadProjectileCount ?? 5;
     this.spreadProjectileSpeed = BOSS_DEFAULTS.spreadProjectileSpeed ?? 240;
     this.spreadArc = BOSS_DEFAULTS.spreadArc ?? 0.75;
     this.spreadAngleVariance = BOSS_DEFAULTS.spreadAngleVariance ?? 0;
 
-    this.volleyInterval = BOSS_DEFAULTS.volleyInterval ?? 1.5;
-    this.volleyIntervalVariance = BOSS_DEFAULTS.volleyVariance ?? 0;
+    this.volleyCooldown = BOSS_DEFAULTS.volleyCooldown ?? 1.5;
+    this.volleyCooldownVariance = BOSS_DEFAULTS.volleyVariance ?? 0;
     this.volleyBurstSize = BOSS_DEFAULTS.volleyBurstSize ?? 4;
     this.volleyShotDelay = BOSS_DEFAULTS.volleyShotDelay ?? 0.18;
     this.volleyProjectileSpeed = BOSS_DEFAULTS.volleyProjectileSpeed ?? 320;
     this.volleySpread = BOSS_DEFAULTS.volleySpread ?? 0.08;
 
-    this.spawnInterval = BOSS_DEFAULTS.spawnInterval ?? 8;
+    this.spawnCooldown = BOSS_DEFAULTS.spawnCooldown ?? 8;
     this.spawnVariance = BOSS_DEFAULTS.spawnVariance ?? 0;
     this.minionTypes = [...(BOSS_DEFAULTS.minionTypes ?? ['drone'])];
 
@@ -220,9 +220,9 @@ export class BossEnemy extends BaseEnemy {
       config.spreadProjectileCount ?? defaults.spreadProjectileCount ?? 7;
     this.spreadProjectileSpeed =
       config.spreadProjectileSpeed ?? defaults.spreadProjectileSpeed ?? 260;
-    this.spreadInterval =
-      config.spreadInterval ?? defaults.spreadInterval ?? 2.4;
-    this.spreadIntervalVariance =
+    this.spreadCooldown =
+      config.spreadCooldown ?? defaults.spreadCooldown ?? 2.4;
+    this.spreadCooldownVariance =
       config.spreadVariance ?? defaults.spreadVariance ?? 0;
     this.spreadArc = config.spreadArc ?? defaults.spreadArc ?? 0.85;
     this.spreadAngleVariance =
@@ -232,9 +232,9 @@ export class BossEnemy extends BaseEnemy {
       config.volleyBurstSize ?? defaults.volleyBurstSize ?? 5;
     this.volleyShotDelay =
       config.volleyShotDelay ?? defaults.volleyShotDelay ?? 0.16;
-    this.volleyInterval =
-      config.volleyInterval ?? defaults.volleyInterval ?? 1.35;
-    this.volleyIntervalVariance =
+    this.volleyCooldown =
+      config.volleyCooldown ?? defaults.volleyCooldown ?? 1.35;
+    this.volleyCooldownVariance =
       config.volleyVariance ?? defaults.volleyVariance ?? 0;
     this.volleyProjectileSpeed =
       config.volleyProjectileSpeed ?? defaults.volleyProjectileSpeed ?? 320;
@@ -244,7 +244,7 @@ export class BossEnemy extends BaseEnemy {
       Array.isArray(config.minionTypes) && config.minionTypes.length
         ? [...config.minionTypes]
         : [...(defaults.minionTypes || ['drone'])];
-    this.spawnInterval = config.spawnInterval ?? defaults.spawnInterval ?? 6.5;
+    this.spawnCooldown = config.spawnCooldown ?? defaults.spawnCooldown ?? 6.5;
     this.spawnVariance = config.spawnVariance ?? defaults.spawnVariance ?? 0;
 
     this.chargeCooldown =
@@ -305,11 +305,11 @@ export class BossEnemy extends BaseEnemy {
     this.currentPhase = 0;
     this.nextPhaseIndex = 0;
 
-    this.spreadTimer = this.computeSpreadInterval();
-    this.volleyTimer = this.computeVolleyInterval();
+    this.spreadTimer = this.computeSpreadCooldown();
+    this.volleyTimer = this.computeVolleyCooldown();
     this.volleyShotTimer = 0;
     this.volleyShotsRemaining = 0;
-    this.spawnTimer = this.computeSpawnInterval();
+    this.spawnTimer = this.computeSpawnCooldown();
     this.chargeTimer = this.chargeCooldown;
     this.chargeState = 'idle';
     this.chargeStateTimer = 0;
@@ -438,7 +438,7 @@ export class BossEnemy extends BaseEnemy {
       this.spreadTimer -= deltaTime;
       if (this.spreadTimer <= 0 && target?.position) {
         this.fireSpreadPattern(target.position);
-        this.spreadTimer = this.computeSpreadInterval();
+        this.spreadTimer = this.computeSpreadCooldown();
       }
     }
   }
@@ -553,7 +553,7 @@ export class BossEnemy extends BaseEnemy {
 
   startVolley() {
     this.volleyShotsRemaining = Math.max(0, Math.floor(this.volleyBurstSize));
-    this.volleyTimer = this.computeVolleyInterval();
+    this.volleyTimer = this.computeVolleyCooldown();
   }
 
   updateMinionSpawns(deltaTime) {
@@ -566,7 +566,7 @@ export class BossEnemy extends BaseEnemy {
       return;
     }
 
-    this.spawnTimer = this.computeSpawnInterval();
+    this.spawnTimer = this.computeSpawnCooldown();
     this.spawnMinion();
   }
 
@@ -928,24 +928,24 @@ export class BossEnemy extends BaseEnemy {
     return { player, position: position || null };
   }
 
-  computeSpreadInterval() {
-    const base = Math.max(0.6, this.spreadInterval || 0);
+  computeSpreadCooldown() {
+    const base = Math.max(0.6, this.spreadCooldown || 0);
     return Math.max(
       0.45,
-      base + this.sampleVariance(this.spreadIntervalVariance)
+      base + this.sampleVariance(this.spreadCooldownVariance)
     );
   }
 
-  computeVolleyInterval() {
-    const base = Math.max(0.45, this.volleyInterval || 0);
+  computeVolleyCooldown() {
+    const base = Math.max(0.45, this.volleyCooldown || 0);
     return Math.max(
       0.3,
-      base + this.sampleVariance(this.volleyIntervalVariance)
+      base + this.sampleVariance(this.volleyCooldownVariance)
     );
   }
 
-  computeSpawnInterval() {
-    const base = Math.max(1, this.spawnInterval || 0);
+  computeSpawnCooldown() {
+    const base = Math.max(1, this.spawnCooldown || 0);
     return Math.max(0.75, base + this.sampleVariance(this.spawnVariance));
   }
 
@@ -1045,9 +1045,9 @@ export class BossEnemy extends BaseEnemy {
       timer: this.invulnerabilityTimer,
     });
 
-    this.spreadTimer = this.computeSpreadInterval();
-    this.volleyTimer = this.computeVolleyInterval();
-    this.spawnTimer = this.computeSpawnInterval();
+    this.spreadTimer = this.computeSpreadCooldown();
+    this.volleyTimer = this.computeVolleyCooldown();
+    this.spawnTimer = this.computeSpawnCooldown();
     this.chargeTimer = this.chargeCooldown;
     this.chargeState = 'idle';
     this.chargeStateTimer = 0;

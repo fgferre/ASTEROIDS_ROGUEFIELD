@@ -323,53 +323,10 @@ export default class CommandQueueService {
       return value;
     }
 
-    if (typeof structuredClone === 'function') {
-      try {
-        return structuredClone(value);
-      } catch (error) {
-        console.warn(
-          '[CommandQueueService] structuredClone failed, falling back to JSON/manual clone:',
-          error
-        );
-      }
-    }
-
     try {
+      return structuredClone(value);
+    } catch {
       return JSON.parse(JSON.stringify(value));
-    } catch (error) {
-      console.warn(
-        '[CommandQueueService] JSON clone failed, performing manual deep clone:',
-        error
-      );
     }
-
-    return this.manualDeepClone(value, new WeakMap());
-  }
-
-  manualDeepClone(value, seen) {
-    if (value === null || typeof value !== 'object') {
-      return value;
-    }
-
-    if (seen.has(value)) {
-      return seen.get(value);
-    }
-
-    if (Array.isArray(value)) {
-      const clone = [];
-      seen.set(value, clone);
-      for (const item of value) {
-        clone.push(this.manualDeepClone(item, seen));
-      }
-      return clone;
-    }
-
-    const clone = {};
-    seen.set(value, clone);
-    for (const [key, item] of Object.entries(value)) {
-      clone[key] = this.manualDeepClone(item, seen);
-    }
-
-    return clone;
   }
 }
