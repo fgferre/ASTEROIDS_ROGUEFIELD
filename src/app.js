@@ -549,6 +549,10 @@ function gameLoop(currentTime) {
         const combat = gameSystemServices?.['combat'];
         const xpOrbs = gameSystemServices?.['xp-orbs'];
         const effects = gameSystemServices?.['effects'];
+        const projectilePerf =
+          combat && typeof combat.getProjectilePerfSnapshot === 'function'
+            ? combat.getProjectilePerfSnapshot()
+            : null;
 
         metricsCache = {
           enemies: enemies?.asteroids?.length || 0,
@@ -556,6 +560,14 @@ function gameLoop(currentTime) {
           orbs: xpOrbs?.orbs?.length || 0,
           particles: effects?.particles?.length || 0,
           wave: enemies?.waveManager?.currentWave || 0,
+          projectileUpdateMs: projectilePerf?.projectileUpdateMs || 0,
+          projectileRenderMs: projectilePerf?.projectileRenderMs || 0,
+          projectilePlayerCount: projectilePerf?.projectilePlayerCount || 0,
+          projectileEnemyCount: projectilePerf?.projectileEnemyCount || 0,
+          projectilePlayerTrailPoints:
+            projectilePerf?.projectilePlayerTrailPoints || 0,
+          projectileEnemyTrailPoints:
+            projectilePerf?.projectileEnemyTrailPoints || 0,
         };
       }
 

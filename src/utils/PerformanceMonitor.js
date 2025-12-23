@@ -53,6 +53,12 @@ export class PerformanceMonitor {
       particles: 0,
       wave: 0,
       score: 0,
+      projectileUpdateMs: 0,
+      projectileRenderMs: 0,
+      projectilePlayerCount: 0,
+      projectileEnemyCount: 0,
+      projectilePlayerTrailPoints: 0,
+      projectileEnemyTrailPoints: 0,
     };
 
     // Performance thresholds

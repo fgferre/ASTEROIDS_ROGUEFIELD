@@ -130,6 +130,14 @@ class CombatSystem extends BaseSystem {
     this.cachedEnemies = null;
     this.cachedPhysics = null;
     this.bulletGlowCache = null;
+    this.projectilePerf = {
+      projectileUpdateMs: 0,
+      projectileRenderMs: 0,
+      projectilePlayerCount: 0,
+      projectileEnemyCount: 0,
+      projectilePlayerTrailPoints: 0,
+      projectileEnemyTrailPoints: 0,
+    };
 
     this.setupEventListeners();
     this.resolveCachedServices(COMBAT_SERVICE_MAP, { force: true });
@@ -218,8 +226,13 @@ class CombatSystem extends BaseSystem {
     }
 
     // Always update bullets - they keep flying even without ship hull
+    const projectileUpdateStart = performance.now();
     this.updateBullets(deltaTime);
     this.updateEnemyBullets(deltaTime, player);
+    this.projectilePerf.projectileUpdateMs =
+      performance.now() - projectileUpdateStart;
+    this.projectilePerf.projectilePlayerCount = this.bullets.length;
+    this.projectilePerf.projectileEnemyCount = this.enemyBullets.length;
 
     const enemies = this.cachedEnemies;
     const physics = this.cachedPhysics;
@@ -2147,6 +2160,7 @@ class CombatSystem extends BaseSystem {
 
     const activeBullets = [];
 
+    let trailPoints = 0;
     for (let i = 0; i < this.enemyBullets.length; i += 1) {
       const bullet = this.enemyBullets[i];
       if (!bullet) {
@@ -2159,6 +2173,7 @@ class CombatSystem extends BaseSystem {
         if (trailLimit > 0 && bullet.trail.length > trailLimit) {
           bullet.trail.splice(0, bullet.trail.length - trailLimit);
         }
+        trailPoints += bullet.trail.length;
       }
 
       bullet.x += bullet.vx * deltaTime;
@@ -2324,6 +2339,7 @@ class CombatSystem extends BaseSystem {
     }
 
     this.enemyBullets = activeBullets;
+    this.projectilePerf.projectileEnemyTrailPoints = trailPoints;
 
     for (let i = 0; i < hitsToEmit.length; i += 1) {
       this.eventBus?.emit?.('player-hit-by-projectile', hitsToEmit[i]);
@@ -2356,6 +2372,7 @@ class CombatSystem extends BaseSystem {
   }
 
   updateBullets(deltaTime) {
+    let trailPoints = 0;
     this.bullets.forEach((bullet) => {
       if (bullet.hit) return;
 
@@ -2364,6 +2381,7 @@ class CombatSystem extends BaseSystem {
       if (bullet.trail.length > this.trailLength) {
         bullet.trail.shift();
       }
+      trailPoints += bullet.trail.length;
 
       // Atualizar posição
       bullet.x += bullet.vx * deltaTime;
@@ -2417,6 +2435,7 @@ class CombatSystem extends BaseSystem {
       }
     }
     this.bullets = activeBullets;
+    this.projectilePerf.projectilePlayerTrailPoints = trailPoints;
   }
 
   // === DETECÇÃO DE COLISÃO ===
@@ -2541,6 +2560,10 @@ class CombatSystem extends BaseSystem {
     return this.bullets.length;
   }
 
+  getProjectilePerfSnapshot() {
+    return { ...this.projectilePerf };
+  }
+
   ensureBulletGlowCache() {
     const glowRadius = (BULLET_SIZE || 0) * 3;
 
@@ -2607,6 +2630,7 @@ class CombatSystem extends BaseSystem {
     ctx.globalCompositeOperation = 'lighter';
 
     // Always render bullets - they keep flying
+    const projectileRenderStart = performance.now();
     this.bullets.forEach((bullet) => {
       if (bullet.hit) return;
 
@@ -2695,6 +2719,8 @@ class CombatSystem extends BaseSystem {
         drawEnemyProjectile(ctx, bullet);
       }
     }
+    this.projectilePerf.projectileRenderMs =
+      performance.now() - projectileRenderStart;
 
     const playerPosition =
       (player && player.position) ||
@@ -2824,6 +2850,14 @@ class CombatSystem extends BaseSystem {
   // === CLEANUP ===
   reset() {
     super.reset();
+    if (this.projectilePerf) {
+      this.projectilePerf.projectileUpdateMs = 0;
+      this.projectilePerf.projectileRenderMs = 0;
+      this.projectilePerf.projectilePlayerCount = 0;
+      this.projectilePerf.projectileEnemyCount = 0;
+      this.projectilePerf.projectilePlayerTrailPoints = 0;
+      this.projectilePerf.projectileEnemyTrailPoints = 0;
+    }
 
     // Return all bullets to pool before clearing array
     for (const bullet of this.bullets) {
@@ -2845,6 +2879,15 @@ class CombatSystem extends BaseSystem {
   }
 
   destroy() {
+    if (this.projectilePerf) {
+      this.projectilePerf.projectileUpdateMs = 0;
+      this.projectilePerf.projectileRenderMs = 0;
+      this.projectilePerf.projectilePlayerCount = 0;
+      this.projectilePerf.projectileEnemyCount = 0;
+      this.projectilePerf.projectilePlayerTrailPoints = 0;
+      this.projectilePerf.projectileEnemyTrailPoints = 0;
+    }
+
     // Return all bullets to pool before destroying
     for (const bullet of this.bullets) {
       GamePools.bullets.release(bullet);

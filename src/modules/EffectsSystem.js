@@ -278,6 +278,7 @@ export default class EffectsSystem extends BaseSystem {
     this.damageIndicators = []; // NEW: Directional damage indicators
     this.bossTransitionEffects = [];
     this.processedMineExplosions = new WeakSet();
+    this.muzzleFlashQueue = [];
 
     // Upgraded screen shake (Week 1: Balance & Feel)
     this.screenShake = new ScreenShake(this.getRandomFork('screenShake'));
@@ -341,6 +342,28 @@ export default class EffectsSystem extends BaseSystem {
     const particle = this.createParticle(x, y, vx, vy, color, size, life, type);
     this.particles.push(particle);
     return particle;
+  }
+
+  queueMuzzleFlash(x, y, dirX, dirY) {
+    this.muzzleFlashQueue.push(x, y, dirX, dirY);
+  }
+
+  flushMuzzleFlashQueue() {
+    const queue = this.muzzleFlashQueue;
+    if (!queue.length) {
+      return;
+    }
+
+    for (let i = 0; i < queue.length; i += 4) {
+      this.createMuzzleFlash(
+        queue[i],
+        queue[i + 1],
+        queue[i + 2],
+        queue[i + 3]
+      );
+    }
+
+    queue.length = 0;
   }
 
   releaseParticle(particle) {
@@ -532,7 +555,7 @@ export default class EffectsSystem extends BaseSystem {
         const vy = data.bullet.vy || 0;
         const speed = Math.sqrt(vx * vx + vy * vy);
         if (speed > 0) {
-          this.createMuzzleFlash(
+          this.queueMuzzleFlash(
             data.from.x,
             data.from.y,
             vx / speed,
@@ -753,17 +776,37 @@ export default class EffectsSystem extends BaseSystem {
   }
 
   updateHitMarkers(deltaTime) {
-    this.hitMarkers = this.hitMarkers.filter((marker) =>
-      marker.update(deltaTime)
-    );
+    const markers = this.hitMarkers;
+    let writeIndex = 0;
+
+    for (let i = 0; i < markers.length; i += 1) {
+      const marker = markers[i];
+      if (marker && marker.update(deltaTime)) {
+        markers[writeIndex++] = marker;
+      }
+    }
+
+    markers.length = writeIndex;
   }
 
   updateDamageIndicators(deltaTime) {
-    this.damageIndicators = this.damageIndicators.filter((indicator) => {
+    const indicators = this.damageIndicators;
+    let writeIndex = 0;
+
+    for (let i = 0; i < indicators.length; i += 1) {
+      const indicator = indicators[i];
+      if (!indicator) {
+        continue;
+      }
+
       indicator.life -= deltaTime;
       indicator.expansion += deltaTime * 30; // Expand at 30px/s
-      return indicator.life > 0;
-    });
+      if (indicator.life > 0) {
+        indicators[writeIndex++] = indicator;
+      }
+    }
+
+    indicators.length = writeIndex;
   }
 
   updateFreezeFrameState(baseDelta) {
@@ -858,37 +901,48 @@ export default class EffectsSystem extends BaseSystem {
 
   updateParticles(deltaTime) {
     // Update particles and return expired ones to pool
-    const activeParticles = [];
-    for (const particle of this.particles) {
+    const particles = this.particles;
+    let writeIndex = 0;
+
+    for (let i = 0; i < particles.length; i += 1) {
+      const particle = particles[i];
       if (
         particle &&
         typeof particle.update === 'function' &&
         particle.update(deltaTime)
       ) {
-        activeParticles.push(particle);
+        particles[writeIndex++] = particle;
       } else if (particle) {
         this.releaseParticle(particle);
       }
     }
-    this.particles = activeParticles;
+
+    particles.length = writeIndex;
 
     // Return oldest particles to pool if we have too many
-    if (this.particles.length > 150) {
-      const excessParticles = this.particles.splice(
-        0,
-        this.particles.length - 100
-      );
-      for (const particle of excessParticles) {
-        if (particle) {
-          this.releaseParticle(particle);
+    if (particles.length > 150) {
+      const toRemove = particles.length - 100;
+      for (let i = 0; i < toRemove; i += 1) {
+        if (particles[i]) {
+          this.releaseParticle(particles[i]);
         }
+      }
+      if (toRemove > 0) {
+        particles.copyWithin(0, toRemove);
+        particles.length -= toRemove;
       }
     }
   }
 
   updateShockwaves(deltaTime) {
-    this.shockwaves = this.shockwaves.filter((wave) => {
-      if (!wave) return false;
+    const shockwaves = this.shockwaves;
+    let writeIndex = 0;
+
+    for (let i = 0; i < shockwaves.length; i += 1) {
+      const wave = shockwaves[i];
+      if (!wave) {
+        continue;
+      }
 
       wave.timer += deltaTime;
       const progress = Math.min(1, wave.timer / wave.duration);
@@ -906,8 +960,12 @@ export default class EffectsSystem extends BaseSystem {
       const widthFactor = Math.max(0, 1 - easedProgress * widthFade);
       wave.lineWidth = Math.max(0.35, wave.baseWidth * widthFactor);
 
-      return wave.timer < wave.duration;
-    });
+      if (wave.timer < wave.duration) {
+        shockwaves[writeIndex++] = wave;
+      }
+    }
+
+    shockwaves.length = writeIndex;
   }
 
   applyScreenShake(ctx) {
@@ -918,12 +976,24 @@ export default class EffectsSystem extends BaseSystem {
   }
 
   draw(ctx) {
-    this.particles.forEach((p) => p.draw(ctx));
+    this.flushMuzzleFlashQueue();
+
+    for (let i = 0; i < this.particles.length; i += 1) {
+      const particle = this.particles[i];
+      if (particle) {
+        particle.draw(ctx);
+      }
+    }
 
     this.drawShockwaves(ctx);
 
     // Draw hit markers
-    this.hitMarkers.forEach((marker) => marker.draw(ctx));
+    for (let i = 0; i < this.hitMarkers.length; i += 1) {
+      const marker = this.hitMarkers[i];
+      if (marker) {
+        marker.draw(ctx);
+      }
+    }
 
     // Draw directional damage indicators
     this.drawDamageIndicators(ctx);
@@ -1807,14 +1877,22 @@ export default class EffectsSystem extends BaseSystem {
       return;
     }
 
-    this.bossTransitionEffects = this.bossTransitionEffects.filter((effect) => {
+    const effects = this.bossTransitionEffects;
+    let writeIndex = 0;
+
+    for (let i = 0; i < effects.length; i += 1) {
+      const effect = effects[i];
       if (!effect) {
-        return false;
+        continue;
       }
 
       effect.timer += deltaTime;
-      return effect.timer < effect.duration;
-    });
+      if (effect.timer < effect.duration) {
+        effects[writeIndex++] = effect;
+      }
+    }
+
+    effects.length = writeIndex;
   }
 
   drawBossTransitions(ctx) {
@@ -4077,6 +4155,7 @@ export default class EffectsSystem extends BaseSystem {
     this.hitMarkers = [];
     this.damageIndicators = [];
     this.bossTransitionEffects = [];
+    this.muzzleFlashQueue = [];
 
     // Custom ScreenShake reseeding
     if (this.screenShake && typeof this.screenShake.reseed === 'function') {
