@@ -125,7 +125,7 @@ describe('Asteroid Metrics - Feature Flags', () => {
   test('WaveManager completion event schedules break timer and suppresses legacy emit', async () => {
     expect(CONSTANTS.USE_WAVE_MANAGER).toBe(true);
 
-    const eventBus = globalThis.gameEvents;
+    const eventBus = harness?.container?.resolve('event-bus');
     expect(eventBus).toBeTruthy();
 
     const emitSpy = vi.spyOn(eventBus, 'emit');

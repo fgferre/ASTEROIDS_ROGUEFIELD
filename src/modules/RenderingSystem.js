@@ -7,7 +7,6 @@ import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 import { MAGNETISM_RADIUS } from '../data/constants/gameplay.js';
-import { clamp } from '../utils/mathHelpers.js';
 import { normalize as normalizeVector } from '../utils/vectorHelpers.js';
 
 // [NEO-ARCADE] Shield Visual Constants
@@ -144,46 +143,6 @@ function computeOutlineRadius(points) {
 
 const SPACE_SKY_RANDOM_SEED = 'rendering:starfield';
 
-const RENDERING_RANDOM_FALLBACK_SEED = 'rendering:system';
-
-const SPACE_SKY_LAYERS = [
-  { density: 220, vx: -0.006, vy: -0.002, size: 0.9, glow: 0.35 },
-  { density: 380, vx: -0.01, vy: -0.004, size: 1.2, glow: 0.48 },
-  { density: 490, vx: -0.016, vy: -0.007, size: 1.5, glow: 0.62 },
-  { density: 60, vx: -0.015, vy: -0.006, size: 2.2, glow: 0.9 },
-];
-
-const SPACE_SKY_PRESETS = {
-  minimal: {
-    densityK: 0.5,
-    twinkleHz: 0.8,
-    twinkleAmp: 0.45,
-    tint: { r: 230, g: 238, b: 255 },
-    drift: { vx: 0, vy: 0 },
-  },
-  cinematic: {
-    densityK: 0.8,
-    twinkleHz: 0.9,
-    twinkleAmp: 0.55,
-    tint: { r: 225, g: 236, b: 255 },
-    drift: { vx: -0.002, vy: -0.001 },
-  },
-  deep_space: {
-    densityK: 0.6,
-    twinkleHz: 0.7,
-    twinkleAmp: 0.5,
-    tint: { r: 210, g: 228, b: 255 },
-    drift: { vx: -0.004, vy: -0.001 },
-  },
-  warp_hint: {
-    densityK: 1,
-    twinkleHz: 1.1,
-    twinkleAmp: 0.6,
-    tint: { r: 235, g: 240, b: 255 },
-    drift: { vx: -0.03, vy: -0.012 },
-  },
-};
-
 function resolveDevicePixelRatio() {
   if (typeof window === 'undefined') {
     return 1;
@@ -193,40 +152,6 @@ function resolveDevicePixelRatio() {
   return Math.max(1, Math.min(2, ratio));
 }
 
-function resolveTimestamp() {
-  if (
-    typeof performance !== 'undefined' &&
-    typeof performance.now === 'function'
-  ) {
-    return performance.now();
-  }
-
-  return Date.now();
-}
-
-function normalizeTintValue(value, fallback) {
-  if (!Number.isFinite(value)) {
-    return fallback;
-  }
-
-  return clamp(Math.round(value), 0, 255);
-}
-
-function extractVelocityComponent(velocity, primaryKey, fallbackKey) {
-  if (!velocity) {
-    return 0;
-  }
-
-  if (Number.isFinite(velocity[primaryKey])) {
-    return velocity[primaryKey];
-  }
-
-  if (Number.isFinite(velocity[fallbackKey])) {
-    return velocity[fallbackKey];
-  }
-
-  return 0;
-}
 
 // [NEO-ARCADE] Multi-Plane 2.5D Parallax Starfield
 // Replaces 3D projection with robust 2D layer scrolling for guaranteed visibility
@@ -238,9 +163,30 @@ class SpaceSkyBackground {
 
     // Configuration
     this.layers = [
-      { speed: 0.1, count: 150, sizeMin: 1.5, sizeMax: 2.5, colorRate: 0.1 }, // Background (Slow, Small)
-      { speed: 0.3, count: 200, sizeMin: 2.5, sizeMax: 4.0, colorRate: 0.3 }, // Midground
-      { speed: 0.6, count: 100, sizeMin: 4.0, sizeMax: 6.0, colorRate: 0.6 }, // Foreground (Fast, Big)
+      {
+        speed: 0.1,
+        count: 150,
+        sizeMin: 1.5,
+        sizeMax: 2.5,
+        colorRate: 0.1,
+        stars: [],
+      }, // Background (Slow, Small)
+      {
+        speed: 0.3,
+        count: 200,
+        sizeMin: 2.5,
+        sizeMax: 4.0,
+        colorRate: 0.3,
+        stars: [],
+      }, // Midground
+      {
+        speed: 0.6,
+        count: 100,
+        sizeMin: 4.0,
+        sizeMax: 6.0,
+        colorRate: 0.6,
+        stars: [],
+      }, // Foreground (Fast, Big)
     ];
 
     this.stars = [];
@@ -254,10 +200,43 @@ class SpaceSkyBackground {
     return new RandomService(SPACE_SKY_RANDOM_SEED);
   }
 
+  randomFloat() {
+    if (this.random && typeof this.random.float === 'function') {
+      return this.random.float();
+    }
+    return Math.random();
+  }
+
+  randomRange(min, max) {
+    if (this.random && typeof this.random.range === 'function') {
+      return this.random.range(min, max);
+    }
+    const low = Math.min(min, max);
+    const high = Math.max(min, max);
+    return low + this.randomFloat() * (high - low);
+  }
+
+  randomInt(min, max) {
+    if (this.random && typeof this.random.int === 'function') {
+      return this.random.int(min, max);
+    }
+    return Math.floor(this.randomRange(min, max + 1));
+  }
+
+  randomChance(probability) {
+    if (this.random && typeof this.random.chance === 'function') {
+      return this.random.chance(probability);
+    }
+    return this.randomFloat() < probability;
+  }
+
   // Required by RenderingSystem.onReset() - reassigns random generator and rebuilds stars
   reseed(randomGenerator) {
     this.random = this.resolveRandomGenerator(randomGenerator);
     this.initialized = false; // Force rebuild on next render
+    if (this.width > 0 && this.height > 0) {
+      this.rebuild();
+    }
   }
 
   resize(width, height) {
@@ -280,17 +259,23 @@ class SpaceSkyBackground {
     // 1. Rebuild Stars
     this.stars = [];
     this.layers.forEach((layer, layerIndex) => {
+      layer.stars = [];
       for (let i = 0; i < layer.count; i++) {
-        this.stars.push({
-          x: Math.random() * w,
-          y: Math.random() * h,
-          size: layer.sizeMin + Math.random() * (layer.sizeMax - layer.sizeMin),
+        const star = {
+          x: this.randomRange(0, w),
+          y: this.randomRange(0, h),
+          size:
+            layer.sizeMin +
+            this.randomFloat() * (layer.sizeMax - layer.sizeMin),
           speed: layer.speed,
-          layerIndex: layerIndex,
+          layerIndex,
           color: this.pickNeonColor(layer.colorRate),
-          phase: Math.random() * Math.PI * 2,
-          blinkSpeed: 1 + Math.random() * 2,
-        });
+          phase: this.randomFloat() * Math.PI * 2,
+          blinkSpeed: 1 + this.randomFloat() * 2,
+          jitter: this.randomFloat(),
+        };
+        layer.stars.push(star);
+        this.stars.push(star);
       }
     });
 
@@ -306,13 +291,13 @@ class SpaceSkyBackground {
 
     for (let i = 0; i < cloudCount; i++) {
       this.nebulaClouds.push({
-        x: Math.random() * w,
-        y: Math.random() * h,
-        radius: 300 + Math.random() * 500,
-        color: colors[Math.floor(Math.random() * colors.length)],
-        vx: (Math.random() - 0.5) * 5, // Very slow drift
-        vy: (Math.random() - 0.5) * 5,
-        phase: Math.random() * Math.PI * 2,
+        x: this.randomRange(0, w),
+        y: this.randomRange(0, h),
+        radius: 300 + this.randomFloat() * 500,
+        color: colors[this.randomInt(0, colors.length - 1)],
+        vx: (this.randomFloat() - 0.5) * 5, // Very slow drift
+        vy: (this.randomFloat() - 0.5) * 5,
+        phase: this.randomFloat() * Math.PI * 2,
       });
     }
 
@@ -321,21 +306,17 @@ class SpaceSkyBackground {
 
   // Generate neon colors with Math.random() to avoid RandomService issues
   pickNeonColor(vibranceChance) {
-    if (Math.random() < vibranceChance) {
+    if (this.randomChance(vibranceChance)) {
       const palette = [
         { r: 0, g: 255, b: 255 }, // Cyan
         { r: 255, g: 0, b: 255 }, // Magenta
         { r: 100, g: 255, b: 100 }, // Neon Green
         { r: 255, g: 200, b: 50 }, // Gold
       ];
-      return palette[Math.floor(Math.random() * palette.length)];
+      return palette[this.randomInt(0, palette.length - 1)];
     }
     // White/blue tinted stars
     return { r: 220, g: 235, b: 255 };
-  }
-
-  pickStarColor(vibranceChance) {
-    return this.pickNeonColor(vibranceChance);
   }
 
   render(ctx, options = {}) {
@@ -1271,7 +1252,3 @@ class RenderingSystem extends BaseSystem {
 }
 
 export default RenderingSystem;
-
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = RenderingSystem;
-}

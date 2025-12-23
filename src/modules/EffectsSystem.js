@@ -703,7 +703,7 @@ export default class EffectsSystem extends BaseSystem {
       this.addScreenFlash('rgba(0, 255, 255, 0.4)', 0.3, 0.2);
 
       // Emit damage event for enemies in radius
-      gameEvents.emit('shield-explosion-damage', {
+      this.eventBus?.emit?.('shield-explosion-damage', {
         position: data.position,
         radius: 200,
         damage: 50, // AoE damage amount

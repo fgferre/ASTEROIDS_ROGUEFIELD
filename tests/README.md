@@ -189,7 +189,7 @@ import { MySystem } from '../../src/modules/MySystem.js';
 
 describe('MySystem', () => {
   beforeEach(() => {
-    setupGlobalMocks({ gameEvents: createEventBusMock() });
+    setupGlobalMocks();
   });
 
   afterEach(() => {
@@ -197,7 +197,8 @@ describe('MySystem', () => {
   });
 
   it('executa comportamento determinístico', () => {
-    const system = new MySystem();
+    const eventBus = createEventBusMock();
+    const system = new MySystem({ eventBus });
     system.update(1 / 60);
     expect(system.state).toMatchObject({ ready: true });
   });

@@ -25,6 +25,7 @@
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { ASTEROID_VARIANTS } from '../../../data/enemies/asteroid-configs.js';
 import { USE_WAVE_MANAGER } from '../../../data/constants/gameplay.js';
+import { resolveEventBus } from '../../../core/serviceUtils.js';
 
 class EnemyDamageSystem {
   /**
@@ -239,8 +240,7 @@ class EnemyDamageSystem {
     }
 
     const bus =
-      this.facade.eventBus ||
-      (typeof gameEvents !== 'undefined' ? gameEvents : null);
+      this.facade.eventBus || resolveEventBus(this.facade?.dependencies);
 
     const payload = {
       enemy: asteroid,
@@ -373,8 +373,7 @@ class EnemyDamageSystem {
     }
 
     const bus =
-      this.facade.eventBus ||
-      (typeof gameEvents !== 'undefined' ? gameEvents : null);
+      this.facade.eventBus || resolveEventBus(this.facade?.dependencies);
 
     const payload = {
       asteroid,
@@ -495,8 +494,7 @@ class EnemyDamageSystem {
     const damageCause = context.cause || 'enemy';
 
     const bus =
-      this.facade.eventBus ||
-      (typeof gameEvents !== 'undefined' ? gameEvents : null);
+      this.facade.eventBus || resolveEventBus(this.facade?.dependencies);
 
     const baseEventPayload = {
       damage: amount,

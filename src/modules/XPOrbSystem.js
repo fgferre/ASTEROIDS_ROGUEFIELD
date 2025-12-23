@@ -1,4 +1,9 @@
-import { SHIP_SIZE, XP_ORB_SIZE } from '../core/GameConstants.js';
+import {
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  SHIP_SIZE,
+  XP_ORB_SIZE,
+} from '../core/GameConstants.js';
 import {
   MAGNETISM_RADIUS,
   MAGNETISM_FORCE,
@@ -13,6 +18,8 @@ import {
   XP_ORB_COLLECTION_RADIUS_PADDING,
   XP_ORB_FUSION_CHECK_INTERVAL,
   XP_ORB_FUSION_ANIMATION_DURATION,
+  XP_ORB_OFFSCREEN_MARGIN,
+  XP_ORB_OFFSCREEN_RETURN_DURATION,
   XP_ORB_CLUSTER_CONFIG,
 } from '../data/constants/gameplay.js';
 import { lerp, easeInOutCubic } from '../utils/mathHelpers.js';
@@ -110,9 +117,9 @@ const SERVICE_CACHE_MAP = Object.freeze({
 });
 
 class XPOrbSystem extends BaseSystem {
-  constructor({ player, progression, random } = {}) {
+  constructor({ eventBus, player, progression, random } = {}) {
     super(
-      { player, progression, random },
+      { eventBus, player, progression, random },
       {
         enableRandomManagement: true,
         systemName: 'XPOrbSystem',
@@ -140,6 +147,14 @@ class XPOrbSystem extends BaseSystem {
       ? XP_ORB_BASE_VALUE
       : 5;
 
+    this.orbOffscreenMargin = Number.isFinite(XP_ORB_OFFSCREEN_MARGIN)
+      ? Math.max(0, XP_ORB_OFFSCREEN_MARGIN)
+      : 0;
+    this.orbOffscreenReturnDuration = Number.isFinite(
+      XP_ORB_OFFSCREEN_RETURN_DURATION
+    )
+      ? Math.max(0.05, XP_ORB_OFFSCREEN_RETURN_DURATION)
+      : 0.55;
     this.orbMagnetismRadius = MAGNETISM_RADIUS;
     this.magnetismForce = ENHANCED_SHIP_MAGNETISM_FORCE || MAGNETISM_FORCE;
     this.magnetismBoost = Number.isFinite(XP_ORB_MAGNETISM_BOOST)
@@ -750,7 +765,7 @@ class XPOrbSystem extends BaseSystem {
     this.addOrbToPools(orb);
     this.enforceClassLimit(orb.class);
 
-    gameEvents.emit('xp-orb-created', {
+    this.eventBus?.emit?.('xp-orb-created', {
       orb,
       position: { x, y },
       value,
@@ -798,6 +813,7 @@ class XPOrbSystem extends BaseSystem {
     if (this.xpOrbs.length) {
       this.advanceOrbAges(deltaTime);
       this.updateShipMagnetism(deltaTime);
+      this.updateOrbSoftBounds(deltaTime);
       this.updateOrbClustering(deltaTime);
       this.checkOrbFusion(deltaTime);
     }
@@ -1088,6 +1104,60 @@ class XPOrbSystem extends BaseSystem {
         }
       }
     });
+
+    if (moved) {
+      this.invalidateSpatialIndex();
+    }
+  }
+
+  updateOrbSoftBounds(deltaTime) {
+    if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
+      return;
+    }
+
+    if (!this.xpOrbs.length) {
+      return;
+    }
+
+    const width = Number.isFinite(GAME_WIDTH) ? GAME_WIDTH : 0;
+    const height = Number.isFinite(GAME_HEIGHT) ? GAME_HEIGHT : 0;
+    if (width <= 0 || height <= 0) {
+      return;
+    }
+
+    const margin = Number.isFinite(this.orbOffscreenMargin)
+      ? this.orbOffscreenMargin
+      : 0;
+    const duration = Number.isFinite(this.orbOffscreenReturnDuration)
+      ? Math.max(0.05, this.orbOffscreenReturnDuration)
+      : 0.55;
+    const ease = 1 - Math.exp(-deltaTime / duration);
+
+    let moved = false;
+
+    for (let i = 0; i < this.xpOrbs.length; i += 1) {
+      const orb = this.xpOrbs[i];
+      if (!this.isOrbActive(orb) || orb.isFusing) {
+        continue;
+      }
+
+      const tier = Number.isFinite(orb.tier) ? Math.max(1, orb.tier) : 1;
+      const radius = XP_ORB_SIZE * (1 + (tier - 1) * 0.2);
+      const padding = Math.max(0, radius + margin);
+      const minX = padding;
+      const maxX = Math.max(minX, width - padding);
+      const minY = padding;
+      const maxY = Math.max(minY, height - padding);
+
+      const targetX = Math.min(Math.max(orb.x, minX), maxX);
+      const targetY = Math.min(Math.max(orb.y, minY), maxY);
+
+      if (targetX !== orb.x || targetY !== orb.y) {
+        orb.x = lerp(orb.x, targetX, ease);
+        orb.y = lerp(orb.y, targetY, ease);
+        moved = true;
+      }
+    }
 
     if (moved) {
       this.invalidateSpatialIndex();
@@ -1547,7 +1617,7 @@ class XPOrbSystem extends BaseSystem {
       age: 0,
     });
 
-    gameEvents.emit('xp-orb-fused', {
+    this.eventBus?.emit?.('xp-orb-fused', {
       fromClass: className,
       toClass: fusedOrb.class,
       consumed: count,
@@ -1640,7 +1710,7 @@ class XPOrbSystem extends BaseSystem {
 
     orb.collected = true;
 
-    gameEvents.emit('xp-collected', {
+    this.eventBus?.emit?.('xp-collected', {
       orb,
       position: { x: orb.x, y: orb.y },
       value: orb.value,
@@ -1648,7 +1718,7 @@ class XPOrbSystem extends BaseSystem {
       tier: orb.tier,
     });
 
-    gameEvents.emit('xp-orb-collected', {
+    this.eventBus?.emit?.('xp-orb-collected', {
       value: orb.value,
       position: { x: orb.x, y: orb.y },
       class: orb.class,
@@ -1910,7 +1980,3 @@ class XPOrbSystem extends BaseSystem {
 }
 
 export default XPOrbSystem;
-
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = XPOrbSystem;
-}

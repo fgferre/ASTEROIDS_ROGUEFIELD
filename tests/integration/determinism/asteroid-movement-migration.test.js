@@ -25,6 +25,7 @@ import {
 function createEnemySystemWithSeed(seed) {
   const container = createTestContainer(seed);
   const random = container.resolve('random');
+  const eventBus = container.resolve('event-bus');
 
   // Mock dependencies
   const world = {
@@ -54,6 +55,7 @@ function createEnemySystemWithSeed(seed) {
   };
 
   const dependencies = {
+    eventBus,
     random,
     world,
     player,

@@ -1,14 +1,10 @@
-const getGameEvents = (system) => {
-  if (system?.gameEvents?.emit) {
-    return system.gameEvents;
+import { resolveEventBus } from '../../../core/serviceUtils.js';
+
+const getEventBus = (system) => {
+  if (system?.eventBus?.emit) {
+    return system.eventBus;
   }
-  if (typeof globalThis !== 'undefined' && globalThis.gameEvents?.emit) {
-    return globalThis.gameEvents;
-  }
-  if (typeof gameEvents !== 'undefined' && gameEvents?.emit) {
-    return gameEvents;
-  }
-  return null;
+  return resolveEventBus(system?.dependencies);
 };
 
 export class HealthComponent {
@@ -141,7 +137,7 @@ export class HealthComponent {
   }
 
   emitDamageEvent(enemy, amount, source, context = {}) {
-    const bus = getGameEvents(enemy.system);
+    const bus = getEventBus(enemy.system);
     if (!bus?.emit) {
       return;
     }
@@ -157,7 +153,7 @@ export class HealthComponent {
   }
 
   onDestroyed(enemy, source, context = {}) {
-    const bus = getGameEvents(enemy.system);
+    const bus = getEventBus(enemy.system);
     const enrichedContext = { ...context, healthComponentManaged: true };
     if (typeof enemy.onDestroyed === 'function') {
       enemy.onDestroyed(source, enrichedContext);

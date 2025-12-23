@@ -194,7 +194,8 @@ export class Mine extends BaseEnemy {
     this.destroyed = true;
     super.onDestroyed(safeSource);
 
-    if (typeof gameEvents === 'undefined' || !gameEvents?.emit) {
+    const eventBus = this.getEventBus();
+    if (!eventBus?.emit) {
       return;
     }
 
@@ -205,7 +206,7 @@ export class Mine extends BaseEnemy {
       'detonation';
     const context = safeSource.context ?? this.explosionCause?.context ?? {};
 
-    gameEvents.emit('mine-exploded', {
+    eventBus.emit('mine-exploded', {
       enemy: this,
       enemyId: this.id,
       enemyType: this.type,

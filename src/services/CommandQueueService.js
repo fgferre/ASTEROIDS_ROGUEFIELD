@@ -1,5 +1,3 @@
-/* global gameServices */
-
 /**
  * CommandQueueService stores input/command envelopes tagged by frame.
  *
@@ -42,12 +40,6 @@ export default class CommandQueueService {
     };
     this.nextDefaultFrame = this.frameCounter;
 
-    if (
-      typeof gameServices !== 'undefined' &&
-      typeof gameServices.register === 'function'
-    ) {
-      gameServices.register('command-queue', this);
-    }
   }
 
   defaultClock() {

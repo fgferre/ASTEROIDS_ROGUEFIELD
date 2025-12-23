@@ -231,7 +231,7 @@ class ProgressionSystem extends UpgradeSystem {
   }
 
   emitComboUpdated(extra = {}) {
-    gameEvents.emit('combo-updated', {
+    this.eventBus?.emit?.('combo-updated', {
       comboCount: this.currentCombo,
       multiplier: this.comboMultiplier,
       remainingTime: this.comboTimer,
@@ -269,7 +269,7 @@ class ProgressionSystem extends UpgradeSystem {
       return;
     }
 
-    gameEvents.emit('combo-broken', {
+    this.eventBus?.emit?.('combo-broken', {
       comboCount: this.currentCombo,
       multiplier: this.comboMultiplier,
       remainingTime: this.comboTimer,
@@ -282,7 +282,7 @@ class ProgressionSystem extends UpgradeSystem {
   }
 
   emitExperienceChanged() {
-    gameEvents.emit('experience-changed', {
+    this.eventBus?.emit?.('experience-changed', {
       current: this.experience,
       needed: this.experienceToNext,
       level: this.level,
@@ -365,13 +365,13 @@ class ProgressionSystem extends UpgradeSystem {
   }
 
   emitLevelUp(context) {
-    gameEvents.emit('player-leveled-up', {
+    this.eventBus?.emit?.('player-leveled-up', {
       newLevel: context.level,
       previousRequirement: context.previousRequirement,
       nextRequirement: context.nextRequirement,
     });
 
-    gameEvents.emit('upgrade-options-ready', {
+    this.eventBus?.emit?.('upgrade-options-ready', {
       level: context.level,
       options: context.options || [],
       poolSize: context.poolSize ?? 0,
@@ -450,8 +450,8 @@ class ProgressionSystem extends UpgradeSystem {
     this.refreshInjectedServices({ force: true });
     this.emitExperienceChanged();
 
-    if (this._upgradeEventTopic && typeof gameEvents !== 'undefined') {
-      gameEvents.emit(`${this._upgradeEventTopic}-reset`);
+    if (this._upgradeEventTopic) {
+      this.eventBus?.emit?.(`${this._upgradeEventTopic}-reset`);
     }
   }
 
@@ -603,7 +603,7 @@ class ProgressionSystem extends UpgradeSystem {
       this.resetCombo({ reason: 'restore-state', silent: true, force: true });
     }
 
-    gameEvents.emit('progression-restored', {
+    this.eventBus?.emit?.('progression-restored', {
       level: this.level,
       experience: this.experience,
       experienceToNext: this.experienceToNext,
@@ -626,8 +626,3 @@ class ProgressionSystem extends UpgradeSystem {
 }
 
 export default ProgressionSystem;
-
-// Export
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = ProgressionSystem;
-}

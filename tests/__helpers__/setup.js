@@ -1,6 +1,5 @@
 import { afterEach, vi } from 'vitest';
 import { ServiceRegistry } from '../../src/core/ServiceRegistry.js';
-import { createEventBusMock, createServiceRegistryMock } from './mocks.js';
 
 const hasOwn = Object.prototype.hasOwnProperty;
 let previousGlobalsStack = null;
@@ -8,31 +7,21 @@ let previousGlobalsStack = null;
 /**
  * Configure globalThis with the default mocks used across integration tests.
  *
- * @param {{gameEvents?: any, gameServices?: any, performance?: {now: () => number}}} [options] - Optional overrides for the global mocks.
- * @returns {{gameEvents?: any, gameServices?: any, performance?: any, hadGameEvents: boolean, hadGameServices: boolean, hadPerformance: boolean}}
+ * @param {{performance?: {now: () => number}}} [options] - Optional overrides for the global mocks.
+ * @returns {{performance?: any, hadPerformance: boolean}}
  * @example
  * const snapshot = setupGlobalMocks();
  * // run test logic
  * cleanupGlobalState();
  */
 export function setupGlobalMocks(options = {}) {
-  const {
-    gameEvents = createEventBusMock(),
-    gameServices = createServiceRegistryMock(),
-    performance = { now: () => 0 },
-  } = options;
+  const { performance = { now: () => 0 } } = options;
 
   const previous = {
-    gameEvents: globalThis.gameEvents,
-    gameServices: globalThis.gameServices,
     performance: globalThis.performance,
-    hadGameEvents: hasOwn.call(globalThis, 'gameEvents'),
-    hadGameServices: hasOwn.call(globalThis, 'gameServices'),
     hadPerformance: hasOwn.call(globalThis, 'performance'),
   };
 
-  globalThis.gameEvents = gameEvents;
-  globalThis.gameServices = gameServices;
   globalThis.performance = performance;
 
   if (previousGlobalsStack === null) {
@@ -56,25 +45,9 @@ export function setupGlobalMocks(options = {}) {
 export function cleanupGlobalState() {
   const stack = previousGlobalsStack;
   const snapshot = (stack && stack.length ? stack.pop() : null) ?? {
-    gameEvents: globalThis.gameEvents,
-    gameServices: globalThis.gameServices,
     performance: globalThis.performance,
-    hadGameEvents: hasOwn.call(globalThis, 'gameEvents'),
-    hadGameServices: hasOwn.call(globalThis, 'gameServices'),
     hadPerformance: hasOwn.call(globalThis, 'performance'),
   };
-
-  if (snapshot.hadGameEvents) {
-    globalThis.gameEvents = snapshot.gameEvents;
-  } else {
-    delete globalThis.gameEvents;
-  }
-
-  if (snapshot.hadGameServices) {
-    globalThis.gameServices = snapshot.gameServices;
-  } else {
-    delete globalThis.gameServices;
-  }
 
   if (snapshot.hadPerformance) {
     globalThis.performance = snapshot.performance;

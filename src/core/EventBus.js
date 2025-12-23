@@ -4,7 +4,7 @@ import {
   registerDebugLoggingController,
 } from './debugLogging.js';
 
-class EventBus {
+export class EventBus {
   constructor() {
     this.events = new Map();
     this.debug = isDebugLoggingEnabled();
@@ -138,14 +138,6 @@ class EventBus {
 }
 
 // Singleton global
-const gameEvents = new EventBus();
+export const gameEvents = new EventBus();
 
-// Para compatibilidade de módulos ES6 e CommonJS
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = gameEvents;
-}
-
-// Para ES6 modules
-if (typeof window !== 'undefined') {
-  window.gameEvents = gameEvents;
-}
+// No global exposure in browsers; use DI to access the singleton.

@@ -17,16 +17,6 @@ export function safeBoolean(value, fallback = false) {
   return Boolean(value);
 }
 
-export function safeString(value, fallback = '') {
-  return typeof value === 'string' ? value : fallback;
-}
-
-export function safeObject(value, fallback = null) {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value
-    : fallback;
-}
-
 // --- Clone helpers ---
 export function deepClone(obj) {
   if (obj === null || typeof obj !== 'object') {
@@ -48,10 +38,6 @@ export function shallowClone(obj) {
   return { ...obj };
 }
 
-export function cloneArray(arr) {
-  return Array.isArray(arr) ? arr.slice() : [];
-}
-
 // --- Snapshot validation helpers ---
 export function hasRequiredFields(snapshot, fields = []) {
   if (!fields || fields.length === 0) {
@@ -65,23 +51,6 @@ export function hasRequiredFields(snapshot, fields = []) {
   }
 
   return true;
-}
-
-export function isValidSnapshotVersion(snapshot, expectedVersion = 1) {
-  if (!snapshot || typeof snapshot !== 'object') {
-    return false;
-  }
-
-  if (snapshot.version === undefined) {
-    return true;
-  }
-
-  const versionNumber = Number(snapshot.version);
-  if (!Number.isFinite(versionNumber)) {
-    return false;
-  }
-
-  return versionNumber === expectedVersion;
 }
 
 export function validateSnapshot(snapshot, requiredFields = []) {
@@ -123,15 +92,5 @@ export function createFallbackHandler({
     }
 
     return false;
-  };
-}
-
-// --- Snapshot wrapper helpers ---
-export function createSnapshotWrapper(exportFn, importFn) {
-  return {
-    getSnapshotState: (...args) => exportFn(...args),
-    restoreSnapshotState: (...args) => importFn(...args),
-    captureSnapshot: (...args) => exportFn(...args),
-    applySnapshot: (...args) => importFn(...args),
   };
 }

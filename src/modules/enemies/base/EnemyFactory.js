@@ -203,6 +203,11 @@ export class EnemyFactory {
 
     // Initialize enemy
     try {
+      if (enemy) {
+        // Ensure pooled instances are bound to the active system.
+        enemy.system = this.system;
+      }
+
       if (typeof enemy.initialize === 'function') {
         if (enemy.initialize.length <= 1) {
           enemy.initialize(finalConfig);

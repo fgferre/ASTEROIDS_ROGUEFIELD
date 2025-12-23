@@ -4,11 +4,8 @@ This guide covers the AAA Tactical HUD layout, a sci-fi inspired interface with 
 
 ## Activating the AAA HUD
 
-1. Open **Settings** → **Video e HUD** → **Layout do HUD**
-2. Select **"AAA Tactical (Mockup)"**
-3. Start or resume gameplay
-
-The HUD will automatically activate with all visual effects and data bindings.
+The AAA Tactical HUD is now the only HUD and mounts automatically when gameplay
+starts (no layout selection required).
 
 ---
 
@@ -58,7 +55,7 @@ Hexagonal tactical radar showing:
 
 | Key   | Action                            |
 | ----- | --------------------------------- |
-| `Esc` | Open Settings (change HUD layout) |
+| `Esc` | Open Settings                      |
 
 ---
 
@@ -66,9 +63,8 @@ Hexagonal tactical radar showing:
 
 ### HUD not appearing
 
-1. Verify **"AAA Tactical (Mockup)"** is selected in Settings
-2. Ensure you're in active gameplay (not paused at menu)
-3. Check browser console for errors
+1. Ensure you're in active gameplay (not paused at menu)
+2. Check browser console for errors
 
 ### Icons not rendering
 
@@ -90,6 +86,5 @@ The HUD uses [Lucide Icons](https://lucide.dev). If icons show as empty boxes:
 | File                             | Purpose                                    |
 | -------------------------------- | ------------------------------------------ |
 | `src/modules/ui/AAAHudLayout.js` | Layout module with HTML/CSS/update methods |
-| `src/aaa-hud-theme.css`          | Shared CSS variables and animations        |
 | `src/data/ui/hudLayout.js`       | Layout definition (`aaa_tactical`)         |
 | `src/modules/UISystem.js`        | Integration and data binding               |

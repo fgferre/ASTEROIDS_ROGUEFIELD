@@ -16,6 +16,8 @@ import MenuBackgroundSystem from '../modules/MenuBackgroundSystem.js';
 import { GamePools } from '../core/GamePools.js';
 import { GarbageCollectionManager } from '../core/GarbageCollectionManager.js';
 import RandomService from '../core/RandomService.js';
+import { gameEvents } from '../core/EventBus.js';
+import { createServiceResolver } from '../core/serviceUtils.js';
 import GameSessionService from '../services/GameSessionService.js';
 import CommandQueueService from '../services/CommandQueueService.js';
 import CrackGenerationService from '../services/CrackGenerationService.js';
@@ -256,14 +258,7 @@ export function createServiceManifest(context = {}) {
       singleton: true,
       lazy: false,
       dependencies: [],
-      factory: () => {
-        if (typeof gameEvents === 'undefined') {
-          throw new Error(
-            '[serviceManifest] Global event bus is not available'
-          );
-        }
-        return gameEvents;
-      },
+      factory: () => gameEvents,
     },
     {
       name: 'random',
@@ -278,15 +273,7 @@ export function createServiceManifest(context = {}) {
       singleton: true,
       lazy: false,
       dependencies: [],
-      factory: ({ container }) => {
-        const service = ensureGameStateService(gameState);
-
-        if (typeof container?.syncInstance === 'function') {
-          container.syncInstance('game-state', service);
-        }
-
-        return service;
-      },
+      factory: () => ensureGameStateService(gameState),
     },
     {
       name: 'game-pools',
@@ -300,30 +287,24 @@ export function createServiceManifest(context = {}) {
       singleton: true,
       lazy: false,
       dependencies: ['game-pools'],
-      factory: ({ container }) => {
-        const manager = createGarbageCollector(garbageCollectorOptions);
-
-        if (typeof container?.syncInstance === 'function') {
-          container.syncInstance('garbage-collector', manager);
-        }
-
-        return manager;
-      },
+      factory: () => createGarbageCollector(garbageCollectorOptions),
     },
     {
       name: 'settings',
       singleton: true,
       lazy: false,
-      dependencies: [],
-      factory: () => new SettingsSystem(),
+      dependencies: ['event-bus'],
+      factory: ({ resolved }) =>
+        new SettingsSystem({ eventBus: resolved['event-bus'] }),
     },
     {
       name: 'audio',
       singleton: true,
       lazy: true,
-      dependencies: ['settings', 'random'],
+      dependencies: ['event-bus', 'settings', 'random'],
       factory: ({ resolved }) =>
         new AudioSystem({
+          eventBus: resolved['event-bus'],
           settings: resolved['settings'],
           random: resolved['random'],
         }),
@@ -347,21 +328,16 @@ export function createServiceManifest(context = {}) {
       singleton: true,
       lazy: false,
       dependencies: [],
-      factory: ({ container }) => {
-        if (typeof container?.syncInstance === 'function') {
-          container.syncInstance('crack-generation', CrackGenerationService);
-        }
-
-        return CrackGenerationService;
-      },
+      factory: () => CrackGenerationService,
     },
     {
       name: 'input',
       singleton: true,
       lazy: false,
-      dependencies: ['settings', 'command-queue'],
+      dependencies: ['event-bus', 'settings', 'command-queue'],
       factory: ({ resolved }) =>
         new InputSystem({
+          eventBus: resolved['event-bus'],
           settings: resolved['settings'],
           'command-queue': resolved['command-queue'],
         }),
@@ -370,9 +346,10 @@ export function createServiceManifest(context = {}) {
       name: 'player',
       singleton: true,
       lazy: false,
-      dependencies: ['input', 'command-queue'],
+      dependencies: ['event-bus', 'input', 'command-queue'],
       factory: ({ resolved }) =>
         new PlayerSystem({
+          eventBus: resolved['event-bus'],
           input: resolved['input'],
           'command-queue': resolved['command-queue'],
         }),
@@ -381,9 +358,10 @@ export function createServiceManifest(context = {}) {
       name: 'xp-orbs',
       singleton: true,
       lazy: false,
-      dependencies: ['player', 'random'],
+      dependencies: ['event-bus', 'player', 'random'],
       factory: ({ resolved }) =>
         new XPOrbSystem({
+          eventBus: resolved['event-bus'],
           player: resolved['player'],
           random: resolved['random'],
         }),
@@ -392,17 +370,24 @@ export function createServiceManifest(context = {}) {
       name: 'healthHearts',
       singleton: true,
       lazy: false,
-      dependencies: ['player'],
+      dependencies: ['event-bus', 'player'],
       factory: ({ resolved }) =>
-        new HealthHeartSystem({ player: resolved['player'] }),
+        new HealthHeartSystem({
+          eventBus: resolved['event-bus'],
+          player: resolved['player'],
+        }),
     },
     {
       name: 'physics',
       singleton: true,
       lazy: false,
-      dependencies: [],
+      dependencies: ['event-bus'],
       factory: ({ resolved, container }) => {
-        const physics = new PhysicsSystem();
+        const serviceResolver = createServiceResolver(container);
+        const physics = new PhysicsSystem({
+          eventBus: resolved['event-bus'],
+          serviceResolver,
+        });
 
         const enemyInstance =
           resolved['enemies'] ||
@@ -422,29 +407,47 @@ export function createServiceManifest(context = {}) {
       name: 'ui',
       singleton: true,
       lazy: false,
-      dependencies: ['settings'],
-      factory: ({ resolved }) =>
-        new UISystem({ settings: resolved['settings'] }),
+      dependencies: ['event-bus', 'settings'],
+      factory: ({ resolved, container }) => {
+        const serviceResolver = createServiceResolver(container);
+        return new UISystem({
+          eventBus: resolved['event-bus'],
+          settings: resolved['settings'],
+          serviceResolver,
+        });
+      },
     },
     {
       name: 'effects',
       singleton: true,
       lazy: false,
-      dependencies: ['audio', 'settings', 'random'],
-      factory: ({ resolved }) =>
-        new EffectsSystem({
+      dependencies: ['event-bus', 'audio', 'settings', 'random'],
+      factory: ({ resolved, container }) => {
+        const serviceResolver = createServiceResolver(container);
+        return new EffectsSystem({
+          eventBus: resolved['event-bus'],
           audio: resolved['audio'],
           settings: resolved['settings'],
           random: resolved['random'],
-        }),
+          serviceResolver,
+        });
+      },
     },
     {
       name: 'progression',
       singleton: true,
       lazy: false,
-      dependencies: ['xp-orbs', 'player', 'ui', 'effects', 'random'],
+      dependencies: [
+        'event-bus',
+        'xp-orbs',
+        'player',
+        'ui',
+        'effects',
+        'random',
+      ],
       factory: ({ resolved }) => {
         const progression = new ProgressionSystem({
+          eventBus: resolved['event-bus'],
           'xp-orbs': resolved['xp-orbs'],
           player: resolved['player'],
           ui: resolved['ui'],
@@ -468,6 +471,7 @@ export function createServiceManifest(context = {}) {
       singleton: true,
       lazy: false,
       dependencies: [
+        'event-bus',
         'player',
         'xp-orbs',
         'progression',
@@ -475,14 +479,17 @@ export function createServiceManifest(context = {}) {
         'healthHearts',
         'random',
       ],
-      factory: ({ resolved }) => {
+      factory: ({ resolved, container }) => {
+        const serviceResolver = createServiceResolver(container);
         const enemySystem = new EnemySystem({
+          eventBus: resolved['event-bus'],
           player: resolved['player'],
           'xp-orbs': resolved['xp-orbs'],
           progression: resolved['progression'],
           physics: resolved['physics'],
           healthHearts: resolved['healthHearts'],
           random: resolved['random'],
+          serviceResolver,
         });
 
         if (
@@ -546,9 +553,16 @@ export function createServiceManifest(context = {}) {
       name: 'combat',
       singleton: true,
       lazy: false,
-      dependencies: ['player', 'enemies', 'physics', 'command-queue'],
+      dependencies: [
+        'event-bus',
+        'player',
+        'enemies',
+        'physics',
+        'command-queue',
+      ],
       factory: ({ resolved }) =>
         new CombatSystem({
+          eventBus: resolved['event-bus'],
           player: resolved['player'],
           enemies: resolved['enemies'],
           physics: resolved['physics'],
@@ -559,9 +573,16 @@ export function createServiceManifest(context = {}) {
       name: 'world',
       singleton: true,
       lazy: false,
-      dependencies: ['player', 'enemies', 'physics', 'progression'],
+      dependencies: [
+        'event-bus',
+        'player',
+        'enemies',
+        'physics',
+        'progression',
+      ],
       factory: ({ resolved }) => {
         const world = new WorldSystem({
+          eventBus: resolved['event-bus'],
           player: resolved['player'],
           enemies: resolved['enemies'],
           physics: resolved['physics'],
@@ -597,7 +618,7 @@ export function createServiceManifest(context = {}) {
         'world',
         'effects',
       ],
-      factory: ({ resolved, context, container }) => {
+      factory: ({ resolved, context }) => {
         const instance = new GameSessionService({
           eventBus: resolved['event-bus'],
           random: resolved['random'],
@@ -617,10 +638,6 @@ export function createServiceManifest(context = {}) {
           gameState: context.gameState,
         });
 
-        if (typeof container?.syncInstance === 'function') {
-          container.syncInstance('game-session', instance);
-        }
-
         if (
           resolved['game-state'] &&
           typeof resolved['game-state'].__attachSessionService === 'function'
@@ -636,6 +653,7 @@ export function createServiceManifest(context = {}) {
       singleton: true,
       lazy: false,
       dependencies: [
+        'event-bus',
         'player',
         'progression',
         'xp-orbs',
@@ -647,6 +665,7 @@ export function createServiceManifest(context = {}) {
       ],
       factory: ({ resolved }) =>
         new RenderingSystem({
+          eventBus: resolved['event-bus'],
           player: resolved['player'],
           progression: resolved['progression'],
           'xp-orbs': resolved['xp-orbs'],
@@ -661,12 +680,16 @@ export function createServiceManifest(context = {}) {
       name: 'menu-background',
       singleton: true,
       lazy: false,
-      dependencies: ['settings', 'random'],
-      factory: ({ resolved }) =>
-        new MenuBackgroundSystem({
+      dependencies: ['event-bus', 'settings', 'random'],
+      factory: ({ resolved, container }) => {
+        const serviceResolver = createServiceResolver(container);
+        return new MenuBackgroundSystem({
+          eventBus: resolved['event-bus'],
           settings: resolved['settings'],
           random: resolved['random'],
-        }),
+          serviceResolver,
+        });
+      },
     },
   ];
 }

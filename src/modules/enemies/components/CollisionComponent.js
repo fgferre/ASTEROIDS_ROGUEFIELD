@@ -1,4 +1,5 @@
 import { COLLISION_BOUNCE } from '../../../data/constants/gameplay.js';
+import { resolveEventBus } from '../../../core/serviceUtils.js';
 
 const sqr = (value) => value * value;
 
@@ -180,20 +181,12 @@ export class CollisionComponent {
       enemy.triggerDetonation(payload);
     }
 
-    if (system?.gameEvents?.emit) {
-      system.gameEvents.emit('enemy-triggered', {
-        enemyId: enemy.id,
-        enemyType: enemy.type,
-        position: { x: enemy.x, y: enemy.y },
-        payload,
-      });
-    } else if (typeof gameEvents !== 'undefined' && gameEvents?.emit) {
-      gameEvents.emit('enemy-triggered', {
-        enemyId: enemy.id,
-        enemyType: enemy.type,
-        position: { x: enemy.x, y: enemy.y },
-        payload,
-      });
-    }
+    const eventBus = system?.eventBus || resolveEventBus(system?.dependencies);
+    eventBus?.emit?.('enemy-triggered', {
+      enemyId: enemy.id,
+      enemyType: enemy.type,
+      position: { x: enemy.x, y: enemy.y },
+      payload,
+    });
   }
 }

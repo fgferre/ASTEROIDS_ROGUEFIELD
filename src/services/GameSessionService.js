@@ -1,5 +1,3 @@
-/* global gameServices */
-
 import {
   DEFAULT_SAFE_SPAWN_DISTANCE,
   GAME_HEIGHT,
@@ -1300,26 +1298,6 @@ export default class GameSessionService {
     if (!instance && directKey !== name && this.services) {
       if (Object.prototype.hasOwnProperty.call(this.services, name)) {
         instance = this.services[name];
-      }
-    }
-
-    if (!instance && typeof gameServices !== 'undefined' && gameServices) {
-      try {
-        if (typeof gameServices.has === 'function' && !gameServices.has(name)) {
-          return instance;
-        }
-
-        if (typeof gameServices.get === 'function') {
-          instance = gameServices.get(name);
-        } else if (Object.prototype.hasOwnProperty.call(gameServices, name)) {
-          instance = gameServices[name];
-        }
-      } catch (error) {
-        console.warn(
-          `[GameSessionService] Failed to resolve service "${name}":`,
-          error
-        );
-        return null;
       }
     }
 

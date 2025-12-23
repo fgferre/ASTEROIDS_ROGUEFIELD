@@ -202,7 +202,6 @@ class UISystem extends BaseSystem {
 
   cacheStaticNodes() {
     return {
-      root: document.getElementById('hud-root') || null,
       gameUi: document.getElementById('game-ui') || null,
       gameField: document.querySelector('#game-ui .game-field') || null,
       canvas: document.getElementById('game-canvas') || null,
@@ -215,8 +214,6 @@ class UISystem extends BaseSystem {
         progressBar: null,
         enemies: null,
         totalKills: null,
-        countdown: document.getElementById('wave-countdown') || null,
-        countdownValue: document.getElementById('countdown-timer') || null,
       },
       levelUp: {
         container: document.getElementById('upgrades-container') || null,
@@ -1635,20 +1632,23 @@ class UISystem extends BaseSystem {
 
     if (pauseRefs.resumeBtn) {
       pauseRefs.resumeBtn.addEventListener('mouseenter', () => {
-        gameEvents.emit('ui-hover', { source: 'pause-menu', button: 'resume' });
+        this.eventBus?.emit?.('ui-hover', {
+          source: 'pause-menu',
+          button: 'resume',
+        });
       });
       pauseRefs.resumeBtn.addEventListener('click', () => {
         if (!this.currentPauseState) {
           return;
         }
 
-        gameEvents.emit('toggle-pause');
+        this.eventBus?.emit?.('toggle-pause');
       });
     }
 
     if (pauseRefs.settingsBtn) {
       pauseRefs.settingsBtn.addEventListener('mouseenter', () => {
-        gameEvents.emit('ui-hover', {
+        this.eventBus?.emit?.('ui-hover', {
           source: 'pause-menu',
           button: 'settings',
         });
@@ -1658,20 +1658,22 @@ class UISystem extends BaseSystem {
           return;
         }
 
-        gameEvents.emit('settings-menu-requested', { source: 'pause' });
+        this.eventBus?.emit?.('settings-menu-requested', { source: 'pause' });
       });
     }
 
     if (pauseRefs.exitBtn) {
       pauseRefs.exitBtn.addEventListener('mouseenter', () => {
-        gameEvents.emit('ui-hover', { source: 'pause-menu', button: 'exit' });
+        this.eventBus?.emit?.('ui-hover', { source: 'pause-menu', button: 'exit' });
       });
       pauseRefs.exitBtn.addEventListener('click', () => {
         if (!this.currentPauseState) {
           return;
         }
 
-        gameEvents.emit('exit-to-menu-requested', { source: 'pause-menu' });
+        this.eventBus?.emit?.('exit-to-menu-requested', {
+          source: 'pause-menu',
+        });
       });
     }
   }
@@ -1695,7 +1697,7 @@ class UISystem extends BaseSystem {
           }
           const button = event.target.closest('[data-settings-category]');
           if (button) {
-            gameEvents.emit('ui-hover', {
+            this.eventBus?.emit?.('ui-hover', {
               source: 'settings-menu',
               element: 'tab',
             });
@@ -1733,7 +1735,7 @@ class UISystem extends BaseSystem {
         ) {
           return;
         }
-        gameEvents.emit('ui-hover', {
+        this.eventBus?.emit?.('ui-hover', {
           source: 'settings-menu',
           element: 'close',
         });
@@ -1753,7 +1755,7 @@ class UISystem extends BaseSystem {
         ) {
           return;
         }
-        gameEvents.emit('ui-hover', {
+        this.eventBus?.emit?.('ui-hover', {
           source: 'settings-menu',
           element: 'reset',
         });
@@ -1806,7 +1808,7 @@ class UISystem extends BaseSystem {
         ) {
           return;
         }
-        gameEvents.emit('ui-hover', {
+        this.eventBus?.emit?.('ui-hover', {
           source: 'credits-menu',
           element: 'close',
         });
@@ -1844,7 +1846,7 @@ class UISystem extends BaseSystem {
               source = 'gameover-menu';
             else if (target.closest('#levelup-screen')) source = 'levelup-menu';
 
-            gameEvents.emit('ui-hover', {
+            this.eventBus?.emit?.('ui-hover', {
               source,
               button: target.id || target.className || 'unknown',
             });
@@ -2030,29 +2032,12 @@ class UISystem extends BaseSystem {
       return;
     }
 
-    const hudRoot = this.domRefs.root;
-    const countdown = this.domRefs.wave?.countdown || null;
-
     this.aaaTacticalHudRestoreState = {
       mountTarget,
       mountPadding: mountTarget.style.padding,
-      hudRootDisplay: hudRoot?.style.display ?? null,
-      hudRootAriaHidden: hudRoot?.getAttribute('aria-hidden') ?? null,
-      countdownDisplay: countdown?.style.display ?? null,
-      countdownAriaHidden: countdown?.getAttribute('aria-hidden') ?? null,
     };
 
     mountTarget.style.padding = '0px';
-
-    if (hudRoot) {
-      hudRoot.style.display = 'none';
-      hudRoot.setAttribute('aria-hidden', 'true');
-    }
-
-    if (countdown) {
-      countdown.style.display = 'none';
-      countdown.setAttribute('aria-hidden', 'true');
-    }
 
     this.aaaTacticalHud = new AAAHudLayout();
     this.aaaTacticalHudDefinition = definition;
@@ -2072,32 +2057,6 @@ class UISystem extends BaseSystem {
     if (restore?.mountTarget instanceof HTMLElement) {
       restore.mountTarget.style.padding =
         typeof restore.mountPadding === 'string' ? restore.mountPadding : '';
-    }
-
-    const hudRoot = this.domRefs.root;
-    if (hudRoot) {
-      hudRoot.style.display =
-        typeof restore?.hudRootDisplay === 'string'
-          ? restore.hudRootDisplay
-          : '';
-      if (restore?.hudRootAriaHidden === null) {
-        hudRoot.removeAttribute('aria-hidden');
-      } else if (typeof restore?.hudRootAriaHidden === 'string') {
-        hudRoot.setAttribute('aria-hidden', restore.hudRootAriaHidden);
-      }
-    }
-
-    const countdown = this.domRefs.wave?.countdown || null;
-    if (countdown) {
-      countdown.style.display =
-        typeof restore?.countdownDisplay === 'string'
-          ? restore.countdownDisplay
-          : '';
-      if (restore?.countdownAriaHidden === null) {
-        countdown.removeAttribute('aria-hidden');
-      } else if (typeof restore?.countdownAriaHidden === 'string') {
-        countdown.setAttribute('aria-hidden', restore.countdownAriaHidden);
-      }
     }
 
     this.aaaTacticalHud = null;
@@ -2212,6 +2171,16 @@ class UISystem extends BaseSystem {
       );
     }
 
+    if (typeof hud.updateNextWaveTimer === 'function') {
+      const isActive = waveState ? Boolean(waveState.isActive ?? true) : true;
+      const breakTimerRaw =
+        waveState?.breakTimer ?? waveState?.breakTimerSeconds ?? 0;
+      const breakSeconds = !isActive
+        ? Math.max(0, Math.ceil(Number(breakTimerRaw) || 0))
+        : 0;
+      hud.updateNextWaveTimer(breakSeconds);
+    }
+
     const physics = this.getService('physics');
     if (
       (physics && typeof physics.getNearbyEnemies === 'function' && player) ||
@@ -2256,6 +2225,13 @@ class UISystem extends BaseSystem {
           continue;
         }
 
+        const isBoss =
+          enemy?.type === 'boss' ||
+          (typeof enemy?.hasTag === 'function' && enemy.hasTag('boss')) ||
+          (enemy?.tags && typeof enemy.tags.has === 'function'
+            ? enemy.tags.has('boss')
+            : false);
+
         const dx = enemyX - originX;
         const dy = enemyY - originY;
         const distance = Math.hypot(dx, dy);
@@ -2266,7 +2242,7 @@ class UISystem extends BaseSystem {
         blips.push({
           x: dx / radarRange,
           y: dy / radarRange,
-          type: 'enemy',
+          type: isBoss ? 'boss' : 'enemy',
         });
       }
 
@@ -2294,6 +2270,7 @@ class UISystem extends BaseSystem {
         phase: bossState.phase ?? 0,
         phaseCount: bossState.phaseCount ?? 1,
         phaseColors: bossState.phaseColors || [],
+        invulnerable: Boolean(bossState.invulnerable),
       };
       hud.updateBoss(true, bossName, percent, phaseInfo);
     }
@@ -4225,7 +4202,7 @@ class UISystem extends BaseSystem {
       element: button,
     };
 
-    gameEvents.emit('input-binding-capture', { state: 'start' });
+    this.eventBus?.emit?.('input-binding-capture', { state: 'start' });
   }
 
   handleKeyPressForCapture(payload) {
@@ -4304,7 +4281,7 @@ class UISystem extends BaseSystem {
 
     this.settingsState.capture = null;
 
-    gameEvents.emit('input-binding-capture', { state: 'end' });
+    this.eventBus?.emit?.('input-binding-capture', { state: 'end' });
 
     this.renderSettingsPanel(this.settingsState.activeCategory);
   }
@@ -4315,7 +4292,7 @@ class UISystem extends BaseSystem {
     }
 
     if (this.settingsState.capture) {
-      gameEvents.emit('input-binding-capture', { state: 'end' });
+      this.eventBus?.emit?.('input-binding-capture', { state: 'end' });
     }
 
     this.settingsState.capture = null;
@@ -5319,7 +5296,7 @@ class UISystem extends BaseSystem {
       document.body?.classList.remove('is-credits-open');
 
       if (emitEvent) {
-        gameEvents.emit('screen-changed', { screen: screenName });
+        this.eventBus?.emit?.('screen-changed', { screen: screenName });
       }
     } catch (error) {
       console.error('[UISystem] Failed to show screen:', error);
@@ -5424,7 +5401,7 @@ class UISystem extends BaseSystem {
     button.innerHTML = this.buildUpgradeOptionMarkup(option);
     button.addEventListener('click', () => this.selectUpgrade(option.id));
     button.addEventListener('mouseenter', () => {
-      gameEvents.emit('ui-hover', { source: 'upgrade-selection', index });
+      this.eventBus?.emit?.('ui-hover', { source: 'upgrade-selection', index });
       this.focusLevelUpOption(index, { preventFocus: true, fromPointer: true });
     });
     button.addEventListener('focus', () =>

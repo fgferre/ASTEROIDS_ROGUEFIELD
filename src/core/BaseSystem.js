@@ -1,4 +1,8 @@
-import { normalizeDependencies, resolveService } from './serviceUtils.js';
+import {
+  normalizeDependencies,
+  resolveEventBus,
+  resolveService,
+} from './serviceUtils.js';
 import RandomService from './RandomService.js';
 
 /**
@@ -55,6 +59,7 @@ class BaseSystem {
     this.dependencies = normalizeDependencies(dependencies);
     this.systemName = options.systemName;
     this._eventTopic = (options.serviceName || options.systemName || '').trim();
+    this.eventBus = resolveEventBus(this.dependencies);
 
     // Initialize event listener tracking
     this._eventListeners = [];
@@ -90,16 +95,6 @@ class BaseSystem {
         frameCount: 0,
         lastFrameTime: performance.now(),
       };
-    }
-
-    // Auto-register with gameServices
-    const serviceKey = options.serviceName ?? options.systemName;
-    if (
-      serviceKey &&
-      typeof gameServices !== 'undefined' &&
-      gameServices?.register
-    ) {
-      gameServices.register(serviceKey, this);
     }
 
     // Call template methods
@@ -291,15 +286,15 @@ class BaseSystem {
     const boundHandler =
       context && context !== this ? handler.bind(context) : handler;
 
-    if (
-      typeof gameEvents === 'undefined' ||
-      typeof gameEvents.on !== 'function'
-    ) {
+    const eventBus = this.eventBus || resolveEventBus(this.dependencies);
+    this.eventBus = eventBus || this.eventBus;
+
+    if (!eventBus || typeof eventBus.on !== 'function') {
       const systemLabel =
         this.systemName ||
         (this.constructor && this.constructor.name) ||
         'UnknownSystem';
-      const warningMessage = `[${systemLabel}] registerEventListener('${eventName}') skipped: gameEvents is unavailable.`;
+      const warningMessage = `[${systemLabel}] registerEventListener('${eventName}') skipped: event bus is unavailable.`;
       const shouldWarn =
         typeof process === 'undefined' ||
         !process.env ||
@@ -315,7 +310,7 @@ class BaseSystem {
       return;
     }
 
-    gameEvents.on(eventName, boundHandler);
+    eventBus.on(eventName, boundHandler);
 
     this._eventListeners.push({
       eventName,
@@ -333,8 +328,9 @@ class BaseSystem {
     if (!this._eventListeners || !this._eventListeners.length) return;
 
     this._eventListeners.forEach(({ eventName, handler }) => {
-      if (gameEvents && typeof gameEvents.off === 'function') {
-        gameEvents.off(eventName, handler);
+      const eventBus = this.eventBus || resolveEventBus(this.dependencies);
+      if (eventBus && typeof eventBus.off === 'function') {
+        eventBus.off(eventName, handler);
       }
     });
 
@@ -454,8 +450,11 @@ class BaseSystem {
     this.onReset();
 
     // Emit reset event
-    if (this._eventTopic && typeof gameEvents !== 'undefined') {
-      gameEvents.emit(`${this._eventTopic}-reset`);
+    if (this._eventTopic) {
+      const eventBus = this.eventBus || resolveEventBus(this.dependencies);
+      if (eventBus && typeof eventBus.emit === 'function') {
+        eventBus.emit(`${this._eventTopic}-reset`);
+      }
     }
   }
 

@@ -426,7 +426,7 @@ class PlayerSystem extends BaseSystem {
   }
 
   emitShieldStats() {
-    gameEvents.emit('shield-stats-changed', {
+    this.eventBus?.emit?.('shield-stats-changed', {
       level: this.shieldUpgradeLevel,
       maxHP: this.shieldMaxHP,
       currentHP:
@@ -440,7 +440,7 @@ class PlayerSystem extends BaseSystem {
   }
 
   emitShieldActivationFailed(reason) {
-    gameEvents.emit('shield-activation-failed', {
+    this.eventBus?.emit?.('shield-activation-failed', {
       reason,
       level: this.shieldUpgradeLevel,
     });
@@ -471,7 +471,7 @@ class PlayerSystem extends BaseSystem {
     this.shieldHP = this.shieldMaxHP;
     this.shieldWasInCooldown = false;
 
-    gameEvents.emit('shield-activated', {
+    this.eventBus?.emit?.('shield-activated', {
       level: this.shieldUpgradeLevel,
       maxHP: this.shieldMaxHP,
     });
@@ -493,7 +493,7 @@ class PlayerSystem extends BaseSystem {
 
     this.shieldHP = Math.max(0, previousHP - absorbed);
 
-    gameEvents.emit('shield-hit', {
+    this.eventBus?.emit?.('shield-hit', {
       level: this.shieldUpgradeLevel,
       remainingHP: this.shieldHP,
       maxHP: this.shieldMaxHP,
@@ -517,14 +517,14 @@ class PlayerSystem extends BaseSystem {
     this.isShieldActive = false;
     this.shieldHP = 0;
 
-    gameEvents.emit('shield-broken', {
+    this.eventBus?.emit?.('shield-broken', {
       level: this.shieldUpgradeLevel,
     });
 
     // Level 5: Deflective explosion on shield break
     if (this.shieldUpgradeLevel >= 5) {
       const position = this.getPosition();
-      gameEvents.emit('shield-deflective-explosion', {
+      this.eventBus?.emit?.('shield-deflective-explosion', {
         position,
         level: this.shieldUpgradeLevel,
       });
@@ -536,7 +536,7 @@ class PlayerSystem extends BaseSystem {
     } else {
       this.shieldCooldownTimer = 0;
       this.shieldWasInCooldown = false;
-      gameEvents.emit('shield-recharged', {
+      this.eventBus?.emit?.('shield-recharged', {
         level: this.shieldUpgradeLevel,
       });
       this.shieldHP = this.shieldMaxHP;
@@ -600,7 +600,7 @@ class PlayerSystem extends BaseSystem {
         if (this.shieldWasInCooldown) {
           this.shieldWasInCooldown = false;
           this.shieldHP = this.shieldMaxHP;
-          gameEvents.emit('shield-recharged', {
+          this.eventBus?.emit?.('shield-recharged', {
             level: this.shieldUpgradeLevel,
           });
           this.emitShieldStats();
@@ -639,7 +639,7 @@ class PlayerSystem extends BaseSystem {
 
     // Emitir evento para outros sistemas
     // Usamos o método 'emitSilently' para não poluir o console a cada frame.
-    gameEvents.emitSilently('player-moved', {
+    this.eventBus?.emitSilently?.('player-moved', {
       position: { ...this.position },
       velocity: { ...this.velocity },
       angle: this.angle,
@@ -746,7 +746,7 @@ class PlayerSystem extends BaseSystem {
     if (thrMain > 0 || this.lastThrusterState.main > 0) {
       // Pushed out to 0.95 to be at the rear nozzle
       const thrusterPos = this.getLocalToWorld(-SHIP_SIZE * 0.95, 0);
-      gameEvents.emit('thruster-effect', {
+      this.eventBus?.emit?.('thruster-effect', {
         position: thrusterPos,
         direction: { x: fwd.x, y: fwd.y },
         intensity: thrMain,
@@ -761,7 +761,7 @@ class PlayerSystem extends BaseSystem {
     if (thrAux > 0 || this.lastThrusterState.aux > 0) {
       // Pushed out to 0.95 to be at the front/retro nozzles
       const thrusterPos = this.getLocalToWorld(SHIP_SIZE * 0.95, 0);
-      gameEvents.emit('thruster-effect', {
+      this.eventBus?.emit?.('thruster-effect', {
         position: thrusterPos,
         direction: { x: -fwd.x, y: -fwd.y },
         intensity: thrAux,
@@ -777,7 +777,7 @@ class PlayerSystem extends BaseSystem {
       // Pushed out to 0.95 to appear on the hull edge/wingtip
       const thrusterPos = this.getLocalToWorld(0, -SHIP_SIZE * 0.95);
       const dir = this.getLocalDirection(0, 1);
-      gameEvents.emit('thruster-effect', {
+      this.eventBus?.emit?.('thruster-effect', {
         position: thrusterPos,
         direction: dir,
         intensity: thrSideL,
@@ -790,7 +790,7 @@ class PlayerSystem extends BaseSystem {
     if (thrSideR > 0 || this.lastThrusterState.sideR > 0) {
       const thrusterPos = this.getLocalToWorld(0, SHIP_SIZE * 0.95);
       const dir = this.getLocalDirection(0, -1);
-      gameEvents.emit('thruster-effect', {
+      this.eventBus?.emit?.('thruster-effect', {
         position: thrusterPos,
         direction: dir,
         intensity: thrSideR,
@@ -1052,7 +1052,7 @@ class PlayerSystem extends BaseSystem {
     this.health = Math.max(0, this.health - remainingDamage);
 
     if (this.health !== previousHealth) {
-      gameEvents.emit('player-health-changed', {
+      this.eventBus?.emit?.('player-health-changed', {
         current: this.health,
         max: this.maxHealth,
       });
@@ -1067,7 +1067,7 @@ class PlayerSystem extends BaseSystem {
 
   heal(amount) {
     this.health = Math.min(this.maxHealth, this.health + Math.max(0, amount));
-    gameEvents.emit('player-health-changed', {
+    this.eventBus?.emit?.('player-health-changed', {
       current: this.health,
       max: this.maxHealth,
     });
@@ -1191,12 +1191,12 @@ class PlayerSystem extends BaseSystem {
    * Called when player dies or game resets
    */
   _stopAllThrusterSounds() {
-    // Check if global gameEvents is available
-    if (typeof gameEvents === 'undefined' || !gameEvents) return;
+    const eventBus = this.eventBus;
+    if (!eventBus?.emit) return;
 
     // Emit stop events for all thruster types
     if (this.lastThrusterState.main > 0) {
-      gameEvents.emit('thruster-effect', {
+      eventBus.emit('thruster-effect', {
         position: this.position,
         direction: { x: 0, y: -1 },
         intensity: 0,
@@ -1206,7 +1206,7 @@ class PlayerSystem extends BaseSystem {
     }
 
     if (this.lastThrusterState.aux > 0) {
-      gameEvents.emit('thruster-effect', {
+      eventBus.emit('thruster-effect', {
         position: this.position,
         direction: { x: 0, y: 1 },
         intensity: 0,
@@ -1220,7 +1220,7 @@ class PlayerSystem extends BaseSystem {
       this.lastThrusterState.sideR
     );
     if (sideIntensity > 0) {
-      gameEvents.emit('thruster-effect', {
+      eventBus.emit('thruster-effect', {
         position: this.position,
         direction: { x: 1, y: 0 },
         intensity: 0,
@@ -1284,7 +1284,7 @@ class PlayerSystem extends BaseSystem {
     const actualHealing = this.health - oldHealth;
 
     if (actualHealing > 0) {
-      gameEvents.emit('player-healed', {
+      this.eventBus?.emit?.('player-healed', {
         amount: actualHealing,
         currentHealth: this.health,
         maxHealth: this.maxHealth,
@@ -1300,8 +1300,3 @@ class PlayerSystem extends BaseSystem {
 }
 
 export default PlayerSystem;
-
-// Export
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = PlayerSystem;
-}

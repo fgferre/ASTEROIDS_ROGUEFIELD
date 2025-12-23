@@ -19,6 +19,8 @@ import {
   COMBAT_PREDICTION_TIME,
   COMBAT_AIMING_UPGRADE_CONFIG,
   COMBAT_MULTISHOT_SPREAD_STEP,
+  PLAYER_BULLET_OFFSCREEN_MARGIN,
+  PLAYER_BULLET_OFFSCREEN_GRACE,
 } from '../data/constants/gameplay.js';
 import { ENEMY_TYPES, BOSS_CONFIG } from '../data/constants/visual.js';
 import {
@@ -257,7 +259,7 @@ class CombatSystem extends BaseSystem {
       this.predictedAimPointsMap.clear();
       this.targetThreatCache.clear();
       if (this.lastPrimaryTargetId !== null) {
-        gameEvents.emit('combat-target-lock', { lost: true });
+        this.eventBus?.emit?.('combat-target-lock', { lost: true });
       }
       this.lastPrimaryTargetId = null;
       this.targetUpdateTimer = 0;
@@ -383,7 +385,7 @@ class CombatSystem extends BaseSystem {
 
     if (!candidates.length) {
       if (this.currentTarget) {
-        gameEvents.emit('combat-target-lock', { lost: true });
+        this.eventBus?.emit?.('combat-target-lock', { lost: true });
       }
       this.currentTarget = null;
       this.currentTargetLocks = [];
@@ -414,7 +416,7 @@ class CombatSystem extends BaseSystem {
     const newPrimaryId = this.currentTarget ? this.currentTarget.id : null;
     if (this.currentTarget && newPrimaryId !== this.lastPrimaryTargetId) {
       this.targetIndicatorPulse = this.targetPulseDuration;
-      gameEvents.emit('combat-target-lock', {
+      this.eventBus?.emit?.('combat-target-lock', {
         enemyId: newPrimaryId,
         variant: this.currentTarget.variant || 'common',
         score: sorted[0]?.score ?? 0,
@@ -595,7 +597,7 @@ class CombatSystem extends BaseSystem {
 
     if (firedTargets.length) {
       const firstTarget = firedTargets[0]?.position || null;
-      gameEvents.emit('weapon-fired', {
+      this.eventBus?.emit?.('weapon-fired', {
         position: playerPos,
         target: firstTarget,
         weaponType: 'basic',
@@ -655,7 +657,7 @@ class CombatSystem extends BaseSystem {
     this.lastShotTime = 0;
 
     if (firedTargets.length) {
-      gameEvents.emit('weapon-fired', {
+      this.eventBus?.emit?.('weapon-fired', {
         position: playerPos,
         target: firedTargets[0].position,
         weaponType: 'basic',
@@ -1845,6 +1847,7 @@ class CombatSystem extends BaseSystem {
     bullet.hit = false;
     bullet.active = true;
     bullet.type = 'player';
+    bullet.offscreenTimer = 0;
 
     // Initialize trail array
     if (!bullet.trail) {
@@ -1856,7 +1859,7 @@ class CombatSystem extends BaseSystem {
     this.bullets.push(bullet);
 
     // Emitir evento para efeitos
-    gameEvents.emit('bullet-created', {
+    this.eventBus?.emit?.('bullet-created', {
       bullet,
       from: fromPos,
       to: toPos,
@@ -1920,6 +1923,7 @@ class CombatSystem extends BaseSystem {
     bullet.hit = false;
     bullet.active = true;
     bullet.type = 'enemy';
+    bullet.offscreenTimer = 0;
     bullet.isBossProjectile = isBossProjectile;
     bullet.color = this.resolveEnemyProjectileColor(
       { ...data, isBossProjectile },
@@ -2322,7 +2326,7 @@ class CombatSystem extends BaseSystem {
     this.enemyBullets = activeBullets;
 
     for (let i = 0; i < hitsToEmit.length; i += 1) {
-      gameEvents.emit('player-hit-by-projectile', hitsToEmit[i]);
+      this.eventBus?.emit?.('player-hit-by-projectile', hitsToEmit[i]);
     }
   }
 
@@ -2366,15 +2370,38 @@ class CombatSystem extends BaseSystem {
       bullet.y += bullet.vy * deltaTime;
       bullet.life -= deltaTime;
 
-      // Remover projéteis que saem da tela para evitar "ricochete"
-      const outOfBounds =
+      const offscreenGrace = Number.isFinite(PLAYER_BULLET_OFFSCREEN_GRACE)
+        ? Math.max(0, PLAYER_BULLET_OFFSCREEN_GRACE)
+        : 0;
+      const offscreenMargin = Number.isFinite(PLAYER_BULLET_OFFSCREEN_MARGIN)
+        ? Math.max(0, PLAYER_BULLET_OFFSCREEN_MARGIN)
+        : 0;
+      const isOffscreen =
         bullet.x < 0 ||
         bullet.x > GAME_WIDTH ||
         bullet.y < 0 ||
         bullet.y > GAME_HEIGHT;
 
+      if (isOffscreen) {
+        bullet.offscreenTimer =
+          (Number(bullet.offscreenTimer) || 0) + deltaTime;
+        if (bullet.offscreenTimer >= offscreenGrace) {
+          bullet.life = 0;
+          return;
+        }
+      } else {
+        bullet.offscreenTimer = 0;
+      }
+
+      const outOfBounds =
+        bullet.x < -offscreenMargin ||
+        bullet.x > GAME_WIDTH + offscreenMargin ||
+        bullet.y < -offscreenMargin ||
+        bullet.y > GAME_HEIGHT + offscreenMargin;
+
       if (outOfBounds) {
         bullet.life = 0;
+        bullet.offscreenTimer = 0;
         return;
       }
     });
@@ -2468,7 +2495,7 @@ class CombatSystem extends BaseSystem {
       });
     }
 
-    gameEvents.emit('bullet-hit', {
+    this.eventBus?.emit?.('bullet-hit', {
       bullet,
       enemy,
       position: { x: bullet.x, y: bullet.y },

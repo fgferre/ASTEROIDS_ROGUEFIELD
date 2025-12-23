@@ -17,7 +17,6 @@
     />
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="style.css" />
-    <link rel="stylesheet" href="aaa-hud-theme.css" />
   </head>
   <body>
     <div id="game-container">
@@ -253,52 +252,7 @@
         <div class="game-field">
           <canvas id="game-canvas" width="800" height="600"></canvas>
 
-          <div class="game-field__overlay">
-            <div id="hud-root" class="hud">
-              <div
-                id="hud-region-top-left"
-                class="hud-region hud-region--top-left"
-                aria-live="polite"
-              ></div>
-
-              <div
-                id="hud-region-top-middle"
-                class="hud-region hud-region--top-middle"
-                aria-live="polite"
-              ></div>
-
-              <div
-                id="hud-region-top-right"
-                class="hud-region hud-region--top-right"
-                aria-live="polite"
-              ></div>
-
-              <div
-                id="hud-region-bottom-left"
-                class="hud-region hud-region--bottom-left"
-              ></div>
-
-              <div
-                id="hud-region-bottom-center"
-                class="hud-region hud-region--bottom-center"
-              ></div>
-
-              <div
-                id="hud-region-bottom-right"
-                class="hud-region hud-region--bottom-right"
-              ></div>
-            </div>
-            <div
-              id="wave-countdown"
-              class="wave-countdown"
-              role="status"
-              aria-live="assertive"
-              aria-hidden="true"
-            >
-              <span class="countdown-label">NEXT WAVE</span>
-              <span id="countdown-timer" class="countdown-value">10</span>
-            </div>
-          </div>
+          <div class="game-field__overlay"></div>
         </div>
       </div>
     </div>

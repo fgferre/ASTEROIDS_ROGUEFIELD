@@ -7,23 +7,28 @@
 
 import {
   normalizeDependencies,
+  resolveEventBus,
   resolveService,
 } from '../../core/serviceUtils.js';
 import HealthHeart from './HealthHeart.js';
 
 export class HealthHeartSystem {
-  constructor({ player } = {}) {
-    this.dependencies = normalizeDependencies({ player });
+  constructor({ eventBus, player } = {}) {
+    this.dependencies = normalizeDependencies({ eventBus, player });
     this.hearts = [];
     this.cachedPlayer = resolveService('player', this.dependencies);
+    this.eventBus = resolveEventBus(this.dependencies);
     this.collectionRadius = 25;
 
-    // Register in gameServices
-    if (typeof gameServices !== 'undefined') {
-      gameServices.register('healthHearts', this);
-    }
-
     console.log('[HealthHeartSystem] Initialized');
+  }
+
+  getEventBus() {
+    const eventBus = this.eventBus || resolveEventBus(this.dependencies);
+    if (eventBus && this.eventBus !== eventBus) {
+      this.eventBus = eventBus;
+    }
+    return eventBus;
   }
 
   update(deltaTime) {
@@ -79,8 +84,9 @@ export class HealthHeartSystem {
       );
 
       // Emit event for effects/audio
-      if (typeof gameEvents !== 'undefined') {
-        gameEvents.emit('health-heart-collected', {
+      const eventBus = this.getEventBus();
+      if (eventBus?.emit) {
+        eventBus.emit('health-heart-collected', {
           healAmount,
           position: { x: heart.x, y: heart.y },
         });

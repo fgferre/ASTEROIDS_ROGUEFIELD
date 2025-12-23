@@ -1,7 +1,11 @@
 // src/modules/InputSystem.js
 
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
-import { normalizeDependencies, resolveService } from '../core/serviceUtils.js';
+import {
+  normalizeDependencies,
+  resolveEventBus,
+  resolveService,
+} from '../core/serviceUtils.js';
 
 const CONTROLS_CATEGORY_ID = 'controls';
 const MOVEMENT_ACTIONS = new Set([
@@ -35,6 +39,7 @@ class InputSystem {
     this.dependencies = normalizeDependencies(dependencies);
     this.commandQueue =
       resolveService('command-queue', this.dependencies) || null;
+    this.eventBus = resolveEventBus(this.dependencies);
     this.lastMovementCommand = null;
     this.keys = {};
     this.codes = {};
@@ -66,10 +71,6 @@ class InputSystem {
     this.setupEventListeners();
     this.initializeBindings();
 
-    if (typeof gameServices !== 'undefined') {
-      gameServices.register('input', this);
-    }
-
     console.log('[InputSystem] Initialized');
   }
 
@@ -79,6 +80,14 @@ class InputSystem {
         resolveService('command-queue', this.dependencies) || this.commandQueue;
     }
     return this.commandQueue;
+  }
+
+  getEventBus() {
+    const eventBus = this.eventBus || resolveEventBus(this.dependencies);
+    if (eventBus && this.eventBus !== eventBus) {
+      this.eventBus = eventBus;
+    }
+    return eventBus;
   }
 
   resolveControlFieldMap() {
@@ -205,14 +214,15 @@ class InputSystem {
       this.onGamepadDisconnected(event)
     );
 
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.on('settings-controls-changed', (payload = {}) => {
+    const eventBus = this.getEventBus();
+    if (eventBus?.on) {
+      eventBus.on('settings-controls-changed', (payload = {}) => {
         if (payload?.values) {
           this.applyControlSettings(payload.values);
         }
       });
 
-      gameEvents.on('input-binding-capture', (payload = {}) => {
+      eventBus.on('input-binding-capture', (payload = {}) => {
         this.isCapturingBinding = payload?.state === 'start';
       });
     }
@@ -281,8 +291,9 @@ class InputSystem {
       });
     }
 
-    if (!wasPressed && typeof gameEvents !== 'undefined') {
-      gameEvents.emit('key-pressed', {
+    const eventBus = this.getEventBus();
+    if (!wasPressed && eventBus?.emit) {
+      eventBus.emit('key-pressed', {
         key,
         code,
         type: 'down',
@@ -311,8 +322,9 @@ class InputSystem {
       });
     });
 
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('key-pressed', {
+    const eventBus = this.getEventBus();
+    if (eventBus?.emit) {
+      eventBus.emit('key-pressed', {
         key,
         code,
         type: 'up',
@@ -329,8 +341,9 @@ class InputSystem {
 
   onMouseDown(event) {
     this.mouseButtons[event.button] = true;
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('mouse-pressed', {
+    const eventBus = this.getEventBus();
+    if (eventBus?.emit) {
+      eventBus.emit('mouse-pressed', {
         button: event.button,
         type: 'down',
         pos: { ...this.mousePos },
@@ -340,8 +353,9 @@ class InputSystem {
 
   onMouseUp(event) {
     this.mouseButtons[event.button] = false;
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('mouse-pressed', {
+    const eventBus = this.getEventBus();
+    if (eventBus?.emit) {
+      eventBus.emit('mouse-pressed', {
         button: event.button,
         type: 'up',
         pos: { ...this.mousePos },
@@ -438,8 +452,9 @@ class InputSystem {
   }
 
   emitActionEvent(action, phase, source, context = {}) {
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('input-action', {
+    const eventBus = this.getEventBus();
+    if (eventBus?.emit) {
+      eventBus.emit('input-action', {
         action,
         phase,
         source,
@@ -453,29 +468,21 @@ class InputSystem {
 
     switch (action) {
       case 'pause':
-        if (typeof gameEvents !== 'undefined') {
-          gameEvents.emit('toggle-pause');
-        }
+        eventBus?.emit?.('toggle-pause');
         break;
       case 'activateShield':
-        if (typeof gameEvents !== 'undefined') {
-          gameEvents.emit('activate-shield-pressed');
-        }
+        eventBus?.emit?.('activate-shield-pressed');
         break;
       case 'openSettings':
-        if (typeof gameEvents !== 'undefined') {
-          gameEvents.emit('settings-menu-requested', {
-            source: context.device || source || 'input',
-          });
-        }
+        eventBus?.emit?.('settings-menu-requested', {
+          source: context.device || source || 'input',
+        });
         break;
       case 'confirm':
-        if (typeof gameEvents !== 'undefined') {
-          gameEvents.emit('input-confirmed', {
-            source,
-            context,
-          });
-        }
+        eventBus?.emit?.('input-confirmed', {
+          source,
+          context,
+        });
         break;
       default:
         break;
@@ -483,11 +490,12 @@ class InputSystem {
   }
 
   emitGamepadDetection(details) {
-    if (typeof gameEvents === 'undefined') {
+    const eventBus = this.getEventBus();
+    if (!eventBus?.emit) {
       return;
     }
 
-    gameEvents.emit('gamepad-input-detected', {
+    eventBus.emit('gamepad-input-detected', {
       ...details,
       timestamp:
         typeof performance !== 'undefined' ? performance.now() : Date.now(),
@@ -1091,7 +1099,3 @@ class InputSystem {
 }
 
 export default InputSystem;
-
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = InputSystem;
-}

@@ -30,6 +30,7 @@ import {
   ENEMY_RENDER_PRESETS,
 } from '../../../data/constants/visual.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
+import { resolveEventBus } from '../../../core/serviceUtils.js';
 
 let fallbackEnemyIdSequence = 0;
 
@@ -264,14 +265,8 @@ export class BaseEnemy {
     };
 
     if (!eventContext?.healthComponentManaged) {
-      const gameEvents = this.system?.gameEvents?.emit
-        ? this.system.gameEvents
-        : null;
-      if (gameEvents) {
-        gameEvents.emit('enemy-destroyed', payload);
-      } else if (this.system?.eventBus?.emit) {
-        this.system.eventBus.emit('enemy-destroyed', payload);
-      }
+      const eventBus = this.getEventBus();
+      eventBus?.emit?.('enemy-destroyed', payload);
     }
 
     // Override in subclasses for death effects
@@ -524,6 +519,15 @@ export class BaseEnemy {
         component.update(context);
       }
     }
+  }
+
+  getEventBus() {
+    const eventBus =
+      this.system?.eventBus || resolveEventBus(this.system?.dependencies);
+    if (eventBus?.emit) {
+      return eventBus;
+    }
+    return resolveEventBus();
   }
 
   /**

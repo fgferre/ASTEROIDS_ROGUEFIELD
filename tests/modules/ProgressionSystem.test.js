@@ -24,8 +24,11 @@ function collectUpgradeIds(progression, count) {
 }
 
 describe('ProgressionSystem determinism', () => {
+  let eventBus;
+
   beforeEach(() => {
-    setupGlobalMocks({ gameEvents: createEventBusMock() });
+    eventBus = createEventBusMock();
+    setupGlobalMocks();
   });
 
   afterEach(() => {
@@ -41,6 +44,7 @@ describe('ProgressionSystem determinism', () => {
       const random = container.resolve('random');
       const progression = new ProgressionSystem({
         random,
+        eventBus,
         player: {},
         ui: {},
         effects: {},
@@ -56,8 +60,8 @@ describe('ProgressionSystem determinism', () => {
 
       random.reset(random.seed);
       progression.reset();
-      globalThis.gameEvents.emit('progression-reset');
-      globalThis.gameEvents.emit('player-reset');
+      eventBus.emit('progression-reset');
+      eventBus.emit('player-reset');
 
       const postResetOptions = collectUpgradeIds(progression, 5);
 
@@ -69,6 +73,7 @@ describe('ProgressionSystem determinism', () => {
     const createProgression = (seed) =>
       new ProgressionSystem({
         random: new RandomService(seed),
+        eventBus,
         player: {},
         ui: {},
         effects: {},
@@ -86,13 +91,13 @@ describe('ProgressionSystem determinism', () => {
 
       progression.random.reset(progression.random.seed);
       progression.reset();
-      globalThis.gameEvents.emit('progression-reset');
+      eventBus.emit('progression-reset');
       const secondRun = collectUpgradeIds(progression, 5);
       expect(secondRun).toStrictEqual(firstRun);
 
       progression.random.reset(progression.random.seed);
       progression.reset();
-      globalThis.gameEvents.emit('player-reset');
+      eventBus.emit('player-reset');
       const thirdRun = collectUpgradeIds(progression, 5);
 
       expect(thirdRun).toStrictEqual(firstRun);

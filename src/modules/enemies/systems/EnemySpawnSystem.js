@@ -11,6 +11,7 @@ import {
 } from '../../../data/enemies/asteroid-configs.js';
 import { GamePools } from '../../../core/GamePools.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
+import { resolveEventBus } from '../../../core/serviceUtils.js';
 import { Asteroid } from '../types/Asteroid.js';
 import { BossEnemy } from '../types/BossEnemy.js';
 
@@ -248,13 +249,14 @@ export class EnemySpawnSystem {
 
     if (typeof facade.emitEvent === 'function') {
       facade.emitEvent('boss-spawned', payload);
-    } else if (
-      typeof gameEvents !== 'undefined' &&
-      typeof gameEvents.emit === 'function'
-    ) {
-      gameEvents.emit('boss-spawned', payload);
     } else {
-      facade.handleBossSpawned(payload);
+      const eventBus =
+        facade?.eventBus || resolveEventBus(facade?.dependencies);
+      if (eventBus?.emit) {
+        eventBus.emit('boss-spawned', payload);
+      } else {
+        facade.handleBossSpawned(payload);
+      }
     }
 
     return boss;
@@ -394,11 +396,12 @@ export class EnemySpawnSystem {
 
     if (typeof facade.emitEvent === 'function') {
       facade.emitEvent('enemy-spawned', payload);
-    } else if (
-      typeof gameEvents !== 'undefined' &&
-      typeof gameEvents.emit === 'function'
-    ) {
-      gameEvents.emit('enemy-spawned', payload);
+    } else {
+      const eventBus =
+        facade?.eventBus || resolveEventBus(facade?.dependencies);
+      if (eventBus?.emit) {
+        eventBus.emit('enemy-spawned', payload);
+      }
     }
 
     return asteroid;

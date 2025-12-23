@@ -141,4 +141,3 @@ export function createRandomHelpers({
   return Object.freeze(boundHelpers);
 }
 
-export default createRandomHelpers;

@@ -44,10 +44,3 @@ const shipModels = Object.freeze({
 
 export { defaultHull };
 export default shipModels;
-
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = {
-    ...shipModels,
-    defaultHull,
-  };
-}

@@ -753,7 +753,7 @@ class UpgradeSystem extends BaseSystem {
     const effects = this.cloneEffects(levelDefinition.effects);
     const prerequisites = this.describePrerequisites(definition);
 
-    gameEvents.emit('upgrade:purchased', {
+    this.eventBus?.emit?.('upgrade:purchased', {
       upgradeId,
       level: newLevel,
       previousLevel: currentLevel,
@@ -763,7 +763,7 @@ class UpgradeSystem extends BaseSystem {
       prerequisites,
     });
 
-    gameEvents.emit('upgrade-applied', {
+    this.eventBus?.emit?.('upgrade-applied', {
       upgradeId,
       level: newLevel,
       previousLevel: currentLevel,
@@ -807,7 +807,7 @@ class UpgradeSystem extends BaseSystem {
           level: newLevel,
           category: definition.category,
         };
-        gameEvents.emit(effect.event, payload);
+        this.eventBus?.emit?.(effect.event, payload);
         return;
       }
 
@@ -888,7 +888,3 @@ class UpgradeSystem extends BaseSystem {
 }
 
 export default UpgradeSystem;
-
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = UpgradeSystem;
-}

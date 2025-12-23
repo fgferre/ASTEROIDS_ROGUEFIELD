@@ -6,7 +6,6 @@ export function bootstrapServices({
   seed,
   randomOverrides,
   logger = console,
-  adapter = null,
 } = {}) {
   if (!container) {
     throw new Error('[bootstrapServices] DI container instance is required');
@@ -33,9 +32,6 @@ export function bootstrapServices({
       const instance = container.resolve(entry.name);
       resolvedServices[entry.name] = instance;
 
-      if (adapter && typeof adapter.syncInstance === 'function') {
-        adapter.syncInstance(entry.name, instance);
-      }
     } catch (error) {
       throw new Error(
         `Failed to bootstrap service '${entry.name}': ${error.message}`

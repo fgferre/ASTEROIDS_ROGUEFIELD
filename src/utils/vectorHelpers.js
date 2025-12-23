@@ -44,37 +44,3 @@ export function normalizeSimple(vx, vy) {
   }
   return { x: vx / len, y: vy / len };
 }
-
-/**
- * Calculates the magnitude of a 2D vector (alias for length).
- * @param {number} vx - X component
- * @param {number} vy - Y component
- * @returns {number} Vector magnitude
- */
-export function magnitude(vx, vy) {
-  return length(vx, vy);
-}
-
-/**
- * Calculates the dot product of two 2D vectors.
- * @param {number} ax - X component of vector A
- * @param {number} ay - Y component of vector A
- * @param {number} bx - X component of vector B
- * @param {number} by - Y component of vector B
- * @returns {number} Dot product
- */
-export function dot(ax, ay, bx, by) {
-  return ax * bx + ay * by;
-}
-
-/**
- * Calculates the Euclidean distance between two points.
- * @param {number} x1 - X coordinate of first point
- * @param {number} y1 - Y coordinate of first point
- * @param {number} x2 - X coordinate of second point
- * @param {number} y2 - Y coordinate of second point
- * @returns {number} Distance between the two points
- */
-export function distance(x1, y1, x2, y2) {
-  return Math.hypot(x2 - x1, y2 - y1);
-}

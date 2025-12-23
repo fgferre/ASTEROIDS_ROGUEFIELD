@@ -6,6 +6,11 @@ export class AAAHudLayout {
     this._styleElement = null;
     this._root = null;
     this.els = null;
+    this._lastBossHealthPercent = null;
+    this._bossHitTimeout = null;
+    this._bossCriticalTimeout = null;
+    this._bossPhaseMarkers = [];
+    this._lastBossPhaseMarkerCount = null;
   }
 
   mount(container) {
@@ -68,6 +73,17 @@ export class AAAHudLayout {
     this._styleElement = null;
     this._root = null;
     this.els = null;
+    if (this._bossHitTimeout) {
+      window.clearTimeout(this._bossHitTimeout);
+      this._bossHitTimeout = null;
+    }
+    if (this._bossCriticalTimeout) {
+      window.clearTimeout(this._bossCriticalTimeout);
+      this._bossCriticalTimeout = null;
+    }
+    this._lastBossHealthPercent = null;
+    this._bossPhaseMarkers = [];
+    this._lastBossPhaseMarkerCount = null;
   }
 
   _cacheElements() {
@@ -86,6 +102,7 @@ export class AAAHudLayout {
       bossPanel: query('#ui-boss-panel'),
       bossName: query('#ui-boss-name'),
       bossFill: query('#ui-boss-fill'),
+      bossMarkers: query('#ui-boss-markers'),
       radarContainer: query('#ui-radar-blips'),
       shieldRow: query('#ui-shield-row'),
       shieldText: query('#ui-shield-text'),
@@ -98,6 +115,8 @@ export class AAAHudLayout {
       coordX: query('#ui-coord-x'),
       coordY: query('#ui-coord-y'),
       vel: query('#ui-velocity'),
+      nextWaveBox: query('#el-wave-alert'),
+      nextWaveTimer: query('#ui-next-wave-timer'),
     };
   }
 
@@ -212,11 +231,27 @@ export class AAAHudLayout {
 
     if (!active) {
       this.els.bossPanel.classList.remove('active');
+      this.els.bossPanel.classList.remove('is-hit', 'is-invulnerable');
+      this.els.bossPanel.classList.remove('is-critical');
+      if (this._bossHitTimeout) {
+        window.clearTimeout(this._bossHitTimeout);
+        this._bossHitTimeout = null;
+      }
+      if (this._bossCriticalTimeout) {
+        window.clearTimeout(this._bossCriticalTimeout);
+        this._bossCriticalTimeout = null;
+      }
+      this._lastBossHealthPercent = null;
+      this._updateBossPhaseMarkers(0, 0);
       this._resetBossColors();
       return;
     }
 
     this.els.bossPanel.classList.add('active');
+    this.els.bossPanel.classList.toggle(
+      'is-invulnerable',
+      Boolean(phaseInfo?.invulnerable)
+    );
 
     // Phase text: "BOSS NAME • PHASE 2/3"
     const phase = phaseInfo?.phase;
@@ -244,6 +279,25 @@ export class AAAHudLayout {
     if (healthPercent !== undefined) {
       this.els.bossFill.style.width = healthPercent + '%';
     }
+
+    if (Number.isFinite(healthPercent)) {
+      const delta =
+        this._lastBossHealthPercent !== null
+          ? this._lastBossHealthPercent - healthPercent
+          : 0;
+      if (
+        this._lastBossHealthPercent !== null &&
+        healthPercent < this._lastBossHealthPercent
+      ) {
+        this._triggerBossHit();
+        if (delta >= 8) {
+          this._triggerBossCritical();
+        }
+      }
+      this._lastBossHealthPercent = healthPercent;
+    }
+
+    this._updateBossPhaseMarkers(phaseCount, phase);
   }
 
   /** Reset boss bar colors to default */
@@ -251,6 +305,69 @@ export class AAAHudLayout {
     if (!this.els?.bossFill) return;
     this.els.bossFill.style.background = '';
     this.els.bossFill.style.boxShadow = '';
+  }
+
+  _triggerBossHit() {
+    if (!this.els?.bossPanel) {
+      return;
+    }
+    this.els.bossPanel.classList.add('is-hit');
+    if (this._bossHitTimeout) {
+      window.clearTimeout(this._bossHitTimeout);
+    }
+    this._bossHitTimeout = window.setTimeout(() => {
+      this.els?.bossPanel?.classList.remove('is-hit');
+      this._bossHitTimeout = null;
+    }, 180);
+  }
+
+  _triggerBossCritical() {
+    if (!this.els?.bossPanel) {
+      return;
+    }
+    this.els.bossPanel.classList.add('is-critical');
+    if (this._bossCriticalTimeout) {
+      window.clearTimeout(this._bossCriticalTimeout);
+    }
+    this._bossCriticalTimeout = window.setTimeout(() => {
+      this.els?.bossPanel?.classList.remove('is-critical');
+      this._bossCriticalTimeout = null;
+    }, 280);
+  }
+
+  _updateBossPhaseMarkers(phaseCount, phaseIndex) {
+    if (!this.els?.bossMarkers) {
+      return;
+    }
+
+    const total = Number.isFinite(phaseCount) ? Math.floor(phaseCount) : 0;
+    const markerCount = total > 1 ? total - 1 : 0;
+
+    if (markerCount !== this._lastBossPhaseMarkerCount) {
+      this.els.bossMarkers.innerHTML = '';
+      this._bossPhaseMarkers = [];
+      for (let i = 0; i < markerCount; i += 1) {
+        const marker = document.createElement('div');
+        marker.className = 'boss-phase-marker';
+        marker.style.left = `${((i + 1) / total) * 100}%`;
+        this.els.bossMarkers.appendChild(marker);
+        this._bossPhaseMarkers.push(marker);
+      }
+      this._lastBossPhaseMarkerCount = markerCount;
+    }
+
+    if (!markerCount) {
+      return;
+    }
+
+    const currentPhase = Number.isFinite(phaseIndex) ? phaseIndex : 0;
+    this._bossPhaseMarkers.forEach((marker, index) => {
+      marker.classList.toggle('passed', currentPhase > index);
+      marker.classList.toggle(
+        'next',
+        currentPhase <= index && currentPhase === index
+      );
+    });
   }
 
   /** Darken a hex color by a factor (0-1) */
@@ -287,6 +404,27 @@ export class AAAHudLayout {
       safeRequired
     )}`;
     this.els.lvlText.innerText = `Lvl ${level}`;
+  }
+
+  updateNextWaveTimer(seconds) {
+    if (!this.els) {
+      return;
+    }
+
+    const nextWaveBox = this.els.nextWaveBox;
+    const nextWaveTimer = this.els.nextWaveTimer;
+    if (!nextWaveBox || !nextWaveTimer) {
+      return;
+    }
+
+    const safeSeconds = Number.isFinite(seconds) ? Math.ceil(seconds) : 0;
+    if (safeSeconds <= 0) {
+      nextWaveBox.classList.remove('visible');
+      return;
+    }
+
+    nextWaveBox.classList.add('visible');
+    nextWaveTimer.innerText = safeSeconds;
   }
 
   /**
@@ -339,28 +477,38 @@ export class AAAHudLayout {
                     <div class="boss-name" id="ui-boss-name">BOSS</div>
                     <div class="boss-skull"><i data-lucide="skull" size="24"></i></div>
                     <div class="boss-fill" id="ui-boss-fill"></div>
+                    <div class="boss-phase-markers" id="ui-boss-markers"></div>
                 </div>
             </div>
 
-            <!-- RADAR (Top Right - FIXED GLASS & ROUND) -->
+            <!-- RADAR (Top Right - Decagon + Analog Ring) -->
             <div class="radar-area hud-panel">
                 <div class="radar-structure">
-                    <!-- SVG Grid Circular -->
-                    <svg class="radar-svg-layer" viewBox="0 0 200 200">
-                        <circle cx="100" cy="100" r="98" fill="none" stroke="var(--secondary-blue)" stroke-width="1.5" stroke-dasharray="20 10" opacity="0.8" />
-                        <circle cx="100" cy="100" r="66" fill="none" stroke="var(--primary-cyan)" stroke-width="0.5" opacity="0.3" />
-                        <circle cx="100" cy="100" r="33" fill="none" stroke="var(--primary-cyan)" stroke-width="0.5" opacity="0.3" />
-                        <line x1="100" y1="5" x2="100" y2="195" stroke="var(--primary-cyan)" stroke-width="0.5" opacity="0.2" />
-                        <line x1="5" y1="100" x2="195" y2="100" stroke="var(--primary-cyan)" stroke-width="0.5" opacity="0.2" />
+                    <svg class="radar-svg-layer" viewBox="0 0 220 220">
+                        <circle cx="110" cy="110" r="108" fill="none" stroke="var(--secondary-blue)" stroke-width="2" stroke-opacity="0.6" />
+                        <circle cx="110" cy="110" r="100" fill="none" stroke="var(--primary-cyan)" stroke-width="1" stroke-dasharray="4 6" opacity="0.3" />
+                        <polygon points="110,15 166,33 200,81 200,139 166,187 110,205 54,187 20,139 20,81 54,33" fill="none" stroke="var(--primary-cyan)" stroke-width="1.5" opacity="0.8" />
+                        <line x1="110" y1="15" x2="110" y2="205" stroke="var(--secondary-blue)" stroke-width="1" opacity="0.1" />
+                        <line x1="20" y1="139" x2="200" y2="81" stroke="var(--secondary-blue)" stroke-width="1" opacity="0.1" />
+                        <line x1="20" y1="81" x2="200" y2="139" stroke="var(--secondary-blue)" stroke-width="1" opacity="0.1" />
+                        <line x1="166" y1="33" x2="54" y2="187" stroke="var(--secondary-blue)" stroke-width="1" opacity="0.1" />
+                        <line x1="54" y1="33" x2="166" y2="187" stroke="var(--secondary-blue)" stroke-width="1" opacity="0.1" />
+                        <polygon points="110,53 144,64 164,93 164,127 144,156 110,167 76,156 56,127 56,93 76,64" fill="none" stroke="var(--secondary-blue)" stroke-width="1" opacity="0.2" />
                     </svg>
-                    
-                    <div class="radar-internal-mask">
+
+                    <div class="radar-mask">
                         <div class="radar-sweep"></div>
                         <div class="blip-container" id="ui-radar-blips">
                             <div class="blip player"></div>
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- NEXT WAVE (Center) -->
+            <div class="next-wave-box" id="el-wave-alert">
+                <div class="next-wave-label">INCOMING WAVE</div>
+                <div class="next-wave-timer" id="ui-next-wave-timer">10</div>
             </div>
 
             <!-- VITALS (Bottom Left) -->
@@ -472,31 +620,37 @@ export class AAAHudLayout {
             .boss-skull { width: 45px; height: 45px; background: #1a0505; border: 2px solid var(--danger-red); position: absolute; left: -22px; display: flex; justify-content: center; align-items: center; clip-path: polygon(25% 0%, 75% 0%, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0% 75%, 0% 25%); box-shadow: 0 0 15px var(--danger-red); color: var(--danger-red); z-index: 5; animation: pulse-border 2s infinite; }
             .boss-fill { height: 100%; width: 100%; background: repeating-linear-gradient(45deg, var(--danger-red), var(--danger-red) 10px, #880020 10px, #880020 20px); box-shadow: 0 0 20px var(--danger-red); transition: width 0.3s ease-out; position: relative; }
             .boss-name { position: absolute; top: -22px; width: 100%; text-align: center; font-size: 1rem; letter-spacing: 4px; color: #ffcccc; font-weight: 700; }
+            .boss-phase-markers { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
+            .boss-phase-marker { position: absolute; top: -2px; width: 2px; height: calc(100% + 4px); background: rgba(255, 255, 255, 0.18); box-shadow: 0 0 6px rgba(255, 255, 255, 0.3); transform: translateX(-50%); }
+            .boss-phase-marker.passed { background: rgba(255, 0, 60, 0.7); box-shadow: 0 0 10px rgba(255, 0, 60, 0.8); }
+            .boss-phase-marker.next { background: rgba(255, 255, 255, 0.6); box-shadow: 0 0 10px rgba(255, 255, 255, 0.8); }
+            .boss-area.is-hit .boss-fill { animation: boss-hit 0.25s ease-out; }
+            .boss-area.is-critical .boss-fill { animation: boss-critical 0.3s ease-out; }
+            .boss-area.is-invulnerable .boss-fill { filter: grayscale(0.35) brightness(0.75); opacity: 0.65; }
+            .boss-area.is-invulnerable .boss-bar-container { border-color: rgba(255, 255, 255, 0.35); box-shadow: 0 0 12px rgba(255, 255, 255, 0.2); }
+            .boss-area.is-invulnerable .boss-skull { border-color: rgba(255, 255, 255, 0.7); box-shadow: 0 0 12px rgba(255, 255, 255, 0.5); color: rgba(255, 255, 255, 0.9); }
             
-            /* RADAR - Round Glass Design */
-            .radar-area { display: flex; justify-content: flex-end; padding-right: 20px; padding-top: 20px; }
-            .radar-structure { 
-                width: 200px; height: 200px; position: relative; 
-                border-radius: 50%;
-                background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.05), rgba(0, 20, 40, 0.6) 80%);
-                box-shadow: 
-                    0 0 15px rgba(0, 240, 255, 0.1),
-                    inset 0 0 20px rgba(0, 240, 255, 0.05),
-                    inset 1px 1px 2px rgba(255, 255, 255, 0.1);
-                backdrop-filter: blur(4px);
-                border: 1px solid rgba(0, 240, 255, 0.3);
+            /* RADAR - Decagon + Analog Ring */
+            .radar-area { grid-column: 3; grid-row: 1; justify-self: end; align-self: start; padding-top: 0; }
+            .radar-structure { width: 220px; height: 220px; position: relative; }
+            .radar-svg-layer { position: absolute; inset: 0; z-index: 5; filter: drop-shadow(0 0 5px rgba(0, 240, 255, 0.3)); pointer-events: none; }
+            .radar-mask {
+                position: absolute; inset: 0; z-index: 2; background: rgba(0, 10, 20, 0.5);
+                clip-path: polygon(50% 7%, 75.5% 15%, 91% 37%, 91% 63%, 75.5% 85%, 50% 93%, 24.5% 85%, 9% 63%, 9% 37%, 24.5% 15%);
             }
-            .radar-svg-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; filter: drop-shadow(0 0 10px rgba(0, 240, 255, 0.3)); border-radius: 50%; }
-            .radar-internal-mask { 
-                position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; 
-                border-radius: 50%; overflow: hidden;
-            }
-            .radar-sweep { position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: conic-gradient(from 0deg, transparent 0%, transparent 60%, rgba(0, 240, 255, 0.05) 80%, rgba(0, 240, 255, 0.4) 100%); animation: radar-sweep-anim 4s linear infinite; border-radius: 50%; mix-blend-mode: screen; }
-            .radar-grid-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 3; opacity: 0.5; border-radius: 50%; }
-            .blip-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; border-radius: 50%; }
-            .blip { position: absolute; border-radius: 50%; transform: translate(-50%, -50%); transition: top 0.1s, left 0.1s; }
-            .blip.enemy { width: 6px; height: 6px; background: var(--danger-red); box-shadow: 0 0 6px var(--danger-red); }
-            .blip.player { top: 50%; left: 50%; width: 8px; height: 8px; background: #fff; border: 1px solid var(--primary-cyan); box-shadow: 0 0 10px #fff; z-index: 15; }
+            .radar-sweep { position: absolute; top: -50%; left: -50%; width: 200%; height: 200%; background: conic-gradient(from 0deg, transparent 0%, transparent 60%, rgba(0, 240, 255, 0.05) 80%, rgba(0, 240, 255, 0.4) 100%); animation: radar-sweep-anim 4s linear infinite; border-radius: 50%; mix-blend-mode: screen; pointer-events: none; }
+            .blip-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; }
+            .blip { position: absolute; border-radius: 50%; transform: translate(-50%, -50%); transition: top 0.1s, left 0.1s; box-shadow: 0 0 8px 2px currentColor; }
+            .blip.enemy { width: 6px; height: 6px; background: var(--danger-red); color: var(--danger-red); }
+            .blip.boss { width: 10px; height: 10px; background: #fff; color: #fff; box-shadow: 0 0 14px 4px rgba(255, 255, 255, 0.9), 0 0 30px rgba(255, 0, 60, 0.8); animation: boss-blip 1.2s ease-in-out infinite; }
+            .blip.player { top: 50%; left: 50%; width: 8px; height: 8px; background: #fff; border: 1px solid var(--primary-cyan); color: #fff; z-index: 15; box-shadow: 0 0 12px 4px rgba(255, 255, 255, 0.8); }
+
+            /* NEXT WAVE */
+            .next-wave-box { position: absolute; top: 50%; left: 0; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; transform: translateY(-50%); font-family: 'Orbitron'; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 100; }
+            .next-wave-box.visible { opacity: 1; }
+            .next-wave-label { font-size: 1.4rem; color: var(--danger-red); letter-spacing: 6px; font-weight: 900; margin: 0; text-transform: uppercase; text-shadow: 0 0 15px rgba(0, 0, 0, 0.9), 0 0 5px var(--danger-red); line-height: 1.2; }
+            .next-wave-timer { font-size: 4rem; line-height: 1; color: #fff; font-weight: 900; text-shadow: 0 0 20px var(--danger-red), 2px 2px 0 #000; margin-top: 10px; }
+            .next-wave-box.visible .next-wave-timer { animation: alert-pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
             
             /* VITALS */
             .status-area { grid-row: 3; display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 20px; padding-left: 20px; }
@@ -538,6 +692,10 @@ export class AAAHudLayout {
             @keyframes blink { 0% { opacity: 0.3; } 100% { opacity: 1; } }
             @keyframes rotate-border { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
             @keyframes radar-sweep-anim { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+            @keyframes alert-pulse { 0% { transform: scale(1); text-shadow: 0 0 20px var(--danger-red); } 50% { transform: scale(1.1); text-shadow: 0 0 30px var(--danger-red), 0 0 10px #fff; } 100% { transform: scale(1); text-shadow: 0 0 20px var(--danger-red); } }
+            @keyframes boss-hit { 0% { filter: brightness(1.6); box-shadow: 0 0 35px #fff; } 100% { filter: brightness(1); box-shadow: 0 0 20px var(--danger-red); } }
+            @keyframes boss-critical { 0% { filter: brightness(2); box-shadow: 0 0 45px #fff, 0 0 25px var(--danger-red); } 100% { filter: brightness(1); box-shadow: 0 0 20px var(--danger-red); } }
+            @keyframes boss-blip { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.2); } }
             @keyframes glitch { 0%, 92%, 95%, 100% { transform: translate(0, 0); opacity: 1; } 93% { transform: translate(-2px, 2px); opacity: 0.8; } 94% { transform: translate(2px, -2px); opacity: 0.8; } 96% { transform: translate(1px, 2px); opacity: 0.9; } 97% { transform: translate(-1px, -1px); opacity: 0.9; } }
             .glitch-text { animation: glitch 3s infinite; }
             

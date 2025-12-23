@@ -156,7 +156,7 @@ class WorldSystem extends BaseSystem {
     };
 
     // Emit player-died FIRST so explosion triggers
-    gameEvents.emit('player-died', data);
+    this.eventBus?.emit?.('player-died', data);
 
     // Mark world state as player not alive (but DON'T stop enemies - they keep wandering)
     this.playerAlive = false;
@@ -172,7 +172,3 @@ class WorldSystem extends BaseSystem {
 }
 
 export default WorldSystem;
-
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = WorldSystem;
-}

@@ -804,7 +804,7 @@ class PhysicsSystem extends BaseSystem {
   }
 
   emitBossPhysicsEvent(eventName, payload = {}) {
-    gameEvents.emit(eventName, { ...payload, processedBy: 'physics' });
+    this.eventBus?.emit?.(eventName, { ...payload, processedBy: 'physics' });
   }
 
   getEffectsService() {
@@ -942,7 +942,7 @@ class PhysicsSystem extends BaseSystem {
     if (data.__emittedByMine || payload.__emittedByMine) {
       return;
     }
-    gameEvents.emit('mine-exploded', payload);
+    this.eventBus?.emit?.('mine-exploded', payload);
   }
 
   buildMineExplosionPayload(enemy, data = {}) {
@@ -1786,7 +1786,7 @@ class PhysicsSystem extends BaseSystem {
         asteroid.shieldHitCooldown = cooldown;
       }
 
-      gameEvents.emit('shield-deflected', {
+      this.eventBus?.emit?.('shield-deflected', {
         position: { x: player.position.x, y: player.position.y },
         normal: { x: nx, y: ny },
         level: context.impactProfile.level || context.shieldState?.level || 0,
@@ -1824,7 +1824,7 @@ class PhysicsSystem extends BaseSystem {
       );
     }
 
-    gameEvents.emit('player-took-damage', {
+    this.eventBus?.emit?.('player-took-damage', {
       damage,
       remaining,
       max: player.maxHealth,
@@ -2056,7 +2056,7 @@ class PhysicsSystem extends BaseSystem {
               player.invulnerableTimer = 0.4;
             }
 
-            gameEvents.emit('player-took-damage', {
+            this.eventBus?.emit?.('player-took-damage', {
               damage: scaledDamage,
               remaining,
               max: player.maxHealth,
@@ -2233,7 +2233,3 @@ class PhysicsSystem extends BaseSystem {
 }
 
 export default PhysicsSystem;
-
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = PhysicsSystem;
-}

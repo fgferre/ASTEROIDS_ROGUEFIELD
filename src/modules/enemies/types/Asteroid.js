@@ -3,6 +3,7 @@ import {
   ASTEROID_BASE_HEALTH,
   ASTEROID_HEALTH_SCALING,
   ASTEROID_SIZES,
+  ASTEROID_ENTRY_ANGLE_VARIANCE,
   GAME_HEIGHT,
   GAME_WIDTH,
   SHIP_SIZE,
@@ -70,6 +71,7 @@ export class Asteroid extends BaseEnemy {
     this.variantState = {};
     this.visualState = {};
     this.spawnTime = 0;
+    this.offscreenTimer = 0;
     this.random = null;
     this.randomScopes = null;
     this.randomScopeSeeds = null;
@@ -274,6 +276,35 @@ export class Asteroid extends BaseEnemy {
       this.vy = Math.sin(angle) * finalSpeed;
     }
 
+    const hasExplicitDirection =
+      Number.isFinite(options.vx) ||
+      Number.isFinite(options.vy) ||
+      Number.isFinite(options.angle);
+    const offscreenMargin = Math.max(0, Number(this.radius) || 0);
+    const isOutsideScreen =
+      this.x < -offscreenMargin ||
+      this.x > GAME_WIDTH + offscreenMargin ||
+      this.y < -offscreenMargin ||
+      this.y > GAME_HEIGHT + offscreenMargin;
+
+    if (isOutsideScreen && !hasExplicitDirection && !options.spawnedBy) {
+      const angleVariance = Number.isFinite(ASTEROID_ENTRY_ANGLE_VARIANCE)
+        ? ASTEROID_ENTRY_ANGLE_VARIANCE
+        : Math.PI / 4;
+      const angleOffset =
+        typeof movementRandom.range === 'function'
+          ? movementRandom.range(-angleVariance, angleVariance)
+          : (movementRandom.float?.() ?? Math.random()) * 2 * angleVariance -
+            angleVariance;
+      const targetAngle = Math.atan2(
+        GAME_HEIGHT / 2 - this.y,
+        GAME_WIDTH / 2 - this.x
+      );
+      const entrySpeed = Math.max(1, Math.hypot(this.vx, this.vy));
+      this.vx = Math.cos(targetAngle + angleOffset) * entrySpeed;
+      this.vy = Math.sin(targetAngle + angleOffset) * entrySpeed;
+    }
+
     this.rotation = options.rotation ?? movementRandom.range(0, Math.PI * 2);
     const baseRotationSpeed =
       options.rotationSpeed ?? movementRandom.range(-0.75, 0.75);
@@ -308,6 +339,7 @@ export class Asteroid extends BaseEnemy {
 
     this.variantState = this.initializeVariantState();
     this.visualState = this.initializeVisualState();
+    this.offscreenTimer = 0;
   }
 
   /**
@@ -354,6 +386,7 @@ export class Asteroid extends BaseEnemy {
     this.variantState = {};
     this.visualState = {};
     this.spawnTime = 0;
+    this.offscreenTimer = 0;
     this.random = null;
     this.randomScopes = null;
     this.randomScopeSeeds = null;
@@ -627,8 +660,9 @@ export class Asteroid extends BaseEnemy {
       this.variantState.fuseTimer <= this.behavior.armTime
     ) {
       this.variantState.armed = true;
-      if (typeof gameEvents !== 'undefined') {
-        gameEvents.emit('asteroid-volatile-armed', {
+      const eventBus = this.getEventBus();
+      if (eventBus?.emit) {
+        eventBus.emit('asteroid-volatile-armed', {
           asteroid: this,
           position: { x: this.x, y: this.y },
         });
@@ -706,8 +740,9 @@ export class Asteroid extends BaseEnemy {
       this.visualState.trailCooldown += desiredInterval;
       emitted += 1;
 
-      if (typeof gameEvents !== 'undefined') {
-        gameEvents.emit('asteroid-volatile-trail', {
+      const eventBus = this.getEventBus();
+      if (eventBus?.emit) {
+        eventBus.emit('asteroid-volatile-trail', {
           asteroidId: this.id,
           position: { x: this.x, y: this.y },
           velocity: { x: this.vx, y: this.vy },
@@ -844,7 +879,8 @@ export class Asteroid extends BaseEnemy {
 
     if (newStage !== this.crackStage) {
       this.crackStage = newStage;
-      if (typeof gameEvents !== 'undefined') {
+      const eventBus = this.getEventBus();
+      if (eventBus?.emit) {
         const layer = this.crackLayers[this.crackStage - 1] || null;
         const segmentList = Array.isArray(layer?.segments)
           ? layer.segments.map((segment) => {
@@ -944,7 +980,7 @@ export class Asteroid extends BaseEnemy {
           layer.segmentIds = sanitizedSegmentIds;
         }
 
-        gameEvents.emit('asteroid-crack-stage-changed', {
+        eventBus.emit('asteroid-crack-stage-changed', {
           asteroidId: this.id,
           layerId: layer?.id ?? null,
           profile: this.crackProfileKey,

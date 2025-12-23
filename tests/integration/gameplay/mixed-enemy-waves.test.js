@@ -48,8 +48,8 @@ const getEventPayloads = (eventName) =>
     .map(([, payload]) => payload);
 
 beforeEach(() => {
-  setupGlobalMocks({ gameEvents: createEventBusMock() });
-  eventBus = globalThis.gameEvents;
+  eventBus = createEventBusMock();
+  setupGlobalMocks();
 });
 
 afterEach(() => {
@@ -160,6 +160,7 @@ describe('Support enemy behaviour', () => {
   it('updates drones so they pursue and fire at the player', () => {
     const random = createDeterministicRandom({ floatValue: 0.5 });
     const system = {
+      eventBus,
       getRandomScope: () => random,
       getCachedPlayer: () => ({
         position: { x: 120, y: 0 },
@@ -188,6 +189,7 @@ describe('Support enemy behaviour', () => {
   it('arms and detonates mines when the player enters proximity', () => {
     const random = createDeterministicRandom({ floatValue: 0.5 });
     const system = {
+      eventBus,
       getRandomScope: () => random,
       getCachedPlayer: () => ({ position: { x: 10, y: 0 } }),
       getPlayerPositionSnapshot: () => ({ x: 10, y: 0 }),
@@ -209,6 +211,7 @@ describe('Support enemy behaviour', () => {
   it('executes hunter burst cycles and emits firing events', () => {
     const random = createDeterministicRandom({ floatValue: 0.5 });
     const system = {
+      eventBus,
       getRandomScope: () => random,
       getCachedPlayer: () => ({
         position: { x: 150, y: 0 },

@@ -2,7 +2,7 @@
  * Tests for DIContainer
  */
 
-import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { DIContainer } from '../../src/core/DIContainer.js';
 
 describe('DIContainer', () => {
@@ -29,15 +29,9 @@ describe('DIContainer', () => {
       expect(() => container.register(null, () => {})).toThrow();
     });
 
-    it('should support legacy instance registration (non-function)', () => {
+    it('should throw error for non-function factory', () => {
       const container = createContainer();
-      const instance = { value: 42, type: 'legacy' };
-      const result = container.register('test', instance);
-
-      // Legacy registration also returns 'this' for method chaining
-      expect(result).toBe(container);
-      expect(container.has('test')).toBe(true);
-      expect(container.get('test')).toBe(instance);
+      expect(() => container.register('test', { value: 42 })).toThrow();
     });
 
     it('should throw error for duplicate registration', () => {
@@ -413,118 +407,6 @@ describe('DIContainer', () => {
       container.resolve('test');
 
       expect(initialized).toBe(true);
-    });
-  });
-
-  describe.concurrent('Legacy Compatibility - syncInstance', () => {
-    it('should sync instance for unregistered service', () => {
-      const container = createContainer();
-      const legacyInstance = { value: 42, legacy: true };
-
-      container.syncInstance('legacyService', legacyInstance);
-
-      expect(container.has('legacyService')).toBe(true);
-      expect(container.isInstantiated('legacyService')).toBe(true);
-      expect(container.resolve('legacyService')).toBe(legacyInstance);
-      expect(container.resolve('legacyService').value).toBe(42);
-    });
-
-    it('should replace singleton instance when service already registered as singleton', () => {
-      const container = createContainer();
-      const originalInstance = { value: 1 };
-      const legacyInstance = { value: 42, legacy: true };
-
-      container.register('test', () => originalInstance, { singleton: true });
-      container.resolve('test'); // Initialize singleton
-
-      expect(container.resolve('test').value).toBe(1);
-
-      container.syncInstance('test', legacyInstance);
-
-      expect(container.resolve('test')).toBe(legacyInstance);
-      expect(container.resolve('test').value).toBe(42);
-    });
-
-    it('should not override transient service factory', () => {
-      const container = createContainer();
-      let factoryCallCount = 0;
-
-      container.register(
-        'transient',
-        () => {
-          factoryCallCount++;
-          return { id: factoryCallCount };
-        },
-        {
-          singleton: false,
-        }
-      );
-
-      const legacyInstance = { id: 999, legacy: true };
-      container.syncInstance('transient', legacyInstance);
-
-      // Factory should still be called, not the synced instance
-      const instance1 = container.resolve('transient');
-      const instance2 = container.resolve('transient');
-
-      expect(instance1).not.toBe(legacyInstance);
-      expect(instance2).not.toBe(legacyInstance);
-      expect(instance1.id).toBe(1);
-      expect(instance2.id).toBe(2);
-      expect(factoryCallCount).toBe(2);
-    });
-
-    it('should throw error for invalid service name', () => {
-      const container = createContainer();
-      const instance = {};
-
-      expect(() => container.syncInstance('', instance)).toThrow();
-      expect(() => container.syncInstance(null, instance)).toThrow();
-    });
-
-    it('should throw error for null/undefined instance', () => {
-      const container = createContainer();
-
-      expect(() => container.syncInstance('test', null)).toThrow(
-        /null\/undefined/i
-      );
-      expect(() => container.syncInstance('test', undefined)).toThrow(
-        /null\/undefined/i
-      );
-    });
-
-    it('should update stats when syncing new service', () => {
-      const container = createContainer();
-      const initialStats = container.getStats();
-
-      container.syncInstance('legacy', { value: 1 });
-
-      const updatedStats = container.getStats();
-
-      expect(updatedStats.registrations).toBe(initialStats.registrations + 1);
-      expect(updatedStats.totalServices).toBe(initialStats.totalServices + 1);
-    });
-  });
-
-  describe.concurrent('Legacy Compatibility - get', () => {
-    it('should resolve service via get() method', () => {
-      const container = createContainer();
-      container.register('test', () => ({ value: 42 }));
-
-      const instance = container.get('test');
-
-      expect(instance).toBeDefined();
-      expect(instance.value).toBe(42);
-    });
-
-    it('should return same instance as resolve()', () => {
-      const container = createContainer();
-      container.register('test', () => ({ value: 42 }), { singleton: true });
-
-      const viaResolve = container.resolve('test');
-      const viaGet = container.get('test');
-
-      expect(viaGet).toBe(viaResolve);
     });
   });
 

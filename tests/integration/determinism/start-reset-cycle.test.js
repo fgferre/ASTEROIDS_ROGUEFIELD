@@ -25,6 +25,8 @@ function cloneSeeds(seeds = {}) {
   );
 }
 
+let eventBus;
+
 beforeAll(() => {
   if (!GamePools.initialized) {
     GamePools.initialize();
@@ -34,7 +36,8 @@ beforeAll(() => {
 // Optimization: vi.useFakeTimers() to avoid real delays
 beforeEach(() => {
   vi.useFakeTimers();
-  setupGlobalMocks({ gameEvents: createEventBusMock() });
+  eventBus = createEventBusMock();
+  setupGlobalMocks();
 });
 
 afterEach(() => {
@@ -52,8 +55,6 @@ afterAll(() => {
 function runStartResetCycle(seed) {
   const container = createTestContainer(seed);
   const random = container.resolve('random');
-  const eventBus = globalThis.gameEvents;
-  const serviceRegistry = globalThis.gameServices;
 
   const audioStub = { play: () => {}, stop: () => {}, init: () => {} };
   const settingsStub = {
@@ -78,16 +79,19 @@ function runStartResetCycle(seed) {
   };
 
   const effects = new EffectsSystem({
+    eventBus,
     random,
     audio: audioStub,
     settings: settingsStub,
   });
   const xpOrbSystem = new XPOrbSystem({
+    eventBus,
     random,
     player: playerStub,
     progression: progressionStub,
   });
   const enemySystem = new EnemySystem({
+    eventBus,
     random,
     player: playerStub,
     world: worldStub,
@@ -132,7 +136,6 @@ function runStartResetCycle(seed) {
   }
 
   eventBus.clear();
-  serviceRegistry.serviceRegistry?.clear?.();
 
   return snapshot;
 }

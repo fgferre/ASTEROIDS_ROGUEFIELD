@@ -4418,7 +4418,3 @@ class AudioSystem extends BaseSystem {
 }
 
 export default AudioSystem;
-
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = AudioSystem;
-}

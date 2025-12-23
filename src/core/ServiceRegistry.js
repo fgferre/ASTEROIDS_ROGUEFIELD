@@ -7,7 +7,6 @@
  *
  * PHASE 2.1 Implementation:
  * - Sets up DI container with service placeholders
- * - Delegates to existing gameServices for now
  * - Full dependency injection will be gradual in Phase 2.2+
  *
  * @example
@@ -164,10 +163,51 @@ export class ServiceRegistry {
       ...serviceOverrides
     } = overrides || {};
 
-    container.register(
-      'event-bus',
-      () => eventBusOverride || { on: () => {}, emit: () => {}, off: () => {} }
-    );
+    const createEventBusStub = () => {
+      const listeners = new Map();
+
+      const on = (eventName, handler) => {
+        if (typeof eventName !== 'string' || typeof handler !== 'function') {
+          return;
+        }
+        if (!listeners.has(eventName)) {
+          listeners.set(eventName, new Set());
+        }
+        listeners.get(eventName).add(handler);
+      };
+
+      const off = (eventName, handler) => {
+        const handlers = listeners.get(eventName);
+        if (!handlers) {
+          return;
+        }
+        handlers.delete(handler);
+        if (handlers.size === 0) {
+          listeners.delete(eventName);
+        }
+      };
+
+      const emit = (eventName, payload) => {
+        const handlers = listeners.get(eventName);
+        if (!handlers) {
+          return;
+        }
+        for (const handler of handlers) {
+          handler(payload);
+        }
+      };
+
+      return {
+        on,
+        off,
+        emit,
+        emitSilently: emit,
+      };
+    };
+
+    const eventBusInstance = eventBusOverride || createEventBusStub();
+
+    container.register('event-bus', () => eventBusInstance);
     container.register(
       'settings',
       () => settingsOverride || { get: () => null, set: () => {} }
@@ -394,8 +434,3 @@ export class ServiceRegistry {
 }
 
 // Export convenience function
-export function createServiceContainer() {
-  const container = new DIContainer();
-  ServiceRegistry.setupServices(container);
-  return container;
-}

@@ -1,0 +1,1755 @@
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AAA HUD + Advanced Editor</title>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+      /* --- FONTS & VARS --- */
+      @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
+
+      :root {
+        --primary-cyan: #00f0ff;
+        --secondary-blue: #00aaff;
+        --danger-red: #ff003c;
+        --health-green: #00ff66;
+        --xp-purple: #aa00ff;
+        --hud-bg: rgba(12, 20, 31, 0.65);
+      }
+
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
+        font-family: 'Rajdhani', sans-serif;
+        color: white;
+        user-select: none;
+        height: 100vh;
+        width: 100vw;
+      }
+
+      /* --- FX LAYERS --- */
+      .scanlines {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 5;
+        opacity: 0.4;
+        background: linear-gradient(
+          to bottom,
+          rgba(255, 255, 255, 0) 50%,
+          rgba(0, 0, 0, 0.1) 50%
+        );
+        background-size: 100% 4px;
+      }
+
+      /* --- SNAP GUIDES --- */
+      .snap-guide {
+        position: fixed;
+        background-color: var(--primary-cyan);
+        pointer-events: none;
+        z-index: 9999;
+        opacity: 0;
+        transition: opacity 0.1s;
+        box-shadow: 0 0 10px var(--primary-cyan);
+      }
+      .snap-guide.vertical {
+        top: 0;
+        bottom: 0;
+        width: 1px;
+      }
+      .snap-guide.horizontal {
+        left: 0;
+        right: 0;
+        height: 1px;
+      }
+      .snap-guide.visible {
+        opacity: 0.8;
+      }
+
+      /* --- EDITOR UI (Main Controls) --- */
+      #editor-ui {
+        position: fixed;
+        top: 20px;
+        left: 20px;
+        z-index: 10000;
+        display: flex;
+        gap: 10px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.3s;
+      }
+      body.edit-mode #editor-ui {
+        opacity: 1;
+        pointer-events: auto;
+      }
+
+      .hud-btn {
+        background: rgba(0, 0, 0, 0.8);
+        border: 1px solid var(--primary-cyan);
+        color: var(--primary-cyan);
+        padding: 8px 16px;
+        font-family: 'Orbitron';
+        font-size: 0.8rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        transition: all 0.2s;
+      }
+      .hud-btn:hover {
+        background: var(--primary-cyan);
+        color: #000;
+      }
+      .hud-btn.save {
+        border-color: var(--health-green);
+        color: var(--health-green);
+      }
+      .hud-btn.save:hover {
+        background: var(--health-green);
+        color: #000;
+      }
+
+      /* --- FLOATING TOOLBAR (O Context Menu do Elemento) --- */
+      #floating-toolbar {
+        position: absolute;
+        z-index: 10001;
+        background: rgba(0, 20, 40, 0.9);
+        border: 1px solid var(--primary-cyan);
+        padding: 5px;
+        border-radius: 4px;
+        display: none;
+        gap: 5px;
+        transform: translate(-50%, -120%); /* Fica acima do elemento */
+        pointer-events: auto;
+      }
+      #floating-toolbar button {
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        color: white;
+        padding: 4px;
+        cursor: pointer;
+        border-radius: 3px;
+      }
+      #floating-toolbar button:hover {
+        background: var(--primary-cyan);
+        color: black;
+      }
+      #floating-toolbar button.active {
+        background: var(--secondary-blue);
+        border-color: var(--primary-cyan);
+      }
+
+      /* --- COMPORTAMENTO DE EDIÇÃO --- */
+      .editable-element,
+      .editable-group {
+        position: relative;
+        transition:
+          border 0.2s,
+          opacity 0.2s;
+        pointer-events: auto !important;
+      }
+
+      /* Edit Mode Styles */
+      body.edit-mode .editable-element,
+      body.edit-mode .editable-group[data-grouped='true'] {
+        cursor: grab;
+      }
+
+      /* Highlight no hover */
+      body.edit-mode .editable-element:hover,
+      body.edit-mode .editable-group[data-grouped='true']:hover {
+        outline: 1px dashed var(--primary-cyan);
+        background: rgba(0, 240, 255, 0.1);
+        z-index: 1000;
+      }
+
+      /* Selecionado */
+      body.edit-mode .is-selected {
+        outline: 2px solid var(--health-green) !important;
+        background: rgba(0, 255, 102, 0.1) !important;
+        z-index: 1001 !important;
+      }
+
+      /* Itens Ocultos (Visualmente) */
+      .is-hidden-in-game {
+        /* No jogo normal, eles somem */
+        opacity: 0 !important;
+        pointer-events: none !important;
+      }
+      body.edit-mode .is-hidden-in-game {
+        /* No editor, ficam semi-transparentes */
+        opacity: 0.3 !important;
+        pointer-events: auto !important;
+        filter: grayscale(1);
+      }
+
+      /* Grupos Desagrupados (Visual Aid) */
+      body.edit-mode .editable-group[data-grouped='false'] {
+        outline: 1px dotted rgba(255, 255, 255, 0.1); /* Mostra a área do grupo levemente */
+        pointer-events: none; /* Deixa clicar nos filhos */
+      }
+      body.edit-mode .editable-group[data-grouped='false'] > .editable-element {
+        pointer-events: auto; /* Filhos capturam mouse */
+      }
+      /* Quando agrupado, filhos não capturam mouse individualmente */
+      body.edit-mode .editable-group[data-grouped='true'] > .editable-element {
+        pointer-events: none;
+      }
+
+      /* --- HUD CONTAINER --- */
+      #hud-layer {
+        position: absolute;
+        inset: 0;
+        z-index: 20;
+        padding: 30px;
+        box-sizing: border-box;
+        display: grid;
+        grid-template-columns: 320px 1fr 320px;
+        grid-template-rows: 150px 1fr 150px;
+        pointer-events: none;
+        text-shadow: 0 0 5px rgba(0, 240, 255, 0.5);
+      }
+
+      /* --- MÓDULOS --- */
+
+      /* Stats */
+      .stats-area {
+        grid-column: 1;
+        grid-row: 1;
+        justify-self: start;
+        align-self: start;
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        padding-top: 0;
+      }
+      .combo-box {
+        animation: pulse-text 2s infinite;
+      }
+      .combo-label {
+        font-size: 1.2rem;
+        color: var(--primary-cyan);
+        letter-spacing: 2px;
+        font-weight: 700;
+      }
+      .combo-val {
+        font-size: 3.5rem;
+        line-height: 0.8;
+        font-family: 'Orbitron';
+        background: linear-gradient(to bottom, #fff, #ffae00);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 900;
+        margin-left: -2px;
+      }
+      .stat-block {
+        display: flex;
+        flex-direction: column;
+        background: linear-gradient(90deg, rgba(0, 20, 40, 0.8), transparent);
+        padding: 8px 10px 8px 15px;
+        border-left: 3px solid var(--secondary-blue);
+        min-width: 140px;
+      }
+      .stat-label {
+        font-size: 0.7rem;
+        color: var(--secondary-blue);
+        font-weight: 700;
+        margin-bottom: 2px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .stat-value {
+        font-family: 'Orbitron';
+        font-size: 1.4rem;
+        color: #fff;
+        line-height: 1.1;
+      }
+
+      /* Boss */
+      .boss-area {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: center;
+        align-self: start;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        opacity: 0;
+        transition: opacity 0.5s;
+        z-index: 50;
+        padding-top: 0;
+      }
+      .boss-area.active {
+        opacity: 1;
+      }
+      .warning-strip {
+        display: flex;
+        gap: 50px;
+        margin-bottom: 25px;
+        opacity: 0.9;
+      }
+      .warning-light {
+        color: var(--danger-red);
+        font-weight: bold;
+        font-size: 1.1rem;
+        animation: blink 0.5s infinite alternate;
+        letter-spacing: 3px;
+      }
+      .boss-bar-container {
+        position: relative;
+        width: 60%;
+        min-width: 400px;
+        height: 35px;
+        background: rgba(20, 0, 0, 0.6);
+        border: 1px solid #662222;
+        transform: perspective(500px) rotateX(15deg);
+        display: flex;
+        align-items: center;
+        margin-top: 0;
+      }
+      .boss-skull {
+        width: 50px;
+        height: 50px;
+        background: #1a0505;
+        border: 2px solid var(--danger-red);
+        position: absolute;
+        left: -25px;
+        top: -10px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        clip-path: polygon(
+          20% 0,
+          80% 0,
+          100% 20%,
+          100% 80%,
+          80% 100%,
+          20% 100%,
+          0 80%,
+          0 20%
+        );
+        box-shadow: 0 0 15px var(--danger-red);
+        color: var(--danger-red);
+        z-index: 5;
+        animation: pulse-border 2s infinite;
+      }
+      .boss-fill {
+        height: 100%;
+        width: 100%;
+        background: repeating-linear-gradient(
+          45deg,
+          var(--danger-red),
+          var(--danger-red) 10px,
+          #880020 10px,
+          #880020 20px
+        );
+        box-shadow: 0 0 20px var(--danger-red);
+        transition: width 0.3s;
+      }
+      .boss-name {
+        position: absolute;
+        top: -25px;
+        width: 100%;
+        text-align: center;
+        font-size: 1rem;
+        letter-spacing: 4px;
+        color: #ffcccc;
+        font-weight: 700;
+        text-shadow: 0 0 10px var(--danger-red);
+      }
+
+      /* Radar - UPDATED GEOMETRY (Perfect Decagon) */
+      .radar-area {
+        grid-column: 3;
+        grid-row: 1;
+        justify-self: end;
+        align-self: start;
+        padding-top: 0;
+      }
+      .radar-structure {
+        width: 220px;
+        height: 220px;
+        position: relative;
+      }
+
+      .radar-svg-layer {
+        position: absolute;
+        inset: 0;
+        z-index: 5;
+        filter: drop-shadow(0 0 5px rgba(0, 240, 255, 0.3));
+        pointer-events: none;
+      }
+
+      /* PERFECT DECAGON MASK CALCULATION (R=95, C=110,110)
+           Points: 
+           110,15 | 166,33 | 200,81 | 200,139 | 166,187 
+           110,205 | 54,187 | 20,139 | 20,81 | 54,33
+           Percentages:
+           50% 7%, 75.5% 15%, 91% 37%, 91% 63%, 75.5% 85%, 
+           50% 93%, 24.5% 85%, 9% 63%, 9% 37%, 24.5% 15%
+        */
+      .radar-mask {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        background: rgba(0, 10, 20, 0.5);
+        clip-path: polygon(
+          50% 7%,
+          75.5% 15%,
+          91% 37%,
+          91% 63%,
+          75.5% 85%,
+          50% 93%,
+          24.5% 85%,
+          9% 63%,
+          9% 37%,
+          24.5% 15%
+        );
+      }
+
+      .radar-sweep {
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: conic-gradient(
+          from 0deg,
+          transparent 0%,
+          transparent 60%,
+          rgba(0, 240, 255, 0.05) 80%,
+          rgba(0, 240, 255, 0.4) 100%
+        );
+        animation: radar-sweep-anim 4s linear infinite;
+        border-radius: 50%;
+        mix-blend-mode: screen;
+        pointer-events: none;
+      }
+
+      .blip-container {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: 10;
+      }
+      .blip {
+        position: absolute;
+        border-radius: 50%;
+        transform: translate(-50%, -50%);
+        transition:
+          top 0.1s,
+          left 0.1s;
+        box-shadow: 0 0 8px 2px currentColor;
+      }
+      .blip.enemy {
+        width: 6px;
+        height: 6px;
+        background: var(--danger-red);
+        color: var(--danger-red);
+      }
+      .blip.player {
+        top: 50%;
+        left: 50%;
+        width: 8px;
+        height: 8px;
+        background: #fff;
+        border: 1px solid var(--primary-cyan);
+        color: #fff;
+        z-index: 15;
+        box-shadow: 0 0 12px 4px rgba(255, 255, 255, 0.8);
+      }
+
+      /* Reticle */
+      .reticle-center {
+        grid-column: 2;
+        grid-row: 2;
+        align-self: center;
+        justify-self: center;
+        width: 100px;
+        height: 100px;
+        opacity: 0.6;
+        pointer-events: none;
+        transition: transform 0.1s;
+      }
+
+      /* Next Wave */
+      .next-wave-box {
+        position: absolute;
+        top: 60%;
+        left: 0;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        transform: translateY(-50%);
+        font-family: 'Orbitron';
+        opacity: 0;
+        transition: opacity 0.3s;
+        pointer-events: none;
+        z-index: 100;
+      }
+      .next-wave-box.visible {
+        opacity: 1;
+      }
+      .next-wave-label {
+        font-size: 1.4rem;
+        color: var(--danger-red);
+        letter-spacing: 6px;
+        font-weight: 900;
+        margin: 0;
+        text-transform: uppercase;
+        text-shadow:
+          0 0 15px rgba(0, 0, 0, 0.9),
+          0 0 5px var(--danger-red);
+        line-height: 1.2;
+      }
+      .next-wave-timer {
+        font-size: 4rem;
+        line-height: 1;
+        color: #fff;
+        font-weight: 900;
+        text-shadow:
+          0 0 20px var(--danger-red),
+          2px 2px 0 #000;
+        margin-top: 10px;
+      }
+      .next-wave-box.visible .next-wave-timer {
+        animation: alert-pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+
+      /* Vitals - GEOMETRICALLY ALIGNED & TIGHT */
+      .status-area {
+        grid-column: 1;
+        grid-row: 3;
+        justify-self: start;
+        align-self: end;
+        display: flex;
+        flex-direction: column;
+        padding-bottom: 0;
+        gap: 10px;
+      }
+      .locked-msg {
+        border-left: 3px solid var(--secondary-blue);
+        background: linear-gradient(
+          90deg,
+          rgba(0, 170, 255, 0.15),
+          transparent
+        );
+        padding: 8px 15px;
+        width: 220px;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        margin-bottom: 5px;
+      }
+
+      .vitals-group {
+        transform: skewX(-15deg);
+        margin-left: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        position: relative;
+      }
+
+      .bar-row-wrapper {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 1px;
+      }
+      .health-bar-row {
+        display: flex;
+        height: 25px;
+        gap: 4px;
+        width: 220px;
+      }
+      .health-bar-row.shield {
+        height: 15px;
+        opacity: 0.9;
+        margin-bottom: 2px;
+      }
+      .bar-segment {
+        flex: 1;
+        background: rgba(0, 255, 102, 0.05);
+        border: 1px solid rgba(0, 255, 102, 0.2);
+        transition: all 0.2s;
+      }
+      .bar-segment.filled {
+        background: var(--health-green);
+        box-shadow: 0 0 8px var(--health-green);
+        border-color: #fff;
+      }
+      .shield .bar-segment.filled {
+        background: var(--secondary-blue);
+        box-shadow: 0 0 8px var(--secondary-blue);
+        border-color: #aaf;
+      }
+      .shield .bar-segment {
+        border-color: rgba(0, 170, 255, 0.3);
+      }
+
+      .bar-value {
+        font-family: 'Orbitron';
+        font-weight: bold;
+        font-size: 1.2rem;
+        width: 60px;
+        text-align: right;
+        text-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+        transform: skewX(15deg);
+        transform-origin: left bottom;
+      }
+      .bar-value.shield {
+        color: var(--secondary-blue);
+        text-shadow: 0 0 10px var(--secondary-blue);
+      }
+      .bar-value.hull {
+        color: var(--health-green);
+        text-shadow: 0 0 10px var(--health-green);
+      }
+
+      .vitals-label {
+        font-size: 0.7rem;
+        font-weight: 700;
+        letter-spacing: 1px;
+        margin-left: 20px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        transform: skewX(15deg);
+        transform-origin: left bottom;
+      }
+      .shield-label {
+        color: var(--secondary-blue);
+        margin-bottom: 2px;
+      }
+      .hull-label {
+        color: var(--health-green);
+        margin-top: 5px;
+      }
+
+      /* Progress */
+      .bottom-center {
+        grid-column: 2;
+        grid-row: 3;
+        justify-self: center;
+        align-self: end;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        padding-bottom: 0;
+      }
+      .wave-indicator {
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        border-top: 2px solid var(--primary-cyan);
+        border-bottom: 2px solid var(--primary-cyan);
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        background: radial-gradient(
+          circle,
+          rgba(0, 240, 255, 0.1),
+          rgba(0, 0, 0, 0.8)
+        );
+        box-shadow: 0 0 20px rgba(0, 240, 255, 0.1);
+        margin-bottom: 15px;
+        animation: rotate-border 4s infinite linear reverse;
+      }
+      .wave-content {
+        text-align: center;
+        animation: rotate-border 4s infinite linear;
+      }
+      .wave-num {
+        font-size: 1.8rem;
+        color: #fff;
+        font-family: 'Orbitron';
+        line-height: 1;
+      }
+      .wave-label {
+        font-size: 0.6rem;
+        color: var(--secondary-blue);
+        letter-spacing: 1px;
+      }
+      .xp-bar-container {
+        width: 80%;
+        max-width: 500px;
+        height: 8px;
+        background: #0a0a0a;
+        border: 1px solid #333;
+        border-radius: 4px;
+        position: relative;
+        display: flex;
+        align-items: center;
+      }
+      .xp-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #5500aa, var(--xp-purple));
+        box-shadow: 0 0 10px var(--xp-purple);
+        border-radius: 2px;
+        transition: width 0.5s;
+      }
+      .xp-label {
+        position: absolute;
+        left: 0;
+        top: -18px;
+        font-size: 0.75rem;
+        color: #ddaaff;
+        font-weight: bold;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      /* Systems */
+      .systems-area {
+        grid-column: 3;
+        grid-row: 3;
+        justify-self: end;
+        align-self: end;
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        padding-bottom: 0;
+      }
+      .nav-block {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        background: linear-gradient(to left, rgba(0, 20, 40, 0.8), transparent);
+        padding: 10px 15px 10px 30px;
+        border-right: 3px solid var(--primary-cyan);
+        position: relative;
+        transform: skewX(15deg);
+        margin-right: 0;
+      }
+      .nav-block::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 30%;
+        height: 2px;
+        background: var(--primary-cyan);
+      }
+      .nav-label {
+        font-size: 0.8rem;
+        color: var(--primary-cyan);
+        font-weight: 700;
+        letter-spacing: 2px;
+        margin-bottom: 5px;
+        transform: skewX(-15deg);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .micro-data {
+        font-family: 'Consolas', monospace;
+        font-size: 0.85rem;
+        color: rgba(200, 240, 255, 0.9);
+        text-align: right;
+        transform: skewX(-15deg);
+        line-height: 1.4;
+      }
+      .data-val {
+        color: #fff;
+        font-weight: bold;
+        text-shadow: 0 0 5px var(--primary-cyan);
+      }
+
+      /* Animations */
+      @keyframes pulse-text {
+        0%,
+        100% {
+          transform: scale(1);
+          filter: brightness(1);
+        }
+        50% {
+          transform: scale(1.02);
+          filter: brightness(1.2);
+        }
+      }
+      @keyframes pulse-border {
+        0%,
+        100% {
+          border-color: var(--danger-red);
+          box-shadow: 0 0 15px var(--danger-red);
+        }
+        50% {
+          border-color: #ff5555;
+          box-shadow: 0 0 25px #ff5555;
+        }
+      }
+      @keyframes blink {
+        0% {
+          opacity: 0.3;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+      @keyframes rotate-border {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes radar-sweep-anim {
+        from {
+          transform: rotate(0deg);
+        }
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      @keyframes alert-pulse {
+        0% {
+          transform: scale(1);
+          text-shadow: 0 0 20px var(--danger-red);
+        }
+        50% {
+          transform: scale(1.1);
+          text-shadow:
+            0 0 30px var(--danger-red),
+            0 0 10px #fff;
+        }
+        100% {
+          transform: scale(1);
+          text-shadow: 0 0 20px var(--danger-red);
+        }
+      }
+      .glitch-text {
+        animation: glitch 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) both
+          infinite;
+        color: var(--danger-red) !important;
+      }
+      @keyframes glitch {
+        0%,
+        100% {
+          transform: translate(0);
+        }
+        20% {
+          transform: translate(-2px, 2px);
+        }
+        40% {
+          transform: translate(-2px, -2px);
+        }
+        60% {
+          transform: translate(2px, 2px);
+        }
+        80% {
+          transform: translate(2px, -2px);
+        }
+      }
+
+      @media (max-width: 1000px) {
+        #hud-layer {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto 1fr auto;
+          padding: 15px;
+        }
+        /* Mobile styles simplified for brevity */
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Interface do Editor -->
+    <div id="editor-ui">
+      <button class="hud-btn" onclick="Editor.resetAll()">
+        <i data-lucide="rotate-ccw" size="14"></i> RESET
+      </button>
+      <button class="hud-btn save" onclick="Editor.saveAndClose()">
+        <i data-lucide="save" size="14"></i> SAVE & EXIT
+      </button>
+      <div
+        style="
+          color: #aaa;
+          font-size: 0.7rem;
+          align-self: center;
+          margin-left: 10px;
+          background: rgba(0, 0, 0, 0.5);
+          padding: 5px 10px;
+          border-radius: 4px;
+        "
+      >
+        DRAG to Move • SCROLL to Zoom
+      </div>
+    </div>
+
+    <!-- Floating Toolbar (Context Menu) -->
+    <div id="floating-toolbar">
+      <button id="ft-visible" title="Show/Hide">
+        <i data-lucide="eye" size="14"></i>
+      </button>
+      <button id="ft-group" title="Group/Ungroup" style="display: none">
+        <i data-lucide="lock" size="14"></i>
+      </button>
+      <button id="ft-reset" title="Reset Position">
+        <i data-lucide="rotate-ccw" size="14"></i>
+      </button>
+    </div>
+
+    <!-- Guias -->
+    <div id="snap-v" class="snap-guide vertical"></div>
+    <div id="snap-h" class="snap-guide horizontal"></div>
+
+    <!-- FX -->
+    <div class="scanlines"></div>
+
+    <!-- HUD LAYOUT -->
+    <div id="hud-layer">
+      <div class="stats-area">
+        <div class="editable-element" id="el-combo">
+          <div class="combo-box">
+            <div class="combo-label">COMBO</div>
+            <div class="combo-val" id="ui-combo">x0</div>
+          </div>
+        </div>
+        <div class="editable-element" id="el-timer">
+          <div class="stat-block">
+            <div class="stat-label">
+              <i data-lucide="clock" size="14"></i> TIME
+            </div>
+            <div class="stat-value" id="ui-timer">00:00:00</div>
+          </div>
+        </div>
+        <div class="editable-element" id="el-kills">
+          <div class="stat-block">
+            <div class="stat-label">
+              <i data-lucide="crosshair" size="14"></i> KILLS
+            </div>
+            <div class="stat-value" id="ui-kills">0</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="boss-area hud-panel editable-element" id="el-boss">
+        <div class="warning-strip">
+          <span class="warning-light"
+            ><i data-lucide="alert-triangle" size="16"></i> WARNING</span
+          ><span class="warning-light"
+            >WARNING <i data-lucide="alert-triangle" size="16"></i
+          ></span>
+        </div>
+        <div class="boss-bar-container">
+          <div class="boss-name" id="ui-boss-name">BOSS NAME</div>
+          <div class="boss-skull"><i data-lucide="skull" size="24"></i></div>
+          <div class="boss-fill" id="ui-boss-fill"></div>
+        </div>
+      </div>
+
+      <!-- RADAR - Decagon + Analog Ring -->
+      <div class="radar-area hud-panel editable-element" id="el-radar">
+        <div class="radar-structure">
+          <svg class="radar-svg-layer" viewBox="0 0 220 220">
+            <!-- Analog Outer Ring -->
+            <circle
+              cx="110"
+              cy="110"
+              r="108"
+              fill="none"
+              stroke="var(--secondary-blue)"
+              stroke-width="2"
+              stroke-opacity="0.6"
+            />
+            <!-- Inner Dash Circle -->
+            <circle
+              cx="110"
+              cy="110"
+              r="100"
+              fill="none"
+              stroke="var(--primary-cyan)"
+              stroke-width="1"
+              stroke-dasharray="4 6"
+              opacity="0.3"
+            />
+
+            <!-- Decagon Frame (Corrected Symmetry) -->
+            <polygon
+              points="110,15 166,33 200,81 200,139 166,187 110,205 54,187 20,139 20,81 54,33"
+              fill="none"
+              stroke="var(--primary-cyan)"
+              stroke-width="1.5"
+              opacity="0.8"
+            />
+
+            <!-- Dense Grid Lines (Web Pattern) -->
+            <!-- 1. Vertical -->
+            <line
+              x1="110"
+              y1="15"
+              x2="110"
+              y2="205"
+              stroke="var(--secondary-blue)"
+              stroke-width="1"
+              opacity="0.1"
+            />
+            <!-- 2. Diagonal Left-Low to Right-High -->
+            <line
+              x1="20"
+              y1="139"
+              x2="200"
+              y2="81"
+              stroke="var(--secondary-blue)"
+              stroke-width="1"
+              opacity="0.1"
+            />
+            <!-- 3. Diagonal Left-High to Right-Low -->
+            <line
+              x1="20"
+              y1="81"
+              x2="200"
+              y2="139"
+              stroke="var(--secondary-blue)"
+              stroke-width="1"
+              opacity="0.1"
+            />
+            <!-- 4. NEW: Diagonal Top-Right to Bottom-Left -->
+            <line
+              x1="166"
+              y1="33"
+              x2="54"
+              y2="187"
+              stroke="var(--secondary-blue)"
+              stroke-width="1"
+              opacity="0.1"
+            />
+            <!-- 5. NEW: Diagonal Top-Left to Bottom-Right -->
+            <line
+              x1="54"
+              y1="33"
+              x2="166"
+              y2="187"
+              stroke="var(--secondary-blue)"
+              stroke-width="1"
+              opacity="0.1"
+            />
+
+            <!-- Inner Decagon rings (Scaled 0.6) -->
+            <!-- Center 110,110. Radius 57. Points calculated same way -->
+            <polygon
+              points="110,53 144,64 164,93 164,127 144,156 110,167 76,156 56,127 56,93 76,64"
+              fill="none"
+              stroke="var(--secondary-blue)"
+              stroke-width="1"
+              opacity="0.2"
+            />
+          </svg>
+
+          <!-- Mask matching new decagon coordinates -->
+          <div class="radar-mask">
+            <div class="radar-sweep"></div>
+            <div class="blip-container" id="ui-radar-blips">
+              <div class="blip player"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="reticle-center editable-element" id="el-reticle">
+        <svg
+          viewBox="0 0 100 100"
+          fill="none"
+          stroke="var(--primary-cyan)"
+          stroke-width="1.5"
+        >
+          <path d="M 40 50 L 20 50" opacity="0.5" />
+          <path d="M 60 50 L 80 50" opacity="0.5" />
+          <path d="M 50 40 L 50 20" opacity="0.5" />
+          <path d="M 50 60 L 50 80" opacity="0.5" />
+          <circle cx="50" cy="50" r="2" fill="var(--primary-cyan)" />
+          <circle
+            cx="50"
+            cy="50"
+            r="15"
+            stroke-dasharray="10 5"
+            opacity="0.3"
+          />
+        </svg>
+      </div>
+
+      <div class="next-wave-box editable-element" id="el-wave-alert">
+        <div class="next-wave-label">INCOMING WAVE</div>
+        <div class="next-wave-timer" id="ui-next-wave-timer">10</div>
+      </div>
+
+      <div class="status-area">
+        <div class="editable-element" id="el-weapon">
+          <div class="locked-msg" id="ui-weapon-msg">
+            <div style="color: var(--secondary-blue)">
+              <i data-lucide="lock" size="24"></i>
+            </div>
+            <div>
+              <div
+                style="font-size: 0.6rem; color: #88ccff; letter-spacing: 1px"
+              >
+                WEAPON SYSTEM
+              </div>
+              <div style="font-weight: bold; color: #fff">
+                LOCKED // LVL 5 REQ
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="editable-group" id="group-vitals" data-grouped="true">
+          <div class="vitals-group">
+            <div
+              class="editable-element vitals-label shield-label"
+              id="el-vital-lbl-shield"
+            >
+              SHIELDS
+            </div>
+            <div class="bar-row-wrapper">
+              <div
+                class="health-bar-row shield editable-element"
+                id="el-vital-bar-shield"
+              ></div>
+              <div
+                class="bar-value shield editable-element"
+                id="el-vital-val-shield"
+              >
+                100%
+              </div>
+            </div>
+            <div class="bar-row-wrapper">
+              <div
+                class="health-bar-row editable-element"
+                id="el-vital-bar-hull"
+              ></div>
+              <div
+                class="bar-value hull editable-element"
+                id="el-vital-val-hull"
+              >
+                100%
+              </div>
+            </div>
+            <div
+              class="editable-element vitals-label hull-label"
+              id="el-vital-lbl-hull"
+            >
+              HULL INTEGRITY
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom-center hud-panel editable-element" id="el-bottom">
+        <div class="wave-indicator">
+          <div class="wave-content">
+            <div class="wave-label">WAVE</div>
+            <div class="wave-num" id="ui-wave-num">1</div>
+          </div>
+        </div>
+        <div class="xp-bar-container">
+          <div class="xp-label">
+            <i data-lucide="zap" size="12" fill="#ddaaff"></i> XP GAIN
+          </div>
+          <div class="xp-fill" id="ui-xp-fill"></div>
+        </div>
+      </div>
+
+      <div class="systems-area hud-panel editable-element" id="el-systems">
+        <div class="nav-block">
+          <div class="nav-label">
+            NAV SYSTEMS <i data-lucide="compass" size="14"></i>
+          </div>
+          <div class="micro-data">
+            COORD: <span class="data-val" id="ui-coord-x">000.00</span> /
+            <span class="data-val" id="ui-coord-y">000.00</span><br />VELOCITY:
+            <span class="data-val" id="ui-velocity">0</span> km/h
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      lucide.createIcons();
+
+      /* --- ENGINE DO EDITOR --- */
+      const Editor = {
+        enabled: false,
+        activeDrag: null,
+        selectedEl: null,
+        snapThreshold: 15,
+
+        init() {
+          this.snapGuides = {
+            v: document.getElementById('snap-v'),
+            h: document.getElementById('snap-h'),
+          };
+          this.toolbar = document.getElementById('floating-toolbar');
+
+          const allEditables = document.querySelectorAll(
+            '.editable-element, .editable-group'
+          );
+          allEditables.forEach((el) => {
+            this.initElementData(el);
+            el.addEventListener('mousedown', (e) =>
+              this.handleMouseDown(e, el)
+            );
+            el.addEventListener('wheel', (e) => this.scale(e, el));
+          });
+
+          document.addEventListener('mousemove', (e) => this.drag(e));
+          document.addEventListener('mouseup', () => this.stopDrag());
+
+          document.getElementById('ft-visible').onclick = (e) => {
+            e.stopPropagation();
+            this.toggleVisibility();
+          };
+          document.getElementById('ft-group').onclick = (e) => {
+            e.stopPropagation();
+            this.toggleGroup();
+          };
+          document.getElementById('ft-reset').onclick = (e) => {
+            e.stopPropagation();
+            this.resetSelected();
+          };
+        },
+
+        initElementData(el) {
+          if (!el.dataset.x) el.dataset.x = 0;
+          if (!el.dataset.y) el.dataset.y = 0;
+          if (!el.dataset.scale) el.dataset.scale = 1;
+        },
+
+        enable() {
+          this.enabled = true;
+          document.body.classList.add('edit-mode');
+          hud.updateBoss(true, 'EDIT MODE', 100);
+          hud.updateNextWaveTimer(99);
+        },
+
+        disable() {
+          this.enabled = false;
+          document.body.classList.remove('edit-mode');
+          this.deselect();
+          hud.updateNextWaveTimer(0);
+        },
+
+        // --- SELECTION & TOOLBAR ---
+        select(el) {
+          this.deselect();
+          this.selectedEl = el;
+          el.classList.add('is-selected');
+
+          // Position Toolbar
+          const rect = el.getBoundingClientRect();
+          this.toolbar.style.display = 'flex';
+          this.toolbar.style.left = rect.left + rect.width / 2 + 'px';
+          this.toolbar.style.top = rect.top + 'px';
+
+          // Config Buttons
+          const btnGroup = document.getElementById('ft-group');
+          const btnVis = document.getElementById('ft-visible');
+
+          // Group Button Logic
+          if (el.classList.contains('editable-group')) {
+            btnGroup.style.display = 'block';
+            const isGrouped = el.dataset.grouped === 'true';
+            btnGroup.innerHTML = isGrouped
+              ? '<i data-lucide="unlock" size="14"></i>'
+              : '<i data-lucide="lock" size="14"></i>';
+            btnGroup.classList.toggle('active', !isGrouped);
+          } else {
+            btnGroup.style.display = 'none';
+          }
+
+          // Eye Button Logic
+          const isHidden = el.classList.contains('is-hidden-in-game');
+          btnVis.innerHTML = isHidden
+            ? '<i data-lucide="eye-off" size="14"></i>'
+            : '<i data-lucide="eye" size="14"></i>';
+          btnVis.classList.toggle('active', isHidden);
+
+          lucide.createIcons();
+        },
+
+        deselect() {
+          if (this.selectedEl) {
+            this.selectedEl.classList.remove('is-selected');
+            this.selectedEl = null;
+          }
+          this.toolbar.style.display = 'none';
+        },
+
+        toggleVisibility() {
+          if (!this.selectedEl) return;
+          this.selectedEl.classList.toggle('is-hidden-in-game');
+          this.select(this.selectedEl); // Refresh toolbar state
+        },
+
+        toggleGroup() {
+          if (
+            !this.selectedEl ||
+            !this.selectedEl.classList.contains('editable-group')
+          )
+            return;
+          const isGrouped = this.selectedEl.dataset.grouped === 'true';
+          this.selectedEl.dataset.grouped = (!isGrouped).toString();
+          this.select(this.selectedEl); // Refresh toolbar
+        },
+
+        resetSelected() {
+          if (!this.selectedEl) return;
+          this.selectedEl.dataset.x = 0;
+          this.selectedEl.dataset.y = 0;
+          this.selectedEl.dataset.scale = 1;
+          this.updateTransform(this.selectedEl);
+          this.deselect();
+        },
+
+        // --- DRAG LOGIC ---
+        handleMouseDown(e, el) {
+          if (!this.enabled) return;
+
+          // Logic:
+          // 1. If we clicked an element inside a GROUPED container, we must drag the container, not the element.
+          // 2. If we clicked an element inside an UNGROUPED container, we drag the element itself.
+
+          let target = el;
+          const parentGroup = el.closest('.editable-group');
+
+          if (parentGroup && parentGroup.dataset.grouped === 'true') {
+            target = parentGroup; // Escalation rule
+          }
+
+          // If we are already dragging something else or clicked toolbar, ignore
+          if (this.activeDrag) return;
+          e.preventDefault();
+          e.stopPropagation(); // Prevent lower layers from catching
+
+          this.select(target); // Select what we are dragging
+
+          const rect = target.getBoundingClientRect();
+          this.activeDrag = {
+            el: target,
+            startX: e.clientX,
+            startY: e.clientY,
+            initialX: parseFloat(target.dataset.x),
+            initialY: parseFloat(target.dataset.y),
+            rect: rect,
+          };
+        },
+
+        drag(e) {
+          if (!this.activeDrag) return;
+
+          let dx = e.clientX - this.activeDrag.startX;
+          let dy = e.clientY - this.activeDrag.startY;
+
+          // --- SNAP LOGIC ---
+          const currentRect = this.activeDrag.rect;
+          const proposedX = currentRect.left + dx;
+          const proposedY = currentRect.top + dy;
+          const centerX = proposedX + currentRect.width / 2;
+          const centerY = proposedY + currentRect.height / 2;
+
+          const screenW = window.innerWidth;
+          const screenH = window.innerHeight;
+          const safeMargin = 30;
+
+          this.snapGuides.v.classList.remove('visible');
+          this.snapGuides.h.classList.remove('visible');
+
+          // Horizontal Snap - Screen
+          let snappedX = false;
+          if (Math.abs(centerX - screenW / 2) < this.snapThreshold) {
+            dx = screenW / 2 - (currentRect.left + currentRect.width / 2);
+            this.showGuide('v', screenW / 2);
+            snappedX = true;
+          } else if (Math.abs(proposedX - safeMargin) < this.snapThreshold) {
+            dx = safeMargin - currentRect.left;
+            this.showGuide('v', safeMargin);
+            snappedX = true;
+          } else if (
+            Math.abs(proposedX + currentRect.width - (screenW - safeMargin)) <
+            this.snapThreshold
+          ) {
+            dx = screenW - safeMargin - (currentRect.left + currentRect.width);
+            this.showGuide('v', screenW - safeMargin);
+            snappedX = true;
+          }
+
+          // Horizontal Snap - Other Elements (Relative)
+          if (!snappedX) {
+            const allOther = document.querySelectorAll(
+              '.editable-element:not(.is-selected), .editable-group:not(.is-selected)'
+            );
+            for (const other of allOther) {
+              const otherRect = other.getBoundingClientRect();
+              // Snap Left to Left
+              if (Math.abs(proposedX - otherRect.left) < this.snapThreshold) {
+                dx = otherRect.left - currentRect.left;
+                this.showGuide('v', otherRect.left);
+                snappedX = true;
+                break;
+              }
+              // Snap Left to Right
+              if (Math.abs(proposedX - otherRect.right) < this.snapThreshold) {
+                dx = otherRect.right - currentRect.left;
+                this.showGuide('v', otherRect.right);
+                snappedX = true;
+                break;
+              }
+              // Snap Right to Right
+              if (
+                Math.abs(proposedX + currentRect.width - otherRect.right) <
+                this.snapThreshold
+              ) {
+                dx = otherRect.right - (currentRect.left + currentRect.width);
+                this.showGuide('v', otherRect.right);
+                snappedX = true;
+                break;
+              }
+              // Snap Center to Center
+              if (
+                Math.abs(centerX - (otherRect.left + otherRect.width / 2)) <
+                this.snapThreshold
+              ) {
+                dx =
+                  otherRect.left +
+                  otherRect.width / 2 -
+                  (currentRect.left + currentRect.width / 2);
+                this.showGuide('v', otherRect.left + otherRect.width / 2);
+                snappedX = true;
+                break;
+              }
+            }
+          }
+
+          // Vertical Snap - Screen
+          let snappedY = false;
+          if (Math.abs(centerY - screenH / 2) < this.snapThreshold) {
+            dy = screenH / 2 - (currentRect.top + currentRect.height / 2);
+            this.showGuide('h', screenH / 2);
+            snappedY = true;
+          } else if (Math.abs(proposedY - safeMargin) < this.snapThreshold) {
+            dy = safeMargin - currentRect.top;
+            this.showGuide('h', safeMargin);
+            snappedY = true;
+          } else if (
+            Math.abs(proposedY + currentRect.height - (screenH - safeMargin)) <
+            this.snapThreshold
+          ) {
+            dy = screenH - safeMargin - (currentRect.top + currentRect.height);
+            this.showGuide('h', screenH - safeMargin);
+            snappedY = true;
+          }
+
+          // Vertical Snap - Other Elements (Relative)
+          if (!snappedY) {
+            const allOther = document.querySelectorAll(
+              '.editable-element:not(.is-selected), .editable-group:not(.is-selected)'
+            );
+            for (const other of allOther) {
+              const otherRect = other.getBoundingClientRect();
+              // Snap Top to Top
+              if (Math.abs(proposedY - otherRect.top) < this.snapThreshold) {
+                dy = otherRect.top - currentRect.top;
+                this.showGuide('h', otherRect.top);
+                snappedY = true;
+                break;
+              }
+              // Snap Top to Bottom
+              if (Math.abs(proposedY - otherRect.bottom) < this.snapThreshold) {
+                dy = otherRect.bottom - currentRect.top;
+                this.showGuide('h', otherRect.bottom);
+                snappedY = true;
+                break;
+              }
+              // Snap Bottom to Bottom
+              if (
+                Math.abs(proposedY + currentRect.height - otherRect.bottom) <
+                this.snapThreshold
+              ) {
+                dy = otherRect.bottom - (currentRect.top + currentRect.height);
+                this.showGuide('h', otherRect.bottom);
+                snappedY = true;
+                break;
+              }
+              // Snap Center to Center
+              if (
+                Math.abs(centerY - (otherRect.top + otherRect.height / 2)) <
+                this.snapThreshold
+              ) {
+                dy =
+                  otherRect.top +
+                  otherRect.height / 2 -
+                  (currentRect.top + currentRect.height / 2);
+                this.showGuide('h', otherRect.top + otherRect.height / 2);
+                snappedY = true;
+                break;
+              }
+            }
+          }
+
+          const el = this.activeDrag.el;
+          el.dataset.x = this.activeDrag.initialX + dx;
+          el.dataset.y = this.activeDrag.initialY + dy;
+          this.updateTransform(el);
+
+          // Update toolbar pos while dragging
+          this.select(el);
+        },
+
+        stopDrag() {
+          this.activeDrag = null;
+          this.snapGuides.v.classList.remove('visible');
+          this.snapGuides.h.classList.remove('visible');
+        },
+
+        scale(e, el) {
+          if (!this.enabled) return;
+          let target = el;
+          const parentGroup = el.closest('.editable-group');
+          if (parentGroup && parentGroup.dataset.grouped === 'true')
+            target = parentGroup;
+
+          if (target !== this.selectedEl) this.select(target);
+
+          e.preventDefault();
+          const delta = e.deltaY * -0.001;
+          let s = parseFloat(target.dataset.scale) + delta;
+          s = Math.min(Math.max(0.5, s), 3);
+          target.dataset.scale = s;
+          this.updateTransform(target);
+        },
+
+        updateTransform(el) {
+          const x = el.dataset.x;
+          const y = el.dataset.y;
+          const s = el.dataset.scale;
+          let base = '';
+          if (el.id === 'el-wave-alert') base = 'translateY(-50%) ';
+          el.style.transform = `${base}translate3d(${x}px, ${y}px, 0) scale(${s})`;
+        },
+
+        showGuide(type, pos) {
+          if (type === 'v') {
+            this.snapGuides.v.style.left = pos + 'px';
+            this.snapGuides.v.classList.add('visible');
+          } else {
+            this.snapGuides.h.style.top = pos + 'px';
+            this.snapGuides.h.classList.add('visible');
+          }
+        },
+
+        resetElement(el) {
+          if (!this.enabled) return;
+          el.dataset.x = 0;
+          el.dataset.y = 0;
+          el.dataset.scale = 1;
+          el.style.transform = '';
+        },
+
+        resetAll() {
+          document
+            .querySelectorAll('.editable-element, .editable-group')
+            .forEach((el) => {
+              el.dataset.x = 0;
+              el.dataset.y = 0;
+              el.dataset.scale = 1;
+              el.classList.remove('is-hidden-in-game');
+              if (el.dataset.grouped) el.dataset.grouped = 'true';
+              this.updateTransform(el);
+            });
+        },
+
+        // Retorna JSON para salvar
+        getLayout() {
+          const layout = {};
+          document
+            .querySelectorAll('.editable-element, .editable-group')
+            .forEach((el) => {
+              layout[el.id] = {
+                x: parseFloat(el.dataset.x),
+                y: parseFloat(el.dataset.y),
+                scale: parseFloat(el.dataset.scale),
+                hidden: el.classList.contains('is-hidden-in-game'),
+                grouped: el.dataset.grouped,
+              };
+            });
+          return layout;
+        },
+
+        // Carrega JSON salvo
+        loadLayout(layoutData) {
+          for (const [id, data] of Object.entries(layoutData)) {
+            const el = document.getElementById(id);
+            if (el) {
+              el.dataset.x = data.x;
+              el.dataset.y = data.y;
+              el.dataset.scale = data.scale;
+              if (data.hidden) el.classList.add('is-hidden-in-game');
+              if (data.grouped) el.dataset.grouped = data.grouped;
+              this.updateTransform(el);
+            }
+          }
+        },
+
+        saveAndClose() {
+          const data = this.getLayout();
+          console.log('HUD Layout Saved:', JSON.stringify(data));
+          alert('Layout salvo no console! (Integre com seu backend)');
+          this.disable();
+        },
+      };
+
+      /* --- HUD CONTROLLER --- */
+      class SpaceHUD {
+        constructor() {
+          this.els = {
+            timer: document.getElementById('ui-timer'),
+            kills: document.getElementById('ui-kills'),
+            combo: document.getElementById('ui-combo'),
+            bossPanel: document.getElementById('el-boss'),
+            bossName: document.getElementById('ui-boss-name'),
+            bossFill: document.getElementById('ui-boss-fill'),
+            radarContainer: document.getElementById('ui-radar-blips'),
+            shieldRow: document.getElementById('el-vital-bar-shield'),
+            hullRow: document.getElementById('el-vital-bar-hull'),
+            shieldVal: document.getElementById('el-vital-val-shield'),
+            hullVal: document.getElementById('el-vital-val-hull'),
+            wave: document.getElementById('ui-wave-num'),
+            xp: document.getElementById('ui-xp-fill'),
+            coordX: document.getElementById('ui-coord-x'),
+            coordY: document.getElementById('ui-coord-y'),
+            vel: document.getElementById('ui-velocity'),
+            nextWaveBox: document.getElementById('el-wave-alert'),
+            nextWaveTimer: document.getElementById('ui-next-wave-timer'),
+          };
+
+          this.createSegments(this.els.shieldRow, 20);
+          this.createSegments(this.els.hullRow, 20);
+          Editor.init();
+        }
+
+        createSegments(container, count) {
+          container.innerHTML = '';
+          for (let i = 0; i < count; i++) {
+            const div = document.createElement('div');
+            div.className = 'bar-segment filled';
+            container.appendChild(div);
+          }
+        }
+
+        updateStats(timeStr, kills, combo) {
+          if (timeStr) this.els.timer.innerText = timeStr;
+          if (kills !== undefined) this.els.kills.innerText = kills;
+          if (combo !== undefined) this.els.combo.innerText = 'x' + combo;
+        }
+
+        updateTelemetry(x, y, speed) {
+          this.els.coordX.innerText = x.toFixed(2);
+          this.els.coordY.innerText = y.toFixed(2);
+          this.els.vel.innerText = Math.floor(speed);
+        }
+
+        updateVitals(shield, maxShield, hull, maxHull) {
+          this._updateBar(this.els.shieldRow, shield, maxShield);
+          this._updateBar(this.els.hullRow, hull, maxHull);
+          const shieldPercent = Math.floor((shield / maxShield) * 100);
+          const hullPercent = Math.floor((hull / maxHull) * 100);
+          this.els.shieldVal.innerText = shieldPercent + '%';
+          this.els.hullVal.innerText = hullPercent + '%';
+          if (hullPercent < 30) this.els.hullVal.classList.add('glitch-text');
+          else this.els.hullVal.classList.remove('glitch-text');
+        }
+
+        _updateBar(container, value, max) {
+          const segments = container.children;
+          const total = segments.length;
+          const filledCount = Math.ceil((value / max) * total);
+          for (let i = 0; i < total; i++) {
+            if (i < filledCount) segments[i].classList.add('filled');
+            else segments[i].classList.remove('filled');
+          }
+        }
+
+        updateBoss(active, name, healthPercent) {
+          if (!active) {
+            this.els.bossPanel.classList.remove('active');
+            return;
+          }
+          this.els.bossPanel.classList.add('active');
+          if (name) this.els.bossName.innerText = name;
+          this.els.bossFill.style.width = healthPercent + '%';
+        }
+
+        updateWave(waveNum, xpPercent) {
+          this.els.wave.innerText = waveNum;
+          this.els.xp.style.width = xpPercent + '%';
+        }
+
+        updateNextWaveTimer(seconds) {
+          if (seconds <= 0) {
+            this.els.nextWaveBox.classList.remove('visible');
+            return;
+          }
+          this.els.nextWaveBox.classList.add('visible');
+          this.els.nextWaveTimer.innerText = Math.ceil(seconds);
+        }
+
+        updateRadar(blips) {
+          this.els.radarContainer.innerHTML = '<div class="blip player"></div>';
+          blips.forEach((b) => {
+            const el = document.createElement('div');
+            el.className = 'blip ' + (b.type || 'enemy');
+            const left = (b.x + 1) * 50;
+            const top = (b.y + 1) * 50;
+            el.style.left = left + '%';
+            el.style.top = top + '%';
+            this.els.radarContainer.appendChild(el);
+          });
+        }
+      }
+
+      const hud = new SpaceHUD();
+
+      // Botão de simulação
+      const demoBtn = document.createElement('button');
+      demoBtn.innerText = 'SIMULATE PAUSE & EDIT';
+      demoBtn.style.cssText =
+        'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); padding:20px; font-size:20px; background:red; color:white; border:none; cursor:pointer; z-index:99999; font-family:sans-serif;';
+      demoBtn.onclick = () => {
+        demoBtn.style.display = 'none';
+        Editor.enable();
+      };
+      document.body.appendChild(demoBtn);
+
+      let time = 0;
+      setInterval(() => {
+        if (Editor.enabled) return;
+        time += 0.1;
+        hud.updateVitals(100, 100, 100, 100);
+        hud.updateRadar([
+          { x: Math.sin(time) * 0.5, y: Math.cos(time) * 0.5, type: 'enemy' },
+        ]);
+        hud.updateStats('12:00', 50, 5);
+        hud.updateTelemetry(100, 200, 500);
+        if (time % 20 < 10) hud.updateNextWaveTimer(10 - (time % 20));
+        else hud.updateNextWaveTimer(0);
+      }, 100);
+    </script>
+  </body>
+</html>

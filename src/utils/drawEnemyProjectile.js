@@ -231,4 +231,3 @@ export function drawEnemyProjectile(ctx, bullet) {
   ctx.restore();
 }
 
-export default drawEnemyProjectile;

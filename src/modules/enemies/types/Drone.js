@@ -215,7 +215,7 @@ export class Drone extends BaseEnemy {
           this.fireTimer = 0;
 
           const angle = Math.atan2(dy, dx);
-          globalThis.gameEvents?.emit('enemy-fired', {
+          this.getEventBus()?.emit?.('enemy-fired', {
             source: this,
             position: { x: this.x, y: this.y },
             velocity: {

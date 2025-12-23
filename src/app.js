@@ -82,17 +82,10 @@ function logServiceRegistrationFlow({ reason = 'bootstrap' } = {}) {
     return;
   }
 
-  const legacyHas =
-    typeof gameServices !== 'undefined' &&
-    typeof gameServices.has === 'function'
-      ? (name) => gameServices.has(name)
-      : () => false;
-
   const serviceSnapshot = diContainer.getServiceNames().map((name) => ({
     service: name,
     placeholder:
       typeof diContainer.has === 'function' ? diContainer.has(name) : false,
-    legacyRegistered: legacyHas(name),
     diSingleton:
       typeof diContainer.isInstantiated === 'function'
         ? diContainer.isInstantiated(name)
@@ -108,22 +101,18 @@ function logServiceRegistrationFlow({ reason = 'bootstrap' } = {}) {
   }
 
   console.groupCollapsed(`[App] Service registration flow (${reason})`);
-  console.log(
-    '1) DIContainer serves as the enhanced service registry with legacy compatibility.'
-  );
+  console.log('1) DIContainer serves as the service registry.');
   console.log(
     '2) ServiceRegistry.setupServices(diContainer) registers all services from manifest.'
   );
-  console.log(
-    '3) Legacy services are synced directly into DIContainer via syncInstance().'
-  );
+  console.log('3) bootstrapServices resolves services for eager initialization.');
 
   if (typeof console.table === 'function') {
     console.table(serviceSnapshot);
   } else {
     serviceSnapshot.forEach((row) => {
       console.log(
-        ` - ${row.service}: placeholder=${row.placeholder}, legacy=${row.legacyRegistered}, singleton=${row.diSingleton}`
+        ` - ${row.service}: placeholder=${row.placeholder}, singleton=${row.diSingleton}`
       );
     });
   }
@@ -183,9 +172,6 @@ function exposeDebugCommands({ showBanner = false } = {}) {
 function initializeDependencyInjection(manifestContext) {
   console.log('[App] Initializing Dependency Injection system...');
 
-  let legacyLocatorSnapshot =
-    typeof gameServices !== 'undefined' ? gameServices : null;
-
   try {
     // Create DI container
     diContainer = new DIContainer();
@@ -194,69 +180,15 @@ function initializeDependencyInjection(manifestContext) {
     // Register all services
     ServiceRegistry.setupServices(diContainer, manifestContext);
 
-    // Synchronize any existing legacy services directly into DIContainer
-    if (typeof gameServices !== 'undefined') {
-      const legacyLocator = gameServices;
-      legacyLocatorSnapshot = legacyLocator;
+    // DIContainer now handles factory-based DI registrations.
 
-      try {
-        const legacyEntries =
-          legacyLocator?.services instanceof Map
-            ? Array.from(legacyLocator.services.entries())
-            : [];
-
-        legacyEntries.forEach(([name, instance]) => {
-          if (!name) return;
-          try {
-            diContainer.syncInstance(name, instance);
-          } catch (syncError) {
-            console.warn(
-              `[App] Failed to sync legacy service '${name}' to DIContainer:`,
-              syncError
-            );
-          }
-        });
-      } catch (syncError) {
-        console.warn(
-          '[App] Could not synchronize existing legacy services:',
-          syncError
-        );
-      }
-
-      // Preserve legacy locator for reference
-      if (typeof globalThis !== 'undefined') {
-        if (!globalThis.__legacyGameServices) {
-          globalThis.__legacyGameServices = legacyLocator;
-        }
-      }
-    }
-
-    // Set DIContainer as the global gameServices
-    if (typeof globalThis !== 'undefined') {
-      globalThis.gameServices = diContainer;
-    }
-
-    // DIContainer now handles both factory-based DI and legacy direct registration.
-    // Systems can continue to call gameServices.register/get() transparently until
-    // full constructor injection is introduced in Phase 2.2+.
-
-    // Just expose container for debugging
+    // Development diagnostics
     if (typeof window !== 'undefined' && DEV_MODE) {
-      window.diContainer = diContainer;
-      window.gameServices = diContainer;
-      window.performanceMonitor = performanceMonitor;
-
       logServiceRegistrationFlow({ reason: 'development snapshot' });
 
       // Enable auto-logging every 10 seconds
       performanceMonitor.enableAutoLog(10000);
 
-      console.log(
-        '[App] ℹ Performance monitor available: window.performanceMonitor'
-      );
-      console.log(
-        '[App] ℹ DIContainer available: window.gameServices, window.diContainer'
-      );
       console.log('[App] ℹ Auto-logging enabled (logs saved to localStorage)');
       console.log('[App] ℹ Get logs: localStorage.getItem("performanceLog")');
       exposeDebugCommands({ showBanner: true });
@@ -266,9 +198,7 @@ function initializeDependencyInjection(manifestContext) {
     console.log(
       `[App] ✓ ${diContainer.getServiceNames().length} services registered`
     );
-    console.log(
-      '[App] ℹ DIContainer serves as unified service registry (factory + legacy)'
-    );
+    console.log('[App] ℹ DIContainer serves as unified service registry');
 
     if (!DEV_MODE) {
       logServiceRegistrationFlow({ reason: 'production snapshot' });
@@ -277,10 +207,7 @@ function initializeDependencyInjection(manifestContext) {
     return true;
   } catch (error) {
     console.error('[App] ✗ Failed to initialize DI system:', error);
-    console.warn('[App] Falling back to legacy ServiceLocator');
-    if (legacyLocatorSnapshot && typeof globalThis !== 'undefined') {
-      globalThis.gameServices = legacyLocatorSnapshot;
-    }
+    console.warn('[App] DI initialization failed; cannot continue.');
     return false;
   }
 }
@@ -357,22 +284,12 @@ function init() {
       }
       alert('Falha na inicialização dos serviços. Recarregue a página.');
 
-      // Set safe no-op stub to prevent accidental usage
-      if (typeof globalThis !== 'undefined') {
-        globalThis.gameServices = {
-          get: () => null,
-          register: () => {},
-          has: () => false,
-        };
-      }
-
       return;
     }
 
     const { services } = bootstrapServices({
       container: diContainer,
       manifestContext,
-      adapter: diContainer,
     });
 
     // Store services for use in game loop

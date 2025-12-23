@@ -94,7 +94,7 @@ export function createTestEventBus() {
  * Create a fully wired EnemySystem harness configured for deterministic tests.
  *
  * @param {number} [seed=TEST_SEED] - Seed applied to the RandomService.
- * @returns {{ enemySystem: EnemySystem, container: any, services: Record<string, any> }}
+ * @returns {{ enemySystem: EnemySystem, container: any }}
  * @example
  * const harness = createEnemySystemHarness();
  * harness.enemySystem.spawnAsteroid();
@@ -183,19 +183,8 @@ export function createEnemySystemHarness(seed = TEST_SEED) {
 
   const randomService = container.resolve('random');
 
-  const services = {
-    world,
-    player,
-    xpOrbs,
-    healthHearts,
-    progression,
-    physics,
-    random: randomService,
-    'xp-orbs': xpOrbs,
-    eventBus,
-  };
-
   const enemySystem = new EnemySystem({
+    eventBus,
     world,
     player,
     progression,
@@ -215,21 +204,10 @@ export function createEnemySystemHarness(seed = TEST_SEED) {
   enemySystem.waveState.initialSpawnDone = false;
   enemySystem.asteroids = [];
 
-  Object.assign(enemySystem.services, {
-    world,
-    player,
-    progression,
-    physics,
-    xpOrbs,
-    healthHearts,
-    random: randomService,
-    eventBus,
-  });
-
   enemySystem.refreshInjectedServices({ force: true, suppressWarnings: true });
   enemySystem.reseedRandomScopes({ seed, resetSequences: true });
 
-  return { enemySystem, container, services };
+  return { enemySystem, container };
 }
 
 /**

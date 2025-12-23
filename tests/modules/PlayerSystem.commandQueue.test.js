@@ -10,8 +10,8 @@ describe('PlayerSystem command queue integration', () => {
   let gameEventsMock;
 
   beforeEach(() => {
-    setupGlobalMocks({ gameEvents: createEventBusMock() });
-    gameEventsMock = globalThis.gameEvents;
+    gameEventsMock = createEventBusMock();
+    setupGlobalMocks();
   });
 
   afterEach(() => {
@@ -27,6 +27,7 @@ describe('PlayerSystem command queue integration', () => {
     };
 
     const baselinePlayer = new PlayerSystem({
+      eventBus: gameEventsMock,
       input: legacyInputService,
       'command-queue': legacyQueue,
     });
@@ -71,6 +72,7 @@ describe('PlayerSystem command queue integration', () => {
     };
 
     const queuePlayer = new PlayerSystem({
+      eventBus: gameEventsMock,
       input: commandInputService,
       'command-queue': commandQueue,
     });
@@ -129,6 +131,7 @@ describe('PlayerSystem command queue integration', () => {
     };
 
     const player = new PlayerSystem({
+      eventBus: gameEventsMock,
       input: inputService,
       'command-queue': commandQueue,
     });

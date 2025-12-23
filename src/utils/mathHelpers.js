@@ -40,21 +40,3 @@ export function easeInOutCubic(t) {
   }
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
-
-/**
- * Normalizes an angle in radians to the range [-PI, PI].
- * @param {number} angle - Angle in radians
- * @returns {number} Normalized angle in range [-PI, PI]
- */
-export function normalizeAngle(angle) {
-  if (!Number.isFinite(angle)) {
-    return 0;
-  }
-  let normalized = angle % (2 * Math.PI);
-  if (normalized > Math.PI) {
-    normalized -= 2 * Math.PI;
-  } else if (normalized < -Math.PI) {
-    normalized += 2 * Math.PI;
-  }
-  return normalized;
-}

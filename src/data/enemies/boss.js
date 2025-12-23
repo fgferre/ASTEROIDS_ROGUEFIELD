@@ -127,6 +127,28 @@ export const BOSS_COMPONENTS = deepFreeze({
     safeDistance: 240,
     damping: 0.95,
   },
+  movementPhases: [
+    {
+      strategy: 'seeking',
+      acceleration: 80,
+      maxSpeed: 45,
+      safeDistance: 320,
+      damping: 0.96,
+      jitter: 0.05,
+    },
+    {
+      strategy: 'orbit',
+      acceleration: 240,
+      maxSpeed: 120,
+      preferredDistance: 180,
+    },
+    {
+      strategy: 'parasite',
+      acceleration: 280,
+      maxSpeed: 160,
+      minDistance: 90,
+    },
+  ],
   weapon: {
     patterns: ['spread', 'volley'],
     spread: {

@@ -30,12 +30,15 @@ import {
   WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
   ASTEROIDS_PER_WAVE_MULTIPLIER,
   ASTEROIDS_PER_WAVE_BASE,
+  ASTEROID_ENTRY_ANGLE_VARIANCE,
+  ASTEROID_OFFSCREEN_RECOVERY_TIME,
   MAX_ASTEROIDS_ON_SCREEN,
   WAVE_DURATION,
   WAVE_BREAK_TIME,
   PRESERVE_LEGACY_SIZE_DISTRIBUTION,
   COLLISION_BOUNCE,
 } from '../../../data/constants/gameplay.js';
+import { ASTEROID_SPEEDS } from '../../../data/constants/physics.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 
 export class EnemyUpdateSystem {
@@ -572,12 +575,15 @@ export class EnemyUpdateSystem {
             enemy.shieldHitCooldown - deltaTime
           );
         }
+        this.applyAsteroidOffscreenRecovery(enemy, deltaTime);
         continue;
       }
 
       if (typeof enemy.update === 'function') {
         enemy.update(deltaTime);
       }
+
+      this.applyAsteroidOffscreenRecovery(enemy, deltaTime);
     }
 
     this.handleAsteroidCollisions();
@@ -594,6 +600,7 @@ export class EnemyUpdateSystem {
     }
 
     const asteroids = this.ctx?.asteroids ?? [];
+    const useComponents = Boolean(this.ctx?.useComponents);
 
     for (let i = 0; i < asteroids.length; i += 1) {
       const enemy = asteroids[i];
@@ -601,10 +608,83 @@ export class EnemyUpdateSystem {
         continue;
       }
 
-      if (typeof enemy.onUpdate === 'function') {
+      const shouldUseComponents =
+        useComponents &&
+        enemy.useComponents &&
+        enemy.components &&
+        enemy.components.size > 0 &&
+        typeof enemy.update === 'function';
+
+      if (shouldUseComponents) {
+        enemy.update(deltaTime);
+      } else if (typeof enemy.onUpdate === 'function') {
         enemy.onUpdate(deltaTime);
       }
     }
+  }
+
+  applyAsteroidOffscreenRecovery(asteroid, deltaTime) {
+    if (!asteroid || asteroid.type !== 'asteroid') {
+      return;
+    }
+
+    if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
+      return;
+    }
+
+    const margin = Math.max(0, Number(asteroid.radius) || 0);
+    const width = Number.isFinite(GAME_WIDTH) ? GAME_WIDTH : 0;
+    const height = Number.isFinite(GAME_HEIGHT) ? GAME_HEIGHT : 0;
+    const isOffscreen =
+      asteroid.x < -margin ||
+      asteroid.x > width + margin ||
+      asteroid.y < -margin ||
+      asteroid.y > height + margin;
+
+    if (!isOffscreen) {
+      asteroid.offscreenTimer = 0;
+      return;
+    }
+
+    asteroid.offscreenTimer =
+      (Number(asteroid.offscreenTimer) || 0) + deltaTime;
+
+    const velocitySpeed = Math.hypot(asteroid.vx ?? 0, asteroid.vy ?? 0);
+    const fallbackSpeed =
+      ASTEROID_SPEEDS?.[asteroid.size] ||
+      ASTEROID_SPEEDS?.medium ||
+      45;
+    const speed = velocitySpeed > 0 ? velocitySpeed : fallbackSpeed;
+    const travelTime = (margin + (Number(asteroid.radius) || 0)) / Math.max(speed, 1);
+    const recoveryTime = Math.max(
+      Number(ASTEROID_OFFSCREEN_RECOVERY_TIME) || 4,
+      travelTime + 0.5
+    );
+
+    if (asteroid.offscreenTimer < recoveryTime) {
+      return;
+    }
+
+    const random =
+      typeof asteroid.getRandomFor === 'function'
+        ? asteroid.getRandomFor('movement')
+        : null;
+    const variance = Number.isFinite(ASTEROID_ENTRY_ANGLE_VARIANCE)
+      ? ASTEROID_ENTRY_ANGLE_VARIANCE
+      : Math.PI / 4;
+    const offset =
+      random && typeof random.range === 'function'
+        ? random.range(-variance, variance)
+        : (random?.float?.() ?? Math.random()) * 2 * variance - variance;
+
+    const angle = Math.atan2(height / 2 - asteroid.y, width / 2 - asteroid.x);
+    const nextVx = Math.cos(angle + offset) * speed;
+    const nextVy = Math.sin(angle + offset) * speed;
+
+    asteroid.vx = nextVx;
+    asteroid.vy = nextVy;
+    asteroid.velocity = { vx: nextVx, vy: nextVy };
+    asteroid.offscreenTimer = 0;
   }
 
   /**

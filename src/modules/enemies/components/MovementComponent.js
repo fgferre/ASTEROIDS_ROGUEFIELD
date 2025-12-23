@@ -91,7 +91,15 @@ const createDefaultStrategies = () => ({
     enemy.rotation = Math.atan2(movement.vy, movement.vx);
     wrapScreenEdges(enemy, bounds);
   },
-  orbit: ({ enemy, deltaTime, player, playerPosition, random, config }) => {
+  orbit: ({
+    enemy,
+    deltaTime,
+    player,
+    playerPosition,
+    random,
+    config,
+    bounds,
+  }) => {
     const center = playerPosition || player?.position || player || null;
     if (!center) {
       return;
@@ -160,6 +168,7 @@ const createDefaultStrategies = () => ({
     enemy.y += movement.vy * deltaTime;
 
     enemy.rotation = Math.atan2(movement.vy, movement.vx);
+    wrapScreenEdges(enemy, bounds);
   },
   proximity: ({ enemy, deltaTime, random, config }) => {
     const state = enemy.movementState || (enemy.movementState = {});
@@ -189,7 +198,15 @@ const createDefaultStrategies = () => ({
       enemy.y += state.velocity.y * deltaTime;
     }
   },
-  seeking: ({ enemy, deltaTime, player, playerPosition, random, config }) => {
+  seeking: ({
+    enemy,
+    deltaTime,
+    player,
+    playerPosition,
+    random,
+    config,
+    bounds,
+  }) => {
     const snapshot = playerPosition || player?.position || player || null;
     if (!snapshot) {
       return;
@@ -263,6 +280,7 @@ const createDefaultStrategies = () => ({
     enemy.y += velocity.vy * deltaTime;
 
     enemy.rotation = Math.atan2(velocity.vy, velocity.vx);
+    wrapScreenEdges(enemy, bounds);
   },
 
   // Parasite movement: tracking with repulsion when too close

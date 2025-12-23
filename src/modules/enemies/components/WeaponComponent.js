@@ -3,23 +3,14 @@ import {
   resolvePlayerVelocity,
   applySpread,
 } from '../../../utils/combatHelpers.js';
+import { resolveEventBus } from '../../../core/serviceUtils.js';
 
-const getGameEvents = (context) => {
-  if (context?.system?.gameEvents?.emit) {
-    return context.system.gameEvents;
+const getEventBus = (context) => {
+  if (context?.system?.eventBus?.emit) {
+    return context.system.eventBus;
   }
 
-  if (typeof globalThis !== 'undefined') {
-    if (globalThis.gameEvents?.emit) {
-      return globalThis.gameEvents;
-    }
-  }
-
-  if (typeof gameEvents !== 'undefined' && gameEvents?.emit) {
-    return gameEvents;
-  }
-
-  return null;
+  return resolveEventBus(context?.system?.dependencies);
 };
 
 const ensureWeaponState = (enemy) => {
@@ -397,7 +388,7 @@ export class WeaponComponent {
       return;
     }
 
-    const bus = getGameEvents(context);
+    const bus = getEventBus(context);
     if (!bus?.emit) {
       return;
     }

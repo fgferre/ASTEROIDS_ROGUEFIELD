@@ -3,6 +3,10 @@
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 import { DEFAULT_HUD_LAYOUT_ID } from '../data/ui/hudLayout.js';
 import { clamp } from '../utils/mathHelpers.js';
+import {
+  normalizeDependencies,
+  resolveEventBus,
+} from '../core/serviceUtils.js';
 
 const VISUAL_CATEGORIES = new Set(['accessibility', 'video']);
 
@@ -25,33 +29,38 @@ function ensureArray(value) {
 }
 
 class SettingsSystem {
-  constructor() {
+  constructor(dependencies = {}) {
+    this.dependencies = normalizeDependencies(dependencies);
     this.schema = Array.isArray(SETTINGS_SCHEMA) ? SETTINGS_SCHEMA : [];
     this.storageKey = STORAGE_KEY;
     this.defaults = this.buildDefaultState();
     this.values = deepClone(this.defaults);
     this.subscribers = new Set();
+    this.eventBus = resolveEventBus(this.dependencies);
 
     this.applyStoredValues();
-    this.registerService();
     this.setupEventListeners();
     this.broadcastInitialCategories();
 
     console.log('[SettingsSystem] Initialized');
   }
 
-  registerService() {
-    if (typeof gameServices !== 'undefined') {
-      gameServices.register('settings', this);
+  getEventBus() {
+    const eventBus =
+      this.eventBus || resolveEventBus(this.dependencies);
+    if (eventBus && this.eventBus !== eventBus) {
+      this.eventBus = eventBus;
     }
+    return eventBus;
   }
 
   setupEventListeners() {
-    if (typeof gameEvents === 'undefined') {
+    const eventBus = this.getEventBus();
+    if (!eventBus?.on) {
       return;
     }
 
-    gameEvents.on('settings-update-requested', (payload = {}) => {
+    eventBus.on('settings-update-requested', (payload = {}) => {
       const { category, key, value, source } = payload;
       if (!category || !key) {
         return;
@@ -59,7 +68,7 @@ class SettingsSystem {
       this.setSetting(category, key, value, { source: source ?? 'event' });
     });
 
-    gameEvents.on('settings-reset-requested', (payload = {}) => {
+    eventBus.on('settings-reset-requested', (payload = {}) => {
       const { category, key, scope = 'category', source } = payload;
       if (key && category) {
         this.resetSetting(category, key, { source: source ?? 'event' });
@@ -448,51 +457,52 @@ class SettingsSystem {
       }
     });
 
-    if (typeof gameEvents !== 'undefined') {
-      gameEvents.emit('settings-changed', change);
+    const eventBus = this.getEventBus();
+    if (!eventBus?.emit) {
+      return;
+    }
 
-      if (change.category === 'audio') {
-        gameEvents.emit('settings-audio-changed', {
-          values: this.getCategoryValues('audio'),
-          change,
-        });
-      }
+    eventBus.emit('settings-changed', change);
 
-      if (change.category === 'controls') {
-        gameEvents.emit('settings-controls-changed', {
-          values: this.getCategoryValues('controls'),
-          change,
-        });
-      }
+    if (change.category === 'audio') {
+      eventBus.emit('settings-audio-changed', {
+        values: this.getCategoryValues('audio'),
+        change,
+      });
+    }
 
-      if (change.category === 'accessibility') {
-        gameEvents.emit('settings-accessibility-changed', {
-          values: this.getCategoryValues('accessibility'),
-          change,
-        });
-      }
+    if (change.category === 'controls') {
+      eventBus.emit('settings-controls-changed', {
+        values: this.getCategoryValues('controls'),
+        change,
+      });
+    }
 
-      if (change.category === 'video') {
-        gameEvents.emit('settings-video-changed', {
-          values: this.getCategoryValues('video'),
-          change,
-        });
-      }
+    if (change.category === 'accessibility') {
+      eventBus.emit('settings-accessibility-changed', {
+        values: this.getCategoryValues('accessibility'),
+        change,
+      });
+    }
 
-      if (
-        VISUAL_CATEGORIES.has(change.category) ||
-        change.type === 'reset-all'
-      ) {
-        gameEvents.emit('settings-visual-changed', {
-          values: this.getVisualPreferences(),
-          change,
-        });
-      }
+    if (change.category === 'video') {
+      eventBus.emit('settings-video-changed', {
+        values: this.getCategoryValues('video'),
+        change,
+      });
+    }
+
+    if (VISUAL_CATEGORIES.has(change.category) || change.type === 'reset-all') {
+      eventBus.emit('settings-visual-changed', {
+        values: this.getVisualPreferences(),
+        change,
+      });
     }
   }
 
   broadcastInitialCategories() {
-    if (typeof gameEvents === 'undefined') {
+    const eventBus = this.getEventBus();
+    if (!eventBus?.emit) {
       return;
     }
 
@@ -502,7 +512,7 @@ class SettingsSystem {
         return;
       }
 
-      gameEvents.emit(`settings-${categoryId}-changed`, {
+      eventBus.emit(`settings-${categoryId}-changed`, {
         values,
         change: {
           category: categoryId,
@@ -514,7 +524,7 @@ class SettingsSystem {
       });
     });
 
-    gameEvents.emit('settings-visual-changed', {
+    eventBus.emit('settings-visual-changed', {
       values: this.getVisualPreferences(),
       change: {
         category: null,

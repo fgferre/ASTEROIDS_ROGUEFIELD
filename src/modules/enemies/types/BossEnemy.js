@@ -84,6 +84,7 @@ export class BossEnemy extends BaseEnemy {
     this.phaseCount = BOSS_DEFAULTS.phaseCount ?? 3;
     this.phaseThresholds = [];
     this.phaseHealthThresholds = [];
+    this._phaseThresholdMaxHealth = null;
     this.nextPhaseIndex = 0;
 
     this.spreadCooldown = BOSS_DEFAULTS.spreadCooldown;
@@ -142,6 +143,9 @@ export class BossEnemy extends BaseEnemy {
     this._lastInvulnerabilityState = null;
     this.weaponState = {};
     this.movementStrategy = 'seeking';
+    this.movementConfig = null;
+    this.movementPhases = null;
+    this._lastMovementPhase = null;
     this.renderStrategy = 'procedural-boss';
     this.useComponents = false;
 
@@ -166,6 +170,14 @@ export class BossEnemy extends BaseEnemy {
           this.weaponPattern || componentConfig.weapon.patterns[0];
       } else if (componentConfig?.weapon?.pattern) {
         this.weaponPattern = componentConfig.weapon.pattern;
+      }
+
+      if (Array.isArray(componentConfig?.movementPhases)) {
+        this.movementPhases = componentConfig.movementPhases.map((phase) => ({
+          ...phase,
+        }));
+      } else {
+        this.movementPhases = null;
       }
     }
 
@@ -293,9 +305,6 @@ export class BossEnemy extends BaseEnemy {
       ? [...thresholds].filter((value) => Number.isFinite(value))
       : [];
     this.phaseThresholds.sort((a, b) => b - a);
-    this.phaseHealthThresholds = this.phaseThresholds.map(
-      (ratio) => this.maxHealth * Math.min(Math.max(ratio, 0), 1)
-    );
     this.phaseCount = Math.max(
       1,
       config.phaseCount ??
@@ -304,6 +313,7 @@ export class BossEnemy extends BaseEnemy {
     );
     this.currentPhase = 0;
     this.nextPhaseIndex = 0;
+    this.syncPhaseThresholds(true);
 
     this.spreadTimer = this.computeSpreadCooldown();
     this.volleyTimer = this.computeVolleyCooldown();
@@ -318,6 +328,8 @@ export class BossEnemy extends BaseEnemy {
 
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;
+    this.applyPhaseLoadout(true);
+    this.applyPhaseMovement(true);
 
     this.renderPayload = this.buildRenderPayload();
 
@@ -381,6 +393,83 @@ export class BossEnemy extends BaseEnemy {
     }
 
     return new RandomService(`enemy:${this.type}`);
+  }
+
+  syncPhaseThresholds(force = false) {
+    const maxHealth = Number.isFinite(this.maxHealth) ? this.maxHealth : null;
+    if (!Number.isFinite(maxHealth)) {
+      this.phaseHealthThresholds = [];
+      this._phaseThresholdMaxHealth = null;
+      return;
+    }
+
+    if (
+      !force &&
+      this._phaseThresholdMaxHealth === maxHealth &&
+      this.phaseHealthThresholds.length
+    ) {
+      return;
+    }
+
+    const thresholds = Array.isArray(this.phaseThresholds)
+      ? this.phaseThresholds
+      : [];
+    this.phaseHealthThresholds = thresholds.map((ratio) => {
+      const clamped = Math.min(Math.max(ratio, 0), 1);
+      return maxHealth * clamped;
+    });
+    this._phaseThresholdMaxHealth = maxHealth;
+    this.nextPhaseIndex = Math.min(
+      Math.max(0, this.currentPhase || 0),
+      this.phaseHealthThresholds.length
+    );
+  }
+
+  applyPhaseLoadout(force = false) {
+    const patterns = Array.isArray(this.weaponPatterns)
+      ? this.weaponPatterns
+      : [];
+    if (!patterns.length) {
+      return;
+    }
+
+    const index = Math.min(
+      Math.max(0, this.currentPhase || 0),
+      patterns.length - 1
+    );
+    const nextPattern = patterns[index];
+    if (!force && this.weaponPattern === nextPattern) {
+      return;
+    }
+    this.weaponPattern = nextPattern;
+  }
+
+  applyPhaseMovement(force = false) {
+    if (!Array.isArray(this.movementPhases) || !this.movementPhases.length) {
+      if (force) {
+        this._lastMovementPhase = null;
+      }
+      return;
+    }
+
+    const phaseIndex = Math.min(
+      Math.max(0, this.currentPhase || 0),
+      this.movementPhases.length - 1
+    );
+
+    if (!force && this._lastMovementPhase === phaseIndex) {
+      return;
+    }
+
+    const phaseConfig = this.movementPhases[phaseIndex] || {};
+    const { strategy, ...movementOverrides } = phaseConfig;
+
+    if (strategy) {
+      this.movementStrategy = strategy;
+    }
+
+    this.movementConfig = { ...movementOverrides };
+    this._lastMovementPhase = phaseIndex;
   }
 
   onUpdate(deltaTime) {
@@ -517,8 +606,9 @@ export class BossEnemy extends BaseEnemy {
       previousTimer: context.previous ?? null,
     };
 
-    if (typeof gameEvents !== 'undefined' && gameEvents?.emit) {
-      gameEvents.emit('boss-invulnerability-changed', payload);
+    const eventBus = this.getEventBus();
+    if (eventBus?.emit) {
+      eventBus.emit('boss-invulnerability-changed', payload);
     }
 
     GameDebugLogger.log('STATE', 'Boss invulnerability state changed', {
@@ -684,11 +774,12 @@ export class BossEnemy extends BaseEnemy {
     const vx = Math.cos(angle) * projectileSpeed;
     const vy = Math.sin(angle) * projectileSpeed;
 
-    if (typeof gameEvents === 'undefined' || !gameEvents?.emit) {
+    const eventBus = this.getEventBus();
+    if (!eventBus?.emit) {
       return;
     }
 
-    gameEvents.emit('enemy-fired', {
+    eventBus.emit('enemy-fired', {
       enemy: this,
       enemyId: this.id,
       enemyType: this.type,
@@ -1015,6 +1106,7 @@ export class BossEnemy extends BaseEnemy {
   }
 
   evaluatePhaseTransition() {
+    this.syncPhaseThresholds();
     if (!this.phaseHealthThresholds.length) {
       return;
     }
@@ -1036,6 +1128,8 @@ export class BossEnemy extends BaseEnemy {
     const previousPhase = this.currentPhase;
     this.currentPhase = Math.min(this.phaseCount - 1, this.currentPhase + 1);
     this.nextPhaseIndex += 1;
+    this.applyPhaseLoadout(true);
+    this.applyPhaseMovement(true);
 
     this.invulnerable = true;
     this.invulnerabilityTimer = this.invulnerabilityDuration || 0;
@@ -1052,8 +1146,9 @@ export class BossEnemy extends BaseEnemy {
     this.chargeState = 'idle';
     this.chargeStateTimer = 0;
 
-    if (typeof gameEvents !== 'undefined' && gameEvents?.emit) {
-      gameEvents.emit('boss-phase-changed', {
+    const eventBus = this.getEventBus();
+    if (eventBus?.emit) {
+      eventBus.emit('boss-phase-changed', {
         enemy: this,
         phase: this.currentPhase,
         wave: this.wave,
@@ -1112,8 +1207,9 @@ export class BossEnemy extends BaseEnemy {
       destructionError = error;
     }
 
-    if (typeof gameEvents !== 'undefined' && gameEvents?.emit) {
-      gameEvents.emit('boss-defeated', payload);
+    const eventBus = this.getEventBus();
+    if (eventBus?.emit) {
+      eventBus.emit('boss-defeated', payload);
       GameDebugLogger.log('EVENT', 'boss-defeated event emitted', {
         id: this.id,
         wave: this.wave,
@@ -1169,6 +1265,12 @@ export class BossEnemy extends BaseEnemy {
     this.phaseHealthThresholds = [];
     this.phaseCount = BOSS_DEFAULTS.phaseCount ?? 3;
     this.nextPhaseIndex = 0;
+    this._phaseThresholdMaxHealth = null;
+    this.weaponPattern = null;
+    this.weaponPatterns = null;
+    this.movementConfig = null;
+    this.movementPhases = null;
+    this._lastMovementPhase = null;
 
     this.spreadTimer = 0;
     this.volleyTimer = 0;

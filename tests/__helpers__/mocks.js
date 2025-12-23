@@ -73,38 +73,6 @@ export function createEventBusMock(options = {}) {
 }
 
 /**
- * Create a ServiceRegistry mock compatible with the existing tests.
- *
- * @returns {{serviceRegistry: Map<string, any>, register: ReturnType<typeof vi.fn>, get: ReturnType<typeof vi.fn>, has: ReturnType<typeof vi.fn>, resolve: (name: string) => any}}
- * @example
- * const registry = createServiceRegistryMock();
- * registry.register('physics', {});
- * expect(registry.get('physics')).toEqual({});
- * expect(registry.resolve('physics')).toEqual({});
- */
-export function createServiceRegistryMock() {
-  const serviceRegistry = new Map();
-
-  const register = vi.fn((name, service) => {
-    serviceRegistry.set(name, service);
-    return service;
-  });
-
-  const get = vi.fn((name) => serviceRegistry.get(name));
-  const has = vi.fn((name) => serviceRegistry.has(name));
-
-  return {
-    serviceRegistry,
-    register,
-    get,
-    has,
-    resolve(name) {
-      return get(name);
-    },
-  };
-}
-
-/**
  * Create a deterministic RandomService stub based on the integration test patterns.
  *
  * @param {string} [seed] - Optional seed for documentation purposes; the stub behaves deterministically regardless of the value.
@@ -182,14 +150,3 @@ export function createAudioSystemStub() {
   };
 }
 
-/**
- * Create a spy-friendly game events mock backed by the event bus helpers.
- *
- * @returns {{listeners: Map<string, Set<Function>>, on: ReturnType<typeof vi.spyOn>, emit: ReturnType<typeof vi.spyOn>, off: ReturnType<typeof vi.spyOn>, clear: ReturnType<typeof vi.spyOn>, emitSilently: ReturnType<typeof vi.spyOn>}}
- * @example
- * const gameEvents = createGameEventsMock();
- * gameEvents.emit('player-moved', { x: 10 });
- */
-export function createGameEventsMock() {
-  return createEventBusMock({ includeEmitSilently: true, withSpies: true });
-}

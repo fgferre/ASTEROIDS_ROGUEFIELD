@@ -188,7 +188,7 @@ export class Hunter extends BaseEnemy {
             this.burstShotsRemaining--;
             this.burstDelayTimer = this.burstInterval || 0.1;
 
-            globalThis.gameEvents?.emit('enemy-fired', {
+            this.getEventBus()?.emit?.('enemy-fired', {
               source: this,
               position: { x: this.x, y: this.y },
               velocity: {

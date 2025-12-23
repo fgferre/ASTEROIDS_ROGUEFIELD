@@ -21,8 +21,6 @@ export class GarbageCollectionManager {
       typeof performance !== 'undefined'
         ? performance
         : { now: () => Date.now() };
-
-    this.tryRegisterService();
   }
 
   initialize() {
@@ -31,31 +29,6 @@ export class GarbageCollectionManager {
     }
 
     this.initialized = true;
-    this.tryRegisterService();
-  }
-
-  tryRegisterService() {
-    if (typeof gameServices === 'undefined') {
-      return;
-    }
-
-    if (
-      typeof gameServices.has === 'function' &&
-      gameServices.has('garbage-collector')
-    ) {
-      return;
-    }
-
-    if (typeof gameServices.register === 'function') {
-      try {
-        gameServices.register('garbage-collector', this);
-      } catch (error) {
-        console.warn(
-          '[GarbageCollectionManager] Failed to register in service locator',
-          error
-        );
-      }
-    }
   }
 
   /**

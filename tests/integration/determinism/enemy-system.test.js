@@ -6,6 +6,7 @@ import { createTestContainer } from '../../__helpers__/setup.js';
 function createEnemySystemWithSeed(seed) {
   const container = createTestContainer(seed);
   const random = container.resolve('random');
+  const eventBus = container.resolve('event-bus');
 
   const world = {
     getBounds() {
@@ -29,6 +30,7 @@ function createEnemySystemWithSeed(seed) {
   };
 
   const dependencies = {
+    eventBus,
     random,
     world,
     player,
@@ -73,7 +75,7 @@ function summarizeAsteroid(asteroid) {
 
 function snapshotRandomSeeds(system) {
   return {
-    base: system.services.random?.seed ?? null,
+    base: system.random?.seed ?? null,
     spawn: system.randomScopeSeeds?.spawn ?? null,
     variants: system.randomScopeSeeds?.variants ?? null,
     fragments: system.randomScopeSeeds?.fragments ?? null,

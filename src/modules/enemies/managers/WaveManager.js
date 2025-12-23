@@ -13,7 +13,7 @@
  *
  * @example
  * ```javascript
- * const waveManager = new WaveManager(enemySystem, eventBus);
+ * const waveManager = new WaveManager({ enemySystem, eventBus });
  * waveManager.startNextWave();
  * waveManager.update(deltaTime);
  * ```
@@ -51,26 +51,12 @@ export class WaveManager {
   /**
    * Creates a new Wave Manager.
    *
-   * @param {Object} enemySystem - Reference to EnemySystem
-   * @param {Object} eventBus - Event bus for wave events
+   * @param {Object} dependencies - Dependencies for WaveManager
+   * @param {Object} dependencies.enemySystem - Reference to EnemySystem
+   * @param {Object} dependencies.eventBus - Event bus for wave events
+   * @param {Object} dependencies.random - Random service override
    */
-  constructor(dependenciesOrEnemySystem = {}, legacyEventBus) {
-    const isLegacySignature =
-      arguments.length > 1 ||
-      !dependenciesOrEnemySystem ||
-      (typeof dependenciesOrEnemySystem === 'object' &&
-        dependenciesOrEnemySystem !== null &&
-        !('enemySystem' in dependenciesOrEnemySystem) &&
-        !('eventBus' in dependenciesOrEnemySystem) &&
-        !('random' in dependenciesOrEnemySystem));
-
-    const dependencies = isLegacySignature
-      ? {
-          enemySystem: dependenciesOrEnemySystem,
-          eventBus: legacyEventBus,
-        }
-      : dependenciesOrEnemySystem;
-
+  constructor(dependencies = {}) {
     this.dependencies = normalizeDependencies(dependencies);
 
     this.enemySystem =
@@ -80,7 +66,6 @@ export class WaveManager {
 
     this.eventBus =
       this.dependencies.eventBus ||
-      legacyEventBus ||
       resolveService('event-bus', this.dependencies) ||
       null;
 
@@ -1307,45 +1292,6 @@ export class WaveManager {
       default:
         return null;
     }
-  }
-
-  /**
-   * Selects a random variant weighted by wave number.
-   *
-   * @deprecated Asteroid variants are now delegated to EnemySystem.decideVariant().
-   * Retained for non-asteroid enemy types that still rely on the legacy
-   * WaveManager-driven variant rolls.
-   *
-   * @param {Array<string>} variants - Available variants
-   * @param {number} waveNumber - Current wave
-   * @returns {string} Selected variant
-   */
-  selectRandomVariant(
-    variants,
-    waveNumber,
-    random = this.getRandomScope('variants')
-  ) {
-    const variantRandom = this.resolveScopedRandom(
-      random,
-      'variants',
-      'variant-roll'
-    );
-
-    // Higher waves have more chance of rare variants
-    const roll = variantRandom.float();
-
-    if (waveNumber < 5) {
-      return 'common'; // Early waves are mostly common
-    }
-
-    if (roll < 0.5) return 'common';
-    if (roll < 0.7) return 'iron';
-    if (roll < 0.85) return 'gold';
-    if (roll < 0.95) return 'crystal';
-    if (roll < 0.98 && variants.includes('volatile')) return 'volatile';
-    if (variants.includes('parasite')) return 'parasite';
-
-    return 'common';
   }
 
   /**
