@@ -981,7 +981,9 @@ export default class EffectsSystem extends BaseSystem {
     for (let i = 0; i < this.particles.length; i += 1) {
       const particle = this.particles[i];
       if (particle) {
-        particle.draw(ctx);
+        if (typeof particle.draw === 'function') {
+          particle.draw(ctx);
+        }
       }
     }
 

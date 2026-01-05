@@ -16,6 +16,7 @@ const MAX_VISUAL_TILT = 0.3;
 const TILT_MULTIPLIER = 0.12;
 const MIN_OUTLINE_POINTS = 3;
 const EPSILON = 1e-6;
+const NEBULA_UPDATE_INTERVAL_MS = 120;
 
 function computePolygonArea(points) {
   if (!Array.isArray(points) || points.length < MIN_OUTLINE_POINTS) {
@@ -190,7 +191,20 @@ class SpaceSkyBackground {
     ];
 
     this.stars = [];
+    this.starSpriteCache = new Map();
     this.initialized = false;
+    this.atmosphereBuffer = {
+      canvas: null,
+      width: 0,
+      height: 0,
+    };
+    this.nebulaBuffer = {
+      canvas: null,
+      ctx: null,
+      width: 0,
+      height: 0,
+      lastUpdate: 0,
+    };
   }
 
   resolveRandomGenerator(randomGenerator) {
@@ -258,6 +272,7 @@ class SpaceSkyBackground {
 
     // 1. Rebuild Stars
     this.stars = [];
+    this.starSpriteCache.clear();
     this.layers.forEach((layer, layerIndex) => {
       layer.stars = [];
       for (let i = 0; i < layer.count; i++) {
@@ -274,6 +289,7 @@ class SpaceSkyBackground {
           blinkSpeed: 1 + this.randomFloat() * 2,
           jitter: this.randomFloat(),
         };
+        star.sprite = this.getStarSprite(star.size, star.color);
         layer.stars.push(star);
         this.stars.push(star);
       }
@@ -281,19 +297,19 @@ class SpaceSkyBackground {
 
     // 2. Generate Nebula Clouds (Deep Atmosphere)
     this.nebulaClouds = [];
-    const cloudCount = 15;
+    const cloudCount = 20;
     const colors = [
-      'rgba(60, 0, 100, 0.04)', // Deep Purple
-      'rgba(0, 40, 100, 0.04)', // Deep Blue
-      'rgba(100, 0, 60, 0.03)', // Magenta Haze
-      'rgba(0, 80, 80, 0.03)', // Cyan Haze
+      'rgba(60, 0, 100, 0.14)', // Deep Purple
+      'rgba(0, 40, 100, 0.12)', // Deep Blue
+      'rgba(100, 0, 60, 0.1)', // Magenta Haze
+      'rgba(0, 80, 80, 0.1)', // Cyan Haze
     ];
 
     for (let i = 0; i < cloudCount; i++) {
       this.nebulaClouds.push({
         x: this.randomRange(0, w),
         y: this.randomRange(0, h),
-        radius: 300 + this.randomFloat() * 500,
+        radius: 220 + this.randomFloat() * 360,
         color: colors[this.randomInt(0, colors.length - 1)],
         vx: (this.randomFloat() - 0.5) * 5, // Very slow drift
         vy: (this.randomFloat() - 0.5) * 5,
@@ -301,6 +317,9 @@ class SpaceSkyBackground {
       });
     }
 
+    this.buildAtmosphereLayer(w, h);
+    this.ensureNebulaBuffer(w, h);
+    this.nebulaBuffer.lastUpdate = 0;
     this.initialized = true;
   }
 
@@ -332,6 +351,8 @@ class SpaceSkyBackground {
     // 1. Clear background - deep space
     ctx.fillStyle = '#030810';
     ctx.fillRect(0, 0, width, height);
+
+    this.drawAtmosphere(ctx, width, height);
 
     // 2. Draw subtle nebula clouds
     this.drawNebula(ctx);
@@ -371,7 +392,20 @@ class SpaceSkyBackground {
       const blink = Math.sin(time * star.blinkSpeed + star.phase);
       const alpha = 0.6 + 0.4 * blink;
 
-      // Neon color with glow
+      const sprite = star.sprite;
+      if (sprite && sprite.canvas) {
+        ctx.globalAlpha = alpha;
+        ctx.drawImage(
+          sprite.canvas,
+          star.x - sprite.halfSize,
+          star.y - sprite.halfSize
+        );
+        ctx.globalAlpha = 1;
+        return;
+      }
+
+      // Neon color with glow (fallback path)
+      ctx.globalAlpha = 1;
       const c = star.color;
       ctx.fillStyle = `rgba(${c.r}, ${c.g}, ${c.b}, ${alpha})`;
 
@@ -395,9 +429,50 @@ class SpaceSkyBackground {
   drawNebula(ctx) {
     if (!this.nebulaClouds) return;
 
-    const time = Date.now() / 1000;
     const width = this.width;
     const height = this.height;
+    const now = performance.now();
+    const time = now / 1000;
+
+    if (this.ensureNebulaBuffer(width, height)) {
+      if (
+        !this.nebulaBuffer.lastUpdate ||
+        now - this.nebulaBuffer.lastUpdate >= NEBULA_UPDATE_INTERVAL_MS
+      ) {
+        this.renderNebulaLayer(
+          this.nebulaBuffer.ctx,
+          time,
+          width,
+          height,
+          true
+        );
+        this.nebulaBuffer.lastUpdate = now;
+      }
+
+      ctx.drawImage(this.nebulaBuffer.canvas, 0, 0, width, height);
+      return;
+    }
+
+    this.renderNebulaLayer(ctx, time, width, height, false);
+  }
+
+  drawAtmosphere(ctx, width, height) {
+    const buffer = this.atmosphereBuffer?.canvas;
+    if (!buffer) {
+      return;
+    }
+
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.drawImage(buffer, 0, 0, width, height);
+    ctx.restore();
+  }
+
+  renderNebulaLayer(ctx, time, width, height, clearFirst) {
+    if (!ctx) return;
+    if (clearFirst) {
+      ctx.clearRect(0, 0, width, height);
+    }
 
     this.nebulaClouds.forEach((cloud) => {
       // Slow drift
@@ -419,6 +494,179 @@ class SpaceSkyBackground {
       // Draw larger rect to cover gradient area
       ctx.fillRect(x - r, y - r, r * 2, r * 2);
     });
+  }
+
+  createOffscreenCanvas(width, height) {
+    const safeWidth = Math.max(1, Math.floor(width));
+    const safeHeight = Math.max(1, Math.floor(height));
+
+    if (
+      typeof document !== 'undefined' &&
+      typeof document.createElement === 'function'
+    ) {
+      const canvas = document.createElement('canvas');
+      canvas.width = safeWidth;
+      canvas.height = safeHeight;
+      return canvas;
+    }
+
+    if (typeof OffscreenCanvas !== 'undefined') {
+      return new OffscreenCanvas(safeWidth, safeHeight);
+    }
+
+    return null;
+  }
+
+  buildAtmosphereLayer(width, height) {
+    const safeWidth = Math.max(1, Math.floor(width));
+    const safeHeight = Math.max(1, Math.floor(height));
+
+    let canvas = this.atmosphereBuffer.canvas;
+    if (
+      !canvas ||
+      this.atmosphereBuffer.width !== safeWidth ||
+      this.atmosphereBuffer.height !== safeHeight
+    ) {
+      canvas = this.createOffscreenCanvas(safeWidth, safeHeight);
+    }
+    if (!canvas || typeof canvas.getContext !== 'function') {
+      this.atmosphereBuffer.canvas = null;
+      this.atmosphereBuffer.width = 0;
+      this.atmosphereBuffer.height = 0;
+      return;
+    }
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      this.atmosphereBuffer.canvas = null;
+      this.atmosphereBuffer.width = 0;
+      this.atmosphereBuffer.height = 0;
+      return;
+    }
+
+    ctx.clearRect(0, 0, safeWidth, safeHeight);
+    const gradient = ctx.createLinearGradient(0, 0, safeWidth, safeHeight);
+    gradient.addColorStop(0, 'rgba(20, 60, 110, 0.22)');
+    gradient.addColorStop(1, 'rgba(90, 30, 70, 0.18)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, safeWidth, safeHeight);
+
+    const glowCount = 4;
+    for (let i = 0; i < glowCount; i += 1) {
+      const x = this.randomRange(0, safeWidth);
+      const y = this.randomRange(0, safeHeight);
+      const radius = 160 + this.randomFloat() * 240;
+      const glow = ctx.createRadialGradient(x, y, 0, x, y, radius);
+      glow.addColorStop(0, 'rgba(90, 160, 200, 0.12)');
+      glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = glow;
+      ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
+    }
+
+    this.atmosphereBuffer.canvas = canvas;
+    this.atmosphereBuffer.width = safeWidth;
+    this.atmosphereBuffer.height = safeHeight;
+  }
+
+  getStarSprite(size, color) {
+    if (!Number.isFinite(size) || !color) {
+      return null;
+    }
+
+    const sizeKey = Number(size).toFixed(2);
+    const r = Number.isFinite(color.r) ? color.r : 255;
+    const g = Number.isFinite(color.g) ? color.g : 255;
+    const b = Number.isFinite(color.b) ? color.b : 255;
+    const key = `${sizeKey}:${r},${g},${b}`;
+
+    if (this.starSpriteCache.has(key)) {
+      return this.starSpriteCache.get(key);
+    }
+
+    const sprite = this.createStarSprite(Number(sizeKey), { r, g, b });
+    if (sprite) {
+      this.starSpriteCache.set(key, sprite);
+    }
+
+    return sprite;
+  }
+
+  createStarSprite(size, color) {
+    const radius = Math.max(0.5, size / 2);
+    const diameter = Math.max(2, Math.ceil(radius * 2 + 2));
+    const canvas = this.createOffscreenCanvas(diameter, diameter);
+    if (!canvas || typeof canvas.getContext !== 'function') {
+      return null;
+    }
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return null;
+    }
+
+    const half = diameter / 2;
+    ctx.save();
+    ctx.translate(half, half);
+    ctx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
+    ctx.beginPath();
+    ctx.moveTo(0, -radius);
+    ctx.lineTo(radius, 0);
+    ctx.lineTo(0, radius);
+    ctx.lineTo(-radius, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    return {
+      canvas,
+      halfSize: half,
+      size: diameter,
+    };
+  }
+
+  ensureNebulaBuffer(width, height) {
+    if (!Number.isFinite(width) || !Number.isFinite(height)) {
+      return false;
+    }
+
+    const safeWidth = Math.max(1, Math.floor(width));
+    const safeHeight = Math.max(1, Math.floor(height));
+
+    if (
+      this.nebulaBuffer.canvas &&
+      this.nebulaBuffer.ctx &&
+      this.nebulaBuffer.width === safeWidth &&
+      this.nebulaBuffer.height === safeHeight
+    ) {
+      return true;
+    }
+
+    const canvas = this.createOffscreenCanvas(safeWidth, safeHeight);
+    if (!canvas || typeof canvas.getContext !== 'function') {
+      this.nebulaBuffer.canvas = null;
+      this.nebulaBuffer.ctx = null;
+      this.nebulaBuffer.width = 0;
+      this.nebulaBuffer.height = 0;
+      this.nebulaBuffer.lastUpdate = 0;
+      return false;
+    }
+
+    const bufferCtx = canvas.getContext('2d');
+    if (!bufferCtx) {
+      this.nebulaBuffer.canvas = null;
+      this.nebulaBuffer.ctx = null;
+      this.nebulaBuffer.width = 0;
+      this.nebulaBuffer.height = 0;
+      this.nebulaBuffer.lastUpdate = 0;
+      return false;
+    }
+
+    this.nebulaBuffer.canvas = canvas;
+    this.nebulaBuffer.ctx = bufferCtx;
+    this.nebulaBuffer.width = safeWidth;
+    this.nebulaBuffer.height = safeHeight;
+    this.nebulaBuffer.lastUpdate = 0;
+    return true;
   }
 
   drawVignette(ctx, width, height) {
