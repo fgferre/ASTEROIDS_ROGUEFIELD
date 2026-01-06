@@ -78,6 +78,18 @@ export class PerformanceMonitor {
     this.lastAutoLogTime = 0;
     this.sessionLogs = [];
 
+    // Phase timing (granular per-system metrics)
+    this.phaseTiming = {
+      background: { current: 0, history: [], avg: 0 },
+      entities: { current: 0, history: [], avg: 0 },
+      particles: { current: 0, history: [], avg: 0 },
+      ui: { current: 0, history: [], avg: 0 },
+      combat: { current: 0, history: [], avg: 0 },
+      effects: { current: 0, history: [], avg: 0 },
+    };
+    this.phaseHistoryLimit = 60;
+    this.activeMeasures = new Map();
+
     console.log('[PerformanceMonitor] Initialized');
   }
 
@@ -358,6 +370,7 @@ export class PerformanceMonitor {
       },
       memory: this.getMemoryUsage(),
       metrics: { ...this.metrics },
+      phases: this.getPhaseReport(),
       warnings: [...this.warnings],
     };
   }
@@ -402,7 +415,67 @@ export class PerformanceMonitor {
     this.totalFrames = 0;
     this.warnings = [];
 
+    // Reset phase timing
+    for (const phase of Object.keys(this.phaseTiming)) {
+      this.phaseTiming[phase] = { current: 0, history: [], avg: 0 };
+    }
+    this.activeMeasures.clear();
+
     console.log('[PerformanceMonitor] Reset');
+  }
+
+  /**
+   * Starts timing a named phase.
+   * @param {string} label - Phase name (e.g., 'background', 'particles')
+   */
+  startMeasure(label) {
+    this.activeMeasures.set(label, performance.now());
+  }
+
+  /**
+   * Ends timing a named phase and records the result.
+   * @param {string} label - Phase name
+   */
+  endMeasure(label) {
+    const startTime = this.activeMeasures.get(label);
+    if (startTime === undefined) return;
+
+    const elapsed = performance.now() - startTime;
+    this.activeMeasures.delete(label);
+
+    // Create phase entry if it doesn't exist
+    if (!this.phaseTiming[label]) {
+      this.phaseTiming[label] = { current: 0, history: [], avg: 0 };
+    }
+
+    const phase = this.phaseTiming[label];
+    phase.current = elapsed;
+    phase.history.push(elapsed);
+
+    if (phase.history.length > this.phaseHistoryLimit) {
+      phase.history.shift();
+    }
+
+    // Update rolling average
+    const sum = phase.history.reduce((a, b) => a + b, 0);
+    phase.avg = sum / phase.history.length;
+  }
+
+  /**
+   * Gets a breakdown of phase timings.
+   * @returns {Object} Object with phase names as keys and { current, avg } as values
+   */
+  getPhaseReport() {
+    const report = {};
+    for (const [label, data] of Object.entries(this.phaseTiming)) {
+      if (data.history.length > 0) {
+        report[label] = {
+          current: Number(data.current.toFixed(2)),
+          avg: Number(data.avg.toFixed(2)),
+        };
+      }
+    }
+    return report;
   }
 
   /**
@@ -411,5 +484,103 @@ export class PerformanceMonitor {
   logReport() {
     const report = this.getReport();
     console.log('[PerformanceMonitor] Report:', report);
+  }
+
+  /**
+   * Creates and shows an on-screen performance overlay.
+   * Toggle visibility with F3 key.
+   */
+  showOverlay() {
+    if (this.overlayElement) {
+      this.overlayElement.style.display = 'block';
+      return;
+    }
+
+    // Create overlay element
+    this.overlayElement = document.createElement('div');
+    this.overlayElement.id = 'perf-overlay';
+    this.overlayElement.style.cssText = `
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      background: rgba(0, 0, 0, 0.85);
+      color: #0f0;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      padding: 10px;
+      border: 1px solid #0f0;
+      border-radius: 4px;
+      z-index: 99999;
+      pointer-events: none;
+      min-width: 200px;
+    `;
+    document.body.appendChild(this.overlayElement);
+
+    // Start update loop
+    this.overlayInterval = setInterval(() => this.updateOverlay(), 100);
+
+    // Add keyboard toggle (F3)
+    if (!this.overlayKeyListener) {
+      this.overlayKeyListener = (e) => {
+        if (e.key === 'F3') {
+          e.preventDefault();
+          this.toggleOverlay();
+        }
+      };
+      document.addEventListener('keydown', this.overlayKeyListener);
+    }
+
+    console.log('[PerformanceMonitor] Overlay enabled (F3 to toggle)');
+  }
+
+  /**
+   * Updates the overlay content.
+   */
+  updateOverlay() {
+    if (!this.overlayElement || this.overlayElement.style.display === 'none')
+      return;
+
+    const m = this.metrics;
+    const phases = this.getPhaseReport();
+    const fps = this.fps.toFixed(0);
+    const frameTime = this.getAverageFrameTime().toFixed(1);
+
+    this.overlayElement.innerHTML = `
+      <div style="color:#ff0;font-weight:bold;margin-bottom:5px;">⚡ PERF MONITOR</div>
+      <div>FPS: <span style="color:${this.fps < 50 ? '#f00' : '#0f0'}">${fps}</span> (${frameTime}ms)</div>
+      <div style="margin-top:5px;color:#0ff;">─── BULLETS ───</div>
+      <div>Player: ${m.projectilePlayerCount || 0}</div>
+      <div>Enemy: ${m.projectileEnemyCount || 0}</div>
+      <div>Trails: ${m.projectilePlayerTrailPoints || 0}</div>
+      <div>Update: ${(m.projectileUpdateMs || 0).toFixed(1)}ms</div>
+      <div>Render: ${(m.projectileRenderMs || 0).toFixed(1)}ms</div>
+      <div style="margin-top:5px;color:#ff0;">─── ENTITIES ───</div>
+      <div>Enemies: ${m.enemies || 0}</div>
+      <div>Orbs: ${m.orbs || 0}</div>
+      <div>Particles: ${m.particles || 0}</div>
+      ${phases.render ? `<div style="margin-top:5px;color:#f0f;">─── RENDER ───</div><div>Total: ${phases.render.avg.toFixed(1)}ms</div>` : ''}
+      <div style="margin-top:5px;color:#888;font-size:10px;">F3 to toggle</div>
+    `;
+  }
+
+  /**
+   * Toggles overlay visibility.
+   */
+  toggleOverlay() {
+    if (!this.overlayElement) {
+      this.showOverlay();
+      return;
+    }
+    const isVisible = this.overlayElement.style.display !== 'none';
+    this.overlayElement.style.display = isVisible ? 'none' : 'block';
+  }
+
+  /**
+   * Hides the overlay.
+   */
+  hideOverlay() {
+    if (this.overlayElement) {
+      this.overlayElement.style.display = 'none';
+    }
   }
 }

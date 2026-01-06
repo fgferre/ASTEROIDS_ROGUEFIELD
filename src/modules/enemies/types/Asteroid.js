@@ -390,6 +390,8 @@ export class Asteroid extends BaseEnemy {
     this.random = null;
     this.randomScopes = null;
     this.randomScopeSeeds = null;
+    this.spriteCache = null;
+    this.spriteCacheStage = -1;
   }
 
   computeWaveHealthMultiplier(wave) {
@@ -1049,13 +1051,29 @@ export class Asteroid extends BaseEnemy {
    * Renders the asteroid.
    * Overrides BaseEnemy.draw() to provide asteroid-specific rendering.
    */
-  draw(ctx) {
-    if (!ctx) return;
+  invalidateCache() {
+    this.spriteCache = null;
+    this.spriteCacheStage = -1;
+  }
 
-    // [NEO-ARCADE] Use NeonGraphics for Asteroid rendering
-    ctx.save();
+  ensureSpriteCache() {
+    if (this.spriteCache && this.spriteCacheStage === this.crackStage) {
+      return this.spriteCache;
+    }
 
-    // Prepare geometry
+    const padding = 20;
+    const diameter = Math.ceil((this.radius + padding) * 2);
+    const offset = Math.ceil(this.radius + padding);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = diameter;
+    canvas.height = diameter;
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) return null;
+
+    ctx.translate(offset, offset);
+
     const path = new Path2D();
     if (this.vertices.length > 0) {
       this.vertices.forEach((v, i) => {
@@ -1065,23 +1083,11 @@ export class Asteroid extends BaseEnemy {
       path.closePath();
     }
 
-    // Determine color based on variant
     const colors = this.getVariantColors();
-    // Default to Neon Pink for common if not specified (just for contrast), or keep original logic
-    const baseColor = colors.stroke || '#8B4513';
+    const neonColor = colors.stroke || '#8B4513';
 
-    // Map variant colors to Neon Palette overrides if desired, or just use the stroke color
-    // Standard Asteroid: Neon Pink/Red -> #FF0055? Or stick to Rock-like #A0522D but neon?
-    // Let's stick to the color provided by getVariantColors but boost it
-    const neonColor = baseColor; // Use the variant's stroke color as the neon color
-
-    ctx.translate(this.x, this.y);
-    ctx.rotate(this.rotation);
-
-    // Draw main body
     NeonGraphics.drawShape(ctx, path, neonColor, 2.0, true);
 
-    // Draw cracks
     if (this.crackStage > 0) {
       for (let stage = 0; stage < this.crackStage; stage += 1) {
         const layer = this.crackLayers[stage];
@@ -1090,26 +1096,54 @@ export class Asteroid extends BaseEnemy {
 
         segments.forEach((line) => {
           const crackPath = new Path2D();
-          crackPath.moveTo(line.x1, line.y1);
-          crackPath.lineTo(line.x2, line.y2);
-          // Cracks are white/bright
+          const x1 = line.x1 ?? line.start?.x ?? 0;
+          const y1 = line.y1 ?? line.start?.y ?? 0;
+          const x2 = line.x2 ?? line.end?.x ?? 0;
+          const y2 = line.y2 ?? line.end?.y ?? 0;
+          crackPath.moveTo(x1, y1);
+          crackPath.lineTo(x2, y2);
           NeonGraphics.drawPath(ctx, crackPath, '#FFFFFF', 1.0, 1.5);
         });
       }
     }
 
-    // Handle Volatile/Pulse effects via inner glow handled by drawShape naturally?
-    // Or add specific overlay
-    const isVolatile = this.behavior?.type === 'volatile';
-    if (isVolatile && this.variantState?.armed) {
-      // Blink red
-      const blink = Math.sin(Date.now() * 0.02) > 0;
-      if (blink) {
-        NeonGraphics.drawShape(ctx, path, '#FF0000', 4.0, false);
-      }
-    }
+    this.spriteCache = { canvas, offset };
+    this.spriteCacheStage = this.crackStage;
+    return this.spriteCache;
+  }
 
-    ctx.restore();
+  draw(ctx) {
+    if (!ctx) return;
+
+    const sprite = this.ensureSpriteCache();
+
+    if (sprite) {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.rotation);
+
+      // [NEO-ARCADE] Use additive blending for cached neon sprites to maintain brightness
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.drawImage(sprite.canvas, -sprite.offset, -sprite.offset);
+
+      const isVolatile = this.behavior?.type === 'volatile';
+      if (isVolatile && this.variantState?.armed) {
+        const blink = Math.sin(Date.now() * 0.02) > 0;
+        if (blink) {
+          const path = new Path2D();
+          if (this.vertices.length > 0) {
+            this.vertices.forEach((v, i) => {
+              if (i === 0) path.moveTo(v.x, v.y);
+              else path.lineTo(v.x, v.y);
+            });
+            path.closePath();
+          }
+          NeonGraphics.drawShape(ctx, path, '#FF0000', 4.0, false);
+        }
+      }
+
+      ctx.restore();
+    }
   }
 
   parseColor(color) {

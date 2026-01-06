@@ -854,6 +854,27 @@ class MenuBackgroundSystem extends BaseSystem {
     this.scene.add(fillLight);
   }
 
+  createStarTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 32;
+    const ctx = canvas.getContext('2d');
+
+    // Radial gradient for soft star look
+    const grad = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+    grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    grad.addColorStop(0.4, 'rgba(255, 255, 255, 0.8)');
+    grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(16, 16, 16, 0, Math.PI * 2);
+    ctx.fill();
+
+    const texture = new this.THREE.CanvasTexture(canvas);
+    return texture;
+  }
+
   createStarLayers() {
     const { THREE } = this;
     const layerConfigs = [
@@ -891,8 +912,9 @@ class MenuBackgroundSystem extends BaseSystem {
           config.distance,
           config.pixelSize
         ),
+        map: this.createStarTexture(), // [NEO-ARCADE] Use texture for round stars
         transparent: true,
-        opacity: this.randomFloat('starfield') * 0.35 + 0.55,
+        opacity: this.randomFloat('starfield') * 0.35 + 0.65, // [NEO-ARCADE] Boost opacity
         fog: false,
       });
       material.sizeAttenuation = true;
@@ -988,6 +1010,7 @@ class MenuBackgroundSystem extends BaseSystem {
     const dustMaterial = new THREE.PointsMaterial({
       size: 0.7,
       color: 0x66aaff,
+      map: this.createStarTexture(),
       transparent: true,
       opacity: 0.35,
       blending: THREE.AdditiveBlending,
@@ -1094,8 +1117,8 @@ class MenuBackgroundSystem extends BaseSystem {
     const positions = geometry.attributes.position;
     const vertex = new THREE.Vector3();
     const temp = new THREE.Vector3();
-    const noiseScale = this.randomFloat('assets') * 0.2 + 0.2;
-    const distortion = this.randomFloat('assets') * 0.3 + 0.2;
+    const noiseScale = this.randomFloat('assets') * 0.15 + 0.1; // [NEO-ARCADE] Smoother, larger features
+    const distortion = this.randomFloat('assets') * 0.15 + 0.1; // [NEO-ARCADE] Less intense distortion
 
     for (let i = 0; i < positions.count; i += 1) {
       vertex.fromBufferAttribute(positions, i);
@@ -1209,7 +1232,7 @@ class MenuBackgroundSystem extends BaseSystem {
     }
 
     const normalData = new Uint8Array(size * size * 4);
-    const normalStrength = 4;
+    const normalStrength = 1.0; // [NEO-ARCADE] Softer normal map (was 4)
     const sampleHeight = (sx, sy) => {
       const xIndex = Math.max(0, Math.min(size - 1, sx));
       const yIndex = Math.max(0, Math.min(size - 1, sy));
@@ -1415,20 +1438,7 @@ class MenuBackgroundSystem extends BaseSystem {
         ${shader.fragmentShader}
       `;
 
-      // 1. Experimental Beveling: Rounding edges via normal manipulation
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <normal_fragment_begin>',
-        `
-        #include <normal_fragment_begin>
-        // Detect geometric edge sharpness using derivatives
-        vec3 faceNormal = normalize(cross(dFdx(vViewPosition), dFdy(vViewPosition)));
-        float edgeCurvature = 1.0 - clamp(dot(normal, faceNormal), 0.0, 1.0);
-        // Warp normal towards face normal to "round" the sharp transition
-        normal = normalize(mix(normal, faceNormal, -edgeCurvature * bevelStrength * bevelSharpness));
-        `
-      );
-
-      // 2. Iridiscence & Alpha Feathering
+      // 1. Iridescence & Alpha Feathering
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <alphamap_fragment>',
         `
@@ -1442,8 +1452,8 @@ class MenuBackgroundSystem extends BaseSystem {
         vec3 iridColor = vec3(0.1, 0.7, 1.0) * pow(fresnel, 2.5) * iridIntensity;
         diffuseColor.rgb += iridColor;
         
-        // Edge Feathering
-        float alphaFeather = clamp(1.0 - fresnel * edgeFeatherStrength, 0.35, 1.0);
+        // Edge Feathering - [NEO-ARCADE] Tweaked to be less transparent
+        float alphaFeather = clamp(1.0 - fresnel * edgeFeatherStrength * 0.5, 0.85, 1.0);
         diffuseColor.a *= alphaFeather;
         `
       );

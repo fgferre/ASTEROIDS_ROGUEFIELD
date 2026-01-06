@@ -338,7 +338,51 @@ export class RenderComponent {
       return;
     }
 
+    // [NEO-ARCADE] Per-Instance Baking: Check/Create Cache
     const strategyName = enemy.renderStrategy || this.strategy;
+    if (
+      strategyName.startsWith('procedural') &&
+      typeof document !== 'undefined'
+    ) {
+      const sprite = this.ensureSpriteCache(enemy, context, strategyName);
+      if (sprite) {
+        ctx.save();
+        ctx.translate(enemy.x, enemy.y);
+        ctx.rotate(enemy.rotation || 0);
+
+        // Draw Baked Sprite
+        ctx.drawImage(sprite.canvas, -sprite.offset, -sprite.offset);
+
+        // [Dynamic Overlays that can't be baked]
+        // 1. Thrust (Variable)
+        if (strategyName.includes('triangle')) {
+          this.drawDynamicThrust(ctx, enemy, context);
+        }
+        // 2. Turret (Independent Rotation)
+        if (strategyName.includes('diamond')) {
+          this.drawDynamicTurret(ctx, enemy, context, sprite.size);
+        }
+        // 3. Pulse (Scale Animation for Mines) - Baked sprite is static, we scale the IMAGE
+        if (strategyName.includes('sphere')) {
+          // Sphere is special: The sprite is the orb. We pulse-scale it here.
+          // The base drawImage above drew it at 1.0 scale. We might need to redraw or
+          // adjust the sprite drawing logic for spheres.
+          // Actually, for Sphere, let's skip the generic draw above and handle custom scaling.
+        } else if (strategyName.includes('boss')) {
+          // Boss Aura is dynamic
+          this.drawDynamicBossAura(ctx, enemy, context, sprite.size);
+        }
+
+        ctx.restore();
+
+        if (this.config.debug) {
+          drawDebugInfo({ enemy, ctx });
+        }
+        return;
+      }
+    }
+
+    // Fallback: Real-time rendering
     const handler =
       this.strategies.get(strategyName) || this.strategies.get('delegate');
 
@@ -349,6 +393,184 @@ export class RenderComponent {
 
     if (this.config.debug) {
       drawDebugInfo({ enemy, ctx, colors });
+    }
+  }
+
+  ensureSpriteCache(enemy, context, strategyName) {
+    // 1. Invalidations
+    // Boss: Phase change changes colors -> invalidate
+    if (strategyName.includes('boss')) {
+      const phase = enemy.currentPhase || 0;
+      if (enemy.spriteCachePhase !== phase) {
+        enemy.spriteCache = null;
+        enemy.spriteCachePhase = phase;
+      }
+    }
+
+    if (enemy.spriteCache) {
+      return enemy.spriteCache;
+    }
+
+    // 2. Determine Size
+    let size = enemy.radius ?? enemy.size ?? 16;
+    if (strategyName.includes('boss')) size = 60; // Boss base size
+
+    // Padding for glows/strokes
+    const padding = size * 1.5;
+    const canvasSize = Math.ceil((size + padding) * 2);
+    const offset = canvasSize / 2;
+
+    const offscreen = document.createElement('canvas');
+    offscreen.width = canvasSize;
+    offscreen.height = canvasSize;
+    const ctx = offscreen.getContext('2d');
+
+    // 3. Bake
+    ctx.translate(offset, offset);
+
+    // Resolve props
+    const colors = context.colors ?? resolvePalette(enemy);
+    const presets = context.presets ?? resolvePresets(enemy);
+
+    // We use the existing renderers but strip dynamic parts like Thrust/Turret/Pulse/Aura
+    // Those are drawn real-time on top.
+    const shape =
+      this.config?.shape ??
+      enemy.renderShape ??
+      (strategyName.includes('triangle')
+        ? 'triangle'
+        : strategyName.includes('diamond')
+          ? 'diamond'
+          : strategyName.includes('sphere')
+            ? 'sphere'
+            : strategyName.includes('boss')
+              ? 'boss'
+              : 'triangle');
+
+    const renderer = shapeRenderers[shape];
+    if (renderer) {
+      // Disable dynamic flags for baking
+      const bakeConfig = {
+        ...this.config,
+        showThrust: false, // Dynamic
+        showTurret: false, // Dynamic rotation
+        showPulse: false, // Dynamic scaling
+        showAura: false, // Dynamic animation
+        showPhaseColor: true, // Baked into boss hull
+      };
+
+      // Mock enemy for static rotation
+      const mockEnemy = {
+        ...enemy,
+        rotation: 0,
+        turretAngle: 0,
+        system: { time: 0 }, // Fix time for consistent bake
+      };
+
+      renderer({
+        enemy: mockEnemy,
+        ctx,
+        colors: colors || {},
+        presets: presets || {},
+        size,
+        config: bakeConfig,
+      });
+    }
+
+    enemy.spriteCache = {
+      canvas: offscreen,
+      offset,
+      size,
+      strategy: strategyName,
+    };
+
+    return enemy.spriteCache;
+  }
+
+  drawDynamicThrust(ctx, enemy, context) {
+    const size = enemy.radius ?? 12;
+    const presets = context.presets ?? resolvePresets(enemy);
+    const colors = context.colors ?? resolvePalette(enemy);
+
+    // Extracted from 'triangle' renderer
+    const thrust =
+      typeof enemy.getThrustIntensity === 'function'
+        ? enemy.getThrustIntensity()
+        : enemy.thrustIntensity ?? enemy._renderThrust ?? 0;
+
+    const exhaustPreset = presets.exhaust ?? {};
+    if (exhaustPreset.enabled !== false && thrust > 0) {
+      const exhaustColor =
+        exhaustPreset.color ?? colors.exhaust ?? 'rgba(255, 200, 120, 0.65)';
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.2, size * 0.65);
+      ctx.lineTo(-size * (0.7 + thrust * 0.5), 0);
+      ctx.lineTo(-size * 0.2, -size * 0.65);
+      ctx.closePath();
+      ctx.fillStyle = exhaustColor;
+      ctx.globalAlpha = 0.6 + thrust * 0.4;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  drawDynamicTurret(ctx, enemy, context, size) {
+    const effectiveSize = size ?? 16;
+    const presets = context.presets ?? resolvePresets(enemy);
+    const colors = context.colors ?? resolvePalette(enemy);
+    const turretPreset = presets.turret ?? {};
+
+    // Relative rotation
+    const turretAngle = enemy.turretAngle ?? enemy.rotation ?? 0;
+    const relRotation = turretAngle - (enemy.rotation ?? 0);
+
+    if (turretPreset?.enabled !== false) {
+      ctx.save();
+      ctx.rotate(relRotation);
+      ctx.beginPath();
+      ctx.roundRect(
+        effectiveSize * 0.2,
+        -effectiveSize * 0.15,
+        effectiveSize * 0.9,
+        effectiveSize * 0.3,
+        effectiveSize * 0.1
+      );
+      ctx.fillStyle = turretPreset.fill ?? colors.turret ?? '#ffe6a6';
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  drawDynamicBossAura(ctx, enemy, context, size) {
+    // Extracted from 'boss' renderer
+    const effectiveSize = size ?? 60;
+    const presets = context.presets ?? resolvePresets(enemy);
+    const colors = context.colors ?? resolvePalette(enemy);
+    const auraPreset = presets.aura ?? {};
+
+    const auraPulse = this.config?.auraPulse ?? auraPreset.pulse ?? 0.18;
+    const pulseSpeed = this.config?.pulseSpeed ?? auraPreset.speed ?? 1.2;
+    const time = enemy.system?.time ?? performance.now() / 1000;
+    const pulse = 1 + Math.sin(time * pulseSpeed) * auraPulse;
+
+    if (auraPreset?.enabled !== false) {
+      const gradient = ctx.createRadialGradient(
+        0,
+        0,
+        effectiveSize,
+        0,
+        0,
+        effectiveSize * (1.5 * pulse)
+      );
+      const innerColor =
+        auraPreset.inner ?? colors.aura ?? 'rgba(255, 120, 90, 0.4)';
+      const outerColor = auraPreset.outer ?? 'rgba(120, 20, 10, 0)';
+      gradient.addColorStop(0, innerColor);
+      gradient.addColorStop(1, outerColor);
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(0, 0, effectiveSize * 1.5 * pulse, 0, TAU);
+      ctx.fill();
     }
   }
 }

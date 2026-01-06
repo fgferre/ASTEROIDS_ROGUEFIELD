@@ -24,6 +24,10 @@ import {
   isDevEnvironment,
 } from './utils/dev/GameDebugLogger.js';
 
+// [NEO-ARCADE] Warmup imports
+import { RenderComponent } from './modules/enemies/components/RenderComponent.js';
+import { warmupProjectileCache } from './utils/drawEnemyProjectile.js';
+
 // Dependency Injection System (Phase 2.1)
 import { DIContainer } from './core/DIContainer.js';
 import { ServiceRegistry } from './core/ServiceRegistry.js';
@@ -105,7 +109,9 @@ function logServiceRegistrationFlow({ reason = 'bootstrap' } = {}) {
   console.log(
     '2) ServiceRegistry.setupServices(diContainer) registers all services from manifest.'
   );
-  console.log('3) bootstrapServices resolves services for eager initialization.');
+  console.log(
+    '3) bootstrapServices resolves services for eager initialization.'
+  );
 
   if (typeof console.table === 'function') {
     console.table(serviceSnapshot);
@@ -189,8 +195,14 @@ function initializeDependencyInjection(manifestContext) {
       // Enable auto-logging every 10 seconds
       performanceMonitor.enableAutoLog(10000);
 
+      // Expose performanceMonitor for console access
+      window.performanceMonitor = performanceMonitor;
+
+      // Enable on-screen performance overlay (F3 to toggle)
+      performanceMonitor.showOverlay();
+
       console.log('[App] ℹ Auto-logging enabled (logs saved to localStorage)');
-      console.log('[App] ℹ Get logs: localStorage.getItem("performanceLog")');
+      console.log('[App] ℹ Performance overlay enabled (F3 to toggle)');
       exposeDebugCommands({ showBanner: true });
     }
 
@@ -443,6 +455,20 @@ function init() {
       }
     }
 
+    // [NEO-ARCADE] OPTIMIZATION: Warmup Caches to prevent lag spikes
+    try {
+      console.log('[App] Warming up render caches...');
+      if (typeof RenderComponent.warmup === 'function') {
+        RenderComponent.warmup();
+      }
+      if (typeof warmupProjectileCache === 'function') {
+        warmupProjectileCache();
+      }
+      console.log('[App] Render caches warmed up.');
+    } catch (e) {
+      console.warn('[App] Cache warmup failed (non-fatal):', e);
+    }
+
     requestAnimationFrame(gameLoop);
   } catch (error) {
     console.error('Erro na inicialização:', error);
@@ -571,11 +597,28 @@ function gameLoop(currentTime) {
         };
       }
 
-      performanceMonitor.updateMetrics(metricsCache);
       metricsCacheFrameCount++;
     }
 
     renderGame();
+
+    // Capture render timing AFTER render completes
+    if (shouldUpdateGame && metricsCacheFrameCount % 5 === 1) {
+      const combat = gameSystemServices?.['combat'];
+      const projectilePerf =
+        combat && typeof combat.getProjectilePerfSnapshot === 'function'
+          ? combat.getProjectilePerfSnapshot()
+          : null;
+      if (projectilePerf && metricsCache) {
+        metricsCache.projectileRenderMs =
+          projectilePerf.projectileRenderMs || 0;
+        metricsCache.projectilePlayerTrailPoints =
+          projectilePerf.projectilePlayerTrailPoints || 0;
+        metricsCache.projectileEnemyTrailPoints =
+          projectilePerf.projectileEnemyTrailPoints || 0;
+        performanceMonitor.updateMetrics(metricsCache);
+      }
+    }
   } catch (error) {
     console.error('Erro no game loop:', error);
   }
@@ -661,7 +704,9 @@ function renderGame() {
 
   const renderer = gameSystemServices?.['renderer'];
   if (renderer && typeof renderer.render === 'function') {
+    performanceMonitor.startMeasure('render');
     renderer.render(gameState.ctx);
+    performanceMonitor.endMeasure('render');
   }
 }
 

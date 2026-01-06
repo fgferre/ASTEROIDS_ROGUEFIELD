@@ -149,14 +149,25 @@ class SpaceParticle {
       // [NEO-ARCADE] Glowing Orb
       const radius = this.size * this.alpha;
       if (radius > 0.5) {
-        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
-        gradient.addColorStop(0, '#FFFFFF'); // Hot white center
-        gradient.addColorStop(0.4, this.color); // Core color
-        gradient.addColorStop(1, 'transparent'); // Fade out
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(0, 0, radius, 0, Math.PI * 2);
-        ctx.fill();
+        const sprite = SpaceParticle.ensureSpriteCache();
+        if (sprite) {
+          ctx.drawImage(sprite, -radius, -radius, radius * 2, radius * 2);
+          // Tint core
+          ctx.fillStyle = this.color;
+          ctx.globalAlpha = this.alpha * 0.6;
+          ctx.beginPath();
+          ctx.arc(0, 0, radius * 0.6, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, radius);
+          gradient.addColorStop(0, '#FFFFFF');
+          gradient.addColorStop(0.4, this.color);
+          gradient.addColorStop(1, 'transparent');
+          ctx.fillStyle = gradient;
+          ctx.beginPath();
+          ctx.arc(0, 0, radius, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
     }
 
@@ -4188,3 +4199,40 @@ export default class EffectsSystem extends BaseSystem {
     };
   }
 }
+
+// Static Cache for Particle Orbs
+SpaceParticle.spriteCache = null;
+SpaceParticle.ensureSpriteCache = function () {
+  if (SpaceParticle.spriteCache) return SpaceParticle.spriteCache;
+
+  if (typeof document === 'undefined') return null;
+
+  const size = 64;
+  const center = size / 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  if (!ctx) return null;
+
+  // Bake a generic white glow orb
+  const gradient = ctx.createRadialGradient(
+    center,
+    center,
+    0,
+    center,
+    center,
+    center
+  );
+  gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+  gradient.addColorStop(0.3, 'rgba(255, 255, 255, 0.8)');
+  gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.2)');
+  gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+
+  SpaceParticle.spriteCache = canvas;
+  return SpaceParticle.spriteCache;
+};

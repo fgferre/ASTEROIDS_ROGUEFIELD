@@ -2564,6 +2564,53 @@ class CombatSystem extends BaseSystem {
     return { ...this.projectilePerf };
   }
 
+  ensureBulletTrailSegmentCache() {
+    // "Laser Beam" Technique: Bake a glowing dot and stretch it
+    const size = 32; // Square canvas
+    const center = size / 2;
+
+    if (this.bulletTrailCache && this.bulletTrailCache.canvas) {
+      return this.bulletTrailCache;
+    }
+
+    if (typeof document === 'undefined') {
+      return null;
+    }
+
+    const offscreen = document.createElement('canvas');
+    offscreen.width = size;
+    offscreen.height = size;
+    const ctx = offscreen.getContext('2d');
+
+    if (!ctx) return null;
+
+    // 1. Bake the Glow (Gold/Yellow)
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = '#FFFF00';
+    ctx.fillStyle = 'rgba(255, 220, 100, 0.8)';
+
+    ctx.beginPath();
+    ctx.arc(center, center, 3, 0, Math.PI * 2); // Radius 3 (Width 6)
+    ctx.fill();
+
+    // 2. Bake the Core (White)
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = '#FFFFFF';
+
+    ctx.beginPath();
+    ctx.arc(center, center, 1.5, 0, Math.PI * 2); // Radius 1.5 (Width 3)
+    ctx.fill();
+
+    this.bulletTrailCache = {
+      canvas: offscreen,
+      width: size,
+      height: size,
+      radius: center,
+    };
+
+    return this.bulletTrailCache;
+  }
+
   ensureBulletGlowCache() {
     const glowRadius = (BULLET_SIZE || 0) * 3;
 
@@ -2635,40 +2682,44 @@ class CombatSystem extends BaseSystem {
       if (bullet.hit) return;
 
       if (bullet.trail.length > 1) {
-        ctx.save();
-        ctx.lineCap = 'round';
+        const trailCache = this.ensureBulletTrailSegmentCache();
 
-        // [NEO-ARCADE] Enhanced Trail Glow
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = '#FFFF00';
+        if (trailCache) {
+          ctx.save();
+          // [NEO-ARCADE] Baked Trail Glow (High Performance)
+          // Draw stretched segments using the baked "Dot" cache
+          for (let i = 1; i < bullet.trail.length; i++) {
+            const p1 = bullet.trail[i - 1];
+            const p2 = bullet.trail[i];
+            const dx = p2.x - p1.x;
+            const dy = p2.y - p1.y;
+            const dist = Math.hypot(dx, dy);
 
-        // Draw glow layer (wider, softer)
-        for (let i = 1; i < bullet.trail.length; i++) {
-          const alpha = (i / bullet.trail.length) * 0.6; // Stronger tail
-          ctx.strokeStyle = `rgba(255, 220, 100, ${alpha})`;
-          ctx.lineWidth = 6; // Wider glow
-          ctx.globalAlpha = alpha;
+            if (dist < 1) continue;
 
-          ctx.beginPath();
-          ctx.moveTo(bullet.trail[i - 1].x, bullet.trail[i - 1].y);
-          ctx.lineTo(bullet.trail[i].x, bullet.trail[i].y);
-          ctx.stroke();
+            const angle = Math.atan2(dy, dx);
+            const alpha = i / bullet.trail.length; // Fade in tail
+
+            ctx.translate(p1.x, p1.y);
+            ctx.rotate(angle);
+            ctx.globalAlpha = alpha;
+
+            // Stretch the dot into a glowing line segment
+            // Overlap slightly (-3 start, +6 length) to ensure smooth joins
+            ctx.drawImage(
+              trailCache.canvas,
+              -3,
+              -trailCache.radius,
+              dist + 6,
+              trailCache.height
+            );
+
+            // Undo transform for next segment
+            ctx.rotate(-angle);
+            ctx.translate(-p1.x, -p1.y);
+          }
+          ctx.restore();
         }
-
-        // Draw core trail (bright, thin)
-        for (let i = 1; i < bullet.trail.length; i++) {
-          const alpha = (i / bullet.trail.length) * 1.0;
-          ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-          ctx.lineWidth = 3;
-          ctx.globalAlpha = alpha;
-
-          ctx.beginPath();
-          ctx.moveTo(bullet.trail[i - 1].x, bullet.trail[i - 1].y);
-          ctx.lineTo(bullet.trail[i].x, bullet.trail[i].y);
-          ctx.stroke();
-        }
-
-        ctx.restore();
       }
 
       const glowSprite = this.ensureBulletGlowCache();
