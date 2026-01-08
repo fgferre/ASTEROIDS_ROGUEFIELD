@@ -1,10 +1,6 @@
 // src/data/constants/gameplay.js
 
-
-
 import { deepFreeze } from '../../utils/deepFreeze.js';
-
-
 
 // === BULLETS & COLLISION ===
 
@@ -13,7 +9,6 @@ export const BULLET_SPEED = 550; // [NEO-ARCADE] Faster bullets (was 450)
 export const COLLISION_BOUNCE = 0.6;
 export const PLAYER_BULLET_OFFSCREEN_MARGIN = 80; // Allow limited offscreen travel to hit edge enemies
 export const PLAYER_BULLET_OFFSCREEN_GRACE = 0.35; // Seconds allowed offscreen before despawn
-
 
 // === MAGNETISM ===
 
@@ -31,8 +26,6 @@ export const MIN_ORB_DISTANCE = 18;
 
 export const CLUSTER_FUSION_COUNT = 10;
 
-
-
 // === XP ORBS ===
 
 export const XP_ORB_BASE_VALUE = 5;
@@ -46,13 +39,11 @@ export const XP_ORB_FUSION_ANIMATION_DURATION = 0.82;
 export const XP_ORB_OFFSCREEN_MARGIN = 16; // Extra padding before soft-clamping into view
 export const XP_ORB_OFFSCREEN_RETURN_DURATION = 0.55; // Seconds to ease back inside bounds
 
-
 export const XP_ORB_MAGNETISM_BOOST = 2.2;
 
 export const XP_ORB_COLLECTION_RADIUS_PADDING = 0.1;
 
 export const XP_ORB_CLUSTER_CONFIG = deepFreeze({
-
   radiusMultiplier: 1.55,
 
   minRadius: 52,
@@ -90,10 +81,7 @@ export const XP_ORB_CLUSTER_CONFIG = deepFreeze({
   idealMovementFactor: 0.5,
 
   densePushFactor: 0.5,
-
 });
-
-
 
 // === SHIELD SYSTEM ===
 
@@ -115,8 +103,6 @@ export const SHIELD_IMPACT_DAMAGE_BASE = 15; // [NEO-ARCADE] Buffed impact (was 
 
 export const SHIELD_IMPACT_DAMAGE_PER_LEVEL = 4;
 
-
-
 // === COMBAT ===
 
 export const COMBAT_SHOOT_COOLDOWN = 0.25; // [NEO-ARCADE] Faster fire rate (was 0.3)
@@ -131,24 +117,17 @@ export const COMBAT_MULTISHOT_SPREAD_STEP = 0.3;
 
 export const TARGET_UPDATE_INTERVAL = 0.15;
 
-
-
 export const COMBAT_AIMING_UPGRADE_CONFIG = deepFreeze({
-
   dangerWeights: {
-
     behavior: {
-
       parasite: 240,
 
       volatile: 200,
 
       default: 140,
-
     },
 
     variantOverrides: {
-
       parasite: 240,
 
       volatile: 200,
@@ -162,7 +141,6 @@ export const COMBAT_AIMING_UPGRADE_CONFIG = deepFreeze({
       iron: 140,
 
       common: 120,
-
     },
 
     reward: 30,
@@ -178,19 +156,16 @@ export const COMBAT_AIMING_UPGRADE_CONFIG = deepFreeze({
     speedReference: 180,
 
     size: {
-
       large: 3,
 
       medium: 2,
 
       small: 1,
-
     },
 
     distance: 0.75,
 
     impact: {
-
       distanceWeight: 18,
 
       distanceNormalization: 150,
@@ -216,23 +191,18 @@ export const COMBAT_AIMING_UPGRADE_CONFIG = deepFreeze({
       minStackScore: 0.15,
 
       maxRecommended: 4,
-
     },
-
   },
 
   dynamicPrediction: {
-
     minLeadTime: 0.05,
 
     maxLeadTime: 1.1,
 
     fallbackLeadTime: 0.35,
-
   },
 
   targetUpdateIntervals: {
-
     base: TARGET_UPDATE_INTERVAL,
 
     adaptive: 0.14,
@@ -240,11 +210,9 @@ export const COMBAT_AIMING_UPGRADE_CONFIG = deepFreeze({
     dynamic: 0.12,
 
     multiLock: 0.1,
-
   },
 
   multiLock: {
-
     baseTargetCount: 4,
 
     cooldownMultiplier: 0.92,
@@ -252,11 +220,9 @@ export const COMBAT_AIMING_UPGRADE_CONFIG = deepFreeze({
     parallelSpacing: 14,
 
     parallelRadiusMultiplier: 0.55,
-
   },
 
   feedback: {
-
     lockPulseDuration: 0.4,
 
     lockLineAlpha: 0.35,
@@ -264,12 +230,8 @@ export const COMBAT_AIMING_UPGRADE_CONFIG = deepFreeze({
     lockHighlightAlpha: 0.75,
 
     predictedMarkerRadius: 14,
-
   },
-
 });
-
-
 
 // === WAVE SYSTEM ===
 
@@ -279,7 +241,7 @@ export const ASTEROIDS_PER_WAVE_MULTIPLIER = 1.3;
 
 export const WAVE_DURATION = 60; // segundos
 
-export const WAVE_BREAK_TIME = 10; // segundos
+export const WAVE_BREAK_TIME = 5; // segundos
 
 export const WAVE_SPAWN_DELAY = 1.0; // atraso base entre waves no sistema legado
 
@@ -288,37 +250,29 @@ export const WAVE_BOSS_INTERVAL = 5;
 export const MAX_ASTEROIDS_ON_SCREEN = 35; // [NEO-ARCADE] Increased density (was 20)
 
 export const SUPPORT_ENEMY_PROGRESSION = deepFreeze({
-
   drone: deepFreeze({
-
     startWave: 8,
 
     baseWeight: 1,
 
     weightScaling: 0.08,
-
   }),
 
   mine: deepFreeze({
-
     startWave: 10,
 
     baseWeight: 1,
 
     weightScaling: 0.07,
-
   }),
 
   hunter: deepFreeze({
-
     startWave: 13,
 
     baseWeight: 1,
 
     weightScaling: 0.1,
-
   }),
-
 });
 
 export const USE_WAVE_MANAGER = true; // Feature flag para ativar o novo WaveManager (experimental). Consulte docs/plans/phase1-enemy-foundation-plan.md para critérios de remoção.
@@ -338,4 +292,3 @@ export const ASTEROID_SAFE_SPAWN_DISTANCE = 200; // Distância mínima do jogado
 export const ASTEROID_ENTRY_ANGLE_VARIANCE = Math.PI / 4; // Ajuste direcional para entrada (45°)
 export const ASTEROID_OFFSCREEN_RECOVERY_TIME = 4.0; // Tempo fora da tela antes de reorientar o asteroide
 export const STRICT_LEGACY_SPAWN_SEQUENCE = true; // WAVE-006: Garante que posição e tamanho reutilizem o mesmo stream de randomização
-
