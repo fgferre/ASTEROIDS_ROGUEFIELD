@@ -4,6 +4,7 @@ import { BaseSystem } from '../core/BaseSystem.js';
 import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
+import { AsteroidImpactEffect } from './AsteroidImpactEffect.js';
 
 const SIMPLEX_DEFAULT_RANDOM = new RandomService(
   'menu-background:simplex-default'
@@ -433,6 +434,12 @@ class MenuBackgroundSystem extends BaseSystem {
       window.removeEventListener('resize', this.handleResize);
     }
 
+    // Cleanup impact effects
+    if (this.impactEffect) {
+      this.impactEffect.cleanup();
+      this.impactEffect = null;
+    }
+
     super.destroy();
 
     this.stop();
@@ -848,6 +855,7 @@ class MenuBackgroundSystem extends BaseSystem {
     this.createStarLayers();
     this.createAtmosphere();
     this.setupPostProcessing();
+    this.setupImpactEffects();
 
     // Start async preloading for heavy assets
     this.preloadAssets();
@@ -1097,6 +1105,23 @@ class MenuBackgroundSystem extends BaseSystem {
       );
       this.alphaToCoverageEnabled = false;
     }
+  }
+
+  setupImpactEffects() {
+    const { THREE, scene, camera } = this;
+    if (!THREE || !scene || !camera) return;
+
+    // Criar sistema de efeitos de impacto cinematográficos
+    this.impactEffect = new AsteroidImpactEffect(THREE, scene, camera, {
+      qualityLevels: {
+        0: { debris: 40, dust: 30, flashIntensity: 3.0, shakeAmount: 0.3 },   // low
+        1: { debris: 80, dust: 60, flashIntensity: 4.0, shakeAmount: 0.4 },   // medium
+        2: { debris: 150, dust: 120, flashIntensity: 5.0, shakeAmount: 0.5 }, // high
+        3: { debris: 300, dust: 200, flashIntensity: 6.0, shakeAmount: 0.5 }  // ultra
+      },
+      initialQualityLevel: this.adaptiveQuality?.currentLevel || 2,
+      randomFloat: () => this.randomFloat('fragments')
+    });
   }
 
   createLighting() {
@@ -3464,6 +3489,12 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     }
 
     this.createExplosion(asteroid.mesh.position);
+
+    // Disparar efeitos cinematográficos de impacto
+    if (this.impactEffect) {
+      this.impactEffect.trigger(asteroid.mesh.position.clone(), impact);
+    }
+
     this.fragmentAsteroid(asteroid);
     this.objectsToDeactivate.push(asteroid);
   }
@@ -3629,6 +3660,11 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
       this.customFX.uniforms.amount.value = config.chromaticAberration;
     }
 
+    // Update impact effects quality level
+    if (this.impactEffect) {
+      this.impactEffect.setQualityLevel(level);
+    }
+
     // Update asteroid material shader detail
     this.updateAsteroidShaderDetail(config.shaderDetail);
   }
@@ -3792,6 +3828,11 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     this.camera.position.y += (targetPosY - this.camera.position.y) * camLerp;
     this.camera.position.z += (targetPosZ - this.camera.position.z) * camLerp;
 
+    // Aplicar camera shake ANTES do lookAt (offset à posição calculada)
+    if (this.impactEffect) {
+      this.impactEffect.updateCameraShake(delta);
+    }
+
     this.camera.lookAt(0, 0, 0);
 
     // Update Atmosphere
@@ -3830,6 +3871,12 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     });
 
     this.updateExplosions(delta);
+
+    // Atualizar efeitos cinematográficos de impacto (flash, detritos, poeira)
+    // Nota: camera shake é aplicado antes do lookAt (linhas acima)
+    if (this.impactEffect) {
+      this.impactEffect.update(delta);
+    }
 
     // Procedural asteroid shader is optional; menu currently uses PBR materials.
     // Keep calls guarded to avoid unnecessary work.
