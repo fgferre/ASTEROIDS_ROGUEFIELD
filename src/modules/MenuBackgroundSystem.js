@@ -434,9 +434,9 @@ class MenuBackgroundSystem extends BaseSystem {
       window.removeEventListener('resize', this.handleResize);
     }
 
-    // Cleanup impact effects
+    // Destroy impact effects (libera memória dos pools)
     if (this.impactEffect) {
-      this.impactEffect.cleanup();
+      this.impactEffect.destroy();
       this.impactEffect = null;
     }
 
@@ -876,8 +876,9 @@ class MenuBackgroundSystem extends BaseSystem {
     const materialCount = 12;
     const monolithMaterialCount = 0;
     const poolSize = this.config.maxAsteroids;
+    const impactEffectsStepCount = 1; // Pre-load impact effects
 
-    // Total steps: geometries + materials + pool chunks + field setup
+    // Total steps: geometries + materials + pool chunks + field setup + impact effects
     const poolChunks = Math.ceil(poolSize / 10); // Create 10 pool items per chunk
     ls.totalSteps =
       starfieldStepCount +
@@ -885,6 +886,7 @@ class MenuBackgroundSystem extends BaseSystem {
       materialCount +
       monolithMaterialCount +
       poolChunks +
+      impactEffectsStepCount +
       1;
     ls.currentStep = 0;
 
@@ -945,7 +947,14 @@ class MenuBackgroundSystem extends BaseSystem {
         await yieldToMain();
       }
 
-      // Phase 4: Prepare initial asteroid field
+      // Phase 4: Pre-load impact effects (pools de flash, debris, dust)
+      if (this.impactEffect) {
+        this.impactEffect.preload();
+        updateProgress('Loading impact effects');
+        await yieldToMain();
+      }
+
+      // Phase 5: Prepare initial asteroid field
       this.prepareInitialField();
       updateProgress('Preparing asteroid field');
 
