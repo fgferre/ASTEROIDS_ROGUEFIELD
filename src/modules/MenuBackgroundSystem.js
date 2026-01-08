@@ -75,6 +75,18 @@ class MenuBackgroundSystem extends BaseSystem {
     this.elapsedTime = 0;
     this.rogueSpawnTimer = 0;
 
+    // Pre-loading state
+    this.loadingState = {
+      isLoading: false,
+      isReady: false,
+      progress: 0,
+      totalSteps: 0,
+      currentStep: 0,
+      pendingStart: false, // True if start() was called during loading
+      onProgress: null, // Callback: (progress: 0-1, message: string) => void
+      onComplete: null, // Callback: () => void
+    };
+
     this.scene = null;
     this.camera = null;
     this.renderer = null;
@@ -98,6 +110,28 @@ class MenuBackgroundSystem extends BaseSystem {
       maxFragmentationLevel: 2,
     };
 
+    // Phase 3: Adaptive Quality System
+    this.adaptiveQuality = {
+      enabled: true,
+      currentLevel: 2, // 0=low, 1=medium, 2=high, 3=ultra
+      targetFpsMin: 50,
+      targetFpsMax: 58, // Just below v-sync to avoid fluctuation
+      // FPS tracking
+      frameTimesMs: [],
+      frameTimesMaxSamples: 60, // 1 second of samples at 60fps
+      lastFps: 60,
+      // Adjustment cooldown (prevent rapid changes)
+      adjustmentCooldown: 0,
+      adjustmentCooldownDuration: 2.0, // seconds between quality changes
+      // Quality level definitions - reduced chromatic aberration for clarity
+      levels: [
+        { name: 'low', shaderDetail: 0.0, bloomStrength: 0.3, chromaticAberration: 0.0 },
+        { name: 'medium', shaderDetail: 0.5, bloomStrength: 0.4, chromaticAberration: 0.0002 },
+        { name: 'high', shaderDetail: 1.0, bloomStrength: 0.5, chromaticAberration: 0.0004 },
+        { name: 'ultra', shaderDetail: 1.5, bloomStrength: 0.6, chromaticAberration: 0.0006 },
+      ],
+    };
+
     this.spawnedBeltAsteroids = 0;
     this.stats =
       this.ready && typeof window.stats !== 'undefined' ? window.stats : null;
@@ -115,10 +149,11 @@ class MenuBackgroundSystem extends BaseSystem {
 
     if (this.ready) {
       this.applyDeterministicThreeUuidGenerator();
+      this.setupLoadingScreen(); // Setup loading UI callbacks
       this.bootstrapScene();
       this.registerEventHooks();
       this.setupSettingsSubscription();
-      this.syncInitialState();
+      // Note: syncInitialState is now called from preloadAssets when complete
     } else {
       if (!this.canvas) {
         console.warn('[MenuBackgroundSystem] Canvas element not found.');
@@ -676,11 +711,67 @@ class MenuBackgroundSystem extends BaseSystem {
     return this.settingsService;
   }
 
+  /**
+   * Sets up the loading screen UI and connects callbacks.
+   * Automatically updates progress bar and hides loading when complete.
+   */
+  setupLoadingScreen() {
+    if (typeof document === 'undefined') return;
+
+    const loadingScreen = document.getElementById('loading-screen');
+    const progressFill = document.getElementById('loading-progress-fill');
+    const progressPercent = document.getElementById('loading-progress-percent');
+    const progressMessage = document.getElementById('loading-progress-message');
+    const menuScreen = document.getElementById('menu-screen');
+
+    if (!loadingScreen) {
+      console.warn('[MenuBackgroundSystem] Loading screen element not found.');
+      return;
+    }
+
+    this.setLoadingCallbacks(
+      // onProgress callback
+      (progress, message) => {
+        const percent = Math.round(progress * 100);
+
+        if (progressFill) {
+          progressFill.style.width = `${percent}%`;
+        }
+
+        if (progressPercent) {
+          progressPercent.textContent = `${percent}%`;
+        }
+
+        if (progressMessage) {
+          progressMessage.textContent = message;
+        }
+      },
+      // onComplete callback
+      () => {
+        // Fade out loading screen
+        loadingScreen.classList.add('hidden');
+
+        // Show menu screen
+        if (menuScreen) {
+          menuScreen.classList.remove('hidden');
+        }
+
+        // Remove loading screen from DOM after transition
+        setTimeout(() => {
+          if (loadingScreen.parentNode) {
+            loadingScreen.parentNode.removeChild(loadingScreen);
+          }
+        }, 600);
+      }
+    );
+  }
+
   bootstrapScene() {
     const { THREE, CANNON } = this;
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x000104, 0.008);
+    // Reduced fog density for clearer distant objects
+    this.scene.fog = new THREE.FogExp2(0x000104, 0.003);
 
     this.camera = new THREE.PerspectiveCamera(
       60,
@@ -690,12 +781,25 @@ class MenuBackgroundSystem extends BaseSystem {
     );
     this.camera.position.set(0, 0, 100);
 
+    // WebGL2 upgrade - enables #version 300 es shaders like the study
+    const gl2Context = this.canvas.getContext('webgl2', {
+      antialias: true,
+      alpha: true,
+      premultipliedAlpha: true,
+      powerPreference: 'high-performance',
+    });
+
     this.renderer = new THREE.WebGLRenderer({
       canvas: this.canvas,
+      context: gl2Context,
       antialias: true,
       alpha: true,
       premultipliedAlpha: true,
     });
+
+    // Log WebGL version for debugging
+    const glVersion = this.renderer.capabilities.isWebGL2 ? 'WebGL2' : 'WebGL1';
+    console.log(`[MenuBackgroundSystem] Renderer: ${glVersion}`);
     const pixelRatio = window.devicePixelRatio || 1;
     this.renderer.setPixelRatio(pixelRatio);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -726,14 +830,130 @@ class MenuBackgroundSystem extends BaseSystem {
 
     this.clock = new THREE.Clock();
 
+    // Quick setup (non-blocking)
     this.createLighting();
     this.createStarLayers();
-    this.createAtmosphere(); // Phase 3: Atmospheric Depth
-    this.createBaseAssets(5);
-    this.setupPostProcessing(); // Phase 2: Post-Processing Core
-    this.updateNormalIntensity(this.normalIntensity);
-    this.ensurePoolSize(this.config.maxAsteroids);
-    this.prepareInitialField();
+    this.createAtmosphere();
+    this.setupPostProcessing();
+
+    // Start async preloading for heavy assets
+    this.preloadAssets();
+  }
+
+  /**
+   * Asynchronously preloads heavy assets (geometries, materials, asteroid pool).
+   * Uses chunked loading to avoid blocking the main thread.
+   */
+  async preloadAssets() {
+    const ls = this.loadingState;
+    ls.isLoading = true;
+    ls.isReady = false;
+    ls.progress = 0;
+
+    const geometryCount = 8;
+    const materialCount = 8;
+    const poolSize = this.config.maxAsteroids;
+
+    // Total steps: geometries + materials + pool chunks + field setup
+    const poolChunks = Math.ceil(poolSize / 10); // Create 10 pool items per chunk
+    ls.totalSteps = geometryCount + materialCount + poolChunks + 1;
+    ls.currentStep = 0;
+
+    const updateProgress = (message) => {
+      ls.currentStep++;
+      ls.progress = ls.currentStep / ls.totalSteps;
+      if (typeof ls.onProgress === 'function') {
+        ls.onProgress(ls.progress, message);
+      }
+    };
+
+    // Helper to yield to main thread
+    const yieldToMain = () =>
+      new Promise((resolve) => setTimeout(resolve, 0));
+
+    try {
+      // Phase 1: Create geometries (one per frame)
+      for (let i = 0; i < geometryCount; i++) {
+        const geometry = this.createDeformedIcosahedron();
+        this.baseGeometries.push(geometry);
+        updateProgress(`Creating geometry ${i + 1}/${geometryCount}`);
+        await yieldToMain();
+      }
+
+      // Phase 2: Create materials (one per frame)
+      for (let i = 0; i < materialCount; i++) {
+        const material = this.createProceduralMaterial(
+          this.randomFloat('assets') * 100
+        );
+        this.baseMaterials.push(material);
+        updateProgress(`Creating material ${i + 1}/${materialCount}`);
+        await yieldToMain();
+      }
+
+      // Apply normal intensity to all materials
+      this.updateNormalIntensity(this.normalIntensity);
+
+      // Phase 3: Create asteroid pool in chunks
+      for (let chunk = 0; chunk < poolChunks; chunk++) {
+        const chunkStart = chunk * 10;
+        const chunkEnd = Math.min(chunkStart + 10, poolSize);
+
+        for (let i = chunkStart; i < chunkEnd; i++) {
+          if (this.asteroidPool.length < poolSize) {
+            this.createPoolableAsteroid();
+          }
+        }
+
+        updateProgress(
+          `Creating asteroid pool ${Math.min((chunk + 1) * 10, poolSize)}/${poolSize}`
+        );
+        await yieldToMain();
+      }
+
+      // Phase 4: Prepare initial asteroid field
+      this.prepareInitialField();
+      updateProgress('Preparing asteroid field');
+
+      // Mark loading complete
+      ls.isLoading = false;
+      ls.isReady = true;
+      ls.progress = 1;
+
+      if (typeof ls.onComplete === 'function') {
+        ls.onComplete();
+      }
+
+      // Auto-start if we should be active
+      this.syncInitialState();
+    } catch (error) {
+      console.error('[MenuBackgroundSystem] Preload error:', error);
+      ls.isLoading = false;
+      ls.isReady = false;
+    }
+  }
+
+  /**
+   * Sets callbacks for loading progress updates.
+   * @param {Function} onProgress - Called with (progress: 0-1, message: string)
+   * @param {Function} onComplete - Called when loading is complete
+   */
+  setLoadingCallbacks(onProgress, onComplete) {
+    this.loadingState.onProgress = onProgress;
+    this.loadingState.onComplete = onComplete;
+  }
+
+  /**
+   * Returns whether the system has finished loading.
+   */
+  isPreloadComplete() {
+    return this.loadingState.isReady;
+  }
+
+  /**
+   * Returns the current loading progress (0-1).
+   */
+  getLoadingProgress() {
+    return this.loadingState.progress;
   }
 
   setupPostProcessing() {
@@ -745,13 +965,13 @@ class MenuBackgroundSystem extends BaseSystem {
     const renderPass = new THREE.RenderPass(scene, camera);
     this.composer.addPass(renderPass);
 
-    // 1. Unreal Bloom Pass
+    // 1. Unreal Bloom Pass - reduced for clarity
     if (THREE.UnrealBloomPass) {
       this.bloomPass = new THREE.UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
-        0.8, // Strength: moderate for that "glowy" space feel
-        0.3, // Radius
-        0.85 // Threshold: only bright spots bloom
+        0.4, // Strength: reduced for clearer image
+        0.2, // Radius: tighter bloom
+        0.92 // Threshold: only very bright spots bloom
       );
       this.composer.addPass(this.bloomPass);
     }
@@ -778,7 +998,7 @@ class MenuBackgroundSystem extends BaseSystem {
     const shader = {
       uniforms: {
         tDiffuse: { value: null },
-        amount: { value: 0.0012 },
+        amount: { value: 0.0004 }, // Reduced chromatic aberration
         time: { value: 0.0 },
       },
       vertexShader: `
@@ -800,18 +1020,18 @@ class MenuBackgroundSystem extends BaseSystem {
 
         void main() {
           vec2 uv = vUv;
-          
-          // Subtle Chromatic Aberration (R/B shift)
+
+          // Very subtle Chromatic Aberration (R/B shift)
           float r = texture2D(tDiffuse, uv + vec2(amount, 0.0)).r;
           float g = texture2D(tDiffuse, uv).g;
           float b = texture2D(tDiffuse, uv - vec2(amount, 0.0)).b;
-          
+
           vec3 color = vec3(r, g, b);
-          
-          // Subtle Filmic Grain (adds texture to space)
-          float noise = (random(uv + time * 0.01) - 0.5) * 0.035;
+
+          // Very subtle film grain (reduced from 0.035 to 0.015)
+          float noise = (random(uv + time * 0.01) - 0.5) * 0.015;
           color += noise;
-          
+
           gl_FragColor = vec4(color, 1.0);
         }
       `,
@@ -841,17 +1061,36 @@ class MenuBackgroundSystem extends BaseSystem {
 
   createLighting() {
     const { THREE } = this;
-    const ambient = new THREE.AmbientLight(0x405060, 0.5);
+
+    // Ambient light - provides base illumination for all surfaces
+    // Increased intensity for better visibility
+    const ambient = new THREE.AmbientLight(0x667788, 0.8);
     this.scene.add(ambient);
 
-    const keyLight = new THREE.PointLight(0xffffff, 1, 1000);
-    keyLight.position.set(80, 80, 80);
+    // Key light - main sun-like light source
+    // Warm white, high intensity, positioned for dramatic lighting
+    const keyLight = new THREE.PointLight(0xfff8f0, 1.8, 2000);
+    keyLight.position.set(100, 80, 100);
     keyLight.castShadow = true;
     this.scene.add(keyLight);
+    this.keyLight = keyLight; // Store reference for potential adjustments
 
-    const fillLight = new THREE.PointLight(0x00aaff, 0.3, 1000);
-    fillLight.position.set(-100, -50, -100);
+    // Fill light - softer blue light from opposite side
+    // Helps illuminate shadow areas with space-like ambiance
+    const fillLight = new THREE.PointLight(0x4488cc, 0.6, 1500);
+    fillLight.position.set(-120, -40, -80);
     this.scene.add(fillLight);
+
+    // Rim light - adds edge definition from behind
+    // Creates nice silhouette separation
+    const rimLight = new THREE.PointLight(0x88aaff, 0.4, 1200);
+    rimLight.position.set(0, 100, -150);
+    this.scene.add(rimLight);
+
+    // Hemisphere light - simulates sky/ground ambient
+    // Adds subtle gradient between top (space) and bottom
+    const hemiLight = new THREE.HemisphereLight(0x446688, 0x222233, 0.3);
+    this.scene.add(hemiLight);
   }
 
   createStarTexture() {
@@ -1110,31 +1349,97 @@ class MenuBackgroundSystem extends BaseSystem {
     };
   }
 
+  /**
+   * Creates a realistically deformed asteroid geometry using advanced noise techniques.
+   * Implements the multi-layer displacement from the study:
+   * 1. FBM base distortion - overall shape variation
+   * 2. Ridged Multifractal - sharp mountain-like ridges
+   * 3. Plane scraping - flat cut surfaces
+   * 4. Voronoi features - craters (bowls) and rock protrusions
+   */
   createDeformedIcosahedron(detailSeed = this.randomFloat('assets') * 100) {
     const { THREE } = this;
+    // Use detail level 5 for good balance of quality and performance
     const geometry = new THREE.IcosahedronGeometry(1, 5);
     const simplex = new SimplexNoise(this.createRandomGenerator(detailSeed));
     const positions = geometry.attributes.position;
     const vertex = new THREE.Vector3();
-    const temp = new THREE.Vector3();
-    const noiseScale = this.randomFloat('assets') * 0.15 + 0.1; // [NEO-ARCADE] Smoother, larger features
-    const distortion = this.randomFloat('assets') * 0.15 + 0.1; // [NEO-ARCADE] Less intense distortion
+
+    // Per-asteroid variation parameters (seeded)
+    const rng = this.createRandomGenerator(detailSeed);
+
+    // Displacement parameters - balanced for smooth but interesting shapes
+    const params = {
+      // Global displacement amplitude - moderate for rounded shapes
+      displacement: rng() * 0.12 + 0.18,
+
+      // Ridge strength - subtle undulations, not sharp peaks
+      ridgeStrength: rng() * 0.25 + 0.35,
+
+      // Scrape/cut strength - gentle flat areas
+      scrapeStrength: rng() * 0.2 + 0.25,
+
+      // Crater/rock feature strength - subtle surface features
+      craterStrength: rng() * 0.25 + 0.3,
+
+      // Feature density - lower = larger, smoother features
+      featureDensity: rng() * 0.8 + 2.0,
+    };
 
     for (let i = 0; i < positions.count; i += 1) {
       vertex.fromBufferAttribute(positions, i);
+      const p = vertex.clone().normalize();
 
-      let totalNoise = 0;
-      let frequency = noiseScale;
-      let amplitude = 1;
+      // Seed offset for this asteroid
+      const px = p.x + detailSeed * 5.0;
+      const py = p.y + detailSeed * 5.0;
+      const pz = p.z + detailSeed * 5.0;
 
-      for (let octave = 0; octave < 4; octave += 1) {
-        temp.copy(vertex).multiplyScalar(frequency).addScalar(detailSeed);
-        totalNoise += simplex.noise3d(temp.x, temp.y, temp.z) * amplitude;
-        frequency *= 2;
-        amplitude *= 0.5;
+      // 1. BASE DISTORTION - Low frequency FBM for smooth overall shape
+      const base = simplex.fbm(px * 0.3, py * 0.3, pz * 0.3, 3, 0.5, 2.0);
+
+      // 2. RIDGED MULTIFRACTAL - Low frequency for gentle undulations
+      const ridges =
+        simplex.ridgedMF(px * 0.5, py * 0.5, pz * 0.5, 3, 2.0, 0.5) *
+        params.ridgeStrength;
+
+      // 3. PLANE SCRAPING - Large flat cut surfaces
+      const cutNoise = simplex.noise3d(px * 0.3 + 12, py * 0.3 + 12, pz * 0.3 + 12);
+      const cuts = this.smoothstep(0.25, 0.75, cutNoise) * params.scrapeStrength;
+
+      // 4. VORONOI FEATURES - Craters and rock protrusions
+      const [dist, cellId] = simplex.voronoi3d(
+        px * params.featureDensity,
+        py * params.featureDensity,
+        pz * params.featureDensity
+      );
+
+      let features = 0;
+
+      if (cellId < 0.4) {
+        // CRATER - smooth bowl shape with subtle rim
+        const rim = this.smoothstep(0.7, 0.5, dist); // Subtle raised edge
+        const bowl = this.smoothstep(0.5, 0.0, dist); // Smooth depression
+        const hasCentralPeak = cellId < 0.12;
+        const peak = hasCentralPeak ? this.smoothstep(0.15, 0.0, dist) * 0.25 : 0;
+        const craterShape = rim * 0.15 - bowl * 0.8 + peak;
+        features += craterShape;
+      } else if (cellId > 0.7) {
+        // ROCK PROTRUSION - gentle raised area
+        let rock = this.smoothstep(0.6, 0.0, dist);
+        rock = Math.pow(rock, 0.5); // Very soft falloff
+        features += rock * 0.5;
       }
+      // cellId 0.4-0.7 = smooth area (no feature)
 
-      vertex.normalize().multiplyScalar(1 + totalNoise * distortion);
+      features *= params.craterStrength;
+
+      // COMBINE ALL LAYERS
+      const totalDisplacement =
+        (base + ridges - cuts + features) * params.displacement;
+
+      // Apply displacement along normal (radial direction for sphere)
+      vertex.add(vertex.clone().normalize().multiplyScalar(1 + totalDisplacement));
       positions.setXYZ(i, vertex.x, vertex.y, vertex.z);
     }
 
@@ -1170,10 +1475,80 @@ class MenuBackgroundSystem extends BaseSystem {
     return geometry;
   }
 
+  /**
+   * Attempt to match GPU smoothstep behavior in JS
+   */
+  smoothstep(edge0, edge1, x) {
+    const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+    return t * t * (3 - 2 * t);
+  }
+
+  /**
+   * Linear interpolation helper
+   */
+  lerp(a, b, t) {
+    return a + (b - a) * t;
+  }
+
+  /**
+   * 2D Worley noise for texture generation
+   * Returns [closestDist, cellId]
+   */
+  worley2d(x, y, simplex) {
+    const px = Math.floor(x);
+    const py = Math.floor(y);
+    const fx = x - px;
+    const fy = y - py;
+
+    let minDist = 8.0;
+    let cellId = 0.0;
+
+    // Search 3x3 neighborhood
+    for (let j = -1; j <= 1; j++) {
+      for (let i = -1; i <= 1; i++) {
+        const cx = px + i;
+        const cy = py + j;
+
+        // Hash for cell point
+        const hash = this.hash2d(cx, cy);
+
+        // Random point within cell
+        const rx = i - fx + hash * 0.7;
+        const ry = j - fy + this.hash2d(cx + 127, cy) * 0.7;
+
+        const dist = rx * rx + ry * ry;
+
+        if (dist < minDist) {
+          minDist = dist;
+          cellId = hash;
+        }
+      }
+    }
+
+    return [Math.sqrt(minDist), cellId];
+  }
+
+  /**
+   * Simple 2D hash function for worley noise
+   */
+  hash2d(x, y) {
+    const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+    return n - Math.floor(n);
+  }
+
+  /**
+   * Creates an enhanced procedural material with techniques from the study.
+   * Phase 2 improvements:
+   * - 512px textures for higher detail
+   * - Worley noise for mineral spots (mottled appearance)
+   * - Crack network pattern
+   * - Multi-scale normal map
+   * - Varied color palette (dust, rock, mineral, metal)
+   */
   createProceduralMaterial(seed) {
     const { THREE } = this;
     const canvas = document.createElement('canvas');
-    const size = 256;
+    const size = 512; // Phase 2: Increased from 256 for better detail
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext('2d');
@@ -1181,37 +1556,121 @@ class MenuBackgroundSystem extends BaseSystem {
     const simplex = new SimplexNoise(this.createRandomGenerator(seed));
     const heightData = new Float32Array(size * size);
 
+    // Color palette - brightened for better visibility while maintaining realism
+    const palette = {
+      regolith: { r: 35, g: 33, b: 38 }, // Dark dust (brightened)
+      rockBase: { r: 95, g: 90, b: 85 }, // Medium grey/brown (was 51,49,46)
+      rockVar: { r: 140, g: 135, b: 125 }, // Lighter grey (was 89,87,82)
+      mineral: { r: 160, g: 150, b: 135 }, // Brownish mineral spot (brightened)
+      metal: { r: 200, g: 205, b: 215 }, // Silver metallic (brightened)
+    };
+
+    // Per-material variation
+    const rng = this.createRandomGenerator(seed + 1000);
+    const materialParams = {
+      patchiness: rng() * 0.4 + 0.4, // Mineral spot intensity
+      metalAmount: rng() * 0.25 + 0.15, // Metal visibility (slightly increased)
+      darkness: rng() * 0.15 + 0.25, // Overall darkness (reduced range: 0.25-0.4 instead of 0.7-1.0)
+      crackIntensity: rng() * 0.6 + 0.4, // Crack visibility
+    };
+
     for (let x = 0; x < size; x += 1) {
       for (let y = 0; y < size; y += 1) {
+        const u = x / size;
+        const v = y / size;
+
+        // 1. BASE HEIGHT - Multi-octave FBM
+        let heightValue = 0;
         let amplitude = 1;
         let frequency = 1;
         let totalAmplitude = 0;
-        let noiseValue = 0;
 
-        for (let octave = 0; octave < 4; octave += 1) {
-          noiseValue +=
+        for (let octave = 0; octave < 5; octave += 1) {
+          heightValue +=
             simplex.noise3d(
-              (x / size) * frequency + seed * 0.37,
-              (y / size) * frequency + seed * 0.53,
+              u * frequency * 4 + seed * 0.37,
+              v * frequency * 4 + seed * 0.53,
               seed * 0.19 + octave * 13.37
             ) * amplitude;
           totalAmplitude += amplitude;
-          amplitude *= 0.55;
+          amplitude *= 0.5;
           frequency *= 2;
         }
+        heightValue = (heightValue / totalAmplitude) * 0.5 + 0.5;
 
-        const normalized = noiseValue / totalAmplitude;
-        const value = normalized * 0.5 + 0.5;
-        heightData[x + y * size] = value;
+        // 2. WORLEY NOISE - Mineral spots (mottled appearance)
+        const [cellDist, cellId] = this.worley2d(
+          u * 6 + seed,
+          v * 6 + seed * 0.7,
+          simplex
+        );
+        const mineralSpot =
+          this.smoothstep(0.6, 0.2, cellDist) * materialParams.patchiness;
 
-        const base = 72 + value * 75;
-        const r = Math.max(0, Math.min(255, base + value * 18));
-        const g = Math.max(0, Math.min(255, base));
-        const b = Math.max(0, Math.min(255, base - value * 20));
+        // 3. CRACK NETWORK - Voronoi cell edges
+        const [crackDist] = this.worley2d(
+          u * 12 + seed * 1.3,
+          v * 12 + seed * 0.9,
+          simplex
+        );
+        const crackMask =
+          1 - this.smoothstep(0.0, 0.08, crackDist) * materialParams.crackIntensity;
+
+        // 4. MACRO COLOR VARIATION - Large scale color shifts
+        const macroVar = simplex.fbm(
+          u * 2 + seed + 10,
+          v * 2 + seed + 10,
+          seed,
+          3,
+          0.5,
+          2.0
+        );
+        const macroNorm = macroVar * 0.5 + 0.5;
+
+        // 5. LAYER MASKS
+        const dustMask = this.smoothstep(0.4, 0.0, heightValue) * 0.6;
+        const metalThreshold = 1.0 - materialParams.metalAmount;
+        const metalMask = this.smoothstep(metalThreshold, 1.0, heightValue);
+
+        // 6. COMBINE COLORS
+        // Start with base rock (varied by macro noise)
+        let r = this.lerp(palette.rockBase.r, palette.rockVar.r, macroNorm);
+        let g = this.lerp(palette.rockBase.g, palette.rockVar.g, macroNorm);
+        let b = this.lerp(palette.rockBase.b, palette.rockVar.b, macroNorm);
+
+        // Add mineral spots
+        r = this.lerp(r, palette.mineral.r, mineralSpot);
+        g = this.lerp(g, palette.mineral.g, mineralSpot);
+        b = this.lerp(b, palette.mineral.b, mineralSpot);
+
+        // Add metallic highlights
+        r = this.lerp(r, palette.metal.r, metalMask);
+        g = this.lerp(g, palette.metal.g, metalMask);
+        b = this.lerp(b, palette.metal.b, metalMask);
+
+        // Add dust in low areas
+        r = this.lerp(r, palette.regolith.r, dustMask);
+        g = this.lerp(g, palette.regolith.g, dustMask);
+        b = this.lerp(b, palette.regolith.b, dustMask);
+
+        // Darken cracks
+        r *= crackMask;
+        g *= crackMask;
+        b *= crackMask;
+
+        // Apply overall darkness
+        const darknessFactor = 1.5 - materialParams.darkness;
+        r *= darknessFactor;
+        g *= darknessFactor;
+        b *= darknessFactor;
+
+        // Store height for normal map (include crack depth)
+        heightData[x + y * size] = heightValue * crackMask;
+
         const index = (x + y * size) * 4;
-        imageData.data[index] = r;
-        imageData.data[index + 1] = g;
-        imageData.data[index + 2] = b;
+        imageData.data[index] = Math.max(0, Math.min(255, Math.round(r)));
+        imageData.data[index + 1] = Math.max(0, Math.min(255, Math.round(g)));
+        imageData.data[index + 2] = Math.max(0, Math.min(255, Math.round(b)));
         imageData.data[index + 3] = 255;
       }
     }
@@ -1231,8 +1690,8 @@ class MenuBackgroundSystem extends BaseSystem {
       albedoTexture.encoding = THREE.sRGBEncoding;
     }
 
+    // ENHANCED NORMAL MAP - Multi-scale detail
     const normalData = new Uint8Array(size * size * 4);
-    const normalStrength = 1.0; // [NEO-ARCADE] Softer normal map (was 4)
     const sampleHeight = (sx, sy) => {
       const xIndex = Math.max(0, Math.min(size - 1, sx));
       const yIndex = Math.max(0, Math.min(size - 1, sy));
@@ -1241,17 +1700,29 @@ class MenuBackgroundSystem extends BaseSystem {
 
     for (let y = 0; y < size; y += 1) {
       for (let x = 0; x < size; x += 1) {
-        const left = sampleHeight(x - 1, y);
-        const right = sampleHeight(x + 1, y);
-        const up = sampleHeight(x, y - 1);
-        const down = sampleHeight(x, y + 1);
+        // Multi-scale normal calculation (central differences at multiple scales)
+        let nx = 0;
+        let ny = 0;
+        const scales = [1, 2, 4]; // Sample at different distances
+        const weights = [0.5, 0.3, 0.2]; // Weight each scale
 
-        const dx = (right - left) * normalStrength;
-        const dy = (down - up) * normalStrength;
-        const nx = -dx;
-        const ny = -dy;
-        const nz = 1;
+        for (let s = 0; s < scales.length; s++) {
+          const scale = scales[s];
+          const weight = weights[s];
+
+          const left = sampleHeight(x - scale, y);
+          const right = sampleHeight(x + scale, y);
+          const up = sampleHeight(x, y - scale);
+          const down = sampleHeight(x, y + scale);
+
+          nx += ((left - right) / (2 * scale)) * weight;
+          ny += ((up - down) / (2 * scale)) * weight;
+        }
+
+        // Normalize
+        const nz = 0.15; // Controls overall normal intensity
         const length = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
+
         const index = (x + y * size) * 4;
         normalData[index] = Math.round(((nx / length) * 0.5 + 0.5) * 255);
         normalData[index + 1] = Math.round(((ny / length) * 0.5 + 0.5) * 255);
@@ -1282,8 +1753,8 @@ class MenuBackgroundSystem extends BaseSystem {
     const material = new THREE.MeshStandardMaterial({
       map: albedoTexture,
       normalMap: normalTexture,
-      roughness: 0.9,
-      metalness: 0.05,
+      roughness: 0.85, // Slightly more reflective for mineral spots
+      metalness: 0.08, // Slight metalness for silver deposits
     });
     material.normalMapType = THREE.TangentSpaceNormalMap;
     material.dithering = true;
@@ -1410,57 +1881,363 @@ class MenuBackgroundSystem extends BaseSystem {
     }
   }
 
+  /**
+   * GLSL noise functions chunk - ported from asteroid_generator_study.html
+   * Contains: Simplex 3D, FBM, Ridge, Voronoi/Worley
+   */
+  getNoiseGLSL() {
+    return `
+      // --- Utilities ---
+      vec3 mod289_3(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+      vec4 mod289_4(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+      vec4 permute4(vec4 x) { return mod289_4(((x*34.0)+1.0)*x); }
+      vec4 taylorInvSqrt4(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+
+      // --- Simplex Noise 3D ---
+      float snoise3(vec3 v) {
+        const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+        const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+        vec3 i = floor(v + dot(v, C.yyy));
+        vec3 x0 = v - i + dot(i, C.xxx);
+        vec3 g = step(x0.yzx, x0.xyz);
+        vec3 l = 1.0 - g;
+        vec3 i1 = min(g.xyz, l.zxy);
+        vec3 i2 = max(g.xyz, l.zxy);
+        vec3 x1 = x0 - i1 + C.xxx;
+        vec3 x2 = x0 - i2 + C.yyy;
+        vec3 x3 = x0 - D.yyy;
+        i = mod289_3(i);
+        vec4 p = permute4(permute4(permute4(
+                  i.z + vec4(0.0, i1.z, i2.z, 1.0))
+                + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+                + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+        float n_ = 0.142857142857;
+        vec3 ns = n_ * D.wyz - D.xzx;
+        vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+        vec4 x_ = floor(j * ns.z);
+        vec4 y_ = floor(j - 7.0 * x_);
+        vec4 x = x_ * ns.x + ns.yyyy;
+        vec4 y = y_ * ns.x + ns.yyyy;
+        vec4 h = 1.0 - abs(x) - abs(y);
+        vec4 b0 = vec4(x.xy, y.xy);
+        vec4 b1 = vec4(x.zw, y.zw);
+        vec4 s0 = floor(b0) * 2.0 + 1.0;
+        vec4 s1 = floor(b1) * 2.0 + 1.0;
+        vec4 sh = -step(h, vec4(0.0));
+        vec4 a0 = b0.xzyw + s0.xzyw * sh.xxyy;
+        vec4 a1 = b1.xzyw + s1.xzyw * sh.zzww;
+        vec3 p0 = vec3(a0.xy, h.x);
+        vec3 p1 = vec3(a0.zw, h.y);
+        vec3 p2 = vec3(a1.xy, h.z);
+        vec3 p3 = vec3(a1.zw, h.w);
+        vec4 norm = taylorInvSqrt4(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
+        p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+        vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+        m = m * m;
+        return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+      }
+
+      // --- FBM ---
+      float fbm3(vec3 p, int octaves) {
+        float amplitude = 0.5;
+        float frequency = 1.0;
+        float total = 0.0;
+        float normalization = 0.0;
+        for (int i = 0; i < 6; ++i) {
+          if(i >= octaves) break;
+          total += snoise3(p * frequency) * amplitude;
+          normalization += amplitude;
+          amplitude *= 0.5;
+          frequency *= 2.0;
+        }
+        return total / normalization;
+      }
+
+      // --- Voronoi/Worley ---
+      vec3 voronoiLCSN(vec3 x) {
+        vec3 p = floor(x);
+        vec3 f = fract(x);
+        float id = 0.0;
+        vec2 res = vec2(8.0);
+        for(int k = -1; k <= 1; k++) {
+          for(int j = -1; j <= 1; j++) {
+            for(int i = -1; i <= 1; i++) {
+              vec3 b = vec3(float(i), float(j), float(k));
+              vec3 p_hash = p + b;
+              float hash = fract(sin(dot(p_hash, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+              vec3 r = vec3(b) - f + (hash * 0.7);
+              float d = dot(r, r);
+              if(d < res.x) {
+                res.y = res.x;
+                res.x = d;
+                id = hash;
+              } else if(d < res.y) {
+                res.y = d;
+              }
+            }
+          }
+        }
+        return vec3(sqrt(res.x), id, sqrt(res.y));
+      }
+
+      // --- Warped Noise (Flow Texture) ---
+      float warpedNoise(vec3 p) {
+        float q = fbm3(p, 4);
+        float r = fbm3(p + q * 2.5, 4);
+        return fbm3(p + r * 4.0, 4);
+      }
+
+      // --- Crack Network ---
+      float getCracks(vec3 p) {
+        vec3 x = p * 4.0;
+        vec3 cellI = floor(x);
+        vec3 cellF = fract(x);
+        float m_dist = 1.0;
+        for(int k = -1; k <= 1; k++) {
+          for(int j = -1; j <= 1; j++) {
+            for(int l = -1; l <= 1; l++) {
+              vec3 b = vec3(float(l), float(j), float(k));
+              vec3 p_hash = cellI + b;
+              vec3 r = vec3(b) - cellF + fract(sin(dot(p_hash, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+              float d = dot(r, r);
+              if(d < m_dist) m_dist = d;
+            }
+          }
+        }
+        return 1.0 - sqrt(m_dist);
+      }
+    `;
+  }
+
+  /**
+   * Creates a fully procedural ShaderMaterial based on asteroid_generator_study.html.
+   * This bypasses MeshStandardMaterial entirely for guaranteed shader execution.
+   * Uses WebGL1 syntax which Three.js automatically upgrades to WebGL2 when available.
+   *
+   * Effects include:
+   * - Procedural warped noise texture (flow patterns)
+   * - Voronoi-based crack network
+   * - Mineral spots (mottled appearance via Worley)
+   * - Central difference bump mapping (7 samples)
+   * - Layered material system (dust, rock, mineral, metal)
+   */
+  createProceduralAsteroidMaterial(seed = Math.random() * 100) {
+    const { THREE } = this;
+
+    const noiseGLSL = this.getNoiseGLSL();
+
+    // Use WebGL1 syntax - Three.js automatically converts to WebGL2 when available
+    // Don't declare position, normal, modelMatrix etc - Three.js provides them
+    const vertexShader = `
+      varying vec3 vWorldPosition;
+      varying vec3 vObjPosition;
+      varying vec3 vNormalWorld;
+      varying float vAO;
+
+      void main() {
+        vObjPosition = position;
+        vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
+        vNormalWorld = normalize(normalMatrix * normal);
+
+        // Simple AO based on vertex height
+        float height = length(position) - 1.0;
+        vAO = smoothstep(-0.3, 0.3, height * 0.5 + 0.3);
+
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `;
+
+    // Fragment shader with all procedural effects from the study
+    const fragmentShader = `
+      precision highp float;
+
+      varying vec3 vWorldPosition;
+      varying vec3 vObjPosition;
+      varying vec3 vNormalWorld;
+      varying float vAO;
+
+      uniform vec3 u_lightDir;
+      uniform vec3 u_viewPos;
+      uniform float u_seed;
+      uniform float u_textureScale;
+      uniform float u_bumpStrength;
+      uniform float u_crackIntensity;
+      uniform float u_metalAmount;
+      uniform float u_darkness;
+      uniform float u_patchiness;
+
+      ${noiseGLSL}
+
+      float getSurfaceDetail(vec3 p) {
+        float flow = warpedNoise(p * u_textureScale * 0.3 + vec3(u_seed));
+        float grain = snoise3(p * u_textureScale * 4.0) * 0.2;
+        float cells = getCracks(p * 2.0 + vec3(u_seed));
+        float cracks = smoothstep(0.05, 0.1, cells);
+        float crackLayer = (1.0 - cracks) * u_crackIntensity * 1.5;
+        return flow + grain - crackLayer;
+      }
+
+      void main() {
+        vec3 N_macro = normalize(vNormalWorld);
+        vec3 p = vObjPosition;
+
+        // --- 1. MICRO BUMP (Central Differences - 7 sample technique from study) ---
+        float eps = 0.005;
+        float h_center = getSurfaceDetail(p);
+
+        float h_x1 = getSurfaceDetail(p + vec3(-eps, 0.0, 0.0));
+        float h_x2 = getSurfaceDetail(p + vec3(eps, 0.0, 0.0));
+        float h_y1 = getSurfaceDetail(p + vec3(0.0, -eps, 0.0));
+        float h_y2 = getSurfaceDetail(p + vec3(0.0, eps, 0.0));
+        float h_z1 = getSurfaceDetail(p + vec3(0.0, 0.0, -eps));
+        float h_z2 = getSurfaceDetail(p + vec3(0.0, 0.0, eps));
+
+        vec3 grad;
+        grad.x = (h_x2 - h_x1) / (2.0 * eps);
+        grad.y = (h_y2 - h_y1) / (2.0 * eps);
+        grad.z = (h_z2 - h_z1) / (2.0 * eps);
+
+        // Remove component parallel to normal (tangent space projection)
+        grad -= N_macro * dot(grad, N_macro);
+        vec3 N = normalize(N_macro - grad * u_bumpStrength);
+
+        // --- 2. MATERIALS (Mottled & Diverse - from study) ---
+        float h_norm = h_center * 0.5 + 0.5;
+
+        // MINERAL SPOTS (Worley-based patches)
+        vec3 cellData = voronoiLCSN(p * 1.5 + vec3(u_seed));
+        float spots = smoothstep(0.6, 0.2, cellData.x);
+
+        // MACRO COLOR VARIATION
+        float macroVar = fbm3(p * 0.5 + vec3(u_seed + 10.0), 3);
+
+        // --- PALETTE (exactly from study) ---
+        vec3 colRegolith = vec3(0.05, 0.05, 0.06);  // Dark dust
+        vec3 colRockBase = vec3(0.20, 0.19, 0.18);  // Medium grey/brown
+        vec3 colRockVar  = vec3(0.35, 0.34, 0.32);  // Lighter grey
+        vec3 colMineral  = vec3(0.40, 0.38, 0.35);  // Brownish mineral
+        vec3 colSilver   = vec3(0.70, 0.72, 0.75);  // Silver metallic
+
+        // 1. Base Rock (Varied by macro noise)
+        vec3 albedo = mix(colRockBase, colRockVar, macroVar * 0.5 + 0.5);
+
+        // 2. Add Mineral Spots (Mottling)
+        albedo = mix(albedo, colMineral, spots * u_patchiness);
+
+        // 3. Layer Masks
+        float dustMask = smoothstep(0.4, 0.0, h_norm) * (1.0 - vAO);
+        dustMask = clamp(dustMask, 0.0, 1.0);
+
+        float metalThreshold = 1.0 - u_metalAmount;
+        float metalMask = smoothstep(metalThreshold, 1.0, h_norm);
+
+        // 4. Apply Layers
+        albedo = mix(albedo, colSilver, metalMask);
+        albedo = mix(albedo, colRegolith, dustMask);
+
+        // Cracks are darker (from study)
+        float crackCells = getCracks(p * 2.0 + vec3(u_seed));
+        float crackVis = (1.0 - smoothstep(0.0, 0.05, crackCells)) * u_crackIntensity;
+        albedo *= (1.0 - crackVis * 0.95);
+
+        // Apply overall brightness (inverse darkness)
+        albedo *= (1.5 - u_darkness);
+
+        // Roughness varies by material (from study)
+        float roughness = 0.7;
+        roughness = mix(roughness, 0.25, metalMask);   // Metal is shiny
+        roughness = mix(roughness, 0.98, dustMask);    // Dust is matte
+        roughness = mix(roughness, 1.0, crackVis);     // Cracks are matte
+        roughness = mix(roughness, 0.8, spots * u_patchiness * 0.5);
+
+        // --- 3. LIGHTING (Blinn-Phong with rim - from study) ---
+        vec3 V = normalize(u_viewPos - vWorldPosition);
+        vec3 L = normalize(u_lightDir);
+        vec3 H = normalize(L + V);
+
+        float NdotL = max(dot(N, L), 0.0);
+        float NdotH = max(dot(N, H), 0.0);
+        float NdotV = max(dot(N, V), 0.0);
+
+        // Half-Lambert diffuse for softer shadows while keeping contrast
+        float diff = NdotL * 0.8 + 0.2 * NdotL * NdotL;
+
+        // Specular with shininess from roughness
+        float shininess = (1.0 - roughness) * 128.0 + 2.0;
+        float spec = pow(NdotH, shininess) * (1.0 - roughness) * 0.5;
+
+        // Specular occlusion (from study)
+        float specOcc = smoothstep(0.2, 1.0, vAO);
+        spec *= specOcc;
+
+        // Rim lighting for silhouette - reduced strength
+        float rim = pow(1.0 - NdotV, 4.0) * 0.15 * roughness;
+
+        // Final color composition
+        vec3 ambient = vec3(0.03, 0.03, 0.04);
+        vec3 sunColor = vec3(1.0, 0.95, 0.9);
+
+        vec3 finalColor = albedo * (diff * sunColor * 0.9 + ambient);
+        finalColor += vec3(spec) * sunColor;
+        finalColor += vec3(rim) * albedo;
+
+        // Apply AO (from study)
+        finalColor *= (vAO * 0.5 + 0.5);
+
+        // No gamma here - renderer handles tone mapping
+        gl_FragColor = vec4(finalColor, 1.0);
+      }
+    `;
+
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        u_lightDir: { value: new THREE.Vector3(1.0, 0.6, 0.4).normalize() },
+        u_viewPos: { value: new THREE.Vector3(0, 0, 100) },
+        u_seed: { value: seed },
+        u_textureScale: { value: 8.0 + Math.random() * 6.0 },
+        u_bumpStrength: { value: 1.2 + Math.random() * 0.6 },
+        u_crackIntensity: { value: 0.7 + Math.random() * 0.3 },
+        u_metalAmount: { value: 0.15 + Math.random() * 0.2 },
+        u_darkness: { value: 0.4 + Math.random() * 0.3 },
+        u_patchiness: { value: 0.4 + Math.random() * 0.4 },
+      },
+      vertexShader,
+      fragmentShader,
+      side: THREE.FrontSide,
+    });
+
+    material.userData.isProceduralAsteroid = true;
+    material.userData.seed = seed;
+
+    return material;
+  }
+
+  /**
+   * Updates procedural material uniforms for camera position.
+   */
+  updateProceduralMaterialUniforms() {
+    if (!this.camera) return;
+
+    const viewPos = this.camera.position;
+    const lightDir = this.keyLight
+      ? this.keyLight.position.clone().normalize()
+      : new this.THREE.Vector3(1.0, 0.6, 0.4).normalize();
+
+    this.activeAsteroids.forEach((asteroid) => {
+      if (asteroid.material?.userData?.isProceduralAsteroid) {
+        asteroid.material.uniforms.u_viewPos.value.copy(viewPos);
+        asteroid.material.uniforms.u_lightDir.value.copy(lightDir);
+      }
+    });
+  }
+
+  /**
+   * Legacy patch method - now creates procedural material instead.
+   */
   patchAsteroidMaterial(material) {
-    if (!material) return;
-    if (material.userData.aaaPatched) return;
-    material.userData.aaaPatched = true;
-
-    material.transparent = true;
-    material.dithering = true;
-
-    const uniforms = {
-      bevelStrength: { value: 0.4 },
-      bevelSharpness: { value: 2.0 },
-      iridIntensity: { value: 0.4 },
-      edgeFeatherPower: { value: 1.6 },
-      edgeFeatherStrength: { value: 0.55 },
-    };
-
-    material.onBeforeCompile = (shader) => {
-      Object.assign(shader.uniforms, uniforms);
-
-      shader.fragmentShader = `
-        uniform float bevelStrength;
-        uniform float bevelSharpness;
-        uniform float iridIntensity;
-        uniform float edgeFeatherPower;
-        uniform float edgeFeatherStrength;
-        ${shader.fragmentShader}
-      `;
-
-      // 1. Iridescence & Alpha Feathering
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <alphamap_fragment>',
-        `
-        #include <alphamap_fragment>
-        
-        vec3 viewDir = normalize(vViewPosition);
-        float vDotN = dot(normalize(vNormal), -viewDir);
-        float fresnel = pow(1.0 - clamp(abs(vDotN), 0.0, 1.0), edgeFeatherPower);
-        
-        // Rim Iridescence (Cyan/Blue glow)
-        vec3 iridColor = vec3(0.1, 0.7, 1.0) * pow(fresnel, 2.5) * iridIntensity;
-        diffuseColor.rgb += iridColor;
-        
-        // Edge Feathering - [NEO-ARCADE] Tweaked to be less transparent
-        float alphaFeather = clamp(1.0 - fresnel * edgeFeatherStrength * 0.5, 0.85, 1.0);
-        diffuseColor.a *= alphaFeather;
-        `
-      );
-    };
-
-    material.customProgramCacheKey = () => 'aaa-asteroid-material-v2';
-    material.needsUpdate = true;
+    // This method is kept for compatibility but no longer patches
+    // The actual procedural material is created in activateAsteroid
+    return material;
   }
 
   ensurePoolSize(size) {
@@ -1615,23 +2392,15 @@ class MenuBackgroundSystem extends BaseSystem {
       this.baseGeometries[
         Math.floor(this.randomFloat('asteroids') * this.baseGeometries.length)
       ];
-    const baseMaterial =
-      this.baseMaterials[
-        Math.floor(this.randomFloat('asteroids') * this.baseMaterials.length)
-      ];
 
     mesh.geometry = geometry;
-    if (!asteroid.material) {
-      asteroid.material = baseMaterial.clone();
-    } else {
-      asteroid.material.copy(baseMaterial);
+
+    // Use the new procedural ShaderMaterial instead of MeshStandardMaterial
+    if (!asteroid.material || !asteroid.material.userData?.isProceduralAsteroid) {
+      const seed = this.randomFloat('materials') * 100;
+      asteroid.material = this.createProceduralAsteroidMaterial(seed);
     }
-    asteroid.material.userData = Object.assign({}, baseMaterial.userData || {});
-    this.applyNormalIntensityToMaterial(asteroid.material);
-    this.patchAsteroidMaterial(asteroid.material);
-    asteroid.material.transparent = true;
-    asteroid.material.opacity = 1;
-    asteroid.material.needsUpdate = true;
+
     mesh.material = asteroid.material;
     mesh.visible = true;
     mesh.position.copy(position);
@@ -1827,6 +2596,146 @@ class MenuBackgroundSystem extends BaseSystem {
     }
   }
 
+  // ============================================
+  // Phase 3: Adaptive Quality System
+  // ============================================
+
+  /**
+   * Updates FPS tracking and adjusts quality level dynamically.
+   * Called every frame to maintain smooth performance.
+   */
+  updateAdaptiveQuality(delta) {
+    const aq = this.adaptiveQuality;
+    if (!aq.enabled) return;
+
+    // Track frame time
+    const frameTimeMs = delta * 1000;
+    aq.frameTimesMs.push(frameTimeMs);
+    if (aq.frameTimesMs.length > aq.frameTimesMaxSamples) {
+      aq.frameTimesMs.shift();
+    }
+
+    // Calculate average FPS (need at least 30 samples)
+    if (aq.frameTimesMs.length < 30) return;
+
+    const avgFrameTime =
+      aq.frameTimesMs.reduce((a, b) => a + b, 0) / aq.frameTimesMs.length;
+    const currentFps = 1000 / avgFrameTime;
+    aq.lastFps = currentFps;
+
+    // Update cooldown
+    if (aq.adjustmentCooldown > 0) {
+      aq.adjustmentCooldown -= delta;
+      return;
+    }
+
+    // Check if we need to adjust quality
+    const maxLevel = aq.levels.length - 1;
+
+    if (currentFps < aq.targetFpsMin && aq.currentLevel > 0) {
+      // FPS too low - decrease quality
+      aq.currentLevel--;
+      aq.adjustmentCooldown = aq.adjustmentCooldownDuration;
+      this.applyQualityLevel(aq.currentLevel);
+      console.log(
+        `[AdaptiveQuality] FPS ${currentFps.toFixed(1)} < ${aq.targetFpsMin}, ` +
+          `降级 to "${aq.levels[aq.currentLevel].name}"`
+      );
+    } else if (currentFps > aq.targetFpsMax && aq.currentLevel < maxLevel) {
+      // FPS has headroom - try increasing quality
+      aq.currentLevel++;
+      aq.adjustmentCooldown = aq.adjustmentCooldownDuration;
+      this.applyQualityLevel(aq.currentLevel);
+      console.log(
+        `[AdaptiveQuality] FPS ${currentFps.toFixed(1)} > ${aq.targetFpsMax}, ` +
+          `升级 to "${aq.levels[aq.currentLevel].name}"`
+      );
+    }
+  }
+
+  /**
+   * Applies a quality level to all relevant systems.
+   */
+  applyQualityLevel(level) {
+    const aq = this.adaptiveQuality;
+    const config = aq.levels[level];
+    if (!config) return;
+
+    // Update bloom pass
+    if (this.bloomPass) {
+      this.bloomPass.strength = config.bloomStrength;
+    }
+
+    // Update chromatic aberration in custom FX
+    if (this.customFX && this.customFX.uniforms) {
+      this.customFX.uniforms.amount.value = config.chromaticAberration;
+    }
+
+    // Update asteroid material shader detail
+    this.updateAsteroidShaderDetail(config.shaderDetail);
+  }
+
+  /**
+   * Updates the shader detail level for all asteroid materials.
+   * This controls the complexity of fragment shader effects.
+   */
+  updateAsteroidShaderDetail(detailLevel) {
+    // Store current detail level for new asteroids
+    this.currentShaderDetail = detailLevel;
+
+    // Update all active asteroid materials
+    this.activeAsteroids.forEach((asteroid) => {
+      if (asteroid.material && asteroid.material.userData) {
+        asteroid.material.userData.shaderDetail = detailLevel;
+        // Update the uniform directly if shader is compiled
+        const uniforms = asteroid.material.userData.shaderUniforms;
+        if (uniforms && uniforms.detailLevel) {
+          uniforms.detailLevel.value = detailLevel;
+        }
+      }
+    });
+
+    // Update base materials
+    this.baseMaterials.forEach((material) => {
+      if (material.userData) {
+        material.userData.shaderDetail = detailLevel;
+        const uniforms = material.userData.shaderUniforms;
+        if (uniforms && uniforms.detailLevel) {
+          uniforms.detailLevel.value = detailLevel;
+        }
+      }
+    });
+  }
+
+  /**
+   * Updates time uniform for all asteroid shaders (for animated effects).
+   */
+  updateAsteroidShaderTime(time) {
+    this.activeAsteroids.forEach((asteroid) => {
+      if (asteroid.material && asteroid.material.userData) {
+        const uniforms = asteroid.material.userData.shaderUniforms;
+        if (uniforms && uniforms.time) {
+          uniforms.time.value = time;
+        }
+      }
+    });
+  }
+
+  /**
+   * Gets the current FPS from the adaptive quality system.
+   */
+  getCurrentFps() {
+    return this.adaptiveQuality.lastFps;
+  }
+
+  /**
+   * Gets the current quality level name.
+   */
+  getCurrentQualityLevel() {
+    const aq = this.adaptiveQuality;
+    return aq.levels[aq.currentLevel]?.name || 'unknown';
+  }
+
   animate() {
     if (!this.isActive) {
       return;
@@ -1840,6 +2749,9 @@ class MenuBackgroundSystem extends BaseSystem {
     }
     this.elapsedTime += delta;
     this.rogueSpawnTimer += delta;
+
+    // Phase 3: Adaptive Quality - monitor FPS and adjust quality
+    this.updateAdaptiveQuality(delta);
 
     if (this.rogueSpawnTimer >= this.config.rogueSpawnInterval) {
       this.spawnRogueAsteroid();
@@ -1930,6 +2842,12 @@ class MenuBackgroundSystem extends BaseSystem {
 
     this.updateExplosions(delta);
 
+    // Update procedural asteroid material uniforms (camera/light position)
+    this.updateProceduralMaterialUniforms();
+
+    // Phase 3: Update shader time for animated effects (sparkle, etc.)
+    this.updateAsteroidShaderTime(this.elapsedTime);
+
     if (this.customFX && this.customFX.uniforms) {
       this.customFX.uniforms.time.value = this.elapsedTime;
     }
@@ -1950,6 +2868,12 @@ class MenuBackgroundSystem extends BaseSystem {
       return;
     }
 
+    // If still loading, mark that we want to start when ready
+    if (this.loadingState.isLoading || !this.loadingState.isReady) {
+      this.loadingState.pendingStart = true;
+      return;
+    }
+
     this.isActive = true;
     if (this.clock) {
       this.clock.start();
@@ -1958,6 +2882,17 @@ class MenuBackgroundSystem extends BaseSystem {
     this.elapsedTime = 0;
     this.rogueSpawnTimer = 0;
     this.animationFrame = requestAnimationFrame(this.animate);
+  }
+
+  /**
+   * Called when preloading completes to sync the initial state.
+   * Starts animation if a start was pending during loading.
+   */
+  syncInitialState() {
+    if (this.loadingState.pendingStart) {
+      this.loadingState.pendingStart = false;
+      this.start();
+    }
   }
 
   stop() {
@@ -2197,6 +3132,113 @@ class SimplexNoise {
   dot(grad3, index, x, y, z) {
     const offset = index * 3;
     return grad3[offset] * x + grad3[offset + 1] * y + grad3[offset + 2] * z;
+  }
+
+  /**
+   * Fractal Brownian Motion - layered noise for natural variation
+   */
+  fbm(x, y, z, octaves = 4, persistence = 0.5, lacunarity = 2.0) {
+    let amplitude = 0.5;
+    let frequency = 1.0;
+    let total = 0.0;
+    let normalization = 0.0;
+
+    for (let i = 0; i < octaves; i++) {
+      total += this.noise3d(x * frequency, y * frequency, z * frequency) * amplitude;
+      normalization += amplitude;
+      amplitude *= persistence;
+      frequency *= lacunarity;
+    }
+
+    return total / normalization;
+  }
+
+  /**
+   * Ridge function - creates sharp ridges from noise
+   */
+  ridge(h, offset = 1.0) {
+    h = Math.abs(h);
+    h = offset - h;
+    h = h * h;
+    return h;
+  }
+
+  /**
+   * Ridged Multifractal - creates sharp mountain-like ridges
+   * Based on the study's ridgedMF implementation
+   */
+  ridgedMF(x, y, z, octaves = 4, lacunarity = 2.2, gain = 0.5) {
+    let sum = 0.0;
+    let amp = 0.5;
+    let freq = 1.0;
+    let prev = 1.0;
+
+    for (let i = 0; i < octaves; i++) {
+      const n = this.noise3d(x * freq, y * freq, z * freq);
+      const r = this.ridge(n, 1.0);
+      sum += r * amp * prev;
+      prev = r;
+      freq *= lacunarity;
+      amp *= gain;
+    }
+
+    return sum;
+  }
+
+  /**
+   * 3D Voronoi/Cellular noise - returns [closestDist, cellId, secondClosestDist]
+   * Used for craters and rock protrusions
+   */
+  voronoi3d(x, y, z) {
+    const px = Math.floor(x);
+    const py = Math.floor(y);
+    const pz = Math.floor(z);
+    const fx = x - px;
+    const fy = y - py;
+    const fz = z - pz;
+
+    let minDist = 8.0;
+    let secondMinDist = 8.0;
+    let cellId = 0.0;
+
+    // Search 3x3x3 neighborhood
+    for (let k = -1; k <= 1; k++) {
+      for (let j = -1; j <= 1; j++) {
+        for (let i = -1; i <= 1; i++) {
+          const cx = px + i;
+          const cy = py + j;
+          const cz = pz + k;
+
+          // Hash function for cell point position
+          const hash = this.hashVoronoi(cx, cy, cz);
+
+          // Random point within cell (0.0 to 0.7 range for variation)
+          const rx = i - fx + hash * 0.7;
+          const ry = j - fy + this.hashVoronoi(cx + 127, cy, cz) * 0.7;
+          const rz = k - fz + this.hashVoronoi(cx, cy + 127, cz) * 0.7;
+
+          const dist = rx * rx + ry * ry + rz * rz;
+
+          if (dist < minDist) {
+            secondMinDist = minDist;
+            minDist = dist;
+            cellId = hash;
+          } else if (dist < secondMinDist) {
+            secondMinDist = dist;
+          }
+        }
+      }
+    }
+
+    return [Math.sqrt(minDist), cellId, Math.sqrt(secondMinDist)];
+  }
+
+  /**
+   * Simple hash function for voronoi cell IDs
+   */
+  hashVoronoi(x, y, z) {
+    const n = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453;
+    return n - Math.floor(n);
   }
 }
 

@@ -1,0 +1,1098 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WebGL2 "The Monolith" Asteroid - Mottled Surface</title>
+    <style>
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #020205;
+        font-family: 'Segoe UI', sans-serif;
+      }
+      canvas {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+      #ui {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(12, 12, 18, 0.95);
+        color: #e0e0e0;
+        padding: 20px;
+        border-radius: 8px;
+        border: 1px solid #333;
+        backdrop-filter: blur(8px);
+        min-width: 300px;
+        z-index: 10;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+        max-height: 90vh;
+        overflow-y: auto;
+      }
+      .control-group {
+        margin-bottom: 12px;
+      }
+      label {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.75rem;
+        color: #d08770;
+        margin-bottom: 4px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+      }
+      span.val {
+        color: #fff;
+        font-weight: normal;
+      }
+      input[type='range'] {
+        width: 100%;
+        cursor: pointer;
+        accent-color: #d08770;
+      }
+      h3 {
+        margin-top: 0;
+        color: #d08770;
+        font-size: 1.1rem;
+        border-bottom: 1px solid #333;
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+      }
+      .section-title {
+        font-size: 0.85rem;
+        color: #88c0d0;
+        margin-top: 15px;
+        margin-bottom: 8px;
+        border-bottom: 1px dashed #444;
+        padding-bottom: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="ui">
+      <h3>The Monolith: Mineral Diversity</h3>
+
+      <div class="control-group">
+        <label>Seed <span id="val_seed" class="val">42.5</span></label>
+        <input
+          type="range"
+          id="seed"
+          min="0"
+          max="100"
+          step="0.1"
+          value="42.5"
+        />
+      </div>
+
+      <div class="section-title">Forma (Geometria)</div>
+
+      <div class="control-group">
+        <label
+          >Amplitude Global
+          <span id="val_displacement" class="val">1.2</span></label
+        >
+        <input
+          type="range"
+          id="displacement"
+          min="0"
+          max="2.0"
+          step="0.05"
+          value="1.2"
+        />
+      </div>
+      <div class="control-group">
+        <label
+          >Cristas (Ridge) <span id="val_ridge" class="val">1.0</span></label
+        >
+        <input
+          type="range"
+          id="ridgeStrength"
+          min="0"
+          max="2.0"
+          step="0.1"
+          value="1.0"
+        />
+      </div>
+      <div class="control-group">
+        <label
+          >Cortes (Scraping) <span id="val_scrape" class="val">0.8</span></label
+        >
+        <input
+          type="range"
+          id="scrapeStrength"
+          min="0"
+          max="2.0"
+          step="0.1"
+          value="0.8"
+        />
+      </div>
+      <div class="control-group">
+        <label
+          >Crateras/Rochas
+          <span id="val_craterStr" class="val">0.7</span></label
+        >
+        <input
+          type="range"
+          id="craterStrength"
+          min="0"
+          max="2.0"
+          step="0.1"
+          value="0.7"
+        />
+      </div>
+      <div class="control-group">
+        <label
+          >Densidade Formas
+          <span id="val_craterDens" class="val">3.5</span></label
+        >
+        <input
+          type="range"
+          id="craterDensity"
+          min="1"
+          max="8"
+          step="0.1"
+          value="3.5"
+        />
+      </div>
+
+      <div class="section-title">Textura & Cor (Superfície)</div>
+
+      <div class="control-group">
+        <label
+          >Escala Textura (Zoom)
+          <span id="val_texScale" class="val">12.0</span></label
+        >
+        <input
+          type="range"
+          id="textureScale"
+          min="1.0"
+          max="50.0"
+          step="1.0"
+          value="12.0"
+        />
+      </div>
+      <div class="control-group">
+        <label
+          >Intensidade Manchas
+          <span id="val_patchiness" class="val">0.6</span></label
+        >
+        <input
+          type="range"
+          id="patchiness"
+          min="0"
+          max="1.0"
+          step="0.05"
+          value="0.6"
+        />
+      </div>
+      <div class="control-group">
+        <label>Força do Bump <span id="val_bump" class="val">0.8</span></label>
+        <input
+          type="range"
+          id="bumpStrength"
+          min="0"
+          max="3.0"
+          step="0.1"
+          value="0.8"
+        />
+      </div>
+      <div class="control-group">
+        <label>Rachaduras <span id="val_cracks" class="val">0.8</span></label>
+        <input
+          type="range"
+          id="crackIntensity"
+          min="0"
+          max="2.0"
+          step="0.05"
+          value="0.8"
+        />
+      </div>
+      <div class="control-group">
+        <label>Metal (Prata) <span id="val_metal" class="val">0.3</span></label>
+        <input
+          type="range"
+          id="metalAmount"
+          min="0"
+          max="1.0"
+          step="0.05"
+          value="0.3"
+        />
+      </div>
+      <div class="control-group">
+        <label
+          >Escuridão (Albedo)
+          <span id="val_darkness" class="val">0.8</span></label
+        >
+        <input
+          type="range"
+          id="darkness"
+          min="0.0"
+          max="1.5"
+          step="0.1"
+          value="0.8"
+        />
+      </div>
+    </div>
+
+    <canvas id="glcanvas"></canvas>
+
+    <!-- 1. NOISE KERNELS (GLSL) -->
+    <script type="glsl/snippet" id="noise-snippet">
+      // --- Utilities ---
+      vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+      vec4 mod289(vec4 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+      vec4 permute(vec4 x) { return mod289(((x*34.0)+1.0)*x); }
+      vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+
+      // --- Simplex Noise 3D ---
+      float snoise(vec3 v) {
+          const vec2  C = vec2(1.0/6.0, 1.0/3.0);
+          const vec4  D = vec4(0.0, 0.5, 1.0, 2.0);
+          vec3 i  = floor(v + dot(v, C.yyy) );
+          vec3 x0 = v - i + dot(i, C.xxx) ;
+          vec3 g = step(x0.yzx, x0.xyz);
+          vec3 l = 1.0 - g;
+          vec3 i1 = min( g.xyz, l.zxy );
+          vec3 i2 = max( g.xyz, l.zxy );
+          vec3 x1 = x0 - i1 + C.xxx;
+          vec3 x2 = x0 - i2 + C.yyy;
+          vec3 x3 = x0 - D.yyy;
+          i = mod289(i);
+          vec4 p = permute( permute( permute(
+                    i.z + vec4(0.0, i1.z, i2.z, 1.0 ))
+                  + i.y + vec4(0.0, i1.y, i2.y, 1.0 ))
+                  + i.x + vec4(0.0, i1.x, i2.x, 1.0 ));
+          float n_ = 0.142857142857;
+          vec3  ns = n_ * D.wyz - D.xzx;
+          vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+          vec4 x_ = floor(j * ns.z);
+          vec4 y_ = floor(j - 7.0 * x_ );
+          vec4 x = x_ *ns.x + ns.yyyy;
+          vec4 y = y_ *ns.x + ns.yyyy;
+          vec4 h = 1.0 - abs(x) - abs(y);
+          vec4 b0 = vec4( x.xy, y.xy );
+          vec4 b1 = vec4( x.zw, y.zw );
+          vec4 s0 = floor(b0)*2.0 + 1.0;
+          vec4 s1 = floor(b1)*2.0 + 1.0;
+          vec4 sh = -step(h, vec4(0.0));
+          vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy ;
+          vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww ;
+          vec3 p0 = vec3(a0.xy,h.x);
+          vec3 p1 = vec3(a0.zw,h.y);
+          vec3 p2 = vec3(a1.xy,h.z);
+          vec3 p3 = vec3(a1.zw,h.w);
+          vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2, p2), dot(p3,p3)));
+          p0 *= norm.x; p1 *= norm.y; p2 *= norm.z; p3 *= norm.w;
+          vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+          m = m * m;
+          return 42.0 * dot( m*m, vec4( dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3) ) );
+      }
+
+      // --- FBM ---
+      float fbm(vec3 p, int octaves, float persistence, float lacunarity) {
+          float amplitude = 0.5;
+          float frequency = 1.0;
+          float total = 0.0;
+          float normalization = 0.0;
+          for (int i = 0; i < 8; ++i) {
+              if(i >= octaves) break;
+              total += snoise(p * frequency) * amplitude;
+              normalization += amplitude;
+              amplitude *= persistence;
+              frequency *= lacunarity;
+          }
+          return total / normalization;
+      }
+
+      // --- Ridge Noise ---
+      float ridge(float h, float offset) {
+          h = abs(h);
+          h = offset - h;
+          h = h * h;
+          return h;
+      }
+
+      float ridgedMF(vec3 p, int octaves, float lacunarity, float gain) {
+          float sum = 0.0;
+          float amp = 0.5;
+          float freq = 1.0;
+          float prev = 1.0;
+          for(int i=0; i < 8; i++) {
+              if (i >= octaves) break;
+              float n = snoise(p * freq);
+              float r = ridge(n, 1.0);
+              sum += r * amp * prev;
+              prev = r;
+              freq *= lacunarity;
+              amp *= gain;
+          }
+          return sum;
+      }
+
+      // --- LCSN Helper ---
+      vec3 voronoiLCSN(vec3 x) {
+          vec3 p = floor(x);
+          vec3 f = fract(x);
+          float id = 0.0;
+          vec2 res = vec2(8.0);
+
+          for(int k=-1; k<=1; k++) {
+              for(int j=-1; j<=1; j++) {
+                  for(int i=-1; i<=1; i++) {
+                      vec3 b = vec3(float(i), float(j), float(k));
+                      vec3 p_hash = p + b;
+                      float hash = fract(sin(dot(p_hash, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+                      vec3 r = vec3(b) - f + (hash * 0.7);
+                      float d = dot(r, r);
+                      if(d < res.x) {
+                          res.y = res.x;
+                          res.x = d;
+                          id = hash;
+                      } else if(d < res.y) {
+                          res.y = d;
+                      }
+                  }
+              }
+          }
+          return vec3(sqrt(res.x), id, sqrt(res.y));
+      }
+
+      // --- Worley for Shader Use (Simple) ---
+      vec2 worley(vec3 P) {
+          return voronoiLCSN(P).xz; // Returns closest dist and 2nd closest
+      }
+    </script>
+
+    <!-- 2. VERTEX SHADER - THE COMBINED PIPELINE -->
+    <script id="vs-render" type="x-shader/x-vertex">
+      #version 300 es
+      layout(location=0) in vec3 a_position;
+
+      uniform mat4 u_model;
+      uniform mat4 u_view;
+      uniform mat4 u_projection;
+
+      // Sliders
+      uniform float u_seed;
+      uniform float u_displacement;
+      uniform float u_ridgeStrength;
+      uniform float u_scrapeStrength;
+      uniform float u_craterStrength;
+      uniform float u_craterDensity;
+
+      out vec3 v_position;
+      out vec3 v_normal;
+      out vec3 v_objPos;
+      out float v_ao;
+
+      // INSERT_NOISE_HERE
+
+      float getAsteroidShape(vec3 p) {
+          vec3 pSeed = p + vec3(u_seed * 5.0);
+
+          // 1. Base Distortion
+          float base = fbm(pSeed * 0.4, 3, 0.5, 2.0);
+
+          // 2. Ridged Multifractal
+          float ridges = ridgedMF(pSeed * 1.5, 4, 2.2, 0.5);
+          ridges *= u_ridgeStrength * 0.5;
+
+          // 3. Plane Scraping
+          float cutNoise = snoise(pSeed * 0.5 + vec3(12.0));
+          float cuts = smoothstep(0.2, 0.8, cutNoise);
+          cuts *= u_scrapeStrength * 0.8;
+
+          // 4. LCSN
+          vec3 vData = voronoiLCSN(pSeed * u_craterDensity);
+          float dist = vData.x;
+          float id = vData.y;
+
+          float features = 0.0;
+
+          if (id < 0.4) {
+              float rim = smoothstep(0.7, 0.5, dist);
+              float bowl = smoothstep(0.5, 0.0, dist);
+              float peak = (id < 0.1) ? smoothstep(0.15, 0.0, dist) * 0.3 : 0.0;
+              float shape = (rim * 0.2) - (bowl * 1.2) + peak;
+              features += shape;
+          } else if (id > 0.65) {
+              float rock = smoothstep(0.55, 0.0, dist);
+              rock = pow(rock, 0.7);
+              features += rock * 0.8;
+          }
+
+          features *= u_craterStrength;
+          float total = base + ridges - cuts + features;
+
+          return total * u_displacement;
+      }
+
+      void main() {
+          vec3 p = normalize(a_position);
+          float radius = 1.0;
+
+          float h = getAsteroidShape(p);
+          vec3 p_final = p * (radius + h);
+
+          // Finite Difference Normal
+          float eps = 0.015;
+          vec3 t1 = normalize(cross(p, vec3(0,1,0)));
+          if(length(t1) < 0.001) t1 = normalize(cross(p, vec3(0,0,1)));
+          vec3 t2 = normalize(cross(p, t1));
+
+          float h1 = getAsteroidShape(normalize(p + t1 * eps));
+          float h2 = getAsteroidShape(normalize(p + t2 * eps));
+
+          vec3 v1 = (p + t1 * eps) * (radius + h1) - p_final;
+          vec3 v2 = (p + t2 * eps) * (radius + h2) - p_final;
+          vec3 n_obj = normalize(cross(v2, v1));
+
+          v_objPos = p_final;
+          v_ao = smoothstep(-0.5, 0.5, h * 0.5 + 0.3);
+
+          v_position = vec3(u_model * vec4(p_final, 1.0));
+
+          mat3 normalMatrix = mat3(u_model);
+          normalMatrix = inverse(normalMatrix);
+          normalMatrix = transpose(normalMatrix);
+          v_normal = normalMatrix * n_obj;
+
+          gl_Position = u_projection * u_view * vec4(v_position, 1.0);
+      }
+    </script>
+
+    <!-- 3. FRAGMENT SHADER - TEXTURE SYNTHESIS & BUMP -->
+    <script id="fs-render" type="x-shader/x-fragment">
+      #version 300 es
+      precision highp float;
+
+      in vec3 v_position;
+      in vec3 v_normal;
+      in vec3 v_objPos;
+      in float v_ao;
+
+      out vec4 fragColor;
+
+      uniform vec3 u_lightDir;
+      uniform vec3 u_viewPos;
+
+      // Sliders
+      uniform float u_seed;
+      uniform float u_bumpStrength;
+      uniform float u_crackIntensity;
+      uniform float u_metalAmount;
+      uniform float u_textureScale;
+      uniform float u_darkness;
+      uniform float u_patchiness; // New: Patch intensity
+
+      // INSERT_NOISE_HERE
+
+      // Warped noise for flow texture
+      float warpedNoise(vec3 p) {
+          float q = fbm(p, 4, 0.5, 2.0);
+          float r = fbm(p + q * 2.5, 4, 0.5, 2.0);
+          return fbm(p + r * 4.0, 4, 0.5, 2.0);
+      }
+
+      // Returns distance to borders (cracks)
+      float getCracks(vec3 p) {
+          vec3 x = p * 4.0; // Scale
+          vec3 i = floor(x);
+          vec3 f = fract(x);
+
+          float m_dist = 1.0;
+
+          for(int k=-1; k<=1; k++) {
+              for(int j=-1; j<=1; j++) {
+                  for(int l=-1; l<=1; l++) {
+                      vec3 b = vec3(float(l), float(j), float(k));
+                      vec3 p_hash = i + b;
+                      vec3 r = vec3(b) - f + fract(sin(dot(p_hash, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+                      float d = dot(r, r);
+                      if(d < m_dist) m_dist = d;
+                  }
+              }
+          }
+          return 1.0 - sqrt(m_dist);
+      }
+
+      float getSurfaceDetail(vec3 p) {
+          // High frequency detail noise based on u_textureScale
+          float flow = warpedNoise(p * u_textureScale * 0.3 + vec3(u_seed));
+
+          // --- TEXTURE ENHANCEMENT: High freq grain ---
+          float grain = snoise(p * u_textureScale * 4.0) * 0.2;
+
+          float cells = getCracks(p * 2.0 + vec3(u_seed));
+          float cracks = smoothstep(0.05, 0.1, cells);
+          float crackLayer = (1.0 - cracks) * u_crackIntensity * 1.5;
+
+          return flow + grain - crackLayer;
+      }
+
+      void main() {
+          vec3 N_macro = normalize(v_normal);
+          vec3 p = v_objPos;
+
+          // --- 1. MICRO BUMP (Central Diff) ---
+          float eps = 0.005;
+          float h_center = getSurfaceDetail(p);
+
+          float h_x1 = getSurfaceDetail(p + vec3(-eps, 0, 0));
+          float h_x2 = getSurfaceDetail(p + vec3(eps, 0, 0));
+          float h_y1 = getSurfaceDetail(p + vec3(0, -eps, 0));
+          float h_y2 = getSurfaceDetail(p + vec3(0, eps, 0));
+          float h_z1 = getSurfaceDetail(p + vec3(0, 0, -eps));
+          float h_z2 = getSurfaceDetail(p + vec3(0, 0, eps));
+
+          vec3 grad;
+          grad.x = (h_x2 - h_x1) / (2.0 * eps);
+          grad.y = (h_y2 - h_y1) / (2.0 * eps);
+          grad.z = (h_z2 - h_z1) / (2.0 * eps);
+
+          grad -= N_macro * dot(grad, N_macro);
+
+          vec3 N = normalize(N_macro - grad * u_bumpStrength * 0.3);
+
+          // --- 2. MATERIALS (Mottled & Diverse) ---
+          float h_norm = h_center * 0.5 + 0.5;
+
+          // MOTTLED SPOTS (Mineral Inclusions)
+          // Use Worley noise to create "patches" of distinct material
+          vec2 cellData = worley(p * 1.5 + vec3(u_seed)); // Low frequency cells
+          float spots = smoothstep(0.6, 0.2, cellData.x); // Spot mask
+
+          // MACRO COLOR VARIATION
+          // Mix two rock tones to break uniformity
+          float macroVar = fbm(p * 0.5 + vec3(u_seed + 10.0), 3, 0.5, 2.0);
+
+          // --- PALETTE ---
+          vec3 colRegolith = vec3(0.05, 0.05, 0.06); // Dark Dust
+          vec3 colRockBase = vec3(0.20, 0.19, 0.18); // Dark Grey/Brown
+          vec3 colRockVar  = vec3(0.35, 0.34, 0.32); // Lighter Grey
+          vec3 colMineral  = vec3(0.40, 0.38, 0.35); // Mineral Spot (Brownish)
+          vec3 colSilver   = vec3(0.70, 0.72, 0.75); // Metal
+
+          // 1. Base Rock (Varied)
+          vec3 albedo = mix(colRockBase, colRockVar, macroVar);
+
+          // 2. Add Mineral Spots (Mottling)
+          albedo = mix(albedo, colMineral, spots * u_patchiness);
+
+          // 3. Masks
+          float dustMask = smoothstep(0.4, 0.0, h_norm) * (1.0 - v_ao);
+          dustMask = clamp(dustMask, 0.0, 1.0);
+
+          float metalThreshold = 1.0 - u_metalAmount;
+          float metalMask = smoothstep(metalThreshold, 1.0, h_norm);
+
+          // 4. Layers
+          albedo = mix(albedo, colSilver, metalMask);
+          albedo = mix(albedo, colRegolith, dustMask);
+
+          // Cracks darker
+          float cells = getCracks(p * 2.0 + vec3(u_seed));
+          float crackVis = (1.0 - smoothstep(0.0, 0.05, cells)) * u_crackIntensity;
+          albedo *= (1.0 - crackVis * 0.95);
+
+          // Apply Darkness
+          albedo *= (1.5 - u_darkness);
+
+          // Roughness
+          float roughness = 0.7;
+          roughness = mix(roughness, 0.25, metalMask);
+          roughness = mix(roughness, 0.98, dustMask);
+          roughness = mix(roughness, 1.0, crackVis);
+          // Vary roughness on spots too
+          roughness = mix(roughness, 0.8, spots * u_patchiness * 0.5);
+
+          // --- 3. LIGHTING ---
+          vec3 V = normalize(u_viewPos - v_position);
+          vec3 L = normalize(u_lightDir);
+          vec3 H = normalize(L + V);
+
+          float NdotL = max(dot(N, L), 0.0);
+          float NdotH = max(dot(N, H), 0.0);
+          float NdotV = max(dot(N, V), 0.0);
+
+          float diff = NdotL;
+
+          float shininess = (1.0 - roughness) * 128.0 + 2.0;
+          float spec = pow(NdotH, shininess) * (1.0 - roughness);
+
+          float specOcc = smoothstep(0.2, 1.0, v_ao);
+          spec *= specOcc;
+
+          float rim = pow(1.0 - NdotV, 3.0) * 0.5 * roughness;
+
+          vec3 ambient = vec3(0.01, 0.01, 0.02);
+          vec3 sunColor = vec3(1.0, 0.98, 0.95);
+
+          vec3 finalColor = albedo * (diff * sunColor + ambient);
+          finalColor += vec3(spec) * sunColor;
+          finalColor += vec3(rim);
+
+          finalColor *= (v_ao * 0.6 + 0.4);
+
+          finalColor = pow(finalColor, vec3(1.0/2.2));
+          fragColor = vec4(finalColor, 1.0);
+      }
+    </script>
+
+    <script>
+      // --- MATH LIB ---
+      const Mat4 = {
+        create: () =>
+          new Float32Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]),
+        identity: (out) => {
+          out[0] = 1;
+          out[1] = 0;
+          out[2] = 0;
+          out[3] = 0;
+          out[4] = 0;
+          out[5] = 1;
+          out[6] = 0;
+          out[7] = 0;
+          out[8] = 0;
+          out[9] = 0;
+          out[10] = 1;
+          out[11] = 0;
+          out[12] = 0;
+          out[13] = 0;
+          out[14] = 0;
+          out[15] = 1;
+        },
+        perspective: (out, fovy, aspect, near, far) => {
+          const f = 1.0 / Math.tan(fovy / 2);
+          const nf = 1 / (near - far);
+          out[0] = f / aspect;
+          out[1] = 0;
+          out[2] = 0;
+          out[3] = 0;
+          out[4] = 0;
+          out[5] = f;
+          out[6] = 0;
+          out[7] = 0;
+          out[8] = 0;
+          out[9] = 0;
+          out[10] = (far + near) * nf;
+          out[11] = -1;
+          out[12] = 0;
+          out[13] = 0;
+          out[14] = 2 * far * near * nf;
+          out[15] = 0;
+        },
+        translate: (out, a, v) => {
+          let x = v[0],
+            y = v[1],
+            z = v[2];
+          out[12] = a[0] * x + a[4] * y + a[8] * z + a[12];
+          out[13] = a[1] * x + a[5] * y + a[9] * z + a[13];
+          out[14] = a[2] * x + a[6] * y + a[10] * z + a[14];
+          out[15] = a[3] * x + a[7] * y + a[11] * z + a[15];
+        },
+        rotate: (out, a, rad, axis) => {
+          let x = axis[0],
+            y = axis[1],
+            z = axis[2];
+          let len = Math.hypot(x, y, z);
+          if (len < 0.0001) return;
+          len = 1 / len;
+          x *= len;
+          y *= len;
+          z *= len;
+          let s = Math.sin(rad),
+            c = Math.cos(rad),
+            t = 1 - c;
+          let a00 = a[0],
+            a01 = a[1],
+            a02 = a[2],
+            a03 = a[3];
+          let a10 = a[4],
+            a11 = a[5],
+            a12 = a[6],
+            a13 = a[7];
+          let a20 = a[8],
+            a21 = a[9],
+            a22 = a[10],
+            a23 = a[11];
+          let b00 = x * x * t + c,
+            b01 = y * x * t + z * s,
+            b02 = z * x * t - y * s;
+          let b10 = x * y * t - z * s,
+            b11 = y * y * t + c,
+            b12 = z * y * t + x * s;
+          let b20 = x * z * t + y * s,
+            b21 = y * z * t - x * s,
+            b22 = z * z * t + c;
+          out[0] = a00 * b00 + a10 * b01 + a20 * b02;
+          out[1] = a01 * b00 + a11 * b01 + a21 * b02;
+          out[2] = a02 * b00 + a12 * b01 + a22 * b02;
+          out[3] = a03 * b00 + a13 * b01 + a23 * b02;
+          out[4] = a00 * b10 + a10 * b11 + a20 * b12;
+          out[5] = a01 * b10 + a11 * b11 + a21 * b12;
+          out[6] = a02 * b10 + a12 * b11 + a22 * b12;
+          out[7] = a03 * b10 + a13 * b11 + a23 * b12;
+          out[8] = a00 * b20 + a10 * b21 + a20 * b22;
+          out[9] = a01 * b20 + a11 * b21 + a21 * b22;
+          out[10] = a02 * b20 + a12 * b21 + a22 * b22;
+          out[11] = a03 * b20 + a13 * b21 + a23 * b22;
+        },
+      };
+
+      function createIcosphere(subdivisions) {
+        const t = (1.0 + Math.sqrt(5.0)) / 2.0;
+        let verts = [
+          -1,
+          t,
+          0,
+          1,
+          t,
+          0,
+          -1,
+          -t,
+          0,
+          1,
+          -t,
+          0,
+          0,
+          -1,
+          t,
+          0,
+          1,
+          t,
+          0,
+          -1,
+          -t,
+          0,
+          1,
+          -t,
+          t,
+          0,
+          -1,
+          t,
+          0,
+          1,
+          -t,
+          0,
+          -1,
+          -t,
+          0,
+          1,
+        ];
+        let indices = [
+          0, 11, 5, 0, 5, 1, 0, 1, 7, 0, 7, 10, 0, 10, 11, 1, 5, 9, 5, 11, 4,
+          11, 10, 2, 10, 7, 6, 7, 1, 8, 3, 9, 4, 3, 4, 2, 3, 2, 6, 3, 6, 8, 3,
+          8, 9, 4, 9, 5, 2, 4, 11, 6, 2, 10, 8, 6, 7, 9, 8, 1,
+        ];
+        for (let i = 0; i < verts.length; i += 3) {
+          let len = Math.hypot(verts[i], verts[i + 1], verts[i + 2]);
+          verts[i] /= len;
+          verts[i + 1] /= len;
+          verts[i + 2] /= len;
+        }
+
+        const midCache = new Map();
+        function getMidPoint(p1, p2) {
+          const key = p1 < p2 ? `${p1}_${p2}` : `${p2}_${p1}`;
+          if (midCache.has(key)) return midCache.get(key);
+          const i1 = p1 * 3,
+            i2 = p2 * 3;
+          let mx = (verts[i1] + verts[i2]) / 2,
+            my = (verts[i1 + 1] + verts[i2 + 1]) / 2,
+            mz = (verts[i1 + 2] + verts[i2 + 2]) / 2;
+          let len = Math.hypot(mx, my, mz);
+          verts.push(mx / len, my / len, mz / len);
+          midCache.set(key, verts.length / 3 - 1);
+          return verts.length / 3 - 1;
+        }
+
+        for (let s = 0; s < subdivisions; s++) {
+          let newIndices = [];
+          for (let i = 0; i < indices.length; i += 3) {
+            let a = indices[i],
+              b = indices[i + 1],
+              c = indices[i + 2];
+            let ab = getMidPoint(a, b),
+              bc = getMidPoint(b, c),
+              ca = getMidPoint(c, a);
+            newIndices.push(a, ab, ca, b, bc, ab, c, ca, bc, ab, bc, ca);
+          }
+          indices = newIndices;
+        }
+        return {
+          vertices: new Float32Array(verts),
+          indices: new Uint16Array(indices),
+        };
+      }
+
+      async function init() {
+        const canvas = document.getElementById('glcanvas');
+        const gl = canvas.getContext('webgl2', {
+          antialias: true,
+          alpha: false,
+        });
+
+        if (!gl) {
+          document.body.innerHTML =
+            "<h2 style='color:white'>Erro: WebGL 2 não suportado.</h2>";
+          return;
+        }
+
+        function resize() {
+          canvas.width = window.innerWidth;
+          canvas.height = window.innerHeight;
+          gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        function createShader(type, source) {
+          const s = gl.createShader(type);
+          gl.shaderSource(s, source);
+          gl.compileShader(s);
+          if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+            console.error(gl.getShaderInfoLog(s));
+            gl.deleteShader(s);
+            return null;
+          }
+          return s;
+        }
+
+        const noiseSnippet =
+          document.getElementById('noise-snippet').textContent;
+
+        // --- Render Program ---
+        const vsRenderSrc = document
+          .getElementById('vs-render')
+          .textContent.trim()
+          .replace('// INSERT_NOISE_HERE', noiseSnippet);
+        const fsRenderSrc = document
+          .getElementById('fs-render')
+          .textContent.trim()
+          .replace('// INSERT_NOISE_HERE', noiseSnippet);
+        const renderProg = gl.createProgram();
+        const vsR = createShader(gl.VERTEX_SHADER, vsRenderSrc);
+        const fsR = createShader(gl.FRAGMENT_SHADER, fsRenderSrc);
+
+        if (!vsR || !fsR) return;
+
+        gl.attachShader(renderProg, vsR);
+        gl.attachShader(renderProg, fsR);
+        gl.linkProgram(renderProg);
+
+        if (!gl.getProgramParameter(renderProg, gl.LINK_STATUS)) {
+          console.error('Link Error: ' + gl.getProgramInfoLog(renderProg));
+          return;
+        }
+
+        // --- Geometry ---
+        let icosphere = createIcosphere(6);
+
+        const vaoResult = gl.createVertexArray();
+        gl.bindVertexArray(vaoResult);
+
+        const bufPos = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, bufPos);
+        gl.bufferData(gl.ARRAY_BUFFER, icosphere.vertices, gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+
+        const bufIndex = gl.createBuffer();
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, bufIndex);
+        gl.bufferData(
+          gl.ELEMENT_ARRAY_BUFFER,
+          icosphere.indices,
+          gl.STATIC_DRAW
+        );
+
+        gl.bindVertexArray(null);
+
+        // --- State ---
+        const state = {
+          seed: 42.5,
+          displacement: 1.2,
+          ridgeStrength: 1.0,
+          scrapeStrength: 0.8,
+          craterStrength: 0.7,
+          craterDensity: 3.5,
+          bumpStrength: 0.8,
+          crackIntensity: 0.8,
+          metalAmount: 0.3,
+          textureScale: 12.0,
+          darkness: 0.8,
+          patchiness: 0.6, // New state
+        };
+
+        // Helper to update state and label
+        function bind(id, prop) {
+          const el = document.getElementById(id);
+          const valEl = document.getElementById(
+            'val_' +
+              (id === 'textureScale'
+                ? 'texScale'
+                : id === 'darkness'
+                  ? 'darkness'
+                  : id === 'patchiness'
+                    ? 'patchiness'
+                    : id === 'craterStrength'
+                      ? 'craterStr'
+                      : id === 'craterDensity'
+                        ? 'craterDens'
+                        : id === 'metalAmount'
+                          ? 'metal'
+                          : id === 'bumpStrength'
+                            ? 'bump'
+                            : id === 'ridgeStrength'
+                              ? 'ridge'
+                              : id === 'scrapeStrength'
+                                ? 'scrape'
+                                : id === 'crackIntensity'
+                                  ? 'cracks'
+                                  : id)
+          );
+
+          el.oninput = (e) => {
+            state[prop] = parseFloat(e.target.value);
+            if (valEl) valEl.innerText = state[prop].toFixed(1);
+          };
+        }
+
+        bind('seed', 'seed');
+        bind('displacement', 'displacement');
+        bind('ridgeStrength', 'ridgeStrength');
+        bind('scrapeStrength', 'scrapeStrength');
+        bind('craterStrength', 'craterStrength');
+        bind('craterDensity', 'craterDensity');
+        bind('bumpStrength', 'bumpStrength');
+        bind('crackIntensity', 'crackIntensity');
+        bind('metalAmount', 'metalAmount');
+        bind('textureScale', 'textureScale');
+        bind('darkness', 'darkness');
+        bind('patchiness', 'patchiness');
+
+        // --- Loop ---
+        let time = 0;
+        const projection = Mat4.create();
+        const view = Mat4.create();
+        const model = Mat4.create();
+        const lightDir = new Float32Array([1.0, 0.6, 0.4]);
+        const viewPos = new Float32Array([0, 0, 3.2]);
+
+        function render(now) {
+          time = now * 0.0005;
+
+          gl.clearColor(0.02, 0.02, 0.03, 1.0);
+          gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+          gl.enable(gl.DEPTH_TEST);
+          gl.enable(gl.CULL_FACE);
+
+          gl.useProgram(renderProg);
+
+          Mat4.perspective(
+            projection,
+            (40 * Math.PI) / 180,
+            canvas.width / canvas.height,
+            0.1,
+            100.0
+          );
+
+          Mat4.identity(view);
+          Mat4.translate(view, view, [0, 0, -3.2]);
+
+          Mat4.identity(model);
+          Mat4.rotate(model, model, time * 0.2, [0, 1, 0]);
+          Mat4.rotate(model, model, time * 0.1, [1, 0, 0]);
+
+          gl.uniformMatrix4fv(
+            gl.getUniformLocation(renderProg, 'u_projection'),
+            false,
+            projection
+          );
+          gl.uniformMatrix4fv(
+            gl.getUniformLocation(renderProg, 'u_view'),
+            false,
+            view
+          );
+          gl.uniformMatrix4fv(
+            gl.getUniformLocation(renderProg, 'u_model'),
+            false,
+            model
+          );
+
+          gl.uniform3fv(
+            gl.getUniformLocation(renderProg, 'u_lightDir'),
+            lightDir
+          );
+          gl.uniform3fv(
+            gl.getUniformLocation(renderProg, 'u_viewPos'),
+            viewPos
+          );
+
+          // Pass all uniforms
+          gl.uniform1f(gl.getUniformLocation(renderProg, 'u_seed'), state.seed);
+          gl.uniform1f(
+            gl.getUniformLocation(renderProg, 'u_displacement'),
+            state.displacement
+          );
+          gl.uniform1f(
+            gl.getUniformLocation(renderProg, 'u_ridgeStrength'),
+            state.ridgeStrength
+          );
+          gl.uniform1f(
+            gl.getUniformLocation(renderProg, 'u_scrapeStrength'),
+            state.scrapeStrength
+          );
+          gl.uniform1f(
+            gl.getUniformLocation(renderProg, 'u_craterStrength'),
+            state.craterStrength
+          );
+          gl.uniform1f(
+            gl.getUniformLocation(renderProg, 'u_craterDensity'),
+            state.craterDensity
+          );
+          gl.uniform1f(
+            gl.getUniformLocation(renderProg, 'u_bumpStrength'),
+            state.bumpStrength
+          );
+          gl.uniform1f(
+            gl.getUniformLocation(renderProg, 'u_crackIntensity'),
+            state.crackIntensity
+          );
+          gl.uniform1f(
+            gl.getUniformLocation(renderProg, 'u_metalAmount'),
+            state.metalAmount
+          );
+          gl.uniform1f(
+            gl.getUniformLocation(renderProg, 'u_textureScale'),
+            state.textureScale
+          );
+          gl.uniform1f(
+            gl.getUniformLocation(renderProg, 'u_darkness'),
+            state.darkness
+          );
+          gl.uniform1f(
+            gl.getUniformLocation(renderProg, 'u_patchiness'),
+            state.patchiness
+          );
+
+          gl.bindVertexArray(vaoResult);
+          gl.drawElements(
+            gl.TRIANGLES,
+            icosphere.indices.length,
+            gl.UNSIGNED_SHORT,
+            0
+          );
+
+          requestAnimationFrame(render);
+        }
+        requestAnimationFrame(render);
+      }
+      window.onload = init;
+    </script>
+  </body>
+</html>

@@ -20,8 +20,29 @@
   </head>
   <body>
     <div id="game-container">
+      <!-- Loading Screen - Shown during asset preload -->
+      <div id="loading-screen" class="loading-screen">
+        <div class="loading-screen__content">
+          <h1 class="loading-screen__title">ASTEROID ROGUEFIELD</h1>
+          <div class="loading-screen__progress-container">
+            <div class="loading-screen__progress-bar">
+              <div id="loading-progress-fill" class="loading-screen__progress-fill"></div>
+            </div>
+            <div class="loading-screen__progress-text">
+              <span id="loading-progress-percent">0%</span>
+              <span id="loading-progress-message">Initializing...</span>
+            </div>
+          </div>
+          <div class="loading-screen__asteroids">
+            <span class="loading-asteroid loading-asteroid--1"></span>
+            <span class="loading-asteroid loading-asteroid--2"></span>
+            <span class="loading-asteroid loading-asteroid--3"></span>
+          </div>
+        </div>
+      </div>
+
       <!-- High-Fidelity FX Pipeline handled by MenuBackgroundSystem (Three.js) -->
-      <div id="menu-screen" class="screen">
+      <div id="menu-screen" class="screen hidden">
         <canvas
           id="menu-background-canvas"
           class="menu-screen__canvas"
