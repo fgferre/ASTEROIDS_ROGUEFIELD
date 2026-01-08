@@ -29,9 +29,11 @@ export function bootstrapServices({
 
   manifest.forEach((entry) => {
     try {
+      if (entry.lazy) {
+        return;
+      }
       const instance = container.resolve(entry.name);
       resolvedServices[entry.name] = instance;
-
     } catch (error) {
       throw new Error(
         `Failed to bootstrap service '${entry.name}': ${error.message}`

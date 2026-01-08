@@ -217,5 +217,3 @@ export const MUSIC_LAYER_CONFIG = Object.freeze({
     bossFall: 2.8,
   }),
 });
-
-console.log('[GameConstants] Loaded');

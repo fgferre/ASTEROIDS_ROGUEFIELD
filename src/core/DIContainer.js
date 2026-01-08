@@ -81,14 +81,20 @@ export class DIContainer {
       throw new Error('[DIContainer] Service name must be a non-empty string');
     }
 
-    if (typeof factory !== 'function') {
-      throw new Error(
-        `[DIContainer] Factory for '${name}' must be a function`
-      );
+    if (this.factories.has(name) || this.singletons.has(name)) {
+      throw new Error(`[DIContainer] Service '${name}' is already registered`);
     }
 
-    if (this.factories.has(name)) {
-      throw new Error(`[DIContainer] Service '${name}' is already registered`);
+    if (typeof factory !== 'function') {
+      this.singletons.set(name, factory);
+      // Instances have no dependencies we can automatically track
+      this.dependencyGraph.set(name, []);
+      this.stats.registrations++;
+
+      if (this.verbose) {
+        console.log(`[DIContainer] Registered instance '${name}'`);
+      }
+      return this;
     }
 
     // Parse options
@@ -542,4 +548,3 @@ export class DIContainer {
     console.groupEnd();
   }
 }
-
