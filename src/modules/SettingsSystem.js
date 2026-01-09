@@ -8,7 +8,12 @@ import {
   resolveEventBus,
 } from '../core/serviceUtils.js';
 
-const VISUAL_CATEGORIES = new Set(['accessibility', 'video']);
+const VISUAL_CATEGORIES = new Set([
+  'accessibility',
+  'video',
+  'graphics',
+  'gameplay',
+]);
 
 const STORAGE_KEY = 'astro:settings:v1';
 
@@ -46,8 +51,7 @@ class SettingsSystem {
   }
 
   getEventBus() {
-    const eventBus =
-      this.eventBus || resolveEventBus(this.dependencies);
+    const eventBus = this.eventBus || resolveEventBus(this.dependencies);
     if (eventBus && this.eventBus !== eventBus) {
       this.eventBus = eventBus;
     }
@@ -506,7 +510,14 @@ class SettingsSystem {
       return;
     }
 
-    ['audio', 'controls', 'accessibility', 'video'].forEach((categoryId) => {
+    [
+      'audio',
+      'controls',
+      'accessibility',
+      'video',
+      'gameplay',
+      'graphics',
+    ].forEach((categoryId) => {
       const values = this.getCategoryValues(categoryId);
       if (!values) {
         return;
@@ -540,11 +551,14 @@ class SettingsSystem {
     const accessibility = this.getCategoryValues('accessibility') || {};
     const video = this.getCategoryValues('video') || {};
 
+    const gameplay = this.getCategoryValues('gameplay') || {};
+    const graphics = this.getCategoryValues('graphics') || {};
+
     const hudScale = Number.isFinite(Number(video.hudScale))
       ? Number(video.hudScale)
       : 1;
-    const screenShake = Number.isFinite(Number(video.screenShakeIntensity))
-      ? Number(video.screenShakeIntensity)
+    const screenShake = Number.isFinite(Number(gameplay.screenShake))
+      ? Number(gameplay.screenShake)
       : 1;
     const hudLayout =
       typeof video.hudLayout === 'string' && video.hudLayout
@@ -554,6 +568,8 @@ class SettingsSystem {
     return {
       accessibility,
       video,
+      graphics,
+      gameplay,
       derived: {
         contrast: accessibility.highContrastHud ? 'high' : 'normal',
         colorVision: accessibility.colorBlindPalette ? 'assist' : 'standard',
@@ -561,8 +577,14 @@ class SettingsSystem {
         hudScale,
         screenShake,
         damageFlash: video.damageFlash !== false,
-        reducedParticles: Boolean(video.reducedParticles),
+        reducedParticles: Boolean(graphics.reducedParticles),
         hudLayout,
+        postProcessing: graphics.postProcessing !== false,
+        bloom: graphics.bloom !== false,
+        chromaticAberration: graphics.chromaticAberration !== false,
+        antialiasing: graphics.antialiasing || 'None',
+        damageNumbers: gameplay.damageNumbers !== false,
+        hitMarkers: gameplay.hitMarkers !== false,
       },
     };
   }

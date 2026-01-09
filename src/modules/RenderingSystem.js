@@ -18,6 +18,14 @@ const MIN_OUTLINE_POINTS = 3;
 const EPSILON = 1e-6;
 const NEBULA_UPDATE_INTERVAL_MS = 120;
 
+// Graphics Settings Defaults
+const DEFAULT_GRAPHICS_SETTINGS = {
+  bloom: true,
+  chromaticAberration: true,
+  postProcessing: true,
+  antialiasing: 'SMAA',
+};
+
 function computePolygonArea(points) {
   if (!Array.isArray(points) || points.length < MIN_OUTLINE_POINTS) {
     return 0;
@@ -152,7 +160,6 @@ function resolveDevicePixelRatio() {
   const ratio = Number(window.devicePixelRatio) || 1;
   return Math.max(1, Math.min(2, ratio));
 }
-
 
 // [NEO-ARCADE] Multi-Plane 2.5D Parallax Starfield
 // Replaces 3D projection with robust 2D layer scrolling for guaranteed visibility
@@ -375,7 +382,10 @@ class SpaceSkyBackground {
     const time = Date.now() / 1000;
 
     ctx.save();
-    ctx.globalCompositeOperation = 'lighter'; // Additive blending for neon glow
+    ctx.save();
+    if (this.bloomEnabled) {
+      ctx.globalCompositeOperation = 'lighter'; // Additive blending for neon glow
+    }
 
     this.stars.forEach((star) => {
       // Parallax movement - opposite to player velocity
@@ -764,6 +774,45 @@ class RenderingSystem extends BaseSystem {
       },
       { force: true }
     );
+    this.chromaticAberrationEnabled =
+      DEFAULT_GRAPHICS_SETTINGS.chromaticAberration;
+    this.bloomEnabled = DEFAULT_GRAPHICS_SETTINGS.bloom;
+    this.postProcessingEnabled = DEFAULT_GRAPHICS_SETTINGS.postProcessing;
+
+    this.setupSettingsIntegration();
+  }
+
+  setupSettingsIntegration() {
+    this.settings = resolveService('settings', this.dependencies);
+
+    // Initial Load
+    if (
+      this.settings &&
+      typeof this.settings.getCategoryValues === 'function'
+    ) {
+      this.applyGraphicsPreferences(
+        this.settings.getCategoryValues('graphics')
+      );
+    }
+
+    // Listener
+    this.registerEventListener('settings-graphics-changed', (payload = {}) => {
+      if (payload?.values) {
+        this.applyGraphicsPreferences(payload.values);
+      }
+    });
+
+    // Also listen for general settings changes if needed, but specific category event is better
+    // if SettingsSystem broadcasts it.
+  }
+
+  applyGraphicsPreferences(values = {}) {
+    this.chromaticAberrationEnabled = values.chromaticAberration !== false;
+    this.bloomEnabled = values.bloom !== false;
+    this.postProcessingEnabled = values.postProcessing !== false;
+
+    // Antialiasing implementation: 'SMAA' (Standard) vs 'Nenhum' (Pixelated)
+    this.antialiasingMode = values.antialiasing !== 'Nenhum';
   }
 
   onReset() {
@@ -782,6 +831,13 @@ class RenderingSystem extends BaseSystem {
     if (!this.stateManager.currentState.fillStyle) {
       this.stateManager.initialize(ctx);
       this.gradientCache.preloadGradients(ctx);
+    }
+
+    // Apply Antialiasing Preference
+    ctx.imageSmoothingEnabled =
+      this.antialiasingMode !== undefined ? this.antialiasingMode : true;
+    if (ctx.imageSmoothingEnabled) {
+      ctx.imageSmoothingQuality = 'high';
     }
 
     ctx.save();
@@ -1155,7 +1211,12 @@ class RenderingSystem extends BaseSystem {
 
           // === SOAP BUBBLE V3 (Vibrant Rainbow Reference) ===
 
-          ctx.globalCompositeOperation = 'source-over';
+          // === SOAP BUBBLE V3 (Vibrant Rainbow Reference) ===
+
+          ctx.globalCompositeOperation = this.bloomEnabled
+            ? 'lighter'
+            : 'source-over';
+          if (!this.bloomEnabled) ctx.globalAlpha = 0.8; // Adjust alpha if not adding
 
           // 1. Base Bubble (Oil Slick Fill)
           const bubbleRadius = radiusForGradient;

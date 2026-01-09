@@ -1,7 +1,7 @@
 {
   "name": "asteroids_roguefield",
   "version": "1.0.0",
-  "description": "Jogo Roguelike inspirado nas mecânicas de Asteroids",
+  "description": "Roguelike game inspired by Asteroids mechanics",
   "type": "module",
   "main": "app.js",
   "scripts": {
@@ -19,7 +19,7 @@
     "test:balance": "vitest run tests/balance",
     "test:visual": "vitest run tests/visual",
     "test:physics": "vitest run tests/physics",
-    "test:visual-enemies": "echo 'Abra http://localhost:5173/scripts/visual-enemy-rendering-test.html no navegador' && npm run dev",
+    "test:visual-enemies": "echo 'Open http://localhost:5173/scripts/visual-enemy-rendering-test.html in browser' && npm run dev",
     "stress": "node scripts/run-stress-checks.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

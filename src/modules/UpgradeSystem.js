@@ -13,8 +13,8 @@ const asArray = (value) => (Array.isArray(value) ? value : []);
 
 const DEFAULT_UPGRADE_CATEGORY = {
   id: 'general',
-  label: 'Tecnologia',
-  description: 'Melhorias que ampliam capacidades gerais da nave.',
+  label: 'Technology',
+  description: 'Enhancements that improve general ship capabilities.',
   icon: '✨',
   themeColor: '#3399FF',
 };
@@ -204,7 +204,7 @@ class UpgradeSystem extends BaseSystem {
       result.push({
         type: 'player-level',
         level: Math.max(1, Math.floor(definition.unlockLevel)),
-        text: `Disponível a partir do level ${definition.unlockLevel}.`,
+        text: `Available from level ${definition.unlockLevel}.`,
       });
     }
 
@@ -327,14 +327,14 @@ class UpgradeSystem extends BaseSystem {
     }
 
     if (prerequisite.type === 'player-level') {
-      return `Level do piloto ${prerequisite.level || 1}+`;
+      return `Pilot Level ${prerequisite.level || 1}+`;
     }
 
     if (prerequisite.type === 'upgrade') {
       const reference = this.upgradeLookup?.get(prerequisite.id);
       const name = reference?.text?.name || reference?.name || prerequisite.id;
       const levelLabel =
-        (prerequisite.level || 1) > 1 ? `Nv. ${prerequisite.level}` : 'Nv. 1';
+        (prerequisite.level || 1) > 1 ? `Lvl ${prerequisite.level}` : 'Lvl 1';
       return `${name} (${levelLabel})`;
     }
 
@@ -448,7 +448,7 @@ class UpgradeSystem extends BaseSystem {
             title:
               nextLevelText?.title ||
               nextLevelDefinition.title ||
-              `Nível ${currentLevel + 1}`,
+              `Level ${currentLevel + 1}`,
             description:
               nextLevelText?.description ||
               nextLevelDefinition.description ||
@@ -776,7 +776,7 @@ class UpgradeSystem extends BaseSystem {
     console.log(
       `[${systemLabel}] Applied upgrade:`,
       summary?.name || upgradeId,
-      '→ nível',
+      '→ level',
       newLevel
     );
 

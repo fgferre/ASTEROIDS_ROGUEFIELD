@@ -5,7 +5,7 @@ import { DEFAULT_HUD_LAYOUT_ID } from './ui/hudLayout.js';
 const DEFAULT_BINDING_METADATA = {
   keyboard: {
     max: 2,
-    label: 'Teclado',
+    label: 'Keyboard',
   },
   gamepad: {
     max: 2,
@@ -17,63 +17,48 @@ const DEFAULT_BINDING_METADATA = {
 
 const SETTINGS_SCHEMA = [
   {
-    id: 'audio',
-    label: 'Áudio',
-    description:
-      'Ajuste a mixagem geral do jogo, controlando volumes individuais e opção de silêncio total.',
+    id: 'gameplay',
+    label: 'Gameplay',
+    description: 'Visual feedback and game mechanics adjustments.',
     fields: [
       {
-        key: 'muteAll',
+        key: 'damageNumbers',
         type: 'toggle',
-        label: 'Silenciar tudo',
-        description: 'Interrompe imediatamente toda saída sonora.',
-        default: false,
+        label: 'Damage Numbers',
+        description: 'Display floating numeric values when hitting enemies.',
+        default: true,
       },
       {
-        key: 'masterVolume',
-        type: 'range',
-        label: 'Volume geral',
-        description: 'Controla o volume global aplicado a todos os canais.',
-        default: 0.7,
-        min: 0,
-        max: 1,
-        step: 0.05,
+        key: 'hitMarkers',
+        type: 'toggle',
+        label: 'Hit Markers',
+        description: 'Visual crosshair feedback when shots connect.',
+        default: true,
       },
       {
-        key: 'musicVolume',
+        key: 'screenShake',
         type: 'range',
-        label: 'Trilha sonora',
+        label: 'Screen Shake Intensity',
         description:
-          'Define a intensidade da música ambiente e futuras faixas temáticas.',
-        default: 0.6,
+          'Controls camera shake intensity during explosions and collisions.',
+        default: 1,
         min: 0,
         max: 1,
-        step: 0.05,
-      },
-      {
-        key: 'effectsVolume',
-        type: 'range',
-        label: 'Efeitos sonoros',
-        description:
-          'Afeta tiros, explosões, coleta de XP e demais efeitos instantâneos.',
-        default: 0.85,
-        min: 0,
-        max: 1,
-        step: 0.05,
+        step: 0.1,
       },
     ],
   },
   {
     id: 'controls',
-    label: 'Controles',
+    label: 'Controls',
     description:
-      'Remapeie as ações principais para teclado e gamepad. Todas as alterações têm efeito imediato e ficam salvas para as próximas sessões.',
+      'Remap main actions for keyboard and gamepad. Changes are saved immediately.',
     fields: [
       {
         key: 'moveUp',
         type: 'binding',
-        label: 'Mover-se para cima',
-        description: 'Acelerar a nave adiante.',
+        label: 'Move Up',
+        description: 'Accelerate ship forward.',
         default: {
           keyboard: ['KeyW', 'ArrowUp'],
           gamepad: ['axis:1:-', 'button:12'],
@@ -86,8 +71,8 @@ const SETTINGS_SCHEMA = [
       {
         key: 'moveDown',
         type: 'binding',
-        label: 'Mover-se para baixo',
-        description: 'Acionar propulsores traseiros para desacelerar.',
+        label: 'Move Down',
+        description: 'Engage rear thrusters to decelerate.',
         default: {
           keyboard: ['KeyS', 'ArrowDown'],
           gamepad: ['axis:1:+', 'button:13'],
@@ -100,8 +85,8 @@ const SETTINGS_SCHEMA = [
       {
         key: 'moveLeft',
         type: 'binding',
-        label: 'Derivar para esquerda',
-        description: 'Controle lateral do casco para ajustar a mira.',
+        label: 'Strafe Left',
+        description: 'Lateral control for aiming adjustment.',
         default: {
           keyboard: ['KeyA', 'ArrowLeft'],
           gamepad: ['axis:0:-', 'button:14'],
@@ -114,8 +99,8 @@ const SETTINGS_SCHEMA = [
       {
         key: 'moveRight',
         type: 'binding',
-        label: 'Derivar para direita',
-        description: 'Aplicar impulso lateral em direção ao alvo.',
+        label: 'Strafe Right',
+        description: 'Lateral thrust towards target.',
         default: {
           keyboard: ['KeyD', 'ArrowRight'],
           gamepad: ['axis:0:+', 'button:15'],
@@ -128,8 +113,8 @@ const SETTINGS_SCHEMA = [
       {
         key: 'activateShield',
         type: 'binding',
-        label: 'Ativar escudo',
-        description: 'Dispara a proteção energética quando disponível.',
+        label: 'Activate Shield',
+        description: 'Deploys energy protection when available.',
         default: {
           keyboard: ['KeyE', 'ShiftLeft'],
           gamepad: ['button:2', 'button:4'],
@@ -142,8 +127,8 @@ const SETTINGS_SCHEMA = [
       {
         key: 'pause',
         type: 'binding',
-        label: 'Pausar / Retomar',
-        description: 'Congela o jogo e exibe o menu rápido.',
+        label: 'Pause / Resume',
+        description: 'Freezes game and opens quick menu.',
         default: {
           keyboard: ['Escape', 'KeyP'],
           gamepad: ['button:9'],
@@ -156,8 +141,8 @@ const SETTINGS_SCHEMA = [
       {
         key: 'openSettings',
         type: 'binding',
-        label: 'Abrir configurações',
-        description: 'Atalho direto para o painel de configurações.',
+        label: 'Open Settings',
+        description: 'Direct shortcut to settings panel.',
         default: {
           keyboard: ['F10'],
           gamepad: ['button:8'],
@@ -170,8 +155,8 @@ const SETTINGS_SCHEMA = [
       {
         key: 'confirm',
         type: 'binding',
-        label: 'Confirmar / Interagir',
-        description: 'Confirma seleções em menus e diálogos.',
+        label: 'Confirm / Interact',
+        description: 'Confirm selections in menus and dialogs.',
         default: {
           keyboard: ['Enter', 'Space'],
           gamepad: ['button:0'],
@@ -184,86 +169,144 @@ const SETTINGS_SCHEMA = [
     ],
   },
   {
-    id: 'accessibility',
-    label: 'Acessibilidade',
-    description:
-      'Opções para reduzir desconfortos visuais e reforçar dicas durante o jogo.',
-    fields: [
-      {
-        key: 'reducedMotion',
-        type: 'toggle',
-        label: 'Reduzir movimentos intensos',
-        description: 'Atenua efeitos como screen shake e flashes rápidos.',
-        default: false,
-      },
-      {
-        key: 'highContrastHud',
-        type: 'toggle',
-        label: 'Aumentar contraste do HUD',
-        description: 'Aplica cores mais fortes aos indicadores principais.',
-        default: false,
-      },
-      {
-        key: 'colorBlindPalette',
-        type: 'toggle',
-        label: 'Modo daltônico',
-        description:
-          'Ativa uma paleta alternativa com maior distinção entre categorias e alertas.',
-        default: false,
-      },
-    ],
-  },
-  {
     id: 'video',
-    label: 'Vídeo e HUD',
-    description:
-      'Personalize a apresentação visual do HUD e dos efeitos de impacto.',
+    label: 'Interface',
+    description: 'Customize HUD layout and scaling.',
     fields: [
       {
         key: 'hudScale',
         type: 'range',
-        label: 'Escala do HUD',
-        description: 'Ajusta o tamanho dos elementos da interface.',
+        label: 'HUD Scale',
+        description: 'Adjust size of interface elements.',
         default: 1,
         min: 0.8,
         max: 1.3,
         step: 0.05,
       },
       {
-        key: 'screenShakeIntensity',
-        type: 'range',
-        label: 'Intensidade do impacto',
-        description: 'Controla o quanto a tela treme em eventos fortes.',
-        default: 1,
-        min: 0,
-        max: 1,
-        step: 0.1,
-      },
-      {
-        key: 'menuAsteroidNormalIntensity',
-        type: 'range',
-        label: 'Relevo dos asteroides do menu',
-        description:
-          'Ajusta a intensidade do normal map na tela inicial para destacar os detalhes sem perder desempenho.',
-        default: 1,
-        min: 0,
-        max: 2.5,
-        step: 0.1,
-      },
-      {
         key: 'damageFlash',
         type: 'toggle',
-        label: 'Flash de dano',
-        description:
-          'Habilita ou desabilita o flash branco rápido ao levar dano.',
+        label: 'Damage Flash',
+        description: 'Enable/disable white screen flash when taking damage.',
         default: true,
+      },
+    ],
+  },
+  {
+    id: 'graphics',
+    label: 'Graphics',
+    description: 'Visual quality and post-processing effects.',
+    fields: [
+      {
+        key: 'postProcessing',
+        type: 'toggle',
+        label: 'Post-Processing',
+        description: 'Enable advanced visual effects pipeline.',
+        default: true,
+      },
+      {
+        key: 'bloom',
+        type: 'toggle',
+        label: 'Bloom',
+        description:
+          'Intense glow effect on lasers, thrusters, and explosions.',
+        default: true,
+      },
+      {
+        key: 'chromaticAberration',
+        type: 'toggle',
+        label: 'Chromatic Aberration',
+        description: 'Simulates lens distortion at screen edges.',
+        default: true,
+      },
+      {
+        key: 'antialiasing',
+        type: 'select',
+        label: 'Anti-aliasing',
+        description: 'Reduces jagged edges.',
+        options: ['None', 'SMAA'],
+        default: 'SMAA',
       },
       {
         key: 'reducedParticles',
         type: 'toggle',
-        label: 'Reduzir partículas',
+        label: 'Reduced Particles',
         description:
-          'Simplifica efeitos visuais intensos como fagulhas, detritos e trilhas.',
+          'Simplifies intense visual effects like sparks and debris.',
+        default: false,
+      },
+    ],
+  },
+  {
+    id: 'audio',
+    label: 'Audio',
+    description: 'Adjust game audio mix, individual volumes, and mute options.',
+    fields: [
+      {
+        key: 'muteAll',
+        type: 'toggle',
+        label: 'Mute All',
+        description: 'Immediately stop all sound output.',
+        default: false,
+      },
+      {
+        key: 'masterVolume',
+        type: 'range',
+        label: 'Master Volume',
+        description: 'Controls global volume for all channels.',
+        default: 0.7,
+        min: 0,
+        max: 1,
+        step: 0.05,
+      },
+      {
+        key: 'musicVolume',
+        type: 'range',
+        label: 'Music Volume',
+        description: 'Sets intensity of ambient music and thematic tracks.',
+        default: 0.6,
+        min: 0,
+        max: 1,
+        step: 0.05,
+      },
+      {
+        key: 'effectsVolume',
+        type: 'range',
+        label: 'SFX Volume',
+        description:
+          'Affects shots, explosions, XP collection, and instant effects.',
+        default: 0.85,
+        min: 0,
+        max: 1,
+        step: 0.05,
+      },
+    ],
+  },
+  {
+    id: 'accessibility',
+    label: 'Accessibility',
+    description: 'Options to reduce visual discomfort and reinforce game cues.',
+    fields: [
+      {
+        key: 'reducedMotion',
+        type: 'toggle',
+        label: 'Reduce Motion',
+        description: 'Attenuates effects like screen shake and rapid flashes.',
+        default: false,
+      },
+      {
+        key: 'highContrastHud',
+        type: 'toggle',
+        label: 'High Contrast HUD',
+        description: 'Applies stronger colors to key indicators.',
+        default: false,
+      },
+      {
+        key: 'colorBlindPalette',
+        type: 'toggle',
+        label: 'Colorblind Mode',
+        description:
+          'Activates alternative palette with better distinction between categories.',
         default: false,
       },
     ],

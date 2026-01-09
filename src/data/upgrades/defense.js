@@ -11,29 +11,29 @@ export const DEFENSE_UPGRADES = deepFreeze([
     icon: '🛡️',
     themeColor: '#4ECDC4',
     unlockLevel: 1,
-    tags: ['vida', 'casco'],
+    tags: ['health', 'hull'],
     text: {
-      name: 'Escudo Energético',
+      name: 'Energy Shield',
       summary:
-        'Instala bobinas regenerativas que aumentam a capacidade estrutural do casco.',
-      lore: 'Sistema adaptado dos cargueiros Typhon. Opera em paralelo ao escudo defletor ativável.',
+        'Installs regenerative coils that increase hull structural capacity.',
+      lore: 'System adapted from Typhon freighters. Operates in parallel with the activateable deflector shield.',
       levels: [
         {
-          title: 'Reservas Auxiliares',
-          description: 'Aumenta a vida máxima em +50 pontos.',
+          title: 'Auxiliary Reserves',
+          description: 'Increases max health by +50 points.',
           highlights: [
-            'Aplica bônus direto de +50 HP e cura imediata equivalente.',
+            'Applies direct bonus of +50 HP and equivalent immediate heal.',
           ],
         },
         {
-          title: 'Camada de Grafeno',
-          description: 'Adiciona mais +50 pontos de vida máxima.',
-          highlights: ['Bônus cumulativo, totalizando +100 HP adicionais.'],
+          title: 'Graphene Layer',
+          description: 'Adds another +50 max health points.',
+          highlights: ['Cumulative bonus, totaling +100 additional HP.'],
         },
         {
-          title: 'Matriz Autorreparadora',
-          description: 'Amplia a reserva total em +75 pontos extras.',
-          highlights: ['Total de +175 HP extras após o terceiro nível.'],
+          title: 'Self-Repair Matrix',
+          description: 'Expands total reserve by +75 extra points.',
+          highlights: ['Total of +175 extra HP after the third level.'],
         },
       ],
     },
@@ -82,44 +82,46 @@ export const DEFENSE_UPGRADES = deepFreeze([
         type: 'upgrade',
         id: 'shield',
         level: 1,
-        text: 'Requer Escudo Energético instalado (Nv. 1).',
+        text: 'Requires Energy Shield installed (Lvl 1).',
       },
     ],
     text: {
-      name: 'Matriz de Deflexão',
+      name: 'Deflection Matrix',
       summary:
-        'Implementa um escudo ativável capaz de absorver impactos diretos.',
-      lore: 'Sistema experimental que redistribui energia do reator para um campo direcional rápido.',
+        'Implements an activateable shield capable of absorbing direct impacts.',
+      lore: 'Experimental system that redistributes reactor energy to a fast directional field.',
       levels: [
         {
-          title: 'Campo Inicial',
+          title: 'Initial Field',
           description:
-            'Escudo ativável absorve até 3 impactos antes de recarregar.',
-          highlights: ['Libera a habilidade na tecla configurada (padrão: E).'],
+            'Activateable shield absorbs up to 3 impacts before recharging.',
+          highlights: ['Unlocks ability on configured key (default: E).'],
         },
         {
-          title: 'Placas Reforçadas',
-          description: 'Capacidade aumentada para 4 impactos por ativação.',
+          title: 'Reinforced Plating',
+          description: 'Capacity increased to 4 impacts per activation.',
           highlights: [
-            'Ideal para aguentar ondas médias sem recarga imediata.',
+            'Ideal for withstanding medium waves without immediate recharge.',
           ],
         },
         {
-          title: 'Resfriamento Otimizado',
-          description: 'Reduz o tempo de recarga do escudo em 5 segundos.',
+          title: 'Optimized Cooling',
+          description: 'Reduces shield recharge time by 5 seconds.',
           highlights: [
-            'Permite reativações mais frequentes em lutas prolongadas.',
+            'Allows more frequent reactivations in prolonged fights.',
           ],
         },
         {
-          title: 'Matriz Avançada',
-          description: 'Capacidade final de 5 impactos por ativação.',
-          highlights: ['Sustenta confrontos contra enxames agressivos.'],
+          title: 'Advanced Matrix',
+          description: 'Final capacity of 5 impacts per activation.',
+          highlights: ['Sustains confrontations against aggressive swarms.'],
         },
         {
-          title: 'Sobrecarga Defletora',
-          description: 'Reduz ainda mais o cooldown total do escudo.',
-          highlights: ['Libera recarga rápida para contra-ataques sucessivos.'],
+          title: 'Deflector Overload',
+          description: 'Further reduces total shield cooldown.',
+          highlights: [
+            'Unlocks rapid recharge for successive counter-attacks.',
+          ],
         },
       ],
     },

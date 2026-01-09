@@ -3,7 +3,8 @@
 const AAA_TACTICAL_LAYOUT = {
   id: 'aaa_tactical',
   label: 'AAA Tactical (Mockup)',
-  description: 'HUD tático AAA integrado via módulo (layoutmockupstudy.html).',
+  description:
+    'AAA tactical HUD integrated via module (layoutmockupstudy.html).',
   plugin: {
     module: 'AAAHudLayout',
     radarRange: 1500,

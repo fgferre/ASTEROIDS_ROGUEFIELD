@@ -247,6 +247,59 @@ class HitMarker {
   }
 }
 
+class DamageText {
+  constructor(x, y, damage, isCritical) {
+    this.x = x;
+    this.y = y;
+    this.damage = Math.round(damage);
+    this.isCritical = isCritical;
+    this.life = 0.8;
+    this.maxLife = 0.8;
+    this.vy = -30; // Move up
+    this.scale = 1;
+  }
+
+  update(deltaTime) {
+    this.life -= deltaTime;
+    this.y += this.vy * deltaTime;
+    this.vy *= 0.95; // Slow down
+
+    // Pop in animation
+    const progress = 1 - this.life / this.maxLife;
+    if (progress < 0.2) {
+      this.scale = progress * 5;
+    } else {
+      this.scale = 1;
+    }
+
+    return this.life > 0;
+  }
+
+  draw(ctx) {
+    const alpha = Math.min(1, this.life * 2);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(this.x, this.y);
+    const s = this.scale * (this.isCritical ? 1.5 : 1.0);
+    ctx.scale(s, s);
+
+    ctx.font = `bold ${this.isCritical ? '24px' : '16px'} "Rajdhani", sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    // Stroke
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#000000';
+    ctx.strokeText(String(this.damage), 0, 0);
+
+    // Fill
+    ctx.fillStyle = this.isCritical ? '#FFBB00' : '#FFFFFF';
+    ctx.fillText(String(this.damage), 0, 0);
+
+    ctx.restore();
+  }
+}
+
 export default class EffectsSystem extends BaseSystem {
   constructor(config = {}) {
     const normalizedConfig =
@@ -319,10 +372,13 @@ export default class EffectsSystem extends BaseSystem {
     this.lastAdjustedDelta = 0;
 
     this.settings = resolveService('settings', this.dependencies);
+    this.hitMarkersEnabled = true;
+    this.damageNumbersEnabled = true;
     this.motionReduced = false;
     this.screenShakeScale = 1;
     this.damageFlashEnabled = true;
     this.particleDensity = 1;
+    this.damageTexts = []; // NEW: Damage text tracking
 
     this.setupSettingsIntegration();
   }
@@ -446,6 +502,23 @@ export default class EffectsSystem extends BaseSystem {
         this.applyVideoPreferences(payload.values);
       }
     });
+
+    this.registerEventListener('settings-gameplay-changed', (payload = {}) => {
+      if (payload?.values) {
+        this.applyGameplayPreferences(payload.values);
+      }
+    });
+
+    // Also apply initial gameplay preferences
+    if (
+      this.settings &&
+      typeof this.settings.getCategoryValues === 'function'
+    ) {
+      const gameplay = this.settings.getCategoryValues('gameplay');
+      if (gameplay) {
+        this.applyGameplayPreferences(gameplay);
+      }
+    }
   }
 
   applyAccessibilityPreferences(values = {}) {
@@ -472,6 +545,21 @@ export default class EffectsSystem extends BaseSystem {
 
     if (typeof values.reducedParticles === 'boolean') {
       this.particleDensity = values.reducedParticles ? 0.55 : 1;
+    }
+  }
+
+  applyGameplayPreferences(values = {}) {
+    this.hitMarkersEnabled = values.hitMarkers !== false;
+    this.damageNumbersEnabled = values.damageNumbers !== false;
+
+    if (Number.isFinite(values.screenShake)) {
+      this.screenShakeScale = Math.max(
+        0,
+        Math.min(2, Number(values.screenShake))
+      );
+      if (this.screenShakeScale <= 0) {
+        this.screenShake.reset();
+      }
     }
   }
 
@@ -621,11 +709,13 @@ export default class EffectsSystem extends BaseSystem {
 
     this.registerEventListener('bullet-hit', (data) => {
       if (data?.position) {
-        this.createHitMarker(
-          data.position,
-          data.killed || false,
-          data.damage || 0
-        );
+        if (this.hitMarkersEnabled) {
+          this.createHitMarker(
+            data.position,
+            data.killed || false,
+            data.damage || 0
+          );
+        }
         this.createBulletImpact(
           data.position,
           { x: data.enemy?.vx || 0, y: data.enemy?.vy || 0 },
@@ -721,6 +811,17 @@ export default class EffectsSystem extends BaseSystem {
       }
     });
 
+    this.registerEventListener('enemy-took-damage', (data) => {
+      if (data?.enemy && Number.isFinite(data.damage)) {
+        this.createFloatingDamageText(
+          data.enemy.x,
+          data.enemy.y,
+          data.damage,
+          data.isCritical || false
+        );
+      }
+    });
+
     // Level 5 shield: deflective explosion when shield breaks
     this.registerEventListener('shield-deflective-explosion', (data) => {
       if (!data?.position) return;
@@ -779,6 +880,7 @@ export default class EffectsSystem extends BaseSystem {
     this.updateParticles(effectDelta);
     this.updateShockwaves(effectDelta);
     this.updateHitMarkers(effectDelta);
+    this.updateDamageTexts(effectDelta);
     this.updateDamageIndicators(effectDelta);
     this.updateBossTransitions(effectDelta);
 
@@ -1005,6 +1107,14 @@ export default class EffectsSystem extends BaseSystem {
       const marker = this.hitMarkers[i];
       if (marker) {
         marker.draw(ctx);
+      }
+    }
+
+    // Draw damage numbers
+    for (let i = 0; i < this.damageTexts.length; i += 1) {
+      const text = this.damageTexts[i];
+      if (text) {
+        text.draw(ctx);
       }
     }
 
@@ -4167,6 +4277,7 @@ export default class EffectsSystem extends BaseSystem {
     this.shockwaves = [];
     this.hitMarkers = [];
     this.damageIndicators = [];
+    this.damageTexts = [];
     this.bossTransitionEffects = [];
     this.muzzleFlashQueue = [];
 
@@ -4197,6 +4308,25 @@ export default class EffectsSystem extends BaseSystem {
       color: '#FFFFFF',
       intensity: 0,
     };
+  }
+
+  createFloatingDamageText(x, y, damage, isCritical = false) {
+    if (!this.damageNumbersEnabled) return;
+    this.damageTexts.push(new DamageText(x, y, damage, isCritical));
+  }
+
+  updateDamageTexts(deltaTime) {
+    const texts = this.damageTexts;
+    let writeIndex = 0;
+
+    for (let i = 0; i < texts.length; i += 1) {
+      const text = texts[i];
+      if (text && text.update(deltaTime)) {
+        texts[writeIndex++] = text;
+      }
+    }
+
+    texts.length = writeIndex;
   }
 }
 

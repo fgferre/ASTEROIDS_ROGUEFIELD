@@ -11,30 +11,27 @@ export const OFFENSE_UPGRADES = deepFreeze([
     icon: '⚡',
     themeColor: '#F6C945',
     unlockLevel: 1,
-    tags: ['dano', 'armamento'],
+    tags: ['damage', 'weaponry'],
     text: {
-      name: 'Arma de Plasma',
+      name: 'Plasma Gun',
       summary:
-        'Condensa o canhão principal em plasma superaquecido para multiplicar o potencial ofensivo.',
-      lore: 'Tecnologia recuperada dos cascos devastados da frota Perseus. Requer monitoramento constante de temperatura.',
+        'Condenses the main cannon into superheated plasma to multiply offensive potential.',
+      lore: 'Technology salvaged from the devastated hulls of the Perseus fleet. Requires constant temperature monitoring.',
       levels: [
         {
-          title: 'Bobina de Fusão',
-          description: 'Projéteis padrão causam imediatamente +25% de dano.',
-          highlights: ['Multiplicador aplicado diretamente ao dano base.'],
+          title: 'Fusion Coil',
+          description: 'Standard projectiles deal immediately +25% damage.',
+          highlights: ['Multiplier applied directly to base damage.'],
         },
         {
-          title: 'Condensadores Geminados',
-          description:
-            'Aprimora o sistema para alcançar +50% de dano acumulado.',
-          highlights: ['Aplica 20% adicionais sobre o dano atual.'],
+          title: 'Twinned Capacitors',
+          description: 'Enhances system to reach +50% accumulated damage.',
+          highlights: ['Applies additional 20% over current damage.'],
         },
         {
-          title: 'Matriz Harmônica',
-          description: 'Estabiliza o plasma para +70% de dano total.',
-          highlights: [
-            'Fornece multiplicador extra de 15% sobre o valor vigente.',
-          ],
+          title: 'Harmonic Matrix',
+          description: 'Stabilizes plasma for +70% total damage.',
+          highlights: ['Provides extra 15% multiplier on current value.'],
         },
       ],
     },
@@ -77,28 +74,27 @@ export const OFFENSE_UPGRADES = deepFreeze([
     icon: '💥',
     themeColor: '#A56DFF',
     unlockLevel: 1,
-    tags: ['projéteis', 'armamento'],
+    tags: ['projectiles', 'weaponry'],
     text: {
-      name: 'Tiro Múltiplo',
+      name: 'Multishot',
       summary:
-        'Acopla emissores secundários ao canhão principal para liberar mais projéteis.',
-      lore: 'Módulos reutilizáveis recuperados de satélites militares desativados.',
+        'Couples secondary emitters to main cannon to unleash more projectiles.',
+      lore: 'Reusable modules salvaged from deactivated military satellites.',
       levels: [
         {
-          title: 'Duas Saídas',
-          description: 'Dispara um projétil adicional por sequência.',
-          highlights: ['Aumenta o volume de fogo instantâneo.'],
+          title: 'Dual Outlet',
+          description: 'Fires one additional projectile per sequence.',
+          highlights: ['Increases instant fire volume.'],
         },
         {
-          title: 'Grade Triangular',
-          description:
-            'Adiciona um terceiro disparo, formando padrão em leque.',
-          highlights: ['Cobre área maior diante da nave.'],
+          title: 'Triangular Grid',
+          description: 'Adds a third shot, forming a fan pattern.',
+          highlights: ['Covers larger area in front of ship.'],
         },
         {
-          title: 'Barragem Sincronizada',
-          description: 'Inclui um quarto projétil por sequência.',
-          highlights: ['Maximiza saturação em curtas distâncias.'],
+          title: 'Synchronized Barrage',
+          description: 'Includes a fourth projectile per sequence.',
+          highlights: ['Maximizes saturation at close range.'],
         },
       ],
     },
@@ -141,38 +137,38 @@ export const OFFENSE_UPGRADES = deepFreeze([
     icon: '🎯',
     themeColor: '#FFD166',
     unlockLevel: 3,
-    tags: ['mira', 'tático', 'armamento'],
+    tags: ['aim', 'tactical', 'weaponry'],
     text: {
-      name: 'Matriz de Mira',
+      name: 'Targeting Matrix',
       summary:
-        'Implanta heurísticas de combate que priorizam ameaças críticas e refinam a predição de disparos.',
-      lore: 'Firmware experimental extraído de drones de escolta, calibrado para leitura instantânea de perigo em cenários caóticos.',
+        'Implants combat heuristics that prioritize critical threats and refine shot prediction.',
+      lore: 'Experimental firmware extracted from escort drones, calibrated for instant hazard reading in chaotic scenarios.',
       levels: [
         {
-          title: 'Aquisição Adaptativa',
+          title: 'Adaptive Acquisition',
           description:
-            'Ativa uma matriz de periculosidade que privilegia variantes perseguidoras e explosivas antes de qualquer outra ameaça.',
+            'Activates a danger matrix privileging chaser and explosive variants before any other threat.',
           highlights: [
-            'Classifica os inimigos por comportamento, recompensa e direção relativa ao jogador.',
-            'Linha de mira pulsa ao fixar um novo alvo prioritário.',
+            'Classifies enemies by behavior, reward from relative player direction.',
+            'Aim line pulses when locking a new priority target.',
           ],
         },
         {
-          title: 'Predição Dinâmica',
+          title: 'Dynamic Prediction',
           description:
-            'Calcula interceptações com base na velocidade real do projétil, reduzindo erros em alvos rápidos.',
+            'Calculates intercepts based on actual projectile velocity, reducing errors on fast targets.',
           highlights: [
-            'Marca visualmente o ponto previsto de impacto.',
-            'Modula levemente o timbre do disparo para indicar a predição avançada.',
+            'Visually marks predicted impact point.',
+            'Slightly modulates shot pitch to indicate advanced prediction.',
           ],
         },
         {
-          title: 'Travas Coordenadas',
+          title: 'Coordinated Locks',
           description:
-            'Ativa uma bateria de quatro canhões independentes que priorizam ameaças críticas em paralelo.',
+            'Activates a battery of four independent cannons prioritizing critical threats in parallel.',
           highlights: [
-            'Disponível apenas com Tiro Múltiplo instalado (Nv. 1+).',
-            'Coordena até quatro travas e pode concentrar fogo em um único alvo iminente.',
+            'Available only with Multishot installed (Lvl 1+).',
+            'Coordinates up to four locks and can concentrate fire on a single imminent target.',
           ],
         },
       ],
@@ -213,7 +209,7 @@ export const OFFENSE_UPGRADES = deepFreeze([
             type: 'upgrade',
             id: 'multishot',
             level: 1,
-            text: 'Requer Tiro Múltiplo instalado (Nv. 1).',
+            text: 'Requires Multishot installed (Lvl 1).',
           },
         ],
         effects: [

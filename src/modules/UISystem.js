@@ -148,6 +148,7 @@ class UISystem extends BaseSystem {
       source: 'menu',
       activeCategory: 'audio',
       capture: null,
+      previousFocus: null,
     };
     this.creditsState = {
       isOpen: false,
@@ -1664,7 +1665,10 @@ class UISystem extends BaseSystem {
 
     if (pauseRefs.exitBtn) {
       pauseRefs.exitBtn.addEventListener('mouseenter', () => {
-        this.eventBus?.emit?.('ui-hover', { source: 'pause-menu', button: 'exit' });
+        this.eventBus?.emit?.('ui-hover', {
+          source: 'pause-menu',
+          button: 'exit',
+        });
       });
       pauseRefs.exitBtn.addEventListener('click', () => {
         if (!this.currentPauseState) {
@@ -3407,6 +3411,15 @@ class UISystem extends BaseSystem {
     }
 
     const restoreFocus = Boolean(options?.restoreFocus);
+    const triggerId = this.creditsState.triggerId;
+
+    if (restoreFocus && triggerId) {
+      const trigger = document.getElementById(triggerId);
+      if (trigger instanceof HTMLElement) {
+        trigger.focus();
+      }
+    }
+
     const overlay = this.domRefs.credits?.overlay;
 
     this.showScreen('credits', { overlay: true, show: false });
@@ -3416,16 +3429,8 @@ class UISystem extends BaseSystem {
 
     document.body?.classList.remove('is-credits-open');
 
-    const triggerId = this.creditsState.triggerId;
     this.creditsState.isOpen = false;
     this.creditsState.triggerId = null;
-
-    if (restoreFocus && triggerId) {
-      const trigger = document.getElementById(triggerId);
-      if (trigger instanceof HTMLElement) {
-        trigger.focus();
-      }
-    }
   }
 
   handleCreditsKeyDown(event) {
@@ -3481,6 +3486,24 @@ class UISystem extends BaseSystem {
       root.dataset.hudScale = String(baseScale);
     }
 
+    // [NEO-ARCADE] Fullscreen Handling
+    if (values.fullscreen !== undefined) {
+      const shouldBeFullscreen = Boolean(values.fullscreen);
+      const isFullscreen = Boolean(document.fullscreenElement);
+
+      if (shouldBeFullscreen && !isFullscreen) {
+        document.documentElement.requestFullscreen().catch((err) => {
+          console.warn('[UISystem] Fullscreen request failed:', err);
+        });
+      } else if (!shouldBeFullscreen && isFullscreen) {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch((err) => {
+            console.warn('[UISystem] Exit fullscreen failed:', err);
+          });
+        }
+      }
+    }
+
     this.currentHudBaseScale = baseScale;
     this.updateHudScale();
     this.requestViewportScaleUpdate();
@@ -3505,7 +3528,12 @@ class UISystem extends BaseSystem {
     this.applyHudLayoutPreference(layoutPreference);
   }
 
-  deriveVisualPreferences(accessibility = {}, video = {}) {
+  deriveVisualPreferences(
+    accessibility = {},
+    video = {},
+    graphics = {},
+    gameplay = {}
+  ) {
     const highContrast = Boolean(accessibility.highContrastHud);
     const reducedMotion = Boolean(accessibility.reducedMotion);
     const colorVision = accessibility.colorBlindPalette ? 'assist' : 'standard';
@@ -3513,11 +3541,15 @@ class UISystem extends BaseSystem {
       ? Number(video.hudScale)
       : 1;
     const damageFlash = video.damageFlash !== false;
-    const reducedParticles = Boolean(video.reducedParticles);
+    const reducedParticles =
+      Boolean(video.reducedParticles) || Boolean(graphics?.reducedParticles);
     const hudLayout =
       typeof video.hudLayout === 'string' && video.hudLayout
         ? video.hudLayout
         : DEFAULT_HUD_LAYOUT_ID;
+    const screenShake = Number.isFinite(Number(gameplay?.screenShake))
+      ? Number(gameplay.screenShake)
+      : 1;
 
     return {
       contrast: highContrast ? 'high' : 'normal',
@@ -3527,16 +3559,32 @@ class UISystem extends BaseSystem {
       damageFlash,
       reducedParticles,
       hudLayout,
+      screenShake,
+      postProcessing: graphics?.postProcessing !== false,
+      bloom: graphics?.bloom !== false,
+      chromaticAberration: graphics?.chromaticAberration !== false,
+      antialiasing: graphics?.antialiasing || 'SMAA',
+      damageNumbers: gameplay?.damageNumbers !== false,
+      hitMarkers: gameplay?.hitMarkers !== false,
     };
   }
 
   applyVisualPreferences(values = {}) {
     const accessibility = values.accessibility || {};
     const video = values.video || {};
+    const graphics = values.graphics || {};
+    const gameplay = values.gameplay || {};
     const derived =
-      values.derived || this.deriveVisualPreferences(accessibility, video);
+      values.derived ||
+      this.deriveVisualPreferences(accessibility, video, graphics, gameplay);
 
-    this.currentVisualPreferences = { accessibility, video, derived };
+    this.currentVisualPreferences = {
+      accessibility,
+      video,
+      graphics,
+      gameplay,
+      derived,
+    };
 
     this.applyAccessibilitySettings(accessibility, derived);
     this.applyVideoSettings(video, derived);
@@ -3652,6 +3700,9 @@ class UISystem extends BaseSystem {
 
     this.settingsState.isOpen = true;
     this.settingsState.source = source;
+    // Capture focus before opening
+    this.settingsState.previousFocus = document.activeElement;
+
     this.renderSettingsCategories();
     this.renderSettingsPanel(this.settingsState.activeCategory);
 
@@ -3671,6 +3722,24 @@ class UISystem extends BaseSystem {
     if (!this.settingsState.isOpen) {
       return;
     }
+
+    // Restore focus BEFORE hiding the overlay to avoid "aria-hidden" warning
+    if (
+      this.settingsState.previousFocus instanceof HTMLElement &&
+      document.body.contains(this.settingsState.previousFocus)
+    ) {
+      this.settingsState.previousFocus.focus();
+    } else {
+      // Fallback if previous element is lost
+      if (this.settingsState.source === 'menu') {
+        const menuBtn = document.getElementById('open-settings-btn');
+        menuBtn?.focus();
+      } else if (this.settingsState.source === 'pause') {
+        const pauseBtn = this.domRefs.pause?.settingsBtn;
+        pauseBtn?.focus();
+      }
+    }
+    this.settingsState.previousFocus = null;
 
     const overlay = this.domRefs.settings?.overlay;
     if (overlay) {
@@ -3715,9 +3784,8 @@ class UISystem extends BaseSystem {
     container.innerHTML = '';
 
     if (!category) {
-      const message = document.createElement('p');
       message.className = 'settings-empty-state';
-      message.textContent = 'Categoria de configurações indisponível.';
+      message.textContent = 'Settings category unavailable.';
       container.appendChild(message);
       return;
     }
@@ -3952,7 +4020,7 @@ class UISystem extends BaseSystem {
       const deviceTitle = document.createElement('span');
       deviceTitle.className = 'settings-binding__device';
       deviceTitle.textContent =
-        metadata.label || (device === 'keyboard' ? 'Teclado' : 'Gamepad');
+        metadata.label || (device === 'keyboard' ? 'Keyboard' : 'Gamepad');
       deviceGroup.appendChild(deviceTitle);
 
       const list = document.createElement('div');
@@ -3971,7 +4039,7 @@ class UISystem extends BaseSystem {
         button.dataset.label = bindingValue;
         button.textContent = bindingValue
           ? this.formatBindingLabel(bindingValue, device)
-          : 'Definir';
+          : 'Set';
         list.appendChild(button);
       }
 
@@ -4018,7 +4086,7 @@ class UISystem extends BaseSystem {
 
   formatBindingLabel(value, device) {
     if (!value) {
-      return 'Definir';
+      return 'Set';
     }
 
     if (device === 'keyboard') {
@@ -4029,13 +4097,13 @@ class UISystem extends BaseSystem {
         return value.slice(5);
       }
       if (value === 'Space') {
-        return 'Barra de espaço';
+        return 'Spacebar';
       }
       if (value === 'Escape') {
         return 'Esc';
       }
       if (value.startsWith('Arrow')) {
-        return `Seta ${value.slice(5).toLowerCase()}`;
+        return `Arrow ${value.slice(5)}`;
       }
       if (value.startsWith('Shift')) {
         return 'Shift';
@@ -4051,13 +4119,13 @@ class UISystem extends BaseSystem {
 
     if (device === 'gamepad') {
       if (value.startsWith('button:')) {
-        return `Botão ${value.split(':')[1]}`;
+        return `Button ${value.split(':')[1]}`;
       }
       if (value.startsWith('axis:')) {
         const [, index, direction] = value.split(':');
         const symbol =
           direction === 'negative' || direction === '-' ? '−' : '+';
-        return `Eixo ${index} ${symbol}`;
+        return `Axis ${index} ${symbol}`;
       }
     }
 
@@ -4192,7 +4260,7 @@ class UISystem extends BaseSystem {
     this.cancelBindingCapture();
 
     button.classList.add('is-listening');
-    button.textContent = 'Aguardando entrada...';
+    button.textContent = 'Waiting for input...';
 
     this.settingsState.capture = {
       categoryId,

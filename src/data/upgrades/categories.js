@@ -14,31 +14,30 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
 export const UPGRADE_CATEGORIES = deepFreeze({
   offense: {
     id: 'offense',
-    label: 'Ofensiva',
-    description:
-      'Potencializa o armamento principal e aumenta o dano por disparo.',
+    label: 'Offense',
+    description: 'Boosts main weaponry and increases damage per shot.',
     icon: '✴️',
     themeColor: '#F6C945',
   },
   defense: {
     id: 'defense',
-    label: 'Defensiva',
+    label: 'Defense',
     description:
-      'Fortalece o casco, reforça o escudo e amplia a sobrevivência.',
+      'Strengthens hull, reinforces shields, and enhances survivability.',
     icon: '🛡️',
     themeColor: '#4ECDC4',
   },
   mobility: {
     id: 'mobility',
-    label: 'Mobilidade',
-    description: 'Aprimora propulsores, aceleração e controle da nave.',
+    label: 'Mobility',
+    description: 'Improves thrusters, acceleration, and ship control.',
     icon: '🛰️',
     themeColor: '#5DADE2',
   },
   utility: {
     id: 'utility',
-    label: 'Utilitária',
-    description: 'Otimiza coleta, magnetismo e suporte tático.',
+    label: 'Utility',
+    description: 'Optimizes collection, magnetism, and tactical support.',
     icon: '🧲',
     themeColor: '#C08BFF',
   },

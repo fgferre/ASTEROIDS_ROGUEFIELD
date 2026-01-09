@@ -11,33 +11,29 @@ export const UTILITY_UPGRADES = deepFreeze([
     icon: '🧲',
     themeColor: '#C08BFF',
     unlockLevel: 1,
-    tags: ['coleta', 'magnetismo'],
+    tags: ['collection', 'magnetism'],
     text: {
-      name: 'Campo Magnético',
+      name: 'Magnetic Field',
       summary:
-        'Amplifica o campo coletor da nave para atrair orbes de experiência mais distantes.',
-      lore: 'Bobinas recalibradas com ligas leves permitem magnetismo estável mesmo durante manobras bruscas.',
+        'Amplifies ship collector field to attract experience orbs from further away.',
+      lore: 'Coils recalibrated with light alloys allow stable magnetism even during sharp maneuvers.',
       levels: [
         {
-          title: 'Lentes de Fluxo',
-          description: 'Aumenta o alcance de coleta em +40%.',
+          title: 'Flux Lenses',
+          description: 'Increases collection range by +40%.',
           highlights: [
-            'Multiplica o raio atual e intensifica a força de atração.',
+            'Multiplies current radius and intensifies attraction force.',
           ],
         },
         {
-          title: 'Catalisador Duplo',
-          description: 'Amplia o bônus acumulado para +75% de alcance.',
-          highlights: [
-            'Aplica incremento adicional de 25% sobre o raio vigente.',
-          ],
+          title: 'Dual Catalyst',
+          description: 'Expands accumulated bonus to +75% range.',
+          highlights: ['Applies additional 25% increment over current radius.'],
         },
         {
-          title: 'Trama de Harmonia',
-          description: 'Estabiliza o campo em +105% de alcance total.',
-          highlights: [
-            'Adiciona 15% extras de raio e reforça a força magnética.',
-          ],
+          title: 'Harmonic Weave',
+          description: 'Stabilizes field at +105% total range.',
+          highlights: ['Adds 15% extra radius and reinforces magnetic force.'],
         },
       ],
     },
