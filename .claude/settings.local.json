@@ -24,8 +24,6 @@
       "Bash(test:*)",
       "Bash(gh run list:*)",
       "Bash(rm:*)"
-    ],
-    "deny": [],
-    "ask": []
+    ]
   }
 }

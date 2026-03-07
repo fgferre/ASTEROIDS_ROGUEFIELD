@@ -1,0 +1,18 @@
+{
+  "mode": "SAFE",
+  "reason": "safe paths changed: fuel-watch-app/app/auth/login.tsx",
+  "source": "stdin",
+  "changedFiles": 32,
+  "riskyPaths": [
+    "fuel-watch-app/app/auth/login.tsx"
+  ],
+  "matches": {
+    "safe": [],
+    "plan": [],
+    "recovery": []
+  },
+  "inputHash": "f3401b0834be7d7a401671acddaaaef2f4cf0db2e3ef5a4f21ba107306601a33",
+  "updatedAt": "2026-03-06T16:07:36.306Z",
+  "ttlMs": 2700000,
+  "version": "router-v2"
+}
