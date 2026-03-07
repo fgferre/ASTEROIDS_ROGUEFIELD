@@ -23,7 +23,10 @@
       "Bash(xargs -I {} sh -c \"grep -l ''''fork'''' {} 2>/dev/null && echo {} || true\")",
       "Bash(test:*)",
       "Bash(gh run list:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(git stash:*)",
+      "Bash(npx vitest run:*)",
+      "Bash(git status:*)"
     ]
   }
 }
