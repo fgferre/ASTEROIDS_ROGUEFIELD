@@ -139,7 +139,6 @@ class CombatSystem extends BaseSystem {
       projectileEnemyTrailPoints: 0,
     };
 
-    this.setupEventListeners();
     this.resolveCachedServices(COMBAT_SERVICE_MAP, { force: true });
   }
 

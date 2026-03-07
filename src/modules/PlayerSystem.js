@@ -140,8 +140,7 @@ class PlayerSystem extends BaseSystem {
     this.isDead = false;
     this.isRetrying = false;
 
-    // Escutar eventos de upgrade
-    this.setupEventListeners();
+    // Event listeners are set up by BaseSystem after initialize()
   }
 
   static normalizeConfig(config) {

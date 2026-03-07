@@ -17,7 +17,6 @@ class WorldSystem extends BaseSystem {
 
     this.playerAlive = true;
 
-    this.setupEventListeners();
     this.resolveCachedServices(WORLD_SERVICE_MAP, { force: true });
   }
 

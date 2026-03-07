@@ -26,6 +26,19 @@ export class HealthComponent {
       return;
     }
 
+    // If the enemy already computed its own scaled health (e.g. BossEnemy),
+    // skip recalculating health values but still apply armor/shields/invuln.
+    if (enemy.healthInitialized) {
+      const config = { ...this.config, ...overrides };
+      enemy.armor = config.armor ?? enemy.armor ?? 0;
+      enemy.shields = config.shields ?? enemy.shields ?? 0;
+      enemy.invulnerable = Boolean(config.invulnerable ?? enemy.invulnerable);
+      enemy.invulnerabilityTimer =
+        config.invulnerabilityDuration ?? enemy.invulnerabilityTimer ?? 0;
+      enemy.healthConfig = config;
+      return;
+    }
+
     const config = { ...this.config, ...overrides };
     const hasExplicitHealth = Number.isFinite(overrides.health);
     const waveMultiplier = hasExplicitHealth

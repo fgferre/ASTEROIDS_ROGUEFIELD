@@ -582,6 +582,14 @@ export class AsteroidImpactEffect {
   }
 
   updateCameraShake(delta) {
+    // Remove previous frame's shake offset before computing new one
+    if (this._shakeOffsetX != null) {
+      this.camera.position.x -= this._shakeOffsetX;
+      this.camera.position.y -= this._shakeOffsetY;
+      this._shakeOffsetX = 0;
+      this._shakeOffsetY = 0;
+    }
+
     if (!this.cameraShakeState) return;
 
     const shake = this.cameraShakeState;
@@ -599,6 +607,8 @@ export class AsteroidImpactEffect {
     const offsetX = Math.sin(time * 1.3) * Math.cos(time * 0.7) * intensity;
     const offsetY = Math.sin(time * 1.7) * Math.cos(time * 1.1) * intensity;
 
+    this._shakeOffsetX = offsetX;
+    this._shakeOffsetY = offsetY;
     this.camera.position.x += offsetX;
     this.camera.position.y += offsetY;
   }

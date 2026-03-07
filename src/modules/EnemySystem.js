@@ -185,6 +185,11 @@ class EnemySystem extends BaseSystem {
     this.setupSpawnSystem(); // Initialize spawn sub-system
     this.setupDamageSystem(); // Initialize damage sub-system
     this.setupUpdateSystem(); // Initialize update sub-system
+    // Re-register listeners now that managers/subsystems are ready.
+    // BaseSystem already called setupEventListeners() during super(), but
+    // at that point waveManager etc. didn't exist yet, so conditional
+    // registrations were skipped.  Clear and redo.
+    this.removeAllEventListeners();
     this.setupEventListeners();
     this.syncPhysicsIntegration(true);
 
@@ -1629,52 +1634,12 @@ class EnemySystem extends BaseSystem {
   }
 
   forwardBossEvent(eventName, payload = {}) {
-    const eventData = { event: eventName, ...payload };
-
-    const effects = this.getCachedEffects();
-    if (effects) {
-      if (typeof effects.handleBossEvent === 'function') {
-        effects.handleBossEvent(eventName, eventData);
-      } else if (typeof effects.onBossEvent === 'function') {
-        effects.onBossEvent(eventName, eventData);
-      } else if (typeof effects.enqueueBossEvent === 'function') {
-        effects.enqueueBossEvent(eventName, eventData);
-      } else {
-        this.applyBossEffectsFallback(effects, eventName, eventData);
-      }
-    } else {
-      this.applyBossEffectsFallback(null, eventName, eventData);
-    }
-
-    const audio = this.getCachedAudio();
-    if (audio) {
-      if (typeof audio.handleBossEvent === 'function') {
-        audio.handleBossEvent(eventName, eventData);
-      } else if (typeof audio.playBossEvent === 'function') {
-        audio.playBossEvent(eventName, eventData);
-      } else {
-        this.applyBossAudioFallback(audio, eventName, eventData);
-      }
-    } else {
-      this.applyBossAudioFallback(null, eventName, eventData);
-    }
-
-    const ui = this.getCachedUI();
-    if (ui) {
-      if (typeof ui.handleBossEvent === 'function') {
-        ui.handleBossEvent(eventName, eventData);
-      } else if (
-        typeof ui.updateBossHud === 'function' &&
-        eventName !== 'boss-hud-update'
-      ) {
-        ui.updateBossHud({ ...this.bossHudState, ...eventData });
-      }
-    }
-
-    this.emitBossSystemEvent('effects', eventName, eventData);
-    this.emitBossSystemEvent('audio', eventName, eventData);
-    this.emitBossSystemEvent('ui', eventName, eventData);
-    this.emitBossSystemEvent('boss', eventName, eventData);
+    // Raw boss events (boss-spawned, boss-phase-changed, boss-defeated) are
+    // already emitted by BossEnemy / EnemySpawnSystem and consumed directly
+    // by EffectsSystem, AudioSystem and UISystem via their own listeners.
+    // This method previously duplicated that processing via direct calls
+    // AND secondary event emissions (effects-boss-*, audio-boss-*, ui-boss-*).
+    // Kept as a no-op hook for any future per-event bookkeeping in EnemySystem.
   }
 
   applyBossEffectsFallback(effects, eventName, payload) {
@@ -3418,13 +3383,21 @@ class EnemySystem extends BaseSystem {
     };
 
     this.emitBossHudUpdate();
-    this.forwardBossEvent('boss-wave-started', {
-      ...data,
-      wave: waveNumber,
-      phaseColors,
-      invulnerable: false,
-      invulnerabilityTimer: null,
-    });
+
+    // boss-wave-started has no raw listeners in EffectsSystem/AudioSystem
+    // (unlike boss-spawned/phase-changed/defeated), so apply feedback here.
+    const effects = this.getCachedEffects();
+    if (effects && typeof effects.addScreenFlash === 'function') {
+      effects.addScreenFlash('rgba(255, 140, 0, 0.25)', 0.35, 0.2);
+    }
+    const audio = this.getCachedAudio();
+    if (audio) {
+      if (typeof audio.playShieldShockwave === 'function') {
+        audio.playShieldShockwave();
+      } else if (typeof audio.playGoldSpawn === 'function') {
+        audio.playGoldSpawn();
+      }
+    }
   }
 
   handleBossSpawned(data = {}) {

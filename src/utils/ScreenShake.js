@@ -144,14 +144,17 @@ export class ScreenShake {
    * @param {number} duration - Optional duration (0 = instant decay)
    */
   add(amount, duration = 0) {
+    const hadTrauma = this.trauma > 0;
     this.trauma = Math.min(1, this.trauma + amount);
 
-    // If duration specified, adjust decay to match
-    if (duration > 0) {
-      this.traumaDecay = amount / duration;
-    } else {
-      this.traumaDecay = 1.5; // Default decay
-    }
+    const newDecay = duration > 0 ? amount / duration : 1.5;
+
+    // When stacking onto an existing shake, keep the faster decay
+    // so a weak event can't prolong a strong one.  When starting
+    // fresh (no prior trauma), just use the requested decay.
+    this.traumaDecay = hadTrauma
+      ? Math.max(this.traumaDecay, newDecay)
+      : newDecay;
   }
 
   /**
@@ -172,6 +175,9 @@ export class ScreenShake {
     // Decay trauma
     if (this.trauma > 0) {
       this.trauma = Math.max(0, this.trauma - this.traumaDecay * deltaTime);
+      if (this.trauma === 0) {
+        this.traumaDecay = 0;
+      }
     }
 
     // Update time for noise

@@ -205,6 +205,7 @@ export class BossEnemy extends BaseEnemy {
       baseHealth * Math.pow(Math.max(1, scaling), waveNumber - 1);
     this.maxHealth = Math.ceil(scaledHealth);
     this.health = config.currentHealth ?? this.maxHealth;
+    this.healthInitialized = true;
 
     this.speed = config.speed ?? defaults.speed ?? 60;
     this.acceleration = config.acceleration ?? defaults.acceleration ?? 120;

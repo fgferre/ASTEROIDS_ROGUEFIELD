@@ -86,15 +86,10 @@ export class DIContainer {
     }
 
     if (typeof factory !== 'function') {
-      this.singletons.set(name, factory);
-      // Instances have no dependencies we can automatically track
-      this.dependencyGraph.set(name, []);
-      this.stats.registrations++;
-
-      if (this.verbose) {
-        console.log(`[DIContainer] Registered instance '${name}'`);
-      }
-      return this;
+      throw new Error(
+        `[DIContainer] Factory for '${name}' must be a function. ` +
+          'To register a pre-built instance, use registerInstance(name, value).'
+      );
     }
 
     // Parse options
