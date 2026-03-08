@@ -382,7 +382,6 @@ class SpaceSkyBackground {
     const time = Date.now() / 1000;
 
     ctx.save();
-    ctx.save();
     if (this.bloomEnabled) {
       ctx.globalCompositeOperation = 'lighter'; // Additive blending for neon glow
     }
@@ -841,33 +840,34 @@ class RenderingSystem extends BaseSystem {
     }
 
     ctx.save();
+    try {
+      this.resolveCachedServices({
+        cachedPlayer: 'player',
+        cachedProgression: 'progression',
+        cachedXPOrbs: 'xp-orbs',
+        cachedHealthHearts: 'healthHearts',
+        cachedEffects: 'effects',
+        cachedCombat: 'combat',
+        cachedEnemies: 'enemies',
+        cachedUI: 'ui',
+      });
 
-    this.resolveCachedServices({
-      cachedPlayer: 'player',
-      cachedProgression: 'progression',
-      cachedXPOrbs: 'xp-orbs',
-      cachedHealthHearts: 'healthHearts',
-      cachedEffects: 'effects',
-      cachedCombat: 'combat',
-      cachedEnemies: 'enemies',
-      cachedUI: 'ui',
-    });
+      const effects = this.cachedEffects;
+      if (effects && typeof effects.applyScreenShake === 'function') {
+        effects.applyScreenShake(ctx);
+      }
 
-    const effects = this.cachedEffects;
-    if (effects && typeof effects.applyScreenShake === 'function') {
-      effects.applyScreenShake(ctx);
+      const player = this.cachedPlayer;
+      const playerVelocity =
+        typeof player?.getVelocity === 'function'
+          ? player.getVelocity()
+          : player?.velocity || null;
+
+      // Optimized rendering with batching
+      this.renderOptimized(ctx, player, playerVelocity);
+    } finally {
+      ctx.restore();
     }
-
-    const player = this.cachedPlayer;
-    const playerVelocity =
-      typeof player?.getVelocity === 'function'
-        ? player.getVelocity()
-        : player?.velocity || null;
-
-    // Optimized rendering with batching
-    this.renderOptimized(ctx, player, playerVelocity);
-
-    ctx.restore();
 
     // Update performance stats
     this.updateRenderStats(frameStart);
@@ -1069,29 +1069,41 @@ class RenderingSystem extends BaseSystem {
   }
 
   drawBackground(ctx, playerVelocity) {
-    if (this.spaceSky) {
-      this.spaceSky.render(ctx, {
-        width: ctx.canvas?.width ?? GAME_WIDTH,
-        height: ctx.canvas?.height ?? GAME_HEIGHT,
-        velocity: playerVelocity,
-      });
-      return;
+    if (!ctx) return;
+
+    // The background also clears the viewport, so it must ignore screen shake.
+    ctx.save();
+    try {
+      if (typeof ctx.setTransform === 'function') {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+      }
+
+      if (this.spaceSky) {
+        this.spaceSky.render(ctx, {
+          width: ctx.canvas?.width ?? GAME_WIDTH,
+          height: ctx.canvas?.height ?? GAME_HEIGHT,
+          velocity: playerVelocity,
+        });
+        return;
+      }
+
+      const gradient = ctx.createRadialGradient(
+        GAME_WIDTH / 2,
+        GAME_HEIGHT / 2,
+        0,
+        GAME_WIDTH / 2,
+        GAME_HEIGHT / 2,
+        Math.max(GAME_WIDTH, GAME_HEIGHT)
+      );
+      gradient.addColorStop(0, '#0a0a1a');
+      gradient.addColorStop(0.6, '#000510');
+      gradient.addColorStop(1, '#000000');
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    } finally {
+      ctx.restore();
     }
-
-    const gradient = ctx.createRadialGradient(
-      GAME_WIDTH / 2,
-      GAME_HEIGHT / 2,
-      0,
-      GAME_WIDTH / 2,
-      GAME_HEIGHT / 2,
-      Math.max(GAME_WIDTH, GAME_HEIGHT)
-    );
-    gradient.addColorStop(0, '#0a0a1a');
-    gradient.addColorStop(0.6, '#000510');
-    gradient.addColorStop(1, '#000000');
-
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
   }
 
   drawMagnetismField(ctx, player, xpOrbs) {

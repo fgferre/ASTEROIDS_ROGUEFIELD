@@ -96,7 +96,6 @@ class SpaceParticle {
         ctx.lineTo(this.size, 0);
         ctx.stroke();
 
-        ctx.setTransform(1, 0, 0, 1, 0, 0); // Reset
       } else {
         // Standard slow spark
         ctx.strokeStyle = this.color;
@@ -143,8 +142,6 @@ class SpaceParticle {
       ctx.arc(0, 0, this.size * this.alpha, 0, Math.PI * 2);
       ctx.fill();
 
-      // Reset transform for next particle
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
     } else {
       // [NEO-ARCADE] Glowing Orb
       const radius = this.size * this.alpha;
@@ -1089,6 +1086,11 @@ export default class EffectsSystem extends BaseSystem {
   }
 
   draw(ctx) {
+    this.drawWorld(ctx);
+    this.drawScreenSpace(ctx);
+  }
+
+  drawWorld(ctx) {
     this.flushMuzzleFlashQueue();
 
     for (let i = 0; i < this.particles.length; i += 1) {
@@ -1117,22 +1119,43 @@ export default class EffectsSystem extends BaseSystem {
         text.draw(ctx);
       }
     }
+  }
 
-    // Draw directional damage indicators
-    this.drawDamageIndicators(ctx);
+  drawScreenSpace(ctx) {
+    if (!ctx) return;
 
-    if (this.screenFlash.timer > 0) {
-      const alpha =
-        (this.screenFlash.timer / this.screenFlash.duration) *
-        this.screenFlash.intensity;
-      ctx.save();
-      ctx.fillStyle = this.screenFlash.color;
-      ctx.globalAlpha = alpha;
-      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-      ctx.restore();
+    // Screen-space overlays should stay anchored to the viewport.
+    this.drawScreenSpaceLayer(ctx, () => {
+      this.drawDamageIndicators(ctx);
+
+      if (this.screenFlash.timer > 0) {
+        const alpha =
+          (this.screenFlash.timer / this.screenFlash.duration) *
+          this.screenFlash.intensity;
+        ctx.fillStyle = this.screenFlash.color;
+        ctx.globalAlpha = alpha;
+        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      }
+
+      this.drawBossTransitions(ctx);
+    });
+  }
+
+  drawScreenSpaceLayer(ctx, drawCallback) {
+    if (!ctx || typeof drawCallback !== 'function') {
+      return;
     }
 
-    this.drawBossTransitions(ctx);
+    ctx.save();
+    if (typeof ctx.setTransform === 'function') {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+    }
+
+    try {
+      drawCallback();
+    } finally {
+      ctx.restore();
+    }
   }
 
   drawShockwaves(ctx) {

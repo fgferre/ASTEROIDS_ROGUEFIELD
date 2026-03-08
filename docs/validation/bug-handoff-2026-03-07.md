@@ -340,6 +340,55 @@ Checklist de verificacao:
 - Reproduzir o inicio de boss wave e checar se o cue visual/sonoro sumiu.
 - Se corrigir: manter o fan-out removido para spawn/phase/defeat, mas tratar `boss-wave-started` por um canal explicito ou listener dedicado.
 
+### HV-11 - Screen shake desloca o frame inteiro antes do background e dos overlays full-screen
+
+Status: confirmado e corrigido em 2026-03-08
+Prioridade: alta
+
+Abrir primeiro:
+
+- `src/modules/RenderingSystem.js:843-859`
+- `src/modules/RenderingSystem.js:876-928`
+- `src/modules/EffectsSystem.js:1084-1088`
+- `src/modules/EffectsSystem.js:1124-1136`
+- `src/modules/EffectsSystem.js:2021-2074`
+- `src/utils/ScreenShake.js:239-248`
+
+Hipotese:
+
+- `RenderingSystem.render()` aplica `effects.applyScreenShake(ctx)` logo no inicio do frame.
+- Esse translate/rotate afeta nao so objetos do mundo, mas tambem o pass de background e os overlays full-screen desenhados depois.
+- Como o jogo usa o proprio background para "limpar" o canvas, desenhar o background com shake pode deixar areas da viewport sem repintura completa naquele frame.
+- Em momentos com explosoes/flashes fortes, essas areas podem preservar lixo do frame anterior e gerar slices/faixas ou flashes deslocados, parecidos com a captura enviada pelo usuario.
+
+Impacto plausivel:
+
+- artefatos em faixas ou bordas quando ha shake forte
+- flashes de tela e boss transitions nao cobrindo a viewport toda
+- smear/stale pixels em transicoes intensas de combate
+- player/nave podendo "sumir" parcialmente ao encostar na faixa onde o frame renderizado foi deslocado, porque o desenho continua sendo clipado pelos limites reais do bitmap do canvas
+
+Evidencia visual adicional:
+
+- O usuario relatou que "parece que o canvas inteiro se desloca em relacao ao frame HTML".
+- Em captura posterior, a nave comeca a desaparecer exatamente na fronteira onde o conteudo do jogo entra na area artefatada.
+- Isso e compativel com `ctx.translate(...)` aplicado ao frame inteiro: HUD/HTML ficam parados, mas o mundo renderizado escorrega e e cortado nas bordas fisicas do canvas.
+
+Checklist de verificacao:
+
+- Reproduzir com shake forte e comparar um frame com shake ativo vs shake desativado.
+- Confirmar se `drawBackground()` e `fillRect(0, 0, width, height)` em `EffectsSystem` estao sendo executados sob transform nao-identidade.
+- Se confirmar: aplicar shake apenas ao world pass, ou resetar transform antes de background/overlays full-screen e reaplicar somente onde fizer sentido.
+
+Resultado da revalidacao em 2026-03-08:
+
+- Confirmado por leitura de fluxo e harness local: background e overlays full-screen eram desenhados sob a mesma transform aplicada por `applyScreenShake(ctx)`.
+- Correcao aplicada em `src/modules/RenderingSystem.js:824` e `src/modules/RenderingSystem.js:1071`: `render()` ficou protegido por `try/finally` e `drawBackground()` passou a desenhar em transform identidade.
+- Correcao aplicada em `src/modules/EffectsSystem.js:1088`, `src/modules/EffectsSystem.js:1124` e `src/modules/EffectsSystem.js:1144`: o `EffectsSystem` separa world pass de overlays screen-space, com reset de transform para flash/transicoes/indicadores full-screen.
+- Hardening adicional: corrigido desequilibrio de `save/restore` no starfield e removidos resets redundantes de transform nas particulas.
+- Testes de regressao adicionados em `tests/visual/rendering-determinism.test.js:54`, `tests/visual/rendering-determinism.test.js:135` e `tests/visual/rendering-determinism.test.js:151`.
+- Hipoteses alternativas rechecadas e sem evidencia no runtime atual: `clearRect()` no canvas principal apos shake, `style.transform` no canvas e `clip()` no pipeline 2D.
+
 ## Leads ja investigados e nao priorizados
 
 ### LP-01 - Boss sendo desenhado duas vezes
