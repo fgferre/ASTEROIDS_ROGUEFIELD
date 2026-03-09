@@ -304,12 +304,152 @@ function createProceduralAlias(shape) {
   };
 }
 
+// Shared image cache for SVG sprite strategies (pool-safe, keyed by source URL)
+const _svgSpriteCache = new Map();
+
+const ensureSvgSpriteImage = (source) => {
+  if (!source || typeof source !== 'string') return null;
+
+  let entry = _svgSpriteCache.get(source);
+  if (entry) return entry;
+
+  if (typeof Image !== 'function') return null;
+
+  const image = new Image();
+  entry = { image, status: 'loading' };
+  _svgSpriteCache.set(source, entry);
+
+  image.decoding = 'async';
+  image.onload = () => { entry.status = 'loaded'; };
+  image.onerror = () => { entry.status = 'error'; };
+  image.src = source;
+
+  return entry;
+};
+
+const svgSpriteBossStrategy = ({ enemy, ctx, colors, presets, config }) => {
+  if (!ctx || !enemy) return;
+
+  const visual = config?.visual;
+  if (!visual || visual.type !== 'svg-sprite' || !visual.source) {
+    // Fallback to procedural boss if visual config missing
+    const fallback = shapeRenderers.boss;
+    if (fallback) {
+      ctx.save();
+      ctx.translate(enemy.x, enemy.y);
+      if (enemy.rotation) ctx.rotate(enemy.rotation);
+      fallback({
+        enemy, ctx,
+        colors: colors || resolvePalette(enemy),
+        presets: presets || resolvePresets(enemy),
+        size: enemy.radius ?? 60,
+        config: { ...config, shape: 'boss' },
+      });
+      ctx.restore();
+    }
+    return;
+  }
+
+  const entry = ensureSvgSpriteImage(visual.source);
+  if (!entry || entry.status !== 'loaded' || !entry.image) {
+    // Image still loading — draw procedural boss as placeholder
+    const fallback = shapeRenderers.boss;
+    if (fallback) {
+      ctx.save();
+      ctx.translate(enemy.x, enemy.y);
+      if (enemy.rotation) ctx.rotate(enemy.rotation);
+      fallback({
+        enemy, ctx,
+        colors: colors || resolvePalette(enemy),
+        presets: presets || resolvePresets(enemy),
+        size: enemy.radius ?? 60,
+        config: { ...config, shape: 'boss' },
+      });
+      ctx.restore();
+    }
+    return;
+  }
+
+  const image = entry.image;
+  const width = Number.isFinite(visual.width) ? Math.abs(visual.width) : 0;
+  const height = Number.isFinite(visual.height) ? Math.abs(visual.height) : 0;
+  if (width <= 0 || height <= 0) return;
+
+  // Resolve source bounds for cropping (normalized 0-1 ratios)
+  const sb = visual.sourceBounds;
+  const naturalW = image.naturalWidth || 0;
+  const naturalH = image.naturalHeight || 0;
+  let sx = 0, sy = 0, sw = naturalW, sh = naturalH;
+
+  if (
+    sb && naturalW > 0 && naturalH > 0 &&
+    Number.isFinite(sb.x) && Number.isFinite(sb.y) &&
+    Number.isFinite(sb.width) && Number.isFinite(sb.height) &&
+    sb.width > 0 && sb.height > 0
+  ) {
+    sx = naturalW * Math.min(Math.max(sb.x, 0), 1);
+    sy = naturalH * Math.min(Math.max(sb.y, 0), 1);
+    sw = naturalW * Math.min(sb.width, 1 - Math.min(Math.max(sb.x, 0), 1));
+    sh = naturalH * Math.min(sb.height, 1 - Math.min(Math.max(sb.y, 0), 1));
+  }
+
+  ctx.save();
+  ctx.translate(enemy.x, enemy.y);
+  if (enemy.rotation) ctx.rotate(enemy.rotation);
+
+  // Dynamic boss aura — sized by enemy.radius, NOT sprite dimensions
+  const effectiveRadius = enemy.radius ?? 60;
+  const palette = colors || resolvePalette(enemy);
+  const renderPreset = presets || resolvePresets(enemy);
+  const auraPreset = renderPreset.aura ?? {};
+
+  if (config?.showAura !== false && auraPreset?.enabled !== false) {
+    const auraPulse = config?.auraPulse ?? auraPreset.pulse ?? 0.18;
+    const pulseSpeed = config?.pulseSpeed ?? auraPreset.speed ?? 1.2;
+    const time = enemy.system?.time ?? performance.now() / 1000;
+    const pulse = 1 + Math.sin(time * pulseSpeed) * auraPulse;
+
+    const gradient = ctx.createRadialGradient(
+      0, 0, effectiveRadius,
+      0, 0, effectiveRadius * (1.5 * pulse)
+    );
+    const innerColor = auraPreset.inner ?? palette.aura ?? 'rgba(255, 120, 90, 0.4)';
+    const outerColor = auraPreset.outer ?? 'rgba(120, 20, 10, 0)';
+    gradient.addColorStop(0, innerColor);
+    gradient.addColorStop(1, outerColor);
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(0, 0, effectiveRadius * 1.5 * pulse, 0, TAU);
+    ctx.fill();
+  }
+
+  // Draw SVG sprite
+  const offsetX = Number.isFinite(visual.offset?.x) ? visual.offset.x : 0;
+  const offsetY = Number.isFinite(visual.offset?.y) ? visual.offset.y : 0;
+  const spriteRotation = Number.isFinite(visual.rotation) ? visual.rotation : 0;
+
+  ctx.save();
+  ctx.translate(offsetX, offsetY);
+  if (spriteRotation !== 0) ctx.rotate(spriteRotation);
+  if (typeof visual.glowColor === 'string' && visual.glowColor) {
+    ctx.shadowColor = visual.glowColor;
+  }
+  if (Number.isFinite(visual.shadowBlur)) {
+    ctx.shadowBlur = Math.max(0, visual.shadowBlur);
+  }
+  ctx.drawImage(image, sx, sy, sw, sh, -width / 2, -height / 2, width, height);
+  ctx.restore();
+
+  ctx.restore();
+};
+
 const defaultStrategies = {
   procedural: proceduralStrategy,
   'procedural-triangle': createProceduralAlias('triangle'),
   'procedural-diamond': createProceduralAlias('diamond'),
   'procedural-sphere': createProceduralAlias('sphere'),
   'procedural-boss': createProceduralAlias('boss'),
+  'svg-sprite-boss': svgSpriteBossStrategy,
   delegate: delegateStrategy,
 };
 

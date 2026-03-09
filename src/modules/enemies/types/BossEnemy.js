@@ -1,4 +1,4 @@
-import { BOSS_COMPONENTS, BOSS_CONFIG } from '../../../data/enemies/boss.js';
+import { BOSS_COMPONENTS, BOSS_CONFIG, BOSS_VISUAL_VARIANT } from '../../../data/enemies/boss.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
@@ -146,7 +146,7 @@ export class BossEnemy extends BaseEnemy {
     this.movementConfig = null;
     this.movementPhases = null;
     this._lastMovementPhase = null;
-    this.renderStrategy = 'procedural-boss';
+    this.renderStrategy = BOSS_COMPONENTS?.render?.strategy || 'procedural-boss';
     this.useComponents = false;
 
     if (Object.keys(config).length > 0) {

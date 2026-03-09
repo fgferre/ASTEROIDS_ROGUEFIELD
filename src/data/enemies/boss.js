@@ -1,6 +1,51 @@
 // src/data/enemies/boss.js
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
+import retroSaucerSvgRaw from '../../../assets/inpirational mockups/retro saucer.svg?raw';
+
+// === BOSS VISUAL VARIANT ===
+// Single source of truth for boss visual selection.
+// 'retro-saucer' — SVG sprite (default)
+// 'procedural'   — legacy procedural circles
+export const BOSS_VISUAL_VARIANT = 'retro-saucer';
+
+// --- SVG sanitization & data URL (mirrors shipModels.js pattern) ---
+
+const sanitizeSvgMarkup = (raw) => {
+  if (typeof raw !== 'string') return '';
+  return raw.replace(/^<\?xml[^>]*>\s*/i, '').trim().replace(/\r\n/g, '\n');
+};
+
+const createBossSvgDataUrl = (svgMarkup) => {
+  const sanitized = sanitizeSvgMarkup(svgMarkup);
+  if (!sanitized) return '';
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sanitized)}`;
+};
+
+const _bossSvgDataUrl = createBossSvgDataUrl(retroSaucerSvgRaw);
+
+/**
+ * SVG sprite visual config for the retro saucer boss.
+ * Only consumed when BOSS_VISUAL_VARIANT === 'retro-saucer'.
+ */
+export const BOSS_VISUAL_CONFIG = deepFreeze({
+  type: 'svg-sprite',
+  source: _bossSvgDataUrl,
+  // Tuned to match boss radius=60 footprint (~120px collision diameter).
+  // SVG viewBox is 636×698 (aspect ~0.911). Sprite slightly exceeds hitbox for visual presence.
+  width: 140,
+  height: 154,
+  rotation: 0,
+  offset: { x: 0, y: 0 },
+  // Normalized crop — the SVG has no opaque background but may have margin from the clip-path.
+  // TBD: fine-tune after runtime visual inspection.
+  sourceBounds: { x: 0.0, y: 0.0, width: 1.0, height: 1.0 },
+  glowColor: 'rgba(255, 120, 90, 0.25)',
+  shadowBlur: 14,
+});
+
+const _resolvedRenderStrategy =
+  BOSS_VISUAL_VARIANT === 'retro-saucer' ? 'svg-sprite-boss' : 'procedural-boss';
 
 /**
  * Boss enemy configuration following canonical schema.
@@ -170,10 +215,11 @@ export const BOSS_COMPONENTS = deepFreeze({
     damage: 35,
   },
   render: {
-    strategy: 'procedural',
+    strategy: _resolvedRenderStrategy,
     shape: 'boss',
     showAura: true,
     showPhaseColor: true,
+    visual: BOSS_VISUAL_VARIANT === 'retro-saucer' ? BOSS_VISUAL_CONFIG : null,
   },
   collision: {
     shape: 'circle',
