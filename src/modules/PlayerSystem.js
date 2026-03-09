@@ -47,6 +47,44 @@ const SHIELD_LEVEL_CONFIG = {
   },
 };
 
+const DEFAULT_THRUSTER_PORTS = Object.freeze({
+  main: Object.freeze({ x: -SHIP_SIZE * 0.95, y: 0 }),
+  aux: Object.freeze({ x: SHIP_SIZE * 0.95, y: 0 }),
+  left: Object.freeze({ x: 0, y: -SHIP_SIZE * 0.95 }),
+  right: Object.freeze({ x: 0, y: SHIP_SIZE * 0.95 }),
+});
+
+const buildClosedPath = (vertices) => {
+  if (
+    typeof Path2D !== 'function' ||
+    !Array.isArray(vertices) ||
+    vertices.length < 3
+  ) {
+    return null;
+  }
+
+  const path = new Path2D();
+  let hasMoved = false;
+
+  vertices.forEach((vertex) => {
+    if (!vertex) return;
+    if (!hasMoved) {
+      path.moveTo(vertex.x, vertex.y);
+      hasMoved = true;
+      return;
+    }
+
+    path.lineTo(vertex.x, vertex.y);
+  });
+
+  if (!hasMoved) {
+    return null;
+  }
+
+  path.closePath();
+  return path;
+};
+
 class PlayerSystem extends BaseSystem {
   constructor(config = {}) {
     const { position, dependencies } = PlayerSystem.normalizeConfig(config);
@@ -108,6 +146,7 @@ class PlayerSystem extends BaseSystem {
       boundingRadius: SHIP_SIZE,
       shieldPadding: 0,
     };
+    this.hullVisualCache = new Map();
     this.setHull(shipModels.defaultHull);
 
     // === VISUAL UPGRADE LEVELS ===
@@ -743,8 +782,11 @@ class PlayerSystem extends BaseSystem {
 
     // Main thruster (forward)
     if (thrMain > 0 || this.lastThrusterState.main > 0) {
-      // Pushed out to 0.95 to be at the rear nozzle
-      const thrusterPos = this.getLocalToWorld(-SHIP_SIZE * 0.95, 0);
+      const mainThrusterPort = this.getHullThrusterPort('main');
+      const thrusterPos = this.getLocalToWorld(
+        mainThrusterPort.x,
+        mainThrusterPort.y
+      );
       this.eventBus?.emit?.('thruster-effect', {
         position: thrusterPos,
         direction: { x: fwd.x, y: fwd.y },
@@ -758,8 +800,11 @@ class PlayerSystem extends BaseSystem {
 
     // Aux thruster (braking)
     if (thrAux > 0 || this.lastThrusterState.aux > 0) {
-      // Pushed out to 0.95 to be at the front/retro nozzles
-      const thrusterPos = this.getLocalToWorld(SHIP_SIZE * 0.95, 0);
+      const auxThrusterPort = this.getHullThrusterPort('aux');
+      const thrusterPos = this.getLocalToWorld(
+        auxThrusterPort.x,
+        auxThrusterPort.y
+      );
       this.eventBus?.emit?.('thruster-effect', {
         position: thrusterPos,
         direction: { x: -fwd.x, y: -fwd.y },
@@ -773,8 +818,11 @@ class PlayerSystem extends BaseSystem {
 
     // Side thrusters (emit both L and R for visuals, audio will aggregate)
     if (thrSideL > 0 || this.lastThrusterState.sideL > 0) {
-      // Pushed out to 0.95 to appear on the hull edge/wingtip
-      const thrusterPos = this.getLocalToWorld(0, -SHIP_SIZE * 0.95);
+      const leftThrusterPort = this.getHullThrusterPort('left');
+      const thrusterPos = this.getLocalToWorld(
+        leftThrusterPort.x,
+        leftThrusterPort.y
+      );
       const dir = this.getLocalDirection(0, 1);
       this.eventBus?.emit?.('thruster-effect', {
         position: thrusterPos,
@@ -787,7 +835,11 @@ class PlayerSystem extends BaseSystem {
     }
 
     if (thrSideR > 0 || this.lastThrusterState.sideR > 0) {
-      const thrusterPos = this.getLocalToWorld(0, SHIP_SIZE * 0.95);
+      const rightThrusterPort = this.getHullThrusterPort('right');
+      const thrusterPos = this.getLocalToWorld(
+        rightThrusterPort.x,
+        rightThrusterPort.y
+      );
       const dir = this.getLocalDirection(0, -1);
       this.eventBus?.emit?.('thruster-effect', {
         position: thrusterPos,
@@ -851,6 +903,7 @@ class PlayerSystem extends BaseSystem {
       outline,
       boundingRadius,
       shieldPadding,
+      outlinePath: buildClosedPath(outline),
     };
   }
 
@@ -878,6 +931,318 @@ class PlayerSystem extends BaseSystem {
       x: dx * cos - dy * sin,
       y: dx * sin + dy * cos,
     };
+  }
+
+  getHullMetricsFor(hullDefinition = this.currentHull) {
+    if (!hullDefinition) {
+      return {
+        outline: [],
+        boundingRadius: SHIP_SIZE,
+        shieldPadding: 0,
+        outlinePath: null,
+      };
+    }
+
+    if (hullDefinition === this.currentHull && this._currentHullMetrics) {
+      return this._currentHullMetrics;
+    }
+
+    return this.computeHullMetrics(hullDefinition);
+  }
+
+  getHullThrusterPort(kind, hullDefinition = this.currentHull) {
+    const hullPorts =
+      hullDefinition?.thrusterPorts && typeof hullDefinition.thrusterPorts === 'object'
+        ? hullDefinition.thrusterPorts
+        : null;
+    const preferredPort =
+      hullPorts && hullPorts[kind] && Number.isFinite(hullPorts[kind].x)
+        ? hullPorts[kind]
+        : DEFAULT_THRUSTER_PORTS[kind] || DEFAULT_THRUSTER_PORTS.main;
+
+    return {
+      x: Number.isFinite(preferredPort?.x) ? preferredPort.x : 0,
+      y: Number.isFinite(preferredPort?.y) ? preferredPort.y : 0,
+    };
+  }
+
+  prepareHullVisual(hullDefinition = this.currentHull, onReady) {
+    const visual = hullDefinition?.visual;
+    if (
+      !visual ||
+      visual.type !== 'svg-sprite' ||
+      typeof visual.source !== 'string' ||
+      !visual.source
+    ) {
+      return null;
+    }
+
+    const cacheKey =
+      typeof hullDefinition?.id === 'string' && hullDefinition.id
+        ? hullDefinition.id
+        : visual.source;
+
+    let entry = this.hullVisualCache.get(cacheKey) || null;
+    if (entry) {
+      if (typeof onReady === 'function' && entry.status === 'loading') {
+        entry.callbacks.add(onReady);
+      }
+      return entry;
+    }
+
+    entry = {
+      status: 'loading',
+      image: null,
+      callbacks: new Set(),
+    };
+
+    if (typeof onReady === 'function') {
+      entry.callbacks.add(onReady);
+    }
+
+    const flushCallbacks = () => {
+      const callbacks = Array.from(entry.callbacks);
+      entry.callbacks.clear();
+      callbacks.forEach((callback) => {
+        try {
+          callback();
+        } catch (error) {
+          console.warn('[PlayerSystem] Hull visual ready callback failed:', error);
+        }
+      });
+    };
+
+    if (typeof Image !== 'function') {
+      entry.status = 'unsupported';
+      this.hullVisualCache.set(cacheKey, entry);
+      flushCallbacks();
+      return entry;
+    }
+
+    const image = new Image();
+    image.decoding = 'async';
+
+    image.onload = () => {
+      entry.status = 'loaded';
+      flushCallbacks();
+    };
+
+    image.onerror = () => {
+      entry.status = 'error';
+      flushCallbacks();
+    };
+
+    entry.image = image;
+    this.hullVisualCache.set(cacheKey, entry);
+    image.src = visual.source;
+    return entry;
+  }
+
+  getHullVisualRadius(hullDefinition = this.currentHull) {
+    const metrics = this.getHullMetricsFor(hullDefinition);
+    const visual = hullDefinition?.visual;
+    if (!visual || visual.type !== 'svg-sprite') {
+      return metrics.boundingRadius;
+    }
+
+    const width = Number.isFinite(visual.width) ? Math.abs(visual.width) : 0;
+    const height = Number.isFinite(visual.height) ? Math.abs(visual.height) : 0;
+    const offsetX = Number.isFinite(visual.offset?.x) ? visual.offset.x : 0;
+    const offsetY = Number.isFinite(visual.offset?.y) ? visual.offset.y : 0;
+    const spriteRadius = Math.hypot(width / 2, height / 2) + Math.hypot(offsetX, offsetY);
+
+    return spriteRadius > 0 ? Math.max(metrics.boundingRadius, spriteRadius) : metrics.boundingRadius;
+  }
+
+  renderLegacyHullModel(ctx, hullDefinition = this.currentHull) {
+    if (!ctx || !hullDefinition) {
+      return false;
+    }
+
+    const metrics = this.getHullMetricsFor(hullDefinition);
+    if (metrics.outlinePath) {
+      NeonGraphics.drawShape(ctx, metrics.outlinePath, '#00FF88', 1.5);
+    }
+
+    const accents = Array.isArray(hullDefinition?.accents) ? hullDefinition.accents : [];
+    if (accents.length > 0) {
+      accents.forEach((polygon) => {
+        const path = buildClosedPath(polygon);
+        if (path) {
+          NeonGraphics.drawShape(ctx, path, '#0088DD', 1.2);
+        }
+      });
+    }
+
+    const cockpit = hullDefinition?.cockpit;
+    if (
+      cockpit?.position &&
+      typeof cockpit.radius === 'number' &&
+      typeof Path2D === 'function'
+    ) {
+      const path = new Path2D();
+      path.arc(
+        cockpit.position.x,
+        cockpit.position.y,
+        Math.max(0, cockpit.radius),
+        0,
+        Math.PI * 2
+      );
+      NeonGraphics.drawShape(ctx, path, '#FFFFFF', 2.0);
+    }
+
+    return Boolean(metrics.outlinePath || accents.length > 0 || cockpit);
+  }
+
+  renderSpriteHullModel(ctx, hullDefinition = this.currentHull, options = {}) {
+    if (!ctx || !hullDefinition?.visual || hullDefinition.visual.type !== 'svg-sprite') {
+      return false;
+    }
+
+    const visual = hullDefinition.visual;
+    const visualState = this.prepareHullVisual(hullDefinition, options.onVisualReady);
+    if (!visualState || visualState.status !== 'loaded' || !visualState.image) {
+      return false;
+    }
+
+    const width = Number.isFinite(visual.width) ? Math.abs(visual.width) : 0;
+    const height = Number.isFinite(visual.height) ? Math.abs(visual.height) : 0;
+    if (width <= 0 || height <= 0) {
+      return false;
+    }
+
+    const image = visualState.image;
+    const naturalWidth = Number.isFinite(image?.naturalWidth) ? image.naturalWidth : 0;
+    const naturalHeight = Number.isFinite(image?.naturalHeight) ? image.naturalHeight : 0;
+    const normalizedSourceBounds =
+      visual.sourceBounds &&
+      Number.isFinite(visual.sourceBounds.x) &&
+      Number.isFinite(visual.sourceBounds.y) &&
+      Number.isFinite(visual.sourceBounds.width) &&
+      Number.isFinite(visual.sourceBounds.height) &&
+      visual.sourceBounds.width > 0 &&
+      visual.sourceBounds.height > 0
+        ? {
+            x: Math.min(Math.max(visual.sourceBounds.x, 0), 1),
+            y: Math.min(Math.max(visual.sourceBounds.y, 0), 1),
+            width: Math.min(Math.max(visual.sourceBounds.width, 0), 1),
+            height: Math.min(Math.max(visual.sourceBounds.height, 0), 1),
+          }
+        : null;
+
+    let sourceX = 0;
+    let sourceY = 0;
+    let sourceWidth = naturalWidth;
+    let sourceHeight = naturalHeight;
+
+    if (normalizedSourceBounds && naturalWidth > 0 && naturalHeight > 0) {
+      sourceX = naturalWidth * normalizedSourceBounds.x;
+      sourceY = naturalHeight * normalizedSourceBounds.y;
+      sourceWidth = naturalWidth * Math.min(normalizedSourceBounds.width, 1 - normalizedSourceBounds.x);
+      sourceHeight =
+        naturalHeight * Math.min(normalizedSourceBounds.height, 1 - normalizedSourceBounds.y);
+    }
+
+    const offsetX = Number.isFinite(visual.offset?.x) ? visual.offset.x : 0;
+    const offsetY = Number.isFinite(visual.offset?.y) ? visual.offset.y : 0;
+    const rotation = Number.isFinite(visual.rotation) ? visual.rotation : 0;
+
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+    if (rotation !== 0) {
+      ctx.rotate(rotation);
+    }
+    if (typeof visual.glowColor === 'string' && visual.glowColor) {
+      ctx.shadowColor = visual.glowColor;
+    }
+    if (Number.isFinite(visual.shadowBlur)) {
+      ctx.shadowBlur = Math.max(0, visual.shadowBlur);
+    }
+    ctx.drawImage(
+      image,
+      sourceX,
+      sourceY,
+      sourceWidth,
+      sourceHeight,
+      -width / 2,
+      -height / 2,
+      width,
+      height
+    );
+    ctx.restore();
+
+    const metrics = this.getHullMetricsFor(hullDefinition);
+    if (
+      metrics.outlinePath &&
+      Number.isFinite(visual.outlineWidth) &&
+      visual.outlineWidth > 0
+    ) {
+      ctx.save();
+      ctx.strokeStyle =
+        typeof visual.outlineColor === 'string' && visual.outlineColor
+          ? visual.outlineColor
+          : '#CFF8FF';
+      ctx.lineWidth =
+        Number.isFinite(visual.outlineWidth) && visual.outlineWidth > 0
+          ? visual.outlineWidth
+          : 1;
+      if (typeof visual.glowColor === 'string' && visual.glowColor) {
+        ctx.shadowColor = visual.glowColor;
+        ctx.shadowBlur = Math.max(
+          0,
+          Number.isFinite(visual.shadowBlur) ? visual.shadowBlur * 0.45 : 8
+        );
+      }
+      ctx.stroke(metrics.outlinePath);
+      ctx.restore();
+    }
+
+    return true;
+  }
+
+  renderHullModel(ctx, hullDefinition = this.currentHull, options = {}) {
+    if (!ctx || !hullDefinition) {
+      return false;
+    }
+
+    if (this.renderSpriteHullModel(ctx, hullDefinition, options)) {
+      return true;
+    }
+
+    return this.renderLegacyHullModel(ctx, hullDefinition);
+  }
+
+  renderHullPreview(ctx, hullDefinition = this.currentHull, options = {}) {
+    if (!ctx || !hullDefinition) {
+      return false;
+    }
+
+    const canvas = ctx.canvas;
+    if (!canvas) {
+      return false;
+    }
+
+    const previewWidth = Number.isFinite(options.width) ? options.width : canvas.width;
+    const previewHeight = Number.isFinite(options.height) ? options.height : canvas.height;
+    const padding = Number.isFinite(options.padding) ? Math.max(0, options.padding) : 10;
+    const visualRadius = this.getHullVisualRadius(hullDefinition);
+    const maxRadius = Math.max(1, visualRadius);
+    const safeWidth = Math.max(1, previewWidth - padding * 2);
+    const safeHeight = Math.max(1, previewHeight - padding * 2);
+    const scale = Math.min(safeWidth / (maxRadius * 2), safeHeight / (maxRadius * 2));
+
+    if (options.clear !== false) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    ctx.save();
+    ctx.translate(previewWidth / 2, previewHeight / 2);
+    ctx.scale(scale, scale);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    this.renderHullModel(ctx, hullDefinition, options);
+    ctx.restore();
+    return true;
   }
 
   // === GETTERS PÚBLICOS ===
@@ -966,65 +1331,7 @@ class PlayerSystem extends BaseSystem {
       ctx.transform(1, 0, tilt, 1, 0, 0);
     }
 
-    // Prepare paths (caching these would be better, but for now we build per frame)
-    const hull = this.currentHull;
-    const outlineData = Array.isArray(this._currentHullMetrics?.outline)
-      ? this._currentHullMetrics.outline
-      : Array.isArray(hull?.outline)
-        ? hull.outline
-        : [];
-
-    if (outlineData.length >= 3) {
-      const path = new Path2D();
-      let hasMoved = false;
-      outlineData.forEach((vertex) => {
-        if (!vertex) return;
-        if (!hasMoved) {
-          path.moveTo(vertex.x, vertex.y);
-          hasMoved = true;
-        } else {
-          path.lineTo(vertex.x, vertex.y);
-        }
-      });
-      path.closePath();
-
-      // [NEO-ARCADE] Use NeonGraphics
-      // Color depends on health state? Maybe later. For now, solid Neon Green.
-      NeonGraphics.drawShape(ctx, path, '#00FF88', 1.5);
-    }
-
-    const accents = Array.isArray(hull?.accents) ? hull.accents : [];
-    if (accents.length > 0) {
-      accents.forEach((polygon) => {
-        if (!Array.isArray(polygon) || polygon.length === 0) return;
-        const path = new Path2D();
-        let hasMoved = false;
-        polygon.forEach((vertex) => {
-          if (!vertex) return;
-          if (!hasMoved) {
-            path.moveTo(vertex.x, vertex.y);
-            hasMoved = true;
-          } else {
-            path.lineTo(vertex.x, vertex.y);
-          }
-        });
-        path.closePath();
-        NeonGraphics.drawShape(ctx, path, '#0088DD', 1.2);
-      });
-    }
-
-    const cockpit = hull?.cockpit;
-    if (cockpit?.position && typeof cockpit.radius === 'number') {
-      const path = new Path2D();
-      path.arc(
-        cockpit.position.x,
-        cockpit.position.y,
-        Math.max(0, cockpit.radius),
-        0,
-        Math.PI * 2
-      );
-      NeonGraphics.drawShape(ctx, path, '#FFFFFF', 2.0);
-    }
+    this.renderHullModel(ctx, this.currentHull, options);
 
     ctx.restore();
   }
@@ -1102,6 +1409,7 @@ class PlayerSystem extends BaseSystem {
 
     this.currentHull = hullDefinition;
     this._currentHullMetrics = this.computeHullMetrics(hullDefinition);
+    this.prepareHullVisual(hullDefinition);
     return true;
   }
 

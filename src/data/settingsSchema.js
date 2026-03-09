@@ -22,6 +22,18 @@ const SETTINGS_SCHEMA = [
     description: 'Visual feedback and game mechanics adjustments.',
     fields: [
       {
+        key: 'selectedHull',
+        type: 'select',
+        label: 'Ship Hull',
+        description: 'Choose the playable hull used for the next run.',
+        default: 'default-hull',
+        options: ['default-hull', 'solar-slicer'],
+        optionLabels: {
+          'default-hull': 'Interceptor',
+          'solar-slicer': 'Solar Slicer',
+        },
+      },
+      {
         key: 'damageNumbers',
         type: 'toggle',
         label: 'Damage Numbers',

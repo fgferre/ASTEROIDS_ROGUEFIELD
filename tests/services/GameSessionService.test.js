@@ -1,11 +1,18 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 import GameSessionService from '../../src/services/GameSessionService.js';
+import {
+  DEFAULT_HULL_ID,
+  SOLAR_SLICER_HULL_ID,
+  getShipModelById,
+} from '../../src/data/shipModels.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 // Optimization: use centralized createRandomServiceStatefulStub()
 import { createRandomServiceStatefulStub } from '../__helpers__/stubs.js';
 
-function createServiceHarness() {
+function createServiceHarness(options = {}) {
+  const { selectedHull = DEFAULT_HULL_ID } = options;
+
   // Optimization: use centralized createEventBusMock() instead of inline helper
   const eventBus = createEventBusMock();
   const random = createRandomServiceStatefulStub();
@@ -19,6 +26,23 @@ function createServiceHarness() {
     reset: vi.fn(),
     getPosition: vi.fn(() => ({ x: 10, y: 15 })),
     activateShield: vi.fn(),
+    currentHull: getShipModelById(DEFAULT_HULL_ID),
+  };
+  player.setHull = vi.fn((hullDefinition) => {
+    player.currentHull = hullDefinition;
+    return true;
+  });
+
+  const settingsState = {
+    gameplay: {
+      selectedHull,
+    },
+  };
+  const settings = {
+    getCategoryValues: vi.fn((categoryId) => {
+      const values = settingsState[categoryId];
+      return values ? { ...values } : null;
+    }),
   };
 
   const world = { reset: vi.fn() };
@@ -82,6 +106,7 @@ function createServiceHarness() {
     services: {
       audio,
       ui,
+      settings,
       player,
       progression,
       enemies,
@@ -127,6 +152,8 @@ function createServiceHarness() {
     combat,
     renderer,
     gameState,
+    settings,
+    settingsState,
   };
 }
 
@@ -301,5 +328,57 @@ describe('GameSessionService lifecycle flows', () => {
     expect(screenChangedCalls[0][1]).toEqual(
       expect.objectContaining({ screen: 'playing', source: 'session.start' })
     );
+  });
+
+  it('applies the configured hull when starting a new run', () => {
+    const { service, player } = createServiceHarness({
+      selectedHull: SOLAR_SLICER_HULL_ID,
+    });
+
+    service.startNewRun({ source: 'test' });
+
+    expect(player.setHull).toHaveBeenCalledWith(
+      getShipModelById(SOLAR_SLICER_HULL_ID)
+    );
+    expect(player.currentHull.id).toBe(SOLAR_SLICER_HULL_ID);
+  });
+
+  it('falls back to the default hull when the selected hull is invalid', () => {
+    const { service, player } = createServiceHarness({
+      selectedHull: 'unknown-hull',
+    });
+
+    service.startNewRun({ source: 'test' });
+
+    expect(player.setHull).toHaveBeenCalledWith(
+      getShipModelById(DEFAULT_HULL_ID)
+    );
+    expect(player.currentHull.id).toBe(DEFAULT_HULL_ID);
+  });
+
+  it('restores the snapshot hull before retry state recovery completes', () => {
+    const { service, player } = createServiceHarness();
+
+    const restored = service.restoreFromSnapshot({
+      snapshot: {
+        random: null,
+        player: {
+          maxHealth: 100,
+          health: 80,
+          position: { x: 40, y: 50 },
+          upgrades: [],
+          hullId: SOLAR_SLICER_HULL_ID,
+        },
+        progression: { level: 3 },
+        enemies: { waves: [] },
+        physics: { active: [] },
+      },
+    });
+
+    expect(restored).toBe(true);
+    expect(player.setHull).toHaveBeenCalledWith(
+      getShipModelById(SOLAR_SLICER_HULL_ID)
+    );
+    expect(player.currentHull.id).toBe(SOLAR_SLICER_HULL_ID);
   });
 });

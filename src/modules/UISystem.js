@@ -4,6 +4,11 @@ import {
   HUD_LAYOUT_IDS,
   getHudLayoutDefinition,
 } from '../data/ui/hudLayout.js';
+import {
+  DEFAULT_HULL_ID,
+  getAllShipModels,
+  getShipModelById,
+} from '../data/shipModels.js';
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 import { WAVE_BOSS_INTERVAL } from '../data/constants/gameplay.js';
 import { BaseSystem } from '../core/BaseSystem.js';
@@ -64,6 +69,7 @@ class UISystem extends BaseSystem {
     this.killsPulseTimeout = null;
     this.levelPulseTimeout = null;
     this.resizeRaf = null;
+    this.menuShipSelectorRefreshFrame = null;
     this._lastHoverTarget = null;
     this.currentHudBaseScale = 1;
     this.currentHudAutoScale = 1;
@@ -163,6 +169,9 @@ class UISystem extends BaseSystem {
       threats: new Map(),
       isReady: false,
     };
+    this.handleMenuShipSelectorVisualReady = () => {
+      this.requestMenuShipSelectorRefresh();
+    };
 
     this.initializeSettingsMetadata();
 
@@ -176,6 +185,7 @@ class UISystem extends BaseSystem {
     this.bindSettingsControls();
     this.bindCreditsControls();
     this.bindMainMenuControls();
+    this.initializeMenuShipSelector();
     this.bootstrapSettingsState();
     this.initializeViewportScaling();
   }
@@ -252,6 +262,12 @@ class UISystem extends BaseSystem {
         container: document.getElementById('hud-combo') || null,
         value: document.getElementById('combo-display') || null,
         multiplier: document.getElementById('combo-multiplier') || null,
+      },
+      menu: {
+        screen: document.getElementById('menu-screen') || null,
+        shipSelector: document.getElementById('menu-ship-selector') || null,
+        shipSelectorOptions:
+          document.getElementById('menu-ship-selector-options') || null,
       },
     };
   }
@@ -588,6 +604,148 @@ class UISystem extends BaseSystem {
     this.applyVisualPreferences({ accessibility, video });
   }
 
+  getSelectedHullId() {
+    const gameplayValues =
+      this.settings && typeof this.settings.getCategoryValues === 'function'
+        ? this.settings.getCategoryValues('gameplay') || null
+        : null;
+    const hullDefinition = getShipModelById(gameplayValues?.selectedHull);
+    return hullDefinition?.id || DEFAULT_HULL_ID;
+  }
+
+  getHullDisplayName(hullDefinition) {
+    if (!hullDefinition) {
+      return 'Unknown Hull';
+    }
+
+    if (hullDefinition.id === DEFAULT_HULL_ID) {
+      return 'Interceptor';
+    }
+
+    return hullDefinition.name || hullDefinition.id;
+  }
+
+  initializeMenuShipSelector() {
+    const menuRefs = this.domRefs.menu;
+    if (!menuRefs?.shipSelector || !menuRefs.shipSelectorOptions) {
+      return;
+    }
+
+    this.buildMenuShipSelectorButtons();
+    this.refreshMenuShipSelector();
+  }
+
+  buildMenuShipSelectorButtons() {
+    const container = this.domRefs.menu?.shipSelectorOptions;
+    if (!container) {
+      return;
+    }
+
+    container.innerHTML = '';
+
+    const fragment = document.createDocumentFragment();
+    getAllShipModels().forEach((hullDefinition) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'menu-ship-selector__option';
+      button.dataset.hullId = hullDefinition.id;
+      button.setAttribute('aria-pressed', 'false');
+
+      const preview = document.createElement('canvas');
+      preview.className = 'menu-ship-selector__preview';
+      preview.width = 112;
+      preview.height = 112;
+      preview.setAttribute('aria-hidden', 'true');
+      button.appendChild(preview);
+
+      const label = document.createElement('span');
+      label.className = 'menu-ship-selector__name';
+      label.textContent = this.getHullDisplayName(hullDefinition);
+      button.appendChild(label);
+
+      button.addEventListener('click', () => {
+        if (!this.settings || typeof this.settings.setSetting !== 'function') {
+          return;
+        }
+
+        this.settings.setSetting('gameplay', 'selectedHull', hullDefinition.id, {
+          source: 'ui',
+        });
+      });
+
+      fragment.appendChild(button);
+    });
+
+    container.appendChild(fragment);
+  }
+
+  requestMenuShipSelectorRefresh() {
+    if (this.menuShipSelectorRefreshFrame !== null) {
+      return;
+    }
+
+    const schedule =
+      typeof window !== 'undefined' &&
+      typeof window.requestAnimationFrame === 'function'
+        ? window.requestAnimationFrame.bind(window)
+        : (callback) => setTimeout(callback, 16);
+
+    this.menuShipSelectorRefreshFrame = schedule(() => {
+      this.menuShipSelectorRefreshFrame = null;
+      this.refreshMenuShipSelector();
+    });
+  }
+
+  refreshMenuShipSelector() {
+    const container = this.domRefs.menu?.shipSelectorOptions;
+    if (!container) {
+      return;
+    }
+
+    const selectedHullId = this.getSelectedHullId();
+    container.querySelectorAll('.menu-ship-selector__option').forEach((button) => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+
+      const isActive = button.dataset.hullId === selectedHullId;
+      button.classList.toggle('is-active', isActive);
+      button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+
+    this.renderMenuShipSelectorPreviews();
+  }
+
+  renderMenuShipSelectorPreviews() {
+    const container = this.domRefs.menu?.shipSelectorOptions;
+    const player = this.getService('player');
+    if (!container || !player || typeof player.renderHullPreview !== 'function') {
+      return;
+    }
+
+    container.querySelectorAll('.menu-ship-selector__option').forEach((button) => {
+      if (!(button instanceof HTMLButtonElement)) {
+        return;
+      }
+
+      const preview = button.querySelector('.menu-ship-selector__preview');
+      if (!(preview instanceof HTMLCanvasElement)) {
+        return;
+      }
+
+      const context = preview.getContext('2d');
+      if (!context) {
+        return;
+      }
+
+      const hullDefinition = getShipModelById(button.dataset.hullId);
+      player.renderHullPreview(context, hullDefinition, {
+        padding: 12,
+        onVisualReady: this.handleMenuShipSelectorVisualReady,
+      });
+    });
+  }
+
   bindPauseControls() {
     const pauseRefs = this.domRefs.pause;
     if (!pauseRefs) {
@@ -796,7 +954,7 @@ class UISystem extends BaseSystem {
         (event) => {
           // Check for common button classes or interactive elements
           const target = event.target.closest(
-            '.menu-screen__button, .btn, .settings-tab-button, [role="button"]'
+            '.menu-screen__button, .menu-ship-selector__option, .btn, .settings-tab-button, [role="button"]'
           );
 
           // Debounce/Check if it's a new hover target to avoid spam
@@ -1253,6 +1411,10 @@ class UISystem extends BaseSystem {
       change.category === this.settingsState.activeCategory
     ) {
       this.renderSettingsPanel(this.settingsState.activeCategory);
+    }
+
+    if (change.category === 'gameplay' || change.type === 'reset-all') {
+      this.requestMenuShipSelectorRefresh();
     }
   }
 
@@ -2344,6 +2506,10 @@ class UISystem extends BaseSystem {
       }
 
       document.body?.classList.remove('is-credits-open');
+
+      if (screenName === 'menu') {
+        this.requestMenuShipSelectorRefresh();
+      }
 
       if (emitEvent) {
         this.eventBus?.emit?.('screen-changed', { screen: screenName });

@@ -610,6 +610,7 @@ export function createServiceManifest(context = {}) {
         'healthHearts',
         'world',
         'effects',
+        'settings',
       ],
       factory: ({ resolved, context }) => {
         const instance = new GameSessionService({
@@ -627,6 +628,7 @@ export function createServiceManifest(context = {}) {
             healthHearts: resolved['healthHearts'],
             world: resolved['world'],
             effects: resolved['effects'],
+            settings: resolved['settings'],
           },
           gameState: context.gameState,
         });

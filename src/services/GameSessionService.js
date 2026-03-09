@@ -8,6 +8,7 @@ import {
   USE_WAVE_MANAGER,
   WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
 } from '../data/constants/gameplay.js';
+import { DEFAULT_HULL_ID, getShipModelById } from '../data/shipModels.js';
 
 /**
  * GameSessionService orchestrates lifecycle state for a single game run.
@@ -705,6 +706,8 @@ export default class GameSessionService {
       );
     }
 
+    this.applyConfiguredPlayerHull();
+
     this.ensureWaveKickoff({ reason: 'session-start' });
 
     const ui = this.resolveServiceInstance('ui');
@@ -1304,6 +1307,43 @@ export default class GameSessionService {
     return instance || null;
   }
 
+  getConfiguredHullId() {
+    const settings = this.resolveServiceInstance('settings');
+    const gameplaySettings =
+      settings && typeof settings.getCategoryValues === 'function'
+        ? settings.getCategoryValues('gameplay') || null
+        : null;
+
+    return typeof gameplaySettings?.selectedHull === 'string'
+      ? gameplaySettings.selectedHull
+      : DEFAULT_HULL_ID;
+  }
+
+  resolveHullDefinition(hullId) {
+    return getShipModelById(
+      typeof hullId === 'string' && hullId.trim().length > 0
+        ? hullId
+        : this.getConfiguredHullId()
+    );
+  }
+
+  applyConfiguredPlayerHull({ hullId } = {}) {
+    const player = this.resolveServiceInstance('player');
+    if (!player || typeof player.setHull !== 'function') {
+      return null;
+    }
+
+    const hullDefinition = this.resolveHullDefinition(hullId);
+
+    try {
+      player.setHull(hullDefinition);
+      return hullDefinition;
+    } catch (error) {
+      console.warn('[GameSessionService] Failed to apply configured hull:', error);
+      return null;
+    }
+  }
+
   clearDeathSnapshot() {
     this.deathSnapshot = null;
     this.randomSnapshot = null;
@@ -1558,6 +1598,10 @@ export default class GameSessionService {
       maxHealth: Number.isFinite(player.maxHealth) ? player.maxHealth : null,
       health: Number.isFinite(player.health) ? player.health : null,
       position: player.position ? { ...player.position } : null,
+      hullId:
+        typeof player.currentHull?.id === 'string'
+          ? player.currentHull.id
+          : this.getConfiguredHullId(),
     };
 
     if (Array.isArray(player.upgrades)) {
@@ -1653,6 +1697,8 @@ export default class GameSessionService {
         );
       }
     }
+
+    this.applyConfiguredPlayerHull({ hullId: payload.player?.hullId });
 
     if (payload.player) {
       const { maxHealth, health, position, upgrades } = payload.player;
