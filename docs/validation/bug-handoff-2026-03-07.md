@@ -1,7 +1,7 @@
 # Handoff Consolidado de Validacao
 
 Data base: 2026-03-07
-Ultima consolidacao: 2026-03-09
+Ultima consolidacao: 2026-03-09 (HV-05 fechado)
 
 Objetivo: este e o unico handoff vivo do repositorio. Ele existe para reduzir custo de contexto da proxima IA.
 
@@ -15,30 +15,11 @@ Objetivo: este e o unico handoff vivo do repositorio. Ele existe para reduzir cu
 ## Estado Atual
 
 - Fonte unica de backlog, status e proximos passos: este arquivo.
-- Itens realmente abertos hoje: `HV-05`, `F4`, `F6`.
-- Itens ja resolvidos e arquivados: `HV-01/02/03/04/06/07/08/09/10/11`, `LP-01`, `R1`, `F3`, `F9`, `F10`.
+- Itens realmente abertos hoje: `F4`, `F6`.
+- Itens ja resolvidos e arquivados: `HV-01/02/03/04/05/06/07/08/09/10/11`, `LP-01`, `R1`, `F3`, `F9`, `F10`.
 - Regra operacional: se surgir duvida sobre item arquivado, consultar o codigo atual primeiro; usar Git history so se a evidencia local for insuficiente.
 
 ## Fila Ativa
-
-### HV-05 - Determinismo incompleto na montagem da cena do menu
-
-Status: ABERTO
-Prioridade: media
-
-Motivo de continuar aberto:
-- `MenuBackgroundSystem` ainda usa `Math.random()` na rotacao inicial das nebulas e nas posicoes da poeira espacial.
-- O teste atual de determinismo do menu cobre UUID/infraestrutura, nao a montagem real da cena.
-
-Abrir primeiro:
-- `src/modules/MenuBackgroundSystem.js:40-46`
-- `src/modules/MenuBackgroundSystem.js:1204-1224`
-- `src/modules/MenuBackgroundSystem.js:1289-1305`
-- `tests/visual/menu-background-determinism.test.js:47-150`
-
-Fechar quando:
-- duas inicializacoes com a mesma seed produzirem as mesmas rotacoes de nebulas e o mesmo buffer de poeira
-- nao restar `Math.random()` nesse caminho visual
 
 ### F4 - Cadencia da fisica do menu reduzida para 30Hz
 
@@ -93,6 +74,7 @@ Arquivados e nao devem ser reabertos sem nova evidencia no runtime atual:
 - `F3`: `CustomFX` agora desliga quando `chromaticAberration` e `grainAmount` sao zero.
 - `F9`: pool de `PointLight` para explosoes corrigido; teste em `tests/visual/explosion-light-pool.test.js`; benchmark local `0.0687ms -> 0.0031ms` por burst de 4 explosoes.
 - `F10`: temporarios reutilizaveis aplicados em `fragmentAsteroid()` e hot paths de debris; benchmarks locais mostraram ganhos de `-22.9%`, `-26.6%` e `-13.7%` nos caminhos amostrados.
+- `HV-05`: `Math.random()` eliminado de `createAtmosphere()`; fork `atmosphere` registrado em `randomForkLabels`; 4 chamadas substituidas por `rng.float()` via `ensureRandom('atmosphere')`; teste de determinismo em `tests/visual/menu-background-determinism.test.js` confirma rotacoes identicas e buffer de poeira identico entre duas runs com mesma seed, e ausencia de `Math.random()` no caminho.
 
 ## Evidencia Rapida
 
@@ -108,9 +90,8 @@ Arquivados e nao devem ser reabertos sem nova evidencia no runtime atual:
 ## Proxima IA
 
 Ordem de trabalho recomendada:
-1. `HV-05`
-2. `F4`
-3. `F6`
+1. `F4` (smoke visual em browser)
+2. `F6` (profiling + mapa de dependencias)
 
 Saida esperada:
 1. dizer se cada item continua aberto, foi encerrado ou foi descartado

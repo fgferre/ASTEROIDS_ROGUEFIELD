@@ -173,3 +173,98 @@ describe('MenuBackgroundSystem THREE UUID determinism', () => {
     }
   });
 });
+
+function createAtmosphereTHREEStub() {
+  class Vector3 {
+    constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
+  }
+
+  return {
+    AdditiveBlending: 2,
+    Color: class { constructor() {} },
+    PlaneGeometry: class { constructor() {} },
+    ShaderMaterial: class { constructor() {} },
+    Mesh: class {
+      constructor() {
+        this.position = new Vector3();
+        this.rotation = new Vector3();
+        this.userData = {};
+      }
+    },
+    BufferGeometry: class {
+      constructor() { this._attrs = {}; }
+      setAttribute(name, attr) { this._attrs[name] = attr; }
+    },
+    BufferAttribute: class {
+      constructor(array, itemSize) { this.array = array; this.itemSize = itemSize; }
+    },
+    PointsMaterial: class { constructor() {} },
+    Points: class {
+      constructor(geometry) { this.geometry = geometry; }
+    },
+  };
+}
+
+function createAtmosphereSystem(seed) {
+  const container = createTestContainer(seed);
+  const random = container.resolve('random');
+  const system = new MenuBackgroundSystem({ random });
+
+  system.THREE = createAtmosphereTHREEStub();
+  system.scene = { add() {} };
+  system.createStarTexture = () => ({});
+  system.ready = true;
+
+  return system;
+}
+
+describe('MenuBackgroundSystem atmosphere determinism (HV-05)', () => {
+  it('two same-seed runs produce identical nebula rotations and dust positions', () => {
+    const a = createAtmosphereSystem(999);
+    const b = createAtmosphereSystem(999);
+
+    a.createAtmosphere();
+    b.createAtmosphere();
+
+    // Nebula rotations must match
+    expect(a.nebulas.length).toBe(2);
+    expect(b.nebulas.length).toBe(2);
+    for (let i = 0; i < a.nebulas.length; i++) {
+      expect(a.nebulas[i].rotation.z).toBe(b.nebulas[i].rotation.z);
+    }
+
+    // Dust positions must match
+    const aDust = a.dustSystem.geometry._attrs.position.array;
+    const bDust = b.dustSystem.geometry._attrs.position.array;
+    expect(aDust.length).toBe(bDust.length);
+    for (let i = 0; i < aDust.length; i++) {
+      expect(aDust[i]).toBe(bDust[i]);
+    }
+  });
+
+  it('does not call Math.random() during createAtmosphere()', () => {
+    const system = createAtmosphereSystem(42);
+    const spy = vi.spyOn(Math, 'random');
+
+    try {
+      system.createAtmosphere();
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('produces non-zero, non-trivial rotation and dust values', () => {
+    const system = createAtmosphereSystem(42);
+    system.createAtmosphere();
+
+    // Rotations should be non-zero (seeded RNG actually ran)
+    const hasNonZeroRotation = system.nebulas.some((n) => n.rotation.z !== 0);
+    expect(hasNonZeroRotation).toBe(true);
+
+    // Dust positions should contain non-zero values
+    const dust = system.dustSystem.geometry._attrs.position.array;
+    const hasNonZeroDust = dust.some((v) => v !== 0);
+    expect(hasNonZeroDust).toBe(true);
+  });
+});

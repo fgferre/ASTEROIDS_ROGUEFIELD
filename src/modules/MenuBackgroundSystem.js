@@ -34,6 +34,7 @@ class MenuBackgroundSystem extends BaseSystem {
         fragments: 'menu.fragments',
         materials: 'menu.materials',
         threeUuid: 'menu.three-uuid',
+        atmosphere: 'menu.atmosphere',
       },
     });
 
@@ -1268,6 +1269,7 @@ class MenuBackgroundSystem extends BaseSystem {
   createAtmosphere() {
     const { THREE } = this;
     if (!THREE) return;
+    const rng = this.ensureRandom('atmosphere');
 
     // 1. Nebula Layers (Gaseous backdrops)
     this.nebulas = [];
@@ -1319,7 +1321,7 @@ class MenuBackgroundSystem extends BaseSystem {
 
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.z = cfg.z;
-      mesh.rotation.z = Math.random() * Math.PI * 2;
+      mesh.rotation.z = rng.float() * Math.PI * 2;
       mesh.userData.rotateSpeed = cfg.speed;
       this.scene.add(mesh);
       this.nebulas.push(mesh);
@@ -1331,9 +1333,9 @@ class MenuBackgroundSystem extends BaseSystem {
     const positions = new Float32Array(dustCount * 3);
 
     for (let i = 0; i < dustCount; i++) {
-      positions[i * 3] = (Math.random() - 0.5) * 500;
-      positions[i * 3 + 1] = (Math.random() - 0.5) * 500;
-      positions[i * 3 + 2] = (Math.random() - 0.5) * 500;
+      positions[i * 3] = (rng.float() - 0.5) * 500;
+      positions[i * 3 + 1] = (rng.float() - 0.5) * 500;
+      positions[i * 3 + 2] = (rng.float() - 0.5) * 500;
     }
 
     dustGeometry.setAttribute(
