@@ -2,13 +2,11 @@
 
 Data: 2026-03-07
 
-Objetivo: reduzir custo de contexto para a proxima IA. A partir de 2026-03-09, este e o documento canonico de handoff/validacao do repositorio. O arquivo `tasks/HANDOFF_menu-audit.md` fica arquivado apenas como historico complementar.
+Objetivo: reduzir custo de contexto para a proxima IA. A partir de 2026-03-09, este e o documento canonico e unico de handoff/validacao do repositorio.
 
 ## Documento Canonico
 
 - Fonte unica atual para backlog, status e proximos passos: este arquivo.
-- `tasks/HANDOFF_menu-audit.md` nao deve mais ser tratado como fonte viva; ele permanece no repo so como historico de auditoria do menu.
-- Se uma IA abrir `tasks/HANDOFF_menu-audit.md`, ela deve usa-lo apenas como redirecionador e voltar imediatamente para este arquivo.
 - Itens ainda realmente abertos no runtime atual:
   - `HV-05` — determinismo incompleto na montagem da cena do menu
   - `F4` — cadencia 30Hz aplicada e testada, mas ainda recomendada validacao visual/runtime em browser
