@@ -31,5 +31,11 @@ export default defineConfig({
     globals: true,
     // Optimization: global setup eliminates 27 duplicated afterEach blocks
     setupFiles: ['tests/__helpers__/global-setup.js'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'],
+      reportsDirectory: 'coverage',
+      exclude: ['dist/**', 'src/public/libs/**'],
+    },
   },
 });

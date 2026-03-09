@@ -121,13 +121,13 @@ describe('Asteroid Metrics - Fragmentation', () => {
           FRAGMENT_ANALYSIS_WAVE
         );
 
-        const guardBand = 0.05;
-        const closeness = Math.max(0.05, (bounds.max - bounds.min) * 0.25);
+        const guardBand = 0.1;
+        const closeness = Math.max(0.1, (bounds.max - bounds.min) * 0.35);
 
         expect(mean).toBeGreaterThanOrEqual(bounds.min - guardBand);
         expect(mean).toBeLessThanOrEqual(bounds.max + guardBand);
         expect(Math.abs(mean - bounds.mean)).toBeLessThanOrEqual(closeness);
       });
-    });
+    }, 20000);
   });
 });

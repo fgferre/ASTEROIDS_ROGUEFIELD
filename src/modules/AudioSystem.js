@@ -4,11 +4,14 @@ import AudioCache from './AudioCache.js';
 import AudioBatcher from './AudioBatcher.js';
 import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
+import { GameDebugLogger, isDevEnvironment } from '../utils/dev/GameDebugLogger.js';
 import {
   BOSS_AUDIO_FREQUENCY_PRESETS,
   MUSIC_LAYER_CONFIG,
 } from '../core/GameConstants.js';
 import { WAVE_BOSS_INTERVAL } from '../data/constants/gameplay.js';
+
+const DEV_MODE = isDevEnvironment();
 
 /**
  * ThrusterLoopManager - Manages continuous thruster loop sounds
@@ -3327,15 +3330,7 @@ class AudioSystem extends BaseSystem {
   }
 
   _exposeRandomDebugControls() {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    if (
-      typeof process !== 'undefined' &&
-      process.env &&
-      process.env.NODE_ENV !== 'development'
-    ) {
+    if (typeof window === 'undefined' || !DEV_MODE) {
       return;
     }
 
@@ -3361,6 +3356,14 @@ class AudioSystem extends BaseSystem {
     }
 
     window.__AUDIO_RANDOM_DEBUG__ = debugData;
+  }
+
+  _clearRandomDebugControls() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    delete window.__AUDIO_RANDOM_DEBUG__;
   }
 
   // === UI Sound Effects ===
@@ -4268,6 +4271,8 @@ class AudioSystem extends BaseSystem {
   }
 
   reset() {
+    this._clearRandomDebugControls();
+
     // Cleanup optimization systems
     if (this.pool) {
       this.pool.cleanup();
@@ -4318,6 +4323,10 @@ class AudioSystem extends BaseSystem {
     this.setMusicIntensity(initialIntensityLevel, { immediate: true });
 
     this.reseedRandomScopes();
+  }
+
+  onDestroy() {
+    this._clearRandomDebugControls();
   }
 
   // === Performance Monitoring ===

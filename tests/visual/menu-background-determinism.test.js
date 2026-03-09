@@ -218,6 +218,26 @@ function createAtmosphereSystem(seed) {
   return system;
 }
 
+function createAtmosphereRuntime(seed) {
+  const container = createTestContainer(seed);
+  const random = container.resolve('random');
+  const system = new MenuBackgroundSystem({ random });
+
+  system.THREE = createAtmosphereTHREEStub();
+  system.scene = { add() {} };
+  system.createStarTexture = () => ({});
+  system.ready = true;
+
+  return { random, system };
+}
+
+function captureAtmosphereSnapshot(system) {
+  return {
+    rotations: system.nebulas.map((nebula) => nebula.rotation.z),
+    dust: Array.from(system.dustSystem.geometry._attrs.position.array),
+  };
+}
+
 describe('MenuBackgroundSystem atmosphere determinism (HV-05)', () => {
   it('two same-seed runs produce identical nebula rotations and dust positions', () => {
     const a = createAtmosphereSystem(999);
@@ -254,6 +274,24 @@ describe('MenuBackgroundSystem atmosphere determinism (HV-05)', () => {
     }
   });
 
+  it('uses the injected random service for atmosphere forks', () => {
+    const { random, system } = createAtmosphereRuntime(42);
+
+    expect(system.random).toBe(random);
+  });
+
+  it('replays the same atmosphere after reset({ refreshForks: true })', () => {
+    const system = createAtmosphereSystem(1337);
+
+    system.createAtmosphere();
+    const firstPass = captureAtmosphereSnapshot(system);
+
+    system.reset({ refreshForks: true });
+    system.createAtmosphere();
+
+    expect(captureAtmosphereSnapshot(system)).toEqual(firstPass);
+  });
+
   it('produces non-zero, non-trivial rotation and dust values', () => {
     const system = createAtmosphereSystem(42);
     system.createAtmosphere();
@@ -266,5 +304,53 @@ describe('MenuBackgroundSystem atmosphere determinism (HV-05)', () => {
     const dust = system.dustSystem.geometry._attrs.position.array;
     const hasNonZeroDust = dust.some((v) => v !== 0);
     expect(hasNonZeroDust).toBe(true);
+  });
+});
+
+describe('MenuBackgroundSystem NASA asset fetching', () => {
+  it('retries the next base candidate when a NASA asset request times out', async () => {
+    vi.useFakeTimers();
+
+    const system = createAtmosphereSystem(7);
+    const expectedBuffer = new ArrayBuffer(8);
+    const fetchMock = vi.fn((url, options = {}) => {
+      if (url.includes('/broken/')) {
+        return new Promise((resolve, reject) => {
+          options.signal?.addEventListener('abort', () => {
+            reject(new Error('request aborted'));
+          });
+        });
+      }
+
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        arrayBuffer: vi.fn(async () => expectedBuffer),
+      });
+    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = fetchMock;
+
+    try {
+      const resultPromise = system.fetchNasaBinaryAsset(
+        'stars.0.bin',
+        ['/broken/', '/good/'],
+        5
+      );
+
+      await vi.advanceTimersByTimeAsync(5);
+
+      await expect(resultPromise).resolves.toBe(expectedBuffer);
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls[0][0]).toBe('/broken/nasa/stars.0.bin');
+      expect(fetchMock.mock.calls[1][0]).toBe('/good/nasa/stars.0.bin');
+    } finally {
+      vi.useRealTimers();
+      if (originalFetch === undefined) {
+        delete globalThis.fetch;
+      } else {
+        globalThis.fetch = originalFetch;
+      }
+    }
   });
 });

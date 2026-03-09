@@ -80,8 +80,9 @@
 **Canvas Context State Mutations:**
 - Direct `ctx.globalAlpha`, `ctx.globalCompositeOperation` changes scattered across files
 - Files: `src/modules/EffectsSystem.js`, `src/modules/CombatSystem.js`, `src/modules/enemies/components/RenderComponent.js`
+- Current mitigation: `RenderingSystem` already uses `src/core/CanvasStateManager.js` for part of the canvas state lifecycle
 - Impact: Rendering order sensitivity; easy to break visual layers if code reordered
-- Fix approach: Create RenderState wrapper to manage context mutations; use stack for alpha/composite
+- Fix approach: Expand `CanvasStateManager` usage or add equivalent guardrails around the remaining direct state mutations
 
 **Multiple Rendering Passes:**
 - Enemies, effects, UI, projectiles all render independently via RenderingSystem.render()
@@ -93,25 +94,25 @@
 ## Console & Debug Logging
 
 **High Console Output:**
-- 461 console.* calls across codebase (console.log, console.warn, console.table)
+- 460 `console.*` call sites across `src/` (console.log, console.warn, console.table, etc.)
 - Files: `src/app.js`, `src/core/BaseSystem.js`, `src/modules/AudioSystem.js`, many others
 - Impact: Prod builds may log extensively; performance overhead in DevTools-heavy environments
 - Current mitigation: debugLogging system with preference toggle
 - Recommendations: Remove console.log from prod paths; audit all console calls for sensitive data
 
 **Debug Flag Exposure to Window:**
-- `window.__AUDIO_RANDOM_DEBUG__`, `window.downloadDebugLog()` exposed in dev
+- `window.__AUDIO_RANDOM_DEBUG__`, `window.downloadDebugLog()` exposed only in dev
 - Files: `src/modules/AudioSystem.js` (line 3363), `src/app.js` (lines 136-139)
-- Impact: Debug hooks could be called from console in prod if not properly gated
-- Fix approach: Ensure all window.* debug methods check `isDevEnvironment()` guard
+- Impact: Low in production as long as dev gates remain correct; main risk is future regressions that bypass the guard
+- Fix approach: Keep all window.* debug methods behind `isDevEnvironment()` and clear transient globals on reset/destroy
 
 ## Error Handling
 
 **Silent Failures in Service Resolution:**
-- DIContainer.resolve() can return null if service not registered; callers must check
+- `DIContainer.resolve()` throws on missing required services; optional resolution helpers in `serviceUtils.js` can return `null`
 - Files: `src/core/DIContainer.js`, `src/core/serviceUtils.js`
-- Impact: Null pointer errors downstream if service missing
-- Recommendations: Throw clear error on missing service; log service resolution stack trace
+- Impact: Callers that use permissive helpers still need explicit null handling, but the container itself does not fail silently
+- Recommendations: Use `DIContainer.resolve()` for required services and audit `serviceUtils` call sites that intentionally accept `null`
 
 **Try-Catch Swallowing Errors:**
 - Multiple nested try-catch blocks in app.js without re-throw or logging
@@ -181,10 +182,10 @@
 - Recommendations: Validate localStorage data on load; consider IndexedDB for larger data
 
 **Fetch Used Without Error Handling:**
-- MenuBackgroundSystem fetches NASA data without timeout
+- MenuBackgroundSystem NASA fetch now retries base candidates with timeout and falls back to the local menu background on failure
 - Files: `src/modules/MenuBackgroundSystem.js` (lines 1457-1507)
-- Risk: Network request could hang; no CORS headers validated
-- Fix approach: Add fetch timeout; validate response headers; fail gracefully
+- Risk: Fixed timeout/retry policy is still static; failures are not yet instrumented
+- Fix approach: Keep graceful fallback, and add telemetry only if NASA asset failures become operationally relevant
 
 **Window Global Access:**
 - AudioContext accessed via window.AudioContext || window.webkitAudioContext
@@ -194,11 +195,11 @@
 
 ## Testing & Verification
 
-**45 Test Files Present, Coverage Unknown:**
-- Test suite covers: core, modules, integration, balance, physics, visual
+**45 Test Files Present, Coverage Reporting Available:**
+- Test suite covers: core, modules, integration, balance, physics, visual, services, utils
 - Files: `tests/`
-- Gap: No explicit coverage metrics; no pre-commit hook enforcing test passage
-- Recommendations: Add coverage enforcement (80%+ threshold); add pre-commit hook
+- Gap: No threshold enforcement; no pre-commit hook enforcing test passage
+- Recommendations: Use `npm run test:coverage` for reports, then decide thresholds separately from this stabilization pass
 
 **Enemy System Behavior Complex to Test:**
 - WaveManager, EnemyFactory, EnemySystem interdependent; unit tests difficult
@@ -206,11 +207,11 @@
 - Risk: Regressions in wave progression, spawn rates, enemy AI not caught until play-test
 - Fix approach: Extract spawn strategy into testable interfaces; mock WaveManager for EnemySystem tests
 
-**Visual Rendering Not Tested:**
-- EffectsSystem particles, CombatSystem projectiles, RenderComponent visuals not validated by tests
+**Visual Rendering Coverage Is Partial:**
+- The suite already includes visual/determinism tests (`audio-determinism`, `rendering-determinism`, `menu-background-determinism`, `thruster-determinism`, etc.), but not every rendering path is covered
 - Files: `src/modules/EffectsSystem.js`, `src/modules/CombatSystem.js`, `src/modules/enemies/components/RenderComponent.js`
-- Risk: Visual bugs (particle leaks, artifacts) only found by manual play
-- Fix approach: Add visual regression tests; baseline screenshot comparisons
+- Risk: Some visual bugs (particle leaks, artifacts, ordering regressions) still rely on manual play or targeted regressions
+- Fix approach: Extend the existing visual suite where behavior is especially volatile
 
 ## Performance Bottlenecks
 
@@ -275,21 +276,21 @@
 - Fix approach: Add checkpoint saves; serialize game state to localStorage or IndexedDB
 
 **No Input Remapping:**
-- Key bindings hardcoded in InputSystem
-- Files: `src/modules/InputSystem.js`
-- Problem: Players with non-US keyboards or accessibility needs cannot customize
-- Fix approach: Extract key map to config; add UI for rebinding
+- Input remapping exists via `settingsSchema`, `InputSystem`, and binding capture flows in `UISystem`
+- Files: `src/data/settingsSchema.js`, `src/modules/InputSystem.js`, `src/modules/UISystem.js`
+- Problem: Accessibility coverage and test depth can still improve, but the feature is already present
+- Fix approach: Preserve the current rebinding flow and extend validation/UX only if product scope requires it
 
 ## Test Coverage Gaps
 
-**AudioSystem Untested:**
-- No unit tests for ThrusterLoopManager, audio synthesis, or frequency scaling
+**AudioSystem Coverage Is Partial:**
+- The suite already covers random scope behavior and audio determinism, but not every synthesis/loop path
 - Files: `src/modules/AudioSystem.js`
-- Risk: Audio changes (frequency, gain, timing) could break gameplay feel unnoticed
+- Risk: Audio changes (frequency, gain, timing) could still break gameplay feel unnoticed outside the existing determinism checks
 - Priority: High - audio is critical to game experience
 
-**WaveManager Progression Untested:**
-- Wave difficulty curve not validated by automated tests
+**WaveManager Progression Coverage Is Incomplete:**
+- There is automated coverage for `WaveManager`, but progression-curve breadth is still limited
 - Files: `src/modules/enemies/managers/WaveManager.js`
 - Risk: Balance changes silently degrade difficulty progression
 - Priority: High - breaks core roguelike progression
@@ -321,11 +322,11 @@
 - Fix approach: Enforce module boundary rules; audit dependency graph
 
 **Service Initialization Order:**
-- Services registered in manifest; no explicit dependency ordering
+- Services are resolved lazily, so the primary risk is hidden dependency assumptions rather than fixed startup ordering
 - Files: `src/bootstrap/serviceManifest.js`, `src/core/ServiceRegistry.js`
-- Risk: Service A depends on Service B, but B not yet initialized
-- Impact: Difficult to debug; manifests as null pointer errors
-- Fix approach: Explicit dependency declaration; validation pass before initialization
+- Risk: A manifest entry can still assume another service exists and fail at resolution time if the dependency graph is wrong
+- Impact: Difficult to debug when dependencies are implicit
+- Fix approach: Keep dependency contracts explicit and validate critical service edges where failures are expensive
 
 **BaseSystem Extension:**
 - All game systems inherit from BaseSystem; unclear which methods must be overridden

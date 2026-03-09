@@ -29,6 +29,7 @@ describe('Systems expose random helpers directly', () => {
       settings: createSettingsStub(),
     });
 
+    expect(system.random).toBe(random);
     expect(system.randomHelpers).toBeDefined();
     expect(system.randomFloat).toBe(system.randomHelpers.randomFloat);
     expect(system.randomRange).toBe(system.randomHelpers.randomRange);
@@ -43,10 +44,27 @@ describe('Systems expose random helpers directly', () => {
     expect(rangeValue).toBeLessThan(15);
   });
 
+  it('EffectsSystem replays forked randomness after reset({ refreshForks: true })', () => {
+    const random = new RandomService('effects-reset-test');
+    const system = new EffectsSystem({
+      random,
+      audio: {},
+      settings: createSettingsStub(),
+    });
+
+    const firstValue = system.randomFloat('particles');
+
+    system.reset({ refreshForks: true });
+
+    expect(system.random).toBe(random);
+    expect(system.randomFloat('particles')).toBe(firstValue);
+  });
+
   it('MenuBackgroundSystem attaches helper methods to the instance', () => {
     const random = new RandomService('menu-test');
     const system = new MenuBackgroundSystem({ random });
 
+    expect(system.random).toBe(random);
     expect(system.randomHelpers).toBeDefined();
     expect(system.randomFloat).toBe(system.randomHelpers.randomFloat);
     expect(system.randomInt).toBe(system.randomHelpers.randomInt);

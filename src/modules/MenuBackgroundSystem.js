@@ -9,19 +9,24 @@ import { AsteroidImpactEffect } from './AsteroidImpactEffect.js';
 const SIMPLEX_DEFAULT_RANDOM = new RandomService(
   'menu-background:simplex-default'
 );
+const NASA_FETCH_TIMEOUT_MS = 5000;
 
 class MenuBackgroundSystem extends BaseSystem {
   constructor(dependencies = {}) {
-    const input =
+    const normalizedDependencies =
       dependencies &&
       typeof dependencies === 'object' &&
       !Array.isArray(dependencies)
         ? dependencies
         : {};
-    const { random = null, ...rest } = input;
+    const parentRandom = normalizedDependencies.random;
+    const initialRandomSnapshot =
+      parentRandom && typeof parentRandom.debugSnapshot === 'function'
+        ? parentRandom.debugSnapshot()
+        : null;
 
     // Pass config to BaseSystem with random management options
-    super(rest, {
+    super(normalizedDependencies, {
       enableRandomManagement: true,
       systemName: 'MenuBackgroundSystem',
       serviceName: 'menu-background',
@@ -37,6 +42,11 @@ class MenuBackgroundSystem extends BaseSystem {
         atmosphere: 'menu.atmosphere',
       },
     });
+    this._initialRandomSnapshot = initialRandomSnapshot
+      ? JSON.parse(JSON.stringify(initialRandomSnapshot))
+      : null;
+    this._initialRandomSeed =
+      typeof parentRandom?.seed === 'number' ? parentRandom.seed >>> 0 : null;
 
     const randomHelpers = createRandomHelpers({
       getRandomFork: (name) => this.getRandomFork(name),
@@ -242,10 +252,26 @@ class MenuBackgroundSystem extends BaseSystem {
   }
 
   reset(options = {}) {
-    super.reset(options);
-
     const normalized =
       options && typeof options === 'object' && options !== null ? options : {};
+
+    if (normalized.refreshForks) {
+      if (
+        this._initialRandomSnapshot &&
+        this.random &&
+        typeof this.random.restore === 'function'
+      ) {
+        this.random.restore(this._initialRandomSnapshot);
+      } else if (
+        this._initialRandomSeed !== null &&
+        this.random &&
+        typeof this.random.reset === 'function'
+      ) {
+        this.random.reset(this._initialRandomSeed);
+      }
+    }
+
+    super.reset(options);
 
     if (normalized.restoreThreeUuidGenerator) {
       this.restoreOriginalThreeUuidGenerator();
@@ -1423,6 +1449,51 @@ class MenuBackgroundSystem extends BaseSystem {
     return Math.max(0.1, viewportScale * pixelSize);
   }
 
+  async fetchWithTimeout(url, { timeoutMs = NASA_FETCH_TIMEOUT_MS } = {}) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      return await fetch(url, { signal: controller.signal });
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  async fetchNasaBinaryAsset(
+    filename,
+    baseCandidates = ['/'],
+    timeoutMs = NASA_FETCH_TIMEOUT_MS
+  ) {
+    let lastStatus = null;
+    let lastError = null;
+
+    for (const candidate of baseCandidates) {
+      const url = `${candidate}nasa/${filename}`;
+
+      try {
+        const response = await this.fetchWithTimeout(url, { timeoutMs });
+        lastStatus = response.status;
+        if (response.ok) {
+          return response.arrayBuffer();
+        }
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    const message =
+      lastStatus !== null
+        ? `Failed to fetch NASA ${filename} (last status ${lastStatus})`
+        : `Failed to fetch NASA ${filename}`;
+
+    if (lastError) {
+      throw new Error(message, { cause: lastError });
+    }
+
+    throw new Error(message);
+  }
+
   async createNasaStarfieldLayers() {
     const { THREE } = this;
     if (!THREE || !this.scene || this._nasaStarfieldLoaded || this._nasaStarfieldLoading) {
@@ -1453,21 +1524,6 @@ class MenuBackgroundSystem extends BaseSystem {
         'stars.5.bin',
         'galaxies.0.bin',
       ];
-
-      const fetchNasaBin = async (filename) => {
-        let lastStatus = null;
-        for (const candidate of baseCandidates) {
-          const url = `${candidate}nasa/${filename}`;
-          const response = await fetch(url);
-          lastStatus = response.status;
-          if (response.ok) {
-            return response.arrayBuffer();
-          }
-        }
-        throw new Error(
-          `Failed to fetch NASA ${filename} (last status ${lastStatus})`
-        );
-      };
 
       class BinaryReader {
         constructor(data) {
@@ -1504,7 +1560,7 @@ class MenuBackgroundSystem extends BaseSystem {
       const buffers = [];
       let totalStars = 0;
       for (const file of nasaFiles) {
-        const buf = await fetchNasaBin(file);
+        const buf = await this.fetchNasaBinaryAsset(file, baseCandidates);
         const tmpReader = new BinaryReader(buf);
         const count = tmpReader.readInt32();
         buffers.push({ file, buf, count });

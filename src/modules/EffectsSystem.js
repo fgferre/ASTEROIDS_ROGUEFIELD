@@ -301,7 +301,12 @@ export default class EffectsSystem extends BaseSystem {
       config && typeof config === 'object' && !Array.isArray(config)
         ? config
         : {};
-    const { audio = null, random = null, ...dependencies } = normalizedConfig;
+    const parentRandom = normalizedConfig.random;
+    const initialRandomSnapshot =
+      parentRandom && typeof parentRandom.debugSnapshot === 'function'
+        ? parentRandom.debugSnapshot()
+        : null;
+    const { audio = null, ...dependencies } = normalizedConfig;
 
     // Pass config to BaseSystem with random management options
     super(dependencies, {
@@ -321,6 +326,11 @@ export default class EffectsSystem extends BaseSystem {
         boss: 'effects.boss',
       },
     });
+    this._initialRandomSnapshot = initialRandomSnapshot
+      ? JSON.parse(JSON.stringify(initialRandomSnapshot))
+      : null;
+    this._initialRandomSeed =
+      typeof parentRandom?.seed === 'number' ? parentRandom.seed >>> 0 : null;
 
     this.audio = audio ?? resolveService('audio', this.dependencies);
 
@@ -4316,8 +4326,27 @@ export default class EffectsSystem extends BaseSystem {
     }
   }
 
-  reset() {
-    super.reset();
+  reset(options = {}) {
+    const normalized =
+      options && typeof options === 'object' && options !== null ? options : {};
+
+    if (normalized.refreshForks) {
+      if (
+        this._initialRandomSnapshot &&
+        this.random &&
+        typeof this.random.restore === 'function'
+      ) {
+        this.random.restore(this._initialRandomSnapshot);
+      } else if (
+        this._initialRandomSeed !== null &&
+        this.random &&
+        typeof this.random.reset === 'function'
+      ) {
+        this.random.reset(this._initialRandomSeed);
+      }
+    }
+
+    super.reset(normalized);
     this.particles = [];
     this.shockwaves = [];
     this.hitMarkers = [];

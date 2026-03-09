@@ -2,11 +2,11 @@
 
 ## 1. Visão Geral
 
-A suíte de testes foi reorganizada em janeiro de 2025 para alinhar completamente a estrutura de `/tests` com os domínios de `/src`. O resultado são **31 arquivos** distribuídos por responsabilidade, com helpers centralizados e documentação viva. A migração eliminou duplicação, reduziu profundidade de diretórios e padronizou os imports, permitindo localizar rapidamente o teste correspondente a cada módulo do jogo.
+A suíte de testes cobre hoje **45 arquivos de teste** distribuídos por responsabilidade, com helpers centralizados e diretórios por domínio. A estrutura continua próxima de `/src`, mas não é mais um espelho perfeito e inclui suítes de integração, balanceamento e regressões visuais que cruzam múltiplos módulos. Use este documento como inventário operacional do estado atual de `/tests`.
 
 ## 2. Organização de Diretórios
 
-A estrutura espelha diretamente o código-fonte. Sempre procure o teste em `/tests/<domínio>/` quando precisar validar um arquivo em `/src/<domínio>/`.
+A organização abaixo reflete o estado atual do diretório `/tests`.
 
 ```
 /tests
@@ -14,17 +14,21 @@ A estrutura espelha diretamente o código-fonte. Sempre procure o teste em `/tes
 │   ├── DIContainer.test.js
 │   ├── ObjectPool.test.js
 │   ├── RandomService.test.js
-│   └── SpatialHash.test.js
-├── modules/             # espelha src/modules/
+│   ├── SpatialHash.test.js
+│   ├── bossVisualVariant.test.js
+│   └── shipModels.test.js
+├── modules/             # cobre sistemas em src/modules/
 │   ├── AudioBatcher.test.js
 │   ├── AudioCache.test.js
 │   ├── AudioSystem.randomScopes.test.js
+│   ├── BossDamageFeedback.test.js
 │   ├── PlayerSystem.commandQueue.test.js
 │   ├── ProgressionSystem.test.js
+│   ├── RandomHelperExposure.test.js
 │   ├── RenderingSystem.starfield.test.js
 │   ├── WaveManager.test.js
-│   ├── RandomHelperExposure.test.js
-│   └── enemies/RewardManager.test.js
+│   └── enemies/
+│       └── RewardManager.test.js
 ├── utils/               # espelha src/utils/
 │   ├── ScreenShake.test.js
 │   └── randomHelpers.test.js
@@ -33,6 +37,8 @@ A estrutura espelha diretamente o código-fonte. Sempre procure o teste em `/tes
 │   └── GameSessionService.test.js
 ├── integration/         # integra múltiplos sistemas
 │   ├── determinism/
+│   │   ├── asteroid-edge-wrapping.test.js
+│   │   ├── asteroid-movement-migration.test.js
 │   │   ├── enemy-system.test.js
 │   │   ├── start-reset-cycle.test.js
 │   │   └── systems.test.js
@@ -42,17 +48,23 @@ A estrutura espelha diretamente o código-fonte. Sempre procure o teste em `/tes
 │   ├── reward-mechanics.test.js
 │   └── asteroid-metrics/
 │       ├── determinism.test.js
+│       ├── feature-flags.test.js
 │       ├── fragmentation.test.js
 │       ├── size-distribution.test.js
 │       ├── spawn-rates.test.js
-│       └── variant-distribution.test.js
+│       ├── variant-distribution.test.js
+│       └── wave-state-counters.test.js
 ├── physics/collision-accuracy.test.js
 ├── visual/
 │   ├── audio-determinism.test.js
 │   ├── enemy-types-rendering.test.js
+│   ├── explosion-light-pool.test.js
+│   ├── material-fade-isolation.test.js
 │   ├── menu-background-determinism.test.js
+│   ├── menu-physics-stepping.test.js
 │   ├── rendering-determinism.test.js
-│   └── screen-shake-determinism.test.js
+│   ├── screen-shake-determinism.test.js
+│   └── thruster-determinism.test.js
 ├── __helpers__/         # helpers reutilizáveis (não são testes)
 │   ├── asteroid-helpers.js
 │   ├── assertions.js
@@ -62,17 +74,18 @@ A estrutura espelha diretamente o código-fonte. Sempre procure o teste em `/tes
 │   ├── setup.js
 │   └── stubs.js
 └── __fixtures__/
+    ├── README.md
     └── enemies.js
 ```
 
-> **Espelhamento garantido:** `tests/core/` ↔ `src/core/`, `tests/modules/` ↔ `src/modules/`, `tests/utils/` ↔ `src/utils/`, `tests/services/` ↔ `src/services/`.
+> `tests/unit/` existe no repositório neste momento, mas está vazio e não entra no inventário acima.
 
 ## 3. Executar Testes
 
 ### Comandos principais
 
 ```bash
-npm test                     # Executa todos os ~31 testes
+npm test                     # Executa todos os 45 arquivos .test/.spec
 npm run test:watch           # Vitest em modo watch
 npm run test:ui              # Interface visual do Vitest
 npm run test:coverage        # Execução com relatório de cobertura
@@ -179,7 +192,7 @@ const eventBus = createEventBusMock();
 
 ## 6. Estrutura de Arquivo de Teste
 
-Modelo base para novos testes unitários seguindo a nova estrutura flat:
+Modelo base para novos testes unitários seguindo a estrutura atual:
 
 ```javascript
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -217,12 +230,12 @@ describe('MySystem', () => {
 
 ## 8. Resultados da Reorganização
 
-- **31 arquivos** reorganizados em estrutura flat.
-- **Redução de 1 nível** na profundidade de diretórios (`tests/unit/...` → `tests/...`).
-- **Imports mais curtos** (`../../../src` → `../../src`).
-- **Espelhamento direto** entre `/tests` e `/src`.
+- **45 arquivos de teste** ativos no inventário atual.
+- **Cobertura por domínio** em `core`, `modules`, `services`, `utils`, `integration`, `balance`, `physics` e `visual`.
+- **Helpers centralizados** em `tests/__helpers__/`.
+- **Diretório `tests/unit/`** presente, porém vazio no estado atual.
 - **Duplicação de código** reduzida graças aos helpers centralizados.
-- **Execução mais rápida** (melhoria observada de 50–60% no tempo total em máquinas de desenvolvimento).
+- **Cobertura de regressões determinísticas** expandida para áudio, menu, render e screen shake.
 
 ## 9. Referências
 
