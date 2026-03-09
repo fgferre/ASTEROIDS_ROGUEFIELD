@@ -231,9 +231,9 @@ export class Drone extends BaseEnemy {
     }
   }
 
-  onDestroyed(source) {
+  onDestroyed(source, context = {}) {
     this.destroyed = true;
-    super.onDestroyed(source);
+    super.onDestroyed(source, context);
   }
 
   draw(ctx) {

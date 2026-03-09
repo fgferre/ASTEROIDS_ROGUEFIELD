@@ -1,16 +1,18 @@
 {
-  "mode": "FAST",
-  "reason": "default low-risk path",
+  "mode": "RECOVERY",
+  "reason": "recovery rules: regression",
   "source": "stdin",
-  "changedFiles": 8,
+  "changedFiles": 4,
   "riskyPaths": [],
   "matches": {
     "safe": [],
     "plan": [],
-    "recovery": []
+    "recovery": [
+      "regression"
+    ]
   },
-  "inputHash": "fd046ef78f2d254aa3837c433be5e9aace1164b5f9cd06d94a355a777f0830c8",
-  "updatedAt": "2026-03-09T18:15:46.506Z",
+  "inputHash": "f90147e2229806421e26192fc9a8eeb58560bfd1c1449877557f64e1b3058643",
+  "updatedAt": "2026-03-09T21:38:15.854Z",
   "ttlMs": 2700000,
   "version": "router-v2"
 }

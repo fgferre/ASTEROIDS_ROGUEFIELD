@@ -1357,19 +1357,24 @@ export class WaveManager {
     let computedTotalEnemies = this.computeTotalEnemies(effectiveConfig);
     let asteroidOnlyTotal = this.computeAsteroidOnlyTotal(effectiveConfig);
 
-    const rawManagerTotals = {
-      all: Math.max(0, Math.floor(computedTotalEnemies)),
-      asteroids: Math.max(0, Math.floor(asteroidOnlyTotal)),
-    };
-
     const compatibilityModeActive =
       !waveManagerSpawnsAsteroids || legacyCompatibilityEnabled;
     const fallbackActive = !waveManagerSpawnsAsteroids;
 
     if (!waveManagerSpawnsAsteroids) {
-      computedTotalEnemies = 0;
+      // Legacy fallback only defers asteroid spawning. Bosses and support
+      // enemies are still spawned and completed by WaveManager.
+      computedTotalEnemies = Math.max(
+        0,
+        Math.floor(computedTotalEnemies - asteroidOnlyTotal)
+      );
       asteroidOnlyTotal = 0;
     }
+
+    const rawManagerTotals = {
+      all: Math.max(0, Math.floor(computedTotalEnemies)),
+      asteroids: Math.max(0, Math.floor(asteroidOnlyTotal)),
+    };
 
     this.totalEnemiesThisWave = computedTotalEnemies;
     this.totalAsteroidEnemiesThisWave = asteroidOnlyTotal;
@@ -2676,16 +2681,46 @@ export class WaveManager {
       this.enemiesKilledThisWave >= this.totalEnemiesThisWave;
     let activeEnemiesCleared = true;
 
-    if (
-      this.enemySystem &&
-      typeof this.enemySystem.getActiveEnemyCount === 'function'
-    ) {
-      activeEnemiesCleared = this.enemySystem.getActiveEnemyCount() === 0;
-    }
+    activeEnemiesCleared =
+      this.getRemainingActiveEnemyCount(destroyedEnemy) === 0;
 
     if (killsCleared && activeEnemiesCleared) {
       this.completeWave();
     }
+  }
+
+  getRemainingActiveEnemyCount(excludedEnemy = null) {
+    const enemies = Array.isArray(this.enemySystem?.asteroids)
+      ? this.enemySystem.asteroids
+      : null;
+
+    if (!enemies) {
+      if (
+        this.enemySystem &&
+        typeof this.enemySystem.getActiveEnemyCount === 'function'
+      ) {
+        return this.enemySystem.getActiveEnemyCount();
+      }
+
+      return 0;
+    }
+
+    let activeCount = 0;
+
+    for (let i = 0; i < enemies.length; i += 1) {
+      const enemy = enemies[i];
+      if (!enemy || enemy === excludedEnemy) {
+        continue;
+      }
+
+      if (enemy.destroyed || enemy.alive === false) {
+        continue;
+      }
+
+      activeCount += 1;
+    }
+
+    return activeCount;
   }
 
   /**

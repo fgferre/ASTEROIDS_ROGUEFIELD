@@ -1428,15 +1428,12 @@ class PhysicsSystem extends BaseSystem {
         continue;
       }
 
-      // Use spatial hash for efficient collision detection
-      const candidates = this.spatialHash.query(
+      // Reuse boss-aware candidate collection so bullets still see the boss
+      // when spatial-hash indexing temporarily falls behind the tracked entity.
+      const candidates = this.getNearbyEnemies(
         bullet.x,
         bullet.y,
-        maxCheckRadius,
-        {
-          filter: (obj) => this.activeEnemies.has(obj) && !obj.destroyed,
-          sorted: false,
-        }
+        maxCheckRadius
       );
 
       this.performanceMetrics.collisionChecks += candidates.length;

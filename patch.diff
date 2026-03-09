@@ -1,0 +1,94 @@
+diff --git a/.claude/runtime/mode.json b/.claude/runtime/mode.json
+index 3cbe918..fc7fb52 100644
+--- a/.claude/runtime/mode.json
++++ b/.claude/runtime/mode.json
+@@ -2,15 +2,15 @@
+   "mode": "FAST",
+   "reason": "default low-risk path",
+   "source": "stdin",
+-  "changedFiles": 8,
++  "changedFiles": 3,
+   "riskyPaths": [],
+   "matches": {
+     "safe": [],
+     "plan": [],
+     "recovery": []
+   },
+-  "inputHash": "fd046ef78f2d254aa3837c433be5e9aace1164b5f9cd06d94a355a777f0830c8",
+-  "updatedAt": "2026-03-09T18:15:46.506Z",
++  "inputHash": "1f82fd6362ef29c3697ee6f141a283b726446f5eb5c42bf709df59c820a434e2",
++  "updatedAt": "2026-03-09T20:01:51.109Z",
+   "ttlMs": 2700000,
+   "version": "router-v2"
+ }
+diff --git a/src/modules/PhysicsSystem.js b/src/modules/PhysicsSystem.js
+index d6c7805..46359bd 100644
+--- a/src/modules/PhysicsSystem.js
++++ b/src/modules/PhysicsSystem.js
+@@ -1415,7 +1415,7 @@ class PhysicsSystem extends BaseSystem {
+       return;
+     }
+ 
+-    if (!this.activeEnemies.size) {
++    if (!this.activeEnemies.size && !this.activeBosses.size) {
+       return;
+     }
+ 
+@@ -1428,15 +1428,12 @@ class PhysicsSystem extends BaseSystem {
+         continue;
+       }
+ 
+-      // Use spatial hash for efficient collision detection
+-      const candidates = this.spatialHash.query(
++      // Reuse boss-aware candidate collection so bullets still see the boss
++      // when spatial-hash indexing temporarily falls behind the tracked entity.
++      const candidates = this.getNearbyEnemies(
+         bullet.x,
+         bullet.y,
+-        maxCheckRadius,
+-        {
+-          filter: (obj) => this.activeEnemies.has(obj) && !obj.destroyed,
+-          sorted: false,
+-        }
++        maxCheckRadius
+       );
+ 
+       this.performanceMetrics.collisionChecks += candidates.length;
+diff --git a/tests/modules/BossDamageFeedback.test.js b/tests/modules/BossDamageFeedback.test.js
+index 2cf34b1..efc473f 100644
+--- a/tests/modules/BossDamageFeedback.test.js
++++ b/tests/modules/BossDamageFeedback.test.js
+@@ -216,4 +216,33 @@ describe('boss damage feedback', () => {
+     expect(collisions).toHaveLength(1);
+     expect(collisions[0].enemy).toBe(boss);
+   });
++
++  it('still resolves boss bullet collisions when spatial hash query misses the boss', () => {
++    const physics = new PhysicsSystem({ eventBus: createEventBus() });
++    const boss = {
++      type: 'boss',
++      x: 0,
++      y: 0,
++      radius: 60,
++      destroyed: false,
++    };
++    const bullet = {
++      x: (BULLET_SIZE || 0) + 60 + BOSS_PHYSICS_CONFIG.collisionPadding - 1,
++      y: 0,
++      hit: false,
++      damage: 20,
++    };
++    const collisions = [];
++
++    physics.activeEnemies.add(boss);
++    physics.activeBosses.add(boss);
++    physics.spatialHash.query = vi.fn(() => []);
++
++    physics.forEachBulletCollision([bullet], (hitBullet, enemy) => {
++      collisions.push({ hitBullet, enemy });
++    });
++
++    expect(collisions).toHaveLength(1);
++    expect(collisions[0].enemy).toBe(boss);
++  });
+ });

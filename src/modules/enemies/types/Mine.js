@@ -188,11 +188,11 @@ export class Mine extends BaseEnemy {
     });
   }
 
-  onDestroyed(source) {
+  onDestroyed(source, context = {}) {
     const safeSource = source ?? {};
 
     this.destroyed = true;
-    super.onDestroyed(safeSource);
+    super.onDestroyed(safeSource, context);
 
     const eventBus = this.getEventBus();
     if (!eventBus?.emit) {
@@ -204,7 +204,8 @@ export class Mine extends BaseEnemy {
       safeSource.cause ??
       this.explosionCause?.cause ??
       'detonation';
-    const context = safeSource.context ?? this.explosionCause?.context ?? {};
+    const explosionContext =
+      safeSource.context ?? this.explosionCause?.context ?? {};
 
     eventBus.emit('mine-exploded', {
       enemy: this,
@@ -216,7 +217,7 @@ export class Mine extends BaseEnemy {
       radius: this.explosionRadius,
       damage: this.explosionDamage,
       cause,
-      context,
+      context: explosionContext,
       source: {
         id: this.id,
         type: this.type,

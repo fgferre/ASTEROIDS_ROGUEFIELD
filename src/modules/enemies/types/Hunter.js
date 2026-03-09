@@ -252,9 +252,9 @@ export class Hunter extends BaseEnemy {
     return;
   }
 
-  onDestroyed(source) {
+  onDestroyed(source, context = {}) {
     this.destroyed = true;
-    super.onDestroyed(source);
+    super.onDestroyed(source, context);
   }
 
   resetForPool() {

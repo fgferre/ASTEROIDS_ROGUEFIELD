@@ -1263,7 +1263,7 @@ export class BossEnemy extends BaseEnemy {
     });
   }
 
-  onDestroyed(source) {
+  onDestroyed(source, context = {}) {
     GameDebugLogger.log('STATE', 'Boss destroyed', {
       id: this.id,
       wave: this.wave,
@@ -1292,7 +1292,7 @@ export class BossEnemy extends BaseEnemy {
 
     let destructionError = null;
     try {
-      super.onDestroyed(source);
+      super.onDestroyed(source, context);
     } catch (error) {
       destructionError = error;
     }

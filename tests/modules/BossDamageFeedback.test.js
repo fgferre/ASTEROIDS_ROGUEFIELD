@@ -216,4 +216,33 @@ describe('boss damage feedback', () => {
     expect(collisions).toHaveLength(1);
     expect(collisions[0].enemy).toBe(boss);
   });
+
+  it('still resolves boss bullet collisions when spatial hash query misses the boss', () => {
+    const physics = new PhysicsSystem({ eventBus: createEventBus() });
+    const boss = {
+      type: 'boss',
+      x: 0,
+      y: 0,
+      radius: 60,
+      destroyed: false,
+    };
+    const bullet = {
+      x: (BULLET_SIZE || 0) + 60 + BOSS_PHYSICS_CONFIG.collisionPadding - 1,
+      y: 0,
+      hit: false,
+      damage: 20,
+    };
+    const collisions = [];
+
+    physics.activeEnemies.add(boss);
+    physics.activeBosses.add(boss);
+    physics.spatialHash.query = vi.fn(() => []);
+
+    physics.forEachBulletCollision([bullet], (hitBullet, enemy) => {
+      collisions.push({ hitBullet, enemy });
+    });
+
+    expect(collisions).toHaveLength(1);
+    expect(collisions[0].enemy).toBe(boss);
+  });
 });

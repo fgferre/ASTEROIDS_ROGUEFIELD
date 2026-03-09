@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { WaveManager } from '../../src/modules/enemies/managers/WaveManager.js';
 import * as CONSTANTS from '../../src/core/GameConstants.js';
 import { createDeterministicRandom } from '../__helpers__/stubs.js';
@@ -151,6 +151,91 @@ describe('WaveManager support enemy weights', () => {
         expect(droneAtHunterWave?.count).toBeGreaterThan(0);
         expect(mineAtHunterWave?.count).toBeGreaterThan(0);
         expect(hunterAtStart?.count).toBeGreaterThan(0);
+      }
+    );
+  });
+
+  it('tracks boss-wave enemies and completes when the boss dies last in legacy asteroid fallback mode', async () => {
+    await withWaveOverrides(
+      { useManager: true, managerHandlesAsteroids: false },
+      () => {
+        const random = createDeterministicRandom({ floatValue: 0.5 });
+        const eventBus = {
+          on: vi.fn(),
+          off: vi.fn(),
+          emit: vi.fn(),
+        };
+        const activeEnemies = [];
+        let supportSequence = 0;
+
+        const enemySystem = {
+          asteroids: activeEnemies,
+          getRandomScope: () => random,
+          getCachedWorld: () => ({
+            getBounds: () => ({ width: 800, height: 600 }),
+          }),
+          getCachedPlayer: () => ({
+            position: { x: 400, y: 300 },
+            velocity: { vx: 0, vy: 0 },
+          }),
+          getPlayerPositionSnapshot: () => ({ x: 400, y: 300 }),
+          spawnBoss: vi.fn((config) => {
+            const boss = {
+              id: 'boss-10',
+              type: 'boss',
+              alive: true,
+              destroyed: false,
+              wave: config.wave,
+            };
+            activeEnemies.push(boss);
+            return boss;
+          }),
+          acquireEnemyViaFactory: vi.fn((type, config) => ({
+            id: `${type}-${supportSequence++}`,
+            type,
+            alive: true,
+            destroyed: false,
+            wave: config.wave,
+          })),
+          registerActiveEnemy: vi.fn((enemy) => {
+            if (!activeEnemies.includes(enemy)) {
+              activeEnemies.push(enemy);
+            }
+            return enemy;
+          }),
+        };
+
+        const manager = new WaveManager({ enemySystem, random, eventBus });
+        manager.currentWave = 9;
+
+        expect(manager.startNextWave()).toBe(true);
+        expect(manager.currentWave).toBe(10);
+        expect(manager.totalEnemiesThisWave).toBe(4);
+
+        const boss = activeEnemies.find((enemy) => enemy.type === 'boss');
+        const supports = activeEnemies.filter((enemy) => enemy.type === 'drone');
+
+        expect(boss).toBeTruthy();
+        expect(supports).toHaveLength(3);
+
+        for (const support of supports) {
+          support.alive = false;
+          support.destroyed = true;
+          manager.onEnemyDestroyed({ enemy: support });
+        }
+
+        expect(manager.waveInProgress).toBe(true);
+        expect(manager.enemiesKilledThisWave).toBe(3);
+
+        boss.alive = false;
+        manager.onEnemyDestroyed({ enemy: boss });
+
+        expect(manager.waveInProgress).toBe(false);
+        expect(manager.enemiesKilledThisWave).toBe(4);
+        expect(eventBus.emit).toHaveBeenCalledWith(
+          'wave-complete',
+          expect.objectContaining({ wave: 10, enemiesKilled: 4 })
+        );
       }
     );
   });
