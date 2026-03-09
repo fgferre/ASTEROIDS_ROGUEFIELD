@@ -1,16 +1,18 @@
 {
-  "mode": "FAST",
-  "reason": "default low-risk path",
+  "mode": "SAFE",
+  "reason": "safe rules: database",
   "source": "stdin",
-  "changedFiles": 5,
+  "changedFiles": 2,
   "riskyPaths": [],
   "matches": {
-    "safe": [],
+    "safe": [
+      "database"
+    ],
     "plan": [],
     "recovery": []
   },
-  "inputHash": "db3a84e03379c471dde62e2775c62fe54e6aa11e1773e9a91ffc7719e4207d73",
-  "updatedAt": "2026-03-09T08:35:28.311Z",
+  "inputHash": "7b04c763cacc11ca5c86a6686b51c02c778d9a8e2d5e4f3df89a783da3f3a54f",
+  "updatedAt": "2026-03-09T11:45:54.122Z",
   "ttlMs": 2700000,
   "version": "router-v2"
 }

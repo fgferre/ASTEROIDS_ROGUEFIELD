@@ -26,7 +26,8 @@
       "Bash(rm:*)",
       "Bash(git stash:*)",
       "Bash(npx vitest run:*)",
-      "Bash(git status:*)"
+      "Bash(git status:*)",
+      "Bash(python3:*)"
     ]
   }
 }
