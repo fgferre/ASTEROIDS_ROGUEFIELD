@@ -25,12 +25,27 @@ git grep -n "Math.random()" -- src/modules/MenuBackgroundSystem.js src/modules/E
 git grep -n "screenShake\\|addScreenShake\\|updateCameraShake\\|applyCameraShake" -- src utils tests
 ```
 
-## Findings priorizados
+## Revalidacao em 2026-03-09
+
+- `HV-01`: enderecado. `BaseSystem` ainda chama `setupEventListeners()` no `super()`, mas `EnemySystem` limpa os handlers herdados com `removeAllEventListeners()` antes de re-registrar; `CombatSystem`, `PlayerSystem` e `WorldSystem` nao duplicam listeners no construtor.
+- `HV-02`: enderecado. `HealthComponent.initialize()` agora respeita `enemy.healthInitialized`; harness local via `EnemySystem.factory.create('boss', { wave: 4 })` manteve `2592/2592` apos `applyComponents()`.
+- `HV-03`: hipotese original descartada no runtime atual. `DIContainer.register()` agora rejeita valores nao-funcao, nao ha call sites de `register(name, instance)` e `has()/getServiceNames()` seguem coerentes com a API atual. Nota separada: a mensagem de erro ainda cita um `registerInstance()` que nao existe.
+- `HV-04`: enderecado. `EnemySystem.forwardBossEvent()` virou no-op e a busca atual nao encontrou emissores de `effects-boss-*`, `ui-boss-*` ou `audio-boss-*`; `EffectsSystem`, `UISystem` e `AudioSystem` consomem apenas o evento raw.
+- `HV-05`: confirmado em aberto. `MenuBackgroundSystem` ainda usa `Math.random()` na rotacao inicial das nebulas e nas posicoes da poeira espacial.
+- `HV-06`: confirmado em aberto. `EffectsSystem` ainda usa `Math.random()` em contagem, jitter, tamanho e lifetime de particulas de thruster e muzzle flash.
+- `HV-07`: enderecado. `ScreenShake.add()` agora preserva apenas o decay mais rapido quando ja existe trauma; simulacao local nao reproduziu mais o prolongamento indevido de shake forte por hit fraco.
+- `HV-08`: enderecado. `AsteroidImpactEffect.updateCameraShake()` remove o offset do frame anterior antes de aplicar o novo; simulacao local retornou a camera exatamente para a posicao base ao fim do shake.
+- `HV-09`: enderecado. O primeiro shake agora usa o decay pedido quando nao havia trauma ativo; simulacao local com `add(1, 1)` + `update(0.5)` resultou em `trauma = 0.5`, como esperado.
+- `HV-10`: enderecado. `forwardBossEvent()` ficou em no-op para evitar duplicacao, mas `EnemySystem.handleBossWaveStarted()` aplica diretamente o flash e o cue sonoro que faltariam nesse evento.
+- `HV-11`: continua corretamente marcado como confirmado e corrigido; os testes de regressao seguem presentes em `tests/visual/rendering-determinism.test.js`.
+- `LP-01`: permanece descartado. O fluxo ainda chama `boss.onDraw(ctx)` na segunda passada e `BossEnemy.onDraw()` continua sem desenhar quando o boss usa componentes.
+
+## Itens Arquivados (enderecados/descartados — sem nova engenharia)
 
 ### HV-01 - Listeners duplicados em subclasses de BaseSystem
 
-Status: forte candidato a bug real
-Prioridade: alta
+Status: ARQUIVADO — enderecado no runtime atual
+Prioridade: encerrado
 
 Abrir primeiro:
 
@@ -43,37 +58,24 @@ Abrir primeiro:
 - `src/modules/PlayerSystem.js:293-390`
 - `src/modules/WorldSystem.js:12-25`
 
-Hipotese:
+Resultado da revalidacao em 2026-03-09:
 
-- `BaseSystem` ja chama `setupEventListeners()` no `super()`.
-- Algumas subclasses chamam `this.setupEventListeners()` de novo no construtor.
-- Isso pode duplicar handlers e efeitos colaterais.
+- `BaseSystem` continua chamando `setupEventListeners()` no construtor (`src/core/BaseSystem.js:100-102`).
+- Na busca atual, a unica subclasse de `BaseSystem` que ainda chama `this.setupEventListeners()` manualmente no construtor e `EnemySystem`.
+- Em `EnemySystem`, a segunda chamada nao acumula listeners: o construtor limpa os handlers herdados com `this.removeAllEventListeners()` e so depois re-registra (`src/modules/EnemySystem.js:188-193`).
+- `CombatSystem`, `PlayerSystem` e `WorldSystem` seguem estendendo `BaseSystem`, mas nao fazem segunda chamada no construtor, entao nao entram mais neste risco.
+- `InputSystem` e `SettingsSystem` ainda chamam `setupEventListeners()` manualmente, mas nao estendem `BaseSystem`; logo, continuam fora do escopo deste item.
+- Harness local com `EventBus` + `EnemySystem` confirmou 1 listener registrado para cada evento critico amostrado: `enemy-fired`, `player-hit-by-projectile`, `wave-complete`, `boss-spawned`, `boss-phase-changed` e `boss-defeated`.
 
-Sinais ja vistos:
+Conclusao:
 
-- `EnemySystem` pode processar `enemy-fired` duas vezes e encaminhar o mesmo payload ao `CombatSystem` duas vezes.
-- `EnemySystem` pode aplicar dano de `player-hit-by-projectile` duas vezes.
-- `PlayerSystem` pode aplicar upgrades duas vezes.
-- `CombatSystem` pode rodar handlers de reset/upgrade duas vezes.
-- `WorldSystem` pode duplicar resets.
-
-Evidencia de log para checar:
-
-- `game-debug.log:966-979` projeteis do boss aparecem em pares identicos.
-- `game-debug.log:1018-1024` colisao do mesmo projetil com o player aparece repetida.
-- `game-debug.log:1029-1041` destruicoes de projeteis aparecem duplicadas.
-
-Checklist de verificacao:
-
-- Confirmar que a classe realmente estende `BaseSystem`.
-- Confirmar que o construtor chama `this.setupEventListeners()` apos `super()`.
-- Seguir um evento concreto (`enemy-fired`, `upgrade-*`, `player-hit-by-projectile`) e contar quantos handlers equivalentes ficam registrados.
-- Se corrigir: nao remover chamadas de classes que nao estendem `BaseSystem` como `InputSystem` e `SettingsSystem`.
+- O handoff capturava um risco valido de um estado anterior, mas o runtime atual ja o endereca.
+- Nao abrir correcao para HV-01 sem nova evidencia de duplicacao fora do fluxo atual de `EnemySystem`.
 
 ### HV-02 - HP do boss e sobrescrito apos a inicializacao
 
-Status: forte candidato a bug real
-Prioridade: alta
+Status: ARQUIVADO — enderecado no runtime atual
+Prioridade: encerrado
 
 Abrir primeiro:
 
@@ -105,8 +107,8 @@ Checklist de verificacao:
 
 ### HV-03 - DIContainer suporta registro por instancia, mas nao o expõe corretamente
 
-Status: bug de contrato/API; impacto runtime depende de uso real
-Prioridade: media
+Status: ARQUIVADO — hipotese original descartada no runtime atual
+Prioridade: encerrado
 
 Abrir primeiro:
 
@@ -140,8 +142,8 @@ c.register('x', svc);
 
 ### HV-04 - Pipeline de eventos do boss reaplica audio, UI e efeitos
 
-Status: forte candidato a bug real
-Prioridade: alta
+Status: ARQUIVADO — duplicacao principal enderecada
+Prioridade: encerrado
 
 Abrir primeiro:
 
@@ -174,10 +176,12 @@ Checklist de verificacao:
 - Verificar se existe algum dedupe interno antes de corrigir.
 - Se corrigir: escolher uma unica estrategia, ou consumo direto do raw event, ou fan-out por canal, mas nao ambos.
 
+## Itens Ativos
+
 ### HV-05 - MenuBackgroundSystem ainda usa Math.random() na montagem da cena
 
-Status: gap real de render/determinismo
-Prioridade: media
+Status: ATIVO — confirmado no runtime atual
+Prioridade: media (condicionado a cobertura real da montagem da cena)
 
 Abrir primeiro:
 
@@ -202,10 +206,16 @@ Checklist de verificacao:
 - Instanciar duas vezes com a mesma seed e comparar `mesh.rotation.z` das nebulas e o buffer `positions` da poeira.
 - Se corrigir: trocar apenas esses pontos por `this.randomFloat(...)` usando um fork coerente com o dominio visual.
 
-### HV-06 - Particulas de thruster e muzzle flash burlam o RNG deterministico
+### HV-06 - Particulas de thruster burlam o RNG deterministico
 
-Status: forte candidato a bug de render/reproducao
-Prioridade: media
+Status: CORRIGIDO em 2026-03-08
+Prioridade: encerrado
+
+Resolucao:
+- Todos os `Math.random()` em `spawnThrusterVFX` substituidos por `this.randomFloat('thrusters')`
+- 3 `Math.random()` residuais em `createMuzzleFlash` substituidos por `this.randomFloat('muzzleFlash')`
+- Zero chamadas a `Math.random()` restantes em `src/modules/EffectsSystem.js`
+- Teste: `tests/visual/thruster-determinism.test.js`
 
 Abrir primeiro:
 
@@ -223,10 +233,12 @@ Checklist de verificacao:
 - Resetar a seed e comparar arrays de particulas gerados por duas chamadas identicas a `createThrusterEffect(...)` e `createMuzzleFlash(...)`.
 - Procurar se existe teste de determinismo cobrindo esse caminho; na busca rapida atual nao apareceu cobertura dedicada para essas rotinas.
 
+## Itens Arquivados (continuacao)
+
 ### HV-07 - Um shake fraco pode prolongar um shake forte ja em curso
 
-Status: forte candidato a bug real
-Prioridade: alta
+Status: ARQUIVADO — enderecado no runtime atual
+Prioridade: encerrado
 
 Abrir primeiro:
 
@@ -256,8 +268,8 @@ Checklist de verificacao:
 
 ### HV-08 - Camera shake do menu altera a posicao real da camera e pode causar drift
 
-Status: forte candidato a bug real
-Prioridade: media
+Status: ARQUIVADO — enderecado no runtime atual
+Prioridade: encerrado
 
 Abrir primeiro:
 
@@ -286,8 +298,8 @@ Checklist de verificacao:
 
 ### HV-09 - Fix com `Math.max` no ScreenShake encurta varios presets logo no primeiro shake
 
-Status: regressao forte apos tentativa de correcao
-Prioridade: alta
+Status: ARQUIVADO — enderecado no runtime atual
+Prioridade: encerrado
 
 Abrir primeiro:
 
@@ -316,8 +328,8 @@ Checklist de verificacao:
 
 ### HV-10 - `forwardBossEvent()` em no-op remove feedback proprio de `boss-wave-started`
 
-Status: regressao forte apos tentativa de correcao
-Prioridade: media
+Status: ARQUIVADO — enderecado no runtime atual
+Prioridade: encerrado
 
 Abrir primeiro:
 
@@ -342,8 +354,8 @@ Checklist de verificacao:
 
 ### HV-11 - Screen shake desloca o frame inteiro antes do background e dos overlays full-screen
 
-Status: confirmado e corrigido em 2026-03-08
-Prioridade: alta
+Status: ARQUIVADO — confirmado e corrigido em 2026-03-08
+Prioridade: encerrado
 
 Abrir primeiro:
 
@@ -393,7 +405,7 @@ Resultado da revalidacao em 2026-03-08:
 
 ### LP-01 - Boss sendo desenhado duas vezes
 
-Nao tratar como bug sem nova evidencia.
+Status: ARQUIVADO — descartado, sem nova evidencia.
 
 Refs:
 
@@ -408,16 +420,11 @@ Motivo:
 - O fluxo parecia desenhar boss duas vezes, mas a segunda passada chama `boss.onDraw(ctx)`, nao `boss.draw(ctx)`.
 - Em boss componentizado, `onDraw()` retorna sem desenhar. Entao a suspeita inicial nao esta confirmada.
 
-## Ordem sugerida de trabalho
+## Ordem de trabalho (atualizada 2026-03-08)
 
-1. Verificar HV-01 com leitura de fluxo e contagem de listeners.
-2. Verificar HV-02 com inspeção do valor de HP antes/depois de `applyComponents()`.
-3. Verificar HV-04 antes de qualquer ajuste em efeitos/audio/UI do boss.
-4. Verificar HV-09 antes de considerar HV-07 encerrado.
-5. Verificar HV-10 antes de considerar HV-04 encerrado.
-6. Verificar HV-08 se houver relato de menu "andando" ou camera 3D instavel.
-7. Verificar HV-05 e HV-06 se o foco da proxima IA for regressao visual ou determinismo.
-8. Verificar HV-03 apenas se ainda houver tempo ou se aparecer uso real de registro por instancia.
+1. HV-06: substituir `Math.random()` restantes em `spawnThrusterVFX` por `this.randomFloat('thrusters')`.
+2. HV-05: condicionado — so implementar com cobertura real da montagem da cena do menu.
+3. Todos os demais itens estao arquivados e nao devem ser reabertos sem nova evidencia.
 
 ## Saida esperada da proxima IA
 

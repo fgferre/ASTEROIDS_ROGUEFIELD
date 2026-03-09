@@ -46,6 +46,10 @@ export class AsteroidImpactEffect {
     this.sharedMaterials = {};
 
     this.isPreloaded = false;
+
+    // F10: reusable temporaries for debris hot paths
+    this._dummy = new THREE.Object3D();
+    this._tmpDirection = new THREE.Vector3();
   }
 
   /**
@@ -330,7 +334,9 @@ export class AsteroidImpactEffect {
     field.activeCount = Math.min(count, POOL_CONFIG.debrisPerField);
 
     const coneAngle = (120 * Math.PI) / 180;
-    const dummy = new THREE.Object3D();
+    // F10: reuse class-level dummy and direction instead of allocating per call/particle
+    const dummy = this._dummy;
+    const direction = this._tmpDirection;
 
     // Configurar cada partícula
     for (let i = 0; i < field.activeCount; i++) {
@@ -343,7 +349,7 @@ export class AsteroidImpactEffect {
       const theta = this.randomFloat() * Math.PI * 2;
       const phi = this.randomFloat() * coneAngle;
 
-      const direction = new THREE.Vector3(
+      direction.set(
         Math.sin(phi) * Math.cos(theta),
         Math.sin(phi) * Math.sin(theta),
         Math.cos(phi)
@@ -505,8 +511,8 @@ export class AsteroidImpactEffect {
   }
 
   updateDebris(delta) {
-    const { THREE } = this;
-    const dummy = new THREE.Object3D();
+    // F10: reuse class-level dummy instead of allocating per frame
+    const dummy = this._dummy;
 
     for (let i = this.activeDebrisFields.length - 1; i >= 0; i--) {
       const field = this.activeDebrisFields[i];
@@ -516,8 +522,8 @@ export class AsteroidImpactEffect {
       for (let j = 0; j < field.activeCount; j++) {
         const particle = field.particles[j];
 
-        // Física
-        particle.position.add(particle.velocity.clone().multiplyScalar(delta));
+        // Física — addScaledVector avoids clone+multiplyScalar per particle/frame
+        particle.position.addScaledVector(particle.velocity, delta);
         particle.rotation.x += particle.angularVelocity.x * delta;
         particle.rotation.y += particle.angularVelocity.y * delta;
         particle.rotation.z += particle.angularVelocity.z * delta;

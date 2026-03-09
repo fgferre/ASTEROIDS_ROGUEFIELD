@@ -2,7 +2,7 @@
 
 **Data:** 2026-03-08
 **Autores:** Opus 4.6 + Codex (auditoria cruzada independente com contraditório)
-**Status:** Fase 0 e Fase 1 implementadas e validadas com build; hotfixes pós-Fase 1 aplicados em `gameover`; Fase 2+ permanecem pendentes
+**Status:** Atualizado em 2026-03-09. S0, S1, S1.1, S1.2, F1, F2, F5, F7 arquivados. Itens com seguimento pendente: HV-05, F4 e F6. R1, F3, F9 e F10 implementados e revalidados. R2-R5 arquivados como hipoteses/contexto sem nova engenharia
 
 ---
 
@@ -40,8 +40,86 @@
   - `Quit to Menu` recebeu contraste coerente com a hierarquia visual
 - **Validação:** inspeção runtime confirmou `disabled: false` e `opacity: 1` para `Retry` ativo + `npm run build` OK
 
-### Próximo ponto real de trabalho
-- A próxima fase pendente continua sendo a **Fase 2 — investigação de bug de materiais/fade**
+### Implementado em 2026-03-08
+
+#### R1 — Bug de materiais compartilhados no fade (Fase 2)
+- `startFadeOut()` agora clona o material compartilhado antes de aplicar fade
+- `deactivateAsteroid()` restaura o material compartilhado e descarta o clone
+- Teste: `tests/visual/material-fade-isolation.test.js` (3 testes)
+- Evidencia: dois asteroides simultaneos, um fading e outro nao, mantem opacidades independentes
+
+#### HV-06 — Thruster determinism
+- Substituidos todos os `Math.random()` em `spawnThrusterVFX` por `this.randomFloat('thrusters')`
+- Substituidos 3 `Math.random()` residuais em `createMuzzleFlash` por `this.randomFloat('muzzleFlash')`
+- Zero chamadas a `Math.random()` restantes em `EffectsSystem.js`
+- Teste: `tests/visual/thruster-determinism.test.js` (2 testes: reset+replay determinismo, no Math.random spy)
+
+#### F3 — CustomFX pass desabilitado quando ocioso
+- Pass `.enabled` agora segue `chromaticAberration !== 0 || grainAmount !== 0`
+- Atualizado tanto na inicializacao quanto em `applyQualityLevel()`
+- Como todas as quality levels tem `chromaticAberration: 0` e `grainAmount` default `0`, o pass fica desabilitado por padrao
+
+#### F4 — Fisica do menu reduzida para 30Hz (sem medicao previa)
+- `world.step(1/30, delta, 1)` substitui `world.step(1/60, delta, 3)`
+- Menu decorativo nao necessita 60Hz com 3 substeps
+- Teste: `tests/visual/menu-physics-stepping.test.js` (prende os parametros `1/30, delta, 1` em `animate()`)
+- Benchmark local em Node com `cannon.min.js` vendorizado:
+  - 18 corpos: `0.0643ms` -> `0.0329ms` medio por `world.step` (`-48.8%`)
+  - 28 corpos: `0.0873ms` -> `0.0428ms` medio por `world.step` (`-51.0%`)
+- **Nota:** a mudanca ja tem evidência local de CPU e teste de configuracao, mas o profiling/smoke visual em browser continua recomendado antes de tratar como custo totalmente encerrado
+
+#### F9 — Pool de PointLights para explosoes
+- 4 luzes pre-alocadas na inicializacao da cena
+- `createExplosion()` reutiliza do pool; `updateExplosions()` devolve ao pool
+- Elimina `new THREE.PointLight()` + `scene.add()/remove()` por explosao
+- Teste: `tests/visual/explosion-light-pool.test.js` (4 testes: acquire, return, exhaustion fallback, clearAll)
+- Benchmark local em Node para burst de 4 explosoes:
+  - baseline `new PointLight + scene.add/remove`: `0.0687ms`
+  - pool atual: `0.0031ms`
+  - ganho medio: `-95.5%`
+
+#### F10 — Temporarios reutilizaveis em fragmentAsteroid + AsteroidImpactEffect
+- `MenuBackgroundSystem`: `_tmpVec3` e `_tmpCannonVec3` pre-alocados; `fragmentAsteroid()` reescrito sem `.clone()` por fragmento
+- `AsteroidImpactEffect`: `_dummy` Object3D e `_tmpDirection` Vector3 pre-alocados na classe
+  - `activateDebrisField()`: `new Object3D()` e `new Vector3()` per-call eliminados
+  - `updateDebris()`: `new Object3D()` per-frame eliminado; `velocity.clone().multiplyScalar(delta)` substituido por `addScaledVector(velocity, delta)`
+- Benchmark local em Node:
+  - `fragmentAsteroid()` por lote de 200 chamadas: `0.2705ms` -> `0.2086ms` (`-22.9%`)
+  - `activateDebrisField()`: `0.2044ms` -> `0.1501ms` (`-26.6%`)
+  - `updateDebris()`: `0.1211ms` -> `0.1044ms` (`-13.7%`)
+
+#### HV-05 — Deferido
+- `Math.random()` na rotacao de nebulas e posicoes de dust permanece
+- Justificativa: teste confiavel da montagem real da cena requer canvas/THREE completo; harness fragil
+- Manter aberto para implementacao futura com cobertura adequada
+
+#### F6 — Deferido (gate nao atingido)
+- 20 services eager vs 5 lazy no manifesto atual
+- Sem medicao de boot real para confirmar ganho >= 100ms
+- Mapa de dependencias nao construido; risco de regressao alto
+- Manter aberto para reavaliacao com profiling real
+
+### Revalidacao em 2026-03-09
+
+- `S0`: confirmado. `prepareInitialField()` continua rodando antes de `warmupFirstImpactPath()` em `src/modules/MenuBackgroundSystem.js`, e o warmup ainda renderiza o caminho completo do primeiro impacto.
+- `S1`: confirmado. `src/app.js` ainda usa `shouldRenderGame` baseado na visibilidade real de `#game-ui`, e `GamePools.update()` / `garbageCollectionManager.update()` continuam guardados por `shouldUpdateGame`.
+- `S1.1`: confirmado. `UISystem` ainda escuta `screen-changed` e trata `gameover` como overlay funcional.
+- `S1.2`: confirmado. `src/style.css` ainda diferencia o `Retry` ativo do estado `:disabled` no bloco de `gameover`.
+- `F1`: enderecado. O render 2D nao roda mais no menu enquanto `#game-ui` estiver oculto.
+- `F2`: enderecado. `GamePools.update()` e `GC.update()` nao rodam mais no menu.
+- `F3`: CORRIGIDO em 2026-03-08. `CustomFX.enabled` agora segue `chromaticAberration !== 0 || grainAmount !== 0`, desabilitando o pass quando ambos sao zero.
+- `F4`: APLICADO em 2026-03-08 e revalidado em 2026-03-09. `world.step(1/30, delta, 1)` — 30Hz com max 1 catch-up step. Teste dedicado prende a configuracao e benchmark local mediu `-48.8%` a `-51.0%` de CPU por `world.step`; smoke visual em browser ainda e recomendado.
+- `F5`: enderecado. `AAAHudLayout` nao injeta mais `@import` de fontes; o carregamento ficou centralizado em `src/index.html`.
+- `F6`: segue em aberto e hoje esta ainda mais claro. O manifesto atual registra 26 services, dos quais 21 continuam `lazy: false`.
+- `F7`: enderecado. O preload atual aquece o caminho frio do primeiro impacto apos preparar o campo inicial.
+- `F8`: continua valido como limite conhecido. O warmup atual cobre flash/debris/dust/explosion light + render, mas nao aquece fragmentacao nem cascata entre fragmentos.
+- `F9`: CORRIGIDO em 2026-03-08 e revalidado em 2026-03-09. 4 PointLights pre-alocados em pool; `createExplosion()` reutiliza do pool. Teste: `tests/visual/explosion-light-pool.test.js`. Benchmark local mediu `0.0687ms` -> `0.0031ms` por burst de 4 explosoes (`-95.5%`).
+- `F10`: CORRIGIDO em 2026-03-09. `fragmentAsteroid()` + `AsteroidImpactEffect` (debris hot paths) reescritos com temporarios reutilizaveis. Cobre todos os hot spots identificados no plano; benchmark local mediu ganhos de `-22.9%`, `-26.6%` e `-13.7%` nos tres caminhos amostrados.
+- `R1`: CORRIGIDO em 2026-03-08. `startFadeOut()` agora clona o material compartilhado; `deactivateAsteroid()` restaura e descarta o clone. Teste: `tests/visual/material-fade-isolation.test.js`.
+- `R2`: permanece apenas contextual. O adaptive quality continua existindo, mas nada novo nesta revalidacao elevou a prioridade.
+- `R3`: continua correto. Bloom segue ativo em `high`, SMAA continua ligado e apenas o `CustomFX` permanece como trabalho obviamente vazio no default atual.
+- `R4`: permanece como hipotese forte, nao fato fechado. O warmup continua mitigando o caminho frio, mas nao prova causa unica para todo microtravamento residual.
+- `R5`: permanece como hipotese media. A fragmentacao ainda cria corpos proximos e pode amplificar custo, mas a revalidacao atual nao fecha isso como causa confirmada.
 
 ## Contexto
 

@@ -105,6 +105,12 @@ class MenuBackgroundSystem extends BaseSystem {
     this.hasProceduralAsteroids = false;
     this.objectsToDeactivate = [];
     this.explosions = [];
+    // F9: pre-allocated explosion light pool to avoid new PointLight() per explosion
+    this._explosionLightPool = [];
+    this._explosionLightPoolSize = 4;
+    // F10: reusable temporaries for hot paths (fragmentAsteroid, etc.)
+    this._tmpVec3 = null; // initialized when THREE is available
+    this._tmpCannonVec3 = null;
 
     this.config = {
       // Higher tessellation is required for "Monolith-like" silhouettes.
@@ -852,6 +858,18 @@ class MenuBackgroundSystem extends BaseSystem {
 
     this.clock = new THREE.Clock();
 
+    // F10: initialize reusable temporaries
+    this._tmpVec3 = new THREE.Vector3();
+    this._tmpCannonVec3 = new CANNON.Vec3();
+
+    // F9: pre-allocate explosion light pool
+    for (let i = 0; i < this._explosionLightPoolSize; i++) {
+      const light = new THREE.PointLight(0xffaa66, 0, 140, 2);
+      light.visible = false;
+      this.scene.add(light);
+      this._explosionLightPool.push(light);
+    }
+
     // Quick setup (non-blocking)
     this.createLighting();
     this.createStarLayers();
@@ -1045,6 +1063,9 @@ class MenuBackgroundSystem extends BaseSystem {
       if (this.customFX?.uniforms?.amount) {
         this.customFX.uniforms.amount.value = chromaticAberration;
       }
+      // F3: disable pass when both effects are zero (avoids 3 texture samples/pixel for no result)
+      const grainValue = this.customFX?.uniforms?.grainAmount?.value ?? 0;
+      this.customFX.enabled = chromaticAberration !== 0 || grainValue !== 0;
       this.composer.addPass(this.customFX);
     }
 
@@ -3476,6 +3497,15 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     asteroid.body.position.set(0, -10000, 0);
     asteroid.body.velocity.set(0, 0, 0);
     asteroid.body.angularVelocity.set(0, 0, 0);
+
+    // Restore shared material and dispose fade clone
+    if (asteroid._fadeClonedMaterial && asteroid._sharedMaterial) {
+      asteroid.material.dispose();
+      asteroid.material = asteroid._sharedMaterial;
+      asteroid.mesh.material = asteroid._sharedMaterial;
+      asteroid._sharedMaterial = null;
+      asteroid._fadeClonedMaterial = false;
+    }
     if (asteroid.material) {
       asteroid.material.opacity = 1;
     }
@@ -3499,6 +3529,18 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     if (!asteroid.fading) {
       asteroid.fading = true;
       asteroid.fadeElapsed = 0;
+
+      // Clone shared material so fade opacity doesn't contaminate other asteroids
+      // that share the same baseMaterials[] entry.
+      if (asteroid.material && !asteroid._fadeClonedMaterial) {
+        asteroid._sharedMaterial = asteroid.material;
+        const cloned = asteroid.material.clone();
+        cloned.transparent = true;
+        cloned.opacity = 1;
+        asteroid.material = cloned;
+        asteroid.mesh.material = cloned;
+        asteroid._fadeClonedMaterial = true;
+      }
     }
   }
 
@@ -3532,71 +3574,72 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
   }
 
   fragmentAsteroid(parent) {
-    const { THREE, CANNON } = this;
     const radius = parent.body.shapes[0]?.radius || 1;
     const fragments = Math.floor(this.randomFloat('fragments') * 3) + 2;
+    // F10: reuse temporaries instead of allocating per fragment
+    const direction = this._tmpVec3;
+    const offset = new this.THREE.Vector3(); // one alloc for the whole loop
+    const impulse = this._tmpCannonVec3;
 
     for (let i = 0; i < fragments; i += 1) {
       const scaleMultiplier = this.randomFloat('fragments') * 0.3 + 0.4;
-      const newScale = parent.mesh.scale
-        .clone()
-        .multiplyScalar(scaleMultiplier);
+      const sx = parent.mesh.scale.x * scaleMultiplier;
+      const sy = parent.mesh.scale.y * scaleMultiplier;
+      const sz = parent.mesh.scale.z * scaleMultiplier;
 
-      if (newScale.x < 1 && newScale.y < 1 && newScale.z < 1) {
+      if (sx < 1 && sy < 1 && sz < 1) {
         continue;
       }
 
-      const direction = new THREE.Vector3(
+      direction.set(
         this.randomFloat('fragments') - 0.5,
         this.randomFloat('fragments') - 0.5,
         this.randomFloat('fragments') - 0.5
       ).normalize();
 
-      const offset = parent.mesh.position
-        .clone()
-        .add(direction.clone().multiplyScalar(radius));
+      offset.copy(parent.mesh.position).addScaledVector(direction, radius);
 
-      const explosionImpulse = new CANNON.Vec3(
-        direction.x,
-        direction.y,
-        direction.z
-      );
-      explosionImpulse.scale(15, explosionImpulse);
+      impulse.set(direction.x * 15, direction.y * 15, direction.z * 15);
 
-      const velocity = new CANNON.Vec3(
-        parent.body.velocity.x + explosionImpulse.x,
-        parent.body.velocity.y + explosionImpulse.y,
-        parent.body.velocity.z + explosionImpulse.z
-      );
-
-      const angularVelocity = new CANNON.Vec3(
-        (this.randomFloat('fragments') - 0.5) * 5,
-        (this.randomFloat('fragments') - 0.5) * 5,
-        (this.randomFloat('fragments') - 0.5) * 5
-      );
+      const avx = (this.randomFloat('fragments') - 0.5) * 5;
+      const avy = (this.randomFloat('fragments') - 0.5) * 5;
+      const avz = (this.randomFloat('fragments') - 0.5) * 5;
 
       this.activateAsteroid({
         position: offset,
-        scale: newScale,
-        velocity,
-        angularVelocity,
+        scale: { x: sx, y: sy, z: sz },
+        velocity: {
+          x: parent.body.velocity.x + impulse.x,
+          y: parent.body.velocity.y + impulse.y,
+          z: parent.body.velocity.z + impulse.z,
+        },
+        angularVelocity: { x: avx, y: avy, z: avz },
         fragmentationLevel: parent.fragmentationLevel + 1,
       });
     }
   }
 
   createExplosion(position) {
-    const { THREE } = this;
-    const light = new THREE.PointLight(0xffaa66, 3.5, 140, 2);
+    // F9: reuse pooled PointLight instead of allocating new one
+    let light = this._explosionLightPool.pop();
+    if (!light) {
+      // Pool exhausted — fall back to allocation (rare)
+      const { THREE } = this;
+      light = new THREE.PointLight(0xffaa66, 3.5, 140, 2);
+      this.scene.add(light);
+    } else {
+      light.intensity = 3.5;
+      light.distance = 140;
+      light.visible = true;
+    }
     light.position.copy(position);
-    this.scene.add(light);
 
     this.explosions.push({
       light,
       life: 0.4,
       maxLife: 0.4,
-      initialIntensity: light.intensity,
-      initialDistance: light.distance,
+      initialIntensity: 3.5,
+      initialDistance: 140,
     });
   }
 
@@ -3659,7 +3702,9 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     while (this.explosions.length) {
       const explosion = this.explosions.pop();
       if (explosion?.light) {
-        this.scene.remove(explosion.light);
+        explosion.light.intensity = 0;
+        explosion.light.visible = false;
+        this._explosionLightPool.push(explosion.light);
       }
     }
   }
@@ -3675,7 +3720,10 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
         explosion.initialDistance * (0.7 + progress * 0.3);
 
       if (explosion.life <= 0) {
-        this.scene.remove(explosion.light);
+        // F9: return light to pool instead of removing from scene
+        explosion.light.intensity = 0;
+        explosion.light.visible = false;
+        this._explosionLightPool.push(explosion.light);
         this.explosions.splice(i, 1);
       }
     }
@@ -3751,9 +3799,11 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
       this.bloomPass.strength = config.bloomStrength;
     }
 
-    // Update chromatic aberration in custom FX
+    // Update chromatic aberration in custom FX + toggle pass enabled state (F3)
     if (this.customFX && this.customFX.uniforms) {
       this.customFX.uniforms.amount.value = config.chromaticAberration;
+      const grainValue = this.customFX.uniforms.grainAmount?.value ?? 0;
+      this.customFX.enabled = config.chromaticAberration !== 0 || grainValue !== 0;
     }
 
     // Update impact effects quality level
@@ -3859,7 +3909,8 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
       this.rogueSpawnTimer = 0;
     }
 
-    this.world.step(1 / 60, delta, 3);
+    // F4: 30Hz fixed step with max 1 catch-up (decorative menu doesn't need 60Hz physics)
+    this.world.step(1 / 30, delta, 1);
 
     for (let i = this.activeAsteroids.length - 1; i >= 0; i -= 1) {
       const asteroid = this.activeAsteroids[i];

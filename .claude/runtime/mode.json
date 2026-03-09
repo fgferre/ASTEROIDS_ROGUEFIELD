@@ -2,15 +2,15 @@
   "mode": "FAST",
   "reason": "default low-risk path",
   "source": "stdin",
-  "changedFiles": 2,
+  "changedFiles": 5,
   "riskyPaths": [],
   "matches": {
     "safe": [],
     "plan": [],
     "recovery": []
   },
-  "inputHash": "8636f462a43f691bad2fbabb0eafc72acd1c37187ce9e9c72e7a369e1a8c4584",
-  "updatedAt": "2026-03-08T22:58:08.329Z",
+  "inputHash": "db3a84e03379c471dde62e2775c62fe54e6aa11e1773e9a91ffc7719e4207d73",
+  "updatedAt": "2026-03-09T08:35:28.311Z",
   "ttlMs": 2700000,
   "version": "router-v2"
 }

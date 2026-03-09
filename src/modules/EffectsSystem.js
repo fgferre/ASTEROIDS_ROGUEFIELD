@@ -2391,8 +2391,8 @@ export default class EffectsSystem extends BaseSystem {
 
     // Base Configuration
     let baseCount = (type === 'main' ? 2 : 1) * countMultiplier * intensity;
-    // Fractional parts accumulation (simple probabalistic check)
-    if (Math.random() > baseCount % 1) baseCount = Math.floor(baseCount);
+    // Fractional parts accumulation (deterministic probabalistic check)
+    if (this.randomFloat(thrusterFork) > baseCount % 1) baseCount = Math.floor(baseCount);
     else baseCount = Math.ceil(baseCount);
 
     const baseSpeed = (type === 'main' ? 140 : 100) * speedMultiplier;
@@ -2437,13 +2437,13 @@ export default class EffectsSystem extends BaseSystem {
 
       this.particles.push(
         this.createParticle(
-          worldX + (Math.random() - 0.5) * 4,
-          worldY + (Math.random() - 0.5) * 4,
-          vx + (Math.random() - 0.5) * 10,
-          vy + (Math.random() - 0.5) * 10,
+          worldX + (this.randomFloat(thrusterFork) - 0.5) * 4,
+          worldY + (this.randomFloat(thrusterFork) - 0.5) * 4,
+          vx + (this.randomFloat(thrusterFork) - 0.5) * 10,
+          vy + (this.randomFloat(thrusterFork) - 0.5) * 10,
           color,
-          (1.5 + Math.random() * 2) * (type === 'main' ? 1.5 : 1), // Size
-          (0.2 + Math.random() * 0.3) * lifeMultiplier, // Life
+          (1.5 + this.randomFloat(thrusterFork) * 2) * (type === 'main' ? 1.5 : 1), // Size
+          (0.2 + this.randomFloat(thrusterFork) * 0.3) * lifeMultiplier, // Life
           'thruster'
         )
       );
@@ -2462,7 +2462,7 @@ export default class EffectsSystem extends BaseSystem {
         dirX * 30, // Drift with ship
         dirY * 30,
         '#FFFFFF',
-        5 + Math.random() * 4, // Tuned Size: 5-9px (was 18+)
+        5 + this.randomFloat('muzzleFlash') * 4, // Tuned Size: 5-9px (was 18+)
         0.06, // Fast pop
         'spark'
       )
@@ -2492,8 +2492,8 @@ export default class EffectsSystem extends BaseSystem {
           vx,
           vy,
           color,
-          1.5 + Math.random() * 2, // Finer sparks
-          0.1 + Math.random() * 0.12,
+          1.5 + this.randomFloat('muzzleFlash') * 2, // Finer sparks
+          0.1 + this.randomFloat('muzzleFlash') * 0.12,
           'spark'
         )
       );
