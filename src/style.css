@@ -2445,6 +2445,38 @@ body.color-assist-mode .upgrade-option__next {
   transition: all var(--duration-quick) var(--ease-bounce);
 }
 
+.gameover-actions .btn--secondary {
+  background: rgba(248, 250, 252, 0.14);
+  border: 1px solid rgba(248, 250, 252, 0.24);
+  color: var(--aaa-text-hero);
+}
+
+.gameover-actions .btn--secondary:hover:not(:disabled) {
+  background: rgba(248, 250, 252, 0.2);
+  border-color: rgba(248, 250, 252, 0.34);
+}
+
+.gameover-actions .btn--secondary:active:not(:disabled) {
+  background: rgba(248, 250, 252, 0.26);
+}
+
+.gameover-actions .btn--secondary:disabled {
+  background: rgba(248, 250, 252, 0.08);
+  border-color: rgba(248, 250, 252, 0.12);
+  color: var(--aaa-text-muted);
+}
+
+.gameover-actions .btn--outline {
+  border-color: rgba(248, 250, 252, 0.24);
+  color: var(--aaa-text-primary);
+}
+
+.gameover-actions .btn--outline:hover:not(:disabled) {
+  background: rgba(248, 250, 252, 0.08);
+  border-color: rgba(248, 250, 252, 0.34);
+  color: var(--aaa-text-hero);
+}
+
 .gameover-actions .btn:hover {
   transform: translateY(-2px);
   box-shadow:

@@ -37,6 +37,7 @@ const gameState = {
   isPaused: false,
   canvas: null,
   ctx: null,
+  gameUI: null,
   initialized: false,
   lastTime: 0,
   deathSnapshot: null, // Snapshot of game state at death for retry
@@ -250,6 +251,7 @@ function init() {
       throw new Error('Canvas não encontrado');
     }
 
+    gameState.gameUI = document.getElementById('game-ui');
     gameState.ctx = gameState.canvas.getContext('2d');
     if (!gameState.ctx) {
       throw new Error('Contexto 2D não disponível');
@@ -522,6 +524,31 @@ function gameLoop(currentTime) {
       }
     }
 
+    let currentScreen = gameState.screen;
+    let isPaused = gameState.isPaused;
+
+    if (session) {
+      try {
+        const screen =
+          typeof session.getScreen === 'function'
+            ? session.getScreen()
+            : gameState.screen;
+        if (typeof screen === 'string') {
+          currentScreen = screen;
+        }
+
+        const paused =
+          typeof session.isPaused === 'function'
+            ? session.isPaused()
+            : gameState.isPaused;
+        if (typeof paused === 'boolean') {
+          isPaused = paused;
+        }
+      } catch (stateError) {
+        console.warn('[App] Failed to read current session frame state:', stateError);
+      }
+    }
+
     const shouldUpdateGame = (() => {
       if (session) {
         try {
@@ -532,30 +559,27 @@ function gameLoop(currentTime) {
             }
           }
 
-          const screen =
-            typeof session.getScreen === 'function'
-              ? session.getScreen()
-              : gameState.screen;
-          const paused =
-            typeof session.isPaused === 'function'
-              ? session.isPaused()
-              : gameState.isPaused;
-          return screen === 'playing' && !paused;
+          return currentScreen === 'playing' && !isPaused;
         } catch (stateError) {
           console.warn('[App] Failed to evaluate session state:', stateError);
         }
       }
 
-      return gameState.screen === 'playing' && !gameState.isPaused;
+      return currentScreen === 'playing' && !isPaused;
     })();
 
-    // Update object pools (always, for TTL and auto-management)
-    GamePools.update(deltaTime);
-    if (
-      garbageCollectionManager &&
-      typeof garbageCollectionManager.update === 'function'
-    ) {
-      garbageCollectionManager.update(deltaTime);
+    const shouldRenderGame = gameState.gameUI
+      ? !gameState.gameUI.classList.contains('hidden')
+      : currentScreen === 'playing' || currentScreen === 'gameover';
+
+    if (shouldUpdateGame) {
+      GamePools.update(deltaTime);
+      if (
+        garbageCollectionManager &&
+        typeof garbageCollectionManager.update === 'function'
+      ) {
+        garbageCollectionManager.update(deltaTime);
+      }
     }
 
     let adjustedDelta = deltaTime;
@@ -600,7 +624,9 @@ function gameLoop(currentTime) {
       metricsCacheFrameCount++;
     }
 
-    renderGame();
+    if (shouldRenderGame) {
+      renderGame();
+    }
 
     // Capture render timing AFTER render completes
     if (shouldUpdateGame && metricsCacheFrameCount % 5 === 1) {

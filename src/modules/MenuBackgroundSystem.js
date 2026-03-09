@@ -101,6 +101,8 @@ class MenuBackgroundSystem extends BaseSystem {
     this.monolithMaterials = [];
     this.asteroidPool = [];
     this.activeAsteroids = [];
+    this.proceduralAsteroidCount = 0;
+    this.hasProceduralAsteroids = false;
     this.objectsToDeactivate = [];
     this.explosions = [];
 
@@ -877,6 +879,7 @@ class MenuBackgroundSystem extends BaseSystem {
     const monolithMaterialCount = 0;
     const poolSize = this.config.maxAsteroids;
     const impactEffectsStepCount = 1; // Pre-load impact effects
+    const impactWarmupStepCount = 1; // Compile first-impact render path
 
     // Total steps: geometries + materials + pool chunks + field setup + impact effects
     const poolChunks = Math.ceil(poolSize / 10); // Create 10 pool items per chunk
@@ -887,6 +890,7 @@ class MenuBackgroundSystem extends BaseSystem {
       monolithMaterialCount +
       poolChunks +
       impactEffectsStepCount +
+      impactWarmupStepCount +
       1;
     ls.currentStep = 0;
 
@@ -954,9 +958,15 @@ class MenuBackgroundSystem extends BaseSystem {
         await yieldToMain();
       }
 
-      // Phase 5: Prepare initial asteroid field
+      // Phase 5: Prepare initial asteroid field so impact warmup renders against
+      // the same lit materials that the player sees once the menu is visible.
       this.prepareInitialField();
       updateProgress('Preparing asteroid field');
+      await yieldToMain();
+
+      // Phase 6: Warm the real first-impact path (lights + debris + dust uploads)
+      await this.warmupFirstImpactPath();
+      updateProgress('Warming impact pipeline');
 
       // Mark loading complete
       ls.isLoading = false;
@@ -3427,6 +3437,10 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     asteroid.fadeElapsed = 0;
     asteroid.fragmentationLevel = fragmentationLevel;
     this.activeAsteroids.push(asteroid);
+    if (asteroid.material?.userData?.isProceduralAsteroid) {
+      this.proceduralAsteroidCount += 1;
+      this.hasProceduralAsteroids = true;
+    }
   }
 
   getAsteroidFromPool() {
@@ -3466,10 +3480,19 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
       asteroid.material.opacity = 1;
     }
 
+    if (asteroid.material?.userData?.isProceduralAsteroid) {
+      this.proceduralAsteroidCount = Math.max(
+        0,
+        this.proceduralAsteroidCount - 1
+      );
+    }
+
     const index = this.activeAsteroids.indexOf(asteroid);
     if (index >= 0) {
       this.activeAsteroids.splice(index, 1);
     }
+
+    this.hasProceduralAsteroids = this.proceduralAsteroidCount > 0;
   }
 
   startFadeOut(asteroid) {
@@ -3575,6 +3598,70 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
       initialIntensity: light.intensity,
       initialDistance: light.distance,
     });
+  }
+
+  async warmupFirstImpactPath() {
+    const { THREE } = this;
+    if (
+      !THREE ||
+      !this.impactEffect ||
+      !this.renderer ||
+      !this.scene ||
+      !this.camera ||
+      this.activeAsteroids.length === 0
+    ) {
+      return;
+    }
+
+    const waitForFrame = () =>
+      new Promise((resolve) => requestAnimationFrame(() => resolve()));
+    const warmupPosition = new THREE.Vector3(0, 0, 0);
+
+    try {
+      // Match the expensive first real impact: pooled impact FX plus the
+      // transient explosion light that changes the active light count.
+      this.impactEffect.trigger(
+        warmupPosition,
+        this.config.fragmentationThreshold + 10
+      );
+      this.createExplosion(warmupPosition);
+
+      await waitForFrame();
+      this.renderWarmupFrame();
+      await waitForFrame();
+      this.renderWarmupFrame();
+    } finally {
+      this.impactEffect.cleanup();
+      this.clearActiveExplosions();
+    }
+  }
+
+  renderWarmupFrame() {
+    if (!this.renderer || !this.scene || !this.camera) {
+      return;
+    }
+
+    if (this.customFX?.uniforms?.time) {
+      this.customFX.uniforms.time.value = this.elapsedTime;
+    }
+
+    this.camera.lookAt(0, 0, 0);
+
+    if (this.composer) {
+      this.composer.render();
+      return;
+    }
+
+    this.renderer.render(this.scene, this.camera);
+  }
+
+  clearActiveExplosions() {
+    while (this.explosions.length) {
+      const explosion = this.explosions.pop();
+      if (explosion?.light) {
+        this.scene.remove(explosion.light);
+      }
+    }
   }
 
   updateExplosions(delta) {
@@ -3889,7 +3976,7 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
 
     // Procedural asteroid shader is optional; menu currently uses PBR materials.
     // Keep calls guarded to avoid unnecessary work.
-    if (this.activeAsteroids.some((a) => a.material?.userData?.isProceduralAsteroid)) {
+    if (this.hasProceduralAsteroids) {
       this.updateProceduralMaterialUniforms();
       this.updateAsteroidShaderTime(this.elapsedTime);
     }

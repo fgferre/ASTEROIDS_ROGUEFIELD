@@ -568,8 +568,6 @@ export class AAAHudLayout {
   }
   _getCSS() {
     return `
-            @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@500;700&display=swap');
-            
             :root { 
                 --primary-cyan: #00f0ff; 
                 --secondary-blue: #00aaff; 

@@ -1140,6 +1140,10 @@ class UISystem extends BaseSystem {
       this.updatePauseScreen(Boolean(data?.isPaused));
     });
 
+    this.registerEventListener('screen-changed', (payload = {}) => {
+      this.handleScreenChanged(payload);
+    });
+
     this.registerEventListener('toggle-pause', () => {
       const appState = this.getService('game-state');
       if (appState && typeof appState.isPaused === 'function') {
@@ -2263,6 +2267,25 @@ class UISystem extends BaseSystem {
     if (this.aaaTacticalHud) {
       this.updateAAATacticalHudFromServices({ force: false });
     }
+  }
+
+  handleScreenChanged(payload = {}) {
+    const screenName = payload?.screen;
+    if (typeof screenName !== 'string' || !screenName.length) {
+      return;
+    }
+
+    if (screenName === 'pause') {
+      this.showScreen('pause', { overlay: true, show: true, emitEvent: false });
+      return;
+    }
+
+    if (screenName === 'gameover') {
+      this.showGameOverScreen(payload);
+      return;
+    }
+
+    this.showScreen(screenName, { emitEvent: false });
   }
 
   // Legacy Standard HUD update methods removed.
