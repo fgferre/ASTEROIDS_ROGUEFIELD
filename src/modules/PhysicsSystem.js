@@ -1449,6 +1449,7 @@ class PhysicsSystem extends BaseSystem {
         if (!asteroid) {
           continue;
         }
+        const collisionRadius = this.resolveEnemyCollisionRadius(asteroid);
 
         // Precise collision detection
         if (
@@ -1458,7 +1459,7 @@ class PhysicsSystem extends BaseSystem {
             bulletRadius,
             asteroid.x,
             asteroid.y,
-            asteroid.radius || 0
+            collisionRadius
           )
         ) {
           const dx = bullet.x - asteroid.x;

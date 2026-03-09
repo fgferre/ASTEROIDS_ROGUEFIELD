@@ -21,6 +21,204 @@ const resolvePresets = (enemy) => {
   return presets ?? {};
 };
 
+const clamp01 = (value) =>
+  Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0));
+
+const resolveBossPhaseColor = ({ enemy, colors, presets, config }) => {
+  const showPhaseColor = config?.showPhaseColor !== false;
+  if (!showPhaseColor) {
+    return null;
+  }
+
+  const rawPhaseIndex =
+    typeof enemy?.getPhaseIndex === 'function'
+      ? enemy.getPhaseIndex()
+      : enemy?.currentPhase ?? enemy?.phase ?? null;
+
+  if (
+    rawPhaseIndex === null ||
+    rawPhaseIndex === undefined ||
+    Number.isNaN(rawPhaseIndex)
+  ) {
+    return null;
+  }
+
+  const palettes = [
+    config?.phaseColors,
+    presets?.phaseColors,
+    colors?.phaseColors,
+    enemy?.phaseColors,
+    enemy?.renderPayload?.phaseColors,
+  ].find((candidate) => Array.isArray(candidate) && candidate.length > 0);
+
+  if (!palettes) {
+    return null;
+  }
+
+  const index = Math.max(
+    0,
+    Math.min(palettes.length - 1, Math.round(rawPhaseIndex))
+  );
+  return palettes[index] ?? null;
+};
+
+const drawBossShieldOverlay = (ctx, enemy, radius, phaseColor) => {
+  if (!ctx || !enemy?.invulnerable) {
+    return;
+  }
+
+  const effectiveRadius = Number.isFinite(radius) ? radius : 60;
+  const time = enemy.system?.time ?? performance.now() / 1000;
+  const shieldColor = phaseColor || '#9be7ff';
+  const invulnerabilityDuration =
+    Number.isFinite(enemy.invulnerabilityDuration) &&
+    enemy.invulnerabilityDuration > 0
+      ? enemy.invulnerabilityDuration
+      : 1;
+  const invulnerabilityTimer = Number.isFinite(enemy.invulnerabilityTimer)
+    ? enemy.invulnerabilityTimer
+    : invulnerabilityDuration;
+  const normalizedTimer = clamp01(
+    invulnerabilityTimer / invulnerabilityDuration
+  );
+  const shellRadius = effectiveRadius * (1.13 + Math.sin(time * 8.5) * 0.015);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+
+  const shellGradient = ctx.createRadialGradient(
+    0,
+    0,
+    effectiveRadius * 0.72,
+    0,
+    0,
+    shellRadius * 1.15
+  );
+  shellGradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
+  shellGradient.addColorStop(0.78, shieldColor);
+  shellGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+  ctx.globalAlpha = 0.1 + normalizedTimer * 0.08;
+  ctx.fillStyle = shellGradient;
+  ctx.beginPath();
+  ctx.arc(0, 0, shellRadius * 1.15, 0, TAU);
+  ctx.fill();
+
+  ctx.globalAlpha = Math.max(
+    0.28,
+    0.38 + Math.sin(time * 12) * 0.05 + normalizedTimer * 0.08
+  );
+  ctx.strokeStyle = shieldColor;
+  ctx.lineWidth = Math.max(3, effectiveRadius * 0.055);
+  ctx.beginPath();
+  ctx.arc(0, 0, shellRadius, 0, TAU);
+  ctx.stroke();
+
+  ctx.globalAlpha = 0.28 + normalizedTimer * 0.08;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = Math.max(1.5, effectiveRadius * 0.02);
+  ctx.beginPath();
+  ctx.arc(0, 0, shellRadius * 0.98, 0, TAU);
+  ctx.stroke();
+
+  const shieldImpactTimer = Number.isFinite(enemy.shieldImpactTimer)
+    ? enemy.shieldImpactTimer
+    : 0;
+  const shieldImpactDuration =
+    Number.isFinite(enemy.shieldImpactDuration) &&
+    enemy.shieldImpactDuration > 0
+      ? enemy.shieldImpactDuration
+      : 0;
+
+  if (shieldImpactTimer > 0 && shieldImpactDuration > 0) {
+    const impactRatio = clamp01(shieldImpactTimer / shieldImpactDuration);
+    const impactAngle = Number.isFinite(enemy.shieldImpactAngle)
+      ? enemy.shieldImpactAngle
+      : 0;
+    const span = 0.22 + (1 - impactRatio) * 0.42;
+
+    ctx.globalAlpha = 0.4 + impactRatio * 0.55;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = Math.max(5, effectiveRadius * 0.09);
+    ctx.shadowColor = shieldColor;
+    ctx.shadowBlur = 14;
+    ctx.beginPath();
+    ctx.arc(0, 0, shellRadius, impactAngle - span, impactAngle + span);
+    ctx.stroke();
+
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 0.18 + impactRatio * 0.22;
+    ctx.strokeStyle = shieldColor;
+    ctx.lineWidth = Math.max(8, effectiveRadius * 0.14);
+    ctx.beginPath();
+    ctx.arc(
+      0,
+      0,
+      shellRadius * (1.02 + (1 - impactRatio) * 0.08),
+      impactAngle - span * 1.15,
+      impactAngle + span * 1.15
+    );
+    ctx.stroke();
+  }
+
+  ctx.restore();
+};
+
+const drawBossDamageFlash = (ctx, enemy, radius, phaseColor) => {
+  if (!ctx) {
+    return;
+  }
+
+  const damageFlashTimer = Number.isFinite(enemy?.damageFlashTimer)
+    ? enemy.damageFlashTimer
+    : 0;
+  const damageFlashDuration =
+    Number.isFinite(enemy?.damageFlashDuration) && enemy.damageFlashDuration > 0
+      ? enemy.damageFlashDuration
+      : 0;
+
+  if (damageFlashTimer <= 0 || damageFlashDuration <= 0) {
+    return;
+  }
+
+  const effectiveRadius = Number.isFinite(radius) ? radius : 60;
+  const flashRatio = clamp01(damageFlashTimer / damageFlashDuration);
+  const flashStrength = clamp01(enemy?.damageFlashStrength || 1);
+  const flashAlpha = flashRatio * flashStrength;
+  const flashColor = phaseColor || '#ffffff';
+  const flashRadius = effectiveRadius * (1.02 + (1 - flashRatio) * 0.08);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+
+  const flashGradient = ctx.createRadialGradient(
+    0,
+    0,
+    effectiveRadius * 0.18,
+    0,
+    0,
+    flashRadius
+  );
+  flashGradient.addColorStop(0, '#ffffff');
+  flashGradient.addColorStop(0.45, flashColor);
+  flashGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+  ctx.globalAlpha = 0.12 + flashAlpha * 0.28;
+  ctx.fillStyle = flashGradient;
+  ctx.beginPath();
+  ctx.arc(0, 0, flashRadius, 0, TAU);
+  ctx.fill();
+
+  ctx.globalAlpha = 0.18 + flashAlpha * 0.2;
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = Math.max(2, effectiveRadius * 0.03);
+  ctx.beginPath();
+  ctx.arc(0, 0, effectiveRadius * (0.96 + (1 - flashRatio) * 0.04), 0, TAU);
+  ctx.stroke();
+
+  ctx.restore();
+};
+
 const shapeRenderers = {
   triangle: ({ enemy, ctx, colors, presets, size, config }) => {
     const effectiveSize = size ?? 12;
@@ -180,36 +378,9 @@ const shapeRenderers = {
     const pulseSpeed = config?.pulseSpeed ?? auraPreset.speed ?? 1.2;
     const time = enemy.system?.time ?? performance.now() / 1000;
     const pulse = 1 + Math.sin(time * pulseSpeed) * auraPulse;
-
-    let phaseColor = null;
-    if (showPhaseColor) {
-      const rawPhaseIndex =
-        typeof enemy.getPhaseIndex === 'function'
-          ? enemy.getPhaseIndex()
-          : enemy.currentPhase ?? enemy.phase ?? null;
-
-      if (
-        rawPhaseIndex !== null &&
-        rawPhaseIndex !== undefined &&
-        !Number.isNaN(rawPhaseIndex)
-      ) {
-        const palettes = [
-          config?.phaseColors,
-          presets?.phaseColors,
-          colors?.phaseColors,
-          enemy?.phaseColors,
-          enemy?.renderPayload?.phaseColors,
-        ].find((candidate) => Array.isArray(candidate) && candidate.length > 0);
-
-        if (palettes) {
-          const index = Math.max(
-            0,
-            Math.min(palettes.length - 1, Math.round(rawPhaseIndex))
-          );
-          phaseColor = palettes[index] ?? null;
-        }
-      }
-    }
+    const phaseColor = showPhaseColor
+      ? resolveBossPhaseColor({ enemy, colors, presets, config })
+      : null;
 
     if (showAura && auraPreset?.enabled !== false) {
       const gradient = ctx.createRadialGradient(
@@ -247,6 +418,14 @@ const shapeRenderers = {
     ctx.globalAlpha = 0.85;
     ctx.fill();
     ctx.globalAlpha = 1;
+
+    if (config?.showShield !== false) {
+      drawBossShieldOverlay(ctx, enemy, effectiveSize, phaseColor);
+    }
+
+    if (config?.showDamageFlash !== false) {
+      drawBossDamageFlash(ctx, enemy, effectiveSize, phaseColor);
+    }
   },
 };
 
@@ -320,8 +499,12 @@ const ensureSvgSpriteImage = (source) => {
   _svgSpriteCache.set(source, entry);
 
   image.decoding = 'async';
-  image.onload = () => { entry.status = 'loaded'; };
-  image.onerror = () => { entry.status = 'error'; };
+  image.onload = () => {
+    entry.status = 'loaded';
+  };
+  image.onerror = () => {
+    entry.status = 'error';
+  };
   image.src = source;
 
   return entry;
@@ -339,7 +522,8 @@ const svgSpriteBossStrategy = ({ enemy, ctx, colors, presets, config }) => {
       ctx.translate(enemy.x, enemy.y);
       if (enemy.rotation) ctx.rotate(enemy.rotation);
       fallback({
-        enemy, ctx,
+        enemy,
+        ctx,
         colors: colors || resolvePalette(enemy),
         presets: presets || resolvePresets(enemy),
         size: enemy.radius ?? 60,
@@ -359,7 +543,8 @@ const svgSpriteBossStrategy = ({ enemy, ctx, colors, presets, config }) => {
       ctx.translate(enemy.x, enemy.y);
       if (enemy.rotation) ctx.rotate(enemy.rotation);
       fallback({
-        enemy, ctx,
+        enemy,
+        ctx,
         colors: colors || resolvePalette(enemy),
         presets: presets || resolvePresets(enemy),
         size: enemy.radius ?? 60,
@@ -379,13 +564,21 @@ const svgSpriteBossStrategy = ({ enemy, ctx, colors, presets, config }) => {
   const sb = visual.sourceBounds;
   const naturalW = image.naturalWidth || 0;
   const naturalH = image.naturalHeight || 0;
-  let sx = 0, sy = 0, sw = naturalW, sh = naturalH;
+  let sx = 0,
+    sy = 0,
+    sw = naturalW,
+    sh = naturalH;
 
   if (
-    sb && naturalW > 0 && naturalH > 0 &&
-    Number.isFinite(sb.x) && Number.isFinite(sb.y) &&
-    Number.isFinite(sb.width) && Number.isFinite(sb.height) &&
-    sb.width > 0 && sb.height > 0
+    sb &&
+    naturalW > 0 &&
+    naturalH > 0 &&
+    Number.isFinite(sb.x) &&
+    Number.isFinite(sb.y) &&
+    Number.isFinite(sb.width) &&
+    Number.isFinite(sb.height) &&
+    sb.width > 0 &&
+    sb.height > 0
   ) {
     sx = naturalW * Math.min(Math.max(sb.x, 0), 1);
     sy = naturalH * Math.min(Math.max(sb.y, 0), 1);
@@ -410,10 +603,15 @@ const svgSpriteBossStrategy = ({ enemy, ctx, colors, presets, config }) => {
     const pulse = 1 + Math.sin(time * pulseSpeed) * auraPulse;
 
     const gradient = ctx.createRadialGradient(
-      0, 0, effectiveRadius,
-      0, 0, effectiveRadius * (1.5 * pulse)
+      0,
+      0,
+      effectiveRadius,
+      0,
+      0,
+      effectiveRadius * (1.5 * pulse)
     );
-    const innerColor = auraPreset.inner ?? palette.aura ?? 'rgba(255, 120, 90, 0.4)';
+    const innerColor =
+      auraPreset.inner ?? palette.aura ?? 'rgba(255, 120, 90, 0.4)';
     const outerColor = auraPreset.outer ?? 'rgba(120, 20, 10, 0)';
     gradient.addColorStop(0, innerColor);
     gradient.addColorStop(1, outerColor);
@@ -438,6 +636,19 @@ const svgSpriteBossStrategy = ({ enemy, ctx, colors, presets, config }) => {
     ctx.shadowBlur = Math.max(0, visual.shadowBlur);
   }
   ctx.drawImage(image, sx, sy, sw, sh, -width / 2, -height / 2, width, height);
+
+  const phaseColor = resolveBossPhaseColor({
+    enemy,
+    colors: palette,
+    presets: renderPreset,
+    config,
+  });
+  if (config?.showShield !== false) {
+    drawBossShieldOverlay(ctx, enemy, effectiveRadius, phaseColor);
+  }
+  if (config?.showDamageFlash !== false) {
+    drawBossDamageFlash(ctx, enemy, effectiveRadius, phaseColor);
+  }
   ctx.restore();
 
   ctx.restore();
@@ -596,6 +807,8 @@ export class RenderComponent {
         showTurret: false, // Dynamic rotation
         showPulse: false, // Dynamic scaling
         showAura: false, // Dynamic animation
+        showShield: false, // Dynamic shield / invulnerability
+        showDamageFlash: false, // Dynamic damage reaction
         showPhaseColor: true, // Baked into boss hull
       };
 
@@ -712,6 +925,15 @@ export class RenderComponent {
       ctx.arc(0, 0, effectiveSize * 1.5 * pulse, 0, TAU);
       ctx.fill();
     }
+
+    const phaseColor = resolveBossPhaseColor({
+      enemy,
+      colors,
+      presets,
+      config: this.config,
+    });
+    drawBossShieldOverlay(ctx, enemy, effectiveSize, phaseColor);
+    drawBossDamageFlash(ctx, enemy, effectiveSize, phaseColor);
   }
 }
 

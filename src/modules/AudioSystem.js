@@ -636,8 +636,17 @@ class AudioSystem extends BaseSystem {
     });
 
     this.registerEventListener('bullet-hit', (data) => {
-      // Play hit confirm sound
-      this.playBulletHit(data?.killed || false);
+      const effectiveDamage = Number.isFinite(data?.effectiveDamage)
+        ? data.effectiveDamage
+        : Number.isFinite(data?.damage)
+          ? data.damage
+          : 0;
+
+      if (data?.blocked && data?.invulnerable) {
+        this.playBossShieldDeflect();
+      } else if (effectiveDamage > 0 || data?.killed) {
+        this.playBulletHit(data?.killed || false);
+      }
     });
 
     this.registerEventListener('player-took-damage', () => {
@@ -2863,6 +2872,35 @@ class AudioSystem extends BaseSystem {
         setTimeout(() => {
           this.pool.returnGain(gain);
         }, 180);
+      }
+    });
+  }
+
+  playBossShieldDeflect() {
+    this.safePlay(() => {
+      const osc = this.pool
+        ? this.pool.getOscillator()
+        : this.context.createOscillator();
+      const gain = this.pool ? this.pool.getGain() : this.context.createGain();
+
+      osc.connect(gain);
+      this.connectGainNode(gain);
+
+      const now = this.context.currentTime;
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(1200, now);
+      osc.frequency.exponentialRampToValueAtTime(600, now + 0.08);
+
+      gain.gain.setValueAtTime(0.09, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+
+      osc.start(now);
+      osc.stop(now + 0.1);
+
+      if (this.pool) {
+        setTimeout(() => {
+          this.pool.returnGain(gain);
+        }, 120);
       }
     });
   }

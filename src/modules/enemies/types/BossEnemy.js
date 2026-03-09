@@ -1,4 +1,8 @@
-import { BOSS_COMPONENTS, BOSS_CONFIG, BOSS_VISUAL_VARIANT } from '../../../data/enemies/boss.js';
+import {
+  BOSS_COMPONENTS,
+  BOSS_CONFIG,
+  BOSS_VISUAL_VARIANT,
+} from '../../../data/enemies/boss.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
@@ -129,6 +133,13 @@ export class BossEnemy extends BaseEnemy {
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;
     this._lastInvulnerabilityState = null;
+    this.damageFlashDuration = 0.14;
+    this.damageFlashTimer = 0;
+    this.damageFlashStrength = 0;
+    this.shieldImpactDuration = 0.24;
+    this.shieldImpactTimer = 0;
+    this.shieldImpactStrength = 0;
+    this.shieldImpactAngle = 0;
 
     this.phaseColors = [...(BOSS_DEFAULTS.phaseColors || ['#ff6b6b'])];
     this.rewards = { ...BOSS_DEFAULTS.rewards };
@@ -146,7 +157,8 @@ export class BossEnemy extends BaseEnemy {
     this.movementConfig = null;
     this.movementPhases = null;
     this._lastMovementPhase = null;
-    this.renderStrategy = BOSS_COMPONENTS?.render?.strategy || 'procedural-boss';
+    this.renderStrategy =
+      BOSS_COMPONENTS?.render?.strategy || 'procedural-boss';
     this.useComponents = false;
 
     if (Object.keys(config).length > 0) {
@@ -329,6 +341,7 @@ export class BossEnemy extends BaseEnemy {
 
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;
+    this.resetFeedbackState();
     this.applyPhaseLoadout(true);
     this.applyPhaseMovement(true);
 
@@ -505,6 +518,7 @@ export class BossEnemy extends BaseEnemy {
     }
 
     this.updateInvulnerability(deltaTime);
+    this.updateFeedbackState(deltaTime);
 
     const target = this.resolvePlayerTarget();
 
@@ -547,6 +561,8 @@ export class BossEnemy extends BaseEnemy {
   updateInvulnerability(deltaTime) {
     if (!this.invulnerable) {
       this._invulnLog = 0;
+      this.shieldImpactTimer = 0;
+      this.shieldImpactStrength = 0;
       return;
     }
 
@@ -561,6 +577,8 @@ export class BossEnemy extends BaseEnemy {
       this.invulnerable = false;
       this.invulnerabilityTimer = 0;
       this._invulnLog = 0;
+      this.shieldImpactTimer = 0;
+      this.shieldImpactStrength = 0;
 
       this.emitInvulnerabilityState(false, {
         reason: 'timer-expired',
@@ -727,6 +745,26 @@ export class BossEnemy extends BaseEnemy {
         pattern: 'charge-burst',
         meta: { stage },
       });
+    }
+  }
+
+  updateFeedbackState(deltaTime) {
+    if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
+      return;
+    }
+
+    if (this.damageFlashTimer > 0) {
+      this.damageFlashTimer = Math.max(0, this.damageFlashTimer - deltaTime);
+      if (this.damageFlashTimer === 0) {
+        this.damageFlashStrength = 0;
+      }
+    }
+
+    if (this.shieldImpactTimer > 0) {
+      this.shieldImpactTimer = Math.max(0, this.shieldImpactTimer - deltaTime);
+      if (this.shieldImpactTimer === 0) {
+        this.shieldImpactStrength = 0;
+      }
     }
   }
 
@@ -1084,8 +1122,6 @@ export class BossEnemy extends BaseEnemy {
       return true;
     }
 
-    this.evaluatePhaseTransition();
-
     return false;
   }
 
@@ -1093,6 +1129,8 @@ export class BossEnemy extends BaseEnemy {
     if (!Number.isFinite(amount) || amount <= 0) {
       return;
     }
+
+    this.triggerDamageFlash(amount);
 
     GameDebugLogger.log('STATE', 'Boss damaged', {
       id: this.id,
@@ -1104,6 +1142,54 @@ export class BossEnemy extends BaseEnemy {
     });
 
     this.evaluatePhaseTransition();
+  }
+
+  triggerDamageFlash(amount = 0) {
+    const normalizedDamage = Number.isFinite(amount) ? Math.max(0, amount) : 0;
+    const maxHealth =
+      Number.isFinite(this.maxHealth) && this.maxHealth > 0
+        ? this.maxHealth
+        : 1;
+    const relativeDamage = Math.min(
+      1,
+      normalizedDamage / Math.max(24, maxHealth * 0.12)
+    );
+
+    this.damageFlashStrength = Math.max(
+      this.damageFlashStrength || 0,
+      0.45 + relativeDamage * 0.55
+    );
+    this.damageFlashTimer = Math.max(
+      this.damageFlashTimer || 0,
+      this.damageFlashDuration
+    );
+  }
+
+  registerInvulnerabilityHit(position = null) {
+    if (!this.invulnerable) {
+      return;
+    }
+
+    let impactAngle = Number.isFinite(this.shieldImpactAngle)
+      ? this.shieldImpactAngle
+      : this.rotation || 0;
+
+    if (
+      position &&
+      Number.isFinite(position.x) &&
+      Number.isFinite(position.y) &&
+      Number.isFinite(this.x) &&
+      Number.isFinite(this.y)
+    ) {
+      impactAngle = Math.atan2(position.y - this.y, position.x - this.x);
+    }
+
+    this.shieldImpactAngle = impactAngle;
+    this.shieldImpactStrength = 1;
+    this.shieldImpactTimer = Math.max(
+      this.shieldImpactTimer || 0,
+      this.shieldImpactDuration
+    );
   }
 
   evaluatePhaseTransition() {
@@ -1134,6 +1220,8 @@ export class BossEnemy extends BaseEnemy {
 
     this.invulnerable = true;
     this.invulnerabilityTimer = this.invulnerabilityDuration || 0;
+    this.shieldImpactTimer = 0;
+    this.shieldImpactStrength = 0;
 
     this.emitInvulnerabilityState(true, {
       reason: 'phase-transition',
@@ -1194,6 +1282,7 @@ export class BossEnemy extends BaseEnemy {
 
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;
+    this.resetFeedbackState();
 
     this.emitInvulnerabilityState(false, {
       reason: 'destroyed',
@@ -1249,9 +1338,29 @@ export class BossEnemy extends BaseEnemy {
       invulnerable: this.invulnerable,
       scale: pulse,
       color: this.phaseColors[phase] || '#ffffff',
+      phaseColors: [...this.phaseColors],
       position: { x: this.x, y: this.y },
       radius: this.radius,
+      damageFlash:
+        this.damageFlashDuration > 0
+          ? this.damageFlashTimer / this.damageFlashDuration
+          : 0,
+      damageFlashStrength: this.damageFlashStrength || 0,
+      shieldImpact:
+        this.shieldImpactDuration > 0
+          ? this.shieldImpactTimer / this.shieldImpactDuration
+          : 0,
+      shieldImpactStrength: this.shieldImpactStrength || 0,
+      shieldImpactAngle: this.shieldImpactAngle || 0,
     };
+  }
+
+  resetFeedbackState() {
+    this.damageFlashTimer = 0;
+    this.damageFlashStrength = 0;
+    this.shieldImpactTimer = 0;
+    this.shieldImpactStrength = 0;
+    this.shieldImpactAngle = 0;
   }
 
   resetForPool() {
@@ -1284,6 +1393,7 @@ export class BossEnemy extends BaseEnemy {
 
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;
+    this.resetFeedbackState();
 
     this.phaseColors = [...(BOSS_DEFAULTS.phaseColors || ['#ff6b6b'])];
     this.rewards = { ...BOSS_DEFAULTS.rewards };

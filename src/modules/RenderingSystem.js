@@ -1059,6 +1059,9 @@ class RenderingSystem extends BaseSystem {
     ctx.lineWidth = 4;
     ctx.stroke();
 
+    this.drawBossFallbackShield(ctx, boss, radius, color);
+    this.drawBossFallbackDamageFlash(ctx, boss, radius, color);
+
     ctx.restore();
 
     GameDebugLogger.log('RENDER', 'Boss rendered (fallback)', {
@@ -1066,6 +1069,149 @@ class RenderingSystem extends BaseSystem {
       position: { x: boss.x, y: boss.y },
       phase: boss.currentPhase,
     });
+  }
+
+  drawBossFallbackShield(ctx, boss, radius, color) {
+    if (!boss?.invulnerable) {
+      return;
+    }
+
+    const time = boss.system?.time ?? performance.now() / 1000;
+    const shellRadius = radius * (1.13 + Math.sin(time * 8.5) * 0.015);
+    const invulnerabilityDuration =
+      Number.isFinite(boss.invulnerabilityDuration) &&
+      boss.invulnerabilityDuration > 0
+        ? boss.invulnerabilityDuration
+        : 1;
+    const invulnerabilityTimer = Number.isFinite(boss.invulnerabilityTimer)
+      ? boss.invulnerabilityTimer
+      : invulnerabilityDuration;
+    const shieldAlpha =
+      0.1 +
+      Math.min(
+        0.18,
+        (Math.max(0, invulnerabilityTimer) / invulnerabilityDuration) * 0.08
+      );
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+
+    const shellGradient = ctx.createRadialGradient(
+      0,
+      0,
+      radius * 0.72,
+      0,
+      0,
+      shellRadius * 1.15
+    );
+    shellGradient.addColorStop(0, 'rgba(255, 255, 255, 0)');
+    shellGradient.addColorStop(0.78, color);
+    shellGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+    ctx.globalAlpha = shieldAlpha;
+    ctx.fillStyle = shellGradient;
+    ctx.beginPath();
+    ctx.arc(0, 0, shellRadius * 1.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 0.38 + Math.sin(time * 12) * 0.05;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(3, radius * 0.055);
+    ctx.beginPath();
+    ctx.arc(0, 0, shellRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.globalAlpha = 0.3;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = Math.max(1.5, radius * 0.02);
+    ctx.beginPath();
+    ctx.arc(0, 0, shellRadius * 0.98, 0, Math.PI * 2);
+    ctx.stroke();
+
+    const shieldImpactTimer = Number.isFinite(boss.shieldImpactTimer)
+      ? boss.shieldImpactTimer
+      : 0;
+    const shieldImpactDuration =
+      Number.isFinite(boss.shieldImpactDuration) &&
+      boss.shieldImpactDuration > 0
+        ? boss.shieldImpactDuration
+        : 0;
+
+    if (shieldImpactTimer > 0 && shieldImpactDuration > 0) {
+      const impactRatio = Math.min(
+        1,
+        Math.max(0, shieldImpactTimer / shieldImpactDuration)
+      );
+      const impactAngle = Number.isFinite(boss.shieldImpactAngle)
+        ? boss.shieldImpactAngle
+        : 0;
+      const span = 0.22 + (1 - impactRatio) * 0.42;
+
+      ctx.globalAlpha = 0.4 + impactRatio * 0.55;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = Math.max(5, radius * 0.09);
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.arc(0, 0, shellRadius, impactAngle - span, impactAngle + span);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  drawBossFallbackDamageFlash(ctx, boss, radius, color) {
+    const damageFlashTimer = Number.isFinite(boss?.damageFlashTimer)
+      ? boss.damageFlashTimer
+      : 0;
+    const damageFlashDuration =
+      Number.isFinite(boss?.damageFlashDuration) && boss.damageFlashDuration > 0
+        ? boss.damageFlashDuration
+        : 0;
+
+    if (damageFlashTimer <= 0 || damageFlashDuration <= 0) {
+      return;
+    }
+
+    const flashRatio = Math.min(
+      1,
+      Math.max(0, damageFlashTimer / damageFlashDuration)
+    );
+    const flashStrength = Math.min(
+      1,
+      Math.max(0, boss?.damageFlashStrength || 1)
+    );
+    const flashRadius = radius * (1.02 + (1 - flashRatio) * 0.08);
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+
+    const flashGradient = ctx.createRadialGradient(
+      0,
+      0,
+      radius * 0.18,
+      0,
+      0,
+      flashRadius
+    );
+    flashGradient.addColorStop(0, '#ffffff');
+    flashGradient.addColorStop(0.45, color);
+    flashGradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+    ctx.globalAlpha = 0.12 + flashRatio * flashStrength * 0.28;
+    ctx.fillStyle = flashGradient;
+    ctx.beginPath();
+    ctx.arc(0, 0, flashRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.globalAlpha = 0.18 + flashRatio * flashStrength * 0.2;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = Math.max(2, radius * 0.03);
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * (0.96 + (1 - flashRatio) * 0.04), 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.restore();
   }
 
   drawBackground(ctx, playerVelocity) {

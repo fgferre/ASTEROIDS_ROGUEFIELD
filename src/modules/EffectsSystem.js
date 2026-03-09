@@ -95,7 +95,6 @@ class SpaceParticle {
         ctx.moveTo(-this.size, 0);
         ctx.lineTo(this.size, 0);
         ctx.stroke();
-
       } else {
         // Standard slow spark
         ctx.strokeStyle = this.color;
@@ -141,7 +140,6 @@ class SpaceParticle {
       ctx.scale(stretch, 1);
       ctx.arc(0, 0, this.size * this.alpha, 0, Math.PI * 2);
       ctx.fill();
-
     } else {
       // [NEO-ARCADE] Glowing Orb
       const radius = this.size * this.alpha;
@@ -706,17 +704,26 @@ export default class EffectsSystem extends BaseSystem {
 
     this.registerEventListener('bullet-hit', (data) => {
       if (data?.position) {
+        const effectiveDamage = Number.isFinite(data?.effectiveDamage)
+          ? data.effectiveDamage
+          : Number.isFinite(data?.damage)
+            ? data.damage
+            : 0;
+        const blocked = Boolean(data?.blocked);
         if (this.hitMarkersEnabled) {
-          this.createHitMarker(
-            data.position,
-            data.killed || false,
-            data.damage || 0
-          );
+          if (!blocked && (effectiveDamage > 0 || data.killed)) {
+            this.createHitMarker(
+              data.position,
+              data.killed || false,
+              effectiveDamage
+            );
+          }
         }
         this.createBulletImpact(
           data.position,
           { x: data.enemy?.vx || 0, y: data.enemy?.vy || 0 },
-          data.killed || false
+          data.killed || false,
+          { blocked }
         );
       }
     });
@@ -2392,7 +2399,8 @@ export default class EffectsSystem extends BaseSystem {
     // Base Configuration
     let baseCount = (type === 'main' ? 2 : 1) * countMultiplier * intensity;
     // Fractional parts accumulation (deterministic probabalistic check)
-    if (this.randomFloat(thrusterFork) > baseCount % 1) baseCount = Math.floor(baseCount);
+    if (this.randomFloat(thrusterFork) > baseCount % 1)
+      baseCount = Math.floor(baseCount);
     else baseCount = Math.ceil(baseCount);
 
     const baseSpeed = (type === 'main' ? 140 : 100) * speedMultiplier;
@@ -2442,7 +2450,8 @@ export default class EffectsSystem extends BaseSystem {
           vx + (this.randomFloat(thrusterFork) - 0.5) * 10,
           vy + (this.randomFloat(thrusterFork) - 0.5) * 10,
           color,
-          (1.5 + this.randomFloat(thrusterFork) * 2) * (type === 'main' ? 1.5 : 1), // Size
+          (1.5 + this.randomFloat(thrusterFork) * 2) *
+            (type === 'main' ? 1.5 : 1), // Size
           (0.2 + this.randomFloat(thrusterFork) * 0.3) * lifeMultiplier, // Life
           'thruster'
         )
@@ -3222,34 +3231,47 @@ export default class EffectsSystem extends BaseSystem {
     });
   }
 
-  createBulletImpact(position, enemyVelocity, killed) {
+  createBulletImpact(position, enemyVelocity, killed, options = {}) {
+    const blocked = Boolean(options?.blocked);
     // More particles if killed, fewer for just a hit
-    const particleCount = this.getScaledParticleCount(killed ? 12 : 6);
+    const particleCount = this.getScaledParticleCount(
+      blocked ? 8 : killed ? 12 : 6
+    );
 
     for (let i = 0; i < particleCount; i++) {
       const angle = this.randomFloat('hits') * Math.PI * 2;
-      const speed = 80 + this.randomFloat('hits') * 100; // FASTER (80-180 vs 60-140)
+      const speed = blocked
+        ? 60 + this.randomFloat('hits') * 90
+        : 80 + this.randomFloat('hits') * 100;
 
-      // Spark color: BRIGHT red if killed, BRIGHT cyan/blue if hit (different from muzzle)
-      const color = killed
-        ? this.randomFloat('hits') > 0.3
-          ? '#FF3333'
-          : '#FFAA00' // Red/orange mix for kills
-        : this.randomFloat('hits') > 0.5
-          ? '#00FFFF'
-          : '#88FFFF'; // Cyan for hits (contrast with yellow muzzle)
+      // Shield hits use colder tones so they don't read as successful damage.
+      const color = blocked
+        ? this.randomFloat('hits') > 0.5
+          ? '#C9F4FF'
+          : '#7FDBFF'
+        : killed
+          ? this.randomFloat('hits') > 0.3
+            ? '#FF3333'
+            : '#FFAA00'
+          : this.randomFloat('hits') > 0.5
+            ? '#00FFFF'
+            : '#88FFFF';
 
       // Inherit some momentum from the enemy
       const vx = Math.cos(angle) * speed + enemyVelocity.x * 0.3;
       const vy = Math.sin(angle) * speed + enemyVelocity.y * 0.3;
 
       // BIGGER sparks (more visible)
-      const size = killed
-        ? 3 + this.randomFloat('hits') * 2.5
-        : 2.5 + this.randomFloat('hits') * 2;
+      const size = blocked
+        ? 2 + this.randomFloat('hits') * 1.4
+        : killed
+          ? 3 + this.randomFloat('hits') * 2.5
+          : 2.5 + this.randomFloat('hits') * 2;
 
       // Longer lifetime
-      const life = 0.18 + this.randomFloat('hits') * 0.12; // 0.18-0.30s
+      const life = blocked
+        ? 0.12 + this.randomFloat('hits') * 0.08
+        : 0.18 + this.randomFloat('hits') * 0.12;
 
       this.particles.push(
         this.createParticle(

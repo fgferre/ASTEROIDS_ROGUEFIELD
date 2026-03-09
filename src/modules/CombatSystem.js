@@ -2468,8 +2468,13 @@ class CombatSystem extends BaseSystem {
         const dx = bullet.x - enemy.x;
         const dy = bullet.y - enemy.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
+        const collisionRadius =
+          this.cachedPhysics &&
+          typeof this.cachedPhysics.resolveEnemyCollisionRadius === 'function'
+            ? this.cachedPhysics.resolveEnemyCollisionRadius(enemy)
+            : enemy.radius;
 
-        if (distance < BULLET_SIZE + enemy.radius) {
+        if (distance < BULLET_SIZE + collisionRadius) {
           this.processBulletHit(bullet, enemy, enemiesSystem);
         }
       });
@@ -2482,44 +2487,78 @@ class CombatSystem extends BaseSystem {
     }
 
     bullet.hit = true;
+    const healthBefore = Number.isFinite(enemy.health) ? enemy.health : null;
+    const requestedDamage = Number.isFinite(bullet.damage) ? bullet.damage : 0;
 
     const damageResult = enemiesSystem
-      ? this.applyDamageToEnemy(enemiesSystem, enemy, bullet.damage)
+      ? this.applyDamageToEnemy(enemiesSystem, enemy, requestedDamage)
       : {
           killed: Boolean(enemy.destroyed),
           remainingHealth: Math.max(0, enemy.health ?? 0),
         };
+    const remainingHealth = Number.isFinite(damageResult.remainingHealth)
+      ? damageResult.remainingHealth
+      : enemy.health ?? null;
+    const effectiveDamage =
+      Number.isFinite(healthBefore) && Number.isFinite(remainingHealth)
+        ? Math.max(0, healthBefore - remainingHealth)
+        : 0;
+    const blockedByInvulnerability =
+      enemy.type === 'boss' &&
+      Boolean(enemy.invulnerable) &&
+      effectiveDamage <= 0;
+
+    if (
+      blockedByInvulnerability &&
+      typeof enemy.registerInvulnerabilityHit === 'function'
+    ) {
+      enemy.registerInvulnerabilityHit({ x: bullet.x, y: bullet.y });
+    }
+
+    damageResult.effectiveDamage = effectiveDamage;
+    damageResult.blocked = blockedByInvulnerability;
 
     if (enemy.type === 'boss') {
       const maxHealth = Number.isFinite(enemy.maxHealth)
         ? enemy.maxHealth
         : null;
-      const remainingHealth = Number.isFinite(damageResult.remainingHealth)
-        ? damageResult.remainingHealth
-        : enemy.health ?? null;
       const healthPercent =
         maxHealth && Number.isFinite(remainingHealth)
           ? Number(((remainingHealth / maxHealth) * 100).toFixed(1))
           : null;
 
-      GameDebugLogger.log('DAMAGE', 'Boss took damage', {
-        damage: Number.isFinite(bullet.damage) ? bullet.damage : 0,
-        killed: !!damageResult.killed,
-        newHealth: remainingHealth,
-        maxHealth,
-        healthPercent,
-        phase: enemy.currentPhase ?? null,
-        invulnerable: !!enemy.invulnerable,
-      });
+      GameDebugLogger.log(
+        'DAMAGE',
+        blockedByInvulnerability
+          ? 'Boss blocked bullet'
+          : effectiveDamage > 0
+            ? 'Boss took damage'
+            : 'Boss bullet impact caused no damage',
+        {
+          requestedDamage,
+          effectiveDamage,
+          blocked: blockedByInvulnerability,
+          killed: !!damageResult.killed,
+          newHealth: remainingHealth,
+          maxHealth,
+          healthPercent,
+          phase: enemy.currentPhase ?? null,
+          invulnerable: !!enemy.invulnerable,
+        }
+      );
     }
 
     this.eventBus?.emit?.('bullet-hit', {
       bullet,
       enemy,
       position: { x: bullet.x, y: bullet.y },
-      damage: bullet.damage,
+      damage: effectiveDamage,
+      requestedDamage,
+      effectiveDamage,
+      blocked: blockedByInvulnerability,
       killed: damageResult.killed,
       remainingHealth: damageResult.remainingHealth,
+      invulnerable: !!enemy.invulnerable,
     });
 
     return damageResult;
