@@ -1,8 +1,18 @@
-# Handoff de Bugs para Verificacao Futura
+# Handoff Consolidado de Validacao
 
 Data: 2026-03-07
 
-Objetivo: reduzir custo de contexto para a proxima IA. Este arquivo nao e fonte de verdade. Cada item abaixo deve ser revalidado na fonte antes de qualquer correcao.
+Objetivo: reduzir custo de contexto para a proxima IA. A partir de 2026-03-09, este e o documento canonico de handoff/validacao do repositorio. O arquivo `tasks/HANDOFF_menu-audit.md` fica arquivado apenas como historico complementar.
+
+## Documento Canonico
+
+- Fonte unica atual para backlog, status e proximos passos: este arquivo.
+- `tasks/HANDOFF_menu-audit.md` nao deve mais ser tratado como fonte viva; ele permanece no repo so como historico de auditoria do menu.
+- Se uma IA abrir `tasks/HANDOFF_menu-audit.md`, ela deve usa-lo apenas como redirecionador e voltar imediatamente para este arquivo.
+- Itens ainda realmente abertos no runtime atual:
+  - `HV-05` — determinismo incompleto na montagem da cena do menu
+  - `F4` — cadencia 30Hz aplicada e testada, mas ainda recomendada validacao visual/runtime em browser
+  - `F6` — lazy-load/boot continua deferido por gate de profiling e mapa de dependencias
 
 ## Regras de uso
 
@@ -32,13 +42,19 @@ git grep -n "screenShake\\|addScreenShake\\|updateCameraShake\\|applyCameraShake
 - `HV-03`: hipotese original descartada no runtime atual. `DIContainer.register()` agora rejeita valores nao-funcao, nao ha call sites de `register(name, instance)` e `has()/getServiceNames()` seguem coerentes com a API atual. Nota separada: a mensagem de erro ainda cita um `registerInstance()` que nao existe.
 - `HV-04`: enderecado. `EnemySystem.forwardBossEvent()` virou no-op e a busca atual nao encontrou emissores de `effects-boss-*`, `ui-boss-*` ou `audio-boss-*`; `EffectsSystem`, `UISystem` e `AudioSystem` consomem apenas o evento raw.
 - `HV-05`: confirmado em aberto. `MenuBackgroundSystem` ainda usa `Math.random()` na rotacao inicial das nebulas e nas posicoes da poeira espacial.
-- `HV-06`: confirmado em aberto. `EffectsSystem` ainda usa `Math.random()` em contagem, jitter, tamanho e lifetime de particulas de thruster e muzzle flash.
+- `HV-06`: corrigido. `spawnThrusterVFX` usa `this.randomFloat('thrusters')`, `createMuzzleFlash` nao depende mais de `Math.random()`, e o teste dedicado esta em `tests/visual/thruster-determinism.test.js`.
 - `HV-07`: enderecado. `ScreenShake.add()` agora preserva apenas o decay mais rapido quando ja existe trauma; simulacao local nao reproduziu mais o prolongamento indevido de shake forte por hit fraco.
 - `HV-08`: enderecado. `AsteroidImpactEffect.updateCameraShake()` remove o offset do frame anterior antes de aplicar o novo; simulacao local retornou a camera exatamente para a posicao base ao fim do shake.
 - `HV-09`: enderecado. O primeiro shake agora usa o decay pedido quando nao havia trauma ativo; simulacao local com `add(1, 1)` + `update(0.5)` resultou em `trauma = 0.5`, como esperado.
 - `HV-10`: enderecado. `forwardBossEvent()` ficou em no-op para evitar duplicacao, mas `EnemySystem.handleBossWaveStarted()` aplica diretamente o flash e o cue sonoro que faltariam nesse evento.
 - `HV-11`: continua corretamente marcado como confirmado e corrigido; os testes de regressao seguem presentes em `tests/visual/rendering-determinism.test.js`.
 - `LP-01`: permanece descartado. O fluxo ainda chama `boss.onDraw(ctx)` na segunda passada e `BossEnemy.onDraw()` continua sem desenhar quando o boss usa componentes.
+- `R1`: corrigido. `startFadeOut()` clona o material compartilhado, `deactivateAsteroid()` restaura o material base, e a regressao esta coberta por `tests/visual/material-fade-isolation.test.js`.
+- `F3`: corrigido. `CustomFX.enabled` agora desliga o pass quando `chromaticAberration` e `grainAmount` sao zero.
+- `F4`: aplicado com evidencia local. `world.step(1/30, delta, 1)` esta preso por teste em `tests/visual/menu-physics-stepping.test.js`; microbenchmark local com `cannon.min.js` vendorizado mediu reducao media de `48.8%` (18 corpos) a `51.0%` (28 corpos) no custo de `world.step`. Ainda vale smoke visual em browser.
+- `F6`: segue em aberto/deferido. O ganho de boot ainda nao foi medido com profiling real e nao existe mapa de dependencias para lazy-load seguro.
+- `F9`: corrigido. Pool de `PointLight` para explosoes coberto por `tests/visual/explosion-light-pool.test.js`; microbenchmark local mediu `0.0687ms -> 0.0031ms` por burst de 4 explosoes (`-95.5%`).
+- `F10`: corrigido. `fragmentAsteroid()` e hot paths de debris em `AsteroidImpactEffect` foram reescritos com temporarios reutilizaveis; microbenchmark local mediu ganhos de `-22.9%`, `-26.6%` e `-13.7%` nos caminhos amostrados.
 
 ## Itens Arquivados (enderecados/descartados — sem nova engenharia)
 
@@ -206,6 +222,53 @@ Checklist de verificacao:
 - Instanciar duas vezes com a mesma seed e comparar `mesh.rotation.z` das nebulas e o buffer `positions` da poeira.
 - Se corrigir: trocar apenas esses pontos por `this.randomFloat(...)` usando um fork coerente com o dominio visual.
 
+### F4 - Cadencia da fisica do menu reduzida para 30Hz exige apenas validacao runtime final
+
+Status: ATIVO — implementado com evidencia local; smoke visual/runtime ainda recomendado
+Prioridade: baixa
+
+Abrir primeiro:
+
+- `src/modules/MenuBackgroundSystem.js:3912-3913`
+- `tests/visual/menu-physics-stepping.test.js`
+
+Estado atual:
+
+- `world.step(1/30, delta, 1)` substituiu `world.step(1/60, delta, 3)`.
+- O teste dedicado prende a configuracao nova em `animate()`.
+- Microbenchmark local com `cannon.min.js` vendorizado mediu reducao media de `48.8%` (18 corpos) a `51.0%` (28 corpos) no custo de `world.step`.
+- O que ainda falta e so validacao visual/runtime em browser para confirmar ausencia de regressao perceptivel no menu.
+
+Checklist de fechamento:
+
+- Observar o menu por alguns segundos e confirmar que a cadencia visual das colisoes/fragmentacoes continua aceitavel.
+- Disparar alguns impactos no menu e confirmar ausencia de regressao visual obvia.
+- Se tudo permanecer estavel, reclassificar `F4` como arquivado/encerrado neste mesmo documento.
+
+### F6 - Boot/lazy-load continua deferido por gate
+
+Status: ATIVO — deferido ate profiling e mapa de dependencias
+Prioridade: media
+
+Abrir primeiro:
+
+- `src/bootstrap/serviceManifest.js`
+- `src/app.js`
+
+Estado atual:
+
+- O manifesto ainda registra 26 services, dos quais 21 permanecem `lazy: false`.
+- Ainda nao existe medicao de boot real confirmando ganho >= `100ms`.
+- Ainda nao existe mapa de dependencias suficiente para mover services de gameplay para lazy-load sem risco.
+
+Checklist de fechamento:
+
+- Medir boot real antes/depois, com numero claro.
+- Construir mapa de dependencias para separar `menu-critical` de `gameplay-only`.
+- So depois disso decidir se `F6` entra em implementacao ou continua arquivado como deferido.
+
+## Itens Arquivados (continuacao)
+
 ### HV-06 - Particulas de thruster burlam o RNG deterministico
 
 Status: CORRIGIDO em 2026-03-08
@@ -232,8 +295,6 @@ Checklist de verificacao:
 
 - Resetar a seed e comparar arrays de particulas gerados por duas chamadas identicas a `createThrusterEffect(...)` e `createMuzzleFlash(...)`.
 - Procurar se existe teste de determinismo cobrindo esse caminho; na busca rapida atual nao apareceu cobertura dedicada para essas rotinas.
-
-## Itens Arquivados (continuacao)
 
 ### HV-07 - Um shake fraco pode prolongar um shake forte ja em curso
 
@@ -420,11 +481,12 @@ Motivo:
 - O fluxo parecia desenhar boss duas vezes, mas a segunda passada chama `boss.onDraw(ctx)`, nao `boss.draw(ctx)`.
 - Em boss componentizado, `onDraw()` retorna sem desenhar. Entao a suspeita inicial nao esta confirmada.
 
-## Ordem de trabalho (atualizada 2026-03-08)
+## Ordem de trabalho (atualizada 2026-03-09)
 
-1. HV-06: substituir `Math.random()` restantes em `spawnThrusterVFX` por `this.randomFloat('thrusters')`.
-2. HV-05: condicionado — so implementar com cobertura real da montagem da cena do menu.
-3. Todos os demais itens estao arquivados e nao devem ser reabertos sem nova evidencia.
+1. HV-05: condicionado — so implementar com cobertura real da montagem da cena do menu.
+2. F4: fazer apenas smoke visual/runtime final do menu; sem nova engenharia, salvo se o smoke revelar regressao.
+3. F6: so iniciar se houver profiling de boot e mapa de dependencias; caso contrario, manter deferido.
+4. Todos os demais itens estao arquivados e nao devem ser reabertos sem nova evidencia.
 
 ## Saida esperada da proxima IA
 
