@@ -8,6 +8,7 @@ import {
   STRICT_LEGACY_SPAWN_SEQUENCE,
 } from './data/constants/gameplay.js';
 import {
+  debugLog,
   resolveDebugPreference,
   applyDebugPreference,
 } from './core/debugLogging.js';
@@ -148,7 +149,7 @@ async function initializeDevStatsPanel() {
 }
 
 function initializeDependencyInjection(manifestContext) {
-  console.log('[App] Initializing Dependency Injection system...');
+  debugLog('[App] Initializing Dependency Injection system...');
 
   try {
     // Create DI container
@@ -171,15 +172,15 @@ function initializeDependencyInjection(manifestContext) {
       // Enable on-screen performance overlay (F3 to toggle)
       performanceMonitor.showOverlay();
 
-      console.log('[App] ℹ Auto-logging enabled (logs saved to localStorage)');
-      console.log('[App] ℹ Performance overlay enabled (F3 to toggle)');
+      debugLog('[App] ℹ Auto-logging enabled (logs saved to localStorage)');
+      debugLog('[App] ℹ Performance overlay enabled (F3 to toggle)');
     }
 
-    console.log('[App] ✓ DI system initialized successfully');
-    console.log(
+    debugLog('[App] ✓ DI system initialized successfully');
+    debugLog(
       `[App] ✓ ${diContainer.getServiceNames().length} services registered`
     );
-    console.log('[App] ℹ DIContainer serves as unified service registry');
+    debugLog('[App] ℹ DIContainer serves as unified service registry');
 
     return true;
   } catch (error) {
@@ -508,14 +509,14 @@ function init() {
 
     // [NEO-ARCADE] OPTIMIZATION: Warmup Caches to prevent lag spikes
     try {
-      console.log('[App] Warming up render caches...');
+      debugLog('[App] Warming up render caches...');
       if (typeof RenderComponent.warmup === 'function') {
         RenderComponent.warmup();
       }
       if (typeof warmupProjectileCache === 'function') {
         warmupProjectileCache();
       }
-      console.log('[App] Render caches warmed up.');
+      debugLog('[App] Render caches warmed up.');
     } catch (e) {
       console.warn('[App] Cache warmup failed (non-fatal):', e);
     }

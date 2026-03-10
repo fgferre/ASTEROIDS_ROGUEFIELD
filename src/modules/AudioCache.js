@@ -1,4 +1,5 @@
 import RandomService from '../core/RandomService.js';
+import { debugLog } from '../core/debugLogging.js';
 
 /**
  * AudioCache - Sistema de cache para buffers de áudio e patterns
@@ -34,7 +35,7 @@ class AudioCache {
     // Pregenerate common noise patterns
     this._pregenerateCommonBuffers();
 
-    console.log('[AudioCache] Initialized with max cache size:', maxCacheSize);
+    debugLog('[AudioCache] Initialized with max cache size:', maxCacheSize);
   }
 
   /**
@@ -154,7 +155,7 @@ class AudioCache {
     this.getNoiseBuffer(0.1, true, 'linear', { family: 'impact' }); // Quick impact
     this.getNoiseBuffer(0.15, true, 'exponential', { family: 'impact' }); // Medium impact
 
-    console.log(
+    debugLog(
       '[AudioCache] Pregenerated',
       this.noiseBuffers.size,
       'common buffers'

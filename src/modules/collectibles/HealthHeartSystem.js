@@ -10,6 +10,7 @@ import {
   resolveEventBus,
   resolveService,
 } from '../../core/serviceUtils.js';
+import { debugLog } from '../../core/debugLogging.js';
 import HealthHeart from './HealthHeart.js';
 
 export class HealthHeartSystem {
@@ -20,7 +21,7 @@ export class HealthHeartSystem {
     this.eventBus = resolveEventBus(this.dependencies);
     this.collectionRadius = 25;
 
-    console.log('[HealthHeartSystem] Initialized');
+    debugLog('[HealthHeartSystem] Initialized');
   }
 
   getEventBus() {
@@ -79,7 +80,7 @@ export class HealthHeartSystem {
 
       this.cachedPlayer.heal(healAmount);
 
-      console.log(
+      debugLog(
         `[HealthHeartSystem] Heart collected - healed ${healAmount} HP (25% of ${maxHP})`
       );
 
@@ -97,7 +98,7 @@ export class HealthHeartSystem {
   spawnHeart(x, y, options = {}) {
     const heart = new HealthHeart(x, y, options);
     this.hearts.push(heart);
-    console.log(`[HealthHeartSystem] Heart spawned at (${x}, ${y})`);
+    debugLog(`[HealthHeartSystem] Heart spawned at (${x}, ${y})`);
     return heart;
   }
 
@@ -125,13 +126,13 @@ export class HealthHeartSystem {
     // Clear all hearts on game reset (new game or quit to menu)
     this.hearts = [];
     this.cachedPlayer = null;
-    console.log('[HealthHeartSystem] Reset');
+    debugLog('[HealthHeartSystem] Reset');
   }
 
   destroy() {
     this.hearts = [];
     this.cachedPlayer = null;
-    console.log('[HealthHeartSystem] Destroyed');
+    debugLog('[HealthHeartSystem] Destroyed');
   }
 }
 

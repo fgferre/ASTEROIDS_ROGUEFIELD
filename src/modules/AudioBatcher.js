@@ -1,4 +1,5 @@
 import RandomService from '../core/RandomService.js';
+import { debugLog } from '../core/debugLogging.js';
 
 /**
  * AudioBatcher - Sistema de batching para sons simultâneos
@@ -30,7 +31,7 @@ class AudioBatcher {
       batchReduction: 0,
     };
 
-    console.log(
+    debugLog(
       '[AudioBatcher] Initialized with batch window:',
       batchWindow,
       'ms'

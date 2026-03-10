@@ -26,9 +26,7 @@
  * ```
  */
 
-import { isDevEnvironment } from '../utils/dev/GameDebugLogger.js';
-
-const DEV_MODE = isDevEnvironment();
+import { isDebugLoggingEnabled } from './debugLogging.js';
 
 export class DIContainer {
   /**
@@ -48,7 +46,7 @@ export class DIContainer {
     this.dependencyGraph = new Map();
 
     /** @private @type {boolean} Enable verbose logging */
-    this.verbose = DEV_MODE;
+    this.verbose = isDebugLoggingEnabled();
 
     // Statistics
     this.stats = {

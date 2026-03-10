@@ -15,6 +15,7 @@
  */
 
 import { ObjectPool, TTLObjectPool } from './ObjectPool.js';
+import { debugLog } from './debugLogging.js';
 import { Drone } from '../modules/enemies/types/Drone.js';
 import { Mine } from '../modules/enemies/types/Mine.js';
 import { Hunter } from '../modules/enemies/types/Hunter.js';
@@ -84,13 +85,13 @@ export class GamePools {
     this.initialized = true;
     this.lastAutoManageTime = performance.now();
 
-    console.log('[GamePools] All pools initialized successfully');
+    debugLog('[GamePools] All pools initialized successfully');
     if (
       typeof process !== 'undefined' &&
       process.env &&
       process.env.NODE_ENV === 'development'
     ) {
-      console.log('Pool configuration:', this.getPoolStats());
+      debugLog('Pool configuration:', this.getPoolStats());
     }
   }
 
@@ -484,7 +485,7 @@ export class GamePools {
         initial: initialSize,
         max: maxSize,
       };
-      console.log(
+      debugLog(
         '[GamePools] Asteroid pool lifecycle configured via EnemySystem'
       );
     } catch (error) {
@@ -589,9 +590,7 @@ export class GamePools {
         initial: initialSize,
         max: maxSize,
       };
-      console.log(
-        '[GamePools] XP orb pool lifecycle configured via XPOrbSystem'
-      );
+      debugLog('[GamePools] XP orb pool lifecycle configured via XPOrbSystem');
     } catch (error) {
       console.error('[GamePools] Failed to configure XP orb lifecycle:', error);
     }
@@ -746,7 +745,7 @@ export class GamePools {
       }
     }
 
-    console.log('[GamePools] Released all objects from all pools');
+    debugLog('[GamePools] Released all objects from all pools');
   }
 
   /**
@@ -844,7 +843,7 @@ export class GamePools {
 
     this.initialized = false;
 
-    console.log('[GamePools] All pools destroyed');
+    debugLog('[GamePools] All pools destroyed');
   }
 
   /**

@@ -8,6 +8,7 @@ import {
   USE_WAVE_MANAGER,
   WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
 } from '../data/constants/gameplay.js';
+import { debugLog } from '../core/debugLogging.js';
 import { DEFAULT_HULL_ID, getShipModelById } from '../data/shipModels.js';
 
 /**
@@ -209,7 +210,7 @@ export default class GameSessionService {
         this.seedInfo.seed,
         this.seedInfo.source
       );
-      console.log(
+      debugLog(
         `[Random] Boot seed (${this.seedInfo.source}): ${String(this.seedInfo.seed)}`
       );
     }
@@ -754,7 +755,7 @@ export default class GameSessionService {
         typeof performance !== 'undefined' ? performance.now() : Date.now();
     }
 
-    console.log('[GameSessionService] Run started successfully!', { source });
+    debugLog('[GameSessionService] Run started successfully!', { source });
   }
 
   handlePlayerDeath(data = {}) {
@@ -1017,7 +1018,7 @@ export default class GameSessionService {
           return;
         }
 
-        console.log(
+        debugLog(
           '[GameSessionService] Quit from pause - triggering epic explosion...'
         );
 
@@ -1150,9 +1151,9 @@ export default class GameSessionService {
     }
 
     if (payload?.source) {
-      console.log(`Retornando ao menu (origem: ${payload.source}).`);
+      debugLog(`Retornando ao menu (origem: ${payload.source}).`);
     } else {
-      console.log('Retornando ao menu.');
+      debugLog('Retornando ao menu.');
     }
 
     this.setSessionState('menu', {
@@ -1339,7 +1340,10 @@ export default class GameSessionService {
       player.setHull(hullDefinition);
       return hullDefinition;
     } catch (error) {
-      console.warn('[GameSessionService] Failed to apply configured hull:', error);
+      console.warn(
+        '[GameSessionService] Failed to apply configured hull:',
+        error
+      );
       return null;
     }
   }
@@ -1647,7 +1651,7 @@ export default class GameSessionService {
       }
     }
 
-    console.log('[Retry] Death snapshot created', snapshot);
+    debugLog('[Retry] Death snapshot created', snapshot);
     return snapshot;
   }
 
@@ -1800,7 +1804,7 @@ export default class GameSessionService {
             }
           );
         } else {
-          console.log(
+          debugLog(
             '[Retry] Reapplied upgrade effects after snapshot restore:',
             reappliedUpgrades
           );
@@ -1865,7 +1869,7 @@ export default class GameSessionService {
     }
 
     if (!hadFallback) {
-      console.log('[Retry] Game state restored from snapshot');
+      debugLog('[Retry] Game state restored from snapshot');
     } else {
       console.warn('[Retry] Snapshot restore completed with fallbacks.');
     }
@@ -2064,10 +2068,7 @@ export default class GameSessionService {
         return candidate.point;
       }
 
-      if (
-        !bestCandidate ||
-        candidate.minDistance > bestCandidate.minDistance
-      ) {
+      if (!bestCandidate || candidate.minDistance > bestCandidate.minDistance) {
         bestCandidate = candidate;
       }
     }
@@ -2210,6 +2211,6 @@ export default class GameSessionService {
       typeof state === 'number'
         ? `0x${state.toString(16).padStart(8, '0')}`
         : state;
-    console.log(`[Random] ${scope} (${mode}) → seed=${seed} state=${stateHex}`);
+    debugLog(`[Random] ${scope} (${mode}) → seed=${seed} state=${stateHex}`);
   }
 }

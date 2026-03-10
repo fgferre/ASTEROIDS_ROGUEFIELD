@@ -3,6 +3,7 @@ import { HealthComponent } from '../components/HealthComponent.js';
 import { MovementComponent } from '../components/MovementComponent.js';
 import { RenderComponent } from '../components/RenderComponent.js';
 import { WeaponComponent } from '../components/WeaponComponent.js';
+import { debugLog } from '../../../core/debugLogging.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 
 /**
@@ -76,7 +77,7 @@ export class EnemyFactory {
     /** @type {Map<string, number>} Statistics per enemy type */
     this.stats = new Map();
 
-    console.log('[EnemyFactory] Initialized');
+    debugLog('[EnemyFactory] Initialized');
   }
 
   /**
@@ -123,7 +124,7 @@ export class EnemyFactory {
       active: 0,
     });
 
-    console.log(`[EnemyFactory] Registered type: ${type}`);
+    debugLog(`[EnemyFactory] Registered type: ${type}`);
     return true;
   }
 
@@ -139,7 +140,7 @@ export class EnemyFactory {
 
     if (!typeConfig) {
       console.error(`[EnemyFactory] Unknown enemy type: ${type}`);
-      console.log('Available types:', Array.from(this.registry.keys()));
+      debugLog('Available types:', Array.from(this.registry.keys()));
       return null;
     }
 
@@ -265,7 +266,7 @@ export class EnemyFactory {
       }
     }
 
-    console.log(
+    debugLog(
       `[EnemyFactory] Created batch of ${enemies.length}/${count} ${type}s`
     );
     return enemies;
@@ -365,7 +366,7 @@ export class EnemyFactory {
     }
 
     typeConfig.enabled = enabled;
-    console.log(
+    debugLog(
       `[EnemyFactory] Type '${type}' ${enabled ? 'enabled' : 'disabled'}`
     );
     return true;
@@ -407,7 +408,7 @@ export class EnemyFactory {
       // Don't reset active - it's current state
     }
 
-    console.log('[EnemyFactory] Statistics reset');
+    debugLog('[EnemyFactory] Statistics reset');
   }
 
   /**
@@ -453,7 +454,7 @@ export class EnemyFactory {
   clear() {
     this.registry.clear();
     this.stats.clear();
-    console.log('[EnemyFactory] Cleared all registrations');
+    debugLog('[EnemyFactory] Cleared all registrations');
   }
 
   /**

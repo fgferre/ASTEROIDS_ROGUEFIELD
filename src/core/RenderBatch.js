@@ -3,6 +3,8 @@
  * Groups similar rendering operations to reduce context state changes
  */
 
+import { debugLog } from './debugLogging.js';
+
 const MAX_BATCH_SIZE = 1000;
 
 class RenderBatch {
@@ -34,7 +36,7 @@ class RenderBatch {
     this.gradientCache = new Map();
     this.pathCache = new Map();
 
-    console.log('[RenderBatch] Initialized');
+    debugLog('[RenderBatch] Initialized');
   }
 
   /**
@@ -458,7 +460,7 @@ class RenderBatch {
     this.pathCache.clear();
     this.batches.clear();
     this.activeBatch = null;
-    console.log('[RenderBatch] Caches cleared');
+    debugLog('[RenderBatch] Caches cleared');
   }
 }
 

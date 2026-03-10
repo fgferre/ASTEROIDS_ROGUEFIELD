@@ -3,6 +3,8 @@
  * Optimizes gradient/pattern creation and reuse across frames
  */
 
+import { debugLog } from './debugLogging.js';
+
 const MAX_CACHE_SIZE = 200;
 const CLEANUP_THRESHOLD = 0.8; // Cleanup when cache is 80% full
 
@@ -71,7 +73,7 @@ class GradientCache {
       },
     };
 
-    console.log(
+    debugLog(
       '[GradientCache] Initialized with',
       Object.keys(this.presets).length,
       'presets'
@@ -333,7 +335,7 @@ class GradientCache {
     }
 
     this.stats.cleanupRuns++;
-    console.log(`[GradientCache] Cleaned up ${toRemove} gradient entries`);
+    debugLog(`[GradientCache] Cleaned up ${toRemove} gradient entries`);
   }
 
   /**
@@ -352,7 +354,7 @@ class GradientCache {
     }
 
     this.stats.cleanupRuns++;
-    console.log(`[GradientCache] Cleaned up ${toRemove} pattern entries`);
+    debugLog(`[GradientCache] Cleaned up ${toRemove} pattern entries`);
   }
 
   /**
@@ -368,7 +370,7 @@ class GradientCache {
     }
 
     this.stats.cleanupRuns++;
-    console.log(`[GradientCache] Cleaned up ${toRemove} canvas entries`);
+    debugLog(`[GradientCache] Cleaned up ${toRemove} canvas entries`);
   }
 
   /**
@@ -428,7 +430,7 @@ class GradientCache {
       cleanupRuns: 0,
     };
 
-    console.log('[GradientCache] Reset complete');
+    debugLog('[GradientCache] Reset complete');
   }
 
   /**
@@ -443,7 +445,7 @@ class GradientCache {
       }
     }
 
-    console.log('[GradientCache] Preloaded gradients for common scales');
+    debugLog('[GradientCache] Preloaded gradients for common scales');
   }
 }
 

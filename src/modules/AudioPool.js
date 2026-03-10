@@ -1,3 +1,5 @@
+import { debugLog } from '../core/debugLogging.js';
+
 /**
  * AudioPool - Sistema de pooling para AudioNodes reutilizáveis
  * Reduz a criação excessiva de objetos de áudio
@@ -24,7 +26,7 @@ class AudioPool {
       poolMisses: 0,
     };
 
-    console.log('[AudioPool] Initialized with max pool size:', maxPoolSize);
+    debugLog('[AudioPool] Initialized with max pool size:', maxPoolSize);
   }
 
   /**

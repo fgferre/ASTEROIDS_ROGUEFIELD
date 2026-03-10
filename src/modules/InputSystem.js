@@ -1,6 +1,7 @@
 // src/modules/InputSystem.js
 
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
+import { debugLog } from '../core/debugLogging.js';
 import {
   normalizeDependencies,
   resolveEventBus,
@@ -71,7 +72,7 @@ class InputSystem {
     this.setupEventListeners();
     this.initializeBindings();
 
-    console.log('[InputSystem] Initialized');
+    debugLog('[InputSystem] Initialized');
   }
 
   resolveCommandQueue(force = false) {
@@ -366,14 +367,14 @@ class InputSystem {
   onGamepadConnected(event) {
     this.gamepadConnected = true;
     this.gamepadIndex = event.gamepad?.index ?? 0;
-    console.log('[InputSystem] Gamepad connected:', event.gamepad);
+    debugLog('[InputSystem] Gamepad connected:', event.gamepad);
   }
 
   onGamepadDisconnected() {
     this.gamepadConnected = false;
     this.gamepad = null;
     this.clearGamepadActions();
-    console.log('[InputSystem] Gamepad disconnected');
+    debugLog('[InputSystem] Gamepad disconnected');
   }
 
   collectKeyboardActions(...inputs) {
@@ -1094,7 +1095,7 @@ class InputSystem {
       document.removeEventListener('keyup', this.handleKeyUpCapture, true);
     }
 
-    console.log('[InputSystem] Destroyed');
+    debugLog('[InputSystem] Destroyed');
   }
 }
 

@@ -3,6 +3,8 @@
  * Minimizes context state changes and provides efficient state tracking
  */
 
+import { debugLog } from './debugLogging.js';
+
 class CanvasStateManager {
   constructor() {
     // Current state tracking
@@ -77,7 +79,7 @@ class CanvasStateManager {
       },
     };
 
-    console.log(
+    debugLog(
       '[CanvasStateManager] Initialized with',
       Object.keys(this.presets).length,
       'presets'
@@ -99,7 +101,7 @@ class CanvasStateManager {
       }
     }
 
-    console.log('[CanvasStateManager] Initialized with context');
+    debugLog('[CanvasStateManager] Initialized with context');
   }
 
   /**
@@ -220,7 +222,7 @@ class CanvasStateManager {
    */
   createPreset(name, state) {
     this.presets[name] = { ...state };
-    console.log(`[CanvasStateManager] Created preset: ${name}`);
+    debugLog(`[CanvasStateManager] Created preset: ${name}`);
   }
 
   /**

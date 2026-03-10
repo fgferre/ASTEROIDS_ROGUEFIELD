@@ -1,6 +1,7 @@
 // src/modules/SettingsSystem.js
 
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
+import { debugLog } from '../core/debugLogging.js';
 import { clamp } from '../utils/mathHelpers.js';
 import {
   normalizeDependencies,
@@ -46,7 +47,7 @@ class SettingsSystem {
     this.setupEventListeners();
     this.broadcastInitialCategories();
 
-    console.log('[SettingsSystem] Initialized');
+    debugLog('[SettingsSystem] Initialized');
   }
 
   getEventBus() {

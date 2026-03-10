@@ -3,14 +3,15 @@
 // Com PRE-LOADING completo para evitar microtravamentos
 
 import { DustParticleShader } from './DustParticleShader.js';
+import { debugLog } from '../core/debugLogging.js';
 
 // Configuração de pools (pré-alocados)
 const POOL_CONFIG = {
-  maxFlashes: 5,           // Máximo de flashes simultâneos
-  maxDebrisFields: 3,      // Máximo de campos de detritos simultâneos
-  maxDustClouds: 3,        // Máximo de nuvens de poeira simultâneas
-  debrisPerField: 150,     // Partículas por campo (usa o máximo, esconde as extras)
-  dustPerCloud: 120        // Partículas por nuvem (usa o máximo, esconde as extras)
+  maxFlashes: 5, // Máximo de flashes simultâneos
+  maxDebrisFields: 3, // Máximo de campos de detritos simultâneos
+  maxDustClouds: 3, // Máximo de nuvens de poeira simultâneas
+  debrisPerField: 150, // Partículas por campo (usa o máximo, esconde as extras)
+  dustPerCloud: 120, // Partículas por nuvem (usa o máximo, esconde as extras)
 };
 
 export class AsteroidImpactEffect {
@@ -21,10 +22,10 @@ export class AsteroidImpactEffect {
 
     // Configuração de qualidade adaptativa
     this.qualityConfig = config.qualityLevels || {
-      0: { debris: 40, dust: 30, flashIntensity: 3.0, shakeAmount: 0.3 },   // low
-      1: { debris: 80, dust: 60, flashIntensity: 4.0, shakeAmount: 0.4 },   // medium
+      0: { debris: 40, dust: 30, flashIntensity: 3.0, shakeAmount: 0.3 }, // low
+      1: { debris: 80, dust: 60, flashIntensity: 4.0, shakeAmount: 0.4 }, // medium
       2: { debris: 150, dust: 120, flashIntensity: 5.0, shakeAmount: 0.5 }, // high
-      3: { debris: 300, dust: 200, flashIntensity: 6.0, shakeAmount: 0.5 }  // ultra
+      3: { debris: 300, dust: 200, flashIntensity: 6.0, shakeAmount: 0.5 }, // ultra
     };
 
     this.currentQualityLevel = config.initialQualityLevel || 2;
@@ -60,7 +61,7 @@ export class AsteroidImpactEffect {
     if (this.isPreloaded) return;
 
     const { THREE } = this;
-    console.log('[AsteroidImpactEffect] Preloading effect pools...');
+    debugLog('[AsteroidImpactEffect] Preloading effect pools...');
 
     // 1. Criar geometrias compartilhadas
     this.sharedGeometries.flash = new THREE.SphereGeometry(1, 16, 16);
@@ -72,14 +73,14 @@ export class AsteroidImpactEffect {
       transparent: true,
       opacity: 1.0,
       depthWrite: false,
-      blending: THREE.AdditiveBlending
+      blending: THREE.AdditiveBlending,
     });
 
     this.sharedMaterials.debris = new THREE.MeshStandardMaterial({
       color: 0x5a4a3a,
       roughness: 0.95,
       metalness: 0.0,
-      transparent: true
+      transparent: true,
     });
 
     this.sharedMaterials.dust = new THREE.ShaderMaterial({
@@ -88,7 +89,7 @@ export class AsteroidImpactEffect {
       fragmentShader: DustParticleShader.fragmentShader,
       transparent: true,
       depthWrite: false,
-      blending: THREE.AdditiveBlending
+      blending: THREE.AdditiveBlending,
     });
 
     // 3. Pré-criar pools de objetos
@@ -100,7 +101,7 @@ export class AsteroidImpactEffect {
     this.warmUpShaders();
 
     this.isPreloaded = true;
-    console.log('[AsteroidImpactEffect] Preload complete.');
+    debugLog('[AsteroidImpactEffect] Preload complete.');
   }
 
   /**
@@ -152,7 +153,7 @@ export class AsteroidImpactEffect {
         life: 0,
         maxLife: 0,
         maxScale: 0,
-        intensity: 0
+        intensity: 0,
       });
     }
   }
@@ -181,7 +182,7 @@ export class AsteroidImpactEffect {
           velocity: new THREE.Vector3(),
           angularVelocity: new THREE.Vector3(),
           rotation: new THREE.Euler(),
-          scale: 1
+          scale: 1,
         });
       }
 
@@ -192,7 +193,7 @@ export class AsteroidImpactEffect {
         life: 0,
         maxLife: 0,
         fadeStartTime: 0,
-        activeCount: 0
+        activeCount: 0,
       });
     }
   }
@@ -211,12 +212,21 @@ export class AsteroidImpactEffect {
       const opacities = new Float32Array(POOL_CONFIG.dustPerCloud);
       const velocities = new Float32Array(POOL_CONFIG.dustPerCloud * 3);
 
-      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute(
+        'position',
+        new THREE.BufferAttribute(positions, 3)
+      );
       geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
       geometry.setAttribute('opacity', new THREE.BufferAttribute(opacities, 1));
-      geometry.setAttribute('velocity', new THREE.BufferAttribute(velocities, 3));
+      geometry.setAttribute(
+        'velocity',
+        new THREE.BufferAttribute(velocities, 3)
+      );
 
-      const points = new THREE.Points(geometry, this.sharedMaterials.dust.clone());
+      const points = new THREE.Points(
+        geometry,
+        this.sharedMaterials.dust.clone()
+      );
       points.visible = false;
       this.scene.add(points);
 
@@ -226,7 +236,7 @@ export class AsteroidImpactEffect {
         life: 0,
         maxLife: 0,
         initialOpacities: new Float32Array(POOL_CONFIG.dustPerCloud),
-        activeCount: 0
+        activeCount: 0,
       });
     }
   }
@@ -269,7 +279,9 @@ export class AsteroidImpactEffect {
    */
   trigger(position, impactVelocity = 60) {
     if (!this.isPreloaded) {
-      console.warn('[AsteroidImpactEffect] Not preloaded! Call preload() first.');
+      console.warn(
+        '[AsteroidImpactEffect] Not preloaded! Call preload() first.'
+      );
       this.preload();
     }
 
@@ -293,7 +305,7 @@ export class AsteroidImpactEffect {
    */
   activateFlash(position, intensity) {
     // Encontrar flash disponível no pool
-    const flash = this.flashPool.find(f => !f.inUse);
+    const flash = this.flashPool.find((f) => !f.inUse);
     if (!flash) return; // Pool cheio, ignorar
 
     flash.inUse = true;
@@ -324,7 +336,7 @@ export class AsteroidImpactEffect {
     const { THREE } = this;
 
     // Encontrar campo disponível no pool
-    const field = this.debrisPool.find(f => !f.inUse);
+    const field = this.debrisPool.find((f) => !f.inUse);
     if (!field) return;
 
     field.inUse = true;
@@ -397,7 +409,7 @@ export class AsteroidImpactEffect {
     const { THREE } = this;
 
     // Encontrar nuvem disponível no pool
-    const cloud = this.dustPool.find(c => !c.inUse);
+    const cloud = this.dustPool.find((c) => !c.inUse);
     if (!cloud) return;
 
     cloud.inUse = true;
@@ -465,7 +477,7 @@ export class AsteroidImpactEffect {
       amount: amount * intensityScale,
       life: 0,
       maxLife: 0.15,
-      frequency: 40 + this.randomFloat() * 20
+      frequency: 40 + this.randomFloat() * 20,
     };
   }
 
@@ -540,7 +552,9 @@ export class AsteroidImpactEffect {
 
       // Fade
       if (field.life >= field.fadeStartTime) {
-        const fadeProgress = (field.life - field.fadeStartTime) / (field.maxLife - field.fadeStartTime);
+        const fadeProgress =
+          (field.life - field.fadeStartTime) /
+          (field.maxLife - field.fadeStartTime);
         field.instancedMesh.material.opacity = 1.0 - fadeProgress;
       }
 
@@ -625,21 +639,21 @@ export class AsteroidImpactEffect {
 
   cleanup() {
     // Desativar todos os efeitos ativos
-    this.activeFlashes.forEach(flash => {
+    this.activeFlashes.forEach((flash) => {
       flash.mesh.visible = false;
       flash.light.visible = false;
       flash.inUse = false;
     });
     this.activeFlashes = [];
 
-    this.activeDebrisFields.forEach(field => {
+    this.activeDebrisFields.forEach((field) => {
       field.instancedMesh.visible = false;
       field.instancedMesh.count = 0;
       field.inUse = false;
     });
     this.activeDebrisFields = [];
 
-    this.activeDustClouds.forEach(cloud => {
+    this.activeDustClouds.forEach((cloud) => {
       cloud.points.visible = false;
       cloud.inUse = false;
     });
@@ -655,20 +669,20 @@ export class AsteroidImpactEffect {
     this.cleanup();
 
     // Remover objetos da cena e liberar memória
-    this.flashPool.forEach(flash => {
+    this.flashPool.forEach((flash) => {
       this.scene.remove(flash.mesh);
       this.scene.remove(flash.light);
       flash.mesh.material.dispose();
     });
     this.flashPool = [];
 
-    this.debrisPool.forEach(field => {
+    this.debrisPool.forEach((field) => {
       this.scene.remove(field.instancedMesh);
       field.instancedMesh.material.dispose();
     });
     this.debrisPool = [];
 
-    this.dustPool.forEach(cloud => {
+    this.dustPool.forEach((cloud) => {
       this.scene.remove(cloud.points);
       cloud.points.geometry.dispose();
       cloud.points.material.dispose();

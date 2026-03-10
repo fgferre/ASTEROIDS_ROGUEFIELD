@@ -21,6 +21,8 @@
  * ```
  */
 
+import { debugLog } from '../core/debugLogging.js';
+
 export class PerformanceMonitor {
   constructor() {
     // FPS tracking
@@ -90,7 +92,7 @@ export class PerformanceMonitor {
     this.phaseHistoryLimit = 60;
     this.activeMeasures = new Map();
 
-    console.log('[PerformanceMonitor] Initialized');
+    debugLog('[PerformanceMonitor] Initialized');
   }
 
   /**
@@ -101,9 +103,7 @@ export class PerformanceMonitor {
   enableAutoLog(interval = 10000) {
     this.autoLogEnabled = true;
     this.autoLogInterval = interval;
-    console.log(
-      `[PerformanceMonitor] Auto-logging enabled (every ${interval}ms)`
-    );
+    debugLog(`[PerformanceMonitor] Auto-logging enabled (every ${interval}ms)`);
   }
 
   /**
@@ -111,7 +111,7 @@ export class PerformanceMonitor {
    */
   disableAutoLog() {
     this.autoLogEnabled = false;
-    console.log('[PerformanceMonitor] Auto-logging disabled');
+    debugLog('[PerformanceMonitor] Auto-logging disabled');
   }
 
   /**
@@ -142,7 +142,7 @@ export class PerformanceMonitor {
           'performanceLog',
           JSON.stringify(this.sessionLogs)
         );
-        console.log(
+        debugLog(
           `[PerformanceMonitor] Auto-log #${this.sessionLogs.length}:`,
           report
         );
@@ -186,7 +186,7 @@ export class PerformanceMonitor {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    console.log(`[PerformanceMonitor] Downloaded ${filename}`);
+    debugLog(`[PerformanceMonitor] Downloaded ${filename}`);
   }
 
   /**
@@ -199,7 +199,7 @@ export class PerformanceMonitor {
     } catch (e) {
       // Silent fail
     }
-    console.log('[PerformanceMonitor] Logs cleared');
+    debugLog('[PerformanceMonitor] Logs cleared');
   }
 
   /**
@@ -421,7 +421,7 @@ export class PerformanceMonitor {
     }
     this.activeMeasures.clear();
 
-    console.log('[PerformanceMonitor] Reset');
+    debugLog('[PerformanceMonitor] Reset');
   }
 
   /**
@@ -483,7 +483,7 @@ export class PerformanceMonitor {
    */
   logReport() {
     const report = this.getReport();
-    console.log('[PerformanceMonitor] Report:', report);
+    debugLog('[PerformanceMonitor] Report:', report);
   }
 
   /**
@@ -530,7 +530,7 @@ export class PerformanceMonitor {
       document.addEventListener('keydown', this.overlayKeyListener);
     }
 
-    console.log('[PerformanceMonitor] Overlay enabled (F3 to toggle)');
+    debugLog('[PerformanceMonitor] Overlay enabled (F3 to toggle)');
   }
 
   /**

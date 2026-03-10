@@ -42,6 +42,7 @@ import { HUNTER_REWARDS } from '../../../data/enemies/hunter.js';
 import { MINE_REWARDS } from '../../../data/enemies/mine.js';
 import { BOSS_REWARDS } from '../../../data/enemies/boss.js';
 import { ENEMY_REWARDS } from '../../../data/constants/visual.js';
+import { debugLog } from '../../../core/debugLogging.js';
 import RandomService from '../../../core/RandomService.js';
 import {
   normalizeDependencies,
@@ -147,7 +148,7 @@ export class RewardManager {
       dropsByType: new Map(),
     };
 
-    console.log('[RewardManager] Initialized');
+    debugLog('[RewardManager] Initialized');
   }
 
   /**
@@ -489,7 +490,7 @@ export class RewardManager {
     this.stats.totalXPDropped = 0;
     this.stats.dropsByType.clear();
 
-    console.log('[RewardManager] Statistics reset');
+    debugLog('[RewardManager] Statistics reset');
   }
 
   /**
@@ -607,7 +608,7 @@ export class RewardManager {
         console.error('[RewardManager] Failed to create wave bonus:', error);
       }
 
-      console.log(`[RewardManager] Wave ${waveNumber} bonus: ${totalBonus} XP`);
+      debugLog(`[RewardManager] Wave ${waveNumber} bonus: ${totalBonus} XP`);
     }
   }
 
@@ -662,7 +663,7 @@ export class RewardManager {
 
     const sizeLabel = enemy.size || 'N/A';
     const variantLabel = enemy.variant || 'common';
-    console.log(
+    debugLog(
       `[RewardManager] Checking heart drop: ${enemy.type} ${sizeLabel} ${variantLabel} - chance: ${(dropChance * 100).toFixed(1)}%`
     );
 
@@ -685,7 +686,7 @@ export class RewardManager {
           enemyType: enemy.type,
           enemySize: enemy.size,
         });
-        console.log(
+        debugLog(
           `[RewardManager] ❤️ Health heart dropped from ${enemy.type} (${sizeLabel} ${variantLabel})!`
         );
       } else {

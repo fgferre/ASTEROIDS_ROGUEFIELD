@@ -1,6 +1,7 @@
 // src/modules/MenuBackgroundSystem.js
 
 import { BaseSystem } from '../core/BaseSystem.js';
+import { debugLog } from '../core/debugLogging.js';
 import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
@@ -869,7 +870,7 @@ class MenuBackgroundSystem extends BaseSystem {
 
     // Log WebGL version for debugging
     const glVersion = this.renderer.capabilities.isWebGL2 ? 'WebGL2' : 'WebGL1';
-    console.log(`[MenuBackgroundSystem] Renderer: ${glVersion}`);
+    debugLog(`[MenuBackgroundSystem] Renderer: ${glVersion}`);
     const pixelRatio = window.devicePixelRatio || 1;
     this.renderer.setPixelRatio(pixelRatio);
     this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -1884,7 +1885,7 @@ class MenuBackgroundSystem extends BaseSystem {
         import.meta.env &&
         import.meta.env.DEV
       ) {
-        console.log(
+        debugLog(
           `[MenuBackgroundSystem] NASA starfield loaded (${totalStars} stars)`
         );
       }
@@ -3909,7 +3910,7 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
       aq.currentLevel--;
       aq.adjustmentCooldown = aq.adjustmentCooldownDuration;
       this.applyQualityLevel(aq.currentLevel);
-      console.log(
+      debugLog(
         `[AdaptiveQuality] FPS ${currentFps.toFixed(1)} < ${aq.targetFpsMin}, ` +
           `降级 to "${aq.levels[aq.currentLevel].name}"`
       );
@@ -3918,7 +3919,7 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
       aq.currentLevel++;
       aq.adjustmentCooldown = aq.adjustmentCooldownDuration;
       this.applyQualityLevel(aq.currentLevel);
-      console.log(
+      debugLog(
         `[AdaptiveQuality] FPS ${currentFps.toFixed(1)} > ${aq.targetFpsMax}, ` +
           `升级 to "${aq.levels[aq.currentLevel].name}"`
       );

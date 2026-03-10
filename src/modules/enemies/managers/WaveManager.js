@@ -25,6 +25,7 @@ import {
   normalizeDependencies,
   resolveService,
 } from '../../../core/serviceUtils.js';
+import { debugLog } from '../../../core/debugLogging.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { clamp } from '../../../utils/mathHelpers.js';
 import {
@@ -146,7 +147,7 @@ export class WaveManager {
 
     this.connectEventListeners();
 
-    console.log('[WaveManager] Initialized');
+    debugLog('[WaveManager] Initialized');
   }
 
   /**
@@ -1437,7 +1438,7 @@ export class WaveManager {
       this.spawnWave(effectiveConfig);
     }
 
-    console.log(
+    debugLog(
       `[WaveManager] Started wave ${waveNumber} (${this.totalEnemiesThisWave} enemies${
         effectiveConfig.isBossWave ? ', boss wave' : ''
       })`
@@ -2814,7 +2815,7 @@ export class WaveManager {
     // Start countdown for next wave
     this.waveCountdown = this.waveDelay;
 
-    console.log(
+    debugLog(
       `[WaveManager] Wave ${this.currentWave} complete in ${duration.toFixed(1)}s`
     );
   }
@@ -2870,7 +2871,7 @@ export class WaveManager {
 
     this.connectEventListeners();
 
-    console.log('[WaveManager] Reset');
+    debugLog('[WaveManager] Reset');
   }
 
   /**

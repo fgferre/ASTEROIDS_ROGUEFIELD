@@ -22,6 +22,7 @@
  */
 
 import RandomService from '../core/RandomService.js';
+import { debugLog } from '../core/debugLogging.js';
 
 export class ScreenShake {
   constructor(randomGenerator = null) {
@@ -52,7 +53,7 @@ export class ScreenShake {
 
     this.reseed(randomGenerator);
 
-    console.log('[ScreenShake] Initialized');
+    debugLog('[ScreenShake] Initialized');
   }
 
   _resolveRandom(randomGenerator, { resetFallback = false } = {}) {

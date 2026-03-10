@@ -1,4 +1,5 @@
 import { createServiceManifest } from './serviceManifest.js';
+import { isDebugLoggingEnabled } from '../core/debugLogging.js';
 
 export function bootstrapServices({
   container,
@@ -41,7 +42,11 @@ export function bootstrapServices({
     }
   });
 
-  if (logger && typeof logger.groupCollapsed === 'function') {
+  if (
+    isDebugLoggingEnabled() &&
+    logger &&
+    typeof logger.groupCollapsed === 'function'
+  ) {
     logger.groupCollapsed('[bootstrapServices] Services initialized');
     logger.table?.(
       Object.entries(resolvedServices).map(([name, instance]) => ({

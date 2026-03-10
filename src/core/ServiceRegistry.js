@@ -18,6 +18,7 @@
  */
 
 import { DIContainer } from './DIContainer.js';
+import { debugLog } from './debugLogging.js';
 import { createServiceManifest } from '../bootstrap/serviceManifest.js';
 import RandomService from './RandomService.js';
 
@@ -127,7 +128,7 @@ export class ServiceRegistry {
       );
     });
 
-    console.log(
+    debugLog(
       `[ServiceRegistry] Registered ${registeredNames.size} services in DI container`
     );
   }
