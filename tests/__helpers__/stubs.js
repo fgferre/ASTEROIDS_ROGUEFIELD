@@ -109,54 +109,95 @@ export function createRandomServiceStatefulStub(options = {}) {
 /**
  * Create a GainNode stub used across audio determinism tests.
  *
- * @returns {{connect: () => void, gain: {setValueAtTime: () => void, exponentialRampToValueAtTime: () => void}}}
+ * @param {{initialValue?: number}} [options] - Optional initial gain value.
+ * @returns {{connect: () => void, disconnect: () => void, gain: {value: number, setValueAtTime: (value: number) => void, linearRampToValueAtTime: (value: number) => void, exponentialRampToValueAtTime: (value: number) => void, cancelScheduledValues: () => void}}}
  * @example
  * const gain = createGainStub();
  * gain.gain.setValueAtTime(0.5, 0);
  */
-export function createGainStub() {
+export function createGainStub(options = {}) {
+  const { initialValue = 0 } = options;
+  const gain = {
+    value: initialValue,
+    setValueAtTime(value) {
+      gain.value = value;
+    },
+    linearRampToValueAtTime(value) {
+      gain.value = value;
+    },
+    exponentialRampToValueAtTime(value) {
+      gain.value = value;
+    },
+    cancelScheduledValues() {},
+  };
+
   return {
     connect() {},
-    gain: {
-      setValueAtTime() {},
-      exponentialRampToValueAtTime() {},
-    },
+    disconnect() {},
+    gain,
   };
 }
 
 /**
- * Create an OscillatorNode stub that captures frequency changes when provided.
+ * Create a MediaElementAudioSourceNode stub for menu music tests.
  *
- * @param {{frequencyLog?: number[]}} [options] - Optional log array that records every frequency set call.
- * @returns {{connect: () => void, start: () => void, stop: () => void, frequency: {setValueAtTime: (value: number, time: number) => void}}}
+ * @param {{mediaElement?: any}} [options] - Optional media element reference stored on the stub.
+ * @returns {{mediaElement: any, connect: ReturnType<typeof vi.fn>, disconnect: ReturnType<typeof vi.fn>}}
  * @example
- * const log = [];
- * const oscillator = createOscillatorStub({ frequencyLog: log });
- * oscillator.frequency.setValueAtTime(440, 0);
- * expect(log).toContain(440);
+ * const source = createMediaElementSourceStub();
+ * source.connect({});
  */
-export function createOscillatorStub(options = {}) {
-  const { frequencyLog } = options;
+export function createMediaElementSourceStub(options = {}) {
+  const { mediaElement = null } = options;
 
   return {
-    connect() {},
-    start() {},
-    stop() {},
-    frequency: {
-      setValueAtTime(value) {
-        if (Array.isArray(frequencyLog)) {
-          frequencyLog.push(value);
-        }
-      },
-      exponentialRampToValueAtTime() {},
-    },
+    mediaElement,
+    connect: vi.fn(),
+    disconnect: vi.fn(),
   };
+}
+
+/**
+ * Create a minimal HTMLAudioElement-like stub for menu music tests.
+ *
+ * @param {{src?: string, currentTime?: number, loop?: boolean}} [options] - Optional initial media element state.
+ * @returns {{src: string, preload: string, loop: boolean, paused: boolean, currentTime: number, play: ReturnType<typeof vi.fn>, pause: ReturnType<typeof vi.fn>, load: ReturnType<typeof vi.fn>}}
+ * @example
+ * const media = createMediaElementStub();
+ * await media.play();
+ * expect(media.paused).toBe(false);
+ */
+export function createMediaElementStub(options = {}) {
+  const {
+    src = '',
+    currentTime = 0,
+    loop = false,
+    preload = 'auto',
+  } = options;
+
+  const mediaElement = {
+    src,
+    preload,
+    loop,
+    paused: true,
+    currentTime,
+    play: vi.fn(() => {
+      mediaElement.paused = false;
+      return Promise.resolve();
+    }),
+    pause: vi.fn(() => {
+      mediaElement.paused = true;
+    }),
+    load: vi.fn(),
+  };
+
+  return mediaElement;
 }
 
 /**
  * Create an AudioBufferSourceNode stub matching integration test expectations.
  *
- * @returns {{connect: () => void, start: () => void, stop: () => void, buffer: any}}
+ * @returns {{connect: () => void, disconnect: () => void, start: () => void, stop: () => void, buffer: any, loop: boolean}}
  * @example
  * const bufferSource = createBufferSourceStub();
  * bufferSource.start();
@@ -164,9 +205,11 @@ export function createOscillatorStub(options = {}) {
 export function createBufferSourceStub() {
   return {
     connect() {},
+    disconnect() {},
     start() {},
     stop() {},
     buffer: null,
+    loop: false,
   };
 }
 
@@ -188,14 +231,18 @@ export function createSettingsStub(values = null) {
 /**
  * Create an AudioContext stub compatible with the audio module tests.
  *
- * @param {{ sampleRate?: number }} [options] - Optional overrides for the stubbed context.
- * @returns {{ sampleRate: number, createBuffer: ReturnType<typeof vi.fn>, createBufferSource: ReturnType<typeof vi.fn> }}
+ * @param {{ sampleRate?: number, currentTime?: number, state?: string }} [options] - Optional overrides for the stubbed context.
+ * @returns {{ sampleRate: number, currentTime: number, state: string, destination: object, createBuffer: ReturnType<typeof vi.fn>, createBufferSource: ReturnType<typeof vi.fn>, createGain: ReturnType<typeof vi.fn>, createOscillator: ReturnType<typeof vi.fn>, createBiquadFilter: ReturnType<typeof vi.fn>, createMediaElementSource: ReturnType<typeof vi.fn>, resume: ReturnType<typeof vi.fn> }}
  * @example
  * const context = createAudioContextStub({ sampleRate: 48000 });
  * const buffer = context.createBuffer(2, 256, 48000);
  */
 export function createAudioContextStub(options = {}) {
-  const { sampleRate = 44100 } = options;
+  const {
+    sampleRate = 44100,
+    currentTime = 0,
+    state = 'running',
+  } = options;
 
   const createBuffer = vi.fn((channels, length, rate = sampleRate) => {
     const data = new Float32Array(length);
@@ -207,13 +254,72 @@ export function createAudioContextStub(options = {}) {
     };
   });
 
-  const createBufferSource = vi.fn(() => ({
-    buffer: null,
-  }));
+  const context = {
+    sampleRate,
+    currentTime,
+    state,
+    destination: {},
+    createBuffer,
+    createBufferSource: vi.fn(() => createBufferSourceStub()),
+    createGain: vi.fn(() => createGainStub()),
+    createOscillator: vi.fn(() => createOscillatorStub()),
+    createBiquadFilter: vi.fn(() => ({
+      type: 'lowpass',
+      connect() {},
+      disconnect() {},
+      frequency: {
+        setValueAtTime() {},
+        exponentialRampToValueAtTime() {},
+      },
+      Q: {
+        setValueAtTime() {},
+      },
+      gain: {
+        setValueAtTime() {},
+      },
+    })),
+    createMediaElementSource: vi.fn((mediaElement) =>
+      createMediaElementSourceStub({ mediaElement })
+    ),
+    resume: vi.fn(async () => {
+      context.state = 'running';
+      return undefined;
+    }),
+  };
+
+  return context;
+}
+/**
+ * Create an OscillatorNode stub that captures frequency changes when provided.
+ *
+ * @param {{frequencyLog?: number[]}} [options] - Optional log array that records every frequency set call.
+ * @returns {{connect: () => void, disconnect: () => void, start: () => void, stop: () => void, detune: {setValueAtTime: () => void}, frequency: {setValueAtTime: (value: number, time: number) => void, linearRampToValueAtTime: () => void, exponentialRampToValueAtTime: () => void}}}
+ * @example
+ * const log = [];
+ * const oscillator = createOscillatorStub({ frequencyLog: log });
+ * oscillator.frequency.setValueAtTime(440, 0);
+ * expect(log).toContain(440);
+ */
+export function createOscillatorStub(options = {}) {
+  const { frequencyLog } = options;
 
   return {
-    sampleRate,
-    createBuffer,
-    createBufferSource,
+    connect() {},
+    disconnect() {},
+    start() {},
+    stop() {},
+    detune: {
+      setValueAtTime() {},
+    },
+    frequency: {
+      setValueAtTime(value) {
+        if (Array.isArray(frequencyLog)) {
+          frequencyLog.push(value);
+        }
+      },
+      linearRampToValueAtTime() {},
+      exponentialRampToValueAtTime() {},
+    },
   };
 }
+

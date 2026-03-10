@@ -1426,6 +1426,18 @@ class UISystem extends BaseSystem {
     this.applyVisualPreferences(payload.values);
   }
 
+  emitOverlayVisibilityChanged(overlay, isOpen, payload = {}) {
+    if (!overlay || !this.eventBus?.emit) {
+      return;
+    }
+
+    this.eventBus.emit('ui-overlay-visibility-changed', {
+      overlay,
+      isOpen: Boolean(isOpen),
+      ...payload,
+    });
+  }
+
   openCreditsOverlay(triggerId = null) {
     const creditsRefs = this.domRefs.credits;
     const overlay = creditsRefs?.overlay;
@@ -1453,6 +1465,7 @@ class UISystem extends BaseSystem {
     this.showScreen('credits', { overlay: true, show: true });
     overlay.setAttribute('aria-hidden', 'false');
     document.body?.classList.add('is-credits-open');
+    this.emitOverlayVisibilityChanged('credits', true, { source: 'menu' });
 
     const focusTarget =
       creditsRefs?.primaryAction ||
@@ -1486,6 +1499,7 @@ class UISystem extends BaseSystem {
     }
 
     document.body?.classList.remove('is-credits-open');
+    this.emitOverlayVisibilityChanged('credits', false, { source: 'menu' });
 
     this.creditsState.isOpen = false;
     this.creditsState.triggerId = null;
@@ -1756,6 +1770,7 @@ class UISystem extends BaseSystem {
     overlay.classList.remove('hidden');
     overlay.setAttribute('aria-hidden', 'false');
     document.body?.classList.add('is-settings-open');
+    this.emitOverlayVisibilityChanged('settings', true, { source });
 
     const activeTab = overlay.querySelector(
       '[data-settings-category].is-active'
@@ -1769,6 +1784,8 @@ class UISystem extends BaseSystem {
     if (!this.settingsState.isOpen) {
       return;
     }
+
+    const source = this.settingsState.source;
 
     // Restore focus BEFORE hiding the overlay to avoid "aria-hidden" warning
     if (
@@ -1797,6 +1814,7 @@ class UISystem extends BaseSystem {
     document.body?.classList.remove('is-settings-open');
     this.cancelBindingCapture();
     this.settingsState.isOpen = false;
+    this.emitOverlayVisibilityChanged('settings', false, { source });
   }
 
   renderSettingsCategories() {

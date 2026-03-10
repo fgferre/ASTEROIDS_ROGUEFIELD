@@ -12,6 +12,10 @@ import {
 import { WAVE_BOSS_INTERVAL } from '../data/constants/gameplay.js';
 
 const DEV_MODE = isDevEnvironment();
+const MENU_OPENING_TRACK_URL = new URL(
+  '../../assets/Music/Asteroids.mp3',
+  import.meta.url
+).href;
 
 /**
  * ThrusterLoopManager - Manages continuous thruster loop sounds
@@ -444,6 +448,21 @@ class AudioSystem extends BaseSystem {
       lastPhase: null,
     };
 
+    this.menuTrackConfig = {
+      src: MENU_OPENING_TRACK_URL,
+      loop: true,
+      fadeInMs: 1500,
+      fadeOutMs: 800,
+    };
+    this.menuTrackState = {
+      audioElement: null,
+      sourceNode: null,
+      trackGain: null,
+      isPlaying: false,
+      currentScreen: null,
+      stopTimerId: null,
+    };
+
     // Thruster sound system
     this.thrusterLoopManager = new ThrusterLoopManager();
     this.thrusterState = {
@@ -518,6 +537,7 @@ class AudioSystem extends BaseSystem {
       this.applyVolumeToNodes();
       this.initializeMusicController();
       this.initialized = true;
+      this._syncMenuTrackForCurrentScreen();
 
       // Start performance monitoring
       this._startPerformanceMonitoring();
@@ -693,8 +713,12 @@ class AudioSystem extends BaseSystem {
       }
     });
 
-    this.registerEventListener('screen-changed', () => {
-      this.playMenuTransition();
+    this.registerEventListener('screen-changed', (payload = {}) => {
+      this._handleScreenChanged(payload);
+    });
+
+    this.registerEventListener('ui-overlay-visibility-changed', (payload = {}) => {
+      this._handleOverlayVisibilityChanged(payload);
     });
 
     this.registerEventListener('input-confirmed', () => {
@@ -936,6 +960,280 @@ class AudioSystem extends BaseSystem {
     if (destination && node && typeof node.connect === 'function') {
       node.connect(destination);
     }
+  }
+
+  _handleScreenChanged(payload = {}) {
+    if (typeof payload?.screen === 'string' && payload.screen) {
+      this.menuTrackState.currentScreen = payload.screen;
+    }
+
+    this.playMenuTransition();
+    this._syncMenuTrackForCurrentScreen();
+  }
+
+  _handleOverlayVisibilityChanged(payload = {}) {
+    const overlay = payload?.overlay;
+    const isOpen = Boolean(payload?.isOpen);
+    const source = typeof payload?.source === 'string' ? payload.source : null;
+
+    if (!['settings', 'credits'].includes(overlay)) {
+      return;
+    }
+
+    if (isOpen) {
+      if (source !== 'menu') {
+        return;
+      }
+      this.menuTrackState.currentScreen = overlay;
+    } else if (
+      source === 'menu' ||
+      this.menuTrackState.currentScreen === overlay
+    ) {
+      this.menuTrackState.currentScreen = 'menu';
+    } else {
+      return;
+    }
+
+    this._syncMenuTrackForCurrentScreen();
+  }
+
+  _syncMenuTrackForCurrentScreen() {
+    const currentScreen = this.menuTrackState.currentScreen;
+    if (!currentScreen) {
+      return;
+    }
+
+    if (currentScreen === 'menu') {
+      this.safePlay(() => {
+        this._playMenuTrackDirect();
+      });
+      return;
+    }
+
+    this._stopMenuTrackPlayback();
+  }
+
+  _createMenuTrackAudioElement() {
+    let audioElement = null;
+
+    if (typeof Audio === 'function') {
+      try {
+        audioElement = new Audio(this.menuTrackConfig.src);
+      } catch (error) {
+        console.warn('[AudioSystem] Failed to construct menu track audio:', error);
+      }
+    }
+
+    if (
+      !audioElement &&
+      typeof document !== 'undefined' &&
+      typeof document.createElement === 'function'
+    ) {
+      try {
+        audioElement = document.createElement('audio');
+        audioElement.src = this.menuTrackConfig.src;
+      } catch (error) {
+        console.warn('[AudioSystem] Failed to create fallback audio element:', error);
+      }
+    }
+
+    if (!audioElement) {
+      return null;
+    }
+
+    audioElement.preload = 'auto';
+    audioElement.loop = Boolean(this.menuTrackConfig.loop);
+
+    return audioElement;
+  }
+
+  _ensureMenuTrackResources() {
+    if (!this.context) {
+      return null;
+    }
+
+    const state = this.menuTrackState;
+    const now = this.context.currentTime;
+
+    if (!state.audioElement) {
+      state.audioElement = this._createMenuTrackAudioElement();
+    }
+
+    if (!state.audioElement) {
+      return null;
+    }
+
+    if (!state.trackGain) {
+      state.trackGain = this.context.createGain();
+      state.trackGain.gain.setValueAtTime(0, now);
+      this.connectMusicNode(state.trackGain);
+    }
+
+    if (!state.sourceNode) {
+      if (typeof this.context.createMediaElementSource !== 'function') {
+        console.warn(
+          '[AudioSystem] MediaElementAudioSourceNode is not available in this environment.'
+        );
+        return null;
+      }
+
+      state.sourceNode = this.context.createMediaElementSource(state.audioElement);
+      state.sourceNode.connect(state.trackGain);
+    }
+
+    return state;
+  }
+
+  _clearMenuTrackStopTimer() {
+    if (!this.menuTrackState.stopTimerId) {
+      return;
+    }
+
+    clearTimeout(this.menuTrackState.stopTimerId);
+    this.menuTrackState.stopTimerId = null;
+  }
+
+  _cancelAudioParamValues(param, now) {
+    if (!param || typeof param.cancelScheduledValues !== 'function') {
+      return;
+    }
+
+    try {
+      param.cancelScheduledValues(now);
+    } catch (error) {
+      // Ignore browsers that throw when clearing empty schedules
+    }
+  }
+
+  _playMenuTrackDirect() {
+    const state = this._ensureMenuTrackResources();
+    if (!state || !state.audioElement || !state.trackGain || !this.context) {
+      return;
+    }
+
+    this._clearMenuTrackStopTimer();
+
+    const now = this.context.currentTime;
+    const fadeInSeconds = Math.max(0, this.menuTrackConfig.fadeInMs / 1000);
+    const gainParam = state.trackGain.gain;
+    const currentValue =
+      typeof gainParam.value === 'number' ? gainParam.value : 0;
+
+    this._cancelAudioParamValues(gainParam, now);
+    gainParam.setValueAtTime(currentValue, now);
+
+    if (fadeInSeconds > 0) {
+      gainParam.linearRampToValueAtTime(1, now + fadeInSeconds);
+    } else {
+      gainParam.setValueAtTime(1, now);
+    }
+
+    state.audioElement.loop = Boolean(this.menuTrackConfig.loop);
+
+    if (state.isPlaying) {
+      return;
+    }
+
+    const playResult =
+      typeof state.audioElement.play === 'function'
+        ? state.audioElement.play()
+        : null;
+
+    state.isPlaying = true;
+
+    if (playResult && typeof playResult.catch === 'function') {
+      playResult.catch((error) => {
+        state.isPlaying = false;
+        if (error?.name !== 'AbortError') {
+          console.warn('[AudioSystem] Failed to play menu track:', error);
+        }
+      });
+    }
+  }
+
+  _stopMenuTrackPlayback({ immediate = false } = {}) {
+    const state = this.menuTrackState;
+    const audioElement = state.audioElement;
+    if (!audioElement) {
+      return;
+    }
+
+    this._clearMenuTrackStopTimer();
+
+    const finalizeStop = () => {
+      try {
+        audioElement.pause?.();
+      } catch (error) {
+        // Ignore pause failures during cleanup
+      }
+
+      try {
+        audioElement.currentTime = 0;
+      } catch (error) {
+        // Ignore media elements that reject currentTime rewinds
+      }
+
+      state.isPlaying = false;
+    };
+
+    const fadeOutSeconds = Math.max(
+      0,
+      (immediate ? 0 : this.menuTrackConfig.fadeOutMs) / 1000
+    );
+
+    if (state.trackGain?.gain && this.context) {
+      const now = this.context.currentTime;
+      const gainParam = state.trackGain.gain;
+      const currentValue =
+        typeof gainParam.value === 'number' ? gainParam.value : 0;
+
+      this._cancelAudioParamValues(gainParam, now);
+      gainParam.setValueAtTime(currentValue, now);
+
+      if (fadeOutSeconds > 0) {
+        gainParam.linearRampToValueAtTime(0, now + fadeOutSeconds);
+      } else {
+        gainParam.setValueAtTime(0, now);
+      }
+    }
+
+    if (immediate || !this.context || fadeOutSeconds <= 0) {
+      finalizeStop();
+      return;
+    }
+
+    state.stopTimerId = setTimeout(() => {
+      state.stopTimerId = null;
+      finalizeStop();
+    }, Math.round(fadeOutSeconds * 1000));
+  }
+
+  _destroyMenuTrackResources() {
+    const state = this.menuTrackState;
+    this._stopMenuTrackPlayback({ immediate: true });
+    this._clearMenuTrackStopTimer();
+
+    if (state.sourceNode && typeof state.sourceNode.disconnect === 'function') {
+      try {
+        state.sourceNode.disconnect();
+      } catch (error) {
+        // Ignore disconnect failures during teardown
+      }
+    }
+
+    if (state.trackGain && typeof state.trackGain.disconnect === 'function') {
+      try {
+        state.trackGain.disconnect();
+      } catch (error) {
+        // Ignore disconnect failures during teardown
+      }
+    }
+
+    state.audioElement = null;
+    state.sourceNode = null;
+    state.trackGain = null;
+    state.isPlaying = false;
+    state.currentScreen = null;
   }
 
   initializeMusicController() {
@@ -4272,6 +4570,7 @@ class AudioSystem extends BaseSystem {
 
   reset() {
     this._clearRandomDebugControls();
+    this._destroyMenuTrackResources();
 
     // Cleanup optimization systems
     if (this.pool) {
@@ -4326,6 +4625,7 @@ class AudioSystem extends BaseSystem {
   }
 
   onDestroy() {
+    this._destroyMenuTrackResources();
     this._clearRandomDebugControls();
   }
 
