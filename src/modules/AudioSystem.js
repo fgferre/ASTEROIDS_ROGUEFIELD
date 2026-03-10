@@ -4,7 +4,10 @@ import AudioCache from './AudioCache.js';
 import AudioBatcher from './AudioBatcher.js';
 import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
-import { GameDebugLogger, isDevEnvironment } from '../utils/dev/GameDebugLogger.js';
+import {
+  GameDebugLogger,
+  isDevEnvironment,
+} from '../utils/dev/GameDebugLogger.js';
 import {
   BOSS_AUDIO_FREQUENCY_PRESETS,
   MUSIC_LAYER_CONFIG,
@@ -13,7 +16,7 @@ import { WAVE_BOSS_INTERVAL } from '../data/constants/gameplay.js';
 
 const DEV_MODE = isDevEnvironment();
 const MENU_OPENING_TRACK_URL = new URL(
-  '../../assets/Music/Asteroids.mp3',
+  '../../assets/Music/Alone Among Orbits.mp3',
   import.meta.url
 ).href;
 
@@ -717,9 +720,12 @@ class AudioSystem extends BaseSystem {
       this._handleScreenChanged(payload);
     });
 
-    this.registerEventListener('ui-overlay-visibility-changed', (payload = {}) => {
-      this._handleOverlayVisibilityChanged(payload);
-    });
+    this.registerEventListener(
+      'ui-overlay-visibility-changed',
+      (payload = {}) => {
+        this._handleOverlayVisibilityChanged(payload);
+      }
+    );
 
     this.registerEventListener('input-confirmed', () => {
       this.playUISelect();
@@ -1020,7 +1026,10 @@ class AudioSystem extends BaseSystem {
       try {
         audioElement = new Audio(this.menuTrackConfig.src);
       } catch (error) {
-        console.warn('[AudioSystem] Failed to construct menu track audio:', error);
+        console.warn(
+          '[AudioSystem] Failed to construct menu track audio:',
+          error
+        );
       }
     }
 
@@ -1033,7 +1042,10 @@ class AudioSystem extends BaseSystem {
         audioElement = document.createElement('audio');
         audioElement.src = this.menuTrackConfig.src;
       } catch (error) {
-        console.warn('[AudioSystem] Failed to create fallback audio element:', error);
+        console.warn(
+          '[AudioSystem] Failed to create fallback audio element:',
+          error
+        );
       }
     }
 
@@ -1077,7 +1089,9 @@ class AudioSystem extends BaseSystem {
         return null;
       }
 
-      state.sourceNode = this.context.createMediaElementSource(state.audioElement);
+      state.sourceNode = this.context.createMediaElementSource(
+        state.audioElement
+      );
       state.sourceNode.connect(state.trackGain);
     }
 
@@ -1202,10 +1216,13 @@ class AudioSystem extends BaseSystem {
       return;
     }
 
-    state.stopTimerId = setTimeout(() => {
-      state.stopTimerId = null;
-      finalizeStop();
-    }, Math.round(fadeOutSeconds * 1000));
+    state.stopTimerId = setTimeout(
+      () => {
+        state.stopTimerId = null;
+        finalizeStop();
+      },
+      Math.round(fadeOutSeconds * 1000)
+    );
   }
 
   _destroyMenuTrackResources() {
