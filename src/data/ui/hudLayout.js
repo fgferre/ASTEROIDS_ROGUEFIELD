@@ -1,47 +1,21 @@
-// src/data/ui/hudLayout.js
-
-const AAA_TACTICAL_LAYOUT = {
+const AAA_TACTICAL_LAYOUT = Object.freeze({
   id: 'aaa_tactical',
-  label: 'AAA Tactical (Mockup)',
-  description:
-    'AAA tactical HUD integrated via module (layoutmockupstudy.html).',
+  label: 'AAA Tactical',
+  description: 'AAA tactical HUD integrated via module.',
   plugin: {
     module: 'AAAHudLayout',
     radarRange: 1500,
   },
   items: [],
-};
-
-const HUD_LAYOUTS = {
-  aaa_tactical: AAA_TACTICAL_LAYOUT,
-};
+});
 
 export const DEFAULT_HUD_LAYOUT_ID = 'aaa_tactical';
 
-export const HUD_LAYOUT_IDS = {
-  AAA_TACTICAL: 'aaa_tactical',
-};
-
-export const HUD_LAYOUT_OPTIONS = [
-  {
-    id: AAA_TACTICAL_LAYOUT.id,
-    value: AAA_TACTICAL_LAYOUT.id,
-    label: AAA_TACTICAL_LAYOUT.label,
-    description: AAA_TACTICAL_LAYOUT.description,
-  },
-];
-
-export const HUD_LAYOUT_OPTION_LABELS = {
-  [AAA_TACTICAL_LAYOUT.id]: AAA_TACTICAL_LAYOUT.label,
-};
-
 export function getHudLayoutDefinition(id = DEFAULT_HUD_LAYOUT_ID) {
-  return HUD_LAYOUTS[id] || HUD_LAYOUTS[DEFAULT_HUD_LAYOUT_ID];
+  if (id && id !== DEFAULT_HUD_LAYOUT_ID) {
+    console.warn(
+      `[hudLayout] Unknown layout "${id}" requested - falling back to "${DEFAULT_HUD_LAYOUT_ID}".`
+    );
+  }
+  return AAA_TACTICAL_LAYOUT;
 }
-
-export function getHudLayoutItems(id = DEFAULT_HUD_LAYOUT_ID) {
-  const layout = getHudLayoutDefinition(id);
-  return Array.isArray(layout.items) ? layout.items : [];
-}
-
-export default HUD_LAYOUTS;

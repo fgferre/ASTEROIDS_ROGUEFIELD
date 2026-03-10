@@ -299,8 +299,6 @@
       </div>
     </div>
 
-    <!-- GSAP Animation Library (AAA Overhaul) -->
-    <script src="/libs/gsap.min.js"></script>
     <script src="/libs/three.min.js"></script>
     <!-- Three.js Post-processing (r128) -->
     <script src="/libs/three-examples/EffectComposer.js"></script>
@@ -313,26 +311,6 @@
     <script src="/libs/three-examples/SMAAPass.js"></script>
 
     <script src="/libs/cannon.min.js"></script>
-    <script src="/libs/Stats.min.js"></script>
-    <script>
-      if (
-        typeof window !== 'undefined' &&
-        typeof Stats !== 'undefined' &&
-        !window.stats
-      ) {
-        const statsPanel = new Stats();
-        statsPanel.showPanel(0);
-        const statsElement = statsPanel.dom || statsPanel.domElement;
-        if (statsElement instanceof Node) {
-          document.body.appendChild(statsElement);
-          window.stats = statsPanel;
-        } else {
-          console.warn(
-            '[bootstrap] Stats panel element was not available for DOM attachment.'
-          );
-        }
-      }
-    </script>
 
     <!-- Módulos Core (carregados primeiro para estarem disponíveis globalmente) -->
     <script type="module" src="./core/EventBus.js"></script>

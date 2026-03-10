@@ -1,7 +1,6 @@
 // src/modules/SettingsSystem.js
 
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
-import { DEFAULT_HUD_LAYOUT_ID } from '../data/ui/hudLayout.js';
 import { clamp } from '../utils/mathHelpers.js';
 import {
   normalizeDependencies,
@@ -560,10 +559,6 @@ class SettingsSystem {
     const screenShake = Number.isFinite(Number(gameplay.screenShake))
       ? Number(gameplay.screenShake)
       : 1;
-    const hudLayout =
-      typeof video.hudLayout === 'string' && video.hudLayout
-        ? video.hudLayout
-        : DEFAULT_HUD_LAYOUT_ID;
 
     return {
       accessibility,
@@ -578,7 +573,6 @@ class SettingsSystem {
         screenShake,
         damageFlash: video.damageFlash !== false,
         reducedParticles: Boolean(graphics.reducedParticles),
-        hudLayout,
         postProcessing: graphics.postProcessing !== false,
         bloom: graphics.bloom !== false,
         chromaticAberration: graphics.chromaticAberration !== false,

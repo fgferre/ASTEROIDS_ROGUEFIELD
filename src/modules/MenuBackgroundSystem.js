@@ -151,10 +151,30 @@ class MenuBackgroundSystem extends BaseSystem {
       // Quality level definitions - reduced chromatic aberration for clarity
       levels: [
         // The Monolith study is sharp (no heavy bloom/aberration); keep post FX subtle.
-        { name: 'low', shaderDetail: 0.0, bloomStrength: 0.0, chromaticAberration: 0.0 },
-        { name: 'medium', shaderDetail: 0.5, bloomStrength: 0.05, chromaticAberration: 0.0 },
-        { name: 'high', shaderDetail: 1.0, bloomStrength: 0.1, chromaticAberration: 0.0 },
-        { name: 'ultra', shaderDetail: 1.5, bloomStrength: 0.15, chromaticAberration: 0.0 },
+        {
+          name: 'low',
+          shaderDetail: 0.0,
+          bloomStrength: 0.0,
+          chromaticAberration: 0.0,
+        },
+        {
+          name: 'medium',
+          shaderDetail: 0.5,
+          bloomStrength: 0.05,
+          chromaticAberration: 0.0,
+        },
+        {
+          name: 'high',
+          shaderDetail: 1.0,
+          bloomStrength: 0.1,
+          chromaticAberration: 0.0,
+        },
+        {
+          name: 'ultra',
+          shaderDetail: 1.5,
+          bloomStrength: 0.15,
+          chromaticAberration: 0.0,
+        },
       ],
     };
     this.currentShaderDetail =
@@ -162,8 +182,7 @@ class MenuBackgroundSystem extends BaseSystem {
         ?.shaderDetail ?? 1.0;
 
     this.spawnedBeltAsteroids = 0;
-    this.stats =
-      this.ready && typeof window.stats !== 'undefined' ? window.stats : null;
+    this.stats = this.resolveStatsPanel();
     this.alphaToCoverageEnabled = false;
 
     this.normalIntensity = this.resolveInitialNormalIntensity();
@@ -856,7 +875,10 @@ class MenuBackgroundSystem extends BaseSystem {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.setClearColor(0x050916, 1);
     this.renderer.shadowMap.enabled = true;
-    if (typeof this.renderer.shadowMap.type !== 'undefined' && THREE?.PCFSoftShadowMap) {
+    if (
+      typeof this.renderer.shadowMap.type !== 'undefined' &&
+      THREE?.PCFSoftShadowMap
+    ) {
       this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     }
     if (
@@ -948,8 +970,7 @@ class MenuBackgroundSystem extends BaseSystem {
     };
 
     // Helper to yield to main thread
-    const yieldToMain = () =>
-      new Promise((resolve) => setTimeout(resolve, 0));
+    const yieldToMain = () => new Promise((resolve) => setTimeout(resolve, 0));
 
     try {
       // Phase 0: Load NASA starfield (matches the standalone mockup).
@@ -1067,7 +1088,9 @@ class MenuBackgroundSystem extends BaseSystem {
     const fxConfig =
       this.adaptiveQuality?.levels?.[this.adaptiveQuality.currentLevel] ?? null;
     const bloomStrength =
-      typeof fxConfig?.bloomStrength === 'number' ? fxConfig.bloomStrength : 0.1;
+      typeof fxConfig?.bloomStrength === 'number'
+        ? fxConfig.bloomStrength
+        : 0.1;
     const chromaticAberration =
       typeof fxConfig?.chromaticAberration === 'number'
         ? fxConfig.chromaticAberration
@@ -1181,13 +1204,13 @@ class MenuBackgroundSystem extends BaseSystem {
     // Criar sistema de efeitos de impacto cinematográficos
     this.impactEffect = new AsteroidImpactEffect(THREE, scene, camera, {
       qualityLevels: {
-        0: { debris: 40, dust: 30, flashIntensity: 3.0, shakeAmount: 0.3 },   // low
-        1: { debris: 80, dust: 60, flashIntensity: 4.0, shakeAmount: 0.4 },   // medium
+        0: { debris: 40, dust: 30, flashIntensity: 3.0, shakeAmount: 0.3 }, // low
+        1: { debris: 80, dust: 60, flashIntensity: 4.0, shakeAmount: 0.4 }, // medium
         2: { debris: 150, dust: 120, flashIntensity: 5.0, shakeAmount: 0.5 }, // high
-        3: { debris: 300, dust: 200, flashIntensity: 6.0, shakeAmount: 0.5 }  // ultra
+        3: { debris: 300, dust: 200, flashIntensity: 6.0, shakeAmount: 0.5 }, // ultra
       },
       initialQualityLevel: this.adaptiveQuality?.currentLevel || 2,
-      randomFloat: () => this.randomFloat('fragments')
+      randomFloat: () => this.randomFloat('fragments'),
     });
   }
 
@@ -1273,10 +1296,16 @@ class MenuBackgroundSystem extends BaseSystem {
         positions[offset + 2] = z;
       }
 
-      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geometry.setAttribute(
+        'position',
+        new THREE.BufferAttribute(positions, 3)
+      );
       const material = new THREE.PointsMaterial({
         color: 0xffffff,
-        size: this.computeWorldSpacePointSize(config.distance, config.pixelSize),
+        size: this.computeWorldSpacePointSize(
+          config.distance,
+          config.pixelSize
+        ),
         map: this.createStarTexture(),
         transparent: true,
         opacity: this.randomFloat('starfield') * 0.35 + 0.65,
@@ -1424,7 +1453,10 @@ class MenuBackgroundSystem extends BaseSystem {
       }
 
       // Legacy PointsMaterial fallback.
-      const newSize = this.computeWorldSpacePointSize(config.distance, config.pixelSize);
+      const newSize = this.computeWorldSpacePointSize(
+        config.distance,
+        config.pixelSize
+      );
       if (mesh.material.size !== newSize) {
         mesh.material.size = newSize;
         mesh.material.needsUpdate = true;
@@ -1444,7 +1476,7 @@ class MenuBackgroundSystem extends BaseSystem {
       window.devicePixelRatio ||
       1;
 
-    // Match nasa-starfield.html: sqrt(maxDim * devicePixelRatio) / 60
+    // Match the original study formula: sqrt(maxDim * devicePixelRatio) / 60
     const viewportScale = Math.sqrt(Math.max(width, height) * pixelRatio) / 60;
     return Math.max(0.1, viewportScale * pixelSize);
   }
@@ -1496,7 +1528,12 @@ class MenuBackgroundSystem extends BaseSystem {
 
   async createNasaStarfieldLayers() {
     const { THREE } = this;
-    if (!THREE || !this.scene || this._nasaStarfieldLoaded || this._nasaStarfieldLoading) {
+    if (
+      !THREE ||
+      !this.scene ||
+      this._nasaStarfieldLoaded ||
+      this._nasaStarfieldLoading
+    ) {
       return;
     }
 
@@ -1567,7 +1604,7 @@ class MenuBackgroundSystem extends BaseSystem {
         totalStars += count;
       }
 
-      // Match nasa-starfield.html conversions.
+      // Match the original study conversions.
       const KM_TO_PARSEC = 1 / 3.086e13;
       const DISTANCE_SCALE = 206265000.0;
       const KM_TO_UNITS = KM_TO_PARSEC * DISTANCE_SCALE;
@@ -1637,7 +1674,8 @@ class MenuBackgroundSystem extends BaseSystem {
       }
 
       const sortedDistances = Array.from(starDistances).filter(
-        (value) => typeof value === 'number' && Number.isFinite(value) && value > 0
+        (value) =>
+          typeof value === 'number' && Number.isFinite(value) && value > 0
       );
       sortedDistances.sort((a, b) => a - b);
       const totalSorted = sortedDistances.length;
@@ -1645,12 +1683,16 @@ class MenuBackgroundSystem extends BaseSystem {
         if (!totalSorted) {
           return 1;
         }
-        const idx = Math.max(0, Math.min(totalSorted - 1, Math.floor(p * (totalSorted - 1))));
+        const idx = Math.max(
+          0,
+          Math.min(totalSorted - 1, Math.floor(p * (totalSorted - 1)))
+        );
         return sortedDistances[idx];
       };
 
-      const distanceBoundaries = Array.from({ length: Math.max(0, LAYER_COUNT - 1) }, (_, i) =>
-        pickPercentile((i + 1) / LAYER_COUNT)
+      const distanceBoundaries = Array.from(
+        { length: Math.max(0, LAYER_COUNT - 1) },
+        (_, i) => pickPercentile((i + 1) / LAYER_COUNT)
       );
 
       const findLayerIndex = (distance) => {
@@ -1688,9 +1730,15 @@ class MenuBackgroundSystem extends BaseSystem {
         layerCounts[layerIndex] += 1;
       }
 
-      const layerPositions = layerCounts.map((count) => new Float32Array(count * 3));
-      const layerColors = layerCounts.map((count) => new Float32Array(count * 4));
-      const layerDistances = layerCounts.map((count) => new Float32Array(count));
+      const layerPositions = layerCounts.map(
+        (count) => new Float32Array(count * 3)
+      );
+      const layerColors = layerCounts.map(
+        (count) => new Float32Array(count * 4)
+      );
+      const layerDistances = layerCounts.map(
+        (count) => new Float32Array(count)
+      );
       const layerWrite = new Array(LAYER_COUNT).fill(0);
 
       for (let i = 0; i < starDistances.length; i += 1) {
@@ -1779,19 +1827,28 @@ class MenuBackgroundSystem extends BaseSystem {
         .map((posArray, idx) => ({ posArray, idx }))
         .filter(({ posArray }) => posArray && posArray.length > 0)
         .map(({ posArray, idx }) => {
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-        geometry.setAttribute('starColor', new THREE.BufferAttribute(layerColors[idx], 4));
-        geometry.setAttribute('starDist', new THREE.BufferAttribute(layerDistances[idx], 1));
-        geometry.computeBoundingSphere();
+          const geometry = new THREE.BufferGeometry();
+          geometry.setAttribute(
+            'position',
+            new THREE.BufferAttribute(posArray, 3)
+          );
+          geometry.setAttribute(
+            'starColor',
+            new THREE.BufferAttribute(layerColors[idx], 4)
+          );
+          geometry.setAttribute(
+            'starDist',
+            new THREE.BufferAttribute(layerDistances[idx], 1)
+          );
+          geometry.computeBoundingSphere();
 
-        const points = new THREE.Points(geometry, material);
-        points.frustumCulled = false;
-        points.userData.followCamera = false;
-        points.userData.followCameraFactor = followByLayer[idx] ?? 0;
-        points.renderOrder = -1000 - idx;
-        return points;
-      });
+          const points = new THREE.Points(geometry, material);
+          points.frustumCulled = false;
+          points.userData.followCamera = false;
+          points.userData.followCameraFactor = followByLayer[idx] ?? 0;
+          points.renderOrder = -1000 - idx;
+          return points;
+        });
 
       // Replace placeholder star layers.
       this.starLayers.forEach((layer) => {
@@ -1910,7 +1967,9 @@ class MenuBackgroundSystem extends BaseSystem {
     // --- Macro shape in geometry (PDF: "stamping" crater hemispheres + noise) ---
     // This avoids per-vertex displacement artifacts in shaders and produces
     // smooth, eroded silhouettes even at grazing angles.
-    const simplex = new SimplexNoise(this.createRandomGenerator(detailSeed + 101));
+    const simplex = new SimplexNoise(
+      this.createRandomGenerator(detailSeed + 101)
+    );
     const craterRng = this.createRandomGenerator(detailSeed + 202);
     const axisScale = new THREE.Vector3(
       0.78 + rng() * 0.44,
@@ -1929,7 +1988,7 @@ class MenuBackgroundSystem extends BaseSystem {
         Math.cos(phi),
         Math.sin(phi) * Math.sin(theta)
       ).normalize();
-      const radius = 0.12 + craterRng() * 0.30; // angular-ish radius (unit sphere)
+      const radius = 0.12 + craterRng() * 0.3; // angular-ish radius (unit sphere)
       const depth = 0.07 + craterRng() * 0.14;
       const rim = 0.012 + craterRng() * 0.035;
       return { center, radius, depth, rim };
@@ -1956,17 +2015,27 @@ class MenuBackgroundSystem extends BaseSystem {
       ).normalize();
 
       const base =
-        simplex.fbm(p.x * 0.45 + detailSeed * 0.07, p.y * 0.45 + detailSeed * 0.11, p.z * 0.45, 4) *
-        0.38;
+        simplex.fbm(
+          p.x * 0.45 + detailSeed * 0.07,
+          p.y * 0.45 + detailSeed * 0.11,
+          p.z * 0.45,
+          4
+        ) * 0.38;
       const ridges =
-        simplex.ridgedMF(p.x * 1.2 + 12.3, p.y * 1.2 + 45.6, p.z * 1.2 + detailSeed * 0.03, 4, 2.0, 0.55) *
-        0.30;
+        simplex.ridgedMF(
+          p.x * 1.2 + 12.3,
+          p.y * 1.2 + 45.6,
+          p.z * 1.2 + detailSeed * 0.03,
+          4,
+          2.0,
+          0.55
+        ) * 0.3;
       const cutNoise = simplex.noise3d(
         p.x * 0.65 + 12.0,
         p.y * 0.65 + 2.0,
         p.z * 0.65 + detailSeed * 0.02
       );
-      const cuts = smoothstep(0.35, 0.9, cutNoise) * 0.20;
+      const cuts = smoothstep(0.35, 0.9, cutNoise) * 0.2;
 
       let craterShape = 0;
       for (let c = 0; c < craters.length; c += 1) {
@@ -1976,14 +2045,15 @@ class MenuBackgroundSystem extends BaseSystem {
         if (d >= crater.radius) continue;
         const t = d / crater.radius;
         const bowl = -(1 - t * t) * crater.depth;
-        const rimBand = smoothstep(0.7, 1.0, t) * smoothstep(1.0, 0.92, t) * crater.rim;
+        const rimBand =
+          smoothstep(0.7, 1.0, t) * smoothstep(1.0, 0.92, t) * crater.rim;
         craterShape += bowl + rimBand;
       }
 
       let h = base + ridges - cuts + craterShape;
       // Erosion-like conditioning: compress peaks hard, keep valleys.
       h = Math.max(-0.75, Math.min(0.45, h));
-      h = h < 0 ? h * 1.20 : h * 0.65;
+      h = h < 0 ? h * 1.2 : h * 0.65;
       heights[i] = h;
     }
 
@@ -2244,7 +2314,8 @@ class MenuBackgroundSystem extends BaseSystem {
           simplex
         );
         const crackMask =
-          1 - this.smoothstep(0.0, 0.08, crackDist) * materialParams.crackIntensity;
+          1 -
+          this.smoothstep(0.0, 0.08, crackDist) * materialParams.crackIntensity;
 
         // 4. MACRO COLOR VARIATION - Large scale color shifts
         const macroVar = simplex.fbm(
@@ -2533,7 +2604,7 @@ class MenuBackgroundSystem extends BaseSystem {
   }
 
   /**
-   * GLSL noise functions chunk - ported from asteroid_generator_study.html
+   * GLSL noise functions chunk ported from the original procedural study.
    * Contains: Simplex 3D, FBM, Ridge, Voronoi/Worley
    */
   getNoiseGLSL() {
@@ -2878,7 +2949,7 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
   }
 
   /**
-   * Creates a fully procedural ShaderMaterial based on asteroid_generator_study.html.
+   * Creates a fully procedural ShaderMaterial based on the original procedural study.
    * This bypasses MeshStandardMaterial entirely for guaranteed shader execution.
    * Uses a self-contained GLSL300 pipeline (RawShaderMaterial) to match the study
    * and avoid Three.js shader chunk injection (fog/dithering/tonemapping).
@@ -3305,7 +3376,10 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
       if (uniforms.time && typeof uniforms.time.value === 'number') {
         uniforms.time.value = this.elapsedTime;
       }
-      if (uniforms.detailLevel && typeof uniforms.detailLevel.value === 'number') {
+      if (
+        uniforms.detailLevel &&
+        typeof uniforms.detailLevel.value === 'number'
+      ) {
         uniforms.detailLevel.value = this.currentShaderDetail ?? 1.0;
       }
     });
@@ -3386,9 +3460,11 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
       ? this.randomFloat('belt') * 5 + 5
       : this.randomFloat('belt') * 3 + 2;
     const scaleJitter = 1 + (this.randomFloat('belt') - 0.5) * 0.8;
-    const scale = new THREE.Vector3(scaleVal, scaleVal, scaleVal).multiplyScalar(
-      scaleJitter
-    );
+    const scale = new THREE.Vector3(
+      scaleVal,
+      scaleVal,
+      scaleVal
+    ).multiplyScalar(scaleJitter);
 
     const velocity = new CANNON.Vec3(
       (this.randomFloat('belt') - 0.5) * 2,
@@ -3474,7 +3550,10 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
 
     // Single-technique policy: all menu asteroids use the same procedural PBR
     // material family (triplanar 3D noise), with seed-driven variations.
-    if (!asteroid.material || !asteroid.material.userData?.isProceduralAsteroid) {
+    if (
+      !asteroid.material ||
+      !asteroid.material.userData?.isProceduralAsteroid
+    ) {
       const material =
         this.baseMaterials[
           Math.floor(this.randomFloat('materials') * this.baseMaterials.length)
@@ -3649,11 +3728,13 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
         continue;
       }
 
-      direction.set(
-        this.randomFloat('fragments') - 0.5,
-        this.randomFloat('fragments') - 0.5,
-        this.randomFloat('fragments') - 0.5
-      ).normalize();
+      direction
+        .set(
+          this.randomFloat('fragments') - 0.5,
+          this.randomFloat('fragments') - 0.5,
+          this.randomFloat('fragments') - 0.5
+        )
+        .normalize();
 
       offset.copy(parent.mesh.position).addScaledVector(direction, radius);
 
@@ -3861,7 +3942,8 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     if (this.customFX && this.customFX.uniforms) {
       this.customFX.uniforms.amount.value = config.chromaticAberration;
       const grainValue = this.customFX.uniforms.grainAmount?.value ?? 0;
-      this.customFX.enabled = config.chromaticAberration !== 0 || grainValue !== 0;
+      this.customFX.enabled =
+        config.chromaticAberration !== 0 || grainValue !== 0;
     }
 
     // Update impact effects quality level
@@ -3945,6 +4027,14 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     return aq.levels[aq.currentLevel]?.name || 'unknown';
   }
 
+  resolveStatsPanel() {
+    if (!this.ready || typeof window === 'undefined') {
+      return null;
+    }
+
+    return typeof window.stats !== 'undefined' ? window.stats : null;
+  }
+
   animate() {
     if (!this.isActive) {
       return;
@@ -3953,6 +4043,7 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     this.animationFrame = requestAnimationFrame(this.animate);
 
     const delta = Math.min(this.clock.getDelta(), 0.05);
+    this.stats = this.stats || this.resolveStatsPanel();
     if (this.stats) {
       this.stats.begin();
     }
@@ -4386,7 +4477,8 @@ class SimplexNoise {
     let normalization = 0.0;
 
     for (let i = 0; i < octaves; i++) {
-      total += this.noise3d(x * frequency, y * frequency, z * frequency) * amplitude;
+      total +=
+        this.noise3d(x * frequency, y * frequency, z * frequency) * amplitude;
       normalization += amplitude;
       amplitude *= persistence;
       frequency *= lacunarity;

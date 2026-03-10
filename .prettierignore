@@ -9,3 +9,18 @@ package-lock.json
 
 # Código legado que não deve ser modificado
 src/legacy/
+
+# Arquivo de instrução local, fora do gate de formatação
+AGENTS.md
+
+# Histórico e contexto preservados apenas como referência
+docs/archive/
+docs/auditorias-racionalizacao/
+docs/validation/bug-handoff-2026-03-07.md
+src/public/libs/
+
+# Materiais de estudo aprovados como referência, fora do runtime
+assets/starfield_tela_abertura_estudo/nasa-starfield.html
+assets/procedural/asteroid_generator_study.html
+assets/procedural/*.pdf
+assets/ui/HUD_layout_mockup.html

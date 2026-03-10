@@ -7,14 +7,21 @@ const __dirname = path.dirname(__filename);
 const PROJECT_ROOT = path.resolve(__dirname, '..');
 const SRC_DIR = path.join(PROJECT_ROOT, 'src');
 const TESTS_DIR = path.join(PROJECT_ROOT, 'tests');
+const INDEX_HTML = path.join(SRC_DIR, 'index.html');
+const PUBLIC_DIR = path.join(SRC_DIR, 'public');
 const OUTPUT_JSON = path.join(PROJECT_ROOT, 'dependency-graph.json');
 const OUTPUT_DOT = path.join(PROJECT_ROOT, 'dependency-graph.dot');
 const OUTPUT_ISSUES = path.join(PROJECT_ROOT, 'dependency-issues.json');
 
 const IMPORT_REGEX = /import\s+[^'";]+['"]([^'";]+)['"];?/g;
+const SCRIPT_TAG_REGEX = /<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*>/g;
+const JS_SCRIPT_REFERENCE_REGEX =
+  /\bloadExternalScript\(\s*['"]([^'"]+)['"]\s*\)/g;
 const EXPORT_REGEX =
   /export\s+(default\s+)?(class|function|const|let|var)\s+(\w+)/g;
+const ORPHAN_IGNORE_PRAGMA = /dependency-analyzer:\s*ignore-orphan/;
 const ENTRY_POINTS = new Set([
+  normalizePath(path.relative(PROJECT_ROOT, INDEX_HTML)),
   normalizePath(
     path.relative(PROJECT_ROOT, path.join(PROJECT_ROOT, 'src', 'app.js'))
   ),
@@ -76,7 +83,12 @@ async function collectFiles(baseDir, includeTests) {
       const fullPath = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         await walk(fullPath);
-      } else if (entry.isFile() && entry.name.endsWith('.js')) {
+      } else if (
+        entry.isFile() &&
+        (entry.name.endsWith('.js') ||
+          entry.name.endsWith('.mjs') ||
+          entry.name.endsWith('.cjs'))
+      ) {
         files.push(fullPath);
       }
     }
@@ -86,6 +98,10 @@ async function collectFiles(baseDir, includeTests) {
 
   if (includeTests && (await exists(TESTS_DIR))) {
     await walk(TESTS_DIR);
+  }
+
+  if (await exists(INDEX_HTML)) {
+    files.push(INDEX_HTML);
   }
 
   return files;
@@ -130,10 +146,38 @@ function resolveImportPath(filePath, importPath, knownFiles) {
   return null;
 }
 
+function resolveScriptPath(filePath, scriptPath, knownFiles) {
+  const candidates = [];
+
+  if (scriptPath.startsWith('/')) {
+    candidates.push(path.join(PUBLIC_DIR, scriptPath.slice(1)));
+  } else {
+    candidates.push(path.resolve(path.dirname(filePath), scriptPath));
+  }
+
+  for (const candidate of candidates) {
+    const withExt = path.extname(candidate) ? candidate : `${candidate}.js`;
+    if (!withExt.startsWith(PROJECT_ROOT)) {
+      continue;
+    }
+    const relative = normalizePath(path.relative(PROJECT_ROOT, withExt));
+    if (knownFiles.has(relative)) {
+      return relative;
+    }
+  }
+
+  return null;
+}
+
+function stripComments(content) {
+  return content.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+}
+
 function extractImports(content) {
   const imports = [];
+  const source = stripComments(content);
   let match;
-  while ((match = IMPORT_REGEX.exec(content))) {
+  while ((match = IMPORT_REGEX.exec(source))) {
     imports.push(match[1]);
   }
   return imports;
@@ -141,11 +185,31 @@ function extractImports(content) {
 
 function extractExports(content) {
   const exports = [];
+  const source = stripComments(content);
   let match;
-  while ((match = EXPORT_REGEX.exec(content))) {
+  while ((match = EXPORT_REGEX.exec(source))) {
     exports.push(match[3]);
   }
   return exports;
+}
+
+function extractHtmlScripts(content) {
+  const scripts = [];
+  let match;
+  while ((match = SCRIPT_TAG_REGEX.exec(content))) {
+    scripts.push(match[1]);
+  }
+  return scripts;
+}
+
+function extractScriptReferences(content) {
+  const scripts = [];
+  const source = stripComments(content);
+  let match;
+  while ((match = JS_SCRIPT_REFERENCE_REGEX.exec(source))) {
+    scripts.push(match[1]);
+  }
+  return scripts;
 }
 
 function detectCycles(graph) {
@@ -214,12 +278,24 @@ async function analyze({ includeTests }) {
       path.relative(PROJECT_ROOT, absolutePath)
     );
     const content = await readFileContent(absolutePath);
-    const imports = extractImports(content);
-    const exports = extractExports(content);
+    const isHtmlFile = absolutePath.endsWith('.html');
+    const imports = isHtmlFile ? [] : extractImports(content);
+    const scriptReferences = isHtmlFile
+      ? extractHtmlScripts(content)
+      : extractScriptReferences(content);
+    const exports = isHtmlFile ? [] : extractExports(content);
+    const allowOrphan = ORPHAN_IGNORE_PRAGMA.test(content);
 
     const resolvedImports = [];
     for (const importPath of imports) {
       const resolved = resolveImportPath(absolutePath, importPath, knownFiles);
+      if (resolved) {
+        resolvedImports.push(resolved);
+      }
+    }
+
+    for (const scriptPath of scriptReferences) {
+      const resolved = resolveScriptPath(absolutePath, scriptPath, knownFiles);
       if (resolved) {
         resolvedImports.push(resolved);
       }
@@ -232,6 +308,7 @@ async function analyze({ includeTests }) {
       dependents: new Set(),
       isHub: false,
       isCritical: false,
+      allowOrphan,
     });
     dependencyGraph.set(relativePath, resolvedImports);
   }
@@ -260,7 +337,11 @@ async function analyze({ includeTests }) {
     if (cycles.some((cycle) => cycle.includes(filePath))) {
       data.isCritical = true;
     }
-    if (dependents.length === 0 && !ENTRY_POINTS.has(filePath)) {
+    if (
+      dependents.length === 0 &&
+      !ENTRY_POINTS.has(filePath) &&
+      !data.allowOrphan
+    ) {
       orphanFiles.push(filePath);
     }
     if (ENTRY_POINTS.has(filePath)) {
@@ -324,18 +405,28 @@ function toDot(graphData) {
 
 async function writeOutputs({ result, issues }, { validateOnly, format }) {
   if (validateOnly) {
-    if (
-      issues.cycles.length > 0 ||
-      issues.hubs.length > 0 ||
-      issues.orphans.length > 0
-    ) {
+    const blockingIssues = {
+      cycles: issues.cycles,
+      orphans: issues.orphans,
+    };
+    const advisoryIssues = {
+      hubs: issues.hubs,
+    };
+
+    if (blockingIssues.cycles.length > 0 || blockingIssues.orphans.length > 0) {
       console.error(
         'Dependency issues detected:',
-        JSON.stringify(issues, null, 2)
+        JSON.stringify(blockingIssues, null, 2)
       );
       process.exitCode = 1;
     } else {
       console.log('No dependency issues detected.');
+      if (advisoryIssues.hubs.length > 0) {
+        console.warn(
+          'Dependency advisories (non-blocking):',
+          JSON.stringify(advisoryIssues, null, 2)
+        );
+      }
     }
     return;
   }

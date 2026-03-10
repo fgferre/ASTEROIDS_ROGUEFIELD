@@ -1,6 +1,4 @@
-// src/data/settingsSchema.js
-
-import { DEFAULT_HUD_LAYOUT_ID } from './ui/hudLayout.js';
+import { DEFAULT_HULL_ID, getAllShipModels } from './shipModels.js';
 
 const DEFAULT_BINDING_METADATA = {
   keyboard: {
@@ -15,6 +13,12 @@ const DEFAULT_BINDING_METADATA = {
   },
 };
 
+const HULL_OPTIONS = getAllShipModels();
+const HULL_OPTION_IDS = HULL_OPTIONS.map((hull) => hull.id);
+const HULL_OPTION_LABELS = Object.fromEntries(
+  HULL_OPTIONS.map((hull) => [hull.id, hull?.name || hull?.id || ''])
+);
+
 const SETTINGS_SCHEMA = [
   {
     id: 'gameplay',
@@ -26,12 +30,9 @@ const SETTINGS_SCHEMA = [
         type: 'select',
         label: 'Ship Hull',
         description: 'Choose the playable hull used for the next run.',
-        default: 'default-hull',
-        options: ['default-hull', 'solar-slicer'],
-        optionLabels: {
-          'default-hull': 'Interceptor',
-          'solar-slicer': 'Solar Slicer',
-        },
+        default: DEFAULT_HULL_ID,
+        options: HULL_OPTION_IDS,
+        optionLabels: HULL_OPTION_LABELS,
       },
       {
         key: 'damageNumbers',

@@ -1,8 +1,11 @@
 /**
- * Enemy Configuration Schema
+ * Enemy Configuration Reference Schema
  *
- * This file defines the canonical structure and field naming conventions for all enemy configurations.
- * It serves as the single source of truth for what fields are available, their types, and their purposes.
+ * This file documents the intended structure and field naming conventions for
+ * enemy configurations. It is currently a reference/types module, not an
+ * enforced runtime validator.
+ *
+ * dependency-analyzer: ignore-orphan
  *
  * BACKWARD COMPATIBILITY:
  * - Legacy field names (speed, fireRate, interval) are still supported via fallback chains in components
@@ -221,10 +224,10 @@ export const ENEMY_CONFIG_SCHEMA = deepFreeze({
 });
 
 /**
- * Validates an enemy config and returns warnings for deprecated field usage.
+ * Advisory helper for manual review of deprecated field usage.
  *
- * This is non-breaking - it only warns, doesn't error.
- * Components handle backward compatibility via fallback chains.
+ * This helper is intentionally non-breaking and is not wired into the runtime.
+ * Components still handle backward compatibility via fallback chains.
  *
  * @param {Object} config - Enemy config to validate
  * @returns {string[]} Array of warning messages

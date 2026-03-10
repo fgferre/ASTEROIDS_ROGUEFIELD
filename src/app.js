@@ -79,100 +79,71 @@ let lastSyncTime = 0;
 
 const DEV_MODE = isDevEnvironment();
 
-let debugCommandsExposed = false;
-let debugBannerPrinted = false;
+function loadExternalScript(src) {
+  return new Promise((resolve, reject) => {
+    if (typeof document === 'undefined') {
+      reject(new Error('document is not available'));
+      return;
+    }
 
-function logServiceRegistrationFlow({ reason = 'bootstrap' } = {}) {
-  if (!diContainer || typeof diContainer.getServiceNames !== 'function') {
-    return;
-  }
-
-  const serviceSnapshot = diContainer.getServiceNames().map((name) => ({
-    service: name,
-    placeholder:
-      typeof diContainer.has === 'function' ? diContainer.has(name) : false,
-    diSingleton:
-      typeof diContainer.isInstantiated === 'function'
-        ? diContainer.isInstantiated(name)
-        : false,
-  }));
-
-  const shouldLog =
-    typeof console !== 'undefined' &&
-    typeof console.groupCollapsed === 'function';
-
-  if (!shouldLog) {
-    return;
-  }
-
-  console.groupCollapsed(`[App] Service registration flow (${reason})`);
-  console.log('1) DIContainer serves as the service registry.');
-  console.log(
-    '2) ServiceRegistry.setupServices(diContainer) registers all services from manifest.'
-  );
-  console.log(
-    '3) bootstrapServices resolves services for eager initialization.'
-  );
-
-  if (typeof console.table === 'function') {
-    console.table(serviceSnapshot);
-  } else {
-    serviceSnapshot.forEach((row) => {
-      console.log(
-        ` - ${row.service}: placeholder=${row.placeholder}, singleton=${row.diSingleton}`
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) {
+      if (existing.dataset.loaded === 'true') {
+        resolve();
+        return;
+      }
+      existing.addEventListener('load', () => resolve(), { once: true });
+      existing.addEventListener(
+        'error',
+        () => reject(new Error(`Failed to load script: ${src}`)),
+        { once: true }
       );
-    });
-  }
+      return;
+    }
 
-  console.groupEnd();
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = false;
+    script.addEventListener(
+      'load',
+      () => {
+        script.dataset.loaded = 'true';
+        resolve();
+      },
+      { once: true }
+    );
+    script.addEventListener(
+      'error',
+      () => reject(new Error(`Failed to load script: ${src}`)),
+      { once: true }
+    );
+    document.head.appendChild(script);
+  });
 }
 
-function exposeDebugCommands({ showBanner = false } = {}) {
-  if (!DEV_MODE || typeof window === 'undefined') {
+async function initializeDevStatsPanel() {
+  if (!DEV_MODE || typeof window === 'undefined' || window.stats) {
     return;
   }
 
-  if (!debugCommandsExposed) {
-    window.downloadDebugLog = () => GameDebugLogger.download();
-    window.clearDebugLog = () => GameDebugLogger.clear();
-    window.showDebugLog = () => console.log(GameDebugLogger.getLogContent());
-    debugCommandsExposed = true;
-  }
+  try {
+    if (typeof window.Stats !== 'function') {
+      await loadExternalScript('/libs/Stats.min.js');
+    }
 
-  if (showBanner && !debugBannerPrinted) {
-    console.log(
-      '%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-      'color: #00ff00'
-    );
-    console.log(
-      '%c🎮 ASTEROIDS ROGUEFIELD - Debug Mode Active',
-      'color: #00ff00; font-weight: bold; font-size: 14px'
-    );
-    console.log(
-      '%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-      'color: #00ff00'
-    );
-    console.log('%cDebug Commands:', 'color: #ffff00; font-weight: bold');
-    console.log(
-      '%c  downloadDebugLog()  %c- Download game-debug.log file',
-      'color: #00ff00',
-      'color: #ffffff'
-    );
-    console.log(
-      '%c  showDebugLog()      %c- Show log in console',
-      'color: #00ff00',
-      'color: #ffffff'
-    );
-    console.log(
-      '%c  clearDebugLog()     %c- Clear current log',
-      'color: #00ff00',
-      'color: #ffffff'
-    );
-    console.log(
-      '%c━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
-      'color: #00ff00'
-    );
-    debugBannerPrinted = true;
+    if (typeof window.Stats !== 'function' || window.stats) {
+      return;
+    }
+
+    const statsPanel = new window.Stats();
+    statsPanel.showPanel(0);
+    const statsElement = statsPanel.dom || statsPanel.domElement;
+    if (statsElement instanceof Node) {
+      document.body.appendChild(statsElement);
+      window.stats = statsPanel;
+    }
+  } catch (error) {
+    console.warn('[bootstrap] Failed to initialize dev stats panel:', error);
   }
 }
 
@@ -191,8 +162,6 @@ function initializeDependencyInjection(manifestContext) {
 
     // Development diagnostics
     if (typeof window !== 'undefined' && DEV_MODE) {
-      logServiceRegistrationFlow({ reason: 'development snapshot' });
-
       // Enable auto-logging every 10 seconds
       performanceMonitor.enableAutoLog(10000);
 
@@ -204,7 +173,6 @@ function initializeDependencyInjection(manifestContext) {
 
       console.log('[App] ℹ Auto-logging enabled (logs saved to localStorage)');
       console.log('[App] ℹ Performance overlay enabled (F3 to toggle)');
-      exposeDebugCommands({ showBanner: true });
     }
 
     console.log('[App] ✓ DI system initialized successfully');
@@ -212,10 +180,6 @@ function initializeDependencyInjection(manifestContext) {
       `[App] ✓ ${diContainer.getServiceNames().length} services registered`
     );
     console.log('[App] ℹ DIContainer serves as unified service registry');
-
-    if (!DEV_MODE) {
-      logServiceRegistrationFlow({ reason: 'production snapshot' });
-    }
 
     return true;
   } catch (error) {
@@ -230,6 +194,92 @@ function bootstrapDebugLogging() {
   applyDebugPreference(preference);
 }
 
+function synchronizeSessionState(currentTime, session) {
+  if (!session) {
+    return;
+  }
+
+  if (typeof session.synchronizeLegacyState === 'function') {
+    const shouldSync = stateDirty || currentTime - lastSyncTime > 100;
+    if (!shouldSync) {
+      return;
+    }
+
+    try {
+      session.synchronizeLegacyState();
+      stateDirty = false;
+      lastSyncTime = currentTime;
+    } catch (syncError) {
+      console.warn('[App] Failed to synchronize legacy state:', syncError);
+    }
+    return;
+  }
+
+  try {
+    const screen =
+      typeof session.getScreen === 'function' ? session.getScreen() : undefined;
+    if (typeof screen === 'string') {
+      gameState.screen = screen;
+    }
+
+    const paused =
+      typeof session.isPaused === 'function' ? session.isPaused() : undefined;
+    if (typeof paused === 'boolean') {
+      gameState.isPaused = paused;
+    }
+  } catch (syncError) {
+    console.warn('[App] Failed to mirror session state:', syncError);
+  }
+}
+
+function getSessionFrameState(session) {
+  const snapshot = {
+    screen: gameState.screen,
+    isPaused: gameState.isPaused,
+    isRunning: gameState.screen === 'playing' && !gameState.isPaused,
+  };
+
+  if (!session) {
+    return snapshot;
+  }
+
+  try {
+    const screen =
+      typeof session.getScreen === 'function'
+        ? session.getScreen()
+        : snapshot.screen;
+    if (typeof screen === 'string') {
+      snapshot.screen = screen;
+      gameState.screen = screen;
+    }
+
+    const paused =
+      typeof session.isPaused === 'function'
+        ? session.isPaused()
+        : snapshot.isPaused;
+    if (typeof paused === 'boolean') {
+      snapshot.isPaused = paused;
+      gameState.isPaused = paused;
+    }
+
+    if (typeof session.isRunning === 'function') {
+      const running = session.isRunning();
+      if (typeof running === 'boolean') {
+        snapshot.isRunning = running;
+      }
+    } else {
+      snapshot.isRunning = snapshot.screen === 'playing' && !snapshot.isPaused;
+    }
+  } catch (stateError) {
+    console.warn(
+      '[App] Failed to read current session frame state:',
+      stateError
+    );
+  }
+
+  return snapshot;
+}
+
 function init() {
   if (DEV_MODE) {
     GameDebugLogger.init();
@@ -238,7 +288,6 @@ function init() {
       userAgent: navigator.userAgent,
       viewport: `${window.innerWidth}x${window.innerHeight}`,
     });
-    exposeDebugCommands({ showBanner: true });
   }
 
   try {
@@ -489,84 +538,10 @@ function gameLoop(currentTime) {
 
   try {
     const session = gameSessionService;
-
-    // OPTIMIZATION #3: Lazy State Sync - only sync when necessary
-    if (session && typeof session.synchronizeLegacyState === 'function') {
-      const shouldSync = stateDirty || currentTime - lastSyncTime > 100;
-      if (shouldSync) {
-        try {
-          session.synchronizeLegacyState();
-          stateDirty = false;
-          lastSyncTime = currentTime;
-        } catch (syncError) {
-          console.warn('[App] Failed to synchronize legacy state:', syncError);
-        }
-      }
-    } else if (session) {
-      try {
-        const screen =
-          typeof session.getScreen === 'function'
-            ? session.getScreen()
-            : undefined;
-        if (typeof screen === 'string') {
-          gameState.screen = screen;
-        }
-
-        const paused =
-          typeof session.isPaused === 'function'
-            ? session.isPaused()
-            : undefined;
-        if (typeof paused === 'boolean') {
-          gameState.isPaused = paused;
-        }
-      } catch (syncError) {
-        console.warn('[App] Failed to mirror session state:', syncError);
-      }
-    }
-
-    let currentScreen = gameState.screen;
-    let isPaused = gameState.isPaused;
-
-    if (session) {
-      try {
-        const screen =
-          typeof session.getScreen === 'function'
-            ? session.getScreen()
-            : gameState.screen;
-        if (typeof screen === 'string') {
-          currentScreen = screen;
-        }
-
-        const paused =
-          typeof session.isPaused === 'function'
-            ? session.isPaused()
-            : gameState.isPaused;
-        if (typeof paused === 'boolean') {
-          isPaused = paused;
-        }
-      } catch (stateError) {
-        console.warn('[App] Failed to read current session frame state:', stateError);
-      }
-    }
-
-    const shouldUpdateGame = (() => {
-      if (session) {
-        try {
-          if (typeof session.isRunning === 'function') {
-            const running = session.isRunning();
-            if (typeof running === 'boolean') {
-              return running;
-            }
-          }
-
-          return currentScreen === 'playing' && !isPaused;
-        } catch (stateError) {
-          console.warn('[App] Failed to evaluate session state:', stateError);
-        }
-      }
-
-      return currentScreen === 'playing' && !isPaused;
-    })();
+    synchronizeSessionState(currentTime, session);
+    const sessionState = getSessionFrameState(session);
+    const currentScreen = sessionState.screen;
+    const shouldUpdateGame = sessionState.isRunning;
 
     const shouldRenderGame = gameState.gameUI
       ? !gameState.gameUI.classList.contains('hidden')
@@ -737,7 +712,9 @@ function renderGame() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  bootstrapDebugLogging();
-  init();
-  console.log('Aplicação inicializada com sucesso!');
+  void (async () => {
+    bootstrapDebugLogging();
+    await initializeDevStatsPanel();
+    init();
+  })();
 });

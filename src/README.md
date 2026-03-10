@@ -9,8 +9,7 @@
 - `/data`: Configuration files (upgrades, ship models, settings schema)
 - `/services`: High-level services (GameSessionService, CommandQueueService)
 - `/utils`: Utilities (ScreenShake, PerformanceMonitor, random helpers)
-- `/legacy`: Historical code preserved for reference
-- `app.js`: Main orchestrator and game loop
+- `app.js`: Main orchestrator, bootstrap, and game loop
 
 ## HTML Structure
 

@@ -6,16 +6,16 @@ Estender a HUD com componentes táticos (minimapa, indicadores de ameaça, combo
 
 ## Componentes Principais
 
-- `hudLayout.js` com novos itens de layout para minimapa, indicadores e combo.
-- `UISystem` responsável por renderizar e atualizar os componentes.
+- `hudLayout.js` mantendo o contrato de layout único e expondo os pontos de montagem do HUD tático.
+- `AAAHudLayout` e `UISystem` responsáveis por renderizar e atualizar os componentes.
 - `style.css` com estilos dedicados.
 - `ProgressionSystem` gerenciando combo e multiplicadores.
 
 ## Passos Detalhados
 
-1. **Atualizar `hudLayout.js`:**
+1. **Atualizar `hudLayout.js` e `AAAHudLayout`:**
 
-   - Adicionar itens ao layout minimal e classic:
+   - Adicionar pontos de montagem e metadados ao layout tático único:
      - `minimap` (canvas 120x120 no canto superior direito, range 300, `rootId: 'hud-minimap'`).
      - `threatIndicators` (overlay central com `rootId: 'threat-indicators-container'`).
      - `comboMeter` (grupo `tactical-vitals`, ícone 🔥, `rootId: 'hud-combo'`, `valueId: 'combo-display'`).
@@ -51,7 +51,7 @@ Estender a HUD com componentes táticos (minimapa, indicadores de ameaça, combo
 - HUD exibe minimapa, indicadores de ameaça e combo operacionais durante gameplay.
 - Barra de vida do boss aparece apenas em ondas de boss e reflete mudanças de fase.
 - Combo influencia XP coletada e possui feedback visual/auditivo consistente.
-- Estilos respeitam tokens existentes e não interferem nos layouts prévios.
+- Estilos respeitam tokens existentes e não interferem na montagem atual do HUD tático.
 
 ## Dependências
 

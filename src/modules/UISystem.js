@@ -1,7 +1,7 @@
 // src/modules/UISystem.js
 
 import {
-  HUD_LAYOUT_IDS,
+  DEFAULT_HUD_LAYOUT_ID,
   getHudLayoutDefinition,
 } from '../data/ui/hudLayout.js';
 import {
@@ -78,7 +78,7 @@ class UISystem extends BaseSystem {
     this.handleResize = this.handleResize.bind(this);
 
     // Force AAA Tactical HUD
-    this.currentHudLayoutId = HUD_LAYOUT_IDS.AAA_TACTICAL;
+    this.currentHudLayoutId = DEFAULT_HUD_LAYOUT_ID;
     this.aaaTacticalHud = null;
     this.aaaTacticalHudDefinition = getHudLayoutDefinition(
       this.currentHudLayoutId
@@ -323,7 +323,9 @@ class UISystem extends BaseSystem {
     return {
       ...this.createInitialBossHudState(),
       ...state,
-      phaseColors: Array.isArray(state.phaseColors) ? [...state.phaseColors] : [],
+      phaseColors: Array.isArray(state.phaseColors)
+        ? [...state.phaseColors]
+        : [],
     };
   }
 
@@ -382,7 +384,8 @@ class UISystem extends BaseSystem {
       ? Math.max(1, Math.floor(Number(next.wave)))
       : null;
     next.invulnerable = Boolean(next.invulnerable);
-    next.name = typeof next.name === 'string' && next.name.trim() ? next.name : 'BOSS';
+    next.name =
+      typeof next.name === 'string' && next.name.trim() ? next.name : 'BOSS';
 
     this.bossHudState = next;
     this.cachedValues.boss = {
@@ -410,7 +413,9 @@ class UISystem extends BaseSystem {
       Boolean(state.bossId) ||
       Boolean(state.defeated);
     const waveMatches =
-      completedWave === null || state.wave === null || state.wave === completedWave;
+      completedWave === null ||
+      state.wave === null ||
+      state.wave === completedWave;
 
     if (!hasBossContext || !waveMatches) {
       return;
@@ -618,10 +623,6 @@ class UISystem extends BaseSystem {
       return 'Unknown Hull';
     }
 
-    if (hullDefinition.id === DEFAULT_HULL_ID) {
-      return 'Interceptor';
-    }
-
     return hullDefinition.name || hullDefinition.id;
   }
 
@@ -668,9 +669,14 @@ class UISystem extends BaseSystem {
           return;
         }
 
-        this.settings.setSetting('gameplay', 'selectedHull', hullDefinition.id, {
-          source: 'ui',
-        });
+        this.settings.setSetting(
+          'gameplay',
+          'selectedHull',
+          hullDefinition.id,
+          {
+            source: 'ui',
+          }
+        );
       });
 
       fragment.appendChild(button);
@@ -703,15 +709,17 @@ class UISystem extends BaseSystem {
     }
 
     const selectedHullId = this.getSelectedHullId();
-    container.querySelectorAll('.menu-ship-selector__option').forEach((button) => {
-      if (!(button instanceof HTMLButtonElement)) {
-        return;
-      }
+    container
+      .querySelectorAll('.menu-ship-selector__option')
+      .forEach((button) => {
+        if (!(button instanceof HTMLButtonElement)) {
+          return;
+        }
 
-      const isActive = button.dataset.hullId === selectedHullId;
-      button.classList.toggle('is-active', isActive);
-      button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
-    });
+        const isActive = button.dataset.hullId === selectedHullId;
+        button.classList.toggle('is-active', isActive);
+        button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      });
 
     this.renderMenuShipSelectorPreviews();
   }
@@ -719,31 +727,37 @@ class UISystem extends BaseSystem {
   renderMenuShipSelectorPreviews() {
     const container = this.domRefs.menu?.shipSelectorOptions;
     const player = this.getService('player');
-    if (!container || !player || typeof player.renderHullPreview !== 'function') {
+    if (
+      !container ||
+      !player ||
+      typeof player.renderHullPreview !== 'function'
+    ) {
       return;
     }
 
-    container.querySelectorAll('.menu-ship-selector__option').forEach((button) => {
-      if (!(button instanceof HTMLButtonElement)) {
-        return;
-      }
+    container
+      .querySelectorAll('.menu-ship-selector__option')
+      .forEach((button) => {
+        if (!(button instanceof HTMLButtonElement)) {
+          return;
+        }
 
-      const preview = button.querySelector('.menu-ship-selector__preview');
-      if (!(preview instanceof HTMLCanvasElement)) {
-        return;
-      }
+        const preview = button.querySelector('.menu-ship-selector__preview');
+        if (!(preview instanceof HTMLCanvasElement)) {
+          return;
+        }
 
-      const context = preview.getContext('2d');
-      if (!context) {
-        return;
-      }
+        const context = preview.getContext('2d');
+        if (!context) {
+          return;
+        }
 
-      const hullDefinition = getShipModelById(button.dataset.hullId);
-      player.renderHullPreview(context, hullDefinition, {
-        padding: 12,
-        onVisualReady: this.handleMenuShipSelectorVisualReady,
+        const hullDefinition = getShipModelById(button.dataset.hullId);
+        player.renderHullPreview(context, hullDefinition, {
+          padding: 12,
+          onVisualReady: this.handleMenuShipSelectorVisualReady,
+        });
       });
-    });
   }
 
   bindPauseControls() {

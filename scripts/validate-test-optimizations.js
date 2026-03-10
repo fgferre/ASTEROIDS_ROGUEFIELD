@@ -1,16 +1,18 @@
 /**
- * Validation script for test optimization patterns
- * 
+ * Advisory validation script for test optimization patterns.
+ *
  * Usage:
  *   node scripts/validate-test-optimizations.js
- * 
+ *   node scripts/validate-test-optimizations.js --strict
+ *
  * Checks for anti-patterns and missing optimizations:
  * - setTimeout without vi.useFakeTimers()
  * - Inline helpers that should use centralized versions
  * - Tests that could be parallelized but aren't
  * - beforeEach that could be beforeAll
- * 
- * Returns exit code 0 if all checks pass, 1 if issues found.
+ *
+ * By default this script is advisory and exits 0 even when findings exist.
+ * Use --strict to turn findings into a failing exit code.
  */
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join } from 'path';
@@ -31,6 +33,12 @@ const PRAGMA_PATTERNS = {
 function hasPragma(content, key) {
   const pattern = PRAGMA_PATTERNS[key];
   return pattern ? pattern.test(content) : false;
+}
+
+function parseArgs(argv) {
+  return {
+    strict: argv.includes('--strict'),
+  };
 }
 
 function findTestFiles(dir) {
@@ -109,7 +117,9 @@ function checkFile(filePath) {
 }
 
 function main() {
-  console.log('Validating test optimization patterns...\n');
+  const args = parseArgs(process.argv);
+
+  console.log('Running advisory test optimization checks...\n');
   
   const testFiles = findTestFiles(TEST_DIR);
   console.log(`Found ${testFiles.length} test files\n`);
@@ -124,14 +134,22 @@ function main() {
   }
 
   if (ISSUES.length === 0) {
-    console.log('\n✅ All checks passed! No optimization issues found.');
+    console.log('\n✅ No advisory findings detected.');
     process.exit(0);
   }
 
-  console.log(`\n❌ Found ${ISSUES.length} potential issues:\n`);
+  const statusLabel = args.strict ? 'blocking findings' : 'advisory findings';
+  console.log(`\n⚠️  Found ${ISSUES.length} ${statusLabel}:\n`);
   ISSUES.forEach((issue) => console.log(`  - ${issue}`));
-  console.log('\nNote: Some issues may be false positives. Review manually.');
-  process.exit(1);
+  console.log(
+    '\nHeuristic signal only: review manually before changing tests or parallelization.'
+  );
+
+  if (args.strict) {
+    process.exit(1);
+  }
+
+  process.exit(0);
 }
 
 main();
