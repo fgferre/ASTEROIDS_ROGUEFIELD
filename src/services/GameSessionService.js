@@ -2015,43 +2015,64 @@ export default class GameSessionService {
       PLAYER_SAFE_SPAWN_DISTANCE ?? DEFAULT_SAFE_SPAWN_DISTANCE ?? 300;
 
     const center = { x: width / 2, y: height / 2 };
-
-    const isSafe = (point) =>
-      asteroids.every((ast) => {
-        if (!ast) {
-          return true;
-        }
-
-        const ax = Number.isFinite(ast.x) ? ast.x : Number(ast.position?.x);
-        const ay = Number.isFinite(ast.y) ? ast.y : Number(ast.position?.y);
-
-        if (!Number.isFinite(ax) || !Number.isFinite(ay)) {
-          return true;
-        }
-
-        const dx = ax - point.x;
-        const dy = ay - point.y;
-        return Math.hypot(dx, dy) > safeDistance;
-      });
-
-    if (isSafe(center)) {
-      return center;
-    }
-
     const quadrants = [
       { x: width * 0.25, y: height * 0.25 },
       { x: width * 0.75, y: height * 0.25 },
       { x: width * 0.25, y: height * 0.75 },
       { x: width * 0.75, y: height * 0.75 },
     ];
+    const candidates = [center, ...quadrants];
 
-    for (let index = 0; index < quadrants.length; index += 1) {
-      if (isSafe(quadrants[index])) {
-        return quadrants[index];
+    const scoreCandidate = (point) => {
+      let minDistance = Number.POSITIVE_INFINITY;
+      let safe = true;
+
+      for (let index = 0; index < asteroids.length; index += 1) {
+        const ast = asteroids[index];
+        if (!ast) {
+          continue;
+        }
+
+        const ax = Number.isFinite(ast.x) ? ast.x : Number(ast.position?.x);
+        const ay = Number.isFinite(ast.y) ? ast.y : Number(ast.position?.y);
+
+        if (!Number.isFinite(ax) || !Number.isFinite(ay)) {
+          continue;
+        }
+
+        const dx = ax - point.x;
+        const dy = ay - point.y;
+        const distance = Math.hypot(dx, dy);
+        minDistance = Math.min(minDistance, distance);
+        if (distance <= safeDistance) {
+          safe = false;
+        }
+      }
+
+      return {
+        point,
+        safe,
+        minDistance,
+      };
+    };
+
+    let bestCandidate = null;
+
+    for (let index = 0; index < candidates.length; index += 1) {
+      const candidate = scoreCandidate(candidates[index]);
+      if (candidate.safe) {
+        return candidate.point;
+      }
+
+      if (
+        !bestCandidate ||
+        candidate.minDistance > bestCandidate.minDistance
+      ) {
+        bestCandidate = candidate;
       }
     }
 
-    return center;
+    return bestCandidate?.point || fallback;
   }
 
   resetForMenu() {

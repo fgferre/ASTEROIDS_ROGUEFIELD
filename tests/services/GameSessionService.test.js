@@ -1,14 +1,19 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 import GameSessionService from '../../src/services/GameSessionService.js';
+import { BULLET_SIZE } from '../../src/core/GameConstants.js';
 import {
   DEFAULT_HULL_ID,
   SOLAR_SLICER_HULL_ID,
   getShipModelById,
 } from '../../src/data/shipModels.js';
+import { BOSS_PHYSICS_CONFIG } from '../../src/data/enemies/boss.js';
+import PhysicsSystem from '../../src/modules/PhysicsSystem.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 // Optimization: use centralized createRandomServiceStatefulStub()
 import { createRandomServiceStatefulStub } from '../__helpers__/stubs.js';
+
+const ASTEROID_POOL_ID = Symbol.for('ASTEROIDS_ROGUEFIELD:asteroidPoolId');
 
 function createServiceHarness(options = {}) {
   const { selectedHull = DEFAULT_HULL_ID } = options;
@@ -380,5 +385,133 @@ describe('GameSessionService lifecycle flows', () => {
       getShipModelById(SOLAR_SLICER_HULL_ID)
     );
     expect(player.currentHull.id).toBe(SOLAR_SLICER_HULL_ID);
+  });
+
+  it('rebuilds boss collision membership across the full retry restore flow', () => {
+    const { service, eventBus } = createServiceHarness();
+    const physics = new PhysicsSystem({ eventBus });
+    const staleBoss = {
+      id: 'boss-retry-flow',
+      type: 'boss',
+      x: -280,
+      y: -200,
+      vx: 0,
+      vy: 0,
+      radius: 60,
+      destroyed: false,
+    };
+    const restoredBoss = {
+      id: 'boss-retry-flow',
+      type: 'boss',
+      x: 0,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      radius: 60,
+      destroyed: false,
+    };
+    restoredBoss[ASTEROID_POOL_ID] = 501;
+
+    let roster = [];
+    const enemySystem = {
+      activeBosses: new Map(),
+      getAllAsteroids: () => roster,
+      restoreSnapshotState: vi.fn(() => {
+        roster = [restoredBoss];
+        enemySystem.activeBosses = new Map([[restoredBoss.id, restoredBoss]]);
+        return true;
+      }),
+      reset: vi.fn(),
+    };
+
+    physics.attachEnemySystem(enemySystem);
+    physics.registerEnemy(staleBoss);
+
+    service.services.enemies = enemySystem;
+    service.services.physics = physics;
+
+    const physicsRestoreSpy = vi.spyOn(physics, 'restoreSnapshotState');
+    const restored = service.restoreFromSnapshot({
+      snapshot: {
+        random: null,
+        player: {
+          maxHealth: 100,
+          health: 80,
+          position: { x: 40, y: 50 },
+          upgrades: [],
+          hullId: DEFAULT_HULL_ID,
+        },
+        progression: { level: 3 },
+        enemies: {
+          bosses: [{ id: restoredBoss.id, poolId: restoredBoss[ASTEROID_POOL_ID] }],
+          supportEnemies: [],
+          waves: [],
+        },
+        physics: {
+          asteroids: [
+            {
+              poolId: restoredBoss[ASTEROID_POOL_ID],
+              x: 220,
+              y: 180,
+              vx: 0,
+              vy: 0,
+              radius: restoredBoss.radius,
+            },
+          ],
+        },
+      },
+    });
+
+    expect(restored).toBe(true);
+    expect(enemySystem.restoreSnapshotState).toHaveBeenCalledTimes(1);
+    expect(physicsRestoreSpy).toHaveBeenCalledTimes(1);
+    expect(
+      enemySystem.restoreSnapshotState.mock.invocationCallOrder[0]
+    ).toBeLessThan(physicsRestoreSpy.mock.invocationCallOrder[0]);
+    expect(physics.activeEnemies.size).toBe(1);
+    expect(physics.activeBosses.size).toBe(1);
+    expect(physics.activeEnemies.has(staleBoss)).toBe(false);
+    expect(physics.activeBosses.has(staleBoss)).toBe(false);
+    expect(physics.spatialHash.objects.has(staleBoss)).toBe(false);
+    expect(physics.activeEnemies.has(restoredBoss)).toBe(true);
+    expect(physics.activeBosses.has(restoredBoss)).toBe(true);
+    expect(physics.spatialHash.objects.has(restoredBoss)).toBe(true);
+    expect(restoredBoss.x).toBe(220);
+    expect(restoredBoss.y).toBe(180);
+
+    const bullet = {
+      x:
+        restoredBoss.x +
+        restoredBoss.radius +
+        BOSS_PHYSICS_CONFIG.collisionPadding +
+        (BULLET_SIZE || 0) -
+        1,
+      y: restoredBoss.y,
+      hit: false,
+      damage: 20,
+    };
+    const collisions = [];
+
+    physics.forEachBulletCollision([bullet], (_hitBullet, enemy) => {
+      collisions.push(enemy);
+    });
+
+    expect(collisions).toEqual([restoredBoss]);
+  });
+
+  it('chooses the safest tested retry spawn point when every candidate is contested', () => {
+    const { service, enemies } = createServiceHarness();
+
+    enemies.getActiveEnemies = vi.fn(() => [
+      { x: 400, y: 300 },
+      { x: 200, y: 150 },
+      { x: 600, y: 150 },
+      { x: 200, y: 450 },
+      { x: 650, y: 450 },
+    ]);
+
+    const spawnPoint = service.findSafeSpawnPoint();
+
+    expect(spawnPoint).toEqual({ x: 600, y: 450 });
   });
 });

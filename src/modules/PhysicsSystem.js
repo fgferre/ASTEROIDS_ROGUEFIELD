@@ -257,6 +257,7 @@ class PhysicsSystem extends BaseSystem {
     }
 
     if (force) {
+      this.clearDerivedEnemyTrackingState();
       this.bootstrapCompleted = false;
     }
 
@@ -271,6 +272,7 @@ class PhysicsSystem extends BaseSystem {
         this.registerEnemy(asteroid);
       });
       this.bootstrapCompleted = true;
+      this.warnOnBossTrackingMismatch({ reason: 'bootstrap.forEachActiveEnemy' });
       return;
     }
 
@@ -282,6 +284,7 @@ class PhysicsSystem extends BaseSystem {
         });
       }
       this.bootstrapCompleted = true;
+      this.warnOnBossTrackingMismatch({ reason: 'bootstrap.getActiveEnemies' });
       return;
     }
 
@@ -290,6 +293,9 @@ class PhysicsSystem extends BaseSystem {
         this.registerEnemy(asteroid);
       });
       this.bootstrapCompleted = true;
+      this.warnOnBossTrackingMismatch({
+        reason: 'bootstrap.forEachActiveAsteroid',
+      });
       return;
     }
 
@@ -301,7 +307,113 @@ class PhysicsSystem extends BaseSystem {
         });
       }
       this.bootstrapCompleted = true;
+      this.warnOnBossTrackingMismatch({ reason: 'bootstrap.getAsteroids' });
     }
+  }
+
+  clearDerivedEnemyTrackingState() {
+    this.activeEnemies.clear();
+    this.activeBosses.clear();
+    this.bossCollisionState.clear();
+    this.enemyIndex.clear();
+    this.spatialHash.clear();
+    this.indexDirty = false;
+    this.lastSpatialHashMaintenance = performance.now();
+  }
+
+  applySnapshotStateToEnemy(enemy, entry = {}) {
+    if (!enemy || !entry) {
+      return false;
+    }
+
+    if (Number.isFinite(entry.x)) {
+      enemy.x = entry.x;
+    }
+    if (Number.isFinite(entry.y)) {
+      enemy.y = entry.y;
+    }
+    if (Number.isFinite(entry.vx)) {
+      enemy.vx = entry.vx;
+    }
+    if (Number.isFinite(entry.vy)) {
+      enemy.vy = entry.vy;
+    }
+    if (Number.isFinite(entry.radius)) {
+      enemy.radius = entry.radius;
+    }
+    if (Number.isFinite(entry.rotation)) {
+      enemy.rotation = entry.rotation;
+    }
+    if (Number.isFinite(entry.rotationSpeed)) {
+      enemy.rotationSpeed = entry.rotationSpeed;
+    }
+
+    if (
+      entry.randomSeed != null &&
+      enemy.random &&
+      typeof enemy.random.reset === 'function'
+    ) {
+      enemy.random.reset(entry.randomSeed);
+    }
+
+    if (entry.randomScopes && typeof entry.randomScopes === 'object') {
+      const randomScopesClone = shallowClone(entry.randomScopes);
+      if (randomScopesClone) {
+        enemy.randomScopeSeeds = randomScopesClone;
+        if (typeof enemy.ensureRandomScopes === 'function') {
+          enemy.ensureRandomScopes();
+        }
+        if (typeof enemy.reseedRandomScopes === 'function') {
+          enemy.reseedRandomScopes();
+        }
+      }
+    }
+
+    return true;
+  }
+
+  warnOnBossTrackingMismatch({ reason = 'unknown' } = {}) {
+    if (
+      typeof process === 'undefined' ||
+      process.env?.NODE_ENV !== 'development'
+    ) {
+      return;
+    }
+
+    const enemySystem = this.enemySystem;
+    if (!enemySystem) {
+      return;
+    }
+
+    let bosses = [];
+
+    if (enemySystem.activeBosses instanceof Map) {
+      bosses = Array.from(enemySystem.activeBosses.values());
+    } else if (typeof enemySystem.getAllAsteroids === 'function') {
+      bosses = enemySystem
+        .getAllAsteroids()
+        .filter((enemy) => this.isBossEnemy(enemy));
+    } else if (Array.isArray(enemySystem.asteroids)) {
+      bosses = enemySystem.asteroids.filter((enemy) => this.isBossEnemy(enemy));
+    }
+
+    const mismatches = bosses
+      .filter((boss) => boss && !boss.destroyed)
+      .map((boss) => ({
+        id: boss.id ?? boss.bossId ?? 'unknown',
+        inActiveEnemies: this.activeEnemies.has(boss),
+        inActiveBosses: this.activeBosses.has(boss),
+      }))
+      .filter((entry) => !entry.inActiveEnemies || !entry.inActiveBosses);
+
+    if (!mismatches.length) {
+      return;
+    }
+
+    console.warn(
+      `[PhysicsSystem] Boss tracking mismatch after ${reason}`,
+      mismatches
+    );
   }
 
   registerEnemy(enemy) {
@@ -1190,31 +1302,30 @@ class PhysicsSystem extends BaseSystem {
       return this._handleSnapshotFallback('enemy system unavailable');
     }
 
-    const availableAsteroids =
+    const availableEnemies =
       typeof enemySystem.getAllAsteroids === 'function'
         ? enemySystem.getAllAsteroids()
         : Array.isArray(enemySystem.asteroids)
           ? enemySystem.asteroids
           : [];
 
-    const asteroidByPoolId = new Map();
-    for (let i = 0; i < availableAsteroids.length; i += 1) {
-      const asteroid = availableAsteroids[i];
-      if (!asteroid || asteroid.destroyed) {
+    const enemyByPoolId = new Map();
+    const liveEnemies = [];
+    for (let i = 0; i < availableEnemies.length; i += 1) {
+      const enemy = availableEnemies[i];
+      if (!enemy || enemy.destroyed) {
         continue;
       }
 
-      const poolId = asteroid[ASTEROID_POOL_ID];
+      liveEnemies.push(enemy);
+
+      const poolId = enemy[ASTEROID_POOL_ID];
       if (poolId != null) {
-        asteroidByPoolId.set(poolId, asteroid);
+        enemyByPoolId.set(poolId, enemy);
       }
     }
 
-    this.activeEnemies.clear();
-    this.enemyIndex.clear();
-    this.spatialHash.clear();
-
-    let restored = 0;
+    this.clearDerivedEnemyTrackingState();
 
     for (let i = 0; i < asteroidSnapshots.length; i += 1) {
       const entry = asteroidSnapshots[i];
@@ -1222,66 +1333,27 @@ class PhysicsSystem extends BaseSystem {
         continue;
       }
 
-      const asteroid = asteroidByPoolId.get(entry.poolId);
-      if (!asteroid || asteroid.destroyed) {
+      const enemy = enemyByPoolId.get(entry.poolId);
+      if (!enemy || enemy.destroyed) {
         continue;
       }
 
-      if (Number.isFinite(entry.x)) {
-        asteroid.x = entry.x;
-      }
-      if (Number.isFinite(entry.y)) {
-        asteroid.y = entry.y;
-      }
-      if (Number.isFinite(entry.vx)) {
-        asteroid.vx = entry.vx;
-      }
-      if (Number.isFinite(entry.vy)) {
-        asteroid.vy = entry.vy;
-      }
-      if (Number.isFinite(entry.radius)) {
-        asteroid.radius = entry.radius;
-      }
-      if (Number.isFinite(entry.rotation)) {
-        asteroid.rotation = entry.rotation;
-      }
-      if (Number.isFinite(entry.rotationSpeed)) {
-        asteroid.rotationSpeed = entry.rotationSpeed;
-      }
-
-      if (
-        entry.randomSeed != null &&
-        asteroid.random &&
-        typeof asteroid.random.reset === 'function'
-      ) {
-        asteroid.random.reset(entry.randomSeed);
-      }
-
-      if (entry.randomScopes && typeof entry.randomScopes === 'object') {
-        const randomScopesClone = shallowClone(entry.randomScopes);
-        if (randomScopesClone) {
-          asteroid.randomScopeSeeds = randomScopesClone;
-          if (typeof asteroid.ensureRandomScopes === 'function') {
-            asteroid.ensureRandomScopes();
-          }
-          if (typeof asteroid.reseedRandomScopes === 'function') {
-            asteroid.reseedRandomScopes();
-          }
-        }
-      }
-
-      this.registerEnemy(asteroid);
-      restored += 1;
+      this.applySnapshotStateToEnemy(enemy, entry);
     }
 
-    if (asteroidSnapshots.length > 0 && restored === 0) {
+    if (asteroidSnapshots.length > 0 && liveEnemies.length === 0) {
       return this._handleSnapshotFallback('no asteroids restored');
+    }
+
+    for (let i = 0; i < liveEnemies.length; i += 1) {
+      this.registerEnemy(liveEnemies[i]);
     }
 
     this.bootstrapCompleted = true;
     this.indexDirty = true;
     this.lastSpatialHashMaintenance = performance.now();
     this._snapshotFallbackWarningIssued = false;
+    this.warnOnBossTrackingMismatch({ reason: 'snapshot-import' });
     return true;
   }
 
@@ -2159,18 +2231,12 @@ class PhysicsSystem extends BaseSystem {
 
   reset() {
     super.reset();
-    this.activeEnemies.clear();
-    this.enemyIndex.clear();
-    this.spatialHash.clear();
-    this.indexDirty = false;
+    this.clearDerivedEnemyTrackingState();
     this.bootstrapCompleted = false;
-    this.lastSpatialHashMaintenance = performance.now();
     this.missingEnemyWarningLogged = false;
     this._snapshotFallbackWarningIssued = false;
     this._handledMineExplosions = new WeakSet();
     this._handledMineExplosionIds.clear();
-    this.activeBosses.clear();
-    this.bossCollisionState.clear();
     this.effectsService = this.dependencies.effects || null;
     this.refreshEnemyReference({ force: true });
 
@@ -2220,9 +2286,7 @@ class PhysicsSystem extends BaseSystem {
   }
 
   destroy() {
-    this.activeEnemies.clear();
-    this.enemyIndex.clear();
-    this.indexDirty = false;
+    this.clearDerivedEnemyTrackingState();
     this.enemySystem = null;
     this.bootstrapCompleted = false;
     this.missingEnemyWarningLogged = false;

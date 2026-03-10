@@ -2555,7 +2555,9 @@ class EnemySystem extends BaseSystem {
       return null;
     }
 
+    const poolId = this.assignAsteroidPoolId(boss);
     return {
+      poolId,
       id: boss.id || null,
       type: boss.type || 'boss',
       wave: safeNumber(boss.wave, this.waveState?.current || 1),
@@ -2580,7 +2582,9 @@ class EnemySystem extends BaseSystem {
       return null;
     }
 
+    const poolId = this.assignAsteroidPoolId(enemy);
     return {
+      poolId,
       id: enemy.id || null,
       type: enemy.type || null,
       wave: safeNumber(enemy.wave, this.waveState?.current || 1),
@@ -2709,6 +2713,7 @@ class EnemySystem extends BaseSystem {
       currentHealth: safeNumber(snapshot.health, null),
       radius: safeNumber(snapshot.radius, null),
       randomScope: 'snapshot',
+      poolId: snapshot.poolId,
     };
 
     let boss = null;
@@ -2733,6 +2738,8 @@ class EnemySystem extends BaseSystem {
     if (!boss) {
       return null;
     }
+
+    this.assignAsteroidPoolId(boss, snapshot.poolId);
 
     if (!registeredByFactory) {
       const registrationResult = this.registerActiveEnemy(boss, {
@@ -2837,6 +2844,7 @@ class EnemySystem extends BaseSystem {
       spawnedBy: snapshot.spawnedBy ?? null,
       spawnedByBossId: snapshot.spawnedByBossId ?? null,
       randomScope: 'snapshot',
+      poolId: snapshot.poolId,
     };
 
     let enemy = null;
@@ -2870,6 +2878,8 @@ class EnemySystem extends BaseSystem {
     if (!enemy) {
       return null;
     }
+
+    this.assignAsteroidPoolId(enemy, snapshot.poolId);
 
     if (!registeredByFactory) {
       const registrationResult = this.registerActiveEnemy(enemy, {
