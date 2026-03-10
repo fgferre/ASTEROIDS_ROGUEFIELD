@@ -78,8 +78,6 @@ A organização abaixo reflete o estado atual do diretório `/tests`.
     └── enemies.js
 ```
 
-> `tests/unit/` existe no repositório neste momento, mas está vazio e não entra no inventário acima.
-
 ## 3. Executar Testes
 
 ### Comandos principais
@@ -233,7 +231,6 @@ describe('MySystem', () => {
 - **45 arquivos de teste** ativos no inventário atual.
 - **Cobertura por domínio** em `core`, `modules`, `services`, `utils`, `integration`, `balance`, `physics` e `visual`.
 - **Helpers centralizados** em `tests/__helpers__/`.
-- **Diretório `tests/unit/`** presente, porém vazio no estado atual.
 - **Duplicação de código** reduzida graças aos helpers centralizados.
 - **Cobertura de regressões determinísticas** expandida para áudio, menu, render e screen shake.
 

@@ -37,4 +37,5 @@
 - **Responsive design:** Media queries for different viewport sizes
 - **Accessibility:** ARIA attributes, focus states, keyboard navigation support
 
-For detailed architecture patterns, see `docs/architecture/CURRENT_STRUCTURE.md`.
+For architecture entry points, inspect `src/bootstrap/serviceManifest.js`,
+`src/app.js`, and the active plans in `docs/plans/`.

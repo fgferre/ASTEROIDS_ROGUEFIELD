@@ -160,9 +160,9 @@ Validar visualmente a renderização de **Drone**, **Mine** e **Hunter** antes d
 
 ## Registro de Validação
 
-**Data:** ******\_******  
-**Validador:** ******\_******  
-**Navegador/Versão:** ******\_******  
+**Data:** **\*\***\_**\*\***  
+**Validador:** **\*\***\_**\*\***  
+**Navegador/Versão:** **\*\***\_**\*\***  
 **Resultado:** ☐ Aprovado ☐ Aprovado com ressalvas ☐ Reprovado  
 **Observações:**
 
@@ -170,6 +170,6 @@ Validar visualmente a renderização de **Drone**, **Mine** e **Hunter** antes d
 
 ### Próximos Passos Após Aprovação
 
-1. Marcar WAVE-003 como concluído em `docs/plans/phase1-enemy-foundation-plan.md`
-2. Prosseguir para WAVE-004: integrar WaveManager ao loop principal
-3. Validar rendering in-game com spawn real via WaveManager
+1. Registrar o resultado no relatório de validação ativo.
+2. Prosseguir para a próxima integração do WaveManager ao loop principal.
+3. Validar rendering in-game com spawn real via WaveManager.

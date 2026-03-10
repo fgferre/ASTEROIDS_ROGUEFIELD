@@ -2,14 +2,14 @@
 
 ## Automação
 
-- [ ] `npm test -- --run src/__tests__/core/RandomService.test.js`
-- [ ] `npm test -- --run tests/unit/modules/ProgressionSystem.test.js`
-  - Nota: toda a suíte de determinismo do ProgressionSystem reside em `tests/unit/modules/ProgressionSystem.test.js`.
-- [ ] `npm test -- --run src/__tests__/audio/audio-determinism.test.js`
-- [ ] `npm test -- --run src/__tests__/rendering/rendering-determinism.test.js`
-- [ ] `npm test -- --run src/__tests__/rendering/screen-shake-determinism.test.js`
-- [ ] `npm test -- --run tests/integration/deterministic-systems.test.js`
-- [ ] `npm test -- --run tests/integration/enemy-system-determinism.test.js`
+- [ ] `npm test -- --run tests/core/RandomService.test.js`
+- [ ] `npm test -- --run tests/modules/ProgressionSystem.test.js`
+- [ ] `npm test -- --run tests/visual/audio-determinism.test.js`
+- [ ] `npm test -- --run tests/visual/rendering-determinism.test.js`
+- [ ] `npm test -- --run tests/visual/screen-shake-determinism.test.js`
+- [ ] `npm test -- --run tests/integration/determinism/systems.test.js`
+- [ ] `npm test -- --run tests/integration/determinism/enemy-system.test.js`
+- [ ] `npm run test:balance`
 - [ ] `npm test`
 
 ## Execução determinística (manual)
@@ -48,6 +48,6 @@
 - [ ] **Performance:** Deixar harness rodando por 1 minuto e confirmar ausência de memory leaks (DevTools → Memory → comparação de snapshots).
 - [ ] **Canvas State:** Ativar checkbox "Show Bounding Circles" e confirmar que círculos de debug não afetam renderização (estado preservado).
 - [ ] Preencher checklist completa em `docs/validation/enemy-rendering-visual-checklist.md` e registrar resultado (Aprovado/Aprovado com ressalvas/Reprovado).
-- [ ] Se aprovado, marcar WAVE-003 como concluído em `docs/plans/phase1-enemy-foundation-plan.md` e prosseguir para WAVE-004.
+- [ ] Se aprovado, registrar o resultado no relatório correspondente e seguir para a próxima integração do WaveManager.
 
 **Critério de bloqueio:** Falha em geometria, cores ou performance impede avanço. Revisar implementações de `onDraw()` e constantes em `GameConstants.ENEMY_EFFECT_COLORS` / `ENEMY_RENDER_PRESETS` antes de integrar o WaveManager.

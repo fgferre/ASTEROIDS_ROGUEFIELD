@@ -7,10 +7,11 @@ coverage/
 performance-log.json
 "Cópia (1)asteroid_stats_by_wave.csv"
 
-# Test directories (old structure - should not exist)
-src/__tests__/
-tests/unit/
+# Local AI tooling
+.claude/
+.planning/
 
-# Temporary test scripts (if recreated)
+# Local temporary artifacts
+patch.diff
 validate-*.js
 *-performance-test.js

@@ -3,10 +3,9 @@
 ## Introdução
 
 Este documento registra as métricas "golden" do sistema legado de asteroides
-(`EnemySystem`) para garantir paridade funcional durante a migração para o
-`WaveManager`. Os dados foram capturados em 2024-06-11 utilizando a suíte de
-testes `src/__tests__/legacy/asteroid-baseline-metrics.test.js` com seed
-fixa `123456`.
+(`EnemySystem`) usadas como referência de compatibilidade para o `WaveManager`.
+O baseline original foi capturado em 2024-06-11 e hoje é mantido pela suíte
+ativa em `tests/balance/asteroid-metrics/`, com seed fixa `123456`.
 
 ## Wave Spawn Rate (Waves 1-10)
 
@@ -23,8 +22,8 @@ fixa `123456`.
 | 9    | 25              | 4 × 1.3^8 = 32.63 → floor = 32 → clamp |
 | 10   | 25              | 4 × 1.3^9 = 42.41 → floor = 42 → clamp |
 
-> Nota: valores calculados com `Math.floor` e limitados pelo teto
-> interno de 25 asteroides por wave no legado.
+> Nota: valores calculados com `Math.floor` e limitados pelo teto interno de
+> 25 asteroides por wave no legado.
 
 ## Size Distribution
 
@@ -80,17 +79,15 @@ fixa `123456`.
   - **Large:** média esperada ≈ **3.38** fragmentos com intervalo **[2.89, 3.87]**
   - **Medium:** média esperada ≈ **2.61** fragmentos com intervalo **[2.16, 3.05]**
   - **Small:** média esperada = **0** fragmentos (sem fragmentação)
-- As execuções baseline ficam dentro desses intervalos, com tolerância de ±0.25 sobre a média para acomodar ajustes mínimos nos pesos ou regras.
+- As execuções baseline ficam dentro desses intervalos, com tolerância de ±0.25
+  sobre a média para acomodar ajustes mínimos nos pesos ou regras.
 
 ## Wave State Counters Behavior
 
 1. **Início da wave**: `isActive = true`, `asteroidsSpawned = 0`, `asteroidsKilled = 0`
-2. **Durante a wave**: `asteroidsSpawned` incrementa a cada spawn (inclui
-   fragmentos), `asteroidsKilled` soma após destruição
-3. **Fragmentação**: `totalAsteroids` e `asteroidsSpawned` aumentam pelo número
-   de fragmentos
-4. **Conclusão**: wave encerra quando `asteroidsKilled ≥ totalAsteroids` e não
-   restam inimigos ativos (`getActiveEnemyCount() === 0`)
+2. **Durante a wave**: `asteroidsSpawned` incrementa a cada spawn (inclui fragmentos), `asteroidsKilled` soma após destruição
+3. **Fragmentação**: `totalAsteroids` e `asteroidsSpawned` aumentam pelo número de fragmentos
+4. **Conclusão**: wave encerra quando `asteroidsKilled ≥ totalAsteroids` e não restam inimigos ativos (`getActiveEnemyCount() === 0`)
 
 ## Special Variant Behaviors
 
@@ -105,72 +102,36 @@ fixa `123456`.
 - Escopos dedicados: `spawn`, `variants`, `fragments`
 - `reset()` e `reseedRandomScopes()` restauram sequências determinísticas
 
+## Compatibilidade Atual
+
+Para preservar o baseline durante a migração do `WaveManager`, as seguintes
+flags devem permanecer consistentes quando a comparação com o legado for
+necessária:
+
+- `USE_WAVE_MANAGER = true`
+- `WAVEMANAGER_HANDLES_ASTEROID_SPAWN = true`
+- `PRESERVE_LEGACY_SIZE_DISTRIBUTION = true`
+- `PRESERVE_LEGACY_POSITIONING = true`
+- `STRICT_LEGACY_SPAWN_SEQUENCE = true`
+
+## Validação
+
+Executar a suíte de balanceamento com as flags de compatibilidade ativas:
+
+```bash
+npm run test:balance
+```
+
+**Critério de sucesso:** os testes de `tests/balance/asteroid-metrics/` devem
+passar sem divergências nas métricas listadas acima.
+
 ## Referências
 
 - `src/modules/EnemySystem.js`
 - `src/core/GameConstants.js`
-- `src/__tests__/legacy/asteroid-baseline-metrics.test.js`
-
-## Migração para WaveManager (WAVE-006)
-
-### Flags de Compatibilidade
-
-Para preservar comportamento baseline durante migração:
-
-- `USE_WAVE_MANAGER = true` - Ativa WaveManager (WAVE-002)
-- `WAVEMANAGER_HANDLES_ASTEROID_SPAWN = true` - WaveManager controla spawn de asteroides
-- `PRESERVE_LEGACY_SIZE_DISTRIBUTION = true` - Usa distribuição 50/30/20 (não 30/40/30)
-- `PRESERVE_LEGACY_POSITIONING = true` - Spawn nas 4 bordas (não safe distance)
-- `STRICT_LEGACY_SPAWN_SEQUENCE = true` - Reutiliza o mesmo stream de randomização para posição e tamanho (paridade com legado)
-
-### Comportamento Esperado
-
-**Com todas as flags ativadas:**
-
-- Taxa de spawn: idêntica ao baseline (4 × 1.3^(wave-1))
-- Distribuição de tamanhos: 50/30/20 (large/medium/small)
-- Variant decision: via `EnemySystem.decideVariant()` (preserva wave bonus, allowed sizes)
-- Posicionamento: 4 bordas (top/right/bottom/left) com margin=80
-- Ordem de spawn: posição e tamanho utilizam o mesmo stream `spawn`, preservando a sequência determinística por seed
-- Fragmentação: contabilizada automaticamente por `WaveManager.onEnemyDestroyed()`
-- Random scopes: `spawn`, `variants`, `fragments` (determinismo preservado)
-
-**Divergências Intencionais (quando flags desativadas):**
-
-- Distribuição 30/40/30: otimizada para mix com drones/mines/hunters
-- Safe distance positioning: evita spawn muito próximo do player
-- Variant decision simplificada: `WaveManager.selectRandomVariant()` (não recomendado)
-
-### Validação
-
-Executar testes baseline com flags ativadas:
-
-```
-# Ativar flags em GameConstants.js
-USE_WAVE_MANAGER = true
-WAVEMANAGER_HANDLES_ASTEROID_SPAWN = true
-PRESERVE_LEGACY_SIZE_DISTRIBUTION = true
-PRESERVE_LEGACY_POSITIONING = true
-STRICT_LEGACY_SPAWN_SEQUENCE = true
-
-# Executar testes
-npm run test:baseline
-```
-
-**Critério de sucesso:** Todos os testes devem passar com métricas idênticas ao baseline.
-
-### Próximos Passos
-
-Após validação completa:
-
-1. Manter flags ativadas por 1-2 semanas em produção
-2. Monitorar telemetria e feedback de usuários
-3. Considerar remoção de `handleSpawning()` legado
-4. Atualizar flags para valores otimizados (30/40/30, safe distance)
-5. Remover flags após estabilização
-
-### Referências
-
-- Plano de migração: `docs/plans/phase1-enemy-foundation-plan.md` (WAVE-006)
-- Código WaveManager: `src/modules/enemies/managers/WaveManager.js`
-- Código legado: `src/modules/EnemySystem.js` (handleSpawning linhas 1938-1955)
+- `src/modules/enemies/managers/WaveManager.js`
+- `tests/balance/asteroid-metrics/spawn-rates.test.js`
+- `tests/balance/asteroid-metrics/size-distribution.test.js`
+- `tests/balance/asteroid-metrics/variant-distribution.test.js`
+- `tests/balance/asteroid-metrics/fragmentation.test.js`
+- `tests/balance/asteroid-metrics/wave-state-counters.test.js`

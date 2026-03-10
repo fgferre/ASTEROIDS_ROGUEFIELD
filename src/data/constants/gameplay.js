@@ -275,7 +275,7 @@ export const SUPPORT_ENEMY_PROGRESSION = deepFreeze({
   }),
 });
 
-export const USE_WAVE_MANAGER = true; // Feature flag para ativar o novo WaveManager (experimental). Consulte docs/plans/phase1-enemy-foundation-plan.md para critérios de remoção.
+export const USE_WAVE_MANAGER = true; // Feature flag para ativar o novo WaveManager (experimental). Consulte docs/validation/asteroid-baseline-metrics.md para critérios de compatibilidade.
 
 export const PRESERVE_LEGACY_SIZE_DISTRIBUTION = true; // WAVE-006: Preservar distribuição legada de tamanhos de asteroides (50/30/20) para paridade com baseline
 

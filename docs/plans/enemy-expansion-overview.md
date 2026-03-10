@@ -28,7 +28,7 @@
 
 ### Referências de Plano por Fase
 
-- [Fase 1 – Fundamentos de Novos Inimigos](phase1-enemy-foundation-plan.md)
+- [Fase 1 – Fundamentos de Novos Inimigos (histórico)](../archive/2026-health-cleanup/plans/phase1-enemy-foundation-plan.md)
 - [Fase 2 – Sistema de Boss](phase2-boss-system-plan.md)
 - [Fase 3 – Efeitos Visuais Avançados](phase3-effects-upgrade-plan.md)
 - [Fase 4 – Áudio Dinâmico](phase4-audio-dynamics-plan.md)
