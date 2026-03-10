@@ -15,10 +15,26 @@ import {
 import { WAVE_BOSS_INTERVAL } from '../data/constants/gameplay.js';
 
 const DEV_MODE = isDevEnvironment();
+const FILE_TRACK_PRELOAD_POLICY = Object.freeze({
+  EAGER: 'eager',
+  DEFERRED: 'deferred',
+});
+const FILE_TRACK_IDS = Object.freeze({
+  MENU_OPENING: 'menu-opening',
+});
 const MENU_OPENING_TRACK_URL = new URL(
   '../../assets/Music/Alone Among Orbits.mp3',
   import.meta.url
 ).href;
+const FILE_TRACK_CATALOG = Object.freeze({
+  [FILE_TRACK_IDS.MENU_OPENING]: Object.freeze({
+    src: MENU_OPENING_TRACK_URL,
+    loop: true,
+    fadeInMs: 1500,
+    fadeOutMs: 800,
+    preloadPolicy: FILE_TRACK_PRELOAD_POLICY.EAGER,
+  }),
+});
 
 /**
  * ThrusterLoopManager - Manages continuous thruster loop sounds
@@ -451,20 +467,21 @@ class AudioSystem extends BaseSystem {
       lastPhase: null,
     };
 
-    this.menuTrackConfig = {
-      src: MENU_OPENING_TRACK_URL,
-      loop: true,
-      fadeInMs: 1500,
-      fadeOutMs: 800,
-    };
-    this.menuTrackState = {
-      audioElement: null,
-      sourceNode: null,
-      trackGain: null,
-      isPlaying: false,
+    this.fileTrackCatalog = { ...FILE_TRACK_CATALOG };
+    this.fileTrackState = {
+      activeTrackId: null,
       currentScreen: null,
-      stopTimerId: null,
+      tracks: Object.fromEntries(
+        Object.keys(this.fileTrackCatalog).map((trackId) => [
+          trackId,
+          this._createInitialFileTrackState(),
+        ])
+      ),
     };
+    this.menuTrackConfig =
+      this.fileTrackCatalog[FILE_TRACK_IDS.MENU_OPENING] || null;
+    this.menuTrackState =
+      this.fileTrackState.tracks[FILE_TRACK_IDS.MENU_OPENING] || null;
 
     // Thruster sound system
     this.thrusterLoopManager = new ThrusterLoopManager();
@@ -481,6 +498,55 @@ class AudioSystem extends BaseSystem {
     this.bootstrapSettings();
     this._exposeRandomDebugControls();
     this._setupEarlyInit();
+    this._warmupEagerFileTracks();
+  }
+
+  _createInitialFileTrackState() {
+    return {
+      audioElement: null,
+      sourceNode: null,
+      trackGain: null,
+      isPlaying: false,
+      currentScreen: null,
+      stopTimerId: null,
+      warmupRequested: false,
+      playbackToken: 0,
+      detachReadyListeners: null,
+    };
+  }
+
+  _getFileTrackConfig(trackId) {
+    if (!trackId) {
+      return null;
+    }
+    return this.fileTrackCatalog?.[trackId] || null;
+  }
+
+  _getFileTrackState(trackId) {
+    if (!trackId) {
+      return null;
+    }
+
+    const tracks = this.fileTrackState?.tracks;
+    if (!tracks) {
+      return null;
+    }
+
+    if (!tracks[trackId] && this._getFileTrackConfig(trackId)) {
+      tracks[trackId] = this._createInitialFileTrackState();
+    }
+
+    return tracks[trackId] || null;
+  }
+
+  _warmupEagerFileTracks() {
+    Object.entries(this.fileTrackCatalog || {}).forEach(
+      ([trackId, config = {}]) => {
+        if (config.preloadPolicy === FILE_TRACK_PRELOAD_POLICY.EAGER) {
+          this.warmupFileTrack(trackId);
+        }
+      }
+    );
   }
 
   /**
@@ -499,13 +565,13 @@ class AudioSystem extends BaseSystem {
         }
       }
       // Remove listeners after first interaction
-      document.removeEventListener('click', initOnInteraction, true);
+      document.removeEventListener('pointerdown', initOnInteraction, true);
       document.removeEventListener('keydown', initOnInteraction, true);
       document.removeEventListener('touchstart', initOnInteraction, true);
     };
 
     // Use capture phase to catch events early
-    document.addEventListener('click', initOnInteraction, true);
+    document.addEventListener('pointerdown', initOnInteraction, true);
     document.addEventListener('keydown', initOnInteraction, true);
     document.addEventListener('touchstart', initOnInteraction, true);
   }
@@ -540,6 +606,13 @@ class AudioSystem extends BaseSystem {
       this.applyVolumeToNodes();
       this.initializeMusicController();
       this.initialized = true;
+      Object.entries(this.fileTrackCatalog || {}).forEach(
+        ([trackId, config = {}]) => {
+          if (config.preloadPolicy === FILE_TRACK_PRELOAD_POLICY.EAGER) {
+            this.ensureFileTrackGraph(trackId);
+          }
+        }
+      );
       this._syncMenuTrackForCurrentScreen();
 
       // Start performance monitoring
@@ -970,7 +1043,10 @@ class AudioSystem extends BaseSystem {
 
   _handleScreenChanged(payload = {}) {
     if (typeof payload?.screen === 'string' && payload.screen) {
-      this.menuTrackState.currentScreen = payload.screen;
+      this.fileTrackState.currentScreen = payload.screen;
+      if (this.menuTrackState) {
+        this.menuTrackState.currentScreen = payload.screen;
+      }
     }
 
     this.playMenuTransition();
@@ -990,12 +1066,18 @@ class AudioSystem extends BaseSystem {
       if (source !== 'menu') {
         return;
       }
-      this.menuTrackState.currentScreen = overlay;
+      this.fileTrackState.currentScreen = overlay;
+      if (this.menuTrackState) {
+        this.menuTrackState.currentScreen = overlay;
+      }
     } else if (
       source === 'menu' ||
-      this.menuTrackState.currentScreen === overlay
+      this.fileTrackState.currentScreen === overlay
     ) {
-      this.menuTrackState.currentScreen = 'menu';
+      this.fileTrackState.currentScreen = 'menu';
+      if (this.menuTrackState) {
+        this.menuTrackState.currentScreen = 'menu';
+      }
     } else {
       return;
     }
@@ -1004,30 +1086,35 @@ class AudioSystem extends BaseSystem {
   }
 
   _syncMenuTrackForCurrentScreen() {
-    const currentScreen = this.menuTrackState.currentScreen;
+    const currentScreen = this.fileTrackState.currentScreen;
     if (!currentScreen) {
       return;
     }
 
     if (currentScreen === 'menu') {
       this.safePlay(() => {
-        this._playMenuTrackDirect();
+        this.playFileTrack(FILE_TRACK_IDS.MENU_OPENING);
       });
       return;
     }
 
-    this._stopMenuTrackPlayback();
+    this.stopFileTrack(FILE_TRACK_IDS.MENU_OPENING);
   }
 
-  _createMenuTrackAudioElement() {
+  _createFileTrackAudioElement(trackId) {
+    const config = this._getFileTrackConfig(trackId);
+    if (!config?.src) {
+      return null;
+    }
+
     let audioElement = null;
 
     if (typeof Audio === 'function') {
       try {
-        audioElement = new Audio(this.menuTrackConfig.src);
+        audioElement = new Audio(config.src);
       } catch (error) {
         console.warn(
-          '[AudioSystem] Failed to construct menu track audio:',
+          `[AudioSystem] Failed to construct file track "${trackId}":`,
           error
         );
       }
@@ -1040,10 +1127,10 @@ class AudioSystem extends BaseSystem {
     ) {
       try {
         audioElement = document.createElement('audio');
-        audioElement.src = this.menuTrackConfig.src;
+        audioElement.src = config.src;
       } catch (error) {
         console.warn(
-          '[AudioSystem] Failed to create fallback audio element:',
+          `[AudioSystem] Failed to create fallback file track "${trackId}":`,
           error
         );
       }
@@ -1054,24 +1141,52 @@ class AudioSystem extends BaseSystem {
     }
 
     audioElement.preload = 'auto';
-    audioElement.loop = Boolean(this.menuTrackConfig.loop);
+    audioElement.loop = Boolean(config.loop);
 
     return audioElement;
   }
 
-  _ensureMenuTrackResources() {
+  warmupFileTrack(trackId) {
+    const config = this._getFileTrackConfig(trackId);
+    const state = this._getFileTrackState(trackId);
+    if (!config || !state) {
+      return null;
+    }
+
+    if (!state.audioElement) {
+      state.audioElement = this._createFileTrackAudioElement(trackId);
+    }
+
+    if (!state.audioElement) {
+      return null;
+    }
+
+    state.audioElement.loop = Boolean(config.loop);
+
+    if (!state.warmupRequested) {
+      state.warmupRequested = true;
+      try {
+        state.audioElement.load?.();
+      } catch (error) {
+        console.warn(
+          `[AudioSystem] Failed to warm up file track "${trackId}":`,
+          error
+        );
+      }
+    }
+
+    return state;
+  }
+
+  ensureFileTrackGraph(trackId) {
     if (!this.context) {
       return null;
     }
 
-    const state = this.menuTrackState;
+    const state = this.warmupFileTrack(trackId);
     const now = this.context.currentTime;
 
-    if (!state.audioElement) {
-      state.audioElement = this._createMenuTrackAudioElement();
-    }
-
-    if (!state.audioElement) {
+    if (!state?.audioElement) {
       return null;
     }
 
@@ -1084,7 +1199,7 @@ class AudioSystem extends BaseSystem {
     if (!state.sourceNode) {
       if (typeof this.context.createMediaElementSource !== 'function') {
         console.warn(
-          '[AudioSystem] MediaElementAudioSourceNode is not available in this environment.'
+          `[AudioSystem] MediaElementAudioSourceNode is not available for "${trackId}".`
         );
         return null;
       }
@@ -1098,13 +1213,39 @@ class AudioSystem extends BaseSystem {
     return state;
   }
 
-  _clearMenuTrackStopTimer() {
-    if (!this.menuTrackState.stopTimerId) {
+  _clearFileTrackStopTimer(trackId) {
+    const state = this._getFileTrackState(trackId);
+    if (!state?.stopTimerId) {
       return;
     }
 
-    clearTimeout(this.menuTrackState.stopTimerId);
-    this.menuTrackState.stopTimerId = null;
+    clearTimeout(state.stopTimerId);
+    state.stopTimerId = null;
+  }
+
+  _detachFileTrackReadyListeners(trackId) {
+    const state = this._getFileTrackState(trackId);
+    if (!state?.detachReadyListeners) {
+      return;
+    }
+
+    try {
+      state.detachReadyListeners();
+    } catch (error) {
+      // Ignore listener cleanup failures during audio teardown
+    }
+
+    state.detachReadyListeners = null;
+  }
+
+  _bumpFileTrackPlaybackToken(trackId) {
+    const state = this._getFileTrackState(trackId);
+    if (!state) {
+      return 0;
+    }
+
+    state.playbackToken += 1;
+    return state.playbackToken;
   }
 
   _cancelAudioParamValues(param, now) {
@@ -1119,116 +1260,204 @@ class AudioSystem extends BaseSystem {
     }
   }
 
-  _playMenuTrackDirect() {
-    const state = this._ensureMenuTrackResources();
-    if (!state || !state.audioElement || !state.trackGain || !this.context) {
+  _getAudioParamCurrentValue(param, fallback = 0) {
+    return typeof param?.value === 'number' ? param.value : fallback;
+  }
+
+  _scheduleFileTrackGain(trackId, targetValue, durationMs = 0) {
+    const state = this._getFileTrackState(trackId);
+    if (!state?.trackGain?.gain || !this.context) {
       return;
     }
 
-    this._clearMenuTrackStopTimer();
-
     const now = this.context.currentTime;
-    const fadeInSeconds = Math.max(0, this.menuTrackConfig.fadeInMs / 1000);
+    const durationSeconds = Math.max(0, durationMs / 1000);
     const gainParam = state.trackGain.gain;
-    const currentValue =
-      typeof gainParam.value === 'number' ? gainParam.value : 0;
+    const currentValue = this._getAudioParamCurrentValue(gainParam, 0);
 
     this._cancelAudioParamValues(gainParam, now);
     gainParam.setValueAtTime(currentValue, now);
 
-    if (fadeInSeconds > 0) {
-      gainParam.linearRampToValueAtTime(1, now + fadeInSeconds);
+    if (durationSeconds > 0) {
+      gainParam.linearRampToValueAtTime(targetValue, now + durationSeconds);
     } else {
-      gainParam.setValueAtTime(1, now);
-    }
-
-    state.audioElement.loop = Boolean(this.menuTrackConfig.loop);
-
-    if (state.isPlaying) {
-      return;
-    }
-
-    const playResult =
-      typeof state.audioElement.play === 'function'
-        ? state.audioElement.play()
-        : null;
-
-    state.isPlaying = true;
-
-    if (playResult && typeof playResult.catch === 'function') {
-      playResult.catch((error) => {
-        state.isPlaying = false;
-        if (error?.name !== 'AbortError') {
-          console.warn('[AudioSystem] Failed to play menu track:', error);
-        }
-      });
+      gainParam.setValueAtTime(targetValue, now);
     }
   }
 
-  _stopMenuTrackPlayback({ immediate = false } = {}) {
-    const state = this.menuTrackState;
-    const audioElement = state.audioElement;
-    if (!audioElement) {
+  _beginFileTrackFadeIn(trackId) {
+    const config = this._getFileTrackConfig(trackId);
+    if (!config) {
       return;
     }
 
-    this._clearMenuTrackStopTimer();
+    this._scheduleFileTrackGain(trackId, 1, config.fadeInMs);
+  }
 
-    const finalizeStop = () => {
-      try {
-        audioElement.pause?.();
-      } catch (error) {
-        // Ignore pause failures during cleanup
+  _finalizeFileTrackStop(trackId) {
+    const state = this._getFileTrackState(trackId);
+    if (!state?.audioElement) {
+      return;
+    }
+
+    try {
+      state.audioElement.pause?.();
+    } catch (error) {
+      // Ignore pause failures during cleanup
+    }
+
+    try {
+      state.audioElement.currentTime = 0;
+    } catch (error) {
+      // Ignore media elements that reject currentTime rewinds
+    }
+
+    state.isPlaying = false;
+    if (this.fileTrackState.activeTrackId === trackId) {
+      this.fileTrackState.activeTrackId = null;
+    }
+  }
+
+  playFileTrack(trackId) {
+    const config = this._getFileTrackConfig(trackId);
+    const state = this.ensureFileTrackGraph(trackId);
+    if (!config || !state?.audioElement || !state.trackGain || !this.context) {
+      return;
+    }
+
+    this._clearFileTrackStopTimer(trackId);
+
+    if (
+      this.fileTrackState.activeTrackId === trackId &&
+      state.isPlaying &&
+      !state.audioElement.paused
+    ) {
+      this._beginFileTrackFadeIn(trackId);
+      return;
+    }
+
+    const token = this._bumpFileTrackPlaybackToken(trackId);
+    const previousActiveTrackId = this.fileTrackState.activeTrackId;
+    const audioElement = state.audioElement;
+
+    this._detachFileTrackReadyListeners(trackId);
+
+    let playbackStarted = false;
+    const handlePlaybackReady = () => {
+      if (playbackStarted || state.playbackToken !== token) {
+        return;
       }
 
-      try {
-        audioElement.currentTime = 0;
-      } catch (error) {
-        // Ignore media elements that reject currentTime rewinds
+      playbackStarted = true;
+      this._detachFileTrackReadyListeners(trackId);
+      state.isPlaying = true;
+
+      if (
+        previousActiveTrackId &&
+        previousActiveTrackId !== trackId &&
+        this._getFileTrackState(previousActiveTrackId)?.isPlaying
+      ) {
+        this.stopFileTrack(previousActiveTrackId);
       }
 
-      state.isPlaying = false;
+      this.fileTrackState.activeTrackId = trackId;
+      this._beginFileTrackFadeIn(trackId);
     };
+
+    if (typeof audioElement.addEventListener === 'function') {
+      const readyHandler = () => {
+        handlePlaybackReady();
+      };
+      audioElement.addEventListener('playing', readyHandler);
+      state.detachReadyListeners = () => {
+        audioElement.removeEventListener?.('playing', readyHandler);
+        state.detachReadyListeners = null;
+      };
+    }
+
+    if (!state.isPlaying) {
+      this._scheduleFileTrackGain(trackId, 0, 0);
+    }
+
+    audioElement.loop = Boolean(config.loop);
+
+    const playResult =
+      typeof audioElement.play === 'function' ? audioElement.play() : null;
+
+    if (playResult && typeof playResult.then === 'function') {
+      playResult
+        .then(() => {
+          handlePlaybackReady();
+        })
+        .catch((error) => {
+          if (state.playbackToken !== token) {
+            return;
+          }
+
+          this._detachFileTrackReadyListeners(trackId);
+          state.isPlaying = false;
+          if (error?.name !== 'AbortError') {
+            console.warn(
+              `[AudioSystem] Failed to play file track "${trackId}":`,
+              error
+            );
+          }
+        });
+      return;
+    }
+
+    if (!audioElement.paused) {
+      handlePlaybackReady();
+    }
+  }
+
+  stopFileTrack(trackId, { immediate = false } = {}) {
+    const config = this._getFileTrackConfig(trackId);
+    const state = this._getFileTrackState(trackId);
+    if (!config || !state?.audioElement) {
+      return;
+    }
+
+    this._clearFileTrackStopTimer(trackId);
+    this._bumpFileTrackPlaybackToken(trackId);
+    this._detachFileTrackReadyListeners(trackId);
 
     const fadeOutSeconds = Math.max(
       0,
-      (immediate ? 0 : this.menuTrackConfig.fadeOutMs) / 1000
+      (immediate ? 0 : config.fadeOutMs) / 1000
     );
 
     if (state.trackGain?.gain && this.context) {
-      const now = this.context.currentTime;
-      const gainParam = state.trackGain.gain;
-      const currentValue =
-        typeof gainParam.value === 'number' ? gainParam.value : 0;
-
-      this._cancelAudioParamValues(gainParam, now);
-      gainParam.setValueAtTime(currentValue, now);
-
-      if (fadeOutSeconds > 0) {
-        gainParam.linearRampToValueAtTime(0, now + fadeOutSeconds);
-      } else {
-        gainParam.setValueAtTime(0, now);
-      }
+      this._scheduleFileTrackGain(
+        trackId,
+        0,
+        immediate ? 0 : config.fadeOutMs
+      );
     }
 
     if (immediate || !this.context || fadeOutSeconds <= 0) {
-      finalizeStop();
+      this._finalizeFileTrackStop(trackId);
       return;
     }
 
     state.stopTimerId = setTimeout(
       () => {
         state.stopTimerId = null;
-        finalizeStop();
+        this._finalizeFileTrackStop(trackId);
       },
       Math.round(fadeOutSeconds * 1000)
     );
   }
 
-  _destroyMenuTrackResources() {
-    const state = this.menuTrackState;
-    this._stopMenuTrackPlayback({ immediate: true });
-    this._clearMenuTrackStopTimer();
+  evictFileTrack(trackId) {
+    const state = this._getFileTrackState(trackId);
+    if (!state) {
+      return;
+    }
+
+    this.stopFileTrack(trackId, { immediate: true });
+    this._clearFileTrackStopTimer(trackId);
+    this._detachFileTrackReadyListeners(trackId);
 
     if (state.sourceNode && typeof state.sourceNode.disconnect === 'function') {
       try {
@@ -1251,6 +1480,37 @@ class AudioSystem extends BaseSystem {
     state.trackGain = null;
     state.isPlaying = false;
     state.currentScreen = null;
+    state.stopTimerId = null;
+    state.warmupRequested = false;
+    state.playbackToken = 0;
+    state.detachReadyListeners = null;
+  }
+
+  _evictAllFileTracks({ resetCurrentScreen = false } = {}) {
+    Object.keys(this.fileTrackCatalog || {}).forEach((trackId) => {
+      this.evictFileTrack(trackId);
+    });
+
+    this.fileTrackState.activeTrackId = null;
+    if (resetCurrentScreen) {
+      this.fileTrackState.currentScreen = null;
+      if (this.menuTrackState) {
+        this.menuTrackState.currentScreen = null;
+      }
+    }
+  }
+
+  _destroyMenuTrackResources() {
+    this.evictFileTrack(FILE_TRACK_IDS.MENU_OPENING);
+    if (this.fileTrackState.activeTrackId === FILE_TRACK_IDS.MENU_OPENING) {
+      this.fileTrackState.activeTrackId = null;
+    }
+    if (this.fileTrackState.currentScreen === 'menu') {
+      this.fileTrackState.currentScreen = null;
+    }
+    if (this.menuTrackState) {
+      this.menuTrackState.currentScreen = null;
+    }
   }
 
   initializeMusicController() {
@@ -4587,7 +4847,7 @@ class AudioSystem extends BaseSystem {
 
   reset() {
     this._clearRandomDebugControls();
-    this._destroyMenuTrackResources();
+    this._evictAllFileTracks({ resetCurrentScreen: true });
 
     // Cleanup optimization systems
     if (this.pool) {
@@ -4642,7 +4902,7 @@ class AudioSystem extends BaseSystem {
   }
 
   onDestroy() {
-    this._destroyMenuTrackResources();
+    this._evictAllFileTracks({ resetCurrentScreen: true });
     this._clearRandomDebugControls();
   }
 

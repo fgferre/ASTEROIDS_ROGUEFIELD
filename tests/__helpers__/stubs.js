@@ -119,21 +119,21 @@ export function createGainStub(options = {}) {
   const { initialValue = 0 } = options;
   const gain = {
     value: initialValue,
-    setValueAtTime(value) {
+    setValueAtTime: vi.fn((value) => {
       gain.value = value;
-    },
-    linearRampToValueAtTime(value) {
+    }),
+    linearRampToValueAtTime: vi.fn((value) => {
       gain.value = value;
-    },
-    exponentialRampToValueAtTime(value) {
+    }),
+    exponentialRampToValueAtTime: vi.fn((value) => {
       gain.value = value;
-    },
-    cancelScheduledValues() {},
+    }),
+    cancelScheduledValues: vi.fn(),
   };
 
   return {
-    connect() {},
-    disconnect() {},
+    connect: vi.fn(),
+    disconnect: vi.fn(),
     gain,
   };
 }
@@ -173,7 +173,27 @@ export function createMediaElementStub(options = {}) {
     currentTime = 0,
     loop = false,
     preload = 'auto',
+    playImplementation,
+    pauseImplementation,
   } = options;
+  const listeners = new Map();
+
+  const addListener = (type, handler) => {
+    if (!listeners.has(type)) {
+      listeners.set(type, new Set());
+    }
+    listeners.get(type).add(handler);
+  };
+
+  const removeListener = (type, handler) => {
+    if (!listeners.has(type)) {
+      return;
+    }
+    listeners.get(type).delete(handler);
+    if (listeners.get(type).size === 0) {
+      listeners.delete(type);
+    }
+  };
 
   const mediaElement = {
     src,
@@ -181,12 +201,40 @@ export function createMediaElementStub(options = {}) {
     loop,
     paused: true,
     currentTime,
+    addEventListener: vi.fn((type, handler) => {
+      addListener(type, handler);
+    }),
+    removeEventListener: vi.fn((type, handler) => {
+      removeListener(type, handler);
+    }),
+    dispatchEvent: vi.fn((event) => {
+      const type = typeof event === 'string' ? event : event?.type;
+      if (!type || !listeners.has(type)) {
+        return false;
+      }
+
+      for (const handler of [...listeners.get(type)]) {
+        handler(event);
+      }
+      return true;
+    }),
     play: vi.fn(() => {
       mediaElement.paused = false;
-      return Promise.resolve();
+      if (typeof playImplementation === 'function') {
+        return playImplementation(mediaElement);
+      }
+
+      const result = Promise.resolve();
+      result.then(() => {
+        mediaElement.dispatchEvent({ type: 'playing', target: mediaElement });
+      });
+      return result;
     }),
     pause: vi.fn(() => {
       mediaElement.paused = true;
+      if (typeof pauseImplementation === 'function') {
+        pauseImplementation(mediaElement);
+      }
     }),
     load: vi.fn(),
   };
