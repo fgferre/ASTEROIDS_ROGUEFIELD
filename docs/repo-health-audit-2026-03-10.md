@@ -42,15 +42,46 @@ sobre o estado atual do cleanup aplicado em 2026-03-10.
 - `assets/procedural/Criando Asteroides Procedurais Realistas em WebGL2.pdf`
   como referência bibliográfica do mesmo estudo procedural, fora do runtime e
   do gate de formatação.
-- `npm run format:check` restrito à superfície oficial mantida por esta
-  racionalização: docs vivos, scripts de tooling ativos e arquivos de runtime
-  tocados pelo cleanup. A dívida de formatação repo-wide continua fora deste
-  gate para evitar um diff mecânico em massa.
-- `npm run validate:deps` como gate de dependências; `npm run test:validate-optimizations`
-  como checklist heurístico não bloqueante.
-- `scripts/validate-object-pooling.js`, `scripts/validate-performance.js` e
-  `scripts/benchmarks/*.js` apenas como ferramentas manuais, fora da superfície
-  oficial de validação.
+
+## Superfície oficial de manutenção
+
+### Documentação viva
+
+- `docs/repo-health-audit-2026-03-10.md`
+- `tests/README.md`
+- `docs/auditorias-racionalizacao/planos-estado-atual-2026-03-11/01-tooling-superficie-oficial.md`
+
+### Comandos oficiais do projeto
+
+- `npm run format:check`
+- `npm run validate:deps`
+
+### Tooling advisory
+
+- `npm run test:validate-optimizations`: checklist heurístico não bloqueante.
+- Warnings de hubs emitidos por `npm run validate:deps`: úteis para revisão,
+  mas não são falha do gate.
+- `scripts/validate-object-pooling.js`
+- `scripts/validate-performance.js`
+- `scripts/benchmarks/*.js`
+
+### Conveniência local e utilitários manuais
+
+- `npm run format`: conveniência local, não gate compartilhado.
+- `npm run analyze:deps` e `npm run analyze:deps:watch`: diagnóstico/manual,
+  úteis para gerar artefatos, não para bloquear manutenção.
+- `npm run test:benchmark`, `npm run stress` e `npm run test:visual-enemies`:
+  validação manual ou medição localizada, fora da superfície oficial.
+
+## Política atual do gate de formatação
+
+- `npm run format:check` permanece em allowlist manual. A dívida de formatação
+  repo-wide continua fora deste gate para evitar diff mecânico em massa.
+- Sempre que um novo doc vivo, script de tooling ativo ou arquivo de runtime
+  entrar na superfície oficial tocada por manutenção, ele deve ser incluído
+  explicitamente em `format` e `format:check` no mesmo change set.
+- A allowlist atual continua intencionalmente pequena; migrar para glob +
+  `.prettierignore` fica fora desta frente.
 
 ## Resíduos periféricos fechados
 

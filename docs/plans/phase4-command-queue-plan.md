@@ -50,7 +50,7 @@
 - **`WorldSystem` & `PhysicsSystem`:** validar que, após a migração, os estados usados para colisões (`player.position`, `velocity`, `invulnerableTimer`, `shieldState`) continuam atualizados antes das verificações, possivelmente introduzindo uma etapa de flush no início do frame. Nenhuma alteração estrutural além de garantir leitura do novo adaptador de movimento quando necessário.【F:src/modules/WorldSystem.js†L67-L184】【F:src/modules/PhysicsSystem.js†L602-L712】
 - **`EffectsSystem`:** continuar reagindo aos eventos `thruster-effect`; adicionar suporte opcional a comandos (ex.: intensidade agregada) para validação futura e garantir que enfileiramento de comandos não reduza frequência dos eventos.【F:src/modules/EffectsSystem.js†L391-L415】
 - **`UISystem`:** manter uso de `input-action` para menus/level-up e considerar observação direta da fila para futuros atalhos ou suporte a inputs alternativos (gamepad focus).【F:src/modules/UISystem.js†L1085-L1092】
-- **Manifesto/DI:** atualizar dependências para que `PlayerSystem` e `CombatSystem` recebam `command-queue` (além de `input` quando necessário para eventos), expondo nova entrada pública no `ServiceLocatorAdapter` para código legado. Atualizar `ServiceRegistry.createTestContainer` com stubs da fila.【F:src/bootstrap/serviceManifest.js†L300-L311】
+- **Manifesto/DI:** atualizar dependências para que `PlayerSystem` e `CombatSystem` recebam `command-queue` (além de `input` quando necessário para eventos), expondo nova entrada pública no `ServiceLocatorAdapter` para código legado. Atualizar o helper `createTestContainer()` em `tests/__helpers__/setup.js` com stubs da fila.【F:src/bootstrap/serviceManifest.js†L300-L311】
 
 ### 6. Validação e monitoramento
 
