@@ -7,7 +7,7 @@ Phase 1 PROC-13 first cut. Launch name decided this phase; final brand assets (c
 - **Internal codename:** `ASTEROIDS_ROGUEFIELD` (preserves M1 git history, repo URL `github.com/fgferre/ASTEROIDS_ROGUEFIELD`).
 - **Public launch name:** **Asteroid Roguefield** (singular; chosen 2026-05-13).
 
-The two coexist intentionally — the repo / GitHub Pages path stays on the codename to preserve M1 commit references; player-facing surfaces (title screen, itch.io / Steam Next Fest / etc. page if pursued, social posts, devlog) use the launch name.
+The two coexist intentionally — the repo / GitHub Pages path stays on the codename to preserve M1 commit references; player-facing surfaces (title screen, itch.io page if pursued, social posts, devlog) use the launch name.
 
 ## Launch name: Asteroid Roguefield (singular)
 

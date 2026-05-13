@@ -2,7 +2,7 @@
 
 Phase 1 PROC-18 lock. Internal positioning, NOT marketing copy (per CONTEXT D-32).
 
-This doc is the **internal** positioning anchor used to keep design + feature decisions aligned across phases. Phase 7 / Phase 8 distill this into the public-facing copy (itch.io description, GitHub Pages landing copy, Steam Next Fest short text — whichever launch surface wins at Phase 8). Do NOT lift sentences from this doc verbatim into public copy.
+This doc is the **internal** positioning anchor used to keep design + feature decisions aligned across phases. Phase 7 / Phase 8 distill this into the public-facing copy (itch.io description or GitHub Pages landing copy — whichever launch surface wins at Phase 8). Do NOT lift sentences from this doc verbatim into public copy.
 
 ## Elevator pitch (≤60 words)
 
@@ -43,8 +43,9 @@ Private link sharing of the same GitHub Pages URL with the PROC-16 trusted circl
 
 - Keep GitHub Pages and flip the URL public (PROC-07 launch flip).
 - Switch to itch.io (Restricted → Public flow via `butler` upload).
-- Steam Next Fest (festival visibility window).
 - Hybrid (e.g., GitHub Pages mirror + itch.io storefront).
+
+*Steam (incl. Steam Next Fest) was considered and excluded at the developer's call 2026-05-13 — aligns with PROJECT.md Out-of-Scope row "Steam release in v2 — itch.io only; Steam considered for future milestone".*
 
 PROC-02 (itch.io page draft) and PROC-06 (`build:itch` npm packaging script) are **deferred to Phase 8** per CONTEXT D-24 revised 2026-05-13 — those packaging artifacts are surface-specific and don't get built until the launch surface is chosen. The Phase 8 deliverable lives in `docs/launch-surface-decision-{date}.md` per ROADMAP Phase 8 Success Criterion 5.
 
