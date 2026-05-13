@@ -67,7 +67,7 @@ export const PROGRESSION_COMBO_MULTIPLIER_CAP = 2.0;
 // sum (sum of progressionService.appliedUpgrades values). Orthogonal to the
 // per-wave healthScaling. Starting values per CONTEXT D-17 — calibrated via
 // tests/integration/boss-curve.test.js and may be re-tuned in Task 3.
-export const UPGRADE_BOSS_HEALTH_SCALAR = 0.10;
+export const UPGRADE_BOSS_HEALTH_SCALAR = 0.18;
 export const UPGRADE_BOSS_DAMAGE_SCALAR = 0.05;
 
 // Re-export all constants from focused files for backward compatibility

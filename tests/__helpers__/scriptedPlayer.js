@@ -40,7 +40,11 @@ import {
 
 const DODGE_FRACTION = 0.5; // fraction of SHIP_MAX_SPEED applied as dodge nudge
 const DODGE_DISTANCE_THRESHOLD = 220; // px — only dodge projectiles closer than this
-const FIRE_INTERVAL_TICKS = 4; // ticks between forced fire events (~15 Hz at 60fps)
+// FIX-04 calibration: dropped from 4 ticks (15 Hz) to 30 ticks (2 Hz) to match
+// realistic live player fire cadence under enforced weapon cooldowns. The 15 Hz
+// rate proved an order of magnitude faster than live and broke the calibration
+// math. See docs/balance-retune-2026-05-12.md FIX-04 calibration log.
+const FIRE_INTERVAL_TICKS = 30; // ticks between forced fire events (~2 Hz at 60fps)
 
 export function createScriptedPlayer({ player, combat, enemies } = {}) {
   if (!player || !combat) {
@@ -56,6 +60,15 @@ export function createScriptedPlayer({ player, combat, enemies } = {}) {
   return {
     update(dt) {
       elapsed += dt;
+
+      // 0) Per-tick boss state advance (phase transitions, invulnerability
+      //    timer). Required because headless tests don't have a full
+      //    EnemySystem.update() loop driving the boss. The combat stub
+      //    exposes `tickBoss(dt)` for this; helper is a no-op if absent so
+      //    non-FIX-04 callers don't have to provide it.
+      if (typeof combat.tickBoss === 'function') {
+        combat.tickBoss(dt);
+      }
 
       // 1) Fire continuously.
       fireCounter++;

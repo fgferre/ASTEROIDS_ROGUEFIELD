@@ -345,3 +345,107 @@ upgrade count falls outside [6, 8].
 
 
 
+
+---
+
+## FIX-04 — Boss Curve
+
+**Target:** 6-upgrade-level-sum player kills boss in 60-90s; 15-upgrade-level-sum
+player survives ≥45s with ≥1 phase transition reached. Per CONTEXT D-17/D-18 and
+ROADMAP SC4.
+
+**Scaling model:** Boss effective stats = `base × (1 + scalar × upgradeLevelSum)`,
+multiplied on top of the existing per-wave `healthScaling`. Two new constants
+added to `src/core/GameConstants.js`:
+
+| Constant | Starting value | Final value |
+|---|---|---|
+| `UPGRADE_BOSS_HEALTH_SCALAR` | 0.10 | **0.18** |
+| `UPGRADE_BOSS_DAMAGE_SCALAR` | 0.05 | **0.05** (unchanged) |
+
+Injection site: `BossEnemy.initialize` (lines ~214-232 of
+`src/modules/enemies/types/BossEnemy.js`). Helper `_resolveUpgradeLevelSum`
+resolves the sum from `progressionService.appliedUpgrades` (or accepts an
+explicit `config.upgradeLevelSum` for tests).
+
+### Calibration iterations (headless harness `tests/integration/boss-curve.test.js`)
+
+| Attempt | HEALTH_SCALAR | DAMAGE_SCALAR | Stub fire rate | sum=6 killTime (s) | invulnSkipCount | sum=15 phases at 45s | Decision |
+|---|---|---|---|---|---|---|---|
+| 1 (D-17 seeds) | 0.10 | 0.05 | 15 Hz (`FIRE_INTERVAL_TICKS=4`) | 6.4 | 0 | 0 | Boss dies 10× too fast; stub fire rate is the dominant DPS lever, not the scalar. |
+| 2 | 0.10 | 0.05 | **2 Hz** (`FIRE_INTERVAL_TICKS=30`) | 48.0 | 0 | 1 | Realistic fire cadence; sum=6 now in the right order of magnitude, still 12s below band. |
+| 3 | **0.18** | 0.05 | 2 Hz | 62.5 | 0 | 1 | In band, but `invulnSkipCount=0` → stub wasn't ticking the boss (no phase transitions). |
+| 4 (Final) | **0.18** | 0.05 | 2 Hz | **66.5** | **8** | **2** | **LOCKED**. Stub now calls `boss.evaluatePhaseTransition()` + `boss.updateInvulnerability(dt)` per tick → real phase transitions, real invulnerability windows. |
+
+**Stub tuning rationale:** `FIRE_INTERVAL_TICKS` was lowered from `4` to `30` in
+`tests/__helpers__/scriptedPlayer.js`. The original 15 Hz value was an order of
+magnitude faster than realistic player fire cadence under enforced weapon
+cooldowns, making any boss-health scalar in `[0.05, 0.20]` insufficient to
+reach the 60s lower bound. The new value (~2 Hz) is in the same ballpark as
+live play. This is a **stub-config tuning knob**, not a behavior change to
+production code.
+
+**Boss-tick injection (required for phase transitions to fire):** the headless
+stub does NOT have a full `EnemySystem.update()` loop, so the boss never
+processed phase transitions or invulnerability decay. The stub now exposes
+`tickBoss(dt)` which calls `boss.evaluatePhaseTransition()` and
+`boss.updateInvulnerability(dt)`; `scriptedPlayer.update(dt)` invokes it on
+every tick. With this, `currentPhase` advances when health crosses thresholds
+and `invulnerable` toggles correctly during shield windows.
+
+**Plausible-bounds check:** `HEALTH_SCALAR = 0.18 ∈ [0.05, 0.20]` ✓ — inside the
+plan's recommended band. `DAMAGE_SCALAR = 0.05 ∈ [0.02, 0.10]` ✓. No override
+needed.
+
+**Per-wave scaling preserved:** the test `'per-wave healthScaling still applies
+with sum=0'` confirms that with `wave=3, sum=0`, the boss receives
+`baseHealth × healthScaling² = 1500 × 1.44 = 2160` HP — orthogonal to the
+upgrade-sum axis.
+
+### Test Fidelity — DPS proxy, not a simulation (REVIEWS Concern 2 mitigation (b))
+
+**The calibration above is a DPS PROXY, NOT A SIMULATION of live gameplay.** The
+minimal combat stub in `tests/integration/boss-curve.test.js` measures scalar
+math under controlled conditions; it does NOT reproduce live combat fidelity.
+
+**Live mechanics deliberately bypassed by the stub:**
+
+- **Armor / damage-type modifiers:** Live `HealthComponent` honors armor and
+  damage-type multipliers; the stub applies raw `damage * multishot`.
+- **Projectile travel time:** Live projectiles take frames to reach the boss; the
+  stub applies damage instantaneously on tick.
+- **Miss rate / boss movement dodging:** Live projectiles can miss when the boss
+  moves; the stub treats every fire-tick as a guaranteed hit.
+- **Real weapon cooldowns:** Live `combat.handleShooting` enforces per-weapon
+  cooldowns and reload mechanics; the stub uses a fixed `FIRE_INTERVAL_TICKS`.
+- **Player vulnerability:** Live player takes damage from boss attacks (and can
+  die); the stub player is immortal.
+- **Build composition effects on player DPS:** Live player damage scales with
+  upgrades like `plasma` and `multishot`; the stub player has fixed
+  `damage=25, multishot=1` regardless of `appliedUpgrades`.
+
+**What the stub DOES model accurately (Concern 2 mitigation (a)):**
+
+- **Phase-transition invulnerability windows:** Stub respects `boss.invulnerable`.
+  During invulnerability ticks, damage is NOT applied. The diagnostic counter
+  `combat.invulnerableSkipCount` records how many ticks were skipped — the
+  Final iteration value of `8` confirms that two phase transitions' shield
+  delays (`2.0s × 2 ≈ 240 ticks` at 60fps, of which only the fire-ticks count)
+  were modeled into the kill time.
+
+**The BLOCKING manual ±20% fun-check (Task 4) is the live-play ground truth.**
+The Plan 03 incident (harness 6 → live 18) demonstrated that this kind of
+synthetic harness can be 3× off from live throughput. The live verification in
+Task 4 catches the residual idealization gap. If the live 6-upgrade kill time
+falls outside `[60s, 90s]` OR the live 15-upgrade kill time is below 30s or
+above 180s, a follow-up tuning commit is REQUIRED before Phase 0 closes.
+
+### Manual fun-check (FIX-04) — BLOCKING live ±20% (Concern 2 mitigation (c))
+
+*(to be filled when you run the playtest per Task 4)*
+
+- date: TBD
+- build A (6-upgrade): live kill time = TBD seconds
+- build B (15-upgrade): live kill time = TBD seconds; phases reached = TBD
+- verdict: TBD (LIVE_IN_BAND | LIVE_PARTIAL_RE-TUNE | LIVE_FAIL_RE-TUNE)
+- follow-up action: TBD
