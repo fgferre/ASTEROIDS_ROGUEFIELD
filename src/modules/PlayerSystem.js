@@ -131,7 +131,21 @@ class PlayerSystem extends BaseSystem {
     this.maxSpeed = SHIP_MAX_SPEED;
     this.acceleration = SHIP_ACCELERATION;
     this.rotationSpeed = SHIP_ROTATION_SPEED;
-    this.linearDamping = SHIP_LINEAR_DAMPING;
+    // FIX-02: split damping into base (always) + braking (no-thrust frames only).
+    this.baseLinearDamping = SHIP_LINEAR_DAMPING;
+    this.brakingDamping = 0;
+    // Backward-compat read shape: `this.linearDamping` returns the combined total
+    // so any external reader (snapshot / serialize / UI tooltip) keeps a sensible
+    // value. No setter — writes that previously hit `this.linearDamping` must
+    // route through the upgrade-linear-damping handler or mutate `brakingDamping`
+    // directly; any other writer is a latent bug.
+    Object.defineProperty(this, 'linearDamping', {
+      get() {
+        return this.baseLinearDamping + this.brakingDamping;
+      },
+      configurable: true,
+      enumerable: false,
+    });
     this.angularDamping = SHIP_ANGULAR_DAMPING;
 
     // === STATS DO JOGADOR ===
@@ -361,10 +375,16 @@ class PlayerSystem extends BaseSystem {
     });
 
     this.registerEventListener('upgrade-linear-damping', (data) => {
-      this.linearDamping = this.linearDamping * data.multiplier;
+      // FIX-02: mutate brakingDamping only. baseLinearDamping is invariant.
+      // Formula preserves the upgrade catalog's intent: "multiplier 1.30" means
+      // "+30% damping during stops" — applied to the cumulative effective total,
+      // then projected back onto the braking-only component.
+      const previousTotal = this.baseLinearDamping + this.brakingDamping;
+      const newTotal = previousTotal * data.multiplier;
+      this.brakingDamping = Math.max(0, newTotal - this.baseLinearDamping);
       console.log(
-        '[PlayerSystem] Linear damping adjusted to',
-        this.linearDamping
+        '[PlayerSystem] Braking damping adjusted to',
+        this.brakingDamping
       );
     });
 
@@ -744,8 +764,16 @@ class PlayerSystem extends BaseSystem {
       this.velocity.vy -= fwd.y * accelStep * thrAux;
     }
 
-    // Amortecimento ambiente
-    const linearDamp = Math.exp(-this.linearDamping * deltaTime);
+    // Amortecimento ambiente — FIX-02: split damping with conditional gate.
+    // baseLinearDamping always applies; brakingDamping applies ONLY on frames
+    // where no manual thrust input is active. This preserves the braking
+    // upgrade's "Paradas mais rápidas" intent without making active flight
+    // sluggish. The auto-damping thrusters (above) still fire during coast;
+    // brakingDamping is the additive component layered on top of base.
+    const noManualThrust = !isMainManual && !isAuxManual;
+    const effectiveDamping =
+      this.baseLinearDamping + (noManualThrust ? this.brakingDamping : 0);
+    const linearDamp = Math.exp(-effectiveDamping * deltaTime);
     this.velocity.vx *= linearDamp;
     this.velocity.vy *= linearDamp;
 
@@ -1450,7 +1478,11 @@ class PlayerSystem extends BaseSystem {
     this.maxSpeed = SHIP_MAX_SPEED;
     this.acceleration = SHIP_ACCELERATION;
     this.rotationSpeed = SHIP_ROTATION_SPEED;
-    this.linearDamping = SHIP_LINEAR_DAMPING;
+    // FIX-02: split damping — reset both components. baseLinearDamping returns
+    // to ship default; brakingDamping clears any accumulated braking_system
+    // upgrade contribution.
+    this.baseLinearDamping = SHIP_LINEAR_DAMPING;
+    this.brakingDamping = 0;
     this.angularDamping = SHIP_ANGULAR_DAMPING;
     this.invulnerableTimer = 0;
     this.driftFactor = 0;
