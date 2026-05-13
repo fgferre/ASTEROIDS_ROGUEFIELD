@@ -15,6 +15,7 @@ import {
 import { PerformanceMonitor } from './utils/PerformanceMonitor.js';
 import { bootstrapServices } from './bootstrap/bootstrapServices.js';
 import { mobileGuard } from './bootstrap/mobileGuard.js';
+import { activateProfileHarness } from './bootstrap/profileHarness.js';
 import {
   DEFAULT_POOL_CONFIG,
   DEFAULT_GC_OPTIONS,
@@ -725,6 +726,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     await initializeDevStatsPanel();
+
+    // INFRA-01: ?profile=<scenario> activates the in-browser performance harness.
+    // No-op when the URL flag is absent. Mutates gameState.randomSeed when active.
+    activateProfileHarness({ gameState, performanceMonitor });
+
     init();
   })();
 });
