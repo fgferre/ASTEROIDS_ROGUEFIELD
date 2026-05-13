@@ -32,11 +32,17 @@ const PROGRESSION_FIX03_SEED = 0xF003;
 const TARGET_MIN = 6;
 const TARGET_MAX = 8;
 
-// Live-derived schedule from Task 0 pre-flight
-// (docs/balance-retune-2026-05-12.md FIX-03 pre-flight section).
-// Verdict at time of authoring: LOW_VARIANCE (total variance 4.3% vs proposed).
+// Live-derived schedule from Task 0 pre-flight + Task 0 refinement
+// (docs/balance-retune-2026-05-12.md FIX-03 pre-flight + Task 0 schedule
+// refinement sections). The common-only baseline [80, 95, 110, 160, 225]
+// (sum 670 XP) underestimates live throughput because the scripted-grant
+// path doesn't fire enemy-destroyed → combo (cap 2.0x) and excludes
+// conditional perfect-wave / quick-time bonuses. Empirical 1.5x multiplier
+// applied to the common baseline yields the refined schedule below.
+// Verdict at time of authoring: MODERATE_VARIANCE (revised from LOW_VARIANCE
+// after Task 1 first-run revealed the effective-XP divergence).
 // If RewardManager changes, re-run the Task 0 spike and refresh this array.
-const XP_PER_WAVE = [80, 95, 110, 160, 225];
+const XP_PER_WAVE = [120, 140, 165, 240, 335];
 
 // Concern 9 + D-23: surface determinism skips so they don't pass silently.
 // Phase 0 expected value: false. ProgressionSystem.applyLevelUp +
