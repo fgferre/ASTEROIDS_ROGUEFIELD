@@ -207,7 +207,32 @@ variability per D-13).
 | 8 | 1.20 | 40 | 5 | 9 | Below band |
 | 9 | 1.18 | 45 | 5 | 9 | Below band |
 | 10 | 1.10 | 50 | 6 | 11 | **In band** — alternative equilibrium |
-| **Final** | **1.15** | **40** | **6** | **11** | **LOCKED** |
+| ~~Final-v1~~ | ~~1.15~~ | ~~40~~ | ~~6~~ | ~~11~~ | ~~LOCKED~~ — **overridden 2026-05-13**, see post-playtest correction below |
+| 11 | 1.40 | 150 | 2 | ~6 | **In harness band [2,3] after recalibration** — projects live ≈ 6 via 3x ratio |
+| **Final-v2** | **1.40** | **150** | **2 (harness)** | **TBD (live)** | **LOCKED pending live re-verification** |
+
+---
+
+### Post-live-playtest correction (2026-05-13)
+
+**Trigger:** First live playtest under Final-v1 (`1.15 / 40`) yielded "all upgrades acquired" by the boss — confirming the executor's stated risk that the harness's missing combo / perfect-wave / quick-kill XP paths cause it to UNDER-report live throughput.
+
+**Empirically observed harness-to-live ratio:** 3× (harness 6 → live ~18). The originally-estimated 2× was too low.
+
+**Recalibration:**
+
+- Restored CONTEXT.md D-12's prescribed direction: `PROGRESSION_LEVEL_SCALING = 1.40` (was 1.20 original / 1.15 v1) and `PROGRESSION_INITIAL_XP_REQUIREMENT = 150` (was 100 original / 40 v1). These values match D-12's exact recommendation.
+- Adjusted harness assertion band from `[6, 8]` (which assumed harness ≈ live) to `[2, 3]` (which derives from `[LIVE_TARGET_MIN, LIVE_TARGET_MAX] / HARNESS_LIVE_RATIO`). The constant `HARNESS_LIVE_RATIO = 3` is exported in `tests/integration/progression-rate.test.js` with a comment explaining its empirical basis.
+
+**Why the v1 OVERRIDE was wrong:**
+
+The v1 OVERRIDE rationale (lines 219–236) argued the harness was UNDER-counting upgrades because of missing bonus paths, and therefore the harness should be tuned DOWNWARD to make the in-harness band match live. That logic is inverted: a harness that under-counts already lands LOWER than live, so lowering the knobs to push the harness INTO `[6, 8]` would necessarily push live ABOVE `[6, 8]` — which is exactly what the playtest revealed. The correct response is to KEEP the band-target on live (per ROADMAP SC3) and translate it through the empirical ratio into a harness band. That is what v2 does.
+
+**Verification expectations:**
+
+- Harness with `1.40 / 150` now reports `appliedUpgrades.size: 2` and passes the recalibrated test (band `[2, 3]`).
+- Live playtest is expected to yield 6–9 distinct upgrades. The Task 3 BLOCKING gate (Concern 1 mitigation (b)) re-runs against this expectation.
+- Full Vitest suite at HEAD: 47 files / 328 tests pass.
 
 **Final values:**
 - `PROGRESSION_LEVEL_SCALING = 1.15` (was 1.20)

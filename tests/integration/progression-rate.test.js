@@ -29,8 +29,29 @@ import ProgressionSystem from '../../src/modules/ProgressionSystem.js';
 
 // Distinct from AIM_REGRESSION_SEED (0xA1A1) per D-05 / D-13 convention.
 const PROGRESSION_FIX03_SEED = 0xF003;
-const TARGET_MIN = 6;
-const TARGET_MAX = 8;
+
+// FIX-03 recalibration (2026-05-13 — post-live-playtest correction):
+//
+// ROADMAP SC3 specifies the LIVE-PLAY target band as [6, 8] distinct
+// upgrades at end of Wave 5. The first calibration pass (constants
+// 1.15 / 40) landed the harness at size=6 but live play yielded "all
+// upgrades acquired" (~18), confirming the executor's own warning
+// that this harness omits the combo multiplier (cap 2.0x) and
+// perfect-wave / quick-kill bonus paths. Empirically observed
+// HARNESS_LIVE_RATIO ≈ 3 (harness 6 → live 18).
+//
+// To keep the harness as a CI regression lock, the assertion band is
+// adjusted by that empirical ratio: live [6, 8] / 3 ≈ harness [2, 3].
+// The locked constants 1.40 / 150 match CONTEXT.md D-12 prescription
+// and produce harness size = 2 (low edge), projecting live ≈ 6.
+//
+// If RewardManager / WaveManager / combo mechanics change, re-derive
+// HARNESS_LIVE_RATIO from a fresh live playtest before adjusting bounds.
+const HARNESS_LIVE_RATIO = 3;
+const LIVE_TARGET_MIN = 6;
+const LIVE_TARGET_MAX = 8;
+const TARGET_MIN = Math.floor(LIVE_TARGET_MIN / HARNESS_LIVE_RATIO); // 2
+const TARGET_MAX = Math.ceil(LIVE_TARGET_MAX / HARNESS_LIVE_RATIO); // 3
 
 // Live-derived schedule from Task 0 pre-flight + Task 0 refinement
 // (docs/balance-retune-2026-05-12.md FIX-03 pre-flight + Task 0 schedule
@@ -137,7 +158,7 @@ describe('Progression rate harness (FIX-03)', () => {
     }
   );
 
-  it('appliedUpgrades.size lands in target band [6, 8] after Wave 5', () => {
+  it('appliedUpgrades.size lands in harness band [2, 3] after Wave 5 (projects live [6, 8] via 3x ratio)', () => {
     const upgrades = runWave5Simulation();
     const size = upgrades.size;
     // Diagnostic line — Task 2 reads this to iterate the constants.
