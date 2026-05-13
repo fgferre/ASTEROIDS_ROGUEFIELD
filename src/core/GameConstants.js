@@ -68,7 +68,13 @@ export const PROGRESSION_COMBO_MULTIPLIER_CAP = 2.0;
 // per-wave healthScaling. Starting values per CONTEXT D-17 — calibrated via
 // tests/integration/boss-curve.test.js and may be re-tuned in Task 3.
 export const UPGRADE_BOSS_HEALTH_SCALAR = 0.18;
-export const UPGRADE_BOSS_DAMAGE_SCALAR = 0.05;
+// FIX-04 Task 4 follow-up (2026-05-13): dropped from 0.05 -> 0.00 after live
+// playtest at 0.18 / 0.05 killed the 6-upgrade player. The harness stub didn't
+// model player vulnerability, so the damage bump (1.30x at sum=6) wasn't
+// reflected as a lethality risk. HP scaling alone meets the "boss not melted
+// by 15-upgrade builds" goal; damage scaling can be re-introduced in a later
+// phase if 15-upgrade builds trivialize the boss after HP scaling is in place.
+export const UPGRADE_BOSS_DAMAGE_SCALAR = 0.00;
 
 // Re-export all constants from focused files for backward compatibility
 export * from '../data/constants/physics.js';

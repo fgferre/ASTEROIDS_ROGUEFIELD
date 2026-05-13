@@ -449,3 +449,20 @@ above 180s, a follow-up tuning commit is REQUIRED before Phase 0 closes.
 - build B (15-upgrade): live kill time = TBD seconds; phases reached = TBD
 - verdict: TBD (LIVE_IN_BAND | LIVE_PARTIAL_RE-TUNE | LIVE_FAIL_RE-TUNE)
 - follow-up action: TBD
+
+### Live follow-up tuning (Task 4 — 2026-05-13)
+
+**Attempt 1 (post-Task-3 lock):** Player died at the boss in live play.
+
+- scalars at time of death: `HEALTH=0.18`, `DAMAGE=0.05`
+- diagnosis: harness doesn't model player vulnerability — stub player is
+  immortal. Live boss at sum=6 deals `45 × 1.30 = 59` contact + `35 × 1.30 = 46`
+  projectile, ~30% above base. Combined with 2.08× tankier HP, lethality
+  exceeded what the 6-upgrade player could sustain.
+- follow-up commit: `DAMAGE_SCALAR 0.05 → 0.00`. HP scaling alone meets the
+  "boss not melted by 15-upgrade builds" goal (D-17); damage scaling can be
+  re-introduced in a later phase if 15-upgrade trivializes the boss.
+- `HEALTH_SCALAR` retained at 0.18 (harness still 6/6 with new values, killTime
+  unchanged at 66.5s in band).
+
+**Attempt 2:** pending re-run by developer.
