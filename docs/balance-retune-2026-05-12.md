@@ -209,7 +209,7 @@ variability per D-13).
 | 10 | 1.10 | 50 | 6 | 11 | **In band** — alternative equilibrium |
 | ~~Final-v1~~ | ~~1.15~~ | ~~40~~ | ~~6~~ | ~~11~~ | ~~LOCKED~~ — **overridden 2026-05-13**, see post-playtest correction below |
 | 11 | 1.40 | 150 | 2 | ~6 | **In harness band [2,3] after recalibration** — projects live ≈ 6 via 3x ratio |
-| **Final-v2** | **1.40** | **150** | **2 (harness)** | **TBD (live)** | **LOCKED pending live re-verification** |
+| **Final-v2** | **1.40** | **150** | **2 (harness)** | **in band (live)** | **LOCKED — live verified 2026-05-13** |
 
 ---
 
