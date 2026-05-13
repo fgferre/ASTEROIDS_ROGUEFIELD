@@ -14,6 +14,7 @@ import {
 } from './core/debugLogging.js';
 import { PerformanceMonitor } from './utils/PerformanceMonitor.js';
 import { bootstrapServices } from './bootstrap/bootstrapServices.js';
+import { mobileGuard } from './bootstrap/mobileGuard.js';
 import {
   DEFAULT_POOL_CONFIG,
   DEFAULT_GC_OPTIONS,
@@ -715,6 +716,14 @@ function renderGame() {
 document.addEventListener('DOMContentLoaded', () => {
   void (async () => {
     bootstrapDebugLogging();
+
+    // A11Y-08: BLOCK on touch devices unless ?desktop=force override is present.
+    // Writes Canvas2D notice on the blocked path; no DI / no Three.js / no Web Audio.
+    const guard = mobileGuard();
+    if (guard.blocked) {
+      return;
+    }
+
     await initializeDevStatsPanel();
     init();
   })();
