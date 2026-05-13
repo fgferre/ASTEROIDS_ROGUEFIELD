@@ -3,6 +3,10 @@ import {
   BOSS_CONFIG,
   BOSS_VISUAL_VARIANT,
 } from '../../../data/enemies/boss.js';
+import {
+  UPGRADE_BOSS_HEALTH_SCALAR,
+  UPGRADE_BOSS_DAMAGE_SCALAR,
+} from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
@@ -213,17 +217,26 @@ export class BossEnemy extends BaseEnemy {
 
     const baseHealth = config.health ?? defaults.health ?? 1500;
     const scaling = config.healthScaling ?? defaults.healthScaling ?? 1;
-    const scaledHealth =
+    const waveScaled =
       baseHealth * Math.pow(Math.max(1, scaling), waveNumber - 1);
-    this.maxHealth = Math.ceil(scaledHealth);
+    const upgradeLevelSum = this._resolveUpgradeLevelSum(config);
+    const upgradeHealthFactor = 1 + UPGRADE_BOSS_HEALTH_SCALAR * upgradeLevelSum; // FIX-04
+    this.upgradeLevelSum = upgradeLevelSum;
+    this.maxHealth = Math.ceil(waveScaled * upgradeHealthFactor);
     this.health = config.currentHealth ?? this.maxHealth;
     this.healthInitialized = true;
 
     this.speed = config.speed ?? defaults.speed ?? 60;
     this.acceleration = config.acceleration ?? defaults.acceleration ?? 120;
-    this.contactDamage = config.contactDamage ?? defaults.contactDamage ?? 45;
-    this.projectileDamage =
+    const baseContactDamage =
+      config.contactDamage ?? defaults.contactDamage ?? 45;
+    const baseProjectileDamage =
       config.projectileDamage ?? defaults.projectileDamage ?? 35;
+    const upgradeDamageFactor = 1 + UPGRADE_BOSS_DAMAGE_SCALAR * upgradeLevelSum; // FIX-04
+    this.contactDamage = Math.round(baseContactDamage * upgradeDamageFactor);
+    this.projectileDamage = Math.round(
+      baseProjectileDamage * upgradeDamageFactor
+    );
 
     this.safeDistance = Number.isFinite(config.safeDistance)
       ? config.safeDistance
@@ -385,6 +398,38 @@ export class BossEnemy extends BaseEnemy {
     }
 
     return this;
+  }
+
+  /**
+   * Returns the cumulative upgrade-level sum from progression.
+   * Returns 0 if the progression service is unavailable or appliedUpgrades is
+   * empty/missing.
+   *
+   * FIX-04 (Phase 0): drives boss stat scaling at construction time. The dual
+   * lookup (getAllUpgrades first, then appliedUpgrades Map fallback) lets tests
+   * pass a plain `{ appliedUpgrades: new Map([...]) }` mock OR a config-level
+   * `upgradeLevelSum` literal without standing up the full ProgressionSystem.
+   */
+  _resolveUpgradeLevelSum(config = {}) {
+    const explicit = config.upgradeLevelSum;
+    if (Number.isFinite(explicit) && explicit >= 0) {
+      return Math.floor(explicit);
+    }
+    const services = this.system?.dependencies ?? this.system ?? {};
+    const progression = services.progression ?? services.progressionService;
+    const upgrades = (typeof progression?.getAllUpgrades === 'function')
+      ? progression.getAllUpgrades()
+      : (progression?.appliedUpgrades instanceof Map
+        ? progression.appliedUpgrades
+        : null);
+    if (!upgrades || typeof upgrades.values !== 'function') {
+      return 0;
+    }
+    let sum = 0;
+    for (const value of upgrades.values()) {
+      if (Number.isFinite(value) && value > 0) sum += value;
+    }
+    return sum;
   }
 
   resolveRandom(config = {}) {
