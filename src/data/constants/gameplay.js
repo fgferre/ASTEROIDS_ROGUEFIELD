@@ -105,6 +105,14 @@ export const SHIELD_IMPACT_DAMAGE_PER_LEVEL = 4;
 
 // === COMBAT ===
 
+// Plan 01.07 FIX-05 — spread + aim mode defaults.
+// Defaults chosen so existing M1 players experience the centerline-fixed
+// CONCENTRATED behavior silently; fan + manual are opt-in toggles via [G] / [T].
+export const COMBAT_SPREAD_MODE_DEFAULT = 'concentrated';
+export const COMBAT_AIM_MODE_DEFAULT = 'auto';
+export const COMBAT_DEFAULT_KEYBIND_TOGGLE_SPREAD = 'KeyG';
+export const COMBAT_DEFAULT_KEYBIND_TOGGLE_AIM = 'KeyT';
+
 export const COMBAT_SHOOT_COOLDOWN = 0.25; // [NEO-ARCADE] Faster fire rate (was 0.3)
 
 export const COMBAT_TARGETING_RANGE = 400;

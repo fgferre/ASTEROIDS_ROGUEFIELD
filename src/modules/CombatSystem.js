@@ -19,9 +19,15 @@ import {
   COMBAT_PREDICTION_TIME,
   COMBAT_AIMING_UPGRADE_CONFIG,
   COMBAT_MULTISHOT_SPREAD_STEP,
+  COMBAT_SPREAD_MODE_DEFAULT,
+  COMBAT_AIM_MODE_DEFAULT,
   PLAYER_BULLET_OFFSCREEN_MARGIN,
   PLAYER_BULLET_OFFSCREEN_GRACE,
 } from '../data/constants/gameplay.js';
+
+// Plan 01.07: validate spread/aim mode mutations to prevent T-07-02 tampering.
+const VALID_SPREAD_MODES = new Set(['concentrated', 'fan']);
+const VALID_AIM_MODES = new Set(['auto', 'manual']);
 import { ENEMY_TYPES, BOSS_CONFIG } from '../data/constants/visual.js';
 import {
   ASTEROID_VARIANTS,
@@ -56,6 +62,19 @@ class CombatSystem extends BaseSystem {
     this.shootCooldown = Number.isFinite(COMBAT_SHOOT_COOLDOWN)
       ? Math.max(0, COMBAT_SHOOT_COOLDOWN)
       : 0.3;
+
+    // Plan 01.07 FIX-05 — spread + aim mode state. Defaults from gameplay.js.
+    // Default = concentrated + auto so the centerline fix lands silently for
+    // existing M1 players.
+    this.spreadMode = VALID_SPREAD_MODES.has(COMBAT_SPREAD_MODE_DEFAULT)
+      ? COMBAT_SPREAD_MODE_DEFAULT
+      : 'concentrated';
+    this.aimMode = VALID_AIM_MODES.has(COMBAT_AIM_MODE_DEFAULT)
+      ? COMBAT_AIM_MODE_DEFAULT
+      : 'auto';
+    // Snapshot of behavioral flags so manual-mode toggle can restore on switchback.
+    this._aimModeFlagSnapshot = null;
+    this.needsRetarget = false;
 
     // === CONFIGURAÇÕES ===
     this.targetingRange = Number.isFinite(COMBAT_TARGETING_RANGE)
@@ -589,12 +608,39 @@ class CombatSystem extends BaseSystem {
         const shouldApplySpread =
           totalShots > assignments.length || assignments.length <= 1;
         if (shouldApplySpread) {
-          aimPoint = this.applyMultishotSpread(
-            playerPos,
-            aimPoint,
-            shotIndex,
-            totalShots
-          );
+          if (this.spreadMode === 'concentrated') {
+            // Plan 01.07 Task 4: route Mode 2 multishot through the
+            // concentrated-fire helper. Compute the full lane set ONCE on
+            // shotIndex 0, cache it on the loop closure, and read per-shot
+            // from the cache. The cache is populated when shotIndex === 0
+            // and the same lane group is used for all subsequent shots in
+            // the volley.
+            if (shotIndex === 0) {
+              const enemy = assignment.enemy;
+              this._concentratedLanes = this.applyConcentratedFire(
+                {
+                  kind: 'target',
+                  enemy,
+                  predictedAim: aimPoint,
+                  fireOrigin: playerPos,
+                },
+                totalShots,
+                playerStats
+              );
+            }
+            const lane = this._concentratedLanes?.[shotIndex];
+            if (lane) {
+              fireOrigin = { ...lane.fireOrigin };
+              aimPoint = { ...lane.aimPoint };
+            }
+          } else {
+            aimPoint = this.applyMultishotSpread(
+              playerPos,
+              aimPoint,
+              shotIndex,
+              totalShots
+            );
+          }
         }
       }
 
@@ -604,6 +650,7 @@ class CombatSystem extends BaseSystem {
         position: { ...aimPoint },
       });
     }
+    this._concentratedLanes = null;
 
     this.lastShotTime = 0;
 
@@ -654,32 +701,56 @@ class CombatSystem extends BaseSystem {
   }
 
   // [SMART AUTO-FIRE] Helper: Fire forward relative to ship rotation
-  fireForward(playerPos, rotation, playerStats) {
+  fireForward(playerPos, rotation, playerStats, options = {}) {
     const totalShots = Math.max(1, Math.floor(playerStats?.multishot ?? 1));
     const angle = Number.isFinite(rotation) ? rotation : 0;
 
-    // Calculate a point far in front
+    // Plan 01.07 Task 6: manual-aim path passes originOverride = ship-nose
+    // position; the centerline math still uses ship rotation but lanes
+    // spawn from the nose rather than the ship center.
+    const originPos = options?.originOverride
+      ? { ...options.originOverride }
+      : { ...playerPos };
+
+    // Calculate a point far in front of the firing origin
     const range = 1000;
     const baseAim = {
-      x: playerPos.x + Math.cos(angle) * range,
-      y: playerPos.y + Math.sin(angle) * range,
+      x: originPos.x + Math.cos(angle) * range,
+      y: originPos.y + Math.sin(angle) * range,
     };
 
     const firedTargets = [];
 
+    // Plan 01.07 Task 4: precompute concentrated lanes when totalShots > 1.
+    const concentratedLanes =
+      totalShots > 1 && this.spreadMode === 'concentrated'
+        ? this.applyConcentratedFire(
+            { kind: 'direction', angle, originPos },
+            totalShots,
+            playerStats
+          )
+        : null;
+
     for (let shotIndex = 0; shotIndex < totalShots; shotIndex++) {
       let aimPoint = { ...baseAim };
+      let shotOrigin = { ...originPos };
 
       if (totalShots > 1) {
-        aimPoint = this.applyMultishotSpread(
-          playerPos,
-          aimPoint,
-          shotIndex,
-          totalShots
-        );
+        if (concentratedLanes && concentratedLanes[shotIndex]) {
+          const lane = concentratedLanes[shotIndex];
+          shotOrigin = { ...lane.fireOrigin };
+          aimPoint = { ...lane.aimPoint };
+        } else {
+          aimPoint = this.applyMultishotSpread(
+            originPos,
+            aimPoint,
+            shotIndex,
+            totalShots
+          );
+        }
       }
 
-      this.createBullet(playerPos, aimPoint, playerStats.damage);
+      this.createBullet(shotOrigin, aimPoint, playerStats.damage);
       firedTargets.push({
         enemyId: null,
         position: { ...aimPoint },
@@ -693,7 +764,7 @@ class CombatSystem extends BaseSystem {
       // along ship rotation (range = 1000 matching the baseline above).
       const centerlineTarget = { ...baseAim };
       this.eventBus?.emit?.('weapon-fired', {
-        position: playerPos,
+        position: originPos,
         target: firedTargets[0].position,
         centerlineTarget,
         weaponType: 'basic',
@@ -3130,6 +3201,71 @@ class CombatSystem extends BaseSystem {
           ctx.restore();
         }
       );
+    }
+  }
+
+  // === MODE STATE (plan 01.07 FIX-05) ===
+  getSpreadMode() {
+    return this.spreadMode;
+  }
+
+  setSpreadMode(value) {
+    if (!VALID_SPREAD_MODES.has(value)) {
+      // Defensive: ignore invalid value (T-07-02 tampering surface).
+      console.warn(`[CombatSystem] Ignoring invalid spreadMode "${value}"`);
+      return;
+    }
+    this.spreadMode = value;
+  }
+
+  getAimMode() {
+    return this.aimMode;
+  }
+
+  setAimMode(value) {
+    if (!VALID_AIM_MODES.has(value)) {
+      console.warn(`[CombatSystem] Ignoring invalid aimMode "${value}"`);
+      return;
+    }
+
+    if (this.aimMode === value) {
+      return;
+    }
+
+    const previousMode = this.aimMode;
+    this.aimMode = value;
+
+    if (value === 'manual') {
+      // Snapshot the behavioral flags so we can restore them on switchback.
+      this._aimModeFlagSnapshot = {
+        dangerScoreEnabled: this.dangerScoreEnabled,
+        dynamicPredictionEnabled: this.dynamicPredictionEnabled,
+      };
+      // Force-clear target locks — no leak of stale aim affordances.
+      this.currentTarget = null;
+      this.currentTargetLocks = [];
+      this.currentLockAssignments = [];
+      this.predictedAimPoints = [];
+      if (this.predictedAimPointsMap) {
+        this.predictedAimPointsMap.clear();
+      }
+      // Pause behavioral aim flags. Rank-3 cooldownMultiplier IS preserved
+      // (decision a — it's a weapon stat, not an aim behavior).
+      this.dangerScoreEnabled = false;
+      this.dynamicPredictionEnabled = false;
+    } else if (value === 'auto' && previousMode === 'manual') {
+      // Restore behavioral flag snapshot (or re-enable from upgrade rank if no snapshot).
+      if (this._aimModeFlagSnapshot) {
+        this.dangerScoreEnabled = this._aimModeFlagSnapshot.dangerScoreEnabled ?? (this.targetingUpgradeLevel >= 1);
+        this.dynamicPredictionEnabled = this._aimModeFlagSnapshot.dynamicPredictionEnabled ?? (this.targetingUpgradeLevel >= 2);
+        this._aimModeFlagSnapshot = null;
+      } else {
+        this.dangerScoreEnabled = this.targetingUpgradeLevel >= 1;
+        this.dynamicPredictionEnabled = this.targetingUpgradeLevel >= 2;
+      }
+      // Trigger fresh target acquisition next tick (no stale currentTarget reuse).
+      this.needsRetarget = true;
+      this.targetUpdateTimer = this.targetUpdateInterval;
     }
   }
 
