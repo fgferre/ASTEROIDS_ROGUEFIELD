@@ -609,9 +609,29 @@ class CombatSystem extends BaseSystem {
 
     if (firedTargets.length) {
       const firstTarget = firedTargets[0]?.position || null;
+      // Plan 01.07 Task 2: emit the centerline (logical aim point of the
+      // primary locked target) so recoil listeners can react to the centerline
+      // direction rather than the first projectile's lane-offset aim.
+      let centerlineTarget = null;
+      const primaryTarget = this.currentTarget;
+      if (primaryTarget) {
+        const predicted = this.predictedAimPointsMap?.get(primaryTarget.id);
+        if (predicted) {
+          centerlineTarget = { x: predicted.x, y: predicted.y };
+        } else {
+          const fallbackPredicted = this.getPredictedTargetPosition(
+            primaryTarget,
+            playerPos
+          );
+          centerlineTarget = fallbackPredicted
+            ? { x: fallbackPredicted.x, y: fallbackPredicted.y }
+            : { x: primaryTarget.x, y: primaryTarget.y };
+        }
+      }
       this.eventBus?.emit?.('weapon-fired', {
         position: playerPos,
         target: firstTarget,
+        centerlineTarget,
         weaponType: 'basic',
         primaryTargetId: this.currentTarget ? this.currentTarget.id : null,
         targeting: {
@@ -669,9 +689,13 @@ class CombatSystem extends BaseSystem {
     this.lastShotTime = 0;
 
     if (firedTargets.length) {
+      // Plan 01.07 Task 2: centerline = the on-axis aim point at fixed range
+      // along ship rotation (range = 1000 matching the baseline above).
+      const centerlineTarget = { ...baseAim };
       this.eventBus?.emit?.('weapon-fired', {
         position: playerPos,
         target: firedTargets[0].position,
+        centerlineTarget,
         weaponType: 'basic',
         primaryTargetId: null,
         targeting: {

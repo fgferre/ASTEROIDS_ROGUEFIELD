@@ -436,10 +436,14 @@ class PlayerSystem extends BaseSystem {
     });
 
     this.registerEventListener('weapon-fired', (data) => {
-      // Apply recoil when weapon fires
-      if (data?.position && data?.target) {
-        const dx = data.target.x - data.position.x;
-        const dy = data.target.y - data.position.y;
+      // Apply recoil when weapon fires. Per plan 01.07 Task 2, prefer the new
+      // `centerlineTarget` field (the logical aim center, recoil-correct in
+      // concentrated mode where the first projectile's `target` is offset by a
+      // perpendicular lane) and fall back to `target` for backward compatibility.
+      const aimTarget = data?.centerlineTarget ?? data?.target;
+      if (data?.position && aimTarget) {
+        const dx = aimTarget.x - data.position.x;
+        const dy = aimTarget.y - data.position.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
 
         if (distance > 0) {
@@ -1329,6 +1333,26 @@ class PlayerSystem extends BaseSystem {
 
   getShieldRadius() {
     return this.getHullBoundingRadius() + this.getShieldPadding();
+  }
+
+  /**
+   * Returns the world-coordinate position of the ship nose for a given rotation.
+   *
+   * Used by manual-aim mode (plan 01.07 Task 6) so shots leave from the nose in
+   * the ship's current rotation direction. The math is intentionally simple:
+   * `{x: pos.x + cos(rotation) * radius, y: pos.y + sin(rotation) * radius}`.
+   *
+   * @param {number} rotation - Ship rotation in radians.
+   * @returns {{x: number, y: number}}
+   */
+  getNosePosition(rotation) {
+    const angle = Number.isFinite(rotation) ? rotation : 0;
+    const radius = this.getHullBoundingRadius();
+    const position = this.getPosition();
+    return {
+      x: position.x + Math.cos(angle) * radius,
+      y: position.y + Math.sin(angle) * radius,
+    };
   }
 
   getShieldImpactProfile() {
