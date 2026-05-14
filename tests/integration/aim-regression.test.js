@@ -808,6 +808,19 @@ describe('FIX-05 centerline invariant + toggles', () => {
       eventBus.emit('toggle-aim-mode'); // no payload at all
       expect(combat.getAimMode()).toBe('auto');
     });
+
+    it('F10: gameplay.js exports COMBAT_BULLET_RADIUS for clamp math (plan artifact contract)', async () => {
+      // Codex review F10: the plan's <artifacts> block for
+      // src/data/constants/gameplay.js requires `COMBAT_BULLET_RADIUS`
+      // exported for clamp math. The original landing added mode/keybind
+      // constants but not this one. The clamp uses BULLET_SIZE from
+      // core/GameConstants — `COMBAT_BULLET_RADIUS` is the gameplay-domain
+      // alias the plan promised.
+      const gameplay = await import('../../src/data/constants/gameplay.js');
+      const { BULLET_SIZE: coreBullet } = await import('../../src/core/GameConstants.js');
+      expect(gameplay.COMBAT_BULLET_RADIUS).toBeDefined();
+      expect(gameplay.COMBAT_BULLET_RADIUS).toBe(coreBullet);
+    });
   });
 
   // Fix-pass — defensive regression locks for Findings F3 and F4 (Codex review).
