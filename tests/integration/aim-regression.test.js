@@ -2373,6 +2373,133 @@ describe('FIX-05 centerline invariant + toggles', () => {
     });
   });
 
+  // Fix-pass-3 Finding 4: the lock-ring palette is currently wired to the
+  // assignment INDEX (`hue = 52 + index * 36` at CombatSystem.js:3400) so
+  // ring colors rotate around assignment order instead of communicating the
+  // threat level the planner promised: low-threat = #00F2FF (thruster cyan),
+  // high-threat = #FF3131 (alert red). The plan's must_haves list does NOT
+  // pin a specific medium-threat hex, so we chose #FFA800 (warning amber).
+  //
+  // Observable contract: when the player's currentTarget has a HIGH-threat
+  // cache entry, the stroke color used to draw its lock ring must equal the
+  // alert palette color (or contain the alert hex). When LOW-threat, it
+  // must match the cyan palette. Verified by mocking the canvas context and
+  // capturing strokeStyle assignments.
+  describe('Finding 4: lock-ring palette tied to threat tier (not assignment index)', () => {
+    // Helper: minimal canvas-2d stub that records strokeStyle assignments.
+    function makePaletteCtxStub() {
+      const calls = [];
+      const record = (name) => (...args) => calls.push({ name, args });
+      return {
+        calls,
+        save: record('save'),
+        restore: record('restore'),
+        beginPath: record('beginPath'),
+        arc: record('arc'),
+        stroke: record('stroke'),
+        fill: record('fill'),
+        moveTo: record('moveTo'),
+        lineTo: record('lineTo'),
+        setLineDash: record('setLineDash'),
+        drawImage: record('drawImage'),
+        rotate: record('rotate'),
+        translate: record('translate'),
+        createRadialGradient: () => ({ addColorStop: () => {} }),
+        set fillStyle(v) { calls.push({ name: 'set:fillStyle', args: [v] }); },
+        set strokeStyle(v) { calls.push({ name: 'set:strokeStyle', args: [v] }); },
+        set lineWidth(v) { calls.push({ name: 'set:lineWidth', args: [v] }); },
+        set globalAlpha(v) { calls.push({ name: 'set:globalAlpha', args: [v] }); },
+        set globalCompositeOperation(v) { calls.push({ name: 'set:gco', args: [v] }); },
+        set font(v) { calls.push({ name: 'set:font', args: [v] }); },
+        canvas: { width: 800, height: 600 },
+      };
+    }
+
+    function strokeStylesFor(ctx) {
+      return ctx.calls
+        .filter((c) => c.name === 'set:strokeStyle')
+        .map((c) => c.args[0]);
+    }
+
+    it('Finding 4: HIGH-threat target renders lock ring in the alert (red) palette', () => {
+      const { combat, eventBus } = setupCombatHarness();
+      eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+      const target = combat.currentTarget;
+      expect(target).not.toBeNull();
+
+      // Force the cache to mark this target as HIGH threat by hand. The
+      // production code reads `targetThreatCache.get(enemy.id)` to derive
+      // the tier; we set urgency well above the high-threshold so the
+      // palette code path selects red.
+      combat.targetThreatCache.set(target.id, {
+        enemy: target,
+        distance: 200,
+        score: 5,
+        breakdown: { urgency: 20, impact: { urgency: 20 } },
+      });
+
+      const ctx = makePaletteCtxStub();
+      combat.render(ctx);
+
+      // Lock-ring strokes appear among all strokeStyle assignments. The
+      // first ring belongs to the primary (currentTarget). The expected
+      // hex is #FF3131 (the alert red from the plan visual direction).
+      const styles = strokeStylesFor(ctx).map(String);
+      const matchesRed = styles.some((s) => s.toLowerCase().includes('ff3131'));
+      expect(matchesRed).toBe(true);
+    });
+
+    it('Finding 4: LOW-threat target renders lock ring in the thruster (cyan) palette', () => {
+      const { combat, eventBus } = setupCombatHarness();
+      eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+      const target = combat.currentTarget;
+      expect(target).not.toBeNull();
+
+      // Force a LOW-threat cache entry (urgency near zero).
+      combat.targetThreatCache.set(target.id, {
+        enemy: target,
+        distance: 800,
+        score: 0,
+        breakdown: { urgency: 0, impact: { urgency: 0 } },
+      });
+
+      const ctx = makePaletteCtxStub();
+      combat.render(ctx);
+
+      const styles = strokeStylesFor(ctx).map(String);
+      const matchesCyan = styles.some((s) => s.toLowerCase().includes('00f2ff'));
+      expect(matchesCyan).toBe(true);
+    });
+
+    it('Finding 4: MEDIUM-threat target renders lock ring in the warning (amber) palette', () => {
+      const { combat, eventBus } = setupCombatHarness();
+      eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+      const target = combat.currentTarget;
+      expect(target).not.toBeNull();
+
+      // Force a MEDIUM-threat cache entry — urgency in the middle band.
+      combat.targetThreatCache.set(target.id, {
+        enemy: target,
+        distance: 400,
+        score: 2,
+        breakdown: { urgency: 10, impact: { urgency: 10 } },
+      });
+
+      const ctx = makePaletteCtxStub();
+      combat.render(ctx);
+
+      const styles = strokeStylesFor(ctx).map(String);
+      const matchesAmber = styles.some((s) => s.toLowerCase().includes('ffa800'));
+      expect(matchesAmber).toBe(true);
+    });
+  });
+
   // Fix-pass-3 Finding 2: when the per-enemy cap filters assignments from
   // (e.g.) 4 lanes down to 2, the surviving lanes' geometry must match the
   // NEW 2-lane layout — not the old 4-lane geometry. The pre-fix-pass-3
