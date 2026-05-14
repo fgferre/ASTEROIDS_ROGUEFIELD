@@ -1333,6 +1333,114 @@ describe('FIX-05 centerline invariant + toggles', () => {
       const arcs = countArcCallsOnTarget(ctx, targetSnapshot);
       expect(arcs).toBe(0);
     });
+
+    // Fix-pass (F11): Codex review noted rank-2 predicted-marker render and
+    // rank-3 multi-lock indicator render had no test coverage. The render
+    // path gates these blocks at `targetingRank >= 2 && aimMode !== 'manual'`
+    // and `renderMultiLock === (rank >= 3)` respectively. These tests assert
+    // BOTH the gated content lands (when expected) AND it stays gated (when
+    // suppressed).
+    it('F11 (rank 2): predicted-impact marker drawn at the predicted-aim position', () => {
+      // Rank 2 requires the predicted point to be different from the target
+      // position, so we use a MOVING target (the harness's Concern-4 setup).
+      const { combat, eventBus } = setupCombatHarness({
+        targetPosition: MOVING_TARGET_POSITION,
+        targetVelocity: MOVING_TARGET_VELOCITY,
+      });
+      eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
+      eventBus.emit('upgrade-aiming-suite', {
+        level: 2,
+        dynamicPrediction: {
+          minLeadTime: 0.05,
+          maxLeadTime: 1,
+          fallbackLeadTime: 0.32,
+        },
+      });
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+      expect(combat.targetingUpgradeLevel).toBeGreaterThanOrEqual(2);
+      expect(combat.usingDynamicPrediction()).toBe(true);
+      expect(combat.predictedAimPoints.length).toBeGreaterThan(0);
+      const predicted = combat.predictedAimPoints[0].position;
+      expect(predicted).toBeDefined();
+
+      const ctx = makeCtxStub();
+      combat.render(ctx);
+
+      // At least one arc call should land near the PREDICTED position
+      // (separate from the lock-ring arc which lands at target.x/y).
+      const predictedArcs = ctx.calls.filter(
+        (c) =>
+          c.name === 'arc' &&
+          Math.abs(c.args[0] - predicted.x) < 1 &&
+          Math.abs(c.args[1] - predicted.y) < 1
+      );
+      expect(predictedArcs.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('F11 (rank 3): multi-lock indicator arcs drawn at ALL lock assignments (not just primary)', () => {
+      const extraEnemies = [
+        { id: 'enemy-2', x: 650, y: 320 },
+        { id: 'enemy-3', x: 620, y: 280 },
+        { id: 'enemy-4', x: 580, y: 340 },
+      ];
+      const { combat, eventBus, playerState } = setupCombatHarness({
+        multishot: 4,
+        extraEnemies,
+      });
+      playerState.multishot = 4;
+      // computeLockCount reads from this.lastKnownPlayerStats which is only
+      // populated by `update()` (not `updateTargeting`). Seed it explicitly
+      // so the rank-3 lock pipeline sees multishot=4 and allocates 4 locks.
+      combat.lastKnownPlayerStats = { multishot: 4, damage: 10 };
+      eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
+      eventBus.emit('upgrade-aiming-suite', { level: 2 });
+      eventBus.emit('upgrade-aiming-suite', {
+        level: 3,
+        multiLockTargets: 4,
+        cooldownMultiplier: 0.92,
+      });
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+      expect(combat.targetingUpgradeLevel).toBeGreaterThanOrEqual(3);
+
+      const assignments = combat.currentLockAssignments;
+      expect(assignments.length).toBeGreaterThanOrEqual(2);
+
+      const ctx = makeCtxStub();
+      combat.render(ctx);
+
+      // Lock-ring rendering: one arc + stroke pair per assignment. Verify at
+      // least 2 DISTINCT lock-ring arc positions land (proving rank-3
+      // multi-lock indicators draw all enemies, not just the primary).
+      const uniqueEnemyPositions = new Set();
+      assignments.forEach((a) => {
+        if (a && a.enemy) {
+          uniqueEnemyPositions.add(`${Math.round(a.enemy.x)},${Math.round(a.enemy.y)}`);
+        }
+      });
+      expect(uniqueEnemyPositions.size).toBeGreaterThanOrEqual(2);
+
+      const arcHits = new Set();
+      ctx.calls
+        .filter((c) => c.name === 'arc')
+        .forEach((c) => {
+          const xKey = Math.round(c.args[0]);
+          const yKey = Math.round(c.args[1]);
+          // Match to any of the assignment positions (within ±50 px so the
+          // arc-radius offset doesn't disqualify the match).
+          for (const pos of uniqueEnemyPositions) {
+            const [px, py] = pos.split(',').map(Number);
+            if (Math.abs(px - xKey) < 2 && Math.abs(py - yKey) < 2) {
+              arcHits.add(pos);
+              break;
+            }
+          }
+        });
+      // Rank-3 contract: arcs land at AT LEAST 2 distinct lock positions
+      // (proving the multi-lock loop is rendering more than just index 0).
+      expect(arcHits.size).toBeGreaterThanOrEqual(2);
+    });
   });
 
   describe('4-combo matrix: auto/manual × concentrated/fan', () => {
@@ -1452,22 +1560,82 @@ describe('FIX-05 centerline invariant + toggles', () => {
     });
   });
 
-  describe('debounce: action-binding emits once per press (handleActionPress wasActive gate)', () => {
-    // InputSystem.handleActionPress uses a `wasActive` gate (line ~418) so the
-    // 'pressed' phase fires only on the keydown→keyup→keydown transition.
-    // We can simulate this at the CombatSystem listener level: emitting
-    // 'toggle-spread-mode' multiple times with the same { screen } payload
-    // each flips the mode (no built-in debounce at the listener; the debounce
-    // is at the keypress level in InputSystem). The contract: ONE physical
-    // press = ONE event = ONE toggle.
-    it('5 rapid emits flip 5 times (no listener-level state); InputSystem-level debounce is the gate', () => {
-      const { combat, eventBus } = setupCombatHarness();
-      expect(combat.getSpreadMode()).toBe('concentrated');
-      for (let i = 0; i < 5; i += 1) {
-        eventBus.emit('toggle-spread-mode', { screen: 'playing' });
+  describe('debounce: InputSystem onKeyDown suppresses autorepeat (true contract test)', () => {
+    // Fix-pass (F11 — debounce rewrite): the prior test emitted 5 events on
+    // the bus and asserted 5 toggles. That tests "the listener has no
+    // state," NOT "InputSystem debounces autorepeat." The real contract is
+    // that pressing the bound key while still held generates 1 emit, not 5.
+    // We exercise InputSystem.onKeyDown directly: 5 calls with the same key
+    // (no onKeyUp in between) simulate auto-repeat → 1 toggle. Then onKeyUp
+    // + onKeyDown simulates a release+repress → second toggle.
+
+    // Minimal DOM/window stub so InputSystem.setupEventListeners doesn't
+    // crash in the node-environment vitest run.
+    function withDOMStub(fn) {
+      const stub = {
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      };
+      const hadDocument = 'document' in globalThis;
+      const hadWindow = 'window' in globalThis;
+      const prevDocument = globalThis.document;
+      const prevWindow = globalThis.window;
+      globalThis.document = stub;
+      globalThis.window = stub;
+      try {
+        return fn();
+      } finally {
+        if (hadDocument) {
+          globalThis.document = prevDocument;
+        } else {
+          delete globalThis.document;
+        }
+        if (hadWindow) {
+          globalThis.window = prevWindow;
+        } else {
+          delete globalThis.window;
+        }
       }
-      // 5 toggles: c → f → c → f → c → f.
-      expect(combat.getSpreadMode()).toBe('fan');
+    }
+
+    it('autorepeat (5 keydown with no keyup) → 1 emit; release + repress → 1 more emit', async () => {
+      const { default: InputSystem } = await import('../../src/modules/InputSystem.js');
+      const container = createTestContainer('debounce-seed');
+      const eventBus = container.resolve('event-bus');
+
+      let toggleSpreadEmits = 0;
+      eventBus.on('toggle-spread-mode', () => {
+        toggleSpreadEmits += 1;
+      });
+
+      withDOMStub(() => {
+        const input = new InputSystem({ eventBus });
+        // Stub resolveGameScreen so the toggle path emits without needing
+        // a game-state service in the harness.
+        input.resolveGameScreen = () => 'playing';
+
+        // Build a fake keyboard event for the G key.
+        const fakeEvent = (type) => ({
+          type,
+          key: 'g',
+          code: 'KeyG',
+          preventDefault: () => {},
+          stopPropagation: () => {},
+        });
+
+        // 5 consecutive onKeyDown calls with NO onKeyUp in between simulate
+        // auto-repeat (browsers fire keydown repeatedly while a key is held).
+        for (let i = 0; i < 5; i += 1) {
+          input.onKeyDown(fakeEvent('keydown'));
+        }
+        // Contract: only the FIRST keydown should have fired the action.
+        expect(toggleSpreadEmits).toBe(1);
+
+        // Release + repress = another emit.
+        input.onKeyUp(fakeEvent('keyup'));
+        input.onKeyDown(fakeEvent('keydown'));
+        expect(toggleSpreadEmits).toBe(2);
+      });
     });
   });
 
