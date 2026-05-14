@@ -297,6 +297,22 @@ class CombatSystem extends BaseSystem {
       this.targetIndicatorPulse - deltaTime
     );
 
+    // Fix-pass (F7): when manual aim is active, skip target acquisition
+    // entirely. The locks are cleared on `setAimMode('manual')` and the
+    // plan must_have is "no target lock / no multi-lock while manual." Any
+    // attempt to refresh targets here would silently repopulate locks
+    // every tick.
+    if (this.aimMode === 'manual') {
+      this.currentTarget = null;
+      this.currentTargetLocks = [];
+      this.currentLockAssignments = [];
+      this.predictedAimPoints = [];
+      if (this.predictedAimPointsMap) {
+        this.predictedAimPointsMap.clear();
+      }
+      return;
+    }
+
     if (
       this.currentTarget &&
       (this.currentTarget.destroyed || !this.isValidTarget(this.currentTarget))
@@ -313,6 +329,19 @@ class CombatSystem extends BaseSystem {
       }
       this.lastPrimaryTargetId = null;
       this.targetUpdateTimer = 0;
+    }
+
+    // Fix-pass (F8): `needsRetarget` is set when manual → auto switchback
+    // happens. Consume it here to force a fresh findBestTarget immediately,
+    // regardless of the residual targetUpdateTimer. Without this, the timer
+    // could delay acquisition by up to a full targetUpdateInterval.
+    if (this.needsRetarget) {
+      this.findBestTarget();
+      this.targetUpdateTimer = this.targetUpdateInterval;
+      this.needsRetarget = false;
+      this.pruneInvalidLocks();
+      this.refreshPredictedAimPoints();
+      return;
     }
 
     this.targetUpdateTimer -= deltaTime;
