@@ -2190,59 +2190,92 @@ describe('FIX-05 centerline invariant + toggles', () => {
       expect(fired).toBe(4);
     });
 
-    // 2 lock targets: 1 high-HP boss + 1 low-HP. Multishot=4. Per-enemy cap:
-    // boss can absorb up to 4 (HP=1500, dmg=100 → ceil(1500/100)=15, capped
-    // at remaining budget); tiny enemy capped at 1. Expected total = 4
-    // (boss takes 3, tiny takes 1). The point: tiny enemy never gets MORE
-    // than 1 shot regardless of lock-distribution.
-    it('C1: rank-3 + boss(HP=1500) + tiny(HP=50) → tiny gets ≤1 shot, total ≤ multishot', () => {
-      const extraEnemies = [
-        { id: 'tiny-1', x: 620, y: 320, variant: 'common', size: 'small' },
-      ];
-      const { combat, playerState } = makeRank3Combat(extraEnemies);
-      const enemies = [];
-      combat.cachedEnemies.forEachActiveEnemy((e) => enemies.push(e));
-      expect(enemies.length).toBe(2);
-      // First enemy = boss. Make boss HIGH HP (4000 — needs 40 shots at
-      // dmg=100, well above multishot 4). The fact that the boss is the
-      // primary target (highest urgency by default sort) makes the
-      // C1 contract sharp: 1 tiny side-target with HP=50 must not absorb
-      // more than its 1-shot cap, no matter how many slots remain.
-      enemies[0].radius = 32;
-      enemies[0].health = 4000;
-      enemies[0].maxHealth = 4000;
-      // Second enemy = tiny (we want it in the lock set and capped at 1).
-      enemies[1].radius = 8;
-      enemies[1].health = 50;
-      enemies[1].maxHealth = 50;
+    // Fix-pass-3 Finding 3 (the canonical "vacuous test" rewrite). The
+    // previous test read `b.targetX` / `b.targetY` from bullets — fields that
+    // do NOT exist on bullets created by `createBullet` (CombatSystem.js:2369-
+    // 2390). `dx = undefined - num = NaN` → `distTiny = NaN` → `NaN < NaN ===
+    // false` → `aimedAtTiny.length === 0` → `expect(0).toBeLessThanOrEqual(1)`
+    // PASSED regardless of whether the C1 cap actually worked. The cap could
+    // be entirely broken and this would still go green — same class of bug
+    // that masked F2.
+    //
+    // Rewrite: subscribe to the `bullet-created` event (the actual observable
+    // surface) and capture each bullet's `to` field (the aim point passed
+    // into `createBullet`). The chosen scenario — 1 tiny low-HP enemy alone —
+    // forces buildLockAssignments to pile multiple slots onto the same tiny
+    // enemy (the only valid target). Pre-fix-pass-3 (cap only in handleShooting):
+    // 4 bullets fire, all 4 have `to` ≈ the tiny enemy. With the cap moved
+    // upstream into buildLockAssignments: assignments has 1 entry, 1 bullet
+    // fires, 1 has `to` ≈ tiny. The assertion uses bullet-to-enemy distance
+    // (real observable from event payloads), and includes a payload-shape
+    // sanity check so the same vacuous-test class of bug can't repeat.
+    it('Finding 3: rank-3 + 1 tiny enemy (HP=50, dmg=100, multi=4) → ≤1 bullet aimed at tiny (via bullet-created event)', () => {
+      const harness = makeRank3Combat();
+      const { combat, eventBus } = harness;
+      let tinyEnemy = null;
+      combat.cachedEnemies.forEachActiveEnemy((e) => {
+        if (!tinyEnemy) tinyEnemy = e;
+      });
+      expect(tinyEnemy).not.toBeNull();
+      tinyEnemy.radius = 8;
+      tinyEnemy.health = 50;
+      tinyEnemy.maxHealth = 50;
       combat.targetUpdateTimer = 0;
       combat.updateTargeting(0);
       expect(combat.targetingUpgradeLevel).toBeGreaterThanOrEqual(3);
 
-      const tinyId = enemies[1].id;
+      // Subscribe to bullet-created BEFORE handleShooting. The event payload
+      // is the real observable surface — read CombatSystem.js:2392-2396 to
+      // confirm: `eventBus.emit('bullet-created', { bullet, from, to })`.
+      const created = [];
+      const off = eventBus.on('bullet-created', (payload) => {
+        created.push(payload);
+      });
 
-      const before = combat.bullets.length;
       const player = combat.getCachedPlayer();
       combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
-      const totalFired = combat.bullets.length - before;
-      expect(totalFired).toBeLessThanOrEqual(4);
 
-      // The plan contract: the tiny enemy (1-shot cap) MUST NOT receive more
-      // than 1 bullet, regardless of how many lock slots it accumulated.
-      // Count bullets whose aim point is nearer to the tiny enemy than to
-      // any other enemy in the scene.
-      const aimedAtTiny = combat.bullets.slice(before).filter((b) => {
-        const tinyEnemy = enemies[1];
-        const dx = b.targetX - tinyEnemy.x;
-        const dy = b.targetY - tinyEnemy.y;
-        const distTiny = Math.sqrt(dx * dx + dy * dy);
-        // Compare against the boss too — only count if tiny is closest.
-        const bossDx = b.targetX - enemies[0].x;
-        const bossDy = b.targetY - enemies[0].y;
-        const distBoss = Math.sqrt(bossDx * bossDx + bossDy * bossDy);
-        return distTiny < distBoss;
+      off?.();
+
+      // Sanity: bullet-created event payload exposes `to` with `x` and `y`.
+      // Without this guard a future regression where the payload shape
+      // changes would silently turn this test vacuous again.
+      expect(created.length).toBeGreaterThan(0);
+      const sample = created[0];
+      expect(sample).toHaveProperty('to');
+      expect(sample.to).toHaveProperty('x');
+      expect(sample.to).toHaveProperty('y');
+
+      // The plan contract — the tiny enemy (HP=50, 1-shot at dmg=100) MUST
+      // NOT receive more than 1 bullet, regardless of how many lock slots it
+      // accumulated. Count bullets whose `to` point is within (radius +
+      // bullet radius + lane spread) of the tiny enemy. With the cap broken,
+      // buildLockAssignments piles 4 slots onto the tiny (only valid target);
+      // 4 bullets fire, 4 are clearly aimed at it. With the cap correct:
+      // 1 bullet, 1 aimed at it.
+      const PROXIMITY = 30; // wider than any lane spread so we don't miss any
+      const aimedAtTiny = created.filter((p) => {
+        const dx = p.to.x - tinyEnemy.x;
+        const dy = p.to.y - tinyEnemy.y;
+        return Math.sqrt(dx * dx + dy * dy) <= PROXIMITY;
       });
       expect(aimedAtTiny.length).toBeLessThanOrEqual(1);
+    });
+
+    // Fix-pass-3 paranoia guard: lock the contract that bullets do NOT
+    // expose `targetX`/`targetY` fields. If a future refactor adds these
+    // back, the previous test will silently turn vacuous again. Asserting
+    // their absence at the bullet-object level surfaces that drift loudly.
+    it('bullets do NOT have targetX/targetY fields (asserts assumptions for Finding 3)', () => {
+      const { combat } = setupCombatHarness({ multishot: 1, damage: 100 });
+      const player = combat.getCachedPlayer();
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      expect(combat.bullets.length).toBeGreaterThan(0);
+      const b = combat.bullets[combat.bullets.length - 1];
+      // If either of these flips, the fix-pass-3 Finding 3 test must be
+      // re-audited to ensure it still reads observable fields.
+      expect(b).not.toHaveProperty('targetX');
+      expect(b).not.toHaveProperty('targetY');
     });
   });
 });
