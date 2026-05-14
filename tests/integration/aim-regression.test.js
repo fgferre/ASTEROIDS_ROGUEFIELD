@@ -969,6 +969,56 @@ describe('FIX-05 centerline invariant + toggles', () => {
       });
     });
 
+    it('F7: manual mode early-returns from updateTargeting; locks stay null across multiple ticks', () => {
+      // Codex review F7: setAimMode("manual") clears locks once, but
+      // updateTargeting was not gated — every subsequent tick could
+      // re-populate currentTarget/currentTargetLocks while still in manual
+      // mode. Plan must_have: "no target lock / no multi-lock while manual."
+      const { combat } = setupCombatHarness({ multishot: 2 });
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+      expect(combat.currentTarget).not.toBeNull();
+
+      combat.setAimMode('manual');
+      // After entering manual mode the locks are cleared.
+      expect(combat.currentTarget).toBeNull();
+      expect(combat.currentTargetLocks).toEqual([]);
+
+      // Advance several update ticks. Without the F7 gate, updateTargeting
+      // re-runs findBestTarget every tick and repopulates currentTarget.
+      for (let i = 0; i < 5; i += 1) {
+        combat.targetUpdateTimer = 0;
+        combat.updateTargeting(combat.targetUpdateInterval + 0.01);
+      }
+      expect(combat.currentTarget).toBeNull();
+      expect(combat.currentTargetLocks).toEqual([]);
+      expect(combat.currentLockAssignments).toEqual([]);
+    });
+
+    it('F8: switching from manual back to auto forces fresh acquisition on the next tick (needsRetarget consumed)', () => {
+      // Codex review F8: setAimMode("auto") sets `needsRetarget = true` but
+      // nothing consumed the flag — updateTargeting decremented the timer
+      // and delayed acquisition by one full interval. Fix: when needsRetarget
+      // is set, the next update forces findBestTarget immediately.
+      const { combat } = setupCombatHarness({ multishot: 2 });
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+      const originalTarget = combat.currentTarget;
+      expect(originalTarget).not.toBeNull();
+
+      combat.setAimMode('manual');
+      expect(combat.currentTarget).toBeNull();
+
+      combat.setAimMode('auto');
+      expect(combat.needsRetarget).toBe(true);
+
+      // Advance ONE update tick. needsRetarget must force findBestTarget
+      // immediately, regardless of targetUpdateTimer remaining.
+      combat.updateTargeting(0.001);
+      expect(combat.currentTarget).not.toBeNull();
+      expect(combat.needsRetarget).toBe(false);
+    });
+
     it('F6: manual + concentrated + N>1 → ALL shots leave from the same ship-nose origin (not nose ± perpendicular offset)', () => {
       // Codex review F6: the prior implementation passed originOverride = nose
       // to fireForward but applyConcentratedFire({kind: 'direction'}) STILL
