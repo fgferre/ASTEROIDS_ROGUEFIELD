@@ -964,6 +964,56 @@ describe('FIX-05 centerline invariant + toggles', () => {
       });
     });
 
+    it('F6: manual + concentrated + N>1 → ALL shots leave from the same ship-nose origin (not nose ± perpendicular offset)', () => {
+      // Codex review F6: the prior implementation passed originOverride = nose
+      // to fireForward but applyConcentratedFire({kind: 'direction'}) STILL
+      // offset each fireOrigin perpendicular to the rotation axis. So a
+      // manual + concentrated multishot 3 burst produced 3 origins on a line
+      // perpendicular to rotation (nose - spacing, nose, nose + spacing).
+      // Plan must_have: "shots leave from the SHIP NOSE in the ship's
+      // CURRENT rotation direction." The fix is option (a) from the brief:
+      // all shots originate at the nose, fan out via aim-point perpendicular
+      // offset only.
+      const container = createTestContainer('manual-conc-nose-seed');
+      const eventBus = container.resolve('event-bus');
+      const random = container.resolve('random');
+      const playerPos = { x: 400, y: 300 };
+      const player = {
+        isDead: false,
+        isRetrying: false,
+        _quitExplosionHidden: false,
+        getPosition() { return { ...playerPos }; },
+        getVelocity() { return { x: 0, y: 0 }; },
+        getAngle() { return 0; },
+        getRotation() { return 0; },
+        getHullBoundingRadius() { return 16; },
+        getNosePosition(rotation) {
+          const angle = Number.isFinite(rotation) ? rotation : 0;
+          return {
+            x: playerPos.x + Math.cos(angle) * 16,
+            y: playerPos.y + Math.sin(angle) * 16,
+          };
+        },
+        getStats() { return { multishot: 3, damage: 10 }; },
+      };
+      const enemies = { forEachActiveEnemy() {} };
+      const physics = { forEachBulletCollision: () => {} };
+      const combat = new CombatSystem({ eventBus, random, player, enemies, physics });
+      combat.setSpreadMode('concentrated');
+      combat.setAimMode('manual');
+
+      const before = combat.bullets.length;
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      const fired = combat.bullets.slice(before);
+
+      expect(fired.length).toBe(3);
+      const noseExpected = { x: 416, y: 300 };
+      fired.forEach((b) => {
+        expect(b.x).toBeCloseTo(noseExpected.x, 0);
+        expect(b.y).toBeCloseTo(noseExpected.y, 0);
+      });
+    });
+
     it('manual mode: bullets spawn at ship nose (origin offset by ship radius along rotation)', () => {
       // The harness's mock player has getHullBoundingRadius() = 16 and
       // getPosition() = (400, 300). When we add getNosePosition to the mock,
