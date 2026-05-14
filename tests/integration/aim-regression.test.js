@@ -1776,4 +1776,156 @@ describe('FIX-05 centerline invariant + toggles', () => {
       expect(allocated).toBe(4);
     });
   });
+
+  // Fix-pass-2 (C1): rank-3 advanced battery's overkill cap was not wired.
+  // The first fix-pass gate `if (!usingAdvancedBattery && requestedShots > 1)`
+  // intentionally excluded rank-3 — so a single low-HP enemy in the lock set
+  // could absorb all 4 shots that 1 shot would kill. The plan must-have:
+  // "Rank-3 multi-lock still allocates up to multiLockTargets DIFFERENT enemies;
+  // overkill cap applies per-enemy (don't send 4 shots to 1 enemy that 1 shot
+  // would kill)."
+  describe('C1: rank-3 multi-lock per-enemy overkill cap', () => {
+    // Helper: bring CombatSystem to rank-3 with multiLockTargets=4.
+    // IMPORTANT: `lastKnownPlayerStats` is normally set inside `update()` —
+    // tests that bypass `update()` and call `updateTargeting` directly must
+    // wire it manually so `computeLockCount` sees the player's multishot
+    // (otherwise it falls back to 1 and rank-3 collapses to 1 lock).
+    function makeRank3Combat(extraEnemies = []) {
+      const harness = setupCombatHarness({ multishot: 4, damage: 100, extraEnemies });
+      const { combat, eventBus, playerState } = harness;
+      eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
+      eventBus.emit('upgrade-aiming-suite', { level: 2 });
+      eventBus.emit('upgrade-aiming-suite', {
+        level: 3,
+        multiLockTargets: 4,
+        cooldownMultiplier: 0.92,
+      });
+      playerState.multishot = 4;
+      playerState.damage = 100;
+      combat.lastKnownPlayerStats = { multishot: 4, damage: 100 };
+      return harness;
+    }
+
+    // 1 lock target, HP=50 (one-shot from dmg=100). Pre-fix: 4 bullets ALL go
+    // to this one enemy (3 wasted). Post-fix: 1 bullet (per-enemy cap).
+    it('C1: rank-3 + 1 enemy with HP=50/dmg=100/multi=4 → 1 bullet fired (NOT 4)', () => {
+      const { combat, playerState } = makeRank3Combat();
+      let baseEnemy = null;
+      combat.cachedEnemies.forEachActiveEnemy((e) => {
+        if (!baseEnemy) baseEnemy = e;
+      });
+      expect(baseEnemy).not.toBeNull();
+      baseEnemy.radius = 8;
+      baseEnemy.health = 50;
+      baseEnemy.maxHealth = 50;
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+      // Sanity: rank-3 active, 4 multishot, ≥1 lock.
+      expect(combat.targetingUpgradeLevel).toBeGreaterThanOrEqual(3);
+      expect(playerState.multishot).toBe(4);
+      expect(combat.currentTargetLocks.length).toBeGreaterThanOrEqual(1);
+
+      const before = combat.bullets.length;
+      const player = combat.getCachedPlayer();
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      const fired = combat.bullets.length - before;
+
+      // The lone target HP=50 only needs 1 shot at damage=100. The 3 extra
+      // multishot slots have nowhere else to go (no other enemies in range),
+      // so they MUST be dropped (overkill prevented) — they cannot pile onto
+      // the same already-dead-on-arrival enemy.
+      expect(fired).toBe(1);
+    });
+
+    // 4 lock targets, HP=50 each (each one-shot from dmg=100), multishot=4.
+    // Pre-fix: still 4 bullets total (since the no-cap rank-3 path naturally
+    // distributes to 4 distinct enemies via buildLockAssignments). Post-fix:
+    // ALSO 4 bullets — but for the correct reason (1 per enemy after the
+    // per-enemy cap reduces each to its needed shot count).
+    it('C1: rank-3 + 4 enemies × HP=50 each → 4 bullets fired total (1 per enemy)', () => {
+      const extraEnemies = [
+        { id: 'enemy-2', x: 600, y: 320, variant: 'common', size: 'small' },
+        { id: 'enemy-3', x: 620, y: 280, variant: 'common', size: 'small' },
+        { id: 'enemy-4', x: 580, y: 340, variant: 'common', size: 'small' },
+      ];
+      const { combat, playerState } = makeRank3Combat(extraEnemies);
+      // Mutate every enemy to tiny-low-HP.
+      const enemies = [];
+      combat.cachedEnemies.forEachActiveEnemy((e) => enemies.push(e));
+      expect(enemies.length).toBe(4);
+      enemies.forEach((e) => {
+        e.radius = 8;
+        e.health = 50;
+        e.maxHealth = 50;
+      });
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+      expect(combat.targetingUpgradeLevel).toBeGreaterThanOrEqual(3);
+      expect(combat.currentTargetLocks.length).toBeGreaterThanOrEqual(2);
+
+      const before = combat.bullets.length;
+      const player = combat.getCachedPlayer();
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      const fired = combat.bullets.length - before;
+
+      // Each enemy needs 1 bullet (dmg=100 vs HP=50). With 4 distinct enemies
+      // and multishot=4 budget, exactly 4 bullets fired total (NOT 16).
+      expect(fired).toBe(4);
+    });
+
+    // 2 lock targets: 1 high-HP boss + 1 low-HP. Multishot=4. Per-enemy cap:
+    // boss can absorb up to 4 (HP=1500, dmg=100 → ceil(1500/100)=15, capped
+    // at remaining budget); tiny enemy capped at 1. Expected total = 4
+    // (boss takes 3, tiny takes 1). The point: tiny enemy never gets MORE
+    // than 1 shot regardless of lock-distribution.
+    it('C1: rank-3 + boss(HP=1500) + tiny(HP=50) → tiny gets ≤1 shot, total ≤ multishot', () => {
+      const extraEnemies = [
+        { id: 'tiny-1', x: 620, y: 320, variant: 'common', size: 'small' },
+      ];
+      const { combat, playerState } = makeRank3Combat(extraEnemies);
+      const enemies = [];
+      combat.cachedEnemies.forEachActiveEnemy((e) => enemies.push(e));
+      expect(enemies.length).toBe(2);
+      // First enemy = boss. Make boss HIGH HP (4000 — needs 40 shots at
+      // dmg=100, well above multishot 4). The fact that the boss is the
+      // primary target (highest urgency by default sort) makes the
+      // C1 contract sharp: 1 tiny side-target with HP=50 must not absorb
+      // more than its 1-shot cap, no matter how many slots remain.
+      enemies[0].radius = 32;
+      enemies[0].health = 4000;
+      enemies[0].maxHealth = 4000;
+      // Second enemy = tiny (we want it in the lock set and capped at 1).
+      enemies[1].radius = 8;
+      enemies[1].health = 50;
+      enemies[1].maxHealth = 50;
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+      expect(combat.targetingUpgradeLevel).toBeGreaterThanOrEqual(3);
+
+      const tinyId = enemies[1].id;
+
+      const before = combat.bullets.length;
+      const player = combat.getCachedPlayer();
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      const totalFired = combat.bullets.length - before;
+      expect(totalFired).toBeLessThanOrEqual(4);
+
+      // The plan contract: the tiny enemy (1-shot cap) MUST NOT receive more
+      // than 1 bullet, regardless of how many lock slots it accumulated.
+      // Count bullets whose aim point is nearer to the tiny enemy than to
+      // any other enemy in the scene.
+      const aimedAtTiny = combat.bullets.slice(before).filter((b) => {
+        const tinyEnemy = enemies[1];
+        const dx = b.targetX - tinyEnemy.x;
+        const dy = b.targetY - tinyEnemy.y;
+        const distTiny = Math.sqrt(dx * dx + dy * dy);
+        // Compare against the boss too — only count if tiny is closest.
+        const bossDx = b.targetX - enemies[0].x;
+        const bossDy = b.targetY - enemies[0].y;
+        const distBoss = Math.sqrt(bossDx * bossDx + bossDy * bossDy);
+        return distTiny < distBoss;
+      });
+      expect(aimedAtTiny.length).toBeLessThanOrEqual(1);
+    });
+  });
 });
