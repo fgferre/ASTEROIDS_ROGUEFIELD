@@ -1134,6 +1134,55 @@ class CombatSystem extends BaseSystem {
     return Math.min(targetCap, shotCount);
   }
 
+  /**
+   * Damage-aware shot allocation cap. Caps allocation at
+   * `Math.ceil(targetHealth / volleyDamage)` so a high-damage build doesn't
+   * waste locks on already-dead-by-volley targets.
+   *
+   * In concentrated mode all shots in a lane group hit (`EXPECTED_HIT_RATE = 1.0`).
+   * In fan mode the rate is conservative (`0.6`) to avoid under-allocating.
+   *
+   * Plan 01.07 Task 3.
+   *
+   * @param {object} enemy - The enemy to allocate shots against.
+   * @param {object} [playerStats] - Reads {damage, multishot}.
+   * @returns {number} Number of shots to allocate, capped at multishot.
+   */
+  computeAllocatedShots(enemy, playerStats = {}) {
+    const multishot = Number(playerStats?.multishot);
+    const shotCount = Number.isFinite(multishot)
+      ? Math.max(1, Math.floor(multishot))
+      : 1;
+
+    if (!enemy) {
+      return shotCount;
+    }
+
+    const damageRaw = Number(playerStats?.damage);
+    const damage = Number.isFinite(damageRaw) && damageRaw > 0 ? damageRaw : 0;
+    if (damage <= 0) {
+      // No damage configured → fall back to multishot cap to avoid divide-by-zero.
+      return shotCount;
+    }
+
+    const hitRate = this.spreadMode === 'fan' ? 0.6 : 1.0;
+    const volleyDamage = damage * hitRate;
+    if (volleyDamage <= 0) {
+      return shotCount;
+    }
+
+    const healthRaw = Number(enemy?.health);
+    const maxHealthRaw = Number(enemy?.maxHealth);
+    const targetHealth = Number.isFinite(healthRaw) && healthRaw > 0
+      ? healthRaw
+      : Number.isFinite(maxHealthRaw) && maxHealthRaw > 0
+        ? maxHealthRaw
+        : 1;
+
+    const needed = Math.max(1, Math.ceil(targetHealth / volleyDamage));
+    return Math.min(shotCount, needed);
+  }
+
   pruneInvalidLocks() {
     if (
       !Array.isArray(this.currentLockAssignments) ||
