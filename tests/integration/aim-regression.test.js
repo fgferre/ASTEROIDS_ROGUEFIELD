@@ -914,6 +914,107 @@ describe('FIX-05 centerline invariant + toggles', () => {
     });
   });
 
+  describe('render visual feedback gated by targetingUpgradeLevel + aimMode', () => {
+    // Helper: create a minimal canvas-2d-ish stub that records stroke/arc/fill
+    // calls so we can assert which visual elements were drawn.
+    function makeCtxStub() {
+      const calls = [];
+      const record = (name) => (...args) => calls.push({ name, args });
+      return {
+        calls,
+        save: record('save'),
+        restore: record('restore'),
+        beginPath: record('beginPath'),
+        arc: record('arc'),
+        stroke: record('stroke'),
+        fill: record('fill'),
+        moveTo: record('moveTo'),
+        lineTo: record('lineTo'),
+        setLineDash: record('setLineDash'),
+        drawImage: record('drawImage'),
+        rotate: record('rotate'),
+        translate: record('translate'),
+        createRadialGradient: () => ({ addColorStop: () => {} }),
+        // Settable state — getters/setters as plain assignments.
+        set fillStyle(v) { calls.push({ name: 'set:fillStyle', args: [v] }); },
+        set strokeStyle(v) { calls.push({ name: 'set:strokeStyle', args: [v] }); },
+        set lineWidth(v) { calls.push({ name: 'set:lineWidth', args: [v] }); },
+        set globalAlpha(v) { calls.push({ name: 'set:globalAlpha', args: [v] }); },
+        set globalCompositeOperation(v) { calls.push({ name: 'set:gco', args: [v] }); },
+        set font(v) { calls.push({ name: 'set:font', args: [v] }); },
+        canvas: { width: 800, height: 600 },
+      };
+    }
+
+    function countArcCallsOnTarget(ctx, target) {
+      return ctx.calls.filter(
+        (c) =>
+          c.name === 'arc' &&
+          Math.abs(c.args[0] - target.x) < 1 &&
+          Math.abs(c.args[1] - target.y) < 1
+      ).length;
+    }
+
+    it('rank 0 (no targeting upgrade): no lock-ring arcs drawn on currentTarget', () => {
+      const { combat } = setupCombatHarness();
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+      const target = combat.currentTarget;
+      expect(target).not.toBeNull();
+      // Rank 0 default.
+      expect(combat.targetingUpgradeLevel).toBe(0);
+
+      const ctx = makeCtxStub();
+      combat.render(ctx);
+
+      // No targeting-affordance arcs should be drawn on the target position.
+      // Bullets draw at their own positions, not the target's.
+      const arcs = countArcCallsOnTarget(ctx, target);
+      expect(arcs).toBe(0);
+    });
+
+    it('rank 1 + auto aim: lock-ring arc drawn on currentTarget', () => {
+      const { combat, eventBus } = setupCombatHarness();
+      eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+      const target = combat.currentTarget;
+      expect(target).not.toBeNull();
+      expect(combat.targetingUpgradeLevel).toBeGreaterThanOrEqual(1);
+
+      const ctx = makeCtxStub();
+      combat.render(ctx);
+
+      const arcs = countArcCallsOnTarget(ctx, target);
+      expect(arcs).toBeGreaterThanOrEqual(1);
+    });
+
+    it('manual mode: no targeting render at any rank (no leak)', () => {
+      const { combat, eventBus } = setupCombatHarness({ multishot: 2 });
+      eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
+      eventBus.emit('upgrade-aiming-suite', { level: 2 });
+      eventBus.emit('upgrade-aiming-suite', {
+        level: 3,
+        multiLockTargets: 4,
+        cooldownMultiplier: 0.92,
+      });
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+      const targetSnapshot = { ...combat.currentTarget };
+
+      combat.setAimMode('manual');
+      // After manual toggle, currentTarget is null. Render uses the cached
+      // assignments, but the gate must skip them too. Verify by also placing
+      // a fake assignment back to test the explicit aimMode-gate path.
+      // Instead, simply assert render does NOT draw arcs at the previous
+      // target position when aimMode is 'manual'.
+      const ctx = makeCtxStub();
+      combat.render(ctx);
+      const arcs = countArcCallsOnTarget(ctx, targetSnapshot);
+      expect(arcs).toBe(0);
+    });
+  });
+
   describe('4-combo matrix: auto/manual × concentrated/fan', () => {
     const combos = [
       { aim: 'auto', spread: 'concentrated' },
