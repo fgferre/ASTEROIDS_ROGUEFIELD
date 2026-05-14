@@ -623,6 +623,122 @@ describe('FIX-05 centerline invariant + toggles', () => {
     });
   });
 
+  describe('spread mode toggle: concentrated default, fan opt-in', () => {
+    it('default boot state: spreadMode is "concentrated"', () => {
+      const { combat } = setupCombatHarness();
+      expect(combat.getSpreadMode()).toBe('concentrated');
+    });
+
+    it('Mode 2 concentrated: N=2 at locked target → both aim points within ±(targetRadius + BULLET_SIZE)', () => {
+      // Target at (300, 0) from player at (0, 0); enemy radius 18.
+      // In concentrated mode, both lane offsets should sit within ±(18 + BULLET_SIZE).
+      const { combat, playerState } = setupCombatHarness({ multishot: 2 });
+      playerState.multishot = 2;
+      combat.setSpreadMode('concentrated');
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+
+      const before = combat.bullets.length;
+      const player = combat.getCachedPlayer();
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      const fired = combat.bullets.slice(before);
+
+      expect(fired.length).toBeGreaterThanOrEqual(2);
+
+      // Compute aim direction angles (atan2 of vy / vx). All angles should differ
+      // by ≤ small epsilon since both lanes point at parallel-translated targets.
+      const playerPos = player.getPosition();
+      const enemy = combat.currentTarget;
+      const cx = enemy.x - playerPos.x;
+      const cy = enemy.y - playerPos.y;
+      const centerAngle = Math.atan2(cy, cx);
+      // Each bullet's velocity is the (lane aim - origin) direction. Lane offsets
+      // are perpendicular AND applied to both origin AND aim, so the velocity
+      // angle is PARALLEL to the centerline (concentrated mode invariant).
+      fired.forEach((b) => {
+        const a = Math.atan2(b.vy, b.vx);
+        expect(Math.abs(a - centerAngle)).toBeLessThan(0.001);
+      });
+    });
+
+    it('Mode 2 fan opt-in: N=2 fires at ±0.15 rad spread (legacy angular fan preserved)', () => {
+      const { combat, playerState } = setupCombatHarness({ multishot: 2 });
+      playerState.multishot = 2;
+      combat.setSpreadMode('fan');
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+
+      const before = combat.bullets.length;
+      const player = combat.getCachedPlayer();
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      const fired = combat.bullets.slice(before);
+
+      expect(fired.length).toBeGreaterThanOrEqual(2);
+
+      const playerPos = player.getPosition();
+      const enemy = combat.currentTarget;
+      const centerAngle = Math.atan2(enemy.y - playerPos.y, enemy.x - playerPos.x);
+      const angles = fired.map((b) => Math.atan2(b.vy, b.vx));
+      // Angles bracket the centerline by ~0.15 rad each side (COMBAT_MULTISHOT_SPREAD_STEP = 0.3).
+      const diffs = angles.map((a) => Math.abs(a - centerAngle));
+      expect(Math.max(...diffs)).toBeGreaterThan(0.05);
+    });
+
+    it('Mode 2 concentrated: N=4 at locked target → 4 parallel lanes, all aim angles match centerline', () => {
+      const { combat, playerState } = setupCombatHarness({ multishot: 4 });
+      playerState.multishot = 4;
+      combat.setSpreadMode('concentrated');
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+
+      const before = combat.bullets.length;
+      const player = combat.getCachedPlayer();
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      const fired = combat.bullets.slice(before);
+
+      expect(fired.length).toBeGreaterThanOrEqual(4);
+
+      const playerPos = player.getPosition();
+      const enemy = combat.currentTarget;
+      const centerAngle = Math.atan2(enemy.y - playerPos.y, enemy.x - playerPos.x);
+      fired.forEach((b) => {
+        const a = Math.atan2(b.vy, b.vx);
+        expect(Math.abs(a - centerAngle)).toBeLessThan(0.001);
+      });
+    });
+
+    it('Mode 1 (no target) concentrated: parallel lanes pointing in rotation direction', () => {
+      const { combat, playerState } = setupCombatHarness({ multishot: 3 });
+      playerState.multishot = 3;
+      combat.setSpreadMode('concentrated');
+
+      // Clear target to force fireForward path.
+      combat.currentTarget = null;
+      combat.currentTargetLocks = [];
+      combat.currentLockAssignments = [];
+
+      const before = combat.bullets.length;
+      const player = combat.getCachedPlayer();
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      const fired = combat.bullets.slice(before);
+
+      expect(fired.length).toBeGreaterThanOrEqual(3);
+
+      // All bullets fly with rotation = 0 (atan2(0, +) = 0).
+      fired.forEach((b) => {
+        const a = Math.atan2(b.vy, b.vx);
+        expect(Math.abs(a)).toBeLessThan(0.001);
+      });
+    });
+
+    it('setSpreadMode rejects invalid values (validation)', () => {
+      const { combat } = setupCombatHarness();
+      const before = combat.getSpreadMode();
+      combat.setSpreadMode('invalid-value');
+      expect(combat.getSpreadMode()).toBe(before); // unchanged
+    });
+  });
+
   describe('recommendedShots damage-aware overkill cap', () => {
     it('damage=100, multishot=4 vs radius-8 health-50 asteroid: caps at 1 (no overkill)', () => {
       const { combat } = setupCombatHarness({ multishot: 4, damage: 100 });
