@@ -3397,7 +3397,12 @@ class CombatSystem extends BaseSystem {
 
         const duplicateIndex = assignment.duplicateIndex || 0;
         const duplicateCount = duplicateTotals.get(target.id || index) || 1;
-        const hue = 52 + index * 36;
+        // Fix-pass-3 Finding 4: ring color follows THREAT TIER, not
+        // assignment index. Plan visual-direction palette: low = thruster
+        // cyan (#00F2FF), high = alert red (#FF3131), medium = warning
+        // amber (#FFA800; the plan did not pin a specific medium hex —
+        // documented in the SUMMARY.md fix-pass-3 section).
+        const ringColor = this.getThreatPaletteColor(target);
         const baseAlpha =
           index === 0 ? this.lockHighlightAlpha : this.lockLineAlpha;
         const lineAlpha = Math.min(1, baseAlpha + pulseRatio * 0.25);
@@ -3411,7 +3416,7 @@ class CombatSystem extends BaseSystem {
         ctx.save();
         ctx.setLineDash([4, 3]);
         ctx.lineWidth = index === 0 ? 2.6 + pulseRatio * 1.4 : 2.1;
-        ctx.strokeStyle = `hsla(${hue}, 90%, 62%, ${lineAlpha})`;
+        ctx.strokeStyle = ringColor.ring(lineAlpha);
         ctx.beginPath();
         ctx.arc(target.x, target.y, arcRadius, 0, Math.PI * 2);
         ctx.stroke();
@@ -3419,7 +3424,7 @@ class CombatSystem extends BaseSystem {
 
         ctx.save();
         ctx.lineWidth = 1.8;
-        ctx.strokeStyle = `hsla(${hue}, 90%, 55%, ${lineAlpha * 0.7})`;
+        ctx.strokeStyle = ringColor.line(lineAlpha * 0.7);
         ctx.beginPath();
         ctx.moveTo(playerPosition.x, playerPosition.y);
         ctx.lineTo(target.x, target.y);
@@ -3437,7 +3442,7 @@ class CombatSystem extends BaseSystem {
       this.usingDynamicPrediction()
     ) {
       this.predictedAimPoints.forEach(
-        ({ position, index, duplicateIndex, duplicateCount }) => {
+        ({ enemy, position, index, duplicateIndex, duplicateCount }) => {
           if (!position) {
             return;
           }
@@ -3446,7 +3451,10 @@ class CombatSystem extends BaseSystem {
             return;
           }
 
-          const hue = 52 + index * 36;
+          // Predicted markers reuse the same threat-tier palette as the
+          // lock ring (consistent visual language across rank 1 vs rank 2
+          // affordances on the same target).
+          const markerColor = this.getThreatPaletteColor(enemy);
           const alpha = index === 0 ? 0.55 : 0.38;
           const radius =
             (this.predictedMarkerRadius || 12) *
@@ -3455,13 +3463,13 @@ class CombatSystem extends BaseSystem {
           ctx.save();
           ctx.setLineDash([]);
           ctx.lineWidth = 2;
-          ctx.strokeStyle = `hsla(${hue}, 95%, 72%, ${alpha})`;
+          ctx.strokeStyle = markerColor.ring(alpha);
           ctx.beginPath();
           ctx.arc(position.x, position.y, radius, 0, Math.PI * 2);
           ctx.stroke();
 
           ctx.globalAlpha = alpha * 0.45;
-          ctx.fillStyle = `hsla(${hue}, 95%, 65%, ${alpha * 0.35})`;
+          ctx.fillStyle = markerColor.fill(alpha * 0.35);
           ctx.beginPath();
           ctx.arc(position.x, position.y, radius * 0.45, 0, Math.PI * 2);
           ctx.fill();
@@ -3469,6 +3477,73 @@ class CombatSystem extends BaseSystem {
         }
       );
     }
+  }
+
+  /**
+   * Fix-pass-3 Finding 4 helper. Map an enemy's threat-cache entry to a
+   * palette triple {ring(alpha), line(alpha), fill(alpha)}. Tier bands
+   * derived from `urgency` (the canonical "how dangerous is this enemy
+   * right now" score from calculateImpactThreat — urgencyDistance=12 +
+   * urgencyTime=10 weights, so the typical max scales near ~22 absent
+   * hpUrgencyMultiplier stacking, or near ~46 with full hp stacking).
+   *
+   *   urgency <  1.5          → low    (#00F2FF cyan / thruster glow)
+   *   urgency <  18           → medium (#FFA800 amber / warning)
+   *   urgency >= 18           → high   (#FF3131 red / alert)
+   *
+   * Thresholds chosen so the default mid-arena distance threat (urgency
+   * ≈ a couple) lands medium, idle-distant enemies land low, and
+   * close-in-fast-incoming targets land high. The exact bands are tunable
+   * via aimingConfig.threatPalette overrides without changing call sites.
+   *
+   * Returns a triple of helpers that take an alpha (0..1) and return the
+   * 8-digit hex (#RRGGBBAA) — canvas-compatible and test-introspection-
+   * friendly (the canonical hex appears in strokeStyle assignments).
+   */
+  getThreatPaletteColor(enemy) {
+    const overrides = this.aimingConfig?.threatPalette || {};
+    const lowHex = overrides.low || '#00F2FF';
+    const mediumHex = overrides.medium || '#FFA800';
+    const highHex = overrides.high || '#FF3131';
+    const lowMaxUrgency = Number.isFinite(overrides.lowMaxUrgency)
+      ? overrides.lowMaxUrgency
+      : 1.5;
+    const mediumMaxUrgency = Number.isFinite(overrides.mediumMaxUrgency)
+      ? overrides.mediumMaxUrgency
+      : 18;
+
+    const id = enemy?.id;
+    const cacheEntry = id != null ? this.targetThreatCache.get(id) : null;
+    const urgency =
+      cacheEntry?.breakdown?.impact?.urgency ??
+      cacheEntry?.breakdown?.urgency ??
+      0;
+
+    let hex = mediumHex;
+    if (urgency < lowMaxUrgency) {
+      hex = lowHex;
+    } else if (urgency >= mediumMaxUrgency) {
+      hex = highHex;
+    }
+
+    // Returns the canonical hex (#RRGGBB) with the alpha encoded as the
+    // 8-digit hex suffix #RRGGBBAA. Browsers (and canvas-2d) accept this
+    // standard. The hex form keeps the palette token directly readable in
+    // strokeStyle assignments (test introspection matches the hex slug).
+    const colorAt = (alpha) => {
+      const clampedAlpha = Math.max(0, Math.min(1, Number(alpha) || 0));
+      const aHex = Math.round(clampedAlpha * 255)
+        .toString(16)
+        .padStart(2, '0');
+      return `${hex}${aHex}`;
+    };
+
+    return {
+      hex,
+      ring: colorAt,
+      line: colorAt,
+      fill: colorAt,
+    };
   }
 
   // === MODE STATE (plan 01.07 FIX-05) ===
