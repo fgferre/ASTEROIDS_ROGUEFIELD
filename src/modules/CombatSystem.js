@@ -1770,7 +1770,16 @@ class CombatSystem extends BaseSystem {
         duplicateIndex,
         duplicateCount,
       });
-      map.set(enemy.id, aimPoint);
+      // Fix-pass-2 (C4): store the CENTERLINE (un-offset predicted aim) in
+      // the map keyed by enemy id, not the lane-offset aim. With rank-3
+      // duplicate locks (same enemy across multiple slots), this iteration
+      // visits the same id multiple times; if we stored the offset aim, the
+      // last duplicate would overwrite earlier entries — and downstream
+      // weapon-fired.centerlineTarget (which reads from this map) would end
+      // up tracking a lane offset instead of the logical center. Per-lane
+      // offsets still live in `assignment.predictedAim` and the
+      // `predictedAimPoints` list above.
+      map.set(enemy.id, { x: predicted.x, y: predicted.y });
     });
 
     this.predictedAimPoints = list;
