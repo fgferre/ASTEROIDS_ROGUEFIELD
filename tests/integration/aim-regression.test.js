@@ -770,6 +770,44 @@ describe('FIX-05 centerline invariant + toggles', () => {
       eventBus.emit('toggle-spread-mode', { screen: 'paused' });
       expect(combat.getSpreadMode()).toBe('concentrated');
     });
+
+    it('F9: toggle-spread-mode no-ops when screen is null/undefined (strict equality gate)', () => {
+      // Codex review F9: the gate read `data?.screen && data.screen !==
+      // 'playing'`. When screen === null, the `&&` short-circuits → toggle
+      // FIRES. Plan must_have: "no-op unless gameState.screen === 'playing'."
+      // The fix changes the gate to strict `!== 'playing'`.
+      const { combat, eventBus } = setupCombatHarness();
+      expect(combat.getSpreadMode()).toBe('concentrated');
+
+      eventBus.emit('toggle-spread-mode', { screen: null });
+      expect(combat.getSpreadMode()).toBe('concentrated');
+
+      eventBus.emit('toggle-spread-mode', { screen: undefined });
+      expect(combat.getSpreadMode()).toBe('concentrated');
+
+      eventBus.emit('toggle-spread-mode', {}); // missing screen field
+      expect(combat.getSpreadMode()).toBe('concentrated');
+
+      eventBus.emit('toggle-spread-mode'); // no payload at all
+      expect(combat.getSpreadMode()).toBe('concentrated');
+    });
+
+    it('F9: toggle-aim-mode no-ops when screen is null/undefined (strict equality gate)', () => {
+      const { combat, eventBus } = setupCombatHarness();
+      expect(combat.getAimMode()).toBe('auto');
+
+      eventBus.emit('toggle-aim-mode', { screen: null });
+      expect(combat.getAimMode()).toBe('auto');
+
+      eventBus.emit('toggle-aim-mode', { screen: undefined });
+      expect(combat.getAimMode()).toBe('auto');
+
+      eventBus.emit('toggle-aim-mode', {}); // missing screen field
+      expect(combat.getAimMode()).toBe('auto');
+
+      eventBus.emit('toggle-aim-mode'); // no payload at all
+      expect(combat.getAimMode()).toBe('auto');
+    });
   });
 
   // Fix-pass — defensive regression locks for Findings F3 and F4 (Codex review).
