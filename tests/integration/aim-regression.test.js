@@ -2601,4 +2601,113 @@ describe('FIX-05 centerline invariant + toggles', () => {
       }
     });
   });
+
+  // Fix-pass-3 smoke check: a single-scenario integration test that fires
+  // one burst against rank-3 + 1 tiny enemy + 1 boss and logs the observed
+  // bullet count, lock-assignment count, and per-bullet `to` positions.
+  // The brief requires this as final evidence that "the numbers match
+  // what the fix promises". Asserts the headline contract observable
+  // from the player's perspective: tiny ≤ 1 shot, boss ≤ remaining
+  // multishot budget, total ≤ multishot, lock count === fired count.
+  describe('Fix-pass-3 smoke check (rank 3, 1 tiny + 1 boss, 1 burst)', () => {
+    function makeRank3Combat(extraEnemies = []) {
+      const harness = setupCombatHarness({ multishot: 4, damage: 100, extraEnemies });
+      const { combat, eventBus, playerState } = harness;
+      eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
+      eventBus.emit('upgrade-aiming-suite', { level: 2 });
+      eventBus.emit('upgrade-aiming-suite', {
+        level: 3,
+        multiLockTargets: 4,
+        cooldownMultiplier: 0.92,
+      });
+      playerState.multishot = 4;
+      playerState.damage = 100;
+      combat.lastKnownPlayerStats = { multishot: 4, damage: 100 };
+      return harness;
+    }
+
+    it('SMOKE: 1 boss(HP=4000, r=32) + 1 tiny(HP=50, r=8); fire one burst → tiny ≤1, total ≤4, locks === fired', () => {
+      const extraEnemies = [
+        { id: 'tiny-1', x: 620, y: 320, variant: 'common', size: 'small' },
+      ];
+      const harness = makeRank3Combat(extraEnemies);
+      const { combat, eventBus } = harness;
+      const enemies = [];
+      combat.cachedEnemies.forEachActiveEnemy((e) => enemies.push(e));
+      expect(enemies.length).toBe(2);
+      const boss = enemies[0];
+      const tiny = enemies[1];
+      boss.radius = 32;
+      boss.health = 4000;
+      boss.maxHealth = 4000;
+      tiny.radius = 8;
+      tiny.health = 50;
+      tiny.maxHealth = 50;
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+      expect(combat.targetingUpgradeLevel).toBeGreaterThanOrEqual(3);
+
+      const created = [];
+      const off = eventBus.on('bullet-created', (p) => created.push(p));
+      const player = combat.getCachedPlayer();
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      off?.();
+
+      // === Smoke-check observable report ===
+      // eslint-disable-next-line no-console
+      console.log('[SMOKE] fix-pass-3 final scenario');
+      // eslint-disable-next-line no-console
+      console.log('[SMOKE] scenario: rank 3, multishot=4, damage=100');
+      // eslint-disable-next-line no-console
+      console.log('[SMOKE] enemies:');
+      enemies.forEach((e) => {
+        // eslint-disable-next-line no-console
+        console.log(`  ${e.id}: pos=(${e.x}, ${e.y}) r=${e.radius} hp=${e.health}/${e.maxHealth}`);
+      });
+      // eslint-disable-next-line no-console
+      console.log(`[SMOKE] OBSERVED bullet count: ${created.length}`);
+      // eslint-disable-next-line no-console
+      console.log(`[SMOKE] OBSERVED currentLockAssignments.length: ${combat.currentLockAssignments.length}`);
+      // eslint-disable-next-line no-console
+      console.log('[SMOKE] OBSERVED currentLockAssignments enemies:',
+        combat.currentLockAssignments.map((a) => a.enemy?.id));
+      // eslint-disable-next-line no-console
+      console.log('[SMOKE] OBSERVED per-bullet `to` positions:');
+      created.forEach((p, i) => {
+        // eslint-disable-next-line no-console
+        console.log(`  bullet[${i}]: to=(${p.to.x.toFixed(2)}, ${p.to.y.toFixed(2)}) from=(${p.from.x.toFixed(2)}, ${p.from.y.toFixed(2)})`);
+      });
+      // Compute which enemy each bullet is closest to.
+      created.forEach((p, i) => {
+        const dxB = p.to.x - boss.x;
+        const dyB = p.to.y - boss.y;
+        const dxT = p.to.x - tiny.x;
+        const dyT = p.to.y - tiny.y;
+        const distBoss = Math.sqrt(dxB * dxB + dyB * dyB);
+        const distTiny = Math.sqrt(dxT * dxT + dyT * dyT);
+        const nearest = distBoss < distTiny ? 'boss' : 'tiny';
+        // eslint-disable-next-line no-console
+        console.log(`  bullet[${i}] nearest enemy: ${nearest} (boss=${distBoss.toFixed(2)} tiny=${distTiny.toFixed(2)})`);
+      });
+
+      // === Headline assertions ===
+      // 1. Lock count matches fired count (Finding 1 invariant).
+      expect(combat.currentLockAssignments.length).toBe(created.length);
+      // 2. Total ≤ multishot.
+      expect(created.length).toBeLessThanOrEqual(4);
+      // 3. Tiny absorbs ≤ 1 bullet (per-enemy cap, Finding 3 contract).
+      const aimedAtTiny = created.filter((p) => {
+        const dxT = p.to.x - tiny.x;
+        const dyT = p.to.y - tiny.y;
+        const distT = Math.sqrt(dxT * dxT + dyT * dyT);
+        const dxB = p.to.x - boss.x;
+        const dyB = p.to.y - boss.y;
+        const distB = Math.sqrt(dxB * dxB + dyB * dyB);
+        return distT < distB;
+      });
+      expect(aimedAtTiny.length).toBeLessThanOrEqual(1);
+      // 4. At least 1 bullet aimed at the boss (sanity).
+      expect(created.length - aimedAtTiny.length).toBeGreaterThanOrEqual(1);
+    });
+  });
 });
