@@ -592,9 +592,8 @@ class CombatSystem extends BaseSystem {
     // Fix-pass (F1): wire the damage-aware overkill cap into the real fire
     // path. In Mode 2 (non-rank-3, single-target multishot) every shot in the
     // volley hits the SAME enemy, so the burst cap = ceil(targetHP /
-    // volleyDamage). Rank-3 advanced battery distributes shots across distinct
-    // locks (per-enemy cap belongs in computeLockCount, not here) — keep its
-    // requestedShots untouched.
+    // volleyDamage). Rank-3 advanced battery is capped PER-ENEMY further
+    // down (C1) once we know how the lock slots distributed.
     let totalShots = requestedShots;
     if (!usingAdvancedBattery && requestedShots > 1) {
       const capTarget = lockTargets[0] || null;
@@ -606,7 +605,7 @@ class CombatSystem extends BaseSystem {
       }
     }
 
-    const assignments = usingAdvancedBattery
+    let assignments = usingAdvancedBattery
       ? Array.isArray(this.currentLockAssignments) &&
         this.currentLockAssignments.length
         ? this.currentLockAssignments
@@ -641,6 +640,78 @@ class CombatSystem extends BaseSystem {
       // Should not happen due to check above, but safely fire forward just in case
       this.fireForward(playerPos, player.getRotation(), playerStats);
       return;
+    }
+
+    // Fix-pass-2 (C1): rank-3 multi-lock per-enemy overkill cap. The first
+    // fix-pass gate on F1 intentionally excluded rank-3, leaving a real bug:
+    // when buildLockAssignments collapses 4 lock slots onto a single low-HP
+    // enemy (only one valid target in range), all 4 shots pile onto that
+    // enemy — wasting the multi-lock budget. Apply the per-enemy cap here
+    // so each unique enemy receives at most `computeAllocatedShots(enemy)`
+    // bullets. Re-index duplicateIndex/duplicateCount per-enemy so
+    // computeParallelOffset still places lanes within the surviving slots.
+    if (usingAdvancedBattery && assignments.length > 1) {
+      const perEnemyCount = new Map();
+      assignments.forEach((a) => {
+        const id = a?.enemy?.id ?? null;
+        if (id == null) return;
+        perEnemyCount.set(id, (perEnemyCount.get(id) || 0) + 1);
+      });
+
+      // Per-enemy cap. For each unique enemy, allocated = min(slotsAssigned,
+      // computeAllocatedShots(enemy, playerStats)). Skip enemies with null id.
+      const perEnemyCap = new Map();
+      perEnemyCount.forEach((count, id) => {
+        const sample = assignments.find((a) => a?.enemy?.id === id);
+        if (!sample) {
+          perEnemyCap.set(id, count);
+          return;
+        }
+        const allocated = this.computeAllocatedShots(sample.enemy, playerStats);
+        const cap = Number.isFinite(allocated) && allocated > 0
+          ? Math.min(count, allocated)
+          : count;
+        perEnemyCap.set(id, cap);
+      });
+
+      // Build the filtered assignment list, keeping at most `cap` per enemy
+      // in their original order so the priority sequence is preserved.
+      const kept = new Map();
+      const filtered = [];
+      assignments.forEach((a) => {
+        const id = a?.enemy?.id ?? null;
+        if (id == null) {
+          filtered.push(a);
+          return;
+        }
+        const so_far = kept.get(id) || 0;
+        const cap = perEnemyCap.get(id) ?? Infinity;
+        if (so_far < cap) {
+          filtered.push(a);
+          kept.set(id, so_far + 1);
+        }
+      });
+
+      // Re-key duplicateIndex / duplicateCount per-enemy on the filtered set
+      // so applyConcentratedFire / computeParallelOffset compute correct lane
+      // positions for the SURVIVING slots only.
+      const newTotals = new Map();
+      filtered.forEach((a) => {
+        const id = a?.enemy?.id ?? null;
+        if (id == null) return;
+        newTotals.set(id, (newTotals.get(id) || 0) + 1);
+      });
+      const running = new Map();
+      const rekeyed = filtered.map((a, index) => {
+        const id = a?.enemy?.id ?? null;
+        const dupCount = id == null ? 1 : newTotals.get(id) || 1;
+        const dupIndex = id == null ? 0 : running.get(id) || 0;
+        if (id != null) running.set(id, dupIndex + 1);
+        return { ...a, duplicateIndex: dupIndex, duplicateCount: dupCount, index };
+      });
+
+      assignments = rekeyed;
+      totalShots = Math.min(requestedShots, assignments.length);
     }
 
     const multiLockActive = usingAdvancedBattery && lockTargets.length > 1;
