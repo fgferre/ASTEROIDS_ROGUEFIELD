@@ -78,6 +78,13 @@ function setupCombatHarness({
   targetPosition = { x: 600, y: 300 },
   multishot = 1,
   damage = 10,
+  // Fix-pass (F1+F2): the FIX-01-era tests assumed every multishot burst spawns
+  // `multishot` bullets. With the overkill cap wired (ceil(targetHP /
+  // (damage*multishot*hitRate))), that assumption breaks against the legacy
+  // default enemy (radius=18 health=50). Bump the default harness health to
+  // 5000 so default tests do NOT trip the cap; the explicit overkill tests
+  // mutate the enemy back to a tiny target on purpose.
+  targetHealth = 5000,
   extraEnemies = [],
 } = {}) {
   const container = createTestContainer(String(AIM_REGRESSION_SEED));
@@ -121,7 +128,8 @@ function setupCombatHarness({
     variant: 'common',
     size: 'medium',
     behavior: 'drift',
-    health: 50,
+    health: targetHealth,
+    maxHealth: targetHealth,
     destroyed: false,
   };
 
@@ -138,7 +146,8 @@ function setupCombatHarness({
       variant: e.variant || 'common',
       size: e.size || 'medium',
       behavior: e.behavior || 'drift',
-      health: 50,
+      health: targetHealth,
+      maxHealth: targetHealth,
       destroyed: false,
     })),
   ];

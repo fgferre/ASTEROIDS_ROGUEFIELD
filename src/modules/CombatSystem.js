@@ -536,8 +536,25 @@ class CombatSystem extends BaseSystem {
       return;
     }
 
-    const totalShots = Math.max(1, Math.floor(playerStats?.multishot ?? 1));
+    const requestedShots = Math.max(1, Math.floor(playerStats?.multishot ?? 1));
     const usingAdvancedBattery = this.targetingUpgradeLevel >= 3;
+
+    // Fix-pass (F1): wire the damage-aware overkill cap into the real fire
+    // path. In Mode 2 (non-rank-3, single-target multishot) every shot in the
+    // volley hits the SAME enemy, so the burst cap = ceil(targetHP /
+    // volleyDamage). Rank-3 advanced battery distributes shots across distinct
+    // locks (per-enemy cap belongs in computeLockCount, not here) — keep its
+    // requestedShots untouched.
+    let totalShots = requestedShots;
+    if (!usingAdvancedBattery && requestedShots > 1) {
+      const capTarget = lockTargets[0] || null;
+      if (capTarget) {
+        const allocated = this.computeAllocatedShots(capTarget, playerStats);
+        if (Number.isFinite(allocated) && allocated > 0) {
+          totalShots = Math.min(requestedShots, allocated);
+        }
+      }
+    }
 
     const assignments = usingAdvancedBattery
       ? Array.isArray(this.currentLockAssignments) &&
@@ -1271,7 +1288,11 @@ class CombatSystem extends BaseSystem {
     }
 
     const hitRate = this.spreadMode === 'fan' ? 0.6 : 1.0;
-    const volleyDamage = damage * hitRate;
+    // Fix-pass (F2): include the multishot factor so volleyDamage reflects the
+    // FULL burst against the target, matching `ceil(targetHP / volleyDamage)`
+    // in the plan acceptance criterion. Without the multishot factor the cap
+    // computed only single-shot damage and overshot by ~multishot×.
+    const volleyDamage = damage * shotCount * hitRate;
     if (volleyDamage <= 0) {
       return shotCount;
     }
