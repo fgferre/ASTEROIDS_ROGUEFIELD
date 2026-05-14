@@ -786,10 +786,16 @@ class CombatSystem extends BaseSystem {
     const firedTargets = [];
 
     // Plan 01.07 Task 4: precompute concentrated lanes when totalShots > 1.
+    // Fix-pass (F6): in manual aim mode we keep every shot's fireOrigin at
+    // the ship nose (the originPos passed in via options.originOverride);
+    // perpendicular offset applies only to the aim point. This realizes the
+    // plan must_have "shots leave from the SHIP NOSE in the ship's CURRENT
+    // rotation direction" for the manual + concentrated + N>1 combo.
+    const sharedOrigin = this.aimMode === 'manual';
     const concentratedLanes =
       totalShots > 1 && this.spreadMode === 'concentrated'
         ? this.applyConcentratedFire(
-            { kind: 'direction', angle, originPos },
+            { kind: 'direction', angle, originPos, sharedOrigin },
             totalShots,
             playerStats
           )
@@ -1778,6 +1784,12 @@ class CombatSystem extends BaseSystem {
       const originPos = input.originPos || { x: 0, y: 0 };
       const baseOriginX = originPos.x;
       const baseOriginY = originPos.y;
+      // Fix-pass (F6): `sharedOrigin` mode keeps every shot's fireOrigin
+      // anchored at `originPos` and applies the perpendicular offset only to
+      // the aimPoint. Used by manual aim so all multishot lanes leave from
+      // the SHIP NOSE (plan must_have), fanning out to slightly offset aim
+      // points rather than sliding the spawn position laterally.
+      const sharedOrigin = input.sharedOrigin === true;
 
       const dxUnit = Math.cos(angle);
       const dyUnit = Math.sin(angle);
@@ -1796,14 +1808,24 @@ class CombatSystem extends BaseSystem {
         const shotPerpX = perpX * magnitude;
         const shotPerpY = perpY * magnitude;
 
-        const fireOrigin = {
-          x: baseOriginX + shotPerpX,
-          y: baseOriginY + shotPerpY,
-        };
-        const aimPoint = {
-          x: fireOrigin.x + dxUnit * range,
-          y: fireOrigin.y + dyUnit * range,
-        };
+        const fireOrigin = sharedOrigin
+          ? { x: baseOriginX, y: baseOriginY }
+          : { x: baseOriginX + shotPerpX, y: baseOriginY + shotPerpY };
+        const aimAnchorX = sharedOrigin ? baseOriginX : fireOrigin.x;
+        const aimAnchorY = sharedOrigin ? baseOriginY : fireOrigin.y;
+        const aimPoint = sharedOrigin
+          ? {
+              // Aim point fans perpendicular from the on-axis projection so
+              // bullets share the origin but fly toward different lateral
+              // targets. Keeping the same `range` projection as the legacy
+              // path preserves muzzle-velocity magnitude per shot.
+              x: aimAnchorX + dxUnit * range + shotPerpX,
+              y: aimAnchorY + dyUnit * range + shotPerpY,
+            }
+          : {
+              x: aimAnchorX + dxUnit * range,
+              y: aimAnchorY + dyUnit * range,
+            };
         results.push({ fireOrigin, aimPoint });
       }
       return results;

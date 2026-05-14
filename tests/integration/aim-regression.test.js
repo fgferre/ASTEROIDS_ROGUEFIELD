@@ -957,10 +957,15 @@ describe('FIX-05 centerline invariant + toggles', () => {
       const fired = combat.bullets.slice(before);
 
       expect(fired.length).toBe(3);
-      // All bullets fly with rotation 0 (mock player rotation is 0).
+      // Fix-pass (F6): manual + concentrated now keeps every origin at the
+      // nose and applies lane offset only to the aim point. So outer lanes
+      // fly with a tiny angular divergence (atan2(parallelSpacing,
+      // range=1000) ≈ 0.014 rad). The center lane still flies on-axis.
+      // Tolerance: 0.02 rad accommodates the parallelSpacing=14, range=1000
+      // geometry plus float-precision slack.
       fired.forEach((b) => {
         const a = Math.atan2(b.vy, b.vx);
-        expect(Math.abs(a)).toBeLessThan(0.001);
+        expect(Math.abs(a)).toBeLessThan(0.02);
       });
     });
 
