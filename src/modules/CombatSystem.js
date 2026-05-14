@@ -1344,11 +1344,18 @@ class CombatSystem extends BaseSystem {
     }
 
     const hitRate = this.spreadMode === 'fan' ? 0.6 : 1.0;
-    // Fix-pass (F2): include the multishot factor so volleyDamage reflects the
-    // FULL burst against the target, matching `ceil(targetHP / volleyDamage)`
-    // in the plan acceptance criterion. Without the multishot factor the cap
-    // computed only single-shot damage and overshot by ~multishot×.
-    const volleyDamage = damage * shotCount * hitRate;
+    // Fix-pass-2 C2 (REVERT first fix-pass F2): the cap is BULLET-COUNT, not
+    // a single mega-volley damage value. The caller spawns N bullets each
+    // dealing `damage` — so per-bullet damage = `damage * hitRate` (hitRate
+    // accounts for fan-mode misses). Number of bullets needed to kill =
+    // ceil(targetHP / (damage * hitRate)), and we cap that at multishot below.
+    //
+    // The first fix-pass mistakenly multiplied by shotCount, treating the
+    // burst as one big volley that all hits OR all misses together. That
+    // UNDER-FIRED mid-HP targets (e.g., HP=500/dmg=100/multi=4 capped at 2
+    // bullets, delivering 200 dmg < 500 HP — wasted half the burst the
+    // player paid multishot for). See aim-regression.test.js "C2:" tests.
+    const volleyDamage = damage * hitRate;
     if (volleyDamage <= 0) {
       return shotCount;
     }
