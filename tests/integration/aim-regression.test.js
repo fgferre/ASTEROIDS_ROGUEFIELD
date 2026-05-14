@@ -1045,6 +1045,112 @@ describe('FIX-05 centerline invariant + toggles', () => {
     });
   });
 
+  describe('centerline distance assertion (FIX-05 root invariant)', () => {
+    // Phase 1 fun-check found: N=2 at distance 300, asteroid radius 16 → both
+    // shots fly 44.8 px outside the target in legacy fan. Plan 01.07's
+    // concentrated default fixes this. Tests assert the geometric distance from
+    // each bullet's aim line to the target center.
+
+    function aimLineDistance(bullet, targetX, targetY) {
+      // Bullet aim line goes from (bullet.x, bullet.y) with direction (vx, vy).
+      // Distance from point (targetX, targetY) to that line:
+      const dx = bullet.vx;
+      const dy = bullet.vy;
+      const speed = Math.hypot(dx, dy);
+      if (speed === 0) return Infinity;
+      const nx = -dy / speed;
+      const ny = dx / speed;
+      // Signed distance from start to target projected on the perpendicular.
+      return Math.abs((targetX - bullet.x) * nx + (targetY - bullet.y) * ny);
+    }
+
+    [2, 3, 4].forEach((n) => {
+      it(`concentrated N=${n}: all bullets pass within (targetRadius + BULLET_SIZE) of target center`, () => {
+        const { combat, playerState } = setupCombatHarness({ multishot: n });
+        playerState.multishot = n;
+        combat.setSpreadMode('concentrated');
+        combat.targetUpdateTimer = 0;
+        combat.updateTargeting(0);
+
+        const before = combat.bullets.length;
+        const player = combat.getCachedPlayer();
+        combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+        const fired = combat.bullets.slice(before);
+        expect(fired.length).toBeGreaterThanOrEqual(n);
+
+        const enemy = combat.currentTarget;
+        const limit = (enemy.radius || 16) + BULLET_SIZE;
+        fired.forEach((b) => {
+          // In concentrated mode, lanes are parallel-translated by ≤ limit.
+          // The aim line passes within `limit` of the target center.
+          const d = aimLineDistance(b, enemy.x, enemy.y);
+          expect(d).toBeLessThanOrEqual(limit + 0.5);
+        });
+      });
+    });
+  });
+
+  describe('recoil follows centerlineTarget direction (Task 2 backward-compat invariant)', () => {
+    it('PlayerSystem.recoilOffset matches centerlineTarget direction (not first projectile aim)', () => {
+      const container = createTestContainer('recoil-seed');
+      const eventBus = container.resolve('event-bus');
+      const player = new PlayerSystem({
+        position: { x: 100, y: 100 },
+        dependencies: { eventBus },
+      });
+
+      // Centerline at (400, 100) — straight to the right of (100, 100).
+      // Even if 'target' is offset perpendicular, recoil must point left
+      // (opposite of the centerline direction).
+      eventBus.emit('weapon-fired', {
+        position: { x: 100, y: 100 },
+        target: { x: 400, y: 130 }, // first projectile aim — offset
+        centerlineTarget: { x: 400, y: 100 }, // logical center — exact axis
+      });
+
+      // Recoil should be opposite +x → recoilOffset.x is negative.
+      expect(player.recoilOffset.x).toBeLessThan(0);
+      // Recoil y should be near zero (centerline is on axis).
+      expect(Math.abs(player.recoilOffset.y)).toBeLessThan(0.1);
+    });
+
+    it('PlayerSystem falls back to target when centerlineTarget is missing (backward compat)', () => {
+      const container = createTestContainer('recoil-fallback-seed');
+      const eventBus = container.resolve('event-bus');
+      const player = new PlayerSystem({
+        position: { x: 100, y: 100 },
+        dependencies: { eventBus },
+      });
+
+      eventBus.emit('weapon-fired', {
+        position: { x: 100, y: 100 },
+        target: { x: 400, y: 100 },
+        // centerlineTarget intentionally omitted
+      });
+
+      expect(player.recoilOffset.x).toBeLessThan(0);
+    });
+  });
+
+  describe('debounce: action-binding emits once per press (handleActionPress wasActive gate)', () => {
+    // InputSystem.handleActionPress uses a `wasActive` gate (line ~418) so the
+    // 'pressed' phase fires only on the keydown→keyup→keydown transition.
+    // We can simulate this at the CombatSystem listener level: emitting
+    // 'toggle-spread-mode' multiple times with the same { screen } payload
+    // each flips the mode (no built-in debounce at the listener; the debounce
+    // is at the keypress level in InputSystem). The contract: ONE physical
+    // press = ONE event = ONE toggle.
+    it('5 rapid emits flip 5 times (no listener-level state); InputSystem-level debounce is the gate', () => {
+      const { combat, eventBus } = setupCombatHarness();
+      expect(combat.getSpreadMode()).toBe('concentrated');
+      for (let i = 0; i < 5; i += 1) {
+        eventBus.emit('toggle-spread-mode', { screen: 'playing' });
+      }
+      // 5 toggles: c → f → c → f → c → f.
+      expect(combat.getSpreadMode()).toBe('fan');
+    });
+  });
+
   describe('recommendedShots damage-aware overkill cap', () => {
     it('damage=100, multishot=4 vs radius-8 health-50 asteroid: caps at 1 (no overkill)', () => {
       const { combat } = setupCombatHarness({ multishot: 4, damage: 100 });
