@@ -1450,21 +1450,154 @@ class CombatSystem extends BaseSystem {
     }
 
     const spacing = this.aimingConfig?.multiLock?.parallelSpacing ?? 10;
-    const maxOffsetSetting = this.aimingConfig?.multiLock?.parallelMaxOffset;
-    const radiusMultiplier =
-      this.aimingConfig?.multiLock?.parallelRadiusMultiplier ?? 0.5;
 
     let magnitude = offsetIndex * spacing;
     const targetRadius = enemy?.radius || 16;
-    const clampLimit = Number.isFinite(maxOffsetSetting)
-      ? Math.max(spacing, maxOffsetSetting)
-      : Math.max(spacing, targetRadius * radiusMultiplier);
+    // Lane clamp per FIX-05 (plan 01.07 Task 3): keep lanes inside the target's
+    // effective hit radius (radius + bullet radius). Tighter than the legacy
+    // `Math.max(spacing, targetRadius * radiusMultiplier)`.
+    const clampLimit = Math.min(spacing, targetRadius + BULLET_SIZE);
     magnitude = Math.max(-clampLimit, Math.min(clampLimit, magnitude));
 
     const perpX = (-dy / distance) * magnitude;
     const perpY = (dx / distance) * magnitude;
 
     return { x: perpX, y: perpY };
+  }
+
+  /**
+   * Concentrated-fire helper extracted from the rank-3 parallel offset code path.
+   *
+   * Two discriminator shapes:
+   *   - `{ kind: 'target', enemy, predictedAim?, fireOrigin? }` — concentrated fire on a specific enemy.
+   *   - `{ kind: 'direction', angle, originPos }` — concentrated fire in a direction from an origin.
+   *
+   * Returns: `Array<{ fireOrigin: {x,y}, aimPoint: {x,y} }>` of length `shotCount`.
+   * For shotCount=1, returns a single entry with zero perpendicular offset.
+   *
+   * For `kind:'target'`, both `fireOrigin` and `aimPoint` are shifted by the same
+   * perpendicular vector (parallel lanes). Lane magnitude is clamped to
+   * `Math.min(spacing, targetRadius + BULLET_SIZE)` so outer lanes never exceed
+   * the target's effective hit radius.
+   *
+   * For `kind:'direction'`, the helper does NOT consult a target — perpendicular
+   * offsets use the fixed `spacing` only; aim points sit at +1000 along the angle
+   * from each fireOrigin (matching the fixed-range baseline used by `fireForward`).
+   *
+   * Caller spawns the bullets — this helper returns positions only.
+   *
+   * @param {{kind: 'target', enemy: object, predictedAim?: {x,y}, fireOrigin?: {x,y}} | {kind: 'direction', angle: number, originPos: {x,y}}} input
+   * @param {number} shotCount
+   * @param {object} [playerStats] — reserved for future damage-aware behavior; not consumed here.
+   * @returns {Array<{ fireOrigin: {x,y}, aimPoint: {x,y} }>}
+   */
+  applyConcentratedFire(input, shotCount, playerStats) {
+    if (!input || typeof input !== 'object') {
+      throw new Error('[CombatSystem] applyConcentratedFire requires an input object with a discriminator kind');
+    }
+
+    const count = Math.max(0, Math.floor(Number(shotCount) || 0));
+    if (count <= 0) {
+      return [];
+    }
+
+    const spacing = this.aimingConfig?.multiLock?.parallelSpacing ?? 10;
+
+    if (input.kind === 'target') {
+      const enemy = input.enemy;
+      if (!enemy) {
+        return [];
+      }
+
+      const predicted = input.predictedAim || { x: enemy.x, y: enemy.y };
+      const player = this.getCachedPlayer();
+      const playerPos =
+        input.fireOrigin ||
+        (player && typeof player.getPosition === 'function'
+          ? player.getPosition()
+          : { x: 0, y: 0 });
+
+      const baseAimX = predicted.x;
+      const baseAimY = predicted.y;
+      const baseOriginX = playerPos.x;
+      const baseOriginY = playerPos.y;
+
+      const dx = baseAimX - baseOriginX;
+      const dy = baseAimY - baseOriginY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance === 0 || count === 1) {
+        const results = [];
+        for (let i = 0; i < count; i += 1) {
+          results.push({
+            fireOrigin: { x: baseOriginX, y: baseOriginY },
+            aimPoint: { x: baseAimX, y: baseAimY },
+          });
+        }
+        return results;
+      }
+
+      const perpX = -dy / distance;
+      const perpY = dx / distance;
+
+      const targetRadius = enemy.radius || 16;
+      const clampLimit = Math.min(spacing, targetRadius + BULLET_SIZE);
+
+      const slotCenter = (count - 1) / 2;
+      const results = [];
+      for (let shotIndex = 0; shotIndex < count; shotIndex += 1) {
+        const offsetIndex = shotIndex - slotCenter;
+        const rawMagnitude = offsetIndex * spacing;
+        const magnitude = Math.max(-clampLimit, Math.min(clampLimit, rawMagnitude));
+
+        const shotPerpX = perpX * magnitude;
+        const shotPerpY = perpY * magnitude;
+
+        results.push({
+          fireOrigin: { x: baseOriginX + shotPerpX, y: baseOriginY + shotPerpY },
+          aimPoint: { x: baseAimX + shotPerpX, y: baseAimY + shotPerpY },
+        });
+      }
+      return results;
+    }
+
+    if (input.kind === 'direction') {
+      const angle = Number.isFinite(input.angle) ? input.angle : 0;
+      const originPos = input.originPos || { x: 0, y: 0 };
+      const baseOriginX = originPos.x;
+      const baseOriginY = originPos.y;
+
+      const dxUnit = Math.cos(angle);
+      const dyUnit = Math.sin(angle);
+
+      // Perpendicular unit vector (no targetRadius reference — clamp is not used).
+      const perpX = -dyUnit;
+      const perpY = dxUnit;
+
+      const range = 1000;
+      const slotCenter = (count - 1) / 2;
+      const results = [];
+
+      for (let shotIndex = 0; shotIndex < count; shotIndex += 1) {
+        const offsetIndex = shotIndex - slotCenter;
+        const magnitude = offsetIndex * spacing;
+        const shotPerpX = perpX * magnitude;
+        const shotPerpY = perpY * magnitude;
+
+        const fireOrigin = {
+          x: baseOriginX + shotPerpX,
+          y: baseOriginY + shotPerpY,
+        };
+        const aimPoint = {
+          x: fireOrigin.x + dxUnit * range,
+          y: fireOrigin.y + dyUnit * range,
+        };
+        results.push({ fireOrigin, aimPoint });
+      }
+      return results;
+    }
+
+    throw new Error(`[CombatSystem] applyConcentratedFire: invalid kind discriminator "${input.kind}"`);
   }
 
   calculateDangerScore(
