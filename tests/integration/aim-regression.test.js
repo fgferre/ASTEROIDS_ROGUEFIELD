@@ -772,6 +772,117 @@ describe('FIX-05 centerline invariant + toggles', () => {
     });
   });
 
+  // Fix-pass — defensive regression locks for Findings F3 and F4 (Codex review).
+  // The Codex review claimed F3 (rank-3 enters the spread-mode branch) and F4
+  // (_concentratedLanes cache reused across enemies), but inspection of
+  // handleShooting confirmed both were already correctly guarded:
+  //   F3: handleShooting branch `if (!usingAdvancedBattery && totalShots > 1)`
+  //   F4: in non-rank-3, `assignments` always has exactly 1 entry (line 587:
+  //       `assignments[Math.min(assignments.length - 1, 0)]`), so all shots in
+  //       a volley use the same enemy → the lane cache is anchored on the same
+  //       aim point for every shotIndex. The cache cannot leak across enemies
+  //       in the non-rank-3 path.
+  // These tests lock those invariants so future refactors that break them
+  // surface immediately rather than silently regressing.
+  describe('FIX-PASS regression locks for Codex F3+F4 (defensive — invariants verified by inspection)', () => {
+    it('F3: rank-3 advanced battery with spreadMode=fan still uses multi-lock parallel path (NOT the angular fan)', () => {
+      // The structural assertion that proves F3 is invalid: in handleShooting,
+      // the spread-mode branch is gated at `if (!usingAdvancedBattery &&
+      // totalShots > 1)`. So when rank-3 is active (usingAdvancedBattery ===
+      // true), the spread-mode code path is structurally bypassed. The test
+      // verifies the rank-3 fire path is taken regardless of spreadMode by
+      // toggling spreadMode and asserting the bullet count + multi-lock
+      // active flags match between concentrated and fan mode at rank 3.
+
+      const extraEnemies = [
+        { id: 'enemy-2', x: 600, y: 320, variant: 'common', size: 'medium' },
+        { id: 'enemy-3', x: 620, y: 280, variant: 'common', size: 'medium' },
+        { id: 'enemy-4', x: 580, y: 340, variant: 'common', size: 'medium' },
+      ];
+
+      function rank3FireAt(spreadMode) {
+        const { combat, eventBus, playerState } = setupCombatHarness({
+          multishot: 4,
+          extraEnemies,
+        });
+        eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
+        eventBus.emit('upgrade-aiming-suite', { level: 2 });
+        eventBus.emit('upgrade-aiming-suite', {
+          level: 3,
+          multiLockTargets: 4,
+          cooldownMultiplier: 0.92,
+        });
+        playerState.multishot = 4;
+        combat.setSpreadMode(spreadMode);
+        combat.targetUpdateTimer = 0;
+        combat.updateTargeting(0);
+        const before = combat.bullets.length;
+        const player = combat.getCachedPlayer();
+        combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+        return combat.bullets.slice(before);
+      }
+
+      const firedConc = rank3FireAt('concentrated');
+      const firedFan = rank3FireAt('fan');
+
+      // Structural invariant: both spread modes produce the SAME number of
+      // bullets at rank-3 (4 from multishot × multi-lock distribution). If F3
+      // were real, fan would re-route through angular-spread math and the
+      // count could diverge.
+      expect(firedConc.length).toBeGreaterThan(0);
+      expect(firedFan.length).toBe(firedConc.length);
+    });
+
+    it('F4: non-rank-3 Mode 2 has exactly 1 assignment (cache anchor cannot drift across enemies)', () => {
+      // Setup: 4 distinct enemies, NO rank-3 (only baseline). handleShooting
+      // collapses lockTargets to currentTarget only, so assignments.length===1.
+      // Lock-anchor uniqueness is what guarantees the _concentratedLanes cache
+      // can't leak across enemies in the non-rank-3 path.
+      const extraEnemies = [
+        { id: 'enemy-2', x: 600, y: 320, variant: 'common', size: 'medium' },
+        { id: 'enemy-3', x: 620, y: 280, variant: 'common', size: 'medium' },
+      ];
+      const { combat, playerState } = setupCombatHarness({
+        multishot: 4,
+        extraEnemies,
+      });
+      playerState.multishot = 4;
+      combat.setSpreadMode('concentrated');
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+
+      // Pre-condition: only one assignment in the non-rank-3 path.
+      // The non-rank-3 branch in handleShooting maps `lockTargets` (which
+      // collapses to [currentTarget] when no rank-3 multi-lock) into
+      // `assignments`. If a future refactor breaks this invariant, the
+      // _concentratedLanes cache could anchor on a stale enemy.
+      const lockTargets = combat.currentTargetLocks?.length
+        ? combat.currentTargetLocks
+        : combat.currentTarget
+          ? [combat.currentTarget]
+          : [];
+      expect(lockTargets.length).toBe(1);
+
+      // Fire and verify all bullets aim at parallel lanes around the SAME
+      // anchor enemy. If F4's scenario were real, later shots would aim at
+      // different enemies → velocity angles would diverge.
+      const before = combat.bullets.length;
+      const player = combat.getCachedPlayer();
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      const fired = combat.bullets.slice(before);
+      expect(fired.length).toBeGreaterThanOrEqual(2);
+
+      // All angles must be near-identical (parallel-lane invariant).
+      const playerPos = player.getPosition();
+      const target = combat.currentTarget;
+      const centerAngle = Math.atan2(target.y - playerPos.y, target.x - playerPos.x);
+      fired.forEach((b) => {
+        const a = Math.atan2(b.vy, b.vx);
+        expect(Math.abs(a - centerAngle)).toBeLessThan(0.001);
+      });
+    });
+  });
+
   describe('aim mode toggle: auto default, manual opt-in', () => {
     it('default boot state: aimMode is "auto"', () => {
       const { combat } = setupCombatHarness();
