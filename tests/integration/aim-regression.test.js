@@ -763,6 +763,187 @@ describe('FIX-05 centerline invariant + toggles', () => {
     });
   });
 
+  describe('aim mode toggle: auto default, manual opt-in', () => {
+    it('default boot state: aimMode is "auto"', () => {
+      const { combat } = setupCombatHarness();
+      expect(combat.getAimMode()).toBe('auto');
+    });
+
+    it('setAimMode("manual") clears currentTarget + locks + predictedAimPoints', () => {
+      const { combat } = setupCombatHarness({ multishot: 2 });
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+      expect(combat.currentTarget).not.toBeNull();
+
+      combat.setAimMode('manual');
+      expect(combat.currentTarget).toBeNull();
+      expect(combat.currentTargetLocks).toEqual([]);
+      expect(combat.currentLockAssignments).toEqual([]);
+    });
+
+    it('manual mode: fireForward path used (no target lock); bullets fly in ship rotation direction', () => {
+      const { combat, playerState } = setupCombatHarness({ multishot: 3 });
+      playerState.multishot = 3;
+      combat.setAimMode('manual');
+      combat.setSpreadMode('concentrated');
+
+      const before = combat.bullets.length;
+      const player = combat.getCachedPlayer();
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      const fired = combat.bullets.slice(before);
+
+      expect(fired.length).toBe(3);
+      // All bullets fly with rotation 0 (mock player rotation is 0).
+      fired.forEach((b) => {
+        const a = Math.atan2(b.vy, b.vx);
+        expect(Math.abs(a)).toBeLessThan(0.001);
+      });
+    });
+
+    it('manual mode: bullets spawn at ship nose (origin offset by ship radius along rotation)', () => {
+      // The harness's mock player has getHullBoundingRadius() = 16 and
+      // getPosition() = (400, 300). When we add getNosePosition to the mock,
+      // rotation 0 puts the nose at (416, 300). Use a custom harness that
+      // exposes getNosePosition the way the real PlayerSystem does (Task 2).
+      const container = createTestContainer('manual-nose-seed');
+      const eventBus = container.resolve('event-bus');
+      const random = container.resolve('random');
+      const playerPos = { x: 400, y: 300 };
+      const player = {
+        isDead: false,
+        isRetrying: false,
+        _quitExplosionHidden: false,
+        getPosition() { return { ...playerPos }; },
+        getVelocity() { return { x: 0, y: 0 }; },
+        getAngle() { return 0; },
+        getRotation() { return 0; },
+        getHullBoundingRadius() { return 16; },
+        getNosePosition(rotation) {
+          const angle = Number.isFinite(rotation) ? rotation : 0;
+          return {
+            x: playerPos.x + Math.cos(angle) * 16,
+            y: playerPos.y + Math.sin(angle) * 16,
+          };
+        },
+        getStats() { return { multishot: 1, damage: 10 }; },
+      };
+      const enemies = { forEachActiveEnemy() {} };
+      const physics = { forEachBulletCollision: () => {} };
+      const combat = new CombatSystem({ eventBus, random, player, enemies, physics });
+      combat.setAimMode('manual');
+
+      const before = combat.bullets.length;
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      const fired = combat.bullets.slice(before);
+
+      expect(fired.length).toBe(1);
+      // Bullet should spawn at (416, 300) — the nose, not the ship center (400, 300).
+      expect(fired[0].x).toBeCloseTo(416, 0);
+      expect(fired[0].y).toBeCloseTo(300, 0);
+    });
+
+    it('manual mode: rank-3 cooldownMultiplier preserved across mode switch (decision a)', () => {
+      const { combat, eventBus } = setupCombatHarness();
+      // Apply rank 3: shootCooldown *= 0.92.
+      eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
+      eventBus.emit('upgrade-aiming-suite', { level: 2 });
+      eventBus.emit('upgrade-aiming-suite', {
+        level: 3,
+        multiLockTargets: 4,
+        cooldownMultiplier: 0.92,
+      });
+
+      const cooldownBefore = combat.shootCooldown;
+      const expectedReduction = combat.baseShootCooldown * 0.92;
+      expect(cooldownBefore).toBeCloseTo(expectedReduction, 5);
+
+      combat.setAimMode('manual');
+      // Cooldown stat preserved — it's a weapon stat, not an aim behavior.
+      expect(combat.shootCooldown).toBeCloseTo(cooldownBefore, 5);
+
+      combat.setAimMode('auto');
+      expect(combat.shootCooldown).toBeCloseTo(cooldownBefore, 5);
+    });
+
+    it('manual mode: behavioral flags paused; restored on switchback to auto', () => {
+      const { combat, eventBus } = setupCombatHarness();
+      eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
+      eventBus.emit('upgrade-aiming-suite', {
+        level: 2,
+        dynamicPrediction: {
+          minLeadTime: 0.05,
+          maxLeadTime: 1,
+          fallbackLeadTime: 0.32,
+        },
+      });
+      expect(combat.dangerScoreEnabled).toBe(true);
+      expect(combat.dynamicPredictionEnabled).toBe(true);
+
+      combat.setAimMode('manual');
+      expect(combat.dangerScoreEnabled).toBe(false);
+      expect(combat.dynamicPredictionEnabled).toBe(false);
+
+      combat.setAimMode('auto');
+      expect(combat.dangerScoreEnabled).toBe(true);
+      expect(combat.dynamicPredictionEnabled).toBe(true);
+    });
+
+    it('switching auto → manual → auto sets needsRetarget flag', () => {
+      const { combat } = setupCombatHarness();
+      combat.setAimMode('manual');
+      expect(combat.needsRetarget).toBeFalsy();
+      combat.setAimMode('auto');
+      expect(combat.needsRetarget).toBe(true);
+    });
+
+    it('toggle-aim-mode event with screen=playing flips aimMode', () => {
+      const { combat, eventBus } = setupCombatHarness();
+      expect(combat.getAimMode()).toBe('auto');
+
+      eventBus.emit('toggle-aim-mode', { screen: 'playing' });
+      expect(combat.getAimMode()).toBe('manual');
+
+      eventBus.emit('toggle-aim-mode', { screen: 'playing' });
+      expect(combat.getAimMode()).toBe('auto');
+    });
+
+    it('toggle-aim-mode no-ops when screen is not playing', () => {
+      const { combat, eventBus } = setupCombatHarness();
+      eventBus.emit('toggle-aim-mode', { screen: 'menu' });
+      expect(combat.getAimMode()).toBe('auto');
+    });
+  });
+
+  describe('4-combo matrix: auto/manual × concentrated/fan', () => {
+    const combos = [
+      { aim: 'auto', spread: 'concentrated' },
+      { aim: 'auto', spread: 'fan' },
+      { aim: 'manual', spread: 'concentrated' },
+      { aim: 'manual', spread: 'fan' },
+    ];
+
+    combos.forEach(({ aim, spread }) => {
+      it(`combo (aim=${aim}, spread=${spread}) produces N=2 bullets`, () => {
+        const { combat, playerState } = setupCombatHarness({ multishot: 2 });
+        playerState.multishot = 2;
+        combat.setSpreadMode(spread);
+        combat.setAimMode(aim);
+
+        if (aim === 'auto') {
+          combat.targetUpdateTimer = 0;
+          combat.updateTargeting(0);
+        }
+
+        const before = combat.bullets.length;
+        const player = combat.getCachedPlayer();
+        combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+        const fired = combat.bullets.slice(before);
+
+        expect(fired.length).toBe(2);
+      });
+    });
+  });
+
   describe('recommendedShots damage-aware overkill cap', () => {
     it('damage=100, multishot=4 vs radius-8 health-50 asteroid: caps at 1 (no overkill)', () => {
       const { combat } = setupCombatHarness({ multishot: 4, damage: 100 });

@@ -505,6 +505,21 @@ class CombatSystem extends BaseSystem {
     const playerPos = player.getPosition();
     if (!playerPos) return;
 
+    // Plan 01.07 Task 6: manual-aim mode bypasses target acquisition entirely
+    // and fires from the ship nose in the ship's current rotation direction.
+    if (this.aimMode === 'manual') {
+      const rotation =
+        typeof player.getAngle === 'function' ? player.getAngle() : 0;
+      const nose =
+        typeof player.getNosePosition === 'function'
+          ? player.getNosePosition(rotation)
+          : playerPos;
+      this.fireForward(playerPos, rotation, playerStats, {
+        originOverride: nose,
+      });
+      return;
+    }
+
     // [SMART AUTO-FIRE] If no targets locked, fire forward!
     const lockTargets =
       this.currentTargetLocks && this.currentTargetLocks.length
