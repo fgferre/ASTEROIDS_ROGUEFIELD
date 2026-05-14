@@ -175,6 +175,9 @@ class CombatSystem extends BaseSystem {
       this.lastKnownPlayerStats = null;
       this.lastPrimaryTargetId = null;
       this.clearEnemyBullets();
+      // Fix-pass-2 (C5): restore in-run toggle state to defaults so a player
+      // ending a run in manual+fan doesn't start the next run in manual+fan.
+      this.resetModeState();
     });
 
     this.registerEventListener('progression-reset', () => {
@@ -3528,6 +3531,25 @@ class CombatSystem extends BaseSystem {
     this.targetingRange = Math.max(50, range);
   }
 
+  /**
+   * Fix-pass-2 (C5): restore in-run toggle state (spread/aim mode, snapshot,
+   * retarget flag) to the gameplay-default values. Called from both
+   * `reset()` and the `player-reset` event listener so a player ending a run
+   * in fan + manual starts the next run with the defaults (concentrated +
+   * auto). Validation against VALID_*_MODES Sets mirrors the constructor
+   * defensively so a constant file mis-edit can't silently corrupt state.
+   */
+  resetModeState() {
+    this.spreadMode = VALID_SPREAD_MODES.has(COMBAT_SPREAD_MODE_DEFAULT)
+      ? COMBAT_SPREAD_MODE_DEFAULT
+      : 'concentrated';
+    this.aimMode = VALID_AIM_MODES.has(COMBAT_AIM_MODE_DEFAULT)
+      ? COMBAT_AIM_MODE_DEFAULT
+      : 'auto';
+    this._aimModeFlagSnapshot = null;
+    this.needsRetarget = false;
+  }
+
   // === CLEANUP ===
   reset() {
     super.reset();
@@ -3555,6 +3577,9 @@ class CombatSystem extends BaseSystem {
     }
     this.targetThreatCache.clear();
     this.lastShotTime = 0;
+    // Fix-pass-2 (C5): restore the in-run toggle defaults so the next run
+    // starts at concentrated + auto regardless of how the previous run ended.
+    this.resetModeState();
     this.resolveCachedServices(COMBAT_SERVICE_MAP, { force: true });
     console.log('[CombatSystem] Reset');
   }
