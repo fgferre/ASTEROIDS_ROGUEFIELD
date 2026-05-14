@@ -1070,6 +1070,78 @@ describe('FIX-05 centerline invariant + toggles', () => {
       expect(combat.needsRetarget).toBe(false);
     });
 
+    // Fix-pass-2 (C3): the _aimModeFlagSnapshot was captured on manual-on
+    // and read verbatim on auto-switchback. If an upgrade-aiming-suite
+    // event fired during manual mode (e.g. levelling up), the upgrade
+    // bumped targetingUpgradeLevel and set the live behavioral flags, but
+    // the snapshot stayed stale. On switchback the restore overwrote the
+    // live flags with the pre-upgrade snapshot — silently dropping the
+    // upgrade. Plan must-have: "rank-3 cooldownMultiplier preserved across
+    // both aim modes" extends to behavioral flags too — upgrades acquired
+    // during manual MUST survive switchback.
+    it('C3: upgrade acquired during manual survives auto switchback (dangerScore + dynamicPrediction)', () => {
+      const { combat, eventBus } = setupCombatHarness({ multishot: 2 });
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+
+      // Start at rank 1: dangerScoreEnabled becomes true, dynamicPrediction false.
+      eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
+      expect(combat.targetingUpgradeLevel).toBe(1);
+      expect(combat.dangerScoreEnabled).toBe(true);
+      expect(combat.dynamicPredictionEnabled).toBe(false);
+
+      // Toggle to manual. Snapshot captured here:
+      //   {dangerScoreEnabled: true, dynamicPredictionEnabled: false}.
+      combat.setAimMode('manual');
+      expect(combat.aimMode).toBe('manual');
+      // Behavioral flags paused while manual.
+      expect(combat.dangerScoreEnabled).toBe(false);
+      expect(combat.dynamicPredictionEnabled).toBe(false);
+
+      // Apply rank-2 upgrade WHILE in manual. dynamicPrediction should
+      // be tracked so the restore on switchback re-enables it.
+      eventBus.emit('upgrade-aiming-suite', { level: 2 });
+      expect(combat.targetingUpgradeLevel).toBe(2);
+
+      // Toggle back to auto. The restore MUST reflect rank 2's flags
+      // (both true), not the pre-upgrade rank-1 snapshot.
+      combat.setAimMode('auto');
+      expect(combat.aimMode).toBe('auto');
+      expect(combat.dangerScoreEnabled).toBe(true);
+      // The C3 regression check — currently FAILS pre-fix because the
+      // stale rank-1 snapshot restore overrides the rank-2 upgrade.
+      expect(combat.dynamicPredictionEnabled).toBe(true);
+    });
+
+    it('C3: upgrade from rank 0 → rank 3 acquired during manual survives auto switchback', () => {
+      // Stronger variant: bigger jump. rank-0 → manual → rank-3.
+      const { combat, eventBus } = setupCombatHarness({ multishot: 4 });
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+
+      // Start at rank 0: both flags false (default).
+      expect(combat.targetingUpgradeLevel).toBe(0);
+      expect(combat.dangerScoreEnabled).toBe(false);
+      expect(combat.dynamicPredictionEnabled).toBe(false);
+
+      // Toggle to manual. Snapshot = {false, false}.
+      combat.setAimMode('manual');
+
+      // Apply rank-3 upgrade while manual.
+      eventBus.emit('upgrade-aiming-suite', { level: 1 });
+      eventBus.emit('upgrade-aiming-suite', { level: 2 });
+      eventBus.emit('upgrade-aiming-suite', {
+        level: 3,
+        multiLockTargets: 4,
+        cooldownMultiplier: 0.92,
+      });
+
+      // Toggle back to auto. Both flags must reflect rank-3 capabilities.
+      combat.setAimMode('auto');
+      expect(combat.dangerScoreEnabled).toBe(true);
+      expect(combat.dynamicPredictionEnabled).toBe(true);
+    });
+
     it('F6: manual + concentrated + N>1 → ALL shots leave from the same ship-nose origin (not nose ± perpendicular offset)', () => {
       // Codex review F6: the prior implementation passed originOverride = nose
       // to fireForward but applyConcentratedFire({kind: 'direction'}) STILL
