@@ -2278,4 +2278,200 @@ describe('FIX-05 centerline invariant + toggles', () => {
       expect(b).not.toHaveProperty('targetY');
     });
   });
+
+  // Fix-pass-3 Finding 1: the per-enemy overkill cap was applied AFTER
+  // buildLockAssignments returned, only inside handleShooting. So
+  // `currentLockAssignments` (which is read by render, predictedAimPoints,
+  // multi-lock indicators, and the weapon-fired event payload) carried the
+  // un-capped 4-lock layout for a tiny enemy that will only receive 1 shot.
+  // The fix moves the cap UPSTREAM into buildLockAssignments so the
+  // assignments returned by it already reflect the correct cap, and the
+  // downstream observers see the correct lock count.
+  //
+  // Observable contract: after updateTargeting (which calls buildLockAssignments
+  // via rebuildLockSet), currentLockAssignments.length must equal the actual
+  // bullet count that handleShooting will fire. This locks the invariant:
+  // "render + predicted markers + multi-lock indicators reflect what fires".
+  describe('Finding 1: buildLockAssignments per-enemy cap is upstream', () => {
+    function makeRank3Combat(extraEnemies = []) {
+      const harness = setupCombatHarness({ multishot: 4, damage: 100, extraEnemies });
+      const { combat, eventBus, playerState } = harness;
+      eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
+      eventBus.emit('upgrade-aiming-suite', { level: 2 });
+      eventBus.emit('upgrade-aiming-suite', {
+        level: 3,
+        multiLockTargets: 4,
+        cooldownMultiplier: 0.92,
+      });
+      playerState.multishot = 4;
+      playerState.damage = 100;
+      combat.lastKnownPlayerStats = { multishot: 4, damage: 100 };
+      return harness;
+    }
+
+    it('Finding 1: rank-3 + 1 tiny enemy (HP=50, dmg=100, multi=4) → currentLockAssignments.length === fired count', () => {
+      const harness = makeRank3Combat();
+      const { combat, eventBus } = harness;
+      let tinyEnemy = null;
+      combat.cachedEnemies.forEachActiveEnemy((e) => {
+        if (!tinyEnemy) tinyEnemy = e;
+      });
+      expect(tinyEnemy).not.toBeNull();
+      tinyEnemy.radius = 8;
+      tinyEnemy.health = 50;
+      tinyEnemy.maxHealth = 50;
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+      expect(combat.targetingUpgradeLevel).toBeGreaterThanOrEqual(3);
+
+      // PRE-FIX: currentLockAssignments.length is 4 (un-capped). Render,
+      // multi-lock indicators, and weapon-fired all see 4 locks. But only 1
+      // bullet fires. This mismatch is the bug.
+      //
+      // POST-FIX: assignments.length === 1 (cap applied upstream).
+      const created = [];
+      const off = eventBus.on('bullet-created', (p) => created.push(p));
+      const player = combat.getCachedPlayer();
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      off?.();
+
+      const assignmentCount = combat.currentLockAssignments.length;
+      const firedCount = created.length;
+
+      // The invariant: the lock state the rest of the engine reads MUST
+      // match what actually fires.
+      expect(assignmentCount).toBe(firedCount);
+    });
+
+    it('Finding 1: rank-3 + 4 enemies × HP=50 each → currentLockAssignments has 4 (1 per enemy)', () => {
+      const extraEnemies = [
+        { id: 'enemy-2', x: 600, y: 320, variant: 'common', size: 'small' },
+        { id: 'enemy-3', x: 620, y: 280, variant: 'common', size: 'small' },
+        { id: 'enemy-4', x: 580, y: 340, variant: 'common', size: 'small' },
+      ];
+      const harness = makeRank3Combat(extraEnemies);
+      const { combat, eventBus } = harness;
+      const enemies = [];
+      combat.cachedEnemies.forEachActiveEnemy((e) => enemies.push(e));
+      enemies.forEach((e) => {
+        e.radius = 8;
+        e.health = 50;
+        e.maxHealth = 50;
+      });
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+
+      const created = [];
+      const off = eventBus.on('bullet-created', (p) => created.push(p));
+      const player = combat.getCachedPlayer();
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      off?.();
+
+      // The 4 enemies each absorb 1 bullet. Assignment count matches.
+      expect(combat.currentLockAssignments.length).toBe(created.length);
+      expect(created.length).toBe(4);
+    });
+  });
+
+  // Fix-pass-3 Finding 2: when the per-enemy cap filters assignments from
+  // (e.g.) 4 lanes down to 2, the surviving lanes' geometry must match the
+  // NEW 2-lane layout — not the old 4-lane geometry. The pre-fix-pass-3
+  // re-keying spread the original `a` first, carrying forward stale
+  // predictedAim / fireOffset / fireOrigin from the 4-lane layout.
+  //
+  // Observable contract: after the cap filters down to N lanes, the
+  // perpendicular offsets of the surviving lanes match the expected N-lane
+  // geometry from computeParallelOffset (e.g., N=2 → magnitudes at
+  // ±parallelSpacing/2 OR within ±clampLimit, NOT the old 4-lane magnitudes
+  // of ±parallelSpacing*1.5).
+  //
+  // If Finding 1 fix dissolves Finding 2 (no more cap-time re-key, because
+  // buildLockAssignments returns correctly-sized assignments), this test
+  // still locks the contract observable from outside.
+  describe('Finding 2: filtered assignments use correct N-lane geometry', () => {
+    function makeRank3Combat(extraEnemies = []) {
+      const harness = setupCombatHarness({ multishot: 4, damage: 100, extraEnemies });
+      const { combat, eventBus, playerState } = harness;
+      eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
+      eventBus.emit('upgrade-aiming-suite', { level: 2 });
+      eventBus.emit('upgrade-aiming-suite', {
+        level: 3,
+        multiLockTargets: 4,
+        cooldownMultiplier: 0.92,
+      });
+      playerState.multishot = 4;
+      playerState.damage = 100;
+      combat.lastKnownPlayerStats = { multishot: 4, damage: 100 };
+      return harness;
+    }
+
+    it('Finding 2: when 4 slots cap down to N, surviving lanes match N-lane perpendicular offsets', () => {
+      // Scenario: rank-3 + 4 multishot + 1 mid-HP enemy where ceil(HP/dmg) = 2.
+      // Pre-fix-pass-3: assignments has 4 slots, cap filter retains 2 but
+      // carries stale 4-lane geometry. Post-fix: assignments has exactly 2
+      // and the parallel-offset math runs on duplicateCount=2.
+      const harness = makeRank3Combat();
+      const { combat, eventBus } = harness;
+      let enemy = null;
+      combat.cachedEnemies.forEachActiveEnemy((e) => {
+        if (!enemy) enemy = e;
+      });
+      expect(enemy).not.toBeNull();
+      // HP=150, damage=100 → ceil(150/100) = 2 shots allocated.
+      enemy.radius = 12;
+      enemy.health = 150;
+      enemy.maxHealth = 150;
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+
+      const created = [];
+      const off = eventBus.on('bullet-created', (p) => created.push(p));
+      const player = combat.getCachedPlayer();
+      const playerPos = player.getPosition();
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      off?.();
+
+      // For 2 lanes (duplicateCount=2), the perpendicular offsets are at
+      // offsetIndex = -0.5 and +0.5 → magnitudes = ±parallelSpacing/2.
+      // For 4 lanes (the stale buggy state), magnitudes would be
+      // ±parallelSpacing*1.5 and ±parallelSpacing*0.5 — and clamped to
+      // the limit. The observable test: the SPREAD between the two `from`
+      // points (perpendicular distance) reflects the 2-lane geometry.
+      expect(created.length).toBe(2);
+      const aimDx = created[0].to.x - playerPos.x;
+      const aimDy = created[0].to.y - playerPos.y;
+      const aimDist = Math.sqrt(aimDx * aimDx + aimDy * aimDy);
+      // Perpendicular unit vector to (aimDx, aimDy)
+      const perpX = -aimDy / aimDist;
+      const perpY = aimDx / aimDist;
+      // Project each bullet origin's offset from playerPos onto perp.
+      const perp0 = (created[0].from.x - playerPos.x) * perpX +
+        (created[0].from.y - playerPos.y) * perpY;
+      const perp1 = (created[1].from.x - playerPos.x) * perpX +
+        (created[1].from.y - playerPos.y) * perpY;
+      const spread = Math.abs(perp1 - perp0);
+
+      // Read spacing from the same source production code uses, so this
+      // test does not bake in a magic number; only the layout INVARIANT.
+      const spacing = combat.aimingConfig?.multiLock?.parallelSpacing ?? 10;
+      // Clamp limit per fix-pass-2 C7b: min(spacing, targetRadius + bullet radius).
+      // For radius=12 + bullet radius (3 by C7b naming) = 15, so clamp = min(spacing, 15).
+      // For 2 lanes, expected spread = 2 * clamp(offsetIndex * spacing, ±clamp)
+      // where offsetIndex = ±0.5, so magnitudes = clamp(±spacing/2, ±clamp).
+      const clampLimit = Math.min(spacing, 12 + 3);
+      const expectedMagnitude = Math.min(spacing / 2, clampLimit);
+      const expectedSpread = 2 * expectedMagnitude;
+      // Tight tolerance — geometry is deterministic; small float drift only.
+      expect(Math.abs(spread - expectedSpread)).toBeLessThan(0.5);
+
+      // The 4-lane buggy layout would have spread ≈ 2 * 1.5 * spacing
+      // (offsetIndex ±1.5 * spacing), clamped. Assert we are NOT seeing
+      // that magnitude — observable proof the layout is 2-lane, not 4-lane.
+      const buggyOuterSpread = 2 * Math.min(spacing * 1.5, clampLimit);
+      // Only meaningful when not clamped to same value.
+      if (Math.abs(buggyOuterSpread - expectedSpread) > 0.5) {
+        expect(Math.abs(spread - buggyOuterSpread)).toBeGreaterThan(0.5);
+      }
+    });
+  });
 });
