@@ -737,6 +737,30 @@ describe('FIX-05 centerline invariant + toggles', () => {
       combat.setSpreadMode('invalid-value');
       expect(combat.getSpreadMode()).toBe(before); // unchanged
     });
+
+    it('emitted toggle-spread-mode event with screen=playing flips spreadMode', () => {
+      const { combat, eventBus } = setupCombatHarness();
+      // Initial state: concentrated.
+      expect(combat.getSpreadMode()).toBe('concentrated');
+
+      // Simulate a gameState wrapper that exposes screen.
+      eventBus.emit('toggle-spread-mode', { screen: 'playing' });
+      expect(combat.getSpreadMode()).toBe('fan');
+
+      eventBus.emit('toggle-spread-mode', { screen: 'playing' });
+      expect(combat.getSpreadMode()).toBe('concentrated');
+    });
+
+    it('toggle-spread-mode no-ops when screen is not playing', () => {
+      const { combat, eventBus } = setupCombatHarness();
+      expect(combat.getSpreadMode()).toBe('concentrated');
+
+      eventBus.emit('toggle-spread-mode', { screen: 'menu' });
+      expect(combat.getSpreadMode()).toBe('concentrated');
+
+      eventBus.emit('toggle-spread-mode', { screen: 'paused' });
+      expect(combat.getSpreadMode()).toBe('concentrated');
+    });
   });
 
   describe('recommendedShots damage-aware overkill cap', () => {
