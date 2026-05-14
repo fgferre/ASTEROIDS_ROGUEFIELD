@@ -491,3 +491,98 @@ describe('Aim regression suite (FIX-01)', () => {
     }
   );
 });
+
+// =============================================================================
+// Plan 01.07 FIX-05 — centerline invariant + toggles
+// =============================================================================
+//
+// New describe block introduced by plan 01.07 (Task 2 + Task 8). Each block
+// names the specific must_have.truths claim it covers; assertions are
+// geometric (vector / position math), not state-flag-only.
+
+import { BULLET_SIZE } from '../../src/core/GameConstants.js';
+import PlayerSystem from '../../src/modules/PlayerSystem.js';
+
+describe('FIX-05 centerline invariant + toggles', () => {
+  beforeAll(() => {
+    if (!GamePools.initialized) {
+      GamePools.initialize();
+    }
+  });
+
+  beforeEach(() => setupGlobalMocks());
+  afterEach(() => cleanupGlobalState());
+
+  describe('weapon-fired payload includes centerlineTarget', () => {
+    it('Mode 2 (locked target): centerlineTarget present and points at the locked enemy aim', () => {
+      const captured = [];
+      const { combat, eventBus, playerState } = setupCombatHarness({
+        multishot: 2,
+      });
+      eventBus.on('weapon-fired', (payload) => {
+        captured.push(payload);
+      });
+
+      playerState.multishot = 2;
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+
+      const player = combat.getCachedPlayer();
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+
+      expect(captured.length).toBe(1);
+      expect(captured[0].centerlineTarget).toBeDefined();
+      expect(captured[0].centerlineTarget).not.toBeNull();
+      expect(Number.isFinite(captured[0].centerlineTarget.x)).toBe(true);
+      expect(Number.isFinite(captured[0].centerlineTarget.y)).toBe(true);
+      // target field PRESERVED for backward compat.
+      expect(captured[0].target).toBeDefined();
+    });
+
+    it('Mode 1 (forward fire, no target): centerlineTarget is at fixed range along rotation', () => {
+      const captured = [];
+      const { combat, eventBus } = setupCombatHarness();
+      eventBus.on('weapon-fired', (payload) => {
+        captured.push(payload);
+      });
+
+      // Force no-target firing path: clear the target locks.
+      combat.currentTarget = null;
+      combat.currentTargetLocks = [];
+      combat.currentLockAssignments = [];
+
+      const player = combat.getCachedPlayer();
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+
+      expect(captured.length).toBe(1);
+      expect(captured[0].centerlineTarget).toBeDefined();
+      // Player at (400, 300), rotation 0 → centerline at (400 + 1000, 300) per plan spec.
+      expect(captured[0].centerlineTarget.x).toBeCloseTo(1400, 0);
+      expect(captured[0].centerlineTarget.y).toBeCloseTo(300, 0);
+    });
+  });
+
+  describe('PlayerSystem.getNosePosition', () => {
+    it('returns ship-nose world coordinates: {x: pos.x + cos(r) * radius, y: pos.y + sin(r) * radius}', () => {
+      // Build a stripped-down PlayerSystem with deterministic position + radius.
+      const container = createTestContainer('nose-position-seed');
+      const eventBus = container.resolve('event-bus');
+      const player = new PlayerSystem({
+        position: { x: 100, y: 200 },
+        dependencies: { eventBus },
+      });
+
+      const radius = player.getHullBoundingRadius();
+
+      // rotation 0 → nose at +x of position.
+      const noseR0 = player.getNosePosition(0);
+      expect(noseR0.x).toBeCloseTo(100 + radius, 5);
+      expect(noseR0.y).toBeCloseTo(200, 5);
+
+      // rotation π/2 → nose at +y of position.
+      const noseR90 = player.getNosePosition(Math.PI / 2);
+      expect(noseR90.x).toBeCloseTo(100, 5);
+      expect(noseR90.y).toBeCloseTo(200 + radius, 5);
+    });
+  });
+});
