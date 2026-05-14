@@ -1152,6 +1152,9 @@ describe('FIX-05 centerline invariant + toggles', () => {
   });
 
   describe('recommendedShots damage-aware overkill cap', () => {
+    // Fix-pass (F2): volleyDamage = damage * multishot * hitRate.
+    // damage=100, multishot=4, concentrated (hitRate=1.0) → volleyDamage = 400.
+    // radius-8 health-50 enemy needs ceil(50 / 400) = 1 shot.
     it('damage=100, multishot=4 vs radius-8 health-50 asteroid: caps at 1 (no overkill)', () => {
       const { combat } = setupCombatHarness({ multishot: 4, damage: 100 });
       const enemy = {
@@ -1169,6 +1172,8 @@ describe('FIX-05 centerline invariant + toggles', () => {
       expect(allocated).toBe(1);
     });
 
+    // damage=10, multishot=4, concentrated → volleyDamage = 40.
+    // health-1500 boss needs ceil(1500/40) = 38 shots → capped at multishot (4).
     it('damage=10, multishot=4 vs health-1500 boss: caps at multishot (full allocation OK)', () => {
       const { combat } = setupCombatHarness({ multishot: 4, damage: 10 });
       const enemy = {
@@ -1187,21 +1192,65 @@ describe('FIX-05 centerline invariant + toggles', () => {
       expect(allocated).toBe(4);
     });
 
-    it('damage=100, multishot=4 vs health-200 enemy: caps at 2 (ceil(200/100) = 2)', () => {
+    // damage=100, multishot=4, concentrated → volleyDamage = 400.
+    // health-500 enemy needs ceil(500/400) = 2 shots.
+    it('damage=100, multishot=4 vs health-500 enemy: caps at 2 (ceil(500/400) = 2)', () => {
       const { combat } = setupCombatHarness({ multishot: 4, damage: 100 });
       const enemy = {
         id: 'mid-1',
         x: 600,
         y: 300,
         radius: 18,
-        health: 200,
-        maxHealth: 200,
+        health: 500,
+        maxHealth: 500,
         variant: 'common',
         size: 'medium',
       };
 
       const allocated = combat.computeAllocatedShots(enemy, { damage: 100, multishot: 4 });
       expect(allocated).toBe(2);
+    });
+
+    // Fix-pass (F1): the cap must be WIRED into the actual fire path. Codex
+    // review noted that `computeAllocatedShots` was added as dead code and the
+    // cap never reached `handleShooting`. This test fires a real burst against
+    // a one-hit enemy and asserts only 1 bullet spawns (proves the path is
+    // wired AND the formula uses multishot in volleyDamage).
+    it('FIX-PASS F1+F2: burst against radius-8 health-50 with damage=100 multishot=4 spawns only 1 bullet', () => {
+      const { combat, playerState } = setupCombatHarness({
+        multishot: 4,
+        damage: 100,
+        targetPosition: { x: 600, y: 300 },
+      });
+      // Override the seeded enemy to a small low-HP one. setupCombatHarness
+      // uses health=50 / radius=18 by default for the moving target, but the
+      // F1+F2 contract is specifically about a tiny one-shot target.
+      const enemy = combat.cachedEnemies;
+      // The harness builds a single baseEnemy at targetPosition; mutate it.
+      let baseEnemy = null;
+      combat.cachedEnemies.forEachActiveEnemy((e) => {
+        if (!baseEnemy) baseEnemy = e;
+      });
+      expect(baseEnemy).not.toBeNull();
+      baseEnemy.radius = 8;
+      baseEnemy.health = 50;
+      baseEnemy.maxHealth = 50;
+      // Re-acquire so currentTarget reflects the mutated enemy.
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+
+      playerState.multishot = 4;
+      playerState.damage = 100;
+
+      const before = combat.bullets.length;
+      const player = combat.getCachedPlayer();
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      const fired = combat.bullets.length - before;
+
+      // Damage 100 with multishot factor → first shot deals 400. Target HP 50.
+      // Allocator must cap at 1 → exactly 1 bullet spawned even though
+      // playerStats.multishot is 4.
+      expect(fired).toBe(1);
     });
   });
 });
