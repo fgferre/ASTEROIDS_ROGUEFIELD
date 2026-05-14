@@ -1142,6 +1142,59 @@ describe('FIX-05 centerline invariant + toggles', () => {
       expect(combat.dynamicPredictionEnabled).toBe(true);
     });
 
+    // Fix-pass-2 (C5): mode state must reset on run end. The first fix-pass
+    // wired the toggles + manual path but did NOT reset spreadMode / aimMode
+    // / _aimModeFlagSnapshot / needsRetarget on combat.reset() or on the
+    // player-reset event. So a player who ended a run in manual+fan would
+    // start the next run in manual+fan — wrong default.
+    it('C5: combat.reset() restores spreadMode / aimMode / snapshot / needsRetarget to defaults', () => {
+      const { combat } = setupCombatHarness({ multishot: 2 });
+      // Dirty all four bits of mode state.
+      combat.setSpreadMode('fan');
+      combat.setAimMode('manual');
+      combat.needsRetarget = true;
+      // The setAimMode('manual') already populates _aimModeFlagSnapshot,
+      // so dirty it further to make sure reset clears (not just overwrites).
+      combat._aimModeFlagSnapshot = {
+        dangerScoreEnabled: true,
+        dynamicPredictionEnabled: true,
+      };
+
+      // Pre-condition: dirty state confirmed.
+      expect(combat.getSpreadMode()).toBe('fan');
+      expect(combat.getAimMode()).toBe('manual');
+      expect(combat._aimModeFlagSnapshot).not.toBeNull();
+      expect(combat.needsRetarget).toBe(true);
+
+      combat.reset();
+
+      // Post-condition: all four restored to defaults.
+      expect(combat.getSpreadMode()).toBe('concentrated');
+      expect(combat.getAimMode()).toBe('auto');
+      expect(combat._aimModeFlagSnapshot).toBeNull();
+      expect(combat.needsRetarget).toBe(false);
+    });
+
+    it('C5: player-reset event also restores spreadMode / aimMode / snapshot / needsRetarget', () => {
+      const { combat, eventBus } = setupCombatHarness({ multishot: 2 });
+      combat.setSpreadMode('fan');
+      combat.setAimMode('manual');
+      combat.needsRetarget = true;
+      combat._aimModeFlagSnapshot = {
+        dangerScoreEnabled: true,
+        dynamicPredictionEnabled: true,
+      };
+      expect(combat.getSpreadMode()).toBe('fan');
+      expect(combat.getAimMode()).toBe('manual');
+
+      eventBus.emit('player-reset');
+
+      expect(combat.getSpreadMode()).toBe('concentrated');
+      expect(combat.getAimMode()).toBe('auto');
+      expect(combat._aimModeFlagSnapshot).toBeNull();
+      expect(combat.needsRetarget).toBe(false);
+    });
+
     it('F6: manual + concentrated + N>1 → ALL shots leave from the same ship-nose origin (not nose ± perpendicular offset)', () => {
       // Codex review F6: the prior implementation passed originOverride = nose
       // to fireForward but applyConcentratedFire({kind: 'direction'}) STILL
