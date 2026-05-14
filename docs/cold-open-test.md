@@ -14,7 +14,7 @@ Phase 1 PROC-20 first-30-seconds developer self-test on a fresh `npm run dev` se
 
 ## Evidence
 
-**PerformanceMonitor capture (INFRA-01 cross-link, CONTEXT D-36):** `.planning/research/profile-cold-open-<date>.json` from the `?profile=cold-open` scenario produced by Plan 01.02's harness (`src/bootstrap/profileHarness.js`). The same 30-second window the developer stopwatches IS the same 30-second window the harness captures FPS / frame-time / phase timings for. Run the harness via `http://localhost:5500/?profile=cold-open`; the JSON downloads to the developer's Downloads folder, which Task 3 moves to `.planning/research/` (gitignored — local working memory).
+**PerformanceMonitor capture (optional — deferred per 2026-05-14 scope decision):** the INFRA-01 harness exposes `?profile=cold-open` to capture FPS / frame-time / phase timings into `.planning/research/profile-cold-open-<date>.json`, but the formal Phase 1 baseline-run was descoped (see `backlog.md` "Deferred from Phase 1"). Capture is still available ad-hoc via `http://localhost:5500/?profile=cold-open` if perf evidence helps the verdict table; otherwise this section can be skipped and the cold-open test stands as a pure UX self-test.
 
 **Screenshots (optional):** the developer may attach `.planning/research/cold-open-screenshot-<t>.png` files if a visual reference helps the verdict table. `.planning/research/` is gitignored per CLAUDE.md GSD Local Practices.
 
