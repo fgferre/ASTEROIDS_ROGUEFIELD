@@ -821,6 +821,84 @@ describe('FIX-05 centerline invariant + toggles', () => {
       expect(gameplay.COMBAT_BULLET_RADIUS).toBeDefined();
       expect(gameplay.COMBAT_BULLET_RADIUS).toBe(coreBullet);
     });
+
+    // Fix-pass-2 (C7a): settingsSchema.js hardcoded 'KeyG' / 'KeyT' instead of
+    // importing the constants from gameplay.js. The constants are exported
+    // (COMBAT_DEFAULT_KEYBIND_TOGGLE_SPREAD / COMBAT_DEFAULT_KEYBIND_TOGGLE_AIM)
+    // but unused. If a designer later wants to change the default keybind in
+    // one place, the schema entry would silently disagree.
+    //
+    // Two-layer assertion:
+    //   (1) Runtime: the schema's default keyboard binding equals the imported
+    //       constant value.
+    //   (2) Source: settingsSchema.js must import the constant from gameplay.js
+    //       (otherwise the runtime check passes by coincidence — both happen
+    //       to be 'KeyG' — without actually wiring the single source of truth).
+    it('C7a: settingsSchema toggleSpreadMode default keybind === COMBAT_DEFAULT_KEYBIND_TOGGLE_SPREAD', async () => {
+      const gameplay = await import('../../src/data/constants/gameplay.js');
+      const { getSettingsSchema } = await import('../../src/data/settingsSchema.js');
+
+      const schema = getSettingsSchema();
+      const controls = schema.find((cat) => cat.id === 'controls');
+      expect(controls).toBeDefined();
+      const spreadField = controls.fields.find((f) => f.key === 'toggleSpreadMode');
+      expect(spreadField).toBeDefined();
+      expect(spreadField.default?.keyboard).toBeDefined();
+      // Layer 1: runtime equality.
+      expect(spreadField.default.keyboard).toContain(
+        gameplay.COMBAT_DEFAULT_KEYBIND_TOGGLE_SPREAD
+      );
+    });
+
+    it('C7a: settingsSchema toggleAimMode default keybind === COMBAT_DEFAULT_KEYBIND_TOGGLE_AIM', async () => {
+      const gameplay = await import('../../src/data/constants/gameplay.js');
+      const { getSettingsSchema } = await import('../../src/data/settingsSchema.js');
+
+      const schema = getSettingsSchema();
+      const controls = schema.find((cat) => cat.id === 'controls');
+      const aimField = controls.fields.find((f) => f.key === 'toggleAimMode');
+      expect(aimField).toBeDefined();
+      expect(aimField.default?.keyboard).toBeDefined();
+      expect(aimField.default.keyboard).toContain(
+        gameplay.COMBAT_DEFAULT_KEYBIND_TOGGLE_AIM
+      );
+    });
+
+    it('C7a: settingsSchema.js imports the keybind constants from gameplay.js (single source of truth)', async () => {
+      // Layer 2: source-level assertion. Without this the C7a runtime tests
+      // pass by coincidence (both literals happen to equal the constants).
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      const filePath = path.resolve(
+        process.cwd(),
+        'src/data/settingsSchema.js'
+      );
+      const src = await fs.readFile(filePath, 'utf8');
+      expect(src).toMatch(/COMBAT_DEFAULT_KEYBIND_TOGGLE_SPREAD/);
+      expect(src).toMatch(/COMBAT_DEFAULT_KEYBIND_TOGGLE_AIM/);
+    });
+
+    // Fix-pass-2 (C7b): the clamp math in CombatSystem.js was imported from
+    // core/GameConstants.js (BULLET_SIZE) while the plan's <artifacts> block
+    // promised COMBAT_BULLET_RADIUS as the gameplay-domain alias. Migrating
+    // CombatSystem to import the gameplay-domain name keeps the domain
+    // boundaries clean (CombatSystem is a gameplay module) and exercises the
+    // F10-exported alias (no longer dead). Numeric value identical — pinned
+    // to BULLET_SIZE in the F10 test.
+    it('C7b: CombatSystem source imports COMBAT_BULLET_RADIUS from gameplay.js (preferred per plan artifact)', async () => {
+      // Read source as text to assert the import statement. Whitespace-tolerant.
+      const fs = await import('fs/promises');
+      const path = await import('path');
+      const filePath = path.resolve(
+        process.cwd(),
+        'src/modules/CombatSystem.js'
+      );
+      const src = await fs.readFile(filePath, 'utf8');
+      // Import should mention COMBAT_BULLET_RADIUS from gameplay.js. Single
+      // string check accommodates multi-line import groups.
+      const importsRadius = /COMBAT_BULLET_RADIUS/.test(src);
+      expect(importsRadius).toBe(true);
+    });
   });
 
   // Fix-pass — defensive regression locks for Findings F3 and F4 (Codex review).
