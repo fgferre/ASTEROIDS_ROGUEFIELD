@@ -6,6 +6,15 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
 
 export const BULLET_SPEED = 550; // [NEO-ARCADE] Faster bullets (was 450)
 
+// Plan 01.07 FIX-05 (fix-pass F10) — gameplay-domain alias for the bullet
+// hit radius. Combat clamp math (lane spacing, hit radius) reads this name;
+// the canonical numeric value is mirrored from `core/GameConstants.js`
+// (`BULLET_SIZE = 3`) but inlined here because `core/GameConstants.js`
+// re-exports this module, so importing back would create a circular module
+// load. There is a tests/integration/aim-regression.test.js assertion
+// (F10 RED/GREEN) that pins both exports to the same numeric value.
+export const COMBAT_BULLET_RADIUS = 3;
+
 export const COLLISION_BOUNCE = 0.6;
 export const PLAYER_BULLET_OFFSCREEN_MARGIN = 80; // Allow limited offscreen travel to hit edge enemies
 export const PLAYER_BULLET_OFFSCREEN_GRACE = 0.35; // Seconds allowed offscreen before despawn
