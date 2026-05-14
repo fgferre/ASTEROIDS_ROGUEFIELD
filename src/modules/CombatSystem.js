@@ -21,6 +21,7 @@ import {
   COMBAT_MULTISHOT_SPREAD_STEP,
   COMBAT_SPREAD_MODE_DEFAULT,
   COMBAT_AIM_MODE_DEFAULT,
+  COMBAT_BULLET_RADIUS,
   PLAYER_BULLET_OFFSCREEN_MARGIN,
   PLAYER_BULLET_OFFSCREEN_GRACE,
 } from '../data/constants/gameplay.js';
@@ -1807,8 +1808,12 @@ class CombatSystem extends BaseSystem {
     const targetRadius = enemy?.radius || 16;
     // Lane clamp per FIX-05 (plan 01.07 Task 3): keep lanes inside the target's
     // effective hit radius (radius + bullet radius). Tighter than the legacy
-    // `Math.max(spacing, targetRadius * radiusMultiplier)`.
-    const clampLimit = Math.min(spacing, targetRadius + BULLET_SIZE);
+    // `Math.max(spacing, targetRadius * radiusMultiplier)`. Fix-pass-2 (C7b):
+    // use the gameplay-domain alias COMBAT_BULLET_RADIUS (mirrors BULLET_SIZE
+    // numerically; pinned by the F10 test). The artifact contract in
+    // 01.07-aim-centerline-toggles-PLAN.md promises this name as the source
+    // of truth for combat clamp math.
+    const clampLimit = Math.min(spacing, targetRadius + COMBAT_BULLET_RADIUS);
     magnitude = Math.max(-clampLimit, Math.min(clampLimit, magnitude));
 
     const perpX = (-dy / distance) * magnitude;
@@ -1829,8 +1834,8 @@ class CombatSystem extends BaseSystem {
    *
    * For `kind:'target'`, both `fireOrigin` and `aimPoint` are shifted by the same
    * perpendicular vector (parallel lanes). Lane magnitude is clamped to
-   * `Math.min(spacing, targetRadius + BULLET_SIZE)` so outer lanes never exceed
-   * the target's effective hit radius.
+   * `Math.min(spacing, targetRadius + COMBAT_BULLET_RADIUS)` so outer lanes never
+   * exceed the target's effective hit radius.
    *
    * For `kind:'direction'`, the helper does NOT consult a target — perpendicular
    * offsets use the fixed `spacing` only; aim points sit at +1000 along the angle
@@ -1893,7 +1898,10 @@ class CombatSystem extends BaseSystem {
       const perpY = dx / distance;
 
       const targetRadius = enemy.radius || 16;
-      const clampLimit = Math.min(spacing, targetRadius + BULLET_SIZE);
+      // Fix-pass-2 (C7b): use the gameplay-domain alias COMBAT_BULLET_RADIUS
+      // here too (mirrors the computeParallelOffset clamp). Mirrors BULLET_SIZE
+      // numerically; pinned by the F10 test.
+      const clampLimit = Math.min(spacing, targetRadius + COMBAT_BULLET_RADIUS);
 
       const slotCenter = (count - 1) / 2;
       const results = [];

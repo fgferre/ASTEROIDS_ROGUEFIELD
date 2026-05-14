@@ -1,4 +1,13 @@
 import { DEFAULT_HULL_ID, getAllShipModels } from './shipModels.js';
+// Plan 01.07 FIX-05 (fix-pass-2 C7a): import the keybind default constants
+// from gameplay.js so the toggle bindings live in a single source of truth.
+// The first fix-pass exported these but left settingsSchema.js with the
+// hardcoded literals 'KeyG' / 'KeyT'; a future designer change would have
+// silently drifted between the two files.
+import {
+  COMBAT_DEFAULT_KEYBIND_TOGGLE_SPREAD,
+  COMBAT_DEFAULT_KEYBIND_TOGGLE_AIM,
+} from './constants/gameplay.js';
 
 const DEFAULT_BINDING_METADATA = {
   keyboard: {
@@ -185,7 +194,7 @@ const SETTINGS_SCHEMA = [
         label: 'Toggle Spread Mode',
         description: 'Switch between concentrated and fan burst shape (FIX-05).',
         default: {
-          keyboard: ['KeyG'],
+          keyboard: [COMBAT_DEFAULT_KEYBIND_TOGGLE_SPREAD],
           gamepad: [],
         },
         metadata: {
@@ -199,7 +208,7 @@ const SETTINGS_SCHEMA = [
         label: 'Toggle Aim Mode',
         description: 'Switch between auto-aim and manual ship-nose aim (FIX-05).',
         default: {
-          keyboard: ['KeyT'],
+          keyboard: [COMBAT_DEFAULT_KEYBIND_TOGGLE_AIM],
           gamepad: [],
         },
         metadata: {
