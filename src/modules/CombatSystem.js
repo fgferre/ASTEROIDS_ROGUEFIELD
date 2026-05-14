@@ -646,75 +646,17 @@ class CombatSystem extends BaseSystem {
       return;
     }
 
-    // Fix-pass-2 (C1): rank-3 multi-lock per-enemy overkill cap. The first
-    // fix-pass gate on F1 intentionally excluded rank-3, leaving a real bug:
-    // when buildLockAssignments collapses 4 lock slots onto a single low-HP
-    // enemy (only one valid target in range), all 4 shots pile onto that
-    // enemy — wasting the multi-lock budget. Apply the per-enemy cap here
-    // so each unique enemy receives at most `computeAllocatedShots(enemy)`
-    // bullets. Re-index duplicateIndex/duplicateCount per-enemy so
-    // computeParallelOffset still places lanes within the surviving slots.
-    if (usingAdvancedBattery && assignments.length > 1) {
-      const perEnemyCount = new Map();
-      assignments.forEach((a) => {
-        const id = a?.enemy?.id ?? null;
-        if (id == null) return;
-        perEnemyCount.set(id, (perEnemyCount.get(id) || 0) + 1);
-      });
-
-      // Per-enemy cap. For each unique enemy, allocated = min(slotsAssigned,
-      // computeAllocatedShots(enemy, playerStats)). Skip enemies with null id.
-      const perEnemyCap = new Map();
-      perEnemyCount.forEach((count, id) => {
-        const sample = assignments.find((a) => a?.enemy?.id === id);
-        if (!sample) {
-          perEnemyCap.set(id, count);
-          return;
-        }
-        const allocated = this.computeAllocatedShots(sample.enemy, playerStats);
-        const cap = Number.isFinite(allocated) && allocated > 0
-          ? Math.min(count, allocated)
-          : count;
-        perEnemyCap.set(id, cap);
-      });
-
-      // Build the filtered assignment list, keeping at most `cap` per enemy
-      // in their original order so the priority sequence is preserved.
-      const kept = new Map();
-      const filtered = [];
-      assignments.forEach((a) => {
-        const id = a?.enemy?.id ?? null;
-        if (id == null) {
-          filtered.push(a);
-          return;
-        }
-        const so_far = kept.get(id) || 0;
-        const cap = perEnemyCap.get(id) ?? Infinity;
-        if (so_far < cap) {
-          filtered.push(a);
-          kept.set(id, so_far + 1);
-        }
-      });
-
-      // Re-key duplicateIndex / duplicateCount per-enemy on the filtered set
-      // so applyConcentratedFire / computeParallelOffset compute correct lane
-      // positions for the SURVIVING slots only.
-      const newTotals = new Map();
-      filtered.forEach((a) => {
-        const id = a?.enemy?.id ?? null;
-        if (id == null) return;
-        newTotals.set(id, (newTotals.get(id) || 0) + 1);
-      });
-      const running = new Map();
-      const rekeyed = filtered.map((a, index) => {
-        const id = a?.enemy?.id ?? null;
-        const dupCount = id == null ? 1 : newTotals.get(id) || 1;
-        const dupIndex = id == null ? 0 : running.get(id) || 0;
-        if (id != null) running.set(id, dupIndex + 1);
-        return { ...a, duplicateIndex: dupIndex, duplicateCount: dupCount, index };
-      });
-
-      assignments = rekeyed;
+    // Fix-pass-3 Finding 1+2: the per-enemy overkill cap moved UPSTREAM into
+    // buildLockAssignments (via applyPerEnemyOverkillCap), so
+    // `currentLockAssignments` is already correctly sized — render,
+    // multi-lock indicators, predictedAimPoints, and weapon-fired all see
+    // the post-cap layout. Finding 2 (stale per-lane geometry on filtered
+    // assignments) also dissolves: the cap now runs BEFORE the duplicate-
+    // index/duplicateCount re-key inside buildLockAssignments, so the
+    // surviving lanes get their N-lane offsets computed correctly the first
+    // time. handleShooting now only adjusts `totalShots` to assignments.length
+    // — no need to filter/re-key here.
+    if (usingAdvancedBattery && assignments.length < totalShots) {
       totalShots = Math.min(requestedShots, assignments.length);
     }
 
@@ -1672,14 +1614,25 @@ class CombatSystem extends BaseSystem {
       return 0;
     });
 
+    // Fix-pass-3 Finding 1: apply the per-enemy overkill cap UPSTREAM inside
+    // buildLockAssignments so the returned assignments already reflect the
+    // damage-aware shot allocation. Downstream consumers (render lock-ring
+    // count, predicted-aim markers, multi-lock indicators, weapon-fired
+    // event payload, handleShooting fire loop) all read
+    // `currentLockAssignments` — if the cap only ran in handleShooting,
+    // those surfaces would see a stale 4-lock layout for a 1-shot enemy.
+    // Cap uses this.lastKnownPlayerStats (the same source computeLockCount
+    // reads in updateTargeting → rebuildLockSet → buildLockAssignments).
+    const cappedAssignments = this.applyPerEnemyOverkillCap(assignments);
+
     const totals = new Map();
-    assignments.forEach((assignment) => {
+    cappedAssignments.forEach((assignment) => {
       const id = assignment.enemy?.id ?? assignment.priorityIndex;
       totals.set(id, (totals.get(id) || 0) + 1);
     });
 
     const running = new Map();
-    assignments.forEach((assignment, index) => {
+    cappedAssignments.forEach((assignment, index) => {
       const id = assignment.enemy?.id ?? assignment.priorityIndex;
       const duplicateIndex = running.get(id) || 0;
       assignment.index = index;
@@ -1688,7 +1641,51 @@ class CombatSystem extends BaseSystem {
       running.set(id, duplicateIndex + 1);
     });
 
-    return assignments;
+    return cappedAssignments;
+  }
+
+  /**
+   * Fix-pass-3 Finding 1 helper. Apply the per-enemy overkill cap to a list
+   * of lock assignments. For each unique enemy, allocate at most
+   * `computeAllocatedShots(enemy, playerStats)` slots. Preserves the
+   * original priority order (assignments earlier in the list survive when
+   * the cap reduces count). Skip enemies with null id (defensive — those
+   * are kept as-is so other invariants don't break).
+   *
+   * Callers must NOT re-key duplicateIndex/duplicateCount before this
+   * runs — that re-keying must happen on the filtered list (see
+   * buildLockAssignments). Returns a NEW array; does not mutate the input.
+   */
+  applyPerEnemyOverkillCap(assignments) {
+    if (!Array.isArray(assignments) || assignments.length === 0) {
+      return assignments || [];
+    }
+    const playerStats = this.lastKnownPlayerStats || {};
+    const perEnemyCap = new Map();
+    const kept = new Map();
+    const filtered = [];
+    assignments.forEach((assignment) => {
+      const enemy = assignment?.enemy;
+      const id = enemy?.id ?? null;
+      if (id == null) {
+        filtered.push(assignment);
+        return;
+      }
+      if (!perEnemyCap.has(id)) {
+        const allocated = this.computeAllocatedShots(enemy, playerStats);
+        const cap = Number.isFinite(allocated) && allocated > 0
+          ? allocated
+          : Infinity;
+        perEnemyCap.set(id, cap);
+      }
+      const cap = perEnemyCap.get(id);
+      const soFar = kept.get(id) || 0;
+      if (soFar < cap) {
+        filtered.push(assignment);
+        kept.set(id, soFar + 1);
+      }
+    });
+    return filtered;
   }
 
   refreshPredictedAimPoints() {
