@@ -508,8 +508,21 @@ class CombatSystem extends BaseSystem {
     // Plan 01.07 Task 6: manual-aim mode bypasses target acquisition entirely
     // and fires from the ship nose in the ship's current rotation direction.
     if (this.aimMode === 'manual') {
-      const rotation =
-        typeof player.getAngle === 'function' ? player.getAngle() : 0;
+      // Fix-pass (F5): the prior `|| 0` silent fallback hid the case where
+      // PlayerSystem doesn't expose the angle accessor — manual fire would
+      // silently shoot right (angle 0). Surface the gap with a one-shot
+      // warning instead, so test harnesses / future refactors detect it.
+      // PlayerSystem.js:1285 exposes `getAngle()` as the canonical accessor.
+      let rotation = 0;
+      if (typeof player.getAngle === 'function') {
+        rotation = player.getAngle();
+      } else if (!this._warnedManualAimNoAngle) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          '[CombatSystem] manual aim requires player.getAngle() — falling back to rotation 0 (this will silently shoot right)'
+        );
+        this._warnedManualAimNoAngle = true;
+      }
       const nose =
         typeof player.getNosePosition === 'function'
           ? player.getNosePosition(rotation)

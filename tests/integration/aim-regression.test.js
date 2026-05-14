@@ -881,6 +881,50 @@ describe('FIX-05 centerline invariant + toggles', () => {
         expect(Math.abs(a - centerAngle)).toBeLessThan(0.001);
       });
     });
+
+    it('F5: manual aim uses player.getAngle() (canonical accessor); silent-zero fallback is gone', () => {
+      // Codex review F5 worried that the fallback `|| 0` silently shot right
+      // if PlayerSystem exposed `getRotation()` instead of `getAngle()`.
+      // Inspection (PlayerSystem.js:1285) confirms `getAngle()` IS the
+      // canonical accessor. The remaining gap (warn loudly when accessor is
+      // missing instead of silently defaulting to 0) is the F5 fix verified
+      // here.
+      const { combat, playerState } = setupCombatHarness({ multishot: 1 });
+      playerState.multishot = 1;
+      combat.setAimMode('manual');
+
+      // Case 1: with getAngle, manual fire uses ship rotation (=== 0 in
+      // harness mock). Bullet velocity should point +x.
+      const before = combat.bullets.length;
+      const player = combat.getCachedPlayer();
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      const fired = combat.bullets.slice(before);
+      expect(fired.length).toBe(1);
+      expect(fired[0].vx).toBeGreaterThan(0);
+      expect(Math.abs(fired[0].vy)).toBeLessThan(0.001);
+
+      // Case 2: when getAngle is missing, a single console.warn surfaces.
+      // Test by monkey-patching the player and capturing console.warn.
+      const warnSpy = [];
+      const originalWarn = console.warn;
+      console.warn = (...args) => warnSpy.push(args.join(' '));
+      try {
+        const broken = combat.getCachedPlayer();
+        const savedGetAngle = broken.getAngle;
+        broken.getAngle = undefined;
+        combat._warnedManualAimNoAngle = false;
+        // Force the cooldown to clear immediately so this fire goes through.
+        combat.lastShotTime = combat.shootCooldown;
+        combat.handleShooting(combat.shootCooldown + 0.001, { multishot: 1, damage: 10 });
+        broken.getAngle = savedGetAngle;
+      } finally {
+        console.warn = originalWarn;
+      }
+      const matched = warnSpy.some((line) =>
+        line.includes('manual aim requires player.getAngle()')
+      );
+      expect(matched).toBe(true);
+    });
   });
 
   describe('aim mode toggle: auto default, manual opt-in', () => {
