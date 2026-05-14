@@ -3143,7 +3143,20 @@ class CombatSystem extends BaseSystem {
             ]
           : [];
 
+    // Plan 01.07 Task 7 — gate targeting visual feedback by upgrade rank +
+    // aim mode.
+    //   rank 0 → nothing (skip lock ring + predicted markers + multi-lock).
+    //   rank 1 → priority-lock ring + pulse on currentTarget (first assignment only).
+    //   rank 2 → + predicted-impact marker (predictedAimPoints render).
+    //   rank 3 → + multi-lock indicators (all assignments).
+    //   aim mode 'manual' → all targeting render skipped (no leak).
+    const targetingRank = this.targetingUpgradeLevel || 0;
+    const renderTargetingFeedback =
+      this.aimMode !== 'manual' && targetingRank >= 1;
+    const renderMultiLock = targetingRank >= 3;
+
     if (
+      renderTargetingFeedback &&
       lockAssignments.length &&
       player &&
       !player.isDead &&
@@ -3170,6 +3183,11 @@ class CombatSystem extends BaseSystem {
       lockAssignments.forEach((assignment, index) => {
         const target = assignment.enemy;
         if (!target || target.destroyed) {
+          return;
+        }
+
+        // Rank 1/2 render only the primary lock (index 0). Rank 3 renders all.
+        if (!renderMultiLock && index > 0) {
           return;
         }
 
@@ -3206,10 +3224,21 @@ class CombatSystem extends BaseSystem {
       });
     }
 
-    if (this.predictedAimPoints.length && this.usingDynamicPrediction()) {
+    // Predicted-impact marker — rank 2+.
+    const renderPredicted =
+      this.aimMode !== 'manual' && targetingRank >= 2;
+    if (
+      renderPredicted &&
+      this.predictedAimPoints.length &&
+      this.usingDynamicPrediction()
+    ) {
       this.predictedAimPoints.forEach(
         ({ position, index, duplicateIndex, duplicateCount }) => {
           if (!position) {
+            return;
+          }
+          // Rank 2 renders only the primary predicted marker; rank 3 renders all.
+          if (!renderMultiLock && index > 0) {
             return;
           }
 
