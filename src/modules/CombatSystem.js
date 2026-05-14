@@ -1205,6 +1205,22 @@ class CombatSystem extends BaseSystem {
       }
     }
 
+    // Fix-pass-2 (C3): if an upgrade lands while aimMode === 'manual', the
+    // behavioral-flag snapshot captured at manual-on is now stale. Reconcile:
+    //   - Update the snapshot so it reflects the upgrade's new flag state
+    //     (what the player should see on switchback).
+    //   - Force live flags back to false because manual still pauses them
+    //     (the unconditional assignments above set them true regardless of
+    //     aim mode — we have to re-zero them to honor manual's pause).
+    if (this.aimMode === 'manual') {
+      this._aimModeFlagSnapshot = {
+        dangerScoreEnabled: this.targetingUpgradeLevel >= 1,
+        dynamicPredictionEnabled: this.targetingUpgradeLevel >= 2,
+      };
+      this.dangerScoreEnabled = false;
+      this.dynamicPredictionEnabled = false;
+    }
+
     if (Number.isFinite(data?.targetUpdateInterval)) {
       this.targetUpdateInterval = Math.max(
         0.05,
