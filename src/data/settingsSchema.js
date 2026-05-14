@@ -179,6 +179,34 @@ const SETTINGS_SCHEMA = [
           gamepad: { ...DEFAULT_BINDING_METADATA.gamepad },
         },
       },
+      {
+        key: 'toggleSpreadMode',
+        type: 'binding',
+        label: 'Toggle Spread Mode',
+        description: 'Switch between concentrated and fan burst shape (FIX-05).',
+        default: {
+          keyboard: ['KeyG'],
+          gamepad: [],
+        },
+        metadata: {
+          keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
+          gamepad: { ...DEFAULT_BINDING_METADATA.gamepad },
+        },
+      },
+      {
+        key: 'toggleAimMode',
+        type: 'binding',
+        label: 'Toggle Aim Mode',
+        description: 'Switch between auto-aim and manual ship-nose aim (FIX-05).',
+        default: {
+          keyboard: ['KeyT'],
+          gamepad: [],
+        },
+        metadata: {
+          keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
+          gamepad: { ...DEFAULT_BINDING_METADATA.gamepad },
+        },
+      },
     ],
   },
   {

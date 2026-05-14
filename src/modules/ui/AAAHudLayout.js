@@ -117,7 +117,29 @@ export class AAAHudLayout {
       vel: query('#ui-velocity'),
       nextWaveBox: query('#el-wave-alert'),
       nextWaveTimer: query('#ui-next-wave-timer'),
+      // Plan 01.07 Task 5/6 — combat mode indicators.
+      spreadModeIndicator: query('#ui-spread-mode'),
+      aimModeIndicator: query('#ui-aim-mode'),
     };
+  }
+
+  /**
+   * Plan 01.07 Task 5/6 — update spread + aim mode indicators.
+   * @param {string} spreadMode - 'concentrated' or 'fan'.
+   * @param {string} aimMode - 'auto' or 'manual'.
+   */
+  updateModeIndicators(spreadMode, aimMode) {
+    if (!this.els) {
+      return;
+    }
+    if (this.els.spreadModeIndicator) {
+      const label = spreadMode === 'fan' ? 'FAN' : 'CONC';
+      this.els.spreadModeIndicator.innerText = label;
+    }
+    if (this.els.aimModeIndicator) {
+      const label = aimMode === 'manual' ? 'MANUAL' : 'AUTO';
+      this.els.aimModeIndicator.innerText = label;
+    }
   }
 
   _initializeBars() {
@@ -560,9 +582,12 @@ export class AAAHudLayout {
                         COORD: <span class="data-val" id="ui-coord-x">000.00</span> / <span class="data-val" id="ui-coord-y">000.00</span><br>
                         VELOCITY: <span class="data-val" id="ui-velocity">0</span> km/h
                     </div>
+                    <div class="micro-data" style="margin-top: 6px;">
+                        AIM: <span class="data-val" id="ui-aim-mode">AUTO</span> &nbsp; SPREAD: <span class="data-val" id="ui-spread-mode">CONC</span>
+                    </div>
                 </div>
             </div>
-            
+
             <div class="cockpit-frame"></div>
         `;
   }

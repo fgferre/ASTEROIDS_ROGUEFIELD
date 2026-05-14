@@ -1155,6 +1155,19 @@ class UISystem extends BaseSystem {
       hud.updateStats(null, undefined, comboCount);
     }
 
+    // Plan 01.07 Task 5/6 — render combat mode indicators from CombatSystem
+    // state. Single source of truth: CombatSystem.getSpreadMode() / .getAimMode().
+    const combat = this.getService('combat');
+    if (combat && typeof hud.updateModeIndicators === 'function') {
+      const spreadMode =
+        typeof combat.getSpreadMode === 'function'
+          ? combat.getSpreadMode()
+          : 'concentrated';
+      const aimMode =
+        typeof combat.getAimMode === 'function' ? combat.getAimMode() : 'auto';
+      hud.updateModeIndicators(spreadMode, aimMode);
+    }
+
     const waveState =
       enemies && typeof enemies.getWaveState === 'function'
         ? enemies.getWaveState() || null

@@ -207,6 +207,25 @@ class CombatSystem extends BaseSystem {
       this.applyAimingUpgrade(data || {});
     });
 
+    // Plan 01.07 Task 5/6: spread + aim mode toggles routed through the
+    // action-binding system. Listener is gated to screen === 'playing' to
+    // T-07-06 (no toggling during pause/menu/level-up/game-over).
+    this.registerEventListener('toggle-spread-mode', (data = {}) => {
+      if (data?.screen && data.screen !== 'playing') {
+        return;
+      }
+      const next = this.spreadMode === 'concentrated' ? 'fan' : 'concentrated';
+      this.setSpreadMode(next);
+    });
+
+    this.registerEventListener('toggle-aim-mode', (data = {}) => {
+      if (data?.screen && data.screen !== 'playing') {
+        return;
+      }
+      const next = this.aimMode === 'auto' ? 'manual' : 'auto';
+      this.setAimMode(next);
+    });
+
     // Enemy projectiles are forwarded to the combat system by EnemySystem.
     // Subscribing here would duplicate the handling and spawn two bullets.
   }

@@ -485,9 +485,45 @@ class InputSystem {
           context,
         });
         break;
+      case 'toggleSpreadMode': {
+        // Plan 01.07 Task 5: emit screen-gated toggle. CombatSystem subscribes
+        // to 'toggle-spread-mode' and no-ops if screen !== 'playing'.
+        const screen = this.resolveGameScreen();
+        eventBus?.emit?.('toggle-spread-mode', { screen, source });
+        break;
+      }
+      case 'toggleAimMode': {
+        // Plan 01.07 Task 6: same shape as toggleSpreadMode.
+        const screen = this.resolveGameScreen();
+        eventBus?.emit?.('toggle-aim-mode', { screen, source });
+        break;
+      }
       default:
         break;
     }
+  }
+
+  /**
+   * Resolve the current game screen state. Reads from the 'game-state' service
+   * if available; otherwise returns null and the listener falls through to a
+   * conservative no-op for the toggle actions (plan 01.07 Task 5/6).
+   *
+   * Implementation note: keydown press → 'pressed' phase → emitActionEvent fires
+   * only once per press (handleActionPress short-circuits via the `wasActive`
+   * gate at line 418), which gives us natural debouncing without extra state.
+   *
+   * @returns {string|null} The current game screen identifier (e.g. 'playing').
+   */
+  resolveGameScreen() {
+    const gameStateService = resolveService('game-state', this.dependencies);
+    if (gameStateService && typeof gameStateService.getScreen === 'function') {
+      return gameStateService.getScreen() || null;
+    }
+    // Fallback: read from a global if surfaced (some bootstraps expose it).
+    if (typeof globalThis !== 'undefined' && globalThis.gameState?.screen) {
+      return globalThis.gameState.screen;
+    }
+    return null;
   }
 
   emitGamepadDetection(details) {
