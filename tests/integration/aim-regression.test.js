@@ -899,6 +899,120 @@ describe('FIX-05 centerline invariant + toggles', () => {
       const importsRadius = /COMBAT_BULLET_RADIUS/.test(src);
       expect(importsRadius).toBe(true);
     });
+
+    // Fix-pass-2 (C4): rank-3 with duplicate locks (same enemy, multiple
+    // lock slots) wrote the OFFSET-LANE aim point into predictedAimPointsMap
+    // keyed by enemy id. Each iteration of refreshPredictedAimPoints
+    // overwrites the previous slot for the same enemy — the final stored
+    // value is the LAST lane's offset aim, NOT the centerline. handleShooting
+    // then reads weapon-fired.centerlineTarget from the map, so recoil ends
+    // up driven by the lane-offset aim, defeating the whole Task-2 contract.
+    //
+    // Fix: store the centerline (un-offset predicted aim) in the map. The
+    // per-lane offsets stay in assignment.predictedAim and predictedAimPoints.
+    it('C4: predictedAimPointsMap stores centerline (not offset lane) for rank-3 duplicate locks', () => {
+      // Build rank-3 combat with a single valid enemy + multishot=4 so
+      // buildLockAssignments puts 4 duplicate slots on the same enemy.
+      // After the C1 fix, the lock filter would reduce this to 1 slot for a
+      // low-HP enemy, defeating the duplicate-lock scenario. Use a high-HP
+      // boss so the per-enemy cap allows multiple slots and we keep the
+      // duplicate-lock scenario alive.
+      const harness = setupCombatHarness({ multishot: 4, damage: 10 });
+      const { combat, eventBus } = harness;
+      eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
+      eventBus.emit('upgrade-aiming-suite', { level: 2 });
+      eventBus.emit('upgrade-aiming-suite', {
+        level: 3,
+        multiLockTargets: 4,
+        cooldownMultiplier: 0.92,
+      });
+      // High HP so per-enemy cap (>=2) keeps the duplicate-lock scenario.
+      let baseEnemy = null;
+      combat.cachedEnemies.forEachActiveEnemy((e) => {
+        if (!baseEnemy) baseEnemy = e;
+      });
+      expect(baseEnemy).not.toBeNull();
+      baseEnemy.radius = 32;
+      baseEnemy.health = 10000;
+      baseEnemy.maxHealth = 10000;
+      combat.lastKnownPlayerStats = { multishot: 4, damage: 10 };
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+
+      // Sanity: rank-3, single enemy, 4 duplicate lock slots.
+      expect(combat.targetingUpgradeLevel).toBe(3);
+      expect(combat.currentLockAssignments.length).toBeGreaterThanOrEqual(2);
+      // All assignment slots point to the same enemy.
+      const distinctEnemyIds = new Set(
+        combat.currentLockAssignments.map((a) => a.enemy?.id)
+      );
+      expect(distinctEnemyIds.size).toBe(1);
+
+      // Compute the expected centerline = the un-offset predicted aim.
+      const player = combat.getCachedPlayer();
+      const playerPos = player.getPosition();
+      const predicted = combat.getPredictedTargetPosition(baseEnemy, playerPos) || {
+        x: baseEnemy.x,
+        y: baseEnemy.y,
+      };
+
+      // C4 invariant: the map's stored aim for the duplicate-lock enemy
+      // MUST be the centerline (predicted), NOT the lane-offset value
+      // computed for any single slot. Tolerance: 1e-6 (float identity).
+      const stored = combat.predictedAimPointsMap.get(baseEnemy.id);
+      expect(stored).toBeDefined();
+      expect(Math.abs(stored.x - predicted.x)).toBeLessThan(0.0001);
+      expect(Math.abs(stored.y - predicted.y)).toBeLessThan(0.0001);
+    });
+
+    it('C4: weapon-fired.centerlineTarget for rank-3 duplicate locks equals centerline (not offset lane)', () => {
+      // Higher-level invariant: after firing a rank-3 burst against a
+      // duplicate-locked enemy, weapon-fired.centerlineTarget must equal
+      // the centerline. The Task-2 backward-compat contract for the
+      // PlayerSystem recoil listener depends on this.
+      const harness = setupCombatHarness({ multishot: 4, damage: 10 });
+      const { combat, eventBus } = harness;
+      eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
+      eventBus.emit('upgrade-aiming-suite', { level: 2 });
+      eventBus.emit('upgrade-aiming-suite', {
+        level: 3,
+        multiLockTargets: 4,
+        cooldownMultiplier: 0.92,
+      });
+      let baseEnemy = null;
+      combat.cachedEnemies.forEachActiveEnemy((e) => {
+        if (!baseEnemy) baseEnemy = e;
+      });
+      baseEnemy.radius = 32;
+      baseEnemy.health = 10000;
+      baseEnemy.maxHealth = 10000;
+      combat.lastKnownPlayerStats = { multishot: 4, damage: 10 };
+      combat.targetUpdateTimer = 0;
+      combat.updateTargeting(0);
+
+      // Capture the weapon-fired payload.
+      let captured = null;
+      const off = combat.eventBus.on('weapon-fired', (p) => {
+        captured = p;
+      });
+
+      const player = combat.getCachedPlayer();
+      combat.handleShooting(combat.shootCooldown + 0.001, player.getStats());
+      if (typeof off === 'function') off();
+
+      expect(captured).not.toBeNull();
+      expect(captured.centerlineTarget).toBeDefined();
+
+      // Centerline = un-offset predicted aim for the primary target.
+      const playerPos = player.getPosition();
+      const predicted = combat.getPredictedTargetPosition(baseEnemy, playerPos) || {
+        x: baseEnemy.x,
+        y: baseEnemy.y,
+      };
+
+      expect(Math.abs(captured.centerlineTarget.x - predicted.x)).toBeLessThan(0.0001);
+      expect(Math.abs(captured.centerlineTarget.y - predicted.y)).toBeLessThan(0.0001);
+    });
   });
 
   // Fix-pass — defensive regression locks for Findings F3 and F4 (Codex review).
