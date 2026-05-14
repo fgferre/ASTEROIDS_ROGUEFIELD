@@ -585,4 +585,95 @@ describe('FIX-05 centerline invariant + toggles', () => {
       expect(noseR90.y).toBeCloseTo(200 + radius, 5);
     });
   });
+
+  describe('computeParallelOffset lane clamp tightened to ±(targetRadius + BULLET_SIZE)', () => {
+    it('4-shot concentrated burst at radius-8 asteroid keeps all 4 lanes within ±(8 + BULLET_SIZE)', () => {
+      const { combat } = setupCombatHarness();
+      const playerPos = { x: 0, y: 0 };
+      const enemy = { id: 'e1', x: 300, y: 0, radius: 8 };
+
+      const results = combat.applyConcentratedFire(
+        { kind: 'target', enemy, fireOrigin: playerPos },
+        4,
+        { damage: 10, multishot: 4 }
+      );
+      const limit = 8 + BULLET_SIZE;
+      results.forEach((entry) => {
+        expect(Math.abs(entry.aimPoint.y)).toBeLessThanOrEqual(limit + 0.0001);
+      });
+    });
+
+    it('lane offsets at radius-50 (big) capped at spacing (not at the wider radius+BULLET_SIZE)', () => {
+      // With spacing=14 and a radius-50 enemy, the clamp is min(14, 53) = 14.
+      // The middle lanes (offsetIndex ±0.5 for shotCount=4) sit at ±7, outer
+      // lanes at ±21 → clamped to ±14. Verify the outermost lane is exactly 14.
+      const { combat } = setupCombatHarness();
+      const playerPos = { x: 0, y: 0 };
+      const enemy = { id: 'e1', x: 300, y: 0, radius: 50 };
+
+      const results = combat.applyConcentratedFire(
+        { kind: 'target', enemy, fireOrigin: playerPos },
+        4,
+        { damage: 10, multishot: 4 }
+      );
+      results.forEach((entry) => {
+        // |perpOffset| ≤ spacing (14) for any lane.
+        expect(Math.abs(entry.aimPoint.y)).toBeLessThanOrEqual(14 + 0.0001);
+      });
+    });
+  });
+
+  describe('recommendedShots damage-aware overkill cap', () => {
+    it('damage=100, multishot=4 vs radius-8 health-50 asteroid: caps at 1 (no overkill)', () => {
+      const { combat } = setupCombatHarness({ multishot: 4, damage: 100 });
+      const enemy = {
+        id: 'tiny-1',
+        x: 600,
+        y: 300,
+        radius: 8,
+        health: 50,
+        maxHealth: 50,
+        variant: 'common',
+        size: 'small',
+      };
+
+      const allocated = combat.computeAllocatedShots(enemy, { damage: 100, multishot: 4 });
+      expect(allocated).toBe(1);
+    });
+
+    it('damage=10, multishot=4 vs health-1500 boss: caps at multishot (full allocation OK)', () => {
+      const { combat } = setupCombatHarness({ multishot: 4, damage: 10 });
+      const enemy = {
+        id: 'boss-1',
+        x: 600,
+        y: 300,
+        radius: 64,
+        health: 1500,
+        maxHealth: 1500,
+        variant: 'common',
+        size: 'large',
+        type: 'boss',
+      };
+
+      const allocated = combat.computeAllocatedShots(enemy, { damage: 10, multishot: 4 });
+      expect(allocated).toBe(4);
+    });
+
+    it('damage=100, multishot=4 vs health-200 enemy: caps at 2 (ceil(200/100) = 2)', () => {
+      const { combat } = setupCombatHarness({ multishot: 4, damage: 100 });
+      const enemy = {
+        id: 'mid-1',
+        x: 600,
+        y: 300,
+        radius: 18,
+        health: 200,
+        maxHealth: 200,
+        variant: 'common',
+        size: 'medium',
+      };
+
+      const allocated = combat.computeAllocatedShots(enemy, { damage: 100, multishot: 4 });
+      expect(allocated).toBe(2);
+    });
+  });
 });
