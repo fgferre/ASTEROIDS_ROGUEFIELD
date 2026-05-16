@@ -2710,4 +2710,83 @@ describe('FIX-05 centerline invariant + toggles', () => {
       expect(created.length - aimedAtTiny.length).toBeGreaterThanOrEqual(1);
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // Runtime-wiring regression (2026-05-16): browser-discovered bug where the
+  // FIX-05 toggles (G/T) silently no-op'd despite all isolation tests passing.
+  // Root cause: src/bootstrap/serviceManifest.js declared the InputSystem
+  // dependencies as ['event-bus', 'settings', 'command-queue'] WITHOUT
+  // 'game-state'. InputSystem.resolveGameScreen() called
+  // resolveService('game-state', this.dependencies) and got null, so the
+  // payload's `screen` field became null, and the strict gate
+  // `screen !== 'playing'` (fix-pass-2 F9) blocked every dispatch.
+  //
+  // The 4 prior review rounds + 429 tests never caught this because every
+  // CombatSystem toggle test constructs a mock and passes
+  // `{screen: 'playing'}` directly — bypassing the InputSystem wiring.
+  // This regression asserts the manifest wiring at the source level so a
+  // future refactor that drops 'game-state' from the deps fails loudly here.
+  // ---------------------------------------------------------------------------
+  describe('FIX-05 manifest wiring (2026-05-16 runtime fix)', () => {
+    it('InputSystem manifest declares game-state as a dependency (else toggles silently no-op)', async () => {
+      const { createServiceManifest } = await import(
+        '../../src/bootstrap/serviceManifest.js'
+      );
+      const manifest = createServiceManifest({
+        gameState: { screen: 'menu', isPaused: false },
+      });
+      const inputEntry = manifest.find((entry) => entry.name === 'input');
+      expect(inputEntry).toBeDefined();
+      expect(Array.isArray(inputEntry.dependencies)).toBe(true);
+      expect(inputEntry.dependencies).toContain('game-state');
+    });
+
+    it('InputSystem factory passes the resolved game-state into the constructor (else resolveService returns null)', async () => {
+      const { createServiceManifest } = await import(
+        '../../src/bootstrap/serviceManifest.js'
+      );
+      const manifest = createServiceManifest({
+        gameState: { screen: 'menu', isPaused: false },
+      });
+      const inputEntry = manifest.find((entry) => entry.name === 'input');
+      // Stub minimum resolved map: factory only reads what it needs.
+      const stubEventBus = { emit: () => {}, on: () => {}, off: () => {} };
+      const stubSettings = {
+        getCategory: () => ({}),
+        get: () => undefined,
+        set: () => {},
+        // Bare minimum surface the constructor pokes at; we are only proving
+        // the resolved['game-state'] reference flows in, not exercising input.
+      };
+      const stubCommandQueue = { register: () => () => {}, push: () => {} };
+      const sentinelGameState = { __sentinel: 'game-state-flowed-through' };
+      let constructed = null;
+      try {
+        constructed = inputEntry.factory({
+          resolved: {
+            'event-bus': stubEventBus,
+            settings: stubSettings,
+            'command-queue': stubCommandQueue,
+            'game-state': sentinelGameState,
+          },
+        });
+      } catch (e) {
+        // Constructor may throw if stubs miss a method — that's fine. What
+        // matters is that the factory READ resolved['game-state'] BEFORE
+        // throwing. We assert that by checking the constructor's signature
+        // received the key. If the factory never reads it, this test still
+        // passes vacuously — so back it up with a source-level grep below.
+      }
+      // Source-level guard: prove the factory body references game-state at
+      // all. If a future refactor renames the kwarg, this assertion is the
+      // canary even when the runtime test passes vacuously.
+      const factorySrc = inputEntry.factory.toString();
+      expect(factorySrc).toMatch(/['"]game-state['"]/);
+      // And when construction succeeded, the instance should have stored
+      // the dependency under the canonical key.
+      if (constructed && constructed.dependencies) {
+        expect(constructed.dependencies['game-state']).toBe(sentinelGameState);
+      }
+    });
+  });
 });

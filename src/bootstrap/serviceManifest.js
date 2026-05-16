@@ -327,12 +327,13 @@ export function createServiceManifest(context = {}) {
       name: 'input',
       singleton: true,
       lazy: false,
-      dependencies: ['event-bus', 'settings', 'command-queue'],
+      dependencies: ['event-bus', 'settings', 'command-queue', 'game-state'],
       factory: ({ resolved }) =>
         new InputSystem({
           eventBus: resolved['event-bus'],
           settings: resolved['settings'],
           'command-queue': resolved['command-queue'],
+          'game-state': resolved['game-state'],
         }),
     },
     {
