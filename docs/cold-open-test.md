@@ -20,13 +20,15 @@ Phase 1 PROC-20 first-30-seconds developer self-test on a fresh `npm run dev` se
 
 ## Per-timestamp log
 
+> **Note (2026-05-20):** abbreviated developer sign-off. Detailed stopwatch observation was declined this session; rows below are reconstructed from the live debug + playtest sessions of 2026-05-16→20. The headline finding (0% loading hang) was reproduced and diagnosed in-session with full evidence.
+
 | t   | What loaded                       | What player sees                  | Friction (>2s confusion?)         |
 | --- | --------------------------------- | --------------------------------- | --------------------------------- |
-| 0s  | {run-by-developer-at-Task-3}      | {run-by-developer-at-Task-3}      | {run-by-developer-at-Task-3}      |
-| 5s  | {run-by-developer-at-Task-3}      | {run-by-developer-at-Task-3}      | {run-by-developer-at-Task-3}      |
-| 10s | {run-by-developer-at-Task-3}      | {run-by-developer-at-Task-3}      | {run-by-developer-at-Task-3}      |
-| 15s | {run-by-developer-at-Task-3}      | {run-by-developer-at-Task-3}      | {run-by-developer-at-Task-3}      |
-| 30s | {run-by-developer-at-Task-3}      | {run-by-developer-at-Task-3}      | {run-by-developer-at-Task-3}      |
+| 0s  | **WITHOUT `?desktop=force`: boot halts — loading screen stuck at 0% indefinitely** (mobileGuard false positive, see Verdict). With the flag: Vite + module graph loads normally | "ASTEROID ROGUEFIELD" title + 0% progress bar | **YES — fatal on affected machines** (see Verdict row 1) |
+| 5s  | (with flag) menu + Three.js background loaded | Hull selection (Default Interceptor / Solar Slicer) + START/OPTIONS/CREDITS | none reported |
+| 10s | (with flag) run started | Ship + first asteroids, combat readable | none reported |
+| 15s | (no notable change since previous row) | (no notable change since previous row) | none reported |
+| 30s | (with flag) combat underway | XP orbs dropping/collected, wave progressing | none reported |
 
 If a row has nothing notable to add (e.g., the 15s state is unchanged from 10s), replace that row's contents with `(no notable change since previous row)` rather than leave the placeholder.
 
@@ -44,7 +46,7 @@ Per the "polish-perfect not content-complete" philosophy (CONTEXT specifics + Ph
 
 | Friction point                                                | Disposition                                                 |
 | ------------------------------------------------------------- | ----------------------------------------------------------- |
-| {run-by-developer-at-Task-3}                                  | {run-by-developer-at-Task-3} `keep / fix-now / fix-Phase-6 / fix-Phase-7 / accept` |
+| Loading hangs at 0% on Windows desktops where `navigator.maxTouchPoints > 0` (most modern Win10/11 machines — Touch APIs enabled without a physical touch screen). Root cause: `mobileGuard.isTouchDevice()` single-signal `maxTouchPoints` probe trips A11Y-08 block; the "Desktop only" canvas notice is then hidden UNDER the DOM loading overlay, so the player sees a silent 0% hang with no explanation. Diagnosed live 2026-05-16→20 (preview browser + developer's Chrome both reproduced; `?desktop=force` confirmed as workaround). | `accept` for Phase 1 close (dev workaround exists; documented in `backlog.md`) — **BUT must be fixed before Phase 3.5 internal-loop test**: trusted-circle testers on touch-capable Windows laptops would hit a silent fatal hang. Backlog entry carries the fix sketch (multi-signal detection + DOM-level notice). |
 
 Additional rows are added by the developer at Task 3 (one row per friction point observed in the per-timestamp log). If no friction points are observed, replace the single placeholder row with `| (no friction points observed in 30s window) | accept |`.
 

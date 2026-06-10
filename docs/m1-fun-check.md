@@ -31,26 +31,26 @@ Each issue was reproduced against the post-Phase-0 `main` build. The four subsec
 ### Issue 1 verification — FIX-01 (Aim system audit)
 
 - **Method:** Fresh `npm run dev` run. Pick `multishot` to rank 2 + `targeting_suite` to rank 2 (or similar aim-affecting upgrades from `src/data/upgrades/offense.js`). Observe (a) whether the projectile fan widens visibly at rank 2 vs rank 1, AND (b) whether the dynamic-prediction marker tracks moving asteroids (targeting_suite rank 2 enables `dynamicPredictionEnabled`).
-- **Evidence:** {run-by-developer-at-Task-3}
-- **Verdict:** {run-by-developer-at-Task-3} `GONE | PARTIAL | FAILED`
+- **Evidence:** Developer live runs (2026-05-16→20, build @ `b7a31cc`, via `?desktop=force` — see backlog mobileGuard entry): projectile fan visibly widens at rank 2 vs rank 1, AND the dynamic-prediction marker tracks moving asteroids. Both signals confirmed.
+- **Verdict:** `GONE`
 
 ### Issue 2 verification — FIX-02 (Mobility brake bug)
 
 - **Method:** Fresh run. Pick `braking_system` rank 1, 2, 3 progressively across waves. On rank 3, hold the main thrust key for 5 seconds. Observe (a) whether peak velocity stays responsive under continuous thrust (no "brake on active thrust" feel vs baseline), AND (b) whether stops feel snappier than baseline once the thrust key is released.
-- **Evidence:** {run-by-developer-at-Task-3}
-- **Verdict:** {run-by-developer-at-Task-3} `GONE | PARTIAL | FAILED`
+- **Evidence:** Developer live runs (2026-05-16→20): no "brake fighting thrust" feel under 5s of held main thrust at braking_system rank 3 — peak velocity stays responsive; stops feel snappier once the thrust key is released. Both signals confirmed.
+- **Verdict:** `GONE`
 
 ### Issue 3 verification — FIX-03 (Progression rate retune)
 
 - **Method:** Fresh run. Reach Wave 5 naturally. Count distinct upgrade cards selected by end of Wave 5 (NOT total level-ups — picking `Propulsores Principais` three times is ONE distinct upgrade). Target band per FIX-03 = **6–8 distinct upgrades at Wave 5**. Plan 0.03 Task 3 already validated this as a BLOCKING gate live; this verification re-confirms after subsequent commits.
-- **Evidence:** {run-by-developer-at-Task-3}
-- **Verdict:** {run-by-developer-at-Task-3} `GONE | PARTIAL | FAILED`
+- **Evidence:** Developer live run (2026-05-16→20): **6 distinct upgrades** selected by end of Wave 5 — inside the 6–8 target band (low edge).
+- **Verdict:** `GONE`
 
 ### Issue 4 verification — FIX-04 (Boss-curve calibration)
 
 - **Method:** Continue the run from Issue 3 into the Wave-5 boss fight (or restart fresh and reach the boss with 6 upgrades collected). Stopwatch the kill time. Target band per FIX-04 = **60–90s with a 6-upgrade build**. Then continue (or fresh run accumulating ~15 upgrades by Wave 8–9) and fight the Wave-8-or-9 boss; record kill time AND distinct phase transitions observed. Target per FIX-04 = **≥45s with ≥1 phase transition**. Phase 0 Plan 04 Task 4 BLOCKING gate already validated the 6-upgrade case live; this verification re-confirms.
-- **Evidence:** {run-by-developer-at-Task-3}
-- **Verdict:** {run-by-developer-at-Task-3} `GONE | PARTIAL | FAILED`
+- **Evidence:** Developer live run (2026-05-16→20): Wave-5 boss killed in **~120s** with a 6-upgrade build — "difícil, mas dá" (hard but doable). Above the 60–90s target band by ~30s. The Wave-8/9 high-upgrade case (≥45s + ≥1 phase transition with ~15 upgrades) was NOT reached this session — unvalidated in this pass.
+- **Verdict:** `PARTIAL` — the original binary-difficulty bug is gone (boss is killable with a low-upgrade build and the fight has texture), but kill time sits ~30s above the calibration band and the high-upgrade case lacks evidence. Follow-up filed in `backlog.md` per PROC-09 (boss-curve calibration recheck + Wave-8/9 validation); Phase 0 NOT reopened — regression is non-blocking.
 
 ## Scope note (D-34)
 

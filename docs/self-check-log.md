@@ -16,7 +16,7 @@ the trend (per CONTEXT D-44).
 
 | Month   | Date       | Energy (1-10)        | Motivation (1-10)    | Fun (1-10)           | Notes                |
 | ------- | ---------- | -------------------- | -------------------- | -------------------- | -------------------- |
-| Month 1 | 2026-05-XX | {fill-at-Task-3}     | {fill-at-Task-3}     | {fill-at-Task-3}     | {fill-at-Task-3}     |
+| Month 1 | 2026-05-20 | — (declined)         | — (declined)         | — (declined)         | Abbreviated sign-off: developer reported overall "tudo ok" after live playtest sessions (2026-05-16→20) but declined numeric 1-10 ratings this month. No <5 distress signal reported. Per the loud-skip semantic above, this partial row IS the signal — resume full numeric ratings in Month 2 (backlog entry filed). |
 
 ---
 
