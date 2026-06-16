@@ -184,7 +184,8 @@ describe('AudioSystem random scope synchronization', () => {
   });
 
   it('starts the menu track after init when the menu screen was already active', async () => {
-    const { audio, context, eventBus, mediaElements } = createMenuMusicHarness();
+    const { audio, context, eventBus, mediaElements } =
+      createMenuMusicHarness();
 
     eventBus.emit('screen-changed', { screen: 'menu' });
 
@@ -220,7 +221,10 @@ describe('AudioSystem random scope synchronization', () => {
 
     expect(trackGain.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
 
-    mediaElements[0].dispatchEvent({ type: 'playing', target: mediaElements[0] });
+    mediaElements[0].dispatchEvent({
+      type: 'playing',
+      target: mediaElements[0],
+    });
     await Promise.resolve();
 
     expect(trackGain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(
@@ -236,7 +240,8 @@ describe('AudioSystem random scope synchronization', () => {
   it('reuses the same media graph across menu to playing to menu transitions', async () => {
     vi.useFakeTimers();
 
-    const { audio, context, eventBus, mediaElements } = createMenuMusicHarness();
+    const { audio, context, eventBus, mediaElements } =
+      createMenuMusicHarness();
 
     eventBus.emit('screen-changed', { screen: 'menu' });
     await audio.init();
@@ -331,7 +336,15 @@ describe('AudioSystem random scope synchronization', () => {
     expect(audio.masterGain.gain.value).toBe(0.4);
     expect(audio.musicGain.gain.value).toBeCloseTo(0.12);
     expect(trackGain.gain.value).toBe(1);
-    expect(trackGain.connect).toHaveBeenCalledWith(audio.musicGain);
+    // Plan 02.06: file tracks join at the music DUCK node (rests 1.0) so they
+    // duck WITH the music; the duck node is itself wired into the musicGain
+    // slider stage. The track gain stays independent of the slider value.
+    expect(trackGain.connect).toHaveBeenCalledWith(
+      audio.duckingController.musicDuckGain
+    );
+    expect(audio.duckingController.musicDuckGain.connect).toHaveBeenCalledWith(
+      audio.musicGain
+    );
 
     audio.updateVolumeState({
       masterVolume: 0.4,
@@ -348,7 +361,8 @@ describe('AudioSystem random scope synchronization', () => {
   it('supports explicit warmup for deferred tracks and crossfades handoff', async () => {
     vi.useFakeTimers();
 
-    const { audio, context, eventBus, mediaElements } = createMenuMusicHarness();
+    const { audio, context, eventBus, mediaElements } =
+      createMenuMusicHarness();
 
     audio.fileTrackCatalog.boss = {
       src: 'boss-theme.mp3',

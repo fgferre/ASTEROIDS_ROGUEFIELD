@@ -7,6 +7,7 @@ import MusicMixer from './audio/MusicMixer.js';
 import FileTrackManager, {
   FILE_TRACK_IDS as FILE_TRACK_MANAGER_IDS,
 } from './audio/FileTrackManager.js';
+import DuckingController from './audio/DuckingController.js';
 import ThrusterLoopManager from './ThrusterLoopManager.js';
 import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
@@ -130,6 +131,17 @@ class AudioSystem extends BaseSystem {
     // driven by screen/overlay events, not by the media graph.
     this.fileTrackManager = new FileTrackManager();
     this.currentScreen = null;
+
+    // DuckingController (INFRA-02 / AUDIO-03) — owns DEDICATED duck nodes
+    // (musicDuckGain/effectsDuckGain) that REST at 1.0 and splice into both
+    // chains; multiplicative by topology (D-11), never touches the slider stages.
+    // Construction does NO AudioContext work; init() splices the duck nodes from
+    // AudioSystem.init() after the buses + MusicMixer exist.
+    this.duckingController = new DuckingController();
+
+    // Low-HP duck edge-detection latch (review fix): the duck fires only on the
+    // CROSSING into ≤25% HP, re-armed when HP recovers above the threshold.
+    this.lowHealthDuckArmed = false;
 
     // Thruster sound system
     this.thrusterLoopManager = new ThrusterLoopManager();
@@ -277,14 +289,29 @@ class AudioSystem extends BaseSystem {
       // initializeMusicController() wave-number heuristic is bypassed — ONLY the
       // boss arc drives music (D-04).
       this.musicMixer.init(this.context, this.musicGain);
+
+      // AUDIO-03 (D-11): splice the DEDICATED duck nodes. The controller creates
+      // musicDuckGain (rests 1.0) between musicPauseFadeGain and musicGain, and
+      // effectsDuckGain (rests 1.0) before effectsGain — each with explicit
+      // disconnect-before-reconnect. Multiplicative by topology; the controller
+      // never writes the slider stages. Music content (mixer + file tracks) now
+      // routes into musicDuckGain; SFX content routes into effectsDuckGain.
+      this.duckingController.init(this.context, {
+        musicSpliceFrom: this.musicMixer.musicPauseFadeGain,
+        musicSpliceTo: this.musicGain,
+        effectsSpliceTo: this.effectsGain,
+      });
+
       this.initialized = true;
 
       // FileTrackManager (INFRA-02): build its graph now that the context + buses
-      // exist. Its trackGains route into musicGain today; 02.06 Task 2 re-points
-      // them to musicDuckGain via setTargetNode after the duck node is spliced.
-      // Every track start is routed through the centralized ensureRunning gate.
-      this.fileTrackManager.init(this.context, this.musicGain, (thunk) =>
-        this.ensureRunning(thunk)
+      // exist. Its trackGains route into the music DUCK node (not musicGain) so
+      // file tracks duck with the music — they join at the duck input, after the
+      // mixer's pause/fade stage. Every start goes through the ensureRunning gate.
+      this.fileTrackManager.init(
+        this.context,
+        this.duckingController.musicDuckGain || this.musicGain,
+        (thunk) => this.ensureRunning(thunk)
       );
 
       this._syncMenuTrackForCurrentScreen();
@@ -703,6 +730,13 @@ class AudioSystem extends BaseSystem {
   }
 
   getEffectsDestination() {
+    // SFX content routes into the effects DUCK node (rests 1.0) so all SFX duck
+    // together (interim — 02.07 adds a protected branch for roars). Falls back to
+    // the slider stage before the duck node is spliced, then masterGain.
+    const duckInput = this.duckingController?.getEffectsInput?.();
+    if (duckInput) {
+      return duckInput;
+    }
     if (this.effectsGain) {
       return this.effectsGain;
     }
@@ -720,7 +754,13 @@ class AudioSystem extends BaseSystem {
   }
 
   connectMusicNode(node) {
-    const destination = this.musicGain || this.masterGain;
+    // Music content (file tracks via the manager target; legacy menu path) joins
+    // at the music DUCK node so it ducks with the music; falls back to the slider
+    // stage before the duck node is spliced.
+    const destination =
+      this.duckingController?.musicDuckGain ||
+      this.musicGain ||
+      this.masterGain;
     if (destination && node && typeof node.connect === 'function') {
       node.connect(destination);
     }
@@ -4308,6 +4348,13 @@ class AudioSystem extends BaseSystem {
       typeof this.fileTrackManager.dispose === 'function'
     ) {
       this.fileTrackManager.dispose();
+    }
+    // Un-splice the duck nodes (restores the direct connections; idempotent).
+    if (
+      this.duckingController &&
+      typeof this.duckingController.dispose === 'function'
+    ) {
+      this.duckingController.dispose();
     }
   }
 

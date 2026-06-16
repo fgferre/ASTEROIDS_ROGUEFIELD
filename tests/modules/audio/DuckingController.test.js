@@ -200,6 +200,11 @@ describe('DuckingController — Task 2: dedicated duck nodes + SC3 envelope', ()
       const musicDuck = fx.createdGains[0];
       const startTime = fx.context.currentTime + 2;
 
+      // Ignore the init-time rest anchor (setValueAtTime(1, now)); inspect ONLY
+      // the scheduled duck envelope.
+      musicDuck.gain.setValueAtTime.mockClear();
+      musicDuck.gain.exponentialRampToValueAtTime.mockClear();
+
       controller.duck({ bus: 'music', startTime });
 
       const allTimes = [
