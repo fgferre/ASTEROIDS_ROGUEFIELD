@@ -3561,33 +3561,52 @@ class AudioSystem extends BaseSystem {
     return { ...seeds };
   }
 
+  // INFRA-03: the window.__AUDIO_RANDOM_DEBUG__ global exposes internal RNG state
+  // (Information Disclosure) and must NOT cross into production builds. Defense in
+  // depth: (1) the build-time `__AUDIO_DEBUG_BUILD__` define (false in prod) lets
+  // Vite dead-code-eliminate this whole body — the assignment STRING is removed,
+  // not just unreachable; (2) the runtime `!DEV_MODE` gate below is a second layer.
+  // The gate is the RUNTIME-reachability CI test (tests/process/no-dev-globals.test.js),
+  // NOT a dist string grep — the minified string survives behind a dead gate, so a
+  // grep is a false positive (see 02-RESEARCH Pitfall 3). The `typeof` guard keeps
+  // non-Vite execution (e.g. vitest module eval) from a ReferenceError on the define.
   _exposeRandomDebugControls() {
-    if (typeof window === 'undefined' || !DEV_MODE) {
-      return;
-    }
+    // Build-time gate (layer 1): in prod the define folds to `if (false) { ... }`
+    // and Vite drops the entire block, removing the window.__AUDIO_RANDOM_DEBUG__
+    // assignment STRING from the bundle. The `typeof` guard means a non-Vite eval
+    // (no define) treats it as truthy and falls through to the runtime gate.
+    if (typeof __AUDIO_DEBUG_BUILD__ === 'undefined' || __AUDIO_DEBUG_BUILD__) {
+      // Runtime gate (layer 2): even in dev/test the global is only exposed in a
+      // real dev environment with a window present.
+      if (typeof window === 'undefined' || !DEV_MODE) {
+        return;
+      }
 
-    const debugData = {
-      seed: this.random?.seed ?? null,
-      debugSnapshot: () => this.random?.debugSnapshot(),
-      forks: {},
-      seeds: this.randomScopes?.seeds || null,
-    };
-
-    Object.entries(this.randomScopes?.families || {}).forEach(([name, rng]) => {
-      debugData.forks[name] = {
-        seed: rng?.seed ?? null,
-        debugSnapshot: () => rng?.debugSnapshot(),
+      const debugData = {
+        seed: this.random?.seed ?? null,
+        debugSnapshot: () => this.random?.debugSnapshot(),
+        forks: {},
+        seeds: this.randomScopes?.seeds || null,
       };
-    });
 
-    if (!debugData.forks.cache && this.randomScopes?.cache) {
-      debugData.forks.cache = {
-        seed: this.randomScopes.cache.seed ?? null,
-        debugSnapshot: () => this.randomScopes.cache.debugSnapshot(),
-      };
+      Object.entries(this.randomScopes?.families || {}).forEach(
+        ([name, rng]) => {
+          debugData.forks[name] = {
+            seed: rng?.seed ?? null,
+            debugSnapshot: () => rng?.debugSnapshot(),
+          };
+        }
+      );
+
+      if (!debugData.forks.cache && this.randomScopes?.cache) {
+        debugData.forks.cache = {
+          seed: this.randomScopes.cache.seed ?? null,
+          debugSnapshot: () => this.randomScopes.cache.debugSnapshot(),
+        };
+      }
+
+      window.__AUDIO_RANDOM_DEBUG__ = debugData;
     }
-
-    window.__AUDIO_RANDOM_DEBUG__ = debugData;
   }
 
   _clearRandomDebugControls() {
