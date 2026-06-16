@@ -280,7 +280,7 @@ export function createSettingsStub(values = null) {
  * Create an AudioContext stub compatible with the audio module tests.
  *
  * @param {{ sampleRate?: number, currentTime?: number, state?: string }} [options] - Optional overrides for the stubbed context.
- * @returns {{ sampleRate: number, currentTime: number, state: string, destination: object, createBuffer: ReturnType<typeof vi.fn>, createBufferSource: ReturnType<typeof vi.fn>, createGain: ReturnType<typeof vi.fn>, createOscillator: ReturnType<typeof vi.fn>, createBiquadFilter: ReturnType<typeof vi.fn>, createMediaElementSource: ReturnType<typeof vi.fn>, resume: ReturnType<typeof vi.fn> }}
+ * @returns {{ sampleRate: number, currentTime: number, state: string, destination: object, createBuffer: ReturnType<typeof vi.fn>, createBufferSource: ReturnType<typeof vi.fn>, createGain: ReturnType<typeof vi.fn>, createOscillator: ReturnType<typeof vi.fn>, createBiquadFilter: ReturnType<typeof vi.fn>, createMediaElementSource: ReturnType<typeof vi.fn>, createConvolver: ReturnType<typeof vi.fn>, decodeAudioData: ReturnType<typeof vi.fn>, createStereoPanner: ReturnType<typeof vi.fn>, resume: ReturnType<typeof vi.fn> }}
  * @example
  * const context = createAudioContextStub({ sampleRate: 48000 });
  * const buffer = context.createBuffer(2, 256, 48000);
@@ -329,6 +329,42 @@ export function createAudioContextStub(options = {}) {
     createMediaElementSource: vi.fn((mediaElement) =>
       createMediaElementSourceStub({ mediaElement })
     ),
+    // ConvolverNode stub — ReverbBus (plan 02.08) assigns `.buffer` (the IR) and
+    // routes the effects bus through it. `buffer` must stay writable so the
+    // reverb-zone code can swap impulse responses on zone change.
+    createConvolver: vi.fn(() => ({
+      buffer: null,
+      normalize: true,
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    })),
+    // decodeAudioData stub — stinger buffer path (plan 02.09). Resolves to a
+    // decoded-buffer-like whose getChannelData returns a zero-filled
+    // Float32Array sized to the stub buffer length.
+    decodeAudioData: vi.fn(async (arrayBuffer) => {
+      const length =
+        arrayBuffer && typeof arrayBuffer.byteLength === 'number'
+          ? Math.max(1, arrayBuffer.byteLength)
+          : 1;
+      return {
+        numberOfChannels: 2,
+        length,
+        sampleRate,
+        duration: length / sampleRate,
+        getChannelData: vi.fn(() => new Float32Array(length)),
+      };
+    }),
+    // StereoPannerNode stub — D-13 CONC/FAN fire pan (plan 02.10). `pan` is an
+    // AudioParam-like with the scheduling methods the pan automation uses.
+    createStereoPanner: vi.fn(() => ({
+      pan: {
+        value: 0,
+        setValueAtTime: vi.fn(),
+        linearRampToValueAtTime: vi.fn(),
+      },
+      connect: vi.fn(),
+      disconnect: vi.fn(),
+    })),
     resume: vi.fn(async () => {
       context.state = 'running';
       return undefined;
