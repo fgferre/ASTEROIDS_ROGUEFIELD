@@ -3,6 +3,7 @@ import AudioPool from './AudioPool.js';
 import AudioCache from './AudioCache.js';
 import AudioBatcher from './AudioBatcher.js';
 import { createSfxSynthPort } from './audio/SfxSynthPort.js';
+import MusicMixer from './audio/MusicMixer.js';
 import ThrusterLoopManager from './ThrusterLoopManager.js';
 import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
@@ -128,6 +129,14 @@ class AudioSystem extends BaseSystem {
     this.bossAudioState = {
       lastPhase: null,
     };
+
+    // MusicMixer (INFRA-02 / AUDIO-01) — composed inside the stable `audio`
+    // service (RESEARCH A3). Construction does NO AudioContext work; init() is
+    // called from AudioSystem.init() once the context + buses exist. The facade
+    // keeps the EventBus listeners and DELEGATES the boss arc + pause to it.
+    this.musicMixer = new MusicMixer({
+      randomScope: this.randomScopes?.families?.music || this.random,
+    });
 
     this.fileTrackCatalog = { ...FILE_TRACK_CATALOG };
     this.fileTrackState = {
@@ -266,7 +275,13 @@ class AudioSystem extends BaseSystem {
       this.captureRandomScopes();
 
       this.applyVolumeToNodes();
-      this.initializeMusicController();
+      // AUDIO-01: the adaptive 4-layer music now lives in MusicMixer. It builds
+      // its graph here (after the context + buses exist) and connects its
+      // pauseFadeGain straight to musicGain (the slider stage). 02.06 re-splices
+      // the duck node between pauseFadeGain and musicGain. The legacy
+      // initializeMusicController() wave-number heuristic is bypassed — ONLY the
+      // boss arc drives music (D-04).
+      this.musicMixer.init(this.context, this.musicGain);
       this.initialized = true;
       Object.entries(this.fileTrackCatalog || {}).forEach(
         ([trackId, config = {}]) => {
@@ -373,27 +388,35 @@ class AudioSystem extends BaseSystem {
       }
     });
 
-    this.registerEventListener('wave-started', (waveEvent = {}) => {
-      this.updateWaveMusicIntensity(waveEvent);
-    });
+    // wave-started no longer drives music (D-04: ONLY the boss arc does). The
+    // pre-boss tension now comes from the `boss-warning` event (02.03) above.
+    // The listener stays registered (audio may use wave context later) but the
+    // legacy wave-number intensity heuristic is intentionally bypassed.
+    this.registerEventListener('wave-started', () => {});
 
     this.registerEventListener('mine-exploded', (data = {}) => {
       this.playMineExplosion(data);
     });
 
+    // Boss arc → MusicMixer (D-04): the ONLY driver of music intensity. The
+    // roar/phase/defeat SFX stay on the facade (BossAudio lands in a later plan).
+    this.registerEventListener('boss-warning', (data = {}) => {
+      this.musicMixer.setIntensityFromBossEvent('boss-warning', data);
+    });
+
     this.registerEventListener('boss-spawned', (data = {}) => {
       this.playBossRoar(data);
-      this._onBossFightStarted(data);
+      this.musicMixer.setIntensityFromBossEvent('boss-spawned', data);
     });
 
     this.registerEventListener('boss-phase-changed', (data = {}) => {
       this.playBossPhaseChange(data);
-      this._onBossPhaseChanged(data);
+      this.musicMixer.setIntensityFromBossEvent('boss-phase-changed', data);
     });
 
     this.registerEventListener('boss-defeated', (data = {}) => {
       this.playBossDefeated(data);
-      this._onBossDefeated(data);
+      this.musicMixer.setIntensityFromBossEvent('boss-defeated', data);
     });
 
     this.registerEventListener('bullet-hit', (data) => {
@@ -444,6 +467,9 @@ class AudioSystem extends BaseSystem {
     });
 
     this.registerEventListener('pause-state-changed', (data) => {
+      // D-10: pause the adaptive music (underwater lowpass + 50% + gain/grid
+      // freeze, SC1 no drift). The pause/resume SFX stay on the facade.
+      this.musicMixer.pause(!!data?.isPaused);
       if (data?.isPaused) {
         this.playPauseOpen();
       } else {
@@ -4602,12 +4628,22 @@ class AudioSystem extends BaseSystem {
 
     this.setMusicIntensity(initialIntensityLevel, { immediate: true });
 
+    // AUDIO-01: the adaptive music now lives in MusicMixer — reset it back to
+    // base intensity (D-04 maps boss-defeated → base) on a fresh run/replay.
+    if (this.musicMixer) {
+      this.musicMixer.setIntensityFromBossEvent('boss-defeated');
+    }
+
     this.reseedRandomScopes();
   }
 
   onDestroy() {
     this._evictAllFileTracks({ resetCurrentScreen: true });
     this._clearRandomDebugControls();
+    // Stop the MusicMixer lookahead + release its nodes (no leaked timer).
+    if (this.musicMixer && typeof this.musicMixer.dispose === 'function') {
+      this.musicMixer.dispose();
+    }
   }
 
   // === Performance Monitoring ===

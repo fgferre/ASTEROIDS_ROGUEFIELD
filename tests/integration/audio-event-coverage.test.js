@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createServiceManifest } from '../../src/bootstrap/serviceManifest.js';
 import { createAudioContextStub } from '../__helpers__/stubs.js';
 import { assertManagerWired } from '../__helpers__/audio-manifest-wiring.js';
@@ -37,7 +37,7 @@ import eventInventory from '../fixtures/audio-event-inventory.json' with { type:
  *
  * @returns {string[]} Event names, one per registered listener.
  */
-export function deriveRegisteredAudioEvents() {
+export function resolveRealAudioService() {
   const manifest = createServiceManifest({
     context: { seed: 'audio-event-coverage' },
   });
@@ -65,6 +65,12 @@ export function deriveRegisteredAudioEvents() {
   });
   // Inject a stub context so context-dependent registration runs in node.
   audio.context = createAudioContextStub();
+
+  return { audio, eventBus };
+}
+
+export function deriveRegisteredAudioEvents() {
+  const { audio } = resolveRealAudioService();
 
   const events = (audio._eventListeners || []).map(
     (listener) => listener.eventName
@@ -168,5 +174,38 @@ describe('audio manifest wiring (assertManagerWired first consumer)', () => {
         { sentinels: incomplete }
       )
     ).toThrow();
+  });
+});
+
+describe('boss-warning → MusicMixer delegation (plan 02.05)', () => {
+  // Registration proves a listener exists; delegation proves the listener
+  // actually drives the MusicMixer (review fix: registration ≠ delegation).
+  // Emitting through the REAL container must call the COMPOSED mixer instance.
+  it('emitting boss-warning invokes musicMixer.setIntensityFromBossEvent exactly once', () => {
+    const { audio, eventBus } = resolveRealAudioService();
+    expect(audio.musicMixer).toBeDefined();
+
+    const spy = vi.spyOn(audio.musicMixer, 'setIntensityFromBossEvent');
+    eventBus.emit('boss-warning', { wave: 4, nextBossWave: 5 });
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0][0]).toBe('boss-warning');
+
+    spy.mockRestore();
+    if (typeof audio.destroy === 'function') audio.destroy();
+  });
+
+  it('pause-state-changed delegates to musicMixer.pause()', () => {
+    const { audio, eventBus } = resolveRealAudioService();
+    const spy = vi.spyOn(audio.musicMixer, 'pause');
+
+    eventBus.emit('pause-state-changed', { isPaused: true });
+    expect(spy).toHaveBeenCalledWith(true);
+
+    eventBus.emit('pause-state-changed', { isPaused: false });
+    expect(spy).toHaveBeenCalledWith(false);
+
+    spy.mockRestore();
+    if (typeof audio.destroy === 'function') audio.destroy();
   });
 });

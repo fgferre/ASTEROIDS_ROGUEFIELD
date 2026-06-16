@@ -3,6 +3,7 @@
   "boss-defeated",
   "boss-phase-changed",
   "boss-spawned",
+  "boss-warning",
   "bullet-hit",
   "combat-target-lock",
   "enemy-destroyed",
