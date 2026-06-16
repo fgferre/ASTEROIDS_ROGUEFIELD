@@ -80,9 +80,9 @@ describe('MusicMixer — Task 1: engine + IntensityResolver + single-writer + li
       expect(mixer).toBeInstanceOf(MusicMixer);
       // No layer graph yet — only init() builds nodes.
       expect(mixer.initialized).toBe(false);
-      expect(mixer.layers === null || Object.keys(mixer.layers).length === 0).toBe(
-        true
-      );
+      expect(
+        mixer.layers === null || Object.keys(mixer.layers).length === 0
+      ).toBe(true);
     });
 
     it('does not throw and creates no nodes even if a context is never provided', () => {
@@ -127,7 +127,9 @@ describe('MusicMixer — Task 1: engine + IntensityResolver + single-writer + li
       mixer.init(context, slider.node);
 
       // pauseFadeGain → targetNode (slider stage)
-      expect(mixer.musicPauseFadeGain.connect).toHaveBeenCalledWith(slider.node);
+      expect(mixer.musicPauseFadeGain.connect).toHaveBeenCalledWith(
+        slider.node
+      );
     });
   });
 
@@ -224,7 +226,8 @@ describe('MusicMixer — Task 1: engine + IntensityResolver + single-writer + li
 
       mixer.init(context, slider.node);
       const gainCallsAfterFirst = context.createGain.mock.calls.length;
-      const biquadCallsAfterFirst = context.createBiquadFilter.mock.calls.length;
+      const biquadCallsAfterFirst =
+        context.createBiquadFilter.mock.calls.length;
 
       mixer.init(context, slider.node); // second init is a no-op
 
@@ -240,13 +243,17 @@ describe('MusicMixer — Task 1: engine + IntensityResolver + single-writer + li
       const mixer = makeMixer();
       mixer.init(context, slider.node);
 
+      // The biquad-filter stub uses a plain disconnect() (not a spy), so wrap
+      // both owned nodes' disconnect with spies before tearing down.
       const lowpass = mixer.lowpass;
       const pauseFade = mixer.musicPauseFadeGain;
+      const lowpassDisconnect = vi.spyOn(lowpass, 'disconnect');
+      const pauseFadeDisconnect = vi.spyOn(pauseFade, 'disconnect');
 
       expect(() => mixer.dispose()).not.toThrow();
 
-      expect(lowpass.disconnect).toHaveBeenCalled();
-      expect(pauseFade.disconnect).toHaveBeenCalled();
+      expect(lowpassDisconnect).toHaveBeenCalled();
+      expect(pauseFadeDisconnect).toHaveBeenCalled();
       expect(mixer.initialized).toBe(false);
 
       // Second dispose must not throw.
@@ -259,7 +266,9 @@ describe('MusicMixer — Task 1: engine + IntensityResolver + single-writer + li
       const mixer = makeMixer();
       mixer.init(context, slider.node);
       mixer.dispose();
-      expect(() => mixer.setIntensityFromBossEvent('boss-spawned')).not.toThrow();
+      expect(() =>
+        mixer.setIntensityFromBossEvent('boss-spawned')
+      ).not.toThrow();
     });
   });
 
