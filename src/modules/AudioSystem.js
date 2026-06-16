@@ -4,6 +4,9 @@ import AudioCache from './AudioCache.js';
 import AudioBatcher from './AudioBatcher.js';
 import { createSfxSynthPort } from './audio/SfxSynthPort.js';
 import MusicMixer from './audio/MusicMixer.js';
+import FileTrackManager, {
+  FILE_TRACK_IDS as FILE_TRACK_MANAGER_IDS,
+} from './audio/FileTrackManager.js';
 import ThrusterLoopManager from './ThrusterLoopManager.js';
 import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
@@ -18,26 +21,6 @@ import {
 import { WAVE_BOSS_INTERVAL } from '../data/constants/gameplay.js';
 
 const DEV_MODE = isDevEnvironment();
-const FILE_TRACK_PRELOAD_POLICY = Object.freeze({
-  EAGER: 'eager',
-  DEFERRED: 'deferred',
-});
-const FILE_TRACK_IDS = Object.freeze({
-  MENU_OPENING: 'menu-opening',
-});
-const MENU_OPENING_TRACK_URL = new URL(
-  '../../assets/Music/Alone Among Orbits.mp3',
-  import.meta.url
-).href;
-const FILE_TRACK_CATALOG = Object.freeze({
-  [FILE_TRACK_IDS.MENU_OPENING]: Object.freeze({
-    src: MENU_OPENING_TRACK_URL,
-    loop: true,
-    fadeInMs: 1500,
-    fadeOutMs: 800,
-    preloadPolicy: FILE_TRACK_PRELOAD_POLICY.EAGER,
-  }),
-});
 
 class AudioSystem extends BaseSystem {
   constructor(dependencies = {}) {
@@ -138,21 +121,15 @@ class AudioSystem extends BaseSystem {
       randomScope: this.randomScopes?.families?.music || this.random,
     });
 
-    this.fileTrackCatalog = { ...FILE_TRACK_CATALOG };
-    this.fileTrackState = {
-      activeTrackId: null,
-      currentScreen: null,
-      tracks: Object.fromEntries(
-        Object.keys(this.fileTrackCatalog).map((trackId) => [
-          trackId,
-          this._createInitialFileTrackState(),
-        ])
-      ),
-    };
-    this.menuTrackConfig =
-      this.fileTrackCatalog[FILE_TRACK_IDS.MENU_OPENING] || null;
-    this.menuTrackState =
-      this.fileTrackState.tracks[FILE_TRACK_IDS.MENU_OPENING] || null;
+    // FileTrackManager (INFRA-02) — owns the MP3 streaming catalog + media graph
+    // + rejection-safe, resume-race-hardened, ordered playback starts. Composed
+    // inside the stable `audio` service. Construction does NO AudioContext work;
+    // init() is called from AudioSystem.init() once the context + buses exist.
+    // The facade keeps the EventBus + screen orchestration and DELEGATES track
+    // play/stop to the manager. `currentScreen` stays on the facade because it is
+    // driven by screen/overlay events, not by the media graph.
+    this.fileTrackManager = new FileTrackManager();
+    this.currentScreen = null;
 
     // Thruster sound system
     this.thrusterLoopManager = new ThrusterLoopManager();
@@ -172,48 +149,66 @@ class AudioSystem extends BaseSystem {
     this._warmupEagerFileTracks();
   }
 
-  _createInitialFileTrackState() {
+  // ---------------------------------------------------------------------------
+  // File-track facade API (INFRA-02 — ownership relocated to FileTrackManager).
+  //
+  // These thin delegators + compatibility accessors preserve the public facade
+  // surface (review requirement: facade API compatibility) while the manager is
+  // the single owner of the catalog + media graph + fades + lifecycle.
+  // ---------------------------------------------------------------------------
+
+  /** @deprecated Compatibility accessor — the catalog lives on the manager. */
+  get fileTrackCatalog() {
+    return this.fileTrackManager?.catalog;
+  }
+
+  /** Compatibility accessor exposing the manager's track state container. */
+  get fileTrackState() {
+    const manager = this.fileTrackManager;
+    if (!manager) {
+      return { activeTrackId: null, currentScreen: null, tracks: {} };
+    }
     return {
-      audioElement: null,
-      sourceNode: null,
-      trackGain: null,
-      isPlaying: false,
-      currentScreen: null,
-      stopTimerId: null,
-      warmupRequested: false,
-      playbackToken: 0,
-      detachReadyListeners: null,
+      get activeTrackId() {
+        return manager.activeTrackId;
+      },
+      set activeTrackId(value) {
+        manager.activeTrackId = value;
+      },
+      get currentScreen() {
+        return manager.currentScreen;
+      },
+      set currentScreen(value) {
+        manager.currentScreen = value;
+      },
+      tracks: manager.tracks,
     };
   }
 
-  _getFileTrackConfig(trackId) {
-    if (!trackId) {
-      return null;
-    }
-    return this.fileTrackCatalog?.[trackId] || null;
+  /** Compatibility accessor: the menu track's config from the manager catalog. */
+  get menuTrackConfig() {
+    return (
+      this.fileTrackManager?.catalog?.[FILE_TRACK_MANAGER_IDS.MENU_OPENING] ||
+      null
+    );
+  }
+
+  /** Compatibility accessor: the menu track's runtime state on the manager. */
+  get menuTrackState() {
+    return (
+      this.fileTrackManager?.tracks?.[FILE_TRACK_MANAGER_IDS.MENU_OPENING] ||
+      null
+    );
   }
 
   _getFileTrackState(trackId) {
-    if (!trackId) {
-      return null;
-    }
-
-    const tracks = this.fileTrackState?.tracks;
-    if (!tracks) {
-      return null;
-    }
-
-    if (!tracks[trackId] && this._getFileTrackConfig(trackId)) {
-      tracks[trackId] = this._createInitialFileTrackState();
-    }
-
-    return tracks[trackId] || null;
+    return this.fileTrackManager?._getState(trackId) || null;
   }
 
   _warmupEagerFileTracks() {
-    Object.entries(this.fileTrackCatalog || {}).forEach(
+    Object.entries(this.fileTrackManager?.catalog || {}).forEach(
       ([trackId, config = {}]) => {
-        if (config.preloadPolicy === FILE_TRACK_PRELOAD_POLICY.EAGER) {
+        if (config.preloadPolicy === 'eager') {
           this.warmupFileTrack(trackId);
         }
       }
@@ -283,13 +278,15 @@ class AudioSystem extends BaseSystem {
       // boss arc drives music (D-04).
       this.musicMixer.init(this.context, this.musicGain);
       this.initialized = true;
-      Object.entries(this.fileTrackCatalog || {}).forEach(
-        ([trackId, config = {}]) => {
-          if (config.preloadPolicy === FILE_TRACK_PRELOAD_POLICY.EAGER) {
-            this.ensureFileTrackGraph(trackId);
-          }
-        }
+
+      // FileTrackManager (INFRA-02): build its graph now that the context + buses
+      // exist. Its trackGains route into musicGain today; 02.06 Task 2 re-points
+      // them to musicDuckGain via setTargetNode after the duck node is spliced.
+      // Every track start is routed through the centralized ensureRunning gate.
+      this.fileTrackManager.init(this.context, this.musicGain, (thunk) =>
+        this.ensureRunning(thunk)
       );
+
       this._syncMenuTrackForCurrentScreen();
 
       // Start performance monitoring
@@ -801,426 +798,68 @@ class AudioSystem extends BaseSystem {
   }
 
   _syncMenuTrackForCurrentScreen() {
-    const currentScreen = this.fileTrackState.currentScreen;
+    const currentScreen = this.fileTrackManager?.currentScreen;
     if (!currentScreen) {
       return;
     }
 
     if (currentScreen === 'menu') {
-      this.safePlay(() => {
-        this.playFileTrack(FILE_TRACK_IDS.MENU_OPENING);
-      });
+      // playFileTrack delegates to FileTrackManager.playTrack, which routes the
+      // start through the centralized ensureRunning gate (resume-race-safe).
+      this.playFileTrack(FILE_TRACK_MANAGER_IDS.MENU_OPENING);
       return;
     }
 
-    this.stopFileTrack(FILE_TRACK_IDS.MENU_OPENING);
+    this.stopFileTrack(FILE_TRACK_MANAGER_IDS.MENU_OPENING);
   }
 
-  _createFileTrackAudioElement(trackId) {
-    const config = this._getFileTrackConfig(trackId);
-    if (!config?.src) {
-      return null;
-    }
-
-    let audioElement = null;
-
-    if (typeof Audio === 'function') {
-      try {
-        audioElement = new Audio(config.src);
-      } catch (error) {
-        console.warn(
-          `[AudioSystem] Failed to construct file track "${trackId}":`,
-          error
-        );
-      }
-    }
-
-    if (
-      !audioElement &&
-      typeof document !== 'undefined' &&
-      typeof document.createElement === 'function'
-    ) {
-      try {
-        audioElement = document.createElement('audio');
-        audioElement.src = config.src;
-      } catch (error) {
-        console.warn(
-          `[AudioSystem] Failed to create fallback file track "${trackId}":`,
-          error
-        );
-      }
-    }
-
-    if (!audioElement) {
-      return null;
-    }
-
-    audioElement.preload = 'auto';
-    audioElement.loop = Boolean(config.loop);
-
-    return audioElement;
-  }
+  // --- File-track delegators (FileTrackManager is the owner; INFRA-02) --------
 
   warmupFileTrack(trackId) {
-    const config = this._getFileTrackConfig(trackId);
-    const state = this._getFileTrackState(trackId);
-    if (!config || !state) {
-      return null;
-    }
-
-    if (!state.audioElement) {
-      state.audioElement = this._createFileTrackAudioElement(trackId);
-    }
-
-    if (!state.audioElement) {
-      return null;
-    }
-
-    state.audioElement.loop = Boolean(config.loop);
-
-    if (!state.warmupRequested) {
-      state.warmupRequested = true;
-      try {
-        state.audioElement.load?.();
-      } catch (error) {
-        console.warn(
-          `[AudioSystem] Failed to warm up file track "${trackId}":`,
-          error
-        );
-      }
-    }
-
-    return state;
+    return this.fileTrackManager?.warmupTrack(trackId) || null;
   }
 
   ensureFileTrackGraph(trackId) {
-    if (!this.context) {
-      return null;
-    }
-
-    const state = this.warmupFileTrack(trackId);
-    const now = this.context.currentTime;
-
-    if (!state?.audioElement) {
-      return null;
-    }
-
-    if (!state.trackGain) {
-      state.trackGain = this.context.createGain();
-      state.trackGain.gain.setValueAtTime(0, now);
-      this.connectMusicNode(state.trackGain);
-    }
-
-    if (!state.sourceNode) {
-      if (typeof this.context.createMediaElementSource !== 'function') {
-        console.warn(
-          `[AudioSystem] MediaElementAudioSourceNode is not available for "${trackId}".`
-        );
-        return null;
-      }
-
-      state.sourceNode = this.context.createMediaElementSource(
-        state.audioElement
-      );
-      state.sourceNode.connect(state.trackGain);
-    }
-
-    return state;
-  }
-
-  _clearFileTrackStopTimer(trackId) {
-    const state = this._getFileTrackState(trackId);
-    if (!state?.stopTimerId) {
-      return;
-    }
-
-    clearTimeout(state.stopTimerId);
-    state.stopTimerId = null;
-  }
-
-  _detachFileTrackReadyListeners(trackId) {
-    const state = this._getFileTrackState(trackId);
-    if (!state?.detachReadyListeners) {
-      return;
-    }
-
-    try {
-      state.detachReadyListeners();
-    } catch (error) {
-      // Ignore listener cleanup failures during audio teardown
-    }
-
-    state.detachReadyListeners = null;
-  }
-
-  _bumpFileTrackPlaybackToken(trackId) {
-    const state = this._getFileTrackState(trackId);
-    if (!state) {
-      return 0;
-    }
-
-    state.playbackToken += 1;
-    return state.playbackToken;
-  }
-
-  _cancelAudioParamValues(param, now) {
-    if (!param || typeof param.cancelScheduledValues !== 'function') {
-      return;
-    }
-
-    try {
-      param.cancelScheduledValues(now);
-    } catch (error) {
-      // Ignore browsers that throw when clearing empty schedules
-    }
-  }
-
-  _getAudioParamCurrentValue(param, fallback = 0) {
-    return typeof param?.value === 'number' ? param.value : fallback;
-  }
-
-  _scheduleFileTrackGain(trackId, targetValue, durationMs = 0) {
-    const state = this._getFileTrackState(trackId);
-    if (!state?.trackGain?.gain || !this.context) {
-      return;
-    }
-
-    const now = this.context.currentTime;
-    const durationSeconds = Math.max(0, durationMs / 1000);
-    const gainParam = state.trackGain.gain;
-    const currentValue = this._getAudioParamCurrentValue(gainParam, 0);
-
-    this._cancelAudioParamValues(gainParam, now);
-    gainParam.setValueAtTime(currentValue, now);
-
-    if (durationSeconds > 0) {
-      gainParam.linearRampToValueAtTime(targetValue, now + durationSeconds);
-    } else {
-      gainParam.setValueAtTime(targetValue, now);
-    }
-  }
-
-  _beginFileTrackFadeIn(trackId) {
-    const config = this._getFileTrackConfig(trackId);
-    if (!config) {
-      return;
-    }
-
-    this._scheduleFileTrackGain(trackId, 1, config.fadeInMs);
-  }
-
-  _finalizeFileTrackStop(trackId) {
-    const state = this._getFileTrackState(trackId);
-    if (!state?.audioElement) {
-      return;
-    }
-
-    try {
-      state.audioElement.pause?.();
-    } catch (error) {
-      // Ignore pause failures during cleanup
-    }
-
-    try {
-      state.audioElement.currentTime = 0;
-    } catch (error) {
-      // Ignore media elements that reject currentTime rewinds
-    }
-
-    state.isPlaying = false;
-    if (this.fileTrackState.activeTrackId === trackId) {
-      this.fileTrackState.activeTrackId = null;
-    }
+    return this.fileTrackManager?.ensureTrackGraph(trackId) || null;
   }
 
   playFileTrack(trackId) {
-    const config = this._getFileTrackConfig(trackId);
-    const state = this.ensureFileTrackGraph(trackId);
-    if (!config || !state?.audioElement || !state.trackGain || !this.context) {
-      return;
-    }
-
-    this._clearFileTrackStopTimer(trackId);
-
-    if (
-      this.fileTrackState.activeTrackId === trackId &&
-      state.isPlaying &&
-      !state.audioElement.paused
-    ) {
-      this._beginFileTrackFadeIn(trackId);
-      return;
-    }
-
-    const token = this._bumpFileTrackPlaybackToken(trackId);
-    const previousActiveTrackId = this.fileTrackState.activeTrackId;
-    const audioElement = state.audioElement;
-
-    this._detachFileTrackReadyListeners(trackId);
-
-    let playbackStarted = false;
-    const handlePlaybackReady = () => {
-      if (playbackStarted || state.playbackToken !== token) {
-        return;
-      }
-
-      playbackStarted = true;
-      this._detachFileTrackReadyListeners(trackId);
-      state.isPlaying = true;
-
-      if (
-        previousActiveTrackId &&
-        previousActiveTrackId !== trackId &&
-        this._getFileTrackState(previousActiveTrackId)?.isPlaying
-      ) {
-        this.stopFileTrack(previousActiveTrackId);
-      }
-
-      this.fileTrackState.activeTrackId = trackId;
-      this._beginFileTrackFadeIn(trackId);
-    };
-
-    if (typeof audioElement.addEventListener === 'function') {
-      const readyHandler = () => {
-        handlePlaybackReady();
-      };
-      audioElement.addEventListener('playing', readyHandler);
-      state.detachReadyListeners = () => {
-        audioElement.removeEventListener?.('playing', readyHandler);
-        state.detachReadyListeners = null;
-      };
-    }
-
-    if (!state.isPlaying) {
-      this._scheduleFileTrackGain(trackId, 0, 0);
-    }
-
-    audioElement.loop = Boolean(config.loop);
-
-    const playResult =
-      typeof audioElement.play === 'function' ? audioElement.play() : null;
-
-    if (playResult && typeof playResult.then === 'function') {
-      playResult
-        .then(() => {
-          handlePlaybackReady();
-        })
-        .catch((error) => {
-          if (state.playbackToken !== token) {
-            return;
-          }
-
-          this._detachFileTrackReadyListeners(trackId);
-          state.isPlaying = false;
-          if (error?.name !== 'AbortError') {
-            console.warn(
-              `[AudioSystem] Failed to play file track "${trackId}":`,
-              error
-            );
-          }
-        });
-      return;
-    }
-
-    if (!audioElement.paused) {
-      handlePlaybackReady();
-    }
+    this.fileTrackManager?.playTrack(trackId);
   }
 
-  stopFileTrack(trackId, { immediate = false } = {}) {
-    const config = this._getFileTrackConfig(trackId);
-    const state = this._getFileTrackState(trackId);
-    if (!config || !state?.audioElement) {
-      return;
-    }
-
-    this._clearFileTrackStopTimer(trackId);
-    this._bumpFileTrackPlaybackToken(trackId);
-    this._detachFileTrackReadyListeners(trackId);
-
-    const fadeOutSeconds = Math.max(
-      0,
-      (immediate ? 0 : config.fadeOutMs) / 1000
-    );
-
-    if (state.trackGain?.gain && this.context) {
-      this._scheduleFileTrackGain(trackId, 0, immediate ? 0 : config.fadeOutMs);
-    }
-
-    if (immediate || !this.context || fadeOutSeconds <= 0) {
-      this._finalizeFileTrackStop(trackId);
-      return;
-    }
-
-    state.stopTimerId = setTimeout(
-      () => {
-        state.stopTimerId = null;
-        this._finalizeFileTrackStop(trackId);
-      },
-      Math.round(fadeOutSeconds * 1000)
-    );
+  stopFileTrack(trackId, options = {}) {
+    this.fileTrackManager?.stopTrack(trackId, options);
   }
 
   evictFileTrack(trackId) {
-    const state = this._getFileTrackState(trackId);
-    if (!state) {
-      return;
-    }
-
-    this.stopFileTrack(trackId, { immediate: true });
-    this._clearFileTrackStopTimer(trackId);
-    this._detachFileTrackReadyListeners(trackId);
-
-    if (state.sourceNode && typeof state.sourceNode.disconnect === 'function') {
-      try {
-        state.sourceNode.disconnect();
-      } catch (error) {
-        // Ignore disconnect failures during teardown
-      }
-    }
-
-    if (state.trackGain && typeof state.trackGain.disconnect === 'function') {
-      try {
-        state.trackGain.disconnect();
-      } catch (error) {
-        // Ignore disconnect failures during teardown
-      }
-    }
-
-    state.audioElement = null;
-    state.sourceNode = null;
-    state.trackGain = null;
-    state.isPlaying = false;
-    state.currentScreen = null;
-    state.stopTimerId = null;
-    state.warmupRequested = false;
-    state.playbackToken = 0;
-    state.detachReadyListeners = null;
+    this.fileTrackManager?.evictTrack(trackId);
   }
 
   _evictAllFileTracks({ resetCurrentScreen = false } = {}) {
-    Object.keys(this.fileTrackCatalog || {}).forEach((trackId) => {
-      this.evictFileTrack(trackId);
+    const manager = this.fileTrackManager;
+    if (!manager) {
+      return;
+    }
+    Object.keys(manager.catalog || {}).forEach((trackId) => {
+      manager.evictTrack(trackId);
     });
-
-    this.fileTrackState.activeTrackId = null;
+    manager.activeTrackId = null;
     if (resetCurrentScreen) {
-      this.fileTrackState.currentScreen = null;
-      if (this.menuTrackState) {
-        this.menuTrackState.currentScreen = null;
-      }
+      manager.currentScreen = null;
     }
   }
 
   _destroyMenuTrackResources() {
-    this.evictFileTrack(FILE_TRACK_IDS.MENU_OPENING);
-    if (this.fileTrackState.activeTrackId === FILE_TRACK_IDS.MENU_OPENING) {
-      this.fileTrackState.activeTrackId = null;
+    const manager = this.fileTrackManager;
+    if (!manager) {
+      return;
     }
-    if (this.fileTrackState.currentScreen === 'menu') {
-      this.fileTrackState.currentScreen = null;
+    manager.evictTrack(FILE_TRACK_MANAGER_IDS.MENU_OPENING);
+    if (manager.activeTrackId === FILE_TRACK_MANAGER_IDS.MENU_OPENING) {
+      manager.activeTrackId = null;
     }
-    if (this.menuTrackState) {
-      this.menuTrackState.currentScreen = null;
+    if (manager.currentScreen === 'menu') {
+      manager.currentScreen = null;
     }
   }
 
@@ -1576,17 +1215,29 @@ class AudioSystem extends BaseSystem {
     this.handleBossEvent(eventName, payload);
   }
 
-  safePlay(soundFunction) {
-    if (
-      !this.initialized ||
-      !this.context ||
-      typeof soundFunction !== 'function'
-    ) {
+  /**
+   * Centralized AudioContext resume gate (INFRA-02 resume-race ownership, plan
+   * 02.06). EVERY playback start path — SFX (safePlay) and file tracks
+   * (FileTrackManager) — funnels through this ONE gate so there is a single
+   * resume path and a deterministic ordered (FIFO) flush.
+   *
+   *   - Fast path: context already running → invoke the thunk synchronously.
+   *   - Slow path: context suspended (or a resume is already in flight) → queue
+   *     the thunk into the ordered pending queue and trigger one resume(); on
+   *     resolve every queued thunk fires in REQUEST ORDER, exactly once.
+   *
+   * The seam is designed so Phase 5a INFRA-16 can make it synchronous without
+   * changing callers.
+   *
+   * @param {Function} thunk - The playback-start work to run once running.
+   */
+  ensureRunning(thunk) {
+    if (!this.initialized || !this.context || typeof thunk !== 'function') {
       return;
     }
 
     if (this.context.state !== 'running' || this.resumePromise) {
-      this.pendingSoundQueue.push(soundFunction);
+      this.pendingSoundQueue.push(thunk);
       this._ensureContextResumed();
       return;
     }
@@ -1595,7 +1246,14 @@ class AudioSystem extends BaseSystem {
       this._flushPendingSounds();
     }
 
-    this._invokeSoundFunction(soundFunction);
+    this._invokeSoundFunction(thunk);
+  }
+
+  safePlay(soundFunction) {
+    // safePlay is the SFX-facing alias of the centralized resume gate. Both
+    // share the single pendingSoundQueue so SFX and file-track starts flush in a
+    // single deterministic order.
+    this.ensureRunning(soundFunction);
   }
 
   _ensureContextResumed() {
@@ -4643,6 +4301,13 @@ class AudioSystem extends BaseSystem {
     // Stop the MusicMixer lookahead + release its nodes (no leaked timer).
     if (this.musicMixer && typeof this.musicMixer.dispose === 'function') {
       this.musicMixer.dispose();
+    }
+    // Tear down the FileTrackManager (idempotent; detaches all track nodes).
+    if (
+      this.fileTrackManager &&
+      typeof this.fileTrackManager.dispose === 'function'
+    ) {
+      this.fileTrackManager.dispose();
     }
   }
 
