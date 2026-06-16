@@ -1401,6 +1401,14 @@ export class WaveManager {
     if (this.eventBus) {
       this.eventBus.emit('wave-started', waveEventPayload);
 
+      // D-04: pre-boss tension trigger (one wave before a boss)
+      if (this.isBossWave(waveNumber + 1)) {
+        this.eventBus.emit('boss-warning', {
+          wave: waveNumber,
+          nextBossWave: waveNumber + 1,
+        });
+      }
+
       if (
         typeof process !== 'undefined' &&
         process.env?.NODE_ENV === 'development'
