@@ -171,7 +171,7 @@ describe('INFRA-03 — no reachable dev globals in production build', () => {
     let bundleName = '';
     let enumeratedGlobals = [];
 
-    beforeAll(() => {
+    beforeAll(async () => {
       // Hermetic: rebuild so the canary always reflects current source, never a
       // stale dist/. `--mode production` is vite build's default but explicit is safer.
       execFileSync('npm', ['run', 'build'], {
@@ -194,7 +194,10 @@ describe('INFRA-03 — no reachable dev globals in production build', () => {
       enumeratedGlobals = [
         ...new Set(bundleSource.match(/window\.__[A-Za-z0-9_]+/g) || []),
       ].sort();
-    });
+      // The hook spawns a full `vite build`; give the vitest hook the SAME
+      // generous budget already declared for the build child process so the
+      // canary does not flake on the 10s default under concurrent suite load.
+    }, BUILD_TIMEOUT_MS);
 
     it('contains NO reachable window.__ assignment site (canary for new ungated globals)', () => {
       // Reachability, not presence: we match ASSIGNMENT (`window.__X =`, excluding
