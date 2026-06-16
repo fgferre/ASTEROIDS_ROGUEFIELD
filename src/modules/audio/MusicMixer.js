@@ -46,6 +46,25 @@ const BOSS_ARC_INTENSITY = Object.freeze({
   'boss-defeated': 0,
 });
 
+// Intensity levels at which the rhythmic pulse grid runs (D-02): only
+// danger/climax add the quantized pulse; base/tension are gain-only drones.
+const RHYTHM_LEVELS = Object.freeze({ 2: true, 3: true });
+
+// Minimal bar-clock (RESEARCH RESOLVED Q3): a ~25ms lookahead scheduler that
+// schedules the next pulse onset at nextBarTime. NOT a generic Transport.
+const LOOKAHEAD_INTERVAL_MS = 25; // tick granularity
+const SCHEDULE_AHEAD_SECONDS = 0.1; // schedule onsets up to this far ahead
+const BAR_SECONDS = 0.5; // one "bar" = a pulse onset every 0.5s (120 BPM feel)
+const PULSE_FREQUENCY = 220; // pulse carrier (tunable — browser-check calibrates)
+const PULSE_GAIN = 0.12; // pulse loudness (kept modest under the drones)
+const PULSE_DURATION_SECONDS = 0.12; // short percussive blip per onset
+
+// Pause "underwater" feel (D-10): ramp the pre-built lowpass into this band and
+// drop musicPauseFadeGain to ~50%. Tunable — the browser-check calibrates feel.
+const PAUSE_LOWPASS_FREQUENCY = 700; // ~600-1000 Hz underwater cutoff
+const PAUSE_FADE_GAIN = 0.5; // ~50% on pause
+const PAUSE_RAMP_SECONDS = 0.25; // smooth (click-safe) pause transition
+
 class MusicMixer {
   /**
    * @param {object} [config]
@@ -78,6 +97,11 @@ class MusicMixer {
         : 0;
     this.intensityLevel = initialLevel;
     this.targetLevel = initialLevel;
+
+    // --- transport (bar-clock) + pause state ---
+    this._lookaheadHandle = null; // setInterval handle for the lookahead
+    this._nextBarTime = 0; // next pulse onset (context.currentTime domain)
+    this._isPaused = false;
 
     this.initialized = false;
   }
@@ -304,6 +328,233 @@ class MusicMixer {
     });
 
     this.intensityLevel = targetLevel;
+
+    // D-02: the rhythmic pulse grid runs ONLY at danger/climax. Start/stop the
+    // minimal bar-clock to match the target level (never while paused).
+    this._syncTransport();
+  }
+
+  // -------------------------------------------------------------------------
+  // Bar-clock transport (D-02) — minimal lookahead scheduler.
+  // -------------------------------------------------------------------------
+
+  /**
+   * Start the lookahead when the level needs rhythm (danger/climax) and we are
+   * not paused; stop it otherwise. Idempotent.
+   * @private
+   */
+  _syncTransport() {
+    const needsRhythm = !!RHYTHM_LEVELS[this.intensityLevel];
+    if (needsRhythm && !this._isPaused) {
+      this._startLookahead();
+    } else {
+      this._stopLookahead();
+    }
+  }
+
+  /**
+   * Start the ~25ms lookahead. The next onset is anchored to the CURRENT
+   * context time (re-anchoring after a pause leaves zero accumulated offset).
+   * @private
+   */
+  _startLookahead() {
+    if (this._lookaheadHandle || !this.context) return;
+    // Anchor the grid to the present — never to a stale wall-clock position.
+    // The first onset lands at the next bar boundary >= now so the first tick
+    // schedules it within the schedule-ahead window.
+    this._nextBarTime = this.context.currentTime;
+    this._lookaheadHandle = setInterval(
+      () => this._lookaheadTick(),
+      LOOKAHEAD_INTERVAL_MS
+    );
+    // Schedule synchronously on start so the first onset is not delayed a full
+    // tick (and so danger/climax produce a pulse immediately under fake timers).
+    this._lookaheadTick();
+  }
+
+  /** Stop the lookahead and release its handle. Idempotent. @private */
+  _stopLookahead() {
+    if (this._lookaheadHandle) {
+      clearInterval(this._lookaheadHandle);
+      this._lookaheadHandle = null;
+    }
+  }
+
+  /**
+   * One lookahead tick: schedule every pulse onset that falls within the
+   * schedule-ahead window, advancing the grid by one bar each time. Onset times
+   * derive from context.currentTime — NEVER Date.now/performance.now.
+   * @private
+   */
+  _lookaheadTick() {
+    if (this._isPaused || !this.context || !this.initialized) return;
+    const horizon = this.context.currentTime + SCHEDULE_AHEAD_SECONDS;
+    let guard = 0;
+    while (this._nextBarTime <= horizon && guard < 64) {
+      this._schedulePulse(this._nextBarTime);
+      this._nextBarTime += BAR_SECONDS;
+      guard += 1;
+    }
+  }
+
+  /**
+   * Schedule a single short pulse oscillator at `onsetTime`. Registers onended
+   * cleanup so each per-bar oscillator releases its nodes (no leak across
+   * hundreds of bars). Uses the seeded randomScope for variation — never
+   * Math.random.
+   * @private
+   */
+  _schedulePulse(onsetTime) {
+    const context = this.context;
+    if (!context || typeof context.createOscillator !== 'function') return;
+
+    const osc = context.createOscillator();
+    const gain = context.createGain();
+
+    // Seeded pitch variation (replay-deterministic).
+    const detune = this._randomBetween(-12, 12);
+    osc.type = 'square';
+    if (osc.frequency && typeof osc.frequency.setValueAtTime === 'function') {
+      osc.frequency.setValueAtTime(PULSE_FREQUENCY, onsetTime);
+    }
+    if (osc.detune && typeof osc.detune.setValueAtTime === 'function') {
+      osc.detune.setValueAtTime(detune, onsetTime);
+    }
+
+    // Short percussive envelope on the pulse's own gain.
+    const endTime = onsetTime + PULSE_DURATION_SECONDS;
+    if (gain.gain) {
+      gain.gain.setValueAtTime(PULSE_GAIN, onsetTime);
+      if (typeof gain.gain.linearRampToValueAtTime === 'function') {
+        gain.gain.linearRampToValueAtTime(0.0001, endTime);
+      }
+    }
+
+    osc.connect(gain);
+    // Route through the same pre-built lowpass so pause muffles the pulse too.
+    if (this.lowpass) {
+      gain.connect(this.lowpass);
+    }
+
+    // onended cleanup — release this per-bar oscillator (no leak).
+    osc.onended = () => {
+      this._safeDisconnect(osc);
+      this._safeDisconnect(gain);
+    };
+
+    try {
+      osc.start(onsetTime);
+      osc.stop(endTime);
+    } catch (error) {
+      // Defensive: a re-scheduled/stopped node should never crash the grid.
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Pause (D-10 / SC1) + fade (D-12).
+  // -------------------------------------------------------------------------
+
+  /**
+   * Pause/resume the music (D-10). On pause: freeze layer gains (anchor+hold),
+   * STOP the lookahead (no new onsets while paused — SC1 no drift), ramp the
+   * pre-built lowpass down to the underwater band and musicPauseFadeGain to
+   * ~50%. On resume: re-anchor the grid to fresh currentTime, ramp the lowpass
+   * back to bypass, restore pauseFadeGain. Writes ONLY owned params.
+   *
+   * @param {boolean} isPaused
+   */
+  pause(isPaused) {
+    if (!this.initialized || !this.context) {
+      this._isPaused = !!isPaused;
+      return;
+    }
+    const now = this.context.currentTime;
+    this._isPaused = !!isPaused;
+
+    if (this._isPaused) {
+      // Freeze every layer gain at its current value (anchor + hold).
+      Object.values(this.layers || {}).forEach((layer) => {
+        const param = layer?.gain?.gain;
+        this._freezeParam(param, now);
+        this._freezeParam(layer?.modulator?.depthGain?.gain, now);
+      });
+      // Stop the grid — no new onsets while paused (SC1: no wall-clock drift).
+      this._stopLookahead();
+      // Underwater: ramp the SAME pre-built lowpass down + drop pauseFade ~50%.
+      this._rampLowpass(PAUSE_LOWPASS_FREQUENCY, now);
+      this._rampParam(
+        this.musicPauseFadeGain?.gain,
+        PAUSE_FADE_GAIN,
+        now,
+        PAUSE_RAMP_SECONDS
+      );
+    } else {
+      // Resume: lowpass back to bypass, pauseFade back to unity.
+      this._rampLowpass(LOWPASS_BYPASS_FREQUENCY, now);
+      this._rampParam(
+        this.musicPauseFadeGain?.gain,
+        1,
+        now,
+        PAUSE_RAMP_SECONDS
+      );
+      // Re-restore layer levels for the current intensity, and re-anchor the
+      // grid to fresh currentTime (zero accumulated offset).
+      this._applyIntensity(this.intensityLevel);
+    }
+  }
+
+  /**
+   * D-12 death-fade hook: click-safe ramp of musicPauseFadeGain to `targetGain`
+   * over `durationSeconds`. Writes the pauseFade stage ONLY — never the slider
+   * stage. This is the parameterized fade Phase 4's cinematic death uses.
+   *
+   * @param {number} targetGain
+   * @param {number} durationSeconds
+   */
+  fade(targetGain, durationSeconds) {
+    if (!this.initialized || !this.context || !this.musicPauseFadeGain) return;
+    const now = this.context.currentTime;
+    const duration = Math.max(0, Number(durationSeconds) || 0);
+    this._rampParam(this.musicPauseFadeGain.gain, targetGain, now, duration);
+  }
+
+  /**
+   * Ramp the pre-built lowpass FREQUENCY (the only param pause touches on it).
+   * Prefers a linear ramp; falls back to setValueAtTime when unavailable.
+   * @private
+   */
+  _rampLowpass(target, now) {
+    const param = this.lowpass?.frequency;
+    if (!param) return;
+    try {
+      param.cancelScheduledValues(now);
+    } catch (error) {
+      // Ignore empty-schedule throws.
+    }
+    const current = typeof param.value === 'number' ? param.value : target;
+    if (typeof param.setValueAtTime === 'function') {
+      param.setValueAtTime(current, now);
+    }
+    if (typeof param.linearRampToValueAtTime === 'function') {
+      param.linearRampToValueAtTime(target, now + PAUSE_RAMP_SECONDS);
+    } else if (typeof param.setValueAtTime === 'function') {
+      param.setValueAtTime(target, now + PAUSE_RAMP_SECONDS);
+    }
+  }
+
+  /**
+   * Freeze a gain param at its current value (cancel scheduled ramps, hold).
+   * @private
+   */
+  _freezeParam(param, now) {
+    if (!param || typeof param.setValueAtTime !== 'function') return;
+    try {
+      param.cancelScheduledValues(now);
+    } catch (error) {
+      // Ignore empty-schedule throws.
+    }
+    const current = typeof param.value === 'number' ? param.value : 0;
+    param.setValueAtTime(current, now);
   }
 
   /**
@@ -340,6 +591,10 @@ class MusicMixer {
     if (!this.initialized) return;
 
     const now = this.context?.currentTime ?? 0;
+
+    // Stop the bar-clock FIRST — no onset must fire after dispose.
+    this._stopLookahead();
+    this._isPaused = false;
 
     Object.values(this.layers || {}).forEach((layer) => {
       this._safeStop(layer?.osc, now);

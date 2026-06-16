@@ -286,11 +286,7 @@ export function createSettingsStub(values = null) {
  * const buffer = context.createBuffer(2, 256, 48000);
  */
 export function createAudioContextStub(options = {}) {
-  const {
-    sampleRate = 44100,
-    currentTime = 0,
-    state = 'running',
-  } = options;
+  const { sampleRate = 44100, currentTime = 0, state = 'running' } = options;
 
   const createBuffer = vi.fn((channels, length, rate = sampleRate) => {
     const data = new Float32Array(length);
@@ -311,21 +307,42 @@ export function createAudioContextStub(options = {}) {
     createBufferSource: vi.fn(() => createBufferSourceStub()),
     createGain: vi.fn(() => createGainStub()),
     createOscillator: vi.fn(() => createOscillatorStub()),
-    createBiquadFilter: vi.fn(() => ({
-      type: 'lowpass',
-      connect() {},
-      disconnect() {},
-      frequency: {
-        setValueAtTime() {},
-        exponentialRampToValueAtTime() {},
-      },
-      Q: {
-        setValueAtTime() {},
-      },
-      gain: {
-        setValueAtTime() {},
-      },
-    })),
+    createBiquadFilter: vi.fn(() => {
+      // The frequency param is AudioParam-shaped: it tracks `value` and supports
+      // the full ramp surface (linear + exponential) so click-safe anchoring and
+      // the MusicMixer pause lowpass ramp (plan 02.05 D-10) work in node. A real
+      // BiquadFilterNode.frequency is a k-rate AudioParam with all of these.
+      const makeFreqParam = (initial) => {
+        const param = {
+          value: initial,
+          setValueAtTime: vi.fn((v) => {
+            param.value = v;
+          }),
+          linearRampToValueAtTime: vi.fn((v) => {
+            param.value = v;
+          }),
+          exponentialRampToValueAtTime: vi.fn((v) => {
+            param.value = v;
+          }),
+          cancelScheduledValues: vi.fn(),
+        };
+        return param;
+      };
+      return {
+        type: 'lowpass',
+        connect() {},
+        disconnect() {},
+        frequency: makeFreqParam(350),
+        Q: {
+          value: 1,
+          setValueAtTime() {},
+        },
+        gain: {
+          value: 0,
+          setValueAtTime() {},
+        },
+      };
+    }),
     createMediaElementSource: vi.fn((mediaElement) =>
       createMediaElementSourceStub({ mediaElement })
     ),
@@ -406,4 +423,3 @@ export function createOscillatorStub(options = {}) {
     },
   };
 }
-
