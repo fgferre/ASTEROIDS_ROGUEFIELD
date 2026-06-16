@@ -2,6 +2,7 @@ import { BaseSystem } from '../core/BaseSystem.js';
 import AudioPool from './AudioPool.js';
 import AudioCache from './AudioCache.js';
 import AudioBatcher from './AudioBatcher.js';
+import { createSfxSynthPort } from './audio/SfxSynthPort.js';
 import ThrusterLoopManager from './ThrusterLoopManager.js';
 import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
@@ -258,7 +259,7 @@ class AudioSystem extends BaseSystem {
       this.cache = new AudioCache(this.context, 20, {
         random: this.randomScopes.cache,
       });
-      this.batcher = new AudioBatcher(this, 0, {
+      this.batcher = new AudioBatcher(this._createSfxSynthPort(), 0, {
         random: this.randomScopes.batcher,
       });
 
@@ -700,6 +701,33 @@ class AudioSystem extends BaseSystem {
     if (destination && node && typeof node.connect === 'function') {
       node.connect(destination);
     }
+  }
+
+  /**
+   * Build the AudioBatcher's SfxSynthPort from EXPLICIT bound functions.
+   *
+   * This is the Option E seam that breaks the AudioBatcher↔AudioSystem cycle
+   * (RESEARCH Pitfall 1): the batcher receives this frozen port, never `this`.
+   * Every member is an explicit named callback — the whole system cannot pass
+   * through any parameter, so the coupling cannot be smuggled back in via a
+   * closure-over-system. pool/context are late-bound (getPool/getContext)
+   * because they are assigned during init() after the batcher is constructed.
+   *
+   * @returns {Readonly<object>} The frozen SFX synth port.
+   */
+  _createSfxSynthPort() {
+    return createSfxSynthPort({
+      playDroneFireDirect: (...args) => this._playDroneFireDirect(...args),
+      playHunterBurstDirect: (...args) => this._playHunterBurstDirect(...args),
+      playMineExplosionDirect: (...args) =>
+        this._playMineExplosionDirect(...args),
+      safePlay: (fn) => this.safePlay(fn),
+      connectGainNode: (node) => this.connectGainNode(node),
+      executeImmediate: (soundType, args) =>
+        this._executeBatchedSound(soundType, args),
+      getPool: () => this.pool,
+      getContext: () => this.context,
+    });
   }
 
   _handleScreenChanged(payload = {}) {

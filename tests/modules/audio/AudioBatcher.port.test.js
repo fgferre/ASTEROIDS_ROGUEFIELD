@@ -17,6 +17,7 @@ function makeFns(overrides = {}) {
     playMineExplosionDirect: vi.fn(),
     safePlay: vi.fn((fn) => fn && fn()),
     connectGainNode: vi.fn(),
+    executeImmediate: vi.fn(),
     getPool: vi.fn(() => ({ pool: true })),
     getContext: vi.fn(() => ({ currentTime: 0 })),
     ...overrides,
@@ -30,6 +31,7 @@ describe('createSfxSynthPort — explicit-functions factory', () => {
     'playMineExplosionDirect',
     'safePlay',
     'connectGainNode',
+    'executeImmediate',
     'getPool',
     'getContext',
   ];
@@ -67,13 +69,14 @@ describe('createSfxSynthPort — explicit-functions factory', () => {
     expect(Object.isFrozen(port)).toBe(true);
   });
 
-  it('exposes ONLY the 5 functions plus pool/context getters — no system, no underscore members', () => {
+  it('exposes ONLY the 6 functions plus pool/context getters — no system, no underscore members', () => {
     const port = createSfxSynthPort(makeFns());
     const keys = Object.keys(port).sort();
     expect(keys).toEqual(
       [
         'connectGainNode',
         'context',
+        'executeImmediate',
         'playDroneFireDirect',
         'playHunterBurstDirect',
         'playMineExplosionDirect',

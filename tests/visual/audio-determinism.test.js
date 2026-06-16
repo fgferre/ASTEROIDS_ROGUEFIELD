@@ -46,9 +46,13 @@ describe('AudioSystem RNG determinism', () => {
       returnGain: () => {},
     };
 
-    audioSystem.batcher = new AudioBatcher(audioSystem, 0, {
-      random: audioSystem.randomScopes?.batcher || random,
-    });
+    audioSystem.batcher = new AudioBatcher(
+      audioSystem._createSfxSynthPort(),
+      0,
+      {
+        random: audioSystem.randomScopes?.batcher || random,
+      }
+    );
     audioSystem.captureRandomScopes({ refreshForks: true });
 
     async function captureAsteroidFrequencies(iterations) {

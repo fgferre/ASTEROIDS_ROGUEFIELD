@@ -13,7 +13,16 @@
  * (the failure mode `createSfxSynthPort(system)` would have allowed).
  *
  * The returned port is frozen and exposes ONLY:
- *   - the 5 call-through synth functions, and
+ *   - the 5 batched-synth call-through functions
+ *     (playDroneFireDirect / playHunterBurstDirect / playMineExplosionDirect /
+ *     safePlay / connectGainNode),
+ *   - `executeImmediate(soundType, args)` — the non-batched / size-1 flush path.
+ *     AudioBatcher._playImmediate previously reached the system directly via
+ *     `this.audioSystem._executeBatchedSound(...)` / `this.audioSystem[soundType](...)`;
+ *     those are the only batcher→system calls NOT in the original interfaces
+ *     block, so the port forwards them through ONE explicit bound function
+ *     rather than handing back the whole system (Rule 3 — the immediate path
+ *     would otherwise be unreachable once the back-ref is removed), and
  *   - `pool` / `context` getters that LATE-BIND to getPool()/getContext()
  *     (pool & context are assigned during AudioSystem.init, so the port must
  *     reflect their current value, not a snapshot taken at construction).
@@ -29,6 +38,7 @@ const REQUIRED_FUNCTIONS = Object.freeze([
   'playMineExplosionDirect',
   'safePlay',
   'connectGainNode',
+  'executeImmediate',
   'getPool',
   'getContext',
 ]);
@@ -42,6 +52,7 @@ const REQUIRED_FUNCTIONS = Object.freeze([
  *   playMineExplosionDirect: (params?: object) => void,
  *   safePlay: (fn: () => void) => void,
  *   connectGainNode: (node: AudioNode) => void,
+ *   executeImmediate: (soundType: string, args: any[]) => void,
  *   getPool: () => object,
  *   getContext: () => AudioContext,
  * }} fns - Explicit named callbacks/resources. Passing a whole system object
@@ -66,6 +77,7 @@ export function createSfxSynthPort(fns) {
     playMineExplosionDirect,
     safePlay,
     connectGainNode,
+    executeImmediate,
     getPool,
     getContext,
   } = fns;
@@ -86,6 +98,7 @@ export function createSfxSynthPort(fns) {
     playMineExplosionDirect,
     safePlay,
     connectGainNode,
+    executeImmediate,
     // Late-bound: pool/context are assigned during AudioSystem.init, so the
     // port must reflect their CURRENT value rather than a construction-time
     // snapshot.

@@ -6,8 +6,12 @@ import { debugLog } from '../core/debugLogging.js';
  * Otimiza sons similares executados ao mesmo tempo
  */
 class AudioBatcher {
-  constructor(audioSystem, batchWindow = 0, { random } = {}) {
-    this.audioSystem = audioSystem;
+  constructor(port, batchWindow = 0, { random } = {}) {
+    // Cycle broken (02.04, RESEARCH Pitfall 1): the batcher receives an
+    // explicit SfxSynthPort, never the whole AudioSystem. There is no
+    // system back-reference — every synth call goes through the frozen port
+    // surface (port.playDroneFireDirect / .safePlay / .pool / ...).
+    this.port = port;
     this.batchWindow = batchWindow; // ms para agrupar sons
     this.random = random || null;
     this._fallbackRandom = null;
@@ -81,7 +85,7 @@ class AudioBatcher {
     aggregated.intensity /= options.length;
     aggregated.gain /= options.length;
 
-    this.audioSystem._playDroneFireDirect(aggregated);
+    this.port.playDroneFireDirect(aggregated);
   }
 
   _playBatchedHunterBurst(batch) {
@@ -117,7 +121,7 @@ class AudioBatcher {
         group.reduce((sum, opt) => sum + (Number(opt.gain) || 0.15), 0) /
         group.length;
 
-      this.audioSystem._playHunterBurstDirect(aggregated);
+      this.port.playHunterBurstDirect(aggregated);
     });
   }
 
@@ -159,7 +163,7 @@ class AudioBatcher {
       totalIntensity / options.length + 0.12 * (options.length - 1)
     );
 
-    this.audioSystem._playMineExplosionDirect(aggregated);
+    this.port.playMineExplosionDirect(aggregated);
   }
 
   /**
@@ -349,16 +353,16 @@ class AudioBatcher {
   _playBatchedLasers(batch) {
     const count = Math.min(batch.length, 5); // Limit simultaneous lasers
 
-    this.audioSystem.safePlay(() => {
+    this.port.safePlay(() => {
       const baseFreq = 800;
       const freqVariation = 100;
 
       for (let i = 0; i < count; i++) {
-        const osc = this.audioSystem.pool.getOscillator();
-        const gain = this.audioSystem.pool.getGain();
+        const osc = this.port.pool.getOscillator();
+        const gain = this.port.pool.getGain();
 
         osc.connect(gain);
-        this.audioSystem.connectGainNode(gain);
+        this.port.connectGainNode(gain);
 
         // Slight frequency variation
         const freq = baseFreq + (i * freqVariation) / count - freqVariation / 2;
@@ -366,29 +370,29 @@ class AudioBatcher {
 
         osc.frequency.setValueAtTime(
           freq,
-          this.audioSystem.context.currentTime + delay
+          this.port.context.currentTime + delay
         );
         osc.frequency.exponentialRampToValueAtTime(
           freq * 0.2,
-          this.audioSystem.context.currentTime + delay + 0.08
+          this.port.context.currentTime + delay + 0.08
         );
 
         gain.gain.setValueAtTime(
           0.12 / count,
-          this.audioSystem.context.currentTime + delay
+          this.port.context.currentTime + delay
         );
         gain.gain.exponentialRampToValueAtTime(
           0.001,
-          this.audioSystem.context.currentTime + delay + 0.08
+          this.port.context.currentTime + delay + 0.08
         );
 
-        osc.start(this.audioSystem.context.currentTime + delay);
-        osc.stop(this.audioSystem.context.currentTime + delay + 0.08);
+        osc.start(this.port.context.currentTime + delay);
+        osc.stop(this.port.context.currentTime + delay + 0.08);
 
         // Return gain to pool after use
         setTimeout(
           () => {
-            this.audioSystem.pool.returnGain(gain);
+            this.port.pool.returnGain(gain);
           },
           (delay + 0.08) * 1000 + 10
         );
@@ -419,17 +423,17 @@ class AudioBatcher {
   _playBatchedAsteroidBreaksBySize(size, items) {
     const count = Math.min(items.length, 4); // Limit simultaneous breaks
 
-    this.audioSystem.safePlay(() => {
+    this.port.safePlay(() => {
       const baseFreq = size === 'large' ? 70 : size === 'medium' ? 110 : 150;
       const duration =
         size === 'large' ? 0.35 : size === 'medium' ? 0.25 : 0.18;
 
       for (let i = 0; i < count; i++) {
-        const osc = this.audioSystem.pool.getOscillator();
-        const gain = this.audioSystem.pool.getGain();
+        const osc = this.port.pool.getOscillator();
+        const gain = this.port.pool.getGain();
 
         osc.connect(gain);
-        this.audioSystem.connectGainNode(gain);
+        this.port.connectGainNode(gain);
 
         const freqVariation = baseFreq * 0.3;
         const freqOffset = this._getRandomRange(
@@ -443,29 +447,29 @@ class AudioBatcher {
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(
           freq,
-          this.audioSystem.context.currentTime + delay
+          this.port.context.currentTime + delay
         );
         osc.frequency.exponentialRampToValueAtTime(
           freq * 0.4,
-          this.audioSystem.context.currentTime + delay + duration
+          this.port.context.currentTime + delay + duration
         );
 
         gain.gain.setValueAtTime(
           0.15 / count,
-          this.audioSystem.context.currentTime + delay
+          this.port.context.currentTime + delay
         );
         gain.gain.exponentialRampToValueAtTime(
           0.001,
-          this.audioSystem.context.currentTime + delay + duration
+          this.port.context.currentTime + delay + duration
         );
 
-        osc.start(this.audioSystem.context.currentTime + delay);
-        osc.stop(this.audioSystem.context.currentTime + delay + duration);
+        osc.start(this.port.context.currentTime + delay);
+        osc.stop(this.port.context.currentTime + delay + duration);
 
         // Return gain to pool after use
         setTimeout(
           () => {
-            this.audioSystem.pool.returnGain(gain);
+            this.port.pool.returnGain(gain);
           },
           (delay + duration) * 1000 + 10
         );
@@ -600,44 +604,44 @@ class AudioBatcher {
   _playBatchedXPCollects(batch) {
     const count = Math.min(batch.length, 6); // Allow more XP sounds
 
-    this.audioSystem.safePlay(() => {
+    this.port.safePlay(() => {
       const baseFreq = 600;
 
       for (let i = 0; i < count; i++) {
-        const osc = this.audioSystem.pool.getOscillator();
-        const gain = this.audioSystem.pool.getGain();
+        const osc = this.port.pool.getOscillator();
+        const gain = this.port.pool.getGain();
 
         osc.connect(gain);
-        this.audioSystem.connectGainNode(gain);
+        this.port.connectGainNode(gain);
 
         const freq = baseFreq + i * 50; // Ascending notes
         const delay = i * 0.015;
 
         osc.frequency.setValueAtTime(
           freq,
-          this.audioSystem.context.currentTime + delay
+          this.port.context.currentTime + delay
         );
         osc.frequency.exponentialRampToValueAtTime(
           freq * 2,
-          this.audioSystem.context.currentTime + delay + 0.12
+          this.port.context.currentTime + delay + 0.12
         );
 
         gain.gain.setValueAtTime(
           0.08 / Math.sqrt(count),
-          this.audioSystem.context.currentTime + delay
+          this.port.context.currentTime + delay
         );
         gain.gain.exponentialRampToValueAtTime(
           0.001,
-          this.audioSystem.context.currentTime + delay + 0.12
+          this.port.context.currentTime + delay + 0.12
         );
 
-        osc.start(this.audioSystem.context.currentTime + delay);
-        osc.stop(this.audioSystem.context.currentTime + delay + 0.12);
+        osc.start(this.port.context.currentTime + delay);
+        osc.stop(this.port.context.currentTime + delay + 0.12);
 
         // Return gain to pool after use
         setTimeout(
           () => {
-            this.audioSystem.pool.returnGain(gain);
+            this.port.pool.returnGain(gain);
           },
           (delay + 0.12) * 1000 + 10
         );
@@ -651,13 +655,13 @@ class AudioBatcher {
   _playBatchedShieldImpacts(batch) {
     const count = Math.min(batch.length, 3); // Limit shield impacts
 
-    this.audioSystem.safePlay(() => {
+    this.port.safePlay(() => {
       for (let i = 0; i < count; i++) {
-        const osc = this.audioSystem.pool.getOscillator();
-        const gain = this.audioSystem.pool.getGain();
+        const osc = this.port.pool.getOscillator();
+        const gain = this.port.pool.getGain();
 
         osc.connect(gain);
-        this.audioSystem.connectGainNode(gain);
+        this.port.connectGainNode(gain);
 
         const baseFreq = 520;
         const freq = baseFreq + i * 40;
@@ -666,29 +670,29 @@ class AudioBatcher {
         osc.type = 'triangle';
         osc.frequency.setValueAtTime(
           freq,
-          this.audioSystem.context.currentTime + delay
+          this.port.context.currentTime + delay
         );
         osc.frequency.exponentialRampToValueAtTime(
           freq * 0.4,
-          this.audioSystem.context.currentTime + delay + 0.1
+          this.port.context.currentTime + delay + 0.1
         );
 
         gain.gain.setValueAtTime(
           0.18 / count,
-          this.audioSystem.context.currentTime + delay
+          this.port.context.currentTime + delay
         );
         gain.gain.exponentialRampToValueAtTime(
           0.001,
-          this.audioSystem.context.currentTime + delay + 0.12
+          this.port.context.currentTime + delay + 0.12
         );
 
-        osc.start(this.audioSystem.context.currentTime + delay);
-        osc.stop(this.audioSystem.context.currentTime + delay + 0.12);
+        osc.start(this.port.context.currentTime + delay);
+        osc.stop(this.port.context.currentTime + delay + 0.12);
 
         // Return gain to pool after use
         setTimeout(
           () => {
-            this.audioSystem.pool.returnGain(gain);
+            this.port.pool.returnGain(gain);
           },
           (delay + 0.12) * 1000 + 10
         );
@@ -703,10 +707,12 @@ class AudioBatcher {
     const args = Array.isArray(params) ? params : [params];
     const category = this._getSoundCategory(soundType);
 
-    if (typeof this.audioSystem._executeBatchedSound === 'function') {
-      this.audioSystem._executeBatchedSound(soundType, args);
-    } else if (typeof this.audioSystem[soundType] === 'function') {
-      this.audioSystem[soundType](...args);
+    // Non-batched / size-1 flush path. Previously reached the system directly
+    // via system._executeBatchedSound / system[soundType]; now routed through
+    // the single explicit port.executeImmediate callback so the batcher holds
+    // no system reference (02.04 cycle break).
+    if (typeof this.port.executeImmediate === 'function') {
+      this.port.executeImmediate(soundType, args);
     }
 
     this.activeSounds.set(category, performance.now());
