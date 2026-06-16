@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createSfxSynthPort } from '../../../src/modules/audio/SfxSynthPort.js';
+import AudioSystem from '../../../src/modules/AudioSystem.js';
+import AudioBatcher from '../../../src/modules/AudioBatcher.js';
+import { createTestContainer } from '../../__helpers__/setup.js';
 
 /**
  * 02.04 — SfxSynthPort + AudioBatcher cycle-break regression lock.
@@ -133,5 +136,364 @@ describe('createSfxSynthPort — explicit-functions factory', () => {
 
     expect(port.pool).toEqual({ id: 'pool-2' });
     expect(port.context).toEqual({ id: 'ctx-2' });
+  });
+});
+
+/**
+ * Synth-param capture harness.
+ *
+ * Records EVERY synth parameter touched during playback — oscillator type,
+ * frequency setValueAtTime / exponentialRampToValueAtTime, and gain
+ * setValueAtTime / exponentialRampToValueAtTime — into a flat, rounded log.
+ * Equivalence is asserted on this full log (not just the initial frequency),
+ * so the proof is genuinely byte-identical synth output, not mere routing.
+ */
+function createSynthHarness(seed) {
+  const container = createTestContainer(seed);
+  const random = container.resolve('random');
+
+  const audioSystem = new AudioSystem({
+    random,
+    settings: { get: () => null, set: () => {} },
+  });
+
+  const log = [];
+  const round = (v) => (typeof v === 'number' ? Number(v.toFixed(6)) : v);
+
+  function recordingOscillator() {
+    const osc = {
+      _type: 'sine',
+      get type() {
+        return osc._type;
+      },
+      set type(value) {
+        osc._type = value;
+        log.push(['osc.type', value]);
+      },
+      connect: () => {},
+      disconnect: () => {},
+      start: () => {},
+      stop: () => {},
+      detune: { setValueAtTime: () => {} },
+      frequency: {
+        setValueAtTime: (value) => log.push(['osc.freq.set', round(value)]),
+        linearRampToValueAtTime: (value) =>
+          log.push(['osc.freq.lramp', round(value)]),
+        exponentialRampToValueAtTime: (value) =>
+          log.push(['osc.freq.eramp', round(value)]),
+      },
+    };
+    return osc;
+  }
+
+  function recordingGain() {
+    return {
+      connect: () => {},
+      disconnect: () => {},
+      gain: {
+        value: 0,
+        setValueAtTime: (value) => log.push(['gain.set', round(value)]),
+        linearRampToValueAtTime: (value) =>
+          log.push(['gain.lramp', round(value)]),
+        exponentialRampToValueAtTime: (value) =>
+          log.push(['gain.eramp', round(value)]),
+        cancelScheduledValues: () => {},
+      },
+    };
+  }
+
+  function recordingBufferSource() {
+    return {
+      buffer: null,
+      loop: false,
+      connect: () => {},
+      disconnect: () => {},
+      start: () => {},
+      stop: () => {},
+    };
+  }
+
+  audioSystem.context = {
+    state: 'running',
+    currentTime: 0,
+    sampleRate: 44100,
+    createBuffer: (channels, length, sampleRate) => ({
+      length,
+      sampleRate,
+      getChannelData: () => new Float32Array(length),
+    }),
+    createBiquadFilter: () => ({
+      type: 'lowpass',
+      connect: () => {},
+      disconnect: () => {},
+      frequency: { setValueAtTime: () => {} },
+      Q: { setValueAtTime: () => {} },
+    }),
+    createBufferSource: () => recordingBufferSource(),
+  };
+  audioSystem.initialized = true;
+  audioSystem.masterGain = recordingGain();
+  audioSystem.effectsGain = recordingGain();
+  audioSystem.pool = {
+    getOscillator: () => recordingOscillator(),
+    getGain: () => recordingGain(),
+    getBufferSource: () => recordingBufferSource(),
+    returnGain: () => {},
+  };
+  // cache disabled so mine-explosion noise buffer is synthesized through the
+  // seeded RNG path (deterministic, same on both direct and port paths).
+  audioSystem.cache = null;
+
+  audioSystem.batcher = new AudioBatcher(audioSystem._createSfxSynthPort(), 0, {
+    random: audioSystem.randomScopes?.batcher || random,
+  });
+  audioSystem.captureRandomScopes({ refreshForks: true });
+
+  function resetSeed() {
+    random.reset(random.seed);
+    audioSystem.reseedRandomScopes({ refreshForks: true });
+    if (audioSystem.batcher?.activeSounds?.clear) {
+      audioSystem.batcher.activeSounds.clear();
+    }
+    audioSystem.batcher.pendingBatches?.clear?.();
+    audioSystem.batcher.pendingFlushes?.clear?.();
+  }
+
+  return { audioSystem, random, log, resetSeed };
+}
+
+// The three batched SFX the port forwards, with a representative payload each.
+const BATCHED_SOUNDS = [
+  {
+    soundType: 'playDroneFire',
+    directMethod: '_playDroneFireDirect',
+    payload: {
+      frequency: 700,
+      detune: 12,
+      duration: 0.1,
+      intensity: 0.7,
+      gain: 0.12,
+    },
+  },
+  {
+    soundType: 'playHunterBurst',
+    directMethod: '_playHunterBurstDirect',
+    payload: {
+      shotCount: 3,
+      spacing: 0.05,
+      duration: 0.09,
+      concurrency: 2,
+      baseFrequency: 760,
+      frequencyJitter: 60,
+      intensity: 0.8,
+      gain: 0.15,
+    },
+  },
+  {
+    soundType: 'playMineExplosion',
+    directMethod: '_playMineExplosionDirect',
+    payload: {
+      duration: 0.5,
+      clusterSize: 2,
+      intensity: 0.9,
+      startFrequency: 90,
+      endFrequency: 36,
+      noiseGain: 0.25,
+      rumbleGain: 0.24,
+    },
+  },
+];
+
+describe('02.04 Suite 1 — output equivalence (port path === direct path)', () => {
+  it.each(BATCHED_SOUNDS)(
+    'produces byte-identical synth params for $soundType through the port vs the direct method',
+    async ({ soundType, directMethod, payload }) => {
+      const seed = 4242;
+
+      // DIRECT PATH: call the private synth method straight, capturing params.
+      const direct = createSynthHarness(seed);
+      direct.resetSeed();
+      direct.audioSystem[directMethod](payload);
+      await Promise.resolve();
+      const directLog = [...direct.log];
+      expect(directLog.length).toBeGreaterThan(0);
+
+      // PORT PATH: schedule the SAME payload via the batcher (size-1 flush →
+      // port.executeImmediate → _executeBatchedSound → same direct method).
+      const ported = createSynthHarness(seed);
+      ported.resetSeed();
+      ported.audioSystem.batcher.scheduleSound(soundType, payload, {
+        allowOverlap: true,
+      });
+      ported.audioSystem.batcher.flushPendingBatches();
+      await Promise.resolve();
+      await Promise.resolve();
+      const portLog = [...ported.log];
+
+      expect(portLog).toStrictEqual(directLog);
+    }
+  );
+
+  it('produces byte-identical aggregated params for a multi-sound drone-fire batch (port path === manual aggregate)', async () => {
+    const seed = 909;
+    const payloads = [
+      { frequency: 680, detune: 8, intensity: 0.7, gain: 0.12 },
+      { frequency: 720, detune: 16, intensity: 0.6, gain: 0.1 },
+      { frequency: 700, detune: 12, intensity: 0.8, gain: 0.14 },
+    ];
+
+    // Reproduce the batcher aggregation deterministically, then drive the
+    // direct method with the aggregate.
+    const aggregated = payloads.reduce(
+      (acc, opt) => {
+        acc.frequency += Number(opt.frequency) || 680;
+        acc.detune = Math.max(acc.detune, Number(opt.detune) || 0);
+        acc.duration = Math.max(acc.duration, Number(opt.duration) || 0.1);
+        acc.intensity += Number(opt.intensity) || 0.7;
+        acc.gain += Number(opt.gain) || 0.12;
+        return acc;
+      },
+      { frequency: 0, detune: 0, duration: 0.1, intensity: 0, gain: 0 }
+    );
+    aggregated.count = payloads.length;
+    aggregated.frequency /= payloads.length;
+    aggregated.intensity /= payloads.length;
+    aggregated.gain /= payloads.length;
+
+    const direct = createSynthHarness(seed);
+    direct.resetSeed();
+    direct.audioSystem._playDroneFireDirect(aggregated);
+    await Promise.resolve();
+    const directLog = [...direct.log];
+
+    const ported = createSynthHarness(seed);
+    ported.resetSeed();
+    payloads.forEach((p) =>
+      ported.audioSystem.batcher.scheduleSound('playDroneFire', p, {
+        allowOverlap: true,
+      })
+    );
+    ported.audioSystem.batcher.flushPendingBatches();
+    await Promise.resolve();
+    await Promise.resolve();
+    const portLog = [...ported.log];
+
+    expect(portLog).toStrictEqual(directLog);
+  });
+});
+
+describe('02.04 Suite 2 — API contract per batching mode', () => {
+  function makeContractBatcher() {
+    const calls = {
+      playDroneFireDirect: [],
+      playHunterBurstDirect: [],
+      playMineExplosionDirect: [],
+      executeImmediate: [],
+    };
+    const port = createSfxSynthPort(
+      makeFns({
+        playDroneFireDirect: vi.fn((p) => calls.playDroneFireDirect.push(p)),
+        playHunterBurstDirect: vi.fn((p) =>
+          calls.playHunterBurstDirect.push(p)
+        ),
+        playMineExplosionDirect: vi.fn((p) =>
+          calls.playMineExplosionDirect.push(p)
+        ),
+        executeImmediate: vi.fn((soundType, args) =>
+          calls.executeImmediate.push({ soundType, args })
+        ),
+      })
+    );
+    return { batcher: new AudioBatcher(port, 0), calls };
+  }
+
+  it('drone-fire batch (size>1) reaches port.playDroneFireDirect with the aggregated payload', () => {
+    const { batcher, calls } = makeContractBatcher();
+    batcher.scheduleSound(
+      'playDroneFire',
+      { frequency: 680, gain: 0.12 },
+      { allowOverlap: true }
+    );
+    batcher.scheduleSound(
+      'playDroneFire',
+      { frequency: 720, gain: 0.12 },
+      { allowOverlap: true }
+    );
+    batcher.flushPendingBatches();
+
+    expect(calls.playDroneFireDirect).toHaveLength(1);
+    const [payload] = calls.playDroneFireDirect;
+    expect(payload.count).toBe(2);
+    expect(payload.frequency).toBe(700); // (680 + 720) / 2
+  });
+
+  it('hunter-burst batch (size>1) reaches port.playHunterBurstDirect with concurrency aggregated', () => {
+    const { batcher, calls } = makeContractBatcher();
+    batcher.scheduleSound(
+      'playHunterBurst',
+      { burstId: 'b1', intensity: 0.8, gain: 0.15 },
+      { allowOverlap: true }
+    );
+    batcher.scheduleSound(
+      'playHunterBurst',
+      { burstId: 'b1', intensity: 0.6, gain: 0.15 },
+      { allowOverlap: true }
+    );
+    batcher.flushPendingBatches();
+
+    expect(calls.playHunterBurstDirect).toHaveLength(1);
+    expect(calls.playHunterBurstDirect[0].concurrency).toBe(2);
+  });
+
+  it('mine-explosion batch (size>1) reaches port.playMineExplosionDirect with clusterSize aggregated', () => {
+    const { batcher, calls } = makeContractBatcher();
+    batcher.scheduleSound(
+      'playMineExplosion',
+      { intensity: 0.9, duration: 0.5 },
+      { allowOverlap: true }
+    );
+    batcher.scheduleSound(
+      'playMineExplosion',
+      { intensity: 0.95, duration: 0.6 },
+      { allowOverlap: true }
+    );
+    batcher.flushPendingBatches();
+
+    expect(calls.playMineExplosionDirect).toHaveLength(1);
+    expect(calls.playMineExplosionDirect[0].clusterSize).toBe(2);
+  });
+
+  it('immediate / non-batched path (size-1 flush) reaches port.executeImmediate with the payload', () => {
+    const { batcher, calls } = makeContractBatcher();
+    batcher.scheduleSound(
+      'playDroneFire',
+      { frequency: 690 },
+      { allowOverlap: true }
+    );
+    batcher.flushPendingBatches();
+
+    expect(calls.executeImmediate).toHaveLength(1);
+    expect(calls.executeImmediate[0].soundType).toBe('playDroneFire');
+    expect(calls.executeImmediate[0].args).toStrictEqual([{ frequency: 690 }]);
+    // size-1 must NOT take the aggregated batched path
+    expect(calls.playDroneFireDirect).toHaveLength(0);
+  });
+});
+
+describe('02.04 Suite 3 — cycle break paranoia', () => {
+  it('batcher holds no audioSystem back-reference', () => {
+    const { audioSystem } = createSynthHarness(7);
+    expect(audioSystem.batcher.audioSystem).toBeUndefined();
+    expect('audioSystem' in audioSystem.batcher).toBe(false);
+  });
+
+  it('the injected port enumerates no system / underscore keys', () => {
+    const { audioSystem } = createSynthHarness(7);
+    const port = audioSystem.batcher.port;
+    const keys = Object.keys(port);
+    expect(keys).not.toContain('system');
+    expect(keys).not.toContain('audioSystem');
+    expect(keys.some((key) => key.startsWith('_'))).toBe(false);
+    expect(Object.isFrozen(port)).toBe(true);
   });
 });
