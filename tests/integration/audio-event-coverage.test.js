@@ -149,13 +149,21 @@ describe('audio manifest wiring (assertManagerWired first consumer)', () => {
       settings: { __sentinel: 'settings', getCategoryValues: () => null },
       random: { __sentinel: 'random' },
     };
-    const { entry } = assertManagerWired(
+    const { entry, constructed } = assertManagerWired(
       createServiceManifest(),
       'audio',
       ['event-bus', 'settings', 'random'],
       { sentinels }
     );
     expect(entry.name).toBe('audio');
+
+    // Plan 02.06: the audio factory composes ALL of the extracted managers from
+    // the same three deps (no new manifest deps — they live inside the factory).
+    // Construction must succeed (assertManagerWired never swallows a throw) and
+    // expose each manager instance — the FIX-05 "manager silently absent" guard.
+    expect(constructed.musicMixer).toBeDefined();
+    expect(constructed.fileTrackManager).toBeDefined();
+    expect(constructed.duckingController).toBeDefined();
   });
 
   it('throws when a sentinel is missing for an expected dep (fail-fast, never swallowed)', () => {
@@ -204,6 +212,61 @@ describe('boss-warning → MusicMixer delegation (plan 02.05)', () => {
 
     eventBus.emit('pause-state-changed', { isPaused: false });
     expect(spy).toHaveBeenCalledWith(false);
+
+    spy.mockRestore();
+    if (typeof audio.destroy === 'function') audio.destroy();
+  });
+});
+
+describe('player-health-changed → DuckingController EDGE delegation (plan 02.06)', () => {
+  // The low-HP duck fires on the CROSSING into ≤25% HP only (edge detection,
+  // review fix). Emitting through the REAL container must call the COMPOSED
+  // DuckingController exactly once per crossing — not once per below-threshold
+  // event. No count LITERALS are asserted against the fixture; the assertions are
+  // pure delegation/edge behavior on the composed instance.
+  it('three consecutive below-threshold events produce EXACTLY ONE duck (edge crossing)', () => {
+    const { audio, eventBus } = resolveRealAudioService();
+    expect(audio.duckingController).toBeDefined();
+
+    const spy = vi.spyOn(audio.duckingController, 'duck');
+
+    // Three events, all below 25% — only the FIRST (the crossing) ducks.
+    eventBus.emit('player-health-changed', { health: 20, maxHealth: 100 });
+    eventBus.emit('player-health-changed', { health: 15, maxHealth: 100 });
+    eventBus.emit('player-health-changed', { health: 10, maxHealth: 100 });
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0][0]).toMatchObject({ bus: 'music' });
+
+    spy.mockRestore();
+    if (typeof audio.destroy === 'function') audio.destroy();
+  });
+
+  it('recovery above threshold re-arms the edge so the next dip ducks again', () => {
+    const { audio, eventBus } = resolveRealAudioService();
+    const spy = vi.spyOn(audio.duckingController, 'duck');
+
+    eventBus.emit('player-health-changed', { health: 20, maxHealth: 100 }); // duck 1
+    eventBus.emit('player-health-changed', { health: 50, maxHealth: 100 }); // recover (re-arm)
+    eventBus.emit('player-health-changed', { health: 20, maxHealth: 100 }); // duck 2
+
+    expect(spy).toHaveBeenCalledTimes(2);
+
+    spy.mockRestore();
+    if (typeof audio.destroy === 'function') audio.destroy();
+  });
+});
+
+describe('screen-changed → FileTrackManager delegation (plan 02.06)', () => {
+  it('screen-changed to menu delegates to fileTrackManager.playTrack (the menu track)', () => {
+    const { audio, eventBus } = resolveRealAudioService();
+    expect(audio.fileTrackManager).toBeDefined();
+
+    const spy = vi.spyOn(audio.fileTrackManager, 'playTrack');
+    eventBus.emit('screen-changed', { screen: 'menu' });
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0][0]).toBe('menu-opening');
 
     spy.mockRestore();
     if (typeof audio.destroy === 'function') audio.destroy();

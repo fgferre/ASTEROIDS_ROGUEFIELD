@@ -531,17 +531,28 @@ class AudioSystem extends BaseSystem {
       this.playUIStartGame();
     });
 
-    // Low health warning
+    // Low health warning + low-HP duck (AUDIO-03 / SC3, D-11). Both fire on the
+    // CROSSING into ≤25% HP only (edge detection — review fix): repeated health
+    // events while already below 25% must NOT machine-gun retrigger the duck.
     this.registerEventListener('player-health-changed', (data) => {
       const healthPercent = data?.health / data?.maxHealth;
-      if (healthPercent <= 0.25 && healthPercent > 0) {
-        // Only play if we just entered low health state
+      const belowThreshold = healthPercent <= 0.25 && healthPercent > 0;
+
+      if (belowThreshold) {
+        // Only play / duck if we just CROSSED into the low-health state.
         if (!this.lowHealthWarning) {
           this.playLowHealthWarning();
           this.lowHealthWarning = true;
         }
+        if (!this.lowHealthDuckArmed) {
+          // Crossing edge → one duck on the music bus; re-armed on recovery.
+          this.duckingController?.duck({ bus: 'music' });
+          this.lowHealthDuckArmed = true;
+        }
       } else {
+        // Above the threshold (or dead) → re-arm both edges for the next dip.
         this.lowHealthWarning = false;
+        this.lowHealthDuckArmed = false;
       }
     });
 
@@ -4331,6 +4342,10 @@ class AudioSystem extends BaseSystem {
     if (this.musicMixer) {
       this.musicMixer.setIntensityFromBossEvent('boss-defeated');
     }
+
+    // Re-arm the low-HP edges so the first dip below 25% in the new run ducks.
+    this.lowHealthWarning = false;
+    this.lowHealthDuckArmed = false;
 
     this.reseedRandomScopes();
   }
