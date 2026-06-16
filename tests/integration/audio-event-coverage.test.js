@@ -157,13 +157,15 @@ describe('audio manifest wiring (assertManagerWired first consumer)', () => {
     );
     expect(entry.name).toBe('audio');
 
-    // Plan 02.06: the audio factory composes ALL of the extracted managers from
-    // the same three deps (no new manifest deps — they live inside the factory).
-    // Construction must succeed (assertManagerWired never swallows a throw) and
-    // expose each manager instance — the FIX-05 "manager silently absent" guard.
+    // Plan 02.06/02.07: the audio factory composes ALL of the extracted managers
+    // from the same three deps (no new manifest deps — they live inside the
+    // factory). Construction must succeed (assertManagerWired never swallows a
+    // throw) and expose each manager instance — the FIX-05 "manager silently
+    // absent" guard. Plan 02.07 adds the SFXBus to this composition.
     expect(constructed.musicMixer).toBeDefined();
     expect(constructed.fileTrackManager).toBeDefined();
     expect(constructed.duckingController).toBeDefined();
+    expect(constructed.sfxBus).toBeDefined();
   });
 
   it('throws when a sentinel is missing for an expected dep (fail-fast, never swallowed)', () => {
@@ -267,6 +269,169 @@ describe('screen-changed → FileTrackManager delegation (plan 02.06)', () => {
 
     expect(spy).toHaveBeenCalledTimes(1);
     expect(spy.mock.calls[0][0]).toBe('menu-opening');
+
+    spy.mockRestore();
+    if (typeof audio.destroy === 'function') audio.destroy();
+  });
+});
+
+describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ delegation)', () => {
+  // The SFX synthesis relocated into SFXBus; emitting each SFX event through the
+  // REAL container must invoke the corresponding SFXBus method EXACTLY once on
+  // the COMPOSED instance (a spy on registration would only prove a listener
+  // exists). No count literals are asserted against the fixture — these are pure
+  // delegation assertions on the composed SFXBus. The synthesis bodies do not run
+  // (the facade is not initialized, so the ensureRunning gate early-returns) —
+  // only the delegation edge is exercised, which is exactly what this locks.
+
+  /**
+   * Emit `event` with `payload` through the real container and assert the named
+   * SFXBus method fired exactly once.
+   */
+  function expectDelegates(event, payload, method, argMatcher) {
+    const { audio, eventBus } = resolveRealAudioService();
+    expect(audio.sfxBus, 'audio service must compose an SFXBus').toBeDefined();
+    expect(
+      typeof audio.sfxBus[method],
+      `SFXBus must expose '${method}'`
+    ).toBe('function');
+
+    const spy = vi.spyOn(audio.sfxBus, method);
+    eventBus.emit(event, payload);
+
+    expect(
+      spy,
+      `'${event}' must delegate to sfxBus.${method} exactly once`
+    ).toHaveBeenCalledTimes(1);
+    if (typeof argMatcher === 'function') argMatcher(spy.mock.calls[0]);
+
+    spy.mockRestore();
+    if (typeof audio.destroy === 'function') audio.destroy();
+  }
+
+  it('weapon-fired → playLaserShot', () => {
+    expectDelegates('weapon-fired', { targeting: { lockCount: 1 } }, 'playLaserShot');
+  });
+
+  it('combat-target-lock → playTargetLock', () => {
+    expectDelegates('combat-target-lock', { lockCount: 2 }, 'playTargetLock');
+  });
+
+  it('enemy-destroyed → playAsteroidBreak', () => {
+    expectDelegates('enemy-destroyed', { size: 'small' }, 'playAsteroidBreak');
+  });
+
+  it('asteroid-volatile-exploded → playBigExplosion', () => {
+    expectDelegates('asteroid-volatile-exploded', {}, 'playBigExplosion');
+  });
+
+  it('player-leveled-up → playLevelUp', () => {
+    expectDelegates('player-leveled-up', {}, 'playLevelUp');
+  });
+
+  it('xp-collected → playXPCollect', () => {
+    expectDelegates('xp-collected', {}, 'playXPCollect');
+  });
+
+  it('xp-orb-fused → playOrbFusion', () => {
+    expectDelegates('xp-orb-fused', { toClass: 'xp-green' }, 'playOrbFusion', (call) => {
+      expect(call[0]).toBe('xp-green');
+    });
+  });
+
+  it('enemy-spawned (gold) → playGoldSpawn', () => {
+    expectDelegates(
+      'enemy-spawned',
+      { enemy: { variant: 'gold' } },
+      'playGoldSpawn'
+    );
+  });
+
+  it('enemy-fired (drone) → playDroneFire', () => {
+    expectDelegates('enemy-fired', { enemyType: 'drone' }, 'playDroneFire');
+  });
+
+  it('enemy-fired (hunter) → playHunterBurst', () => {
+    expectDelegates('enemy-fired', { enemyType: 'hunter' }, 'playHunterBurst');
+  });
+
+  it('mine-exploded → playMineExplosion', () => {
+    expectDelegates('mine-exploded', { radius: 120, damage: 40 }, 'playMineExplosion');
+  });
+
+  it('bullet-hit (damage) → playBulletHit', () => {
+    expectDelegates('bullet-hit', { effectiveDamage: 5, killed: false }, 'playBulletHit');
+  });
+
+  it('bullet-hit (boss invuln deflect) → playBossShieldDeflect', () => {
+    expectDelegates(
+      'bullet-hit',
+      { blocked: true, invulnerable: true },
+      'playBossShieldDeflect'
+    );
+  });
+
+  it('player-took-damage → playShipHit', () => {
+    expectDelegates('player-took-damage', {}, 'playShipHit');
+  });
+
+  it('shield-activated → playShieldActivate', () => {
+    expectDelegates('shield-activated', {}, 'playShieldActivate');
+  });
+
+  it('shield-hit → playShieldImpact', () => {
+    expectDelegates('shield-hit', {}, 'playShieldImpact');
+  });
+
+  it('shield-broken → playShieldBreak', () => {
+    expectDelegates('shield-broken', {}, 'playShieldBreak');
+  });
+
+  it('shield-recharged → playShieldRecharged', () => {
+    expectDelegates('shield-recharged', {}, 'playShieldRecharged');
+  });
+
+  it('shield-activation-failed → playShieldFail', () => {
+    expectDelegates('shield-activation-failed', {}, 'playShieldFail');
+  });
+
+  it('shield-shockwave → playShieldShockwave', () => {
+    expectDelegates('shield-shockwave', {}, 'playShieldShockwave');
+  });
+
+  it('upgrade-applied → playUpgradeSelect', () => {
+    expectDelegates('upgrade-applied', { rarity: 'rare' }, 'playUpgradeSelect', (call) => {
+      expect(call[0]).toBe('rare');
+    });
+  });
+
+  it('input-confirmed → playUISelect', () => {
+    expectDelegates('input-confirmed', {}, 'playUISelect');
+  });
+
+  it('game-started → playUIStartGame', () => {
+    expectDelegates('game-started', {}, 'playUIStartGame');
+  });
+
+  it('ui-hover → playUIHover (debounced — first hover delegates)', () => {
+    expectDelegates('ui-hover', {}, 'playUIHover');
+  });
+
+  it('thruster-effect → SFXBus.startThrusterLoop (requires init; loop ownership lives in the bus)', () => {
+    const { audio, eventBus } = resolveRealAudioService();
+    // handleThrusterEffect early-returns when uninitialized; mark initialized so
+    // the delegation edge into SFXBus.startThrusterLoop is exercised.
+    audio.initialized = true;
+    const spy = vi.spyOn(audio.sfxBus, 'startThrusterLoop');
+
+    eventBus.emit('thruster-effect', {
+      type: 'main',
+      intensity: 0.8,
+      isAutomatic: true,
+    });
+
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(spy.mock.calls[0][0]).toBe('main');
 
     spy.mockRestore();
     if (typeof audio.destroy === 'function') audio.destroy();
