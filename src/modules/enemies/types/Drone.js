@@ -8,7 +8,6 @@ import {
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
-import { NeonGraphics } from '../../../utils/NeonGraphics.js';
 
 const DRONE_DEFAULTS = DRONE_CONFIG ?? {};
 
@@ -234,26 +233,6 @@ export class Drone extends BaseEnemy {
   onDestroyed(source, context = {}) {
     this.destroyed = true;
     super.onDestroyed(source, context);
-  }
-
-  draw(ctx) {
-    if (!ctx) return;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(this.rotation);
-
-    // Triangle shape for Drone
-    const path = new Path2D();
-    const r = this.radius;
-    path.moveTo(r, 0);
-    path.lineTo(-r * 0.6, r * 0.7);
-    path.lineTo(-r * 0.6, -r * 0.7);
-    path.closePath();
-
-    // Neon Cyan
-    NeonGraphics.drawShape(ctx, path, '#00FFFF', 2.0);
-
-    ctx.restore();
   }
 
   onDraw() {

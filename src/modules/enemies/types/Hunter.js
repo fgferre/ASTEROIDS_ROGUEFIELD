@@ -5,9 +5,10 @@ import {
 import { ENEMY_EFFECT_COLORS } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
-import { NeonGraphics } from '../../../utils/NeonGraphics.js';
 
 const HUNTER_DEFAULTS = HUNTER_CONFIG ?? {};
+// The lens brightens over this window before a burst (docs/NORTE.md §3).
+const SEEKER_TELEGRAPH_SECONDS = 0.4;
 
 export class Hunter extends BaseEnemy {
   constructor(system, config = {}) {
@@ -209,25 +210,23 @@ export class Hunter extends BaseEnemy {
       return;
     }
   }
-  draw(ctx) {
-    if (!ctx) return;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(this.rotation);
+  /** 0..1: how lit the Seeker's lens is — rises in the 0.4 s before a burst. */
+  get telegraphRatio() {
+    const state = this.useComponents ? this.weaponState : null;
+    const firing = state
+      ? (state.burstRemaining ?? 0) > 0
+      : this.burstShotsRemaining > 0 && this.burstCooldown <= 0;
+    if (firing) return 1;
+    const cooldown = state ? state.cooldown ?? 0 : this.burstCooldown ?? 0;
+    return Math.max(0, Math.min(1, 1 - cooldown / SEEKER_TELEGRAPH_SECONDS));
+  }
 
-    // Diamond/Aggressive shape for Hunter
-    const path = new Path2D();
-    const r = this.radius;
-    path.moveTo(r, 0);
-    path.lineTo(0, r * 0.8);
-    path.lineTo(-r, 0);
-    path.lineTo(0, -r * 0.8);
-    path.closePath();
-
-    // Neon Red/Orange
-    NeonGraphics.drawShape(ctx, path, '#FF4400', 2.0);
-
-    ctx.restore();
+  /** Where the Seeker's lens points: at the player when known. */
+  get aimAngle() {
+    const player = this.system?.getCachedPlayer?.();
+    const target = player?.position;
+    if (!target) return this.rotation || 0;
+    return Math.atan2(target.y - this.y, target.x - this.x);
   }
 
   onDraw() {
