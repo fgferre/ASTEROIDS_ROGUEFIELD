@@ -22,3 +22,4 @@
 - Fundo novo (17/10) assa ~10 camadas em tela cheia (estrelas ×3, névoa ×2, Anel, vinheta, emissivo + 3 níveis de bloom): ~75 MB em escala 2,8. Se pesar em máquina fraca, baixar névoa/Anel para 1/4 e limitar o teto de DPR por setting.
 - UISystem `onVisualReady`/`handleMenuShipSelectorVisualReady` ficaram sem efeito depois que a nave virou procedural; XPOrbSystem ainda carrega cores por classe só para o payload de eventos. Apagar os dois.
 - Flags `showThrust/showTurret/showPulse/showAura` em `src/data/enemies/{drone,hunter,mine}.js` e no schema não são mais lidas pelo RenderComponent novo (17/10); apagar as flags e as cores neon antigas em `visual.pulse.color` das variantes.
+- Depois do passe de efeitos (17/10): a função `draw` das partículas em `GamePools.js` não é mais usada (tudo passa por `drawParticle`); `EnemySystem.js` ainda manda cores fora da paleta para `addScreenFlash`. Apagar a primeira, trocar as segundas por PALETTE.

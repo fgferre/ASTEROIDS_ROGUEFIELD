@@ -1,9 +1,15 @@
 import { BaseSystem } from '../core/BaseSystem.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { applyBaseTransform } from '../core/viewport.js';
-import { PALETTE, withAlpha } from '../data/constants/palette.js';
+import { LINE, PALETTE, withAlpha } from '../data/constants/palette.js';
+import { getEmissive } from '../core/bloomLayer.js';
 import { GamePools } from '../core/GamePools.js';
-import { DamageText, HitMarker, SpaceParticle } from './EffectEntities.js';
+import {
+  DamageText,
+  HitMarker,
+  SpaceParticle,
+  drawParticle,
+} from './EffectEntities.js';
 import { ScreenShake, ShakePresets } from '../utils/ScreenShake.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
@@ -12,17 +18,34 @@ import { SHIELD_SHOCKWAVE_RADIUS } from '../data/constants/gameplay.js';
 import {
   BOSS_EFFECTS_PRESETS,
   BOSS_SCREEN_SHAKES,
-  ENEMY_EFFECT_COLORS,
 } from '../data/constants/visual.js';
 import { ASTEROID_VARIANTS } from '../data/enemies/asteroid-configs.js';
 
 const MAIN_THRUSTER_FLASH_THRESHOLD = 0.85;
-const MAIN_THRUSTER_FLASH_COLOR = '#3399FF';
+const MAIN_THRUSTER_FLASH_COLOR = PALETTE.player;
 const MAIN_THRUSTER_FLASH_DURATION = 0.05;
 const MAIN_THRUSTER_FLASH_INTENSITY = 0.05;
 
 const BOSS_EFFECTS = BOSS_EFFECTS_PRESETS || {};
 const BOSS_SHAKES = BOSS_SCREEN_SHAKES || {};
+
+// One light per source (docs/NORTE.md §2). Machine enemies glow threat-red and
+// shed matte hull chips; the boss glows violet. Data-file colors are ignored
+// here on purpose: they predate the palette.
+const ENEMY_FX = Object.freeze({
+  spark: PALETTE.threat,
+  sparkDim: withAlpha(PALETTE.threat, 0.7),
+  glow: withAlpha(PALETTE.threat, 0.45),
+  chip: PALETTE.hullLit,
+  smoke: withAlpha(PALETTE.rock, 0.45),
+});
+const BOSS_FX = Object.freeze({
+  core: PALETTE.boss,
+  accent: PALETTE.text,
+  trail: withAlpha(PALETTE.boss, 0.6),
+  smoke: withAlpha(PALETTE.rock, 0.35),
+  flash: withAlpha(PALETTE.boss, 0.45),
+});
 
 export default class EffectsSystem extends BaseSystem {
   constructor(config = {}) {
@@ -90,7 +113,7 @@ export default class EffectsSystem extends BaseSystem {
     this.screenFlash = {
       timer: 0,
       duration: 0,
-      color: '#FFFFFF',
+      color: PALETTE.text,
       intensity: 0,
     };
     this.timeDilation = {
@@ -361,7 +384,7 @@ export default class EffectsSystem extends BaseSystem {
         this.activeBoss.lastPhase = payload.phase;
       }
       this.createBossEntranceEffect(payload);
-      this.triggerBossTransitionEffect('boss-spawned', payload);
+      this.triggerBossTransitionEffect('boss-spawned');
     });
 
     registerBossEvent('boss-phase-changed', (payload = {}) => {
@@ -373,7 +396,7 @@ export default class EffectsSystem extends BaseSystem {
         this.activeBoss.lastPhase = payload.phase;
       }
       this.createBossPhaseTransition(payload);
-      this.triggerBossTransitionEffect('boss-phase-changed', payload);
+      this.triggerBossTransitionEffect('boss-phase-changed');
     });
 
     registerBossEvent('boss-defeated', (payload = {}) => {
@@ -384,7 +407,7 @@ export default class EffectsSystem extends BaseSystem {
       });
       this.clearBossEffectsState();
       this.createBossDefeatedExplosion(payload);
-      this.triggerBossTransitionEffect('boss-defeated', payload);
+      this.triggerBossTransitionEffect('boss-defeated');
       this.activeBoss = { id: null, lastPhase: 0 };
     });
 
@@ -507,7 +530,7 @@ export default class EffectsSystem extends BaseSystem {
 
     this.registerEventListener('asteroid-volatile-armed', (data) => {
       if (data?.position) {
-        this.addScreenFlash('rgba(255, 140, 60, 0.18)', 0.12, 0.08);
+        this.addScreenFlash(withAlpha(PALETTE.shot, 0.18), 0.12, 0.08);
         this.spawnVolatileWarning(data.position);
       }
     });
@@ -523,7 +546,7 @@ export default class EffectsSystem extends BaseSystem {
     this.registerEventListener('player-leveled-up', () => {
       this.addScreenShake(6, 0.4);
       this.addFreezeFrame(0.2, 0.4);
-      this.addScreenFlash('#FFD700', 0.15, 0.2);
+      this.addScreenFlash(PALETTE.xp, 0.15, 0.2);
 
       const player = resolveService('player', this.dependencies);
       if (player) {
@@ -548,7 +571,7 @@ export default class EffectsSystem extends BaseSystem {
       this.addScreenShake(8, 0.3);
 
       // Red damage flash
-      this.addScreenFlash('rgba(255, 50, 50, 0.4)', 0.25, 0.3);
+      this.addScreenFlash(withAlpha(PALETTE.threat, 0.4), 0.25, 0.3);
 
       // Brief freeze frame for impact
       this.addFreezeFrame(0.12, 0.15);
@@ -577,16 +600,15 @@ export default class EffectsSystem extends BaseSystem {
     this.registerEventListener('shield-deflective-explosion', (data) => {
       if (!data?.position) return;
 
-      // Create cyan shockwave effect
       this.createShockwaveEffect({
         position: data.position,
         radius: 200, // AoE damage radius
-        color: 'rgba(0, 255, 255, 0.6)',
+        color: withAlpha(PALETTE.player, 0.6),
       });
 
       // Screen effects
       this.addScreenShake(12, 0.4);
-      this.addScreenFlash('rgba(0, 255, 255, 0.4)', 0.3, 0.2);
+      this.addScreenFlash(withAlpha(PALETTE.player, 0.4), 0.3, 0.2);
 
       // Emit damage event for enemies in radius
       this.eventBus?.emit?.('shield-explosion-damage', {
@@ -848,16 +870,12 @@ export default class EffectsSystem extends BaseSystem {
   drawWorld(ctx) {
     this.flushMuzzleFlashQueue();
 
+    const emissive = getEmissive();
     for (let i = 0; i < this.particles.length; i += 1) {
-      const particle = this.particles[i];
-      if (particle) {
-        if (typeof particle.draw === 'function') {
-          particle.draw(ctx);
-        }
-      }
+      drawParticle(ctx, this.particles[i], emissive);
     }
 
-    this.drawShockwaves(ctx);
+    this.drawShockwaves(ctx, emissive);
     this.drawTelegraphs(ctx);
 
     // Draw hit markers
@@ -943,11 +961,11 @@ export default class EffectsSystem extends BaseSystem {
         const length = Math.max(radius * 2, t.length || 400);
         // faint lane, widening as the strike nears
         ctx.globalAlpha = 0.08 + 0.18 * progress;
-        ctx.fillStyle = '#ff3131';
+        ctx.fillStyle = PALETTE.threat;
         ctx.fillRect(0, -radius * 0.9, length, radius * 1.8);
         // sharp dashed centerline
         ctx.globalAlpha = 0.35 + 0.55 * progress;
-        ctx.strokeStyle = '#ff3131';
+        ctx.strokeStyle = PALETTE.threat;
         ctx.lineWidth = 2;
         ctx.setLineDash([14, 10]);
         ctx.lineDashOffset = -progress * 120;
@@ -966,14 +984,14 @@ export default class EffectsSystem extends BaseSystem {
         const arc = Math.max(0.1, t.arc || 0.8);
         const length = Math.max(radius * 1.5, t.length || 180);
         ctx.globalAlpha = 0.07 + 0.2 * progress;
-        ctx.fillStyle = '#ff3131';
+        ctx.fillStyle = PALETTE.threat;
         ctx.beginPath();
         ctx.moveTo(0, 0);
         ctx.arc(0, 0, length, -arc / 2, arc / 2);
         ctx.closePath();
         ctx.fill();
         ctx.globalAlpha = 0.3 + 0.6 * progress;
-        ctx.strokeStyle = '#ff3131';
+        ctx.strokeStyle = PALETTE.threat;
         ctx.lineWidth = 1.5;
         ctx.stroke();
       }
@@ -981,7 +999,7 @@ export default class EffectsSystem extends BaseSystem {
       // warning ring around the hull, pulsing faster as it nears
       ctx.rotate(-(t.angle || 0));
       ctx.globalAlpha = (0.2 + 0.5 * progress) * (0.6 + 0.4 * pulse);
-      ctx.strokeStyle = '#ff3131';
+      ctx.strokeStyle = PALETTE.threat;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(0, 0, radius * (1.15 + 0.1 * pulse), 0, Math.PI * 2);
@@ -991,108 +1009,49 @@ export default class EffectsSystem extends BaseSystem {
     }
   }
 
-  drawShockwaves(ctx) {
+  // A ring in the source's color with a thin hot core; the bloom layer gives
+  // it the glow that shadowBlur used to fake.
+  drawShockwaves(ctx, emissive = null) {
     if (!ctx) return;
 
-    this.shockwaves.forEach((wave) => {
-      if (!wave) return;
+    for (let i = 0; i < this.shockwaves.length; i += 1) {
+      const wave = this.shockwaves[i];
+      if (!wave || wave.radius <= 0) continue;
+      const color = wave.color || PALETTE.shot;
 
       ctx.save();
-      // [NEO-ARCADE] Shockwave Rendering
-      // Use additive blending for "light" effect
       ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = wave.alpha;
-
-      const centerX = wave.x;
-      const centerY = wave.y;
-      const radius = wave.radius;
-
-      // 1. Colored Glow Ring (Thick, blurred)
       ctx.beginPath();
-      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-      ctx.lineWidth = Math.max(2, wave.lineWidth * 3);
-      ctx.strokeStyle = wave.color || 'rgba(100, 200, 255, 0.5)';
-      ctx.shadowColor = wave.color;
-      ctx.shadowBlur = 20;
+      ctx.arc(wave.x, wave.y, wave.radius, 0, Math.PI * 2);
+      ctx.lineWidth = Math.max(LINE.thin, wave.lineWidth * 0.3);
+      ctx.strokeStyle = color;
       ctx.stroke();
-
-      // 2. White Hot Core Ring (Thin, sharp)
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-      ctx.lineWidth = Math.max(1, wave.lineWidth);
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.shadowBlur = 0;
+      ctx.globalAlpha = wave.alpha * 0.6;
+      ctx.lineWidth = LINE.hair;
+      ctx.strokeStyle = PALETTE.text;
       ctx.stroke();
-
-      // 3. Optional: Chromatic Distortion Echo (very subtle)
-      if (wave.radius > 50) {
-        ctx.globalAlpha = wave.alpha * 0.5;
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, radius - 4, 0, Math.PI * 2);
-        ctx.lineWidth = wave.lineWidth * 0.5;
-        ctx.strokeStyle = '#FF00FF'; // Magenta inner echo
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, radius + 4, 0, Math.PI * 2);
-        ctx.lineWidth = wave.lineWidth * 0.5;
-        ctx.strokeStyle = '#00FFFF'; // Cyan outer echo
-        ctx.stroke();
-      }
-
       ctx.restore();
-    });
-  }
 
-  resolveBossTransitionColor(eventName, payload = {}) {
-    if (typeof payload.color === 'string' && payload.color.trim().length > 0) {
-      return payload.color.trim();
-    }
-
-    const palette = Array.isArray(payload.phaseColors)
-      ? payload.phaseColors
-      : Array.isArray(payload?.enemy?.phaseColors)
-        ? payload.enemy.phaseColors
-        : Array.isArray(payload?.boss?.phaseColors)
-          ? payload.boss.phaseColors
-          : null;
-
-    if (palette && palette.length) {
-      const phaseIndex = Math.max(
-        0,
-        Math.min(palette.length - 1, Math.floor(payload.phase ?? 0))
-      );
-      const candidate = palette[phaseIndex];
-      if (typeof candidate === 'string' && candidate.trim().length > 0) {
-        return candidate.trim();
+      if (emissive) {
+        emissive.save();
+        emissive.globalAlpha = wave.alpha;
+        emissive.beginPath();
+        emissive.arc(wave.x, wave.y, wave.radius, 0, Math.PI * 2);
+        emissive.lineWidth = Math.max(LINE.base, wave.lineWidth * 0.5);
+        emissive.strokeStyle = color;
+        emissive.stroke();
+        emissive.restore();
       }
     }
-
-    if (payload.enemy && typeof payload.enemy.color === 'string') {
-      return payload.enemy.color;
-    }
-
-    if (payload.boss && typeof payload.boss.color === 'string') {
-      return payload.boss.color;
-    }
-
-    if (eventName === 'boss-phase-changed') {
-      return 'rgba(255, 210, 120, 0.9)';
-    }
-
-    if (eventName === 'boss-defeated') {
-      return 'rgba(255, 245, 235, 0.92)';
-    }
-
-    return 'rgba(255, 105, 140, 0.95)';
   }
 
-  triggerBossTransitionEffect(eventName, payload = {}) {
+  triggerBossTransitionEffect(eventName) {
     if (!this.bossTransitionEffects) {
       this.bossTransitionEffects = [];
     }
 
-    const color = this.resolveBossTransitionColor(eventName, payload);
+    const color = PALETTE.boss;
     const presets = {
       'boss-spawned': {
         duration: 1.65,
@@ -1227,8 +1186,7 @@ export default class EffectsSystem extends BaseSystem {
 
     const flashConfig = config.screenFlash;
     if (flashConfig) {
-      const flashColor =
-        flashConfig.color || palette.flash || palette.core || '#ffffff';
+      const flashColor = palette.flash;
       const flashDuration = Number.isFinite(flashConfig.duration)
         ? flashConfig.duration
         : 0.35;
@@ -1332,55 +1290,6 @@ export default class EffectsSystem extends BaseSystem {
     return null;
   }
 
-  resolveBossPalette(
-    payload = {},
-    configColors = {},
-    eventName = 'boss-spawned'
-  ) {
-    const colors = configColors || {};
-    const coreColor =
-      this.resolveBossTransitionColor(eventName, payload) ||
-      colors.core ||
-      '#ff6b9c';
-
-    const phaseColorsSource = Array.isArray(payload.phaseColors)
-      ? payload.phaseColors
-      : Array.isArray(payload.enemy?.phaseColors)
-        ? payload.enemy.phaseColors
-        : Array.isArray(payload.boss?.phaseColors)
-          ? payload.boss.phaseColors
-          : null;
-
-    const phaseValue = Number(payload.phase);
-    const fallbackPhase = Number.isFinite(this.activeBoss?.lastPhase)
-      ? this.activeBoss.lastPhase
-      : 0;
-    const selectedPhase = Number.isFinite(phaseValue)
-      ? phaseValue
-      : fallbackPhase;
-
-    let accentColor = colors.accent || null;
-    if (phaseColorsSource && phaseColorsSource.length) {
-      const index = Math.max(
-        0,
-        Math.min(phaseColorsSource.length - 1, Math.round(selectedPhase))
-      );
-      accentColor = phaseColorsSource[index];
-    }
-
-    if (!accentColor) {
-      accentColor = colors.accent || coreColor;
-    }
-
-    return {
-      core: coreColor,
-      accent: accentColor,
-      trail: colors.trail || accentColor,
-      smoke: colors.smoke || 'rgba(255, 255, 255, 0.24)',
-      flash: colors.flash || '#ffffff',
-    };
-  }
-
   createBossEntranceEffect(payload = {}) {
     const origin = this.resolveBossPosition(payload);
     if (!origin) {
@@ -1388,11 +1297,7 @@ export default class EffectsSystem extends BaseSystem {
     }
 
     const config = this.getBossEffectConfig('entrance') || {};
-    const palette = this.resolveBossPalette(
-      payload,
-      config.colors || {},
-      'boss-spawned'
-    );
+    const palette = BOSS_FX;
 
     const swirl = config.swirl || {};
     const swirlCount = this.getScaledParticleCount(swirl.count ?? 48, {
@@ -1491,7 +1396,7 @@ export default class EffectsSystem extends BaseSystem {
         palette.smoke,
         this.randomRange(dustSizeMin, dustSizeMax, 'boss'),
         this.randomRange(dustLifeMin, dustLifeMax, 'boss'),
-        'normal'
+        'smoke'
       );
       particle.rotationSpeed = this.randomCentered(1.2, 'boss');
       this.tagBossParticle(particle, 'boss-entrance');
@@ -1508,9 +1413,6 @@ export default class EffectsSystem extends BaseSystem {
         widthFade: config.shockwave.widthFade,
         easingPower: config.shockwave.easingPower,
         color: palette.core,
-        shadowColor: config.shockwave.shadowColor,
-        shadowBlur: config.shockwave.shadowBlur,
-        fillColor: config.shockwave.fillColor,
       });
     }
 
@@ -1525,11 +1427,7 @@ export default class EffectsSystem extends BaseSystem {
     }
 
     const config = this.getBossEffectConfig('phaseTransition') || {};
-    const palette = this.resolveBossPalette(
-      payload,
-      config.colors || {},
-      'boss-phase-changed'
-    );
+    const palette = BOSS_FX;
 
     const burst = config.burst || {};
     const burstCount = this.getScaledParticleCount(burst.count ?? 48, {
@@ -1614,7 +1512,7 @@ export default class EffectsSystem extends BaseSystem {
         origin.y,
         Math.cos(angle) * speed,
         Math.sin(angle) * speed,
-        palette.smoke,
+        palette.trail,
         this.randomRange(emberSizeMin, emberSizeMax, 'boss'),
         this.randomRange(emberLifeMin, emberLifeMax, 'boss'),
         'normal'
@@ -1634,9 +1532,6 @@ export default class EffectsSystem extends BaseSystem {
         widthFade: config.shockwave.widthFade,
         easingPower: config.shockwave.easingPower,
         color: palette.accent,
-        shadowColor: config.shockwave.shadowColor,
-        shadowBlur: config.shockwave.shadowBlur,
-        fillColor: config.shockwave.fillColor,
       });
     }
 
@@ -1651,19 +1546,13 @@ export default class EffectsSystem extends BaseSystem {
     }
 
     const config = this.getBossEffectConfig('defeated') || {};
-    const palette = this.resolveBossPalette(
-      payload,
-      config.colors || {},
-      'boss-defeated'
-    );
-    const boss = payload?.enemy ?? null;
+    const palette = BOSS_FX;
 
     this.addFreezeFrame(0.5, 0.3);
     this.addScreenShake(20, 1.0);
-    this.addScreenFlash('#ffffff', 0.8, 0.3);
+    this.addScreenFlash(PALETTE.text, 0.8, 0.3);
 
-    const burstColor =
-      boss?.phaseColors?.[boss.currentPhase] || palette.core || '#ff6b6b';
+    const burstColor = palette.core;
     const burstCount = 50;
     const scheduleBurst = typeof setTimeout === 'function';
 
@@ -1713,7 +1602,7 @@ export default class EffectsSystem extends BaseSystem {
         origin.y,
         Math.cos(angle) * speed,
         Math.sin(angle) * speed,
-        palette.core,
+        PALETTE.hullLit,
         this.randomRange(debrisSizeMin, debrisSizeMax, 'boss'),
         this.randomRange(debrisLifeMin, debrisLifeMax, 'boss'),
         'debris'
@@ -1801,7 +1690,7 @@ export default class EffectsSystem extends BaseSystem {
         palette.smoke,
         this.randomRange(smokeSizeMin, smokeSizeMax, 'boss'),
         this.randomRange(smokeLifeMin, smokeLifeMax, 'boss'),
-        'normal'
+        'smoke'
       );
       particle.rotationSpeed = this.randomCentered(0.9, 'boss');
       this.tagBossParticle(particle, 'boss-defeat');
@@ -1818,9 +1707,6 @@ export default class EffectsSystem extends BaseSystem {
         widthFade: config.shockwave.widthFade,
         easingPower: config.shockwave.easingPower,
         color: palette.core,
-        shadowColor: config.shockwave.shadowColor,
-        shadowBlur: config.shockwave.shadowBlur,
-        fillColor: config.shockwave.fillColor,
       });
     }
 
@@ -1834,7 +1720,6 @@ export default class EffectsSystem extends BaseSystem {
         widthFade: config.secondaryShockwave.widthFade,
         easingPower: config.secondaryShockwave.easingPower,
         color: palette.accent,
-        fillColor: config.secondaryShockwave.fillColor,
       });
     }
 
@@ -1906,9 +1791,9 @@ export default class EffectsSystem extends BaseSystem {
 
         ctx.save();
         ctx.globalAlpha = borderAlpha;
-        ctx.strokeStyle = effect.color || 'rgba(255, 105, 140, 0.95)';
+        ctx.strokeStyle = effect.color || PALETTE.boss;
         ctx.lineWidth = strokeWidth;
-        ctx.shadowColor = effect.color || 'rgba(255, 105, 140, 0.95)';
+        ctx.shadowColor = effect.color || PALETTE.boss;
         ctx.shadowBlur = strokeWidth * 1.4 * fade;
         ctx.beginPath();
         ctx.strokeRect(
@@ -1925,7 +1810,7 @@ export default class EffectsSystem extends BaseSystem {
       if (overlayAlpha > 0.01) {
         ctx.save();
         ctx.globalAlpha = overlayAlpha;
-        ctx.fillStyle = effect.color || 'rgba(255, 105, 140, 0.9)';
+        ctx.fillStyle = effect.color || PALETTE.boss;
         ctx.fillRect(0, 0, width, height);
         ctx.restore();
       }
@@ -2270,50 +2155,46 @@ export default class EffectsSystem extends BaseSystem {
     }
   }
 
+  // A crisp amber flare at the nose plus a few embers. It must read as the
+  // gun firing, not as a projectile: small, short, no stretch along the shot.
+  // The random rolls stay in the old order so the muzzleFlash fork is stable.
   createMuzzleFlash(x, y, dirX, dirY) {
-    // [NEO-ARCADE] Punchy Muzzle Flash - TUNED
-
-    // 1. Core Flash (Bright, Stationary, Short)
-    // Offset increased to 22 (SHIP_SIZE 15 + margin) to clear nose
+    const flareJitter = this.randomFloat('muzzleFlash');
     this.particles.push(
       this.createParticle(
-        x + dirX * 22,
-        y + dirY * 22,
-        dirX * 30, // Drift with ship
+        x + dirX * 18,
+        y + dirY * 18,
+        dirX * 30,
         dirY * 30,
-        '#FFFFFF',
-        5 + this.randomFloat('muzzleFlash') * 4, // Tuned Size: 5-9px (was 18+)
-        0.06, // Fast pop
-        'spark'
+        PALETTE.shot,
+        3 + flareJitter * 0.4, // radius: a 6 px flare, 2 px hot core
+        0.06,
+        'flare'
       )
     );
 
-    // 2. High-Velocity Sparks (Directional)
-    const particleCount = this.getScaledParticleCount(
-      5 + this.randomFloat('muzzleFlash') * 3 // Reduced count slightly
+    const sparkCount = this.getScaledParticleCount(
+      5 + this.randomFloat('muzzleFlash') * 3
     );
+    const baseAngle = Math.atan2(dirY, dirX);
 
-    for (let i = 0; i < particleCount; i++) {
-      // Very tight cone (±10°)
-      const spreadAngle = (this.randomFloat('muzzleFlash') - 0.5) * 0.18;
-      const angle = Math.atan2(dirY, dirX) + spreadAngle;
-
-      const speed = 250 + this.randomFloat('muzzleFlash') * 200;
-      const vx = Math.cos(angle) * speed;
-      const vy = Math.sin(angle) * speed;
-
-      const color =
-        this.randomFloat('muzzleFlash') > 0.3 ? '#FFFF00' : '#FFFFFF';
+    for (let i = 0; i < sparkCount; i++) {
+      const angle = baseAngle + (this.randomFloat('muzzleFlash') - 0.5) * 1.2;
+      const speed = 60 + this.randomFloat('muzzleFlash') * 90;
+      const hot = this.randomFloat('muzzleFlash') > 0.7;
+      const size = 0.5 + this.randomFloat('muzzleFlash') * 0.5;
+      const life = 0.08 + this.randomFloat('muzzleFlash') * 0.1;
+      if (i >= 4) continue;
 
       this.particles.push(
         this.createParticle(
-          x + dirX * 24, // Spawn at tip
-          y + dirY * 24,
-          vx,
-          vy,
-          color,
-          1.5 + this.randomFloat('muzzleFlash') * 2, // Finer sparks
-          0.1 + this.randomFloat('muzzleFlash') * 0.12,
+          x + dirX * 19,
+          y + dirY * 19,
+          Math.cos(angle) * speed,
+          Math.sin(angle) * speed,
+          hot ? PALETTE.text : PALETTE.shot,
+          size,
+          life,
           'spark'
         )
       );
@@ -2338,23 +2219,6 @@ export default class EffectsSystem extends BaseSystem {
     }
 
     return null;
-  }
-
-  resolveEnemyEffectPalette(type, fallbackType = null) {
-    if (!ENEMY_EFFECT_COLORS) {
-      return {};
-    }
-
-    const normalizedType = typeof type === 'string' ? type.toLowerCase() : null;
-    const fallback =
-      typeof fallbackType === 'string' ? fallbackType.toLowerCase() : null;
-
-    const palette =
-      (normalizedType && ENEMY_EFFECT_COLORS[normalizedType]) ||
-      (fallback && ENEMY_EFFECT_COLORS[fallback]) ||
-      null;
-
-    return palette || {};
   }
 
   resolveEnemyProjectileOrigin(payload = {}) {
@@ -2429,16 +2293,15 @@ export default class EffectsSystem extends BaseSystem {
 
     const enemy = payload?.enemy || null;
     const direction = this.resolveEnemyProjectileDirection(payload);
-    const palette = this.resolveEnemyEffectPalette('drone');
     const radius = Number.isFinite(enemy?.radius) ? enemy.radius : 12;
     const muzzleDistance = radius + 8;
     const spawnX = origin.x + direction.x * muzzleDistance;
     const spawnY = origin.y + direction.y * muzzleDistance;
 
-    const baseColor = palette.muzzle || '#7AD7FF';
-    const accentColor = palette.muzzleAccent || '#C9F1FF';
-    const exhaustColor = palette.exhaust || 'rgba(110, 200, 255, 0.45)';
-    const flashColor = palette.flash || 'rgba(150, 220, 255, 0.35)';
+    const baseColor = ENEMY_FX.spark;
+    const accentColor = ENEMY_FX.sparkDim;
+    const exhaustColor = ENEMY_FX.glow;
+    const flashColor = withAlpha(PALETTE.threat, 0.35);
 
     const particleCount = this.getScaledParticleCount(
       4 + this.randomFloat('muzzleFlash') * 3,
@@ -2503,16 +2366,15 @@ export default class EffectsSystem extends BaseSystem {
 
     const enemy = payload?.enemy || null;
     const direction = this.resolveEnemyProjectileDirection(payload);
-    const palette = this.resolveEnemyEffectPalette('hunter');
     const radius = Number.isFinite(enemy?.radius) ? enemy.radius : 16;
     const muzzleDistance = radius + 10;
     const spawnX = origin.x + direction.x * muzzleDistance;
     const spawnY = origin.y + direction.y * muzzleDistance;
 
-    const baseColor = palette.muzzle || '#FF86E8';
-    const accentColor = palette.muzzleAccent || '#FFD6FF';
-    const trailColor = palette.burstTrail || '#BE9CFF';
-    const flashColor = palette.flash || 'rgba(255, 200, 255, 0.38)';
+    const baseColor = ENEMY_FX.spark;
+    const accentColor = ENEMY_FX.sparkDim;
+    const trailColor = ENEMY_FX.glow;
+    const flashColor = withAlpha(PALETTE.threat, 0.38);
 
     const burstInfo = payload?.projectile?.burst || {};
     const shotsRemaining = Number.isFinite(burstInfo.shotsRemaining)
@@ -2579,14 +2441,13 @@ export default class EffectsSystem extends BaseSystem {
     }
 
     const direction = this.resolveEnemyProjectileDirection(payload);
-    const palette = this.resolveBossPalette(payload, {}, 'boss-phase-changed');
     const radius = Number.isFinite(enemy?.radius) ? enemy.radius : 60;
     const muzzleDistance = radius + 18;
     const spawnX = origin.x + direction.x * muzzleDistance;
     const spawnY = origin.y + direction.y * muzzleDistance;
 
-    const coreColor = palette.core || '#ff6b9c';
-    const accentColor = palette.accent || '#f9c74f';
+    const coreColor = BOSS_FX.core;
+    const accentColor = BOSS_FX.accent;
 
     const particleCount = this.getScaledParticleCount(6, { minimum: 3 });
     const baseAngle = Math.atan2(direction.y, direction.x);
@@ -2612,8 +2473,7 @@ export default class EffectsSystem extends BaseSystem {
       );
     }
 
-    const flashColor = palette.flash || coreColor;
-    this.addScreenFlash(flashColor, 0.14, 0.12);
+    this.addScreenFlash(BOSS_FX.flash, 0.14, 0.12);
     this.addScreenShake('bossAttack');
   }
 
@@ -2647,7 +2507,6 @@ export default class EffectsSystem extends BaseSystem {
     }
 
     const position = { x: posX, y: posY };
-    const palette = this.resolveEnemyEffectPalette('mine');
     const radius = Number.isFinite(payload.radius)
       ? payload.radius
       : Number.isFinite(enemy?.explosionRadius)
@@ -2659,12 +2518,11 @@ export default class EffectsSystem extends BaseSystem {
     };
 
     const radiusFactor = Math.max(1, radius / 110);
-    const flashColor = palette.flash || 'rgba(255, 190, 110, 0.4)';
-    const shockwaveColor =
-      palette.shockwave || palette.flash || 'rgba(255, 160, 70, 0.35)';
-    const debrisColor = palette.debris || '#7A3B16';
-    const sparkColor = palette.sparks || '#FFD27F';
-    const smokeColor = palette.smoke || 'rgba(90, 40, 20, 0.45)';
+    const flashColor = withAlpha(PALETTE.threat, 0.4);
+    const shockwaveColor = withAlpha(PALETTE.threat, 0.35);
+    const debrisColor = ENEMY_FX.chip;
+    const sparkColor = ENEMY_FX.spark;
+    const smokeColor = ENEMY_FX.smoke;
 
     const shakePreset = ShakePresets.mineExplosion;
     const baseShakeIntensity = 6 + 110 * 0.025;
@@ -2696,9 +2554,6 @@ export default class EffectsSystem extends BaseSystem {
       baseWidth: 20,
       maxAlpha: 0.72,
       color: shockwaveColor,
-      shadowColor: 'rgba(255, 140, 60, 0.5)',
-      shadowBlur: 28,
-      fillColor: 'rgba(255, 210, 160, 0.18)',
     });
 
     const sparkCount = this.getScaledParticleCount(24 + Math.round(radius / 4));
@@ -2759,7 +2614,7 @@ export default class EffectsSystem extends BaseSystem {
           smokeColor,
           6 + this.randomFloat('explosions') * 5,
           0.7 + this.randomFloat('explosions') * 0.4,
-          'normal'
+          'smoke'
         )
       );
     }
@@ -2787,7 +2642,6 @@ export default class EffectsSystem extends BaseSystem {
       return;
     }
 
-    const palette = this.resolveEnemyEffectPalette('drone');
     const radius = Number.isFinite(enemy.radius) ? enemy.radius : 12;
     const velocity = {
       x: Number.isFinite(enemy.vx) ? enemy.vx : 0,
@@ -2795,11 +2649,7 @@ export default class EffectsSystem extends BaseSystem {
     };
 
     this.addScreenShake('droneDestroyed');
-    this.addScreenFlash(
-      palette.flash || 'rgba(150, 220, 255, 0.35)',
-      0.12,
-      0.1
-    );
+    this.addScreenFlash(withAlpha(PALETTE.threat, 0.35), 0.12, 0.1);
 
     const sparkCount = this.getScaledParticleCount(14 + Math.round(radius));
     for (let i = 0; i < sparkCount; i += 1) {
@@ -2811,7 +2661,7 @@ export default class EffectsSystem extends BaseSystem {
           position.y,
           Math.cos(angle) * speed + velocity.x * 0.3,
           Math.sin(angle) * speed + velocity.y * 0.3,
-          palette.explosionSpark || '#E1F6FF',
+          ENEMY_FX.spark,
           2 + this.randomFloat('explosions') * 2.2,
           0.32 + this.randomFloat('explosions') * 0.18,
           'spark'
@@ -2829,7 +2679,7 @@ export default class EffectsSystem extends BaseSystem {
           position.y,
           Math.cos(angle) * speed + velocity.x * 0.25,
           Math.sin(angle) * speed + velocity.y * 0.25,
-          palette.explosionCore || 'rgba(120, 205, 255, 0.45)',
+          ENEMY_FX.glow,
           3 + this.randomFloat('explosions') * 2.8,
           0.4 + this.randomFloat('explosions') * 0.18,
           'normal'
@@ -2847,10 +2697,10 @@ export default class EffectsSystem extends BaseSystem {
           position.y,
           Math.cos(angle) * speed * 0.5,
           Math.sin(angle) * speed * 0.5,
-          palette.explosionSmoke || 'rgba(40, 80, 120, 0.35)',
+          ENEMY_FX.chip,
           4.5 + this.randomFloat('explosions') * 3.2,
           0.55 + this.randomFloat('explosions') * 0.22,
-          'normal'
+          'debris'
         )
       );
     }
@@ -2878,7 +2728,6 @@ export default class EffectsSystem extends BaseSystem {
       return;
     }
 
-    const palette = this.resolveEnemyEffectPalette('hunter');
     const radius = Number.isFinite(enemy.radius) ? enemy.radius : 16;
     const velocity = {
       x: Number.isFinite(enemy.vx) ? enemy.vx : 0,
@@ -2886,20 +2735,14 @@ export default class EffectsSystem extends BaseSystem {
     };
 
     this.addScreenShake('hunterDestroyed');
-    this.addScreenFlash(
-      palette.flash || 'rgba(255, 200, 255, 0.38)',
-      0.14,
-      0.14
-    );
+    this.addScreenFlash(withAlpha(PALETTE.threat, 0.38), 0.14, 0.14);
     this.createShockwaveEffect({
       position,
       radius: radius * 2.4,
       duration: 0.42,
       baseWidth: 16,
       maxAlpha: 0.55,
-      color: palette.explosionCore || 'rgba(250, 150, 255, 0.5)',
-      shadowColor: 'rgba(120, 40, 160, 0.45)',
-      shadowBlur: 22,
+      color: withAlpha(PALETTE.threat, 0.5),
     });
 
     const sparkCount = this.getScaledParticleCount(
@@ -2908,10 +2751,7 @@ export default class EffectsSystem extends BaseSystem {
     for (let i = 0; i < sparkCount; i += 1) {
       const angle = this.randomFloat('explosions') * Math.PI * 2;
       const speed = 150 + this.randomFloat('explosions') * 170;
-      const color =
-        i % 3 === 0
-          ? palette.explosionCore || 'rgba(250, 150, 255, 0.5)'
-          : palette.explosionSpark || '#FFE8FF';
+      const color = i % 3 === 0 ? ENEMY_FX.sparkDim : ENEMY_FX.spark;
       this.particles.push(
         this.createParticle(
           position.x,
@@ -2936,7 +2776,7 @@ export default class EffectsSystem extends BaseSystem {
           position.y,
           Math.cos(angle) * speed + velocity.x * 0.22,
           Math.sin(angle) * speed + velocity.y * 0.22,
-          palette.explosionCore || 'rgba(250, 150, 255, 0.5)',
+          ENEMY_FX.glow,
           4.8 + this.randomFloat('explosions') * 3.4,
           0.46 + this.randomFloat('explosions') * 0.24,
           'normal'
@@ -2954,10 +2794,10 @@ export default class EffectsSystem extends BaseSystem {
           position.y,
           Math.cos(angle) * speed * 0.55,
           Math.sin(angle) * speed * 0.55,
-          palette.explosionSmoke || 'rgba(70, 30, 110, 0.35)',
+          ENEMY_FX.chip,
           5.4 + this.randomFloat('explosions') * 3.6,
           0.6 + this.randomFloat('explosions') * 0.22,
-          'normal'
+          'debris'
         )
       );
     }
@@ -3003,7 +2843,7 @@ export default class EffectsSystem extends BaseSystem {
       life: 0.6, // 0.6s visibility
       maxLife: 0.6,
       expansion: 0,
-      color: 'rgba(255, 50, 50, 0.9)', // Bright red
+      color: PALETTE.threat,
     });
   }
 
@@ -3019,8 +2859,8 @@ export default class EffectsSystem extends BaseSystem {
       ctx.rotate(indicator.angle);
 
       // Draw chevron (triple arrow: <<<)
-      ctx.strokeStyle = indicator.color.replace('0.9)', `${alpha * 0.9})`);
-      ctx.fillStyle = indicator.color.replace('0.9)', `${alpha * 0.7})`);
+      ctx.globalAlpha = alpha * 0.9;
+      ctx.strokeStyle = indicator.color;
       ctx.lineWidth = 3;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -3055,18 +2895,14 @@ export default class EffectsSystem extends BaseSystem {
         ? 60 + this.randomFloat('hits') * 90
         : 80 + this.randomFloat('hits') * 100;
 
-      // Shield hits use colder tones so they don't read as successful damage.
+      // The shot's amber light on a hit; a blocked hit only knocks off matte
+      // chips so it doesn't read as successful damage.
+      const roll = this.randomFloat('hits');
       const color = blocked
-        ? this.randomFloat('hits') > 0.5
-          ? '#C9F4FF'
-          : '#7FDBFF'
-        : killed
-          ? this.randomFloat('hits') > 0.3
-            ? '#FF3333'
-            : '#FFAA00'
-          : this.randomFloat('hits') > 0.5
-            ? '#00FFFF'
-            : '#88FFFF';
+        ? PALETTE.neutral
+        : roll > (killed ? 0.3 : 0.5)
+          ? PALETTE.shot
+          : PALETTE.text;
 
       // Inherit some momentum from the enemy
       const vx = Math.cos(angle) * speed + enemyVelocity.x * 0.3;
@@ -3093,7 +2929,7 @@ export default class EffectsSystem extends BaseSystem {
           color,
           size,
           life,
-          'spark'
+          blocked ? 'debris' : 'spark'
         )
       );
     }
@@ -3134,9 +2970,6 @@ export default class EffectsSystem extends BaseSystem {
       widthFade,
       easingPower,
       color: data.color,
-      shadowColor: data.shadowColor,
-      shadowBlur: data.shadowBlur,
-      fillColor: data.fillColor,
     };
 
     this.shockwaves.push(wave);
@@ -3174,7 +3007,7 @@ export default class EffectsSystem extends BaseSystem {
           data.position.y,
           vx,
           vy,
-          `rgba(80, 220, 255, ${0.6 + this.randomFloat('hits') * 0.3})`,
+          withAlpha(PALETTE.player, 0.6 + this.randomFloat('hits') * 0.3),
           2.4 + this.randomFloat('hits') * 1.6,
           0.28 + this.randomFloat('hits') * 0.18,
           'spark'
@@ -3187,14 +3020,18 @@ export default class EffectsSystem extends BaseSystem {
       data.position.y,
       -nx * 40,
       -ny * 40,
-      'rgba(140, 240, 255, 0.4)',
+      withAlpha(PALETTE.player, 0.4),
       5 + level * 1.3,
       0.3 + 0.05 * level
     );
     this.particles.push(glow);
 
     this.addScreenShake(3 + level * 0.6, 0.15 + 0.02 * intensity);
-    this.addScreenFlash('rgba(0, 191, 255, 0.22)', 0.12, 0.18 + 0.04 * level);
+    this.addScreenFlash(
+      withAlpha(PALETTE.player, 0.22),
+      0.12,
+      0.18 + 0.04 * level
+    );
   }
 
   createXPCollectEffect(x, y) {
@@ -3207,7 +3044,7 @@ export default class EffectsSystem extends BaseSystem {
         y,
         Math.cos(angle) * speed,
         Math.sin(angle) * speed,
-        '#00DDFF',
+        PALETTE.xp,
         1.5 + this.randomFloat('explosions') * 1.5,
         0.3 + this.randomFloat('explosions') * 0.2
       );
@@ -3218,9 +3055,9 @@ export default class EffectsSystem extends BaseSystem {
   createOrbFusionEffect(data) {
     const tier = data?.tier || 1;
     const consumed = data?.consumed || 0;
-    const particleColor = data?.color || '#FFFFFF';
-    const glowColor = data?.glow || 'rgba(255, 255, 255, 0.35)';
-    const flashColor = data?.flash || 'rgba(255, 255, 255, 0.2)';
+    const particleColor = data?.color || PALETTE.xp;
+    const glowColor = data?.glow || withAlpha(PALETTE.xp, 0.35);
+    const flashColor = data?.flash || withAlpha(PALETTE.xp, 0.2);
     const { x, y } = data.position;
 
     const particleCount = this.getScaledParticleCount(
@@ -3286,7 +3123,7 @@ export default class EffectsSystem extends BaseSystem {
     this.addScreenShake(15, 0.6);
 
     // Bright white flash
-    this.addScreenFlash('rgba(255, 255, 255, 0.8)', 0.4, 0.6);
+    this.addScreenFlash(withAlpha(PALETTE.text, 0.8), 0.4, 0.6);
 
     // HIGH VELOCITY FRAGMENTS (50-80 particles)
     const fragmentCount = this.getScaledParticleCount(
@@ -3297,16 +3134,14 @@ export default class EffectsSystem extends BaseSystem {
       // HIGH VELOCITY: 250-500 px/s
       const speed = 250 + this.randomFloat('explosions') * 250;
 
-      // Mix of colors: white, yellow, orange, red
+      // Half light (the ship's cyan, white-hot), half matte hull chips
       const colorChoice = this.randomFloat('explosions');
+      const light = colorChoice < 0.5;
       let color;
-      if (colorChoice < 0.25)
-        color = '#FFFFFF'; // White hot
-      else if (colorChoice < 0.5)
-        color = '#FFFF00'; // Yellow
-      else if (colorChoice < 0.75)
-        color = '#FF8800'; // Orange
-      else color = '#FF3333'; // Red
+      if (colorChoice < 0.25) color = PALETTE.text;
+      else if (colorChoice < 0.5) color = PALETTE.player;
+      else if (colorChoice < 0.75) color = PALETTE.hullLit;
+      else color = PALETTE.hull;
 
       // Large fragments
       const size = 3 + this.randomFloat('explosions') * 4;
@@ -3323,7 +3158,7 @@ export default class EffectsSystem extends BaseSystem {
           color,
           size,
           life,
-          'debris'
+          light ? 'spark' : 'debris'
         )
       );
     }
@@ -3338,7 +3173,7 @@ export default class EffectsSystem extends BaseSystem {
       position: position,
       radius: shockwaveRadius,
       duration: 0.8, // Longer duration
-      color: 'rgba(255, 100, 50, 0.6)', // Orange-red
+      color: withAlpha(PALETTE.player, 0.6),
       baseWidth: 8, // Thick wave
       maxAlpha: 0.8, // Very visible
     });
@@ -3349,7 +3184,7 @@ export default class EffectsSystem extends BaseSystem {
         position: position,
         radius: shockwaveRadius * 0.5,
         duration: 0.5,
-        color: 'rgba(255, 200, 100, 0.7)', // Bright yellow-orange
+        color: withAlpha(PALETTE.text, 0.7),
         baseWidth: 6,
         maxAlpha: 0.9,
       });
@@ -3366,7 +3201,7 @@ export default class EffectsSystem extends BaseSystem {
         player.y,
         Math.cos(angle) * speed,
         Math.sin(angle) * speed,
-        `hsl(${this.randomFloat('explosions') * 40 + 40}, 100%, 60%)`,
+        this.randomFloat('explosions') > 0.75 ? PALETTE.text : PALETTE.xp,
         2 + this.randomFloat('explosions') * 2,
         0.6 + this.randomFloat('explosions') * 0.4,
         'spark'
@@ -3427,13 +3262,14 @@ export default class EffectsSystem extends BaseSystem {
       typeof asteroid.getVariantColors === 'function'
         ? asteroid.getVariantColors()
         : null;
-    const debrisColor = variantColors?.fill || '#8B4513';
+    // Matte rock chips plus embers in the variant's vein color (the crystal
+    // inside the Ring stone).
+    const debrisColor = variantColors?.fill || PALETTE.rock;
     const sparkColor =
-      variantColors?.glow ||
-      variantColors?.pulse ||
-      `hsl(${this.randomFloat('explosions') * 20 + 30}, 100%, 70%)`;
-    const secondarySparkColor =
-      variantColors?.cracks || 'rgba(255, 220, 170, 0.85)';
+      variantColors?.veins || variantColors?.cracks || PALETTE.shot;
+    if (!variantColors?.glow && !variantColors?.pulse) {
+      this.randomFloat('explosions'); // the old hue roll; keeps the fork in step
+    }
 
     const baseCount = { large: 12, medium: 8, small: 5 }[asteroid.size] || 6;
     const radius = Number.isFinite(asteroid.radius)
@@ -3472,7 +3308,11 @@ export default class EffectsSystem extends BaseSystem {
     } else if (asteroid.size === 'large') {
       this.addScreenShake(8 + radius * 0.015, 0.28);
       this.addFreezeFrame(0.18, 0.24);
-      this.addScreenFlash(variantColors?.glow || '#FF6B6B', 0.22, 0.12);
+      this.addScreenFlash(
+        variantColors?.glow || withAlpha(sparkColor, 0.6),
+        0.22,
+        0.12
+      );
       // Massive shockwave
       this.createShockwaveEffect({
         position: { x: asteroid.x, y: asteroid.y },
@@ -3503,15 +3343,17 @@ export default class EffectsSystem extends BaseSystem {
       );
       this.particles.push(debris);
 
+      // every other one is a lit chip: mostly stone, a few embers
+      const ember = i % 2 === 0;
       const spark = this.createParticle(
         asteroid.x,
         asteroid.y,
         Math.cos(angle) * speed * 1.25 + parentVx * momentumScale,
         Math.sin(angle) * speed * 1.25 + parentVy * momentumScale,
-        sparkColor,
+        ember ? sparkColor : PALETTE.rockLit,
         1.6 + this.randomFloat('explosions') * 1.6,
         0.32 + this.randomFloat('explosions') * 0.22,
-        'spark'
+        ember ? 'spark' : 'debris'
       );
       this.particles.push(spark);
 
@@ -3521,7 +3363,7 @@ export default class EffectsSystem extends BaseSystem {
           asteroid.y,
           Math.cos(angle + Math.PI / 2) * speed * 0.6,
           Math.sin(angle + Math.PI / 2) * speed * 0.6,
-          secondarySparkColor,
+          sparkColor,
           1.2 + this.randomFloat('explosions') * 1,
           0.28 + this.randomFloat('explosions') * 0.18,
           'spark',
@@ -3532,20 +3374,15 @@ export default class EffectsSystem extends BaseSystem {
     }
   }
 
-  resolveAsteroidColors(variant, size) {
-    const fallbackBySize = {
-      large: '#8B4513',
-      medium: '#A0522D',
-      small: '#CD853F',
-    };
+  resolveAsteroidColors(variant) {
     const config = ASTEROID_VARIANTS?.[variant] || ASTEROID_VARIANTS?.common;
     const colors = config?.colors || {};
-    const fallbackFill = fallbackBySize[size] || fallbackBySize.medium;
+    const vein = colors.veins || colors.cracks || PALETTE.shot;
 
     return {
-      cracks: colors.cracks || 'rgba(255, 235, 200, 0.92)',
-      glow: colors.innerGlow || colors.glow || 'rgba(255, 255, 255, 0.28)',
-      debris: colors.fill || fallbackFill,
+      cracks: vein,
+      glow: vein,
+      debris: colors.fill || PALETTE.rock,
     };
   }
 
@@ -3560,7 +3397,6 @@ export default class EffectsSystem extends BaseSystem {
       ? Math.max(event.radius, 6)
       : 18;
     const variant = event.variant || 'common';
-    const size = event.size || 'medium';
 
     const cos = Math.cos(rotation);
     const sin = Math.sin(rotation);
@@ -3575,7 +3411,7 @@ export default class EffectsSystem extends BaseSystem {
       y: vector.x * sin + vector.y * cos,
     });
 
-    const colors = this.resolveAsteroidColors(variant, size);
+    const colors = this.resolveAsteroidColors(variant);
     const intensity = Math.max(1, Math.round(event.intensity ?? 1));
     const baseLifetime = 0.2 + intensity * 0.08;
     const burst = event.burst || {};
@@ -3836,10 +3672,9 @@ export default class EffectsSystem extends BaseSystem {
       ? Math.atan2(velocity.y, velocity.x) + Math.PI
       : this.randomFloat('volatility') * Math.PI * 2;
 
-    const colors = config.colors || {};
-    const coreColor = colors.core || 'rgba(255, 200, 130, 0.9)';
-    const emberColor = colors.ember || 'rgba(255, 110, 40, 0.85)';
-    const smokeColor = colors.smoke || 'rgba(60, 24, 10, 0.35)';
+    const coreColor = withAlpha(PALETTE.shot, 0.9);
+    const emberColor = withAlpha(PALETTE.shot, 0.85);
+    const smokeColor = withAlpha(PALETTE.rock, 0.35);
 
     const resolveRange = (value, fallback) => {
       if (Array.isArray(value)) {
@@ -3934,7 +3769,7 @@ export default class EffectsSystem extends BaseSystem {
           smokeColor,
           emberSize * (1.2 + this.randomFloat('volatility') * 0.6),
           emberLife * (1.3 + this.randomFloat('volatility') * 0.4),
-          'normal',
+          'smoke',
           this.getRandomFork('volatility')
         );
         this.particles.push(smoke);
@@ -3946,7 +3781,7 @@ export default class EffectsSystem extends BaseSystem {
           spawnY,
           Math.cos(angle) * emberSpeed * 0.2,
           Math.sin(angle) * emberSpeed * 0.2,
-          'rgba(255, 220, 180, 0.7)',
+          withAlpha(PALETTE.text, 0.7),
           emberSize * 0.5,
           emberLife * 0.5,
           'normal',
@@ -3967,7 +3802,7 @@ export default class EffectsSystem extends BaseSystem {
         position.y,
         Math.cos(angle) * speed,
         Math.sin(angle) * speed,
-        'rgba(255, 120, 0, 0.45)',
+        withAlpha(PALETTE.shot, 0.45),
         1.8 + this.randomFloat('volatility') * 0.6,
         0.35 + this.randomFloat('volatility') * 0.15,
         'spark'
@@ -3990,9 +3825,7 @@ export default class EffectsSystem extends BaseSystem {
       maxAlpha: data.maxAlpha ?? 0.78,
       widthFade: data.widthFade ?? 0.45,
       easingPower: data.easingPower ?? 0.8,
-      color: data.color ?? 'rgba(255, 180, 90, 1)',
-      shadowColor: data.shadowColor ?? 'rgba(255, 130, 50, 0.75)',
-      shadowBlur: data.shadowBlur ?? 34,
+      color: data.color ?? PALETTE.shot,
     });
 
     const innerScale = data.innerScale ?? 0.55;
@@ -4005,10 +3838,7 @@ export default class EffectsSystem extends BaseSystem {
         maxAlpha: data.innerMaxAlpha ?? 0.6,
         widthFade: data.innerWidthFade ?? 0.7,
         easingPower: data.innerEasingPower ?? 1.1,
-        color: data.innerColor ?? 'rgba(255, 220, 200, 1)',
-        shadowColor: data.innerShadowColor ?? 'rgba(255, 200, 160, 0.55)',
-        shadowBlur: data.innerShadowBlur ?? 22,
-        fillColor: data.innerFillColor ?? 'rgba(255, 210, 170, 0.12)',
+        color: data.innerColor ?? PALETTE.text,
       });
     }
   }
@@ -4023,7 +3853,7 @@ export default class EffectsSystem extends BaseSystem {
     const intensity = Math.min(1.2, radius / 90);
 
     this.addScreenShake(7 + radius * 0.025, 0.32);
-    this.addScreenFlash('rgba(255, 150, 70, 0.55)', 0.26, 0.24);
+    this.addScreenFlash(withAlpha(PALETTE.shot, 0.55), 0.26, 0.24);
 
     this.createExplosionShockwave({
       position,
@@ -4038,14 +3868,16 @@ export default class EffectsSystem extends BaseSystem {
       const speed =
         (70 + this.randomFloat('volatility') * 150) * (0.8 + intensity * 0.4);
 
+      // two unused rolls were the old green/blue jitter; kept for the fork
+      this.randomFloat('volatility');
+      this.randomFloat('volatility');
+      const flameAlpha = 0.7 + this.randomFloat('volatility') * 0.2;
       const flame = new SpaceParticle(
         position.x,
         position.y,
         Math.cos(angle) * speed,
         Math.sin(angle) * speed,
-        `rgba(255, ${Math.floor(140 + this.randomFloat('volatility') * 70)}, ${Math.floor(
-          40 + this.randomFloat('volatility') * 40
-        )}, ${0.7 + this.randomFloat('volatility') * 0.2})`,
+        withAlpha(PALETTE.shot, flameAlpha),
         2.4 + this.randomFloat('volatility') * 1.8,
         0.38 + this.randomFloat('volatility') * 0.24,
         'spark',
@@ -4058,7 +3890,7 @@ export default class EffectsSystem extends BaseSystem {
         position.y + (this.randomFloat('volatility') - 0.5) * radius * 0.4,
         Math.cos(angle) * speed * 0.6,
         Math.sin(angle) * speed * 0.6,
-        '#5E1A0D',
+        PALETTE.rock,
         2 + this.randomFloat('volatility') * 2,
         0.6 + this.randomFloat('volatility') * 0.2,
         'debris'
@@ -4076,10 +3908,10 @@ export default class EffectsSystem extends BaseSystem {
         position.y + Math.sin(angle) * distance,
         Math.cos(angle) * speed * 0.35,
         Math.sin(angle) * speed * 0.35,
-        `rgba(60, 30, 20, ${0.25 + this.randomFloat('volatility') * 0.18})`,
+        withAlpha(PALETTE.rock, 0.25 + this.randomFloat('volatility') * 0.18),
         3.5 + this.randomFloat('volatility') * 3.5,
         0.85 + this.randomFloat('volatility') * 0.5,
-        'normal',
+        'smoke',
         this.getRandomFork('volatility')
       );
       this.particles.push(smoke);
@@ -4091,7 +3923,7 @@ export default class EffectsSystem extends BaseSystem {
         position.y,
         0,
         0,
-        'rgba(255, 200, 140, 0.5)',
+        withAlpha(PALETTE.shot, 0.5),
         radius * 0.24,
         0.45 + this.randomFloat('volatility') * 0.2,
         'normal',
@@ -4181,7 +4013,7 @@ export default class EffectsSystem extends BaseSystem {
     this.screenFlash = {
       timer: 0,
       duration: 0,
-      color: '#FFFFFF',
+      color: PALETTE.text,
       intensity: 0,
     };
   }

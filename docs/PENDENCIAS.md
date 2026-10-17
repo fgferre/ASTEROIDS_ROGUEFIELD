@@ -4,7 +4,7 @@ Lista viva do que está aberto, nas palavras do dono. Leia só a seção O BAST�
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 7.**
 
-## O BASTÃO — onde a rodada parou (17/10, noite) — ETAPAS 1, 2, 4 E A ARTE NOVA (3, PARCIAL) FEITAS, NÃO PUBLICADAS
+## O BASTÃO — onde a rodada parou (17/10, noite) — ETAPAS 1–4 FEITAS (ARTE NOVA COMPLETA), NÃO PUBLICADAS
 
 Palavras dele (17/10): _"transformar isso num jogo maravilhoso para as próximas gerações de videogame"_; _"como se
 fosse uma versão nova para uma plataforma nova... com as melhores placas de vídeo"_; _"tudo em inglês"_.
@@ -16,7 +16,8 @@ fosse uma versão nova para uma plataforma nova... com as melhores placas de ví
   controles visíveis, Quit com confirmação, `mobileGuard` que não trava Windows.
 - Etapa 4 — loop de passo fixo a 60 Hz.
 - Arte nova por `docs/NORTE.md` (o roteiro do Anel partido, pedra fosca e luz só onde há energia): fundo, fragmentos
-  com rachaduras que acendem, Wardens, nave Interceptor, lanças, fagulhas, bloom. Falta câmera e escudo.
+  com rachaduras que acendem, Wardens, nave Interceptor, lanças, fagulhas, bloom, câmera 1.3× com follow,
+  escudo hexagonal, explosões e clarões na paleta.
 - Telegraphs do boss (faixa da investida, cunha do leque).
 - Jogo todo em inglês.
 
@@ -26,7 +27,7 @@ comparar fluidez com e sem `?renderScale=1`; conferir se a 144 Hz o movimento re
 **Decisões dele que destravam as próximas etapas (ver `PLAN.md`):**
 
 - Arte: ele pediu para reimaginar tudo e eu decidi (NORTE.md). Ele julga jogando: o que ainda parece fraco?
-- Câmera 1.3× com follow (NORTE §2): confirmar jogando antes de eu codar.
+- Câmera 1.3× com follow já está no jogo (`?camera=0` desliga): aprovar ou reprovar jogando.
 - Etapa 6: dash e sua tecla; regra de sinergia por tag (ou retirar a promessa); fim de run e meta-progressão.
 
 ## Jogabilidade e sensação
