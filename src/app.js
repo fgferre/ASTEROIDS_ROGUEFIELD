@@ -253,10 +253,15 @@ function init(recording = null) {
 
     const { seed: initialSeed, source: seedSource } = recording
       ? { seed: recording.seed, source: 'replay' }
-      : GameSessionService.deriveInitialSeed();
+      : gameState.randomSeedSource === 'profile-harness'
+        ? { seed: gameState.randomSeed, source: gameState.randomSeedSource }
+        : GameSessionService.deriveInitialSeed();
     const seedInfo = { seed: initialSeed, source: seedSource };
     gameState.randomSeed = initialSeed;
     gameState.randomSeedSource = seedSource;
+    if (DEV_MODE) {
+      console.info(`[Seed] using ${initialSeed} (${seedSource})`);
+    }
 
     const manifestContext = {
       gameState,

@@ -66,7 +66,7 @@ class PhysicsSystem extends BaseSystem {
     this.asteroidIndex = enemyIndex; // Legacy alias for backward compatibility
     this.indexDirty = false;
     this.bootstrapCompleted = false;
-    this.lastSpatialHashMaintenance = performance.now();
+    this.lastSpatialHashMaintenance = this.getSimulationTimeMs();
     this.missingEnemyWarningLogged = false;
     this._snapshotFallbackWarningIssued = false;
     this._handleSnapshotFallback = createFallbackHandler({
@@ -279,7 +279,7 @@ class PhysicsSystem extends BaseSystem {
     this.enemyIndex.clear();
     this.spatialHash.clear();
     this.indexDirty = false;
-    this.lastSpatialHashMaintenance = performance.now();
+    this.lastSpatialHashMaintenance = this.getSimulationTimeMs();
   }
 
   applySnapshotStateToEnemy(enemy, entry = {}) {
@@ -674,15 +674,23 @@ class PhysicsSystem extends BaseSystem {
       : 120;
   }
 
+  /**
+   * Simulation clock in milliseconds: the session time the enemy system
+   * accumulates from fixed steps. Never reads the wall clock.
+   */
+  getSimulationTimeMs() {
+    return (this.enemySystem?.sessionStats?.timeElapsed ?? 0) * 1000;
+  }
+
   shouldEmitBossCollision(boss, type) {
     if (!boss) {
       return false;
     }
 
-    const now = performance.now();
+    const now = this.getSimulationTimeMs();
     const cooldown = this.getBossCollisionCooldown(type);
     const state = this.bossCollisionState.get(boss) || {};
-    const lastTime = state[type] ?? 0;
+    const lastTime = state[type] ?? -Infinity;
 
     if (now - lastTime < cooldown) {
       return false;
@@ -1145,7 +1153,7 @@ class PhysicsSystem extends BaseSystem {
    * This ensures collision detection uses up-to-date positions.
    */
   updateSpatialHash() {
-    const now = performance.now();
+    const now = this.getSimulationTimeMs();
 
     for (const asteroid of this.activeEnemies) {
       if (asteroid.destroyed) {
@@ -1169,7 +1177,10 @@ class PhysicsSystem extends BaseSystem {
     }
 
     // Cleanup the spatial hash on a fixed cadence
-    if (now - this.lastSpatialHashMaintenance >= 1000) {
+    if (
+      now < this.lastSpatialHashMaintenance ||
+      now - this.lastSpatialHashMaintenance >= 1000
+    ) {
       this.spatialHash.cleanup();
       this.lastSpatialHashMaintenance = now;
     }
@@ -1278,7 +1289,7 @@ class PhysicsSystem extends BaseSystem {
 
     this.bootstrapCompleted = true;
     this.indexDirty = true;
-    this.lastSpatialHashMaintenance = performance.now();
+    this.lastSpatialHashMaintenance = this.getSimulationTimeMs();
     this._snapshotFallbackWarningIssued = false;
     this.warnOnBossTrackingMismatch({ reason: 'snapshot-import' });
     return true;

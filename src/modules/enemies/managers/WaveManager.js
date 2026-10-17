@@ -1080,7 +1080,7 @@ export class WaveManager {
 
     this.currentWave++;
     this.waveInProgress = true;
-    this.waveStartTime = Date.now();
+    this.waveStartTime = this.getSimulationTimeMs();
     this.enemiesSpawnedThisWave = 0;
     this.enemiesKilledThisWave = 0;
     this.asteroidsSpawnedThisWave = 0;
@@ -2360,6 +2360,11 @@ export class WaveManager {
     }
   }
 
+  /** Simulation clock in ms (session time from fixed steps, not wall clock). */
+  getSimulationTimeMs() {
+    return (this.enemySystem?.sessionStats?.timeElapsed ?? 0) * 1000;
+  }
+
   /**
    * Completes the current wave.
    */
@@ -2367,7 +2372,7 @@ export class WaveManager {
     if (!this.waveInProgress) return;
 
     this.waveInProgress = false;
-    this.waveEndTime = Date.now();
+    this.waveEndTime = this.getSimulationTimeMs();
     const duration = (this.waveEndTime - this.waveStartTime) / 1000;
 
     GameDebugLogger.log('WAVE', 'Wave complete', {
