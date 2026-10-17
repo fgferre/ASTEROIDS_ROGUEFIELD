@@ -2911,7 +2911,8 @@ class CombatSystem extends BaseSystem {
     const damageResult = this.applyDamageToEnemy(
       enemiesSystem,
       enemy,
-      requestedDamage
+      requestedDamage,
+      { hitPosition: { x: bullet.x, y: bullet.y } }
     );
     const remainingHealth = Number.isFinite(damageResult.remainingHealth)
       ? damageResult.remainingHealth
@@ -2981,8 +2982,8 @@ class CombatSystem extends BaseSystem {
     return damageResult;
   }
 
-  applyDamageToEnemy(enemiesSystem, enemy, damage) {
-    const result = enemiesSystem.applyDamage(enemy, damage);
+  applyDamageToEnemy(enemiesSystem, enemy, damage, source) {
+    const result = enemiesSystem.applyDamage(enemy, damage, { source });
     return {
       killed: !!result?.killed,
       remainingHealth: Math.max(

@@ -4,6 +4,10 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
 import { DRONE_CONFIG, DRONE_REWARDS } from '../enemies/drone.js';
 import { HUNTER_CONFIG, HUNTER_REWARDS } from '../enemies/hunter.js';
 import { MINE_CONFIG, MINE_REWARDS } from '../enemies/mine.js';
+import { HUSK_CONFIG, HUSK_REWARDS } from '../enemies/husk.js';
+import { RAM_CONFIG, RAM_REWARDS } from '../enemies/ram.js';
+import { WEAVER_CONFIG, WEAVER_REWARDS } from '../enemies/weaver.js';
+import { BULWARK_CONFIG, BULWARK_REWARDS } from '../enemies/bulwark.js';
 import {
   BOSS_CONFIG,
   BOSS_PHYSICS_CONFIG,
@@ -20,6 +24,10 @@ export const ENEMY_TYPES = deepFreeze({
   drone: DRONE_CONFIG,
   mine: MINE_CONFIG,
   hunter: HUNTER_CONFIG,
+  husk: HUSK_CONFIG,
+  ram: RAM_CONFIG,
+  weaver: WEAVER_CONFIG,
+  bulwark: BULWARK_CONFIG,
 });
 
 export {
@@ -51,6 +59,10 @@ export const ENEMY_REWARDS = deepFreeze({
   drone: DRONE_REWARDS,
   mine: MINE_REWARDS,
   hunter: HUNTER_REWARDS,
+  husk: HUSK_REWARDS,
+  ram: RAM_REWARDS,
+  weaver: WEAVER_REWARDS,
+  bulwark: BULWARK_REWARDS,
   boss: BOSS_REWARDS,
 });
 

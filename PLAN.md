@@ -148,7 +148,7 @@ tudo num browser."_ Fatias, cada uma um commit com captura; números como "propo
 
 - [x] **R2.1 Profundidade e luz (render3d).** sRGB + tone mapping (hoje saída linear, por isso chapado perto do menu),
       chão de poeira que a luz da nave varre, sombras suaves sob rochas/inimigos/nave, pool de luzes para explosões.
-- [ ] **R2.2 Roster.** Quatro tipos novos com comportamento próprio (Husk que se parte em Motes, Ram com investida
+- [x] **R2.2 Roster.** Quatro tipos novos com comportamento próprio (Husk que se parte em Motes, Ram com investida
       telegrafada, Weaver que semeia Tethers, Bulwark com escudo frontal) + modificador **Elite** (vida, tamanho,
       cor emissiva, recompensa) aplicável a qualquer tipo de apoio. Look 2D no RenderComponent.
 - [ ] **R2.3 Look 3D dos novos** em `render3d/enemyMirror.js` (+ tipo desconhecido não pode virar Mote em silêncio).

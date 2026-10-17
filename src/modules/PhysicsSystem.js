@@ -1734,7 +1734,12 @@ class PhysicsSystem extends BaseSystem {
     const previousShieldHits = context.shieldState?.currentHits ?? 0;
     const prevShieldActive = context.shieldActive;
 
-    const baseDamage = 12;
+    // Support enemies with a contactDamage (Husk, Ram, Bulwark, elites) hit
+    // that hard; everything else keeps the base 12.
+    const baseDamage =
+      !isBoss && Number.isFinite(asteroid.contactDamage)
+        ? asteroid.contactDamage
+        : 12;
     const momentumFactor = (asteroid.mass * relSpeed) / 120;
     let rawDamage =
       baseDamage +

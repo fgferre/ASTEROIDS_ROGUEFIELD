@@ -96,7 +96,8 @@ class EnemyDamageSystem {
       return { killed: false, remainingHealth: 0, fragments: [] };
     }
 
-    const killed = asteroid.takeDamage(damage);
+    // options.source carries the hit position for direction-aware enemies (Bulwark).
+    const killed = asteroid.takeDamage(damage, options.source);
     const remainingHealth = Math.max(0, asteroid.health);
 
     if (killed) {

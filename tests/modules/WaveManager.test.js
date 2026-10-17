@@ -24,9 +24,9 @@ describe('WaveManager support enemy weights', () => {
       () => {
         const manager = createWaveManager();
         const earliestStart = Math.min(
-          CONSTANTS.SUPPORT_ENEMY_PROGRESSION.drone.startWave,
-          CONSTANTS.SUPPORT_ENEMY_PROGRESSION.mine.startWave,
-          CONSTANTS.SUPPORT_ENEMY_PROGRESSION.hunter.startWave
+          ...Object.values(CONSTANTS.SUPPORT_ENEMY_PROGRESSION).map(
+            (rule) => rule.startWave
+          )
         );
 
         return manager.computeSupportWeights(earliestStart - 1);
@@ -44,8 +44,12 @@ describe('WaveManager support enemy weights', () => {
       const mineStart = CONSTANTS.SUPPORT_ENEMY_PROGRESSION.mine.startWave;
       const hunterStart = CONSTANTS.SUPPORT_ENEMY_PROGRESSION.hunter.startWave;
 
-      const waveDroneOnly = manager.computeSupportWeights(droneStart);
-      expect(waveDroneOnly).toEqual([{ key: 'drone', weight: 1 }]);
+      const waveAtDroneStart = manager.computeSupportWeights(droneStart);
+      expect(waveAtDroneStart.find((entry) => entry.key === 'drone')).toEqual({
+        key: 'drone',
+        weight: 1,
+      });
+      expect(waveAtDroneStart.map((entry) => entry.key)).not.toContain('mine');
 
       const waveWithMines = manager.computeSupportWeights(mineStart);
       const droneAtMineWave = waveWithMines.find(

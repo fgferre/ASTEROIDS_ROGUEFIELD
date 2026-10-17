@@ -16,6 +16,7 @@ import {
   PALETTE,
   withAlpha,
 } from '../../../data/constants/palette.js';
+import { BULWARK_SHIELD_HALF_ARC } from '../../../data/enemies/bulwark.js';
 
 const TAU = Math.PI * 2;
 
@@ -74,8 +75,11 @@ const darkEdge = (ctx) => {
   ctx.stroke();
 };
 
-const threatRim = (ctx) => {
-  ctx.strokeStyle = PALETTE.threat;
+// An elite's energy burns gold instead of threat red (docs/NORTE.md §2).
+const accentOf = (enemy) => (enemy?.elite ? PALETTE.xp : PALETTE.threat);
+
+const threatRim = (ctx, color = PALETTE.threat) => {
+  ctx.strokeStyle = color;
   ctx.lineWidth = LINE.hair;
   ctx.stroke();
 };
@@ -105,10 +109,10 @@ const mote = {
     ctx.stroke();
     bevel(ctx, r * 0.58 + 0.75, 0.35);
   },
-  glow(ctx, size) {
+  glow(ctx, size, enemy) {
     ctx.beginPath();
     ctx.arc(0, 0, size * 0.85 + 0.5, 0, TAU);
-    threatRim(ctx);
+    threatRim(ctx, accentOf(enemy));
   },
   live(ctx, size, enemy, emissive) {
     const r = size * 0.85;
@@ -124,7 +128,7 @@ const mote = {
     }
     ctx.beginPath();
     ctx.arc(ex, ey, emissive ? eye * 1.4 : eye, 0, TAU);
-    ctx.fillStyle = PALETTE.threat;
+    ctx.fillStyle = accentOf(enemy);
     ctx.fill();
   },
 };
@@ -172,9 +176,9 @@ const seeker = {
     ctx.fillStyle = PALETTE.rockShadow;
     ctx.fill();
   },
-  glow(ctx, size) {
+  glow(ctx, size, enemy) {
     seekerHull(ctx, size);
-    threatRim(ctx);
+    threatRim(ctx, accentOf(enemy));
   },
   live(ctx, size, enemy, emissive) {
     const half = size * 0.75;
@@ -183,7 +187,7 @@ const seeker = {
     const lens = w * 0.2;
     ctx.beginPath();
     ctx.arc(half * 0.48, 0, lens * (emissive ? 1 + charge * 1.6 : 1), 0, TAU);
-    ctx.fillStyle = withAlpha(PALETTE.threat, 0.3 + charge * 0.7);
+    ctx.fillStyle = withAlpha(accentOf(enemy), 0.3 + charge * 0.7);
     ctx.fill();
     if (charge > 0.5) {
       ctx.beginPath();
@@ -236,29 +240,30 @@ const tether = {
     ctx.fillStyle = PALETTE.rockShadow;
     ctx.fill();
   },
-  glow(ctx, size) {
+  glow(ctx, size, enemy) {
     ctx.beginPath();
     ctx.arc(0, 0, size * 0.42 + 0.5, 0, TAU);
-    threatRim(ctx);
+    threatRim(ctx, accentOf(enemy));
     for (const angle of STRUT_ANGLES) {
       const tip = strutTip(size, angle);
       ctx.beginPath();
       ctx.arc(tip.x, tip.y, 2.4, 0, TAU);
-      threatRim(ctx);
+      threatRim(ctx, accentOf(enemy));
     }
   },
   live(ctx, size, enemy, emissive) {
     const pulse = 0.5 + 0.5 * Math.sin(enemy.pulsePhase ?? 0);
     const armed = Boolean(enemy.armed);
+    const accent = accentOf(enemy);
     ctx.beginPath();
     ctx.arc(0, 0, size * 0.42 * 0.22, 0, TAU);
-    ctx.fillStyle = withAlpha(PALETTE.threat, armed ? 0.6 + pulse * 0.4 : 0.25);
+    ctx.fillStyle = withAlpha(accent, armed ? 0.6 + pulse * 0.4 : 0.25);
     ctx.fill();
     if (!armed) return;
 
     const frame = Math.floor(enemyTime(enemy) * 18);
     const seed = (enemy.id ? String(enemy.id).length * 7 : 0) + frame;
-    ctx.strokeStyle = withAlpha(PALETTE.threat, 0.45 + pulse * 0.55);
+    ctx.strokeStyle = withAlpha(accent, 0.45 + pulse * 0.55);
     ctx.lineWidth = emissive ? 1.4 : 0.9;
     ctx.lineJoin = 'round';
     for (let i = 0; i < STRUT_ANGLES.length; i += 1) {
@@ -282,6 +287,275 @@ const tether = {
       ctx.lineTo(b.x, b.y);
       ctx.stroke();
     }
+  },
+};
+
+// --- Husk: cracked matte shell, red seams brighten as it nears death -----
+
+// Shell outline (radius factors) and seam polylines, in units of size.
+const HUSK_SHELL = [1, 0.9, 0.97, 0.86, 0.95, 0.9, 1, 0.87, 0.94];
+const HUSK_SEAMS = [
+  [
+    [0.05, -0.1],
+    [0.32, -0.28],
+    [0.48, -0.22],
+    [0.8, -0.45],
+  ],
+  [
+    [0.02, 0.05],
+    [-0.25, 0.3],
+    [-0.3, 0.55],
+    [-0.52, 0.72],
+  ],
+  [
+    [-0.05, -0.02],
+    [-0.38, -0.12],
+    [-0.62, -0.38],
+  ],
+  [
+    [0.1, 0.12],
+    [0.42, 0.34],
+    [0.58, 0.66],
+  ],
+];
+
+const huskShell = (ctx, size) => {
+  const r = size * 0.95;
+  ctx.beginPath();
+  HUSK_SHELL.forEach((k, i) => {
+    const a = (i / HUSK_SHELL.length) * TAU;
+    const x = Math.cos(a) * r * k;
+    const y = Math.sin(a) * r * k;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.closePath();
+};
+
+const huskSeams = (ctx, size) => {
+  ctx.beginPath();
+  for (const seam of HUSK_SEAMS) {
+    seam.forEach(([x, y], i) => {
+      if (i === 0) ctx.moveTo(x * size, y * size);
+      else ctx.lineTo(x * size, y * size);
+    });
+  }
+};
+
+const husk = {
+  facing: () => 0,
+  body(ctx, size) {
+    huskShell(ctx, size);
+    ctx.fillStyle = litFill(ctx, size);
+    ctx.fill();
+    darkEdge(ctx);
+    bevel(ctx, size * 0.86, 0.5);
+    huskSeams(ctx, size);
+    ctx.strokeStyle = PALETTE.rockShadow;
+    ctx.lineWidth = 2.2;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+  },
+  glow(ctx, size, enemy) {
+    huskShell(ctx, size);
+    threatRim(ctx, accentOf(enemy));
+  },
+  live(ctx, size, enemy, emissive) {
+    const heat = clamp01(enemy.damageRatio);
+    huskSeams(ctx, size);
+    ctx.strokeStyle = withAlpha(accentOf(enemy), 0.15 + heat * 0.85);
+    ctx.lineWidth = emissive ? 1 + heat * 1.6 : 0.8;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+  },
+};
+
+// --- Ram: arrowhead hull, one lens that brightens through the windup -----
+
+const ramHull = (ctx, size) => {
+  ctx.beginPath();
+  ctx.moveTo(size * 1.1, 0);
+  ctx.lineTo(-size * 0.8, size * 0.75);
+  ctx.lineTo(-size * 0.42, 0);
+  ctx.lineTo(-size * 0.8, -size * 0.75);
+  ctx.closePath();
+};
+
+const ram = {
+  facing: (enemy) => enemy.rotation ?? 0,
+  body(ctx, size) {
+    ramHull(ctx, size);
+    ctx.fillStyle = litFill(ctx, size);
+    ctx.fill();
+    darkEdge(ctx);
+    // keel line and the lens socket
+    ctx.beginPath();
+    ctx.moveTo(-size * 0.42, 0);
+    ctx.lineTo(size * 0.25, 0);
+    ctx.strokeStyle = withAlpha(PALETTE.rockShadow, 0.8);
+    ctx.lineWidth = 0.75;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(size * 0.45, 0, size * 0.18, 0, TAU);
+    ctx.fillStyle = PALETTE.rockShadow;
+    ctx.fill();
+  },
+  glow(ctx, size, enemy) {
+    ramHull(ctx, size);
+    threatRim(ctx, accentOf(enemy));
+  },
+  live(ctx, size, enemy, emissive) {
+    const charge = clamp01(enemy.telegraphRatio);
+    const lens = size * 0.12;
+    ctx.beginPath();
+    ctx.arc(size * 0.45, 0, lens * (emissive ? 1 + charge * 1.8 : 1), 0, TAU);
+    ctx.fillStyle = withAlpha(accentOf(enemy), 0.3 + charge * 0.7);
+    ctx.fill();
+    if (charge > 0.5) {
+      ctx.beginPath();
+      ctx.arc(size * 0.45, 0, lens * 0.5, 0, TAU);
+      ctx.fillStyle = withAlpha(PALETTE.text, (charge - 0.5) * 1.6);
+      ctx.fill();
+    }
+  },
+};
+
+// --- Weaver: small hub, three thin arms that spin; tips flare on laying --
+
+const WEAVER_ARMS = 3;
+
+const weaverArm = (ctx, size, angle) => {
+  const bend = 0.55; // arms trail the spin a little
+  ctx.beginPath();
+  ctx.moveTo(Math.cos(angle) * size * 0.3, Math.sin(angle) * size * 0.3);
+  ctx.quadraticCurveTo(
+    Math.cos(angle - bend * 0.5) * size * 0.75,
+    Math.sin(angle - bend * 0.5) * size * 0.75,
+    Math.cos(angle - bend) * size,
+    Math.sin(angle - bend) * size
+  );
+};
+
+const weaver = {
+  facing: () => 0, // the hub is round; the arms turn in live()
+  body(ctx, size) {
+    const hub = size * 0.34;
+    ctx.beginPath();
+    ctx.arc(0, 0, hub, 0, TAU);
+    ctx.fillStyle = litFill(ctx, hub);
+    ctx.fill();
+    darkEdge(ctx);
+    bevel(ctx, hub - 0.8);
+    ctx.beginPath();
+    ctx.arc(0, 0, hub * 0.4, 0, TAU);
+    ctx.fillStyle = PALETTE.rockShadow;
+    ctx.fill();
+  },
+  glow(ctx, size, enemy) {
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.34 + 0.5, 0, TAU);
+    threatRim(ctx, accentOf(enemy));
+  },
+  live(ctx, size, enemy, emissive) {
+    const accent = accentOf(enemy);
+    const lay = clamp01(enemy.layGlow);
+    ctx.lineCap = 'round';
+    for (let i = 0; i < WEAVER_ARMS; i += 1) {
+      const angle = (enemy.spin ?? 0) + (i * TAU) / WEAVER_ARMS;
+      const tipAngle = angle - 0.55;
+      const tx = Math.cos(tipAngle) * size;
+      const ty = Math.sin(tipAngle) * size;
+      if (!emissive) {
+        weaverArm(ctx, size, angle);
+        ctx.strokeStyle = PALETTE.rockShadow;
+        ctx.lineWidth = 2.6;
+        ctx.stroke();
+        ctx.strokeStyle = PALETTE.hullLit;
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      }
+      if (lay > 0) {
+        weaverArm(ctx, size, angle);
+        ctx.strokeStyle = withAlpha(accent, lay * 0.85);
+        ctx.lineWidth = emissive ? 1.6 : 0.8;
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.arc(tx, ty, emissive ? 1.8 + lay * 1.5 : 1.3, 0, TAU);
+      ctx.fillStyle = withAlpha(accent, 0.4 + lay * 0.6);
+      ctx.fill();
+    }
+  },
+};
+
+// --- Bulwark: squat hull behind a wide frontal plate; only the rim glows --
+
+const bulwarkPlate = (ctx, size, halfArc) => {
+  ctx.beginPath();
+  ctx.arc(0, 0, size * 1.02, -halfArc, halfArc);
+  ctx.arc(0, 0, size * 0.8, halfArc, -halfArc, true);
+  ctx.closePath();
+};
+
+const bulwark = {
+  facing: () => 0, // the hull is round; the plate turns in live()
+  body(ctx, size) {
+    const r = size * 0.72;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, TAU);
+    ctx.fillStyle = litFill(ctx, r);
+    ctx.fill();
+    darkEdge(ctx);
+    bevel(ctx, r - 0.9);
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 0.55, 0, TAU);
+    ctx.strokeStyle = withAlpha(PALETTE.rockShadow, 0.8);
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  },
+  glow(ctx, size, enemy) {
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.72 + 0.5, 0, TAU);
+    threatRim(ctx, accentOf(enemy));
+  },
+  live(ctx, size, enemy, emissive) {
+    const broken = Boolean(enemy.shieldBroken);
+    ctx.save();
+    ctx.rotate(enemy.facing ?? 0);
+    if (!emissive) {
+      bulwarkPlate(ctx, size, BULWARK_SHIELD_HALF_ARC);
+      ctx.fillStyle = broken ? PALETTE.hull : PALETTE.hullLit;
+      ctx.fill();
+      darkEdge(ctx);
+      if (broken) {
+        // the dead plate shows its fracture
+        ctx.beginPath();
+        ctx.moveTo(size * 1.0, -size * 0.18);
+        ctx.lineTo(size * 0.88, size * 0.05);
+        ctx.lineTo(size * 0.97, size * 0.3);
+        ctx.strokeStyle = PALETTE.rockShadow;
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+      }
+    }
+    if (!broken) {
+      const ratio =
+        enemy.maxShieldHealth > 0
+          ? clamp01(enemy.shieldHealth / enemy.maxShieldHealth)
+          : 1;
+      ctx.beginPath();
+      ctx.arc(
+        0,
+        0,
+        size * 1.02,
+        -BULWARK_SHIELD_HALF_ARC,
+        BULWARK_SHIELD_HALF_ARC
+      );
+      ctx.strokeStyle = withAlpha(accentOf(enemy), 0.35 + ratio * 0.6);
+      ctx.lineWidth = emissive ? LINE.base : LINE.hair;
+      ctx.stroke();
+    }
+    ctx.restore();
   },
 };
 
@@ -443,6 +717,10 @@ const LOOKS = {
   triangle: mote,
   diamond: seeker,
   sphere: tether,
+  husk,
+  ram,
+  weaver,
+  bulwark,
   boss: warden,
 };
 
@@ -456,7 +734,7 @@ const bakeLook = (look, shape, size, enemy) => {
   if (typeof document === 'undefined') return null;
   const scale = getRenderScale();
   const variant = look.key ? look.key(enemy) : 0;
-  const key = `${shape}|${size}|${variant}|${scale}`;
+  const key = `${shape}|${size}|${variant}|${scale}|${Boolean(enemy?.elite)}`;
   const cached = BAKES.get(key);
   if (cached) return cached;
 
@@ -488,6 +766,15 @@ const drawLayer = (ctx, enemy, angle, draw) => {
   if (angle) ctx.rotate(angle);
   draw();
   ctx.restore();
+};
+
+// Thin gold ring just outside an elite's silhouette.
+const eliteRing = (ctx, size, emissive) => {
+  ctx.beginPath();
+  ctx.arc(0, 0, size * 1.18 + 2, 0, TAU);
+  ctx.strokeStyle = withAlpha(PALETTE.xp, emissive ? 0.8 : 0.55);
+  ctx.lineWidth = LINE.hair;
+  ctx.stroke();
 };
 
 const proceduralStrategy = ({ enemy, ctx, config }) => {
@@ -525,6 +812,7 @@ const proceduralStrategy = ({ enemy, ctx, config }) => {
     if (sprite) blit(ctx, sprite.body);
     else look.body(ctx, size, enemy);
     look.live(ctx, size, enemy, false);
+    if (enemy.elite) eliteRing(ctx, size, false);
     if (flash > 0) blitFlash(ctx, HIT_FLASH_BODY_ALPHA);
   });
 
@@ -534,6 +822,7 @@ const proceduralStrategy = ({ enemy, ctx, config }) => {
     if (sprite) blit(emissive, sprite.glow);
     else look.glow(emissive, size, enemy);
     look.live(emissive, size, enemy, true);
+    if (enemy.elite) eliteRing(emissive, size, true);
     if (flash > 0) blitFlash(emissive, HIT_FLASH_EMISSIVE_ALPHA);
   });
 };

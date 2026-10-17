@@ -31,6 +31,7 @@ import {
 } from '../../../data/constants/visual.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import { resolveEventBus } from '../../../core/serviceUtils.js';
+import RandomService from '../../../core/RandomService.js';
 
 // docs/NORTE.md §2: a white flash on any damage. PROPOSAL 17/10 (was none).
 export const HIT_FLASH_SECONDS = 0.06;
@@ -550,6 +551,53 @@ export class BaseEnemy {
         component.update(context);
       }
     }
+  }
+
+  /**
+   * Seeded random for this enemy: the spawn's own stream when given, else a
+   * fork of the system's scope for this type.
+   */
+  resolveRandom(config = {}) {
+    if (config.random && typeof config.random.float === 'function') {
+      return config.random;
+    }
+
+    if (this.system && typeof this.system.getRandomScope === 'function') {
+      const generator = this.system.getRandomScope(
+        config.randomScope || this.type,
+        {
+          parentScope: config.randomParentScope || 'spawn',
+          label: `enemy:${this.type}:${config.id || this.id || 'spawn'}`,
+        }
+      );
+      return generator?.fork ? generator.fork(`${this.type}:core`) : generator;
+    }
+
+    return new RandomService(`enemy:${this.type}`);
+  }
+
+  /**
+   * Spawns an enemy this one releases (Husk Motes, Weaver Tethers) through the
+   * same path as the Warden's minions: factory acquire, then counted in the
+   * running wave.
+   */
+  spawnChild(type, config = {}) {
+    const system = this.system;
+    const child = system?.acquireEnemyViaFactory?.(type, {
+      wave: this.wave,
+      spawnedBy: this.id,
+      randomParentScope: `${this.type}:${this.id}`,
+      ...config,
+    });
+    if (!child) return null;
+    // A pooled child keeps its last velocity object; rebuild it from vx/vy.
+    child.velocity = null;
+    child[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')] = false;
+    system.waveManager?.registerDynamicMinion?.(child, {
+      parentId: this.id,
+      minionType: type,
+    });
+    return child;
   }
 
   getEventBus() {

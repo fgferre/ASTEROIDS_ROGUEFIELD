@@ -5,6 +5,10 @@ import { RenderComponent } from '../components/RenderComponent.js';
 import { WeaponComponent } from '../components/WeaponComponent.js';
 import { debugLog } from '../../../core/debugLogging.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
+import {
+  ELITE_EXCLUDED_TYPES,
+  ELITE_MODIFIERS,
+} from '../../../data/enemies/elite.js';
 
 /**
  * Enemy Factory
@@ -224,6 +228,10 @@ export class EnemyFactory {
       // Apply default tags
       for (const tag of typeConfig.tags) {
         enemy.addTag(tag);
+      }
+
+      if (!ELITE_EXCLUDED_TYPES.includes(type)) {
+        this.applyElite(enemy, finalConfig);
       }
 
       stats.active++;
@@ -505,6 +513,36 @@ export class EnemyFactory {
     }
 
     console.groupEnd();
+  }
+
+  /**
+   * Support enemies carry `elite` and a `displayName` every spawn (pooled
+   * instances must not keep the last one's). An elite request scales the
+   * enemy by ELITE_MODIFIERS; rewards read `enemy.elite` in RewardManager.
+   */
+  applyElite(enemy, finalConfig) {
+    enemy.elite = Boolean(finalConfig.elite);
+    const baseName = finalConfig.displayName ?? enemy.type;
+    enemy.displayName = enemy.elite ? `Elite ${baseName}` : baseName;
+    // Undefined for kinds without one: PhysicsSystem then uses its base hit.
+    const contactDamage = finalConfig.contactDamage;
+    enemy.contactDamage = enemy.elite
+      ? (contactDamage ?? 12) * ELITE_MODIFIERS.contactDamage
+      : contactDamage;
+    if (!enemy.elite) return;
+
+    enemy.maxHealth *= ELITE_MODIFIERS.health;
+    enemy.health = enemy.maxHealth;
+    enemy.radius *= ELITE_MODIFIERS.radius;
+    if (Number.isFinite(enemy.collisionRadius)) {
+      enemy.collisionRadius *= ELITE_MODIFIERS.radius;
+    }
+    const movement = enemy.movementConfig;
+    for (const key of ['maxSpeed', 'chargeSpeed']) {
+      if (Number.isFinite(movement?.[key])) {
+        movement[key] *= ELITE_MODIFIERS.speed;
+      }
+    }
   }
 
   applyComponents(enemy, components = {}, finalConfig = {}) {

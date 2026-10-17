@@ -43,6 +43,11 @@ import {
 } from '../../../data/constants/gameplay.js';
 import { ENEMY_TYPES, BOSS_CONFIG } from '../../../data/constants/visual.js';
 import { IS_DEV } from '../../../core/env.js';
+import { eliteChanceForWave } from '../../../data/enemies/elite.js';
+
+// Support kinds with no hand-tuned wave entries: they join the predefined
+// waves and the dynamic ones from SUPPORT_ENEMY_PROGRESSION alone.
+const ADDED_SUPPORT_KINDS = ['husk', 'ram', 'bulwark', 'weaver'];
 
 export class WaveManager {
   /**
@@ -228,6 +233,16 @@ export class WaveManager {
       }
 
       configs.set(i, { isBossWave: false, enemies: baseGroups });
+    }
+
+    for (const [wave, config] of configs) {
+      for (const kind of ADDED_SUPPORT_KINDS) {
+        const group = this.createSupportGroup(
+          kind,
+          this.computeSupportCount(kind, wave)
+        );
+        if (group) config.enemies.push(group);
+      }
     }
 
     // Waves 13+: Dynamic generation
@@ -984,8 +999,13 @@ export class WaveManager {
           1 + Math.floor((waveNumber - 13) / 2),
           Math.max(1, Math.round(baseCount * 0.18))
         );
-      default:
-        return 0;
+      default: {
+        const startWave = SUPPORT_ENEMY_PROGRESSION[kind]?.startWave;
+        if (!ADDED_SUPPORT_KINDS.includes(kind) || !(waveNumber >= startWave)) {
+          return 0;
+        }
+        return 1 + Math.floor((waveNumber - startWave) / 3);
+      }
     }
   }
 
@@ -1061,7 +1081,9 @@ export class WaveManager {
         };
       }
       default:
-        return null;
+        return ADDED_SUPPORT_KINDS.includes(kind)
+          ? { type: kind, count }
+          : null;
     }
   }
 
@@ -1301,7 +1323,8 @@ export class WaveManager {
       const isDrone = typeKey === 'drone';
       const isMine = typeKey === 'mine';
       const isHunter = typeKey === 'hunter';
-      const isTacticalEnemy = isDrone || isMine || isHunter;
+      const isTacticalEnemy =
+        isDrone || isMine || isHunter || ADDED_SUPPORT_KINDS.includes(typeKey);
 
       if (isAsteroid && !waveManagerSpawnsAsteroids) {
         continue;
@@ -1472,6 +1495,13 @@ export class WaveManager {
         if (spawnContext.random?.fork) {
           enemyConfig.random = spawnContext.random.fork('asteroid-core');
           enemyConfig.randomScope = 'spawn';
+        }
+
+        // Rolled after the core fork so the enemy's own stream is unchanged.
+        if (isTacticalEnemy) {
+          enemyConfig.elite = spawnContext.random.chance(
+            eliteChanceForWave(this.currentWave)
+          );
         }
 
         // Centralized acquisition path for factory-backed enemies

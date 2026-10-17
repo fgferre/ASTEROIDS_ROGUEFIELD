@@ -13,6 +13,10 @@ import { Drone } from './enemies/types/Drone.js';
 import { Mine } from './enemies/types/Mine.js';
 import { Hunter } from './enemies/types/Hunter.js';
 import { BossEnemy } from './enemies/types/BossEnemy.js';
+import { Husk } from './enemies/types/Husk.js';
+import { Ram } from './enemies/types/Ram.js';
+import { Weaver } from './enemies/types/Weaver.js';
+import { Bulwark } from './enemies/types/Bulwark.js';
 import { EnemyFactory } from './enemies/base/EnemyFactory.js';
 import { WaveManager } from './enemies/managers/WaveManager.js';
 import { RewardManager } from './enemies/managers/RewardManager.js';
@@ -49,6 +53,10 @@ import { DRONE_COMPONENTS } from '../data/enemies/drone.js';
 import { HUNTER_COMPONENTS } from '../data/enemies/hunter.js';
 import { MINE_COMPONENTS } from '../data/enemies/mine.js';
 import { BOSS_COMPONENTS } from '../data/enemies/boss.js';
+import { HUSK_COMPONENTS } from '../data/enemies/husk.js';
+import { RAM_COMPONENTS } from '../data/enemies/ram.js';
+import { WEAVER_COMPONENTS } from '../data/enemies/weaver.js';
+import { BULWARK_COMPONENTS } from '../data/enemies/bulwark.js';
 import { ORB_VALUE } from '../data/enemies/asteroid-configs.js';
 import { IS_DEV } from '../core/env.js';
 
@@ -647,6 +655,27 @@ class EnemySystem extends BaseSystem {
           pool: GamePools?.hunters || null,
           defaults: { ...ENEMY_TYPES.hunter, components: HUNTER_COMPONENTS },
           tags: ['enemy', 'hostile', 'ranged', 'elite'],
+        });
+      }
+
+      const supportKinds = [
+        ['husk', Husk, GamePools?.husks, HUSK_COMPONENTS, ['splitter']],
+        ['ram', Ram, GamePools?.rams, RAM_COMPONENTS, ['charger']],
+        ['weaver', Weaver, GamePools?.weavers, WEAVER_COMPONENTS, ['layer']],
+        [
+          'bulwark',
+          Bulwark,
+          GamePools?.bulwarks,
+          BULWARK_COMPONENTS,
+          ['armored'],
+        ],
+      ];
+      for (const [type, EnemyClass, pool, components, tags] of supportKinds) {
+        this.factory.registerType(type, {
+          class: EnemyClass,
+          pool: pool || null,
+          defaults: { ...ENEMY_TYPES[type], components },
+          tags: ['enemy', 'hostile', ...tags],
         });
       }
 

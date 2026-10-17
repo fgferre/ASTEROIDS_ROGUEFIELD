@@ -305,6 +305,16 @@ export const SUPPORT_ENEMY_PROGRESSION = deepFreeze({
 
     weightScaling: 0.1,
   }),
+
+  // proposta 17/10: the four new kinds. Count = 1 at startWave, +1 every
+  // 3 waves (WaveManager.getBaselineSupportCount default).
+  husk: deepFreeze({ startWave: 6, baseWeight: 1, weightScaling: 0.06 }),
+
+  ram: deepFreeze({ startWave: 9, baseWeight: 1, weightScaling: 0.06 }),
+
+  bulwark: deepFreeze({ startWave: 11, baseWeight: 1, weightScaling: 0.05 }),
+
+  weaver: deepFreeze({ startWave: 12, baseWeight: 1, weightScaling: 0.05 }),
 });
 
 export const WAVEMANAGER_HANDLES_ASTEROID_SPAWN = false; // WAVE-006: Ativar controle de spawn de asteroides pelo WaveManager
