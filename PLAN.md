@@ -61,7 +61,7 @@ arquivo quando a última etapa fechar. Decisões de produto são do dono, por im
 - Núcleo: rotação + empuxo newtoniano (Asteroids clássico) com **tiro automático e auto-aim** por padrão; escudo
   (E) e dois toggles (G spread, T mira). Inimigos: asteroides (variantes), Drone, Hunter, Mine, Boss com fases.
 - `docs/positioning.md` promete cinco famílias de tag com sinergias e uma matriz 16 células de status × status;
-  o que disso existe no código fica a confirmar na Etapa 6 (relatório de jogabilidade pendente nesta sessão).
+  o que disso existe no código fica a confirmar quando a Etapa 6 abrir (o levantamento de jogabilidade de 17/10 foi cancelado antes de terminar; refazer com um Explore na hora).
 
 ## Decisões já tomadas (17/10)
 
@@ -106,8 +106,7 @@ arquivo quando a última etapa fechar. Decisões de produto são do dono, por im
       joga, depois trava. Worker: opus.
 - [ ] **6. Dinâmicas.** Confirmar o que existe das sinergias por tag e da matriz de status; onde não existe,
       decidir com ele o que entra no v1; raridade/reroll/banish nas cartas; comportamento dos inimigos por onda; uma
-      habilidade ativa além do escudo (dash?) é decisão de produto dele. Esta etapa recebe o relatório de jogabilidade
-      pendente antes de ser detalhada.
+      habilidade ativa além do escudo (dash?) é decisão de produto dele. Esta etapa começa por um levantamento de jogabilidade (o de 17/10 foi cancelado) antes de ser detalhada.
 - [ ] **7. Engenharia contínua (em paralelo, por fatias pequenas).** `resolveService` lança em vez de devolver
       `null` e os sistemas recebem dependências obrigatórias no construtor → remover os `typeof`/`try` defensivos;
       apagar flags de legado e o espelho `gameState`; um só `isDev`; zerar `no-unused-vars` e `Math.random` e
