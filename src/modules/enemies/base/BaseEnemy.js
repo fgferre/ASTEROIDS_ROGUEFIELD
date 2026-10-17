@@ -32,6 +32,9 @@ import {
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import { resolveEventBus } from '../../../core/serviceUtils.js';
 
+// docs/NORTE.md §2: a white flash on any damage. PROPOSAL 17/10 (was none).
+export const HIT_FLASH_SECONDS = 0.06;
+
 let fallbackEnemyIdSequence = 0;
 
 export class BaseEnemy {
@@ -76,6 +79,7 @@ export class BaseEnemy {
     this.rotation = 0;
     this.rotationSpeed = 0;
     this.visible = true;
+    this.lastHitTime = -Infinity; // performance.now() of the last damage taken
 
     // Components (to be set by subclasses)
     this.components = new Map();
@@ -110,6 +114,7 @@ export class BaseEnemy {
     this.alive = true;
     this.initialized = true;
     this.age = 0;
+    this.lastHitTime = -Infinity;
 
     // Rotation
     this.rotation = config.rotation || 0;
@@ -212,7 +217,9 @@ export class BaseEnemy {
 
     const healthComponent = this.getComponent('health');
     if (healthComponent && typeof healthComponent.takeDamage === 'function') {
+      const before = this.health;
       healthComponent.takeDamage(this, amount, source);
+      if (this.health < before) this.markHit();
       return this.health <= 0;
     }
 
@@ -220,6 +227,7 @@ export class BaseEnemy {
     const actualDamage = Math.max(0, amount - this.armor);
 
     this.health -= actualDamage;
+    if (actualDamage > 0) this.markHit();
 
     // Hook for damage reactions
     this.onDamaged(actualDamage, source);
@@ -231,6 +239,29 @@ export class BaseEnemy {
     }
 
     return false;
+  }
+
+  markHit() {
+    this.lastHitTime = performance.now();
+  }
+
+  /**
+   * Hit-flash strength, 1 right after damage fading to 0. The Warden keeps its
+   * own timed, damage-scaled flash (BossEnemy.triggerDamageFlash).
+   *
+   * @returns {number} 0-1
+   */
+  getHitFlash() {
+    if (this.damageFlashDuration > 0) {
+      return (
+        Math.min(
+          1,
+          Math.max(0, this.damageFlashTimer / this.damageFlashDuration)
+        ) * Math.min(1, Math.max(0, this.damageFlashStrength || 1))
+      );
+    }
+    const elapsed = (performance.now() - this.lastHitTime) / 1000;
+    return Math.min(1, Math.max(0, 1 - elapsed / HIT_FLASH_SECONDS));
   }
 
   /**
@@ -377,6 +408,7 @@ export class BaseEnemy {
     this.alive = false;
     this.initialized = false;
     this.visible = true;
+    this.lastHitTime = -Infinity;
     this.useComponents = false;
 
     // Reset position & velocity

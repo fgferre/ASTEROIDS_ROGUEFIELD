@@ -69,4 +69,13 @@ describe('createCamera', () => {
       ['t', -W / 2, -H / 2],
     ]);
   });
+
+  it('pulses the zoom toward the peak and settles back on the base', () => {
+    const camera = createCamera({ fieldWidth: W, fieldHeight: H, zoom: 1.3 });
+    camera.pulseZoom(1.5, 0.6);
+    camera.update(W / 2, H / 2, 0.18);
+    expect(camera.zoom).toBeCloseTo(1.5, 6);
+    camera.update(W / 2, H / 2, 0.42);
+    expect(camera.zoom).toBe(1.3);
+  });
 });

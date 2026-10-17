@@ -33,6 +33,30 @@ const MAIN_THRUSTER_FLASH_INTENSITY = 0.05;
 const XP_SPARK_LIFE_SCALE = 1.5; // was 1
 const EXPLOSION_EMBER_LIFE_SCALE = 1.3; // was 1
 
+// Hits feel like hits (PLAN.md step 5). PROPOSAL from 17/10, judged by playing.
+// Numeric shake intensity becomes trauma as intensity / divisor (was 15).
+const SHAKE_INTENSITY_DIVISOR = 10;
+const PLAYER_HIT_SHAKE = { intensity: 7, duration: 0.35 }; // was 8 / 0.3 s; 7 keeps a hit (trauma 0.7) below death/boss (1.0)
+// Hit-stop on every kill: the world runs at `scale` speed, easing back to
+// full speed over `duration` s (freeze frame). Before 17/10 only the large
+// fragment (0.18 s at 24 %) and the Tether blast (0.14-0.26 s at 18 %) had one.
+const HIT_STOP = Object.freeze({
+  small: { duration: 0.05, scale: 0.3 }, // was none
+  medium: { duration: 0.08, scale: 0.25 }, // was none
+  large: { duration: 0.18, scale: 0.24 }, // unchanged
+  drone: { duration: 0.05, scale: 0.3 }, // Mote, was none
+  hunter: { duration: 0.09, scale: 0.25 }, // Seeker, was none
+  mine: { duration: 0.12, scale: 0.18 }, // Tether, was 0.14-0.26 s by radius
+});
+// A kind re-triggers at most once per this many seconds of game time, so a
+// multishot that kills three smalls freezes once.
+const HIT_STOP_COOLDOWN = 0.1;
+// Slow-motion beats (was: level-up a 0.2 s freeze at 40 %, death none). The
+// scale holds, then eases back to 1 over `ease` s; the camera zoom pulses to
+// `zoom` (base 1.3) and back over the same total time.
+const LEVEL_UP_SLOW_MO = { scale: 0.35, hold: 0.25, ease: 0.2, zoom: 1.42 };
+const DEATH_SLOW_MO = { scale: 0.3, hold: 0.5, ease: 0.4, zoom: 1.5 };
+
 // Ambient field life (docs/NORTE.md §2 "Fundo com volume"): matte micro-chips
 // and a few faint amber crystal motes drifting through the camera view, so the
 // Field is never empty. PROPOSAL from 17/10 (was: none), judged by playing.
@@ -141,6 +165,9 @@ export default class EffectsSystem extends BaseSystem {
         ? this.screenShake.captureSeedState()
         : null;
     this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
+    this.hitStopClock = 0;
+    this.hitStopReadyAt = {};
+    this.pendingZoomPulse = null;
     this.screenFlash = {
       timer: 0,
       duration: 0,
@@ -569,7 +596,7 @@ export default class EffectsSystem extends BaseSystem {
 
     this.registerEventListener('player-leveled-up', () => {
       this.addScreenShake(6, 0.4);
-      this.addFreezeFrame(0.2, 0.4);
+      this.playSlowMotion(LEVEL_UP_SLOW_MO);
       this.addScreenFlash(PALETTE.xp, 0.15, 0.2);
 
       // Player is built after effects' own dependencies; resolve on use.
@@ -594,8 +621,10 @@ export default class EffectsSystem extends BaseSystem {
     });
 
     this.registerEventListener('player-took-damage', (data) => {
-      // Intense screen shake
-      this.addScreenShake(8, 0.3);
+      this.addScreenShake(
+        PLAYER_HIT_SHAKE.intensity,
+        PLAYER_HIT_SHAKE.duration
+      );
 
       // Red damage flash
       this.addScreenFlash(withAlpha(PALETTE.threat, 0.4), 0.25, 0.3);
@@ -650,6 +679,7 @@ export default class EffectsSystem extends BaseSystem {
     });
 
     this.registerEventListener('player-died', (data) => {
+      this.playSlowMotion(DEATH_SLOW_MO);
       if (data?.position) {
         this.createEpicShipExplosion(data.position);
       }
@@ -660,6 +690,14 @@ export default class EffectsSystem extends BaseSystem {
     const baseDelta = Number.isFinite(deltaTime) ? Math.max(0, deltaTime) : 0;
     let effectDelta = baseDelta;
     let adjustedDelta = baseDelta;
+
+    this.hitStopClock += baseDelta;
+    // Emitted on the first running step: the level-up screen pauses the run
+    // in the same step that queued the pulse, so it plays on resume.
+    if (this.pendingZoomPulse && baseDelta > 0) {
+      this.eventBus?.emit?.('camera-zoom-pulse', this.pendingZoomPulse);
+      this.pendingZoomPulse = null;
+    }
 
     const freezeMultiplier = this.updateFreezeFrameState(baseDelta);
     effectDelta *= freezeMultiplier;
@@ -2058,7 +2096,10 @@ export default class EffectsSystem extends BaseSystem {
         return;
       }
 
-      const traumaFromIntensity = Math.min(1, finalIntensity / 15);
+      const traumaFromIntensity = Math.min(
+        1,
+        finalIntensity / SHAKE_INTENSITY_DIVISOR
+      );
       this.screenShake.add(traumaFromIntensity, finalDuration);
       return;
     }
@@ -2095,12 +2136,32 @@ export default class EffectsSystem extends BaseSystem {
       return;
     }
 
+    // A lighter freeze landing on a running one must not lift its floor.
+    this.freezeFrame.fade =
+      this.freezeFrame.timer > 0
+        ? Math.min(this.freezeFrame.fade, finalFade)
+        : finalFade;
     this.freezeFrame.timer = Math.max(this.freezeFrame.timer, finalDuration);
     this.freezeFrame.duration = Math.max(
       this.freezeFrame.duration,
       finalDuration
     );
-    this.freezeFrame.fade = finalFade;
+  }
+
+  addHitStop(kind) {
+    const stop = HIT_STOP[kind];
+    if (this.hitStopClock < (this.hitStopReadyAt[kind] ?? 0)) {
+      return;
+    }
+    this.hitStopReadyAt[kind] = this.hitStopClock + HIT_STOP_COOLDOWN;
+    this.addFreezeFrame(stop.duration, stop.scale);
+  }
+
+  playSlowMotion({ scale, hold, ease, zoom }) {
+    this.applyTimeDilation(scale, { holdDuration: hold, duration: ease });
+    if (!this.motionReduced) {
+      this.pendingZoomPulse = { zoom, duration: hold + ease };
+    }
   }
 
   applyTimeDilation(targetScale, options = {}) {
@@ -2687,7 +2748,7 @@ export default class EffectsSystem extends BaseSystem {
       maxDuration: 1.2,
     });
     this.addScreenFlash(flashColor, 0.22, 0.2 + radiusFactor * 0.05);
-    this.addFreezeFrame(0.14 + Math.min(0.12, radiusFactor * 0.08), 0.18);
+    this.addHitStop('mine');
 
     this.createShockwaveEffect({
       position,
@@ -2791,6 +2852,7 @@ export default class EffectsSystem extends BaseSystem {
     };
 
     this.addScreenShake('droneDestroyed');
+    this.addHitStop('drone');
     this.addScreenFlash(withAlpha(PALETTE.threat, 0.35), 0.12, 0.1);
 
     const sparkCount = this.getScaledParticleCount(14 + Math.round(radius));
@@ -2877,6 +2939,7 @@ export default class EffectsSystem extends BaseSystem {
     };
 
     this.addScreenShake('hunterDestroyed');
+    this.addHitStop('hunter');
     this.addScreenFlash(withAlpha(PALETTE.threat, 0.38), 0.14, 0.14);
     this.createShockwaveEffect({
       position,
@@ -3429,6 +3492,7 @@ export default class EffectsSystem extends BaseSystem {
 
     if (asteroid.size === 'small') {
       this.addScreenShake(2 + radius * 0.01, 0.12);
+      this.addHitStop('small');
       // Small shockwave
       this.createShockwaveEffect({
         position: { x: asteroid.x, y: asteroid.y },
@@ -3439,6 +3503,7 @@ export default class EffectsSystem extends BaseSystem {
       });
     } else if (asteroid.size === 'medium') {
       this.addScreenShake(4 + radius * 0.012, 0.18);
+      this.addHitStop('medium');
       // Medium shockwave
       this.createShockwaveEffect({
         position: { x: asteroid.x, y: asteroid.y },
@@ -3449,7 +3514,7 @@ export default class EffectsSystem extends BaseSystem {
       });
     } else if (asteroid.size === 'large') {
       this.addScreenShake(8 + radius * 0.015, 0.28);
-      this.addFreezeFrame(0.18, 0.24);
+      this.addHitStop('large');
       this.addScreenFlash(
         variantColors?.glow || withAlpha(sparkColor, 0.6),
         0.22,
@@ -4156,6 +4221,9 @@ export default class EffectsSystem extends BaseSystem {
     }
 
     this.freezeFrame = { timer: 0, duration: 0, fade: 0 };
+    this.hitStopClock = 0;
+    this.hitStopReadyAt = {};
+    this.pendingZoomPulse = null;
     this.screenFlash = {
       timer: 0,
       duration: 0,

@@ -25,6 +25,11 @@ import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { getRenderScale } from '../../../core/viewport.js';
 import { getEmissive } from '../../../core/bloomLayer.js';
 import {
+  HIT_FLASH_BODY_ALPHA,
+  HIT_FLASH_EMISSIVE_ALPHA,
+  whiteSilhouette,
+} from '../components/RenderComponent.js';
+import {
   FILL_LIGHT,
   KEY_LIGHT_ANGLE,
   KEY_LIGHT_DIR,
@@ -1033,6 +1038,7 @@ export class Asteroid extends BaseEnemy {
 
     this.health = Math.max(0, this.health - appliedDamage);
     this.lastDamageTime = 0.12;
+    this.markHit();
     this.updateCrackStage();
     return this.health <= 0;
   }
@@ -1411,6 +1417,22 @@ export class Asteroid extends BaseEnemy {
       );
     }
 
+    const flash = this.getHitFlash();
+    const blitFlash = (target, alpha) => {
+      sprite.flash ??= whiteSilhouette(sprite.canvas);
+      if (!sprite.flash) return;
+      target.globalCompositeOperation = 'source-over';
+      target.globalAlpha = alpha * flash;
+      target.drawImage(
+        sprite.flash,
+        -sprite.offset,
+        -sprite.offset,
+        sprite.size,
+        sprite.size
+      );
+    };
+    if (flash > 0) blitFlash(ctx, HIT_FLASH_BODY_ALPHA);
+
     const blink =
       this.behavior?.type === 'volatile' &&
       this.variantState?.armed &&
@@ -1426,7 +1448,7 @@ export class Asteroid extends BaseEnemy {
     ctx.restore();
 
     const emissive = getEmissive();
-    if (!emissive || (!sprite.glow && !blink)) return;
+    if (!emissive || (!sprite.glow && !blink && flash <= 0)) return;
     emissive.save();
     emissive.translate(this.x, this.y);
     emissive.rotate(this.rotation);
@@ -1440,6 +1462,7 @@ export class Asteroid extends BaseEnemy {
         sprite.size
       );
     }
+    if (flash > 0) blitFlash(emissive, HIT_FLASH_EMISSIVE_ALPHA);
     if (blink) {
       emissive.globalAlpha = 1;
       this.traceOutline(emissive);

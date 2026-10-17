@@ -17,3 +17,4 @@
 - Depois do passe de efeitos (17/10): a função `draw` das partículas em `GamePools.js` não é mais usada (tudo passa por `drawParticle`); `EnemySystem.js` ainda manda cores fora da paleta para `addScreenFlash`. Apagar a primeira, trocar as segundas por PALETTE.
 - `mixed-enemy-waves.test.js` chama `withWaveOverrides` sem `await` num teste: falhas ali viram unhandled rejection, não falha de teste. Pôr o `await`.
 - Achados do passe de dependências (17/10): o manifesto passa `command-queue` ao combat e `audio` aos effects e nenhum usa; `WorldSystem` não tem `getBounds()`, então WaveManager sempre cai em GAME_WIDTH/HEIGHT; EnemySystem atualiza a HUD do boss duas vezes (chamada direta + evento `ui-boss-hud-update`). Limpar os três.
+- Slow-mo de level-up (17/10) toca depois da escolha, não antes da tela: a tela abre e pausa no mesmo passo. Para tocar antes, atrasar a abertura em ~0,3 s em `ProgressionSystem`/`UISystem`.

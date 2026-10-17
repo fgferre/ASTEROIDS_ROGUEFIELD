@@ -1097,6 +1097,9 @@ class RenderingSystem extends BaseSystem {
     this.registerEventListener('shield-hit', () => {
       this.shieldImpactAt = performance.now();
     });
+    this.registerEventListener('camera-zoom-pulse', ({ zoom, duration }) => {
+      this.camera.pulseZoom(zoom, duration);
+    });
   }
 
   setupSettingsIntegration() {

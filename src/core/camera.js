@@ -11,6 +11,8 @@ export const CAMERA_ZOOM = 1.3;
 const DEAD_ZONE_HALF_WIDTH = 30;
 const DEAD_ZONE_HALF_HEIGHT = 22.5;
 const FOLLOW_TIME_CONSTANT = 0.25;
+// Share of a zoom pulse spent pushing in; the rest eases back out.
+const PULSE_ATTACK = 0.3;
 
 export function cameraDisabledByUrl() {
   try {
@@ -36,6 +38,8 @@ export function createCamera({
 } = {}) {
   let enabled = true;
   let lastTarget = null;
+  let baseZoom = zoom;
+  let pulse = null;
 
   const camera = {
     x: fieldWidth / 2,
@@ -52,6 +56,7 @@ export function createCamera({
         return;
       }
       if (!Number.isFinite(targetX) || !Number.isFinite(targetY)) return;
+      advancePulse(dt);
 
       // The field wraps: a jump of more than half of it is a wrap, not motion.
       const wrapped =
@@ -92,8 +97,18 @@ export function createCamera({
     },
 
     setZoom(z) {
-      if (Number.isFinite(z) && z > 0) camera.zoom = z;
+      if (Number.isFinite(z) && z > 0) {
+        baseZoom = z;
+        camera.zoom = z;
+      }
       clampToField();
+    },
+
+    // Pushes the zoom to `peak` and back to the base over `duration` s.
+    pulseZoom(peak, duration) {
+      if (Number.isFinite(peak) && peak > 0 && duration > 0) {
+        pulse = { peak, duration, elapsed: 0 };
+      }
     },
 
     snapTo(x, y) {
@@ -107,7 +122,9 @@ export function createCamera({
     reset() {
       camera.x = fieldWidth / 2;
       camera.y = fieldHeight / 2;
+      camera.zoom = baseZoom;
       lastTarget = null;
+      pulse = null;
     },
 
     setEnabled(flag) {
@@ -119,6 +136,23 @@ export function createCamera({
       return enabled;
     },
   };
+
+  function advancePulse(dt) {
+    if (!pulse) return;
+    pulse.elapsed += Math.max(0, dt);
+    const t = pulse.elapsed / pulse.duration;
+    if (t >= 1) {
+      pulse = null;
+      camera.zoom = baseZoom;
+      return;
+    }
+    const envelope =
+      t < PULSE_ATTACK
+        ? Math.sin((t / PULSE_ATTACK) * (Math.PI / 2))
+        : 0.5 +
+          0.5 * Math.cos(((t - PULSE_ATTACK) / (1 - PULSE_ATTACK)) * Math.PI);
+    camera.zoom = baseZoom + (pulse.peak - baseZoom) * envelope;
+  }
 
   function clampToField() {
     const z = camera.effectiveZoom;

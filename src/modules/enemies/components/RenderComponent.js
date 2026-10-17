@@ -24,6 +24,25 @@ const clamp01 = (value) =>
 
 const enemyTime = (enemy) => enemy?.system?.time ?? performance.now() / 1000;
 
+// Hit flash (docs/NORTE.md §2): the body goes white on damage and fades,
+// with a fainter copy in the bloom layer. PROPOSAL 17/10 (was none).
+export const HIT_FLASH_BODY_ALPHA = 0.85;
+export const HIT_FLASH_EMISSIVE_ALPHA = 0.4;
+
+// A white copy of a baked body, same size and alpha mask.
+export const whiteSilhouette = (source) => {
+  const canvas = document.createElement('canvas');
+  canvas.width = source.width;
+  canvas.height = source.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.drawImage(source, 0, 0);
+  ctx.globalCompositeOperation = 'source-in';
+  ctx.fillStyle = PALETTE.text;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  return canvas;
+};
+
 // Matte metal lit from the key light: bright toward it, dark opposite.
 const litFill = (ctx, radius) => {
   const gradient = ctx.createRadialGradient(
@@ -364,11 +383,7 @@ const warden = {
   live(ctx, size, enemy, emissive) {
     const phase = wardenPhase(enemy);
     const time = enemyTime(enemy);
-    const flash =
-      enemy.damageFlashDuration > 0
-        ? clamp01(enemy.damageFlashTimer / enemy.damageFlashDuration) *
-          clamp01(enemy.damageFlashStrength || 1)
-        : 0;
+    const flash = enemy.getHitFlash();
     const pulse = 0.5 + 0.5 * Math.sin(time * (2 + phase));
     const core = size * (0.4 + phase * 0.06) * (1 + pulse * 0.04);
 
@@ -497,10 +512,20 @@ const proceduralStrategy = ({ enemy, ctx, config }) => {
       sprite.canvasSize
     );
 
+  const flash = sprite ? enemy.getHitFlash() : 0;
+  const blitFlash = (target, alpha) => {
+    sprite.flash ??= whiteSilhouette(sprite.body);
+    if (!sprite.flash) return;
+    target.globalAlpha = alpha * flash;
+    blit(target, sprite.flash);
+    target.globalAlpha = 1;
+  };
+
   drawLayer(ctx, enemy, angle, () => {
     if (sprite) blit(ctx, sprite.body);
     else look.body(ctx, size, enemy);
     look.live(ctx, size, enemy, false);
+    if (flash > 0) blitFlash(ctx, HIT_FLASH_BODY_ALPHA);
   });
 
   const emissive = getEmissive();
@@ -509,6 +534,7 @@ const proceduralStrategy = ({ enemy, ctx, config }) => {
     if (sprite) blit(emissive, sprite.glow);
     else look.glow(emissive, size, enemy);
     look.live(emissive, size, enemy, true);
+    if (flash > 0) blitFlash(emissive, HIT_FLASH_EMISSIVE_ALPHA);
   });
 };
 
