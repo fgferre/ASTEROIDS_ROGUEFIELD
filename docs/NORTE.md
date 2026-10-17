@@ -66,6 +66,19 @@ com placar). Build: 9 → ~25 upgrades em quatro famílias com um bônus "3 igua
 entram como propostas com os números ao lado; ele aprova ou reverte jogando.** Fim de run: vitória no Warden da
 camada 15 (modo infinito só se ele pedir).
 
+## 4b. O salto (decidido em 17/10, noite, a pedido dele: "falta um salto enorme… câmera dinâmica, zoom, movimento lateral, quase 3D visto de cima")
+
+- **O gameplay passa a ser desenhado em Three.js (WebGL)**, como o menu já é: cena 3D vista de cima com inclinação
+  de ~18°, luz-chave direcional + preenchimento frio, asteroides como malhas 3D procedurais (o gerador do menu,
+  extraído para `src/modules/render3d/asteroidMesh.js`), nave low-poly extrudada do contorno de colisão, lanças e
+  fagulhas emissivas, UnrealBloom + SMAA. A **simulação continua 2D** no plano 800×600; o renderer espelha as
+  entidades em malhas. `?renderer=2d` mantém o Canvas 2D como fallback — nada do trabalho 2D é jogado fora.
+- **Câmera dinâmica:** follow com dead zone e antecipação, dolly que afasta na velocidade e aproxima no combate,
+  shake por deslocamento da câmera. Mesma lógica de `src/core/camera.js`, agora dirigindo uma câmera perspectiva.
+- **Movimento lateral:** A/D passam a ser strafe (deslocamento lateral); W/S empuxo; a nave aponta para onde se
+  move ou para o alvo da mira; dash em Shift. Controle à la twin-stick sem o segundo stick (a mira é automática).
+- A regra de §2 continua valendo em 3D: massa fosca, luz só onde há energia.
+
 ## 5. O que não fazemos
 
 Sem narrativa falada, sem personagens, sem textura fotográfica, sem reescrever o gameplay em WebGL (o menu em
