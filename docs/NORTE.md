@@ -62,7 +62,9 @@ cristal exposto, olho de máquina, escudo). A informação é luz; o resto é ma
 Oito a doze minutos. Camadas 1–4 só pedra; 5 primeiro Guardião-Maior; 6–9 Motes e Tethers; 10 Guardião; 11–14
 Seekers; 15 Guardião final → **fim da run com vitória** (a decidir com ele: a run termina no 15 ou vira modo infinito
 com placar). Build: 9 → ~25 upgrades em quatro famílias com um bônus "3 iguais" simples e visível; dash em Shift
-(escudo passa para E apenas) — **as duas coisas são decisão dele antes de codar** (`PLAN.md` etapa 6).
+(escudo passa para E apenas). **Decidido pela sessão em 17/10 à noite, sob o mandato "reimaginar tudo, segue em frente":
+entram como propostas com os números ao lado; ele aprova ou reverte jogando.** Fim de run: vitória no Warden da
+camada 15 (modo infinito só se ele pedir).
 
 ## 5. O que não fazemos
 

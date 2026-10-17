@@ -36,7 +36,9 @@ prancha com entidades reais; `?bloom=1.5`, `?camera=0` e `?renderScale=1` são a
 
 - Arte: ele pediu para reimaginar tudo e eu decidi (NORTE.md). Ele julga jogando: o que ainda parece fraco?
 - Câmera 1.3× com follow já está no jogo (`?camera=0` desliga): aprovar ou reprovar jogando.
-- Etapa 6: dash e sua tecla; regra de sinergia por tag (ou retirar a promessa); fim de run e meta-progressão.
+- Etapa 6, decidida pela sessão como proposta (ele aprova ou reverte jogando): dash em Shift com i-frames e
+  cooldown; cinco famílias de tag com bônus ao juntar 3 upgrades da mesma família; catálogo de 9 para 20; vitória no
+  Warden da camada 15. Meta-progressão entre runs continua em aberto.
 
 ## Jogabilidade e sensação
 
