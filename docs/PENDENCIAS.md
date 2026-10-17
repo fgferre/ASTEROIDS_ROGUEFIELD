@@ -42,6 +42,7 @@ jogo parecer com o menu; depois passo fixo no loop e as dinâmicas. Cada etapa t
 
 ## Desempenho
 
-- **(6)** Ele abriu o DevTools _"justamente porque estava lento demais"_ (17/10). O trace mostrou `gameLoop` a 377 ms,
-  mas o jogo roda a ~5 ms de render em headless; o suspeito é o log de depuração (um `console.log` por evento, dezenas
-  por quadro) somado ao profiler. Falta medir na máquina dele com `?debugLogging=0` antes de concluir.
+- **(6)** Ele abriu o DevTools _"justamente porque estava lento demais"_ (17/10). O trace mostrou `gameLoop` a 377 ms.
+  Em headless (17/10) o jogo fica em 16,7 ms de mediana com picos de 33–50 ms, com ou sem log de depuração — o
+  travamento dele **não reproduziu** aqui. Falta medir na máquina dele: `?debugLogging=0`, DevTools fechado, e o
+  painel F3 do jogo aberto por 60 s; só depois decidir o que otimizar.
