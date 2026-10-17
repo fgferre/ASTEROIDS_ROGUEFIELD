@@ -71,6 +71,7 @@ export default class EffectsSystem extends BaseSystem {
     Object.assign(this, randomHelpers);
     this.particles = [];
     this.shockwaves = [];
+    this.telegraphs = [];
     this.hitMarkers = []; // NEW: Hit marker tracking
     this.damageIndicators = []; // NEW: Directional damage indicators
     this.bossTransitionEffects = [];
@@ -344,6 +345,13 @@ export default class EffectsSystem extends BaseSystem {
       this.registerEventListener(eventName, wrapped);
       this.registerEventListener(`effects-${eventName}`, wrapped);
     };
+
+    registerBossEvent('boss-telegraph', (payload = {}) => {
+      const boss = payload.enemy || payload.boss || null;
+      if (boss && !this.telegraphs.includes(boss)) {
+        this.telegraphs.push(boss);
+      }
+    });
 
     registerBossEvent('boss-spawned', (payload = {}) => {
       this.clearBossEffectsState();
@@ -621,6 +629,7 @@ export default class EffectsSystem extends BaseSystem {
 
     this.updateParticles(effectDelta);
     this.updateShockwaves(effectDelta);
+    this.pruneTelegraphs();
     this.updateHitMarkers(effectDelta);
     this.updateDamageTexts(effectDelta);
     this.updateDamageIndicators(effectDelta);
@@ -848,6 +857,7 @@ export default class EffectsSystem extends BaseSystem {
     }
 
     this.drawShockwaves(ctx);
+    this.drawTelegraphs(ctx);
 
     // Draw hit markers
     for (let i = 0; i < this.hitMarkers.length; i += 1) {
@@ -897,6 +907,85 @@ export default class EffectsSystem extends BaseSystem {
     try {
       drawCallback();
     } finally {
+      ctx.restore();
+    }
+  }
+
+  pruneTelegraphs() {
+    if (!this.telegraphs.length) return;
+    this.telegraphs = this.telegraphs.filter(
+      (boss) => boss && !boss.destroyed && boss.telegraph
+    );
+  }
+
+  // Boss attack telegraphs: a lane for the charge, a wedge for the fan. They
+  // read the boss's live state each frame, so the owner is the boss itself.
+  drawTelegraphs(ctx) {
+    if (!ctx || !this.telegraphs.length) return;
+
+    for (let i = 0; i < this.telegraphs.length; i += 1) {
+      const boss = this.telegraphs[i];
+      const t = boss?.telegraph;
+      if (!t || boss.destroyed) continue;
+
+      const duration = t.duration > 0 ? t.duration : 1;
+      const progress = Math.min(1, Math.max(0, 1 - t.timer / duration));
+      const pulse = 0.5 + 0.5 * Math.sin(progress * Math.PI * 6);
+      const radius = Math.max(20, boss.radius || 60);
+
+      ctx.save();
+      ctx.translate(boss.x, boss.y);
+      ctx.rotate(t.angle || 0);
+      ctx.globalCompositeOperation = 'lighter';
+
+      if (t.type === 'charge') {
+        const length = Math.max(radius * 2, t.length || 400);
+        // faint lane, widening as the strike nears
+        ctx.globalAlpha = 0.08 + 0.18 * progress;
+        ctx.fillStyle = '#ff3131';
+        ctx.fillRect(0, -radius * 0.9, length, radius * 1.8);
+        // sharp dashed centerline
+        ctx.globalAlpha = 0.35 + 0.55 * progress;
+        ctx.strokeStyle = '#ff3131';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([14, 10]);
+        ctx.lineDashOffset = -progress * 120;
+        ctx.beginPath();
+        ctx.moveTo(radius * 0.6, 0);
+        ctx.lineTo(length, 0);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // chevron at the end
+        ctx.beginPath();
+        ctx.moveTo(length - 18, -12);
+        ctx.lineTo(length, 0);
+        ctx.lineTo(length - 18, 12);
+        ctx.stroke();
+      } else if (t.type === 'fan') {
+        const arc = Math.max(0.1, t.arc || 0.8);
+        const length = Math.max(radius * 1.5, t.length || 180);
+        ctx.globalAlpha = 0.07 + 0.2 * progress;
+        ctx.fillStyle = '#ff3131';
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, length, -arc / 2, arc / 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalAlpha = 0.3 + 0.6 * progress;
+        ctx.strokeStyle = '#ff3131';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
+      // warning ring around the hull, pulsing faster as it nears
+      ctx.rotate(-(t.angle || 0));
+      ctx.globalAlpha = (0.2 + 0.5 * progress) * (0.6 + 0.4 * pulse);
+      ctx.strokeStyle = '#ff3131';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * (1.15 + 0.1 * pulse), 0, Math.PI * 2);
+      ctx.stroke();
+
       ctx.restore();
     }
   }
@@ -1120,7 +1209,7 @@ export default class EffectsSystem extends BaseSystem {
     }
   }
 
-  applyBossEffectTimings(config = {}, palette = {}, eventName = '') {
+  applyBossEffectTimings(config = {}, palette = {}) {
     if (config.freezeFrame) {
       this.addFreezeFrame(config.freezeFrame.duration, config.freezeFrame.fade);
     }
@@ -2075,7 +2164,6 @@ export default class EffectsSystem extends BaseSystem {
   ) {
     if (this.particleDensity < 0.1) return; // Optimization
 
-    const i = Math.max(0, Math.min(1, intensity));
     const thrusterFork = 'thrusters';
 
     // === UPGRADE SCALING: SPRAY -> AFTERBURNER ===
@@ -4075,6 +4163,7 @@ export default class EffectsSystem extends BaseSystem {
     super.reset(normalized);
     this.particles = [];
     this.shockwaves = [];
+    this.telegraphs = [];
     this.hitMarkers = [];
     this.damageIndicators = [];
     this.damageTexts = [];
