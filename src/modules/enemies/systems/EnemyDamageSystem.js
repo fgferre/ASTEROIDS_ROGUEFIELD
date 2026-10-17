@@ -26,6 +26,7 @@ import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { ASTEROID_VARIANTS } from '../../../data/enemies/asteroid-configs.js';
 import { USE_WAVE_MANAGER } from '../../../data/constants/gameplay.js';
 import { resolveEventBus } from '../../../core/serviceUtils.js';
+import { requireRandom } from '../../../utils/randomHelpers.js';
 
 class EnemyDamageSystem {
   /**
@@ -685,7 +686,12 @@ class EnemyDamageSystem {
         const rotationImpulse =
           rotationSource && typeof rotationSource.range === 'function'
             ? rotationSource.range(-1.5, 1.5)
-            : (rotationSource?.float?.() ?? Math.random()) * 3 - 1.5;
+            : requireRandom(
+                rotationSource,
+                'enemy.collision.rotation'
+              ).float() *
+                3 -
+              1.5;
         asteroid.rotationSpeed += rotationImpulse * falloff;
       }
     }

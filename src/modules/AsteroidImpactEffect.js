@@ -4,6 +4,7 @@
 
 import { DustParticleShader } from './DustParticleShader.js';
 import { debugLog } from '../core/debugLogging.js';
+import { requireRandom } from '../utils/randomHelpers.js';
 
 // Configuração de pools (pré-alocados)
 const POOL_CONFIG = {
@@ -29,7 +30,10 @@ export class AsteroidImpactEffect {
     };
 
     this.currentQualityLevel = config.initialQualityLevel || 2;
-    this.randomFloat = config.randomFloat || Math.random.bind(Math);
+    const fallbackRandom = config.randomFloat
+      ? null
+      : requireRandom(null, 'menu.impact-effect');
+    this.randomFloat = config.randomFloat || (() => fallbackRandom.float());
 
     // Estado de efeitos ativos (índices nos pools)
     this.activeFlashes = [];

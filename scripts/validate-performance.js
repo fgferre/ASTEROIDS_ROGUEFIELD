@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-properties -- benchmark/validation script: synthetic load data, not gameplay; determinism not required */
 /**
  * Quick Performance Validation Script
  *

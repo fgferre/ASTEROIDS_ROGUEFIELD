@@ -35,7 +35,7 @@ Otherwise pick a sensible option, say what you assumed, and keep going. If nobod
 Traps (not obvious from the code, caused a mistake before; one line each, with the reason; max 5)
 
 * The game canvas is 800×600 logical pixels stretched by CSS (`UISystem` resize), nothing is DPR-aware: blur is systemic, not one sprite's fault — fix it in the resize path (PLAN.md step), never per sprite.
-* `process.env.NODE_ENV` is not defined by Vite here, so `=== 'development'` branches never run in the browser; dev mode is `isDevEnvironment()` / `import.meta.env.DEV`.
+* Dev mode is one switch: `IS_DEV` from `src/core/env.js`. Never test `process.env.NODE_ENV` (Vite only replaces it in dev builds) or add a second helper.
 * Debug logging is on by default in dev and prints every EventBus emit (dozens per frame): profile with `?debugLogging=0`, or the DevTools trace measures `console.log`, not the game.
 * `mobileGuard` blocks any browser with `maxTouchPoints > 0`, which includes many Windows laptops and headless Chromium; `?desktop=force` bypasses it.
 * `.planning/` and `.claude/settings.local.json` are gitignored on purpose; never `git add -f` them (the hook blocks force-add).

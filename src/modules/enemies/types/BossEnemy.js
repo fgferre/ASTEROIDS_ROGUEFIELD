@@ -6,6 +6,7 @@ import {
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
+import { requireRandom } from '../../../utils/randomHelpers.js';
 
 const SOURCE_CONFIG = BOSS_CONFIG || {};
 
@@ -999,9 +1000,10 @@ export class BossEnemy extends BaseEnemy {
       return;
     }
 
-    const angle = this.patternRandom?.float
-      ? this.patternRandom.float() * Math.PI * 2
-      : Math.random() * Math.PI * 2;
+    const angle =
+      requireRandom(this.patternRandom, 'enemy.boss.pattern').float() *
+      Math.PI *
+      2;
     const distance = this.radius + 40;
 
     const spawnConfig = {
@@ -1122,12 +1124,10 @@ export class BossEnemy extends BaseEnemy {
       return null;
     }
 
-    if (this.minionRandom && typeof this.minionRandom.int === 'function') {
-      const index = this.minionRandom.int(0, this.minionTypes.length - 1);
-      return this.minionTypes[index] || null;
-    }
-
-    const index = Math.floor(Math.random() * this.minionTypes.length);
+    const index = requireRandom(this.minionRandom, 'enemy.boss.minion').int(
+      0,
+      this.minionTypes.length - 1
+    );
     return this.minionTypes[index] || null;
   }
 
@@ -1238,11 +1238,10 @@ export class BossEnemy extends BaseEnemy {
       return randomSource.range(-value, value);
     }
 
-    if (randomSource && typeof randomSource.float === 'function') {
-      return (randomSource.float() * 2 - 1) * value;
-    }
-
-    return (Math.random() * 2 - 1) * value;
+    return (
+      (requireRandom(randomSource, 'enemy.boss.pattern').float() * 2 - 1) *
+      value
+    );
   }
 
   takeDamage(amount, source = null) {

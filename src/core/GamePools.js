@@ -20,6 +20,7 @@ import { Drone } from '../modules/enemies/types/Drone.js';
 import { Mine } from '../modules/enemies/types/Mine.js';
 import { Hunter } from '../modules/enemies/types/Hunter.js';
 import { BossEnemy } from '../modules/enemies/types/BossEnemy.js';
+import { IS_DEV } from './env.js';
 
 /**
  * Game object pool registry.
@@ -86,11 +87,7 @@ export class GamePools {
     this.lastAutoManageTime = performance.now();
 
     debugLog('[GamePools] All pools initialized successfully');
-    if (
-      typeof process !== 'undefined' &&
-      process.env &&
-      process.env.NODE_ENV === 'development'
-    ) {
+    if (IS_DEV) {
       debugLog('Pool configuration:', this.getPoolStats());
     }
   }
@@ -882,7 +879,7 @@ export class GamePools {
 }
 
 // Development tools
-if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+if (typeof window !== 'undefined' && IS_DEV) {
   window.GamePools = GamePools;
 
   // Add global debug commands

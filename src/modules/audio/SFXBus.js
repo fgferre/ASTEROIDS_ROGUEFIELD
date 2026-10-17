@@ -4,6 +4,7 @@ import AudioBatcher from '../AudioBatcher.js';
 import ThrusterLoopManager from '../ThrusterLoopManager.js';
 import { createSfxSynthPort } from './SfxSynthPort.js';
 import RandomService from '../../core/RandomService.js';
+import { requireRandom } from '../../utils/randomHelpers.js';
 
 /**
  * SFXBus — owns ALL per-event SFX synthesis (INFRA-02).
@@ -582,8 +583,12 @@ class SFXBus {
           this.context.sampleRate
         );
         const output = noiseBuffer.getChannelData(0);
+        const noiseRandom = requireRandom(
+          this.randomScopes?.bufferFamilies?.explosion,
+          'audio.sfx.explosion'
+        );
         for (let i = 0; i < bufferSize; i++) {
-          output[i] = Math.random() * 2 - 1;
+          output[i] = noiseRandom.range(-1, 1);
         }
       }
 
@@ -2085,7 +2090,7 @@ class SFXBus {
     if (isAutomatic) {
       const randomScope = this._getThrusterRandomScope(type);
       const variation = Math.floor(
-        randomScope?.range ? randomScope.range(0, 3) : Math.random() * 3
+        requireRandom(randomScope, 'audio.sfx.thruster').range(0, 3)
       );
 
       // Reduce intensity for automatic thrusters (softer spray sound)
@@ -2113,7 +2118,7 @@ class SFXBus {
 
         const randomScope = this._getThrusterRandomScope(type);
         const variation = Math.floor(
-          randomScope?.range ? randomScope.range(0, 3) : Math.random() * 3
+          requireRandom(randomScope, 'audio.sfx.thruster').range(0, 3)
         );
 
         this.thrusterLoops.startLoop(
@@ -2222,13 +2227,10 @@ class SFXBus {
           this.context.sampleRate
         );
         const output = noiseBuffer.getChannelData(0);
+        const noiseRandom = requireRandom(randomScope, 'audio.sfx.thruster');
         for (let i = 0; i < bufferSize; i++) {
           const progress = i / bufferSize;
-          output[i] =
-            (randomScope?.range
-              ? randomScope.range(-1, 1)
-              : Math.random() * 2 - 1) *
-            (1 - progress);
+          output[i] = noiseRandom.range(-1, 1) * (1 - progress);
         }
       }
 

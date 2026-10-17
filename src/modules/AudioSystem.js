@@ -13,6 +13,7 @@ import {
   MUSIC_LAYER_CONFIG,
 } from '../core/GameConstants.js';
 import { WAVE_BOSS_INTERVAL } from '../data/constants/gameplay.js';
+import { requireRandom } from '../utils/randomHelpers.js';
 
 const DEV_MODE = isDevEnvironment();
 
@@ -726,8 +727,7 @@ class AudioSystem extends BaseSystem {
       }
     }
 
-    const [low, high] = max >= min ? [min, max] : [max, min];
-    return low + (high - low) * Math.random();
+    return requireRandom(null, 'audio.music').range(min, max);
   }
 
   bootstrapSettings() {

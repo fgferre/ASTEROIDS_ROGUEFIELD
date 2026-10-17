@@ -46,6 +46,7 @@ import {
   WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
 } from '../../../data/constants/gameplay.js';
 import { ENEMY_TYPES, BOSS_CONFIG } from '../../../data/constants/visual.js';
+import { IS_DEV } from '../../../core/env.js';
 
 export class WaveManager {
   /**
@@ -942,17 +943,6 @@ export class WaveManager {
       this.totalAsteroidEnemiesThisWave = this.asteroidsSpawnedThisWave;
     }
 
-    if (
-      typeof process !== 'undefined' &&
-      process.env?.NODE_ENV === 'development' &&
-      typeof console !== 'undefined' &&
-      typeof console.debug === 'function'
-    ) {
-      console.debug(
-        `[WaveManager] (legacy bridge) Registered asteroid spawn ${this.asteroidsSpawnedThisWave}/${this.totalAsteroidEnemiesThisWave} for wave ${this.currentWave}`
-      );
-    }
-
     return true;
   }
 
@@ -1408,10 +1398,7 @@ export class WaveManager {
         });
       }
 
-      if (
-        typeof process !== 'undefined' &&
-        process.env?.NODE_ENV === 'development'
-      ) {
+      if (IS_DEV) {
         this.eventBus.emit('wave-started-debug', {
           ...waveEventPayload,
           config: this.cloneWaveConfig(effectiveConfig),
@@ -1802,17 +1789,6 @@ export class WaveManager {
           if (compatibilityMode && isAsteroid) {
             this.asteroidsSpawnedThisWave++;
           }
-          if (
-            registeredEnemy &&
-            typeof process !== 'undefined' &&
-            process.env?.NODE_ENV === 'development' &&
-            typeof console !== 'undefined' &&
-            typeof console.debug === 'function'
-          ) {
-            console.debug(
-              `[WaveManager] Registered enemy: type=${enemyGroup.type}, wave=${this.currentWave}, spawned=${this.enemiesSpawnedThisWave}/${this.totalEnemiesThisWave}`
-            );
-          }
         }
       }
     }
@@ -2089,17 +2065,7 @@ export class WaveManager {
       entryPadding + bossRadius
     );
 
-    const getRange = (min, max) => {
-      if (generator && typeof generator.range === 'function') {
-        return generator.range(min, max);
-      }
-      const span = max - min;
-      const value =
-        generator && typeof generator.float === 'function'
-          ? generator.float()
-          : Math.random();
-      return min + span * value;
-    };
+    const getRange = (min, max) => generator.range(min, max);
 
     let x = bounds.width / 2;
     let y = verticalMargin;
@@ -2306,10 +2272,7 @@ export class WaveManager {
     const attempts = 8;
     let clamped = false;
 
-    const nextFloat = () =>
-      spawnRandom && typeof spawnRandom.float === 'function'
-        ? spawnRandom.float()
-        : Math.random();
+    const nextFloat = () => spawnRandom.float();
     const nextRange = (min, max) => {
       if (
         spawnRandom &&
@@ -2402,10 +2365,7 @@ export class WaveManager {
       'tactical-center-fallback'
     );
 
-    const nextFloat = () =>
-      spawnRandom && typeof spawnRandom.float === 'function'
-        ? spawnRandom.float()
-        : Math.random();
+    const nextFloat = () => spawnRandom.float();
 
     const jitter = (range) => (nextFloat() - 0.5) * range * 0.5;
     const usableWidth = Math.max(0, width - horizontalMargin * 2);
@@ -2654,17 +2614,6 @@ export class WaveManager {
       this.asteroidsKilledThisWave++;
     }
 
-    if (
-      typeof process !== 'undefined' &&
-      process.env?.NODE_ENV === 'development' &&
-      typeof console !== 'undefined' &&
-      typeof console.debug === 'function'
-    ) {
-      console.debug(
-        `[WaveManager] Enemy destroyed: ${this.enemiesKilledThisWave}/${this.totalEnemiesThisWave}`
-      );
-    }
-
     if (isBossMinion) {
       GameDebugLogger.log('STATE', 'Boss minion destroyed', {
         wave: this.currentWave,
@@ -2677,12 +2626,7 @@ export class WaveManager {
     }
 
     // Development assertion: verify accounting consistency
-    if (
-      typeof process !== 'undefined' &&
-      process.env?.NODE_ENV === 'development'
-    ) {
-      this.assertAccountingConsistency();
-    }
+    this.assertAccountingConsistency();
 
     // Check if wave is complete
     const killsCleared =
@@ -2737,10 +2681,7 @@ export class WaveManager {
    * Only runs in development mode to avoid performance impact.
    */
   assertAccountingConsistency() {
-    if (
-      typeof process === 'undefined' ||
-      process.env?.NODE_ENV !== 'development'
-    ) {
+    if (!IS_DEV) {
       return;
     }
 

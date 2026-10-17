@@ -17,6 +17,7 @@ import {
   PALETTE,
   withAlpha,
 } from '../data/constants/palette.js';
+import { requireRandom } from '../utils/randomHelpers.js';
 
 // Player shield: a field-generator barrier around the hull outline.
 const SHIELD_SWEEP_SPEED = 0.35; // perimeters per second
@@ -297,10 +298,7 @@ class SpaceSkyBackground {
   }
 
   randomFloat() {
-    if (this.random && typeof this.random.float === 'function') {
-      return this.random.float();
-    }
-    return Math.random();
+    return requireRandom(this.random, 'rendering.space-sky').float();
   }
 
   randomRange(min, max) {

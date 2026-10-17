@@ -6,6 +6,7 @@ import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
 import { AsteroidImpactEffect } from './AsteroidImpactEffect.js';
+import { IS_DEV } from '../core/env.js';
 
 const SIMPLEX_DEFAULT_RANDOM = new RandomService(
   'menu-background:simplex-default'
@@ -75,9 +76,9 @@ class MenuBackgroundSystem extends BaseSystem {
       originalMathUtils: null,
       originalMath: undefined,
       originalMathRandom: undefined,
+      seededMathRandomDepth: 0,
       deterministicMathUtils: null,
       deterministicUuidGenerator: null,
-      deterministicMathRandom: null,
       generateUuidDescriptors: new Map(),
       patchedMathUtilsTargets: new Set(),
     };
@@ -197,9 +198,11 @@ class MenuBackgroundSystem extends BaseSystem {
     this.animate = this.animate.bind(this);
 
     if (this.ready) {
-      this.applyDeterministicThreeUuidGenerator();
-      this.setupLoadingScreen(); // Setup loading UI callbacks
-      this.bootstrapScene();
+      this.withSeededMathRandom(() => {
+        this.applyDeterministicThreeUuidGenerator();
+        this.setupLoadingScreen(); // Setup loading UI callbacks
+        this.bootstrapScene();
+      });
       this.registerEventHooks();
       this.setupSettingsSubscription();
       // Note: syncInitialState is now called from preloadAssets when complete
@@ -310,42 +313,6 @@ class MenuBackgroundSystem extends BaseSystem {
     const mathUtilsCandidate = three.MathUtils ?? three.Math;
     if (!mathUtilsCandidate || typeof mathUtilsCandidate !== 'object') {
       return;
-    }
-
-    if (state.originalMathRandom === undefined) {
-      state.originalMathRandom =
-        typeof Math.random === 'function' ? Math.random : null;
-    }
-
-    if (!state.deterministicMathRandom) {
-      const deterministicRandom = () => {
-        const fork = this.ensureThreeUuidRandom();
-        if (fork && typeof fork.float === 'function') {
-          return fork.float();
-        }
-        if (typeof state.originalMathRandom === 'function') {
-          return state.originalMathRandom();
-        }
-        return SIMPLEX_DEFAULT_RANDOM.float();
-      };
-
-      try {
-        Object.defineProperty(deterministicRandom, 'name', {
-          value: 'MenuBackgroundDeterministicRandom',
-          configurable: true,
-        });
-      } catch (error) {
-        // Ignore failure to label the function
-      }
-
-      state.deterministicMathRandom = deterministicRandom;
-    }
-
-    if (
-      state.deterministicMathRandom &&
-      Math.random !== state.deterministicMathRandom
-    ) {
-      Math.random = state.deterministicMathRandom;
     }
 
     const aliasCandidate =
@@ -472,13 +439,47 @@ class MenuBackgroundSystem extends BaseSystem {
     }
 
     state.deterministicMathUtils = null;
+  }
 
-    if (state.deterministicMathRandom) {
-      if (typeof state.originalMathRandom === 'function') {
-        Math.random = state.originalMathRandom;
-      }
-      state.deterministicMathRandom = null;
+  /**
+   * Three.js draws its internal UUIDs (and its rand* helpers) from the global
+   * Math.random, bypassing MathUtils.generateUUID. While `fn` runs (the async
+   * scene build, or a runtime Three allocation) the global is swapped for the
+   * menu's seeded fork, so the menu stays reproducible and the dev
+   * Math.random guard stays quiet. The original is restored when the
+   * outermost call settles (awaited when `fn` returns a promise).
+   */
+  withSeededMathRandom(fn) {
+    const state = this._threeMathUtilsState;
+    if (state.seededMathRandomDepth === 0) {
+      // eslint-disable-next-line no-restricted-properties -- Three.js reads Math.random; swapped for the seeded generator while the menu scene builds
+      state.originalMathRandom = Math.random;
+      // eslint-disable-next-line no-restricted-properties -- Three.js reads Math.random; swapped for the seeded generator while the menu scene builds
+      Math.random = () => this.ensureThreeUuidRandom().float();
     }
+    state.seededMathRandomDepth += 1;
+
+    const release = () => {
+      state.seededMathRandomDepth -= 1;
+      if (state.seededMathRandomDepth === 0) {
+        // eslint-disable-next-line no-restricted-properties -- Three.js reads Math.random; swapped for the seeded generator while the menu scene builds
+        Math.random = state.originalMathRandom;
+        state.originalMathRandom = undefined;
+      }
+    };
+
+    let result;
+    try {
+      result = fn();
+    } catch (error) {
+      release();
+      throw error;
+    }
+    if (result && typeof result.then === 'function') {
+      return result.finally(release);
+    }
+    release();
+    return result;
   }
 
   destroy() {
@@ -928,7 +929,7 @@ class MenuBackgroundSystem extends BaseSystem {
     this.setupImpactEffects();
 
     // Start async preloading for heavy assets
-    this.preloadAssets();
+    this.withSeededMathRandom(() => this.preloadAssets());
   }
 
   /**
@@ -1879,11 +1880,7 @@ class MenuBackgroundSystem extends BaseSystem {
 
       this._nasaStarfieldLoaded = true;
 
-      if (
-        typeof import.meta !== 'undefined' &&
-        import.meta.env &&
-        import.meta.env.DEV
-      ) {
+      if (IS_DEV) {
         debugLog(
           `[MenuBackgroundSystem] NASA starfield loaded (${totalStars} stars)`
         );
@@ -3608,7 +3605,7 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     }
 
     if (this.asteroidPool.length < this.config.maxAsteroids) {
-      this.createPoolableAsteroid();
+      this.withSeededMathRandom(() => this.createPoolableAsteroid());
       return this.asteroidPool[this.asteroidPool.length - 1];
     }
 
@@ -3667,7 +3664,9 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
       // that share the same baseMaterials[] entry.
       if (asteroid.material && !asteroid._fadeClonedMaterial) {
         asteroid._sharedMaterial = asteroid.material;
-        const cloned = asteroid.material.clone();
+        const cloned = this.withSeededMathRandom(() =>
+          asteroid.material.clone()
+        );
         cloned.transparent = true;
         cloned.opacity = 1;
         asteroid.material = cloned;
@@ -3760,7 +3759,9 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     if (!light) {
       // Pool exhausted — fall back to allocation (rare)
       const { THREE } = this;
-      light = new THREE.PointLight(0xffaa66, 3.5, 140, 2);
+      light = this.withSeededMathRandom(
+        () => new THREE.PointLight(0xffaa66, 3.5, 140, 2)
+      );
       this.scene.add(light);
     } else {
       light.intensity = 3.5;

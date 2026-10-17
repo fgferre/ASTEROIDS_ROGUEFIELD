@@ -25,6 +25,7 @@ import {
   BOSS_PHYSICS_CONFIG,
   ENEMY_TYPES,
 } from '../data/constants/visual.js';
+import { IS_DEV } from '../core/env.js';
 
 const ASTEROID_POOL_ID = Symbol.for('ASTEROIDS_ROGUEFIELD:asteroidPoolId');
 
@@ -375,10 +376,7 @@ class PhysicsSystem extends BaseSystem {
   }
 
   warnOnBossTrackingMismatch({ reason = 'unknown' } = {}) {
-    if (
-      typeof process === 'undefined' ||
-      process.env?.NODE_ENV !== 'development'
-    ) {
+    if (!IS_DEV) {
       return;
     }
 

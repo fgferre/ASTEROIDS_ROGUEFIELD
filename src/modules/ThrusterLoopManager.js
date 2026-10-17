@@ -1,3 +1,4 @@
+import { requireRandom } from '../utils/randomHelpers.js';
 /**
  * Manages continuous thruster loop sounds for main, retro, and side thrusters.
  */
@@ -78,10 +79,9 @@ class ThrusterLoopManager {
       const bufferSize = Math.floor(context.sampleRate * noiseDuration);
       noiseBuffer = context.createBuffer(1, bufferSize, context.sampleRate);
       const output = noiseBuffer.getChannelData(0);
+      const noiseRandom = requireRandom(randomScope, 'audio.sfx.thruster');
       for (let i = 0; i < bufferSize; i++) {
-        output[i] = randomScope?.range
-          ? randomScope.range(-1, 1)
-          : Math.random() * 2 - 1;
+        output[i] = noiseRandom.range(-1, 1);
       }
     }
 

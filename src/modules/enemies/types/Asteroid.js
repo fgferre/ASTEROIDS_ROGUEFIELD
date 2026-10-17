@@ -32,6 +32,7 @@ import {
   PALETTE,
   withAlpha,
 } from '../../../data/constants/palette.js';
+import { requireRandom } from '../../../utils/randomHelpers.js';
 
 /**
  * Asteroid Enemy Type
@@ -303,7 +304,12 @@ export class Asteroid extends BaseEnemy {
       const angleOffset =
         typeof movementRandom.range === 'function'
           ? movementRandom.range(-angleVariance, angleVariance)
-          : (movementRandom.float?.() ?? Math.random()) * 2 * angleVariance -
+          : requireRandom(
+              movementRandom,
+              'enemy.asteroid.entry-angle'
+            ).float() *
+              2 *
+              angleVariance -
             angleVariance;
       const targetAngle = Math.atan2(
         GAME_HEIGHT / 2 - this.y,

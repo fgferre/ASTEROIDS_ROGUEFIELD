@@ -2165,8 +2165,8 @@ export default class GameSessionService {
       }
     }
 
-    source = 'math-random';
-    seed = Math.floor(Math.random() * 0xffffffff);
+    source = 'clock';
+    seed = Date.now() >>> 0;
     return { seed, source };
   }
 

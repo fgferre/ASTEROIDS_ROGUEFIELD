@@ -40,6 +40,8 @@ import {
 } from '../../../data/constants/gameplay.js';
 import { ASTEROID_SPEEDS } from '../../../data/constants/physics.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
+import { IS_DEV } from '../../../core/env.js';
+import { requireRandom } from '../../../utils/randomHelpers.js';
 
 export class EnemyUpdateSystem {
   /**
@@ -463,10 +465,7 @@ export class EnemyUpdateSystem {
       );
     }
 
-    if (
-      typeof process !== 'undefined' &&
-      process.env?.NODE_ENV === 'development'
-    ) {
+    if (IS_DEV) {
       const managerKilled = managerState.killed ?? 0;
       const systemKilled = wave.asteroidsKilled ?? 0;
       if (Math.abs(managerKilled - systemKilled) > 1) {
@@ -673,7 +672,10 @@ export class EnemyUpdateSystem {
     const offset =
       random && typeof random.range === 'function'
         ? random.range(-variance, variance)
-        : (random?.float?.() ?? Math.random()) * 2 * variance - variance;
+        : requireRandom(random, 'enemy.asteroid.entry-angle').float() *
+            2 *
+            variance -
+          variance;
 
     const angle = Math.atan2(height / 2 - asteroid.y, width / 2 - asteroid.x);
     const nextVx = Math.cos(angle + offset) * speed;

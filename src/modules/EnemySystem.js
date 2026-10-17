@@ -46,6 +46,7 @@ import { HUNTER_COMPONENTS } from '../data/enemies/hunter.js';
 import { MINE_COMPONENTS } from '../data/enemies/mine.js';
 import { BOSS_COMPONENTS } from '../data/enemies/boss.js';
 import { ORB_VALUE } from '../data/enemies/asteroid-configs.js';
+import { IS_DEV } from '../core/env.js';
 
 const ENEMY_SERVICE_MAP = {
   player: 'player',
@@ -464,11 +465,7 @@ class EnemySystem extends BaseSystem {
         const pending = [...this.pendingEnemyProjectiles];
         this.pendingEnemyProjectiles = [];
         pending.forEach((payload) => this.handleEnemyProjectile(payload));
-        if (
-          typeof process !== 'undefined' &&
-          process.env &&
-          process.env.NODE_ENV === 'development'
-        ) {
+        if (IS_DEV) {
           console.debug(
             '[EnemySystem] Flushed pending projectiles',
             pending.length
@@ -1983,15 +1980,6 @@ class EnemySystem extends BaseSystem {
 
   // Backward compatibility with legacy API
   forEachActiveAsteroid(callback) {
-    if (
-      typeof process !== 'undefined' &&
-      process?.env?.NODE_ENV === 'development'
-    ) {
-      console.warn(
-        '[EnemySystem] forEachActiveAsteroid is deprecated. Use forEachActiveEnemy instead.'
-      );
-    }
-
     this.forEachActiveEnemy(callback);
   }
 
@@ -3214,12 +3202,7 @@ class EnemySystem extends BaseSystem {
           breakTimer: wave.breakTimer,
         });
       }
-    } else if (
-      typeof process !== 'undefined' &&
-      process.env?.NODE_ENV === 'development' &&
-      typeof console !== 'undefined' &&
-      typeof console.debug === 'function'
-    ) {
+    } else if (IS_DEV) {
       console.debug(
         '[EnemySystem] WaveManager active - skipping legacy wave-completed emit for Wave',
         wave.current
@@ -3241,13 +3224,7 @@ class EnemySystem extends BaseSystem {
       if (!this.waveManager.waveInProgress) {
         waveStarted = this.waveManager.startNextWave();
 
-        if (
-          !waveStarted &&
-          typeof process !== 'undefined' &&
-          process.env?.NODE_ENV === 'development' &&
-          typeof console !== 'undefined' &&
-          typeof console.debug === 'function'
-        ) {
+        if (!waveStarted && IS_DEV) {
           console.debug('[EnemySystem] WaveManager refused to start next wave');
         }
       } else {
@@ -3879,7 +3856,7 @@ class EnemySystem extends BaseSystem {
 
     // Last-resort: queue payload when both combat and bus are unavailable
     this.pendingEnemyProjectiles.push(payload);
-    if (process.env.NODE_ENV === 'development') {
+    if (IS_DEV) {
       console.debug(
         '[EnemySystem] Queued enemy projectile (combat/bus unavailable)',
         payload

@@ -4,6 +4,7 @@ import {
   resolveService,
 } from './serviceUtils.js';
 import RandomService from './RandomService.js';
+import { IS_DEV } from './env.js';
 
 /**
  * Base class for game systems providing common infrastructure.
@@ -100,15 +101,6 @@ class BaseSystem {
     // Call template methods
     this.initialize();
     this.setupEventListeners();
-
-    // Log initialization
-    if (
-      typeof process !== 'undefined' &&
-      process.env &&
-      process.env.NODE_ENV === 'development'
-    ) {
-      console.log(`[${this.systemName}] Initialized via BaseSystem`);
-    }
   }
 
   // ========================================
@@ -295,13 +287,7 @@ class BaseSystem {
         (this.constructor && this.constructor.name) ||
         'UnknownSystem';
       const warningMessage = `[${systemLabel}] registerEventListener('${eventName}') skipped: event bus is unavailable.`;
-      const shouldWarn =
-        typeof process === 'undefined' ||
-        !process.env ||
-        (process.env.NODE_ENV && process.env.NODE_ENV !== 'production');
-
       if (
-        shouldWarn &&
         typeof console !== 'undefined' &&
         typeof console.warn === 'function'
       ) {
@@ -486,15 +472,6 @@ class BaseSystem {
 
     // Call subclass hook
     this.onDestroy();
-
-    // Log destruction
-    if (
-      typeof process !== 'undefined' &&
-      process.env &&
-      process.env.NODE_ENV === 'development'
-    ) {
-      console.log(`[${this.systemName}] Destroyed`);
-    }
   }
 
   /**
@@ -526,11 +503,7 @@ class BaseSystem {
    * this.log('System initialized', { config: this.config });
    */
   log(message, data = null) {
-    if (
-      typeof process !== 'undefined' &&
-      process.env &&
-      process.env.NODE_ENV === 'development'
-    ) {
+    if (IS_DEV) {
       const prefix = `[${this.systemName || 'BaseSystem'}]`;
       if (data) {
         console.log(prefix, message, data);

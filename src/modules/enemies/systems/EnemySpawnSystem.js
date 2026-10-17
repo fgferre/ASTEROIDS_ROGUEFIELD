@@ -14,6 +14,7 @@ import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { resolveEventBus } from '../../../core/serviceUtils.js';
 import { Asteroid } from '../types/Asteroid.js';
 import { BossEnemy } from '../types/BossEnemy.js';
+import { IS_DEV } from '../../../core/env.js';
 
 const ASTEROID_POOL_ID = Symbol.for('ASTEROIDS_ROGUEFIELD:asteroidPoolId');
 const FACTORY_REGISTERED_FLAG = Symbol.for(
@@ -573,10 +574,7 @@ export class EnemySpawnSystem {
       !WAVEMANAGER_HANDLES_ASTEROID_SPAWN &&
       facade.waveManager;
 
-    const isDevelopment =
-      typeof process !== 'undefined' && process.env?.NODE_ENV === 'development';
-
-    if (!waveManagerEnabled || !isDevelopment) {
+    if (!waveManagerEnabled || !IS_DEV) {
       return;
     }
 

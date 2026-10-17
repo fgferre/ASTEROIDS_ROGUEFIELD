@@ -8,6 +8,7 @@ import {
 import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
+import { requireRandom } from '../../../utils/randomHelpers.js';
 
 const DRONE_DEFAULTS = DRONE_CONFIG ?? {};
 
@@ -129,12 +130,9 @@ export class Drone extends BaseEnemy {
 
       const centerX = boundsWidth > 0 ? boundsWidth / 2 : 0;
       const centerY = boundsHeight > 0 ? boundsHeight / 2 : 0;
-      const offsetGenerator =
-        this.random && typeof this.random.range === 'function'
-          ? () => this.random.range(-100, 100)
-          : () => (Math.random() - 0.5) * 200;
-      this.x = centerX + offsetGenerator();
-      this.y = centerY + offsetGenerator();
+      const offsetRandom = requireRandom(this.random, 'enemy.drone.recenter');
+      this.x = centerX + offsetRandom.range(-100, 100);
+      this.y = centerY + offsetRandom.range(-100, 100);
 
       GameDebugLogger.log('STATE', 'Drone position corrected to center area', {
         newPosition: {

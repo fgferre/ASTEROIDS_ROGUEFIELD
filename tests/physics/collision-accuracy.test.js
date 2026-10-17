@@ -1,6 +1,9 @@
 // src/__tests__/physics/collision-accuracy.test.js
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SpatialHash } from '../../src/core/SpatialHash.js';
+import RandomService from '../../src/core/RandomService.js';
+
+const testRandom = new RandomService('collision-accuracy-test');
 
 // Mock GameConstants for testing
 vi.mock('../../src/core/GameConstants.js', () => ({
@@ -340,9 +343,9 @@ describe('Collision Accuracy Tests', () => {
       for (let i = 0; i < 100; i++) {
         const asteroid = {
           id: `perf-asteroid-${i}`,
-          x: Math.random() * 1000,
-          y: Math.random() * 1000,
-          radius: 10 + Math.random() * 20,
+          x: testRandom.float() * 1000,
+          y: testRandom.float() * 1000,
+          radius: 10 + testRandom.float() * 20,
           destroyed: false,
         };
         manyAsteroids.push(asteroid);
@@ -353,8 +356,8 @@ describe('Collision Accuracy Tests', () => {
       for (let i = 0; i < 50; i++) {
         manyBullets.push({
           id: `perf-bullet-${i}`,
-          x: Math.random() * 1000,
-          y: Math.random() * 1000,
+          x: testRandom.float() * 1000,
+          y: testRandom.float() * 1000,
           hit: false,
         });
       }
@@ -500,8 +503,8 @@ describe('Collision Accuracy Tests', () => {
       for (let i = 0; i < 10; i++) {
         const asteroid = {
           id: `temp-${i}`,
-          x: Math.random() * 500,
-          y: Math.random() * 500,
+          x: testRandom.float() * 500,
+          y: testRandom.float() * 500,
           radius: 15,
           destroyed: false,
         };

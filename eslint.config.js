@@ -62,11 +62,12 @@ export default [
       ],
       'no-empty': ['error', { allowEmptyCatch: true }],
       'no-extra-boolean-cast': 'error',
-      // Determinism contract: gameplay randomness goes through RandomService.
-      // MenuBackgroundSystem deliberately overrides Math.random; it disables
-      // the rule inline.
+      // Determinism contract: all randomness goes through RandomService.
+      // Allowed exceptions disable the rule inline with a reason:
+      // MenuBackgroundSystem.withSeededMathRandom, the dev Math.random guard,
+      // and the benchmark scripts.
       'no-restricted-properties': [
-        'warn',
+        'error',
         {
           object: 'Math',
           property: 'random',

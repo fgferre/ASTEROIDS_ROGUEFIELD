@@ -4,6 +4,7 @@ import {
   applySpread,
 } from '../../../utils/combatHelpers.js';
 import { resolveEventBus } from '../../../core/serviceUtils.js';
+import { requireRandom } from '../../../utils/randomHelpers.js';
 
 const getEventBus = (context) => {
   if (context?.system?.eventBus?.emit) {
@@ -219,7 +220,7 @@ const defaultPatterns = {
 
     for (let i = 0; i < config.projectileCount; i += 1) {
       const randomOffset =
-        ((context.random?.float?.() ?? Math.random()) - 0.5) *
+        (requireRandom(context.random, 'enemy.weapon.spread').float() - 0.5) *
         config.angleVariance;
       const shotAngle = startAngle + offset * i + randomOffset;
       const vx = Math.cos(shotAngle) * config.speed;
