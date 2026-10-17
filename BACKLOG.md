@@ -24,3 +24,4 @@
 - Flags `showThrust/showTurret/showPulse/showAura` em `src/data/enemies/{drone,hunter,mine}.js` e no schema não são mais lidas pelo RenderComponent novo (17/10); apagar as flags e as cores neon antigas em `visual.pulse.color` das variantes.
 - Depois do passe de efeitos (17/10): a função `draw` das partículas em `GamePools.js` não é mais usada (tudo passa por `drawParticle`); `EnemySystem.js` ainda manda cores fora da paleta para `addScreenFlash`. Apagar a primeira, trocar as segundas por PALETTE.
 - `?profile=boss-arena` agora inicia sozinho (17/10), mas o jogador morre em ~5 s de jogo: a onda 5 forçada pode estar somando a onda 1 ao boss, ou o boss mata antes de a cena aparecer. Dar invulnerabilidade ao cenário ou reiniciar a onda 5 limpa; só então a captura do Warden em jogo é possível.
+- `mixed-enemy-waves.test.js` chama `withWaveOverrides` sem `await` num teste: falhas ali viram unhandled rejection, não falha de teste. Pôr o `await`.

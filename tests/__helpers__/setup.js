@@ -55,7 +55,6 @@ export function cleanupGlobalState() {
     delete globalThis.performance;
   }
 
-  delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
   delete globalThis.__WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__;
 
   vi.restoreAllMocks();
@@ -73,22 +72,20 @@ export function cleanupGlobalState() {
 /**
  * Execute a callback with WaveManager feature flags temporarily overridden.
  *
- * @param {{useManager?: boolean, managerHandlesAsteroids?: boolean}} config - Flags to apply during the callback execution.
+ * @param {{managerHandlesAsteroids?: boolean}} config - Flags to apply during the callback execution.
  * @param {() => Promise<any>|any} callback - Callback executed with overrides enabled.
  * @returns {Promise<any>} Resolves with the callback result once overrides are restored.
  * @example
- * await withWaveOverrides({ useManager: true }, async () => {
+ * await withWaveOverrides({ managerHandlesAsteroids: true }, async () => {
  *   // assertions
  * });
  */
 export async function withWaveOverrides(config, callback) {
-  const { useManager = true, managerHandlesAsteroids = true } = config ?? {};
+  const { managerHandlesAsteroids = true } = config ?? {};
 
-  const previousUseManager = globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
   const previousManagerHandles =
     globalThis.__WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__;
 
-  globalThis.__USE_WAVE_MANAGER_OVERRIDE__ = useManager;
   globalThis.__WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__ =
     managerHandlesAsteroids;
 
@@ -96,12 +93,6 @@ export async function withWaveOverrides(config, callback) {
     const result = await callback();
     return result;
   } finally {
-    if (previousUseManager === undefined) {
-      delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
-    } else {
-      globalThis.__USE_WAVE_MANAGER_OVERRIDE__ = previousUseManager;
-    }
-
     if (previousManagerHandles === undefined) {
       delete globalThis.__WAVEMANAGER_HANDLES_ASTEROID_SPAWN_OVERRIDE__;
     } else {

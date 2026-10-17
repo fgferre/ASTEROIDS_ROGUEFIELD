@@ -4,10 +4,7 @@ import {
   GAME_WIDTH,
   PLAYER_SAFE_SPAWN_DISTANCE,
 } from '../core/GameConstants.js';
-import {
-  USE_WAVE_MANAGER,
-  WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
-} from '../data/constants/gameplay.js';
+import { WAVEMANAGER_HANDLES_ASTEROID_SPAWN } from '../data/constants/gameplay.js';
 import { debugLog } from '../core/debugLogging.js';
 import { DEFAULT_HULL_ID, getShipModelById } from '../data/shipModels.js';
 
@@ -329,36 +326,6 @@ export default class GameSessionService {
     return this.sessionState;
   }
 
-  synchronizeLegacyState() {
-    if (!this.gameState || typeof this.gameState !== 'object') {
-      return;
-    }
-
-    const screen = this.getScreen();
-    if (typeof screen === 'string') {
-      this.gameState.screen = screen;
-    }
-
-    this.gameState.isPaused = this.isPaused();
-    this.gameState.sessionState = this.sessionState;
-
-    if (Object.prototype.hasOwnProperty.call(this.seedInfo, 'seed')) {
-      this.gameState.randomSeed = this.seedInfo.seed;
-    }
-
-    if (Object.prototype.hasOwnProperty.call(this.seedInfo, 'source')) {
-      this.gameState.randomSeedSource = this.seedInfo.source;
-    }
-
-    if (this.currentRandomSnapshot) {
-      this.gameState.randomSnapshot = this.currentRandomSnapshot;
-    }
-
-    if (typeof this.currentRandomScope === 'string') {
-      this.gameState.randomScope = this.currentRandomScope;
-    }
-  }
-
   emitSessionRetryCountdown(payload = {}) {
     if (!this.eventBus || typeof this.eventBus.emit !== 'function') {
       return;
@@ -624,8 +591,7 @@ export default class GameSessionService {
       return false;
     }
 
-    const waveManagerActive =
-      enemies.useManagers && Boolean(USE_WAVE_MANAGER) && enemies.waveManager;
+    const waveManagerActive = enemies.useManagers && enemies.waveManager;
 
     if (!waveManagerActive) {
       return false;

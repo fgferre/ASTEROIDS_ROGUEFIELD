@@ -31,7 +31,9 @@ describe('Asteroid Metrics - Wave State Counters', () => {
   });
 
   test('wave lifecycle updates counters correctly', async () => {
-    await withWaveOverrides({ useManager: false }, () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      // EnemySystem drives the wave itself only when no WaveManager is attached.
+      harness.enemySystem.waveManager = null;
       prepareWave(harness.enemySystem, 1);
       const startState = { ...harness.enemySystem.waveState };
 

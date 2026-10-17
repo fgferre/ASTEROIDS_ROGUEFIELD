@@ -99,7 +99,7 @@ const findEmit = (emits, eventName) =>
 
 describe('WaveManager boss-warning timing (D-04)', () => {
   it('emits boss-warning on wave 4 (one wave before boss wave 5) with { wave, nextBossWave }', async () => {
-    await withWaveOverrides({ useManager: true }, () => {
+    await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
       const emits = startWaveAndRecord(4);
 
       const bossWarning = findEmit(emits, 'boss-warning');
@@ -112,7 +112,7 @@ describe('WaveManager boss-warning timing (D-04)', () => {
   });
 
   it('emits boss-warning on wave 9 (one wave before boss wave 10) with { wave, nextBossWave }', async () => {
-    await withWaveOverrides({ useManager: true }, () => {
+    await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
       const emits = startWaveAndRecord(9);
 
       const bossWarning = findEmit(emits, 'boss-warning');
@@ -126,7 +126,7 @@ describe('WaveManager boss-warning timing (D-04)', () => {
   it.each([1, 2, 3])(
     'does NOT emit boss-warning on non-pre-boss wave %i',
     async (wave) => {
-      await withWaveOverrides({ useManager: true }, () => {
+      await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
         const emits = startWaveAndRecord(wave);
 
         expect(findEmit(emits, 'boss-warning')).toBeUndefined();
@@ -137,7 +137,7 @@ describe('WaveManager boss-warning timing (D-04)', () => {
   );
 
   it('does NOT emit boss-warning on boss wave 5 itself (that is the boss-spawn path)', async () => {
-    await withWaveOverrides({ useManager: true }, () => {
+    await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
       const emits = startWaveAndRecord(5);
 
       expect(findEmit(emits, 'boss-warning')).toBeUndefined();
@@ -148,7 +148,7 @@ describe('WaveManager boss-warning timing (D-04)', () => {
   });
 
   it('does NOT emit boss-warning on wave 10 (post-boss, not pre-boss)', async () => {
-    await withWaveOverrides({ useManager: true }, () => {
+    await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
       const emits = startWaveAndRecord(10);
 
       expect(findEmit(emits, 'boss-warning')).toBeUndefined();

@@ -34,14 +34,9 @@ import {
   ASTEROIDS_PER_WAVE_BASE,
   ASTEROIDS_PER_WAVE_MULTIPLIER,
   MAX_ASTEROIDS_ON_SCREEN,
-  PRESERVE_LEGACY_POSITIONING,
-  PRESERVE_LEGACY_SIZE_DISTRIBUTION,
-  STRICT_LEGACY_SPAWN_SEQUENCE,
   SUPPORT_ENEMY_PROGRESSION,
-  USE_WAVE_MANAGER,
   WAVE_BOSS_INTERVAL,
   WAVE_BREAK_TIME,
-  WAVE_MANAGER_EMIT_LEGACY_WAVE_COMPLETED,
   WAVE_SPAWN_DELAY,
   WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
 } from '../../../data/constants/gameplay.js';
@@ -133,7 +128,6 @@ export class WaveManager {
     this._trackedDynamicMinions = new WeakSet();
     this.managerTotalsForWave = { all: 0, asteroids: 0 };
     this.compatibilityModeActive = false;
-    this.legacyFallbackActive = false;
 
     // Timers
     this.spawnTimer = 0;
@@ -334,8 +328,6 @@ export class WaveManager {
     const baseCount = this.computeBaseEnemyCount(waveNumber);
 
     const enemies = [];
-    // WAVE-006: Distribuição de tamanhos configurável via flag
-    const useLegacyDistribution = PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
 
     const normalizedBaseCount = Math.max(
       0,
@@ -344,62 +336,30 @@ export class WaveManager {
 
     const metadata = {};
     const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
-    const strictLegacySequence = this.isStrictLegacySpawnSequenceEnabled();
-    const distributionWeights = this.getAsteroidDistributionWeights(
-      useLegacyDistribution
-    );
+    const distributionWeights = this.getAsteroidDistributionWeights();
 
     if (waveManagerSpawnsAsteroids && normalizedBaseCount > 0) {
-      const distributionLabel = useLegacyDistribution
-        ? 'legacy-50-30-20'
-        : 'mixed-30-40-30';
+      const distributionLabel = 'legacy-50-30-20';
+      const groupMetadata = {
+        spawnDistribution: distributionLabel,
+        distributionWeights: { ...distributionWeights },
+      };
 
-      if (strictLegacySequence) {
-        const groupMetadata = {
-          spawnDistribution: distributionLabel,
-          strictLegacySequence: true,
-          distributionWeights: { ...distributionWeights },
-        };
+      enemies.push({
+        type: 'asteroid',
+        count: normalizedBaseCount,
+        size: null,
+        variant: null,
+        metadata: groupMetadata,
+      });
 
-        enemies.push({
-          type: 'asteroid',
-          count: normalizedBaseCount,
-          size: null,
-          variant: null,
-          metadata: groupMetadata,
-        });
+      // Asteroid size rolls happen during spawn to keep the random call
+      // order deterministic. Consumers must therefore tolerate null/auto
+      // sizes in the wave configuration and rely on spawn-time resolution.
 
-        // In strict legacy mode, asteroid size rolls happen during spawn to
-        // maintain the exact random call order used by the legacy
-        // EnemySystem. Consumers must therefore tolerate null/auto sizes in
-        // the wave configuration and rely on spawn-time resolution instead.
-
-        metadata.spawnDistribution = distributionLabel;
-        metadata.strictLegacySequence = true;
-        metadata.targetAsteroidCount = normalizedBaseCount;
-        metadata.distributionWeights = { ...distributionWeights };
-      } else {
-        const { sequence: asteroidSequence, counts: asteroidCounts } =
-          this.buildAsteroidSpawnSequence(
-            normalizedBaseCount,
-            distributionWeights
-          );
-
-        asteroidSequence.forEach((size, index) => {
-          enemies.push({
-            type: 'asteroid',
-            count: 1,
-            size,
-            variant: null,
-            spawnIndexBase: index,
-          });
-        });
-
-        metadata.asteroidCounts = { ...asteroidCounts };
-        metadata.asteroidSpawnOrder = asteroidSequence.slice();
-        metadata.spawnDistribution = distributionLabel;
-        metadata.distributionWeights = { ...distributionWeights };
-      }
+      metadata.spawnDistribution = distributionLabel;
+      metadata.targetAsteroidCount = normalizedBaseCount;
+      metadata.distributionWeights = { ...distributionWeights };
     }
 
     const supportWeights = this.computeSupportWeights(waveNumber);
@@ -429,14 +389,8 @@ export class WaveManager {
     return config;
   }
 
-  getAsteroidDistributionWeights(
-    useLegacy = PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true
-  ) {
-    if (useLegacy) {
-      return { large: 0.5, medium: 0.3, small: 0.2 };
-    }
-
-    return { large: 0.3, medium: 0.4, small: 0.3 };
+  getAsteroidDistributionWeights() {
+    return { large: 0.5, medium: 0.3, small: 0.2 };
   }
 
   normalizeAsteroidDistribution(distribution = {}) {
@@ -451,104 +405,9 @@ export class WaveManager {
     return { weights, total };
   }
 
-  /**
-   * Builds a deterministic asteroid spawn sequence by sampling individual spawns
-   * using the provided size distribution. Returns both the ordered sequence and
-   * aggregate counts to aid accounting/telemetry.
-   *
-   * @param {number} targetCount - Number of asteroids to spawn
-   * @param {Object} distribution - Size weights (e.g., { large: 0.5, medium: 0.3, small: 0.2 })
-   * @returns {{sequence: string[], counts: Object}}
-   */
-  buildAsteroidSpawnSequence(targetCount = 0, distribution = {}) {
-    const sanitizedCount = Math.max(0, Math.floor(Number(targetCount) || 0));
-    const { weights, total } = this.normalizeAsteroidDistribution(distribution);
-
-    const weightEntries = Object.entries(weights).filter(
-      ([, weight]) => weight > 0
-    );
-    const totalWeight =
-      total > 0
-        ? total
-        : weightEntries.reduce((sum, [, weight]) => sum + weight, 0);
-
-    const scopedRandom = this.createScopedRandom('spawn', 'asteroid-size');
-    const sizeRandom =
-      (scopedRandom && scopedRandom.random) ||
-      this.resolveScopedRandom(
-        this.getRandomScope('spawn'),
-        'spawn',
-        'asteroid-size'
-      );
-
-    let resolvedRandom = sizeRandom;
-    if (
-      !resolvedRandom ||
-      (typeof resolvedRandom.float !== 'function' &&
-        typeof resolvedRandom.range !== 'function')
-    ) {
-      if (!this._fallbackRandom) {
-        this._fallbackRandom = new RandomService('wave-manager:fallback');
-      }
-
-      resolvedRandom = this._fallbackRandom.fork(
-        'wave-manager:asteroid-size-fallback'
-      );
-    }
-
-    const selectSize = () => {
-      if (!weightEntries.length || totalWeight <= 0 || !resolvedRandom) {
-        return weightEntries.length ? weightEntries[0][0] : 'small';
-      }
-
-      let roll;
-      if (typeof resolvedRandom.range === 'function') {
-        roll = resolvedRandom.range(0, totalWeight);
-      } else {
-        const base =
-          typeof resolvedRandom.float === 'function'
-            ? resolvedRandom.float()
-            : 0;
-        roll = base * totalWeight;
-      }
-
-      for (let i = 0; i < weightEntries.length; i += 1) {
-        const [key, weight] = weightEntries[i];
-        if (weight <= 0) {
-          continue;
-        }
-
-        if (roll < weight) {
-          return key;
-        }
-
-        roll -= weight;
-      }
-
-      return weightEntries[weightEntries.length - 1][0];
-    };
-
-    const sequence = [];
-    const counts = { large: 0, medium: 0, small: 0 };
-
-    for (let i = 0; i < sanitizedCount; i += 1) {
-      const size = selectSize();
-      sequence.push(size);
-      if (typeof counts[size] !== 'number') {
-        counts[size] = 0;
-      }
-      counts[size] += 1;
-    }
-
-    return { sequence, counts };
-  }
-
   resolveAsteroidSpawnSize(
     random,
-    {
-      distribution = this.getAsteroidDistributionWeights(),
-      strict = this.isStrictLegacySpawnSequenceEnabled(),
-    } = {}
+    distribution = this.getAsteroidDistributionWeights()
   ) {
     const { weights, total } = this.normalizeAsteroidDistribution(distribution);
     const fallbackRandom = this.getRandomService();
@@ -580,51 +439,20 @@ export class WaveManager {
     };
 
     const sizeOrder = ['large', 'medium', 'small'];
-
-    if (strict) {
-      const normalizedTotal = total > 0 ? total : 1;
-      const roll = drawFloat();
-      let cumulative = 0;
-
-      for (const size of sizeOrder) {
-        const weight = weights[size] / normalizedTotal;
-        if (weight <= 0) {
-          continue;
-        }
-
-        cumulative += weight;
-        if (roll < cumulative) {
-          return size;
-        }
-      }
-
-      return sizeOrder[sizeOrder.length - 1];
-    }
-
-    const totalWeight =
-      total > 0 ? total : sizeOrder.reduce((sum, key) => sum + weights[key], 0);
-    if (totalWeight <= 0) {
-      return sizeOrder[sizeOrder.length - 1];
-    }
-
-    let roll;
-    if (spawnRandom && typeof spawnRandom.range === 'function') {
-      roll = spawnRandom.range(0, totalWeight);
-    } else {
-      roll = drawFloat() * totalWeight;
-    }
+    const normalizedTotal = total > 0 ? total : 1;
+    const roll = drawFloat();
+    let cumulative = 0;
 
     for (const size of sizeOrder) {
-      const weight = weights[size];
+      const weight = weights[size] / normalizedTotal;
       if (weight <= 0) {
         continue;
       }
 
-      if (roll < weight) {
+      cumulative += weight;
+      if (roll < cumulative) {
         return size;
       }
-
-      roll -= weight;
     }
 
     return sizeOrder[sizeOrder.length - 1];
@@ -863,26 +691,7 @@ export class WaveManager {
       return false;
     }
 
-    const useOverride =
-      typeof globalThis !== 'undefined'
-        ? globalThis.__USE_WAVE_MANAGER_OVERRIDE__
-        : undefined;
-
-    const waveManagerHandles =
-      typeof WAVEMANAGER_HANDLES_ASTEROID_SPAWN === 'boolean'
-        ? WAVEMANAGER_HANDLES_ASTEROID_SPAWN
-        : false;
-    const useWaveManagerFlag =
-      typeof USE_WAVE_MANAGER === 'boolean' ? USE_WAVE_MANAGER : false;
-
-    const resolvedUseWaveManager =
-      useOverride === true
-        ? true
-        : useOverride === false
-          ? false
-          : useWaveManagerFlag;
-
-    return Boolean(waveManagerHandles && resolvedUseWaveManager);
+    return Boolean(WAVEMANAGER_HANDLES_ASTEROID_SPAWN);
   }
 
   registerActiveEnemy(enemy, { skipDuplicateCheck = false } = {}) {
@@ -1078,27 +887,6 @@ export class WaveManager {
     });
 
     return true;
-  }
-
-  isLegacyAsteroidCompatibilityEnabled() {
-    const preserveLegacy = PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
-    if (!preserveLegacy) {
-      return false;
-    }
-
-    return preserveLegacy && this.shouldWaveManagerSpawnAsteroids();
-  }
-
-  isStrictLegacySpawnSequenceEnabled() {
-    if (!this.shouldWaveManagerSpawnAsteroids()) {
-      return false;
-    }
-
-    if (typeof STRICT_LEGACY_SPAWN_SEQUENCE === 'boolean') {
-      return STRICT_LEGACY_SPAWN_SEQUENCE;
-    }
-
-    return this.isLegacyAsteroidCompatibilityEnabled();
   }
 
   computeBaseEnemyCount(waveNumber) {
@@ -1311,8 +1099,6 @@ export class WaveManager {
 
     const waveNumber = this.currentWave;
     const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
-    const legacyCompatibilityEnabled =
-      this.isLegacyAsteroidCompatibilityEnabled();
     let config;
 
     if (this.isBossWave(waveNumber)) {
@@ -1324,7 +1110,7 @@ export class WaveManager {
         supportGroups: config?.supportGroups?.length || 0,
       });
     } else {
-      if (legacyCompatibilityEnabled) {
+      if (waveManagerSpawnsAsteroids) {
         config = this.generateDynamicWave(waveNumber);
       } else {
         const predefined = this.waveConfigs.get(waveNumber);
@@ -1347,10 +1133,6 @@ export class WaveManager {
     let computedTotalEnemies = this.computeTotalEnemies(effectiveConfig);
     let asteroidOnlyTotal = this.computeAsteroidOnlyTotal(effectiveConfig);
 
-    const compatibilityModeActive =
-      !waveManagerSpawnsAsteroids || legacyCompatibilityEnabled;
-    const fallbackActive = !waveManagerSpawnsAsteroids;
-
     if (!waveManagerSpawnsAsteroids) {
       // Legacy fallback only defers asteroid spawning. Bosses and support
       // enemies are still spawned and completed by WaveManager.
@@ -1369,8 +1151,7 @@ export class WaveManager {
     this.totalEnemiesThisWave = computedTotalEnemies;
     this.totalAsteroidEnemiesThisWave = asteroidOnlyTotal;
     this.managerTotalsForWave = { ...rawManagerTotals };
-    this.compatibilityModeActive = compatibilityModeActive;
-    this.legacyFallbackActive = fallbackActive;
+    this.compatibilityModeActive = true;
 
     const waveEventPayload = {
       wave: waveNumber,
@@ -1378,14 +1159,9 @@ export class WaveManager {
       asteroidTotal: asteroidOnlyTotal,
       isBossWave: effectiveConfig.isBossWave,
       spawnDelayMultiplier: sharedSpawnDelayMultiplier,
-      compatibilityMode: compatibilityModeActive,
-      legacyFallbackActive: fallbackActive,
+      compatibilityMode: true,
       managerTotals: { ...rawManagerTotals },
     };
-
-    if (fallbackActive) {
-      waveEventPayload.legacyFallbackTotals = { ...rawManagerTotals };
-    }
 
     if (this.eventBus) {
       this.eventBus.emit('wave-started', waveEventPayload);
@@ -1416,8 +1192,7 @@ export class WaveManager {
           wave: waveNumber,
           totalEnemies: this.totalEnemiesThisWave,
           asteroidTotal: asteroidOnlyTotal,
-          compatibilityMode: compatibilityModeActive,
-          legacyFallbackActive: fallbackActive,
+          compatibilityMode: true,
           managerTotals: { ...rawManagerTotals },
           boss: effectiveConfig.boss ? { ...effectiveConfig.boss } : null,
           support: supportGroups,
@@ -1518,15 +1293,8 @@ export class WaveManager {
         ? this.enemySystem.getPlayerPositionSnapshot(player)
         : null;
     const safeDistance = ASTEROID_SAFE_SPAWN_DISTANCE || 200;
-    const compatibilityMode =
-      this.compatibilityModeActive ??
-      (!waveManagerSpawnsAsteroids ||
-        this.isLegacyAsteroidCompatibilityEnabled());
-    const useLegacyDistribution = PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true;
-    const strictLegacySequence = this.isStrictLegacySpawnSequenceEnabled();
-    const defaultDistributionWeights = this.getAsteroidDistributionWeights(
-      useLegacyDistribution
-    );
+    const compatibilityMode = this.compatibilityModeActive;
+    const defaultDistributionWeights = this.getAsteroidDistributionWeights();
 
     const spawnDelayMultiplier =
       this.resolveWaveSpawnDelayMultiplier(waveConfig);
@@ -1558,16 +1326,13 @@ export class WaveManager {
       }
 
       for (let i = 0; i < groupCount; i++) {
-        const spawnContext =
-          strictLegacySequence && isAsteroid
-            ? this.createLegacyAsteroidScopedRandom()
-            : this.createScopedRandom('spawn', 'wave-spawn');
-        // WAVE-006: Posicionamento configurável via flag
-        const useLegacyPositioning = PRESERVE_LEGACY_POSITIONING ?? true;
+        const spawnContext = isAsteroid
+          ? this.createLegacyAsteroidScopedRandom()
+          : this.createScopedRandom('spawn', 'wave-spawn');
 
         let position;
-        if (useLegacyPositioning && isAsteroid) {
-          // Legacy: spawn on one of 4 edges (matches baseline behavior)
+        if (isAsteroid) {
+          // Asteroids spawn on one of the 4 edges
           position = this.calculateEdgeSpawnPosition(
             worldBounds,
             spawnContext.random
@@ -1677,10 +1442,10 @@ export class WaveManager {
             (groupMetadata && groupMetadata.distributionWeights) ||
             defaultDistributionWeights;
 
-          resolvedSize = this.resolveAsteroidSpawnSize(spawnContext.random, {
-            distribution: distributionForGroup,
-            strict: strictLegacySequence,
-          });
+          resolvedSize = this.resolveAsteroidSpawnSize(
+            spawnContext.random,
+            distributionForGroup
+          );
         }
 
         const enemyConfig = {
@@ -1713,7 +1478,7 @@ export class WaveManager {
             spawnIndex,
             resolvedSize,
           };
-        } else if (isAsteroid && strictLegacySequence) {
+        } else if (isAsteroid) {
           enemyConfig.metadata = { spawnIndex, resolvedSize };
         }
 
@@ -2689,15 +2454,7 @@ export class WaveManager {
       return;
     }
 
-    if (!USE_WAVE_MANAGER) {
-      return;
-    }
-
-    const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
-    const compatibilityMode =
-      this.compatibilityModeActive ??
-      (!waveManagerSpawnsAsteroids ||
-        this.isLegacyAsteroidCompatibilityEnabled());
+    const compatibilityMode = this.compatibilityModeActive;
 
     const waveManagerTotal = compatibilityMode
       ? this.totalAsteroidEnemiesThisWave
@@ -2754,10 +2511,6 @@ export class WaveManager {
       };
 
       this.eventBus.emit('wave-complete', payload);
-
-      if (WAVE_MANAGER_EMIT_LEGACY_WAVE_COMPLETED ?? false) {
-        this.eventBus.emit('wave-completed', payload);
-      }
     }
 
     // Start countdown for next wave
@@ -2810,7 +2563,6 @@ export class WaveManager {
     this._trackedDynamicMinions = new WeakSet();
     this.managerTotalsForWave = { all: 0, asteroids: 0 };
     this.compatibilityModeActive = false;
-    this.legacyFallbackActive = false;
     if (this.randomSequences) {
       this.randomSequences.spawn = 0;
       this.randomSequences.variants = 0;
@@ -2831,10 +2583,7 @@ export class WaveManager {
     const sanitizeCount = (value) => (Number.isFinite(value) ? value : 0);
 
     const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
-    const compatibilityMode =
-      this.compatibilityModeActive ??
-      (!waveManagerSpawnsAsteroids ||
-        this.isLegacyAsteroidCompatibilityEnabled());
+    const compatibilityMode = this.compatibilityModeActive;
     const preferAsteroidBreakdown = !waveManagerSpawnsAsteroids;
 
     const totals = {
@@ -2891,9 +2640,6 @@ export class WaveManager {
       progress:
         progressDenominator > 0 ? killedForState / progressDenominator : 0,
       compatibilityMode,
-      legacyFallbackActive: Boolean(
-        this.legacyFallbackActive ?? !waveManagerSpawnsAsteroids
-      ),
     };
   }
 

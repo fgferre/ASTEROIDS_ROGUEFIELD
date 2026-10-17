@@ -519,10 +519,6 @@ class InputSystem {
     if (gameStateService && typeof gameStateService.getScreen === 'function') {
       return gameStateService.getScreen() || null;
     }
-    // Fallback: read from a global if surfaced (some bootstraps expose it).
-    if (typeof globalThis !== 'undefined' && globalThis.gameState?.screen) {
-      return globalThis.gameState.screen;
-    }
     return null;
   }
 

@@ -387,7 +387,6 @@ export class ServiceRegistry {
         seed: sessionState.seed,
         source: sessionState.seedSource,
       }),
-      synchronizeLegacyState: () => undefined,
     };
 
     const resolvedGameSession = (() => {

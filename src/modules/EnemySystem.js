@@ -36,7 +36,6 @@ import {
   ASTEROIDS_PER_WAVE_MULTIPLIER,
   SHIELD_SHOCKWAVE_FORCE,
   SHIELD_SHOCKWAVE_RADIUS,
-  USE_WAVE_MANAGER,
   WAVE_BREAK_TIME,
   WAVE_DURATION,
 } from '../data/constants/gameplay.js';
@@ -107,12 +106,10 @@ class EnemySystem extends BaseSystem {
       warningFlag: '_snapshotFallbackWarningIssued',
       onFallback: this.reset.bind(this),
     });
-    this._waveSystemDebugLogged = false;
     this._waveManagerFallbackWarningIssued = false;
     this._waveManagerInvalidStateWarningIssued = false;
     this._lastWaveManagerCompletionHandled = null;
     this._asteroidSpawnDebugLogged = false;
-    this._waveManagerRuntimeEnabled = false;
     this._lastEnemyUpdateLog = 0;
     this._playerCacheLogged = false;
     this._playerServiceRefreshWarning = false;
@@ -293,7 +290,7 @@ class EnemySystem extends BaseSystem {
 
       if (this.waveManager) {
         this.registerEventListener('wave-complete', (data = {}) => {
-          if (Boolean(USE_WAVE_MANAGER) && this.waveState) {
+          if (this.waveState) {
             const waveNumber = Number.isFinite(Number(data.wave))
               ? Number(data.wave)
               : Number.isFinite(this.waveState.current)
@@ -2002,7 +1999,6 @@ class EnemySystem extends BaseSystem {
         killed: { all: 0, asteroids: 0 },
       },
       compatibilityMode: false,
-      legacyFallbackActive: false,
     };
   }
 
@@ -2035,7 +2031,6 @@ class EnemySystem extends BaseSystem {
           timeRemaining: Math.max(0, this.waveState.timeRemaining),
           managerTotals: normalizedManagerTotals,
           compatibilityMode: Boolean(this.waveState.compatibilityMode),
-          legacyFallbackActive: Boolean(this.waveState.legacyFallbackActive),
         }
       : null;
 
@@ -2064,7 +2059,6 @@ class EnemySystem extends BaseSystem {
         : 0,
       managerAllEnemiesTotal: normalizedManagerTotals?.all ?? 0,
       compatibilityMode: Boolean(this.waveState?.compatibilityMode),
-      legacyFallbackActive: Boolean(this.waveState?.legacyFallbackActive),
     };
 
     if (!force && this.lastWaveBroadcast) {
@@ -2080,8 +2074,7 @@ class EnemySystem extends BaseSystem {
         prev.totalKills === snapshot.totalKills &&
         prev.sessionTimeSeconds === snapshot.sessionTimeSeconds &&
         prev.managerAllEnemiesTotal === snapshot.managerAllEnemiesTotal &&
-        prev.compatibilityMode === snapshot.compatibilityMode &&
-        prev.legacyFallbackActive === snapshot.legacyFallbackActive;
+        prev.compatibilityMode === snapshot.compatibilityMode;
 
       if (unchanged) {
         return;
@@ -2447,10 +2440,6 @@ class EnemySystem extends BaseSystem {
         typeof wave.compatibilityMode === 'boolean'
           ? wave.compatibilityMode
           : base.compatibilityMode,
-      legacyFallbackActive:
-        typeof wave.legacyFallbackActive === 'boolean'
-          ? wave.legacyFallbackActive
-          : base.legacyFallbackActive,
     };
   }
 
@@ -3112,8 +3101,7 @@ class EnemySystem extends BaseSystem {
     this.refreshServiceState({ force: true });
     this.syncPhysicsIntegration(true);
 
-    const waveManagerActive =
-      this.useManagers && Boolean(USE_WAVE_MANAGER) && this.waveManager;
+    const waveManagerActive = this.useManagers && this.waveManager;
 
     if (waveManagerActive) {
       if (typeof this.waveManager.reset === 'function') {
@@ -3187,8 +3175,7 @@ class EnemySystem extends BaseSystem {
     wave.spawnTimer = 0;
     wave.initialSpawnDone = false;
 
-    const waveManagerActive =
-      this.useManagers && Boolean(USE_WAVE_MANAGER) && this.waveManager;
+    const waveManagerActive = this.useManagers && this.waveManager;
 
     if (!waveManagerActive) {
       this.grantWaveRewards();
@@ -3215,8 +3202,7 @@ class EnemySystem extends BaseSystem {
   startNextWave() {
     if (!this.waveState) return;
 
-    const waveManagerActive =
-      this.useManagers && Boolean(USE_WAVE_MANAGER) && this.waveManager;
+    const waveManagerActive = this.useManagers && this.waveManager;
 
     let waveStarted = false;
 

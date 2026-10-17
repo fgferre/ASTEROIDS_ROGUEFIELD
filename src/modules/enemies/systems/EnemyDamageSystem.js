@@ -24,7 +24,6 @@
 
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { ASTEROID_VARIANTS } from '../../../data/enemies/asteroid-configs.js';
-import { USE_WAVE_MANAGER } from '../../../data/constants/gameplay.js';
 import { resolveEventBus } from '../../../core/serviceUtils.js';
 import { requireRandom } from '../../../utils/randomHelpers.js';
 
@@ -276,9 +275,7 @@ class EnemyDamageSystem {
         activeCount === 0;
 
       const usingWaveManager =
-        this.facade.useManagers &&
-        Boolean(USE_WAVE_MANAGER) &&
-        this.facade.waveManager;
+        this.facade.useManagers && this.facade.waveManager;
 
       if (
         !usingWaveManager &&

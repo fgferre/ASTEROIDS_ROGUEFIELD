@@ -292,15 +292,7 @@ export const SUPPORT_ENEMY_PROGRESSION = deepFreeze({
   }),
 });
 
-export const USE_WAVE_MANAGER = true; // Feature flag para ativar o novo WaveManager (experimental). Consulte docs/validation/asteroid-baseline-metrics.md para critérios de compatibilidade.
-
-export const PRESERVE_LEGACY_SIZE_DISTRIBUTION = true; // WAVE-006: Preservar distribuição legada de tamanhos de asteroides (50/30/20) para paridade com baseline
-
-export const PRESERVE_LEGACY_POSITIONING = true; // WAVE-006: Preservar posicionamento legado de asteroides (4 bordas) vs. safe distance
-
-export const WAVEMANAGER_HANDLES_ASTEROID_SPAWN = false; // WAVE-006: Ativar controle de spawn de asteroides pelo WaveManager (requer USE_WAVE_MANAGER=true)
-
-export const WAVE_MANAGER_EMIT_LEGACY_WAVE_COMPLETED = false; // WAVE-004: Emite evento legado 'wave-completed' somente quando compatibilidade for necessária
+export const WAVEMANAGER_HANDLES_ASTEROID_SPAWN = false; // WAVE-006: Ativar controle de spawn de asteroides pelo WaveManager
 
 export const ASTEROID_EDGE_SPAWN_MARGIN = 80; // WAVE-006: Margem para posicionamento de spawn nas bordas (paridade com legado)
 
@@ -308,4 +300,3 @@ export const ASTEROID_SAFE_SPAWN_DISTANCE = 200; // Distância mínima do jogado
 
 export const ASTEROID_ENTRY_ANGLE_VARIANCE = Math.PI / 4; // Ajuste direcional para entrada (45°)
 export const ASTEROID_OFFSCREEN_RECOVERY_TIME = 4.0; // Tempo fora da tela antes de reorientar o asteroide
-export const STRICT_LEGACY_SPAWN_SEQUENCE = true; // WAVE-006: Garante que posição e tamanho reutilizem o mesmo stream de randomização

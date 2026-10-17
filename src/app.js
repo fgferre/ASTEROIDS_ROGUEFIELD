@@ -1,11 +1,7 @@
 import { GamePools } from './core/GamePools.js';
 import {
-  USE_WAVE_MANAGER,
   WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
   WAVE_BOSS_INTERVAL,
-  PRESERVE_LEGACY_SIZE_DISTRIBUTION,
-  PRESERVE_LEGACY_POSITIONING,
-  STRICT_LEGACY_SPAWN_SEQUENCE,
 } from './data/constants/gameplay.js';
 import {
   debugLog,
@@ -81,8 +77,6 @@ let servicesCache = {
   ui: null,
 };
 let servicesCacheInitialized = false;
-let stateDirty = false;
-let lastSyncTime = 0;
 
 const DEV_MODE = isDevEnvironment();
 
@@ -201,92 +195,6 @@ function bootstrapDebugLogging() {
   applyDebugPreference(preference);
 }
 
-function synchronizeSessionState(currentTime, session) {
-  if (!session) {
-    return;
-  }
-
-  if (typeof session.synchronizeLegacyState === 'function') {
-    const shouldSync = stateDirty || currentTime - lastSyncTime > 100;
-    if (!shouldSync) {
-      return;
-    }
-
-    try {
-      session.synchronizeLegacyState();
-      stateDirty = false;
-      lastSyncTime = currentTime;
-    } catch (syncError) {
-      console.warn('[App] Failed to synchronize legacy state:', syncError);
-    }
-    return;
-  }
-
-  try {
-    const screen =
-      typeof session.getScreen === 'function' ? session.getScreen() : undefined;
-    if (typeof screen === 'string') {
-      gameState.screen = screen;
-    }
-
-    const paused =
-      typeof session.isPaused === 'function' ? session.isPaused() : undefined;
-    if (typeof paused === 'boolean') {
-      gameState.isPaused = paused;
-    }
-  } catch (syncError) {
-    console.warn('[App] Failed to mirror session state:', syncError);
-  }
-}
-
-function getSessionFrameState(session) {
-  const snapshot = {
-    screen: gameState.screen,
-    isPaused: gameState.isPaused,
-    isRunning: gameState.screen === 'playing' && !gameState.isPaused,
-  };
-
-  if (!session) {
-    return snapshot;
-  }
-
-  try {
-    const screen =
-      typeof session.getScreen === 'function'
-        ? session.getScreen()
-        : snapshot.screen;
-    if (typeof screen === 'string') {
-      snapshot.screen = screen;
-      gameState.screen = screen;
-    }
-
-    const paused =
-      typeof session.isPaused === 'function'
-        ? session.isPaused()
-        : snapshot.isPaused;
-    if (typeof paused === 'boolean') {
-      snapshot.isPaused = paused;
-      gameState.isPaused = paused;
-    }
-
-    if (typeof session.isRunning === 'function') {
-      const running = session.isRunning();
-      if (typeof running === 'boolean') {
-        snapshot.isRunning = running;
-      }
-    } else {
-      snapshot.isRunning = snapshot.screen === 'playing' && !snapshot.isPaused;
-    }
-  } catch (stateError) {
-    console.warn(
-      '[App] Failed to read current session frame state:',
-      stateError
-    );
-  }
-
-  return snapshot;
-}
-
 function init() {
   if (DEV_MODE) {
     GameDebugLogger.init();
@@ -335,12 +243,8 @@ function init() {
 
     if (DEV_MODE) {
       GameDebugLogger.log('INIT', 'Feature Flags', {
-        USE_WAVE_MANAGER,
         WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
         WAVE_BOSS_INTERVAL,
-        PRESERVE_LEGACY_SIZE_DISTRIBUTION,
-        PRESERVE_LEGACY_POSITIONING,
-        STRICT_LEGACY_SPAWN_SEQUENCE,
       });
     }
 
@@ -495,14 +399,7 @@ function init() {
         const gameEvents = diContainer.resolve('event-bus');
         if (gameEvents && typeof gameEvents.on === 'function') {
           gameEvents.on('screen-changed', () => {
-            stateDirty = true;
             servicesCacheInitialized = false;
-          });
-          gameEvents.on('pause-state-changed', () => {
-            stateDirty = true;
-          });
-          gameEvents.on('session-state-changed', () => {
-            stateDirty = true;
           });
         }
       } catch (error) {
@@ -545,11 +442,8 @@ function gameLoop(currentTime) {
   gameState.lastTime = currentTime;
 
   try {
-    const session = gameSessionService;
-    synchronizeSessionState(currentTime, session);
-    const sessionState = getSessionFrameState(session);
-    const currentScreen = sessionState.screen;
-    const shouldUpdateGame = sessionState.isRunning;
+    const currentScreen = gameSessionService.getScreen();
+    const shouldUpdateGame = gameSessionService.isRunning();
 
     const shouldRenderGame = gameState.gameUI
       ? !gameState.gameUI.classList.contains('hidden')

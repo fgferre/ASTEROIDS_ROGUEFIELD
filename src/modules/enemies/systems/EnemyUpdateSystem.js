@@ -26,7 +26,6 @@
  */
 import { GAME_WIDTH, GAME_HEIGHT } from '../../../core/GameConstants.js';
 import {
-  USE_WAVE_MANAGER,
   WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
   ASTEROIDS_PER_WAVE_MULTIPLIER,
   ASTEROIDS_PER_WAVE_BASE,
@@ -35,7 +34,6 @@ import {
   MAX_ASTEROIDS_ON_SCREEN,
   WAVE_DURATION,
   WAVE_BREAK_TIME,
-  PRESERVE_LEGACY_SIZE_DISTRIBUTION,
   COLLISION_BOUNCE,
 } from '../../../data/constants/gameplay.js';
 import { ASTEROID_SPEEDS } from '../../../data/constants/physics.js';
@@ -110,36 +108,9 @@ export class EnemyUpdateSystem {
       this.ctx.refreshServiceState();
     }
 
-    const overrideValue =
-      typeof globalThis !== 'undefined'
-        ? globalThis.__USE_WAVE_MANAGER_OVERRIDE__
-        : undefined;
-
-    const constantsFlag =
-      typeof USE_WAVE_MANAGER === 'boolean' ? USE_WAVE_MANAGER : false;
-
-    let waveManagerEnabled = constantsFlag;
-    if (overrideValue === true) {
-      waveManagerEnabled = true;
-    } else if (overrideValue === false) {
-      waveManagerEnabled = false;
-    }
-
-    if (!facade._waveSystemDebugLogged) {
-      console.debug(
-        `[EnemySystem] Wave system: ${waveManagerEnabled ? 'WaveManager' : 'Legacy'}`
-      );
-      facade._waveSystemDebugLogged = true;
-    }
-
-    facade._waveManagerRuntimeEnabled = waveManagerEnabled;
-
-    const waveManagerHandlesSpawnFlag =
-      (WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
-      facade._waveManagerRuntimeEnabled;
     const waveManagerInstance = this.ctx?.waveManager;
     const waveManagerControlsSpawn = Boolean(
-      waveManagerHandlesSpawnFlag &&
+      WAVEMANAGER_HANDLES_ASTEROID_SPAWN &&
         waveManagerInstance &&
         !facade._waveManagerFallbackWarningIssued &&
         !facade._waveManagerInvalidStateWarningIssued
@@ -159,13 +130,8 @@ export class EnemyUpdateSystem {
       sessionStats.timeElapsed += deltaTime;
     }
 
-    if (waveManagerEnabled) {
-      this.updateWaveManagerLogic(deltaTime);
-      this.updateAsteroids(deltaTime);
-    } else {
-      this.updateAsteroids(deltaTime);
-      this.updateWaveLogic(deltaTime);
-    }
+    this.updateWaveManagerLogic(deltaTime);
+    this.updateAsteroids(deltaTime);
 
     this.updateSupportEnemies(deltaTime);
     this.cleanupDestroyed();
@@ -194,8 +160,7 @@ export class EnemyUpdateSystem {
     let spawnHandled = false;
 
     const waveManagerHandlesSpawn =
-      (WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
-      facade._waveManagerRuntimeEnabled &&
+      WAVEMANAGER_HANDLES_ASTEROID_SPAWN &&
       this.ctx?.waveManager &&
       !facade._waveManagerFallbackWarningIssued &&
       !facade._waveManagerInvalidStateWarningIssued;
@@ -259,7 +224,7 @@ export class EnemyUpdateSystem {
     if (!waveManager) {
       if (!facade._waveManagerFallbackWarningIssued) {
         console.warn(
-          '[EnemySystem] WaveManager indisponível. Recuando para updateWaveLogic() enquanto USE_WAVE_MANAGER está ativo.'
+          '[EnemySystem] WaveManager indisponível. Recuando para updateWaveLogic().'
         );
         facade._waveManagerFallbackWarningIssued = true;
       }
@@ -267,8 +232,7 @@ export class EnemyUpdateSystem {
     }
 
     const waveManagerHandlesAsteroids =
-      (WAVEMANAGER_HANDLES_ASTEROID_SPAWN ?? false) &&
-      facade._waveManagerRuntimeEnabled &&
+      WAVEMANAGER_HANDLES_ASTEROID_SPAWN &&
       !facade._waveManagerFallbackWarningIssued &&
       !facade._waveManagerInvalidStateWarningIssued;
 
@@ -297,7 +261,7 @@ export class EnemyUpdateSystem {
     if (!managerStateValid) {
       if (!facade._waveManagerInvalidStateWarningIssued) {
         console.warn(
-          '[EnemySystem] WaveManager returned invalid state. Falling back to updateWaveLogic() while USE_WAVE_MANAGER is active.'
+          '[EnemySystem] WaveManager returned invalid state. Falling back to updateWaveLogic().'
         );
         facade._waveManagerInvalidStateWarningIssued = true;
       }
@@ -367,23 +331,12 @@ export class EnemyUpdateSystem {
       }
     }
 
-    const legacyCompatibilityEnabled =
-      (PRESERVE_LEGACY_SIZE_DISTRIBUTION ?? true) &&
-      waveManagerHandlesAsteroids;
-
     const totals = managerState.totals || {};
     const counts = managerState.counts || {};
     const spawnedBreakdown = counts.spawned || {};
     const killedBreakdown = counts.killed || {};
 
-    const resolvedCompatibilityMode =
-      managerState.compatibilityMode ??
-      (!waveManagerHandlesAsteroids || legacyCompatibilityEnabled);
-    const resolvedFallbackActive =
-      managerState.legacyFallbackActive ?? !waveManagerHandlesAsteroids;
-
-    wave.compatibilityMode = Boolean(resolvedCompatibilityMode);
-    wave.legacyFallbackActive = Boolean(resolvedFallbackActive);
+    wave.compatibilityMode = Boolean(managerState.compatibilityMode ?? true);
 
     const coerceFiniteNumber = (value) => {
       const numeric = Number(value);
@@ -422,12 +375,9 @@ export class EnemyUpdateSystem {
     };
 
     if (waveManagerHandlesAsteroids) {
-      const managerSpawnedValue = legacyCompatibilityEnabled
-        ? spawnedBreakdown.asteroids ?? managerState.spawned
-        : managerState.spawned;
-      const managerTotalValue = legacyCompatibilityEnabled
-        ? totals.asteroids ?? managerState.total
-        : managerState.total;
+      const managerSpawnedValue =
+        spawnedBreakdown.asteroids ?? managerState.spawned;
+      const managerTotalValue = totals.asteroids ?? managerState.total;
 
       nextSpawned = selectManagerValue(managerSpawnedValue, previousSpawned);
       nextTotal = selectManagerValue(managerTotalValue, previousTotal);

@@ -64,41 +64,36 @@ afterEach(() => {
 
 describe('Wave progression', () => {
   it('unlocks support enemies at configured progression thresholds', () => {
-    withWaveOverrides(
-      { useManager: true, managerHandlesAsteroids: true },
-      () => {
-        const manager = createWaveManager({ eventBus });
-        manager.currentWave =
-          CONSTANTS.SUPPORT_ENEMY_PROGRESSION.drone.startWave;
-        const droneWave = manager.generateDynamicWave(manager.currentWave);
-        expect(droneWave.enemies.some((group) => group.type === 'drone')).toBe(
-          true
-        );
-        expect(droneWave.enemies.some((group) => group.type === 'mine')).toBe(
-          false
-        );
+    withWaveOverrides({ managerHandlesAsteroids: true }, () => {
+      const manager = createWaveManager({ eventBus });
+      manager.currentWave = CONSTANTS.SUPPORT_ENEMY_PROGRESSION.drone.startWave;
+      const droneWave = manager.generateDynamicWave(manager.currentWave);
+      expect(droneWave.enemies.some((group) => group.type === 'drone')).toBe(
+        true
+      );
+      expect(droneWave.enemies.some((group) => group.type === 'mine')).toBe(
+        false
+      );
 
-        manager.currentWave =
-          CONSTANTS.SUPPORT_ENEMY_PROGRESSION.mine.startWave;
-        const mineWave = manager.generateDynamicWave(manager.currentWave);
-        expect(mineWave.enemies.some((group) => group.type === 'drone')).toBe(
-          true
-        );
-        expect(mineWave.enemies.some((group) => group.type === 'mine')).toBe(
-          true
-        );
-        expect(mineWave.enemies.some((group) => group.type === 'hunter')).toBe(
-          false
-        );
+      manager.currentWave = CONSTANTS.SUPPORT_ENEMY_PROGRESSION.mine.startWave;
+      const mineWave = manager.generateDynamicWave(manager.currentWave);
+      expect(mineWave.enemies.some((group) => group.type === 'drone')).toBe(
+        true
+      );
+      expect(mineWave.enemies.some((group) => group.type === 'mine')).toBe(
+        true
+      );
+      expect(mineWave.enemies.some((group) => group.type === 'hunter')).toBe(
+        false
+      );
 
-        manager.currentWave =
-          CONSTANTS.SUPPORT_ENEMY_PROGRESSION.hunter.startWave;
-        const hunterWave = manager.generateDynamicWave(manager.currentWave);
-        expect(
-          hunterWave.enemies.some((group) => group.type === 'hunter')
-        ).toBe(true);
-      }
-    );
+      manager.currentWave =
+        CONSTANTS.SUPPORT_ENEMY_PROGRESSION.hunter.startWave;
+      const hunterWave = manager.generateDynamicWave(manager.currentWave);
+      expect(hunterWave.enemies.some((group) => group.type === 'hunter')).toBe(
+        true
+      );
+    });
   });
 });
 
@@ -106,53 +101,46 @@ describe('Enemy spawning integration', () => {
   it('spawns support groups through the EnemySystem factory pathway', () => {
     const spawnLog = [];
 
-    withWaveOverrides(
-      { useManager: true, managerHandlesAsteroids: true },
-      () => {
-        const enemySystem = {
-          getCachedWorld: () => ({
-            getBounds: () => ({ width: 800, height: 600 }),
-          }),
-          getCachedPlayer: () => ({ position: { x: 400, y: 300 } }),
-          getPlayerPositionSnapshot: () => ({ x: 400, y: 300 }),
-          acquireEnemyViaFactory: vi.fn((type, config) => {
-            const enemy = { type, config, destroyed: false };
-            spawnLog.push({ type, config });
-            return enemy;
-          }),
-          registerActiveEnemy: vi.fn(() => true),
-        };
+    withWaveOverrides({ managerHandlesAsteroids: true }, () => {
+      const enemySystem = {
+        getCachedWorld: () => ({
+          getBounds: () => ({ width: 800, height: 600 }),
+        }),
+        getCachedPlayer: () => ({ position: { x: 400, y: 300 } }),
+        getPlayerPositionSnapshot: () => ({ x: 400, y: 300 }),
+        acquireEnemyViaFactory: vi.fn((type, config) => {
+          const enemy = { type, config, destroyed: false };
+          spawnLog.push({ type, config });
+          return enemy;
+        }),
+        registerActiveEnemy: vi.fn(() => true),
+      };
 
-        const manager = createWaveManager({ enemySystem, eventBus });
-        const waveNumber =
-          CONSTANTS.SUPPORT_ENEMY_PROGRESSION.hunter.startWave + 1;
-        manager.currentWave = waveNumber;
-        const config = manager.generateDynamicWave(waveNumber);
-        manager.spawnWave(config);
+      const manager = createWaveManager({ enemySystem, eventBus });
+      const waveNumber =
+        CONSTANTS.SUPPORT_ENEMY_PROGRESSION.hunter.startWave + 1;
+      manager.currentWave = waveNumber;
+      const config = manager.generateDynamicWave(waveNumber);
+      manager.spawnWave(config);
 
-        const spawnedTypes = spawnLog.map((entry) => entry.type);
-        expect(spawnedTypes).toContain('drone');
-        expect(spawnedTypes).toContain('mine');
-        expect(spawnedTypes).toContain('hunter');
-      }
-    );
+      const spawnedTypes = spawnLog.map((entry) => entry.type);
+      expect(spawnedTypes).toContain('drone');
+      expect(spawnedTypes).toContain('mine');
+      expect(spawnedTypes).toContain('hunter');
+    });
   });
 
-  it('emits legacy fallback totals when asteroid spawning is legacy-controlled', () => {
-    withWaveOverrides(
-      { useManager: true, managerHandlesAsteroids: false },
-      () => {
-        const manager = createWaveManager({ eventBus });
-        manager.currentWave =
-          CONSTANTS.SUPPORT_ENEMY_PROGRESSION.mine.startWave;
-        manager.startNextWave();
+  it('excludes asteroids from manager totals when EnemySystem spawns them', () => {
+    withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const manager = createWaveManager({ eventBus });
+      manager.currentWave = CONSTANTS.SUPPORT_ENEMY_PROGRESSION.mine.startWave;
+      manager.startNextWave();
 
-        const [startedPayload] = getEventPayloads('wave-started');
-        expect(startedPayload?.legacyFallbackActive).toBe(true);
-        expect(startedPayload?.managerTotals?.all).toBeGreaterThan(0);
-        expect(startedPayload?.legacyFallbackTotals?.all).toBeGreaterThan(0);
-      }
-    );
+      const [startedPayload] = getEventPayloads('wave-started');
+      expect(startedPayload?.asteroidTotal).toBe(0);
+      expect(startedPayload?.managerTotals?.all).toBeGreaterThan(0);
+      expect(startedPayload?.managerTotals?.asteroids).toBe(0);
+    });
   });
 });
 
@@ -251,34 +239,31 @@ describe('Combat integration', () => {
       handleMineExplosion: vi.fn(),
     };
 
-    withWaveOverrides(
-      { useManager: false, managerHandlesAsteroids: false },
-      () => {
-        const enemySystem = new EnemySystem({
-          combat,
-          physics,
-          eventBus,
-          random: new RandomService('combat'),
-        });
-        activeSystems.push(enemySystem);
+    withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const enemySystem = new EnemySystem({
+        combat,
+        physics,
+        eventBus,
+        random: new RandomService('combat'),
+      });
+      activeSystems.push(enemySystem);
 
-        const payload = {
-          enemyType: 'drone',
-          projectile: { damage: 10, speed: 200 },
-        };
-        const routed = enemySystem.handleEnemyProjectile(payload);
+      const payload = {
+        enemyType: 'drone',
+        projectile: { damage: 10, speed: 200 },
+      };
+      const routed = enemySystem.handleEnemyProjectile(payload);
 
-        expect(routed).toBe(true);
-        expect(combat.handleEnemyProjectile).toHaveBeenCalled();
+      expect(routed).toBe(true);
+      expect(combat.handleEnemyProjectile).toHaveBeenCalled();
 
-        enemySystem.handleMineExplosion({
-          position: { x: 0, y: 0 },
-          radius: 80,
-          damage: 50,
-        });
-        expect(physics.handleMineExplosion).toHaveBeenCalled();
-      }
-    );
+      enemySystem.handleMineExplosion({
+        position: { x: 0, y: 0 },
+        radius: 80,
+        damage: 50,
+      });
+      expect(physics.handleMineExplosion).toHaveBeenCalled();
+    });
   });
 });
 
@@ -312,34 +297,31 @@ describe('Reward handling', () => {
 
 describe('Deterministic wave generation', () => {
   it('produces identical support group compositions for identical seeds', () => {
-    withWaveOverrides(
-      { useManager: true, managerHandlesAsteroids: true },
-      () => {
-        const seed = 'mixed-wave-seed';
-        const eventBusA = createEventBusMock();
-        const eventBusB = createEventBusMock();
-        const randomA = createTestContainer(seed).resolve('random');
-        const randomB = createTestContainer(seed).resolve('random');
+    withWaveOverrides({ managerHandlesAsteroids: true }, () => {
+      const seed = 'mixed-wave-seed';
+      const eventBusA = createEventBusMock();
+      const eventBusB = createEventBusMock();
+      const randomA = createTestContainer(seed).resolve('random');
+      const randomB = createTestContainer(seed).resolve('random');
 
-        const managerA = createWaveManager({
-          eventBus: eventBusA,
-          random: randomA,
-        });
-        const managerB = createWaveManager({
-          eventBus: eventBusB,
-          random: randomB,
-        });
+      const managerA = createWaveManager({
+        eventBus: eventBusA,
+        random: randomA,
+      });
+      const managerB = createWaveManager({
+        eventBus: eventBusB,
+        random: randomB,
+      });
 
-        const waveNumber =
-          CONSTANTS.SUPPORT_ENEMY_PROGRESSION.hunter.startWave + 3;
-        managerA.currentWave = waveNumber;
-        managerB.currentWave = waveNumber;
+      const waveNumber =
+        CONSTANTS.SUPPORT_ENEMY_PROGRESSION.hunter.startWave + 3;
+      managerA.currentWave = waveNumber;
+      managerB.currentWave = waveNumber;
 
-        const configA = managerA.generateDynamicWave(waveNumber);
-        const configB = managerB.generateDynamicWave(waveNumber);
+      const configA = managerA.generateDynamicWave(waveNumber);
+      const configB = managerB.generateDynamicWave(waveNumber);
 
-        expect(configA.enemies).toEqual(configB.enemies);
-      }
-    );
+      expect(configA.enemies).toEqual(configB.enemies);
+    });
   });
 });

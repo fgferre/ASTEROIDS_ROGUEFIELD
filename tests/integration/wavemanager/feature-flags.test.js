@@ -7,11 +7,10 @@ import {
 } from '../../__helpers__/setup.js';
 import {
   createEnemySystemHarness,
-  simulateWave,
   prepareWave,
 } from '../../__helpers__/asteroid-helpers.js';
 
-describe('WaveManager Integration - Feature Flags', () => {
+describe('WaveManager Integration', () => {
   /** @type {{ enemySystem: any, container: any }} */
   let harness;
 
@@ -32,59 +31,9 @@ describe('WaveManager Integration - Feature Flags', () => {
   });
 
   // Note: vi.restoreAllMocks() handled by global setup (tests/__helpers__/setup.js)
-  // Note: Tests modify globalThis and CONSTANTS, cannot be parallelized safely
 
-  describe('Feature Flag: USE_WAVE_MANAGER', () => {
-    test('Legacy system remains functional when flag is forced off', () => {
-      expect(CONSTANTS.USE_WAVE_MANAGER).toBe(true);
-
-      const previousOverride = globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
-      const legacySpies = [vi.spyOn(harness.enemySystem, 'updateWaveLogic')];
-      const waveManagerSpies = [
-        vi.spyOn(harness.enemySystem, 'updateWaveManagerLogic'),
-      ];
-
-      if (harness.enemySystem.updateSystem) {
-        legacySpies.push(
-          vi.spyOn(harness.enemySystem.updateSystem, 'updateWaveLogic')
-        );
-        waveManagerSpies.push(
-          vi.spyOn(harness.enemySystem.updateSystem, 'updateWaveManagerLogic')
-        );
-      }
-
-      try {
-        globalThis.__USE_WAVE_MANAGER_OVERRIDE__ = false;
-
-        const { waveState } = simulateWave(harness.enemySystem, 1, 400);
-
-        expect(waveState.totalAsteroids).toBe(4);
-        expect(waveState.asteroidsSpawned).toBeGreaterThan(0);
-        const legacyCalled = legacySpies.some((spy) => spy.mock.calls.length);
-        const waveManagerCalled = waveManagerSpies.some(
-          (spy) => spy.mock.calls.length
-        );
-
-        expect(legacyCalled).toBe(true);
-        expect(waveManagerCalled).toBe(false);
-      } finally {
-        legacySpies.forEach((spy) => spy.mockRestore());
-        waveManagerSpies.forEach((spy) => spy.mockRestore());
-
-        if (previousOverride === undefined) {
-          delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
-        } else {
-          globalThis.__USE_WAVE_MANAGER_OVERRIDE__ = previousOverride;
-        }
-      }
-    });
-
+  describe('EnemySystem wave flow', () => {
     test('EnemySystem gracefully handles missing WaveManager', () => {
-      const originalDescriptor = Object.getOwnPropertyDescriptor(
-        CONSTANTS,
-        'USE_WAVE_MANAGER'
-      );
-
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const legacySpies = [vi.spyOn(harness.enemySystem, 'updateWaveLogic')];
       if (harness.enemySystem.updateSystem) {
@@ -97,16 +46,6 @@ describe('WaveManager Integration - Feature Flags', () => {
       prepareWave(harness.enemySystem, 1);
 
       try {
-        try {
-          // eslint-disable-next-line no-import-assign -- may throw; caught below
-          Object.defineProperty(CONSTANTS, 'USE_WAVE_MANAGER', {
-            configurable: true,
-            get: () => true,
-          });
-        } catch (error) {
-          globalThis.__USE_WAVE_MANAGER_OVERRIDE__ = true;
-        }
-
         expect(() => harness.enemySystem.update(0.5)).not.toThrow();
         const legacyCalled = legacySpies.some((spy) => spy.mock.calls.length);
         expect(legacyCalled).toBe(true);
@@ -116,25 +55,12 @@ describe('WaveManager Integration - Feature Flags', () => {
         );
         expect(warningEmitted).toBe(true);
       } finally {
-        if (originalDescriptor && originalDescriptor.configurable) {
-          // eslint-disable-next-line no-import-assign -- restores the descriptor set above
-          Object.defineProperty(
-            CONSTANTS,
-            'USE_WAVE_MANAGER',
-            originalDescriptor
-          );
-        }
-
-        delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
-
         legacySpies.forEach((spy) => spy.mockRestore());
         warnSpy.mockRestore();
       }
     });
 
     test('WaveManager completion event schedules break timer and suppresses legacy emit', async () => {
-      expect(CONSTANTS.USE_WAVE_MANAGER).toBe(true);
-
       const eventBus = harness?.container?.resolve('event-bus');
       expect(eventBus).toBeTruthy();
 
@@ -271,8 +197,6 @@ describe('WaveManager Integration - Feature Flags', () => {
       const initialWaveState = { ...harness.enemySystem.waveState };
 
       try {
-        globalThis.__USE_WAVE_MANAGER_OVERRIDE__ = true;
-
         harness.enemySystem.update(0.25);
 
         expect(harness.enemySystem.waveManager.update).toHaveBeenCalledWith(
@@ -297,7 +221,6 @@ describe('WaveManager Integration - Feature Flags', () => {
 
         expect(syncedState.asteroidsKilled).toBe(stubState.killed);
       } finally {
-        delete globalThis.__USE_WAVE_MANAGER_OVERRIDE__;
         harness.enemySystem.waveManager = null;
       }
     });

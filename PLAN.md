@@ -122,7 +122,7 @@ arquivo quando a última etapa fechar. Decisões de produto são do dono, por im
       (`BossEnemy.js:220-226`).
 - [ ] **7. Engenharia contínua (em paralelo, por fatias pequenas).** `resolveService` lança em vez de devolver
       `null` e os sistemas recebem dependências obrigatórias no construtor → remover os `typeof`/`try` defensivos;
-      apagar flags de legado e o espelho `gameState`; um só `isDev`; zerar `no-unused-vars` e `Math.random` e
+      ~~apagar flags de legado e o espelho `gameState`; um só `isDev`~~ (feitos 17/10); zerar `no-unused-vars` e `Math.random` e
       promovê-los a erro; quebrar os god-files (meta ~600 linhas) começando por `EnemySystem`, `CombatSystem`,
       `EffectsSystem`; JSDoc + `checkJs` como caminho para TypeScript folha a folha (`core/`, `utils/`, `data/`).
 - [ ] **8. Replay e testes de comportamento** (depende da 4). Gravar input + seed, reproduzir; cenários headless
