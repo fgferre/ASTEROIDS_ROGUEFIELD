@@ -4,7 +4,7 @@ Lista viva do que está aberto, nas palavras do dono. Leia só a seção O BAST�
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 7.**
 
-## O BASTÃO — onde a rodada parou (17/10, noite) — ETAPAS 1, 2 E 4 DO PLANO FEITAS, NÃO PUBLICADAS
+## O BASTÃO — onde a rodada parou (17/10, noite) — ETAPAS 1, 2 E 4 FEITAS, TELEGRAPHS DO BOSS FEITOS, NÃO PUBLICADAS
 
 Palavras dele (17/10): _"transformar isso num jogo maravilhoso para as próximas gerações de videogame"_; _"como se
 fosse uma versão nova para uma plataforma nova... com as melhores placas de vídeo"_; _"tudo em inglês"_.
@@ -22,7 +22,8 @@ comparar fluidez com e sem `?renderScale=1`; conferir se a 144 Hz o movimento re
 
 **Decisões dele que destravam as próximas etapas (ver `PLAN.md`):**
 
-- Etapa 3: vetor neon (Geometry Wars) × sprite ilustrado (Nova Drift) — prancha A/B a fazer.
+- Etapa 3: vetor neon (A) × sprite com volume (B) — prancha A/B enviada em 17/10; e se a câmera deve dar zoom
+  (hoje a nave tem ~34 px na tela e o campo parece vazio).
 - Etapa 6: dash e sua tecla; regra de sinergia por tag (ou retirar a promessa); fim de run e meta-progressão.
 
 ## Jogabilidade e sensação

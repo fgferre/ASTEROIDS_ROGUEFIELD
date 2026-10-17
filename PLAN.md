@@ -92,7 +92,12 @@ arquivo quando a última etapa fechar. Decisões de produto são do dono, por im
       visível e congelado atrás + lockout 400 ms; game over com tempo/onda/kills/combo máx./nível/build; Quit pede
       segundo toque; foco em Resume; controles no menu e na pausa + toast de primeira run; `mobileGuard` com dois
       sinais e aviso em DOM; idioma inglês. Capturas em todas as telas conferidas.
-- [ ] **3. Paleta única + bloom real.** Prancha A/B para ele escolher a linguagem (item 3 das decisões). Depois:
+- [ ] **3. Paleta única + bloom real.** Prancha A/B feita em 17/10 (duas cenas idênticas na escala real do jogo:
+      A vetor neon, B sprites com volume; fonte em scratchpad, não versionada — refazer é barato). O que a prancha
+      ensinou: na escala atual a nave tem ~34 px e o campo parece vazio nos dois estilos; a sensação "next-gen" pede
+      também uma decisão de **câmera** (zoom ~1.4× com follow suave ou campo lógico maior). Recomendação da sessão:
+      B para asteroides e cascos (volume, luz fixa, textura de crateras portada do menu) com a legibilidade de A (aro
+      emissivo fino em ameaças e no jogador), e bloom compartilhado em 3 níveis (1/2, 1/4, 1/8). **Decisão dele.** Depois:
       `src/data/constants/palette.js` com tokens + escala de traço e de glow, literais trocados; camada emissiva num
       canvas próprio, reduzida a 1/4, `filter: blur()` e composta em `lighter` (liga as opções de bloom/aberração que
       hoje não fazem nada); asteroides com volume (gradiente com luz fixa, borda iluminada, crateras por ruído —

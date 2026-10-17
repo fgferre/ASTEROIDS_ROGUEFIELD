@@ -19,3 +19,4 @@
 - `ShakePresets` em `ScreenShake.js` não é chamado por nome em lugar nenhum; os chamadores passam números inline. Unificar ao calibrar a etapa 5.
 - Boss sai da fábrica com `useComponents=true` (`EnemyFactory.js:644-651`), o que pode desativar o ataque legado em `BossEnemy.js:588-607`; confirmar qual caminho de ataque roda de fato.
 - `GameConstants.js:35-37` diz que o escalonamento de asteroides só vale até a onda 10, mas a fórmula não bate com o comentário; medir.
+- Limpeza de lint (17/10) apagou leituras que pareciam lógica esquecida, não sobra: `AudioSystem` ~2241 lia `lastIntensity` sem comparar com a atual (detecção de mudança do propulsor?); `CombatSystem` ~3428 calculava `duplicateCount` e não usava no anel de lock. Conferir se faltava um `if`.
