@@ -276,6 +276,50 @@ export class RibbonBatch {
     this.vertex(mx - nx, h, mz - ny, r, g, b);
   }
 
+  /** A straight band of constant width and brightness (lines, dashes). */
+  segment(ax, ay, bx, by, h, rgb, width, gain) {
+    if (this.verts + 6 > this.maxVerts) return;
+    const dx = bx - ax;
+    const dy = by - ay;
+    const len = Math.hypot(dx, dy);
+    if (len < 0.01) return;
+    const nx = (-dy / len) * width * 0.5;
+    const ny = (dx / len) * width * 0.5;
+    const x0 = ax - HALF_W;
+    const z0 = ay - HALF_H;
+    const x1 = bx - HALF_W;
+    const z1 = by - HALF_H;
+    const r = rgb[0] * gain;
+    const g = rgb[1] * gain;
+    const b = rgb[2] * gain;
+    this.vertex(x0 + nx, h, z0 + ny, r, g, b);
+    this.vertex(x0 - nx, h, z0 - ny, r, g, b);
+    this.vertex(x1 + nx, h, z1 + ny, r, g, b);
+    this.vertex(x1 + nx, h, z1 + ny, r, g, b);
+    this.vertex(x0 - nx, h, z0 - ny, r, g, b);
+    this.vertex(x1 - nx, h, z1 - ny, r, g, b);
+  }
+
+  /** A circle of `dashes` dashes (fill 0..1 of each period); 0 = solid. */
+  circle(cx, cy, radius, h, rgb, width, gain, dashes = 0, fill = 0.5) {
+    const steps = dashes || Math.max(12, Math.min(64, Math.round(radius)));
+    const span = dashes ? fill : 1;
+    for (let i = 0; i < steps; i += 1) {
+      const a0 = (i / steps) * Math.PI * 2;
+      const a1 = ((i + span) / steps) * Math.PI * 2;
+      this.segment(
+        cx + Math.cos(a0) * radius,
+        cy + Math.sin(a0) * radius,
+        cx + Math.cos(a1) * radius,
+        cy + Math.sin(a1) * radius,
+        h,
+        rgb,
+        width,
+        gain
+      );
+    }
+  }
+
   end() {
     this.positionAttr.updateRange.offset = 0;
     this.positionAttr.updateRange.count = this.verts * 3;

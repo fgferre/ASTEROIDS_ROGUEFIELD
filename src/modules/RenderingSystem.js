@@ -1122,8 +1122,18 @@ class RenderingSystem extends BaseSystem {
       }
     });
 
-    // Also listen for general settings changes if needed, but specific category event is better
-    // if SettingsSystem broadcasts it.
+    // SettingsSystem emits 'settings-graphics-changed' only at startup; live
+    // edits arrive as 'settings-changed' with the category.
+    this.registerEventListener('settings-changed', (change = {}) => {
+      if (
+        this.settings &&
+        (change.category === 'graphics' || change.type === 'reset-all')
+      ) {
+        this.applyGraphicsPreferences(
+          this.settings.getCategoryValues('graphics')
+        );
+      }
+    });
   }
 
   applyGraphicsPreferences(values = {}) {
@@ -1137,8 +1147,8 @@ class RenderingSystem extends BaseSystem {
         !bloomDisabledByUrl(),
     });
 
-    // Antialiasing implementation: 'SMAA' (Standard) vs 'Nenhum' (Pixelated)
-    this.antialiasingMode = values.antialiasing !== 'Nenhum';
+    // Antialiasing: 'SMAA' (smoothed) vs 'None' (pixelated), per settingsSchema
+    this.antialiasingMode = values.antialiasing !== 'None';
   }
 
   onReset() {

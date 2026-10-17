@@ -7,12 +7,8 @@ Número é identidade, não posição: item novo entra no fim da sua seção. **
 ## O BASTÃO — onde a rodada parou (17/10, ~23h) — SESSÃO ENCERRADA POR CONTEXTO CHEIO; TUDO NO RAMO, NADA PUBLICADO
 
 **Como retomar (próxima sessão):** `git fetch && git checkout claude/session-011CUZwFkeqHg4syYX2GsSkg`; ler este
-BASTÃO, `PLAN.md` e `docs/NORTE.md` (§4b é o salto); rodar `npm ci && npm run done`. Primeiro ato: `git status` —
-se houver arquivos modificados em `src/modules/render3d/`, são da **segunda fatia do renderer 3D** que um worker
-estava fazendo quando a sessão acabou (nave legível, overlays 2D portados para 3D, materiais foscos, câmera presa ao
-campo, settings gráficos no renderer). Revisar o diff, rodar o portão e commitar ou descartar; não assumir que está
-completo. Se a árvore estiver limpa, essa fatia nunca chegou: refazer pelo brief resumido na linha "Renderer 3D
-(17/10), primeira fatia" do `BACKLOG.md`.
+BASTÃO, `PLAN.md` e `docs/NORTE.md` (§4b é o salto); rodar `npm ci && npm run done`. Primeiro ato: `git status` deve estar limpo — a segunda fatia do renderer 3D (nave legível, overlays 2D em
+3D, materiais foscos, câmera presa ao campo, settings gráficos nos dois renderers) foi commitada no fim da sessão.
 
 **Palavras dele nesta rodada:** _"falta um salto enorme… câmera dinâmica rolando, zoom, movimento lateral da nave,
 quase um 3D visto de cima"_; antes: _"reimaginar tudo, segue em frente"_, _"tudo em inglês"_.

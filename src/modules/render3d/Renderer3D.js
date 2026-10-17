@@ -10,11 +10,19 @@
 // WebGL side is created on the first render().
 
 import { BaseSystem } from '../../core/BaseSystem.js';
-import { GAME_WIDTH, XP_ORB_SIZE } from '../../core/GameConstants.js';
+import {
+  GAME_HEIGHT,
+  GAME_WIDTH,
+  XP_ORB_SIZE,
+} from '../../core/GameConstants.js';
 import { cameraDisabledByUrl, createCamera } from '../../core/camera.js';
 import { IS_DEV } from '../../core/env.js';
 import { resolveService } from '../../core/serviceUtils.js';
-import { KEY_LIGHT_DIR, PALETTE } from '../../data/constants/palette.js';
+import {
+  KEY_LIGHT_DIR,
+  PALETTE,
+  withAlpha,
+} from '../../data/constants/palette.js';
 import { SHIP_MAX_SPEED } from '../../data/constants/physics.js';
 import {
   CapsuleBatch,
@@ -27,6 +35,7 @@ import {
 import { EnemyMirror } from './enemyMirror.js';
 import { FieldBackdrop } from './fieldBackdrop.js';
 import { PlayerMirror } from './playerMirror.js';
+import { TextSprites } from './textSprites.js';
 
 const FOV = 38;
 const TILT = (18 * Math.PI) / 180;
@@ -38,6 +47,8 @@ const COMBAT_RANGE = 140;
 const BLOOM = { strength: 0.9, radius: 0.6, threshold: 0.75 };
 const MAX_SHOCKWAVES = 25;
 const MAX_TRAIL_POINTS = 64;
+const MAX_DAMAGE_TEXTS = 16;
+const OVERLAY_H = 9;
 const WHITE = [1, 1, 1];
 
 const SHOCKWAVE_VERTEX = `
@@ -93,7 +104,7 @@ class Renderer3D extends BaseSystem {
     this.dolly = 1;
     this.three = null;
     this.failed = false;
-    this.bloomSetting = true;
+    this.graphics = { bloom: true, postProcessing: true, smaa: true };
     this.stats = { drawCalls: 0, triangles: 0, frames: 0 };
 
     this.resolveCachedServices(
@@ -113,6 +124,8 @@ class Renderer3D extends BaseSystem {
     const menu = resolveService('menu-background', this.dependencies);
     this.seeded = (fn) => menu.withSeededMathRandom(fn);
 
+    // SettingsSystem emits 'settings-graphics-changed' only at startup; live
+    // edits arrive as 'settings-changed' with the category.
     const settings = resolveService('settings', this.dependencies);
     if (settings) {
       this.applyGraphicsPreferences(settings.getCategoryValues('graphics'));
@@ -120,17 +133,37 @@ class Renderer3D extends BaseSystem {
     this.registerEventListener('settings-graphics-changed', (payload = {}) => {
       if (payload?.values) this.applyGraphicsPreferences(payload.values);
     });
+    this.registerEventListener('settings-changed', (change = {}) => {
+      if (
+        settings &&
+        (change.category === 'graphics' || change.type === 'reset-all')
+      ) {
+        this.applyGraphicsPreferences(settings.getCategoryValues('graphics'));
+      }
+    });
+    this.registerEventListener('shield-hit', () => {
+      this.three?.player.flashShield(performance.now() / 1000);
+    });
     this.registerEventListener('camera-zoom-pulse', ({ zoom, duration }) => {
       this.camera.pulseZoom(zoom, duration);
     });
   }
 
+  // The same flags RenderingSystem reads: postProcessing off skips the
+  // composer (no bloom, no SMAA); antialiasing 'None' drops the SMAA pass.
   applyGraphicsPreferences(values = {}) {
-    this.bloomSetting =
-      values.bloom !== false && values.postProcessing !== false;
-    if (this.three?.bloomPass) {
-      this.three.bloomPass.enabled = this.bloomSetting && this.three.bloomUrl;
-    }
+    this.graphics.postProcessing = values.postProcessing !== false;
+    this.graphics.bloom = values.bloom !== false;
+    this.graphics.smaa = values.antialiasing !== 'None';
+    this.syncPasses();
+  }
+
+  syncPasses() {
+    const t = this.three;
+    if (!t) return;
+    const { bloom, postProcessing, smaa } = this.graphics;
+    t.bloomPass.enabled = bloom && postProcessing && t.bloomUrl;
+    t.smaaPass.enabled = smaa && postProcessing;
   }
 
   onReset() {
@@ -193,9 +226,18 @@ class Renderer3D extends BaseSystem {
       BLOOM.radius,
       BLOOM.threshold
     );
-    bloomPass.enabled = bloomUrl.enabled && this.bloomSetting;
     composer.addPass(bloomPass);
-    composer.addPass(new THREE.SMAAPass(width, height));
+    const smaaPass = new THREE.SMAAPass(width, height);
+    composer.addPass(smaaPass);
+
+    // Drawn after the composer: text stays crisp, never bloomed.
+    const overlay = new THREE.Scene();
+    const texts = new TextSprites(
+      THREE,
+      overlay,
+      this.seeded,
+      MAX_DAMAGE_TEXTS
+    );
 
     const backdrop = new FieldBackdrop(THREE, scene);
     const enemies = new EnemyMirror(THREE, scene, this.seeded);
@@ -245,6 +287,9 @@ class Renderer3D extends BaseSystem {
     flash.style.cssText =
       'position:absolute;inset:0;pointer-events:none;opacity:0;z-index:6;border-radius:inherit;';
     canvas.after(flash);
+    // Boss phase transitions: tinted border + wash, like drawBossTransitions.
+    const bossFlash = flash.cloneNode();
+    canvas.after(bossFlash);
 
     this.three = {
       THREE,
@@ -254,7 +299,12 @@ class Renderer3D extends BaseSystem {
       camera,
       composer,
       bloomPass,
+      smaaPass,
       bloomUrl: bloomUrl.enabled,
+      overlay,
+      texts,
+      bossFlash,
+      bossFlashKey: '',
       wardenLight,
       backdrop,
       enemies,
@@ -273,7 +323,10 @@ class Renderer3D extends BaseSystem {
       threatRgb: rgbOf(THREE, PALETTE.threat),
       xpRgb: rgbOf(THREE, PALETTE.xp),
       statusRgb: rgbOf(THREE, PALETTE.status),
+      accentRgb: rgbOf(THREE, PALETTE.player),
+      textRgb: rgbOf(THREE, PALETTE.text),
     };
+    this.syncPasses();
   }
 
   // A dim reflection environment so metal reads as metal: black below, a
@@ -352,6 +405,7 @@ class Renderer3D extends BaseSystem {
     t.glow.begin();
     t.matte.begin();
     t.smoke.begin();
+    t.texts.begin();
 
     const warden = t.enemies.update(enemyList, time);
     t.wardenLight.intensity = warden ? 2.6 : 0;
@@ -360,6 +414,7 @@ class Renderer3D extends BaseSystem {
     this.mirrorProjectiles();
     this.mirrorPickups(time);
     this.mirrorEffects(effects);
+    this.mirrorOverlays(player, effects);
 
     const pointScale = t.height / (2 * Math.tan((FOV * Math.PI) / 360));
     t.backdrop.update(this.camera.x, this.camera.y, dt, pointScale);
@@ -368,9 +423,14 @@ class Renderer3D extends BaseSystem {
     t.glow.end(pointScale);
     t.matte.end(pointScale);
     t.smoke.end(pointScale);
+    t.texts.end();
 
     t.renderer.info.reset();
-    t.composer.render(dt);
+    if (this.graphics.postProcessing) t.composer.render(dt);
+    else t.renderer.render(t.scene, t.camera);
+    t.renderer.autoClear = false;
+    t.renderer.render(t.overlay, t.camera);
+    t.renderer.autoClear = true;
     this.recordStats();
   }
 
@@ -433,8 +493,9 @@ class Renderer3D extends BaseSystem {
     const shaking = shake && shake.trauma > 0.001;
     const ox = shaking ? shake.offsetX / zoom : 0;
     const oy = shaking ? shake.offsetY / zoom : 0;
-    const tx = this.camera.x - HALF_W - ox;
-    const tz = this.camera.y - HALF_H - oy;
+    const { x: cx, y: cy } = this.clampToField(distance, t.camera.aspect);
+    const tx = cx - HALF_W - ox;
+    const tz = cy - HALF_H - oy;
     t.camera.position.set(
       tx,
       distance * Math.cos(TILT),
@@ -443,6 +504,34 @@ class Renderer3D extends BaseSystem {
     t.camera.up.set(0, 0, -1);
     t.camera.lookAt(tx, 0, tz);
     if (shaking && Math.abs(shake.angle) > 0.001) t.camera.rotateZ(shake.angle);
+  }
+
+  // The follow point, kept so the frustum's footprint on the field plane (a
+  // trapezoid: wider at the far, upper edge) stays inside the 800×600 field.
+  // createCamera clamps for the flat 2D view; tilt and dolly widen this one.
+  clampToField(distance, aspect) {
+    const out = this.clampedFollow || (this.clampedFollow = { x: 0, y: 0 });
+    out.x = this.camera.x;
+    out.y = this.camera.y;
+    if (!this.camera.isEnabled()) return out;
+    const tanV = Math.tan((FOV * Math.PI) / 360);
+    const cos = Math.cos(TILT);
+    const sin = Math.sin(TILT);
+    const height = distance * cos;
+    const far = cos - tanV * sin;
+    const near = cos + tanV * sin;
+    const halfW = (height * tanV * aspect) / far;
+    const up = (height * (sin + tanV * cos)) / far - distance * sin;
+    const down = distance * sin + (height * (tanV * cos - sin)) / near;
+    out.x =
+      halfW * 2 >= GAME_WIDTH
+        ? GAME_WIDTH / 2
+        : Math.max(halfW, Math.min(GAME_WIDTH - halfW, out.x));
+    out.y =
+      up + down >= GAME_HEIGHT
+        ? (up + GAME_HEIGHT - down) / 2
+        : Math.max(up, Math.min(GAME_HEIGHT - down, out.y));
+    return out;
   }
 
   mirrorProjectiles() {
@@ -637,6 +726,206 @@ class Renderer3D extends BaseSystem {
       t.flash.style.opacity = String(alpha);
       if (alpha > 0) t.flash.style.background = screenFlash.color;
     }
+  }
+
+  // The 2D overlays (EffectsSystem.drawWorld/drawScreenSpace, the
+  // CombatSystem lock marks, RenderingSystem.drawMagnetismField) as flat
+  // ribbons on the field plane and camera-facing sprites.
+  mirrorOverlays(player, effects) {
+    const t = this.three;
+    const { ribbons } = t;
+    const alive =
+      player &&
+      !player.isDead &&
+      !player.isRetrying &&
+      !player._quitExplosionHidden &&
+      player.position;
+
+    if (effects) {
+      const markers = effects.hitMarkers || [];
+      for (let i = 0; i < markers.length; i += 1) {
+        const m = markers[i];
+        if (!m) continue;
+        const alpha = Math.max(0, m.life / m.maxLife);
+        const r = m.size + m.expansion;
+        const k = m.killed ? Math.SQRT1_2 : 1;
+        const a = r * k;
+        const b = m.killed ? a : 0;
+        const gain = 0.7 * alpha;
+        ribbons.segment(
+          m.x - a,
+          m.y - b,
+          m.x + a,
+          m.y + b,
+          OVERLAY_H,
+          t.textRgb,
+          1.2,
+          gain
+        );
+        ribbons.segment(
+          m.x + b,
+          m.y - a,
+          m.x - b,
+          m.y + a,
+          OVERLAY_H,
+          t.textRgb,
+          1.2,
+          gain
+        );
+      }
+
+      const texts = effects.damageTexts || [];
+      for (let i = 0; i < texts.length; i += 1) {
+        const d = texts[i];
+        if (!d) continue;
+        const size = (d.isCritical ? 24 * 1.5 : 16) * d.scale;
+        t.texts.push(
+          d.damage,
+          d.x,
+          d.y,
+          size,
+          d.isCritical ? PALETTE.shot : PALETTE.text,
+          Math.min(1, d.life * 2)
+        );
+      }
+
+      this.mirrorBossTransitions(effects.bossTransitionEffects);
+    }
+
+    if (!alive) return;
+    const { x: px, y: py } = player.position;
+    this.mirrorLocks(px, py);
+
+    const orbs = this.cachedXPOrbs?.xpOrbs || [];
+    let orbActive = false;
+    for (let i = 0; i < orbs.length && !orbActive; i += 1) {
+      orbActive = Boolean(orbs[i] && !orbs[i].collected);
+    }
+    if (orbActive) {
+      const radius =
+        player.getMagnetismRadius() || this.cachedXPOrbs.getMagnetismRadius();
+      const dashes = Math.max(12, Math.round((Math.PI * 2 * radius) / 6));
+      ribbons.circle(px, py, radius, OVERLAY_H, t.accentRgb, 1, 0.25, dashes);
+    }
+  }
+
+  // Same gating as CombatSystem.render: rank 1 ring + line, rank 2 the
+  // predicted-aim marker, rank 3 every lock; nothing in manual aim.
+  mirrorLocks(px, py) {
+    const combat = this.cachedCombat;
+    if (!combat || combat.aimMode === 'manual') return;
+    const rank = combat.targetingUpgradeLevel || 0;
+    if (rank < 1) return;
+    const t = this.three;
+    const { ribbons, accentRgb } = t;
+    const multi = rank >= 3;
+    const locks = combat.currentLockAssignments || [];
+    const pulse = Math.max(
+      0,
+      Math.min(
+        1,
+        combat.targetIndicatorPulse / (combat.targetPulseDuration || 0.0001)
+      )
+    );
+    const count = locks.length || (combat.currentTarget ? 1 : 0);
+    for (let i = 0; i < count; i += 1) {
+      if (!multi && i > 0) break;
+      const lock = locks[i];
+      const target = lock ? lock.enemy : combat.currentTarget;
+      if (!target || target.destroyed) continue;
+      const base = i === 0 ? combat.lockHighlightAlpha : combat.lockLineAlpha;
+      const alpha = Math.min(1, (base || 0.6) + pulse * 0.25);
+      const radius =
+        (target.radius || 16) +
+        6 +
+        (lock?.duplicateIndex || 0) * 4 +
+        pulse * (i === 0 ? 6 : 3.5);
+      const dashes = Math.max(8, Math.round((Math.PI * 2 * radius) / 10));
+      ribbons.circle(
+        target.x,
+        target.y,
+        radius,
+        OVERLAY_H,
+        accentRgb,
+        i === 0 ? 1.5 : 1,
+        alpha * 0.8,
+        dashes,
+        0.6
+      );
+      ribbons.segment(
+        px,
+        py,
+        target.x,
+        target.y,
+        OVERLAY_H,
+        accentRgb,
+        1,
+        alpha * 0.3
+      );
+    }
+
+    if (rank < 2 || !combat.usingDynamicPrediction()) return;
+    const points = combat.predictedAimPoints || [];
+    for (let i = 0; i < points.length; i += 1) {
+      const point = points[i];
+      if (!point?.position || (!multi && point.index > 0)) continue;
+      const primary = point.index === 0;
+      const alpha = primary ? 0.55 : 0.38;
+      const radius =
+        (combat.predictedMarkerRadius || 12) *
+        (primary ? 1 : 0.82 + (point.duplicateIndex || 0) * 0.04);
+      const { x, y } = point.position;
+      ribbons.circle(x, y, radius, OVERLAY_H, accentRgb, 1, alpha);
+      t.glow.push(x, OVERLAY_H, y, accentRgb, radius * 0.9, alpha * 0.3, 0.6);
+    }
+  }
+
+  mirrorBossTransitions(list) {
+    const t = this.three;
+    let border = 0;
+    let wash = 0;
+    let width = 0;
+    let color = PALETTE.boss;
+    const effects = list || [];
+    for (let i = 0; i < effects.length; i += 1) {
+      const e = effects[i];
+      if (!e) continue;
+      const progress = Math.min(1, e.timer / e.duration);
+      const fadePower = Number.isFinite(e.fadePower)
+        ? Math.max(0.1, e.fadePower)
+        : 1.5;
+      const fade = Math.max(0, 1 - Math.pow(progress, fadePower));
+      const frequency = Number.isFinite(e.pulseFrequency)
+        ? e.pulseFrequency
+        : 1.8;
+      const pulse = 0.65 + 0.35 * Math.sin(progress * Math.PI * frequency);
+      const b = e.maxAlpha * fade * pulse;
+      const w = e.overlayAlpha * fade * Math.min(1, pulse + 0.15);
+      if (b > border) {
+        border = b;
+        width = e.borderWidth * (0.85 + 0.15 * pulse);
+      }
+      wash = Math.max(wash, w);
+      if (e.color) color = e.color;
+    }
+    // quantized so the DOM is touched only when the look changes
+    const key =
+      border > 0.01 || wash > 0.01
+        ? `${color}|${Math.round(border * 50)}|${Math.round(wash * 50)}|${Math.round(width)}`
+        : '';
+    if (key === t.bossFlashKey) return;
+    t.bossFlashKey = key;
+    const style = t.bossFlash.style;
+    if (!key) {
+      style.opacity = '0';
+      return;
+    }
+    // canvas px are logical px × the CSS stretch
+    const scale = t.canvas.clientWidth / GAME_WIDTH || 1;
+    const px = Math.max(1, width * scale);
+    style.opacity = '1';
+    style.background = withAlpha(color, wash);
+    style.boxShadow = `inset 0 0 ${px * 1.4}px ${px}px ${withAlpha(color, border)}`;
   }
 
   recordStats() {

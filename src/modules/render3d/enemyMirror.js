@@ -177,15 +177,16 @@ export class EnemyMirror {
       this.rockGeometries.push(geometry);
     }
 
+    // Matte mass (docs/NORTE.md §2): the eye/core is the only light.
     this.hullMaterial = new THREE.MeshStandardMaterial({
       color: PALETTE.hullLit,
-      metalness: 0.5,
-      roughness: 0.58,
+      metalness: 0.2,
+      roughness: 0.85,
     });
     this.plateMaterial = new THREE.MeshStandardMaterial({
       color: PALETTE.hullLit,
-      metalness: 0.5,
-      roughness: 0.68,
+      metalness: 0.2,
+      roughness: 0.85,
       flatShading: true,
     });
     this.darkMaterial = new THREE.MeshStandardMaterial({

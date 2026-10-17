@@ -1,15 +1,63 @@
 // The Interceptor in 3D (docs/NORTE.md §3): the hull panels of shipModels.js
 // extruded into a faceted gunmetal wedge (ridge along the spine), dark panel
-// seams, a thin cyan rim, and the only light on it — the thrusters (emissive
-// cones, a cyan point light and a ribbon trail).
+// seams, a thin cyan rim (line + fresnel), and the only light on it — the
+// thrusters (emissive cones, a cyan point light and a ribbon trail). Dash
+// afterimages, the invulnerability blink and the shield impact flash mirror
+// the 2D PlayerSystem render.
 
+import {
+  DASH_GHOST_COUNT,
+  DASH_GHOST_LIFE,
+} from '../../data/constants/gameplay.js';
 import { PALETTE } from '../../data/constants/palette.js';
 import { SHIP_MAX_SPEED } from '../../data/constants/physics.js';
 import { HALF_H, HALF_W, rgbOf } from './batches.js';
 
 const HULL_DEPTH = 6;
-const TRAIL_LENGTH = 12;
+// Visual only: collision keeps the 2D outline.
+const SHIP_SCALE = 1.25;
+const TRAIL_MIN = 12;
+const TRAIL_LENGTH = 22;
 const MAX_BANK = 0.45;
+const BLINK_HZ = 8;
+const SHIELD_FLASH_S = 0.08;
+const GHOST_ALPHA = 0.5;
+
+// Cyan fresnel rim on the hull (silhouette against the dark field) plus the
+// white invulnerability pulse, both as emissive.
+function patchHull(shader) {
+  const { uRim, uBlink } = this.userData;
+  shader.uniforms.uRim = uRim;
+  shader.uniforms.uBlink = uBlink;
+  shader.fragmentShader = shader.fragmentShader
+    .replace(
+      '#include <common>',
+      '#include <common>\nuniform vec3 uRim;\nuniform float uBlink;'
+    )
+    .replace(
+      '#include <emissivemap_fragment>',
+      `#include <emissivemap_fragment>
+      float rim = 1.0 - max(dot(normal, normalize(vViewPosition)), 0.0);
+      totalEmissiveRadiance += uRim * pow(rim, 3.0) + vec3(uBlink);`
+    );
+}
+
+// All hull panels in one non-indexed position buffer (one draw per ghost).
+function mergePositions(THREE, geometries) {
+  const parts = geometries.map((g) => (g.index ? g.toNonIndexed() : g));
+  const total = parts.reduce((n, g) => n + g.getAttribute('position').count, 0);
+  const positions = new Float32Array(total * 3);
+  let offset = 0;
+  parts.forEach((g, i) => {
+    const array = g.getAttribute('position').array;
+    positions.set(array, offset);
+    offset += array.length;
+    if (g !== geometries[i]) g.dispose();
+  });
+  const merged = new THREE.BufferGeometry();
+  merged.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  return merged;
+}
 
 export class PlayerMirror {
   constructor(THREE, scene, seeded) {
@@ -21,12 +69,22 @@ export class PlayerMirror {
     this.group.add(this.ship);
     scene.add(this.group);
 
+    // Lighter and less metallic than the enemies' plates, so the key light
+    // reads on it at gameplay zoom.
     this.hullMaterial = new THREE.MeshStandardMaterial({
-      color: PALETTE.hullLit,
-      metalness: 0.6,
-      roughness: 0.55,
+      color: new THREE.Color(PALETTE.hullLit).lerp(
+        new THREE.Color(PALETTE.neutral),
+        0.3
+      ),
+      metalness: 0.3,
+      roughness: 0.5,
       flatShading: true,
     });
+    this.hullMaterial.userData.uRim = {
+      value: new THREE.Color(PALETTE.player).multiplyScalar(0.55),
+    };
+    this.hullMaterial.userData.uBlink = { value: 0 };
+    this.hullMaterial.onBeforeCompile = patchHull;
     this.seamMaterial = new THREE.LineBasicMaterial({
       color: PALETTE.rockShadow,
     });
@@ -69,6 +127,30 @@ export class PlayerMirror {
       })
     );
     this.group.add(this.shield);
+    this.shieldRgb = new THREE.Color(PALETTE.player).multiplyScalar(1.4);
+    this.shieldFlashRgb = new THREE.Color(1.6, 1.6, 1.6);
+    this.shieldHitAt = -Infinity;
+
+    this.ghosts = [];
+    for (let i = 0; i < DASH_GHOST_COUNT; i += 1) {
+      const ghost = new THREE.Mesh(
+        new THREE.BufferGeometry(),
+        new THREE.MeshBasicMaterial({
+          color: PALETTE.player,
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          toneMapped: false,
+        })
+      );
+      ghost.visible = false;
+      ghost.rotation.order = 'YXZ';
+      ghost.scale.setScalar(SHIP_SCALE);
+      scene.add(ghost);
+      this.ghosts.push(ghost);
+    }
+    this.ghostRgb = new THREE.Color(PALETTE.player);
+    this.dashGuard = false;
 
     this.hullKey = null;
     this.flames = [];
@@ -100,6 +182,7 @@ export class PlayerMirror {
     this.flames = [];
 
     const maxY = geometry.maxY || 1;
+    const solids = [];
     geometry.panels.forEach((panel) => {
       // Shape in (x, −y) so rotateX(−π/2) puts height up and keeps y → z.
       const shape = new THREE.Shape();
@@ -125,6 +208,7 @@ export class PlayerMirror {
       solid.rotateX(-Math.PI / 2);
       solid.computeVertexNormals();
       this.ship.add(new THREE.Mesh(solid, this.hullMaterial));
+      solids.push(solid);
       this.ship.add(
         new THREE.LineSegments(
           new THREE.EdgesGeometry(solid, 30),
@@ -179,7 +263,18 @@ export class PlayerMirror {
       this.flames.push({ flame, core, r: nozzle.r });
     });
 
-    this.light.position.set(geometry.minNozzleX - 6, HULL_DEPTH + 4, 0);
+    const ghostGeometry = mergePositions(THREE, solids);
+    this.ghosts[0].geometry.dispose();
+    this.ghosts.forEach((ghost) => {
+      ghost.geometry = ghostGeometry;
+    });
+
+    this.ship.scale.setScalar(SHIP_SCALE);
+    this.light.position.set(
+      (geometry.minNozzleX - 6) * SHIP_SCALE,
+      HULL_DEPTH + 4,
+      0
+    );
     this.shield.scale.setScalar(geometry.extent * 1.7);
     return geometry;
   }
@@ -195,6 +290,7 @@ export class PlayerMirror {
     if (hidden) {
       this.light.intensity = 0;
       this.trailCount = 0;
+      this.hideGhosts();
       return;
     }
     const levels = player.getHullVisualLevels();
@@ -214,7 +310,7 @@ export class PlayerMirror {
     this.group.rotation.x = Math.max(-MAX_BANK, Math.min(MAX_BANK, bank));
 
     const main = thrust.main || 0;
-    const length = (4 + 12 * main) * (1 + 0.1 * (levels.thruster || 0));
+    const length = (5 + 15 * main) * (1 + 0.1 * (levels.thruster || 0));
     for (let i = 0; i < this.flames.length; i += 1) {
       const { flame, core, r } = this.flames[i];
       const flicker = 0.9 + 0.1 * Math.sin(time * 40 + i * 1.7);
@@ -229,18 +325,37 @@ export class PlayerMirror {
 
     this.shield.visible = Boolean(player.isShieldActive);
     if (this.shield.visible) {
-      this.shield.material.opacity = 0.25 + 0.12 * Math.sin(time * 4);
+      const impact = time - this.shieldHitAt < SHIELD_FLASH_S;
+      this.shield.material.color.copy(
+        impact ? this.shieldFlashRgb : this.shieldRgb
+      );
+      this.shield.material.opacity = impact
+        ? 0.9
+        : 0.25 + 0.12 * Math.sin(time * 4);
     }
 
-    // trail: nozzle exit in logical space, oldest first
-    const exitX = x + geometry.minNozzleX * cos;
-    const exitY = y + geometry.minNozzleX * sin;
+    // Blink while invulnerable after a hit; the dash's own i-frames do not.
+    const invulnerable = player.invulnerableTimer > 0;
+    if (player.dashTimer > 0) this.dashGuard = true;
+    else if (!invulnerable) this.dashGuard = false;
+    this.hullMaterial.userData.uBlink.value =
+      invulnerable && !this.dashGuard
+        ? 0.35 * (1 + Math.sin(time * Math.PI * 2 * BLINK_HZ))
+        : 0;
+
+    this.updateGhosts(player.dashGhosts);
+
+    // trail: nozzle exit in logical space, oldest first; longer at speed
+    const speed = Math.min(1, Math.hypot(v.vx, v.vy) / SHIP_MAX_SPEED);
+    const trailMax = Math.round(TRAIL_MIN + (TRAIL_LENGTH - TRAIL_MIN) * speed);
+    const exitX = x + geometry.minNozzleX * SHIP_SCALE * cos;
+    const exitY = y + geometry.minNozzleX * SHIP_SCALE * sin;
     this.trailX[this.trailHead] = exitX;
     this.trailY[this.trailHead] = exitY;
     this.trailHead = (this.trailHead + 1) % TRAIL_LENGTH;
     this.trailCount = Math.min(TRAIL_LENGTH, this.trailCount + 1);
     if (main > 0.02 && this.trailCount > 1) {
-      const n = this.trailCount;
+      const n = Math.min(this.trailCount, trailMax);
       for (let i = 0; i < n; i += 1) {
         const k = (this.trailHead - n + i + TRAIL_LENGTH) % TRAIL_LENGTH;
         ribbons.px[i] = this.trailX[k];
@@ -250,7 +365,37 @@ export class PlayerMirror {
     }
   }
 
+  updateGhosts(list) {
+    const ghosts = list || [];
+    for (let i = 0; i < this.ghosts.length; i += 1) {
+      const mesh = this.ghosts[i];
+      const ghost = ghosts[i];
+      if (!ghost) {
+        mesh.visible = false;
+        continue;
+      }
+      const alpha = GHOST_ALPHA * Math.max(0, 1 - ghost.age / DASH_GHOST_LIFE);
+      mesh.visible = alpha > 0.01;
+      mesh.position.set(ghost.x - HALF_W, 0, ghost.y - HALF_H);
+      mesh.rotation.y = -(ghost.angle || 0);
+      mesh.material.color.copy(this.ghostRgb).multiplyScalar(alpha);
+    }
+  }
+
+  hideGhosts() {
+    for (let i = 0; i < this.ghosts.length; i += 1) {
+      this.ghosts[i].visible = false;
+    }
+  }
+
+  /** `time` in seconds, same clock as update(). */
+  flashShield(time) {
+    this.shieldHitAt = time;
+  }
+
   reset() {
     this.trailCount = 0;
+    this.dashGuard = false;
+    this.hideGhosts();
   }
 }

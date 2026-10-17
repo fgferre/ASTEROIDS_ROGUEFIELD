@@ -3,7 +3,7 @@
 // Ring as a dark arc for scale, and dust drifting between plane and haze.
 // Everything sits at real depth, so the perspective camera gives the parallax.
 
-import { FILL_LIGHT, PALETTE } from '../../data/constants/palette.js';
+import { FILL_LIGHT } from '../../data/constants/palette.js';
 import { SimplexNoise, createSeededRandom } from './asteroidMesh.js';
 import { PointBatch } from './batches.js';
 
@@ -98,8 +98,8 @@ export class FieldBackdrop {
     this.stars.object.renderOrder = -20;
     scene.add(this.stars.object);
 
-    // The broken Ring: a flattened dark band far below, its break (with
-    // exposed crystal glinting) inside the field's view.
+    // The broken Ring: a flattened dark band far below, a faint silhouette
+    // whose break sits inside the field's view.
     const arc = Math.PI * 0.9;
     const radius = 2200;
     const ring = new THREE.Mesh(
@@ -111,15 +111,6 @@ export class FieldBackdrop {
     ring.scale.set(1, 1, 0.4);
     ring.position.set(-1900, -900, -1700);
     scene.add(ring);
-    const glint = new THREE.Mesh(
-      new THREE.SphereGeometry(5, 10, 8),
-      new THREE.MeshBasicMaterial({
-        color: new THREE.Color(PALETTE.shot).multiplyScalar(1.3),
-        toneMapped: false,
-      })
-    );
-    glint.position.set(radius * Math.cos(arc), radius * Math.sin(arc), 0);
-    ring.add(glint);
 
     // Dust between the play plane and the haze, wrapped around the camera.
     this.dust = new PointBatch(THREE, DUST_COUNT);
