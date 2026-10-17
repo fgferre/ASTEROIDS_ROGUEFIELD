@@ -174,10 +174,20 @@ function main() {
     const toks = tokens(seg);
     if (!toks.length) continue;
     if (toks[0] === 'git') {
-      const sub = toks.findIndex(
-        (t, i) => i > 0 && (t === 'push' || t === 'add')
-      );
-      if (sub === -1) continue;
+      // the subcommand is the first token after `git` and its global
+      // options; `-c k=v`, `-C dir`, `--git-dir x` take a value. A later
+      // `push` (as in `git stash push`) is an argument, not a push.
+      let sub = 1;
+      while (sub < toks.length && toks[sub].startsWith('-')) {
+        const opt = toks[sub];
+        const takesValue =
+          ['-c', '-C', '--git-dir', '--work-tree', '--namespace'].includes(
+            opt
+          ) && !opt.includes('=');
+        sub += takesValue ? 2 : 1;
+      }
+      if (sub >= toks.length) continue;
+      if (toks[sub] !== 'push' && toks[sub] !== 'add') continue;
       const args = withoutRedirects(toks.slice(sub + 1));
       if (toks[sub] === 'push') judgePush(seg, args);
       else judgeAdd(seg, args);

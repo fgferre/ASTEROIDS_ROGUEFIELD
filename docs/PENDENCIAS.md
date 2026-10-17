@@ -24,6 +24,11 @@ fosse uma versão nova para uma plataforma nova... com as melhores placas de ví
 **O que ele precisa fazer na máquina dele:** jogar uma run inteira e dizer, por tela, o que ainda parece amador;
 comparar fluidez com e sem `?renderScale=1`; conferir se a 144 Hz o movimento repete quadros.
 
+**Propostas de números em jogo (17/10), para ele julgar jogando e eu travar ou reverter:** asteroides por camada
+6 × 1,26^(n−1) com teto 40 (era 4 × 1,3^(n−1), teto 35); fagulhas de XP ao coletar duram 1,5×; brasas de explosão
+1,3×; 28 lascas e 6 motes âmbar de vida ambiente; 14 fragmentos distantes no fundo. `?scene=hero` monta a cena da
+prancha com entidades reais; `?bloom=1.5`, `?camera=0` e `?renderScale=1` são as comparações.
+
 **Decisões dele que destravam as próximas etapas (ver `PLAN.md`):**
 
 - Arte: ele pediu para reimaginar tudo e eu decidi (NORTE.md). Ele julga jogando: o que ainda parece fraco?
