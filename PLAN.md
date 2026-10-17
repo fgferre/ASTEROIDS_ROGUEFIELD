@@ -121,7 +121,7 @@ arquivo quando a última etapa fechar. Decisões de produto são do dono, por im
 - [ ] **7. Engenharia contínua (em paralelo, por fatias pequenas).** `resolveService` lança em vez de devolver
       `null` e os sistemas recebem dependências obrigatórias no construtor → remover os `typeof`/`try` defensivos;
       ~~apagar flags de legado e o espelho `gameState`; um só `isDev`~~ (feitos 17/10); zerar `no-unused-vars` e `Math.random` e
-      promovê-los a erro; quebrar os god-files (meta ~600 linhas) começando por `EnemySystem`, `CombatSystem`,
+      promovê-los a erro; quebrar os god-files (meta ~600 linhas; **só com pedido explícito dele** — AGENTS.md não move arquivos sem pedido) começando por `EnemySystem`, `CombatSystem`,
       `EffectsSystem`; JSDoc + `checkJs` como caminho para TypeScript folha a folha (`core/`, `utils/`, `data/`).
 - [x] **8. Replay** (17/10) `src/core/replay.js` + `src/bootstrap/replaySession.js`: gravação de seed + input por passo
       (máscara de 7 bits, só mudanças) + escolhas de upgrade; `?replay=<url>` repete no navegador; F9 (dev) baixa a
