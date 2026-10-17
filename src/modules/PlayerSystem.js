@@ -1,8 +1,16 @@
 // src/modules/PlayerSystem.js
 import { BaseSystem } from '../core/BaseSystem.js';
-import { NeonGraphics } from '../utils/NeonGraphics.js';
 import { GAME_HEIGHT, GAME_WIDTH, SHIP_SIZE } from '../core/GameConstants.js';
 import shipModels from '../data/shipModels.js';
+import {
+  FILL_LIGHT,
+  KEY_LIGHT_DIR,
+  LINE,
+  PALETTE,
+  withAlpha,
+} from '../data/constants/palette.js';
+import { getRenderScale, resolveDevicePixelRatio } from '../core/viewport.js';
+import { getEmissive } from '../core/bloomLayer.js';
 import { resolveService } from '../core/serviceUtils.js';
 import {
   SHIP_ACCELERATION,
@@ -85,6 +93,234 @@ const buildClosedPath = (vertices) => {
   return path;
 };
 
+const THRUSTER_TRAIL_LENGTH = 12;
+const TRAIL_BREAK_DISTANCE = 40;
+const PREVIEW_THRUST = 0.35;
+const PREVIEW_ANGLE = -Math.PI / 2;
+const IDLE_THRUST = Object.freeze({ main: 0, aux: 0, sideL: 0, sideR: 0 });
+
+const coneLength = (thrust, thrusterLevel) =>
+  (4 + 12 * thrust) * (1 + 0.1 * thrusterLevel);
+
+// The emissive layer shares the frame transform; sync it to the caller's
+// current transform (recoil, ship rotation) and hand it back saved.
+const beginEmissive = (emissive, ctx) => {
+  if (!emissive) return null;
+  emissive.save();
+  emissive.setTransform(ctx.getTransform());
+  return emissive;
+};
+
+const createSpriteCanvas = (width, height, scale) => {
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.ceil(width * scale));
+  canvas.height = Math.max(1, Math.ceil(height * scale));
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  ctx.scale(scale, scale);
+  return { canvas, ctx };
+};
+
+// Thrust cone along +x from the origin: accent flame with a white-hot core.
+const CONE_SIZE = { length: 32, height: 12 };
+const coneSpriteCache = new Map();
+const getConeSprite = (color, scale) => {
+  const key = `${color}|${scale}`;
+  if (!coneSpriteCache.has(key)) {
+    const sprite = createSpriteCanvas(
+      CONE_SIZE.length,
+      CONE_SIZE.height,
+      scale
+    );
+    if (sprite) {
+      const { ctx } = sprite;
+      const mid = CONE_SIZE.height / 2;
+      const flame = (length, halfWidth, fill) => {
+        ctx.beginPath();
+        ctx.moveTo(0, mid - halfWidth);
+        ctx.quadraticCurveTo(length * 0.3, mid - halfWidth, length, mid);
+        ctx.quadraticCurveTo(length * 0.3, mid + halfWidth, 0, mid + halfWidth);
+        ctx.closePath();
+        ctx.fillStyle = fill;
+        ctx.fill();
+      };
+      const outer = ctx.createLinearGradient(0, 0, CONE_SIZE.length, 0);
+      outer.addColorStop(0, withAlpha(color, 0.95));
+      outer.addColorStop(0.35, withAlpha(color, 0.5));
+      outer.addColorStop(1, withAlpha(color, 0));
+      flame(CONE_SIZE.length, mid * 0.8, outer);
+      const core = ctx.createLinearGradient(0, 0, CONE_SIZE.length * 0.45, 0);
+      core.addColorStop(0, withAlpha(PALETTE.text, 1));
+      core.addColorStop(1, withAlpha(PALETTE.text, 0));
+      flame(CONE_SIZE.length * 0.45, mid * 0.35, core);
+    }
+    coneSpriteCache.set(key, sprite ? sprite.canvas : null);
+  }
+  return coneSpriteCache.get(key);
+};
+
+const drawCone = (ctx, sprite, x, y, rotation, length, width, alpha) => {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(rotation);
+  ctx.globalAlpha = Math.min(1, alpha);
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.drawImage(sprite, 0, -width / 2, length, width);
+  ctx.restore();
+};
+
+// Applies the visual-upgrade levels to a hull's panel data (shipModels.js).
+const buildHullGeometry = (visual, levels) => {
+  const levelOf = (key) => levels[key] || 0;
+  const panels = visual.panels
+    .filter(
+      (panel) =>
+        !panel.minLevel || levelOf(panel.minLevel.key) >= panel.minLevel.value
+    )
+    .map((panel) => {
+      const steps = panel.grow ? levelOf(panel.grow.key) : 0;
+      const points = panel.points.map((point, index) =>
+        steps && panel.grow.indices.includes(index)
+          ? {
+              x: point.x + panel.grow.step.x * steps,
+              y: point.y + panel.grow.step.y * steps,
+            }
+          : point
+      );
+      const length = Math.hypot(panel.facing.x, panel.facing.y) || 1;
+      return {
+        points,
+        path: buildClosedPath(points),
+        facing: { x: panel.facing.x / length, y: panel.facing.y / length },
+        rcsPort: Number.isInteger(panel.rcsPort) ? points[panel.rcsPort] : null,
+      };
+    });
+  const thrusterLevel = levelOf('thruster');
+  const nozzleLength =
+    visual.nozzleLength + visual.nozzleLengthPerLevel * thrusterLevel;
+  const nozzles = visual.nozzles
+    .filter((nozzle) => !nozzle.minLevel || thrusterLevel >= nozzle.minLevel)
+    .map((nozzle) => ({ ...nozzle, exitX: nozzle.x - nozzleLength }));
+
+  let minX = 0;
+  let maxX = 0;
+  let maxY = 0;
+  panels.forEach((panel) =>
+    panel.points.forEach((point) => {
+      minX = Math.min(minX, point.x);
+      maxX = Math.max(maxX, point.x);
+      maxY = Math.max(maxY, Math.abs(point.y));
+    })
+  );
+  const minNozzleX = Math.min(...nozzles.map((nozzle) => nozzle.exitX));
+  minX = Math.min(minX, minNozzleX);
+
+  return {
+    accent: PALETTE[visual.accent] || PALETTE.player,
+    panels,
+    nozzles,
+    nozzleLength,
+    nozzleRadius: nozzles[0].r,
+    minNozzleX,
+    retroPorts: visual.retroPorts,
+    rcsPorts: panels.filter((panel) => panel.rcsPort).map((p) => p.rcsPort),
+    cockpit: visual.cockpit,
+    minX,
+    maxX,
+    maxY,
+    extent: Math.max(-minX, maxX, maxY),
+  };
+};
+
+// Static hull art per (hull, levels, scale): matte base, seams + nozzles,
+// and the 1 px player rim (emissive layer only).
+const bakeHullSprites = (geometry, scale) => {
+  const half = Math.ceil(geometry.extent + 3);
+  const size = half * 2;
+  const base = createSpriteCanvas(size, size, scale);
+  const detail = createSpriteCanvas(size, size, scale);
+  const mask = createSpriteCanvas(size, size, scale);
+  const rim = createSpriteCanvas(size, size, scale);
+  if (!base || !detail || !mask || !rim) return null;
+  [base, detail, mask].forEach(({ ctx }) => ctx.translate(half, half));
+
+  const housing = (ctx, nozzle) =>
+    ctx.rect(
+      nozzle.exitX,
+      nozzle.y - nozzle.r,
+      geometry.nozzleLength,
+      nozzle.r * 2
+    );
+
+  // base: nozzle housings under the matte panels
+  base.ctx.fillStyle = PALETTE.rockShadow;
+  geometry.nozzles.forEach((nozzle) => {
+    base.ctx.beginPath();
+    housing(base.ctx, nozzle);
+    base.ctx.fill();
+  });
+  base.ctx.fillStyle = PALETTE.hull;
+  geometry.panels.forEach((panel) => base.ctx.fill(panel.path));
+
+  // detail: seams, nozzle lips, dim cockpit slit
+  const d = detail.ctx;
+  d.lineJoin = 'round';
+  d.strokeStyle = withAlpha(PALETTE.background, 0.9);
+  d.lineWidth = 0.6;
+  geometry.panels.forEach((panel) => d.stroke(panel.path));
+  d.strokeStyle = withAlpha(PALETTE.neutral, 0.55);
+  d.lineWidth = 0.4;
+  geometry.nozzles.forEach((nozzle) => {
+    d.beginPath();
+    housing(d, nozzle);
+    d.stroke();
+    d.fillStyle = withAlpha(geometry.accent, 0.5);
+    d.beginPath();
+    d.ellipse(
+      nozzle.exitX,
+      nozzle.y,
+      nozzle.r * 0.35,
+      nozzle.r * 0.8,
+      0,
+      0,
+      Math.PI * 2
+    );
+    d.fill();
+  });
+  const { cockpit } = geometry;
+  d.lineCap = 'round';
+  d.lineWidth = cockpit.width;
+  d.strokeStyle = withAlpha(PALETTE.player, 0.75);
+  d.beginPath();
+  d.moveTo(cockpit.from.x, cockpit.from.y);
+  d.lineTo(cockpit.to.x, cockpit.to.y);
+  d.stroke();
+
+  // rim: dilate the silhouette by 1 logical px, keep only the ring
+  mask.ctx.fillStyle = PALETTE.text;
+  geometry.panels.forEach((panel) => mask.ctx.fill(panel.path));
+  geometry.nozzles.forEach((nozzle) => {
+    mask.ctx.beginPath();
+    housing(mask.ctx, nozzle);
+    mask.ctx.fill();
+  });
+  const r = rim.ctx;
+  r.setTransform(1, 0, 0, 1, 0, 0);
+  const step = LINE.hair * scale;
+  for (let k = 0; k < 8; k += 1) {
+    const a = (k / 8) * Math.PI * 2;
+    r.drawImage(mask.canvas, Math.cos(a) * step, Math.sin(a) * step);
+  }
+  r.globalCompositeOperation = 'source-in';
+  r.fillStyle = PALETTE.player;
+  r.fillRect(0, 0, rim.canvas.width, rim.canvas.height);
+  r.globalCompositeOperation = 'destination-out';
+  r.drawImage(mask.canvas, 0, 0);
+
+  return { base: base.canvas, detail: detail.canvas, rim: rim.canvas, half };
+};
+
 class PlayerSystem extends BaseSystem {
   constructor(config = {}) {
     const { position, dependencies } = PlayerSystem.normalizeConfig(config);
@@ -160,7 +396,8 @@ class PlayerSystem extends BaseSystem {
       boundingRadius: SHIP_SIZE,
       shieldPadding: 0,
     };
-    this.hullVisualCache = new Map();
+    this.hullGeometryCache = new Map();
+    this.hullSpriteCache = new Map();
     this.setHull(shipModels.defaultHull);
 
     // === VISUAL UPGRADE LEVELS ===
@@ -174,6 +411,16 @@ class PlayerSystem extends BaseSystem {
       aux: 0,
       sideL: 0,
       sideR: 0,
+    };
+    this.thrusterVisual = { main: 0, aux: 0, sideL: 0, sideR: 0 };
+    this.thrusterTrail = {
+      points: Array.from({ length: THRUSTER_TRAIL_LENGTH }, () => ({
+        x: 0,
+        y: 0,
+        i: 0,
+      })),
+      head: 0,
+      count: 0,
     };
 
     // === WEAPON RECOIL ===
@@ -978,276 +1225,165 @@ class PlayerSystem extends BaseSystem {
     };
   }
 
-  prepareHullVisual(hullDefinition = this.currentHull, onReady) {
-    const visual = hullDefinition?.visual;
-    if (
-      !visual ||
-      visual.type !== 'svg-sprite' ||
-      typeof visual.source !== 'string' ||
-      !visual.source
-    ) {
-      return null;
-    }
-
-    const cacheKey =
-      typeof hullDefinition?.id === 'string' && hullDefinition.id
-        ? hullDefinition.id
-        : visual.source;
-
-    let entry = this.hullVisualCache.get(cacheKey) || null;
-    if (entry) {
-      if (typeof onReady === 'function' && entry.status === 'loading') {
-        entry.callbacks.add(onReady);
-      }
-      return entry;
-    }
-
-    entry = {
-      status: 'loading',
-      image: null,
-      callbacks: new Set(),
+  getHullVisualLevels() {
+    return {
+      thruster: this.thrusterVisualLevel || 0,
+      rcs: this.rcsVisualLevel || 0,
+      braking: this.brakingVisualLevel || 0,
     };
+  }
 
-    if (typeof onReady === 'function') {
-      entry.callbacks.add(onReady);
+  getHullGeometry(hullDefinition, levels) {
+    const key = `${hullDefinition.id}|${levels.thruster}|${levels.rcs}|${levels.braking}`;
+    let geometry = this.hullGeometryCache.get(key);
+    if (!geometry) {
+      geometry = buildHullGeometry(hullDefinition.visual, levels);
+      this.hullGeometryCache.set(key, geometry);
+    }
+    return geometry;
+  }
+
+  getHullSprites(hullDefinition, levels, geometry, pixelScale) {
+    const key = `${hullDefinition.id}|${levels.thruster}|${levels.rcs}|${levels.braking}|${pixelScale}`;
+    if (!this.hullSpriteCache.has(key)) {
+      this.hullSpriteCache.set(key, bakeHullSprites(geometry, pixelScale));
+    }
+    return this.hullSpriteCache.get(key);
+  }
+
+  // Matte facets lit by the fixed world key light: the lit amount follows
+  // the ship's rotation, so it is drawn live over the baked base.
+  renderHullLighting(ctx, geometry, angle) {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    ctx.save();
+    geometry.panels.forEach((panel) => {
+      const wx = panel.facing.x * cos - panel.facing.y * sin;
+      const wy = panel.facing.x * sin + panel.facing.y * cos;
+      const light = wx * KEY_LIGHT_DIR.x + wy * KEY_LIGHT_DIR.y;
+      ctx.globalAlpha = 0.12 + 0.88 * Math.max(0, light);
+      ctx.fillStyle = PALETTE.hullLit;
+      ctx.fill(panel.path);
+      if (light < 0) {
+        ctx.globalAlpha = -light;
+        ctx.fillStyle = FILL_LIGHT;
+        ctx.fill(panel.path);
+      }
+    });
+    ctx.restore();
+  }
+
+  renderHullModel(ctx, hullDefinition = this.currentHull, options = {}) {
+    if (!ctx || !hullDefinition?.visual) {
+      return false;
     }
 
-    const flushCallbacks = () => {
-      const callbacks = Array.from(entry.callbacks);
-      entry.callbacks.clear();
-      callbacks.forEach((callback) => {
-        try {
-          callback();
-        } catch (error) {
-          console.warn(
-            '[PlayerSystem] Hull visual ready callback failed:',
-            error
+    const levels = options.levels || this.getHullVisualLevels();
+    const geometry = this.getHullGeometry(hullDefinition, levels);
+    const pixelScale = options.pixelScale || getRenderScale();
+    const sprites = this.getHullSprites(
+      hullDefinition,
+      levels,
+      geometry,
+      pixelScale
+    );
+    if (!sprites) {
+      return false;
+    }
+
+    const angle = Number.isFinite(options.angle) ? options.angle : this.angle;
+    const thrust = options.thrust || IDLE_THRUST;
+    const cone = getConeSprite(geometry.accent, pixelScale);
+    const emissive = beginEmissive(options.emissive, ctx);
+    const layers = emissive ? [ctx, emissive] : [ctx];
+
+    // main thrust sits under the hull
+    if (cone && thrust.main > 0.01) {
+      const length = coneLength(thrust.main, levels.thruster);
+      geometry.nozzles.forEach((nozzle) => {
+        layers.forEach((target) =>
+          drawCone(
+            target,
+            cone,
+            nozzle.exitX,
+            nozzle.y,
+            Math.PI,
+            length * (nozzle.r / geometry.nozzleRadius),
+            nozzle.r * 5,
+            thrust.main
+          )
+        );
+      });
+    }
+
+    const { half } = sprites;
+    ctx.drawImage(sprites.base, -half, -half, half * 2, half * 2);
+    this.renderHullLighting(ctx, geometry, angle);
+    ctx.drawImage(sprites.detail, -half, -half, half * 2, half * 2);
+
+    if (cone && thrust.aux > 0.01) {
+      geometry.retroPorts.forEach((port) => {
+        layers.forEach((target) =>
+          drawCone(
+            target,
+            cone,
+            port.x,
+            port.y,
+            0,
+            3 + 7 * thrust.aux,
+            3.5,
+            thrust.aux
+          )
+        );
+      });
+    }
+    if (cone) {
+      geometry.rcsPorts.forEach((port) => {
+        const amount = port.y < 0 ? thrust.sideL : thrust.sideR;
+        if (amount > 0.01) {
+          layers.forEach((target) =>
+            drawCone(
+              target,
+              cone,
+              port.x,
+              port.y,
+              port.y < 0 ? -Math.PI / 2 : Math.PI / 2,
+              2 + 5 * amount,
+              3,
+              amount
+            )
           );
         }
       });
-    };
-
-    if (typeof Image !== 'function') {
-      entry.status = 'unsupported';
-      this.hullVisualCache.set(cacheKey, entry);
-      flushCallbacks();
-      return entry;
     }
 
-    const image = new Image();
-    image.decoding = 'async';
-
-    image.onload = () => {
-      entry.status = 'loaded';
-      flushCallbacks();
-    };
-
-    image.onerror = () => {
-      entry.status = 'error';
-      flushCallbacks();
-    };
-
-    entry.image = image;
-    this.hullVisualCache.set(cacheKey, entry);
-    image.src = visual.source;
-    return entry;
-  }
-
-  getHullVisualRadius(hullDefinition = this.currentHull) {
-    const metrics = this.getHullMetricsFor(hullDefinition);
-    const visual = hullDefinition?.visual;
-    if (!visual || visual.type !== 'svg-sprite') {
-      return metrics.boundingRadius;
-    }
-
-    const width = Number.isFinite(visual.width) ? Math.abs(visual.width) : 0;
-    const height = Number.isFinite(visual.height) ? Math.abs(visual.height) : 0;
-    const offsetX = Number.isFinite(visual.offset?.x) ? visual.offset.x : 0;
-    const offsetY = Number.isFinite(visual.offset?.y) ? visual.offset.y : 0;
-    const spriteRadius =
-      Math.hypot(width / 2, height / 2) + Math.hypot(offsetX, offsetY);
-
-    return spriteRadius > 0
-      ? Math.max(metrics.boundingRadius, spriteRadius)
-      : metrics.boundingRadius;
-  }
-
-  renderLegacyHullModel(ctx, hullDefinition = this.currentHull) {
-    if (!ctx || !hullDefinition) {
-      return false;
-    }
-
-    const metrics = this.getHullMetricsFor(hullDefinition);
-    if (metrics.outlinePath) {
-      NeonGraphics.drawShape(ctx, metrics.outlinePath, '#00FF88', 1.5);
-    }
-
-    const accents = Array.isArray(hullDefinition?.accents)
-      ? hullDefinition.accents
-      : [];
-    if (accents.length > 0) {
-      accents.forEach((polygon) => {
-        const path = buildClosedPath(polygon);
-        if (path) {
-          NeonGraphics.drawShape(ctx, path, '#0088DD', 1.2);
-        }
-      });
-    }
-
-    const cockpit = hullDefinition?.cockpit;
-    if (
-      cockpit?.position &&
-      typeof cockpit.radius === 'number' &&
-      typeof Path2D === 'function'
-    ) {
-      const path = new Path2D();
-      path.arc(
-        cockpit.position.x,
-        cockpit.position.y,
-        Math.max(0, cockpit.radius),
-        0,
-        Math.PI * 2
+    if (emissive) {
+      emissive.drawImage(sprites.rim, -half, -half, half * 2, half * 2);
+      const { cockpit } = geometry;
+      emissive.lineCap = 'round';
+      emissive.lineWidth = cockpit.width;
+      emissive.strokeStyle = withAlpha(PALETTE.player, 0.7);
+      emissive.beginPath();
+      emissive.moveTo(cockpit.from.x, cockpit.from.y);
+      emissive.lineTo(cockpit.to.x, cockpit.to.y);
+      emissive.stroke();
+      emissive.fillStyle = withAlpha(
+        geometry.accent,
+        0.35 + thrust.main * 0.65
       );
-      NeonGraphics.drawShape(ctx, path, '#FFFFFF', 2.0);
-    }
-
-    return Boolean(metrics.outlinePath || accents.length > 0 || cockpit);
-  }
-
-  renderSpriteHullModel(ctx, hullDefinition = this.currentHull, options = {}) {
-    if (
-      !ctx ||
-      !hullDefinition?.visual ||
-      hullDefinition.visual.type !== 'svg-sprite'
-    ) {
-      return false;
-    }
-
-    const visual = hullDefinition.visual;
-    const visualState = this.prepareHullVisual(
-      hullDefinition,
-      options.onVisualReady
-    );
-    if (!visualState || visualState.status !== 'loaded' || !visualState.image) {
-      return false;
-    }
-
-    const width = Number.isFinite(visual.width) ? Math.abs(visual.width) : 0;
-    const height = Number.isFinite(visual.height) ? Math.abs(visual.height) : 0;
-    if (width <= 0 || height <= 0) {
-      return false;
-    }
-
-    const image = visualState.image;
-    const naturalWidth = Number.isFinite(image?.naturalWidth)
-      ? image.naturalWidth
-      : 0;
-    const naturalHeight = Number.isFinite(image?.naturalHeight)
-      ? image.naturalHeight
-      : 0;
-    const normalizedSourceBounds =
-      visual.sourceBounds &&
-      Number.isFinite(visual.sourceBounds.x) &&
-      Number.isFinite(visual.sourceBounds.y) &&
-      Number.isFinite(visual.sourceBounds.width) &&
-      Number.isFinite(visual.sourceBounds.height) &&
-      visual.sourceBounds.width > 0 &&
-      visual.sourceBounds.height > 0
-        ? {
-            x: Math.min(Math.max(visual.sourceBounds.x, 0), 1),
-            y: Math.min(Math.max(visual.sourceBounds.y, 0), 1),
-            width: Math.min(Math.max(visual.sourceBounds.width, 0), 1),
-            height: Math.min(Math.max(visual.sourceBounds.height, 0), 1),
-          }
-        : null;
-
-    let sourceX = 0;
-    let sourceY = 0;
-    let sourceWidth = naturalWidth;
-    let sourceHeight = naturalHeight;
-
-    if (normalizedSourceBounds && naturalWidth > 0 && naturalHeight > 0) {
-      sourceX = naturalWidth * normalizedSourceBounds.x;
-      sourceY = naturalHeight * normalizedSourceBounds.y;
-      sourceWidth =
-        naturalWidth *
-        Math.min(normalizedSourceBounds.width, 1 - normalizedSourceBounds.x);
-      sourceHeight =
-        naturalHeight *
-        Math.min(normalizedSourceBounds.height, 1 - normalizedSourceBounds.y);
-    }
-
-    const offsetX = Number.isFinite(visual.offset?.x) ? visual.offset.x : 0;
-    const offsetY = Number.isFinite(visual.offset?.y) ? visual.offset.y : 0;
-    const rotation = Number.isFinite(visual.rotation) ? visual.rotation : 0;
-
-    ctx.save();
-    ctx.translate(offsetX, offsetY);
-    if (rotation !== 0) {
-      ctx.rotate(rotation);
-    }
-    if (typeof visual.glowColor === 'string' && visual.glowColor) {
-      ctx.shadowColor = visual.glowColor;
-    }
-    if (Number.isFinite(visual.shadowBlur)) {
-      ctx.shadowBlur = Math.max(0, visual.shadowBlur);
-    }
-    ctx.drawImage(
-      image,
-      sourceX,
-      sourceY,
-      sourceWidth,
-      sourceHeight,
-      -width / 2,
-      -height / 2,
-      width,
-      height
-    );
-    ctx.restore();
-
-    const metrics = this.getHullMetricsFor(hullDefinition);
-    if (
-      metrics.outlinePath &&
-      Number.isFinite(visual.outlineWidth) &&
-      visual.outlineWidth > 0
-    ) {
-      ctx.save();
-      ctx.strokeStyle =
-        typeof visual.outlineColor === 'string' && visual.outlineColor
-          ? visual.outlineColor
-          : '#CFF8FF';
-      ctx.lineWidth =
-        Number.isFinite(visual.outlineWidth) && visual.outlineWidth > 0
-          ? visual.outlineWidth
-          : 1;
-      if (typeof visual.glowColor === 'string' && visual.glowColor) {
-        ctx.shadowColor = visual.glowColor;
-        ctx.shadowBlur = Math.max(
-          0,
-          Number.isFinite(visual.shadowBlur) ? visual.shadowBlur * 0.45 : 8
-        );
-      }
-      ctx.stroke(metrics.outlinePath);
-      ctx.restore();
+      geometry.nozzles.forEach((nozzle) => {
+        emissive.beginPath();
+        emissive.arc(nozzle.exitX, nozzle.y, nozzle.r, 0, Math.PI * 2);
+        emissive.fill();
+      });
+      emissive.restore();
     }
 
     return true;
   }
 
-  renderHullModel(ctx, hullDefinition = this.currentHull, options = {}) {
-    if (!ctx || !hullDefinition) {
-      return false;
-    }
-
-    if (this.renderSpriteHullModel(ctx, hullDefinition, options)) {
-      return true;
-    }
-
-    return this.renderLegacyHullModel(ctx, hullDefinition);
-  }
-
   renderHullPreview(ctx, hullDefinition = this.currentHull, options = {}) {
-    if (!ctx || !hullDefinition) {
+    if (!ctx || !hullDefinition?.visual) {
       return false;
     }
 
@@ -1256,34 +1392,55 @@ class PlayerSystem extends BaseSystem {
       return false;
     }
 
-    const previewWidth = Number.isFinite(options.width)
+    // Native-resolution backing store for the CSS box (crisp at DPR 2).
+    const cssWidth = Number.isFinite(options.width)
       ? options.width
-      : canvas.width;
-    const previewHeight = Number.isFinite(options.height)
+      : canvas.clientWidth || canvas.width;
+    const cssHeight = Number.isFinite(options.height)
       ? options.height
-      : canvas.height;
+      : canvas.clientHeight || canvas.height;
+    if (!Number.isFinite(options.width) && canvas.clientWidth > 0) {
+      const dpr = resolveDevicePixelRatio();
+      const width = Math.round(cssWidth * dpr);
+      const height = Math.round(cssHeight * dpr);
+      if (canvas.width !== width) canvas.width = width;
+      if (canvas.height !== height) canvas.height = height;
+    }
+    const pixelRatio = canvas.width / cssWidth;
+
     const padding = Number.isFinite(options.padding)
       ? Math.max(0, options.padding)
       : 10;
-    const visualRadius = this.getHullVisualRadius(hullDefinition);
-    const maxRadius = Math.max(1, visualRadius);
-    const safeWidth = Math.max(1, previewWidth - padding * 2);
-    const safeHeight = Math.max(1, previewHeight - padding * 2);
+    const levels = { thruster: 0, rcs: 0, braking: 0 };
+    const geometry = this.getHullGeometry(hullDefinition, levels);
+    const tailX = geometry.minNozzleX - coneLength(PREVIEW_THRUST, 0);
+    const minX = Math.min(geometry.minX, tailX);
+    const spanX = Math.max(1, geometry.maxX - minX);
+    const spanY = Math.max(1, geometry.maxY * 2);
+    // nose points up: ship x runs along the preview's height
     const scale = Math.min(
-      safeWidth / (maxRadius * 2),
-      safeHeight / (maxRadius * 2)
+      Math.max(1, cssWidth - padding * 2) / spanY,
+      Math.max(1, cssHeight - padding * 2) / spanX
     );
 
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     if (options.clear !== false) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
-
-    ctx.save();
-    ctx.translate(previewWidth / 2, previewHeight / 2);
+    ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    ctx.translate(cssWidth / 2, cssHeight / 2);
     ctx.scale(scale, scale);
+    ctx.rotate(PREVIEW_ANGLE);
+    ctx.translate(-(geometry.maxX + minX) / 2, 0);
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
-    this.renderHullModel(ctx, hullDefinition, options);
+    this.renderHullModel(ctx, hullDefinition, {
+      levels,
+      angle: PREVIEW_ANGLE,
+      pixelScale: scale * pixelRatio,
+      thrust: { main: PREVIEW_THRUST, aux: 0, sideL: 0, sideR: 0 },
+    });
     ctx.restore();
     return true;
   }
@@ -1380,11 +1537,67 @@ class PlayerSystem extends BaseSystem {
     return { damage, forceMultiplier, level };
   }
 
+  // Smoothed thruster intensities for the cone (input is on/off).
+  updateThrusterVisual() {
+    const visual = this.thrusterVisual;
+    const target = this.lastThrusterState;
+    ['main', 'aux', 'sideL', 'sideR'].forEach((key) => {
+      visual[key] += ((target[key] || 0) - visual[key]) * 0.35;
+      if (visual[key] < 0.005) visual[key] = 0;
+    });
+    return visual;
+  }
+
+  // Persistent light trail behind the main nozzles (world space).
+  renderThrusterTrail(ctx, emissive, geometry, intensity) {
+    const trail = this.thrusterTrail;
+    const exit = this.getLocalToWorld(geometry.minNozzleX, 0);
+    const slot = trail.points[trail.head];
+    slot.x = exit.x;
+    slot.y = exit.y;
+    slot.i = intensity;
+    trail.head = (trail.head + 1) % THRUSTER_TRAIL_LENGTH;
+    trail.count = Math.min(THRUSTER_TRAIL_LENGTH, trail.count + 1);
+    if (trail.count < 2) return;
+
+    const layers = emissive ? [ctx, emissive] : [ctx];
+    const start = trail.head - trail.count + THRUSTER_TRAIL_LENGTH;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    layers.forEach((target) => {
+      target.lineCap = 'round';
+    });
+    for (let k = 1; k < trail.count; k += 1) {
+      const a = trail.points[(start + k - 1) % THRUSTER_TRAIL_LENGTH];
+      const b = trail.points[(start + k) % THRUSTER_TRAIL_LENGTH];
+      const strength = Math.min(a.i, b.i);
+      if (strength < 0.02) continue;
+      if (Math.hypot(b.x - a.x, b.y - a.y) > TRAIL_BREAK_DISTANCE) continue;
+      const age = k / (trail.count - 1);
+      layers.forEach((target) => {
+        target.strokeStyle = withAlpha(geometry.accent, 0.5 * age * strength);
+        target.lineWidth = (0.5 + 2.5 * age) * strength;
+        target.beginPath();
+        target.moveTo(a.x, a.y);
+        target.lineTo(b.x, b.y);
+        target.stroke();
+      });
+    }
+    ctx.restore();
+  }
+
   render(ctx, options = {}) {
     if (!ctx) return;
     if (this.isDead || this._quitExplosionHidden) return;
+    if (!this.currentHull?.visual) return;
 
     const tilt = typeof options.tilt === 'number' ? options.tilt : 0;
+    const thrust = this.updateThrusterVisual();
+    const levels = this.getHullVisualLevels();
+    const geometry = this.getHullGeometry(this.currentHull, levels);
+    const emissive = beginEmissive(getEmissive(), ctx);
+    this.renderThrusterTrail(ctx, emissive, geometry, thrust.main);
+    emissive?.restore();
 
     ctx.save();
     ctx.translate(this.position.x, this.position.y);
@@ -1394,7 +1607,12 @@ class PlayerSystem extends BaseSystem {
       ctx.transform(1, 0, tilt, 1, 0, 0);
     }
 
-    this.renderHullModel(ctx, this.currentHull, options);
+    this.renderHullModel(ctx, this.currentHull, {
+      levels,
+      angle: this.angle,
+      thrust,
+      emissive: getEmissive(),
+    });
 
     ctx.restore();
   }
@@ -1463,7 +1681,6 @@ class PlayerSystem extends BaseSystem {
 
     this.currentHull = hullDefinition;
     this._currentHullMetrics = this.computeHullMetrics(hullDefinition);
-    this.prepareHullVisual(hullDefinition);
     return true;
   }
 

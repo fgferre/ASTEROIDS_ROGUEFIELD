@@ -1,4 +1,6 @@
 import RandomService from '../../core/RandomService.js';
+import { getEmissive } from '../../core/bloomLayer.js';
+import { PALETTE, withAlpha } from '../../data/constants/palette.js';
 
 const TWO_PI = Math.PI * 2;
 
@@ -50,53 +52,55 @@ export class HealthHeart {
     this.pulsePhase += deltaTime * 3;
   }
 
+  // Lime capsule with a soft core (docs/NORTE.md §3, status light).
   render(ctx) {
     if (this.collected) return;
 
+    const pulse = 1 + Math.sin(this.pulsePhase) * 0.12;
+    const length = this.radius * 0.95 * pulse;
+    const width = this.radius * 0.5 * pulse;
+    const emissive = getEmissive();
+
     ctx.save();
     ctx.translate(this.x, this.y);
+    ctx.rotate(Math.sin(this.pulsePhase * 0.35) * 0.35);
 
-    // Pulse effect
-    const pulseScale = 1 + Math.sin(this.pulsePhase) * 0.2;
-    const size = this.radius * pulseScale;
-
-    // Outer glow
-    const outerGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, size * 2.5);
-    outerGlow.addColorStop(0, 'rgba(255, 50, 50, 0.5)');
-    outerGlow.addColorStop(0.5, 'rgba(255, 50, 50, 0.25)');
-    outerGlow.addColorStop(1, 'rgba(255, 50, 50, 0)');
-
-    ctx.fillStyle = outerGlow;
+    const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, length * 1.4);
+    halo.addColorStop(0, withAlpha(PALETTE.status, 0.3));
+    halo.addColorStop(1, withAlpha(PALETTE.status, 0));
+    ctx.fillStyle = halo;
     ctx.beginPath();
-    ctx.arc(0, 0, size * 2.5, 0, Math.PI * 2);
+    ctx.arc(0, 0, length * 1.4, 0, Math.PI * 2);
     ctx.fill();
 
-    // Heart body
-    const heartGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, size);
-    heartGradient.addColorStop(0, '#ff6b6b');
-    heartGradient.addColorStop(0.6, '#ff3838');
-    heartGradient.addColorStop(1, '#cc0000');
-
-    ctx.fillStyle = heartGradient;
+    const body = ctx.createLinearGradient(0, -width, 0, width);
+    body.addColorStop(0, PALETTE.status);
+    body.addColorStop(1, withAlpha(PALETTE.status, 0.55));
+    ctx.fillStyle = body;
     ctx.beginPath();
-    ctx.arc(0, 0, size, 0, Math.PI * 2);
+    ctx.roundRect(-length / 2, -width / 2, length, width, width / 2);
     ctx.fill();
 
-    // Inner highlight
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.beginPath();
-    ctx.arc(-size * 0.3, -size * 0.3, size * 0.35, 0, Math.PI * 2);
-    ctx.fill();
+    // heal cross, cut dark into the capsule
+    ctx.fillStyle = withAlpha(PALETTE.background, 0.75);
+    const cross = width * 0.7;
+    const bar = cross * 0.3;
+    ctx.fillRect(-bar / 2, -cross / 2, bar, cross);
+    ctx.fillRect(-cross / 2, -bar / 2, cross, bar);
 
-    // Cross/plus symbol
-    ctx.fillStyle = '#ffffff';
-    const crossSize = size * 0.55;
-    const crossWidth = crossSize * 0.28;
-
-    // Vertical bar
-    ctx.fillRect(-crossWidth / 2, -crossSize / 2, crossWidth, crossSize);
-    // Horizontal bar
-    ctx.fillRect(-crossSize / 2, -crossWidth / 2, crossSize, crossWidth);
+    if (emissive) {
+      emissive.save();
+      emissive.setTransform(ctx.getTransform());
+      const core = emissive.createRadialGradient(0, 0, 0, 0, 0, length * 0.7);
+      core.addColorStop(0, PALETTE.text);
+      core.addColorStop(0.4, PALETTE.status);
+      core.addColorStop(1, withAlpha(PALETTE.status, 0));
+      emissive.fillStyle = core;
+      emissive.beginPath();
+      emissive.arc(0, 0, length * 0.7, 0, Math.PI * 2);
+      emissive.fill();
+      emissive.restore();
+    }
 
     ctx.restore();
   }

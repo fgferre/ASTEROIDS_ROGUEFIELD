@@ -1,13 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  ALL_HULLS,
   DEFAULT_HULL_ID,
   getShipModelById,
-  solarSlicer,
 } from '../../src/data/shipModels.js';
-
-const SOLAR_SLICER_BACKGROUND_SIGNATURE =
-  /transform="scale\(0\.625977 0\.625977\)" d="M0 0L1024 0L1024 1024L0 1024L0 0Z"/i;
 
 describe('shipModels', () => {
   afterEach(() => {
@@ -26,14 +23,11 @@ describe('shipModels', () => {
     );
   });
 
-  it('strips the full-canvas background path from the solar slicer sprite source', () => {
-    const encodedMarkup = solarSlicer.visual.source.replace(
-      'data:image/svg+xml;charset=utf-8,',
-      ''
-    );
-    const decodedMarkup = decodeURIComponent(encodedMarkup);
-
-    expect(decodedMarkup).toContain('<svg');
-    expect(decodedMarkup).not.toMatch(SOLAR_SLICER_BACKGROUND_SIGNATURE);
+  it('draws every hull from procedural panels with at least one nozzle', () => {
+    ALL_HULLS.forEach((hull) => {
+      expect(hull.visual.panels.length).toBeGreaterThan(0);
+      expect(hull.visual.nozzles.length).toBeGreaterThan(0);
+      expect(hull.visual.source).toBeUndefined();
+    });
   });
 });

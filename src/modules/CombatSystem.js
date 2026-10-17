@@ -31,12 +31,20 @@ const VALID_SPREAD_MODES = new Set(['concentrated', 'fan']);
 const VALID_AIM_MODES = new Set(['auto', 'manual']);
 import { ENEMY_TYPES, BOSS_CONFIG } from '../data/constants/visual.js';
 import { getRenderScale } from '../core/viewport.js';
+import { getEmissive } from '../core/bloomLayer.js';
+import { LINE, PALETTE, withAlpha } from '../data/constants/palette.js';
 import {
   ASTEROID_VARIANTS,
   ASTEROID_BASE_ORBS,
   ASTEROID_SIZE_ORB_FACTOR,
   ORB_VALUE,
 } from '../data/enemies/asteroid-configs.js';
+
+const LANCE_SPRITE = { width: 16, height: 8, originX: 12 };
+// Trail alpha ramp, tail → head (precomputed: one string per step).
+const LANCE_TRAIL_STYLES = Array.from({ length: 8 }, (_, i) =>
+  withAlpha(PALETTE.shot, (0.65 * i) / 7)
+);
 
 const COMBAT_SERVICE_MAP = {
   cachedPlayer: 'player',
@@ -150,7 +158,7 @@ class CombatSystem extends BaseSystem {
     this.cachedPlayer = null;
     this.cachedEnemies = null;
     this.cachedPhysics = null;
-    this.bulletGlowCache = null;
+    this.lanceSprite = null;
     this.projectilePerf = {
       projectileUpdateMs: 0,
       projectileRenderMs: 0,
@@ -3128,216 +3136,120 @@ class CombatSystem extends BaseSystem {
     return { ...this.projectilePerf };
   }
 
-  ensureBulletTrailSegmentCache() {
-    // "Laser Beam" Technique: Bake a glowing dot and stretch it
-    const size = 32; // Square canvas
-    const center = size / 2;
-
+  // Lance shot (docs/NORTE.md §3): 8×2 amber core behind a 4 px white-hot
+  // head, axis +x, origin at the head. `head` is the emissive copy.
+  ensureLanceSprite() {
     const scale = getRenderScale();
-    if (
-      this.bulletTrailCache &&
-      this.bulletTrailCache.canvas &&
-      this.bulletTrailCache.scale === scale
-    ) {
-      return this.bulletTrailCache;
+    if (this.lanceSprite && this.lanceSprite.scale === scale) {
+      return this.lanceSprite;
     }
-
     if (typeof document === 'undefined') {
       return null;
     }
 
-    const offscreen = document.createElement('canvas');
-    const pixels = Math.ceil(size * scale);
-    offscreen.width = pixels;
-    offscreen.height = pixels;
-    const ctx = offscreen.getContext('2d');
-
-    if (!ctx) return null;
-
-    ctx.scale(scale, scale);
-
-    // 1. Bake the Glow (Gold/Yellow). shadowBlur ignores the transform.
-    ctx.shadowBlur = 10 * scale;
-    ctx.shadowColor = '#FFFF00';
-    ctx.fillStyle = 'rgba(255, 220, 100, 0.8)';
-
-    ctx.beginPath();
-    ctx.arc(center, center, 3, 0, Math.PI * 2); // Radius 3 (Width 6)
-    ctx.fill();
-
-    // 2. Bake the Core (White)
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = '#FFFFFF';
-
-    ctx.beginPath();
-    ctx.arc(center, center, 1.5, 0, Math.PI * 2); // Radius 1.5 (Width 3)
-    ctx.fill();
-
-    this.bulletTrailCache = {
-      canvas: offscreen,
-      width: size,
-      height: size,
-      radius: center,
-      scale,
+    const bake = (drawHead, drawCore) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.ceil(LANCE_SPRITE.width * scale);
+      canvas.height = Math.ceil(LANCE_SPRITE.height * scale);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      ctx.scale(scale, scale);
+      ctx.translate(LANCE_SPRITE.originX, LANCE_SPRITE.height / 2);
+      if (drawCore) {
+        const core = ctx.createLinearGradient(-8, 0, 0, 0);
+        core.addColorStop(0, withAlpha(PALETTE.shot, 0));
+        core.addColorStop(0.45, withAlpha(PALETTE.shot, 0.9));
+        core.addColorStop(1, PALETTE.shot);
+        ctx.fillStyle = core;
+        ctx.beginPath();
+        ctx.moveTo(-8, 0);
+        ctx.lineTo(-1, -1);
+        ctx.lineTo(0, 0);
+        ctx.lineTo(-1, 1);
+        ctx.closePath();
+        ctx.fill();
+      }
+      if (drawHead) {
+        const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, 3.5);
+        halo.addColorStop(0, withAlpha(PALETTE.shot, 0.55));
+        halo.addColorStop(1, withAlpha(PALETTE.shot, 0));
+        ctx.fillStyle = halo;
+        ctx.beginPath();
+        ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = PALETTE.text;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 2, 1.1, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      return canvas;
     };
 
-    return this.bulletTrailCache;
+    const lance = bake(true, true);
+    const head = bake(true, false);
+    this.lanceSprite = lance && head ? { lance, head, scale } : null;
+    return this.lanceSprite;
   }
 
-  ensureBulletGlowCache() {
-    const glowRadius = (BULLET_SIZE || 0) * 3;
-
-    if (!Number.isFinite(glowRadius) || glowRadius <= 0) {
-      this.bulletGlowCache = null;
-      return null;
+  drawLanceTrail(ctx, bullet) {
+    const trail = bullet.trail;
+    const count = trail.length + 1;
+    ctx.lineCap = 'round';
+    let prev = trail[0];
+    for (let k = 1; k < count; k += 1) {
+      const point = k < trail.length ? trail[k] : bullet;
+      const f = k / (count - 1);
+      ctx.strokeStyle =
+        LANCE_TRAIL_STYLES[Math.round(f * (LANCE_TRAIL_STYLES.length - 1))];
+      ctx.lineWidth = 0.3 + 1.7 * f;
+      ctx.beginPath();
+      ctx.moveTo(prev.x, prev.y);
+      ctx.lineTo(point.x, point.y);
+      ctx.stroke();
+      prev = point;
     }
-
-    if (
-      this.bulletGlowCache &&
-      this.bulletGlowCache.radius === glowRadius &&
-      this.bulletGlowCache.scale === getRenderScale() &&
-      this.bulletGlowCache.canvas
-    ) {
-      return this.bulletGlowCache;
-    }
-
-    if (typeof document === 'undefined') {
-      return null;
-    }
-
-    const scale = getRenderScale();
-    const diameter = Math.ceil(glowRadius * 2);
-    const pixels = Math.ceil(diameter * scale);
-    const offscreen = document.createElement('canvas');
-    offscreen.width = pixels;
-    offscreen.height = pixels;
-    const offscreenCtx = offscreen.getContext('2d');
-
-    if (!offscreenCtx) {
-      return null;
-    }
-
-    offscreenCtx.scale(scale, scale);
-
-    const gradient = offscreenCtx.createRadialGradient(
-      glowRadius,
-      glowRadius,
-      0,
-      glowRadius,
-      glowRadius,
-      glowRadius
-    );
-    gradient.addColorStop(0, '#FFFF00');
-    gradient.addColorStop(0.5, 'rgba(255, 255, 0, 0.4)');
-    gradient.addColorStop(1, 'transparent');
-
-    offscreenCtx.clearRect(0, 0, diameter, diameter);
-    offscreenCtx.fillStyle = gradient;
-    offscreenCtx.beginPath();
-    offscreenCtx.arc(glowRadius, glowRadius, glowRadius, 0, Math.PI * 2);
-    offscreenCtx.fill();
-
-    this.bulletGlowCache = {
-      canvas: offscreen,
-      radius: glowRadius,
-      diameter,
-      scale,
-    };
-
-    return this.bulletGlowCache;
   }
 
   render(ctx) {
     if (!ctx) return;
 
     const player = this.getCachedPlayer();
+    const emissive = getEmissive();
+    const sprite = this.ensureLanceSprite();
 
-    // [NEO-ARCADE] Additive Blending for Bullet Glow
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
 
     // Always render bullets - they keep flying
     const projectileRenderStart = performance.now();
+    emissive?.save();
     this.bullets.forEach((bullet) => {
       if (bullet.hit) return;
 
-      if (bullet.trail.length > 1) {
-        const trailCache = this.ensureBulletTrailSegmentCache();
-
-        if (trailCache) {
-          ctx.save();
-          // [NEO-ARCADE] Baked Trail Glow (High Performance)
-          // Draw stretched segments using the baked "Dot" cache
-          for (let i = 1; i < bullet.trail.length; i++) {
-            const p1 = bullet.trail[i - 1];
-            const p2 = bullet.trail[i];
-            const dx = p2.x - p1.x;
-            const dy = p2.y - p1.y;
-            const dist = Math.hypot(dx, dy);
-
-            if (dist < 1) continue;
-
-            const angle = Math.atan2(dy, dx);
-            const alpha = i / bullet.trail.length; // Fade in tail
-
-            ctx.translate(p1.x, p1.y);
-            ctx.rotate(angle);
-            ctx.globalAlpha = alpha;
-
-            // Stretch the dot into a glowing line segment
-            // Overlap slightly (-3 start, +6 length) to ensure smooth joins
-            ctx.drawImage(
-              trailCache.canvas,
-              -3,
-              -trailCache.radius,
-              dist + 6,
-              trailCache.height
-            );
-
-            // Undo transform for next segment
-            ctx.rotate(-angle);
-            ctx.translate(-p1.x, -p1.y);
-          }
-          ctx.restore();
-        }
+      if (bullet.trail.length > 0) {
+        this.drawLanceTrail(ctx, bullet);
+        if (emissive) this.drawLanceTrail(emissive, bullet);
       }
 
-      const glowSprite = this.ensureBulletGlowCache();
-
-      if (glowSprite) {
-        ctx.drawImage(
-          glowSprite.canvas,
-          bullet.x - glowSprite.radius,
-          bullet.y - glowSprite.radius,
-          glowSprite.diameter,
-          glowSprite.diameter
+      if (!sprite) return;
+      const angle = Math.atan2(bullet.vy || 0, bullet.vx || 1);
+      const draw = (target, image) => {
+        target.save();
+        target.translate(bullet.x, bullet.y);
+        target.rotate(angle);
+        target.drawImage(
+          image,
+          -LANCE_SPRITE.originX,
+          -LANCE_SPRITE.height / 2,
+          LANCE_SPRITE.width,
+          LANCE_SPRITE.height
         );
-      } else {
-        const gradient = ctx.createRadialGradient(
-          bullet.x,
-          bullet.y,
-          0,
-          bullet.x,
-          bullet.y,
-          BULLET_SIZE * 4 // Larger bloom
-        );
-        gradient.addColorStop(0, '#FFFFFF'); // Hot core
-        gradient.addColorStop(0.3, '#FFFF00'); // Inner yellow
-        gradient.addColorStop(0.6, 'rgba(255, 100, 0, 0.4)'); // Outer orange
-        gradient.addColorStop(1, 'transparent');
-
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(bullet.x, bullet.y, BULLET_SIZE * 4, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Solid White Core
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.arc(bullet.x, bullet.y, BULLET_SIZE, 0, Math.PI * 2);
-      ctx.fill();
+        target.restore();
+      };
+      draw(ctx, sprite.lance);
+      if (emissive) draw(emissive, sprite.head);
     });
+    emissive?.restore();
 
     ctx.restore(); // End 'lighter' mode
 
@@ -3442,8 +3354,8 @@ class CombatSystem extends BaseSystem {
           pulseRatio * (index === 0 ? 6 : 3.5);
 
         ctx.save();
-        ctx.setLineDash([4, 3]);
-        ctx.lineWidth = index === 0 ? 2.6 + pulseRatio * 1.4 : 2.1;
+        ctx.setLineDash([6, 4]);
+        ctx.lineWidth = index === 0 ? LINE.thin : LINE.hair;
         ctx.strokeStyle = ringColor.ring(lineAlpha);
         ctx.beginPath();
         ctx.arc(target.x, target.y, arcRadius, 0, Math.PI * 2);
@@ -3451,8 +3363,8 @@ class CombatSystem extends BaseSystem {
         ctx.restore();
 
         ctx.save();
-        ctx.lineWidth = 1.8;
-        ctx.strokeStyle = ringColor.line(lineAlpha * 0.7);
+        ctx.lineWidth = LINE.hair;
+        ctx.strokeStyle = ringColor.line(lineAlpha * 0.35);
         ctx.beginPath();
         ctx.moveTo(playerPosition.x, playerPosition.y);
         ctx.lineTo(target.x, target.y);
@@ -3489,7 +3401,7 @@ class CombatSystem extends BaseSystem {
 
           ctx.save();
           ctx.setLineDash([]);
-          ctx.lineWidth = 2;
+          ctx.lineWidth = LINE.hair;
           ctx.strokeStyle = markerColor.ring(alpha);
           ctx.beginPath();
           ctx.arc(position.x, position.y, radius, 0, Math.PI * 2);
