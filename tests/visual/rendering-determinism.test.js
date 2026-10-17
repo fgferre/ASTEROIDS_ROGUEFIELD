@@ -259,6 +259,7 @@ function createTrackedContext() {
     rotate(angle) {
       state.angle += angle;
     },
+    scale() {},
     setTransform(a, b, c, d, e, f) {
       state.tx = e;
       state.ty = f;

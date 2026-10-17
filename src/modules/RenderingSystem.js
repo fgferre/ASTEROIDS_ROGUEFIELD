@@ -10,6 +10,7 @@ import { MAGNETISM_RADIUS } from '../data/constants/gameplay.js';
 import { normalize as normalizeVector } from '../utils/vectorHelpers.js';
 import { applyBaseTransform, getRenderScale } from '../core/viewport.js';
 import * as bloomLayer from '../core/bloomLayer.js';
+import { cameraDisabledByUrl, createCamera } from '../core/camera.js';
 import {
   FILL_LIGHT,
   LINE,
@@ -17,8 +18,10 @@ import {
   withAlpha,
 } from '../data/constants/palette.js';
 
-// [NEO-ARCADE] Shield Visual Constants
-const SHIELD_HEX_SIZE = 24;
+// Player shield: a field-generator barrier around the hull outline.
+const SHIELD_SWEEP_SPEED = 0.35; // perimeters per second
+const SHIELD_SWEEP_SHARE = 0.18; // fraction of the perimeter lit by the sweep
+const SHIELD_IMPACT_FLASH_MS = 80;
 
 const MAX_VISUAL_TILT = 0.3;
 const TILT_MULTIPLIER = 0.12;
@@ -157,6 +160,40 @@ function computeOutlineRadius(points) {
   }, 0);
 }
 
+// Elongated hexagon around the padded hull: the box corners become its side
+// vertices and the tips sit past the nose and the tail.
+function hexagonAround(points) {
+  const xs = points.map((p) => p.x);
+  const ys = points.map((p) => p.y);
+  const minX = Math.min(...xs);
+  const maxX = Math.max(...xs);
+  const minY = Math.min(...ys);
+  const maxY = Math.max(...ys);
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const hx = (maxX - minX) / 2;
+  const hy = (maxY - minY) / 2;
+  const tip = hx + hy * 0.6;
+  return [
+    { x: cx + tip, y: cy },
+    { x: cx + hx, y: cy + hy },
+    { x: cx - hx, y: cy + hy },
+    { x: cx - tip, y: cy },
+    { x: cx - hx, y: cy - hy },
+    { x: cx + hx, y: cy - hy },
+  ];
+}
+
+function computePerimeter(points) {
+  let total = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    total += Math.hypot(b.x - a.x, b.y - a.y);
+  }
+  return total;
+}
+
 const SPACE_SKY_RANDOM_SEED = 'rendering:starfield';
 
 // `?bloom=0` turns the post pass off for A/B and for slow machines.
@@ -246,6 +283,8 @@ class SpaceSkyBackground {
       buffer: null,
     };
     this.vignette = null;
+    this.cameraShiftX = 0;
+    this.cameraShiftY = 0;
     this.bakedScale = 0;
     this.initialized = false;
   }
@@ -714,6 +753,15 @@ class SpaceSkyBackground {
         ? rawVelocity.y
         : 0;
 
+    // The camera pans over the field; each layer follows at its parallax
+    // rate (`speed`), so far layers barely move and dust moves most.
+    this.cameraShiftX = Number.isFinite(options.cameraX)
+      ? options.cameraX - width / 2
+      : 0;
+    this.cameraShiftY = Number.isFinite(options.cameraY)
+      ? options.cameraY - height / 2
+      : 0;
+
     const dt = 16 / 1000;
     const time = performance.now() / 1000;
     const scroll = (layer) => {
@@ -749,8 +797,14 @@ class SpaceSkyBackground {
     );
     if (ring.buffer) {
       const m = RING_MARGIN;
-      const sx = Math.max(-m, Math.min(m, ring.shiftX));
-      const sy = Math.max(-m, Math.min(m, ring.shiftY));
+      const sx = Math.max(
+        -m,
+        Math.min(m, ring.shiftX - this.cameraShiftX * 0.01)
+      );
+      const sy = Math.max(
+        -m,
+        Math.min(m, ring.shiftY - this.cameraShiftY * 0.01)
+      );
       ctx.globalAlpha = 1;
       ctx.drawImage(ring.buffer, sx - m, sy - m, width + m * 2, height + m * 2);
     }
@@ -767,6 +821,7 @@ class SpaceSkyBackground {
       ctx,
       this.dust.tile,
       {
+        speed: this.dust.speed,
         offsetX: this.dust.offsetX + this.dust.driftX * time,
         offsetY: this.dust.offsetY + this.dust.driftY * time,
       },
@@ -794,11 +849,12 @@ class SpaceSkyBackground {
   drawTiled(ctx, tile, layer, width, height, alpha) {
     if (!tile) return;
     const scale = this.bakedScale;
+    const offsetX = layer.offsetX - this.cameraShiftX * layer.speed;
+    const offsetY = layer.offsetY - this.cameraShiftY * layer.speed;
     const ox =
-      Math.round((((layer.offsetX % width) + width) % width) * scale) / scale;
+      Math.round((((offsetX % width) + width) % width) * scale) / scale;
     const oy =
-      Math.round((((layer.offsetY % height) + height) % height) * scale) /
-      scale;
+      Math.round((((offsetY % height) + height) % height) * scale) / scale;
     ctx.globalAlpha = alpha;
     for (const x of ox > 0 ? [ox - width, ox] : [0]) {
       for (const y of oy > 0 ? [oy - height, oy] : [0]) {
@@ -873,18 +929,17 @@ class RenderingSystem extends BaseSystem {
 
     this.shieldVisualCache = {
       signature: '',
-      patternCanvas: null, // [NEO-ARCADE] Cache for hex pattern
       path: null,
+      perimeter: 0,
       radius: SHIP_SIZE,
       padding: 0,
     };
-    this.shieldGradientCache = {
-      radius: 0,
-      ratio: 0,
-      canvas: null,
-      context: null,
-      size: 0,
-    };
+    this.shieldImpactAt = -Infinity;
+
+    // docs/NORTE.md §2 "Câmera"; `?camera=0` keeps the fixed full-field view.
+    this.camera = createCamera();
+    this.camera.setEnabled(!cameraDisabledByUrl());
+    this.lastRenderTime = null;
 
     // Initialize state manager with common presets
     this.stateManager.createPreset('starfield', {
@@ -913,6 +968,9 @@ class RenderingSystem extends BaseSystem {
     this.postProcessingEnabled = DEFAULT_GRAPHICS_SETTINGS.postProcessing;
 
     this.setupSettingsIntegration();
+    this.registerEventListener('shield-hit', () => {
+      this.shieldImpactAt = performance.now();
+    });
   }
 
   setupSettingsIntegration() {
@@ -959,6 +1017,8 @@ class RenderingSystem extends BaseSystem {
       const starfieldRandom = this.getRandomFork('starfield');
       this.spaceSky.reseed(starfieldRandom);
     }
+    this.camera.reset();
+    this.lastRenderTime = null;
   }
 
   render(ctx) {
@@ -1000,18 +1060,27 @@ class RenderingSystem extends BaseSystem {
         effects.applyScreenShake(ctx);
       }
 
-      // Light sources drawn into the emissive layer this frame get bloomed
-      // in composite() below (docs/NORTE.md §2).
-      bloomLayer.beginFrame(ctx);
-
       const player = this.cachedPlayer;
       const playerVelocity =
         typeof player?.getVelocity === 'function'
           ? player.getVelocity()
           : player?.velocity || null;
 
+      this.updateCamera(player, frameStart);
+
+      // The sky is far away: drawn unzoomed, shifted by the camera at
+      // parallax rates.
+      this.stateManager.transitionToPhase(ctx, 'background');
+      this.drawBackground(ctx, playerVelocity);
+
+      this.camera.applyTransform(ctx);
+
+      // Light sources drawn into the emissive layer this frame get bloomed
+      // in composite() below (docs/NORTE.md §2).
+      bloomLayer.beginFrame(ctx);
+
       // Optimized rendering with batching
-      this.renderOptimized(ctx, player, playerVelocity);
+      this.renderOptimized(ctx, player);
       bloomLayer.composite(ctx);
     } finally {
       ctx.restore();
@@ -1021,11 +1090,27 @@ class RenderingSystem extends BaseSystem {
     this.updateRenderStats(frameStart);
   }
 
-  renderOptimized(ctx, player, playerVelocity) {
-    // Background phase
-    this.stateManager.transitionToPhase(ctx, 'background');
-    this.drawBackground(ctx, playerVelocity);
+  updateCamera(player, now) {
+    const dt =
+      this.lastRenderTime === null
+        ? 0
+        : Math.min(0.1, Math.max(0, (now - this.lastRenderTime) / 1000));
+    const firstFrame = this.lastRenderTime === null;
+    this.lastRenderTime = now;
 
+    const position =
+      typeof player?.getPosition === 'function'
+        ? player.getPosition()
+        : player?.position;
+    if (!position) return;
+    if (firstFrame) {
+      this.camera.snapTo(position.x, position.y);
+    } else {
+      this.camera.update(position.x, position.y, dt);
+    }
+  }
+
+  renderOptimized(ctx, player) {
     // Objects phase - batch similar objects
     this.stateManager.transitionToPhase(ctx, 'objects');
 
@@ -1375,6 +1460,8 @@ class RenderingSystem extends BaseSystem {
           width: GAME_WIDTH,
           height: GAME_HEIGHT,
           velocity: playerVelocity,
+          cameraX: this.camera.x,
+          cameraY: this.camera.y,
         });
         return;
       }
@@ -1476,149 +1563,83 @@ class RenderingSystem extends BaseSystem {
         0,
         Math.min(1, shieldState.currentHits / shieldState.maxHits)
       );
-      const position =
-        typeof player.getPosition === 'function'
-          ? player.getPosition()
-          : player.position;
-
-      if (position) {
-        const padding = Math.max(
-          0,
-          typeof player.getShieldPadding === 'function'
-            ? player.getShieldPadding()
-            : 0
-        );
-
-        const visuals = this.resolveShieldVisual(player, padding);
-        const shieldPath = visuals.path;
-        const radiusForGradient = visuals.radius;
-
-        if (shieldPath && radiusForGradient > 0) {
-          const angle =
-            typeof player.getAngle === 'function'
-              ? player.getAngle()
-              : player.angle || 0;
-
-          ctx.save();
-          ctx.translate(position.x, position.y);
-          // [NEO-ARCADE] Rotate shield slightly independently for "floating field" feel
-          ctx.rotate(angle);
-
-          if (tilt !== 0) {
-            ctx.transform(1, 0, tilt, 1, 0, 0);
-          }
-
-          // === SOAP BUBBLE V3 (Vibrant Rainbow Reference) ===
-
-          // === SOAP BUBBLE V3 (Vibrant Rainbow Reference) ===
-
-          ctx.globalCompositeOperation = this.bloomEnabled
-            ? 'lighter'
-            : 'source-over';
-          if (!this.bloomEnabled) ctx.globalAlpha = 0.8; // Adjust alpha if not adding
-
-          // 1. Base Bubble (Oil Slick Fill)
-          const bubbleRadius = radiusForGradient;
-          const oilGrad = ctx.createRadialGradient(
-            bubbleRadius * 0.3,
-            -bubbleRadius * 0.3,
-            0,
-            0,
-            0,
-            bubbleRadius
-          );
-          // Stronger colors for "Rainbow Effect"
-          oilGrad.addColorStop(0, 'rgba(255, 255, 255, 0.1)');
-          oilGrad.addColorStop(0.3, 'rgba(0, 255, 255, 0.15)'); // Cyan
-          oilGrad.addColorStop(0.5, 'rgba(255, 0, 255, 0.15)'); // Magenta
-          oilGrad.addColorStop(0.7, 'rgba(255, 255, 0, 0.12)'); // Yellow
-          oilGrad.addColorStop(
-            0.95,
-            `rgba(255, 255, 255, ${0.2 + ratio * 0.2})`
-          ); // Rim catch
-
-          ctx.beginPath();
-          ctx.arc(0, 0, bubbleRadius, 0, Math.PI * 2);
-          ctx.fillStyle = oilGrad;
-          ctx.fill();
-
-          // 2. The RIM (Rainbow Ring)
-          const rimGrad = ctx.createLinearGradient(
-            -bubbleRadius,
-            -bubbleRadius,
-            bubbleRadius,
-            bubbleRadius
-          );
-          rimGrad.addColorStop(0, 'rgba(0, 255, 255, 0.8)');
-          rimGrad.addColorStop(0.33, 'rgba(255, 0, 255, 0.8)');
-          rimGrad.addColorStop(0.66, 'rgba(255, 255, 0, 0.8)');
-          rimGrad.addColorStop(1, 'rgba(0, 255, 255, 0.8)');
-
-          ctx.lineWidth = 1.5;
-          ctx.strokeStyle = rimGrad;
-          ctx.beginPath();
-          ctx.arc(0, 0, bubbleRadius, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // 3. Window Reflection (Primary Top Left)
-          ctx.save();
-          ctx.translate(-bubbleRadius * 0.5, -bubbleRadius * 0.5);
-          ctx.rotate(-Math.PI / 6);
-
-          ctx.beginPath();
-          // Softbox shape
-          ctx.ellipse(
-            0,
-            0,
-            bubbleRadius * 0.35,
-            bubbleRadius * 0.2,
-            0,
-            0,
-            Math.PI * 2
-          );
-
-          const windowGrad = ctx.createLinearGradient(0, -20, 0, 20);
-          windowGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-          windowGrad.addColorStop(1, 'rgba(255, 255, 255, 0.1)');
-
-          ctx.fillStyle = windowGrad;
-          ctx.shadowColor = 'rgba(255, 255, 255, 0.5)';
-          ctx.shadowBlur = 10;
-          ctx.fill();
-          ctx.restore();
-
-          // 4. Bottom Reflection (Bounce Light)
-          ctx.save();
-          ctx.translate(bubbleRadius * 0.5, bubbleRadius * 0.5);
-          ctx.rotate(Math.PI / 6);
-          ctx.beginPath();
-          ctx.ellipse(
-            0,
-            0,
-            bubbleRadius * 0.25,
-            bubbleRadius * 0.1,
-            0,
-            0,
-            Math.PI * 2
-          );
-
-          const botGrad = ctx.createLinearGradient(0, -10, 0, 10);
-          botGrad.addColorStop(0, 'rgba(0, 255, 255, 0.1)');
-          botGrad.addColorStop(1, 'rgba(0, 255, 255, 0.5)');
-
-          ctx.fillStyle = botGrad;
-          ctx.filter = 'blur(4px)';
-          ctx.fill();
-          ctx.restore();
-
-          ctx.restore();
-        }
-      }
+      this.drawPlayerShield(ctx, player, ratio, tilt);
     }
 
     player.render(ctx, { tilt });
 
     // Restore context (remove recoil transform)
+    ctx.restore();
+  }
+
+  // Field-generator barrier (docs/NORTE.md §2): a thin line following the
+  // padded hull, a faint fill, and a brighter segment sweeping around it.
+  // Lit by the hit ratio; flashes white for a moment when it absorbs a hit.
+  drawPlayerShield(ctx, player, ratio, tilt) {
+    const position =
+      typeof player.getPosition === 'function'
+        ? player.getPosition()
+        : player.position;
+    if (!position) return;
+
+    const padding = Math.max(
+      0,
+      typeof player.getShieldPadding === 'function'
+        ? player.getShieldPadding()
+        : 0
+    );
+    const { path, perimeter } = this.resolveShieldVisual(player, padding);
+    if (!path) return;
+
+    const angle =
+      typeof player.getAngle === 'function'
+        ? player.getAngle()
+        : player.angle || 0;
+    const now = performance.now();
+    const impact = now - this.shieldImpactAt < SHIELD_IMPACT_FLASH_MS;
+    const strokeColor = impact
+      ? PALETTE.text
+      : withAlpha(PALETTE.player, 0.2 + 0.35 * ratio);
+    const sweepLength = perimeter * SHIELD_SWEEP_SHARE;
+    const sweepOffset = -((now / 1000) * SHIELD_SWEEP_SPEED * perimeter);
+
+    // The emissive copy lights the sweep fully but the barrier line only
+    // faintly, so the bloom does not thicken the 1.5 px line.
+    const drawBarrier = (target, isMain) => {
+      if (isMain) {
+        target.fillStyle = withAlpha(PALETTE.player, 0.06);
+        target.fill(path);
+      }
+      target.lineJoin = 'round';
+      target.lineWidth = LINE.thin;
+      target.strokeStyle =
+        isMain || impact ? strokeColor : withAlpha(PALETTE.player, 0.15);
+      target.stroke(path);
+      if (perimeter > 0) {
+        target.lineWidth = LINE.base;
+        target.strokeStyle = withAlpha(PALETTE.player, 0.5 + 0.5 * ratio);
+        target.setLineDash([sweepLength, perimeter - sweepLength]);
+        target.lineDashOffset = sweepOffset;
+        target.stroke(path);
+        target.setLineDash([]);
+      }
+    };
+
+    ctx.save();
+    ctx.translate(position.x, position.y);
+    ctx.rotate(angle);
+    if (tilt !== 0) {
+      ctx.transform(1, 0, tilt, 1, 0, 0);
+    }
+    drawBarrier(ctx, true);
+
+    const emissive = bloomLayer.getEmissive();
+    if (emissive) {
+      emissive.save();
+      emissive.setTransform(ctx.getTransform());
+      drawBarrier(emissive, false);
+      emissive.restore();
+    }
     ctx.restore();
   }
 
@@ -1655,14 +1676,17 @@ class RenderingSystem extends BaseSystem {
           expanded && expanded.length >= MIN_OUTLINE_POINTS
             ? expanded
             : hullOutline.map((vertex) => ({ ...vertex }));
-        const outlinePath = buildPathFromPoints(outlineToUse);
-        const outlineRadius = computeOutlineRadius(outlineToUse);
+        const barrier = hexagonAround(outlineToUse);
+        const outlinePath = buildPathFromPoints(barrier);
+        const outlineRadius = computeOutlineRadius(barrier);
         cache.path = outlinePath || null;
+        cache.perimeter = computePerimeter(barrier);
         cache.radius = Math.max(outlineRadius, fallbackRadius);
       } else {
         const path = new Path2D();
         path.arc(0, 0, fallbackRadius, 0, Math.PI * 2);
         cache.path = path;
+        cache.perimeter = Math.PI * 2 * fallbackRadius;
         cache.radius = fallbackRadius;
       }
 
@@ -1675,6 +1699,7 @@ class RenderingSystem extends BaseSystem {
       const path = new Path2D();
       path.arc(0, 0, fallbackRadius, 0, Math.PI * 2);
       cache.path = path;
+      cache.perimeter = Math.PI * 2 * fallbackRadius;
       cache.radius = fallbackRadius;
     }
 
@@ -1691,11 +1716,6 @@ class RenderingSystem extends BaseSystem {
         ? player.getShieldRadius()
         : hullRadius + padding;
     return Math.max(fallback, SHIP_SIZE);
-  }
-
-  ensureShieldGradientCanvas(radius, ratio) {
-    // Use the new gradient cache system for better performance
-    return this.gradientCache.createShieldGradient(null, radius, ratio);
   }
 
   /**
@@ -1827,35 +1847,6 @@ class RenderingSystem extends BaseSystem {
     this.gradientCache.reset();
 
     console.log('[RenderingSystem] Performance tracking reset');
-  }
-
-  // [NEO-ARCADE] Procedural Hexagon Pattern Generation
-  createHexagonPattern() {
-    const size = SHIELD_HEX_SIZE;
-    const canvas = document.createElement('canvas');
-    canvas.width = size * 2;
-    canvas.height = size * Math.sqrt(3);
-    const tempCtx = canvas.getContext('2d');
-
-    tempCtx.strokeStyle = 'rgba(255, 255, 255, 0.15)'; // Very subtle white/cyan
-    tempCtx.lineWidth = 1;
-    tempCtx.lineCap = 'round';
-
-    // Draw Hexagon (approximated for tiling)
-    tempCtx.beginPath();
-    const w = size;
-    const h = (size * Math.sqrt(3)) / 2;
-
-    tempCtx.moveTo(0, h);
-    tempCtx.lineTo(w / 2, 0);
-    tempCtx.lineTo(w * 1.5, 0);
-    tempCtx.lineTo(w * 2, h);
-    tempCtx.lineTo(w * 1.5, h * 2);
-    tempCtx.lineTo(w / 2, h * 2);
-    tempCtx.lineTo(0, h);
-    tempCtx.stroke();
-
-    return canvas;
   }
 }
 
