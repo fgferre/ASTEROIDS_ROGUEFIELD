@@ -88,6 +88,7 @@ let servicesCache = {
   combat: null,
   'xp-orbs': null,
   healthHearts: null,
+  pickups: null,
   progression: null,
   world: null,
   ui: null,
@@ -321,6 +322,7 @@ function init(recording = null) {
         'combat',
         'xp-orbs',
         'healthHearts',
+        'pickups',
         'progression',
         'world',
         'ui',
@@ -598,6 +600,7 @@ function updateGame(deltaTime) {
     servicesCache.combat = gameSystemServices?.['combat'];
     servicesCache['xp-orbs'] = gameSystemServices?.['xp-orbs'];
     servicesCache.healthHearts = gameSystemServices?.['healthHearts'];
+    servicesCache.pickups = gameSystemServices?.['pickups'];
     servicesCache.progression = gameSystemServices?.['progression'];
     servicesCache.world = gameSystemServices?.['world'];
     servicesCache.ui = gameSystemServices?.['ui'];
@@ -613,6 +616,7 @@ function updateGame(deltaTime) {
   servicesCache.combat.update(deltaTime);
   servicesCache['xp-orbs'].update(deltaTime);
   servicesCache.healthHearts.update(deltaTime);
+  servicesCache.pickups.update(deltaTime);
   servicesCache.progression.update(deltaTime);
   servicesCache.world.update(deltaTime);
   servicesCache.ui.update(deltaTime);

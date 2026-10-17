@@ -197,6 +197,7 @@ class XPOrbSystem extends BaseSystem {
         : 0.3;
     this.fusionCheckTimer = 0;
     this.activeFusionAnimations = [];
+    this.globalPull = null;
 
     this.orbClusterRadius = 0;
     this.orbClusterForce = 0;
@@ -836,6 +837,10 @@ class XPOrbSystem extends BaseSystem {
   }
 
   update(deltaTime) {
+    if (this.globalPull) {
+      this.updateGlobalPull(deltaTime);
+    }
+
     if (!this.xpOrbs.length && this.activeFusionAnimations.length === 0) {
       return;
     }
@@ -998,6 +1003,35 @@ class XPOrbSystem extends BaseSystem {
     this.spatialIndex = index;
     this.spatialIndexDirty = false;
     return index;
+  }
+
+  // Magnet pickup: every orb flies to the ship, faster each second; the
+  // ship magnetism below collects them on arrival.
+  startGlobalPull(duration, speed, acceleration) {
+    this.globalPull = { remaining: duration, elapsed: 0, speed, acceleration };
+  }
+
+  updateGlobalPull(deltaTime) {
+    const pull = this.globalPull;
+    pull.remaining -= deltaTime;
+    pull.elapsed += deltaTime;
+    const target = this.cachedPlayer?.getPosition();
+    if (pull.remaining <= 0 || !target) {
+      this.globalPull = null;
+      return;
+    }
+    const step = (pull.speed + pull.acceleration * pull.elapsed) * deltaTime;
+    for (const orb of this.xpOrbs) {
+      if (!this.isOrbActive(orb) || orb.isFusing) continue;
+      const dx = target.x - orb.x;
+      const dy = target.y - orb.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance === 0) continue;
+      const move = Math.min(step, distance) / distance;
+      orb.x += dx * move;
+      orb.y += dy * move;
+    }
+    this.invalidateSpatialIndex();
   }
 
   updateShipMagnetism(deltaTime) {
@@ -1971,6 +2005,7 @@ class XPOrbSystem extends BaseSystem {
     this.xpOrbPools = this.createEmptyOrbPools();
     this.fusionCheckTimer = 0;
     this.activeFusionAnimations = [];
+    this.globalPull = null;
     this.spatialIndex.clear();
     this.spatialIndexDirty = true;
     this.visualCache.clear();

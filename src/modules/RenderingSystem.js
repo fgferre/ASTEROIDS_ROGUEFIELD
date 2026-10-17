@@ -1043,6 +1043,7 @@ class RenderingSystem extends BaseSystem {
     this.cachedProgression = null;
     this.cachedXPOrbs = null;
     this.cachedHealthHearts = null;
+    this.cachedPickups = null;
     this.cachedEffects = null;
     this.cachedCombat = null;
     this.cachedEnemies = null;
@@ -1081,6 +1082,7 @@ class RenderingSystem extends BaseSystem {
         cachedProgression: 'progression',
         cachedXPOrbs: 'xp-orbs',
         cachedHealthHearts: 'healthHearts',
+        cachedPickups: 'pickups',
         cachedEffects: 'effects',
         cachedCombat: 'combat',
         cachedEnemies: 'enemies',
@@ -1188,6 +1190,7 @@ class RenderingSystem extends BaseSystem {
         cachedProgression: 'progression',
         cachedXPOrbs: 'xp-orbs',
         cachedHealthHearts: 'healthHearts',
+        cachedPickups: 'pickups',
         cachedEffects: 'effects',
         cachedCombat: 'combat',
         cachedEnemies: 'enemies',
@@ -1270,6 +1273,9 @@ class RenderingSystem extends BaseSystem {
     if (healthHearts && typeof healthHearts.render === 'function') {
       healthHearts.render(ctx);
     }
+
+    // Field pickups
+    this.cachedPickups?.render(ctx);
 
     // Combat (bullets)
     const combat = this.cachedCombat;

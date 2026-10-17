@@ -19,6 +19,7 @@ import {
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { AAAHudLayout } from './ui/AAAHudLayout.js';
+import { PICKUP_KINDS } from '../data/pickups.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
 const LEVEL_UP_LOCKOUT_MS = 400;
@@ -1393,11 +1394,23 @@ class UISystem extends BaseSystem {
     });
 
     this.registerEventListener('enemy-destroyed', (payload = {}) => {
-      this.aaaTacticalHud?.addKillFeed(payload.enemy?.type);
+      this.aaaTacticalHud?.addKillFeed(
+        payload.enemy?.type,
+        payload.enemy?.elite
+      );
     });
 
     this.registerEventListener('xp-orb-collected', (payload = {}) => {
       this.aaaTacticalHud?.addXpFeed(Number(payload.value));
+    });
+
+    this.registerEventListener('pickup-collected', ({ kind } = {}) => {
+      const pickup = PICKUP_KINDS[kind];
+      this.aaaTacticalHud?.addPickupFeed(
+        pickup.label,
+        pickup.detail,
+        pickup.color
+      );
     });
 
     this.registerEventListener('pause-state-changed', (data) => {

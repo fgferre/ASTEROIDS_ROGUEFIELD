@@ -6,6 +6,7 @@ import { EnemySystem } from '../modules/EnemySystem.js';
 import PhysicsSystem from '../modules/PhysicsSystem.js';
 import XPOrbSystem from '../modules/XPOrbSystem.js';
 import HealthHeartSystem from '../modules/collectibles/HealthHeartSystem.js';
+import PickupSystem from '../modules/collectibles/PickupSystem.js';
 import ProgressionSystem from '../modules/ProgressionSystem.js';
 import UISystem from '../modules/UISystem.js';
 import EffectsSystem from '../modules/EffectsSystem.js';
@@ -506,6 +507,28 @@ export function createServiceManifest(context = {}) {
       },
     },
     {
+      name: 'pickups',
+      singleton: true,
+      lazy: false,
+      dependencies: [
+        'event-bus',
+        'player',
+        'xp-orbs',
+        'enemies',
+        'effects',
+        'random',
+      ],
+      factory: ({ resolved }) =>
+        new PickupSystem({
+          eventBus: resolved['event-bus'],
+          player: resolved['player'],
+          'xp-orbs': resolved['xp-orbs'],
+          enemies: resolved['enemies'],
+          effects: resolved['effects'],
+          random: resolved['random'],
+        }),
+    },
+    {
       name: 'enemy-spawn',
       singleton: true,
       lazy: true,
@@ -671,6 +694,7 @@ export function createServiceManifest(context = {}) {
         'progression',
         'xp-orbs',
         'healthHearts',
+        'pickups',
         'effects',
         'combat',
         'enemies',
@@ -689,6 +713,7 @@ export function createServiceManifest(context = {}) {
           progression: resolved['progression'],
           'xp-orbs': resolved['xp-orbs'],
           healthHearts: resolved['healthHearts'],
+          pickups: resolved['pickups'],
           effects: resolved['effects'],
           combat: resolved['combat'],
           enemies: resolved['enemies'],

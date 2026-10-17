@@ -21,6 +21,7 @@ const UPDATE_ORDER = [
   'combat',
   'xp-orbs',
   'healthHearts',
+  'pickups',
   'progression',
   'world',
 ];

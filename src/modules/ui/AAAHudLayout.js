@@ -20,6 +20,10 @@ const FEED_NAMES = {
   drone: 'Mote',
   hunter: 'Seeker',
   mine: 'Tether',
+  husk: 'Husk',
+  ram: 'Ram',
+  weaver: 'Weaver',
+  bulwark: 'Bulwark',
   boss: 'Warden Prime',
 };
 const COMBO_TIER_RANK = { text: 0, status: 1, xp: 2, boss: 3 };
@@ -226,12 +230,13 @@ export class AAAHudLayout {
   }
 
   /** Kill feed row for a destroyed enemy; repeated kills count up (×N). */
-  addKillFeed(enemyType) {
-    const name = FEED_NAMES[enemyType];
-    if (!name) {
+  addKillFeed(enemyType, elite = false) {
+    const baseName = FEED_NAMES[enemyType];
+    if (!baseName) {
       return;
     }
-    this._pushFeed(`kill:${enemyType}`, 'kill', (row) => {
+    const name = elite ? `Elite ${baseName}` : baseName;
+    this._pushFeed(`kill:${name}`, 'kill', (row) => {
       row.count += 1;
       row.label.textContent = name;
       row.value.textContent = row.count > 1 ? `×${row.count}` : '';
@@ -246,6 +251,16 @@ export class AAAHudLayout {
     this._pushFeed('xp', 'xp', (row) => {
       row.count += amount;
       row.label.textContent = `+${Math.round(row.count)} XP`;
+    });
+  }
+
+  /** Feed row announcing a collected field pickup, in the pickup's color. */
+  addPickupFeed(label, detail, color) {
+    this._pushFeed(`pickup:${label}`, 'pickup', (row) => {
+      row.el.style.color = color;
+      row.el.style.borderRightColor = color;
+      row.label.textContent = label;
+      row.value.textContent = detail;
     });
   }
 

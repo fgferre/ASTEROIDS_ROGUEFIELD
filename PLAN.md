@@ -159,7 +159,7 @@ tudo num browser."_ Fatias, cada uma um commit com captura; números como "propo
       aberração cromática em impactos grandes, faíscas direcionais; tudo lendo os eventos que já existem.
 - [x] **R2.6 SFX.** Compressor/limitador no master, reverb por bus, cues por inimigo novo (spawn, telegraph, morte),
       explosão em três tamanhos, música que sobe com camada/densidade e não só com boss.
-- [ ] **R2.7 Pickups à la VS.** Ímã (puxa todas as fagulhas), pulso (limpa a tela), sobrecarga (cadência ×2 por 8 s);
+- [x] **R2.7 Pickups à la VS.** Ímã (puxa todas as fagulhas), pulso (limpa a tela), sobrecarga (cadência ×2 por 8 s);
       caem de Elites e Wardens; HUD mostra o que caiu.
 
 ## Fora de escopo deste plano
