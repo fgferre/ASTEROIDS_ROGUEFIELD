@@ -14,10 +14,10 @@ the trend (per CONTEXT D-44).
 
 ## Log
 
-| Month   | Date       | Energy (1-10)        | Motivation (1-10)    | Fun (1-10)           | Notes                |
-| ------- | ---------- | -------------------- | -------------------- | -------------------- | -------------------- |
-| Month 1 | 2026-05-20 | — (declined)         | — (declined)         | — (declined)         | Abbreviated sign-off: developer reported overall "tudo ok" after live playtest sessions (2026-05-16→20) but declined numeric 1-10 ratings this month. No <5 distress signal reported. Per the loud-skip semantic above, this partial row IS the signal — resume full numeric ratings in Month 2 (backlog entry filed). |
+| Month   | Date       | Energy (1-10) | Motivation (1-10) | Fun (1-10)   | Notes                                                                                                                                                                                                                                                                                                                  |
+| ------- | ---------- | ------------- | ----------------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Month 1 | 2026-05-20 | — (declined)  | — (declined)      | — (declined) | Abbreviated sign-off: developer reported overall "tudo ok" after live playtest sessions (2026-05-16→20) but declined numeric 1-10 ratings this month. No <5 distress signal reported. Per the loud-skip semantic above, this partial row IS the signal — resume full numeric ratings in Month 2 (backlog entry filed). |
 
 ---
 
-*PROC-12 trigger: if Energy, Motivation, OR Fun rates <5 for 3 consecutive months, schedule a mandatory scope review. See .planning/REQUIREMENTS.md PROC-12.*
+_PROC-12 trigger: if Energy, Motivation, OR Fun rates <5 for 3 consecutive months, schedule a mandatory scope review. See .planning/REQUIREMENTS.md PROC-12._

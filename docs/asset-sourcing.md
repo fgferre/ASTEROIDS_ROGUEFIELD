@@ -56,12 +56,12 @@ correspond to the integrations already enumerated in
 Google Fonts Orbitron + Rajdhani, Lucide icons). Phase 2-6b plans append rows for
 any new sources.
 
-| Source | License | Attribution required | Attribution target | Audit date |
-|---|---|---|---|---|
-| NASA imagery (via `MenuBackgroundSystem.js` fetch) | Public domain (NASA media usage guidelines) | No (credit recommended but not required by NASA policy) | docs/credits.md (Phase 7) | 2026-05-13 |
-| Google Fonts — Orbitron | SIL Open Font License 1.1 (OFL) | No (when embedded as webfont; OFL bundle ships with font file regardless) | docs/credits.md (Phase 7) | 2026-05-13 |
-| Google Fonts — Rajdhani | SIL Open Font License 1.1 (OFL) | No (when embedded as webfont; OFL bundle ships with font file regardless) | docs/credits.md (Phase 7) | 2026-05-13 |
-| Lucide icons | ISC | No (ISC permits use without notice; credit recommended) | docs/credits.md (Phase 7) | 2026-05-13 |
+| Source                                             | License                                     | Attribution required                                                      | Attribution target        | Audit date |
+| -------------------------------------------------- | ------------------------------------------- | ------------------------------------------------------------------------- | ------------------------- | ---------- |
+| NASA imagery (via `MenuBackgroundSystem.js` fetch) | Public domain (NASA media usage guidelines) | No (credit recommended but not required by NASA policy)                   | docs/credits.md (Phase 7) | 2026-05-13 |
+| Google Fonts — Orbitron                            | SIL Open Font License 1.1 (OFL)             | No (when embedded as webfont; OFL bundle ships with font file regardless) | docs/credits.md (Phase 7) | 2026-05-13 |
+| Google Fonts — Rajdhani                            | SIL Open Font License 1.1 (OFL)             | No (when embedded as webfont; OFL bundle ships with font file regardless) | docs/credits.md (Phase 7) | 2026-05-13 |
+| Lucide icons                                       | ISC                                         | No (ISC permits use without notice; credit recommended)                   | docs/credits.md (Phase 7) | 2026-05-13 |
 
 **Audit cadence:** Phase 2-6b plans re-audit any row older than 6 months from the
 plan's start date. Lucide / Orbitron / Rajdhani are all under permissive licenses
@@ -104,4 +104,4 @@ audit table as its source of truth.
 
 ---
 
-*LOCK. See PROC-17 in .planning/REQUIREMENTS.md.*
+_LOCK. See PROC-17 in .planning/REQUIREMENTS.md._

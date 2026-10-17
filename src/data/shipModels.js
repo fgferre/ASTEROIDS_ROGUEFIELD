@@ -151,7 +151,7 @@ const createSvgDataUrl = (svgMarkup) => {
 
   const withoutBackground = sanitizedMarkup
     ? stripSolarSlicerBackground(sanitizedMarkup)
-      : '';
+    : '';
 
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
     withoutBackground

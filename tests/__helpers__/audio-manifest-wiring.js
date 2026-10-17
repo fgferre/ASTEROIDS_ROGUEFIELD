@@ -60,10 +60,7 @@ export function assertManagerWired(
 
   // (1) Entry exists.
   const entry = manifest.find((item) => item && item.name === serviceName);
-  expect(
-    entry,
-    `manifest has no entry named '${serviceName}'`
-  ).toBeDefined();
+  expect(entry, `manifest has no entry named '${serviceName}'`).toBeDefined();
   expect(Array.isArray(entry.dependencies)).toBe(true);
   expect(typeof entry.factory).toBe('function');
 

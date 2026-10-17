@@ -272,7 +272,9 @@ class PhysicsSystem extends BaseSystem {
         this.registerEnemy(asteroid);
       });
       this.bootstrapCompleted = true;
-      this.warnOnBossTrackingMismatch({ reason: 'bootstrap.forEachActiveEnemy' });
+      this.warnOnBossTrackingMismatch({
+        reason: 'bootstrap.forEachActiveEnemy',
+      });
       return;
     }
 

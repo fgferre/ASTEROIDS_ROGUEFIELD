@@ -2825,7 +2825,11 @@ class EnemySystem extends BaseSystem {
 
     const snapshotType =
       typeof snapshot.type === 'string' ? snapshot.type.toLowerCase() : null;
-    if (!snapshotType || snapshotType === 'asteroid' || snapshotType === 'boss') {
+    if (
+      !snapshotType ||
+      snapshotType === 'asteroid' ||
+      snapshotType === 'boss'
+    ) {
       return null;
     }
 
@@ -3051,10 +3055,7 @@ class EnemySystem extends BaseSystem {
           defeated: false,
           bossId: boss.id ?? this.bossHudState?.bossId ?? null,
           name:
-            boss.displayName ||
-            boss.name ||
-            this.bossHudState?.name ||
-            'Boss',
+            boss.displayName || boss.name || this.bossHudState?.name || 'Boss',
           phase,
           phaseCount: boss.phaseCount ?? this.bossHudState?.phaseCount ?? 0,
           health: boss.health ?? this.bossHudState?.health ?? 0,
@@ -3068,7 +3069,8 @@ class EnemySystem extends BaseSystem {
           invulnerabilityTimer: Number.isFinite(boss.invulnerabilityTimer)
             ? Math.max(0, Number(boss.invulnerabilityTimer))
             : null,
-          invulnerabilitySource: this.bossHudState?.invulnerabilitySource ?? null,
+          invulnerabilitySource:
+            this.bossHudState?.invulnerabilitySource ?? null,
         });
       }
 
@@ -3715,8 +3717,7 @@ class EnemySystem extends BaseSystem {
     }
 
     const enemyType = data.enemyType || data.type || data.enemy?.type || null;
-    const isBoss =
-      enemyType === 'boss' || this.isBossEnemy(data.enemy || null);
+    const isBoss = enemyType === 'boss' || this.isBossEnemy(data.enemy || null);
 
     if (!isBoss) {
       return;
@@ -3732,7 +3733,10 @@ class EnemySystem extends BaseSystem {
       typeof performance.now === 'function'
         ? performance.now()
         : Date.now();
-    if (this._lastBossHudDamageUpdate && now - this._lastBossHudDamageUpdate < 80) {
+    if (
+      this._lastBossHudDamageUpdate &&
+      now - this._lastBossHudDamageUpdate < 80
+    ) {
       return;
     }
 

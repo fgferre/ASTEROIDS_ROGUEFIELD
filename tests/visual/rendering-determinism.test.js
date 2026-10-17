@@ -121,8 +121,7 @@ describe('RenderingSystem RNG determinism', () => {
     );
     const bossOverlayFill = ctx.ops.find(
       (op) =>
-        op.type === 'fillRect' &&
-        op.fillStyle === 'rgba(255, 105, 140, 0.95)'
+        op.type === 'fillRect' && op.fillStyle === 'rgba(255, 105, 140, 0.95)'
     );
 
     expect(backgroundFill).toMatchObject({ tx: 0, ty: 0, angle: 0 });

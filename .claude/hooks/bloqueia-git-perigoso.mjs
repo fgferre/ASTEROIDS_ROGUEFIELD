@@ -20,23 +20,54 @@ import { readFileSync } from 'node:fs';
 const ALLOWED =
   "Allowed without asking: 'git push origin main:backup' and 'git push [-u] origin <branch>' " +
   "(or 'HEAD:<branch>') for any branch other than main. Pushing main publishes the site: ask the owner.";
-const FORCE = new Set(['-f', '--force', '--delete', '-d', '--force-if-includes']);
-const HARMLESS = new Set(['-u', '--set-upstream', '-q', '--quiet', '-v', '--verbose']);
+const FORCE = new Set([
+  '-f',
+  '--force',
+  '--delete',
+  '-d',
+  '--force-if-includes',
+]);
+const HARMLESS = new Set([
+  '-u',
+  '--set-upstream',
+  '-q',
+  '--quiet',
+  '-v',
+  '--verbose',
+]);
 const REF_NAME = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
 const REDIRECT_ATTACHED = /^(\d*>&\d+|\d*>>?\S+|\d*<\S+|&>>?\S+)$/;
 const REDIRECT_LOOSE = /^(\d*>>?|\d*<|&>>?)$/;
 const EXECUTORS = new Set([
-  'sh', 'bash', 'zsh', 'dash', 'eval', 'exec', 'env', 'command',
-  'xargs', 'sudo', 'nohup', 'timeout', 'time', 'nice', 'script',
+  'sh',
+  'bash',
+  'zsh',
+  'dash',
+  'eval',
+  'exec',
+  'env',
+  'command',
+  'xargs',
+  'sudo',
+  'nohup',
+  'timeout',
+  'time',
+  'nice',
+  'script',
 ]);
 
 function block(reason, hint = ALLOWED) {
-  process.stderr.write(`BLOCKED by bloqueia-git-perigoso: ${reason}\n${hint}\n`);
+  process.stderr.write(
+    `BLOCKED by bloqueia-git-perigoso: ${reason}\n${hint}\n`
+  );
   process.exit(2);
 }
 
 function segments(command) {
-  return command.split(/\n|;|&&|\|\||\|/).map((s) => s.trim()).filter(Boolean);
+  return command
+    .split(/\n|;|&&|\|\||\|/)
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 // shlex-like split: respects single/double quotes
@@ -71,8 +102,14 @@ function withoutRedirects(args) {
   const out = [];
   let skip = false;
   for (const a of args) {
-    if (skip) { skip = false; continue; }
-    if (REDIRECT_LOOSE.test(a)) { skip = true; continue; }
+    if (skip) {
+      skip = false;
+      continue;
+    }
+    if (REDIRECT_LOOSE.test(a)) {
+      skip = true;
+      continue;
+    }
     if (REDIRECT_ATTACHED.test(a)) continue;
     out.push(a);
   }
@@ -93,18 +130,27 @@ function judgePush(seg, args) {
   if (args.some((a) => FORCE.has(a) || a.startsWith('--force-with-lease'))) {
     block(`force push or remote branch deletion -> '${seg}'`);
   }
-  if (args.some((a) => a.startsWith('+'))) block(`'+' refspec forces the push -> '${seg}'`);
+  if (args.some((a) => a.startsWith('+')))
+    block(`'+' refspec forces the push -> '${seg}'`);
   const opts = args.filter((a) => a.startsWith('-'));
-  if (opts.some((o) => !HARMLESS.has(o))) block(`push option that hides the destination -> '${seg}'`);
+  if (opts.some((o) => !HARMLESS.has(o)))
+    block(`push option that hides the destination -> '${seg}'`);
   const targets = args.filter((a) => !a.startsWith('-'));
-  if (targets.length !== 2) block(`push without explicit remote and refspec -> '${seg}'`);
+  if (targets.length !== 2)
+    block(`push without explicit remote and refspec -> '${seg}'`);
   const dest = destinationOf(targets[1]);
-  if (dest === null || !REF_NAME.test(dest)) block(`push destination cannot be judged -> '${seg}'`);
-  if (dest === 'main' || dest.endsWith('/main')) block(`pushing main publishes the site -> '${seg}'`);
+  if (dest === null || !REF_NAME.test(dest))
+    block(`push destination cannot be judged -> '${seg}'`);
+  if (dest === 'main' || dest.endsWith('/main'))
+    block(`pushing main publishes the site -> '${seg}'`);
 }
 
 function judgeAdd(seg, args) {
-  if (args.some((a) => a === '-f' || a === '--force' || /^-[a-zA-Z]*f[a-zA-Z]*$/.test(a))) {
+  if (
+    args.some(
+      (a) => a === '-f' || a === '--force' || /^-[a-zA-Z]*f[a-zA-Z]*$/.test(a)
+    )
+  ) {
     block(
       `'git add --force' adds an ignored path -> '${seg}'`,
       'Ignored paths (.planning/, .claude/settings.local.json, logs) are ignored on purpose; ask the owner.'
@@ -128,7 +174,9 @@ function main() {
     const toks = tokens(seg);
     if (!toks.length) continue;
     if (toks[0] === 'git') {
-      const sub = toks.findIndex((t, i) => i > 0 && (t === 'push' || t === 'add'));
+      const sub = toks.findIndex(
+        (t, i) => i > 0 && (t === 'push' || t === 'add')
+      );
       if (sub === -1) continue;
       const args = withoutRedirects(toks.slice(sub + 1));
       if (toks[sub] === 'push') judgePush(seg, args);

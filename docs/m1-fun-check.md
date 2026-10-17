@@ -4,7 +4,7 @@ Phase 1 PROC-19 formal documentation of the informal M1 fun-check + post-Phase-0
 
 ## Method
 
-Single self-administered pass per FIX-*. For each of the four bugs surfaced by the informal M1 fun-check (FIX-01..04), the developer:
+Single self-administered pass per FIX-\*. For each of the four bugs surfaced by the informal M1 fun-check (FIX-01..04), the developer:
 
 1. Reads the Phase 0 evidence file for that fix (linked below).
 2. Reproduces the original M1 issue against the post-Phase-0 `main` build (`ce47a17` or later — the FIX-04 close commit).
@@ -54,10 +54,10 @@ Each issue was reproduced against the post-Phase-0 `main` build. The four subsec
 
 ## Scope note (D-34)
 
-This doc is **"bugs are gone"**, NOT **"loop is addictive."** Loop-addictiveness is the Phase 3.5 internal-loop-test territory — the trusted-circle members run that test (PROC-16), not the developer alone. Phase 1's m1-fun-check answers: *"did Phase 0 close the four bugs surfaced by the informal fun-check?"* It does NOT answer: *"is the M1-equivalent build addictive?"*
+This doc is **"bugs are gone"**, NOT **"loop is addictive."** Loop-addictiveness is the Phase 3.5 internal-loop-test territory — the trusted-circle members run that test (PROC-16), not the developer alone. Phase 1's m1-fun-check answers: _"did Phase 0 close the four bugs surfaced by the informal fun-check?"_ It does NOT answer: _"is the M1-equivalent build addictive?"_
 
 Per CONTEXT D-34, this doc resists scope creep toward addictiveness verdicts. If the verification surface during Task 3 reveals a non-bug observation that affects loop feel (pacing, satisfaction, etc.), that observation goes into `backlog.md` per PROC-09 — NOT into this doc's verdict column.
 
 ---
 
-*See PROC-19 in .planning/REQUIREMENTS.md.*
+_See PROC-19 in .planning/REQUIREMENTS.md._

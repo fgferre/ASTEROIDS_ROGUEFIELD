@@ -302,7 +302,9 @@ describe('boss damage feedback', () => {
 
     const activeEnemies = enemySystem.getActiveEnemies();
     const restoredBoss = activeEnemies.find((enemy) => enemy.type === 'boss');
-    const restoredSupport = activeEnemies.find((enemy) => enemy.type === 'drone');
+    const restoredSupport = activeEnemies.find(
+      (enemy) => enemy.type === 'drone'
+    );
 
     expect(restoredBoss?.[ASTEROID_POOL_ID]).toBe(41);
     expect(restoredSupport?.[ASTEROID_POOL_ID]).toBe(42);

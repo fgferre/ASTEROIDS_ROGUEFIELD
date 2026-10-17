@@ -13,7 +13,10 @@ export const BOSS_VISUAL_VARIANT = 'retro-saucer';
 
 const sanitizeSvgMarkup = (raw) => {
   if (typeof raw !== 'string') return '';
-  return raw.replace(/^<\?xml[^>]*>\s*/i, '').trim().replace(/\r\n/g, '\n');
+  return raw
+    .replace(/^<\?xml[^>]*>\s*/i, '')
+    .trim()
+    .replace(/\r\n/g, '\n');
 };
 
 const createBossSvgDataUrl = (svgMarkup) => {
@@ -45,7 +48,9 @@ export const BOSS_VISUAL_CONFIG = deepFreeze({
 });
 
 const _resolvedRenderStrategy =
-  BOSS_VISUAL_VARIANT === 'retro-saucer' ? 'svg-sprite-boss' : 'procedural-boss';
+  BOSS_VISUAL_VARIANT === 'retro-saucer'
+    ? 'svg-sprite-boss'
+    : 'procedural-boss';
 
 /**
  * Boss enemy configuration following canonical schema.

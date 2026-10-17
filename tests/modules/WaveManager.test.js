@@ -213,7 +213,9 @@ describe('WaveManager support enemy weights', () => {
         expect(manager.totalEnemiesThisWave).toBe(4);
 
         const boss = activeEnemies.find((enemy) => enemy.type === 'boss');
-        const supports = activeEnemies.filter((enemy) => enemy.type === 'drone');
+        const supports = activeEnemies.filter(
+          (enemy) => enemy.type === 'drone'
+        );
 
         expect(boss).toBeTruthy();
         expect(supports).toHaveLength(3);

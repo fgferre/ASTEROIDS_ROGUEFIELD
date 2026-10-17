@@ -651,11 +651,10 @@ export class EnemyUpdateSystem {
 
     const velocitySpeed = Math.hypot(asteroid.vx ?? 0, asteroid.vy ?? 0);
     const fallbackSpeed =
-      ASTEROID_SPEEDS?.[asteroid.size] ||
-      ASTEROID_SPEEDS?.medium ||
-      45;
+      ASTEROID_SPEEDS?.[asteroid.size] || ASTEROID_SPEEDS?.medium || 45;
     const speed = velocitySpeed > 0 ? velocitySpeed : fallbackSpeed;
-    const travelTime = (margin + (Number(asteroid.radius) || 0)) / Math.max(speed, 1);
+    const travelTime =
+      (margin + (Number(asteroid.radius) || 0)) / Math.max(speed, 1);
     const recoveryTime = Math.max(
       Number(ASTEROID_OFFSCREEN_RECOVERY_TIME) || 4,
       travelTime + 0.5

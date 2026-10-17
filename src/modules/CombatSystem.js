@@ -1395,11 +1395,12 @@ class CombatSystem extends BaseSystem {
 
     const healthRaw = Number(enemy?.health);
     const maxHealthRaw = Number(enemy?.maxHealth);
-    const targetHealth = Number.isFinite(healthRaw) && healthRaw > 0
-      ? healthRaw
-      : Number.isFinite(maxHealthRaw) && maxHealthRaw > 0
-        ? maxHealthRaw
-        : 1;
+    const targetHealth =
+      Number.isFinite(healthRaw) && healthRaw > 0
+        ? healthRaw
+        : Number.isFinite(maxHealthRaw) && maxHealthRaw > 0
+          ? maxHealthRaw
+          : 1;
 
     const needed = Math.max(1, Math.ceil(targetHealth / volleyDamage));
     return Math.min(shotCount, needed);
@@ -1673,9 +1674,8 @@ class CombatSystem extends BaseSystem {
       }
       if (!perEnemyCap.has(id)) {
         const allocated = this.computeAllocatedShots(enemy, playerStats);
-        const cap = Number.isFinite(allocated) && allocated > 0
-          ? allocated
-          : Infinity;
+        const cap =
+          Number.isFinite(allocated) && allocated > 0 ? allocated : Infinity;
         perEnemyCap.set(id, cap);
       }
       const cap = perEnemyCap.get(id);
@@ -1856,7 +1856,9 @@ class CombatSystem extends BaseSystem {
    */
   applyConcentratedFire(input, shotCount, playerStats) {
     if (!input || typeof input !== 'object') {
-      throw new Error('[CombatSystem] applyConcentratedFire requires an input object with a discriminator kind');
+      throw new Error(
+        '[CombatSystem] applyConcentratedFire requires an input object with a discriminator kind'
+      );
     }
 
     const count = Math.max(0, Math.floor(Number(shotCount) || 0));
@@ -1914,13 +1916,19 @@ class CombatSystem extends BaseSystem {
       for (let shotIndex = 0; shotIndex < count; shotIndex += 1) {
         const offsetIndex = shotIndex - slotCenter;
         const rawMagnitude = offsetIndex * spacing;
-        const magnitude = Math.max(-clampLimit, Math.min(clampLimit, rawMagnitude));
+        const magnitude = Math.max(
+          -clampLimit,
+          Math.min(clampLimit, rawMagnitude)
+        );
 
         const shotPerpX = perpX * magnitude;
         const shotPerpY = perpY * magnitude;
 
         results.push({
-          fireOrigin: { x: baseOriginX + shotPerpX, y: baseOriginY + shotPerpY },
+          fireOrigin: {
+            x: baseOriginX + shotPerpX,
+            y: baseOriginY + shotPerpY,
+          },
           aimPoint: { x: baseAimX + shotPerpX, y: baseAimY + shotPerpY },
         });
       }
@@ -1979,7 +1987,9 @@ class CombatSystem extends BaseSystem {
       return results;
     }
 
-    throw new Error(`[CombatSystem] applyConcentratedFire: invalid kind discriminator "${input.kind}"`);
+    throw new Error(
+      `[CombatSystem] applyConcentratedFire: invalid kind discriminator "${input.kind}"`
+    );
   }
 
   calculateDangerScore(
@@ -3434,8 +3444,7 @@ class CombatSystem extends BaseSystem {
     }
 
     // Predicted-impact marker — rank 2+.
-    const renderPredicted =
-      this.aimMode !== 'manual' && targetingRank >= 2;
+    const renderPredicted = this.aimMode !== 'manual' && targetingRank >= 2;
     if (
       renderPredicted &&
       this.predictedAimPoints.length &&
@@ -3598,8 +3607,12 @@ class CombatSystem extends BaseSystem {
     } else if (value === 'auto' && previousMode === 'manual') {
       // Restore behavioral flag snapshot (or re-enable from upgrade rank if no snapshot).
       if (this._aimModeFlagSnapshot) {
-        this.dangerScoreEnabled = this._aimModeFlagSnapshot.dangerScoreEnabled ?? (this.targetingUpgradeLevel >= 1);
-        this.dynamicPredictionEnabled = this._aimModeFlagSnapshot.dynamicPredictionEnabled ?? (this.targetingUpgradeLevel >= 2);
+        this.dangerScoreEnabled =
+          this._aimModeFlagSnapshot.dangerScoreEnabled ??
+          this.targetingUpgradeLevel >= 1;
+        this.dynamicPredictionEnabled =
+          this._aimModeFlagSnapshot.dynamicPredictionEnabled ??
+          this.targetingUpgradeLevel >= 2;
         this._aimModeFlagSnapshot = null;
       } else {
         this.dangerScoreEnabled = this.targetingUpgradeLevel >= 1;

@@ -21,4 +21,3 @@ export function deepFreeze(value) {
 
   return Object.freeze(value);
 }
-

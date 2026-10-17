@@ -192,7 +192,8 @@ const SETTINGS_SCHEMA = [
         key: 'toggleSpreadMode',
         type: 'binding',
         label: 'Toggle Spread Mode',
-        description: 'Switch between concentrated and fan burst shape (FIX-05).',
+        description:
+          'Switch between concentrated and fan burst shape (FIX-05).',
         default: {
           keyboard: [COMBAT_DEFAULT_KEYBIND_TOGGLE_SPREAD],
           gamepad: [],
@@ -206,7 +207,8 @@ const SETTINGS_SCHEMA = [
         key: 'toggleAimMode',
         type: 'binding',
         label: 'Toggle Aim Mode',
-        description: 'Switch between auto-aim and manual ship-nose aim (FIX-05).',
+        description:
+          'Switch between auto-aim and manual ship-nose aim (FIX-05).',
         default: {
           keyboard: [COMBAT_DEFAULT_KEYBIND_TOGGLE_AIM],
           gamepad: [],

@@ -54,7 +54,11 @@ export default [
       ...js.configs.recommended.rules,
       'no-unused-vars': [
         'warn',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrors: 'none' },
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrors: 'none',
+        },
       ],
       'no-empty': ['warn', { allowEmptyCatch: true }],
       'no-extra-boolean-cast': 'warn',

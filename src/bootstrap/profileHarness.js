@@ -167,11 +167,17 @@ function forceWaveNumber(enemiesService, requestedWave) {
   if (!enemiesService) return;
   const waveManager = enemiesService.waveManager;
   if (!waveManager) {
-    debugLog('[profileHarness] enemies.waveManager unavailable — skipping wave force');
+    debugLog(
+      '[profileHarness] enemies.waveManager unavailable — skipping wave force'
+    );
     return;
   }
   const numericWave =
-    requestedWave === 'boss' ? 5 : Number.isFinite(requestedWave) ? requestedWave : 1;
+    requestedWave === 'boss'
+      ? 5
+      : Number.isFinite(requestedWave)
+        ? requestedWave
+        : 1;
   try {
     // Mutate the field directly. If a future refactor adds a setter, the
     // field assignment still works because Object property writes call the
@@ -327,12 +333,9 @@ async function runDeferredScenario({ scenario, config, performanceMonitor }) {
           '../../tests/__helpers__/scriptedPlayer.js'
         );
 
-        const player =
-          services['player'] || services.player || null;
-        const combat =
-          services['combat'] || services.combat || null;
-        const enemies =
-          services['enemies'] || services.enemies || null;
+        const player = services['player'] || services.player || null;
+        const combat = services['combat'] || services.combat || null;
+        const enemies = services['enemies'] || services.enemies || null;
         const progression =
           services['progression'] || services.progression || null;
 

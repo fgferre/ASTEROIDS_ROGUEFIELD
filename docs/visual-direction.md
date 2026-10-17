@@ -6,7 +6,7 @@ This doc is the **taste anchor**, not the implementation spec. Per CONTEXT D-28,
 
 ## Mood references
 
-The three references below frame the visual ambition. They are *aesthetic concepts*, not specific imagery (the developer can drop local thumbnails into `docs/visual-direction/mood-NN-<descriptor>.png` later if Phase 6a wants concrete pulls).
+The three references below frame the visual ambition. They are _aesthetic concepts_, not specific imagery (the developer can drop local thumbnails into `docs/visual-direction/mood-NN-<descriptor>.png` later if Phase 6a wants concrete pulls).
 
 1. **Brutalismo Tecnológico** — Massive, angular geometric structures that prioritize scale and industrial functionality over decorative aesthetic. Applied here: ship hulls and asteroids read as functional / weighty / mass-bearing, not ornamental. Surfaces have purpose; nothing is sculpted for prettiness alone.
 
@@ -57,4 +57,4 @@ Visual direction is the **taste anchor**, not the implementation spec. Phase 6b 
 
 ---
 
-*First cut. Lock = before Phase 6a kickoff. See PROC-15 in .planning/REQUIREMENTS.md.*
+_First cut. Lock = before Phase 6a kickoff. See PROC-15 in .planning/REQUIREMENTS.md._

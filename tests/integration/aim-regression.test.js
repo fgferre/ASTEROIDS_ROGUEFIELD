@@ -24,7 +24,7 @@ import {
 import { GamePools } from '../../src/core/GamePools.js';
 import CombatSystem from '../../src/modules/CombatSystem.js';
 
-const AIM_REGRESSION_SEED = 0xA1A1;
+const AIM_REGRESSION_SEED = 0xa1a1;
 // Concern 4 moving-target constants. The target must (a) sit inside
 // COMBAT_TARGETING_RANGE (400 units), and (b) have a natural intercept time
 // that lands OUTSIDE the linear-prediction clamp [0.1, 0.6]s but inside (or
@@ -194,9 +194,7 @@ function captureVectorSet(combat, fireCount = 8) {
     combat.handleShooting(dt, stats);
   }
   const fired = combat.bullets.slice(before);
-  const angles = fired
-    .map((b) => Math.atan2(b.vy, b.vx))
-    .sort((a, b) => a - b);
+  const angles = fired.map((b) => Math.atan2(b.vy, b.vx)).sort((a, b) => a - b);
   return {
     count: fired.length,
     angles,
@@ -686,7 +684,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
       const playerPos = player.getPosition();
       const enemy = combat.currentTarget;
-      const centerAngle = Math.atan2(enemy.y - playerPos.y, enemy.x - playerPos.x);
+      const centerAngle = Math.atan2(
+        enemy.y - playerPos.y,
+        enemy.x - playerPos.x
+      );
       const angles = fired.map((b) => Math.atan2(b.vy, b.vx));
       // Angles bracket the centerline by ~0.15 rad each side (COMBAT_MULTISHOT_SPREAD_STEP = 0.3).
       const diffs = angles.map((a) => Math.abs(a - centerAngle));
@@ -709,7 +710,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
       const playerPos = player.getPosition();
       const enemy = combat.currentTarget;
-      const centerAngle = Math.atan2(enemy.y - playerPos.y, enemy.x - playerPos.x);
+      const centerAngle = Math.atan2(
+        enemy.y - playerPos.y,
+        enemy.x - playerPos.x
+      );
       fired.forEach((b) => {
         const a = Math.atan2(b.vy, b.vx);
         expect(Math.abs(a - centerAngle)).toBeLessThan(0.001);
@@ -817,7 +821,9 @@ describe('FIX-05 centerline invariant + toggles', () => {
       // core/GameConstants — `COMBAT_BULLET_RADIUS` is the gameplay-domain
       // alias the plan promised.
       const gameplay = await import('../../src/data/constants/gameplay.js');
-      const { BULLET_SIZE: coreBullet } = await import('../../src/core/GameConstants.js');
+      const { BULLET_SIZE: coreBullet } = await import(
+        '../../src/core/GameConstants.js'
+      );
       expect(gameplay.COMBAT_BULLET_RADIUS).toBeDefined();
       expect(gameplay.COMBAT_BULLET_RADIUS).toBe(coreBullet);
     });
@@ -836,12 +842,16 @@ describe('FIX-05 centerline invariant + toggles', () => {
     //       to be 'KeyG' — without actually wiring the single source of truth).
     it('C7a: settingsSchema toggleSpreadMode default keybind === COMBAT_DEFAULT_KEYBIND_TOGGLE_SPREAD', async () => {
       const gameplay = await import('../../src/data/constants/gameplay.js');
-      const { getSettingsSchema } = await import('../../src/data/settingsSchema.js');
+      const { getSettingsSchema } = await import(
+        '../../src/data/settingsSchema.js'
+      );
 
       const schema = getSettingsSchema();
       const controls = schema.find((cat) => cat.id === 'controls');
       expect(controls).toBeDefined();
-      const spreadField = controls.fields.find((f) => f.key === 'toggleSpreadMode');
+      const spreadField = controls.fields.find(
+        (f) => f.key === 'toggleSpreadMode'
+      );
       expect(spreadField).toBeDefined();
       expect(spreadField.default?.keyboard).toBeDefined();
       // Layer 1: runtime equality.
@@ -852,7 +862,9 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
     it('C7a: settingsSchema toggleAimMode default keybind === COMBAT_DEFAULT_KEYBIND_TOGGLE_AIM', async () => {
       const gameplay = await import('../../src/data/constants/gameplay.js');
-      const { getSettingsSchema } = await import('../../src/data/settingsSchema.js');
+      const { getSettingsSchema } = await import(
+        '../../src/data/settingsSchema.js'
+      );
 
       const schema = getSettingsSchema();
       const controls = schema.find((cat) => cat.id === 'controls');
@@ -951,7 +963,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
       // Compute the expected centerline = the un-offset predicted aim.
       const player = combat.getCachedPlayer();
       const playerPos = player.getPosition();
-      const predicted = combat.getPredictedTargetPosition(baseEnemy, playerPos) || {
+      const predicted = combat.getPredictedTargetPosition(
+        baseEnemy,
+        playerPos
+      ) || {
         x: baseEnemy.x,
         y: baseEnemy.y,
       };
@@ -1005,13 +1020,20 @@ describe('FIX-05 centerline invariant + toggles', () => {
 
       // Centerline = un-offset predicted aim for the primary target.
       const playerPos = player.getPosition();
-      const predicted = combat.getPredictedTargetPosition(baseEnemy, playerPos) || {
+      const predicted = combat.getPredictedTargetPosition(
+        baseEnemy,
+        playerPos
+      ) || {
         x: baseEnemy.x,
         y: baseEnemy.y,
       };
 
-      expect(Math.abs(captured.centerlineTarget.x - predicted.x)).toBeLessThan(0.0001);
-      expect(Math.abs(captured.centerlineTarget.y - predicted.y)).toBeLessThan(0.0001);
+      expect(Math.abs(captured.centerlineTarget.x - predicted.x)).toBeLessThan(
+        0.0001
+      );
+      expect(Math.abs(captured.centerlineTarget.y - predicted.y)).toBeLessThan(
+        0.0001
+      );
     });
   });
 
@@ -1118,7 +1140,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
       // All angles must be near-identical (parallel-lane invariant).
       const playerPos = player.getPosition();
       const target = combat.currentTarget;
-      const centerAngle = Math.atan2(target.y - playerPos.y, target.x - playerPos.x);
+      const centerAngle = Math.atan2(
+        target.y - playerPos.y,
+        target.x - playerPos.x
+      );
       fired.forEach((b) => {
         const a = Math.atan2(b.vy, b.vx);
         expect(Math.abs(a - centerAngle)).toBeLessThan(0.001);
@@ -1158,7 +1183,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
         combat._warnedManualAimNoAngle = false;
         // Force the cooldown to clear immediately so this fire goes through.
         combat.lastShotTime = combat.shootCooldown;
-        combat.handleShooting(combat.shootCooldown + 0.001, { multishot: 1, damage: 10 });
+        combat.handleShooting(combat.shootCooldown + 0.001, {
+          multishot: 1,
+          damage: 10,
+        });
         broken.getAngle = savedGetAngle;
       } finally {
         console.warn = originalWarn;
@@ -1405,11 +1433,21 @@ describe('FIX-05 centerline invariant + toggles', () => {
         isDead: false,
         isRetrying: false,
         _quitExplosionHidden: false,
-        getPosition() { return { ...playerPos }; },
-        getVelocity() { return { x: 0, y: 0 }; },
-        getAngle() { return 0; },
-        getRotation() { return 0; },
-        getHullBoundingRadius() { return 16; },
+        getPosition() {
+          return { ...playerPos };
+        },
+        getVelocity() {
+          return { x: 0, y: 0 };
+        },
+        getAngle() {
+          return 0;
+        },
+        getRotation() {
+          return 0;
+        },
+        getHullBoundingRadius() {
+          return 16;
+        },
         getNosePosition(rotation) {
           const angle = Number.isFinite(rotation) ? rotation : 0;
           return {
@@ -1417,11 +1455,19 @@ describe('FIX-05 centerline invariant + toggles', () => {
             y: playerPos.y + Math.sin(angle) * 16,
           };
         },
-        getStats() { return { multishot: 3, damage: 10 }; },
+        getStats() {
+          return { multishot: 3, damage: 10 };
+        },
       };
       const enemies = { forEachActiveEnemy() {} };
       const physics = { forEachBulletCollision: () => {} };
-      const combat = new CombatSystem({ eventBus, random, player, enemies, physics });
+      const combat = new CombatSystem({
+        eventBus,
+        random,
+        player,
+        enemies,
+        physics,
+      });
       combat.setSpreadMode('concentrated');
       combat.setAimMode('manual');
 
@@ -1450,11 +1496,21 @@ describe('FIX-05 centerline invariant + toggles', () => {
         isDead: false,
         isRetrying: false,
         _quitExplosionHidden: false,
-        getPosition() { return { ...playerPos }; },
-        getVelocity() { return { x: 0, y: 0 }; },
-        getAngle() { return 0; },
-        getRotation() { return 0; },
-        getHullBoundingRadius() { return 16; },
+        getPosition() {
+          return { ...playerPos };
+        },
+        getVelocity() {
+          return { x: 0, y: 0 };
+        },
+        getAngle() {
+          return 0;
+        },
+        getRotation() {
+          return 0;
+        },
+        getHullBoundingRadius() {
+          return 16;
+        },
         getNosePosition(rotation) {
           const angle = Number.isFinite(rotation) ? rotation : 0;
           return {
@@ -1462,11 +1518,19 @@ describe('FIX-05 centerline invariant + toggles', () => {
             y: playerPos.y + Math.sin(angle) * 16,
           };
         },
-        getStats() { return { multishot: 1, damage: 10 }; },
+        getStats() {
+          return { multishot: 1, damage: 10 };
+        },
       };
       const enemies = { forEachActiveEnemy() {} };
       const physics = { forEachBulletCollision: () => {} };
-      const combat = new CombatSystem({ eventBus, random, player, enemies, physics });
+      const combat = new CombatSystem({
+        eventBus,
+        random,
+        player,
+        enemies,
+        physics,
+      });
       combat.setAimMode('manual');
 
       const before = combat.bullets.length;
@@ -1556,7 +1620,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
     // calls so we can assert which visual elements were drawn.
     function makeCtxStub() {
       const calls = [];
-      const record = (name) => (...args) => calls.push({ name, args });
+      const record =
+        (name) =>
+        (...args) =>
+          calls.push({ name, args });
       return {
         calls,
         save: record('save'),
@@ -1573,12 +1640,24 @@ describe('FIX-05 centerline invariant + toggles', () => {
         translate: record('translate'),
         createRadialGradient: () => ({ addColorStop: () => {} }),
         // Settable state — getters/setters as plain assignments.
-        set fillStyle(v) { calls.push({ name: 'set:fillStyle', args: [v] }); },
-        set strokeStyle(v) { calls.push({ name: 'set:strokeStyle', args: [v] }); },
-        set lineWidth(v) { calls.push({ name: 'set:lineWidth', args: [v] }); },
-        set globalAlpha(v) { calls.push({ name: 'set:globalAlpha', args: [v] }); },
-        set globalCompositeOperation(v) { calls.push({ name: 'set:gco', args: [v] }); },
-        set font(v) { calls.push({ name: 'set:font', args: [v] }); },
+        set fillStyle(v) {
+          calls.push({ name: 'set:fillStyle', args: [v] });
+        },
+        set strokeStyle(v) {
+          calls.push({ name: 'set:strokeStyle', args: [v] });
+        },
+        set lineWidth(v) {
+          calls.push({ name: 'set:lineWidth', args: [v] });
+        },
+        set globalAlpha(v) {
+          calls.push({ name: 'set:globalAlpha', args: [v] });
+        },
+        set globalCompositeOperation(v) {
+          calls.push({ name: 'set:gco', args: [v] });
+        },
+        set font(v) {
+          calls.push({ name: 'set:font', args: [v] });
+        },
         canvas: { width: 800, height: 600 },
       };
     }
@@ -1733,7 +1812,9 @@ describe('FIX-05 centerline invariant + toggles', () => {
       const uniqueEnemyPositions = new Set();
       assignments.forEach((a) => {
         if (a && a.enemy) {
-          uniqueEnemyPositions.add(`${Math.round(a.enemy.x)},${Math.round(a.enemy.y)}`);
+          uniqueEnemyPositions.add(
+            `${Math.round(a.enemy.x)},${Math.round(a.enemy.y)}`
+          );
         }
       });
       expect(uniqueEnemyPositions.size).toBeGreaterThanOrEqual(2);
@@ -1916,7 +1997,9 @@ describe('FIX-05 centerline invariant + toggles', () => {
     }
 
     it('autorepeat (5 keydown with no keyup) → 1 emit; release + repress → 1 more emit', async () => {
-      const { default: InputSystem } = await import('../../src/modules/InputSystem.js');
+      const { default: InputSystem } = await import(
+        '../../src/modules/InputSystem.js'
+      );
       const container = createTestContainer('debounce-seed');
       const eventBus = container.resolve('event-bus');
 
@@ -2066,30 +2149,58 @@ describe('FIX-05 centerline invariant + toggles', () => {
     it('C2 allocator: HP=50/dmg=100/multi=4 → allocates 1 (matches burst count)', () => {
       const { combat } = setupCombatHarness({ multishot: 4, damage: 100 });
       const enemy = {
-        id: 'tiny-1', x: 600, y: 300, radius: 8,
-        health: 50, maxHealth: 50, variant: 'common', size: 'small',
+        id: 'tiny-1',
+        x: 600,
+        y: 300,
+        radius: 8,
+        health: 50,
+        maxHealth: 50,
+        variant: 'common',
+        size: 'small',
       };
-      const allocated = combat.computeAllocatedShots(enemy, { damage: 100, multishot: 4 });
+      const allocated = combat.computeAllocatedShots(enemy, {
+        damage: 100,
+        multishot: 4,
+      });
       expect(allocated).toBe(1);
     });
 
     it('C2 allocator: HP=500/dmg=100/multi=4 → allocates 4 (does NOT under-fire mid-HP)', () => {
       const { combat } = setupCombatHarness({ multishot: 4, damage: 100 });
       const enemy = {
-        id: 'mid-1', x: 600, y: 300, radius: 18,
-        health: 500, maxHealth: 500, variant: 'common', size: 'medium',
+        id: 'mid-1',
+        x: 600,
+        y: 300,
+        radius: 18,
+        health: 500,
+        maxHealth: 500,
+        variant: 'common',
+        size: 'medium',
       };
-      const allocated = combat.computeAllocatedShots(enemy, { damage: 100, multishot: 4 });
+      const allocated = combat.computeAllocatedShots(enemy, {
+        damage: 100,
+        multishot: 4,
+      });
       expect(allocated).toBe(4);
     });
 
     it('C2 allocator: HP=1500/dmg=10/multi=4 → allocates 4 (high-HP, full multishot)', () => {
       const { combat } = setupCombatHarness({ multishot: 4, damage: 10 });
       const enemy = {
-        id: 'boss-1', x: 600, y: 300, radius: 64,
-        health: 1500, maxHealth: 1500, variant: 'common', size: 'large', type: 'boss',
+        id: 'boss-1',
+        x: 600,
+        y: 300,
+        radius: 64,
+        health: 1500,
+        maxHealth: 1500,
+        variant: 'common',
+        size: 'large',
+        type: 'boss',
       };
-      const allocated = combat.computeAllocatedShots(enemy, { damage: 10, multishot: 4 });
+      const allocated = combat.computeAllocatedShots(enemy, {
+        damage: 10,
+        multishot: 4,
+      });
       expect(allocated).toBe(4);
     });
   });
@@ -2108,7 +2219,11 @@ describe('FIX-05 centerline invariant + toggles', () => {
     // wire it manually so `computeLockCount` sees the player's multishot
     // (otherwise it falls back to 1 and rank-3 collapses to 1 lock).
     function makeRank3Combat(extraEnemies = []) {
-      const harness = setupCombatHarness({ multishot: 4, damage: 100, extraEnemies });
+      const harness = setupCombatHarness({
+        multishot: 4,
+        damage: 100,
+        extraEnemies,
+      });
       const { combat, eventBus, playerState } = harness;
       eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
       eventBus.emit('upgrade-aiming-suite', { level: 2 });
@@ -2294,7 +2409,11 @@ describe('FIX-05 centerline invariant + toggles', () => {
   // "render + predicted markers + multi-lock indicators reflect what fires".
   describe('Finding 1: buildLockAssignments per-enemy cap is upstream', () => {
     function makeRank3Combat(extraEnemies = []) {
-      const harness = setupCombatHarness({ multishot: 4, damage: 100, extraEnemies });
+      const harness = setupCombatHarness({
+        multishot: 4,
+        damage: 100,
+        extraEnemies,
+      });
       const { combat, eventBus, playerState } = harness;
       eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
       eventBus.emit('upgrade-aiming-suite', { level: 2 });
@@ -2389,7 +2508,10 @@ describe('FIX-05 centerline invariant + toggles', () => {
     // Helper: minimal canvas-2d stub that records strokeStyle assignments.
     function makePaletteCtxStub() {
       const calls = [];
-      const record = (name) => (...args) => calls.push({ name, args });
+      const record =
+        (name) =>
+        (...args) =>
+          calls.push({ name, args });
       return {
         calls,
         save: record('save'),
@@ -2405,12 +2527,24 @@ describe('FIX-05 centerline invariant + toggles', () => {
         rotate: record('rotate'),
         translate: record('translate'),
         createRadialGradient: () => ({ addColorStop: () => {} }),
-        set fillStyle(v) { calls.push({ name: 'set:fillStyle', args: [v] }); },
-        set strokeStyle(v) { calls.push({ name: 'set:strokeStyle', args: [v] }); },
-        set lineWidth(v) { calls.push({ name: 'set:lineWidth', args: [v] }); },
-        set globalAlpha(v) { calls.push({ name: 'set:globalAlpha', args: [v] }); },
-        set globalCompositeOperation(v) { calls.push({ name: 'set:gco', args: [v] }); },
-        set font(v) { calls.push({ name: 'set:font', args: [v] }); },
+        set fillStyle(v) {
+          calls.push({ name: 'set:fillStyle', args: [v] });
+        },
+        set strokeStyle(v) {
+          calls.push({ name: 'set:strokeStyle', args: [v] });
+        },
+        set lineWidth(v) {
+          calls.push({ name: 'set:lineWidth', args: [v] });
+        },
+        set globalAlpha(v) {
+          calls.push({ name: 'set:globalAlpha', args: [v] });
+        },
+        set globalCompositeOperation(v) {
+          calls.push({ name: 'set:gco', args: [v] });
+        },
+        set font(v) {
+          calls.push({ name: 'set:font', args: [v] });
+        },
         canvas: { width: 800, height: 600 },
       };
     }
@@ -2471,7 +2605,9 @@ describe('FIX-05 centerline invariant + toggles', () => {
       combat.render(ctx);
 
       const styles = strokeStylesFor(ctx).map(String);
-      const matchesCyan = styles.some((s) => s.toLowerCase().includes('00f2ff'));
+      const matchesCyan = styles.some((s) =>
+        s.toLowerCase().includes('00f2ff')
+      );
       expect(matchesCyan).toBe(true);
     });
 
@@ -2495,7 +2631,9 @@ describe('FIX-05 centerline invariant + toggles', () => {
       combat.render(ctx);
 
       const styles = strokeStylesFor(ctx).map(String);
-      const matchesAmber = styles.some((s) => s.toLowerCase().includes('ffa800'));
+      const matchesAmber = styles.some((s) =>
+        s.toLowerCase().includes('ffa800')
+      );
       expect(matchesAmber).toBe(true);
     });
   });
@@ -2517,7 +2655,11 @@ describe('FIX-05 centerline invariant + toggles', () => {
   // still locks the contract observable from outside.
   describe('Finding 2: filtered assignments use correct N-lane geometry', () => {
     function makeRank3Combat(extraEnemies = []) {
-      const harness = setupCombatHarness({ multishot: 4, damage: 100, extraEnemies });
+      const harness = setupCombatHarness({
+        multishot: 4,
+        damage: 100,
+        extraEnemies,
+      });
       const { combat, eventBus, playerState } = harness;
       eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
       eventBus.emit('upgrade-aiming-suite', { level: 2 });
@@ -2572,9 +2714,11 @@ describe('FIX-05 centerline invariant + toggles', () => {
       const perpX = -aimDy / aimDist;
       const perpY = aimDx / aimDist;
       // Project each bullet origin's offset from playerPos onto perp.
-      const perp0 = (created[0].from.x - playerPos.x) * perpX +
+      const perp0 =
+        (created[0].from.x - playerPos.x) * perpX +
         (created[0].from.y - playerPos.y) * perpY;
-      const perp1 = (created[1].from.x - playerPos.x) * perpX +
+      const perp1 =
+        (created[1].from.x - playerPos.x) * perpX +
         (created[1].from.y - playerPos.y) * perpY;
       const spread = Math.abs(perp1 - perp0);
 
@@ -2611,7 +2755,11 @@ describe('FIX-05 centerline invariant + toggles', () => {
   // multishot budget, total ≤ multishot, lock count === fired count.
   describe('Fix-pass-3 smoke check (rank 3, 1 tiny + 1 boss, 1 burst)', () => {
     function makeRank3Combat(extraEnemies = []) {
-      const harness = setupCombatHarness({ multishot: 4, damage: 100, extraEnemies });
+      const harness = setupCombatHarness({
+        multishot: 4,
+        damage: 100,
+        extraEnemies,
+      });
       const { combat, eventBus, playerState } = harness;
       eventBus.emit('upgrade-aiming-suite', { resetWeights: true, level: 1 });
       eventBus.emit('upgrade-aiming-suite', { level: 2 });
@@ -2662,20 +2810,28 @@ describe('FIX-05 centerline invariant + toggles', () => {
       console.log('[SMOKE] enemies:');
       enemies.forEach((e) => {
         // eslint-disable-next-line no-console
-        console.log(`  ${e.id}: pos=(${e.x}, ${e.y}) r=${e.radius} hp=${e.health}/${e.maxHealth}`);
+        console.log(
+          `  ${e.id}: pos=(${e.x}, ${e.y}) r=${e.radius} hp=${e.health}/${e.maxHealth}`
+        );
       });
       // eslint-disable-next-line no-console
       console.log(`[SMOKE] OBSERVED bullet count: ${created.length}`);
       // eslint-disable-next-line no-console
-      console.log(`[SMOKE] OBSERVED currentLockAssignments.length: ${combat.currentLockAssignments.length}`);
+      console.log(
+        `[SMOKE] OBSERVED currentLockAssignments.length: ${combat.currentLockAssignments.length}`
+      );
       // eslint-disable-next-line no-console
-      console.log('[SMOKE] OBSERVED currentLockAssignments enemies:',
-        combat.currentLockAssignments.map((a) => a.enemy?.id));
+      console.log(
+        '[SMOKE] OBSERVED currentLockAssignments enemies:',
+        combat.currentLockAssignments.map((a) => a.enemy?.id)
+      );
       // eslint-disable-next-line no-console
       console.log('[SMOKE] OBSERVED per-bullet `to` positions:');
       created.forEach((p, i) => {
         // eslint-disable-next-line no-console
-        console.log(`  bullet[${i}]: to=(${p.to.x.toFixed(2)}, ${p.to.y.toFixed(2)}) from=(${p.from.x.toFixed(2)}, ${p.from.y.toFixed(2)})`);
+        console.log(
+          `  bullet[${i}]: to=(${p.to.x.toFixed(2)}, ${p.to.y.toFixed(2)}) from=(${p.from.x.toFixed(2)}, ${p.from.y.toFixed(2)})`
+        );
       });
       // Compute which enemy each bullet is closest to.
       created.forEach((p, i) => {
@@ -2687,7 +2843,9 @@ describe('FIX-05 centerline invariant + toggles', () => {
         const distTiny = Math.sqrt(dxT * dxT + dyT * dyT);
         const nearest = distBoss < distTiny ? 'boss' : 'tiny';
         // eslint-disable-next-line no-console
-        console.log(`  bullet[${i}] nearest enemy: ${nearest} (boss=${distBoss.toFixed(2)} tiny=${distTiny.toFixed(2)})`);
+        console.log(
+          `  bullet[${i}] nearest enemy: ${nearest} (boss=${distBoss.toFixed(2)} tiny=${distTiny.toFixed(2)})`
+        );
       });
 
       // === Headline assertions ===

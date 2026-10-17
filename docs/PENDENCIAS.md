@@ -6,11 +6,12 @@ Número é identidade, não posição: item novo entra no fim da sua seção. **
 
 ## O BASTÃO — onde a rodada parou (17/10) — DIAGNÓSTICO FEITO, JEITO DE TRABALHAR IMPORTADO, NADA VISUAL MUDOU AINDA
 
-Palavras dele (17/10): *"revise tudo e vamos melhorar o projeto como um todo, sinto que estamos presos no passado
-ainda... tudo muito amador... dos gráficos até as dinâmicas e efeitos, UX tudo ruim"*; e *"precisamos começar a
-trabalhar mais inteligentemente"* — importar o jeito de trabalhar do Mar de Estrelas.
+Palavras dele (17/10): _"revise tudo e vamos melhorar o projeto como um todo, sinto que estamos presos no passado
+ainda... tudo muito amador... dos gráficos até as dinâmicas e efeitos, UX tudo ruim"_; e _"precisamos começar a
+trabalhar mais inteligentemente"_ — importar o jeito de trabalhar do Mar de Estrelas.
 
 **Feito nesta rodada (ramo `claude/session-011CUZwFkeqHg4syYX2GsSkg`, não publicado — publicar é dele):**
+
 - `AGENTS.md` e `CLAUDE.md` reescritos no molde do Mar de Estrelas; `.claude/` (settings, hook que barra push na
   `main` e `git add -f`, agentes Explore/worker) agora versionado; `BACKLOG.md` (30 linhas) no lugar do `backlog.md`.
 - Portões: `npm run done` = lint + formatação + testes + build (o mesmo que o CI); `npm run gate` para o commit
@@ -24,9 +25,9 @@ jogo parecer com o menu; depois passo fixo no loop e as dinâmicas. Cada etapa t
 
 ## Jogabilidade e sensação
 
-- **(1)** *"dos gráficos até as dinâmicas e efeitos, UX tudo ruim"* (17/10). O que o diagnóstico achou está em
+- **(1)** _"dos gráficos até as dinâmicas e efeitos, UX tudo ruim"_ (17/10). O que o diagnóstico achou está em
   `PLAN.md`; este item fecha quando ele disser, jogando, que não está mais amador.
-- **(2)** Boss da wave 5 levou ~120 s para morrer com 6 upgrades — *"difícil, mas dá"* (maio/2026). Alvo era 60–90 s.
+- **(2)** Boss da wave 5 levou ~120 s para morrer com 6 upgrades — _"difícil, mas dá"_ (maio/2026). Alvo era 60–90 s.
 
 ## Visual
 
@@ -41,6 +42,6 @@ jogo parecer com o menu; depois passo fixo no loop e as dinâmicas. Cada etapa t
 
 ## Desempenho
 
-- **(6)** Ele abriu o DevTools *"justamente porque estava lento demais"* (17/10). O trace mostrou `gameLoop` a 377 ms,
+- **(6)** Ele abriu o DevTools _"justamente porque estava lento demais"_ (17/10). O trace mostrou `gameLoop` a 377 ms,
   mas o jogo roda a ~5 ms de render em headless; o suspeito é o log de depuração (um `console.log` por evento, dezenas
   por quadro) somado ao profiler. Falta medir na máquina dele com `?debugLogging=0` antes de concluir.

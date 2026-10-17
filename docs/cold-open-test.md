@@ -10,7 +10,7 @@ Phase 1 PROC-20 first-30-seconds developer self-test on a fresh `npm run dev` se
 4. Stopwatch the first 30 seconds; record observations at 0s, 5s, 10s, 15s, 30s.
 5. Capture friction points: any >2s confusion or "what should I do?" moment.
 
-**Self-administered — NOT a user test** per CONTEXT D-37. Phase 3.5 (trusted-circle internal-loop) and Phase 8 (closed beta) produce user-test evidence. Phase 1's cold-open test surfaces *blockers a trusted-circle test would surface but more cheaply* — loading hangs, missing input cues, illegible first-frame UI.
+**Self-administered — NOT a user test** per CONTEXT D-37. Phase 3.5 (trusted-circle internal-loop) and Phase 8 (closed beta) produce user-test evidence. Phase 1's cold-open test surfaces _blockers a trusted-circle test would surface but more cheaply_ — loading hangs, missing input cues, illegible first-frame UI.
 
 ## Evidence
 
@@ -22,13 +22,13 @@ Phase 1 PROC-20 first-30-seconds developer self-test on a fresh `npm run dev` se
 
 > **Note (2026-05-20):** abbreviated developer sign-off. Detailed stopwatch observation was declined this session; rows below are reconstructed from the live debug + playtest sessions of 2026-05-16→20. The headline finding (0% loading hang) was reproduced and diagnosed in-session with full evidence.
 
-| t   | What loaded                       | What player sees                  | Friction (>2s confusion?)         |
-| --- | --------------------------------- | --------------------------------- | --------------------------------- |
-| 0s  | **WITHOUT `?desktop=force`: boot halts — loading screen stuck at 0% indefinitely** (mobileGuard false positive, see Verdict). With the flag: Vite + module graph loads normally | "ASTEROID ROGUEFIELD" title + 0% progress bar | **YES — fatal on affected machines** (see Verdict row 1) |
-| 5s  | (with flag) menu + Three.js background loaded | Hull selection (Default Interceptor / Solar Slicer) + START/OPTIONS/CREDITS | none reported |
-| 10s | (with flag) run started | Ship + first asteroids, combat readable | none reported |
-| 15s | (no notable change since previous row) | (no notable change since previous row) | none reported |
-| 30s | (with flag) combat underway | XP orbs dropping/collected, wave progressing | none reported |
+| t   | What loaded                                                                                                                                                                     | What player sees                                                            | Friction (>2s confusion?)                                |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------- |
+| 0s  | **WITHOUT `?desktop=force`: boot halts — loading screen stuck at 0% indefinitely** (mobileGuard false positive, see Verdict). With the flag: Vite + module graph loads normally | "ASTEROID ROGUEFIELD" title + 0% progress bar                               | **YES — fatal on affected machines** (see Verdict row 1) |
+| 5s  | (with flag) menu + Three.js background loaded                                                                                                                                   | Hull selection (Default Interceptor / Solar Slicer) + START/OPTIONS/CREDITS | none reported                                            |
+| 10s | (with flag) run started                                                                                                                                                         | Ship + first asteroids, combat readable                                     | none reported                                            |
+| 15s | (no notable change since previous row)                                                                                                                                          | (no notable change since previous row)                                      | none reported                                            |
+| 30s | (with flag) combat underway                                                                                                                                                     | XP orbs dropping/collected, wave progressing                                | none reported                                            |
 
 If a row has nothing notable to add (e.g., the 15s state is unchanged from 10s), replace that row's contents with `(no notable change since previous row)` rather than leave the placeholder.
 
@@ -44,12 +44,12 @@ For each friction point observed in the per-timestamp log, assign a disposition:
 
 Per the "polish-perfect not content-complete" philosophy (CONTEXT specifics + Phase 0 lessons), `fix-now` should be rare. Most friction items defer to Phase 6/7 polish work.
 
-| Friction point                                                | Disposition                                                 |
-| ------------------------------------------------------------- | ----------------------------------------------------------- |
+| Friction point                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Disposition                                                                                                                                                                                                                                                                                                          |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Loading hangs at 0% on Windows desktops where `navigator.maxTouchPoints > 0` (most modern Win10/11 machines — Touch APIs enabled without a physical touch screen). Root cause: `mobileGuard.isTouchDevice()` single-signal `maxTouchPoints` probe trips A11Y-08 block; the "Desktop only" canvas notice is then hidden UNDER the DOM loading overlay, so the player sees a silent 0% hang with no explanation. Diagnosed live 2026-05-16→20 (preview browser + developer's Chrome both reproduced; `?desktop=force` confirmed as workaround). | `accept` for Phase 1 close (dev workaround exists; documented in `backlog.md`) — **BUT must be fixed before Phase 3.5 internal-loop test**: trusted-circle testers on touch-capable Windows laptops would hit a silent fatal hang. Backlog entry carries the fix sketch (multi-signal detection + DOM-level notice). |
 
 Additional rows are added by the developer at Task 3 (one row per friction point observed in the per-timestamp log). If no friction points are observed, replace the single placeholder row with `| (no friction points observed in 30s window) | accept |`.
 
 ---
 
-*Self-test, not user test. See PROC-20 in .planning/REQUIREMENTS.md.*
+_Self-test, not user test. See PROC-20 in .planning/REQUIREMENTS.md._

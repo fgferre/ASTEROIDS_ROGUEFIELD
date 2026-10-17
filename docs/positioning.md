@@ -14,11 +14,11 @@ Asteroid Roguefield is a top-down asteroid-arena roguelite where every run combi
 
 Three closest-feel competitors. The visual references the developer named (Chorus, House of the Dying Sun, Everspace, Nova Drift, lone.AI, Metori) live in `docs/visual-direction.md` as visual mood anchors — the three below are the **mechanic / audience** competitors.
 
-1. **Vampire Survivors** — *Audience overlap:* players who love watching a build escalate, dying in chaos, and immediately starting over with a tweaked combination. They tolerate sparse narrative if the loop feels addictive. *Distinct angle:* Asteroid Roguefield has explicit player control (aim, dodge, manage shield) instead of VS's auto-attack; the 5-tag synergy taxonomy gives more directed build-crafting than VS's mostly-passive evolution path; runs are shorter (8-12 min vs 20-30 min) so the "one more" cadence hits faster.
+1. **Vampire Survivors** — _Audience overlap:_ players who love watching a build escalate, dying in chaos, and immediately starting over with a tweaked combination. They tolerate sparse narrative if the loop feels addictive. _Distinct angle:_ Asteroid Roguefield has explicit player control (aim, dodge, manage shield) instead of VS's auto-attack; the 5-tag synergy taxonomy gives more directed build-crafting than VS's mostly-passive evolution path; runs are shorter (8-12 min vs 20-30 min) so the "one more" cadence hits faster.
 
-2. **Hades** — *Audience overlap:* players who expect a roguelite to have polish, weighty hitstop, satisfying impact feedback, and a clear meta-progression curve. They reward craft. *Distinct angle:* Asteroid Roguefield trades Hades's narrative density and isometric-action genre for a top-down asteroid-arena shooter; meta-power is capped at ≤15% of run ceiling (per PROJECT.md decision) so unlocks stay flavor over necessity; no voice acting, no story-mode pretension — content scope is VS+, not Hades-AAA.
+2. **Hades** — _Audience overlap:_ players who expect a roguelite to have polish, weighty hitstop, satisfying impact feedback, and a clear meta-progression curve. They reward craft. _Distinct angle:_ Asteroid Roguefield trades Hades's narrative density and isometric-action genre for a top-down asteroid-arena shooter; meta-power is capped at ≤15% of run ceiling (per PROJECT.md decision) so unlocks stay flavor over necessity; no voice acting, no story-mode pretension — content scope is VS+, not Hades-AAA.
 
-3. **Nova Drift** — *Audience overlap:* this is the closest genre-mate. Players who already love Asteroids-style arena combat with deep build evolution. *Distinct angle:* Nova Drift's modifiers are mostly self-contained per-build; Asteroid Roguefield's 5-tag synergy taxonomy is explicit and combinatorial — 3-of-a-tag triggers a named bonus, so the player can SEE the build forming. The status × status interaction matrix (16 cells, all explicit per GAME-07) adds layer Nova Drift doesn't pursue.
+3. **Nova Drift** — _Audience overlap:_ this is the closest genre-mate. Players who already love Asteroids-style arena combat with deep build evolution. _Distinct angle:_ Nova Drift's modifiers are mostly self-contained per-build; Asteroid Roguefield's 5-tag synergy taxonomy is explicit and combinatorial — 3-of-a-tag triggers a named bonus, so the player can SEE the build forming. The status × status interaction matrix (16 cells, all explicit per GAME-07) adds layer Nova Drift doesn't pursue.
 
 ## Distinctive promise (1-2 sentences)
 
@@ -45,10 +45,10 @@ Private link sharing of the same GitHub Pages URL with the PROC-16 trusted circl
 - Switch to itch.io (Restricted → Public flow via `butler` upload).
 - Hybrid (e.g., GitHub Pages mirror + itch.io storefront).
 
-*Steam (incl. Steam Next Fest) was considered and excluded at the developer's call 2026-05-13 — aligns with PROJECT.md Out-of-Scope row "Steam release in v2 — itch.io only; Steam considered for future milestone".*
+_Steam (incl. Steam Next Fest) was considered and excluded at the developer's call 2026-05-13 — aligns with PROJECT.md Out-of-Scope row "Steam release in v2 — itch.io only; Steam considered for future milestone"._
 
 PROC-02 (itch.io page draft) and PROC-06 (`build:itch` npm packaging script) are **deferred to Phase 8** per CONTEXT D-24 revised 2026-05-13 — those packaging artifacts are surface-specific and don't get built until the launch surface is chosen. The Phase 8 deliverable lives in `docs/launch-surface-decision-{date}.md` per ROADMAP Phase 8 Success Criterion 5.
 
 ---
 
-*Internal. Phase 7/8 distill into public copy. See PROC-18 in .planning/REQUIREMENTS.md.*
+_Internal. Phase 7/8 distill into public copy. See PROC-18 in .planning/REQUIREMENTS.md._

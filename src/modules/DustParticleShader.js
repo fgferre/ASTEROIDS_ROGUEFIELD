@@ -34,5 +34,5 @@ export const DustParticleShader = {
 
       gl_FragColor = vec4(dustColor, alpha);
     }
-  `
+  `,
 };

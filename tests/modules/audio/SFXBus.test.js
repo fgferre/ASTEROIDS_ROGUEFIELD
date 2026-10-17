@@ -152,9 +152,7 @@ describe('SFXBus ambient/protected bus topology (D-14: player sounds never duck)
     const { bus, effectsGain } = makeInitializedBus();
     expect(bus.protectedBus.connect).toHaveBeenCalledWith(effectsGain);
     // It must NOT route through the duck node.
-    expect(bus.protectedBus.connect).not.toHaveBeenCalledWith(
-      bus.ambientBus
-    );
+    expect(bus.protectedBus.connect).not.toHaveBeenCalledWith(bus.ambientBus);
   });
 
   it('the protected destination is NOT the effectsDuckGain node', () => {
@@ -239,7 +237,9 @@ describe('SFXBus owns the batcher port (cycle closes locally — no facade back-
 describe('SFXBus has zero god-class coupling (T-02-12)', () => {
   it('the SFXBus source contains no this.audioSystem reference', () => {
     const src = readFileSync(
-      fileURLToPath(new URL('../../../src/modules/audio/SFXBus.js', import.meta.url)),
+      fileURLToPath(
+        new URL('../../../src/modules/audio/SFXBus.js', import.meta.url)
+      ),
       'utf8'
     );
     expect(src.includes('this.audioSystem')).toBe(false);
@@ -247,7 +247,9 @@ describe('SFXBus has zero god-class coupling (T-02-12)', () => {
 
   it('the SFXBus source builds the port via createSfxSynthPort from its own methods', () => {
     const src = readFileSync(
-      fileURLToPath(new URL('../../../src/modules/audio/SFXBus.js', import.meta.url)),
+      fileURLToPath(
+        new URL('../../../src/modules/audio/SFXBus.js', import.meta.url)
+      ),
       'utf8'
     );
     expect(src).toMatch(/createSfxSynthPort\(\{/);

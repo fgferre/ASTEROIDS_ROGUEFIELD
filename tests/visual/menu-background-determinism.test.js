@@ -176,14 +176,24 @@ describe('MenuBackgroundSystem THREE UUID determinism', () => {
 
 function createAtmosphereTHREEStub() {
   class Vector3 {
-    constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
+    constructor(x = 0, y = 0, z = 0) {
+      this.x = x;
+      this.y = y;
+      this.z = z;
+    }
   }
 
   return {
     AdditiveBlending: 2,
-    Color: class { constructor() {} },
-    PlaneGeometry: class { constructor() {} },
-    ShaderMaterial: class { constructor() {} },
+    Color: class {
+      constructor() {}
+    },
+    PlaneGeometry: class {
+      constructor() {}
+    },
+    ShaderMaterial: class {
+      constructor() {}
+    },
     Mesh: class {
       constructor() {
         this.position = new Vector3();
@@ -192,15 +202,26 @@ function createAtmosphereTHREEStub() {
       }
     },
     BufferGeometry: class {
-      constructor() { this._attrs = {}; }
-      setAttribute(name, attr) { this._attrs[name] = attr; }
+      constructor() {
+        this._attrs = {};
+      }
+      setAttribute(name, attr) {
+        this._attrs[name] = attr;
+      }
     },
     BufferAttribute: class {
-      constructor(array, itemSize) { this.array = array; this.itemSize = itemSize; }
+      constructor(array, itemSize) {
+        this.array = array;
+        this.itemSize = itemSize;
+      }
     },
-    PointsMaterial: class { constructor() {} },
+    PointsMaterial: class {
+      constructor() {}
+    },
     Points: class {
-      constructor(geometry) { this.geometry = geometry; }
+      constructor(geometry) {
+        this.geometry = geometry;
+      }
     },
   };
 }

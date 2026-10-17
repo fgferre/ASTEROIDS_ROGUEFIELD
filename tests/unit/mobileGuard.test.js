@@ -1,15 +1,5 @@
-import {
-  describe,
-  it,
-  expect,
-  beforeEach,
-  afterEach,
-  vi,
-} from 'vitest';
-import {
-  setupGlobalMocks,
-  cleanupGlobalState,
-} from '../__helpers__/setup.js';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { setupGlobalMocks, cleanupGlobalState } from '../__helpers__/setup.js';
 import { mobileGuard } from '../../src/bootstrap/mobileGuard.js';
 
 // A11Y-08 detection contract lock per CONTEXT D-07.
@@ -105,9 +95,7 @@ function stubDeviceProfile({
       };
 
   vi.stubGlobal('document', {
-    getElementById: vi.fn((id) =>
-      id === 'game-canvas' ? canvasStub : null
-    ),
+    getElementById: vi.fn((id) => (id === 'game-canvas' ? canvasStub : null)),
   });
 
   return { ctxStub, canvasStub, fillRectMock, fillTextMock, measureTextMock };

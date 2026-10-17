@@ -963,7 +963,8 @@ class PlayerSystem extends BaseSystem {
 
   getHullThrusterPort(kind, hullDefinition = this.currentHull) {
     const hullPorts =
-      hullDefinition?.thrusterPorts && typeof hullDefinition.thrusterPorts === 'object'
+      hullDefinition?.thrusterPorts &&
+      typeof hullDefinition.thrusterPorts === 'object'
         ? hullDefinition.thrusterPorts
         : null;
     const preferredPort =
@@ -1018,7 +1019,10 @@ class PlayerSystem extends BaseSystem {
         try {
           callback();
         } catch (error) {
-          console.warn('[PlayerSystem] Hull visual ready callback failed:', error);
+          console.warn(
+            '[PlayerSystem] Hull visual ready callback failed:',
+            error
+          );
         }
       });
     };
@@ -1060,9 +1064,12 @@ class PlayerSystem extends BaseSystem {
     const height = Number.isFinite(visual.height) ? Math.abs(visual.height) : 0;
     const offsetX = Number.isFinite(visual.offset?.x) ? visual.offset.x : 0;
     const offsetY = Number.isFinite(visual.offset?.y) ? visual.offset.y : 0;
-    const spriteRadius = Math.hypot(width / 2, height / 2) + Math.hypot(offsetX, offsetY);
+    const spriteRadius =
+      Math.hypot(width / 2, height / 2) + Math.hypot(offsetX, offsetY);
 
-    return spriteRadius > 0 ? Math.max(metrics.boundingRadius, spriteRadius) : metrics.boundingRadius;
+    return spriteRadius > 0
+      ? Math.max(metrics.boundingRadius, spriteRadius)
+      : metrics.boundingRadius;
   }
 
   renderLegacyHullModel(ctx, hullDefinition = this.currentHull) {
@@ -1075,7 +1082,9 @@ class PlayerSystem extends BaseSystem {
       NeonGraphics.drawShape(ctx, metrics.outlinePath, '#00FF88', 1.5);
     }
 
-    const accents = Array.isArray(hullDefinition?.accents) ? hullDefinition.accents : [];
+    const accents = Array.isArray(hullDefinition?.accents)
+      ? hullDefinition.accents
+      : [];
     if (accents.length > 0) {
       accents.forEach((polygon) => {
         const path = buildClosedPath(polygon);
@@ -1106,12 +1115,19 @@ class PlayerSystem extends BaseSystem {
   }
 
   renderSpriteHullModel(ctx, hullDefinition = this.currentHull, options = {}) {
-    if (!ctx || !hullDefinition?.visual || hullDefinition.visual.type !== 'svg-sprite') {
+    if (
+      !ctx ||
+      !hullDefinition?.visual ||
+      hullDefinition.visual.type !== 'svg-sprite'
+    ) {
       return false;
     }
 
     const visual = hullDefinition.visual;
-    const visualState = this.prepareHullVisual(hullDefinition, options.onVisualReady);
+    const visualState = this.prepareHullVisual(
+      hullDefinition,
+      options.onVisualReady
+    );
     if (!visualState || visualState.status !== 'loaded' || !visualState.image) {
       return false;
     }
@@ -1123,8 +1139,12 @@ class PlayerSystem extends BaseSystem {
     }
 
     const image = visualState.image;
-    const naturalWidth = Number.isFinite(image?.naturalWidth) ? image.naturalWidth : 0;
-    const naturalHeight = Number.isFinite(image?.naturalHeight) ? image.naturalHeight : 0;
+    const naturalWidth = Number.isFinite(image?.naturalWidth)
+      ? image.naturalWidth
+      : 0;
+    const naturalHeight = Number.isFinite(image?.naturalHeight)
+      ? image.naturalHeight
+      : 0;
     const normalizedSourceBounds =
       visual.sourceBounds &&
       Number.isFinite(visual.sourceBounds.x) &&
@@ -1149,9 +1169,12 @@ class PlayerSystem extends BaseSystem {
     if (normalizedSourceBounds && naturalWidth > 0 && naturalHeight > 0) {
       sourceX = naturalWidth * normalizedSourceBounds.x;
       sourceY = naturalHeight * normalizedSourceBounds.y;
-      sourceWidth = naturalWidth * Math.min(normalizedSourceBounds.width, 1 - normalizedSourceBounds.x);
+      sourceWidth =
+        naturalWidth *
+        Math.min(normalizedSourceBounds.width, 1 - normalizedSourceBounds.x);
       sourceHeight =
-        naturalHeight * Math.min(normalizedSourceBounds.height, 1 - normalizedSourceBounds.y);
+        naturalHeight *
+        Math.min(normalizedSourceBounds.height, 1 - normalizedSourceBounds.y);
     }
 
     const offsetX = Number.isFinite(visual.offset?.x) ? visual.offset.x : 0;
@@ -1233,14 +1256,23 @@ class PlayerSystem extends BaseSystem {
       return false;
     }
 
-    const previewWidth = Number.isFinite(options.width) ? options.width : canvas.width;
-    const previewHeight = Number.isFinite(options.height) ? options.height : canvas.height;
-    const padding = Number.isFinite(options.padding) ? Math.max(0, options.padding) : 10;
+    const previewWidth = Number.isFinite(options.width)
+      ? options.width
+      : canvas.width;
+    const previewHeight = Number.isFinite(options.height)
+      ? options.height
+      : canvas.height;
+    const padding = Number.isFinite(options.padding)
+      ? Math.max(0, options.padding)
+      : 10;
     const visualRadius = this.getHullVisualRadius(hullDefinition);
     const maxRadius = Math.max(1, visualRadius);
     const safeWidth = Math.max(1, previewWidth - padding * 2);
     const safeHeight = Math.max(1, previewHeight - padding * 2);
-    const scale = Math.min(safeWidth / (maxRadius * 2), safeHeight / (maxRadius * 2));
+    const scale = Math.min(
+      safeWidth / (maxRadius * 2),
+      safeHeight / (maxRadius * 2)
+    );
 
     if (options.clear !== false) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);

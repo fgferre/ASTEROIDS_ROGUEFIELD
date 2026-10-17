@@ -29,7 +29,9 @@ export function resolveService(name, dependencies = {}) {
 
 export function resolveEventBus(dependencies = {}) {
   const byKey =
-    dependencies?.['event-bus'] || dependencies?.eventBus || dependencies?.events;
+    dependencies?.['event-bus'] ||
+    dependencies?.eventBus ||
+    dependencies?.events;
   if (byKey) {
     return byKey;
   }

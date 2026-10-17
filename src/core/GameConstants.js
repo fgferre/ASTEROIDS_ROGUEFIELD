@@ -55,7 +55,7 @@ export const PHYSICS_CELL_SIZE = 96;
 // === PROGRESSÃO ===
 export const PROGRESSION_INITIAL_LEVEL = 1;
 export const PROGRESSION_INITIAL_XP_REQUIREMENT = 150;
-export const PROGRESSION_LEVEL_SCALING = 1.40;
+export const PROGRESSION_LEVEL_SCALING = 1.4;
 export const PROGRESSION_UPGRADE_ROLL_COUNT = 3;
 export const PROGRESSION_UPGRADE_FALLBACK_COUNT = 3;
 export const PROGRESSION_COMBO_TIMEOUT = 3.0;
@@ -74,7 +74,7 @@ export const UPGRADE_BOSS_HEALTH_SCALAR = 0.18;
 // reflected as a lethality risk. HP scaling alone meets the "boss not melted
 // by 15-upgrade builds" goal; damage scaling can be re-introduced in a later
 // phase if 15-upgrade builds trivialize the boss after HP scaling is in place.
-export const UPGRADE_BOSS_DAMAGE_SCALAR = 0.00;
+export const UPGRADE_BOSS_DAMAGE_SCALAR = 0.0;
 
 // Re-export all constants from focused files for backward compatibility
 export * from '../data/constants/physics.js';

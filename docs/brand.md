@@ -16,6 +16,7 @@ The two coexist intentionally — the repo / GitHub Pages path stays on the code
 The original PROJECT.md row "Project codename ≠ launch title — Atari trademark risk on 'Asteroids' word" assumed the only path was a fully different name. The developer's call here is **lighter**: drop the plural ("Asteroids") and the genre word "field" stays — `Asteroid Roguefield` (singular) is the launch title because trademark law does not let anyone monopolize common nouns (you can't trademark "pedra" or "water" or "asteroid" as standalone descriptors; Atari's mark is on the specific brand "Asteroids" applied to video games / entertainment, not the noun itself).
 
 The risk surface is therefore narrower than the original 3-candidate exercise implied. The developer accepts:
+
 - The name is descriptive (asteroid + roguelike + field), not invented.
 - Atari's mark would only become a concern if a launch surface (itch.io / Steam) flagged it; in that case the fallback is to add a distinguishing prefix or stylization (`AR: Roguefield`, `Roguefield`, etc.).
 - Phase 7 attorney clearance pass remains the safety net — it confirms the chosen name doesn't conflict and produces the final lockup.
@@ -24,7 +25,7 @@ The risk surface is therefore narrower than the original 3-candidate exercise im
 
 ## Tagline (first cut)
 
-**Working tagline:** *Can you beat the field?*
+**Working tagline:** _Can you beat the field?_
 
 One-liner that invites the loop without overselling. Direction kept short / kinetic / asking-the-player. Phase 7 trusted-circle pass may refine, but this carries through closed beta as-is.
 
@@ -47,4 +48,4 @@ Direction (Claude-recommended per developer request "sugestao sua relevante e cr
 
 ---
 
-*Name chosen Phase 1; final brand assets (capsule art + logo + attorney clearance) lock Phase 7. See .planning/REQUIREMENTS.md PROC-13.*
+_Name chosen Phase 1; final brand assets (capsule art + logo + attorney clearance) lock Phase 7. See .planning/REQUIREMENTS.md PROC-13._

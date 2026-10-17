@@ -27,7 +27,9 @@ describe('boss visual variant', () => {
   });
 
   it('BOSS_VISUAL_CONFIG has a valid data URL source', () => {
-    expect(BOSS_VISUAL_CONFIG.source).toMatch(/^data:image\/svg\+xml;charset=utf-8,/);
+    expect(BOSS_VISUAL_CONFIG.source).toMatch(
+      /^data:image\/svg\+xml;charset=utf-8,/
+    );
   });
 
   it('BOSS_VISUAL_CONFIG dimensions are positive and proportional to SVG viewBox', () => {

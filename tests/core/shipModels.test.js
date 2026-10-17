@@ -21,7 +21,9 @@ describe('shipModels', () => {
     expect(getShipModelById('missing-hull').id).toBe(DEFAULT_HULL_ID);
 
     expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy.mock.calls[0][0]).toContain('Unknown hull id "missing-hull"');
+    expect(warnSpy.mock.calls[0][0]).toContain(
+      'Unknown hull id "missing-hull"'
+    );
   });
 
   it('strips the full-canvas background path from the solar slicer sprite source', () => {

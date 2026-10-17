@@ -291,10 +291,9 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
   function expectDelegates(event, payload, method, argMatcher) {
     const { audio, eventBus } = resolveRealAudioService();
     expect(audio.sfxBus, 'audio service must compose an SFXBus').toBeDefined();
-    expect(
-      typeof audio.sfxBus[method],
-      `SFXBus must expose '${method}'`
-    ).toBe('function');
+    expect(typeof audio.sfxBus[method], `SFXBus must expose '${method}'`).toBe(
+      'function'
+    );
 
     const spy = vi.spyOn(audio.sfxBus, method);
     eventBus.emit(event, payload);
@@ -310,7 +309,11 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
   }
 
   it('weapon-fired → playLaserShot', () => {
-    expectDelegates('weapon-fired', { targeting: { lockCount: 1 } }, 'playLaserShot');
+    expectDelegates(
+      'weapon-fired',
+      { targeting: { lockCount: 1 } },
+      'playLaserShot'
+    );
   });
 
   it('combat-target-lock → playTargetLock', () => {
@@ -334,9 +337,14 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
   });
 
   it('xp-orb-fused → playOrbFusion', () => {
-    expectDelegates('xp-orb-fused', { toClass: 'xp-green' }, 'playOrbFusion', (call) => {
-      expect(call[0]).toBe('xp-green');
-    });
+    expectDelegates(
+      'xp-orb-fused',
+      { toClass: 'xp-green' },
+      'playOrbFusion',
+      (call) => {
+        expect(call[0]).toBe('xp-green');
+      }
+    );
   });
 
   it('enemy-spawned (gold) → playGoldSpawn', () => {
@@ -356,11 +364,19 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
   });
 
   it('mine-exploded → playMineExplosion', () => {
-    expectDelegates('mine-exploded', { radius: 120, damage: 40 }, 'playMineExplosion');
+    expectDelegates(
+      'mine-exploded',
+      { radius: 120, damage: 40 },
+      'playMineExplosion'
+    );
   });
 
   it('bullet-hit (damage) → playBulletHit', () => {
-    expectDelegates('bullet-hit', { effectiveDamage: 5, killed: false }, 'playBulletHit');
+    expectDelegates(
+      'bullet-hit',
+      { effectiveDamage: 5, killed: false },
+      'playBulletHit'
+    );
   });
 
   it('bullet-hit (boss invuln deflect) → playBossShieldDeflect', () => {
@@ -400,9 +416,14 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
   });
 
   it('upgrade-applied → playUpgradeSelect', () => {
-    expectDelegates('upgrade-applied', { rarity: 'rare' }, 'playUpgradeSelect', (call) => {
-      expect(call[0]).toBe('rare');
-    });
+    expectDelegates(
+      'upgrade-applied',
+      { rarity: 'rare' },
+      'playUpgradeSelect',
+      (call) => {
+        expect(call[0]).toBe('rare');
+      }
+    );
   });
 
   it('input-confirmed → playUISelect', () => {

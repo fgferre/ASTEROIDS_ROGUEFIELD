@@ -443,7 +443,9 @@ describe('GameSessionService lifecycle flows', () => {
         },
         progression: { level: 3 },
         enemies: {
-          bosses: [{ id: restoredBoss.id, poolId: restoredBoss[ASTEROID_POOL_ID] }],
+          bosses: [
+            { id: restoredBoss.id, poolId: restoredBoss[ASTEROID_POOL_ID] },
+          ],
           supportEnemies: [],
           waves: [],
         },

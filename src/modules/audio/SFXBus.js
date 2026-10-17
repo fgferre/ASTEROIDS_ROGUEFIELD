@@ -1431,10 +1431,7 @@ class SFXBus {
             this.randomScopes.families.shield ||
             this.randomScopes.base ||
             null;
-          const rng = this._resolveRandom(
-            bufferRandom,
-            this.randomScopes.base
-          );
+          const rng = this._resolveRandom(bufferRandom, this.randomScopes.base);
           const noiseSample =
             typeof rng.range === 'function'
               ? rng.range(-1, 1)

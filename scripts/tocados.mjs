@@ -59,7 +59,10 @@ function importMap() {
     for (const m of code.matchAll(importRe)) {
       const spec = m[1] ?? m[2];
       if (!spec || !spec.startsWith('.')) continue;
-      const target = relative(ROOT, resolve(dirname(testFile), spec)).replace(/\\/g, '/');
+      const target = relative(ROOT, resolve(dirname(testFile), spec)).replace(
+        /\\/g,
+        '/'
+      );
       if (!target.startsWith('src/')) continue;
       if (!map.has(target)) map.set(target, new Set());
       map.get(target).add(relative(ROOT, testFile).replace(/\\/g, '/'));
@@ -76,7 +79,11 @@ if (files.length === 0) {
 
 if (files.some(isSharedTestInfra)) {
   process.stdout.write('shared test infra touched: running the whole suite\n');
-  const r = spawnSync('npx', ['vitest', 'run'], { cwd: ROOT, stdio: 'inherit', shell: true });
+  const r = spawnSync('npx', ['vitest', 'run'], {
+    cwd: ROOT,
+    stdio: 'inherit',
+    shell: true,
+  });
   process.exit(r.status ?? 1);
 }
 
@@ -107,6 +114,12 @@ if (list.length === 0) {
   process.stdout.write('no tests cover the touched files\n');
   process.exit(0);
 }
-process.stdout.write(`tests for touched files (${list.length}):\n${list.map((t) => `  ${t}`).join('\n')}\n`);
-const r = spawnSync('npx', ['vitest', 'run', ...list], { cwd: ROOT, stdio: 'inherit', shell: true });
+process.stdout.write(
+  `tests for touched files (${list.length}):\n${list.map((t) => `  ${t}`).join('\n')}\n`
+);
+const r = spawnSync('npx', ['vitest', 'run', ...list], {
+  cwd: ROOT,
+  stdio: 'inherit',
+  shell: true,
+});
 process.exit(r.status ?? 1);

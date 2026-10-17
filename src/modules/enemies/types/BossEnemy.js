@@ -220,7 +220,8 @@ export class BossEnemy extends BaseEnemy {
     const waveScaled =
       baseHealth * Math.pow(Math.max(1, scaling), waveNumber - 1);
     const upgradeLevelSum = this._resolveUpgradeLevelSum(config);
-    const upgradeHealthFactor = 1 + UPGRADE_BOSS_HEALTH_SCALAR * upgradeLevelSum; // FIX-04
+    const upgradeHealthFactor =
+      1 + UPGRADE_BOSS_HEALTH_SCALAR * upgradeLevelSum; // FIX-04
     this.upgradeLevelSum = upgradeLevelSum;
     this.maxHealth = Math.ceil(waveScaled * upgradeHealthFactor);
     this.health = config.currentHealth ?? this.maxHealth;
@@ -232,7 +233,8 @@ export class BossEnemy extends BaseEnemy {
       config.contactDamage ?? defaults.contactDamage ?? 45;
     const baseProjectileDamage =
       config.projectileDamage ?? defaults.projectileDamage ?? 35;
-    const upgradeDamageFactor = 1 + UPGRADE_BOSS_DAMAGE_SCALAR * upgradeLevelSum; // FIX-04
+    const upgradeDamageFactor =
+      1 + UPGRADE_BOSS_DAMAGE_SCALAR * upgradeLevelSum; // FIX-04
     this.contactDamage = Math.round(baseContactDamage * upgradeDamageFactor);
     this.projectileDamage = Math.round(
       baseProjectileDamage * upgradeDamageFactor
@@ -417,11 +419,12 @@ export class BossEnemy extends BaseEnemy {
     }
     const services = this.system?.dependencies ?? this.system ?? {};
     const progression = services.progression ?? services.progressionService;
-    const upgrades = (typeof progression?.getAllUpgrades === 'function')
-      ? progression.getAllUpgrades()
-      : (progression?.appliedUpgrades instanceof Map
-        ? progression.appliedUpgrades
-        : null);
+    const upgrades =
+      typeof progression?.getAllUpgrades === 'function'
+        ? progression.getAllUpgrades()
+        : progression?.appliedUpgrades instanceof Map
+          ? progression.appliedUpgrades
+          : null;
     if (!upgrades || typeof upgrades.values !== 'function') {
       return 0;
     }
