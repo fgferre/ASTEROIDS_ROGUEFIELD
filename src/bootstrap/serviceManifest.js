@@ -12,6 +12,8 @@ import EffectsSystem from '../modules/EffectsSystem.js';
 import AudioSystem from '../modules/AudioSystem.js';
 import WorldSystem from '../modules/WorldSystem.js';
 import RenderingSystem from '../modules/RenderingSystem.js';
+import Renderer3D from '../modules/render3d/Renderer3D.js';
+import { getRendererMode } from '../modules/render3d/rendererMode.js';
 import MenuBackgroundSystem from '../modules/MenuBackgroundSystem.js';
 import { GamePools } from '../core/GamePools.js';
 import { GarbageCollectionManager } from '../core/GarbageCollectionManager.js';
@@ -645,6 +647,21 @@ export function createServiceManifest(context = {}) {
       },
     },
     {
+      name: 'menu-background',
+      singleton: true,
+      lazy: false,
+      dependencies: ['event-bus', 'settings', 'random'],
+      factory: ({ resolved, container }) => {
+        const serviceResolver = createServiceResolver(container);
+        return new MenuBackgroundSystem({
+          eventBus: resolved['event-bus'],
+          settings: resolved['settings'],
+          random: resolved['random'],
+          serviceResolver,
+        });
+      },
+    },
+    {
       name: 'renderer',
       singleton: true,
       lazy: false,
@@ -658,9 +675,15 @@ export function createServiceManifest(context = {}) {
         'combat',
         'enemies',
         'random',
+        'menu-background',
       ],
-      factory: ({ resolved }) =>
-        new RenderingSystem({
+      // docs/NORTE.md §4b: Three.js by default, `?renderer=2d` for Canvas 2D.
+      factory: ({ resolved }) => {
+        const Renderer =
+          (context.rendererMode ?? getRendererMode()) === '3d'
+            ? Renderer3D
+            : RenderingSystem;
+        return new Renderer({
           eventBus: resolved['event-bus'],
           player: resolved['player'],
           progression: resolved['progression'],
@@ -670,20 +693,7 @@ export function createServiceManifest(context = {}) {
           combat: resolved['combat'],
           enemies: resolved['enemies'],
           random: resolved['random'],
-        }),
-    },
-    {
-      name: 'menu-background',
-      singleton: true,
-      lazy: false,
-      dependencies: ['event-bus', 'settings', 'random'],
-      factory: ({ resolved, container }) => {
-        const serviceResolver = createServiceResolver(container);
-        return new MenuBackgroundSystem({
-          eventBus: resolved['event-bus'],
-          settings: resolved['settings'],
-          random: resolved['random'],
-          serviceResolver,
+          'menu-background': resolved['menu-background'],
         });
       },
     },

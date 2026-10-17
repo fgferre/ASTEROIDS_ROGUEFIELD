@@ -4,7 +4,7 @@ Lista viva do que está aberto, nas palavras do dono. Leia só a seção O BAST�
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 7.**
 
-## O BASTÃO — onde a rodada parou (17/10, noite) — ETAPAS 1–5, 7 E 8 FEITAS; FALTA SÓ A 6 (DECISÕES DELE); NÃO PUBLICADAS
+## O BASTÃO — onde a rodada parou (17/10, noite) — TODAS AS ETAPAS DO PLANO FEITAS COMO PROPOSTA, INCLUINDO O SALTO 3D; NÃO PUBLICADAS
 
 Palavras dele (17/10): _"transformar isso num jogo maravilhoso para as próximas gerações de videogame"_; _"como se
 fosse uma versão nova para uma plataforma nova... com as melhores placas de vídeo"_; _"tudo em inglês"_.
@@ -23,6 +23,11 @@ fosse uma versão nova para uma plataforma nova... com as melhores placas de ví
 - Etapas 7 e 8 — engenharia: sem Math.random solto, um só modo dev, flags de legado fora, dependências falham cedo,
   relógio de simulação, gravação e replay de runs (F9 baixa; `?replay=`), testes de cenário jogável.
 - Jogo todo em inglês.
+
+**O salto (17/10, noite), a pedido dele:** o jogo agora é desenhado em Three.js — rochas 3D com luz dentro, câmera
+perspectiva com follow, zoom e dolly, nave 3D, bloom real. `?renderer=2d` volta ao Canvas 2D. Controles: A/D
+deslocam de lado e o nariz segue a mira (`?controls=classic` volta ao antigo). Dash em Shift. Famílias de upgrade
+com sinergia. Vitória no Warden 15. Tudo isso ele ainda não viu rodando na máquina dele.
 
 **O que ele precisa fazer na máquina dele:** jogar uma run inteira e dizer, por tela, o que ainda parece amador;
 comparar fluidez com e sem `?renderScale=1`; conferir se a 144 Hz o movimento repete quadros.

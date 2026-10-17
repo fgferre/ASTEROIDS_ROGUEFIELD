@@ -110,7 +110,7 @@ arquivo quando a última etapa fechar. Decisões de produto são do dono, por im
       em dano a inimigo; slow-mo com pulso de zoom em level-up e morte (o de level-up toca depois da escolha — BACKLOG);
       banner "LAYER N", intro "WARDEN PRIME — Guardian of the Ring", kill feed e popups de XP, combo com cor por tier,
       vinheta pulsante com casco < 30 %. Vida ambiente e densidade propostas (6 × 1,26^(n−1), teto 40).
-- [ ] **6. Dinâmicas.** Fato (17/10): `docs/positioning.md` promete 5 famílias de tag, sinergia "3 iguais" e matriz
+- [x] **6. Dinâmicas** (ver item 6 abaixo, feito como proposta em 17/10). Fato (17/10): `docs/positioning.md` promete 5 famílias de tag, sinergia "3 iguais" e matriz
       16 células de status; **nada disso existe no código** (zero ocorrências). Hoje: 9 upgrades em 4 categorias com
       ~3 ranks, 1 arma, escudo como única habilidade ativa, sem dash, ondas infinitas sem fim de run, sem
       meta-progressão, HP do boss composto (onda 15 ≈ 19 mil). **Decisões dele antes de codar:** (a) dash/impulso e em
@@ -129,6 +129,16 @@ arquivo quando a última etapa fechar. Decisões de produto são do dono, por im
       kills, XP, nível e inimigos idênticos. Efeito colateral deliberado: E/G/T agem no passo seguinte, não no handler
       de tecla. Restam leituras de relógio de parede que podem divergir (BACKLOG). **Falta:** cenários jogáveis
       headless ("mata a camada 1", "Warden aparece na 5") no lugar de snapshots; cobertura mínima no CI.
+
+- [~] **9. O salto (NORTE §4b).** (17/10, noite) Gameplay renderizado em **Three.js**: `src/modules/render3d/`
+  (Renderer3D, asteroidMesh extraído do menu, mirrors de inimigos/jogador, batches, fundo), escolhido no manifesto;
+  `?renderer=2d` mantém o Canvas 2D. Câmera perspectiva 18° com follow/zoom/dolly/shake, rochas 3D com rachaduras
+  âmbar em shader, nave extrudada, Wardens/Motes/Seekers/Tethers em malha, lanças instanciadas, bloom + SMAA em
+  HalfFloat; 44–53 draw calls. Controles modernos (A/D strafe, nariz segue a mira; `?controls=classic`). **Falta
+  (BACKLOG):** overlays 2D que ainda não existem em 3D, nave pequena/escura, materiais dos Wardens, Anel; e a
+  medida de fps na máquina dele — headless sem GPU dá 2–4 fps nos dois renderers.
+- [x] **6. Dinâmicas (como propostas).** Dash em Shift, famílias de tag com sinergia "3 iguais", catálogo 9 → 20,
+      vitória no Warden 15 ("Field cleared"). Meta-progressão entre runs continua em aberto.
 
 ## Fora de escopo deste plano
 

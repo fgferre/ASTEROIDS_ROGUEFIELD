@@ -16,6 +16,7 @@ import { createFixedStepper } from './core/fixedStep.js';
 import { serialize } from './core/replay.js';
 import { bootstrapServices } from './bootstrap/bootstrapServices.js';
 import { mobileGuard } from './bootstrap/mobileGuard.js';
+import { getRendererMode } from './modules/render3d/rendererMode.js';
 import {
   activateProfileHarness,
   startRun,
@@ -246,9 +247,13 @@ function init(recording = null) {
     }
 
     gameState.gameUI = document.getElementById('game-ui');
-    gameState.ctx = gameState.canvas.getContext('2d');
-    if (!gameState.ctx) {
-      throw new Error('2D context unavailable');
+    // The 3D renderer takes the canvas for WebGL: a 2D context would lock it.
+    gameState.rendererMode = getRendererMode();
+    if (gameState.rendererMode === '2d') {
+      gameState.ctx = gameState.canvas.getContext('2d');
+      if (!gameState.ctx) {
+        throw new Error('2D context unavailable');
+      }
     }
 
     const { seed: initialSeed, source: seedSource } = recording
@@ -275,6 +280,7 @@ function init(recording = null) {
       seed: initialSeed,
       randomSeed: initialSeed,
       randomSeedSource: seedSource,
+      rendererMode: gameState.rendererMode,
     };
 
     if (DEV_MODE) {
@@ -613,7 +619,7 @@ function updateGame(deltaTime) {
 }
 
 function renderGame() {
-  if (!gameState.ctx) return;
+  if (gameState.rendererMode === '2d' && !gameState.ctx) return;
 
   performanceMonitor.startMeasure('render');
   gameSystemServices.renderer.render(gameState.ctx);
