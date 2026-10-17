@@ -1,6 +1,7 @@
 import { BaseSystem } from '../core/BaseSystem.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { applyBaseTransform } from '../core/viewport.js';
+import { PALETTE, withAlpha } from '../data/constants/palette.js';
 import { GamePools } from '../core/GamePools.js';
 import { DamageText, HitMarker, SpaceParticle } from './EffectEntities.js';
 import { ScreenShake, ShakePresets } from '../utils/ScreenShake.js';
@@ -2221,11 +2222,12 @@ export default class EffectsSystem extends BaseSystem {
     }
 
     // Base Configuration
-    let baseCount = (type === 'main' ? 2 : 1) * countMultiplier * intensity;
+    let baseCount = (type === 'main' ? 1 : 0.6) * countMultiplier * intensity;
     // Fractional parts accumulation (deterministic probabalistic check)
     if (this.randomFloat(thrusterFork) > baseCount % 1)
       baseCount = Math.floor(baseCount);
     else baseCount = Math.ceil(baseCount);
+    if (intensity > 0) baseCount = Math.max(1, baseCount);
 
     const baseSpeed = (type === 'main' ? 140 : 100) * speedMultiplier;
 
@@ -2242,30 +2244,15 @@ export default class EffectsSystem extends BaseSystem {
       const vx = Math.cos(angle) * speed;
       const vy = Math.sin(angle) * speed;
 
-      // Color Logic
+      // One light, the player's (docs/NORTE.md §2): white-hot core, cyan
+      // body, dimmer cyan tail. Upgrade tiers change count, speed and
+      // spread above, not the hue.
       let color;
       const t = this.randomFloat(thrusterFork);
-
-      if (colorPalette === 'neon') {
-        // Cyan / Magenta / White hot core
-        if (t > 0.7)
-          color = '#FFFFFF'; // White core
-        else if (t > 0.4)
-          color = '#00FFFF'; // Cyan
-        else color = '#FF00FF'; // Magenta
-      } else if (colorPalette === 'blue') {
-        // Blue / Cyan / White
-        if (t > 0.8) color = '#FFFFFF';
-        else if (t > 0.3) color = '#00CCFF';
-        else color = '#0066FF';
-      } else {
-        // Orange / Yellow / Red
-        if (t > 0.7)
-          color = '#FFFF00'; // Yellow
-        else if (t > 0.3)
-          color = '#FF8800'; // Orange
-        else color = '#FF4400'; // Reddish
-      }
+      const hot = colorPalette === 'neon' ? 0.6 : 0.8;
+      if (t > hot) color = PALETTE.text;
+      else if (t > 0.35) color = PALETTE.player;
+      else color = withAlpha(PALETTE.player, 0.55);
 
       this.particles.push(
         this.createParticle(
