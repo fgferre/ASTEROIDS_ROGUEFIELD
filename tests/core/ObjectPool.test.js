@@ -81,7 +81,7 @@ describe('ObjectPool', () => {
       }
 
       // This should create a new object
-      const newObj = pool.acquire();
+      pool.acquire();
       expect(pool.getStats().totalCreated).toBe(6);
       expect(pool.getStats().inUse).toBe(6);
     });
@@ -114,8 +114,8 @@ describe('ObjectPool', () => {
 
     test('should release all objects', () => {
       const pool = createPool();
-      const obj1 = pool.acquire();
-      const obj2 = pool.acquire();
+      pool.acquire();
+      pool.acquire();
 
       pool.releaseAll();
 
@@ -125,7 +125,7 @@ describe('ObjectPool', () => {
 
     test('should clear pool', () => {
       const pool = createPool();
-      const obj = pool.acquire();
+      pool.acquire();
       pool.clear();
 
       expect(pool.getStats().available).toBe(0);
@@ -237,7 +237,7 @@ describe.sequential('TTLObjectPool', () => {
 
   // Optimization: vi.useFakeTimers() to avoid real delays (60ms → instant)
   test('should release expired objects on update', () => {
-    const obj = ttlPool.acquire(50); // 50ms TTL
+    ttlPool.acquire(50); // 50ms TTL
 
     // Wait for expiration
     vi.advanceTimersByTime(60);

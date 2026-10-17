@@ -84,25 +84,6 @@ function resolveBaseColor(bullet) {
   return bullet?.isBossProjectile ? DEFAULT_BOSS_COLOR : DEFAULT_ENEMY_COLOR;
 }
 
-function resolveTrailRgb(bullet) {
-  const parsed = parseColor(bullet?.color);
-  if (parsed) {
-    return `${parsed.r}, ${parsed.g}, ${parsed.b}`;
-  }
-
-  if (bullet?.isBossProjectile) {
-    const bossParsed = parseColor(DEFAULT_BOSS_COLOR);
-    return bossParsed
-      ? `${bossParsed.r}, ${bossParsed.g}, ${bossParsed.b}`
-      : '255, 120, 220';
-  }
-
-  const enemyParsed = parseColor(DEFAULT_ENEMY_COLOR);
-  return enemyParsed
-    ? `${enemyParsed.r}, ${enemyParsed.g}, ${enemyParsed.b}`
-    : '255, 150, 110';
-}
-
 function resolveRadius(bullet) {
   if (Number.isFinite(bullet?.radius) && bullet.radius > 0) {
     return bullet.radius;
@@ -226,7 +207,7 @@ function ensureGlowCache(colorKey, baseColor, radius, isBoss) {
   return cacheEntry;
 }
 
-function drawTrail(ctx, bullet, radius) {
+function drawTrail(ctx, bullet) {
   if (!Array.isArray(bullet?.trail) || bullet.trail.length < 2) {
     return;
   }
@@ -237,7 +218,6 @@ function drawTrail(ctx, bullet, radius) {
     return;
   }
 
-  const parsed = parseColor(bullet?.color);
   // We can't easily tint the cached white dot without 'source-in' composite
   // which is expensive. Instead, we'll draw it with additive blending ('lighter')
   // and set strokeStyle color for tinting if we were stroking.
@@ -328,14 +308,7 @@ export function drawEnemyProjectile(ctx, bullet) {
     );
     const centerX = bullet.x ?? 0;
     const centerY = bullet.y ?? 0;
-    const gradient = ctx.createRadialGradient(
-      centerX,
-      centerY,
-      0,
-      centerX,
-      centerY,
-      glowRadius
-    );
+    ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, glowRadius);
     // ... (rest of gradient logic if needed)
   }
 

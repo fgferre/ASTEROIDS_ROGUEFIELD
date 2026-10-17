@@ -39,9 +39,8 @@ export class BaseEnemy {
    * Creates a base enemy instance.
    *
    * @param {Object} system - Reference to parent EnemySystem
-   * @param {Object} config - Configuration options
    */
-  constructor(system, config = {}) {
+  constructor(system) {
     // System reference
     this.system = system;
 
@@ -155,7 +154,7 @@ export class BaseEnemy {
    *
    * @param {number} deltaTime - Time elapsed
    */
-  onUpdate(deltaTime) {
+  onUpdate() {
     // Override in subclasses
   }
 
@@ -197,7 +196,7 @@ export class BaseEnemy {
    *
    * @param {CanvasRenderingContext2D} ctx - Canvas context
    */
-  onDraw(ctx) {
+  onDraw() {
     // Override in subclasses
   }
 
@@ -240,7 +239,7 @@ export class BaseEnemy {
    * @param {number} amount - Damage taken
    * @param {Object} source - Damage source
    */
-  onDamaged(amount, source) {
+  onDamaged() {
     // Override in subclasses for reactions
   }
 

@@ -34,7 +34,7 @@ class WorldSystem extends BaseSystem {
     });
   }
 
-  update(deltaTime) {
+  update() {
     // DON'T return early - let game keep running even when player is dead
     // This allows asteroids to keep wandering while player is in death state
 

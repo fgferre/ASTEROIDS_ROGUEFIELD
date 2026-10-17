@@ -41,7 +41,6 @@ import {
   USE_WAVE_MANAGER,
   WAVE_BOSS_INTERVAL,
   WAVE_BREAK_TIME,
-  WAVE_DURATION,
   WAVE_MANAGER_EMIT_LEGACY_WAVE_COMPLETED,
   WAVE_SPAWN_DELAY,
   WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
@@ -2749,7 +2748,7 @@ export class WaveManager {
       return;
     }
 
-    if (!Boolean(USE_WAVE_MANAGER)) {
+    if (!USE_WAVE_MANAGER) {
       return;
     }
 

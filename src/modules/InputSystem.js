@@ -757,7 +757,7 @@ class InputSystem {
     }
   }
 
-  registerKeyboardBindings(action, bindings = [], field) {
+  registerKeyboardBindings(action, bindings = []) {
     const entries = ensureArray(bindings);
     entries.forEach((binding) => {
       const normalized = this.normalizeKeyboardBinding(binding);
@@ -846,7 +846,7 @@ class InputSystem {
       return {};
     }
 
-    const { event, ...rest } = context;
+    const { event: _event, ...rest } = context;
     return { ...rest };
   }
 

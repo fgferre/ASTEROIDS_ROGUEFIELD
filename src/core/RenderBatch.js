@@ -398,7 +398,7 @@ class RenderBatch {
    */
   generateBatchKey(type, state) {
     const stateStr = Object.entries(state)
-      .filter(([key, value]) => value !== null)
+      .filter(([, value]) => value !== null)
       .map(([key, value]) => `${key}:${value}`)
       .sort()
       .join('|');

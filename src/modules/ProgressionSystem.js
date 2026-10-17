@@ -114,7 +114,7 @@ class ProgressionSystem extends UpgradeSystem {
       this.handleEnemyDestroyed(data);
     });
 
-    this.registerEventListener('progression-reset', (payload = {}) => {
+    this.registerEventListener('progression-reset', () => {
       this.refreshInjectedServices({ force: true });
       this.resetCombo({
         reason: 'progression-reset',
@@ -123,12 +123,12 @@ class ProgressionSystem extends UpgradeSystem {
       });
     });
 
-    this.registerEventListener('player-reset', (payload = {}) => {
+    this.registerEventListener('player-reset', () => {
       this.refreshInjectedServices({ force: true });
       this.resetCombo({ reason: 'player-reset', silent: true, force: true });
     });
 
-    this.registerEventListener('player-died', (payload = {}) => {
+    this.registerEventListener('player-died', () => {
       this.resetCombo({ reason: 'player-died', silent: false, force: true });
     });
   }

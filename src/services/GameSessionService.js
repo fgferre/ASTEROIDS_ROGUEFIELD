@@ -614,7 +614,7 @@ export default class GameSessionService {
     this.ensureWaveKickoff({ reason: 'progression-reset', payload });
   }
 
-  ensureWaveKickoff({ reason = 'unknown', payload = null } = {}) {
+  ensureWaveKickoff({ reason = 'unknown' } = {}) {
     if (this._suppressWaveKickoff) {
       return false;
     }

@@ -594,7 +594,6 @@ export class EnemyUpdateSystem {
    * @param {number} deltaTime
    */
   updateSupportEnemies(deltaTime) {
-    const facade = this.facade;
     if (!Number.isFinite(deltaTime) || deltaTime <= 0) {
       return;
     }
@@ -690,7 +689,6 @@ export class EnemyUpdateSystem {
    * Performs asteroid-asteroid collision handling using a reusable buffer.
    */
   handleAsteroidCollisions() {
-    const facade = this.facade;
     const buffer = this._activeAsteroidsBuffer;
     buffer.length = 0;
 

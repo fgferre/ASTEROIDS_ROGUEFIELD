@@ -333,8 +333,6 @@ export class AsteroidImpactEffect {
    * Ativa um campo de detritos do pool
    */
   activateDebrisField(position, impactVelocity, count) {
-    const { THREE } = this;
-
     // Encontrar campo disponível no pool
     const field = this.debrisPool.find((f) => !f.inUse);
     if (!field) return;
@@ -406,8 +404,6 @@ export class AsteroidImpactEffect {
    * Ativa uma nuvem de poeira do pool
    */
   activateDustCloud(position, count) {
-    const { THREE } = this;
-
     // Encontrar nuvem disponível no pool
     const cloud = this.dustPool.find((c) => !c.inUse);
     if (!cloud) return;

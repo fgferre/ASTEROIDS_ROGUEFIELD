@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from 'vitest';
+import { describe, test, beforeEach, afterEach } from 'vitest';
 import { GamePools } from '../../../src/core/GamePools.js';
 import {
   setupGlobalMocks,

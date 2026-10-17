@@ -74,11 +74,11 @@ class UpgradeSystem extends BaseSystem {
   setupEventListeners() {
     this.refreshInjectedServices();
 
-    this.registerEventListener('progression-reset', (payload = {}) => {
+    this.registerEventListener('progression-reset', () => {
       this.refreshInjectedServices({ force: true });
     });
 
-    this.registerEventListener('player-reset', (payload = {}) => {
+    this.registerEventListener('player-reset', () => {
       this.refreshInjectedServices({ force: true });
     });
   }

@@ -36,7 +36,7 @@ describe('Asteroid edge wrapping', () => {
       { name: 'left edge', x: -80, y: GAME_HEIGHT / 2, radius: 40 },
     ];
 
-    testCases.forEach(({ name, x, y, radius }) => {
+    testCases.forEach(({ x, y, radius }) => {
       const asteroid = { x, y, radius };
       const originalX = asteroid.x;
       const originalY = asteroid.y;

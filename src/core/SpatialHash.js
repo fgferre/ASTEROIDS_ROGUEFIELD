@@ -317,7 +317,7 @@ export class SpatialHash {
     const collisions = [];
     const checked = new Set();
 
-    for (const [cellKey, cell] of this.grid.entries()) {
+    for (const [, cell] of this.grid.entries()) {
       if (cell.size < 2) continue;
 
       const objects = Array.from(cell);

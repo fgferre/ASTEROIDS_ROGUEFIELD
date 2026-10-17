@@ -33,28 +33,6 @@ const COLOR_ASSIST_ACCENTS = {
   default: '#4C6EF5',
 };
 
-const MINIMAP_ENTITY_COLORS = {
-  asteroid: '#A0AEC0',
-  drone: '#63B3ED',
-  mine: '#F6AD55',
-  hunter: '#B794F4',
-  boss: '#F56565',
-  default: '#E2E8F0',
-};
-
-const THREAT_ICON_LOOKUP = {
-  boss: '☠',
-  hunter: '✦',
-  drone: '▲',
-  mine: '✸',
-  asteroid: '●',
-  default: '•',
-};
-
-const DEFAULT_MINIMAP_RANGE = 300;
-const DEFAULT_MINIMAP_DETECTION_MULTIPLIER = 1.5;
-const MAX_THREAT_INDICATORS = 8;
-
 class UISystem extends BaseSystem {
   constructor(dependencies = {}) {
     super(dependencies, {
@@ -2952,7 +2930,7 @@ class UISystem extends BaseSystem {
     }
   }
 
-  updateLevelDisplay(level, options = {}) {
+  updateLevelDisplay() {
     // Standard HUD legacy method.
     // AAA HUD updates via updateAAATacticalHudFromServices.
     // Kept as stub for shared logic calls.

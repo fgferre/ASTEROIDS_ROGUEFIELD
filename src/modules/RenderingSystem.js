@@ -153,15 +153,6 @@ function computeOutlineRadius(points) {
 
 const SPACE_SKY_RANDOM_SEED = 'rendering:starfield';
 
-function resolveDevicePixelRatio() {
-  if (typeof window === 'undefined') {
-    return 1;
-  }
-
-  const ratio = Number(window.devicePixelRatio) || 1;
-  return Math.max(1, Math.min(2, ratio));
-}
-
 // [NEO-ARCADE] Multi-Plane 2.5D Parallax Starfield
 // Replaces 3D projection with robust 2D layer scrolling for guaranteed visibility
 class SpaceSkyBackground {
@@ -1371,12 +1362,7 @@ class RenderingSystem extends BaseSystem {
           ctx.save();
           ctx.translate(position.x, position.y);
           // [NEO-ARCADE] Rotate shield slightly independently for "floating field" feel
-          const time = Date.now() / 1000;
           ctx.rotate(angle);
-
-          // Counter-rotate pattern for stability or rotate for effect?
-          // Let's rotate the field slowly
-          const fieldRotation = Math.sin(time * 0.5) * 0.1;
 
           if (tilt !== 0) {
             ctx.transform(1, 0, tilt, 1, 0, 0);
@@ -1641,7 +1627,7 @@ class RenderingSystem extends BaseSystem {
   renderBatchedCircles(ctx, circles, fillStyle, strokeStyle = null) {
     if (!circles || circles.length === 0) return;
 
-    const batch = this.renderBatch.beginBatch('circles', {
+    this.renderBatch.beginBatch('circles', {
       fillStyle,
       strokeStyle,
       globalAlpha: 1,
@@ -1666,7 +1652,7 @@ class RenderingSystem extends BaseSystem {
   renderBatchedLines(ctx, lines, strokeStyle, lineWidth = 1) {
     if (!lines || lines.length === 0) return;
 
-    const batch = this.renderBatch.beginBatch('lines', {
+    this.renderBatch.beginBatch('lines', {
       strokeStyle,
       lineWidth,
     });

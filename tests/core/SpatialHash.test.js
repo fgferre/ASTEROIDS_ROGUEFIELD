@@ -569,7 +569,7 @@ describe('SpatialHash', () => {
       }
 
       const startTime = performance.now();
-      const collisions = spatialHash.findAllCollisions();
+      spatialHash.findAllCollisions();
       const endTime = performance.now();
 
       expect(endTime - startTime).toBeLessThan(50); // Should be fast

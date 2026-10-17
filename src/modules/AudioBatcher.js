@@ -217,7 +217,7 @@ class AudioBatcher {
   /**
    * Determina se um som deve ser agrupado em batch
    */
-  _shouldBatch(soundType, params) {
+  _shouldBatch(soundType) {
     // Alguns sons se beneficiam mais de batching
     const batchableSounds = [
       'playLaserShot',

@@ -230,7 +230,7 @@ export class Hunter extends BaseEnemy {
     ctx.restore();
   }
 
-  onDraw(ctx) {
+  onDraw() {
     if (!this.useComponents || !this.components?.size) {
       // Fallback: Generate payload without components (for testing)
       return {

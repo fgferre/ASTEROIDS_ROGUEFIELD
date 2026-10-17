@@ -7,10 +7,7 @@ import FileTrackManager, {
 import DuckingController from './audio/DuckingController.js';
 import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
-import {
-  GameDebugLogger,
-  isDevEnvironment,
-} from '../utils/dev/GameDebugLogger.js';
+import { isDevEnvironment } from '../utils/dev/GameDebugLogger.js';
 import {
   BOSS_AUDIO_FREQUENCY_PRESETS,
   MUSIC_LAYER_CONFIG,
@@ -1287,7 +1284,7 @@ class AudioSystem extends BaseSystem {
     }
   }
 
-  _onBossDefeated(payload = {}) {
+  _onBossDefeated() {
     this.musicController.bossActive = false;
     this.bossAudioState.lastPhase = null;
 
@@ -1503,7 +1500,7 @@ class AudioSystem extends BaseSystem {
     this.sfxBus.playGoldJackpot();
   }
 
-  playBossRoar(payload = {}) {
+  playBossRoar() {
     this._trackPerformance('playBossRoar');
 
     this.safePlay(() => {
@@ -1705,7 +1702,7 @@ class AudioSystem extends BaseSystem {
     });
   }
 
-  playBossDefeated(payload = {}) {
+  playBossDefeated() {
     this._trackPerformance('playBossDefeated');
 
     this.safePlay(() => {
@@ -2238,7 +2235,6 @@ class AudioSystem extends BaseSystem {
     }
 
     const currentIntensity = intensity;
-    const lastIntensity = this.thrusterState.lastIntensity[thrusterKey] || 0;
     const isActive = this.sfxBus.isThrusterActive(thrusterKey);
     const now = performance.now();
 
@@ -2449,7 +2445,7 @@ class AudioSystem extends BaseSystem {
   /**
    * Tracked de chamadas de áudio para performance
    */
-  _trackPerformance(methodName) {
+  _trackPerformance() {
     if (!this.performanceMonitor.enabled) return;
 
     this.performanceMonitor.audioCallsPerFrame++;

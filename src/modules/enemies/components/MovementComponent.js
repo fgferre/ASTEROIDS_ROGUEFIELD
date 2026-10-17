@@ -285,15 +285,7 @@ const createDefaultStrategies = () => ({
 
   // Parasite movement: tracking with repulsion when too close
   // Ported from AsteroidMovement.parasiteMovement (lines 89-131)
-  parasite: ({
-    enemy,
-    deltaTime,
-    player,
-    playerPosition,
-    random,
-    config,
-    bounds,
-  }) => {
+  parasite: ({ enemy, deltaTime, player, playerPosition, config, bounds }) => {
     // Initialize velocity properties to prevent NaN
     enemy.vx = enemy.vx ?? 0;
     enemy.vy = enemy.vy ?? 0;
@@ -357,15 +349,7 @@ const createDefaultStrategies = () => ({
 
   // Volatile movement: linear with rotation jitter when armed
   // Ported from AsteroidMovement.volatileMovement (lines 141-161)
-  volatile: ({
-    enemy,
-    deltaTime,
-    player,
-    playerPosition,
-    random,
-    config,
-    bounds,
-  }) => {
+  volatile: ({ enemy, deltaTime, random, bounds }) => {
     // Initialize velocity properties to prevent NaN
     enemy.vx = enemy.vx ?? 0;
     enemy.vy = enemy.vy ?? 0;

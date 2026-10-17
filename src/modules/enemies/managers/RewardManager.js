@@ -223,7 +223,7 @@ export class RewardManager {
       totalXP: bossRewards?.totalXP ?? 500,
       baseOrbs: () => bossRewards?.baseOrbs ?? 10,
       sizeFactor: () => 1.0,
-      variantMultiplier: (variant) => {
+      variantMultiplier: () => {
         // Boss phases could have different multipliers in the future
         return 1.0;
       },

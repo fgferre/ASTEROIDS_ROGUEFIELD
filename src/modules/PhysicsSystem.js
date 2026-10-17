@@ -2003,7 +2003,6 @@ class PhysicsSystem extends BaseSystem {
 
     const originX = basePosition.x;
     const originY = basePosition.y;
-    const radiusSq = radius * radius;
 
     const candidates = this.getNearbyEnemies(originX, originY, radius);
 

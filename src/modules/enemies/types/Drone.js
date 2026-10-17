@@ -256,7 +256,7 @@ export class Drone extends BaseEnemy {
     ctx.restore();
   }
 
-  onDraw(ctx) {
+  onDraw() {
     if (!this.useComponents || !this.components?.size) {
       // Fallback: Generate payload without components (for testing)
       const speed = Math.hypot(this.vx || 0, this.vy || 0);

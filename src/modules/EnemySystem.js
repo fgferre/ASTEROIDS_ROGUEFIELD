@@ -1,11 +1,6 @@
 // src/modules/EnemySystem.js
 import { BaseSystem } from '../core/BaseSystem.js';
-import {
-  ASTEROID_SIZES,
-  GAME_HEIGHT,
-  GAME_WIDTH,
-  SHIP_SIZE,
-} from '../core/GameConstants.js';
+import { ASTEROID_SIZES, SHIP_SIZE } from '../core/GameConstants.js';
 import { GamePools } from '../core/GamePools.js';
 import RandomService from '../core/RandomService.js';
 import { resolveEventBus, resolveService } from '../core/serviceUtils.js';
@@ -39,30 +34,18 @@ import {
 import {
   ASTEROIDS_PER_WAVE_BASE,
   ASTEROIDS_PER_WAVE_MULTIPLIER,
-  ASTEROID_EDGE_SPAWN_MARGIN,
-  COLLISION_BOUNCE,
-  MAX_ASTEROIDS_ON_SCREEN,
-  PRESERVE_LEGACY_POSITIONING,
-  PRESERVE_LEGACY_SIZE_DISTRIBUTION,
   SHIELD_SHOCKWAVE_FORCE,
   SHIELD_SHOCKWAVE_RADIUS,
   USE_WAVE_MANAGER,
   WAVE_BREAK_TIME,
   WAVE_DURATION,
-  WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
 } from '../data/constants/gameplay.js';
 import { ENEMY_TYPES, BOSS_CONFIG } from '../data/constants/visual.js';
 import { DRONE_COMPONENTS } from '../data/enemies/drone.js';
 import { HUNTER_COMPONENTS } from '../data/enemies/hunter.js';
 import { MINE_COMPONENTS } from '../data/enemies/mine.js';
 import { BOSS_COMPONENTS } from '../data/enemies/boss.js';
-import {
-  ASTEROID_VARIANTS,
-  ASTEROID_VARIANT_CHANCES,
-  ORB_VALUE,
-} from '../data/enemies/asteroid-configs.js';
-
-const ASTEROID_POOL_ID = Symbol.for('ASTEROIDS_ROGUEFIELD:asteroidPoolId');
+import { ORB_VALUE } from '../data/enemies/asteroid-configs.js';
 
 const ENEMY_SERVICE_MAP = {
   player: 'player',
@@ -1633,7 +1616,7 @@ class EnemySystem extends BaseSystem {
     return this.bossHudState;
   }
 
-  forwardBossEvent(eventName, payload = {}) {
+  forwardBossEvent() {
     // Raw boss events (boss-spawned, boss-phase-changed, boss-defeated) are
     // already emitted by BossEnemy / EnemySpawnSystem and consumed directly
     // by EffectsSystem, AudioSystem and UISystem via their own listeners.

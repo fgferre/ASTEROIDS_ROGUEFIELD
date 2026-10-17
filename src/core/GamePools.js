@@ -672,7 +672,7 @@ export class GamePools {
    *
    * @param {number} [deltaTime] - Time since last update
    */
-  static update(deltaTime) {
+  static update() {
     if (!this.initialized) {
       console.warn(
         '[GamePools] Not initialized - call GamePools.initialize() first'

@@ -53,15 +53,15 @@ export default [
     rules: {
       ...js.configs.recommended.rules,
       'no-unused-vars': [
-        'warn',
+        'error',
         {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
           caughtErrors: 'none',
         },
       ],
-      'no-empty': ['warn', { allowEmptyCatch: true }],
-      'no-extra-boolean-cast': 'warn',
+      'no-empty': ['error', { allowEmptyCatch: true }],
+      'no-extra-boolean-cast': 'error',
       // Determinism contract: gameplay randomness goes through RandomService.
       // MenuBackgroundSystem deliberately overrides Math.random; it disables
       // the rule inline.

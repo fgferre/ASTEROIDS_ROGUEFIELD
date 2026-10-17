@@ -1855,7 +1855,7 @@ class CombatSystem extends BaseSystem {
    * @param {object} [playerStats] — reserved for future damage-aware behavior; not consumed here.
    * @returns {Array<{ fireOrigin: {x,y}, aimPoint: {x,y} }>}
    */
-  applyConcentratedFire(input, shotCount, playerStats) {
+  applyConcentratedFire(input, shotCount) {
     if (!input || typeof input !== 'object') {
       throw new Error(
         '[CombatSystem] applyConcentratedFire requires an input object with a discriminator kind'
@@ -3425,7 +3425,6 @@ class CombatSystem extends BaseSystem {
         }
 
         const duplicateIndex = assignment.duplicateIndex || 0;
-        const duplicateCount = duplicateTotals.get(target.id || index) || 1;
         // Fix-pass-3 Finding 4: ring color follows THREAT TIER, not
         // assignment index. Plan visual-direction palette: low = thruster
         // cyan (#00F2FF), high = alert red (#FF3131), medium = warning
@@ -3470,7 +3469,7 @@ class CombatSystem extends BaseSystem {
       this.usingDynamicPrediction()
     ) {
       this.predictedAimPoints.forEach(
-        ({ enemy, position, index, duplicateIndex, duplicateCount }) => {
+        ({ enemy, position, index, duplicateIndex }) => {
           if (!position) {
             return;
           }

@@ -1711,7 +1711,6 @@ class MenuBackgroundSystem extends BaseSystem {
         return lo; // 0..LAYER_COUNT-1
       };
 
-      const clamp01 = (t) => Math.max(0, Math.min(1, t));
       const radiiByLayer = Array.from({ length: LAYER_COUNT }, (_, idx) => {
         const x = LAYER_COUNT > 1 ? idx / (LAYER_COUNT - 1) : 0;
         return MIN_SKY_RADIUS + (MAX_SKY_RADIUS - MIN_SKY_RADIUS) * x;
@@ -2195,7 +2194,7 @@ class MenuBackgroundSystem extends BaseSystem {
    * 2D Worley noise for texture generation
    * Returns [closestDist, cellId]
    */
-  worley2d(x, y, simplex) {
+  worley2d(x, y) {
     const px = Math.floor(x);
     const py = Math.floor(y);
     const fx = x - px;
@@ -2300,11 +2299,7 @@ class MenuBackgroundSystem extends BaseSystem {
         heightValue = (heightValue / totalAmplitude) * 0.5 + 0.5;
 
         // 2. WORLEY NOISE - Mineral spots (mottled appearance)
-        const [cellDist, cellId] = this.worley2d(
-          u * 6 + seed,
-          v * 6 + seed * 0.7,
-          simplex
-        );
+        const [cellDist] = this.worley2d(u * 6 + seed, v * 6 + seed * 0.7);
         const mineralSpot =
           this.smoothstep(0.6, 0.2, cellDist) * materialParams.patchiness;
 

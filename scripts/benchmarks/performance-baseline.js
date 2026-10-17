@@ -405,7 +405,7 @@ if (typeof window !== 'undefined') {
 if (typeof require !== 'undefined' && require.main === module) {
   (async () => {
     const baseline = new PerformanceBaseline();
-    const results = await baseline.runAllBenchmarks();
+    await baseline.runAllBenchmarks();
     baseline.saveResults();
 
     console.log('\n🎯 PERFORMANCE TARGETS FOR PHASE 1:');

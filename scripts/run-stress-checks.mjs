@@ -269,7 +269,7 @@ const bullets = asteroids.map((asteroid) => ({
 }));
 
 let collisionCount = 0;
-physics.forEachBulletCollision(bullets, (bullet, asteroid) => {
+physics.forEachBulletCollision(bullets, (bullet) => {
   bullet.hit = true;
   collisionCount += 1;
 });

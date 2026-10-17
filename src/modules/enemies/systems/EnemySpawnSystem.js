@@ -227,7 +227,7 @@ export class EnemySpawnSystem {
       config?.skipWaveAccounting !== true &&
       (!facade.useManagers ||
         !facade._waveManagerRuntimeEnabled ||
-        !Boolean(USE_WAVE_MANAGER) ||
+        !USE_WAVE_MANAGER ||
         WAVEMANAGER_HANDLES_ASTEROID_SPAWN === false);
 
     if (
@@ -373,7 +373,7 @@ export class EnemySpawnSystem {
     const shouldApplyLegacyWaveAccounting =
       !facade.useManagers ||
       !facade._waveManagerRuntimeEnabled ||
-      !Boolean(USE_WAVE_MANAGER) ||
+      !USE_WAVE_MANAGER ||
       WAVEMANAGER_HANDLES_ASTEROID_SPAWN === false;
 
     if (
@@ -531,7 +531,7 @@ export class EnemySpawnSystem {
       facade.waveManager &&
       facade._waveManagerRuntimeEnabled &&
       Boolean(USE_WAVE_MANAGER) &&
-      !Boolean(WAVEMANAGER_HANDLES_ASTEROID_SPAWN) &&
+      !WAVEMANAGER_HANDLES_ASTEROID_SPAWN &&
       typeof facade.waveManager.registerActiveEnemy === 'function';
 
     let waveManagerRegistered = true;
@@ -570,7 +570,7 @@ export class EnemySpawnSystem {
       facade.useManagers &&
       facade._waveManagerRuntimeEnabled &&
       Boolean(USE_WAVE_MANAGER) &&
-      !Boolean(WAVEMANAGER_HANDLES_ASTEROID_SPAWN) &&
+      !WAVEMANAGER_HANDLES_ASTEROID_SPAWN &&
       facade.waveManager;
 
     const isDevelopment =

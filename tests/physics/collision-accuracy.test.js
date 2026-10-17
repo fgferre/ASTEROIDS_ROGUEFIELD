@@ -263,7 +263,6 @@ describe('Collision Accuracy Tests', () => {
 
     it('should detect exact collision with touching circles', () => {
       const bullet = { id: 'touching-bullet', x: 50, y: 72, hit: false }; // Exactly 22 units from center (20 + 2 = 22)
-      const asteroid = testAsteroids[0]; // At (50, 50) with radius 20
 
       const collisions = [];
       physics.forEachBulletCollision([bullet], (b, a) => {

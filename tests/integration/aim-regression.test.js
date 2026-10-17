@@ -2280,7 +2280,7 @@ describe('FIX-05 centerline invariant + toggles', () => {
         { id: 'enemy-3', x: 620, y: 280, variant: 'common', size: 'small' },
         { id: 'enemy-4', x: 580, y: 340, variant: 'common', size: 'small' },
       ];
-      const { combat, playerState } = makeRank3Combat(extraEnemies);
+      const { combat } = makeRank3Combat(extraEnemies);
       // Mutate every enemy to tiny-low-HP.
       const enemies = [];
       combat.cachedEnemies.forEachActiveEnemy((e) => enemies.push(e));

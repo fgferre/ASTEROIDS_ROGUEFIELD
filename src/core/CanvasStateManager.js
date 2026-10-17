@@ -316,7 +316,7 @@ class CanvasStateManager {
   /**
    * Utility: Create gradient with caching consideration
    */
-  createOptimizedGradient(ctx, type, params, colorStops, cacheKey) {
+  createOptimizedGradient(ctx, type, params, colorStops) {
     // This would integrate with RenderBatch gradient cache
     if (type === 'radial') {
       const gradient = ctx.createRadialGradient(...params);
