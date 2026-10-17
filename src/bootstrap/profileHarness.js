@@ -65,6 +65,8 @@ const SCENARIOS = Object.freeze({
   'mid-game': { wave: 5, upgrades: 7, durationSec: 60 },
   'boss-arena': { wave: 'boss', upgrades: 7, durationSec: 90 },
   'late-stress': { wave: 10, upgrades: 15, durationSec: 60 },
+  // `?scene=hero` — fixed art-review picture on real entities (no capture).
+  hero: { wave: 1, upgrades: 0, durationSec: 60, hero: true },
 });
 
 const SCENARIO_NAMES = Object.keys(SCENARIOS);
@@ -110,6 +112,9 @@ function getScenarioFromURL() {
 
   try {
     const params = new URLSearchParams(window.location.search);
+    if (params.get('scene') === 'hero') {
+      return 'hero';
+    }
     if (!params.has('profile')) {
       return null;
     }
@@ -204,6 +209,57 @@ function forceWaveNumber(enemiesService, requestedWave) {
   }
 }
 
+// `?scene=hero` layout, logical 800x600 field.
+const HERO_ASTEROIDS = Object.freeze([
+  { size: 'large', variant: 'common', x: 330, y: 170, vx: 5, vy: 3 },
+  { size: 'medium', variant: 'volatile', x: 560, y: 420, vx: -4, vy: -3 },
+  { size: 'small', variant: 'common', x: 680, y: 130, vx: -3, vy: 4 },
+]);
+const HERO_ORBS = Object.freeze([
+  [640, 380],
+  [700, 400],
+  [720, 440],
+  [660, 450],
+  [690, 470],
+  [640, 420],
+]);
+const HERO_PLAYER = Object.freeze({ x: 300, y: 300, driftSpeed: 14 });
+const HERO_XP_REQUIREMENT = 1e9;
+
+/**
+ * Composes the hero scene through the public spawn paths: factory-backed
+ * enemies, createXPOrb, a frozen wave manager and an unreachable level-up.
+ */
+function composeHeroScene({ player, enemies, progression, xpOrbs }) {
+  enemies.releaseAllAsteroidsToPool();
+  // Freeze spawning: waves start from waveManager.update() and the legacy
+  // timer spawns from spawnSystem.handleSpawning().
+  enemies.waveManager.update = () => {};
+  enemies.spawnSystem.handleSpawning = () => {};
+  enemies.waveManager.spawnQueue = [];
+  progression.experienceToNext = HERO_XP_REQUIREMENT;
+
+  const spawn = (type, config) => {
+    const enemy = enemies.acquireEnemyViaFactory(type, {
+      wave: 1,
+      ...config,
+    });
+    if (enemy) {
+      enemy[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')] = false;
+    }
+    return enemy;
+  };
+  HERO_ASTEROIDS.forEach((config) => spawn('asteroid', config));
+  spawn('drone', { x: 690, y: 100 });
+  spawn('hunter', { x: 520, y: 250 });
+  HERO_ORBS.forEach(([x, y]) => xpOrbs.createXPOrb(x, y, 5));
+
+  player.position.x = HERO_PLAYER.x;
+  player.position.y = HERO_PLAYER.y;
+  player.angle = 0;
+  player.setInvulnerableTimer(60);
+}
+
 /**
  * Paints a single-line completion overlay on the game canvas. Best-effort —
  * silently no-ops if Canvas2D is unavailable.
@@ -261,6 +317,13 @@ function pollForGameServices(getServices) {
  * scenario runs without manual input. Bounded wait; failures are debug-logged.
  */
 async function startRun(enemiesService) {
+  // Clicking before the menu loader finishes lets it re-show the menu over
+  // the running game.
+  const loadingScreen = document.getElementById('loading-screen');
+  for (let i = 0; i < 240 && loadingScreen; i++) {
+    if (loadingScreen.classList.contains('hidden')) break;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
   document.getElementById('start-game-btn')?.click();
   for (let i = 0; i < 80; i++) {
     if (enemiesService?.waveManager?.waveInProgress) return;
@@ -279,7 +342,13 @@ function runScenarioDriver(driver, scenario, durationSec, player) {
     let simulatedSeconds = 0;
     const intervalId = setInterval(() => {
       try {
-        if (player?.velocity) {
+        if (scenario === 'hero' && player?.velocity) {
+          // Gentle rightward drift with the main thruster lit.
+          player.angle = 0;
+          player.velocity.vx = HERO_PLAYER.driftSpeed;
+          player.velocity.vy = 0;
+          if (player.cachedMovementInput) player.cachedMovementInput.up = true;
+        } else if (player?.velocity) {
           // Slow circular drift (scenario-only) to exercise camera/telegraphs.
           const heading = simulatedSeconds * 0.6;
           player.velocity.vx = Math.cos(heading) * 40;
@@ -383,9 +452,18 @@ async function runDeferredScenario({
           services['progression'] || services.progression || null;
 
         await startRun(enemies);
-        forceProgressionUpgrades(progression, config.upgrades);
-        forceWaveNumber(enemies, config.wave);
-        player?.setInvulnerableTimer?.(45);
+        if (config.hero) {
+          composeHeroScene({
+            player,
+            enemies,
+            progression,
+            xpOrbs: services['xp-orbs'],
+          });
+        } else {
+          forceProgressionUpgrades(progression, config.upgrades);
+          forceWaveNumber(enemies, config.wave);
+          player?.setInvulnerableTimer?.(45);
+        }
 
         if (player && combat) {
           driver = createScriptedPlayer({ player, combat, enemies });
