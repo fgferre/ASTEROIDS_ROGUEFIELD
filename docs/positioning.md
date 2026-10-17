@@ -20,6 +20,11 @@ Three closest-feel competitors. The visual references the developer named (Choru
 
 3. **Nova Drift** — _Audience overlap:_ this is the closest genre-mate. Players who already love Asteroids-style arena combat with deep build evolution. _Distinct angle:_ Nova Drift's modifiers are mostly self-contained per-build; Asteroid Roguefield's 5-tag synergy taxonomy is explicit and combinatorial — 3-of-a-tag triggers a named bonus, so the player can SEE the build forming. The status × status interaction matrix (16 cells, all explicit per GAME-07) adds layer Nova Drift doesn't pursue.
 
+> **Status (2026-10-17):** the five-tag synergy taxonomy and the 16-cell status matrix described below are a
+> design promise, not shipped code — no tag family, synergy rule or status interaction exists in `src/` today.
+> The art and fiction direction now lives in `docs/NORTE.md`; the synergy rule, dash and run end are the owner's
+> pending decisions in `PLAN.md` step 6. This document is kept as the positioning target, not as a description.
+
 ## Distinctive promise (1-2 sentences)
 
 Asteroid Roguefield is the only roguelite where the asteroid-belt classic meets a fully-mapped synergy taxonomy — five tag families plus a 16-cell status × status interaction matrix authored before any feature ships, so every build choice composes deterministically into the next. The result: the "just one more run" loop, built on a foundation the player can actually reason about.
