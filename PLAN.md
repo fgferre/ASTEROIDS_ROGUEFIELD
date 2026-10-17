@@ -97,9 +97,12 @@ arquivo quando a última etapa fechar. Decisões de produto são do dono, por im
       portar o gerador de textura do menu, `MenuBackgroundSystem.js:2244+`); aposentar o multi-stroke do
       `NeonGraphics`; rastro do tiro inimigo na cor do tiro; orbes animados. Apagar `RenderBatch`/`GradientCache`/
       `CanvasStateManager` ou pô-los para trabalhar. Worker: opus. Baseline de perf antes (`?profile=mid-game`).
-- [ ] **4. Loop de passo fixo.** Acumulador a 60 Hz, teto de ~5 passos/quadro, render com interpolação; tirar o
-      `try` global do loop (pausar e mostrar o erro na primeira falha). Fecha câmera lenta, 144 Hz e determinismo de
-      uma vez; pré-requisito para replay. Worker: opus (máquina de estados).
+- [x] **4. Loop de passo fixo.** (17/10) `src/core/fixedStep.js`: acumulador a 60 Hz, teto de 5 passos por quadro
+      (acima disso o atraso é descartado — câmera lenta breve em vez de espiral), quadro acima de 250 ms tratado como
+      250 ms; `app.js` roda pools, GC, efeitos (que devolvem o delta com freeze/dilatação) e sistemas por passo, e
+      renderiza uma vez por rAF. Testes unitários do acumulador. **Sem interpolação de render ainda** (`alpha` já é
+      exposto): a 144 Hz pode haver repetição de quadros; medir na máquina dele antes de investir. O `try` global do
+      loop ficou (etapa 7).
 - [ ] **5. Sensação (juice).** Flash branco em dano, hit-stop calibrado, anéis de onda de choque, faíscas
       esticadas pela velocidade, sequência de morte do inimigo em camadas, vinheta pulsante com HP < 30 %, banner
       "WAVE N", intro de boss (nome + 1,5 s), kill feed/popup de XP, combo com cor por tier. Números propostos, ele

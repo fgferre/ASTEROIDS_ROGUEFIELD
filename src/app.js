@@ -13,6 +13,7 @@ import {
   applyDebugPreference,
 } from './core/debugLogging.js';
 import { PerformanceMonitor } from './utils/PerformanceMonitor.js';
+import { createFixedStepper } from './core/fixedStep.js';
 import { bootstrapServices } from './bootstrap/bootstrapServices.js';
 import { mobileGuard } from './bootstrap/mobileGuard.js';
 import { activateProfileHarness } from './bootstrap/profileHarness.js';
@@ -54,6 +55,9 @@ let garbageCollectionManager = null;
 
 // Performance monitoring (Week 1: Balance & Feel)
 const performanceMonitor = new PerformanceMonitor();
+
+// Simulation runs in fixed 1/60 s steps; render once per animation frame.
+const fixedStepper = createFixedStepper();
 
 // Initialize DI Container (Phase 2.1)
 let diContainer = null;
@@ -536,7 +540,8 @@ function gameLoop(currentTime) {
   // Start performance monitoring
   performanceMonitor.startFrame();
 
-  const deltaTime = Math.min((currentTime - gameState.lastTime) / 1000, 0.016);
+  const frameSeconds =
+    gameState.lastTime > 0 ? (currentTime - gameState.lastTime) / 1000 : 0;
   gameState.lastTime = currentTime;
 
   try {
@@ -550,24 +555,32 @@ function gameLoop(currentTime) {
       ? !gameState.gameUI.classList.contains('hidden')
       : currentScreen === 'playing' || currentScreen === 'gameover';
 
-    if (shouldUpdateGame) {
-      GamePools.update(deltaTime);
-      if (
-        garbageCollectionManager &&
-        typeof garbageCollectionManager.update === 'function'
-      ) {
-        garbageCollectionManager.update(deltaTime);
-      }
-    }
-
-    let adjustedDelta = deltaTime;
     const effects = gameSystemServices?.['effects'];
-    if (effects && typeof effects.update === 'function') {
-      adjustedDelta = effects.update(shouldUpdateGame ? deltaTime : 0);
-    }
+    const stepSeconds = fixedStepper.step;
 
     if (shouldUpdateGame) {
-      updateGame(adjustedDelta);
+      const steps = fixedStepper.advance(frameSeconds);
+      for (let i = 0; i < steps; i += 1) {
+        GamePools.update(stepSeconds);
+        if (
+          garbageCollectionManager &&
+          typeof garbageCollectionManager.update === 'function'
+        ) {
+          garbageCollectionManager.update(stepSeconds);
+        }
+        // Effects own freeze frames and time dilation: they return the
+        // simulation delta the game systems should actually advance by.
+        const adjustedDelta =
+          effects && typeof effects.update === 'function'
+            ? effects.update(stepSeconds)
+            : stepSeconds;
+        updateGame(adjustedDelta);
+      }
+    } else {
+      fixedStepper.reset();
+      if (effects && typeof effects.update === 'function') {
+        effects.update(0);
+      }
     }
 
     // OPTIMIZATION #1: PerformanceMonitor Cache - recalculate only every 5 frames
