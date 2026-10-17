@@ -607,27 +607,6 @@ class PlayerSystem extends BaseSystem {
     this.emitShieldStats();
   }
 
-  getShieldState() {
-    return {
-      level: this.shieldUpgradeLevel,
-      maxHits: this.shieldMaxHP, // For backward compatibility with rendering
-      currentHits:
-        this.isShieldActive || this.shieldCooldownTimer > 0
-          ? this.shieldHP
-          : this.shieldMaxHP, // For backward compatibility with rendering
-      maxHP: this.shieldMaxHP,
-      currentHP:
-        this.isShieldActive || this.shieldCooldownTimer > 0
-          ? this.shieldHP
-          : this.shieldMaxHP,
-      cooldownTimer: this.shieldCooldownTimer,
-      cooldownDuration: this.shieldMaxCooldown,
-      isActive: this.isShieldActive,
-      isUnlocked: this.shieldUpgradeLevel > 0,
-      isOnCooldown: this.shieldCooldownTimer > 0,
-    };
-  }
-
   // === MÉTODO PRINCIPAL UPDATE ===
   update(deltaTime) {
     const commandQueue = this.getCommandQueue();
@@ -1421,15 +1400,6 @@ class PlayerSystem extends BaseSystem {
 
   setInvulnerableTimer(duration) {
     this.invulnerableTimer = duration;
-  }
-
-  heal(amount) {
-    this.health = Math.min(this.maxHealth, this.health + Math.max(0, amount));
-    this.eventBus?.emit?.('player-health-changed', {
-      current: this.health,
-      max: this.maxHealth,
-    });
-    return this.health;
   }
 
   getStats() {

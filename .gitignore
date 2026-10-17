@@ -7,8 +7,12 @@ coverage/
 performance-log.json
 "Cópia (1)asteroid_stats_by_wave.csv"
 
-# Local AI tooling
-.claude/
+# Local AI tooling: shared config is versioned (.claude/settings.json, hooks, agents);
+# per-machine state stays local
+.claude/*
+!.claude/settings.json
+!.claude/hooks/
+!.claude/agents/
 .planning/
 
 # Local temporary artifacts

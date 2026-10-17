@@ -1876,6 +1876,7 @@ class UISystem extends BaseSystem {
     container.innerHTML = '';
 
     if (!category) {
+      const message = document.createElement('p');
       message.className = 'settings-empty-state';
       message.textContent = 'Settings category unavailable.';
       container.appendChild(message);

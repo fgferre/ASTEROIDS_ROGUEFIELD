@@ -98,6 +98,7 @@ describe('WaveManager Integration - Feature Flags', () => {
 
       try {
         try {
+          // eslint-disable-next-line no-import-assign -- may throw; caught below
           Object.defineProperty(CONSTANTS, 'USE_WAVE_MANAGER', {
             configurable: true,
             get: () => true,
@@ -116,6 +117,7 @@ describe('WaveManager Integration - Feature Flags', () => {
         expect(warningEmitted).toBe(true);
       } finally {
         if (originalDescriptor && originalDescriptor.configurable) {
+          // eslint-disable-next-line no-import-assign -- restores the descriptor set above
           Object.defineProperty(
             CONSTANTS,
             'USE_WAVE_MANAGER',

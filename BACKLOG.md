@@ -1,0 +1,15 @@
+# BACKLOG — noticed, not done (max 30 lines, one per line)
+- `rcs_system` rank 5 emits `upgrade-strafe-movement` (`src/data/upgrades/mobility.js`) and `braking_system` rank 3 emits `upgrade-emergency-brake`; no PlayerSystem handler consumes either, so both upgrades are inert while their cards promise an effect.
+- `PlayerSystem.getShieldState()` had two definitions; the 15-field one (level, maxHP, cooldownTimer, isUnlocked…) was shadowed by a 4-field one. The lint cleanup (17/10) deleted the dead one and kept runtime behavior; check whether the HUD wanted the richer fields.
+- `PlayerSystem.heal()` likewise: the kept version emits `player-healed`; the deleted one emitted `player-health-changed`. Check that nothing listened for the latter.
+- ESLint reports ~160 `no-unused-vars` warnings (mostly `catch (error)` never used) and ~10 `Math.random` fallbacks outside RandomService; one mechanical cleanup round zeroes both and promotes them to errors in `eslint.config.js`.
+- `tests/process/scope-freeze.test.js` reads `.planning/REQUIREMENTS.md`, which no longer exists in the repo, so it always skips; retire it or point it at PLAN.md.
+- `RenderBatch`, `GradientCache` and `CanvasStateManager` (`src/core/`) have no real callers in the render hot path — only stats. Delete them or make them work (PLAN.md decides).
+- `resolveDevicePixelRatio()` in RenderingSystem is dead; the settings for bloom, chromatic aberration and `hudScale` are stored but never read. Remove the toggles or wire them (PLAN.md post-FX step).
+- `AAAHudLayout` shows a static "WEAPON SYSTEM LOCKED // LVL 5 REQ" panel and NAV coords/km/h; the radar rebuilds ~80 DOM nodes per frame via innerHTML.
+- `style.css` carries a 863-line Perplexity template block with a font from their CDN, on top of the game's own tokens and a third `:root` injected by the HUD.
+- Boss curve: Wave-5 boss kill took ~120s with a 6-upgrade build (target 60–90s); Wave-8/9 high-upgrade case never measured. Owner's play decides before touching `UPGRADE_BOSS_HEALTH_SCALAR`.
+- Profile harness (`?profile=cold-open|mid-game|boss-arena|late-stress`, `src/bootstrap/profileHarness.js`) exists but no baseline was ever recorded; record one before the post-FX step so there is a before/after.
+- Idea (owner, Phase 1): "Harmonic Plasma Lance" as a second weapon unlock (beam + fragment splits + charged burst); keep as a meta-progression candidate, not v1.
+- `docs/plans/*.md` and `docs/validation/*.md` describe phases that already shipped or were abandoned; a truth pass should archive what no longer matches the code.
+- Visual references the owner named (Nova Drift, Chorus, House of the Dying Sun, Geometry Wars) have no local thumbnails; `docs/visual-direction.md` suggests `docs/visual-direction/mood-NN.png`.

@@ -4218,17 +4218,6 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     this.animationFrame = requestAnimationFrame(this.animate);
   }
 
-  /**
-   * Called when preloading completes to sync the initial state.
-   * Starts animation if a start was pending during loading.
-   */
-  syncInitialState() {
-    if (this.loadingState.pendingStart) {
-      this.loadingState.pendingStart = false;
-      this.start();
-    }
-  }
-
   stop() {
     if (!this.isActive) {
       return;

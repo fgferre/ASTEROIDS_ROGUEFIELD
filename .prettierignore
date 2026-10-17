@@ -7,11 +7,10 @@ dist
 # Arquivos de Lock
 package-lock.json
 
-# Código legado que não deve ser modificado
-src/legacy/
-
-# Arquivo de instrução local, fora do gate de formatação
+# Policy files are hand-set (line budget, one idea per line); out of the format gate
 AGENTS.md
+CLAUDE.md
+BACKLOG.md
 
 # Histórico e contexto preservados apenas como referência
 docs/archive/
@@ -24,3 +23,8 @@ assets/starfield_tela_abertura_estudo/nasa-starfield.html
 assets/procedural/asteroid_generator_study.html
 assets/procedural/*.pdf
 assets/ui/HUD_layout_mockup.html
+
+# Build output and coverage
+coverage/
+exported-assets/
+.planning/
