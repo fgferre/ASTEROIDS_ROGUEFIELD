@@ -104,14 +104,12 @@ arquivo quando a última etapa fechar. Decisões de produto são do dono, por im
       renderiza uma vez por rAF. Testes unitários do acumulador. **Sem interpolação de render ainda** (`alpha` já é
       exposto): a 144 Hz pode haver repetição de quadros; medir na máquina dele antes de investir. O `try` global do
       loop ficou (etapa 7).
-- [ ] **5. Sensação (juice).** Medido em 17/10: o hit no jogador dá ~2,3 px de pico de shake (trauma² com divisor
-      15, `ScreenShake.js:188`, `EffectsSystem.js:1944`); o "freeze" só desacelera (piso 15–40 %), nunca para; não há
-      hit-stop em abates pequeno/médio (`EffectsSystem.js:3377-3398`); nenhum slow-mo em level-up ou morte; câmera fixa
-      sem zoom; o boss investe sem telegraph (`BossEnemy.js:730-776`); `AsteroidImpactEffect` (Three.js) só roda no
-      menu. Fazer, nesta ordem, cada um com números propostos para ele jogar: curva de shake e hit do jogador; hit-stop
-      em todo abate; windup visível antes da investida e do leque do boss; flash branco em dano no inimigo; anéis de
-      choque e faíscas esticadas; slow-mo breve em level-up e morte; banner "WAVE N", intro de boss (nome + 1,5 s),
-      kill feed, combo com cor por tier; vinheta pulsante com HP < 30 %.
+- [x] **5. Sensação (juice).** (17/10, tudo como proposta nomeada para ele julgar jogando) Telegraphs do boss
+      (faixa da investida, cunha do leque — e o bug que os deixava mortos no caminho de componentes, corrigido);
+      curva de shake trauma^1.6, teto 12 px, 1° de rotação; hit-stop em todo abate com cooldown; flash branco de 60 ms
+      em dano a inimigo; slow-mo com pulso de zoom em level-up e morte (o de level-up toca depois da escolha — BACKLOG);
+      banner "LAYER N", intro "WARDEN PRIME — Guardian of the Ring", kill feed e popups de XP, combo com cor por tier,
+      vinheta pulsante com casco < 30 %. Vida ambiente e densidade propostas (6 × 1,26^(n−1), teto 40).
 - [ ] **6. Dinâmicas.** Fato (17/10): `docs/positioning.md` promete 5 famílias de tag, sinergia "3 iguais" e matriz
       16 células de status; **nada disso existe no código** (zero ocorrências). Hoje: 9 upgrades em 4 categorias com
       ~3 ranks, 1 arma, escudo como única habilidade ativa, sem dash, ondas infinitas sem fim de run, sem

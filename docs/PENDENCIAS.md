@@ -4,7 +4,7 @@ Lista viva do que está aberto, nas palavras do dono. Leia só a seção O BAST�
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 7.**
 
-## O BASTÃO — onde a rodada parou (17/10, noite) — ETAPAS 1–4 FEITAS (ARTE NOVA COMPLETA), NÃO PUBLICADAS
+## O BASTÃO — onde a rodada parou (17/10, noite) — ETAPAS 1–5, 7 E 8 FEITAS; FALTA SÓ A 6 (DECISÕES DELE); NÃO PUBLICADAS
 
 Palavras dele (17/10): _"transformar isso num jogo maravilhoso para as próximas gerações de videogame"_; _"como se
 fosse uma versão nova para uma plataforma nova... com as melhores placas de vídeo"_; _"tudo em inglês"_.
@@ -18,7 +18,10 @@ fosse uma versão nova para uma plataforma nova... com as melhores placas de ví
 - Arte nova por `docs/NORTE.md` (o roteiro do Anel partido, pedra fosca e luz só onde há energia): fundo, fragmentos
   com rachaduras que acendem, Wardens, nave Interceptor, lanças, fagulhas, bloom, câmera 1.3× com follow,
   escudo hexagonal, explosões e clarões na paleta.
-- Telegraphs do boss (faixa da investida, cunha do leque).
+- Etapa 5 — impacto e legibilidade: telegraphs do Warden (vivos de verdade agora), shake, hit-stop, flash de dano,
+  slow-mo, banner de camada, intro do Warden, kill feed, combo por tier, vinheta de HP baixo.
+- Etapas 7 e 8 — engenharia: sem Math.random solto, um só modo dev, flags de legado fora, dependências falham cedo,
+  relógio de simulação, gravação e replay de runs (F9 baixa; `?replay=`), testes de cenário jogável.
 - Jogo todo em inglês.
 
 **O que ele precisa fazer na máquina dele:** jogar uma run inteira e dizer, por tela, o que ainda parece amador;

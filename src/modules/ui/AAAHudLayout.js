@@ -5,6 +5,33 @@ const RADAR_SIZE = 220;
 const RADAR_POOL_SIZE = 80;
 const BOSS_FALLBACK_COLOR = '#ff003c';
 const BOSS_FALLBACK_DARK = '#880020';
+const LAYER_BANNER_MS = 1200;
+const BOSS_INTRO_MS = 1500;
+const BOSS_BAR_HOLD_MS = 1000;
+const FADE_OUT_MS = 300;
+const FEED_LIFE_MS = 1600;
+const FEED_MAX_ROWS = 4;
+const COMBO_POP_MS = 120;
+const LOW_HULL_PERCENT = 30;
+const CRITICAL_HULL_PERCENT = 15;
+// NORTE §3 names, keyed by enemy.type.
+const FEED_NAMES = {
+  asteroid: 'Fragment',
+  drone: 'Mote',
+  hunter: 'Seeker',
+  mine: 'Tether',
+  boss: 'Warden Prime',
+};
+const COMBO_TIER_RANK = { text: 0, status: 1, xp: 2, boss: 3 };
+
+/** Combo color tier: text < 1.3×, status 1.3–1.6×, xp 1.7–1.9×, boss at 2.0×. */
+export function comboTier(multiplier) {
+  const m = Number(multiplier) || 1;
+  if (m >= 1.999) return 'boss';
+  if (m > 1.601) return 'xp';
+  if (m >= 1.299) return 'status';
+  return 'text';
+}
 
 export class AAAHudLayout {
   constructor() {
@@ -18,7 +45,13 @@ export class AAAHudLayout {
     this._bossPhaseMarkers = [];
     this._lastBossPhaseMarkerCount = null;
     this._lastCombo = null;
+    this._lastComboTier = 'text';
     this._blipPool = [];
+    this._timers = new Set();
+    this._bannerTimer = null;
+    this._bannerEndsAt = 0;
+    this._bossBarHeldUntil = 0;
+    this._feedRows = [];
   }
 
   mount(container) {
@@ -94,7 +127,182 @@ export class AAAHudLayout {
     this._bossPhaseMarkers = [];
     this._lastBossPhaseMarkerCount = null;
     this._lastCombo = null;
+    this._lastComboTier = 'text';
     this._blipPool = [];
+    this._timers.forEach((id) => window.clearTimeout(id));
+    this._timers.clear();
+    this._bannerTimer = null;
+    this._bannerEndsAt = 0;
+    this._bossBarHeldUntil = 0;
+    this._feedRows = [];
+  }
+
+  _later(fn, ms) {
+    const id = window.setTimeout(() => {
+      this._timers.delete(id);
+      fn();
+    }, ms);
+    this._timers.add(id);
+    return id;
+  }
+
+  _cancel(id) {
+    window.clearTimeout(id);
+    this._timers.delete(id);
+  }
+
+  /** Restarts a CSS animation class on an element. */
+  _replay(el, className) {
+    el.classList.remove(className);
+    void el.offsetWidth;
+    el.classList.add(className);
+  }
+
+  /**
+   * Centered "LAYER N" banner; boss layers read "LAYER N — WARDEN".
+   * Shown for LAYER_BANNER_MS, the last FADE_OUT_MS fading.
+   */
+  showLayerBanner(layer, { boss = false, delayMs = 0 } = {}) {
+    const banner = this.els?.layerBanner;
+    if (!banner) {
+      return;
+    }
+    if (this._bannerTimer) {
+      this._cancel(this._bannerTimer);
+    }
+    this._bannerEndsAt = performance.now() + delayMs + LAYER_BANNER_MS;
+    this._bannerTimer = this._later(() => {
+      this.els.layerBannerTitle.textContent = boss
+        ? `LAYER ${layer} — WARDEN`
+        : `LAYER ${layer}`;
+      banner.classList.toggle('is-boss', boss);
+      banner.classList.remove('is-leaving');
+      this._replay(banner, 'is-showing');
+      this._bannerTimer = this._later(() => {
+        banner.classList.add('is-leaving');
+        this._bannerTimer = this._later(() => {
+          banner.classList.remove('is-showing', 'is-leaving');
+          this._bannerTimer = null;
+        }, FADE_OUT_MS);
+      }, LAYER_BANNER_MS - FADE_OUT_MS);
+    }, delayMs);
+  }
+
+  /** Keeps the boss bar hidden for `ms` (the boss intro owns the moment). */
+  holdBossBar(ms = BOSS_BAR_HOLD_MS) {
+    this._bossBarHeldUntil = Math.max(
+      this._bossBarHeldUntil,
+      performance.now() + ms
+    );
+  }
+
+  /**
+   * Boss name card, queued after a layer banner still on screen; the boss bar
+   * stays hidden until the card is gone.
+   */
+  showBossIntro(name) {
+    const card = this.els?.bossIntro;
+    if (!card) {
+      return;
+    }
+    const now = performance.now();
+    const delayMs = Math.max(0, this._bannerEndsAt - FADE_OUT_MS - now);
+    // The bar stays hidden until the card has faded out.
+    this._bossBarHeldUntil = Infinity;
+    this._later(() => {
+      this.els.bossIntroName.textContent = name || 'Warden Prime';
+      card.classList.remove('is-leaving');
+      this._replay(card, 'is-showing');
+      this._later(() => {
+        card.classList.add('is-leaving');
+        this._later(() => {
+          card.classList.remove('is-showing', 'is-leaving');
+          this._bossBarHeldUntil = 0;
+        }, FADE_OUT_MS);
+      }, BOSS_INTRO_MS - FADE_OUT_MS);
+    }, delayMs);
+  }
+
+  /** Kill feed row for a destroyed enemy; repeated kills count up (×N). */
+  addKillFeed(enemyType) {
+    const name = FEED_NAMES[enemyType];
+    if (!name) {
+      return;
+    }
+    this._pushFeed(`kill:${enemyType}`, 'kill', (row) => {
+      row.count += 1;
+      row.label.textContent = name;
+      row.value.textContent = row.count > 1 ? `×${row.count}` : '';
+    });
+  }
+
+  /** XP feed row; orbs collected while the row is up add into it. */
+  addXpFeed(amount) {
+    if (!(amount > 0)) {
+      return;
+    }
+    this._pushFeed('xp', 'xp', (row) => {
+      row.count += amount;
+      row.label.textContent = `+${Math.round(row.count)} XP`;
+    });
+  }
+
+  _pushFeed(key, tone, render) {
+    const container = this.els?.feed;
+    if (!container) {
+      return;
+    }
+    // A row still on screen keeps counting and moves back to the top.
+    let row = this._feedRows.find((entry) => entry.key === key);
+    if (row) {
+      container.prepend(row.el);
+      this._feedRows = [
+        row,
+        ...this._feedRows.filter((entry) => entry !== row),
+      ];
+    } else {
+      const el = document.createElement('div');
+      el.className = `feed-row feed-row--${tone}`;
+      el.innerHTML =
+        '<span class="feed-label"></span><span class="feed-value"></span>';
+      row = {
+        key,
+        el,
+        count: 0,
+        label: el.firstChild,
+        value: el.lastChild,
+        timer: null,
+      };
+      container.prepend(el);
+      this._feedRows.unshift(row);
+      while (this._feedRows.length > FEED_MAX_ROWS) {
+        this._removeFeedRow(this._feedRows[this._feedRows.length - 1]);
+      }
+    }
+    render(row);
+    row.el.classList.remove('is-leaving');
+    if (row.timer) {
+      this._cancel(row.timer);
+    }
+    row.timer = this._later(
+      () => {
+        row.el.classList.add('is-leaving');
+        row.timer = this._later(
+          () => this._removeFeedRow(row),
+          FADE_OUT_MS + 100
+        );
+      },
+      FEED_LIFE_MS - FADE_OUT_MS - 100
+    );
+    return row;
+  }
+
+  _removeFeedRow(row) {
+    if (row.timer) {
+      this._cancel(row.timer);
+    }
+    row.el.remove();
+    this._feedRows = this._feedRows.filter((entry) => entry !== row);
   }
 
   _cacheElements() {
@@ -129,6 +337,12 @@ export class AAAHudLayout {
       // Plan 01.07 Task 5/6 — combat mode indicators.
       spreadModeIndicator: query('#ui-spread-mode'),
       aimModeIndicator: query('#ui-aim-mode'),
+      layerBanner: query('#ui-layer-banner'),
+      layerBannerTitle: query('#ui-layer-banner-title'),
+      bossIntro: query('#ui-boss-intro'),
+      bossIntroName: query('#ui-boss-intro-name'),
+      feed: query('#ui-feed'),
+      lowHpVignette: query('#ui-lowhp-vignette'),
     };
   }
 
@@ -176,7 +390,7 @@ export class AAAHudLayout {
   }
 
   /** Atualiza tempo, abates e combo */
-  updateStats(timeStr, kills, combo) {
+  updateStats(timeStr, kills, combo, multiplier) {
     if (!this.els) {
       return;
     }
@@ -184,15 +398,26 @@ export class AAAHudLayout {
     if (timeStr) this.els.timer.innerText = timeStr;
     if (kills !== undefined) this.els.kills.innerText = kills;
     if (combo !== undefined && combo !== this._lastCombo) {
+      const increased = combo > (this._lastCombo ?? 0);
       this._lastCombo = combo;
       const visible = combo >= COMBO_VISIBLE_MIN;
       this.els.comboBox.classList.toggle('is-hidden', !visible);
+      const tier = comboTier(multiplier);
+      this.els.comboBox.dataset.tier = tier;
       if (visible) {
         this.els.combo.innerText = 'x' + combo;
-        this.els.comboBox.classList.remove('pulse');
-        void this.els.comboBox.offsetWidth;
-        this.els.comboBox.classList.add('pulse');
+        if (increased) {
+          this._replay(this.els.comboBox, 'pulse');
+        }
       }
+      if (COMBO_TIER_RANK[tier] > COMBO_TIER_RANK[this._lastComboTier]) {
+        this._pushFeed('combo', 'combo', (row) => {
+          row.el.dataset.tier = tier;
+          row.label.textContent = `Combo x${combo}`;
+          row.value.textContent = `${Number(multiplier).toFixed(1)}×`;
+        });
+      }
+      this._lastComboTier = tier;
     }
   }
 
@@ -218,11 +443,23 @@ export class AAAHudLayout {
     this.els.hullText.innerText = hpPercent + '%';
 
     // Feedback visual de dano cr¡tico
-    if (hpPercent < 30) {
+    if (hpPercent < LOW_HULL_PERCENT) {
       this.els.hullText.classList.add('is-critical', 'glitch-text');
     } else {
       this.els.hullText.classList.remove('is-critical', 'glitch-text');
     }
+
+    const vignette = this.els.lowHpVignette;
+    const hullPercent = (safeHull / safeMaxHull) * 100;
+    const alive = safeHull > 0;
+    vignette.classList.toggle(
+      'is-low',
+      alive && hullPercent < LOW_HULL_PERCENT
+    );
+    vignette.classList.toggle(
+      'is-critical',
+      alive && hullPercent < CRITICAL_HULL_PERCENT
+    );
   }
 
   /** Helper interno para preencher segmentos */
@@ -271,7 +508,10 @@ export class AAAHudLayout {
       return;
     }
 
-    this.els.bossPanel.classList.add('active');
+    this.els.bossPanel.classList.toggle(
+      'active',
+      performance.now() >= this._bossBarHeldUntil
+    );
     this.els.bossPanel.classList.toggle(
       'is-invulnerable',
       Boolean(phaseInfo?.invulnerable)
@@ -496,6 +736,8 @@ export class AAAHudLayout {
 
   _getHTML() {
     return `
+            <div class="lowhp-vignette" id="ui-lowhp-vignette"></div>
+
             <!-- STATS (Top Left) -->
             <div class="stats-area hud-panel">
                 <div class="stats-grid">
@@ -516,10 +758,6 @@ export class AAAHudLayout {
 
             <!-- BOSS (Top Center) -->
             <div class="boss-area hud-panel" id="ui-boss-panel">
-                <div class="warning-strip">
-                    <span class="warning-light"><i data-lucide="alert-triangle" size="16"></i> WARNING</span>
-                    <span class="warning-light">WARNING <i data-lucide="alert-triangle" size="16"></i></span>
-                </div>
                 <div class="boss-bar-container">
                     <div class="boss-name" id="ui-boss-name">BOSS</div>
                     <div class="boss-skull"><i data-lucide="skull" size="24"></i></div>
@@ -557,6 +795,21 @@ export class AAAHudLayout {
                 <div class="next-wave-label">INCOMING LAYER</div>
                 <div class="next-wave-timer" id="ui-next-wave-timer">10</div>
             </div>
+
+            <!-- LAYER BANNER + BOSS INTRO (Center, upper third) -->
+            <div class="layer-banner" id="ui-layer-banner" aria-live="polite">
+                <div class="layer-banner__title" id="ui-layer-banner-title">LAYER 1</div>
+                <div class="layer-banner__line"></div>
+            </div>
+            <div class="boss-intro" id="ui-boss-intro" aria-live="polite">
+                <div class="boss-intro__line"></div>
+                <div class="boss-intro__name" id="ui-boss-intro-name">Warden Prime</div>
+                <div class="boss-intro__sub">Guardian of the Ring</div>
+                <div class="boss-intro__line"></div>
+            </div>
+
+            <!-- KILL FEED (Right, under the radar) -->
+            <div class="hud-feed" id="ui-feed"></div>
 
             <!-- VITALS (Bottom Left) -->
             <div class="status-area hud-panel">
@@ -633,15 +886,16 @@ export class AAAHudLayout {
             .stat-value { font-family: var(--font-display, 'Orbitron', sans-serif); font-size: var(--text-xl, 28px); color: var(--text, #fff); line-height: 1.1; }
             .combo-box { margin-top: var(--space-2, 8px); }
             .combo-box.is-hidden { visibility: hidden; }
-            .combo-box.pulse { animation: pulse-text var(--motion-base, 0.3s) var(--ease-out, ease-out) 1; }
+            .combo-box { transform-origin: left center; }
             .combo-label { font-size: var(--text-sm, 14px); color: var(--accent, #00f2ff); letter-spacing: 2px; font-weight: 700; }
-            .combo-val { font-size: var(--text-xl, 28px); line-height: 1; font-family: var(--font-display, 'Orbitron', sans-serif); color: var(--status, #ffae00); font-weight: 900; }
+            .combo-val { font-size: var(--text-xl, 28px); line-height: 1; font-family: var(--font-display, 'Orbitron', sans-serif); color: var(--text); font-weight: 900; transition: color var(--motion-fast); }
+            .combo-box[data-tier='status'] .combo-val { color: var(--status); }
+            .combo-box[data-tier='xp'] .combo-val { color: var(--xp); }
+            .combo-box[data-tier='boss'] .combo-val { color: var(--boss); text-shadow: 0 0 12px var(--boss); }
 
             /* BOSS */
             .boss-area { grid-column: 2; display: flex; flex-direction: column; align-items: center; padding-top: var(--space-4, 16px); opacity: 0; transition: opacity 0.5s; }
             .boss-area.active { opacity: 1; }
-            .warning-strip { display: flex; gap: 50px; margin-bottom: 5px; opacity: 0.9; }
-            .warning-light { color: var(--danger, #ff003c); font-weight: bold; font-size: var(--text-md, 16px); animation: blink 0.5s infinite alternate; letter-spacing: 3px; }
             .boss-bar-container { position: relative; width: 70%; height: 32px; background: var(--surface, rgba(20, 0, 0, 0.6)); border: 1px solid var(--boss, #ff003c); display: flex; align-items: center; margin-top: var(--space-4, 16px); }
             .boss-skull { width: 45px; height: 45px; background: var(--bg, #0a0a0f); border: 2px solid var(--boss, #ff003c); position: absolute; left: -22px; display: flex; justify-content: center; align-items: center; clip-path: polygon(25% 0%, 75% 0%, 100% 25%, 100% 75%, 75% 100%, 25% 100%, 0% 75%, 0% 25%); color: var(--boss, #ff003c); z-index: 5; }
             .boss-fill { height: 100%; width: 100%; background: var(--boss, #ff003c); box-shadow: 0 0 20px var(--boss, #ff003c); transition: width 0.3s ease-out; position: relative; }
@@ -718,8 +972,6 @@ export class AAAHudLayout {
             .data-val { color: var(--accent, #00f2ff); font-weight: bold; }
 
             /* ANIMATIONS */
-            @keyframes pulse-text { 0% { transform: scale(1); } 40% { transform: scale(1.15); } 100% { transform: scale(1); } }
-            @keyframes blink { 0% { opacity: 0.3; } 100% { opacity: 1; } }
             @keyframes rotate-border { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
             @keyframes radar-sweep-anim { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
             @keyframes alert-pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
@@ -727,6 +979,60 @@ export class AAAHudLayout {
             @keyframes boss-critical { 0% { filter: brightness(2); } 100% { filter: brightness(1); } }
             @keyframes glitch { 0%, 92%, 95%, 100% { transform: translate(0, 0); opacity: 1; } 93% { transform: translate(-2px, 2px); opacity: 0.8; } 94% { transform: translate(2px, -2px); opacity: 0.8; } 96% { transform: translate(1px, 2px); opacity: 0.9; } 97% { transform: translate(-1px, -1px); opacity: 0.9; } }
             .glitch-text { animation: glitch 3s infinite; }
+
+            /* LOW HULL VIGNETTE */
+            .lowhp-vignette { position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity var(--motion-base); box-shadow: inset 0 0 120px 24px var(--danger-line); }
+            .lowhp-vignette.is-low { opacity: 0.6; }
+            .lowhp-vignette.is-critical { opacity: 0.9; box-shadow: inset 0 0 130px 36px var(--danger-line), inset 0 0 28px 3px var(--danger); }
+
+            /* LAYER BANNER */
+            .layer-banner { position: absolute; top: 28%; left: 0; width: 100%; display: flex; flex-direction: column; align-items: center; gap: var(--space-2); pointer-events: none; z-index: 90; opacity: 0; visibility: hidden; }
+            .layer-banner.is-showing { opacity: 1; visibility: visible; }
+            .layer-banner__title { font-family: var(--font-display); font-size: var(--text-2xl); font-weight: 700; letter-spacing: 0.5em; margin-right: -0.5em; color: var(--text); text-shadow: 0 0 18px var(--accent-line), 0 2px 0 rgba(0, 0, 0, 0.8); }
+            .layer-banner__line { width: 420px; max-width: 70%; height: 1px; background: linear-gradient(90deg, transparent, var(--accent) 20%, var(--accent) 80%, transparent); box-shadow: var(--glow-accent); }
+            .layer-banner.is-boss .layer-banner__title { color: var(--boss); text-shadow: 0 0 18px var(--boss), 0 2px 0 rgba(0, 0, 0, 0.8); }
+            .layer-banner.is-boss .layer-banner__line { background: linear-gradient(90deg, transparent, var(--boss) 20%, var(--boss) 80%, transparent); box-shadow: 0 0 12px var(--boss); }
+
+            /* BOSS INTRO */
+            .boss-intro { position: absolute; top: 26%; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-4) var(--space-6); background: radial-gradient(ellipse at center, color-mix(in srgb, var(--boss) 22%, transparent) 0%, transparent 70%); pointer-events: none; z-index: 95; opacity: 0; visibility: hidden; }
+            .boss-intro.is-showing { opacity: 1; visibility: visible; }
+            .layer-banner.is-leaving, .boss-intro.is-leaving { opacity: 0; }
+            .boss-intro__name { font-family: var(--font-display); font-size: var(--text-hero); font-weight: 900; letter-spacing: 0.3em; margin-right: -0.3em; text-transform: uppercase; color: var(--text); text-shadow: 0 0 24px var(--boss), 0 0 4px var(--boss), 0 3px 0 rgba(0, 0, 0, 0.85); line-height: 1; white-space: nowrap; }
+            .boss-intro__sub { font-family: var(--font-ui); font-size: var(--text-lg); font-weight: 600; letter-spacing: 0.4em; margin-right: -0.4em; text-transform: uppercase; color: var(--boss); text-shadow: 0 0 10px rgba(0, 0, 0, 0.9); }
+            .boss-intro__line { width: 100%; height: 1px; background: linear-gradient(90deg, transparent, var(--boss) 25%, var(--boss) 75%, transparent); box-shadow: 0 0 10px var(--boss); }
+
+            /* KILL FEED */
+            .hud-feed { position: absolute; top: calc(220px + var(--space-6)); right: var(--space-4); width: 200px; display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); pointer-events: none; z-index: 30; }
+            .feed-row { display: flex; align-items: baseline; gap: var(--space-2); padding: 2px var(--space-2); background: linear-gradient(270deg, var(--surface) 0%, transparent 100%); border-right: 2px solid var(--neutral); font-family: var(--font-ui); font-size: var(--text-md); font-weight: 600; letter-spacing: 1px; color: var(--text); white-space: nowrap; }
+            .feed-row.is-leaving { opacity: 0; }
+            .feed-value { font-family: var(--font-display); font-size: var(--text-sm); color: var(--text-dim); }
+            .feed-row--xp { border-right-color: var(--xp); color: var(--xp); }
+            .feed-row--combo { border-right-color: var(--status); color: var(--status); }
+            .feed-row--combo[data-tier='xp'] { border-right-color: var(--xp); color: var(--xp); }
+            .feed-row--combo[data-tier='boss'] { border-right-color: var(--boss); color: var(--boss); }
+            .feed-row--combo .feed-value { color: inherit; }
+
+            @media (prefers-reduced-motion: no-preference) {
+                .combo-box.pulse { animation: combo-pop ${COMBO_POP_MS}ms var(--ease-out) 1; }
+                .lowhp-vignette.is-low { animation: lowhp-pulse 0.83s ease-in-out infinite alternate; }
+                .lowhp-vignette.is-critical { animation-name: lowhp-pulse-critical; }
+                .layer-banner.is-showing .layer-banner__title { animation: banner-title-in 420ms var(--ease-out); }
+                .layer-banner.is-showing .layer-banner__line { animation: banner-line-draw 600ms var(--ease-out) 120ms both; }
+                .layer-banner.is-leaving, .boss-intro.is-leaving { transition: opacity ${FADE_OUT_MS}ms ease-in; }
+                .boss-intro.is-showing { animation: boss-intro-in 360ms var(--ease-out); }
+                .boss-intro.is-showing .boss-intro__line { animation: banner-line-draw 600ms var(--ease-out) 150ms both; }
+                .boss-area { transform: translateY(-24px); transition: opacity 0.5s var(--ease-out), transform 0.5s var(--ease-out); }
+                .boss-area.active { transform: translateY(0); }
+                .feed-row { animation: feed-in var(--motion-base) var(--ease-out); transition: opacity ${FADE_OUT_MS}ms ease-in, transform ${FADE_OUT_MS}ms ease-in; }
+                .feed-row.is-leaving { transform: translateX(8px); }
+            }
+            @keyframes combo-pop { 0% { transform: scale(1); } 50% { transform: scale(1.18); } 100% { transform: scale(1); } }
+            @keyframes lowhp-pulse { from { opacity: 0.25; } to { opacity: 0.75; } }
+            @keyframes lowhp-pulse-critical { from { opacity: 0.55; } to { opacity: 1; } }
+            @keyframes banner-title-in { from { opacity: 0; letter-spacing: 0.2em; margin-right: -0.2em; } to { opacity: 1; letter-spacing: 0.5em; margin-right: -0.5em; } }
+            @keyframes banner-line-draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+            @keyframes boss-intro-in { from { opacity: 0; transform: translateX(-50%) scale(0.9); } to { opacity: 1; transform: translateX(-50%) scale(1); } }
+            @keyframes feed-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
 
             @media (max-width: 900px) { #hud-layer { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; } .stats-area { position: absolute; top: 10px; left: 10px; } .radar-area { position: absolute; top: 10px; right: 10px; } .boss-area { margin-top: 60px; transform: scale(0.8); } .status-area { position: absolute; bottom: 20px; left: 10px; transform: scale(0.9); transform-origin: bottom left; } .systems-area { position: absolute; bottom: 20px; right: 10px; } .bottom-center { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 300px; } }
         `;

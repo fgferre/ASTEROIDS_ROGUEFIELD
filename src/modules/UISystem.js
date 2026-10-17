@@ -341,6 +341,7 @@ class UISystem extends BaseSystem {
 
     switch (eventName) {
       case 'boss-wave-started':
+        this.aaaTacticalHud?.holdBossBar();
         next.active = false;
         next.upcoming = true;
         next.defeated = false;
@@ -348,6 +349,13 @@ class UISystem extends BaseSystem {
         next.maxHealth = Number(data?.maxHealth ?? next.maxHealth ?? 0) || 0;
         break;
       case 'boss-spawned':
+        if (!current.active) {
+          this.aaaTacticalHud?.showBossIntro(data?.enemy?.displayName);
+        }
+        next.active = true;
+        next.upcoming = false;
+        next.defeated = false;
+        break;
       case 'boss-phase-changed':
       case 'boss-invulnerability-changed':
         next.active = true;
@@ -391,6 +399,24 @@ class UISystem extends BaseSystem {
 
     this.updateAAATacticalHudFromServices({ force: true });
     return this.getBossHudState();
+  }
+
+  handleLayerStarted(payload = {}) {
+    const hud = this.aaaTacticalHud;
+    if (!hud) {
+      return;
+    }
+    const layer = Math.max(1, Math.floor(Number(payload.wave) || 1));
+    const bossInterval = Number(WAVE_BOSS_INTERVAL) || 0;
+    const boss =
+      Boolean(payload.isBossWave) ||
+      (bossInterval > 0 && layer % bossInterval === 0);
+    // The first-run controls toast opens right after layer 1 starts.
+    const toastShowing =
+      layer === 1 &&
+      (this.isControlsToastPending() ||
+        Boolean(this.domRefs.gameUi?.querySelector('.controls-toast')));
+    hud.showLayerBanner(layer, { boss, delayMs: toastShowing ? 1000 : 0 });
   }
 
   handleWaveCompletionEvent(payload = {}, sourceEvent = 'wave-complete') {
@@ -1183,7 +1209,7 @@ class UISystem extends BaseSystem {
     if (progression && typeof progression.getComboState === 'function') {
       const comboState = progression.getComboState() || {};
       const comboCount = Number(comboState.comboCount ?? 0) || 0;
-      hud.updateStats(null, undefined, comboCount);
+      hud.updateStats(null, undefined, comboCount, comboState.multiplier);
     }
 
     // Plan 01.07 Task 5/6 — render combat mode indicators from CombatSystem
@@ -1351,6 +1377,18 @@ class UISystem extends BaseSystem {
       'boss-invulnerability-changed',
       'boss-defeated',
     ].forEach(registerBossEvent);
+
+    this.registerEventListener('wave-started', (payload = {}) => {
+      this.handleLayerStarted(payload);
+    });
+
+    this.registerEventListener('enemy-destroyed', (payload = {}) => {
+      this.aaaTacticalHud?.addKillFeed(payload.enemy?.type);
+    });
+
+    this.registerEventListener('xp-orb-collected', (payload = {}) => {
+      this.aaaTacticalHud?.addXpFeed(Number(payload.value));
+    });
 
     this.registerEventListener('pause-state-changed', (data) => {
       this.updatePauseScreen(Boolean(data?.isPaused));
@@ -3127,14 +3165,22 @@ class UISystem extends BaseSystem {
     focusTarget?.focus({ preventScroll: true });
   }
 
-  maybeShowControlsToast() {
+  isControlsToastPending() {
     if (this.controlsToastDisabled) {
+      return false;
+    }
+    try {
+      return !localStorage.getItem(CONTROLS_SEEN_KEY);
+    } catch (error) {
+      return false;
+    }
+  }
+
+  maybeShowControlsToast() {
+    if (!this.isControlsToastPending()) {
       return;
     }
     try {
-      if (localStorage.getItem(CONTROLS_SEEN_KEY)) {
-        return;
-      }
       localStorage.setItem(CONTROLS_SEEN_KEY, '1');
     } catch (error) {
       return;
