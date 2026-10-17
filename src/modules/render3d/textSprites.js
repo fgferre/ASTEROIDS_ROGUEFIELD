@@ -69,6 +69,7 @@ export class TextSprites {
     ctx.fillStyle = color;
     ctx.fillText(text, width / 2, height / 2);
     const texture = this.seeded(() => new this.THREE.CanvasTexture(canvas));
+    texture.encoding = this.THREE.sRGBEncoding;
     entry = { texture, aspect: width / height };
     cache.set(value, entry);
     this.cached += 1;

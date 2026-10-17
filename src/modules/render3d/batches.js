@@ -7,7 +7,13 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../../core/GameConstants.js';
 export const HALF_W = GAME_WIDTH / 2;
 export const HALF_H = GAME_HEIGHT / 2;
 
-// Parsed colors, keyed by the CSS string the simulation stores.
+// Colors are authored in sRGB (palette, simulation); lighting and blending
+// run in linear, and the composer encodes back to sRGB at the end.
+export function colorOf(THREE, css) {
+  return new THREE.Color(css).convertSRGBToLinear();
+}
+
+// Parsed linear colors, keyed by the CSS string the simulation stores.
 const colorCache = new Map();
 export function rgbOf(THREE, css) {
   let rgb = colorCache.get(css);
@@ -18,6 +24,7 @@ export function rgbOf(THREE, css) {
     } catch {
       color.set(0xffffff);
     }
+    color.convertSRGBToLinear();
     rgb = [color.r, color.g, color.b];
     colorCache.set(css, rgb);
   }

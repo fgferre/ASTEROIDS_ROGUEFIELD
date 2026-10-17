@@ -146,7 +146,7 @@ Pedido dele (`/goal`): _"3D visto de cima, câmera dinâmica, fases, ondas e ini
 Vampire Survivors… muitos inimigos diferentes e fases. Motor gráfico top de linha… SFX e VFX de grandes estúdios,
 tudo num browser."_ Fatias, cada uma um commit com captura; números como "proposta 17/10" para ele julgar jogando.
 
-- [ ] **R2.1 Profundidade e luz (render3d).** sRGB + tone mapping (hoje saída linear, por isso chapado perto do menu),
+- [x] **R2.1 Profundidade e luz (render3d).** sRGB + tone mapping (hoje saída linear, por isso chapado perto do menu),
       chão de poeira que a luz da nave varre, sombras suaves sob rochas/inimigos/nave, pool de luzes para explosões.
 - [ ] **R2.2 Roster.** Quatro tipos novos com comportamento próprio (Husk que se parte em Motes, Ram com investida
       telegrafada, Weaver que semeia Tethers, Bulwark com escudo frontal) + modificador **Elite** (vida, tamanho,
@@ -157,7 +157,7 @@ tudo num browser."_ Fatias, cada uma um commit com captura; números como "propo
       WaveManager lê dela e as três tabelas de hoje (configs 1–12, pesos hardcoded, geração dinâmica 13+) saem.
 - [ ] **R2.5 VFX 3D.** Estilhaços de rocha com rotação, dissolve na morte de inimigo, afterimage do dash,
       aberração cromática em impactos grandes, faíscas direcionais; tudo lendo os eventos que já existem.
-- [ ] **R2.6 SFX.** Compressor/limitador no master, reverb por bus, cues por inimigo novo (spawn, telegraph, morte),
+- [x] **R2.6 SFX.** Compressor/limitador no master, reverb por bus, cues por inimigo novo (spawn, telegraph, morte),
       explosão em três tamanhos, música que sobe com camada/densidade e não só com boss.
 - [ ] **R2.7 Pickups à la VS.** Ímã (puxa todas as fagulhas), pulso (limpa a tela), sobrecarga (cadência ×2 por 8 s);
       caem de Elites e Wardens; HUD mostra o que caiu.

@@ -11,7 +11,7 @@ import {
 } from '../../data/constants/gameplay.js';
 import { PALETTE } from '../../data/constants/palette.js';
 import { SHIP_MAX_SPEED } from '../../data/constants/physics.js';
-import { HALF_H, HALF_W, rgbOf } from './batches.js';
+import { HALF_H, HALF_W, colorOf, rgbOf } from './batches.js';
 
 const HULL_DEPTH = 6;
 // Visual only: collision keeps the 2D outline.
@@ -72,8 +72,8 @@ export class PlayerMirror {
     // Lighter and less metallic than the enemies' plates, so the key light
     // reads on it at gameplay zoom.
     this.hullMaterial = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(PALETTE.hullLit).lerp(
-        new THREE.Color(PALETTE.neutral),
+      color: colorOf(THREE, PALETTE.hullLit).lerp(
+        colorOf(THREE, PALETTE.neutral),
         0.3
       ),
       metalness: 0.3,
@@ -81,19 +81,19 @@ export class PlayerMirror {
       flatShading: true,
     });
     this.hullMaterial.userData.uRim = {
-      value: new THREE.Color(PALETTE.player).multiplyScalar(0.55),
+      value: colorOf(THREE, PALETTE.player).multiplyScalar(0.55),
     };
     this.hullMaterial.userData.uBlink = { value: 0 };
     this.hullMaterial.onBeforeCompile = patchHull;
     this.seamMaterial = new THREE.LineBasicMaterial({
-      color: PALETTE.rockShadow,
+      color: colorOf(THREE, PALETTE.rockShadow),
     });
     this.rimMaterial = new THREE.LineBasicMaterial({
-      color: new THREE.Color(PALETTE.player).multiplyScalar(0.9),
+      color: colorOf(THREE, PALETTE.player).multiplyScalar(0.9),
       toneMapped: false,
     });
     this.flameMaterial = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(PALETTE.player).multiplyScalar(1.7),
+      color: colorOf(THREE, PALETTE.player).multiplyScalar(1.7),
       transparent: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
@@ -112,13 +112,18 @@ export class PlayerMirror {
     cone.translate(-0.5, 0, 0);
     this.cone = cone;
 
-    this.light = new THREE.PointLight(PALETTE.player, 0, 150, 2);
+    this.light = new THREE.PointLight(
+      colorOf(THREE, PALETTE.player),
+      0,
+      150,
+      2
+    );
     this.group.add(this.light);
 
     this.shield = new THREE.Mesh(
       new THREE.RingGeometry(0.9, 1, 64).rotateX(-Math.PI / 2),
       new THREE.MeshBasicMaterial({
-        color: new THREE.Color(PALETTE.player).multiplyScalar(1.4),
+        color: colorOf(THREE, PALETTE.player).multiplyScalar(1.4),
         transparent: true,
         opacity: 0.35,
         depthWrite: false,
@@ -127,7 +132,7 @@ export class PlayerMirror {
       })
     );
     this.group.add(this.shield);
-    this.shieldRgb = new THREE.Color(PALETTE.player).multiplyScalar(1.4);
+    this.shieldRgb = colorOf(THREE, PALETTE.player).multiplyScalar(1.4);
     this.shieldFlashRgb = new THREE.Color(1.6, 1.6, 1.6);
     this.shieldHitAt = -Infinity;
 
@@ -136,7 +141,7 @@ export class PlayerMirror {
       const ghost = new THREE.Mesh(
         new THREE.BufferGeometry(),
         new THREE.MeshBasicMaterial({
-          color: PALETTE.player,
+          color: colorOf(THREE, PALETTE.player),
           transparent: true,
           depthWrite: false,
           blending: THREE.AdditiveBlending,
@@ -149,7 +154,7 @@ export class PlayerMirror {
       scene.add(ghost);
       this.ghosts.push(ghost);
     }
-    this.ghostRgb = new THREE.Color(PALETTE.player);
+    this.ghostRgb = colorOf(THREE, PALETTE.player);
     this.dashGuard = false;
 
     this.hullKey = null;
@@ -231,7 +236,7 @@ export class PlayerMirror {
       const glass = new THREE.Mesh(
         new THREE.BoxGeometry(length, 1, cockpit.width * 2),
         new THREE.MeshBasicMaterial({
-          color: new THREE.Color(PALETTE.player).multiplyScalar(0.55),
+          color: colorOf(THREE, PALETTE.player).multiplyScalar(0.55),
           toneMapped: false,
         })
       );

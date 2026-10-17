@@ -6,7 +6,7 @@
 
 import { PALETTE } from '../../data/constants/palette.js';
 import { createAsteroidGeometry, createSeededRandom } from './asteroidMesh.js';
-import { HALF_H, HALF_W } from './batches.js';
+import { HALF_H, HALF_W, colorOf } from './batches.js';
 
 const ROCK_SHAPES = 8;
 const ROCK_DETAIL = 4;
@@ -140,9 +140,9 @@ function smooth(a, b, x) {
 function paintRock(THREE, geometry, seed) {
   const position = geometry.getAttribute('position');
   const colors = new Float32Array(position.count * 3);
-  const low = new THREE.Color(PALETTE.rockShadow);
-  const mid = new THREE.Color(PALETTE.rock);
-  const high = new THREE.Color(PALETTE.rockLit);
+  const low = colorOf(THREE, PALETTE.rockShadow);
+  const mid = colorOf(THREE, PALETTE.rock);
+  const high = colorOf(THREE, PALETTE.rockLit);
   const color = new THREE.Color();
   const random = createSeededRandom(seed + 9);
   for (let i = 0; i < position.count; i += 1) {
@@ -179,23 +179,23 @@ export class EnemyMirror {
 
     // Matte mass (docs/NORTE.md §2): the eye/core is the only light.
     this.hullMaterial = new THREE.MeshStandardMaterial({
-      color: PALETTE.hullLit,
+      color: colorOf(THREE, PALETTE.hullLit),
       metalness: 0.2,
       roughness: 0.85,
     });
     this.plateMaterial = new THREE.MeshStandardMaterial({
-      color: PALETTE.hullLit,
+      color: colorOf(THREE, PALETTE.hullLit),
       metalness: 0.2,
       roughness: 0.85,
       flatShading: true,
     });
     this.darkMaterial = new THREE.MeshStandardMaterial({
-      color: PALETTE.hull,
+      color: colorOf(THREE, PALETTE.hull),
       metalness: 0.3,
       roughness: 0.8,
     });
     this.rimMaterial = new THREE.LineBasicMaterial({
-      color: new THREE.Color(PALETTE.threat).multiplyScalar(1.1),
+      color: colorOf(THREE, PALETTE.threat).multiplyScalar(1.1),
       toneMapped: false,
     });
 
@@ -290,7 +290,7 @@ export class EnemyMirror {
 
   emissive(hex, gain) {
     const material = new this.THREE.MeshBasicMaterial({ toneMapped: false });
-    material.userData.base = new this.THREE.Color(hex);
+    material.userData.base = colorOf(this.THREE, hex);
     material.color.copy(material.userData.base).multiplyScalar(gain);
     return material;
   }
@@ -311,7 +311,7 @@ export class EnemyMirror {
       uReveal: { value: 0 },
       uWidth: { value: 0.05 },
       uFlash: { value: 0 },
-      uVein: { value: new THREE.Color(PALETTE.shot) },
+      uVein: { value: colorOf(THREE, PALETTE.shot) },
       uSeed: { value: new THREE.Vector3() },
     };
     material.onBeforeCompile = patchRockShader;
@@ -373,7 +373,7 @@ export class EnemyMirror {
       spin.add(strut, node);
     }
     const arcMaterial = new THREE.LineBasicMaterial({ toneMapped: false });
-    arcMaterial.userData.base = new THREE.Color(PALETTE.threat);
+    arcMaterial.userData.base = colorOf(THREE, PALETTE.threat);
     const arc = new THREE.LineLoop(
       new THREE.BufferGeometry().setFromPoints(tips),
       arcMaterial
@@ -406,8 +406,8 @@ export class EnemyMirror {
       ring.add(segment);
     }
     const coreMaterial = new THREE.MeshStandardMaterial({
-      color: '#120a1a',
-      emissive: PALETTE.boss,
+      color: colorOf(THREE, '#120a1a'),
+      emissive: colorOf(THREE, PALETTE.boss),
       emissiveIntensity: 1.3,
       roughness: 0.35,
       metalness: 0.2,
@@ -418,7 +418,7 @@ export class EnemyMirror {
     const rim = new THREE.LineLoop(
       this.circleRim,
       new THREE.LineBasicMaterial({
-        color: new THREE.Color(PALETTE.boss).multiplyScalar(1.2),
+        color: colorOf(THREE, PALETTE.boss).multiplyScalar(1.2),
         toneMapped: false,
       })
     );
@@ -428,7 +428,7 @@ export class EnemyMirror {
 
     const additive = (hex) =>
       new THREE.MeshBasicMaterial({
-        color: hex,
+        color: colorOf(THREE, hex),
         transparent: true,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
@@ -527,7 +527,9 @@ export class EnemyMirror {
     material.roughness = variant.roughness ?? 0.94;
     material.metalness = variant.metalness ?? 0.04;
     const uniforms = material.userData.rockUniforms;
-    uniforms.uVein.value.set(variant.vein || PALETTE.shot);
+    uniforms.uVein.value
+      .set(variant.vein || PALETTE.shot)
+      .convertSRGBToLinear();
     uniforms.uSeed.value.set(random() * 50, random() * 50, random() * 50);
   }
 

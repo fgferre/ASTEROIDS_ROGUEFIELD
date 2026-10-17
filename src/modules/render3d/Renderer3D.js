@@ -30,10 +30,13 @@ import {
   HALF_W,
   PointBatch,
   RibbonBatch,
+  colorOf,
   rgbOf,
 } from './batches.js';
+import { DustFloor } from './dustFloor.js';
 import { EnemyMirror } from './enemyMirror.js';
 import { FieldBackdrop } from './fieldBackdrop.js';
+import { FlashLights } from './flashLights.js';
 import { PlayerMirror } from './playerMirror.js';
 import { TextSprites } from './textSprites.js';
 
@@ -45,11 +48,34 @@ const DOLLY_SPEED_OUT = 0.08;
 const DOLLY_COMBAT_IN = 0.06;
 const COMBAT_RANGE = 140;
 const BLOOM = { strength: 0.9, radius: 0.6, threshold: 0.75 };
+// proposta 17/10: ACES on lit surfaces, sRGB on the way out (emissives are
+// toneMapped:false, so they stay hot enough to bloom).
+const EXPOSURE = 1;
+const WARDEN_LIGHT_DISTANCE = 420;
 const MAX_SHOCKWAVES = 25;
 const MAX_TRAIL_POINTS = 64;
 const MAX_DAMAGE_TEXTS = 16;
 const OVERLAY_H = 9;
+const SHIP_SHADOW_RADIUS = 14;
 const WHITE = [1, 1, 1];
+
+// Last linear → sRGB step of the composer (the passes work in linear; the
+// renderer's outputEncoding only applies when drawing to the screen).
+const OUTPUT_SHADER = {
+  uniforms: { tDiffuse: { value: null } },
+  vertexShader: `
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}`,
+  fragmentShader: `
+uniform sampler2D tDiffuse;
+varying vec2 vUv;
+void main() {
+  gl_FragColor = LinearTosRGB(texture2D(tDiffuse, vUv));
+}`,
+};
 
 const SHOCKWAVE_VERTEX = `
 varying vec2 vPos;
@@ -186,7 +212,10 @@ class Renderer3D extends BaseSystem {
       powerPreference: 'high-performance',
     });
     renderer.setPixelRatio(1);
-    renderer.setClearColor(PALETTE.background, 1);
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = EXPOSURE;
+    renderer.setClearColor(colorOf(THREE, PALETTE.background), 1);
     renderer.info.autoReset = false;
 
     const scene = new THREE.Scene();
@@ -195,17 +224,29 @@ class Renderer3D extends BaseSystem {
     // Key: warm white from upper-left (KEY_LIGHT_DIR), fixed in the world.
     // No shadow maps in this slice (cost); the fill and the environment keep
     // the unlit sides readable.
-    const key = new THREE.DirectionalLight(0xfff1e2, 1.6);
+    const key = new THREE.DirectionalLight(colorOf(THREE, '#fff1e2'), 1.6);
     key.position.set(
       KEY_LIGHT_DIR.x * Math.cos(KEY_ELEVATION),
       Math.sin(KEY_ELEVATION),
       KEY_LIGHT_DIR.y * Math.cos(KEY_ELEVATION)
     );
     // Fill: cool, from below-right; hemisphere keeps shadows from going void.
-    const fill = new THREE.DirectionalLight(PALETTE.neutral, 0.35);
+    const fill = new THREE.DirectionalLight(
+      colorOf(THREE, PALETTE.neutral),
+      0.35
+    );
     fill.position.set(0.7, 0.3, 0.65);
-    const hemi = new THREE.HemisphereLight(0x2a3346, 0x050608, 0.3);
-    const wardenLight = new THREE.PointLight(PALETTE.boss, 0, 320, 2);
+    const hemi = new THREE.HemisphereLight(
+      colorOf(THREE, '#2a3346'),
+      colorOf(THREE, '#050608'),
+      0.3
+    );
+    const wardenLight = new THREE.PointLight(
+      colorOf(THREE, PALETTE.boss),
+      0,
+      WARDEN_LIGHT_DISTANCE,
+      2
+    );
     scene.add(key, fill, hemi, wardenLight);
     scene.environment = this.buildEnvironment(THREE, renderer);
 
@@ -226,7 +267,17 @@ class Renderer3D extends BaseSystem {
       BLOOM.radius,
       BLOOM.threshold
     );
+    // The bloom chain defaults to 8-bit targets: in linear, its faint tail
+    // quantizes into steps that the sRGB encode turns into visible blocks.
+    [
+      bloomPass.renderTargetBright,
+      ...bloomPass.renderTargetsHorizontal,
+      ...bloomPass.renderTargetsVertical,
+    ].forEach((rt) => {
+      rt.texture.type = THREE.HalfFloatType;
+    });
     composer.addPass(bloomPass);
+    composer.addPass(new THREE.ShaderPass(OUTPUT_SHADER));
     const smaaPass = new THREE.SMAAPass(width, height);
     composer.addPass(smaaPass);
 
@@ -240,6 +291,8 @@ class Renderer3D extends BaseSystem {
     );
 
     const backdrop = new FieldBackdrop(THREE, scene);
+    const floor = new DustFloor(THREE, scene, TILT);
+    const flashes = new FlashLights(THREE, scene);
     const enemies = new EnemyMirror(THREE, scene, this.seeded);
     const player = new PlayerMirror(THREE, scene, this.seeded);
 
@@ -307,6 +360,8 @@ class Renderer3D extends BaseSystem {
       bossFlashKey: '',
       wardenLight,
       backdrop,
+      floor,
+      flashes,
       enemies,
       player,
       ribbons,
@@ -406,11 +461,14 @@ class Renderer3D extends BaseSystem {
     t.matte.begin();
     t.smoke.begin();
     t.texts.begin();
+    t.floor.begin();
 
     const warden = t.enemies.update(enemyList, time);
     t.wardenLight.intensity = warden ? 2.6 : 0;
     if (warden) t.wardenLight.position.copy(warden.object.position).setY(40);
     t.player.update(player, t.ribbons, time);
+    this.mirrorShadows(player, enemyList);
+    t.flashes.update(dt);
     this.mirrorProjectiles();
     this.mirrorPickups(time);
     this.mirrorEffects(effects);
@@ -696,6 +754,7 @@ class Renderer3D extends BaseSystem {
         continue;
       }
       const rgb = rgbOf(THREE, wave.color || PALETTE.shot);
+      t.flashes.observe(wave, rgb);
       const alpha = Math.max(0, Math.min(1, wave.alpha)) * 1.6;
       const width = Math.max(1.5, (wave.lineWidth || 4) * 0.3);
       const extent = wave.radius + width * 3 + 2;
@@ -726,6 +785,18 @@ class Renderer3D extends BaseSystem {
       t.flash.style.opacity = String(alpha);
       if (alpha > 0) t.flash.style.background = screenFlash.color;
     }
+  }
+
+  // A shadow on the dust floor under every mass; the ship's light pool.
+  mirrorShadows(player, enemies) {
+    const { floor, player: ship } = this.three;
+    for (let i = 0; i < enemies.length; i += 1) {
+      const e = enemies[i];
+      if (e && !e.destroyed) floor.shadow(e.x, e.y, e.radius || 12);
+    }
+    const visible = ship.group.visible && player?.position;
+    if (visible) floor.shadow(visible.x, visible.y, SHIP_SHADOW_RADIUS);
+    floor.end(visible || null, ship.light.intensity);
   }
 
   // The 2D overlays (EffectsSystem.drawWorld/drawScreenSpace, the

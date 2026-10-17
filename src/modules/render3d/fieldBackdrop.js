@@ -5,7 +5,7 @@
 
 import { FILL_LIGHT } from '../../data/constants/palette.js';
 import { SimplexNoise, createSeededRandom } from './asteroidMesh.js';
-import { PointBatch } from './batches.js';
+import { PointBatch, colorOf } from './batches.js';
 
 const STAR_COUNT = 120;
 const STAR_DEPTH = -1500;
@@ -39,6 +39,7 @@ function hazeTexture(THREE, seed, rgb) {
   }
   ctx.putImageData(image, 0, 0);
   const texture = new THREE.CanvasTexture(canvas);
+  texture.encoding = THREE.sRGBEncoding;
   texture.needsUpdate = true;
   return texture;
 }
@@ -104,7 +105,7 @@ export class FieldBackdrop {
     const radius = 2200;
     const ring = new THREE.Mesh(
       new THREE.TorusGeometry(radius, 14, 8, 160, arc),
-      new THREE.MeshBasicMaterial({ color: '#030508' })
+      new THREE.MeshBasicMaterial({ color: colorOf(THREE, '#030508') })
     );
     ring.rotation.x = Math.PI / 2 - 0.12;
     ring.rotation.z = (50 * Math.PI) / 180 - arc;
