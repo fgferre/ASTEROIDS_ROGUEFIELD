@@ -1,4 +1,4 @@
-# Modernização do Asteroid Roguefield — plano (17/10/2026)
+# Modernização do Asteroid Roguefield — plano (17/10/2026; sessão 1 encerrada à noite, ver O BASTÃO em docs/PENDENCIAS.md)
 
 Tarefa que atravessa sessões. Quem pegar este arquivo lê tudo antes de mexer; marca a etapa feita aqui; apaga o
 arquivo quando a última etapa fechar. Decisões de produto são do dono, por imagem e jogando — nunca por teste.

@@ -4,46 +4,45 @@ Lista viva do que está aberto, nas palavras do dono. Leia só a seção O BAST�
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 7.**
 
-## O BASTÃO — onde a rodada parou (17/10, noite) — TODAS AS ETAPAS DO PLANO FEITAS COMO PROPOSTA, INCLUINDO O SALTO 3D; NÃO PUBLICADAS
+## O BASTÃO — onde a rodada parou (17/10, ~23h) — SESSÃO ENCERRADA POR CONTEXTO CHEIO; TUDO NO RAMO, NADA PUBLICADO
 
-Palavras dele (17/10): _"transformar isso num jogo maravilhoso para as próximas gerações de videogame"_; _"como se
-fosse uma versão nova para uma plataforma nova... com as melhores placas de vídeo"_; _"tudo em inglês"_.
+**Como retomar (próxima sessão):** `git fetch && git checkout claude/session-011CUZwFkeqHg4syYX2GsSkg`; ler este
+BASTÃO, `PLAN.md` e `docs/NORTE.md` (§4b é o salto); rodar `npm ci && npm run done`. Primeiro ato: `git status` —
+se houver arquivos modificados em `src/modules/render3d/`, são da **segunda fatia do renderer 3D** que um worker
+estava fazendo quando a sessão acabou (nave legível, overlays 2D portados para 3D, materiais foscos, câmera presa ao
+campo, settings gráficos no renderer). Revisar o diff, rodar o portão e commitar ou descartar; não assumir que está
+completo. Se a árvore estiver limpa, essa fatia nunca chegou: refazer pelo brief resumido na linha "Renderer 3D
+(17/10), primeira fatia" do `BACKLOG.md`.
 
-**No ramo `claude/session-011CUZwFkeqHg4syYX2GsSkg`, pronto para ele olhar (publicar é dele):**
+**Palavras dele nesta rodada:** _"falta um salto enorme… câmera dinâmica rolando, zoom, movimento lateral da nave,
+quase um 3D visto de cima"_; antes: _"reimaginar tudo, segue em frente"_, _"tudo em inglês"_.
 
-- Etapa 1 — resolução nativa (teto 2× DPR), sprites nítidos; `?renderScale=1` volta ao antigo para comparar.
-- Etapa 2 — um só design system, telas com fade, HUD enxuta, level-up com o jogo atrás, game over com números,
-  controles visíveis, Quit com confirmação, `mobileGuard` que não trava Windows.
-- Etapa 4 — loop de passo fixo a 60 Hz.
-- Arte nova por `docs/NORTE.md` (o roteiro do Anel partido, pedra fosca e luz só onde há energia): fundo, fragmentos
-  com rachaduras que acendem, Wardens, nave Interceptor, lanças, fagulhas, bloom, câmera 1.3× com follow,
-  escudo hexagonal, explosões e clarões na paleta.
-- Etapa 5 — impacto e legibilidade: telegraphs do Warden (vivos de verdade agora), shake, hit-stop, flash de dano,
-  slow-mo, banner de camada, intro do Warden, kill feed, combo por tier, vinheta de HP baixo.
-- Etapas 7 e 8 — engenharia: sem Math.random solto, um só modo dev, flags de legado fora, dependências falham cedo,
-  relógio de simulação, gravação e replay de runs (F9 baixa; `?replay=`), testes de cenário jogável.
-- Jogo todo em inglês.
+**O que está no ramo (publicar é dele; `main` não foi tocada):**
 
-**O salto (17/10, noite), a pedido dele:** o jogo agora é desenhado em Three.js — rochas 3D com luz dentro, câmera
-perspectiva com follow, zoom e dolly, nave 3D, bloom real. `?renderer=2d` volta ao Canvas 2D. Controles: A/D
-deslocam de lado e o nariz segue a mira (`?controls=classic` volta ao antigo). Dash em Shift. Famílias de upgrade
-com sinergia. Vitória no Warden 15. Tudo isso ele ainda não viu rodando na máquina dele.
+- Jeito de trabalhar (AGENTS/CLAUDE/.claude, `npm run done`, hook de git), lint zero, tudo em inglês.
+- Resolução nativa, design system único, telas com conteúdo e transições, HUD enxuta, kill feed, banner de camada,
+  intro do Warden, combo por tier, vinheta de HP baixo.
+- Arte nova por NORTE (fundo, fragmentos com rachaduras que acendem, Wardens, nave, lanças, fagulhas, bloom),
+  câmera com follow, impacto (shake, hit-stop, flash, slow-mo), telegraphs do Warden (e o bug que os deixava mortos).
+- **O salto:** gameplay em Three.js (`src/modules/render3d/`, `?renderer=2d` volta ao Canvas), câmera perspectiva
+  com follow/zoom/dolly, controles modernos (A/D strafe, nariz segue a mira; `?controls=classic`), dash em Shift,
+  famílias de upgrade com sinergia "3 iguais", catálogo 9 → 20, vitória no Warden 15.
+- Engenharia: passo fixo, sem `Math.random` solto, um modo dev, flags de legado fora, dependências falham cedo,
+  relógio de simulação, gravação e replay (`?replay=`, F9), testes de cenário jogável (~615 testes).
 
-**O que ele precisa fazer na máquina dele:** jogar uma run inteira e dizer, por tela, o que ainda parece amador;
-comparar fluidez com e sem `?renderScale=1`; conferir se a 144 Hz o movimento repete quadros.
+**Tudo acima foi visto só em headless sem GPU (2–4 fps).** Ele ainda não jogou nada disto na máquina dele.
 
-**Propostas de números em jogo (17/10), para ele julgar jogando e eu travar ou reverter:** asteroides por camada
-6 × 1,26^(n−1) com teto 40 (era 4 × 1,3^(n−1), teto 35); fagulhas de XP ao coletar duram 1,5×; brasas de explosão
-1,3×; 28 lascas e 6 motes âmbar de vida ambiente; 14 fragmentos distantes no fundo. `?scene=hero` monta a cena da
-prancha com entidades reais; `?bloom=1.5`, `?camera=0` e `?renderScale=1` são as comparações.
+**O que só ele pode responder, jogando:** fluidez e aparência do 3D na placa dele (`?renderer=2d` como comparação;
+`?bloom=0`/`?bloom=1.5`; `?renderScale=1`); se o salto é o que ele imaginava ou se precisa ir além (inclinação da
+câmera, tamanho da nave, campo maior); controles modernos × `?controls=classic`; os números de densidade, dash,
+shake e sinergia (todos marcados "proposta 17/10" no código); meta-progressão entre runs (em aberto).
 
-**Decisões dele que destravam as próximas etapas (ver `PLAN.md`):**
+**Decisões que a sessão tomou por ele, sob o mandato, e ele pode reverter:** renderer 3D como padrão; A/D strafe;
+dash em Shift com escudo só em E; as cinco famílias (Thermal, Kinetic, Arc, Field, Salvage) e seus bônus; fim de
+run no 15; "wave" → "layer" na interface; nomes Warden Prime / Mote / Seeker / Tether.
 
-- Arte: ele pediu para reimaginar tudo e eu decidi (NORTE.md). Ele julga jogando: o que ainda parece fraco?
-- Câmera 1.3× com follow já está no jogo (`?camera=0` desliga): aprovar ou reprovar jogando.
-- Etapa 6, decidida pela sessão como proposta (ele aprova ou reverte jogando): dash em Shift com i-frames e
-  cooldown; cinco famílias de tag com bônus ao juntar 3 upgrades da mesma família; catálogo de 9 para 20; vitória no
-  Warden da camada 15. Meta-progressão entre runs continua em aberto.
+**Fora do que a sessão podia fazer sozinha:** dividir os arquivos gigantes (AGENTS.md exige pedido explícito);
+meta-progressão (decisão de produto); medir desempenho real.
 
 ## Jogabilidade e sensação
 
