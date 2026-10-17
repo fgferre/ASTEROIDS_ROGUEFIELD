@@ -4,7 +4,10 @@ import {
   GAME_WIDTH,
   PLAYER_SAFE_SPAWN_DISTANCE,
 } from '../core/GameConstants.js';
-import { WAVEMANAGER_HANDLES_ASTEROID_SPAWN } from '../data/constants/gameplay.js';
+import {
+  RUN_FINAL_LAYER,
+  WAVEMANAGER_HANDLES_ASTEROID_SPAWN,
+} from '../data/constants/gameplay.js';
 import { debugLog } from '../core/debugLogging.js';
 import { DEFAULT_HULL_ID, getShipModelById } from '../data/shipModels.js';
 
@@ -21,6 +24,7 @@ const RANDOM_STORAGE_KEYS = {
 };
 
 const GAME_OVER_SCREEN_DELAY_MS = 3000;
+const VICTORY_SCREEN_DELAY_MS = 2500; // boss death effects play first
 
 export default class GameSessionService {
   /**
@@ -83,6 +87,7 @@ export default class GameSessionService {
       exitToMenuRequested: (payload) => this.exitToMenu(payload || {}),
       activateShieldPressed: () => this.handleActivateShieldPressedEvent(),
       progressionReset: (payload) => this.handleProgressionResetEvent(payload),
+      bossDefeated: (payload) => this.handleBossDefeatedEvent(payload),
     };
 
     this.initializeSessionState();
@@ -408,7 +413,8 @@ export default class GameSessionService {
 
     switch (id) {
       case 'start-game-btn':
-      case 'restart-game-btn': {
+      case 'restart-game-btn':
+      case 'victory-restart-btn': {
         preventDefault();
         this.emitCreditsMenuRequest({ open: false, source: id });
         this.startNewRun({ source: id });
@@ -421,7 +427,8 @@ export default class GameSessionService {
         }
         break;
       }
-      case 'quit-game-btn': {
+      case 'quit-game-btn':
+      case 'victory-quit-btn': {
         preventDefault();
         this.exitToMenu({ source: 'gameover' });
         break;
@@ -503,6 +510,7 @@ export default class GameSessionService {
       this.globalEventHandlers.activateShieldPressed
     );
     register('progression-reset', this.globalEventHandlers.progressionReset);
+    register('boss-defeated', this.globalEventHandlers.bossDefeated);
   }
 
   teardownGlobalEventListeners() {
@@ -556,6 +564,28 @@ export default class GameSessionService {
 
   handlePlayerDiedEvent(data) {
     this.handlePlayerDeath(data);
+  }
+
+  handleBossDefeatedEvent(payload = {}) {
+    if (
+      payload?.wave !== RUN_FINAL_LAYER ||
+      this.getSessionState() === 'victory'
+    ) {
+      return;
+    }
+
+    this.resolveServiceInstance('enemies')?.waveManager?.holdWaves();
+    this.setSessionState('victory', { reason: 'final-boss-defeated' });
+    this.eventBus.emit('run-won', { wave: payload.wave });
+
+    this.clearPendingGameOverTransition();
+    this.gameOverScreenTimeoutId = setTimeout(() => {
+      this.gameOverScreenTimeoutId = null;
+      const data =
+        this.resolveServiceInstance('world')?.buildRunSummary() ?? {};
+      this.setScreen('victory');
+      this.emitScreenChanged('victory', { source: 'run-won', data });
+    }, VICTORY_SCREEN_DELAY_MS);
   }
 
   handleTogglePauseEvent(payload = {}) {
@@ -728,6 +758,10 @@ export default class GameSessionService {
   }
 
   handlePlayerDeath(data = {}) {
+    if (this.getSessionState() === 'victory') {
+      return;
+    }
+
     if (this.isPaused()) {
       this.setPaused(false);
       this.emitPauseState({ source: 'player-died' });
@@ -939,6 +973,10 @@ export default class GameSessionService {
 
   togglePause({ source = 'toggle-pause' } = {}) {
     const currentScreen = this.getScreen();
+
+    if (this.getSessionState() === 'victory') {
+      return false;
+    }
 
     if (currentScreen !== 'playing') {
       const wasPaused = this.isPaused();

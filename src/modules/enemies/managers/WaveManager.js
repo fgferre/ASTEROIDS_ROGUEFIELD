@@ -2404,11 +2404,23 @@ export class WaveManager {
   }
 
   /**
+   * Stops layer progression for good (until reset): the run is over.
+   */
+  holdWaves() {
+    this.wavePaused = true;
+    this.waveCountdown = 0;
+  }
+
+  /**
    * Updates the wave manager.
    *
    * @param {number} deltaTime - Time elapsed
    */
   update(deltaTime) {
+    if (this.wavePaused) {
+      return;
+    }
+
     // Handle wave countdown
     if (!this.waveInProgress && this.waveCountdown > 0) {
       this.waveCountdown -= deltaTime;

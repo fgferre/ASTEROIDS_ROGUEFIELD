@@ -277,6 +277,8 @@ export const WAVE_SPAWN_DELAY = 1.0; // atraso base entre waves no sistema legad
 
 export const WAVE_BOSS_INTERVAL = 5;
 
+export const RUN_FINAL_LAYER = 15; // PROPOSAL 17/10 (docs/NORTE.md section 4): defeating this layer's Warden Prime clears the Field
+
 export const MAX_ASTEROIDS_ON_SCREEN = 40; // PROPOSAL 17/10 (was 35; 20 before NEO-ARCADE)
 
 export const SUPPORT_ENEMY_PROGRESSION = deepFreeze({

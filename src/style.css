@@ -184,7 +184,8 @@ select {
 .screen--overlay,
 #pause-screen,
 #levelup-screen,
-#gameover-screen {
+#gameover-screen,
+#victory-screen {
   background: var(--surface);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
@@ -1511,7 +1512,8 @@ kbd {
 /* ============================================
    GAME OVER
    ============================================ */
-#gameover-screen::before {
+#gameover-screen::before,
+#victory-screen::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -1540,6 +1542,25 @@ kbd {
   text-transform: uppercase;
   color: var(--danger);
   text-shadow: 0 0 24px var(--danger-line);
+}
+
+.victory .gameover-title {
+  color: var(--accent);
+  text-shadow: var(--glow-accent);
+}
+
+#victory-screen::before {
+  background: radial-gradient(
+    circle at 50% 50%,
+    transparent 25%,
+    color-mix(in srgb, var(--accent) 10%, transparent) 70%,
+    rgba(0, 0, 0, 0.85) 100%
+  );
+}
+
+.victory-subtitle {
+  margin: calc(var(--space-4) * -1) 0 var(--space-5);
+  color: var(--text-dim, inherit);
 }
 
 .gameover-actions {

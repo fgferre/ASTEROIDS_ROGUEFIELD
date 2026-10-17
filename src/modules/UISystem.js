@@ -216,6 +216,16 @@ class UISystem extends BaseSystem {
         restartBtn: document.getElementById('restart-game-btn') || null,
         quitBtn: document.getElementById('quit-game-btn') || null,
       },
+      victory: {
+        time: document.getElementById('victory-time') || null,
+        wave: document.getElementById('victory-wave') || null,
+        kills: document.getElementById('victory-kills') || null,
+        combo: document.getElementById('victory-combo') || null,
+        level: document.getElementById('victory-level') || null,
+        build: document.getElementById('victory-build') || null,
+        synergies: document.getElementById('victory-synergies') || null,
+        restartBtn: document.getElementById('victory-restart-btn') || null,
+      },
       pause: {
         container: document.getElementById('pause-screen') || null,
         resumeBtn: document.getElementById('pause-resume-btn') || null,
@@ -1052,6 +1062,7 @@ class UISystem extends BaseSystem {
               source = 'settings-menu';
             else if (target.closest('#gameover-screen'))
               source = 'gameover-menu';
+            else if (target.closest('#victory-screen')) source = 'victory-menu';
             else if (target.closest('#levelup-screen')) source = 'levelup-menu';
 
             this.eventBus?.emit?.('ui-hover', {
@@ -1419,6 +1430,12 @@ class UISystem extends BaseSystem {
       }
     });
 
+    this.registerEventListener('run-won', () => {
+      this.runWon = true;
+    });
+    this.registerEventListener('game-started', () => {
+      this.runWon = false;
+    });
     this.registerEventListener('upgrade-options-ready', (payload = {}) => {
       this.handleUpgradeOptions(payload);
     });
@@ -2570,6 +2587,11 @@ class UISystem extends BaseSystem {
       return;
     }
 
+    if (screenName === 'victory') {
+      this.showVictoryScreen(payload);
+      return;
+    }
+
     if (screenName === 'playing') {
       this.maybeShowControlsToast();
     }
@@ -2592,7 +2614,8 @@ class UISystem extends BaseSystem {
         if (
           (screenName === 'pause' ||
             screenName === 'levelup' ||
-            screenName === 'gameover') &&
+            screenName === 'gameover' ||
+            screenName === 'victory') &&
           show
         ) {
           const gameUI = document.getElementById('game-ui');
@@ -2918,6 +2941,10 @@ class UISystem extends BaseSystem {
   }
 
   handleUpgradeOptions(payload = {}) {
+    if (this.runWon) {
+      return;
+    }
+
     const options = ensureArray(payload.options || payload.availableUpgrades);
     this.levelUpState.poolSize = Number.isFinite(Number(payload.poolSize))
       ? Number(payload.poolSize)
@@ -3150,6 +3177,64 @@ class UISystem extends BaseSystem {
     }
 
     return `rgba(51, 153, 255, ${clampedAlpha})`;
+  }
+
+  showVictoryScreen(payload) {
+    this.showScreen('victory', { overlay: true, show: true });
+
+    const data = payload?.data || {};
+    const refs = this.domRefs.victory;
+    const setText = (node, value) => {
+      if (node) node.textContent = value;
+    };
+
+    const totalSeconds = Math.max(
+      0,
+      Math.floor(Number(data.stats?.timeElapsed) || 0)
+    );
+    const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+    const seconds = String(totalSeconds % 60).padStart(2, '0');
+    const wave = typeof data.wave === 'number' ? data.wave : data.wave?.current;
+    const level = data.player?.level ?? data.level;
+
+    setText(refs.time, `${minutes}:${seconds}`);
+    setText(refs.wave, `${wave ?? '—'}`);
+    setText(refs.kills, `${data.stats?.totalKills ?? data.stats?.kills ?? 0}`);
+    setText(refs.combo, `x${data.maxCombo ?? 0}`);
+    setText(refs.level, `${level ?? '—'}`);
+
+    if (refs.build) {
+      refs.build.innerHTML = '';
+      const upgrades = ensureArray(data.upgrades);
+      if (!upgrades.length) {
+        const empty = document.createElement('li');
+        empty.className = 'gameover-build__empty';
+        empty.textContent = 'No upgrades';
+        refs.build.appendChild(empty);
+      }
+      upgrades.forEach(({ name, id, level: rank }) => {
+        const item = document.createElement('li');
+        item.className = 'gameover-build__item';
+        item.append(`${name || id} `);
+        const rankNode = document.createElement('span');
+        rankNode.className = 'gameover-build__rank';
+        rankNode.textContent = `Lv.${rank}`;
+        item.appendChild(rankNode);
+        refs.build.appendChild(item);
+      });
+    }
+
+    if (refs.synergies) {
+      refs.synergies.innerHTML = '';
+      ensureArray(data.synergies).forEach(({ name, family }) => {
+        const item = document.createElement('li');
+        item.className = 'gameover-build__item';
+        item.textContent = name || family;
+        refs.synergies.appendChild(item);
+      });
+    }
+
+    refs.restartBtn?.focus({ preventScroll: true });
   }
 
   showGameOverScreen(payload) {
