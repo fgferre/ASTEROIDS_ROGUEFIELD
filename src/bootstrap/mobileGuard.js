@@ -12,7 +12,7 @@
 // is JSDOM unit test + developer self-smoke on the dev laptop.
 //
 // CONTEXT decisions honored:
-//   D-03: Combined-OR detection — ontouchstart || maxTouchPoints>0 || matchMedia('(pointer: coarse)').
+//   D-03 (revised): block only when `(pointer: coarse)` AND (ontouchstart OR maxTouchPoints>0).
 //   D-04: Pre-DI location; zero calls into Three.js / Web Audio / DIContainer on the blocked path.
 //   D-05: EN line ("Desktop only — keyboard + mouse required") stacked above PT-BR line
 //         ("Requer teclado e mouse (apenas desktop)"); monospace 16px Canvas2D fillText.
@@ -41,28 +41,12 @@ function isTouchDevice() {
     return false;
   }
 
-  if ('ontouchstart' in window) {
-    return true;
-  }
-
-  if (
-    typeof navigator !== 'undefined' &&
-    typeof navigator.maxTouchPoints === 'number' &&
-    navigator.maxTouchPoints > 0
-  ) {
-    return true;
-  }
-
+  let pointerCoarse = false;
   if (typeof window.matchMedia === 'function') {
     try {
       const result = window.matchMedia('(pointer: coarse)');
-      if (result && result.matches === true) {
-        return true;
-      }
+      pointerCoarse = Boolean(result && result.matches === true);
     } catch (error) {
-      // T-01-03: exotic browser threw — safe default = uncertain → no signal here
-      // (the combined OR returns false; the surrounding caller may still get true
-      // from one of the prior probes). NOT a fatal error.
       console.warn(
         '[mobileGuard] matchMedia probe failed; treating pointer-coarse signal as false:',
         error
@@ -70,7 +54,19 @@ function isTouchDevice() {
     }
   }
 
-  return false;
+  if (!pointerCoarse) {
+    return false;
+  }
+
+  // Windows laptops report maxTouchPoints > 0 alone, so a coarse primary
+  // pointer plus one touch-capability signal is required to block.
+  const hasTouchStart = 'ontouchstart' in window;
+  const hasTouchPoints =
+    typeof navigator !== 'undefined' &&
+    typeof navigator.maxTouchPoints === 'number' &&
+    navigator.maxTouchPoints > 0;
+
+  return hasTouchStart || hasTouchPoints;
 }
 
 /**
@@ -120,6 +116,20 @@ function paintNotice() {
       '[mobileGuard] document is undefined; cannot paint notice (non-browser environment).'
     );
     return false;
+  }
+
+  const loading = document.getElementById('loading-screen');
+  if (loading) {
+    loading.classList.add('hidden');
+  }
+
+  const container = document.getElementById('game-container');
+  if (container && typeof document.createElement === 'function') {
+    const notice = document.createElement('div');
+    notice.className = 'desktop-only-notice';
+    notice.setAttribute('role', 'alert');
+    notice.textContent = NOTICE_EN;
+    container.appendChild(notice);
   }
 
   const canvas = document.getElementById('game-canvas');

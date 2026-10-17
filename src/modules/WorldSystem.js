@@ -152,6 +152,17 @@ class WorldSystem extends BaseSystem {
         : { totalKills: 0, timeElapsed: 0 },
       wave: enemies ? enemies.getWaveState() : { completedWaves: 0 },
       position: playerPosition, // CRITICAL: Add position for explosion!
+      maxCombo: progression ? progression.getMaxCombo() : 0,
+      upgrades: progression
+        ? progression.getUpgradeProgressSnapshot().map(({ id, level }) => {
+            const definition = progression.upgradeLookup?.get(id) || {};
+            return {
+              id,
+              level,
+              name: definition.text?.name || definition.name || id,
+            };
+          })
+        : [],
     };
 
     // Emit player-died FIRST so explosion triggers

@@ -21,6 +21,9 @@ import { resolveService } from '../core/serviceUtils.js';
 import { AAAHudLayout } from './ui/AAAHudLayout.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
+const LEVEL_UP_LOCKOUT_MS = 400;
+const CONTROLS_SEEN_KEY = 'roguefield:seenControls';
+const CONTROLS_TOAST_MS = 8000;
 
 const COLOR_ASSIST_ACCENTS = {
   offense: '#3366CC',
@@ -162,7 +165,9 @@ class UISystem extends BaseSystem {
       buttons: [],
       focusIndex: -1,
       poolSize: 0,
+      lockedUntil: 0,
     };
+    this.quitConfirm = { button: null, label: '', timeoutId: null };
     this.currentVisualPreferences = {
       accessibility: {},
       video: {},
@@ -224,10 +229,15 @@ class UISystem extends BaseSystem {
         text: document.getElementById('levelup-text') || null,
       },
       gameOver: {
-        level: document.getElementById('final-level') || null,
-        kills: document.getElementById('final-kills') || null,
-        waves: document.getElementById('final-waves') || null,
-        time: document.getElementById('final-time') || null,
+        time: document.getElementById('gameover-time') || null,
+        wave: document.getElementById('gameover-wave') || null,
+        kills: document.getElementById('gameover-kills') || null,
+        combo: document.getElementById('gameover-combo') || null,
+        level: document.getElementById('gameover-level') || null,
+        build: document.getElementById('gameover-build') || null,
+        retryBtn: document.getElementById('retry-game-btn') || null,
+        restartBtn: document.getElementById('restart-game-btn') || null,
+        quitBtn: document.getElementById('quit-game-btn') || null,
       },
       pause: {
         container: document.getElementById('pause-screen') || null,
@@ -818,11 +828,60 @@ class UISystem extends BaseSystem {
           return;
         }
 
+        if (!this.confirmQuit(pauseRefs.exitBtn)) {
+          return;
+        }
+
         this.eventBus?.emit?.('exit-to-menu-requested', {
           source: 'pause-menu',
         });
       });
     }
+
+    const quitBtn = this.domRefs.gameOver?.quitBtn;
+    if (quitBtn) {
+      // Runs before GameSessionService's document-level click handler.
+      quitBtn.addEventListener('click', (event) => {
+        if (!this.confirmQuit(quitBtn)) {
+          event.stopPropagation();
+        }
+      });
+    }
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        this.cancelQuitConfirm();
+      }
+    });
+  }
+
+  confirmQuit(button) {
+    const state = this.quitConfirm;
+    if (state.button === button) {
+      this.cancelQuitConfirm();
+      return true;
+    }
+
+    this.cancelQuitConfirm();
+    state.button = button;
+    state.label = button.textContent;
+    button.textContent = 'Quit? Press again';
+    button.classList.add('is-confirming');
+    button.setAttribute('aria-live', 'polite');
+    state.timeoutId = setTimeout(() => this.cancelQuitConfirm(), 3000);
+    return false;
+  }
+
+  cancelQuitConfirm() {
+    const state = this.quitConfirm;
+    clearTimeout(state.timeoutId);
+    if (state.button) {
+      state.button.textContent = state.label;
+      state.button.classList.remove('is-confirming');
+      state.button.removeAttribute('aria-live');
+    }
+    state.button = null;
+    state.timeoutId = null;
   }
 
   bindSettingsControls() {
@@ -2480,9 +2539,22 @@ class UISystem extends BaseSystem {
       return;
     }
 
+    if (screenName === 'levelup') {
+      this.showScreen('levelup', {
+        overlay: true,
+        show: true,
+        emitEvent: false,
+      });
+      return;
+    }
+
     if (screenName === 'gameover') {
       this.showGameOverScreen(payload);
       return;
+    }
+
+    if (screenName === 'playing') {
+      this.maybeShowControlsToast();
     }
 
     this.showScreen(screenName, { emitEvent: false });
@@ -2499,10 +2571,20 @@ class UISystem extends BaseSystem {
           target.classList.toggle('hidden', !show);
         }
 
-        // Keep game-ui visible for pause and gameover overlays
-        if ((screenName === 'pause' || screenName === 'gameover') && show) {
+        // Keep game-ui visible for pause, level-up and gameover overlays
+        if (
+          (screenName === 'pause' ||
+            screenName === 'levelup' ||
+            screenName === 'gameover') &&
+          show
+        ) {
           const gameUI = document.getElementById('game-ui');
           if (gameUI) gameUI.classList.remove('hidden');
+        }
+
+        // The session service pauses the game on any non-'playing' screen.
+        if (screenName === 'levelup' && show && emitEvent) {
+          this.eventBus?.emit?.('screen-changed', { screen: screenName });
         }
         return;
       }
@@ -2570,6 +2652,14 @@ class UISystem extends BaseSystem {
     this.currentPauseState = shouldPause;
     this.showScreen('pause', { overlay: true, show: shouldPause });
 
+    const resumeBtn = this.domRefs.pause?.resumeBtn;
+    if (shouldPause) {
+      resumeBtn?.focus({ preventScroll: true });
+    } else {
+      this.cancelQuitConfirm();
+      resumeBtn?.blur();
+    }
+
     document.body?.classList.toggle('is-paused', shouldPause);
 
     if (
@@ -2605,7 +2695,8 @@ class UISystem extends BaseSystem {
       : options.length;
     this.levelUpState.focusIndex = -1;
 
-    this.showScreen('levelup');
+    this.showScreen('levelup', { overlay: true, show: true });
+    this.levelUpState.lockedUntil = Date.now() + LEVEL_UP_LOCKOUT_MS;
 
     if (this.domRefs.levelUp.text) {
       const optionCount = options.length;
@@ -2746,6 +2837,10 @@ class UISystem extends BaseSystem {
 
   selectUpgrade(upgradeId) {
     if (!upgradeId) {
+      return;
+    }
+
+    if (Date.now() < this.levelUpState.lockedUntil) {
       return;
     }
 
@@ -2913,6 +3008,7 @@ class UISystem extends BaseSystem {
       buttons: [],
       focusIndex: -1,
       poolSize: 0,
+      lockedUntil: 0,
     };
   }
 
@@ -2999,10 +3095,80 @@ class UISystem extends BaseSystem {
     return `rgba(51, 153, 255, ${clampedAlpha})`;
   }
 
-  showGameOverScreen(data) {
+  showGameOverScreen(payload) {
     // Show gameover as overlay so game canvas stays visible with asteroids wandering
     this.showScreen('gameover', { overlay: true, show: true });
-    // Simplified game over screen - no stats display
+
+    const data = payload?.data || {};
+    const refs = this.domRefs.gameOver;
+    const setText = (node, value) => {
+      if (node) node.textContent = value;
+    };
+
+    const totalSeconds = Math.max(
+      0,
+      Math.floor(Number(data.stats?.timeElapsed) || 0)
+    );
+    const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+    const seconds = String(totalSeconds % 60).padStart(2, '0');
+    const wave = typeof data.wave === 'number' ? data.wave : data.wave?.current;
+    const level = data.player?.level ?? data.level;
+
+    setText(refs.time, `${minutes}:${seconds}`);
+    setText(refs.wave, `${wave ?? '—'}`);
+    setText(refs.kills, `${data.stats?.totalKills ?? data.stats?.kills ?? 0}`);
+    setText(refs.combo, `x${data.maxCombo ?? 0}`);
+    setText(refs.level, `${level ?? '—'}`);
+
+    if (refs.build) {
+      refs.build.innerHTML = '';
+      const upgrades = ensureArray(data.upgrades);
+      if (!upgrades.length) {
+        const empty = document.createElement('li');
+        empty.className = 'gameover-build__empty';
+        empty.textContent = 'No upgrades';
+        refs.build.appendChild(empty);
+      }
+      upgrades.forEach(({ name, id, level: rank }) => {
+        const item = document.createElement('li');
+        item.className = 'gameover-build__item';
+        item.append(`${name || id} `);
+        const rankNode = document.createElement('span');
+        rankNode.className = 'gameover-build__rank';
+        rankNode.textContent = `Lv.${rank}`;
+        item.appendChild(rankNode);
+        refs.build.appendChild(item);
+      });
+    }
+
+    const focusTarget = refs.retryBtn?.disabled
+      ? refs.restartBtn
+      : refs.retryBtn || refs.restartBtn;
+    focusTarget?.focus({ preventScroll: true });
+  }
+
+  maybeShowControlsToast() {
+    try {
+      if (localStorage.getItem(CONTROLS_SEEN_KEY)) {
+        return;
+      }
+      localStorage.setItem(CONTROLS_SEEN_KEY, '1');
+    } catch (error) {
+      return;
+    }
+
+    const gameUi = this.domRefs.gameUi;
+    if (!gameUi) {
+      return;
+    }
+
+    const toast = document.createElement('div');
+    toast.className = 'controls-toast';
+    toast.textContent =
+      'A/D turn · W thrust · shooting is automatic · E shield';
+    gameUi.appendChild(toast);
+    requestAnimationFrame(() => toast.classList.add('is-visible'));
+    setTimeout(() => toast.remove(), CONTROLS_TOAST_MS);
   }
 }
 

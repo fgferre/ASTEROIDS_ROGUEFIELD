@@ -68,6 +68,7 @@ class ProgressionSystem extends UpgradeSystem {
     this.defaultComboMultiplierStep = comboStep;
     this.defaultComboMultiplierCap = comboCap;
     this.currentCombo = 0;
+    this.maxCombo = 0;
     this.comboTimer = 0;
     this.comboTimeout = comboTimeout;
     this.comboMultiplier = 1;
@@ -206,6 +207,7 @@ class ProgressionSystem extends UpgradeSystem {
 
   incrementCombo(context = {}) {
     this.currentCombo = Math.max(0, Math.floor(this.currentCombo)) + 1;
+    this.maxCombo = Math.max(this.maxCombo, this.currentCombo);
     this.comboTimer = this.comboTimeout;
     this.updateComboMultiplier();
 
@@ -389,6 +391,10 @@ class ProgressionSystem extends UpgradeSystem {
     return this.level;
   }
 
+  getMaxCombo() {
+    return this.maxCombo;
+  }
+
   getExperience() {
     return {
       current: this.experience,
@@ -446,6 +452,7 @@ class ProgressionSystem extends UpgradeSystem {
     }
 
     this.resetCombo({ reason: 'progression-reset', silent: true, emit: false });
+    this.maxCombo = 0;
 
     this.refreshInjectedServices({ force: true });
     this.emitExperienceChanged();
