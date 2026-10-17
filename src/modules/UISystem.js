@@ -2738,7 +2738,7 @@ class UISystem extends BaseSystem {
             ${categoryIcon}
             ${category.label || 'Tecnologia'}
           </span>
-          <span class="upgrade-option__level">Nv. atual: ${currentLevel}/${
+          <span class="upgrade-option__level">Lv. ${currentLevel}/${
             maxLevel || Math.max(1, currentLevel)
           }</span>
         </div>
