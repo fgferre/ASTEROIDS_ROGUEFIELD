@@ -8,6 +8,7 @@ import { resolveService } from '../core/serviceUtils.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 import { MAGNETISM_RADIUS } from '../data/constants/gameplay.js';
 import { normalize as normalizeVector } from '../utils/vectorHelpers.js';
+import { applyBaseTransform, getRenderScale } from '../core/viewport.js';
 
 // [NEO-ARCADE] Shield Visual Constants
 const SHIELD_HEX_SIZE = 24;
@@ -386,6 +387,7 @@ class SpaceSkyBackground {
       ctx.globalCompositeOperation = 'lighter'; // Additive blending for neon glow
     }
 
+    const renderScale = getRenderScale();
     this.stars.forEach((star) => {
       // Parallax movement - opposite to player velocity
       star.x -= vx * star.speed * dt;
@@ -401,13 +403,18 @@ class SpaceSkyBackground {
       const blink = Math.sin(time * star.blinkSpeed + star.phase);
       const alpha = 0.6 + 0.4 * blink;
 
-      const sprite = star.sprite;
+      let sprite = star.sprite;
+      if (sprite && sprite.scale !== renderScale) {
+        sprite = star.sprite = this.getStarSprite(star.size, star.color);
+      }
       if (sprite && sprite.canvas) {
         ctx.globalAlpha = alpha;
         ctx.drawImage(
           sprite.canvas,
           star.x - sprite.halfSize,
-          star.y - sprite.halfSize
+          star.y - sprite.halfSize,
+          sprite.size,
+          sprite.size
         );
         ctx.globalAlpha = 1;
         return;
@@ -505,9 +512,9 @@ class SpaceSkyBackground {
     });
   }
 
-  createOffscreenCanvas(width, height) {
-    const safeWidth = Math.max(1, Math.floor(width));
-    const safeHeight = Math.max(1, Math.floor(height));
+  createOffscreenCanvas(width, height, scale = 1) {
+    const safeWidth = Math.max(1, Math.ceil(Math.floor(width) * scale));
+    const safeHeight = Math.max(1, Math.ceil(Math.floor(height) * scale));
 
     if (
       typeof document !== 'undefined' &&
@@ -586,7 +593,7 @@ class SpaceSkyBackground {
     const r = Number.isFinite(color.r) ? color.r : 255;
     const g = Number.isFinite(color.g) ? color.g : 255;
     const b = Number.isFinite(color.b) ? color.b : 255;
-    const key = `${sizeKey}:${r},${g},${b}`;
+    const key = `${sizeKey}:${r},${g},${b}:${getRenderScale()}`;
 
     if (this.starSpriteCache.has(key)) {
       return this.starSpriteCache.get(key);
@@ -603,7 +610,8 @@ class SpaceSkyBackground {
   createStarSprite(size, color) {
     const radius = Math.max(0.5, size / 2);
     const diameter = Math.max(2, Math.ceil(radius * 2 + 2));
-    const canvas = this.createOffscreenCanvas(diameter, diameter);
+    const scale = getRenderScale();
+    const canvas = this.createOffscreenCanvas(diameter, diameter, scale);
     if (!canvas || typeof canvas.getContext !== 'function') {
       return null;
     }
@@ -613,6 +621,7 @@ class SpaceSkyBackground {
       return null;
     }
 
+    ctx.scale(scale, scale);
     const half = diameter / 2;
     ctx.save();
     ctx.translate(half, half);
@@ -630,6 +639,7 @@ class SpaceSkyBackground {
       canvas,
       halfSize: half,
       size: diameter,
+      scale,
     };
   }
 
@@ -640,17 +650,19 @@ class SpaceSkyBackground {
 
     const safeWidth = Math.max(1, Math.floor(width));
     const safeHeight = Math.max(1, Math.floor(height));
+    const scale = getRenderScale();
 
     if (
       this.nebulaBuffer.canvas &&
       this.nebulaBuffer.ctx &&
       this.nebulaBuffer.width === safeWidth &&
-      this.nebulaBuffer.height === safeHeight
+      this.nebulaBuffer.height === safeHeight &&
+      this.nebulaBuffer.scale === scale
     ) {
       return true;
     }
 
-    const canvas = this.createOffscreenCanvas(safeWidth, safeHeight);
+    const canvas = this.createOffscreenCanvas(safeWidth, safeHeight, scale);
     if (!canvas || typeof canvas.getContext !== 'function') {
       this.nebulaBuffer.canvas = null;
       this.nebulaBuffer.ctx = null;
@@ -670,8 +682,10 @@ class SpaceSkyBackground {
       return false;
     }
 
+    bufferCtx.scale(scale, scale);
     this.nebulaBuffer.canvas = canvas;
     this.nebulaBuffer.ctx = bufferCtx;
+    this.nebulaBuffer.scale = scale;
     this.nebulaBuffer.width = safeWidth;
     this.nebulaBuffer.height = safeHeight;
     this.nebulaBuffer.lastUpdate = 0;
@@ -825,6 +839,9 @@ class RenderingSystem extends BaseSystem {
     if (!ctx) return;
 
     const frameStart = performance.now();
+
+    // Logical 800×600 → native canvas pixels (see src/core/viewport.js).
+    applyBaseTransform(ctx);
 
     // Initialize state manager if needed
     if (!this.stateManager.currentState.fillStyle) {
@@ -1220,14 +1237,12 @@ class RenderingSystem extends BaseSystem {
     // The background also clears the viewport, so it must ignore screen shake.
     ctx.save();
     try {
-      if (typeof ctx.setTransform === 'function') {
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-      }
+      applyBaseTransform(ctx);
 
       if (this.spaceSky) {
         this.spaceSky.render(ctx, {
-          width: ctx.canvas?.width ?? GAME_WIDTH,
-          height: ctx.canvas?.height ?? GAME_HEIGHT,
+          width: GAME_WIDTH,
+          height: GAME_HEIGHT,
           velocity: playerVelocity,
         });
         return;

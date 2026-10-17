@@ -2,6 +2,7 @@ import {
   ENEMY_EFFECT_COLORS,
   ENEMY_RENDER_PRESETS,
 } from '../../../data/constants/visual.js';
+import { getRenderScale } from '../../../core/viewport.js';
 
 const TAU = Math.PI * 2;
 
@@ -702,7 +703,13 @@ export class RenderComponent {
         ctx.rotate(enemy.rotation || 0);
 
         // Draw Baked Sprite
-        ctx.drawImage(sprite.canvas, -sprite.offset, -sprite.offset);
+        ctx.drawImage(
+          sprite.canvas,
+          -sprite.offset,
+          -sprite.offset,
+          sprite.canvasSize,
+          sprite.canvasSize
+        );
 
         // [Dynamic Overlays that can't be baked]
         // 1. Thrust (Variable)
@@ -758,7 +765,8 @@ export class RenderComponent {
       }
     }
 
-    if (enemy.spriteCache) {
+    const scale = getRenderScale();
+    if (enemy.spriteCache && enemy.spriteCache.scale === scale) {
       return enemy.spriteCache;
     }
 
@@ -772,11 +780,12 @@ export class RenderComponent {
     const offset = canvasSize / 2;
 
     const offscreen = document.createElement('canvas');
-    offscreen.width = canvasSize;
-    offscreen.height = canvasSize;
+    offscreen.width = Math.ceil(canvasSize * scale);
+    offscreen.height = Math.ceil(canvasSize * scale);
     const ctx = offscreen.getContext('2d');
 
     // 3. Bake
+    ctx.scale(scale, scale);
     ctx.translate(offset, offset);
 
     // Resolve props
@@ -834,6 +843,8 @@ export class RenderComponent {
       canvas: offscreen,
       offset,
       size,
+      canvasSize,
+      scale,
       strategy: strategyName,
     };
 

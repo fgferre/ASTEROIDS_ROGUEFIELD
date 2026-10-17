@@ -12,6 +12,11 @@ import {
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 import { WAVE_BOSS_INTERVAL } from '../data/constants/gameplay.js';
 import { BaseSystem } from '../core/BaseSystem.js';
+import {
+  applyCanvasResolution,
+  resolveDevicePixelRatio,
+} from '../core/viewport.js';
+import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { AAAHudLayout } from './ui/AAAHudLayout.js';
 
@@ -74,7 +79,8 @@ class UISystem extends BaseSystem {
     this.currentHudBaseScale = 1;
     this.currentHudAutoScale = 1;
     this.currentCanvasScale = 1;
-    this.canvasBaseSize = { width: 0, height: 0 };
+    this.currentCanvasDpr = 0;
+    this.canvasBaseSize = { width: GAME_WIDTH, height: GAME_HEIGHT };
     this.handleResize = this.handleResize.bind(this);
 
     // Force AAA Tactical HUD
@@ -481,13 +487,6 @@ class UISystem extends BaseSystem {
       return;
     }
 
-    if (!this.canvasBaseSize.width || !this.canvasBaseSize.height) {
-      this.canvasBaseSize.width =
-        Number(canvas.width) || canvas.getBoundingClientRect().width || 800;
-      this.canvasBaseSize.height =
-        Number(canvas.height) || canvas.getBoundingClientRect().height || 600;
-    }
-
     const baseWidth = this.canvasBaseSize.width;
     const baseHeight = this.canvasBaseSize.height;
 
@@ -529,15 +528,24 @@ class UISystem extends BaseSystem {
 
     const scale = Math.min(heightScale, widthScale);
 
-    if (!options.force && Math.abs(scale - this.currentCanvasScale) < 0.005) {
+    const dpr = resolveDevicePixelRatio();
+    if (
+      !options.force &&
+      dpr === this.currentCanvasDpr &&
+      Math.abs(scale - this.currentCanvasScale) < 0.005
+    ) {
       return;
     }
 
     this.currentCanvasScale = scale;
+    this.currentCanvasDpr = dpr;
 
     const scaledWidth = Math.round(baseWidth * scale);
     const scaledHeight = Math.round(baseHeight * scale);
 
+    // Backing store at native resolution; drawing stays in 800×600 logical
+    // units through the base transform the renderer applies each frame.
+    applyCanvasResolution(canvas, scaledWidth, scaledHeight, dpr);
     canvas.style.width = `${scaledWidth}px`;
     canvas.style.height = `${scaledHeight}px`;
     canvas.style.maxWidth = '100%';

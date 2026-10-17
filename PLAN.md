@@ -78,10 +78,13 @@ arquivo quando a última etapa fechar. Decisões de produto são do dono, por im
 
 - [x] **0. Jeito de trabalhar.** AGENTS/CLAUDE/.claude, lint, `done`, `tocados`, Prettier no repo inteiro, CI
       sem Node 18. (17/10)
-- [ ] **1. Resolução nativa.** `UISystem` resize passa a definir `canvas.width/height = css × DPR` e
-      `ctx.setTransform` mantendo a lógica em 800×600; sprites assados (`Asteroid.ensureSpriteCache`,
-      `RenderComponent.ensureSpriteCache`, orbes, glow de tiro) multiplicados pelo DPR; vinheta em cache. Pronto quando
-      a captura em DPR 2 não tem borrão e o p95 de quadro não piora mais que 2 ms. Worker: sonnet (brief fechado).
+- [x] **1. Resolução nativa.** (17/10) `src/core/viewport.js` dimensiona o backing store em CSS × DPR (teto 2×) e
+      aplica a transformação base por quadro; `UISystem` chama isso no resize; `setTransform(1,…)` de tela virou
+      `applyBaseTransform`; todos os sprites assados (asteroide, inimigos, orbes, tiros, partículas, estrelas, nebulosa)
+      passaram a assar em `tamanho × escala`. Captura antes × depois em DPR 2: bordas nítidas. **Desempenho não
+      validado:** o headless (sem GPU) foi de 33 para 333 ms por quadro em DPR 2 — `drawImage` em software domina (~940
+      por quadro, 450 só de estrelas). Em máquina com GPU o custo é outro; ele mede com e sem `?renderScale=1`. Se ficar
+      lento, a saída é reduzir chamadas (estrelas em camadas assadas, etapa 3), não voltar ao borrão.
 - [ ] **2. Um design system e HUD enxuta.** Apagar o bloco Perplexity e a fonte do CDN; `tokens.css` único (cor,
       tipo, espaço, movimento) com os 8 hex da direção visual; HUD em tokens, sem inline, colunas ~200 px, sem painel
       falso nem NAV/km/h, combo some em x0, radar no canvas; `.hidden` vira `is-open` com 150–250 ms; level-up com o

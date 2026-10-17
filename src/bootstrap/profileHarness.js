@@ -47,6 +47,8 @@
  */
 
 import { debugLog } from '../core/debugLogging.js';
+import { GAME_WIDTH } from '../core/GameConstants.js';
+import { applyBaseTransform } from '../core/viewport.js';
 
 // CONTEXT D-09: deterministic seed forced across all scenarios.
 const PROFILE_HARNESS_SEED = 0xb45e;
@@ -201,13 +203,14 @@ function paintCompletionOverlay(scenario, filename) {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const text = `scenario complete — ${filename}`;
+    applyBaseTransform(ctx);
     ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(0, 0, canvas.width || 800, 28);
+    ctx.fillRect(0, 0, GAME_WIDTH, 28);
     ctx.fillStyle = '#0f0';
     ctx.font = '14px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, (canvas.width || 800) / 2, 14);
+    ctx.fillText(text, GAME_WIDTH / 2, 14);
   } catch (error) {
     debugLog('[profileHarness] Could not paint completion overlay:', error);
   }

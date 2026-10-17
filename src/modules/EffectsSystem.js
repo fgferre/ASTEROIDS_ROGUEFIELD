@@ -1,5 +1,6 @@
 import { BaseSystem } from '../core/BaseSystem.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
+import { applyBaseTransform } from '../core/viewport.js';
 import { GamePools } from '../core/GamePools.js';
 import { DamageText, HitMarker, SpaceParticle } from './EffectEntities.js';
 import { ScreenShake, ShakePresets } from '../utils/ScreenShake.js';
@@ -878,7 +879,7 @@ export default class EffectsSystem extends BaseSystem {
           this.screenFlash.intensity;
         ctx.fillStyle = this.screenFlash.color;
         ctx.globalAlpha = alpha;
-        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
       }
 
       this.drawBossTransitions(ctx);
@@ -891,9 +892,7 @@ export default class EffectsSystem extends BaseSystem {
     }
 
     ctx.save();
-    if (typeof ctx.setTransform === 'function') {
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-    }
+    applyBaseTransform(ctx);
 
     try {
       drawCallback();

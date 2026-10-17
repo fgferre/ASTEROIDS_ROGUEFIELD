@@ -33,6 +33,7 @@ import { GamePools } from '../core/GamePools.js';
 import RandomService from '../core/RandomService.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import { resolveService } from '../core/serviceUtils.js';
+import { getRenderScale } from '../core/viewport.js';
 
 const ORB_CLASS_ORDER = [
   { name: 'blue', tier: 1 },
@@ -483,9 +484,9 @@ class XPOrbSystem extends BaseSystem {
     this.xpOrbs.length = 0;
   }
 
-  createOffscreenCanvas(width, height) {
-    const safeWidth = Math.max(1, Math.floor(width));
-    const safeHeight = Math.max(1, Math.floor(height));
+  createOffscreenCanvas(width, height, scale = 1) {
+    const safeWidth = Math.max(1, Math.ceil(Math.floor(width) * scale));
+    const safeHeight = Math.max(1, Math.ceil(Math.floor(height) * scale));
 
     if (
       typeof document !== 'undefined' &&
@@ -506,7 +507,8 @@ class XPOrbSystem extends BaseSystem {
 
   createOrbSprite(visual) {
     const diameter = Math.ceil(visual.glowRadius * 2 + 6);
-    const canvas = this.createOffscreenCanvas(diameter, diameter);
+    const scale = getRenderScale();
+    const canvas = this.createOffscreenCanvas(diameter, diameter, scale);
     if (!canvas || typeof canvas.getContext !== 'function') {
       return null;
     }
@@ -516,6 +518,7 @@ class XPOrbSystem extends BaseSystem {
       return null;
     }
 
+    ctx.scale(scale, scale);
     ctx.save();
     ctx.translate(diameter / 2, diameter / 2);
 
@@ -548,6 +551,7 @@ class XPOrbSystem extends BaseSystem {
       height: diameter,
       halfWidth: diameter / 2,
       halfHeight: diameter / 2,
+      scale,
     };
   }
 
@@ -556,11 +560,11 @@ class XPOrbSystem extends BaseSystem {
       return null;
     }
 
-    if (visual.sprite) {
+    if (visual.sprite && visual.sprite.scale === getRenderScale()) {
       return visual.sprite;
     }
 
-    if (visual.spriteAttempted) {
+    if (!visual.sprite && visual.spriteAttempted) {
       return null;
     }
 

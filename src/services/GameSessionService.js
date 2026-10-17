@@ -2012,8 +2012,8 @@ export default class GameSessionService {
           ? enemies.getAsteroids()
           : [];
 
-    const width = Number.isFinite(canvas.width) ? canvas.width : GAME_WIDTH;
-    const height = Number.isFinite(canvas.height) ? canvas.height : GAME_HEIGHT;
+    const width = GAME_WIDTH;
+    const height = GAME_HEIGHT;
 
     const safeDistance =
       PLAYER_SAFE_SPAWN_DISTANCE ?? DEFAULT_SAFE_SPAWN_DISTANCE ?? 300;

@@ -1,4 +1,5 @@
 import RandomService from '../core/RandomService.js';
+import { getRenderScale } from '../core/viewport.js';
 
 class SpaceParticle {
   constructor(x, y, vx, vy, color, size, life, type = 'normal', random = null) {
@@ -151,18 +152,23 @@ SpaceParticle.resolveRandom = function resolveRandom(random) {
 };
 
 SpaceParticle.ensureSpriteCache = function ensureSpriteCache() {
-  if (SpaceParticle.spriteCache) return SpaceParticle.spriteCache;
+  const scale = getRenderScale();
+  if (SpaceParticle.spriteCache && SpaceParticle.spriteScale === scale) {
+    return SpaceParticle.spriteCache;
+  }
 
   if (typeof document === 'undefined') return null;
 
   const size = 64;
   const center = size / 2;
   const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = Math.ceil(size * scale);
+  canvas.height = Math.ceil(size * scale);
   const ctx = canvas.getContext('2d');
 
   if (!ctx) return null;
+
+  ctx.scale(scale, scale);
 
   const gradient = ctx.createRadialGradient(
     center,
@@ -181,6 +187,7 @@ SpaceParticle.ensureSpriteCache = function ensureSpriteCache() {
   ctx.fillRect(0, 0, size, size);
 
   SpaceParticle.spriteCache = canvas;
+  SpaceParticle.spriteScale = scale;
   return SpaceParticle.spriteCache;
 };
 

@@ -30,6 +30,7 @@ import {
 const VALID_SPREAD_MODES = new Set(['concentrated', 'fan']);
 const VALID_AIM_MODES = new Set(['auto', 'manual']);
 import { ENEMY_TYPES, BOSS_CONFIG } from '../data/constants/visual.js';
+import { getRenderScale } from '../core/viewport.js';
 import {
   ASTEROID_VARIANTS,
   ASTEROID_BASE_ORBS,
@@ -3132,7 +3133,12 @@ class CombatSystem extends BaseSystem {
     const size = 32; // Square canvas
     const center = size / 2;
 
-    if (this.bulletTrailCache && this.bulletTrailCache.canvas) {
+    const scale = getRenderScale();
+    if (
+      this.bulletTrailCache &&
+      this.bulletTrailCache.canvas &&
+      this.bulletTrailCache.scale === scale
+    ) {
       return this.bulletTrailCache;
     }
 
@@ -3141,14 +3147,17 @@ class CombatSystem extends BaseSystem {
     }
 
     const offscreen = document.createElement('canvas');
-    offscreen.width = size;
-    offscreen.height = size;
+    const pixels = Math.ceil(size * scale);
+    offscreen.width = pixels;
+    offscreen.height = pixels;
     const ctx = offscreen.getContext('2d');
 
     if (!ctx) return null;
 
-    // 1. Bake the Glow (Gold/Yellow)
-    ctx.shadowBlur = 10;
+    ctx.scale(scale, scale);
+
+    // 1. Bake the Glow (Gold/Yellow). shadowBlur ignores the transform.
+    ctx.shadowBlur = 10 * scale;
     ctx.shadowColor = '#FFFF00';
     ctx.fillStyle = 'rgba(255, 220, 100, 0.8)';
 
@@ -3169,6 +3178,7 @@ class CombatSystem extends BaseSystem {
       width: size,
       height: size,
       radius: center,
+      scale,
     };
 
     return this.bulletTrailCache;
@@ -3185,6 +3195,7 @@ class CombatSystem extends BaseSystem {
     if (
       this.bulletGlowCache &&
       this.bulletGlowCache.radius === glowRadius &&
+      this.bulletGlowCache.scale === getRenderScale() &&
       this.bulletGlowCache.canvas
     ) {
       return this.bulletGlowCache;
@@ -3194,15 +3205,19 @@ class CombatSystem extends BaseSystem {
       return null;
     }
 
+    const scale = getRenderScale();
     const diameter = Math.ceil(glowRadius * 2);
+    const pixels = Math.ceil(diameter * scale);
     const offscreen = document.createElement('canvas');
-    offscreen.width = diameter;
-    offscreen.height = diameter;
+    offscreen.width = pixels;
+    offscreen.height = pixels;
     const offscreenCtx = offscreen.getContext('2d');
 
     if (!offscreenCtx) {
       return null;
     }
+
+    offscreenCtx.scale(scale, scale);
 
     const gradient = offscreenCtx.createRadialGradient(
       glowRadius,
@@ -3225,6 +3240,8 @@ class CombatSystem extends BaseSystem {
     this.bulletGlowCache = {
       canvas: offscreen,
       radius: glowRadius,
+      diameter,
+      scale,
     };
 
     return this.bulletGlowCache;
@@ -3291,7 +3308,9 @@ class CombatSystem extends BaseSystem {
         ctx.drawImage(
           glowSprite.canvas,
           bullet.x - glowSprite.radius,
-          bullet.y - glowSprite.radius
+          bullet.y - glowSprite.radius,
+          glowSprite.diameter,
+          glowSprite.diameter
         );
       } else {
         const gradient = ctx.createRadialGradient(

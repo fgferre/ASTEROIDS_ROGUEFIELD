@@ -1,4 +1,5 @@
 import { BULLET_SIZE } from '../core/GameConstants.js';
+import { getRenderScale } from '../core/viewport.js';
 
 const DEFAULT_ENEMY_COLOR = 'rgba(255, 150, 110, 0.9)';
 const DEFAULT_BOSS_COLOR = 'rgba(255, 120, 220, 0.95)';
@@ -117,22 +118,27 @@ const GLOW_CACHE = new Map();
 let TRAIL_DOT_CACHE = null;
 
 function ensureTrailDotCache() {
-  if (TRAIL_DOT_CACHE) return TRAIL_DOT_CACHE;
+  const scale = getRenderScale();
+  if (TRAIL_DOT_CACHE && TRAIL_DOT_CACHE.scale === scale) {
+    return TRAIL_DOT_CACHE;
+  }
   if (typeof document === 'undefined') return null;
 
   const size = 32;
   const center = size / 2;
   const offscreen = document.createElement('canvas');
-  offscreen.width = size;
-  offscreen.height = size;
+  offscreen.width = Math.ceil(size * scale);
+  offscreen.height = Math.ceil(size * scale);
   const ctx = offscreen.getContext('2d');
 
   if (!ctx) return null;
 
+  ctx.scale(scale, scale);
+
   // 1. Bake the Glow (Generic White/Yellow tint)
   // We tint it via globalCompositeOperation or just rely on alpha blending
   // Actually, a white core with yellowish outer is good for general use
-  ctx.shadowBlur = 8;
+  ctx.shadowBlur = 8 * scale; // shadowBlur ignores the transform
   ctx.shadowColor = '#FFFFFF';
   ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
 
@@ -151,12 +157,14 @@ function ensureTrailDotCache() {
     width: size,
     height: size,
     radius: center,
+    scale,
   };
   return TRAIL_DOT_CACHE;
 }
 
 function ensureGlowCache(colorKey, baseColor, radius, isBoss) {
-  const cacheKey = `${colorKey}-${radius}-${isBoss ? 'boss' : 'minion'}`;
+  const scale = getRenderScale();
+  const cacheKey = `${colorKey}-${radius}-${isBoss ? 'boss' : 'minion'}-${scale}`;
 
   if (GLOW_CACHE.has(cacheKey)) {
     return GLOW_CACHE.get(cacheKey);
@@ -168,11 +176,13 @@ function ensureGlowCache(colorKey, baseColor, radius, isBoss) {
 
   const diameter = Math.ceil(glowRadius * 2);
   const offscreen = document.createElement('canvas');
-  offscreen.width = diameter;
-  offscreen.height = diameter;
+  offscreen.width = Math.ceil(diameter * scale);
+  offscreen.height = Math.ceil(diameter * scale);
   const ctx = offscreen.getContext('2d');
 
   if (!ctx) return null;
+
+  ctx.scale(scale, scale);
 
   const gradient = ctx.createRadialGradient(
     glowRadius,
@@ -207,6 +217,7 @@ function ensureGlowCache(colorKey, baseColor, radius, isBoss) {
   const cacheEntry = {
     canvas: offscreen,
     radius: glowRadius,
+    diameter,
   };
 
   // Simple LRU or clear logic could be added here if memory is finding,
@@ -305,7 +316,9 @@ export function drawEnemyProjectile(ctx, bullet) {
     ctx.drawImage(
       glowSprite.canvas,
       (bullet.x ?? 0) - glowSprite.radius,
-      (bullet.y ?? 0) - glowSprite.radius
+      (bullet.y ?? 0) - glowSprite.radius,
+      glowSprite.diameter,
+      glowSprite.diameter
     );
   } else {
     // Fallback

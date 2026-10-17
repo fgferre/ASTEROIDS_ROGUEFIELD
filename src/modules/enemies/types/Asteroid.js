@@ -23,6 +23,7 @@ import {
 } from '../../../data/enemies/asteroid-configs.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { NeonGraphics } from '../../../utils/NeonGraphics.js';
+import { getRenderScale } from '../../../core/viewport.js';
 
 /**
  * Asteroid Enemy Type
@@ -1057,7 +1058,12 @@ export class Asteroid extends BaseEnemy {
   }
 
   ensureSpriteCache() {
-    if (this.spriteCache && this.spriteCacheStage === this.crackStage) {
+    const scale = getRenderScale();
+    if (
+      this.spriteCache &&
+      this.spriteCacheStage === this.crackStage &&
+      this.spriteCache.scale === scale
+    ) {
       return this.spriteCache;
     }
 
@@ -1066,12 +1072,13 @@ export class Asteroid extends BaseEnemy {
     const offset = Math.ceil(this.radius + padding);
 
     const canvas = document.createElement('canvas');
-    canvas.width = diameter;
-    canvas.height = diameter;
+    canvas.width = Math.ceil(diameter * scale);
+    canvas.height = Math.ceil(diameter * scale);
     const ctx = canvas.getContext('2d');
 
     if (!ctx) return null;
 
+    ctx.scale(scale, scale);
     ctx.translate(offset, offset);
 
     const path = new Path2D();
@@ -1107,7 +1114,7 @@ export class Asteroid extends BaseEnemy {
       }
     }
 
-    this.spriteCache = { canvas, offset };
+    this.spriteCache = { canvas, offset, size: diameter, scale };
     this.spriteCacheStage = this.crackStage;
     return this.spriteCache;
   }
@@ -1124,7 +1131,13 @@ export class Asteroid extends BaseEnemy {
 
       // [NEO-ARCADE] Use additive blending for cached neon sprites to maintain brightness
       ctx.globalCompositeOperation = 'lighter';
-      ctx.drawImage(sprite.canvas, -sprite.offset, -sprite.offset);
+      ctx.drawImage(
+        sprite.canvas,
+        -sprite.offset,
+        -sprite.offset,
+        sprite.size,
+        sprite.size
+      );
 
       const isVolatile = this.behavior?.type === 'volatile';
       if (isVolatile && this.variantState?.armed) {
