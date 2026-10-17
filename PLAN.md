@@ -1,4 +1,4 @@
-# Modernização do Asteroid Roguefield — plano (17/10/2026; sessão 1 encerrada à noite, ver O BASTÃO em docs/PENDENCIAS.md)
+# Modernização do Asteroid Roguefield — plano (17/10/2026; sessão 2 em curso — Rodada 2 abaixo; O BASTÃO em docs/PENDENCIAS.md)
 
 Tarefa que atravessa sessões. Quem pegar este arquivo lê tudo antes de mexer; marca a etapa feita aqui; apaga o
 arquivo quando a última etapa fechar. Decisões de produto são do dono, por imagem e jogando — nunca por teste.
@@ -139,6 +139,28 @@ arquivo quando a última etapa fechar. Decisões de produto são do dono, por im
   medida de fps na máquina dele — headless sem GPU dá 2–4 fps nos dois renderers.
 - [x] **6. Dinâmicas (como propostas).** Dash em Shift, famílias de tag com sinergia "3 iguais", catálogo 9 → 20,
       vitória no Warden 15 ("Field cleared"). Meta-progressão entre runs continua em aberto.
+
+## Rodada 2 (17/10, noite, sessão 2) — o medley: "muitos inimigos diferentes e fases, motor top, VFX/SFX de estúdio"
+
+Pedido dele (`/goal`): _"3D visto de cima, câmera dinâmica, fases, ondas e inimigos como um medley de Asteroids com
+Vampire Survivors… muitos inimigos diferentes e fases. Motor gráfico top de linha… SFX e VFX de grandes estúdios,
+tudo num browser."_ Fatias, cada uma um commit com captura; números como "proposta 17/10" para ele julgar jogando.
+
+- [ ] **R2.1 Profundidade e luz (render3d).** sRGB + tone mapping (hoje saída linear, por isso chapado perto do menu),
+      chão de poeira que a luz da nave varre, sombras suaves sob rochas/inimigos/nave, pool de luzes para explosões.
+- [ ] **R2.2 Roster.** Quatro tipos novos com comportamento próprio (Husk que se parte em Motes, Ram com investida
+      telegrafada, Weaver que semeia Tethers, Bulwark com escudo frontal) + modificador **Elite** (vida, tamanho,
+      cor emissiva, recompensa) aplicável a qualquer tipo de apoio. Look 2D no RenderComponent.
+- [ ] **R2.3 Look 3D dos novos** em `render3d/enemyMirror.js` (+ tipo desconhecido não pode virar Mote em silêncio).
+- [ ] **R2.4 Diretor de camadas.** Uma tabela só (`src/data/layers.js`) com, por camada: rochas, pesos de variante,
+      roster de apoio com cadência, chance de elite, **surtos** (burst com faixa na tela, à la VS) e eventos;
+      WaveManager lê dela e as três tabelas de hoje (configs 1–12, pesos hardcoded, geração dinâmica 13+) saem.
+- [ ] **R2.5 VFX 3D.** Estilhaços de rocha com rotação, dissolve na morte de inimigo, afterimage do dash,
+      aberração cromática em impactos grandes, faíscas direcionais; tudo lendo os eventos que já existem.
+- [ ] **R2.6 SFX.** Compressor/limitador no master, reverb por bus, cues por inimigo novo (spawn, telegraph, morte),
+      explosão em três tamanhos, música que sobe com camada/densidade e não só com boss.
+- [ ] **R2.7 Pickups à la VS.** Ímã (puxa todas as fagulhas), pulso (limpa a tela), sobrecarga (cadência ×2 por 8 s);
+      caem de Elites e Wardens; HUD mostra o que caiu.
 
 ## Fora de escopo deste plano
 
