@@ -66,6 +66,27 @@ function ensureSize(width, height) {
 export function configure({ enabled, intensity } = {}) {
   if (typeof enabled === 'boolean') state.enabled = enabled;
   if (Number.isFinite(intensity)) state.intensity = Math.max(0, intensity);
+  applyUrlOverride();
+}
+
+// `?bloom=0` turns the pass off; `?bloom=1.5` (any 0..3) sets its strength,
+// so the owner can A/B glow on his own GPU without touching settings.
+function applyUrlOverride() {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = new URLSearchParams(window.location.search).get('bloom');
+    if (raw === null) return;
+    const value = Number(raw);
+    if (!Number.isFinite(value)) return;
+    if (value <= 0) {
+      state.enabled = false;
+    } else {
+      state.enabled = true;
+      state.intensity = Math.min(3, value);
+    }
+  } catch {
+    // no URL available (tests): keep the configured values
+  }
 }
 
 export function isEnabled() {
