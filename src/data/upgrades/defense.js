@@ -101,7 +101,7 @@ export const DEFENSE_UPGRADES = deepFreeze([
           title: 'Reinforced Plating',
           description: 'Capacity increased to 4 impacts per activation.',
           highlights: [
-            'Ideal for withstanding medium waves without immediate recharge.',
+            'Ideal for withstanding medium barrages without immediate recharge.',
           ],
         },
         {

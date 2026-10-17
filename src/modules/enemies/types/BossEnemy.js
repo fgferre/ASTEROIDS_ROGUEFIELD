@@ -12,7 +12,7 @@ const SOURCE_CONFIG = BOSS_CONFIG || {};
 
 const BASE_CONFIG = {
   key: 'boss',
-  displayName: 'Apex Overlord',
+  displayName: 'Warden Prime',
   radius: 60,
   safeDistance: 220,
   entryPadding: 24,

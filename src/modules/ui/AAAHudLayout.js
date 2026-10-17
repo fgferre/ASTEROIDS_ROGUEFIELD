@@ -554,7 +554,7 @@ export class AAAHudLayout {
 
             <!-- NEXT WAVE (Center) -->
             <div class="next-wave-box" id="el-wave-alert">
-                <div class="next-wave-label">INCOMING WAVE</div>
+                <div class="next-wave-label">INCOMING LAYER</div>
                 <div class="next-wave-timer" id="ui-next-wave-timer">10</div>
             </div>
 
@@ -578,7 +578,7 @@ export class AAAHudLayout {
             <div class="bottom-center hud-panel">
                 <div class="wave-indicator">
                     <div class="wave-content">
-                        <div class="wave-label">WAVE</div>
+                        <div class="wave-label">LAYER</div>
                         <div class="wave-num" id="ui-wave-num">1</div>
                     </div>
                 </div>

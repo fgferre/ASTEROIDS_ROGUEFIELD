@@ -185,6 +185,12 @@ function forceWaveNumber(enemiesService, requestedWave) {
     // field assignment still works because Object property writes call the
     // setter transparently.
     waveManager.currentWave = numericWave;
+    if (numericWave > 1) {
+      // The run already started wave 1: restart as the requested wave.
+      waveManager.currentWave = numericWave - 1;
+      waveManager.waveInProgress = false;
+      enemiesService.startNextWave();
+    }
     debugLog(`[profileHarness] Forced wave currentWave=${numericWave}`);
   } catch (error) {
     debugLog('[profileHarness] Failed to force wave number:', error);
@@ -223,15 +229,12 @@ function paintCompletionOverlay(scenario, filename) {
  * auto-log capture runs regardless (real-frame data is still gathered when
  * the developer drives the game manually).
  */
-function pollForGameServices() {
+function pollForGameServices(getServices) {
   return new Promise((resolve) => {
     let attempts = 0;
     const tick = () => {
       attempts += 1;
-      const candidate =
-        (typeof window !== 'undefined' &&
-          (window.__gameSystemServices || window.gameSystemServices)) ||
-        null;
+      const candidate = getServices?.() || null;
       if (candidate) {
         resolve(candidate);
         return;
@@ -244,6 +247,19 @@ function pollForGameServices() {
     };
     setTimeout(tick, SERVICES_POLL_INTERVAL_MS);
   });
+}
+
+/**
+ * Clicks the menu start button and waits for the first wave to begin, so the
+ * scenario runs without manual input. Bounded wait; failures are debug-logged.
+ */
+async function startRun(enemiesService) {
+  document.getElementById('start-game-btn')?.click();
+  for (let i = 0; i < 80; i++) {
+    if (enemiesService?.waveManager?.waveInProgress) return;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  debugLog('[profileHarness] Run did not start within 20s');
 }
 
 /**
@@ -279,7 +295,11 @@ function runScenarioDriver(driver, scenario, durationSec) {
  * @param {{ gameState: object, performanceMonitor: object }} deps
  * @returns {{ active: boolean, scenario?: string }}
  */
-export function activateProfileHarness({ gameState, performanceMonitor } = {}) {
+export function activateProfileHarness({
+  gameState,
+  performanceMonitor,
+  getServices,
+} = {}) {
   const scenario = getScenarioFromURL();
   if (!scenario) {
     return { active: false };
@@ -307,6 +327,7 @@ export function activateProfileHarness({ gameState, performanceMonitor } = {}) {
       scenario,
       config,
       performanceMonitor,
+      getServices,
     });
   }, 0);
 
@@ -318,14 +339,19 @@ export function activateProfileHarness({ gameState, performanceMonitor } = {}) {
  * so its async path doesn't affect the synchronous return shape (which
  * src/app.js wiring depends on).
  */
-async function runDeferredScenario({ scenario, config, performanceMonitor }) {
+async function runDeferredScenario({
+  scenario,
+  config,
+  performanceMonitor,
+  getServices,
+}) {
   try {
     performanceMonitor.enableAutoLog(1000);
     debugLog(
       `[profileHarness] Auto-log enabled at 1000ms cadence; awaiting scenario "${scenario}"`
     );
 
-    const services = await pollForGameServices();
+    const services = await pollForGameServices(getServices);
     let driver = null;
 
     if (services) {
@@ -342,6 +368,7 @@ async function runDeferredScenario({ scenario, config, performanceMonitor }) {
         const progression =
           services['progression'] || services.progression || null;
 
+        await startRun(enemies);
         forceProgressionUpgrades(progression, config.upgrades);
         forceWaveNumber(enemies, config.wave);
 

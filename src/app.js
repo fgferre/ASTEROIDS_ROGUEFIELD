@@ -742,7 +742,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // INFRA-01: ?profile=<scenario> activates the in-browser performance harness.
     // No-op when the URL flag is absent. Mutates gameState.randomSeed when active.
-    activateProfileHarness({ gameState, performanceMonitor });
+    activateProfileHarness({
+      gameState,
+      performanceMonitor,
+      getServices: () => gameSystemServices,
+    });
 
     init();
   })();

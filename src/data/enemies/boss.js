@@ -61,7 +61,7 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
  */
 const _bossConfigBase = {
   key: 'boss',
-  displayName: 'Apex Overlord',
+  displayName: 'Warden Prime',
   radius: 60,
   safeDistance: 240,
   entryPadding: 24,
