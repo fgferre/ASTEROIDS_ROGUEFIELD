@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import MusicMixer from '../../../src/modules/audio/MusicMixer.js';
+import MusicMixer, {
+  computeRunIntensity,
+  resolveMusicLevel,
+} from '../../../src/modules/audio/MusicMixer.js';
 import { createServiceManifest } from '../../../src/bootstrap/serviceManifest.js';
 import { createAudioContextStub } from '../../__helpers__/stubs.js';
 import { assertManagerWired } from '../../__helpers__/audio-manifest-wiring.js';
@@ -593,5 +596,38 @@ describe('MusicMixer — Task 2: transport + pause-freeze + fade', () => {
       // No timer fires after dispose.
       expect(() => vi.advanceTimersByTime(1000)).not.toThrow();
     });
+  });
+});
+
+describe('MusicMixer — run-following intensity (wave + density + HP + boss)', () => {
+  const activeLayers = (state, bossLevel = null) => {
+    const level = resolveMusicLevel(computeRunIntensity(state), bossLevel);
+    const profile = MUSIC_LAYER_CONFIG.intensities[level];
+    return LAYER_KEYS.filter((key) => profile[key] > 0);
+  };
+
+  it('maps wave progress, density, low HP and the boss floor to the expected layer set', () => {
+    expect(activeLayers({ wave: 1, enemyCount: 0 })).toEqual([]);
+    expect(activeLayers({ wave: 3, enemyCount: 6 })).toEqual([
+      'base',
+      'tension',
+    ]);
+    expect(activeLayers({ wave: 8, enemyCount: 14 })).toEqual([
+      'base',
+      'tension',
+      'danger',
+    ]);
+    expect(activeLayers({ wave: 15, enemyCount: 20 })).toEqual(LAYER_KEYS);
+    // Low HP (< 30 %) adds tension on top of the same wave/density.
+    expect(activeLayers({ wave: 6, enemyCount: 10 })).toEqual([
+      'base',
+      'tension',
+    ]);
+    expect(activeLayers({ wave: 6, enemyCount: 10, healthRatio: 0.2 })).toEqual(
+      ['base', 'tension', 'danger']
+    );
+    // The boss arc overrides upwards, never downwards.
+    expect(activeLayers({ wave: 1, enemyCount: 0 }, 3)).toEqual(LAYER_KEYS);
+    expect(activeLayers({ wave: 15, enemyCount: 20 }, 1)).toEqual(LAYER_KEYS);
   });
 });

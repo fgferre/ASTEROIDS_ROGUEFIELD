@@ -232,3 +232,126 @@ export const MUSIC_LAYER_CONFIG = Object.freeze({
     bossFall: 2.8,
   }),
 });
+
+// === MASTER CHAIN ("studio" bus) ===
+// Soft limiter on the summed music + effects buses, right before masterGain.
+export const AUDIO_MASTER_LIMITER = Object.freeze({
+  thresholdDb: -6,
+  kneeDb: 12,
+  ratio: 8,
+  attackSeconds: 0.003,
+  releaseSeconds: 0.15,
+});
+
+// Shared reverb send: procedural stereo IR (exponentially decaying noise,
+// darkened over time by a one-pole lowpass), generated once at init.
+export const AUDIO_REVERB = Object.freeze({
+  durationSeconds: 1.6,
+  preDelaySeconds: 0.012,
+  decayDb: 60, // level drop across durationSeconds (RT60-style)
+  dampingCoefficient: 0.35, // one-pole lowpass on the IR noise (0 = bright)
+  returnGain: 1,
+  seed: 'audio:reverb-ir',
+});
+
+// Send levels (dB) per cue family. UI, thrusters and the laser never send.
+export const AUDIO_REVERB_SEND_DB = Object.freeze({
+  explosionSmall: -14,
+  explosionMedium: -12,
+  explosionLarge: -10,
+  mine: -12,
+  shield: -13,
+  levelUp: -12,
+  boss: -10,
+  elite: -11,
+});
+
+// Enemy-side cues pan by source x relative to the player.
+export const AUDIO_STEREO_PAN_MAX = 0.6;
+
+// Explosions in three sizes: sub thump, mid crack, filtered noise/air tail.
+// Times in seconds. `minIntervalMs` throttles same-size pile-ups.
+export const EXPLOSION_PROFILES = Object.freeze({
+  small: Object.freeze({
+    sub: Object.freeze({ start: 160, end: 60, gain: 0.4, duration: 0.16 }),
+    mid: Object.freeze({ start: 520, end: 170, gain: 0.2, duration: 0.09 }),
+    noise: Object.freeze({
+      gain: 0.3,
+      duration: 0.22,
+      filterStart: 3400,
+      filterEnd: 800,
+    }),
+    reverbSendDb: AUDIO_REVERB_SEND_DB.explosionSmall,
+    minIntervalMs: 40,
+  }),
+  medium: Object.freeze({
+    sub: Object.freeze({ start: 135, end: 42, gain: 0.7, duration: 0.36 }),
+    mid: Object.freeze({ start: 330, end: 85, gain: 0.32, duration: 0.2 }),
+    noise: Object.freeze({
+      gain: 0.45,
+      duration: 0.48,
+      filterStart: 2300,
+      filterEnd: 320,
+    }),
+    reverbSendDb: AUDIO_REVERB_SEND_DB.explosionMedium,
+    minIntervalMs: 60,
+  }),
+  large: Object.freeze({
+    sub: Object.freeze({ start: 120, end: 30, gain: 1.0, duration: 0.6 }),
+    mid: Object.freeze({ start: 250, end: 60, gain: 0.4, duration: 0.3 }),
+    noise: Object.freeze({
+      gain: 0.6,
+      duration: 0.8,
+      filterStart: 1500,
+      filterEnd: 200,
+    }),
+    reverbSendDb: AUDIO_REVERB_SEND_DB.explosionLarge,
+    minIntervalMs: 100,
+  }),
+});
+
+// enemy-destroyed → explosion size. Asteroids use their own `size`; mines have
+// their own cue (mine-exploded); unknown types fall back to the default; an
+// `elite` flag bumps one size up. Types not in this checkout yet are listed so
+// they work when they land.
+export const EXPLOSION_SIZE_BY_ENEMY_TYPE = Object.freeze({
+  mote: 'small',
+  drone: 'small',
+  seeker: 'medium',
+  hunter: 'medium',
+  husk: 'medium',
+  ram: 'medium',
+  weaver: 'medium',
+  bulwark: 'large',
+  warden: 'large',
+  boss: 'large',
+  mine: null,
+});
+export const EXPLOSION_DEFAULT_SIZE = 'medium';
+
+// Short music duck on big moments (level-up, large explosions).
+export const AUDIO_BIG_MOMENT_DUCK = Object.freeze({
+  depthDb: 6,
+  attackMs: 30,
+  holdMs: 70,
+  releaseMs: 150,
+});
+
+// Run-following music intensity (0..1). Weighted sum of run progress (wave /
+// RUN_FINAL_LAYER), enemy density and a low-HP bump, smoothed with separate
+// attack/release time constants; each level fades in when the smoothed value
+// crosses its threshold (levels index MUSIC_LAYER_CONFIG.intensities). Boss
+// arc levels still override upwards.
+export const MUSIC_RUN_INTENSITY = Object.freeze({
+  waveWeight: 0.5,
+  densityWeight: 0.35,
+  densityFullCount: 20, // enemies alive/pending in the wave for full weight
+  lowHealthRatio: 0.3,
+  lowHealthBonus: 0.2,
+  attackSeconds: 1.5,
+  releaseSeconds: 4,
+  // [level 1 (base+tension), level 2 (+danger), level 3 (+climax)]
+  levelThresholds: Object.freeze([0.1, 0.45, 0.8]),
+  layerFadeSeconds: 2.5,
+  tickMs: 200,
+});

@@ -324,8 +324,16 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
     expectDelegates('enemy-destroyed', { size: 'small' }, 'playAsteroidBreak');
   });
 
-  it('asteroid-volatile-exploded → playBigExplosion', () => {
-    expectDelegates('asteroid-volatile-exploded', {}, 'playBigExplosion');
+  it('asteroid-volatile-exploded → playExplosion', () => {
+    expectDelegates('asteroid-volatile-exploded', {}, 'playExplosion');
+  });
+
+  it('enemy-telegraph → playEnemyTelegraph', () => {
+    expectDelegates('enemy-telegraph', {}, 'playEnemyTelegraph');
+  });
+
+  it('elite-spawned → playEliteSpawned', () => {
+    expectDelegates('elite-spawned', {}, 'playEliteSpawned');
   });
 
   it('player-leveled-up → playLevelUp', () => {

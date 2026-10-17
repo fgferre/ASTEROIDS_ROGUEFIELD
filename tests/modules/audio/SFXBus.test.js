@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import SFXBus from '../../../src/modules/audio/SFXBus.js';
+import SFXBus, {
+  resolveExplosionSize,
+} from '../../../src/modules/audio/SFXBus.js';
 import AudioSystem from '../../../src/modules/AudioSystem.js';
 import RandomService from '../../../src/core/RandomService.js';
 import {
@@ -288,7 +290,6 @@ const FACADE_PUBLIC_API_BASELINE = Object.freeze([
   'normalizeLaserShotOptions',
   'onDestroy',
   'playAsteroidBreak',
-  'playBigExplosion',
   'playBossDefeated',
   'playBossEvent',
   'playBossPhaseChange',
@@ -297,6 +298,9 @@ const FACADE_PUBLIC_API_BASELINE = Object.freeze([
   'playBulletHit',
   'playButtonClick',
   'playDroneFire',
+  'playEliteSpawned',
+  'playEnemyTelegraph',
+  'playExplosion',
   'playFileTrack',
   'playGoldJackpot',
   'playGoldSpawn',
@@ -376,5 +380,27 @@ describe('AudioSystem facade API parity after SFXBus extraction (02.07)', () => 
       dropped,
       `facade dropped public methods listed in the parity baseline (a parity break): ${dropped.join(', ')}`
     ).toEqual([]);
+  });
+});
+
+describe('SFXBus explosion-size routing (enemy-destroyed → small/medium/large)', () => {
+  it('routes rocks by size, enemies by type, bumps elites and skips mines', () => {
+    const route = (payload) => resolveExplosionSize(payload);
+    expect(route({ size: 'small' })).toBe('small');
+    expect(route({ size: 'medium' })).toBe('medium');
+    expect(route({ size: 'large' })).toBe('large');
+    expect(route({ enemyType: 'mote' })).toBe('small');
+    expect(route({ enemyType: 'drone' })).toBe('small');
+    expect(route({ enemyType: 'seeker' })).toBe('medium');
+    expect(route({ enemyType: 'husk' })).toBe('medium');
+    expect(route({ enemy: { type: 'ram' } })).toBe('medium');
+    expect(route({ enemyType: 'weaver' })).toBe('medium');
+    expect(route({ enemyType: 'bulwark' })).toBe('large');
+    expect(route({ enemyType: 'warden' })).toBe('large');
+    expect(route({ enemyType: 'something-new' })).toBe('medium');
+    expect(route({ enemyType: 'seeker', elite: true })).toBe('large');
+    expect(route({ enemy: { type: 'mote', elite: true } })).toBe('medium');
+    expect(route({ enemyType: 'warden', elite: true })).toBe('large');
+    expect(route({ enemyType: 'mine' })).toBeNull();
   });
 });

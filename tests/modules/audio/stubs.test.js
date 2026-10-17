@@ -61,8 +61,10 @@ describe('createAudioContextStub Web Audio extensions', () => {
     expect(typeof panner.disconnect).toBe('function');
   });
 
-  it('does NOT add an unused createDynamicsCompressor node (review: keep the stub minimal)', () => {
+  it('adds createDynamicsCompressor for the master soft limiter', () => {
     const context = createAudioContextStub();
-    expect(context.createDynamicsCompressor).toBeUndefined();
+    const limiter = context.createDynamicsCompressor();
+    expect(typeof limiter.threshold.value).toBe('number');
+    expect(typeof limiter.connect).toBe('function');
   });
 });

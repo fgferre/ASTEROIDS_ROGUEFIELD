@@ -5,6 +5,71 @@ import ThrusterLoopManager from '../ThrusterLoopManager.js';
 import { createSfxSynthPort } from './SfxSynthPort.js';
 import RandomService from '../../core/RandomService.js';
 import { requireRandom } from '../../utils/randomHelpers.js';
+import {
+  AUDIO_REVERB,
+  AUDIO_REVERB_SEND_DB,
+  AUDIO_STEREO_PAN_MAX,
+  EXPLOSION_DEFAULT_SIZE,
+  EXPLOSION_PROFILES,
+  EXPLOSION_SIZE_BY_ENEMY_TYPE,
+  GAME_WIDTH,
+} from '../../core/GameConstants.js';
+
+const EXPLOSION_SIZE_ORDER = Object.freeze(['small', 'medium', 'large']);
+const ASTEROID_SIZES = new Set(EXPLOSION_SIZE_ORDER);
+
+/**
+ * Explosion size for an enemy-destroyed payload: asteroids by their `size`,
+ * other enemies by EXPLOSION_SIZE_BY_ENEMY_TYPE (unknown → default), `elite`
+ * bumps one size up. Returns null when the enemy has its own death cue (mine).
+ *
+ * @param {object} payload
+ * @returns {'small'|'medium'|'large'|null}
+ */
+export function resolveExplosionSize(payload = {}) {
+  const enemy = payload?.enemy || {};
+  const type = String(
+    payload?.enemyType || enemy.type || (payload?.size ? 'asteroid' : '')
+  ).toLowerCase();
+
+  let size;
+  if (type === 'asteroid') {
+    const asteroidSize = payload?.size ?? enemy.size;
+    size = ASTEROID_SIZES.has(asteroidSize)
+      ? asteroidSize
+      : EXPLOSION_DEFAULT_SIZE;
+  } else if (
+    Object.prototype.hasOwnProperty.call(EXPLOSION_SIZE_BY_ENEMY_TYPE, type)
+  ) {
+    size = EXPLOSION_SIZE_BY_ENEMY_TYPE[type];
+  } else {
+    size = EXPLOSION_DEFAULT_SIZE;
+  }
+
+  if (!size) return null;
+  if (payload?.elite || enemy.elite) {
+    const index = EXPLOSION_SIZE_ORDER.indexOf(size);
+    size =
+      EXPLOSION_SIZE_ORDER[
+        Math.min(EXPLOSION_SIZE_ORDER.length - 1, index + 1)
+      ];
+  }
+  return size;
+}
+
+/**
+ * Stereo pan for a source at `sourceX` heard from `listenerX` (the player):
+ * half a screen away reaches the ±AUDIO_STEREO_PAN_MAX edge. Centred when the
+ * source position is unknown.
+ */
+export function resolveStereoPan(sourceX, listenerX = GAME_WIDTH / 2) {
+  if (!Number.isFinite(sourceX)) return 0;
+  const reference = Number.isFinite(listenerX) ? listenerX : GAME_WIDTH / 2;
+  const offset = (sourceX - reference) / (GAME_WIDTH / 2);
+  return Math.max(-1, Math.min(1, offset)) * AUDIO_STEREO_PAN_MAX;
+}
+
+const dbToGain = (db) => Math.pow(10, db / 20);
 
 /**
  * SFXBus — owns ALL per-event SFX synthesis (INFRA-02).
@@ -59,6 +124,14 @@ class SFXBus {
     // --- owned output buses (created in init) ---
     this.ambientBus = null; // → effectsDuckGain (ducks with the world)
     this.protectedBus = null; // → effectsGain directly (player feedback never ducks)
+    this.reverbSend = null; // per-cue sends → convolver → reverbReturn → effectsGain
+    this.reverbConvolver = null;
+    this.reverbReturn = null;
+    this._lastExplosionTime = {
+      small: -Infinity,
+      medium: -Infinity,
+      large: -Infinity,
+    };
 
     // --- injected facade seams (assigned in init) ---
     this._getContext = () => null;
@@ -128,6 +201,19 @@ class SFXBus {
     this.protectedBus = context.createGain();
     if (effectsGain) {
       this.protectedBus.connect(effectsGain);
+    }
+
+    // --- reverb send bus: shared convolver with a procedural IR; the return
+    // joins effectsGain (slider applies; the send never ducks twice) ---
+    if (effectsGain) {
+      this.reverbSend = context.createGain();
+      this.reverbConvolver = context.createConvolver();
+      this.reverbConvolver.buffer = this._createReverbImpulse(context);
+      this.reverbReturn = context.createGain();
+      this.reverbReturn.gain.value = AUDIO_REVERB.returnGain;
+      this.reverbSend.connect(this.reverbConvolver);
+      this.reverbConvolver.connect(this.reverbReturn);
+      this.reverbReturn.connect(effectsGain);
     }
 
     // --- owned optimization instances (relocated ownership; files unmoved) ---
@@ -217,6 +303,57 @@ class SFXBus {
     }
   }
 
+  /**
+   * Stereo exponentially-decaying noise IR, darkened over time by a one-pole
+   * lowpass, from its own seeded stream (never touches the gameplay scopes).
+   * @private
+   */
+  _createReverbImpulse(context) {
+    const rate = context.sampleRate;
+    const length = Math.max(1, Math.floor(rate * AUDIO_REVERB.durationSeconds));
+    const preDelay = Math.floor(rate * AUDIO_REVERB.preDelaySeconds);
+    const buffer = context.createBuffer(2, length, rate);
+    const rng = new RandomService(AUDIO_REVERB.seed);
+    const decayPerSecond = (AUDIO_REVERB.decayDb / 20) * Math.LN10;
+    const damping = AUDIO_REVERB.dampingCoefficient;
+
+    for (let channel = 0; channel < 2; channel += 1) {
+      const data = buffer.getChannelData(channel);
+      let filtered = 0;
+      for (let i = preDelay; i < length; i += 1) {
+        const t = (i - preDelay) / rate;
+        filtered += (rng.range(-1, 1) - filtered) * (1 - damping);
+        data[i] = filtered * Math.exp(-decayPerSecond * t);
+      }
+    }
+    return buffer;
+  }
+
+  /**
+   * Feed `node` into the shared reverb at `sendDb` (no-op before init).
+   * @private
+   */
+  _sendToReverb(node, sendDb) {
+    if (!this.reverbSend || !node || typeof node.connect !== 'function') return;
+    const send = this.context.createGain();
+    send.gain.value = dbToGain(sendDb);
+    node.connect(send);
+    send.connect(this.reverbSend);
+  }
+
+  /**
+   * Ambient destination, through a StereoPanner when `pan` is non-zero.
+   * @private
+   */
+  _ambientInput(pan = 0) {
+    const destination = this.getAmbientDestination();
+    if (!destination || !pan) return destination;
+    const panner = this.context.createStereoPanner();
+    panner.pan.value = pan;
+    panner.connect(destination);
+    return panner;
+  }
+
   _resolveRandom(...candidates) {
     for (const candidate of candidates) {
       if (candidate && typeof candidate.float === 'function') {
@@ -287,6 +424,7 @@ class SFXBus {
       gain: 0.1 + intensity * 0.04,
       intensity,
       wave,
+      pan: Number(data?.pan) || 0,
       enemyType: (
         data?.enemyType ||
         data?.enemy?.type ||
@@ -329,6 +467,7 @@ class SFXBus {
       duration: 0.09,
       gain: 0.13 + speedRatio * 0.06,
       intensity: Math.min(1.2, 0.7 + speedRatio * 0.5),
+      pan: Number(data?.pan) || 0,
       burstId:
         burst.id !== undefined
           ? `hunter:${burst.id}`
@@ -359,6 +498,7 @@ class SFXBus {
       noiseGain: 0.22 + intensity * 0.18,
       rumbleGain: 0.2 + intensity * 0.18,
       intensity,
+      pan: Number(data?.pan) || 0,
       enemyType: (data?.enemyType || data?.enemy?.type || 'mine').toLowerCase(),
     };
   }
@@ -529,12 +669,37 @@ class SFXBus {
     this._playAsteroidBreakDirect(size);
   }
 
-  playBigExplosion() {
-    this._trackPerformance('playBigExplosion');
+  /**
+   * Explosion in three sizes (EXPLOSION_PROFILES): sub thump, mid crack and a
+   * filtered noise tail, panned, with a size-scaled reverb send. Same-size
+   * pile-ups inside `minIntervalMs` are dropped.
+   *
+   * @param {'small'|'medium'|'large'} [size='large']
+   * @param {{pan?: number}} [options]
+   */
+  playExplosion(size = 'large', { pan = 0 } = {}) {
+    this._trackPerformance('playExplosion');
+    const profile = EXPLOSION_PROFILES[size] || EXPLOSION_PROFILES.large;
+    const sizeKey = EXPLOSION_PROFILES[size] ? size : 'large';
 
     this._safePlay(() => {
-      // [NEO-ARCADE AUDIO] Cinematic Explosion
-      // Layer 1: Sub-Bass Sine (The "Thud")
+      const now = this.context.currentTime;
+      if (
+        (now - this._lastExplosionTime[sizeKey]) * 1000 <
+        profile.minIntervalMs
+      ) {
+        return;
+      }
+      this._lastExplosionTime[sizeKey] = now;
+
+      const destination = this._ambientInput(pan);
+      if (!destination) {
+        return;
+      }
+
+      const { sub, mid, noise: noiseProfile } = profile;
+
+      // Layer 1: sub-bass sine (the thump)
       const subOsc = this.pool
         ? this.pool.getOscillator()
         : this.context.createOscillator();
@@ -543,7 +708,7 @@ class SFXBus {
         : this.context.createGain();
       subOsc.connect(subGain);
 
-      // Layer 2: Mid-Range Punch (The "Crack")
+      // Layer 2: mid-range triangle (the crack)
       const midOsc = this.pool
         ? this.pool.getOscillator()
         : this.context.createOscillator();
@@ -552,22 +717,18 @@ class SFXBus {
         : this.context.createGain();
       midOsc.connect(midGain);
 
-      // Layer 3: Filtered Noise (The "Debris")
-      // Use proper LPF on noise to avoid cheap "hiss"
+      // Layer 3: lowpassed noise (debris / air tail)
       const noiseFilter = this.pool
         ? this.pool.getFilter()
         : this.context.createBiquadFilter();
       noiseFilter.type = 'lowpass';
-      noiseFilter.frequency.value = 1200; // Muffled debris
 
-      const destination = this.getAmbientDestination();
-      if (destination) {
-        subGain.connect(destination);
-        midGain.connect(destination);
-        noiseFilter.connect(destination); // Noise -> Filter -> Dest
-      }
+      subGain.connect(destination);
+      midGain.connect(destination);
+      noiseFilter.connect(destination);
+      this._sendToReverb(midGain, profile.reverbSendDb);
+      this._sendToReverb(noiseFilter, profile.reverbSendDb);
 
-      // Use cached noise buffer if available
       let noiseBuffer;
       if (this.cache) {
         noiseBuffer = this.cache.getNoiseBuffer(0.8, true, 'exponential', {
@@ -575,7 +736,6 @@ class SFXBus {
           random: this.randomScopes.bufferFamilies.explosion,
         });
       } else {
-        // Fallback
         const bufferSize = this.context.sampleRate * 0.8;
         noiseBuffer = this.context.createBuffer(
           1,
@@ -599,51 +759,125 @@ class SFXBus {
       const noiseGain = this.pool
         ? this.pool.getGain()
         : this.context.createGain();
-
       noise.connect(noiseGain);
-      noiseGain.connect(noiseFilter); // Route noise through filter
+      noiseGain.connect(noiseFilter);
 
-      const now = this.context.currentTime;
-
-      // 1. SUB-BASS (Physical Impact) - Tuned for audibility
       subOsc.type = 'sine';
-      subOsc.frequency.setValueAtTime(120, now); // Higher start (was 80)
-      subOsc.frequency.exponentialRampToValueAtTime(30, now + 0.6); // (was 10)
-      subGain.gain.setValueAtTime(1.0, now); // Max volume
-      subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+      subOsc.frequency.setValueAtTime(sub.start, now);
+      subOsc.frequency.exponentialRampToValueAtTime(
+        sub.end,
+        now + sub.duration
+      );
+      subGain.gain.setValueAtTime(sub.gain, now);
+      subGain.gain.exponentialRampToValueAtTime(0.001, now + sub.duration);
 
-      // 2. MID-RANGE (Texture) - Tuned for punch
       midOsc.type = 'triangle';
-      midOsc.frequency.setValueAtTime(250, now); // (was 200)
-      midOsc.frequency.exponentialRampToValueAtTime(60, now + 0.3);
-      midGain.gain.setValueAtTime(0.4, now); // (was 0.3)
-      midGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      midOsc.frequency.setValueAtTime(mid.start, now);
+      midOsc.frequency.exponentialRampToValueAtTime(
+        mid.end,
+        now + mid.duration
+      );
+      midGain.gain.setValueAtTime(mid.gain, now);
+      midGain.gain.exponentialRampToValueAtTime(0.001, now + mid.duration);
 
-      // 3. NOISE (Explosion body)
-      noiseGain.gain.setValueAtTime(0.6, now);
-      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
-      // Sweep filter down slightly
-      noiseFilter.frequency.setValueAtTime(1500, now);
-      noiseFilter.frequency.exponentialRampToValueAtTime(200, now + 0.7);
+      noiseGain.gain.setValueAtTime(noiseProfile.gain, now);
+      noiseGain.gain.exponentialRampToValueAtTime(
+        0.001,
+        now + noiseProfile.duration
+      );
+      noiseFilter.frequency.setValueAtTime(noiseProfile.filterStart, now);
+      noiseFilter.frequency.exponentialRampToValueAtTime(
+        noiseProfile.filterEnd,
+        now + noiseProfile.duration * 0.9
+      );
 
       subOsc.start(now);
-      subOsc.stop(now + 0.61);
-
+      subOsc.stop(now + sub.duration + 0.01);
       midOsc.start(now);
-      midOsc.stop(now + 0.31);
-
+      midOsc.stop(now + mid.duration + 0.01);
       noise.start(now);
-      noise.stop(now + 0.81);
+      noise.stop(now + noiseProfile.duration + 0.01);
 
-      // Return nodes to pool
       if (this.pool) {
-        setTimeout(() => {
-          this.pool.returnGain(subGain);
-          this.pool.returnGain(midGain);
-          this.pool.returnGain(noiseGain);
-          this.pool.returnFilter(noiseFilter); // If we implemented returnFilter
-        }, 900);
+        const longest = Math.max(
+          sub.duration,
+          mid.duration,
+          noiseProfile.duration
+        );
+        setTimeout(
+          () => {
+            this.pool.returnGain(subGain);
+            this.pool.returnGain(midGain);
+            this.pool.returnGain(noiseGain);
+            this.pool.returnFilter(noiseFilter);
+          },
+          longest * 1000 + 100
+        );
       }
+    });
+  }
+
+  /**
+   * Enemy telegraph: short rising tone (an attack is coming), panned.
+   * @param {{pan?: number}} [options]
+   */
+  playEnemyTelegraph({ pan = 0 } = {}) {
+    this._trackPerformance('playEnemyTelegraph');
+
+    this._safePlay(() => {
+      const destination = this._ambientInput(pan);
+      if (!destination) return;
+
+      const now = this.context.currentTime;
+      const osc = this.context.createOscillator();
+      const gain = this.context.createGain();
+      osc.connect(gain);
+      gain.connect(destination);
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(520, now);
+      osc.frequency.exponentialRampToValueAtTime(1040, now + 0.16);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.09, now + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+      osc.start(now);
+      osc.stop(now + 0.19);
+    });
+  }
+
+  /** Elite spawned: low metallic chord (detuned squares, bandpassed), reverb. */
+  playEliteSpawned() {
+    this._trackPerformance('playEliteSpawned');
+
+    this._safePlay(() => {
+      const destination = this.getAmbientDestination();
+      if (!destination) return;
+
+      const now = this.context.currentTime;
+      const filter = this.context.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(900, now);
+      filter.Q.setValueAtTime(4, now);
+      const gain = this.context.createGain();
+      filter.connect(gain);
+      gain.connect(destination);
+      this._sendToReverb(gain, AUDIO_REVERB_SEND_DB.elite);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.16, now + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+
+      // Inharmonic ratios give the metallic ring; the fifth anchors the chord.
+      [98, 147, 98 * 2.76].forEach((frequency, index) => {
+        const osc = this.context.createOscillator();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(frequency, now);
+        osc.detune.setValueAtTime((index - 1) * 7, now);
+        osc.connect(filter);
+        osc.start(now);
+        osc.stop(now + 0.92);
+      });
     });
   }
 
@@ -732,6 +966,7 @@ class SFXBus {
       const duration = Math.max(0.06, Number(params.duration) || 0.1);
       const startFrequency = Math.max(520, Number(params.frequency) || 680);
       const now = this.context.currentTime;
+      const output = this._ambientInput(params.pan);
 
       for (let i = 0; i < voices; i += 1) {
         const osc = this.pool
@@ -742,7 +977,7 @@ class SFXBus {
           : this.context.createGain();
 
         osc.connect(gain);
-        this._connectAmbient(gain);
+        if (output) gain.connect(output);
 
         const spreadFactor = voices > 1 ? i / (voices - 1) - 0.5 : 0;
         const pitchOffset = detune * spreadFactor;
@@ -798,6 +1033,7 @@ class SFXBus {
       const totalGain = Math.min(0.32, baseGain * concurrency);
       const perShotGain = Math.max(0.04, totalGain / shotCount);
       const now = this.context.currentTime;
+      const output = this._ambientInput(params.pan);
 
       for (let shot = 0; shot < shotCount; shot += 1) {
         const osc = this.pool
@@ -808,7 +1044,7 @@ class SFXBus {
           : this.context.createGain();
 
         osc.connect(gain);
-        this._connectAmbient(gain);
+        if (output) gain.connect(output);
 
         const shotStart = now + shot * spacing;
         const position = shotCount > 1 ? shot / (shotCount - 1) : 0.5;
@@ -868,7 +1104,7 @@ class SFXBus {
       );
 
       const now = this.context.currentTime;
-      const destination = this.getAmbientDestination();
+      const destination = this._ambientInput(params.pan);
       if (!destination) {
         return;
       }
@@ -888,6 +1124,7 @@ class SFXBus {
       );
       rumbleOsc.connect(rumbleGain);
       rumbleGain.connect(destination);
+      this._sendToReverb(rumbleGain, AUDIO_REVERB_SEND_DB.mine);
 
       rumbleGain.gain.setValueAtTime(rumbleGainValue, now);
       rumbleGain.gain.exponentialRampToValueAtTime(0.001, now + duration);
@@ -946,6 +1183,7 @@ class SFXBus {
       noiseSource.connect(noiseFilter);
       noiseFilter.connect(noiseGain);
       noiseGain.connect(destination);
+      this._sendToReverb(noiseGain, AUDIO_REVERB_SEND_DB.mine);
 
       noiseGain.gain.setValueAtTime(noiseGainValue, now);
       noiseGain.gain.exponentialRampToValueAtTime(0.001, now + duration * 0.85);
@@ -1232,6 +1470,7 @@ class SFXBus {
 
       osc.connect(gain);
       this._connectProtected(gain);
+      this._sendToReverb(gain, AUDIO_REVERB_SEND_DB.shield);
 
       const now = this.context.currentTime;
       osc.type = 'sine';
@@ -1262,6 +1501,7 @@ class SFXBus {
 
       osc.connect(gain);
       this._connectProtected(gain);
+      this._sendToReverb(gain, AUDIO_REVERB_SEND_DB.shield);
 
       const now = this.context.currentTime;
       const params = {}; // Assuming params might be passed or defined elsewhere, defaulting to empty for now
@@ -1332,6 +1572,7 @@ class SFXBus {
 
       osc.connect(gain);
       this._connectProtected(gain);
+      this._sendToReverb(gain, AUDIO_REVERB_SEND_DB.shield);
 
       const now = this.context.currentTime;
       osc.type = 'sawtooth';
@@ -1361,6 +1602,7 @@ class SFXBus {
 
       osc.connect(gain);
       this._connectProtected(gain);
+      this._sendToReverb(gain, AUDIO_REVERB_SEND_DB.shield);
 
       const now = this.context.currentTime;
       osc.type = 'square';
@@ -1391,6 +1633,7 @@ class SFXBus {
 
       osc.connect(gain);
       this._connectProtected(gain);
+      this._sendToReverb(gain, AUDIO_REVERB_SEND_DB.shield);
 
       const now = this.context.currentTime;
       osc.type = 'square';
@@ -1462,9 +1705,11 @@ class SFXBus {
 
       noise.connect(noiseGain);
       this._connectProtected(noiseGain);
+      this._sendToReverb(noiseGain, AUDIO_REVERB_SEND_DB.shield);
 
       osc.connect(oscGain);
       this._connectProtected(oscGain);
+      this._sendToReverb(oscGain, AUDIO_REVERB_SEND_DB.shield);
 
       const now = this.context.currentTime;
       osc.type = 'sine';
@@ -1506,6 +1751,7 @@ class SFXBus {
 
         osc.connect(gain);
         this._connectAmbient(gain);
+        this._sendToReverb(gain, AUDIO_REVERB_SEND_DB.levelUp);
 
         const startTime = this.context.currentTime + index * 0.06;
         osc.frequency.setValueAtTime(freq, startTime);
@@ -2464,8 +2710,14 @@ class SFXBus {
 
     this._safeDisconnect(this.ambientBus);
     this._safeDisconnect(this.protectedBus);
+    this._safeDisconnect(this.reverbSend);
+    this._safeDisconnect(this.reverbConvolver);
+    this._safeDisconnect(this.reverbReturn);
     this.ambientBus = null;
     this.protectedBus = null;
+    this.reverbSend = null;
+    this.reverbConvolver = null;
+    this.reverbReturn = null;
     this.batcher = null;
     this.pool = null;
     this.cache = null;
