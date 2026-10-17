@@ -3,7 +3,6 @@ import {
   ASTEROID_SIZES,
   BULLET_SIZE,
   PHYSICS_CELL_SIZE,
-  SHIP_SIZE,
 } from '../core/GameConstants.js';
 import { SpatialHash } from '../core/SpatialHash.js';
 import { resolveService } from '../core/serviceUtils.js';
@@ -221,13 +220,9 @@ class PhysicsSystem extends BaseSystem {
 
     let enemyService = this.dependencies.enemies;
     if (!enemyService) {
-      try {
-        enemyService = resolveService('enemies', this.dependencies);
-        if (enemyService) {
-          this.dependencies.enemies = enemyService;
-        }
-      } catch (error) {
-        enemyService = null;
+      enemyService = resolveService('enemies', this.dependencies);
+      if (enemyService) {
+        this.dependencies.enemies = enemyService;
       }
     }
 
@@ -268,50 +263,13 @@ class PhysicsSystem extends BaseSystem {
       return;
     }
 
-    if (typeof enemySystem.forEachActiveEnemy === 'function') {
-      enemySystem.forEachActiveEnemy((asteroid) => {
-        this.registerEnemy(asteroid);
-      });
-      this.bootstrapCompleted = true;
-      this.warnOnBossTrackingMismatch({
-        reason: 'bootstrap.forEachActiveEnemy',
-      });
-      return;
-    }
-
-    if (typeof enemySystem.getActiveEnemies === 'function') {
-      const asteroids = enemySystem.getActiveEnemies();
-      if (Array.isArray(asteroids) && asteroids.length) {
-        asteroids.forEach((asteroid) => {
-          this.registerEnemy(asteroid);
-        });
-      }
-      this.bootstrapCompleted = true;
-      this.warnOnBossTrackingMismatch({ reason: 'bootstrap.getActiveEnemies' });
-      return;
-    }
-
-    if (typeof enemySystem.forEachActiveAsteroid === 'function') {
-      enemySystem.forEachActiveAsteroid((asteroid) => {
-        this.registerEnemy(asteroid);
-      });
-      this.bootstrapCompleted = true;
-      this.warnOnBossTrackingMismatch({
-        reason: 'bootstrap.forEachActiveAsteroid',
-      });
-      return;
-    }
-
-    if (typeof enemySystem.getAsteroids === 'function') {
-      const asteroids = enemySystem.getAsteroids();
-      if (Array.isArray(asteroids) && asteroids.length) {
-        asteroids.forEach((asteroid) => {
-          this.registerEnemy(asteroid);
-        });
-      }
-      this.bootstrapCompleted = true;
-      this.warnOnBossTrackingMismatch({ reason: 'bootstrap.getAsteroids' });
-    }
+    enemySystem.forEachActiveEnemy((asteroid) => {
+      this.registerEnemy(asteroid);
+    });
+    this.bootstrapCompleted = true;
+    this.warnOnBossTrackingMismatch({
+      reason: 'bootstrap.forEachActiveEnemy',
+    });
   }
 
   clearDerivedEnemyTrackingState() {
@@ -385,17 +343,7 @@ class PhysicsSystem extends BaseSystem {
       return;
     }
 
-    let bosses = [];
-
-    if (enemySystem.activeBosses instanceof Map) {
-      bosses = Array.from(enemySystem.activeBosses.values());
-    } else if (typeof enemySystem.getAllAsteroids === 'function') {
-      bosses = enemySystem
-        .getAllAsteroids()
-        .filter((enemy) => this.isBossEnemy(enemy));
-    } else if (Array.isArray(enemySystem.asteroids)) {
-      bosses = enemySystem.asteroids.filter((enemy) => this.isBossEnemy(enemy));
-    }
+    const bosses = Array.from(enemySystem.activeBosses.values());
 
     const mismatches = bosses
       .filter((boss) => boss && !boss.destroyed)
@@ -919,22 +867,13 @@ class PhysicsSystem extends BaseSystem {
     this.eventBus?.emit?.(eventName, { ...payload, processedBy: 'physics' });
   }
 
+  // Effects is built after physics in the manifest, so it is resolved on first
+  // use; physics-only harnesses legitimately run without it.
   getEffectsService() {
-    if (this.effectsService) {
-      return this.effectsService;
+    if (!this.effectsService) {
+      this.effectsService = resolveService('effects', this.dependencies);
     }
-
-    try {
-      const effects = resolveService('effects', this.dependencies);
-      if (effects) {
-        this.effectsService = effects;
-        return effects;
-      }
-    } catch (error) {
-      // ignore service resolution failures
-    }
-
-    return null;
+    return this.effectsService;
   }
 
   triggerScreenShake(
@@ -952,14 +891,7 @@ class PhysicsSystem extends BaseSystem {
       return;
     }
 
-    const effects = this.getEffectsService();
-    if (effects && typeof effects.addScreenShake === 'function') {
-      try {
-        effects.addScreenShake(intensity, duration);
-      } catch (error) {
-        // ignore effects failures
-      }
-    }
+    this.getEffectsService()?.addScreenShake(intensity, duration);
 
     this.emitBossPhysicsEvent('boss-screen-shake', {
       reason,
@@ -1044,7 +976,7 @@ class PhysicsSystem extends BaseSystem {
     this.updateMaxEnemyRadiusFromPayload(payload);
 
     const enemySystem = this.enemySystem ?? this.dependencies.enemies;
-    if (enemySystem && typeof enemySystem.handleMineExplosion === 'function') {
+    if (enemySystem) {
       enemySystem.handleMineExplosion(payload);
       return;
     }
@@ -1302,12 +1234,7 @@ class PhysicsSystem extends BaseSystem {
       return this._handleSnapshotFallback('enemy system unavailable');
     }
 
-    const availableEnemies =
-      typeof enemySystem.getAllAsteroids === 'function'
-        ? enemySystem.getAllAsteroids()
-        : Array.isArray(enemySystem.asteroids)
-          ? enemySystem.asteroids
-          : [];
+    const availableEnemies = enemySystem.getAllAsteroids();
 
     const enemyByPoolId = new Map();
     const liveEnemies = [];
@@ -1591,27 +1518,17 @@ class PhysicsSystem extends BaseSystem {
   }
 
   buildPlayerCollisionContext(player) {
-    const shieldState =
-      typeof player.getShieldState === 'function'
-        ? player.getShieldState()
-        : null;
+    const shieldState = player.getShieldState();
     const shieldActive =
       shieldState?.isActive &&
       shieldState.maxHits > 0 &&
       shieldState.currentHits > 0;
-    const impactProfile =
-      shieldActive && typeof player.getShieldImpactProfile === 'function'
-        ? player.getShieldImpactProfile()
-        : { damage: 0, forceMultiplier: 1, level: shieldState?.level ?? 0 };
+    const impactProfile = shieldActive
+      ? player.getShieldImpactProfile()
+      : { damage: 0, forceMultiplier: 1, level: shieldState?.level ?? 0 };
 
-    const hullRadius =
-      typeof player.getHullBoundingRadius === 'function'
-        ? player.getHullBoundingRadius()
-        : SHIP_SIZE;
-    const padding =
-      shieldActive && typeof player.getShieldPadding === 'function'
-        ? player.getShieldPadding()
-        : 0;
+    const hullRadius = player.getHullBoundingRadius();
+    const padding = shieldActive ? player.getShieldPadding() : 0;
 
     const collisionRadius = Math.max(0, hullRadius + padding);
 
@@ -1817,16 +1734,10 @@ class PhysicsSystem extends BaseSystem {
       damage = Math.max(0, Math.floor(damageOverride));
     }
     result.damage = damage;
-    const remaining =
-      typeof player.takeDamage === 'function'
-        ? player.takeDamage(damage)
-        : undefined;
+    const remaining = player.takeDamage(damage);
     result.remainingHealth = typeof remaining === 'number' ? remaining : null;
 
-    const newShieldState =
-      typeof player.getShieldState === 'function'
-        ? player.getShieldState()
-        : null;
+    const newShieldState = player.getShieldState();
 
     const shieldAbsorbedHit =
       prevShieldActive &&
@@ -1850,9 +1761,7 @@ class PhysicsSystem extends BaseSystem {
       }
 
       if (asteroid.shieldHitCooldown <= 0) {
-        if (enemiesSystem && typeof enemiesSystem.applyDamage === 'function') {
-          enemiesSystem.applyDamage(asteroid, context.impactProfile.damage);
-        }
+        enemiesSystem.applyDamage(asteroid, context.impactProfile.damage);
         asteroid.shieldHitCooldown = cooldown;
       }
 
@@ -1868,11 +1777,7 @@ class PhysicsSystem extends BaseSystem {
       return result;
     }
 
-    if (typeof player.setInvulnerableTimer === 'function') {
-      player.setInvulnerableTimer(0.5);
-    } else {
-      player.invulnerableTimer = 0.5;
-    }
+    player.setInvulnerableTimer(0.5);
 
     finalizeBossFeedback(damage);
 
@@ -2039,10 +1944,7 @@ class PhysicsSystem extends BaseSystem {
         } catch (error) {
           // ignore individual enemy damage errors
         }
-      } else if (
-        enemiesSystem &&
-        typeof enemiesSystem.applyDamage === 'function'
-      ) {
+      } else {
         enemiesSystem.applyDamage(enemy, scaledDamage);
       }
 
@@ -2112,18 +2014,11 @@ class PhysicsSystem extends BaseSystem {
             scaledDamage > 0 &&
             (!player.invulnerableTimer || player.invulnerableTimer <= 0)
           ) {
-            const remaining =
-              typeof player.takeDamage === 'function'
-                ? player.takeDamage(scaledDamage)
-                : null;
+            const remaining = player.takeDamage(scaledDamage);
             playerResult.remainingHealth =
               typeof remaining === 'number' ? remaining : null;
 
-            if (typeof player.setInvulnerableTimer === 'function') {
-              player.setInvulnerableTimer(0.4);
-            } else {
-              player.invulnerableTimer = 0.4;
-            }
+            player.setInvulnerableTimer(0.4);
 
             this.eventBus?.emit?.('player-took-damage', {
               damage: scaledDamage,

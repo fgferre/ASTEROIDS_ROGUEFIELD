@@ -48,6 +48,8 @@ function createEnemySystemWithSeed(seed) {
 
   const physics = {
     bootstrapFromEnemySystem: () => {},
+    registerEnemy: () => {},
+    unregisterEnemy: () => {},
   };
 
   const xpOrbs = {
@@ -62,6 +64,7 @@ function createEnemySystemWithSeed(seed) {
     physics,
     progression: { getDifficulty: () => 1 },
     'xp-orbs': xpOrbs,
+    healthHearts: {},
   };
 
   const system = new EnemySystem(dependencies);

@@ -456,25 +456,15 @@ function gameLoop(currentTime) {
       const steps = fixedStepper.advance(frameSeconds);
       for (let i = 0; i < steps; i += 1) {
         GamePools.update(stepSeconds);
-        if (
-          garbageCollectionManager &&
-          typeof garbageCollectionManager.update === 'function'
-        ) {
-          garbageCollectionManager.update(stepSeconds);
-        }
+        garbageCollectionManager.update(stepSeconds);
         // Effects own freeze frames and time dilation: they return the
         // simulation delta the game systems should actually advance by.
-        const adjustedDelta =
-          effects && typeof effects.update === 'function'
-            ? effects.update(stepSeconds)
-            : stepSeconds;
+        const adjustedDelta = effects.update(stepSeconds);
         updateGame(adjustedDelta);
       }
     } else {
       fixedStepper.reset();
-      if (effects && typeof effects.update === 'function') {
-        effects.update(0);
-      }
+      effects.update(0);
     }
 
     // OPTIMIZATION #1: PerformanceMonitor Cache - recalculate only every 5 frames
@@ -484,10 +474,7 @@ function gameLoop(currentTime) {
         const combat = gameSystemServices?.['combat'];
         const xpOrbs = gameSystemServices?.['xp-orbs'];
         const effects = gameSystemServices?.['effects'];
-        const projectilePerf =
-          combat && typeof combat.getProjectilePerfSnapshot === 'function'
-            ? combat.getProjectilePerfSnapshot()
-            : null;
+        const projectilePerf = combat.getProjectilePerfSnapshot();
 
         metricsCache = {
           enemies: enemies?.asteroids?.length || 0,
@@ -516,10 +503,7 @@ function gameLoop(currentTime) {
     // Capture render timing AFTER render completes
     if (shouldUpdateGame && metricsCacheFrameCount % 5 === 1) {
       const combat = gameSystemServices?.['combat'];
-      const projectilePerf =
-        combat && typeof combat.getProjectilePerfSnapshot === 'function'
-          ? combat.getProjectilePerfSnapshot()
-          : null;
+      const projectilePerf = combat.getProjectilePerfSnapshot();
       if (projectilePerf && metricsCache) {
         metricsCache.projectileRenderMs =
           projectilePerf.projectileRenderMs || 0;
@@ -556,69 +540,26 @@ function updateGame(deltaTime) {
     servicesCacheInitialized = true;
   }
 
-  // Use cached service references directly (10 direct lookups instead of forEach)
-  if (servicesCache.input && typeof servicesCache.input.update === 'function') {
-    servicesCache.input.update(deltaTime);
-  }
-  if (
-    servicesCache.player &&
-    typeof servicesCache.player.update === 'function'
-  ) {
-    servicesCache.player.update(deltaTime);
-  }
-  if (
-    servicesCache.enemies &&
-    typeof servicesCache.enemies.update === 'function'
-  ) {
-    servicesCache.enemies.update(deltaTime);
-  }
-  if (
-    servicesCache.physics &&
-    typeof servicesCache.physics.update === 'function'
-  ) {
-    servicesCache.physics.update(deltaTime);
-  }
-  if (
-    servicesCache.combat &&
-    typeof servicesCache.combat.update === 'function'
-  ) {
-    servicesCache.combat.update(deltaTime);
-  }
-  if (
-    servicesCache['xp-orbs'] &&
-    typeof servicesCache['xp-orbs'].update === 'function'
-  ) {
-    servicesCache['xp-orbs'].update(deltaTime);
-  }
-  if (
-    servicesCache.healthHearts &&
-    typeof servicesCache.healthHearts.update === 'function'
-  ) {
-    servicesCache.healthHearts.update(deltaTime);
-  }
-  if (
-    servicesCache.progression &&
-    typeof servicesCache.progression.update === 'function'
-  ) {
-    servicesCache.progression.update(deltaTime);
-  }
-  if (servicesCache.world && typeof servicesCache.world.update === 'function') {
-    servicesCache.world.update(deltaTime);
-  }
-  if (servicesCache.ui && typeof servicesCache.ui.update === 'function') {
-    servicesCache.ui.update(deltaTime);
-  }
+  // Use cached service references directly (10 direct lookups instead of forEach).
+  // The manifest guarantees every one of these services and its update().
+  servicesCache.input.update(deltaTime);
+  servicesCache.player.update(deltaTime);
+  servicesCache.enemies.update(deltaTime);
+  servicesCache.physics.update(deltaTime);
+  servicesCache.combat.update(deltaTime);
+  servicesCache['xp-orbs'].update(deltaTime);
+  servicesCache.healthHearts.update(deltaTime);
+  servicesCache.progression.update(deltaTime);
+  servicesCache.world.update(deltaTime);
+  servicesCache.ui.update(deltaTime);
 }
 
 function renderGame() {
   if (!gameState.ctx) return;
 
-  const renderer = gameSystemServices?.['renderer'];
-  if (renderer && typeof renderer.render === 'function') {
-    performanceMonitor.startMeasure('render');
-    renderer.render(gameState.ctx);
-    performanceMonitor.endMeasure('render');
-  }
+  performanceMonitor.startMeasure('render');
+  gameSystemServices.renderer.render(gameState.ctx);
+  performanceMonitor.endMeasure('render');
 }
 
 document.addEventListener('DOMContentLoaded', () => {

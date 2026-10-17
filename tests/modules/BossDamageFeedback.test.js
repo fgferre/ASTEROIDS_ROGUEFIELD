@@ -56,7 +56,12 @@ describe('boss damage feedback', () => {
 
   it('marks invulnerable boss bullet hits as blocked and triggers shield feedback', () => {
     const eventBus = createEventBus();
-    const combat = new CombatSystem({ eventBus });
+    const combat = new CombatSystem({
+      eventBus,
+      player: {},
+      enemies: {},
+      physics: {},
+    });
     const boss = {
       type: 'boss',
       currentPhase: 1,
@@ -339,7 +344,7 @@ describe('boss damage feedback', () => {
     const roster = [restoredBoss];
     const enemySystem = {
       activeBosses: new Map([[restoredBoss.id, restoredBoss]]),
-      getActiveEnemies: () => roster,
+      forEachActiveEnemy: (callback) => roster.forEach(callback),
       getAllAsteroids: () => roster,
     };
 
@@ -357,7 +362,12 @@ describe('boss damage feedback', () => {
 
   it('rebuilds boss/support collision membership from the enemy roster during physics restore', () => {
     const physics = new PhysicsSystem({ eventBus: createEventBus() });
-    const combat = new CombatSystem({ eventBus: createEventBus() });
+    const combat = new CombatSystem({
+      eventBus: createEventBus(),
+      player: {},
+      enemies: {},
+      physics,
+    });
     const boss = {
       id: 'boss-restore',
       type: 'boss',
@@ -389,7 +399,7 @@ describe('boss damage feedback', () => {
     const roster = [boss, support];
     const enemySystem = {
       activeBosses: new Map([[boss.id, boss]]),
-      getActiveEnemies: () => roster,
+      forEachActiveEnemy: (callback) => roster.forEach(callback),
       getAllAsteroids: () => roster,
     };
 
@@ -482,7 +492,7 @@ describe('boss damage feedback', () => {
     let roster = [];
     const enemySystem = {
       activeBosses: new Map(),
-      getActiveEnemies: () => roster,
+      forEachActiveEnemy: (callback) => roster.forEach(callback),
       getAllAsteroids: () => roster,
     };
 

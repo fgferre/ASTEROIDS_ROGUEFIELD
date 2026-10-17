@@ -3,6 +3,7 @@ import RandomService from '../../src/core/RandomService.js';
 import EffectsSystem from '../../src/modules/EffectsSystem.js';
 import RenderingSystem from '../../src/modules/RenderingSystem.js';
 import { createTestContainer } from '../__helpers__/setup.js';
+import { createSettingsStub } from '../__helpers__/stubs.js';
 
 function captureStarfieldSnapshot(renderingSystem) {
   const layers = renderingSystem.spaceSky.layers.map((layer) => ({
@@ -64,6 +65,7 @@ describe('RenderingSystem RNG determinism', () => {
     const effects = new EffectsSystem({
       random: new RandomService('effects-hv11'),
       eventBus,
+      settings: createSettingsStub(),
     });
 
     rendering.resolveCachedServices = () => {};

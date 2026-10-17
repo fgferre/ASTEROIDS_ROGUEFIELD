@@ -59,7 +59,7 @@ if (MATH_RANDOM_LEAK_DETECTED) {
  *   - getPosition(), getVelocity(), getAngle(), getRotation()
  *   - getStats() — returns { multishot, damage } from a mutable internal state.
  *   - isDead = false
- *   - getHullBoundingRadius() — soft fallback for findBestTarget.
+ *   - getHullBoundingRadius(), getShieldRadius(), getNosePosition()
  *
  * The mock enemies expose `forEachActiveEnemy(callback)` so `findBestTarget`
  * (line 382) iterates them. Each enemy has id / x / y / vx / vy / radius
@@ -111,6 +111,12 @@ function setupCombatHarness({
     },
     getHullBoundingRadius() {
       return 16;
+    },
+    getShieldRadius() {
+      return 16;
+    },
+    getNosePosition() {
+      return { ...playerPos };
     },
     getStats() {
       return { ...playerState };
@@ -1153,10 +1159,8 @@ describe('FIX-05 centerline invariant + toggles', () => {
     it('F5: manual aim uses player.getAngle() (canonical accessor); silent-zero fallback is gone', () => {
       // Codex review F5 worried that the fallback `|| 0` silently shot right
       // if PlayerSystem exposed `getRotation()` instead of `getAngle()`.
-      // Inspection (PlayerSystem.js:1285) confirms `getAngle()` IS the
-      // canonical accessor. The remaining gap (warn loudly when accessor is
-      // missing instead of silently defaulting to 0) is the F5 fix verified
-      // here.
+      // `getAngle()` IS the canonical accessor; a player without it is a
+      // wiring bug and must fail loudly instead of defaulting to 0.
       const { combat, playerState } = setupCombatHarness({ multishot: 1 });
       playerState.multishot = 1;
       combat.setAimMode('manual');
@@ -1171,30 +1175,20 @@ describe('FIX-05 centerline invariant + toggles', () => {
       expect(fired[0].vx).toBeGreaterThan(0);
       expect(Math.abs(fired[0].vy)).toBeLessThan(0.001);
 
-      // Case 2: when getAngle is missing, a single console.warn surfaces.
-      // Test by monkey-patching the player and capturing console.warn.
-      const warnSpy = [];
-      const originalWarn = console.warn;
-      console.warn = (...args) => warnSpy.push(args.join(' '));
-      try {
-        const broken = combat.getCachedPlayer();
-        const savedGetAngle = broken.getAngle;
-        broken.getAngle = undefined;
-        combat._warnedManualAimNoAngle = false;
-        // Force the cooldown to clear immediately so this fire goes through.
-        combat.lastShotTime = combat.shootCooldown;
+      // Case 2: when getAngle is missing, manual fire throws instead of
+      // silently shooting at rotation 0.
+      const broken = combat.getCachedPlayer();
+      const savedGetAngle = broken.getAngle;
+      broken.getAngle = undefined;
+      // Force the cooldown to clear immediately so this fire goes through.
+      combat.lastShotTime = combat.shootCooldown;
+      expect(() =>
         combat.handleShooting(combat.shootCooldown + 0.001, {
           multishot: 1,
           damage: 10,
-        });
-        broken.getAngle = savedGetAngle;
-      } finally {
-        console.warn = originalWarn;
-      }
-      const matched = warnSpy.some((line) =>
-        line.includes('manual aim requires player.getAngle()')
-      );
-      expect(matched).toBe(true);
+        })
+      ).toThrow(TypeError);
+      broken.getAngle = savedGetAngle;
     });
   });
 
@@ -1448,6 +1442,9 @@ describe('FIX-05 centerline invariant + toggles', () => {
         getHullBoundingRadius() {
           return 16;
         },
+        getShieldRadius() {
+          return 16;
+        },
         getNosePosition(rotation) {
           const angle = Number.isFinite(rotation) ? rotation : 0;
           return {
@@ -1509,6 +1506,9 @@ describe('FIX-05 centerline invariant + toggles', () => {
           return 0;
         },
         getHullBoundingRadius() {
+          return 16;
+        },
+        getShieldRadius() {
           return 16;
         },
         getNosePosition(rotation) {

@@ -11,7 +11,7 @@ import {
   drawParticle,
 } from './EffectEntities.js';
 import { ScreenShake, ShakePresets } from '../utils/ScreenShake.js';
-import { resolveService } from '../core/serviceUtils.js';
+import { requireService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 import { SHIELD_SHOCKWAVE_RADIUS } from '../data/constants/gameplay.js';
@@ -58,10 +58,8 @@ export default class EffectsSystem extends BaseSystem {
       parentRandom && typeof parentRandom.debugSnapshot === 'function'
         ? parentRandom.debugSnapshot()
         : null;
-    const { audio = null, ...dependencies } = normalizedConfig;
-
     // Pass config to BaseSystem with random management options
-    super(dependencies, {
+    super(normalizedConfig, {
       enableRandomManagement: true,
       systemName: 'EffectsSystem',
       serviceName: 'effects',
@@ -83,8 +81,6 @@ export default class EffectsSystem extends BaseSystem {
       : null;
     this._initialRandomSeed =
       typeof parentRandom?.seed === 'number' ? parentRandom.seed >>> 0 : null;
-
-    this.audio = audio ?? resolveService('audio', this.dependencies);
 
     const randomHelpers = createRandomHelpers({
       getRandomFork: (name) => this.getRandomFork(name),
@@ -129,7 +125,11 @@ export default class EffectsSystem extends BaseSystem {
     this.activeBoss = { id: null, lastPhase: 0 };
     this.lastAdjustedDelta = 0;
 
-    this.settings = resolveService('settings', this.dependencies);
+    this.settings = requireService(
+      'settings',
+      this.dependencies,
+      'EffectsSystem'
+    );
     this.hitMarkersEnabled = true;
     this.damageNumbersEnabled = true;
     this.motionReduced = false;
@@ -227,23 +227,14 @@ export default class EffectsSystem extends BaseSystem {
   }
 
   setupSettingsIntegration() {
-    if (!this.settings) {
-      this.settings = resolveService('settings', this.dependencies);
+    const accessibility = this.settings.getCategoryValues('accessibility');
+    if (accessibility) {
+      this.applyAccessibilityPreferences(accessibility);
     }
 
-    if (
-      this.settings &&
-      typeof this.settings.getCategoryValues === 'function'
-    ) {
-      const accessibility = this.settings.getCategoryValues('accessibility');
-      if (accessibility) {
-        this.applyAccessibilityPreferences(accessibility);
-      }
-
-      const video = this.settings.getCategoryValues('video');
-      if (video) {
-        this.applyVideoPreferences(video);
-      }
+    const video = this.settings.getCategoryValues('video');
+    if (video) {
+      this.applyVideoPreferences(video);
     }
 
     this.registerEventListener(
@@ -268,14 +259,9 @@ export default class EffectsSystem extends BaseSystem {
     });
 
     // Also apply initial gameplay preferences
-    if (
-      this.settings &&
-      typeof this.settings.getCategoryValues === 'function'
-    ) {
-      const gameplay = this.settings.getCategoryValues('gameplay');
-      if (gameplay) {
-        this.applyGameplayPreferences(gameplay);
-      }
+    const gameplay = this.settings.getCategoryValues('gameplay');
+    if (gameplay) {
+      this.applyGameplayPreferences(gameplay);
     }
   }
 
@@ -548,10 +534,13 @@ export default class EffectsSystem extends BaseSystem {
       this.addFreezeFrame(0.2, 0.4);
       this.addScreenFlash(PALETTE.xp, 0.15, 0.2);
 
-      const player = resolveService('player', this.dependencies);
-      if (player) {
-        this.createLevelUpExplosion(player.position);
-      }
+      // Player is built after effects' own dependencies; resolve on use.
+      const player = requireService(
+        'player',
+        this.dependencies,
+        'EffectsSystem'
+      );
+      this.createLevelUpExplosion(player.position);
     });
 
     this.registerEventListener('xp-collected', (data) => {

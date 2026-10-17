@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import EffectsSystem from '../../src/modules/EffectsSystem.js';
 import { createTestContainer } from '../__helpers__/setup.js';
+import { createSettingsStub } from '../__helpers__/stubs.js';
 
 describe('EffectsSystem screen shake determinism', () => {
   function createEffectsHarness(seed) {
     const container = createTestContainer(seed);
     const random = container.resolve('random');
-    const effects = new EffectsSystem({ random, audio: {} });
+    const effects = new EffectsSystem({
+      random,
+      settings: createSettingsStub(),
+    });
 
     return { effects, random };
   }

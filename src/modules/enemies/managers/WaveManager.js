@@ -23,6 +23,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import RandomService from '../../../core/RandomService.js';
 import {
   normalizeDependencies,
+  requireService,
   resolveService,
 } from '../../../core/serviceUtils.js';
 import { debugLog } from '../../../core/debugLogging.js';
@@ -57,13 +58,11 @@ export class WaveManager {
 
     this.enemySystem =
       this.dependencies.enemySystem ||
-      resolveService('enemies', this.dependencies) ||
-      null;
+      requireService('enemies', this.dependencies, 'WaveManager');
 
     this.eventBus =
       this.dependencies.eventBus ||
-      resolveService('event-bus', this.dependencies) ||
-      null;
+      requireService('event-bus', this.dependencies, 'WaveManager');
 
     this._onEnemyDestroyedHandler = null;
     this._isEnemyDestroyedListenerActive = false;
@@ -71,11 +70,9 @@ export class WaveManager {
 
     let resolvedRandom =
       this.dependencies.random ||
-      (this.enemySystem && typeof this.enemySystem.getRandomScope === 'function'
-        ? this.enemySystem.getRandomScope('wave-manager', {
-            label: 'wave-manager',
-          })
-        : null) ||
+      this.enemySystem.getRandomScope('wave-manager', {
+        label: 'wave-manager',
+      }) ||
       resolveService('random', this.dependencies) ||
       null;
 
@@ -241,10 +238,6 @@ export class WaveManager {
 
   connectEventListeners() {
     const eventBus = this.eventBus;
-    if (!eventBus || typeof eventBus.on !== 'function') {
-      return;
-    }
-
     if (!this._onEnemyDestroyedHandler) {
       this._onEnemyDestroyedHandler = (data) => this.onEnemyDestroyed(data);
     }
@@ -266,7 +259,7 @@ export class WaveManager {
   disconnect() {
     const bus = this._enemyDestroyedBus || this.eventBus;
 
-    if (bus && typeof bus.off === 'function' && this._onEnemyDestroyedHandler) {
+    if (this._onEnemyDestroyedHandler) {
       bus.off('enemy-destroyed', this._onEnemyDestroyedHandler);
     }
 
@@ -1163,42 +1156,40 @@ export class WaveManager {
       managerTotals: { ...rawManagerTotals },
     };
 
-    if (this.eventBus) {
-      this.eventBus.emit('wave-started', waveEventPayload);
+    this.eventBus.emit('wave-started', waveEventPayload);
 
-      // D-04: pre-boss tension trigger (one wave before a boss)
-      if (this.isBossWave(waveNumber + 1)) {
-        this.eventBus.emit('boss-warning', {
-          wave: waveNumber,
-          nextBossWave: waveNumber + 1,
-        });
-      }
+    // D-04: pre-boss tension trigger (one wave before a boss)
+    if (this.isBossWave(waveNumber + 1)) {
+      this.eventBus.emit('boss-warning', {
+        wave: waveNumber,
+        nextBossWave: waveNumber + 1,
+      });
+    }
 
-      if (IS_DEV) {
-        this.eventBus.emit('wave-started-debug', {
-          ...waveEventPayload,
-          config: this.cloneWaveConfig(effectiveConfig),
-        });
-      }
+    if (IS_DEV) {
+      this.eventBus.emit('wave-started-debug', {
+        ...waveEventPayload,
+        config: this.cloneWaveConfig(effectiveConfig),
+      });
+    }
 
-      if (effectiveConfig.isBossWave) {
-        const supportGroups = Array.isArray(effectiveConfig.supportGroups)
-          ? effectiveConfig.supportGroups.map((group) => ({ ...group }))
-          : Array.isArray(effectiveConfig.enemies)
-            ? effectiveConfig.enemies.map((group) => ({ ...group }))
-            : [];
+    if (effectiveConfig.isBossWave) {
+      const supportGroups = Array.isArray(effectiveConfig.supportGroups)
+        ? effectiveConfig.supportGroups.map((group) => ({ ...group }))
+        : Array.isArray(effectiveConfig.enemies)
+          ? effectiveConfig.enemies.map((group) => ({ ...group }))
+          : [];
 
-        this.eventBus.emit('boss-wave-started', {
-          wave: waveNumber,
-          totalEnemies: this.totalEnemiesThisWave,
-          asteroidTotal: asteroidOnlyTotal,
-          compatibilityMode: true,
-          managerTotals: { ...rawManagerTotals },
-          boss: effectiveConfig.boss ? { ...effectiveConfig.boss } : null,
-          support: supportGroups,
-          config: this.cloneWaveConfig(effectiveConfig),
-        });
-      }
+      this.eventBus.emit('boss-wave-started', {
+        wave: waveNumber,
+        totalEnemies: this.totalEnemiesThisWave,
+        asteroidTotal: asteroidOnlyTotal,
+        compatibilityMode: true,
+        managerTotals: { ...rawManagerTotals },
+        boss: effectiveConfig.boss ? { ...effectiveConfig.boss } : null,
+        support: supportGroups,
+        config: this.cloneWaveConfig(effectiveConfig),
+      });
     }
 
     if (effectiveConfig.isBossWave) {
@@ -1287,11 +1278,7 @@ export class WaveManager {
             height: GAME_HEIGHT || 600,
           };
     const player = this.enemySystem.getCachedPlayer();
-    const playerSnapshot =
-      this.enemySystem &&
-      typeof this.enemySystem.getPlayerPositionSnapshot === 'function'
-        ? this.enemySystem.getPlayerPositionSnapshot(player)
-        : null;
+    const playerSnapshot = this.enemySystem.getPlayerPositionSnapshot(player);
     const safeDistance = ASTEROID_SAFE_SPAWN_DISTANCE || 200;
     const compatibilityMode = this.compatibilityModeActive;
     const defaultDistributionWeights = this.getAsteroidDistributionWeights();
@@ -1487,69 +1474,23 @@ export class WaveManager {
           enemyConfig.randomScope = 'spawn';
         }
 
-        // Use centralized acquisition path when available for factory-backed enemies
-        let enemy;
-        let registeredEnemy = false;
+        // Centralized acquisition path for factory-backed enemies
+        const enemy = this.enemySystem.acquireEnemyViaFactory(
+          enemyGroup.type,
+          enemyConfig
+        );
 
         if (
-          this.enemySystem &&
-          typeof this.enemySystem.acquireEnemyViaFactory === 'function'
+          enemy &&
+          !enemy[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')]
         ) {
-          enemy = this.enemySystem.acquireEnemyViaFactory(
-            enemyGroup.type,
-            enemyConfig
-          );
-          if (enemy?.[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')]) {
-            registeredEnemy = true;
-            enemy[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')] = false;
-          }
-        } else if (this.enemySystem?.factory) {
-          const factoryHasType =
-            typeof this.enemySystem.factory.hasType === 'function'
-              ? this.enemySystem.factory.hasType(enemyGroup.type)
-              : true;
-
-          if (
-            factoryHasType &&
-            typeof this.enemySystem.factory.create === 'function'
-          ) {
-            enemy = this.enemySystem.factory.create(
-              enemyGroup.type,
-              enemyConfig
-            );
-          } else if (typeof this.enemySystem.acquireAsteroid === 'function') {
-            enemy = this.enemySystem.acquireAsteroid(enemyConfig);
-          }
-        } else if (typeof this.enemySystem?.acquireAsteroid === 'function') {
-          // Legacy: Direct Asteroid creation
-          enemy = this.enemySystem.acquireAsteroid(enemyConfig);
-        }
-
-        if (!enemy && typeof this.enemySystem?.acquireAsteroid === 'function') {
-          enemy = this.enemySystem.acquireAsteroid(enemyConfig);
-        }
-
-        if (enemy && !registeredEnemy) {
-          if (
-            this.enemySystem &&
-            typeof this.enemySystem.registerActiveEnemy === 'function'
-          ) {
-            this.enemySystem.registerActiveEnemy(enemy, {
-              skipDuplicateCheck: true,
-            });
-            registeredEnemy = true;
-          } else {
-            console.warn(
-              '[WaveManager] Cannot register enemy - registerActiveEnemy() not available on EnemySystem'
-            );
-          }
+          this.enemySystem.registerActiveEnemy(enemy, {
+            skipDuplicateCheck: true,
+          });
         }
 
         if (enemy) {
           enemy[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')] = false;
-        }
-
-        if (enemy) {
           this.enemiesSpawnedThisWave++;
           if (compatibilityMode && isAsteroid) {
             this.asteroidsSpawnedThisWave++;
@@ -1632,49 +1573,6 @@ export class WaveManager {
       wave: this.currentWave,
     });
 
-    if (!this.enemySystem) {
-      if (
-        typeof console !== 'undefined' &&
-        typeof console.error === 'function'
-      ) {
-        console.error(
-          '[WaveManager] Cannot spawn boss - enemySystem is not defined'
-        );
-      }
-      GameDebugLogger.log(
-        'ERROR',
-        'Boss spawn failed - enemySystem unavailable',
-        {
-          hasEnemySystem: false,
-        }
-      );
-      return null;
-    }
-
-    if (typeof this.enemySystem.spawnBoss !== 'function') {
-      if (
-        typeof console !== 'undefined' &&
-        typeof console.error === 'function'
-      ) {
-        console.error(
-          '[WaveManager] Cannot spawn boss - spawnBoss() not available',
-          {
-            type: typeof this.enemySystem.spawnBoss,
-            hasMethod: 'spawnBoss' in this.enemySystem,
-            enemySystemConstructor: this.enemySystem.constructor?.name,
-          }
-        );
-      }
-      GameDebugLogger.log(
-        'ERROR',
-        'Boss spawn failed - spawnBoss() missing on enemySystem',
-        {
-          hasSpawnBoss: typeof this.enemySystem.spawnBoss === 'function',
-        }
-      );
-      return null;
-    }
-
     const world = this.enemySystem?.getCachedWorld?.();
     const worldBounds =
       world && typeof world.getBounds === 'function'
@@ -1685,10 +1583,7 @@ export class WaveManager {
           };
 
     const player = this.enemySystem.getCachedPlayer();
-    const playerSnapshot =
-      typeof this.enemySystem.getPlayerPositionSnapshot === 'function'
-        ? this.enemySystem.getPlayerPositionSnapshot(player)
-        : null;
+    const playerSnapshot = this.enemySystem.getPlayerPositionSnapshot(player);
 
     const spawnRandom = this.resolveScopedRandom(
       this.getRandomScope ? this.getRandomScope('boss-spawn') : null,
@@ -2407,21 +2302,7 @@ export class WaveManager {
   }
 
   getRemainingActiveEnemyCount(excludedEnemy = null) {
-    const enemies = Array.isArray(this.enemySystem?.asteroids)
-      ? this.enemySystem.asteroids
-      : null;
-
-    if (!enemies) {
-      if (
-        this.enemySystem &&
-        typeof this.enemySystem.getActiveEnemyCount === 'function'
-      ) {
-        return this.enemySystem.getActiveEnemyCount();
-      }
-
-      return 0;
-    }
-
+    const enemies = this.enemySystem.asteroids;
     let activeCount = 0;
 
     for (let i = 0; i < enemies.length; i += 1) {
@@ -2503,15 +2384,11 @@ export class WaveManager {
     this._trackedDynamicMinions = new WeakSet();
 
     // Emit wave complete event
-    if (this.eventBus) {
-      const payload = {
-        wave: this.currentWave,
-        duration: duration,
-        enemiesKilled: this.enemiesKilledThisWave,
-      };
-
-      this.eventBus.emit('wave-complete', payload);
-    }
+    this.eventBus.emit('wave-complete', {
+      wave: this.currentWave,
+      duration: duration,
+      enemiesKilled: this.enemiesKilledThisWave,
+    });
 
     // Start countdown for next wave
     this.waveCountdown = this.waveDelay;

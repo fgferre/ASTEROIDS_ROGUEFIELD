@@ -1,5 +1,6 @@
 // src/modules/CombatSystem.js
 import { BaseSystem } from '../core/BaseSystem.js';
+import { requireService } from '../core/serviceUtils.js';
 import {
   GAME_HEIGHT,
   GAME_WIDTH,
@@ -46,13 +47,6 @@ const LANCE_TRAIL_STYLES = Array.from({ length: 8 }, (_, i) =>
   withAlpha(PALETTE.shot, (0.65 * i) / 7)
 );
 
-const COMBAT_SERVICE_MAP = {
-  cachedPlayer: 'player',
-  cachedEnemies: 'enemies',
-  cachedPhysics: 'physics',
-  commandQueue: 'command-queue',
-};
-
 class CombatSystem extends BaseSystem {
   constructor(dependencies = {}) {
     super(dependencies, {
@@ -61,8 +55,6 @@ class CombatSystem extends BaseSystem {
       enableRandomManagement: false,
     });
 
-    this.commandQueue = null;
-    this.commandQueueConsumerId = 'combat-system';
     // === ESTADO DO SISTEMA DE COMBATE ===
     this.bullets = [];
     this.enemyBullets = [];
@@ -155,9 +147,21 @@ class CombatSystem extends BaseSystem {
     this.resetAimingBranchState();
 
     // === CACHES DE SERVIÇOS ===
-    this.cachedPlayer = null;
-    this.cachedEnemies = null;
-    this.cachedPhysics = null;
+    this.cachedPlayer = requireService(
+      'player',
+      this.dependencies,
+      'CombatSystem'
+    );
+    this.cachedEnemies = requireService(
+      'enemies',
+      this.dependencies,
+      'CombatSystem'
+    );
+    this.cachedPhysics = requireService(
+      'physics',
+      this.dependencies,
+      'CombatSystem'
+    );
     this.lanceSprite = null;
     this.projectilePerf = {
       projectileUpdateMs: 0,
@@ -167,13 +171,10 @@ class CombatSystem extends BaseSystem {
       projectilePlayerTrailPoints: 0,
       projectileEnemyTrailPoints: 0,
     };
-
-    this.resolveCachedServices(COMBAT_SERVICE_MAP, { force: true });
   }
 
   setupEventListeners() {
     this.registerEventListener('player-reset', () => {
-      this.resolveCachedServices(COMBAT_SERVICE_MAP, { force: true });
       this.currentTarget = null;
       this.currentTargetLocks = [];
       this.currentLockAssignments = [];
@@ -191,14 +192,12 @@ class CombatSystem extends BaseSystem {
     });
 
     this.registerEventListener('progression-reset', () => {
-      this.resolveCachedServices(COMBAT_SERVICE_MAP, { force: true });
       this.resetAimingBranchState();
       this.targetThreatCache.clear();
       this.clearEnemyBullets();
     });
 
     this.registerEventListener('physics-reset', () => {
-      this.resolveCachedServices(COMBAT_SERVICE_MAP, { force: true });
       this.clearEnemyBullets();
     });
 
@@ -252,30 +251,17 @@ class CombatSystem extends BaseSystem {
   }
 
   getCachedPlayer() {
-    if (!this.cachedPlayer) {
-      this.resolveCachedServices(COMBAT_SERVICE_MAP);
-    }
     return this.cachedPlayer;
   }
 
   // === UPDATE PRINCIPAL ===
   update(deltaTime) {
-    this.resolveCachedServices(COMBAT_SERVICE_MAP);
-
     const player = this.cachedPlayer;
-    const playerStats =
-      player && typeof player.getStats === 'function'
-        ? player.getStats()
-        : null;
+    const playerStats = player.getStats();
     this.lastKnownPlayerStats = playerStats || null;
 
     // Only target and shoot when ship hull exists (visible and alive)
-    if (
-      player &&
-      !player.isDead &&
-      !player.isRetrying &&
-      !player._quitExplosionHidden
-    ) {
+    if (!player.isDead && !player.isRetrying && !player._quitExplosionHidden) {
       this.updateTargeting(deltaTime);
 
       if (playerStats) {
@@ -293,22 +279,15 @@ class CombatSystem extends BaseSystem {
     this.projectilePerf.projectileEnemyCount = this.enemyBullets.length;
 
     const enemies = this.cachedEnemies;
-    const physics = this.cachedPhysics;
-
-    if (
-      physics &&
-      enemies &&
-      typeof physics.forEachBulletCollision === 'function'
-    ) {
-      physics.forEachBulletCollision(this.bullets, (bullet, asteroid) => {
+    this.cachedPhysics.forEachBulletCollision(
+      this.bullets,
+      (bullet, asteroid) => {
         if (!asteroid || bullet.hit) {
           return;
         }
         this.processBulletHit(bullet, asteroid, enemies);
-      });
-    } else if (enemies) {
-      this.checkBulletCollisions(enemies);
-    }
+      }
+    );
   }
 
   // === SISTEMA DE TARGETING ===
@@ -382,33 +361,16 @@ class CombatSystem extends BaseSystem {
   }
 
   findBestTarget() {
-    const player = this.getCachedPlayer();
-    if (!player || typeof player.getPosition !== 'function') {
-      this.currentTarget = null;
-      this.currentTargetLocks = [];
-      this.currentLockAssignments = [];
-      this.targetingPriorityList = [];
-      return;
-    }
-
+    const player = this.cachedPlayer;
     const playerPos = player.getPosition();
     if (!playerPos) {
       return;
     }
 
-    const playerVelocity =
-      typeof player.getVelocity === 'function' ? player.getVelocity() : null;
-    const playerRadius =
-      typeof player.getShieldRadius === 'function'
-        ? player.getShieldRadius()
-        : typeof player.getHullBoundingRadius === 'function'
-          ? player.getHullBoundingRadius()
-          : SHIP_SIZE || 24;
+    const playerVelocity = player.getVelocity();
+    const playerRadius = player.getShieldRadius();
 
     const enemies = this.cachedEnemies;
-    if (!enemies) {
-      return;
-    }
 
     const candidates = [];
     const scoringEnabled = this.dangerScoreEnabled;
@@ -467,21 +429,7 @@ class CombatSystem extends BaseSystem {
       candidates.push(candidateEntry);
     };
 
-    if (typeof enemies.forEachActiveEnemy === 'function') {
-      enemies.forEachActiveEnemy(processEnemy);
-    } else if (typeof enemies.forEachActiveAsteroid === 'function') {
-      enemies.forEachActiveAsteroid(processEnemy);
-    } else if (typeof enemies.getActiveEnemies === 'function') {
-      const activeEnemies = enemies.getActiveEnemies();
-      for (let i = 0; i < activeEnemies.length; i += 1) {
-        processEnemy(activeEnemies[i]);
-      }
-    } else if (typeof enemies.getAsteroids === 'function') {
-      const asteroids = enemies.getAsteroids();
-      for (let i = 0; i < asteroids.length; i += 1) {
-        processEnemy(asteroids[i]);
-      }
-    }
+    enemies.forEachActiveEnemy(processEnemy);
 
     if (!candidates.length) {
       if (this.currentTarget) {
@@ -530,12 +478,7 @@ class CombatSystem extends BaseSystem {
   isValidTarget(target) {
     if (!target || target.destroyed) return false;
 
-    const player = this.getCachedPlayer();
-    if (!player || typeof player.getPosition !== 'function') {
-      return false;
-    }
-
-    const playerPos = player.getPosition();
+    const playerPos = this.cachedPlayer.getPosition();
     const dx = target.x - playerPos.x;
     const dy = target.y - playerPos.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
@@ -549,34 +492,17 @@ class CombatSystem extends BaseSystem {
 
     if (!this.canShoot()) return;
 
-    const player = this.getCachedPlayer();
-    if (!player || typeof player.getPosition !== 'function') return;
-
+    const player = this.cachedPlayer;
     const playerPos = player.getPosition();
     if (!playerPos) return;
 
     // Plan 01.07 Task 6: manual-aim mode bypasses target acquisition entirely
     // and fires from the ship nose in the ship's current rotation direction.
     if (this.aimMode === 'manual') {
-      // Fix-pass (F5): the prior `|| 0` silent fallback hid the case where
-      // PlayerSystem doesn't expose the angle accessor — manual fire would
-      // silently shoot right (angle 0). Surface the gap with a one-shot
-      // warning instead, so test harnesses / future refactors detect it.
-      // PlayerSystem.js:1285 exposes `getAngle()` as the canonical accessor.
-      let rotation = 0;
-      if (typeof player.getAngle === 'function') {
-        rotation = player.getAngle();
-      } else if (!this._warnedManualAimNoAngle) {
-        // eslint-disable-next-line no-console
-        console.warn(
-          '[CombatSystem] manual aim requires player.getAngle() — falling back to rotation 0 (this will silently shoot right)'
-        );
-        this._warnedManualAimNoAngle = true;
-      }
-      const nose =
-        typeof player.getNosePosition === 'function'
-          ? player.getNosePosition(rotation)
-          : playerPos;
+      // Fix-pass (F5): `getAngle()` is PlayerSystem's canonical accessor; a
+      // player without it is a wiring bug and throws instead of shooting right.
+      const rotation = player.getAngle();
+      const nose = player.getNosePosition(rotation);
       this.fireForward(playerPos, rotation, playerStats, {
         originOverride: nose,
       });
@@ -593,9 +519,7 @@ class CombatSystem extends BaseSystem {
 
     // [SMART AUTO-FIRE] Fallback to forward fire if no lock
     if (!lockTargets.length) {
-      const rotation =
-        typeof player.getAngle === 'function' ? player.getAngle() : 0;
-      this.fireForward(playerPos, rotation, playerStats);
+      this.fireForward(playerPos, player.getAngle(), playerStats);
       return;
     }
 
@@ -918,12 +842,7 @@ class CombatSystem extends BaseSystem {
   getPredictedTargetPosition(enemy = this.currentTarget, playerPos = null) {
     if (!enemy) return null;
 
-    const player = this.getCachedPlayer();
-    const origin =
-      playerPos ||
-      (player && typeof player.getPosition === 'function'
-        ? player.getPosition()
-        : null);
+    const origin = playerPos || this.cachedPlayer.getPosition();
 
     if (!origin) {
       return null;
@@ -1698,12 +1617,7 @@ class CombatSystem extends BaseSystem {
   }
 
   refreshPredictedAimPoints() {
-    const player = this.getCachedPlayer();
-    if (!player || typeof player.getPosition !== 'function') {
-      return;
-    }
-
-    const playerPos = player.getPosition();
+    const playerPos = this.cachedPlayer.getPosition();
     if (!playerPos) {
       return;
     }
@@ -1884,12 +1798,7 @@ class CombatSystem extends BaseSystem {
       }
 
       const predicted = input.predictedAim || { x: enemy.x, y: enemy.y };
-      const player = this.getCachedPlayer();
-      const playerPos =
-        input.fireOrigin ||
-        (player && typeof player.getPosition === 'function'
-          ? player.getPosition()
-          : { x: 0, y: 0 });
+      const playerPos = input.fireOrigin || this.cachedPlayer.getPosition();
 
       const baseAimX = predicted.x;
       const baseAimY = predicted.y;
@@ -2731,12 +2640,7 @@ class CombatSystem extends BaseSystem {
 
       if (playerAlive && bullet.life > 0 && !bullet.hit) {
         if (!playerPosition) {
-          const candidatePosition =
-            (typeof player.getPosition === 'function'
-              ? player.getPosition()
-              : null) ||
-            player.position ||
-            null;
+          const candidatePosition = player.getPosition();
 
           if (
             candidatePosition &&
@@ -2748,42 +2652,25 @@ class CombatSystem extends BaseSystem {
         }
 
         if (playerPosition) {
-          if (
-            !collisionContext &&
-            physics &&
-            physics.buildPlayerCollisionContext
-          ) {
+          if (!collisionContext) {
             collisionContext = physics.buildPlayerCollisionContext(player);
           }
 
-          const collisionRadius = Number.isFinite(
-            collisionContext?.collisionRadius
-          )
-            ? collisionContext.collisionRadius
-            : typeof player.getHullBoundingRadius === 'function'
-              ? player.getHullBoundingRadius()
-              : SHIP_SIZE || 0;
+          const collisionRadius = collisionContext.collisionRadius;
 
           const bulletRadius = Number.isFinite(bullet.radius)
             ? bullet.radius
             : defaultBulletRadius;
 
           if (collisionRadius > 0) {
-            if (physics && typeof physics.checkCircleCollision === 'function') {
-              collided = physics.checkCircleCollision(
-                bullet.x,
-                bullet.y,
-                bulletRadius,
-                playerPosition.x,
-                playerPosition.y,
-                collisionRadius
-              );
-            } else {
-              const dx = bullet.x - playerPosition.x;
-              const dy = bullet.y - playerPosition.y;
-              const totalRadius = bulletRadius + collisionRadius;
-              collided = dx * dx + dy * dy <= totalRadius * totalRadius;
-            }
+            collided = physics.checkCircleCollision(
+              bullet.x,
+              bullet.y,
+              bulletRadius,
+              playerPosition.x,
+              playerPosition.y,
+              collisionRadius
+            );
           }
         }
       }
@@ -2971,50 +2858,6 @@ class CombatSystem extends BaseSystem {
     this.projectilePerf.projectilePlayerTrailPoints = trailPoints;
   }
 
-  // === DETECÇÃO DE COLISÃO ===
-  checkBulletCollisions(enemiesSystem) {
-    const iterateAsteroids = (handler) => {
-      if (typeof enemiesSystem.forEachActiveEnemy === 'function') {
-        enemiesSystem.forEachActiveEnemy(handler);
-      } else if (typeof enemiesSystem.forEachActiveAsteroid === 'function') {
-        enemiesSystem.forEachActiveAsteroid(handler);
-      } else if (typeof enemiesSystem.getActiveEnemies === 'function') {
-        const enemies = enemiesSystem.getActiveEnemies();
-        for (let i = 0; i < enemies.length; i += 1) {
-          handler(enemies[i]);
-        }
-      } else if (typeof enemiesSystem.getAsteroids === 'function') {
-        const asteroids = enemiesSystem.getAsteroids();
-        for (let i = 0; i < asteroids.length; i += 1) {
-          handler(asteroids[i]);
-        }
-      }
-    };
-
-    for (const bullet of this.bullets) {
-      if (bullet.hit) continue;
-
-      iterateAsteroids((enemy) => {
-        if (!enemy || enemy.destroyed || bullet.hit) {
-          return;
-        }
-
-        const dx = bullet.x - enemy.x;
-        const dy = bullet.y - enemy.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        const collisionRadius =
-          this.cachedPhysics &&
-          typeof this.cachedPhysics.resolveEnemyCollisionRadius === 'function'
-            ? this.cachedPhysics.resolveEnemyCollisionRadius(enemy)
-            : enemy.radius;
-
-        if (distance < BULLET_SIZE + collisionRadius) {
-          this.processBulletHit(bullet, enemy, enemiesSystem);
-        }
-      });
-    }
-  }
-
   processBulletHit(bullet, enemy, enemiesSystem) {
     if (!bullet || !enemy || bullet.hit) {
       return;
@@ -3024,12 +2867,11 @@ class CombatSystem extends BaseSystem {
     const healthBefore = Number.isFinite(enemy.health) ? enemy.health : null;
     const requestedDamage = Number.isFinite(bullet.damage) ? bullet.damage : 0;
 
-    const damageResult = enemiesSystem
-      ? this.applyDamageToEnemy(enemiesSystem, enemy, requestedDamage)
-      : {
-          killed: Boolean(enemy.destroyed),
-          remainingHealth: Math.max(0, enemy.health ?? 0),
-        };
+    const damageResult = this.applyDamageToEnemy(
+      enemiesSystem,
+      enemy,
+      requestedDamage
+    );
     const remainingHealth = Number.isFinite(damageResult.remainingHealth)
       ? damageResult.remainingHealth
       : enemy.health ?? null;
@@ -3099,24 +2941,14 @@ class CombatSystem extends BaseSystem {
   }
 
   applyDamageToEnemy(enemiesSystem, enemy, damage) {
-    if (typeof enemiesSystem.applyDamage === 'function') {
-      const result = enemiesSystem.applyDamage(enemy, damage);
-      return {
-        killed: !!result?.killed,
-        remainingHealth: Math.max(
-          0,
-          result?.remainingHealth ?? enemy.health ?? 0
-        ),
-      };
-    }
-
-    const killed = enemy.takeDamage(damage);
-    if (killed) {
-      enemy.destroyed = true;
-      return { killed: true, remainingHealth: 0 };
-    }
-
-    return { killed: false, remainingHealth: Math.max(0, enemy.health ?? 0) };
+    const result = enemiesSystem.applyDamage(enemy, damage);
+    return {
+      killed: !!result?.killed,
+      remainingHealth: Math.max(
+        0,
+        result?.remainingHealth ?? enemy.health ?? 0
+      ),
+    };
   }
 
   // === GETTERS PÚBLICOS ===
@@ -3213,7 +3045,7 @@ class CombatSystem extends BaseSystem {
   render(ctx) {
     if (!ctx) return;
 
-    const player = this.getCachedPlayer();
+    const player = this.cachedPlayer;
     const emissive = getEmissive();
     const sprite = this.ensureLanceSprite();
 
@@ -3267,11 +3099,7 @@ class CombatSystem extends BaseSystem {
     this.projectilePerf.projectileRenderMs =
       performance.now() - projectileRenderStart;
 
-    const playerPosition =
-      (player && player.position) ||
-      (player && typeof player.getPosition === 'function'
-        ? player.getPosition()
-        : null);
+    const playerPosition = player.getPosition();
 
     const lockAssignments =
       Array.isArray(this.currentLockAssignments) &&
@@ -3612,7 +3440,6 @@ class CombatSystem extends BaseSystem {
     // Fix-pass-2 (C5): restore the in-run toggle defaults so the next run
     // starts at concentrated + auto regardless of how the previous run ended.
     this.resetModeState();
-    this.resolveCachedServices(COMBAT_SERVICE_MAP, { force: true });
     console.log('[CombatSystem] Reset');
   }
 

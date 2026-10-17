@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import EffectsSystem from '../../src/modules/EffectsSystem.js';
 import { createTestContainer } from '../__helpers__/setup.js';
+import { createSettingsStub } from '../__helpers__/stubs.js';
 
 /**
  * HV-06 — Same seed must produce exactly the same thruster particles.
@@ -10,7 +11,10 @@ describe('HV-06: Thruster particle determinism', () => {
   function createEffectsSystem(seed) {
     const container = createTestContainer(seed);
     const random = container.resolve('random');
-    const system = new EffectsSystem({ random });
+    const system = new EffectsSystem({
+      random,
+      settings: createSettingsStub(),
+    });
     system.particleDensity = 1;
 
     // Stub createParticle to avoid GamePools dependency — returns plain object

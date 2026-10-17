@@ -204,7 +204,7 @@ export function createEnemySystemHarness(seed = TEST_SEED) {
   enemySystem.waveState.initialSpawnDone = false;
   enemySystem.asteroids = [];
 
-  enemySystem.refreshInjectedServices({ force: true, suppressWarnings: true });
+  enemySystem.refreshServiceState({ force: true });
   enemySystem.reseedRandomScopes({ seed, resetSequences: true });
 
   return { enemySystem, container };

@@ -3,13 +3,18 @@ import { WaveManager } from '../../src/modules/enemies/managers/WaveManager.js';
 import * as CONSTANTS from '../../src/core/GameConstants.js';
 import { createDeterministicRandom } from '../__helpers__/stubs.js';
 import { withWaveOverrides } from '../__helpers__/setup.js';
+import { createEventBusMock } from '../__helpers__/mocks.js';
 
 function createWaveManager() {
   const random = createDeterministicRandom({ floatValue: 0.5 });
   const enemySystem = {
     getRandomScope: () => random,
   };
-  return new WaveManager({ enemySystem, random, eventBus: null });
+  return new WaveManager({
+    enemySystem,
+    random,
+    eventBus: createEventBusMock(),
+  });
 }
 
 describe('WaveManager support enemy weights', () => {

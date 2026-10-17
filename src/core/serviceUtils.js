@@ -27,6 +27,16 @@ export function resolveService(name, dependencies = {}) {
   return null;
 }
 
+// A missing required service is a wiring bug: fail at construction, not as a
+// silent per-frame no-op. Use resolveService for genuinely optional lookups.
+export function requireService(name, dependencies = {}, caller = 'service') {
+  const service = resolveService(name, dependencies);
+  if (!service) {
+    throw new Error(`[${caller}] required service '${name}' is not registered`);
+  }
+  return service;
+}
+
 export function resolveEventBus(dependencies = {}) {
   const byKey =
     dependencies?.['event-bus'] ||

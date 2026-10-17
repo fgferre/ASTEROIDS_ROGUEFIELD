@@ -237,6 +237,7 @@ describe('Combat integration', () => {
     };
     const physics = {
       handleMineExplosion: vi.fn(),
+      bootstrapFromEnemySystem: () => {},
     };
 
     withWaveOverrides({ managerHandlesAsteroids: false }, () => {
@@ -245,6 +246,10 @@ describe('Combat integration', () => {
         physics,
         eventBus,
         random: new RandomService('combat'),
+        player: {},
+        'xp-orbs': {},
+        progression: {},
+        healthHearts: {},
       });
       activeSystems.push(enemySystem);
 

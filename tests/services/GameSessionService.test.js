@@ -415,6 +415,7 @@ describe('GameSessionService lifecycle flows', () => {
     let roster = [];
     const enemySystem = {
       activeBosses: new Map(),
+      forEachActiveEnemy: (callback) => roster.forEach(callback),
       getAllAsteroids: () => roster,
       restoreSnapshotState: vi.fn(() => {
         roster = [restoredBoss];

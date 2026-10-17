@@ -48,6 +48,9 @@ function makeCombat() {
     getHullBoundingRadius() {
       return 16;
     },
+    getShieldRadius() {
+      return 16;
+    },
     getStats() {
       return { multishot: 1, damage: 10 };
     },
