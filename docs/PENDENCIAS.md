@@ -4,26 +4,26 @@ Lista viva do que está aberto, nas palavras do dono. Leia só a seção O BAST�
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 7.**
 
-## O BASTÃO — onde a rodada parou (17/10) — DIAGNÓSTICO FEITO, JEITO DE TRABALHAR IMPORTADO, JOGO TODO EM INGLÊS (5)
+## O BASTÃO — onde a rodada parou (17/10, noite) — ETAPAS 1, 2 E 4 DO PLANO FEITAS, NÃO PUBLICADAS
 
-Palavras dele (17/10): _"revise tudo e vamos melhorar o projeto como um todo, sinto que estamos presos no passado
-ainda... tudo muito amador... dos gráficos até as dinâmicas e efeitos, UX tudo ruim"_; e _"precisamos começar a
-trabalhar mais inteligentemente"_ — importar o jeito de trabalhar do Mar de Estrelas.
+Palavras dele (17/10): _"transformar isso num jogo maravilhoso para as próximas gerações de videogame"_; _"como se
+fosse uma versão nova para uma plataforma nova... com as melhores placas de vídeo"_; _"tudo em inglês"_.
 
-**Feito nesta rodada (ramo `claude/session-011CUZwFkeqHg4syYX2GsSkg`, não publicado — publicar é dele):**
+**No ramo `claude/session-011CUZwFkeqHg4syYX2GsSkg`, pronto para ele olhar (publicar é dele):**
 
-- `AGENTS.md` e `CLAUDE.md` reescritos no molde do Mar de Estrelas; `.claude/` (settings, hook que barra push na
-  `main` e `git add -f`, agentes Explore/worker) agora versionado; `BACKLOG.md` (30 linhas) no lugar do `backlog.md`.
-- Portões: `npm run done` = lint + formatação + testes + build (o mesmo que o CI); `npm run gate` para o commit
-  rápido; ESLint entrou (8 defeitos reais corrigidos: variável inexistente em `UISystem.renderSettingsPanel`, três
-  métodos duplicados que se sobrescreviam, dois `defineProperty` em teste). CI sem Node 18 (Vite 7 pede 20.19+).
-- `PLAN.md`: o diagnóstico inteiro (gráficos, UX, jogabilidade, engenharia) e a ordem de modernização proposta.
+- Etapa 1 — resolução nativa (teto 2× DPR), sprites nítidos; `?renderScale=1` volta ao antigo para comparar.
+- Etapa 2 — um só design system, telas com fade, HUD enxuta, level-up com o jogo atrás, game over com números,
+  controles visíveis, Quit com confirmação, `mobileGuard` que não trava Windows.
+- Etapa 4 — loop de passo fixo a 60 Hz.
+- Jogo todo em inglês.
 
-**Decidido por ele (17/10):** o jogo inteiro em inglês — feito (item 5 fechado).
+**O que ele precisa fazer na máquina dele:** jogar uma run inteira e dizer, por tela, o que ainda parece amador;
+comparar fluidez com e sem `?renderScale=1`; conferir se a 144 Hz o movimento repete quadros.
 
-**A próxima rodada — a ordem é dele.** Sugestão (ver `PLAN.md`): 1) resolução nativa do canvas (acaba com o
-borrão em qualquer tela); 2) um só sistema de design e HUD enxuta; 3) bloom real + paleta única no gameplay, para o
-jogo parecer com o menu; depois passo fixo no loop e as dinâmicas. Cada etapa termina com captura antes × depois.
+**Decisões dele que destravam as próximas etapas (ver `PLAN.md`):**
+
+- Etapa 3: vetor neon (Geometry Wars) × sprite ilustrado (Nova Drift) — prancha A/B a fazer.
+- Etapa 6: dash e sua tecla; regra de sinergia por tag (ou retirar a promessa); fim de run e meta-progressão.
 
 ## Jogabilidade e sensação
 
@@ -37,9 +37,6 @@ jogo parecer com o menu; depois passo fixo no loop e as dinâmicas. Cada etapa t
   continuação do menu — é o que `docs/brand.md` e `docs/visual-direction.md` já pedem.
 
 ## Interface
-
-- **(4)** Em máquinas Windows com touch habilitado o jogo trava em 0 % na tela de carregamento (`mobileGuard`); a
-  saída `?desktop=force` é escondida. Precisa estar resolvido antes de qualquer teste com outras pessoas.
 
 ## Desempenho
 

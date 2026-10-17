@@ -15,3 +15,7 @@
 - Visual references the owner named (Nova Drift, Chorus, House of the Dying Sun, Geometry Wars) have no local thumbnails; `docs/visual-direction.md` suggests `docs/visual-direction/mood-NN.png`.
 - Caches ainda a 1× depois da etapa 1: `atmosphereBuffer`, `shieldVisualCache.patternCanvas` e `shieldGradientCache` em `RenderingSystem`; assar com `getRenderScale()` como os demais.
 - SpaceSky desenha ~450 estrelas com um `drawImage` cada por quadro (twinkle por estrela). Assar cada camada num tile e deslocar com wrap, com 2–3 fases de twinkle pré-assadas, corta ~450 chamadas por quadro; pertence ao fundo novo da etapa 3.
+- `docs/positioning.md` promete 5 famílias de tag, sinergia e matriz 16 células que não existem no código; alinhar o doc à decisão do dono na etapa 6.
+- `ShakePresets` em `ScreenShake.js` não é chamado por nome em lugar nenhum; os chamadores passam números inline. Unificar ao calibrar a etapa 5.
+- Boss sai da fábrica com `useComponents=true` (`EnemyFactory.js:644-651`), o que pode desativar o ataque legado em `BossEnemy.js:588-607`; confirmar qual caminho de ataque roda de fato.
+- `GameConstants.js:35-37` diz que o escalonamento de asteroides só vale até a onda 10, mas a fórmula não bate com o comentário; medir.

@@ -85,11 +85,13 @@ arquivo quando a última etapa fechar. Decisões de produto são do dono, por im
       validado:** o headless (sem GPU) foi de 33 para 333 ms por quadro em DPR 2 — `drawImage` em software domina (~940
       por quadro, 450 só de estrelas). Em máquina com GPU o custo é outro; ele mede com e sem `?renderScale=1`. Se ficar
       lento, a saída é reduzir chamadas (estrelas em camadas assadas, etapa 3), não voltar ao borrão.
-- [ ] **2. Um design system e HUD enxuta.** Apagar o bloco Perplexity e a fonte do CDN; `tokens.css` único (cor,
-      tipo, espaço, movimento) com os 8 hex da direção visual; HUD em tokens, sem inline, colunas ~200 px, sem painel
-      falso nem NAV/km/h, combo some em x0, radar no canvas; `.hidden` vira `is-open` com 150–250 ms; level-up com o
-      jogo visível e congelado atrás + lockout de 400 ms; game over com tempo/onda/kills/combo/build; confirmação no
-      Quit; foco em Resume; painel de controles no menu e na pausa + dicas nos primeiros 20 s; **idioma: inglês, decidido em 17/10 e já aplicado a cartas e telas**; `mobileGuard` com dois sinais e aviso em DOM. Worker: opus (há escolhas de composição).
+- [x] **2. Um design system e HUD enxuta.** (17/10) `style.css` de 2700 para ~1700 linhas: bloco Perplexity e
+      fonte de CDN fora, um `:root` com os 8 hex da direção + tipo/espaço/movimento, 216 → 24 cores hardcoded; telas
+      com fade de 250 ms (reduced-motion respeitado); grade de upgrades cabe em 1366×768; HUD sem painel falso, sem
+      NAV, combo some em zero, radar com pool de nós, colunas 220 px, escala da HUD funcionando; level-up com o jogo
+      visível e congelado atrás + lockout 400 ms; game over com tempo/onda/kills/combo máx./nível/build; Quit pede
+      segundo toque; foco em Resume; controles no menu e na pausa + toast de primeira run; `mobileGuard` com dois
+      sinais e aviso em DOM; idioma inglês. Capturas em todas as telas conferidas.
 - [ ] **3. Paleta única + bloom real.** Prancha A/B para ele escolher a linguagem (item 3 das decisões). Depois:
       `src/data/constants/palette.js` com tokens + escala de traço e de glow, literais trocados; camada emissiva num
       canvas próprio, reduzida a 1/4, `filter: blur()` e composta em `lighter` (liga as opções de bloom/aberração que
@@ -103,13 +105,22 @@ arquivo quando a última etapa fechar. Decisões de produto são do dono, por im
       renderiza uma vez por rAF. Testes unitários do acumulador. **Sem interpolação de render ainda** (`alpha` já é
       exposto): a 144 Hz pode haver repetição de quadros; medir na máquina dele antes de investir. O `try` global do
       loop ficou (etapa 7).
-- [ ] **5. Sensação (juice).** Flash branco em dano, hit-stop calibrado, anéis de onda de choque, faíscas
-      esticadas pela velocidade, sequência de morte do inimigo em camadas, vinheta pulsante com HP < 30 %, banner
-      "WAVE N", intro de boss (nome + 1,5 s), kill feed/popup de XP, combo com cor por tier. Números propostos, ele
-      joga, depois trava. Worker: opus.
-- [ ] **6. Dinâmicas.** Confirmar o que existe das sinergias por tag e da matriz de status; onde não existe,
-      decidir com ele o que entra no v1; raridade/reroll/banish nas cartas; comportamento dos inimigos por onda; uma
-      habilidade ativa além do escudo (dash?) é decisão de produto dele. Esta etapa começa por um levantamento de jogabilidade (o de 17/10 foi cancelado) antes de ser detalhada.
+- [ ] **5. Sensação (juice).** Medido em 17/10: o hit no jogador dá ~2,3 px de pico de shake (trauma² com divisor
+      15, `ScreenShake.js:188`, `EffectsSystem.js:1944`); o "freeze" só desacelera (piso 15–40 %), nunca para; não há
+      hit-stop em abates pequeno/médio (`EffectsSystem.js:3377-3398`); nenhum slow-mo em level-up ou morte; câmera fixa
+      sem zoom; o boss investe sem telegraph (`BossEnemy.js:730-776`); `AsteroidImpactEffect` (Three.js) só roda no
+      menu. Fazer, nesta ordem, cada um com números propostos para ele jogar: curva de shake e hit do jogador; hit-stop
+      em todo abate; windup visível antes da investida e do leque do boss; flash branco em dano no inimigo; anéis de
+      choque e faíscas esticadas; slow-mo breve em level-up e morte; banner "WAVE N", intro de boss (nome + 1,5 s),
+      kill feed, combo com cor por tier; vinheta pulsante com HP < 30 %.
+- [ ] **6. Dinâmicas.** Fato (17/10): `docs/positioning.md` promete 5 famílias de tag, sinergia "3 iguais" e matriz
+      16 células de status; **nada disso existe no código** (zero ocorrências). Hoje: 9 upgrades em 4 categorias com
+      ~3 ranks, 1 arma, escudo como única habilidade ativa, sem dash, ondas infinitas sem fim de run, sem
+      meta-progressão, HP do boss composto (onda 15 ≈ 19 mil). **Decisões dele antes de codar:** (a) dash/impulso e em
+      que tecla (Shift já é escudo); (b) a regra de sinergia por tag — ou retirar a promessa do positioning; (c) fim de
+      run (onda alvo ou tempo) e o que a meta-progressão desbloqueia. Com isso decidido: catálogo de upgrades de 9 para
+      ~25 com tags reais, raridade/reroll/banish nas cartas, telegraphs dos inimigos, teto ou linearização do HP do boss
+      (`BossEnemy.js:220-226`).
 - [ ] **7. Engenharia contínua (em paralelo, por fatias pequenas).** `resolveService` lança em vez de devolver
       `null` e os sistemas recebem dependências obrigatórias no construtor → remover os `typeof`/`try` defensivos;
       apagar flags de legado e o espelho `gameState`; um só `isDev`; zerar `no-unused-vars` e `Math.random` e
