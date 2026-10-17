@@ -33,6 +33,11 @@
  *      and paints a one-line on-canvas overlay so the developer knows the
  *      capture is on disk.
  *
+ * Scenario-only aids (never gameplay changes): live enemies are cleared before
+ * the forced wave start, the player gets a 45s invulnerability window at
+ * scenario start so boss telegraphs can be photographed, and the driver
+ * steers the ship in a slow circle so the camera and telegraphs get exercised.
+ *
  * Per CONTEXT D-08 the existing `scripts/benchmarks/performance-baseline.js`
  * Node bench is NOT replaced — it's a synthetic micro-bench. INFRA-01's
  * baseline IS this in-browser harness output.
@@ -186,6 +191,8 @@ function forceWaveNumber(enemiesService, requestedWave) {
     // setter transparently.
     waveManager.currentWave = numericWave;
     if (numericWave > 1) {
+      // Drop wave-1 asteroids so the forced wave starts on a clear arena.
+      enemiesService.releaseAllAsteroidsToPool();
       // The run already started wave 1: restart as the requested wave.
       waveManager.currentWave = numericWave - 1;
       waveManager.waveInProgress = false;
@@ -267,11 +274,18 @@ async function startRun(enemiesService) {
  * until `driver.bossKilled === true` for boss-arena. Uses setInterval at
  * 60Hz cadence. Resolves when the timer or kill condition trips.
  */
-function runScenarioDriver(driver, scenario, durationSec) {
+function runScenarioDriver(driver, scenario, durationSec, player) {
   return new Promise((resolve) => {
     let simulatedSeconds = 0;
     const intervalId = setInterval(() => {
       try {
+        if (player?.velocity) {
+          // Slow circular drift (scenario-only) to exercise camera/telegraphs.
+          const heading = simulatedSeconds * 0.6;
+          player.velocity.vx = Math.cos(heading) * 40;
+          player.velocity.vy = Math.sin(heading) * 40;
+          player.angle = heading;
+        }
         driver.update(DRIVER_TICK_DT);
       } catch (error) {
         debugLog('[profileHarness] driver.update threw:', error);
@@ -371,6 +385,7 @@ async function runDeferredScenario({
         await startRun(enemies);
         forceProgressionUpgrades(progression, config.upgrades);
         forceWaveNumber(enemies, config.wave);
+        player?.setInvulnerableTimer?.(45);
 
         if (player && combat) {
           driver = createScriptedPlayer({ player, combat, enemies });
@@ -395,7 +410,12 @@ async function runDeferredScenario({
     }
 
     if (driver) {
-      await runScenarioDriver(driver, scenario, config.durationSec);
+      await runScenarioDriver(
+        driver,
+        scenario,
+        config.durationSec,
+        services.player
+      );
     } else {
       // No driver: still hold for the scenario duration so the auto-log
       // captures the full target window. The developer can play manually
