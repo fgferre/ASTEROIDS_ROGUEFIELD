@@ -252,9 +252,12 @@ export const COMBAT_AIMING_UPGRADE_CONFIG = deepFreeze({
 
 // === WAVE SYSTEM ===
 
-export const ASTEROIDS_PER_WAVE_BASE = 4;
+// Field density (docs/NORTE.md §2): PROPOSAL from 17/10, to be judged by the
+// owner playing. Was base 4, growth 1.3, cap 35: under the 1.3× camera the
+// first waves read as an empty field.
+export const ASTEROIDS_PER_WAVE_BASE = 6; // was 4
 
-export const ASTEROIDS_PER_WAVE_MULTIPLIER = 1.3;
+export const ASTEROIDS_PER_WAVE_MULTIPLIER = 1.26; // was 1.3
 
 export const WAVE_DURATION = 60; // segundos
 
@@ -264,7 +267,7 @@ export const WAVE_SPAWN_DELAY = 1.0; // atraso base entre waves no sistema legad
 
 export const WAVE_BOSS_INTERVAL = 5;
 
-export const MAX_ASTEROIDS_ON_SCREEN = 35; // [NEO-ARCADE] Increased density (was 20)
+export const MAX_ASTEROIDS_ON_SCREEN = 40; // PROPOSAL 17/10 (was 35; 20 before NEO-ARCADE)
 
 export const SUPPORT_ENEMY_PROGRESSION = deepFreeze({
   drone: deepFreeze({

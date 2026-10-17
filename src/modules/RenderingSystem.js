@@ -13,6 +13,7 @@ import * as bloomLayer from '../core/bloomLayer.js';
 import { cameraDisabledByUrl, createCamera } from '../core/camera.js';
 import {
   FILL_LIGHT,
+  KEY_LIGHT_DIR,
   LINE,
   PALETTE,
   withAlpha,
@@ -208,12 +209,28 @@ function bloomDisabledByUrl() {
 
 // The Field (docs/NORTE.md §2): two haze layers, drifting dust, ~120 white
 // stars and the broken Ring far back. Everything is baked once (on resize or
-// render-scale change) and drawn as wrapped tiles, so a frame costs ~27 draws.
+// render-scale change) and drawn as wrapped tiles, so a frame costs ~31 draws.
 const HAZE_SCALE = 0.25;
 const HAZE_BLUR = 5;
 const VIGNETTE_SCALE = 0.25;
 const RING_MARGIN = 16;
 const MAX_GLINTS = 8;
+
+// Far fragments: dark Ring shards drifting between the haze and the stars,
+// baked into one wrapped tile. PROPOSAL from 17/10 (was: none), judged by the
+// owner playing.
+const FAR_FRAGMENTS = Object.freeze({
+  count: 14,
+  speed: 0.15, // parallax factor
+  verticesMin: 7,
+  verticesMax: 10,
+  radiusMin: 5, // logical px → 10–28 px across
+  radiusMax: 14,
+  driftMax: 2.5, // px/s of their own slow drift
+  alphaMin: 0.55, // kept below the gameplay rocks so they never read as targets
+  alphaMax: 0.85,
+  rimAlpha: 0.3,
+});
 
 function hexToRgb(hex) {
   const n = parseInt(hex.replace('#', ''), 16);
@@ -269,6 +286,16 @@ class SpaceSkyBackground {
       speed: 0.16,
       count: 40,
       motes: [],
+      driftX: 0,
+      driftY: 0,
+      offsetX: 0,
+      offsetY: 0,
+      tile: null,
+    };
+
+    this.fragments = {
+      speed: FAR_FRAGMENTS.speed,
+      shards: [],
       driftX: 0,
       driftY: 0,
       offsetX: 0,
@@ -402,6 +429,8 @@ class SpaceSkyBackground {
     this.dust.driftY = this.randomRange(-2, 2);
 
     this.buildRing();
+    // Generated after everything else so the older layers keep their layout.
+    this.buildFragments(w, h);
     this.bake();
     this.initialized = true;
   }
@@ -437,6 +466,84 @@ class SpaceSkyBackground {
     }
   }
 
+  buildFragments(w, h) {
+    const f = FAR_FRAGMENTS;
+    this.fragments.shards = [];
+    for (let i = 0; i < f.count; i++) {
+      const radius = this.randomRange(f.radiusMin, f.radiusMax);
+      const vertices = this.randomInt(f.verticesMin, f.verticesMax);
+      const squash = this.randomRange(0.55, 1);
+      const rotation = this.randomRange(0, Math.PI * 2);
+      const points = [];
+      for (let v = 0; v < vertices; v++) {
+        const angle =
+          ((v + this.randomRange(-0.3, 0.3)) / vertices) * Math.PI * 2;
+        const r = radius * this.randomRange(0.6, 1);
+        const px = Math.cos(angle) * r;
+        const py = Math.sin(angle) * r * squash;
+        points.push([
+          px * Math.cos(rotation) - py * Math.sin(rotation),
+          px * Math.sin(rotation) + py * Math.cos(rotation),
+        ]);
+      }
+      this.fragments.shards.push({
+        x: this.randomRange(0, w),
+        y: this.randomRange(0, h),
+        radius,
+        points,
+        alpha: this.randomRange(f.alphaMin, f.alphaMax),
+      });
+    }
+    this.fragments.driftX = this.randomRange(-f.driftMax, f.driftMax);
+    this.fragments.driftY = this.randomRange(-f.driftMax, f.driftMax);
+  }
+
+  // Matte silhouette, a faint lit face and a rim on the key-light side.
+  paintFragment(ctx, x, y, shard) {
+    const pts = shard.points;
+    const r = shard.radius;
+    ctx.globalAlpha = shard.alpha;
+    ctx.beginPath();
+    pts.forEach(([px, py], i) =>
+      i === 0 ? ctx.moveTo(x + px, y + py) : ctx.lineTo(x + px, y + py)
+    );
+    ctx.closePath();
+    ctx.fillStyle = PALETTE.rockShadow;
+    ctx.fill();
+    const face = ctx.createLinearGradient(
+      x + KEY_LIGHT_DIR.x * r,
+      y + KEY_LIGHT_DIR.y * r,
+      x - KEY_LIGHT_DIR.x * r,
+      y - KEY_LIGHT_DIR.y * r
+    );
+    face.addColorStop(0, withAlpha(PALETTE.rock, 0.75));
+    face.addColorStop(0.6, withAlpha(PALETTE.rock, 0));
+    ctx.fillStyle = face;
+    ctx.fill();
+
+    ctx.lineWidth = LINE.hair * 0.8;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = withAlpha(PALETTE.rockLit, FAR_FRAGMENTS.rimAlpha);
+    ctx.beginPath();
+    pts.forEach(([ax, ay], i) => {
+      const [bx, by] = pts[(i + 1) % pts.length];
+      // outward edge normal (points sit around the origin)
+      let nx = by - ay;
+      let ny = ax - bx;
+      if (nx * (ax + bx) + ny * (ay + by) < 0) {
+        nx = -nx;
+        ny = -ny;
+      }
+      const len = Math.hypot(nx, ny) || 1;
+      if ((nx * KEY_LIGHT_DIR.x + ny * KEY_LIGHT_DIR.y) / len > 0.25) {
+        ctx.moveTo(x + ax, y + ay);
+        ctx.lineTo(x + bx, y + by);
+      }
+    });
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
   // Paints every buffer from the generated layout at the current render scale.
   bake() {
     const w = this.width > 0 ? this.width : 800;
@@ -468,6 +575,14 @@ class SpaceSkyBackground {
             mote.radius * 2
           );
         })
+      );
+    });
+
+    this.fragments.tile = this.bakeLayer(w, h, scale, (ctx) => {
+      this.fragments.shards.forEach((shard) =>
+        this.forWrapped(shard.x, shard.y, shard.radius + 2, w, h, (x, y) =>
+          this.paintFragment(ctx, x, y, shard)
+        )
       );
     });
 
@@ -769,6 +884,7 @@ class SpaceSkyBackground {
     this.layers.forEach(scroll);
     this.hazeLayers.forEach(scroll);
     scroll(this.dust);
+    scroll(this.fragments);
 
     // The Ring barely moves: it leans against the motion and settles back.
     const ring = this.ring;
@@ -807,6 +923,18 @@ class SpaceSkyBackground {
       ctx.drawImage(ring.buffer, sx - m, sy - m, width + m * 2, height + m * 2);
     }
     this.drawTiled(ctx, nearHaze.tile, nearHaze, width, height, 1);
+    this.drawTiled(
+      ctx,
+      this.fragments.tile,
+      {
+        speed: this.fragments.speed,
+        offsetX: this.fragments.offsetX + this.fragments.driftX * time,
+        offsetY: this.fragments.offsetY + this.fragments.driftY * time,
+      },
+      width,
+      height,
+      1
+    );
     this.drawTiled(
       ctx,
       midStars.tile,
@@ -1112,6 +1240,12 @@ class RenderingSystem extends BaseSystem {
     // Objects phase - batch similar objects
     this.stateManager.transitionToPhase(ctx, 'objects');
 
+    // Ambient chips and motes sit under every entity, kept around the view.
+    const effects = this.cachedEffects;
+    if (effects && typeof effects.drawAmbient === 'function') {
+      effects.drawAmbient(ctx, this.camera.getView());
+    }
+
     // XP Orbs
     const xpOrbs = this.cachedXPOrbs;
     if (xpOrbs && typeof xpOrbs.render === 'function') {
@@ -1152,7 +1286,6 @@ class RenderingSystem extends BaseSystem {
 
     // Effects phase
     this.stateManager.transitionToPhase(ctx, 'effects');
-    const effects = this.cachedEffects;
     if (effects && typeof effects.draw === 'function') {
       effects.draw(ctx);
     }

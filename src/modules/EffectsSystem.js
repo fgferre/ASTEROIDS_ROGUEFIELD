@@ -26,6 +26,41 @@ const MAIN_THRUSTER_FLASH_COLOR = PALETTE.player;
 const MAIN_THRUSTER_FLASH_DURATION = 0.05;
 const MAIN_THRUSTER_FLASH_INTENSITY = 0.05;
 
+// Light lingers (docs/NORTE.md §2): PROPOSAL from 17/10, judged by playing.
+// Multipliers on the old lifetimes: XP collect sparks were 0.3–0.5 s, asteroid
+// explosion embers 0.32–0.54 s (secondary 0.28–0.46 s). Thruster embers keep
+// their lifetimes. Stone chips are mass, not light, and are unchanged.
+const XP_SPARK_LIFE_SCALE = 1.5; // was 1
+const EXPLOSION_EMBER_LIFE_SCALE = 1.3; // was 1
+
+// Ambient field life (docs/NORTE.md §2 "Fundo com volume"): matte micro-chips
+// and a few faint amber crystal motes drifting through the camera view, so the
+// Field is never empty. PROPOSAL from 17/10 (was: none), judged by playing.
+// Kept in their own arrays, not in `particles`, so particle metrics and the
+// determinism suites never see them. Rolls come from the 'colors' fork, which
+// nothing else in this system draws from, so no other sequence shifts.
+const AMBIENT = Object.freeze({
+  fork: 'colors',
+  chipCount: 28,
+  chipSizeMin: 1, // logical px (drawn ~1–3 px)
+  chipSizeMax: 2.5,
+  chipSpeedMin: 3, // px/s
+  chipSpeedMax: 10,
+  chipSpinMax: 0.6, // rad/s either way
+  chipAlphaMin: 0.55,
+  chipAlphaMax: 0.95,
+  moteCount: 6,
+  moteSizeMin: 1.2,
+  moteSizeMax: 2,
+  moteSpeedMin: 1.5,
+  moteSpeedMax: 4,
+  moteAlpha: 0.25,
+  lifeMin: 20, // s
+  lifeMax: 40,
+  fade: 2, // s of fade-in and fade-out
+  margin: 24, // respawn this far outside the view; cull at twice it
+});
+
 const BOSS_EFFECTS = BOSS_EFFECTS_PRESETS || {};
 const BOSS_SHAKES = BOSS_SCREEN_SHAKES || {};
 
@@ -137,6 +172,9 @@ export default class EffectsSystem extends BaseSystem {
     this.damageFlashEnabled = true;
     this.particleDensity = 1;
     this.damageTexts = []; // NEW: Damage text tracking
+    this.ambientChips = [];
+    this.ambientMotes = [];
+    this.ambientView = null;
 
     this.setupSettingsIntegration();
   }
@@ -646,6 +684,7 @@ export default class EffectsSystem extends BaseSystem {
     this.updateDamageTexts(effectDelta);
     this.updateDamageIndicators(effectDelta);
     this.updateBossTransitions(effectDelta);
+    this.updateAmbient(effectDelta);
 
     this.lastAdjustedDelta = adjustedDelta;
     return adjustedDelta;
@@ -854,6 +893,120 @@ export default class EffectsSystem extends BaseSystem {
   draw(ctx) {
     this.drawWorld(ctx);
     this.drawScreenSpace(ctx);
+  }
+
+  // === AMBIENT FIELD LIFE ===
+  // Spawns inside the view on the first fill, then just outside an edge,
+  // heading for a random point in the view.
+  spawnAmbient(view, mote, inside) {
+    const roll = (min, max) => this.randomRange(min, max, AMBIENT.fork);
+    const m = AMBIENT.margin;
+    let x;
+    let y;
+    let angle;
+    if (inside) {
+      x = view.x + roll(0, view.width);
+      y = view.y + roll(0, view.height);
+      angle = roll(0, Math.PI * 2);
+    } else {
+      const side = Math.floor(roll(0, 4));
+      const along = roll(0, 1);
+      x = side === 1 ? view.x + view.width + m : view.x - m;
+      y = side === 2 ? view.y + view.height + m : view.y - m;
+      if (side === 0 || side === 2) x = view.x + along * view.width;
+      else y = view.y + along * view.height;
+      const tx = view.x + roll(0.2, 0.8) * view.width;
+      const ty = view.y + roll(0.2, 0.8) * view.height;
+      angle = Math.atan2(ty - y, tx - x);
+    }
+    const speed = mote
+      ? roll(AMBIENT.moteSpeedMin, AMBIENT.moteSpeedMax)
+      : roll(AMBIENT.chipSpeedMin, AMBIENT.chipSpeedMax);
+    const life = roll(AMBIENT.lifeMin, AMBIENT.lifeMax);
+    return {
+      x,
+      y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      rotation: roll(0, Math.PI * 2),
+      rotationSpeed: mote ? 0 : roll(-AMBIENT.chipSpinMax, AMBIENT.chipSpinMax),
+      size: mote
+        ? roll(AMBIENT.moteSizeMin, AMBIENT.moteSizeMax)
+        : roll(AMBIENT.chipSizeMin, AMBIENT.chipSizeMax),
+      color: roll(0, 1) < 0.5 ? PALETTE.rock : PALETTE.rockLit,
+      baseAlpha: mote
+        ? AMBIENT.moteAlpha
+        : roll(AMBIENT.chipAlphaMin, AMBIENT.chipAlphaMax),
+      alpha: 0,
+      life,
+      maxLife: life,
+      type: 'debris',
+    };
+  }
+
+  updateAmbient(deltaTime) {
+    const view = this.ambientView;
+    if (!view) return;
+    const m = AMBIENT.margin * 2;
+    const step = (list, count, mote) => {
+      const firstFill = list.length === 0;
+      while (list.length < count) {
+        list.push(this.spawnAmbient(view, mote, firstFill));
+      }
+      for (let i = 0; i < list.length; i += 1) {
+        const a = list[i];
+        a.x += a.vx * deltaTime;
+        a.y += a.vy * deltaTime;
+        a.rotation += a.rotationSpeed * deltaTime;
+        a.life -= deltaTime;
+        const outside =
+          a.x < view.x - m ||
+          a.x > view.x + view.width + m ||
+          a.y < view.y - m ||
+          a.y > view.y + view.height + m;
+        if (a.life <= 0 || outside) {
+          list[i] = this.spawnAmbient(view, mote, false);
+          continue;
+        }
+        const fade = Math.min(
+          1,
+          (a.maxLife - a.life) / AMBIENT.fade,
+          a.life / AMBIENT.fade
+        );
+        a.alpha = a.baseAlpha * fade;
+      }
+    };
+    step(this.ambientChips, AMBIENT.chipCount, false);
+    step(this.ambientMotes, AMBIENT.moteCount, true);
+  }
+
+  // Drawn under the entities; `view` is the camera's visible logical rect.
+  drawAmbient(ctx, view) {
+    this.ambientView = view;
+    if (!ctx) return;
+    for (let i = 0; i < this.ambientChips.length; i += 1) {
+      drawParticle(ctx, this.ambientChips[i]);
+    }
+
+    const motes = this.ambientMotes;
+    if (!motes.length) return;
+    const paint = (target, radiusScale) => {
+      target.save();
+      target.globalCompositeOperation = 'lighter';
+      target.fillStyle = PALETTE.shot;
+      for (let i = 0; i < motes.length; i += 1) {
+        const mote = motes[i];
+        if (mote.alpha <= 0) continue;
+        target.globalAlpha = mote.alpha;
+        target.beginPath();
+        target.arc(mote.x, mote.y, mote.size * radiusScale, 0, Math.PI * 2);
+        target.fill();
+      }
+      target.restore();
+    };
+    paint(ctx, 0.6);
+    const emissive = getEmissive();
+    if (emissive) paint(emissive, 1.8);
   }
 
   drawWorld(ctx) {
@@ -3035,7 +3188,7 @@ export default class EffectsSystem extends BaseSystem {
         Math.sin(angle) * speed,
         PALETTE.xp,
         1.5 + this.randomFloat('explosions') * 1.5,
-        0.3 + this.randomFloat('explosions') * 0.2
+        (0.3 + this.randomFloat('explosions') * 0.2) * XP_SPARK_LIFE_SCALE
       );
       this.particles.push(particle);
     }
@@ -3341,7 +3494,8 @@ export default class EffectsSystem extends BaseSystem {
         Math.sin(angle) * speed * 1.25 + parentVy * momentumScale,
         ember ? sparkColor : PALETTE.rockLit,
         1.6 + this.randomFloat('explosions') * 1.6,
-        0.32 + this.randomFloat('explosions') * 0.22,
+        (0.32 + this.randomFloat('explosions') * 0.22) *
+          (ember ? EXPLOSION_EMBER_LIFE_SCALE : 1),
         ember ? 'spark' : 'debris'
       );
       this.particles.push(spark);
@@ -3354,7 +3508,8 @@ export default class EffectsSystem extends BaseSystem {
           Math.sin(angle + Math.PI / 2) * speed * 0.6,
           sparkColor,
           1.2 + this.randomFloat('explosions') * 1,
-          0.28 + this.randomFloat('explosions') * 0.18,
+          (0.28 + this.randomFloat('explosions') * 0.18) *
+            EXPLOSION_EMBER_LIFE_SCALE,
           'spark',
           this.getRandomFork('explosions')
         );
@@ -3977,6 +4132,8 @@ export default class EffectsSystem extends BaseSystem {
     this.damageTexts = [];
     this.bossTransitionEffects = [];
     this.muzzleFlashQueue = [];
+    this.ambientChips = [];
+    this.ambientMotes = [];
 
     // Custom ScreenShake reseeding
     if (this.screenShake && typeof this.screenShake.reseed === 'function') {
