@@ -19,3 +19,4 @@
 - Boss sai da fábrica com `useComponents=true` (`EnemyFactory.js:644-651`), o que pode desativar o ataque legado em `BossEnemy.js:588-607`; confirmar qual caminho de ataque roda de fato.
 - `GameConstants.js:35-37` diz que o escalonamento de asteroides só vale até a onda 10, mas a fórmula não bate com o comentário; medir.
 - Limpeza de lint (17/10) apagou leituras que pareciam lógica esquecida, não sobra: `AudioSystem` ~2241 lia `lastIntensity` sem comparar com a atual (detecção de mudança do propulsor?); `CombatSystem` ~3428 calculava `duplicateCount` e não usava no anel de lock. Conferir se faltava um `if`.
+- Fundo novo (17/10) assa ~10 camadas em tela cheia (estrelas ×3, névoa ×2, Anel, vinheta, emissivo + 3 níveis de bloom): ~75 MB em escala 2,8. Se pesar em máquina fraca, baixar névoa/Anel para 1/4 e limitar o teto de DPR por setting.

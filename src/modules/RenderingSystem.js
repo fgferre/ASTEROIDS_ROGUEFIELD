@@ -10,6 +10,12 @@ import { MAGNETISM_RADIUS } from '../data/constants/gameplay.js';
 import { normalize as normalizeVector } from '../utils/vectorHelpers.js';
 import { applyBaseTransform, getRenderScale } from '../core/viewport.js';
 import * as bloomLayer from '../core/bloomLayer.js';
+import {
+  FILL_LIGHT,
+  LINE,
+  PALETTE,
+  withAlpha,
+} from '../data/constants/palette.js';
 
 // [NEO-ARCADE] Shield Visual Constants
 const SHIELD_HEX_SIZE = 24;
@@ -18,7 +24,6 @@ const MAX_VISUAL_TILT = 0.3;
 const TILT_MULTIPLIER = 0.12;
 const MIN_OUTLINE_POINTS = 3;
 const EPSILON = 1e-6;
-const NEBULA_UPDATE_INTERVAL_MS = 120;
 
 // Graphics Settings Defaults
 const DEFAULT_GRAPHICS_SETTINGS = {
@@ -163,57 +168,86 @@ function bloomDisabledByUrl() {
   }
 }
 
-// [NEO-ARCADE] Multi-Plane 2.5D Parallax Starfield
-// Replaces 3D projection with robust 2D layer scrolling for guaranteed visibility
+// The Field (docs/NORTE.md §2): two haze layers, drifting dust, ~120 white
+// stars and the broken Ring far back. Everything is baked once (on resize or
+// render-scale change) and drawn as wrapped tiles, so a frame costs ~27 draws.
+const HAZE_SCALE = 0.25;
+const HAZE_BLUR = 5;
+const VIGNETTE_SCALE = 0.25;
+const RING_MARGIN = 16;
+const MAX_GLINTS = 8;
+
+function hexToRgb(hex) {
+  const n = parseInt(hex.replace('#', ''), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function mixRgb(a, b, t) {
+  return a.map((v, i) => Math.round(v + (b[i] - v) * t));
+}
+
+function rgba(rgb, alpha) {
+  return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${alpha})`;
+}
+
+const COLD_BLUE = FILL_LIGHT.match(/\d+/g).slice(0, 3).map(Number);
+const STAR_COOL = hexToRgb(PALETTE.text);
+const STAR_WARM = mixRgb(STAR_COOL, hexToRgb(PALETTE.shot), 0.18);
+
 class SpaceSkyBackground {
   constructor(randomGenerator = null) {
     this.random = this.resolveRandomGenerator(randomGenerator);
     this.width = 0;
     this.height = 0;
 
-    // Configuration
+    // Star layers, far to near. `speed` is the parallax factor.
     this.layers = [
-      {
-        speed: 0.1,
-        count: 150,
-        sizeMin: 1.5,
-        sizeMax: 2.5,
-        colorRate: 0.1,
-        stars: [],
-      }, // Background (Slow, Small)
-      {
-        speed: 0.3,
-        count: 200,
-        sizeMin: 2.5,
-        sizeMax: 4.0,
-        colorRate: 0.3,
-        stars: [],
-      }, // Midground
-      {
-        speed: 0.6,
-        count: 100,
-        sizeMin: 4.0,
-        sizeMax: 6.0,
-        colorRate: 0.6,
-        stars: [],
-      }, // Foreground (Fast, Big)
-    ];
+      { speed: 0.04, count: 60, sizeMin: 1, sizeMax: 1.3, alpha: 0.5 },
+      { speed: 0.12, count: 40, sizeMin: 1.1, sizeMax: 1.6, alpha: 0.7 },
+      { speed: 0.24, count: 20, sizeMin: 1.4, sizeMax: 2, alpha: 0.85 },
+    ].map((layer) => ({
+      ...layer,
+      stars: [],
+      phase: 0,
+      breath: 0,
+      offsetX: 0,
+      offsetY: 0,
+      tile: null,
+    }));
 
-    this.stars = [];
-    this.starSpriteCache = new Map();
+    this.hazeLayers = [
+      { speed: 0.02, grid: 2, octaves: 4, alpha: 0.16, threshold: 0.4 },
+      { speed: 0.09, grid: 3, octaves: 4, alpha: 0.09, threshold: 0.48 },
+    ].map((layer) => ({
+      ...layer,
+      lattices: [],
+      tint: [],
+      offsetX: 0,
+      offsetY: 0,
+      tile: null,
+    }));
+
+    this.dust = {
+      speed: 0.16,
+      count: 40,
+      motes: [],
+      driftX: 0,
+      driftY: 0,
+      offsetX: 0,
+      offsetY: 0,
+      tile: null,
+    };
+
+    this.ring = {
+      segments: [],
+      debris: [],
+      shiftX: 0,
+      shiftY: 0,
+      buffer: null,
+    };
+    this.vignette = null;
+    this.bakedScale = 0;
     this.initialized = false;
-    this.atmosphereBuffer = {
-      canvas: null,
-      width: 0,
-      height: 0,
-    };
-    this.nebulaBuffer = {
-      canvas: null,
-      ctx: null,
-      width: 0,
-      height: 0,
-      lastUpdate: 0,
-    };
   }
 
   resolveRandomGenerator(randomGenerator) {
@@ -274,15 +308,15 @@ class SpaceSkyBackground {
     }
   }
 
+  // Generates the layout from the seeded RNG, then bakes it.
   rebuild() {
-    // Use actual dimensions with fallback
     const w = this.width > 0 ? this.width : 800;
     const h = this.height > 0 ? this.height : 600;
 
-    // 1. Rebuild Stars
-    this.stars = [];
-    this.starSpriteCache.clear();
+    let glints = 0;
     this.layers.forEach((layer, layerIndex) => {
+      layer.phase = this.randomFloat() * Math.PI * 2;
+      layer.breath = 0.15 + this.randomFloat() * 0.2;
       layer.stars = [];
       for (let i = 0; i < layer.count; i++) {
         const star = {
@@ -291,60 +325,367 @@ class SpaceSkyBackground {
           size:
             layer.sizeMin +
             this.randomFloat() * (layer.sizeMax - layer.sizeMin),
-          speed: layer.speed,
-          layerIndex,
-          color: this.pickNeonColor(layer.colorRate),
           phase: this.randomFloat() * Math.PI * 2,
-          blinkSpeed: 1 + this.randomFloat() * 2,
           jitter: this.randomFloat(),
+          glint: false,
         };
-        star.sprite = this.getStarSprite(star.size, star.color);
+        if (layerIndex > 0 && glints < MAX_GLINTS && this.randomChance(0.12)) {
+          star.glint = true;
+          glints += 1;
+        }
         layer.stars.push(star);
-        this.stars.push(star);
       }
     });
 
-    // 2. Generate Nebula Clouds (Deep Atmosphere)
-    this.nebulaClouds = [];
-    const cloudCount = 20;
-    const colors = [
-      'rgba(60, 0, 100, 0.14)', // Deep Purple
-      'rgba(0, 40, 100, 0.12)', // Deep Blue
-      'rgba(100, 0, 60, 0.1)', // Magenta Haze
-      'rgba(0, 80, 80, 0.1)', // Cyan Haze
-    ];
+    // Tileable value-noise lattices for the haze (base grid keeps 4:3).
+    this.hazeLayers.forEach((layer) => {
+      layer.lattices = [];
+      for (let o = 0; o < layer.octaves; o++) {
+        const gx = layer.grid * 4 * 2 ** o;
+        const gy = layer.grid * 3 * 2 ** o;
+        const values = new Float32Array(gx * gy);
+        for (let i = 0; i < values.length; i++) values[i] = this.randomFloat();
+        layer.lattices.push({ gx, gy, values });
+      }
+      const tint = new Float32Array(4 * 3);
+      for (let i = 0; i < tint.length; i++) tint[i] = this.randomFloat();
+      layer.tint = { gx: 4, gy: 3, values: tint };
+    });
 
-    for (let i = 0; i < cloudCount; i++) {
-      this.nebulaClouds.push({
+    this.dust.motes = [];
+    for (let i = 0; i < this.dust.count; i++) {
+      this.dust.motes.push({
         x: this.randomRange(0, w),
         y: this.randomRange(0, h),
-        radius: 220 + this.randomFloat() * 360,
-        color: colors[this.randomInt(0, colors.length - 1)],
-        vx: (this.randomFloat() - 0.5) * 5, // Very slow drift
-        vy: (this.randomFloat() - 0.5) * 5,
-        phase: this.randomFloat() * Math.PI * 2,
+        radius: this.randomRange(1, 2),
+        alpha: this.randomRange(0.1, 0.25),
       });
     }
+    this.dust.driftX = this.randomRange(-3, 3);
+    this.dust.driftY = this.randomRange(-2, 2);
 
-    this.buildAtmosphereLayer(w, h);
-    this.ensureNebulaBuffer(w, h);
-    this.nebulaBuffer.lastUpdate = 0;
+    this.buildRing();
+    this.bake();
     this.initialized = true;
   }
 
-  // Generate neon colors with Math.random() to avoid RandomService issues
-  pickNeonColor(vibranceChance) {
-    if (this.randomChance(vibranceChance)) {
-      const palette = [
-        { r: 0, g: 255, b: 255 }, // Cyan
-        { r: 255, g: 0, b: 255 }, // Magenta
-        { r: 100, g: 255, b: 100 }, // Neon Green
-        { r: 255, g: 200, b: 50 }, // Gold
-      ];
-      return palette[this.randomInt(0, palette.length - 1)];
+  // The far side of a huge ring seen almost edge-on, cracked into segments.
+  buildRing() {
+    const count = this.randomInt(3, 5);
+    const start = Math.PI * 1.5 - 0.8;
+    const end = Math.PI * 1.5 + 0.8;
+    const span = (end - start) / count;
+    this.ring.segments = [];
+    this.ring.debris = [];
+    for (let i = 0; i < count; i++) {
+      const gapA = i === 0 ? 0 : this.randomRange(0.025, 0.06);
+      const gapB = i === count - 1 ? 0 : this.randomRange(0.025, 0.06);
+      const jag = () => [0, 1, 2].map(() => this.randomRange(-0.012, 0.012));
+      this.ring.segments.push({
+        a0: start + span * i + gapA,
+        a1: start + span * (i + 1) - gapB,
+        jag0: jag(),
+        jag1: jag(),
+      });
+      if (i > 0) {
+        for (let d = 0; d < 3; d++) {
+          this.ring.debris.push({
+            angle: start + span * i + this.randomRange(-0.05, 0.05),
+            depth: this.randomRange(0.88, 1.02),
+            size: this.randomRange(2, 5),
+            rotation: this.randomRange(0, Math.PI * 2),
+          });
+        }
+      }
     }
-    // White/blue tinted stars
-    return { r: 220, g: 235, b: 255 };
+  }
+
+  // Paints every buffer from the generated layout at the current render scale.
+  bake() {
+    const w = this.width > 0 ? this.width : 800;
+    const h = this.height > 0 ? this.height : 600;
+    const scale = getRenderScale() || 1;
+    this.bakedScale = scale;
+
+    this.layers.forEach((layer) => {
+      layer.tile = this.bakeLayer(w, h, scale, (ctx) => {
+        layer.stars.forEach((star) =>
+          this.forWrapped(star.x, star.y, 6, w, h, (x, y) =>
+            this.paintStar(ctx, x, y, star, layer.alpha)
+          )
+        );
+      });
+    });
+
+    this.dust.tile = this.bakeLayer(w, h, scale, (ctx) => {
+      this.dust.motes.forEach((mote) =>
+        this.forWrapped(mote.x, mote.y, 4, w, h, (x, y) => {
+          const glow = ctx.createRadialGradient(x, y, 0, x, y, mote.radius);
+          glow.addColorStop(0, withAlpha(PALETTE.text, mote.alpha));
+          glow.addColorStop(1, withAlpha(PALETTE.neutral, 0));
+          ctx.fillStyle = glow;
+          ctx.fillRect(
+            x - mote.radius,
+            y - mote.radius,
+            mote.radius * 2,
+            mote.radius * 2
+          );
+        })
+      );
+    });
+
+    this.hazeLayers.forEach((layer) => {
+      layer.tile = this.bakeHaze(layer, w, h);
+    });
+
+    this.ring.buffer = this.bakeRing(w, h, scale);
+    this.vignette = this.bakeVignette(w, h);
+  }
+
+  bakeLayer(w, h, scale, paint) {
+    const canvas = this.createOffscreenCanvas(w, h, scale);
+    const ctx = canvas?.getContext?.('2d');
+    if (!ctx) return null;
+    ctx.scale(scale, scale);
+    paint(ctx);
+    return canvas;
+  }
+
+  forWrapped(x, y, margin, w, h, draw) {
+    const xs = [x];
+    const ys = [y];
+    if (x < margin) xs.push(x + w);
+    if (x > w - margin) xs.push(x - w);
+    if (y < margin) ys.push(y + h);
+    if (y > h - margin) ys.push(y - h);
+    xs.forEach((px) => ys.forEach((py) => draw(px, py)));
+  }
+
+  paintStar(ctx, x, y, star, layerAlpha) {
+    const rgb = star.jitter < 0.5 ? STAR_WARM : STAR_COOL;
+    const alpha = layerAlpha * (0.55 + 0.45 * star.jitter);
+    const r = star.size / 2;
+
+    const halo = ctx.createRadialGradient(x, y, 0, x, y, r * 2.5);
+    halo.addColorStop(0, rgba(rgb, alpha * 0.25));
+    halo.addColorStop(1, rgba(rgb, 0));
+    ctx.fillStyle = halo;
+    ctx.fillRect(x - r * 2.5, y - r * 2.5, r * 5, r * 5);
+
+    ctx.fillStyle = rgba(rgb, alpha);
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (!star.glint) return;
+    const reach = 3 + star.size * 2;
+    ctx.lineWidth = LINE.hair * 0.6;
+    [
+      [reach, 0],
+      [0, reach],
+    ].forEach(([dx, dy]) => {
+      const spike = ctx.createLinearGradient(x - dx, y - dy, x + dx, y + dy);
+      spike.addColorStop(0, rgba(rgb, 0));
+      spike.addColorStop(0.5, rgba(rgb, alpha * 0.7));
+      spike.addColorStop(1, rgba(rgb, 0));
+      ctx.strokeStyle = spike;
+      ctx.beginPath();
+      ctx.moveTo(x - dx, y - dy);
+      ctx.lineTo(x + dx, y + dy);
+      ctx.stroke();
+    });
+  }
+
+  sampleNoise(lattice, u, v) {
+    const { gx, gy, values } = lattice;
+    const fx = u * gx;
+    const fy = v * gy;
+    const x0 = Math.floor(fx);
+    const y0 = Math.floor(fy);
+    const tx = fx - x0;
+    const ty = fy - y0;
+    const sx = tx * tx * (3 - 2 * tx);
+    const sy = ty * ty * (3 - 2 * ty);
+    const xa = ((x0 % gx) + gx) % gx;
+    const xb = (xa + 1) % gx;
+    const ya = ((y0 % gy) + gy) % gy;
+    const yb = (ya + 1) % gy;
+    const top = values[ya * gx + xa] * (1 - sx) + values[ya * gx + xb] * sx;
+    const bottom = values[yb * gx + xa] * (1 - sx) + values[yb * gx + xb] * sx;
+    return top * (1 - sy) + bottom * sy;
+  }
+
+  bakeHaze(layer, w, h) {
+    const canvas = this.createOffscreenCanvas(w, h, HAZE_SCALE);
+    const ctx = canvas?.getContext?.('2d');
+    if (!ctx) return null;
+
+    const cw = canvas.width;
+    const ch = canvas.height;
+    const image = ctx.createImageData(cw, ch);
+    const data = image.data;
+    const neutral = hexToRgb(PALETTE.neutral);
+    let norm = 0;
+    for (let o = 0; o < layer.octaves; o++) norm += 0.5 ** o;
+
+    for (let py = 0; py < ch; py++) {
+      const v = py / ch;
+      for (let px = 0; px < cw; px++) {
+        const u = px / cw;
+        let n = 0;
+        for (let o = 0; o < layer.octaves; o++) {
+          n += this.sampleNoise(layer.lattices[o], u, v) * 0.5 ** o;
+        }
+        n /= norm;
+        const d = Math.min(1, Math.max(0, (n - layer.threshold) / 0.35));
+        const rgb = mixRgb(
+          neutral,
+          COLD_BLUE,
+          this.sampleNoise(layer.tint, u, v)
+        );
+        const i = (py * cw + px) * 4;
+        data[i] = rgb[0];
+        data[i + 1] = rgb[1];
+        data[i + 2] = rgb[2];
+        data[i + 3] = Math.round(d * d * layer.alpha * 255);
+      }
+    }
+    ctx.putImageData(image, 0, 0);
+    return this.blurTile(canvas, HAZE_BLUR);
+  }
+
+  // Softens a wrapped tile without seams: blur a 3×3 mosaic, keep the middle.
+  blurTile(tile, radius) {
+    const cw = tile.width;
+    const ch = tile.height;
+    const out = this.createOffscreenCanvas(cw, ch);
+    const ctx = out?.getContext?.('2d');
+    if (!ctx) return tile;
+    ctx.filter = `blur(${radius}px)`;
+    for (let x = -1; x <= 1; x++) {
+      for (let y = -1; y <= 1; y++) ctx.drawImage(tile, x * cw, y * ch);
+    }
+    ctx.filter = 'none';
+    return out;
+  }
+
+  ringPoint(cx, cy, rx, ry, rot, k, angle) {
+    const ex = Math.cos(angle) * rx * k;
+    const ey = Math.sin(angle) * ry * k;
+    return [
+      cx + ex * Math.cos(rot) - ey * Math.sin(rot),
+      cy + ex * Math.sin(rot) + ey * Math.cos(rot),
+    ];
+  }
+
+  bakeRing(w, h, scale) {
+    const m = RING_MARGIN;
+    const canvas = this.createOffscreenCanvas(w + m * 2, h + m * 2, scale);
+    const ctx = canvas?.getContext?.('2d');
+    if (!ctx) return null;
+    ctx.scale(scale, scale);
+    ctx.translate(m, m);
+
+    const cx = w * 0.55;
+    const cy = h * 1.45;
+    const rx = w * 1.3;
+    const ry = h * 1.22;
+    const rot = -0.14;
+    const inner = 0.95;
+    const at = (k, a) => this.ringPoint(cx, cy, rx, ry, rot, k, a);
+    const steps = 48;
+
+    const band = new Path2D();
+    const rim = new Path2D();
+    this.ring.segments.forEach((seg) => {
+      const crack = (angle, jag, fromOuter) =>
+        jag.forEach((j, idx) => {
+          const t = fromOuter ? (idx + 1) / 4 : 1 - (idx + 1) / 4;
+          band.lineTo(...at(1 - (1 - inner) * t, angle + j));
+        });
+      band.moveTo(...at(1, seg.a0));
+      rim.moveTo(...at(1, seg.a0));
+      for (let s = 1; s <= steps; s++) {
+        const a = seg.a0 + ((seg.a1 - seg.a0) * s) / steps;
+        band.lineTo(...at(1, a));
+        rim.lineTo(...at(1, a));
+      }
+      crack(seg.a1, seg.jag1, true);
+      for (let s = steps; s >= 0; s--) {
+        band.lineTo(...at(inner, seg.a0 + ((seg.a1 - seg.a0) * s) / steps));
+      }
+      crack(seg.a0, seg.jag0, false);
+      band.closePath();
+    });
+
+    // Occlude what lies behind, then lift the mass just above the void.
+    ctx.fillStyle = withAlpha(PALETTE.background, 0.65);
+    ctx.fill(band);
+    const topY = at(1, Math.PI * 1.5)[1];
+    const mass = ctx.createLinearGradient(0, topY - h * 0.1, 0, h);
+    mass.addColorStop(0, withAlpha(PALETTE.hull, 0.3));
+    mass.addColorStop(1, withAlpha(PALETTE.hull, 0.12));
+    ctx.fillStyle = mass;
+    ctx.fill(band);
+
+    // A dark lane inside the band reads as ring structure.
+    ctx.lineWidth = LINE.thin;
+    ctx.strokeStyle = withAlpha(PALETTE.background, 0.45);
+    this.ring.segments.forEach((seg) => {
+      ctx.beginPath();
+      for (let s = 0; s <= steps; s++) {
+        const p = at(0.97, seg.a0 + ((seg.a1 - seg.a0) * s) / steps);
+        if (s === 0) ctx.moveTo(...p);
+        else ctx.lineTo(...p);
+      }
+      ctx.stroke();
+    });
+
+    // Key light from the upper left catches the outer edge.
+    const light = ctx.createLinearGradient(0, 0, w, 0);
+    light.addColorStop(0, withAlpha(PALETTE.rockLit, 0.2));
+    light.addColorStop(0.5, withAlpha(PALETTE.rockLit, 0.1));
+    light.addColorStop(1, withAlpha(PALETTE.rockLit, 0.04));
+    ctx.lineWidth = LINE.hair;
+    ctx.strokeStyle = light;
+    ctx.stroke(rim);
+
+    this.ring.debris.forEach((chunk) => {
+      const [x, y] = at(chunk.depth, chunk.angle);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(chunk.rotation);
+      ctx.fillStyle = withAlpha(PALETTE.hull, 0.45);
+      ctx.fillRect(
+        -chunk.size / 2,
+        -chunk.size / 3,
+        chunk.size,
+        chunk.size / 1.5
+      );
+      ctx.restore();
+    });
+
+    return canvas;
+  }
+
+  bakeVignette(w, h) {
+    const canvas = this.createOffscreenCanvas(w, h, VIGNETTE_SCALE);
+    const ctx = canvas?.getContext?.('2d');
+    if (!ctx) return null;
+    ctx.scale(VIGNETTE_SCALE, VIGNETTE_SCALE);
+    const gradient = ctx.createRadialGradient(
+      w / 2,
+      h / 2,
+      Math.min(w, h) * 0.35,
+      w / 2,
+      h / 2,
+      Math.hypot(w, h) * 0.62
+    );
+    gradient.addColorStop(0, withAlpha(PALETTE.background, 0));
+    gradient.addColorStop(1, withAlpha(PALETTE.background, 0.7));
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, w, h);
+    return canvas;
   }
 
   render(ctx, options = {}) {
@@ -356,17 +697,10 @@ class SpaceSkyBackground {
     if (!this.initialized || this.width !== width || this.height !== height) {
       this.resize(width, height);
     }
+    if (this.bakedScale !== (getRenderScale() || 1)) {
+      this.bake();
+    }
 
-    // 1. Clear background - deep space
-    ctx.fillStyle = '#030810';
-    ctx.fillRect(0, 0, width, height);
-
-    this.drawAtmosphere(ctx, width, height);
-
-    // 2. Draw subtle nebula clouds
-    this.drawNebula(ctx);
-
-    // 3. Update & draw stars
     // Safeguard against NaN velocity - check both {vx,vy} and {x,y} formats
     const rawVelocity = options.velocity || {};
     const vx = Number.isFinite(rawVelocity.vx)
@@ -381,138 +715,97 @@ class SpaceSkyBackground {
         : 0;
 
     const dt = 16 / 1000;
-    const time = Date.now() / 1000;
+    const time = performance.now() / 1000;
+    const scroll = (layer) => {
+      layer.offsetX -= vx * layer.speed * dt;
+      layer.offsetY -= vy * layer.speed * dt;
+    };
+    this.layers.forEach(scroll);
+    this.hazeLayers.forEach(scroll);
+    scroll(this.dust);
+
+    // The Ring barely moves: it leans against the motion and settles back.
+    const ring = this.ring;
+    ring.shiftX += (-vx * 0.03 - ring.shiftX) * 0.02;
+    ring.shiftY += (-vy * 0.03 - ring.shiftY) * 0.02;
 
     ctx.save();
-    if (this.bloomEnabled) {
-      ctx.globalCompositeOperation = 'lighter'; // Additive blending for neon glow
-    }
+    ctx.fillStyle = PALETTE.background;
+    ctx.fillRect(0, 0, width, height);
 
-    const renderScale = getRenderScale();
-    this.stars.forEach((star) => {
-      // Parallax movement - opposite to player velocity
-      star.x -= vx * star.speed * dt;
-      star.y -= vy * star.speed * dt;
+    const [farHaze, nearHaze] = this.hazeLayers;
+    const [farStars, midStars, nearStars] = this.layers;
+    const breathe = (layer) =>
+      0.85 + 0.15 * Math.sin(time * layer.breath + layer.phase);
 
-      // Wrap around screen edges
-      if (star.x < -10) star.x += width + 20;
-      if (star.x > width + 10) star.x -= width + 20;
-      if (star.y < -10) star.y += height + 20;
-      if (star.y > height + 10) star.y -= height + 20;
-
-      // Twinkle effect
-      const blink = Math.sin(time * star.blinkSpeed + star.phase);
-      const alpha = 0.6 + 0.4 * blink;
-
-      let sprite = star.sprite;
-      if (sprite && sprite.scale !== renderScale) {
-        sprite = star.sprite = this.getStarSprite(star.size, star.color);
-      }
-      if (sprite && sprite.canvas) {
-        ctx.globalAlpha = alpha;
-        ctx.drawImage(
-          sprite.canvas,
-          star.x - sprite.halfSize,
-          star.y - sprite.halfSize,
-          sprite.size,
-          sprite.size
-        );
-        ctx.globalAlpha = 1;
-        return;
-      }
-
-      // Neon color with glow (fallback path)
+    this.drawTiled(ctx, farHaze.tile, farHaze, width, height, 1);
+    this.drawTiled(
+      ctx,
+      farStars.tile,
+      farStars,
+      width,
+      height,
+      breathe(farStars)
+    );
+    if (ring.buffer) {
+      const m = RING_MARGIN;
+      const sx = Math.max(-m, Math.min(m, ring.shiftX));
+      const sy = Math.max(-m, Math.min(m, ring.shiftY));
       ctx.globalAlpha = 1;
-      const c = star.color;
-      ctx.fillStyle = `rgba(${c.r}, ${c.g}, ${c.b}, ${alpha})`;
+      ctx.drawImage(ring.buffer, sx - m, sy - m, width + m * 2, height + m * 2);
+    }
+    this.drawTiled(ctx, nearHaze.tile, nearHaze, width, height, 1);
+    this.drawTiled(
+      ctx,
+      midStars.tile,
+      midStars,
+      width,
+      height,
+      breathe(midStars)
+    );
+    this.drawTiled(
+      ctx,
+      this.dust.tile,
+      {
+        offsetX: this.dust.offsetX + this.dust.driftX * time,
+        offsetY: this.dust.offsetY + this.dust.driftY * time,
+      },
+      width,
+      height,
+      1
+    );
+    this.drawTiled(
+      ctx,
+      nearStars.tile,
+      nearStars,
+      width,
+      height,
+      breathe(nearStars)
+    );
 
-      // Draw diamond shape
-      const r = star.size / 2;
-      ctx.beginPath();
-      ctx.moveTo(star.x, star.y - r);
-      ctx.lineTo(star.x + r, star.y);
-      ctx.lineTo(star.x, star.y + r);
-      ctx.lineTo(star.x - r, star.y);
-      ctx.closePath();
-      ctx.fill();
-    });
-
+    if (this.vignette) {
+      ctx.globalAlpha = 1;
+      ctx.drawImage(this.vignette, 0, 0, width, height);
+    }
     ctx.restore();
-
-    // 4. Vignette overlay
-    this.drawVignette(ctx, width, height);
   }
 
-  drawNebula(ctx) {
-    if (!this.nebulaClouds) return;
-
-    const width = this.width;
-    const height = this.height;
-    const now = performance.now();
-    const time = now / 1000;
-
-    if (this.ensureNebulaBuffer(width, height)) {
-      if (
-        !this.nebulaBuffer.lastUpdate ||
-        now - this.nebulaBuffer.lastUpdate >= NEBULA_UPDATE_INTERVAL_MS
-      ) {
-        this.renderNebulaLayer(
-          this.nebulaBuffer.ctx,
-          time,
-          width,
-          height,
-          true
-        );
-        this.nebulaBuffer.lastUpdate = now;
+  // Draws a full-field tile scrolled by the layer offset (≤4 drawImage).
+  drawTiled(ctx, tile, layer, width, height, alpha) {
+    if (!tile) return;
+    const scale = this.bakedScale;
+    const ox =
+      Math.round((((layer.offsetX % width) + width) % width) * scale) / scale;
+    const oy =
+      Math.round((((layer.offsetY % height) + height) % height) * scale) /
+      scale;
+    ctx.globalAlpha = alpha;
+    for (const x of ox > 0 ? [ox - width, ox] : [0]) {
+      for (const y of oy > 0 ? [oy - height, oy] : [0]) {
+        ctx.drawImage(tile, x, y, width, height);
       }
-
-      ctx.drawImage(this.nebulaBuffer.canvas, 0, 0, width, height);
-      return;
     }
-
-    this.renderNebulaLayer(ctx, time, width, height, false);
   }
-
-  drawAtmosphere(ctx, width, height) {
-    const buffer = this.atmosphereBuffer?.canvas;
-    if (!buffer) {
-      return;
-    }
-
-    ctx.save();
-    ctx.globalAlpha = 0.35;
-    ctx.drawImage(buffer, 0, 0, width, height);
-    ctx.restore();
-  }
-
-  renderNebulaLayer(ctx, time, width, height, clearFirst) {
-    if (!ctx) return;
-    if (clearFirst) {
-      ctx.clearRect(0, 0, width, height);
-    }
-
-    this.nebulaClouds.forEach((cloud) => {
-      // Slow drift
-      let x = cloud.x + cloud.vx * time;
-      let y = cloud.y + cloud.vy * time;
-
-      // Wrap
-      x = ((x % width) + width) % width;
-      y = ((y % height) + height) % height;
-
-      // Pulse size slightly
-      const r = cloud.radius * (0.9 + 0.2 * Math.sin(time * 0.2 + cloud.phase));
-
-      const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
-      grad.addColorStop(0, cloud.color);
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
-
-      ctx.fillStyle = grad;
-      // Draw larger rect to cover gradient area
-      ctx.fillRect(x - r, y - r, r * 2, r * 2);
-    });
-  }
-
   createOffscreenCanvas(width, height, scale = 1) {
     const safeWidth = Math.max(1, Math.ceil(Math.floor(width) * scale));
     const safeHeight = Math.max(1, Math.ceil(Math.floor(height) * scale));
@@ -532,180 +825,6 @@ class SpaceSkyBackground {
     }
 
     return null;
-  }
-
-  buildAtmosphereLayer(width, height) {
-    const safeWidth = Math.max(1, Math.floor(width));
-    const safeHeight = Math.max(1, Math.floor(height));
-
-    let canvas = this.atmosphereBuffer.canvas;
-    if (
-      !canvas ||
-      this.atmosphereBuffer.width !== safeWidth ||
-      this.atmosphereBuffer.height !== safeHeight
-    ) {
-      canvas = this.createOffscreenCanvas(safeWidth, safeHeight);
-    }
-    if (!canvas || typeof canvas.getContext !== 'function') {
-      this.atmosphereBuffer.canvas = null;
-      this.atmosphereBuffer.width = 0;
-      this.atmosphereBuffer.height = 0;
-      return;
-    }
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      this.atmosphereBuffer.canvas = null;
-      this.atmosphereBuffer.width = 0;
-      this.atmosphereBuffer.height = 0;
-      return;
-    }
-
-    ctx.clearRect(0, 0, safeWidth, safeHeight);
-    const gradient = ctx.createLinearGradient(0, 0, safeWidth, safeHeight);
-    gradient.addColorStop(0, 'rgba(20, 60, 110, 0.22)');
-    gradient.addColorStop(1, 'rgba(90, 30, 70, 0.18)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, safeWidth, safeHeight);
-
-    const glowCount = 4;
-    for (let i = 0; i < glowCount; i += 1) {
-      const x = this.randomRange(0, safeWidth);
-      const y = this.randomRange(0, safeHeight);
-      const radius = 160 + this.randomFloat() * 240;
-      const glow = ctx.createRadialGradient(x, y, 0, x, y, radius);
-      glow.addColorStop(0, 'rgba(90, 160, 200, 0.12)');
-      glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = glow;
-      ctx.fillRect(x - radius, y - radius, radius * 2, radius * 2);
-    }
-
-    this.atmosphereBuffer.canvas = canvas;
-    this.atmosphereBuffer.width = safeWidth;
-    this.atmosphereBuffer.height = safeHeight;
-  }
-
-  getStarSprite(size, color) {
-    if (!Number.isFinite(size) || !color) {
-      return null;
-    }
-
-    const sizeKey = Number(size).toFixed(2);
-    const r = Number.isFinite(color.r) ? color.r : 255;
-    const g = Number.isFinite(color.g) ? color.g : 255;
-    const b = Number.isFinite(color.b) ? color.b : 255;
-    const key = `${sizeKey}:${r},${g},${b}:${getRenderScale()}`;
-
-    if (this.starSpriteCache.has(key)) {
-      return this.starSpriteCache.get(key);
-    }
-
-    const sprite = this.createStarSprite(Number(sizeKey), { r, g, b });
-    if (sprite) {
-      this.starSpriteCache.set(key, sprite);
-    }
-
-    return sprite;
-  }
-
-  createStarSprite(size, color) {
-    const radius = Math.max(0.5, size / 2);
-    const diameter = Math.max(2, Math.ceil(radius * 2 + 2));
-    const scale = getRenderScale();
-    const canvas = this.createOffscreenCanvas(diameter, diameter, scale);
-    if (!canvas || typeof canvas.getContext !== 'function') {
-      return null;
-    }
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      return null;
-    }
-
-    ctx.scale(scale, scale);
-    const half = diameter / 2;
-    ctx.save();
-    ctx.translate(half, half);
-    ctx.fillStyle = `rgb(${color.r}, ${color.g}, ${color.b})`;
-    ctx.beginPath();
-    ctx.moveTo(0, -radius);
-    ctx.lineTo(radius, 0);
-    ctx.lineTo(0, radius);
-    ctx.lineTo(-radius, 0);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-
-    return {
-      canvas,
-      halfSize: half,
-      size: diameter,
-      scale,
-    };
-  }
-
-  ensureNebulaBuffer(width, height) {
-    if (!Number.isFinite(width) || !Number.isFinite(height)) {
-      return false;
-    }
-
-    const safeWidth = Math.max(1, Math.floor(width));
-    const safeHeight = Math.max(1, Math.floor(height));
-    const scale = getRenderScale();
-
-    if (
-      this.nebulaBuffer.canvas &&
-      this.nebulaBuffer.ctx &&
-      this.nebulaBuffer.width === safeWidth &&
-      this.nebulaBuffer.height === safeHeight &&
-      this.nebulaBuffer.scale === scale
-    ) {
-      return true;
-    }
-
-    const canvas = this.createOffscreenCanvas(safeWidth, safeHeight, scale);
-    if (!canvas || typeof canvas.getContext !== 'function') {
-      this.nebulaBuffer.canvas = null;
-      this.nebulaBuffer.ctx = null;
-      this.nebulaBuffer.width = 0;
-      this.nebulaBuffer.height = 0;
-      this.nebulaBuffer.lastUpdate = 0;
-      return false;
-    }
-
-    const bufferCtx = canvas.getContext('2d');
-    if (!bufferCtx) {
-      this.nebulaBuffer.canvas = null;
-      this.nebulaBuffer.ctx = null;
-      this.nebulaBuffer.width = 0;
-      this.nebulaBuffer.height = 0;
-      this.nebulaBuffer.lastUpdate = 0;
-      return false;
-    }
-
-    bufferCtx.scale(scale, scale);
-    this.nebulaBuffer.canvas = canvas;
-    this.nebulaBuffer.ctx = bufferCtx;
-    this.nebulaBuffer.scale = scale;
-    this.nebulaBuffer.width = safeWidth;
-    this.nebulaBuffer.height = safeHeight;
-    this.nebulaBuffer.lastUpdate = 0;
-    return true;
-  }
-
-  drawVignette(ctx, width, height) {
-    const gradient = ctx.createRadialGradient(
-      width / 2,
-      height / 2,
-      Math.min(width, height) * 0.4,
-      width / 2,
-      height / 2,
-      Math.hypot(width, height) * 0.7
-    );
-    gradient.addColorStop(0, 'rgba(0,0,0,0)');
-    gradient.addColorStop(1, 'rgba(0,0,0,0.6)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
   }
 }
 
