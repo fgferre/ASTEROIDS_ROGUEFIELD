@@ -128,8 +128,8 @@ describe('mobileGuard', () => {
         pointerCoarse: false,
       });
       expect(mobileGuard()).toEqual({ blocked: true });
-      // Notice was painted — both EN and PT-BR lines.
-      expect(fillTextMock).toHaveBeenCalledTimes(2);
+      // Notice was painted.
+      expect(fillTextMock).toHaveBeenCalledTimes(1);
     });
 
     it('returns { blocked: true } on phone (pointer: coarse)', () => {
@@ -139,7 +139,7 @@ describe('mobileGuard', () => {
         pointerCoarse: true,
       });
       expect(mobileGuard()).toEqual({ blocked: true });
-      expect(fillTextMock).toHaveBeenCalledTimes(2);
+      expect(fillTextMock).toHaveBeenCalledTimes(1);
     });
 
     it('returns { blocked: true } on tablet (maxTouchPoints alone — OR-not-AND)', () => {

@@ -671,7 +671,7 @@ class UpgradeSystem extends BaseSystem {
       summary: text.summary || '',
       lore: text.lore || '',
       levelText: {
-        title: levelText.title || levelData.title || `Nível ${levelIndex + 1}`,
+        title: levelText.title || levelData.title || `Level ${levelIndex + 1}`,
         description: levelText.description || levelData.description || '',
         highlights: asArray(
           levelText.highlights || levelData.highlights

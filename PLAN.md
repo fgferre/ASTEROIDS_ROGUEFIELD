@@ -86,8 +86,7 @@ arquivo quando a última etapa fechar. Decisões de produto são do dono, por im
       tipo, espaço, movimento) com os 8 hex da direção visual; HUD em tokens, sem inline, colunas ~200 px, sem painel
       falso nem NAV/km/h, combo some em x0, radar no canvas; `.hidden` vira `is-open` com 150–250 ms; level-up com o
       jogo visível e congelado atrás + lockout de 400 ms; game over com tempo/onda/kills/combo/build; confirmação no
-      Quit; foco em Resume; painel de controles no menu e na pausa + dicas nos primeiros 20 s; **idioma: decisão dele
-      antes de começar**; `mobileGuard` com dois sinais e aviso em DOM. Worker: opus (há escolhas de composição).
+      Quit; foco em Resume; painel de controles no menu e na pausa + dicas nos primeiros 20 s; **idioma: inglês, decidido em 17/10 e já aplicado a cartas e telas**; `mobileGuard` com dois sinais e aviso em DOM. Worker: opus (há escolhas de composição).
 - [ ] **3. Paleta única + bloom real.** Prancha A/B para ele escolher a linguagem (item 3 das decisões). Depois:
       `src/data/constants/palette.js` com tokens + escala de traço e de glow, literais trocados; camada emissiva num
       canvas próprio, reduzida a 1/4, `filter: blur()` e composta em `lighter` (liga as opções de bloom/aberração que

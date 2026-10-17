@@ -300,13 +300,13 @@ function init() {
 
     gameState.canvas = document.getElementById('game-canvas');
     if (!gameState.canvas) {
-      throw new Error('Canvas não encontrado');
+      throw new Error('Canvas not found');
     }
 
     gameState.gameUI = document.getElementById('game-ui');
     gameState.ctx = gameState.canvas.getContext('2d');
     if (!gameState.ctx) {
-      throw new Error('Contexto 2D não disponível');
+      throw new Error('2D context unavailable');
     }
 
     const { seed: initialSeed, source: seedSource } =
@@ -348,7 +348,7 @@ function init() {
       if (DEV_MODE) {
         GameDebugLogger.log('ERROR', 'DI bootstrap failed; aborting init');
       }
-      alert('Falha na inicialização dos serviços. Recarregue a página.');
+      alert('Service initialization failed. Reload the page.');
 
       return;
     }
@@ -526,7 +526,7 @@ function init() {
     requestAnimationFrame(gameLoop);
   } catch (error) {
     console.error('Erro na inicialização:', error);
-    alert('Erro ao inicializar o jogo. Recarregue a página.');
+    alert('Game failed to start. Reload the page.');
   }
 }
 

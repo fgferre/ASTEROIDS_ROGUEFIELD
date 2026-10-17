@@ -26,7 +26,6 @@ const DESKTOP_FORCE_PARAM = 'desktop';
 const DESKTOP_FORCE_VALUE = 'force';
 
 const NOTICE_EN = 'Desktop only — keyboard + mouse required';
-const NOTICE_PT = 'Requer teclado e mouse (apenas desktop)';
 
 /**
  * Combined-OR touch detection per CONTEXT D-03.
@@ -156,16 +155,14 @@ function paintNotice() {
   ctx.fillStyle = '#000';
   ctx.fillRect(0, 0, width, height);
 
-  // White monospace text, 16px, stacked and centered.
+  // White monospace text, 16px, centered.
   ctx.fillStyle = '#fff';
   ctx.font = '16px monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
   const centerX = width / 2;
-  const lineHeight = 24;
-  const enY = height / 2 - lineHeight / 2;
-  const ptY = height / 2 + lineHeight / 2;
+  const centerY = height / 2;
 
   // ctx.measureText is referenced by the unit test mock; calling it here keeps
   // the stub surface honest even though textAlign='center' makes the result
@@ -173,15 +170,13 @@ function paintNotice() {
   if (typeof ctx.measureText === 'function') {
     try {
       ctx.measureText(NOTICE_EN);
-      ctx.measureText(NOTICE_PT);
     } catch (error) {
       // measureText shouldn't throw under any normal browser — defensive only.
       console.warn('[mobileGuard] measureText probe failed:', error);
     }
   }
 
-  ctx.fillText(NOTICE_EN, centerX, enY);
-  ctx.fillText(NOTICE_PT, centerX, ptY);
+  ctx.fillText(NOTICE_EN, centerX, centerY);
 
   return true;
 }

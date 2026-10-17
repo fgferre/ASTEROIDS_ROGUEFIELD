@@ -2618,14 +2618,14 @@ class UISystem extends BaseSystem {
     if (this.domRefs.levelUp.text) {
       const optionCount = options.length;
       const poolSize = this.levelUpState.poolSize;
-      const optionLabel = optionCount === 1 ? 'opção' : 'opções';
+      const optionLabel = optionCount === 1 ? 'option' : 'options';
       let suffix = ` (${optionCount} ${optionLabel})`;
       if (poolSize > optionCount) {
-        suffix = ` (${optionCount} de ${poolSize} ${optionLabel})`;
+        suffix = ` (${optionCount} of ${poolSize} ${optionLabel})`;
       }
       const prefix = Number.isFinite(levelValue)
-        ? `Level ${levelValue} - Escolha sua tecnologia`
-        : 'Escolha sua tecnologia';
+        ? `Level ${levelValue} - Choose your technology`
+        : 'Choose your technology';
       this.domRefs.levelUp.text.textContent = `${prefix}${suffix}:`;
     }
 
@@ -2694,8 +2694,8 @@ class UISystem extends BaseSystem {
 
     const nextLevelSection = nextLevel
       ? `<section class="upgrade-option__next">
-          <p class="upgrade-option__next-label">Próximo: ${
-            nextLevel.title || `Nível ${currentLevel + 1}`
+          <p class="upgrade-option__next-label">Next: ${
+            nextLevel.title || `Level ${currentLevel + 1}`
           }</p>
           <p class="upgrade-option__description">${
             nextLevel.description || ''
@@ -2708,7 +2708,7 @@ class UISystem extends BaseSystem {
               : ''
           }
         </section>`
-      : '<p class="upgrade-option__maxed">Tecnologia já maximizada.</p>';
+      : '<p class="upgrade-option__maxed">Technology maxed out.</p>';
 
     const prerequisitesSection = prerequisites.length
       ? `<footer class="upgrade-option__footer">

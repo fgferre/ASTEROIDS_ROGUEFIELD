@@ -4,7 +4,7 @@ Lista viva do que está aberto, nas palavras do dono. Leia só a seção O BAST�
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 7.**
 
-## O BASTÃO — onde a rodada parou (17/10) — DIAGNÓSTICO FEITO, JEITO DE TRABALHAR IMPORTADO, NADA VISUAL MUDOU AINDA
+## O BASTÃO — onde a rodada parou (17/10) — DIAGNÓSTICO FEITO, JEITO DE TRABALHAR IMPORTADO, JOGO TODO EM INGLÊS (5)
 
 Palavras dele (17/10): _"revise tudo e vamos melhorar o projeto como um todo, sinto que estamos presos no passado
 ainda... tudo muito amador... dos gráficos até as dinâmicas e efeitos, UX tudo ruim"_; e _"precisamos começar a
@@ -18,6 +18,8 @@ trabalhar mais inteligentemente"_ — importar o jeito de trabalhar do Mar de Es
   rápido; ESLint entrou (8 defeitos reais corrigidos: variável inexistente em `UISystem.renderSettingsPanel`, três
   métodos duplicados que se sobrescreviam, dois `defineProperty` em teste). CI sem Node 18 (Vite 7 pede 20.19+).
 - `PLAN.md`: o diagnóstico inteiro (gráficos, UX, jogabilidade, engenharia) e a ordem de modernização proposta.
+
+**Decidido por ele (17/10):** o jogo inteiro em inglês — feito (item 5 fechado).
 
 **A próxima rodada — a ordem é dele.** Sugestão (ver `PLAN.md`): 1) resolução nativa do canvas (acaba com o
 borrão em qualquer tela); 2) um só sistema de design e HUD enxuta; 3) bloom real + paleta única no gameplay, para o
@@ -38,7 +40,6 @@ jogo parecer com o menu; depois passo fixo no loop e as dinâmicas. Cada etapa t
 
 - **(4)** Em máquinas Windows com touch habilitado o jogo trava em 0 % na tela de carregamento (`mobileGuard`); a
   saída `?desktop=force` é escondida. Precisa estar resolvido antes de qualquer teste com outras pessoas.
-- **(5)** Idioma misturado: menu e HUD em inglês, cartas de upgrade em português. Ele decide o idioma do jogo.
 
 ## Desempenho
 

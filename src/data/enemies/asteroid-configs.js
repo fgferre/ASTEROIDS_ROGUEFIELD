@@ -671,7 +671,7 @@ export const ASTEROID_ORB_DROP_MULTIPLIER = Object.freeze({
 export const ASTEROID_VARIANTS = deepFreeze({
   common: {
     key: 'common',
-    displayName: 'Padrão',
+    displayName: 'Standard',
     allowedSizes: ['large', 'medium', 'small'],
     hpMultiplier: 1.0,
     speedMultiplier: 1.0,
@@ -697,7 +697,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
   },
   iron: {
     key: 'iron',
-    displayName: 'Blindado',
+    displayName: 'Armored',
     allowedSizes: ['large', 'medium', 'small'],
     hpMultiplier: 1.3,
     speedMultiplier: 0.85,
@@ -724,7 +724,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
   },
   denseCore: {
     key: 'denseCore',
-    displayName: 'Núcleo Denso',
+    displayName: 'Dense Core',
     allowedSizes: ['large', 'medium'],
     hpMultiplier: 1.8,
     speedMultiplier: 0.65,
@@ -751,7 +751,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
   },
   gold: {
     key: 'gold',
-    displayName: 'Tesouro Dourado 💰',
+    displayName: 'Golden Treasure 💰',
     allowedSizes: ['medium', 'small'],
     hpMultiplier: 0.4, // ULTRA FRÁGIL (vidro!)
     speedMultiplier: 1.8, // ULTRA RÁPIDO (foge!)
@@ -792,7 +792,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
   },
   volatile: {
     key: 'volatile',
-    displayName: 'Fragmento Volátil',
+    displayName: 'Volatile Fragment',
     allowedSizes: ['large', 'medium', 'small'],
     hpMultiplier: 0.6,
     speedMultiplier: 1.4,
@@ -865,7 +865,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
   },
   parasite: {
     key: 'parasite',
-    displayName: 'Parásita',
+    displayName: 'Parasite',
     allowedSizes: ['large', 'medium', 'small'],
     hpMultiplier: 0.8,
     speedMultiplier: 1.2,
@@ -926,7 +926,7 @@ export const ASTEROID_VARIANTS = deepFreeze({
   },
   crystal: {
     key: 'crystal',
-    displayName: 'Cristal Energético',
+    displayName: 'Energy Crystal',
     allowedSizes: ['large', 'medium', 'small'],
     hpMultiplier: 0.7,
     speedMultiplier: 1.3, // AUMENTADO de 0.8 para 1.3 (ágil!)

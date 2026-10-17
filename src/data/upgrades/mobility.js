@@ -11,38 +11,37 @@ export const MOBILITY_UPGRADES = deepFreeze([
     icon: '🚀',
     themeColor: '#5DADE2',
     unlockLevel: 1,
-    tags: ['velocidade', 'mobilidade', 'aceleração'],
+    tags: ['speed', 'mobility', 'acceleration'],
     text: {
-      name: 'Propulsores Principais',
+      name: 'Main Thrusters',
       summary:
-        'Aprimora os motores principais para melhorar aceleração e velocidade máxima.',
-      lore: 'Sistema modular de propulsão que evolui de bicos calibrados até sobrecarga vetorial de plasma.',
+        'Upgrades the main engines for better acceleration and top speed.',
+      lore: 'Modular propulsion system that evolves from tuned nozzles to vectored plasma overload.',
       levels: [
         {
-          title: 'Bicos Otimizados',
-          description:
-            'Aumenta aceleração em +12% e velocidade máxima em +10%.',
-          highlights: ['Resposta ligeiramente mais rápida aos comandos.'],
+          title: 'Tuned Nozzles',
+          description: 'Acceleration +12% and top speed +10%.',
+          highlights: ['Slightly faster response to controls.'],
         },
         {
-          title: 'Queima Estável',
-          description: 'Aceleração +25% e velocidade +22% (acumulado).',
-          highlights: ['Propulsão visivelmente melhorada.'],
+          title: 'Stable Burn',
+          description: 'Acceleration +25% and speed +22% (cumulative).',
+          highlights: ['Visibly improved thrust.'],
         },
         {
-          title: 'Injeção Dupla',
-          description: 'Aceleração +45% e velocidade +38% (acumulado).',
-          highlights: ['Desempenho de caça de combate.'],
+          title: 'Dual Injection',
+          description: 'Acceleration +45% and speed +38% (cumulative).',
+          highlights: ['Combat fighter performance.'],
         },
         {
-          title: 'Plasma Superaquecido',
-          description: 'Aceleração +75% e velocidade +60% (acumulado).',
-          highlights: ['Propulsores em sobrecarga. Chamas brancas visíveis.'],
+          title: 'Superheated Plasma',
+          description: 'Acceleration +75% and speed +60% (cumulative).',
+          highlights: ['Thrusters overloaded. White flames visible.'],
         },
         {
-          title: 'Sobrecarga Vetorial',
-          description: 'Aceleração +110% e velocidade +85% (acumulado).',
-          highlights: ['Desempenho extremo. Rastro de íons danifica inimigos.'],
+          title: 'Vector Overload',
+          description: 'Acceleration +110% and speed +85% (cumulative).',
+          highlights: ['Extreme performance. Ion trail damages enemies.'],
         },
       ],
     },
@@ -160,47 +159,45 @@ export const MOBILITY_UPGRADES = deepFreeze([
     icon: '🛰️',
     themeColor: '#5DADE2',
     unlockLevel: 2,
-    tags: ['rotação', 'agilidade', 'manobras'],
+    tags: ['rotation', 'agility', 'maneuvers'],
     prerequisites: [
       {
         type: 'upgrade',
         id: 'propulsors',
         level: 1,
-        text: 'Requer Propulsores Principais instalados (Nv. 1).',
+        text: 'Requires Main Thrusters installed (Lv. 1).',
       },
     ],
     text: {
-      name: 'Sistema RCS',
+      name: 'RCS System',
       summary:
-        'Ativa propulsores de manobra para controle preciso de rotação e agilidade.',
-      lore: 'Sistema de Controle de Reação recuperado de estações espaciais abandonadas. Permite manobras impossíveis para naves convencionais.',
+        'Enables maneuvering thrusters for precise rotation and agility control.',
+      lore: 'Reaction Control System salvaged from abandoned space stations. Allows maneuvers impossible for conventional ships.',
       levels: [
         {
-          title: 'RCS Básico',
-          description: 'Ativa propulsores auxiliares para +15% de rotação.',
-          highlights: ['Resposta perceptível em curvas apertadas.'],
+          title: 'Basic RCS',
+          description: 'Enables auxiliary thrusters for +15% rotation.',
+          highlights: ['Noticeable response in tight turns.'],
         },
         {
-          title: 'RCS Ativado',
-          description: 'Rotação +32% e amortecimento angular -12%.',
-          highlights: ['Giros notavelmente mais rápidos e precisos.'],
+          title: 'Active RCS',
+          description: 'Rotation +32% and angular damping -12%.',
+          highlights: ['Noticeably faster, more precise turns.'],
         },
         {
-          title: 'RCS Aprimorado',
-          description: 'Rotação +55% e amortecimento angular -25%.',
-          highlights: ['Controle de caça espacial. Giros instantâneos.'],
+          title: 'Enhanced RCS',
+          description: 'Rotation +55% and angular damping -25%.',
+          highlights: ['Space fighter control. Instant turns.'],
         },
         {
-          title: 'RCS Vetorial',
-          description: 'Rotação +90% e amortecimento angular -40%.',
-          highlights: ['Controle sobre-humano. Reversões instantâneas.'],
+          title: 'Vector RCS',
+          description: 'Rotation +90% and angular damping -40%.',
+          highlights: ['Superhuman control. Instant reversals.'],
         },
         {
-          title: 'RCS Omni-direcional',
-          description: 'Rotação +130% e movimento lateral desbloqueado.',
-          highlights: [
-            'Controle total vetorial. Movimento independente da orientação.',
-          ],
+          title: 'Omni-directional RCS',
+          description: 'Rotation +130% and lateral movement unlocked.',
+          highlights: ['Full vector control. Movement independent of heading.'],
         },
       ],
     },
@@ -313,42 +310,37 @@ export const MOBILITY_UPGRADES = deepFreeze([
     icon: '⚙️',
     themeColor: '#5DADE2',
     unlockLevel: 3,
-    tags: ['controle', 'frenagem', 'precisão'],
+    tags: ['control', 'braking', 'precision'],
     prerequisites: [
       {
         type: 'upgrade',
         id: 'rcs_system',
         level: 2,
-        text: 'Requer Sistema RCS ativado (Nv. 2).',
+        text: 'Requires RCS System active (Lv. 2).',
       },
     ],
     text: {
-      name: 'Sistema de Frenagem',
-      summary:
-        'Instala freios inerciais que permitem paradas rápidas e controle preciso.',
-      lore: 'Tecnologia de mineração adaptada para combate. Permite paradas impossíveis e mudanças bruscas de direção.',
+      name: 'Braking System',
+      summary: 'Installs inertial brakes for quick stops and precise control.',
+      lore: 'Mining technology adapted for combat. Allows impossible stops and sharp direction changes.',
       levels: [
         {
-          title: 'Freios Inerciais',
-          description: 'Amortecimento linear +30%. Paradas mais rápidas.',
+          title: 'Inertial Brakes',
+          description: 'Linear damping +30%. Faster stops.',
           highlights: [
-            'Reduz inércia ao soltar teclas de movimento. Controle melhorado.',
+            'Reduces inertia when releasing movement keys. Improved control.',
           ],
         },
         {
-          title: 'Retroimpulsores',
-          description:
-            'Amortecimento linear +60%. Reversões quase instantâneas.',
-          highlights: [
-            'Paradas muito rápidas. Ideal para combate corpo-a-corpo.',
-          ],
+          title: 'Retro Thrusters',
+          description: 'Linear damping +60%. Near-instant reversals.',
+          highlights: ['Very fast stops. Ideal for close-quarters combat.'],
         },
         {
-          title: 'Freio de Emergência',
-          description:
-            'Amortecimento linear +100%. Desbloqueia habilidade especial.',
+          title: 'Emergency Brake',
+          description: 'Linear damping +100%. Unlocks special ability.',
           highlights: [
-            'Tecla dedicada (Shift) para parada instantânea com onda de choque.',
+            'Dedicated key (Shift) for an instant stop with a shockwave.',
           ],
         },
       ],
