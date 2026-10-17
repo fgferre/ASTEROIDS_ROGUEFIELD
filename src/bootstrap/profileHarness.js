@@ -316,7 +316,7 @@ function pollForGameServices(getServices) {
  * Clicks the menu start button and waits for the first wave to begin, so the
  * scenario runs without manual input. Bounded wait; failures are debug-logged.
  */
-async function startRun(enemiesService) {
+export async function startRun(enemiesService) {
   // Clicking before the menu loader finishes lets it re-show the menu over
   // the running game.
   const loadingScreen = document.getElementById('loading-screen');

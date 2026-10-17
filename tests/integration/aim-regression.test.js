@@ -2028,12 +2028,15 @@ describe('FIX-05 centerline invariant + toggles', () => {
         for (let i = 0; i < 5; i += 1) {
           input.onKeyDown(fakeEvent('keydown'));
         }
+        // Presses apply at the next fixed step.
+        input.update();
         // Contract: only the FIRST keydown should have fired the action.
         expect(toggleSpreadEmits).toBe(1);
 
         // Release + repress = another emit.
         input.onKeyUp(fakeEvent('keyup'));
         input.onKeyDown(fakeEvent('keydown'));
+        input.update();
         expect(toggleSpreadEmits).toBe(2);
       });
     });

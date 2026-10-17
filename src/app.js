@@ -8,11 +8,23 @@ import {
   resolveDebugPreference,
   applyDebugPreference,
 } from './core/debugLogging.js';
-import { PerformanceMonitor } from './utils/PerformanceMonitor.js';
+import {
+  PerformanceMonitor,
+  downloadJSON,
+} from './utils/PerformanceMonitor.js';
 import { createFixedStepper } from './core/fixedStep.js';
+import { serialize } from './core/replay.js';
 import { bootstrapServices } from './bootstrap/bootstrapServices.js';
 import { mobileGuard } from './bootstrap/mobileGuard.js';
-import { activateProfileHarness } from './bootstrap/profileHarness.js';
+import {
+  activateProfileHarness,
+  startRun,
+} from './bootstrap/profileHarness.js';
+import {
+  createReplayController,
+  fetchRecording,
+  getReplayUrl,
+} from './bootstrap/replaySession.js';
 import {
   DEFAULT_POOL_CONFIG,
   DEFAULT_GC_OPTIONS,
@@ -54,6 +66,9 @@ const performanceMonitor = new PerformanceMonitor();
 
 // Simulation runs in fixed 1/60 s steps; render once per animation frame.
 const fixedStepper = createFixedStepper();
+// Fixed steps simulated since boot; recordings index input by it.
+let simulationStep = 0;
+let replayController = null;
 
 // Initialize DI Container (Phase 2.1)
 let diContainer = null;
@@ -195,7 +210,22 @@ function bootstrapDebugLogging() {
   applyDebugPreference(preference);
 }
 
-function init() {
+function installReplayDownloadShortcut() {
+  window.addEventListener('keydown', (event) => {
+    const recorder = gameSessionService?.replayRecorder;
+    if (event.key !== 'F9' || !recorder) {
+      return;
+    }
+    event.preventDefault();
+    const recording = recorder.toJSON();
+    downloadJSON(
+      `roguefield-replay-${recording.seed}.json`,
+      serialize(recording)
+    );
+  });
+}
+
+function init(recording = null) {
   if (DEV_MODE) {
     GameDebugLogger.init();
     GameDebugLogger.log('INIT', 'Game starting', {
@@ -221,8 +251,9 @@ function init() {
       throw new Error('2D context unavailable');
     }
 
-    const { seed: initialSeed, source: seedSource } =
-      GameSessionService.deriveInitialSeed();
+    const { seed: initialSeed, source: seedSource } = recording
+      ? { seed: recording.seed, source: 'replay' }
+      : GameSessionService.deriveInitialSeed();
     const seedInfo = { seed: initialSeed, source: seedSource };
     gameState.randomSeed = initialSeed;
     gameState.randomSeedSource = seedSource;
@@ -346,6 +377,23 @@ function init() {
     const ui = services['ui'];
     if (ui) ui.showScreen('menu');
 
+    replayController = createReplayController({
+      eventBus: diContainer.resolve('event-bus'),
+      input: services['input'],
+      session: gameSessionService,
+      progression: services['progression'],
+      ui,
+      getStep: () => simulationStep,
+    });
+    if (recording) {
+      replayController.arm(recording);
+      ui.controlsToastDisabled = true;
+      void startRun(services['enemies']);
+    }
+    if (DEV_MODE) {
+      installReplayDownloadShortcut();
+    }
+
     if (DEV_MODE) {
       const playerSystem = services['player'];
       const enemySystem = services['enemies'];
@@ -442,6 +490,8 @@ function gameLoop(currentTime) {
   gameState.lastTime = currentTime;
 
   try {
+    replayController.tick();
+
     const currentScreen = gameSessionService.getScreen();
     const shouldUpdateGame = gameSessionService.isRunning();
 
@@ -454,13 +504,16 @@ function gameLoop(currentTime) {
 
     if (shouldUpdateGame) {
       const steps = fixedStepper.advance(frameSeconds);
-      for (let i = 0; i < steps; i += 1) {
+      // Stop mid-frame when a step pauses the run (level-up, pause): the
+      // remaining steps must not depend on how frames were batched.
+      for (let i = 0; i < steps && gameSessionService.isRunning(); i += 1) {
         GamePools.update(stepSeconds);
         garbageCollectionManager.update(stepSeconds);
         // Effects own freeze frames and time dilation: they return the
         // simulation delta the game systems should actually advance by.
         const adjustedDelta = effects.update(stepSeconds);
         updateGame(adjustedDelta);
+        simulationStep += 1;
       }
     } else {
       fixedStepper.reset();
@@ -583,6 +636,17 @@ document.addEventListener('DOMContentLoaded', () => {
       getServices: () => gameSystemServices,
     });
 
-    init();
+    // ?replay=<url>: the recording's seed must be known before init().
+    const replayUrl = getReplayUrl();
+    let recording = null;
+    if (replayUrl) {
+      try {
+        recording = await fetchRecording(replayUrl);
+      } catch (error) {
+        console.error('[replay] Could not load recording:', error);
+      }
+    }
+
+    init(recording);
   })();
 });

@@ -57,6 +57,9 @@ export default class GameSessionService {
     this.currentRandomScope = 'uninitialized';
     this.randomSnapshot = null;
     this.deathSnapshot = null;
+    // Recording of the current/last run (src/core/replay.js); set by the
+    // replay controller, read by the F9 download.
+    this.replayRecorder = null;
     this.sessionState = 'menu';
     this.quitExplosionTimeoutId = null;
     this.gameOverScreenTimeoutId = null;

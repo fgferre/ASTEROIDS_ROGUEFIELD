@@ -7,6 +7,7 @@ import {
   resolveEventBus,
   resolveService,
 } from '../core/serviceUtils.js';
+import { createInputFrame } from '../core/replay.js';
 
 const CONTROLS_CATEGORY_ID = 'controls';
 const MOVEMENT_ACTIONS = new Set([
@@ -18,6 +19,13 @@ const MOVEMENT_ACTIONS = new Set([
 const MOVEMENT_ACTION_LIST = Array.from(MOVEMENT_ACTIONS);
 const DEFAULT_GAMEPAD_AXIS_THRESHOLD = 0.45;
 const PASSWORD_MANAGER_GUARD_CODES = new Set(['KeyS', 'ArrowDown']);
+// Gameplay presses are applied at the next fixed step (not in the DOM handler)
+// so a recorded run replays them at the same step.
+const STEP_PRESS_FIELDS = {
+  activateShield: 'shield',
+  toggleSpreadMode: 'spread',
+  toggleAimMode: 'aim',
+};
 
 function ensureArray(value) {
   return Array.isArray(value) ? value : [];
@@ -64,6 +72,8 @@ class InputSystem {
     this.activeGamepadActions = new Set();
     this.keyboardActionInputs = new Map();
     this.isCapturingBinding = false;
+    this.pendingStepPresses = new Set();
+    this.inputSource = null;
 
     this.keyAliases = { w: 'keyw', a: 'keya', s: 'keys', d: 'keyd' };
 
@@ -225,6 +235,12 @@ class InputSystem {
 
       eventBus.on('input-binding-capture', (payload = {}) => {
         this.isCapturingBinding = payload?.state === 'start';
+      });
+
+      eventBus.on('screen-changed', (payload = {}) => {
+        if (payload?.screen !== 'playing') {
+          this.pendingStepPresses.clear();
+        }
       });
     }
   }
@@ -467,12 +483,17 @@ class InputSystem {
       return;
     }
 
+    const stepField = STEP_PRESS_FIELDS[action];
+    if (stepField) {
+      if (this.resolveGameScreen() === 'playing') {
+        this.pendingStepPresses.add(stepField);
+      }
+      return;
+    }
+
     switch (action) {
       case 'pause':
         eventBus?.emit?.('toggle-pause');
-        break;
-      case 'activateShield':
-        eventBus?.emit?.('activate-shield-pressed');
         break;
       case 'openSettings':
         eventBus?.emit?.('settings-menu-requested', {
@@ -485,21 +506,43 @@ class InputSystem {
           context,
         });
         break;
-      case 'toggleSpreadMode': {
-        // Plan 01.07 Task 5: emit screen-gated toggle. CombatSystem subscribes
-        // to 'toggle-spread-mode' and no-ops if screen !== 'playing'.
-        const screen = this.resolveGameScreen();
-        eventBus?.emit?.('toggle-spread-mode', { screen, source });
-        break;
-      }
-      case 'toggleAimMode': {
-        // Plan 01.07 Task 6: same shape as toggleSpreadMode.
-        const screen = this.resolveGameScreen();
-        eventBus?.emit?.('toggle-aim-mode', { screen, source });
-        break;
-      }
       default:
         break;
+    }
+  }
+
+  /**
+   * Replaces the per-step input. `source(liveFrame)` runs once per fixed step
+   * and returns the frame the simulation uses (null/undefined keeps the live
+   * one); a recorder returns the live frame after storing it.
+   */
+  setInputSource(source) {
+    this.inputSource = source || null;
+  }
+
+  /** The device input for this step: held movement + presses since last step. */
+  sampleInputFrame() {
+    const frame = createInputFrame(this.getMovementBinaryState());
+    this.pendingStepPresses.forEach((field) => {
+      frame[field] = true;
+    });
+    this.pendingStepPresses.clear();
+    return frame;
+  }
+
+  dispatchStepPresses(frame) {
+    const eventBus = this.getEventBus();
+    if (frame.shield) {
+      eventBus?.emit?.('activate-shield-pressed');
+    }
+    // CombatSystem no-ops the toggles unless screen === 'playing'.
+    if (frame.spread) {
+      const screen = this.resolveGameScreen();
+      eventBus?.emit?.('toggle-spread-mode', { screen, source: 'step' });
+    }
+    if (frame.aim) {
+      const screen = this.resolveGameScreen();
+      eventBus?.emit?.('toggle-aim-mode', { screen, source: 'step' });
     }
   }
 
@@ -935,8 +978,13 @@ class InputSystem {
     };
   }
 
-  buildMovementCommandPayload() {
-    const binary = this.getMovementBinaryState();
+  buildMovementCommandPayload(frame) {
+    const binary = {
+      up: frame.up,
+      down: frame.down,
+      left: frame.left,
+      right: frame.right,
+    };
     const vector = this.computeMovementVector(binary);
     const details = this.collectMovementBindingDetails();
     const timestamp = this.getCurrentTimestamp();
@@ -1104,7 +1152,11 @@ class InputSystem {
   update() {
     this.pollGamepad();
 
-    const { command, metadata } = this.buildMovementCommandPayload();
+    const liveFrame = this.sampleInputFrame();
+    const frame = this.inputSource?.(liveFrame) ?? liveFrame;
+    this.dispatchStepPresses(frame);
+
+    const { command, metadata } = this.buildMovementCommandPayload(frame);
     this.lastMovementCommand = command;
 
     const queue = this.resolveCommandQueue();

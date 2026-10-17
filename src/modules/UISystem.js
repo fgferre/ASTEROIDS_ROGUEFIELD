@@ -45,6 +45,8 @@ class UISystem extends BaseSystem {
         transitions: 'ui.transitions',
       },
     });
+    // `?replay=` runs without the first-run controls toast.
+    this.controlsToastDisabled = false;
   }
 
   initialize() {
@@ -3126,6 +3128,9 @@ class UISystem extends BaseSystem {
   }
 
   maybeShowControlsToast() {
+    if (this.controlsToastDisabled) {
+      return;
+    }
     try {
       if (localStorage.getItem(CONTROLS_SEEN_KEY)) {
         return;

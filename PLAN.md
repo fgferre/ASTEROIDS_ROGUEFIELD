@@ -125,8 +125,12 @@ arquivo quando a última etapa fechar. Decisões de produto são do dono, por im
       ~~apagar flags de legado e o espelho `gameState`; um só `isDev`~~ (feitos 17/10); zerar `no-unused-vars` e `Math.random` e
       promovê-los a erro; quebrar os god-files (meta ~600 linhas) começando por `EnemySystem`, `CombatSystem`,
       `EffectsSystem`; JSDoc + `checkJs` como caminho para TypeScript folha a folha (`core/`, `utils/`, `data/`).
-- [ ] **8. Replay e testes de comportamento** (depende da 4). Gravar input + seed, reproduzir; cenários headless
-      ("mata a onda 1", "boss aparece na onda N") no lugar de snapshots; cobertura mínima no CI.
+- [x] **8. Replay** (17/10) `src/core/replay.js` + `src/bootstrap/replaySession.js`: gravação de seed + input por passo
+      (máscara de 7 bits, só mudanças) + escolhas de upgrade; `?replay=<url>` repete no navegador; F9 (dev) baixa a
+      gravação. Teste de integração grava 600 passos com o manifesto real e repete numa instância nova com posição,
+      kills, XP, nível e inimigos idênticos. Efeito colateral deliberado: E/G/T agem no passo seguinte, não no handler
+      de tecla. Restam leituras de relógio de parede que podem divergir (BACKLOG). **Falta:** cenários jogáveis
+      headless ("mata a camada 1", "Warden aparece na 5") no lugar de snapshots; cobertura mínima no CI.
 
 ## Fora de escopo deste plano
 
