@@ -9,6 +9,7 @@ import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 import { MAGNETISM_RADIUS } from '../data/constants/gameplay.js';
 import { normalize as normalizeVector } from '../utils/vectorHelpers.js';
 import { applyBaseTransform, getRenderScale } from '../core/viewport.js';
+import * as bloomLayer from '../core/bloomLayer.js';
 
 // [NEO-ARCADE] Shield Visual Constants
 const SHIELD_HEX_SIZE = 24;
@@ -152,6 +153,15 @@ function computeOutlineRadius(points) {
 }
 
 const SPACE_SKY_RANDOM_SEED = 'rendering:starfield';
+
+// `?bloom=0` turns the post pass off for A/B and for slow machines.
+function bloomDisabledByUrl() {
+  try {
+    return new URLSearchParams(window.location.search).get('bloom') === '0';
+  } catch {
+    return false;
+  }
+}
 
 // [NEO-ARCADE] Multi-Plane 2.5D Parallax Starfield
 // Replaces 3D projection with robust 2D layer scrolling for guaranteed visibility
@@ -814,6 +824,12 @@ class RenderingSystem extends BaseSystem {
     this.chromaticAberrationEnabled = values.chromaticAberration !== false;
     this.bloomEnabled = values.bloom !== false;
     this.postProcessingEnabled = values.postProcessing !== false;
+    bloomLayer.configure({
+      enabled:
+        this.bloomEnabled &&
+        this.postProcessingEnabled &&
+        !bloomDisabledByUrl(),
+    });
 
     // Antialiasing implementation: 'SMAA' (Standard) vs 'Nenhum' (Pixelated)
     this.antialiasingMode = values.antialiasing !== 'Nenhum';
@@ -865,6 +881,10 @@ class RenderingSystem extends BaseSystem {
         effects.applyScreenShake(ctx);
       }
 
+      // Light sources drawn into the emissive layer this frame get bloomed
+      // in composite() below (docs/NORTE.md §2).
+      bloomLayer.beginFrame(ctx);
+
       const player = this.cachedPlayer;
       const playerVelocity =
         typeof player?.getVelocity === 'function'
@@ -873,6 +893,7 @@ class RenderingSystem extends BaseSystem {
 
       // Optimized rendering with batching
       this.renderOptimized(ctx, player, playerVelocity);
+      bloomLayer.composite(ctx);
     } finally {
       ctx.restore();
     }

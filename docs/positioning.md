@@ -12,7 +12,7 @@ Asteroid Roguefield is a top-down asteroid-arena roguelite where every run combi
 
 ## Top-3 competitors
 
-Three closest-feel competitors. The visual references the developer named (Chorus, House of the Dying Sun, Everspace, Nova Drift, lone.AI, Metori) live in `docs/visual-direction.md` as visual mood anchors — the three below are the **mechanic / audience** competitors.
+Three closest-feel competitors. The visual references the developer named (Chorus, House of the Dying Sun, Everspace, Nova Drift, lone.AI, Metori) live in `docs/NORTE.md` as visual mood anchors — the three below are the **mechanic / audience** competitors.
 
 1. **Vampire Survivors** — _Audience overlap:_ players who love watching a build escalate, dying in chaos, and immediately starting over with a tweaked combination. They tolerate sparse narrative if the loop feels addictive. _Distinct angle:_ Asteroid Roguefield has explicit player control (aim, dodge, manage shield) instead of VS's auto-attack; the 5-tag synergy taxonomy gives more directed build-crafting than VS's mostly-passive evolution path; runs are shorter (8-12 min vs 20-30 min) so the "one more" cadence hits faster.
 

@@ -35,7 +35,7 @@ comparar fluidez com e sem `?renderScale=1`; conferir se a 144 Hz o movimento re
 ## Visual
 
 - **(3)** O menu (Three.js, bloom) é muito melhor que o jogo (Canvas 800×600 esticado, borrado). O jogo tem de parecer
-  continuação do menu — é o que `docs/brand.md` e `docs/visual-direction.md` já pedem.
+  continuação do menu — é o que `docs/brand.md` e `docs/NORTE.md` já pedem.
 
 ## Interface
 

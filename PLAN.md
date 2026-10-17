@@ -26,7 +26,7 @@ arquivo quando a última etapa fechar. Decisões de produto são do dono, por im
 - Três linguagens visuais que não conversam: wireframe neon (Drone, Hunter, nave padrão), formas chapadas com
   gradiente (asteroides viram anéis marrom/rosa — o "neon" do asteroide comum é `#654321` em blend aditivo), e
   SVGs ilustrados vindos de `assets/inpirational mockups/` usados como asset final (nave Solar Slicer, boss).
-- A paleta de `docs/visual-direction.md` aparece 5 vezes no código; há ~571 literais de cor (~323 distintos).
+- A paleta de `docs/NORTE.md` aparece 5 vezes no código; há ~571 literais de cor (~323 distintos).
 - Não existe pós-processamento no jogo: "bloom" é traço repetido; as opções de bloom, aberração cromática e
   `hudScale` em Settings são gravadas e nunca lidas. O **menu** tem Three.js + UnrealBloom + SMAA + grão: o
   contraste menu → jogo é o que grita "inacabado".
@@ -68,7 +68,7 @@ arquivo quando a última etapa fechar. Decisões de produto são do dono, por im
 1. O jogo continua **Canvas 2D** com um passe de pós-processamento próprio; não se reescreve o gameplay em WebGL.
    Reabrir só se o bloom em Canvas não segurar 60 fps na máquina do dono.
 2. O menu em Three.js fica como está: é o alvo visual do jogo ("o jogo é continuação do menu", `docs/brand.md`).
-3. Direção: `docs/visual-direction.md` vale (casco fosco, neon só na informação, fundo com volume). A escolha
+3. Direção: `docs/NORTE.md` vale (casco fosco, neon só na informação, fundo com volume). A escolha
    **vetor neon (Geometry Wars) × sprite ilustrado (Nova Drift)** é dele, por prancha comparativa (Etapa 3).
 4. Cada etapa visual termina com captura antes × depois (headless, `?desktop=force&debugLogging=0`), e com
    `npm run done` verde. Ele aprova pela imagem; nada de "ficou melhor" em texto.

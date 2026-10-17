@@ -12,7 +12,6 @@
 - Profile harness (`?profile=cold-open|mid-game|boss-arena|late-stress`, `src/bootstrap/profileHarness.js`) exists but no baseline was ever recorded; record one before the post-FX step so there is a before/after.
 - Idea (owner, Phase 1): "Harmonic Plasma Lance" as a second weapon unlock (beam + fragment splits + charged burst); keep as a meta-progression candidate, not v1.
 - `docs/plans/*.md` and `docs/validation/*.md` describe phases that already shipped or were abandoned; a truth pass should archive what no longer matches the code.
-- Visual references the owner named (Nova Drift, Chorus, House of the Dying Sun, Geometry Wars) have no local thumbnails; `docs/visual-direction.md` suggests `docs/visual-direction/mood-NN.png`.
 - Caches ainda a 1× depois da etapa 1: `atmosphereBuffer`, `shieldVisualCache.patternCanvas` e `shieldGradientCache` em `RenderingSystem`; assar com `getRenderScale()` como os demais.
 - SpaceSky desenha ~450 estrelas com um `drawImage` cada por quadro (twinkle por estrela). Assar cada camada num tile e deslocar com wrap, com 2–3 fases de twinkle pré-assadas, corta ~450 chamadas por quadro; pertence ao fundo novo da etapa 3.
 - `docs/positioning.md` promete 5 famílias de tag, sinergia e matriz 16 células que não existem no código; alinhar o doc à decisão do dono na etapa 6.

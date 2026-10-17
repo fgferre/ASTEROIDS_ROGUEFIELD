@@ -43,7 +43,7 @@ Anchored by the developer's existing menu-background animation (`src/modules/Men
 Direction (Claude-recommended per developer request "sugestao sua relevante e criativa"). Phase 7 lock.
 
 - **Wordmark:** "Asteroid Roguefield" set in an angular wide-set sans-serif (e.g., the existing Orbitron display face already loaded — `Orbitron` weight 700-900 is the natural starting point since it's already a project dependency per `src/index.html` Google Fonts preconnect). All caps OR small-caps to lean into the "field"/"ROGUEFIELD" syllabic emphasis. Letter-spacing wide enough that "ROGUEFIELD" reads as a single uninterrupted form.
-- **Symbol option (favicon / icon use):** abstract mark formed from a stylized asteroid-belt arc that doubles as a targeting reticle — single-stroke, evokes both "the field" and "can you beat it?". Cyan (`#00F2FF` per the visual-direction palette) on the near-black background (`#020408`) for thruster-glow continuity. Works at 16×16 favicon scale because it's a single shape.
+- **Symbol option (favicon / icon use):** abstract mark formed from a stylized asteroid-belt arc that doubles as a targeting reticle — single-stroke, evokes both "the field" and "can you beat it?". Cyan (`#00F2FF` per the docs/NORTE.md palette) on the near-black background (`#020408`) for thruster-glow continuity. Works at 16×16 favicon scale because it's a single shape.
 - **Lockup:** wordmark on one line; tagline ("Can you beat the field?") in a much smaller weight directly underneath, centered. Symbol-mark to the left or above the wordmark depending on context (badge mark for icon use; full lockup with tagline for marketing surfaces). Phase 7 finalizes the exact proportions and weights.
 
 ---

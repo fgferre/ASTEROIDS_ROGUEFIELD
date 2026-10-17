@@ -42,7 +42,7 @@ sources + an AI-draft policy where applicable.
 
 ### Visual concepts (mood-board)
 
-- **Reference-only.** Mixed-source references collected in `docs/visual-direction.md`
+- **Reference-only.** Mixed-source references collected in `docs/NORTE.md`
   and the (on-demand) `docs/visual-direction/` thumbnails directory. **No assets are
   imported from these references** — they inform direction, not implementation.
   The PROC-15 first-cut doc enforces this scope.
