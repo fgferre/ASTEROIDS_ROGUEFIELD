@@ -63,8 +63,8 @@ afterEach(() => {
 });
 
 describe('Wave progression', () => {
-  it('unlocks support enemies at configured progression thresholds', () => {
-    withWaveOverrides({ managerHandlesAsteroids: true }, () => {
+  it('unlocks support enemies at configured progression thresholds', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
       const manager = createWaveManager({ eventBus });
       manager.currentWave = CONSTANTS.SUPPORT_ENEMY_PROGRESSION.drone.startWave;
       const droneWave = manager.generateDynamicWave(manager.currentWave);
@@ -98,10 +98,10 @@ describe('Wave progression', () => {
 });
 
 describe('Enemy spawning integration', () => {
-  it('spawns support groups through the EnemySystem factory pathway', () => {
+  it('spawns support groups through the EnemySystem factory pathway', async () => {
     const spawnLog = [];
 
-    withWaveOverrides({ managerHandlesAsteroids: true }, () => {
+    await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
       const enemySystem = {
         getCachedWorld: () => ({
           getBounds: () => ({ width: 800, height: 600 }),
@@ -130,8 +130,8 @@ describe('Enemy spawning integration', () => {
     });
   });
 
-  it('excludes asteroids from manager totals when EnemySystem spawns them', () => {
-    withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+  it('excludes asteroids from manager totals when EnemySystem spawns them', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
       const manager = createWaveManager({ eventBus });
       manager.currentWave = CONSTANTS.SUPPORT_ENEMY_PROGRESSION.mine.startWave;
       manager.startNextWave();
@@ -231,7 +231,7 @@ describe('Support enemy behaviour', () => {
 });
 
 describe('Combat integration', () => {
-  it('routes enemy-fired payloads to the CombatSystem', () => {
+  it('routes enemy-fired payloads to the CombatSystem', async () => {
     const combat = {
       handleEnemyProjectile: vi.fn(),
     };
@@ -240,7 +240,7 @@ describe('Combat integration', () => {
       bootstrapFromEnemySystem: () => {},
     };
 
-    withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
       const enemySystem = new EnemySystem({
         combat,
         physics,
@@ -301,8 +301,8 @@ describe('Reward handling', () => {
 });
 
 describe('Deterministic wave generation', () => {
-  it('produces identical support group compositions for identical seeds', () => {
-    withWaveOverrides({ managerHandlesAsteroids: true }, () => {
+  it('produces identical support group compositions for identical seeds', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: true }, () => {
       const seed = 'mixed-wave-seed';
       const eventBusA = createEventBusMock();
       const eventBusB = createEventBusMock();

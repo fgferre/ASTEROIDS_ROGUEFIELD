@@ -112,23 +112,15 @@ export const WEAPON_SCHEMA = deepFreeze({
  * @typedef {Object} RenderSchema
  * @property {string} strategy - Render strategy: 'procedural', 'delegate'
  * @property {string} [shape] - Procedural shape: 'triangle', 'diamond', 'sphere', 'boss'
- * @property {boolean} [showThrust] - Triangle: show exhaust flames
- * @property {boolean} [showTurret] - Diamond: show turret indicator
- * @property {boolean} [showPulse] - Sphere: show pulse animation
  * @property {number} [pulseSpeed] - Sphere: pulse frequency
  * @property {number} [pulseAmount] - Sphere: pulse amplitude
- * @property {boolean} [showAura] - Boss: show aura effect
  * @property {boolean} [showPhaseColor] - Boss: phase-based coloring
  */
 export const RENDER_SCHEMA = deepFreeze({
   strategy: 'procedural', // Required: render approach
   shape: 'triangle', // Required (procedural): visual shape
-  showThrust: true, // Optional: triangle exhaust
-  showTurret: true, // Optional: diamond turret
-  showPulse: true, // Optional: sphere pulse
   pulseSpeed: 2.0, // Optional: pulse frequency
   pulseAmount: 0.15, // Optional: pulse amplitude
-  showAura: true, // Optional: boss aura
   showPhaseColor: true, // Optional: boss phase colors
 });
 

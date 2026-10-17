@@ -6,6 +6,7 @@ import {
   PROGRESSION_COMBO_MULTIPLIER_CAP,
   PROGRESSION_LEVEL_SCALING,
   PROGRESSION_UPGRADE_ROLL_COUNT,
+  LEVEL_UP_SCREEN_DELAY_SECONDS,
 } from '../core/GameConstants.js';
 import UpgradeSystem from './UpgradeSystem.js';
 import {
@@ -53,6 +54,8 @@ class ProgressionSystem extends UpgradeSystem {
       : 100;
     this.experienceToNext = Math.max(1, Math.floor(initialRequirement));
     this.totalExperience = 0;
+    this.pendingLevelUpScreens = [];
+    this.levelUpScreenTimer = 0;
 
     const comboTimeout = Number.isFinite(PROGRESSION_COMBO_TIMEOUT)
       ? Math.max(0, Number(PROGRESSION_COMBO_TIMEOUT))
@@ -333,6 +336,8 @@ class ProgressionSystem extends UpgradeSystem {
       return;
     }
 
+    this.updatePendingLevelUpScreens(dt);
+
     if (this.currentCombo <= 0 || this.comboTimer <= 0) {
       return;
     }
@@ -343,6 +348,23 @@ class ProgressionSystem extends UpgradeSystem {
     if (previousTimer > 0 && this.comboTimer <= 0) {
       this.resetCombo({ reason: 'timeout', force: true });
     }
+  }
+
+  updatePendingLevelUpScreens(dt) {
+    if (this.pendingLevelUpScreens.length === 0) {
+      return;
+    }
+
+    this.levelUpScreenTimer -= dt;
+    if (this.levelUpScreenTimer > 0) {
+      return;
+    }
+
+    const ready = this.pendingLevelUpScreens;
+    this.pendingLevelUpScreens = [];
+    ready.forEach((payload) => {
+      this.eventBus?.emit?.('upgrade-options-ready', payload);
+    });
   }
 
   applyLevelUp() {
@@ -373,7 +395,11 @@ class ProgressionSystem extends UpgradeSystem {
       nextRequirement: context.nextRequirement,
     });
 
-    this.eventBus?.emit?.('upgrade-options-ready', {
+    // The pick screen opens after a short delay so the level-up slow-mo plays first.
+    if (this.pendingLevelUpScreens.length === 0) {
+      this.levelUpScreenTimer = LEVEL_UP_SCREEN_DELAY_SECONDS;
+    }
+    this.pendingLevelUpScreens.push({
       level: context.level,
       options: context.options || [],
       poolSize: context.poolSize ?? 0,
@@ -439,6 +465,8 @@ class ProgressionSystem extends UpgradeSystem {
     this.totalExperience = 0;
     this.appliedUpgrades.clear();
     this.pendingUpgradeOptions = [];
+    this.pendingLevelUpScreens = [];
+    this.levelUpScreenTimer = 0;
     this._snapshotFallbackWarningIssued = false;
 
     if (Number.isFinite(this.defaultComboTimeout)) {

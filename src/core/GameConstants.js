@@ -32,12 +32,10 @@ export const ASTEROID_BASE_HEALTH = {
 
 export const ASTEROID_HEALTH_SCALING = {
   perWave: 0.12,
-  maxMultiplier: 2.2, // Only applies up to wave 10
-  // Infinite scaling formula for wave 11+:
-  // multiplier = 2.2 + (wave - 10) * 0.08 (logarithmic slow growth)
-  // Wave 15: 2.2 + 5*0.08 = 2.6x
-  // Wave 20: 2.2 + 10*0.08 = 3.0x
-  // Wave 30: 2.2 + 20*0.08 = 3.8x
+  maxMultiplier: 2.2, // Waves 1-10: 1 + perWave * (wave - 1), clamped here (wave 10 = 2.08x); also the base at wave 11
+  // Waves 11+ (infiniteScaling): multiplier = 2.2 + (wave - 11) * 0.08, linear until softCapWave
+  // Wave 11: 2.2x, wave 15: 2.52x, wave 20: 2.92x, wave 30: 3.72x
+  // From softCapWave on, growth is log2 (diminishing); hard cap at infiniteScaling.maxMultiplier
   infiniteScaling: {
     enabled: true,
     startWave: 11,
@@ -56,6 +54,9 @@ export const PHYSICS_CELL_SIZE = 96;
 export const PROGRESSION_INITIAL_LEVEL = 1;
 export const PROGRESSION_INITIAL_XP_REQUIREMENT = 150;
 export const PROGRESSION_LEVEL_SCALING = 1.4;
+// Simulation seconds between the level-up event and the pick screen opening,
+// so the slow-mo + zoom pulse play first (proposta 17/10).
+export const LEVEL_UP_SCREEN_DELAY_SECONDS = 0.12; // proposta 17/10: tempo de simulação; durante o slow-mo de 0.35x vale ~0.34 s reais, a tela abre a um terço do pulso
 export const PROGRESSION_UPGRADE_ROLL_COUNT = 3;
 export const PROGRESSION_UPGRADE_FALLBACK_COUNT = 3;
 export const PROGRESSION_COMBO_TIMEOUT = 3.0;

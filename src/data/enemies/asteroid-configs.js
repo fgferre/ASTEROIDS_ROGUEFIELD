@@ -779,7 +779,6 @@ export const ASTEROID_VARIANTS = deepFreeze({
       pulse: {
         speed: 4.0, // Faster pulse
         amount: 0.8,
-        color: 'rgba(255, 250, 200, 1.0)', // Brighter pulse
       },
       glow: {
         baseBlur: 25,
@@ -834,7 +833,6 @@ export const ASTEROID_VARIANTS = deepFreeze({
         amount: 0.75,
         fuseBoost: 0.6,
         armedBoost: 0.25,
-        color: 'rgba(255, 160, 70, 0.9)',
       },
       glow: {
         baseBlur: 18,
@@ -908,7 +906,6 @@ export const ASTEROID_VARIANTS = deepFreeze({
       pulse: {
         speed: 1.7,
         amount: 0.38,
-        color: 'rgba(190, 120, 255, 0.75)',
       },
       colors: {
         fill: 'rgba(120, 120, 130, 0.12)', // [NEO-ARCADE] Darker Hologram
@@ -957,7 +954,6 @@ export const ASTEROID_VARIANTS = deepFreeze({
       pulse: {
         speed: 1.9,
         amount: 0.35,
-        color: 'rgba(220, 255, 255, 0.8)',
       },
       glow: {
         baseBlur: 12,

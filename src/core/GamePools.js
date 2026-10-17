@@ -182,47 +182,6 @@ export class GamePools {
           return this.life > 0;
         };
 
-        particle.draw = function (ctx) {
-          if (this.alpha <= 0) return;
-
-          ctx.save();
-          ctx.globalAlpha = this.alpha;
-          ctx.translate(this.x, this.y);
-          ctx.rotate(this.rotation);
-
-          if (this.type === 'spark') {
-            ctx.strokeStyle = this.color;
-            ctx.lineWidth = this.size * this.alpha;
-            ctx.lineCap = 'round';
-            ctx.beginPath();
-            ctx.moveTo(-this.size, 0);
-            ctx.lineTo(this.size, 0);
-            ctx.stroke();
-          } else if (this.type === 'crack') {
-            ctx.strokeStyle = this.color;
-            ctx.lineWidth = Math.max(0.6, this.size * 0.4);
-            ctx.lineCap = 'round';
-            ctx.beginPath();
-            const length = this.size * 3.2;
-            ctx.moveTo(-length * 0.5, 0);
-            ctx.lineTo(length * 0.5, 0);
-            ctx.stroke();
-          } else if (this.type === 'debris') {
-            ctx.fillStyle = this.color;
-            ctx.beginPath();
-            const s = this.size * this.alpha;
-            ctx.rect(-s / 2, -s / 2, s, s);
-            ctx.fill();
-          } else {
-            ctx.fillStyle = this.color;
-            ctx.beginPath();
-            ctx.arc(0, 0, this.size * this.alpha, 0, Math.PI * 2);
-            ctx.fill();
-          }
-
-          ctx.restore();
-        };
-
         return particle;
       },
 

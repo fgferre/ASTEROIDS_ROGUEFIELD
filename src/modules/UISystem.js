@@ -160,9 +160,6 @@ class UISystem extends BaseSystem {
       threats: new Map(),
       isReady: false,
     };
-    this.handleMenuShipSelectorVisualReady = () => {
-      this.requestMenuShipSelectorRefresh();
-    };
 
     this.initializeSettingsMetadata();
 
@@ -779,7 +776,6 @@ class UISystem extends BaseSystem {
         const hullDefinition = getShipModelById(button.dataset.hullId);
         player.renderHullPreview(context, hullDefinition, {
           padding: 12,
-          onVisualReady: this.handleMenuShipSelectorVisualReady,
         });
       });
   }

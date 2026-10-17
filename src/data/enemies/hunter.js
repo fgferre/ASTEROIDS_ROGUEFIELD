@@ -86,7 +86,6 @@ export const HUNTER_COMPONENTS = deepFreeze({
   render: {
     strategy: 'procedural',
     shape: 'diamond',
-    showTurret: true,
   },
   collision: {
     shape: 'circle',

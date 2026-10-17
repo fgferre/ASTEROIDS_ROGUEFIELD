@@ -126,6 +126,8 @@ function runWave5Simulation(
     const chunk = Math.max(1, Math.floor(totalXp / 10));
     for (let i = 0; i < 10; i += 1) {
       progression.collectXP(chunk);
+      // The pick screen opens after the level-up delay (simulation time).
+      progression.update(CONSTANTS.LEVEL_UP_SCREEN_DELAY_SECONDS);
       while (pendingOptions && pendingOptions.length > 0) {
         const optionId = pendingOptions[0]?.id;
         pendingOptions = null;

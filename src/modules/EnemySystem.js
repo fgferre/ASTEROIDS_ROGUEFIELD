@@ -43,6 +43,7 @@ import {
   WAVE_BREAK_TIME,
   WAVE_DURATION,
 } from '../data/constants/gameplay.js';
+import { PALETTE, withAlpha } from '../data/constants/palette.js';
 import { ENEMY_TYPES, BOSS_CONFIG } from '../data/constants/visual.js';
 import { DRONE_COMPONENTS } from '../data/enemies/drone.js';
 import { HUNTER_COMPONENTS } from '../data/enemies/hunter.js';
@@ -2940,7 +2941,7 @@ class EnemySystem extends BaseSystem {
     // boss-wave-started has no raw listeners in EffectsSystem/AudioSystem
     // (unlike boss-spawned/phase-changed/defeated), so apply feedback here.
     this.getCachedEffects()?.addScreenFlash(
-      'rgba(255, 140, 0, 0.25)',
+      withAlpha(PALETTE.boss, 0.25),
       0.35,
       0.2
     );

@@ -806,8 +806,6 @@ class XPOrbSystem extends BaseSystem {
       class: orb.class,
       tier: orb.tier,
       source: options.source || 'drop',
-      color: resolvedConfig.baseColor,
-      glow: resolvedConfig.glowColor,
     });
 
     return orb;
