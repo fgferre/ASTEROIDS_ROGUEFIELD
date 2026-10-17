@@ -34,6 +34,22 @@ describe('boss attack telegraphs', () => {
     expect(boss.vx).toBeGreaterThan(0);
   });
 
+  it('hands movement to the charge until it ends, then back to the phase', () => {
+    const { boss } = createBoss();
+    boss.currentPhase = 2;
+    boss.applyPhaseMovement(true);
+    boss.chargeTimer = 0;
+
+    boss.updateChargeState(1 / 60, target);
+    expect(boss.movementStrategy).toBe('linear');
+
+    boss.updateChargeState(boss.chargeWindup + 0.01, target);
+    boss.updateChargeState(boss.chargeDuration + 0.01, target);
+
+    expect(boss.chargeState).toBe('recover');
+    expect(boss.movementStrategy).toBe('parasite');
+  });
+
   it('keeps aiming at the player during the windup', () => {
     const { boss } = createBoss();
     boss.chargeTimer = 0;

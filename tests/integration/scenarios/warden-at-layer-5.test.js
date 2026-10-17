@@ -56,14 +56,12 @@ describe('layer 5 scenario', () => {
 
     expect(enemies.waveManager.currentWave).toBe(5);
     expect(boss).toBeTruthy();
-    // Boss instances expose no displayName (the HUD falls back to 'Boss').
-    expect(boss.constructor.name).toBe('BossEnemy');
+    expect(boss.displayName).toBe('Warden Prime');
+    expect(enemies.getBossHudState().name).toBe('Warden Prime');
     expect(player.health).toBeGreaterThan(0);
   });
 
-  // KNOWN BUG: with components active BossEnemy never runs its spread/charge
-  // cycles, so no telegraph is emitted. Remove `.fails` when it is fixed.
-  it.fails('telegraphs a charge or fan within 20 s', () => {
+  it('telegraphs a charge or fan within 20 s', () => {
     const { telegraphs } = playToLayer5();
 
     expect(telegraphs.some((t) => ['charge', 'fan'].includes(t))).toBe(true);

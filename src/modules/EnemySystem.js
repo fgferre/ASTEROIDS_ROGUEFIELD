@@ -2382,7 +2382,6 @@ class EnemySystem extends BaseSystem {
       boss.invulnerabilityTimer = 0;
     }
 
-    boss.applyPhaseLoadout(true);
     boss.applyPhaseMovement(true);
 
     return boss;

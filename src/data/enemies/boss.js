@@ -108,13 +108,12 @@ export const BOSS_CONFIG = deepFreeze(_bossConfigBase);
 
 /**
  * Component configuration that assembles the boss enemy from modular behaviors.
- * Movement, weapon patterns, rendering, collision and health management are
- * delegated to reusable components defined here so the boss class can focus on
- * phase orchestration and minion control.
+ * Movement, rendering, collision and health management are delegated to
+ * reusable components defined here; the boss class owns its attacks (fan,
+ * volley, charge with telegraphs) and minion control per phase.
  *
  * @typedef {object} BossComponents
  * @property {object} movement - Seeking movement strategy configuration
- * @property {object} weapon - Multi-pattern weapon configuration
  * @property {object} render - Procedural boss renderer tuning
  * @property {object} collision - Collision radius/response parameters
  * @property {object} health - Health/armor/phase configuration
@@ -149,26 +148,6 @@ export const BOSS_COMPONENTS = deepFreeze({
       minDistance: 90,
     },
   ],
-  weapon: {
-    patterns: ['spread', 'volley'],
-    spread: {
-      projectileCount: 7,
-      speed: 260,
-      cooldown: 2.4,
-      variance: 0.45,
-      arc: 0.85,
-      angleVariance: 0.12,
-    },
-    volley: {
-      burstSize: 5,
-      shotDelay: 0.16,
-      cooldown: 1.35,
-      variance: 0.2,
-      speed: 320,
-      spread: 0.12,
-    },
-    damage: 35,
-  },
   // Warden Prime (docs/NORTE.md §3): segmented ring around a violet core,
   // drawn by RenderComponent's 'boss' look.
   render: {

@@ -161,7 +161,6 @@ export class BossEnemy extends BaseEnemy {
     this._lastFallbackReason = null;
     this._invulnLog = 0;
     this._lastInvulnerabilityState = null;
-    this.weaponState = {};
     this.movementStrategy = 'seeking';
     this.movementConfig = null;
     this.movementPhases = null;
@@ -181,17 +180,9 @@ export class BossEnemy extends BaseEnemy {
 
     const componentConfig = config.components ?? BOSS_COMPONENTS;
     if (componentConfig) {
-      this.weaponState = this.weaponState || {};
       this.movementStrategy = componentConfig?.movement?.strategy || 'seeking';
       this.renderStrategy =
         componentConfig?.render?.strategy || 'procedural-boss';
-      if (Array.isArray(componentConfig?.weapon?.patterns)) {
-        this.weaponPatterns = [...componentConfig.weapon.patterns];
-        this.weaponPattern =
-          this.weaponPattern || componentConfig.weapon.patterns[0];
-      } else if (componentConfig?.weapon?.pattern) {
-        this.weaponPattern = componentConfig.weapon.pattern;
-      }
 
       if (Array.isArray(componentConfig?.movementPhases)) {
         this.movementPhases = componentConfig.movementPhases.map((phase) => ({
@@ -205,6 +196,7 @@ export class BossEnemy extends BaseEnemy {
     const defaults = BOSS_DEFAULTS;
 
     this.type = 'boss';
+    this.displayName = config.displayName ?? defaults.displayName;
     this.addTag('boss');
     this._missingTargetLogged = false;
     this._missingPlayerReferenceLogged = false;
@@ -364,7 +356,6 @@ export class BossEnemy extends BaseEnemy {
     this.invulnerable = false;
     this.invulnerabilityTimer = 0;
     this.resetFeedbackState();
-    this.applyPhaseLoadout(true);
     this.applyPhaseMovement(true);
 
     this.renderPayload = this.buildRenderPayload();
@@ -494,25 +485,6 @@ export class BossEnemy extends BaseEnemy {
     );
   }
 
-  applyPhaseLoadout(force = false) {
-    const patterns = Array.isArray(this.weaponPatterns)
-      ? this.weaponPatterns
-      : [];
-    if (!patterns.length) {
-      return;
-    }
-
-    const index = Math.min(
-      Math.max(0, this.currentPhase || 0),
-      patterns.length - 1
-    );
-    const nextPattern = patterns[index];
-    if (!force && this.weaponPattern === nextPattern) {
-      return;
-    }
-    this.weaponPattern = nextPattern;
-  }
-
   applyPhaseMovement(force = false) {
     if (!Array.isArray(this.movementPhases) || !this.movementPhases.length) {
       if (force) {
@@ -593,9 +565,7 @@ export class BossEnemy extends BaseEnemy {
   }
 
   handlePhaseIntro(deltaTime, target) {
-    if (!(this.useComponents && this.components?.size > 0)) {
-      this.updateSpreadCycle(deltaTime, target);
-    }
+    this.updateSpreadCycle(deltaTime, target);
   }
 
   // The fan is announced by a wedge for `spreadWindup` seconds, then fired
@@ -662,9 +632,7 @@ export class BossEnemy extends BaseEnemy {
   }
 
   handlePhaseAssault(deltaTime, target) {
-    if (!(this.useComponents && this.components?.size > 0)) {
-      this.updateVolleyCycle(deltaTime, target);
-    }
+    this.updateVolleyCycle(deltaTime, target);
     this.updateMinionSpawns(deltaTime);
   }
 
@@ -819,6 +787,7 @@ export class BossEnemy extends BaseEnemy {
         if (this.chargeStateTimer <= 0) {
           this.chargeState = 'recover';
           this.chargeStateTimer = this.chargeRecovery;
+          this.applyPhaseMovement(true);
           this.triggerChargeBurst('end');
         }
         break;
@@ -841,6 +810,10 @@ export class BossEnemy extends BaseEnemy {
   beginCharge(target) {
     const aimPosition = target?.position || null;
     this.chargeAimAngle = aimPosition ? this.angleTo(aimPosition) : 0;
+
+    // The phase movement would steer and cap the dash; drift on vx/vy instead
+    // until the charge ends.
+    this.movementStrategy = 'linear';
 
     const windup = Math.max(0, this.chargeWindup || 0);
     if (windup <= 0) {
@@ -1362,7 +1335,6 @@ export class BossEnemy extends BaseEnemy {
     const previousPhase = this.currentPhase;
     this.currentPhase = Math.min(this.phaseCount - 1, this.currentPhase + 1);
     this.nextPhaseIndex += 1;
-    this.applyPhaseLoadout(true);
     this.applyPhaseMovement(true);
 
     this.invulnerable = true;
@@ -1523,8 +1495,6 @@ export class BossEnemy extends BaseEnemy {
     this.phaseCount = BOSS_DEFAULTS.phaseCount ?? 3;
     this.nextPhaseIndex = 0;
     this._phaseThresholdMaxHealth = null;
-    this.weaponPattern = null;
-    this.weaponPatterns = null;
     this.movementConfig = null;
     this.movementPhases = null;
     this._lastMovementPhase = null;
