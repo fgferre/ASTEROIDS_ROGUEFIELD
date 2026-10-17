@@ -92,18 +92,14 @@ arquivo quando a última etapa fechar. Decisões de produto são do dono, por im
       visível e congelado atrás + lockout 400 ms; game over com tempo/onda/kills/combo máx./nível/build; Quit pede
       segundo toque; foco em Resume; controles no menu e na pausa + toast de primeira run; `mobileGuard` com dois
       sinais e aviso em DOM; idioma inglês. Capturas em todas as telas conferidas.
-- [ ] **3. Paleta única + bloom real.** Prancha A/B feita em 17/10 (duas cenas idênticas na escala real do jogo:
-      A vetor neon, B sprites com volume; fonte em scratchpad, não versionada — refazer é barato). O que a prancha
-      ensinou: na escala atual a nave tem ~34 px e o campo parece vazio nos dois estilos; a sensação "next-gen" pede
-      também uma decisão de **câmera** (zoom ~1.4× com follow suave ou campo lógico maior). Recomendação da sessão:
-      B para asteroides e cascos (volume, luz fixa, textura de crateras portada do menu) com a legibilidade de A (aro
-      emissivo fino em ameaças e no jogador), e bloom compartilhado em 3 níveis (1/2, 1/4, 1/8). **Decisão dele.** Depois:
-      `src/data/constants/palette.js` com tokens + escala de traço e de glow, literais trocados; camada emissiva num
-      canvas próprio, reduzida a 1/4, `filter: blur()` e composta em `lighter` (liga as opções de bloom/aberração que
-      hoje não fazem nada); asteroides com volume (gradiente com luz fixa, borda iluminada, crateras por ruído —
-      portar o gerador de textura do menu, `MenuBackgroundSystem.js:2244+`); aposentar o multi-stroke do
-      `NeonGraphics`; rastro do tiro inimigo na cor do tiro; orbes animados. Apagar `RenderBatch`/`GradientCache`/
-      `CanvasStateManager` ou pô-los para trabalhar. Worker: opus. Baseline de perf antes (`?profile=mid-game`).
+- [~] **3. Arte nova (docs/NORTE.md).** Feito em 17/10: paleta em código (`src/data/constants/palette.js`), bloom
+  compartilhado em 3 níveis (`src/core/bloomLayer.js`, segue a opção Bloom e `?bloom=0`), fundo do Campo (120
+  estrelas, névoa, poeira, Anel partido; 450 → 12 draw calls), fragmentos do Anel com rachaduras que acendem,
+  Motes/Seekers/Tethers/Warden Prime, nave Interceptor e Solar Slicer procedurais, lanças âmbar, fagulhas de XP,
+  brasas do propulsor na cor do jogador. **Falta:** captura em jogo de Wardens (só a prancha de lineup); câmera
+  1.3× com follow (NORTE §2); escudo do jogador ainda com o visual antigo (`RenderingSystem.renderPlayer`);
+  partículas de explosão/shockwave do `EffectsSystem` ainda com cores antigas; perf real na máquina dele
+  (headless sem GPU: ~800 ms/quadro em DPR 2 — não é medida válida).
 - [x] **4. Loop de passo fixo.** (17/10) `src/core/fixedStep.js`: acumulador a 60 Hz, teto de 5 passos por quadro
       (acima disso o atraso é descartado — câmera lenta breve em vez de espiral), quadro acima de 250 ms tratado como
       250 ms; `app.js` roda pools, GC, efeitos (que devolvem o delta com freeze/dilatação) e sistemas por passo, e
