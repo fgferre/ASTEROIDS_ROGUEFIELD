@@ -1108,17 +1108,6 @@ class UISystem extends BaseSystem {
           ? { x: player.position.x ?? 0, y: player.position.y ?? 0 }
           : { x: 0, y: 0 };
 
-    const playerVelocity =
-      player && typeof player.getVelocity === 'function'
-        ? player.getVelocity()
-        : player?.velocity && typeof player.velocity === 'object'
-          ? player.velocity
-          : { vx: 0, vy: 0 };
-
-    const velocityX = Number(playerVelocity.vx ?? playerVelocity.x ?? 0) || 0;
-    const velocityY = Number(playerVelocity.vy ?? playerVelocity.y ?? 0) || 0;
-    const speed = Math.hypot(velocityX, velocityY);
-
     if (player || force) {
       const hull = Number(player?.health ?? 0) || 0;
       const maxHull = Number(player?.maxHealth ?? 0) || 0;
@@ -1137,11 +1126,6 @@ class UISystem extends BaseSystem {
       }
 
       hud.updateVitals(shield, maxShield, hull, maxHull);
-      hud.updateTelemetry(
-        Number(playerPosition.x ?? 0) || 0,
-        Number(playerPosition.y ?? 0) || 0,
-        speed
-      );
     }
 
     if (enemies && typeof enemies.getSessionStats === 'function') {
