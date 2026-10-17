@@ -1187,6 +1187,9 @@ class UISystem extends BaseSystem {
       }
 
       hud.updateVitals(shield, maxShield, hull, maxHull);
+      if (player) {
+        hud.updateDashCooldown(player.getDashCooldownFraction());
+      }
     }
 
     if (enemies && typeof enemies.getSessionStats === 'function') {
@@ -2756,6 +2759,9 @@ class UISystem extends BaseSystem {
     const accentColors = this.resolveAccentColors(option);
     button.style.setProperty('--upgrade-accent', accentColors.accent);
     button.style.setProperty('--upgrade-accent-soft', accentColors.soft);
+    if (option.family) {
+      button.style.setProperty('--family-color', option.family.color);
+    }
 
     button.innerHTML = this.buildUpgradeOptionMarkup(option);
     button.addEventListener('click', () => this.selectUpgrade(option.id));
@@ -2784,6 +2790,8 @@ class UISystem extends BaseSystem {
       ? nextLevel.highlights
       : [];
     const prerequisites = ensureArray(option.prerequisites);
+
+    const familySection = this.buildFamilyProgressMarkup(option.family);
 
     const categoryIcon = category.icon
       ? `<span class="upgrade-option__category-icon" aria-hidden="true">${category.icon}</span>`
@@ -2831,10 +2839,17 @@ class UISystem extends BaseSystem {
           option.icon || '✨'
         }</span>
         <div class="upgrade-option__meta">
-          <span class="upgrade-option__category">
-            ${categoryIcon}
-            ${category.label || 'Tecnologia'}
-          </span>
+          <div class="upgrade-option__chips">
+            <span class="upgrade-option__category">
+              ${categoryIcon}
+              ${category.label || 'Tecnologia'}
+            </span>
+            ${
+              option.family
+                ? `<span class="upgrade-option__family">${option.family.name}</span>`
+                : ''
+            }
+          </div>
           <span class="upgrade-option__level">Lv. ${currentLevel}/${
             maxLevel || Math.max(1, currentLevel)
           }</span>
@@ -2843,10 +2858,38 @@ class UISystem extends BaseSystem {
       <div class="upgrade-option__body">
         <h3 class="upgrade-option__title">${option.name || option.id}</h3>
         ${summary ? `<p class="upgrade-option__summary">${summary}</p>` : ''}
+        ${familySection}
         ${nextLevelSection}
       </div>
       ${prerequisitesSection}
     `;
+  }
+
+  // Pips for distinct upgrades held in the family; names the bonus a pick unlocks.
+  buildFamilyProgressMarkup(family) {
+    if (!family) {
+      return '';
+    }
+    const pips = Array.from(
+      { length: family.required },
+      (_, index) =>
+        `<span class="family-pip${index < family.owned ? ' is-filled' : ''}"></span>`
+    ).join('');
+    let state = '';
+    let label = `${family.name} ${Math.min(family.owned, family.required)}/${family.required} · ${family.bonusName}`;
+    if (family.active) {
+      state = ' is-active';
+      label = `${family.bonusName} online`;
+    } else if (family.completesSynergy) {
+      state = ' is-unlocking';
+      label = `Unlocks: ${family.bonusName} — ${family.bonusDescription}`;
+    } else if (family.owned > 0) {
+      state = ' is-building';
+    }
+    return `<p class="upgrade-option__family-progress${state}">
+        <span class="family-pips" aria-hidden="true">${pips}</span>
+        <span>${label}</span>
+      </p>`;
   }
 
   selectUpgrade(upgradeId) {
@@ -3190,7 +3233,7 @@ class UISystem extends BaseSystem {
     const toast = document.createElement('div');
     toast.className = 'controls-toast';
     toast.textContent =
-      'A/D turn · W thrust · shooting is automatic · E shield';
+      'A/D turn · W thrust · shooting is automatic · Shift dash · E shield';
     gameUi.appendChild(toast);
     requestAnimationFrame(() => toast.classList.add('is-visible'));
     setTimeout(() => toast.remove(), CONTROLS_TOAST_MS);

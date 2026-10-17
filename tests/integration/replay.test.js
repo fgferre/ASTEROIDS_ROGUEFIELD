@@ -21,7 +21,8 @@ import { deserialize, serialize } from '../../src/core/replay.js';
 const STEPS = 600; // 10 s at 60 Hz
 
 // Keys held during each half-second of the run (W thrust, A/D turn, S brake);
-// lowercase letters are taps (e shield, g spread toggle, t aim toggle).
+// lowercase letters are taps (e shield, g spread toggle, t aim toggle,
+// h dash).
 const SEGMENT_STEPS = 30;
 const SCRIPT = [
   '',
@@ -29,7 +30,7 @@ const SCRIPT = [
   'S',
   'WAe',
   'WA',
-  'W',
+  'Wh',
   'A',
   '',
   'A',
@@ -37,7 +38,7 @@ const SCRIPT = [
   'g',
   'A',
   'W',
-  'WD',
+  'WDh',
   'WDt',
   'WA',
   'WD',
@@ -56,6 +57,7 @@ const KEY_CODES = {
   e: 'KeyE',
   g: 'KeyG',
   t: 'KeyT',
+  h: 'ShiftLeft',
 };
 
 describe('run replay', () => {
@@ -104,6 +106,8 @@ describe('run replay', () => {
 
     expect(recording.steps).toBe(STEPS);
     expect(recording.upgrades.length).toBeGreaterThan(0);
+    // The dash bit (version 2) is in the recording.
+    expect(recording.inputs.some(([, mask]) => mask & 128)).toBe(true);
     expect(recorded.kills).toBeGreaterThan(0);
 
     // Replay in a fresh instance: no key events, only the recording.

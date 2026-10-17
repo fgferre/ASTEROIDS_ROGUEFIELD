@@ -219,6 +219,10 @@ class CombatSystem extends BaseSystem {
       this.applyAimingUpgrade(data || {});
     });
 
+    this.registerEventListener('upgrade-weapon-tuning', (data) => {
+      this.applyWeaponTuning(data);
+    });
+
     // Plan 01.07 Task 5/6: spread + aim mode toggles routed through the
     // action-binding system. Listener is gated to screen === 'playing' to
     // T-07-06 (no toggling during pause/menu/level-up/game-over).
@@ -999,6 +1003,36 @@ class CombatSystem extends BaseSystem {
     return settings;
   }
 
+  // Fire rate, projectile speed/lifetime and lock range from upgrades. Keyed
+  // by upgrade rank so re-applying a rank (Retry) does not compound it.
+  applyWeaponTuning(data = {}) {
+    this.weaponTuningSources.set(`${data.upgradeId}:${data.level}`, data);
+    const product = (field) => {
+      let value = 1;
+      this.weaponTuningSources.forEach((entry) => {
+        const factor = Number(entry[field]);
+        if (factor > 0) {
+          value *= factor;
+        }
+      });
+      return value;
+    };
+    this.cooldownTuning = product('cooldownMultiplier');
+    this.bulletSpeed = BULLET_SPEED * product('bulletSpeedMultiplier');
+    this.bulletLifetime =
+      COMBAT_BULLET_LIFETIME * product('bulletLifetimeMultiplier');
+    this.setTargetingRange(
+      COMBAT_TARGETING_RANGE * product('targetingRangeMultiplier')
+    );
+    this.refreshShootCooldown();
+  }
+
+  refreshShootCooldown() {
+    this.setShootCooldown(
+      this.baseShootCooldown * this.aimCooldownMultiplier * this.cooldownTuning
+    );
+  }
+
   resetAimingBranchState() {
     this.dangerWeights = this.cloneDangerWeights(this.defaultDangerWeights);
     this.dynamicPredictionSettings = {
@@ -1025,6 +1059,12 @@ class CombatSystem extends BaseSystem {
     this.targetThreatCache.clear();
     this.lastPrimaryTargetId = null;
     this.shootCooldown = this.baseShootCooldown;
+    this.aimCooldownMultiplier = 1;
+    this.cooldownTuning = 1;
+    this.weaponTuningSources = new Map();
+    this.bulletSpeed = BULLET_SPEED;
+    this.bulletLifetime = COMBAT_BULLET_LIFETIME;
+    this.targetingRange = COMBAT_TARGETING_RANGE;
   }
 
   applyAimingUpgrade(data = {}) {
@@ -1068,14 +1108,14 @@ class CombatSystem extends BaseSystem {
 
       const cooldownMultiplier = Number(data?.cooldownMultiplier);
       if (Number.isFinite(cooldownMultiplier) && cooldownMultiplier > 0) {
-        this.setShootCooldown(this.baseShootCooldown * cooldownMultiplier);
+        this.aimCooldownMultiplier = cooldownMultiplier;
+        this.refreshShootCooldown();
       } else if (
         Number.isFinite(this.aimingConfig?.multiLock?.cooldownMultiplier)
       ) {
-        this.setShootCooldown(
-          this.baseShootCooldown *
-            this.aimingConfig.multiLock.cooldownMultiplier
-        );
+        this.aimCooldownMultiplier =
+          this.aimingConfig.multiLock.cooldownMultiplier;
+        this.refreshShootCooldown();
       }
     }
 

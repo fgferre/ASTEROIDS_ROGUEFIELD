@@ -20,6 +20,13 @@ import {
   SHIP_ROTATION_SPEED,
 } from '../data/constants/physics.js';
 import {
+  DASH_COOLDOWN,
+  DASH_DURATION,
+  DASH_GHOST_COUNT,
+  DASH_GHOST_LIFE,
+  DASH_IMPULSE,
+  DASH_INVULNERABILITY,
+  DASH_SPEED_CAP_MULTIPLIER,
   MAGNETISM_RADIUS,
   SHIELD_COOLDOWN_DURATION,
   SHIELD_IMPACT_DAMAGE_BASE,
@@ -435,6 +442,7 @@ class PlayerSystem extends BaseSystem {
     this.shieldWasInCooldown = false;
     this.isShieldActive = false;
     this.invulnerableTimer = 0;
+    this.resetDashState();
 
     // === DEATH/RETRY STATE ===
     this.isDead = false;
@@ -590,6 +598,11 @@ class PlayerSystem extends BaseSystem {
   }
 
   setupEventListeners() {
+    // Applied in the next update, once this step's movement input is known.
+    this.registerEventListener('dash-pressed', () => {
+      this.dashRequested = true;
+    });
+
     this.registerEventListener('upgrade-damage-boost', (data) => {
       this.damage = Math.floor(this.damage * data.multiplier);
       console.log('[PlayerSystem] Damage boosted to', this.damage);
@@ -898,13 +911,24 @@ class PlayerSystem extends BaseSystem {
       }
     }
 
+    if (this.dashCooldownTimer > 0) {
+      this.dashCooldownTimer = Math.max(0, this.dashCooldownTimer - deltaTime);
+    }
+    const dashRequested = this.dashRequested;
+    this.dashRequested = false;
+
     // === ONLY UPDATE WHEN ALIVE: ===
     if (this.isDead || this.isRetrying) {
       return; // Don't process input, movement, or effects when dead/retrying
     }
 
+    if (dashRequested && this.dashCooldownTimer <= 0) {
+      this.startDash(movement);
+    }
+
     this.updateMovement(deltaTime, movement);
     this.updatePosition(deltaTime);
+    this.updateDash(deltaTime);
 
     // Update weapon recoil (decay over time)
     this.recoilOffset.x *= this.recoilDecay;
@@ -932,6 +956,101 @@ class PlayerSystem extends BaseSystem {
       velocity: { ...this.velocity },
       angle: this.angle,
     });
+  }
+
+  // === DASH ===
+  resetDashState() {
+    this.dashRequested = false;
+    this.dashTimer = 0;
+    this.dashCooldownTimer = 0;
+    this.dashGhosts = [];
+    this.dashGhostsDropped = 0;
+  }
+
+  /** Forward along the nose, or backward while only S/↓ is held. */
+  startDash(movement) {
+    const sign = movement.down && !movement.up ? -1 : 1;
+    const direction = {
+      x: Math.cos(this.angle) * sign,
+      y: Math.sin(this.angle) * sign,
+    };
+    this.velocity.vx += direction.x * DASH_IMPULSE;
+    this.velocity.vy += direction.y * DASH_IMPULSE;
+    this.dashTimer = DASH_DURATION;
+    this.dashCooldownTimer = DASH_COOLDOWN;
+    this.invulnerableTimer = Math.max(
+      this.invulnerableTimer,
+      DASH_INVULNERABILITY
+    );
+    this.dashGhostsDropped = 0;
+    this.dropDashGhosts();
+    this.eventBus?.emit?.('player-dashed', {
+      position: { ...this.position },
+      direction,
+    });
+  }
+
+  // Afterimages spread evenly over the dash, the first at its start.
+  dropDashGhosts() {
+    const elapsed = DASH_DURATION - this.dashTimer;
+    const interval = DASH_DURATION / (DASH_GHOST_COUNT - 1);
+    const due = Math.min(
+      DASH_GHOST_COUNT,
+      1 + Math.floor(elapsed / interval + 1e-6)
+    );
+    while (this.dashGhostsDropped < due) {
+      this.dashGhosts.push({
+        x: this.position.x,
+        y: this.position.y,
+        angle: this.angle,
+        age: 0,
+      });
+      this.dashGhostsDropped += 1;
+    }
+  }
+
+  updateDash(deltaTime) {
+    this.dashGhosts.forEach((ghost) => {
+      ghost.age += deltaTime;
+    });
+    this.dashGhosts = this.dashGhosts.filter(
+      (ghost) => ghost.age < DASH_GHOST_LIFE
+    );
+    if (this.dashTimer > 0) {
+      this.dashTimer = Math.max(0, this.dashTimer - deltaTime);
+      this.dropDashGhosts();
+    }
+  }
+
+  /** 0 when the dash is ready, 1 right after dashing. */
+  getDashCooldownFraction() {
+    return this.dashCooldownTimer / DASH_COOLDOWN;
+  }
+
+  // Cyan rim copies of the hull, fading out where the dash passed.
+  renderDashGhosts(ctx, geometry, levels) {
+    if (this.dashGhosts.length === 0) return;
+    const sprites = this.getHullSprites(
+      this.currentHull,
+      levels,
+      geometry,
+      getRenderScale()
+    );
+    if (!sprites) return;
+    const { half } = sprites;
+    const emissive = beginEmissive(getEmissive(), ctx);
+    const layers = emissive ? [ctx, emissive] : [ctx];
+    layers.forEach((target) => {
+      this.dashGhosts.forEach((ghost) => {
+        target.save();
+        target.translate(ghost.x, ghost.y);
+        target.rotate(ghost.angle);
+        target.globalAlpha = 0.6 * (1 - ghost.age / DASH_GHOST_LIFE);
+        target.drawImage(sprites.rim, -half, -half, half * 2, half * 2);
+        target.restore();
+      });
+    });
+    emissive?.restore();
   }
 
   // === LÓGICA DE MOVIMENTO (COPIADA DO ORIGINAL) ===
@@ -1003,14 +1122,21 @@ class PlayerSystem extends BaseSystem {
     const noManualThrust = !isMainManual && !isAuxManual;
     const effectiveDamping =
       this.baseLinearDamping + (noManualThrust ? this.brakingDamping : 0);
-    const linearDamp = Math.exp(-effectiveDamping * deltaTime);
-    this.velocity.vx *= linearDamp;
-    this.velocity.vy *= linearDamp;
+    // A dash carries its burst undamped, under a raised speed cap.
+    const dashing = this.dashTimer > 0;
+    if (!dashing) {
+      const linearDamp = Math.exp(-effectiveDamping * deltaTime);
+      this.velocity.vx *= linearDamp;
+      this.velocity.vy *= linearDamp;
+    }
 
     // Limitar velocidade máxima
+    const speedCap = dashing
+      ? this.maxSpeed * DASH_SPEED_CAP_MULTIPLIER
+      : this.maxSpeed;
     const currentSpeed = Math.hypot(this.velocity.vx, this.velocity.vy);
-    if (currentSpeed > this.maxSpeed) {
-      const scale = this.maxSpeed / currentSpeed;
+    if (currentSpeed > speedCap) {
+      const scale = speedCap / currentSpeed;
       this.velocity.vx *= scale;
       this.velocity.vy *= scale;
     }
@@ -1598,6 +1724,7 @@ class PlayerSystem extends BaseSystem {
     const emissive = beginEmissive(getEmissive(), ctx);
     this.renderThrusterTrail(ctx, emissive, geometry, thrust.main);
     emissive?.restore();
+    this.renderDashGhosts(ctx, geometry, levels);
 
     ctx.save();
     ctx.translate(this.position.x, this.position.y);
@@ -1753,6 +1880,7 @@ class PlayerSystem extends BaseSystem {
     this.angle = 0;
     this.angularVelocity = 0;
     this.driftFactor = 0;
+    this.resetDashState();
     this._quitExplosionHidden = false; // Reset visibility flag
     this.isDead = false;
     this.isRetrying = false;
@@ -1834,6 +1962,7 @@ class PlayerSystem extends BaseSystem {
     this.velocity.vy = 0;
     this.angularVelocity = 0;
     this.driftFactor = 0;
+    this.resetDashState();
 
     // Reset thruster state to stop any active sounds
     this.lastThrusterState = {

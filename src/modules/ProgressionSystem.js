@@ -77,6 +77,7 @@ class ProgressionSystem extends UpgradeSystem {
     this.comboMultiplier = 1;
     this.comboMultiplierStep = comboStep;
     this.comboMultiplierCap = comboCap;
+    this.xpGainMultiplier = 1;
 
     this.xpOrbsService = null;
     this.playerService = null;
@@ -306,7 +307,10 @@ class ProgressionSystem extends UpgradeSystem {
     const multiplier = Number.isFinite(this.comboMultiplier)
       ? Math.max(1, this.comboMultiplier)
       : 1;
-    const adjustedValue = Math.max(1, Math.round(value * multiplier));
+    const adjustedValue = Math.max(
+      1,
+      Math.round(value * multiplier * this.xpGainMultiplier)
+    );
 
     this.totalExperience += adjustedValue;
 
@@ -405,6 +409,7 @@ class ProgressionSystem extends UpgradeSystem {
       poolSize: context.poolSize ?? 0,
       totalDefinitions: context.totalDefinitions ?? 0,
       inventory: this.getUpgradeProgressSnapshot(),
+      synergies: this.getSynergySnapshot(),
       autoResolved: (context.options || []).length === 0,
     });
   }
@@ -464,6 +469,8 @@ class ProgressionSystem extends UpgradeSystem {
     this.experienceToNext = Math.max(1, Math.floor(initialRequirement));
     this.totalExperience = 0;
     this.appliedUpgrades.clear();
+    this.activeSynergies.clear();
+    this.xpGainMultiplier = 1;
     this.pendingUpgradeOptions = [];
     this.pendingLevelUpScreens = [];
     this.levelUpScreenTimer = 0;
@@ -521,6 +528,10 @@ class ProgressionSystem extends UpgradeSystem {
       ? snapshot.appliedUpgrades
       : [];
     this.appliedUpgrades = new Map(entries);
+    // Upgrade-driven numbers start clean: the caller re-applies every rank
+    // (GameSessionService.reapplyProgressionUpgrades), synergies included.
+    this.activeSynergies.clear();
+    this.xpGainMultiplier = 1;
     this.pendingUpgradeOptions = [];
 
     if (Number.isFinite(this.defaultComboTimeout)) {
@@ -543,12 +554,6 @@ class ProgressionSystem extends UpgradeSystem {
     }
 
     const comboData = deepClone(snapshot.comboState) || {};
-    if (
-      Number.isFinite(comboData?.comboTimeout) &&
-      comboData.comboTimeout >= 0
-    ) {
-      this.comboTimeout = comboData.comboTimeout;
-    }
 
     const restoredCombo = Number.isFinite(comboData?.comboCount)
       ? Math.max(0, Math.floor(comboData.comboCount))

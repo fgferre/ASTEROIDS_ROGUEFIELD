@@ -3,6 +3,10 @@ import {
   PROGRESSION_UPGRADE_FALLBACK_COUNT,
 } from '../core/GameConstants.js';
 import UPGRADE_LIBRARY, { UPGRADE_CATEGORIES } from '../data/upgrades/index.js';
+import {
+  UPGRADE_FAMILIES,
+  FAMILY_SYNERGY_THRESHOLD,
+} from '../data/upgrades/families.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import {
   MAGNETISM_FORCE,
@@ -18,6 +22,14 @@ const DEFAULT_UPGRADE_CATEGORY = {
   icon: '✨',
   themeColor: '#3399FF',
 };
+
+// Progression-owned numbers an upgrade effect may change directly.
+const PROGRESSION_SELF_PROPERTIES = new Set([
+  'comboTimeout',
+  'comboMultiplierStep',
+  'comboMultiplierCap',
+  'xpGainMultiplier',
+]);
 
 class UpgradeSystem extends BaseSystem {
   constructor(dependencies = {}, options = {}) {
@@ -48,6 +60,7 @@ class UpgradeSystem extends BaseSystem {
 
   initialize() {
     this.appliedUpgrades = new Map();
+    this.activeSynergies = new Set();
     this.pendingUpgradeOptions = [];
     this.upgradeDefinitions = this.buildUpgradeDefinitions(UPGRADE_LIBRARY);
     this.upgradeLookup = this.buildUpgradeLookup(this.upgradeDefinitions);
@@ -438,6 +451,7 @@ class UpgradeSystem extends BaseSystem {
       themeColor: definition.themeColor || category.themeColor,
       category,
       tags: asArray(definition.tags),
+      family: this.describeFamilyProgress(definition),
       currentLevel,
       maxLevel,
       unlockLevel: definition.unlockLevel ?? null,
@@ -567,6 +581,7 @@ class UpgradeSystem extends BaseSystem {
     return {
       id,
       category: entry.category || entry.type || DEFAULT_UPGRADE_CATEGORY.id,
+      family: entry.family || null,
       icon: entry.icon || '✨',
       themeColor:
         entry.themeColor || entry.color || DEFAULT_UPGRADE_CATEGORY.themeColor,
@@ -786,9 +801,16 @@ class UpgradeSystem extends BaseSystem {
   }
 
   applyUpgradeEffects(definition, levelDefinition, newLevel) {
-    const effects = asArray(levelDefinition?.effects);
+    this.applyEffectList(levelDefinition?.effects, {
+      upgradeId: definition.id,
+      level: newLevel,
+      category: definition.category,
+    });
+    this.syncSynergies();
+  }
 
-    effects.forEach((effect) => {
+  applyEffectList(effects, context) {
+    asArray(effects).forEach((effect) => {
       if (!effect || typeof effect !== 'object') {
         return;
       }
@@ -801,13 +823,10 @@ class UpgradeSystem extends BaseSystem {
       }
 
       if (type === 'event' && typeof effect.event === 'string') {
-        const payload = {
+        this.eventBus?.emit?.(effect.event, {
           ...(effect.payload || {}),
-          upgradeId: definition.id,
-          level: newLevel,
-          category: definition.category,
-        };
-        this.eventBus?.emit?.(effect.event, payload);
+          ...context,
+        });
         return;
       }
 
@@ -816,6 +835,69 @@ class UpgradeSystem extends BaseSystem {
         type
       );
     });
+  }
+
+  // === FAMILIES AND SYNERGIES ===
+  getFamilyCounts() {
+    const counts = {};
+    Object.keys(UPGRADE_FAMILIES).forEach((id) => {
+      counts[id] = 0;
+    });
+    this.appliedUpgrades.forEach((level, upgradeId) => {
+      const family = this.upgradeLookup?.get(upgradeId)?.family;
+      if (level > 0 && family in counts) {
+        counts[family] += 1;
+      }
+    });
+    return counts;
+  }
+
+  // Switches on every family bonus whose threshold is met and is not on yet.
+  syncSynergies() {
+    const counts = this.getFamilyCounts();
+    Object.values(UPGRADE_FAMILIES).forEach((family) => {
+      if (
+        counts[family.id] < FAMILY_SYNERGY_THRESHOLD ||
+        this.activeSynergies.has(family.id)
+      ) {
+        return;
+      }
+      this.activeSynergies.add(family.id);
+      this.applyEffectList(family.bonus.effects, {
+        synergy: family.id,
+        level: 1,
+      });
+      this.eventBus?.emit?.('synergy-unlocked', {
+        family: family.id,
+        familyName: family.name,
+        name: family.bonus.name,
+        description: family.bonus.description,
+        color: family.color,
+      });
+    });
+  }
+
+  describeFamilyProgress(definition) {
+    const family = UPGRADE_FAMILIES[definition.family];
+    if (!family) {
+      return null;
+    }
+    const owned = this.getFamilyCounts()[family.id];
+    const isNewToFamily = this.getUpgradeCount(definition.id) === 0;
+    return {
+      id: family.id,
+      name: family.name,
+      color: family.color,
+      bonusName: family.bonus.name,
+      bonusDescription: family.bonus.description,
+      owned,
+      required: FAMILY_SYNERGY_THRESHOLD,
+      active: this.activeSynergies.has(family.id),
+      completesSynergy:
+        isNewToFamily &&
+        !this.activeSynergies.has(family.id) &&
+        owned + 1 === FAMILY_SYNERGY_THRESHOLD,
+    };
   }
 
   applyProgressionEffect(effect) {
@@ -830,13 +912,6 @@ class UpgradeSystem extends BaseSystem {
     }
 
     const operation = effect.operation || 'set';
-    this.refreshInjectedServices();
-    const xpSystem = this.xpOrbsService;
-
-    if (!xpSystem) {
-      return;
-    }
-
     const applyNumericOperation = (current, modifier) => {
       switch (operation) {
         case 'multiply':
@@ -848,6 +923,18 @@ class UpgradeSystem extends BaseSystem {
           return modifier;
       }
     };
+
+    if (PROGRESSION_SELF_PROPERTIES.has(property)) {
+      this[property] = applyNumericOperation(this[property], value);
+      return;
+    }
+
+    this.refreshInjectedServices();
+    const xpSystem = this.xpOrbsService;
+
+    if (!xpSystem) {
+      return;
+    }
 
     if (property === 'orbMagnetismRadius') {
       const current =
@@ -883,7 +970,19 @@ class UpgradeSystem extends BaseSystem {
     return Array.from(this.appliedUpgrades.entries()).map(([id, level]) => ({
       id,
       level,
+      family: this.upgradeLookup?.get(id)?.family || null,
     }));
+  }
+
+  // Distinct upgrades per family and the bonuses already on (game over build list).
+  getSynergySnapshot() {
+    return {
+      families: this.getFamilyCounts(),
+      synergies: Array.from(this.activeSynergies).map((id) => ({
+        family: id,
+        name: UPGRADE_FAMILIES[id].bonus.name,
+      })),
+    };
   }
 }
 

@@ -112,6 +112,16 @@ export const SHIELD_IMPACT_DAMAGE_BASE = 15; // [NEO-ARCADE] Buffed impact (was 
 
 export const SHIELD_IMPACT_DAMAGE_PER_LEVEL = 4;
 
+// === DASH === (PLAN.md step 6) PROPOSAL 17/10 ("proposta 17/10"), judged by playing.
+export const DASH_IMPULSE = 520; // px/s added along the dash direction at start
+export const DASH_DURATION = 0.14; // s with no damping and a raised speed cap
+export const DASH_SPEED_CAP_MULTIPLIER = 1.9; // × max speed while dashing
+export const DASH_INVULNERABILITY = 0.22; // s from dash start
+export const DASH_COOLDOWN = 1.6; // s
+export const DASH_GHOST_COUNT = 5; // afterimages dropped during the dash
+export const DASH_GHOST_LIFE = 0.25; // s each afterimage fades over
+export const DASH_SHAKE = Object.freeze({ intensity: 3, duration: 0.12 });
+
 // === COMBAT ===
 
 // Plan 01.07 FIX-05 — spread + aim mode defaults.

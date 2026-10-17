@@ -14,7 +14,10 @@ import { ScreenShake, ShakePresets } from '../utils/ScreenShake.js';
 import { requireService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
 import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
-import { SHIELD_SHOCKWAVE_RADIUS } from '../data/constants/gameplay.js';
+import {
+  DASH_SHAKE,
+  SHIELD_SHOCKWAVE_RADIUS,
+} from '../data/constants/gameplay.js';
 import {
   BOSS_EFFECTS_PRESETS,
   BOSS_SCREEN_SHAKES,
@@ -672,6 +675,12 @@ export default class EffectsSystem extends BaseSystem {
         radius: 200,
         damage: 50, // AoE damage amount
       });
+    });
+
+    this.registerEventListener('player-dashed', (data) => {
+      if (data?.position && data?.direction) {
+        this.createDashBurst(data.position, data.direction);
+      }
     });
 
     this.registerEventListener('shield-deflected', (data) => {
@@ -2240,6 +2249,26 @@ export default class EffectsSystem extends BaseSystem {
     this.screenFlash.duration = finalDuration;
     this.screenFlash.timer = finalDuration;
     this.screenFlash.intensity = finalIntensity;
+  }
+
+  // Dash kick (PLAN.md step 6, proposal 17/10): a short shake and a hard
+  // thruster burst out of the tail; the afterimages are the hull's own
+  // (PlayerSystem.renderDashGhosts).
+  createDashBurst(position, direction) {
+    this.addScreenShake(DASH_SHAKE.intensity, DASH_SHAKE.duration);
+    const tailX = position.x - direction.x * 12;
+    const tailY = position.y - direction.y * 12;
+    for (let i = 0; i < 4; i += 1) {
+      this.spawnThrusterVFX(
+        tailX,
+        tailY,
+        direction.x,
+        direction.y,
+        3,
+        'main',
+        3
+      );
+    }
   }
 
   spawnThrusterVFX(

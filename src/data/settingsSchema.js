@@ -138,8 +138,22 @@ const SETTINGS_SCHEMA = [
         label: 'Activate Shield',
         description: 'Deploys energy protection when available.',
         default: {
-          keyboard: ['KeyE', 'ShiftLeft'],
+          keyboard: ['KeyE'],
           gamepad: ['button:2', 'button:4'],
+        },
+        metadata: {
+          keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
+          gamepad: { ...DEFAULT_BINDING_METADATA.gamepad },
+        },
+      },
+      {
+        key: 'dash',
+        type: 'binding',
+        label: 'Dash',
+        description: 'Short burst forward (or backward while braking).',
+        default: {
+          keyboard: ['ShiftLeft', 'ShiftRight'],
+          gamepad: ['button:5'],
         },
         metadata: {
           keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },

@@ -435,6 +435,46 @@ describe('Aim regression suite (FIX-01)', () => {
     });
   });
 
+  describe('weapon tuning (Heat Sink / Overcharge Coil / Afterburn Lance)', () => {
+    it('compounds per rank, composes with the rank-3 lock cooldown, and is idempotent on reapply', () => {
+      const { combat, eventBus } = setupCombatHarness();
+      const baseCooldown = combat.shootCooldown;
+      const baseSpeed = combat.bulletSpeed;
+
+      eventBus.emit('upgrade-weapon-tuning', {
+        upgradeId: 'heat_sink',
+        level: 1,
+        cooldownMultiplier: 0.9,
+      });
+      eventBus.emit('upgrade-weapon-tuning', {
+        upgradeId: 'heat_sink',
+        level: 2,
+        cooldownMultiplier: 0.9,
+      });
+      eventBus.emit('upgrade-weapon-tuning', {
+        upgradeId: 'overcharge_coil',
+        level: 1,
+        bulletSpeedMultiplier: 1.15,
+      });
+      expect(combat.shootCooldown).toBeCloseTo(baseCooldown * 0.81, 6);
+      expect(combat.bulletSpeed).toBeCloseTo(baseSpeed * 1.15, 6);
+
+      // Retry re-applies the same ranks: nothing compounds twice.
+      eventBus.emit('upgrade-weapon-tuning', {
+        upgradeId: 'heat_sink',
+        level: 1,
+        cooldownMultiplier: 0.9,
+      });
+      expect(combat.shootCooldown).toBeCloseTo(baseCooldown * 0.81, 6);
+
+      eventBus.emit('upgrade-aiming-suite', {
+        level: 3,
+        cooldownMultiplier: 0.92,
+      });
+      expect(combat.shootCooldown).toBeCloseTo(baseCooldown * 0.81 * 0.92, 6);
+    });
+  });
+
   describe('vector-neutral / plasma', () => {
     // Plasma is damage-only. The vector set MUST be identical to baseline.
     // Damage value MUST change per rank.

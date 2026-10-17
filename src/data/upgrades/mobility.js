@@ -8,6 +8,7 @@ export const MOBILITY_UPGRADES = deepFreeze([
   {
     id: 'propulsors',
     category: 'mobility',
+    family: 'kinetic',
     icon: '🚀',
     themeColor: '#5DADE2',
     unlockLevel: 1,
@@ -156,6 +157,7 @@ export const MOBILITY_UPGRADES = deepFreeze([
   {
     id: 'rcs_system',
     category: 'mobility',
+    family: 'kinetic',
     icon: '🛰️',
     themeColor: '#5DADE2',
     unlockLevel: 2,
@@ -307,6 +309,7 @@ export const MOBILITY_UPGRADES = deepFreeze([
   {
     id: 'braking_system',
     category: 'mobility',
+    family: 'kinetic',
     icon: '⚙️',
     themeColor: '#5DADE2',
     unlockLevel: 3,

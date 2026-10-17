@@ -88,4 +88,17 @@ describe('replay recording', () => {
       deserialize(JSON.stringify({ ...recording, version: 99 }))
     ).toThrow(/version/);
   });
+
+  it('records dash presses as bit 7 (version 2)', () => {
+    expect(REPLAY_VERSION).toBe(2);
+    expect(encodeInputFrame(createInputFrame({ dash: true }))).toBe(128);
+  });
+
+  it('still reads version 1 recordings, with dash off', () => {
+    const v1 = { version: 1, seed: 3, hull: null, steps: 2, inputs: [[0, 17]] };
+    const player = createPlayer(deserialize(serialize(v1)));
+    expect(player.frameAt(1)).toEqual(
+      createInputFrame({ up: true, shield: true })
+    );
+  });
 });

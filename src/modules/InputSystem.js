@@ -25,6 +25,7 @@ const STEP_PRESS_FIELDS = {
   activateShield: 'shield',
   toggleSpreadMode: 'spread',
   toggleAimMode: 'aim',
+  dash: 'dash',
 };
 
 function ensureArray(value) {
@@ -534,6 +535,9 @@ class InputSystem {
     const eventBus = this.getEventBus();
     if (frame.shield) {
       eventBus?.emit?.('activate-shield-pressed');
+    }
+    if (frame.dash) {
+      eventBus?.emit?.('dash-pressed');
     }
     // CombatSystem no-ops the toggles unless screen === 'playing'.
     if (frame.spread) {

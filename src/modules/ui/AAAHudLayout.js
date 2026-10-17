@@ -45,6 +45,7 @@ export class AAAHudLayout {
     this._bossPhaseMarkers = [];
     this._lastBossPhaseMarkerCount = null;
     this._lastCombo = null;
+    this._lastDashFraction = null;
     this._lastComboTier = 'text';
     this._blipPool = [];
     this._timers = new Set();
@@ -127,6 +128,7 @@ export class AAAHudLayout {
     this._bossPhaseMarkers = [];
     this._lastBossPhaseMarkerCount = null;
     this._lastCombo = null;
+    this._lastDashFraction = null;
     this._lastComboTier = 'text';
     this._blipPool = [];
     this._timers.forEach((id) => window.clearTimeout(id));
@@ -337,6 +339,8 @@ export class AAAHudLayout {
       // Plan 01.07 Task 5/6 — combat mode indicators.
       spreadModeIndicator: query('#ui-spread-mode'),
       aimModeIndicator: query('#ui-aim-mode'),
+      dashChip: query('#ui-dash-chip'),
+      dashFill: query('#ui-dash-fill'),
       layerBanner: query('#ui-layer-banner'),
       layerBannerTitle: query('#ui-layer-banner-title'),
       bossIntro: query('#ui-boss-intro'),
@@ -362,6 +366,28 @@ export class AAAHudLayout {
     if (this.els.aimModeIndicator) {
       const label = aimMode === 'manual' ? 'MANUAL' : 'AUTO';
       this.els.aimModeIndicator.innerText = label;
+    }
+  }
+
+  /**
+   * DASH chip: the bar empties as the dash recharges and the chip flashes
+   * once when it is ready again.
+   * @param {number} cooldownFraction - 1 right after a dash, 0 when ready.
+   */
+  updateDashCooldown(cooldownFraction) {
+    if (!this.els?.dashFill) {
+      return;
+    }
+    const fraction = Math.min(1, Math.max(0, cooldownFraction || 0));
+    if (fraction === this._lastDashFraction) {
+      return;
+    }
+    const wasCharging = this._lastDashFraction > 0;
+    this._lastDashFraction = fraction;
+    this.els.dashFill.style.transform = `scaleX(${fraction})`;
+    this.els.dashChip.classList.toggle('is-charging', fraction > 0);
+    if (wasCharging && fraction === 0) {
+      this._replay(this.els.dashChip, 'is-ready');
     }
   }
 
@@ -849,6 +875,7 @@ export class AAAHudLayout {
             <div class="systems-area hud-panel">
                 <div class="mode-chip">AIM <span class="data-val" id="ui-aim-mode">AUTO</span></div>
                 <div class="mode-chip">SPREAD <span class="data-val" id="ui-spread-mode">CONC</span></div>
+                <div class="mode-chip dash-chip" id="ui-dash-chip">DASH <span class="dash-meter"><span class="dash-meter__fill" id="ui-dash-fill"></span></span></div>
             </div>
 
             <div class="cockpit-frame"></div>
@@ -970,6 +997,11 @@ export class AAAHudLayout {
             .systems-area { grid-row: 3; grid-column: 3; display: flex; flex-direction: row; justify-content: flex-end; align-items: flex-end; gap: var(--space-2, 8px); }
             .mode-chip { font-family: var(--font-mono, 'Consolas', monospace); font-size: var(--text-xs, 12px); color: var(--text-dim, #ccc); background: var(--surface, rgba(12, 20, 31, 0.65)); border: 1px solid var(--line, rgba(255,255,255,0.2)); border-radius: var(--radius-sm, 4px); padding: var(--space-1, 4px) var(--space-2, 8px); letter-spacing: 1px; }
             .data-val { color: var(--accent, #00f2ff); font-weight: bold; }
+            .dash-chip { display: flex; align-items: center; gap: var(--space-1, 4px); color: var(--accent); border-color: var(--accent-line); }
+            .dash-chip.is-charging { color: var(--text-dim); border-color: var(--line); }
+            .dash-meter { width: 28px; height: 4px; background: var(--accent); border-radius: var(--radius-sm); overflow: hidden; box-shadow: var(--glow-accent); }
+            .dash-chip.is-charging .dash-meter { background: var(--surface-strong); box-shadow: none; }
+            .dash-meter__fill { display: block; width: 100%; height: 100%; background: var(--accent-line); transform: scaleX(0); transform-origin: left; }
 
             /* ANIMATIONS */
             @keyframes rotate-border { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -1014,6 +1046,7 @@ export class AAAHudLayout {
 
             @media (prefers-reduced-motion: no-preference) {
                 .combo-box.pulse { animation: combo-pop ${COMBO_POP_MS}ms var(--ease-out) 1; }
+                .dash-chip.is-ready { animation: dash-ready var(--motion-base) var(--ease-out) 1; }
                 .lowhp-vignette.is-low { animation: lowhp-pulse 0.83s ease-in-out infinite alternate; }
                 .lowhp-vignette.is-critical { animation-name: lowhp-pulse-critical; }
                 .layer-banner.is-showing .layer-banner__title { animation: banner-title-in 420ms var(--ease-out); }
@@ -1027,6 +1060,7 @@ export class AAAHudLayout {
                 .feed-row.is-leaving { transform: translateX(8px); }
             }
             @keyframes combo-pop { 0% { transform: scale(1); } 50% { transform: scale(1.18); } 100% { transform: scale(1); } }
+            @keyframes dash-ready { 0% { box-shadow: var(--glow-accent); background: var(--accent-soft); } 100% { box-shadow: none; } }
             @keyframes lowhp-pulse { from { opacity: 0.25; } to { opacity: 0.75; } }
             @keyframes lowhp-pulse-critical { from { opacity: 0.55; } to { opacity: 1; } }
             @keyframes banner-title-in { from { opacity: 0; letter-spacing: 0.2em; margin-right: -0.2em; } to { opacity: 1; letter-spacing: 0.5em; margin-right: -0.5em; } }

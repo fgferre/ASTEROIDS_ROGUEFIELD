@@ -6,7 +6,9 @@
 // upgrade picked at each level-up, in pick order. Dependency-free on purpose:
 // the browser (F9 download, `?replay=`) and the headless tests share it.
 
-export const REPLAY_VERSION = 1;
+export const REPLAY_VERSION = 2;
+// Version 1 had no `dash` bit (bit 7); its masks decode unchanged with dash off.
+const READABLE_VERSIONS = new Set([1, REPLAY_VERSION]);
 
 // One step of input. Movement fields are held state; the rest are presses
 // that happened since the previous step. Field order is the bit order of the
@@ -20,6 +22,7 @@ export const INPUT_FRAME_FIELDS = Object.freeze([
   'shield',
   'spread',
   'aim',
+  'dash', // version 2
 ]);
 
 export function createInputFrame(values = {}) {
@@ -129,7 +132,7 @@ export function serialize(recording) {
 
 export function deserialize(text) {
   const data = typeof text === 'string' ? JSON.parse(text) : text;
-  if (!data || data.version !== REPLAY_VERSION) {
+  if (!data || !READABLE_VERSIONS.has(data.version)) {
     throw new Error(
       `[replay] Unsupported recording version ${data?.version} (expected ${REPLAY_VERSION})`
     );
