@@ -1,5 +1,5 @@
 # BACKLOG — noticed, not done (max 30 lines, one per line)
-- `rcs_system` rank 5 emits `upgrade-strafe-movement` (`src/data/upgrades/mobility.js`) and `braking_system` rank 3 emits `upgrade-emergency-brake`; no PlayerSystem handler consumes either, so both upgrades are inert while their cards promise an effect. Same for `propulsors` rank 5 `upgrade-ion-trail` ("Ion trail damages enemies"); `tests/modules/UpgradeSystem.synergy.test.js` lists the three as known-inert.
+- `braking_system` rank 3 emits `upgrade-emergency-brake` (`src/data/upgrades/mobility.js`); no PlayerSystem handler consumes it, so the upgrade is inert while its card promises an effect. Same for `propulsors` rank 5 `upgrade-ion-trail` ("Ion trail damages enemies"); `tests/modules/UpgradeSystem.synergy.test.js` lists both as known-inert.
 - `PlayerSystem.getShieldState()` had two definitions; the 15-field one (level, maxHP, cooldownTimer, isUnlocked…) was shadowed by a 4-field one. The lint cleanup (17/10) deleted the dead one and kept runtime behavior; check whether the HUD wanted the richer fields.
 - `PlayerSystem.heal()` likewise: the kept version emits `player-healed`; the deleted one emitted `player-health-changed`. Check that nothing listened for the latter.
 - `tests/process/scope-freeze.test.js` reads `.planning/REQUIREMENTS.md`, which no longer exists in the repo, so it always skips; retire it or point it at PLAN.md.
@@ -13,3 +13,4 @@
 - Fundo novo (17/10) assa ~10 camadas em tela cheia (estrelas ×3, névoa ×2, Anel, vinheta, emissivo + 3 níveis de bloom): ~75 MB em escala 2,8. Se pesar em máquina fraca, baixar névoa/Anel para 1/4 e limitar o teto de DPR por setting.
 - Achados do passe de dependências (17/10): o manifesto passa `command-queue` ao combat e `audio` aos effects e nenhum usa; `WorldSystem` não tem `getBounds()`, então WaveManager sempre cai em GAME_WIDTH/HEIGHT; EnemySystem atualiza a HUD do boss duas vezes (chamada direta + evento `ui-boss-hud-update`). Limpar os três.
 - Dash (17/10): no fim dos 0,14 s a velocidade cai de 418 para 220 de uma vez; pode parecer freada. Se ele sentir, decair o teto ao longo de 0,2 s.
+- Esquema moderno (17/10): o nariz salta quando o alvo primário muda (−2,0 → 0,54 → −0,07 rad em três quadros); pode parecer nervoso. Botão: o teto de 10 rad/s em `physics.js`, ou histerese na troca de alvo em `CombatSystem`.

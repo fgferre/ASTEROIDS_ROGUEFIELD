@@ -267,6 +267,7 @@ class CombatSystem extends BaseSystem {
     // Only target and shoot when ship hull exists (visible and alive)
     if (!player.isDead && !player.isRetrying && !player._quitExplosionHidden) {
       this.updateTargeting(deltaTime);
+      player.setAimPoint(this.getPrimaryAimPoint());
 
       if (playerStats) {
         this.handleShooting(deltaTime, playerStats);
@@ -2998,6 +2999,16 @@ class CombatSystem extends BaseSystem {
 
   getCurrentTarget() {
     return this.currentTarget;
+  }
+
+  /** Where the primary lock is aimed (lead included), or null. */
+  getPrimaryAimPoint() {
+    const target = this.currentTarget;
+    if (!target) return null;
+    const predicted = this.predictedAimPointsMap.get(target.id);
+    return predicted
+      ? { x: predicted.x, y: predicted.y }
+      : { x: target.x, y: target.y };
   }
 
   getBulletCount() {

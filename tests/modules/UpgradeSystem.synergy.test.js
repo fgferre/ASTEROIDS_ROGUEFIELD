@@ -61,7 +61,6 @@ describe('upgrade families', () => {
     ];
     // Known inert ranks, listed in BACKLOG.md.
     const knownInert = new Set([
-      'upgrade-strafe-movement',
       'upgrade-emergency-brake',
       'upgrade-ion-trail',
     ]);

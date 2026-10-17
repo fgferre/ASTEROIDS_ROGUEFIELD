@@ -14,10 +14,15 @@ import { getEmissive } from '../core/bloomLayer.js';
 import { resolveService } from '../core/serviceUtils.js';
 import {
   SHIP_ACCELERATION,
+  SHIP_AIM_TURN_RATE,
   SHIP_ANGULAR_DAMPING,
+  SHIP_FACE_VELOCITY_MIN_SPEED,
+  SHIP_FACING_RESPONSE,
   SHIP_LINEAR_DAMPING,
   SHIP_MAX_SPEED,
+  SHIP_MOVE_TURN_RATE,
   SHIP_ROTATION_SPEED,
+  SHIP_STRAFE_ACCELERATION_RATIO,
 } from '../data/constants/physics.js';
 import {
   DASH_COOLDOWN,
@@ -105,6 +110,19 @@ const TRAIL_BREAK_DISTANCE = 40;
 const PREVIEW_THRUST = 0.35;
 const PREVIEW_ANGLE = -Math.PI / 2;
 const IDLE_THRUST = Object.freeze({ main: 0, aux: 0, sideL: 0, sideR: 0 });
+
+// 'modern' (NORTE §4b): W/S thrust, A/D strafe, nose on the aim point.
+// 'classic' (?controls=classic): A/D rotate, Asteroids-style.
+const controlSchemeFromUrl = () => {
+  try {
+    return new URLSearchParams(window.location.search).get('controls') ===
+      'classic'
+      ? 'classic'
+      : 'modern';
+  } catch {
+    return 'modern';
+  }
+};
 
 const coneLength = (thrust, thrusterLevel) =>
   (4 + 12 * thrust) * (1 + 0.1 * thrusterLevel);
@@ -356,6 +374,9 @@ class PlayerSystem extends BaseSystem {
       resolveService('command-queue', this.dependencies) ||
       null;
     this.commandQueueConsumerId = 'player-system';
+    this.controlScheme = config?.controlScheme || controlSchemeFromUrl();
+    // World point CombatSystem aims at (null without a lock), set each step.
+    this.aimPoint = null;
     this.cachedMovementInput = this.getDefaultMovementBinary();
     this.lastConsumedMovementCommand = null;
     const startX = Number.isFinite(position?.x) ? position.x : GAME_WIDTH / 2;
@@ -374,6 +395,7 @@ class PlayerSystem extends BaseSystem {
     this.maxSpeed = SHIP_MAX_SPEED;
     this.acceleration = SHIP_ACCELERATION;
     this.rotationSpeed = SHIP_ROTATION_SPEED;
+    this.strafeMultiplier = 1;
     // FIX-02: split damping into base (always) + braking (no-thrust frames only).
     this.baseLinearDamping = SHIP_LINEAR_DAMPING;
     this.brakingDamping = 0;
@@ -624,6 +646,11 @@ class PlayerSystem extends BaseSystem {
         '[PlayerSystem] Rotation speed boosted to',
         this.rotationSpeed
       );
+    });
+
+    // rcs_system rank 5: harder sidesteps (strafe is base movement now).
+    this.registerEventListener('upgrade-strafe-movement', (data) => {
+      this.strafeMultiplier *= data.multiplier;
     });
 
     this.registerEventListener('upgrade-angular-damping', (data) => {
@@ -967,13 +994,24 @@ class PlayerSystem extends BaseSystem {
     this.dashGhostsDropped = 0;
   }
 
-  /** Forward along the nose, or backward while only S/↓ is held. */
+  /**
+   * Classic: forward along the nose, or backward while only S/↓ is held.
+   * Modern: along the held input direction, else along the nose.
+   */
   startDash(movement) {
-    const sign = movement.down && !movement.up ? -1 : 1;
-    const direction = {
-      x: Math.cos(this.angle) * sign,
-      y: Math.sin(this.angle) * sign,
-    };
+    const fwd = { x: Math.cos(this.angle), y: Math.sin(this.angle) };
+    let direction;
+    if (this.controlScheme === 'modern') {
+      const along = (movement.up ? 1 : 0) - (movement.down ? 1 : 0);
+      const side = (movement.right ? 1 : 0) - (movement.left ? 1 : 0);
+      const x = fwd.x * along - fwd.y * side;
+      const y = fwd.y * along + fwd.x * side;
+      const length = Math.hypot(x, y);
+      direction = length > 0 ? { x: x / length, y: y / length } : fwd;
+    } else {
+      const sign = movement.down && !movement.up ? -1 : 1;
+      direction = { x: fwd.x * sign, y: fwd.y * sign };
+    }
     this.velocity.vx += direction.x * DASH_IMPULSE;
     this.velocity.vy += direction.y * DASH_IMPULSE;
     this.dashTimer = DASH_DURATION;
@@ -1056,24 +1094,29 @@ class PlayerSystem extends BaseSystem {
   // === LÓGICA DE MOVIMENTO (COPIADA DO ORIGINAL) ===
   updateMovement(deltaTime, input) {
     // COPIAR EXATAMENTE da função updatePlayerMovement() original
+    const modern = this.controlScheme === 'modern';
     const accelStep = this.acceleration * deltaTime;
     const fwd = {
       x: Math.cos(this.angle),
       y: Math.sin(this.angle),
     };
+    // Ship's starboard (screen y points down).
+    const right = { x: -fwd.y, y: fwd.x };
 
     // Thruster intensities (lógica do original)
     let thrMain = input.up ? 1 : 0;
     let thrAux = input.down ? 1 : 0;
+    // Classic: torque. Modern: sideL pushes to starboard, sideR to port.
     let thrSideR = input.left ? 1 : 0; // CCW torque
     let thrSideL = input.right ? 1 : 0; // CW torque
 
     // Track if thrusters are manually controlled (for audio distinction)
     const isMainManual = input.up;
     const isAuxManual = input.down;
+    const isSideManual = modern && (input.left || input.right);
 
     // Auto-brake quando não há input linear
-    const noLinearInput = !input.up && !input.down;
+    const noLinearInput = !input.up && !input.down && !isSideManual;
     const speed = Math.hypot(this.velocity.vx, this.velocity.vy);
 
     if (noLinearInput) {
@@ -1101,6 +1144,17 @@ class PlayerSystem extends BaseSystem {
       const k = kBase * driftBrakeScale;
       if (proj > 0) thrAux = Math.max(thrAux, k);
       else if (proj < 0) thrMain = Math.max(thrMain, k);
+      if (modern) {
+        // The nose follows the target, not the motion: brake drift too.
+        const lateral = this.velocity.vx * right.x + this.velocity.vy * right.y;
+        const kLateral =
+          Math.max(
+            0.35,
+            Math.min(1, Math.abs(lateral) / (this.maxSpeed * 0.8))
+          ) * driftBrakeScale;
+        if (lateral > 0) thrSideR = Math.max(thrSideR, kLateral);
+        else if (lateral < 0) thrSideL = Math.max(thrSideL, kLateral);
+      }
     }
 
     // Aplicar forças dos thrusters
@@ -1112,6 +1166,12 @@ class PlayerSystem extends BaseSystem {
       this.velocity.vx -= fwd.x * accelStep * thrAux;
       this.velocity.vy -= fwd.y * accelStep * thrAux;
     }
+    if (modern) {
+      const strafeStep =
+        accelStep * SHIP_STRAFE_ACCELERATION_RATIO * this.strafeMultiplier;
+      this.velocity.vx += right.x * strafeStep * (thrSideL - thrSideR);
+      this.velocity.vy += right.y * strafeStep * (thrSideL - thrSideR);
+    }
 
     // Amortecimento ambiente — FIX-02: split damping with conditional gate.
     // baseLinearDamping always applies; brakingDamping applies ONLY on frames
@@ -1119,7 +1179,7 @@ class PlayerSystem extends BaseSystem {
     // upgrade's "Paradas mais rápidas" intent without making active flight
     // sluggish. The auto-damping thrusters (above) still fire during coast;
     // brakingDamping is the additive component layered on top of base.
-    const noManualThrust = !isMainManual && !isAuxManual;
+    const noManualThrust = !isMainManual && !isAuxManual && !isSideManual;
     const effectiveDamping =
       this.baseLinearDamping + (noManualThrust ? this.brakingDamping : 0);
     // A dash carries its burst undamped, under a raised speed cap.
@@ -1142,23 +1202,29 @@ class PlayerSystem extends BaseSystem {
     }
 
     // === MOVIMENTO ANGULAR ===
-    // Restaurando a lógica de aceleração e amortecimento angular do app.js original
-    const rotationAccel = this.rotationSpeed * deltaTime;
-    let angularAccel = 0;
-    if (thrSideR) angularAccel -= rotationAccel; // 'a' ou 'arrowleft'
-    if (thrSideL) angularAccel += rotationAccel; // 'd' ou 'arrowright'
+    if (modern) {
+      this.updateFacing(deltaTime);
+    } else {
+      // Restaurando a lógica de aceleração e amortecimento angular do app.js original
+      const rotationAccel = this.rotationSpeed * deltaTime;
+      let angularAccel = 0;
+      if (thrSideR) angularAccel -= rotationAccel; // 'a' ou 'arrowleft'
+      if (thrSideL) angularAccel += rotationAccel; // 'd' ou 'arrowright'
 
-    this.angularVelocity += angularAccel;
+      this.angularVelocity += angularAccel;
 
-    // Amortecimento angular
-    const angularDamp = Math.exp(-this.angularDamping * deltaTime);
-    this.angularVelocity *= angularDamp;
+      // Amortecimento angular
+      const angularDamp = Math.exp(-this.angularDamping * deltaTime);
+      this.angularVelocity *= angularDamp;
 
-    // Limitar velocidade angular (clamp)
-    const maxAng = this.rotationSpeed;
-    if (this.angularVelocity > maxAng) this.angularVelocity = maxAng;
-    if (this.angularVelocity < -maxAng) this.angularVelocity = -maxAng;
-    this.angle = this.wrapAngle(this.angle + this.angularVelocity * deltaTime);
+      // Limitar velocidade angular (clamp)
+      const maxAng = this.rotationSpeed;
+      if (this.angularVelocity > maxAng) this.angularVelocity = maxAng;
+      if (this.angularVelocity < -maxAng) this.angularVelocity = -maxAng;
+      this.angle = this.wrapAngle(
+        this.angle + this.angularVelocity * deltaTime
+      );
+    }
 
     // === EFEITOS DE THRUSTER ===
     // Emitir eventos SEMPRE (não só na mudança) para manter visuais funcionando
@@ -1234,6 +1300,48 @@ class PlayerSystem extends BaseSystem {
       });
       this.lastThrusterState.sideR = thrSideR;
     }
+  }
+
+  // Modern scheme: nose onto the aim point, else onto the motion, else hold.
+  // Exponential approach under a rate cap, so it never overshoots. RCS
+  // rotation upgrades raise the cap.
+  updateFacing(deltaTime) {
+    let heading = null;
+    let rate = 0;
+    if (this.aimPoint) {
+      heading = Math.atan2(
+        this.aimPoint.y - this.position.y,
+        this.aimPoint.x - this.position.x
+      );
+      rate = SHIP_AIM_TURN_RATE;
+    } else if (
+      Math.hypot(this.velocity.vx, this.velocity.vy) >
+      SHIP_FACE_VELOCITY_MIN_SPEED
+    ) {
+      heading = Math.atan2(this.velocity.vy, this.velocity.vx);
+      rate = SHIP_MOVE_TURN_RATE;
+    }
+    if (heading === null) {
+      this.angularVelocity = 0;
+      return;
+    }
+    const maxStep =
+      rate * (this.rotationSpeed / SHIP_ROTATION_SPEED) * deltaTime;
+    const error = this.wrapAngle(heading - this.angle);
+    const step = Math.max(
+      -maxStep,
+      Math.min(
+        maxStep,
+        error * (1 - Math.exp(-SHIP_FACING_RESPONSE * deltaTime))
+      )
+    );
+    this.angle = this.wrapAngle(this.angle + step);
+    this.angularVelocity = step / deltaTime;
+  }
+
+  /** CombatSystem's aim point for this step, or null without a lock. */
+  setAimPoint(point) {
+    this.aimPoint = point;
   }
 
   updatePosition(deltaTime) {
@@ -1848,6 +1956,7 @@ class PlayerSystem extends BaseSystem {
     this.maxSpeed = SHIP_MAX_SPEED;
     this.acceleration = SHIP_ACCELERATION;
     this.rotationSpeed = SHIP_ROTATION_SPEED;
+    this.strafeMultiplier = 1;
     // FIX-02: split damping — reset both components. baseLinearDamping returns
     // to ship default; brakingDamping clears any accumulated braking_system
     // upgrade contribution.
@@ -1879,6 +1988,7 @@ class PlayerSystem extends BaseSystem {
     this.velocity = { vx: 0, vy: 0 };
     this.angle = 0;
     this.angularVelocity = 0;
+    this.aimPoint = null;
     this.driftFactor = 0;
     this.resetDashState();
     this._quitExplosionHidden = false; // Reset visibility flag
@@ -1961,6 +2071,7 @@ class PlayerSystem extends BaseSystem {
     this.velocity.vx = 0;
     this.velocity.vy = 0;
     this.angularVelocity = 0;
+    this.aimPoint = null;
     this.driftFactor = 0;
     this.resetDashState();
 

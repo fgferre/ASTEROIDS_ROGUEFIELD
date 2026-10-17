@@ -79,8 +79,8 @@ const SETTINGS_SCHEMA = [
       {
         key: 'moveUp',
         type: 'binding',
-        label: 'Move Up',
-        description: 'Accelerate ship forward.',
+        label: 'Thrust Forward',
+        description: 'Thrust along the nose.',
         default: {
           keyboard: ['KeyW', 'ArrowUp'],
           gamepad: ['axis:1:-', 'button:12'],
@@ -93,8 +93,8 @@ const SETTINGS_SCHEMA = [
       {
         key: 'moveDown',
         type: 'binding',
-        label: 'Move Down',
-        description: 'Engage rear thrusters to decelerate.',
+        label: 'Thrust Back',
+        description: 'Reverse thrust along the nose.',
         default: {
           keyboard: ['KeyS', 'ArrowDown'],
           gamepad: ['axis:1:+', 'button:13'],
@@ -108,7 +108,7 @@ const SETTINGS_SCHEMA = [
         key: 'moveLeft',
         type: 'binding',
         label: 'Strafe Left',
-        description: 'Lateral control for aiming adjustment.',
+        description: 'Slide to port; the nose stays on the target.',
         default: {
           keyboard: ['KeyA', 'ArrowLeft'],
           gamepad: ['axis:0:-', 'button:14'],
@@ -122,7 +122,7 @@ const SETTINGS_SCHEMA = [
         key: 'moveRight',
         type: 'binding',
         label: 'Strafe Right',
-        description: 'Lateral thrust towards target.',
+        description: 'Slide to starboard; the nose stays on the target.',
         default: {
           keyboard: ['KeyD', 'ArrowRight'],
           gamepad: ['axis:0:+', 'button:15'],

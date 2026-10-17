@@ -198,8 +198,8 @@ export const MOBILITY_UPGRADES = deepFreeze([
         },
         {
           title: 'Omni-directional RCS',
-          description: 'Rotation +130% and lateral movement unlocked.',
-          highlights: ['Full vector control. Movement independent of heading.'],
+          description: 'Rotation +130% and strafe thrust +15%.',
+          highlights: ['Sharper sidesteps around incoming fire.'],
         },
       ],
     },
@@ -300,7 +300,7 @@ export const MOBILITY_UPGRADES = deepFreeze([
           {
             type: 'event',
             event: 'upgrade-strafe-movement',
-            payload: { enabled: true },
+            payload: { multiplier: 1.15 },
           },
         ],
       },

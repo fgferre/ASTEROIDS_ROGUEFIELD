@@ -69,6 +69,14 @@ describe('PlayerSystem dash', () => {
     expect(player.velocity.vx).toBeLessThan(-SHIP_MAX_SPEED);
   });
 
+  it('dashes to starboard while only D is held', () => {
+    const { player, eventBus } = makePlayer({ right: true });
+    eventBus.emit('dash-pressed');
+    player.update(DELTA_TIME);
+    expect(player.velocity.vy).toBeGreaterThan(SHIP_MAX_SPEED);
+    expect(Math.abs(player.velocity.vx)).toBeLessThan(1e-6);
+  });
+
   it('ignores presses during the cooldown and while dead', () => {
     const { player, eventBus } = makePlayer();
     eventBus.emit('dash-pressed');
