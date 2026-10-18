@@ -40,6 +40,7 @@ import { FieldBackdrop } from './fieldBackdrop.js';
 import { FlashLights } from './flashLights.js';
 import { HitSparks, MuzzleFlashes } from './hitSparks.js';
 import { ImpactKick, createImpactPass } from './impactPass.js';
+import { PickupMirror } from './pickupMirror.js';
 import { PlayerMirror } from './playerMirror.js';
 import { TextSprites } from './textSprites.js';
 
@@ -159,6 +160,7 @@ class Renderer3D extends BaseSystem {
         cachedPlayer: 'player',
         cachedXPOrbs: 'xp-orbs',
         cachedHealthHearts: 'healthHearts',
+        cachedPickups: 'pickups',
         cachedEffects: 'effects',
         cachedCombat: 'combat',
         cachedEnemies: 'enemies',
@@ -371,6 +373,7 @@ class Renderer3D extends BaseSystem {
     const flashes = new FlashLights(THREE, scene);
     const enemies = new EnemyMirror(THREE, scene, this.seeded);
     const player = new PlayerMirror(THREE, scene, this.seeded);
+    const pickups = new PickupMirror(THREE, scene);
     const debris = new DebrisChunks(THREE, scene);
 
     const ribbons = new RibbonBatch(THREE, 4000);
@@ -442,6 +445,7 @@ class Renderer3D extends BaseSystem {
       flashes,
       enemies,
       player,
+      pickups,
       ribbons,
       lances,
       glow,
@@ -769,6 +773,8 @@ class Renderer3D extends BaseSystem {
       t.glow.push(heart.x, 4, heart.y, t.statusRgb, r * 1.6 * pulse, 0.7, 1);
       t.glow.push(heart.x, 4.5, heart.y, WHITE, r * 0.4, 0.9, 1.2);
     }
+
+    t.pickups.update(this.cachedPickups?.getActivePickups() || []);
   }
 
   mirrorEffects(effects) {
