@@ -245,7 +245,7 @@ Conteúdo:
       ícone no inimigo e no feed; tabela por camada; recompensa por afixo.
 - [x] **R6.3 Dificuldade e seed.** Settings: Pilot / Veteran / Warden (multiplicadores nomeados); seed da run na HUD
       e no recap, `?seed=` compartilhável, "Daily Field" com seed do dia e placar local separado.
-- [ ] **R6.4 Solar Slicer de verdade.** Casco próprio (lâminas, propulsor âmbar, torreta própria), stats distintos
+- [x] **R6.4 Solar Slicer de verdade.** Casco próprio (lâminas, propulsor âmbar, torreta própria), stats distintos
       (mais leve, mais rápido, menos casco), seleção no Hangar com prévia.
       Qualidade:
 - [x] **R6.5 HUD direcional.** Indicador de direção do dano na borda, setas de fora-de-tela para Heralds/Wardens e

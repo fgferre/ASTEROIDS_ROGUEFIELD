@@ -46,6 +46,28 @@ describe('PlayerMirror', () => {
     expect(amber.r).toBeGreaterThan(amber.b);
   });
 
+  it('builds the Solar Slicer with two amber-edged blades and a low turret', () => {
+    const named = (mirror, name) =>
+      mirror.ship.children.filter((child) => child.name === name);
+    const interceptor = mirrorFor(defaultHull).mirror;
+    expect(named(interceptor, 'fin')).toHaveLength(2);
+    expect(named(interceptor, 'blade')).toHaveLength(0);
+    expect(interceptor.turretHousing.visible).toBe(true);
+    expect(interceptor.turretHousingLow.visible).toBe(false);
+
+    const slicer = mirrorFor(solarSlicer).mirror;
+    expect(named(slicer, 'blade')).toHaveLength(2);
+    expect(named(slicer, 'fin')).toHaveLength(0);
+    const edges = named(slicer, 'bladeEdge');
+    expect(edges).toHaveLength(2);
+    const { r, b } = edges[0].material.color;
+    expect(r).toBeGreaterThan(b);
+    expect(slicer.flames).toHaveLength(2);
+    expect(slicer.turretHousing.visible).toBe(false);
+    expect(slicer.turretHousingLow.visible).toBe(true);
+    expect(slicer.barrels.position.y).toBeLessThan(0);
+  });
+
   it('rim-lights the hull materials and carries no flat shield ring', () => {
     const { mirror } = mirrorFor(defaultHull);
     [mirror.baseMaterial, mirror.finMaterial, mirror.spineMaterial].forEach(
