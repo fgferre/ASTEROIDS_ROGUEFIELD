@@ -4,11 +4,11 @@ Lista viva do que está aberto, nas palavras do dono. Leia só a seção O BAST�
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 7.**
 
-## O BASTÃO — onde a rodada parou (18/10, ~03h40) — RODADAS 2, 3 E 4 MESCLADAS NA `main` (publicado)
+## O BASTÃO — onde a rodada parou (18/10, ~04h00) — RODADAS 2, 3 E 4 COMPLETAS E MESCLADAS NA `main` (publicado)
 
 **Como retomar (qualquer máquina):** `git clone https://github.com/fgferre/ASTEROIDS_ROGUEFIELD.git`, `git checkout main`
-(contém tudo: PRs #247, #248 e o terceiro, mesclados a pedido dele: _"eu aprovo daqui… preciso que tudo seja mergeado"_).
-Ler este BASTÃO, `PLAN.md` (Rodadas 2–4) e `docs/NORTE.md` (§7 = Norte 2); `npm ci && npm run done` (762 testes).
+(contém tudo: PRs #247, #248, #249 e o quarto, mesclados a pedido dele: _"eu aprovo daqui… preciso que tudo seja mergeado"_).
+Ler este BASTÃO, `PLAN.md` (Rodadas 2–4) e `docs/NORTE.md` (§7 = Norte 2); `npm ci && npm run done` (773 testes).
 
 **Palavras dele:** _"crie um goal novo baseado nos seus achados e aja independentemente… aumentando o conteúdo do
 jogo a cada rodada"_. O Norte 2 (NORTE §7) é o goal escrito pela sessão; a Rodada 4 do PLAN é a execução.
@@ -20,8 +20,7 @@ no renderer 2D; modo infinito após o 15 ("Continue into the deep field", record
 melhorias permanentes, casco Solar Slicer) como **proposta reversível num commit**; dissolve de morte em 3D;
 HUD com arma/evoluções/buffs; nomes unificados (Mote/Seeker/Tether); cues de áudio para tudo que é novo.
 
-**Do Norte 2 só falta R4.9:** interpolação de render (144 Hz), rochas instanciadas, presets de qualidade
-automáticos por fps medido. Tudo o mais do §7 tem uma primeira versão no jogo.
+**Norte 2 tem uma primeira versão de todos os oito pilares.** R4.9 fechou por último: interpolação de render pelo alpha do passo fixo (`?interp=0` desliga) e preset de qualidade automático por tempo de quadro medido (`graphics.quality` em Settings, `?quality=` para A/B). Próxima rodada = o que ele disser jogando; sem veredito dele, candidatos: `BACKLOG.md` (30 linhas, triado), 2D parity residual, e a divisão dos arquivos gigantes (só com pedido explícito).
 
 **Tudo visto só em headless sem GPU (2–4 fps).** Ele ainda não jogou nada disto. `?stats=1` mostra fps/ms reais.
 
