@@ -2500,6 +2500,9 @@ class CombatSystem extends BaseSystem {
             id: bullet.enemyId,
             type: bullet.enemyType,
             wave: data.wave ?? data.enemy?.wave ?? null,
+            displayName: data.enemy?.displayName ?? null,
+            elite: Boolean(data.enemy?.elite),
+            bossKind: data.enemy?.bossKind ?? null,
           }
         : null;
 

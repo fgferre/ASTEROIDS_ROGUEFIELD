@@ -28,8 +28,39 @@ import {
   wardenTransmission,
 } from './ui/transmissions.js';
 import { PICKUP_KINDS } from '../data/pickups.js';
+import {
+  buildBlockMarkup,
+  collectBuild,
+  killerName,
+  pipsMarkup,
+  runLocationLine,
+} from './ui/runRecap.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
+
+// One Codex row; an entry never met shows as a dark silhouette, unnamed.
+function codexEntryMarkup(entry) {
+  const known = Boolean(entry.seen);
+  const classes = `codex-entry${known ? '' : ' is-unknown'}${
+    entry.warden ? ' is-warden' : ''
+  }`;
+  const glyph = `<svg class="codex-entry__glyph" viewBox="-16 -16 32 32" aria-hidden="true">${entry.glyph}</svg>`;
+  if (!known) {
+    return `<li class="${classes}">${glyph}
+      <div class="codex-entry__text">
+        <h3 class="codex-entry__name">Unknown signal</h3>
+        <p class="codex-entry__meta">Below layer ${entry.fromLayer}</p>
+        <p class="codex-entry__lore">No contact logged. Go deeper.</p>
+      </div></li>`;
+  }
+  return `<li class="${classes}">${glyph}
+    <div class="codex-entry__text">
+      <h3 class="codex-entry__name">${entry.name}</h3>
+      <p class="codex-entry__meta">From layer ${entry.fromLayer} · First contact: layer ${entry.seen.firstLayer} · Destroyed: ${entry.seen.kills}</p>
+      <p class="codex-entry__lore">${entry.lore}</p>
+      <p class="codex-entry__hint">${entry.hint}</p>
+    </div></li>`;
+}
 const LEVEL_UP_LOCKOUT_MS = 400;
 const UPGRADE_RARITY_LABELS = { common: 'Common', rare: 'Rare', epic: 'Epic' };
 const CONTROLS_SEEN_KEY = 'roguefield:seenControls';
@@ -152,6 +183,7 @@ class UISystem extends BaseSystem {
       triggerId: null,
     };
     this.handleCreditsKeyDown = this.handleCreditsKeyDown.bind(this);
+    this.codexState = { isOpen: false, trigger: null };
     this.levelUpState = {
       isVisible: false,
       options: [],
@@ -188,6 +220,7 @@ class UISystem extends BaseSystem {
     this.bindLevelUpControls();
     this.bindSettingsControls();
     this.bindCreditsControls();
+    this.bindCodexControls();
     this.bindMainMenuControls();
     this.initializeMenuShipSelector();
     this.bootstrapSettingsState();
@@ -230,6 +263,8 @@ class UISystem extends BaseSystem {
         kills: document.getElementById('gameover-kills') || null,
         combo: document.getElementById('gameover-combo') || null,
         level: document.getElementById('gameover-level') || null,
+        killer: document.getElementById('gameover-killer') || null,
+        location: document.getElementById('gameover-location') || null,
         build: document.getElementById('gameover-build') || null,
         retryBtn: document.getElementById('retry-game-btn') || null,
         restartBtn: document.getElementById('restart-game-btn') || null,
@@ -250,6 +285,17 @@ class UISystem extends BaseSystem {
         resumeBtn: document.getElementById('pause-resume-btn') || null,
         settingsBtn: document.getElementById('pause-settings-btn') || null,
         exitBtn: document.getElementById('pause-exit-btn') || null,
+        location: document.getElementById('pause-build-location') || null,
+        build: document.getElementById('pause-build-block') || null,
+        tools: document.getElementById('pause-build-tools') || null,
+      },
+      codex: {
+        overlay: document.getElementById('codex-screen') || null,
+        list: document.getElementById('codex-list') || null,
+        count: document.getElementById('codex-count') || null,
+        openBtn: document.getElementById('menu-codex-btn') || null,
+        backBtn: document.getElementById('codex-back-btn') || null,
+        closeBtn: document.getElementById('codex-close-btn') || null,
       },
       settings: {
         overlay: document.getElementById('settings-screen') || null,
@@ -1756,6 +1802,47 @@ class UISystem extends BaseSystem {
     }
   }
 
+  bindCodexControls() {
+    const refs = this.domRefs.codex;
+    if (!refs.overlay) return;
+    refs.openBtn?.addEventListener('click', () => this.openCodex());
+    [refs.backBtn, refs.closeBtn].forEach((button) =>
+      button?.addEventListener('click', () => this.closeCodex())
+    );
+    refs.overlay.addEventListener('click', (event) => {
+      if (event.target === refs.overlay) this.closeCodex();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (this.codexState.isOpen && event.key === 'Escape') {
+        event.preventDefault();
+        this.closeCodex();
+      }
+    });
+  }
+
+  openCodex() {
+    const refs = this.domRefs.codex;
+    const entries = this.getService('codex').getEntries();
+    refs.list.innerHTML = entries.map(codexEntryMarkup).join('');
+    const found = entries.filter((entry) => entry.seen).length;
+    refs.count.textContent = `${found} / ${entries.length} signals logged`;
+    this.codexState = { isOpen: true, trigger: document.activeElement };
+    this.showScreen('codex', { overlay: true, show: true });
+    refs.overlay.setAttribute('aria-hidden', 'false');
+    this.emitOverlayVisibilityChanged('codex', true, { source: 'menu' });
+    refs.backBtn?.focus({ preventScroll: true });
+  }
+
+  closeCodex() {
+    if (!this.codexState.isOpen) return;
+    const refs = this.domRefs.codex;
+    this.showScreen('codex', { overlay: true, show: false });
+    refs.overlay.setAttribute('aria-hidden', 'true');
+    this.emitOverlayVisibilityChanged('codex', false, { source: 'menu' });
+    this.codexState.trigger?.focus?.({ preventScroll: true });
+    this.codexState = { isOpen: false, trigger: null };
+  }
+
   applyAccessibilitySettings(values = {}, derived = null) {
     const body = document.body;
     const root = document.documentElement;
@@ -2793,6 +2880,8 @@ class UISystem extends BaseSystem {
         this.creditsState.triggerId = null;
       }
 
+      this.closeCodex();
+
       document.body?.classList.remove('is-credits-open');
 
       if (screenName === 'menu') {
@@ -2822,6 +2911,7 @@ class UISystem extends BaseSystem {
 
     const resumeBtn = this.domRefs.pause?.resumeBtn;
     if (shouldPause) {
+      this.renderPauseBuild();
       resumeBtn?.focus({ preventScroll: true });
     } else {
       this.cancelQuitConfirm();
@@ -2837,6 +2927,19 @@ class UISystem extends BaseSystem {
     ) {
       this.closeSettingsPanel();
     }
+  }
+
+  // The pause panel: the same build block as the death recap, plus the
+  // level-up tools left and where the run is.
+  renderPauseBuild() {
+    const refs = this.domRefs.pause;
+    const progression = this.getService('progression');
+    if (!refs.build || !progression) return;
+    refs.build.innerHTML = buildBlockMarkup(
+      collectBuild(progression, this.getService('combat'))
+    );
+    refs.location.textContent = runLocationLine(this.transmissionLayer);
+    refs.tools.textContent = `Rerolls ${progression.rerollsLeft} · Banishes ${progression.banishesLeft}`;
   }
 
   showLevelUpScreen(data = {}) {
@@ -3098,11 +3201,7 @@ class UISystem extends BaseSystem {
     if (!family) {
       return '';
     }
-    const pips = Array.from(
-      { length: family.required },
-      (_, index) =>
-        `<span class="family-pip${index < family.owned ? ' is-filled' : ''}"></span>`
-    ).join('');
+    const pips = pipsMarkup(family.owned, family.required);
     let state = '';
     let label = `${family.name} ${Math.min(family.owned, family.required)}/${family.required} · ${family.bonusName}`;
     if (family.active) {
@@ -3474,26 +3573,14 @@ class UISystem extends BaseSystem {
     setText(refs.kills, `${data.stats?.totalKills ?? data.stats?.kills ?? 0}`);
     setText(refs.combo, `x${data.maxCombo ?? 0}`);
     setText(refs.level, `${level ?? '—'}`);
+    setText(refs.killer, `Killed by ${killerName(data.killedBy)}`);
+    setText(refs.location, runLocationLine(wave, totalSeconds));
 
-    if (refs.build) {
-      refs.build.innerHTML = '';
-      const upgrades = ensureArray(data.upgrades);
-      if (!upgrades.length) {
-        const empty = document.createElement('li');
-        empty.className = 'gameover-build__empty';
-        empty.textContent = 'No upgrades';
-        refs.build.appendChild(empty);
-      }
-      upgrades.forEach(({ name, id, level: rank }) => {
-        const item = document.createElement('li');
-        item.className = 'gameover-build__item';
-        item.append(`${name || id} `);
-        const rankNode = document.createElement('span');
-        rankNode.className = 'gameover-build__rank';
-        rankNode.textContent = `Lv.${rank}`;
-        item.appendChild(rankNode);
-        refs.build.appendChild(item);
-      });
+    const progression = this.getService('progression');
+    if (refs.build && progression) {
+      refs.build.innerHTML = buildBlockMarkup(
+        collectBuild(progression, this.getService('combat'))
+      );
     }
 
     const focusTarget = refs.retryBtn?.disabled

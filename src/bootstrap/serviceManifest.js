@@ -23,6 +23,7 @@ import { gameEvents } from '../core/EventBus.js';
 import { createServiceResolver } from '../core/serviceUtils.js';
 import GameSessionService from '../services/GameSessionService.js';
 import CommandQueueService from '../services/CommandQueueService.js';
+import CodexService from '../services/CodexService.js';
 
 export const DEFAULT_POOL_CONFIG = {
   bullets: { initial: 25, max: 120 },
@@ -298,6 +299,14 @@ export function createServiceManifest(context = {}) {
       dependencies: ['event-bus'],
       factory: ({ resolved }) =>
         new SettingsSystem({ eventBus: resolved['event-bus'] }),
+    },
+    {
+      name: 'codex',
+      singleton: true,
+      lazy: false,
+      dependencies: ['event-bus'],
+      factory: ({ resolved }) =>
+        new CodexService({ eventBus: resolved['event-bus'] }),
     },
     {
       name: 'audio',

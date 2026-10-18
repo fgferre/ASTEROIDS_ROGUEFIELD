@@ -874,6 +874,7 @@ export class Asteroid extends BaseEnemy {
         const result = this.system.applyDirectDamageToPlayer(damage, {
           cause: 'parasite',
           position: { x: this.x, y: this.y },
+          source: this,
         });
 
         if (result?.applied) {

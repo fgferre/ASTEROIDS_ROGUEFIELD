@@ -3,6 +3,7 @@
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 import { debugLog } from '../core/debugLogging.js';
 import { clamp } from '../utils/mathHelpers.js';
+import { loadJSON, saveJSON } from '../core/storage.js';
 import {
   normalizeDependencies,
   resolveEventBus,
@@ -169,36 +170,11 @@ class SettingsSystem {
   }
 
   loadFromStorage() {
-    try {
-      if (typeof window === 'undefined' || !window.localStorage) {
-        return null;
-      }
-
-      const raw = window.localStorage.getItem(this.storageKey);
-      if (!raw) {
-        return null;
-      }
-
-      return JSON.parse(raw);
-    } catch (error) {
-      console.warn(
-        '[SettingsSystem] Failed to load settings from storage:',
-        error
-      );
-      return null;
-    }
+    return loadJSON(this.storageKey);
   }
 
   persist() {
-    try {
-      if (typeof window === 'undefined' || !window.localStorage) {
-        return;
-      }
-
-      window.localStorage.setItem(this.storageKey, JSON.stringify(this.values));
-    } catch (error) {
-      console.warn('[SettingsSystem] Failed to persist settings:', error);
-    }
+    saveJSON(this.storageKey, this.values);
   }
 
   findField(categoryId, key) {

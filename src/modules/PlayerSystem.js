@@ -1853,7 +1853,9 @@ class PlayerSystem extends BaseSystem {
   }
 
   // === GERENCIAMENTO DE VIDA ===
-  takeDamage(amount) {
+  // `source`: the enemy (or its snapshot) that dealt the hit; the last one to
+  // reach the hull is kept by value (enemies are pooled) for the death recap.
+  takeDamage(amount, source = null) {
     const damageAmount = Math.max(0, amount);
     if (damageAmount <= 0) {
       return this.health;
@@ -1874,6 +1876,14 @@ class PlayerSystem extends BaseSystem {
     this.health = Math.max(0, this.health - remainingDamage);
 
     if (this.health !== previousHealth) {
+      this.lastDamageSource = source?.type
+        ? {
+            type: source.type,
+            displayName: source.displayName ?? null,
+            elite: Boolean(source.elite),
+            bossKind: source.bossKind ?? null,
+          }
+        : null;
       this.eventBus?.emit?.('player-health-changed', {
         current: this.health,
         max: this.maxHealth,
@@ -1992,6 +2002,7 @@ class PlayerSystem extends BaseSystem {
     this.driftFactor = 0;
     this.resetDashState();
     this._quitExplosionHidden = false; // Reset visibility flag
+    this.lastDamageSource = null;
     this.isDead = false;
     this.isRetrying = false;
   }

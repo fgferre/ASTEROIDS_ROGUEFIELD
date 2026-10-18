@@ -123,6 +123,7 @@ export class WardenNull extends BossEnemy {
           cause: 'boss-plate',
           position: { x: plate.x, y: plate.y },
           radius: NULL.plateRadius,
+          source: this,
         }
       );
       return;
