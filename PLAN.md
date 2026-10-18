@@ -238,6 +238,7 @@ efeitos e câmera, jogabilidade, etc. UX melhor a cada rodada."_** Toda rodada t
 ## Rodada 6 (18/10, manhã) — dois eixos, enquanto ele joga a 5
 
 Conteúdo:
+
 - [ ] **R6.1 Gamepad twin-stick.** Analógico esquerdo move, direito mira a torreta manualmente (solta = mira automática),
       gatilhos dash/escudo, vibração em dano e Warden; navegação dos menus com o controle; ícones de botão nas dicas.
 - [ ] **R6.2 Afixos de Elite.** Elite ganha 1–2 afixos visíveis (Shielded, Swift, Volatile, Splitter, Warded) com
@@ -246,7 +247,7 @@ Conteúdo:
       e no recap, `?seed=` compartilhável, "Daily Field" com seed do dia e placar local separado.
 - [ ] **R6.4 Solar Slicer de verdade.** Casco próprio (lâminas, propulsor âmbar, torreta própria), stats distintos
       (mais leve, mais rápido, menos casco), seleção no Hangar com prévia.
-Qualidade:
+      Qualidade:
 - [ ] **R6.5 HUD direcional.** Indicador de direção do dano na borda, setas de fora-de-tela para Heralds/Wardens e
       pickups, barra do chefe segmentada por fase, minimapa com ícones por tipo.
 - [ ] **R6.6 Desempenho.** Rochas instanciadas por variante (atributos por instância para rachaduras/veios), orçamento
