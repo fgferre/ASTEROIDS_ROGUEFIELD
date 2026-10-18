@@ -216,7 +216,7 @@ variedade de evento, de carta e de chefe, e um começo/fim de run com peso. Tudo
 efeitos e câmera, jogabilidade, etc. UX melhor a cada rodada."_** Toda rodada tem dois eixos: conteúdo (acima) e
 **qualidade** (abaixo); nenhuma rodada fecha só com conteúdo.
 
-- [ ] **R5.7 Câmera 2.0.** Antecipação para onde a mira aponta, zoom por densidade de ameaça (afasta com muitos
+- [x] **R5.7 Câmera 2.0.** Antecipação para onde a mira aponta, zoom por densidade de ameaça (afasta com muitos
       inimigos, aproxima no 1×1), enquadramento de chefe (nave e Warden sempre no quadro), rolagem sutil no strafe,
       transição suave entre modos; `?camera=1` mantém a atual para A/B.
 - [ ] **R5.8 Passe gráfico.** Vinheta + grão leve no passe de impacto, luz de borda (rim) nos cascos, estrelas que

@@ -318,6 +318,16 @@ const SETTINGS_SCHEMA = [
         default: 'SMAA',
       },
       {
+        key: 'cameraMode',
+        type: 'select',
+        label: 'Camera',
+        description:
+          'Dynamic leads toward your aim, pulls out in crowds and frames bosses; Classic is the plain follow.',
+        options: ['dynamic', 'classic'],
+        optionLabels: { dynamic: 'Dynamic', classic: 'Classic' },
+        default: 'dynamic',
+      },
+      {
         key: 'reducedParticles',
         type: 'toggle',
         label: 'Reduced Particles',

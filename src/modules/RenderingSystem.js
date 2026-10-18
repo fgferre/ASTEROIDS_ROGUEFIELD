@@ -11,7 +11,12 @@ import { normalize as normalizeVector } from '../utils/vectorHelpers.js';
 import { applyBaseTransform, getRenderScale } from '../core/viewport.js';
 import * as bloomLayer from '../core/bloomLayer.js';
 import { BiomeTransition } from '../data/biomes.js';
-import { cameraDisabledByUrl, createCamera } from '../core/camera.js';
+import {
+  createCamera,
+  createCameraScene,
+  readCameraScene,
+  resolveCameraMode,
+} from '../core/camera.js';
 import {
   FILL_LIGHT,
   KEY_LIGHT_DIR,
@@ -1077,7 +1082,8 @@ class RenderingSystem extends BaseSystem {
 
     // docs/NORTE.md §2 "Câmera"; `?camera=0` keeps the fixed full-field view.
     this.camera = createCamera();
-    this.camera.setEnabled(!cameraDisabledByUrl());
+    this.camera.setMode(resolveCameraMode());
+    this.cameraScene = createCameraScene();
     this.lastRenderTime = null;
 
     // Initialize state manager with common presets
@@ -1167,6 +1173,7 @@ class RenderingSystem extends BaseSystem {
 
     // Antialiasing: 'SMAA' (smoothed) vs 'None' (pixelated), per settingsSchema
     this.antialiasingMode = values.antialiasing !== 'None';
+    this.camera.setMode(resolveCameraMode(values.cameraMode));
   }
 
   onReset() {
@@ -1283,7 +1290,13 @@ class RenderingSystem extends BaseSystem {
     if (firstFrame) {
       this.camera.snapTo(position.x, position.y);
     } else {
-      this.camera.update(position.x, position.y, dt);
+      const scene = readCameraScene(
+        this.cameraScene,
+        player,
+        this.cachedCombat,
+        this.cachedEnemies?.getActiveEnemies() || []
+      );
+      this.camera.update(position.x, position.y, dt, scene);
     }
   }
 

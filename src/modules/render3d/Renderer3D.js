@@ -15,7 +15,13 @@ import {
   GAME_WIDTH,
   XP_ORB_SIZE,
 } from '../../core/GameConstants.js';
-import { cameraDisabledByUrl, createCamera } from '../../core/camera.js';
+import {
+  createCamera,
+  createCameraScene,
+  dampTo,
+  readCameraScene,
+  resolveCameraMode,
+} from '../../core/camera.js';
 import {
   blendPose,
   cinematicFreezeFromUrl,
@@ -68,6 +74,9 @@ const KEY_ELEVATION = (40 * Math.PI) / 180;
 const DOLLY_TIME_CONSTANT = 0.4;
 const DOLLY_SPEED_OUT = 0.08;
 const DOLLY_COMBAT_IN = 0.06;
+// Camera roll on strafe (dynamic mode only, none in boss framing).
+const ROLL_MAX = (2.5 * Math.PI) / 180;
+const ROLL_SMOOTH = 0.25;
 // A skipped or released cinematic eases back to the follow camera this long.
 const CINEMATIC_HANDBACK_MS = 500;
 const FOLLOW_POSE = followPose();
@@ -164,7 +173,9 @@ class Renderer3D extends BaseSystem {
     });
 
     this.camera = createCamera();
-    this.camera.setEnabled(!cameraDisabledByUrl());
+    this.camera.setMode(resolveCameraMode());
+    this.cameraScene = createCameraScene();
+    this.roll = { value: 0, velocity: 0 };
     this.lastRenderTime = null;
     this.dolly = 1;
     // The run's intro/epilogue camera (core/cinematics.js), on render time.
@@ -384,6 +395,7 @@ class Renderer3D extends BaseSystem {
     this.graphics.smaa = values.antialiasing !== 'None';
     this.graphics.aberration = values.chromaticAberration !== false;
     if (!this.qualityUrl) this.quality.setMode(values.quality);
+    this.camera.setMode(resolveCameraMode(values.cameraMode));
     this.syncPasses();
   }
 
@@ -456,6 +468,7 @@ class Renderer3D extends BaseSystem {
 
   applyAccessibilityPreferences(values = {}) {
     this.reducedMotion = Boolean(values.reducedMotion);
+    this.camera.setReducedMotion(this.reducedMotion);
   }
 
   syncPasses() {
@@ -468,6 +481,8 @@ class Renderer3D extends BaseSystem {
 
   onReset() {
     this.camera.reset();
+    this.roll.value = 0;
+    this.roll.velocity = 0;
     this.lastRenderTime = null;
     this.dolly = 1;
     this.cinematic = null;
@@ -929,12 +944,19 @@ class Renderer3D extends BaseSystem {
 
   updateCamera(player, enemies, effects, dt) {
     const t = this.three;
+    // Poses are interpolated by now (render → applyPoses), so is the scene.
     const position = player?.position;
     if (position) {
       if (this.lastRenderTime === null) {
         this.camera.snapTo(position.x, position.y);
       } else {
-        this.camera.update(position.x, position.y, dt);
+        const scene = readCameraScene(
+          this.cameraScene,
+          player,
+          this.cachedCombat,
+          enemies
+        );
+        this.camera.update(position.x, position.y, dt, scene);
       }
     }
 
@@ -988,7 +1010,33 @@ class Renderer3D extends BaseSystem {
     );
     t.camera.up.set(0, 0, -1);
     t.camera.lookAt(tx, 0, tz);
-    if (shaking && Math.abs(shake.angle) > 0.001) t.camera.rotateZ(shake.angle);
+    const roll = this.updateRoll(player, dt);
+    const angle = roll + (shaking ? shake.angle : 0);
+    if (Math.abs(angle) > 0.0001) t.camera.rotateZ(angle);
+  }
+
+  // Banks the view up to ROLL_MAX with the strafe: the screen-horizontal
+  // part of the ship's sideways velocity. Not in classic/static, boss
+  // framing, cinematics or reduced motion.
+  updateRoll(player, dt) {
+    let goal = 0;
+    const v = player?.velocity;
+    if (
+      v &&
+      this.camera.mode === 'dynamic' &&
+      !this.cinematic &&
+      !this.reducedMotion
+    ) {
+      const angle = player.angle || 0;
+      const sin = Math.sin(angle);
+      const lateral = -v.vx * sin + v.vy * Math.cos(angle);
+      const strafe = Math.max(
+        -1,
+        Math.min(1, (-sin * lateral) / SHIP_MAX_SPEED)
+      );
+      goal = -ROLL_MAX * strafe * (1 - this.camera.frameWeight);
+    }
+    return dampTo(this.roll, goal, ROLL_SMOOTH, dt);
   }
 
   // The follow point, kept so the frustum's footprint on the field plane (a
@@ -1283,13 +1331,12 @@ class Renderer3D extends BaseSystem {
       for (let i = 0; i < texts.length; i += 1) {
         const d = texts[i];
         if (!d) continue;
-        const size = (d.isCritical ? 24 * 1.5 : 16) * d.scale;
         t.texts.push(
           d.damage,
           d.x,
           d.y,
-          size,
-          d.isCritical ? PALETTE.shot : PALETTE.text,
+          d.size,
+          d.color,
           Math.min(1, d.life * 2)
         );
       }
