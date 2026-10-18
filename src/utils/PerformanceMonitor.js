@@ -331,6 +331,21 @@ export class PerformanceMonitor {
   }
 
   /**
+   * Average time between frames (ms) over the FPS history: what the player
+   * sees, GPU waits included (getAverageFrameTime is only the loop's work).
+   *
+   * @returns {number} Average frame interval in ms
+   */
+  getAverageFrameInterval() {
+    if (this.fpsHistory.length === 0) return 0;
+    let sum = 0;
+    for (let i = 0; i < this.fpsHistory.length; i += 1) {
+      sum += 1000 / this.fpsHistory[i];
+    }
+    return sum / this.fpsHistory.length;
+  }
+
+  /**
    * Gets memory usage (if available).
    *
    * @returns {Object|null} Memory info or null

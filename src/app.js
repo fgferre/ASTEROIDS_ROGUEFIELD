@@ -469,6 +469,8 @@ function gameLoop(currentTime) {
         const adjustedDelta = effects.update(stepSeconds);
         updateGame(adjustedDelta);
         simulationStep += 1;
+        // Renderer3D keeps each step's poses to interpolate between them.
+        gameSystemServices.renderer.snapshot?.();
       }
     } else {
       fixedStepper.reset();
@@ -505,7 +507,15 @@ function gameLoop(currentTime) {
     }
 
     if (shouldRenderGame) {
-      renderGame();
+      // Paused, the last step is what stays on screen.
+      renderGame(shouldUpdateGame ? fixedStepper.alpha : 1);
+      if (shouldUpdateGame) {
+        // Renderer3D's automatic quality preset follows the frame rate.
+        gameSystemServices.renderer.quality?.update(
+          frameSeconds,
+          performanceMonitor.getAverageFrameInterval()
+        );
+      }
     }
 
     // Capture render timing AFTER render completes
@@ -565,11 +575,11 @@ function updateGame(deltaTime) {
   servicesCache.ui.update(deltaTime);
 }
 
-function renderGame() {
+function renderGame(alpha) {
   if (gameState.rendererMode === '2d' && !gameState.ctx) return;
 
   performanceMonitor.startMeasure('render');
-  gameSystemServices.renderer.render(gameState.ctx);
+  gameSystemServices.renderer.render(gameState.ctx, alpha);
   performanceMonitor.endMeasure('render');
 }
 

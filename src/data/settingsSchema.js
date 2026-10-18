@@ -272,6 +272,22 @@ const SETTINGS_SCHEMA = [
     description: 'Visual quality and post-processing effects.',
     fields: [
       {
+        key: 'quality',
+        type: 'select',
+        label: 'Quality',
+        description:
+          'Auto lowers the 3D detail when frames get slow and raises it back when they recover.',
+        options: ['auto', 'ultra', 'high', 'medium', 'low'],
+        optionLabels: {
+          auto: 'Auto',
+          ultra: 'Ultra',
+          high: 'High',
+          medium: 'Medium',
+          low: 'Low',
+        },
+        default: 'auto',
+      },
+      {
         key: 'postProcessing',
         type: 'toggle',
         label: 'Post-Processing',
