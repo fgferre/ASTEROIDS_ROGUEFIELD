@@ -205,6 +205,19 @@ describe('boss-warning → MusicMixer delegation (plan 02.05)', () => {
     if (typeof audio.destroy === 'function') audio.destroy();
   });
 
+  it('the boss arc drives only the MusicMixer (no legacy music controller)', () => {
+    const { audio, eventBus } = resolveRealAudioService();
+    const spy = vi.spyOn(audio.musicMixer, 'setIntensityFromBossEvent');
+
+    eventBus.emit('boss-spawned', {});
+    expect(spy.mock.calls[0][0]).toBe('boss-spawned');
+    expect(audio.musicController).toBeUndefined();
+    expect(audio.setMusicIntensity).toBeUndefined();
+
+    spy.mockRestore();
+    audio.destroy();
+  });
+
   it('pause-state-changed delegates to musicMixer.pause()', () => {
     const { audio, eventBus } = resolveRealAudioService();
     const spy = vi.spyOn(audio.musicMixer, 'pause');
@@ -603,6 +616,49 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
     expectDelegates('enemy-fired', { enemyType: 'hunter' }, 'playHunterBurst');
   });
 
+  it('enemy-fired (herald) → playHeraldAttack with the Herald’s kind', () => {
+    expectDelegates(
+      'enemy-fired',
+      { enemyType: 'herald', enemy: { heraldKind: 'heat', x: 100, y: 50 } },
+      'playHeraldAttack',
+      ([options]) => expect(options.kind).toBe('heat')
+    );
+  });
+
+  it('herald-spawned → playHeraldSpawn with its kind, panned to it', () => {
+    expectDelegates(
+      'herald-spawned',
+      { kind: 'silence', x: 760, y: 300 },
+      'playHeraldSpawn',
+      ([options]) => {
+        expect(options.kind).toBe('silence');
+        expect(options.pan).toBeGreaterThan(0);
+      }
+    );
+  });
+
+  it('flak-burst → playFlakBurst', () => {
+    expectDelegates(
+      'flak-burst',
+      { position: { x: 100, y: 300 } },
+      'playFlakBurst',
+      ([options]) => expect(options.pan).toBeLessThan(0)
+    );
+  });
+
+  it('leech-ate → playLeechAte; leech-burst → playLeechBurst', () => {
+    expectDelegates(
+      'leech-ate',
+      { position: { x: 400, y: 300 } },
+      'playLeechAte'
+    );
+    expectDelegates(
+      'leech-burst',
+      { position: { x: 400, y: 300 } },
+      'playLeechBurst'
+    );
+  });
+
   it('mine-exploded → playMineExplosion', () => {
     expectDelegates(
       'mine-exploded',
@@ -651,8 +707,12 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
     expectDelegates('shield-activation-failed', {}, 'playShieldFail');
   });
 
-  it('shield-shockwave → playShieldShockwave', () => {
-    expectDelegates('shield-shockwave', {}, 'playShieldShockwave');
+  it('shield-shockwave has no listener (nothing emits it; a boss wave calls the cue directly)', () => {
+    const { audio, eventBus } = resolveRealAudioService();
+    const spy = vi.spyOn(audio.sfxBus, 'playShieldShockwave');
+    eventBus.emit('shield-shockwave', {});
+    expect(spy).not.toHaveBeenCalled();
+    audio.destroy();
   });
 
   it('upgrade-applied → playUpgradeSelect', () => {
