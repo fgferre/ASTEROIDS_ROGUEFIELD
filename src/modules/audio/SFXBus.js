@@ -1018,6 +1018,60 @@ class SFXBus {
     });
   }
 
+  /** Warden transmission opens: band-limited radio squelch, then a soft cold tone. */
+  playTransmission() {
+    this._trackPerformance('playTransmission');
+
+    this._safePlay(() => {
+      const destination = this.getAmbientDestination();
+      if (!destination) return;
+
+      const now = this.context.currentTime;
+      // Squelch: a short burst of seeded noise through a narrow radio band.
+      const rate = this.context.sampleRate;
+      const length = Math.max(1, Math.floor(rate * 0.12));
+      const buffer = this.context.createBuffer(1, length, rate);
+      const output = buffer.getChannelData(0);
+      const rng = this._resolveRandom(
+        this.randomScopes?.bufferFamilies?.explosion,
+        this.randomScopes?.families?.explosion,
+        this.randomScopes?.base
+      );
+      for (let i = 0; i < length; i += 1) {
+        output[i] = rng.float() * 2 - 1;
+      }
+      const noise = this.context.createBufferSource();
+      noise.buffer = buffer;
+      const band = this.context.createBiquadFilter();
+      band.type = 'bandpass';
+      band.frequency.setValueAtTime(1800, now);
+      band.Q.setValueAtTime(4, now);
+      const noiseGain = this.context.createGain();
+      noiseGain.gain.setValueAtTime(0.0001, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.09, now + 0.01);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      noise.connect(band);
+      band.connect(noiseGain);
+      noiseGain.connect(destination);
+      noise.start(now);
+
+      // Carrier tone settling in after the squelch.
+      const osc = this.context.createOscillator();
+      const gain = this.context.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(660, now + 0.1);
+      osc.frequency.exponentialRampToValueAtTime(440, now + 0.5);
+      gain.gain.setValueAtTime(0.0001, now + 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.05, now + 0.16);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+      osc.connect(gain);
+      gain.connect(destination);
+      this._sendToReverb(gain, AUDIO_REVERB_SEND_DB.levelUp);
+      osc.start(now + 0.1);
+      osc.stop(now + 0.62);
+    });
+  }
+
   playXPCollect() {
     this._trackPerformance('playXPCollect');
 

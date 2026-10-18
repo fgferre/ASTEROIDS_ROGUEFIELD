@@ -340,6 +340,10 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
     expectDelegates('surge-started', {}, 'playSurgeSting');
   });
 
+  it('transmission-shown → playTransmission', () => {
+    expectDelegates('transmission-shown', {}, 'playTransmission');
+  });
+
   it('boss-telegraph (ram) → playEnemyTelegraph', () => {
     expectDelegates(
       'boss-telegraph',

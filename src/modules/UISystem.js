@@ -20,6 +20,13 @@ import {
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { AAAHudLayout } from './ui/AAAHudLayout.js';
+import {
+  TransmissionQueue,
+  chapterTransmission,
+  deathTransmission,
+  victoryTransmission,
+  wardenTransmission,
+} from './ui/transmissions.js';
 import { PICKUP_KINDS } from '../data/pickups.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
@@ -72,6 +79,9 @@ class UISystem extends BaseSystem {
     // Force AAA Tactical HUD
     this.currentHudLayoutId = DEFAULT_HUD_LAYOUT_ID;
     this.aaaTacticalHud = null;
+    this.transmissions = null;
+    this.transmissionRaf = null;
+    this.transmissionLayer = 1;
     this.aaaTacticalHudDefinition = getHudLayoutDefinition(
       this.currentHudLayoutId
     );
@@ -430,11 +440,16 @@ class UISystem extends BaseSystem {
       (this.isControlsToastPending() ||
         Boolean(this.domRefs.gameUi?.querySelector('.controls-toast')));
     const biome = biomeForLayer(layer);
+    const firstOfBiome = biome.layers[0] === layer;
+    this.transmissionLayer = layer;
     hud.showLayerBanner(layer, {
       boss,
       delayMs: toastShowing ? 1000 : 0,
-      chapter: biome.layers[0] === layer ? biome.title : '',
+      chapter: firstOfBiome ? biome.title : '',
     });
+    if (firstOfBiome) {
+      this.queueTransmission(chapterTransmission(biome.id));
+    }
   }
 
   handleWaveCompletionEvent(payload = {}, sourceEvent = 'wave-complete') {
@@ -1157,6 +1172,44 @@ class UISystem extends BaseSystem {
     this.aaaTacticalHudDefinition = definition;
     this.aaaTacticalHudMountTarget = mountTarget;
     this.aaaTacticalHud.mount(mountTarget);
+    this.transmissions = new TransmissionQueue(
+      this.aaaTacticalHud,
+      ({ speaker, key }) => {
+        this.eventBus.emit('transmission-shown', { speaker, key });
+      }
+    );
+  }
+
+  /** Queues a Warden transmission and keeps the frame loop that plays it. */
+  queueTransmission(entry, { interrupt = false } = {}) {
+    const queue = this.transmissions;
+    if (!queue || !entry) {
+      return;
+    }
+    if (interrupt) {
+      queue.interrupt(entry);
+    } else {
+      queue.push(entry);
+    }
+    if (this.transmissionRaf) {
+      return;
+    }
+    // Wall-clock UI timing like the HUD banners: it keeps playing while the
+    // run is paused, dead or won.
+    const tick = () => {
+      if (this.transmissions !== queue) {
+        this.transmissionRaf = null;
+        return;
+      }
+      const reducedMotion =
+        document.body.classList.contains('motion-reduced') ||
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      queue.update(performance.now(), reducedMotion);
+      this.transmissionRaf = queue.active
+        ? window.requestAnimationFrame(tick)
+        : null;
+    };
+    this.transmissionRaf = window.requestAnimationFrame(tick);
   }
 
   deactivateAAATacticalHud() {
@@ -1166,6 +1219,7 @@ class UISystem extends BaseSystem {
     ) {
       this.aaaTacticalHud.unmount();
     }
+    this.transmissions = null;
 
     const restore = this.aaaTacticalHudRestoreState;
     if (restore?.mountTarget instanceof HTMLElement) {
@@ -1419,6 +1473,26 @@ class UISystem extends BaseSystem {
       this.handleLayerStarted(payload);
     });
 
+    this.registerEventListener('boss-warning', (payload = {}) => {
+      this.queueTransmission(
+        wardenTransmission(payload.nextBossWave, 'warning')
+      );
+    });
+
+    this.registerEventListener('boss-defeated', (payload = {}) => {
+      this.queueTransmission(wardenTransmission(payload.wave, 'defeated'));
+    });
+
+    this.registerEventListener('player-died', () => {
+      if (this.runWon) {
+        return;
+      }
+      this.queueTransmission(
+        deathTransmission(this.getRandomFork('base'), this.transmissionLayer),
+        { interrupt: true }
+      );
+    });
+
     this.registerEventListener('surge-started', (payload = {}) => {
       this.aaaTacticalHud?.showSurgeBanner(payload.label);
     });
@@ -1475,9 +1549,11 @@ class UISystem extends BaseSystem {
 
     this.registerEventListener('run-won', () => {
       this.runWon = true;
+      this.queueTransmission(victoryTransmission(), { interrupt: true });
     });
     this.registerEventListener('game-started', () => {
       this.runWon = false;
+      this.transmissions?.clear();
     });
     this.registerEventListener('upgrade-options-ready', (payload = {}) => {
       this.handleUpgradeOptions(payload);

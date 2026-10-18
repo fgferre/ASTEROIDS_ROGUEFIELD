@@ -185,7 +185,7 @@ rodada"_. Cada pilar do §7 vira fatias; a ordem é impacto visível por custo. 
 
 - [x] **R4.1 Biomas.** `src/data/biomes.js` (3 entradas: paleta, fundo, chão, névoa, tema de música) ligado à tabela
       de camadas; render3d troca fieldBackdrop/dustFloor por bioma com transição de 2 s; título de capítulo na HUD.
-- [ ] **R4.2 Transmissões.** Uma linha do Warden antes de cada chefe e no fim de cada bioma (texto em inglês, dados em
+- [x] **R4.2 Transmissões.** Uma linha do Warden antes de cada chefe e no fim de cada bioma (texto em inglês, dados em
       `src/data/story.js`), banner estilo rádio na HUD, cue de áudio.
 - [ ] **R4.3 Warden Choir (10) e Warden Null (15).** Dois chefes novos com fases que destroem geometria visível;
       Warden Prime fica no 5.

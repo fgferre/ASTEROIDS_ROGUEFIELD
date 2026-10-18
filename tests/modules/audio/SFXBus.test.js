@@ -324,6 +324,7 @@ const FACADE_PUBLIC_API_BASELINE = Object.freeze([
   'playShipHit',
   'playSurgeSting',
   'playTargetLock',
+  'playTransmission',
   'playUIHover',
   'playUISelect',
   'playUIStartGame',

@@ -500,6 +500,10 @@ class AudioSystem extends BaseSystem {
       this.playPickupCollected(data?.kind);
     });
 
+    this.registerEventListener('transmission-shown', () => {
+      this.playTransmission();
+    });
+
     this.registerEventListener('pickup-spawned', (data = {}) => {
       this.playPickupSpawned({
         pan: resolveStereoPan(data?.x, this.listenerX),
@@ -1460,6 +1464,10 @@ class AudioSystem extends BaseSystem {
 
   playPickupSpawned(options = {}) {
     this.sfxBus.playPickupSpawned(options);
+  }
+
+  playTransmission() {
+    this.sfxBus.playTransmission();
   }
 
   playXPCollect() {
