@@ -75,7 +75,7 @@ camada 15 (modo infinito só se ele pedir).
   de ~18°, luz-chave direcional + preenchimento frio, asteroides como malhas 3D procedurais (o gerador do menu,
   extraído para `src/modules/render3d/asteroidMesh.js`), nave low-poly extrudada do contorno de colisão, lanças e
   fagulhas emissivas, UnrealBloom + SMAA. A **simulação continua 2D** no plano 800×600; o renderer espelha as
-  entidades em malhas. `?renderer=2d` mantém o Canvas 2D como fallback — nada do trabalho 2D é jogado fora.
+  entidades em malhas. `?renderer=2d` mantém o Canvas 2D como easter egg congelado (decisão dele, 18/10): não recebe feature nem paridade, só não pode quebrar.
 - **Câmera dinâmica:** follow com dead zone e antecipação, dolly que afasta na velocidade e aproxima no combate,
   shake por deslocamento da câmera. Mesma lógica de `src/core/camera.js`, agora dirigindo uma câmera perspectiva.
 - **Movimento lateral:** A/D passam a ser strafe (deslocamento lateral); W/S empuxo; a nave aponta para onde se

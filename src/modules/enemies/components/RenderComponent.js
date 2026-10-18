@@ -1,3 +1,8 @@
+// FROZEN (18/10/2026): the Canvas 2D gameplay renderer is an easter egg
+// (`?renderer=2d`). No new features, no 2D/3D parity, no captures: new
+// machines, weapons and effects are built in src/modules/render3d/ only.
+// Touch this file only to keep it from breaking.
+// tests/process/render2d-frozen.test.js pins its size.
 // Enemy looks (docs/NORTE.md §3): matte machines of the Ring, lit by the
 // fixed key light, whose only light is energy — eyes, lenses, arcs, the
 // Warden core — plus a 1 px threat rim drawn into the bloom layer only (the
@@ -1603,11 +1608,9 @@ const proceduralStrategy = ({ enemy, ctx, config }) => {
       : requested === 'herald'
         ? HERALD_LOOKS[enemy.heraldKind] ?? HERALD_LOOKS.dust
         : requested;
-  const look = LOOKS[shape];
-  if (!look) {
-    console.warn(`[RenderComponent] Unknown procedural shape: ${shape}`);
-    return;
-  }
+  // Frozen path: a machine born after the freeze has no 2D look and shows as
+  // the generic triangle instead of vanishing or warning every frame.
+  const look = LOOKS[shape] ?? LOOKS.triangle;
 
   const size = lookSize(enemy, shape);
   const angle = look.facing(enemy);
