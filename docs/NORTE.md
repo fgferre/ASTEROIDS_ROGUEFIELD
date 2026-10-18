@@ -96,3 +96,37 @@ rosa saturados em pedra.
 4. Interceptor e Solar Slicer novos; tiros e orbes.
 5. Motes, Seekers, Tethers; Warden Prime segmentado.
 6. Câmera 1.3× com follow; zoom em level-up/morte.
+
+## 7. Norte 2 — "grandioso" (18/10, madrugada; pedido dele: _"crie um goal novo baseado nos seus achados e aja independentemente… aumentando o conteúdo a cada rodada"_)
+
+**Diagnóstico honesto após as Rodadas 1–3.** Arte: procedural competente, não AAA — sem texturas, sem herói visual,
+o mesmo Warden três vezes, variantes de rocha iguais em 3D. Roteiro: um parágrafo em §1 que o jogador nunca vê.
+Assets: tudo gerado em código, nenhum pipeline. UX: HUD e menu bons; sem onboarding, sem códice, sem recap de morte,
+sem sensação de lugar. Áudio: procedural sólido, sem tema por bioma. Meta: nada entre runs.
+
+**O goal novo (uma frase):** _uma descida de 15 camadas por três biomas do Anel, contada em jogo, com um Warden
+diferente por bioma, arte com material e textura, um herói visual, duas armas que evoluem com as famílias, códice e
+hangar — tudo no browser, tudo medido na máquina dele._
+
+**Pilares, cada um vira rodadas (ordem = impacto visível por custo):**
+
+1. **Lugar.** Três biomas que trocam fundo, paleta, chão e névoa a cada 5 camadas: _Outer Ring_ (poeira cinza-azul,
+   fragmentos), _Dense Core_ (lascas escuras, veios âmbar, luz baixa), _Warden's Reach_ (violeta, estruturas do Anel
+   intactas, luz fria). Título de capítulo ao entrar; uma linha de transmissão do Warden antes de cada chefe.
+2. **Três Wardens, não um.** _Warden Prime_ (anel segmentado, 5), _Warden Choir_ (três núcleos orbitando que se
+   revezam, 10), _Warden Null_ (núcleo que inverte a gravidade das fagulhas e abre o Anel, 15). Cada fase destrói
+   geometria visível.
+3. **Material e textura.** Mapas procedurais assados uma vez (normal/roughness/AO) para rocha, casco e placas do
+   Warden; cinco variantes de rocha distintas em 3D (Dense Core, Volatile, Golden, Parasite, Crystal); herói com
+   detalhe de painel e luz própria. Sem assets externos até ele pedir.
+4. **Duas armas e evoluções.** Lança âmbar + _Harmonic Plasma Lance_ (feixe curto que parte fragmentos). Sinergia
+   "3 iguais" vira **evolução** da arma (ex.: Thermal → lança incendiária com trilha; Arc → feixe que salta).
+5. **UX de estúdio.** Primeira run com onboarding de 20 s em jogo (não tela de texto); códice com inimigos
+   descobertos; recap de morte ("killed by Elite Ram, layer 9, 7:42") com o build; pausa mostrando o build e as
+   sinergias; presets de qualidade automáticos por fps medido (`?stats=1`).
+6. **Som com lugar.** Um tema procedural por bioma, tema de Warden, stingers de capítulo; mix já tem limitador/reverb.
+7. **Meta.** Hangar (salvage → melhorias pequenas, segundo casco), modo infinito após o 15, placar local.
+8. **Tecnologia.** Interpolação de render (144 Hz sem repetição), rochas instanciadas, partículas em GPU, orçamento
+   de draw calls < 120, medição real antes de cada otimização.
+
+Regra que não muda: números são propostas; ele julga jogando; nada publica sem ele.

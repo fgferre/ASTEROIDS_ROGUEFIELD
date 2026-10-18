@@ -178,6 +178,24 @@ tudo num browser."_ Fatias, cada uma um commit com captura; números como "propo
 - [ ] **R3.6 Morte de inimigo em 3D.** Dissolve (shader) + estilhaços na cor do inimigo; Warden perde segmentos
       visivelmente a cada fase.
 
+## Rodada 4+ (18/10) — Norte 2, "grandioso" (`docs/NORTE.md` §7)
+
+Pedido dele: _"crie um goal novo baseado nos seus achados e aja independentemente… aumentando o conteúdo a cada
+rodada"_. Cada pilar do §7 vira fatias; a ordem é impacto visível por custo. Marcar aqui conforme fecha.
+
+- [ ] **R4.1 Biomas.** `src/data/biomes.js` (3 entradas: paleta, fundo, chão, névoa, tema de música) ligado à tabela
+      de camadas; render3d troca fieldBackdrop/dustFloor por bioma com transição de 2 s; título de capítulo na HUD.
+- [ ] **R4.2 Transmissões.** Uma linha do Warden antes de cada chefe e no fim de cada bioma (texto em inglês, dados em
+      `src/data/story.js`), banner estilo rádio na HUD, cue de áudio.
+- [ ] **R4.3 Warden Choir (10) e Warden Null (15).** Dois chefes novos com fases que destroem geometria visível;
+      Warden Prime fica no 5.
+- [ ] **R4.4 Variantes de rocha em 3D** (Dense Core, Volatile, Golden, Parasite, Crystal) com material próprio.
+- [ ] **R4.5 Texturas procedurais assadas** (normal/roughness/AO) para rocha, casco e Warden.
+- [ ] **R4.6 Harmonic Plasma Lance + evoluções por família.**
+- [ ] **R4.7 Códice, recap de morte, pausa com build, onboarding em jogo.**
+- [ ] **R4.8 Tema por bioma, tema de Warden, stingers.**
+- [ ] **R4.9 Interpolação de render, rochas instanciadas, presets automáticos por fps.**
+
 ## Fora de escopo deste plano
 
 Steam, mobile/touch, multiplayer, narrativa, reescrita do gameplay em WebGL (ver decisão 1), troca do framework de
