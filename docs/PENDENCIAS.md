@@ -4,41 +4,47 @@ Lista viva do que está aberto, nas palavras do dono. Leia só a seção O BAST�
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 7.**
 
-## O BASTÃO — onde a rodada parou (17/10, ~23h) — SESSÃO ENCERRADA POR CONTEXTO CHEIO; TUDO NO RAMO, NADA PUBLICADO
+## O BASTÃO — onde a rodada parou (18/10, ~00h40) — RODADA 2 FECHADA NO RAMO; NADA PUBLICADO
 
 **Como retomar (próxima sessão):** `git fetch && git checkout claude/session-011CUZwFkeqHg4syYX2GsSkg`; ler este
-BASTÃO, `PLAN.md` e `docs/NORTE.md` (§4b é o salto); rodar `npm ci && npm run done`. Primeiro ato: `git status` deve estar limpo — a segunda fatia do renderer 3D (nave legível, overlays 2D em
-3D, materiais foscos, câmera presa ao campo, settings gráficos nos dois renderers) foi commitada no fim da sessão.
+BASTÃO, `PLAN.md` (seção "Rodada 2") e `docs/NORTE.md` (§4 arco novo, §4b o salto); rodar `npm ci && npm run done`
+(passou: 648 testes, build ok). `git status` deve estar limpo.
 
-**Palavras dele nesta rodada:** _"falta um salto enorme… câmera dinâmica rolando, zoom, movimento lateral da nave,
-quase um 3D visto de cima"_; antes: _"reimaginar tudo, segue em frente"_, _"tudo em inglês"_.
+**Palavras dele nesta rodada (`/goal`):** _"medley de um Asteroids com Vampire Survivors… muitos inimigos diferentes
+e fases. Motor gráfico de top de linha… SFX e VFX de grandes estúdios, mas tudo num browser."_
 
-**O que está no ramo (publicar é dele; `main` não foi tocada):**
+**O que a Rodada 2 colocou no ramo (sete fatias, um commit cada; publicar é dele; `main` não foi tocada):**
 
-- Jeito de trabalhar (AGENTS/CLAUDE/.claude, `npm run done`, hook de git), lint zero, tudo em inglês.
-- Resolução nativa, design system único, telas com conteúdo e transições, HUD enxuta, kill feed, banner de camada,
-  intro do Warden, combo por tier, vinheta de HP baixo.
-- Arte nova por NORTE (fundo, fragmentos com rachaduras que acendem, Wardens, nave, lanças, fagulhas, bloom),
-  câmera com follow, impacto (shake, hit-stop, flash, slow-mo), telegraphs do Warden (e o bug que os deixava mortos).
-- **O salto:** gameplay em Three.js (`src/modules/render3d/`, `?renderer=2d` volta ao Canvas), câmera perspectiva
-  com follow/zoom/dolly, controles modernos (A/D strafe, nariz segue a mira; `?controls=classic`), dash em Shift,
-  famílias de upgrade com sinergia "3 iguais", catálogo 9 → 20, vitória no Warden 15.
-- Engenharia: passo fixo, sem `Math.random` solto, um modo dev, flags de legado fora, dependências falham cedo,
-  relógio de simulação, gravação e replay (`?replay=`, F9), testes de cenário jogável (~615 testes).
+- **Profundidade e luz no 3D:** pipeline de cor sRGB + ACES (antes saía linear, por isso chapado), chão de poeira
+  que a luz da nave varre, sombras suaves sob rochas/inimigos/nave, luzes que piscam nas explosões.
+- **Roster:** Husk (parte-se em Motes), Ram (investida telegrafada), Weaver (semeia Tethers), Bulwark (escudo
+  frontal) + modificador **Elite** (vida ×2,5, tamanho ×1,3, recompensa ×3, dourado). Look 2D e 3D próprios.
+  Dano de contato passou a ler o valor de cada tipo (era 12 fixo para tudo menos o Warden).
+- **Diretor de camadas:** `src/data/layers.js` é a única tabela das 15 camadas (rochas, roster com cadência,
+  chance de elite, Wardens em 5/10/15, **surtos** com faixa vermelha "SURGE"). WaveManager perdeu 400 linhas.
+- **VFX 3D:** estilhaços de rocha girando, lens-kick (aberração + blur radial) em dano/fase do boss/dash/explosão
+  grande, cone de faíscas no impacto, flash no nariz a cada tiro.
+- **SFX:** limitador no master, reverb procedural, pan por posição, explosões em três tamanhos, música que sobe
+  com camada/densidade/casco baixo (antes só acordava no boss), cues para surto, Elite, telegraph do Ram, pickups.
+- **Pickups à la VS:** Ímã, Pulso, Sobrecarga caem de Elites (35 %) e Wardens; feed anuncia.
 
-**Tudo acima foi visto só em headless sem GPU (2–4 fps).** Ele ainda não jogou nada disto na máquina dele.
+**Tudo visto só em headless sem GPU (2–4 fps); ele ainda não jogou nada da Rodada 1 nem da 2 na máquina dele.**
 
-**O que só ele pode responder, jogando:** fluidez e aparência do 3D na placa dele (`?renderer=2d` como comparação;
-`?bloom=0`/`?bloom=1.5`; `?renderScale=1`); se o salto é o que ele imaginava ou se precisa ir além (inclinação da
-câmera, tamanho da nave, campo maior); controles modernos × `?controls=classic`; os números de densidade, dash,
-shake e sinergia (todos marcados "proposta 17/10" no código); meta-progressão entre runs (em aberto).
+**O que só ele pode responder, jogando:** se o 3D agora "parece 3D" (chão, sombras, profundidade) e roda liso
+(`?renderer=2d` compara; `?bloom=0/1.5`; `?renderScale=1`); se os quatro inimigos novos são legíveis e divertidos;
+se o arco de 15 camadas com surtos tem o ritmo de VS ou está lento/duro (números em `src/data/layers.js`); se a
+música acompanhando a run agrada (limiares em `GameConstants.js`); se os pickups viram momentos; o lens-kick e os
+estilhaços (fosco de propósito) são visíveis o bastante.
 
-**Decisões que a sessão tomou por ele, sob o mandato, e ele pode reverter:** renderer 3D como padrão; A/D strafe;
-dash em Shift com escudo só em E; as cinco famílias (Thermal, Kinetic, Arc, Field, Salvage) e seus bônus; fim de
-run no 15; "wave" → "layer" na interface; nomes Warden Prime / Mote / Seeker / Tether.
+**Decisões da sessão sob o mandato, reversíveis:** arco revisto do NORTE §4 (Motes na 4, Husks 6–7, Rams 8–9,
+Seekers/Bulwarks 11–12, tudo + Weavers 13–14); Wardens não trazem mais o grupo de apoio antigo; ACES como tone
+mapping; chão de poeira 140 unidades abaixo do plano; pickups só de Elites/Wardens.
 
-**Fora do que a sessão podia fazer sozinha:** dividir os arquivos gigantes (AGENTS.md exige pedido explícito);
-meta-progressão (decisão de produto); medir desempenho real.
+**Fora do que a sessão podia fazer sozinha:** dividir os arquivos gigantes (pedido explícito); meta-progressão;
+medir desempenho real; ouvir o áudio.
+
+**Aviso de processo (18/10):** um worker rodou `git stash`/`stash pop` na árvore compartilhada no meio de outros
+workers; restaurou limpo, mas o risco existe — se repetir, bloquear `git stash` no hook.
 
 ## Jogabilidade e sensação
 
