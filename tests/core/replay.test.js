@@ -78,6 +78,24 @@ describe('replay recording', () => {
     expect(player.takeUpgrade()).toBeNull();
   });
 
+  it('returns level-up rerolls and banishes in order with the picks (version 3)', () => {
+    const recorder = createRecorder({ seed: 1 });
+    recorder.record(0, createInputFrame());
+    recorder.recordReroll(120);
+    recorder.recordBanish(120, 'plasma');
+    recorder.recordUpgrade(120, 'multishot');
+
+    const player = createPlayer(deserialize(serialize(recorder.toJSON())));
+    expect(REPLAY_VERSION).toBe(3);
+    expect(player.takeUpgrade()).toEqual({ step: 120, action: 'reroll' });
+    expect(player.takeUpgrade()).toEqual({
+      step: 120,
+      action: 'banish',
+      upgradeId: 'plasma',
+    });
+    expect(player.takeUpgrade()).toEqual({ step: 120, upgradeId: 'multishot' });
+  });
+
   it('serializes to JSON and rejects other versions', () => {
     const recorder = createRecorder({ seed: 'abc', hull: 'interceptor' });
     recorder.record(0, createInputFrame({ down: true }));
@@ -90,7 +108,7 @@ describe('replay recording', () => {
   });
 
   it('records dash presses as bit 7 (version 2)', () => {
-    expect(REPLAY_VERSION).toBe(2);
+    expect(REPLAY_VERSION).toBeGreaterThanOrEqual(2);
     expect(encodeInputFrame(createInputFrame({ dash: true }))).toBe(128);
   });
 

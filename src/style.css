@@ -54,6 +54,9 @@
   --panel-inset: color-mix(in srgb, var(--hull) 55%, transparent);
   --shadow-panel: 0 24px 64px rgba(0, 0, 0, 0.55);
   --text-hero: calc(var(--text-2xl) * 1.6);
+  --rarity-common: var(--neutral);
+  --rarity-rare: var(--accent);
+  --rarity-epic: var(--xp);
 
   color-scheme: dark;
 }
@@ -731,6 +734,7 @@ select {
 .upgrade-option {
   --upgrade-accent: var(--accent);
   --upgrade-accent-soft: var(--accent-soft);
+  --rarity-color: var(--rarity-common);
   position: relative;
   flex: 0 1 calc((100% - var(--levelup-gap)) / 2);
   min-width: 0;
@@ -745,7 +749,7 @@ select {
   background: var(--panel-inset);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  box-shadow: inset 0 3px 0 var(--upgrade-accent);
+  box-shadow: inset 0 4px 0 var(--rarity-color);
   color: var(--text);
   font-family: var(--font-ui);
   text-align: left;
@@ -776,9 +780,75 @@ select {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 6%, var(--panel-inset));
   box-shadow:
-    inset 0 3px 0 var(--upgrade-accent),
+    inset 0 4px 0 var(--rarity-color),
     0 0 0 1px var(--accent),
     var(--glow-accent);
+}
+
+.upgrade-option--rare {
+  --rarity-color: var(--rarity-rare);
+}
+
+.upgrade-option--epic {
+  --rarity-color: var(--rarity-epic);
+  border-color: color-mix(in srgb, var(--rarity-epic) 45%, transparent);
+}
+
+.upgrade-option__rarity {
+  margin: calc(var(--space-2) * -1) 0 0;
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--rarity-color);
+}
+
+#levelup-screen.is-banishing .upgrade-option:hover,
+#levelup-screen.is-banishing .upgrade-option.is-focused,
+#levelup-screen.is-banishing .upgrade-option:focus-visible {
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 8%, var(--panel-inset));
+  box-shadow:
+    inset 0 4px 0 var(--rarity-color),
+    0 0 0 1px var(--danger);
+}
+
+.levelup-actions {
+  display: flex;
+  justify-content: center;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+
+.levelup-action {
+  gap: var(--space-2);
+}
+
+.levelup-action:disabled {
+  border-color: var(--line);
+  color: var(--text-dim);
+}
+
+.levelup-action__count {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  opacity: 0.8;
+}
+
+#levelup-banish-btn[aria-pressed='true'] {
+  background: var(--danger-soft);
+  border-color: var(--danger);
+}
+
+.levelup-hint {
+  margin: var(--space-3) 0 0;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--danger);
 }
 
 @media (prefers-reduced-motion: no-preference) {

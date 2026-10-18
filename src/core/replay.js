@@ -3,12 +3,15 @@
 // A run is reproducible from its seed, hull and the input the simulation
 // consumed at each fixed step (see fixedStep.js). The recording stores that
 // per-step input run-length encoded (only the steps where it changes) plus the
-// upgrade picked at each level-up, in pick order. Dependency-free on purpose:
+// upgrade picked at each level-up, in pick order, with any reroll or banish
+// made on the level-up screen before the pick. Dependency-free on purpose:
 // the browser (F9 download, `?replay=`) and the headless tests share it.
 
-export const REPLAY_VERSION = 2;
+export const REPLAY_VERSION = 3;
 // Version 1 had no `dash` bit (bit 7); its masks decode unchanged with dash off.
-const READABLE_VERSIONS = new Set([1, REPLAY_VERSION]);
+// Versions 1-2 had no level-up rerolls/banishes (version 3); their picks are
+// ids only and load unchanged.
+const READABLE_VERSIONS = new Set([1, 2, REPLAY_VERSION]);
 
 // One step of input. Movement fields are held state; the rest are presses
 // that happened since the previous step. Field order is the bit order of the
@@ -76,6 +79,14 @@ export function createRecorder({
     recordUpgrade(step, upgradeId) {
       upgrades.push([step, upgradeId]);
     },
+    /** Level-up screen reroll, before the pick (version 3). */
+    recordReroll(step) {
+      upgrades.push([step, { type: 'reroll' }]);
+    },
+    /** Level-up screen banish of `upgradeId`, before the pick (version 3). */
+    recordBanish(step, upgradeId) {
+      upgrades.push([step, { type: 'banish', id: upgradeId }]);
+    },
     get steps() {
       return steps;
     },
@@ -86,7 +97,10 @@ export function createRecorder({
         hull,
         steps,
         inputs: inputs.map((entry) => [...entry]),
-        upgrades: upgrades.map((entry) => [...entry]),
+        upgrades: upgrades.map(([step, entry]) => [
+          step,
+          typeof entry === 'string' ? entry : { ...entry },
+        ]),
       };
     },
   };
@@ -113,12 +127,21 @@ export function createPlayer(recording) {
       }
       return decodeInputFrame(inputs[cursor][1]);
     },
-    /** Next recorded level-up pick, in order; null when none are left. */
+    /**
+     * Next recorded level-up action, in order; null when none are left. A
+     * pick is `{ step, upgradeId }`; a reroll `{ step, action: 'reroll' }`; a
+     * banish `{ step, action: 'banish', upgradeId }`.
+     */
     takeUpgrade() {
       if (nextUpgrade >= upgrades.length) return null;
-      const [step, upgradeId] = upgrades[nextUpgrade];
+      const [step, entry] = upgrades[nextUpgrade];
       nextUpgrade += 1;
-      return { step, upgradeId };
+      if (typeof entry === 'string') {
+        return { step, upgradeId: entry };
+      }
+      return entry.type === 'banish'
+        ? { step, action: 'banish', upgradeId: entry.id }
+        : { step, action: 'reroll' };
     },
     isFinished(step) {
       return step >= steps;

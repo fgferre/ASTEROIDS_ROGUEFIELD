@@ -72,19 +72,25 @@ describe('run replay', () => {
     restoreDom();
   });
 
-  it('replays a recorded 10 s run to the same player position, kills and XP', () => {
-    // Record.
+  // Plays the scripted run with real key events; `beforePick(progression,
+  // levelUpIndex)` runs on the level-up screen before the first card is taken.
+  function recordRun(beforePick = () => {}) {
     const live = createHeadlessGame();
     live.session.startNewRun({ source: 'test' });
-    live.services.progression.experienceToNext = TEST_XP_TO_LEVEL;
+    const { progression } = live.services;
+    progression.experienceToNext = TEST_XP_TO_LEVEL;
     const input = live.services.input;
     const press = (letter) => input.onKeyDown(keyEvent(KEY_CODES[letter]));
     const release = (letter) => input.onKeyUp(keyEvent(KEY_CODES[letter]));
     let held = [];
     let taps = [];
+    let levelUps = 0;
     for (let step = 0; step < STEPS; step += 1) {
-      const pick = live.takeOfferedUpgrade();
-      if (pick) live.services.progression.applyUpgrade(pick);
+      if (live.takeOfferedUpgrade()) {
+        beforePick(progression, levelUps);
+        levelUps += 1;
+        progression.applyUpgrade(progression.pendingUpgradeOptions[0].id);
+      }
       if (step % SEGMENT_STEPS === 0) {
         const keys = [...SCRIPT[step / SEGMENT_STEPS]];
         const nextHeld = keys.filter((key) => key === key.toUpperCase());
@@ -99,18 +105,14 @@ describe('run replay', () => {
       }
       live.step();
     }
-    const recorded = live.snapshot();
     const recording = deserialize(
       serialize(live.session.replayRecorder.toJSON())
     );
+    return { live, recording };
+  }
 
-    expect(recording.steps).toBe(STEPS);
-    expect(recording.upgrades.length).toBeGreaterThan(0);
-    // The dash bit (version 2) is in the recording.
-    expect(recording.inputs.some(([, mask]) => mask & 128)).toBe(true);
-    expect(recorded.kills).toBeGreaterThan(0);
-
-    // Replay in a fresh instance: no key events, only the recording.
+  // Replays `recording` in a fresh instance: no key events, only the recording.
+  function replayRun(recording) {
     const replay = createHeadlessGame();
     replay.controller.arm(recording);
     replay.session.startNewRun({ source: 'test' });
@@ -119,7 +121,42 @@ describe('run replay', () => {
       replay.controller.tick();
       replay.step();
     }
+    return replay;
+  }
 
+  it('replays a recorded 10 s run to the same player position, kills and XP', () => {
+    const { live, recording } = recordRun();
+    const recorded = live.snapshot();
+
+    expect(recording.steps).toBe(STEPS);
+    expect(recording.upgrades.length).toBeGreaterThan(0);
+    // The dash bit (version 2) is in the recording.
+    expect(recording.inputs.some(([, mask]) => mask & 128)).toBe(true);
+    expect(recorded.kills).toBeGreaterThan(0);
+
+    expect(replayRun(recording).snapshot()).toEqual(recorded);
+  });
+
+  it('replays level-up rerolls and banishes to the same upgrades', () => {
+    const { live, recording } = recordRun((progression, levelUpIndex) => {
+      if (levelUpIndex === 0) progression.rerollUpgradeOptions();
+      if (levelUpIndex === 1) {
+        progression.banishUpgrade(progression.pendingUpgradeOptions[0].id);
+      }
+    });
+    const entries = recording.upgrades.map(([, entry]) => entry);
+    expect(entries).toContainEqual({ type: 'reroll' });
+    expect(entries.some((entry) => entry?.type === 'banish')).toBe(true);
+
+    // Snapshot before replaying: the pools are shared between instances.
+    const recorded = live.snapshot();
+    const { progression } = live.services;
+    const upgrades = progression.getAllUpgrades();
+    const banished = new Set(progression.banishedUpgrades);
+
+    const replay = replayRun(recording);
     expect(replay.snapshot()).toEqual(recorded);
+    expect(replay.services.progression.getAllUpgrades()).toEqual(upgrades);
+    expect(replay.services.progression.banishedUpgrades).toEqual(banished);
   });
 });

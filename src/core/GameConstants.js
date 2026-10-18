@@ -59,6 +59,26 @@ export const PROGRESSION_LEVEL_SCALING = 1.4;
 export const LEVEL_UP_SCREEN_DELAY_SECONDS = 0.12; // proposta 17/10: tempo de simulação; durante o slow-mo de 0.35x vale ~0.34 s reais, a tela abre a um terço do pulso
 export const PROGRESSION_UPGRADE_ROLL_COUNT = 3;
 export const PROGRESSION_UPGRADE_FALLBACK_COUNT = 3;
+// Level-up card rarity (proposta 18/10): chance of each tier at pilot level 1,
+// what each level above 1 adds to rare/epic, and their caps; common takes the
+// rest. Within a tier every eligible card is equally likely.
+export const UPGRADE_RARITIES = Object.freeze(['common', 'rare', 'epic']);
+export const UPGRADE_RARITY_BASE_WEIGHTS = Object.freeze({
+  common: 0.7,
+  rare: 0.25,
+  epic: 0.05,
+});
+export const UPGRADE_RARITY_WEIGHT_PER_LEVEL = Object.freeze({
+  rare: 0.01,
+  epic: 0.01,
+});
+export const UPGRADE_RARITY_WEIGHT_CAPS = Object.freeze({
+  rare: 0.35,
+  epic: 0.2,
+});
+// Per-run level-up rerolls and banishes (proposta 18/10).
+export const PROGRESSION_UPGRADE_REROLLS_PER_RUN = 1;
+export const PROGRESSION_UPGRADE_BANISHES_PER_RUN = 1;
 export const PROGRESSION_COMBO_TIMEOUT = 3.0;
 export const PROGRESSION_COMBO_MULTIPLIER_STEP = 0.1;
 export const PROGRESSION_COMBO_MULTIPLIER_CAP = 2.0;

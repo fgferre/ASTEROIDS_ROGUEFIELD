@@ -166,7 +166,7 @@ tudo num browser."_ Fatias, cada uma um commit com captura; números como "propo
 
 - [ ] **R3.1 Nave com presença.** No 3D a nave é pequena e branca; casco fosco com linhas de painel, silhueta maior
       (proposta de escala), propulsores legíveis, luz própria mais quente. Só `render3d/playerMirror.js`.
-- [ ] **R3.2 Cartas com raridade, reroll e banish.** Prometido na etapa 6 e nunca feito: raridade por cor na carta,
+- [x] **R3.2 Cartas com raridade, reroll e banish.** Prometido na etapa 6 e nunca feito: raridade por cor na carta,
       1 reroll e 1 banish por run (proposta), com teclas e botões; famílias continuam.
 - [x] **R3.3 Medição na máquina dele.** `?stats=1` liga o Stats.min.js já vendorizado (fps e ms por quadro) para ele
       reportar números reais; `F8` alterna no dev.

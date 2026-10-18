@@ -128,6 +128,28 @@
           <div id="upgrades-container" class="upgrades-grid">
             <!-- Upgrades will be inserted here dynamically -->
           </div>
+          <div class="levelup-actions">
+            <button
+              id="levelup-reroll-btn"
+              class="btn btn--secondary levelup-action"
+              type="button"
+            >
+              Reroll (R)
+              <span class="levelup-action__count" data-count>1 left</span>
+            </button>
+            <button
+              id="levelup-banish-btn"
+              class="btn btn--danger levelup-action"
+              type="button"
+              aria-pressed="false"
+            >
+              Banish (B)
+              <span class="levelup-action__count" data-count>1 left</span>
+            </button>
+          </div>
+          <p id="levelup-banish-hint" class="levelup-hint hidden" role="status">
+            Pick a card to banish it for the rest of the run. Esc cancels.
+          </p>
         </div>
       </div>
 

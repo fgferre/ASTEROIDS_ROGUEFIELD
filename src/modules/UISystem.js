@@ -23,6 +23,7 @@ import { PICKUP_KINDS } from '../data/pickups.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
 const LEVEL_UP_LOCKOUT_MS = 400;
+const UPGRADE_RARITY_LABELS = { common: 'Common', rare: 'Rare', epic: 'Epic' };
 const CONTROLS_SEEN_KEY = 'roguefield:seenControls';
 const CONTROLS_TOAST_MS = 8000;
 
@@ -146,7 +147,9 @@ class UISystem extends BaseSystem {
       buttons: [],
       focusIndex: -1,
       poolSize: 0,
+      level: null,
       lockedUntil: 0,
+      banishMode: false,
     };
     this.quitConfirm = { button: null, label: '', timeoutId: null };
     this.currentVisualPreferences = {
@@ -171,6 +174,7 @@ class UISystem extends BaseSystem {
     this.updateAAATacticalHudFromServices({ force: true });
 
     this.bindPauseControls();
+    this.bindLevelUpControls();
     this.bindSettingsControls();
     this.bindCreditsControls();
     this.bindMainMenuControls();
@@ -205,6 +209,9 @@ class UISystem extends BaseSystem {
       levelUp: {
         container: document.getElementById('upgrades-container') || null,
         text: document.getElementById('levelup-text') || null,
+        rerollBtn: document.getElementById('levelup-reroll-btn') || null,
+        banishBtn: document.getElementById('levelup-banish-btn') || null,
+        banishHint: document.getElementById('levelup-banish-hint') || null,
       },
       gameOver: {
         time: document.getElementById('gameover-time') || null,
@@ -783,6 +790,25 @@ class UISystem extends BaseSystem {
           padding: 12,
         });
       });
+  }
+
+  bindLevelUpControls() {
+    const { rerollBtn, banishBtn } = this.domRefs.levelUp;
+    rerollBtn?.addEventListener('click', () => this.rerollLevelUpOptions());
+    banishBtn?.addEventListener('click', () => this.toggleBanishMode());
+
+    document.addEventListener('keydown', (event) => {
+      if (!this.levelUpState.isVisible || event.repeat) {
+        return;
+      }
+      if (event.code === 'KeyR') {
+        this.rerollLevelUpOptions();
+      } else if (event.code === 'KeyB') {
+        this.toggleBanishMode();
+      } else if (event.key === 'Escape' && this.levelUpState.banishMode) {
+        this.setBanishMode(false);
+      }
+    });
   }
 
   bindPauseControls() {
@@ -1449,6 +1475,12 @@ class UISystem extends BaseSystem {
     });
     this.registerEventListener('upgrade-options-ready', (payload = {}) => {
       this.handleUpgradeOptions(payload);
+    });
+    this.registerEventListener('upgrade-rerolled', (payload = {}) => {
+      this.refreshLevelUpOptions(payload);
+    });
+    this.registerEventListener('upgrade-banished', (payload = {}) => {
+      this.refreshLevelUpOptions(payload);
     });
 
     this.registerEventListener('settings-menu-requested', (payload = {}) => {
@@ -2740,14 +2772,23 @@ class UISystem extends BaseSystem {
         : null;
 
     this.levelUpState.isVisible = true;
+    this.levelUpState.level = levelValue;
+    this.showScreen('levelup', { overlay: true, show: true });
+    this.renderLevelUpOptions(options, data.poolSize);
+  }
+
+  // Cards, subtitle and reroll/banish buttons for the offered options; new
+  // cards restart the input lockout so a held key can't pick one unseen.
+  renderLevelUpOptions(options, offeredPoolSize) {
+    const levelValue = this.levelUpState.level;
     this.levelUpState.options = options;
-    this.levelUpState.poolSize = Number.isFinite(Number(data.poolSize))
-      ? Number(data.poolSize)
+    this.levelUpState.poolSize = Number.isFinite(Number(offeredPoolSize))
+      ? Number(offeredPoolSize)
       : options.length;
     this.levelUpState.focusIndex = -1;
-
-    this.showScreen('levelup', { overlay: true, show: true });
     this.levelUpState.lockedUntil = Date.now() + LEVEL_UP_LOCKOUT_MS;
+    this.setBanishMode(false);
+    this.updateLevelUpActionButtons();
 
     if (this.domRefs.levelUp.text) {
       const optionCount = options.length;
@@ -2783,10 +2824,75 @@ class UISystem extends BaseSystem {
     }
   }
 
+  // After a reroll or banish: redraw the cards, or close if none are left.
+  refreshLevelUpOptions(payload = {}) {
+    if (!this.levelUpState.isVisible) {
+      return;
+    }
+    const options = ensureArray(payload.options);
+    if (!options.length) {
+      this.resetLevelUpState();
+      this.showGameUI();
+      return;
+    }
+    this.renderLevelUpOptions(options, payload.poolSize);
+  }
+
+  updateLevelUpActionButtons() {
+    const progression = this.getService('progression');
+    const { rerollBtn, banishBtn } = this.domRefs.levelUp;
+    [
+      [rerollBtn, progression?.rerollsLeft ?? 0],
+      [banishBtn, progression?.banishesLeft ?? 0],
+    ].forEach(([button, left]) => {
+      if (!button) {
+        return;
+      }
+      button.disabled = left <= 0;
+      const count = button.querySelector('[data-count]');
+      if (count) {
+        count.textContent = `${left} left`;
+      }
+    });
+  }
+
+  isLevelUpLocked() {
+    return Date.now() < this.levelUpState.lockedUntil;
+  }
+
+  rerollLevelUpOptions() {
+    if (!this.levelUpState.isVisible || this.isLevelUpLocked()) {
+      return;
+    }
+    this.getService('progression')?.rerollUpgradeOptions();
+  }
+
+  toggleBanishMode() {
+    if (!this.levelUpState.isVisible || this.isLevelUpLocked()) {
+      return;
+    }
+    const progression = this.getService('progression');
+    if (!this.levelUpState.banishMode && !(progression?.banishesLeft > 0)) {
+      return;
+    }
+    this.setBanishMode(!this.levelUpState.banishMode);
+  }
+
+  // Banish pick mode: the next card chosen is banished instead of taken.
+  setBanishMode(active) {
+    this.levelUpState.banishMode = active;
+    const { banishBtn, banishHint } = this.domRefs?.levelUp || {};
+    banishBtn?.setAttribute('aria-pressed', active ? 'true' : 'false');
+    banishHint?.classList.toggle('hidden', !active);
+    document
+      .getElementById('levelup-screen')
+      ?.classList.toggle('is-banishing', active);
+  }
+
   createUpgradeOptionButton(option, index) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = 'upgrade-option';
+    button.className = `upgrade-option upgrade-option--${option.rarity || 'common'}`;
     button.dataset.upgradeId = option.id;
     button.dataset.index = `${index}`;
 
@@ -2867,7 +2973,10 @@ class UISystem extends BaseSystem {
         </footer>`
       : '';
 
+    const rarity = option.rarity || 'common';
+
     return `
+      <p class="upgrade-option__rarity">${UPGRADE_RARITY_LABELS[rarity]}</p>
       <header class="upgrade-option__header">
         <span class="upgrade-icon" aria-hidden="true">${
           option.icon || '✨'
@@ -2931,11 +3040,16 @@ class UISystem extends BaseSystem {
       return;
     }
 
-    if (Date.now() < this.levelUpState.lockedUntil) {
+    if (this.isLevelUpLocked()) {
       return;
     }
 
     const progression = this.getService('progression');
+
+    if (this.levelUpState.banishMode) {
+      progression?.banishUpgrade(upgradeId);
+      return;
+    }
 
     if (!progression || typeof progression.applyUpgrade !== 'function') {
       this.showGameUI();
@@ -3096,6 +3210,7 @@ class UISystem extends BaseSystem {
         button.disabled = false;
       }
     });
+    this.setBanishMode(false);
 
     this.levelUpState = {
       isVisible: false,
@@ -3103,7 +3218,9 @@ class UISystem extends BaseSystem {
       buttons: [],
       focusIndex: -1,
       poolSize: 0,
+      level: null,
       lockedUntil: 0,
+      banishMode: false,
     };
   }
 

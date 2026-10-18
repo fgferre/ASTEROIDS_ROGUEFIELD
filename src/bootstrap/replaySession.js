@@ -3,8 +3,9 @@
 // Recording starts when a run starts ('game-started') and stops at death; the
 // recorder lives on the session (`session.replayRecorder`). Input is captured
 // and substituted at InputSystem's per-step seam (`setInputSource`); level-up
-// picks are recorded in order and re-applied at the next frame boundary, which
-// is when a player's click lands too (the loop stops stepping on level-up).
+// picks (and the rerolls/banishes before them) are recorded in order and
+// re-applied at the next frame boundary, which is when a player's click lands
+// too (the loop stops stepping on level-up).
 
 import { createPlayer, createRecorder, deserialize } from '../core/replay.js';
 
@@ -93,6 +94,18 @@ export function createReplayController({
     }
   });
 
+  eventBus.on('upgrade-rerolled', () => {
+    if (recorder) {
+      recorder.recordReroll(runStep());
+    }
+  });
+
+  eventBus.on('upgrade-banished', (payload = {}) => {
+    if (recorder && payload.upgradeId) {
+      recorder.recordBanish(runStep(), payload.upgradeId);
+    }
+  });
+
   eventBus.on('upgrade-options-ready', (payload = {}) => {
     if (player && (payload.options || []).length > 0) {
       pickPending = true;
@@ -104,14 +117,29 @@ export function createReplayController({
     arm(recording) {
       armedRecording = recording;
     },
-    /** Once per frame, before the fixed steps: applies a pending replay pick. */
+    /**
+     * Once per frame, before the fixed steps: applies a pending replay pick,
+     * after the rerolls/banishes recorded before it.
+     */
     tick() {
       if (!pickPending || !player) {
         return;
       }
       pickPending = false;
-      const pick = player.takeUpgrade();
-      if (pick && progression.applyUpgrade(pick.upgradeId)) {
+      let entry = player.takeUpgrade();
+      while (entry?.action) {
+        const options =
+          entry.action === 'reroll'
+            ? progression.rerollUpgradeOptions()
+            : progression.banishUpgrade(entry.upgradeId);
+        if (options?.length === 0) {
+          // Banished the last card: the screen closed with no pick.
+          ui.showGameUI();
+          return;
+        }
+        entry = player.takeUpgrade();
+      }
+      if (entry && progression.applyUpgrade(entry.upgradeId)) {
         ui.showGameUI();
       }
     },
