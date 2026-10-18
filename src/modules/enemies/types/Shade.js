@@ -7,6 +7,7 @@ import {
   SHADE_FIELD_MARGIN,
   SHADE_FIRE_DELAY,
   SHADE_FLANK_DISTANCE,
+  SHADE_FLANK_MIN_DISTANCE,
   SHADE_PHASED_SECONDS,
   SHADE_PHASE_SPEED,
   SHADE_SHOTS,
@@ -45,7 +46,9 @@ const PHASE_EVENTS = {
  * CombatSystem skip it). It keeps to a flank point SHADE_FLANK_DISTANCE px
  * beside the ship — across the ship's heading on the side it is on, or a
  * seeded side while the ship is still — inside the field; phased, it glides
- * there to arrive as the window ends. `visibility`: 0 phased … 1 solid.
+ * there to arrive as the window ends. A wall that clamps the point within
+ * SHADE_FLANK_MIN_DISTANCE of the ship sends it to the other side, else
+ * toward the field's centre. `visibility`: 0 phased … 1 solid.
  * Emits `shade-phased-out` / `shade-phased-in` as each dissolve starts.
  */
 export class Shade extends BaseEnemy {
@@ -168,10 +171,21 @@ export class Shade extends BaseEnemy {
     const ny = moving
       ? (vx / speed) * this.flankSide
       : Math.sin(this.flankAngle);
-    return {
-      x: clampToField(target.x + nx * SHADE_FLANK_DISTANCE, GAME_WIDTH),
-      y: clampToField(target.y + ny * SHADE_FLANK_DISTANCE, GAME_HEIGHT),
-    };
+    const toward = (dx, dy) => ({
+      x: clampToField(target.x + dx * SHADE_FLANK_DISTANCE, GAME_WIDTH),
+      y: clampToField(target.y + dy * SHADE_FLANK_DISTANCE, GAME_HEIGHT),
+    });
+    const clear = (point) =>
+      Math.hypot(point.x - target.x, point.y - target.y) >=
+      SHADE_FLANK_MIN_DISTANCE;
+    const side = toward(nx, ny);
+    if (clear(side)) return side;
+    const other = toward(-nx, -ny);
+    if (clear(other)) return other;
+    const cx = GAME_WIDTH / 2 - target.x;
+    const cy = GAME_HEIGHT / 2 - target.y;
+    const span = Math.hypot(cx, cy) || 1;
+    return toward(cx / span, cy / span);
   }
 
   steer(player, target, deltaTime) {

@@ -306,11 +306,12 @@ export function createCamera({
 
     // Pushes the zoom to `peak` (under the base: pulls out) and back to the
     // base over `duration` s, leaving from where a running pulse has it. A
-    // pulse that would move the zoom less than the running one does right
-    // now is dropped: a dash never cuts the level-up push short.
+    // pulse weaker than the running one's peak is dropped, even in its first
+    // frames: a dash never cuts the level-up push short.
     pulseZoom(peak, duration) {
       if (!(Number.isFinite(peak) && peak > 0 && duration > 0)) return;
-      if (Math.abs(peak / baseZoom - 1) < Math.abs(pulseFactor - 1)) return;
+      const strength = (factor) => Math.abs(factor / baseZoom - 1);
+      if (pulse && strength(peak) < strength(pulse.peak)) return;
       pulse = { peak, duration, elapsed: 0, from: pulseFactor };
     },
 

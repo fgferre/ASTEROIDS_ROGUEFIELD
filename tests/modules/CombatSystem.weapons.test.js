@@ -164,6 +164,35 @@ describe('Harmonic Plasma Lance', () => {
     combat.processBulletHit(lance(), rock, enemies);
     expect(enemies.acquireAsteroid).toHaveBeenCalledTimes(1);
   });
+
+  it('passes through a phased Shade: no hit, no burn, no chain hop through it', () => {
+    const phased = makeEnemy('phased', 200, 300, {
+      type: 'shade',
+      intangible: true,
+    });
+    const solid = makeEnemy('solid', 330, 300); // 130 px from the Shade
+    const aside = makeEnemy('aside', 200, 380); // off-axis, 80 px from it
+    const { combat, eventBus } = makeCombat([phased, solid, aside]);
+    const hits = vi.fn();
+    eventBus.on('bullet-hit', hits);
+    eventBus.emit('upgrade-weapon-harmonic', { weaponId: 'harmonic' });
+    ['thermal', 'arc'].forEach((family) =>
+      eventBus.emit('synergy-unlocked', { family })
+    );
+
+    const stats = { multishot: 1, damage: DAMAGE };
+    for (let shot = 0; shot < 4; shot += 1) combat.handleShooting(1, stats);
+    expect(combat.beams).toHaveLength(1);
+    expect(hits.mock.calls.map(([data]) => data.enemy.id)).toEqual(['solid']);
+    expect(combat.burns.has(phased)).toBe(false);
+    expect(combat.burns.has(solid)).toBe(true);
+    // The solid one's arc has nothing else within 140 px.
+    expect(combat.arcs).toHaveLength(0);
+
+    combat.updateWeaponEffects(2);
+    expect(phased.health).toBe(100);
+    expect(aside.health).toBe(100);
+  });
 });
 
 describe('weapon evolutions', () => {

@@ -14,6 +14,7 @@ export const SHADE_VISIBLE_SECONDS = 1.6; // proposta 18/10
 export const SHADE_FADE_SECONDS = 0.35; // proposta 18/10: out, and back in
 export const SHADE_PHASED_SECONDS = 1.4; // proposta 18/10: intangible
 export const SHADE_FLANK_DISTANCE = 180; // proposta 18/10: beside the ship
+export const SHADE_FLANK_MIN_DISTANCE = 120; // proposta 18/10: a wall's clamp never brings it closer
 export const SHADE_FIRE_DELAY = 0.3; // proposta 18/10: after it is solid
 export const SHADE_SHOTS = 3; // proposta 18/10
 export const SHADE_FAN_ARC = (24 * Math.PI) / 180; // proposta 18/10: outer to outer

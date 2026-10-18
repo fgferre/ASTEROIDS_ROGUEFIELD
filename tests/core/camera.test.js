@@ -95,13 +95,27 @@ describe('createCamera', () => {
     expect(camera.zoom).toBe(1.3);
   });
 
-  it('drops a pulse weaker than the running one where it stands', () => {
+  it('drops a pulse weaker than the running one at its peak', () => {
     const camera = createCamera({ fieldWidth: W, fieldHeight: H, zoom: 1.3 });
     camera.pulseZoom(1.42, 0.45); // level-up
     camera.update(W / 2, H / 2, 0.135); // at its peak
     camera.pulseZoom(1.3 * 0.94, 0.3); // a dash
     camera.update(W / 2, H / 2, 1 / 60);
     expect(camera.zoom).toBeGreaterThan(1.4);
+  });
+
+  it('drops a weaker pulse in the first frames of a stronger one, which still peaks', () => {
+    const camera = createCamera({ fieldWidth: W, fieldHeight: H, zoom: 1.3 });
+    camera.pulseZoom(1.42, 0.45); // level-up
+    camera.update(W / 2, H / 2, 1 / 60);
+    camera.update(W / 2, H / 2, 1 / 60);
+    camera.pulseZoom(1.3 * 0.94, 0.3); // a dash, two frames in
+    let highest = 0;
+    for (let t = 0; t < 0.45; t += 1 / 60) {
+      camera.update(W / 2, H / 2, 1 / 60);
+      highest = Math.max(highest, camera.zoom);
+    }
+    expect(highest).toBeCloseTo(1.42, 2);
   });
 
   it('starts a replacing pulse from the zoom the running one left', () => {

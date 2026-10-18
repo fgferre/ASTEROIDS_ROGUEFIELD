@@ -100,7 +100,7 @@ export const ACHIEVEMENTS = deepFreeze([
   {
     id: 'counter-battery',
     title: 'Counter-Battery',
-    description: 'Destroy 20 Casters before they finish the volley.',
+    description: 'Destroy 20 Casters, volley or no volley.',
     glyph: '⌖',
     target: 20,
   },

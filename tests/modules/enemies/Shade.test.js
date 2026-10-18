@@ -1,11 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import Shade from '../../../src/modules/enemies/types/Shade.js';
+import { GAME_HEIGHT, GAME_WIDTH } from '../../../src/core/GameConstants.js';
 import {
   SHADE_FADE_SECONDS,
   SHADE_FAN_ARC,
   SHADE_FIRE_DELAY,
+  SHADE_FIELD_MARGIN,
   SHADE_FLANK_DISTANCE,
+  SHADE_FLANK_MIN_DISTANCE,
   SHADE_PHASED_SECONDS,
   SHADE_SHOTS,
   SHADE_VISIBLE_SECONDS,
@@ -94,5 +97,31 @@ describe('Shade', () => {
     ).toBeLessThan(15);
     shade.takeDamage(10);
     expect(shade.health).toBe(shade.maxHealth - 10);
+  });
+
+  it('with the ship along a wall, it flanks from the open side, never on top of the ship', () => {
+    // Seeded onto the wall side, where the clamped flank point is 10 px away.
+    const random = { float: () => 0.5, chance: () => false, range: (a) => a };
+    const { player, shade } = setup({ x: 20, y: 300, random });
+    player.position = { x: 50, y: 300 };
+    player.velocity = { vx: 0, vy: -200 }; // heading up the left wall
+
+    step(
+      shade,
+      SHADE_FADE_SECONDS * 2 +
+        SHADE_VISIBLE_SECONDS +
+        SHADE_PHASED_SECONDS +
+        0.05
+    );
+    expect(shade.phase).toBe('fade-in');
+    const gap = Math.hypot(
+      shade.x - player.position.x,
+      shade.y - player.position.y
+    );
+    expect(gap).toBeGreaterThanOrEqual(SHADE_FLANK_MIN_DISTANCE);
+    expect(shade.x).toBeGreaterThanOrEqual(SHADE_FIELD_MARGIN);
+    expect(shade.x).toBeLessThanOrEqual(GAME_WIDTH - SHADE_FIELD_MARGIN);
+    expect(shade.y).toBeGreaterThanOrEqual(SHADE_FIELD_MARGIN);
+    expect(shade.y).toBeLessThanOrEqual(GAME_HEIGHT - SHADE_FIELD_MARGIN);
   });
 });
