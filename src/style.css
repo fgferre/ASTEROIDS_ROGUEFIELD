@@ -2141,28 +2141,6 @@ body.particles-reduced #game-canvas {
 }
 
 /* === First-run toast over the field === */
-.controls-toast {
-  position: absolute;
-  left: 50%;
-  bottom: 18%;
-  transform: translate(-50%, var(--space-3));
-  padding: var(--space-2) var(--space-4);
-  font-family: var(--font-ui);
-  font-size: var(--text-md);
-  color: var(--text);
-  background: var(--surface-strong);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--accent);
-  border-radius: var(--radius-md);
-  opacity: 0;
-  pointer-events: none;
-  z-index: 5;
-}
-
-.controls-toast.is-visible {
-  opacity: 1;
-  transform: translate(-50%, 0);
-}
 
 /* === Quit confirmation state === */
 .btn.is-confirming,
@@ -2188,11 +2166,6 @@ body.particles-reduced #game-canvas {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .controls-toast {
-    transition:
-      opacity var(--motion-base) var(--ease-out),
-      transform var(--motion-base) var(--ease-out);
-  }
 }
 
 @media (max-width: 900px) {
@@ -2202,9 +2175,4 @@ body.particles-reduced #game-canvas {
 }
 
 @media (prefers-reduced-motion: no-preference) {
-  .controls-toast {
-    transition:
-      opacity var(--motion-base) var(--ease-out),
-      transform var(--motion-base) var(--ease-out);
-  }
 }

@@ -68,6 +68,14 @@ const SETTINGS_SCHEMA = [
         max: 1,
         step: 0.1,
       },
+      {
+        key: 'onboardingTips',
+        type: 'toggle',
+        label: 'Show Onboarding Tips',
+        description:
+          'Short in-play tips on your first run. Turning this back on shows them again.',
+        default: true,
+      },
     ],
   },
   {

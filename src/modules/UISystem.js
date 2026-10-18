@@ -21,6 +21,7 @@ import {
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { AAAHudLayout } from './ui/AAAHudLayout.js';
+import { Onboarding, onboardingPrompts } from './ui/onboarding.js';
 import {
   TransmissionQueue,
   chapterTransmission,
@@ -70,8 +71,6 @@ function codexEntryMarkup(entry) {
 // Level-up cards and the victory buttons ignore input this long after showing.
 const SCREEN_INPUT_LOCKOUT_MS = 400;
 const UPGRADE_RARITY_LABELS = { common: 'Common', rare: 'Rare', epic: 'Epic' };
-const CONTROLS_SEEN_KEY = 'roguefield:seenControls';
-const CONTROLS_TOAST_MS = 8000;
 
 const COLOR_ASSIST_ACCENTS = {
   offense: '#3366CC',
@@ -93,8 +92,8 @@ class UISystem extends BaseSystem {
         transitions: 'ui.transitions',
       },
     });
-    // `?replay=` runs without the first-run controls toast.
-    this.controlsToastDisabled = false;
+    // `?replay=` runs without the first-run onboarding tips.
+    this.onboardingDisabled = false;
   }
 
   initialize() {
@@ -125,6 +124,13 @@ class UISystem extends BaseSystem {
     );
     this.aaaTacticalHudMountTarget = null;
     this.aaaTacticalHudRestoreState = null;
+    this.onboarding = new Onboarding(
+      {
+        showTip: (id) => this.showOnboardingTip(id),
+        hideTip: () => this.aaaTacticalHud?.hideOnboardingTip(),
+      },
+      (id) => this.eventBus?.emit('onboarding-step', { id })
+    );
 
     this.cachedValues = {
       health: { current: null, max: null },
@@ -506,17 +512,11 @@ class UISystem extends BaseSystem {
     }
     const layer = Math.max(1, Math.floor(Number(payload.wave) || 1));
     const boss = Boolean(payload.isBossWave) || directorFor(layer).warden;
-    // The first-run controls toast opens right after layer 1 starts.
-    const toastShowing =
-      layer === 1 &&
-      (this.isControlsToastPending() ||
-        Boolean(this.domRefs.gameUi?.querySelector('.controls-toast')));
     const biome = biomeForLayer(layer);
     const firstOfBiome = biome.layers[0] === layer;
     this.transmissionLayer = layer;
     hud.showLayerBanner(layer, {
       boss,
-      delayMs: toastShowing ? 1000 : 0,
       chapter: firstOfBiome
         ? biome.title
         : layer > RUN_FINAL_LAYER
@@ -1654,6 +1654,22 @@ class UISystem extends BaseSystem {
       this.runWon = false;
       this.transmissions?.clear();
       this.aaaTacticalHud?.clearBuffs();
+      this.removeOnboardingCardsTip();
+      if (this.isOnboardingEnabled()) {
+        this.onboarding.start();
+      } else {
+        this.onboarding.stop();
+      }
+    });
+    this.registerEventListener('player-dashed', () => {
+      this.onboarding.dashed();
+    });
+    this.registerEventListener('shield-activated', () => {
+      this.onboarding.shieldRaised();
+    });
+    this.registerEventListener('upgrade-applied', () => {
+      this.onboarding.cardPicked();
+      this.removeOnboardingCardsTip();
     });
     this.registerEventListener('upgrade-options-ready', (payload = {}) => {
       this.handleUpgradeOptions(payload);
@@ -1752,6 +1768,15 @@ class UISystem extends BaseSystem {
 
     if (change.category === 'gameplay' || change.type === 'reset-all') {
       this.requestMenuShipSelectorRefresh();
+    }
+
+    if (change.category === 'gameplay' && change.key === 'onboardingTips') {
+      if (change.value === false) {
+        this.onboarding.stop();
+        this.removeOnboardingCardsTip();
+      } else if (change.previous === false) {
+        this.onboarding.replay();
+      }
     }
   }
 
@@ -2908,6 +2933,14 @@ class UISystem extends BaseSystem {
       this.updateAAATacticalHudFromServices({ force: false });
       this.aaaTacticalHud.tickBuffs(deltaTime);
     }
+    if (this.onboarding.current) {
+      const moving = this.getService('input').getMovementInput();
+      this.onboarding.update(deltaTime, {
+        moving: moving.up || moving.down || moving.left || moving.right,
+        shieldReady: this.getService('player').getShieldState().maxHits > 0,
+        bannerBusy: Boolean(this.aaaTacticalHud?.isBannerBusy()),
+      });
+    }
   }
 
   handleScreenChanged(payload = {}) {
@@ -2938,10 +2971,6 @@ class UISystem extends BaseSystem {
     if (screenName === 'victory') {
       this.showVictoryScreen(payload);
       return;
-    }
-
-    if (screenName === 'playing') {
-      this.maybeShowControlsToast();
     }
 
     this.showScreen(screenName, { emitEvent: false });
@@ -3097,6 +3126,7 @@ class UISystem extends BaseSystem {
     this.levelUpState.level = levelValue;
     this.showScreen('levelup', { overlay: true, show: true });
     this.renderLevelUpOptions(options, data.poolSize);
+    this.showOnboardingCardsTip();
   }
 
   // Cards, subtitle and reroll/banish buttons for the offered options; new
@@ -3739,39 +3769,57 @@ class UISystem extends BaseSystem {
     focusTarget?.focus({ preventScroll: true });
   }
 
-  isControlsToastPending() {
-    if (this.controlsToastDisabled) {
-      return false;
-    }
-    try {
-      return !localStorage.getItem(CONTROLS_SEEN_KEY);
-    } catch (error) {
-      return false;
-    }
+  isOnboardingEnabled() {
+    return (
+      !this.onboardingDisabled &&
+      this.resolveSettingsService()?.getSetting(
+        'gameplay',
+        'onboardingTips'
+      ) !== false
+    );
   }
 
-  maybeShowControlsToast() {
-    if (!this.isControlsToastPending()) {
-      return;
-    }
-    try {
-      localStorage.setItem(CONTROLS_SEEN_KEY, '1');
-    } catch (error) {
-      return;
-    }
+  /** The in-play tip `id`, naming the keys the player actually bound. */
+  showOnboardingTip(id) {
+    const controls =
+      this.resolveSettingsService()?.getCategoryValues('controls') || {};
+    const keys = {};
+    [
+      'moveUp',
+      'moveDown',
+      'moveLeft',
+      'moveRight',
+      'dash',
+      'activateShield',
+    ].forEach((action) => {
+      keys[action] = this.formatBindingLabel(
+        controls[action]?.keyboard?.[0],
+        'keyboard'
+      );
+    });
+    const prompt = onboardingPrompts(
+      keys,
+      this.getService('player')?.controlScheme
+    )[id];
+    this.aaaTacticalHud?.showOnboardingTip(prompt.keys, prompt.text);
+  }
 
-    const gameUi = this.domRefs.gameUi;
-    if (!gameUi) {
+  /** The cards tip in the level-up footer, on the first level-up only. */
+  showOnboardingCardsTip() {
+    const text = this.onboarding.cardsTip();
+    const content = document.querySelector('#levelup-screen .levelup-content');
+    if (!text || !content || content.querySelector('.onboarding-cards-tip')) {
       return;
     }
+    const tip = document.createElement('p');
+    tip.className = 'levelup-hint onboarding-cards-tip';
+    tip.setAttribute('role', 'status');
+    tip.textContent = text;
+    content.appendChild(tip);
+  }
 
-    const toast = document.createElement('div');
-    toast.className = 'controls-toast';
-    toast.textContent =
-      'A/D turn · W thrust · shooting is automatic · Shift dash · E shield';
-    gameUi.appendChild(toast);
-    requestAnimationFrame(() => toast.classList.add('is-visible'));
-    setTimeout(() => toast.remove(), CONTROLS_TOAST_MS);
+  removeOnboardingCardsTip() {
+    document.querySelector('.onboarding-cards-tip')?.remove();
   }
 }
 

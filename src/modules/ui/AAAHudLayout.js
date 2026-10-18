@@ -54,6 +54,7 @@ export class AAAHudLayout {
     this._bannerEndsAt = 0;
     this._bossIntroEndsAt = 0;
     this._transmissionHideTimer = null;
+    this._onboardingHideTimer = null;
     this._bossBarHeldUntil = 0;
     this._feedRows = [];
     this._lastWeaponKey = null;
@@ -143,6 +144,7 @@ export class AAAHudLayout {
     this._bannerEndsAt = 0;
     this._bossIntroEndsAt = 0;
     this._transmissionHideTimer = null;
+    this._onboardingHideTimer = null;
     this._bossBarHeldUntil = 0;
     this._feedRows = [];
     this._lastWeaponKey = null;
@@ -309,6 +311,41 @@ export class AAAHudLayout {
     }, FADE_OUT_MS);
   }
 
+  /** First-run tip under the top HUD: key chips and one line. */
+  showOnboardingTip(keys, text) {
+    const tip = this.els?.onboardingTip;
+    if (!tip) {
+      return;
+    }
+    if (this._onboardingHideTimer) {
+      this._cancel(this._onboardingHideTimer);
+      this._onboardingHideTimer = null;
+    }
+    this.els.onboardingKeys.replaceChildren(
+      ...keys.map((label) => {
+        const chip = document.createElement('kbd');
+        chip.className = 'onboarding-tip__key';
+        chip.textContent = label;
+        return chip;
+      })
+    );
+    this.els.onboardingText.textContent = text;
+    tip.classList.remove('is-leaving');
+    this._replay(tip, 'is-showing');
+  }
+
+  hideOnboardingTip() {
+    const tip = this.els?.onboardingTip;
+    if (!tip || !tip.classList.contains('is-showing')) {
+      return;
+    }
+    tip.classList.add('is-leaving');
+    this._onboardingHideTimer = this._later(() => {
+      tip.classList.remove('is-showing', 'is-leaving');
+      this._onboardingHideTimer = null;
+    }, FADE_OUT_MS);
+  }
+
   /** Kill feed row for a destroyed enemy; repeated kills count up (×N). */
   addKillFeed(enemyType, elite = false) {
     const baseName =
@@ -457,6 +494,9 @@ export class AAAHudLayout {
       transmissionSpeaker: query('#ui-transmission-speaker'),
       transmissionLine: query('#ui-transmission-line'),
       feed: query('#ui-feed'),
+      onboardingTip: query('#ui-onboarding-tip'),
+      onboardingKeys: query('#ui-onboarding-keys'),
+      onboardingText: query('#ui-onboarding-text'),
       lowHpVignette: query('#ui-lowhp-vignette'),
     };
   }
@@ -1048,6 +1088,10 @@ export class AAAHudLayout {
                 <div class="boss-intro__sub" id="ui-boss-intro-sub">Guardian of the Ring</div>
                 <div class="boss-intro__line"></div>
             </div>
+            <div class="onboarding-tip" id="ui-onboarding-tip" role="status">
+                <div class="onboarding-tip__keys" id="ui-onboarding-keys"></div>
+                <div class="onboarding-tip__text" id="ui-onboarding-text"></div>
+            </div>
             <div class="transmission" id="ui-transmission" aria-live="polite">
                 <div class="transmission__speaker" id="ui-transmission-speaker"></div>
                 <div class="transmission__rule"></div>
@@ -1289,6 +1333,14 @@ export class AAAHudLayout {
             .transmission__line { min-height: 1.5em; font-family: var(--font-display); font-size: var(--text-md); letter-spacing: 0.06em; line-height: 1.5; text-align: center; color: var(--text); text-shadow: 0 0 10px rgba(0, 0, 0, 0.9), 0 0 6px var(--accent-line); }
             .transmission.is-typing .transmission__line::after { content: '▌'; margin-left: 2px; color: var(--accent); }
 
+            /* ONBOARDING TIP (first run, top centre under the boss bar slot) */
+            .onboarding-tip { position: absolute; top: 15%; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); background: var(--surface-strong); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--radius-md); pointer-events: none; z-index: 80; white-space: nowrap; opacity: 0; visibility: hidden; }
+            .onboarding-tip.is-showing { opacity: 1; visibility: visible; }
+            .onboarding-tip.is-leaving { opacity: 0; }
+            .onboarding-tip__keys { display: flex; gap: var(--space-1); }
+            .onboarding-tip__key { min-width: 1.9em; padding: 2px var(--space-2); font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 700; letter-spacing: 1px; text-align: center; text-transform: uppercase; color: var(--accent); background: var(--surface); border: 1px solid var(--accent-line); border-bottom-width: 2px; border-radius: var(--radius-sm); }
+            .onboarding-tip__text { font-family: var(--font-ui); font-size: var(--text-md); font-weight: 600; letter-spacing: 0.04em; color: var(--text); }
+
             /* KILL FEED */
             .hud-feed { position: absolute; top: calc(220px + var(--space-6)); right: var(--space-4); width: 200px; display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); pointer-events: none; z-index: 30; }
             .feed-row { display: flex; align-items: baseline; gap: var(--space-2); padding: 2px var(--space-2); background: linear-gradient(270deg, var(--surface) 0%, transparent 100%); border-right: 2px solid var(--neutral); font-family: var(--font-ui); font-size: var(--text-md); font-weight: 600; letter-spacing: 1px; color: var(--text); white-space: nowrap; }
@@ -1315,6 +1367,8 @@ export class AAAHudLayout {
                 .boss-intro.is-showing .boss-intro__line { animation: banner-line-draw 600ms var(--ease-out) 150ms both; }
                 .transmission.is-showing { animation: transmission-flicker 2.4s steps(1, end) infinite; }
                 .transmission.is-leaving { animation: none; transition: opacity ${FADE_OUT_MS}ms ease-in; }
+                .onboarding-tip.is-showing { animation: onboarding-tip-in var(--motion-base) var(--ease-out); }
+                .onboarding-tip.is-leaving { animation: none; transition: opacity ${FADE_OUT_MS}ms ease-in; }
                 .boss-area { transform: translateY(-24px); transition: opacity 0.5s var(--ease-out), transform 0.5s var(--ease-out); }
                 .boss-area.active { transform: translateY(0); }
                 .feed-row { animation: feed-in var(--motion-base) var(--ease-out); transition: opacity ${FADE_OUT_MS}ms ease-in, transform ${FADE_OUT_MS}ms ease-in; }
@@ -1329,6 +1383,7 @@ export class AAAHudLayout {
             @keyframes banner-line-draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
             @keyframes boss-intro-in { from { opacity: 0; transform: translateX(-50%) scale(0.9); } to { opacity: 1; transform: translateX(-50%) scale(1); } }
             @keyframes transmission-flicker { 0%, 100% { opacity: 1; } 3% { opacity: 0.55; } 5% { opacity: 0.9; } 7% { opacity: 0.7; } 9% { opacity: 1; } 61% { opacity: 0.82; } 62% { opacity: 1; } }
+            @keyframes onboarding-tip-in { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
             @keyframes feed-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
 
             @media (max-width: 900px) { #hud-layer { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; } .stats-area { position: absolute; top: 10px; left: 10px; } .radar-area { position: absolute; top: 10px; right: 10px; } .boss-area { margin-top: 60px; transform: scale(0.8); } .status-area { position: absolute; bottom: 20px; left: 10px; transform: scale(0.9); transform-origin: bottom left; } .systems-area { position: absolute; bottom: 20px; right: 10px; } .bottom-center { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 300px; } }
