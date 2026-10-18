@@ -103,8 +103,8 @@ describe('DissolvePool', () => {
 
     const twin = view.dissolve.twins.get(mirror.machineMaterial);
     expect(twin.vertexColors).toBe(true);
-    // merged body, lens and core: one twin per material drawn
-    expect(view.dissolve.twins.size).toBe(3);
+    // the merged body only: lens and core are glow-batch instances
+    expect(view.dissolve.twins.size).toBe(1);
     expect(view.dissolve.sources.indexOf(mirror.machineMaterial)).toBe(0);
   });
 

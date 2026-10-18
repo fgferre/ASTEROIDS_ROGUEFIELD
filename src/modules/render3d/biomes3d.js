@@ -7,6 +7,10 @@ import { BIOMES } from '../../data/biomes.js';
 import { colorOf } from './batches.js';
 
 const COLORS = ['hazeColor', 'veinColor', 'dustColor', 'keyColor', 'fillColor'];
+// Dense Fog (enemyMirror FOG_DIM): the nebula and the dust lose this much
+// light at the full fade.
+export const FOG_SPACE_DIM = 0.3;
+const FOG_DIMMED = ['sky0', 'sky1', 'hazeColor', 'veinColor', 'dustColor'];
 const NUMBERS = [
   'hazeDensity',
   'veinDensity',
@@ -49,10 +53,13 @@ export class BiomeController {
     this.applied = null;
   }
 
-  /** Applies the transition's current mix, if it moved since last frame. */
-  update(transition) {
+  /**
+   * Applies the transition's current mix and the Dense Fog fade (`fog`
+   * 0..1), if either moved since last frame.
+   */
+  update(transition, fog = 0) {
     const { from, to, mix } = transition;
-    const key = `${from.id}>${to.id}@${mix}`;
+    const key = `${from.id}>${to.id}@${mix}~${fog}`;
     if (key === this.applied) return;
     this.applied = key;
 
@@ -68,6 +75,8 @@ export class BiomeController {
     NUMBERS.forEach((name) => {
       look[name] = from[name] + (to[name] - from[name]) * mix;
     });
+    const dim = 1 - FOG_SPACE_DIM * fog;
+    FOG_DIMMED.forEach((name) => look[name].multiplyScalar(dim));
 
     const {
       key: keyLight,

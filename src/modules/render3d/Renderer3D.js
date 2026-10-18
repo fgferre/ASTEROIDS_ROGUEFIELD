@@ -180,6 +180,22 @@ function angleOf(holder, key) {
   return holder && Number.isFinite(holder[key]) ? holder[key] : 0;
 }
 
+// r128's UnrealBloomPass blurs a fixed five mips (two draws each) and its
+// composite samples all five: fewer `mips` end the blur loop early and point
+// the composite's unused slots at `pass.blackMip` (a black texel, made in
+// setup). The active targets are resized to the composer's (`width` ×
+// `height`, skipped before the first).
+export function setBloomMips(pass, mips, width, height) {
+  if (pass.nMips === mips) return;
+  pass.nMips = mips;
+  const { uniforms } = pass.compositeMaterial;
+  pass.renderTargetsVertical.forEach((target, i) => {
+    uniforms[`blurTexture${i + 1}`].value =
+      i < mips ? target.texture : pass.blackMip;
+  });
+  if (width > 0) pass.setSize(width, height);
+}
+
 function smoothstep(a, b, x) {
   const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
@@ -251,6 +267,10 @@ class Renderer3D extends BaseSystem {
     this.hitSparks = new HitSparks();
     this.muzzles = new MuzzleFlashes();
     this.biome = new BiomeTransition();
+    // Dense Fog (endless layer modifier): the far rocks and the space dim,
+    // with distance from the camera target (world x, z; updateCamera).
+    this.denseFog = false;
+    this.focus = { x: 0, z: 0 };
     this.stats = { drawCalls: 0, triangles: 0, frames: 0 };
 
     this.resolveCachedServices(
@@ -301,6 +321,12 @@ class Renderer3D extends BaseSystem {
     });
     this.registerEventListener('wave-started', (payload = {}) => {
       this.biome.enterLayer(payload.wave);
+    });
+    this.registerEventListener('layer-modifier-started', (payload = {}) => {
+      if (payload.id === 'dense-fog') this.denseFog = true;
+    });
+    this.registerEventListener('layer-modifier-ended', (payload = {}) => {
+      if (payload.id === 'dense-fog') this.denseFog = false;
     });
     this.registerEventListener('shield-hit', () => {
       const time = performance.now() / 1000;
@@ -461,6 +487,7 @@ class Renderer3D extends BaseSystem {
     const q = this.quality.settings;
     t.biomes.targets.bloomBase = BLOOM.strength * t.bloomScale * q.bloomScale;
     t.biomes.applied = null;
+    setBloomMips(t.bloomPass, q.bloomMips, t.width, t.height);
     t.enemies.setSurfaceMaps(q.surfaceMaps);
     t.player.setSurfaceMaps(q.surfaceMaps);
     this.applyShadows(q.shadows);
@@ -659,6 +686,8 @@ class Renderer3D extends BaseSystem {
     ].forEach((rt) => {
       rt.texture.type = THREE.HalfFloatType;
     });
+    bloomPass.blackMip = new THREE.DataTexture(new Uint8Array(4), 1, 1);
+    bloomPass.blackMip.needsUpdate = true;
     composer.addPass(bloomPass);
     const impactPass = createImpactPass(THREE);
     composer.addPass(impactPass);
@@ -965,6 +994,8 @@ class Renderer3D extends BaseSystem {
     if (t.key.castShadow) {
       t.enemies.budgetShadows(t.key.target.position.x, t.key.target.position.z);
     }
+    const { focus } = this;
+    const fog = t.enemies.updateFog(dt, this.denseFog, focus.x, focus.z);
     t.decals.update(dt, t.enemies.views);
     t.bursts.update(dt);
     t.wardenLight.intensity = warden ? 2.6 : 0;
@@ -984,7 +1015,7 @@ class Renderer3D extends BaseSystem {
 
     const pointScale = t.height / (2 * Math.tan((FOV * Math.PI) / 360));
     this.biome.update(dt);
-    t.biomes.update(this.biome);
+    t.biomes.update(this.biome, fog);
     const ship = t.player.group.visible && player?.position;
     t.space.update(this.camera.x, this.camera.y, dt, {
       ship: ship || null,
@@ -1119,6 +1150,8 @@ class Renderer3D extends BaseSystem {
     );
     t.camera.up.set(0, 0, -1);
     t.camera.lookAt(tx, 0, tz);
+    this.focus.x = tx;
+    this.focus.z = tz;
     this.aimKeyShadow(tx, tz, range);
     const roll = this.updateRoll(player, dt);
     const angle = roll + (shaking ? shake.angle : 0);

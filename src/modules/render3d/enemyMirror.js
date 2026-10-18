@@ -17,8 +17,10 @@ import { HERALD_KINDS } from '../../data/enemies/herald.js';
 import { createAsteroidGeometry, createSeededRandom } from './asteroidMesh.js';
 import { bakePlateMaps, bakeRockMaps } from './bakedMaps.js';
 import { HALF_H, HALF_W, colorOf } from './batches.js';
-import { DissolvePool } from './dissolve.js';
+import { DISSOLVE_SECONDS, DissolvePool } from './dissolve.js';
+import { GlowBatch } from './glowBatch.js';
 import { mergeStatic } from './mergeStatic.js';
+import { RimBatch, rimLoop } from './rimBatch.js';
 import { addRimLight } from './rimLight.js';
 import { RockInstances } from './rockInstances.js';
 
@@ -151,6 +153,15 @@ const MAP_SEED = 4242.7;
 export const SHADOW_RADIUS = 520;
 export const SHADOW_CASTERS = 24;
 
+// Dense Fog (endless layer modifier, PLAN.md R8.2): rocks lose up to
+// FOG_DIM of their light with distance from the camera target, all of it
+// from FOG_FAR px out (smoothstep from FOG_NEAR); fades in and out over
+// FOG_FADE_SECONDS.
+export const FOG_DIM = 0.55;
+export const FOG_NEAR = 180;
+export const FOG_FAR = 420;
+export const FOG_FADE_SECONDS = 1;
+
 // Per-rock values: instance attributes on the instanced rocks
 // (ROCK_INSTANCED, rockInstances.js), uniforms on single meshes (a burning
 // rock, the Husk's shell).
@@ -184,6 +195,11 @@ uniform vec3 uSeed;
 uniform float uRim;
 uniform vec3 uRimColor;
 varying vec3 vRockPos;
+#ifdef ROCK_FOG
+uniform float uFogDim;
+uniform vec2 uFogCenter;
+varying vec2 vRockFogXZ;
+#endif
 #ifdef ROCK_NORMAL
 uniform sampler2D uRockNormalMap;
 uniform float uRockNormalScale;
@@ -231,13 +247,16 @@ vec2 rockCracks(vec3 p) {
 `;
 
 function patchRockShader(shader) {
-  const { rockUniforms, rockMaps } = this.userData;
-  Object.assign(shader.uniforms, rockUniforms, rockMaps);
+  const { rockUniforms, rockMaps, rockFog } = this.userData;
+  Object.assign(shader.uniforms, rockUniforms, rockMaps, rockFog);
   shader.vertexShader = shader.vertexShader
     .replace(
       '#include <common>',
       `#include <common>
       varying vec3 vRockPos;
+      #ifdef ROCK_FOG
+      varying vec2 vRockFogXZ;
+      #endif
       #ifdef ROCK_INSTANCED
       attribute vec4 aGlow;
       attribute vec3 aVein;
@@ -278,6 +297,17 @@ function patchRockShader(shader) {
       vRockViewX = rockToView[0];
       vRockViewY = rockToView[1];
       vRockViewZ = rockToView[2];
+      #endif`
+    )
+    .replace(
+      '#include <project_vertex>',
+      `#include <project_vertex>
+      #ifdef ROCK_FOG
+      vec4 rockFogPos = vec4(transformed, 1.0);
+      #ifdef USE_INSTANCING
+      rockFogPos = instanceMatrix * rockFogPos;
+      #endif
+      vRockFogXZ = (modelMatrix * rockFogPos).xz;
       #endif`
     );
   // Baked maps (rock geometry has no UVs): triplanar in object space, the
@@ -365,6 +395,14 @@ function patchRockShader(shader) {
         totalEmissiveRadiance += uRimColor * uRim * pow(edge, 2.2);
       }
       totalEmissiveRadiance += vec3(ROCK_FLASH);`
+    )
+    .replace(
+      '#include <tonemapping_fragment>',
+      `#ifdef ROCK_FOG
+      gl_FragColor.rgb *= 1.0 - uFogDim * smoothstep(${FOG_NEAR.toFixed(1)},
+        ${FOG_FAR.toFixed(1)}, distance(vRockFogXZ, uFogCenter));
+      #endif
+      #include <tonemapping_fragment>`
     );
 }
 
@@ -390,6 +428,14 @@ function hashId(id) {
 }
 
 const clamp01 = (x) => Math.max(0, Math.min(1, x));
+
+// A batched part's anchor and its parents up to the view's root are shown.
+function shown(anchor) {
+  for (let node = anchor; node && !node.isScene; node = node.parent) {
+    if (!node.visible) return false;
+  }
+  return true;
+}
 
 function smooth(a, b, x) {
   const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
@@ -511,6 +557,13 @@ export class EnemyMirror {
     // Quality preset: every material that samples baked maps, to toggle.
     this.surfaceMaps = true;
     this.rockMaterials = [];
+    this.fog = {
+      amount: 0,
+      uniforms: {
+        uFogDim: { value: 0 },
+        uFogCenter: { value: new THREE.Vector2() },
+      },
+    };
     this.rockFamilies = this.createRockFamilies();
     this.rocks = new RockInstances(
       THREE,
@@ -545,17 +598,24 @@ export class EnemyMirror {
       dark: colorOf(THREE, PALETTE.hull),
     };
     this.mergedGeometries = new Map();
-    this.rimMaterial = new THREE.LineBasicMaterial({
-      color: colorOf(THREE, PALETTE.threat).multiplyScalar(1.1),
-      toneMapped: false,
-    });
+    // Outlines and eyes/lenses/nodes draw batched (rimBatch.js,
+    // glowBatch.js, packBatches): a view holds their anchors and colours.
+    // Herald and Warden rims glow violet: officials of the Ring.
+    this.rimBatch = new RimBatch(THREE, scene);
+    this.glows = new GlowBatch(THREE, scene);
+    this.rimColors = {
+      threat: colorOf(THREE, PALETTE.threat).multiplyScalar(1.1),
+      elite: colorOf(THREE, PALETTE.xp).multiplyScalar(1.1),
+      boss: colorOf(THREE, PALETTE.boss).multiplyScalar(1.2),
+    };
+    this.packView = (view) => this.packLive(view);
 
     const circle = [];
     for (let i = 0; i < 48; i += 1) {
       const a = (i / 48) * Math.PI * 2;
       circle.push(new THREE.Vector3(Math.cos(a), 0, Math.sin(a)));
     }
-    this.circleRim = new THREE.BufferGeometry().setFromPoints(circle);
+    this.circleRim = rimLoop(circle);
     this.sphere = new THREE.SphereGeometry(1, 20, 12);
     this.smallSphere = new THREE.SphereGeometry(1, 10, 8);
 
@@ -588,7 +648,7 @@ export class EnemyMirror {
     }
     this.seekerHull.rotateX(-Math.PI / 2);
     this.seekerHull.computeVertexNormals();
-    this.seekerRim = new THREE.BufferGeometry().setFromPoints(
+    this.seekerRim = rimLoop(
       seekerOutline.map(([x, y]) => new THREE.Vector3(x * 1.12, 0.05, y * 1.12))
     );
 
@@ -632,15 +692,7 @@ export class EnemyMirror {
     // Accent energy: threat red, gold on an Elite (RenderComponent accentOf).
     this.threatColor = colorOf(THREE, PALETTE.threat);
     this.bossColor = colorOf(THREE, PALETTE.boss);
-    this.bossRimMaterial = new THREE.LineBasicMaterial({
-      color: colorOf(THREE, PALETTE.boss).multiplyScalar(1.2),
-      toneMapped: false,
-    });
     this.goldColor = colorOf(THREE, PALETTE.xp);
-    this.eliteRimMaterial = new THREE.LineBasicMaterial({
-      color: colorOf(THREE, PALETTE.xp).multiplyScalar(1.1),
-      toneMapped: false,
-    });
     // dashed, so the slow turn of the Elite ring reads
     this.eliteDash = new THREE.RingGeometry(
       1.22,
@@ -703,7 +755,7 @@ export class EnemyMirror {
     }
     this.ramHull.rotateX(-Math.PI / 2);
     this.ramHull.computeVertexNormals();
-    this.ramRim = new THREE.BufferGeometry().setFromPoints(
+    this.ramRim = rimLoop(
       ramOutline.map(([x, y]) => new THREE.Vector3(x * 1.08, 0.05, y * 1.08))
     );
 
@@ -779,7 +831,7 @@ export class EnemyMirror {
     });
     this.dustSlab.rotateX(-Math.PI / 2);
     this.dustSlab.translate(0, -0.18, 0);
-    this.dustRim = new THREE.BufferGeometry().setFromPoints(
+    this.dustRim = rimLoop(
       slabOutline.map(([x, y]) => new THREE.Vector3(x * 1.06, 0.24, -y * 1.04))
     );
     this.dustSlit = new THREE.BoxGeometry(0.1, 0.04, 0.36);
@@ -810,7 +862,7 @@ export class EnemyMirror {
     }
     this.silencePrism.rotateX(-Math.PI / 2);
     this.silencePrism.computeVertexNormals();
-    this.silenceRim = new THREE.BufferGeometry().setFromPoints(
+    this.silenceRim = rimLoop(
       prismOutline.map(([x, y]) => new THREE.Vector3(x * 1.08, 0.02, -y * 1.04))
     );
     // Heat: a matte ring around a dark core, the seam between them.
@@ -962,8 +1014,9 @@ export class EnemyMirror {
     return 'unknown';
   }
 
-  // Machine views: `accents` are the materials whose base color is the
-  // threat/elite accent, `rims` the threat outlines.
+  // Machine views: `accents` are the materials (and glow tones) whose base
+  // color is the threat/elite accent, `rims` the outlines (in `rimColor`
+  // unless a rim has its own colour), `glows` the eyes/lenses/nodes.
   view(kind, object, parts) {
     return {
       kind,
@@ -974,6 +1027,8 @@ export class EnemyMirror {
       affix: null,
       accents: [],
       rims: [],
+      rimColor: this.rimColors.threat,
+      glows: [],
       ...parts,
     };
   }
@@ -988,6 +1043,33 @@ export class EnemyMirror {
   setGain(material, gain) {
     material.userData.gain = gain;
     material.color.copy(material.userData.base).multiplyScalar(gain);
+  }
+
+  // A glow's colour (base × gain, through setGain), drawn by the glow batch.
+  tone(hex, gain) {
+    const tone = {
+      color: new this.THREE.Color(),
+      userData: { base: colorOf(this.THREE, hex) },
+    };
+    this.setGain(tone, gain);
+    return tone;
+  }
+
+  // Batched parts: an anchor posed in the view's graph (scale, position,
+  // visible), drawn by packBatches. A rim's `color` overrides the view's.
+  rim(parent, points, scale = 1, color = null) {
+    const anchor = new this.THREE.Object3D();
+    anchor.scale.setScalar(scale);
+    parent.add(anchor);
+    return { anchor, points, color };
+  }
+
+  glow(parent, tone, scale = 1, position = null) {
+    const anchor = new this.THREE.Object3D();
+    anchor.scale.setScalar(scale);
+    if (position) anchor.position.copy(position);
+    parent.add(anchor);
+    return { anchor, tone };
   }
 
   // One merged geometry per name, shared by every view of the kind.
@@ -1036,7 +1118,7 @@ export class EnemyMirror {
     [stone, crystal].forEach((material) => {
       material.defines.ROCK_INSTANCED = '';
       material.onBeforeCompile = patchRockShader;
-      this.trackSurfaceMaps(material);
+      this.trackRockMaterial(material);
     });
     return { stone, crystal };
   }
@@ -1076,7 +1158,7 @@ export class EnemyMirror {
     );
     material.userData.rockMaps = this.stoneMaps;
     material.onBeforeCompile = patchRockShader;
-    this.trackSurfaceMaps(material);
+    this.trackRockMaterial(material);
     const mesh = new THREE.Mesh(this.rockGeometries[0], material);
     mesh.rotation.order = 'YXZ';
     this.scene.add(mesh);
@@ -1106,7 +1188,7 @@ export class EnemyMirror {
   createCrystal(view) {
     const material = this.crystalMaterial(view.stone.userData.rockUniforms);
     material.onBeforeCompile = patchRockShader;
-    this.trackSurfaceMaps(material);
+    this.trackRockMaterial(material);
     return material;
   }
 
@@ -1191,9 +1273,25 @@ export class EnemyMirror {
     plate.needsUpdate = true;
   }
 
-  trackSurfaceMaps(material) {
+  // Every rock material: surface maps per preset, Dense Fog dimming.
+  trackRockMaterial(material) {
     this.rockMaterials.push(material);
+    material.defines.ROCK_FOG = '';
+    material.userData.rockFog = this.fog.uniforms;
     this.applySurfaceMaps(material);
+  }
+
+  /**
+   * Per frame: Dense Fog `on` or off (faded over FOG_FADE_SECONDS), (x, z)
+   * the camera target in world units. Returns the fade, 0..1.
+   */
+  updateFog(dt, on, x, z) {
+    const fog = this.fog;
+    const step = dt / FOG_FADE_SECONDS;
+    fog.amount = clamp01(fog.amount + (on ? step : -step));
+    fog.uniforms.uFogDim.value = FOG_DIM * fog.amount;
+    fog.uniforms.uFogCenter.value.set(x, z);
+    return fog.amount;
   }
 
   // Stone takes normal + roughness/AO; crystal only the faint normal.
@@ -1216,20 +1314,14 @@ export class EnemyMirror {
     const body = this.body('drone', () => [
       { geometry: this.sphere, color: this.tones.hull, scale: [1, 0.42, 1] },
     ]);
-    const eye = new THREE.Mesh(
-      this.smallSphere,
-      this.emissive(PALETTE.threat, 1.4)
-    );
-    eye.scale.setScalar(0.22);
-    eye.position.set(0.7, 0.16, 0);
-    const rim = new THREE.LineLoop(this.circleRim, this.rimMaterial);
-    rim.scale.setScalar(1.04);
-    group.add(body, eye, rim);
+    const eyeTone = this.tone(PALETTE.threat, 1.4);
+    group.add(body);
     this.scene.add(group);
     return this.view('drone', group, {
       body,
-      accents: [eye.material],
-      rims: [rim],
+      accents: [eyeTone],
+      rims: [this.rim(group, this.circleRim, 1.04)],
+      glows: [this.glow(group, eyeTone, 0.22, new THREE.Vector3(0.7, 0.16, 0))],
     });
   }
 
@@ -1239,17 +1331,14 @@ export class EnemyMirror {
     const body = this.body('hunter', () => [
       { geometry: this.seekerHull, color: this.tones.hull },
     ]);
-    const lensMaterial = this.emissive(PALETTE.threat, 0.5);
-    const lens = new THREE.Mesh(this.smallSphere, lensMaterial);
-    lens.scale.setScalar(0.2);
-    lens.position.set(1.12, 0.3, 0);
-    const rim = new THREE.LineLoop(this.seekerRim, this.rimMaterial);
-    group.add(body, lens, rim);
+    const lensTone = this.tone(PALETTE.threat, 0.5);
+    group.add(body);
     this.scene.add(group);
     return this.view('hunter', group, {
-      lensMaterial,
-      accents: [lensMaterial],
-      rims: [rim],
+      lensTone,
+      accents: [lensTone],
+      rims: [this.rim(group, this.seekerRim)],
+      glows: [this.glow(group, lensTone, 0.2, new THREE.Vector3(1.12, 0.3, 0))],
     });
   }
 
@@ -1270,36 +1359,21 @@ export class EnemyMirror {
         rotationY,
       })),
     ]);
-    const nodeMaterial = this.emissive(PALETTE.threat, 0.6);
-    const nodes = new THREE.Mesh(
-      this.merged('mine-nodes', () =>
-        tips.map((tip) => ({
-          geometry: this.smallSphere,
-          scale: 0.15,
-          position: tip.toArray(),
-        }))
-      ),
-      nodeMaterial
-    );
-    spin.add(frame, nodes);
-    const arcMaterial = new THREE.LineBasicMaterial({ toneMapped: false });
-    arcMaterial.userData.base = colorOf(THREE, PALETTE.threat);
-    const arc = new THREE.LineLoop(
-      new THREE.BufferGeometry().setFromPoints(tips),
-      arcMaterial
-    );
-    spin.add(arc);
-    const rim = new THREE.LineLoop(this.circleRim, this.rimMaterial);
-    rim.scale.setScalar(1.2);
-    group.add(spin, rim);
+    const nodeTone = this.tone(PALETTE.threat, 0.6);
+    spin.add(frame);
+    // the arc between the nodes: a rim in its own (pulsing accent) colour
+    const arcTone = this.tone(PALETTE.threat, 1.1);
+    const arc = this.rim(spin, rimLoop(tips), 1, arcTone.color);
+    group.add(spin);
     this.scene.add(group);
     return this.view('mine', group, {
       spin,
-      nodeMaterial,
+      nodeTone,
       arc,
-      arcMaterial,
-      accents: [nodeMaterial, arcMaterial],
-      rims: [rim],
+      arcTone,
+      accents: [nodeTone, arcTone],
+      rims: [this.rim(group, this.circleRim, 1.2), arc],
+      glows: tips.map((tip) => this.glow(spin, nodeTone, 0.15, tip)),
     });
   }
 
@@ -1320,11 +1394,13 @@ export class EnemyMirror {
     addRimLight(material);
     const shell = new THREE.Mesh(this.huskShell, material);
     shell.scale.setScalar(0.95);
-    const rim = new THREE.LineLoop(this.circleRim, this.rimMaterial);
-    rim.scale.setScalar(0.98);
-    group.add(shell, rim);
+    group.add(shell);
     this.scene.add(group);
-    return this.view('husk', group, { shell, material, rims: [rim] });
+    return this.view('husk', group, {
+      shell,
+      material,
+      rims: [this.rim(group, this.circleRim, 0.98)],
+    });
   }
 
   createRam() {
@@ -1339,25 +1415,31 @@ export class EnemyMirror {
         position: [0.45, 0.38, 0],
       },
     ]);
-    const lensMaterial = this.emissive(PALETTE.threat, 0.4);
-    const lens = new THREE.Mesh(this.smallSphere, lensMaterial);
-    lens.scale.setScalar(0.12);
-    lens.position.set(0.45, 0.4, 0);
-    const coreMaterial = this.emissive(PALETTE.text, 0);
-    const core = new THREE.Mesh(this.smallSphere, coreMaterial);
-    core.scale.setScalar(0.07);
-    core.position.set(0.45, 0.48, 0);
-    const rim = new THREE.LineLoop(this.ramRim, this.rimMaterial);
-    group.add(body, lens, core, rim);
+    const lensTone = this.tone(PALETTE.threat, 0.4);
+    const lens = this.glow(
+      group,
+      lensTone,
+      0.12,
+      new THREE.Vector3(0.45, 0.4, 0)
+    );
+    const coreTone = this.tone(PALETTE.text, 0);
+    const core = this.glow(
+      group,
+      coreTone,
+      0.07,
+      new THREE.Vector3(0.45, 0.48, 0)
+    );
+    group.add(body);
     this.scene.add(group);
     return this.view('ram', group, {
-      lens,
-      lensMaterial,
-      core,
-      coreMaterial,
+      lens: lens.anchor,
+      lensTone,
+      core: core.anchor,
+      coreTone,
       telegraph: this.createTelegraph(),
-      accents: [lensMaterial],
-      rims: [rim],
+      accents: [lensTone],
+      rims: [this.rim(group, this.ramRim)],
+      glows: [lens, core],
     });
   }
 
@@ -1388,7 +1470,7 @@ export class EnemyMirror {
     });
     armMaterial.userData.base = armMaterial.emissive;
     addRimLight(armMaterial);
-    const tipMaterial = this.emissive(PALETTE.threat, 0.5);
+    const tipTone = this.tone(PALETTE.threat, 0.5);
     const spin = new THREE.Group();
     const turns = Array.from(
       { length: WEAVER_ARMS },
@@ -1400,25 +1482,26 @@ export class EnemyMirror {
       ),
       armMaterial
     );
-    const tips = turns.map((turn) => {
-      const tip = new THREE.Mesh(this.smallSphere, tipMaterial);
-      tip.position
-        .copy(this.weaverTip)
-        .applyAxisAngle(new THREE.Vector3(0, 1, 0), turn);
-      return tip;
-    });
-    spin.add(arms, ...tips);
-    const rim = new THREE.LineLoop(this.circleRim, this.rimMaterial);
-    rim.scale.setScalar(0.36);
-    group.add(hub, spin, rim);
+    const up = new THREE.Vector3(0, 1, 0);
+    const tips = turns.map((turn) =>
+      this.glow(
+        spin,
+        tipTone,
+        1,
+        this.weaverTip.clone().applyAxisAngle(up, turn)
+      )
+    );
+    spin.add(arms);
+    group.add(hub, spin);
     this.scene.add(group);
     return this.view('weaver', group, {
       spin,
       armMaterial,
-      tipMaterial,
-      tips,
-      accents: [armMaterial, tipMaterial],
-      rims: [rim],
+      tipTone,
+      tips: tips.map((tip) => tip.anchor),
+      accents: [armMaterial, tipTone],
+      rims: [this.rim(group, this.circleRim, 0.36)],
+      glows: tips,
     });
   }
 
@@ -1443,9 +1526,7 @@ export class EnemyMirror {
     const edgeMaterial = this.emissive(PALETTE.threat, 1.2);
     const edge = new THREE.Mesh(this.bulwarkEdge, edgeMaterial);
     plate.add(plateMesh, edge);
-    const rim = new THREE.LineLoop(this.circleRim, this.rimMaterial);
-    rim.scale.setScalar(0.74);
-    group.add(hull, plate, rim);
+    group.add(hull, plate);
     this.scene.add(group);
     return this.view('bulwark', group, {
       plate,
@@ -1453,16 +1534,11 @@ export class EnemyMirror {
       edge,
       edgeMaterial,
       accents: [edgeMaterial],
-      rims: [rim],
+      rims: [this.rim(group, this.circleRim, 0.74)],
     });
   }
 
   // --- Heralds ----------------------------------------------------------------
-
-  // Herald rims glow violet: officials of the Ring, not Wardens.
-  heraldRim(geometry) {
-    return new this.THREE.LineLoop(geometry, this.bossRimMaterial);
-  }
 
   createDust() {
     const { THREE } = this;
@@ -1480,7 +1556,6 @@ export class EnemyMirror {
       ),
       slitMaterial
     );
-    const rim = this.heraldRim(this.dustRim);
     // the haze: a slow ring of faint dust motes, never in the bloom
     const haze = new THREE.Group();
     const hazeMaterial = new THREE.MeshBasicMaterial({
@@ -1512,13 +1587,15 @@ export class EnemyMirror {
         hazeMaterial
       )
     );
-    group.add(slab, slits, rim, haze);
+    group.add(slab, slits, haze);
     this.scene.add(group);
     return this.view('herald-dust', group, {
       slitMaterial,
       hazeMaterial,
       haze,
       accents: [slitMaterial],
+      rims: [this.rim(group, this.dustRim)],
+      rimColor: this.rimColors.boss,
     });
   }
 
@@ -1542,14 +1619,15 @@ export class EnemyMirror {
     });
     const warn = new THREE.Mesh(this.warnRing, warnMaterial);
     warn.visible = false;
-    const rim = this.heraldRim(this.circleRim);
-    group.add(shell, seam, warn, rim);
+    group.add(shell, seam, warn);
     this.scene.add(group);
     return this.view('herald-heat', group, {
       seam,
       seamMaterial,
       warn,
       accents: [seamMaterial],
+      rims: [this.rim(group, this.circleRim)],
+      rimColor: this.rimColors.boss,
     });
   }
 
@@ -1566,12 +1644,14 @@ export class EnemyMirror {
     });
     addRimLight(prismMaterial);
     const prism = new THREE.Mesh(this.silencePrism, prismMaterial);
-    const eyeMaterial = this.emissive(PALETTE.text, 1.6);
-    const eye = new THREE.Mesh(this.smallSphere, eyeMaterial);
-    eye.scale.setScalar(0.12);
-    eye.position.set(0, 0.58, -0.2);
-    const rim = this.heraldRim(this.silenceRim);
-    group.add(prism, eye, rim);
+    const eyeTone = this.tone(PALETTE.text, 1.6);
+    const eye = this.glow(
+      group,
+      eyeTone,
+      0.12,
+      new THREE.Vector3(0, 0.58, -0.2)
+    );
+    group.add(prism);
     this.scene.add(group);
     // the blink rings live in field pixels, outside the scaled body
     const ring = () =>
@@ -1595,11 +1675,14 @@ export class EnemyMirror {
     telegraph.group.visible = false;
     this.scene.add(telegraph.group);
     return this.view('herald-silence', group, {
-      eye,
-      eyeMaterial,
+      eye: eye.anchor,
+      eyeTone,
       prismMaterial,
       telegraph,
-      accents: [eyeMaterial],
+      accents: [eyeTone],
+      rims: [this.rim(group, this.silenceRim)],
+      rimColor: this.rimColors.boss,
+      glows: [eye],
     });
   }
 
@@ -1630,7 +1713,7 @@ export class EnemyMirror {
       object.rotation.y = 0;
       view.eye.scale.setScalar(0.12 + 0.05 * charge);
       this.setGain(
-        view.eyeMaterial,
+        view.eyeTone,
         1.4 + 0.25 * Math.sin(time * 3) + flash * 0.8 + charge
       );
       const t = view.telegraph;
@@ -1693,15 +1776,7 @@ export class EnemyMirror {
     const coreMaterial = this.wardenCoreMaterial(1.3);
     const core = new THREE.Mesh(this.sphere, coreMaterial);
     core.scale.setScalar(0.45);
-    const rim = new THREE.LineLoop(
-      this.circleRim,
-      new THREE.LineBasicMaterial({
-        color: colorOf(THREE, PALETTE.boss).multiplyScalar(1.2),
-        toneMapped: false,
-      })
-    );
-    rim.scale.setScalar(1.24);
-    group.add(ring, core, rim);
+    group.add(ring, core);
     this.scene.add(group);
 
     return {
@@ -1710,6 +1785,8 @@ export class EnemyMirror {
       ring,
       core,
       coreMaterial,
+      rims: [this.rim(group, this.circleRim, 1.24)],
+      rimColor: this.rimColors.boss,
       telegraph: this.createTelegraph(),
       id: null,
     };
@@ -1722,9 +1799,9 @@ export class EnemyMirror {
     const group = new THREE.Group();
     const hub = new THREE.Mesh(this.sphere, this.darkMaterial);
     hub.scale.set(22, 14, 22);
-    const hubRim = new THREE.LineLoop(this.circleRim, this.bossRimMaterial);
-    hubRim.scale.setScalar(30);
-    group.add(hub, hubRim);
+    group.add(hub);
+    const hubRim = this.rim(group, this.circleRim, 30);
+    const halos = [];
     const cores = [];
     for (let i = 0; i < 3; i += 1) {
       const pivot = new THREE.Group();
@@ -1734,13 +1811,11 @@ export class EnemyMirror {
       const core = new THREE.Mesh(this.sphere, coreMaterial);
       core.position.x = 90;
       core.scale.setScalar(CHOIR_CORE_PX);
-      const haloMaterial = new THREE.LineBasicMaterial({
-        color: colorOf(THREE, PALETTE.boss).multiplyScalar(1.3),
-        transparent: true,
-        toneMapped: false,
-      });
-      const halo = new THREE.LineLoop(this.circleRim, haloMaterial);
-      halo.position.x = 90;
+      // the singing halo: a rim whose gain beats (it was its opacity)
+      const haloTone = this.tone(PALETTE.boss, 1.3);
+      const halo = this.rim(pivot, this.circleRim, 1, haloTone.color);
+      halo.anchor.position.x = 90;
+      halos.push(halo);
       const shards = [];
       for (let k = 0; k < CHOIR_SHARDS; k += 1) {
         const shard = new THREE.Mesh(this.shard, this.wardenPlateMaterial);
@@ -1748,15 +1823,15 @@ export class EnemyMirror {
         shards.push(shard);
         pivot.add(shard);
       }
-      pivot.add(arm, core, halo);
+      pivot.add(arm, core);
       group.add(pivot);
       cores.push({
         pivot,
         arm,
         core,
         coreMaterial,
-        halo,
-        haloMaterial,
+        halo: halo.anchor,
+        haloTone,
         shards,
       });
     }
@@ -1765,6 +1840,8 @@ export class EnemyMirror {
       kind: 'boss-choir',
       object: group,
       cores,
+      rims: [hubRim, ...halos],
+      rimColor: this.rimColors.boss,
       telegraph: this.createTelegraph(3),
       id: null,
     };
@@ -1778,7 +1855,7 @@ export class EnemyMirror {
     const coreMaterial = this.wardenCoreMaterial(0.5);
     coreMaterial.color.copy(colorOf(THREE, '#05030a'));
     const core = new THREE.Mesh(this.sphere, coreMaterial);
-    const rim = new THREE.LineLoop(this.circleRim, this.bossRimMaterial);
+    const rim = this.rim(group, this.circleRim);
     const plates = [];
     for (let i = 0; i < 8; i += 1) {
       const mesh = new THREE.Mesh(this.nullPlate, this.wardenPlateMaterial);
@@ -1803,14 +1880,16 @@ export class EnemyMirror {
       group.add(ring);
       return ring;
     });
-    group.add(core, rim);
+    group.add(core);
     this.scene.add(group);
     return {
       kind: 'boss-null',
       object: group,
       core,
       coreMaterial,
-      rim,
+      rim: rim.anchor,
+      rims: [rim],
+      rimColor: this.rimColors.boss,
       plates,
       pullRings,
       shedAt: null,
@@ -1907,7 +1986,45 @@ export class EnemyMirror {
     });
     if (this.dead.size) this.dead.forEach(this.pruneDead);
     this.rocks.end();
+    this.packBatches();
     return warden;
+  }
+
+  // The live views' outlines and glows, then the glows of the burning ones,
+  // shrinking to nothing over the burn (their outlines go dark at once).
+  packBatches() {
+    this.rimBatch.begin();
+    this.glows.begin();
+    this.views.forEach(this.packView);
+    const { slots } = this.dissolve;
+    for (let i = 0; i < slots.length; i += 1) {
+      const { view, age } = slots[i];
+      if (view?.glows?.length) {
+        this.packGlows(view, Math.max(0, 1 - age / DISSOLVE_SECONDS));
+      }
+    }
+    this.rimBatch.end();
+    this.glows.end();
+  }
+
+  packLive(view) {
+    const { rims, glows } = view;
+    if (!rims?.length && !glows?.length) return;
+    view.object.updateMatrixWorld();
+    for (let i = 0; i < rims.length; i += 1) {
+      const { anchor, points, color } = rims[i];
+      if (!shown(anchor)) continue;
+      this.rimBatch.push(points, anchor.matrixWorld, color || view.rimColor);
+    }
+    if (glows) this.packGlows(view, 1);
+  }
+
+  packGlows(view, scale) {
+    const { glows } = view;
+    for (let i = 0; i < glows.length; i += 1) {
+      const { anchor, tone } = glows[i];
+      if (shown(anchor)) this.glows.push(anchor.matrixWorld, tone.color, scale);
+    }
   }
 
   /** The simulation killed `enemy` (asteroid splits excluded). */
@@ -1962,13 +2079,13 @@ export class EnemyMirror {
       this.updateAffixes(view, enemy, time);
     }
     if (kind === 'hunter') {
-      this.setGain(view.lensMaterial, 0.5 + 1.3 * (enemy.telegraphRatio || 0));
+      this.setGain(view.lensTone, 0.5 + 1.3 * (enemy.telegraphRatio || 0));
     } else if (kind === 'mine') {
       const armed = Boolean(enemy.armed);
       const pulse = 0.5 + 0.5 * Math.sin(time * 9 + (view.seed % 7));
-      this.setGain(view.nodeMaterial, armed ? 1.1 + 0.6 * pulse : 0.6);
-      view.arc.visible = armed;
-      this.setGain(view.arcMaterial, 1.1 + 0.6 * pulse);
+      this.setGain(view.nodeTone, armed ? 1.1 + 0.6 * pulse : 0.6);
+      view.arc.anchor.visible = armed;
+      this.setGain(view.arcTone, 1.1 + 0.6 * pulse);
       view.spin.rotation.y = time * (armed ? 2.4 : 0.8);
     } else if (kind === 'husk') {
       object.rotation.y = 0;
@@ -1981,17 +2098,17 @@ export class EnemyMirror {
       uniforms.uFlash.value = flash * 0.45;
     } else if (kind === 'ram') {
       const charge = clamp01(enemy.telegraphRatio || 0);
-      this.setGain(view.lensMaterial, 0.4 + 1.8 * charge);
+      this.setGain(view.lensTone, 0.4 + 1.8 * charge);
       view.lens.scale.setScalar(0.12 * (1 + 0.8 * charge));
       view.core.visible = charge > 0.5;
-      this.setGain(view.coreMaterial, (charge - 0.5) * 2.4);
+      this.setGain(view.coreTone, (charge - 0.5) * 2.4);
       this.updateTelegraph(view.telegraph, enemy, enemy.radius || 14);
     } else if (kind === 'weaver') {
       object.rotation.y = 0;
       view.spin.rotation.y = -(enemy.spin || 0);
       const lay = clamp01(enemy.layGlow || 0);
       view.armMaterial.emissiveIntensity = 2.2 * lay;
-      this.setGain(view.tipMaterial, 0.5 + 1.6 * lay);
+      this.setGain(view.tipTone, 0.5 + 1.6 * lay);
       for (let i = 0; i < view.tips.length; i += 1) {
         view.tips[i].scale.setScalar(0.09 + 0.07 * lay);
       }
@@ -2023,8 +2140,7 @@ export class EnemyMirror {
     }
     if (view.material)
       view.material.userData.rockUniforms.uVein.value.copy(accent);
-    const rim = elite ? this.eliteRimMaterial : this.rimMaterial;
-    for (let i = 0; i < view.rims.length; i += 1) view.rims[i].material = rim;
+    view.rimColor = elite ? this.rimColors.elite : this.rimColors.threat;
     if (elite && !view.eliteRing) {
       view.eliteRing = this.seeded(
         () =>
@@ -2314,7 +2430,7 @@ export class EnemyMirror {
         );
         c.halo.visible = singing;
         c.halo.scale.setScalar(CHOIR_CORE_PX * (1.3 + 0.08 * beat));
-        c.haloMaterial.opacity = 0.6 + 0.3 * beat;
+        this.setGain(c.haloTone, 1.3 * (0.6 + 0.3 * beat));
         continue;
       }
       if (!c.broken) {
@@ -2532,5 +2648,7 @@ export class EnemyMirror {
     this.dissolve.clear();
     this.dead.clear();
     this.rocks.clear();
+    this.rimBatch.clear();
+    this.glows.clear();
   }
 }

@@ -10,7 +10,8 @@
 // `shadows`: the key light's shadow map size in texels (rocks, machines and
 // the ship shadow each other), 0 = off. The polish layers (proposta 18/10):
 // `filmGrain` grain + vignette in the impact pass, `rimLight` on machine
-// hulls, `decals` scorch marks on rocks.
+// hulls, `decals` scorch marks on rocks. `bloomMips`: blur levels of the
+// bloom (5 = the widest halo; each one is two draws).
 export const QUALITY_PRESETS = {
   ultra: {
     bloomScale: 1,
@@ -23,6 +24,7 @@ export const QUALITY_PRESETS = {
     filmGrain: true,
     rimLight: true,
     decals: true,
+    bloomMips: 5,
   },
   high: {
     bloomScale: 1,
@@ -35,6 +37,7 @@ export const QUALITY_PRESETS = {
     filmGrain: true,
     rimLight: true,
     decals: true,
+    bloomMips: 3,
   },
   medium: {
     bloomScale: 0.85,
@@ -47,6 +50,7 @@ export const QUALITY_PRESETS = {
     filmGrain: true,
     rimLight: true,
     decals: true,
+    bloomMips: 3,
   },
   low: {
     bloomScale: 0.7,
@@ -59,6 +63,7 @@ export const QUALITY_PRESETS = {
     filmGrain: false,
     rimLight: false,
     decals: false,
+    bloomMips: 3,
   },
 };
 export const QUALITY_LEVELS = Object.keys(QUALITY_PRESETS);

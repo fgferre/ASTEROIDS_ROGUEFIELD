@@ -26,6 +26,7 @@ export function qualityPresetSummary(preset) {
     .map(([key, value]) => {
       if (key === 'bloomScale') return `Bloom ${Math.round(value * 100)}%`;
       if (key === 'debrisCap') return `${value} debris`;
+      if (key === 'bloomMips') return `${value} bloom levels`;
       if (key === 'pixelRatio') return `${value}× resolution`;
       return `${words(key)} ${value ? 'on' : 'off'}`;
     })

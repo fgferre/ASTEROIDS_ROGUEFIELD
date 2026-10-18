@@ -281,9 +281,9 @@ Conteúdo:
       um segundo estágio visível (Incendiary → Solar Flare Lance; Railshot → Coilgun; Chain → Storm Lance; Gravitic →
       Singularity Lance; Prospector → Motherlode), com look próprio em 3D/2D, chip na HUD e conquista.
       Qualidade:
-- [ ] **R8.2 Decisão de draw calls.** Rims de todas as máquinas num LineSegments só, olhos/lentes/esferas emissivas num
-      InstancedMesh, bloom com menos mips no preset alto; Dense Fog escurece rochas distantes no 3D; meta < 100 no
-      ultra na cena carregada.
+- [~] **R8.2 Decisão de draw calls.** Rims de todas as máquinas num LineSegments só, olhos/lentes/esferas emissivas num
+  InstancedMesh, bloom com menos mips no preset alto; Dense Fog escurece rochas distantes no 3D; meta < 100 no
+  ultra na cena carregada.
 - [x] **R8.3 BACKLOG curto.** Seed do wave-manager por run (modificadores variam entre runs); prévia 3D do casco no
       Hangar; dois arrows no mesmo painel não se empilham.
 - [x] **R8.4 Acessibilidade.** Escala de texto da HUD (Settings), modo alto contraste da HUD, redução de flashes
