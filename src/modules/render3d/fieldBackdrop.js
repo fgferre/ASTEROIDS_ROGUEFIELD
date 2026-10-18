@@ -19,6 +19,12 @@ const DEBRIS_COLOR = '#16130f';
 const STRUCTURE_COLOR = '#07050f';
 const STRUCTURE_EDGE = '#8070ff';
 const STRUCTURE_EDGE_ALPHA = 0.35;
+// The victory epilogue's "wake" (setWake): the Ring and the structures light
+// up from their dark silhouettes to these, bright enough to bloom.
+const RING_COLOR = '#030508';
+const RING_WAKE_COLOR = '#9a8cff';
+const RING_WAKE_GAIN = 2.4;
+const STRUCTURE_WAKE_COLOR = '#2c2470';
 
 // A soft white noise cloud on a canvas, faded to transparent at the edges
 // (the material colour tints it). `veins` turns the cloud into thin ridges.
@@ -210,16 +216,25 @@ export class FieldBackdrop {
     const radius = 2200;
     const ring = new THREE.Mesh(
       new THREE.TorusGeometry(radius, 14, 8, 160, arc),
-      new THREE.MeshBasicMaterial({ color: colorOf(THREE, '#030508') })
+      new THREE.MeshBasicMaterial({ color: colorOf(THREE, RING_COLOR) })
     );
     ring.rotation.x = Math.PI / 2 - 0.12;
     ring.rotation.z = (50 * Math.PI) / 180 - arc;
     ring.scale.set(1, 1, 0.4);
     ring.position.set(-1900, -900, -1700);
     scene.add(ring);
+    this.ring = ring;
+    this.ringColor = colorOf(THREE, RING_COLOR);
+    this.ringWakeColor = colorOf(THREE, RING_WAKE_COLOR).multiplyScalar(
+      RING_WAKE_GAIN
+    );
 
     this.structures = ringStructures(THREE);
     scene.add(this.structures.group);
+    this.structureColor = colorOf(THREE, STRUCTURE_COLOR);
+    this.structureWakeColor = colorOf(THREE, STRUCTURE_WAKE_COLOR);
+    this.structureShare = 0;
+    this.wake = 0;
 
     // Far fragments drifting well below the field, dark and barely lit;
     // the biome's `debris` share decides how many show.
@@ -289,10 +304,8 @@ export class FieldBackdrop {
     this.sky.material.uniforms.uZenith.value.copy(look.sky0);
     this.sky.material.uniforms.uHorizon.value.copy(look.sky1);
 
-    const { group, dark, edge } = this.structures;
-    group.visible = look.structures > 0.001;
-    dark.opacity = look.structures;
-    edge.opacity = look.structures * STRUCTURE_EDGE_ALPHA;
+    this.structureShare = look.structures;
+    this.applyStructures();
 
     // Fragments past the share shrink away one by one.
     const shown = look.debris * DEBRIS_COUNT;
@@ -304,6 +317,29 @@ export class FieldBackdrop {
       this.debris.setMatrixAt(i, this.debrisMatrix);
     }
     this.debris.instanceMatrix.needsUpdate = true;
+  }
+
+  /** The Ring's wake, 0 (dark silhouette) to 1 (lit), for the epilogue. */
+  setWake(wake) {
+    if (wake === this.wake) return;
+    this.wake = wake;
+    this.ring.material.color
+      .copy(this.ringColor)
+      .lerp(this.ringWakeColor, wake);
+    this.structures.dark.color
+      .copy(this.structureColor)
+      .lerp(this.structureWakeColor, wake);
+    this.applyStructures();
+  }
+
+  // The biome's share of the intact Ring, raised to full while it wakes.
+  applyStructures() {
+    const { group, dark, edge } = this.structures;
+    const share = Math.max(this.structureShare, this.wake);
+    group.visible = share > 0.001;
+    dark.opacity = share;
+    edge.opacity =
+      share * (STRUCTURE_EDGE_ALPHA + (1 - STRUCTURE_EDGE_ALPHA) * this.wake);
   }
 
   /** `cx`, `cy`: camera follow point (logical). */

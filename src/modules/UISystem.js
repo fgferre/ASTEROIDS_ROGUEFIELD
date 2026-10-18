@@ -22,6 +22,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { AAAHudLayout } from './ui/AAAHudLayout.js';
 import { Onboarding, onboardingPrompts } from './ui/onboarding.js';
+import { RunCinematics } from './ui/runCinematics.js';
 import {
   TransmissionQueue,
   chapterTransmission,
@@ -97,6 +98,26 @@ class UISystem extends BaseSystem {
     this.transmissions = null;
     this.transmissionRaf = null;
     this.transmissionLayer = 1;
+    this.cinematics = new RunCinematics({
+      eventBus: this.eventBus,
+      renderer: () => this.getService('renderer'),
+      hud: () => this.aaaTacticalHud,
+      // The session's pause flag alone: no pause screen, no fixed steps.
+      holdSim: (held) => this.getService('game-state')?.setPaused(held),
+      bindSkip: (skip) => {
+        // Capture on window runs before every other key handler: the key
+        // only skips (a held key's repeats are swallowed too).
+        const onKey = (event) => {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          if (!event.repeat) skip();
+        };
+        window.addEventListener('keydown', onKey, true);
+        return () => window.removeEventListener('keydown', onKey, true);
+      },
+      onIntroEnd: () =>
+        this.handleLayerStarted({ wave: this.transmissionLayer }),
+    });
     this.aaaTacticalHudDefinition = getHudLayoutDefinition(
       this.currentHudLayoutId
     );
@@ -490,10 +511,14 @@ class UISystem extends BaseSystem {
       return;
     }
     const layer = Math.max(1, Math.floor(Number(payload.wave) || 1));
+    this.transmissionLayer = layer;
+    // The intro's end shows this layer's title card.
+    if (this.cinematics.introActive) {
+      return;
+    }
     const boss = Boolean(payload.isBossWave) || directorFor(layer).warden;
     const biome = biomeForLayer(layer);
     const firstOfBiome = biome.layers[0] === layer;
-    this.transmissionLayer = layer;
     hud.showLayerBanner(layer, {
       boss,
       chapter: firstOfBiome
@@ -1641,14 +1666,19 @@ class UISystem extends BaseSystem {
 
     this.registerEventListener('run-won', () => {
       this.runWon = true;
+      this.cinematics.startEpilogue();
       this.queueTransmission(victoryTransmission(), { interrupt: true });
     });
     this.registerEventListener('run-continued', () => {
       this.runWon = false;
+      this.cinematics.release();
     });
     this.registerEventListener('game-started', () => {
       this.runWon = false;
       this.transmissions?.clear();
+      this.cinematics.stop();
+      // After startNewRun has unpaused: the intro holds the first step.
+      queueMicrotask(() => this.cinematics.startIntro());
       this.aaaTacticalHud?.clearBuffs();
       this.removeOnboardingCardsTip();
       if (this.isOnboardingEnabled()) {
@@ -2997,7 +3027,10 @@ class UISystem extends BaseSystem {
     }
 
     if (screenName === 'victory') {
-      this.showVictoryScreen(payload);
+      const show = () => this.showVictoryScreen(payload);
+      if (!this.cinematics.deferUntilEpilogueEnds(show)) {
+        show();
+      }
       return;
     }
 

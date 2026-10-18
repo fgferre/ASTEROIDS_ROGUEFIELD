@@ -16,6 +16,13 @@ import {
   XP_ORB_SIZE,
 } from '../../core/GameConstants.js';
 import { cameraDisabledByUrl, createCamera } from '../../core/camera.js';
+import {
+  blendPose,
+  cinematicFreezeFromUrl,
+  epiloguePath,
+  followPose,
+  introPath,
+} from '../../core/cinematics.js';
 import { IS_DEV } from '../../core/env.js';
 import {
   StepInterpolator,
@@ -61,6 +68,9 @@ const KEY_ELEVATION = (40 * Math.PI) / 180;
 const DOLLY_TIME_CONSTANT = 0.4;
 const DOLLY_SPEED_OUT = 0.08;
 const DOLLY_COMBAT_IN = 0.06;
+// A skipped or released cinematic eases back to the follow camera this long.
+const CINEMATIC_HANDBACK_MS = 500;
+const FOLLOW_POSE = followPose();
 const COMBAT_RANGE = 140;
 const BLOOM = { strength: 0.9, radius: 0.6, threshold: 0.75 };
 // proposta 17/10: ACES on lit surfaces, sRGB on the way out (emissives are
@@ -157,6 +167,10 @@ class Renderer3D extends BaseSystem {
     this.camera.setEnabled(!cameraDisabledByUrl());
     this.lastRenderTime = null;
     this.dolly = 1;
+    // The run's intro/epilogue camera (core/cinematics.js), on render time.
+    this.cinematic = null;
+    this.cinePose = followPose();
+    this.cinematicFreeze = IS_DEV ? cinematicFreezeFromUrl() : null;
     this.three = null;
     this.failed = false;
     this.graphics = {
@@ -302,6 +316,61 @@ class Renderer3D extends BaseSystem {
     });
   }
 
+  /**
+   * Runs the intro descent over `durationMs`, then hands back to the follow
+   * camera. False when nothing would move (WebGL failed, `?camera=0`,
+   * reduced motion): the caller skips the cinematic.
+   */
+  playIntro(durationMs) {
+    return this.startCinematic(introPath, durationMs, false, 'intro');
+  }
+
+  /** The victory pull-back; it holds its last shot until endCinematic(). */
+  playEpilogue(durationMs) {
+    return this.startCinematic(epiloguePath, durationMs, true, 'epilogue');
+  }
+
+  startCinematic(path, durationMs, hold, kind) {
+    if (this.failed || !this.camera.isEnabled() || this.reducedMotion) {
+      return false;
+    }
+    const freeze = this.cinematicFreeze;
+    this.cinematic = {
+      path,
+      startedAt: performance.now(),
+      durationMs,
+      hold,
+      frozenAt: freeze?.kind === kind ? freeze.t : null,
+    };
+    return true;
+  }
+
+  /** Eases from wherever the cinematic is back to the follow camera. */
+  endCinematic() {
+    if (!this.cinematic) return;
+    this.cinematic = {
+      from: { ...this.cinePose },
+      startedAt: performance.now(),
+      durationMs: CINEMATIC_HANDBACK_MS,
+    };
+  }
+
+  // The cinematic's pose this frame, null once the follow camera is back.
+  cinematicPose(now) {
+    const c = this.cinematic;
+    if (!c) return null;
+    const t = c.frozenAt ?? (now - c.startedAt) / c.durationMs;
+    if (t >= 1 && !c.hold) {
+      this.cinematic = null;
+      return null;
+    }
+    const pose = c.path
+      ? c.path(Math.min(1, t))
+      : blendPose(c.from, FOLLOW_POSE, t);
+    Object.assign(this.cinePose, pose);
+    return this.cinePose;
+  }
+
   /** Kicks the lens (aberration + radial blur) by `strength` 0..1. */
   kick(strength) {
     this.impact.kick(strength);
@@ -401,6 +470,8 @@ class Renderer3D extends BaseSystem {
     this.camera.reset();
     this.lastRenderTime = null;
     this.dolly = 1;
+    this.cinematic = null;
+    this.three?.backdrop.setWake(0);
     this.three?.enemies.clear();
     this.three?.bursts.clear();
     this.three?.player.reset();
@@ -430,7 +501,8 @@ class Renderer3D extends BaseSystem {
     renderer.info.autoReset = false;
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(FOV, 4 / 3, 10, 4000);
+    // Far enough for the sky from the cinematics' high shots.
+    const camera = new THREE.PerspectiveCamera(FOV, 4 / 3, 10, 7000);
 
     // Key: warm white from upper-left (KEY_LIGHT_DIR), fixed in the world.
     // No shadow maps in this slice (cost); the fill and the environment keep
@@ -902,12 +974,17 @@ class Renderer3D extends BaseSystem {
     const ox = shaking ? shake.offsetX / zoom : 0;
     const oy = shaking ? shake.offsetY / zoom : 0;
     const { x: cx, y: cy } = this.clampToField(distance, t.camera.aspect);
-    const tx = cx - HALF_W - ox;
-    const tz = cy - HALF_H - oy;
+    // A cinematic poses the camera relative to the follow shot it ends on.
+    const pose = this.cinematicPose(performance.now()) || FOLLOW_POSE;
+    const tilt = (pose.tilt * Math.PI) / 180;
+    const range = distance * pose.distance;
+    const tx = cx - HALF_W - ox + pose.offsetX;
+    const tz = cy - HALF_H - oy + pose.offsetY;
+    t.backdrop.setWake(pose.wake);
     t.camera.position.set(
       tx,
-      distance * Math.cos(TILT),
-      tz + distance * Math.sin(TILT)
+      range * Math.cos(tilt),
+      tz + range * Math.sin(tilt)
     );
     t.camera.up.set(0, 0, -1);
     t.camera.lookAt(tx, 0, tz);

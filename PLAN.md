@@ -201,7 +201,7 @@ rodada"_. Cada pilar do §7 vira fatias; a ordem é impacto visível por custo. 
 Norte 2 tem primeira versão de tudo; esta rodada engorda o jogo onde um jogador sente falta aos 5 minutos:
 variedade de evento, de carta e de chefe, e um começo/fim de run com peso. Tudo proposta; ele reverte jogando.
 
-- [ ] **R5.1 Cinema.** Intro de 3 s (câmera desce do Anel até a nave, cartão "LAYER 1 — THE OUTER RING", pulável) e
+- [x] **R5.1 Cinema.** Intro de 3 s (câmera desce do Anel até a nave, cartão "LAYER 1 — THE OUTER RING", pulável) e
       epílogo da vitória (câmera recua, o Anel acende).
 - [ ] **R5.2 Heralds.** Mini-chefes nas camadas 3, 8 e 13, uma mecânica cada (Dust: muros de rocha; Heat: torna rochas
       voláteis; Silence: embaralha o radar), intro curta, drop garantido.

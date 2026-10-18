@@ -243,6 +243,21 @@ export class AAAHudLayout {
     }, delayMs);
   }
 
+  /** Drops the layer/surge banner, shown or pending (a cinematic owns it). */
+  cancelBanner() {
+    if (this._bannerTimer) {
+      this._cancel(this._bannerTimer);
+      this._bannerTimer = null;
+    }
+    this._bannerEndsAt = 0;
+    this.els?.layerBanner?.classList.remove('is-showing', 'is-leaving');
+  }
+
+  /** The "press any key to skip" line under a cinematic. */
+  showCinematicHint(show) {
+    this.els?.cinematicHint?.classList.toggle('is-showing', Boolean(show));
+  }
+
   /** Keeps the boss bar hidden for `ms` (the boss intro owns the moment). */
   holdBossBar(ms = BOSS_BAR_HOLD_MS) {
     this._bossBarHeldUntil = Math.max(
@@ -509,6 +524,7 @@ export class AAAHudLayout {
       layerBanner: query('#ui-layer-banner'),
       layerBannerTitle: query('#ui-layer-banner-title'),
       layerBannerSub: query('#ui-layer-banner-sub'),
+      cinematicHint: query('#ui-cinematic-hint'),
       bossIntro: query('#ui-boss-intro'),
       bossIntroName: query('#ui-boss-intro-name'),
       bossIntroSub: query('#ui-boss-intro-sub'),
@@ -1124,6 +1140,7 @@ export class AAAHudLayout {
                 <div class="layer-banner__line"></div>
                 <div class="layer-banner__sub" id="ui-layer-banner-sub"></div>
             </div>
+            <div class="cinematic-hint" id="ui-cinematic-hint">PRESS ANY KEY TO SKIP</div>
             <div class="boss-intro" id="ui-boss-intro" aria-live="polite">
                 <div class="boss-intro__line"></div>
                 <div class="boss-intro__name" id="ui-boss-intro-name">Warden Prime</div>
