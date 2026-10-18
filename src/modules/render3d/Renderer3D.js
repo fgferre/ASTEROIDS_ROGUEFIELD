@@ -367,6 +367,20 @@ class Renderer3D extends BaseSystem {
   }
 
   /**
+   * Logical field (x, y) → 800×600 screen point through the perspective
+   * camera (last rendered pose), for the HUD. Null before the first frame.
+   */
+  worldToScreen(x, y, out = { x: 0, y: 0 }) {
+    const t = this.three;
+    if (!t) return null;
+    const v = this.projected || (this.projected = new t.THREE.Vector3());
+    v.set(x - HALF_W, 0, y - HALF_H).project(t.camera);
+    out.x = ((v.x + 1) / 2) * GAME_WIDTH;
+    out.y = ((1 - v.y) / 2) * GAME_HEIGHT;
+    return out;
+  }
+
+  /**
    * Runs the intro descent over `durationMs`, then hands back to the follow
    * camera. False when nothing would move (WebGL failed, `?camera=0`,
    * reduced motion): the caller skips the cinematic.

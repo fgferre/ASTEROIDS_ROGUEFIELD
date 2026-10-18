@@ -1176,6 +1176,14 @@ class RenderingSystem extends BaseSystem {
     this.camera.setMode(resolveCameraMode(values.cameraMode));
   }
 
+  /** Logical field (x, y) → 800×600 screen point under the camera (HUD). */
+  worldToScreen(x, y, out = { x: 0, y: 0 }) {
+    const z = this.camera.effectiveZoom;
+    out.x = GAME_WIDTH / 2 + (x - this.camera.x) * z;
+    out.y = GAME_HEIGHT / 2 + (y - this.camera.y) * z;
+    return out;
+  }
+
   onReset() {
     if (this.spaceSky) {
       const starfieldRandom = this.getRandomFork('starfield');

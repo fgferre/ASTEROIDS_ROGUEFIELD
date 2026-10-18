@@ -21,7 +21,7 @@ import {
 } from '../core/viewport.js';
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { resolveService } from '../core/serviceUtils.js';
-import { AAAHudLayout } from './ui/AAAHudLayout.js';
+import { AAAHudLayout, radarGlyph } from './ui/AAAHudLayout.js';
 import { Onboarding, onboardingPrompts } from './ui/onboarding.js';
 import { RunCinematics } from './ui/runCinematics.js';
 import {
@@ -1505,13 +1505,6 @@ class UISystem extends BaseSystem {
           continue;
         }
 
-        const isBoss =
-          enemy?.type === 'boss' ||
-          (typeof enemy?.hasTag === 'function' && enemy.hasTag('boss')) ||
-          (enemy?.tags && typeof enemy.tags.has === 'function'
-            ? enemy.tags.has('boss')
-            : false);
-
         const dx = enemyX - originX;
         const dy = enemyY - originY;
         const distance = Math.hypot(dx, dy);
@@ -1522,12 +1515,62 @@ class UISystem extends BaseSystem {
         blips.push({
           x: dx / radarRange,
           y: dy / radarRange,
-          type: isBoss ? 'boss' : 'enemy',
+          type: radarGlyph(enemy),
         });
+      }
+
+      const pickups = this.getService('pickups')?.getActivePickups() || [];
+      for (let i = 0; i < pickups.length && blips.length < limit; i += 1) {
+        const dx = pickups[i].x - originX;
+        const dy = pickups[i].y - originY;
+        if (Math.hypot(dx, dy) <= radarRange) {
+          blips.push({
+            x: dx / radarRange,
+            y: dy / radarRange,
+            type: 'pickup',
+          });
+        }
       }
 
       hud.updateRadar(blips);
     }
+
+    // Off-screen arrows (Wardens, Heralds, then pickups) and the Herald's bar.
+    const renderer = this.getService('renderer');
+    const arrowTargets = [];
+    let herald = null;
+    if (renderer && player && enemies) {
+      const toTarget = (kind, entity, color, labelled) => {
+        const point = renderer.worldToScreen(entity.x, entity.y);
+        if (!point) return;
+        arrowTargets.push({
+          kind,
+          x: point.x,
+          y: point.y,
+          color,
+          distance: labelled
+            ? Math.hypot(
+                entity.x - playerPosition.x,
+                entity.y - playerPosition.y
+              )
+            : undefined,
+        });
+      };
+      const active = enemies.getActiveEnemies();
+      for (let i = 0; i < active.length; i += 1) {
+        const enemy = active[i];
+        if (enemy.type === 'boss') toTarget('warden', enemy, null, true);
+        if (enemy.type === 'herald') {
+          toTarget('herald', enemy, null, true);
+          herald = herald || enemy;
+        }
+      }
+      const pickups = this.getService('pickups')?.getActivePickups() || [];
+      for (let i = 0; i < pickups.length; i += 1) {
+        toTarget('pickup', pickups[i], pickups[i].color, false);
+      }
+    }
+    hud.updateEdgeArrows(arrowTargets);
 
     const bossState = this.getBossHudState();
     const cachedBossVisible = Boolean(this.cachedValues.boss?.visible);
@@ -1536,7 +1579,19 @@ class UISystem extends BaseSystem {
       Boolean(bossState.active) ||
       Boolean(bossState.upcoming);
 
-    if (!bossActive) {
+    if (!bossActive && herald) {
+      hud.updateBoss(
+        true,
+        herald.displayName,
+        Math.max(0, Math.min(100, (herald.health / herald.maxHealth) * 100)),
+        {
+          phase: 0,
+          phaseCount: 1,
+          herald: true,
+          invulnerable: Boolean(herald.invulnerable),
+        }
+      );
+    } else if (!bossActive) {
       hud.updateBoss(false);
     } else {
       const bossName = bossState.name || 'BOSS';
@@ -1641,6 +1696,18 @@ class UISystem extends BaseSystem {
     this.registerEventListener('game-started', () => {
       this.aaaTacticalHud?.setRadarJammed(false);
     });
+
+    this.registerEventListener(
+      'player-took-damage',
+      ({ playerPosition, damageSource } = {}) => {
+        const renderer = this.getService('renderer');
+        if (!playerPosition || !damageSource || !renderer) return;
+        this.aaaTacticalHud?.showDamageFrom(
+          renderer.worldToScreen(playerPosition.x, playerPosition.y),
+          renderer.worldToScreen(damageSource.x, damageSource.y)
+        );
+      }
+    );
 
     this.registerEventListener('enemy-destroyed', (payload = {}) => {
       this.aaaTacticalHud?.addKillFeed(
