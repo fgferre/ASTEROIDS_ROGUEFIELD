@@ -30,6 +30,7 @@ import {
   TURRET_TURN_RATE,
 } from '../data/constants/physics.js';
 import { GAMEPAD_AIM_ENGAGE } from '../data/constants/gamepad.js';
+import { UPGRADE_FAMILIES } from '../data/upgrades/families.js';
 import {
   DASH_COOLDOWN,
   DASH_DECAY_SECONDS,
@@ -443,6 +444,7 @@ class PlayerSystem extends BaseSystem {
     this.magnetismRadius = MAGNETISM_RADIUS;
     this.dashCooldown = DASH_COOLDOWN;
     this.dashAfterInvulnerability = 0;
+    this.resetManeuverStats();
     this.emergencyBrake = null;
     this.hullDrain = null;
     this.hullDrainTimer = 0;
@@ -751,6 +753,35 @@ class PlayerSystem extends BaseSystem {
       this.emergencyBrake = data;
     });
 
+    // Maneuver cards. Afterburner: on top of the hull × Hangar cooldown.
+    this.registerEventListener('upgrade-dash-cooldown', (data) => {
+      this.dashCooldown *= data.multiplier;
+    });
+    // Ram Plating: PhysicsSystem hits each enemy a dash touches once.
+    this.registerEventListener('upgrade-ram-plating', (data) => {
+      this.dashContactDamage = data.damage;
+    });
+    this.registerEventListener('upgrade-turret-turn', (data) => {
+      this.turretTurnMultiplier *= data.multiplier;
+    });
+    this.registerEventListener('upgrade-reactive-brake', (data) => {
+      this.reactiveBrake = data;
+    });
+    // Inertial Dampers 2: a faster dash under a higher cap goes further.
+    this.registerEventListener('upgrade-dash-distance', (data) => {
+      this.dashDistanceMultiplier *= data.multiplier;
+    });
+    this.registerEventListener('upgrade-phase-dash', (data) => {
+      this.dashInvulnerabilityBonus = data.invulnerability;
+      this.dashGhostLinger = data.ghostLinger;
+    });
+    // Maneuver's Apex has no weapon: the dash becomes Blink (startDash).
+    this.registerEventListener('apex-unlocked', ({ family } = {}) => {
+      if (family === UPGRADE_FAMILIES.maneuver.id) {
+        this.blink = UPGRADE_FAMILIES.maneuver.apex;
+      }
+    });
+
     // Overclocked Core: the hull loses `amount` every `interval` s, never
     // below `floorFraction` of max.
     this.registerEventListener('upgrade-hull-drain', (data) => {
@@ -1054,6 +1085,9 @@ class PlayerSystem extends BaseSystem {
     this.dashCooldownTimer = 0;
     this.dashGhosts = [];
     this.dashGhostsDropped = 0;
+    this.dashRammed = new Set();
+    if (this.blinkTimer > 0) this._quitExplosionHidden = false;
+    this.blinkTimer = 0;
     this.brakeHold = 0;
     this.brakeArmed = false;
     this.brakeCooldownTimer = 0;
@@ -1074,14 +1108,21 @@ class PlayerSystem extends BaseSystem {
       const sign = movement.down && !movement.up ? -1 : 1;
       direction = { x: fwd.x * sign, y: fwd.y * sign };
     }
-    this.velocity.vx += direction.x * DASH_IMPULSE;
-    this.velocity.vy += direction.y * DASH_IMPULSE;
+    const impulse = DASH_IMPULSE * this.dashDistanceMultiplier;
+    this.velocity.vx += direction.x * impulse;
+    this.velocity.vy += direction.y * impulse;
     this.dashTimer = DASH_DURATION;
     this.dashCooldownTimer = this.dashCooldown;
     this.invulnerableTimer = Math.max(
       this.invulnerableTimer,
-      DASH_INVULNERABILITY
+      DASH_INVULNERABILITY + this.dashInvulnerabilityBonus
     );
+    this.dashRammed.clear();
+    // Blink: the renderers' hide flag, so the ship is gone from both views.
+    if (this.blink) {
+      this.blinkTimer = this.blink.hide;
+      this._quitExplosionHidden = true;
+    }
     this.dashGhostsDropped = 0;
     this.dropDashGhosts();
     this.eventBus?.emit?.('player-dashed', {
@@ -1110,8 +1151,9 @@ class PlayerSystem extends BaseSystem {
   }
 
   updateDash(deltaTime) {
+    // Ghost Drive ages them slower, so every renderer's fade lasts longer.
     this.dashGhosts.forEach((ghost) => {
-      ghost.age += deltaTime;
+      ghost.age += deltaTime / this.dashGhostLinger;
     });
     this.dashGhosts = this.dashGhosts.filter(
       (ghost) => ghost.age < DASH_GHOST_LIFE
@@ -1128,6 +1170,18 @@ class PlayerSystem extends BaseSystem {
       }
     } else if (this.dashDecayTimer > 0) {
       this.dashDecayTimer = Math.max(0, this.dashDecayTimer - deltaTime);
+    }
+    if (this.blinkTimer > 0) {
+      this.blinkTimer = Math.max(0, this.blinkTimer - deltaTime);
+      if (this.blinkTimer === 0) {
+        // Lands with the emergency brake's shockwave: ring, shove and thump.
+        this._quitExplosionHidden = false;
+        this.eventBus?.emit?.('player-braked', {
+          position: { ...this.position },
+          radius: this.blink.radius,
+          knockback: this.blink.knockback,
+        });
+      }
     }
   }
 
@@ -1175,11 +1229,21 @@ class PlayerSystem extends BaseSystem {
         this.brakeCooldownTimer = brake.cooldown;
         this.brakeTimer = brake.stopTime;
         this.brakeFrom = { ...this.velocity };
+        const reactive = this.reactiveBrake;
         this.eventBus?.emit?.('player-braked', {
           position: { ...this.position },
           radius: brake.radius,
-          knockback: brake.knockback,
+          knockback: brake.knockback * (reactive?.knockbackMultiplier ?? 1),
         });
+        // Reactive Brake: EnemySystem's area damage, full at the ship and
+        // fading to the ring's edge.
+        if (reactive) {
+          this.eventBus?.emit?.('shield-explosion-damage', {
+            position: { ...this.position },
+            radius: brake.radius,
+            damage: reactive.damage,
+          });
+        }
       }
     }
     if (this.brakeTimer > 0) {
@@ -1361,8 +1425,8 @@ class PlayerSystem extends BaseSystem {
     const dashCapFraction = dashing
       ? 1
       : this.dashDecayTimer / DASH_DECAY_SECONDS;
-    const speedCap =
-      this.maxSpeed * (1 + (DASH_SPEED_CAP_MULTIPLIER - 1) * dashCapFraction);
+    const dashCap = DASH_SPEED_CAP_MULTIPLIER * this.dashDistanceMultiplier;
+    const speedCap = this.maxSpeed * (1 + (dashCap - 1) * dashCapFraction);
     const currentSpeed = Math.hypot(this.velocity.vx, this.velocity.vy);
     if (currentSpeed > speedCap) {
       const scale = speedCap / currentSpeed;
@@ -1553,7 +1617,7 @@ class PlayerSystem extends BaseSystem {
       : this.aimPoint
         ? Math.atan2(this.aimPoint.y - pivot.y, this.aimPoint.x - pivot.x)
         : this.angle;
-    const maxStep = TURRET_TURN_RATE * deltaTime;
+    const maxStep = TURRET_TURN_RATE * this.turretTurnMultiplier * deltaTime;
     const error = this.wrapAngle(goal - this.turretAngle);
     const step = Math.max(
       -maxStep,
@@ -2215,6 +2279,17 @@ class PlayerSystem extends BaseSystem {
     };
   }
 
+  // What the Maneuver cards and their Apex change, back to none.
+  resetManeuverStats() {
+    this.dashContactDamage = 0;
+    this.dashDistanceMultiplier = 1;
+    this.dashInvulnerabilityBonus = 0;
+    this.dashGhostLinger = 1;
+    this.turretTurnMultiplier = 1;
+    this.reactiveBrake = null;
+    this.blink = null;
+  }
+
   resetStats() {
     // The Hangar's permanent upgrades, read once per run.
     const hangar =
@@ -2230,6 +2305,7 @@ class PlayerSystem extends BaseSystem {
     this.dashCooldown =
       DASH_COOLDOWN * hull.dashCooldown * hangar.dashCooldownMultiplier;
     this.dashAfterInvulnerability = 0;
+    this.resetManeuverStats();
     this.emergencyBrake = null;
     this.hullDrain = null;
     this.hullDrainTimer = 0;

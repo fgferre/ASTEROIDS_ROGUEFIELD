@@ -5,7 +5,8 @@ import { PALETTE } from '../constants/palette.js';
 
 // Three distinct upgrades of one family switch its bonus on.
 export const FAMILY_SYNERGY_THRESHOLD = 3;
-// Five raise the family's weapon evolution to its Apex (data/weapons.js).
+// Five raise the family's weapon evolution to its Apex (data/weapons.js);
+// Maneuver has no weapon evolution, its Apex is the dash (`apex` below).
 export const FAMILY_APEX_THRESHOLD = 5;
 
 // Family bonuses — proposta 17/10: numbers for the owner to judge by playing.
@@ -16,11 +17,17 @@ export const SYNERGY_CHAIN_COMBO_WINDOW_BONUS = 1; // seconds
 export const SYNERGY_CHAIN_COMBO_STEP_BONUS = 0.05;
 export const SYNERGY_BULWARK_HULL_BONUS = 60;
 export const SYNERGY_SCAVENGER_XP_MULTIPLIER = 1.15;
+// Maneuver — proposta 18/10.
+export const SYNERGY_AFTERBURN_LIFE = 0.6; // seconds the dash trail burns
+export const APEX_BLINK_HIDE_SECONDS = 0.12; // ship gone at the dash start
+export const APEX_BLINK_RADIUS = 100; // px of the landing shove ring
+export const APEX_BLINK_KNOCKBACK = 220; // px/s the ring shoves enemies
 
 /**
- * The five tag families of the Ring's machine (docs/positioning.md promised
+ * The tag families of the Ring's machine (docs/positioning.md promised
  * fire/cryo/chain/tech/kinetic; renamed to fit the fiction):
- * thermal ← fire, kinetic ← kinetic, arc ← chain, field ← cryo, salvage ← tech.
+ * thermal ← fire, kinetic ← kinetic, arc ← chain, field ← cryo, salvage ← tech;
+ * maneuver (R12) is the dash, the brake and the turret.
  * A bonus uses the same effect schema as an upgrade level.
  */
 export const UPGRADE_FAMILIES = deepFreeze({
@@ -120,6 +127,26 @@ export const UPGRADE_FAMILIES = deepFreeze({
           value: SYNERGY_SCAVENGER_XP_MULTIPLIER,
         },
       ],
+    },
+  },
+  maneuver: {
+    id: 'maneuver',
+    name: 'Maneuver',
+    color: PALETTE.boss,
+    fantasy: 'The Field is a maze: dash more, turn faster, stop on the spot.',
+    bonus: {
+      name: 'Afterburn',
+      description: `The dash leaves a trail that burns for ${SYNERGY_AFTERBURN_LIFE}s.`,
+      effects: [],
+    },
+    // Five cards: the dash becomes a jump (PlayerSystem, on apex-unlocked).
+    apex: {
+      name: 'Blink',
+      description:
+        'The ship vanishes as it dashes and lands with a shockwave that shoves enemies away.',
+      hide: APEX_BLINK_HIDE_SECONDS,
+      radius: APEX_BLINK_RADIUS,
+      knockback: APEX_BLINK_KNOCKBACK,
     },
   },
 });

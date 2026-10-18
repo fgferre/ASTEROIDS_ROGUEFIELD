@@ -523,6 +523,7 @@ export const OFFENSE_UPGRADES = deepFreeze([
     themeColor: PALETTE.shot,
     unlockLevel: 3,
     tags: ['weapon', 'weaponry'],
+    excludes: ['scatter_coil'],
     text: {
       name: 'Harmonic Resonator',
       summary:
@@ -561,6 +562,7 @@ export const OFFENSE_UPGRADES = deepFreeze([
     themeColor: WEAPONS.scatter.colors.burst,
     unlockLevel: 3,
     tags: ['weapon', 'weaponry'],
+    excludes: ['harmonic_resonator'],
     text: {
       name: 'Scatter Coil',
       summary:

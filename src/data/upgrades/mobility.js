@@ -524,4 +524,333 @@ export const MOBILITY_UPGRADES = deepFreeze([
       },
     ],
   },
+  // Maneuver cards (R12; numbers: proposta 18/10, for the owner to judge by playing).
+  {
+    id: 'afterburner',
+    category: 'mobility',
+    family: 'maneuver',
+    rarity: 'common',
+    icon: '💨',
+    themeColor: PALETTE.boss,
+    unlockLevel: 1,
+    tags: ['dash', 'cooldown'],
+    text: {
+      name: 'Afterburner',
+      summary:
+        'Reroutes the reactor into the dash coils: the dash recharges sooner.',
+      lore: 'Ring couriers ran their burners hot and short. Most of them made the delivery.',
+      levels: [
+        {
+          title: 'Hot Coils',
+          description: 'Dash cooldown -12%.',
+          highlights: ['Dash a little more often.'],
+        },
+        {
+          title: 'Bypass Valves',
+          description: 'Dash cooldown -22% (cumulative).',
+          highlights: ['The dash is back before the next wave of fire.'],
+        },
+        {
+          title: 'Open Burner',
+          description: 'Dash cooldown -30% (cumulative).',
+          highlights: ['Dash your way through the Field.'],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-dash-cooldown',
+            payload: { multiplier: 0.88 },
+          },
+        ],
+      },
+      {
+        rank: 2,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-dash-cooldown',
+            payload: { multiplier: 0.886 }, // Total: 0.78
+          },
+        ],
+      },
+      {
+        rank: 3,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-dash-cooldown',
+            payload: { multiplier: 0.897 }, // Total: 0.70
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'ram_plating',
+    category: 'mobility',
+    family: 'maneuver',
+    rarity: 'rare',
+    icon: '🐏',
+    themeColor: PALETTE.boss,
+    unlockLevel: 2,
+    tags: ['dash', 'contact damage'],
+    text: {
+      name: 'Ram Plating',
+      summary:
+        'Armors the bow: the dash slams into whatever it passes through.',
+      lore: 'Ore haulers bolted these on to clear drift. Machines break the same way.',
+      levels: [
+        {
+          title: 'Bow Plate',
+          description: 'The dash deals 20 damage to each enemy it hits.',
+          highlights: ['Once per enemy per dash.'],
+        },
+        {
+          title: 'Reinforced Prow',
+          description: 'The dash deals 35 damage to each enemy it hits.',
+          highlights: ['Another +15 per hit.'],
+        },
+        {
+          title: 'Battering Ram',
+          description: 'The dash deals 50 damage to each enemy it hits.',
+          highlights: ['Dash first, shoot after.'],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-ram-plating',
+            payload: { damage: 20 },
+          },
+        ],
+      },
+      {
+        rank: 2,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-ram-plating',
+            payload: { damage: 35 },
+          },
+        ],
+      },
+      {
+        rank: 3,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-ram-plating',
+            payload: { damage: 50 },
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'gyro_servos',
+    category: 'mobility',
+    family: 'maneuver',
+    rarity: 'common',
+    icon: '🔄',
+    themeColor: PALETTE.boss,
+    unlockLevel: 1,
+    tags: ['turret', 'aim'],
+    text: {
+      name: 'Gyro Servos',
+      summary: 'Faster turret motors: the gun swings onto a new target sooner.',
+      lore: 'Lifted from a Warden gun mount. It still twitches toward movement.',
+      levels: [
+        {
+          title: 'Fast Servos',
+          description: 'Turret turn speed +25%.',
+          highlights: ['Quicker swings onto targets behind you.'],
+        },
+        {
+          title: 'Gyro Lock',
+          description: 'Turret turn speed +50% (cumulative).',
+          highlights: ['The gun is where you look.'],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-turret-turn',
+            payload: { multiplier: 1.25 },
+          },
+        ],
+      },
+      {
+        rank: 2,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-turret-turn',
+            payload: { multiplier: 1.2 }, // Total: 1.50
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'reactive_brake',
+    category: 'mobility',
+    family: 'maneuver',
+    rarity: 'rare',
+    icon: '💢',
+    themeColor: PALETTE.boss,
+    unlockLevel: 3,
+    tags: ['braking', 'shockwave', 'area damage'],
+    prerequisites: [
+      {
+        type: 'upgrade',
+        id: 'braking_system',
+        level: 3,
+        text: 'Requires the Emergency Brake (Braking System Lv. 3).',
+      },
+    ],
+    text: {
+      name: 'Reactive Brake',
+      summary: 'The emergency brake dumps its charge into the shockwave.',
+      lore: 'All that speed has to go somewhere. Now it goes into them.',
+      levels: [
+        {
+          title: 'Charged Ring',
+          description:
+            'The brake shockwave shoves 40% harder and deals up to 12 damage.',
+          highlights: ['Full damage next to the ship, fading toward the edge.'],
+        },
+        {
+          title: 'Detonating Ring',
+          description:
+            'The brake shockwave shoves 80% harder and deals up to 24 damage.',
+          highlights: ['Stop dead in a crowd.'],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-reactive-brake',
+            payload: { knockbackMultiplier: 1.4, damage: 12 },
+          },
+        ],
+      },
+      {
+        rank: 2,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-reactive-brake',
+            payload: { knockbackMultiplier: 1.8, damage: 24 },
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'inertial_dampers',
+    category: 'mobility',
+    family: 'maneuver',
+    rarity: 'common',
+    icon: '🧭',
+    themeColor: PALETTE.boss,
+    unlockLevel: 2,
+    tags: ['braking', 'dash', 'control'],
+    text: {
+      name: 'Inertial Dampers',
+      summary: 'Bleeds off drift when you let go, and stretches the dash.',
+      lore: 'Field-grade dampers from a survey skiff. Built to hold still over a crack in a rock.',
+      levels: [
+        {
+          title: 'Drift Bleed',
+          description: 'Braking damping +25%: faster stops when you let go.',
+          highlights: ['Less drift between moves.'],
+        },
+        {
+          title: 'Long Stride',
+          description:
+            'Braking damping +50% (cumulative) and the dash goes 15% further.',
+          highlights: ['Cross the gap, then stop on the spot.'],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-linear-damping',
+            payload: { multiplier: 1.25 },
+          },
+        ],
+      },
+      {
+        rank: 2,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-linear-damping',
+            payload: { multiplier: 1.2 }, // Total: 1.50
+          },
+          {
+            type: 'event',
+            event: 'upgrade-dash-distance',
+            payload: { multiplier: 1.15 },
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'phase_dash',
+    category: 'mobility',
+    family: 'maneuver',
+    rarity: 'rare',
+    icon: '🌫️',
+    themeColor: PALETTE.boss,
+    unlockLevel: 3,
+    tags: ['dash', 'invulnerability'],
+    text: {
+      name: 'Ghost Drive',
+      summary:
+        'The dash drive runs a beat out of phase: longer untouchable, longer afterimages.',
+      lore: 'Pilots swear the afterimages keep flying a moment after they leave.',
+      levels: [
+        {
+          title: 'Ghost Drive',
+          description: 'The dash stays invulnerable 0.15 s longer.',
+          highlights: ['Its afterimages linger twice as long.'],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-phase-dash',
+            payload: { invulnerability: 0.15, ghostLinger: 2 },
+          },
+        ],
+      },
+    ],
+  },
 ]);
