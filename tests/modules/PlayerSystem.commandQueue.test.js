@@ -160,7 +160,8 @@ describe('PlayerSystem command queue integration', () => {
 
     player.update(DELTA_TIME);
 
-    expect(player.velocity.vx).toBeGreaterThan(velocityAfterCommand.vx);
+    // Modern W moves up the screen.
+    expect(player.velocity.vy).toBeLessThan(velocityAfterCommand.vy);
     expect(thrusterEvents.length).toBeGreaterThan(0);
     expect(player.cachedMovementInput.up).toBe(true);
   });

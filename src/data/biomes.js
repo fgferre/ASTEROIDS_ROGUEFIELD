@@ -6,12 +6,10 @@ import { deepFreeze } from '../utils/deepFreeze.js';
 // five layers each. Every number here is a proposta 18/10 — the owner's play
 // decides.
 //
-// sky: [zenith, horizon] of the far gradient behind the stars.
-// hazeColor / hazeDensity: the cold cloud layers and their opacity scale.
-// veinColor / veinDensity: the thin second cloud between them (amber veins).
-// floorColor: dust albedo; floorSpecks: colour of the bright grains;
-//   floorSeams: 0..1 strength of the grid of plate seams in the dust;
-//   floorGlow: how much the grains and seams light themselves.
+// sky: [centre, rim] of the nebula's dark base, far behind the stars.
+// hazeColor / hazeDensity: the nebula's broad clouds and their strength.
+// veinColor / veinDensity: its thin ridges (the Dense Core's amber veins).
+// dustColor: the dust drifting around the play plane, lit by the ship.
 // key* / fill*: the two directional lights; bloomScale multiplies bloom.
 // debris: 0..1 share of the far dark fragments drifting below the field.
 // structures: 0..1 opacity of the intact Ring arcs and beams far below.
@@ -27,10 +25,7 @@ export const BIOMES = deepFreeze([
     hazeDensity: 1,
     veinColor: '#ffb347',
     veinDensity: 0.05,
-    floorColor: '#8c867c',
-    floorSpecks: '#d8dce4',
-    floorSeams: 0,
-    floorGlow: 0,
+    dustColor: '#d8dce4',
     keyColor: '#fff1e2',
     keyIntensity: 1.6,
     fillColor: '#64748b',
@@ -50,10 +45,7 @@ export const BIOMES = deepFreeze([
     hazeDensity: 0.45,
     veinColor: '#d9701c',
     veinDensity: 0.38,
-    floorColor: '#2e2620',
-    floorSpecks: '#ffb35c',
-    floorSeams: 0,
-    floorGlow: 0.3,
+    dustColor: '#ffb35c',
     keyColor: '#ffe2bc',
     keyIntensity: 1.45,
     fillColor: '#8a5a3a',
@@ -73,10 +65,7 @@ export const BIOMES = deepFreeze([
     hazeDensity: 1.25,
     veinColor: '#3a2aa0',
     veinDensity: 0.35,
-    floorColor: '#5a5878',
-    floorSpecks: '#b8b0ff',
-    floorSeams: 0.45,
-    floorGlow: 0.05,
+    dustColor: '#b8b0ff',
     keyColor: '#e8e4ff',
     keyIntensity: 1.35,
     fillColor: '#5a6cff',

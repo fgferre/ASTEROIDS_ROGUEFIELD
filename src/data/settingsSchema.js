@@ -274,6 +274,7 @@ const SETTINGS_SCHEMA = [
       {
         key: 'quality',
         type: 'select',
+        control: 'segmented',
         label: 'Quality',
         description:
           'Auto lowers the 3D detail when frames get slow and raises it back when they recover.',
@@ -316,6 +317,17 @@ const SETTINGS_SCHEMA = [
         description: 'Reduces jagged edges.',
         options: ['None', 'SMAA'],
         default: 'SMAA',
+      },
+      {
+        key: 'cameraMode',
+        type: 'select',
+        control: 'segmented',
+        label: 'Camera',
+        description:
+          'Dynamic leads toward your aim, pulls out in crowds and frames bosses; Classic is the plain follow.',
+        options: ['dynamic', 'classic'],
+        optionLabels: { dynamic: 'Dynamic', classic: 'Classic' },
+        default: 'dynamic',
       },
       {
         key: 'reducedParticles',

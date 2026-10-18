@@ -25,7 +25,18 @@ import {
   COMBAT_BULLET_RADIUS,
   PLAYER_BULLET_OFFSCREEN_MARGIN,
   PLAYER_BULLET_OFFSCREEN_GRACE,
+  KNOCKBACK_BASE,
+  KNOCKBACK_HEAVY_FACTOR,
+  KNOCKBACK_MAX,
+  KNOCKBACK_MIN,
+  KNOCKBACK_REFERENCE_DAMAGE,
 } from '../data/constants/gameplay.js';
+
+/** Knockback speed (px/s) for a hit of `damage`, before the heavy factor. */
+export function knockbackSpeed(damage) {
+  const speed = KNOCKBACK_BASE * (damage / KNOCKBACK_REFERENCE_DAMAGE);
+  return Math.min(KNOCKBACK_MAX, Math.max(KNOCKBACK_MIN, speed));
+}
 
 // Plan 01.07: validate spread/aim mode mutations to prevent T-07-02 tampering.
 const VALID_SPREAD_MODES = new Set(['concentrated', 'fan']);
@@ -241,6 +252,38 @@ class CombatSystem extends BaseSystem {
 
     this.registerEventListener('upgrade-weapon-harmonic', (data = {}) => {
       this.weaponId = WEAPONS[data.weaponId] ? data.weaponId : 'harmonic';
+    });
+
+    // Cards that add a weapon behaviour keep the payload of their latest rank.
+    this.registerEventListener('upgrade-thermal-lens', (data) => {
+      this.cardEffects.thermalLens = data;
+    });
+    this.registerEventListener('upgrade-chain-capacitor', (data) => {
+      this.cardEffects.chainCapacitor = data;
+    });
+    this.registerEventListener('upgrade-static-shell', (data) => {
+      this.cardEffects.staticShell = data;
+    });
+    this.registerEventListener('upgrade-gravity-brake', (data) => {
+      this.cardEffects.gravityBrake = data;
+    });
+    this.registerEventListener('upgrade-cinder-trail', (data) => {
+      this.cardEffects.cinderTrail = data;
+    });
+
+    this.registerEventListener('thruster-effect', (data = {}) => {
+      if (
+        this.cardEffects.cinderTrail &&
+        data.type === 'main' &&
+        data.intensity > 0
+      ) {
+        this.dropCinder(data.position);
+      }
+    });
+
+    // Discharged on the next update, outside the collision pass that hit us.
+    this.registerEventListener('player-took-damage', () => {
+      if (this.cardEffects.staticShell) this.staticShellPending = true;
     });
 
     this.registerEventListener('synergy-unlocked', (data = {}) => {
@@ -534,15 +577,17 @@ class CombatSystem extends BaseSystem {
       }
     }
 
+    // Every shot leaves the turret's muzzle (R5.11). Without a lock the
+    // turret has turned back onto the nose.
+    const muzzle = player.getMuzzlePoint();
+
     // Plan 01.07 Task 6: manual-aim mode bypasses target acquisition entirely
-    // and fires from the ship nose in the ship's current rotation direction.
+    // and fires from the muzzle along the turret.
     if (this.aimMode === 'manual') {
-      // Fix-pass (F5): `getAngle()` is PlayerSystem's canonical accessor; a
-      // player without it is a wiring bug and throws instead of shooting right.
-      const rotation = player.getAngle();
-      const nose = player.getNosePosition(rotation);
-      this.fireForward(playerPos, rotation, playerStats, {
-        originOverride: nose,
+      // Fix-pass (F5): `getTurretAngle()` is PlayerSystem's canonical weapon
+      // heading; a player without it is a wiring bug and throws.
+      this.fireForward(playerPos, player.getTurretAngle(), playerStats, {
+        originOverride: muzzle,
       });
       return;
     }
@@ -557,7 +602,9 @@ class CombatSystem extends BaseSystem {
 
     // [SMART AUTO-FIRE] Fallback to forward fire if no lock
     if (!lockTargets.length) {
-      this.fireForward(playerPos, player.getAngle(), playerStats);
+      this.fireForward(playerPos, player.getTurretAngle(), playerStats, {
+        originOverride: muzzle,
+      });
       return;
     }
 
@@ -613,7 +660,9 @@ class CombatSystem extends BaseSystem {
 
     if (!assignments.length) {
       // Should not happen due to check above, but safely fire forward just in case
-      this.fireForward(playerPos, player.getRotation(), playerStats);
+      this.fireForward(playerPos, player.getTurretAngle(), playerStats, {
+        originOverride: muzzle,
+      });
       return;
     }
 
@@ -733,7 +782,15 @@ class CombatSystem extends BaseSystem {
         }
       }
 
-      this.createBullet(fireOrigin, aimPoint, playerStats.damage);
+      // Lanes are laid out around the hull centre; shift them to the muzzle.
+      this.createBullet(
+        {
+          x: fireOrigin.x + muzzle.x - playerPos.x,
+          y: fireOrigin.y + muzzle.y - playerPos.y,
+        },
+        aimPoint,
+        playerStats.damage
+      );
       firedTargets.push({
         enemyId: assignment.enemy?.id ?? null,
         position: { ...aimPoint },
@@ -1052,6 +1109,11 @@ class CombatSystem extends BaseSystem {
       return value;
     };
     this.cooldownTuning = product('cooldownMultiplier');
+    this.lanceDamageTuning = product('lanceDamageMultiplier');
+    this.pierceBonus = 0;
+    this.weaponTuningSources.forEach((entry) => {
+      this.pierceBonus += Number(entry.pierceBonus) || 0;
+    });
     this.bulletSpeed = BULLET_SPEED * product('bulletSpeedMultiplier');
     this.bulletLifetime =
       COMBAT_BULLET_LIFETIME * product('bulletLifetimeMultiplier');
@@ -1095,6 +1157,8 @@ class CombatSystem extends BaseSystem {
     this.shootCooldown = this.baseShootCooldown;
     this.aimCooldownMultiplier = 1;
     this.cooldownTuning = 1;
+    this.lanceDamageTuning = 1;
+    this.pierceBonus = 0;
     this.weaponTuningSources = new Map();
     this.bulletSpeed = BULLET_SPEED;
     this.bulletLifetime = COMBAT_BULLET_LIFETIME;
@@ -2370,7 +2434,12 @@ class CombatSystem extends BaseSystem {
     bullet.y = fromPos.y;
     bullet.vx = (dx / distance) * this.bulletSpeed;
     bullet.vy = (dy / distance) * this.bulletSpeed;
-    bullet.damage = damage;
+    // Thermal Lens boosts the lance only while the beam is not there to take it.
+    const lens =
+      this.weaponId !== 'harmonic' && this.cardEffects.thermalLens
+        ? this.cardEffects.thermalLens.lanceDamageMultiplier
+        : 1;
+    bullet.damage = damage * this.lanceDamageTuning * lens;
     bullet.life = this.bulletLifetime;
     bullet.maxLife = this.bulletLifetime;
     bullet.hit = false;
@@ -2378,7 +2447,7 @@ class CombatSystem extends BaseSystem {
     bullet.type = 'player';
     bullet.kind = 'lance';
     bullet.offscreenTimer = 0;
-    bullet.pierceLeft = this.lancePierce;
+    bullet.pierceLeft = this.lancePierce + this.pierceBonus;
     if (!bullet.pierced) {
       bullet.pierced = [];
     } else {
@@ -2958,7 +3027,17 @@ class CombatSystem extends BaseSystem {
       bullet.hit = true;
     }
     const healthBefore = Number.isFinite(enemy.health) ? enemy.health : null;
-    const requestedDamage = Number.isFinite(bullet.damage) ? bullet.damage : 0;
+    let requestedDamage = Number.isFinite(bullet.damage) ? bullet.damage : 0;
+    // Chain Capacitor without the Chain Lance: some lances hit twice.
+    const capacitor = this.cardEffects.chainCapacitor;
+    if (
+      capacitor &&
+      bullet.kind === 'lance' &&
+      !this.evolutions.includes('arc') &&
+      this.rollCardChance(capacitor.doubleHitChance)
+    ) {
+      requestedDamage *= 2;
+    }
     // Harmonic beam: a large/medium rock it kills splits once more, along
     // the same seams (generateFragments is seeded by the rock's crackSeed).
     const beamSplit =
@@ -3050,6 +3129,9 @@ class CombatSystem extends BaseSystem {
     });
 
     if (!blockedByInvulnerability) {
+      if (!damageResult.killed && effectiveDamage > 0) {
+        this.applyKnockback(bullet, enemy, effectiveDamage);
+      }
       if (beamSplit && damageResult.killed) {
         this.spawnBeamFragment(enemiesSystem, enemy, beamSplit);
       }
@@ -3068,6 +3150,26 @@ class CombatSystem extends BaseSystem {
     return damageResult;
   }
 
+  // A shove along the bullet, heavier for bigger hits (PLAN.md R5.9). The AI
+  // reasserts its own velocity, so it reads as a short stagger; asteroids
+  // drift linearly and would keep it forever, so they are left alone.
+  applyKnockback(bullet, enemy, damage) {
+    if (enemy.type === 'asteroid') return;
+    const length = Math.hypot(bullet.vx || 0, bullet.vy || 0);
+    if (length === 0) return;
+    const heavy = enemy.type === 'boss' || enemy.type === 'herald';
+    const speed = knockbackSpeed(damage) * (heavy ? KNOCKBACK_HEAVY_FACTOR : 1);
+    const ix = (bullet.vx / length) * speed;
+    const iy = (bullet.vy / length) * speed;
+    enemy.vx = (enemy.vx ?? 0) + ix;
+    enemy.vy = (enemy.vy ?? 0) + iy;
+    // Steering strategies read `velocity` and write it back to vx/vy.
+    if (enemy.velocity) {
+      enemy.velocity.vx = (enemy.velocity.vx ?? 0) + ix;
+      enemy.velocity.vy = (enemy.velocity.vy ?? 0) + iy;
+    }
+  }
+
   // === WEAPONS AND EVOLUTIONS (docs/NORTE.md §7 pillar 4) ===
   resetWeaponState() {
     this.weaponId = WEAPONS.lance.id;
@@ -3079,6 +3181,11 @@ class CombatSystem extends BaseSystem {
     this.burns = new Map();
     this.slows = new Map();
     this.prospectorCarry = 0;
+    this.cardEffects = {};
+    this.cardRolls = 0;
+    this.cinders = [];
+    this.cinderTimer = 0;
+    this.staticShellPending = false;
     this.refreshLanceLook();
   }
 
@@ -3143,17 +3250,21 @@ class CombatSystem extends BaseSystem {
 
   // Harmonic beam: damage lands on everything in the segment on the firing
   // frame; the beam stays on screen for HARMONIC_BEAM.duration. Aimed like the
-  // lances: the primary lock's lead point in auto, the ship's nose otherwise.
+  // lances: from the muzzle onto the primary lock's lead point in auto, along
+  // the turret otherwise.
   fireBeam(playerPos, playerStats) {
     const player = this.cachedPlayer;
     const aim = this.aimMode === 'manual' ? null : this.getPrimaryAimPoint();
+    const origin = player.getMuzzlePoint();
     const angle = aim
-      ? Math.atan2(aim.y - playerPos.y, aim.x - playerPos.x)
-      : player.getAngle();
-    const origin = player.getNosePosition(angle);
+      ? Math.atan2(aim.y - origin.y, aim.x - origin.x)
+      : player.getTurretAngle();
     const dirX = Math.cos(angle);
     const dirY = Math.sin(angle);
-    const { length, width, duration } = HARMONIC_BEAM;
+    const { width, duration } = HARMONIC_BEAM;
+    const length =
+      HARMONIC_BEAM.length *
+      (this.cardEffects.thermalLens?.beamLengthMultiplier ?? 1);
     const end = { x: origin.x + dirX * length, y: origin.y + dirY * length };
     const damage =
       (Number(playerStats?.damage) || 0) * HARMONIC_BEAM.damageMultiplier;
@@ -3309,20 +3420,25 @@ class CombatSystem extends BaseSystem {
       });
     }
     if (this.evolutions.includes('arc')) {
+      const { chain } = WEAPON_EVOLUTIONS.arc;
       this.chainFrom(
         enemy,
-        damage * WEAPON_EVOLUTIONS.arc.chain.damageFraction
+        damage * chain.damageFraction,
+        chain.jumps + (this.cardEffects.chainCapacitor?.extraJumps ?? 0)
       );
     }
   }
 
-  // Chain Lance: one jump to the nearest other enemy within range.
-  chainFrom(source, damage) {
-    const { range, duration } = WEAPON_EVOLUTIONS.arc.chain;
+  // Chain Lance: `jumps` hops, each to the nearest enemy within range not
+  // yet in this chain.
+  chainFrom(source, damage, jumps = 1, visited = [source]) {
+    const { range } = WEAPON_EVOLUTIONS.arc.chain;
     let best = null;
     let bestSq = range * range + 1e-6;
     this.cachedEnemies.forEachActiveEnemy((candidate) => {
-      if (!candidate || candidate === source || candidate.destroyed) return;
+      if (!candidate || visited.includes(candidate) || candidate.destroyed) {
+        return;
+      }
       const dx = candidate.x - source.x;
       const dy = candidate.y - source.y;
       const sq = dx * dx + dy * dy;
@@ -3336,9 +3452,36 @@ class CombatSystem extends BaseSystem {
     const dx = best.x - source.x;
     const dy = best.y - source.y;
     const distance = Math.hypot(dx, dy) || 1;
+    this.addArc(source, best);
+
+    this.processBulletHit(
+      {
+        kind: 'chain',
+        x: best.x - (dx / distance) * (best.radius || 0),
+        y: best.y - (dy / distance) * (best.radius || 0),
+        vx: (dx / distance) * this.bulletSpeed,
+        vy: (dy / distance) * this.bulletSpeed,
+        damage,
+        hit: false,
+      },
+      best,
+      this.cachedEnemies
+    );
+    if (jumps > 1) {
+      visited.push(best);
+      this.chainFrom(best, damage, jumps - 1, visited);
+    }
+  }
+
+  // A jagged arc between two circles (Chain Lance, Static Shell).
+  addArc(source, target) {
+    const { duration } = WEAPON_EVOLUTIONS.arc.chain;
+    const dx = target.x - source.x;
+    const dy = target.y - source.y;
+    const distance = Math.hypot(dx, dy) || 1;
     // Rim to rim, so the arc shows in the gap instead of under the rocks.
     const startGap = Math.min(source.radius || 0, distance * 0.45);
-    const endGap = Math.min(best.radius || 0, distance * 0.45);
+    const endGap = Math.min(target.radius || 0, distance * 0.45);
     const span = distance - startGap - endGap;
     const ux = dx / distance;
     const uy = dy / distance;
@@ -3356,20 +3499,88 @@ class CombatSystem extends BaseSystem {
       });
     }
     this.arcs.push({ points, life: duration, maxLife: duration });
+  }
 
-    this.processBulletHit(
-      {
-        kind: 'chain',
-        x: best.x - (dx / distance) * (best.radius || 0),
-        y: best.y - (dy / distance) * (best.radius || 0),
-        vx: (dx / distance) * this.bulletSpeed,
-        vy: (dy / distance) * this.bulletSpeed,
-        damage,
-        hit: false,
-      },
-      best,
-      this.cachedEnemies
-    );
+  // Deterministic card roll (no game RNG here, like the arc jitter).
+  rollCardChance(chance) {
+    this.cardRolls += 1;
+    return (hashUnit(this.cardRolls * 7 + 3) + 1) / 2 < chance;
+  }
+
+  // Cinder Trail: a burning point every few px along the main thruster.
+  dropCinder(position) {
+    const { life, radius } = this.cardEffects.cinderTrail;
+    const last = this.cinders[this.cinders.length - 1];
+    if (last && Math.hypot(last.x - position.x, last.y - position.y) < radius) {
+      return;
+    }
+    this.cinders.push({ x: position.x, y: position.y, life, maxLife: life });
+  }
+
+  burnCinderTouches({ damage, radius }) {
+    const touched = [];
+    this.cachedEnemies.forEachActiveEnemy((enemy) => {
+      if (!enemy || enemy.destroyed) return;
+      const reach = (enemy.radius || 0) + radius;
+      const reachSq = reach * reach;
+      if (
+        this.cinders.some(
+          (c) => (c.x - enemy.x) ** 2 + (c.y - enemy.y) ** 2 <= reachSq
+        )
+      ) {
+        touched.push(enemy);
+      }
+    });
+    touched.forEach((enemy) => {
+      if (enemy.destroyed) return;
+      this.applyDamageToEnemy(this.cachedEnemies, enemy, damage, {
+        hitPosition: { x: enemy.x, y: enemy.y },
+      });
+    });
+  }
+
+  // Static Shell: an arc to every enemy within reach of the ship.
+  dischargeStaticShell({ radius, damage }) {
+    const { x, y } = this.cachedPlayer.getPosition();
+    const origin = { x, y, radius: SHIP_SIZE };
+    const struck = [];
+    this.cachedEnemies.forEachActiveEnemy((enemy) => {
+      if (!enemy || enemy.destroyed) return;
+      const reach = radius + (enemy.radius || 0);
+      if ((enemy.x - x) ** 2 + (enemy.y - y) ** 2 <= reach * reach) {
+        struck.push(enemy);
+      }
+    });
+    struck.forEach((enemy) => {
+      if (enemy.destroyed) return;
+      this.addArc(origin, enemy);
+      // A chain-kind hit: no burn, slow or chain procs off the discharge.
+      this.processBulletHit(
+        {
+          kind: 'chain',
+          x: enemy.x,
+          y: enemy.y,
+          vx: 0,
+          vy: 0,
+          damage,
+          hit: false,
+        },
+        enemy,
+        this.cachedEnemies
+      );
+    });
+  }
+
+  // Gravity Brake: undo part of this frame's travel near the ship.
+  applyGravityBrake({ radius, slowFraction }, deltaTime) {
+    const { x, y } = this.cachedPlayer.getPosition();
+    const drag = slowFraction * deltaTime;
+    this.cachedEnemies.forEachActiveEnemy((enemy) => {
+      if (!enemy || enemy.destroyed || enemy.type === 'boss') return;
+      if ((enemy.x - x) ** 2 + (enemy.y - y) ** 2 > radius * radius) return;
+      enemy.x -= (enemy.vx || 0) * drag;
+      enemy.y -= (enemy.vy || 0) * drag;
+    });
   }
 
   updateWeaponEffects(deltaTime) {
@@ -3383,16 +3594,36 @@ class CombatSystem extends BaseSystem {
     };
     fade(this.beams);
     fade(this.arcs);
-    // The beam stays on the nose while it shows (its damage already landed).
+    fade(this.cinders);
+
+    const { cinderTrail, staticShell, gravityBrake } = this.cardEffects;
+    if (cinderTrail && this.cinders.length) {
+      this.cinderTimer += deltaTime;
+      while (this.cinderTimer >= cinderTrail.tickInterval) {
+        this.cinderTimer -= cinderTrail.tickInterval;
+        this.burnCinderTouches(cinderTrail);
+      }
+    } else {
+      this.cinderTimer = 0;
+    }
+    if (this.staticShellPending) {
+      this.staticShellPending = false;
+      this.dischargeStaticShell(staticShell);
+    }
+    // The beam stays on the muzzle while it shows (its damage already landed).
     const player = this.cachedPlayer;
     if (this.beams.length && !player.isDead) {
+      const muzzle = player.getMuzzlePoint();
       this.beams.forEach((beam) => {
-        const nose = player.getNosePosition(beam.angle);
-        beam.ex += nose.x - beam.x;
-        beam.ey += nose.y - beam.y;
-        beam.x = nose.x;
-        beam.y = nose.y;
+        beam.ex += muzzle.x - beam.x;
+        beam.ey += muzzle.y - beam.y;
+        beam.x = muzzle.x;
+        beam.y = muzzle.y;
       });
+    }
+
+    if (gravityBrake && !player.isDead) {
+      this.applyGravityBrake(gravityBrake, deltaTime);
     }
 
     if (this.burns.size) {
@@ -3562,6 +3793,13 @@ class CombatSystem extends BaseSystem {
   // cores also go to the emissive (bloom) layer.
   drawWeaponEffects(ctx, emissive) {
     const look = this.lanceLook;
+    this.cinders.forEach((cinder) => {
+      const k = cinder.life / cinder.maxLife;
+      ctx.fillStyle = withAlpha(WEAPON_EVOLUTIONS.thermal.look.trail, 0.5 * k);
+      ctx.beginPath();
+      ctx.arc(cinder.x, cinder.y, 2 + 3 * k, 0, Math.PI * 2);
+      ctx.fill();
+    });
     this.burns.forEach((entry, enemy) => {
       const r = (enemy.radius || 12) * 0.9;
       const glow = ctx.createRadialGradient(
@@ -3695,7 +3933,8 @@ class CombatSystem extends BaseSystem {
     this.projectilePerf.projectileRenderMs =
       performance.now() - projectileRenderStart;
 
-    const playerPosition = player.getPosition();
+    // The lock line starts at the turret's muzzle.
+    const playerPosition = player.getMuzzlePoint();
 
     const lockAssignments =
       Array.isArray(this.currentLockAssignments) &&

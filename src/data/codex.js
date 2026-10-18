@@ -3,6 +3,7 @@
 import { deepFreeze } from '../utils/deepFreeze.js';
 import { ENEMY_TYPES } from './constants/visual.js';
 import { BOSS_BY_LAYER, WARDEN_KINDS } from './enemies/boss.js';
+import { HERALD_KINDS } from './enemies/herald.js';
 import { LAYERS } from './layers.js';
 
 // The Codex (docs/NORTE.md §7 pillar 5): every enemy the pilot can meet, in
@@ -30,14 +31,20 @@ const GLYPHS = {
     '<circle cy="-8" r="4.5"/><circle cx="7" cy="5" r="4.5"/><circle cx="-7" cy="5" r="4.5"/><circle class="eye" cy="-8" r="2"/>',
   'warden-null':
     '<circle r="13" fill="none" stroke-width="2"/><circle r="7"/><circle class="eye" r="3"/>',
+  'herald-dust':
+    '<rect x="-14" y="-6" width="28" height="12" rx="1.5"/><rect class="eye" x="-9.5" y="-1" width="4" height="2"/><rect class="eye" x="-2" y="-1" width="4" height="2"/><rect class="eye" x="5.5" y="-1" width="4" height="2"/>',
+  'herald-heat':
+    '<circle r="12"/><path class="eye" fill-rule="evenodd" d="M-10.5 0a10.5 10.5 0 1 0 21 0a10.5 10.5 0 1 0 -21 0Z M-8.5 0a8.5 8.5 0 1 0 17 0a8.5 8.5 0 1 0 -17 0Z"/>',
+  'herald-silence':
+    '<polygon points="0,-15 5,-5 5,9 0,15 -5,9 -5,-5"/><circle class="eye" cy="-3" r="2"/>',
 };
 
-/** Codex id of an enemy or a damage-source snapshot: its type, or the Warden's kind. */
+/** Codex id of an enemy or a damage-source snapshot: its type, or the Warden's or Herald's kind. */
 export function codexIdOf(entity) {
   if (!entity?.type) return null;
-  return entity.type === 'boss'
-    ? `warden-${entity.bossKind || 'prime'}`
-    : entity.type;
+  if (entity.type === 'boss') return `warden-${entity.bossKind || 'prime'}`;
+  if (entity.type === 'herald') return `herald-${entity.heraldKind || 'dust'}`;
+  return entity.type;
 }
 
 function firstLayerOf(kind) {
@@ -66,6 +73,16 @@ const support = (type, lore, hint) => ({
   warden: false,
 });
 
+const herald = (kind, lore, hint) => ({
+  id: `herald-${kind}`,
+  name: HERALD_KINDS[kind].displayName,
+  lore,
+  hint,
+  glyph: GLYPHS[`herald-${kind}`],
+  fromLayer: LAYERS.findIndex((layer) => layer.herald === kind) + 1,
+  warden: false,
+});
+
 const warden = (kind, lore, hint) => ({
   id: `warden-${kind}`,
   name: WARDEN_KINDS[kind].displayName,
@@ -87,6 +104,11 @@ export const CODEX_ENTRIES = deepFreeze(
       fromLayer: firstLayerOf('asteroid'),
       warden: false,
     },
+    herald(
+      'dust',
+      'We sent the Dust ahead to speak for us. It speaks in walls.',
+      'Every few seconds it raises a wall of rock. The slits light first.'
+    ),
     support(
       'drone',
       'The smallest of the Ring’s keepers. It wakes in swarms and never alone.',
@@ -112,6 +134,11 @@ export const CODEX_ENTRIES = deepFreeze(
       'Built to clear debris from the Ring’s lanes. It still does.',
       'Stops, winds up, then charges straight. Step aside.'
     ),
+    herald(
+      'heat',
+      'The Core still burns where we told it to. The Heat carries the flame.',
+      'Its seam brightens, then the rocks nearest it turn Volatile.'
+    ),
     warden(
       'choir',
       'Three cores that once sang the Ring closed. Only three voices remain.',
@@ -131,6 +158,11 @@ export const CODEX_ENTRIES = deepFreeze(
       'weaver',
       'It does not attack. It closes the Field around you.',
       'Orbits you and lays Tethers behind it. Kill it first.'
+    ),
+    herald(
+      'silence',
+      'Past this point we do not answer. The Silence makes sure of it.',
+      'Blinds your radar while it lives. A ring marks where it blinks.'
     ),
     warden(
       'null',

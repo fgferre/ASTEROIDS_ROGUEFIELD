@@ -20,14 +20,14 @@ import { deserialize, serialize } from '../../src/core/replay.js';
 
 const STEPS = 600; // 10 s at 60 Hz
 
-// Keys held during each half-second of the run (W thrust, A/D turn, S brake);
-// lowercase letters are taps (e shield, g spread toggle, t aim toggle,
-// h dash).
+// Keys held during each half-second of the run (WASD moves on the screen
+// axes); lowercase letters are taps (e shield, g spread toggle, t aim toggle,
+// h dash). The route is picked so the run levels up twice.
 const SEGMENT_STEPS = 30;
 const SCRIPT = [
   '',
-  'S',
-  'S',
+  'W',
+  'W',
   'WAe',
   'WA',
   'Wh',

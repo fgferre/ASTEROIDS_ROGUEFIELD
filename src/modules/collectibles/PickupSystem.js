@@ -1,8 +1,9 @@
 /**
  * Pickup System
  *
- * Field pickups (Magnet, Pulse, Overcharge) dropped by Elites and Wardens.
- * They drift, blink before expiring and apply their effect on contact.
+ * Field pickups (Magnet, Pulse, Overcharge) dropped by Elites, Heralds and
+ * Wardens. They drift, blink before expiring and apply their effect on
+ * contact.
  * Catalogue and drop rules: src/data/pickups.js.
  */
 
@@ -41,14 +42,21 @@ export class PickupSystem extends BaseSystem {
     );
     this.pickups = [];
     this.overchargeRemaining = 0;
+    this.rockDropChance = 0;
     this.reseedRandom();
   }
 
   setupEventListeners() {
+    // Elites drop at their chance; plain rocks only with Lucky Fragment.
     this.registerEventListener('enemy-destroyed', (payload = {}) => {
       const enemy = payload.enemy;
-      if (!enemy?.elite || enemy.type === 'boss') return;
-      if (!this.random.chance(PICKUP_DROPS.eliteChance)) return;
+      if (!enemy || enemy.type === 'boss') return;
+      const chance = enemy.elite
+        ? PICKUP_DROPS.eliteChance
+        : enemy.type === 'asteroid'
+          ? this.rockDropChance
+          : 0;
+      if (chance <= 0 || !this.random.chance(chance)) return;
       const { x, y } = payload.position || enemy;
       this.spawnPickup(this.rollKind(), x, y);
     });
@@ -59,6 +67,19 @@ export class PickupSystem extends BaseSystem {
       const half = PICKUP_TOKEN.wardenSpread / 2;
       this.spawnPickup(PICKUP_DROPS.wardenGuaranteed, x - half, y);
       this.spawnPickup(this.rollKind(), x + half, y);
+    });
+
+    // A Herald always drops one.
+    this.registerEventListener('herald-defeated', ({ x, y } = {}) => {
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+      this.spawnPickup(this.rollKind(), x, y);
+    });
+
+    this.registerEventListener('upgrade-lucky-fragment', (data) => {
+      this.rockDropChance = data.chance;
+    });
+    this.registerEventListener('progression-reset', () => {
+      this.rockDropChance = 0;
     });
 
     this.registerEventListener('game-started', () => this.reset());

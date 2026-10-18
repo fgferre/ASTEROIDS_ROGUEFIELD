@@ -587,6 +587,7 @@ class UpgradeSystem extends BaseSystem {
       themeColor: definition.themeColor || category.themeColor,
       category,
       rarity: definition.rarity,
+      cursed: definition.cursed,
       tags: asArray(definition.tags),
       family: this.describeFamilyProgress(definition),
       currentLevel,
@@ -722,6 +723,8 @@ class UpgradeSystem extends BaseSystem {
       rarity: UPGRADE_RARITIES.includes(entry.rarity)
         ? entry.rarity
         : UPGRADE_RARITIES[0],
+      // A big boost with a real cost; no family.
+      cursed: entry.cursed === true,
       icon: entry.icon || '✨',
       themeColor:
         entry.themeColor || entry.color || DEFAULT_UPGRADE_CATEGORY.themeColor,

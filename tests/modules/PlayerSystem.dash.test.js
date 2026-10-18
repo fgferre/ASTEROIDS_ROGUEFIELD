@@ -62,19 +62,20 @@ describe('PlayerSystem dash', () => {
     expect(player.invulnerableTimer).toBe(0);
   });
 
-  it('dashes backward while only S is held', () => {
+  it('dashes down the screen while only S is held, whatever the heading', () => {
     const { player, eventBus } = makePlayer({ down: true });
-    eventBus.emit('dash-pressed');
-    player.update(DELTA_TIME);
-    expect(player.velocity.vx).toBeLessThan(-SHIP_MAX_SPEED);
-  });
-
-  it('dashes to starboard while only D is held', () => {
-    const { player, eventBus } = makePlayer({ right: true });
     eventBus.emit('dash-pressed');
     player.update(DELTA_TIME);
     expect(player.velocity.vy).toBeGreaterThan(SHIP_MAX_SPEED);
     expect(Math.abs(player.velocity.vx)).toBeLessThan(1e-6);
+  });
+
+  it('dashes left on the screen while only A is held', () => {
+    const { player, eventBus } = makePlayer({ left: true });
+    eventBus.emit('dash-pressed');
+    player.update(DELTA_TIME);
+    expect(player.velocity.vx).toBeLessThan(-SHIP_MAX_SPEED);
+    expect(Math.abs(player.velocity.vy)).toBeLessThan(1e-6);
   });
 
   it('ignores presses during the cooldown and while dead', () => {

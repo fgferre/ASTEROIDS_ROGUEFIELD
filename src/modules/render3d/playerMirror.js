@@ -6,15 +6,24 @@
 // cyan Interceptor, amber Solar Slicer): glowing nozzles, cones with a white
 // core that stretch with thrust, side puffs on strafe, a point light and a
 // ribbon trail. Dash afterimages, the invulnerability blink and the shield
-// impact flash mirror the 2D PlayerSystem render.
+// impact flash mirror the 2D PlayerSystem render. In the modern scheme a
+// dorsal turret (base, twin barrels, amber lens) turns on its own to the
+// simulation's turret heading; its barrel tips sit on the sim's muzzle point.
 
 import {
   DASH_GHOST_COUNT,
   DASH_GHOST_LIFE,
 } from '../../data/constants/gameplay.js';
 import { PALETTE } from '../../data/constants/palette.js';
-import { SHIP_MAX_SPEED } from '../../data/constants/physics.js';
+import {
+  SHIP_MAX_SPEED,
+  SHIP_ROTATION_SPEED,
+  TURRET_BARREL_LENGTH,
+  TURRET_PIVOT_X,
+} from '../../data/constants/physics.js';
+import { ALL_HULLS } from '../../data/shipModels.js';
 import { bakeHullMaps } from './bakedMaps.js';
+import { addRimLight } from './rimLight.js';
 import { HALF_H, HALF_W, colorOf, rgbOf } from './batches.js';
 
 // Plate heights in hull units: base plate, raised spine (peak at y = 0) and
@@ -33,12 +42,31 @@ const NOZZLE_HEIGHT = 2.6;
 const VISUAL_SCALE = 1.35;
 const TRAIL_MIN = 12;
 const TRAIL_LENGTH = 22;
-const MAX_BANK = 0.45;
+// Banking (PLAN.md R5.9, proposta 18/10): roll into the strafe input and the
+// yaw rate, eased with a time constant so it saturates and relaxes smoothly.
+// Both come from the simulation (input, angular velocity), never from the
+// interpolated pose.
+const BANK_STRAFE = (22 * Math.PI) / 180;
+const BANK_YAW = (8 * Math.PI) / 180;
+const BANK_SMOOTH_S = 0.18;
+// Each shot pushes the hull back along the nose for the muzzle frames.
+const RECOIL_DIP = 2;
+// Dash i-frames: brighter cyan rim and a thin ring (proposta 18/10).
+const DASH_RIM_BOOST = 3;
+const DASH_RING_OPACITY = 0.55;
 const BLINK_HZ = 8;
-const SHIELD_FLASH_S = 0.08;
 const GHOST_ALPHA = 0.5;
 // proposta 17/10: each shot bumps the ship light for a couple of frames.
 const MUZZLE_LIGHT = 1.6;
+// Turret, in field units (unscaled, so the barrel tips meet the sim muzzle):
+// the base sits on the scaled spine top, the barrels clear the canopy.
+const TURRET_BASE_Y = (BASE_TOP + SPINE_DEPTH) * VISUAL_SCALE;
+const TURRET_BASE_R = 4;
+const TURRET_BASE_H = 2;
+const TURRET_BARREL_Y = TURRET_BASE_Y + TURRET_BASE_H + 0.9;
+const TURRET_BARREL_R = 0.7;
+const TURRET_BARREL_Z = 1.3;
+const TURRET_RECOIL = 1.2;
 const MUZZLE_LIGHT_FRAMES = 2;
 // Baked panel maps (bakedMaps.js): one texture tile per HULL_TILE hull units
 // (the extruded plates' UVs are in hull units). proposta 18/10: strengths.
@@ -115,7 +143,7 @@ export class PlayerMirror {
       material.userData.uRim = rim;
       material.userData.uBlink = blink;
       material.onBeforeCompile = patchHull;
-      return material;
+      return addRimLight(material);
     };
     this.baseMaterial = hullTone(PALETTE.hull, PALETTE.hullLit, 0.2, 0.85);
     this.finMaterial = hullTone(PALETTE.hullLit, PALETTE.neutral, 0.15, 0.8);
@@ -123,13 +151,15 @@ export class PlayerMirror {
     this.hullMaps = maps;
     this.surfaceMaps = true;
     this.blink = blink;
-    this.canopyMaterial = new THREE.MeshStandardMaterial({
-      color: colorOf(THREE, PALETTE.rockShadow),
-      emissive: colorOf(THREE, PALETTE.player).multiplyScalar(0.25),
-      metalness: 0.1,
-      roughness: 0.3,
-      flatShading: true,
-    });
+    this.canopyMaterial = addRimLight(
+      new THREE.MeshStandardMaterial({
+        color: colorOf(THREE, PALETTE.rockShadow),
+        emissive: colorOf(THREE, PALETTE.player).multiplyScalar(0.25),
+        metalness: 0.1,
+        roughness: 0.3,
+        flatShading: true,
+      })
+    );
     this.seamMaterial = new THREE.LineBasicMaterial({
       color: colorOf(THREE, PALETTE.rockShadow),
     });
@@ -165,22 +195,26 @@ export class PlayerMirror {
     );
     this.group.add(this.light);
 
-    this.shield = new THREE.Mesh(
-      new THREE.RingGeometry(0.9, 1, 64).rotateX(-Math.PI / 2),
+    this.muzzleFrames = 0;
+    this.bank = 0;
+    this.bankTime = null;
+
+    this.rim = rim.value;
+    this.rimRgb = rim.value.clone();
+    this.dashRimRgb = rim.value.clone().multiplyScalar(DASH_RIM_BOOST);
+    this.dashRing = new THREE.Mesh(
+      new THREE.RingGeometry(0.94, 1, 64).rotateX(-Math.PI / 2),
       new THREE.MeshBasicMaterial({
-        color: colorOf(THREE, PALETTE.player).multiplyScalar(1.4),
+        color: colorOf(THREE, PALETTE.player).multiplyScalar(1.6),
         transparent: true,
-        opacity: 0.35,
+        opacity: DASH_RING_OPACITY,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
         toneMapped: false,
       })
     );
-    this.group.add(this.shield);
-    this.shieldRgb = colorOf(THREE, PALETTE.player).multiplyScalar(1.4);
-    this.shieldFlashRgb = new THREE.Color(1.6, 1.6, 1.6);
-    this.shieldHitAt = -Infinity;
-    this.muzzleFrames = 0;
+    this.dashRing.visible = false;
+    this.group.add(this.dashRing);
 
     this.ghosts = [];
     for (let i = 0; i < DASH_GHOST_COUNT; i += 1) {
@@ -211,6 +245,67 @@ export class PlayerMirror {
     this.trailCount = 0;
     this.trailHead = 0;
     this.thrustRgb = rgbOf(THREE, PALETTE.player);
+    this.buildTurret();
+  }
+
+  buildTurret() {
+    const { THREE } = this;
+    const lit = (geometry) => {
+      geometry.setAttribute('uv2', geometry.getAttribute('uv'));
+      return geometry;
+    };
+    this.turret = new THREE.Group();
+    const base = new THREE.Mesh(
+      lit(
+        new THREE.CylinderGeometry(
+          TURRET_BASE_R * 0.85,
+          TURRET_BASE_R,
+          TURRET_BASE_H,
+          10
+        ).translate(0, TURRET_BASE_Y + TURRET_BASE_H / 2, 0)
+      ),
+      this.spineMaterial
+    );
+    // Barrels and their block recoil together along the turret's axis.
+    this.barrels = new THREE.Group();
+    const block = new THREE.Mesh(
+      lit(new THREE.BoxGeometry(4.6, 2, 4).translate(0.3, TURRET_BARREL_Y, 0)),
+      this.baseMaterial
+    );
+    const length = TURRET_BARREL_LENGTH - 1.5;
+    const barrel = (z) =>
+      new THREE.Mesh(
+        lit(
+          new THREE.CylinderGeometry(
+            TURRET_BARREL_R,
+            TURRET_BARREL_R,
+            length,
+            6
+          )
+            .rotateZ(Math.PI / 2)
+            .translate(1.5 + length / 2, TURRET_BARREL_Y, z)
+        ),
+        this.finMaterial
+      );
+    const lens = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 8, 6).translate(
+        2.2,
+        TURRET_BARREL_Y + 0.9,
+        0
+      ),
+      new THREE.MeshBasicMaterial({
+        color: colorOf(THREE, PALETTE.shot).multiplyScalar(2),
+        toneMapped: false,
+      })
+    );
+    this.barrels.add(
+      block,
+      barrel(-TURRET_BARREL_Z),
+      barrel(TURRET_BARREL_Z),
+      lens
+    );
+    this.turret.add(base, this.barrels);
+    this.group.add(this.turret);
   }
 
   // Rebuilds the meshes when the hull or its visual-upgrade levels change.
@@ -220,6 +315,19 @@ export class PlayerMirror {
     if (key === this.hullKey) return this.geometry;
     this.hullKey = key;
     return this.seeded(() => this.rebuild(player, hull, levels));
+  }
+
+  /**
+   * Loading-screen warm-up (Renderer3D.warmUp): builds every hull once for
+   * `compile`; the next update() rebuilds the live one.
+   */
+  warm(player, compile) {
+    const levels = player.getHullVisualLevels();
+    ALL_HULLS.forEach((hull) => {
+      this.seeded(() => this.rebuild(player, hull, levels));
+      compile();
+    });
+    this.hullKey = null;
   }
 
   rebuild(player, hull, levels) {
@@ -352,7 +460,8 @@ export class PlayerMirror {
       (NOZZLE_HEIGHT + 4) * VISUAL_SCALE,
       0
     );
-    this.shield.scale.setScalar(geometry.extent * 1.7);
+    this.shieldRadius = geometry.extent * 1.7;
+    this.dashRing.scale.setScalar(geometry.extent * 1.3);
     return geometry;
   }
 
@@ -449,9 +558,12 @@ export class PlayerMirror {
     this.group.rotation.y = -angle;
     // Bank into turns and strafes (the sim stays flat; this is only visual).
     const v = player.velocity || { vx: 0, vy: 0 };
-    const lateral = (-v.vx * sin + v.vy * cos) / SHIP_MAX_SPEED;
-    const bank = lateral * 0.5 + (player.angularVelocity || 0) * 0.08;
-    this.group.rotation.x = Math.max(-MAX_BANK, Math.min(MAX_BANK, bank));
+    this.group.rotation.x = this.updateBank(player, time);
+    this.ship.position.x = this.muzzleFrames > 0 ? -RECOIL_DIP : 0;
+    this.turret.visible = player.controlScheme === 'modern';
+    this.turret.position.x = TURRET_PIVOT_X + this.ship.position.x;
+    this.turret.rotation.y = -(player.turretAngle - angle);
+    this.barrels.position.x = this.muzzleFrames > 0 ? -TURRET_RECOIL : 0;
 
     const main = thrust.main || 0;
     const length = (5 + 18 * main) * (1 + 0.1 * (levels.thruster || 0));
@@ -484,17 +596,6 @@ export class PlayerMirror {
       2.6 * main + (this.muzzleFrames > 0 ? MUZZLE_LIGHT : 0);
     if (this.muzzleFrames > 0) this.muzzleFrames -= 1;
 
-    this.shield.visible = Boolean(player.isShieldActive);
-    if (this.shield.visible) {
-      const impact = time - this.shieldHitAt < SHIELD_FLASH_S;
-      this.shield.material.color.copy(
-        impact ? this.shieldFlashRgb : this.shieldRgb
-      );
-      this.shield.material.opacity = impact
-        ? 0.9
-        : 0.25 + 0.12 * Math.sin(time * 4);
-    }
-
     // Blink while invulnerable after a hit; the dash's own i-frames do not.
     const invulnerable = player.invulnerableTimer > 0;
     if (player.dashTimer > 0) this.dashGuard = true;
@@ -503,6 +604,9 @@ export class PlayerMirror {
       invulnerable && !this.dashGuard
         ? 0.35 * (1 + Math.sin(time * Math.PI * 2 * BLINK_HZ))
         : 0;
+    const dashShield = invulnerable && this.dashGuard;
+    this.rim.copy(dashShield ? this.dashRimRgb : this.rimRgb);
+    this.dashRing.visible = dashShield;
 
     this.updateGhosts(player.dashGhosts);
 
@@ -532,6 +636,30 @@ export class PlayerMirror {
     }
   }
 
+  /**
+   * Roll target: strafe input (modern only; classic A/D is torque) plus the
+   * yaw rate, eased toward with BANK_SMOOTH_S. Returns radians.
+   */
+  updateBank(player, time) {
+    const dt =
+      this.bankTime === null
+        ? 0
+        : Math.min(0.1, Math.max(0, time - this.bankTime));
+    this.bankTime = time;
+    const thrust = player.lastThrusterState || {};
+    const strafe =
+      player.controlScheme === 'modern'
+        ? (thrust.sideL || 0) - (thrust.sideR || 0)
+        : 0;
+    const yaw = Math.max(
+      -1,
+      Math.min(1, (player.angularVelocity || 0) / SHIP_ROTATION_SPEED)
+    );
+    const target = BANK_STRAFE * strafe + BANK_YAW * yaw;
+    this.bank += (target - this.bank) * (1 - Math.exp(-dt / BANK_SMOOTH_S));
+    return this.bank;
+  }
+
   updateGhosts(list) {
     const ghosts = list || [];
     for (let i = 0; i < this.ghosts.length; i += 1) {
@@ -553,11 +681,6 @@ export class PlayerMirror {
     for (let i = 0; i < this.ghosts.length; i += 1) {
       this.ghosts[i].visible = false;
     }
-  }
-
-  /** `time` in seconds, same clock as update(). */
-  flashShield(time) {
-    this.shieldHitAt = time;
   }
 
   /** A shot left the nose: bump the ship light for a few frames. */
@@ -582,6 +705,8 @@ export class PlayerMirror {
   reset() {
     this.trailCount = 0;
     this.muzzleFrames = 0;
+    this.bank = 0;
+    this.bankTime = null;
     this.dashGuard = false;
     this.hideGhosts();
   }

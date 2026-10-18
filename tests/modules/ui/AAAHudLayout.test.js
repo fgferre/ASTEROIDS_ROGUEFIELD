@@ -28,6 +28,7 @@ function fakeElement() {
     parent: null,
     children: [],
     textContent: '',
+    dataset: {},
     style: {
       setProperty(name, value) {
         this[name] = value;
@@ -124,5 +125,32 @@ describe('AAAHudLayout weapon and buff chips', () => {
 
     hud.tickBuffs(duration);
     expect(hud.els.buffs.children).toHaveLength(0);
+  });
+});
+
+describe('AAAHudLayout radar jam', () => {
+  let hud;
+  beforeEach(() => {
+    vi.stubGlobal('document', { createElement: fakeElement });
+    hud = new AAAHudLayout();
+    hud.els = { radar: fakeElement(), radarContainer: fakeElement() };
+    hud._createBlipPool();
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  const shown = () => hud._blipPool.filter((el) => el.style.display !== 'none');
+  const enemy = [{ x: 0.5, y: 0.5, type: 'enemy' }];
+
+  it('shows noise and NO SIGNAL while jammed, the real blips after', () => {
+    hud.setRadarJammed(true);
+    hud.updateRadar(enemy);
+    expect(hud.els.radar.classList.contains('is-jammed')).toBe(true);
+    expect(shown().length).toBeGreaterThan(1);
+    expect(shown().every((el) => el.dataset.type === 'noise')).toBe(true);
+
+    hud.setRadarJammed(false);
+    hud.updateRadar(enemy);
+    expect(hud.els.radar.classList.contains('is-jammed')).toBe(false);
+    expect(shown().map((el) => el.dataset.type)).toEqual(['enemy']);
   });
 });

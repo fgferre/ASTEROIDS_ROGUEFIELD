@@ -24,6 +24,7 @@ import { createServiceResolver } from '../core/serviceUtils.js';
 import GameSessionService from '../services/GameSessionService.js';
 import CommandQueueService from '../services/CommandQueueService.js';
 import CodexService from '../services/CodexService.js';
+import AchievementService from '../services/AchievementService.js';
 import HangarService from '../services/HangarService.js';
 
 export const DEFAULT_POOL_CONFIG = {
@@ -308,6 +309,14 @@ export function createServiceManifest(context = {}) {
       dependencies: ['event-bus'],
       factory: ({ resolved }) =>
         new CodexService({ eventBus: resolved['event-bus'] }),
+    },
+    {
+      name: 'achievements',
+      singleton: true,
+      lazy: false,
+      dependencies: ['event-bus'],
+      factory: ({ resolved }) =>
+        new AchievementService({ eventBus: resolved['event-bus'] }),
     },
     {
       name: 'hangar',

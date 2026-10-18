@@ -122,6 +122,16 @@ export const DASH_GHOST_COUNT = 5; // afterimages dropped during the dash
 export const DASH_GHOST_LIFE = 0.25; // s each afterimage fades over
 export const DASH_SHAKE = Object.freeze({ intensity: 3, duration: 0.12 });
 
+// === HIT FEEL === (PLAN.md R5.9) PROPOSAL 18/10 ("proposta 18/10"), judged by playing.
+export const SHOT_RECOIL_IMPULSE = 8; // px/s against the aim, once per weapon-fired
+// Knockback along the bullet: base × (damage / reference), clamped; asteroids
+// keep their linear drift (an impulse there would never decay).
+export const KNOCKBACK_BASE = 60; // px/s at the reference damage
+export const KNOCKBACK_REFERENCE_DAMAGE = 20;
+export const KNOCKBACK_MIN = 30; // px/s
+export const KNOCKBACK_MAX = 160; // px/s
+export const KNOCKBACK_HEAVY_FACTOR = 0.1; // bosses (wardens) and heralds
+
 // === COMBAT ===
 
 // Plan 01.07 FIX-05 — spread + aim mode defaults.

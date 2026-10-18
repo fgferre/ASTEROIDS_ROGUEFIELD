@@ -1,6 +1,7 @@
 // src/data/upgrades/mobility.js
 
 import { deepFreeze } from '../../utils/deepFreeze.js';
+import { PALETTE } from '../constants/palette.js';
 
 // === MOBILITY UPGRADES ===
 
@@ -399,6 +400,107 @@ export const MOBILITY_UPGRADES = deepFreeze([
             type: 'event',
             event: 'upgrade-emergency-brake',
             payload: { enabled: true },
+          },
+        ],
+      },
+    ],
+  },
+  // Cards from R5.4 (numbers: proposta 18/10, for the owner to judge by playing).
+  {
+    id: 'cinder_trail',
+    category: 'mobility',
+    family: 'thermal',
+    rarity: 'common',
+    icon: '🔥',
+    themeColor: PALETTE.shot,
+    unlockLevel: 2,
+    tags: ['thrusters', 'burn'],
+    text: {
+      name: 'Cinder Trail',
+      summary:
+        'Mixes crystal dust into the exhaust: the main thruster leaves a burning trail.',
+      lore: 'Salvagers used it to mark their path. Rocks that cross it come out scorched.',
+      levels: [
+        {
+          title: 'Ember Wake',
+          description:
+            'Thrust leaves a 0.6 s trail that burns touching enemies for 6 damage per tick.',
+          highlights: ['Ticks 5 times a second.'],
+        },
+        {
+          title: 'Flame Wake',
+          description: 'The trail burns for 12 damage per tick.',
+          highlights: ['Another +6 per tick.'],
+        },
+        {
+          title: 'Inferno Wake',
+          description: 'The trail burns for 18 damage per tick.',
+          highlights: ['Fly circles around them.'],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-cinder-trail',
+            payload: { damage: 6, life: 0.6, tickInterval: 0.2, radius: 10 },
+          },
+        ],
+      },
+      {
+        rank: 2,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-cinder-trail',
+            payload: { damage: 12, life: 0.6, tickInterval: 0.2, radius: 10 },
+          },
+        ],
+      },
+      {
+        rank: 3,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-cinder-trail',
+            payload: { damage: 18, life: 0.6, tickInterval: 0.2, radius: 10 },
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'phase_skin',
+    category: 'mobility',
+    family: 'field',
+    rarity: 'rare',
+    icon: '👻',
+    themeColor: PALETTE.text,
+    unlockLevel: 3,
+    tags: ['dash', 'invulnerability'],
+    text: {
+      name: 'Phase Skin',
+      summary: 'The hull stays out of phase for a moment after every dash.',
+      lore: 'A Ring field coil tuned too fine. You are not quite there when you land.',
+      levels: [
+        {
+          title: 'Out of Phase',
+          description: 'For 0.4 s after a dash ends, nothing can hurt you.',
+          highlights: ["Adds to the dash's own invulnerability."],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-phase-skin',
+            payload: { duration: 0.4 },
           },
         ],
       },

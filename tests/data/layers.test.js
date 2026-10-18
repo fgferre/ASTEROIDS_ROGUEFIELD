@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GamePools } from '../../src/core/GamePools.js';
 import { RUN_FINAL_LAYER } from '../../src/data/constants/gameplay.js';
-import { LAYERS, directorFor } from '../../src/data/layers.js';
+import { FIELD_EVENTS, LAYERS, directorFor } from '../../src/data/layers.js';
 import {
   createHeadlessGame,
   installDomStubs,
@@ -28,6 +28,18 @@ describe('layer table', () => {
     expect(wardens).toEqual([5, 10, 15]);
   });
 
+  it('sends one Herald per biome: Dust on 3, Heat on 8, Silence on 13', () => {
+    const heralds = LAYERS.flatMap((layer, i) =>
+      layer.herald ? [[i + 1, layer.herald]] : []
+    );
+    expect(heralds).toEqual([
+      [3, 'dust'],
+      [8, 'heat'],
+      [13, 'silence'],
+    ]);
+    expect(directorFor(18).herald).toBeUndefined();
+  });
+
   it('lists only registered kinds, support kinds in rosters', () => {
     const restoreDom = installDomStubs();
     try {
@@ -42,6 +54,7 @@ describe('layer table', () => {
             expect(factory.hasType(kind)).toBe(true);
           }
         }
+        if (layer.herald) expect(factory.hasType('herald')).toBe(true);
       }
     } finally {
       GamePools.releaseAll();
@@ -115,5 +128,22 @@ describe('directorFor', () => {
       scheduledCount(directorFor(14))
     );
     expect(Object.isFrozen(later.roster[0])).toBe(true);
+  });
+
+  it('schedules field events of known kinds, never on a Warden layer', () => {
+    const layers = [
+      ...LAYERS,
+      ...Array.from({ length: 15 }, (_, i) => directorFor(16 + i)),
+    ];
+    for (const layer of layers) {
+      if (layer.warden) expect(layer.events).toEqual([]);
+      for (const event of layer.events) {
+        expect(Object.keys(FIELD_EVENTS)).toContain(event.kind);
+        expect(event.label).toBe(FIELD_EVENTS[event.kind].label);
+        expect(event.at).toBeGreaterThan(0);
+      }
+    }
+    expect(directorFor(16).events).toHaveLength(1);
+    expect(directorFor(16).events).toEqual(directorFor(16).events);
   });
 });

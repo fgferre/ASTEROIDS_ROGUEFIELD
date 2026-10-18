@@ -196,6 +196,45 @@ rodada"_. Cada pilar do §7 vira fatias; a ordem é impacto visível por custo. 
 - [x] **R4.8 Tema por bioma, tema de Warden, stingers.**
 - [x] **R4.9 Interpolação de render, rochas instanciadas, presets automáticos por fps.**
 
+## Rodada 5 (18/10, madrugada) — conteúdo e cinema, ainda sem veredito dele
+
+Norte 2 tem primeira versão de tudo; esta rodada engorda o jogo onde um jogador sente falta aos 5 minutos:
+variedade de evento, de carta e de chefe, e um começo/fim de run com peso. Tudo proposta; ele reverte jogando.
+
+- [x] **R5.1 Cinema.** Intro de 3 s (câmera desce do Anel até a nave, cartão "LAYER 1 — THE OUTER RING", pulável) e
+      epílogo da vitória (câmera recua, o Anel acende).
+- [x] **R5.2 Heralds.** Mini-chefes nas camadas 3, 8 e 13, uma mecânica cada (Dust: muros de rocha; Heat: torna rochas
+      voláteis; Silence: embaralha o radar), intro curta, drop garantido.
+- [x] **R5.3 Eventos de campo** na tabela de camadas: Gravity Well (fagulhas puxadas a um ponto), Solar Flare (flash
+      do bioma, inimigos atordoados 1 s), Sensor Jam (radar fora 10 s); banner e cue.
+- [x] **R5.4 Catálogo 21 → 34.** Duas cartas novas por família + três "cursed" raras (ganho grande com custo).
+- [x] **R5.5 Warm-up de shaders** na tela de loading (compila todos os materiais, inclusive os gêmeos do dissolve);
+      barra de progresso real.
+- [x] **R5.6 Conquistas locais** numa aba do Códice (12, com toast na hora).
+
+**Regra dele (18/10, ~04h30): _"além de aumentar conteúdo tem que melhorar tudo em relação a qualidade gráfica e
+efeitos e câmera, jogabilidade, etc. UX melhor a cada rodada."_** Toda rodada tem dois eixos: conteúdo (acima) e
+**qualidade** (abaixo); nenhuma rodada fecha só com conteúdo.
+
+- [x] **R5.7 Câmera 2.0.** Antecipação para onde a mira aponta, zoom por densidade de ameaça (afasta com muitos
+      inimigos, aproxima no 1×1), enquadramento de chefe (nave e Warden sempre no quadro), rolagem sutil no strafe,
+      transição suave entre modos; `?camera=1` mantém a atual para A/B.
+- [x] **R5.8 Passe gráfico.** Vinheta + grão leve no passe de impacto, luz de borda (rim) nos cascos, estrelas que
+      cintilam, partículas suaves (fade por profundidade), escudo hexagonal em 3D, marcas de queimadura (decals)
+      nas rochas atingidas, poeira volumétrica no bioma.
+- [x] **R5.10 Espaço procedural (veredito dele, 18/10).** O fundo lê como textura de estrelas e as sombras no "chão"
+      não fazem sentido no espaço. Trocar `dustFloor`/`fieldBackdrop` por: 3–4 camadas de estrelas em pontos 3D a
+      profundidades diferentes (paralaxe real com a câmera, cintilação), nebulosa em shader (fbm) num plano distante,
+      poeira volumétrica esparsa; **sem chão e sem sombras num plano de fundo**; sombras reais só entre objetos 3D
+      (shadow map da luz-chave: rochas sobre rochas, nave sobre rocha; presets alto/ultra); a luz da nave ilumina rochas e poeira.
+- [x] **R5.11 Torreta (veredito dele, 18/10).** O casco vira sozinho para a mira e o WASD "puxa" para onde atira.
+      Separar: casco aponta para a direção do movimento (WASD relativo à tela, suavizado, inclina nas curvas);
+      a arma é uma **torreta** no casco que gira sozinha para o alvo (malha visível em 3D e 2D, tiro sai dela,
+      linha de mira a partir da torreta); `?controls=classic` continua girar + empurrar.
+- [x] **R5.9 Sensação e UX.** Nave inclina no strafe (banking), recuo no tiro, knockback nos inimigos atingidos,
+      i-frames do dash visíveis; menu com a nave 3D em destaque e presets de qualidade visíveis; pausa/settings com
+      o mesmo design das cartas; transição das cartas no level-up; números de dano com peso por tamanho.
+
 ## Fora de escopo deste plano
 
 Steam, mobile/touch, multiplayer, narrativa, reescrita do gameplay em WebGL (ver decisão 1), troca do framework de

@@ -8,13 +8,17 @@ export const SHIP_ROTATION_SPEED = 8; // rad/s
 export const SHIP_ANGULAR_DAMPING = 6.2; // s^-1
 export const SHIP_MASS = 60;
 
-// === MODERN CONTROLS === (NORTE §4b) PROPOSAL 17/10 ("proposta 17/10"), judged by playing.
-// W/S thrust along the nose, A/D strafe; the nose faces the aim point or the motion.
-export const SHIP_STRAFE_ACCELERATION_RATIO = 0.85; // strafe thrust / forward thrust
-export const SHIP_AIM_TURN_RATE = 10; // rad/s cap turning onto the auto-aim point
-export const SHIP_MOVE_TURN_RATE = 6; // rad/s cap turning onto the velocity (no target)
+// === MODERN CONTROLS === (NORTE §4b) PROPOSAL 18/10 ("proposta 18/10"), judged by playing.
+// WASD moves on the screen axes; the hull faces the motion; a turret aims.
+export const MODERN_MOVE_ACCEL = 1; // × ship acceleration along the WASD direction
+export const SHIP_HEADING_TURN_RATE = 10; // rad/s cap turning onto the WASD direction
+export const SHIP_MOVE_TURN_RATE = 6; // rad/s cap turning onto the velocity (no input)
 export const SHIP_FACE_VELOCITY_MIN_SPEED = 20; // px/s; slower than this, hold heading
 export const SHIP_FACING_RESPONSE = 14; // s^-1 exponential approach (no overshoot)
+export const TURRET_TURN_RATE = 14; // rad/s cap turning onto the aim point
+export const TURRET_RESPONSE = 30; // s^-1 exponential approach (no overshoot)
+export const TURRET_PIVOT_X = 2.5; // px ahead of the hull centre, behind the cockpit
+export const TURRET_BARREL_LENGTH = 9; // px from the pivot to the muzzle
 
 // === ASTEROID SPEEDS ===
 export const ASTEROID_SPEEDS = Object.freeze({

@@ -35,6 +35,10 @@ import RandomService from '../../../core/RandomService.js';
 
 // docs/NORTE.md §2: a white flash on any damage. PROPOSAL 17/10 (was none).
 export const HIT_FLASH_SECONDS = 0.06;
+// Bigger hits hold the flash longer: × damage / reference, up to the cap
+// (PLAN.md R5.9, proposta 18/10).
+export const HIT_FLASH_REFERENCE_DAMAGE = 20;
+export const HIT_FLASH_MAX_STRETCH = 2.5;
 
 let fallbackEnemyIdSequence = 0;
 
@@ -70,6 +74,8 @@ export class BaseEnemy {
     this.health = 100;
     this.maxHealth = 100;
     this.armor = 0;
+    // Seconds left frozen (Solar Flare): EnemyUpdateSystem skips the update.
+    this.stunTimer = 0;
 
     // Lifecycle
     this.age = 0; // Time since spawn
@@ -81,6 +87,7 @@ export class BaseEnemy {
     this.rotationSpeed = 0;
     this.visible = true;
     this.lastHitTime = -Infinity; // performance.now() of the last damage taken
+    this.hitFlashSeconds = HIT_FLASH_SECONDS;
 
     // Components (to be set by subclasses)
     this.components = new Map();
@@ -116,6 +123,7 @@ export class BaseEnemy {
     this.initialized = true;
     this.age = 0;
     this.lastHitTime = -Infinity;
+    this.stunTimer = 0;
 
     // Rotation
     this.rotation = config.rotation || 0;
@@ -220,7 +228,7 @@ export class BaseEnemy {
     if (healthComponent && typeof healthComponent.takeDamage === 'function') {
       const before = this.health;
       healthComponent.takeDamage(this, amount, source);
-      if (this.health < before) this.markHit();
+      if (this.health < before) this.markHit(before - this.health);
       return this.health <= 0;
     }
 
@@ -228,7 +236,7 @@ export class BaseEnemy {
     const actualDamage = Math.max(0, amount - this.armor);
 
     this.health -= actualDamage;
-    if (actualDamage > 0) this.markHit();
+    if (actualDamage > 0) this.markHit(actualDamage);
 
     // Hook for damage reactions
     this.onDamaged(actualDamage, source);
@@ -242,8 +250,14 @@ export class BaseEnemy {
     return false;
   }
 
-  markHit() {
+  markHit(damage = 0) {
     this.lastHitTime = performance.now();
+    this.hitFlashSeconds =
+      HIT_FLASH_SECONDS *
+      Math.min(
+        HIT_FLASH_MAX_STRETCH,
+        Math.max(1, damage / HIT_FLASH_REFERENCE_DAMAGE)
+      );
   }
 
   /**
@@ -262,7 +276,7 @@ export class BaseEnemy {
       );
     }
     const elapsed = (performance.now() - this.lastHitTime) / 1000;
-    return Math.min(1, Math.max(0, 1 - elapsed / HIT_FLASH_SECONDS));
+    return Math.min(1, Math.max(0, 1 - elapsed / this.hitFlashSeconds));
   }
 
   /**
@@ -422,6 +436,7 @@ export class BaseEnemy {
     this.health = 0;
     this.maxHealth = 100;
     this.armor = 0;
+    this.stunTimer = 0;
 
     // Reset lifecycle
     this.age = 0;

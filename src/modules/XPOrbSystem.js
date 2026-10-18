@@ -1007,14 +1007,16 @@ class XPOrbSystem extends BaseSystem {
 
   // Magnet pickup: every orb flies to the ship, faster each second; the
   // ship magnetism below collects them on arrival. `direction` -1 inverts it
-  // (Warden Null): every orb flies away from the ship.
-  startGlobalPull(duration, speed, acceleration, direction = 1) {
+  // (Warden Null): every orb flies away from the ship. A `target` {x, y}
+  // (Gravity Well) pulls toward that world point instead of the ship.
+  startGlobalPull(duration, speed, acceleration, direction = 1, target = null) {
     this.globalPull = {
       remaining: duration,
       elapsed: 0,
       speed,
       acceleration,
       direction,
+      target,
     };
   }
 
@@ -1022,7 +1024,7 @@ class XPOrbSystem extends BaseSystem {
     const pull = this.globalPull;
     pull.remaining -= deltaTime;
     pull.elapsed += deltaTime;
-    const target = this.cachedPlayer?.getPosition();
+    const target = pull.target || this.cachedPlayer?.getPosition();
     if (pull.remaining <= 0 || !target) {
       this.globalPull = null;
       return;

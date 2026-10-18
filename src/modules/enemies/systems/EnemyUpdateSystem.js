@@ -539,6 +539,11 @@ export class EnemyUpdateSystem {
       if (!enemy || enemy.destroyed || enemy.type === 'asteroid') {
         continue;
       }
+      // Stunned (Solar Flare): frozen in place, no AI, no fire.
+      if (enemy.stunTimer > 0) {
+        enemy.stunTimer -= deltaTime;
+        continue;
+      }
 
       const shouldUseComponents =
         useComponents &&

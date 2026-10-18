@@ -342,4 +342,136 @@ export const DEFENSE_UPGRADES = deepFreeze([
       },
     ],
   },
+  // Cards from R5.4 (numbers: proposta 18/10, for the owner to judge by playing).
+  {
+    id: 'static_shell',
+    category: 'defense',
+    family: 'arc',
+    rarity: 'common',
+    icon: '⚡',
+    themeColor: PALETTE.status,
+    unlockLevel: 1,
+    tags: ['retaliation', 'hull'],
+    text: {
+      name: 'Static Shell',
+      summary:
+        'Charges the hull plating: whatever hits you gets the current back.',
+      lore: 'A Warden trick. Their hulls bit back, and now yours does too.',
+      levels: [
+        {
+          title: 'Live Plating',
+          description:
+            'Taking a hit discharges a 90 px arc: 20 damage to every enemy in reach.',
+          highlights: ['Shield hits count too.'],
+        },
+        {
+          title: 'Hot Plating',
+          description: 'The arc deals 40 damage.',
+          highlights: ['Another +20 per discharge.'],
+        },
+        {
+          title: 'Storm Plating',
+          description: 'The arc deals 60 damage.',
+          highlights: ['Getting hit becomes an attack.'],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-static-shell',
+            payload: { radius: 90, damage: 20 },
+          },
+        ],
+      },
+      {
+        rank: 2,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-static-shell',
+            payload: { radius: 90, damage: 40 },
+          },
+        ],
+      },
+      {
+        rank: 3,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-static-shell',
+            payload: { radius: 90, damage: 60 },
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'gravity_brake',
+    category: 'defense',
+    family: 'field',
+    rarity: 'common',
+    icon: '🌑',
+    themeColor: PALETTE.text,
+    unlockLevel: 2,
+    tags: ['control', 'slow'],
+    text: {
+      name: 'Gravity Brake',
+      summary:
+        'A short-range field that drags at anything flying close to the ship.',
+      lore: 'The Ring held its rocks in place with fields like this. A small one still works.',
+      levels: [
+        {
+          title: 'Drag Field',
+          description: 'Enemies within 120 px move 8% slower.',
+          highlights: ['Bosses are not slowed.'],
+        },
+        {
+          title: 'Deep Drag',
+          description: 'Enemies within 120 px move 16% slower.',
+          highlights: ['Another -8% speed in the field.'],
+        },
+        {
+          title: 'Still Point',
+          description: 'Enemies within 120 px move 24% slower.',
+          highlights: ['Close rocks crawl.'],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-gravity-brake',
+            payload: { radius: 120, slowFraction: 0.08 },
+          },
+        ],
+      },
+      {
+        rank: 2,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-gravity-brake',
+            payload: { radius: 120, slowFraction: 0.16 },
+          },
+        ],
+      },
+      {
+        rank: 3,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-gravity-brake',
+            payload: { radius: 120, slowFraction: 0.24 },
+          },
+        ],
+      },
+    ],
+  },
 ]);

@@ -14,16 +14,20 @@ import { getEmissive } from '../core/bloomLayer.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { BASE_MODIFIERS } from '../data/hangar.js';
 import {
+  MODERN_MOVE_ACCEL,
   SHIP_ACCELERATION,
-  SHIP_AIM_TURN_RATE,
   SHIP_ANGULAR_DAMPING,
   SHIP_FACE_VELOCITY_MIN_SPEED,
   SHIP_FACING_RESPONSE,
+  SHIP_HEADING_TURN_RATE,
   SHIP_LINEAR_DAMPING,
   SHIP_MAX_SPEED,
   SHIP_MOVE_TURN_RATE,
   SHIP_ROTATION_SPEED,
-  SHIP_STRAFE_ACCELERATION_RATIO,
+  TURRET_BARREL_LENGTH,
+  TURRET_PIVOT_X,
+  TURRET_RESPONSE,
+  TURRET_TURN_RATE,
 } from '../data/constants/physics.js';
 import {
   DASH_COOLDOWN,
@@ -37,6 +41,7 @@ import {
   SHIELD_COOLDOWN_DURATION,
   SHIELD_IMPACT_DAMAGE_BASE,
   SHIELD_IMPACT_DAMAGE_PER_LEVEL,
+  SHOT_RECOIL_IMPULSE,
 } from '../data/constants/gameplay.js';
 
 const DRIFT_SETTINGS = {
@@ -112,7 +117,8 @@ const PREVIEW_THRUST = 0.35;
 const PREVIEW_ANGLE = -Math.PI / 2;
 const IDLE_THRUST = Object.freeze({ main: 0, aux: 0, sideL: 0, sideR: 0 });
 
-// 'modern' (NORTE §4b): W/S thrust, A/D strafe, nose on the aim point.
+// 'modern' (NORTE §4b): WASD moves on the screen axes, the hull faces the
+// motion and the turret aims on its own.
 // 'classic' (?controls=classic): A/D rotate, Asteroids-style.
 const controlSchemeFromUrl = () => {
   try {
@@ -387,6 +393,8 @@ class PlayerSystem extends BaseSystem {
     this.position = { x: startX, y: startY };
     this.velocity = { vx: 0, vy: 0 };
     this.angle = 0;
+    // Weapon heading: on the aim point in modern, the hull's in classic.
+    this.turretAngle = 0;
     this.targetAngle = 0; // Para rotação suave (futuro)
     this.angularVelocity = 0;
     this.driftFactor = 0;
@@ -421,6 +429,9 @@ class PlayerSystem extends BaseSystem {
     this.multishot = 1;
     this.magnetismRadius = MAGNETISM_RADIUS;
     this.dashCooldown = DASH_COOLDOWN;
+    this.dashAfterInvulnerability = 0;
+    this.hullDrain = null;
+    this.hullDrainTimer = 0;
     this.currentHull = null;
     this._currentHullMetrics = {
       outline: [],
@@ -698,10 +709,25 @@ class PlayerSystem extends BaseSystem {
       );
     });
 
+    // `bonus` adds hull and repairs it; `multiplier` (Glass Cannon) scales it.
     this.registerEventListener('upgrade-health-boost', (data) => {
-      this.maxHealth += data.bonus;
-      this.health = Math.min(this.health + data.bonus, this.maxHealth);
+      const bonus = data.bonus ?? 0;
+      this.maxHealth = Math.round(
+        (this.maxHealth + bonus) * (data.multiplier ?? 1)
+      );
+      this.health = Math.min(this.health + bonus, this.maxHealth);
       console.log('[PlayerSystem] Health boosted to', this.maxHealth);
+    });
+
+    // Phase Skin: invulnerability for `duration` s after a dash ends.
+    this.registerEventListener('upgrade-phase-skin', (data) => {
+      this.dashAfterInvulnerability = data.duration;
+    });
+
+    // Overclocked Core: the hull loses `amount` every `interval` s, never
+    // below `floorFraction` of max.
+    this.registerEventListener('upgrade-hull-drain', (data) => {
+      this.hullDrain = data;
     });
 
     this.registerEventListener('upgrade-multishot', (data) => {
@@ -740,6 +766,9 @@ class PlayerSystem extends BaseSystem {
           const recoilStrength = 2.5; // pixels
           this.recoilOffset.x = -(dx / distance) * recoilStrength;
           this.recoilOffset.y = -(dy / distance) * recoilStrength;
+          // ...and a small kick to the hull, the same path as the dash.
+          this.velocity.vx -= (dx / distance) * SHOT_RECOIL_IMPULSE;
+          this.velocity.vy -= (dy / distance) * SHOT_RECOIL_IMPULSE;
         }
       }
     });
@@ -958,6 +987,7 @@ class PlayerSystem extends BaseSystem {
     this.updateMovement(deltaTime, movement);
     this.updatePosition(deltaTime);
     this.updateDash(deltaTime);
+    this.updateHullDrain(deltaTime);
 
     // Update weapon recoil (decay over time)
     this.recoilOffset.x *= this.recoilDecay;
@@ -998,18 +1028,13 @@ class PlayerSystem extends BaseSystem {
 
   /**
    * Classic: forward along the nose, or backward while only S/↓ is held.
-   * Modern: along the held input direction, else along the nose.
+   * Modern: along the held WASD direction, else along the nose.
    */
   startDash(movement) {
     const fwd = { x: Math.cos(this.angle), y: Math.sin(this.angle) };
     let direction;
     if (this.controlScheme === 'modern') {
-      const along = (movement.up ? 1 : 0) - (movement.down ? 1 : 0);
-      const side = (movement.right ? 1 : 0) - (movement.left ? 1 : 0);
-      const x = fwd.x * along - fwd.y * side;
-      const y = fwd.y * along + fwd.x * side;
-      const length = Math.hypot(x, y);
-      direction = length > 0 ? { x: x / length, y: y / length } : fwd;
+      direction = this.getModernMove(movement) || fwd;
     } else {
       const sign = movement.down && !movement.up ? -1 : 1;
       direction = { x: fwd.x * sign, y: fwd.y * sign };
@@ -1059,6 +1084,28 @@ class PlayerSystem extends BaseSystem {
     if (this.dashTimer > 0) {
       this.dashTimer = Math.max(0, this.dashTimer - deltaTime);
       this.dropDashGhosts();
+      if (this.dashTimer === 0) {
+        this.invulnerableTimer = Math.max(
+          this.invulnerableTimer,
+          this.dashAfterInvulnerability
+        );
+      }
+    }
+  }
+
+  updateHullDrain(deltaTime) {
+    if (!this.hullDrain) return;
+    const { amount, interval, floorFraction } = this.hullDrain;
+    this.hullDrainTimer += deltaTime;
+    while (this.hullDrainTimer >= interval) {
+      this.hullDrainTimer -= interval;
+      const floor = Math.ceil(this.maxHealth * floorFraction);
+      if (this.health <= floor) continue;
+      this.health = Math.max(floor, this.health - amount);
+      this.eventBus?.emit?.('player-health-changed', {
+        current: this.health,
+        max: this.maxHealth,
+      });
     }
   }
 
@@ -1105,20 +1152,30 @@ class PlayerSystem extends BaseSystem {
     // Ship's starboard (screen y points down).
     const right = { x: -fwd.y, y: fwd.x };
 
+    const move = modern ? this.getModernMove(input) : null;
+
     // Thruster intensities (lógica do original)
     let thrMain = input.up ? 1 : 0;
     let thrAux = input.down ? 1 : 0;
     // Classic: torque. Modern: sideL pushes to starboard, sideR to port.
     let thrSideR = input.left ? 1 : 0; // CCW torque
     let thrSideL = input.right ? 1 : 0; // CW torque
+    if (modern) {
+      // Main flame while moving (the hull turns onto the motion); side puffs
+      // on the part of the move off the nose.
+      const lateral = move ? move.x * right.x + move.y * right.y : 0;
+      thrMain = move ? 1 : 0;
+      thrAux = 0;
+      thrSideL = Math.max(0, lateral);
+      thrSideR = Math.max(0, -lateral);
+    }
 
     // Track if thrusters are manually controlled (for audio distinction)
-    const isMainManual = input.up;
-    const isAuxManual = input.down;
-    const isSideManual = modern && (input.left || input.right);
+    const isMainManual = modern ? Boolean(move) : input.up;
+    const isAuxManual = !modern && input.down;
 
     // Auto-brake quando não há input linear
-    const noLinearInput = !input.up && !input.down && !isSideManual;
+    const noLinearInput = modern ? !move : !input.up && !input.down;
     const speed = Math.hypot(this.velocity.vx, this.velocity.vy);
 
     if (noLinearInput) {
@@ -1147,7 +1204,7 @@ class PlayerSystem extends BaseSystem {
       if (proj > 0) thrAux = Math.max(thrAux, k);
       else if (proj < 0) thrMain = Math.max(thrMain, k);
       if (modern) {
-        // The nose follows the target, not the motion: brake drift too.
+        // Coasting with the nose off the motion: brake the drift too.
         const lateral = this.velocity.vx * right.x + this.velocity.vy * right.y;
         const kLateral =
           Math.max(
@@ -1160,19 +1217,30 @@ class PlayerSystem extends BaseSystem {
     }
 
     // Aplicar forças dos thrusters
-    if (thrMain > 0) {
-      this.velocity.vx += fwd.x * accelStep * thrMain;
-      this.velocity.vy += fwd.y * accelStep * thrMain;
-    }
-    if (thrAux > 0) {
-      this.velocity.vx -= fwd.x * accelStep * thrAux;
-      this.velocity.vy -= fwd.y * accelStep * thrAux;
-    }
-    if (modern) {
-      const strafeStep =
-        accelStep * SHIP_STRAFE_ACCELERATION_RATIO * this.strafeMultiplier;
-      this.velocity.vx += right.x * strafeStep * (thrSideL - thrSideR);
-      this.velocity.vy += right.y * strafeStep * (thrSideL - thrSideR);
+    if (move) {
+      // Along the WASD direction; the part off the nose (a sidestep) takes
+      // the RCS strafe upgrade.
+      const moveStep = accelStep * MODERN_MOVE_ACCEL;
+      const along = move.x * fwd.x + move.y * fwd.y;
+      const side =
+        (move.x * right.x + move.y * right.y) * this.strafeMultiplier;
+      this.velocity.vx += (fwd.x * along + right.x * side) * moveStep;
+      this.velocity.vy += (fwd.y * along + right.y * side) * moveStep;
+    } else {
+      if (thrMain > 0) {
+        this.velocity.vx += fwd.x * accelStep * thrMain;
+        this.velocity.vy += fwd.y * accelStep * thrMain;
+      }
+      if (thrAux > 0) {
+        this.velocity.vx -= fwd.x * accelStep * thrAux;
+        this.velocity.vy -= fwd.y * accelStep * thrAux;
+      }
+      if (modern) {
+        const strafeStep =
+          accelStep * MODERN_MOVE_ACCEL * this.strafeMultiplier;
+        this.velocity.vx += right.x * strafeStep * (thrSideL - thrSideR);
+        this.velocity.vy += right.y * strafeStep * (thrSideL - thrSideR);
+      }
     }
 
     // Amortecimento ambiente — FIX-02: split damping with conditional gate.
@@ -1181,7 +1249,7 @@ class PlayerSystem extends BaseSystem {
     // upgrade's "Paradas mais rápidas" intent without making active flight
     // sluggish. The auto-damping thrusters (above) still fire during coast;
     // brakingDamping is the additive component layered on top of base.
-    const noManualThrust = !isMainManual && !isAuxManual && !isSideManual;
+    const noManualThrust = !isMainManual && !isAuxManual;
     const effectiveDamping =
       this.baseLinearDamping + (noManualThrust ? this.brakingDamping : 0);
     // A dash carries its burst undamped, under a raised speed cap.
@@ -1205,7 +1273,7 @@ class PlayerSystem extends BaseSystem {
 
     // === MOVIMENTO ANGULAR ===
     if (modern) {
-      this.updateFacing(deltaTime);
+      this.updateFacing(deltaTime, move);
     } else {
       // Restaurando a lógica de aceleração e amortecimento angular do app.js original
       const rotationAccel = this.rotationSpeed * deltaTime;
@@ -1227,6 +1295,7 @@ class PlayerSystem extends BaseSystem {
         this.angle + this.angularVelocity * deltaTime
       );
     }
+    this.updateTurret(deltaTime);
 
     // === EFEITOS DE THRUSTER ===
     // Emitir eventos SEMPRE (não só na mudança) para manter visuais funcionando
@@ -1304,18 +1373,23 @@ class PlayerSystem extends BaseSystem {
     }
   }
 
-  // Modern scheme: nose onto the aim point, else onto the motion, else hold.
-  // Exponential approach under a rate cap, so it never overshoots. RCS
+  /** Modern WASD as a unit vector on the screen axes (W up), or null. */
+  getModernMove(input) {
+    const x = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    const y = (input.down ? 1 : 0) - (input.up ? 1 : 0);
+    const length = Math.hypot(x, y);
+    return length > 0 ? { x: x / length, y: y / length } : null;
+  }
+
+  // Modern scheme: nose onto the WASD direction, else onto the motion, else
+  // hold. Exponential approach under a rate cap, so it never overshoots. RCS
   // rotation upgrades raise the cap.
-  updateFacing(deltaTime) {
+  updateFacing(deltaTime, move) {
     let heading = null;
     let rate = 0;
-    if (this.aimPoint) {
-      heading = Math.atan2(
-        this.aimPoint.y - this.position.y,
-        this.aimPoint.x - this.position.x
-      );
-      rate = SHIP_AIM_TURN_RATE;
+    if (move) {
+      heading = Math.atan2(move.y, move.x);
+      rate = SHIP_HEADING_TURN_RATE;
     } else if (
       Math.hypot(this.velocity.vx, this.velocity.vy) >
       SHIP_FACE_VELOCITY_MIN_SPEED
@@ -1339,6 +1413,26 @@ class PlayerSystem extends BaseSystem {
     );
     this.angle = this.wrapAngle(this.angle + step);
     this.angularVelocity = step / deltaTime;
+  }
+
+  // Modern: the turret turns onto the aim point (CombatSystem's lead point)
+  // on its own, and back onto the nose without one. Classic: it is the nose.
+  updateTurret(deltaTime) {
+    if (this.controlScheme !== 'modern') {
+      this.turretAngle = this.angle;
+      return;
+    }
+    const pivot = this.getTurretPivot();
+    const goal = this.aimPoint
+      ? Math.atan2(this.aimPoint.y - pivot.y, this.aimPoint.x - pivot.x)
+      : this.angle;
+    const maxStep = TURRET_TURN_RATE * deltaTime;
+    const error = this.wrapAngle(goal - this.turretAngle);
+    const step = Math.max(
+      -maxStep,
+      Math.min(maxStep, error * (1 - Math.exp(-TURRET_RESPONSE * deltaTime)))
+    );
+    this.turretAngle = this.wrapAngle(this.turretAngle + step);
   }
 
   /** CombatSystem's aim point for this step, or null without a lock. */
@@ -1739,23 +1833,21 @@ class PlayerSystem extends BaseSystem {
     return this.getHullBoundingRadius() + this.getShieldPadding();
   }
 
-  /**
-   * Returns the world-coordinate position of the ship nose for a given rotation.
-   *
-   * Used by manual-aim mode (plan 01.07 Task 6) so shots leave from the nose in
-   * the ship's current rotation direction. The math is intentionally simple:
-   * `{x: pos.x + cos(rotation) * radius, y: pos.y + sin(rotation) * radius}`.
-   *
-   * @param {number} rotation - Ship rotation in radians.
-   * @returns {{x: number, y: number}}
-   */
-  getNosePosition(rotation) {
-    const angle = Number.isFinite(rotation) ? rotation : 0;
-    const radius = this.getHullBoundingRadius();
-    const position = this.getPosition();
+  getTurretAngle() {
+    return this.turretAngle;
+  }
+
+  /** World point the turret turns on, on the hull's centreline. */
+  getTurretPivot() {
+    return this.getLocalToWorld(TURRET_PIVOT_X, 0);
+  }
+
+  /** World point lances and the beam leave from: the turret's barrel tip. */
+  getMuzzlePoint() {
+    const pivot = this.getTurretPivot();
     return {
-      x: position.x + Math.cos(angle) * radius,
-      y: position.y + Math.sin(angle) * radius,
+      x: pivot.x + Math.cos(this.turretAngle) * TURRET_BARREL_LENGTH,
+      y: pivot.y + Math.sin(this.turretAngle) * TURRET_BARREL_LENGTH,
     };
   }
 
@@ -1850,7 +1942,36 @@ class PlayerSystem extends BaseSystem {
       thrust,
       emissive: getEmissive(),
     });
+    if (this.controlScheme === 'modern') this.renderTurret(ctx);
 
+    ctx.restore();
+  }
+
+  // Dorsal turret in hull-local space: a round base, twin barrels out to
+  // the muzzle and an amber lens, turned to the turret's own heading.
+  renderTurret(ctx) {
+    ctx.save();
+    ctx.translate(TURRET_PIVOT_X, 0);
+    ctx.rotate(this.turretAngle - this.angle);
+    ctx.fillStyle = PALETTE.neutral;
+    ctx.fillRect(1, -2, TURRET_BARREL_LENGTH - 1, 1.4);
+    ctx.fillRect(1, 0.6, TURRET_BARREL_LENGTH - 1, 1.4);
+    ctx.beginPath();
+    ctx.arc(0, 0, 3, 0, Math.PI * 2);
+    ctx.fillStyle = PALETTE.hull;
+    ctx.fill();
+    ctx.lineWidth = LINE.hair;
+    ctx.strokeStyle = withAlpha(PALETTE.player, 0.8);
+    ctx.stroke();
+    const emissive = beginEmissive(getEmissive(), ctx);
+    [ctx, emissive].forEach((target) => {
+      if (!target) return;
+      target.fillStyle = PALETTE.shot;
+      target.beginPath();
+      target.arc(1.6, 0, 1, 0, Math.PI * 2);
+      target.fill();
+    });
+    emissive?.restore();
     ctx.restore();
   }
 
@@ -1970,6 +2091,9 @@ class PlayerSystem extends BaseSystem {
     this.multishot = 1;
     this.magnetismRadius = MAGNETISM_RADIUS * hangar.pickupRadiusMultiplier;
     this.dashCooldown = DASH_COOLDOWN * hangar.dashCooldownMultiplier;
+    this.dashAfterInvulnerability = 0;
+    this.hullDrain = null;
+    this.hullDrainTimer = 0;
     this.maxSpeed = SHIP_MAX_SPEED;
     this.acceleration = SHIP_ACCELERATION;
     this.rotationSpeed = SHIP_ROTATION_SPEED;
@@ -2004,6 +2128,7 @@ class PlayerSystem extends BaseSystem {
     };
     this.velocity = { vx: 0, vy: 0 };
     this.angle = 0;
+    this.turretAngle = 0;
     this.angularVelocity = 0;
     this.aimPoint = null;
     this.driftFactor = 0;
@@ -2089,6 +2214,7 @@ class PlayerSystem extends BaseSystem {
     this.velocity.vx = 0;
     this.velocity.vy = 0;
     this.angularVelocity = 0;
+    this.turretAngle = this.angle;
     this.aimPoint = null;
     this.driftFactor = 0;
     this.resetDashState();

@@ -46,6 +46,15 @@ describe('PlayerMirror', () => {
     expect(amber.r).toBeGreaterThan(amber.b);
   });
 
+  it('rim-lights the hull materials and carries no flat shield ring', () => {
+    const { mirror } = mirrorFor(defaultHull);
+    [mirror.baseMaterial, mirror.finMaterial, mirror.spineMaterial].forEach(
+      (material) => expect(material.userData.rimBase).toBeDefined()
+    );
+    expect(mirror.shield).toBeUndefined();
+    expect(mirror.shieldRadius).toBeGreaterThan(0);
+  });
+
   it('lights the side puff on the strafing flank only', () => {
     const { player, mirror } = mirrorFor(defaultHull);
     player.thrusterVisual.sideL = 1;
@@ -53,5 +62,54 @@ describe('PlayerMirror', () => {
     mirror.update(player, ribbons, 0);
     const shown = mirror.puffs.filter(({ puff }) => puff.visible);
     expect(shown.map(({ left }) => left)).toEqual([true]);
+  });
+
+  it('banks into a held strafe up to 22°, then relaxes level', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    player.controlScheme = 'modern';
+    player.angularVelocity = 0;
+    player.lastThrusterState.sideL = 1;
+    let time = 0;
+    for (let i = 0; i < 120; i += 1) {
+      time += 1 / 60;
+      mirror.update(player, ribbons, time);
+    }
+    expect(mirror.group.rotation.x).toBeCloseTo((22 * Math.PI) / 180, 3);
+
+    player.lastThrusterState.sideL = 0;
+    for (let i = 0; i < 120; i += 1) {
+      time += 1 / 60;
+      mirror.update(player, ribbons, time);
+    }
+    expect(Math.abs(mirror.group.rotation.x)).toBeLessThan(1e-3);
+  });
+
+  it('banks only on the yaw rate in classic controls', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    player.controlScheme = 'classic';
+    player.lastThrusterState.sideL = 1;
+    player.angularVelocity = -100;
+    let time = 0;
+    for (let i = 0; i < 120; i += 1) {
+      time += 1 / 60;
+      mirror.update(player, ribbons, time);
+    }
+    expect(mirror.group.rotation.x).toBeCloseTo((-8 * Math.PI) / 180, 3);
+  });
+
+  it('shows the dash ring and a brighter rim only through dash i-frames', () => {
+    const { player, mirror } = mirrorFor(defaultHull);
+    const rim = mirror.rim.r + mirror.rim.g + mirror.rim.b;
+    player.dashTimer = 0.1;
+    player.invulnerableTimer = 0.2;
+    mirror.update(player, ribbons, 0.1);
+    expect(mirror.dashRing.visible).toBe(true);
+    expect(mirror.rim.r + mirror.rim.g + mirror.rim.b).toBeGreaterThan(rim);
+
+    player.dashTimer = 0;
+    player.invulnerableTimer = 0;
+    mirror.update(player, ribbons, 0.2);
+    expect(mirror.dashRing.visible).toBe(false);
+    expect(mirror.rim.r + mirror.rim.g + mirror.rim.b).toBeCloseTo(rim, 6);
   });
 });

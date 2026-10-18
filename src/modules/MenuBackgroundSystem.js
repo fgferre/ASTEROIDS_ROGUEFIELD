@@ -6,6 +6,7 @@ import RandomService from '../core/RandomService.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { createRandomHelpers } from '../utils/randomHelpers.js';
 import { AsteroidImpactEffect } from './AsteroidImpactEffect.js';
+import { MenuHullPreview } from './MenuHullPreview.js';
 import { IS_DEV } from '../core/env.js';
 import {
   createAsteroidGeometry,
@@ -927,6 +928,11 @@ class MenuBackgroundSystem extends BaseSystem {
 
     // Quick setup (non-blocking)
     this.createLighting();
+    // The chosen hull, framed into the menu's stage box (camera children
+    // only render with the camera in the scene).
+    this.scene.add(this.camera);
+    this.hullPreview = new MenuHullPreview(THREE, this.camera);
+    this.hullStage = document.getElementById('menu-hull-stage');
     this.createStarLayers();
     this.createAtmosphere();
     this.setupPostProcessing();
@@ -2019,6 +2025,8 @@ class MenuBackgroundSystem extends BaseSystem {
             return;
           }
 
+          this.syncHullPreview();
+
           if (change.type === 'snapshot') {
             const snapshotValue =
               change.value?.video?.menuAsteroidNormalIntensity;
@@ -2054,6 +2062,19 @@ class MenuBackgroundSystem extends BaseSystem {
         error
       );
     }
+  }
+
+  // The selected hull (if the Hangar has unlocked it) and reduced motion.
+  syncHullPreview() {
+    const settings = this.getSettingsService();
+    const hull = settings.getCategoryValues('gameplay')?.selectedHull;
+    // New meshes draw Three's UUIDs: from the seeded stream.
+    this.withSeededMathRandom(() =>
+      this.hullPreview.setHull(this.getService('hangar').hullFor(hull))
+    );
+    this.hullReducedMotion =
+      Boolean(settings.getCategoryValues('accessibility')?.reducedMotion) ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   }
 
   handleVideoSettingsChanged(event = {}) {
@@ -3605,6 +3626,8 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
 
     this.camera.lookAt(0, 0, 0);
 
+    this.hullPreview.update(delta, this.hullStage, this.hullReducedMotion);
+
     // Update Atmosphere
     if (this.nebulas) {
       this.nebulas.forEach((neb) => {
@@ -3682,6 +3705,8 @@ void sampleAsteroid( vec3 objPos, vec3 objNorm, out vec3 albedo, out float bumpH
     }
 
     this.isActive = true;
+    // A Hangar purchase may have unlocked the selected hull.
+    this.syncHullPreview();
     if (this.clock) {
       this.clock.start();
       this.clock.getDelta();

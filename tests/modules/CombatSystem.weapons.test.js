@@ -58,12 +58,8 @@ function makeCombat(enemyList = [], options = {}) {
   const player = {
     isDead: false,
     getPosition: () => ({ x: 100, y: 300 }),
-    getAngle: () => 0,
-    getRotation: () => 0,
-    getNosePosition: (angle) => ({
-      x: 100 + Math.cos(angle) * NOSE,
-      y: 300 + Math.sin(angle) * NOSE,
-    }),
+    getTurretAngle: () => 0,
+    getMuzzlePoint: () => ({ x: 100 + NOSE, y: 300 }),
     getStats: () => ({ multishot: 1, damage: DAMAGE }),
   };
   const enemies = options.enemies || makeEnemies(enemyList);
@@ -245,7 +241,8 @@ describe('weapon evolutions', () => {
     const target = makeEnemy('t', 0, 0, { vx: 100 });
     const { combat, eventBus } = makeCombat([target]);
     eventBus.emit('synergy-unlocked', { family: 'field' });
-    combat.processBulletHit(lance(), target, combat.cachedEnemies);
+    // A directionless hit: no knockback, so this measures the slow alone.
+    combat.processBulletHit(lance({ vx: 0 }), target, combat.cachedEnemies);
 
     const step = (dt) => {
       target.x += target.vx * dt; // the enemy's own movement

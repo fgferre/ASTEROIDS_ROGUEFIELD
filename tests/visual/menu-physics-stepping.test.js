@@ -40,6 +40,7 @@ describe('F4: Menu physics stepping', () => {
       system.hasProceduralAsteroids = false;
       system.customFX = null;
       system.composer = { render: vi.fn() };
+      system.hullPreview = { update: vi.fn() };
       system.camera = {
         position: { x: 0, y: 0, z: 0 },
         lookAt: vi.fn(),

@@ -34,29 +34,55 @@ describe('PlayerSystem control schemes', () => {
     for (let i = 0; i < count; i += 1) player.update(DELTA_TIME);
   };
 
-  it('A strafes to port relative to the facing, without turning', () => {
-    const player = makePlayer({ left: true });
-    player.angle = -Math.PI / 2; // nose up the screen: port is -x
-    player.setAimPoint({ x: 400, y: -1e6 });
-    steps(player, 30);
-
-    expect(player.velocity.vx).toBeLessThan(-50);
-    expect(Math.abs(player.velocity.vy)).toBeLessThan(1);
-    expect(player.angle).toBeCloseTo(-Math.PI / 2, 2);
-  });
-
-  it('turns the nose onto the aim point without overshooting', () => {
-    const player = makePlayer();
-    player.angle = 0;
-    player.setAimPoint({ x: 400, y: 600 }); // straight down: +PI/2
-    let maxAngle = 0;
+  it('WASD moves on the screen axes and the hull turns onto the motion, not the aim', () => {
+    const player = makePlayer({ right: true });
+    player.angle = -Math.PI / 2; // nose up the screen
+    player.setAimPoint({ x: 400, y: -1e6 }); // target straight up
+    let maxAngle = -Math.PI / 2;
     for (let i = 0; i < 60; i += 1) {
       player.update(DELTA_TIME);
       maxAngle = Math.max(maxAngle, player.angle);
     }
 
-    expect(player.angle).toBeCloseTo(Math.PI / 2, 2);
-    expect(maxAngle).toBeLessThanOrEqual(Math.PI / 2 + 1e-9);
+    expect(player.velocity.vx).toBeGreaterThan(50);
+    expect(Math.abs(player.velocity.vy)).toBeLessThan(5);
+    expect(player.angle).toBeCloseTo(0, 2);
+    expect(maxAngle).toBeLessThanOrEqual(1e-9);
+  });
+
+  it('W moves up the screen whatever the hull heading', () => {
+    const player = makePlayer({ up: true });
+    player.angle = 0;
+    steps(player, 30);
+
+    expect(player.velocity.vy).toBeLessThan(-50);
+    expect(Math.abs(player.velocity.vx)).toBeLessThan(20);
+    expect(player.angle).toBeCloseTo(-Math.PI / 2, 2);
+  });
+
+  it('the turret turns onto the aim point on its own, and the muzzle follows it', () => {
+    const player = makePlayer({ right: true });
+    player.angle = 0;
+    player.setAimPoint({ x: 400, y: -1e6 }); // straight up: -PI/2
+    player.update(DELTA_TIME);
+    expect(player.getTurretAngle()).toBeGreaterThan(-Math.PI / 2 + 0.1);
+    steps(player, 20);
+
+    expect(player.getTurretAngle()).toBeCloseTo(-Math.PI / 2, 2);
+    expect(player.angle).toBeCloseTo(0, 2);
+    const pivot = player.getTurretPivot();
+    const muzzle = player.getMuzzlePoint();
+    expect(muzzle.x).toBeCloseTo(pivot.x, 1);
+    expect(muzzle.y).toBeLessThan(pivot.y);
+  });
+
+  it('without a lock the turret settles back onto the nose', () => {
+    const player = makePlayer();
+    player.angle = 0.5;
+    player.turretAngle = -1.5;
+    steps(player, 30);
+
+    expect(player.getTurretAngle()).toBeCloseTo(0.5, 2);
   });
 
   it('classic still rotates on A/D instead of strafing', () => {
@@ -66,5 +92,6 @@ describe('PlayerSystem control schemes', () => {
 
     expect(player.angle).toBeGreaterThan(0.3);
     expect(Math.hypot(player.velocity.vx, player.velocity.vy)).toBeLessThan(1);
+    expect(player.getTurretAngle()).toBe(player.angle);
   });
 });

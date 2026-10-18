@@ -32,7 +32,7 @@ export function onboardingPrompts(keys, scheme = 'modern') {
         }
       : {
           keys: [keys.moveUp, keys.moveLeft, keys.moveDown, keys.moveRight],
-          text: 'Thrust and strafe. Your guns aim and fire on their own.',
+          text: 'Move with WASD. The turret aims and fires on its own.',
         };
   return {
     move,

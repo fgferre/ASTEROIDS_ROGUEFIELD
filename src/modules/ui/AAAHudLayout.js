@@ -3,10 +3,14 @@
 import { ENEMY_TYPES, BOSS_CONFIG } from '../../data/constants/visual.js';
 import { WEAPONS } from '../../data/weapons.js';
 import { UPGRADE_FAMILIES } from '../../data/upgrades/families.js';
+import RandomService from '../../core/RandomService.js';
 
 const COMBO_VISIBLE_MIN = 2;
 const RADAR_SIZE = 220;
 const RADAR_POOL_SIZE = 80;
+// Sensor Jam: noise dots on the radar, re-rolled every RADAR_NOISE_MS.
+const RADAR_NOISE_DOTS = 28;
+const RADAR_NOISE_MS = 90;
 const BOSS_FALLBACK_COLOR = '#ff003c';
 const BOSS_FALLBACK_DARK = '#880020';
 const LAYER_BANNER_MS = 1200;
@@ -49,6 +53,9 @@ export class AAAHudLayout {
     this._lastDashFraction = null;
     this._lastComboTier = 'text';
     this._blipPool = [];
+    this._radarJammed = false;
+    this._radarNoise = new RandomService('radar-jam');
+    this._radarNoiseAt = -Infinity;
     this._timers = new Set();
     this._bannerTimer = null;
     this._bannerEndsAt = 0;
@@ -138,6 +145,7 @@ export class AAAHudLayout {
     this._lastDashFraction = null;
     this._lastComboTier = 'text';
     this._blipPool = [];
+    this._radarJammed = false;
     this._timers.forEach((id) => window.clearTimeout(id));
     this._timers.clear();
     this._bannerTimer = null;
@@ -191,9 +199,22 @@ export class AAAHudLayout {
     this._showBanner('SURGE', { tone: 'surge', subtitle: label });
   }
 
+  /** Amber "EVENT" banner with the field event's label underneath. */
+  showFieldEventBanner(label) {
+    this._showBanner('EVENT', { tone: 'event', subtitle: label });
+  }
+
+  /** Violet "HERALD OF …" banner with the Herald's line underneath. */
+  showHeraldBanner(name, subtitle) {
+    this._showBanner(String(name).toUpperCase(), {
+      tone: 'herald',
+      subtitle,
+    });
+  }
+
   /**
    * The centered banner, shown for `durationMs`, the last FADE_OUT_MS
-   * fading. `tone` 'boss' or 'surge' recolours it.
+   * fading. `tone` 'boss', 'surge', 'event' or 'herald' recolours it.
    */
   _showBanner(
     title,
@@ -217,6 +238,8 @@ export class AAAHudLayout {
       this.els.layerBannerSub.textContent = subtitle;
       banner.classList.toggle('is-boss', tone === 'boss');
       banner.classList.toggle('is-surge', tone === 'surge');
+      banner.classList.toggle('is-event', tone === 'event');
+      banner.classList.toggle('is-herald', tone === 'herald');
       banner.classList.remove('is-leaving');
       this._replay(banner, 'is-showing');
       this._bannerTimer = this._later(() => {
@@ -227,6 +250,21 @@ export class AAAHudLayout {
         }, FADE_OUT_MS);
       }, durationMs - FADE_OUT_MS);
     }, delayMs);
+  }
+
+  /** Drops the layer/surge banner, shown or pending (a cinematic owns it). */
+  cancelBanner() {
+    if (this._bannerTimer) {
+      this._cancel(this._bannerTimer);
+      this._bannerTimer = null;
+    }
+    this._bannerEndsAt = 0;
+    this.els?.layerBanner?.classList.remove('is-showing', 'is-leaving');
+  }
+
+  /** The "press any key to skip" line under a cinematic. */
+  showCinematicHint(show) {
+    this.els?.cinematicHint?.classList.toggle('is-showing', Boolean(show));
   }
 
   /** Keeps the boss bar hidden for `ms` (the boss intro owns the moment). */
@@ -386,6 +424,13 @@ export class AAAHudLayout {
     });
   }
 
+  /** Gold feed row announcing an achievement the moment it unlocks. */
+  addAchievementFeed(title) {
+    this._pushFeed(`achievement:${title}`, 'achievement', (row) => {
+      row.label.textContent = `ACHIEVEMENT — ${title}`;
+    });
+  }
+
   _pushFeed(key, tone, render) {
     const container = this.els?.feed;
     if (!container) {
@@ -462,6 +507,7 @@ export class AAAHudLayout {
       bossName: query('#ui-boss-name'),
       bossFill: query('#ui-boss-fill'),
       bossMarkers: query('#ui-boss-markers'),
+      radar: query('#ui-radar'),
       radarContainer: query('#ui-radar-blips'),
       shieldRow: query('#ui-shield-row'),
       shieldText: query('#ui-shield-text'),
@@ -487,6 +533,7 @@ export class AAAHudLayout {
       layerBanner: query('#ui-layer-banner'),
       layerBannerTitle: query('#ui-layer-banner-title'),
       layerBannerSub: query('#ui-layer-banner-sub'),
+      cinematicHint: query('#ui-cinematic-hint'),
       bossIntro: query('#ui-boss-intro'),
       bossIntroName: query('#ui-boss-intro-name'),
       bossIntroSub: query('#ui-boss-intro-sub'),
@@ -981,7 +1028,19 @@ export class AAAHudLayout {
       return;
     }
 
-    const list = Array.isArray(blips) ? blips : [];
+    let list = Array.isArray(blips) ? blips : [];
+    if (this._radarJammed) {
+      const now = performance.now();
+      if (now - this._radarNoiseAt < RADAR_NOISE_MS) {
+        return;
+      }
+      this._radarNoiseAt = now;
+      list = Array.from({ length: RADAR_NOISE_DOTS }, () => ({
+        x: this._radarNoise.range(-0.85, 0.85),
+        y: this._radarNoise.range(-0.85, 0.85),
+        type: 'noise',
+      }));
+    }
     const count = Math.min(list.length, this._blipPool.length);
     for (let i = 0; i < this._blipPool.length; i += 1) {
       const el = this._blipPool[i];
@@ -1000,6 +1059,13 @@ export class AAAHudLayout {
       const y = ((b.y + 1) / 2) * RADAR_SIZE;
       el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -50%)`;
     }
+  }
+
+  /** Sensor Jam: noise instead of blips and a "NO SIGNAL" label while on. */
+  setRadarJammed(jammed) {
+    this._radarJammed = Boolean(jammed);
+    this._radarNoiseAt = -Infinity;
+    this.els?.radar?.classList.toggle('is-jammed', this._radarJammed);
   }
 
   _createBlipPool() {
@@ -1048,7 +1114,7 @@ export class AAAHudLayout {
 
             <!-- RADAR (Top Right - Decagon + Analog Ring) -->
             <div class="radar-area hud-panel">
-                <div class="radar-structure">
+                <div class="radar-structure" id="ui-radar">
                     <svg class="radar-svg-layer" viewBox="0 0 220 220">
                         <circle class="radar-ring" cx="110" cy="110" r="108" />
                         <circle class="radar-ring-dash" cx="110" cy="110" r="100" />
@@ -1067,6 +1133,7 @@ export class AAAHudLayout {
                             <div class="blip player"></div>
                         </div>
                     </div>
+                    <div class="radar-jam-label">NO SIGNAL</div>
                 </div>
             </div>
 
@@ -1082,6 +1149,7 @@ export class AAAHudLayout {
                 <div class="layer-banner__line"></div>
                 <div class="layer-banner__sub" id="ui-layer-banner-sub"></div>
             </div>
+            <div class="cinematic-hint" id="ui-cinematic-hint">PRESS ANY KEY TO SKIP</div>
             <div class="boss-intro" id="ui-boss-intro" aria-live="polite">
                 <div class="boss-intro__line"></div>
                 <div class="boss-intro__name" id="ui-boss-intro-name">Warden Prime</div>
@@ -1227,6 +1295,11 @@ export class AAAHudLayout {
             .blip.enemy { width: 6px; height: 6px; background: var(--danger, #ff003c); color: var(--danger, #ff003c); }
             .blip.boss { width: 10px; height: 10px; background: var(--boss, #ff003c); color: var(--boss, #ff003c); }
             .blip.ally { width: 6px; height: 6px; background: var(--status, #00ff66); color: var(--status, #00ff66); }
+            .blip.noise { width: 3px; height: 3px; background: var(--text-dim); color: var(--text-dim); box-shadow: none; }
+            .radar-jam-label { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); z-index: 20; display: none; text-align: center; font-family: var(--font-display); font-size: var(--text-sm); font-weight: 700; letter-spacing: 0.3em; margin-right: -0.3em; color: var(--xp); text-shadow: 0 0 8px var(--xp), 0 1px 0 rgba(0, 0, 0, 0.8); pointer-events: none; }
+            .radar-structure.is-jammed .radar-jam-label { display: block; }
+            .radar-structure.is-jammed .radar-sweep { opacity: 0.2; }
+            .radar-structure.is-jammed .blip.player { display: none; }
             .blip.player { top: 50%; left: 50%; width: 8px; height: 8px; background: var(--text, #fff); border: 1px solid var(--accent, #00f2ff); color: var(--text, #fff); z-index: 15; transform: translate(-50%, -50%); }
 
             /* NEXT WAVE */
@@ -1315,6 +1388,15 @@ export class AAAHudLayout {
             .layer-banner.is-surge .layer-banner__title { color: var(--danger); text-shadow: 0 0 18px var(--danger), 0 2px 0 rgba(0, 0, 0, 0.8); }
             .layer-banner.is-surge .layer-banner__line { background: linear-gradient(90deg, transparent, var(--danger) 20%, var(--danger) 80%, transparent); box-shadow: 0 0 12px var(--danger); }
             .layer-banner.is-surge .layer-banner__sub { color: var(--danger); }
+            .layer-banner.is-event .layer-banner__title { color: var(--xp); text-shadow: 0 0 18px var(--xp), 0 2px 0 rgba(0, 0, 0, 0.8); }
+            .layer-banner.is-event .layer-banner__line { background: linear-gradient(90deg, transparent, var(--xp) 20%, var(--xp) 80%, transparent); box-shadow: 0 0 12px var(--xp); }
+            .layer-banner.is-event .layer-banner__sub { color: var(--xp); }
+            .layer-banner.is-herald .layer-banner__title { color: var(--text); text-shadow: 0 0 18px var(--boss), 0 0 4px var(--boss), 0 2px 0 rgba(0, 0, 0, 0.8); }
+            .layer-banner.is-herald .layer-banner__line { background: linear-gradient(90deg, transparent, var(--boss) 20%, var(--boss) 80%, transparent); box-shadow: 0 0 12px var(--boss); }
+            .layer-banner.is-herald .layer-banner__sub { color: color-mix(in srgb, var(--boss) 45%, var(--text)); text-transform: none; letter-spacing: 0.2em; margin-right: -0.2em; }
+
+            .cinematic-hint { position: absolute; bottom: 64px; left: 0; width: 100%; text-align: center; font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.3em; color: var(--text-dim); text-shadow: 0 0 8px rgba(0, 0, 0, 0.9); pointer-events: none; z-index: 90; opacity: 0; visibility: hidden; }
+            .cinematic-hint.is-showing { opacity: 0.8; visibility: visible; }
 
             /* BOSS INTRO */
             .boss-intro { position: absolute; top: 26%; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: var(--space-2); padding: var(--space-4) var(--space-6); background: radial-gradient(ellipse at center, color-mix(in srgb, var(--boss) 22%, transparent) 0%, transparent 70%); pointer-events: none; z-index: 95; opacity: 0; visibility: hidden; }
@@ -1351,6 +1433,7 @@ export class AAAHudLayout {
             .feed-row--combo[data-tier='xp'] { border-right-color: var(--xp); color: var(--xp); }
             .feed-row--combo[data-tier='boss'] { border-right-color: var(--boss); color: var(--boss); }
             .feed-row--combo .feed-value { color: inherit; }
+            .feed-row--achievement { border-right-color: var(--xp); color: var(--xp); background: linear-gradient(270deg, color-mix(in srgb, var(--xp) 22%, var(--surface)) 0%, transparent 100%); text-shadow: 0 0 8px color-mix(in srgb, var(--xp) 60%, transparent); }
 
             @media (prefers-reduced-motion: no-preference) {
                 .combo-box.pulse { animation: combo-pop ${COMBO_POP_MS}ms var(--ease-out) 1; }

@@ -15,7 +15,20 @@ import {
   GAME_WIDTH,
   XP_ORB_SIZE,
 } from '../../core/GameConstants.js';
-import { cameraDisabledByUrl, createCamera } from '../../core/camera.js';
+import {
+  createCamera,
+  createCameraScene,
+  dampTo,
+  readCameraScene,
+  resolveCameraMode,
+} from '../../core/camera.js';
+import {
+  blendPose,
+  cinematicFreezeFromUrl,
+  epiloguePath,
+  followPose,
+  introPath,
+} from '../../core/cinematics.js';
 import { IS_DEV } from '../../core/env.js';
 import {
   StepInterpolator,
@@ -43,14 +56,17 @@ import {
 import { BiomeController } from './biomes3d.js';
 import { DebrisChunks } from './debrisChunks.js';
 import { DeathBursts } from './dissolve.js';
-import { DustFloor } from './dustFloor.js';
-import { EnemyMirror } from './enemyMirror.js';
+import { EnemyMirror, VIEW_KINDS, markShadowCasters } from './enemyMirror.js';
 import { FieldBackdrop } from './fieldBackdrop.js';
 import { FlashLights } from './flashLights.js';
 import { HitSparks, MuzzleFlashes } from './hitSparks.js';
 import { ImpactKick, createImpactPass } from './impactPass.js';
 import { PickupMirror } from './pickupMirror.js';
 import { PlayerMirror } from './playerMirror.js';
+import { setRimLight } from './rimLight.js';
+import { ScorchDecals } from './scorchDecals.js';
+import { ShieldMirror } from './shieldMirror.js';
+import { SpaceField } from './spaceField.js';
 import { TextSprites } from './textSprites.js';
 import { mirrorWeaponEffects, pushLance } from './weaponMirror.js';
 import { WEAPONS } from '../../data/weapons.js';
@@ -61,6 +77,12 @@ const KEY_ELEVATION = (40 * Math.PI) / 180;
 const DOLLY_TIME_CONSTANT = 0.4;
 const DOLLY_SPEED_OUT = 0.08;
 const DOLLY_COMBAT_IN = 0.06;
+// Camera roll on strafe (dynamic mode only, none in boss framing).
+const ROLL_MAX = (2.5 * Math.PI) / 180;
+const ROLL_SMOOTH = 0.25;
+// A skipped or released cinematic eases back to the follow camera this long.
+const CINEMATIC_HANDBACK_MS = 500;
+const FOLLOW_POSE = followPose();
 const COMBAT_RANGE = 140;
 const BLOOM = { strength: 0.9, radius: 0.6, threshold: 0.75 };
 // proposta 17/10: ACES on lit surfaces, sRGB on the way out (emissives are
@@ -71,7 +93,6 @@ const MAX_SHOCKWAVES = 25;
 const MAX_TRAIL_POINTS = 64;
 const MAX_DAMAGE_TEXTS = 16;
 const OVERLAY_H = 9;
-const SHIP_SHADOW_RADIUS = 14;
 const WHITE = [1, 1, 1];
 // proposta 17/10: what kicks the impact pass (strength 0..1). Shockwaves
 // kick only from KICK_WAVE_RADIUS up, full at KICK_WAVE_FULL.
@@ -82,6 +103,24 @@ const KICK_WAVE_RADIUS = 90;
 const KICK_WAVE_FULL = 200;
 const KICK_WAVE_MIN = 0.25;
 const KICK_WAVE_MAX = 0.8;
+// proposta 18/10: the key light's shadow box follows the camera target: the
+// light sits KEY_SHADOW.distance away along its direction, the box spans the
+// shot (`span` × the camera range, clamped) and the biases keep rocks from
+// shadowing themselves in stripes.
+const KEY_SHADOW = {
+  distance: 1000,
+  depth: 500,
+  span: 0.62,
+  min: 380,
+  max: 1400,
+  bias: -0.0006,
+  normalBias: 0.6,
+};
+// The ship's hull panels cast; its turret, nozzles and canopy (radius under
+// this, world units) only receive.
+const SHIP_MIN_CASTER = 5;
+// Point sizes of the star layers are authored for a frame this tall.
+const STAR_FRAME_HEIGHT = 900;
 
 // Last linear → sRGB step of the composer (the passes work in linear; the
 // renderer's outputEncoding only applies when drawing to the screen).
@@ -154,9 +193,15 @@ class Renderer3D extends BaseSystem {
     });
 
     this.camera = createCamera();
-    this.camera.setEnabled(!cameraDisabledByUrl());
+    this.camera.setMode(resolveCameraMode());
+    this.cameraScene = createCameraScene();
+    this.roll = { value: 0, velocity: 0 };
     this.lastRenderTime = null;
     this.dolly = 1;
+    // The run's intro/epilogue camera (core/cinematics.js), on render time.
+    this.cinematic = null;
+    this.cinePose = followPose();
+    this.cinematicFreeze = IS_DEV ? cinematicFreezeFromUrl() : null;
     this.three = null;
     this.failed = false;
     this.graphics = {
@@ -257,7 +302,15 @@ class Renderer3D extends BaseSystem {
       this.biome.enterLayer(payload.wave);
     });
     this.registerEventListener('shield-hit', () => {
-      this.three?.player.flashShield(performance.now() / 1000);
+      const time = performance.now() / 1000;
+      const dir = this.threatDirection();
+      this.three?.shield.hit(time, dir.x, dir.y);
+    });
+    this.registerEventListener('shield-activated', () => {
+      this.three?.shield.activate(performance.now() / 1000);
+    });
+    this.registerEventListener('shield-broken', () => {
+      this.three?.shield.break(performance.now() / 1000);
     });
     this.registerEventListener('camera-zoom-pulse', ({ zoom, duration }) => {
       this.camera.pulseZoom(zoom, duration);
@@ -292,6 +345,17 @@ class Renderer3D extends BaseSystem {
         bullet?.vy || 0,
         Boolean(data.killed)
       );
+      // a rock that survives the hit keeps a scorch mark
+      if (enemy?.type === 'asteroid' && bullet && !data.killed) {
+        const view = this.three?.enemies.views.get(enemy.id || enemy);
+        if (view) {
+          this.three.decals.hit(
+            view,
+            position.x - enemy.x,
+            position.y - enemy.y
+          );
+        }
+      }
     });
     this.registerEventListener('bullet-created', (data) => {
       const { from, bullet } = data || {};
@@ -300,6 +364,61 @@ class Renderer3D extends BaseSystem {
       if (speed <= 0) return;
       this.muzzles.emit(from.x, from.y, bullet.vx / speed, bullet.vy / speed);
     });
+  }
+
+  /**
+   * Runs the intro descent over `durationMs`, then hands back to the follow
+   * camera. False when nothing would move (WebGL failed, `?camera=0`,
+   * reduced motion): the caller skips the cinematic.
+   */
+  playIntro(durationMs) {
+    return this.startCinematic(introPath, durationMs, false, 'intro');
+  }
+
+  /** The victory pull-back; it holds its last shot until endCinematic(). */
+  playEpilogue(durationMs) {
+    return this.startCinematic(epiloguePath, durationMs, true, 'epilogue');
+  }
+
+  startCinematic(path, durationMs, hold, kind) {
+    if (this.failed || !this.camera.isEnabled() || this.reducedMotion) {
+      return false;
+    }
+    const freeze = this.cinematicFreeze;
+    this.cinematic = {
+      path,
+      startedAt: performance.now(),
+      durationMs,
+      hold,
+      frozenAt: freeze?.kind === kind ? freeze.t : null,
+    };
+    return true;
+  }
+
+  /** Eases from wherever the cinematic is back to the follow camera. */
+  endCinematic() {
+    if (!this.cinematic) return;
+    this.cinematic = {
+      from: { ...this.cinePose },
+      startedAt: performance.now(),
+      durationMs: CINEMATIC_HANDBACK_MS,
+    };
+  }
+
+  // The cinematic's pose this frame, null once the follow camera is back.
+  cinematicPose(now) {
+    const c = this.cinematic;
+    if (!c) return null;
+    const t = c.frozenAt ?? (now - c.startedAt) / c.durationMs;
+    if (t >= 1 && !c.hold) {
+      this.cinematic = null;
+      return null;
+    }
+    const pose = c.path
+      ? c.path(Math.min(1, t))
+      : blendPose(c.from, FOLLOW_POSE, t);
+    Object.assign(this.cinePose, pose);
+    return this.cinePose;
   }
 
   /** Kicks the lens (aberration + radial blur) by `strength` 0..1. */
@@ -315,6 +434,7 @@ class Renderer3D extends BaseSystem {
     this.graphics.smaa = values.antialiasing !== 'None';
     this.graphics.aberration = values.chromaticAberration !== false;
     if (!this.qualityUrl) this.quality.setMode(values.quality);
+    this.camera.setMode(resolveCameraMode(values.cameraMode));
     this.syncPasses();
   }
 
@@ -328,9 +448,28 @@ class Renderer3D extends BaseSystem {
     t.biomes.applied = null;
     t.enemies.setSurfaceMaps(q.surfaceMaps);
     t.player.setSurfaceMaps(q.surfaceMaps);
-    t.floor.shadows.visible = q.shadows;
+    this.applyShadows(q.shadows);
     t.debris.limit = q.debrisCap;
+    setRimLight(q.rimLight);
+    t.decals.setEnabled(q.decals);
     this.syncPasses();
+  }
+
+  // The key light's shadow map, `size` texels square (0 = off). Toggling it
+  // changes the lit programs, so a preset change recompiles them once. A
+  // new map is drawn once here, seeded: three names it with a Math.random
+  // UUID.
+  applyShadows(size) {
+    const { renderer, key, scene, camera } = this.three;
+    const on = size > 0;
+    renderer.shadowMap.enabled = on;
+    key.castShadow = on;
+    if (on && key.shadow.mapSize.x !== size) {
+      key.shadow.mapSize.set(size, size);
+      key.shadow.map?.dispose();
+      key.shadow.map = null;
+      this.seeded(() => renderer.shadowMap.render([key], scene, camera));
+    }
   }
 
   /** After every simulation step (app.js): captures poses to interpolate. */
@@ -387,6 +526,7 @@ class Renderer3D extends BaseSystem {
 
   applyAccessibilityPreferences(values = {}) {
     this.reducedMotion = Boolean(values.reducedMotion);
+    this.camera.setReducedMotion(this.reducedMotion);
   }
 
   syncPasses() {
@@ -399,11 +539,17 @@ class Renderer3D extends BaseSystem {
 
   onReset() {
     this.camera.reset();
+    this.roll.value = 0;
+    this.roll.velocity = 0;
     this.lastRenderTime = null;
     this.dolly = 1;
+    this.cinematic = null;
+    this.three?.backdrop.setWake(0);
     this.three?.enemies.clear();
     this.three?.bursts.clear();
     this.three?.player.reset();
+    this.three?.decals.clear();
+    this.three?.shield.reset();
     this.impact.strength = 0;
     this.hitSparks.clear();
     this.muzzles.clear();
@@ -430,17 +576,25 @@ class Renderer3D extends BaseSystem {
     renderer.info.autoReset = false;
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(FOV, 4 / 3, 10, 4000);
+    // Far enough for the nebula from the cinematics' high shots.
+    const camera = new THREE.PerspectiveCamera(FOV, 4 / 3, 10, 9000);
 
-    // Key: warm white from upper-left (KEY_LIGHT_DIR), fixed in the world.
-    // No shadow maps in this slice (cost); the fill and the environment keep
-    // the unlit sides readable.
+    // Key: warm white from upper-left (KEY_LIGHT_DIR), fixed in direction;
+    // on high/ultra it casts shadows between the 3D objects (applyShadows),
+    // its target following the camera (updateCamera). The fill and the
+    // environment keep the unlit sides readable.
     const key = new THREE.DirectionalLight(colorOf(THREE, '#fff1e2'), 1.6);
-    key.position.set(
+    const keyDir = new THREE.Vector3(
       KEY_LIGHT_DIR.x * Math.cos(KEY_ELEVATION),
       Math.sin(KEY_ELEVATION),
       KEY_LIGHT_DIR.y * Math.cos(KEY_ELEVATION)
     );
+    key.position.copy(keyDir).multiplyScalar(KEY_SHADOW.distance);
+    key.shadow.bias = KEY_SHADOW.bias;
+    key.shadow.normalBias = KEY_SHADOW.normalBias;
+    key.shadow.camera.near = KEY_SHADOW.distance - KEY_SHADOW.depth;
+    key.shadow.camera.far = KEY_SHADOW.distance + KEY_SHADOW.depth;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     // Fill: cool, from below-right; hemisphere keeps shadows from going void.
     const fill = new THREE.DirectionalLight(
       colorOf(THREE, PALETTE.neutral),
@@ -458,7 +612,7 @@ class Renderer3D extends BaseSystem {
       WARDEN_LIGHT_DISTANCE,
       2
     );
-    scene.add(key, fill, hemi, wardenLight);
+    scene.add(key, key.target, fill, hemi, wardenLight);
     scene.environment = this.buildEnvironment(THREE, renderer);
 
     const width = Math.max(1, canvas.width);
@@ -504,14 +658,14 @@ class Renderer3D extends BaseSystem {
     );
 
     const backdrop = new FieldBackdrop(THREE, scene);
-    const floor = new DustFloor(THREE, scene, TILT);
+    const space = new SpaceField(THREE, scene);
     const biomes = new BiomeController(THREE, {
       key,
       fill,
       bloomPass,
       bloomBase: BLOOM.strength * bloomUrl.scale,
       backdrop,
-      floor,
+      space,
     });
     const flashes = new FlashLights(THREE, scene);
     const debris = new DebrisChunks(THREE, scene);
@@ -519,6 +673,12 @@ class Renderer3D extends BaseSystem {
     const enemies = new EnemyMirror(THREE, scene, this.seeded, bursts);
     const player = new PlayerMirror(THREE, scene, this.seeded);
     const pickups = new PickupMirror(THREE, scene);
+    const decals = new ScorchDecals(THREE, scene);
+    const shield = new ShieldMirror(
+      THREE,
+      scene,
+      rgbOf(THREE, PALETTE.player).map((c) => c * 1.4)
+    );
 
     const ribbons = new RibbonBatch(THREE, 4000);
     const lances = new CapsuleBatch(THREE, 240);
@@ -584,14 +744,18 @@ class Renderer3D extends BaseSystem {
       texts,
       bossFlash,
       bossFlashKey: '',
+      key,
+      keyDir,
       wardenLight,
       backdrop,
-      floor,
+      space,
       biomes,
       flashes,
       enemies,
       player,
       pickups,
+      decals,
+      shield,
       ribbons,
       lances,
       glow,
@@ -654,21 +818,94 @@ class Renderer3D extends BaseSystem {
     return texture;
   }
 
+  // The WebGL side, built on first use; false once setup has failed.
+  ready() {
+    if (this.failed) return false;
+    if (this.three) return true;
+    try {
+      this.seeded(() => this.setup());
+      return true;
+    } catch (error) {
+      this.failed = true;
+      console.error('[Renderer3D] WebGL setup failed:', error);
+      return false;
+    }
+  }
+
+  // --- warm-up ---------------------------------------------------------------
+
+  /**
+   * Loading screen (app.js): builds the scene (maps baked) and compiles every
+   * program a run can draw with — each enemy view kind in all its looks and
+   * burning, both hulls, then one frame of everything through the composer
+   * (post passes, texture and buffer uploads). One chunk per task, so the
+   * bar repaints; `onProgress(done)` after each, 0..1.
+   */
+  async warmUp(onProgress) {
+    const compile = () => this.compileScene();
+    const steps = [
+      () => this.ready(),
+      () => this.three.player.warm(this.cachedPlayer, compile),
+      ...VIEW_KINDS.map((kind) => () => this.three.enemies.warm(kind, compile)),
+      () => this.drawEverything(),
+    ];
+    for (let i = 0; i < steps.length; i += 1) {
+      if (!this.failed) steps[i]();
+      onProgress((i + 1) / steps.length);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  }
+
+  // Programs for the scene's materials (pooled views included) as the
+  // frame draws them: into the composer's target, or the screen without it.
+  compileScene() {
+    const t = this.three;
+    markShadowCasters(t.player.group, SHIP_MIN_CASTER);
+    t.renderer.setRenderTarget(
+      this.graphics.postProcessing ? t.composer.readBuffer : null
+    );
+    t.renderer.compile(t.scene, t.camera);
+    t.renderer.setRenderTarget(null);
+    t.renderer.compile(t.overlay, t.camera);
+  }
+
+  // One frame with every object shown and unculled (lights as they are, so
+  // the light count programs are keyed on stays the run's) and every pass on.
+  drawEverything() {
+    const t = this.three;
+    const saved = [];
+    t.scene.traverse((object) => {
+      if (object.isLight) return;
+      saved.push(object, object.visible, object.frustumCulled);
+      object.visible = true;
+      object.frustumCulled = false;
+    });
+    // a damage number: the sprite program takes its map
+    t.texts.begin();
+    t.texts.push('0', 0, 0, 10, PALETTE.text, 1);
+    t.texts.end();
+    t.bloomPass.enabled = true;
+    t.smaaPass.enabled = true;
+    t.impactPass.enabled = true;
+    // Seeded: the shadow pass names its depth material with a Math.random
+    // UUID the first time it draws.
+    this.seeded(() => t.composer.render(0));
+    t.renderer.render(t.overlay, t.camera);
+    t.texts.begin();
+    t.texts.end();
+    for (let i = 0; i < saved.length; i += 3) {
+      saved[i].visible = saved[i + 1];
+      saved[i].frustumCulled = saved[i + 2];
+    }
+    t.impactPass.enabled = false;
+    this.syncPasses();
+  }
+
   // --- frame -----------------------------------------------------------------
 
   /** `alpha`: the fixed stepper's leftover fraction (1 = latest step). */
   render(ctx, alpha = 1) {
-    if (this.failed) return;
-    if (!this.three) {
-      try {
-        this.seeded(() => this.setup());
-      } catch (error) {
-        this.failed = true;
-        console.error('[Renderer3D] WebGL setup failed:', error);
-        return;
-      }
-    }
-
+    if (!this.ready()) return;
     this.applyPoses(alpha);
     try {
       this.drawFrame();
@@ -704,15 +941,16 @@ class Renderer3D extends BaseSystem {
     t.matte.begin();
     t.smoke.begin();
     t.texts.begin();
-    t.floor.begin();
     t.debris.begin();
 
     const warden = t.enemies.update(enemyList, time, dt);
+    t.decals.update(dt, t.enemies.views);
     t.bursts.update(dt);
     t.wardenLight.intensity = warden ? 2.6 : 0;
     if (warden) t.wardenLight.position.copy(warden.object.position).setY(40);
     t.player.update(player, t.ribbons, time);
-    this.mirrorShadows(player, enemyList);
+    this.mirrorShield(player, time);
+    markShadowCasters(t.player.group, SHIP_MIN_CASTER);
     t.flashes.update(dt);
     this.mirrorProjectiles();
     this.mirrorPickups(time);
@@ -726,7 +964,13 @@ class Renderer3D extends BaseSystem {
     const pointScale = t.height / (2 * Math.tan((FOV * Math.PI) / 360));
     this.biome.update(dt);
     t.biomes.update(this.biome);
-    t.backdrop.update(this.camera.x, this.camera.y, dt, pointScale);
+    const ship = t.player.group.visible && player?.position;
+    t.space.update(this.camera.x, this.camera.y, dt, {
+      ship: ship || null,
+      shipLight: t.player.light.intensity,
+      pointScale,
+      pixel: t.height / STAR_FRAME_HEIGHT,
+    });
     t.ribbons.end();
     t.lances.end();
     t.glow.end(pointScale);
@@ -744,7 +988,8 @@ class Renderer3D extends BaseSystem {
           !this.reducedMotion &&
           this.quality.settings.impactPass,
         this.graphics.aberration
-      )
+      ),
+      this.graphics.postProcessing && this.quality.settings.filmGrain
     );
 
     t.renderer.info.reset();
@@ -787,12 +1032,19 @@ class Renderer3D extends BaseSystem {
 
   updateCamera(player, enemies, effects, dt) {
     const t = this.three;
+    // Poses are interpolated by now (render → applyPoses), so is the scene.
     const position = player?.position;
     if (position) {
       if (this.lastRenderTime === null) {
         this.camera.snapTo(position.x, position.y);
       } else {
-        this.camera.update(position.x, position.y, dt);
+        const scene = readCameraScene(
+          this.cameraScene,
+          player,
+          this.cachedCombat,
+          enemies
+        );
+        this.camera.update(position.x, position.y, dt, scene);
       }
     }
 
@@ -832,16 +1084,74 @@ class Renderer3D extends BaseSystem {
     const ox = shaking ? shake.offsetX / zoom : 0;
     const oy = shaking ? shake.offsetY / zoom : 0;
     const { x: cx, y: cy } = this.clampToField(distance, t.camera.aspect);
-    const tx = cx - HALF_W - ox;
-    const tz = cy - HALF_H - oy;
+    // A cinematic poses the camera relative to the follow shot it ends on.
+    const pose = this.cinematicPose(performance.now()) || FOLLOW_POSE;
+    const tilt = (pose.tilt * Math.PI) / 180;
+    const range = distance * pose.distance;
+    const tx = cx - HALF_W - ox + pose.offsetX;
+    const tz = cy - HALF_H - oy + pose.offsetY;
+    t.backdrop.setWake(pose.wake);
     t.camera.position.set(
       tx,
-      distance * Math.cos(TILT),
-      tz + distance * Math.sin(TILT)
+      range * Math.cos(tilt),
+      tz + range * Math.sin(tilt)
     );
     t.camera.up.set(0, 0, -1);
     t.camera.lookAt(tx, 0, tz);
-    if (shaking && Math.abs(shake.angle) > 0.001) t.camera.rotateZ(shake.angle);
+    this.aimKeyShadow(tx, tz, range);
+    const roll = this.updateRoll(player, dt);
+    const angle = roll + (shaking ? shake.angle : 0);
+    if (Math.abs(angle) > 0.0001) t.camera.rotateZ(angle);
+  }
+
+  // The key light's shadow box over the shot: centred on the camera target
+  // (snapped to whole texels so still edges don't crawl), sized by the range.
+  aimKeyShadow(tx, tz, range) {
+    const { key, keyDir } = this.three;
+    if (!key.castShadow) return;
+    const half = Math.min(
+      KEY_SHADOW.max,
+      Math.max(KEY_SHADOW.min, range * KEY_SHADOW.span)
+    );
+    const texel = (2 * half) / key.shadow.mapSize.x;
+    const x = Math.round(tx / texel) * texel;
+    const z = Math.round(tz / texel) * texel;
+    key.target.position.set(x, 0, z);
+    key.position.copy(keyDir).multiplyScalar(KEY_SHADOW.distance);
+    key.position.x += x;
+    key.position.z += z;
+    const cam = key.shadow.camera;
+    if (cam.right !== half) {
+      cam.left = -half;
+      cam.right = half;
+      cam.top = half;
+      cam.bottom = -half;
+      cam.updateProjectionMatrix();
+    }
+  }
+
+  // Banks the view up to ROLL_MAX with the strafe: the screen-horizontal
+  // part of the ship's sideways velocity. Not in classic/static, boss
+  // framing, cinematics or reduced motion.
+  updateRoll(player, dt) {
+    let goal = 0;
+    const v = player?.velocity;
+    if (
+      v &&
+      this.camera.mode === 'dynamic' &&
+      !this.cinematic &&
+      !this.reducedMotion
+    ) {
+      const angle = player.angle || 0;
+      const sin = Math.sin(angle);
+      const lateral = -v.vx * sin + v.vy * Math.cos(angle);
+      const strafe = Math.max(
+        -1,
+        Math.min(1, (-sin * lateral) / SHIP_MAX_SPEED)
+      );
+      goal = -ROLL_MAX * strafe * (1 - this.camera.frameWeight);
+    }
+    return dampTo(this.roll, goal, ROLL_SMOOTH, dt);
   }
 
   // The follow point, kept so the frustum's footprint on the field plane (a
@@ -1071,19 +1381,45 @@ class Renderer3D extends BaseSystem {
     this.impact.kick(KICK_WAVE_MIN + (KICK_WAVE_MAX - KICK_WAVE_MIN) * k);
   }
 
-  // A shadow on the dust floor under every mass; the ship's light pool.
-  mirrorShadows(player, enemies) {
-    const { floor, player: ship } = this.three;
-    const shadows = floor.shadows.visible;
-    for (let i = 0; i < enemies.length && shadows; i += 1) {
-      const e = enemies[i];
-      if (e && !e.destroyed) floor.shadow(e.x, e.y, e.radius || 12);
-    }
-    const visible = ship.group.visible && player?.position;
-    if (visible && shadows) {
-      floor.shadow(visible.x, visible.y, SHIP_SHADOW_RADIUS);
-    }
-    floor.end(visible || null, ship.light.intensity);
+  // The hex dome (shieldMirror.js) is sized from the hull mirror.
+  mirrorShield(player, time) {
+    const { shield, player: ship } = this.three;
+    const state = player?.getShieldState();
+    const alive = ship.group.visible && player?.position;
+    shield.update(
+      time,
+      Boolean(alive && state?.isActive),
+      state?.maxHits > 0 ? state.currentHits / state.maxHits : 1,
+      alive ? player.position.x - HALF_W : 0,
+      alive ? player.position.y - HALF_H : 0,
+      alive ? ship.shieldRadius : 0
+    );
+  }
+
+  // Logical direction from the ship to the nearest threat (enemy shot or
+  // enemy): where a shield hit most likely came from.
+  threatDirection() {
+    const out = this.threatDir || (this.threatDir = { x: 1, y: 0 });
+    const pos = this.cachedPlayer?.position;
+    if (!pos) return out;
+    let best = Infinity;
+    const scan = (list) => {
+      for (let i = 0; i < list.length; i += 1) {
+        const e = list[i];
+        if (!e || e.destroyed) continue;
+        const dx = e.x - pos.x;
+        const dy = e.y - pos.y;
+        const d = dx * dx + dy * dy - (e.radius || 0) ** 2;
+        if (d < best) {
+          best = d;
+          out.x = dx;
+          out.y = dy;
+        }
+      }
+    };
+    scan(this.cachedCombat?.enemyBullets || []);
+    scan(this.cachedEnemies?.getActiveEnemies() || []);
+    return out;
   }
 
   // The 2D overlays (EffectsSystem.drawWorld/drawScreenSpace, the
@@ -1136,13 +1472,12 @@ class Renderer3D extends BaseSystem {
       for (let i = 0; i < texts.length; i += 1) {
         const d = texts[i];
         if (!d) continue;
-        const size = (d.isCritical ? 24 * 1.5 : 16) * d.scale;
         t.texts.push(
           d.damage,
           d.x,
           d.y,
-          size,
-          d.isCritical ? PALETTE.shot : PALETTE.text,
+          d.size,
+          d.color,
           Math.min(1, d.life * 2)
         );
       }

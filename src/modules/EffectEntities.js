@@ -303,6 +303,50 @@ class HitMarker {
   }
 }
 
+// Damage numbers with weight (PLAN.md R5.9, proposta 18/10): size grows with
+// the log of the damage, colour steps white → amber → red, and each number
+// pops in past its size before settling. Shared by the 2D and 3D renderers.
+export const DAMAGE_TEXT_PX = 16;
+const DAMAGE_SCALE_MIN = 0.8; // at DAMAGE_SCALE_LOW damage and below
+const DAMAGE_SCALE_MAX = 1.6; // at DAMAGE_SCALE_HIGH damage and above
+const DAMAGE_SCALE_LOW = 5;
+const DAMAGE_SCALE_HIGH = 100;
+const DAMAGE_AMBER_AT = 30;
+const DAMAGE_RED_AT = 60;
+const CRIT_SCALE = 1.25;
+const POP_IN = 0.12; // fraction of life growing to the overshoot
+const POP_SETTLE = 0.28; // fraction of life back down to 1
+const POP_OVERSHOOT = 1.35;
+
+/** Size multiplier and colour for a number showing `damage`. */
+export function damageTextStyle(damage, isCritical = false) {
+  const t = Math.min(
+    1,
+    Math.max(
+      0,
+      Math.log(Math.max(damage, 1) / DAMAGE_SCALE_LOW) /
+        Math.log(DAMAGE_SCALE_HIGH / DAMAGE_SCALE_LOW)
+    )
+  );
+  const scale =
+    (DAMAGE_SCALE_MIN + (DAMAGE_SCALE_MAX - DAMAGE_SCALE_MIN) * t) *
+    (isCritical ? CRIT_SCALE : 1);
+  let color = PALETTE.text;
+  if (damage >= DAMAGE_RED_AT) color = PALETTE.threat;
+  else if (damage >= DAMAGE_AMBER_AT || isCritical) color = PALETTE.shot;
+  return { scale, color };
+}
+
+/** Pop-in curve over the number's life: 0 → overshoot → 1, then holds. */
+export function damageTextPop(progress) {
+  if (progress < POP_IN) return (progress / POP_IN) * POP_OVERSHOOT;
+  if (progress < POP_SETTLE) {
+    const k = (progress - POP_IN) / (POP_SETTLE - POP_IN);
+    return POP_OVERSHOOT + (1 - POP_OVERSHOOT) * k;
+  }
+  return 1;
+}
+
 class DamageText {
   constructor(x, y, damage, isCritical) {
     this.x = x;
@@ -312,22 +356,23 @@ class DamageText {
     this.life = 0.8;
     this.maxLife = 0.8;
     this.vy = -30;
-    this.scale = 1;
+    this.scale = 0;
+    const style = damageTextStyle(this.damage, isCritical);
+    this.sizeScale = style.scale;
+    this.color = style.color;
   }
 
   update(deltaTime) {
     this.life -= deltaTime;
     this.y += this.vy * deltaTime;
     this.vy *= 0.95;
-
-    const progress = 1 - this.life / this.maxLife;
-    if (progress < 0.2) {
-      this.scale = progress * 5;
-    } else {
-      this.scale = 1;
-    }
-
+    this.scale = damageTextPop(1 - this.life / this.maxLife);
     return this.life > 0;
+  }
+
+  /** Glyph height in logical px this frame. */
+  get size() {
+    return DAMAGE_TEXT_PX * this.sizeScale * this.scale;
   }
 
   draw(ctx) {
@@ -335,17 +380,17 @@ class DamageText {
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.translate(this.x, this.y);
-    const scale = this.scale * (this.isCritical ? 1.5 : 1.0);
+    const scale = this.sizeScale * this.scale;
     ctx.scale(scale, scale);
 
-    ctx.font = `bold ${this.isCritical ? '24px' : '16px'} "Rajdhani", sans-serif`;
+    ctx.font = `bold ${DAMAGE_TEXT_PX}px "Rajdhani", sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.lineWidth = 3;
     ctx.strokeStyle = PALETTE.background;
     ctx.strokeText(String(this.damage), 0, 0);
 
-    ctx.fillStyle = this.isCritical ? PALETTE.shot : PALETTE.text;
+    ctx.fillStyle = this.color;
     ctx.fillText(String(this.damage), 0, 0);
 
     ctx.restore();

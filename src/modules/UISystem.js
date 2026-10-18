@@ -11,6 +11,7 @@ import {
 } from '../data/shipModels.js';
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 import { directorFor } from '../data/layers.js';
+import { HERALD_KINDS } from '../data/enemies/herald.js';
 import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
 import { biomeForLayer } from '../data/biomes.js';
 import { BaseSystem } from '../core/BaseSystem.js';
@@ -22,6 +23,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { AAAHudLayout } from './ui/AAAHudLayout.js';
 import { Onboarding, onboardingPrompts } from './ui/onboarding.js';
+import { RunCinematics } from './ui/runCinematics.js';
 import {
   TransmissionQueue,
   chapterTransmission,
@@ -42,32 +44,14 @@ import {
   salvageBalanceText,
   salvageLine,
 } from './ui/hangar.js';
+import { adjacentCodexTab, codexTabView } from './ui/codexTabs.js';
+import { settingPreview } from './ui/settingsPreview.js';
+import { menuStatusItems, menuStatusMarkup } from './ui/menuStatus.js';
+import { loadRecords } from '../services/runRecords.js';
+import { playLevelUpExit, staggerCardEntry } from './ui/levelUpTransition.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
-// One Codex row; an entry never met shows as a dark silhouette, unnamed.
-function codexEntryMarkup(entry) {
-  const known = Boolean(entry.seen);
-  const classes = `codex-entry${known ? '' : ' is-unknown'}${
-    entry.warden ? ' is-warden' : ''
-  }`;
-  const glyph = `<svg class="codex-entry__glyph" viewBox="-16 -16 32 32" aria-hidden="true">${entry.glyph}</svg>`;
-  if (!known) {
-    return `<li class="${classes}">${glyph}
-      <div class="codex-entry__text">
-        <h3 class="codex-entry__name">Unknown signal</h3>
-        <p class="codex-entry__meta">Below layer ${entry.fromLayer}</p>
-        <p class="codex-entry__lore">No contact logged. Go deeper.</p>
-      </div></li>`;
-  }
-  return `<li class="${classes}">${glyph}
-    <div class="codex-entry__text">
-      <h3 class="codex-entry__name">${entry.name}</h3>
-      <p class="codex-entry__meta">From layer ${entry.fromLayer} · First contact: layer ${entry.seen.firstLayer} · Destroyed: ${entry.seen.kills}</p>
-      <p class="codex-entry__lore">${entry.lore}</p>
-      <p class="codex-entry__hint">${entry.hint}</p>
-    </div></li>`;
-}
 // Level-up cards and the victory buttons ignore input this long after showing.
 const SCREEN_INPUT_LOCKOUT_MS = 400;
 const UPGRADE_RARITY_LABELS = { common: 'Common', rare: 'Rare', epic: 'Epic' };
@@ -119,6 +103,26 @@ class UISystem extends BaseSystem {
     this.transmissions = null;
     this.transmissionRaf = null;
     this.transmissionLayer = 1;
+    this.cinematics = new RunCinematics({
+      eventBus: this.eventBus,
+      renderer: () => this.getService('renderer'),
+      hud: () => this.aaaTacticalHud,
+      // The session's pause flag alone: no pause screen, no fixed steps.
+      holdSim: (held) => this.getService('game-state')?.setPaused(held),
+      bindSkip: (skip) => {
+        // Capture on window runs before every other key handler: the key
+        // only skips (a held key's repeats are swallowed too).
+        const onKey = (event) => {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          if (!event.repeat) skip();
+        };
+        window.addEventListener('keydown', onKey, true);
+        return () => window.removeEventListener('keydown', onKey, true);
+      },
+      onIntroEnd: () =>
+        this.handleLayerStarted({ wave: this.transmissionLayer }),
+    });
     this.aaaTacticalHudDefinition = getHudLayoutDefinition(
       this.currentHudLayoutId
     );
@@ -182,12 +186,13 @@ class UISystem extends BaseSystem {
     };
 
     this.settings = null;
+    this.liveQualityPreset = null;
     this.settingsSchema = [];
     this.schemaByCategory = new Map();
     this.settingsState = {
       isOpen: false,
       source: 'menu',
-      activeCategory: 'audio',
+      activeCategory: 'graphics',
       capture: null,
       previousFocus: null,
     };
@@ -196,7 +201,7 @@ class UISystem extends BaseSystem {
       triggerId: null,
     };
     this.handleCreditsKeyDown = this.handleCreditsKeyDown.bind(this);
-    this.codexState = { isOpen: false, trigger: null };
+    this.codexState = { isOpen: false, trigger: null, tab: 'enemies' };
     this.hangarState = { isOpen: false, trigger: null };
     this.levelUpState = {
       isVisible: false,
@@ -207,6 +212,7 @@ class UISystem extends BaseSystem {
       level: null,
       lockedUntil: 0,
       banishMode: false,
+      exitTimer: null,
     };
     this.quitConfirm = { button: null, label: '', timeoutId: null };
     this.currentVisualPreferences = {
@@ -238,6 +244,7 @@ class UISystem extends BaseSystem {
     this.bindHangarControls();
     this.bindMainMenuControls();
     this.initializeMenuShipSelector();
+    this.refreshMenuStatus();
     this.bootstrapSettingsState();
     this.initializeViewportScaling();
   }
@@ -316,6 +323,7 @@ class UISystem extends BaseSystem {
         openBtn: document.getElementById('menu-codex-btn') || null,
         backBtn: document.getElementById('codex-back-btn') || null,
         closeBtn: document.getElementById('codex-close-btn') || null,
+        tabs: Array.from(document.querySelectorAll('[data-codex-tab]')),
       },
       hangar: {
         overlay: document.getElementById('hangar-screen') || null,
@@ -365,6 +373,7 @@ class UISystem extends BaseSystem {
         shipSelector: document.getElementById('menu-ship-selector') || null,
         shipSelectorOptions:
           document.getElementById('menu-ship-selector-options') || null,
+        status: document.getElementById('menu-status') || null,
       },
     };
   }
@@ -511,10 +520,14 @@ class UISystem extends BaseSystem {
       return;
     }
     const layer = Math.max(1, Math.floor(Number(payload.wave) || 1));
+    this.transmissionLayer = layer;
+    // The intro's end shows this layer's title card.
+    if (this.cinematics.introActive) {
+      return;
+    }
     const boss = Boolean(payload.isBossWave) || directorFor(layer).warden;
     const biome = biomeForLayer(layer);
     const firstOfBiome = biome.layers[0] === layer;
-    this.transmissionLayer = layer;
     hud.showLayerBanner(layer, {
       boss,
       chapter: firstOfBiome
@@ -859,6 +872,24 @@ class UISystem extends BaseSystem {
       });
 
     this.renderMenuShipSelectorPreviews();
+  }
+
+  // The records strip under the menu title (ui/menuStatus.js).
+  refreshMenuStatus() {
+    const strip = this.domRefs.menu?.status;
+    if (!strip) {
+      return;
+    }
+    strip.innerHTML = menuStatusMarkup(
+      menuStatusItems({
+        records: loadRecords(),
+        hangar: this.getService('hangar'),
+        codex: this.getService('codex'),
+        achievements: this.getService('achievements'),
+        quality: this.settings?.getCategoryValues('graphics')?.quality,
+        livePreset: this.liveQualityPreset,
+      })
+    );
   }
 
   renderMenuShipSelectorPreviews() {
@@ -1284,10 +1315,7 @@ class UISystem extends BaseSystem {
         this.transmissionRaf = null;
         return;
       }
-      const reducedMotion =
-        document.body.classList.contains('motion-reduced') ||
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      queue.update(performance.now(), reducedMotion);
+      queue.update(performance.now(), this.prefersReducedMotion());
       this.transmissionRaf = queue.active
         ? window.requestAnimationFrame(tick)
         : null;
@@ -1581,6 +1609,39 @@ class UISystem extends BaseSystem {
       this.aaaTacticalHud?.showSurgeBanner(payload.label);
     });
 
+    this.registerEventListener('field-event-started', (payload = {}) => {
+      this.aaaTacticalHud?.showFieldEventBanner(payload.label);
+      if (payload.kind === 'sensor-jam') {
+        this.aaaTacticalHud?.setRadarJammed(true);
+      }
+    });
+
+    this.registerEventListener('field-event-ended', (payload = {}) => {
+      if (payload.kind === 'sensor-jam') {
+        this.aaaTacticalHud?.setRadarJammed(false);
+      }
+    });
+
+    // A Herald arrives under a violet banner; Silence jams the radar while it
+    // lives (a new run clears it).
+    this.registerEventListener('herald-spawned', ({ kind } = {}) => {
+      const herald = HERALD_KINDS[kind];
+      if (!herald) return;
+      this.aaaTacticalHud?.showHeraldBanner(
+        herald.displayName,
+        herald.subtitle
+      );
+      if (herald.jamsRadar) this.aaaTacticalHud?.setRadarJammed(true);
+    });
+    this.registerEventListener('herald-defeated', ({ kind } = {}) => {
+      if (HERALD_KINDS[kind]?.jamsRadar) {
+        this.aaaTacticalHud?.setRadarJammed(false);
+      }
+    });
+    this.registerEventListener('game-started', () => {
+      this.aaaTacticalHud?.setRadarJammed(false);
+    });
+
     this.registerEventListener('enemy-destroyed', (payload = {}) => {
       this.aaaTacticalHud?.addKillFeed(
         payload.enemy?.type,
@@ -1609,6 +1670,10 @@ class UISystem extends BaseSystem {
       }
     });
 
+    this.registerEventListener('achievement-unlocked', ({ title } = {}) => {
+      this.aaaTacticalHud?.addAchievementFeed(title);
+    });
+
     this.registerEventListener('weapon-beam-fired', () => {
       this.aaaTacticalHud?.flashBeam();
     });
@@ -1619,6 +1684,23 @@ class UISystem extends BaseSystem {
 
     this.registerEventListener('screen-changed', (payload = {}) => {
       this.handleScreenChanged(payload);
+    });
+
+    this.registerEventListener('hangar-purchased', () =>
+      this.refreshMenuStatus()
+    );
+
+    // Renderer3D's Auto quality picked a preset: menu strip and the
+    // Graphics preview name it.
+    this.registerEventListener('quality-changed', ({ preset } = {}) => {
+      this.liveQualityPreset = preset;
+      this.refreshMenuStatus();
+      if (
+        this.settingsState.isOpen &&
+        this.settingsState.activeCategory === 'graphics'
+      ) {
+        this.renderSettingsPanel('graphics');
+      }
     });
 
     this.registerEventListener('toggle-pause', () => {
@@ -1645,14 +1727,19 @@ class UISystem extends BaseSystem {
 
     this.registerEventListener('run-won', () => {
       this.runWon = true;
+      this.cinematics.startEpilogue();
       this.queueTransmission(victoryTransmission(), { interrupt: true });
     });
     this.registerEventListener('run-continued', () => {
       this.runWon = false;
+      this.cinematics.release();
     });
     this.registerEventListener('game-started', () => {
       this.runWon = false;
       this.transmissions?.clear();
+      this.cinematics.stop();
+      // After startNewRun has unpaused: the intro holds the first step.
+      queueMicrotask(() => this.cinematics.startIntro());
       this.aaaTacticalHud?.clearBuffs();
       this.removeOnboardingCardsTip();
       if (this.isOnboardingEnabled()) {
@@ -1763,11 +1850,27 @@ class UISystem extends BaseSystem {
       this.settingsState.isOpen &&
       change.category === this.settingsState.activeCategory
     ) {
+      // The redraw replaces the focused control: focus its twin after.
+      const focused = document.activeElement;
+      const key = focused?.dataset?.settingKey;
+      const segment = focused?.dataset?.segmentValue;
       this.renderSettingsPanel(this.settingsState.activeCategory);
+      if (key) {
+        const selector = segment
+          ? `[data-setting-key="${key}"][data-segment-value="${segment}"]`
+          : `input[data-setting-key="${key}"], select[data-setting-key="${key}"]`;
+        this.domRefs.settings.container
+          .querySelector(selector)
+          ?.focus({ preventScroll: true });
+      }
     }
 
     if (change.category === 'gameplay' || change.type === 'reset-all') {
       this.requestMenuShipSelectorRefresh();
+    }
+
+    if (change.category === 'graphics' || change.type === 'reset-all') {
+      this.refreshMenuStatus();
     }
 
     if (change.category === 'gameplay' && change.key === 'onboardingTips') {
@@ -1888,21 +1991,53 @@ class UISystem extends BaseSystem {
     refs.overlay.addEventListener('click', (event) => {
       if (event.target === refs.overlay) this.closeCodex();
     });
+    refs.tabs.forEach((button) =>
+      button.addEventListener('click', () =>
+        this.showCodexTab(button.dataset.codexTab)
+      )
+    );
     document.addEventListener('keydown', (event) => {
-      if (this.codexState.isOpen && event.key === 'Escape') {
+      if (!this.codexState.isOpen) return;
+      if (event.key === 'Escape') {
         event.preventDefault();
         this.closeCodex();
+      } else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        event.preventDefault();
+        const step = event.key === 'ArrowLeft' ? -1 : 1;
+        this.showCodexTab(adjacentCodexTab(this.codexState.tab, step), {
+          focusTab: true,
+        });
       }
     });
   }
 
+  showCodexTab(tab, { focusTab = false } = {}) {
+    const refs = this.domRefs.codex;
+    const view = codexTabView(tab, {
+      enemies: this.getService('codex').getEntries(),
+      achievements: this.getService('achievements').getEntries(),
+    });
+    refs.list.innerHTML = view.markup;
+    refs.list.setAttribute('aria-label', view.label);
+    refs.list.scrollTop = 0;
+    refs.count.textContent = view.count;
+    refs.tabs.forEach((button) => {
+      const active = button.dataset.codexTab === tab;
+      button.classList.toggle('is-active', active);
+      button.setAttribute('aria-selected', String(active));
+      if (active && focusTab) button.focus({ preventScroll: true });
+    });
+    this.codexState.tab = tab;
+  }
+
   openCodex() {
     const refs = this.domRefs.codex;
-    const entries = this.getService('codex').getEntries();
-    refs.list.innerHTML = entries.map(codexEntryMarkup).join('');
-    const found = entries.filter((entry) => entry.seen).length;
-    refs.count.textContent = `${found} / ${entries.length} signals logged`;
-    this.codexState = { isOpen: true, trigger: document.activeElement };
+    this.codexState = {
+      isOpen: true,
+      trigger: document.activeElement,
+      tab: 'enemies',
+    };
+    this.showCodexTab('enemies');
     this.showScreen('codex', { overlay: true, show: true });
     refs.overlay.setAttribute('aria-hidden', 'false');
     this.emitOverlayVisibilityChanged('codex', true, { source: 'menu' });
@@ -1916,7 +2051,7 @@ class UISystem extends BaseSystem {
     refs.overlay.setAttribute('aria-hidden', 'true');
     this.emitOverlayVisibilityChanged('codex', false, { source: 'menu' });
     this.codexState.trigger?.focus?.({ preventScroll: true });
-    this.codexState = { isOpen: false, trigger: null };
+    this.codexState = { isOpen: false, trigger: null, tab: 'enemies' };
   }
 
   bindHangarControls() {
@@ -2199,6 +2334,16 @@ class UISystem extends BaseSystem {
   }
 
   handleSettingsClick(event) {
+    const segment = event.target.closest('[data-segment-value]');
+    if (segment && this.settings) {
+      this.settings.setSetting(
+        segment.dataset.settingCategory,
+        segment.dataset.settingKey,
+        segment.dataset.segmentValue,
+        { source: 'ui' }
+      );
+      return;
+    }
     const captureButton = event.target.closest(
       '[data-action="capture-binding"]'
     );
@@ -2355,13 +2500,39 @@ class UISystem extends BaseSystem {
         field,
         values[field.key]
       );
-      if (element) {
-        container.appendChild(element);
+      if (!element) {
+        return;
       }
+      const preview = settingPreview(
+        field.key,
+        values[field.key] ?? field.default,
+        {
+          livePreset: this.liveQualityPreset,
+          postProcessing: values.postProcessing,
+        }
+      );
+      if (preview) {
+        const line = document.createElement('p');
+        line.className = 'settings-preview';
+        line.dataset.previewFor = field.key;
+        if ('glow' in preview) {
+          const dot = document.createElement('span');
+          dot.className = `settings-preview__glow${preview.glow ? ' is-on' : ''}`;
+          line.appendChild(dot);
+        }
+        line.appendChild(document.createTextNode(preview.text));
+        (element.querySelector('.settings-field__body') || element).appendChild(
+          line
+        );
+      }
+      container.appendChild(element);
     });
   }
 
   renderSettingField(categoryId, field, value) {
+    if (field.control === 'segmented') {
+      return this.renderSegmentedField(categoryId, field, value);
+    }
     switch (field.type) {
       case 'toggle':
         return this.renderToggleField(categoryId, field, value);
@@ -2524,6 +2695,46 @@ class UISystem extends BaseSystem {
       wrapper.appendChild(description);
     }
 
+    return wrapper;
+  }
+
+  // A select shown as one button per option; a click sets it at once.
+  renderSegmentedField(categoryId, field, value) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'settings-field settings-field--wide';
+    wrapper.dataset.settingKey = field.key;
+    wrapper.dataset.settingCategory = categoryId;
+
+    const label = document.createElement('span');
+    label.className = 'settings-field__label';
+    label.id = `setting-${categoryId}-${field.key}-label`;
+    label.textContent = field.label;
+    wrapper.appendChild(label);
+
+    const group = document.createElement('div');
+    group.className = 'settings-segmented';
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-labelledby', label.id);
+    const current = value ?? field.default;
+    ensureArray(field.options).forEach((option) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'settings-segment';
+      button.dataset.settingKey = field.key;
+      button.dataset.settingCategory = categoryId;
+      button.dataset.segmentValue = option;
+      button.setAttribute('aria-pressed', String(option === current));
+      button.textContent = field.optionLabels?.[option] ?? option;
+      group.appendChild(button);
+    });
+    wrapper.appendChild(group);
+
+    if (field.description) {
+      const description = document.createElement('p');
+      description.className = 'settings-field__description';
+      description.textContent = field.description;
+      wrapper.appendChild(description);
+    }
     return wrapper;
   }
 
@@ -2969,7 +3180,10 @@ class UISystem extends BaseSystem {
     }
 
     if (screenName === 'victory') {
-      this.showVictoryScreen(payload);
+      const show = () => this.showVictoryScreen(payload);
+      if (!this.cinematics.deferUntilEpilogueEnds(show)) {
+        show();
+      }
       return;
     }
 
@@ -3049,6 +3263,7 @@ class UISystem extends BaseSystem {
 
       if (screenName === 'menu') {
         this.requestMenuShipSelectorRefresh();
+        this.refreshMenuStatus();
       }
 
       if (emitEvent) {
@@ -3170,6 +3385,9 @@ class UISystem extends BaseSystem {
 
       container.appendChild(fragment);
       this.levelUpState.buttons = buttons;
+      if (!this.prefersReducedMotion()) {
+        staggerCardEntry(buttons);
+      }
       this.focusLevelUpOption(0, { preventFocus: false });
     } else {
       this.levelUpState.buttons = [];
@@ -3244,7 +3462,9 @@ class UISystem extends BaseSystem {
   createUpgradeOptionButton(option, index) {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = `upgrade-option upgrade-option--${option.rarity || 'common'}`;
+    button.className = `upgrade-option upgrade-option--${option.rarity || 'common'}${
+      option.cursed ? ' upgrade-option--cursed' : ''
+    }`;
     button.dataset.upgradeId = option.id;
     button.dataset.index = `${index}`;
 
@@ -3328,7 +3548,9 @@ class UISystem extends BaseSystem {
     const rarity = option.rarity || 'common';
 
     return `
-      <p class="upgrade-option__rarity">${UPGRADE_RARITY_LABELS[rarity]}</p>
+      <p class="upgrade-option__rarity">${
+        option.cursed ? 'Cursed' : UPGRADE_RARITY_LABELS[rarity]
+      }</p>
       <header class="upgrade-option__header">
         <span class="upgrade-icon" aria-hidden="true">${
           option.icon || '✨'
@@ -3407,10 +3629,31 @@ class UISystem extends BaseSystem {
     this.disableLevelUpOptions();
     const success = progression.applyUpgrade(upgradeId);
     if (success) {
-      this.showGameUI();
+      this.leaveLevelUp(upgradeId);
     } else {
       this.enableLevelUpOptions();
     }
+  }
+
+  // Cards out (ui/levelUpTransition.js), input locked, then back to the run.
+  leaveLevelUp(upgradeId) {
+    const buttons = ensureArray(this.levelUpState.buttons);
+    this.levelUpState.lockedUntil = Infinity;
+    this.levelUpState.exitTimer = playLevelUpExit({
+      screen: document.getElementById('levelup-screen'),
+      cards: buttons,
+      picked: buttons.find((button) => button.dataset.upgradeId === upgradeId),
+      target: document.getElementById('ui-weapon-chip'),
+      reducedMotion: this.prefersReducedMotion(),
+      done: () => this.showGameUI(),
+    });
+  }
+
+  prefersReducedMotion() {
+    return (
+      document.body.classList.contains('motion-reduced') ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    );
   }
 
   handleUpgradeOptions(payload = {}) {
@@ -3552,6 +3795,8 @@ class UISystem extends BaseSystem {
   }
 
   resetLevelUpState() {
+    clearTimeout(this.levelUpState.exitTimer);
+    document.getElementById('levelup-screen')?.classList.remove('is-leaving');
     ensureArray(this.levelUpState.buttons).forEach((button) => {
       if (button) {
         button.classList.remove('is-focused');
@@ -3569,6 +3814,7 @@ class UISystem extends BaseSystem {
       level: null,
       lockedUntil: 0,
       banishMode: false,
+      exitTimer: null,
     };
   }
 

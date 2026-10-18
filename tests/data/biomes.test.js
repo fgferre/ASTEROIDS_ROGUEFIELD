@@ -13,8 +13,7 @@ const RGBA =
 const COLOR_FIELDS = [
   'hazeColor',
   'veinColor',
-  'floorColor',
-  'floorSpecks',
+  'dustColor',
   'keyColor',
   'fillColor',
 ];

@@ -130,3 +130,6 @@ hangar — tudo no browser, tudo medido na máquina dele._
    de draw calls < 120, medição real antes de cada otimização.
 
 Regra que não muda: números são propostas; ele julga jogando; nada publica sem ele.
+
+**Regra dele (18/10):** toda rodada melhora também qualidade gráfica, efeitos, câmera, jogabilidade e UX — não só
+conteúdo. O PLAN de cada rodada tem os dois eixos.

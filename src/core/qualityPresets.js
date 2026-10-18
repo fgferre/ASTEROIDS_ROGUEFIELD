@@ -7,42 +7,58 @@
 
 // Best first. `pixelRatio` caps render pixels per CSS pixel (the canvas
 // itself stays at native size; the composer draws smaller and scales up).
+// `shadows`: the key light's shadow map size in texels (rocks, machines and
+// the ship shadow each other), 0 = off. The polish layers (proposta 18/10):
+// `filmGrain` grain + vignette in the impact pass, `rimLight` on machine
+// hulls, `decals` scorch marks on rocks.
 export const QUALITY_PRESETS = {
   ultra: {
     bloomScale: 1,
     smaa: true,
     impactPass: true,
     surfaceMaps: true,
-    shadows: true,
+    shadows: 2048,
     debrisCap: 160,
     pixelRatio: 2,
+    filmGrain: true,
+    rimLight: true,
+    decals: true,
   },
   high: {
     bloomScale: 1,
     smaa: true,
     impactPass: true,
     surfaceMaps: true,
-    shadows: true,
+    shadows: 1024,
     debrisCap: 120,
     pixelRatio: 1.5,
+    filmGrain: true,
+    rimLight: true,
+    decals: true,
   },
   medium: {
     bloomScale: 0.85,
     smaa: false,
     impactPass: true,
     surfaceMaps: true,
-    shadows: true,
+    shadows: 0,
     debrisCap: 80,
     pixelRatio: 1.25,
+    filmGrain: true,
+    rimLight: true,
+    decals: true,
   },
   low: {
     bloomScale: 0.7,
     smaa: false,
     impactPass: false,
     surfaceMaps: false,
-    shadows: false,
+    shadows: 0,
     debrisCap: 48,
     pixelRatio: 1,
+    filmGrain: false,
+    rimLight: false,
+    decals: false,
   },
 };
 export const QUALITY_LEVELS = Object.keys(QUALITY_PRESETS);

@@ -63,6 +63,12 @@
             <h1 id="menu-screen-title" class="menu-screen__title">
               ASTEROID ROGUEFIELD
             </h1>
+            <p id="menu-status" class="menu-status" aria-label="Records"></p>
+            <div
+              id="menu-hull-stage"
+              class="menu-hull-stage"
+              aria-hidden="true"
+            ></div>
             <section
               id="menu-ship-selector"
               class="menu-ship-selector"
@@ -81,20 +87,20 @@
                 aria-label="Ship hull selection"
               ></div>
             </section>
-            <nav class="menu-screen__nav" aria-label="Main Menu">
+            <nav class="menu-screen__nav menu-grid" aria-label="Main Menu">
               <button
                 id="start-game-btn"
-                class="menu-screen__button"
+                class="menu-screen__button menu-screen__button--primary"
                 type="button"
               >
                 Start
               </button>
               <button
-                id="open-settings-btn"
+                id="menu-hangar-btn"
                 class="menu-screen__button"
                 type="button"
               >
-                Options
+                Hangar
               </button>
               <button
                 id="menu-codex-btn"
@@ -104,11 +110,11 @@
                 Codex
               </button>
               <button
-                id="menu-hangar-btn"
+                id="open-settings-btn"
                 class="menu-screen__button"
                 type="button"
               >
-                Hangar
+                Settings
               </button>
               <button
                 id="menu-credits-btn"
@@ -167,65 +173,57 @@
         </div>
       </div>
 
-      <!-- Pause Screen -->
+      <!-- Pause Screen: the recap's card layout (header, build card, actions) -->
       <div id="pause-screen" class="screen hidden">
-        <div class="pause-layout">
-          <div
-            class="pause-content"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="pause-title"
-          >
-            <header class="pause-header">
-              <h2 id="pause-title" class="pause-title">GAME PAUSED</h2>
-              <p class="pause-subtitle">Press Esc to continue</p>
-            </header>
-            <div class="pause-actions">
-              <button
-                id="pause-resume-btn"
-                class="btn btn--primary"
-                type="button"
-              >
-                Resume Mission
-              </button>
-              <button
-                id="pause-settings-btn"
-                class="btn btn--secondary"
-                type="button"
-              >
-                Settings
-              </button>
-              <button
-                id="pause-exit-btn"
-                class="btn btn--outline btn--danger"
-                type="button"
-              >
-                Quit to Menu
-              </button>
-            </div>
-            <div class="pause-hints">
-              <ul class="controls-hints" aria-label="Controls">
-                <li><kbd>W</kbd><kbd>↑</kbd> thrust</li>
-                <li><kbd>A</kbd><kbd>D</kbd> turn</li>
-                <li><kbd>Shift</kbd> dash</li>
-                <li><kbd>E</kbd> shield</li>
-                <li><kbd>G</kbd> spread mode</li>
-                <li><kbd>T</kbd> aim mode</li>
-                <li><kbd>Esc</kbd> pause</li>
-                <li class="controls-hints__note">Shooting is automatic</li>
-              </ul>
-            </div>
-          </div>
-          <aside class="pause-build" aria-labelledby="pause-build-title">
-            <header class="pause-build__header">
-              <h3 id="pause-build-title" class="pause-build__title">
-                Current Build
-              </h3>
-              <p id="pause-build-location" class="run-recap__location">—</p>
-            </header>
+        <div
+          class="pause-content"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="pause-title"
+        >
+          <header class="pause-header">
+            <h2 id="pause-title" class="pause-title">Game Paused</h2>
+            <p id="pause-build-location" class="run-recap__location">—</p>
+          </header>
+          <section class="pause-build" aria-labelledby="pause-build-title">
+            <h3 id="pause-build-title" class="run-build__label">
+              Current Build
+            </h3>
             <div id="pause-build-block" class="run-build"></div>
             <p id="pause-build-tools" class="pause-build__tools">—</p>
-          </aside>
+          </section>
+          <div class="pause-actions menu-grid">
+            <button
+              id="pause-resume-btn"
+              class="menu-screen__button menu-screen__button--primary"
+              type="button"
+            >
+              Resume
+            </button>
+            <button
+              id="pause-settings-btn"
+              class="menu-screen__button"
+              type="button"
+            >
+              Settings
+            </button>
+            <button
+              id="pause-exit-btn"
+              class="menu-screen__button menu-screen__button--danger"
+              type="button"
+            >
+              Quit to Menu
+            </button>
+          </div>
+          <ul class="controls-hints" aria-label="Controls">
+            <li><kbd>W</kbd><kbd>↑</kbd> thrust</li>
+            <li><kbd>A</kbd><kbd>D</kbd> turn</li>
+            <li><kbd>Shift</kbd> dash</li>
+            <li><kbd>E</kbd> shield</li>
+            <li><kbd>G</kbd> spread mode</li>
+            <li><kbd>T</kbd> aim mode</li>
+            <li><kbd>Esc</kbd> resume</li>
+          </ul>
         </div>
       </div>
 
@@ -357,6 +355,28 @@
               ✕
             </button>
           </header>
+          <div class="codex-tabs" role="tablist" aria-label="Codex sections">
+            <button
+              class="codex-tab is-active"
+              type="button"
+              role="tab"
+              data-codex-tab="enemies"
+              aria-selected="true"
+              aria-controls="codex-list"
+            >
+              Enemies
+            </button>
+            <button
+              class="codex-tab"
+              type="button"
+              role="tab"
+              data-codex-tab="achievements"
+              aria-selected="false"
+              aria-controls="codex-list"
+            >
+              Achievements
+            </button>
+          </div>
           <ul
             id="codex-list"
             class="codex-list credits-body"
