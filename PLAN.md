@@ -343,7 +343,7 @@ Qualidade:
       telegrafia/lançamento/impacto do Caster e de fase do Shade.
 - [x] **R11.8 Conquistas do conteúdo novo.** Counter-Battery (20 Casters), Unphased (15 Shades), Iron Escort (vitória
       com o Bastion), Full Garage (os três cascos).
-- [ ] **R11.9 Números de dano no 3D.** Provar por captura que aparecem e na fonte do jogo (Rajdhani); corrigir a menor
+- [x] **R11.9 Números de dano no 3D.** Provar por captura que aparecem e na fonte do jogo (Rajdhani); corrigir a menor
       causa se assarem na fonte reserva.
 
 ## Fora de escopo deste plano
