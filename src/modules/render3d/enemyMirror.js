@@ -1,12 +1,14 @@
 // Mirrors EnemySystem entities into Three objects (docs/NORTE.md §3): Ring
 // fragments as procedural rock meshes whose cracks light up amber with
 // damage, and the Wardens' machines (Mote, Seeker, Tether, Husk, Ram, Weaver,
-// Bulwark, Warden Prime). Views are pooled per kind and keyed by entity id; a
+// Bulwark) and the three Wardens (Prime, Choir, Null; one view kind each,
+// picked by `bossKind`). Views are pooled per kind and keyed by entity id; a
 // view not seen in a frame is hidden and returned to its pool.
 
 import { IS_DEV } from '../../core/env.js';
 import { PALETTE } from '../../data/constants/palette.js';
 import { BULWARK_SHIELD_HALF_ARC } from '../../data/enemies/bulwark.js';
+import { WARDEN_KINDS } from '../../data/enemies/boss.js';
 import { createAsteroidGeometry, createSeededRandom } from './asteroidMesh.js';
 import { HALF_H, HALF_W, colorOf } from './batches.js';
 
@@ -20,6 +22,12 @@ const ROCK_SCALE = 1.08;
 const CRACK_GLOW = [0, 0.8, 1.15, 1.4];
 const CRACK_REVEAL = [0, 0.35, 0.65, 1];
 const WARDEN_SEGMENTS = 6;
+// Choir and Null views are drawn in field pixels (their bodies come from the
+// boss: `cores`, `plates`); Prime is a unit model scaled by the radius.
+const CHOIR_CORE_PX = 28;
+const CHOIR_SHARDS = 5;
+const NULL_CLOSED_PX = 70;
+const BREAK_SECONDS = 1.6;
 const WEAVER_ARMS = 3;
 const ELITE_DASHES = 6;
 const TAU = Math.PI * 2;
@@ -307,6 +315,17 @@ export class EnemyMirror {
     this.wardenSegment.rotateX(Math.PI / 2);
     this.wardenSegment.scale(1, 0.55, 1);
     this.wardenSegment.rotateY(-arc / 2);
+    // Choir: a machined arm from the hub to a core; shards for its break.
+    this.choirArm = new THREE.BoxGeometry(1, 0.5, 1);
+    this.choirArm.translate(0.5, 0, 0);
+    this.shard = new THREE.TetrahedronGeometry(1, 0);
+    // Null: one curved plate of the shell, centred on its own origin.
+    const plateArc = (TAU / 8) * 0.82;
+    this.nullPlate = new THREE.TorusGeometry(1, 0.3, 4, 6, plateArc);
+    this.nullPlate.rotateX(Math.PI / 2);
+    this.nullPlate.scale(1, 0.8, 1);
+    this.nullPlate.rotateY(-plateArc / 2);
+    this.nullPlate.translate(-1, 0, 0);
 
     // telegraph pieces (flat on the field plane)
     this.lanePlane = new THREE.PlaneGeometry(1, 1);
@@ -318,6 +337,11 @@ export class EnemyMirror {
 
     // Accent energy: threat red, gold on an Elite (RenderComponent accentOf).
     this.threatColor = colorOf(THREE, PALETTE.threat);
+    this.bossColor = colorOf(THREE, PALETTE.boss);
+    this.bossRimMaterial = new THREE.LineBasicMaterial({
+      color: colorOf(THREE, PALETTE.boss).multiplyScalar(1.2),
+      toneMapped: false,
+    });
     this.goldColor = colorOf(THREE, PALETTE.xp);
     this.eliteRimMaterial = new THREE.LineBasicMaterial({
       color: colorOf(THREE, PALETTE.xp).multiplyScalar(1.1),
@@ -465,13 +489,18 @@ export class EnemyMirror {
       case 'bulwark':
         return this.createBulwark();
       case 'boss':
-        return this.createWarden();
+      case 'boss-choir':
+      case 'boss-null':
+        return this.createWarden(kind);
       default:
         return this.createUnknown();
     }
   }
 
-  kindOf(type) {
+  kindOf(type, bossKind) {
+    if (type === 'boss' && (bossKind === 'choir' || bossKind === 'null')) {
+      return `boss-${bossKind}`;
+    }
     if (KNOWN_KINDS.has(type)) return type;
     if (IS_DEV && !this.unknownWarned.has(type)) {
       this.unknownWarned.add(type);
@@ -766,7 +795,27 @@ export class EnemyMirror {
     return this.view('unknown', mesh);
   }
 
-  createWarden() {
+  // One view kind per Warden: the boss's `bossKind` picks the body.
+  createWarden(kind) {
+    if (kind === 'boss-choir') return this.createChoir();
+    if (kind === 'boss-null') return this.createNull();
+    return this.createPrime();
+  }
+
+  wardenCoreMaterial(intensity) {
+    const { THREE } = this;
+    const material = new THREE.MeshStandardMaterial({
+      color: colorOf(THREE, '#120a1a'),
+      emissive: colorOf(THREE, PALETTE.boss),
+      emissiveIntensity: intensity,
+      roughness: 0.35,
+      metalness: 0.2,
+    });
+    material.onBeforeCompile = patchHotCore;
+    return material;
+  }
+
+  createPrime() {
     const { THREE } = this;
     const group = new THREE.Group();
     const ring = new THREE.Group();
@@ -777,14 +826,7 @@ export class EnemyMirror {
       segments.push(segment);
       ring.add(segment);
     }
-    const coreMaterial = new THREE.MeshStandardMaterial({
-      color: colorOf(THREE, '#120a1a'),
-      emissive: colorOf(THREE, PALETTE.boss),
-      emissiveIntensity: 1.3,
-      roughness: 0.35,
-      metalness: 0.2,
-    });
-    coreMaterial.onBeforeCompile = patchHotCore;
+    const coreMaterial = this.wardenCoreMaterial(1.3);
     const core = new THREE.Mesh(this.sphere, coreMaterial);
     core.scale.setScalar(0.45);
     const rim = new THREE.LineLoop(
@@ -810,8 +852,113 @@ export class EnemyMirror {
     };
   }
 
-  // Charge lane / fan / warning ring on the field plane (Warden and Ram).
-  createTelegraph() {
+  // Three cores on arms around a dark hub; each core owns its material so it
+  // can sing (lit) or stay dim, and its arm and shards for the break.
+  createChoir() {
+    const { THREE } = this;
+    const group = new THREE.Group();
+    const hub = new THREE.Mesh(this.sphere, this.darkMaterial);
+    hub.scale.set(22, 14, 22);
+    const hubRim = new THREE.LineLoop(this.circleRim, this.bossRimMaterial);
+    hubRim.scale.setScalar(30);
+    group.add(hub, hubRim);
+    const cores = [];
+    for (let i = 0; i < 3; i += 1) {
+      const pivot = new THREE.Group();
+      const arm = new THREE.Mesh(this.choirArm, this.plateMaterial);
+      arm.scale.set(90 - CHOIR_CORE_PX, 6, 9);
+      const coreMaterial = this.wardenCoreMaterial(0.2);
+      const core = new THREE.Mesh(this.sphere, coreMaterial);
+      core.position.x = 90;
+      core.scale.setScalar(CHOIR_CORE_PX);
+      const haloMaterial = new THREE.LineBasicMaterial({
+        color: colorOf(THREE, PALETTE.boss).multiplyScalar(1.3),
+        transparent: true,
+        toneMapped: false,
+      });
+      const halo = new THREE.LineLoop(this.circleRim, haloMaterial);
+      halo.position.x = 90;
+      const shards = [];
+      for (let k = 0; k < CHOIR_SHARDS; k += 1) {
+        const shard = new THREE.Mesh(this.shard, this.plateMaterial);
+        shard.visible = false;
+        shards.push(shard);
+        pivot.add(shard);
+      }
+      pivot.add(arm, core, halo);
+      group.add(pivot);
+      cores.push({
+        pivot,
+        arm,
+        core,
+        coreMaterial,
+        halo,
+        haloMaterial,
+        shards,
+      });
+    }
+    this.scene.add(group);
+    return {
+      kind: 'boss-choir',
+      object: group,
+      cores,
+      telegraph: this.createTelegraph(3),
+      id: null,
+    };
+  }
+
+  // A dark core inside eight plates; the plates open into an orbit, then are
+  // shed. Two rings announce and show the inverted XP pull.
+  createNull() {
+    const { THREE } = this;
+    const group = new THREE.Group();
+    const coreMaterial = this.wardenCoreMaterial(0.5);
+    coreMaterial.color.copy(colorOf(THREE, '#05030a'));
+    const core = new THREE.Mesh(this.sphere, coreMaterial);
+    const rim = new THREE.LineLoop(this.circleRim, this.bossRimMaterial);
+    const plates = [];
+    for (let i = 0; i < 8; i += 1) {
+      const mesh = new THREE.Mesh(this.nullPlate, this.plateMaterial);
+      mesh.scale.setScalar(NULL_CLOSED_PX);
+      plates.push({ mesh, shed: null });
+      group.add(mesh);
+    }
+    const pullRings = [0, 1].map(() => {
+      const ring = new THREE.Mesh(
+        this.warnRing,
+        new THREE.MeshBasicMaterial({
+          color: colorOf(THREE, PALETTE.xp),
+          transparent: true,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          side: THREE.DoubleSide,
+          toneMapped: false,
+        })
+      );
+      ring.position.y = 1;
+      ring.visible = false;
+      group.add(ring);
+      return ring;
+    });
+    group.add(core, rim);
+    this.scene.add(group);
+    return {
+      kind: 'boss-null',
+      object: group,
+      core,
+      coreMaterial,
+      rim,
+      plates,
+      pullRings,
+      shedAt: null,
+      telegraph: this.createTelegraph(),
+      id: null,
+    };
+  }
+
+  // Charge lane / fan / warning ring on the field plane (Wardens and Ram);
+  // `beams` lines for the Choir's converging volley.
+  createTelegraph(beams = 0) {
     const { THREE } = this;
     const additive = (hex) =>
       new THREE.MeshBasicMaterial({
@@ -827,10 +974,27 @@ export class EnemyMirror {
     const line = new THREE.Mesh(this.lanePlane, additive(PALETTE.threat));
     const fan = new THREE.Mesh(this.lanePlane, additive(PALETTE.threat));
     const warn = new THREE.Mesh(this.warnRing, additive(PALETTE.threat));
-    group.add(lane, line, fan, warn);
+    // the Null's lane: a dark band between two violet edges
+    const dark = new THREE.Mesh(
+      this.lanePlane,
+      new THREE.MeshBasicMaterial({
+        color: colorOf(THREE, '#030106'),
+        transparent: true,
+        depthWrite: false,
+        side: THREE.DoubleSide,
+      })
+    );
+    const edges = [0, 1].map(
+      () => new THREE.Mesh(this.lanePlane, additive(PALETTE.boss))
+    );
+    const beamList = [];
+    for (let i = 0; i < beams; i += 1) {
+      beamList.push(new THREE.Mesh(this.lanePlane, additive(PALETTE.threat)));
+    }
+    group.add(lane, line, fan, warn, dark, ...edges, ...beamList);
     group.visible = false;
     this.scene.add(group);
-    return { group, lane, line, fan, warn };
+    return { group, lane, line, fan, warn, dark, edges, beams: beamList };
   }
 
   // --- per frame -------------------------------------------------------------
@@ -843,7 +1007,7 @@ export class EnemyMirror {
       const enemy = enemies[i];
       if (!enemy || enemy.destroyed) continue;
       const key = enemy.id || enemy;
-      const kind = this.kindOf(enemy.type);
+      const kind = this.kindOf(enemy.type, enemy.bossKind);
       let view = this.views.get(key);
       if (view && view.kind !== kind) {
         this.release(key, view);
@@ -861,7 +1025,7 @@ export class EnemyMirror {
       object.position.set(enemy.x - HALF_W, 0, enemy.y - HALF_H);
       const flash = enemy.getHitFlash();
       if (kind === 'asteroid') this.updateRock(view, enemy, time, flash);
-      else if (kind === 'boss') {
+      else if (kind.startsWith('boss')) {
         this.updateWarden(view, enemy, time);
         warden = view;
       } else this.updateMachine(view, enemy, kind, time, flash);
@@ -962,6 +1126,26 @@ export class EnemyMirror {
   }
 
   bind(view, enemy) {
+    if (view.kind === 'boss-choir') {
+      view.cores.forEach((core) => {
+        core.broken = null;
+        core.pivot.visible = true;
+        core.pivot.position.set(0, 0, 0);
+        core.pivot.rotation.set(0, 0, 0);
+        core.shards.forEach((shard) => (shard.visible = false));
+      });
+      return;
+    }
+    if (view.kind === 'boss-null') {
+      view.shedAt = null;
+      view.plates.forEach((plate) => {
+        plate.shed = null;
+        plate.mesh.visible = true;
+        plate.mesh.rotation.set(0, 0, 0);
+        plate.mesh.scale.setScalar(NULL_CLOSED_PX);
+      });
+      return;
+    }
     if (view.kind === 'husk') {
       const random = createSeededRandom((view.seed % 100000) + 1);
       view.material.userData.rockUniforms.uSeed.value.set(
@@ -1042,6 +1226,12 @@ export class EnemyMirror {
   }
 
   updateWarden(view, boss, time) {
+    if (view.kind === 'boss-choir') this.updateChoir(view, boss, time);
+    else if (view.kind === 'boss-null') this.updateNull(view, boss, time);
+    else this.updatePrime(view, boss, time);
+  }
+
+  updatePrime(view, boss, time) {
     const radius = boss.radius || 60;
     view.object.scale.setScalar(radius);
     view.object.rotation.y = -(boss.rotation || 0);
@@ -1055,6 +1245,155 @@ export class EnemyMirror {
     const flash = boss.getHitFlash();
     view.coreMaterial.emissiveIntensity =
       1.25 + 0.25 * Math.sin(time * 3) + phase * 0.2 + flash * 0.8;
+    this.updateTelegraph(view.telegraph, boss, radius);
+  }
+
+  // The singing core is lit and haloed, the others dim. A broken core keeps
+  // its last angle and drifts out with its arm, tumbling and going dark,
+  // while shards fly from it.
+  updateChoir(view, boss, time) {
+    const flash = boss.getHitFlash();
+    const states = boss.cores || [];
+    for (let i = 0; i < view.cores.length; i += 1) {
+      const c = view.cores[i];
+      const state = states[i];
+      if (!state) {
+        c.pivot.visible = false;
+        continue;
+      }
+      if (state.alive) {
+        const angle = Math.atan2(state.y - boss.y, state.x - boss.x);
+        c.pivot.rotation.y = -angle;
+        const singing = boss.singingIndex === i;
+        const beat = Math.sin(time * 5 + i);
+        c.coreMaterial.emissiveIntensity = singing
+          ? 1.7 + 0.35 * beat + flash * 0.8
+          : 0.16 + flash * 0.25;
+        c.core.scale.setScalar(
+          CHOIR_CORE_PX * (singing ? 1.06 + 0.04 * beat : 0.9)
+        );
+        c.halo.visible = singing;
+        c.halo.scale.setScalar(CHOIR_CORE_PX * (1.3 + 0.08 * beat));
+        c.haloMaterial.opacity = 0.6 + 0.3 * beat;
+        continue;
+      }
+      if (!c.broken) {
+        c.broken = { start: time };
+        c.halo.visible = false;
+      }
+      const age = time - c.broken.start;
+      if (age > BREAK_SECONDS) {
+        c.pivot.visible = false;
+        continue;
+      }
+      const u = age / BREAK_SECONDS;
+      // out along the arm, sinking and tipping as it goes
+      c.pivot.position.set(0, -40 * u * u, 0);
+      c.arm.position.x = 70 * u;
+      c.core.position.x = 90 + 120 * u;
+      c.arm.rotation.z = -1.2 * u;
+      c.arm.rotation.x = 2.5 * u;
+      c.core.rotation.y = 6 * u;
+      c.coreMaterial.emissiveIntensity =
+        (1 - u) * (1.2 + 1.2 * Math.abs(Math.sin(age * 31)));
+      c.core.scale.setScalar(CHOIR_CORE_PX * (1 - 0.45 * u));
+      const spray = 90 * Math.sqrt(u);
+      c.shards.forEach((shard, k) => {
+        const a = (k / CHOIR_SHARDS) * TAU + i;
+        shard.visible = true;
+        shard.position.set(
+          90 + Math.cos(a) * spray + 60 * u,
+          Math.sin(a * 2) * spray * 0.4 - 30 * u * u,
+          Math.sin(a) * spray
+        );
+        shard.rotation.set(age * (3 + k), age * 2, age * (1 + k));
+        shard.scale.setScalar(9 * (1 - u) + 2);
+      });
+    }
+    const t = boss.telegraph;
+    this.updateTelegraph(
+      view.telegraph,
+      boss,
+      t?.type === 'fan' ? CHOIR_CORE_PX * 1.3 : boss.radius || 118
+    );
+  }
+
+  // Plates follow the boss's own positions (closed shell, then open orbit);
+  // once shed they fly out, tumbling and shrinking. The core brightens when
+  // exposed. The pull rings close in during the windup and ripple outward
+  // while the XP pull is inverted.
+  updateNull(view, boss, time) {
+    const flash = boss.getHitFlash();
+    const phase = Math.max(0, boss.currentPhase || 0);
+    const exposed = phase >= 2;
+    const radius = boss.radius || NULL_CLOSED_PX;
+    view.core.scale.setScalar(radius * (exposed ? 0.62 : 0.52));
+    view.coreMaterial.emissiveIntensity = exposed
+      ? 2.2 + 0.5 * Math.sin(time * 6) + flash * 0.8
+      : 0.25 + 0.1 * Math.sin(time * 2) + flash * 0.6;
+    view.rim.scale.setScalar(radius * (exposed ? 0.8 : 1.25));
+    view.rim.visible = exposed || (boss.shellOpen || 0) > 0.2;
+
+    const states = boss.plates || [];
+    if (boss.shellShed && view.shedAt === null) view.shedAt = time;
+    const shedAge = view.shedAt === null ? 0 : time - view.shedAt;
+    for (let i = 0; i < view.plates.length; i += 1) {
+      const plate = view.plates[i];
+      const state = states[i];
+      const { mesh } = plate;
+      if (!state) {
+        mesh.visible = false;
+        continue;
+      }
+      const dx = state.x - boss.x;
+      const dy = state.y - boss.y;
+      const angle = Math.atan2(dy, dx);
+      if (view.shedAt === null) {
+        mesh.visible = true;
+        mesh.position.set(dx, 0, dy);
+        mesh.rotation.set(0, -angle, 0);
+        // an open plate tilts up, so it reads as loose
+        mesh.rotation.z = (boss.shellOpen || 0) * 0.5;
+        continue;
+      }
+      if (!plate.shed) plate.shed = { x: dx, y: dy, angle };
+      if (shedAge > BREAK_SECONDS) {
+        mesh.visible = false;
+        continue;
+      }
+      const u = shedAge / BREAK_SECONDS;
+      const out = 260 * u;
+      const a = plate.shed.angle;
+      mesh.position.set(
+        plate.shed.x + Math.cos(a) * out,
+        30 * Math.sin(u * Math.PI) - 20 * u,
+        plate.shed.y + Math.sin(a) * out
+      );
+      mesh.rotation.set(shedAge * (2 + (i % 3)), -a + shedAge, shedAge * 3);
+      mesh.scale.setScalar(NULL_CLOSED_PX * (1 - 0.7 * u));
+    }
+
+    const state = boss.pullState;
+    view.pullRings.forEach((ring, k) => {
+      ring.visible = state === 'windup' || state === 'inverting';
+      if (!ring.visible) return;
+      let r;
+      let opacity;
+      if (state === 'windup') {
+        const p = clamp01(
+          1 - (boss.pullStateTimer || 0) / WARDEN_KINDS.null.pullWindup
+        );
+        r = 260 - 170 * p + k * 30;
+        opacity = 0.2 + 0.6 * p;
+      } else {
+        const w = (time * 1.4 + k * 0.5) % 1;
+        r = 90 + 300 * w;
+        opacity = 0.75 * (1 - w);
+      }
+      ring.scale.set(r, 1, r);
+      ring.material.opacity = opacity;
+    });
+
     this.updateTelegraph(view.telegraph, boss, radius);
   }
 
@@ -1081,18 +1420,44 @@ export class EnemyMirror {
     const progress = Math.min(1, Math.max(0, 1 - t.timer / duration));
     const pulse = 0.5 + 0.5 * Math.sin(progress * Math.PI * 6);
     const r = Math.max(20, radius);
-    parts.group.position.set(boss.x - HALF_W, 1, boss.y - HALF_H);
-    parts.group.rotation.y = -(t.angle || 0);
+    const ox = Number.isFinite(t.x) ? t.x : boss.x;
+    const oy = Number.isFinite(t.y) ? t.y : boss.y;
+    parts.group.position.set(ox - HALF_W, 1, oy - HALF_H);
+    const chorus = t.type === 'chorus';
+    parts.group.rotation.y = chorus ? 0 : -(t.angle || 0);
     const charge = t.type === 'charge';
-    parts.lane.visible = charge;
+    const dark = charge && t.tone === 'dark';
+    parts.lane.visible = charge && !dark;
+    parts.dark.visible = dark;
+    parts.edges.forEach((edge) => (edge.visible = dark));
     parts.line.visible = charge;
     parts.fan.visible = t.type === 'fan';
+    parts.beams.forEach((beam, i) => {
+      const line = chorus ? t.lines?.[i] : null;
+      beam.visible = Boolean(line);
+      if (!line) return;
+      beam.position.set(line.x - ox, 0, line.y - oy);
+      beam.rotation.y = -line.angle;
+      beam.scale.set(Math.max(1, line.length), 1, 2 + 4 * progress);
+      beam.material.opacity = (0.3 + 0.6 * progress) * (0.7 + 0.3 * pulse);
+    });
     if (charge) {
       const length = Math.max(r * 2, t.length || 400);
-      parts.lane.scale.set(length, 1, r * 1.8);
-      parts.lane.material.opacity = 0.08 + 0.18 * progress;
+      parts.line.material.color.copy(dark ? this.bossColor : this.threatColor);
       parts.line.scale.set(length, 1, 2);
       parts.line.material.opacity = 0.35 + 0.55 * progress;
+      if (dark) {
+        parts.dark.scale.set(length, 1, r * 1.8);
+        parts.dark.material.opacity = 0.35 + 0.4 * progress;
+        parts.edges.forEach((edge, i) => {
+          edge.position.z = (i ? 1 : -1) * r * 0.9;
+          edge.scale.set(length, 1, 3);
+          edge.material.opacity = 0.3 + 0.6 * progress;
+        });
+      } else {
+        parts.lane.scale.set(length, 1, r * 1.8);
+        parts.lane.material.opacity = 0.08 + 0.18 * progress;
+      }
     } else if (t.type === 'fan') {
       const arc = Math.max(0.1, t.arc || 0.8);
       const length = Math.max(r * 1.5, t.length || 180);

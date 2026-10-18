@@ -1006,9 +1006,16 @@ class XPOrbSystem extends BaseSystem {
   }
 
   // Magnet pickup: every orb flies to the ship, faster each second; the
-  // ship magnetism below collects them on arrival.
-  startGlobalPull(duration, speed, acceleration) {
-    this.globalPull = { remaining: duration, elapsed: 0, speed, acceleration };
+  // ship magnetism below collects them on arrival. `direction` -1 inverts it
+  // (Warden Null): every orb flies away from the ship.
+  startGlobalPull(duration, speed, acceleration, direction = 1) {
+    this.globalPull = {
+      remaining: duration,
+      elapsed: 0,
+      speed,
+      acceleration,
+      direction,
+    };
   }
 
   updateGlobalPull(deltaTime) {
@@ -1027,7 +1034,10 @@ class XPOrbSystem extends BaseSystem {
       const dy = target.y - orb.y;
       const distance = Math.hypot(dx, dy);
       if (distance === 0) continue;
-      const move = Math.min(step, distance) / distance;
+      const move =
+        pull.direction < 0
+          ? -step / distance
+          : Math.min(step, distance) / distance;
       orb.x += dx * move;
       orb.y += dy * move;
     }

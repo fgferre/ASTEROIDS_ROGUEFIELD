@@ -29,6 +29,35 @@ describe('EnemyMirror', () => {
     }
   });
 
+  it('draws each Warden kind with its own view; a broken Choir core falls away', () => {
+    const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
+    const core = (alive, x) => ({ alive, x, y: 300 });
+    const choir = {
+      id: 'choir',
+      type: 'boss',
+      bossKind: 'choir',
+      x: 400,
+      y: 300,
+      radius: 118,
+      singingIndex: 1,
+      cores: [core(false, 490), core(true, 310), core(true, 400)],
+      getHitFlash: () => 0,
+    };
+    const nullBoss = { ...choir, id: 'null', bossKind: 'null', cores: null };
+
+    expect(mirror.update([choir, nullBoss], 0)).toBeTruthy();
+    expect(mirror.views.get('choir').kind).toBe('boss-choir');
+    expect(mirror.views.get('null').kind).toBe('boss-null');
+    const view = mirror.views.get('choir');
+    expect(view.cores[0].pivot.visible).toBe(true); // breaking, still seen
+    expect(view.cores[1].halo.visible).toBe(true); // the singing core
+    expect(view.cores[2].halo.visible).toBe(false);
+
+    mirror.update([choir], 2);
+    expect(view.cores[0].pivot.visible).toBe(false);
+    expect(view.cores[1].pivot.visible).toBe(true);
+  });
+
   it('gives every asteroid variant its own material preset, rebound on reuse', () => {
     const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
     const rock = (id, variant) => ({
