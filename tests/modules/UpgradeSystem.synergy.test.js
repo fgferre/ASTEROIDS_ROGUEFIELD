@@ -37,10 +37,14 @@ function listSourceFiles(dir) {
 }
 
 describe('upgrade families', () => {
-  it('every upgrade has one known family and every family can reach its bonus', () => {
-    expect(UPGRADE_LIBRARY).toHaveLength(21);
+  it('every upgrade has one known family (cursed ones none) and every family can reach its bonus', () => {
+    expect(UPGRADE_LIBRARY).toHaveLength(34);
     const counts = {};
     UPGRADE_LIBRARY.forEach((upgrade) => {
+      if (upgrade.cursed) {
+        expect(upgrade.family).toBeNull();
+        return;
+      }
       expect(UPGRADE_FAMILIES[upgrade.family]).toBeDefined();
       counts[upgrade.family] = (counts[upgrade.family] || 0) + 1;
     });

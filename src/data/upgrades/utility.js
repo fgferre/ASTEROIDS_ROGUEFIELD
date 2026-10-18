@@ -477,4 +477,190 @@ export const UTILITY_UPGRADES = deepFreeze([
       },
     ],
   },
+  // Cards from R5.4 (numbers: proposta 18/10, for the owner to judge by playing).
+  {
+    id: 'chain_capacitor',
+    category: 'utility',
+    family: 'arc',
+    rarity: 'rare',
+    icon: '🔗',
+    themeColor: PALETTE.status,
+    unlockLevel: 3,
+    tags: ['chain', 'weaponry'],
+    text: {
+      name: 'Chain Capacitor',
+      summary: 'Stores a spare charge on every round and spends it on contact.',
+      lore: 'A capacitor bank from a Warden relay. It always has a little left over.',
+      levels: [
+        {
+          title: 'Spare Charge',
+          description:
+            'With the Chain Lance: each chain jumps once more. Otherwise: lances have a 10% chance to hit twice.',
+          highlights: [
+            'Switches to the extra jump when the Arc bonus evolves the lance.',
+          ],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-chain-capacitor',
+            payload: { extraJumps: 1, doubleHitChance: 0.1 },
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'scrap_compactor',
+    category: 'utility',
+    family: 'salvage',
+    rarity: 'common',
+    icon: '🗜️',
+    themeColor: PALETTE.xp,
+    unlockLevel: 1,
+    tags: ['xp', 'collection'],
+    text: {
+      name: 'Scrap Compactor',
+      summary:
+        'Crushes the slag out of every orb so only the Ring light is left.',
+      lore: 'Bolted to the hold by a salvager who hated wasted space.',
+      levels: [
+        {
+          title: 'Hand Press',
+          description: 'XP from orbs +6%.',
+          highlights: ['Applies before the combo multiplier.'],
+        },
+        {
+          title: 'Hydraulic Press',
+          description: 'XP from orbs +12% (cumulative).',
+          highlights: ['Another +6%.'],
+        },
+        {
+          title: 'Mass Press',
+          description: 'XP from orbs +19% (cumulative).',
+          highlights: ['Another +6%.'],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'progression',
+            property: 'xpGainMultiplier',
+            operation: 'multiply',
+            value: 1.06,
+          },
+        ],
+      },
+      {
+        rank: 2,
+        effects: [
+          {
+            type: 'progression',
+            property: 'xpGainMultiplier',
+            operation: 'multiply',
+            value: 1.06,
+          },
+        ],
+      },
+      {
+        rank: 3,
+        effects: [
+          {
+            type: 'progression',
+            property: 'xpGainMultiplier',
+            operation: 'multiply',
+            value: 1.06,
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'lucky_fragment',
+    category: 'utility',
+    family: 'salvage',
+    rarity: 'rare',
+    icon: '🍀',
+    themeColor: PALETTE.xp,
+    unlockLevel: 3,
+    tags: ['pickups', 'collection'],
+    text: {
+      name: 'Lucky Fragment',
+      summary:
+        'A shard of Ring crystal that rattles when something worth taking is near.',
+      lore: 'Every salvager carries one. Most will tell you it does nothing.',
+      levels: [
+        {
+          title: 'Rattling Shard',
+          description:
+            'Every rock you destroy has a 10% chance to drop a field pickup.',
+          highlights: ['Magnet, Pulse or Overcharge, like an Elite drop.'],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-lucky-fragment',
+            payload: { chance: 0.1 },
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'blood_ledger',
+    category: 'utility',
+    family: null,
+    cursed: true,
+    rarity: 'rare',
+    icon: '🩸',
+    themeColor: PALETTE.boss,
+    unlockLevel: 4,
+    tags: ['xp', 'cursed'],
+    text: {
+      name: 'Blood Ledger',
+      summary:
+        'Sign the ledger: the Field pays double, and stops patching you up.',
+      lore: 'Nobody knows who keeps the book. Everybody knows it always balances.',
+      levels: [
+        {
+          title: 'Signed in Red',
+          description: 'XP from orbs +100%. Hearts no longer drop.',
+          highlights: [
+            'Cursed: only hearts already on the field can heal you.',
+          ],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'progression',
+            property: 'xpGainMultiplier',
+            operation: 'multiply',
+            value: 2,
+          },
+          {
+            type: 'event',
+            event: 'upgrade-no-heart-drops',
+            payload: {},
+          },
+        ],
+      },
+    ],
+  },
 ]);

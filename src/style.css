@@ -57,6 +57,7 @@
   --rarity-common: var(--neutral);
   --rarity-rare: var(--accent);
   --rarity-epic: var(--xp);
+  --rarity-cursed: var(--boss);
 
   color-scheme: dark;
 }
@@ -792,6 +793,11 @@ select {
 .upgrade-option--epic {
   --rarity-color: var(--rarity-epic);
   border-color: color-mix(in srgb, var(--rarity-epic) 45%, transparent);
+}
+
+.upgrade-option--cursed {
+  --rarity-color: var(--rarity-cursed);
+  border-color: color-mix(in srgb, var(--rarity-cursed) 55%, transparent);
 }
 
 .upgrade-option__rarity {

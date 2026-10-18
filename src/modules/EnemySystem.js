@@ -122,6 +122,7 @@ class EnemySystem extends BaseSystem {
     // Managers (new architecture)
     this.waveManager = null;
     this.rewardManager = null;
+    this.heartDropsBlocked = false; // Blood Ledger
     this.useManagers = true; // Feature flag to enable new manager system
 
     // Components (new architecture)
@@ -212,6 +213,11 @@ class EnemySystem extends BaseSystem {
 
     this.registerEventListener('progression-reset', () => {
       this.refreshServiceState({ force: true });
+      this.heartDropsBlocked = false;
+    });
+
+    this.registerEventListener('upgrade-no-heart-drops', () => {
+      this.heartDropsBlocked = true;
     });
 
     this.registerEventListener('world-reset', () => {

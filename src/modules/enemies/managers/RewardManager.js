@@ -633,7 +633,7 @@ export class RewardManager {
    */
   tryDropHealthHeart(enemy, randomContext = null) {
     const rewardConfig = ENEMY_REWARDS?.[enemy.type];
-    if (!rewardConfig) {
+    if (!rewardConfig || this.enemySystem?.heartDropsBlocked) {
       return;
     }
 

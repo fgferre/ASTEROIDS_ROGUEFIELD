@@ -552,4 +552,224 @@ export const OFFENSE_UPGRADES = deepFreeze([
       },
     ],
   },
+  // Cards from R5.4 (numbers: proposta 18/10, for the owner to judge by playing).
+  {
+    id: 'ballast_rounds',
+    category: 'offense',
+    family: 'kinetic',
+    rarity: 'common',
+    icon: '🪨',
+    themeColor: PALETTE.player,
+    unlockLevel: 1,
+    tags: ['damage', 'trade-off'],
+    text: {
+      name: 'Ballast Rounds',
+      summary: 'Packs every lance with dense slag: harder hits, slower breech.',
+      lore: 'Ring hull scrap pressed into slugs. Heavier than it looks.',
+      levels: [
+        {
+          title: 'Lead Core',
+          description: 'Lance damage +8%, fire rate -4%.',
+          highlights: ['Harmonic beams keep their damage.'],
+        },
+        {
+          title: 'Slag Core',
+          description: 'Lance damage +17%, fire rate -8% (cumulative).',
+          highlights: ['Another +8% damage and -4% fire rate.'],
+        },
+        {
+          title: 'Dead Weight',
+          description: 'Lance damage +26%, fire rate -11% (cumulative).',
+          highlights: ['Fewer shots, each one counts.'],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-weapon-tuning',
+            payload: { lanceDamageMultiplier: 1.08, cooldownMultiplier: 1.04 },
+          },
+        ],
+      },
+      {
+        rank: 2,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-weapon-tuning',
+            payload: { lanceDamageMultiplier: 1.08, cooldownMultiplier: 1.04 },
+          },
+        ],
+      },
+      {
+        rank: 3,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-weapon-tuning',
+            payload: { lanceDamageMultiplier: 1.08, cooldownMultiplier: 1.04 },
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'recoil_dampers',
+    category: 'offense',
+    family: 'kinetic',
+    rarity: 'rare',
+    icon: '🔩',
+    themeColor: PALETTE.player,
+    unlockLevel: 3,
+    tags: ['pierce', 'weaponry'],
+    text: {
+      name: 'Recoil Dampers',
+      summary:
+        'Steadies the barrel so each lance keeps its line through a rock.',
+      lore: 'Warden mounting dampers. The cannon stops kicking and starts punching.',
+      levels: [
+        {
+          title: 'Locked Barrel',
+          description: 'Every lance pierces one more target.',
+          highlights: ['Stacks with the Railshot evolution.'],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-weapon-tuning',
+            payload: { pierceBonus: 1 },
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'thermal_lens',
+    category: 'offense',
+    family: 'thermal',
+    rarity: 'rare',
+    icon: '🔍',
+    themeColor: PALETTE.shot,
+    unlockLevel: 3,
+    tags: ['damage', 'weapon'],
+    text: {
+      name: 'Thermal Lens',
+      summary:
+        'A crystal lens on the muzzle that focuses whatever the cannon throws.',
+      lore: 'Cut from exposed Ring crystal. It bends heat the way glass bends light.',
+      levels: [
+        {
+          title: 'Focused Burn',
+          description:
+            'With the Harmonic Plasma Lance: beam length +40%. Otherwise: lance damage +15%.',
+          highlights: [
+            'Switches to the beam bonus when you take the Harmonic Resonator.',
+          ],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-thermal-lens',
+            payload: { beamLengthMultiplier: 1.4, lanceDamageMultiplier: 1.15 },
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'glass_cannon',
+    category: 'offense',
+    family: null,
+    cursed: true,
+    rarity: 'rare',
+    icon: '🔺',
+    themeColor: PALETTE.boss,
+    unlockLevel: 4,
+    tags: ['damage', 'cursed'],
+    text: {
+      name: 'Glass Cannon',
+      summary: 'Strips the armour off the hull and feeds it to the cannon.',
+      lore: 'The Ring builders called it a test rig. Nobody who flew it called it anything.',
+      levels: [
+        {
+          title: 'Bare Frame',
+          description: 'Damage +60%, max hull -30%.',
+          highlights: ['Cursed: the hull loss lasts the whole run.'],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-damage-boost',
+            payload: { multiplier: 1.6 },
+          },
+          {
+            type: 'event',
+            event: 'upgrade-health-boost',
+            payload: { multiplier: 0.7 },
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'overclocked_core',
+    category: 'offense',
+    family: null,
+    cursed: true,
+    rarity: 'rare',
+    icon: '⏱️',
+    themeColor: PALETTE.boss,
+    unlockLevel: 4,
+    tags: ['fire-rate', 'cursed'],
+    text: {
+      name: 'Overclocked Core',
+      summary:
+        'Runs the reactor past its rating. The cannon loves it; the hull does not.',
+      lore: 'Every salvager has a story about a core that ran hot. The short ones end here.',
+      levels: [
+        {
+          title: 'Red Line',
+          description:
+            'Fire rate +35%. The hull loses 1 HP every 4 s, down to 20% of max.',
+          highlights: ['Cursed: the drain never stops, but it never kills.'],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-weapon-tuning',
+            payload: { cooldownMultiplier: 0.74 },
+          },
+          {
+            type: 'event',
+            event: 'upgrade-hull-drain',
+            payload: { amount: 1, interval: 4, floorFraction: 0.2 },
+          },
+        ],
+      },
+    ],
+  },
 ]);

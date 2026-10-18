@@ -421,6 +421,9 @@ class PlayerSystem extends BaseSystem {
     this.multishot = 1;
     this.magnetismRadius = MAGNETISM_RADIUS;
     this.dashCooldown = DASH_COOLDOWN;
+    this.dashAfterInvulnerability = 0;
+    this.hullDrain = null;
+    this.hullDrainTimer = 0;
     this.currentHull = null;
     this._currentHullMetrics = {
       outline: [],
@@ -698,10 +701,25 @@ class PlayerSystem extends BaseSystem {
       );
     });
 
+    // `bonus` adds hull and repairs it; `multiplier` (Glass Cannon) scales it.
     this.registerEventListener('upgrade-health-boost', (data) => {
-      this.maxHealth += data.bonus;
-      this.health = Math.min(this.health + data.bonus, this.maxHealth);
+      const bonus = data.bonus ?? 0;
+      this.maxHealth = Math.round(
+        (this.maxHealth + bonus) * (data.multiplier ?? 1)
+      );
+      this.health = Math.min(this.health + bonus, this.maxHealth);
       console.log('[PlayerSystem] Health boosted to', this.maxHealth);
+    });
+
+    // Phase Skin: invulnerability for `duration` s after a dash ends.
+    this.registerEventListener('upgrade-phase-skin', (data) => {
+      this.dashAfterInvulnerability = data.duration;
+    });
+
+    // Overclocked Core: the hull loses `amount` every `interval` s, never
+    // below `floorFraction` of max.
+    this.registerEventListener('upgrade-hull-drain', (data) => {
+      this.hullDrain = data;
     });
 
     this.registerEventListener('upgrade-multishot', (data) => {
@@ -958,6 +976,7 @@ class PlayerSystem extends BaseSystem {
     this.updateMovement(deltaTime, movement);
     this.updatePosition(deltaTime);
     this.updateDash(deltaTime);
+    this.updateHullDrain(deltaTime);
 
     // Update weapon recoil (decay over time)
     this.recoilOffset.x *= this.recoilDecay;
@@ -1059,6 +1078,28 @@ class PlayerSystem extends BaseSystem {
     if (this.dashTimer > 0) {
       this.dashTimer = Math.max(0, this.dashTimer - deltaTime);
       this.dropDashGhosts();
+      if (this.dashTimer === 0) {
+        this.invulnerableTimer = Math.max(
+          this.invulnerableTimer,
+          this.dashAfterInvulnerability
+        );
+      }
+    }
+  }
+
+  updateHullDrain(deltaTime) {
+    if (!this.hullDrain) return;
+    const { amount, interval, floorFraction } = this.hullDrain;
+    this.hullDrainTimer += deltaTime;
+    while (this.hullDrainTimer >= interval) {
+      this.hullDrainTimer -= interval;
+      const floor = Math.ceil(this.maxHealth * floorFraction);
+      if (this.health <= floor) continue;
+      this.health = Math.max(floor, this.health - amount);
+      this.eventBus?.emit?.('player-health-changed', {
+        current: this.health,
+        max: this.maxHealth,
+      });
     }
   }
 
@@ -1970,6 +2011,9 @@ class PlayerSystem extends BaseSystem {
     this.multishot = 1;
     this.magnetismRadius = MAGNETISM_RADIUS * hangar.pickupRadiusMultiplier;
     this.dashCooldown = DASH_COOLDOWN * hangar.dashCooldownMultiplier;
+    this.dashAfterInvulnerability = 0;
+    this.hullDrain = null;
+    this.hullDrainTimer = 0;
     this.maxSpeed = SHIP_MAX_SPEED;
     this.acceleration = SHIP_ACCELERATION;
     this.rotationSpeed = SHIP_ROTATION_SPEED;
