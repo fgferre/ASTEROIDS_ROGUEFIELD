@@ -6,6 +6,7 @@ const RADAR_POOL_SIZE = 80;
 const BOSS_FALLBACK_COLOR = '#ff003c';
 const BOSS_FALLBACK_DARK = '#880020';
 const LAYER_BANNER_MS = 1200;
+const CHAPTER_BANNER_MS = 3000;
 const BOSS_INTRO_MS = 1500;
 const BOSS_BAR_HOLD_MS = 1000;
 const FADE_OUT_MS = 300;
@@ -164,11 +165,16 @@ export class AAAHudLayout {
     el.classList.add(className);
   }
 
-  /** Centered "LAYER N" banner; boss layers read "LAYER N — WARDEN". */
-  showLayerBanner(layer, { boss = false, delayMs = 0 } = {}) {
+  /**
+   * Centered "LAYER N" banner; boss layers read "LAYER N — WARDEN". A
+   * `chapter` title (a biome's first layer) goes underneath and holds longer.
+   */
+  showLayerBanner(layer, { boss = false, delayMs = 0, chapter = '' } = {}) {
     this._showBanner(boss ? `LAYER ${layer} — WARDEN` : `LAYER ${layer}`, {
       tone: boss ? 'boss' : null,
+      subtitle: chapter,
       delayMs,
+      durationMs: chapter ? CHAPTER_BANNER_MS : LAYER_BANNER_MS,
     });
   }
 
@@ -178,10 +184,18 @@ export class AAAHudLayout {
   }
 
   /**
-   * The centered banner, shown for LAYER_BANNER_MS, the last FADE_OUT_MS
+   * The centered banner, shown for `durationMs`, the last FADE_OUT_MS
    * fading. `tone` 'boss' or 'surge' recolours it.
    */
-  _showBanner(title, { tone = null, subtitle = '', delayMs = 0 } = {}) {
+  _showBanner(
+    title,
+    {
+      tone = null,
+      subtitle = '',
+      delayMs = 0,
+      durationMs = LAYER_BANNER_MS,
+    } = {}
+  ) {
     const banner = this.els?.layerBanner;
     if (!banner) {
       return;
@@ -189,7 +203,7 @@ export class AAAHudLayout {
     if (this._bannerTimer) {
       this._cancel(this._bannerTimer);
     }
-    this._bannerEndsAt = performance.now() + delayMs + LAYER_BANNER_MS;
+    this._bannerEndsAt = performance.now() + delayMs + durationMs;
     this._bannerTimer = this._later(() => {
       this.els.layerBannerTitle.textContent = title;
       this.els.layerBannerSub.textContent = subtitle;
@@ -203,7 +217,7 @@ export class AAAHudLayout {
           banner.classList.remove('is-showing', 'is-leaving');
           this._bannerTimer = null;
         }, FADE_OUT_MS);
-      }, LAYER_BANNER_MS - FADE_OUT_MS);
+      }, durationMs - FADE_OUT_MS);
     }, delayMs);
   }
 

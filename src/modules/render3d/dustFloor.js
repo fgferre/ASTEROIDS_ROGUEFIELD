@@ -2,8 +2,11 @@
 // dark dust some distance below the play plane, lit only faintly by the key
 // so the ship's own light pools on it and sweeps as it moves, with a soft
 // shadow blob under every mass. Being deeper than the play plane, the
-// perspective camera parallaxes it against the field for free.
+// perspective camera parallaxes it against the field for free. Each biome
+// bakes its own dust (albedo, grains, plate seams); setLook() cross-fades
+// between two of them.
 
+import { BIOMES } from '../../data/biomes.js';
 import { KEY_LIGHT_DIR, PALETTE } from '../../data/constants/palette.js';
 import { SimplexNoise, createSeededRandom } from './asteroidMesh.js';
 import { HALF_H, HALF_W, colorOf } from './batches.js';
@@ -18,7 +21,9 @@ const FLOOR_SEGMENTS = { w: 36, h: 30 };
 // One texture tile covers this many world units (grain stays ~1–2 units).
 const TILE_UNITS = 420;
 const TEXTURE_SIZE = 256;
-const DUST_ALBEDO = '#8c867c';
+// Plate seams per texture tile (Warden's Reach), and their width in texels.
+const SEAM_CELLS = 4;
+const SEAM_TEXELS = 1.5;
 // Share of the key light the floor receives: low, so local lights dominate.
 const KEY_SHARE = 0.14;
 const ENV_SHARE = 0.4;
@@ -50,28 +55,63 @@ function tileNoise(noise, u, v, scale) {
   return a * (1 - u) * (1 - v) + b * u * (1 - v) + c * (1 - u) * v + d * u * v;
 }
 
-// Dust density in alpha (clumped clouds + seeded grains), albedo in rgb.
-function dustTexture(THREE) {
+// Dust density (clumped clouds + seeded grains) per texel, shared by every
+// biome's texture: `density` 0..1 and `speck` 0..0.5.
+function dustDensity() {
+  const size = TEXTURE_SIZE;
+  const density = new Float32Array(size * size);
+  const specks = new Float32Array(size * size);
+  const random = createSeededRandom(7171.3);
+  const noise = new SimplexNoise(createSeededRandom(9191.7));
+  const seams = new SimplexNoise(createSeededRandom(2727.9));
+  const seamGaps = new Float32Array(size * size);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const n = tileNoise(noise, x / size, y / size, 3) * 0.5 + 0.5;
+      const grain = random();
+      const speck = grain > 0.985 ? 0.5 : grain * 0.18;
+      const i = x + y * size;
+      density[i] = Math.min(1, Math.pow(n, 1.8) * 1.15 + speck);
+      specks[i] = speck;
+      seamGaps[i] = tileNoise(seams, x / size, y / size, 6) * 0.5 + 0.5;
+    }
+  }
+  return { density, specks, seamGaps };
+}
+
+// One biome's dust: albedo in rgb (bright grains in the speck colour, seams
+// lit along a broken grid), density in alpha.
+function dustTexture(THREE, biome, field) {
   const size = TEXTURE_SIZE;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d');
   const image = ctx.createImageData(size, size);
-  const random = createSeededRandom(7171.3);
-  const noise = new SimplexNoise(createSeededRandom(9191.7));
+  const base = new THREE.Color(biome.floorColor);
+  const speckColor = new THREE.Color(biome.floorSpecks);
+  const cell = size / SEAM_CELLS;
+  const color = new THREE.Color();
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
-      const n = tileNoise(noise, x / size, y / size, 3) * 0.5 + 0.5;
-      const grain = random();
-      const speck = grain > 0.985 ? 0.5 : grain * 0.18;
-      const density = Math.min(1, Math.pow(n, 1.8) * 1.15 + speck);
-      const i = (x + y * size) * 4;
-      const tone = 200 + Math.round(55 * speck);
-      image.data[i] = tone;
-      image.data[i + 1] = tone;
-      image.data[i + 2] = tone;
-      image.data[i + 3] = Math.round(255 * (0.18 + 0.72 * density));
+      const i = x + y * size;
+      const speck = field.specks[i];
+      // Distance to the nearest seam line, in texels.
+      const sx = Math.abs(((x + cell / 2) % cell) - cell / 2);
+      const sy = Math.abs(((y + cell / 2) % cell) - cell / 2);
+      const line = Math.max(0, 1 - Math.min(sx, sy) / SEAM_TEXELS);
+      const seam =
+        biome.floorSeams * line * (field.seamGaps[i] > 0.42 ? 1 : 0.15);
+      const tone = 0.78 + 0.22 * (speck / 0.5);
+      color.copy(base).multiplyScalar(tone);
+      color.lerp(speckColor, Math.min(1, speck * 1.6 + seam * 0.8));
+      const p = i * 4;
+      image.data[p] = Math.round(255 * Math.min(1, color.r));
+      image.data[p + 1] = Math.round(255 * Math.min(1, color.g));
+      image.data[p + 2] = Math.round(255 * Math.min(1, color.b));
+      image.data[p + 3] = Math.round(
+        255 * Math.min(1, 0.18 + 0.72 * field.density[i] + seam * 0.5)
+      );
     }
   }
   ctx.putImageData(image, 0, 0);
@@ -107,14 +147,30 @@ function floorGeometry(THREE) {
   return geometry;
 }
 
-function patchFloor(THREE, shader) {
-  shader.uniforms.uKeyShare = { value: KEY_SHARE };
+// Key share, the cross-fade to a second dust texture, and the grains' own
+// glow (texel albedo × uGlow, added as emission).
+function patchFloor(THREE, shader, uniforms) {
+  Object.assign(shader.uniforms, uniforms);
   const lights = THREE.ShaderChunk.lights_fragment_begin.replace(
     'getDirectionalDirectLightIrradiance( directionalLight, geometry, directLight );',
     'getDirectionalDirectLightIrradiance( directionalLight, geometry, directLight );\n\t\tdirectLight.color *= uKeyShare;'
   );
   shader.fragmentShader = shader.fragmentShader
-    .replace('void main() {', 'uniform float uKeyShare;\nvoid main() {')
+    .replace(
+      'void main() {',
+      'uniform float uKeyShare;\nuniform sampler2D uMapB;\nuniform float uMix;\nuniform float uGlow;\nvoid main() {'
+    )
+    .replace(
+      '#include <map_fragment>',
+      [
+        'vec4 texelColor = mapTexelToLinear( mix( texture2D( map, vUv ), texture2D( uMapB, vUv ), uMix ) );',
+        'diffuseColor *= texelColor;',
+      ].join('\n')
+    )
+    .replace(
+      '#include <emissivemap_fragment>',
+      '#include <emissivemap_fragment>\ntotalEmissiveRadiance += texelColor.rgb * texelColor.a * uGlow;'
+    )
     .replace('#include <lights_fragment_begin>', lights);
 }
 
@@ -144,9 +200,18 @@ function shadowTexture(THREE) {
 export class DustFloor {
   /** `tilt`: camera tilt in radians (the floor's parallax shift). */
   constructor(THREE, scene, tilt) {
+    const field = dustDensity();
+    this.textures = new Map(
+      BIOMES.map((biome) => [biome.id, dustTexture(THREE, biome, field)])
+    );
+    this.uniforms = {
+      uKeyShare: { value: KEY_SHARE },
+      uMapB: { value: this.textures.get(BIOMES[0].id) },
+      uMix: { value: 0 },
+      uGlow: { value: 0 },
+    };
     const material = new THREE.MeshStandardMaterial({
-      color: colorOf(THREE, DUST_ALBEDO),
-      map: dustTexture(THREE),
+      map: this.textures.get(BIOMES[0].id),
       vertexColors: true,
       roughness: 1,
       metalness: 0,
@@ -154,7 +219,8 @@ export class DustFloor {
       transparent: true,
       depthWrite: false,
     });
-    material.onBeforeCompile = (shader) => patchFloor(THREE, shader);
+    material.onBeforeCompile = (shader) =>
+      patchFloor(THREE, shader, this.uniforms);
     this.floor = new THREE.Mesh(floorGeometry(THREE), material);
     this.floor.position.y = -FLOOR_DEPTH;
     this.floor.renderOrder = -5;
@@ -190,6 +256,14 @@ export class DustFloor {
     this.shadows.renderOrder = -4;
     scene.add(this.shadows);
     this.matrix = new THREE.Matrix4();
+  }
+
+  /** A biome look from BiomeController. */
+  setLook(look) {
+    this.floor.material.map = this.textures.get(look.from.id);
+    this.uniforms.uMapB.value = this.textures.get(look.to.id);
+    this.uniforms.uMix.value = look.mix;
+    this.uniforms.uGlow.value = look.floorGlow;
   }
 
   begin() {

@@ -17,6 +17,7 @@ import {
 } from '../../core/GameConstants.js';
 import { cameraDisabledByUrl, createCamera } from '../../core/camera.js';
 import { IS_DEV } from '../../core/env.js';
+import { BiomeTransition } from '../../data/biomes.js';
 import { resolveService } from '../../core/serviceUtils.js';
 import {
   KEY_LIGHT_DIR,
@@ -33,6 +34,7 @@ import {
   colorOf,
   rgbOf,
 } from './batches.js';
+import { BiomeController } from './biomes3d.js';
 import { DebrisChunks } from './debrisChunks.js';
 import { DustFloor } from './dustFloor.js';
 import { EnemyMirror } from './enemyMirror.js';
@@ -153,6 +155,7 @@ class Renderer3D extends BaseSystem {
     this.impact = new ImpactKick();
     this.hitSparks = new HitSparks();
     this.muzzles = new MuzzleFlashes();
+    this.biome = new BiomeTransition();
     this.stats = { drawCalls: 0, triangles: 0, frames: 0 };
 
     this.resolveCachedServices(
@@ -200,6 +203,9 @@ class Renderer3D extends BaseSystem {
           settings.getCategoryValues('accessibility')
         );
       }
+    });
+    this.registerEventListener('wave-started', (payload = {}) => {
+      this.biome.enterLayer(payload.wave);
     });
     this.registerEventListener('shield-hit', () => {
       this.three?.player.flashShield(performance.now() / 1000);
@@ -274,6 +280,7 @@ class Renderer3D extends BaseSystem {
     this.impact.strength = 0;
     this.hitSparks.clear();
     this.muzzles.clear();
+    this.biome.reset();
   }
 
   // --- setup -----------------------------------------------------------------
@@ -370,6 +377,14 @@ class Renderer3D extends BaseSystem {
 
     const backdrop = new FieldBackdrop(THREE, scene);
     const floor = new DustFloor(THREE, scene, TILT);
+    const biomes = new BiomeController(THREE, {
+      key,
+      fill,
+      bloomPass,
+      bloomBase: BLOOM.strength * bloomUrl.scale,
+      backdrop,
+      floor,
+    });
     const flashes = new FlashLights(THREE, scene);
     const enemies = new EnemyMirror(THREE, scene, this.seeded);
     const player = new PlayerMirror(THREE, scene, this.seeded);
@@ -442,6 +457,7 @@ class Renderer3D extends BaseSystem {
       wardenLight,
       backdrop,
       floor,
+      biomes,
       flashes,
       enemies,
       player,
@@ -563,6 +579,8 @@ class Renderer3D extends BaseSystem {
     this.mirrorOverlays(player, effects);
 
     const pointScale = t.height / (2 * Math.tan((FOV * Math.PI) / 360));
+    this.biome.update(dt);
+    t.biomes.update(this.biome);
     t.backdrop.update(this.camera.x, this.camera.y, dt, pointScale);
     t.ribbons.end();
     t.lances.end();

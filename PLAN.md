@@ -183,7 +183,7 @@ tudo num browser."_ Fatias, cada uma um commit com captura; números como "propo
 Pedido dele: _"crie um goal novo baseado nos seus achados e aja independentemente… aumentando o conteúdo a cada
 rodada"_. Cada pilar do §7 vira fatias; a ordem é impacto visível por custo. Marcar aqui conforme fecha.
 
-- [ ] **R4.1 Biomas.** `src/data/biomes.js` (3 entradas: paleta, fundo, chão, névoa, tema de música) ligado à tabela
+- [x] **R4.1 Biomas.** `src/data/biomes.js` (3 entradas: paleta, fundo, chão, névoa, tema de música) ligado à tabela
       de camadas; render3d troca fieldBackdrop/dustFloor por bioma com transição de 2 s; título de capítulo na HUD.
 - [ ] **R4.2 Transmissões.** Uma linha do Warden antes de cada chefe e no fim de cada bioma (texto em inglês, dados em
       `src/data/story.js`), banner estilo rádio na HUD, cue de áudio.

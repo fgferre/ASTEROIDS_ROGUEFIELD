@@ -11,6 +11,7 @@ import {
 } from '../data/shipModels.js';
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 import { directorFor } from '../data/layers.js';
+import { biomeForLayer } from '../data/biomes.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import {
   applyCanvasResolution,
@@ -428,7 +429,12 @@ class UISystem extends BaseSystem {
       layer === 1 &&
       (this.isControlsToastPending() ||
         Boolean(this.domRefs.gameUi?.querySelector('.controls-toast')));
-    hud.showLayerBanner(layer, { boss, delayMs: toastShowing ? 1000 : 0 });
+    const biome = biomeForLayer(layer);
+    hud.showLayerBanner(layer, {
+      boss,
+      delayMs: toastShowing ? 1000 : 0,
+      chapter: biome.layers[0] === layer ? biome.title : '',
+    });
   }
 
   handleWaveCompletionEvent(payload = {}, sourceEvent = 'wave-complete') {

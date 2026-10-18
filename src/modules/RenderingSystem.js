@@ -10,6 +10,7 @@ import { MAGNETISM_RADIUS } from '../data/constants/gameplay.js';
 import { normalize as normalizeVector } from '../utils/vectorHelpers.js';
 import { applyBaseTransform, getRenderScale } from '../core/viewport.js';
 import * as bloomLayer from '../core/bloomLayer.js';
+import { BiomeTransition } from '../data/biomes.js';
 import { cameraDisabledByUrl, createCamera } from '../core/camera.js';
 import {
   FILL_LIGHT,
@@ -197,6 +198,17 @@ function computePerimeter(points) {
 }
 
 const SPACE_SKY_RANDOM_SEED = 'rendering:starfield';
+
+// 'rgba(r, g, b, a)' → [r, g, b, a], parsed once per string.
+const tintCache = new Map();
+function parseTint(css) {
+  let rgba = tintCache.get(css);
+  if (!rgba) {
+    rgba = css.match(/[\d.]+/g).map(Number);
+    tintCache.set(css, rgba);
+  }
+  return rgba;
+}
 
 // `?bloom=0` turns the post pass off for A/B and for slow machines.
 function bloomDisabledByUrl() {
@@ -1102,6 +1114,10 @@ class RenderingSystem extends BaseSystem {
     this.registerEventListener('camera-zoom-pulse', ({ zoom, duration }) => {
       this.camera.pulseZoom(zoom, duration);
     });
+    this.biome = new BiomeTransition();
+    this.registerEventListener('wave-started', (payload = {}) => {
+      this.biome.enterLayer(payload.wave);
+    });
   }
 
   setupSettingsIntegration() {
@@ -1160,6 +1176,7 @@ class RenderingSystem extends BaseSystem {
     }
     this.camera.reset();
     this.lastRenderTime = null;
+    this.biome.reset();
   }
 
   render(ctx) {
@@ -1227,9 +1244,26 @@ class RenderingSystem extends BaseSystem {
     } finally {
       ctx.restore();
     }
+    this.drawBiomeTint(ctx);
 
     // Update performance stats
     this.updateRenderStats(frameStart);
+  }
+
+  // The biome's colour over the whole field, cross-faded with the biome;
+  // screen, because soft-light and multiply vanish on a near-black field.
+  drawBiomeTint(ctx) {
+    const { from, to, mix } = this.biome;
+    const a = parseTint(from.tint);
+    const b = parseTint(to.tint);
+    const alpha = a[3] + (b[3] - a[3]) * mix;
+    if (alpha < 0.002) return;
+    const rgb = [0, 1, 2].map((i) => Math.round(a[i] + (b[i] - a[i]) * mix));
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    ctx.fillStyle = `rgba(${rgb.join(', ')}, ${alpha})`;
+    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+    ctx.restore();
   }
 
   updateCamera(player, now) {
@@ -1239,6 +1273,7 @@ class RenderingSystem extends BaseSystem {
         : Math.min(0.1, Math.max(0, (now - this.lastRenderTime) / 1000));
     const firstFrame = this.lastRenderTime === null;
     this.lastRenderTime = now;
+    this.biome.update(dt);
 
     const position =
       typeof player?.getPosition === 'function'
