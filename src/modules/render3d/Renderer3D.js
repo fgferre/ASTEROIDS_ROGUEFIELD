@@ -959,6 +959,9 @@ class Renderer3D extends BaseSystem {
     t.debris.begin();
 
     const warden = t.enemies.update(enemyList, time, dt);
+    if (t.key.castShadow) {
+      t.enemies.budgetShadows(t.key.target.position.x, t.key.target.position.z);
+    }
     t.decals.update(dt, t.enemies.views);
     t.bursts.update(dt);
     t.wardenLight.intensity = warden ? 2.6 : 0;
