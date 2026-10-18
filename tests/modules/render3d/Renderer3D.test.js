@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import { EventBus } from '../../../src/core/EventBus.js';
 import { QUALITY_PRESETS } from '../../../src/core/qualityPresets.js';
+import RandomService from '../../../src/core/RandomService.js';
+import EffectsSystem from '../../../src/modules/EffectsSystem.js';
 import Renderer3D, {
   setBloomMips,
 } from '../../../src/modules/render3d/Renderer3D.js';
@@ -15,6 +18,80 @@ describe('Renderer3D camera clamp', () => {
     // further out shows more, so the follow point sits further from the edge
     expect(far.x).toBeGreaterThan(near.x);
     expect(far.y).toBeGreaterThan(near.y);
+  });
+});
+
+describe('Renderer3D dash and brake camera', () => {
+  const zoomAfter = (event, reducedMotion = false) => {
+    const eventBus = new EventBus();
+    const renderer = new Renderer3D({ eventBus });
+    renderer.reducedMotion = reducedMotion;
+    eventBus.emit(event, { position: { x: 400, y: 300 } });
+    renderer.camera.update(400, 300, 0.08);
+    return renderer.camera.zoom;
+  };
+
+  it('the dash pulls the shot out, the brake leans in, neither with reduced motion', () => {
+    const base = zoomAfter('nothing');
+    expect(zoomAfter('player-dashed')).toBeLessThan(base);
+    expect(zoomAfter('player-braked')).toBeGreaterThan(base);
+    expect(zoomAfter('player-dashed', true)).toBe(base);
+    expect(zoomAfter('player-braked', true)).toBe(base);
+  });
+});
+
+describe('Renderer3D brake ring', () => {
+  it('draws the emergency brake ring as a 3D shockwave at the ship', () => {
+    const eventBus = new EventBus();
+    const effects = new EffectsSystem({
+      eventBus,
+      random: new RandomService('brake-ring'),
+      audio: {},
+      settings: { getCategoryValues: () => null },
+    });
+    eventBus.emit('player-braked', {
+      position: { x: 300, y: 200 },
+      radius: 110,
+      knockback: 160,
+    });
+    effects.update(0.1);
+
+    class Color {
+      r = 1;
+      g = 1;
+      b = 1;
+      setStyle() {}
+      set() {}
+      convertSRGBToLinear() {}
+    }
+    const uniform = () => ({ value: 0 });
+    const ring = {
+      visible: false,
+      position: { set: vi.fn() },
+      scale: { set: vi.fn() },
+      material: {
+        uniforms: {
+          uRadius: uniform(),
+          uWidth: uniform(),
+          uExtent: uniform(),
+          uColor: { value: { setRGB: vi.fn() } },
+        },
+      },
+    };
+    const renderer = Object.create(Renderer3D.prototype);
+    renderer.three = {
+      THREE: { Color },
+      shockwaves: [ring],
+      flashes: { observe: () => false },
+      flashAlpha: 0,
+    };
+    renderer.mirrorEffects({ shockwaves: effects.shockwaves });
+
+    expect(ring.visible).toBe(true);
+    expect(ring.position.set).toHaveBeenCalledWith(-100, 1.5, -100);
+    const radius = ring.material.uniforms.uRadius.value;
+    expect(radius).toBeGreaterThan(0);
+    expect(radius).toBeLessThan(110);
   });
 });
 

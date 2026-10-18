@@ -295,11 +295,14 @@ export function createCamera({
       clampToField();
     },
 
-    // Pushes the zoom to `peak` and back to the base over `duration` s.
+    // Pushes the zoom to `peak` (under the base: pulls out) and back to the
+    // base over `duration` s, leaving from where a running pulse has it. A
+    // pulse that would move the zoom less than the running one does right
+    // now is dropped: a dash never cuts the level-up push short.
     pulseZoom(peak, duration) {
-      if (Number.isFinite(peak) && peak > 0 && duration > 0) {
-        pulse = { peak, duration, elapsed: 0 };
-      }
+      if (!(Number.isFinite(peak) && peak > 0 && duration > 0)) return;
+      if (Math.abs(peak / baseZoom - 1) < Math.abs(pulseFactor - 1)) return;
+      pulse = { peak, duration, elapsed: 0, from: pulseFactor };
     },
 
     snapTo(x, y) {
@@ -343,7 +346,8 @@ export function createCamera({
   };
 
   // The pulse scales whatever zoom the mode wants, so the two never fight:
-  // at base zoom it is base + (peak - base) × envelope.
+  // at base zoom it is base + (peak - base) × envelope. The attack leaves
+  // from the factor the pulse started at (1 unless it replaced another).
   function advancePulse(dt) {
     pulseFactor = 1;
     if (!pulse) return;
@@ -358,7 +362,8 @@ export function createCamera({
         ? Math.sin((t / PULSE_ATTACK) * (Math.PI / 2))
         : 0.5 +
           0.5 * Math.cos(((t - PULSE_ATTACK) / (1 - PULSE_ATTACK)) * Math.PI);
-    pulseFactor = 1 + (pulse.peak / baseZoom - 1) * envelope;
+    const from = t < PULSE_ATTACK ? pulse.from : 1;
+    pulseFactor = from + (pulse.peak / baseZoom - from) * envelope;
   }
 
   // goal.x/y/zoom: ship + look-ahead at the threat zoom, blended over

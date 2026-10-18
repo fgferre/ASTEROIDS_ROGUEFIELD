@@ -406,6 +406,23 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
     expectDelegates('weapon-evolved', {}, 'playWeaponEvolved');
   });
 
+  it('player-dashed → playDash, sweeping toward the dash', () => {
+    expectDelegates(
+      'player-dashed',
+      { position: { x: 400, y: 300 }, direction: { x: -1, y: 0 } },
+      'playDash',
+      ([options]) => expect(options.directionX).toBe(-1)
+    );
+  });
+
+  it('player-braked → playBrake', () => {
+    expectDelegates(
+      'player-braked',
+      { position: { x: 400, y: 300 }, radius: 110 },
+      'playBrake'
+    );
+  });
+
   it('upgrade-rerolled → playCardReroll', () => {
     expectDelegates('upgrade-rerolled', {}, 'playCardReroll');
   });

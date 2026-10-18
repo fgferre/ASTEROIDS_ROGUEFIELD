@@ -637,6 +637,21 @@ class AudioSystem extends BaseSystem {
       this.playShipHit();
     });
 
+    // The ship's own moves: centred on it (the listener), the dash whoosh
+    // sweeps toward where it goes.
+    this.registerEventListener('player-dashed', (data = {}) => {
+      this.playDash({
+        pan: resolveStereoPan(data?.position?.x, this.listenerX),
+        directionX: data?.direction?.x || 0,
+      });
+    });
+
+    this.registerEventListener('player-braked', (data = {}) => {
+      this.playBrake({
+        pan: resolveStereoPan(data?.position?.x, this.listenerX),
+      });
+    });
+
     this.registerEventListener('shield-activated', () => {
       this.playShieldActivate();
     });
@@ -1861,6 +1876,14 @@ class AudioSystem extends BaseSystem {
 
   playShipHit() {
     this.sfxBus.playShipHit();
+  }
+
+  playDash(options = {}) {
+    this.sfxBus.playDash(options);
+  }
+
+  playBrake(options = {}) {
+    this.sfxBus.playBrake(options);
   }
 
   playShieldActivate() {

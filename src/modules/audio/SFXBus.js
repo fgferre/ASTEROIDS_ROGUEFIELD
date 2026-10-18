@@ -101,6 +101,40 @@ const dbToGain = (db) => Math.pow(10, db / 20);
 // under it.
 const TRANSMISSION_SQUELCH_PEAK = 0.09;
 
+// proposta 18/10: the dash is a band-passed noise whoosh sweeping up (and
+// across, toward the dash) over a soft sub thump; quieter than a shot, never
+// retriggered within minInterval s (one voice at a time).
+const DASH_SFX = Object.freeze({
+  seconds: 0.3,
+  attack: 0.03,
+  peak: 0.22,
+  fromHz: 500,
+  toHz: 3200,
+  q: 1.1,
+  sweepPan: 0.35,
+  thump: Object.freeze({ fromHz: 120, toHz: 45, peak: 0.12, seconds: 0.12 }),
+  minInterval: 0.25,
+});
+// proposta 18/10: the emergency brake is a reverse-thruster burst (noise, its
+// band sweeping down) and a low thud once the ship is at rest, `thud.delay`
+// s in (the brake's stopTime, data/upgrades/mobility.js).
+const BRAKE_SFX = Object.freeze({
+  seconds: 0.3,
+  attack: 0.015,
+  peak: 0.2,
+  fromHz: 2400,
+  toHz: 350,
+  q: 0.9,
+  thud: Object.freeze({
+    delay: 0.1,
+    fromHz: 85,
+    toHz: 38,
+    peak: 0.16,
+    seconds: 0.18,
+  }),
+  minInterval: 0.25,
+});
+
 /**
  * SFXBus — owns ALL per-event SFX synthesis (INFRA-02).
  *
@@ -162,6 +196,8 @@ class SFXBus {
       medium: -Infinity,
       large: -Infinity,
     };
+    this._lastDashTime = -Infinity;
+    this._lastBrakeTime = -Infinity;
 
     // --- injected facade seams (assigned in init) ---
     this._getContext = () => null;
@@ -2272,6 +2308,113 @@ class SFXBus {
       osc.start();
       osc.stop(this.context.currentTime + 0.3);
     });
+  }
+
+  /**
+   * Dash (DASH_SFX): the whoosh pans from `pan` toward `directionX`, the dash
+   * direction's x. Player feedback → protected bus.
+   */
+  playDash({ pan = 0, directionX = 0 } = {}) {
+    this._trackPerformance('playDash');
+
+    this._safePlay(() => {
+      const now = this.context.currentTime;
+      if (now - this._lastDashTime < DASH_SFX.minInterval) return;
+      this._lastDashTime = now;
+
+      const panner = this._protectedPanner(pan);
+      panner.pan.setValueAtTime(pan, now);
+      panner.pan.linearRampToValueAtTime(
+        Math.max(-1, Math.min(1, pan + directionX * DASH_SFX.sweepPan)),
+        now + DASH_SFX.seconds
+      );
+      this._maneuverNoise(panner, now, DASH_SFX);
+      this._maneuverTone(panner, now, DASH_SFX.thump);
+    });
+  }
+
+  /** Emergency brake (BRAKE_SFX). Player feedback → protected bus. */
+  playBrake({ pan = 0 } = {}) {
+    this._trackPerformance('playBrake');
+
+    this._safePlay(() => {
+      const now = this.context.currentTime;
+      if (now - this._lastBrakeTime < BRAKE_SFX.minInterval) return;
+      this._lastBrakeTime = now;
+
+      const panner = this._protectedPanner(pan);
+      this._maneuverNoise(panner, now, BRAKE_SFX);
+      this._maneuverTone(panner, now + BRAKE_SFX.thud.delay, BRAKE_SFX.thud);
+    });
+  }
+
+  /**
+   * A StereoPanner at `pan` into the protected bus.
+   * @private
+   */
+  _protectedPanner(pan) {
+    const panner = this.context.createStereoPanner();
+    panner.pan.value = pan;
+    this._connectProtected(panner);
+    return panner;
+  }
+
+  /**
+   * Noise through a band sweeping fromHz → toHz over `seconds`, rising to
+   * `peak` in `attack` s, into `destination` (dash / brake).
+   * @private
+   */
+  _maneuverNoise(destination, now, { seconds, attack, peak, fromHz, toHz, q }) {
+    const end = now + seconds;
+    const rate = this.context.sampleRate;
+    const length = Math.max(1, Math.floor(rate * seconds));
+    const buffer = this.context.createBuffer(1, length, rate);
+    const output = buffer.getChannelData(0);
+    const rng = this._resolveRandom(
+      this.randomScopes?.bufferFamilies?.thruster,
+      this.randomScopes?.families?.thruster,
+      this.randomScopes?.base
+    );
+    for (let i = 0; i < length; i += 1) {
+      output[i] = rng.float() * 2 - 1;
+    }
+    const noise = this.context.createBufferSource();
+    noise.buffer = buffer;
+    const band = this.context.createBiquadFilter();
+    band.type = 'bandpass';
+    band.frequency.setValueAtTime(fromHz, now);
+    band.frequency.exponentialRampToValueAtTime(toHz, end);
+    band.Q.setValueAtTime(q, now);
+    const gain = this.context.createGain();
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(peak, now + attack);
+    gain.gain.exponentialRampToValueAtTime(0.001, end);
+    noise.connect(band);
+    band.connect(gain);
+    gain.connect(destination);
+    noise.start(now);
+    noise.stop(end);
+  }
+
+  /**
+   * A sine dropping fromHz → toHz from `start` over `seconds` (the dash's
+   * thump, the brake's thud), into `destination`.
+   * @private
+   */
+  _maneuverTone(destination, start, { fromHz, toHz, peak, seconds }) {
+    const end = start + seconds;
+    const osc = this.context.createOscillator();
+    const gain = this.context.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(fromHz, start);
+    osc.frequency.exponentialRampToValueAtTime(toHz, end);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(peak, start + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.001, end);
+    osc.connect(gain);
+    gain.connect(destination);
+    osc.start(start);
+    osc.stop(end + 0.02);
   }
 
   // ===========================================================================

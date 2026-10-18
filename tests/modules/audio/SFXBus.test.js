@@ -209,6 +209,66 @@ describe('SFXBus per-sound routing (player → protected; world → ambient)', (
   });
 });
 
+describe('SFXBus dash and brake (player moves → protected bus)', () => {
+  function recordManeuver(context) {
+    const oscillators = [];
+    const frequencyLog = [];
+    context.createOscillator = vi.fn(() => {
+      const osc = createOscillatorStub({ frequencyLog });
+      osc.start = vi.fn();
+      oscillators.push(osc);
+      return osc;
+    });
+    const sources = context.createBufferSource.mock.calls.length;
+    return {
+      oscillators,
+      frequencyLog,
+      newSources: () => context.createBufferSource.mock.calls.length - sources,
+      band: () => context.createBiquadFilter.mock.results.at(-1).value,
+      panner: () => context.createStereoPanner.mock.results.at(-1).value,
+    };
+  }
+
+  it('the dash whooshes up and toward its direction over a sub thump, one at a time', () => {
+    const { bus, context } = makeInitializedBus();
+    const record = recordManeuver(context);
+
+    bus.playDash({ pan: 0, directionX: 1 });
+    bus.playDash({ pan: 0, directionX: 1 }); // same instant: throttled
+
+    expect(record.newSources()).toBe(1);
+    const band = record.band();
+    expect(band.type).toBe('bandpass');
+    const [[from]] = band.frequency.setValueAtTime.mock.calls;
+    const [[to]] = band.frequency.exponentialRampToValueAtTime.mock.calls;
+    expect(to).toBeGreaterThan(from);
+    const panner = record.panner();
+    expect(panner.connect).toHaveBeenCalledWith(bus.protectedBus);
+    expect(panner.pan.linearRampToValueAtTime.mock.calls[0][0]).toBeGreaterThan(
+      0
+    );
+    expect(record.frequencyLog).toHaveLength(1);
+    expect(record.frequencyLog[0]).toBeLessThan(150);
+  });
+
+  it('the brake bursts down and thuds low once the ship is at rest', () => {
+    const { bus, context } = makeInitializedBus();
+    const record = recordManeuver(context);
+
+    bus.playBrake({ pan: 0 });
+
+    expect(record.newSources()).toBe(1);
+    const band = record.band();
+    const [[from]] = band.frequency.setValueAtTime.mock.calls;
+    const [[to]] = band.frequency.exponentialRampToValueAtTime.mock.calls;
+    expect(to).toBeLessThan(from);
+    expect(record.panner().connect).toHaveBeenCalledWith(bus.protectedBus);
+    expect(record.frequencyLog[0]).toBeLessThan(100);
+    const [[thudAt]] = record.oscillators[0].start.mock.calls;
+    expect(thudAt).toBeGreaterThan(context.currentTime);
+  });
+});
+
 describe('SFXBus music stingers', () => {
   function recordOscillators(context) {
     const frequencyLog = [];
@@ -378,6 +438,8 @@ const FACADE_PUBLIC_API_BASELINE = Object.freeze([
   'playShieldRecharged',
   'playShieldShockwave',
   'playShipHit',
+  'playDash',
+  'playBrake',
   'playSurgeSting',
   'playDeepFieldEntry',
   'playSalvageAwarded',

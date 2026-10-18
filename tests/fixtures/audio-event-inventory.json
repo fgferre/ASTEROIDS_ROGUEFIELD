@@ -21,6 +21,8 @@
   "pause-state-changed",
   "pickup-collected",
   "pickup-spawned",
+  "player-braked",
+  "player-dashed",
   "player-health-changed",
   "player-leveled-up",
   "player-took-damage",

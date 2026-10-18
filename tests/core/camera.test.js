@@ -86,6 +86,34 @@ describe('createCamera', () => {
     expect(camera.zoom).toBe(1.3);
   });
 
+  it('pulls the zoom out for a peak under the base and settles back', () => {
+    const camera = createCamera({ fieldWidth: W, fieldHeight: H, zoom: 1.3 });
+    camera.pulseZoom(1.3 * 0.94, 0.3);
+    camera.update(W / 2, H / 2, 0.09);
+    expect(camera.zoom).toBeCloseTo(1.3 * 0.94, 6);
+    camera.update(W / 2, H / 2, 0.3);
+    expect(camera.zoom).toBe(1.3);
+  });
+
+  it('drops a pulse weaker than the running one where it stands', () => {
+    const camera = createCamera({ fieldWidth: W, fieldHeight: H, zoom: 1.3 });
+    camera.pulseZoom(1.42, 0.45); // level-up
+    camera.update(W / 2, H / 2, 0.135); // at its peak
+    camera.pulseZoom(1.3 * 0.94, 0.3); // a dash
+    camera.update(W / 2, H / 2, 1 / 60);
+    expect(camera.zoom).toBeGreaterThan(1.4);
+  });
+
+  it('starts a replacing pulse from the zoom the running one left', () => {
+    const camera = createCamera({ fieldWidth: W, fieldHeight: H, zoom: 1.3 });
+    camera.pulseZoom(1.3 * 0.94, 0.3);
+    camera.update(W / 2, H / 2, 0.09);
+    const before = camera.zoom;
+    camera.pulseZoom(1.5, 0.6);
+    camera.update(W / 2, H / 2, 1 / 240);
+    expect(Math.abs(camera.zoom - before)).toBeLessThan(0.02);
+  });
+
   it('saturates the look-ahead at 90 px toward the aim', () => {
     const scene = { ...createCameraScene(), hasAim: true, aimX: 500, aimY: 0 };
     const near = lookAheadFor({ ...scene, aimX: 100 }, 0, 0, {});
