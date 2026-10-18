@@ -382,6 +382,22 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
     expectDelegates('surge-started', {}, 'playSurgeSting');
   });
 
+  it('run-continued → playDeepFieldEntry', () => {
+    expectDelegates('run-continued', { fromLayer: 1 }, 'playDeepFieldEntry');
+  });
+
+  it('salvage-awarded → playSalvageAwarded', () => {
+    expectDelegates('salvage-awarded', { amount: 120 }, 'playSalvageAwarded');
+  });
+
+  it('hangar-purchased → playHangarPurchase', () => {
+    expectDelegates('hangar-purchased', { id: 'x' }, 'playHangarPurchase');
+  });
+
+  it('onboarding-step → playTipChime', () => {
+    expectDelegates('onboarding-step', { id: 'x' }, 'playTipChime');
+  });
+
   it('weapon-beam-fired → playHarmonicBeam', () => {
     expectDelegates('weapon-beam-fired', { x: 100, y: 50 }, 'playHarmonicBeam');
   });

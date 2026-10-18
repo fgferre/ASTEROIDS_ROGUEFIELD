@@ -514,6 +514,22 @@ class AudioSystem extends BaseSystem {
       this.playSurgeSting();
     });
 
+    this.registerEventListener('run-continued', () => {
+      this.playDeepFieldEntry();
+    });
+
+    this.registerEventListener('salvage-awarded', (data = {}) => {
+      this.playSalvageAwarded(data?.amount);
+    });
+
+    this.registerEventListener('hangar-purchased', () => {
+      this.playHangarPurchase();
+    });
+
+    this.registerEventListener('onboarding-step', () => {
+      this.playTipChime();
+    });
+
     // The Ram shares the Warden's telegraph event; only non-bosses get the
     // enemy cue (the boss keeps its EffectsSystem/roar handling).
     this.registerEventListener('boss-telegraph', (data = {}) => {
@@ -1495,6 +1511,22 @@ class AudioSystem extends BaseSystem {
 
   playSurgeSting() {
     this.sfxBus.playSurgeSting();
+  }
+
+  playDeepFieldEntry() {
+    this.sfxBus.playDeepFieldEntry();
+  }
+
+  playSalvageAwarded(amount) {
+    this.sfxBus.playSalvageAwarded(amount);
+  }
+
+  playHangarPurchase() {
+    this.sfxBus.playHangarPurchase();
+  }
+
+  playTipChime() {
+    this.sfxBus.playTipChime();
   }
 
   playHarmonicBeam(options = {}) {
