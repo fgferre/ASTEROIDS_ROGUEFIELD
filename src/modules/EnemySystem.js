@@ -20,6 +20,7 @@ import { Weaver } from './enemies/types/Weaver.js';
 import { Bulwark } from './enemies/types/Bulwark.js';
 import { Caster } from './enemies/types/Caster.js';
 import { Shade } from './enemies/types/Shade.js';
+import { Leech } from './enemies/types/Leech.js';
 import { Herald } from './enemies/types/Herald.js';
 import { EnemyFactory } from './enemies/base/EnemyFactory.js';
 import { WaveManager } from './enemies/managers/WaveManager.js';
@@ -65,6 +66,7 @@ import { WEAVER_COMPONENTS } from '../data/enemies/weaver.js';
 import { BULWARK_COMPONENTS } from '../data/enemies/bulwark.js';
 import { CASTER_COMPONENTS } from '../data/enemies/caster.js';
 import { SHADE_COMPONENTS } from '../data/enemies/shade.js';
+import { LEECH_COMPONENTS } from '../data/enemies/leech.js';
 import { HERALD_COMPONENTS } from '../data/enemies/herald.js';
 import { ORB_VALUE } from '../data/enemies/asteroid-configs.js';
 import { bossRushDirectorFor, directorFor } from '../data/layers.js';
@@ -694,6 +696,7 @@ class EnemySystem extends BaseSystem {
           ['ranged', 'artillery'],
         ],
         ['shade', Shade, GamePools?.shades, SHADE_COMPONENTS, ['phasing']],
+        ['leech', Leech, GamePools?.leeches, LEECH_COMPONENTS, ['scavenger']],
       ];
       for (const [type, EnemyClass, pool, components, tags] of supportKinds) {
         this.factory.registerType(type, {
@@ -1152,6 +1155,11 @@ class EnemySystem extends BaseSystem {
 
   getCachedXPOrbs() {
     return this.xpOrbs;
+  }
+
+  // Pickups are built after the enemies (they need them): resolved late.
+  getCachedPickups() {
+    return resolveService('pickups', this.dependencies);
   }
 
   getCachedPhysics() {

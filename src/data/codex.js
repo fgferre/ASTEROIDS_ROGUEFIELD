@@ -29,6 +29,8 @@ const GLYPHS = {
     '<circle r="8"/><rect x="3" y="-3.5" width="11" height="7" rx="1"/><circle class="eye" cx="11" r="2"/>',
   shade:
     '<polygon points="14,0 1,-6 -11,-12 -6,-3 -9,0 -6,3 -11,12 1,6"/><circle class="eye" cx="5" r="2"/>',
+  leech:
+    '<ellipse rx="14" ry="10"/><path fill="none" d="M-6 -8.8 Q-4 0 -6 8.8 M5 -9.4 Q7 0 5 9.4"/><ellipse class="eye" cx="-0.5" rx="4.5" ry="3.5"/><circle cx="13" r="2.5"/>',
   'warden-prime':
     '<circle r="11" fill="none" stroke-width="5" stroke-dasharray="9.5 2"/><circle class="eye" r="4.5"/>',
   'warden-choir':
@@ -146,6 +148,11 @@ export const CODEX_ENTRIES = deepFreeze(
       'ram',
       'Built to clear debris from the Ring’s lanes. It still does.',
       'Stops, winds up, then charges straight. Step aside.'
+    ),
+    support(
+      'leech',
+      'The Ring kept its light in small bellies so that none of it was ever lost. This one has forgotten whose light it keeps.',
+      'Eats loose XP and pickups, grows, and flees when full. Kill it to get it all back, with interest.'
     ),
     support(
       'shade',

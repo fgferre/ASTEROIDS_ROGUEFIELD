@@ -146,7 +146,8 @@ export const LAYERS = deepFreeze([
   },
   // 5: first Warden.
   { rocks: rockCurve(5), roster: [], surges: [], events: [], warden: true },
-  // 6–7: Motes, Husks and the first Caster; Tethers and a battery from 7.
+  // 6–7: Motes, Husks and the first Caster; Tethers, a battery and the first
+  // Leech from 7.
   {
     rocks: rockCurve(6),
     roster: [
@@ -165,6 +166,7 @@ export const LAYERS = deepFreeze([
       { kind: 'husk', count: 3, from: 10, every: 10, elite: 0.05 },
       { kind: 'mine', count: 2, from: 15, every: 12, elite: 0.05 },
       { kind: 'caster', count: 1, from: 18, every: 1, elite: 0.05 },
+      { kind: 'leech', count: 1, from: 25, every: 1, elite: 0.05 },
     ],
     surges: [
       { at: 35, kinds: ['drone'], count: 6, label: 'Mote swarm' },
@@ -183,6 +185,7 @@ export const LAYERS = deepFreeze([
       { kind: 'mine', count: 2, from: 15, every: 12, elite: 0.08 },
       { kind: 'caster', count: 2, from: 15, every: 14, elite: 0.08 },
       { kind: 'shade', count: 1, from: 20, every: 1, elite: 0.08 },
+      { kind: 'leech', count: 1, from: 25, every: 1, elite: 0.08 },
     ],
     surges: [{ at: 30, kinds: ['ram'], count: 3, label: 'Ram pack' }],
     events: [],
@@ -198,8 +201,12 @@ export const LAYERS = deepFreeze([
       { kind: 'mine', count: 3, from: 15, every: 10, elite: 0.08 },
       { kind: 'caster', count: 2, from: 15, every: 12, elite: 0.08 },
       { kind: 'shade', count: 2, from: 15, every: 12, elite: 0.08 },
+      { kind: 'leech', count: 1, from: 20, every: 1, elite: 0.08 },
     ],
-    surges: [{ at: 30, kinds: ['ram'], count: 4, label: 'Ram pack' }],
+    surges: [
+      { at: 30, kinds: ['ram'], count: 4, label: 'Ram pack' },
+      { at: 40, kinds: ['leech', 'asteroid'], count: 4, label: 'Scavengers' },
+    ],
     events: [fieldEvent('sensor-jam', 20), fieldEvent('gravity-well', 45)],
     warden: false,
   },
@@ -223,6 +230,7 @@ export const LAYERS = deepFreeze([
       { kind: 'bulwark', count: 1, from: 20, every: 1, elite: 0.1 },
       { kind: 'caster', count: 2, from: 15, every: 12, elite: 0.1 },
       { kind: 'shade', count: 2, from: 15, every: 12, elite: 0.1 },
+      { kind: 'leech', count: 1, from: 20, every: 1, elite: 0.1 },
     ],
     surges: [
       { at: 30, kinds: ['drone'], count: 8, label: 'Mote swarm' },
@@ -242,6 +250,7 @@ export const LAYERS = deepFreeze([
       { kind: 'bulwark', count: 2, from: 15, every: 15, elite: 0.15 },
       { kind: 'caster', count: 2, from: 15, every: 12, elite: 0.15 },
       { kind: 'shade', count: 2, from: 15, every: 12, elite: 0.15 },
+      { kind: 'leech', count: 1, from: 20, every: 1, elite: 0.15 },
     ],
     surges: [
       { at: 30, kinds: ['ram'], count: 5, label: 'Ram pack' },
@@ -263,6 +272,7 @@ export const LAYERS = deepFreeze([
       { kind: 'weaver', count: 2, from: 15, every: 12, elite: 0.2 },
       { kind: 'caster', count: 2, from: 15, every: 12, elite: 0.2 },
       { kind: 'shade', count: 3, from: 15, every: 10, elite: 0.2 },
+      { kind: 'leech', count: 2, from: 15, every: 15, elite: 0.2 },
     ],
     surges: [
       {
@@ -288,6 +298,7 @@ export const LAYERS = deepFreeze([
       { kind: 'weaver', count: 3, from: 15, every: 10, elite: 0.3 },
       { kind: 'caster', count: 3, from: 15, every: 10, elite: 0.3 },
       { kind: 'shade', count: 3, from: 15, every: 10, elite: 0.3 },
+      { kind: 'leech', count: 2, from: 15, every: 15, elite: 0.3 },
     ],
     surges: [
       {

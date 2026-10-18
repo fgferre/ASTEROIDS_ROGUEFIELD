@@ -151,6 +151,7 @@ describe('EnemyMirror', () => {
       bulwark: 3,
       caster: 1,
       shade: 1,
+      leech: 2,
       boss: 2,
       'herald-dust': 3,
       'herald-heat': 2,
@@ -411,6 +412,38 @@ describe('EnemyMirror', () => {
     expect(view.dissolve.sources).toEqual([mirror.machineMaterial]);
     mirror.update([caster], 0, DISSOLVE_SECONDS);
     expect(view.body.material).toBe(mirror.machineMaterial);
+  });
+
+  it('lights and swells the Leech’s belly with what it holds', () => {
+    const mirror = new EnemyMirror(THREE, new THREE.Scene(), (fn) => fn());
+    const leech = {
+      id: 'leech',
+      type: 'leech',
+      x: 400,
+      y: 300,
+      radius: 16,
+      fullness: 0,
+      full: false,
+      getHitFlash: () => 0,
+    };
+    mirror.update([leech], 0);
+    const view = mirror.views.get('leech');
+    const emptyGain = view.bellyMaterial.userData.gain;
+    const emptyScale = view.belly.scale.x;
+
+    leech.fullness = 1;
+    leech.radius = 26;
+    mirror.update([leech], 0);
+    expect(view.bellyMaterial.userData.gain).toBeGreaterThan(emptyGain);
+    expect(view.belly.scale.x).toBeGreaterThan(emptyScale);
+    expect(view.object.scale.x).toBe(26);
+
+    leech.full = true;
+    const gains = [0, 0.13, 0.26].map((time) => {
+      mirror.update([leech], time);
+      return view.bellyMaterial.userData.gain;
+    });
+    expect(new Set(gains).size).toBeGreaterThan(1); // the full pulse
   });
 
   it('bakes the affix badge textures in warm-up, inside the seeded wrapper', () => {

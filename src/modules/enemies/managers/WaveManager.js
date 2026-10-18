@@ -60,6 +60,7 @@ const SUPPORT_KINDS = [
   'weaver',
   'caster',
   'shade',
+  'leech',
 ];
 // Surge bursts: units spread this far (px) along the edge either side of the
 // burst point; support enemies appear this far inside the field.

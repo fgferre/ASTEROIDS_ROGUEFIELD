@@ -16,7 +16,16 @@ export const ELITE_AFFIXES = deepFreeze({
     color: PALETTE.text,
     shieldHealth: 60, // proposta 18/10: frontal plate, like the Bulwark's
     halfArc: BULWARK_SHIELD_HALF_ARC,
-    kinds: ['drone', 'hunter', 'mine', 'husk', 'ram', 'weaver', 'caster'],
+    kinds: [
+      'drone',
+      'hunter',
+      'mine',
+      'husk',
+      'ram',
+      'weaver',
+      'caster',
+      'leech',
+    ],
   },
   swift: {
     id: 'swift',
@@ -33,6 +42,7 @@ export const ELITE_AFFIXES = deepFreeze({
       'bulwark',
       'caster',
       'shade',
+      'leech',
     ],
   },
   volatile: {

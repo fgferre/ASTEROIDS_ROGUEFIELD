@@ -1,7 +1,7 @@
 // Mirrors EnemySystem entities into Three objects (docs/NORTE.md §3): Ring
 // fragments as procedural rock meshes whose cracks light up amber with
 // damage (drawn instanced, rockInstances.js), and the Wardens' machines (Mote, Seeker, Tether, Husk, Ram, Weaver,
-// Bulwark, Caster, Shade), the three Wardens (Prime, Choir, Null; one view kind each,
+// Bulwark, Caster, Shade, Leech), the three Wardens (Prime, Choir, Null; one view kind each,
 // picked by `bossKind`) and the three Heralds (Dust, Heat, Silence, picked by
 // `heraldKind`). Views are pooled per kind and keyed by entity id; a
 // view not seen in a frame is hidden and returned to its pool, unless its
@@ -66,6 +66,16 @@ const CASTER_SHELL_GAIN = 1.8;
 const SHADE_PHASED_THRESHOLD = 0.76;
 const SHADE_FLECK_GLOW = 2;
 const SHADE_NOISE_CELLS = 2.4;
+// proposta 18/10: the Leech — how far its hull leans teal, its belly's
+// colour (gold → lime) and glow (empty → full), how much the belly swells
+// when full, and the full pulse (rad/s, gain, swell).
+const LEECH_TEAL_MIX = 0.14;
+const LEECH_BELLY_LIME = 0.55;
+const LEECH_BELLY_GAIN = [0.5, 1.05];
+const LEECH_BELLY_SWELL = 0.25;
+const LEECH_PULSE_RATE = 6;
+const LEECH_PULSE_GAIN = 0.25;
+const LEECH_PULSE_SWELL = 0.08;
 export const KNOWN_KINDS = new Set([
   'asteroid',
   'drone',
@@ -77,6 +87,7 @@ export const KNOWN_KINDS = new Set([
   'bulwark',
   'caster',
   'shade',
+  'leech',
   'boss',
 ]);
 // Every view kind create() builds: a Warden's `bossKind` splits 'boss' in
@@ -859,6 +870,14 @@ export class EnemyMirror {
       shadeOutline.map(([x, y]) => new THREE.Vector3(x * 1.06, 0.05, y * 1.06))
     );
 
+    // Leech: the pod's outline (RenderComponent leechHull).
+    const pod = [];
+    for (let i = 0; i < 40; i += 1) {
+      const a = (i / 40) * TAU;
+      pod.push(new THREE.Vector3(Math.cos(a) * 1.08, 0, Math.sin(a) * 0.8));
+    }
+    this.leechRim = rimLoop(pod);
+
     // Heralds. Dust: a chamfered slab, broadside to the ship (local +x),
     // three slits along its face.
     const outline = (points) => {
@@ -1002,6 +1021,8 @@ export class EnemyMirror {
         return this.createCaster();
       case 'shade':
         return this.createShade();
+      case 'leech':
+        return this.createLeech();
       case 'boss':
       case 'boss-choir':
       case 'boss-null':
@@ -1752,6 +1773,67 @@ export class EnemyMirror {
     );
   }
 
+  // A pod of three plates leaning teal, its dark maw forward; the belly
+  // window on its back is its own emissive material, the maw's lips the
+  // accent.
+  createLeech() {
+    const { THREE } = this;
+    const group = new THREE.Group();
+    const teal = this.tones.hull
+      .clone()
+      .lerp(colorOf(THREE, PALETTE.player), LEECH_TEAL_MIX);
+    const body = this.body('leech', () => [
+      {
+        geometry: this.sphere,
+        color: teal,
+        scale: [0.42, 0.34, 0.5],
+        position: [-0.62, 0, 0],
+      },
+      { geometry: this.sphere, color: teal, scale: [0.6, 0.46, 0.76] },
+      {
+        geometry: this.sphere,
+        color: teal,
+        scale: [0.44, 0.38, 0.62],
+        position: [0.52, 0, 0],
+      },
+      {
+        geometry: this.smallSphere,
+        color: this.tones.dark,
+        scale: [0.12, 0.2, 0.3],
+        position: [0.9, 0.06, 0],
+      },
+    ]);
+    const lime = colorOf(THREE, PALETTE.status);
+    const bellyMaterial = this.emissive(PALETTE.xp, LEECH_BELLY_GAIN[0]);
+    bellyMaterial.userData.base.lerp(lime, LEECH_BELLY_LIME);
+    this.setGain(bellyMaterial, LEECH_BELLY_GAIN[0]);
+    const belly = new THREE.Mesh(this.smallSphere, bellyMaterial);
+    belly.position.set(-0.04, 0.4, 0);
+    const lipsTone = this.tone(PALETTE.threat, 1.2);
+    group.add(body, belly);
+    this.scene.add(group);
+    return this.view('leech', group, {
+      belly,
+      bellyMaterial,
+      accents: [lipsTone],
+      rims: [this.rim(group, this.leechRim)],
+      glows: [this.glow(group, lipsTone, 0.1, new THREE.Vector3(1.0, 0.18, 0))],
+    });
+  }
+
+  // `fullness` lights and swells the belly; `full` pulses it.
+  updateLeech(view, leech, time) {
+    const fullness = clamp01(leech.fullness || 0);
+    const pulse = leech.full
+      ? 0.5 + 0.5 * Math.sin(time * LEECH_PULSE_RATE + (view.seed % 7))
+      : 0;
+    const [dim, lit] = LEECH_BELLY_GAIN;
+    const gain = dim + (lit - dim) * fullness + LEECH_PULSE_GAIN * pulse;
+    this.setGain(view.bellyMaterial, gain);
+    const swell = 1 + LEECH_BELLY_SWELL * fullness + LEECH_PULSE_SWELL * pulse;
+    view.belly.scale.set(0.36 * swell, 0.12 * swell, 0.3 * swell);
+  }
+
   // --- Heralds ----------------------------------------------------------------
 
   createDust() {
@@ -2331,6 +2413,8 @@ export class EnemyMirror {
       this.updateCaster(view, enemy);
     } else if (kind === 'shade') {
       this.phaseShade(view, 1 - clamp01(enemy.visibility ?? 1));
+    } else if (kind === 'leech') {
+      this.updateLeech(view, enemy, time);
     } else if (kind === 'bulwark') {
       object.rotation.y = 0;
       view.plate.rotation.y = -(enemy.facing || 0);

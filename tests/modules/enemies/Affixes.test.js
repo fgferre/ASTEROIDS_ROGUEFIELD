@@ -30,6 +30,7 @@ const SUPPORT_KINDS = [
   'bulwark',
   'caster',
   'shade',
+  'leech',
 ];
 
 const createSystem = (overrides = {}) => ({
@@ -77,6 +78,10 @@ describe('Elite affixes', () => {
     expect(ELITE_AFFIXES.splitter.kinds).not.toContain('husk');
     expect(ELITE_AFFIXES.shielded.kinds).not.toContain('bulwark');
     expect(ELITE_AFFIXES.splitter.kinds).not.toContain('shade');
+    expect(ELITE_AFFIXES.shielded.kinds).toContain('leech');
+    expect(ELITE_AFFIXES.swift.kinds).toContain('leech');
+    expect(ELITE_AFFIXES.splitter.kinds).not.toContain('leech');
+    expect(ELITE_AFFIXES.volatile.kinds).not.toContain('leech');
   });
 
   it('rolls none before layer 6, one on 6–10, one or two on 11–14, two from 15', () => {

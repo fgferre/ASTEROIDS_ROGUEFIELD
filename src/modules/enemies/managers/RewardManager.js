@@ -219,8 +219,8 @@ export class RewardManager {
       variantMultiplier: () => 1.0, // No variant scaling (yet)
     });
 
-    // Husk, Ram, Weaver, Bulwark, Caster, Shade, Herald: fixed base orbs with
-    // a total XP target.
+    // Husk, Ram, Weaver, Bulwark, Caster, Shade, Leech, Herald: fixed base
+    // orbs with a total XP target (a Leech's hoard comes back on its own).
     for (const type of [
       'husk',
       'ram',
@@ -228,6 +228,7 @@ export class RewardManager {
       'bulwark',
       'caster',
       'shade',
+      'leech',
       'herald',
     ]) {
       const rewards = ENEMY_REWARDS[type];

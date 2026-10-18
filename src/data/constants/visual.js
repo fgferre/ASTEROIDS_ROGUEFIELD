@@ -10,6 +10,7 @@ import { WEAVER_CONFIG, WEAVER_REWARDS } from '../enemies/weaver.js';
 import { BULWARK_CONFIG, BULWARK_REWARDS } from '../enemies/bulwark.js';
 import { CASTER_CONFIG, CASTER_REWARDS } from '../enemies/caster.js';
 import { SHADE_CONFIG, SHADE_REWARDS } from '../enemies/shade.js';
+import { LEECH_CONFIG, LEECH_REWARDS } from '../enemies/leech.js';
 import { HERALD_REWARDS } from '../enemies/herald.js';
 import {
   BOSS_CONFIG,
@@ -33,6 +34,7 @@ export const ENEMY_TYPES = deepFreeze({
   bulwark: BULWARK_CONFIG,
   caster: CASTER_CONFIG,
   shade: SHADE_CONFIG,
+  leech: LEECH_CONFIG,
 });
 
 export {
@@ -70,6 +72,7 @@ export const ENEMY_REWARDS = deepFreeze({
   bulwark: BULWARK_REWARDS,
   caster: CASTER_REWARDS,
   shade: SHADE_REWARDS,
+  leech: LEECH_REWARDS,
   herald: HERALD_REWARDS,
   boss: BOSS_REWARDS,
 });

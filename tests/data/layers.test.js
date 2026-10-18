@@ -26,6 +26,7 @@ const SUPPORT_KINDS = [
   'weaver',
   'caster',
   'shade',
+  'leech',
 ];
 
 const scheduledCount = (layer) =>
@@ -133,6 +134,22 @@ describe('directorFor', () => {
     expect(kindsOn(8)).toEqual(expect.arrayContaining(['caster', 'shade']));
     expect(kindsOn(10)).not.toContain('caster');
     expect(kindsOn(14)).toEqual(expect.arrayContaining(['caster', 'shade']));
+  });
+
+  it('brings Leeches from 7, never to a Warden layer, and Scavengers on 9', () => {
+    const kindsOn = (n) => directorFor(n).roster.map((entry) => entry.kind);
+    expect(kindsOn(6)).not.toContain('leech');
+    expect(kindsOn(7)).toContain('leech');
+    expect(kindsOn(10)).not.toContain('leech');
+    expect(kindsOn(14)).toContain('leech');
+    expect(directorFor(15).roster.map((entry) => entry.kind)).not.toContain(
+      'leech'
+    );
+    const scavengers = directorFor(9).surges.find(
+      (surge) => surge.label === 'Scavengers'
+    );
+    expect(scavengers.kinds).toEqual(['leech', 'asteroid']);
+    expect(scavengers.count).toBe(4); // two Leeches, two rocks to feed them
   });
 
   it('escorts the final Warden with Seekers', () => {
