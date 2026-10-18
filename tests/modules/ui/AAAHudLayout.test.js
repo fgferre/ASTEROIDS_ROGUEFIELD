@@ -89,13 +89,14 @@ describe('AAAHudLayout weapon and buff chips', () => {
   const weaponState = (weaponId, shotsToBeam = null) => ({
     weaponId,
     name: WEAPONS[weaponId].name,
+    chip: WEAPONS[weaponId].chip,
     shotsToBeam,
     evolutions: [],
   });
 
   it('names the weapon and fills a pip per shot toward the Harmonic beam', () => {
     hud.updateWeapon(weaponState('lance'));
-    expect(hud.els.weaponName.textContent).toBe('AMBER LANCE');
+    expect(hud.els.weaponName.textContent).toBe('LANCE');
     expect(hud.els.beamPips.classList.contains('is-hidden')).toBe(true);
 
     // Beam every 4th shot: shotsToBeam 4 → 1 fills 0 → 3 pips.
@@ -104,13 +105,13 @@ describe('AAAHudLayout weapon and buff chips', () => {
       return filledPips();
     };
     expect([4, 3, 2, 1].map(pipsAt)).toEqual([0, 1, 2, 3]);
-    expect(hud.els.weaponName.textContent).toBe('HARMONIC PLASMA LANCE');
+    expect(hud.els.weaponName.textContent).toBe('HARMONIC');
     expect(hud.els.beamPips.classList.contains('is-hidden')).toBe(false);
   });
 
   it('reads the weapon name from the weapon state: the Scatter Coil has no pips', () => {
     hud.updateWeapon(weaponState('scatter'));
-    expect(hud.els.weaponName.textContent).toBe('SCATTER COIL');
+    expect(hud.els.weaponName.textContent).toBe('SCATTER');
     expect(hud.els.beamPips.classList.contains('is-hidden')).toBe(true);
   });
 

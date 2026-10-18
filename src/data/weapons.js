@@ -25,11 +25,13 @@ export const WEAPONS = deepFreeze({
   lance: {
     id: 'lance',
     name: 'Amber Lance',
+    chip: 'LANCE',
     description: 'Short amber traces from the nose.',
   },
   harmonic: {
     id: 'harmonic',
     name: 'Harmonic Plasma Lance',
+    chip: 'HARMONIC',
     description: 'Every 4th shot is a short plasma beam that splits rocks.',
     beam: {
       every: 4, // shots; the 4th is the beam
@@ -51,6 +53,7 @@ export const WEAPONS = deepFreeze({
   scatter: {
     id: 'scatter',
     name: 'Scatter Coil',
+    chip: 'SCATTER',
     description: 'A fan of short flak bolts that burst into shrapnel.',
     // proposta 18/10: the flak volley, for the owner to judge by playing.
     flak: {

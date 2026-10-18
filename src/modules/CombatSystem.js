@@ -3350,6 +3350,7 @@ class CombatSystem extends BaseSystem {
     return {
       weaponId: this.weaponId,
       name: WEAPONS[this.weaponId].name,
+      chip: WEAPONS[this.weaponId].chip,
       shotsToBeam:
         this.weaponId === 'harmonic'
           ? every - (this.harmonicShots % every)
