@@ -2,8 +2,8 @@
 //
 // The pooled particles and what lives beside them: shockwave rings, hit
 // markers, floating damage numbers, the muzzle-flash queue and the ambient
-// field drift. EffectsSystem owns it, builds every per-event burst on top of
-// it and ticks it at the effects' speed; Renderer3D reads these lists through
+// field drift. EffectsSystem owns it; PlayerEffects, EnemyEffects and
+// BossTransitions build their bursts on top of it; EffectsSystem ticks it; Renderer3D reads these lists through
 // same-name getters on the effects object.
 
 import { PALETTE } from '../../data/constants/palette.js';

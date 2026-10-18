@@ -17,7 +17,7 @@ import {
 const BOSS_EFFECTS = BOSS_EFFECTS_PRESETS || {};
 const BOSS_SHAKES = BOSS_SCREEN_SHAKES || {};
 
-// The boss glows violet (docs/NORTE.md §2); EffectsSystem's boss attack
+// The boss glows violet (docs/NORTE.md §2); EnemyEffects' boss attack
 // effects share these colors.
 export const BOSS_FX = Object.freeze({
   core: PALETTE.boss,
