@@ -76,4 +76,28 @@ export default [
       ],
     },
   },
+  // Dev mode is one switch: only src/core/env.js may read the build flags.
+  // import.meta.env.BASE_URL (asset paths) is not a dev switch and stays legal.
+  {
+    files: ['src/**/*.{js,mjs}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "MemberExpression[object.object.name='process'][object.property.name='env'][property.name='NODE_ENV']",
+          message: 'Dev mode is one switch: import IS_DEV from src/core/env.js',
+        },
+        {
+          selector:
+            "MemberExpression[object.type='MemberExpression'][object.object.type='MetaProperty'][object.property.name='env'][property.name=/^(DEV|PROD|MODE)$/]",
+          message: 'Dev mode is one switch: import IS_DEV from src/core/env.js',
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/core/env.js'],
+    rules: { 'no-restricted-syntax': 'off' },
+  },
 ];

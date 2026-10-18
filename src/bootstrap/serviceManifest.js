@@ -437,11 +437,10 @@ export function createServiceManifest(context = {}) {
         });
 
         const enemyInstance =
-          resolved['enemies'] ||
-          (typeof container?.isInstantiated === 'function' &&
+          typeof container?.isInstantiated === 'function' &&
           container.isInstantiated('enemies')
             ? container.resolve('enemies')
-            : null);
+            : null;
 
         if (enemyInstance && typeof physics.attachEnemySystem === 'function') {
           physics.attachEnemySystem(enemyInstance);
