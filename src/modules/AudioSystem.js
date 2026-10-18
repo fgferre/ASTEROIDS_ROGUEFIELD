@@ -489,6 +489,27 @@ class AudioSystem extends BaseSystem {
       this.playEliteSpawned();
     });
 
+    this.registerEventListener('weapon-beam-fired', (data = {}) => {
+      this.playHarmonicBeam({ pan: resolveStereoPan(data.x, this.listenerX) });
+    });
+
+    this.registerEventListener('weapon-evolved', () => {
+      this.playWeaponEvolved();
+      this._duckBigMoment();
+    });
+
+    this.registerEventListener('upgrade-rerolled', () => {
+      this.playCardReroll();
+    });
+
+    this.registerEventListener('upgrade-banished', () => {
+      this.playCardBanish();
+    });
+
+    this.registerEventListener('codex-discovered', () => {
+      this.playCodexDiscovered();
+    });
+
     this.registerEventListener('surge-started', () => {
       this.playSurgeSting();
     });
@@ -1474,6 +1495,26 @@ class AudioSystem extends BaseSystem {
 
   playSurgeSting() {
     this.sfxBus.playSurgeSting();
+  }
+
+  playHarmonicBeam(options = {}) {
+    this.sfxBus.playHarmonicBeam(options);
+  }
+
+  playWeaponEvolved() {
+    this.sfxBus.playWeaponEvolved();
+  }
+
+  playCardReroll() {
+    this.sfxBus.playCardReroll();
+  }
+
+  playCardBanish() {
+    this.sfxBus.playCardBanish();
+  }
+
+  playCodexDiscovered() {
+    this.sfxBus.playCodexDiscovered();
   }
 
   playPickupCollected(kind) {

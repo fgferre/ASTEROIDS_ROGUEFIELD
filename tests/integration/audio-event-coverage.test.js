@@ -382,6 +382,26 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
     expectDelegates('surge-started', {}, 'playSurgeSting');
   });
 
+  it('weapon-beam-fired → playHarmonicBeam', () => {
+    expectDelegates('weapon-beam-fired', { x: 100, y: 50 }, 'playHarmonicBeam');
+  });
+
+  it('weapon-evolved → playWeaponEvolved', () => {
+    expectDelegates('weapon-evolved', {}, 'playWeaponEvolved');
+  });
+
+  it('upgrade-rerolled → playCardReroll', () => {
+    expectDelegates('upgrade-rerolled', {}, 'playCardReroll');
+  });
+
+  it('upgrade-banished → playCardBanish', () => {
+    expectDelegates('upgrade-banished', {}, 'playCardBanish');
+  });
+
+  it('codex-discovered → playCodexDiscovered', () => {
+    expectDelegates('codex-discovered', {}, 'playCodexDiscovered');
+  });
+
   it('transmission-shown → playTransmission', () => {
     expectDelegates('transmission-shown', {}, 'playTransmission');
   });

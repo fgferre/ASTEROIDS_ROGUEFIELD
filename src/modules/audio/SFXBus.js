@@ -949,6 +949,197 @@ class SFXBus {
     });
   }
 
+  /** Harmonic beam fired: 0.18 s bright saw sweep over a sine sub body, panned, small reverb send. */
+  playHarmonicBeam({ pan = 0 } = {}) {
+    this._trackPerformance('playHarmonicBeam');
+
+    this._safePlay(() => {
+      const destination = this._ambientInput(pan);
+      if (!destination) return;
+
+      const now = this.context.currentTime;
+      const gain = this.context.createGain();
+      gain.connect(destination);
+      this._sendToReverb(gain, AUDIO_REVERB_SEND_DB.levelUp - 6);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.12, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+      const saw = this.context.createOscillator();
+      saw.type = 'sawtooth';
+      saw.frequency.setValueAtTime(1800, now);
+      saw.frequency.exponentialRampToValueAtTime(500, now + 0.18);
+      const filter = this.context.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(5000, now);
+      filter.frequency.exponentialRampToValueAtTime(1200, now + 0.18);
+      saw.connect(filter);
+      filter.connect(gain);
+
+      const sub = this.context.createOscillator();
+      sub.type = 'sine';
+      sub.frequency.setValueAtTime(140, now);
+      sub.frequency.exponentialRampToValueAtTime(70, now + 0.18);
+      sub.connect(gain);
+
+      saw.start(now);
+      sub.start(now);
+      saw.stop(now + 0.2);
+      sub.stop(now + 0.2);
+    });
+  }
+
+  /** Weapon evolved: rising three-note chord with a shimmer tail, reverb. */
+  playWeaponEvolved() {
+    this._trackPerformance('playWeaponEvolved');
+
+    this._safePlay(() => {
+      const destination = this.getAmbientDestination();
+      if (!destination) return;
+
+      const now = this.context.currentTime;
+      [
+        [392, 0],
+        [494, 0.09],
+        [587, 0.18],
+      ].forEach(([frequency, offset]) => {
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(frequency, now + offset);
+        gain.gain.setValueAtTime(0.0001, now + offset);
+        gain.gain.exponentialRampToValueAtTime(0.12, now + offset + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+        osc.connect(gain);
+        gain.connect(destination);
+        this._sendToReverb(gain, AUDIO_REVERB_SEND_DB.levelUp);
+        osc.start(now + offset);
+        osc.stop(now + 0.92);
+      });
+
+      // Shimmer tail: two detuned high sines fading in late.
+      [1568, 1576].forEach((frequency) => {
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(frequency, now + 0.2);
+        gain.gain.setValueAtTime(0.0001, now + 0.2);
+        gain.gain.exponentialRampToValueAtTime(0.04, now + 0.3);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.1);
+        osc.connect(gain);
+        gain.connect(destination);
+        this._sendToReverb(gain, AUDIO_REVERB_SEND_DB.levelUp);
+        osc.start(now + 0.2);
+        osc.stop(now + 1.12);
+      });
+    });
+  }
+
+  /** Upgrade card rerolled: quick shuffle noise burst plus a tick. */
+  playCardReroll() {
+    this._trackPerformance('playCardReroll');
+
+    this._safePlay(() => {
+      const destination = this.getAmbientDestination();
+      if (!destination) return;
+
+      const now = this.context.currentTime;
+      const rate = this.context.sampleRate;
+      const length = Math.max(1, Math.floor(rate * 0.12));
+      const buffer = this.context.createBuffer(1, length, rate);
+      const output = buffer.getChannelData(0);
+      const rng = this._resolveRandom(
+        this.randomScopes?.bufferFamilies?.explosion,
+        this.randomScopes?.families?.explosion,
+        this.randomScopes?.base
+      );
+      for (let i = 0; i < length; i += 1) {
+        output[i] = (rng.float() * 2 - 1) * (1 - i / length);
+      }
+      const noise = this.context.createBufferSource();
+      noise.buffer = buffer;
+      const filter = this.context.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(3000, now);
+      filter.Q.setValueAtTime(1.2, now);
+      const noiseGain = this.context.createGain();
+      noiseGain.gain.setValueAtTime(0.1, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      noise.connect(filter);
+      filter.connect(noiseGain);
+      noiseGain.connect(destination);
+      noise.start(now);
+
+      const tick = this.context.createOscillator();
+      const tickGain = this.context.createGain();
+      tick.type = 'square';
+      tick.frequency.setValueAtTime(1200, now + 0.1);
+      tickGain.gain.setValueAtTime(0.0001, now + 0.1);
+      tickGain.gain.exponentialRampToValueAtTime(0.06, now + 0.105);
+      tickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+      tick.connect(tickGain);
+      tickGain.connect(destination);
+      tick.start(now + 0.1);
+      tick.stop(now + 0.17);
+    });
+  }
+
+  /** Upgrade card banished: short descending tone with a low thud. */
+  playCardBanish() {
+    this._trackPerformance('playCardBanish');
+
+    this._safePlay(() => {
+      const destination = this.getAmbientDestination();
+      if (!destination) return;
+
+      const now = this.context.currentTime;
+      const tone = (type, start, end, duration, peak) => {
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(start, now);
+        osc.frequency.exponentialRampToValueAtTime(end, now + duration);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(peak, now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+        osc.connect(gain);
+        gain.connect(destination);
+        osc.start(now);
+        osc.stop(now + duration + 0.02);
+      };
+      tone('triangle', 700, 220, 0.22, 0.1);
+      tone('sine', 90, 45, 0.2, 0.25);
+    });
+  }
+
+  /** Codex entry discovered: soft two-note chime, unpanned. */
+  playCodexDiscovered() {
+    this._trackPerformance('playCodexDiscovered');
+
+    this._safePlay(() => {
+      const destination = this.getAmbientDestination();
+      if (!destination) return;
+
+      const now = this.context.currentTime;
+      [
+        [880, 0],
+        [1319, 0.12],
+      ].forEach(([frequency, offset]) => {
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(frequency, now + offset);
+        gain.gain.setValueAtTime(0.0001, now + offset);
+        gain.gain.exponentialRampToValueAtTime(0.07, now + offset + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.5);
+        osc.connect(gain);
+        gain.connect(destination);
+        osc.start(now + offset);
+        osc.stop(now + offset + 0.52);
+      });
+    });
+  }
+
   /**
    * Pickup collected: per-kind cue (magnet arpeggio, pulse thump, overcharge zap).
    * @param {'magnet'|'pulse'|'overcharge'} kind
