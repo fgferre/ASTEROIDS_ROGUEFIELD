@@ -104,6 +104,17 @@
                 Daily Field
               </button>
               <button
+                id="boss-rush-btn"
+                class="menu-screen__button menu-screen__button--stacked"
+                type="button"
+                title="The three Wardens back to back"
+              >
+                Boss Rush
+                <span id="boss-rush-lock" class="menu-screen__lock hidden"
+                  >Defeat Warden Prime to unlock</span
+                >
+              </button>
+              <button
                 id="menu-hangar-btn"
                 class="menu-screen__button"
                 type="button"
@@ -575,7 +586,7 @@
       <!-- Victory Overlay -->
       <div id="victory-screen" class="screen screen--overlay victory hidden">
         <div class="gameover-content">
-          <h1 class="gameover-title">FIELD CLEARED</h1>
+          <h1 id="victory-title" class="gameover-title">FIELD CLEARED</h1>
           <p class="victory-subtitle">The Ring is quiet.</p>
           <p id="victory-best" class="victory-subtitle">—</p>
           <p id="victory-salvage" class="run-recap__salvage">—</p>

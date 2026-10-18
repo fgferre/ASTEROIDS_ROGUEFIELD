@@ -726,6 +726,11 @@ select {
   grid-column: auto;
 }
 
+/* An odd last action spans the row */
+.menu-screen__nav.menu-grid > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
 .menu-screen__button {
   pointer-events: all;
   padding: var(--space-4) var(--space-5);
@@ -752,6 +757,27 @@ select {
   background: var(--danger-soft);
   border-color: var(--danger);
   box-shadow: none;
+}
+
+/* A label with a line under it (Boss Rush and its lock) */
+.menu-screen__button--stacked {
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.menu-screen__lock {
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+.menu-screen__button:disabled {
+  color: var(--text-dim);
+  border-style: dashed;
+  border-color: var(--line);
+  background: var(--surface-strong);
+  box-shadow: none;
+  cursor: not-allowed;
 }
 
 @media (max-width: 768px) {

@@ -10,6 +10,7 @@ import {
 } from '../data/constants/gameplay.js';
 import { debugLog } from '../core/debugLogging.js';
 import { DEFAULT_HULL_ID, getShipModelById } from '../data/shipModels.js';
+import { BOSS_RUSH_LAYERS, bossRushStage } from '../data/layers.js';
 import { updateRecords } from './runRecords.js';
 
 /**
@@ -90,6 +91,10 @@ export default class GameSessionService {
     this._suppressWaveKickoff = false;
     // True once the player continues past the final Warden (endless run).
     this.endless = false;
+    // Boss Rush run: the three Wardens back to back (startNewRun); the
+    // Wardens killed so far.
+    this.bossRush = false;
+    this.bossRushWardens = 0;
     this.globalEventHandlers = {
       screenChanged: (data) => this.handleScreenChangedEvent(data),
       playerDied: (data) => this.handlePlayerDiedEvent(data),
@@ -98,7 +103,12 @@ export default class GameSessionService {
       activateShieldPressed: () => this.handleActivateShieldPressedEvent(),
       progressionReset: (payload) => this.handleProgressionResetEvent(payload),
       bossDefeated: (payload) => this.handleBossDefeatedEvent(payload),
-      waveStarted: (payload) => updateRecords({ layer: payload?.wave }),
+      waveStarted: (payload) =>
+        updateRecords(
+          this.bossRush
+            ? { bossRushStage: bossRushStage(payload?.wave) }
+            : { layer: payload?.wave }
+        ),
       transmissionShown: () => {
         this.transmissionOnAir = true;
       },
@@ -432,19 +442,21 @@ export default class GameSessionService {
     switch (id) {
       case 'start-game-btn':
       case 'daily-field-btn':
+      case 'boss-rush-btn':
       case 'restart-game-btn':
       case 'victory-restart-btn': {
         preventDefault();
         this.emitCreditsMenuRequest({ open: false, source: id });
-        // From the menu, Start flies a normal run and Daily Field today's
-        // field; New Mission keeps the mode of the run that just ended.
-        const daily =
-          id === 'start-game-btn'
-            ? false
-            : id === 'daily-field-btn'
-              ? true
-              : undefined;
-        this.startNewRun({ source: id, daily });
+        // From the menu, Start flies a normal run, Daily Field today's field
+        // and Boss Rush the three Wardens; New Mission keeps the mode of the
+        // run that just ended.
+        const restart =
+          id === 'restart-game-btn' || id === 'victory-restart-btn';
+        this.startNewRun({
+          source: id,
+          daily: restart ? undefined : id === 'daily-field-btn',
+          bossRush: restart ? undefined : id === 'boss-rush-btn',
+        });
         break;
       }
       case 'retry-game-btn': {
@@ -605,6 +617,17 @@ export default class GameSessionService {
   }
 
   handleBossDefeatedEvent(payload = {}) {
+    if (this.bossRush && payload?.wave !== RUN_FINAL_LAYER) {
+      // Boss Rush: a card pick for each Warden before the last (not over
+      // the death screen).
+      this.bossRushWardens += 1;
+      if (this.getSessionState() === 'running') {
+        const progression = this.resolveServiceInstance('progression');
+        progression.emitLevelUp(progression.applyLevelUp());
+        progression.emitExperienceChanged();
+      }
+      return;
+    }
     if (
       payload?.wave !== RUN_FINAL_LAYER ||
       this.endless ||
@@ -613,6 +636,9 @@ export default class GameSessionService {
       return;
     }
 
+    if (this.bossRush) {
+      this.bossRushWardens += 1;
+    }
     this.resolveServiceInstance('enemies')?.waveManager?.holdWaves();
     this.setSessionState('victory', { reason: 'final-boss-defeated' });
     this.eventBus.emit('run-won', { wave: payload.wave });
@@ -621,7 +647,7 @@ export default class GameSessionService {
       () => {
         const summary =
           this.resolveServiceInstance('world')?.buildRunSummary() ?? {};
-        const data = { ...summary, bestLayer: this.recordRunReached(summary) };
+        const data = { ...summary, ...this.recordRunReached(summary) };
         this.setScreen('victory');
         this.emitScreenChanged('victory', { source: 'run-won', data });
       },
@@ -632,10 +658,11 @@ export default class GameSessionService {
 
   /**
    * Victory screen's "continue": the run goes endless. Layers resume from the
-   * one after the final Warden; later Wardens only drop their rewards.
+   * one after the final Warden; later Wardens only drop their rewards. Not
+   * after a Boss Rush.
    */
   continueBeyondVictory() {
-    if (this.getSessionState() !== 'victory') {
+    if (this.getSessionState() !== 'victory' || this.bossRush) {
       return false;
     }
 
@@ -651,16 +678,34 @@ export default class GameSessionService {
 
   /**
    * Records the layer and time in a run summary (and in today's Daily Field
-   * record on a Daily Field run); returns the best layer.
+   * record on a Daily Field run); returns `{ bestLayer }` for the end screen.
+   * A Boss Rush records only its clear time (on a win) and returns
+   * `{ bossRush: { stage, bestStage, bestTime } }`, `stage` the Warden it
+   * reached.
    */
   recordRunReached(summary = {}) {
+    if (this.bossRush) {
+      const records = updateRecords({
+        bossRushTime:
+          this.bossRushWardens === BOSS_RUSH_LAYERS.length
+            ? summary.stats?.timeElapsed
+            : 0,
+      });
+      return {
+        bossRush: {
+          stage: Math.min(this.bossRushWardens + 1, BOSS_RUSH_LAYERS.length),
+          bestStage: records.bossRushStage,
+          bestTime: records.bossRushTime,
+        },
+      };
+    }
     const wave = summary.wave;
     const reached = {
       layer: typeof wave === 'number' ? wave : wave?.current,
       time: summary.stats?.timeElapsed,
     };
     this.resolveServiceInstance('difficulty').recordRun(reached);
-    return updateRecords(reached).bestLayer;
+    return { bestLayer: updateRecords(reached).bestLayer };
   }
 
   handleTogglePauseEvent(payload = {}) {
@@ -752,8 +797,12 @@ export default class GameSessionService {
     return true;
   }
 
-  /** `daily`: see DifficultyService.beginRun. */
-  startNewRun({ source = 'unknown', daily } = {}) {
+  /**
+   * `daily`: see DifficultyService.beginRun. `bossRush` true starts a Boss
+   * Rush, false any other run; undefined keeps the last mode.
+   */
+  startNewRun({ source = 'unknown', daily, bossRush } = {}) {
+    if (bossRush !== undefined) this.bossRush = bossRush;
     const difficulty = this.resolveServiceInstance('difficulty');
     const seed = difficulty.beginRun({ daily });
     if (this.gameState) {
@@ -779,7 +828,11 @@ export default class GameSessionService {
 
     this._suppressWaveKickoff = false;
     this.endless = false;
+    this.bossRushWardens = 0;
     updateRecords({ newRun: true });
+    // Before the reset: the first layer's rock count already follows it.
+    const waveManager = this.resolveServiceInstance('enemies')?.waveManager;
+    if (waveManager) waveManager.bossRush = this.bossRush;
 
     try {
       this.resetSystems({ manageRandom: false });
@@ -823,7 +876,11 @@ export default class GameSessionService {
     this.emitScreenChanged('playing', { source: 'session.start' });
 
     // Emit game-started event for audio feedback
-    this.emitGameStarted({ source, timestamp: Date.now() });
+    this.emitGameStarted({
+      source,
+      timestamp: Date.now(),
+      bossRush: this.bossRush,
+    });
     if (difficulty.isDaily()) {
       this.eventBus.emit('daily-started', { seed });
     }
@@ -860,7 +917,7 @@ export default class GameSessionService {
 
     this.scheduleGameOverScreenTransition({
       ...data,
-      bestLayer: this.recordRunReached(data),
+      ...this.recordRunReached(data),
     });
 
     const retriesRemaining = this.getRetryCount();

@@ -2,6 +2,7 @@
 
 import RandomService from '../core/RandomService.js';
 import { deepFreeze } from '../utils/deepFreeze.js';
+import { bossKindForLayer } from './enemies/boss.js';
 import {
   ASTEROIDS_PER_WAVE_BASE,
   ASTEROIDS_PER_WAVE_MULTIPLIER,
@@ -363,4 +364,38 @@ function beyond(layer, runSeed) {
 export function directorFor(layer, runSeed = 0) {
   const n = Math.max(1, Math.floor(Number(layer) || 1));
   return n <= LAYERS.length ? LAYERS[n - 1] : beyond(n, runSeed);
+}
+
+// Boss Rush: the three Wardens back to back, each on its own layer (biome,
+// music, Warden kind and HP scaling follow the layer) with only its escort
+// and BOSS_RUSH_ROCKS rocks; GameSessionService.bossRush turns it on.
+export const BOSS_RUSH_LAYERS = deepFreeze([5, 10, 15]);
+const BOSS_RUSH_ROCKS = 3; // proposta 18/10
+// The calm after each Warden but the last (one card pick, the next title).
+export const BOSS_RUSH_BREATHER_SECONDS = 8; // proposta 18/10
+
+/** The Boss Rush stage (1-based) whose Warden holds `layer`, else 0. */
+export function bossRushStage(layer) {
+  return BOSS_RUSH_LAYERS.indexOf(layer) + 1;
+}
+
+/** The Warden layer Boss Rush plays after `layer` (0: the first). */
+export function nextBossRushLayer(layer) {
+  return BOSS_RUSH_LAYERS.find((n) => n > layer);
+}
+
+/** A layer's entry on Boss Rush: no surges or events, BOSS_RUSH_ROCKS rocks. */
+export function bossRushDirectorFor(layer) {
+  return deepFreeze({
+    ...directorFor(layer),
+    rocks: BOSS_RUSH_ROCKS,
+    surges: [],
+    events: [],
+  });
+}
+
+/** 'WARDEN 2 OF 3 — CHOIR' for stage 2. */
+export function bossRushStageTitle(stage) {
+  const kind = bossKindForLayer(BOSS_RUSH_LAYERS[stage - 1]);
+  return `WARDEN ${stage} OF ${BOSS_RUSH_LAYERS.length} — ${kind.toUpperCase()}`;
 }

@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { GamePools } from '../../src/core/GamePools.js';
 import { RUN_FINAL_LAYER } from '../../src/data/constants/gameplay.js';
-import { FIELD_EVENTS, LAYERS, directorFor } from '../../src/data/layers.js';
+import {
+  BOSS_RUSH_LAYERS,
+  FIELD_EVENTS,
+  LAYERS,
+  bossRushDirectorFor,
+  bossRushStage,
+  bossRushStageTitle,
+  directorFor,
+  nextBossRushLayer,
+} from '../../src/data/layers.js';
 import {
   createHeadlessGame,
   installDomStubs,
@@ -157,5 +166,34 @@ describe('directorFor', () => {
     }
     expect(directorFor(16).events).toHaveLength(1);
     expect(directorFor(16).events).toEqual(directorFor(16).events);
+  });
+});
+
+describe('Boss Rush', () => {
+  it('runs the three Warden layers in order, each named by its Warden', () => {
+    expect(BOSS_RUSH_LAYERS).toEqual([5, 10, 15]);
+    expect([0, 5, 10, 15].map(nextBossRushLayer)).toEqual([
+      5,
+      10,
+      15,
+      undefined,
+    ]);
+    expect([5, 10, 15, 6].map(bossRushStage)).toEqual([1, 2, 3, 0]);
+    expect([1, 2, 3].map(bossRushStageTitle)).toEqual([
+      'WARDEN 1 OF 3 — PRIME',
+      'WARDEN 2 OF 3 — CHOIR',
+      'WARDEN 3 OF 3 — NULL',
+    ]);
+  });
+
+  it("keeps each Warden layer's Warden and escort, with few rocks and no surges or events", () => {
+    for (const layer of BOSS_RUSH_LAYERS) {
+      const rush = bossRushDirectorFor(layer);
+      expect(rush.warden).toBe(true);
+      expect(rush.roster).toEqual(directorFor(layer).roster);
+      expect(rush.rocks).toBeLessThan(directorFor(layer).rocks);
+      expect(rush.surges).toEqual([]);
+      expect(rush.events).toEqual([]);
+    }
   });
 });

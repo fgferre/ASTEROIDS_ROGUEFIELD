@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { WaveManager } from '../../src/modules/enemies/managers/WaveManager.js';
 import {
+  BOSS_RUSH_BREATHER_SECONDS,
   LAYER_MODIFIERS,
   directorFor,
   modifierFor,
@@ -410,6 +411,48 @@ describe('WaveManager layer modifiers', () => {
       startLayer(field, 14);
       expect(field.manager.layerModifier).toBeNull();
       expect(eventsOf(field, 'layer-modifier-started')).toEqual([]);
+    });
+  });
+});
+
+describe('WaveManager Boss Rush', () => {
+  it('plays only the Warden layers, a breather and a warning between them', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const field = createField();
+      const { manager, active, emits } = field;
+      manager.bossRush = true;
+      const clearLayer = () => {
+        manager.update(60);
+        active.filter((e) => !e.destroyed).forEach(field.kill);
+      };
+
+      expect(manager.startNextWave()).toBe(true);
+      expect(manager.currentWave).toBe(5);
+      expect(emits).toContainEqual({
+        event: 'wave-started',
+        payload: expect.objectContaining({ wave: 5, bossRush: true }),
+      });
+      clearLayer();
+      expect(manager.waveInProgress).toBe(false);
+      expect(manager.waveCountdown).toBe(BOSS_RUSH_BREATHER_SECONDS);
+      expect(emits).toContainEqual({
+        event: 'boss-warning',
+        payload: { wave: 5, nextBossWave: 10 },
+      });
+
+      manager.update(BOSS_RUSH_BREATHER_SECONDS - 0.5);
+      expect(manager.waveInProgress).toBe(false);
+      manager.update(0.5);
+      expect(manager.currentWave).toBe(10);
+
+      clearLayer();
+      manager.update(BOSS_RUSH_BREATHER_SECONDS);
+      expect(manager.currentWave).toBe(15);
+      clearLayer();
+      expect(manager.waveInProgress).toBe(false);
+      expect(
+        emits.filter(({ event }) => event === 'boss-warning')
+      ).toHaveLength(2);
     });
   });
 });

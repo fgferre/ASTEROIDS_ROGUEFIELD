@@ -67,7 +67,7 @@ import { CASTER_COMPONENTS } from '../data/enemies/caster.js';
 import { SHADE_COMPONENTS } from '../data/enemies/shade.js';
 import { HERALD_COMPONENTS } from '../data/enemies/herald.js';
 import { ORB_VALUE } from '../data/enemies/asteroid-configs.js';
-import { directorFor } from '../data/layers.js';
+import { bossRushDirectorFor, directorFor } from '../data/layers.js';
 import { scaleDirector } from '../data/difficulty.js';
 import { IS_DEV } from '../core/env.js';
 
@@ -1665,10 +1665,15 @@ class EnemySystem extends BaseSystem {
     this.forEachActiveEnemy(callback);
   }
 
-  /** The layer's director with spawn counts scaled by the difficulty. */
+  /**
+   * The layer's director (Boss Rush's on a Boss Rush run) with spawn counts
+   * scaled by the difficulty.
+   */
   layerDirector(layer) {
     return scaleDirector(
-      directorFor(layer),
+      this.waveManager?.bossRush
+        ? bossRushDirectorFor(layer)
+        : directorFor(layer),
       resolveService('difficulty', this.dependencies)?.getModifiers()
         .spawnCount ?? 1
     );
