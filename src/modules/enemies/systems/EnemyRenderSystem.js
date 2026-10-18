@@ -1,3 +1,8 @@
+// FROZEN (18/10/2026): the Canvas 2D gameplay renderer is an easter egg
+// (`?renderer=2d`). No new features, no 2D/3D parity, no captures: new
+// machines, weapons and effects are built in src/modules/render3d/ only.
+// Touch this file only to keep it from breaking.
+// tests/process/render2d-frozen.test.js pins its size.
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 
 /**

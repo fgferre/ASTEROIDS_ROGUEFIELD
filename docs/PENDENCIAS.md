@@ -60,7 +60,7 @@ são "proposta" nomeada no código — ele julga jogando; (e) um commit por fati
 **O goal dele (18/10, noite), nas palavras dele, está na seção "Goal novo" abaixo (itens 9–14), com os itens 7, 8 e 15.**
 Estado por ponto: fundo com volume → R13.1 feita (ele ainda não viu); faixa escura do Anel → item 15, nada mudado,
 explicado; casco/mira → nada no código acopla (lido 18/10), R13.2 proposta em Settings; medição na máquina dele →
-R13.3 proposta; áudio morto → R12.6 feita, sobras em R13.7; paridade 2D/3D → R13.6 proposta; replay sem modo → R13.4
+R13.3 proposta; áudio morto → R12.6 feita, sobras em R13.7; paridade 2D/3D → o 2D virou easter egg congelado por decisão dele (18/10, conversa local; PLAN decisão 6), sobra só o anel 3D em R13.6; replay sem modo → R13.4
 proposta; pooling/director → R13.5 feita (avisos 30–100/camada → 0); arquivos grandes → R13.8 proposta (pontos de
 corte mapeados no histórico desta sessão, não no repo: CombatSystem 4867, SFXBus 4595, UISystem 4516, EffectsSystem
 4462 linhas). **Ele pediu para avisar quando os oito estiverem fechados para trocar o goal; sugestão de goal seguinte

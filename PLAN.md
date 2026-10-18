@@ -21,6 +21,11 @@ por imagem e jogando — nunca por teste.
 4. Cada etapa visual termina com captura antes × depois (headless, `?desktop=force&debugLogging=0`), e com
    `npm run done` verde. Ele aprova pela imagem; nada de "ficou melhor" em texto.
 5. Balanceamento e sensação (XP, boss, shake, hit-stop) nunca fecham por harness: proposta com número, ele joga.
+6. **(18/10, noite, conversa local) O Canvas 2D está congelado como easter egg** (`?renderer=2d`). Não recebe feature
+   nova, paridade, captura nem leitura de rodada: máquina, arma ou efeito novo nasce só no 3D (`src/modules/render3d/`)
+   e no 2D aparece como silhueta genérica ou não aparece. Só se mexe nele para não quebrar (ele precisa continuar
+   abrindo). `tests/process/render2d-frozen.test.js` trava o tamanho dos quatro arquivos 2D; os docs não listam mais
+   pendências 2D. Matar o 2D de vez fica como opção dele para depois.
 
 ## Rodadas 1–11 — fechadas e mescladas na `main` (17–18/10; PRs #247–#260)
 
@@ -79,11 +84,12 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
 - [x] **R13.5 Pooling/director.** Velocidade/timers zerados no reaproveitamento; Heralds/Wardens descartam o espelho
       3D; seed do director igual no EnemySystem e no WaveManager; avisos de "accounting discrepancy" explicados ou
       eliminados.
-- [ ] **R13.6 Paridade 2D/3D e oddities.** Wardens Choir/Null com visual próprio no 2D; nave 2D sem borrão; pulso de
-      zoom do dash/freio no 2D; anel chapado sob o domo do escudo.
+- [ ] **R13.6 Oddity do 3D.** Anel chapado sob o domo do escudo (candidato: o anel do dash no espelho do jogador, que
+      só deveria aparecer nos i-frames — conferir na captura). Os itens 2D saíram: 2D congelado (decisão 6).
 - [ ] **R13.7 Áudio morto.** `MUSIC_LAYER_CONFIG` sem uso, `_randomBetween`, e o que mais a auditoria achar.
 - [ ] **R13.8 Arquivos grandes.** CombatSystem, SFXBus, UISystem, EffectsSystem (> 4400 linhas cada) divididos por
-      assunto em módulos novos, sem mudar comportamento (testes iguais antes e depois).
+      assunto em módulos novos, sem mudar comportamento (testes iguais antes e depois). Os métodos de desenho 2D que
+      vivem neles (`render(ctx)`) só mudam de arquivo junto com o assunto; não ganham nada (decisão 6).
 
 ## Fora de escopo deste plano
 
