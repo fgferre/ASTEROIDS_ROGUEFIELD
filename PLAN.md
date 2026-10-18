@@ -50,7 +50,7 @@ Conteúdo:
 
 Qualidade:
 
-- [ ] **R12.5 Entrada do Warden.** No aviso de chefe: 1 s de câmera indo ao Warden, barras de letterbox, dilatação de
+- [ ] **R12.5 Entrada do Warden** (não iniciado em 18/10: o worker caiu sem escrever; fica para a próxima sessão)**.** No aviso de chefe: 1 s de câmera indo ao Warden, barras de letterbox, dilatação de
       tempo curta; sem nada disso com movimento reduzido. Constantes "proposta 18/10".
 - [x] **R12.6 Áudio limpo.** Aviso `ThrusterLoopManager` centenas de vezes (timer de partida sem marcar ativo);
       crossfade de tema (dois conjuntos de osciladores, percussão velha no beat novo); cues do Heat/Dust Herald;
