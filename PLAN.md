@@ -346,6 +346,33 @@ Qualidade:
 - [x] **R11.9 Números de dano no 3D.** Provar por captura que aparecem e na fonte do jogo (Rajdhani); corrigir a menor
       causa se assarem na fonte reserva.
 
+## Rodada 12 (18/10, fim de tarde) — terceira arma, cartas de manobra, Leech, falas; entrada do Warden, áudio limpo, bloom
+
+Conteúdo:
+
+- [ ] **R12.1 Terceira arma: _Scatter Coil_.** Carta como a do Harmonic: leque de 5 flaks curtos que estouram a ~180 px
+      em estilhaços de área; cadência menor, dano por flak menor; controle de multidão de perto. 2D, 3D, chip do HUD
+      lendo o nome da arma (hoje fixo em LANCE/HARMONIC), evoluções de família honradas onde já há gancho.
+- [ ] **R12.2 Família _Maneuver_ (6 cartas, 34→40).** Afterburner (recarga do dash), Ram Plating (dash dá dano de
+      contato), Gyro Servos (torreta gira mais rápido), Reactive Brake (onda do freio empurra e fere), Inertial
+      Dampers (freio mais forte), Phase Dash (i-frames do dash). Sinergia 3 → rastro ardente no dash; Apex 5 → Blink
+      (dash vira salto curto com onda na chegada). Dash/torreta passam a ter stat escalável.
+- [ ] **R12.3 _Leech_ (11ª máquina).** Lenta, vai atrás de orbes de XP e pickups e os come, crescendo (raio/vida até um
+      teto); foge quando cheia; ao morrer devolve tudo que comeu (com bônus). Camadas 7+. Códice, afixos, 2D/3D.
+- [ ] **R12.4 Falas que faltam.** Primeiro avistamento de Caster/Shade/Leech (emite `enemy-spawned` para máquinas de
+      roster — fecha também o Códice que só descobria no abate), linha de abertura do Boss Rush, linha ao destravar o
+      Bastion.
+
+Qualidade:
+
+- [ ] **R12.5 Entrada do Warden.** No aviso de chefe: 1 s de câmera indo ao Warden, barras de letterbox, dilatação de
+      tempo curta; sem nada disso com movimento reduzido. Constantes "proposta 18/10".
+- [ ] **R12.6 Áudio limpo.** Aviso `ThrusterLoopManager` centenas de vezes (timer de partida sem marcar ativo);
+      crossfade de tema (dois conjuntos de osciladores, percussão velha no beat novo); cues do Heat/Dust Herald;
+      ouvinte `shield-shockwave` sem emissor; `musicController.initialized` morto; cue da Scatter Coil e da Leech.
+- [ ] **R12.7 Bloom em Settings.** `graphics.bloom` (off/low/normal/high) em vez de só `?bloom=`; multi-lock conferido
+      (exige Targeting Suite 3 + multishot ≥ 2 — é desenho, não bug; BACKLOG ajustado).
+
 ## Fora de escopo deste plano
 
 Steam, mobile/touch, multiplayer, narrativa, reescrita do gameplay em WebGL (ver decisão 1), troca do framework de
