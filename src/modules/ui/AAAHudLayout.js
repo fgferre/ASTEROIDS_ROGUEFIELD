@@ -1,5 +1,8 @@
 // src/modules/ui/AAAHudLayout.js
 
+import { WEAPONS } from '../../data/weapons.js';
+import { UPGRADE_FAMILIES } from '../../data/upgrades/families.js';
+
 const COMBO_VISIBLE_MIN = 2;
 const RADAR_SIZE = 220;
 const RADAR_POOL_SIZE = 80;
@@ -15,6 +18,8 @@ const FEED_MAX_ROWS = 4;
 const COMBO_POP_MS = 120;
 const LOW_HULL_PERCENT = 30;
 const CRITICAL_HULL_PERCENT = 15;
+// One pip per lance shot before the Harmonic beam (the beam is the last shot).
+const BEAM_PIPS = WEAPONS.harmonic.beam.every - 1;
 // NORTE §3 names, keyed by enemy.type.
 const FEED_NAMES = {
   asteroid: 'Fragment',
@@ -60,6 +65,9 @@ export class AAAHudLayout {
     this._transmissionHideTimer = null;
     this._bossBarHeldUntil = 0;
     this._feedRows = [];
+    this._lastWeaponKey = null;
+    this._evolutionChips = new Map();
+    this._buffs = new Map();
   }
 
   mount(container) {
@@ -146,6 +154,9 @@ export class AAAHudLayout {
     this._transmissionHideTimer = null;
     this._bossBarHeldUntil = 0;
     this._feedRows = [];
+    this._lastWeaponKey = null;
+    this._evolutionChips = new Map();
+    this._buffs = new Map();
   }
 
   _later(fn, ms) {
@@ -434,6 +445,12 @@ export class AAAHudLayout {
       aimModeIndicator: query('#ui-aim-mode'),
       dashChip: query('#ui-dash-chip'),
       dashFill: query('#ui-dash-fill'),
+      weaponChip: query('#ui-weapon-chip'),
+      weaponName: query('#ui-weapon-name'),
+      beamPips: query('#ui-beam-pips'),
+      beamPipEls: [...root.querySelectorAll('.beam-pip')],
+      evolutions: query('#ui-evolutions'),
+      buffs: query('#ui-buffs'),
       layerBanner: query('#ui-layer-banner'),
       layerBannerTitle: query('#ui-layer-banner-title'),
       layerBannerSub: query('#ui-layer-banner-sub'),
@@ -487,6 +504,109 @@ export class AAAHudLayout {
     if (wasCharging && fraction === 0) {
       this._replay(this.els.dashChip, 'is-ready');
     }
+  }
+
+  /**
+   * WEAPON chip, beam pips and evolution chips from
+   * CombatSystem.getWeaponState(); writes the DOM only when something changed.
+   */
+  updateWeapon(state) {
+    if (!this.els?.weaponName || !state) {
+      return;
+    }
+    const harmonic = state.weaponId === 'harmonic';
+    const filled = harmonic ? BEAM_PIPS + 1 - state.shotsToBeam : 0;
+    const key = `${state.weaponId}:${filled}:${state.evolutions.map((evolution) => evolution.id).join(',')}`;
+    if (key === this._lastWeaponKey) {
+      return;
+    }
+    this._lastWeaponKey = key;
+    this.els.weaponName.textContent = harmonic ? 'HARMONIC' : 'LANCE';
+    this.els.beamPips.classList.toggle('is-hidden', !harmonic);
+    this.els.beamPipEls.forEach((pip, index) =>
+      pip.classList.toggle('is-filled', index < filled)
+    );
+
+    const ids = new Set(state.evolutions.map((evolution) => evolution.id));
+    for (const [id, chip] of this._evolutionChips) {
+      if (!ids.has(id)) {
+        chip.remove();
+        this._evolutionChips.delete(id);
+      }
+    }
+    for (const { id, family } of state.evolutions) {
+      if (this._evolutionChips.has(id)) {
+        continue;
+      }
+      const chip = document.createElement('span');
+      chip.className = 'evo-chip';
+      chip.textContent = id.toUpperCase();
+      chip.style.setProperty('--family-color', UPGRADE_FAMILIES[family].color);
+      this.els.evolutions.appendChild(chip);
+      this._evolutionChips.set(id, chip);
+    }
+  }
+
+  /** The Harmonic beam fired: the weapon chip and its pips flash once. */
+  flashBeam() {
+    if (this.els?.weaponChip) {
+      this._replay(this.els.weaponChip, 'is-beam');
+    }
+  }
+
+  /** Timed pickup chip ("OVERCHARGE 7.9s"); collecting it again restarts it. */
+  startBuff(kind, label, duration, color) {
+    const container = this.els?.buffs;
+    if (!container) {
+      return;
+    }
+    let buff = this._buffs.get(kind);
+    if (!buff) {
+      const el = document.createElement('div');
+      el.className = 'mode-chip buff-chip';
+      el.style.setProperty('--buff-color', color);
+      const text = document.createElement('span');
+      const meter = document.createElement('span');
+      meter.className = 'buff-meter';
+      const fill = document.createElement('span');
+      fill.className = 'buff-meter__fill';
+      meter.appendChild(fill);
+      el.appendChild(text);
+      el.appendChild(meter);
+      container.appendChild(el);
+      buff = { el, text, fill, label, duration, remaining: 0, shown: '' };
+      this._buffs.set(kind, buff);
+    }
+    buff.duration = duration;
+    buff.remaining = duration;
+    this._renderBuff(buff);
+  }
+
+  /** Counts the buff chips down on the game's clock; a chip at 0 goes away. */
+  tickBuffs(deltaTime) {
+    for (const [kind, buff] of this._buffs) {
+      buff.remaining -= deltaTime;
+      if (buff.remaining <= 0) {
+        buff.el.remove();
+        this._buffs.delete(kind);
+      } else {
+        this._renderBuff(buff);
+      }
+    }
+  }
+
+  clearBuffs() {
+    this._buffs.forEach((buff) => buff.el.remove());
+    this._buffs.clear();
+  }
+
+  _renderBuff(buff) {
+    const shown = `${buff.label} ${buff.remaining.toFixed(1)}s`;
+    if (shown !== buff.shown) {
+      buff.shown = shown;
+      buff.text.textContent = shown;
+    }
+    buff.fill.style.transform = `scaleX(${buff.remaining / buff.duration})`;
   }
 
   _initializeBars() {
@@ -977,9 +1097,16 @@ export class AAAHudLayout {
 
             <!-- MODES (Bottom Right) -->
             <div class="systems-area hud-panel">
-                <div class="mode-chip">AIM <span class="data-val" id="ui-aim-mode">AUTO</span></div>
-                <div class="mode-chip">SPREAD <span class="data-val" id="ui-spread-mode">CONC</span></div>
-                <div class="mode-chip dash-chip" id="ui-dash-chip">DASH <span class="dash-meter"><span class="dash-meter__fill" id="ui-dash-fill"></span></span></div>
+                <div class="buff-row" id="ui-buffs"></div>
+                <div class="weapon-group">
+                    <div class="mode-chip weapon-chip" id="ui-weapon-chip">WEAPON <span class="data-val" id="ui-weapon-name">LANCE</span><span class="beam-pips is-hidden" id="ui-beam-pips">${'<span class="beam-pip"></span>'.repeat(BEAM_PIPS)}</span></div>
+                    <div class="evo-row" id="ui-evolutions"></div>
+                </div>
+                <div class="systems-row">
+                    <div class="mode-chip">AIM <span class="data-val" id="ui-aim-mode">AUTO</span></div>
+                    <div class="mode-chip">SPREAD <span class="data-val" id="ui-spread-mode">CONC</span></div>
+                    <div class="mode-chip dash-chip" id="ui-dash-chip">DASH <span class="dash-meter"><span class="dash-meter__fill" id="ui-dash-fill"></span></span></div>
+                </div>
             </div>
 
             <div class="cockpit-frame"></div>
@@ -1098,7 +1225,8 @@ export class AAAHudLayout {
             .lvl-indicator { font-family: var(--font-display, 'Orbitron', sans-serif); font-size: var(--text-sm, 14px); font-weight: 700; color: var(--text, #fff); letter-spacing: 1px; }
 
             /* MODES */
-            .systems-area { grid-row: 3; grid-column: 3; display: flex; flex-direction: row; justify-content: flex-end; align-items: flex-end; gap: var(--space-2, 8px); }
+            .systems-area { grid-row: 3; grid-column: 3; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end; gap: var(--space-2, 8px); }
+            .systems-row { display: flex; flex-direction: row; justify-content: flex-end; align-items: flex-end; gap: var(--space-2, 8px); }
             .mode-chip { font-family: var(--font-mono, 'Consolas', monospace); font-size: var(--text-xs, 12px); color: var(--text-dim, #ccc); background: var(--surface, rgba(12, 20, 31, 0.65)); border: 1px solid var(--line, rgba(255,255,255,0.2)); border-radius: var(--radius-sm, 4px); padding: var(--space-1, 4px) var(--space-2, 8px); letter-spacing: 1px; }
             .data-val { color: var(--accent, #00f2ff); font-weight: bold; }
             .dash-chip { display: flex; align-items: center; gap: var(--space-1, 4px); color: var(--accent); border-color: var(--accent-line); }
@@ -1106,6 +1234,20 @@ export class AAAHudLayout {
             .dash-meter { width: 28px; height: 4px; background: var(--accent); border-radius: var(--radius-sm); overflow: hidden; box-shadow: var(--glow-accent); }
             .dash-chip.is-charging .dash-meter { background: var(--surface-strong); box-shadow: none; }
             .dash-meter__fill { display: block; width: 100%; height: 100%; background: var(--accent-line); transform: scaleX(0); transform-origin: left; }
+            .weapon-group { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1, 4px); }
+            .weapon-chip { display: flex; align-items: center; gap: var(--space-1, 4px); }
+            .beam-pips { display: flex; gap: 3px; margin-left: 2px; }
+            .beam-pips.is-hidden { display: none; }
+            .beam-pip { width: 5px; height: 5px; border: 1px solid var(--accent-line); border-radius: 1px; }
+            .beam-pip.is-filled { background: var(--accent); box-shadow: var(--glow-accent); }
+            .evo-row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; max-width: 220px; }
+            .evo-chip { font-family: var(--font-mono); font-size: 9px; letter-spacing: 1px; padding: 1px var(--space-1, 4px); color: var(--family-color); background: var(--surface); border: 1px solid color-mix(in srgb, var(--family-color) 55%, transparent); border-radius: var(--radius-sm); }
+            .buff-row { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1, 4px); }
+            .buff-row:empty { display: none; }
+            .evo-row:empty { display: none; }
+            .buff-chip { display: flex; align-items: center; gap: var(--space-2, 8px); color: var(--buff-color); border-color: color-mix(in srgb, var(--buff-color) 55%, transparent); }
+            .buff-meter { width: 36px; height: 4px; background: var(--surface-strong); border-radius: var(--radius-sm); overflow: hidden; }
+            .buff-meter__fill { display: block; width: 100%; height: 100%; background: var(--buff-color); transform-origin: left; }
 
             /* ANIMATIONS */
             @keyframes rotate-border { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -1165,6 +1307,9 @@ export class AAAHudLayout {
             @media (prefers-reduced-motion: no-preference) {
                 .combo-box.pulse { animation: combo-pop ${COMBO_POP_MS}ms var(--ease-out) 1; }
                 .dash-chip.is-ready { animation: dash-ready var(--motion-base) var(--ease-out) 1; }
+                .weapon-chip.is-beam { animation: dash-ready var(--motion-base) var(--ease-out) 1; }
+                .weapon-chip.is-beam .beam-pip { animation: beam-pip-flash var(--motion-base) var(--ease-out) 1; }
+                .evo-chip, .buff-chip { animation: feed-in var(--motion-base) var(--ease-out); }
                 .lowhp-vignette.is-low { animation: lowhp-pulse 0.83s ease-in-out infinite alternate; }
                 .lowhp-vignette.is-critical { animation-name: lowhp-pulse-critical; }
                 .layer-banner.is-showing .layer-banner__title { animation: banner-title-in 420ms var(--ease-out); }
@@ -1181,6 +1326,7 @@ export class AAAHudLayout {
             }
             @keyframes combo-pop { 0% { transform: scale(1); } 50% { transform: scale(1.18); } 100% { transform: scale(1); } }
             @keyframes dash-ready { 0% { box-shadow: var(--glow-accent); background: var(--accent-soft); } 100% { box-shadow: none; } }
+            @keyframes beam-pip-flash { 0% { background: var(--accent); box-shadow: var(--glow-accent); } 100% { background: transparent; box-shadow: none; } }
             @keyframes lowhp-pulse { from { opacity: 0.25; } to { opacity: 0.75; } }
             @keyframes lowhp-pulse-critical { from { opacity: 0.55; } to { opacity: 1; } }
             @keyframes banner-title-in { from { opacity: 0; letter-spacing: 0.2em; margin-right: -0.2em; } to { opacity: 1; letter-spacing: 0.5em; margin-right: -0.5em; } }

@@ -1397,6 +1397,7 @@ class UISystem extends BaseSystem {
       const aimMode =
         typeof combat.getAimMode === 'function' ? combat.getAimMode() : 'auto';
       hud.updateModeIndicators(spreadMode, aimMode);
+      hud.updateWeapon(combat.getWeaponState());
     }
 
     const waveState =
@@ -1598,6 +1599,18 @@ class UISystem extends BaseSystem {
         pickup.detail,
         pickup.color
       );
+      if (pickup.duration) {
+        this.aaaTacticalHud?.startBuff(
+          kind,
+          pickup.label,
+          pickup.duration,
+          pickup.color
+        );
+      }
+    });
+
+    this.registerEventListener('weapon-beam-fired', () => {
+      this.aaaTacticalHud?.flashBeam();
     });
 
     this.registerEventListener('pause-state-changed', (data) => {
@@ -1640,6 +1653,7 @@ class UISystem extends BaseSystem {
     this.registerEventListener('game-started', () => {
       this.runWon = false;
       this.transmissions?.clear();
+      this.aaaTacticalHud?.clearBuffs();
     });
     this.registerEventListener('upgrade-options-ready', (payload = {}) => {
       this.handleUpgradeOptions(payload);
@@ -2889,9 +2903,10 @@ class UISystem extends BaseSystem {
     );
   }
 
-  update() {
+  update(deltaTime) {
     if (this.aaaTacticalHud) {
       this.updateAAATacticalHudFromServices({ force: false });
+      this.aaaTacticalHud.tickBuffs(deltaTime);
     }
   }
 
