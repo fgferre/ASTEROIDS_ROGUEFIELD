@@ -55,7 +55,7 @@ worker; nunca `| tail`/`| grep` antes de `&&` em comandos de teste (mascarou uma
 `set -o pipefail`); um worker apagou `scratchpad/*.js` de outros — scripts compartilhados em `.mjs`; o container pode
 reiniciar (trabalho em disco sobrevive); desligar temporizadores antigos; pedir ao worker que encerre após ~60 min.
 
-## Visual (palavras dele, 18/10, primeira vez jogando a Rodada 4)
+## Visual (itens 7 e 3; o 7 nas palavras dele, 18/10, jogando a Rodada 4)
 
 - **(7)** _"Tá ficando muito interessante, mas tá um pouco estranho o background ser essas estrelas como se fosse uma
   textura. Achei que tinha que ser algo mais procedural ali. Além disso, é estranho fazer sombra em cima dessa
@@ -64,17 +64,14 @@ reiniciar (trabalho em disco sobrevive); desligar temporizadores antigos; pedir 
   sombra é interessante também, mas ter uma sombra refletida embaixo no chão, nas estrelas, como se fosse um chão, é
   estranho."_ → sombras só entre objetos 3D (shadow map da luz-chave; nave e rochas sombreando rochas), nenhuma num
   plano de fundo. Fecha quando ele disser que o fundo lê como espaço.
+- **(3)** O menu (Three.js, bloom) é muito melhor que o jogo (Canvas 800×600 esticado, borrado). O jogo tem de parecer
+  continuação do menu — é o que `docs/brand.md` e `docs/NORTE.md` já pedem.
 
 ## Jogabilidade e sensação
 
 - **(1)** _"dos gráficos até as dinâmicas e efeitos, UX tudo ruim"_ (17/10). O que o diagnóstico achou está em
   `PLAN.md`; este item fecha quando ele disser, jogando, que não está mais amador.
 - **(2)** Boss da wave 5 levou ~120 s para morrer com 6 upgrades — _"difícil, mas dá"_ (maio/2026). Alvo era 60–90 s.
-
-## Visual
-
-- **(3)** O menu (Three.js, bloom) é muito melhor que o jogo (Canvas 800×600 esticado, borrado). O jogo tem de parecer
-  continuação do menu — é o que `docs/brand.md` e `docs/NORTE.md` já pedem.
 
 ## Controles (palavras dele, 18/10)
 
@@ -83,8 +80,6 @@ reiniciar (trabalho em disco sobrevive); desligar temporizadores antigos; pedir 
   movimento fica muito estranho usando o WASD, porque ela vai em direção para onde está atirando."_ → Rodada 5,
   R5.11: casco aponta para onde se move (WASD relativo à tela), arma vira torreta que gira sozinha para o alvo.
   Fecha quando ele disser que pilotar e atirar voltaram a ser independentes.
-
-## Interface
 
 ## Desempenho
 
