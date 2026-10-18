@@ -350,7 +350,7 @@ Qualidade:
 
 Conteúdo:
 
-- [ ] **R12.1 Terceira arma: _Scatter Coil_.** Carta como a do Harmonic: leque de 5 flaks curtos que estouram a ~180 px
+- [x] **R12.1 Terceira arma: _Scatter Coil_.** Carta como a do Harmonic: leque de 5 flaks curtos que estouram a ~180 px
       em estilhaços de área; cadência menor, dano por flak menor; controle de multidão de perto. 2D, 3D, chip do HUD
       lendo o nome da arma (hoje fixo em LANCE/HARMONIC), evoluções de família honradas onde já há gancho.
 - [ ] **R12.2 Família _Maneuver_ (6 cartas, 34→40).** Afterburner (recarga do dash), Ram Plating (dash dá dano de
