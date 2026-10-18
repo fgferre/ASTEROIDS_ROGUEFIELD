@@ -367,7 +367,7 @@ Qualidade:
 
 - [ ] **R12.5 Entrada do Warden.** No aviso de chefe: 1 s de câmera indo ao Warden, barras de letterbox, dilatação de
       tempo curta; sem nada disso com movimento reduzido. Constantes "proposta 18/10".
-- [ ] **R12.6 Áudio limpo.** Aviso `ThrusterLoopManager` centenas de vezes (timer de partida sem marcar ativo);
+- [x] **R12.6 Áudio limpo.** Aviso `ThrusterLoopManager` centenas de vezes (timer de partida sem marcar ativo);
       crossfade de tema (dois conjuntos de osciladores, percussão velha no beat novo); cues do Heat/Dust Herald;
       ouvinte `shield-shockwave` sem emissor; `musicController.initialized` morto; cue da Scatter Coil e da Leech.
 - [ ] **R12.7 Bloom em Settings.** `graphics.bloom` (off/low/normal/high) em vez de só `?bloom=`; multi-lock conferido
