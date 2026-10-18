@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PlayerSystem from '../../src/modules/PlayerSystem.js';
-import { defaultHull, solarSlicer } from '../../src/data/shipModels.js';
+import {
+  bastion,
+  defaultHull,
+  solarSlicer,
+} from '../../src/data/shipModels.js';
 import { DASH_COOLDOWN } from '../../src/data/constants/gameplay.js';
 import {
   SHIP_ACCELERATION,
@@ -45,6 +49,15 @@ describe('PlayerSystem hull stats', () => {
     expect(player.maxHealth).toBe(100);
   });
 
+  it('makes the Bastion heavier: slower, tougher', () => {
+    const player = makePlayer();
+    player.setHull(bastion);
+    expect(player.acceleration).toBeCloseTo(SHIP_ACCELERATION * 0.85, 6);
+    expect(player.maxSpeed).toBeCloseTo(SHIP_MAX_SPEED * 0.9, 6);
+    expect(player.maxHealth).toBe(135);
+    expect(player.dashCooldown).toBeCloseTo(DASH_COOLDOWN * 1.2, 6);
+  });
+
   it('applies the Hangar modifiers on top of the hull stats', () => {
     const hangar = {
       getModifiers: () => ({
@@ -87,5 +100,22 @@ describe('PlayerSystem hull stats', () => {
     expect(player.renderHullPreview(ctx, solarSlicer, { padding: 4 })).toBe(
       true
     );
+  });
+
+  it('draws the Bastion wider, with armoured shoulders on darker steel', () => {
+    const player = makePlayer();
+    const levels = { thruster: 0, rcs: 0, braking: 0 };
+    const interceptor = player.getHullGeometry(defaultHull, levels);
+    const geometry = player.getHullGeometry(bastion, levels);
+    expect(geometry.maxY).toBeGreaterThan(interceptor.maxY * 1.3);
+    expect(geometry.panels.filter((panel) => panel.armor)).toHaveLength(2);
+    expect(geometry.albedo).toBeLessThan(interceptor.albedo);
+    expect(geometry.nozzles).toHaveLength(2);
+
+    const ctx = new Proxy(
+      { canvas: { width: 48, height: 48, clientWidth: 0 } },
+      { get: (target, key) => (key in target ? target[key] : () => {}) }
+    );
+    expect(player.renderHullPreview(ctx, bastion, { padding: 4 })).toBe(true);
   });
 });

@@ -10,6 +10,7 @@ import HangarService, {
   HANGAR_STORAGE_KEY,
 } from '../../src/services/HangarService.js';
 import {
+  BASTION_HULL_ID,
   DEFAULT_HULL_ID,
   SOLAR_SLICER_HULL_ID,
 } from '../../src/data/shipModels.js';
@@ -100,7 +101,7 @@ describe('HangarService', () => {
     expect(next.owned).toEqual({ 'salvage-magnet': true });
   });
 
-  it('turns owned items into run modifiers and gates the Solar Slicer', () => {
+  it('turns owned items into run modifiers and gates the bought hulls', () => {
     const none = new HangarService({ eventBus: new EventBus() });
     expect(none.getModifiers()).toEqual({
       hullMultiplier: 1,
@@ -110,6 +111,7 @@ describe('HangarService', () => {
       pickupRadiusMultiplier: 1,
     });
     expect(none.hullFor(SOLAR_SLICER_HULL_ID)).toBe(DEFAULT_HULL_ID);
+    expect(none.hullFor(BASTION_HULL_ID)).toBe(DEFAULT_HULL_ID);
 
     stock(0, {
       'reinforced-plating': true,
@@ -118,6 +120,7 @@ describe('HangarService', () => {
       'dash-coils': true,
       'salvage-magnet': true,
       'solar-slicer-hull': true,
+      'bastion-hull': true,
     });
     const all = new HangarService({ eventBus: new EventBus() });
     expect(all.getModifiers()).toEqual({
@@ -128,6 +131,7 @@ describe('HangarService', () => {
       pickupRadiusMultiplier: 1.15,
     });
     expect(all.hullFor(SOLAR_SLICER_HULL_ID)).toBe(SOLAR_SLICER_HULL_ID);
+    expect(all.hullFor(BASTION_HULL_ID)).toBe(BASTION_HULL_ID);
   });
 
   it('applies owned items at run start in the booted game', () => {

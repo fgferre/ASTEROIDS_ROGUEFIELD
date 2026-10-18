@@ -4,6 +4,7 @@ import GameSessionService from '../../src/services/GameSessionService.js';
 import DifficultyService from '../../src/services/DifficultyService.js';
 import { BULLET_SIZE } from '../../src/core/GameConstants.js';
 import {
+  BASTION_HULL_ID,
   DEFAULT_HULL_ID,
   SOLAR_SLICER_HULL_ID,
   getShipModelById,
@@ -338,18 +339,19 @@ describe('GameSessionService lifecycle flows', () => {
     );
   });
 
-  it('applies the configured hull when starting a new run', () => {
-    const { service, player } = createServiceHarness({
-      selectedHull: SOLAR_SLICER_HULL_ID,
-    });
+  it.each([SOLAR_SLICER_HULL_ID, BASTION_HULL_ID])(
+    'applies the configured hull %s when starting a new run',
+    (hullId) => {
+      const { service, player } = createServiceHarness({
+        selectedHull: hullId,
+      });
 
-    service.startNewRun({ source: 'test' });
+      service.startNewRun({ source: 'test' });
 
-    expect(player.setHull).toHaveBeenCalledWith(
-      getShipModelById(SOLAR_SLICER_HULL_ID)
-    );
-    expect(player.currentHull.id).toBe(SOLAR_SLICER_HULL_ID);
-  });
+      expect(player.setHull).toHaveBeenCalledWith(getShipModelById(hullId));
+      expect(player.currentHull.id).toBe(hullId);
+    }
+  );
 
   it('falls back to the default hull when the selected hull is invalid', () => {
     const { service, player } = createServiceHarness({

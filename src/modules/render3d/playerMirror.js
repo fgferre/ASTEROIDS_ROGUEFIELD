@@ -11,6 +11,8 @@
 // simulation's turret heading; its barrel tips sit on the sim's muzzle point.
 // The Solar Slicer's fins are blades edged in its amber accent and its turret
 // sits in a low, wide housing (shipModels.js `blades`, `turret: 'low'`).
+// The Bastion's shoulders carry two stacked armour plates trimmed in its
+// amber accent, on darker steel (shipModels.js `armor`, `albedo`).
 // The static plates and nozzle housings of a hull merge into one
 // vertex-coloured mesh (mergeStatic.js), cached per hull (PLAN.md R9.1).
 
@@ -41,6 +43,12 @@ const BASE_TOP = BASE_DEPTH + BEVEL;
 // Raised plates are their panel shrunk toward its centroid: the base shows
 // around them as a panel border and a seam down the spine.
 const INSET = 0.8;
+// Armour (proposta 18/10): a lower plate inset like the others and a smaller
+// upper plate stacked on it; the trim runs on the lower plate's top edge.
+const ARMOR_DEPTH = 1.8;
+const ARMOR_TOP_DEPTH = 0.9;
+const ARMOR_TOP_INSET = 0.5;
+const ARMOR_TOP = BASE_TOP + ARMOR_DEPTH + BEVEL;
 const NOZZLE_HEIGHT = 2.6;
 // Visual only: collision keeps the 2D outline, and effects anchored on the
 // nose (muzzle flash, lances) take their position from the simulation.
@@ -103,6 +111,16 @@ function patchHull(shader) {
       float rim = 1.0 - max(dot(normal, normalize(vViewPosition)), 0.0);
       totalEmissiveRadiance += uRim * pow(rim, 3.0) + vec3(uBlink * (0.25 + rim));`
     );
+}
+
+// `points` shrunk toward their centroid by `k`.
+function insetOf(points, k) {
+  const cx = points.reduce((n, p) => n + p.x, 0) / points.length;
+  const cy = points.reduce((n, p) => n + p.y, 0) / points.length;
+  return points.map((p) => ({
+    x: cx + (p.x - cx) * k,
+    y: cy + (p.y - cy) * k,
+  }));
 }
 
 // Hull and visual-upgrade levels: what the built geometry depends on.
@@ -391,32 +409,58 @@ export class PlayerMirror {
     const seams = [];
     const edges = { edge: [], bladeEdge: [] };
     const maxY = geometry.maxY || 1;
+    // Darker steel (Bastion) scales the three tones.
+    const [baseTone, finTone, spineTone] = [
+      this.baseTone,
+      this.finTone,
+      this.spineTone,
+    ].map((color) => color.clone().multiplyScalar(geometry.albedo));
     geometry.panels.forEach((panel) => {
+      // Armour rides on the plates under it: no base plate of its own.
+      if (panel.armor) {
+        if (plates) {
+          raised.push(
+            {
+              geometry: this.plate(
+                insetOf(panel.points, INSET),
+                ARMOR_DEPTH,
+                BASE_TOP,
+                0
+              ),
+              color: finTone,
+            },
+            {
+              geometry: this.plate(
+                insetOf(panel.points, ARMOR_TOP_INSET),
+                ARMOR_TOP_DEPTH,
+                ARMOR_TOP,
+                0
+              ),
+              color: spineTone,
+            }
+          );
+        }
+        this.addEdges(edges, panel, false, geometry.maxX, geometry.blades);
+        return;
+      }
       const base = this.plate(panel.points, BASE_DEPTH, 0, 0);
       // Dark seams on the base plate only: the raised plates read by tone.
       seams.push(new THREE.EdgesGeometry(base, 40));
-      if (plates) plates.push({ geometry: base, color: this.baseTone });
+      if (plates) plates.push({ geometry: base, color: baseTone });
       else base.dispose();
       const spine = panel.points.some((p) => p.y === 0);
       if (!spine && !panel.rcsPort) return;
-      const cx =
-        panel.points.reduce((n, p) => n + p.x, 0) / panel.points.length;
-      const cy =
-        panel.points.reduce((n, p) => n + p.y, 0) / panel.points.length;
-      const inset = panel.points.map((p) => ({
-        x: cx + (p.x - cx) * INSET,
-        y: cy + (p.y - cy) * INSET,
-      }));
+      const inset = insetOf(panel.points, INSET);
       if (plates) {
         raised.push(
           spine
             ? {
                 geometry: this.plate(inset, SPINE_DEPTH, BASE_TOP, maxY),
-                color: this.spineTone,
+                color: spineTone,
               }
             : {
                 geometry: this.plate(inset, FIN_DEPTH, BASE_TOP, 0),
-                color: this.finTone,
+                color: finTone,
               }
         );
       }
@@ -469,7 +513,7 @@ export class PlayerMirror {
             nozzle.y
           );
         housing.setAttribute('uv2', housing.getAttribute('uv'));
-        raised.push({ geometry: housing, color: this.baseTone });
+        raised.push({ geometry: housing, color: baseTone });
       }
       // Hot throat: a glowing bead at the exit, lit even at idle.
       const throat = new THREE.Mesh(
@@ -574,16 +618,20 @@ export class PlayerMirror {
 
   // Thin cyan line on the prow's outer edge and on the fins' trailing edges
   // (edges whose outward normal points aft), just above the base plate. A
-  // blade is edged in the accent all round except where it meets the spine.
+  // blade is edged in the accent all round except where it meets the spine;
+  // an armour plate's outboard edges are trimmed in the accent on its lower
+  // plate's top.
   addEdges(edges, panel, spine, noseX, blades) {
     const { THREE } = this;
-    const { points } = panel;
+    const { armor } = panel;
+    const points = armor ? insetOf(panel.points, INSET) : panel.points;
     const prow = spine && points.some((p) => p.x === noseX);
     if (spine && !prow) return;
     const blade = blades && !spine;
     const cx = points.reduce((n, p) => n + p.x, 0) / points.length;
     const cy = points.reduce((n, p) => n + p.y, 0) / points.length;
-    const segments = blade ? edges.bladeEdge : edges.edge;
+    const segments = blade || armor ? edges.bladeEdge : edges.edge;
+    const height = (armor ? ARMOR_TOP : BASE_TOP) + 0.05;
     points.forEach((a, i) => {
       const b = points[(i + 1) % points.length];
       const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
@@ -593,15 +641,17 @@ export class PlayerMirror {
         nx = -nx;
         ny = -ny;
       }
-      const keep = prow
-        ? nx > 0.1 && Math.abs(ny) > 0.1
-        : blade
-          ? ny * Math.sign(cy) > -0.5
-          : nx < -0.6;
+      const keep = armor
+        ? ny * Math.sign(cy) > 0.3
+        : prow
+          ? nx > 0.1 && Math.abs(ny) > 0.1
+          : blade
+            ? ny * Math.sign(cy) > -0.5
+            : nx < -0.6;
       if (keep) {
         segments.push(
-          new THREE.Vector3(a.x, BASE_TOP + 0.05, a.y),
-          new THREE.Vector3(b.x, BASE_TOP + 0.05, b.y)
+          new THREE.Vector3(a.x, height, a.y),
+          new THREE.Vector3(b.x, height, b.y)
         );
       }
     });

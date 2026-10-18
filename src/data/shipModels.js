@@ -2,6 +2,7 @@ import { SHIP_SIZE } from '../core/GameConstants.js';
 
 const DEFAULT_HULL_ID = 'default-hull';
 const SOLAR_SLICER_HULL_ID = 'solar-slicer';
+const BASTION_HULL_ID = 'bastion';
 const warnedMissingHullIds = new Set();
 
 const freezeDeep = (value) => {
@@ -41,7 +42,9 @@ const createHullDefinition = (definition) =>
 // renderer lights it against the fixed world key light. Panels are listed
 // for the left side (y < 0) and mirrored. `grow` moves the listed vertices by
 // `step` per level of the named visual upgrade (thruster | rcs | braking);
-// `minLevel` hides a panel until that upgrade level.
+// `minLevel` hides a panel until that upgrade level. An `armor` panel rides
+// on the plates under it as two stacked plates trimmed in the accent; a
+// visual's `albedo` scales its hull tones.
 const S = SHIP_SIZE;
 const pt = (x, y) => ({ x: x * S, y: y * S });
 
@@ -176,6 +179,71 @@ const solarSlicerVisual = {
   cockpit: { from: pt(0.72, 0), to: pt(1.02, 0), width: 0.06 * S },
 };
 
+// Bastion: a broad delta with a blunt prow and a heavy flat stern, layered
+// armour plates on the shoulders edged in amber, twin amber thrusters and
+// darker steel plates (playerMirror.js reads `armor` and `albedo`).
+const BASTION_ALBEDO = 0.7; // proposta 18/10: share of the Interceptor's tones
+const bastionVisual = {
+  accent: 'shot',
+  albedo: BASTION_ALBEDO,
+  panels: [
+    ...panelPair({
+      points: [
+        pt(-0.68, -0.44),
+        pt(-0.92, -0.64),
+        pt(-1.0, -0.58),
+        pt(-0.8, -0.38),
+      ],
+      facing: { x: -0.6, y: -0.8 },
+      minLevel: { key: 'braking', value: 1 },
+      grow: { key: 'braking', indices: [1, 2], step: pt(-0.04, -0.05) },
+    }),
+    // delta wings: leading edge from the shoulder to the tip
+    ...panelPair({
+      points: [
+        pt(0.42, -0.24),
+        pt(-0.58, -0.9),
+        pt(-0.72, -0.86),
+        pt(-0.62, -0.36),
+      ],
+      facing: { x: -0.25, y: -1 },
+      grow: { key: 'rcs', indices: [1, 2], step: pt(-0.03, -0.05) },
+      rcsPort: 1,
+    }),
+    // body, wide to the flat stern
+    ...panelPair({
+      points: [
+        pt(0.42, 0),
+        pt(0.42, -0.24),
+        pt(-0.62, -0.36),
+        pt(-0.84, -0.3),
+        pt(-0.84, 0),
+      ],
+      facing: { x: -0.05, y: -1 },
+    }),
+    // prow
+    ...panelPair({
+      points: [pt(0.98, 0), pt(0.42, 0), pt(0.42, -0.24)],
+      facing: { x: 0.4, y: -0.9 },
+    }),
+    // shoulder armour over the wing roots
+    ...panelPair({
+      points: [pt(0.36, -0.2), pt(0, -0.5), pt(-0.42, -0.6), pt(-0.36, -0.26)],
+      facing: { x: 0.35, y: -0.95 },
+      armor: true,
+    }),
+  ],
+  nozzles: [
+    { ...pt(-0.84, -0.17), r: 0.085 * S },
+    { ...pt(-0.84, 0.17), r: 0.085 * S },
+    { ...pt(-0.84, 0), r: 0.065 * S, minLevel: 3 },
+  ],
+  nozzleLength: 0.13 * S,
+  nozzleLengthPerLevel: 0.025 * S,
+  retroPorts: [pt(0.42, -0.24), pt(0.42, 0.24)],
+  cockpit: { from: pt(0.48, 0), to: pt(0.72, 0), width: 0.08 * S },
+};
+
 // Flight stats per hull (proposta 18/10), multiplied in
 // PlayerSystem.resetStats before the Hangar's modifiers.
 const HULL_STATS = freezeDeep({
@@ -190,6 +258,13 @@ const HULL_STATS = freezeDeep({
     maxSpeed: 1.15,
     maxHealth: 0.8,
     dashCooldown: 0.85,
+  },
+  // proposta 18/10: the heavy hull also waits longer between dashes.
+  [BASTION_HULL_ID]: {
+    acceleration: 0.85,
+    maxSpeed: 0.9,
+    maxHealth: 1.35,
+    dashCooldown: 1.2,
   },
 });
 
@@ -242,10 +317,37 @@ const solarSlicer = createHullDefinition({
   stats: HULL_STATS[SOLAR_SLICER_HULL_ID],
   visual: solarSlicerVisual,
 });
-const ALL_HULLS = freezeDeep([defaultHull, solarSlicer]);
+const bastion = createHullDefinition({
+  id: BASTION_HULL_ID,
+  name: 'Bastion',
+  outline: [
+    { x: SHIP_SIZE * 0.98, y: 0 },
+    { x: SHIP_SIZE * 0.42, y: -SHIP_SIZE * 0.24 },
+    { x: -SHIP_SIZE * 0.58, y: -SHIP_SIZE * 0.9 },
+    { x: -SHIP_SIZE * 0.72, y: -SHIP_SIZE * 0.86 },
+    { x: -SHIP_SIZE * 0.62, y: -SHIP_SIZE * 0.36 },
+    { x: -SHIP_SIZE * 0.84, y: -SHIP_SIZE * 0.3 },
+    { x: -SHIP_SIZE * 0.84, y: SHIP_SIZE * 0.3 },
+    { x: -SHIP_SIZE * 0.62, y: SHIP_SIZE * 0.36 },
+    { x: -SHIP_SIZE * 0.72, y: SHIP_SIZE * 0.86 },
+    { x: -SHIP_SIZE * 0.58, y: SHIP_SIZE * 0.9 },
+    { x: SHIP_SIZE * 0.42, y: SHIP_SIZE * 0.24 },
+  ],
+  shieldPadding: 14,
+  thrusterPorts: {
+    main: { x: -SHIP_SIZE * 1.0, y: 0 },
+    aux: { x: SHIP_SIZE * 1.0, y: 0 },
+    left: { x: -SHIP_SIZE * 0.62, y: -SHIP_SIZE * 0.82 },
+    right: { x: -SHIP_SIZE * 0.62, y: SHIP_SIZE * 0.82 },
+  },
+  stats: HULL_STATS[BASTION_HULL_ID],
+  visual: bastionVisual,
+});
+const ALL_HULLS = freezeDeep([defaultHull, solarSlicer, bastion]);
 const HULLS_BY_ID = freezeDeep({
   [defaultHull.id]: defaultHull,
   [solarSlicer.id]: solarSlicer,
+  [bastion.id]: bastion,
 });
 
 const getAllShipModels = () => ALL_HULLS;
@@ -271,14 +373,17 @@ const getShipModelById = (hullId) => {
 const shipModels = Object.freeze({
   defaultHull,
   solarSlicer,
+  bastion,
   all: ALL_HULLS,
   byId: HULLS_BY_ID,
 });
 
 export {
   ALL_HULLS,
+  BASTION_HULL_ID,
   DEFAULT_HULL_ID,
   SOLAR_SLICER_HULL_ID,
+  bastion,
   defaultHull,
   getAllShipModels,
   getShipModelById,

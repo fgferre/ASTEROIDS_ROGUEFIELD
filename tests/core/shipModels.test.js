@@ -35,6 +35,7 @@ describe('shipModels', () => {
     expect(ALL_HULLS.map((hull) => hull.name)).toEqual([
       'Interceptor',
       'Solar Slicer',
+      'Bastion',
     ]);
   });
 });
