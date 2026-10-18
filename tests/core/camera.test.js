@@ -161,6 +161,14 @@ describe('createCamera', () => {
     expect(frameFor(0, 0, 900, 0, {}).zoom).toBe(0.85);
   });
 
+  it('keeps a wide boss inside the margin by its rim, not its centre', () => {
+    const centre = frameFor(200, 300, 600, 300, {}, W, H, 0);
+    const wide = frameFor(200, 300, 600, 300, {}, W, H, 100);
+    // Boss half-extent 240 + radius 100 + 120 margin = 460.
+    expect(wide.zoom).toBeCloseTo(W / (2 * 460), 6);
+    expect(wide.zoom).toBeLessThan(centre.zoom);
+  });
+
   it('blends into boss framing and reaches its target', () => {
     const camera = createCamera({ fieldWidth: W, fieldHeight: H });
     camera.snapTo(200, 300);

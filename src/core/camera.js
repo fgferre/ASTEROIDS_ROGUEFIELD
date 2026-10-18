@@ -109,7 +109,11 @@ export function threatZoomFor(count, base = CAMERA_ZOOM) {
   return base * (1 - (1 - THREAT_BUSY_RATIO) * t);
 }
 
-/** Midpoint (ship 0.6 / boss 0.4) and the zoom that fits both + margin. */
+/**
+ * Midpoint (ship 0.6 / boss 0.4) and the zoom that fits both + margin. The
+ * boss counts with its radius, so a wide Warden's rim stays inside the
+ * margin instead of its centre only.
+ */
 export function frameFor(
   ax,
   ay,
@@ -117,12 +121,15 @@ export function frameFor(
   by,
   out,
   fieldWidth = GAME_WIDTH,
-  fieldHeight = GAME_HEIGHT
+  fieldHeight = GAME_HEIGHT,
+  bossRadius = 0
 ) {
   const mx = ax * FRAME_SHIP_WEIGHT + bx * (1 - FRAME_SHIP_WEIGHT);
   const my = ay * FRAME_SHIP_WEIGHT + by * (1 - FRAME_SHIP_WEIGHT);
-  const hx = Math.max(Math.abs(ax - mx), Math.abs(bx - mx)) + FRAME_MARGIN;
-  const hy = Math.max(Math.abs(ay - my), Math.abs(by - my)) + FRAME_MARGIN;
+  const hx =
+    Math.max(Math.abs(ax - mx), Math.abs(bx - mx) + bossRadius) + FRAME_MARGIN;
+  const hy =
+    Math.max(Math.abs(ay - my), Math.abs(by - my) + bossRadius) + FRAME_MARGIN;
   out.x = mx;
   out.y = my;
   out.zoom = clamp(
@@ -145,6 +152,7 @@ export function createCameraScene() {
     hasBoss: false,
     bossX: 0,
     bossY: 0,
+    bossRadius: 0,
   };
 }
 
@@ -173,6 +181,7 @@ export function readCameraScene(scene, player, combat, enemies) {
       scene.hasBoss = true;
       scene.bossX = e.x;
       scene.bossY = e.y;
+      scene.bossRadius = e.radius || 0;
     }
   }
   return scene;
@@ -204,7 +213,7 @@ export function createCamera({
   const threatZoom = { value: zoom, velocity: 0 };
   const fitZoom = { value: zoom, velocity: 0 };
   let frameBlend = 0;
-  const boss = { x: 0, y: 0 };
+  const boss = { x: 0, y: 0, radius: 0 };
   const goal = { x: 0, y: 0, zoom };
 
   const camera = {
@@ -386,6 +395,7 @@ export function createCamera({
     if (framing) {
       boss.x = scene.bossX;
       boss.y = scene.bossY;
+      boss.radius = scene.bossRadius;
     }
     // Entering from plain follow, the framing zoom starts where we are.
     if (framing && frameBlend === 0) {
@@ -399,7 +409,18 @@ export function createCamera({
     );
     const w = smoothstep01(frameBlend);
     // Leaving (boss dead or far), frame its last position while blending out.
-    if (w > 0) frameFor(x, y, boss.x, boss.y, goal, fieldWidth, fieldHeight);
+    if (w > 0) {
+      frameFor(
+        x,
+        y,
+        boss.x,
+        boss.y,
+        goal,
+        fieldWidth,
+        fieldHeight,
+        boss.radius
+      );
+    }
     if (w > 0) dampTo(fitZoom, goal.zoom, FRAME_ZOOM_SMOOTH * slow, dt);
     const leadX = x + lookX.value;
     const leadY = y + lookY.value;
