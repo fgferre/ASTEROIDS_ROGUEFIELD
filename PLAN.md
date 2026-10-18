@@ -173,7 +173,7 @@ tudo num browser."_ Fatias, cada uma um commit com captura; números como "propo
 - [ ] **R3.4 Meta-progressão (proposta).** Salvage persistido no navegador, ganho por camada/abates; "Hangar" no menu
       com 6 melhorias permanentes pequenas (ex.: +1 reroll, casco Solar Slicer, +5 % casco). Tudo atrás de um serviço
       só, para reverter com um commit.
-- [ ] **R3.5 Modo infinito (proposta).** Na vitória do Warden 15, botão "Continue into the deep field": `beyond(n)` da
+- [x] **R3.5 Modo infinito (proposta).** Na vitória do Warden 15, botão "Continue into the deep field": `beyond(n)` da
       tabela de camadas escala rochas/roster/elite; placar de camada máxima.
 - [ ] **R3.6 Morte de inimigo em 3D.** Dissolve (shader) + estilhaços na cor do inimigo; Warden perde segmentos
       visivelmente a cada fase.

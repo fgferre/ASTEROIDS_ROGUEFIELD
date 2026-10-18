@@ -24,12 +24,16 @@ export function formatRunTime(totalSeconds) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
-/** "Layer 9 · 7:42 · CHAPTER II — THE DENSE CORE" (time left out when null). */
-export function runLocationLine(layer, totalSeconds = null) {
+/**
+ * "Layer 9 · 7:42 · CHAPTER II — THE DENSE CORE · BEST LAYER 12" (time and
+ * best layer left out when null).
+ */
+export function runLocationLine(layer, totalSeconds = null, bestLayer = null) {
   const n = Math.max(1, Math.floor(Number(layer) || 1));
   const parts = [`Layer ${n}`];
   if (totalSeconds !== null) parts.push(formatRunTime(totalSeconds));
   parts.push(biomeForLayer(n).title);
+  if (bestLayer !== null) parts.push(`BEST LAYER ${bestLayer}`);
   return parts.join(' · ');
 }
 

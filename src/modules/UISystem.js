@@ -11,6 +11,7 @@ import {
 } from '../data/shipModels.js';
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 import { directorFor } from '../data/layers.js';
+import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
 import { biomeForLayer } from '../data/biomes.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import {
@@ -61,7 +62,8 @@ function codexEntryMarkup(entry) {
       <p class="codex-entry__hint">${entry.hint}</p>
     </div></li>`;
 }
-const LEVEL_UP_LOCKOUT_MS = 400;
+// Level-up cards and the victory buttons ignore input this long after showing.
+const SCREEN_INPUT_LOCKOUT_MS = 400;
 const UPGRADE_RARITY_LABELS = { common: 'Common', rare: 'Rare', epic: 'Epic' };
 const CONTROLS_SEEN_KEY = 'roguefield:seenControls';
 const CONTROLS_TOAST_MS = 8000;
@@ -278,7 +280,10 @@ class UISystem extends BaseSystem {
         level: document.getElementById('victory-level') || null,
         build: document.getElementById('victory-build') || null,
         synergies: document.getElementById('victory-synergies') || null,
+        best: document.getElementById('victory-best') || null,
+        continueBtn: document.getElementById('victory-continue-btn') || null,
         restartBtn: document.getElementById('victory-restart-btn') || null,
+        quitBtn: document.getElementById('victory-quit-btn') || null,
       },
       pause: {
         container: document.getElementById('pause-screen') || null,
@@ -494,7 +499,11 @@ class UISystem extends BaseSystem {
     hud.showLayerBanner(layer, {
       boss,
       delayMs: toastShowing ? 1000 : 0,
-      chapter: firstOfBiome ? biome.title : '',
+      chapter: firstOfBiome
+        ? biome.title
+        : layer > RUN_FINAL_LAYER
+          ? 'DEEP FIELD'
+          : '',
     });
     if (firstOfBiome) {
       this.queueTransmission(chapterTransmission(biome.id));
@@ -1599,6 +1608,9 @@ class UISystem extends BaseSystem {
     this.registerEventListener('run-won', () => {
       this.runWon = true;
       this.queueTransmission(victoryTransmission(), { interrupt: true });
+    });
+    this.registerEventListener('run-continued', () => {
+      this.runWon = false;
     });
     this.registerEventListener('game-started', () => {
       this.runWon = false;
@@ -2974,7 +2986,7 @@ class UISystem extends BaseSystem {
       ? Number(offeredPoolSize)
       : options.length;
     this.levelUpState.focusIndex = -1;
-    this.levelUpState.lockedUntil = Date.now() + LEVEL_UP_LOCKOUT_MS;
+    this.levelUpState.lockedUntil = Date.now() + SCREEN_INPUT_LOCKOUT_MS;
     this.setBanishMode(false);
     this.updateLevelUpActionButtons();
 
@@ -3514,6 +3526,7 @@ class UISystem extends BaseSystem {
     setText(refs.kills, `${data.stats?.totalKills ?? data.stats?.kills ?? 0}`);
     setText(refs.combo, `x${data.maxCombo ?? 0}`);
     setText(refs.level, `${level ?? '—'}`);
+    setText(refs.best, `Best layer: ${data.bestLayer ?? wave ?? '—'}`);
 
     if (refs.build) {
       refs.build.innerHTML = '';
@@ -3546,7 +3559,17 @@ class UISystem extends BaseSystem {
       });
     }
 
-    refs.restartBtn?.focus({ preventScroll: true });
+    const buttons = [refs.continueBtn, refs.restartBtn, refs.quitBtn];
+    buttons.forEach((button) => {
+      if (button) button.disabled = true;
+    });
+    clearTimeout(this.victoryLockoutTimer);
+    this.victoryLockoutTimer = setTimeout(() => {
+      buttons.forEach((button) => {
+        if (button) button.disabled = false;
+      });
+      refs.continueBtn?.focus({ preventScroll: true });
+    }, SCREEN_INPUT_LOCKOUT_MS);
   }
 
   showGameOverScreen(payload) {
@@ -3574,7 +3597,10 @@ class UISystem extends BaseSystem {
     setText(refs.combo, `x${data.maxCombo ?? 0}`);
     setText(refs.level, `${level ?? '—'}`);
     setText(refs.killer, `Killed by ${killerName(data.killedBy)}`);
-    setText(refs.location, runLocationLine(wave, totalSeconds));
+    setText(
+      refs.location,
+      runLocationLine(wave, totalSeconds, data.bestLayer ?? null)
+    );
 
     const progression = this.getService('progression');
     if (refs.build && progression) {

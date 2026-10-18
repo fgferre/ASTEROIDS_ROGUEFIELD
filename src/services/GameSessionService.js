@@ -10,6 +10,7 @@ import {
 } from '../data/constants/gameplay.js';
 import { debugLog } from '../core/debugLogging.js';
 import { DEFAULT_HULL_ID, getShipModelById } from '../data/shipModels.js';
+import { updateRecords } from './runRecords.js';
 
 /**
  * GameSessionService orchestrates lifecycle state for a single game run.
@@ -80,6 +81,8 @@ export default class GameSessionService {
     this.domClickUnsubscribe = null;
     this.globalEventUnsubscribes = [];
     this._suppressWaveKickoff = false;
+    // True once the player continues past the final Warden (endless run).
+    this.endless = false;
     this.globalEventHandlers = {
       screenChanged: (data) => this.handleScreenChangedEvent(data),
       playerDied: (data) => this.handlePlayerDiedEvent(data),
@@ -88,6 +91,7 @@ export default class GameSessionService {
       activateShieldPressed: () => this.handleActivateShieldPressedEvent(),
       progressionReset: (payload) => this.handleProgressionResetEvent(payload),
       bossDefeated: (payload) => this.handleBossDefeatedEvent(payload),
+      waveStarted: (payload) => updateRecords({ layer: payload?.wave }),
     };
 
     this.initializeSessionState();
@@ -433,6 +437,11 @@ export default class GameSessionService {
         this.exitToMenu({ source: 'gameover' });
         break;
       }
+      case 'victory-continue-btn': {
+        preventDefault();
+        this.continueBeyondVictory();
+        break;
+      }
       case 'open-settings-btn': {
         preventDefault();
         this.emitSettingsMenuRequest({ source: 'menu' });
@@ -511,6 +520,7 @@ export default class GameSessionService {
     );
     register('progression-reset', this.globalEventHandlers.progressionReset);
     register('boss-defeated', this.globalEventHandlers.bossDefeated);
+    register('wave-started', this.globalEventHandlers.waveStarted);
   }
 
   teardownGlobalEventListeners() {
@@ -569,6 +579,7 @@ export default class GameSessionService {
   handleBossDefeatedEvent(payload = {}) {
     if (
       payload?.wave !== RUN_FINAL_LAYER ||
+      this.endless ||
       this.getSessionState() === 'victory'
     ) {
       return;
@@ -581,11 +592,40 @@ export default class GameSessionService {
     this.clearPendingGameOverTransition();
     this.gameOverScreenTimeoutId = setTimeout(() => {
       this.gameOverScreenTimeoutId = null;
-      const data =
+      const summary =
         this.resolveServiceInstance('world')?.buildRunSummary() ?? {};
+      const data = { ...summary, bestLayer: this.recordRunReached(summary) };
       this.setScreen('victory');
       this.emitScreenChanged('victory', { source: 'run-won', data });
     }, VICTORY_SCREEN_DELAY_MS);
+  }
+
+  /**
+   * Victory screen's "continue": the run goes endless. Layers resume from the
+   * one after the final Warden; later Wardens only drop their rewards.
+   */
+  continueBeyondVictory() {
+    if (this.getSessionState() !== 'victory') {
+      return false;
+    }
+
+    this.clearPendingGameOverTransition();
+    this.endless = true;
+    this.resolveServiceInstance('enemies')?.waveManager?.resumeWaves();
+    this.setScreen('playing');
+    this.emitScreenChanged('playing', { source: 'run-continued' });
+    this.setSessionState('running', { reason: 'run-continued' });
+    this.eventBus.emit('run-continued', { fromLayer: RUN_FINAL_LAYER });
+    return true;
+  }
+
+  /** Records the layer and time in a run summary; returns the best layer. */
+  recordRunReached(summary = {}) {
+    const wave = summary.wave;
+    return updateRecords({
+      layer: typeof wave === 'number' ? wave : wave?.current,
+      time: summary.stats?.timeElapsed,
+    }).bestLayer;
   }
 
   handleTogglePauseEvent(payload = {}) {
@@ -696,6 +736,8 @@ export default class GameSessionService {
     this.setRetryButtonEnabled(true);
 
     this._suppressWaveKickoff = false;
+    this.endless = false;
+    updateRecords({ newRun: true });
 
     try {
       this.resetSystems({ manageRandom: false });
@@ -771,7 +813,10 @@ export default class GameSessionService {
       this.createDeathSnapshot();
     }
 
-    this.scheduleGameOverScreenTransition(data);
+    this.scheduleGameOverScreenTransition({
+      ...data,
+      bestLayer: this.recordRunReached(data),
+    });
 
     const retriesRemaining = this.getRetryCount();
     if (retriesRemaining <= 0) {

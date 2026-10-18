@@ -180,24 +180,34 @@ export const LAYERS = deepFreeze([
   },
 ]);
 
+/** Endless-run growth per layer past 14 (proposta 18/10). */
+const BEYOND_ROCKS_PER_LAYER = 2;
+const BEYOND_ROSTER_GROWTH = 1.08;
+const BEYOND_ELITE_PER_LAYER = 0.03;
+const BEYOND_ELITE_CAP = 0.5;
+
 /**
- * Past the last layer (only if the run turns endless): Wardens every 5th
- * layer as on 15, the rest as on 14 with one more of each roster kind every
- * 2 layers and +1 % elite chance per layer, capped at 40 %.
+ * Past the last layer (the run turned endless): a Warden every 5th layer with
+ * layer 15's escort, the rest built on layer 14. Counted from 14: rocks +2 per
+ * layer (capped at the on-screen limit), roster counts ×1.08 per layer, elite
+ * chance +0.03 per layer up to 0.5.
  */
 function beyond(layer) {
-  if (layer % 5 === 0) {
-    return LAYERS[14];
-  }
-  const base = LAYERS[13];
-  const extra = Math.floor((layer - 14) / 2);
-  const elite = Math.min(0.4, 0.3 + 0.01 * (layer - 14));
+  const steps = layer - 14;
+  const base = layer % 5 === 0 ? LAYERS[14] : LAYERS[13];
+  const elite = Math.min(
+    BEYOND_ELITE_CAP,
+    LAYERS[13].roster[0].elite + BEYOND_ELITE_PER_LAYER * steps
+  );
   return deepFreeze({
     ...base,
-    rocks: rockCurve(layer),
+    rocks: Math.min(
+      MAX_ASTEROIDS_ON_SCREEN,
+      rockCurve(14) + BEYOND_ROCKS_PER_LAYER * steps
+    ),
     roster: base.roster.map((entry) => ({
       ...entry,
-      count: entry.count + extra,
+      count: Math.round(entry.count * Math.pow(BEYOND_ROSTER_GROWTH, steps)),
       elite,
     })),
   });

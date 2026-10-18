@@ -78,4 +78,10 @@ describe('death recap', () => {
       'Layer 9 · 7:42 · CHAPTER II — THE DENSE CORE'
     );
   });
+
+  it('ends the recap line with the best layer when one is recorded', () => {
+    expect(runLocationLine(9, 462, 17)).toBe(
+      'Layer 9 · 7:42 · CHAPTER II — THE DENSE CORE · BEST LAYER 17'
+    );
+  });
 });

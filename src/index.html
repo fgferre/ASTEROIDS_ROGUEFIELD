@@ -418,6 +418,7 @@
         <div class="gameover-content">
           <h1 class="gameover-title">FIELD CLEARED</h1>
           <p class="victory-subtitle">The Ring is quiet.</p>
+          <p id="victory-best" class="victory-subtitle">—</p>
           <dl id="victory-stats" class="gameover-stats">
             <div class="gameover-stat">
               <dt>Time</dt>
@@ -451,7 +452,10 @@
             aria-label="Unlocked synergies"
           ></ul>
           <div class="gameover-actions">
-            <button id="victory-restart-btn" class="btn btn--primary">
+            <button id="victory-continue-btn" class="btn btn--primary">
+              Continue into the Deep Field
+            </button>
+            <button id="victory-restart-btn" class="btn btn--secondary">
               New Mission
             </button>
             <button id="victory-quit-btn" class="btn btn--outline">
