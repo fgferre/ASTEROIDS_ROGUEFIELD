@@ -45,6 +45,8 @@ import { ImpactKick, createImpactPass } from './impactPass.js';
 import { PickupMirror } from './pickupMirror.js';
 import { PlayerMirror } from './playerMirror.js';
 import { TextSprites } from './textSprites.js';
+import { mirrorWeaponEffects, pushLance } from './weaponMirror.js';
+import { WEAPONS } from '../../data/weapons.js';
 
 const FOV = 38;
 const TILT = (18 * Math.PI) / 180;
@@ -221,6 +223,9 @@ class Renderer3D extends BaseSystem {
     });
     this.registerEventListener('player-dashed', () => {
       this.impact.kick(KICK_DASH);
+    });
+    this.registerEventListener('weapon-beam-fired', () => {
+      this.impact.kick(WEAPONS.harmonic.beam.kick);
     });
     this.registerEventListener('bullet-hit', (data) => {
       const { position, enemy, bullet } = data || {};
@@ -716,21 +721,15 @@ class Renderer3D extends BaseSystem {
     const { lances } = t;
 
     const bullets = combat.bullets || [];
+    const look = combat.lanceLook;
+    const evolved = combat.evolutions.length > 0;
+    const pushTrail = this.pushTrail.bind(this);
     for (let i = 0; i < bullets.length; i += 1) {
       const b = bullets[i];
       if (!b || b.hit) continue;
-      this.pushTrail(b, t.shotRgb, 2.4, 1.3);
-      lances.push(
-        b.x,
-        b.y,
-        3,
-        Math.atan2(b.vy || 0, b.vx || 1),
-        6.5,
-        1.5,
-        t.shotRgb,
-        1.9
-      );
+      pushLance(t.THREE, t, look, evolved, b, pushTrail);
     }
+    mirrorWeaponEffects(t.THREE, combat, t, t.flashes);
 
     const enemyBullets = combat.enemyBullets || [];
     for (let i = 0; i < enemyBullets.length; i += 1) {

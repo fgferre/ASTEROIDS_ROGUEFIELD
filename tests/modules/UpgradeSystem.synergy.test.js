@@ -38,7 +38,7 @@ function listSourceFiles(dir) {
 
 describe('upgrade families', () => {
   it('every upgrade has one known family and every family can reach its bonus', () => {
-    expect(UPGRADE_LIBRARY).toHaveLength(20);
+    expect(UPGRADE_LIBRARY).toHaveLength(21);
     const counts = {};
     UPGRADE_LIBRARY.forEach((upgrade) => {
       expect(UPGRADE_FAMILIES[upgrade.family]).toBeDefined();

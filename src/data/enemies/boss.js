@@ -169,6 +169,144 @@ export const BOSS_COMPONENTS = deepFreeze({
   },
 });
 
+// === WARDENS ===
+
+// Three Wardens, one per biome (docs/NORTE.md §7 pillar 2). All keep
+// `type: 'boss'` (HUD, audio, rewards, victory); `bossKind` picks the class
+// (src/modules/enemies/types/wardens.js) and the 3D look. Numbers: proposta
+// 18/10 — the owner's play decides.
+export const BOSS_BY_LAYER = deepFreeze({
+  5: 'prime',
+  10: 'choir',
+  15: 'null',
+});
+const WARDEN_CYCLE = ['prime', 'choir', 'null'];
+
+/** Warden kind for a layer: the table, then prime/choir/null every 5 layers. */
+export function bossKindForLayer(layer) {
+  const kind = BOSS_BY_LAYER[layer];
+  if (kind) return kind;
+  const slot = Math.max(1, Math.floor(layer / 5)) - 1;
+  return WARDEN_CYCLE[slot % WARDEN_CYCLE.length];
+}
+
+export const WARDEN_KINDS = deepFreeze({
+  prime: {
+    displayName: 'Warden Prime',
+    subtitle: 'Guardian of the Ring',
+  },
+  // Three cores orbiting a shared centre; one sings (lit, vulnerable, fires)
+  // and the voice passes every `singDuration` s. Each phase breaks one core.
+  choir: {
+    displayName: 'Warden Choir',
+    subtitle: 'Three voices of the Ring',
+    radius: 118, // covers the cores: orbit + core radius
+    coreCount: 3,
+    coreOrbitRadius: 90,
+    coreRadius: 28,
+    orbitSpeed: 0.35, // rad/s
+    orbitSpeedPerLostCore: 0.35, // rad/s added per broken core
+    singDuration: 6,
+    dimDamageFactor: 0.25,
+    spreadProjectileCount: 5,
+    spreadArc: 0.6,
+    spreadCooldown: 2.2,
+    spreadVariance: 0.3,
+    spreadWindup: 0.45,
+    chorusInterval: 10,
+    chorusWindup: 1.1,
+    chorusShots: 3,
+    chorusSpread: 0.07,
+    chorusProjectileSpeed: 300,
+    movementPhases: [
+      {
+        strategy: 'seeking',
+        acceleration: 70,
+        maxSpeed: 40,
+        safeDistance: 300,
+        damping: 0.96,
+      },
+      {
+        strategy: 'seeking',
+        acceleration: 80,
+        maxSpeed: 50,
+        safeDistance: 280,
+        damping: 0.96,
+      },
+      {
+        strategy: 'seeking',
+        acceleration: 90,
+        maxSpeed: 60,
+        safeDistance: 260,
+        damping: 0.96,
+      },
+    ],
+  },
+  // A dark core inside 8 plates. Phase 2 opens the shell (plates orbit as
+  // hazards) and inverts the XP pull; phase 3 sheds the plates and charges.
+  null: {
+    displayName: 'Warden Null',
+    subtitle: 'The silence at the center',
+    radius: 70,
+    plateCount: 8,
+    plateRadius: 16,
+    shellSpin: 0.6, // rad/s, closed
+    openSpin: 1.1, // rad/s, open
+    openOrbitRadius: 150,
+    openDuration: 1.2, // s for the shell to spread
+    plateDamageFactor: 0.6, // of contactDamage
+    pullInterval: 12,
+    firstPullDelay: 2, // s after the shell opens
+    pullWindup: 1.0,
+    pullDuration: 3,
+    pullSpeed: 260,
+    pullAcceleration: 120,
+    chargeCooldown: 5.5,
+    chargeWindup: 0.8,
+    chargeProjectileCount: 8,
+    openChargeCooldown: 7,
+    // phase 3: windup + dash + recover + cooldown = finaleChargeCadence
+    finaleChargeCadence: 4,
+    finaleChargeWindup: 0.5,
+    finaleChargeDuration: 0.9,
+    finaleChargeRecovery: 0.6,
+    movementPhases: [
+      {
+        strategy: 'seeking',
+        acceleration: 80,
+        maxSpeed: 45,
+        safeDistance: 300,
+        damping: 0.96,
+      },
+      {
+        strategy: 'orbit',
+        acceleration: 200,
+        maxSpeed: 90,
+        preferredDistance: 240,
+      },
+      {
+        strategy: 'seeking',
+        acceleration: 140,
+        maxSpeed: 80,
+        safeDistance: 200,
+        damping: 0.95,
+      },
+    ],
+  },
+});
+
+/** Components for a Warden kind: the shared set with its own movement. */
+export function wardenComponents(kind) {
+  const warden = WARDEN_KINDS[kind];
+  if (!warden?.movementPhases) return BOSS_COMPONENTS;
+  return {
+    ...BOSS_COMPONENTS,
+    movement: { ...BOSS_COMPONENTS.movement, ...warden.movementPhases[0] },
+    movementPhases: warden.movementPhases,
+    collision: { ...BOSS_COMPONENTS.collision, radius: warden.radius },
+  };
+}
+
 // === BOSS PHYSICS ===
 
 /**

@@ -14,4 +14,9 @@ export const ELITE_MODIFIERS = deepFreeze({
   heartChanceBonus: 0.1, // proposta 17/10: added to the heart drop chance
 });
 
-export const ELITE_EXCLUDED_TYPES = deepFreeze(['asteroid', 'boss']);
+export const ELITE_EXCLUDED_TYPES = deepFreeze([
+  'asteroid',
+  'boss',
+  'boss-choir',
+  'boss-null',
+]);

@@ -1,7 +1,7 @@
 /**
- * Defeating the layer-15 Warden Prime clears the Field: the run ends in
+ * Defeating the layer-15 Warden (Null) clears the Field: the run ends in
  * victory (screen-changed 'victory', run-won) and layer 16 never starts.
- * The layer 5 and 10 Wardens are ordinary bosses.
+ * The layer 5 and 10 Wardens (Prime, Choir) are ordinary bosses.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -66,6 +66,7 @@ describe('field cleared', () => {
   it('emits victory once when the layer 15 boss dies and starts no layer 16', () => {
     const { game, boss, enemies, victories, won } = defeatBossOnLayer(15);
 
+    expect(boss.displayName).toBe('Warden Null');
     expect(boss.destroyed).toBe(true);
     expect(won).toHaveLength(1);
     expect(victories).toHaveLength(1);
@@ -75,11 +76,15 @@ describe('field cleared', () => {
     expect(enemies.waveManager.currentWave).toBe(15);
   });
 
-  it.each([5, 10])(
-    'does not emit victory when the layer %i boss dies',
-    (layer) => {
+  it.each([
+    [5, 'Warden Prime'],
+    [10, 'Warden Choir'],
+  ])(
+    'does not emit victory when the layer %i boss (%s) dies',
+    (layer, name) => {
       const { boss, victories, won } = defeatBossOnLayer(layer);
 
+      expect(boss.displayName).toBe(name);
       expect(boss.destroyed).toBe(true);
       expect(won).toHaveLength(0);
       expect(victories).toHaveLength(0);

@@ -56,6 +56,8 @@ export class AAAHudLayout {
     this._timers = new Set();
     this._bannerTimer = null;
     this._bannerEndsAt = 0;
+    this._bossIntroEndsAt = 0;
+    this._transmissionHideTimer = null;
     this._bossBarHeldUntil = 0;
     this._feedRows = [];
   }
@@ -140,6 +142,8 @@ export class AAAHudLayout {
     this._timers.clear();
     this._bannerTimer = null;
     this._bannerEndsAt = 0;
+    this._bossIntroEndsAt = 0;
+    this._transmissionHideTimer = null;
     this._bossBarHeldUntil = 0;
     this._feedRows = [];
   }
@@ -233,7 +237,7 @@ export class AAAHudLayout {
    * Boss name card, queued after a layer banner still on screen; the boss bar
    * stays hidden until the card is gone.
    */
-  showBossIntro(name) {
+  showBossIntro(name, subtitle) {
     const card = this.els?.bossIntro;
     if (!card) {
       return;
@@ -242,8 +246,10 @@ export class AAAHudLayout {
     const delayMs = Math.max(0, this._bannerEndsAt - FADE_OUT_MS - now);
     // The bar stays hidden until the card has faded out.
     this._bossBarHeldUntil = Infinity;
+    this._bossIntroEndsAt = now + delayMs + BOSS_INTRO_MS;
     this._later(() => {
       this.els.bossIntroName.textContent = name || 'Warden Prime';
+      this.els.bossIntroSub.textContent = subtitle || 'Guardian of the Ring';
       card.classList.remove('is-leaving');
       this._replay(card, 'is-showing');
       this._later(() => {
@@ -254,6 +260,51 @@ export class AAAHudLayout {
         }, FADE_OUT_MS);
       }, BOSS_INTRO_MS - FADE_OUT_MS);
     }, delayMs);
+  }
+
+  /** True while the layer/surge banner or the boss intro owns the screen. */
+  isBannerBusy() {
+    const now = performance.now();
+    return now < this._bannerEndsAt || now < this._bossIntroEndsAt;
+  }
+
+  /** Opens the transmission banner for `speaker` with an empty line. */
+  showTransmission(speaker) {
+    const panel = this.els?.transmission;
+    if (!panel) {
+      return;
+    }
+    if (this._transmissionHideTimer) {
+      this._cancel(this._transmissionHideTimer);
+      this._transmissionHideTimer = null;
+    }
+    this.els.transmissionSpeaker.textContent = `▌TRANSMISSION — ${speaker}`;
+    this.els.transmissionLine.textContent = '';
+    panel.classList.remove('is-leaving');
+    panel.classList.add('is-typing');
+    this._replay(panel, 'is-showing');
+  }
+
+  /** Shows the typed part of the line; `done` drops the typing caret. */
+  typeTransmission(text, done) {
+    const panel = this.els?.transmission;
+    if (!panel) {
+      return;
+    }
+    this.els.transmissionLine.textContent = text;
+    panel.classList.toggle('is-typing', !done);
+  }
+
+  hideTransmission() {
+    const panel = this.els?.transmission;
+    if (!panel || !panel.classList.contains('is-showing')) {
+      return;
+    }
+    panel.classList.add('is-leaving');
+    this._transmissionHideTimer = this._later(() => {
+      panel.classList.remove('is-showing', 'is-leaving', 'is-typing');
+      this._transmissionHideTimer = null;
+    }, FADE_OUT_MS);
   }
 
   /** Kill feed row for a destroyed enemy; repeated kills count up (×N). */
@@ -388,6 +439,10 @@ export class AAAHudLayout {
       layerBannerSub: query('#ui-layer-banner-sub'),
       bossIntro: query('#ui-boss-intro'),
       bossIntroName: query('#ui-boss-intro-name'),
+      bossIntroSub: query('#ui-boss-intro-sub'),
+      transmission: query('#ui-transmission'),
+      transmissionSpeaker: query('#ui-transmission-speaker'),
+      transmissionLine: query('#ui-transmission-line'),
       feed: query('#ui-feed'),
       lowHpVignette: query('#ui-lowhp-vignette'),
     };
@@ -874,8 +929,13 @@ export class AAAHudLayout {
             <div class="boss-intro" id="ui-boss-intro" aria-live="polite">
                 <div class="boss-intro__line"></div>
                 <div class="boss-intro__name" id="ui-boss-intro-name">Warden Prime</div>
-                <div class="boss-intro__sub">Guardian of the Ring</div>
+                <div class="boss-intro__sub" id="ui-boss-intro-sub">Guardian of the Ring</div>
                 <div class="boss-intro__line"></div>
+            </div>
+            <div class="transmission" id="ui-transmission" aria-live="polite">
+                <div class="transmission__speaker" id="ui-transmission-speaker"></div>
+                <div class="transmission__rule"></div>
+                <div class="transmission__line" id="ui-transmission-line"></div>
             </div>
 
             <!-- KILL FEED (Right, under the radar) -->
@@ -1082,6 +1142,15 @@ export class AAAHudLayout {
             .boss-intro__sub { font-family: var(--font-ui); font-size: var(--text-lg); font-weight: 600; letter-spacing: 0.4em; margin-right: -0.4em; text-transform: uppercase; color: var(--boss); text-shadow: 0 0 10px rgba(0, 0, 0, 0.9); }
             .boss-intro__line { width: 100%; height: 1px; background: linear-gradient(90deg, transparent, var(--boss) 25%, var(--boss) 75%, transparent); box-shadow: 0 0 10px var(--boss); }
 
+            /* TRANSMISSION (Warden radio, bottom centre above the layer dial) */
+            .transmission { position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%); width: min(640px, 80%); display: flex; flex-direction: column; align-items: center; gap: var(--space-1); padding: var(--space-2) var(--space-4); background: radial-gradient(ellipse at center, color-mix(in srgb, var(--accent) 8%, transparent) 0%, transparent 70%); pointer-events: none; z-index: 85; opacity: 0; visibility: hidden; }
+            .transmission.is-showing { opacity: 1; visibility: visible; }
+            .transmission.is-leaving { opacity: 0; }
+            .transmission__speaker { font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.25em; color: var(--accent); text-shadow: 0 0 8px var(--accent-line); }
+            .transmission__rule { width: 100%; height: 1px; background: linear-gradient(90deg, transparent, var(--accent-line) 20%, var(--accent-line) 80%, transparent); }
+            .transmission__line { min-height: 1.5em; font-family: var(--font-display); font-size: var(--text-md); letter-spacing: 0.06em; line-height: 1.5; text-align: center; color: var(--text); text-shadow: 0 0 10px rgba(0, 0, 0, 0.9), 0 0 6px var(--accent-line); }
+            .transmission.is-typing .transmission__line::after { content: '▌'; margin-left: 2px; color: var(--accent); }
+
             /* KILL FEED */
             .hud-feed { position: absolute; top: calc(220px + var(--space-6)); right: var(--space-4); width: 200px; display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); pointer-events: none; z-index: 30; }
             .feed-row { display: flex; align-items: baseline; gap: var(--space-2); padding: 2px var(--space-2); background: linear-gradient(270deg, var(--surface) 0%, transparent 100%); border-right: 2px solid var(--neutral); font-family: var(--font-ui); font-size: var(--text-md); font-weight: 600; letter-spacing: 1px; color: var(--text); white-space: nowrap; }
@@ -1103,6 +1172,8 @@ export class AAAHudLayout {
                 .layer-banner.is-leaving, .boss-intro.is-leaving { transition: opacity ${FADE_OUT_MS}ms ease-in; }
                 .boss-intro.is-showing { animation: boss-intro-in 360ms var(--ease-out); }
                 .boss-intro.is-showing .boss-intro__line { animation: banner-line-draw 600ms var(--ease-out) 150ms both; }
+                .transmission.is-showing { animation: transmission-flicker 2.4s steps(1, end) infinite; }
+                .transmission.is-leaving { animation: none; transition: opacity ${FADE_OUT_MS}ms ease-in; }
                 .boss-area { transform: translateY(-24px); transition: opacity 0.5s var(--ease-out), transform 0.5s var(--ease-out); }
                 .boss-area.active { transform: translateY(0); }
                 .feed-row { animation: feed-in var(--motion-base) var(--ease-out); transition: opacity ${FADE_OUT_MS}ms ease-in, transform ${FADE_OUT_MS}ms ease-in; }
@@ -1115,6 +1186,7 @@ export class AAAHudLayout {
             @keyframes banner-title-in { from { opacity: 0; letter-spacing: 0.2em; margin-right: -0.2em; } to { opacity: 1; letter-spacing: 0.5em; margin-right: -0.5em; } }
             @keyframes banner-line-draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
             @keyframes boss-intro-in { from { opacity: 0; transform: translateX(-50%) scale(0.9); } to { opacity: 1; transform: translateX(-50%) scale(1); } }
+            @keyframes transmission-flicker { 0%, 100% { opacity: 1; } 3% { opacity: 0.55; } 5% { opacity: 0.9; } 7% { opacity: 0.7; } 9% { opacity: 1; } 61% { opacity: 0.82; } 62% { opacity: 1; } }
             @keyframes feed-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
 
             @media (max-width: 900px) { #hud-layer { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; } .stats-area { position: absolute; top: 10px; left: 10px; } .radar-area { position: absolute; top: 10px; right: 10px; } .boss-area { margin-top: 60px; transform: scale(0.8); } .status-area { position: absolute; bottom: 20px; left: 10px; transform: scale(0.9); transform-origin: bottom left; } .systems-area { position: absolute; bottom: 20px; right: 10px; } .bottom-center { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 300px; } }

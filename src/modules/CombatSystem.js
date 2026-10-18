@@ -40,12 +40,26 @@ import {
   ASTEROID_SIZE_ORB_FACTOR,
   ORB_VALUE,
 } from '../data/enemies/asteroid-configs.js';
+import {
+  LANCE_BASE_LOOK,
+  WEAPONS,
+  WEAPON_EVOLUTIONS,
+} from '../data/weapons.js';
 
 const LANCE_SPRITE = { width: 16, height: 8, originX: 12 };
 // Trail alpha ramp, tail → head (precomputed: one string per step).
-const LANCE_TRAIL_STYLES = Array.from({ length: 8 }, (_, i) =>
-  withAlpha(PALETTE.shot, (0.65 * i) / 7)
-);
+const lanceTrailStyles = (color) =>
+  Array.from({ length: 8 }, (_, i) => withAlpha(color, (0.65 * i) / 7));
+const HARMONIC_BEAM = WEAPONS.harmonic.beam;
+const BEAM_COLORS = WEAPONS.harmonic.colors;
+const ARC_SEGMENTS = 6;
+const ARC_JITTER = 7; // px, perpendicular
+
+// Deterministic −1..1 from an integer (arc jaggedness; no game RNG used).
+const hashUnit = (n) => {
+  const v = Math.sin(n * 12.9898) * 43758.5453;
+  return (v - Math.floor(v)) * 2 - 1;
+};
 
 class CombatSystem extends BaseSystem {
   constructor(dependencies = {}) {
@@ -163,6 +177,7 @@ class CombatSystem extends BaseSystem {
       'CombatSystem'
     );
     this.lanceSprite = null;
+    this.resetWeaponState();
     this.projectilePerf = {
       projectileUpdateMs: 0,
       projectileRenderMs: 0,
@@ -193,6 +208,7 @@ class CombatSystem extends BaseSystem {
 
     this.registerEventListener('progression-reset', () => {
       this.resetAimingBranchState();
+      this.resetWeaponState();
       this.targetThreatCache.clear();
       this.clearEnemyBullets();
     });
@@ -221,6 +237,14 @@ class CombatSystem extends BaseSystem {
 
     this.registerEventListener('upgrade-weapon-tuning', (data) => {
       this.applyWeaponTuning(data);
+    });
+
+    this.registerEventListener('upgrade-weapon-harmonic', (data = {}) => {
+      this.weaponId = WEAPONS[data.weaponId] ? data.weaponId : 'harmonic';
+    });
+
+    this.registerEventListener('synergy-unlocked', (data = {}) => {
+      this.evolveWeapon(data.family);
     });
 
     // Plan 01.07 Task 5/6: spread + aim mode toggles routed through the
@@ -293,6 +317,7 @@ class CombatSystem extends BaseSystem {
         this.processBulletHit(bullet, asteroid, enemies);
       }
     );
+    this.updateWeaponEffects(deltaTime);
   }
 
   // === SISTEMA DE TARGETING ===
@@ -500,6 +525,14 @@ class CombatSystem extends BaseSystem {
     const player = this.cachedPlayer;
     const playerPos = player.getPosition();
     if (!playerPos) return;
+
+    if (this.weaponId === 'harmonic') {
+      this.harmonicShots += 1;
+      if (this.harmonicShots % HARMONIC_BEAM.every === 0) {
+        this.fireBeam(playerPos, playerStats);
+        return;
+      }
+    }
 
     // Plan 01.07 Task 6: manual-aim mode bypasses target acquisition entirely
     // and fires from the ship nose in the ship's current rotation direction.
@@ -2343,7 +2376,14 @@ class CombatSystem extends BaseSystem {
     bullet.hit = false;
     bullet.active = true;
     bullet.type = 'player';
+    bullet.kind = 'lance';
     bullet.offscreenTimer = 0;
+    bullet.pierceLeft = this.lancePierce;
+    if (!bullet.pierced) {
+      bullet.pierced = [];
+    } else {
+      bullet.pierced.length = 0;
+    }
 
     // Initialize trail array
     if (!bullet.trail) {
@@ -2903,10 +2943,37 @@ class CombatSystem extends BaseSystem {
     if (!bullet || !enemy || bullet.hit) {
       return;
     }
+    // Railshot: a piercing lance skips what it already went through.
+    if (bullet.pierced?.includes(enemy)) {
+      return;
+    }
 
-    bullet.hit = true;
+    if (bullet.pierceLeft > 0) {
+      bullet.pierceLeft -= 1;
+      bullet.pierced.push(enemy);
+    } else {
+      bullet.hit = true;
+    }
     const healthBefore = Number.isFinite(enemy.health) ? enemy.health : null;
     const requestedDamage = Number.isFinite(bullet.damage) ? bullet.damage : 0;
+    // Harmonic beam: a large/medium rock it kills splits once more, along
+    // the same seams (generateFragments is seeded by the rock's crackSeed).
+    const beamSplit =
+      bullet.kind === 'beam' &&
+      enemy.type === 'asteroid' &&
+      (enemy.size === 'large' || enemy.size === 'medium')
+        ? {
+            x: enemy.x,
+            y: enemy.y,
+            wave: enemy.wave,
+            descriptors: enemy.generateFragments(),
+          }
+        : null;
+    const rewards =
+      bullet.kind !== 'chain' && this.evolutions.includes('salvage')
+        ? enemiesSystem.rewardManager
+        : null;
+    const orbsBefore = rewards ? rewards.stats.totalOrbsDropped : 0;
 
     const damageResult = this.applyDamageToEnemy(
       enemiesSystem,
@@ -2979,7 +3046,390 @@ class CombatSystem extends BaseSystem {
       invulnerable: !!enemy.invulnerable,
     });
 
+    if (!blockedByInvulnerability) {
+      if (beamSplit && damageResult.killed) {
+        this.spawnBeamFragment(enemiesSystem, enemy, beamSplit);
+      }
+      if (rewards && damageResult.killed) {
+        this.dropProspectorOrbs(
+          rewards,
+          enemy,
+          rewards.stats.totalOrbsDropped - orbsBefore
+        );
+      }
+      if (bullet.kind !== 'chain') {
+        this.applyEvolutionHit(enemy, requestedDamage, damageResult);
+      }
+    }
+
     return damageResult;
+  }
+
+  // === WEAPONS AND EVOLUTIONS (docs/NORTE.md §7 pillar 4) ===
+  resetWeaponState() {
+    this.weaponId = WEAPONS.lance.id;
+    this.harmonicShots = 0;
+    this.evolutions = [];
+    this.beams = [];
+    this.arcs = [];
+    this.arcSeed = 0;
+    this.burns = new Map();
+    this.slows = new Map();
+    this.prospectorCarry = 0;
+    this.refreshLanceLook();
+  }
+
+  /** A family's "3 of a kind" synergy evolves the lance for the rest of the run. */
+  evolveWeapon(family) {
+    const evolution = WEAPON_EVOLUTIONS[family];
+    if (!evolution || this.evolutions.includes(family)) {
+      return;
+    }
+    this.evolutions.push(family);
+    this.refreshLanceLook();
+    this.eventBus?.emit?.('weapon-evolved', {
+      family,
+      id: evolution.id,
+      name: evolution.name,
+      description: evolution.description,
+      weaponId: this.weaponId,
+    });
+  }
+
+  // Colours override in unlock order (the last one wins); sizes multiply.
+  refreshLanceLook() {
+    const look = { ...LANCE_BASE_LOOK, arc: null };
+    this.evolutions.forEach((family) => {
+      const delta = WEAPON_EVOLUTIONS[family].look;
+      ['body', 'trail', 'head', 'arc'].forEach((key) => {
+        if (delta[key]) look[key] = delta[key];
+      });
+      ['trailLength', 'width', 'headLength'].forEach((key) => {
+        if (delta[key]) look[key] *= delta[key];
+      });
+    });
+    look.trailStyles = lanceTrailStyles(look.trail);
+    this.lanceLook = look;
+    this.trailLength = Math.round(TRAIL_LENGTH * look.trailLength);
+    this.lancePierce = this.evolutions.includes('kinetic')
+      ? WEAPON_EVOLUTIONS.kinetic.pierce
+      : 0;
+  }
+
+  /** What the HUD shows: the weapon and its evolutions, in unlock order. */
+  getWeaponState() {
+    const every = HARMONIC_BEAM.every;
+    return {
+      weaponId: this.weaponId,
+      name: WEAPONS[this.weaponId].name,
+      shotsToBeam:
+        this.weaponId === 'harmonic'
+          ? every - (this.harmonicShots % every)
+          : null,
+      evolutions: this.evolutions.map((family) => {
+        const evolution = WEAPON_EVOLUTIONS[family];
+        return {
+          family,
+          id: evolution.id,
+          name: evolution.name,
+          description: evolution.description,
+        };
+      }),
+    };
+  }
+
+  // Harmonic beam: damage lands on everything in the segment on the firing
+  // frame; the beam stays on screen for HARMONIC_BEAM.duration. Aimed like the
+  // lances: the primary lock's lead point in auto, the ship's nose otherwise.
+  fireBeam(playerPos, playerStats) {
+    const player = this.cachedPlayer;
+    const aim = this.aimMode === 'manual' ? null : this.getPrimaryAimPoint();
+    const angle = aim
+      ? Math.atan2(aim.y - playerPos.y, aim.x - playerPos.x)
+      : player.getAngle();
+    const origin = player.getNosePosition(angle);
+    const dirX = Math.cos(angle);
+    const dirY = Math.sin(angle);
+    const { length, width, duration } = HARMONIC_BEAM;
+    const end = { x: origin.x + dirX * length, y: origin.y + dirY * length };
+    const damage =
+      (Number(playerStats?.damage) || 0) * HARMONIC_BEAM.damageMultiplier;
+
+    const struck = [];
+    this.cachedEnemies.forEachActiveEnemy((enemy) => {
+      if (!enemy || enemy.destroyed) return;
+      const along = Math.max(
+        0,
+        Math.min(
+          length,
+          (enemy.x - origin.x) * dirX + (enemy.y - origin.y) * dirY
+        )
+      );
+      const offX = origin.x + dirX * along - enemy.x;
+      const offY = origin.y + dirY * along - enemy.y;
+      const radius = enemy.radius || 0;
+      const reach = radius + width / 2;
+      if (offX * offX + offY * offY > reach * reach) return;
+      // Hit point on the rim facing the beam (sparks need a normal).
+      const off = Math.hypot(offX, offY);
+      struck.push({
+        enemy,
+        x:
+          off > 0.5 ? enemy.x + (offX / off) * radius : enemy.x - dirX * radius,
+        y:
+          off > 0.5 ? enemy.y + (offY / off) * radius : enemy.y - dirY * radius,
+      });
+    });
+
+    const vx = dirX * this.bulletSpeed;
+    const vy = dirY * this.bulletSpeed;
+    struck.forEach(({ enemy, x, y }) => {
+      if (enemy.destroyed) return;
+      this.processBulletHit(
+        { kind: 'beam', x, y, vx, vy, damage, hit: false },
+        enemy,
+        this.cachedEnemies
+      );
+    });
+
+    this.beams.push({
+      x: origin.x,
+      y: origin.y,
+      ex: end.x,
+      ey: end.y,
+      angle,
+      width,
+      life: duration,
+      maxLife: duration,
+      maxRadius: HARMONIC_BEAM.flashRadius,
+    });
+    this.lastShotTime = -HARMONIC_BEAM.cooldownPenalty;
+
+    this.eventBus?.emit?.('weapon-beam-fired', {
+      position: origin,
+      end,
+      angle,
+      damage,
+      hits: struck.length,
+    });
+    this.eventBus?.emit?.('weapon-fired', {
+      position: playerPos,
+      target: end,
+      centerlineTarget: end,
+      weaponType: 'harmonic-beam',
+      primaryTargetId: this.currentTarget ? this.currentTarget.id : null,
+      targeting: {
+        dynamicPrediction: this.usingDynamicPrediction(),
+        lockCount: this.currentTargetLocks.length,
+        multiLockActive: false,
+        predictedPoints: [],
+      },
+    });
+  }
+
+  // One more fragment from a beam kill, turned half a step from the first
+  // seam so it does not overlap its siblings; registered like the others
+  // (EnemyDamageSystem.destroyAsteroid).
+  spawnBeamFragment(enemies, parent, split) {
+    const { descriptors } = split;
+    if (!descriptors.length) return;
+    const base = descriptors[0];
+    const wave = enemies.waveState?.current || split.wave || 1;
+    for (let k = 0; k < HARMONIC_BEAM.extraFragments; k += 1) {
+      const turn = (Math.PI * (2 * k + 1)) / descriptors.length;
+      const cos = Math.cos(turn);
+      const sin = Math.sin(turn);
+      const ox = base.x - split.x;
+      const oy = base.y - split.y;
+      const descriptor = {
+        ...base,
+        x: split.x + ox * cos - oy * sin,
+        y: split.y + ox * sin + oy * cos,
+        vx: base.vx * cos - base.vy * sin,
+        vy: base.vx * sin + base.vy * cos,
+      };
+      const [variant] = enemies.assignVariantsToFragments(
+        [descriptor],
+        parent,
+        wave
+      );
+      const fragment = enemies.acquireAsteroid({
+        ...descriptor,
+        variant,
+        wave: descriptor.wave || wave,
+        random: enemies.createScopedRandom('fragments', 'fragment')?.random,
+        randomScope: 'fragments',
+      });
+      if (!fragment) continue;
+      enemies.warnIfWaveManagerRegistrationFailed(
+        enemies.registerActiveEnemy(fragment),
+        'fragment-spawn',
+        fragment
+      );
+      const waveState = enemies.waveState;
+      if (waveState?.isActive) {
+        waveState.totalAsteroids += 1;
+        waveState.asteroidsSpawned += 1;
+      }
+    }
+  }
+
+  // Prospector: +25 % of the orbs a lance kill dropped, carried across kills
+  // so small rocks (1 orb) still pay out on average.
+  dropProspectorOrbs(rewards, enemy, dropped) {
+    this.prospectorCarry +=
+      Math.max(0, dropped) * WEAPON_EVOLUTIONS.salvage.orbBonus;
+    const extra = Math.floor(this.prospectorCarry + 1e-9);
+    if (extra <= 0) return;
+    this.prospectorCarry -= extra;
+    rewards.createXPOrbs(enemy, extra, ORB_VALUE);
+  }
+
+  // Burn, slow and chain on a lance or beam hit (chain hits do not chain).
+  applyEvolutionHit(enemy, damage, result) {
+    if (!this.evolutions.length) return;
+    const alive = !result.killed && !enemy.destroyed;
+    if (alive && this.evolutions.includes('thermal')) {
+      const { burn } = WEAPON_EVOLUTIONS.thermal;
+      this.burns.set(enemy, {
+        id: enemy.id,
+        timer: 0,
+        ticksLeft: burn.ticks,
+        damage: damage * burn.damageFraction,
+      });
+    }
+    // Bosses move on scripts, not on velocity: no slow.
+    if (alive && enemy.type !== 'boss' && this.evolutions.includes('field')) {
+      this.slows.set(enemy, {
+        id: enemy.id,
+        timer: WEAPON_EVOLUTIONS.field.slow.duration,
+      });
+    }
+    if (this.evolutions.includes('arc')) {
+      this.chainFrom(
+        enemy,
+        damage * WEAPON_EVOLUTIONS.arc.chain.damageFraction
+      );
+    }
+  }
+
+  // Chain Lance: one jump to the nearest other enemy within range.
+  chainFrom(source, damage) {
+    const { range, duration } = WEAPON_EVOLUTIONS.arc.chain;
+    let best = null;
+    let bestSq = range * range + 1e-6;
+    this.cachedEnemies.forEachActiveEnemy((candidate) => {
+      if (!candidate || candidate === source || candidate.destroyed) return;
+      const dx = candidate.x - source.x;
+      const dy = candidate.y - source.y;
+      const sq = dx * dx + dy * dy;
+      if (sq < bestSq) {
+        best = candidate;
+        bestSq = sq;
+      }
+    });
+    if (!best) return;
+
+    const dx = best.x - source.x;
+    const dy = best.y - source.y;
+    const distance = Math.hypot(dx, dy) || 1;
+    // Rim to rim, so the arc shows in the gap instead of under the rocks.
+    const startGap = Math.min(source.radius || 0, distance * 0.45);
+    const endGap = Math.min(best.radius || 0, distance * 0.45);
+    const span = distance - startGap - endGap;
+    const ux = dx / distance;
+    const uy = dy / distance;
+    const points = [];
+    const seed = (this.arcSeed += 1);
+    for (let i = 0; i <= ARC_SEGMENTS; i += 1) {
+      const along = startGap + (span * i) / ARC_SEGMENTS;
+      const jitter =
+        i === 0 || i === ARC_SEGMENTS
+          ? 0
+          : hashUnit(seed * 31 + i) * ARC_JITTER;
+      points.push({
+        x: source.x + ux * along - uy * jitter,
+        y: source.y + uy * along + ux * jitter,
+      });
+    }
+    this.arcs.push({ points, life: duration, maxLife: duration });
+
+    this.processBulletHit(
+      {
+        kind: 'chain',
+        x: best.x - (dx / distance) * (best.radius || 0),
+        y: best.y - (dy / distance) * (best.radius || 0),
+        vx: (dx / distance) * this.bulletSpeed,
+        vy: (dy / distance) * this.bulletSpeed,
+        damage,
+        hit: false,
+      },
+      best,
+      this.cachedEnemies
+    );
+  }
+
+  updateWeaponEffects(deltaTime) {
+    const fade = (list) => {
+      let kept = 0;
+      for (let i = 0; i < list.length; i += 1) {
+        list[i].life -= deltaTime;
+        if (list[i].life > 0) list[kept++] = list[i];
+      }
+      list.length = kept;
+    };
+    fade(this.beams);
+    fade(this.arcs);
+    // The beam stays on the nose while it shows (its damage already landed).
+    const player = this.cachedPlayer;
+    if (this.beams.length && !player.isDead) {
+      this.beams.forEach((beam) => {
+        const nose = player.getNosePosition(beam.angle);
+        beam.ex += nose.x - beam.x;
+        beam.ey += nose.y - beam.y;
+        beam.x = nose.x;
+        beam.y = nose.y;
+      });
+    }
+
+    if (this.burns.size) {
+      const { burn } = WEAPON_EVOLUTIONS.thermal;
+      const interval = burn.duration / burn.ticks;
+      this.burns.forEach((entry, enemy) => {
+        entry.timer += deltaTime;
+        while (
+          entry.timer >= interval - 1e-9 &&
+          entry.ticksLeft > 0 &&
+          !enemy.destroyed &&
+          enemy.id === entry.id
+        ) {
+          entry.timer -= interval;
+          entry.ticksLeft -= 1;
+          this.applyDamageToEnemy(this.cachedEnemies, enemy, entry.damage, {
+            hitPosition: { x: enemy.x, y: enemy.y },
+          });
+        }
+        if (entry.ticksLeft <= 0 || enemy.destroyed || enemy.id !== entry.id) {
+          this.burns.delete(enemy);
+        }
+      });
+    }
+
+    if (this.slows.size) {
+      // Undo (1 − factor) of this frame's travel: the AI keeps its velocity.
+      const drag = 1 - WEAPON_EVOLUTIONS.field.slow.factor;
+      this.slows.forEach((entry, enemy) => {
+        if (enemy.destroyed || enemy.id !== entry.id) {
+          this.slows.delete(enemy);
+          return;
+        }
+        const slowed = Math.min(deltaTime, entry.timer) * drag;
+        enemy.x -= (enemy.vx || 0) * slowed;
+        enemy.y -= (enemy.vy || 0) * slowed;
+        entry.timer -= deltaTime;
+        if (entry.timer <= 1e-9) this.slows.delete(enemy);
+      });
+    }
   }
 
   applyDamageToEnemy(enemiesSystem, enemy, damage, source) {
@@ -3022,9 +3472,16 @@ class CombatSystem extends BaseSystem {
 
   // Lance shot (docs/NORTE.md §3): 8×2 amber core behind a 4 px white-hot
   // head, axis +x, origin at the head. `head` is the emissive copy.
+  // Colours follow the evolved look (lanceLook).
   ensureLanceSprite() {
     const scale = getRenderScale();
-    if (this.lanceSprite && this.lanceSprite.scale === scale) {
+    const { body, head: headColor } = this.lanceLook;
+    if (
+      this.lanceSprite &&
+      this.lanceSprite.scale === scale &&
+      this.lanceSprite.body === body &&
+      this.lanceSprite.headColor === headColor
+    ) {
       return this.lanceSprite;
     }
     if (typeof document === 'undefined') {
@@ -3041,9 +3498,9 @@ class CombatSystem extends BaseSystem {
       ctx.translate(LANCE_SPRITE.originX, LANCE_SPRITE.height / 2);
       if (drawCore) {
         const core = ctx.createLinearGradient(-8, 0, 0, 0);
-        core.addColorStop(0, withAlpha(PALETTE.shot, 0));
-        core.addColorStop(0.45, withAlpha(PALETTE.shot, 0.9));
-        core.addColorStop(1, PALETTE.shot);
+        core.addColorStop(0, withAlpha(body, 0));
+        core.addColorStop(0.45, withAlpha(body, 0.9));
+        core.addColorStop(1, body);
         ctx.fillStyle = core;
         ctx.beginPath();
         ctx.moveTo(-8, 0);
@@ -3055,13 +3512,16 @@ class CombatSystem extends BaseSystem {
       }
       if (drawHead) {
         const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, 3.5);
-        halo.addColorStop(0, withAlpha(PALETTE.shot, 0.55));
-        halo.addColorStop(1, withAlpha(PALETTE.shot, 0));
+        halo.addColorStop(
+          0,
+          withAlpha(headColor === PALETTE.text ? body : headColor, 0.55)
+        );
+        halo.addColorStop(1, withAlpha(body, 0));
         ctx.fillStyle = halo;
         ctx.beginPath();
         ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = PALETTE.text;
+        ctx.fillStyle = headColor;
         ctx.beginPath();
         ctx.ellipse(0, 0, 2, 1.1, 0, 0, Math.PI * 2);
         ctx.fill();
@@ -3071,27 +3531,105 @@ class CombatSystem extends BaseSystem {
 
     const lance = bake(true, true);
     const head = bake(true, false);
-    this.lanceSprite = lance && head ? { lance, head, scale } : null;
+    this.lanceSprite =
+      lance && head ? { lance, head, scale, body, headColor } : null;
     return this.lanceSprite;
   }
 
   drawLanceTrail(ctx, bullet) {
     const trail = bullet.trail;
     const count = trail.length + 1;
+    const { trailStyles, width } = this.lanceLook;
     ctx.lineCap = 'round';
     let prev = trail[0];
     for (let k = 1; k < count; k += 1) {
       const point = k < trail.length ? trail[k] : bullet;
       const f = k / (count - 1);
-      ctx.strokeStyle =
-        LANCE_TRAIL_STYLES[Math.round(f * (LANCE_TRAIL_STYLES.length - 1))];
-      ctx.lineWidth = 0.3 + 1.7 * f;
+      ctx.strokeStyle = trailStyles[Math.round(f * (trailStyles.length - 1))];
+      ctx.lineWidth = (0.3 + 1.7 * f) * width;
       ctx.beginPath();
       ctx.moveTo(prev.x, prev.y);
       ctx.lineTo(point.x, point.y);
       ctx.stroke();
       prev = point;
     }
+  }
+
+  // Beams, chain arcs and the burn/slow marks, in 'lighter' mode; the white
+  // cores also go to the emissive (bloom) layer.
+  drawWeaponEffects(ctx, emissive) {
+    const look = this.lanceLook;
+    this.burns.forEach((entry, enemy) => {
+      const r = (enemy.radius || 12) * 0.9;
+      const glow = ctx.createRadialGradient(
+        enemy.x,
+        enemy.y,
+        0,
+        enemy.x,
+        enemy.y,
+        r
+      );
+      glow.addColorStop(
+        0,
+        withAlpha(WEAPON_EVOLUTIONS.thermal.look.trail, 0.35)
+      );
+      glow.addColorStop(1, withAlpha(PALETTE.shot, 0));
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y, r, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    this.slows.forEach((entry, enemy) => {
+      ctx.lineWidth = LINE.thin;
+      ctx.strokeStyle = withAlpha(WEAPON_EVOLUTIONS.field.look.trail, 0.55);
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y, (enemy.radius || 12) + 4, 0, Math.PI * 2);
+      ctx.stroke();
+    });
+
+    ctx.lineCap = 'round';
+    this.arcs.forEach((arc) => {
+      const k = arc.life / arc.maxLife;
+      const stroke = (target, color, lineWidth) => {
+        target.strokeStyle = color;
+        target.lineWidth = lineWidth;
+        target.beginPath();
+        target.moveTo(arc.points[0].x, arc.points[0].y);
+        for (let i = 1; i < arc.points.length; i += 1) {
+          target.lineTo(arc.points[i].x, arc.points[i].y);
+        }
+        target.stroke();
+      };
+      stroke(ctx, withAlpha(look.arc || PALETTE.player, 0.85 * k), 2.2);
+      stroke(ctx, withAlpha(PALETTE.text, 0.9 * k), 0.8);
+      if (emissive) stroke(emissive, withAlpha(PALETTE.text, k), 0.8);
+    });
+
+    this.beams.forEach((beam) => {
+      const k = beam.life / beam.maxLife;
+      const ramp = (color, alpha) => {
+        const g = ctx.createLinearGradient(beam.x, beam.y, beam.ex, beam.ey);
+        g.addColorStop(0, withAlpha(color, alpha));
+        g.addColorStop(0.8, withAlpha(color, alpha * 0.8));
+        g.addColorStop(1, withAlpha(color, 0));
+        return g;
+      };
+      const stroke = (target, style, lineWidth) => {
+        target.lineCap = 'round';
+        target.strokeStyle = style;
+        target.lineWidth = lineWidth;
+        target.beginPath();
+        target.moveTo(beam.x, beam.y);
+        target.lineTo(beam.ex, beam.ey);
+        target.stroke();
+      };
+      stroke(ctx, ramp(BEAM_COLORS.glow, 0.35 * k), beam.width * 2.2);
+      stroke(ctx, ramp(BEAM_COLORS.mid, 0.8 * k), beam.width);
+      stroke(ctx, ramp(BEAM_COLORS.core, k), beam.width * 0.35);
+      if (emissive) {
+        stroke(emissive, ramp(BEAM_COLORS.core, k), beam.width * 0.5);
+      }
+    });
   }
 
   render(ctx) {
@@ -3117,10 +3655,12 @@ class CombatSystem extends BaseSystem {
 
       if (!sprite) return;
       const angle = Math.atan2(bullet.vy || 0, bullet.vx || 1);
+      const { headLength, width } = this.lanceLook;
       const draw = (target, image) => {
         target.save();
         target.translate(bullet.x, bullet.y);
         target.rotate(angle);
+        target.scale(headLength, width);
         target.drawImage(
           image,
           -LANCE_SPRITE.originX,
@@ -3133,6 +3673,7 @@ class CombatSystem extends BaseSystem {
       draw(ctx, sprite.lance);
       if (emissive) draw(emissive, sprite.head);
     });
+    this.drawWeaponEffects(ctx, emissive);
     emissive?.restore();
 
     ctx.restore(); // End 'lighter' mode
@@ -3489,6 +4030,7 @@ class CombatSystem extends BaseSystem {
     }
     this.targetThreatCache.clear();
     this.lastShotTime = 0;
+    this.resetWeaponState();
     // Fix-pass-2 (C5): restore the in-run toggle defaults so the next run
     // starts at concentrated + auto regardless of how the previous run ended.
     this.resetModeState();

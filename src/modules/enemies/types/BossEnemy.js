@@ -1,4 +1,8 @@
-import { BOSS_COMPONENTS, BOSS_CONFIG } from '../../../data/enemies/boss.js';
+import {
+  BOSS_COMPONENTS,
+  BOSS_CONFIG,
+  WARDEN_KINDS,
+} from '../../../data/enemies/boss.js';
 import {
   UPGRADE_BOSS_HEALTH_SCALAR,
   UPGRADE_BOSS_DAMAGE_SCALAR,
@@ -196,7 +200,9 @@ export class BossEnemy extends BaseEnemy {
     const defaults = BOSS_DEFAULTS;
 
     this.type = 'boss';
+    this.bossKind = 'prime';
     this.displayName = config.displayName ?? defaults.displayName;
+    this.subtitle = WARDEN_KINDS.prime.subtitle;
     this.addTag('boss');
     this._missingTargetLogged = false;
     this._missingPlayerReferenceLogged = false;
@@ -576,6 +582,9 @@ export class BossEnemy extends BaseEnemy {
       if (target?.position) {
         this.chargeAimAngle = this.angleTo(target.position);
         if (this.telegraph?.type === 'fan') {
+          const origin = this.attackOrigin();
+          this.telegraph.x = origin.x;
+          this.telegraph.y = origin.y;
           this.telegraph.angle = this.chargeAimAngle;
           this.telegraph.timer = Math.max(0, this.spreadWindupTimer);
         }
@@ -600,8 +609,11 @@ export class BossEnemy extends BaseEnemy {
       }
       this.spreadWindupTimer = windup;
       this.chargeAimAngle = this.angleTo(target.position);
+      const origin = this.attackOrigin();
       this.setTelegraph({
         type: 'fan',
+        x: origin.x,
+        y: origin.y,
         angle: this.chargeAimAngle,
         arc: Math.max(0, this.spreadArc ?? 0),
         length: 180,
@@ -611,8 +623,15 @@ export class BossEnemy extends BaseEnemy {
     }
   }
 
+  // Where shots and the fan wedge start: the hull here; a Warden with
+  // several bodies (WardenChoir) returns the one that is attacking.
+  attackOrigin() {
+    return this;
+  }
+
   angleTo(position) {
-    return Math.atan2(position.y - this.y, position.x - this.x);
+    const origin = this.attackOrigin();
+    return Math.atan2(position.y - origin.y, position.x - origin.x);
   }
 
   setTelegraph(telegraph) {
@@ -891,9 +910,7 @@ export class BossEnemy extends BaseEnemy {
   }
 
   fireSpreadPattern(targetPosition) {
-    const dx = targetPosition.x - this.x;
-    const dy = targetPosition.y - this.y;
-    const baseAngle = Math.atan2(dy, dx);
+    const baseAngle = this.angleTo(targetPosition);
 
     const count = Math.max(1, Math.floor(this.spreadProjectileCount));
     const arc = Math.max(0, this.spreadArc ?? 0);
@@ -913,10 +930,8 @@ export class BossEnemy extends BaseEnemy {
   }
 
   fireVolleyShot(targetPosition) {
-    const dx = targetPosition.x - this.x;
-    const dy = targetPosition.y - this.y;
-    let angle = Math.atan2(dy, dx);
-    angle += this.sampleVariance(this.volleySpread);
+    const angle =
+      this.angleTo(targetPosition) + this.sampleVariance(this.volleySpread);
 
     this.emitBossProjectile({
       angle,
@@ -926,7 +941,14 @@ export class BossEnemy extends BaseEnemy {
     });
   }
 
-  emitBossProjectile({ angle, speed, damage, pattern, meta = {} }) {
+  emitBossProjectile({
+    angle,
+    speed,
+    damage,
+    pattern,
+    meta = {},
+    origin = this.attackOrigin(),
+  }) {
     if (!Number.isFinite(angle)) {
       return;
     }
@@ -945,7 +967,7 @@ export class BossEnemy extends BaseEnemy {
       enemyId: this.id,
       enemyType: this.type,
       wave: this.wave,
-      position: { x: this.x, y: this.y },
+      position: { x: origin.x, y: origin.y },
       velocity: { x: vx, y: vy },
       damage: damage ?? this.projectileDamage,
       projectile: {

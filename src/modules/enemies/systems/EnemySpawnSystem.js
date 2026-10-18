@@ -12,7 +12,8 @@ import { GamePools } from '../../../core/GamePools.js';
 import { GameDebugLogger } from '../../../utils/dev/GameDebugLogger.js';
 import { resolveEventBus } from '../../../core/serviceUtils.js';
 import { Asteroid } from '../types/Asteroid.js';
-import { BossEnemy } from '../types/BossEnemy.js';
+import { WARDEN_CLASSES, wardenFactoryKey } from '../types/wardens.js';
+import { bossKindForLayer } from '../../../data/enemies/boss.js';
 import { IS_DEV } from '../../../core/env.js';
 
 const ASTEROID_POOL_ID = Symbol.for('ASTEROIDS_ROGUEFIELD:asteroidPoolId');
@@ -98,8 +99,12 @@ export class EnemySpawnSystem {
       facade.getRandomScope(scopeLabel) ||
       facade.getRandomService();
 
+    const bossKind = config.bossKind ?? bossKindForLayer(waveNumber);
+    const factoryKey = wardenFactoryKey(bossKind);
+
     const spawnConfig = {
       ...config,
+      bossKind,
       wave: waveNumber,
       random: spawnRandom,
       randomScope: scopeLabel,
@@ -123,16 +128,17 @@ export class EnemySpawnSystem {
     if (facade.useFactory && facade.factory) {
       const factory = facade.factory;
       const canCheckType = typeof factory.hasType === 'function';
-      const supportsBoss = !canCheckType || factory.hasType('boss');
+      const supportsBoss = !canCheckType || factory.hasType(factoryKey);
 
       if (supportsBoss) {
-        boss = this.acquireEnemyViaFactory('boss', spawnConfig);
+        boss = this.acquireEnemyViaFactory(factoryKey, spawnConfig);
       }
     }
 
     if (!boss) {
       try {
-        boss = new BossEnemy(facade, spawnConfig);
+        const WardenClass = WARDEN_CLASSES[bossKind] || WARDEN_CLASSES.prime;
+        boss = new WardenClass(facade, spawnConfig);
         this.assignAsteroidPoolId(boss, spawnConfig.poolId);
       } catch (error) {
         console.error('[EnemySystem] Failed to instantiate boss enemy', error);

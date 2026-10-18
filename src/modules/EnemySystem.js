@@ -13,6 +13,7 @@ import { Drone } from './enemies/types/Drone.js';
 import { Mine } from './enemies/types/Mine.js';
 import { Hunter } from './enemies/types/Hunter.js';
 import { BossEnemy } from './enemies/types/BossEnemy.js';
+import { WARDEN_CLASSES, wardenFactoryKey } from './enemies/types/wardens.js';
 import { Husk } from './enemies/types/Husk.js';
 import { Ram } from './enemies/types/Ram.js';
 import { Weaver } from './enemies/types/Weaver.js';
@@ -50,7 +51,11 @@ import { ENEMY_TYPES, BOSS_CONFIG } from '../data/constants/visual.js';
 import { DRONE_COMPONENTS } from '../data/enemies/drone.js';
 import { HUNTER_COMPONENTS } from '../data/enemies/hunter.js';
 import { MINE_COMPONENTS } from '../data/enemies/mine.js';
-import { BOSS_COMPONENTS } from '../data/enemies/boss.js';
+import {
+  BOSS_COMPONENTS,
+  WARDEN_KINDS,
+  wardenComponents,
+} from '../data/enemies/boss.js';
 import { HUSK_COMPONENTS } from '../data/enemies/husk.js';
 import { RAM_COMPONENTS } from '../data/enemies/ram.js';
 import { WEAVER_COMPONENTS } from '../data/enemies/weaver.js';
@@ -696,6 +701,16 @@ class EnemySystem extends BaseSystem {
           defaults: { ...bossDefaults, components: BOSS_COMPONENTS },
           tags: ['enemy', 'boss', 'elite'],
         });
+        // Choir and Null: their own classes, unpooled (bosses are never
+        // released back to a pool).
+        for (const kind of Object.keys(WARDEN_KINDS)) {
+          if (kind === 'prime') continue;
+          this.factory.registerType(wardenFactoryKey(kind), {
+            class: WARDEN_CLASSES[kind],
+            defaults: { ...bossDefaults, components: wardenComponents(kind) },
+            tags: ['enemy', 'boss', 'elite'],
+          });
+        }
       }
     } catch (error) {
       console.warn('[EnemySystem] Failed to initialize EnemyFactory', error);
@@ -2159,6 +2174,7 @@ class EnemySystem extends BaseSystem {
       poolId,
       id: boss.id || null,
       type: boss.type || 'boss',
+      bossKind: boss.bossKind || 'prime',
       wave: safeNumber(boss.wave, this.waveState?.current || 1),
       x: safeNumber(boss.x),
       y: safeNumber(boss.y),
@@ -2313,13 +2329,17 @@ class EnemySystem extends BaseSystem {
       radius: safeNumber(snapshot.radius, null),
       randomScope: 'snapshot',
       poolId: snapshot.poolId,
+      bossKind: snapshot.bossKind || 'prime',
     };
 
     let boss = null;
     let registeredByFactory = false;
 
     if (this.useFactory && this.factory) {
-      boss = this.acquireEnemyViaFactory('boss', config);
+      boss = this.acquireEnemyViaFactory(
+        wardenFactoryKey(config.bossKind),
+        config
+      );
       if (boss) {
         registeredByFactory = true;
       }
@@ -2327,7 +2347,9 @@ class EnemySystem extends BaseSystem {
 
     if (!boss) {
       try {
-        boss = new BossEnemy(this, config);
+        const WardenClass =
+          WARDEN_CLASSES[config.bossKind] || WARDEN_CLASSES.prime;
+        boss = new WardenClass(this, config);
       } catch (error) {
         console.error('[EnemySystem] Failed to restore boss snapshot:', error);
         return null;
