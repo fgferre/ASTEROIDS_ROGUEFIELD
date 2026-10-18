@@ -10,6 +10,7 @@ import {
   downloadJSON,
 } from './utils/PerformanceMonitor.js';
 import { createFixedStepper } from './core/fixedStep.js';
+import { createStatsOverlay } from './core/statsOverlay.js';
 import { serialize } from './core/replay.js';
 import { bootstrapServices } from './bootstrap/bootstrapServices.js';
 import { mobileGuard } from './bootstrap/mobileGuard.js';
@@ -94,74 +95,6 @@ let servicesCacheInitialized = false;
 
 const DEV_MODE = isDevEnvironment();
 
-function loadExternalScript(src) {
-  return new Promise((resolve, reject) => {
-    if (typeof document === 'undefined') {
-      reject(new Error('document is not available'));
-      return;
-    }
-
-    const existing = document.querySelector(`script[src="${src}"]`);
-    if (existing) {
-      if (existing.dataset.loaded === 'true') {
-        resolve();
-        return;
-      }
-      existing.addEventListener('load', () => resolve(), { once: true });
-      existing.addEventListener(
-        'error',
-        () => reject(new Error(`Failed to load script: ${src}`)),
-        { once: true }
-      );
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = src;
-    script.async = false;
-    script.addEventListener(
-      'load',
-      () => {
-        script.dataset.loaded = 'true';
-        resolve();
-      },
-      { once: true }
-    );
-    script.addEventListener(
-      'error',
-      () => reject(new Error(`Failed to load script: ${src}`)),
-      { once: true }
-    );
-    document.head.appendChild(script);
-  });
-}
-
-async function initializeDevStatsPanel() {
-  if (!DEV_MODE || typeof window === 'undefined' || window.stats) {
-    return;
-  }
-
-  try {
-    if (typeof window.Stats !== 'function') {
-      await loadExternalScript('/libs/Stats.min.js');
-    }
-
-    if (typeof window.Stats !== 'function' || window.stats) {
-      return;
-    }
-
-    const statsPanel = new window.Stats();
-    statsPanel.showPanel(0);
-    const statsElement = statsPanel.dom || statsPanel.domElement;
-    if (statsElement instanceof Node) {
-      document.body.appendChild(statsElement);
-      window.stats = statsPanel;
-    }
-  } catch (error) {
-    console.warn('[bootstrap] Failed to initialize dev stats panel:', error);
-  }
-}
-
 function initializeDependencyInjection(manifestContext) {
   debugLog('[App] Initializing Dependency Injection system...');
 
@@ -207,6 +140,17 @@ function initializeDependencyInjection(manifestContext) {
 function bootstrapDebugLogging() {
   const preference = resolveDebugPreference();
   applyDebugPreference(preference);
+}
+
+const statsOverlay = createStatsOverlay();
+
+function installStatsShortcut() {
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'F8') {
+      event.preventDefault();
+      statsOverlay.toggle();
+    }
+  });
 }
 
 function installReplayDownloadShortcut() {
@@ -401,6 +345,7 @@ function init(recording = null) {
     }
     if (DEV_MODE) {
       installReplayDownloadShortcut();
+      installStatsShortcut();
     }
 
     if (DEV_MODE) {
@@ -491,6 +436,7 @@ function init(recording = null) {
 function gameLoop(currentTime) {
   if (!gameState.initialized) return;
 
+  statsOverlay.begin();
   // Start performance monitoring
   performanceMonitor.startFrame();
 
@@ -582,6 +528,7 @@ function gameLoop(currentTime) {
 
   // End performance monitoring
   performanceMonitor.endFrame();
+  statsOverlay.end();
 
   requestAnimationFrame(gameLoop);
 }
@@ -636,8 +583,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (guard.blocked) {
       return;
     }
-
-    await initializeDevStatsPanel();
 
     // INFRA-01: ?profile=<scenario> activates the in-browser performance harness.
     // No-op when the URL flag is absent. Mutates gameState.randomSeed when active.

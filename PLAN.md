@@ -168,7 +168,7 @@ tudo num browser."_ Fatias, cada uma um commit com captura; números como "propo
       (proposta de escala), propulsores legíveis, luz própria mais quente. Só `render3d/playerMirror.js`.
 - [ ] **R3.2 Cartas com raridade, reroll e banish.** Prometido na etapa 6 e nunca feito: raridade por cor na carta,
       1 reroll e 1 banish por run (proposta), com teclas e botões; famílias continuam.
-- [ ] **R3.3 Medição na máquina dele.** `?stats=1` liga o Stats.min.js já vendorizado (fps e ms por quadro) para ele
+- [x] **R3.3 Medição na máquina dele.** `?stats=1` liga o Stats.min.js já vendorizado (fps e ms por quadro) para ele
       reportar números reais; `F8` alterna no dev.
 - [ ] **R3.4 Meta-progressão (proposta).** Salvage persistido no navegador, ganho por camada/abates; "Hangar" no menu
       com 6 melhorias permanentes pequenas (ex.: +1 reroll, casco Solar Slicer, +5 % casco). Tudo atrás de um serviço
