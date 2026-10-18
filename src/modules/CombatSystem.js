@@ -1,59 +1,31 @@
 // src/modules/CombatSystem.js
 import { BaseSystem } from '../core/BaseSystem.js';
 import { requireService } from '../core/serviceUtils.js';
-import { SHIP_SIZE } from '../core/GameConstants.js';
 import { drawEnemyProjectile } from '../utils/drawEnemyProjectile.js';
-import { GameDebugLogger } from '../utils/dev/GameDebugLogger.js';
 import { Targeting } from './combat/Targeting.js';
 import { Projectiles } from './combat/Projectiles.js';
 import { Weapons } from './combat/Weapons.js';
+import { HitResolution } from './combat/HitResolution.js';
+import { CardEffects, hashUnit } from './combat/CardEffects.js';
 import {
-  COMBAT_TARGETING_RANGE,
-  BULLET_SPEED,
-  COMBAT_BULLET_LIFETIME,
   COMBAT_AIMING_UPGRADE_CONFIG,
-  KNOCKBACK_BASE,
-  KNOCKBACK_HEAVY_FACTOR,
-  KNOCKBACK_MAX,
-  KNOCKBACK_MIN,
-  KNOCKBACK_REFERENCE_DAMAGE,
   ION_TRAIL_GAP,
 } from '../data/constants/gameplay.js';
-
-/** Knockback speed (px/s) for a hit of `damage`, before the heavy factor. */
-export function knockbackSpeed(damage) {
-  const speed = KNOCKBACK_BASE * (damage / KNOCKBACK_REFERENCE_DAMAGE);
-  return Math.min(KNOCKBACK_MAX, Math.max(KNOCKBACK_MIN, speed));
-}
+// The knockback suite imports it from here.
+export { knockbackSpeed } from './combat/HitResolution.js';
 import { getRenderScale } from '../core/viewport.js';
 import { getEmissive } from '../core/bloomLayer.js';
 import { LINE, PALETTE, withAlpha } from '../data/constants/palette.js';
-import { ORB_VALUE } from '../data/enemies/asteroid-configs.js';
 import { WEAPONS, WEAPON_APEX, WEAPON_EVOLUTIONS } from '../data/weapons.js';
 
 const LANCE_SPRITE = { width: 16, height: 8, originX: 12 };
-const HARMONIC_BEAM = WEAPONS.harmonic.beam;
 const BEAM_COLORS = WEAPONS.harmonic.colors;
 const FLAK = WEAPONS.scatter.flak;
 const FLAK_COLORS = WEAPONS.scatter.colors;
 const FLAK_SPARKS = 7; // proposta 18/10: 2D shrapnel streaks per burst
-// Afterburn (Maneuver synergy) — proposta 18/10: a point every this many px
-// of dash travel, at most this many alive; a jump wider than the gap (the
-// screen wrap) starts a new, unjoined line.
-const AFTERBURN_POINT_SPACING = 8;
-const AFTERBURN_MAX_POINTS = 40;
-const AFTERBURN_JOIN_GAP = 80;
-// 2D look, proposta 18/10: an amber band (px wide when fresh) under a hot
-// core that cools first, so old segments read as embers.
+// Afterburn's 2D look, proposta 18/10: an amber band (px wide when fresh)
+// under a hot core that cools first, so old segments read as embers.
 const AFTERBURN_LOOK = { band: 6, bandAlpha: 0.55, core: 2, coreAlpha: 0.85 };
-const ARC_SEGMENTS = 6;
-const ARC_JITTER = 7; // px, perpendicular
-
-// Deterministic −1..1 from an integer (arc jaggedness; no game RNG used).
-const hashUnit = (n) => {
-  const v = Math.sin(n * 12.9898) * 43758.5453;
-  return (v - Math.floor(v)) * 2 - 1;
-};
 
 class CombatSystem extends BaseSystem {
   constructor(dependencies = {}) {
@@ -79,12 +51,12 @@ class CombatSystem extends BaseSystem {
       targeting: () => this.targeting,
       createBullet: (...args) => this.projectiles.createBullet(...args),
       hitEnemy: (hit, enemy) =>
-        this.processBulletHit(hit, enemy, this.cachedEnemies),
+        this.hits.processBulletHit(hit, enemy, this.cachedEnemies),
       emit: (name, payload) => this.eventBus?.emit?.(name, payload),
-      cardEffects: () => this.cardEffects,
+      cardEffects: () => this.cards.cardEffects,
       tuning: () => ({
-        aimCooldownMultiplier: this.aimCooldownMultiplier,
-        cooldownTuning: this.cooldownTuning,
+        aimCooldownMultiplier: this.cards.aimCooldownMultiplier,
+        cooldownTuning: this.cards.cooldownTuning,
       }),
     });
     this.targeting = new Targeting({
@@ -105,15 +77,27 @@ class CombatSystem extends BaseSystem {
         bulletSpeed: this.weapons.bulletSpeed,
         bulletLifetime: this.weapons.bulletLifetime,
         trailLength: this.weapons.trailLength,
-        thermalLens: this.cardEffects.thermalLens,
-        lanceDamageTuning: this.lanceDamageTuning,
+        thermalLens: this.cards.cardEffects.thermalLens,
+        lanceDamageTuning: this.cards.lanceDamageTuning,
         lanceApexDamage: this.weapons.lanceApexDamage,
         lancePierce: this.weapons.lancePierce,
-        pierceBonus: this.pierceBonus,
+        pierceBonus: this.cards.pierceBonus,
       }),
       burstFlak: (bolt) => this.weapons.burstFlak(bolt),
     });
-    this.resetWeaponTuning();
+    this.hits = new HitResolution({
+      weapons: () => this.weapons,
+      cards: () => this.cards,
+      emit: (name, payload) => this.eventBus?.emit?.(name, payload),
+    });
+    // Built after Weapons: it resets the shot tuning as it sets up.
+    this.cards = new CardEffects({
+      player: () => this.cachedPlayer,
+      enemies: () => this.cachedEnemies,
+      targeting: () => this.targeting,
+      weapons: () => this.weapons,
+      hits: () => this.hits,
+    });
 
     // === CACHES DE SERVIÇOS ===
     this.cachedPlayer = requireService(
@@ -147,7 +131,7 @@ class CombatSystem extends BaseSystem {
 
     this.registerEventListener('progression-reset', () => {
       this.targeting.resetAimingBranchState();
-      this.resetWeaponTuning();
+      this.cards.resetWeaponTuning();
       this.resetWeaponState();
       this.targetThreatCache.clear();
       this.projectiles.clearEnemyBullets();
@@ -165,11 +149,11 @@ class CombatSystem extends BaseSystem {
     });
 
     this.registerEventListener('upgrade-aiming-suite', (data) => {
-      this.applyAimingUpgrade(data || {});
+      this.cards.applyAimingUpgrade(data || {});
     });
 
     this.registerEventListener('upgrade-weapon-tuning', (data) => {
-      this.applyWeaponTuning(data);
+      this.cards.applyWeaponTuning(data);
     });
 
     // A weapon card names its weapon (data/weapons.js); an unknown id is ignored.
@@ -181,42 +165,45 @@ class CombatSystem extends BaseSystem {
 
     // Cards that add a weapon behaviour keep the payload of their latest rank.
     this.registerEventListener('upgrade-thermal-lens', (data) => {
-      this.cardEffects.thermalLens = data;
+      this.cards.cardEffects.thermalLens = data;
     });
     this.registerEventListener('upgrade-chain-capacitor', (data) => {
-      this.cardEffects.chainCapacitor = data;
+      this.cards.cardEffects.chainCapacitor = data;
     });
     this.registerEventListener('upgrade-static-shell', (data) => {
-      this.cardEffects.staticShell = data;
+      this.cards.cardEffects.staticShell = data;
     });
     this.registerEventListener('upgrade-gravity-brake', (data) => {
-      this.cardEffects.gravityBrake = data;
+      this.cards.cardEffects.gravityBrake = data;
     });
     this.registerEventListener('upgrade-cinder-trail', (data) => {
-      this.cardEffects.cinderTrail = data;
+      this.cards.cardEffects.cinderTrail = data;
     });
     this.registerEventListener('upgrade-ion-trail', (data) => {
-      this.cardEffects.ionTrail = data;
+      this.cards.cardEffects.ionTrail = data;
     });
     this.registerEventListener('upgrade-afterburn', (data) => {
-      this.cardEffects.afterburn = data;
+      this.cards.cardEffects.afterburn = data;
     });
 
     this.registerEventListener('thruster-effect', (data = {}) => {
       if (data.type !== 'main' || !(data.intensity > 0)) return;
-      const { cinderTrail, ionTrail } = this.cardEffects;
-      if (cinderTrail) this.dropTrailPoint(this.cinders, cinderTrail, data);
-      if (ionTrail) this.dropTrailPoint(this.ions, ionTrail, data);
+      const cards = this.cards;
+      const { cinderTrail, ionTrail } = cards.cardEffects;
+      if (cinderTrail) cards.dropTrailPoint(cards.cinders, cinderTrail, data);
+      if (ionTrail) cards.dropTrailPoint(cards.ions, ionTrail, data);
     });
 
     // Emergency brake (Braking System 3): a shove, no damage.
     this.registerEventListener('player-braked', (data = {}) => {
-      this.shoveFrom(data.position, data.radius, data.knockback);
+      this.cards.shoveFrom(data.position, data.radius, data.knockback);
     });
 
     // Discharged on the next update, outside the collision pass that hit us.
     this.registerEventListener('player-took-damage', () => {
-      if (this.cardEffects.staticShell) this.staticShellPending = true;
+      if (this.cards.cardEffects.staticShell) {
+        this.cards.staticShellPending = true;
+      }
     });
 
     this.registerEventListener('synergy-unlocked', (data = {}) => {
@@ -450,17 +437,16 @@ class CombatSystem extends BaseSystem {
         if (!asteroid || bullet.hit) {
           return;
         }
-        this.processBulletHit(bullet, asteroid, enemies);
+        this.hits.processBulletHit(bullet, asteroid, enemies);
       }
     );
-    this.updateWeaponEffects(deltaTime);
+    this.cards.updateWeaponEffects(deltaTime);
   }
 
   // === WEAPONS (combat/Weapons.js) ===
-  // Weapons owns the guns. Both renderers, the 2D draw, the card effects and
-  // the weapons, upgrade and aim suites read these fields on the combat
-  // object; the setters exist because the weapon tuning and the aim suite
-  // write them.
+  // Weapons owns the guns. Both renderers, the 2D draw and the weapons,
+  // upgrade and aim suites read these fields on the combat object; the aim
+  // suite writes lastShotTime.
   get weaponId() {
     return this.weapons.weaponId;
   }
@@ -497,24 +483,8 @@ class CombatSystem extends BaseSystem {
     return this.weapons.bulletSpeed;
   }
 
-  set bulletSpeed(value) {
-    this.weapons.bulletSpeed = value;
-  }
-
-  get bulletLifetime() {
-    return this.weapons.bulletLifetime;
-  }
-
-  set bulletLifetime(value) {
-    this.weapons.bulletLifetime = value;
-  }
-
   get shootCooldown() {
     return this.weapons.shootCooldown;
-  }
-
-  set shootCooldown(value) {
-    this.weapons.shootCooldown = value;
   }
 
   get baseShootCooldown() {
@@ -530,9 +500,7 @@ class CombatSystem extends BaseSystem {
   }
 
   // Called on the combat object: the HUD and the run recap read the weapon
-  // state, the test helpers and suites fire, lay lanes and evolve, the hit
-  // path bursts flak, and the card effects reach enemies through
-  // forEachSolidEnemy.
+  // state, the test helpers and suites fire, lay lanes and evolve.
   handleShooting(deltaTime, playerStats) {
     this.weapons.handleShooting(deltaTime, playerStats);
   }
@@ -549,822 +517,57 @@ class CombatSystem extends BaseSystem {
     return this.weapons.getWeaponState();
   }
 
-  burstFlak(bolt) {
-    this.weapons.burstFlak(bolt);
+  // === HITS AND CARDS (combat/HitResolution.js, combat/CardEffects.js) ===
+  // CardEffects owns what the cards leave on the Field. The 3D weapon mirror,
+  // the 2D draw and the weapons, upgrade and afterburn suites read it on the
+  // combat object.
+  get arcs() {
+    return this.cards.arcs;
   }
 
-  forEachSolidEnemy(callback) {
-    this.weapons.forEachSolidEnemy(callback);
+  get wells() {
+    return this.cards.wells;
   }
 
-  // Fire rate, projectile speed/lifetime and lock range from upgrades. Keyed
-  // by upgrade rank so re-applying a rank (Retry) does not compound it.
-  applyWeaponTuning(data = {}) {
-    this.weaponTuningSources.set(`${data.upgradeId}:${data.level}`, data);
-    const product = (field) => {
-      let value = 1;
-      this.weaponTuningSources.forEach((entry) => {
-        const factor = Number(entry[field]);
-        if (factor > 0) {
-          value *= factor;
-        }
-      });
-      return value;
-    };
-    this.cooldownTuning = product('cooldownMultiplier');
-    this.lanceDamageTuning = product('lanceDamageMultiplier');
-    this.pierceBonus = 0;
-    this.weaponTuningSources.forEach((entry) => {
-      this.pierceBonus += Number(entry.pierceBonus) || 0;
-    });
-    this.bulletSpeed = BULLET_SPEED * product('bulletSpeedMultiplier');
-    this.bulletLifetime =
-      COMBAT_BULLET_LIFETIME * product('bulletLifetimeMultiplier');
-    this.setTargetingRange(
-      COMBAT_TARGETING_RANGE * product('targetingRangeMultiplier')
-    );
-    this.weapons.refreshShootCooldown();
+  get burns() {
+    return this.cards.burns;
   }
 
-  // The weapon half of the aiming branch reset (Targeting resets its own half).
-  resetWeaponTuning() {
-    this.shootCooldown = this.baseShootCooldown;
-    this.aimCooldownMultiplier = 1;
-    this.cooldownTuning = 1;
-    this.lanceDamageTuning = 1;
-    this.pierceBonus = 0;
-    this.weaponTuningSources = new Map();
-    this.bulletSpeed = BULLET_SPEED;
-    this.bulletLifetime = COMBAT_BULLET_LIFETIME;
+  get slows() {
+    return this.cards.slows;
   }
 
-  applyAimingUpgrade(data = {}) {
-    const targeting = this.targeting;
-    const levelValue = Number(data?.level);
-    if (Number.isFinite(levelValue)) {
-      targeting.setUpgradeLevel(
-        Math.max(this.targetingUpgradeLevel, Math.floor(levelValue))
-      );
-    }
-
-    if (data?.resetWeights) {
-      targeting.resetDangerWeights();
-    }
-
-    if (data?.dangerWeights) {
-      targeting.mergeDangerWeights(data.dangerWeights);
-    }
-
-    if (Number.isFinite(data?.linearLeadTime)) {
-      targeting.setLinearPredictionTime(
-        Math.max(0, Number(data.linearLeadTime))
-      );
-    }
-
-    if (data?.dynamicPrediction) {
-      targeting.updateDynamicPredictionSettings(data.dynamicPrediction);
-    }
-
-    if (this.targetingUpgradeLevel >= 1) {
-      targeting.setDangerScoreEnabled(true);
-    }
-
-    if (this.targetingUpgradeLevel >= 2) {
-      targeting.setDynamicPredictionEnabled(true);
-    }
-
-    if (this.targetingUpgradeLevel >= 3) {
-      const targetCount = Number(data?.multiLockTargets);
-      if (Number.isFinite(targetCount) && targetCount > 0) {
-        targeting.setMultiLockTargets(Math.max(1, Math.floor(targetCount)));
-      }
-
-      const cooldownMultiplier = Number(data?.cooldownMultiplier);
-      if (Number.isFinite(cooldownMultiplier) && cooldownMultiplier > 0) {
-        this.aimCooldownMultiplier = cooldownMultiplier;
-        this.weapons.refreshShootCooldown();
-      } else if (
-        Number.isFinite(this.aimingConfig?.multiLock?.cooldownMultiplier)
-      ) {
-        this.aimCooldownMultiplier =
-          this.aimingConfig.multiLock.cooldownMultiplier;
-        this.weapons.refreshShootCooldown();
-      }
-    }
-
-    // Fix-pass-2 (C3): if an upgrade lands while aimMode === 'manual', the
-    // behavioral-flag snapshot captured at manual-on is now stale. Reconcile:
-    //   - Update the snapshot so it reflects the upgrade's new flag state
-    //     (what the player should see on switchback).
-    //   - Force live flags back to false because manual still pauses them
-    //     (the unconditional assignments above set them true regardless of
-    //     aim mode — we have to re-zero them to honor manual's pause).
-    if (this.aimMode === 'manual') {
-      targeting.setAimModeFlagSnapshot({
-        dangerScoreEnabled: this.targetingUpgradeLevel >= 1,
-        dynamicPredictionEnabled: this.targetingUpgradeLevel >= 2,
-      });
-      targeting.setDangerScoreEnabled(false);
-      targeting.setDynamicPredictionEnabled(false);
-    }
-
-    targeting.setTargetUpdateInterval(
-      Number.isFinite(data?.targetUpdateInterval)
-        ? Math.max(0.05, Number(data.targetUpdateInterval))
-        : targeting.resolveTargetUpdateInterval()
-    );
+  get pulls() {
+    return this.cards.pulls;
   }
 
+  get cinders() {
+    return this.cards.cinders;
+  }
+
+  get ions() {
+    return this.cards.ions;
+  }
+
+  get afterburnTrail() {
+    return this.cards.afterburnTrail;
+  }
+
+  // Called on the combat object by the weapons, upgrade, knockback, afterburn
+  // and boss feedback suites.
   processBulletHit(bullet, enemy, enemiesSystem) {
-    if (!bullet || !enemy || bullet.hit) {
-      return;
-    }
-    // Railshot: a piercing lance skips what it already went through.
-    if (bullet.pierced?.includes(enemy)) {
-      return;
-    }
-
-    if (bullet.pierceLeft > 0) {
-      bullet.pierceLeft -= 1;
-      bullet.pierced.push(enemy);
-    } else {
-      bullet.hit = true;
-    }
-    const healthBefore = Number.isFinite(enemy.health) ? enemy.health : null;
-    let requestedDamage = Number.isFinite(bullet.damage) ? bullet.damage : 0;
-    // Chain Capacitor without the Chain Lance: some lances hit twice.
-    const capacitor = this.cardEffects.chainCapacitor;
-    if (
-      capacitor &&
-      (bullet.kind === 'lance' || bullet.kind === 'flak') &&
-      !this.evolutions.includes('arc') &&
-      this.rollCardChance(capacitor.doubleHitChance)
-    ) {
-      requestedDamage *= 2;
-    }
-    // Harmonic beam: a large/medium rock it kills splits once more, along
-    // the same seams (generateFragments is seeded by the rock's crackSeed).
-    const beamSplit =
-      bullet.kind === 'beam' &&
-      enemy.type === 'asteroid' &&
-      (enemy.size === 'large' || enemy.size === 'medium')
-        ? {
-            x: enemy.x,
-            y: enemy.y,
-            wave: enemy.wave,
-            descriptors: enemy.generateFragments(),
-          }
-        : null;
-    const rewards =
-      bullet.kind !== 'chain' && this.evolutions.includes('salvage')
-        ? enemiesSystem.rewardManager
-        : null;
-    const orbsBefore = rewards ? rewards.stats.totalOrbsDropped : 0;
-
-    const damageResult = this.applyDamageToEnemy(
-      enemiesSystem,
-      enemy,
-      requestedDamage,
-      { hitPosition: { x: bullet.x, y: bullet.y } }
-    );
-    const remainingHealth = Number.isFinite(damageResult.remainingHealth)
-      ? damageResult.remainingHealth
-      : enemy.health ?? null;
-    const effectiveDamage =
-      Number.isFinite(healthBefore) && Number.isFinite(remainingHealth)
-        ? Math.max(0, healthBefore - remainingHealth)
-        : 0;
-    const blockedByInvulnerability =
-      enemy.type === 'boss' &&
-      Boolean(enemy.invulnerable) &&
-      effectiveDamage <= 0;
-
-    if (
-      blockedByInvulnerability &&
-      typeof enemy.registerInvulnerabilityHit === 'function'
-    ) {
-      enemy.registerInvulnerabilityHit({ x: bullet.x, y: bullet.y });
-    }
-
-    damageResult.effectiveDamage = effectiveDamage;
-    damageResult.blocked = blockedByInvulnerability;
-
-    if (enemy.type === 'boss') {
-      const maxHealth = Number.isFinite(enemy.maxHealth)
-        ? enemy.maxHealth
-        : null;
-      const healthPercent =
-        maxHealth && Number.isFinite(remainingHealth)
-          ? Number(((remainingHealth / maxHealth) * 100).toFixed(1))
-          : null;
-
-      GameDebugLogger.log(
-        'DAMAGE',
-        blockedByInvulnerability
-          ? 'Boss blocked bullet'
-          : effectiveDamage > 0
-            ? 'Boss took damage'
-            : 'Boss bullet impact caused no damage',
-        {
-          requestedDamage,
-          effectiveDamage,
-          blocked: blockedByInvulnerability,
-          killed: !!damageResult.killed,
-          newHealth: remainingHealth,
-          maxHealth,
-          healthPercent,
-          phase: enemy.currentPhase ?? null,
-          invulnerable: !!enemy.invulnerable,
-        }
-      );
-    }
-
-    this.eventBus?.emit?.('bullet-hit', {
-      bullet,
-      enemy,
-      position: { x: bullet.x, y: bullet.y },
-      damage: effectiveDamage,
-      requestedDamage,
-      effectiveDamage,
-      blocked: blockedByInvulnerability,
-      killed: damageResult.killed,
-      remainingHealth: damageResult.remainingHealth,
-      invulnerable: !!enemy.invulnerable,
-    });
-
-    if (!blockedByInvulnerability) {
-      if (!damageResult.killed && effectiveDamage > 0) {
-        this.applyKnockback(bullet, enemy, effectiveDamage);
-      }
-      if (beamSplit && damageResult.killed) {
-        this.spawnBeamFragment(enemiesSystem, enemy, beamSplit);
-      }
-      if (rewards && damageResult.killed) {
-        this.dropProspectorOrbs(
-          rewards,
-          enemy,
-          rewards.stats.totalOrbsDropped - orbsBefore
-        );
-      }
-      if (bullet.kind !== 'chain') {
-        this.applyEvolutionHit(enemy, requestedDamage, damageResult, bullet);
-      }
-    }
-    // A flak bolt bursts on its first hit, blocked or not; its shrapnel
-    // spares the enemy it struck.
-    if (bullet.kind === 'flak') {
-      bullet.volley.struck.push(enemy);
-      this.burstFlak(bullet);
-    }
-
-    return damageResult;
-  }
-
-  // A shove along the bullet, heavier for bigger hits (PLAN.md R5.9). The AI
-  // reasserts its own velocity, so it reads as a short stagger; asteroids
-  // drift linearly and would keep it forever, so they are left alone.
-  applyKnockback(bullet, enemy, damage) {
-    this.pushEnemy(
-      enemy,
-      bullet.vx || 0,
-      bullet.vy || 0,
-      knockbackSpeed(damage)
-    );
-  }
-
-  // Adds `speed` px/s along (dx, dy); bosses and heralds take a tenth, rocks
-  // none (they would keep the drift forever).
-  pushEnemy(enemy, dx, dy, speed) {
-    if (enemy.type === 'asteroid') return;
-    const length = Math.hypot(dx, dy);
-    if (length === 0) return;
-    const heavy = enemy.type === 'boss' || enemy.type === 'herald';
-    const push = speed * (heavy ? KNOCKBACK_HEAVY_FACTOR : 1);
-    const ix = (dx / length) * push;
-    const iy = (dy / length) * push;
-    enemy.vx = (enemy.vx ?? 0) + ix;
-    enemy.vy = (enemy.vy ?? 0) + iy;
-    // Steering strategies read `velocity` and write it back to vx/vy.
-    if (enemy.velocity) {
-      enemy.velocity.vx = (enemy.velocity.vx ?? 0) + ix;
-      enemy.velocity.vy = (enemy.velocity.vy ?? 0) + iy;
-    }
-  }
-
-  // The card effects' state; the weapon's own resets in Weapons.
-  resetWeaponState() {
-    this.weapons.resetWeaponState();
-    this.arcs = [];
-    this.wells = [];
-    this.arcSeed = 0;
-    this.burns = new Map();
-    this.slows = new Map();
-    this.pulls = new Map();
-    this.prospectorCarry = 0;
-    this.cardEffects = {};
-    this.cardRolls = 0;
-    this.cinders = [];
-    this.cinderTimer = 0;
-    this.ions = [];
-    this.ionTimer = 0;
-    this.afterburnTrail = [];
-    this.afterburnTimer = 0;
-    this.afterburnDashing = false;
-    this.staticShellPending = false;
-  }
-
-  // One more fragment from a beam kill, turned half a step from the first
-  // seam so it does not overlap its siblings; registered like the others
-  // (EnemyDamageSystem.destroyAsteroid).
-  spawnBeamFragment(enemies, parent, split) {
-    const { descriptors } = split;
-    if (!descriptors.length) return;
-    const base = descriptors[0];
-    const wave = enemies.waveState?.current || split.wave || 1;
-    for (let k = 0; k < HARMONIC_BEAM.extraFragments; k += 1) {
-      const turn = (Math.PI * (2 * k + 1)) / descriptors.length;
-      const cos = Math.cos(turn);
-      const sin = Math.sin(turn);
-      const ox = base.x - split.x;
-      const oy = base.y - split.y;
-      const descriptor = {
-        ...base,
-        x: split.x + ox * cos - oy * sin,
-        y: split.y + ox * sin + oy * cos,
-        vx: base.vx * cos - base.vy * sin,
-        vy: base.vx * sin + base.vy * cos,
-      };
-      const [variant] = enemies.assignVariantsToFragments(
-        [descriptor],
-        parent,
-        wave
-      );
-      const fragment = enemies.acquireAsteroid({
-        ...descriptor,
-        variant,
-        wave: descriptor.wave || wave,
-        random: enemies.createScopedRandom('fragments', 'fragment')?.random,
-        randomScope: 'fragments',
-      });
-      if (!fragment) continue;
-      enemies.warnIfWaveManagerRegistrationFailed(
-        enemies.registerActiveEnemy(fragment),
-        'fragment-spawn',
-        fragment
-      );
-      const waveState = enemies.waveState;
-      if (waveState?.isActive) {
-        waveState.totalAsteroids += 1;
-        waveState.asteroidsSpawned += 1;
-      }
-    }
-  }
-
-  // Prospector: +25 % of the orbs a lance kill dropped (Motherlode: +100 %),
-  // carried across kills so small rocks (1 orb) still pay out on average.
-  dropProspectorOrbs(rewards, enemy, dropped) {
-    const { orbBonus } = this.apexes.includes('salvage')
-      ? WEAPON_APEX.salvage
-      : WEAPON_EVOLUTIONS.salvage;
-    this.prospectorCarry += Math.max(0, dropped) * orbBonus;
-    const extra = Math.floor(this.prospectorCarry + 1e-9);
-    if (extra <= 0) return;
-    this.prospectorCarry -= extra;
-    rewards.createXPOrbs(enemy, extra, ORB_VALUE);
-  }
-
-  // Burn, slow and chain on a lance or beam hit (chain hits do not chain);
-  // an Apex replaces its family's first stage.
-  applyEvolutionHit(enemy, damage, result, hit) {
-    if (!this.evolutions.length) return;
-    const alive = !result.killed && !enemy.destroyed;
-    if (alive && this.evolutions.includes('thermal')) {
-      const { burn } = WEAPON_EVOLUTIONS.thermal;
-      this.burns.set(enemy, {
-        id: enemy.id,
-        timer: 0,
-        interval: burn.duration / burn.ticks,
-        ticksLeft: burn.ticks,
-        damage: damage * burn.damageFraction,
-        spreadTo: this.apexes.includes('thermal') ? [] : null,
-      });
-    }
-    // Bosses move on scripts, not on velocity: no slow and no pull.
-    if (this.apexes.includes('field')) {
-      this.pullToward(enemy, alive, hit.x, hit.y);
-    } else if (
-      alive &&
-      enemy.type !== 'boss' &&
-      this.evolutions.includes('field')
-    ) {
-      this.slows.set(enemy, {
-        id: enemy.id,
-        timer: WEAPON_EVOLUTIONS.field.slow.duration,
-      });
-    }
-    if (this.evolutions.includes('arc')) {
-      const { chain } = WEAPON_EVOLUTIONS.arc;
-      const storm = this.apexes.includes('arc') ? WEAPON_APEX.arc.chain : null;
-      this.chainFrom(
-        enemy,
-        damage * chain.damageFraction,
-        (storm ? storm.jumps : chain.jumps) +
-          (this.cardEffects.chainCapacitor?.extraJumps ?? 0),
-        [enemy],
-        storm ? storm.fork : 1
-      );
-    }
-  }
-
-  // Singularity: the target (if alive) and every non-boss whose rim is
-  // within reach of the hit point are pulled toward it; the collapsing ring
-  // is a `well`.
-  pullToward(target, targetAlive, x, y) {
-    const { radius, duration } = WEAPON_APEX.field.pull;
-    this.forEachSolidEnemy((enemy) => {
-      if (enemy.type === 'boss') return;
-      const inReach =
-        enemy === target
-          ? targetAlive
-          : Math.hypot(enemy.x - x, enemy.y - y) - (enemy.radius || 0) <=
-            radius;
-      if (!inReach) return;
-      this.pulls.set(enemy, { id: enemy.id, timer: duration, x, y });
-    });
-    this.wells.push({ x, y, life: duration, maxLife: duration });
-  }
-
-  // Chain Lance: `jumps` hops, each to the nearest enemy within range not
-  // yet in this chain. Storm Lance: the first hop goes to the `fork`
-  // nearest, and each branch keeps jumping.
-  chainFrom(source, damage, jumps = 1, visited = [source], fork = 1) {
-    const { range } = WEAPON_EVOLUTIONS.arc.chain;
-    const rangeSq = range * range + 1e-6;
-    const near = [];
-    this.forEachSolidEnemy((candidate) => {
-      if (visited.includes(candidate)) return;
-      const sq = (candidate.x - source.x) ** 2 + (candidate.y - source.y) ** 2;
-      if (sq < rangeSq) near.push({ candidate, sq });
-    });
-    if (!near.length) return;
-    near.sort((a, b) => a.sq - b.sq);
-    const targets = near.slice(0, fork).map((entry) => entry.candidate);
-    visited.push(...targets);
-
-    const storm = this.apexes.includes('arc');
-    targets.forEach((best) => {
-      const dx = best.x - source.x;
-      const dy = best.y - source.y;
-      const distance = Math.hypot(dx, dy) || 1;
-      this.addArc(source, best, storm ? { heavy: true } : null);
-      this.processBulletHit(
-        {
-          kind: 'chain',
-          x: best.x - (dx / distance) * (best.radius || 0),
-          y: best.y - (dy / distance) * (best.radius || 0),
-          vx: (dx / distance) * this.bulletSpeed,
-          vy: (dy / distance) * this.bulletSpeed,
-          damage,
-          hit: false,
-        },
-        best,
-        this.cachedEnemies
-      );
-    });
-    if (jumps > 1) {
-      targets.forEach((best) =>
-        this.chainFrom(best, damage, jumps - 1, visited)
-      );
-    }
-  }
-
-  // A jagged arc between two circles (Chain Lance, Static Shell, Solar Flare
-  // spread). `style`: { color } overrides the lance's arc colour, { heavy }
-  // draws the Storm Lance's thicker bolt.
-  addArc(source, target, style = null) {
-    const { duration } = WEAPON_EVOLUTIONS.arc.chain;
-    const dx = target.x - source.x;
-    const dy = target.y - source.y;
-    const distance = Math.hypot(dx, dy) || 1;
-    // Rim to rim, so the arc shows in the gap instead of under the rocks.
-    const startGap = Math.min(source.radius || 0, distance * 0.45);
-    const endGap = Math.min(target.radius || 0, distance * 0.45);
-    const span = distance - startGap - endGap;
-    const ux = dx / distance;
-    const uy = dy / distance;
-    const points = [];
-    const seed = (this.arcSeed += 1);
-    for (let i = 0; i <= ARC_SEGMENTS; i += 1) {
-      const along = startGap + (span * i) / ARC_SEGMENTS;
-      const jitter =
-        i === 0 || i === ARC_SEGMENTS
-          ? 0
-          : hashUnit(seed * 31 + i) * ARC_JITTER;
-      points.push({
-        x: source.x + ux * along - uy * jitter,
-        y: source.y + uy * along + ux * jitter,
-      });
-    }
-    this.arcs.push({
-      points,
-      life: duration,
-      maxLife: duration,
-      color: style?.color ?? null,
-      heavy: Boolean(style?.heavy),
-    });
-  }
-
-  // Deterministic card roll (no game RNG here, like the arc jitter).
-  rollCardChance(chance) {
-    this.cardRolls += 1;
-    return (hashUnit(this.cardRolls * 7 + 3) + 1) / 2 < chance;
-  }
-
-  // Cinder Trail / Ion Trail: a point every few px along the main thruster.
-  dropTrailPoint(list, { life, radius }, { position }) {
-    const last = list[list.length - 1];
-    if (last && Math.hypot(last.x - position.x, last.y - position.y) < radius) {
-      return;
-    }
-    list.push({ x: position.x, y: position.y, life, maxLife: life });
-  }
-
-  // Afterburn: while the ship dashes, a point every AFTERBURN_POINT_SPACING
-  // px of its travel; `joined` links a point to the one before it.
-  dropAfterburnPoints({ life }) {
-    const player = this.cachedPlayer;
-    if (player.isDead || !(player.dashTimer > 0)) {
-      this.afterburnDashing = false;
-      return;
-    }
-    const list = this.afterburnTrail;
-    const { x, y } = player.getPosition();
-    const last = this.afterburnDashing ? list[list.length - 1] : null;
-    const dx = last ? x - last.x : 0;
-    const dy = last ? y - last.y : 0;
-    const distance = Math.hypot(dx, dy);
-    if (!last || distance > AFTERBURN_JOIN_GAP) {
-      list.push({ x, y, life, maxLife: life, joined: false });
-    } else {
-      const steps = Math.floor(distance / AFTERBURN_POINT_SPACING);
-      for (let i = 1; i <= steps; i += 1) {
-        const t = (i * AFTERBURN_POINT_SPACING) / distance;
-        list.push({
-          x: last.x + dx * t,
-          y: last.y + dy * t,
-          life,
-          maxLife: life,
-          joined: true,
-        });
-      }
-    }
-    this.afterburnDashing = true;
-    if (list.length > AFTERBURN_MAX_POINTS) {
-      list.splice(0, list.length - AFTERBURN_MAX_POINTS);
-    }
-  }
-
-  // The Ion Trail spares rocks and halves on bosses (`bossFactor`).
-  burnTrailTouches(list, { damage, radius, bossFactor }) {
-    const ion = bossFactor !== undefined;
-    const touched = [];
-    this.forEachSolidEnemy((enemy) => {
-      if (ion && enemy.type === 'asteroid') return;
-      const reach = (enemy.radius || 0) + radius;
-      const reachSq = reach * reach;
-      if (
-        list.some((c) => (c.x - enemy.x) ** 2 + (c.y - enemy.y) ** 2 <= reachSq)
-      ) {
-        touched.push(enemy);
-      }
-    });
-    touched.forEach((enemy) => {
-      if (enemy.destroyed) return;
-      const scale = ion && enemy.type === 'boss' ? bossFactor : 1;
-      this.applyDamageToEnemy(this.cachedEnemies, enemy, damage * scale, {
-        hitPosition: { x: enemy.x, y: enemy.y },
-      });
-    });
-  }
-
-  // Pushes every enemy within `radius` straight away from `origin`.
-  shoveFrom(origin, radius, speed) {
-    if (!origin) return;
-    this.forEachSolidEnemy((enemy) => {
-      const dx = enemy.x - origin.x;
-      const dy = enemy.y - origin.y;
-      const reach = radius + (enemy.radius || 0);
-      if (dx * dx + dy * dy > reach * reach) return;
-      this.pushEnemy(enemy, dx, dy, speed);
-    });
-  }
-
-  // Static Shell: an arc to every enemy within reach of the ship.
-  dischargeStaticShell({ radius, damage }) {
-    const { x, y } = this.cachedPlayer.getPosition();
-    const origin = { x, y, radius: SHIP_SIZE };
-    const struck = [];
-    this.forEachSolidEnemy((enemy) => {
-      const reach = radius + (enemy.radius || 0);
-      if ((enemy.x - x) ** 2 + (enemy.y - y) ** 2 <= reach * reach) {
-        struck.push(enemy);
-      }
-    });
-    struck.forEach((enemy) => {
-      if (enemy.destroyed) return;
-      this.addArc(origin, enemy);
-      // A chain-kind hit: no burn, slow or chain procs off the discharge.
-      this.processBulletHit(
-        {
-          kind: 'chain',
-          x: enemy.x,
-          y: enemy.y,
-          vx: 0,
-          vy: 0,
-          damage,
-          hit: false,
-        },
-        enemy,
-        this.cachedEnemies
-      );
-    });
-  }
-
-  // Gravity Brake: undo part of this frame's travel near the ship.
-  applyGravityBrake({ radius, slowFraction }, deltaTime) {
-    const { x, y } = this.cachedPlayer.getPosition();
-    const drag = slowFraction * deltaTime;
-    this.forEachSolidEnemy((enemy) => {
-      if (enemy.type === 'boss') return;
-      if ((enemy.x - x) ** 2 + (enemy.y - y) ** 2 > radius * radius) return;
-      enemy.x -= (enemy.vx || 0) * drag;
-      enemy.y -= (enemy.vy || 0) * drag;
-    });
+    return this.hits.processBulletHit(bullet, enemy, enemiesSystem);
   }
 
   updateWeaponEffects(deltaTime) {
-    const fade = (list) => {
-      let kept = 0;
-      for (let i = 0; i < list.length; i += 1) {
-        list[i].life -= deltaTime;
-        if (list[i].life > 0) list[kept++] = list[i];
-      }
-      list.length = kept;
-    };
-    fade(this.beams);
-    fade(this.flakBursts);
-    fade(this.arcs);
-    fade(this.cinders);
-    fade(this.ions);
-    fade(this.afterburnTrail);
-    fade(this.wells);
-
-    const { cinderTrail, ionTrail, afterburn, staticShell, gravityBrake } =
-      this.cardEffects;
-    if (afterburn) this.dropAfterburnPoints(afterburn);
-    // Each trail ticks on its own timer while it has points.
-    const tick = (list, trail, timerKey) => {
-      if (!trail || !list.length) {
-        this[timerKey] = 0;
-        return;
-      }
-      this[timerKey] += deltaTime;
-      while (this[timerKey] >= trail.tickInterval) {
-        this[timerKey] -= trail.tickInterval;
-        this.burnTrailTouches(list, trail);
-      }
-    };
-    tick(this.cinders, cinderTrail, 'cinderTimer');
-    tick(this.ions, ionTrail, 'ionTimer');
-    tick(this.afterburnTrail, afterburn, 'afterburnTimer');
-    if (this.staticShellPending) {
-      this.staticShellPending = false;
-      this.dischargeStaticShell(staticShell);
-    }
-    // The beam stays on the muzzle while it shows (its damage already landed).
-    const player = this.cachedPlayer;
-    if (this.beams.length && !player.isDead) {
-      const muzzle = player.getMuzzlePoint();
-      this.beams.forEach((beam) => {
-        beam.ex += muzzle.x - beam.x;
-        beam.ey += muzzle.y - beam.y;
-        beam.x = muzzle.x;
-        beam.y = muzzle.y;
-      });
-    }
-
-    if (gravityBrake && !player.isDead) {
-      this.applyGravityBrake(gravityBrake, deltaTime);
-    }
-
-    if (this.burns.size) {
-      const spreads = [];
-      this.burns.forEach((entry, enemy) => {
-        entry.timer += deltaTime;
-        while (
-          entry.timer >= entry.interval - 1e-9 &&
-          entry.ticksLeft > 0 &&
-          !enemy.destroyed &&
-          enemy.id === entry.id
-        ) {
-          entry.timer -= entry.interval;
-          entry.ticksLeft -= 1;
-          if (entry.spreadTo) this.spreadBurn(enemy, entry, spreads);
-          this.applyDamageToEnemy(this.cachedEnemies, enemy, entry.damage, {
-            hitPosition: { x: enemy.x, y: enemy.y },
-          });
-        }
-        if (entry.ticksLeft <= 0 || enemy.destroyed || enemy.id !== entry.id) {
-          this.burns.delete(enemy);
-        }
-      });
-      // Added after the pass, so a fresh spread burn does not tick this frame.
-      spreads.forEach(([enemy, entry]) => this.burns.set(enemy, entry));
-    }
-
-    if (this.pulls.size) {
-      const { speed } = WEAPON_APEX.field.pull;
-      this.pulls.forEach((entry, enemy) => {
-        if (enemy.destroyed || enemy.id !== entry.id) {
-          this.pulls.delete(enemy);
-          return;
-        }
-        const dx = entry.x - enemy.x;
-        const dy = entry.y - enemy.y;
-        const distance = Math.hypot(dx, dy);
-        const step = Math.min(
-          distance,
-          speed * Math.min(deltaTime, entry.timer)
-        );
-        if (distance > 1e-9) {
-          enemy.x += (dx / distance) * step;
-          enemy.y += (dy / distance) * step;
-        }
-        entry.timer -= deltaTime;
-        if (entry.timer <= 1e-9) this.pulls.delete(enemy);
-      });
-    }
-
-    if (this.slows.size) {
-      // Undo (1 − factor) of this frame's travel: the AI keeps its velocity.
-      const drag = 1 - WEAPON_EVOLUTIONS.field.slow.factor;
-      this.slows.forEach((entry, enemy) => {
-        if (enemy.destroyed || enemy.id !== entry.id) {
-          this.slows.delete(enemy);
-          return;
-        }
-        const slowed = Math.min(deltaTime, entry.timer) * drag;
-        enemy.x -= (enemy.vx || 0) * slowed;
-        enemy.y -= (enemy.vy || 0) * slowed;
-        entry.timer -= deltaTime;
-        if (entry.timer <= 1e-9) this.slows.delete(enemy);
-      });
-    }
+    this.cards.updateWeaponEffects(deltaTime);
   }
 
-  // Solar Flare: a burn tick sets every enemy whose rim is within reach of
-  // the burning one's and is not burning alight, once per source, at half
-  // duration; those do not spread.
-  spreadBurn(source, entry, spreads) {
-    const { radius, durationFraction, ticks } = WEAPON_APEX.thermal.spread;
-    const { duration } = WEAPON_EVOLUTIONS.thermal.burn;
-    this.forEachSolidEnemy((enemy) => {
-      if (
-        enemy === source ||
-        this.burns.has(enemy) ||
-        entry.spreadTo.includes(enemy) ||
-        Math.hypot(enemy.x - source.x, enemy.y - source.y) -
-          (enemy.radius || 0) -
-          (source.radius || 0) >
-          radius
-      ) {
-        return;
-      }
-      entry.spreadTo.push(enemy);
-      this.addArc(source, enemy, { color: WEAPON_APEX.thermal.look.outer });
-      spreads.push([
-        enemy,
-        {
-          id: enemy.id,
-          timer: 0,
-          interval: (duration * durationFraction) / ticks,
-          ticksLeft: ticks,
-          damage: entry.damage,
-          spreadTo: null,
-        },
-      ]);
-    });
-  }
-
-  applyDamageToEnemy(enemiesSystem, enemy, damage, source) {
-    const result = enemiesSystem.applyDamage(enemy, damage, { source });
-    return {
-      killed: !!result?.killed,
-      remainingHealth: Math.max(
-        0,
-        result?.remainingHealth ?? enemy.health ?? 0
-      ),
-    };
+  // A new run: the weapon, the cards in play and the Prospector carry.
+  resetWeaponState() {
+    this.weapons.resetWeaponState();
+    this.cards.resetCardState();
+    this.hits.resetProspectorCarry();
   }
 
   // === GETTERS PÚBLICOS ===
@@ -1989,10 +1192,6 @@ class CombatSystem extends BaseSystem {
   }
 
   // === CONFIGURAÇÃO ===
-  setTargetingRange(range) {
-    this.targeting.setTargetingRange(range);
-  }
-
   /**
    * Fix-pass-2 (C5): restore in-run toggle state (spread/aim mode, snapshot,
    * retarget flag) to the gameplay-default values. Called from both

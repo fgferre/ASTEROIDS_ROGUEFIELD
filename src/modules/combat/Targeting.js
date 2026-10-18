@@ -1533,7 +1533,7 @@ export class Targeting {
     this.targetingRange = Math.max(50, range);
   }
 
-  // Setters for CombatSystem.applyAimingUpgrade (the Targeting Suite card).
+  // Setters for CardEffects.applyAimingUpgrade (the Targeting Suite card).
   setUpgradeLevel(level) {
     this.targetingUpgradeLevel = level;
   }

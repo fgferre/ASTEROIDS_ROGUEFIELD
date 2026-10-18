@@ -3,8 +3,8 @@
 // The ship's guns: the weapon it carries (lance, Harmonic beam, Scatter
 // flak), when it may fire, how a volley spreads over its lanes, and the
 // evolutions and Apexes that change the lance. CombatSystem owns it, ticks it
-// after targeting and before the shots fly; the card tuning and the hit path
-// stay in CombatSystem.
+// after targeting and before the shots fly; the card tuning lives in
+// CardEffects and the hit path in HitResolution.
 
 import { TRAIL_LENGTH } from '../../core/GameConstants.js';
 import {
@@ -39,7 +39,7 @@ export class Weapons {
    * `enemies()`: the enemy service (forEachActiveEnemy).
    * `targeting()`: the Targeting instance (locks, lead points, aim mode, right stick).
    * `createBullet(fromPos, toPos, damage, volley)`: launches a shot (Projectiles).
-   * `hitEnemy(hit, enemy)`: lands a beam or shrapnel hit through CombatSystem's hit path.
+   * `hitEnemy(hit, enemy)`: lands a beam or shrapnel hit (HitResolution, through CombatSystem).
    * `emit(name, payload)`: sends weapon-fired, weapon-beam-fired, flak-burst and weapon-evolved.
    * `cardEffects()`: the weapon cards in play (the beam reads the Thermal Lens).
    * `tuning()`: the cards' fire-rate tuning, a fresh plain object: { aimCooldownMultiplier, cooldownTuning }.
@@ -712,7 +712,7 @@ export class Weapons {
   }
 
   // === WEAPONS AND EVOLUTIONS (docs/NORTE.md §7 pillar 4) ===
-  // The card effects' half of the reset stays in CombatSystem.
+  // The card effects reset in CardEffects; CombatSystem orders the two.
   resetWeaponState() {
     this.weaponId = WEAPONS.lance.id;
     this.harmonicShots = 0;
