@@ -288,7 +288,6 @@ class Renderer3D extends BaseSystem {
     });
     this.registerEventListener('shield-hit', () => {
       const time = performance.now() / 1000;
-      this.three?.player.flashShield(time);
       const dir = this.threatDirection();
       this.three?.shield.hit(time, dir.x, dir.y);
     });
@@ -1310,11 +1309,9 @@ class Renderer3D extends BaseSystem {
     this.impact.kick(KICK_WAVE_MIN + (KICK_WAVE_MAX - KICK_WAVE_MIN) * k);
   }
 
-  // The hex dome (shieldMirror.js) replaces the hull mirror's flat ring,
-  // whose size it borrows.
+  // The hex dome (shieldMirror.js) is sized from the hull mirror.
   mirrorShield(player, time) {
     const { shield, player: ship } = this.three;
-    const ring = ship.shield;
     const state = player?.getShieldState();
     const alive = ship.group.visible && player?.position;
     shield.update(
@@ -1323,9 +1320,8 @@ class Renderer3D extends BaseSystem {
       state?.maxHits > 0 ? state.currentHits / state.maxHits : 1,
       alive ? player.position.x - HALF_W : 0,
       alive ? player.position.y - HALF_H : 0,
-      alive ? ring.scale.x : 0
+      alive ? ship.shieldRadius : 0
     );
-    ring.visible = false;
   }
 
   // Logical direction from the ship to the nearest threat (enemy shot or

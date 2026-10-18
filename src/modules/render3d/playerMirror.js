@@ -23,6 +23,7 @@ import {
 } from '../../data/constants/physics.js';
 import { ALL_HULLS } from '../../data/shipModels.js';
 import { bakeHullMaps } from './bakedMaps.js';
+import { addRimLight } from './rimLight.js';
 import { HALF_H, HALF_W, colorOf, rgbOf } from './batches.js';
 
 // Plate heights in hull units: base plate, raised spine (peak at y = 0) and
@@ -54,7 +55,6 @@ const RECOIL_DIP = 2;
 const DASH_RIM_BOOST = 3;
 const DASH_RING_OPACITY = 0.55;
 const BLINK_HZ = 8;
-const SHIELD_FLASH_S = 0.08;
 const GHOST_ALPHA = 0.5;
 // proposta 17/10: each shot bumps the ship light for a couple of frames.
 const MUZZLE_LIGHT = 1.6;
@@ -143,7 +143,7 @@ export class PlayerMirror {
       material.userData.uRim = rim;
       material.userData.uBlink = blink;
       material.onBeforeCompile = patchHull;
-      return material;
+      return addRimLight(material);
     };
     this.baseMaterial = hullTone(PALETTE.hull, PALETTE.hullLit, 0.2, 0.85);
     this.finMaterial = hullTone(PALETTE.hullLit, PALETTE.neutral, 0.15, 0.8);
@@ -151,13 +151,15 @@ export class PlayerMirror {
     this.hullMaps = maps;
     this.surfaceMaps = true;
     this.blink = blink;
-    this.canopyMaterial = new THREE.MeshStandardMaterial({
-      color: colorOf(THREE, PALETTE.rockShadow),
-      emissive: colorOf(THREE, PALETTE.player).multiplyScalar(0.25),
-      metalness: 0.1,
-      roughness: 0.3,
-      flatShading: true,
-    });
+    this.canopyMaterial = addRimLight(
+      new THREE.MeshStandardMaterial({
+        color: colorOf(THREE, PALETTE.rockShadow),
+        emissive: colorOf(THREE, PALETTE.player).multiplyScalar(0.25),
+        metalness: 0.1,
+        roughness: 0.3,
+        flatShading: true,
+      })
+    );
     this.seamMaterial = new THREE.LineBasicMaterial({
       color: colorOf(THREE, PALETTE.rockShadow),
     });
@@ -193,21 +195,6 @@ export class PlayerMirror {
     );
     this.group.add(this.light);
 
-    this.shield = new THREE.Mesh(
-      new THREE.RingGeometry(0.9, 1, 64).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({
-        color: colorOf(THREE, PALETTE.player).multiplyScalar(1.4),
-        transparent: true,
-        opacity: 0.35,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-        toneMapped: false,
-      })
-    );
-    this.group.add(this.shield);
-    this.shieldRgb = colorOf(THREE, PALETTE.player).multiplyScalar(1.4);
-    this.shieldFlashRgb = new THREE.Color(1.6, 1.6, 1.6);
-    this.shieldHitAt = -Infinity;
     this.muzzleFrames = 0;
     this.bank = 0;
     this.bankTime = null;
@@ -473,7 +460,7 @@ export class PlayerMirror {
       (NOZZLE_HEIGHT + 4) * VISUAL_SCALE,
       0
     );
-    this.shield.scale.setScalar(geometry.extent * 1.7);
+    this.shieldRadius = geometry.extent * 1.7;
     this.dashRing.scale.setScalar(geometry.extent * 1.3);
     return geometry;
   }
@@ -609,17 +596,6 @@ export class PlayerMirror {
       2.6 * main + (this.muzzleFrames > 0 ? MUZZLE_LIGHT : 0);
     if (this.muzzleFrames > 0) this.muzzleFrames -= 1;
 
-    this.shield.visible = Boolean(player.isShieldActive);
-    if (this.shield.visible) {
-      const impact = time - this.shieldHitAt < SHIELD_FLASH_S;
-      this.shield.material.color.copy(
-        impact ? this.shieldFlashRgb : this.shieldRgb
-      );
-      this.shield.material.opacity = impact
-        ? 0.9
-        : 0.25 + 0.12 * Math.sin(time * 4);
-    }
-
     // Blink while invulnerable after a hit; the dash's own i-frames do not.
     const invulnerable = player.invulnerableTimer > 0;
     if (player.dashTimer > 0) this.dashGuard = true;
@@ -705,11 +681,6 @@ export class PlayerMirror {
     for (let i = 0; i < this.ghosts.length; i += 1) {
       this.ghosts[i].visible = false;
     }
-  }
-
-  /** `time` in seconds, same clock as update(). */
-  flashShield(time) {
-    this.shieldHitAt = time;
   }
 
   /** A shot left the nose: bump the ship light for a few frames. */

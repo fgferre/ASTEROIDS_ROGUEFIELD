@@ -46,6 +46,15 @@ describe('PlayerMirror', () => {
     expect(amber.r).toBeGreaterThan(amber.b);
   });
 
+  it('rim-lights the hull materials and carries no flat shield ring', () => {
+    const { mirror } = mirrorFor(defaultHull);
+    [mirror.baseMaterial, mirror.finMaterial, mirror.spineMaterial].forEach(
+      (material) => expect(material.userData.rimBase).toBeDefined()
+    );
+    expect(mirror.shield).toBeUndefined();
+    expect(mirror.shieldRadius).toBeGreaterThan(0);
+  });
+
   it('lights the side puff on the strafing flank only', () => {
     const { player, mirror } = mirrorFor(defaultHull);
     player.thrusterVisual.sideL = 1;
