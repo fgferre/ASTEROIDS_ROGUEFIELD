@@ -554,6 +554,7 @@ class Renderer3D extends BaseSystem {
     t.debris.limit = q.debrisCap;
     setRimLight(q.rimLight);
     t.decals.setEnabled(q.decals);
+    t.space.setLayers(q.spaceLayers);
     this.syncPasses();
   }
 
