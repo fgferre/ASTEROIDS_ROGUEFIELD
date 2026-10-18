@@ -62,6 +62,7 @@ const isSrc = (f) => f.startsWith('src/') && f.endsWith('.js');
 const isSharedTestInfra = (f) =>
   f.startsWith('tests/__helpers__/') ||
   f.startsWith('tests/__fixtures__/') ||
+  f.startsWith('tests/fixtures/') ||
   f === 'vite.config.js';
 
 const SPECIFIER_RES = [
