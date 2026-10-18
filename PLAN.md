@@ -219,7 +219,7 @@ efeitos e câmera, jogabilidade, etc. UX melhor a cada rodada."_** Toda rodada t
 - [x] **R5.7 Câmera 2.0.** Antecipação para onde a mira aponta, zoom por densidade de ameaça (afasta com muitos
       inimigos, aproxima no 1×1), enquadramento de chefe (nave e Warden sempre no quadro), rolagem sutil no strafe,
       transição suave entre modos; `?camera=1` mantém a atual para A/B.
-- [ ] **R5.8 Passe gráfico.** Vinheta + grão leve no passe de impacto, luz de borda (rim) nos cascos, estrelas que
+- [x] **R5.8 Passe gráfico.** Vinheta + grão leve no passe de impacto, luz de borda (rim) nos cascos, estrelas que
       cintilam, partículas suaves (fade por profundidade), escudo hexagonal em 3D, marcas de queimadura (decals)
       nas rochas atingidas, poeira volumétrica no bioma.
 - [ ] **R5.10 Espaço procedural (veredito dele, 18/10).** O fundo lê como textura de estrelas e as sombras no "chão"

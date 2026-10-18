@@ -56,7 +56,7 @@ import {
 import { BiomeController } from './biomes3d.js';
 import { DebrisChunks } from './debrisChunks.js';
 import { DeathBursts } from './dissolve.js';
-import { DustFloor } from './dustFloor.js';
+import { DustFloor, FLOOR_DEPTH } from './dustFloor.js';
 import { EnemyMirror, VIEW_KINDS } from './enemyMirror.js';
 import { FieldBackdrop } from './fieldBackdrop.js';
 import { FlashLights } from './flashLights.js';
@@ -64,6 +64,9 @@ import { HitSparks, MuzzleFlashes } from './hitSparks.js';
 import { ImpactKick, createImpactPass } from './impactPass.js';
 import { PickupMirror } from './pickupMirror.js';
 import { PlayerMirror } from './playerMirror.js';
+import { setRimLight } from './rimLight.js';
+import { ScorchDecals } from './scorchDecals.js';
+import { ShieldMirror } from './shieldMirror.js';
 import { TextSprites } from './textSprites.js';
 import { mirrorWeaponEffects, pushLance } from './weaponMirror.js';
 import { WEAPONS } from '../../data/weapons.js';
@@ -101,6 +104,8 @@ const KICK_WAVE_RADIUS = 90;
 const KICK_WAVE_FULL = 200;
 const KICK_WAVE_MIN = 0.25;
 const KICK_WAVE_MAX = 0.8;
+// proposta 18/10: soft particles fade over this many units above the floor.
+const SOFT_FLOOR_RANGE = 60;
 
 // Last linear → sRGB step of the composer (the passes work in linear; the
 // renderer's outputEncoding only applies when drawing to the screen).
@@ -282,7 +287,16 @@ class Renderer3D extends BaseSystem {
       this.biome.enterLayer(payload.wave);
     });
     this.registerEventListener('shield-hit', () => {
-      this.three?.player.flashShield(performance.now() / 1000);
+      const time = performance.now() / 1000;
+      this.three?.player.flashShield(time);
+      const dir = this.threatDirection();
+      this.three?.shield.hit(time, dir.x, dir.y);
+    });
+    this.registerEventListener('shield-activated', () => {
+      this.three?.shield.activate(performance.now() / 1000);
+    });
+    this.registerEventListener('shield-broken', () => {
+      this.three?.shield.break(performance.now() / 1000);
     });
     this.registerEventListener('camera-zoom-pulse', ({ zoom, duration }) => {
       this.camera.pulseZoom(zoom, duration);
@@ -317,6 +331,17 @@ class Renderer3D extends BaseSystem {
         bullet?.vy || 0,
         Boolean(data.killed)
       );
+      // a rock that survives the hit keeps a scorch mark
+      if (enemy?.type === 'asteroid' && bullet && !data.killed) {
+        const view = this.three?.enemies.views.get(enemy.id || enemy);
+        if (view) {
+          this.three.decals.hit(
+            view,
+            position.x - enemy.x,
+            position.y - enemy.y
+          );
+        }
+      }
     });
     this.registerEventListener('bullet-created', (data) => {
       const { from, bullet } = data || {};
@@ -411,6 +436,12 @@ class Renderer3D extends BaseSystem {
     t.player.setSurfaceMaps(q.surfaceMaps);
     t.floor.shadows.visible = q.shadows;
     t.debris.limit = q.debrisCap;
+    setRimLight(q.rimLight);
+    t.decals.setEnabled(q.decals);
+    const soft = q.softParticles ? SOFT_FLOOR_RANGE : 0;
+    [t.glow, t.matte, t.smoke].forEach((batch) =>
+      batch.setSoftFloor(-FLOOR_DEPTH, soft)
+    );
     this.syncPasses();
   }
 
@@ -490,6 +521,8 @@ class Renderer3D extends BaseSystem {
     this.three?.enemies.clear();
     this.three?.bursts.clear();
     this.three?.player.reset();
+    this.three?.decals.clear();
+    this.three?.shield.reset();
     this.impact.strength = 0;
     this.hitSparks.clear();
     this.muzzles.clear();
@@ -606,6 +639,12 @@ class Renderer3D extends BaseSystem {
     const enemies = new EnemyMirror(THREE, scene, this.seeded, bursts);
     const player = new PlayerMirror(THREE, scene, this.seeded);
     const pickups = new PickupMirror(THREE, scene);
+    const decals = new ScorchDecals(THREE, scene);
+    const shield = new ShieldMirror(
+      THREE,
+      scene,
+      rgbOf(THREE, PALETTE.player).map((c) => c * 1.4)
+    );
 
     const ribbons = new RibbonBatch(THREE, 4000);
     const lances = new CapsuleBatch(THREE, 240);
@@ -679,6 +718,8 @@ class Renderer3D extends BaseSystem {
       enemies,
       player,
       pickups,
+      decals,
+      shield,
       ribbons,
       lances,
       glow,
@@ -865,10 +906,12 @@ class Renderer3D extends BaseSystem {
     t.debris.begin();
 
     const warden = t.enemies.update(enemyList, time, dt);
+    t.decals.update(dt, t.enemies.views);
     t.bursts.update(dt);
     t.wardenLight.intensity = warden ? 2.6 : 0;
     if (warden) t.wardenLight.position.copy(warden.object.position).setY(40);
     t.player.update(player, t.ribbons, time);
+    this.mirrorShield(player, time);
     this.mirrorShadows(player, enemyList);
     t.flashes.update(dt);
     this.mirrorProjectiles();
@@ -901,7 +944,8 @@ class Renderer3D extends BaseSystem {
           !this.reducedMotion &&
           this.quality.settings.impactPass,
         this.graphics.aberration
-      )
+      ),
+      this.graphics.postProcessing && this.quality.settings.filmGrain
     );
 
     t.renderer.info.reset();
@@ -1264,6 +1308,50 @@ class Renderer3D extends BaseSystem {
     if (radius < KICK_WAVE_RADIUS) return;
     const k = smoothstep(KICK_WAVE_RADIUS, KICK_WAVE_FULL, radius);
     this.impact.kick(KICK_WAVE_MIN + (KICK_WAVE_MAX - KICK_WAVE_MIN) * k);
+  }
+
+  // The hex dome (shieldMirror.js) replaces the hull mirror's flat ring,
+  // whose size it borrows.
+  mirrorShield(player, time) {
+    const { shield, player: ship } = this.three;
+    const ring = ship.shield;
+    const state = player?.getShieldState();
+    const alive = ship.group.visible && player?.position;
+    shield.update(
+      time,
+      Boolean(alive && state?.isActive),
+      state?.maxHits > 0 ? state.currentHits / state.maxHits : 1,
+      alive ? player.position.x - HALF_W : 0,
+      alive ? player.position.y - HALF_H : 0,
+      alive ? ring.scale.x : 0
+    );
+    ring.visible = false;
+  }
+
+  // Logical direction from the ship to the nearest threat (enemy shot or
+  // enemy): where a shield hit most likely came from.
+  threatDirection() {
+    const out = this.threatDir || (this.threatDir = { x: 1, y: 0 });
+    const pos = this.cachedPlayer?.position;
+    if (!pos) return out;
+    let best = Infinity;
+    const scan = (list) => {
+      for (let i = 0; i < list.length; i += 1) {
+        const e = list[i];
+        if (!e || e.destroyed) continue;
+        const dx = e.x - pos.x;
+        const dy = e.y - pos.y;
+        const d = dx * dx + dy * dy - (e.radius || 0) ** 2;
+        if (d < best) {
+          best = d;
+          out.x = dx;
+          out.y = dy;
+        }
+      }
+    };
+    scan(this.cachedCombat?.enemyBullets || []);
+    scan(this.cachedEnemies?.getActiveEnemies() || []);
+    return out;
   }
 
   // A shadow on the dust floor under every mass; the ship's light pool.

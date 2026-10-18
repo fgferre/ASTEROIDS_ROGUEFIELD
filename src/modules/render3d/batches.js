@@ -37,6 +37,8 @@ attribute float aSize;
 attribute float aAlpha;
 uniform float uScale;
 uniform float uAttenuate;
+uniform float uSoftFloor;
+uniform float uSoftRange;
 varying vec3 vColor;
 varying float vAlpha;
 void main() {
@@ -45,6 +47,11 @@ void main() {
   gl_PointSize = max(1.0, size);
   vColor = aColor;
   vAlpha = aAlpha * clamp(size, 0.0, 1.0);
+  // soft particles: fade out on the way into the dust floor (0 range = off)
+  if (uSoftRange > 0.0) {
+    float worldY = (modelMatrix * vec4(position, 1.0)).y;
+    vAlpha *= smoothstep(uSoftFloor, uSoftFloor + uSoftRange, worldY);
+  }
   gl_Position = projectionMatrix * mv;
 }`;
 
@@ -112,6 +119,8 @@ export class PointBatch {
         uShape: { value: SHAPES[shape] },
         uAdditive: { value: additive ? 1 : 0 },
         uGain: { value: gain },
+        uSoftFloor: { value: 0 },
+        uSoftRange: { value: 0 },
       },
       vertexShader: POINT_VERTEX,
       fragmentShader: POINT_FRAGMENT,
@@ -122,6 +131,17 @@ export class PointBatch {
     this.geometry = geometry;
     this.object = new THREE.Points(geometry, this.material);
     this.object.frustumCulled = false;
+  }
+
+  /**
+   * Soft particles (quality preset): points fade over `range` world units
+   * above the plane at height `floor`; range 0 turns it off. A depth-texture
+   * fade would need a depth prepass of the whole scene (twice the draw
+   * calls), so the fade is against the one surface whose height is known.
+   */
+  setSoftFloor(floor, range) {
+    this.material.uniforms.uSoftFloor.value = floor;
+    this.material.uniforms.uSoftRange.value = range;
   }
 
   begin() {

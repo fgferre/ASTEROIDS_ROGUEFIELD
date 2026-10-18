@@ -84,8 +84,10 @@ function patchDissolve(shader, renderer) {
     );
 }
 
+// The source's own key: a chained patch (rimLight.js) is one function over
+// several bases, so its text alone would mix programs up.
 function dissolveCacheKey() {
-  return `dissolve:${this.dissolveBase.toString()}`;
+  return `dissolve:${this.dissolveKey}`;
 }
 
 export class DissolvePool {
@@ -185,6 +187,7 @@ export class DissolvePool {
     // Standard/Physical copy() resets defines (rock ROCK_* flags); Basic has none
     if (source.defines) Object.assign(twin.defines, source.defines);
     twin.dissolveBase = source.onBeforeCompile;
+    twin.dissolveKey = source.customProgramCacheKey();
     twin.dissolveUniforms = parts.uniforms;
     twin.onBeforeCompile = patchDissolve;
     twin.customProgramCacheKey = dissolveCacheKey;

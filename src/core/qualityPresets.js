@@ -7,6 +7,9 @@
 
 // Best first. `pixelRatio` caps render pixels per CSS pixel (the canvas
 // itself stays at native size; the composer draws smaller and scales up).
+// The polish layers (proposta 18/10): `filmGrain` grain + vignette in the
+// impact pass, `rimLight` on machine hulls, `softParticles` the points'
+// fade near the floor, `decals` scorch marks on rocks.
 export const QUALITY_PRESETS = {
   ultra: {
     bloomScale: 1,
@@ -16,6 +19,10 @@ export const QUALITY_PRESETS = {
     shadows: true,
     debrisCap: 160,
     pixelRatio: 2,
+    filmGrain: true,
+    rimLight: true,
+    softParticles: true,
+    decals: true,
   },
   high: {
     bloomScale: 1,
@@ -25,6 +32,10 @@ export const QUALITY_PRESETS = {
     shadows: true,
     debrisCap: 120,
     pixelRatio: 1.5,
+    filmGrain: true,
+    rimLight: true,
+    softParticles: true,
+    decals: true,
   },
   medium: {
     bloomScale: 0.85,
@@ -34,6 +45,10 @@ export const QUALITY_PRESETS = {
     shadows: true,
     debrisCap: 80,
     pixelRatio: 1.25,
+    filmGrain: true,
+    rimLight: true,
+    softParticles: true,
+    decals: true,
   },
   low: {
     bloomScale: 0.7,
@@ -43,6 +58,10 @@ export const QUALITY_PRESETS = {
     shadows: false,
     debrisCap: 48,
     pixelRatio: 1,
+    filmGrain: false,
+    rimLight: false,
+    softParticles: false,
+    decals: false,
   },
 };
 export const QUALITY_LEVELS = Object.keys(QUALITY_PRESETS);

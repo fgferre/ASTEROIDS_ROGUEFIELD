@@ -16,6 +16,7 @@ import { createAsteroidGeometry, createSeededRandom } from './asteroidMesh.js';
 import { bakePlateMaps, bakeRockMaps } from './bakedMaps.js';
 import { HALF_H, HALF_W, colorOf } from './batches.js';
 import { DissolvePool } from './dissolve.js';
+import { addRimLight } from './rimLight.js';
 
 const ROCK_SHAPES = 8;
 const ROCK_DETAIL = 4;
@@ -384,18 +385,24 @@ export class EnemyMirror {
       uRockNormalScale: { value: CRYSTAL_NORMAL_SCALE },
     };
 
-    // Matte mass (docs/NORTE.md §2): the eye/core is the only light.
-    this.hullMaterial = new THREE.MeshStandardMaterial({
-      color: colorOf(THREE, PALETTE.hullLit),
-      metalness: 0.2,
-      roughness: 0.85,
-    });
-    this.plateMaterial = new THREE.MeshStandardMaterial({
-      color: colorOf(THREE, PALETTE.hullLit),
-      metalness: 0.2,
-      roughness: 0.85,
-      flatShading: true,
-    });
+    // Matte mass (docs/NORTE.md §2): the eye/core is the only light; a
+    // faint key-coloured rim (rimLight.js) keeps machine silhouettes apart
+    // from the field. Rocks get none.
+    this.hullMaterial = addRimLight(
+      new THREE.MeshStandardMaterial({
+        color: colorOf(THREE, PALETTE.hullLit),
+        metalness: 0.2,
+        roughness: 0.85,
+      })
+    );
+    this.plateMaterial = addRimLight(
+      new THREE.MeshStandardMaterial({
+        color: colorOf(THREE, PALETTE.hullLit),
+        metalness: 0.2,
+        roughness: 0.85,
+        flatShading: true,
+      })
+    );
     // The Wardens' segments, arms and plates: the plate look plus grooved
     // surface maps on their UVs.
     const plateMaps = bakePlateMaps(THREE, MAP_SEED);
@@ -403,16 +410,19 @@ export class EnemyMirror {
     // Quality preset: every material that samples baked maps, to toggle.
     this.surfaceMaps = true;
     this.rockMaterials = [];
-    this.wardenPlateMaterial = this.plateMaterial.clone();
+    // clone() drops the rim patch (and userData functions): add it again
+    this.wardenPlateMaterial = addRimLight(this.plateMaterial.clone());
     Object.assign(this.wardenPlateMaterial, plateMaps, {
       normalScale: new THREE.Vector2(PLATE_NORMAL_SCALE, PLATE_NORMAL_SCALE),
       aoMapIntensity: PLATE_AO,
     });
-    this.darkMaterial = new THREE.MeshStandardMaterial({
-      color: colorOf(THREE, PALETTE.hull),
-      metalness: 0.3,
-      roughness: 0.8,
-    });
+    this.darkMaterial = addRimLight(
+      new THREE.MeshStandardMaterial({
+        color: colorOf(THREE, PALETTE.hull),
+        metalness: 0.3,
+        roughness: 0.8,
+      })
+    );
     this.rimMaterial = new THREE.LineBasicMaterial({
       color: colorOf(THREE, PALETTE.threat).multiplyScalar(1.1),
       toneMapped: false,
@@ -986,6 +996,7 @@ export class EnemyMirror {
       this.threatColor.clone()
     );
     material.onBeforeCompile = patchRockShader;
+    addRimLight(material);
     const shell = new THREE.Mesh(this.huskShell, material);
     shell.scale.setScalar(0.95);
     const rim = new THREE.LineLoop(this.circleRim, this.rimMaterial);
@@ -1042,6 +1053,7 @@ export class EnemyMirror {
       emissiveIntensity: 0,
     });
     armMaterial.userData.base = armMaterial.emissive;
+    addRimLight(armMaterial);
     const tipMaterial = this.emissive(PALETTE.threat, 0.5);
     const spin = new THREE.Group();
     const tips = [];
@@ -1186,6 +1198,7 @@ export class EnemyMirror {
       roughness: 0.38,
       flatShading: true,
     });
+    addRimLight(prismMaterial);
     const prism = new THREE.Mesh(this.silencePrism, prismMaterial);
     const eyeMaterial = this.emissive(PALETTE.text, 1.6);
     const eye = new THREE.Mesh(this.smallSphere, eyeMaterial);
