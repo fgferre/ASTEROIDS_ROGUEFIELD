@@ -570,6 +570,7 @@ class UISystem extends BaseSystem {
     const stage = this.bossRush ? bossRushStage(layer) : 0;
     hud.showLayerBanner(layer, {
       boss,
+      bossRush: this.bossRush,
       chapter: stage
         ? bossRushStageTitle(stage)
         : firstOfBiome
@@ -1566,10 +1567,12 @@ class UISystem extends BaseSystem {
       let radarEnemies = [];
       if (physics && typeof physics.getNearbyEnemies === 'function') {
         try {
+          // A phased Shade still shows on the radar, dimmed.
           radarEnemies = physics.getNearbyEnemies(
             Number(playerPosition.x) || 0,
             Number(playerPosition.y) || 0,
-            radarRange
+            radarRange,
+            { includeIntangible: true }
           );
         } catch (error) {
           radarEnemies = [];
@@ -1610,6 +1613,7 @@ class UISystem extends BaseSystem {
           x: dx / radarRange,
           y: dy / radarRange,
           type: radarGlyph(enemy),
+          phased: Boolean(enemy.intangible),
         });
       }
 
@@ -1741,6 +1745,7 @@ class UISystem extends BaseSystem {
       if (this.bossRush) {
         this.aaaTacticalHud?.showLayerBanner(payload.nextBossWave, {
           boss: true,
+          bossRush: true,
           chapter: bossRushStageTitle(bossRushStage(payload.nextBossWave)),
         });
       }

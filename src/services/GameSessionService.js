@@ -641,7 +641,10 @@ export default class GameSessionService {
     }
     this.resolveServiceInstance('enemies')?.waveManager?.holdWaves();
     this.setSessionState('victory', { reason: 'final-boss-defeated' });
-    this.eventBus.emit('run-won', { wave: payload.wave });
+    this.eventBus.emit('run-won', {
+      wave: payload.wave,
+      hullId: this.getConfiguredHullId(),
+    });
 
     this.scheduleRunEndScreen(
       () => {
@@ -820,6 +823,7 @@ export default class GameSessionService {
 
     this.clearRetryCountdownTimers();
     this.clearPendingGameOverTransition();
+    this.transmissionOnAir = false;
     this.isRetryCountdownActive = false;
     this.clearDeathSnapshot();
     this.hideRetryCountdown();
@@ -2258,6 +2262,7 @@ export default class GameSessionService {
   resetForMenu() {
     this.clearRetryCountdownTimers();
     this.clearPendingGameOverTransition();
+    this.transmissionOnAir = false;
     this.isRetryCountdownActive = false;
     this.hideRetryCountdown();
     this.setRetryCount(0);

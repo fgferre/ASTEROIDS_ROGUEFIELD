@@ -274,6 +274,22 @@ describe('WaveManager field events', () => {
     });
   });
 
+  it('leaves a phased Shade unstunned on a Solar Flare', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const field = createField();
+      startLayer(field, 7);
+      const shade = { type: 'shade', destroyed: false, intangible: true };
+      field.active.push({ type: 'asteroid', destroyed: false }, shade);
+
+      field.manager.update(35);
+
+      expect(eventsOf(field, 'field-event-started')[0].kind).toBe(
+        'solar-flare'
+      );
+      expect(shade.stunTimer).toBeUndefined();
+    });
+  });
+
   it('does not hold a cleared layer open for an event still to come', async () => {
     await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
       const field = createField();

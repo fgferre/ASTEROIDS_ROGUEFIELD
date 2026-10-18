@@ -10,6 +10,7 @@ import {
   getShipModelById,
 } from '../../src/data/shipModels.js';
 import { BOSS_PHYSICS_CONFIG } from '../../src/data/enemies/boss.js';
+import { RUN_FINAL_LAYER } from '../../src/data/constants/gameplay.js';
 import PhysicsSystem from '../../src/modules/PhysicsSystem.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 // Optimization: use centralized createRandomServiceStatefulStub()
@@ -387,6 +388,32 @@ describe('GameSessionService lifecycle flows', () => {
       getShipModelById(DEFAULT_HULL_ID)
     );
     expect(player.currentHull.id).toBe(DEFAULT_HULL_ID);
+  });
+
+  it('names the flown hull in the run-won payload', () => {
+    const { service, eventBus } = createServiceHarness({
+      selectedHull: BASTION_HULL_ID,
+    });
+    vi.useFakeTimers();
+    service.startNewRun({ source: 'test' });
+
+    service.handleBossDefeatedEvent({ wave: RUN_FINAL_LAYER });
+
+    expect(eventBus.emit).toHaveBeenCalledWith('run-won', {
+      wave: RUN_FINAL_LAYER,
+      hullId: BASTION_HULL_ID,
+    });
+  });
+
+  it('clears a transmission left on air when a new run starts', () => {
+    const { service, eventBus } = createServiceHarness();
+    service.startNewRun({ source: 'test' });
+    eventBus.emit('transmission-shown', { key: 'death:0' });
+    expect(service.transmissionOnAir).toBe(true);
+
+    service.startNewRun({ source: 'test' });
+
+    expect(service.transmissionOnAir).toBe(false);
   });
 
   it('restores the snapshot hull before retry state recovery completes', () => {

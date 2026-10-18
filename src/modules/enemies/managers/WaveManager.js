@@ -1391,8 +1391,9 @@ export class WaveManager {
         .getCachedXPOrbs?.()
         ?.startGlobalPull(duration, pullSpeed, pullAcceleration, 1, point);
     } else if (kind === 'solar-flare') {
+      // A phased Shade (`intangible`) is out of reach of the flare.
       this.enemySystem.forEachActiveEnemy?.((enemy) => {
-        enemy.stunTimer = duration;
+        if (!enemy.intangible) enemy.stunTimer = duration;
       });
       this.enemySystem
         .getCachedEffects?.()
