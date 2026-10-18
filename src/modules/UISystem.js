@@ -40,6 +40,7 @@ import {
   killerName,
   pipsMarkup,
   runLocationLine,
+  transmissionQuoteMarkup,
 } from './ui/runRecap.js';
 import {
   hangarItemMarkup,
@@ -115,6 +116,8 @@ class UISystem extends BaseSystem {
     this.transmissions = null;
     this.transmissionRaf = null;
     this.transmissionLayer = 1;
+    // The line shown since the death or the win, quoted on the end screen.
+    this.lastTransmission = null;
     this.cinematics = new RunCinematics({
       eventBus: this.eventBus,
       renderer: () => this.getService('renderer'),
@@ -301,6 +304,7 @@ class UISystem extends BaseSystem {
         combo: document.getElementById('gameover-combo') || null,
         level: document.getElementById('gameover-level') || null,
         killer: document.getElementById('gameover-killer') || null,
+        quote: document.getElementById('gameover-quote') || null,
         location: document.getElementById('gameover-location') || null,
         salvage: document.getElementById('gameover-salvage') || null,
         build: document.getElementById('gameover-build') || null,
@@ -316,6 +320,7 @@ class UISystem extends BaseSystem {
         kills: document.getElementById('victory-kills') || null,
         combo: document.getElementById('victory-combo') || null,
         level: document.getElementById('victory-level') || null,
+        quote: document.getElementById('victory-quote') || null,
         build: document.getElementById('victory-build') || null,
         synergies: document.getElementById('victory-synergies') || null,
         best: document.getElementById('victory-best') || null,
@@ -1341,8 +1346,12 @@ class UISystem extends BaseSystem {
     this.aaaTacticalHud.mount(mountTarget);
     this.transmissions = new TransmissionQueue(
       this.aaaTacticalHud,
-      ({ speaker, key }) => {
+      ({ speaker, key, text }) => {
+        this.lastTransmission = { speaker, text };
         this.eventBus.emit('transmission-shown', { speaker, key });
+      },
+      ({ key }) => {
+        this.eventBus.emit('transmission-finished', { key });
       }
     );
   }
@@ -1710,6 +1719,7 @@ class UISystem extends BaseSystem {
       if (this.runWon) {
         return;
       }
+      this.lastTransmission = null;
       this.queueTransmission(
         deathTransmission(this.getRandomFork('base'), this.transmissionLayer),
         { interrupt: true }
@@ -1872,6 +1882,7 @@ class UISystem extends BaseSystem {
 
     this.registerEventListener('run-won', () => {
       this.runWon = true;
+      this.lastTransmission = null;
       this.cinematics.startEpilogue();
       this.queueTransmission(victoryTransmission(), { interrupt: true });
     });
@@ -4257,6 +4268,9 @@ class UISystem extends BaseSystem {
     setText(refs.level, `${level ?? '—'}`);
     setText(refs.best, `Best layer: ${data.bestLayer ?? wave ?? '—'}`);
     setText(refs.salvage, salvageLine(this.getService('hangar').lastAward));
+    if (refs.quote) {
+      refs.quote.innerHTML = transmissionQuoteMarkup(this.lastTransmission);
+    }
 
     if (refs.build) {
       refs.build.innerHTML = '';
@@ -4334,6 +4348,9 @@ class UISystem extends BaseSystem {
     setText(refs.salvage, salvageLine(this.getService('hangar').lastAward));
     setText(refs.seed, this.getService('difficulty').runLabel());
     setText(refs.copySeedBtn, 'Copy seed link');
+    if (refs.quote) {
+      refs.quote.innerHTML = transmissionQuoteMarkup(this.lastTransmission);
+    }
 
     const progression = this.getService('progression');
     if (refs.build && progression) {

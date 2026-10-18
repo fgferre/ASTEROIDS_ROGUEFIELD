@@ -2346,6 +2346,33 @@ kbd {
   color: var(--xp);
 }
 
+/* Death/victory quote: the last transmission, labelled like its HUD banner */
+.run-recap__quote {
+  width: min(640px, 100%);
+  margin: var(--space-4) auto 0;
+}
+
+.run-recap__quote:empty {
+  display: none;
+}
+
+.run-recap__quote-speaker {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  letter-spacing: 0.25em;
+  color: var(--accent);
+  text-shadow: 0 0 8px var(--accent-line);
+}
+
+.run-recap__quote-line {
+  margin: var(--space-1) 0 0;
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: 0.06em;
+  line-height: 1.5;
+  color: var(--text);
+}
+
 @media (max-width: 640px) {
   .gameover-stats {
     grid-template-columns: repeat(3, minmax(0, 1fr));

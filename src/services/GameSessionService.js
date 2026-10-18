@@ -24,8 +24,12 @@ const RANDOM_STORAGE_KEYS = {
   last: 'roguefield.lastSeed',
 };
 
+// The end screens wait for the transmission on air (the last words) to end,
+// up to the cap.
 const GAME_OVER_SCREEN_DELAY_MS = 3000;
+const GAME_OVER_SCREEN_MAX_DELAY_MS = 6500; // proposta 18/10
 const VICTORY_SCREEN_DELAY_MS = 2500; // boss death effects play first
+const VICTORY_SCREEN_MAX_DELAY_MS = 7000; // proposta 18/10
 
 export default class GameSessionService {
   /**
@@ -68,6 +72,9 @@ export default class GameSessionService {
     this.sessionState = 'menu';
     this.quitExplosionTimeoutId = null;
     this.gameOverScreenTimeoutId = null;
+    // Set while the end screen waits for the transmission on air to end.
+    this.openRunEndScreen = null;
+    this.transmissionOnAir = false;
     this.quitExplosionPlayerRef = null;
     this.isRetryCountdownActive = false;
 
@@ -92,6 +99,13 @@ export default class GameSessionService {
       progressionReset: (payload) => this.handleProgressionResetEvent(payload),
       bossDefeated: (payload) => this.handleBossDefeatedEvent(payload),
       waveStarted: (payload) => updateRecords({ layer: payload?.wave }),
+      transmissionShown: () => {
+        this.transmissionOnAir = true;
+      },
+      transmissionFinished: () => {
+        this.transmissionOnAir = false;
+        this.openRunEndScreen?.();
+      },
     };
 
     this.initializeSessionState();
@@ -530,6 +544,11 @@ export default class GameSessionService {
     register('progression-reset', this.globalEventHandlers.progressionReset);
     register('boss-defeated', this.globalEventHandlers.bossDefeated);
     register('wave-started', this.globalEventHandlers.waveStarted);
+    register('transmission-shown', this.globalEventHandlers.transmissionShown);
+    register(
+      'transmission-finished',
+      this.globalEventHandlers.transmissionFinished
+    );
   }
 
   teardownGlobalEventListeners() {
@@ -598,15 +617,17 @@ export default class GameSessionService {
     this.setSessionState('victory', { reason: 'final-boss-defeated' });
     this.eventBus.emit('run-won', { wave: payload.wave });
 
-    this.clearPendingGameOverTransition();
-    this.gameOverScreenTimeoutId = setTimeout(() => {
-      this.gameOverScreenTimeoutId = null;
-      const summary =
-        this.resolveServiceInstance('world')?.buildRunSummary() ?? {};
-      const data = { ...summary, bestLayer: this.recordRunReached(summary) };
-      this.setScreen('victory');
-      this.emitScreenChanged('victory', { source: 'run-won', data });
-    }, VICTORY_SCREEN_DELAY_MS);
+    this.scheduleRunEndScreen(
+      () => {
+        const summary =
+          this.resolveServiceInstance('world')?.buildRunSummary() ?? {};
+        const data = { ...summary, bestLayer: this.recordRunReached(summary) };
+        this.setScreen('victory');
+        this.emitScreenChanged('victory', { source: 'run-won', data });
+      },
+      VICTORY_SCREEN_DELAY_MS,
+      VICTORY_SCREEN_MAX_DELAY_MS
+    );
   }
 
   /**
@@ -1442,6 +1463,27 @@ export default class GameSessionService {
       clearTimeout(this.gameOverScreenTimeoutId);
       this.gameOverScreenTimeoutId = null;
     }
+    this.openRunEndScreen = null;
+  }
+
+  /**
+   * `open()` runs after `delayMs`; if a transmission is on air then, it runs
+   * when the line ends, and by `maxDelayMs` at the latest.
+   */
+  scheduleRunEndScreen(open, delayMs, maxDelayMs) {
+    this.clearPendingGameOverTransition();
+    const fire = () => {
+      this.clearPendingGameOverTransition();
+      open();
+    };
+    this.gameOverScreenTimeoutId = setTimeout(() => {
+      if (!this.transmissionOnAir) {
+        fire();
+        return;
+      }
+      this.openRunEndScreen = fire;
+      this.gameOverScreenTimeoutId = setTimeout(fire, maxDelayMs - delayMs);
+    }, delayMs);
   }
 
   scheduleGameOverScreenTransition(data = {}) {
@@ -1455,13 +1497,14 @@ export default class GameSessionService {
       return;
     }
 
-    this.clearPendingGameOverTransition();
-
-    this.gameOverScreenTimeoutId = setTimeout(() => {
-      this.gameOverScreenTimeoutId = null;
-      this.setScreen('gameover');
-      this.emitScreenChanged('gameover', { source: 'player-died', data });
-    }, GAME_OVER_SCREEN_DELAY_MS);
+    this.scheduleRunEndScreen(
+      () => {
+        this.setScreen('gameover');
+        this.emitScreenChanged('gameover', { source: 'player-died', data });
+      },
+      GAME_OVER_SCREEN_DELAY_MS,
+      GAME_OVER_SCREEN_MAX_DELAY_MS
+    );
   }
 
   hasDeathSnapshot() {

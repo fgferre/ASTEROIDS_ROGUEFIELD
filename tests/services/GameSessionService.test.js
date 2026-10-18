@@ -240,6 +240,29 @@ describe('GameSessionService lifecycle flows', () => {
     ]);
   });
 
+  it('holds the game over screen while the death line plays, up to the cap', () => {
+    const dieDuringLine = () => {
+      const harness = createServiceHarness();
+      harness.service.startNewRun({ source: 'spec' });
+      harness.eventBus.emit('transmission-shown', { key: 'death:0' });
+      harness.service.handlePlayerDeath({ reason: 'spec' });
+      return harness;
+    };
+    vi.useFakeTimers();
+
+    const heard = dieDuringLine();
+    vi.advanceTimersByTime(3000);
+    expect(heard.service.getScreen()).toBe('playing');
+    heard.eventBus.emit('transmission-finished', { key: 'death:0' });
+    expect(heard.service.getScreen()).toBe('gameover');
+
+    const capped = dieDuringLine();
+    vi.advanceTimersByTime(6499);
+    expect(capped.service.getScreen()).toBe('playing');
+    vi.advanceTimersByTime(1);
+    expect(capped.service.getScreen()).toBe('gameover');
+  });
+
   it('restores retry button and player state when snapshot restoration fails', () => {
     const { service, player } = createServiceHarness();
 

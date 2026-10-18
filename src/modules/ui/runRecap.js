@@ -139,3 +139,13 @@ export function buildBlockMarkup(build) {
     </div>
     ${families}`;
 }
+
+/**
+ * The death/victory screen's quote: the last transmission, labelled like its
+ * HUD banner; empty when no line was shown.
+ */
+export function transmissionQuoteMarkup(line) {
+  if (!line) return '';
+  return `<figcaption class="run-recap__quote-speaker">▌TRANSMISSION — ${line.speaker}</figcaption>
+    <blockquote class="run-recap__quote-line">${line.text}</blockquote>`;
+}
