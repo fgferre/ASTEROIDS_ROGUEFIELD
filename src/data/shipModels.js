@@ -113,59 +113,85 @@ const interceptorVisual = {
   cockpit: { from: pt(0.4, 0), to: pt(0.66, 0), width: 0.07 * S },
 };
 
+// Solar Slicer: a longer, thinner spine with two swept blades whose edges
+// burn amber, twin amber thrusters set wide on the blade roots and a low
+// turret housing (playerMirror.js reads `blades` and `turret`).
 const solarSlicerVisual = {
   accent: 'shot',
+  blades: true,
+  turret: 'low',
   panels: [
     ...panelPair({
       points: [
-        pt(-0.55, -0.19),
-        pt(-0.86, -0.38),
-        pt(-0.98, -0.33),
-        pt(-0.82, -0.15),
+        pt(-0.78, -0.42),
+        pt(-1.04, -0.6),
+        pt(-1.12, -0.52),
+        pt(-0.94, -0.36),
       ],
       facing: { x: -0.6, y: -0.8 },
       minLevel: { key: 'braking', value: 1 },
-      grow: { key: 'braking', indices: [1, 2], step: pt(-0.04, -0.06) },
+      grow: { key: 'braking', indices: [1, 2], step: pt(-0.04, -0.05) },
     }),
-    // crescent blades
+    // swept blades: a long leading edge from the waist to the tip, the
+    // trailing edge cut back to the thruster pod
     ...panelPair({
       points: [
-        pt(0.42, -0.15),
-        pt(0.05, -0.5),
-        pt(-0.9, -0.98),
-        pt(-0.64, -0.6),
-        pt(-0.62, -0.21),
+        pt(0.1, -0.13),
+        pt(-0.98, -0.8),
+        pt(-0.78, -0.5),
+        pt(-0.9, -0.38),
+        pt(-0.9, -0.2),
+        pt(-0.8, -0.13),
       ],
       facing: { x: -0.2, y: -1 },
-      grow: { key: 'rcs', indices: [1, 2, 3], step: pt(-0.03, -0.05) },
-      rcsPort: 2,
+      grow: { key: 'rcs', indices: [1, 2], step: pt(-0.03, -0.05) },
+      rcsPort: 1,
     }),
+    // spine
     ...panelPair({
       points: [
-        pt(0.45, 0),
-        pt(0.45, -0.15),
-        pt(-0.2, -0.22),
-        pt(-0.95, -0.18),
-        pt(-1.05, -0.1),
-        pt(-1.05, 0),
+        pt(0.55, 0),
+        pt(0.55, -0.12),
+        pt(-0.3, -0.15),
+        pt(-1.0, -0.13),
+        pt(-1.1, -0.07),
+        pt(-1.1, 0),
       ],
       facing: { x: -0.05, y: -1 },
     }),
+    // prow
     ...panelPair({
-      points: [pt(1.2, 0), pt(0.45, 0), pt(0.45, -0.15)],
+      points: [pt(1.35, 0), pt(0.55, 0), pt(0.55, -0.12)],
       facing: { x: 0.45, y: -0.9 },
     }),
   ],
   nozzles: [
-    { ...pt(-1.05, 0), r: 0.1 * S },
-    { ...pt(-0.98, -0.15), r: 0.055 * S, minLevel: 3 },
-    { ...pt(-0.98, 0.15), r: 0.055 * S, minLevel: 3 },
+    { ...pt(-0.9, -0.29), r: 0.075 * S },
+    { ...pt(-0.9, 0.29), r: 0.075 * S },
+    { ...pt(-1.1, 0), r: 0.055 * S, minLevel: 3 },
   ],
   nozzleLength: 0.16 * S,
   nozzleLengthPerLevel: 0.025 * S,
-  retroPorts: [pt(0.45, -0.15), pt(0.45, 0.15)],
-  cockpit: { from: pt(0.5, 0), to: pt(0.85, 0), width: 0.07 * S },
+  retroPorts: [pt(0.55, -0.12), pt(0.55, 0.12)],
+  cockpit: { from: pt(0.72, 0), to: pt(1.02, 0), width: 0.06 * S },
 };
+
+// Flight stats per hull (proposta 18/10), multiplied in
+// PlayerSystem.resetStats before the Hangar's modifiers.
+const HULL_STATS = freezeDeep({
+  [DEFAULT_HULL_ID]: {
+    acceleration: 1,
+    maxSpeed: 1,
+    maxHealth: 1,
+    dashCooldown: 1,
+  },
+  [SOLAR_SLICER_HULL_ID]: {
+    acceleration: 1.15,
+    maxSpeed: 1.15,
+    maxHealth: 0.8,
+    dashCooldown: 0.85,
+  },
+});
 
 const defaultHullOutline = [
   { x: SHIP_SIZE, y: 0 },
@@ -185,28 +211,35 @@ const defaultHull = createHullDefinition({
     left: { x: 0, y: -SHIP_SIZE * 0.95 },
     right: { x: 0, y: SHIP_SIZE * 0.95 },
   },
+  stats: HULL_STATS[DEFAULT_HULL_ID],
   visual: interceptorVisual,
 });
 
 const solarSlicer = createHullDefinition({
   id: SOLAR_SLICER_HULL_ID,
   name: 'Solar Slicer',
-  // Collision and shield use a simplified silhouette; the panels carry the detail.
+  // Collision, shield and the menu preview's base plate follow the blades.
   outline: [
-    { x: SHIP_SIZE * 1.2, y: 0 },
-    { x: SHIP_SIZE * 0.45, y: -SHIP_SIZE * 0.72 },
-    { x: -SHIP_SIZE * 0.9, y: -SHIP_SIZE * 0.98 },
-    { x: -SHIP_SIZE * 1.15, y: 0 },
-    { x: -SHIP_SIZE * 0.9, y: SHIP_SIZE * 0.98 },
-    { x: SHIP_SIZE * 0.45, y: SHIP_SIZE * 0.72 },
+    { x: SHIP_SIZE * 1.35, y: 0 },
+    { x: SHIP_SIZE * 0.1, y: -SHIP_SIZE * 0.13 },
+    { x: -SHIP_SIZE * 0.98, y: -SHIP_SIZE * 0.8 },
+    { x: -SHIP_SIZE * 0.78, y: -SHIP_SIZE * 0.5 },
+    { x: -SHIP_SIZE * 0.9, y: -SHIP_SIZE * 0.38 },
+    { x: -SHIP_SIZE * 1.1, y: -SHIP_SIZE * 0.07 },
+    { x: -SHIP_SIZE * 1.1, y: SHIP_SIZE * 0.07 },
+    { x: -SHIP_SIZE * 0.9, y: SHIP_SIZE * 0.38 },
+    { x: -SHIP_SIZE * 0.78, y: SHIP_SIZE * 0.5 },
+    { x: -SHIP_SIZE * 0.98, y: SHIP_SIZE * 0.8 },
+    { x: SHIP_SIZE * 0.1, y: SHIP_SIZE * 0.13 },
   ],
   shieldPadding: 14,
   thrusterPorts: {
-    main: { x: -SHIP_SIZE * 1.14, y: 0 },
-    aux: { x: SHIP_SIZE * 1.02, y: 0 },
-    left: { x: 0, y: -SHIP_SIZE * 0.82 },
-    right: { x: 0, y: SHIP_SIZE * 0.82 },
+    main: { x: -SHIP_SIZE * 1.12, y: 0 },
+    aux: { x: SHIP_SIZE * 1.15, y: 0 },
+    left: { x: -SHIP_SIZE * 0.75, y: -SHIP_SIZE * 0.64 },
+    right: { x: -SHIP_SIZE * 0.75, y: SHIP_SIZE * 0.64 },
   },
+  stats: HULL_STATS[SOLAR_SLICER_HULL_ID],
   visual: solarSlicerVisual,
 });
 const ALL_HULLS = freezeDeep([defaultHull, solarSlicer]);

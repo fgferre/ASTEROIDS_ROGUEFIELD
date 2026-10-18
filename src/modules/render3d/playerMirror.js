@@ -9,6 +9,8 @@
 // impact flash mirror the 2D PlayerSystem render. In the modern scheme a
 // dorsal turret (base, twin barrels, amber lens) turns on its own to the
 // simulation's turret heading; its barrel tips sit on the sim's muzzle point.
+// The Solar Slicer's fins are blades edged in its amber accent and its turret
+// sits in a low, wide housing (shipModels.js `blades`, `turret: 'low'`).
 
 import {
   DASH_GHOST_COUNT,
@@ -67,6 +69,10 @@ const TURRET_BARREL_Y = TURRET_BASE_Y + TURRET_BASE_H + 0.9;
 const TURRET_BARREL_R = 0.7;
 const TURRET_BARREL_Z = 1.3;
 const TURRET_RECOIL = 1.2;
+// Low housing (Solar Slicer): wide hexagonal collar, barrels lowered onto it.
+const TURRET_LOW_H = 1.2;
+const TURRET_LOW_R = 5;
+const TURRET_LOW_DROP = TURRET_BASE_H - TURRET_LOW_H;
 const MUZZLE_LIGHT_FRAMES = 2;
 // Baked panel maps (bakedMaps.js): one texture tile per HULL_TILE hull units
 // (the extruded plates' UVs are in hull units). proposta 18/10: strengths.
@@ -167,6 +173,7 @@ export class PlayerMirror {
       color: colorOf(THREE, PALETTE.player).multiplyScalar(0.7),
       toneMapped: false,
     });
+    this.bladeEdgeMaterial = new THREE.LineBasicMaterial({ toneMapped: false });
     const glow = () =>
       new THREE.MeshBasicMaterial({
         transparent: true,
@@ -255,7 +262,7 @@ export class PlayerMirror {
       return geometry;
     };
     this.turret = new THREE.Group();
-    const base = new THREE.Mesh(
+    this.turretHousing = new THREE.Mesh(
       lit(
         new THREE.CylinderGeometry(
           TURRET_BASE_R * 0.85,
@@ -266,6 +273,20 @@ export class PlayerMirror {
       ),
       this.spineMaterial
     );
+    this.turretHousing.name = 'turretHousing';
+    this.turretHousingLow = new THREE.Mesh(
+      lit(
+        new THREE.CylinderGeometry(
+          TURRET_LOW_R * 0.85,
+          TURRET_LOW_R,
+          TURRET_LOW_H,
+          6
+        ).translate(0, TURRET_BASE_Y + TURRET_LOW_H / 2, 0)
+      ),
+      this.spineMaterial
+    );
+    this.turretHousingLow.name = 'turretHousingLow';
+    this.turretHousingLow.visible = false;
     // Barrels and their block recoil together along the turret's axis.
     this.barrels = new THREE.Group();
     const block = new THREE.Mesh(
@@ -304,7 +325,7 @@ export class PlayerMirror {
       barrel(TURRET_BARREL_Z),
       lens
     );
-    this.turret.add(base, this.barrels);
+    this.turret.add(this.turretHousing, this.turretHousingLow, this.barrels);
     this.group.add(this.turret);
   }
 
@@ -348,6 +369,11 @@ export class PlayerMirror {
     this.thrustRgb = rgbOf(THREE, geometry.accent);
     this.flameMaterial.color.copy(this.accent).multiplyScalar(1.8);
     this.puffMaterial.color.copy(this.accent).multiplyScalar(1.4);
+    this.bladeEdgeMaterial.color.copy(this.accent).multiplyScalar(1.3);
+    const lowTurret = hull.visual.turret === 'low';
+    this.turretHousing.visible = !lowTurret;
+    this.turretHousingLow.visible = lowTurret;
+    this.barrels.position.y = lowTurret ? -TURRET_LOW_DROP : 0;
 
     const maxY = geometry.maxY || 1;
     const bases = [];
@@ -358,7 +384,7 @@ export class PlayerMirror {
         0,
         0,
         this.baseMaterial
-      );
+      ).geometry;
       bases.push(base);
       // Dark seams on the base plate only: the raised plates read by tone.
       this.ship.add(
@@ -380,9 +406,16 @@ export class PlayerMirror {
       if (spine) {
         this.addPlate(inset, SPINE_DEPTH, BASE_TOP, maxY, this.spineMaterial);
       } else {
-        this.addPlate(inset, FIN_DEPTH, BASE_TOP, 0, this.finMaterial);
+        const fin = this.addPlate(
+          inset,
+          FIN_DEPTH,
+          BASE_TOP,
+          0,
+          this.finMaterial
+        );
+        fin.name = geometry.blades ? 'blade' : 'fin';
       }
-      this.addEdges(panel, spine, geometry.maxX);
+      this.addEdges(panel, spine, geometry.maxX, geometry.blades);
     });
 
     const { cockpit } = geometry;
@@ -493,17 +526,20 @@ export class PlayerMirror {
     solid.rotateX(-Math.PI / 2);
     solid.computeVertexNormals();
     solid.setAttribute('uv2', solid.getAttribute('uv'));
-    this.ship.add(new THREE.Mesh(solid, material));
-    return solid;
+    const mesh = new THREE.Mesh(solid, material);
+    this.ship.add(mesh);
+    return mesh;
   }
 
   // Thin cyan line on the prow's outer edge and on the fins' trailing edges
-  // (edges whose outward normal points aft), just above the base plate.
-  addEdges(panel, spine, noseX) {
+  // (edges whose outward normal points aft), just above the base plate. A
+  // blade is edged in the accent all round except where it meets the spine.
+  addEdges(panel, spine, noseX, blades) {
     const { THREE } = this;
     const { points } = panel;
     const prow = spine && points.some((p) => p.x === noseX);
     if (spine && !prow) return;
+    const blade = blades && !spine;
     const cx = points.reduce((n, p) => n + p.x, 0) / points.length;
     const cy = points.reduce((n, p) => n + p.y, 0) / points.length;
     const segments = [];
@@ -516,7 +552,12 @@ export class PlayerMirror {
         nx = -nx;
         ny = -ny;
       }
-      if (prow ? nx > 0.1 && Math.abs(ny) > 0.1 : nx < -0.6) {
+      const keep = prow
+        ? nx > 0.1 && Math.abs(ny) > 0.1
+        : blade
+          ? ny * Math.sign(cy) > -0.5
+          : nx < -0.6;
+      if (keep) {
         segments.push(
           new THREE.Vector3(a.x, BASE_TOP + 0.05, a.y),
           new THREE.Vector3(b.x, BASE_TOP + 0.05, b.y)
@@ -524,12 +565,12 @@ export class PlayerMirror {
       }
     });
     if (!segments.length) return;
-    this.ship.add(
-      new THREE.LineSegments(
-        new THREE.BufferGeometry().setFromPoints(segments),
-        this.edgeMaterial
-      )
+    const lines = new THREE.LineSegments(
+      new THREE.BufferGeometry().setFromPoints(segments),
+      blade ? this.bladeEdgeMaterial : this.edgeMaterial
     );
+    if (blade) lines.name = 'bladeEdge';
+    this.ship.add(lines);
   }
 
   /** Mirrors the player; feeds its thruster trail into `ribbons`. */

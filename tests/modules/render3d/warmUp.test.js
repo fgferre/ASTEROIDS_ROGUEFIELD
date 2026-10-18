@@ -114,11 +114,15 @@ describe('Renderer3D.warmUp', () => {
       if (object.material) expect(compiled.has(object.material)).toBe(true);
     });
     batches.forEach((batch) => expect(compiled.has(batch.material)).toBe(true));
+    // the instanced rocks' shared materials
+    Object.values(enemies.rockFamilies).forEach((material) =>
+      expect(compiled.has(material)).toBe(true)
+    );
     let twins = 0;
     enemies.pools.forEach((pool) =>
       pool.forEach((view) => {
         expect(view.object.visible).toBe(false);
-        view.dissolve.twins.forEach((twin) => {
+        view.dissolve?.twins.forEach((twin) => {
           twins += 1;
           expect(compiled.has(twin)).toBe(true);
         });

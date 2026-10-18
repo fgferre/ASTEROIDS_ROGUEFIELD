@@ -10,6 +10,10 @@ import {
 
 const fakeServices = () => ({
   hangar: { salvage: 470 },
+  difficulty: {
+    getDailyRecord: () => ({ bestLayer: 3 }),
+    getSelectedDifficulty: () => 'warden',
+  },
   codex: {
     getEntries: () => [{ seen: { kills: 3 } }, { seen: null }, { seen: {} }],
   },
@@ -28,7 +32,7 @@ describe('Main menu status strip', () => {
   });
   afterEach(() => restoreDom());
 
-  it('reads best layer, Salvage, Codex, achievements and quality', () => {
+  it('reads best layer, Daily best, Salvage, Codex, achievements, difficulty and quality', () => {
     const items = menuStatusItems({
       records: { bestLayer: 7 },
       quality: 'auto',
@@ -37,9 +41,11 @@ describe('Main menu status strip', () => {
 
     expect(items).toEqual([
       ['Best layer', '7'],
+      ['Daily best', '3'],
       ['Salvage', '470'],
       ['Codex', '2/3'],
       ['Achievements', '2/12'],
+      ['Difficulty', 'WARDEN'],
       ['Quality', 'AUTO'],
     ]);
     expect(menuStatusMarkup(items)).toContain(
@@ -68,7 +74,7 @@ describe('Main menu status strip', () => {
 
     const text = strip.innerHTML.replace(/<[^>]+>/g, '');
     expect(text).toBe(
-      'Best layer 4Salvage 470Codex 2/3Achievements 2/12Quality HIGH'
+      'Best layer 4Daily best 3Salvage 470Codex 2/3Achievements 2/12Difficulty WARDENQuality HIGH'
     );
   });
 });

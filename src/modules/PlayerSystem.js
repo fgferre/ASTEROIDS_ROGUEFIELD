@@ -251,6 +251,7 @@ const buildHullGeometry = (visual, levels) => {
 
   return {
     accent: PALETTE[visual.accent] || PALETTE.player,
+    blades: Boolean(visual.blades),
     panels,
     nozzles,
     nozzleLength,
@@ -329,6 +330,14 @@ const bakeHullSprites = (geometry, scale) => {
   d.moveTo(cockpit.from.x, cockpit.from.y);
   d.lineTo(cockpit.to.x, cockpit.to.y);
   d.stroke();
+  // blades (Solar Slicer): edged in the hull accent
+  if (geometry.blades) {
+    d.strokeStyle = withAlpha(geometry.accent, 0.8);
+    d.lineWidth = 0.5;
+    geometry.panels
+      .filter((panel) => panel.rcsPort)
+      .forEach((panel) => d.stroke(panel.path));
+  }
 
   // rim: dilate the silhouette by 1 logical px, keep only the ring
   mask.ctx.fillStyle = PALETTE.text;
@@ -2018,8 +2027,12 @@ class PlayerSystem extends BaseSystem {
   // === GERENCIAMENTO DE VIDA ===
   // `source`: the enemy (or its snapshot) that dealt the hit; the last one to
   // reach the hull is kept by value (enemies are pooled) for the death recap.
+  // Every hit is scaled by the difficulty preset's enemyDamage.
   takeDamage(amount, source = null) {
-    const damageAmount = Math.max(0, amount);
+    const damageAmount =
+      Math.max(0, amount) *
+      (resolveService('difficulty', this.dependencies)?.getModifiers()
+        .enemyDamage ?? 1);
     if (damageAmount <= 0) {
       return this.health;
     }
@@ -2087,8 +2100,12 @@ class PlayerSystem extends BaseSystem {
       return false;
     }
 
+    const previous = this.currentHull;
     this.currentHull = hullDefinition;
     this._currentHullMetrics = this.computeHullMetrics(hullDefinition);
+    // A different hull flies with its own stats (the run start sets the hull
+    // right after the reset).
+    if (previous && previous.id !== hullDefinition.id) this.resetStats();
     return true;
   }
 
@@ -2125,17 +2142,20 @@ class PlayerSystem extends BaseSystem {
     const hangar =
       resolveService('hangar', this.dependencies)?.getModifiers() ??
       BASE_MODIFIERS;
-    this.maxHealth = Math.round(100 * hangar.hullMultiplier);
+    // The hull's own flight stats (shipModels.js), before the Hangar's.
+    const hull = (this.currentHull ?? shipModels.defaultHull).stats;
+    this.maxHealth = Math.round(100 * hull.maxHealth * hangar.hullMultiplier);
     this.health = this.maxHealth;
     this.damage = 25;
     this.multishot = 1;
     this.magnetismRadius = MAGNETISM_RADIUS * hangar.pickupRadiusMultiplier;
-    this.dashCooldown = DASH_COOLDOWN * hangar.dashCooldownMultiplier;
+    this.dashCooldown =
+      DASH_COOLDOWN * hull.dashCooldown * hangar.dashCooldownMultiplier;
     this.dashAfterInvulnerability = 0;
     this.hullDrain = null;
     this.hullDrainTimer = 0;
-    this.maxSpeed = SHIP_MAX_SPEED;
-    this.acceleration = SHIP_ACCELERATION;
+    this.maxSpeed = SHIP_MAX_SPEED * hull.maxSpeed;
+    this.acceleration = SHIP_ACCELERATION * hull.acceleration;
     this.rotationSpeed = SHIP_ROTATION_SPEED;
     this.strafeMultiplier = 1;
     // FIX-02: split damping — reset both components. baseLinearDamping returns

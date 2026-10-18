@@ -76,7 +76,7 @@ export const HANGAR_ITEMS = deepFreeze([
   {
     id: 'solar-slicer-hull',
     name: 'Solar Slicer Hull',
-    effect: 'Unlocks the Solar Slicer hull',
+    effect: 'Solar Slicer — lighter blade hull: faster, thinner.',
     cost: 400, // proposta 18/10
     unlocksHull: SOLAR_SLICER_HULL_ID,
   },

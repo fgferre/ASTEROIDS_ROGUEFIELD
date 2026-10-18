@@ -1,6 +1,6 @@
 // Mirrors EnemySystem entities into Three objects (docs/NORTE.md §3): Ring
 // fragments as procedural rock meshes whose cracks light up amber with
-// damage, and the Wardens' machines (Mote, Seeker, Tether, Husk, Ram, Weaver,
+// damage (drawn instanced, rockInstances.js), and the Wardens' machines (Mote, Seeker, Tether, Husk, Ram, Weaver,
 // Bulwark), the three Wardens (Prime, Choir, Null; one view kind each,
 // picked by `bossKind`) and the three Heralds (Dust, Heat, Silence, picked by
 // `heraldKind`). Views are pooled per kind and keyed by entity id; a
@@ -19,6 +19,7 @@ import { bakePlateMaps, bakeRockMaps } from './bakedMaps.js';
 import { HALF_H, HALF_W, colorOf } from './batches.js';
 import { DissolvePool } from './dissolve.js';
 import { addRimLight } from './rimLight.js';
+import { RockInstances } from './rockInstances.js';
 
 const ROCK_SHAPES = 8;
 const ROCK_DETAIL = 4;
@@ -142,14 +143,43 @@ const ROCK_AO = 0.8;
 const PLATE_NORMAL_SCALE = 0.7;
 const PLATE_AO = 0.8;
 const MAP_SEED = 4242.7;
+// proposta 18/10: shadow-pass budget. Machines (alive or burning) cast only
+// within SHADOW_RADIUS world units (= logical px) of the camera target,
+// nearest first, up to SHADOW_CASTERS meshes; the rest still receive. Each
+// rock mesh casts all its instances in one draw.
+export const SHADOW_RADIUS = 520;
+export const SHADOW_CASTERS = 24;
 
+// Per-rock values: instance attributes on the instanced rocks
+// (ROCK_INSTANCED, rockInstances.js), uniforms on single meshes (a burning
+// rock, the Husk's shell).
 const ROCK_SHADER_HEAD = `
+#ifdef ROCK_INSTANCED
+varying vec4 vRockGlow;
+varying vec3 vRockVein;
+varying vec3 vRockSeed;
+varying vec3 vRockBase;
+varying vec2 vRockSurface;
+#define ROCK_GLOW vRockGlow.x
+#define ROCK_REVEAL vRockGlow.y
+#define ROCK_WIDTH vRockGlow.z
+#define ROCK_FLASH vRockGlow.w
+#define ROCK_VEIN vRockVein
+#define ROCK_SEED vRockSeed
+#else
 uniform float uGlow;
 uniform float uReveal;
 uniform float uWidth;
 uniform float uFlash;
 uniform vec3 uVein;
 uniform vec3 uSeed;
+#define ROCK_GLOW uGlow
+#define ROCK_REVEAL uReveal
+#define ROCK_WIDTH uWidth
+#define ROCK_FLASH uFlash
+#define ROCK_VEIN uVein
+#define ROCK_SEED uSeed
+#endif
 uniform float uRim;
 uniform vec3 uRimColor;
 varying vec3 vRockPos;
@@ -207,6 +237,18 @@ function patchRockShader(shader) {
       '#include <common>',
       `#include <common>
       varying vec3 vRockPos;
+      #ifdef ROCK_INSTANCED
+      attribute vec4 aGlow;
+      attribute vec3 aVein;
+      attribute vec3 aSeed;
+      attribute vec3 aBase;
+      attribute vec2 aSurface;
+      varying vec4 vRockGlow;
+      varying vec3 vRockVein;
+      varying vec3 vRockSeed;
+      varying vec3 vRockBase;
+      varying vec2 vRockSurface;
+      #endif
       #ifdef ROCK_NORMAL
       varying vec3 vRockNormal;
       varying vec3 vRockViewX;
@@ -218,11 +260,23 @@ function patchRockShader(shader) {
       '#include <begin_vertex>',
       `#include <begin_vertex>
       vRockPos = position;
+      #ifdef ROCK_INSTANCED
+      vRockGlow = aGlow;
+      vRockVein = aVein;
+      vRockSeed = aSeed;
+      vRockBase = aBase;
+      vRockSurface = aSurface;
+      #endif
       #ifdef ROCK_NORMAL
       vRockNormal = objectNormal;
-      vRockViewX = normalMatrix[0];
-      vRockViewY = normalMatrix[1];
-      vRockViewZ = normalMatrix[2];
+      #ifdef USE_INSTANCING
+      mat3 rockToView = normalMatrix * mat3(instanceMatrix);
+      #else
+      mat3 rockToView = normalMatrix;
+      #endif
+      vRockViewX = rockToView[0];
+      vRockViewY = rockToView[1];
+      vRockViewZ = rockToView[2];
       #endif`
     );
   // Baked maps (rock geometry has no UVs): triplanar in object space, the
@@ -231,8 +285,25 @@ function patchRockShader(shader) {
   shader.fragmentShader = shader.fragmentShader
     .replace('#include <common>', `#include <common>\n${ROCK_SHADER_HEAD}`)
     .replace(
+      '#include <color_fragment>',
+      `#include <color_fragment>
+      #ifdef ROCK_INSTANCED
+      diffuseColor.rgb *= vRockBase;
+      #endif`
+    )
+    .replace(
+      '#include <metalnessmap_fragment>',
+      `#include <metalnessmap_fragment>
+      #ifdef ROCK_INSTANCED
+      metalnessFactor = vRockSurface.y;
+      #endif`
+    )
+    .replace(
       '#include <roughnessmap_fragment>',
       `#include <roughnessmap_fragment>
+      #ifdef ROCK_INSTANCED
+      roughnessFactor = vRockSurface.x;
+      #endif
       #ifdef ROCK_NORMAL
       vec3 rockN = normalize(vRockNormal);
       vec3 rockP = vRockPos * uRockTile;
@@ -278,21 +349,21 @@ function patchRockShader(shader) {
     .replace(
       '#include <emissivemap_fragment>',
       `#include <emissivemap_fragment>
-      if (uGlow > 0.001) {
-        vec2 c = rockCracks(vRockPos * 2.3 + uSeed);
-        float wall = 1.0 - smoothstep(uWidth * 0.4, uWidth, c.x);
-        float fine = 1.0 - smoothstep(0.0, uWidth * 0.5,
-          rockCracks(vRockPos * 5.1 + uSeed.zxy).x);
-        float crack = max(wall, fine * 0.7 * step(0.6, uReveal))
-          * step(c.y, uReveal);
+      if (ROCK_GLOW > 0.001) {
+        vec2 c = rockCracks(vRockPos * 2.3 + ROCK_SEED);
+        float wall = 1.0 - smoothstep(ROCK_WIDTH * 0.4, ROCK_WIDTH, c.x);
+        float fine = 1.0 - smoothstep(0.0, ROCK_WIDTH * 0.5,
+          rockCracks(vRockPos * 5.1 + ROCK_SEED.zxy).x);
+        float crack = max(wall, fine * 0.7 * step(0.6, ROCK_REVEAL))
+          * step(c.y, ROCK_REVEAL);
         diffuseColor.rgb *= 1.0 - 0.7 * crack;
-        totalEmissiveRadiance += uVein * crack * uGlow;
+        totalEmissiveRadiance += ROCK_VEIN * crack * ROCK_GLOW;
       }
       if (uRim > 0.001) {
         float edge = 1.0 - max(dot(normal, normalize(vViewPosition)), 0.0);
         totalEmissiveRadiance += uRimColor * uRim * pow(edge, 2.2);
       }
-      totalEmissiveRadiance += vec3(uFlash);`
+      totalEmissiveRadiance += vec3(ROCK_FLASH);`
     );
 }
 
@@ -439,6 +510,13 @@ export class EnemyMirror {
     // Quality preset: every material that samples baked maps, to toggle.
     this.surfaceMaps = true;
     this.rockMaterials = [];
+    this.rockFamilies = this.createRockFamilies();
+    this.rocks = new RockInstances(
+      THREE,
+      scene,
+      this.rockGeometries,
+      this.rockFamilies
+    );
     // clone() drops the rim patch (and userData functions): add it again
     this.wardenPlateMaterial = addRimLight(this.plateMaterial.clone());
     Object.assign(this.wardenPlateMaterial, plateMaps, {
@@ -765,6 +843,13 @@ export class EnemyMirror {
       pool && pool.length ? pool.pop() : this.seeded(() => this.create(kind));
     view.object.visible = true;
     markShadowCasters(view.object);
+    if (kind !== 'asteroid') {
+      view.casters ??= [];
+      view.casters.length = 0;
+      view.object.traverse((object) => {
+        if (object.castShadow) view.casters.push(object);
+      });
+    }
     return view;
   }
 
@@ -772,6 +857,8 @@ export class EnemyMirror {
     switch (kind) {
       case 'asteroid':
         return this.createRock();
+      case 'asteroid-burn':
+        return this.createBurnRock();
       case 'drone':
         return this.createMote();
       case 'hunter':
@@ -832,7 +919,11 @@ export class EnemyMirror {
       if (view.affix) view.affix.group.visible = false;
     });
     views.forEach((view) =>
-      this.dissolve.start(view, this.accentOf(view), view.radius || 12)
+      this.dissolve.start(
+        this.burnOf(view),
+        this.accentOf(view),
+        view.radius || 12
+      )
     );
     compile();
     this.dissolve.clear();
@@ -899,7 +990,55 @@ export class EnemyMirror {
     };
   }
 
+  // The instanced rocks' two shared materials: stone (each variant's colour
+  // and surface come per instance) and Crystal, with its cold rim.
+  createRockFamilies() {
+    const { THREE } = this;
+    const stone = new THREE.MeshStandardMaterial({ vertexColors: true });
+    stone.userData.rockUniforms = this.rockUniforms(
+      colorOf(THREE, PALETTE.shot)
+    );
+    stone.userData.rockMaps = this.stoneMaps;
+    const crystal = this.crystalMaterial({
+      ...stone.userData.rockUniforms,
+      uRim: { value: VARIANT_LOOKS.crystal.rim },
+    });
+    [stone, crystal].forEach((material) => {
+      material.defines.ROCK_INSTANCED = '';
+      material.onBeforeCompile = patchRockShader;
+      this.trackSurfaceMaps(material);
+    });
+    return { stone, crystal };
+  }
+
+  // A live rock is an instance (rockInstances.js); `object` only holds its
+  // pose and shape (the scorch decals raycast it) and is never drawn.
   createRock() {
+    const { THREE } = this;
+    const object = new THREE.Mesh(
+      this.rockGeometries[0],
+      this.rockFamilies.stone
+    );
+    object.rotation.order = 'YXZ';
+    return {
+      kind: 'asteroid',
+      object,
+      id: null,
+      shape: 0,
+      family: 'stone',
+      look: null,
+      rock: {
+        base: new THREE.Color(),
+        vein: new THREE.Color(),
+        seed: new THREE.Vector3(),
+        glow: [0, 0, 0, 0],
+        surface: [1, 0],
+      },
+    };
+  }
+
+  // A killed rock leaves its instance and burns as one of these (burnOf).
+  createBurnRock() {
     const { THREE } = this;
     const material = new THREE.MeshStandardMaterial({ vertexColors: true });
     material.userData.rockUniforms = this.rockUniforms(
@@ -912,7 +1051,7 @@ export class EnemyMirror {
     mesh.rotation.order = 'YXZ';
     this.scene.add(mesh);
     return {
-      kind: 'asteroid',
+      kind: 'asteroid-burn',
       object: mesh,
       material,
       stone: material,
@@ -922,18 +1061,92 @@ export class EnemyMirror {
   }
 
   // Crystal: same rock geometry, flat-shaded glossy facets, clear coat.
-  createCrystal(view) {
+  crystalMaterial(rockUniforms) {
     const material = new this.THREE.MeshPhysicalMaterial({
       vertexColors: true,
       flatShading: true,
       clearcoat: 1,
       clearcoatRoughness: 0.08,
     });
-    material.userData.rockUniforms = view.stone.userData.rockUniforms;
+    material.userData.rockUniforms = rockUniforms;
     material.userData.rockMaps = this.crystalMaps;
+    return material;
+  }
+
+  createCrystal(view) {
+    const material = this.crystalMaterial(view.stone.userData.rockUniforms);
     material.onBeforeCompile = patchRockShader;
     this.trackSurfaceMaps(material);
     return material;
+  }
+
+  /**
+   * `view` as it should burn: a rock gives its instance back (to the pool)
+   * and a plain rock mesh takes over its pose and look; any other view
+   * burns itself.
+   */
+  burnOf(view) {
+    if (view.kind !== 'asteroid') return view;
+    const burn = this.acquire('asteroid-burn');
+    const { look, rock, object } = view;
+    if (look.crystal && !burn.crystal) {
+      burn.crystal = this.seeded(() => this.createCrystal(burn));
+    }
+    const material = look.crystal ? burn.crystal : burn.stone;
+    burn.material = material;
+    burn.object.material = material;
+    burn.object.geometry = object.geometry;
+    burn.object.position.copy(object.position);
+    burn.object.rotation.copy(object.rotation);
+    burn.object.scale.copy(object.scale);
+    burn.seed = view.seed;
+    burn.radius = view.radius;
+    // a twin from an earlier burn copied the look it had then
+    [material, burn.dissolve?.twins.get(material)].forEach((target) => {
+      if (!target) return;
+      target.color.copy(rock.base);
+      target.roughness = rock.surface[0];
+      target.metalness = rock.surface[1];
+    });
+    const uniforms = material.userData.rockUniforms;
+    uniforms.uVein.value.copy(rock.vein);
+    uniforms.uSeed.value.copy(rock.seed);
+    uniforms.uRim.value = look.rim || 0;
+    [
+      uniforms.uGlow.value,
+      uniforms.uReveal.value,
+      uniforms.uWidth.value,
+      uniforms.uFlash.value,
+    ] = rock.glow;
+    object.visible = false;
+    this.pool(view);
+    return burn;
+  }
+
+  /**
+   * Shadow-pass budget around the camera target (world x, z): see
+   * SHADOW_RADIUS. Call after `update`.
+   */
+  budgetShadows(x, z) {
+    const near = (this.shadowNear ??= []);
+    near.length = 0;
+    const consider = (view) => {
+      if (!view?.casters?.length) return;
+      const { position } = view.object;
+      view.shadowDistance = Math.hypot(position.x - x, position.z - z);
+      view.casters.forEach((mesh) => (mesh.castShadow = false));
+      if (view.shadowDistance <= SHADOW_RADIUS) near.push(view);
+    };
+    this.views.forEach(consider);
+    this.dissolve.slots.forEach((slot) => consider(slot.view));
+    near.sort((a, b) => a.shadowDistance - b.shadowDistance);
+    let left = SHADOW_CASTERS;
+    for (let i = 0; i < near.length && left > 0; i += 1) {
+      const { casters } = near[i];
+      if (casters.length > left) continue;
+      casters.forEach((mesh) => (mesh.castShadow = true));
+      left -= casters.length;
+    }
   }
 
   /** Quality preset: baked surface maps on or off (one recompile each). */
@@ -1565,6 +1778,7 @@ export class EnemyMirror {
   update(enemies, time, dt = 0) {
     this.frame += 1;
     this.dissolve.update(dt);
+    this.rocks.begin();
     let warden = null;
     for (let i = 0; i < enemies.length; i += 1) {
       const enemy = enemies[i];
@@ -1604,6 +1818,7 @@ export class EnemyMirror {
       }
     });
     if (this.dead.size) this.dead.forEach(this.pruneDead);
+    this.rocks.end();
     return warden;
   }
 
@@ -1620,7 +1835,7 @@ export class EnemyMirror {
     if (view.telegraph) view.telegraph.group.visible = false;
     if (view.affix) view.affix.group.visible = false;
     const accent = this.accentOf(view);
-    this.dissolve.start(view, accent, view.radius);
+    this.dissolve.start(this.burnOf(view), accent, view.radius);
     if (view.kind === 'asteroid') return;
     const x = view.object.position.x + HALF_W;
     const y = view.object.position.z + HALF_H;
@@ -1644,6 +1859,7 @@ export class EnemyMirror {
       return this.bossColor;
     }
     if (view.accents?.length) return view.accents[0].userData.base;
+    if (view.rock) return view.rock.vein;
     if (view.material) return view.material.userData.rockUniforms.uVein.value;
     return this.threatColor;
   }
@@ -1890,7 +2106,8 @@ export class EnemyMirror {
     }
     if (view.kind !== 'asteroid') return;
     const seed = view.seed;
-    view.object.geometry = this.rockGeometries[seed % ROCK_SHAPES];
+    view.shape = seed % ROCK_SHAPES;
+    view.object.geometry = this.rockGeometries[view.shape];
     const random = createSeededRandom((seed % 100000) + 1);
     view.spinRate = (0.25 + random() * 0.5) * (random() < 0.5 ? -1 : 1);
     view.spinPhase = random() * Math.PI * 2;
@@ -1899,18 +2116,14 @@ export class EnemyMirror {
     view.look = look;
     view.pulse = view.spinPhase;
     view.lastTime = null;
-    if (look.crystal && !view.crystal)
-      view.crystal = this.seeded(() => this.createCrystal(view));
-    const material = look.crystal ? view.crystal : view.stone;
-    view.material = material;
-    view.object.material = material;
-    material.color.copy(colorOf(this.THREE, look.base));
-    material.roughness = look.roughness;
-    material.metalness = look.metalness;
-    const uniforms = material.userData.rockUniforms;
-    uniforms.uVein.value.copy(colorOf(this.THREE, look.vein || PALETTE.shot));
-    uniforms.uRim.value = look.rim || 0;
-    uniforms.uSeed.value.set(random() * 50, random() * 50, random() * 50);
+    view.family = look.crystal ? 'crystal' : 'stone';
+    view.object.material = this.rockFamilies[view.family];
+    const { rock } = view;
+    rock.base.set(look.base).convertSRGBToLinear();
+    rock.vein.set(look.vein || PALETTE.shot).convertSRGBToLinear();
+    rock.surface[0] = look.roughness;
+    rock.surface[1] = look.metalness;
+    rock.seed.set(random() * 50, random() * 50, random() * 50);
   }
 
   // Vein pulse rate (Hz) from the live variant state.
@@ -1954,11 +2167,13 @@ export class EnemyMirror {
       reveal = Math.max(reveal, look.reveal);
     }
     view.lastTime = time;
-    const uniforms = view.material.userData.rockUniforms;
-    uniforms.uGlow.value = glow;
-    uniforms.uReveal.value = reveal;
-    uniforms.uWidth.value = Math.max(0.035 + stage * 0.012, look.width || 0);
-    uniforms.uFlash.value = flash * 0.45;
+    const g = view.rock.glow;
+    g[0] = glow;
+    g[1] = reveal;
+    g[2] = Math.max(0.035 + stage * 0.012, look.width || 0);
+    g[3] = flash * 0.45;
+    object.updateMatrixWorld();
+    this.rocks.push(view);
   }
 
   updateWarden(view, boss, time) {
@@ -2227,5 +2442,6 @@ export class EnemyMirror {
     this.views.forEach((view, key) => this.release(key, view));
     this.dissolve.clear();
     this.dead.clear();
+    this.rocks.clear();
   }
 }

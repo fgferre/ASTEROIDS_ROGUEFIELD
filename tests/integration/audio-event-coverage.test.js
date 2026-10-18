@@ -422,6 +422,27 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
     expectDelegates('transmission-shown', {}, 'playTransmission');
   });
 
+  it('transmission-shown → playTransmissionVoice with the speaker', () => {
+    expectDelegates(
+      'transmission-shown',
+      { speaker: 'THE CHOIR', key: 'warning' },
+      'playTransmissionVoice',
+      ([speaker]) => expect(speaker).toBe('THE CHOIR')
+    );
+  });
+
+  it('enemy-telegraph far from the player → playEnemyTelegraph with a distance mix', () => {
+    expectDelegates(
+      'enemy-telegraph',
+      { position: { x: 400, y: 1200 } },
+      'playEnemyTelegraph',
+      ([options]) => {
+        expect(options.distance.gain).toBeLessThan(1);
+        expect(options.distance.cutoff).toBeLessThan(18000);
+      }
+    );
+  });
+
   it('boss-telegraph (ram) → playEnemyTelegraph', () => {
     expectDelegates(
       'boss-telegraph',

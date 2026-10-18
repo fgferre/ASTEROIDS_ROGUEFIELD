@@ -1,12 +1,14 @@
 import {
   MUSIC_DEFAULT_THEME,
   MUSIC_LAYER_CONFIG,
+  MUSIC_PERCUSSION,
   MUSIC_RUN_INTENSITY,
   MUSIC_THEME_CROSSFADE,
   MUSIC_THEMES,
   RUN_FINAL_LAYER,
 } from '../../core/GameConstants.js';
 import { midiToHz, themeDegreeHz } from './MusicThemes.js';
+import RandomService from '../../core/RandomService.js';
 
 /**
  * MusicMixer — adaptive 4-layer synth music (AUDIO-01 / INFRA-02).
@@ -26,6 +28,8 @@ import { midiToHz, themeDegreeHz } from './MusicThemes.js';
  *     MUSIC_THEMES entry; a theme change equal-power crossfades the voice
  *     gains of the outgoing and incoming banks, then stops the old one)
  *   → layerGains[base|tension|danger|climax]      (writer: MusicMixer)
+ *   + percussion hits → bank percussion voice gain (crossfaded with the theme)
+ *     → percussionGain (writer: MusicMixer, follows the run intensity)
  *     → music lowpass (pre-built at init; bypass ~20kHz; writer: MusicMixer
  *        pause ramps its FREQUENCY only — built HERE, never at pause time)
  *     → musicPauseFadeGain                          (writer: MusicMixer pause/fade)
@@ -120,6 +124,30 @@ export function resolveMusicLevel(intensity, bossLevel = null) {
 }
 
 /**
+ * Percussion layer level 0..1 for an intensity 0..1: silent below
+ * MUSIC_PERCUSSION.enterIntensity, linear up to 1 at fullIntensity.
+ */
+export function percussionMix(intensity) {
+  const { enterIntensity, fullIntensity } = MUSIC_PERCUSSION;
+  return clamp01(
+    (intensity - enterIntensity) / (fullIntensity - enterIntensity)
+  );
+}
+
+/**
+ * Intensity the percussion follows: the smoothed run intensity, raised to the
+ * threshold of the boss-arc level when one is set.
+ */
+export function percussionIntensity(runIntensity, bossLevel = null) {
+  const thresholds = MUSIC_RUN_INTENSITY.levelThresholds;
+  const floor =
+    Number.isFinite(bossLevel) && bossLevel > 0
+      ? thresholds[Math.min(bossLevel, thresholds.length) - 1]
+      : 0;
+  return Math.max(runIntensity, floor);
+}
+
+/**
  * One-pole step of `current` toward `target` over `dtSeconds`: attack time
  * constant when rising, release when falling.
  */
@@ -157,6 +185,9 @@ class MusicMixer {
     this.layers = {};
     this.lowpass = null;
     this.musicPauseFadeGain = null;
+    this.percussionGain = null;
+    this._percussionNoise = null;
+    this._percussionTarget = 0;
 
     const initialLevel =
       typeof MUSIC_LAYER_CONFIG?.initialIntensity === 'number'
@@ -174,6 +205,8 @@ class MusicMixer {
     this._lookaheadHandle = null; // setInterval handle for the lookahead
     this._nextBarTime = 0; // next pulse onset (context.currentTime domain)
     this._pulseStep = 0; // index into the theme's pulse pattern
+    this._nextPercussionTime = 0; // next percussion step onset
+    this._percussionStep = 0; // index into the theme's percussion loop
     this._isPaused = false;
 
     // --- run-following intensity (raw inputs → smoothed 0..1) + boss override ---
@@ -225,6 +258,11 @@ class MusicMixer {
 
     // --- 4 intensity layers → lowpass, voiced by the current theme ---
     this.layers = this._buildLayers(context, now, lowpass);
+    // --- percussion layer → lowpass (silent until the intensity gate opens) ---
+    this.percussionGain = context.createGain();
+    this.percussionGain.gain.setValueAtTime(0, now);
+    this.percussionGain.connect(lowpass);
+    this._percussionNoise = this._buildPercussionNoise(context);
     this._themeBank = this._buildThemeBank(this.themeId, now, 1);
 
     this.initialized = true;
@@ -333,7 +371,32 @@ class MusicMixer {
       voices[key] = { oscillators, gain, filter, level };
     });
 
+    // Percussion voice: no oscillators — the transport schedules hits into it.
+    if (theme.percussion && this.percussionGain) {
+      const gain = context.createGain();
+      gain.gain.setValueAtTime(weight, now);
+      gain.connect(this.percussionGain);
+      voices.percussion = { oscillators: [], gain, filter: null, level: 1 };
+    }
+
     return { themeId, voices, endTime: Infinity };
+  }
+
+  /** Seeded mono noise buffer shared by the percussion noise hits. @private */
+  _buildPercussionNoise(context) {
+    if (typeof context.createBuffer !== 'function') return null;
+    const rate = context.sampleRate;
+    const length = Math.max(
+      1,
+      Math.floor(rate * MUSIC_PERCUSSION.noiseSeconds)
+    );
+    const buffer = context.createBuffer(1, length, rate);
+    const data = buffer.getChannelData(0);
+    const rng = new RandomService(MUSIC_PERCUSSION.noiseSeed);
+    for (let i = 0; i < length; i += 1) {
+      data[i] = rng.range(-1, 1);
+    }
+    return buffer;
   }
 
   /**
@@ -349,6 +412,7 @@ class MusicMixer {
     if (!MUSIC_THEMES[themeId] || themeId === this.themeId) return;
     this.themeId = themeId;
     this._pulseStep = 0;
+    this._percussionStep = 0;
     if (!this.initialized || !this.context) return;
 
     const now = this.context.currentTime;
@@ -370,7 +434,11 @@ class MusicMixer {
       }
     });
 
-    this._fadingBanks = this._fadingBanks.filter((bank) => bank.endTime > now);
+    this._fadingBanks = this._fadingBanks.filter((bank) => {
+      if (bank.endTime > now) return true;
+      this._safeDisconnect(bank.voices.percussion?.gain);
+      return false;
+    });
     if (!outgoing) return;
     if (immediate) {
       this._stopBank(outgoing, now);
@@ -512,7 +580,28 @@ class MusicMixer {
       this._applyIntensity(level, {
         rampSeconds: MUSIC_RUN_INTENSITY.layerFadeSeconds,
       });
+    } else {
+      this._applyPercussion(MUSIC_RUN_INTENSITY.tickMs / 1000);
     }
+  }
+
+  /**
+   * Ramp the percussion layer to its level for the current run intensity and
+   * boss floor over `rampSeconds` (0 = set). Writes ONLY percussionGain.
+   * @private
+   */
+  _applyPercussion(rampSeconds) {
+    const target =
+      percussionMix(percussionIntensity(this.runIntensity, this.bossLevel)) *
+      MUSIC_PERCUSSION.gain;
+    this._percussionTarget = target;
+    if (!this.initialized || !this.context || !this.percussionGain) return;
+    this._rampParam(
+      this.percussionGain.gain,
+      target,
+      this.context.currentTime,
+      rampSeconds
+    );
   }
 
   /**
@@ -571,6 +660,7 @@ class MusicMixer {
       }
     });
 
+    this._applyPercussion(immediate ? 0 : rampDuration);
     this.intensityLevel = targetLevel;
 
     // D-02: the rhythmic pulse grid runs ONLY at danger/climax. Start/stop the
@@ -607,6 +697,8 @@ class MusicMixer {
     // The first onset lands at the next bar boundary >= now so the first tick
     // schedules it within the schedule-ahead window.
     this._nextBarTime = this.context.currentTime;
+    this._nextPercussionTime = this._nextBarTime;
+    this._percussionStep = 0;
     this._lookaheadHandle = setInterval(
       () => this._lookaheadTick(),
       LOOKAHEAD_INTERVAL_MS
@@ -639,6 +731,99 @@ class MusicMixer {
       this._nextBarTime += MUSIC_THEMES[this.themeId].barSeconds;
       guard += 1;
     }
+    guard = 0;
+    while (this._nextPercussionTime <= horizon && guard < 64) {
+      this._schedulePercussionStep(this._nextPercussionTime);
+      const theme = MUSIC_THEMES[this.themeId];
+      this._nextPercussionTime +=
+        theme.barSeconds / (theme.percussion?.subdivision || 1);
+      guard += 1;
+    }
+  }
+
+  /**
+   * Schedule the percussion hits of the current loop step at `onsetTime` into
+   * every live bank's percussion voice (the playing theme plus banks still
+   * fading out), so a theme change crossfades the drums like the drones. Skips
+   * the step while the layer is closed and silent.
+   * @private
+   */
+  _schedulePercussionStep(onsetTime) {
+    const step = this._percussionStep;
+    this._percussionStep += 1;
+    const layerGain = this.percussionGain?.gain;
+    if (!layerGain) return;
+    if (this._percussionTarget <= 0 && !(layerGain.value > 0.001)) return;
+
+    [this._themeBank, ...this._fadingBanks].forEach((bank) => {
+      const voice = bank?.voices?.percussion;
+      if (!voice || onsetTime >= bank.endTime) return;
+      const { percussion } = MUSIC_THEMES[bank.themeId];
+      const loopStep = step % percussion.steps;
+      percussion.hits.forEach((hit) => {
+        if (hit.steps.includes(loopStep)) {
+          this._schedulePercussionHit(hit, onsetTime, voice.gain);
+        }
+      });
+    });
+  }
+
+  /**
+   * One percussion hit at `onsetTime` into `destination`: a pitch-dropping
+   * tone (plus an optional sub tail) or a burst of filtered seeded noise.
+   * Every node is released on ended.
+   * @private
+   */
+  _schedulePercussionHit(hit, onsetTime, destination) {
+    const context = this.context;
+    const playTone = (type, startHz, endHz, seconds, peak) => {
+      const osc = context.createOscillator();
+      const gain = context.createGain();
+      const end = onsetTime + seconds;
+      osc.type = type;
+      osc.frequency.setValueAtTime(startHz, onsetTime);
+      osc.frequency.exponentialRampToValueAtTime(endHz, end);
+      gain.gain.setValueAtTime(peak, onsetTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, end);
+      osc.connect(gain);
+      gain.connect(destination);
+      osc.onended = () => {
+        this._safeDisconnect(osc);
+        this._safeDisconnect(gain);
+      };
+      osc.start(onsetTime);
+      osc.stop(end);
+    };
+
+    if (hit.kind === 'tone') {
+      playTone(hit.type, hit.startHz, hit.endHz, hit.seconds, hit.gain);
+      if (hit.subHz) {
+        playTone('sine', hit.subHz, hit.subHz, hit.subSeconds, hit.subGain);
+      }
+      return;
+    }
+
+    if (!this._percussionNoise) return;
+    const source = context.createBufferSource();
+    const filter = context.createBiquadFilter();
+    const gain = context.createGain();
+    const end = onsetTime + hit.seconds;
+    source.buffer = this._percussionNoise;
+    filter.type = hit.filter.type;
+    filter.frequency.setValueAtTime(hit.filter.frequency, onsetTime);
+    filter.Q.setValueAtTime(hit.filter.Q, onsetTime);
+    gain.gain.setValueAtTime(hit.gain, onsetTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, end);
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(destination);
+    source.onended = () => {
+      this._safeDisconnect(source);
+      this._safeDisconnect(filter);
+      this._safeDisconnect(gain);
+    };
+    source.start(onsetTime);
+    source.stop(end);
   }
 
   /**
@@ -731,6 +916,7 @@ class MusicMixer {
         this._freezeParam(param, now);
         this._freezeParam(layer?.modulator?.depthGain?.gain, now);
       });
+      this._freezeParam(this.percussionGain?.gain, now);
       // Stop the grid — no new onsets while paused (SC1: no wall-clock drift).
       this._stopLookahead();
       // Underwater: ramp the SAME pre-built lowpass down + drop pauseFade ~50%.
@@ -870,6 +1056,11 @@ class MusicMixer {
       this._safeDisconnect(layer?.modulator?.depthGain);
     });
 
+    if (this.percussionGain) {
+      this._cancel(this.percussionGain.gain, now);
+      this._safeDisconnect(this.percussionGain);
+    }
+
     if (this.lowpass) {
       this._cancel(this.lowpass.frequency, now);
       this._safeDisconnect(this.lowpass);
@@ -882,6 +1073,8 @@ class MusicMixer {
     this.layers = {};
     this.lowpass = null;
     this.musicPauseFadeGain = null;
+    this.percussionGain = null;
+    this._percussionNoise = null;
     this.targetNode = null;
     this.context = null;
     this.initialized = false;

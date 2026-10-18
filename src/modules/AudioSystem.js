@@ -1,5 +1,6 @@
 import { BaseSystem } from '../core/BaseSystem.js';
 import SFXBus, {
+  resolveDistanceMix,
   resolveExplosionSize,
   resolveStereoPan,
 } from './audio/SFXBus.js';
@@ -21,6 +22,7 @@ import {
   AUDIO_MASTER_LIMITER,
   AUDIO_REVERB_SEND_DB,
   BOSS_AUDIO_FREQUENCY_PRESETS,
+  GAME_HEIGHT,
   GAME_WIDTH,
   MUSIC_LAYER_CONFIG,
 } from '../core/GameConstants.js';
@@ -91,10 +93,11 @@ class AudioSystem extends BaseSystem {
     // Low health warning state
     this.lowHealthWarning = false;
 
-    // Run-following music inputs: the player's x (pan reference for enemy-side
-    // cues) and the wave's enemies alive or still to spawn (density proxy:
+    // Run-following music inputs: the player's position (pan + distance
+    // reference for enemy-side cues) and the wave's enemies alive or still to spawn (density proxy:
     // wave-started totalEnemies + enemy-spawned + fragments − enemy-destroyed).
     this.listenerX = GAME_WIDTH / 2;
+    this.listenerY = GAME_HEIGHT / 2;
     this.runEnemyCount = 0;
 
     // UI sound debouncing
@@ -440,7 +443,7 @@ class AudioSystem extends BaseSystem {
       }
       const size = resolveExplosionSize(data);
       if (size) {
-        this.playExplosion(size, { pan: this._resolveSourcePan(data) });
+        this.playExplosion(size, this._resolveSourceSpatial(data));
         if (size === 'large') {
           this._duckBigMoment();
         }
@@ -453,7 +456,7 @@ class AudioSystem extends BaseSystem {
     });
 
     this.registerEventListener('asteroid-volatile-exploded', (data = {}) => {
-      this.playExplosion('large', { pan: this._resolveSourcePan(data) });
+      this.playExplosion('large', this._resolveSourceSpatial(data));
       this._duckBigMoment();
     });
 
@@ -482,7 +485,7 @@ class AudioSystem extends BaseSystem {
 
     // Cues later enemy slices emit (harmless until they do).
     this.registerEventListener('enemy-telegraph', (data = {}) => {
-      this.playEnemyTelegraph({ pan: this._resolveSourcePan(data) });
+      this.playEnemyTelegraph(this._resolveSourceSpatial(data));
     });
 
     this.registerEventListener('elite-spawned', () => {
@@ -534,7 +537,7 @@ class AudioSystem extends BaseSystem {
     // enemy cue (the boss keeps its EffectsSystem/roar handling).
     this.registerEventListener('boss-telegraph', (data = {}) => {
       if (data?.enemy?.type && data.enemy.type !== 'boss') {
-        this.playEnemyTelegraph({ pan: this._resolveSourcePan(data) });
+        this.playEnemyTelegraph(this._resolveSourceSpatial(data));
       }
     });
 
@@ -542,8 +545,9 @@ class AudioSystem extends BaseSystem {
       this.playPickupCollected(data?.kind);
     });
 
-    this.registerEventListener('transmission-shown', () => {
+    this.registerEventListener('transmission-shown', (data = {}) => {
       this.playTransmission();
+      this.playTransmissionVoice(data?.speaker);
     });
 
     this.registerEventListener('pickup-spawned', (data = {}) => {
@@ -562,12 +566,12 @@ class AudioSystem extends BaseSystem {
       ).toLowerCase();
 
       if (enemyType === 'drone') {
-        this.playDroneFire({ ...data, pan: this._resolveSourcePan(data) });
+        this.playDroneFire({ ...data, ...this._resolveSourceSpatial(data) });
         return;
       }
 
       if (enemyType === 'hunter') {
-        this.playHunterBurst({ ...data, pan: this._resolveSourcePan(data) });
+        this.playHunterBurst({ ...data, ...this._resolveSourceSpatial(data) });
         return;
       }
     });
@@ -587,7 +591,7 @@ class AudioSystem extends BaseSystem {
     });
 
     this.registerEventListener('mine-exploded', (data = {}) => {
-      this.playMineExplosion({ ...data, pan: this._resolveSourcePan(data) });
+      this.playMineExplosion({ ...data, ...this._resolveSourceSpatial(data) });
     });
 
     // Boss arc → MusicMixer (D-04): overrides the run intensity upwards. The
@@ -755,11 +759,27 @@ class AudioSystem extends BaseSystem {
     if (Number.isFinite(position?.x)) {
       this.listenerX = position.x;
     }
+    if (Number.isFinite(position?.y)) {
+      this.listenerY = position.y;
+    }
   }
 
-  _resolveSourcePan(data = {}) {
+  /**
+   * Pan + distance mix of an enemy-side cue from its source position; no
+   * distance mix when the position is unknown.
+   */
+  _resolveSourceSpatial(data = {}) {
     const position = data?.position || data?.enemy || null;
-    return resolveStereoPan(position?.x, this.listenerX);
+    const known = Number.isFinite(position?.x) && Number.isFinite(position?.y);
+    return {
+      pan: resolveStereoPan(position?.x, this.listenerX),
+      distance: known
+        ? resolveDistanceMix(
+            position.x - this.listenerX,
+            position.y - this.listenerY
+          )
+        : null,
+    };
   }
 
   /** Short music duck on big moments (level-up, large explosions). */
@@ -1567,6 +1587,10 @@ class AudioSystem extends BaseSystem {
 
   playTransmission() {
     this.sfxBus.playTransmission();
+  }
+
+  playTransmissionVoice(speaker) {
+    this.sfxBus.playTransmissionVoice(speaker);
   }
 
   playXPCollect() {
@@ -2521,6 +2545,7 @@ class AudioSystem extends BaseSystem {
     }
     this.runEnemyCount = 0;
     this.listenerX = GAME_WIDTH / 2;
+    this.listenerY = GAME_HEIGHT / 2;
 
     // Re-arm the low-HP edges so the first dip below 25% in the new run ducks.
     this.lowHealthWarning = false;

@@ -37,6 +37,7 @@ import {
 import { ENEMY_TYPES, BOSS_CONFIG } from '../../../data/constants/visual.js';
 import { IS_DEV } from '../../../core/env.js';
 import { FIELD_EVENTS, directorFor } from '../../../data/layers.js';
+import { scaleDirector } from '../../../data/difficulty.js';
 import { HERALD_SPAWN_AT } from '../../../data/enemies/herald.js';
 import { PALETTE, withAlpha } from '../../../data/constants/palette.js';
 
@@ -780,7 +781,14 @@ export class WaveManager {
 
     const waveNumber = this.currentWave;
     const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
-    const director = directorFor(waveNumber);
+    // Same scaling as EnemySystem.layerDirector (difficulty spawnCount).
+    const director = scaleDirector(
+      directorFor(waveNumber),
+      resolveService(
+        'difficulty',
+        this.enemySystem.dependencies
+      )?.getModifiers().spawnCount ?? 1
+    );
     let config;
 
     if (director.warden) {

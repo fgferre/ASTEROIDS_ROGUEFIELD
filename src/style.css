@@ -682,6 +682,11 @@ select {
   grid-column: 1 / -1;
 }
 
+/* Main menu: Start and Daily Field share the first row */
+.menu-screen__nav.menu-grid > :first-child {
+  grid-column: auto;
+}
+
 .menu-screen__button {
   pointer-events: all;
   padding: var(--space-4) var(--space-5);
@@ -2233,6 +2238,23 @@ kbd {
   color: var(--text-dim);
   border-style: dashed;
   cursor: not-allowed;
+}
+
+.run-recap__seed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+.run-recap__seed .run-recap__location {
+  margin-top: 0;
+}
+
+.run-recap__copy {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
 }
 
 .run-recap__salvage {

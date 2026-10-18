@@ -76,8 +76,9 @@ describe('run replay', () => {
 
   // Plays the scripted run with real key events; `beforePick(progression,
   // levelUpIndex)` runs on the level-up screen before the first card is taken.
-  function recordRun(beforePick = () => {}) {
+  function recordRun(beforePick = () => {}, difficulty = 'veteran') {
     const live = createHeadlessGame();
+    live.services.settings.setSetting('gameplay', 'difficulty', difficulty);
     live.session.startNewRun({ source: 'test' });
     const { progression } = live.services;
     progression.experienceToNext = TEST_XP_TO_LEVEL;
@@ -200,5 +201,24 @@ describe('run replay', () => {
     expect(replay.snapshot()).toEqual(recorded);
     expect(replay.services.progression.getAllUpgrades()).toEqual(upgrades);
     expect(replay.services.progression.banishedUpgrades).toEqual(banished);
+  });
+
+  it('replays a Warden run at Warden, whatever the replaying setting', () => {
+    const { live, recording } = recordRun(() => {}, 'warden');
+    const recorded = live.snapshot();
+    expect(recording.difficulty).toBe('warden');
+
+    // The setting is shared storage: the replay must ignore it.
+    const replay = createHeadlessGame();
+    replay.services.settings.setSetting('gameplay', 'difficulty', 'pilot');
+    replay.controller.arm(recording);
+    replay.session.startNewRun({ source: 'test' });
+    replay.services.progression.experienceToNext = TEST_XP_TO_LEVEL;
+    for (let step = 0; step < STEPS; step += 1) {
+      replay.controller.tick();
+      replay.step();
+    }
+    expect(replay.services.difficulty.getDifficulty()).toBe('warden');
+    expect(replay.snapshot()).toEqual(recorded);
   });
 });
