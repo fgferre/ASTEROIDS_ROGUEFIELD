@@ -97,8 +97,12 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
   - [x] **R13.8.2 Piloto SFXBus** (18/10, ramo `claude/inspiring-panini-c21aa9`): nove famílias de sons em `src/modules/audio/sfx/`
         (fábricas que recebem o kit do barramento, nunca o barramento; `SFXBus.js` 4595 → 1105 linhas, só infraestrutura e
         delegados de uma linha); dados de áudio em `src/data/audio/` (`GameConstants.js` 783 → 126, reexporta).
-  - [ ] **R13.8.3 UISystem** por tela ou responsabilidade, com o padrão do piloto. **R13.8.4** CombatSystem e
-        enemyMirror. **R13.8.5** autoridade das ondas; depois escopos de random.
+  - [x] **R13.8.3 UISystem** (18/10, ramo `r13/ui-por-tela`): 4516 → 1229 linhas; nove classes em `src/modules/ui/`, uma por
+        tela, cada uma com dependências nomeadas e sem ponteiro de volta; cinco recortes, cada um visto no jogo antes do
+        commit. Medição: um ajudante opus por recorte (85 a 120 mil tokens cada); sessão principal em 42% da janela (420 mil
+        tokens) ao fim, somando o marco 2; portão passou de primeira em todos; uma chamada órfã escapou dos testes e só
+        apareceu no navegador (a sonda é obrigatória).
+  - [ ] **R13.8.4** CombatSystem e enemyMirror. **R13.8.5** autoridade das ondas; depois escopos de random.
 
 ## Fora de escopo deste plano
 
