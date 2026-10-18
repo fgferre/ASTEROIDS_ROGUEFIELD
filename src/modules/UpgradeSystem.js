@@ -320,6 +320,10 @@ class UpgradeSystem extends BaseSystem {
       return false;
     }
 
+    if (this.isExcludedByBuild(definition)) {
+      return false;
+    }
+
     const prerequisites = this.collectRawPrerequisites(definition);
     const baseRequirementsMet = prerequisites.every((requirement) =>
       this.evaluatePrerequisite(requirement)
@@ -337,6 +341,20 @@ class UpgradeSystem extends BaseSystem {
     return levelRequirements.every((requirement) =>
       this.evaluatePrerequisite(requirement)
     );
+  }
+
+  // A card that rules out an owned card, or that an owned card rules out.
+  isExcludedByBuild(definition) {
+    for (const [id, level] of this.appliedUpgrades) {
+      if (
+        level > 0 &&
+        (definition.excludes.includes(id) ||
+          this.upgradeLookup.get(id)?.excludes.includes(definition.id))
+      ) {
+        return true;
+      }
+    }
+    return false;
   }
 
   collectRawPrerequisites(definition, options = {}) {
@@ -733,6 +751,8 @@ class UpgradeSystem extends BaseSystem {
       unlockLevel: entry.unlockLevel ?? null,
       tags: asArray(entry.tags).map((tag) => `${tag}`),
       prerequisites: asArray(entry.prerequisites),
+      // Ids never in one build with this card (either side may list them).
+      excludes: asArray(entry.excludes),
       name: entry.name || '',
       description: entry.description || '',
       text,

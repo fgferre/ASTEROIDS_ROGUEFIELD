@@ -5,6 +5,7 @@ import ThrusterLoopManager from '../ThrusterLoopManager.js';
 import { createSfxSynthPort } from './SfxSynthPort.js';
 import RandomService from '../../core/RandomService.js';
 import { requireRandom } from '../../utils/randomHelpers.js';
+import { deepFreeze } from '../../utils/deepFreeze.js';
 import {
   AUDIO_DISTANCE_MIX,
   AUDIO_REVERB,
@@ -340,6 +341,198 @@ const SHADE_PHASE_SFX = Object.freeze({
   flutterDepth: 0.5,
   minInterval: 0.12,
 });
+// A layered cue (see _layeredCue): swept noise bands, sine drops/rises,
+// struck pings and click trains, each `at` s into the cue.
+// Dust's grit: `count` clicks over `seconds`, scattered by the golden ratio
+// (deterministic, no RNG), swelling in and out.
+const GOLDEN_RATIO_FRACTION = 0.6180339887;
+function grainScatter(count, seconds) {
+  const times = [];
+  const gains = [];
+  for (let k = 0; k < count; k += 1) {
+    const jitter = ((k + 1) * GOLDEN_RATIO_FRACTION) % 1;
+    times.push((seconds * (k + jitter)) / count);
+    gains.push((0.4 + 0.6 * jitter) * Math.sin((Math.PI * (k + 0.5)) / count));
+  }
+  return { times, gains };
+}
+
+// Heralds: their own world cues on the ambient bus, panned and distance-mixed
+// by the Herald's position, one voice per cue within minInterval. Heat and
+// Silence also mark their attacks (Heat's ignite spread, Silence's homing
+// shard); Dust's wall raises no event.
+// proposta 18/10: Heat arrives as a low furnace roar — two dark noise bands
+// swelling up over a slow attack, under a sparse crackle of embers. Dust
+// arrives as a dry granular hiss — grit clicks over a thin band sweeping
+// slowly up. Silence arrives as a sub drop and a short vacuum: noise with a
+// wide band-stop (notch) sweeping down, swelling in and cut short.
+const HERALD_SPAWN_SFX = deepFreeze({
+  heat: {
+    noise: [
+      { seconds: 1.2, attack: 0.5, peak: 0.6, fromHz: 70, toHz: 160, q: 0.9 },
+      { seconds: 1.1, attack: 0.55, peak: 0.4, fromHz: 160, toHz: 480, q: 0.8 },
+    ],
+    clicks: [
+      {
+        seconds: 1.2,
+        times: [0.2, 0.33, 0.47, 0.6, 0.76, 0.9, 1.04],
+        gains: [0.5, 0.8, 0.6, 1, 0.7, 0.5, 0.35],
+        clickSeconds: 0.003,
+        bandHz: 2200,
+        q: 2,
+        peak: 0.3,
+      },
+    ],
+    minInterval: 0.5,
+  },
+  dust: {
+    noise: [
+      { seconds: 1.4, attack: 0.5, peak: 0.14, fromHz: 1300, toHz: 4000, q: 2 },
+    ],
+    clicks: [
+      {
+        seconds: 1.4,
+        ...grainScatter(36, 1.4),
+        clickSeconds: 0.002,
+        bandHz: 3400,
+        q: 1.2,
+        peak: 0.35,
+      },
+    ],
+    minInterval: 0.5,
+  },
+  silence: {
+    tones: [{ fromHz: 95, toHz: 28, peak: 0.22, seconds: 0.9 }],
+    noise: [
+      {
+        type: 'notch',
+        seconds: 0.45,
+        attack: 0.3,
+        peak: 0.12,
+        fromHz: 5000,
+        toHz: 350,
+        q: 0.5,
+      },
+    ],
+    minInterval: 0.5,
+  },
+});
+// proposta 18/10: Heat igniting the rocks is a short furnace flare (a noise
+// band whooshing up under a crackle); Silence's shard leaves with a smaller
+// vacuum over a soft low drop.
+const HERALD_ATTACK_SFX = deepFreeze({
+  heat: {
+    noise: [
+      {
+        seconds: 0.4,
+        attack: 0.06,
+        peak: 0.24,
+        fromHz: 240,
+        toHz: 1200,
+        q: 0.8,
+      },
+    ],
+    clicks: [
+      {
+        seconds: 0.35,
+        times: [0.04, 0.09, 0.13, 0.2, 0.27],
+        gains: [1, 0.7, 0.85, 0.5, 0.3],
+        clickSeconds: 0.003,
+        bandHz: 3000,
+        q: 2,
+        peak: 0.3,
+      },
+    ],
+    minInterval: 0.3,
+  },
+  silence: {
+    tones: [{ fromHz: 70, toHz: 40, peak: 0.06, seconds: 0.15 }],
+    noise: [
+      {
+        type: 'notch',
+        seconds: 0.22,
+        attack: 0.14,
+        peak: 0.06,
+        fromHz: 4000,
+        toHz: 700,
+        q: 0.6,
+      },
+    ],
+    minInterval: 0.3,
+  },
+});
+// proposta 18/10: a Scatter Coil bolt bursting is a compact amber pop — a
+// quick sine drop and a mid noise puff under a short crackle; quiet, at most
+// one every minInterval s (bolts burst in volleys).
+const FLAK_BURST_SFX = deepFreeze({
+  tones: [{ fromHz: 520, toHz: 170, peak: 0.07, seconds: 0.06 }],
+  noise: [
+    { seconds: 0.07, attack: 0.003, peak: 0.06, fromHz: 1800, toHz: 700, q: 1 },
+  ],
+  clicks: [
+    {
+      seconds: 0.1,
+      times: [0, 0.018, 0.034, 0.055, 0.075],
+      gains: [1, 0.6, 0.8, 0.45, 0.3],
+      clickSeconds: 0.002,
+      bandHz: 2800,
+      q: 1.8,
+      peak: 0.2,
+    },
+  ],
+  minInterval: 0.06,
+});
+// proposta 18/10: a Leech eating is a wet, very quiet gulp — a sine dropping
+// then a little bloop back up, over a narrow wet band.
+const LEECH_ATE_SFX = deepFreeze({
+  tones: [
+    { fromHz: 300, toHz: 130, peak: 0.04, seconds: 0.07 },
+    { at: 0.06, fromHz: 140, toHz: 220, peak: 0.025, seconds: 0.05 },
+  ],
+  noise: [
+    { seconds: 0.08, attack: 0.01, peak: 0.03, fromHz: 700, toHz: 350, q: 4 },
+  ],
+  minInterval: 0.08,
+});
+// proposta 18/10: a Leech bursting is a bubbling release — rising sine
+// bubbles over a wet noise gush — then a bright sprinkle of pings as the
+// orbs scatter.
+const LEECH_BURST_SFX = deepFreeze({
+  tones: [
+    [0, 320],
+    [0.035, 410],
+    [0.07, 280],
+    [0.11, 480],
+    [0.15, 360],
+    [0.2, 520],
+  ].map(([at, fromHz]) => ({
+    at,
+    fromHz,
+    toHz: fromHz * 1.9,
+    peak: 0.06,
+    seconds: 0.05,
+  })),
+  noise: [
+    { seconds: 0.25, attack: 0.01, peak: 0.08, fromHz: 900, toHz: 300, q: 1.5 },
+  ],
+  strikes: [
+    [0.08, 2900],
+    [0.13, 3600],
+    [0.19, 3200],
+    [0.26, 4300],
+  ].map(([at, hz]) => ({
+    at,
+    type: 'sine',
+    hz,
+    partials: [
+      [1, 1],
+      [2.76, 0.3],
+    ],
+    peak: 0.035,
+    seconds: 0.12,
+  })),
+  minInterval: 0.15,
+});
 // A struck partial reaches its peak this fast (s); a click is cut after this
 // many of its decay times (e^-5 < 1%).
 const STRIKE_ATTACK = 0.002;
@@ -394,6 +587,9 @@ class SFXBus {
     this.cache = null;
     this.batcher = null;
     this.thrusterLoops = new ThrusterLoopManager();
+    // Manual thruster loops waiting out their start burst: type → {timer,
+    // intensity}. A pending type counts as active, so one press starts once.
+    this._pendingThrusterStarts = new Map();
 
     // --- owned output buses (created in init) ---
     this.ambientBus = null; // → effectsDuckGain (ducks with the world)
@@ -419,6 +615,11 @@ class SFXBus {
       casterLaunch: -Infinity,
       casterImpact: -Infinity,
       shadePhase: -Infinity,
+      heraldSpawn: -Infinity,
+      heraldAttack: -Infinity,
+      flakBurst: -Infinity,
+      leechAte: -Infinity,
+      leechBurst: -Infinity,
     };
 
     // --- injected facade seams (assigned in init) ---
@@ -1445,6 +1646,78 @@ class SFXBus {
         fromHz: out ? phase.highHz : phase.lowHz,
         toHz: out ? phase.lowHz : phase.highHz,
       });
+    });
+  }
+
+  /**
+   * A Herald arrives (HERALD_SPAWN_SFX): Heat roars low like a furnace, Dust
+   * hisses dry grains through a slow sweep, Silence drops a sub under a short
+   * vacuum.
+   * @param {{kind?: string, pan?: number, distance?: {gain: number, cutoff: number}}} [options]
+   */
+  playHeraldSpawn({ kind = 'dust', pan = 0, distance = null } = {}) {
+    this._trackPerformance('playHeraldSpawn');
+    this._playLayeredCue(
+      'heraldSpawn',
+      HERALD_SPAWN_SFX[kind] ?? HERALD_SPAWN_SFX.dust,
+      pan,
+      distance
+    );
+  }
+
+  /**
+   * A Herald attacks (HERALD_ATTACK_SFX): Heat's ignite flares, Silence's
+   * shard leaves with a vacuum. Dust has none.
+   * @param {{kind?: string, pan?: number, distance?: {gain: number, cutoff: number}}} [options]
+   */
+  playHeraldAttack({ kind = 'dust', pan = 0, distance = null } = {}) {
+    this._trackPerformance('playHeraldAttack');
+    const cue = HERALD_ATTACK_SFX[kind];
+    if (cue) this._playLayeredCue('heraldAttack', cue, pan, distance);
+  }
+
+  /** A Scatter Coil bolt bursts (FLAK_BURST_SFX): a compact amber pop. */
+  playFlakBurst({ pan = 0, distance = null } = {}) {
+    this._trackPerformance('playFlakBurst');
+    this._playLayeredCue('flakBurst', FLAK_BURST_SFX, pan, distance);
+  }
+
+  /** A Leech eats an orb (LEECH_ATE_SFX): a wet, very quiet gulp. */
+  playLeechAte({ pan = 0, distance = null } = {}) {
+    this._trackPerformance('playLeechAte');
+    this._playLayeredCue('leechAte', LEECH_ATE_SFX, pan, distance);
+  }
+
+  /** A Leech bursts (LEECH_BURST_SFX): bubbles, then a bright sprinkle. */
+  playLeechBurst({ pan = 0, distance = null } = {}) {
+    this._trackPerformance('playLeechBurst');
+    this._playLayeredCue('leechBurst', LEECH_BURST_SFX, pan, distance);
+  }
+
+  /**
+   * Claim the machine cue `key` and play `cue`'s layers, each `at` s in:
+   * swept noise bands, sine drops/rises, struck pings and click trains, into
+   * the ambient bus (panned, distance-mixed).
+   * @private
+   */
+  _playLayeredCue(key, cue, pan, distance) {
+    this._safePlay(() => {
+      const now = this.context.currentTime;
+      if (!this._claimMachineCue(key, cue.minInterval, now)) return;
+      const destination = this._ambientInput(pan, distance);
+      if (!destination) return;
+
+      const { noise = [], tones = [], strikes = [], clicks = [] } = cue;
+      noise.forEach(({ at = 0, ...layer }) =>
+        this._maneuverNoise(destination, now + at, layer)
+      );
+      tones.forEach(({ at = 0, ...layer }) =>
+        this._maneuverTone(destination, now + at, layer)
+      );
+      strikes.forEach(({ at = 0, ...layer }) =>
+        this._strike(destination, now + at, layer)
+      );
+      clicks.forEach((layer) => this._clickTrain(destination, now, layer));
     });
   }
 
@@ -2875,17 +3148,22 @@ class SFXBus {
   }
 
   /**
-   * Noise through a band sweeping fromHz → toHz over `seconds`, rising to
-   * `peak` in `attack` s, into `destination` (dash / brake, the Ram's
-   * whoosh, the Husk's hiss, the Bulwark plate's knock and crack).
+   * Noise through a band (or, with `type: 'notch'`, around one) sweeping
+   * fromHz → toHz over `seconds`, rising to `peak` in `attack` s, into
+   * `destination` (dash / brake, the Ram's whoosh, the Husk's hiss, the
+   * Bulwark plate's knock and crack, Silence's vacuum).
    * @private
    */
-  _maneuverNoise(destination, now, { seconds, attack, peak, fromHz, toHz, q }) {
+  _maneuverNoise(
+    destination,
+    now,
+    { type = 'bandpass', seconds, attack, peak, fromHz, toHz, q }
+  ) {
     const end = now + seconds;
     const noise = this.context.createBufferSource();
     noise.buffer = this._noiseBuffer(seconds);
     const band = this.context.createBiquadFilter();
-    band.type = 'bandpass';
+    band.type = type;
     band.frequency.setValueAtTime(fromHz, now);
     band.frequency.exponentialRampToValueAtTime(toHz, end);
     band.Q.setValueAtTime(q, now);
@@ -3886,6 +4164,7 @@ class SFXBus {
    */
   startThrusterLoop(type, intensity, isAutomatic = false) {
     this._trackPerformance(`_startThrusterSound:${type}`);
+    if (this.isThrusterActive(type)) return null;
 
     if (isAutomatic) {
       const randomScope = this._getThrusterRandomScope(type);
@@ -3909,11 +4188,15 @@ class SFXBus {
       return null;
     }
 
-    // Manual thrusters: play burst then loop after a short delay.
+    // Manual thrusters: play burst then loop after a short delay. The type is
+    // pending meanwhile, so the frames in between update it instead of
+    // queueing more starts.
     this._playThrusterStartBurst(type);
 
-    return setTimeout(
+    const pending = { timer: null, intensity };
+    pending.timer = setTimeout(
       () => {
+        this._pendingThrusterStarts.delete(type);
         if (!this.context) return;
 
         const randomScope = this._getThrusterRandomScope(type);
@@ -3924,7 +4207,7 @@ class SFXBus {
         this.thrusterLoops.startLoop(
           type,
           variation,
-          intensity,
+          pending.intensity,
           this.context,
           this.pool,
           this.cache,
@@ -3934,16 +4217,33 @@ class SFXBus {
       },
       type === 'side' ? 80 : type === 'retro' ? 140 : 160
     ); // Delay ajustado para burst mais longo
+    this._pendingThrusterStarts.set(type, pending);
+    return pending.timer;
   }
 
   updateThrusterLoop(type, intensity) {
+    const pending = this._pendingThrusterStarts.get(type);
+    if (pending) {
+      pending.intensity = intensity;
+      return;
+    }
     this.thrusterLoops.updateLoop(type, intensity);
+  }
+
+  /** Cancel the delayed loop starts still waiting out their burst. @private */
+  _cancelPendingThrusterStarts(type = null) {
+    for (const [key, pending] of this._pendingThrusterStarts) {
+      if (type !== null && key !== type) continue;
+      clearTimeout(pending.timer);
+      this._pendingThrusterStarts.delete(key);
+    }
   }
 
   stopThrusterLoop(type, skipRelease = false) {
     this._trackPerformance(`_stopThrusterSound:${type}`);
 
-    // Stop loop first
+    // Stop loop first (or the start still waiting out its burst)
+    this._cancelPendingThrusterStarts(type);
     this.thrusterLoops.stopLoop(type, this.pool);
 
     // Play stop release sound only for manual thrusters
@@ -3953,7 +4253,9 @@ class SFXBus {
   }
 
   isThrusterActive(type) {
-    return this.thrusterLoops.isActive(type);
+    return (
+      this._pendingThrusterStarts.has(type) || this.thrusterLoops.isActive(type)
+    );
   }
 
   _playThrusterStartBurst(type) {
@@ -4229,6 +4531,7 @@ class SFXBus {
       this.batcher.flushPendingBatches();
       this.batcher.resetStats();
     }
+    this._cancelPendingThrusterStarts();
     if (this.thrusterLoops) {
       this.thrusterLoops.cleanup(this.pool);
     }
@@ -4248,6 +4551,7 @@ class SFXBus {
    * buses. Idempotent (safe to call repeatedly).
    */
   dispose() {
+    this._cancelPendingThrusterStarts();
     if (this.thrusterLoops) {
       this.thrusterLoops.cleanup(this.pool);
     }

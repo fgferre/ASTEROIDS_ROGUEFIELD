@@ -195,6 +195,146 @@ describe('Harmonic Plasma Lance', () => {
   });
 });
 
+describe('Scatter Coil', () => {
+  beforeAll(() => {
+    if (!GamePools.initialized) GamePools.initialize();
+  });
+  beforeEach(() => setupGlobalMocks());
+  afterEach(() => {
+    GamePools.releaseAll();
+    cleanupGlobalState();
+  });
+
+  const FLAK = WEAPONS.scatter.flak;
+  const scatter = (enemyList) => {
+    const made = makeCombat(enemyList);
+    made.eventBus.emit('upgrade-weapon-scatter', { weaponId: 'scatter' });
+    return made;
+  };
+
+  it('the card swaps the cannon for the Scatter Coil; an unknown weapon id changes nothing', () => {
+    const eventBus = createEventBusMock();
+    const progression = new ProgressionSystem({
+      random: new RandomService(7),
+      eventBus,
+      player: {},
+      ui: {},
+      effects: {},
+      'xp-orbs': { attachProgression: () => {} },
+    });
+    progression.level = 10;
+    const combat = new CombatSystem({
+      eventBus,
+      player: { getStats: () => ({}) },
+      enemies: makeEnemies([]),
+      physics: { forEachBulletCollision: () => {} },
+    });
+
+    progression.applyUpgrade('scatter_coil');
+    expect(combat.getWeaponState()).toMatchObject({
+      weaponId: 'scatter',
+      name: 'Scatter Coil',
+      shotsToBeam: null,
+    });
+    eventBus.emit('upgrade-weapon-harmonic', { weaponId: 'nope' });
+    expect(combat.weaponId).toBe('scatter');
+  });
+
+  it('fires a 26° fan of 5 slower bolts, one more per extra Multishot up to 9, and waits 1.6× the cooldown', () => {
+    const { combat, eventBus } = scatter([]);
+    const fired = vi.fn();
+    eventBus.on('weapon-fired', fired);
+
+    combat.handleShooting(1, { multishot: 1, damage: DAMAGE });
+    expect(combat.bullets).toHaveLength(FLAK.bolts);
+    const angles = combat.bullets.map((bolt) => Math.atan2(bolt.vy, bolt.vx));
+    const half = (FLAK.fan * Math.PI) / 360;
+    expect(angles[0]).toBeCloseTo(-half, 6);
+    expect(angles[FLAK.bolts - 1]).toBeCloseTo(half, 6);
+    combat.bullets.forEach((bolt) => {
+      expect(bolt.kind).toBe('flak');
+      expect(Math.hypot(bolt.vx, bolt.vy)).toBeCloseTo(
+        combat.bulletSpeed * FLAK.speedMultiplier,
+        6
+      );
+      expect(bolt.damage).toBeCloseTo(DAMAGE * FLAK.damageMultiplier, 6);
+    });
+    expect(combat.lastShotTime).toBeCloseTo(
+      -combat.shootCooldown * (FLAK.cooldownMultiplier - 1),
+      6
+    );
+    expect(fired).toHaveBeenCalledWith(
+      expect.objectContaining({ weaponType: 'scatter' })
+    );
+
+    combat.bullets = [];
+    combat.handleShooting(1, { multishot: 3, damage: DAMAGE });
+    expect(combat.bullets).toHaveLength(FLAK.bolts + 2);
+    combat.bullets = [];
+    combat.handleShooting(1, { multishot: 20, damage: DAMAGE });
+    expect(combat.bullets).toHaveLength(FLAK.maxBolts);
+  });
+
+  it('a bolt that hits nothing bursts at the end of its range; shrapnel hits each enemy in reach once per volley', () => {
+    // Muzzle at (116, 300), aimed along +x: the centre bolt ends at x 296.
+    const end = 116 + FLAK.range;
+    const centre = makeEnemy('centre', end, 300); // in reach of all 5 bursts
+    const reach = FLAK.burstRadius + 10;
+    const outside = makeEnemy('outside', end + reach + 5, 300);
+    const { combat, eventBus } = scatter([centre, outside]);
+    const bursts = vi.fn();
+    eventBus.on('flak-burst', bursts);
+
+    combat.handleShooting(1, { multishot: 1, damage: DAMAGE });
+    for (let step = 0; step < 4; step += 1) combat.updateBullets(0.1);
+
+    expect(combat.bullets).toHaveLength(0);
+    expect(bursts).toHaveBeenCalledTimes(FLAK.bolts);
+    expect(combat.flakBursts).toHaveLength(FLAK.bolts);
+    expect(combat.flakBursts.filter((burst) => burst.lit)).toHaveLength(1);
+    const burst = combat.flakBursts[2];
+    expect(burst.x).toBeCloseTo(end, 3);
+    expect(burst.y).toBeCloseTo(300, 3);
+    expect(centre.health).toBeCloseTo(
+      100 - DAMAGE * FLAK.burstDamageMultiplier,
+      6
+    );
+    expect(outside.health).toBe(100);
+
+    combat.updateWeaponEffects(FLAK.burstDuration + 0.01);
+    expect(combat.flakBursts).toHaveLength(0);
+  });
+
+  it('a bolt bursts on its first hit: the struck enemy takes the bolt, its neighbours the shrapnel, a phased Shade nothing, and the evolution procs on both', () => {
+    const target = makeEnemy('target', 200, 300);
+    const near = makeEnemy('near', 190, 300 + FLAK.burstRadius);
+    const phased = makeEnemy('phased', 190, 290, {
+      type: 'shade',
+      intangible: true,
+    });
+    const { combat, eventBus } = scatter([target, near, phased]);
+    eventBus.emit('synergy-unlocked', { family: 'thermal' });
+
+    combat.handleShooting(1, { multishot: 1, damage: DAMAGE });
+    const bolt = combat.bullets[2];
+    bolt.x = 190;
+    bolt.y = 300;
+    combat.processBulletHit(bolt, target, combat.cachedEnemies);
+
+    expect(bolt.hit).toBe(true);
+    expect(combat.flakBursts).toHaveLength(1);
+    expect(target.health).toBeCloseTo(100 - DAMAGE * FLAK.damageMultiplier, 6);
+    expect(near.health).toBeCloseTo(
+      100 - DAMAGE * FLAK.burstDamageMultiplier,
+      6
+    );
+    expect(phased.health).toBe(100);
+    expect(combat.burns.has(target)).toBe(true);
+    expect(combat.burns.has(near)).toBe(true);
+    expect(combat.burns.has(phased)).toBe(false);
+  });
+});
+
 describe('weapon evolutions', () => {
   beforeAll(() => {
     if (!GamePools.initialized) GamePools.initialize();

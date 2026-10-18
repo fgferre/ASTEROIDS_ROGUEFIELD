@@ -5,8 +5,11 @@ import {
   TRANSMISSION_CHARS_PER_SECOND,
   TRANSMISSION_HOLD_MS,
   TransmissionQueue,
+  bossRushTransmission,
   deathTransmission,
+  hangarTransmission,
   heraldTransmission,
+  sightingTransmission,
   victoryTransmission,
   wardenTransmission,
 } from '../../../src/modules/ui/transmissions.js';
@@ -115,6 +118,38 @@ describe('heraldTransmission', () => {
       text: STORY.herald.heat.defeated,
     });
     expect(heraldTransmission('nobody', 'spawned')).toBeNull();
+  });
+});
+
+describe('sightingTransmission', () => {
+  it('lets the Ring name a machine with a line, and nothing else', () => {
+    expect(sightingTransmission('caster')).toEqual({
+      key: 'sighting:caster',
+      speaker: 'THE RING',
+      text: STORY.sighting.caster,
+    });
+    expect(sightingTransmission('drone')).toBeNull();
+  });
+});
+
+describe('bossRushTransmission', () => {
+  it('opens a Boss Rush in Warden Prime’s voice', () => {
+    expect(bossRushTransmission()).toEqual({
+      key: 'boss-rush',
+      speaker: 'WARDEN PRIME',
+      text: STORY.bossRush,
+    });
+  });
+});
+
+describe('hangarTransmission', () => {
+  it('logs the Bastion hull purchase in the Ring’s voice', () => {
+    expect(hangarTransmission('bastion-hull')).toEqual({
+      key: 'hangar:bastion-hull',
+      speaker: 'THE RING',
+      text: STORY.hangar['bastion-hull'],
+    });
+    expect(hangarTransmission('reinforced-plating')).toBeNull();
   });
 });
 

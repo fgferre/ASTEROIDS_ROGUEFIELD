@@ -24,7 +24,6 @@ import {
   BOSS_AUDIO_FREQUENCY_PRESETS,
   GAME_HEIGHT,
   GAME_WIDTH,
-  MUSIC_LAYER_CONFIG,
 } from '../core/GameConstants.js';
 import { requireRandom } from '../utils/randomHelpers.js';
 
@@ -103,40 +102,6 @@ class AudioSystem extends BaseSystem {
     // UI sound debouncing
     this.lastUIHoverTime = 0;
 
-    const initialIntensityLevel =
-      typeof MUSIC_LAYER_CONFIG?.initialIntensity === 'number'
-        ? MUSIC_LAYER_CONFIG.initialIntensity
-        : 0;
-
-    this.musicController = {
-      initialized: false,
-      layers: {},
-      intensityLevel: initialIntensityLevel,
-      targetLevel: initialIntensityLevel,
-      bossActive: false,
-      relaxTimeout: null,
-      lastNonBossIntensity: initialIntensityLevel,
-      pendingNonBossIntensity: null,
-      relaxedIntensity:
-        typeof MUSIC_LAYER_CONFIG?.relaxedIntensity === 'number'
-          ? MUSIC_LAYER_CONFIG.relaxedIntensity
-          : initialIntensityLevel,
-      bossIntensity:
-        typeof MUSIC_LAYER_CONFIG?.bossIntensity === 'number'
-          ? MUSIC_LAYER_CONFIG.bossIntensity
-          : initialIntensityLevel,
-      rampDurations: {
-        rise: MUSIC_LAYER_CONFIG?.rampDurations?.rise ?? 1.2,
-        fall: MUSIC_LAYER_CONFIG?.rampDurations?.fall ?? 2.0,
-        bossRise: MUSIC_LAYER_CONFIG?.rampDurations?.bossRise ?? 0.6,
-        bossFall: MUSIC_LAYER_CONFIG?.rampDurations?.bossFall ?? 2.8,
-      },
-    };
-
-    this.bossAudioState = {
-      lastPhase: null,
-    };
-
     // MusicMixer (INFRA-02 / AUDIO-01) — composed inside the stable `audio`
     // service (RESEARCH A3). Construction does NO AudioContext work; init() is
     // called from AudioSystem.init() once the context + buses exist. The facade
@@ -170,7 +135,6 @@ class AudioSystem extends BaseSystem {
     // SFXBus; the facade keeps the event-driven state machine + inactivity timer
     // and delegates the actual loop/burst synthesis into SFXBus.
     this.thrusterState = {
-      lastIntensity: { main: 0, retro: 0, side: 0 },
       lastEventTime: { main: 0, retro: 0, side: 0 }, // Timestamp of last event per type
       startThreshold: 0.1, // Intensity threshold to start thruster sound
       stopThreshold: 0.05, // Hysteresis: lower threshold to stop (prevents flapping)
@@ -592,6 +556,26 @@ class AudioSystem extends BaseSystem {
       this.playShadePhase({ ...this._resolveSourceSpatial(data), out: false });
     });
 
+    // Each Herald kind arrives with its own cue (its attacks: enemy-fired).
+    this.registerEventListener('herald-spawned', (data = {}) => {
+      this.playHeraldSpawn({
+        ...this._resolveSourceSpatial({ position: data }),
+        kind: data.kind,
+      });
+    });
+
+    this.registerEventListener('flak-burst', (data = {}) => {
+      this.playFlakBurst(this._resolveSourceSpatial(data));
+    });
+
+    this.registerEventListener('leech-ate', (data = {}) => {
+      this.playLeechAte(this._resolveSourceSpatial(data));
+    });
+
+    this.registerEventListener('leech-burst', (data = {}) => {
+      this.playLeechBurst(this._resolveSourceSpatial(data));
+    });
+
     this.registerEventListener('pickup-collected', (data = {}) => {
       this.playPickupCollected(data?.kind);
     });
@@ -625,6 +609,14 @@ class AudioSystem extends BaseSystem {
       if (enemyType === 'hunter') {
         this.playHunterBurst({ ...data, ...this._resolveSourceSpatial(data) });
         return;
+      }
+
+      // Heat's ignite spread flares; Silence's shard leaves with a vacuum.
+      if (enemyType === 'herald') {
+        this.playHeraldAttack({
+          ...this._resolveSourceSpatial(data),
+          kind: data.enemy?.heraldKind,
+        });
       }
     });
 
@@ -722,10 +714,6 @@ class AudioSystem extends BaseSystem {
 
     this.registerEventListener('shield-activation-failed', () => {
       this.playShieldFail();
-    });
-
-    this.registerEventListener('shield-shockwave', () => {
-      this.playShieldShockwave();
     });
 
     // UI Sound Effects
@@ -1109,216 +1097,16 @@ class AudioSystem extends BaseSystem {
     }
   }
 
-  setMusicIntensity(level, options = {}) {
-    const intensities = MUSIC_LAYER_CONFIG?.intensities || [];
-
-    if (!intensities.length) {
-      this.musicController.intensityLevel = level;
-      this.musicController.targetLevel = level;
-      return;
-    }
-
-    const maxLevel = intensities.length - 1;
-    const targetLevel = Math.min(Math.max(0, Math.floor(level)), maxLevel);
-    const { immediate = false, rampDuration, reason } = options;
-
-    this.musicController.targetLevel = targetLevel;
-
-    if (!this.musicController.initialized || !this.context) {
-      this.musicController.intensityLevel = targetLevel;
-      return;
-    }
-
-    let duration = typeof rampDuration === 'number' ? rampDuration : null;
-    if (duration === null) {
-      const isIncrease = targetLevel > this.musicController.intensityLevel;
-      if (reason === 'boss') {
-        duration = this.musicController.rampDurations.bossRise;
-      } else if (reason === 'bossVictory') {
-        duration = this.musicController.rampDurations.bossFall;
-      } else {
-        duration = isIncrease
-          ? this.musicController.rampDurations.rise
-          : this.musicController.rampDurations.fall;
-      }
-    }
-
-    this._applyMusicIntensity(targetLevel, {
-      immediate,
-      duration,
-    });
-
-    this.musicController.intensityLevel = targetLevel;
-  }
-
-  _applyMusicIntensity(level, options = {}) {
-    if (!this.musicController.initialized || !this.context) {
-      return;
-    }
-
-    const profile = (MUSIC_LAYER_CONFIG?.intensities || [])[level];
-    if (!profile) {
-      return;
-    }
-
-    const { immediate = false, duration = 1.2 } = options;
-    const rampDuration = Math.max(0.05, duration || 0.05);
-    const now = this.context.currentTime;
-
-    Object.entries(this.musicController.layers).forEach(([key, layer]) => {
-      const gainNode = layer?.gain;
-      if (!gainNode || !gainNode.gain) {
-        return;
-      }
-
-      const targetGain = profile[key] ?? 0;
-
-      try {
-        gainNode.gain.cancelScheduledValues(now);
-      } catch (error) {
-        // Some browsers throw if there are no scheduled values
-      }
-
-      if (immediate) {
-        gainNode.gain.setValueAtTime(targetGain, now);
-      } else {
-        const currentValue =
-          typeof gainNode.gain.value === 'number'
-            ? gainNode.gain.value
-            : targetGain;
-
-        gainNode.gain.setValueAtTime(currentValue, now);
-        gainNode.gain.linearRampToValueAtTime(targetGain, now + rampDuration);
-      }
-
-      const modulator = layer?.modulator;
-      const depthParam = modulator?.depthGain?.gain;
-      if (!depthParam) {
-        return;
-      }
-
-      const depthValue = Math.max(0, targetGain * modulator.depthMultiplier);
-
-      try {
-        depthParam.cancelScheduledValues(now);
-      } catch (error) {
-        // Ignore browsers that throw when clearing empty schedules
-      }
-
-      if (immediate) {
-        depthParam.setValueAtTime(depthValue, now);
-        return;
-      }
-
-      const currentDepth =
-        typeof depthParam.value === 'number' ? depthParam.value : depthValue;
-
-      depthParam.setValueAtTime(currentDepth, now);
-      depthParam.linearRampToValueAtTime(depthValue, now + rampDuration);
-    });
-  }
-
-  _scheduleMusicRelaxation(delay = 0) {
-    if (this.musicController.relaxTimeout) {
-      clearTimeout(this.musicController.relaxTimeout);
-      this.musicController.relaxTimeout = null;
-    }
-
-    if (!Number.isFinite(delay) || delay <= 0) {
-      return;
-    }
-
-    this.musicController.relaxTimeout = setTimeout(() => {
-      this.musicController.relaxTimeout = null;
-
-      const hasPendingLevel =
-        this.musicController.pendingNonBossIntensity !== null &&
-        this.musicController.pendingNonBossIntensity !== undefined;
-
-      if (!hasPendingLevel) {
-        return;
-      }
-
-      const fallbackLevel = this.musicController.pendingNonBossIntensity;
-
-      this.musicController.pendingNonBossIntensity = null;
-
-      if (!Number.isFinite(fallbackLevel)) {
-        return;
-      }
-
-      this.setMusicIntensity(fallbackLevel, {
-        reason: 'bossVictory',
-        rampDuration: this.musicController.rampDurations.fall,
-      });
-
-      this.musicController.lastNonBossIntensity = fallbackLevel;
-    }, delay);
-  }
-
-  _onBossFightStarted(payload = {}) {
-    this.musicController.bossActive = true;
-    if (this.musicController.relaxTimeout) {
-      clearTimeout(this.musicController.relaxTimeout);
-      this.musicController.relaxTimeout = null;
-    }
-
-    this.setMusicIntensity(this.musicController.bossIntensity, {
-      reason: 'boss',
-      rampDuration: this.musicController.rampDurations.bossRise,
-    });
-
-    if (payload?.phase != null) {
-      this.bossAudioState.lastPhase = payload.phase;
-    }
-  }
-
-  _onBossPhaseChanged(payload = {}) {
-    if (!this.musicController.bossActive) {
-      this._onBossFightStarted(payload);
-    } else {
-      const quickRamp = Math.max(
-        0.3,
-        this.musicController.rampDurations.bossRise * 0.75
-      );
-      this.setMusicIntensity(this.musicController.bossIntensity, {
-        reason: 'boss',
-        rampDuration: quickRamp,
-      });
-    }
-
-    const nextPhase =
-      payload?.phase ?? payload?.nextPhase ?? payload?.newPhase ?? null;
-    if (nextPhase != null) {
-      this.bossAudioState.lastPhase = nextPhase;
-    }
-  }
-
-  _onBossDefeated() {
-    this.musicController.bossActive = false;
-    this.bossAudioState.lastPhase = null;
-
-    this.setMusicIntensity(this.musicController.relaxedIntensity, {
-      reason: 'bossVictory',
-      rampDuration: this.musicController.rampDurations.bossFall,
-    });
-
-    this._scheduleMusicRelaxation(4000);
-  }
-
   handleBossEvent(eventName, payload = {}) {
     switch (eventName) {
       case 'boss-spawned':
         this.playBossRoar(payload);
-        this._onBossFightStarted(payload);
         break;
       case 'boss-phase-changed':
         this.playBossPhaseChange(payload);
-        this._onBossPhaseChanged(payload);
         break;
       case 'boss-defeated':
         this.playBossDefeated(payload);
-        this._onBossDefeated(payload);
         break;
       default:
         break;
@@ -1500,6 +1288,26 @@ class AudioSystem extends BaseSystem {
 
   playShadePhase(options = {}) {
     this.sfxBus.playShadePhase(options);
+  }
+
+  playHeraldSpawn(options = {}) {
+    this.sfxBus.playHeraldSpawn(options);
+  }
+
+  playHeraldAttack(options = {}) {
+    this.sfxBus.playHeraldAttack(options);
+  }
+
+  playFlakBurst(options = {}) {
+    this.sfxBus.playFlakBurst(options);
+  }
+
+  playLeechAte(options = {}) {
+    this.sfxBus.playLeechAte(options);
+  }
+
+  playLeechBurst(options = {}) {
+    this.sfxBus.playLeechBurst(options);
   }
 
   playEliteSpawned() {
@@ -2402,9 +2210,6 @@ class AudioSystem extends BaseSystem {
       // STOP: intensity dropped below stop threshold (hysteresis)
       this._stopThrusterSound(thrusterKey);
     }
-
-    // Update last intensity
-    this.thrusterState.lastIntensity[thrusterKey] = currentIntensity;
   }
 
   /**
@@ -2497,7 +2302,6 @@ class AudioSystem extends BaseSystem {
       this.thrusterInactivityCheckInterval = null;
     }
     if (this.thrusterState) {
-      this.thrusterState.lastIntensity = { main: 0, retro: 0, side: 0 };
       this.thrusterState.lastEventTime = { main: 0, retro: 0, side: 0 };
     }
 
@@ -2507,21 +2311,6 @@ class AudioSystem extends BaseSystem {
     // Clear pending playback queue
     this.pendingSoundQueue.length = 0;
     this.resumePromise = null;
-
-    if (this.musicController.relaxTimeout) {
-      clearTimeout(this.musicController.relaxTimeout);
-      this.musicController.relaxTimeout = null;
-    }
-
-    this.musicController.bossActive = false;
-    this.bossAudioState.lastPhase = null;
-
-    const initialIntensityLevel =
-      typeof MUSIC_LAYER_CONFIG?.initialIntensity === 'number'
-        ? MUSIC_LAYER_CONFIG.initialIntensity
-        : 0;
-
-    this.setMusicIntensity(initialIntensityLevel, { immediate: true });
 
     // AUDIO-01: the adaptive music now lives in MusicMixer — back to a fresh
     // run (no wave, no density, no boss floor) on a new run/replay.

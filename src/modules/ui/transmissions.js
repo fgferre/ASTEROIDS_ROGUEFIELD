@@ -41,6 +41,29 @@ export function heraldTransmission(kind, moment) {
   };
 }
 
+/** The Ring names a machine seen for the first time; null without a line. */
+export function sightingTransmission(type) {
+  const text = STORY.sighting[type];
+  if (!text) {
+    return null;
+  }
+  return { key: `sighting:${type}`, speaker: STORY.speaker.ring, text };
+}
+
+/** Warden Prime opens a Boss Rush. */
+export function bossRushTransmission() {
+  return { key: 'boss-rush', speaker: STORY.speaker[5], text: STORY.bossRush };
+}
+
+/** The Ring logs a Hangar purchase; null for an item without a line. */
+export function hangarTransmission(itemId) {
+  const text = STORY.hangar[itemId];
+  if (!text) {
+    return null;
+  }
+  return { key: `hangar:${itemId}`, speaker: STORY.speaker.ring, text };
+}
+
 /** A death line picked with the seeded `random`, spoken by the biome's Warden. */
 export function deathTransmission(random, layer) {
   const index = random.int(0, STORY.death.length - 1);

@@ -189,6 +189,42 @@ describe('Renderer3D bloom mips', () => {
   });
 });
 
+describe('Renderer3D bloom intensity', () => {
+  const strengthWith = (values, scene = {}) => {
+    const renderer = Object.create(Renderer3D.prototype);
+    renderer.graphics = {};
+    renderer.quality = { settings: { bloomScale: 0.85 } };
+    renderer.camera = { setMode: vi.fn() };
+    renderer.qualityUrl = 'high';
+    renderer.three = {
+      bloomScale: 1,
+      bloomSet: false,
+      biomes: { targets: {}, applied: 'x' },
+      bloomPass: { enabled: true },
+      smaaPass: {},
+      ...scene,
+    };
+    renderer.applyGraphicsPreferences(values);
+    expect(renderer.three.biomes.applied).toBeNull();
+    return renderer.three.biomes.targets.bloomBase;
+  };
+
+  it('scales the preset strength live: Low 0.6x, Normal 1x, High 1.4x', () => {
+    const normal = strengthWith({ bloomIntensity: 'normal' });
+    expect(normal).toBeCloseTo(0.9 * 0.85);
+    expect(strengthWith({ bloomIntensity: 'low' })).toBeCloseTo(normal * 0.6);
+    expect(strengthWith({ bloomIntensity: 'high' })).toBeCloseTo(normal * 1.4);
+    expect(strengthWith({})).toBeCloseTo(normal);
+  });
+
+  it('lets ?bloom=<n> replace the setting', () => {
+    const three = { bloomSet: true, bloomScale: 2 };
+    expect(strengthWith({ bloomIntensity: 'low' }, three)).toBeCloseTo(
+      0.9 * 2 * 0.85
+    );
+  });
+});
+
 describe('Renderer3D boss flash', () => {
   const effect = (timer) => ({
     timer,

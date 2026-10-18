@@ -553,6 +553,10 @@ export class BaseEnemy {
     this.y = 0;
     this.vx = 0;
     this.vy = 0;
+    // Steering strategies read `velocity` before vx/vy and the proximity one
+    // keeps its clock in `movementState`: a reused enemy starts from neither.
+    this.velocity = null;
+    this.movementState = null;
 
     // Reset health
     this.health = 0;
@@ -728,8 +732,6 @@ export class BaseEnemy {
       ...config,
     });
     if (!child) return null;
-    // A pooled child keeps its last velocity object; rebuild it from vx/vy.
-    child.velocity = null;
     child[Symbol.for('ASTEROIDS_ROGUEFIELD:factoryRegistered')] = false;
     system.waveManager?.registerDynamicMinion?.(child, {
       parentId: this.id,

@@ -752,6 +752,7 @@ export function createServiceManifest(context = {}) {
         'enemies',
         'random',
         'menu-background',
+        'settings',
       ],
       // docs/NORTE.md §4b: Three.js by default, `?renderer=2d` for Canvas 2D.
       factory: ({ resolved }) => {
@@ -771,6 +772,7 @@ export function createServiceManifest(context = {}) {
           enemies: resolved['enemies'],
           random: resolved['random'],
           'menu-background': resolved['menu-background'],
+          settings: resolved['settings'],
         });
       },
     },

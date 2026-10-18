@@ -39,7 +39,7 @@ function listSourceFiles(dir) {
 
 describe('upgrade families', () => {
   it('every upgrade has one known family (cursed ones none) and every family can reach its bonus', () => {
-    expect(UPGRADE_LIBRARY).toHaveLength(34);
+    expect(UPGRADE_LIBRARY).toHaveLength(41);
     const counts = {};
     UPGRADE_LIBRARY.forEach((upgrade) => {
       if (upgrade.cursed) {
@@ -156,6 +156,43 @@ describe('3-of-a-kind synergy', () => {
     progression.level = 10;
     thermal.forEach((id) => progression.applyUpgrade(id));
     expect(order.filter((entry) => entry === 'apex:thermal')).toHaveLength(2);
+  });
+
+  it('Maneuver reaches its Apex on five cards that need no other family', () => {
+    const unlocked = vi.fn();
+    eventBus.on('apex-unlocked', unlocked);
+    [
+      'afterburner',
+      'gyro_servos',
+      'inertial_dampers',
+      'ram_plating',
+      'phase_dash',
+    ].forEach((id) => expect(progression.applyUpgrade(id), id).toBe(true));
+    expect(progression.getSynergySnapshot()).toMatchObject({
+      families: { maneuver: 5 },
+      synergies: [{ family: 'maneuver', name: 'Afterburn' }],
+    });
+    expect(unlocked).toHaveBeenCalledWith({ family: 'maneuver' });
+  });
+
+  it('never offers a card beside one it rules out, whichever card lists it', () => {
+    const offered = () =>
+      progression.getEligibleUpgradeDefinitions().map(({ id }) => id);
+    expect(offered()).toContain('scatter_coil');
+    progression.applyUpgrade('harmonic_resonator');
+    expect(offered()).not.toContain('scatter_coil');
+    expect(progression.applyUpgrade('scatter_coil')).toBe(false);
+
+    // Owned `loner` lists plasma; plasma does not list it back.
+    const loner = progression.normalizeUpgradeDefinition({
+      id: 'loner',
+      levels: [{ effects: [] }],
+      excludes: ['plasma'],
+    });
+    progression.upgradeLookup.set('loner', loner);
+    expect(offered()).toContain('plasma');
+    progression.applyUpgrade('loner');
+    expect(offered()).not.toContain('plasma');
   });
 
   it('Scavenger raises XP from orbs and a new run clears it', () => {

@@ -722,6 +722,85 @@ const shade = {
   },
 };
 
+// --- Leech: a plump pod of three plates under a cold teal wash, its maw
+// leading. A belly window glows green-gold with what it holds (`fullness`),
+// swelling as it fills, and pulses once it is `full`.
+
+const LEECH_RX = 1.05; // × size, along the heading
+const LEECH_RY = 0.78; // × size, across
+const LEECH_SEAMS = [-0.45, 0.4]; // plate seams along the heading, × size
+const LEECH_TEAL = 0.09; // proposta 18/10: alpha of the teal wash
+const LEECH_BELLY_ALPHA = [0.15, 0.95]; // proposta 18/10: empty → full
+const LEECH_BELLY_SWELL = 0.35; // proposta 18/10: belly growth when full
+const LEECH_PULSE_RATE = 6; // proposta 18/10: rad/s of the full pulse
+const LEECH_PULSE_ALPHA = 0.15; // proposta 18/10: belly alpha at the pulse peak
+const LEECH_PULSE_SWELL = 0.08; // proposta 18/10: belly growth at the pulse peak
+
+const leechHull = (ctx, size) => {
+  ctx.beginPath();
+  ctx.ellipse(0, 0, size * LEECH_RX, size * LEECH_RY, 0, 0, TAU);
+};
+
+const leech = {
+  facing: (enemy) => enemy.rotation ?? 0,
+  body(ctx, size) {
+    leechHull(ctx, size);
+    ctx.fillStyle = litFill(ctx, size);
+    ctx.fill();
+    ctx.fillStyle = withAlpha(PALETTE.player, LEECH_TEAL);
+    ctx.fill();
+    darkEdge(ctx);
+    bevel(ctx, size * LEECH_RY - 0.9, 0.5);
+    ctx.strokeStyle = withAlpha(PALETTE.rockShadow, 0.85);
+    ctx.lineWidth = LINE.thin;
+    for (const seam of LEECH_SEAMS) {
+      const x = seam * size;
+      const half = size * LEECH_RY * Math.sqrt(1 - (seam / LEECH_RX) ** 2);
+      ctx.beginPath();
+      ctx.moveTo(x, -half);
+      ctx.quadraticCurveTo(x + size * 0.14, 0, x, half);
+      ctx.stroke();
+    }
+    // the maw
+    ctx.beginPath();
+    ctx.ellipse(size * 0.9, 0, size * 0.14, size * 0.3, 0, 0, TAU);
+    ctx.fillStyle = PALETTE.rockShadow;
+    ctx.fill();
+  },
+  glow(ctx, size, enemy) {
+    leechHull(ctx, size);
+    threatRim(ctx, accentOf(enemy));
+  },
+  live(ctx, size, enemy, emissive) {
+    const fullness = clamp01(enemy.fullness);
+    const pulse = enemy.full
+      ? 0.5 + 0.5 * Math.sin(enemyTime(enemy) * LEECH_PULSE_RATE)
+      : 0;
+    const [dim, lit] = LEECH_BELLY_ALPHA;
+    const alpha = Math.min(
+      1,
+      dim + (lit - dim) * fullness + LEECH_PULSE_ALPHA * pulse
+    );
+    const swell = 1 + LEECH_BELLY_SWELL * fullness + LEECH_PULSE_SWELL * pulse;
+    const rx = size * 0.42 * swell;
+    const ry = size * 0.3 * swell;
+    const cx = -size * 0.04;
+    const belly = ctx.createRadialGradient(cx, 0, 0, cx, 0, rx);
+    belly.addColorStop(0, withAlpha(PALETTE.xp, alpha));
+    belly.addColorStop(1, withAlpha(PALETTE.status, alpha * 0.35));
+    ctx.beginPath();
+    ctx.ellipse(cx, 0, rx, ry, 0, 0, TAU);
+    ctx.fillStyle = belly;
+    ctx.fill();
+    // the lips of the maw: its accent light
+    ctx.beginPath();
+    ctx.ellipse(size * 0.9, 0, size * 0.14, size * 0.3, 0, -1.2, 1.2);
+    ctx.strokeStyle = accentOf(enemy);
+    ctx.lineWidth = emissive ? LINE.base : LINE.hair;
+    ctx.stroke();
+  },
+};
+
 // --- Warden Prime (boss): six matte segments around a violet core ---------
 
 const WARDEN_SEGMENTS = 6;
@@ -1366,6 +1445,7 @@ const LOOKS = {
   bulwark,
   caster,
   shade,
+  leech,
   boss: warden,
   'warden-choir': wardenChoir,
   'warden-null': wardenNull,

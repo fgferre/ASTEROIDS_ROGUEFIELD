@@ -674,10 +674,10 @@ describe('MusicMixer — themes (crossfade between voice banks)', () => {
       expect(value).toBeCloseTo(voice.level, 9);
       expect(time).toBeCloseTo(end, 9);
     }
-    for (const voice of Object.values(outgoing.voices)) {
+    for (const [key, voice] of Object.entries(outgoing.voices)) {
       const [value, time] = lastRamp(voice.gain.gain);
       expect(value).toBe(0);
-      expect(time).toBeCloseTo(end, 9);
+      if (key !== 'percussion') expect(time).toBeCloseTo(end, 9);
       voice.oscillators.forEach((osc) => {
         expect(osc.stop).toHaveBeenCalledWith(end);
       });
@@ -830,22 +830,50 @@ describe('MusicMixer — percussion layer (enters with the run intensity)', () =
     expect(harness.pulses()).toHaveLength(3); // the pulse only
   });
 
-  it('a theme change crossfades the percussion voice with the drones', () => {
+  it('a theme change stops the old drums at once and releases the old bank after the fade', () => {
     const harness = makeSchedulingContext();
     const mixer = makeMixer();
     mixer.init(harness.context, makeSliderNode());
-    const outgoing = mixer._themeBank.voices.percussion;
+    mixer.setIntensityFromBossEvent('boss-phase-changed'); // climax: drums on
+    const outgoing = mixer._themeBank;
+    const oldDrums = outgoing.voices.percussion;
 
     mixer.setTheme('warden');
-    const incoming = mixer._themeBank.voices.percussion;
+    const newDrums = mixer._themeBank.voices.percussion;
     const end = MUSIC_THEME_CROSSFADE.seconds;
-    expect(outgoing.gain.gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(
-      0,
-      end
-    );
-    expect(incoming.gain.gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(
+    // The hits already scheduled ahead (≤ 0.1 s) fade out; the new drums fade in.
+    const [oldTo, oldAt] =
+      oldDrums.gain.gain.linearRampToValueAtTime.mock.calls.at(-1);
+    expect(oldTo).toBe(0);
+    expect(oldAt).toBeLessThanOrEqual(0.1);
+    expect(newDrums.gain.gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(
       1,
       end
     );
+
+    const gainsBefore = harness.context.createGain.mock.results.length;
+    harness.advanceTime(end);
+    vi.advanceTimersByTime(25);
+    const hits = harness.context.createGain.mock.results
+      .slice(gainsBefore)
+      .map(({ value }) => value);
+    const into = (drums) =>
+      hits.filter((gain) =>
+        gain.connect.mock.calls.some(([target]) => target === drums.gain)
+      ).length;
+    expect(into(newDrums)).toBeGreaterThan(0);
+    expect(into(oldDrums)).toBe(0);
+
+    const drones = Object.values(outgoing.voices).flatMap(
+      (voice) => voice.oscillators
+    );
+    drones.forEach((osc) => osc.fireEnded());
+    expect(drones.every((osc) => osc._stopped && osc._disconnected)).toBe(true);
+    Object.values(outgoing.voices).forEach((voice) => {
+      expect(voice.gain.disconnect).toHaveBeenCalled();
+    });
+    expect(
+      [mixer._themeBank, ...mixer._fadingBanks].map((bank) => bank.themeId)
+    ).toEqual(['warden']);
   });
 });

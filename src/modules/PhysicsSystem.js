@@ -1732,6 +1732,17 @@ class PhysicsSystem extends BaseSystem {
     };
 
     if (player.invulnerableTimer > 0) {
+      // Ram Plating: a dashing ship hits each enemy it touches once per dash.
+      if (
+        player.dashTimer > 0 &&
+        player.dashContactDamage > 0 &&
+        !player.dashRammed.has(asteroid)
+      ) {
+        player.dashRammed.add(asteroid);
+        enemiesSystem.applyDamage(asteroid, player.dashContactDamage, {
+          source: { hitPosition: result.impactPosition },
+        });
+      }
       finalizeBossFeedback(0);
       return result;
     }

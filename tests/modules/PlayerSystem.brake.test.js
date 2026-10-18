@@ -232,4 +232,27 @@ describe('Braking System 3: emergency brake', () => {
     steps(player, holdSteps * 2);
     expect(brakes()).toBe(2);
   });
+
+  it('Reactive Brake: the shockwave shoves 80% harder and deals up to 24 damage', () => {
+    const { player, movement } = makePlayer(-150);
+    UPGRADE_LIBRARY.find((u) => u.id === 'reactive_brake').levels.forEach(
+      (level) =>
+        level.effects.forEach((e) => player.eventBus.emit(e.event, e.payload))
+    );
+    movement.down = true;
+    steps(player, holdSteps);
+    const emitted = (name) =>
+      player.eventBus.emit.mock.calls.filter(([event]) => event === name);
+    const [[, braked]] = emitted('player-braked');
+    expect(braked).toMatchObject({
+      radius: brake.radius,
+      knockback: brake.knockback * 1.8,
+    });
+    expect(emitted('shield-explosion-damage')).toEqual([
+      [
+        'shield-explosion-damage',
+        { position: braked.position, radius: brake.radius, damage: 24 },
+      ],
+    ]);
+  });
 });

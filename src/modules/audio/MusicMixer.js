@@ -26,9 +26,11 @@ import RandomService from '../../core/RandomService.js';
  * Gain topology (single writer per AudioParam — cross-plan contract):
  *   theme voices (oscillator stack → voice gain → voice filter, one bank per
  *     MUSIC_THEMES entry; a theme change equal-power crossfades the voice
- *     gains of the outgoing and incoming banks, then stops the old one)
+ *     gains of the outgoing and incoming banks, then stops and releases the
+ *     old one)
  *   → layerGains[base|tension|danger|climax]      (writer: MusicMixer)
- *   + percussion hits → bank percussion voice gain (crossfaded with the theme)
+ *   + percussion hits → the playing bank's percussion voice gain (the outgoing
+ *     theme's drums stop at the change; the incoming ones fade in)
  *     → percussionGain (writer: MusicMixer, follows the run intensity)
  *     → music lowpass (pre-built at init; bypass ~20kHz; writer: MusicMixer
  *        pause ramps its FREQUENCY only — built HERE, never at pause time)
@@ -71,6 +73,10 @@ const RHYTHM_LEVELS = Object.freeze({ 2: true, 3: true });
 const LOOKAHEAD_INTERVAL_MS = 25; // tick granularity
 const SCHEDULE_AHEAD_SECONDS = 0.1; // schedule onsets up to this far ahead
 const PULSE_DURATION_SECONDS = 0.12; // short percussive blip per onset
+// proposta 18/10: on a theme change the outgoing drums stop at once (no new
+// hits) and the hits already scheduled ahead fade out over this many seconds,
+// while the outgoing drones crossfade over MUSIC_THEME_CROSSFADE.seconds.
+const THEME_PERCUSSION_RELEASE_SECONDS = 0.08;
 
 // Pause "underwater" feel (D-10): ramp the pre-built lowpass into this band and
 // drop musicPauseFadeGain to ~50%. Tunable — the browser-check calibrates feel.
@@ -379,7 +385,7 @@ class MusicMixer {
       voices.percussion = { oscillators: [], gain, filter: null, level: 1 };
     }
 
-    return { themeId, voices, endTime: Infinity };
+    return { themeId, voices };
   }
 
   /** Seeded mono noise buffer shared by the percussion noise hits. @private */
@@ -434,11 +440,6 @@ class MusicMixer {
       }
     });
 
-    this._fadingBanks = this._fadingBanks.filter((bank) => {
-      if (bank.endTime > now) return true;
-      this._safeDisconnect(bank.voices.percussion?.gain);
-      return false;
-    });
     if (!outgoing) return;
     if (immediate) {
       this._stopBank(outgoing, now);
@@ -447,12 +448,14 @@ class MusicMixer {
     Object.values(incoming.voices).forEach((voice) => {
       this._equalPowerRamp(voice.gain.gain, 0, voice.level, now, seconds);
     });
-    Object.values(outgoing.voices).forEach((voice) => {
+    Object.entries(outgoing.voices).forEach(([key, voice]) => {
       const from =
         typeof voice.gain.gain.value === 'number'
           ? voice.gain.gain.value
           : voice.level;
-      this._equalPowerRamp(voice.gain.gain, from, 0, now, seconds);
+      const fade =
+        key === 'percussion' ? THEME_PERCUSSION_RELEASE_SECONDS : seconds;
+      this._equalPowerRamp(voice.gain.gain, from, 0, now, fade);
     });
     this._stopBank(outgoing, now + seconds);
     this._fadingBanks.push(outgoing);
@@ -480,22 +483,36 @@ class MusicMixer {
   }
 
   /**
-   * Stop a bank's oscillators at `when`; the last one to end disconnects the
-   * bank's gains and filters.
+   * Stop a bank's oscillators at `when`; the last one to end releases the
+   * bank.
    * @private
    */
   _stopBank(bank, when) {
-    bank.endTime = when;
-    Object.values(bank.voices).forEach((voice) => {
-      voice.oscillators.forEach((osc) => {
-        osc.onended = () => {
-          this._safeDisconnect(osc);
-          this._safeDisconnect(voice.gain);
-          this._safeDisconnect(voice.filter);
-        };
-        this._safeStop(osc, when);
-      });
+    const oscillators = Object.values(bank.voices).flatMap(
+      (voice) => voice.oscillators
+    );
+    let playing = oscillators.length;
+    if (playing === 0) {
+      this._releaseBank(bank);
+      return;
+    }
+    oscillators.forEach((osc) => {
+      osc.onended = () => {
+        this._safeDisconnect(osc);
+        playing -= 1;
+        if (playing === 0) this._releaseBank(bank);
+      };
+      this._safeStop(osc, when);
     });
+  }
+
+  /** Disconnect a stopped bank's gains and filters and forget it. @private */
+  _releaseBank(bank) {
+    Object.values(bank.voices).forEach((voice) => {
+      this._safeDisconnect(voice.gain);
+      this._safeDisconnect(voice.filter);
+    });
+    this._fadingBanks = this._fadingBanks.filter((fading) => fading !== bank);
   }
 
   /**
@@ -743,9 +760,9 @@ class MusicMixer {
 
   /**
    * Schedule the percussion hits of the current loop step at `onsetTime` into
-   * every live bank's percussion voice (the playing theme plus banks still
-   * fading out), so a theme change crossfades the drums like the drones. Skips
-   * the step while the layer is closed and silent.
+   * the playing bank's percussion voice (a bank fading out gets no new hits,
+   * so two themes never drum at once). Skips the step while the layer is
+   * closed and silent.
    * @private
    */
   _schedulePercussionStep(onsetTime) {
@@ -755,16 +772,14 @@ class MusicMixer {
     if (!layerGain) return;
     if (this._percussionTarget <= 0 && !(layerGain.value > 0.001)) return;
 
-    [this._themeBank, ...this._fadingBanks].forEach((bank) => {
-      const voice = bank?.voices?.percussion;
-      if (!voice || onsetTime >= bank.endTime) return;
-      const { percussion } = MUSIC_THEMES[bank.themeId];
-      const loopStep = step % percussion.steps;
-      percussion.hits.forEach((hit) => {
-        if (hit.steps.includes(loopStep)) {
-          this._schedulePercussionHit(hit, onsetTime, voice.gain);
-        }
-      });
+    const voice = this._themeBank?.voices?.percussion;
+    if (!voice) return;
+    const { percussion } = MUSIC_THEMES[this._themeBank.themeId];
+    const loopStep = step % percussion.steps;
+    percussion.hits.forEach((hit) => {
+      if (hit.steps.includes(loopStep)) {
+        this._schedulePercussionHit(hit, onsetTime, voice.gain);
+      }
     });
   }
 

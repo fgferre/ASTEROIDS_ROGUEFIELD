@@ -212,6 +212,28 @@ export class PickupSystem extends BaseSystem {
     });
   }
 
+  /** The nearest pickup within `maxDistance` of (x, y), or null. */
+  nearestPickup(x, y, maxDistance) {
+    let nearest = null;
+    let nearestSq = maxDistance * maxDistance;
+    for (const pickup of this.pickups) {
+      const distanceSq = (pickup.x - x) ** 2 + (pickup.y - y) ** 2;
+      if (distanceSq <= nearestSq) {
+        nearest = pickup;
+        nearestSq = distanceSq;
+      }
+    }
+    return nearest;
+  }
+
+  /** Takes a pickup off the field without its effect (a Leech ate it); returns its kind, or null. */
+  takePickup(pickup) {
+    const index = this.pickups.indexOf(pickup);
+    if (index < 0) return null;
+    this.pickups.splice(index, 1);
+    return pickup.kind;
+  }
+
   /** Plain snapshot for other renderers (3D mirror). */
   getActivePickups() {
     return this.pickups.map(({ kind, x, y, radius, age, lifetime, color }) => ({

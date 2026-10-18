@@ -26,6 +26,7 @@ import { Weaver } from '../modules/enemies/types/Weaver.js';
 import { Bulwark } from '../modules/enemies/types/Bulwark.js';
 import { Caster } from '../modules/enemies/types/Caster.js';
 import { Shade } from '../modules/enemies/types/Shade.js';
+import { Leech } from '../modules/enemies/types/Leech.js';
 import { IS_DEV } from './env.js';
 
 /**
@@ -51,6 +52,7 @@ export class GamePools {
   static bulwarks = null;
   static casters = null;
   static shades = null;
+  static leeches = null;
   static xpOrbs = null;
   static shockwaves = null;
   static tempObjects = null;
@@ -82,6 +84,7 @@ export class GamePools {
       bulwarks: { initial: 2, max: 8 },
       casters: { initial: 2, max: 8 },
       shades: { initial: 2, max: 8 },
+      leeches: { initial: 2, max: 8 },
       xpOrbs: { initial: 30, max: 200 },
       shockwaves: { initial: 5, max: 20 },
       tempObjects: { initial: 10, max: 50 },
@@ -103,6 +106,7 @@ export class GamePools {
     this.bulwarks = this.createEnemyPool(Bulwark, config.bulwarks);
     this.casters = this.createEnemyPool(Caster, config.casters);
     this.shades = this.createEnemyPool(Shade, config.shades);
+    this.leeches = this.createEnemyPool(Leech, config.leeches);
     this.initializeXPOrbPool(config.xpOrbs);
     this.initializeShockwavePool(config.shockwaves);
     this.initializeTempObjectPool(config.tempObjects);
@@ -579,6 +583,7 @@ export class GamePools {
       this.bulwarks,
       this.casters,
       this.shades,
+      this.leeches,
       this.xpOrbs,
       this.shockwaves,
       this.tempObjects,
@@ -612,6 +617,7 @@ export class GamePools {
       this.bulwarks,
       this.casters,
       this.shades,
+      this.leeches,
       this.xpOrbs,
       this.shockwaves,
       this.tempObjects,
@@ -651,6 +657,7 @@ export class GamePools {
       bulwarks: this.bulwarks?.getStats() || null,
       casters: this.casters?.getStats() || null,
       shades: this.shades?.getStats() || null,
+      leeches: this.leeches?.getStats() || null,
       xpOrbs: this.xpOrbs?.getStats() || null,
       shockwaves: this.shockwaves?.getStats() || null,
       tempObjects: this.tempObjects?.getStats() || null,
@@ -689,6 +696,7 @@ export class GamePools {
       bulwarks: this.bulwarks,
       casters: this.casters,
       shades: this.shades,
+      leeches: this.leeches,
       xpOrbs: this.xpOrbs,
       shockwaves: this.shockwaves,
       tempObjects: this.tempObjects,
@@ -733,6 +741,7 @@ export class GamePools {
     this.bulwarks = null;
     this.casters = null;
     this.shades = null;
+    this.leeches = null;
     this.xpOrbs = null;
     this.shockwaves = null;
     this.tempObjects = null;

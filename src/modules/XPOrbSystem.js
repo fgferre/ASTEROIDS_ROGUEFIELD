@@ -1857,6 +1857,29 @@ class XPOrbSystem extends BaseSystem {
     return this.xpOrbs.filter((orb) => !orb.collected);
   }
 
+  /** The nearest loose orb within `maxDistance` of (x, y), or null; orbs mid-fusion are spoken for. */
+  nearestOrb(x, y, maxDistance) {
+    let nearest = null;
+    let nearestSq = maxDistance * maxDistance;
+    for (let i = 0; i < this.xpOrbs.length; i += 1) {
+      const orb = this.xpOrbs[i];
+      if (!this.isOrbEligibleForFusion(orb)) continue;
+      const distanceSq = (orb.x - x) ** 2 + (orb.y - y) ** 2;
+      if (distanceSq <= nearestSq) {
+        nearest = orb;
+        nearestSq = distanceSq;
+      }
+    }
+    return nearest;
+  }
+
+  /** Takes a loose orb off the field without granting its XP (a Leech ate it); returns its value. */
+  consumeOrb(orb) {
+    if (!this.isOrbEligibleForFusion(orb)) return 0;
+    orb.collected = true;
+    return orb.value;
+  }
+
   getOrbVisualConfig(className, tier) {
     const key = `${className}:${tier}`;
     if (this.visualCache.has(key)) {

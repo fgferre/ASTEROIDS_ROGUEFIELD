@@ -496,6 +496,16 @@ export class EnemySpawnSystem {
         'factory-acquire',
         enemy
       );
+      // The Codex meets support machines as they arrive. Not 'enemy-spawned':
+      // its music-density count would add them twice (wave-started already
+      // has them). Rocks, Wardens and Heralds have their own spawn events.
+      if (!['asteroid', 'boss', 'herald'].includes(enemy.type)) {
+        facade.eventBus.emit('machine-spawned', {
+          enemy,
+          type: enemy.type,
+          position: { x: enemy.x, y: enemy.y },
+        });
+      }
       return enemy;
     } catch (error) {
       console.error('[EnemySystem] Factory creation failed:', error);

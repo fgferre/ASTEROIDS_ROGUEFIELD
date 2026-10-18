@@ -31,6 +31,20 @@ describe('CodexService', () => {
     expect(discovered).toEqual(['ram']);
   });
 
+  it('meets a support machine when it arrives, before any kill', () => {
+    const eventBus = new EventBus();
+    const codex = new CodexService({ eventBus });
+    const discovered = [];
+    eventBus.on('codex-discovered', (payload) => discovered.push(payload.type));
+
+    eventBus.emit('wave-started', { wave: 6 });
+    eventBus.emit('machine-spawned', { enemy: { type: 'caster' } });
+    eventBus.emit('machine-spawned', { enemy: { type: 'caster' } });
+
+    expect(seenOf(codex, 'caster')).toEqual({ firstLayer: 6, kills: 0 });
+    expect(discovered).toEqual(['caster']);
+  });
+
   it('keeps each Warden by its kind', () => {
     const eventBus = new EventBus();
     const codex = new CodexService({ eventBus });

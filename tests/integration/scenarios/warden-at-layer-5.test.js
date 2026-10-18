@@ -61,6 +61,13 @@ describe('layer 5 scenario', () => {
     expect(player.health).toBeGreaterThan(0);
   });
 
+  it('keeps the Warden out of the boss pool, which nothing releases it to', () => {
+    const { boss } = playToLayer5();
+
+    expect(boss).toBeTruthy();
+    expect(GamePools.bosses.getStats().inUse).toBe(0);
+  });
+
   it('telegraphs a charge or fan within 20 s', () => {
     const { telegraphs } = playToLayer5();
 

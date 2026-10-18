@@ -33,9 +33,12 @@ import { Onboarding, onboardingPrompts } from './ui/onboarding.js';
 import { RunCinematics } from './ui/runCinematics.js';
 import {
   TransmissionQueue,
+  bossRushTransmission,
   chapterTransmission,
   deathTransmission,
+  hangarTransmission,
   heraldTransmission,
+  sightingTransmission,
   victoryTransmission,
   wardenTransmission,
 } from './ui/transmissions.js';
@@ -581,6 +584,9 @@ class UISystem extends BaseSystem {
     });
     if (firstOfBiome) {
       this.queueTransmission(chapterTransmission(biome.id));
+    }
+    if (stage === 1) {
+      this.queueTransmission(bossRushTransmission());
     }
   }
 
@@ -1762,6 +1768,7 @@ class UISystem extends BaseSystem {
       if (this.runWon) {
         return;
       }
+      this.pilotDown = true;
       this.lastTransmission = null;
       this.queueTransmission(
         deathTransmission(this.getRandomFork('base'), this.transmissionLayer),
@@ -1817,6 +1824,14 @@ class UISystem extends BaseSystem {
       if (HERALD_KINDS[kind]?.jamsRadar) {
         this.aaaTacticalHud?.setRadarJammed(false);
       }
+    });
+    // The Ring names a machine the first time it is ever seen; not over the
+    // intro or once the run has ended.
+    this.registerEventListener('codex-discovered', ({ type } = {}) => {
+      if (this.cinematics.introActive || this.runWon || this.pilotDown) {
+        return;
+      }
+      this.queueTransmission(sightingTransmission(type));
     });
     this.registerEventListener('game-started', () => {
       this.aaaTacticalHud?.setRadarJammed(false);
@@ -1884,9 +1899,19 @@ class UISystem extends BaseSystem {
       this.handleScreenChanged(payload);
     });
 
-    this.registerEventListener('hangar-purchased', () =>
-      this.refreshMenuStatus()
-    );
+    // The run's transmission banner is hidden in the menu: the Ring's line
+    // for a purchase shows in the caption under the Hangar's hull stage,
+    // scrolled into view.
+    this.registerEventListener('hangar-purchased', ({ id } = {}) => {
+      this.refreshMenuStatus();
+      const line = hangarTransmission(id);
+      const caption = this.domRefs.hangar.hullLock;
+      if (line && caption) {
+        caption.textContent = `${line.speaker}: ${line.text}`;
+        caption.hidden = false;
+        caption.scrollIntoView({ block: 'nearest' });
+      }
+    });
 
     // Renderer3D's Auto quality picked a preset: menu strip and the
     // Graphics preview name it.
@@ -1935,6 +1960,7 @@ class UISystem extends BaseSystem {
     });
     this.registerEventListener('game-started', () => {
       this.runWon = false;
+      this.pilotDown = false;
       this.transmissions?.clear();
       this.cinematics.stop();
       // After startNewRun has unpaused: the intro holds the first step.
@@ -2472,6 +2498,7 @@ class UISystem extends BaseSystem {
   openHangar() {
     const refs = this.domRefs.hangar;
     this.renderHangar();
+    refs.hullLock.hidden = true;
     this.hangarState = { isOpen: true, trigger: document.activeElement };
     this.showScreen('hangar', { overlay: true, show: true });
     refs.overlay.setAttribute('aria-hidden', 'false');

@@ -523,6 +523,7 @@ export const OFFENSE_UPGRADES = deepFreeze([
     themeColor: PALETTE.shot,
     unlockLevel: 3,
     tags: ['weapon', 'weaponry'],
+    excludes: ['scatter_coil'],
     text: {
       name: 'Harmonic Resonator',
       summary:
@@ -547,6 +548,45 @@ export const OFFENSE_UPGRADES = deepFreeze([
             type: 'event',
             event: 'upgrade-weapon-harmonic',
             payload: { weaponId: WEAPONS.harmonic.id },
+          },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'scatter_coil',
+    category: 'offense',
+    family: 'kinetic',
+    rarity: 'epic',
+    icon: '🎆',
+    themeColor: WEAPONS.scatter.colors.burst,
+    unlockLevel: 3,
+    tags: ['weapon', 'weaponry'],
+    excludes: ['harmonic_resonator'],
+    text: {
+      name: 'Scatter Coil',
+      summary:
+        'Swaps the cannon for the Scatter Coil: a fan of short flak bolts that burst into shrapnel.',
+      lore: "A Ring miner's blasting coil, rewound to throw its charges at anything that moves.",
+      levels: [
+        {
+          title: 'Scatter Coil',
+          description: `Fires ${WEAPONS.scatter.flak.bolts} bolts in a ${WEAPONS.scatter.flak.fan}° fan; each bursts on its first hit or at ${WEAPONS.scatter.flak.range} px, hitting everything within ${WEAPONS.scatter.flak.burstRadius} px.`,
+          highlights: [
+            `Multishot adds bolts to the fan, up to ${WEAPONS.scatter.flak.maxBolts}.`,
+            'Slower volleys than the lance: get close.',
+          ],
+        },
+      ],
+    },
+    levels: [
+      {
+        rank: 1,
+        effects: [
+          {
+            type: 'event',
+            event: 'upgrade-weapon-scatter',
+            payload: { weaponId: WEAPONS.scatter.id },
           },
         ],
       },

@@ -308,10 +308,15 @@ describe('SFXBus support machines (world cues → ambient bus, panned)', () => {
       'playCasterLaunch',
       'playCasterImpact',
       'playShadePhase',
+      'playHeraldSpawn',
+      'playHeraldAttack',
+      'playFlakBurst',
+      'playLeechAte',
+      'playLeechBurst',
     ]) {
       const { bus, context } = makeInitializedBus();
       const panners = context.createStereoPanner.mock.results.length;
-      bus[cue]({ pan: -0.4 });
+      bus[cue]({ pan: -0.4, kind: 'heat' });
       const panner = context.createStereoPanner.mock.results.at(-1).value;
       expect(context.createStereoPanner.mock.results.length, cue).toBe(
         panners + 1
@@ -320,7 +325,7 @@ describe('SFXBus support machines (world cues → ambient bus, panned)', () => {
       expect(panner.connect, cue).toHaveBeenCalledWith(bus.ambientBus);
 
       const gains = context.createGain.mock.calls.length;
-      bus[cue]({ pan: -0.4 }); // same instant: throttled
+      bus[cue]({ pan: -0.4, kind: 'heat' }); // same instant: throttled
       expect(context.createGain.mock.calls.length, cue).toBe(gains);
     }
   });
@@ -484,6 +489,177 @@ describe('SFXBus support machines (world cues → ambient bus, panned)', () => {
     expect(inTo).toBeGreaterThan(inFrom);
     expect(Math.min(outTo, inFrom)).toBeGreaterThan(2000);
   });
+
+  it('each Herald arrives in its own timbre: Heat roars low, Dust hisses grains on a slow sweep, Silence drops a sub under a vacuum', () => {
+    const { bus, context } = makeInitializedBus();
+    const record = recordCue(context);
+    const arrive = (kind) => {
+      const filters = context.createBiquadFilter.mock.results.length;
+      const sources = record.newSources();
+      const tones = record.oscillators.length;
+      bus.playHeraldSpawn({ kind });
+      context.currentTime += 1; // past the cue's throttle
+      return {
+        // Swept bands only (a click train's band holds still).
+        bands: context.createBiquadFilter.mock.results
+          .slice(filters)
+          .map(({ value }) => value)
+          .filter(
+            (filter) =>
+              filter.frequency.exponentialRampToValueAtTime.mock.calls.length
+          ),
+        sources: record.newSources() - sources,
+        tones: record.oscillators.slice(tones),
+      };
+    };
+
+    const heat = arrive('heat');
+    expect(heat.tones).toHaveLength(0);
+    expect(heat.bands).toHaveLength(2);
+    heat.bands.forEach((band) => {
+      const [from, to] = sweep(band.frequency);
+      expect(to).toBeGreaterThan(from);
+      expect(to).toBeLessThan(500);
+    });
+
+    const dust = arrive('dust');
+    expect(dust.sources).toBe(2); // the hiss and the grit
+    const [hiss] = dust.bands;
+    const [hissFrom, hissTo] = sweep(hiss.frequency);
+    expect(hissFrom).toBeGreaterThan(1000);
+    expect(hissTo).toBeGreaterThan(hissFrom);
+    const [[, sweepEnd]] =
+      hiss.frequency.exponentialRampToValueAtTime.mock.calls;
+    expect(sweepEnd - hiss.frequency.setValueAtTime.mock.calls[0][1]).toBe(1.4);
+
+    const silence = arrive('silence');
+    const [sub] = silence.tones;
+    expect(sub.frequencyLog[0]).toBeLessThan(100);
+    expect(
+      sub.frequency.exponentialRampToValueAtTime.mock.calls[0][0]
+    ).toBeLessThan(40);
+    const [vacuum] = silence.bands;
+    expect(vacuum.type).toBe('notch');
+    const [vacuumFrom, vacuumTo] = sweep(vacuum.frequency);
+    expect(vacuumTo).toBeLessThan(vacuumFrom);
+  });
+
+  it('a Herald attack flares for Heat, whooshes a vacuum for Silence and is silent for Dust', () => {
+    const { bus, context } = makeInitializedBus();
+    const sources = () => context.createBufferSource.mock.calls.length;
+
+    const before = sources();
+    bus.playHeraldAttack({ kind: 'dust' });
+    expect(sources()).toBe(before);
+
+    bus.playHeraldAttack({ kind: 'heat' });
+    const [flareFrom, flareTo] = sweep(
+      context.createBiquadFilter.mock.results.at(-2).value.frequency
+    );
+    expect(flareTo).toBeGreaterThan(flareFrom);
+    expect(sources()).toBe(before + 2); // the flare and its crackle
+
+    context.currentTime += 1;
+    bus.playHeraldAttack({ kind: 'silence' });
+    expect(context.createBiquadFilter.mock.results.at(-1).value.type).toBe(
+      'notch'
+    );
+  });
+
+  it('a flak burst pops under a crackle; a Leech gulps quietly and bursts in rising bubbles before bright pings', () => {
+    const { bus, context } = makeInitializedBus();
+    const record = recordCue(context);
+    const drops = (osc) =>
+      osc.frequency.exponentialRampToValueAtTime.mock.calls[0][0] <
+      osc.frequencyLog[0];
+
+    bus.playFlakBurst();
+    const [pop] = record.oscillators;
+    expect(drops(pop)).toBe(true);
+    expect(record.newSources()).toBe(2); // the puff and the crackle
+
+    const gains = context.createGain.mock.results.length;
+    const gulpAt = record.oscillators.length;
+    bus.playLeechAte();
+    const [gulp, bloop] = record.oscillators.slice(gulpAt);
+    expect(drops(gulp)).toBe(true);
+    expect(drops(bloop)).toBe(false);
+    const peaks = context.createGain.mock.results
+      .slice(gains)
+      .flatMap(({ value }) =>
+        value.gain.exponentialRampToValueAtTime.mock.calls.map(([v]) => v)
+      );
+    expect(Math.max(...peaks)).toBeLessThanOrEqual(0.05); // very quiet
+
+    const burstAt = record.oscillators.length;
+    bus.playLeechBurst();
+    const burst = record.oscillators.slice(burstAt);
+    const bubbles = burst.filter((osc) => osc.frequencyLog[0] < 1000);
+    const pings = burst.filter((osc) => osc.frequencyLog[0] > 2500);
+    expect(bubbles.length).toBeGreaterThanOrEqual(5);
+    bubbles.forEach((osc) => expect(drops(osc)).toBe(false));
+    expect(pings.length).toBeGreaterThan(0);
+    const firstStart = (oscs) =>
+      Math.min(...oscs.map((osc) => osc.start.mock.calls[0][0]));
+    expect(firstStart(bubbles)).toBeLessThan(firstStart(pings));
+  });
+});
+
+describe('SFXBus thruster loops (one start per press)', () => {
+  function thrusterRig() {
+    vi.useFakeTimers();
+    const { bus, context } = makeInitializedBus();
+    // Real gains know their context (the loop reads it on update).
+    bus.pool.getGain = () => Object.assign(createGainStub(), { context });
+    const audio = new AudioSystem({
+      random: new RandomService('thruster-loops'),
+      settings: createSettingsStub(),
+    });
+    audio.initialized = true;
+    audio.context = context;
+    audio.sfxBus = bus;
+    const startLoop = vi.spyOn(bus.thrusterLoops, 'startLoop');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const frame = (intensity = 1) => {
+      // PlayerSystem emits the side thrusters twice a frame (left, right).
+      audio.handleThrusterEffect({ type: 'side', intensity });
+      audio.handleThrusterEffect({ type: 'side', intensity });
+    };
+    const done = () => {
+      warn.mockRestore();
+      vi.useRealTimers();
+    };
+    return { audio, bus, warn, startLoop, frame, done };
+  }
+
+  it('frames held through the start burst start one loop and warn nothing', () => {
+    const { audio, bus, warn, startLoop, frame, done } = thrusterRig();
+
+    frame();
+    vi.advanceTimersByTime(16);
+    frame(0.8);
+    vi.advanceTimersByTime(200);
+    frame(0.8);
+
+    expect(startLoop).toHaveBeenCalledTimes(1);
+    expect(startLoop.mock.calls[0][2]).toBe(0.8); // the latest intensity
+    expect(bus.thrusterLoops.isActive('side')).toBe(true);
+    expect(warn).not.toHaveBeenCalled();
+    expect(audio.thrusterState).not.toHaveProperty('lastIntensity');
+    done();
+  });
+
+  it('a tap shorter than the start burst cancels the pending loop', () => {
+    const { bus, startLoop, frame, done } = thrusterRig();
+
+    frame();
+    frame(0);
+    vi.advanceTimersByTime(200);
+
+    expect(startLoop).not.toHaveBeenCalled();
+    expect(bus.isThrusterActive('side')).toBe(false);
+    done();
+  });
 });
 
 describe('SFXBus music stingers', () => {
@@ -638,6 +814,11 @@ const FACADE_PUBLIC_API_BASELINE = Object.freeze([
   'playCasterLaunch',
   'playCasterImpact',
   'playShadePhase',
+  'playHeraldSpawn',
+  'playHeraldAttack',
+  'playFlakBurst',
+  'playLeechAte',
+  'playLeechBurst',
   'playExplosion',
   'playFileTrack',
   'playGoldJackpot',
@@ -685,7 +866,6 @@ const FACADE_PUBLIC_API_BASELINE = Object.freeze([
   'reset',
   'safePlay',
   'sanitizeVolume',
-  'setMusicIntensity',
   'setPerformanceMonitoring',
   'setupEventListeners',
   'stopFileTrack',
