@@ -376,7 +376,10 @@ class UISystem extends BaseSystem {
         break;
       case 'boss-spawned':
         if (!current.active) {
-          this.aaaTacticalHud?.showBossIntro(data?.enemy?.displayName);
+          this.aaaTacticalHud?.showBossIntro(
+            data?.enemy?.displayName,
+            data?.enemy?.subtitle
+          );
         }
         next.active = true;
         next.upcoming = false;

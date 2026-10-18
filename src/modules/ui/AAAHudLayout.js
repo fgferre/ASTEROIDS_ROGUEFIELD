@@ -237,7 +237,7 @@ export class AAAHudLayout {
    * Boss name card, queued after a layer banner still on screen; the boss bar
    * stays hidden until the card is gone.
    */
-  showBossIntro(name) {
+  showBossIntro(name, subtitle) {
     const card = this.els?.bossIntro;
     if (!card) {
       return;
@@ -249,6 +249,7 @@ export class AAAHudLayout {
     this._bossIntroEndsAt = now + delayMs + BOSS_INTRO_MS;
     this._later(() => {
       this.els.bossIntroName.textContent = name || 'Warden Prime';
+      this.els.bossIntroSub.textContent = subtitle || 'Guardian of the Ring';
       card.classList.remove('is-leaving');
       this._replay(card, 'is-showing');
       this._later(() => {
@@ -438,6 +439,7 @@ export class AAAHudLayout {
       layerBannerSub: query('#ui-layer-banner-sub'),
       bossIntro: query('#ui-boss-intro'),
       bossIntroName: query('#ui-boss-intro-name'),
+      bossIntroSub: query('#ui-boss-intro-sub'),
       transmission: query('#ui-transmission'),
       transmissionSpeaker: query('#ui-transmission-speaker'),
       transmissionLine: query('#ui-transmission-line'),
@@ -927,7 +929,7 @@ export class AAAHudLayout {
             <div class="boss-intro" id="ui-boss-intro" aria-live="polite">
                 <div class="boss-intro__line"></div>
                 <div class="boss-intro__name" id="ui-boss-intro-name">Warden Prime</div>
-                <div class="boss-intro__sub">Guardian of the Ring</div>
+                <div class="boss-intro__sub" id="ui-boss-intro-sub">Guardian of the Ring</div>
                 <div class="boss-intro__line"></div>
             </div>
             <div class="transmission" id="ui-transmission" aria-live="polite">
