@@ -31,7 +31,7 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
  */
 export const MINE_CONFIG = deepFreeze({
   key: 'mine',
-  displayName: 'Proximity Mine',
+  displayName: 'Tether',
   radius: 18,
   health: 20,
   armTime: 0.5,

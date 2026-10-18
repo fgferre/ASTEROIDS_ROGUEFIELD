@@ -28,3 +28,4 @@
 - Códice/recap (18/10, R4.7): 'enemy-spawned' só dispara para asteroides, então inimigos de apoio entram no códice ao morrer ou ao matar o piloto; nomes usam os dados ('Assault Drone', 'Hunter Frigate') e não a ficção do NORTE (Mote/Seeker) — unificar displayName; minas que se detonam contam como 'destroyed'.
 - Modo infinito (18/10, R3.5): rochas já estão no teto 40 a partir da 14, então só roster/elite crescem depois da 15; level-ups ganhos com a tela de vitória aberta são ignorados (conferir se fica um pendente); bestTime = run mais longa (leitura da sessão).
 - Hangar (18/10, R3.4): sair da run pelo menu não paga Salvage; replay também paga e um replay gravado com outros itens do Hangar não repete igual; o menu ficou com 5 botões (Credits sozinho na última linha).
+- Nomes (18/10): o kill feed chama todo Warden de 'Warden Prime' porque addKillFeed só recebe enemy.type; passar bossKind/displayName pelo UISystem.

@@ -34,7 +34,7 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
  */
 export const DRONE_CONFIG = deepFreeze({
   key: 'drone',
-  displayName: 'Assault Drone',
+  displayName: 'Mote',
   radius: 12,
   health: 30,
   acceleration: 260,

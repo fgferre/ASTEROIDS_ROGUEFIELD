@@ -1,5 +1,6 @@
 // src/modules/ui/AAAHudLayout.js
 
+import { ENEMY_TYPES, BOSS_CONFIG } from '../../data/constants/visual.js';
 import { WEAPONS } from '../../data/weapons.js';
 import { UPGRADE_FAMILIES } from '../../data/upgrades/families.js';
 
@@ -20,18 +21,8 @@ const LOW_HULL_PERCENT = 30;
 const CRITICAL_HULL_PERCENT = 15;
 // One pip per lance shot before the Harmonic beam (the beam is the last shot).
 const BEAM_PIPS = WEAPONS.harmonic.beam.every - 1;
-// NORTE §3 names, keyed by enemy.type.
-const FEED_NAMES = {
-  asteroid: 'Fragment',
-  drone: 'Mote',
-  hunter: 'Seeker',
-  mine: 'Tether',
-  husk: 'Husk',
-  ram: 'Ram',
-  weaver: 'Weaver',
-  bulwark: 'Bulwark',
-  boss: 'Warden Prime',
-};
+// Asteroids have no enemy data entry; the Warden's feed name is the boss config's.
+const ASTEROID_FEED_NAME = 'Fragment';
 const COMBO_TIER_RANK = { text: 0, status: 1, xp: 2, boss: 3 };
 
 /** Combo color tier: text < 1.3×, status 1.3–1.6×, xp 1.7–1.9×, boss at 2.0×. */
@@ -320,7 +311,12 @@ export class AAAHudLayout {
 
   /** Kill feed row for a destroyed enemy; repeated kills count up (×N). */
   addKillFeed(enemyType, elite = false) {
-    const baseName = FEED_NAMES[enemyType];
+    const baseName =
+      enemyType === 'asteroid'
+        ? ASTEROID_FEED_NAME
+        : enemyType === 'boss'
+          ? BOSS_CONFIG.displayName
+          : ENEMY_TYPES[enemyType]?.displayName;
     if (!baseName) {
       return;
     }
