@@ -72,6 +72,33 @@ describe('HangarService', () => {
     expect(hangar.salvage).toBe(180 + 150 + 3 * 25);
   });
 
+  it('pays a Boss Rush clear 15 per Warden plus 150, not the layer-15 pay', () => {
+    const eventBus = new EventBus();
+    const hangar = new HangarService({ eventBus, difficulty: atRate(1) });
+    eventBus.emit('game-started', { bossRush: true });
+    [5, 10, 15].forEach((wave) => eventBus.emit('boss-defeated', { wave }));
+    eventBus.emit('run-won', { wave: 15 });
+    eventBus.emit('screen-changed', {
+      screen: 'victory',
+      data: summary(15, 40),
+    });
+    expect(hangar.salvage).toBe(3 * 15 + 150);
+  });
+
+  it('pays a Boss Rush death per Warden felled, then a normal run pays by layer again', () => {
+    const eventBus = new EventBus();
+    const hangar = new HangarService({ eventBus, difficulty: atRate(1) });
+    eventBus.emit('game-started', { bossRush: true });
+    eventBus.emit('boss-defeated', { wave: 5 });
+    eventBus.emit('player-died', summary(10, 40)); // died at the second Warden
+    expect(hangar.salvage).toBe(15);
+
+    eventBus.emit('game-started', { bossRush: false });
+    eventBus.emit('boss-defeated', { wave: 5 });
+    eventBus.emit('player-died', summary(9, 47));
+    expect(hangar.salvage).toBe(15 + 99);
+  });
+
   it('scales the payout by the difficulty salvage multiplier', () => {
     const eventBus = new EventBus();
     const hangar = new HangarService({ eventBus, difficulty: atRate(1.3) });

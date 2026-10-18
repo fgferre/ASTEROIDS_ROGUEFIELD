@@ -43,6 +43,7 @@ export default class AchievementService {
     this.heraldsFelled = stored.heraldsFelled ?? [];
     this.hullClean = true;
     this.cursedHeld = false;
+    this.bossRush = false;
 
     eventBus.on('game-started', () => {
       this.cursedHeld = false;
@@ -50,10 +51,16 @@ export default class AchievementService {
     });
     eventBus.on('wave-started', (payload = {}) => {
       this.hullClean = true;
-      if (Number(payload.wave) >= DEEP_FIELD_LAYER) this.unlock('deep-field');
+      // Boss Rush starts at layer 5, 10 and 15: those are not layers reached.
+      this.bossRush = Boolean(payload.bossRush);
+      if (!this.bossRush && Number(payload.wave) >= DEEP_FIELD_LAYER) {
+        this.unlock('deep-field');
+      }
     });
     eventBus.on('wave-complete', (payload = {}) => {
-      if (Number(payload.wave) >= 1) this.unlock('first-light');
+      if (!this.bossRush && Number(payload.wave) >= 1) {
+        this.unlock('first-light');
+      }
     });
     eventBus.on('player-took-damage', (payload = {}) => {
       if ((payload.healthDamage ?? payload.damage) > 0) this.hullClean = false;
