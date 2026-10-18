@@ -116,6 +116,24 @@ describe('AAAHudLayout weapon and buff chips', () => {
     expect(hud.els.evolutions.children).toHaveLength(0);
   });
 
+  it('swaps the chip for a brighter APEX chip when the family reaches its Apex', () => {
+    const state = { weaponId: 'lance', shotsToBeam: null, evolutions: [] };
+    hud.updateWeapon({
+      ...state,
+      evolutions: [{ family: 'thermal', id: 'incendiary', name: 'x' }],
+    });
+    hud.updateWeapon({
+      ...state,
+      evolutions: [
+        { family: 'thermal', id: 'solar-flare', apex: true, short: 'FLARE' },
+      ],
+    });
+    const chips = hud.els.evolutions.children;
+    expect(chips).toHaveLength(1);
+    expect(chips[0].textContent).toBe('APEX FLARE');
+    expect(chips[0].classList.contains('is-apex')).toBe(true);
+  });
+
   it('counts the Overcharge chip down and removes it at zero', () => {
     const { label, duration, color } = PICKUP_KINDS.overcharge;
     hud.startBuff('overcharge', label, duration, color);
@@ -331,5 +349,17 @@ describe('AAAHudLayout boss bar segments', () => {
     expect(bossSegments(1, 0)).toEqual([
       { left: 0, width: 100, state: 'current' },
     ]);
+  });
+});
+
+describe('AAAHudLayout accessibility styles', () => {
+  it('enlarges transmission lines 1.35× with Large Subtitles and stops their flicker with Reduce Flashing', () => {
+    const css = AAAHudLayout.prototype._getCSS.call({});
+    expect(css).toMatch(
+      /body\.subtitles-large \.transmission__line \{ font-size: calc\(var\(--text-md\) \* 1\.35\); \}/
+    );
+    expect(css).toMatch(
+      /body\.flashing-reduced \.transmission\.is-showing \{ animation: none; \}/
+    );
   });
 });

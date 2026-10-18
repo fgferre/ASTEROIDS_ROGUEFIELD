@@ -55,6 +55,10 @@ const HIT_STOP = Object.freeze({
 // A kind re-triggers at most once per this many seconds of game time, so a
 // multishot that kills three smalls freezes once.
 const HIT_STOP_COOLDOWN = 0.1;
+// Settings → Accessibility → Reduce Flashing: flashes at 30 % strength, at
+// most one every 0.34 s (under WCAG's three a second); ones too faint to see
+// at that strength are dropped so they never hold the window.
+const REDUCED_FLASH = Object.freeze({ scale: 0.3, gap: 0.34, floor: 0.02 });
 // Slow-motion beats (was: level-up a 0.2 s freeze at 40 %, death none). The
 // scale holds, then eases back to 1 over `ease` s; the camera zoom pulses to
 // `zoom` (base 1.3) and back over the same total time.
@@ -199,6 +203,8 @@ export default class EffectsSystem extends BaseSystem {
     this.hitMarkersEnabled = true;
     this.damageNumbersEnabled = true;
     this.motionReduced = false;
+    this.flashingReduced = false;
+    this.flashGap = 0;
     this.screenShakeScale = 1;
     this.damageFlashEnabled = true;
     this.particleDensity = 1;
@@ -336,6 +342,7 @@ export default class EffectsSystem extends BaseSystem {
 
   applyAccessibilityPreferences(values = {}) {
     this.motionReduced = Boolean(values.reducedMotion);
+    this.flashingReduced = Boolean(values.reduceFlashing);
   }
 
   applyVideoPreferences(values = {}) {
@@ -724,6 +731,7 @@ export default class EffectsSystem extends BaseSystem {
       this.screenFlash.timer -= effectDelta;
       if (this.screenFlash.timer < 0) this.screenFlash.timer = 0;
     }
+    this.flashGap = Math.max(0, this.flashGap - effectDelta);
 
     this.updateParticles(effectDelta);
     this.updateShockwaves(effectDelta);
@@ -2295,6 +2303,12 @@ export default class EffectsSystem extends BaseSystem {
 
     if (finalDuration <= 0 || finalIntensity <= 0) {
       return;
+    }
+
+    if (this.flashingReduced) {
+      finalIntensity *= REDUCED_FLASH.scale;
+      if (this.flashGap > 0 || finalIntensity < REDUCED_FLASH.floor) return;
+      this.flashGap = REDUCED_FLASH.gap;
     }
 
     this.screenFlash.color = color;
@@ -4305,6 +4319,7 @@ export default class EffectsSystem extends BaseSystem {
     this.hitStopClock = 0;
     this.hitStopReadyAt = {};
     this.pendingZoomPulse = null;
+    this.flashGap = 0;
     this.screenFlash = {
       timer: 0,
       duration: 0,

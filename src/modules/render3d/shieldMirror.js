@@ -33,6 +33,7 @@ uniform float uAppear;
 uniform vec2 uHitDir;
 uniform float uHitAge;
 uniform float uBreakAge;
+uniform float uBreakFlare;
 varying vec3 vLocal;
 varying vec3 vNormalView;
 varying vec3 vViewDir;
@@ -73,7 +74,7 @@ void main() {
     float k = uBreakAge / ${BREAK_TIME.toFixed(2)};
     float beat = 0.15 + 0.85 * shieldHash(id);
     if (k > beat) discard;
-    light += (0.4 + 1.2 * edge) * (1.0 - k / beat);
+    light += (0.4 + 1.2 * edge) * (1.0 - k / beat) * uBreakFlare;
   }
   gl_FragColor = vec4(uColor * light * shown, 1.0);
 }`;
@@ -89,6 +90,7 @@ export class ShieldMirror {
       uHitDir: { value: new THREE.Vector2(1, 0) },
       uHitAge: { value: -1 },
       uBreakAge: { value: -1 },
+      uBreakFlare: { value: 1 },
     };
     this.uniforms.uColor.value.multiplyScalar(BASE_GAIN);
     // the upper hemisphere, squashed into a low dome
@@ -131,8 +133,10 @@ export class ShieldMirror {
     if (len > 0) this.uniforms.uHitDir.value.set(dx / len, dy / len);
   }
 
-  break(time) {
+  /** `flare`: the break flare's strength (Reduce Flashing lowers it). */
+  break(time, flare = 1) {
     this.brokenAt = time;
+    this.uniforms.uBreakFlare.value = flare;
   }
 
   /**

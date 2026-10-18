@@ -2427,13 +2427,21 @@ class UISystem extends BaseSystem {
         ? 'assist'
         : 'standard';
 
+    const textScale = Number(values.textScale);
+
     if (body) {
       body.classList.toggle('hud-high-contrast', highContrast);
       body.classList.toggle('motion-reduced', reducedMotion);
       body.classList.toggle('color-assist-mode', colorVision === 'assist');
+      body.classList.toggle('flashing-reduced', Boolean(values.reduceFlashing));
+      body.classList.toggle('subtitles-large', Boolean(values.largeSubtitles));
     }
 
     if (root) {
+      root.style.setProperty(
+        '--text-scale',
+        String(Number.isFinite(textScale) && textScale > 0 ? textScale : 1)
+      );
       root.dataset.contrast = highContrast ? 'high' : 'normal';
       root.dataset.motion = reducedMotion ? 'reduced' : 'standard';
       root.dataset.colorVision = colorVision;

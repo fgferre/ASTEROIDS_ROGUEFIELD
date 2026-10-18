@@ -286,7 +286,7 @@ Conteúdo:
       ultra na cena carregada.
 - [ ] **R8.3 BACKLOG curto.** Seed do wave-manager por run (modificadores variam entre runs); prévia 3D do casco no
       Hangar; dois arrows no mesmo painel não se empilham.
-- [ ] **R8.4 Acessibilidade.** Escala de texto da HUD (Settings), modo alto contraste da HUD, redução de flashes
+- [x] **R8.4 Acessibilidade.** Escala de texto da HUD (Settings), modo alto contraste da HUD, redução de flashes
       (Solar Flare/lens-kick/flash de dano respeitam uma opção "reduce flashing"), legendas de transmissão maiores,
       tudo persistido e coberto por teste.
 

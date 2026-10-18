@@ -62,16 +62,37 @@
   --rarity-rare: var(--accent);
   --rarity-epic: var(--xp);
   --rarity-cursed: var(--boss);
+  /* Settings → Accessibility → Text Size (UISystem sets it on html) */
+  --text-scale: 1;
 
   color-scheme: dark;
 }
 
-/* Accessibility variants set by UISystem (html dataset) */
+/* Text Size: the type scale re-derived for the HUD and the run overlays
+   (level-up, pause, recap); menus and settings keep the base sizes. */
+#hud-layer,
+#pause-screen,
+#levelup-screen,
+#gameover-screen,
+#victory-screen {
+  --text-xs: calc(12px * var(--text-scale));
+  --text-sm: calc(14px * var(--text-scale));
+  --text-md: calc(16px * var(--text-scale));
+  --text-lg: calc(20px * var(--text-scale));
+  --text-xl: calc(28px * var(--text-scale));
+  --text-2xl: calc(40px * var(--text-scale));
+  --text-hero: calc(var(--text-2xl) * 1.6);
+}
+
+/* Accessibility variants set by UISystem (html dataset). High contrast:
+   opaque surfaces, solid lines, labels at least 6.9:1 on --surface (AA). */
 :root[data-contrast='high'] {
-  --text-dim: rgba(230, 238, 248, 0.86);
-  --line: rgba(148, 163, 184, 0.7);
-  --surface: rgba(2, 4, 8, 0.9);
-  --surface-strong: rgba(2, 4, 8, 0.98);
+  --text-dim: #cfd8e3;
+  --neutral: #a8b4c6;
+  --boss: #b47cff;
+  --line: #94a3b8;
+  --surface: #05080f;
+  --surface-strong: #020408;
 }
 
 :root[data-color-vision='assist'] {
@@ -207,6 +228,18 @@ select {
   background: var(--surface);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
+}
+
+:root[data-contrast='high']
+  :is(
+    .screen--overlay,
+    #pause-screen,
+    #levelup-screen,
+    #gameover-screen,
+    #victory-screen
+  ) {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .screen--overlay {

@@ -86,11 +86,13 @@ export class ImpactKick {
     this.aberration = 0;
     this.blur = 0;
     this.frame = 0;
+    // Reduce Flashing (Settings → Accessibility) sets it to 0.3
+    this.scale = 1;
   }
 
   /** Spikes the kick to `strength` (0..1); never lowers a running one. */
   kick(strength) {
-    this.strength = Math.max(this.strength, Math.min(1, strength));
+    this.strength = Math.max(this.strength, Math.min(1, strength) * this.scale);
   }
 
   /**

@@ -211,6 +211,7 @@ class Renderer3D extends BaseSystem {
       aberration: true,
     };
     this.reducedMotion = false;
+    this.flashScale = 1; // Reduce Flashing: 0.3
     // `?quality=` pins a preset (or 'auto') over the Graphics setting.
     this.qualityUrl = qualityFromUrl();
     this.quality = new AutoQuality({
@@ -310,7 +311,7 @@ class Renderer3D extends BaseSystem {
       this.three?.shield.activate(performance.now() / 1000);
     });
     this.registerEventListener('shield-broken', () => {
-      this.three?.shield.break(performance.now() / 1000);
+      this.three?.shield.break(performance.now() / 1000, this.flashScale);
     });
     this.registerEventListener('camera-zoom-pulse', ({ zoom, duration }) => {
       this.camera.pulseZoom(zoom, duration);
@@ -542,6 +543,8 @@ class Renderer3D extends BaseSystem {
   applyAccessibilityPreferences(values = {}) {
     this.reducedMotion = Boolean(values.reducedMotion);
     this.camera.setReducedMotion(this.reducedMotion);
+    this.flashScale = values.reduceFlashing ? 0.3 : 1;
+    this.impact.scale = this.flashScale;
   }
 
   syncPasses() {

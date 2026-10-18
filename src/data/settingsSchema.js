@@ -422,10 +422,36 @@ const SETTINGS_SCHEMA = [
         default: false,
       },
       {
+        key: 'reduceFlashing',
+        type: 'toggle',
+        label: 'Reduce Flashing',
+        description:
+          'Softens screen flashes, lens kicks and the shield break to under a third, and never strobes.',
+        default: false,
+      },
+      {
+        key: 'textScale',
+        type: 'select',
+        control: 'segmented',
+        label: 'Text Size',
+        description:
+          'Scales HUD text and the level-up, pause and recap screens.',
+        options: ['0.9', '1', '1.15', '1.3'],
+        optionLabels: { 0.9: '90%', 1: '100%', 1.15: '115%', 1.3: '130%' },
+        default: '1',
+      },
+      {
         key: 'highContrastHud',
         type: 'toggle',
         label: 'High Contrast HUD',
-        description: 'Applies stronger colors to key indicators.',
+        description: 'Opaque HUD panels, thicker outlines and brighter labels.',
+        default: false,
+      },
+      {
+        key: 'largeSubtitles',
+        type: 'toggle',
+        label: 'Large Subtitles',
+        description: 'Makes transmission lines bigger, on top of Text Size.',
         default: false,
       },
       {

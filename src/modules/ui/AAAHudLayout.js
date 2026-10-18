@@ -1745,6 +1745,15 @@ export class AAAHudLayout {
             .transmission__rule { width: 100%; height: 1px; background: linear-gradient(90deg, transparent, var(--accent-line) 20%, var(--accent-line) 80%, transparent); }
             .transmission__line { min-height: 1.5em; font-family: var(--font-display); font-size: var(--text-md); letter-spacing: 0.06em; line-height: 1.5; text-align: center; color: var(--text); text-shadow: 0 0 10px rgba(0, 0, 0, 0.9), 0 0 6px var(--accent-line); }
             .transmission.is-typing .transmission__line::after { content: '▌'; margin-left: 2px; color: var(--accent); }
+            /* Settings → Accessibility: Large Subtitles stacks on Text Size; Reduce Flashing stops the flicker */
+            body.subtitles-large .transmission { width: min(760px, 90%); }
+            body.subtitles-large .transmission__speaker { font-size: calc(var(--text-xs) * 1.35); }
+            body.subtitles-large .transmission__line { font-size: calc(var(--text-md) * 1.35); }
+            body.flashing-reduced .transmission.is-showing { animation: none; }
+
+            /* High Contrast HUD: opaque panels and 2 px outlines (tokens in style.css) */
+            body.hud-high-contrast :is(.stat-block, .feed-row, .transmission) { background: var(--surface); outline: 2px solid var(--line); }
+            body.hud-high-contrast :is(.mode-chip, .xp-bar-container, .bar-segment, .boss-bar-container, .onboarding-tip) { border-width: 2px; }
 
             /* ONBOARDING TIP (first run, top centre under the boss bar slot) */
             .onboarding-tip { position: absolute; top: 15%; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); background: var(--surface-strong); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--radius-md); pointer-events: none; z-index: 80; white-space: nowrap; opacity: 0; visibility: hidden; }

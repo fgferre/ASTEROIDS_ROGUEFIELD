@@ -6,6 +6,7 @@ import {
   ImpactKick,
   VIGNETTE,
 } from '../../../src/modules/render3d/impactPass.js';
+import Renderer3D from '../../../src/modules/render3d/Renderer3D.js';
 
 describe('ImpactKick', () => {
   it('peaks on the frame after a kick and is gone within ~180 ms', () => {
@@ -69,5 +70,19 @@ describe('ImpactKick grain and vignette', () => {
     expect(p.enabled).toBe(true);
     expect(p.uniforms.uGrain.value).toBe(0);
     expect(p.uniforms.uVignette.value).toBe(0);
+  });
+});
+
+describe('Reduce Flashing in 3D', () => {
+  it('scales lens kicks to 30 % and the shield break flare with them, live', () => {
+    const renderer = new Renderer3D();
+    renderer.applyAccessibilityPreferences({ reduceFlashing: true });
+    renderer.impact.kick(1);
+    expect(renderer.impact.strength).toBeCloseTo(0.3, 5);
+    expect(renderer.flashScale).toBe(0.3);
+
+    renderer.applyAccessibilityPreferences({ reduceFlashing: false });
+    renderer.impact.kick(1);
+    expect(renderer.impact.strength).toBe(1);
   });
 });
