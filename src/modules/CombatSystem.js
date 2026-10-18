@@ -30,6 +30,7 @@ import {
   KNOCKBACK_MAX,
   KNOCKBACK_MIN,
   KNOCKBACK_REFERENCE_DAMAGE,
+  ION_TRAIL_GAP,
 } from '../data/constants/gameplay.js';
 
 /** Knockback speed (px/s) for a hit of `damage`, before the heavy factor. */
@@ -274,15 +275,20 @@ class CombatSystem extends BaseSystem {
     this.registerEventListener('upgrade-cinder-trail', (data) => {
       this.cardEffects.cinderTrail = data;
     });
+    this.registerEventListener('upgrade-ion-trail', (data) => {
+      this.cardEffects.ionTrail = data;
+    });
 
     this.registerEventListener('thruster-effect', (data = {}) => {
-      if (
-        this.cardEffects.cinderTrail &&
-        data.type === 'main' &&
-        data.intensity > 0
-      ) {
-        this.dropCinder(data.position);
-      }
+      if (data.type !== 'main' || !(data.intensity > 0)) return;
+      const { cinderTrail, ionTrail } = this.cardEffects;
+      if (cinderTrail) this.dropTrailPoint(this.cinders, cinderTrail, data);
+      if (ionTrail) this.dropTrailPoint(this.ions, ionTrail, data);
+    });
+
+    // Emergency brake (Braking System 3): a shove, no damage.
+    this.registerEventListener('player-braked', (data = {}) => {
+      this.shoveFrom(data.position, data.radius, data.knockback);
     });
 
     // Discharged on the next update, outside the collision pass that hit us.
@@ -3186,13 +3192,24 @@ class CombatSystem extends BaseSystem {
   // reasserts its own velocity, so it reads as a short stagger; asteroids
   // drift linearly and would keep it forever, so they are left alone.
   applyKnockback(bullet, enemy, damage) {
+    this.pushEnemy(
+      enemy,
+      bullet.vx || 0,
+      bullet.vy || 0,
+      knockbackSpeed(damage)
+    );
+  }
+
+  // Adds `speed` px/s along (dx, dy); bosses and heralds take a tenth, rocks
+  // none (they would keep the drift forever).
+  pushEnemy(enemy, dx, dy, speed) {
     if (enemy.type === 'asteroid') return;
-    const length = Math.hypot(bullet.vx || 0, bullet.vy || 0);
+    const length = Math.hypot(dx, dy);
     if (length === 0) return;
     const heavy = enemy.type === 'boss' || enemy.type === 'herald';
-    const speed = knockbackSpeed(damage) * (heavy ? KNOCKBACK_HEAVY_FACTOR : 1);
-    const ix = (bullet.vx / length) * speed;
-    const iy = (bullet.vy / length) * speed;
+    const push = speed * (heavy ? KNOCKBACK_HEAVY_FACTOR : 1);
+    const ix = (dx / length) * push;
+    const iy = (dy / length) * push;
     enemy.vx = (enemy.vx ?? 0) + ix;
     enemy.vy = (enemy.vy ?? 0) + iy;
     // Steering strategies read `velocity` and write it back to vx/vy.
@@ -3220,6 +3237,8 @@ class CombatSystem extends BaseSystem {
     this.cardRolls = 0;
     this.cinders = [];
     this.cinderTimer = 0;
+    this.ions = [];
+    this.ionTimer = 0;
     this.staticShellPending = false;
     this.refreshLanceLook();
   }
@@ -3615,35 +3634,49 @@ class CombatSystem extends BaseSystem {
     return (hashUnit(this.cardRolls * 7 + 3) + 1) / 2 < chance;
   }
 
-  // Cinder Trail: a burning point every few px along the main thruster.
-  dropCinder(position) {
-    const { life, radius } = this.cardEffects.cinderTrail;
-    const last = this.cinders[this.cinders.length - 1];
+  // Cinder Trail / Ion Trail: a point every few px along the main thruster.
+  dropTrailPoint(list, { life, radius }, { position }) {
+    const last = list[list.length - 1];
     if (last && Math.hypot(last.x - position.x, last.y - position.y) < radius) {
       return;
     }
-    this.cinders.push({ x: position.x, y: position.y, life, maxLife: life });
+    list.push({ x: position.x, y: position.y, life, maxLife: life });
   }
 
-  burnCinderTouches({ damage, radius }) {
+  // The Ion Trail spares rocks and halves on bosses (`bossFactor`).
+  burnTrailTouches(list, { damage, radius, bossFactor }) {
+    const ion = bossFactor !== undefined;
     const touched = [];
     this.cachedEnemies.forEachActiveEnemy((enemy) => {
       if (!enemy || enemy.destroyed) return;
+      if (ion && enemy.type === 'asteroid') return;
       const reach = (enemy.radius || 0) + radius;
       const reachSq = reach * reach;
       if (
-        this.cinders.some(
-          (c) => (c.x - enemy.x) ** 2 + (c.y - enemy.y) ** 2 <= reachSq
-        )
+        list.some((c) => (c.x - enemy.x) ** 2 + (c.y - enemy.y) ** 2 <= reachSq)
       ) {
         touched.push(enemy);
       }
     });
     touched.forEach((enemy) => {
       if (enemy.destroyed) return;
-      this.applyDamageToEnemy(this.cachedEnemies, enemy, damage, {
+      const scale = ion && enemy.type === 'boss' ? bossFactor : 1;
+      this.applyDamageToEnemy(this.cachedEnemies, enemy, damage * scale, {
         hitPosition: { x: enemy.x, y: enemy.y },
       });
+    });
+  }
+
+  // Pushes every enemy within `radius` straight away from `origin`.
+  shoveFrom(origin, radius, speed) {
+    if (!origin) return;
+    this.cachedEnemies.forEachActiveEnemy((enemy) => {
+      if (!enemy || enemy.destroyed) return;
+      const dx = enemy.x - origin.x;
+      const dy = enemy.y - origin.y;
+      const reach = radius + (enemy.radius || 0);
+      if (dx * dx + dy * dy > reach * reach) return;
+      this.pushEnemy(enemy, dx, dy, speed);
     });
   }
 
@@ -3703,18 +3736,25 @@ class CombatSystem extends BaseSystem {
     fade(this.beams);
     fade(this.arcs);
     fade(this.cinders);
+    fade(this.ions);
     fade(this.wells);
 
-    const { cinderTrail, staticShell, gravityBrake } = this.cardEffects;
-    if (cinderTrail && this.cinders.length) {
-      this.cinderTimer += deltaTime;
-      while (this.cinderTimer >= cinderTrail.tickInterval) {
-        this.cinderTimer -= cinderTrail.tickInterval;
-        this.burnCinderTouches(cinderTrail);
+    const { cinderTrail, ionTrail, staticShell, gravityBrake } =
+      this.cardEffects;
+    // Each trail ticks on its own timer while it has points.
+    const tick = (list, trail, timerKey) => {
+      if (!trail || !list.length) {
+        this[timerKey] = 0;
+        return;
       }
-    } else {
-      this.cinderTimer = 0;
-    }
+      this[timerKey] += deltaTime;
+      while (this[timerKey] >= trail.tickInterval) {
+        this[timerKey] -= trail.tickInterval;
+        this.burnTrailTouches(list, trail);
+      }
+    };
+    tick(this.cinders, cinderTrail, 'cinderTimer');
+    tick(this.ions, ionTrail, 'ionTimer');
     if (this.staticShellPending) {
       this.staticShellPending = false;
       this.dischargeStaticShell(staticShell);
@@ -3991,6 +4031,19 @@ class CombatSystem extends BaseSystem {
       ctx.arc(cinder.x, cinder.y, 2 + 3 * k, 0, Math.PI * 2);
       ctx.fill();
     });
+    // Ion Trail: a cyan line, broken where thrust stopped.
+    ctx.lineCap = 'round';
+    for (let i = 1; i < this.ions.length; i += 1) {
+      const a = this.ions[i - 1];
+      const b = this.ions[i];
+      if ((a.x - b.x) ** 2 + (a.y - b.y) ** 2 > ION_TRAIL_GAP ** 2) continue;
+      ctx.strokeStyle = withAlpha(PALETTE.player, 0.6 * (b.life / b.maxLife));
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
     this.burns.forEach((entry, enemy) => {
       const r = (enemy.radius || 12) * 0.9;
       const glow = ctx.createRadialGradient(

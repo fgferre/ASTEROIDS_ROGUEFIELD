@@ -1,9 +1,10 @@
 // Weapon looks in 3D (docs/NORTE.md §7 pillar 4): evolved lances, the
-// Harmonic beam, chain arcs and the burn/slow marks, drawn into the shared
+// Harmonic beam, chain arcs, the thruster trails and the burn/slow marks, drawn into the shared
 // batches from CombatSystem's state. Colours come from data/weapons.js, the
 // same ones CombatSystem's 2D draw uses.
 
 import { PALETTE } from '../../data/constants/palette.js';
+import { ION_TRAIL_GAP } from '../../data/constants/gameplay.js';
 import { WEAPONS, WEAPON_APEX, WEAPON_EVOLUTIONS } from '../../data/weapons.js';
 import { rgbOf } from './batches.js';
 
@@ -11,6 +12,8 @@ const LANCE_H = 3;
 const BEAM_H = 3.2;
 const ARC_H = 8;
 const MARK_H = 6;
+const TRAIL_H = 2;
+const ION_KINK = 14; // px, the most an ion segment bends off its line
 // proposta 18/10: beam layers, outer glow → white core: [colour, width ×
 // beam width, gain]. Additive, so the core reads hottest where they overlap.
 // The fourth entry is the layer's length (× beam length): inner layers stop
@@ -96,6 +99,36 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
   const { ribbons, glow } = batches;
   const white = rgbOf(THREE, PALETTE.text);
   const colors = WEAPONS.harmonic.colors;
+
+  // Thruster trails: Cinder Trail embers, Ion Trail as a cyan ribbon.
+  const cinderRgb = rgbOf(THREE, WEAPON_EVOLUTIONS.thermal.look.trail);
+  combat.cinders.forEach((c) => {
+    const k = c.life / c.maxLife;
+    glow.push(c.x, TRAIL_H, c.y, cinderRgb, 6 + 6 * k, 0.6 * k);
+  });
+  // The ion trail crackles (a kinked bolt per segment, re-kinked as it
+  // fades) so it reads apart from the cyan exhaust it sits on.
+  const ionRgb = rgbOf(THREE, PALETTE.player);
+  const ions = combat.ions;
+  for (let i = 1; i < ions.length; i += 1) {
+    const a = ions[i - 1];
+    const b = ions[i];
+    if ((a.x - b.x) ** 2 + (a.y - b.y) ** 2 > ION_TRAIL_GAP ** 2) continue;
+    const k = b.life / b.maxLife;
+    const flicker = Math.floor(b.life * 20);
+    const kink = (glint(b.x + flicker, b.y) - 0.5) * ION_KINK;
+    const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+    const mx = (a.x + b.x) / 2 - ((b.y - a.y) / len) * kink;
+    const my = (a.y + b.y) / 2 + ((b.x - a.x) / len) * kink;
+    [
+      [a, { x: mx, y: my }],
+      [{ x: mx, y: my }, b],
+    ].forEach(([p, q]) => {
+      ribbons.segment(p.x, p.y, q.x, q.y, ARC_H, ionRgb, 4, 0.7 * k);
+      ribbons.segment(p.x, p.y, q.x, q.y, ARC_H, white, 1, 1.6 * k);
+    });
+    glow.push(b.x, ARC_H, b.y, ionRgb, 8 * k + 2, 0.5 * k, 1.4);
+  }
 
   const flare = combat.apexes.includes('thermal');
   combat.burns.forEach((entry, enemy) => {

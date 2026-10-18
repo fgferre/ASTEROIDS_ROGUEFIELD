@@ -307,7 +307,7 @@ Qualidade:
 
 Conteúdo:
 
-- [ ] **R10.1 Cartas que prometem e não entregam.** `upgrade-emergency-brake` (Braking System 3) vira freio de emergência
+- [x] **R10.1 Cartas que prometem e não entregam.** `upgrade-emergency-brake` (Braking System 3) vira freio de emergência
       real (segurar S parado por 0,25 s zera a velocidade com onda de choque leve) e `upgrade-ion-trail` (Propulsors 5)
       vira rastro iônico que dá dano por contato; dash deixa de cair de 418 → 220 de uma vez (decai em 0,2 s).
       Qualidade:

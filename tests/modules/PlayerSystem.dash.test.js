@@ -4,6 +4,7 @@ import { createEventBusMock } from '../__helpers__/mocks.js';
 import { cleanupGlobalState, setupGlobalMocks } from '../__helpers__/setup.js';
 import {
   DASH_COOLDOWN,
+  DASH_DECAY_SECONDS,
   DASH_GHOST_COUNT,
   DASH_IMPULSE,
   DASH_INVULNERABILITY,
@@ -55,11 +56,34 @@ describe('PlayerSystem dash', () => {
 
     steps(player, 15);
     expect(player.dashGhosts.length).toBeGreaterThan(0);
+    steps(player, 10); // past the dash and its decay
     expect(player.dashGhostsDropped).toBe(DASH_GHOST_COUNT);
     expect(
       Math.hypot(player.velocity.vx, player.velocity.vy)
     ).toBeLessThanOrEqual(SHIP_MAX_SPEED);
     expect(player.invulnerableTimer).toBe(0);
+  });
+
+  it('eases from dash speed back to max speed over the decay, not in one frame', () => {
+    const { player, eventBus } = makePlayer();
+    eventBus.emit('dash-pressed');
+    player.update(DELTA_TIME);
+    while (player.dashTimer > 0) player.update(DELTA_TIME);
+    const speed = () => Math.hypot(player.velocity.vx, player.velocity.vy);
+    let previous = speed();
+    expect(previous).toBeGreaterThan(1.5 * SHIP_MAX_SPEED);
+    const decaySteps = Math.round(DASH_DECAY_SECONDS / DELTA_TIME);
+    const drops = [];
+    for (let i = 0; i < decaySteps; i += 1) {
+      player.update(DELTA_TIME);
+      const now = speed();
+      expect(now).toBeLessThan(previous);
+      drops.push(previous - now);
+      previous = now;
+    }
+    // No frame takes a cliff: each loses well under the old 418 → 220 drop.
+    expect(Math.max(...drops)).toBeLessThan(0.25 * SHIP_MAX_SPEED);
+    expect(previous).toBeLessThanOrEqual(SHIP_MAX_SPEED);
   });
 
   it('dashes down the screen while only S is held, whatever the heading', () => {

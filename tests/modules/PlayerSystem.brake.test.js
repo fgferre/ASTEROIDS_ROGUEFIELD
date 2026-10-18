@@ -3,6 +3,7 @@ import PlayerSystem from '../../src/modules/PlayerSystem.js';
 import { createEventBusMock } from '../__helpers__/mocks.js';
 import { cleanupGlobalState, setupGlobalMocks } from '../__helpers__/setup.js';
 import { SHIP_LINEAR_DAMPING } from '../../src/data/constants/physics.js';
+import UPGRADE_LIBRARY from '../../src/data/upgrades/index.js';
 
 // FIX-02 regression suite. Locks the velocity-envelope contract from CONTEXT D-10:
 // (1) max-rank braking_system + continuous thrust => peak velocity within +/-2% of baseline.
@@ -158,5 +159,77 @@ describe('PlayerSystem brake upgrade (FIX-02)', () => {
     const expectedTotalR3 = SHIP_LINEAR_DAMPING * 1.3 * 1.231 * 1.25;
     const actualTotalR3 = SHIP_LINEAR_DAMPING + r3;
     expect(actualTotalR3).toBeCloseTo(expectedTotalR3, 6);
+  });
+});
+
+describe('Braking System 3: emergency brake', () => {
+  beforeEach(() => setupGlobalMocks());
+  afterEach(() => cleanupGlobalState());
+
+  const brake = UPGRADE_LIBRARY.find(
+    (u) => u.id === 'braking_system'
+  ).levels[2].effects.find(
+    (e) => e.event === 'upgrade-emergency-brake'
+  ).payload;
+
+  // Modern scheme: S pushes down the screen; the ship starts flying up.
+  function makePlayer(vy) {
+    const eventBus = createEventBusMock();
+    const movement = { up: false, down: false, left: false, right: false };
+    const input = { getMovementInput: vi.fn(() => ({ ...movement })) };
+    const player = new PlayerSystem({ eventBus, input, 'command-queue': null });
+    player.position = { x: 400, y: 300 };
+    player.velocity = { vx: 0, vy };
+    eventBus.emit('upgrade-emergency-brake', brake);
+    const brakes = () =>
+      eventBus.emit.mock.calls.filter(([name]) => name === 'player-braked')
+        .length;
+    return { player, movement, brakes };
+  }
+
+  const steps = (player, count) => {
+    for (let i = 0; i < count; i += 1) player.update(DELTA_TIME);
+  };
+  const holdSteps = Math.round(brake.hold / DELTA_TIME);
+
+  it('fires once S has been held 0.25 s against the motion, and stops the ship', () => {
+    const { player, movement, brakes } = makePlayer(-150);
+    movement.down = true;
+    steps(player, holdSteps - 1);
+    expect(brakes()).toBe(0);
+    steps(player, 1);
+    expect(brakes()).toBe(1);
+    steps(player, Math.round(brake.stopTime / DELTA_TIME));
+    expect(Math.hypot(player.velocity.vx, player.velocity.vy)).toBeLessThan(5);
+  });
+
+  it('fires once per press, waits out its cooldown, and never fires along the motion', () => {
+    const { player, movement, brakes } = makePlayer(-150);
+    movement.down = true;
+    steps(player, holdSteps + 30);
+    expect(brakes()).toBe(1);
+
+    // A second press inside the 1.2 s cooldown is spent.
+    movement.down = false;
+    player.update(DELTA_TIME);
+    player.velocity = { vx: 0, vy: -150 };
+    movement.down = true;
+    steps(player, holdSteps);
+    expect(brakes()).toBe(1);
+
+    movement.down = false;
+    steps(player, Math.round(brake.cooldown / DELTA_TIME));
+    player.velocity = { vx: 0, vy: -150 };
+    movement.down = true;
+    steps(player, holdSteps);
+    expect(brakes()).toBe(2);
+
+    // Flying down the screen with S held is just movement.
+    movement.down = false;
+    steps(player, Math.round(brake.cooldown / DELTA_TIME));
+    player.velocity = { vx: 0, vy: 150 };
+    movement.down = true;
+    steps(player, holdSteps * 2);
+    expect(brakes()).toBe(2);
   });
 });

@@ -685,6 +685,17 @@ export default class EffectsSystem extends BaseSystem {
       });
     });
 
+    // Emergency brake: a small cyan ring the size of its shove.
+    this.registerEventListener('player-braked', (data) => {
+      this.createShockwaveEffect({
+        position: data?.position,
+        radius: data?.radius,
+        duration: 0.3,
+        baseWidth: 6,
+        color: withAlpha(PALETTE.player, 0.6),
+      });
+    });
+
     this.registerEventListener('player-dashed', (data) => {
       if (data?.position && data?.direction) {
         this.createDashBurst(data.position, data.direction);
