@@ -34,6 +34,9 @@ export class DebrisChunks {
     });
     this.meshes = [];
     this.counts = new Int32Array(VARIANTS);
+    // quality preset: live chunks at most (≤ DEBRIS_CAPACITY)
+    this.limit = DEBRIS_CAPACITY;
+    this.total = 0;
     const white = new THREE.Color(1, 1, 1);
     for (let v = 0; v < VARIANTS; v += 1) {
       const geometry = createAsteroidGeometry(THREE, 31 + v * 17, {
@@ -65,10 +68,12 @@ export class DebrisChunks {
 
   begin() {
     this.counts.fill(0);
+    this.total = 0;
   }
 
   /** One debris particle `p` (EffectsSystem fields) in linear `rgb`. */
   push(p, rgb) {
+    if (this.total >= this.limit) return;
     const seed = p.rotationSpeed || p.maxLife || 1;
     let v = Math.floor(hash01(seed) * VARIANTS);
     for (let tries = 0; this.counts[v] >= PER_VARIANT; tries += 1) {
@@ -105,6 +110,7 @@ export class DebrisChunks {
     mesh.setMatrixAt(i, this.matrix);
     mesh.setColorAt(i, this.color.setRGB(rgb[0], rgb[1], rgb[2]));
     this.counts[v] = i + 1;
+    this.total += 1;
   }
 
   end() {
@@ -121,8 +127,6 @@ export class DebrisChunks {
 
   /** Live instances (all variants). */
   get count() {
-    let total = 0;
-    for (let v = 0; v < VARIANTS; v += 1) total += this.counts[v];
-    return total;
+    return this.total;
   }
 }

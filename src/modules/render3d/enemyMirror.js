@@ -382,6 +382,10 @@ export class EnemyMirror {
     // The Wardens' segments, arms and plates: the plate look plus grooved
     // surface maps on their UVs.
     const plateMaps = bakePlateMaps(THREE, MAP_SEED);
+    this.plateMaps = plateMaps;
+    // Quality preset: every material that samples baked maps, to toggle.
+    this.surfaceMaps = true;
+    this.rockMaterials = [];
     this.wardenPlateMaterial = this.plateMaterial.clone();
     Object.assign(this.wardenPlateMaterial, plateMaps, {
       normalScale: new THREE.Vector2(PLATE_NORMAL_SCALE, PLATE_NORMAL_SCALE),
@@ -701,8 +705,8 @@ export class EnemyMirror {
       colorOf(THREE, PALETTE.shot)
     );
     material.userData.rockMaps = this.stoneMaps;
-    Object.assign(material.defines, { ROCK_NORMAL: '', ROCK_SURFACE: '' });
     material.onBeforeCompile = patchRockShader;
+    this.trackSurfaceMaps(material);
     const mesh = new THREE.Mesh(this.rockGeometries[0], material);
     mesh.rotation.order = 'YXZ';
     this.scene.add(mesh);
@@ -726,9 +730,40 @@ export class EnemyMirror {
     });
     material.userData.rockUniforms = view.stone.userData.rockUniforms;
     material.userData.rockMaps = this.crystalMaps;
-    material.defines.ROCK_NORMAL = '';
     material.onBeforeCompile = patchRockShader;
+    this.trackSurfaceMaps(material);
     return material;
+  }
+
+  /** Quality preset: baked surface maps on or off (one recompile each). */
+  setSurfaceMaps(enabled) {
+    if (enabled === this.surfaceMaps) return;
+    this.surfaceMaps = enabled;
+    this.rockMaterials.forEach((material) => this.applySurfaceMaps(material));
+    const plate = this.wardenPlateMaterial;
+    Object.keys(this.plateMaps).forEach((name) => {
+      plate[name] = enabled ? this.plateMaps[name] : null;
+    });
+    plate.needsUpdate = true;
+  }
+
+  trackSurfaceMaps(material) {
+    this.rockMaterials.push(material);
+    this.applySurfaceMaps(material);
+  }
+
+  // Stone takes normal + roughness/AO; crystal only the faint normal.
+  applySurfaceMaps(material) {
+    const { defines } = material;
+    delete defines.ROCK_NORMAL;
+    delete defines.ROCK_SURFACE;
+    if (this.surfaceMaps) {
+      defines.ROCK_NORMAL = '';
+      if (material.userData.rockMaps === this.stoneMaps) {
+        defines.ROCK_SURFACE = '';
+      }
+    }
+    material.needsUpdate = true;
   }
 
   createMote() {

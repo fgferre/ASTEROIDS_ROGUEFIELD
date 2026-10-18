@@ -17,6 +17,12 @@ import {
 } from '../../core/GameConstants.js';
 import { cameraDisabledByUrl, createCamera } from '../../core/camera.js';
 import { IS_DEV } from '../../core/env.js';
+import {
+  StepInterpolator,
+  interpolationDisabledByUrl,
+} from '../../core/interpolation.js';
+import { AutoQuality, qualityFromUrl } from '../../core/qualityPresets.js';
+import { getViewport } from '../../core/viewport.js';
 import { BiomeTransition } from '../../data/biomes.js';
 import { resolveService } from '../../core/serviceUtils.js';
 import {
@@ -130,6 +136,11 @@ function bloomFromUrl() {
   }
 }
 
+// The pose of an entity's angle field, 0 when it has none.
+function angleOf(holder, key) {
+  return holder && Number.isFinite(holder[key]) ? holder[key] : 0;
+}
+
 function smoothstep(a, b, x) {
   const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
   return t * t * (3 - 2 * t);
@@ -155,6 +166,41 @@ class Renderer3D extends BaseSystem {
       aberration: true,
     };
     this.reducedMotion = false;
+    // `?quality=` pins a preset (or 'auto') over the Graphics setting.
+    this.qualityUrl = qualityFromUrl();
+    this.quality = new AutoQuality({
+      mode: this.qualityUrl || 'auto',
+      onChange: (change) => {
+        this.applyQuality();
+        this.eventBus?.emit('quality-changed', change);
+      },
+    });
+    // Render interpolation (interpolation.js): poses captured per step,
+    // written into the entities only while a frame is drawn, then restored.
+    this.interp = interpolationDisabledByUrl() ? null : new StepInterpolator();
+    this.poseOut = { x: 0, y: 0, angle: 0 };
+    this.poseAlpha = 1;
+    this.posed = [];
+    this.captureBody = (pos, holder, key, id) => {
+      this.interp.capture(pos, pos.x, pos.y, angleOf(holder, key), id);
+    };
+    this.poseBody = (pos, holder, key) => {
+      const angle = angleOf(holder, key);
+      const out = this.interp.sample(
+        pos,
+        pos.x,
+        pos.y,
+        angle,
+        this.poseAlpha,
+        this.poseOut
+      );
+      if (!out) return;
+      const turns = holder && Number.isFinite(holder[key]);
+      this.posed.push(pos, pos.x, pos.y, turns ? holder : null, key, angle);
+      pos.x = out.x;
+      pos.y = out.y;
+      if (turns) holder[key] = out.angle;
+    };
     this.impact = new ImpactKick();
     this.hitSparks = new HitSparks();
     this.muzzles = new MuzzleFlashes();
@@ -268,7 +314,75 @@ class Renderer3D extends BaseSystem {
     this.graphics.bloom = values.bloom !== false;
     this.graphics.smaa = values.antialiasing !== 'None';
     this.graphics.aberration = values.chromaticAberration !== false;
+    if (!this.qualityUrl) this.quality.setMode(values.quality);
     this.syncPasses();
+  }
+
+  // The current preset (qualityPresets.js) on the live scene. Resolution
+  // follows in syncSize, which compares the scale every frame.
+  applyQuality() {
+    const t = this.three;
+    if (!t) return;
+    const q = this.quality.settings;
+    t.biomes.targets.bloomBase = BLOOM.strength * t.bloomScale * q.bloomScale;
+    t.biomes.applied = null;
+    t.enemies.setSurfaceMaps(q.surfaceMaps);
+    t.player.setSurfaceMaps(q.surfaceMaps);
+    t.floor.shadows.visible = q.shadows;
+    t.debris.limit = q.debrisCap;
+    this.syncPasses();
+  }
+
+  /** After every simulation step (app.js): captures poses to interpolate. */
+  snapshot() {
+    if (!this.interp) return;
+    this.interp.beginStep();
+    this.visitBodies(this.captureBody);
+    this.interp.endStep();
+  }
+
+  // Every entity drawn at an interpolated pose: visit(pos, angleHolder,
+  // angleKey, id), pos holding x/y.
+  visitBodies(visit) {
+    const enemies = this.cachedEnemies?.getActiveEnemies() || [];
+    for (let i = 0; i < enemies.length; i += 1) {
+      const e = enemies[i];
+      if (e) visit(e, e, 'rotation', e.id);
+    }
+    const player = this.cachedPlayer;
+    if (player?.position) visit(player.position, player, 'angle', null);
+    const combat = this.cachedCombat;
+    const lists = [
+      combat?.bullets,
+      combat?.enemyBullets,
+      this.cachedPickups?.pickups,
+      this.cachedXPOrbs?.xpOrbs,
+      this.cachedHealthHearts?.hearts,
+    ];
+    for (let l = 0; l < lists.length; l += 1) {
+      const list = lists[l] || [];
+      for (let i = 0; i < list.length; i += 1) {
+        const item = list[i];
+        if (item) visit(item, null, null, item.id);
+      }
+    }
+  }
+
+  applyPoses(alpha) {
+    // alpha 1 is the latest step: the live pose itself
+    if (!this.interp || !(alpha < 1)) return;
+    this.poseAlpha = alpha;
+    this.visitBodies(this.poseBody);
+  }
+
+  restorePoses() {
+    const p = this.posed;
+    for (let i = 0; i < p.length; i += 6) {
+      p[i].x = p[i + 1];
+      p[i].y = p[i + 2];
+      if (p[i + 3]) p[i + 3][p[i + 4]] = p[i + 5];
+    }
+    p.length = 0;
   }
 
   applyAccessibilityPreferences(values = {}) {
@@ -280,7 +394,7 @@ class Renderer3D extends BaseSystem {
     if (!t) return;
     const { bloom, postProcessing, smaa } = this.graphics;
     t.bloomPass.enabled = bloom && postProcessing && t.bloomUrl;
-    t.smaaPass.enabled = smaa && postProcessing;
+    t.smaaPass.enabled = smaa && postProcessing && this.quality.settings.smaa;
   }
 
   onReset() {
@@ -294,6 +408,7 @@ class Renderer3D extends BaseSystem {
     this.hitSparks.clear();
     this.muzzles.clear();
     this.biome.reset();
+    this.interp?.clear();
   }
 
   // --- setup -----------------------------------------------------------------
@@ -464,6 +579,7 @@ class Renderer3D extends BaseSystem {
       impactPass,
       smaaPass,
       bloomUrl: bloomUrl.enabled,
+      bloomScale: bloomUrl.scale,
       overlay,
       texts,
       bossFlash,
@@ -488,6 +604,9 @@ class Renderer3D extends BaseSystem {
       flashAlpha: 0,
       width: 0,
       height: 0,
+      canvasWidth: 0,
+      canvasHeight: 0,
+      scale: 1,
       shotRgb: rgbOf(THREE, PALETTE.shot),
       threatRgb: rgbOf(THREE, PALETTE.threat),
       xpRgb: rgbOf(THREE, PALETTE.xp),
@@ -495,7 +614,7 @@ class Renderer3D extends BaseSystem {
       accentRgb: rgbOf(THREE, PALETTE.player),
       textRgb: rgbOf(THREE, PALETTE.text),
     };
-    this.syncPasses();
+    this.applyQuality();
   }
 
   // A dim reflection environment so metal reads as metal: black below, a
@@ -537,7 +656,8 @@ class Renderer3D extends BaseSystem {
 
   // --- frame -----------------------------------------------------------------
 
-  render() {
+  /** `alpha`: the fixed stepper's leftover fraction (1 = latest step). */
+  render(ctx, alpha = 1) {
     if (this.failed) return;
     if (!this.three) {
       try {
@@ -549,6 +669,15 @@ class Renderer3D extends BaseSystem {
       }
     }
 
+    this.applyPoses(alpha);
+    try {
+      this.drawFrame();
+    } finally {
+      this.restorePoses();
+    }
+  }
+
+  drawFrame() {
     const now = performance.now();
     const dt =
       this.lastRenderTime === null
@@ -611,7 +740,9 @@ class Renderer3D extends BaseSystem {
       t.height,
       this.impact.update(
         dt,
-        this.graphics.postProcessing && !this.reducedMotion,
+        this.graphics.postProcessing &&
+          !this.reducedMotion &&
+          this.quality.settings.impactPass,
         this.graphics.aberration
       )
     );
@@ -625,15 +756,31 @@ class Renderer3D extends BaseSystem {
     this.recordStats();
   }
 
+  // The canvas stays at native size; the composer draws at the preset's
+  // pixel-ratio cap and its last pass scales up. t.width/height are the
+  // composer's pixels (point sizes, impact pass).
   syncSize() {
     const t = this.three;
     const width = Math.max(1, t.canvas.width);
     const height = Math.max(1, t.canvas.height);
-    if (width === t.width && height === t.height) return;
-    t.width = width;
-    t.height = height;
+    const scale = Math.min(
+      1,
+      this.quality.settings.pixelRatio / (getViewport().dpr || 1)
+    );
+    if (
+      width === t.canvasWidth &&
+      height === t.canvasHeight &&
+      scale === t.scale
+    ) {
+      return;
+    }
+    t.canvasWidth = width;
+    t.canvasHeight = height;
+    t.scale = scale;
+    t.width = Math.max(1, Math.round(width * scale));
+    t.height = Math.max(1, Math.round(height * scale));
     t.renderer.setSize(width, height, false);
-    t.composer.setSize(width, height);
+    t.composer.setSize(t.width, t.height);
     t.camera.aspect = width / height;
     t.camera.updateProjectionMatrix();
   }
@@ -927,12 +1074,15 @@ class Renderer3D extends BaseSystem {
   // A shadow on the dust floor under every mass; the ship's light pool.
   mirrorShadows(player, enemies) {
     const { floor, player: ship } = this.three;
-    for (let i = 0; i < enemies.length; i += 1) {
+    const shadows = floor.shadows.visible;
+    for (let i = 0; i < enemies.length && shadows; i += 1) {
       const e = enemies[i];
       if (e && !e.destroyed) floor.shadow(e.x, e.y, e.radius || 12);
     }
     const visible = ship.group.visible && player?.position;
-    if (visible) floor.shadow(visible.x, visible.y, SHIP_SHADOW_RADIUS);
+    if (visible && shadows) {
+      floor.shadow(visible.x, visible.y, SHIP_SHADOW_RADIUS);
+    }
     floor.end(visible || null, ship.light.intensity);
   }
 

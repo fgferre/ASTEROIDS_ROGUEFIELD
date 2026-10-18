@@ -194,7 +194,7 @@ rodada"_. Cada pilar do §7 vira fatias; a ordem é impacto visível por custo. 
 - [x] **R4.6 Harmonic Plasma Lance + evoluções por família.**
 - [x] **R4.7 Códice, recap de morte, pausa com build, onboarding em jogo.**
 - [x] **R4.8 Tema por bioma, tema de Warden, stingers.**
-- [ ] **R4.9 Interpolação de render, rochas instanciadas, presets automáticos por fps.**
+- [x] **R4.9 Interpolação de render, rochas instanciadas, presets automáticos por fps.**
 
 ## Fora de escopo deste plano
 

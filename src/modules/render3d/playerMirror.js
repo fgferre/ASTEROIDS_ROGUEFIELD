@@ -120,6 +120,8 @@ export class PlayerMirror {
     this.baseMaterial = hullTone(PALETTE.hull, PALETTE.hullLit, 0.2, 0.85);
     this.finMaterial = hullTone(PALETTE.hullLit, PALETTE.neutral, 0.15, 0.8);
     this.spineMaterial = hullTone(PALETTE.hullLit, PALETTE.neutral, 0.6, 0.72);
+    this.hullMaps = maps;
+    this.surfaceMaps = true;
     this.blink = blink;
     this.canopyMaterial = new THREE.MeshStandardMaterial({
       color: colorOf(THREE, PALETTE.rockShadow),
@@ -561,6 +563,20 @@ export class PlayerMirror {
   /** A shot left the nose: bump the ship light for a few frames. */
   flashMuzzle() {
     this.muzzleFrames = MUZZLE_LIGHT_FRAMES;
+  }
+
+  /** Quality preset: the baked hull maps on or off (one recompile). */
+  setSurfaceMaps(enabled) {
+    if (enabled === this.surfaceMaps) return;
+    this.surfaceMaps = enabled;
+    [this.baseMaterial, this.finMaterial, this.spineMaterial].forEach(
+      (material) => {
+        Object.keys(this.hullMaps).forEach((name) => {
+          material[name] = enabled ? this.hullMaps[name] : null;
+        });
+        material.needsUpdate = true;
+      }
+    );
   }
 
   reset() {
