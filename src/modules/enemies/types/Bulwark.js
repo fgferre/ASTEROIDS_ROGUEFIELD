@@ -71,10 +71,6 @@ export class Bulwark extends BaseEnemy {
     }
 
     const overflow = absorbFrontalHit(this, amount, hit);
-    this.getEventBus()?.emit?.(
-      this.shieldBroken ? 'bulwark-plate-broken' : 'bulwark-plate-hit',
-      { enemy: this, enemyId: this.id, position: { x: hit.x, y: hit.y } }
-    );
     return overflow > 0 ? super.takeDamage(overflow, source) : false;
   }
 
