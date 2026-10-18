@@ -196,6 +196,22 @@ rodada"_. Cada pilar do §7 vira fatias; a ordem é impacto visível por custo. 
 - [x] **R4.8 Tema por bioma, tema de Warden, stingers.**
 - [x] **R4.9 Interpolação de render, rochas instanciadas, presets automáticos por fps.**
 
+## Rodada 5 (18/10, madrugada) — conteúdo e cinema, ainda sem veredito dele
+
+Norte 2 tem primeira versão de tudo; esta rodada engorda o jogo onde um jogador sente falta aos 5 minutos:
+variedade de evento, de carta e de chefe, e um começo/fim de run com peso. Tudo proposta; ele reverte jogando.
+
+- [ ] **R5.1 Cinema.** Intro de 3 s (câmera desce do Anel até a nave, cartão "LAYER 1 — THE OUTER RING", pulável) e
+      epílogo da vitória (câmera recua, o Anel acende).
+- [ ] **R5.2 Heralds.** Mini-chefes nas camadas 3, 8 e 13, uma mecânica cada (Dust: muros de rocha; Heat: torna rochas
+      voláteis; Silence: embaralha o radar), intro curta, drop garantido.
+- [ ] **R5.3 Eventos de campo** na tabela de camadas: Gravity Well (fagulhas puxadas a um ponto), Solar Flare (flash
+      do bioma, inimigos atordoados 1 s), Sensor Jam (radar fora 10 s); banner e cue.
+- [ ] **R5.4 Catálogo 21 → 30.** Duas cartas novas por família + três "cursed" raras (ganho grande com custo).
+- [ ] **R5.5 Warm-up de shaders** na tela de loading (compila todos os materiais, inclusive os gêmeos do dissolve);
+      barra de progresso real.
+- [ ] **R5.6 Conquistas locais** numa aba do Códice (12, com toast na hora).
+
 ## Fora de escopo deste plano
 
 Steam, mobile/touch, multiplayer, narrativa, reescrita do gameplay em WebGL (ver decisão 1), troca do framework de
