@@ -912,17 +912,19 @@ class AudioSystem extends BaseSystem {
       return;
     }
 
+    // Master scales the summed mix once, at masterGain (after the limiter); the
+    // bus sliders carry only the per-bus mix.
     const { master, music, effects, muteAll } = this.volumeState;
     const masterValue = muteAll ? 0 : master;
 
     this.masterGain.gain.value = masterValue;
 
     if (this.musicGain) {
-      this.musicGain.gain.value = muteAll ? 0 : master * music;
+      this.musicGain.gain.value = muteAll ? 0 : music;
     }
 
     if (this.effectsGain) {
-      this.effectsGain.gain.value = muteAll ? 0 : master * effects;
+      this.effectsGain.gain.value = muteAll ? 0 : effects;
     }
   }
 
