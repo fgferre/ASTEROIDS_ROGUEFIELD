@@ -577,15 +577,17 @@ class CombatSystem extends BaseSystem {
       }
     }
 
+    // Every shot leaves the turret's muzzle (R5.11). Without a lock the
+    // turret has turned back onto the nose.
+    const muzzle = player.getMuzzlePoint();
+
     // Plan 01.07 Task 6: manual-aim mode bypasses target acquisition entirely
-    // and fires from the ship nose in the ship's current rotation direction.
+    // and fires from the muzzle along the turret.
     if (this.aimMode === 'manual') {
-      // Fix-pass (F5): `getAngle()` is PlayerSystem's canonical accessor; a
-      // player without it is a wiring bug and throws instead of shooting right.
-      const rotation = player.getAngle();
-      const nose = player.getNosePosition(rotation);
-      this.fireForward(playerPos, rotation, playerStats, {
-        originOverride: nose,
+      // Fix-pass (F5): `getTurretAngle()` is PlayerSystem's canonical weapon
+      // heading; a player without it is a wiring bug and throws.
+      this.fireForward(playerPos, player.getTurretAngle(), playerStats, {
+        originOverride: muzzle,
       });
       return;
     }
@@ -600,7 +602,9 @@ class CombatSystem extends BaseSystem {
 
     // [SMART AUTO-FIRE] Fallback to forward fire if no lock
     if (!lockTargets.length) {
-      this.fireForward(playerPos, player.getAngle(), playerStats);
+      this.fireForward(playerPos, player.getTurretAngle(), playerStats, {
+        originOverride: muzzle,
+      });
       return;
     }
 
@@ -656,7 +660,9 @@ class CombatSystem extends BaseSystem {
 
     if (!assignments.length) {
       // Should not happen due to check above, but safely fire forward just in case
-      this.fireForward(playerPos, player.getRotation(), playerStats);
+      this.fireForward(playerPos, player.getTurretAngle(), playerStats, {
+        originOverride: muzzle,
+      });
       return;
     }
 
@@ -776,7 +782,15 @@ class CombatSystem extends BaseSystem {
         }
       }
 
-      this.createBullet(fireOrigin, aimPoint, playerStats.damage);
+      // Lanes are laid out around the hull centre; shift them to the muzzle.
+      this.createBullet(
+        {
+          x: fireOrigin.x + muzzle.x - playerPos.x,
+          y: fireOrigin.y + muzzle.y - playerPos.y,
+        },
+        aimPoint,
+        playerStats.damage
+      );
       firedTargets.push({
         enemyId: assignment.enemy?.id ?? null,
         position: { ...aimPoint },
@@ -3236,14 +3250,15 @@ class CombatSystem extends BaseSystem {
 
   // Harmonic beam: damage lands on everything in the segment on the firing
   // frame; the beam stays on screen for HARMONIC_BEAM.duration. Aimed like the
-  // lances: the primary lock's lead point in auto, the ship's nose otherwise.
+  // lances: from the muzzle onto the primary lock's lead point in auto, along
+  // the turret otherwise.
   fireBeam(playerPos, playerStats) {
     const player = this.cachedPlayer;
     const aim = this.aimMode === 'manual' ? null : this.getPrimaryAimPoint();
+    const origin = player.getMuzzlePoint();
     const angle = aim
-      ? Math.atan2(aim.y - playerPos.y, aim.x - playerPos.x)
-      : player.getAngle();
-    const origin = player.getNosePosition(angle);
+      ? Math.atan2(aim.y - origin.y, aim.x - origin.x)
+      : player.getTurretAngle();
     const dirX = Math.cos(angle);
     const dirY = Math.sin(angle);
     const { width, duration } = HARMONIC_BEAM;
@@ -3595,15 +3610,15 @@ class CombatSystem extends BaseSystem {
       this.staticShellPending = false;
       this.dischargeStaticShell(staticShell);
     }
-    // The beam stays on the nose while it shows (its damage already landed).
+    // The beam stays on the muzzle while it shows (its damage already landed).
     const player = this.cachedPlayer;
     if (this.beams.length && !player.isDead) {
+      const muzzle = player.getMuzzlePoint();
       this.beams.forEach((beam) => {
-        const nose = player.getNosePosition(beam.angle);
-        beam.ex += nose.x - beam.x;
-        beam.ey += nose.y - beam.y;
-        beam.x = nose.x;
-        beam.y = nose.y;
+        beam.ex += muzzle.x - beam.x;
+        beam.ey += muzzle.y - beam.y;
+        beam.x = muzzle.x;
+        beam.y = muzzle.y;
       });
     }
 
@@ -3918,7 +3933,8 @@ class CombatSystem extends BaseSystem {
     this.projectilePerf.projectileRenderMs =
       performance.now() - projectileRenderStart;
 
-    const playerPosition = player.getPosition();
+    // The lock line starts at the turret's muzzle.
+    const playerPosition = player.getMuzzlePoint();
 
     const lockAssignments =
       Array.isArray(this.currentLockAssignments) &&

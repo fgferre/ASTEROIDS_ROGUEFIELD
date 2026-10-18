@@ -227,7 +227,7 @@ efeitos e câmera, jogabilidade, etc. UX melhor a cada rodada."_** Toda rodada t
       profundidades diferentes (paralaxe real com a câmera, cintilação), nebulosa em shader (fbm) num plano distante,
       poeira volumétrica esparsa; **sem chão e sem sombras num plano de fundo**; sombras reais só entre objetos 3D
       (shadow map da luz-chave: rochas sobre rochas, nave sobre rocha; presets alto/ultra); a luz da nave ilumina rochas e poeira.
-- [ ] **R5.11 Torreta (veredito dele, 18/10).** O casco vira sozinho para a mira e o WASD "puxa" para onde atira.
+- [x] **R5.11 Torreta (veredito dele, 18/10).** O casco vira sozinho para a mira e o WASD "puxa" para onde atira.
       Separar: casco aponta para a direção do movimento (WASD relativo à tela, suavizado, inclina nas curvas);
       a arma é uma **torreta** no casco que gira sozinha para o alvo (malha visível em 3D e 2D, tiro sai dela,
       linha de mira a partir da torreta); `?controls=classic` continua girar + empurrar.

@@ -115,7 +115,10 @@ function setupCombatHarness({
     getShieldRadius() {
       return 16;
     },
-    getNosePosition() {
+    getTurretAngle() {
+      return 0;
+    },
+    getMuzzlePoint() {
       return { ...playerPos };
     },
     getStats() {
@@ -555,6 +558,10 @@ describe('Aim regression suite (FIX-01)', () => {
 
 import { BULLET_SIZE } from '../../src/core/GameConstants.js';
 import PlayerSystem from '../../src/modules/PlayerSystem.js';
+import {
+  TURRET_BARREL_LENGTH,
+  TURRET_PIVOT_X,
+} from '../../src/data/constants/physics.js';
 
 describe('FIX-05 centerline invariant + toggles', () => {
   beforeAll(() => {
@@ -615,27 +622,20 @@ describe('FIX-05 centerline invariant + toggles', () => {
     });
   });
 
-  describe('PlayerSystem.getNosePosition', () => {
-    it('returns ship-nose world coordinates: {x: pos.x + cos(r) * radius, y: pos.y + sin(r) * radius}', () => {
-      // Build a stripped-down PlayerSystem with deterministic position + radius.
+  describe('PlayerSystem.getMuzzlePoint', () => {
+    it('sits a turret pivot ahead of the centre plus a barrel along the turret', () => {
       const container = createTestContainer('nose-position-seed');
       const eventBus = container.resolve('event-bus');
       const player = new PlayerSystem({
         position: { x: 100, y: 200 },
         dependencies: { eventBus },
       });
+      player.angle = 0;
+      player.turretAngle = Math.PI / 2;
 
-      const radius = player.getHullBoundingRadius();
-
-      // rotation 0 → nose at +x of position.
-      const noseR0 = player.getNosePosition(0);
-      expect(noseR0.x).toBeCloseTo(100 + radius, 5);
-      expect(noseR0.y).toBeCloseTo(200, 5);
-
-      // rotation π/2 → nose at +y of position.
-      const noseR90 = player.getNosePosition(Math.PI / 2);
-      expect(noseR90.x).toBeCloseTo(100, 5);
-      expect(noseR90.y).toBeCloseTo(200 + radius, 5);
+      const muzzle = player.getMuzzlePoint();
+      expect(muzzle.x).toBeCloseTo(100 + TURRET_PIVOT_X, 5);
+      expect(muzzle.y).toBeCloseTo(200 + TURRET_BARREL_LENGTH, 5);
     });
   });
 
@@ -1196,16 +1196,15 @@ describe('FIX-05 centerline invariant + toggles', () => {
       });
     });
 
-    it('F5: manual aim uses player.getAngle() (canonical accessor); silent-zero fallback is gone', () => {
-      // Codex review F5 worried that the fallback `|| 0` silently shot right
-      // if PlayerSystem exposed `getRotation()` instead of `getAngle()`.
-      // `getAngle()` IS the canonical accessor; a player without it is a
-      // wiring bug and must fail loudly instead of defaulting to 0.
+    it('F5: manual aim uses player.getTurretAngle() (canonical accessor); silent-zero fallback is gone', () => {
+      // Codex review F5 worried that a fallback `|| 0` silently shot right.
+      // `getTurretAngle()` IS the canonical weapon heading; a player without
+      // it is a wiring bug and must fail loudly instead of defaulting to 0.
       const { combat, playerState } = setupCombatHarness({ multishot: 1 });
       playerState.multishot = 1;
       combat.setAimMode('manual');
 
-      // Case 1: with getAngle, manual fire uses ship rotation (=== 0 in
+      // Case 1: with getTurretAngle, manual fire uses the turret heading (=== 0 in
       // harness mock). Bullet velocity should point +x.
       const before = combat.bullets.length;
       const player = combat.getCachedPlayer();
@@ -1215,11 +1214,11 @@ describe('FIX-05 centerline invariant + toggles', () => {
       expect(fired[0].vx).toBeGreaterThan(0);
       expect(Math.abs(fired[0].vy)).toBeLessThan(0.001);
 
-      // Case 2: when getAngle is missing, manual fire throws instead of
+      // Case 2: when getTurretAngle is missing, manual fire throws instead of
       // silently shooting at rotation 0.
       const broken = combat.getCachedPlayer();
-      const savedGetAngle = broken.getAngle;
-      broken.getAngle = undefined;
+      const savedGetAngle = broken.getTurretAngle;
+      broken.getTurretAngle = undefined;
       // Force the cooldown to clear immediately so this fire goes through.
       combat.lastShotTime = combat.shootCooldown;
       expect(() =>
@@ -1228,7 +1227,7 @@ describe('FIX-05 centerline invariant + toggles', () => {
           damage: 10,
         })
       ).toThrow(TypeError);
-      broken.getAngle = savedGetAngle;
+      broken.getTurretAngle = savedGetAngle;
     });
   });
 
@@ -1485,12 +1484,11 @@ describe('FIX-05 centerline invariant + toggles', () => {
         getShieldRadius() {
           return 16;
         },
-        getNosePosition(rotation) {
-          const angle = Number.isFinite(rotation) ? rotation : 0;
-          return {
-            x: playerPos.x + Math.cos(angle) * 16,
-            y: playerPos.y + Math.sin(angle) * 16,
-          };
+        getTurretAngle() {
+          return 0;
+        },
+        getMuzzlePoint() {
+          return { x: playerPos.x + 16, y: playerPos.y };
         },
         getStats() {
           return { multishot: 3, damage: 10 };
@@ -1520,11 +1518,8 @@ describe('FIX-05 centerline invariant + toggles', () => {
       });
     });
 
-    it('manual mode: bullets spawn at ship nose (origin offset by ship radius along rotation)', () => {
-      // The harness's mock player has getHullBoundingRadius() = 16 and
-      // getPosition() = (400, 300). When we add getNosePosition to the mock,
-      // rotation 0 puts the nose at (416, 300). Use a custom harness that
-      // exposes getNosePosition the way the real PlayerSystem does (Task 2).
+    it('manual mode: bullets spawn at the turret muzzle, not the ship centre', () => {
+      // getPosition() = (400, 300); the mock's muzzle sits at (416, 300).
       const container = createTestContainer('manual-nose-seed');
       const eventBus = container.resolve('event-bus');
       const random = container.resolve('random');
@@ -1551,12 +1546,11 @@ describe('FIX-05 centerline invariant + toggles', () => {
         getShieldRadius() {
           return 16;
         },
-        getNosePosition(rotation) {
-          const angle = Number.isFinite(rotation) ? rotation : 0;
-          return {
-            x: playerPos.x + Math.cos(angle) * 16,
-            y: playerPos.y + Math.sin(angle) * 16,
-          };
+        getTurretAngle() {
+          return 0;
+        },
+        getMuzzlePoint() {
+          return { x: playerPos.x + 16, y: playerPos.y };
         },
         getStats() {
           return { multishot: 1, damage: 10 };
@@ -1578,7 +1572,7 @@ describe('FIX-05 centerline invariant + toggles', () => {
       const fired = combat.bullets.slice(before);
 
       expect(fired.length).toBe(1);
-      // Bullet should spawn at (416, 300) — the nose, not the ship center (400, 300).
+      // Bullet should spawn at (416, 300) — the muzzle, not the ship center (400, 300).
       expect(fired[0].x).toBeCloseTo(416, 0);
       expect(fired[0].y).toBeCloseTo(300, 0);
     });

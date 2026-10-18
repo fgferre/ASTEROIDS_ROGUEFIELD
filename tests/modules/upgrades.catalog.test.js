@@ -62,11 +62,8 @@ function makeCombat(list = []) {
   const player = {
     isDead: false,
     getPosition: () => ({ ...PLAYER }),
-    getAngle: () => 0,
-    getNosePosition: (angle) => ({
-      x: PLAYER.x + Math.cos(angle) * NOSE,
-      y: PLAYER.y + Math.sin(angle) * NOSE,
-    }),
+    getTurretAngle: () => 0,
+    getMuzzlePoint: () => ({ x: PLAYER.x + NOSE, y: PLAYER.y }),
     getStats: () => ({ multishot: 1, damage: DAMAGE }),
   };
   const enemies = {

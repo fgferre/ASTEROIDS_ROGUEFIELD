@@ -6,7 +6,9 @@
 // cyan Interceptor, amber Solar Slicer): glowing nozzles, cones with a white
 // core that stretch with thrust, side puffs on strafe, a point light and a
 // ribbon trail. Dash afterimages, the invulnerability blink and the shield
-// impact flash mirror the 2D PlayerSystem render.
+// impact flash mirror the 2D PlayerSystem render. In the modern scheme a
+// dorsal turret (base, twin barrels, amber lens) turns on its own to the
+// simulation's turret heading; its barrel tips sit on the sim's muzzle point.
 
 import {
   DASH_GHOST_COUNT,
@@ -16,6 +18,8 @@ import { PALETTE } from '../../data/constants/palette.js';
 import {
   SHIP_MAX_SPEED,
   SHIP_ROTATION_SPEED,
+  TURRET_BARREL_LENGTH,
+  TURRET_PIVOT_X,
 } from '../../data/constants/physics.js';
 import { ALL_HULLS } from '../../data/shipModels.js';
 import { bakeHullMaps } from './bakedMaps.js';
@@ -54,6 +58,15 @@ const SHIELD_FLASH_S = 0.08;
 const GHOST_ALPHA = 0.5;
 // proposta 17/10: each shot bumps the ship light for a couple of frames.
 const MUZZLE_LIGHT = 1.6;
+// Turret, in field units (unscaled, so the barrel tips meet the sim muzzle):
+// the base sits on the scaled spine top, the barrels clear the canopy.
+const TURRET_BASE_Y = (BASE_TOP + SPINE_DEPTH) * VISUAL_SCALE;
+const TURRET_BASE_R = 4;
+const TURRET_BASE_H = 2;
+const TURRET_BARREL_Y = TURRET_BASE_Y + TURRET_BASE_H + 0.9;
+const TURRET_BARREL_R = 0.7;
+const TURRET_BARREL_Z = 1.3;
+const TURRET_RECOIL = 1.2;
 const MUZZLE_LIGHT_FRAMES = 2;
 // Baked panel maps (bakedMaps.js): one texture tile per HULL_TILE hull units
 // (the extruded plates' UVs are in hull units). proposta 18/10: strengths.
@@ -245,6 +258,67 @@ export class PlayerMirror {
     this.trailCount = 0;
     this.trailHead = 0;
     this.thrustRgb = rgbOf(THREE, PALETTE.player);
+    this.buildTurret();
+  }
+
+  buildTurret() {
+    const { THREE } = this;
+    const lit = (geometry) => {
+      geometry.setAttribute('uv2', geometry.getAttribute('uv'));
+      return geometry;
+    };
+    this.turret = new THREE.Group();
+    const base = new THREE.Mesh(
+      lit(
+        new THREE.CylinderGeometry(
+          TURRET_BASE_R * 0.85,
+          TURRET_BASE_R,
+          TURRET_BASE_H,
+          10
+        ).translate(0, TURRET_BASE_Y + TURRET_BASE_H / 2, 0)
+      ),
+      this.spineMaterial
+    );
+    // Barrels and their block recoil together along the turret's axis.
+    this.barrels = new THREE.Group();
+    const block = new THREE.Mesh(
+      lit(new THREE.BoxGeometry(4.6, 2, 4).translate(0.3, TURRET_BARREL_Y, 0)),
+      this.baseMaterial
+    );
+    const length = TURRET_BARREL_LENGTH - 1.5;
+    const barrel = (z) =>
+      new THREE.Mesh(
+        lit(
+          new THREE.CylinderGeometry(
+            TURRET_BARREL_R,
+            TURRET_BARREL_R,
+            length,
+            6
+          )
+            .rotateZ(Math.PI / 2)
+            .translate(1.5 + length / 2, TURRET_BARREL_Y, z)
+        ),
+        this.finMaterial
+      );
+    const lens = new THREE.Mesh(
+      new THREE.SphereGeometry(1, 8, 6).translate(
+        2.2,
+        TURRET_BARREL_Y + 0.9,
+        0
+      ),
+      new THREE.MeshBasicMaterial({
+        color: colorOf(THREE, PALETTE.shot).multiplyScalar(2),
+        toneMapped: false,
+      })
+    );
+    this.barrels.add(
+      block,
+      barrel(-TURRET_BARREL_Z),
+      barrel(TURRET_BARREL_Z),
+      lens
+    );
+    this.turret.add(base, this.barrels);
+    this.group.add(this.turret);
   }
 
   // Rebuilds the meshes when the hull or its visual-upgrade levels change.
@@ -499,6 +573,10 @@ export class PlayerMirror {
     const v = player.velocity || { vx: 0, vy: 0 };
     this.group.rotation.x = this.updateBank(player, time);
     this.ship.position.x = this.muzzleFrames > 0 ? -RECOIL_DIP : 0;
+    this.turret.visible = player.controlScheme === 'modern';
+    this.turret.position.x = TURRET_PIVOT_X + this.ship.position.x;
+    this.turret.rotation.y = -(player.turretAngle - angle);
+    this.barrels.position.x = this.muzzleFrames > 0 ? -TURRET_RECOIL : 0;
 
     const main = thrust.main || 0;
     const length = (5 + 18 * main) * (1 + 0.1 * (levels.thruster || 0));
