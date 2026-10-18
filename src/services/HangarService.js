@@ -80,7 +80,7 @@ export default class HangarService {
     this.salvage -= item.cost;
     this.owned[id] = true;
     this.persist();
-    this.eventBus.emit('hangar-purchased', { id });
+    this.eventBus.emit('hangar-purchased', { id, owned: { ...this.owned } });
     return true;
   }
 

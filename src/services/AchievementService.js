@@ -1,6 +1,8 @@
 // src/services/AchievementService.js
 
 import { ACHIEVEMENTS } from '../data/achievements.js';
+import { HANGAR_ITEMS } from '../data/hangar.js';
+import { BASTION_HULL_ID } from '../data/shipModels.js';
 import UPGRADE_LIBRARY from '../data/upgrades/index.js';
 import { loadJSON, saveJSON } from '../core/storage.js';
 
@@ -17,6 +19,13 @@ const WARDEN_ACHIEVEMENTS = {
   choir: 'choir-silenced',
   null: 'null-and-void',
 };
+const KILL_ACHIEVEMENTS = {
+  caster: 'counter-battery',
+  shade: 'unphased',
+};
+const HULL_ITEM_IDS = HANGAR_ITEMS.filter((item) => item.unlocksHull).map(
+  (item) => item.id
+);
 const DEEP_FIELD_LAYER = 20;
 
 /**
@@ -59,15 +68,23 @@ export default class AchievementService {
       this.heraldsFelled.push(kind);
       this.count('herald-hunter');
     });
-    eventBus.on('run-won', () => {
+    eventBus.on('run-won', (payload = {}) => {
       this.unlock('null-and-void');
       if (this.cursedHeld) this.unlock('cursed-run');
+      if (payload.hullId === BASTION_HULL_ID) this.unlock('iron-escort');
     });
     eventBus.on('synergy-unlocked', () => this.unlock('full-set'));
     eventBus.on('apex-unlocked', () => this.unlock('apex-predator'));
     eventBus.on('weapon-beam-fired', () => this.count('harmonic'));
     eventBus.on('enemy-destroyed', (payload = {}) => {
       if (payload.enemy?.elite) this.count('elite-hunter');
+      const killAchievement = KILL_ACHIEVEMENTS[payload.enemy?.type];
+      if (killAchievement) this.count(killAchievement);
+    });
+    eventBus.on('hangar-purchased', (payload = {}) => {
+      if (HULL_ITEM_IDS.every((id) => payload.owned?.[id])) {
+        this.unlock('full-garage');
+      }
     });
     eventBus.on('pickup-collected', () => this.count('scrapper'));
     eventBus.on('upgrade-applied', (payload = {}) => {

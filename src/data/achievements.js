@@ -97,4 +97,30 @@ export const ACHIEVEMENTS = deepFreeze([
     glyph: '↻',
     target: 10,
   },
+  {
+    id: 'counter-battery',
+    title: 'Counter-Battery',
+    description: 'Destroy 20 Casters before they finish the volley.',
+    glyph: '⌖',
+    target: 20,
+  },
+  {
+    id: 'unphased',
+    title: 'Unphased',
+    description: 'Destroy 15 Shades, however they slip out of phase.',
+    glyph: '◌',
+    target: 15,
+  },
+  {
+    id: 'iron-escort',
+    title: 'Iron Escort',
+    description: 'Win the descent piloting the Bastion hull.',
+    glyph: '⬢',
+  },
+  {
+    id: 'full-garage',
+    title: 'Full Garage',
+    description: 'Own every hull the Hangar sells.',
+    glyph: '▣',
+  },
 ]);
