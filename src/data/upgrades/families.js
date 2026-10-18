@@ -19,6 +19,9 @@ export const SYNERGY_BULWARK_HULL_BONUS = 60;
 export const SYNERGY_SCAVENGER_XP_MULTIPLIER = 1.15;
 // Maneuver — proposta 18/10.
 export const SYNERGY_AFTERBURN_LIFE = 0.6; // seconds the dash trail burns
+export const SYNERGY_AFTERBURN_DAMAGE = 6; // per tick, to each enemy on it
+export const SYNERGY_AFTERBURN_TICK = 0.25; // seconds between burn ticks
+export const SYNERGY_AFTERBURN_RADIUS = 26; // px reach of each trail point
 export const APEX_BLINK_HIDE_SECONDS = 0.12; // ship gone at the dash start
 export const APEX_BLINK_RADIUS = 100; // px of the landing shove ring
 export const APEX_BLINK_KNOCKBACK = 220; // px/s the ring shoves enemies
@@ -137,7 +140,18 @@ export const UPGRADE_FAMILIES = deepFreeze({
     bonus: {
       name: 'Afterburn',
       description: `The dash leaves a trail that burns for ${SYNERGY_AFTERBURN_LIFE}s.`,
-      effects: [],
+      effects: [
+        {
+          type: 'event',
+          event: 'upgrade-afterburn',
+          payload: {
+            damage: SYNERGY_AFTERBURN_DAMAGE,
+            tickInterval: SYNERGY_AFTERBURN_TICK,
+            life: SYNERGY_AFTERBURN_LIFE,
+            radius: SYNERGY_AFTERBURN_RADIUS,
+          },
+        },
+      ],
     },
     // Five cards: the dash becomes a jump (PlayerSystem, on apex-unlocked).
     apex: {

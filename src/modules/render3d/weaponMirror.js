@@ -15,6 +15,11 @@ const ARC_H = 8;
 const MARK_H = 6;
 const TRAIL_H = 2;
 const ION_KINK = 14; // px, the most an ion segment bends off its line
+// proposta 18/10: Afterburn (the dash trail) band and core widths, point
+// glow size, all when fresh.
+const AFTERBURN_BAND = 7;
+const AFTERBURN_CORE = 2;
+const AFTERBURN_GLOW = 14;
 // proposta 18/10: Scatter Coil looks. The bolt: tracer and core ribbon
 // widths, the head capsule's length/width, the head glow's size. The burst:
 // flash and core glow sizes, ring width at its start.
@@ -172,6 +177,38 @@ export function mirrorWeaponEffects(THREE, combat, batches, flashes) {
       ribbons.segment(p.x, p.y, q.x, q.y, ARC_H, white, 1, 1.6 * k);
     });
     glow.push(b.x, ARC_H, b.y, ionRgb, 8 * k + 2, 0.5 * k, 1.4);
+  }
+  // Afterburn: the dash's line, an amber band under a hot core that cools
+  // first, so old segments read as embers.
+  const amberRgb = rgbOf(THREE, PALETTE.shot);
+  const burnLine = combat.afterburnTrail;
+  for (let i = 0; i < burnLine.length; i += 1) {
+    const b = burnLine[i];
+    const k = b.life / b.maxLife;
+    const fresh = 0.5 + 0.5 * k;
+    glow.push(b.x, TRAIL_H, b.y, amberRgb, AFTERBURN_GLOW * fresh, 0.45 * k);
+    if (i === 0 || !b.joined) continue;
+    const a = burnLine[i - 1];
+    ribbons.segment(
+      a.x,
+      a.y,
+      b.x,
+      b.y,
+      TRAIL_H,
+      amberRgb,
+      AFTERBURN_BAND * fresh,
+      0.7 * k
+    );
+    ribbons.segment(
+      a.x,
+      a.y,
+      b.x,
+      b.y,
+      TRAIL_H,
+      cinderRgb,
+      AFTERBURN_CORE,
+      1.4 * k * k
+    );
   }
 
   const flare = combat.apexes.includes('thermal');

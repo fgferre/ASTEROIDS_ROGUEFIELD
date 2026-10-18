@@ -68,6 +68,15 @@ const BEAM_COLORS = WEAPONS.harmonic.colors;
 const FLAK = WEAPONS.scatter.flak;
 const FLAK_COLORS = WEAPONS.scatter.colors;
 const FLAK_SPARKS = 7; // proposta 18/10: 2D shrapnel streaks per burst
+// Afterburn (Maneuver synergy) — proposta 18/10: a point every this many px
+// of dash travel, at most this many alive; a jump wider than the gap (the
+// screen wrap) starts a new, unjoined line.
+const AFTERBURN_POINT_SPACING = 8;
+const AFTERBURN_MAX_POINTS = 40;
+const AFTERBURN_JOIN_GAP = 80;
+// 2D look, proposta 18/10: an amber band (px wide when fresh) under a hot
+// core that cools first, so old segments read as embers.
+const AFTERBURN_LOOK = { band: 6, bandAlpha: 0.55, core: 2, coreAlpha: 0.85 };
 const ARC_SEGMENTS = 6;
 const ARC_JITTER = 7; // px, perpendicular
 
@@ -283,6 +292,9 @@ class CombatSystem extends BaseSystem {
     });
     this.registerEventListener('upgrade-ion-trail', (data) => {
       this.cardEffects.ionTrail = data;
+    });
+    this.registerEventListener('upgrade-afterburn', (data) => {
+      this.cardEffects.afterburn = data;
     });
 
     this.registerEventListener('thruster-effect', (data = {}) => {
@@ -3278,6 +3290,9 @@ class CombatSystem extends BaseSystem {
     this.cinderTimer = 0;
     this.ions = [];
     this.ionTimer = 0;
+    this.afterburnTrail = [];
+    this.afterburnTimer = 0;
+    this.afterburnDashing = false;
     this.staticShellPending = false;
     this.refreshLanceLook();
   }
@@ -3790,6 +3805,41 @@ class CombatSystem extends BaseSystem {
     list.push({ x: position.x, y: position.y, life, maxLife: life });
   }
 
+  // Afterburn: while the ship dashes, a point every AFTERBURN_POINT_SPACING
+  // px of its travel; `joined` links a point to the one before it.
+  dropAfterburnPoints({ life }) {
+    const player = this.cachedPlayer;
+    if (player.isDead || !(player.dashTimer > 0)) {
+      this.afterburnDashing = false;
+      return;
+    }
+    const list = this.afterburnTrail;
+    const { x, y } = player.getPosition();
+    const last = this.afterburnDashing ? list[list.length - 1] : null;
+    const dx = last ? x - last.x : 0;
+    const dy = last ? y - last.y : 0;
+    const distance = Math.hypot(dx, dy);
+    if (!last || distance > AFTERBURN_JOIN_GAP) {
+      list.push({ x, y, life, maxLife: life, joined: false });
+    } else {
+      const steps = Math.floor(distance / AFTERBURN_POINT_SPACING);
+      for (let i = 1; i <= steps; i += 1) {
+        const t = (i * AFTERBURN_POINT_SPACING) / distance;
+        list.push({
+          x: last.x + dx * t,
+          y: last.y + dy * t,
+          life,
+          maxLife: life,
+          joined: true,
+        });
+      }
+    }
+    this.afterburnDashing = true;
+    if (list.length > AFTERBURN_MAX_POINTS) {
+      list.splice(0, list.length - AFTERBURN_MAX_POINTS);
+    }
+  }
+
   // The Ion Trail spares rocks and halves on bosses (`bossFactor`).
   burnTrailTouches(list, { damage, radius, bossFactor }) {
     const ion = bossFactor !== undefined;
@@ -3882,10 +3932,12 @@ class CombatSystem extends BaseSystem {
     fade(this.arcs);
     fade(this.cinders);
     fade(this.ions);
+    fade(this.afterburnTrail);
     fade(this.wells);
 
-    const { cinderTrail, ionTrail, staticShell, gravityBrake } =
+    const { cinderTrail, ionTrail, afterburn, staticShell, gravityBrake } =
       this.cardEffects;
+    if (afterburn) this.dropAfterburnPoints(afterburn);
     // Each trail ticks on its own timer while it has points.
     const tick = (list, trail, timerKey) => {
       if (!trail || !list.length) {
@@ -3900,6 +3952,7 @@ class CombatSystem extends BaseSystem {
     };
     tick(this.cinders, cinderTrail, 'cinderTimer');
     tick(this.ions, ionTrail, 'ionTimer');
+    tick(this.afterburnTrail, afterburn, 'afterburnTimer');
     if (this.staticShellPending) {
       this.staticShellPending = false;
       this.dischargeStaticShell(staticShell);
@@ -4211,6 +4264,26 @@ class CombatSystem extends BaseSystem {
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+    }
+    // Afterburn: the dash's line, amber cooling to ember as it ages.
+    const burnLine = this.afterburnTrail;
+    for (let i = 1; i < burnLine.length; i += 1) {
+      const a = burnLine[i - 1];
+      const b = burnLine[i];
+      if (!b.joined) continue;
+      const k = b.life / b.maxLife;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.strokeStyle = withAlpha(PALETTE.shot, AFTERBURN_LOOK.bandAlpha * k);
+      ctx.lineWidth = AFTERBURN_LOOK.band * (0.5 + 0.5 * k);
+      ctx.stroke();
+      ctx.strokeStyle = withAlpha(
+        WEAPON_EVOLUTIONS.thermal.look.trail,
+        AFTERBURN_LOOK.coreAlpha * k * k
+      );
+      ctx.lineWidth = AFTERBURN_LOOK.core;
       ctx.stroke();
     }
     this.burns.forEach((entry, enemy) => {
