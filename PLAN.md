@@ -235,6 +235,25 @@ efeitos e câmera, jogabilidade, etc. UX melhor a cada rodada."_** Toda rodada t
       i-frames do dash visíveis; menu com a nave 3D em destaque e presets de qualidade visíveis; pausa/settings com
       o mesmo design das cartas; transição das cartas no level-up; números de dano com peso por tamanho.
 
+## Rodada 6 (18/10, manhã) — dois eixos, enquanto ele joga a 5
+
+Conteúdo:
+- [ ] **R6.1 Gamepad twin-stick.** Analógico esquerdo move, direito mira a torreta manualmente (solta = mira automática),
+      gatilhos dash/escudo, vibração em dano e Warden; navegação dos menus com o controle; ícones de botão nas dicas.
+- [ ] **R6.2 Afixos de Elite.** Elite ganha 1–2 afixos visíveis (Shielded, Swift, Volatile, Splitter, Warded) com
+      ícone no inimigo e no feed; tabela por camada; recompensa por afixo.
+- [ ] **R6.3 Dificuldade e seed.** Settings: Pilot / Veteran / Warden (multiplicadores nomeados); seed da run na HUD
+      e no recap, `?seed=` compartilhável, "Daily Field" com seed do dia e placar local separado.
+- [ ] **R6.4 Solar Slicer de verdade.** Casco próprio (lâminas, propulsor âmbar, torreta própria), stats distintos
+      (mais leve, mais rápido, menos casco), seleção no Hangar com prévia.
+Qualidade:
+- [ ] **R6.5 HUD direcional.** Indicador de direção do dano na borda, setas de fora-de-tela para Heralds/Wardens e
+      pickups, barra do chefe segmentada por fase, minimapa com ícones por tipo.
+- [ ] **R6.6 Desempenho.** Rochas instanciadas por variante (atributos por instância para rachaduras/veios), orçamento
+      do passe de sombra (só casters perto da câmera), meta de < 80 draw calls no ultra com 40 rochas.
+- [ ] **R6.7 Áudio espacial.** Atenuação por distância + filtro passa-baixa por distância nos cues de inimigo, camada
+      de percussão por bioma que entra com a intensidade, voz dos Wardens nas transmissões (síntese granular curta).
+
 ## Fora de escopo deste plano
 
 Steam, mobile/touch, multiplayer, narrativa, reescrita do gameplay em WebGL (ver decisão 1), troca do framework de
