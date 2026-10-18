@@ -193,7 +193,7 @@ rodada"_. Cada pilar do §7 vira fatias; a ordem é impacto visível por custo. 
 - [ ] **R4.5 Texturas procedurais assadas** (normal/roughness/AO) para rocha, casco e Warden.
 - [x] **R4.6 Harmonic Plasma Lance + evoluções por família.**
 - [ ] **R4.7 Códice, recap de morte, pausa com build, onboarding em jogo.**
-- [ ] **R4.8 Tema por bioma, tema de Warden, stingers.**
+- [x] **R4.8 Tema por bioma, tema de Warden, stingers.**
 - [ ] **R4.9 Interpolação de render, rochas instanciadas, presets automáticos por fps.**
 
 ## Fora de escopo deste plano

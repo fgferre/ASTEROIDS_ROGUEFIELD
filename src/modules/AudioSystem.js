@@ -4,6 +4,11 @@ import SFXBus, {
   resolveStereoPan,
 } from './audio/SFXBus.js';
 import MusicMixer from './audio/MusicMixer.js';
+import {
+  biomeThemeForLayer,
+  chapterThemeForLayer,
+  musicThemeForLayer,
+} from './audio/MusicThemes.js';
 import FileTrackManager, {
   FILE_TRACK_IDS as FILE_TRACK_MANAGER_IDS,
 } from './audio/FileTrackManager.js';
@@ -530,9 +535,18 @@ class AudioSystem extends BaseSystem {
       }
     });
 
-    // Wave start feeds the run-following music (progress + wave enemy total).
+    // Wave start feeds the run-following music (progress + wave enemy total),
+    // picks the layer's theme (the Warden's on boss layers) and plays the
+    // chapter stinger on a biome's first layer.
     this.registerEventListener('wave-started', (data = {}) => {
       this.updateWaveMusicIntensity(data);
+      const wave = Number(data?.wave);
+      if (!Number.isFinite(wave) || wave <= 0) return;
+      this.musicMixer.setTheme(musicThemeForLayer(wave));
+      const chapterTheme = chapterThemeForLayer(wave);
+      if (chapterTheme) {
+        this.playChapterStinger(chapterTheme);
+      }
     });
 
     this.registerEventListener('mine-exploded', (data = {}) => {
@@ -542,6 +556,7 @@ class AudioSystem extends BaseSystem {
     // Boss arc → MusicMixer (D-04): overrides the run intensity upwards. The
     // roar/phase/defeat SFX stay on the facade (BossAudio lands in a later plan).
     this.registerEventListener('boss-warning', (data = {}) => {
+      this.playWardenStinger();
       this.musicMixer.setIntensityFromBossEvent('boss-warning', data);
     });
 
@@ -558,6 +573,9 @@ class AudioSystem extends BaseSystem {
     this.registerEventListener('boss-defeated', (data = {}) => {
       this.playBossDefeated(data);
       this.musicMixer.setIntensityFromBossEvent('boss-defeated', data);
+      this.musicMixer.setTheme(
+        biomeThemeForLayer(this.musicMixer.runState.wave)
+      );
     });
 
     this.registerEventListener('bullet-hit', (data) => {
@@ -1464,6 +1482,14 @@ class AudioSystem extends BaseSystem {
 
   playPickupSpawned(options = {}) {
     this.sfxBus.playPickupSpawned(options);
+  }
+
+  playChapterStinger(themeId) {
+    this.sfxBus.playChapterStinger(themeId);
+  }
+
+  playWardenStinger() {
+    this.sfxBus.playWardenStinger();
   }
 
   playTransmission() {

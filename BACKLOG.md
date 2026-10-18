@@ -28,3 +28,4 @@
 - Transmissões (18/10, R4.2): as linhas de morte e vitória ficam atrás das telas de game over/vitória (3 s / 2,5 s); a intro do boss ainda diz 'Guardian of the Ring' para todos os Wardens; a fila roda em relógio de parede como os banners.
 - Wardens novos (18/10, R4.3): o renderer 2D desenha os três com o look do Prime e os telegraphs do Choir saem do centro, não do núcleo; o pull invertido do Null ocupa o único slot de pull (substitui um Ímã ativo); dano de área sem posição conta cheio no Choir.
 - Arma (18/10, R4.6): HUD ainda não mostra arma/evoluções (getWeaponState() pronto); eventos 'weapon-beam-fired'/'weapon-evolved' sem cue de áudio; Prospector lê rewardManager.stats e chama createXPOrbs (internos); marca de queimadura fraca no 3D.
+- Música (18/10, R4.8): initializeMusicController em AudioSystem nunca é chamado e só sobrevive pela baseline de API — apagar e ajustar o teste; durante os 2,5 s de crossfade rodam dois conjuntos de osciladores.

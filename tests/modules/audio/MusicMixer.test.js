@@ -6,7 +6,10 @@ import MusicMixer, {
 import { createServiceManifest } from '../../../src/bootstrap/serviceManifest.js';
 import { createAudioContextStub } from '../../__helpers__/stubs.js';
 import { assertManagerWired } from '../../__helpers__/audio-manifest-wiring.js';
-import { MUSIC_LAYER_CONFIG } from '../../../src/core/GameConstants.js';
+import {
+  MUSIC_LAYER_CONFIG,
+  MUSIC_THEME_CROSSFADE,
+} from '../../../src/core/GameConstants.js';
 
 // ---------------------------------------------------------------------------
 // Plan 02.05 — MusicMixer (INFRA-02 + AUDIO-01).
@@ -629,5 +632,118 @@ describe('MusicMixer — run-following intensity (wave + density + HP + boss)', 
     // The boss arc overrides upwards, never downwards.
     expect(activeLayers({ wave: 1, enemyCount: 0 }, 3)).toEqual(LAYER_KEYS);
     expect(activeLayers({ wave: 15, enemyCount: 20 }, 1)).toEqual(LAYER_KEYS);
+  });
+});
+
+describe('MusicMixer — themes (crossfade between voice banks)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  const lastRamp = (param) => param.linearRampToValueAtTime.mock.calls.at(-1);
+
+  function initAt(time) {
+    const harness = makeSchedulingContext();
+    harness.advanceTime(time);
+    const mixer = makeMixer();
+    mixer.init(harness.context, makeSliderNode());
+    return { harness, mixer };
+  }
+
+  it('crossfades to the new theme in ≤ 2.5 s: incoming at full level, outgoing silent and stopped', () => {
+    const { mixer } = initAt(10);
+    const outgoing = mixer._themeBank;
+
+    mixer.setTheme('dense-core');
+    const incoming = mixer._themeBank;
+    const end = 10 + MUSIC_THEME_CROSSFADE.seconds;
+
+    expect(MUSIC_THEME_CROSSFADE.seconds).toBeLessThanOrEqual(2.5);
+    expect(incoming.themeId).toBe('dense-core');
+    for (const voice of Object.values(incoming.voices)) {
+      const [value, time] = lastRamp(voice.gain.gain);
+      expect(value).toBeCloseTo(voice.level, 9);
+      expect(time).toBeCloseTo(end, 9);
+    }
+    for (const voice of Object.values(outgoing.voices)) {
+      const [value, time] = lastRamp(voice.gain.gain);
+      expect(value).toBe(0);
+      expect(time).toBeCloseTo(end, 9);
+      voice.oscillators.forEach((osc) => {
+        expect(osc.stop).toHaveBeenCalledWith(end);
+      });
+    }
+  });
+
+  it('the crossfade is equal-power (summed power constant at the midpoint)', () => {
+    const { mixer } = initAt(0);
+    const outgoing = mixer._themeBank.voices.base;
+    const from = outgoing.gain.gain.value;
+
+    mixer.setTheme('warden');
+    const incoming = mixer._themeBank.voices.base;
+    const mid = MUSIC_THEME_CROSSFADE.segments / 2;
+    const inValue =
+      incoming.gain.gain.linearRampToValueAtTime.mock.calls[mid - 1][0];
+    const outValue =
+      outgoing.gain.gain.linearRampToValueAtTime.mock.calls[mid - 1][0];
+
+    expect(inValue / incoming.level).toBeCloseTo(Math.SQRT1_2, 9);
+    expect(outValue / from).toBeCloseTo(Math.SQRT1_2, 9);
+  });
+
+  it('a theme change leaves the intensity layer gains alone; the same theme is a no-op', () => {
+    const { harness, mixer } = initAt(0);
+    const layerRamps = LAYER_KEYS.map(
+      (key) =>
+        mixer.layers[key].gain.gain.linearRampToValueAtTime.mock.calls.length
+    );
+
+    mixer.setTheme('wardens-reach');
+    expect(
+      LAYER_KEYS.map(
+        (key) =>
+          mixer.layers[key].gain.gain.linearRampToValueAtTime.mock.calls.length
+      )
+    ).toEqual(layerRamps);
+
+    const oscillatorCount = harness.allOscillators.length;
+    mixer.setTheme('wardens-reach');
+    expect(harness.allOscillators.length).toBe(oscillatorCount);
+  });
+
+  it('resetRun cuts straight back to the default theme (no crossfade)', () => {
+    const { mixer } = initAt(5);
+    mixer.setTheme('warden');
+    const warden = mixer._themeBank;
+
+    mixer.resetRun();
+
+    expect(mixer.themeId).toBe('outer-ring');
+    Object.values(warden.voices).forEach((voice) => {
+      voice.oscillators.forEach((osc) =>
+        expect(osc.stop).toHaveBeenCalledWith(5)
+      );
+    });
+  });
+
+  it('the pulse follows the theme tempo (Warden: an onset every 0.25 s)', () => {
+    const { harness, mixer } = initAt(0);
+    mixer.setTheme('warden', { immediate: true });
+    harness.markBuilt();
+
+    mixer.setIntensityFromBossEvent('boss-spawned'); // danger → pulse grid
+    expect(harness.pulses().map((osc) => osc._startTimes[0])).toEqual([0]);
+
+    harness.advanceTime(0.3);
+    vi.advanceTimersByTime(25); // one lookahead tick → horizon 0.4 s
+    expect(harness.pulses().map((osc) => osc._startTimes[0])).toEqual([
+      0, 0.25,
+    ]);
   });
 });

@@ -203,6 +203,51 @@ describe('SFXBus per-sound routing (player → protected; world → ambient)', (
   });
 });
 
+describe('SFXBus music stingers', () => {
+  function recordOscillators(context) {
+    const frequencyLog = [];
+    context.createOscillator = vi.fn(() =>
+      createOscillatorStub({ frequencyLog })
+    );
+    return frequencyLog;
+  }
+
+  it('the chapter stinger plays the theme motif in its scale (dense core: F, Gb, C)', () => {
+    const { bus, context } = makeInitializedBus();
+    const frequencyLog = recordOscillators(context);
+
+    bus.playChapterStinger('dense-core');
+
+    // Root F2 (MIDI 41) two octaves up: F4, Gb4, C5.
+    const expected = [65, 66, 72].map((midi) => 440 * 2 ** ((midi - 69) / 12));
+    expect(frequencyLog).toHaveLength(3);
+    frequencyLog.forEach((hz, index) => {
+      expect(hz).toBeCloseTo(expected[index], 3);
+    });
+  });
+
+  it('the chapter stinger is silent for a theme without a motif (the Warden)', () => {
+    const { bus, context } = makeInitializedBus();
+    const frequencyLog = recordOscillators(context);
+
+    bus.playChapterStinger('warden');
+
+    expect(frequencyLog).toEqual([]);
+  });
+
+  it('the warden stinger stacks the low brass hit under a riser', () => {
+    const { bus, context } = makeInitializedBus();
+    const frequencyLog = recordOscillators(context);
+
+    expect(() => bus.playWardenStinger()).not.toThrow();
+
+    // Three hit notes × two detuned saws + the riser tone.
+    expect(frequencyLog).toHaveLength(7);
+    expect(Math.min(...frequencyLog)).toBeCloseTo(65.41, 1); // C2
+    expect(context.createBufferSource).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('SFXBus owns the batcher port (cycle closes locally — no facade back-ref)', () => {
   it('createSfxSynthPort builds a working frozen port from the bus own methods', () => {
     const { bus } = makeInitializedBus();
@@ -297,6 +342,7 @@ const FACADE_PUBLIC_API_BASELINE = Object.freeze([
   'playBossShieldDeflect',
   'playBulletHit',
   'playButtonClick',
+  'playChapterStinger',
   'playDroneFire',
   'playEliteSpawned',
   'playEnemyTelegraph',
@@ -329,6 +375,7 @@ const FACADE_PUBLIC_API_BASELINE = Object.freeze([
   'playUISelect',
   'playUIStartGame',
   'playUpgradeSelect',
+  'playWardenStinger',
   'playXPCollect',
   'reseedRandomScopes',
   'reset',
