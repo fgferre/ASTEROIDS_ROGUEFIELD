@@ -17,6 +17,7 @@ import {
   withAlpha,
 } from '../../../data/constants/palette.js';
 import { BULWARK_SHIELD_HALF_ARC } from '../../../data/enemies/bulwark.js';
+import { WARDEN_KINDS } from '../../../data/enemies/boss.js';
 
 const TAU = Math.PI * 2;
 
@@ -713,6 +714,266 @@ const drawWardenBarrier = (ctx, size, enemy, time, emissive) => {
   ctx.stroke();
 };
 
+// --- Warden Choir / Null (bosses): drawn live, their parts move -----------
+
+const CHOIR = WARDEN_KINDS.choir;
+const NULL = WARDEN_KINDS.null;
+// how long a broken core / its arm stays on screen while it drifts away
+const CHOIR_BREAK_SECONDS = 1.6;
+const NULL_PLATE_ARC = (TAU / NULL.plateCount) * 0.82;
+
+// A matte disc lit from the key light, edge dark.
+const matteDisc = (ctx, x, y, radius, tint = null) => {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, TAU);
+  ctx.fillStyle = litFill(ctx, radius);
+  ctx.fill();
+  if (tint) {
+    ctx.fillStyle = tint;
+    ctx.fill();
+  }
+  darkEdge(ctx);
+  bevel(ctx, radius, 0.45);
+  ctx.restore();
+};
+
+// Lit violet-white core with a soft edge (the Prime core's recipe).
+const litCore = (ctx, x, y, radius, alpha, emissive) => {
+  const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
+  gradient.addColorStop(0, withAlpha(PALETTE.text, 0.8));
+  gradient.addColorStop(0.35, PALETTE.boss);
+  gradient.addColorStop(1, withAlpha(PALETTE.boss, emissive ? 0 : 0.15));
+  ctx.globalAlpha = alpha;
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, TAU);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+};
+
+// A machined bar from `from` to `to` along +x, lit on its key-facing side.
+const choirArm = (ctx, angle, from, to, halfWidth) => {
+  ctx.save();
+  ctx.rotate(angle);
+  ctx.beginPath();
+  ctx.moveTo(from, -halfWidth * 0.6);
+  ctx.lineTo(from + halfWidth, -halfWidth);
+  ctx.lineTo(to, -halfWidth);
+  ctx.lineTo(to, halfWidth);
+  ctx.lineTo(from + halfWidth, halfWidth);
+  ctx.lineTo(from, halfWidth * 0.6);
+  ctx.closePath();
+  ctx.fillStyle = PALETTE.hull;
+  ctx.fill();
+  darkEdge(ctx);
+  // the side facing the key light catches it
+  const side = Math.sin(KEY_LIGHT_ANGLE - angle) >= 0 ? 1 : -1;
+  ctx.beginPath();
+  ctx.moveTo(from + halfWidth, side * halfWidth);
+  ctx.lineTo(to, side * halfWidth);
+  ctx.strokeStyle = withAlpha(PALETTE.rockLit, 0.55);
+  ctx.lineWidth = LINE.hair;
+  ctx.stroke();
+  ctx.restore();
+};
+
+// When each core broke and at which angle (the class keeps orbiting it).
+const CHOIR_BREAKS = new WeakMap();
+
+const choirBreak = (core, angle, time) => {
+  let broken = CHOIR_BREAKS.get(core);
+  if (!broken) {
+    broken = { start: time, angle };
+    CHOIR_BREAKS.set(core, broken);
+  }
+  return broken;
+};
+
+const wardenChoir = {
+  facing: () => 0,
+  bake: false,
+  // the dark hub the arms meet at
+  body(ctx) {
+    matteDisc(ctx, 0, 0, 22, withAlpha(PALETTE.rockShadow, 0.55));
+  },
+  glow(ctx) {
+    ctx.beginPath();
+    ctx.arc(0, 0, 30, 0, TAU);
+    threatRim(ctx, PALETTE.boss);
+  },
+  live(ctx, size, enemy, emissive) {
+    const time = enemyTime(enemy);
+    // a hit shows as the cores flaring, not as white mass (as in 3D)
+    const flash = enemy.getHitFlash();
+    const cores = enemy.cores || [];
+    if (!emissive) {
+      ctx.beginPath();
+      ctx.arc(0, 0, 30, 0, TAU);
+      ctx.strokeStyle = withAlpha(PALETTE.boss, 0.45);
+      ctx.lineWidth = LINE.hair;
+      ctx.stroke();
+    }
+    const orbit = CHOIR.coreOrbitRadius;
+    const coreRadius = CHOIR.coreRadius;
+    cores.forEach((core, i) => {
+      const angle = Math.atan2(core.y - enemy.y, core.x - enemy.x);
+      if (core.alive) {
+        const singing = enemy.singingIndex === i;
+        const beat = Math.sin(time * 5 + i);
+        const x = Math.cos(angle) * orbit;
+        const y = Math.sin(angle) * orbit;
+        const r = coreRadius * (singing ? 1.06 + 0.04 * beat : 0.9);
+        if (!emissive) choirArm(ctx, angle, 18, orbit - r * 0.7, 4.5);
+        if (singing) {
+          const alpha = emissive ? 0.75 + 0.2 * beat + flash * 0.35 : 1;
+          litCore(ctx, x, y, r, Math.min(1, alpha), emissive);
+          ctx.beginPath();
+          ctx.arc(x, y, coreRadius * (1.3 + 0.08 * beat), 0, TAU);
+          ctx.strokeStyle = withAlpha(PALETTE.boss, 0.6 + 0.3 * beat);
+          ctx.lineWidth = LINE.thin;
+          ctx.stroke();
+        } else if (emissive) {
+          litCore(ctx, x, y, r * 0.7, 0.16 + flash * 0.25, true);
+        } else {
+          matteDisc(ctx, x, y, r, withAlpha(PALETTE.boss, 0.18 + flash * 0.2));
+        }
+        return;
+      }
+      // broken: the stub drifts out along its last angle, shrinking, dark
+      const broken = choirBreak(core, angle, time);
+      const age = time - broken.start;
+      if (age > CHOIR_BREAK_SECONDS) return;
+      const u = age / CHOIR_BREAK_SECONDS;
+      const fade = 1 - u;
+      const reach = orbit + 120 * u;
+      const x = Math.cos(broken.angle) * reach;
+      const y = Math.sin(broken.angle) * reach;
+      const r = coreRadius * (1 - 0.45 * u);
+      ctx.globalAlpha = fade;
+      if (!emissive) {
+        choirArm(
+          ctx,
+          broken.angle + 0.6 * u,
+          18 + 70 * u,
+          orbit - coreRadius * 0.6 + 70 * u,
+          4.5
+        );
+        matteDisc(ctx, x, y, r, withAlpha(PALETTE.rockShadow, 0.5));
+      } else {
+        const sputter = 0.5 + 0.5 * Math.abs(Math.sin(age * 31));
+        litCore(ctx, x, y, r * 0.8, fade * sputter, true);
+      }
+      ctx.globalAlpha = 1;
+    });
+
+    if (enemy.invulnerable) {
+      drawWardenBarrier(ctx, size, enemy, time, emissive);
+    }
+  },
+};
+
+// One curved plate of the Null's shell, centred on (distance, 0).
+const nullPlatePath = (ctx, distance) => {
+  const r = NULL.radius;
+  const tube = r * 0.3;
+  const cx = distance - r;
+  const a0 = -NULL_PLATE_ARC / 2;
+  const a1 = NULL_PLATE_ARC / 2;
+  ctx.beginPath();
+  ctx.arc(cx, 0, r + tube, a0, a1);
+  ctx.arc(cx, 0, r - tube, a1, a0, true);
+  ctx.closePath();
+};
+
+const wardenNull = {
+  facing: () => 0,
+  bake: false,
+  body() {},
+  glow() {},
+  live(ctx, size, enemy, emissive) {
+    const time = enemyTime(enemy);
+    const exposed = (enemy.currentPhase || 0) >= 2;
+    const open = enemy.shellOpen || 0;
+
+    // the gold rings that announce and show the inverted XP pull
+    const pull = enemy.pullState;
+    if (pull === 'windup' || pull === 'inverting') {
+      for (let k = 0; k < 2; k += 1) {
+        let r;
+        let alpha;
+        if (pull === 'windup') {
+          const p = clamp01(1 - (enemy.pullStateTimer || 0) / NULL.pullWindup);
+          r = 260 - 170 * p + k * 30;
+          alpha = 0.2 + 0.6 * p;
+        } else {
+          const w = (time * 1.4 + k * 0.5) % 1;
+          r = 90 + 300 * w;
+          alpha = 0.75 * (1 - w);
+        }
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, TAU);
+        ctx.strokeStyle = withAlpha(PALETTE.xp, alpha * (emissive ? 1 : 0.7));
+        ctx.lineWidth = emissive ? LINE.base : LINE.thin;
+        ctx.stroke();
+      }
+    }
+
+    // the core: dark and barely breathing, bright once the shell is shed
+    const core = size * (exposed ? 0.62 : 0.52);
+    if (!emissive) {
+      ctx.beginPath();
+      ctx.arc(0, 0, core, 0, TAU);
+      ctx.fillStyle = PALETTE.background;
+      ctx.fill();
+      darkEdge(ctx);
+    }
+    // a hit shows as the core flaring, not as white mass (as in 3D)
+    const flash = enemy.getHitFlash();
+    const glow = exposed
+      ? 0.8 + 0.2 * Math.sin(time * 6) + flash * 0.3
+      : 0.14 + 0.05 * Math.sin(time * 2) + flash * 0.3;
+    litCore(ctx, 0, 0, core * (exposed ? 1 : 0.7), Math.min(1, glow), emissive);
+    if (exposed || open > 0.2) {
+      ctx.beginPath();
+      ctx.arc(0, 0, size * (exposed ? 0.8 : 1.25), 0, TAU);
+      ctx.strokeStyle = withAlpha(PALETTE.boss, emissive ? 0.8 : 0.5);
+      ctx.lineWidth = LINE.hair;
+      ctx.stroke();
+    }
+
+    if (!enemy.shellShed) {
+      for (const plate of enemy.plates || []) {
+        const dx = plate.x - enemy.x;
+        const dy = plate.y - enemy.y;
+        const angle = Math.atan2(dy, dx);
+        ctx.save();
+        ctx.rotate(angle);
+        nullPlatePath(ctx, Math.hypot(dx, dy));
+        if (emissive) {
+          threatRim(ctx);
+        } else {
+          const facing = Math.cos(angle - KEY_LIGHT_ANGLE);
+          ctx.fillStyle = PALETTE.hull;
+          ctx.fill();
+          ctx.fillStyle =
+            facing >= 0
+              ? withAlpha(PALETTE.hullLit, facing * 0.45)
+              : withAlpha(PALETTE.rockShadow, -facing * 0.5);
+          ctx.fill();
+          darkEdge(ctx);
+        }
+        ctx.restore();
+      }
+    }
+
+    if (enemy.invulnerable) {
+      drawWardenBarrier(ctx, size, enemy, time, emissive);
+    }
+  },
+};
+
 const LOOKS = {
   triangle: mote,
   diamond: seeker,
@@ -722,7 +983,12 @@ const LOOKS = {
   weaver,
   bulwark,
   boss: warden,
+  'warden-choir': wardenChoir,
+  'warden-null': wardenNull,
 };
+
+// The three Wardens share the 'boss' shape; the kind picks the look.
+const BOSS_LOOKS = { choir: 'warden-choir', null: 'warden-null' };
 
 const lookSize = (enemy, shape) =>
   shape === 'boss' ? enemy.radius ?? 60 : enemy.radius ?? enemy.size ?? 16;
@@ -731,7 +997,7 @@ const lookSize = (enemy, shape) =>
 const BAKES = new Map();
 
 const bakeLook = (look, shape, size, enemy) => {
-  if (typeof document === 'undefined') return null;
+  if (typeof document === 'undefined' || look.bake === false) return null;
   const scale = getRenderScale();
   const variant = look.key ? look.key(enemy) : 0;
   const key = `${shape}|${size}|${variant}|${scale}|${Boolean(enemy?.elite)}`;
@@ -780,7 +1046,9 @@ const eliteRing = (ctx, size, emissive) => {
 const proceduralStrategy = ({ enemy, ctx, config }) => {
   if (!ctx) return;
 
-  const shape = config?.shape ?? enemy.renderShape ?? 'triangle';
+  const requested = config?.shape ?? enemy.renderShape ?? 'triangle';
+  const shape =
+    requested === 'boss' ? BOSS_LOOKS[enemy.bossKind] ?? requested : requested;
   const look = LOOKS[shape];
   if (!look) {
     console.warn(`[RenderComponent] Unknown procedural shape: ${shape}`);

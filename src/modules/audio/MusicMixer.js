@@ -1,8 +1,12 @@
 import {
+  MUSIC_DEFAULT_THEME,
   MUSIC_LAYER_CONFIG,
   MUSIC_RUN_INTENSITY,
+  MUSIC_THEME_CROSSFADE,
+  MUSIC_THEMES,
   RUN_FINAL_LAYER,
 } from '../../core/GameConstants.js';
+import { midiToHz, themeDegreeHz } from './MusicThemes.js';
 
 /**
  * MusicMixer — adaptive 4-layer synth music (AUDIO-01 / INFRA-02).
@@ -18,7 +22,10 @@ import {
  *     both init() and dispose() are idempotent.
  *
  * Gain topology (single writer per AudioParam — cross-plan contract):
- *   layerGains[base|tension|danger|climax]        (writer: MusicMixer)
+ *   theme voices (oscillator stack → voice gain → voice filter, one bank per
+ *     MUSIC_THEMES entry; a theme change equal-power crossfades the voice
+ *     gains of the outgoing and incoming banks, then stops the old one)
+ *   → layerGains[base|tension|danger|climax]      (writer: MusicMixer)
  *     → music lowpass (pre-built at init; bypass ~20kHz; writer: MusicMixer
  *        pause ramps its FREQUENCY only — built HERE, never at pause time)
  *     → musicPauseFadeGain                          (writer: MusicMixer pause/fade)
@@ -59,9 +66,6 @@ const RHYTHM_LEVELS = Object.freeze({ 2: true, 3: true });
 // schedules the next pulse onset at nextBarTime. NOT a generic Transport.
 const LOOKAHEAD_INTERVAL_MS = 25; // tick granularity
 const SCHEDULE_AHEAD_SECONDS = 0.1; // schedule onsets up to this far ahead
-const BAR_SECONDS = 0.5; // one "bar" = a pulse onset every 0.5s (120 BPM feel)
-const PULSE_FREQUENCY = 220; // pulse carrier (tunable — browser-check calibrates)
-const PULSE_GAIN = 0.12; // pulse loudness (kept modest under the drones)
 const PULSE_DURATION_SECONDS = 0.12; // short percussive blip per onset
 
 // Pause "underwater" feel (D-10): ramp the pre-built lowpass into this band and
@@ -161,9 +165,15 @@ class MusicMixer {
     this.intensityLevel = initialLevel;
     this.targetLevel = initialLevel;
 
+    // --- theme: the playing voice bank + banks still fading out ---
+    this.themeId = MUSIC_DEFAULT_THEME;
+    this._themeBank = null;
+    this._fadingBanks = [];
+
     // --- transport (bar-clock) + pause state ---
     this._lookaheadHandle = null; // setInterval handle for the lookahead
     this._nextBarTime = 0; // next pulse onset (context.currentTime domain)
+    this._pulseStep = 0; // index into the theme's pulse pattern
     this._isPaused = false;
 
     // --- run-following intensity (raw inputs → smoothed 0..1) + boss override ---
@@ -213,8 +223,9 @@ class MusicMixer {
       pauseFade.connect(targetNode);
     }
 
-    // --- 4 synth layers → lowpass ---
+    // --- 4 intensity layers → lowpass, voiced by the current theme ---
     this.layers = this._buildLayers(context, now, lowpass);
+    this._themeBank = this._buildThemeBank(this.themeId, now, 1);
 
     this.initialized = true;
 
@@ -223,61 +234,19 @@ class MusicMixer {
   }
 
   /**
-   * Build one oscillator+gain(+filter+modulator) graph per configured layer.
-   * Mirrors the legacy initializeMusicController engine, re-rooted onto the
-   * pre-built lowpass (the single music insert point).
+   * Build the theme-independent part of each layer: the intensity gain (with
+   * its slow LFO) routed into the pre-built lowpass. The theme voices feed it.
    * @private
    */
   _buildLayers(context, now, lowpass) {
     const layersConfig = MUSIC_LAYER_CONFIG?.layers || {};
+    const theme = MUSIC_THEMES[this.themeId];
     const created = {};
 
     Object.entries(layersConfig).forEach(([key, layerConfig = {}]) => {
-      const osc = context.createOscillator();
       const gain = context.createGain();
-
-      const baseFrequency = Number(layerConfig.frequency) || 110;
-      osc.type = layerConfig.type || 'sine';
-      osc.frequency.setValueAtTime(Math.max(10, baseFrequency), now);
-
-      // Seeded detune (replay-deterministic — never Math.random).
-      const detuneCents = Number(layerConfig.detuneCents) || 0;
-      const randomDetuneSpan = Number(layerConfig.randomDetuneCents);
-      let detune = detuneCents;
-      if (Number.isFinite(randomDetuneSpan) && randomDetuneSpan > 0) {
-        const span = Math.abs(randomDetuneSpan);
-        detune += this._randomBetween(-span, span);
-      }
-      if (osc.detune && typeof osc.detune.setValueAtTime === 'function') {
-        osc.detune.setValueAtTime(detune, now);
-      }
-
       // Layers start silent — intensity ramps them in.
       gain.gain.setValueAtTime(0, now);
-      osc.connect(gain);
-
-      let outputNode = gain;
-      let filterNode = null;
-      const filterConfig = layerConfig.filter;
-      if (filterConfig && typeof context.createBiquadFilter === 'function') {
-        filterNode = context.createBiquadFilter();
-        filterNode.type = filterConfig.type || 'lowpass';
-        if (typeof filterConfig.frequency === 'number') {
-          filterNode.frequency.setValueAtTime(
-            Math.max(10, filterConfig.frequency),
-            now
-          );
-        }
-        if (
-          filterNode.Q &&
-          typeof filterNode.Q.setValueAtTime === 'function' &&
-          typeof filterConfig.Q === 'number'
-        ) {
-          filterNode.Q.setValueAtTime(Math.max(0.0001, filterConfig.Q), now);
-        }
-        gain.connect(filterNode);
-        outputNode = filterNode;
-      }
 
       // Slow amplitude modulation (LFO → gain.gain) for an atmospheric drone.
       let modulator = null;
@@ -285,45 +254,180 @@ class MusicMixer {
         typeof layerConfig.modulationDepth === 'number'
           ? Math.max(0, Math.min(0.95, layerConfig.modulationDepth))
           : 0;
-      if (
-        depthMultiplier > 0 &&
-        typeof context.createOscillator === 'function'
-      ) {
+      if (depthMultiplier > 0) {
         const lfo = context.createOscillator();
         const depthGain = context.createGain();
-        const rate =
-          typeof layerConfig.modulationRate === 'number'
-            ? Math.max(0.01, layerConfig.modulationRate)
-            : 0.12;
+        const rate = this._modulationRate(theme, key);
         lfo.type = layerConfig.modulationType || 'sine';
         lfo.frequency.setValueAtTime(rate, now);
         depthGain.gain.setValueAtTime(0, now);
         lfo.connect(depthGain);
         depthGain.connect(gain.gain);
 
-        let phaseOffset = 0;
-        if (layerConfig.randomizeModulationPhase !== false && rate > 0) {
-          const cycleDuration = 1 / rate;
-          phaseOffset = this._randomBetween(0, Math.min(cycleDuration, 2.5));
-        }
+        const phaseOffset = this._randomBetween(0, Math.min(1 / rate, 2.5));
         lfo.start(now + Math.max(0, phaseOffset));
         modulator = { lfo, depthGain, depthMultiplier };
       }
 
-      // Route the layer output into the pre-built lowpass (the single insert).
-      outputNode.connect(lowpass);
-      osc.start(now);
-
-      created[key] = {
-        osc,
-        gain,
-        filter: filterNode,
-        modulator,
-        config: layerConfig,
-      };
+      gain.connect(lowpass);
+      created[key] = { gain, modulator, config: layerConfig };
     });
 
     return created;
+  }
+
+  /** LFO rate of a theme's layer (Hz). @private */
+  _modulationRate(theme, key) {
+    return Math.max(0.01, theme?.layers?.[key]?.modulationRate ?? 0.12);
+  }
+
+  /**
+   * Build one voice bank for `themeId`: per layer, a stack of oscillators
+   * (theme notes, spread + seeded detune) → voice gain → voice filter → the
+   * layer's intensity gain. Voice gains start at `weight` × their level.
+   * @private
+   */
+  _buildThemeBank(themeId, now, weight) {
+    const context = this.context;
+    const theme = MUSIC_THEMES[themeId];
+    const voices = {};
+
+    Object.entries(this.layers).forEach(([key, layer]) => {
+      const voiceConfig = theme.layers[key];
+      if (!voiceConfig) return;
+      const notes = voiceConfig.notes;
+      // Equal-power sum: a stack of n notes is as loud as one oscillator.
+      const level = (voiceConfig.level ?? 1) / Math.sqrt(notes.length);
+
+      const gain = context.createGain();
+      gain.gain.setValueAtTime(level * weight, now);
+
+      let output = gain;
+      let filter = null;
+      if (voiceConfig.filter) {
+        filter = context.createBiquadFilter();
+        filter.type = voiceConfig.filter.type;
+        filter.frequency.setValueAtTime(voiceConfig.filter.frequency, now);
+        filter.Q.setValueAtTime(voiceConfig.filter.Q, now);
+        gain.connect(filter);
+        output = filter;
+      }
+      output.connect(layer.gain);
+
+      const spread = voiceConfig.detuneCents ?? 0;
+      const randomSpan = voiceConfig.randomDetuneCents ?? 0;
+      const oscillators = notes.map((note, index) => {
+        const osc = context.createOscillator();
+        osc.type = voiceConfig.type;
+        osc.frequency.setValueAtTime(midiToHz(theme.root + note), now);
+        // Seeded detune (replay-deterministic — never Math.random).
+        const detune =
+          (index - (notes.length - 1) / 2) * spread +
+          (randomSpan > 0 ? this._randomBetween(-randomSpan, randomSpan) : 0);
+        osc.detune.setValueAtTime(detune, now);
+        osc.connect(gain);
+        osc.start(now);
+        return osc;
+      });
+
+      voices[key] = { oscillators, gain, filter, level };
+    });
+
+    return { themeId, voices, endTime: Infinity };
+  }
+
+  /**
+   * Switch the music theme. Default: equal-power crossfade of the voice gains
+   * over MUSIC_THEME_CROSSFADE.seconds (incoming bank built silent, outgoing
+   * bank stopped once silent); `immediate` cuts. Layer intensity gains are not
+   * touched, so the run intensity keeps driving which layers sound.
+   *
+   * @param {string} themeId - key of MUSIC_THEMES
+   * @param {{immediate?: boolean}} [options]
+   */
+  setTheme(themeId, { immediate = false } = {}) {
+    if (!MUSIC_THEMES[themeId] || themeId === this.themeId) return;
+    this.themeId = themeId;
+    this._pulseStep = 0;
+    if (!this.initialized || !this.context) return;
+
+    const now = this.context.currentTime;
+    const seconds = immediate ? 0 : MUSIC_THEME_CROSSFADE.seconds;
+    const outgoing = this._themeBank;
+    const incoming = this._buildThemeBank(themeId, now, immediate ? 1 : 0);
+    this._themeBank = incoming;
+
+    const theme = MUSIC_THEMES[themeId];
+    Object.entries(this.layers).forEach(([key, layer]) => {
+      const lfoRate = layer.modulator?.lfo?.frequency;
+      if (lfoRate) {
+        this._rampParam(
+          lfoRate,
+          this._modulationRate(theme, key),
+          now,
+          seconds
+        );
+      }
+    });
+
+    this._fadingBanks = this._fadingBanks.filter((bank) => bank.endTime > now);
+    if (!outgoing) return;
+    if (immediate) {
+      this._stopBank(outgoing, now);
+      return;
+    }
+    Object.values(incoming.voices).forEach((voice) => {
+      this._equalPowerRamp(voice.gain.gain, 0, voice.level, now, seconds);
+    });
+    Object.values(outgoing.voices).forEach((voice) => {
+      const from =
+        typeof voice.gain.gain.value === 'number'
+          ? voice.gain.gain.value
+          : voice.level;
+      this._equalPowerRamp(voice.gain.gain, from, 0, now, seconds);
+    });
+    this._stopBank(outgoing, now + seconds);
+    this._fadingBanks.push(outgoing);
+  }
+
+  /**
+   * Equal-power gain move from `from` to `to`: value(t) = from·cos(tπ/2) +
+   * to·sin(tπ/2), scheduled as MUSIC_THEME_CROSSFADE.segments linear ramps
+   * that end exactly on `to` at now + seconds (click-safe anchor first).
+   * @private
+   */
+  _equalPowerRamp(param, from, to, now, seconds) {
+    this._cancel(param, now);
+    param.setValueAtTime(from, now);
+    const segments = MUSIC_THEME_CROSSFADE.segments;
+    for (let i = 1; i <= segments; i += 1) {
+      const t = i / segments;
+      const value =
+        i === segments
+          ? to
+          : from * Math.cos((t * Math.PI) / 2) +
+            to * Math.sin((t * Math.PI) / 2);
+      param.linearRampToValueAtTime(value, now + seconds * t);
+    }
+  }
+
+  /**
+   * Stop a bank's oscillators at `when`; the last one to end disconnects the
+   * bank's gains and filters.
+   * @private
+   */
+  _stopBank(bank, when) {
+    bank.endTime = when;
+    Object.values(bank.voices).forEach((voice) => {
+      voice.oscillators.forEach((osc) => {
+        osc.onended = () => {
+          this._safeDisconnect(osc);
+          this._safeDisconnect(voice.gain);
+          this._safeDisconnect(voice.filter);
+        };
+        this._safeStop(osc, when);
+      });
+    });
   }
 
   /**
@@ -366,6 +470,7 @@ class MusicMixer {
     this._applyIntensity(0, {
       rampSeconds: MUSIC_RUN_INTENSITY.layerFadeSeconds,
     });
+    this.setTheme(MUSIC_DEFAULT_THEME, { immediate: true });
   }
 
   /** @private */
@@ -531,13 +636,14 @@ class MusicMixer {
     let guard = 0;
     while (this._nextBarTime <= horizon && guard < 64) {
       this._schedulePulse(this._nextBarTime);
-      this._nextBarTime += BAR_SECONDS;
+      this._nextBarTime += MUSIC_THEMES[this.themeId].barSeconds;
       guard += 1;
     }
   }
 
   /**
-   * Schedule a single short pulse oscillator at `onsetTime`. Registers onended
+   * Schedule a single short pulse oscillator at `onsetTime`, pitched on the
+   * next step of the theme's pulse pattern. Registers onended
    * cleanup so each per-bar oscillator releases its nodes (no leak across
    * hundreds of bars). Uses the seeded randomScope for variation — never
    * Math.random.
@@ -550,11 +656,19 @@ class MusicMixer {
     const osc = context.createOscillator();
     const gain = context.createGain();
 
+    const theme = MUSIC_THEMES[this.themeId];
+    const { pulse } = theme;
+    const degree = pulse.pattern[this._pulseStep % pulse.pattern.length];
+    this._pulseStep += 1;
+
     // Seeded pitch variation (replay-deterministic).
     const detune = this._randomBetween(-12, 12);
-    osc.type = 'square';
+    osc.type = pulse.type;
     if (osc.frequency && typeof osc.frequency.setValueAtTime === 'function') {
-      osc.frequency.setValueAtTime(PULSE_FREQUENCY, onsetTime);
+      osc.frequency.setValueAtTime(
+        themeDegreeHz(theme, degree, pulse.octave),
+        onsetTime
+      );
     }
     if (osc.detune && typeof osc.detune.setValueAtTime === 'function') {
       osc.detune.setValueAtTime(detune, onsetTime);
@@ -563,7 +677,7 @@ class MusicMixer {
     // Short percussive envelope on the pulse's own gain.
     const endTime = onsetTime + PULSE_DURATION_SECONDS;
     if (gain.gain) {
-      gain.gain.setValueAtTime(PULSE_GAIN, onsetTime);
+      gain.gain.setValueAtTime(pulse.gain, onsetTime);
       if (typeof gain.gain.linearRampToValueAtTime === 'function') {
         gain.gain.linearRampToValueAtTime(0.0001, endTime);
       }
@@ -736,11 +850,23 @@ class MusicMixer {
     this._stopLookahead();
     this._isPaused = false;
 
+    [this._themeBank, ...this._fadingBanks].forEach((bank) => {
+      if (!bank) return;
+      Object.values(bank.voices).forEach((voice) => {
+        voice.oscillators.forEach((osc) => {
+          this._safeStop(osc, now);
+          this._safeDisconnect(osc);
+        });
+        this._safeDisconnect(voice.gain);
+        this._safeDisconnect(voice.filter);
+      });
+    });
+    this._themeBank = null;
+    this._fadingBanks = [];
+
     Object.values(this.layers || {}).forEach((layer) => {
-      this._safeStop(layer?.osc, now);
       this._safeStop(layer?.modulator?.lfo, now);
       this._safeDisconnect(layer?.gain);
-      this._safeDisconnect(layer?.filter);
       this._safeDisconnect(layer?.modulator?.depthGain);
     });
 

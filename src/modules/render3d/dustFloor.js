@@ -47,7 +47,7 @@ const SHADOW_ALPHA = 0.85;
 const MAX_SHADOWS = 96;
 
 // Tileable fbm: four shifted samples cross-faded, so the edges wrap.
-function tileNoise(noise, u, v, scale) {
+export function tileNoise(noise, u, v, scale) {
   const a = noise.fbm(u * scale, v * scale, 0.5, 4);
   const b = noise.fbm((u - 1) * scale, v * scale, 0.5, 4);
   const c = noise.fbm(u * scale, (v - 1) * scale, 0.5, 4);

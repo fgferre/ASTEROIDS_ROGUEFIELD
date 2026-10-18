@@ -173,6 +173,7 @@ class WorldSystem extends BaseSystem {
     const data = {
       ...this.buildRunSummary(),
       position: playerPosition, // CRITICAL: Add position for explosion!
+      killedBy: player?.lastDamageSource ?? null,
     };
 
     // Emit player-died FIRST so explosion triggers

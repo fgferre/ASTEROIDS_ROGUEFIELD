@@ -181,60 +181,18 @@ export const BOSS_AUDIO_FREQUENCY_PRESETS = Object.freeze({
   }),
 });
 
+// The four intensity layers. Pitch, timbre and filters come from the active
+// MUSIC_THEMES entry; here only the slow amplitude LFO each layer shares
+// across themes (its rate is per theme).
 export const MUSIC_LAYER_CONFIG = Object.freeze({
   layers: Object.freeze({
-    base: Object.freeze({
-      frequency: 110,
-      type: 'sine',
-      modulationDepth: 0.55,
-      modulationRate: 0.07,
-      modulationType: 'sine',
-      randomDetuneCents: 8,
-      filter: Object.freeze({
-        type: 'lowpass',
-        frequency: 420,
-        Q: 0.8,
-      }),
-    }),
-    tension: Object.freeze({
-      frequency: 220,
-      type: 'triangle',
-      modulationDepth: 0.4,
-      modulationRate: 0.12,
-      modulationType: 'sine',
-      randomDetuneCents: 6,
-      filter: Object.freeze({
-        type: 'bandpass',
-        frequency: 680,
-        Q: 1.1,
-      }),
-    }),
+    base: Object.freeze({ modulationDepth: 0.55, modulationType: 'sine' }),
+    tension: Object.freeze({ modulationDepth: 0.4, modulationType: 'sine' }),
     danger: Object.freeze({
-      frequency: 330,
-      type: 'sawtooth',
       modulationDepth: 0.32,
-      modulationRate: 0.18,
       modulationType: 'triangle',
-      randomDetuneCents: 5,
-      filter: Object.freeze({
-        type: 'bandpass',
-        frequency: 940,
-        Q: 1.3,
-      }),
     }),
-    climax: Object.freeze({
-      frequency: 440,
-      type: 'square',
-      modulationDepth: 0.26,
-      modulationRate: 0.24,
-      modulationType: 'sine',
-      randomDetuneCents: 4,
-      filter: Object.freeze({
-        type: 'highpass',
-        frequency: 520,
-        Q: 0.7,
-      }),
-    }),
+    climax: Object.freeze({ modulationDepth: 0.26, modulationType: 'sine' }),
   }),
   intensities: Object.freeze([
     Object.freeze({ base: 0.0, tension: 0.0, danger: 0.0, climax: 0.0 }),
@@ -251,6 +209,250 @@ export const MUSIC_LAYER_CONFIG = Object.freeze({
     bossRise: 0.6,
     bossFall: 2.8,
   }),
+});
+
+// Musical scales as semitones above the root (one octave).
+const MUSIC_SCALES = Object.freeze({
+  dorian: Object.freeze([0, 2, 3, 5, 7, 9, 10]),
+  phrygian: Object.freeze([0, 1, 3, 5, 7, 8, 10]),
+  lydian: Object.freeze([0, 2, 4, 6, 7, 9, 11]),
+  aeolian: Object.freeze([0, 2, 3, 5, 7, 8, 10]),
+});
+
+// Procedural music themes (proposta 18/10 — the owner's ear decides). Each
+// theme voices the same four intensity layers, so the run intensity keeps
+// working unchanged; a theme change only swaps what each layer plays.
+//   root: MIDI note of the theme's tonic (45 = A2, 110 Hz).
+//   scale: semitone steps; pulse.pattern and motif are scale DEGREES
+//     (7 = the root an octave up).
+//   barSeconds: pulse grid spacing (the theme's tempo).
+//   layers.<key>: type, notes (semitones above root, stacked oscillators),
+//     detuneCents (spread across the stack), randomDetuneCents (seeded),
+//     filter, modulationRate (LFO Hz), level (trim).
+//   pulse: the danger/climax rhythmic blip — type, octave above root, pattern,
+//     gain.
+//   motif: the chapter stinger's three notes (biome themes only).
+export const MUSIC_THEMES = Object.freeze({
+  // Open, travelling: A dorian, the bright sixth over a calm fifth.
+  'outer-ring': Object.freeze({
+    root: 45,
+    scale: MUSIC_SCALES.dorian,
+    barSeconds: 0.5,
+    layers: Object.freeze({
+      base: Object.freeze({
+        type: 'sine',
+        notes: Object.freeze([0, 7]),
+        randomDetuneCents: 8,
+        filter: Object.freeze({ type: 'lowpass', frequency: 420, Q: 0.8 }),
+        modulationRate: 0.07,
+      }),
+      tension: Object.freeze({
+        type: 'triangle',
+        notes: Object.freeze([12, 21]),
+        randomDetuneCents: 6,
+        filter: Object.freeze({ type: 'bandpass', frequency: 680, Q: 1.1 }),
+        modulationRate: 0.12,
+      }),
+      danger: Object.freeze({
+        type: 'sawtooth',
+        notes: Object.freeze([19, 24]),
+        randomDetuneCents: 5,
+        filter: Object.freeze({ type: 'bandpass', frequency: 940, Q: 1.3 }),
+        modulationRate: 0.18,
+      }),
+      climax: Object.freeze({
+        type: 'square',
+        notes: Object.freeze([24, 31]),
+        randomDetuneCents: 4,
+        filter: Object.freeze({ type: 'highpass', frequency: 520, Q: 0.7 }),
+        modulationRate: 0.24,
+      }),
+    }),
+    pulse: Object.freeze({
+      type: 'square',
+      octave: 1,
+      pattern: Object.freeze([0, 0, 4, 2]),
+      gain: 0.12,
+    }),
+    motif: Object.freeze([0, 4, 5]),
+  }),
+  // Heavy, close: F phrygian a fourth lower, sub octave, minor-second rub,
+  // darker filters, slower pulse.
+  'dense-core': Object.freeze({
+    root: 41,
+    scale: MUSIC_SCALES.phrygian,
+    barSeconds: 0.667,
+    layers: Object.freeze({
+      base: Object.freeze({
+        type: 'sine',
+        notes: Object.freeze([-12, 0, 7]),
+        randomDetuneCents: 6,
+        filter: Object.freeze({ type: 'lowpass', frequency: 300, Q: 0.9 }),
+        modulationRate: 0.05,
+      }),
+      tension: Object.freeze({
+        type: 'triangle',
+        notes: Object.freeze([12, 13]),
+        randomDetuneCents: 5,
+        filter: Object.freeze({ type: 'bandpass', frequency: 520, Q: 1.2 }),
+        modulationRate: 0.09,
+      }),
+      danger: Object.freeze({
+        type: 'sawtooth',
+        notes: Object.freeze([15, 19]),
+        randomDetuneCents: 5,
+        filter: Object.freeze({ type: 'lowpass', frequency: 700, Q: 2 }),
+        modulationRate: 0.14,
+      }),
+      climax: Object.freeze({
+        type: 'square',
+        notes: Object.freeze([24, 32]),
+        randomDetuneCents: 4,
+        filter: Object.freeze({ type: 'bandpass', frequency: 1200, Q: 1 }),
+        modulationRate: 0.2,
+      }),
+    }),
+    pulse: Object.freeze({
+      type: 'triangle',
+      octave: 1,
+      pattern: Object.freeze([0, 1, 0, 4]),
+      gain: 0.13,
+    }),
+    motif: Object.freeze([0, 1, 4]),
+  }),
+  // Cold, vast: E lydian, the raised fourth in high sine partials, slow
+  // shimmering LFOs.
+  'wardens-reach': Object.freeze({
+    root: 40,
+    scale: MUSIC_SCALES.lydian,
+    barSeconds: 0.5,
+    layers: Object.freeze({
+      base: Object.freeze({
+        type: 'sine',
+        notes: Object.freeze([0, 7, 18]),
+        randomDetuneCents: 6,
+        filter: Object.freeze({ type: 'lowpass', frequency: 600, Q: 0.7 }),
+        modulationRate: 0.04,
+      }),
+      tension: Object.freeze({
+        type: 'triangle',
+        notes: Object.freeze([24, 30]),
+        randomDetuneCents: 5,
+        filter: Object.freeze({ type: 'bandpass', frequency: 1100, Q: 0.9 }),
+        modulationRate: 0.06,
+      }),
+      danger: Object.freeze({
+        type: 'triangle',
+        notes: Object.freeze([19, 23, 28]),
+        randomDetuneCents: 5,
+        filter: Object.freeze({ type: 'bandpass', frequency: 1400, Q: 1 }),
+        modulationRate: 0.1,
+      }),
+      climax: Object.freeze({
+        type: 'sine',
+        notes: Object.freeze([36, 42, 47]),
+        randomDetuneCents: 7,
+        filter: Object.freeze({ type: 'highpass', frequency: 900, Q: 0.7 }),
+        modulationRate: 0.15,
+      }),
+    }),
+    pulse: Object.freeze({
+      type: 'sine',
+      octave: 2,
+      pattern: Object.freeze([0, 4, 3, 6]),
+      gain: 0.1,
+    }),
+    motif: Object.freeze([0, 3, 4]),
+  }),
+  // The Warden: C minor over a root + tritone drone, a detuned saw stack like
+  // brass, an insistent eighth-note pulse.
+  warden: Object.freeze({
+    root: 36,
+    scale: MUSIC_SCALES.aeolian,
+    barSeconds: 0.25,
+    layers: Object.freeze({
+      base: Object.freeze({
+        type: 'triangle',
+        notes: Object.freeze([0, 6]),
+        randomDetuneCents: 4,
+        filter: Object.freeze({ type: 'lowpass', frequency: 380, Q: 1 }),
+        modulationRate: 0.09,
+      }),
+      tension: Object.freeze({
+        type: 'sawtooth',
+        notes: Object.freeze([12, 15]),
+        randomDetuneCents: 5,
+        filter: Object.freeze({ type: 'lowpass', frequency: 800, Q: 1.4 }),
+        modulationRate: 0.16,
+      }),
+      danger: Object.freeze({
+        type: 'sawtooth',
+        notes: Object.freeze([19, 24, 27]),
+        detuneCents: 9,
+        randomDetuneCents: 3,
+        filter: Object.freeze({ type: 'lowpass', frequency: 1500, Q: 1.8 }),
+        modulationRate: 0.2,
+      }),
+      climax: Object.freeze({
+        type: 'square',
+        notes: Object.freeze([30, 36]),
+        randomDetuneCents: 4,
+        filter: Object.freeze({ type: 'bandpass', frequency: 1800, Q: 1.2 }),
+        modulationRate: 0.28,
+      }),
+    }),
+    pulse: Object.freeze({
+      type: 'sawtooth',
+      octave: 1,
+      pattern: Object.freeze([0, 0, 0, 4, 0, 0, 2, 1]),
+      gain: 0.14,
+    }),
+  }),
+});
+
+export const MUSIC_DEFAULT_THEME = 'outer-ring';
+export const MUSIC_WARDEN_THEME = 'warden';
+
+// Theme change: equal-power crossfade between the outgoing and incoming
+// voices (piecewise-linear over `segments` steps), proposta 18/10.
+export const MUSIC_THEME_CROSSFADE = Object.freeze({
+  seconds: 2.5,
+  segments: 8,
+});
+
+// Chapter stinger: the biome theme's three-note motif, on its first layer.
+export const CHAPTER_STINGER = Object.freeze({
+  octave: 2, // above the theme root
+  type: 'triangle',
+  spacingSeconds: 0.22,
+  noteSeconds: 0.9,
+  lastNoteSeconds: 1.8,
+  gain: 0.09,
+  reverbSendDb: -8,
+});
+
+// Warden stinger (boss-warning, one layer before the Warden): a low brass
+// hit on the Warden root plus a rising noise/sine riser into the next layer.
+export const WARDEN_STINGER = Object.freeze({
+  hit: Object.freeze({
+    notes: Object.freeze([36, 43, 48]), // C2, G2, C3 (MIDI)
+    detuneCents: 8,
+    gain: 0.16,
+    attackSeconds: 0.02,
+    seconds: 1.4,
+    filterStart: 2200,
+    filterEnd: 260,
+  }),
+  riser: Object.freeze({
+    seconds: 1.6,
+    gain: 0.07,
+    filterStart: 400,
+    filterEnd: 4800,
+    toneStart: 130.8, // C3
+    toneEnd: 523.3, // C5
+    toneGain: 0.04,
+  }),
+  reverbSendDb: -9,
 });
 
 // === MASTER CHAIN ("studio" bus) ===
@@ -284,6 +486,7 @@ export const AUDIO_REVERB_SEND_DB = Object.freeze({
   levelUp: -12,
   boss: -10,
   elite: -11,
+  deepFieldEntry: -10,
 });
 
 // Enemy-side cues pan by source x relative to the player.

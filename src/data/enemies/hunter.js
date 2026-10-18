@@ -35,7 +35,7 @@ import { deepFreeze } from '../../utils/deepFreeze.js';
  */
 export const HUNTER_CONFIG = deepFreeze({
   key: 'hunter',
-  displayName: 'Hunter Frigate',
+  displayName: 'Seeker',
   radius: 16,
   health: 48,
   acceleration: 220,

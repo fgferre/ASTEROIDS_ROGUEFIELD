@@ -14,6 +14,8 @@ import {
   FAMILY_SYNERGY_THRESHOLD,
 } from '../data/upgrades/families.js';
 import { BaseSystem } from '../core/BaseSystem.js';
+import { resolveService } from '../core/serviceUtils.js';
+import { BASE_MODIFIERS } from '../data/hangar.js';
 import {
   MAGNETISM_FORCE,
   MAGNETISM_RADIUS,
@@ -82,8 +84,13 @@ class UpgradeSystem extends BaseSystem {
 
   // Per-run reroll/banish budget and the upgrades banished this run.
   resetRunUpgradeActions() {
-    this.rerollsLeft = PROGRESSION_UPGRADE_REROLLS_PER_RUN;
-    this.banishesLeft = PROGRESSION_UPGRADE_BANISHES_PER_RUN;
+    const hangar =
+      resolveService('hangar', this.dependencies)?.getModifiers() ??
+      BASE_MODIFIERS;
+    this.rerollsLeft =
+      PROGRESSION_UPGRADE_REROLLS_PER_RUN + hangar.extraRerolls;
+    this.banishesLeft =
+      PROGRESSION_UPGRADE_BANISHES_PER_RUN + hangar.extraBanishes;
     this.banishedUpgrades = new Set();
   }
 

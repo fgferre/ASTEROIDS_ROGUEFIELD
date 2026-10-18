@@ -2286,11 +2286,22 @@ export class WaveManager {
   }
 
   /**
-   * Stops layer progression for good (until reset): the run is over.
+   * Stops layer progression (until reset or resumeWaves): the run is over.
    */
   holdWaves() {
     this.wavePaused = true;
     this.waveCountdown = 0;
+  }
+
+  /**
+   * Undoes holdWaves (the run went endless): a finished layer counts down to
+   * the next as usual; one still in progress plays on.
+   */
+  resumeWaves() {
+    this.wavePaused = false;
+    if (!this.waveInProgress) {
+      this.waveCountdown = this.waveDelay;
+    }
   }
 
   /**

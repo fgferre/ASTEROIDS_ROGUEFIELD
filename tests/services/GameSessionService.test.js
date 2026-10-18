@@ -202,7 +202,7 @@ describe('GameSessionService lifecycle flows', () => {
       expect.objectContaining({
         screen: 'gameover',
         source: 'player-died',
-        data: { reason: 'spec' },
+        data: expect.objectContaining({ reason: 'spec' }),
       }),
     ]);
 
@@ -230,7 +230,7 @@ describe('GameSessionService lifecycle flows', () => {
       expect.objectContaining({
         screen: 'gameover',
         source: 'player-died',
-        data: { reason: 'spec' },
+        data: expect.objectContaining({ reason: 'spec' }),
       }),
       expect.objectContaining({ screen: 'playing', source: 'retry-complete' }),
     ]);

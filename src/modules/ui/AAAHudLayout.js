@@ -1,5 +1,9 @@
 // src/modules/ui/AAAHudLayout.js
 
+import { ENEMY_TYPES, BOSS_CONFIG } from '../../data/constants/visual.js';
+import { WEAPONS } from '../../data/weapons.js';
+import { UPGRADE_FAMILIES } from '../../data/upgrades/families.js';
+
 const COMBO_VISIBLE_MIN = 2;
 const RADAR_SIZE = 220;
 const RADAR_POOL_SIZE = 80;
@@ -15,18 +19,10 @@ const FEED_MAX_ROWS = 4;
 const COMBO_POP_MS = 120;
 const LOW_HULL_PERCENT = 30;
 const CRITICAL_HULL_PERCENT = 15;
-// NORTE §3 names, keyed by enemy.type.
-const FEED_NAMES = {
-  asteroid: 'Fragment',
-  drone: 'Mote',
-  hunter: 'Seeker',
-  mine: 'Tether',
-  husk: 'Husk',
-  ram: 'Ram',
-  weaver: 'Weaver',
-  bulwark: 'Bulwark',
-  boss: 'Warden Prime',
-};
+// One pip per lance shot before the Harmonic beam (the beam is the last shot).
+const BEAM_PIPS = WEAPONS.harmonic.beam.every - 1;
+// Asteroids have no enemy data entry; the Warden's feed name is the boss config's.
+const ASTEROID_FEED_NAME = 'Fragment';
 const COMBO_TIER_RANK = { text: 0, status: 1, xp: 2, boss: 3 };
 
 /** Combo color tier: text < 1.3×, status 1.3–1.6×, xp 1.7–1.9×, boss at 2.0×. */
@@ -58,8 +54,12 @@ export class AAAHudLayout {
     this._bannerEndsAt = 0;
     this._bossIntroEndsAt = 0;
     this._transmissionHideTimer = null;
+    this._onboardingHideTimer = null;
     this._bossBarHeldUntil = 0;
     this._feedRows = [];
+    this._lastWeaponKey = null;
+    this._evolutionChips = new Map();
+    this._buffs = new Map();
   }
 
   mount(container) {
@@ -144,8 +144,12 @@ export class AAAHudLayout {
     this._bannerEndsAt = 0;
     this._bossIntroEndsAt = 0;
     this._transmissionHideTimer = null;
+    this._onboardingHideTimer = null;
     this._bossBarHeldUntil = 0;
     this._feedRows = [];
+    this._lastWeaponKey = null;
+    this._evolutionChips = new Map();
+    this._buffs = new Map();
   }
 
   _later(fn, ms) {
@@ -307,9 +311,49 @@ export class AAAHudLayout {
     }, FADE_OUT_MS);
   }
 
+  /** First-run tip under the top HUD: key chips and one line. */
+  showOnboardingTip(keys, text) {
+    const tip = this.els?.onboardingTip;
+    if (!tip) {
+      return;
+    }
+    if (this._onboardingHideTimer) {
+      this._cancel(this._onboardingHideTimer);
+      this._onboardingHideTimer = null;
+    }
+    this.els.onboardingKeys.replaceChildren(
+      ...keys.map((label) => {
+        const chip = document.createElement('kbd');
+        chip.className = 'onboarding-tip__key';
+        chip.textContent = label;
+        return chip;
+      })
+    );
+    this.els.onboardingText.textContent = text;
+    tip.classList.remove('is-leaving');
+    this._replay(tip, 'is-showing');
+  }
+
+  hideOnboardingTip() {
+    const tip = this.els?.onboardingTip;
+    if (!tip || !tip.classList.contains('is-showing')) {
+      return;
+    }
+    tip.classList.add('is-leaving');
+    this._onboardingHideTimer = this._later(() => {
+      tip.classList.remove('is-showing', 'is-leaving');
+      this._onboardingHideTimer = null;
+    }, FADE_OUT_MS);
+  }
+
   /** Kill feed row for a destroyed enemy; repeated kills count up (×N). */
   addKillFeed(enemyType, elite = false) {
-    const baseName = FEED_NAMES[enemyType];
+    const baseName =
+      enemyType === 'asteroid'
+        ? ASTEROID_FEED_NAME
+        : enemyType === 'boss'
+          ? BOSS_CONFIG.displayName
+          : ENEMY_TYPES[enemyType]?.displayName;
     if (!baseName) {
       return;
     }
@@ -434,6 +478,12 @@ export class AAAHudLayout {
       aimModeIndicator: query('#ui-aim-mode'),
       dashChip: query('#ui-dash-chip'),
       dashFill: query('#ui-dash-fill'),
+      weaponChip: query('#ui-weapon-chip'),
+      weaponName: query('#ui-weapon-name'),
+      beamPips: query('#ui-beam-pips'),
+      beamPipEls: [...root.querySelectorAll('.beam-pip')],
+      evolutions: query('#ui-evolutions'),
+      buffs: query('#ui-buffs'),
       layerBanner: query('#ui-layer-banner'),
       layerBannerTitle: query('#ui-layer-banner-title'),
       layerBannerSub: query('#ui-layer-banner-sub'),
@@ -444,6 +494,9 @@ export class AAAHudLayout {
       transmissionSpeaker: query('#ui-transmission-speaker'),
       transmissionLine: query('#ui-transmission-line'),
       feed: query('#ui-feed'),
+      onboardingTip: query('#ui-onboarding-tip'),
+      onboardingKeys: query('#ui-onboarding-keys'),
+      onboardingText: query('#ui-onboarding-text'),
       lowHpVignette: query('#ui-lowhp-vignette'),
     };
   }
@@ -487,6 +540,109 @@ export class AAAHudLayout {
     if (wasCharging && fraction === 0) {
       this._replay(this.els.dashChip, 'is-ready');
     }
+  }
+
+  /**
+   * WEAPON chip, beam pips and evolution chips from
+   * CombatSystem.getWeaponState(); writes the DOM only when something changed.
+   */
+  updateWeapon(state) {
+    if (!this.els?.weaponName || !state) {
+      return;
+    }
+    const harmonic = state.weaponId === 'harmonic';
+    const filled = harmonic ? BEAM_PIPS + 1 - state.shotsToBeam : 0;
+    const key = `${state.weaponId}:${filled}:${state.evolutions.map((evolution) => evolution.id).join(',')}`;
+    if (key === this._lastWeaponKey) {
+      return;
+    }
+    this._lastWeaponKey = key;
+    this.els.weaponName.textContent = harmonic ? 'HARMONIC' : 'LANCE';
+    this.els.beamPips.classList.toggle('is-hidden', !harmonic);
+    this.els.beamPipEls.forEach((pip, index) =>
+      pip.classList.toggle('is-filled', index < filled)
+    );
+
+    const ids = new Set(state.evolutions.map((evolution) => evolution.id));
+    for (const [id, chip] of this._evolutionChips) {
+      if (!ids.has(id)) {
+        chip.remove();
+        this._evolutionChips.delete(id);
+      }
+    }
+    for (const { id, family } of state.evolutions) {
+      if (this._evolutionChips.has(id)) {
+        continue;
+      }
+      const chip = document.createElement('span');
+      chip.className = 'evo-chip';
+      chip.textContent = id.toUpperCase();
+      chip.style.setProperty('--family-color', UPGRADE_FAMILIES[family].color);
+      this.els.evolutions.appendChild(chip);
+      this._evolutionChips.set(id, chip);
+    }
+  }
+
+  /** The Harmonic beam fired: the weapon chip and its pips flash once. */
+  flashBeam() {
+    if (this.els?.weaponChip) {
+      this._replay(this.els.weaponChip, 'is-beam');
+    }
+  }
+
+  /** Timed pickup chip ("OVERCHARGE 7.9s"); collecting it again restarts it. */
+  startBuff(kind, label, duration, color) {
+    const container = this.els?.buffs;
+    if (!container) {
+      return;
+    }
+    let buff = this._buffs.get(kind);
+    if (!buff) {
+      const el = document.createElement('div');
+      el.className = 'mode-chip buff-chip';
+      el.style.setProperty('--buff-color', color);
+      const text = document.createElement('span');
+      const meter = document.createElement('span');
+      meter.className = 'buff-meter';
+      const fill = document.createElement('span');
+      fill.className = 'buff-meter__fill';
+      meter.appendChild(fill);
+      el.appendChild(text);
+      el.appendChild(meter);
+      container.appendChild(el);
+      buff = { el, text, fill, label, duration, remaining: 0, shown: '' };
+      this._buffs.set(kind, buff);
+    }
+    buff.duration = duration;
+    buff.remaining = duration;
+    this._renderBuff(buff);
+  }
+
+  /** Counts the buff chips down on the game's clock; a chip at 0 goes away. */
+  tickBuffs(deltaTime) {
+    for (const [kind, buff] of this._buffs) {
+      buff.remaining -= deltaTime;
+      if (buff.remaining <= 0) {
+        buff.el.remove();
+        this._buffs.delete(kind);
+      } else {
+        this._renderBuff(buff);
+      }
+    }
+  }
+
+  clearBuffs() {
+    this._buffs.forEach((buff) => buff.el.remove());
+    this._buffs.clear();
+  }
+
+  _renderBuff(buff) {
+    const shown = `${buff.label} ${buff.remaining.toFixed(1)}s`;
+    if (shown !== buff.shown) {
+      buff.shown = shown;
+      buff.text.textContent = shown;
+    }
+    buff.fill.style.transform = `scaleX(${buff.remaining / buff.duration})`;
   }
 
   _initializeBars() {
@@ -932,6 +1088,10 @@ export class AAAHudLayout {
                 <div class="boss-intro__sub" id="ui-boss-intro-sub">Guardian of the Ring</div>
                 <div class="boss-intro__line"></div>
             </div>
+            <div class="onboarding-tip" id="ui-onboarding-tip" role="status">
+                <div class="onboarding-tip__keys" id="ui-onboarding-keys"></div>
+                <div class="onboarding-tip__text" id="ui-onboarding-text"></div>
+            </div>
             <div class="transmission" id="ui-transmission" aria-live="polite">
                 <div class="transmission__speaker" id="ui-transmission-speaker"></div>
                 <div class="transmission__rule"></div>
@@ -977,9 +1137,16 @@ export class AAAHudLayout {
 
             <!-- MODES (Bottom Right) -->
             <div class="systems-area hud-panel">
-                <div class="mode-chip">AIM <span class="data-val" id="ui-aim-mode">AUTO</span></div>
-                <div class="mode-chip">SPREAD <span class="data-val" id="ui-spread-mode">CONC</span></div>
-                <div class="mode-chip dash-chip" id="ui-dash-chip">DASH <span class="dash-meter"><span class="dash-meter__fill" id="ui-dash-fill"></span></span></div>
+                <div class="buff-row" id="ui-buffs"></div>
+                <div class="weapon-group">
+                    <div class="mode-chip weapon-chip" id="ui-weapon-chip">WEAPON <span class="data-val" id="ui-weapon-name">LANCE</span><span class="beam-pips is-hidden" id="ui-beam-pips">${'<span class="beam-pip"></span>'.repeat(BEAM_PIPS)}</span></div>
+                    <div class="evo-row" id="ui-evolutions"></div>
+                </div>
+                <div class="systems-row">
+                    <div class="mode-chip">AIM <span class="data-val" id="ui-aim-mode">AUTO</span></div>
+                    <div class="mode-chip">SPREAD <span class="data-val" id="ui-spread-mode">CONC</span></div>
+                    <div class="mode-chip dash-chip" id="ui-dash-chip">DASH <span class="dash-meter"><span class="dash-meter__fill" id="ui-dash-fill"></span></span></div>
+                </div>
             </div>
 
             <div class="cockpit-frame"></div>
@@ -1098,7 +1265,8 @@ export class AAAHudLayout {
             .lvl-indicator { font-family: var(--font-display, 'Orbitron', sans-serif); font-size: var(--text-sm, 14px); font-weight: 700; color: var(--text, #fff); letter-spacing: 1px; }
 
             /* MODES */
-            .systems-area { grid-row: 3; grid-column: 3; display: flex; flex-direction: row; justify-content: flex-end; align-items: flex-end; gap: var(--space-2, 8px); }
+            .systems-area { grid-row: 3; grid-column: 3; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end; gap: var(--space-2, 8px); }
+            .systems-row { display: flex; flex-direction: row; justify-content: flex-end; align-items: flex-end; gap: var(--space-2, 8px); }
             .mode-chip { font-family: var(--font-mono, 'Consolas', monospace); font-size: var(--text-xs, 12px); color: var(--text-dim, #ccc); background: var(--surface, rgba(12, 20, 31, 0.65)); border: 1px solid var(--line, rgba(255,255,255,0.2)); border-radius: var(--radius-sm, 4px); padding: var(--space-1, 4px) var(--space-2, 8px); letter-spacing: 1px; }
             .data-val { color: var(--accent, #00f2ff); font-weight: bold; }
             .dash-chip { display: flex; align-items: center; gap: var(--space-1, 4px); color: var(--accent); border-color: var(--accent-line); }
@@ -1106,6 +1274,20 @@ export class AAAHudLayout {
             .dash-meter { width: 28px; height: 4px; background: var(--accent); border-radius: var(--radius-sm); overflow: hidden; box-shadow: var(--glow-accent); }
             .dash-chip.is-charging .dash-meter { background: var(--surface-strong); box-shadow: none; }
             .dash-meter__fill { display: block; width: 100%; height: 100%; background: var(--accent-line); transform: scaleX(0); transform-origin: left; }
+            .weapon-group { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1, 4px); }
+            .weapon-chip { display: flex; align-items: center; gap: var(--space-1, 4px); }
+            .beam-pips { display: flex; gap: 3px; margin-left: 2px; }
+            .beam-pips.is-hidden { display: none; }
+            .beam-pip { width: 5px; height: 5px; border: 1px solid var(--accent-line); border-radius: 1px; }
+            .beam-pip.is-filled { background: var(--accent); box-shadow: var(--glow-accent); }
+            .evo-row { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; max-width: 220px; }
+            .evo-chip { font-family: var(--font-mono); font-size: 9px; letter-spacing: 1px; padding: 1px var(--space-1, 4px); color: var(--family-color); background: var(--surface); border: 1px solid color-mix(in srgb, var(--family-color) 55%, transparent); border-radius: var(--radius-sm); }
+            .buff-row { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1, 4px); }
+            .buff-row:empty { display: none; }
+            .evo-row:empty { display: none; }
+            .buff-chip { display: flex; align-items: center; gap: var(--space-2, 8px); color: var(--buff-color); border-color: color-mix(in srgb, var(--buff-color) 55%, transparent); }
+            .buff-meter { width: 36px; height: 4px; background: var(--surface-strong); border-radius: var(--radius-sm); overflow: hidden; }
+            .buff-meter__fill { display: block; width: 100%; height: 100%; background: var(--buff-color); transform-origin: left; }
 
             /* ANIMATIONS */
             @keyframes rotate-border { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -1151,6 +1333,14 @@ export class AAAHudLayout {
             .transmission__line { min-height: 1.5em; font-family: var(--font-display); font-size: var(--text-md); letter-spacing: 0.06em; line-height: 1.5; text-align: center; color: var(--text); text-shadow: 0 0 10px rgba(0, 0, 0, 0.9), 0 0 6px var(--accent-line); }
             .transmission.is-typing .transmission__line::after { content: '▌'; margin-left: 2px; color: var(--accent); }
 
+            /* ONBOARDING TIP (first run, top centre under the boss bar slot) */
+            .onboarding-tip { position: absolute; top: 15%; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-4); background: var(--surface-strong); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--radius-md); pointer-events: none; z-index: 80; white-space: nowrap; opacity: 0; visibility: hidden; }
+            .onboarding-tip.is-showing { opacity: 1; visibility: visible; }
+            .onboarding-tip.is-leaving { opacity: 0; }
+            .onboarding-tip__keys { display: flex; gap: var(--space-1); }
+            .onboarding-tip__key { min-width: 1.9em; padding: 2px var(--space-2); font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 700; letter-spacing: 1px; text-align: center; text-transform: uppercase; color: var(--accent); background: var(--surface); border: 1px solid var(--accent-line); border-bottom-width: 2px; border-radius: var(--radius-sm); }
+            .onboarding-tip__text { font-family: var(--font-ui); font-size: var(--text-md); font-weight: 600; letter-spacing: 0.04em; color: var(--text); }
+
             /* KILL FEED */
             .hud-feed { position: absolute; top: calc(220px + var(--space-6)); right: var(--space-4); width: 200px; display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); pointer-events: none; z-index: 30; }
             .feed-row { display: flex; align-items: baseline; gap: var(--space-2); padding: 2px var(--space-2); background: linear-gradient(270deg, var(--surface) 0%, transparent 100%); border-right: 2px solid var(--neutral); font-family: var(--font-ui); font-size: var(--text-md); font-weight: 600; letter-spacing: 1px; color: var(--text); white-space: nowrap; }
@@ -1165,6 +1355,9 @@ export class AAAHudLayout {
             @media (prefers-reduced-motion: no-preference) {
                 .combo-box.pulse { animation: combo-pop ${COMBO_POP_MS}ms var(--ease-out) 1; }
                 .dash-chip.is-ready { animation: dash-ready var(--motion-base) var(--ease-out) 1; }
+                .weapon-chip.is-beam { animation: dash-ready var(--motion-base) var(--ease-out) 1; }
+                .weapon-chip.is-beam .beam-pip { animation: beam-pip-flash var(--motion-base) var(--ease-out) 1; }
+                .evo-chip, .buff-chip { animation: feed-in var(--motion-base) var(--ease-out); }
                 .lowhp-vignette.is-low { animation: lowhp-pulse 0.83s ease-in-out infinite alternate; }
                 .lowhp-vignette.is-critical { animation-name: lowhp-pulse-critical; }
                 .layer-banner.is-showing .layer-banner__title { animation: banner-title-in 420ms var(--ease-out); }
@@ -1174,6 +1367,8 @@ export class AAAHudLayout {
                 .boss-intro.is-showing .boss-intro__line { animation: banner-line-draw 600ms var(--ease-out) 150ms both; }
                 .transmission.is-showing { animation: transmission-flicker 2.4s steps(1, end) infinite; }
                 .transmission.is-leaving { animation: none; transition: opacity ${FADE_OUT_MS}ms ease-in; }
+                .onboarding-tip.is-showing { animation: onboarding-tip-in var(--motion-base) var(--ease-out); }
+                .onboarding-tip.is-leaving { animation: none; transition: opacity ${FADE_OUT_MS}ms ease-in; }
                 .boss-area { transform: translateY(-24px); transition: opacity 0.5s var(--ease-out), transform 0.5s var(--ease-out); }
                 .boss-area.active { transform: translateY(0); }
                 .feed-row { animation: feed-in var(--motion-base) var(--ease-out); transition: opacity ${FADE_OUT_MS}ms ease-in, transform ${FADE_OUT_MS}ms ease-in; }
@@ -1181,12 +1376,14 @@ export class AAAHudLayout {
             }
             @keyframes combo-pop { 0% { transform: scale(1); } 50% { transform: scale(1.18); } 100% { transform: scale(1); } }
             @keyframes dash-ready { 0% { box-shadow: var(--glow-accent); background: var(--accent-soft); } 100% { box-shadow: none; } }
+            @keyframes beam-pip-flash { 0% { background: var(--accent); box-shadow: var(--glow-accent); } 100% { background: transparent; box-shadow: none; } }
             @keyframes lowhp-pulse { from { opacity: 0.25; } to { opacity: 0.75; } }
             @keyframes lowhp-pulse-critical { from { opacity: 0.55; } to { opacity: 1; } }
             @keyframes banner-title-in { from { opacity: 0; letter-spacing: 0.2em; margin-right: -0.2em; } to { opacity: 1; letter-spacing: 0.5em; margin-right: -0.5em; } }
             @keyframes banner-line-draw { from { transform: scaleX(0); } to { transform: scaleX(1); } }
             @keyframes boss-intro-in { from { opacity: 0; transform: translateX(-50%) scale(0.9); } to { opacity: 1; transform: translateX(-50%) scale(1); } }
             @keyframes transmission-flicker { 0%, 100% { opacity: 1; } 3% { opacity: 0.55; } 5% { opacity: 0.9; } 7% { opacity: 0.7; } 9% { opacity: 1; } 61% { opacity: 0.82; } 62% { opacity: 1; } }
+            @keyframes onboarding-tip-in { from { opacity: 0; transform: translate(-50%, -8px); } to { opacity: 1; transform: translate(-50%, 0); } }
             @keyframes feed-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
 
             @media (max-width: 900px) { #hud-layer { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; } .stats-area { position: absolute; top: 10px; left: 10px; } .radar-area { position: absolute; top: 10px; right: 10px; } .boss-area { margin-top: 60px; transform: scale(0.8); } .status-area { position: absolute; bottom: 20px; left: 10px; transform: scale(0.9); transform-origin: bottom left; } .systems-area { position: absolute; bottom: 20px; right: 10px; } .bottom-center { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); width: 300px; } }

@@ -220,6 +220,48 @@ describe('boss-warning → MusicMixer delegation (plan 02.05)', () => {
   });
 });
 
+describe('music themes + stingers follow the run (wave / boss events)', () => {
+  function withAudio(run) {
+    const { audio, eventBus } = resolveRealAudioService();
+    const setTheme = vi.spyOn(audio.musicMixer, 'setTheme');
+    const chapter = vi.spyOn(audio.sfxBus, 'playChapterStinger');
+    const warden = vi.spyOn(audio.sfxBus, 'playWardenStinger');
+    run({ eventBus, setTheme, chapter, warden });
+    vi.restoreAllMocks();
+    audio.destroy();
+  }
+
+  it('wave-started on a biome’s first layer picks its theme and plays the chapter stinger', () => {
+    withAudio(({ eventBus, setTheme, chapter }) => {
+      eventBus.emit('wave-started', { wave: 6, totalEnemies: 10 });
+      expect(setTheme).toHaveBeenCalledWith('dense-core');
+      expect(chapter).toHaveBeenCalledTimes(1);
+      expect(chapter).toHaveBeenCalledWith('dense-core');
+
+      eventBus.emit('wave-started', { wave: 7, totalEnemies: 10 });
+      expect(chapter).toHaveBeenCalledTimes(1); // mid-biome: no stinger
+    });
+  });
+
+  it('a Warden layer takes the warden theme; boss-defeated hands back to the biome', () => {
+    withAudio(({ eventBus, setTheme, chapter }) => {
+      eventBus.emit('wave-started', { wave: 10, totalEnemies: 1 });
+      expect(setTheme).toHaveBeenLastCalledWith('warden');
+      expect(chapter).not.toHaveBeenCalled();
+
+      eventBus.emit('boss-defeated', {});
+      expect(setTheme).toHaveBeenLastCalledWith('dense-core');
+    });
+  });
+
+  it('boss-warning plays the warden stinger exactly once', () => {
+    withAudio(({ eventBus, warden }) => {
+      eventBus.emit('boss-warning', { wave: 4, nextBossWave: 5 });
+      expect(warden).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
 describe('player-health-changed → DuckingController EDGE delegation (plan 02.06)', () => {
   // The low-HP duck fires on the CROSSING into ≤25% HP only (edge detection,
   // review fix). Emitting through the REAL container must call the COMPOSED
@@ -338,6 +380,42 @@ describe('SFX event → SFXBus delegation (plan 02.07 — registration ≠ deleg
 
   it('surge-started → playSurgeSting', () => {
     expectDelegates('surge-started', {}, 'playSurgeSting');
+  });
+
+  it('run-continued → playDeepFieldEntry', () => {
+    expectDelegates('run-continued', { fromLayer: 1 }, 'playDeepFieldEntry');
+  });
+
+  it('salvage-awarded → playSalvageAwarded', () => {
+    expectDelegates('salvage-awarded', { amount: 120 }, 'playSalvageAwarded');
+  });
+
+  it('hangar-purchased → playHangarPurchase', () => {
+    expectDelegates('hangar-purchased', { id: 'x' }, 'playHangarPurchase');
+  });
+
+  it('onboarding-step → playTipChime', () => {
+    expectDelegates('onboarding-step', { id: 'x' }, 'playTipChime');
+  });
+
+  it('weapon-beam-fired → playHarmonicBeam', () => {
+    expectDelegates('weapon-beam-fired', { x: 100, y: 50 }, 'playHarmonicBeam');
+  });
+
+  it('weapon-evolved → playWeaponEvolved', () => {
+    expectDelegates('weapon-evolved', {}, 'playWeaponEvolved');
+  });
+
+  it('upgrade-rerolled → playCardReroll', () => {
+    expectDelegates('upgrade-rerolled', {}, 'playCardReroll');
+  });
+
+  it('upgrade-banished → playCardBanish', () => {
+    expectDelegates('upgrade-banished', {}, 'playCardBanish');
+  });
+
+  it('codex-discovered → playCodexDiscovered', () => {
+    expectDelegates('codex-discovered', {}, 'playCodexDiscovered');
   });
 
   it('transmission-shown → playTransmission', () => {

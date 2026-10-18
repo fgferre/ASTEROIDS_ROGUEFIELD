@@ -4,38 +4,35 @@ Lista viva do que está aberto, nas palavras do dono. Leia só a seção O BAST�
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 7.**
 
-## O BASTÃO — onde a rodada parou (18/10, ~02h20) — RODADAS 2, 3 E PARTE DA 4 MESCLADAS NA `main` (publicado)
+## O BASTÃO — onde a rodada parou (18/10, ~03h40) — RODADAS 2, 3 E 4 MESCLADAS NA `main` (publicado)
 
-**Como retomar (qualquer máquina):** `git clone https://github.com/fgferre/ASTEROIDS_ROGUEFIELD.git` (ou `git fetch`),
-`git checkout main` — a `main` já contém tudo (PRs #247 e o seguinte, mesclados a pedido dele: _"eu aprovo daqui"_).
-Ler este BASTÃO, `PLAN.md` (Rodadas 2–4) e `docs/NORTE.md` (§7 é o Norte 2); rodar `npm ci && npm run done`.
+**Como retomar (qualquer máquina):** `git clone https://github.com/fgferre/ASTEROIDS_ROGUEFIELD.git`, `git checkout main`
+(contém tudo: PRs #247, #248 e o terceiro, mesclados a pedido dele: _"eu aprovo daqui… preciso que tudo seja mergeado"_).
+Ler este BASTÃO, `PLAN.md` (Rodadas 2–4) e `docs/NORTE.md` (§7 = Norte 2); `npm ci && npm run done` (762 testes).
 
-**Palavras dele nesta rodada:** _"crie um goal novo baseado nos seus achados e aja independentemente… aumentando o
-conteúdo do jogo a cada rodada"_; _"preciso que tudo seja mergeado e commitado no main no github"_.
+**Palavras dele:** _"crie um goal novo baseado nos seus achados e aja independentemente… aumentando o conteúdo do
+jogo a cada rodada"_. O Norte 2 (NORTE §7) é o goal escrito pela sessão; a Rodada 4 do PLAN é a execução.
 
-**O que entrou desde o bastão anterior (um commit por fatia):**
+**O que entrou desde o bastão anterior:** texturas procedurais assadas (normal/roughness/AO em rocha, casco,
+placas do Warden); recap de morte ("Killed by…", build, melhor camada), Códice entre runs, pausa com build;
+onboarding em jogo na primeira run; temas musicais por bioma + tema de Warden + stingers; Wardens Choir/Null também
+no renderer 2D; modo infinito após o 15 ("Continue into the deep field", recorde local); Hangar (Salvage → seis
+melhorias permanentes, casco Solar Slicer) como **proposta reversível num commit**; dissolve de morte em 3D;
+HUD com arma/evoluções/buffs; nomes unificados (Mote/Seeker/Tether); cues de áudio para tudo que é novo.
 
-- Rodada 2 (medley): profundidade e luz no 3D; roster Husk/Ram/Weaver/Bulwark + Elite; diretor de camadas com
-  surtos; VFX 3D; SFX com limitador/reverb/música que acompanha a run; pickups Ímã/Pulso/Sobrecarga.
-- Rodada 3: nave com presença (casco em três tons, propulsores com núcleo); cartas com raridade + reroll + banish
-  (gravados no replay v3); `?stats=1` para medir na máquina dele.
-- Rodada 4 (Norte 2): três biomas (Outer Ring, Dense Core, Warden's Reach) com título de capítulo; transmissões dos
-  Wardens (roteiro em `src/data/story.js`); Warden Choir (10) e Warden Null (15); sete variantes de rocha em 3D;
-  Harmonic Plasma Lance + cinco evoluções por família.
-
-**Ainda não feito do Norte 2 (`PLAN.md` Rodada 4):** texturas procedurais assadas (R4.5), códice/recap de
-morte/onboarding (R4.7), tema musical por bioma (R4.8), interpolação de render e presets por fps (R4.9); e da
-Rodada 3: meta-progressão/Hangar (R3.4), modo infinito (R3.5), dissolve de morte (R3.6).
+**Do Norte 2 só falta R4.9:** interpolação de render (144 Hz), rochas instanciadas, presets de qualidade
+automáticos por fps medido. Tudo o mais do §7 tem uma primeira versão no jogo.
 
 **Tudo visto só em headless sem GPU (2–4 fps).** Ele ainda não jogou nada disto. `?stats=1` mostra fps/ms reais.
 
-**O que só ele pode responder, jogando:** desempenho do 3D na placa dele; legibilidade da nave e dos inimigos novos;
-ritmo das 15 camadas, surtos e dos três Wardens; se os biomas e as transmissões dão sensação de lugar e história;
-raridade/reroll/banish; a segunda arma e as evoluções; música e mix. Tudo é "proposta" nomeada no código.
+**O que só ele pode responder, jogando:** desempenho do 3D com texturas e dissolve na placa dele; legibilidade;
+ritmo das 15 camadas, surtos e Wardens; se biomas, transmissões e temas dão lugar e história; cartas
+(raridade/reroll/banish); segunda arma e evoluções; se o Hangar agrada ou se prefere roguelite puro (um commit
+remove); se o modo infinito vale; todas as "propostas" nomeadas no código.
 
-**Avisos de processo (18/10):** um worker rodou `git stash` na árvore compartilhada (restaurou limpo); workers em
-paralelo no mesmo servidor Vite recarregam capturas uns dos outros — usar servidores descartáveis por porta.
-`BACKLOG.md` passou de 30 linhas: triar antes de adicionar.
+**Avisos de processo (18/10):** workers em paralelo no mesmo arquivo (`UISystem.js`) exigiram separar hunks na hora
+do commit — preferir fatias com arquivos disjuntos; `pgrep -f` mata o próprio shell do worker (usar PID da porta);
+`BACKLOG.md` está no limite de 30 linhas — triar antes de adicionar.
 
 ## Jogabilidade e sensação
 

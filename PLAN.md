@@ -170,12 +170,12 @@ tudo num browser."_ Fatias, cada uma um commit com captura; números como "propo
       1 reroll e 1 banish por run (proposta), com teclas e botões; famílias continuam.
 - [x] **R3.3 Medição na máquina dele.** `?stats=1` liga o Stats.min.js já vendorizado (fps e ms por quadro) para ele
       reportar números reais; `F8` alterna no dev.
-- [ ] **R3.4 Meta-progressão (proposta).** Salvage persistido no navegador, ganho por camada/abates; "Hangar" no menu
+- [x] **R3.4 Meta-progressão (proposta).** Salvage persistido no navegador, ganho por camada/abates; "Hangar" no menu
       com 6 melhorias permanentes pequenas (ex.: +1 reroll, casco Solar Slicer, +5 % casco). Tudo atrás de um serviço
       só, para reverter com um commit.
-- [ ] **R3.5 Modo infinito (proposta).** Na vitória do Warden 15, botão "Continue into the deep field": `beyond(n)` da
+- [x] **R3.5 Modo infinito (proposta).** Na vitória do Warden 15, botão "Continue into the deep field": `beyond(n)` da
       tabela de camadas escala rochas/roster/elite; placar de camada máxima.
-- [ ] **R3.6 Morte de inimigo em 3D.** Dissolve (shader) + estilhaços na cor do inimigo; Warden perde segmentos
+- [x] **R3.6 Morte de inimigo em 3D.** Dissolve (shader) + estilhaços na cor do inimigo; Warden perde segmentos
       visivelmente a cada fase.
 
 ## Rodada 4+ (18/10) — Norte 2, "grandioso" (`docs/NORTE.md` §7)
@@ -190,10 +190,10 @@ rodada"_. Cada pilar do §7 vira fatias; a ordem é impacto visível por custo. 
 - [x] **R4.3 Warden Choir (10) e Warden Null (15).** Dois chefes novos com fases que destroem geometria visível;
       Warden Prime fica no 5.
 - [x] **R4.4 Variantes de rocha em 3D** (Dense Core, Volatile, Golden, Parasite, Crystal) com material próprio.
-- [ ] **R4.5 Texturas procedurais assadas** (normal/roughness/AO) para rocha, casco e Warden.
+- [x] **R4.5 Texturas procedurais assadas** (normal/roughness/AO) para rocha, casco e Warden.
 - [x] **R4.6 Harmonic Plasma Lance + evoluções por família.**
-- [ ] **R4.7 Códice, recap de morte, pausa com build, onboarding em jogo.**
-- [ ] **R4.8 Tema por bioma, tema de Warden, stingers.**
+- [x] **R4.7 Códice, recap de morte, pausa com build, onboarding em jogo.**
+- [x] **R4.8 Tema por bioma, tema de Warden, stingers.**
 - [ ] **R4.9 Interpolação de render, rochas instanciadas, presets automáticos por fps.**
 
 ## Fora de escopo deste plano

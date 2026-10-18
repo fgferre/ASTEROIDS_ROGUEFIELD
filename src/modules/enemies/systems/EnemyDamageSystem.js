@@ -368,6 +368,7 @@ class EnemyDamageSystem {
         cause: 'volatile-explosion',
         position: { x: asteroid.x, y: asteroid.y },
         radius,
+        source: asteroid,
       });
     }
 
@@ -456,7 +457,7 @@ class EnemyDamageSystem {
       ? player.health
       : null;
 
-    const remaining = player.takeDamage(amount);
+    const remaining = player.takeDamage(amount, context.source);
     const currentHealth = Number.isFinite(player.health)
       ? player.health
       : previousHealth;

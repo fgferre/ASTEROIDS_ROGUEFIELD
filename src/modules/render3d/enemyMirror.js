@@ -3,14 +3,17 @@
 // damage, and the Wardens' machines (Mote, Seeker, Tether, Husk, Ram, Weaver,
 // Bulwark) and the three Wardens (Prime, Choir, Null; one view kind each,
 // picked by `bossKind`). Views are pooled per kind and keyed by entity id; a
-// view not seen in a frame is hidden and returned to its pool.
+// view not seen in a frame is hidden and returned to its pool, unless its
+// enemy was killed (`markDead`): then it burns away first (dissolve.js).
 
 import { IS_DEV } from '../../core/env.js';
 import { PALETTE } from '../../data/constants/palette.js';
 import { BULWARK_SHIELD_HALF_ARC } from '../../data/enemies/bulwark.js';
 import { WARDEN_KINDS } from '../../data/enemies/boss.js';
 import { createAsteroidGeometry, createSeededRandom } from './asteroidMesh.js';
+import { bakePlateMaps, bakeRockMaps } from './bakedMaps.js';
 import { HALF_H, HALF_W, colorOf } from './batches.js';
+import { DissolvePool } from './dissolve.js';
 
 const ROCK_SHAPES = 8;
 const ROCK_DETAIL = 4;
@@ -31,6 +34,10 @@ const BREAK_SECONDS = 1.6;
 const WEAVER_ARMS = 3;
 const ELITE_DASHES = 6;
 const TAU = Math.PI * 2;
+// proposta 18/10: chunks a death throws (machines by radius; final Warden).
+const BURST_MIN = 6;
+const BURST_MAX = 12;
+const WARDEN_BURST = 24;
 export const KNOWN_KINDS = new Set([
   'asteroid',
   'drone',
@@ -102,6 +109,16 @@ export const VARIANT_LOOKS = {
 const PARASITE_NEAR = 80;
 const PARASITE_FAR = 360;
 const CRYSTAL_RIM = '#9fdcff';
+// Baked surface maps (bakedMaps.js): rock maps tile every 1/ROCK_TILE rock
+// radii, sampled triplanar; crystal facets take only a faint normal.
+// proposta 18/10: strengths.
+const ROCK_TILE = 0.8;
+const ROCK_NORMAL_SCALE = 0.9;
+const CRYSTAL_NORMAL_SCALE = 0.25;
+const ROCK_AO = 0.8;
+const PLATE_NORMAL_SCALE = 0.7;
+const PLATE_AO = 0.8;
+const MAP_SEED = 4242.7;
 
 const ROCK_SHADER_HEAD = `
 uniform float uGlow;
@@ -113,6 +130,25 @@ uniform vec3 uSeed;
 uniform float uRim;
 uniform vec3 uRimColor;
 varying vec3 vRockPos;
+#ifdef ROCK_NORMAL
+uniform sampler2D uRockNormalMap;
+uniform float uRockNormalScale;
+uniform float uRockTile;
+varying vec3 vRockNormal;
+varying vec3 vRockViewX;
+varying vec3 vRockViewY;
+varying vec3 vRockViewZ;
+#endif
+#ifdef ROCK_SURFACE
+uniform sampler2D uRockRoughnessMap;
+uniform sampler2D uRockAoMap;
+uniform float uRockAoIntensity;
+#endif
+// Triplanar sample of a grey map, planes blended by the object normal.
+float rockTriplanar(sampler2D map, vec3 p, vec3 w) {
+  return texture2D(map, p.zy).g * w.x + texture2D(map, p.xz).g * w.y
+    + texture2D(map, p.xy).g * w.z;
+}
 vec3 rockHash(vec3 p) {
   p = vec3(dot(p, vec3(127.1, 311.7, 74.7)), dot(p, vec3(269.5, 183.3, 246.1)),
     dot(p, vec3(113.5, 271.9, 124.6)));
@@ -141,16 +177,81 @@ vec2 rockCracks(vec3 p) {
 `;
 
 function patchRockShader(shader) {
-  const uniforms = this.userData.rockUniforms;
-  Object.assign(shader.uniforms, uniforms);
+  const { rockUniforms, rockMaps } = this.userData;
+  Object.assign(shader.uniforms, rockUniforms, rockMaps);
   shader.vertexShader = shader.vertexShader
-    .replace('#include <common>', '#include <common>\nvarying vec3 vRockPos;')
+    .replace(
+      '#include <common>',
+      `#include <common>
+      varying vec3 vRockPos;
+      #ifdef ROCK_NORMAL
+      varying vec3 vRockNormal;
+      varying vec3 vRockViewX;
+      varying vec3 vRockViewY;
+      varying vec3 vRockViewZ;
+      #endif`
+    )
     .replace(
       '#include <begin_vertex>',
-      '#include <begin_vertex>\nvRockPos = position;'
+      `#include <begin_vertex>
+      vRockPos = position;
+      #ifdef ROCK_NORMAL
+      vRockNormal = objectNormal;
+      vRockViewX = normalMatrix[0];
+      vRockViewY = normalMatrix[1];
+      vRockViewZ = normalMatrix[2];
+      #endif`
     );
+  // Baked maps (rock geometry has no UVs): triplanar in object space, the
+  // detail normal added to the shaded normal (flat crystal facets keep their
+  // facets), roughness and AO multiplied into what the material sets.
   shader.fragmentShader = shader.fragmentShader
     .replace('#include <common>', `#include <common>\n${ROCK_SHADER_HEAD}`)
+    .replace(
+      '#include <roughnessmap_fragment>',
+      `#include <roughnessmap_fragment>
+      #ifdef ROCK_NORMAL
+      vec3 rockN = normalize(vRockNormal);
+      vec3 rockP = vRockPos * uRockTile;
+      vec3 rockW = pow(abs(rockN), vec3(4.0));
+      rockW /= rockW.x + rockW.y + rockW.z;
+      #endif
+      #ifdef ROCK_SURFACE
+      roughnessFactor *= rockTriplanar(uRockRoughnessMap, rockP, rockW);
+      float rockAo = rockTriplanar(uRockAoMap, rockP, rockW);
+      #endif`
+    )
+    .replace(
+      '#include <normal_fragment_maps>',
+      `#include <normal_fragment_maps>
+      #ifdef ROCK_NORMAL
+      {
+        vec3 tx = texture2D(uRockNormalMap, rockP.zy).xyz * 2.0 - 1.0;
+        vec3 ty = texture2D(uRockNormalMap, rockP.xz).xyz * 2.0 - 1.0;
+        vec3 tz = texture2D(uRockNormalMap, rockP.xy).xyz * 2.0 - 1.0;
+        tx.xy *= uRockNormalScale;
+        ty.xy *= uRockNormalScale;
+        tz.xy *= uRockNormalScale;
+        // whiteout blend per plane, swizzled back to object axes
+        vec3 nx = vec3(tx.xy + rockN.zy, abs(tx.z) * rockN.x);
+        vec3 ny = vec3(ty.xy + rockN.xz, abs(ty.z) * rockN.y);
+        vec3 nz = vec3(tz.xy + rockN.xy, abs(tz.z) * rockN.z);
+        vec3 detail = normalize(nx.zyx * rockW.x + ny.xzy * rockW.y + nz * rockW.z);
+        mat3 toView = mat3(vRockViewX, vRockViewY, vRockViewZ);
+        normal = normalize(normal + normalize(toView * detail)
+          - normalize(toView * rockN));
+      }
+      #endif`
+    )
+    .replace(
+      '#include <aomap_fragment>',
+      `#include <aomap_fragment>
+      #ifdef ROCK_SURFACE
+      float rockOcclusion = mix(1.0, rockAo, uRockAoIntensity);
+      reflectedLight.indirectDiffuse *= rockOcclusion;
+      reflectedLight.directDiffuse *= mix(1.0, rockOcclusion, 0.5);
+      #endif`
+    )
     .replace(
       '#include <emissivemap_fragment>',
       `#include <emissivemap_fragment>
@@ -223,13 +324,22 @@ function paintRock(THREE, geometry, seed) {
 }
 
 export class EnemyMirror {
-  constructor(THREE, scene, seeded) {
+  /** `bursts`: DeathBursts (dissolve.js) for the chunks a death throws. */
+  constructor(THREE, scene, seeded, bursts) {
     this.THREE = THREE;
     this.scene = scene;
     this.seeded = seeded;
+    this.bursts = bursts;
     this.views = new Map();
     this.pools = new Map();
     this.frame = 0;
+    // ids killed since the last frame; their views dissolve instead of
+    // vanishing, and stay out of `views` (a reused id gets a fresh view)
+    this.dead = new Set();
+    this.dissolve = new DissolvePool(THREE, seeded, (view) => this.pool(view));
+    this.pruneDead = (key) => {
+      if (!this.views.has(key)) this.dead.delete(key);
+    };
 
     this.rockGeometries = [];
     for (let i = 0; i < ROCK_SHAPES; i += 1) {
@@ -240,6 +350,22 @@ export class EnemyMirror {
       paintRock(THREE, geometry, seed);
       this.rockGeometries.push(geometry);
     }
+    const rockMaps = bakeRockMaps(THREE, MAP_SEED);
+    const rockNormal = {
+      uRockNormalMap: { value: rockMaps.normalMap },
+      uRockTile: { value: ROCK_TILE },
+    };
+    this.stoneMaps = {
+      ...rockNormal,
+      uRockNormalScale: { value: ROCK_NORMAL_SCALE },
+      uRockRoughnessMap: { value: rockMaps.roughnessMap },
+      uRockAoMap: { value: rockMaps.aoMap },
+      uRockAoIntensity: { value: ROCK_AO },
+    };
+    this.crystalMaps = {
+      ...rockNormal,
+      uRockNormalScale: { value: CRYSTAL_NORMAL_SCALE },
+    };
 
     // Matte mass (docs/NORTE.md §2): the eye/core is the only light.
     this.hullMaterial = new THREE.MeshStandardMaterial({
@@ -252,6 +378,14 @@ export class EnemyMirror {
       metalness: 0.2,
       roughness: 0.85,
       flatShading: true,
+    });
+    // The Wardens' segments, arms and plates: the plate look plus grooved
+    // surface maps on their UVs.
+    const plateMaps = bakePlateMaps(THREE, MAP_SEED);
+    this.wardenPlateMaterial = this.plateMaterial.clone();
+    Object.assign(this.wardenPlateMaterial, plateMaps, {
+      normalScale: new THREE.Vector2(PLATE_NORMAL_SCALE, PLATE_NORMAL_SCALE),
+      aoMapIntensity: PLATE_AO,
     });
     this.darkMaterial = new THREE.MeshStandardMaterial({
       color: colorOf(THREE, PALETTE.hull),
@@ -318,6 +452,9 @@ export class EnemyMirror {
     // Choir: a machined arm from the hub to a core; shards for its break.
     this.choirArm = new THREE.BoxGeometry(1, 0.5, 1);
     this.choirArm.translate(0.5, 0, 0);
+    // the arm is drawn ~7× longer than wide: repeat the plate maps along it
+    const armUv = this.choirArm.getAttribute('uv');
+    for (let i = 0; i < armUv.count; i += 1) armUv.setX(i, armUv.getX(i) * 2);
     this.shard = new THREE.TetrahedronGeometry(1, 0);
     // Null: one curved plate of the shell, centred on its own origin.
     const plateArc = (TAU / 8) * 0.82;
@@ -326,6 +463,10 @@ export class EnemyMirror {
     this.nullPlate.scale(1, 0.8, 1);
     this.nullPlate.rotateY(-plateArc / 2);
     this.nullPlate.translate(-1, 0, 0);
+    // aoMap reads uv2
+    [this.wardenSegment, this.choirArm, this.shard, this.nullPlate].forEach(
+      (geometry) => geometry.setAttribute('uv2', geometry.getAttribute('uv'))
+    );
 
     // telegraph pieces (flat on the field plane)
     this.lanePlane = new THREE.PlaneGeometry(1, 1);
@@ -559,6 +700,8 @@ export class EnemyMirror {
     material.userData.rockUniforms = this.rockUniforms(
       colorOf(THREE, PALETTE.shot)
     );
+    material.userData.rockMaps = this.stoneMaps;
+    Object.assign(material.defines, { ROCK_NORMAL: '', ROCK_SURFACE: '' });
     material.onBeforeCompile = patchRockShader;
     const mesh = new THREE.Mesh(this.rockGeometries[0], material);
     mesh.rotation.order = 'YXZ';
@@ -582,6 +725,8 @@ export class EnemyMirror {
       clearcoatRoughness: 0.08,
     });
     material.userData.rockUniforms = view.stone.userData.rockUniforms;
+    material.userData.rockMaps = this.crystalMaps;
+    material.defines.ROCK_NORMAL = '';
     material.onBeforeCompile = patchRockShader;
     return material;
   }
@@ -821,7 +966,10 @@ export class EnemyMirror {
     const ring = new THREE.Group();
     const segments = [];
     for (let i = 0; i < WARDEN_SEGMENTS; i += 1) {
-      const segment = new THREE.Mesh(this.wardenSegment, this.plateMaterial);
+      const segment = new THREE.Mesh(
+        this.wardenSegment,
+        this.wardenPlateMaterial
+      );
       segment.rotation.y = (i / WARDEN_SEGMENTS) * Math.PI * 2;
       segments.push(segment);
       ring.add(segment);
@@ -865,7 +1013,7 @@ export class EnemyMirror {
     const cores = [];
     for (let i = 0; i < 3; i += 1) {
       const pivot = new THREE.Group();
-      const arm = new THREE.Mesh(this.choirArm, this.plateMaterial);
+      const arm = new THREE.Mesh(this.choirArm, this.wardenPlateMaterial);
       arm.scale.set(90 - CHOIR_CORE_PX, 6, 9);
       const coreMaterial = this.wardenCoreMaterial(0.2);
       const core = new THREE.Mesh(this.sphere, coreMaterial);
@@ -880,7 +1028,7 @@ export class EnemyMirror {
       halo.position.x = 90;
       const shards = [];
       for (let k = 0; k < CHOIR_SHARDS; k += 1) {
-        const shard = new THREE.Mesh(this.shard, this.plateMaterial);
+        const shard = new THREE.Mesh(this.shard, this.wardenPlateMaterial);
         shard.visible = false;
         shards.push(shard);
         pivot.add(shard);
@@ -918,7 +1066,7 @@ export class EnemyMirror {
     const rim = new THREE.LineLoop(this.circleRim, this.bossRimMaterial);
     const plates = [];
     for (let i = 0; i < 8; i += 1) {
-      const mesh = new THREE.Mesh(this.nullPlate, this.plateMaterial);
+      const mesh = new THREE.Mesh(this.nullPlate, this.wardenPlateMaterial);
       mesh.scale.setScalar(NULL_CLOSED_PX);
       plates.push({ mesh, shed: null });
       group.add(mesh);
@@ -1000,8 +1148,9 @@ export class EnemyMirror {
   // --- per frame -------------------------------------------------------------
 
   /** Mirrors `enemies`; returns the Warden view (for its light) or null. */
-  update(enemies, time) {
+  update(enemies, time, dt = 0) {
     this.frame += 1;
+    this.dissolve.update(dt);
     let warden = null;
     for (let i = 0; i < enemies.length; i += 1) {
       const enemy = enemies[i];
@@ -1021,6 +1170,7 @@ export class EnemyMirror {
         this.views.set(key, view);
       }
       view.stamp = this.frame;
+      view.radius = enemy.radius || 12;
       const { object } = view;
       object.position.set(enemy.x - HALF_W, 0, enemy.y - HALF_H);
       const flash = enemy.getHitFlash();
@@ -1032,9 +1182,51 @@ export class EnemyMirror {
     }
 
     this.views.forEach((view, key) => {
-      if (view.stamp !== this.frame) this.release(key, view);
+      if (view.stamp !== this.frame) {
+        if (this.dead.delete(key)) this.die(key, view);
+        else this.release(key, view);
+      }
     });
+    if (this.dead.size) this.dead.forEach(this.pruneDead);
     return warden;
+  }
+
+  /** The simulation killed `enemy` (asteroid splits excluded). */
+  markDead(enemy) {
+    this.dead.add(enemy.id || enemy);
+  }
+
+  // The view burns in place; a burst of accent chunks flies out (rocks
+  // already shed stone debris through EffectsSystem). The Warden's phase
+  // breaks have their own pieces: only its final death bursts, bigger, lit.
+  die(key, view) {
+    this.views.delete(key);
+    if (view.telegraph) view.telegraph.group.visible = false;
+    const accent = this.accentOf(view);
+    this.dissolve.start(view, accent, view.radius);
+    if (view.kind === 'asteroid') return;
+    const x = view.object.position.x + HALF_W;
+    const y = view.object.position.z + HALF_H;
+    if (view.kind.startsWith('boss')) {
+      this.bursts.spawn(x, y, view.radius, accent, WARDEN_BURST);
+      this.bursts.flash(x, y, accent);
+    } else {
+      const count = Math.round(view.radius / 2);
+      this.bursts.spawn(
+        x,
+        y,
+        view.radius,
+        accent,
+        Math.max(BURST_MIN, Math.min(BURST_MAX, count))
+      );
+    }
+  }
+
+  accentOf(view) {
+    if (view.kind.startsWith('boss')) return this.bossColor;
+    if (view.accents?.length) return view.accents[0].userData.base;
+    if (view.material) return view.material.userData.rockUniforms.uVein.value;
+    return this.threatColor;
   }
 
   updateMachine(view, enemy, kind, time, flash) {
@@ -1474,6 +1666,10 @@ export class EnemyMirror {
     view.object.visible = false;
     if (view.telegraph) view.telegraph.group.visible = false;
     this.views.delete(key);
+    this.pool(view);
+  }
+
+  pool(view) {
     let pool = this.pools.get(view.kind);
     if (!pool) {
       pool = [];
@@ -1484,5 +1680,7 @@ export class EnemyMirror {
 
   clear() {
     this.views.forEach((view, key) => this.release(key, view));
+    this.dissolve.clear();
+    this.dead.clear();
   }
 }

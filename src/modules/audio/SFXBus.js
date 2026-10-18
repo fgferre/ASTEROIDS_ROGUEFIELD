@@ -9,11 +9,15 @@ import {
   AUDIO_REVERB,
   AUDIO_REVERB_SEND_DB,
   AUDIO_STEREO_PAN_MAX,
+  CHAPTER_STINGER,
   EXPLOSION_DEFAULT_SIZE,
   EXPLOSION_PROFILES,
   EXPLOSION_SIZE_BY_ENEMY_TYPE,
   GAME_WIDTH,
+  MUSIC_THEMES,
+  WARDEN_STINGER,
 } from '../../core/GameConstants.js';
+import { midiToHz, themeDegreeHz } from './MusicThemes.js';
 
 const EXPLOSION_SIZE_ORDER = Object.freeze(['small', 'medium', 'large']);
 const ASTEROID_SIZES = new Set(EXPLOSION_SIZE_ORDER);
@@ -945,6 +949,339 @@ class SFXBus {
     });
   }
 
+  /** Endless run continued: low descending drone swell, bright ping at the end, reverb. */
+  playDeepFieldEntry() {
+    this._trackPerformance('playDeepFieldEntry');
+
+    this._safePlay(() => {
+      const destination = this.getAmbientDestination();
+      if (!destination) return;
+
+      const now = this.context.currentTime;
+      const drone = this.context.createOscillator();
+      drone.type = 'sawtooth';
+      drone.frequency.setValueAtTime(110, now);
+      drone.frequency.exponentialRampToValueAtTime(45, now + 1.4);
+      const filter = this.context.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(600, now);
+      filter.frequency.exponentialRampToValueAtTime(150, now + 1.4);
+      const droneGain = this.context.createGain();
+      droneGain.gain.setValueAtTime(0.0001, now);
+      droneGain.gain.exponentialRampToValueAtTime(0.16, now + 0.9);
+      droneGain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+      drone.connect(filter);
+      filter.connect(droneGain);
+      droneGain.connect(destination);
+      this._sendToReverb(droneGain, AUDIO_REVERB_SEND_DB.deepFieldEntry);
+      drone.start(now);
+      drone.stop(now + 1.55);
+
+      const ping = this.context.createOscillator();
+      ping.type = 'sine';
+      ping.frequency.setValueAtTime(1760, now + 1.2);
+      const pingGain = this.context.createGain();
+      pingGain.gain.setValueAtTime(0.0001, now + 1.2);
+      pingGain.gain.exponentialRampToValueAtTime(0.1, now + 1.22);
+      pingGain.gain.exponentialRampToValueAtTime(0.001, now + 2);
+      ping.connect(pingGain);
+      pingGain.connect(destination);
+      this._sendToReverb(pingGain, AUDIO_REVERB_SEND_DB.deepFieldEntry);
+      ping.start(now + 1.2);
+      ping.stop(now + 2.05);
+    });
+  }
+
+  /** Run-end salvage: short metallic coin cascade, 3-5 ticks by amount, no pan. */
+  playSalvageAwarded(amount = 0) {
+    this._trackPerformance('playSalvageAwarded');
+
+    this._safePlay(() => {
+      const destination = this.getAmbientDestination();
+      if (!destination) return;
+
+      const safeAmount = Number.isFinite(amount) ? Math.max(0, amount) : 0;
+      const ticks = Math.min(5, 3 + Math.floor(safeAmount / 100));
+      const now = this.context.currentTime;
+      for (let i = 0; i < ticks; i += 1) {
+        const start = now + i * 0.07;
+        const osc = this.context.createOscillator();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(1800 + i * 150, start);
+        const filter = this.context.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(2800, start);
+        filter.Q.setValueAtTime(4, start);
+        const gain = this.context.createGain();
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(0.07, start + 0.005);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.09);
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(destination);
+        osc.start(start);
+        osc.stop(start + 0.1);
+      }
+    });
+  }
+
+  /** Hangar purchase: low mechanical clunk followed by a confirm tone. */
+  playHangarPurchase() {
+    this._trackPerformance('playHangarPurchase');
+
+    this._safePlay(() => {
+      const destination = this.getAmbientDestination();
+      if (!destination) return;
+
+      const now = this.context.currentTime;
+      const clunk = this.context.createOscillator();
+      clunk.type = 'triangle';
+      clunk.frequency.setValueAtTime(140, now);
+      clunk.frequency.exponentialRampToValueAtTime(55, now + 0.12);
+      const clunkGain = this.context.createGain();
+      clunkGain.gain.setValueAtTime(0.0001, now);
+      clunkGain.gain.exponentialRampToValueAtTime(0.25, now + 0.008);
+      clunkGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+      clunk.connect(clunkGain);
+      clunkGain.connect(destination);
+      clunk.start(now);
+      clunk.stop(now + 0.2);
+
+      const tone = this.context.createOscillator();
+      tone.type = 'sine';
+      tone.frequency.setValueAtTime(660, now + 0.12);
+      tone.frequency.setValueAtTime(880, now + 0.2);
+      const toneGain = this.context.createGain();
+      toneGain.gain.setValueAtTime(0.0001, now + 0.12);
+      toneGain.gain.exponentialRampToValueAtTime(0.1, now + 0.14);
+      toneGain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+      tone.connect(toneGain);
+      toneGain.connect(destination);
+      tone.start(now + 0.12);
+      tone.stop(now + 0.5);
+    });
+  }
+
+  /** First-run tip: very soft two-note chime (UI select gain 0.12 at -12 dB). */
+  playTipChime() {
+    this._trackPerformance('playTipChime');
+
+    this._safePlay(() => {
+      const destination = this.getAmbientDestination();
+      if (!destination) return;
+
+      const now = this.context.currentTime;
+      [
+        [880, 0],
+        [1320, 0.12],
+      ].forEach(([frequency, offset]) => {
+        const start = now + offset;
+        const osc = this.context.createOscillator();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(frequency, start);
+        const gain = this.context.createGain();
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(0.03, start + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + 0.25);
+        osc.connect(gain);
+        gain.connect(destination);
+        osc.start(start);
+        osc.stop(start + 0.3);
+      });
+    });
+  }
+
+  /** Harmonic beam fired: 0.18 s bright saw sweep over a sine sub body, panned, small reverb send. */
+  playHarmonicBeam({ pan = 0 } = {}) {
+    this._trackPerformance('playHarmonicBeam');
+
+    this._safePlay(() => {
+      const destination = this._ambientInput(pan);
+      if (!destination) return;
+
+      const now = this.context.currentTime;
+      const gain = this.context.createGain();
+      gain.connect(destination);
+      this._sendToReverb(gain, AUDIO_REVERB_SEND_DB.levelUp - 6);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.12, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+      const saw = this.context.createOscillator();
+      saw.type = 'sawtooth';
+      saw.frequency.setValueAtTime(1800, now);
+      saw.frequency.exponentialRampToValueAtTime(500, now + 0.18);
+      const filter = this.context.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(5000, now);
+      filter.frequency.exponentialRampToValueAtTime(1200, now + 0.18);
+      saw.connect(filter);
+      filter.connect(gain);
+
+      const sub = this.context.createOscillator();
+      sub.type = 'sine';
+      sub.frequency.setValueAtTime(140, now);
+      sub.frequency.exponentialRampToValueAtTime(70, now + 0.18);
+      sub.connect(gain);
+
+      saw.start(now);
+      sub.start(now);
+      saw.stop(now + 0.2);
+      sub.stop(now + 0.2);
+    });
+  }
+
+  /** Weapon evolved: rising three-note chord with a shimmer tail, reverb. */
+  playWeaponEvolved() {
+    this._trackPerformance('playWeaponEvolved');
+
+    this._safePlay(() => {
+      const destination = this.getAmbientDestination();
+      if (!destination) return;
+
+      const now = this.context.currentTime;
+      [
+        [392, 0],
+        [494, 0.09],
+        [587, 0.18],
+      ].forEach(([frequency, offset]) => {
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(frequency, now + offset);
+        gain.gain.setValueAtTime(0.0001, now + offset);
+        gain.gain.exponentialRampToValueAtTime(0.12, now + offset + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+        osc.connect(gain);
+        gain.connect(destination);
+        this._sendToReverb(gain, AUDIO_REVERB_SEND_DB.levelUp);
+        osc.start(now + offset);
+        osc.stop(now + 0.92);
+      });
+
+      // Shimmer tail: two detuned high sines fading in late.
+      [1568, 1576].forEach((frequency) => {
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(frequency, now + 0.2);
+        gain.gain.setValueAtTime(0.0001, now + 0.2);
+        gain.gain.exponentialRampToValueAtTime(0.04, now + 0.3);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 1.1);
+        osc.connect(gain);
+        gain.connect(destination);
+        this._sendToReverb(gain, AUDIO_REVERB_SEND_DB.levelUp);
+        osc.start(now + 0.2);
+        osc.stop(now + 1.12);
+      });
+    });
+  }
+
+  /** Upgrade card rerolled: quick shuffle noise burst plus a tick. */
+  playCardReroll() {
+    this._trackPerformance('playCardReroll');
+
+    this._safePlay(() => {
+      const destination = this.getAmbientDestination();
+      if (!destination) return;
+
+      const now = this.context.currentTime;
+      const rate = this.context.sampleRate;
+      const length = Math.max(1, Math.floor(rate * 0.12));
+      const buffer = this.context.createBuffer(1, length, rate);
+      const output = buffer.getChannelData(0);
+      const rng = this._resolveRandom(
+        this.randomScopes?.bufferFamilies?.explosion,
+        this.randomScopes?.families?.explosion,
+        this.randomScopes?.base
+      );
+      for (let i = 0; i < length; i += 1) {
+        output[i] = (rng.float() * 2 - 1) * (1 - i / length);
+      }
+      const noise = this.context.createBufferSource();
+      noise.buffer = buffer;
+      const filter = this.context.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(3000, now);
+      filter.Q.setValueAtTime(1.2, now);
+      const noiseGain = this.context.createGain();
+      noiseGain.gain.setValueAtTime(0.1, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      noise.connect(filter);
+      filter.connect(noiseGain);
+      noiseGain.connect(destination);
+      noise.start(now);
+
+      const tick = this.context.createOscillator();
+      const tickGain = this.context.createGain();
+      tick.type = 'square';
+      tick.frequency.setValueAtTime(1200, now + 0.1);
+      tickGain.gain.setValueAtTime(0.0001, now + 0.1);
+      tickGain.gain.exponentialRampToValueAtTime(0.06, now + 0.105);
+      tickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+      tick.connect(tickGain);
+      tickGain.connect(destination);
+      tick.start(now + 0.1);
+      tick.stop(now + 0.17);
+    });
+  }
+
+  /** Upgrade card banished: short descending tone with a low thud. */
+  playCardBanish() {
+    this._trackPerformance('playCardBanish');
+
+    this._safePlay(() => {
+      const destination = this.getAmbientDestination();
+      if (!destination) return;
+
+      const now = this.context.currentTime;
+      const tone = (type, start, end, duration, peak) => {
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(start, now);
+        osc.frequency.exponentialRampToValueAtTime(end, now + duration);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(peak, now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+        osc.connect(gain);
+        gain.connect(destination);
+        osc.start(now);
+        osc.stop(now + duration + 0.02);
+      };
+      tone('triangle', 700, 220, 0.22, 0.1);
+      tone('sine', 90, 45, 0.2, 0.25);
+    });
+  }
+
+  /** Codex entry discovered: soft two-note chime, unpanned. */
+  playCodexDiscovered() {
+    this._trackPerformance('playCodexDiscovered');
+
+    this._safePlay(() => {
+      const destination = this.getAmbientDestination();
+      if (!destination) return;
+
+      const now = this.context.currentTime;
+      [
+        [880, 0],
+        [1319, 0.12],
+      ].forEach(([frequency, offset]) => {
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(frequency, now + offset);
+        gain.gain.setValueAtTime(0.0001, now + offset);
+        gain.gain.exponentialRampToValueAtTime(0.07, now + offset + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.5);
+        osc.connect(gain);
+        gain.connect(destination);
+        osc.start(now + offset);
+        osc.stop(now + offset + 0.52);
+      });
+    });
+  }
+
   /**
    * Pickup collected: per-kind cue (magnet arpeggio, pulse thump, overcharge zap).
    * @param {'magnet'|'pulse'|'overcharge'} kind
@@ -1069,6 +1406,148 @@ class SFXBus {
       this._sendToReverb(gain, AUDIO_REVERB_SEND_DB.levelUp);
       osc.start(now + 0.1);
       osc.stop(now + 0.62);
+    });
+  }
+
+  /**
+   * Chapter stinger: the biome theme's three-note motif in its own scale,
+   * overlapping bell-like tones into the reverb (first layer of a biome).
+   * @param {string} themeId - key of MUSIC_THEMES with a motif
+   */
+  playChapterStinger(themeId) {
+    this._trackPerformance('playChapterStinger');
+    const theme = MUSIC_THEMES[themeId];
+    if (!theme?.motif) return;
+
+    this._safePlay(() => {
+      const destination = this.getAmbientDestination();
+      if (!destination) return;
+
+      const config = CHAPTER_STINGER;
+      const now = this.context.currentTime;
+      theme.motif.forEach((degree, index) => {
+        const at = now + index * config.spacingSeconds;
+        const length =
+          index === theme.motif.length - 1
+            ? config.lastNoteSeconds
+            : config.noteSeconds;
+        const osc = this.context.createOscillator();
+        const gain = this.context.createGain();
+        osc.type = config.type;
+        osc.frequency.setValueAtTime(
+          themeDegreeHz(theme, degree, config.octave),
+          at
+        );
+        gain.gain.setValueAtTime(0.0001, at);
+        gain.gain.exponentialRampToValueAtTime(config.gain, at + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.001, at + length);
+        osc.connect(gain);
+        gain.connect(destination);
+        this._sendToReverb(gain, config.reverbSendDb);
+        osc.start(at);
+        osc.stop(at + length + 0.02);
+      });
+    });
+  }
+
+  /**
+   * Warden stinger (boss-warning): a low detuned brass hit on the Warden root
+   * whose filter closes, under a noise + sine riser that opens toward the
+   * Warden layer. The boss roar stays on boss-spawned.
+   */
+  playWardenStinger() {
+    this._trackPerformance('playWardenStinger');
+
+    this._safePlay(() => {
+      const destination = this.getAmbientDestination();
+      if (!destination) return;
+
+      const { hit, riser, reverbSendDb } = WARDEN_STINGER;
+      const now = this.context.currentTime;
+
+      // Brass hit: saw stack → closing lowpass.
+      const brassFilter = this.context.createBiquadFilter();
+      brassFilter.type = 'lowpass';
+      brassFilter.frequency.setValueAtTime(hit.filterStart, now);
+      brassFilter.frequency.exponentialRampToValueAtTime(
+        hit.filterEnd,
+        now + hit.seconds
+      );
+      const brassGain = this.context.createGain();
+      brassGain.gain.setValueAtTime(0.0001, now);
+      brassGain.gain.exponentialRampToValueAtTime(
+        hit.gain,
+        now + hit.attackSeconds
+      );
+      brassGain.gain.exponentialRampToValueAtTime(0.001, now + hit.seconds);
+      brassFilter.connect(brassGain);
+      brassGain.connect(destination);
+      this._sendToReverb(brassGain, reverbSendDb);
+      hit.notes.forEach((note, index) => {
+        [-1, 1].forEach((side) => {
+          const osc = this.context.createOscillator();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(midiToHz(note), now);
+          osc.detune.setValueAtTime(side * hit.detuneCents * (index + 1), now);
+          osc.connect(brassFilter);
+          osc.start(now);
+          osc.stop(now + hit.seconds + 0.02);
+        });
+      });
+
+      // Riser: seeded noise through an opening bandpass, plus a rising sine.
+      const rate = this.context.sampleRate;
+      const length = Math.max(1, Math.floor(rate * riser.seconds));
+      const buffer = this.context.createBuffer(1, length, rate);
+      const output = buffer.getChannelData(0);
+      const rng = this._resolveRandom(
+        this.randomScopes?.bufferFamilies?.explosion,
+        this.randomScopes?.families?.explosion,
+        this.randomScopes?.base
+      );
+      for (let i = 0; i < length; i += 1) {
+        output[i] = rng.float() * 2 - 1;
+      }
+      const noise = this.context.createBufferSource();
+      noise.buffer = buffer;
+      const band = this.context.createBiquadFilter();
+      band.type = 'bandpass';
+      band.frequency.setValueAtTime(riser.filterStart, now);
+      band.frequency.exponentialRampToValueAtTime(
+        riser.filterEnd,
+        now + riser.seconds
+      );
+      const riserGain = this.context.createGain();
+      riserGain.gain.setValueAtTime(0.0001, now);
+      riserGain.gain.exponentialRampToValueAtTime(
+        riser.gain,
+        now + riser.seconds * 0.9
+      );
+      riserGain.gain.exponentialRampToValueAtTime(0.001, now + riser.seconds);
+      noise.connect(band);
+      band.connect(riserGain);
+      riserGain.connect(destination);
+      this._sendToReverb(riserGain, reverbSendDb);
+      noise.start(now);
+
+      const tone = this.context.createOscillator();
+      const toneGain = this.context.createGain();
+      tone.type = 'sine';
+      tone.frequency.setValueAtTime(riser.toneStart, now);
+      tone.frequency.exponentialRampToValueAtTime(
+        riser.toneEnd,
+        now + riser.seconds
+      );
+      toneGain.gain.setValueAtTime(0.0001, now);
+      toneGain.gain.exponentialRampToValueAtTime(
+        riser.toneGain,
+        now + riser.seconds * 0.9
+      );
+      toneGain.gain.exponentialRampToValueAtTime(0.001, now + riser.seconds);
+      tone.connect(toneGain);
+      toneGain.connect(destination);
+      tone.start(now);
+      tone.stop(now + riser.seconds + 0.02);
     });
   }
 

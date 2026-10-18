@@ -4,6 +4,11 @@ import SFXBus, {
   resolveStereoPan,
 } from './audio/SFXBus.js';
 import MusicMixer from './audio/MusicMixer.js';
+import {
+  biomeThemeForLayer,
+  chapterThemeForLayer,
+  musicThemeForLayer,
+} from './audio/MusicThemes.js';
 import FileTrackManager, {
   FILE_TRACK_IDS as FILE_TRACK_MANAGER_IDS,
 } from './audio/FileTrackManager.js';
@@ -484,8 +489,45 @@ class AudioSystem extends BaseSystem {
       this.playEliteSpawned();
     });
 
+    this.registerEventListener('weapon-beam-fired', (data = {}) => {
+      this.playHarmonicBeam({ pan: resolveStereoPan(data.x, this.listenerX) });
+    });
+
+    this.registerEventListener('weapon-evolved', () => {
+      this.playWeaponEvolved();
+      this._duckBigMoment();
+    });
+
+    this.registerEventListener('upgrade-rerolled', () => {
+      this.playCardReroll();
+    });
+
+    this.registerEventListener('upgrade-banished', () => {
+      this.playCardBanish();
+    });
+
+    this.registerEventListener('codex-discovered', () => {
+      this.playCodexDiscovered();
+    });
+
     this.registerEventListener('surge-started', () => {
       this.playSurgeSting();
+    });
+
+    this.registerEventListener('run-continued', () => {
+      this.playDeepFieldEntry();
+    });
+
+    this.registerEventListener('salvage-awarded', (data = {}) => {
+      this.playSalvageAwarded(data?.amount);
+    });
+
+    this.registerEventListener('hangar-purchased', () => {
+      this.playHangarPurchase();
+    });
+
+    this.registerEventListener('onboarding-step', () => {
+      this.playTipChime();
     });
 
     // The Ram shares the Warden's telegraph event; only non-bosses get the
@@ -530,9 +572,18 @@ class AudioSystem extends BaseSystem {
       }
     });
 
-    // Wave start feeds the run-following music (progress + wave enemy total).
+    // Wave start feeds the run-following music (progress + wave enemy total),
+    // picks the layer's theme (the Warden's on boss layers) and plays the
+    // chapter stinger on a biome's first layer.
     this.registerEventListener('wave-started', (data = {}) => {
       this.updateWaveMusicIntensity(data);
+      const wave = Number(data?.wave);
+      if (!Number.isFinite(wave) || wave <= 0) return;
+      this.musicMixer.setTheme(musicThemeForLayer(wave));
+      const chapterTheme = chapterThemeForLayer(wave);
+      if (chapterTheme) {
+        this.playChapterStinger(chapterTheme);
+      }
     });
 
     this.registerEventListener('mine-exploded', (data = {}) => {
@@ -542,6 +593,7 @@ class AudioSystem extends BaseSystem {
     // Boss arc → MusicMixer (D-04): overrides the run intensity upwards. The
     // roar/phase/defeat SFX stay on the facade (BossAudio lands in a later plan).
     this.registerEventListener('boss-warning', (data = {}) => {
+      this.playWardenStinger();
       this.musicMixer.setIntensityFromBossEvent('boss-warning', data);
     });
 
@@ -558,6 +610,9 @@ class AudioSystem extends BaseSystem {
     this.registerEventListener('boss-defeated', (data = {}) => {
       this.playBossDefeated(data);
       this.musicMixer.setIntensityFromBossEvent('boss-defeated', data);
+      this.musicMixer.setTheme(
+        biomeThemeForLayer(this.musicMixer.runState.wave)
+      );
     });
 
     this.registerEventListener('bullet-hit', (data) => {
@@ -1458,12 +1513,56 @@ class AudioSystem extends BaseSystem {
     this.sfxBus.playSurgeSting();
   }
 
+  playDeepFieldEntry() {
+    this.sfxBus.playDeepFieldEntry();
+  }
+
+  playSalvageAwarded(amount) {
+    this.sfxBus.playSalvageAwarded(amount);
+  }
+
+  playHangarPurchase() {
+    this.sfxBus.playHangarPurchase();
+  }
+
+  playTipChime() {
+    this.sfxBus.playTipChime();
+  }
+
+  playHarmonicBeam(options = {}) {
+    this.sfxBus.playHarmonicBeam(options);
+  }
+
+  playWeaponEvolved() {
+    this.sfxBus.playWeaponEvolved();
+  }
+
+  playCardReroll() {
+    this.sfxBus.playCardReroll();
+  }
+
+  playCardBanish() {
+    this.sfxBus.playCardBanish();
+  }
+
+  playCodexDiscovered() {
+    this.sfxBus.playCodexDiscovered();
+  }
+
   playPickupCollected(kind) {
     this.sfxBus.playPickupCollected(kind);
   }
 
   playPickupSpawned(options = {}) {
     this.sfxBus.playPickupSpawned(options);
+  }
+
+  playChapterStinger(themeId) {
+    this.sfxBus.playChapterStinger(themeId);
+  }
+
+  playWardenStinger() {
+    this.sfxBus.playWardenStinger();
   }
 
   playTransmission() {

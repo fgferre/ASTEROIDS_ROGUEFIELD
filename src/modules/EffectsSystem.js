@@ -23,6 +23,7 @@ import {
   BOSS_SCREEN_SHAKES,
 } from '../data/constants/visual.js';
 import { ASTEROID_VARIANTS } from '../data/enemies/asteroid-configs.js';
+import { WARDEN_KINDS } from '../data/enemies/boss.js';
 
 const MAIN_THRUSTER_FLASH_THRESHOLD = 0.85;
 const MAIN_THRUSTER_FLASH_COLOR = PALETTE.player;
@@ -1126,8 +1127,9 @@ export default class EffectsSystem extends BaseSystem {
     );
   }
 
-  // Boss attack telegraphs: a lane for the charge, a wedge for the fan. They
-  // read the boss's live state each frame, so the owner is the boss itself.
+  // Boss attack telegraphs: a lane for the charge (dark for the Null), a wedge
+  // for the fan, a line per core for the chorus. They read the boss's live
+  // state each frame, so the owner is the boss itself.
   drawTelegraphs(ctx) {
     if (!ctx || !this.telegraphs.length) return;
 
@@ -1139,14 +1141,64 @@ export default class EffectsSystem extends BaseSystem {
       const duration = t.duration > 0 ? t.duration : 1;
       const progress = Math.min(1, Math.max(0, 1 - t.timer / duration));
       const pulse = 0.5 + 0.5 * Math.sin(progress * Math.PI * 6);
-      const radius = Math.max(20, boss.radius || 60);
+      // the Choir's fan comes from its singing core, so the ring hugs that
+      const radius = Math.max(
+        20,
+        t.type === 'fan' && boss.bossKind === 'choir'
+          ? WARDEN_KINDS.choir.coreRadius * 1.3
+          : boss.radius || 60
+      );
+      // a telegraph may start off the hull (a Choir core); default the hull
+      const originX = Number.isFinite(t.x) ? t.x : boss.x;
+      const originY = Number.isFinite(t.y) ? t.y : boss.y;
 
       ctx.save();
-      ctx.translate(boss.x, boss.y);
+      ctx.translate(originX, originY);
       ctx.rotate(t.angle || 0);
       ctx.globalCompositeOperation = 'lighter';
 
-      if (t.type === 'charge') {
+      if (t.type === 'charge' && t.tone === 'dark') {
+        // the Null's lane: a dark band between two violet edges
+        const length = Math.max(radius * 2, t.length || 400);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 0.35 + 0.4 * progress;
+        ctx.fillStyle = PALETTE.background;
+        ctx.fillRect(0, -radius * 0.9, length, radius * 1.8);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.globalAlpha = 0.3 + 0.6 * progress;
+        ctx.strokeStyle = PALETTE.boss;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, -radius * 0.9);
+        ctx.lineTo(length, -radius * 0.9);
+        ctx.moveTo(0, radius * 0.9);
+        ctx.lineTo(length, radius * 0.9);
+        ctx.stroke();
+        ctx.globalAlpha = 0.35 + 0.55 * progress;
+        ctx.setLineDash([14, 10]);
+        ctx.lineDashOffset = -progress * 120;
+        ctx.beginPath();
+        ctx.moveTo(radius * 0.6, 0);
+        ctx.lineTo(length, 0);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      } else if (t.type === 'chorus') {
+        // one line from each living core to the locked focus point
+        ctx.globalAlpha = (0.3 + 0.6 * progress) * (0.7 + 0.3 * pulse);
+        ctx.strokeStyle = PALETTE.threat;
+        ctx.lineWidth = 2 + 4 * progress;
+        ctx.beginPath();
+        for (const line of t.lines || []) {
+          const x = line.x - originX;
+          const y = line.y - originY;
+          ctx.moveTo(x, y);
+          ctx.lineTo(
+            x + Math.cos(line.angle) * line.length,
+            y + Math.sin(line.angle) * line.length
+          );
+        }
+        ctx.stroke();
+      } else if (t.type === 'charge') {
         const length = Math.max(radius * 2, t.length || 400);
         // faint lane, widening as the strike nears
         ctx.globalAlpha = 0.08 + 0.18 * progress;

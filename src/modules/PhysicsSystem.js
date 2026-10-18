@@ -1750,7 +1750,7 @@ class PhysicsSystem extends BaseSystem {
       damage = Math.max(0, Math.floor(damageOverride));
     }
     result.damage = damage;
-    const remaining = player.takeDamage(damage);
+    const remaining = player.takeDamage(damage, asteroid);
     result.remainingHealth = typeof remaining === 'number' ? remaining : null;
 
     const newShieldState = player.getShieldState();
@@ -2030,7 +2030,7 @@ class PhysicsSystem extends BaseSystem {
             scaledDamage > 0 &&
             (!player.invulnerableTimer || player.invulnerableTimer <= 0)
           ) {
-            const remaining = player.takeDamage(scaledDamage);
+            const remaining = player.takeDamage(scaledDamage, boss);
             playerResult.remainingHealth =
               typeof remaining === 'number' ? remaining : null;
 

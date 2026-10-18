@@ -15,7 +15,7 @@ import { deepFreeze } from '../utils/deepFreeze.js';
 // key* / fill*: the two directional lights; bloomScale multiplies bloom.
 // debris: 0..1 share of the far dark fragments drifting below the field.
 // structures: 0..1 opacity of the intact Ring arcs and beams far below.
-// musicTheme: id for a future per-biome theme (unused).
+// musicTheme: id of the procedural theme MusicMixer plays in this biome.
 // tint: the 2D renderer's full-canvas overlay (screen: lifts the blacks).
 export const BIOMES = deepFreeze([
   {

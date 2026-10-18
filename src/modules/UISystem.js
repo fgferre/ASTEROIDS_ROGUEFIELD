@@ -11,6 +11,7 @@ import {
 } from '../data/shipModels.js';
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 import { directorFor } from '../data/layers.js';
+import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
 import { biomeForLayer } from '../data/biomes.js';
 import { BaseSystem } from '../core/BaseSystem.js';
 import {
@@ -20,6 +21,7 @@ import {
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { AAAHudLayout } from './ui/AAAHudLayout.js';
+import { Onboarding, onboardingPrompts } from './ui/onboarding.js';
 import {
   TransmissionQueue,
   chapterTransmission,
@@ -28,12 +30,47 @@ import {
   wardenTransmission,
 } from './ui/transmissions.js';
 import { PICKUP_KINDS } from '../data/pickups.js';
+import {
+  buildBlockMarkup,
+  collectBuild,
+  killerName,
+  pipsMarkup,
+  runLocationLine,
+} from './ui/runRecap.js';
+import {
+  hangarItemMarkup,
+  salvageBalanceText,
+  salvageLine,
+} from './ui/hangar.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
-const LEVEL_UP_LOCKOUT_MS = 400;
+
+// One Codex row; an entry never met shows as a dark silhouette, unnamed.
+function codexEntryMarkup(entry) {
+  const known = Boolean(entry.seen);
+  const classes = `codex-entry${known ? '' : ' is-unknown'}${
+    entry.warden ? ' is-warden' : ''
+  }`;
+  const glyph = `<svg class="codex-entry__glyph" viewBox="-16 -16 32 32" aria-hidden="true">${entry.glyph}</svg>`;
+  if (!known) {
+    return `<li class="${classes}">${glyph}
+      <div class="codex-entry__text">
+        <h3 class="codex-entry__name">Unknown signal</h3>
+        <p class="codex-entry__meta">Below layer ${entry.fromLayer}</p>
+        <p class="codex-entry__lore">No contact logged. Go deeper.</p>
+      </div></li>`;
+  }
+  return `<li class="${classes}">${glyph}
+    <div class="codex-entry__text">
+      <h3 class="codex-entry__name">${entry.name}</h3>
+      <p class="codex-entry__meta">From layer ${entry.fromLayer} · First contact: layer ${entry.seen.firstLayer} · Destroyed: ${entry.seen.kills}</p>
+      <p class="codex-entry__lore">${entry.lore}</p>
+      <p class="codex-entry__hint">${entry.hint}</p>
+    </div></li>`;
+}
+// Level-up cards and the victory buttons ignore input this long after showing.
+const SCREEN_INPUT_LOCKOUT_MS = 400;
 const UPGRADE_RARITY_LABELS = { common: 'Common', rare: 'Rare', epic: 'Epic' };
-const CONTROLS_SEEN_KEY = 'roguefield:seenControls';
-const CONTROLS_TOAST_MS = 8000;
 
 const COLOR_ASSIST_ACCENTS = {
   offense: '#3366CC',
@@ -55,8 +92,8 @@ class UISystem extends BaseSystem {
         transitions: 'ui.transitions',
       },
     });
-    // `?replay=` runs without the first-run controls toast.
-    this.controlsToastDisabled = false;
+    // `?replay=` runs without the first-run onboarding tips.
+    this.onboardingDisabled = false;
   }
 
   initialize() {
@@ -87,6 +124,13 @@ class UISystem extends BaseSystem {
     );
     this.aaaTacticalHudMountTarget = null;
     this.aaaTacticalHudRestoreState = null;
+    this.onboarding = new Onboarding(
+      {
+        showTip: (id) => this.showOnboardingTip(id),
+        hideTip: () => this.aaaTacticalHud?.hideOnboardingTip(),
+      },
+      (id) => this.eventBus?.emit('onboarding-step', { id })
+    );
 
     this.cachedValues = {
       health: { current: null, max: null },
@@ -152,6 +196,8 @@ class UISystem extends BaseSystem {
       triggerId: null,
     };
     this.handleCreditsKeyDown = this.handleCreditsKeyDown.bind(this);
+    this.codexState = { isOpen: false, trigger: null };
+    this.hangarState = { isOpen: false, trigger: null };
     this.levelUpState = {
       isVisible: false,
       options: [],
@@ -188,6 +234,8 @@ class UISystem extends BaseSystem {
     this.bindLevelUpControls();
     this.bindSettingsControls();
     this.bindCreditsControls();
+    this.bindCodexControls();
+    this.bindHangarControls();
     this.bindMainMenuControls();
     this.initializeMenuShipSelector();
     this.bootstrapSettingsState();
@@ -230,6 +278,9 @@ class UISystem extends BaseSystem {
         kills: document.getElementById('gameover-kills') || null,
         combo: document.getElementById('gameover-combo') || null,
         level: document.getElementById('gameover-level') || null,
+        killer: document.getElementById('gameover-killer') || null,
+        location: document.getElementById('gameover-location') || null,
+        salvage: document.getElementById('gameover-salvage') || null,
         build: document.getElementById('gameover-build') || null,
         retryBtn: document.getElementById('retry-game-btn') || null,
         restartBtn: document.getElementById('restart-game-btn') || null,
@@ -243,13 +294,37 @@ class UISystem extends BaseSystem {
         level: document.getElementById('victory-level') || null,
         build: document.getElementById('victory-build') || null,
         synergies: document.getElementById('victory-synergies') || null,
+        best: document.getElementById('victory-best') || null,
+        salvage: document.getElementById('victory-salvage') || null,
+        continueBtn: document.getElementById('victory-continue-btn') || null,
         restartBtn: document.getElementById('victory-restart-btn') || null,
+        quitBtn: document.getElementById('victory-quit-btn') || null,
       },
       pause: {
         container: document.getElementById('pause-screen') || null,
         resumeBtn: document.getElementById('pause-resume-btn') || null,
         settingsBtn: document.getElementById('pause-settings-btn') || null,
         exitBtn: document.getElementById('pause-exit-btn') || null,
+        location: document.getElementById('pause-build-location') || null,
+        build: document.getElementById('pause-build-block') || null,
+        tools: document.getElementById('pause-build-tools') || null,
+      },
+      codex: {
+        overlay: document.getElementById('codex-screen') || null,
+        list: document.getElementById('codex-list') || null,
+        count: document.getElementById('codex-count') || null,
+        openBtn: document.getElementById('menu-codex-btn') || null,
+        backBtn: document.getElementById('codex-back-btn') || null,
+        closeBtn: document.getElementById('codex-close-btn') || null,
+      },
+      hangar: {
+        overlay: document.getElementById('hangar-screen') || null,
+        list: document.getElementById('hangar-list') || null,
+        hulls: document.getElementById('hangar-hulls') || null,
+        balance: document.getElementById('hangar-balance') || null,
+        openBtn: document.getElementById('menu-hangar-btn') || null,
+        backBtn: document.getElementById('hangar-back-btn') || null,
+        closeBtn: document.getElementById('hangar-close-btn') || null,
       },
       settings: {
         overlay: document.getElementById('settings-screen') || null,
@@ -437,18 +512,16 @@ class UISystem extends BaseSystem {
     }
     const layer = Math.max(1, Math.floor(Number(payload.wave) || 1));
     const boss = Boolean(payload.isBossWave) || directorFor(layer).warden;
-    // The first-run controls toast opens right after layer 1 starts.
-    const toastShowing =
-      layer === 1 &&
-      (this.isControlsToastPending() ||
-        Boolean(this.domRefs.gameUi?.querySelector('.controls-toast')));
     const biome = biomeForLayer(layer);
     const firstOfBiome = biome.layers[0] === layer;
     this.transmissionLayer = layer;
     hud.showLayerBanner(layer, {
       boss,
-      delayMs: toastShowing ? 1000 : 0,
-      chapter: firstOfBiome ? biome.title : '',
+      chapter: firstOfBiome
+        ? biome.title
+        : layer > RUN_FINAL_LAYER
+          ? 'DEEP FIELD'
+          : '',
     });
     if (firstOfBiome) {
       this.queueTransmission(chapterTransmission(biome.id));
@@ -672,7 +745,9 @@ class UISystem extends BaseSystem {
         ? this.settings.getCategoryValues('gameplay') || null
         : null;
     const hullDefinition = getShipModelById(gameplayValues?.selectedHull);
-    return hullDefinition?.id || DEFAULT_HULL_ID;
+    return this.getService('hangar').hullFor(
+      hullDefinition?.id || DEFAULT_HULL_ID
+    );
   }
 
   getHullDisplayName(hullDefinition) {
@@ -766,6 +841,7 @@ class UISystem extends BaseSystem {
     }
 
     const selectedHullId = this.getSelectedHullId();
+    const hangar = this.getService('hangar');
     container
       .querySelectorAll('.menu-ship-selector__option')
       .forEach((button) => {
@@ -776,6 +852,10 @@ class UISystem extends BaseSystem {
         const isActive = button.dataset.hullId === selectedHullId;
         button.classList.toggle('is-active', isActive);
         button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        const locked = !hangar.isHullUnlocked(button.dataset.hullId);
+        button.disabled = locked;
+        button.classList.toggle('is-locked', locked);
+        button.title = locked ? 'Unlock in the Hangar' : '';
       });
 
     this.renderMenuShipSelectorPreviews();
@@ -1317,6 +1397,7 @@ class UISystem extends BaseSystem {
       const aimMode =
         typeof combat.getAimMode === 'function' ? combat.getAimMode() : 'auto';
       hud.updateModeIndicators(spreadMode, aimMode);
+      hud.updateWeapon(combat.getWeaponState());
     }
 
     const waveState =
@@ -1518,6 +1599,18 @@ class UISystem extends BaseSystem {
         pickup.detail,
         pickup.color
       );
+      if (pickup.duration) {
+        this.aaaTacticalHud?.startBuff(
+          kind,
+          pickup.label,
+          pickup.duration,
+          pickup.color
+        );
+      }
+    });
+
+    this.registerEventListener('weapon-beam-fired', () => {
+      this.aaaTacticalHud?.flashBeam();
     });
 
     this.registerEventListener('pause-state-changed', (data) => {
@@ -1554,9 +1647,29 @@ class UISystem extends BaseSystem {
       this.runWon = true;
       this.queueTransmission(victoryTransmission(), { interrupt: true });
     });
+    this.registerEventListener('run-continued', () => {
+      this.runWon = false;
+    });
     this.registerEventListener('game-started', () => {
       this.runWon = false;
       this.transmissions?.clear();
+      this.aaaTacticalHud?.clearBuffs();
+      this.removeOnboardingCardsTip();
+      if (this.isOnboardingEnabled()) {
+        this.onboarding.start();
+      } else {
+        this.onboarding.stop();
+      }
+    });
+    this.registerEventListener('player-dashed', () => {
+      this.onboarding.dashed();
+    });
+    this.registerEventListener('shield-activated', () => {
+      this.onboarding.shieldRaised();
+    });
+    this.registerEventListener('upgrade-applied', () => {
+      this.onboarding.cardPicked();
+      this.removeOnboardingCardsTip();
     });
     this.registerEventListener('upgrade-options-ready', (payload = {}) => {
       this.handleUpgradeOptions(payload);
@@ -1656,6 +1769,15 @@ class UISystem extends BaseSystem {
     if (change.category === 'gameplay' || change.type === 'reset-all') {
       this.requestMenuShipSelectorRefresh();
     }
+
+    if (change.category === 'gameplay' && change.key === 'onboardingTips') {
+      if (change.value === false) {
+        this.onboarding.stop();
+        this.removeOnboardingCardsTip();
+      } else if (change.previous === false) {
+        this.onboarding.replay();
+      }
+    }
   }
 
   handleVisualPreferencesChange(payload = {}) {
@@ -1754,6 +1876,128 @@ class UISystem extends BaseSystem {
       event.preventDefault();
       this.closeCreditsOverlay({ restoreFocus: true });
     }
+  }
+
+  bindCodexControls() {
+    const refs = this.domRefs.codex;
+    if (!refs.overlay) return;
+    refs.openBtn?.addEventListener('click', () => this.openCodex());
+    [refs.backBtn, refs.closeBtn].forEach((button) =>
+      button?.addEventListener('click', () => this.closeCodex())
+    );
+    refs.overlay.addEventListener('click', (event) => {
+      if (event.target === refs.overlay) this.closeCodex();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (this.codexState.isOpen && event.key === 'Escape') {
+        event.preventDefault();
+        this.closeCodex();
+      }
+    });
+  }
+
+  openCodex() {
+    const refs = this.domRefs.codex;
+    const entries = this.getService('codex').getEntries();
+    refs.list.innerHTML = entries.map(codexEntryMarkup).join('');
+    const found = entries.filter((entry) => entry.seen).length;
+    refs.count.textContent = `${found} / ${entries.length} signals logged`;
+    this.codexState = { isOpen: true, trigger: document.activeElement };
+    this.showScreen('codex', { overlay: true, show: true });
+    refs.overlay.setAttribute('aria-hidden', 'false');
+    this.emitOverlayVisibilityChanged('codex', true, { source: 'menu' });
+    refs.backBtn?.focus({ preventScroll: true });
+  }
+
+  closeCodex() {
+    if (!this.codexState.isOpen) return;
+    const refs = this.domRefs.codex;
+    this.showScreen('codex', { overlay: true, show: false });
+    refs.overlay.setAttribute('aria-hidden', 'true');
+    this.emitOverlayVisibilityChanged('codex', false, { source: 'menu' });
+    this.codexState.trigger?.focus?.({ preventScroll: true });
+    this.codexState = { isOpen: false, trigger: null };
+  }
+
+  bindHangarControls() {
+    const refs = this.domRefs.hangar;
+    if (!refs.overlay) return;
+    refs.openBtn?.addEventListener('click', () => this.openHangar());
+    [refs.backBtn, refs.closeBtn].forEach((button) =>
+      button?.addEventListener('click', () => this.closeHangar())
+    );
+    refs.overlay.addEventListener('click', (event) => {
+      if (event.target === refs.overlay) {
+        this.closeHangar();
+        return;
+      }
+      const buy = event.target.closest('[data-hangar-buy]');
+      if (buy) {
+        const id = buy.dataset.hangarBuy;
+        this.getService('hangar').buy(id);
+        this.renderHangar();
+        refs.list
+          .querySelector(`[data-hangar-item="${id}"] .hangar-item__action`)
+          ?.focus({ preventScroll: true });
+        return;
+      }
+      const hull = event.target.closest('[data-hangar-hull]');
+      if (hull) {
+        this.settings.setSetting(
+          'gameplay',
+          'selectedHull',
+          hull.dataset.hangarHull,
+          { source: 'ui' }
+        );
+        this.renderHangar();
+      }
+    });
+    document.addEventListener('keydown', (event) => {
+      if (this.hangarState.isOpen && event.key === 'Escape') {
+        event.preventDefault();
+        this.closeHangar();
+      }
+    });
+  }
+
+  renderHangar() {
+    const refs = this.domRefs.hangar;
+    const hangar = this.getService('hangar');
+    refs.balance.textContent = salvageBalanceText(hangar.salvage);
+    refs.list.innerHTML = hangar.getItems().map(hangarItemMarkup).join('');
+    const selected = this.getSelectedHullId();
+    refs.hulls.innerHTML = getAllShipModels()
+      .map((hull) => {
+        const locked = !hangar.isHullUnlocked(hull.id);
+        const active = hull.id === selected;
+        return `<button type="button" class="hangar-hull${
+          active ? ' is-active' : ''
+        }" data-hangar-hull="${hull.id}" aria-pressed="${active}"${
+          locked ? ' disabled' : ''
+        }>${this.getHullDisplayName(hull)}${locked ? ' · Locked' : ''}</button>`;
+      })
+      .join('');
+  }
+
+  openHangar() {
+    const refs = this.domRefs.hangar;
+    this.renderHangar();
+    this.hangarState = { isOpen: true, trigger: document.activeElement };
+    this.showScreen('hangar', { overlay: true, show: true });
+    refs.overlay.setAttribute('aria-hidden', 'false');
+    this.emitOverlayVisibilityChanged('hangar', true, { source: 'menu' });
+    refs.backBtn?.focus({ preventScroll: true });
+  }
+
+  closeHangar() {
+    if (!this.hangarState.isOpen) return;
+    const refs = this.domRefs.hangar;
+    this.showScreen('hangar', { overlay: true, show: false });
+    refs.overlay.setAttribute('aria-hidden', 'true');
+    this.emitOverlayVisibilityChanged('hangar', false, { source: 'menu' });
+    this.requestMenuShipSelectorRefresh();
+    this.hangarState.trigger?.focus?.({ preventScroll: true });
+    this.hangarState = { isOpen: false, trigger: null };
   }
 
   applyAccessibilitySettings(values = {}, derived = null) {
@@ -2684,9 +2928,18 @@ class UISystem extends BaseSystem {
     );
   }
 
-  update() {
+  update(deltaTime) {
     if (this.aaaTacticalHud) {
       this.updateAAATacticalHudFromServices({ force: false });
+      this.aaaTacticalHud.tickBuffs(deltaTime);
+    }
+    if (this.onboarding.current) {
+      const moving = this.getService('input').getMovementInput();
+      this.onboarding.update(deltaTime, {
+        moving: moving.up || moving.down || moving.left || moving.right,
+        shieldReady: this.getService('player').getShieldState().maxHits > 0,
+        bannerBusy: Boolean(this.aaaTacticalHud?.isBannerBusy()),
+      });
     }
   }
 
@@ -2718,10 +2971,6 @@ class UISystem extends BaseSystem {
     if (screenName === 'victory') {
       this.showVictoryScreen(payload);
       return;
-    }
-
-    if (screenName === 'playing') {
-      this.maybeShowControlsToast();
     }
 
     this.showScreen(screenName, { emitEvent: false });
@@ -2793,6 +3042,9 @@ class UISystem extends BaseSystem {
         this.creditsState.triggerId = null;
       }
 
+      this.closeCodex();
+      this.closeHangar();
+
       document.body?.classList.remove('is-credits-open');
 
       if (screenName === 'menu') {
@@ -2822,6 +3074,7 @@ class UISystem extends BaseSystem {
 
     const resumeBtn = this.domRefs.pause?.resumeBtn;
     if (shouldPause) {
+      this.renderPauseBuild();
       resumeBtn?.focus({ preventScroll: true });
     } else {
       this.cancelQuitConfirm();
@@ -2837,6 +3090,19 @@ class UISystem extends BaseSystem {
     ) {
       this.closeSettingsPanel();
     }
+  }
+
+  // The pause panel: the same build block as the death recap, plus the
+  // level-up tools left and where the run is.
+  renderPauseBuild() {
+    const refs = this.domRefs.pause;
+    const progression = this.getService('progression');
+    if (!refs.build || !progression) return;
+    refs.build.innerHTML = buildBlockMarkup(
+      collectBuild(progression, this.getService('combat'))
+    );
+    refs.location.textContent = runLocationLine(this.transmissionLayer);
+    refs.tools.textContent = `Rerolls ${progression.rerollsLeft} · Banishes ${progression.banishesLeft}`;
   }
 
   showLevelUpScreen(data = {}) {
@@ -2860,6 +3126,7 @@ class UISystem extends BaseSystem {
     this.levelUpState.level = levelValue;
     this.showScreen('levelup', { overlay: true, show: true });
     this.renderLevelUpOptions(options, data.poolSize);
+    this.showOnboardingCardsTip();
   }
 
   // Cards, subtitle and reroll/banish buttons for the offered options; new
@@ -2871,7 +3138,7 @@ class UISystem extends BaseSystem {
       ? Number(offeredPoolSize)
       : options.length;
     this.levelUpState.focusIndex = -1;
-    this.levelUpState.lockedUntil = Date.now() + LEVEL_UP_LOCKOUT_MS;
+    this.levelUpState.lockedUntil = Date.now() + SCREEN_INPUT_LOCKOUT_MS;
     this.setBanishMode(false);
     this.updateLevelUpActionButtons();
 
@@ -3098,11 +3365,7 @@ class UISystem extends BaseSystem {
     if (!family) {
       return '';
     }
-    const pips = Array.from(
-      { length: family.required },
-      (_, index) =>
-        `<span class="family-pip${index < family.owned ? ' is-filled' : ''}"></span>`
-    ).join('');
+    const pips = pipsMarkup(family.owned, family.required);
     let state = '';
     let label = `${family.name} ${Math.min(family.owned, family.required)}/${family.required} · ${family.bonusName}`;
     if (family.active) {
@@ -3415,6 +3678,8 @@ class UISystem extends BaseSystem {
     setText(refs.kills, `${data.stats?.totalKills ?? data.stats?.kills ?? 0}`);
     setText(refs.combo, `x${data.maxCombo ?? 0}`);
     setText(refs.level, `${level ?? '—'}`);
+    setText(refs.best, `Best layer: ${data.bestLayer ?? wave ?? '—'}`);
+    setText(refs.salvage, salvageLine(this.getService('hangar').lastAward));
 
     if (refs.build) {
       refs.build.innerHTML = '';
@@ -3447,7 +3712,17 @@ class UISystem extends BaseSystem {
       });
     }
 
-    refs.restartBtn?.focus({ preventScroll: true });
+    const buttons = [refs.continueBtn, refs.restartBtn, refs.quitBtn];
+    buttons.forEach((button) => {
+      if (button) button.disabled = true;
+    });
+    clearTimeout(this.victoryLockoutTimer);
+    this.victoryLockoutTimer = setTimeout(() => {
+      buttons.forEach((button) => {
+        if (button) button.disabled = false;
+      });
+      refs.continueBtn?.focus({ preventScroll: true });
+    }, SCREEN_INPUT_LOCKOUT_MS);
   }
 
   showGameOverScreen(payload) {
@@ -3474,26 +3749,18 @@ class UISystem extends BaseSystem {
     setText(refs.kills, `${data.stats?.totalKills ?? data.stats?.kills ?? 0}`);
     setText(refs.combo, `x${data.maxCombo ?? 0}`);
     setText(refs.level, `${level ?? '—'}`);
+    setText(refs.killer, `Killed by ${killerName(data.killedBy)}`);
+    setText(
+      refs.location,
+      runLocationLine(wave, totalSeconds, data.bestLayer ?? null)
+    );
+    setText(refs.salvage, salvageLine(this.getService('hangar').lastAward));
 
-    if (refs.build) {
-      refs.build.innerHTML = '';
-      const upgrades = ensureArray(data.upgrades);
-      if (!upgrades.length) {
-        const empty = document.createElement('li');
-        empty.className = 'gameover-build__empty';
-        empty.textContent = 'No upgrades';
-        refs.build.appendChild(empty);
-      }
-      upgrades.forEach(({ name, id, level: rank }) => {
-        const item = document.createElement('li');
-        item.className = 'gameover-build__item';
-        item.append(`${name || id} `);
-        const rankNode = document.createElement('span');
-        rankNode.className = 'gameover-build__rank';
-        rankNode.textContent = `Lv.${rank}`;
-        item.appendChild(rankNode);
-        refs.build.appendChild(item);
-      });
+    const progression = this.getService('progression');
+    if (refs.build && progression) {
+      refs.build.innerHTML = buildBlockMarkup(
+        collectBuild(progression, this.getService('combat'))
+      );
     }
 
     const focusTarget = refs.retryBtn?.disabled
@@ -3502,39 +3769,57 @@ class UISystem extends BaseSystem {
     focusTarget?.focus({ preventScroll: true });
   }
 
-  isControlsToastPending() {
-    if (this.controlsToastDisabled) {
-      return false;
-    }
-    try {
-      return !localStorage.getItem(CONTROLS_SEEN_KEY);
-    } catch (error) {
-      return false;
-    }
+  isOnboardingEnabled() {
+    return (
+      !this.onboardingDisabled &&
+      this.resolveSettingsService()?.getSetting(
+        'gameplay',
+        'onboardingTips'
+      ) !== false
+    );
   }
 
-  maybeShowControlsToast() {
-    if (!this.isControlsToastPending()) {
-      return;
-    }
-    try {
-      localStorage.setItem(CONTROLS_SEEN_KEY, '1');
-    } catch (error) {
-      return;
-    }
+  /** The in-play tip `id`, naming the keys the player actually bound. */
+  showOnboardingTip(id) {
+    const controls =
+      this.resolveSettingsService()?.getCategoryValues('controls') || {};
+    const keys = {};
+    [
+      'moveUp',
+      'moveDown',
+      'moveLeft',
+      'moveRight',
+      'dash',
+      'activateShield',
+    ].forEach((action) => {
+      keys[action] = this.formatBindingLabel(
+        controls[action]?.keyboard?.[0],
+        'keyboard'
+      );
+    });
+    const prompt = onboardingPrompts(
+      keys,
+      this.getService('player')?.controlScheme
+    )[id];
+    this.aaaTacticalHud?.showOnboardingTip(prompt.keys, prompt.text);
+  }
 
-    const gameUi = this.domRefs.gameUi;
-    if (!gameUi) {
+  /** The cards tip in the level-up footer, on the first level-up only. */
+  showOnboardingCardsTip() {
+    const text = this.onboarding.cardsTip();
+    const content = document.querySelector('#levelup-screen .levelup-content');
+    if (!text || !content || content.querySelector('.onboarding-cards-tip')) {
       return;
     }
+    const tip = document.createElement('p');
+    tip.className = 'levelup-hint onboarding-cards-tip';
+    tip.setAttribute('role', 'status');
+    tip.textContent = text;
+    content.appendChild(tip);
+  }
 
-    const toast = document.createElement('div');
-    toast.className = 'controls-toast';
-    toast.textContent =
-      'A/D turn · W thrust · shooting is automatic · Shift dash · E shield';
-    gameUi.appendChild(toast);
-    requestAnimationFrame(() => toast.classList.add('is-visible'));
-    setTimeout(() => toast.remove(), CONTROLS_TOAST_MS);
+  removeOnboardingCardsTip() {
+    document.querySelector('.onboarding-cards-tip')?.remove();
   }
 }
 

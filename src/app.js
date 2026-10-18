@@ -340,7 +340,7 @@ function init(recording = null) {
     });
     if (recording) {
       replayController.arm(recording);
-      ui.controlsToastDisabled = true;
+      ui.onboardingDisabled = true;
       void startRun(services['enemies']);
     }
     if (DEV_MODE) {
