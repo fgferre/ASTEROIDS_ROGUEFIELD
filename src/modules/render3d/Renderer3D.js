@@ -486,6 +486,8 @@ class Renderer3D extends BaseSystem {
     if (!t) return;
     const q = this.quality.settings;
     t.biomes.targets.bloomBase = BLOOM.strength * t.bloomScale * q.bloomScale;
+    t.biomes.targets.fillScale = q.fillScale;
+    t.biomes.targets.hemiScale = q.hemiScale;
     t.biomes.applied = null;
     setBloomMips(t.bloomPass, q.bloomMips, t.width, t.height);
     t.enemies.setSurfaceMaps(q.surfaceMaps);
@@ -709,6 +711,8 @@ class Renderer3D extends BaseSystem {
     const biomes = new BiomeController(THREE, {
       key,
       fill,
+      hemi,
+      hemiBase: hemi.intensity,
       bloomPass,
       bloomBase: BLOOM.strength * bloomUrl.scale,
       backdrop,

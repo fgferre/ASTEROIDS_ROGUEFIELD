@@ -5,6 +5,7 @@ import {
   FAST_HOLD_SECONDS,
   MIN_CHANGE_GAP_SECONDS,
   QUALITY_LEVELS,
+  QUALITY_PRESETS,
   SLOW_FRAME_MS,
   SLOW_HOLD_SECONDS,
 } from '../../src/core/qualityPresets.js';
@@ -74,5 +75,14 @@ describe('AutoQuality', () => {
     run(q, FAST_HOLD_SECONDS + 1, FAST);
     expect(q.preset).toBe('medium');
     expect(changes.at(-1)).toEqual({ preset: 'medium', auto: true });
+  });
+
+  it('dims fill and hemisphere only where shadows are on', () => {
+    QUALITY_LEVELS.forEach((level) => {
+      const { shadows, fillScale, hemiScale } = QUALITY_PRESETS[level];
+      expect([fillScale, hemiScale]).toEqual(
+        shadows > 0 ? [0.85, 0.9] : [1, 1]
+      );
+    });
   });
 });

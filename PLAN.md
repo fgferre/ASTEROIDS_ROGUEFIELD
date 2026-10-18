@@ -314,7 +314,7 @@ Conteúdo:
 - [x] **R10.2 BACKLOG verdadeiro.** Conferir cada linha contra o código; apagar o que já foi feito (lock da torreta, HUD
       de arma, chip de Overcharge, menu 2×3…); kill feed com o nome certo de cada Warden; `BossEnemy.spawnMinion` via
       `spawnChild`; meta ≤ 20 linhas.
-- [ ] **R10.3 Polimento visual.** Céu-base do Dense Core sem marrom; token próprio para o banner de modificador (não o
+- [x] **R10.3 Polimento visual.** Céu-base do Dense Core sem marrom; token próprio para o banner de modificador (não o
       ciano); enquadramento do casco no Hangar (sem transbordar); sombras reais um pouco mais presentes (fill −15 %).
 
 ## Fora de escopo deste plano

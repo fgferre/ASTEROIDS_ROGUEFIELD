@@ -11,6 +11,8 @@
   --status: #bcff00;
   --boss: #8a2be2;
   --xp: #ffd700;
+  /* Layer-modifier banner frame: indigo, apart from the cyan --accent */
+  --modifier: #7b86ff;
 
   --text: #e6eef8;
   --text-dim: rgba(230, 238, 248, 0.62);
