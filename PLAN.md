@@ -231,7 +231,7 @@ efeitos e câmera, jogabilidade, etc. UX melhor a cada rodada."_** Toda rodada t
       Separar: casco aponta para a direção do movimento (WASD relativo à tela, suavizado, inclina nas curvas);
       a arma é uma **torreta** no casco que gira sozinha para o alvo (malha visível em 3D e 2D, tiro sai dela,
       linha de mira a partir da torreta); `?controls=classic` continua girar + empurrar.
-- [ ] **R5.9 Sensação e UX.** Nave inclina no strafe (banking), recuo no tiro, knockback nos inimigos atingidos,
+- [x] **R5.9 Sensação e UX.** Nave inclina no strafe (banking), recuo no tiro, knockback nos inimigos atingidos,
       i-frames do dash visíveis; menu com a nave 3D em destaque e presets de qualidade visíveis; pausa/settings com
       o mesmo design das cartas; transição das cartas no level-up; números de dano com peso por tamanho.
 

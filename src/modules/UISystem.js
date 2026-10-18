@@ -45,6 +45,10 @@ import {
   salvageLine,
 } from './ui/hangar.js';
 import { adjacentCodexTab, codexTabView } from './ui/codexTabs.js';
+import { settingPreview } from './ui/settingsPreview.js';
+import { menuStatusItems, menuStatusMarkup } from './ui/menuStatus.js';
+import { loadRecords } from '../services/runRecords.js';
+import { playLevelUpExit, staggerCardEntry } from './ui/levelUpTransition.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
@@ -182,12 +186,13 @@ class UISystem extends BaseSystem {
     };
 
     this.settings = null;
+    this.liveQualityPreset = null;
     this.settingsSchema = [];
     this.schemaByCategory = new Map();
     this.settingsState = {
       isOpen: false,
       source: 'menu',
-      activeCategory: 'audio',
+      activeCategory: 'graphics',
       capture: null,
       previousFocus: null,
     };
@@ -207,6 +212,7 @@ class UISystem extends BaseSystem {
       level: null,
       lockedUntil: 0,
       banishMode: false,
+      exitTimer: null,
     };
     this.quitConfirm = { button: null, label: '', timeoutId: null };
     this.currentVisualPreferences = {
@@ -238,6 +244,7 @@ class UISystem extends BaseSystem {
     this.bindHangarControls();
     this.bindMainMenuControls();
     this.initializeMenuShipSelector();
+    this.refreshMenuStatus();
     this.bootstrapSettingsState();
     this.initializeViewportScaling();
   }
@@ -366,6 +373,7 @@ class UISystem extends BaseSystem {
         shipSelector: document.getElementById('menu-ship-selector') || null,
         shipSelectorOptions:
           document.getElementById('menu-ship-selector-options') || null,
+        status: document.getElementById('menu-status') || null,
       },
     };
   }
@@ -866,6 +874,24 @@ class UISystem extends BaseSystem {
     this.renderMenuShipSelectorPreviews();
   }
 
+  // The records strip under the menu title (ui/menuStatus.js).
+  refreshMenuStatus() {
+    const strip = this.domRefs.menu?.status;
+    if (!strip) {
+      return;
+    }
+    strip.innerHTML = menuStatusMarkup(
+      menuStatusItems({
+        records: loadRecords(),
+        hangar: this.getService('hangar'),
+        codex: this.getService('codex'),
+        achievements: this.getService('achievements'),
+        quality: this.settings?.getCategoryValues('graphics')?.quality,
+        livePreset: this.liveQualityPreset,
+      })
+    );
+  }
+
   renderMenuShipSelectorPreviews() {
     const container = this.domRefs.menu?.shipSelectorOptions;
     const player = this.getService('player');
@@ -1289,10 +1315,7 @@ class UISystem extends BaseSystem {
         this.transmissionRaf = null;
         return;
       }
-      const reducedMotion =
-        document.body.classList.contains('motion-reduced') ||
-        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      queue.update(performance.now(), reducedMotion);
+      queue.update(performance.now(), this.prefersReducedMotion());
       this.transmissionRaf = queue.active
         ? window.requestAnimationFrame(tick)
         : null;
@@ -1663,6 +1686,23 @@ class UISystem extends BaseSystem {
       this.handleScreenChanged(payload);
     });
 
+    this.registerEventListener('hangar-purchased', () =>
+      this.refreshMenuStatus()
+    );
+
+    // Renderer3D's Auto quality picked a preset: menu strip and the
+    // Graphics preview name it.
+    this.registerEventListener('quality-changed', ({ preset } = {}) => {
+      this.liveQualityPreset = preset;
+      this.refreshMenuStatus();
+      if (
+        this.settingsState.isOpen &&
+        this.settingsState.activeCategory === 'graphics'
+      ) {
+        this.renderSettingsPanel('graphics');
+      }
+    });
+
     this.registerEventListener('toggle-pause', () => {
       const appState = this.getService('game-state');
       if (appState && typeof appState.isPaused === 'function') {
@@ -1810,11 +1850,27 @@ class UISystem extends BaseSystem {
       this.settingsState.isOpen &&
       change.category === this.settingsState.activeCategory
     ) {
+      // The redraw replaces the focused control: focus its twin after.
+      const focused = document.activeElement;
+      const key = focused?.dataset?.settingKey;
+      const segment = focused?.dataset?.segmentValue;
       this.renderSettingsPanel(this.settingsState.activeCategory);
+      if (key) {
+        const selector = segment
+          ? `[data-setting-key="${key}"][data-segment-value="${segment}"]`
+          : `input[data-setting-key="${key}"], select[data-setting-key="${key}"]`;
+        this.domRefs.settings.container
+          .querySelector(selector)
+          ?.focus({ preventScroll: true });
+      }
     }
 
     if (change.category === 'gameplay' || change.type === 'reset-all') {
       this.requestMenuShipSelectorRefresh();
+    }
+
+    if (change.category === 'graphics' || change.type === 'reset-all') {
+      this.refreshMenuStatus();
     }
 
     if (change.category === 'gameplay' && change.key === 'onboardingTips') {
@@ -2278,6 +2334,16 @@ class UISystem extends BaseSystem {
   }
 
   handleSettingsClick(event) {
+    const segment = event.target.closest('[data-segment-value]');
+    if (segment && this.settings) {
+      this.settings.setSetting(
+        segment.dataset.settingCategory,
+        segment.dataset.settingKey,
+        segment.dataset.segmentValue,
+        { source: 'ui' }
+      );
+      return;
+    }
     const captureButton = event.target.closest(
       '[data-action="capture-binding"]'
     );
@@ -2434,13 +2500,39 @@ class UISystem extends BaseSystem {
         field,
         values[field.key]
       );
-      if (element) {
-        container.appendChild(element);
+      if (!element) {
+        return;
       }
+      const preview = settingPreview(
+        field.key,
+        values[field.key] ?? field.default,
+        {
+          livePreset: this.liveQualityPreset,
+          postProcessing: values.postProcessing,
+        }
+      );
+      if (preview) {
+        const line = document.createElement('p');
+        line.className = 'settings-preview';
+        line.dataset.previewFor = field.key;
+        if ('glow' in preview) {
+          const dot = document.createElement('span');
+          dot.className = `settings-preview__glow${preview.glow ? ' is-on' : ''}`;
+          line.appendChild(dot);
+        }
+        line.appendChild(document.createTextNode(preview.text));
+        (element.querySelector('.settings-field__body') || element).appendChild(
+          line
+        );
+      }
+      container.appendChild(element);
     });
   }
 
   renderSettingField(categoryId, field, value) {
+    if (field.control === 'segmented') {
+      return this.renderSegmentedField(categoryId, field, value);
+    }
     switch (field.type) {
       case 'toggle':
         return this.renderToggleField(categoryId, field, value);
@@ -2603,6 +2695,46 @@ class UISystem extends BaseSystem {
       wrapper.appendChild(description);
     }
 
+    return wrapper;
+  }
+
+  // A select shown as one button per option; a click sets it at once.
+  renderSegmentedField(categoryId, field, value) {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'settings-field settings-field--wide';
+    wrapper.dataset.settingKey = field.key;
+    wrapper.dataset.settingCategory = categoryId;
+
+    const label = document.createElement('span');
+    label.className = 'settings-field__label';
+    label.id = `setting-${categoryId}-${field.key}-label`;
+    label.textContent = field.label;
+    wrapper.appendChild(label);
+
+    const group = document.createElement('div');
+    group.className = 'settings-segmented';
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-labelledby', label.id);
+    const current = value ?? field.default;
+    ensureArray(field.options).forEach((option) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'settings-segment';
+      button.dataset.settingKey = field.key;
+      button.dataset.settingCategory = categoryId;
+      button.dataset.segmentValue = option;
+      button.setAttribute('aria-pressed', String(option === current));
+      button.textContent = field.optionLabels?.[option] ?? option;
+      group.appendChild(button);
+    });
+    wrapper.appendChild(group);
+
+    if (field.description) {
+      const description = document.createElement('p');
+      description.className = 'settings-field__description';
+      description.textContent = field.description;
+      wrapper.appendChild(description);
+    }
     return wrapper;
   }
 
@@ -3131,6 +3263,7 @@ class UISystem extends BaseSystem {
 
       if (screenName === 'menu') {
         this.requestMenuShipSelectorRefresh();
+        this.refreshMenuStatus();
       }
 
       if (emitEvent) {
@@ -3252,6 +3385,9 @@ class UISystem extends BaseSystem {
 
       container.appendChild(fragment);
       this.levelUpState.buttons = buttons;
+      if (!this.prefersReducedMotion()) {
+        staggerCardEntry(buttons);
+      }
       this.focusLevelUpOption(0, { preventFocus: false });
     } else {
       this.levelUpState.buttons = [];
@@ -3493,10 +3629,31 @@ class UISystem extends BaseSystem {
     this.disableLevelUpOptions();
     const success = progression.applyUpgrade(upgradeId);
     if (success) {
-      this.showGameUI();
+      this.leaveLevelUp(upgradeId);
     } else {
       this.enableLevelUpOptions();
     }
+  }
+
+  // Cards out (ui/levelUpTransition.js), input locked, then back to the run.
+  leaveLevelUp(upgradeId) {
+    const buttons = ensureArray(this.levelUpState.buttons);
+    this.levelUpState.lockedUntil = Infinity;
+    this.levelUpState.exitTimer = playLevelUpExit({
+      screen: document.getElementById('levelup-screen'),
+      cards: buttons,
+      picked: buttons.find((button) => button.dataset.upgradeId === upgradeId),
+      target: document.getElementById('ui-weapon-chip'),
+      reducedMotion: this.prefersReducedMotion(),
+      done: () => this.showGameUI(),
+    });
+  }
+
+  prefersReducedMotion() {
+    return (
+      document.body.classList.contains('motion-reduced') ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    );
   }
 
   handleUpgradeOptions(payload = {}) {
@@ -3638,6 +3795,8 @@ class UISystem extends BaseSystem {
   }
 
   resetLevelUpState() {
+    clearTimeout(this.levelUpState.exitTimer);
+    document.getElementById('levelup-screen')?.classList.remove('is-leaving');
     ensureArray(this.levelUpState.buttons).forEach((button) => {
       if (button) {
         button.classList.remove('is-focused');
@@ -3655,6 +3814,7 @@ class UISystem extends BaseSystem {
       level: null,
       lockedUntil: 0,
       banishMode: false,
+      exitTimer: null,
     };
   }
 
