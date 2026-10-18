@@ -1789,7 +1789,8 @@ class UISystem extends BaseSystem {
     this.registerEventListener('enemy-destroyed', (payload = {}) => {
       this.aaaTacticalHud?.addKillFeed(
         payload.enemy?.type,
-        payload.enemy?.elite
+        payload.enemy?.elite,
+        payload.enemy?.displayName
       );
     });
 

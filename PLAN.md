@@ -311,7 +311,7 @@ Conteúdo:
       real (segurar S parado por 0,25 s zera a velocidade com onda de choque leve) e `upgrade-ion-trail` (Propulsors 5)
       vira rastro iônico que dá dano por contato; dash deixa de cair de 418 → 220 de uma vez (decai em 0,2 s).
       Qualidade:
-- [ ] **R10.2 BACKLOG verdadeiro.** Conferir cada linha contra o código; apagar o que já foi feito (lock da torreta, HUD
+- [x] **R10.2 BACKLOG verdadeiro.** Conferir cada linha contra o código; apagar o que já foi feito (lock da torreta, HUD
       de arma, chip de Overcharge, menu 2×3…); kill feed com o nome certo de cada Warden; `BossEnemy.spawnMinion` via
       `spawnChild`; meta ≤ 20 linhas.
 - [ ] **R10.3 Polimento visual.** Céu-base do Dense Core sem marrom; token próprio para o banner de modificador (não o

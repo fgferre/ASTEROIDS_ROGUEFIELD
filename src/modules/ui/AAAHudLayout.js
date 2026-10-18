@@ -551,12 +551,12 @@ export class AAAHudLayout {
   }
 
   /** Kill feed row for a destroyed enemy; repeated kills count up (×N). */
-  addKillFeed(enemyType, elite = false) {
+  addKillFeed(enemyType, elite = false, displayName = null) {
     const baseName =
       enemyType === 'asteroid'
         ? ASTEROID_FEED_NAME
         : enemyType === 'boss'
-          ? BOSS_CONFIG.displayName
+          ? displayName ?? BOSS_CONFIG.displayName
           : ENEMY_TYPES[enemyType]?.displayName;
     if (!baseName) {
       return;
