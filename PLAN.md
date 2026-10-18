@@ -91,7 +91,7 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
       assunto em módulos novos, sem mudar comportamento (testes iguais antes e depois). Os métodos de desenho 2D que
       vivem neles (`render(ctx)`) só mudam de arquivo junto com o assunto; não ganham nada (decisão 6).
       Análise e ordem em `docs/analise-estrutura-ia-2026-10-18.md` (seção 5); o custo de cada iteração vem antes da divisão.
-  - [ ] **R13.8.1 Base da iteração** (ramo `r13/base-da-iteracao`): seletor de testes transitivo e por base do ramo;
+  - [x] **R13.8.1 Base da iteração** (18/10, ramo `r13/base-da-iteracao`, portão e sonda no navegador ok): seletor de testes transitivo e por base do ramo;
         portão imprime só falhas; grafo gera sem erro e seus artefatos são ignorados; `src/README.md` vira mapa por
         assunto e `tests/README.md` página curta; um só interruptor de dev, com lint; ramo morto do manifesto removido.
   - [ ] **R13.8.2 Piloto SFXBus**: famílias de sons em módulos de `src/modules/audio/`; dados de áudio saem de
