@@ -38,4 +38,18 @@ describe('SettingsSystem dash binding migration', () => {
     expect(controls.activateShield.keyboard).toEqual(['KeyE', 'ShiftLeft']);
     expect(controls.dash.keyboard).toEqual(['KeyQ']);
   });
+
+  it('moves a save from before 18/10 onto the new pad table, keeping remaps', () => {
+    const controls = load({
+      activateShield: { keyboard: ['KeyE'], gamepad: ['button:2', 'button:4'] },
+      dash: { keyboard: ['ShiftLeft'], gamepad: ['button:1'] },
+      toggleSpreadMode: { keyboard: ['KeyG'], gamepad: [] },
+      toggleAimMode: { keyboard: ['KeyT'], gamepad: [] },
+    });
+    expect(controls.activateShield.gamepad).toEqual(['button:6']);
+    expect(controls.dash.gamepad).toEqual(['button:1']);
+    expect(controls.toggleSpreadMode.gamepad).toEqual(['button:2']);
+    expect(controls.toggleAimMode.gamepad).toEqual(['button:3']);
+    expect(controls.vibration).toBe(true);
+  });
 });

@@ -239,7 +239,7 @@ efeitos e câmera, jogabilidade, etc. UX melhor a cada rodada."_** Toda rodada t
 
 Conteúdo:
 
-- [ ] **R6.1 Gamepad twin-stick.** Analógico esquerdo move, direito mira a torreta manualmente (solta = mira automática),
+- [x] **R6.1 Gamepad twin-stick.** Analógico esquerdo move, direito mira a torreta manualmente (solta = mira automática),
       gatilhos dash/escudo, vibração em dano e Warden; navegação dos menus com o controle; ícones de botão nas dicas.
 - [ ] **R6.2 Afixos de Elite.** Elite ganha 1–2 afixos visíveis (Shielded, Swift, Volatile, Splitter, Warded) com
       ícone no inimigo e no feed; tabela por camada; recompensa por afixo.

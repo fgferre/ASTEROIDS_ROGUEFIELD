@@ -29,6 +29,7 @@ import {
   TURRET_RESPONSE,
   TURRET_TURN_RATE,
 } from '../data/constants/physics.js';
+import { GAMEPAD_AIM_ENGAGE } from '../data/constants/gamepad.js';
 import {
   DASH_COOLDOWN,
   DASH_DURATION,
@@ -384,6 +385,8 @@ class PlayerSystem extends BaseSystem {
     this.controlScheme = config?.controlScheme || controlSchemeFromUrl();
     // World point CombatSystem aims at (null without a lock), set each step.
     this.aimPoint = null;
+    // Right-stick direction (unit) while it is held past GAMEPAD_AIM_ENGAGE.
+    this.aimStick = null;
     this.cachedMovementInput = this.getDefaultMovementBinary();
     this.lastConsumedMovementCommand = null;
     const startX = Number.isFinite(position?.x) ? position.x : GAME_WIDTH / 2;
@@ -570,7 +573,15 @@ class PlayerSystem extends BaseSystem {
 
     if (payload && typeof payload === 'object') {
       if (payload.binary && typeof payload.binary === 'object') {
-        return this.normalizeMovementBinary(payload.binary);
+        const movement = this.normalizeMovementBinary(payload.binary);
+        // Gamepad sticks (InputSystem `analog`), centred from the keyboard.
+        if (payload.analog) {
+          movement.moveX = Number(payload.analog.moveX) || 0;
+          movement.moveY = Number(payload.analog.moveY) || 0;
+          movement.aimX = Number(payload.analog.aimX) || 0;
+          movement.aimY = Number(payload.analog.aimY) || 0;
+        }
+        return movement;
       }
 
       if (payload.axes && typeof payload.axes === 'object') {
@@ -951,6 +962,7 @@ class PlayerSystem extends BaseSystem {
     if (!movement) {
       movement = { ...this.cachedMovementInput };
     }
+    this.aimStick = this.getAimStickDirection(movement);
 
     if (this.shieldCooldownTimer > 0) {
       this.shieldCooldownTimer -= deltaTime;
@@ -1373,8 +1385,17 @@ class PlayerSystem extends BaseSystem {
     }
   }
 
-  /** Modern WASD as a unit vector on the screen axes (W up), or null. */
+  /**
+   * Modern WASD, or the left stick's direction, as a unit vector on the
+   * screen axes (W up), or null. The stick steers at full thrust like a key.
+   */
   getModernMove(input) {
+    const stickX = Number(input.moveX) || 0;
+    const stickY = Number(input.moveY) || 0;
+    const stick = Math.hypot(stickX, stickY);
+    if (stick > 0) {
+      return { x: stickX / stick, y: stickY / stick };
+    }
     const x = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     const y = (input.down ? 1 : 0) - (input.up ? 1 : 0);
     const length = Math.hypot(x, y);
@@ -1415,17 +1436,36 @@ class PlayerSystem extends BaseSystem {
     this.angularVelocity = step / deltaTime;
   }
 
-  // Modern: the turret turns onto the aim point (CombatSystem's lead point)
-  // on its own, and back onto the nose without one. Classic: it is the nose.
+  /** Modern only: the right stick's unit direction past the engage, or null. */
+  getAimStickDirection(input) {
+    const x = Number(input.aimX) || 0;
+    const y = Number(input.aimY) || 0;
+    const magnitude = Math.hypot(x, y);
+    if (this.controlScheme !== 'modern' || magnitude <= GAMEPAD_AIM_ENGAGE) {
+      return null;
+    }
+    return { x: x / magnitude, y: y / magnitude };
+  }
+
+  /** The held right-stick aim direction for this step, or null (auto). */
+  getAimStick() {
+    return this.aimStick;
+  }
+
+  // Modern: the turret turns along the right stick while it is held, else
+  // onto the aim point (CombatSystem's lead point) on its own, and back onto
+  // the nose without one. Classic: it is the nose.
   updateTurret(deltaTime) {
     if (this.controlScheme !== 'modern') {
       this.turretAngle = this.angle;
       return;
     }
     const pivot = this.getTurretPivot();
-    const goal = this.aimPoint
-      ? Math.atan2(this.aimPoint.y - pivot.y, this.aimPoint.x - pivot.x)
-      : this.angle;
+    const goal = this.aimStick
+      ? Math.atan2(this.aimStick.y, this.aimStick.x)
+      : this.aimPoint
+        ? Math.atan2(this.aimPoint.y - pivot.y, this.aimPoint.x - pivot.x)
+        : this.angle;
     const maxStep = TURRET_TURN_RATE * deltaTime;
     const error = this.wrapAngle(goal - this.turretAngle);
     const step = Math.max(
@@ -2131,6 +2171,7 @@ class PlayerSystem extends BaseSystem {
     this.turretAngle = 0;
     this.angularVelocity = 0;
     this.aimPoint = null;
+    this.aimStick = null;
     this.driftFactor = 0;
     this.resetDashState();
     this._quitExplosionHidden = false; // Reset visibility flag
@@ -2216,6 +2257,7 @@ class PlayerSystem extends BaseSystem {
     this.angularVelocity = 0;
     this.turretAngle = this.angle;
     this.aimPoint = null;
+    this.aimStick = null;
     this.driftFactor = 0;
     this.resetDashState();
 

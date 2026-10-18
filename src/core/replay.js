@@ -4,14 +4,18 @@
 // consumed at each fixed step (see fixedStep.js). The recording stores that
 // per-step input run-length encoded (only the steps where it changes) plus the
 // upgrade picked at each level-up, in pick order, with any reroll or banish
-// made on the level-up screen before the pick. Dependency-free on purpose:
+// made on the level-up screen before the pick. Analog stick values (gamepad)
+// are quantized before the simulation sees them, so the stored integers
+// replay exactly. Dependency-free on purpose:
 // the browser (F9 download, `?replay=`) and the headless tests share it.
 
-export const REPLAY_VERSION = 3;
+export const REPLAY_VERSION = 4;
 // Version 1 had no `dash` bit (bit 7); its masks decode unchanged with dash off.
 // Versions 1-2 had no level-up rerolls/banishes (version 3); their picks are
 // ids only and load unchanged.
-const READABLE_VERSIONS = new Set([1, 2, REPLAY_VERSION]);
+// Versions 1-3 had no analog sticks (version 4); their entries are
+// [step, mask] only and decode with the sticks centred.
+const READABLE_VERSIONS = new Set([1, 2, 3, REPLAY_VERSION]);
 
 // One step of input. Movement fields are held state; the rest are presses
 // that happened since the previous step. Field order is the bit order of the
@@ -28,12 +32,45 @@ export const INPUT_FRAME_FIELDS = Object.freeze([
   'dash', // version 2
 ]);
 
+// Held stick axes in -1..1 (screen axes, y down): left stick move, right
+// stick aim. Stored after the mask as integers (version 4).
+export const INPUT_ANALOG_FIELDS = Object.freeze([
+  'moveX',
+  'moveY',
+  'aimX',
+  'aimY',
+]);
+/** Analog steps per unit: values are multiples of 1 / ANALOG_RESOLUTION. */
+export const ANALOG_RESOLUTION = 100;
+
+function quantizeAxis(value) {
+  const clamped = Math.max(-1, Math.min(1, Number(value) || 0));
+  // `|| 0` folds -0 into 0.
+  return Math.round(clamped * ANALOG_RESOLUTION) || 0;
+}
+
+function analogFrom(frame, ints) {
+  INPUT_ANALOG_FIELDS.forEach((field, index) => {
+    frame[field] = (ints[index] || 0) / ANALOG_RESOLUTION;
+  });
+}
+
 export function createInputFrame(values = {}) {
   const frame = {};
   for (const field of INPUT_FRAME_FIELDS) {
     frame[field] = Boolean(values[field]);
   }
+  analogFrom(
+    frame,
+    INPUT_ANALOG_FIELDS.map((field) => quantizeAxis(values[field]))
+  );
   return Object.seal(frame);
+}
+
+/** The frame's sticks as stored integers; empty when all are centred. */
+export function encodeAnalog(frame) {
+  const ints = INPUT_ANALOG_FIELDS.map((field) => quantizeAxis(frame?.[field]));
+  return ints.some((value) => value !== 0) ? ints : [];
 }
 
 export function encodeInputFrame(frame) {
@@ -44,11 +81,12 @@ export function encodeInputFrame(frame) {
   return mask;
 }
 
-export function decodeInputFrame(mask) {
+export function decodeInputFrame(mask, analog = []) {
   const frame = {};
   INPUT_FRAME_FIELDS.forEach((field, bit) => {
     frame[field] = (mask & (1 << bit)) !== 0;
   });
+  analogFrom(frame, analog);
   return Object.seal(frame);
 }
 
@@ -63,15 +101,17 @@ export function createRecorder({
 }) {
   const inputs = [];
   const upgrades = [];
-  let lastMask = null;
+  let lastKey = null;
   let steps = 0;
 
   return {
     record(step, frame) {
-      const mask = encodeInputFrame(frame);
-      if (mask !== lastMask) {
-        inputs.push([step, mask]);
-        lastMask = mask;
+      // [step, mask] or, with a stick off centre, [step, mask, ...analog].
+      const entry = [step, encodeInputFrame(frame), ...encodeAnalog(frame)];
+      const key = entry.slice(1).join();
+      if (key !== lastKey) {
+        inputs.push(entry);
+        lastKey = key;
       }
       steps = Math.max(steps, step + 1);
     },
@@ -125,7 +165,8 @@ export function createPlayer(recording) {
       while (cursor + 1 < inputs.length && inputs[cursor + 1][0] <= step) {
         cursor += 1;
       }
-      return decodeInputFrame(inputs[cursor][1]);
+      const [, mask, ...analog] = inputs[cursor];
+      return decodeInputFrame(mask, analog);
     },
     /**
      * Next recorded level-up action, in order; null when none are left. A

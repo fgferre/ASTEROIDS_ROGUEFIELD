@@ -17,6 +17,8 @@ import {
   keyEvent,
 } from '../__helpers__/headlessGame.js';
 import { deserialize, serialize } from '../../src/core/replay.js';
+import { PAD_BUTTON } from '../../src/data/constants/gamepad.js';
+import { installFakeGamepad } from '../__helpers__/fakeGamepad.js';
 
 const STEPS = 600; // 10 s at 60 Hz
 
@@ -135,6 +137,46 @@ describe('run replay', () => {
     expect(recorded.kills).toBeGreaterThan(0);
 
     expect(replayRun(recording).snapshot()).toEqual(recorded);
+  });
+
+  it('replays a gamepad-driven run (analog sticks, triggers) to the same end state', () => {
+    const fake = installFakeGamepad();
+    try {
+      const live = createHeadlessGame();
+      live.session.startNewRun({ source: 'test' });
+      live.services.progression.experienceToNext = TEST_XP_TO_LEVEL;
+      for (let step = 0; step < STEPS; step += 1) {
+        if (live.takeOfferedUpgrade()) {
+          const { progression } = live.services;
+          progression.applyUpgrade(progression.pendingUpgradeOptions[0].id);
+        }
+        // The left stick sweeps a slow circle at part tilt; the right stick
+        // aims by hand every other second; RT dashes now and then.
+        const t = step / 60;
+        const aiming = Math.floor(t) % 2 === 1;
+        fake.set({
+          axes: [
+            0.7 * Math.cos(t),
+            0.7 * Math.sin(t),
+            aiming ? Math.cos(2 * t) : 0,
+            aiming ? Math.sin(2 * t) : 0,
+          ],
+          pressed: step % 150 === 75 ? [PAD_BUTTON.RT] : [],
+        });
+        live.step();
+      }
+      const recording = deserialize(
+        serialize(live.session.replayRecorder.toJSON())
+      );
+      const recorded = live.snapshot();
+      expect(recording.inputs.some((entry) => entry.length === 6)).toBe(true);
+      expect(recording.inputs.some(([, mask]) => mask & 128)).toBe(true);
+
+      fake.disconnect();
+      expect(replayRun(recording).snapshot()).toEqual(recorded);
+    } finally {
+      fake.restore();
+    }
   });
 
   it('replays level-up rerolls and banishes to the same upgrades', () => {

@@ -14,17 +14,30 @@ export const MOVE_HOLD_SECONDS = 0.6;
 /** The shield tip leaves on its own after this long on screen. */
 export const SHIELD_TIP_SECONDS = 6;
 export const CARDS_TIP_TEXT = 'Pick a card. R rerolls, B banishes.';
+export const CARDS_TIP_TEXT_GAMEPAD = 'Pick a card. X rerolls, Y banishes.';
 
 /** In-play tips in order; `cards` lives on the level-up screen instead. */
 const PLAY_STEPS = ['move', 'dash', 'shield'];
 export const ONBOARDING_STEP_IDS = [...PLAY_STEPS, 'cards'];
 
 /**
- * Prompt content per step. `keys` are the labels of the bound keys
- * ({ moveUp, moveDown, moveLeft, moveRight, dash, activateShield }).
+ * Prompt content per step. `keys` are the labels of the bound keys or pad
+ * buttons ({ moveUp, moveDown, moveLeft, moveRight, dash, activateShield });
+ * `device` is the last one used ('keyboard' | 'gamepad').
  */
-export function onboardingPrompts(keys, scheme = 'modern') {
-  const move =
+export function onboardingPrompts(
+  keys,
+  scheme = 'modern',
+  device = 'keyboard'
+) {
+  const padMove = {
+    keys: ['L-Stick'],
+    text:
+      scheme === 'classic'
+        ? 'Turn and thrust with the left stick. Your guns fire on their own.'
+        : 'Move with the left stick. The turret aims on its own; the right stick aims it by hand.',
+  };
+  const keyboardMove =
     scheme === 'classic'
       ? {
           keys: [keys.moveLeft, keys.moveUp, keys.moveRight],
@@ -35,7 +48,7 @@ export function onboardingPrompts(keys, scheme = 'modern') {
           text: 'Move with WASD. The turret aims and fires on its own.',
         };
   return {
-    move,
+    move: device === 'gamepad' ? padMove : keyboardMove,
     dash: {
       keys: [keys.dash === 'Shift' ? '⇧ Shift' : keys.dash],
       text: "Dash through danger. You can't be hit mid-dash.",
@@ -152,7 +165,7 @@ export class Onboarding {
   }
 
   /** Footer text for the level-up screen, or null once learned. */
-  cardsTip() {
+  cardsTip(device = 'keyboard') {
     if (!this.active || this.done.has('cards')) {
       return null;
     }
@@ -160,7 +173,7 @@ export class Onboarding {
       this.cardsShown = true;
       this.onStep('cards');
     }
-    return CARDS_TIP_TEXT;
+    return device === 'gamepad' ? CARDS_TIP_TEXT_GAMEPAD : CARDS_TIP_TEXT;
   }
 
   /** A card was picked; the tip counts once it was on screen. */

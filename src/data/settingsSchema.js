@@ -8,6 +8,7 @@ import {
   COMBAT_DEFAULT_KEYBIND_TOGGLE_SPREAD,
   COMBAT_DEFAULT_KEYBIND_TOGGLE_AIM,
 } from './constants/gameplay.js';
+import { GAMEPAD_BINDINGS } from './constants/gamepad.js';
 
 const DEFAULT_BINDING_METADATA = {
   keyboard: {
@@ -91,7 +92,7 @@ const SETTINGS_SCHEMA = [
         description: 'Thrust along the nose.',
         default: {
           keyboard: ['KeyW', 'ArrowUp'],
-          gamepad: ['axis:1:-', 'button:12'],
+          gamepad: GAMEPAD_BINDINGS.moveUp,
         },
         metadata: {
           keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
@@ -105,7 +106,7 @@ const SETTINGS_SCHEMA = [
         description: 'Reverse thrust along the nose.',
         default: {
           keyboard: ['KeyS', 'ArrowDown'],
-          gamepad: ['axis:1:+', 'button:13'],
+          gamepad: GAMEPAD_BINDINGS.moveDown,
         },
         metadata: {
           keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
@@ -119,7 +120,7 @@ const SETTINGS_SCHEMA = [
         description: 'Slide to port; the nose stays on the target.',
         default: {
           keyboard: ['KeyA', 'ArrowLeft'],
-          gamepad: ['axis:0:-', 'button:14'],
+          gamepad: GAMEPAD_BINDINGS.moveLeft,
         },
         metadata: {
           keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
@@ -133,7 +134,7 @@ const SETTINGS_SCHEMA = [
         description: 'Slide to starboard; the nose stays on the target.',
         default: {
           keyboard: ['KeyD', 'ArrowRight'],
-          gamepad: ['axis:0:+', 'button:15'],
+          gamepad: GAMEPAD_BINDINGS.moveRight,
         },
         metadata: {
           keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
@@ -147,7 +148,7 @@ const SETTINGS_SCHEMA = [
         description: 'Deploys energy protection when available.',
         default: {
           keyboard: ['KeyE'],
-          gamepad: ['button:2', 'button:4'],
+          gamepad: GAMEPAD_BINDINGS.activateShield,
         },
         metadata: {
           keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
@@ -161,7 +162,7 @@ const SETTINGS_SCHEMA = [
         description: 'Short burst forward (or backward while braking).',
         default: {
           keyboard: ['ShiftLeft', 'ShiftRight'],
-          gamepad: ['button:5'],
+          gamepad: GAMEPAD_BINDINGS.dash,
         },
         metadata: {
           keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
@@ -175,7 +176,7 @@ const SETTINGS_SCHEMA = [
         description: 'Freezes game and opens quick menu.',
         default: {
           keyboard: ['Escape', 'KeyP'],
-          gamepad: ['button:9'],
+          gamepad: GAMEPAD_BINDINGS.pause,
         },
         metadata: {
           keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
@@ -189,7 +190,7 @@ const SETTINGS_SCHEMA = [
         description: 'Direct shortcut to settings panel.',
         default: {
           keyboard: ['F10'],
-          gamepad: ['button:8'],
+          gamepad: GAMEPAD_BINDINGS.openSettings,
         },
         metadata: {
           keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
@@ -203,7 +204,7 @@ const SETTINGS_SCHEMA = [
         description: 'Confirm selections in menus and dialogs.',
         default: {
           keyboard: ['Enter', 'Space'],
-          gamepad: ['button:0'],
+          gamepad: GAMEPAD_BINDINGS.confirm,
         },
         metadata: {
           keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
@@ -218,7 +219,7 @@ const SETTINGS_SCHEMA = [
           'Switch between concentrated and fan burst shape (FIX-05).',
         default: {
           keyboard: [COMBAT_DEFAULT_KEYBIND_TOGGLE_SPREAD],
-          gamepad: [],
+          gamepad: GAMEPAD_BINDINGS.toggleSpreadMode,
         },
         metadata: {
           keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
@@ -233,12 +234,20 @@ const SETTINGS_SCHEMA = [
           'Switch between auto-aim and manual ship-nose aim (FIX-05).',
         default: {
           keyboard: [COMBAT_DEFAULT_KEYBIND_TOGGLE_AIM],
-          gamepad: [],
+          gamepad: GAMEPAD_BINDINGS.toggleAimMode,
         },
         metadata: {
           keyboard: { ...DEFAULT_BINDING_METADATA.keyboard },
           gamepad: { ...DEFAULT_BINDING_METADATA.gamepad },
         },
+      },
+      {
+        key: 'vibration',
+        type: 'toggle',
+        label: 'Gamepad Vibration',
+        description:
+          'Rumble on hull hits, dashes and Warden arrivals. Off with Reduce Motion.',
+        default: true,
       },
     ],
   },

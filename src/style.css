@@ -1256,6 +1256,12 @@ select {
   border-top: 1px solid var(--line);
 }
 
+/* Hints for the last device used (UISystem sets data-input-device). */
+body[data-input-device='gamepad'] [data-device='keyboard'],
+body:not([data-input-device='gamepad']) [data-device='gamepad'] {
+  display: none;
+}
+
 /* Control hints (menu + pause) */
 .controls-hints {
   list-style: none;

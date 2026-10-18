@@ -102,6 +102,9 @@ class CombatSystem extends BaseSystem {
     // Snapshot of behavioral flags so manual-mode toggle can restore on switchback.
     this._aimModeFlagSnapshot = null;
     this.needsRetarget = false;
+    // Right-stick manual aim (PlayerSystem.getAimStick), unit vector or null:
+    // while held, no lock and shots go along it; released, auto again.
+    this.stickAim = null;
 
     // === CONFIGURAÇÕES ===
     this.targetingRange = Number.isFinite(COMBAT_TARGETING_RANGE)
@@ -333,6 +336,7 @@ class CombatSystem extends BaseSystem {
 
     // Only target and shoot when ship hull exists (visible and alive)
     if (!player.isDead && !player.isRetrying && !player._quitExplosionHidden) {
+      this.updateStickAim(player.getAimStick());
       this.updateTargeting(deltaTime);
       player.setAimPoint(this.getPrimaryAimPoint());
 
@@ -363,6 +367,19 @@ class CombatSystem extends BaseSystem {
     this.updateWeaponEffects(deltaTime);
   }
 
+  updateStickAim(stick) {
+    const wasHeld = Boolean(this.stickAim);
+    this.stickAim = stick;
+    if (wasHeld === Boolean(stick)) {
+      return;
+    }
+    if (!stick && this.aimMode === 'auto') {
+      this.needsRetarget = true;
+    }
+    // The HUD's AIM chip can show "MANUAL" while the stick aims.
+    this.eventBus?.emit?.('aim-stick-changed', { active: Boolean(stick) });
+  }
+
   // === SISTEMA DE TARGETING ===
   updateTargeting(deltaTime) {
     this.targetIndicatorPulse = Math.max(
@@ -374,8 +391,8 @@ class CombatSystem extends BaseSystem {
     // entirely. The locks are cleared on `setAimMode('manual')` and the
     // plan must_have is "no target lock / no multi-lock while manual." Any
     // attempt to refresh targets here would silently repopulate locks
-    // every tick.
-    if (this.aimMode === 'manual') {
+    // every tick. The right stick aims by hand the same way while held.
+    if (this.aimMode === 'manual' || this.stickAim) {
       this.currentTarget = null;
       this.currentTargetLocks = [];
       this.currentLockAssignments = [];
@@ -580,6 +597,16 @@ class CombatSystem extends BaseSystem {
     // Every shot leaves the turret's muzzle (R5.11). Without a lock the
     // turret has turned back onto the nose.
     const muzzle = player.getMuzzlePoint();
+
+    if (this.stickAim) {
+      this.fireForward(
+        playerPos,
+        Math.atan2(this.stickAim.y, this.stickAim.x),
+        playerStats,
+        { originOverride: muzzle }
+      );
+      return;
+    }
 
     // Plan 01.07 Task 6: manual-aim mode bypasses target acquisition entirely
     // and fires from the muzzle along the turret.
@@ -3256,9 +3283,11 @@ class CombatSystem extends BaseSystem {
     const player = this.cachedPlayer;
     const aim = this.aimMode === 'manual' ? null : this.getPrimaryAimPoint();
     const origin = player.getMuzzlePoint();
-    const angle = aim
-      ? Math.atan2(aim.y - origin.y, aim.x - origin.x)
-      : player.getTurretAngle();
+    const angle = this.stickAim
+      ? Math.atan2(this.stickAim.y, this.stickAim.x)
+      : aim
+        ? Math.atan2(aim.y - origin.y, aim.x - origin.x)
+        : player.getTurretAngle();
     const dirX = Math.cos(angle);
     const dirY = Math.sin(angle);
     const { width, duration } = HARMONIC_BEAM;
@@ -4243,6 +4272,7 @@ class CombatSystem extends BaseSystem {
       : 'auto';
     this._aimModeFlagSnapshot = null;
     this.needsRetarget = false;
+    this.stickAim = null;
   }
 
   // === CLEANUP ===

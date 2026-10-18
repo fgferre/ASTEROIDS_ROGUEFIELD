@@ -8,6 +8,12 @@ import {
   resolveService,
 } from '../core/serviceUtils.js';
 import { createInputFrame } from '../core/replay.js';
+import {
+  GAMEPAD_NAV_BUTTONS,
+  GAMEPAD_NAV_STICK_THRESHOLD,
+  GAMEPAD_RUMBLE,
+  GAMEPAD_STICK_DEADZONE,
+} from '../data/constants/gamepad.js';
 
 const CONTROLS_CATEGORY_ID = 'controls';
 const MOVEMENT_ACTIONS = new Set([
@@ -27,6 +33,33 @@ const STEP_PRESS_FIELDS = {
   toggleAimMode: 'aim',
   dash: 'dash',
 };
+
+const CENTRED_STICKS = Object.freeze({ moveX: 0, moveY: 0, aimX: 0, aimY: 0 });
+
+/** Radial deadzone; past it the magnitude is rescaled to 0..1. */
+export function applyStickDeadzone(x = 0, y = 0) {
+  const magnitude = Math.hypot(x, y);
+  if (magnitude <= GAMEPAD_STICK_DEADZONE) {
+    return { x: 0, y: 0 };
+  }
+  const scaled =
+    Math.min(
+      1,
+      (magnitude - GAMEPAD_STICK_DEADZONE) / (1 - GAMEPAD_STICK_DEADZONE)
+    ) / magnitude;
+  return { x: x * scaled, y: y * scaled };
+}
+
+/** The dominant direction of a raw stick past the menu threshold, or null. */
+function stickNavDirection(x = 0, y = 0) {
+  if (Math.hypot(x, y) < GAMEPAD_NAV_STICK_THRESHOLD) {
+    return null;
+  }
+  if (Math.abs(x) > Math.abs(y)) {
+    return x > 0 ? 'right' : 'left';
+  }
+  return y > 0 ? 'down' : 'up';
+}
 
 function ensureArray(value) {
   return Array.isArray(value) ? value : [];
@@ -75,6 +108,12 @@ class InputSystem {
     this.isCapturingBinding = false;
     this.pendingStepPresses = new Set();
     this.inputSource = null;
+    // Pad sticks after the deadzone, read at each poll (see sampleInputFrame).
+    this.padSticks = CENTRED_STICKS;
+    this.padNavDirection = null;
+    // Last device used: 'keyboard' or 'gamepad' (tips and hints follow it).
+    this.activeDevice = 'keyboard';
+    this.menuPollFrame = null;
 
     this.keyAliases = { w: 'keyw', a: 'keya', s: 'keys', d: 'keyd' };
 
@@ -82,6 +121,7 @@ class InputSystem {
 
     this.setupEventListeners();
     this.initializeBindings();
+    this.startMenuPadPolling();
 
     debugLog('[InputSystem] Initialized');
   }
@@ -167,6 +207,9 @@ class InputSystem {
 
     Object.entries(values).forEach(([action, bindingValue]) => {
       const field = this.controlFieldDefinitions.get(action);
+      if (field && field.type !== 'binding') {
+        return;
+      }
       const normalized = this.normalizeBindingStructure(bindingValue);
       this.actionBindings[action] = normalized;
 
@@ -243,7 +286,73 @@ class InputSystem {
           this.pendingStepPresses.clear();
         }
       });
+
+      eventBus.on('player-took-damage', (payload = {}) => {
+        if ((payload.healthDamage ?? payload.damage) > 0) {
+          this.rumble(GAMEPAD_RUMBLE.hullHit);
+        }
+      });
+      eventBus.on('boss-spawned', () =>
+        this.rumble(GAMEPAD_RUMBLE.wardenSpawn)
+      );
+      eventBus.on('player-dashed', () => this.rumble(GAMEPAD_RUMBLE.dash));
     }
+  }
+
+  /**
+   * Off the fixed steps (menus, pause, level-up) nothing else polls the pad,
+   * so a frame loop does; during play `update()` polls once per step.
+   */
+  startMenuPadPolling() {
+    if (typeof window.requestAnimationFrame !== 'function') {
+      return;
+    }
+    const tick = () => {
+      if (!this.isGameRunning()) {
+        this.pollGamepad();
+      }
+      this.menuPollFrame = window.requestAnimationFrame(tick);
+    };
+    this.menuPollFrame = window.requestAnimationFrame(tick);
+  }
+
+  isGameRunning() {
+    const gameState = resolveService('game-state', this.dependencies);
+    return gameState?.getScreen?.() === 'playing' && !gameState.isPaused?.();
+  }
+
+  setActiveDevice(device) {
+    if (this.activeDevice === device) {
+      return;
+    }
+    this.activeDevice = device;
+    this.getEventBus()?.emit?.('input-device-changed', { device });
+  }
+
+  getActiveDevice() {
+    return this.activeDevice;
+  }
+
+  /** One dual-rumble effect on the active pad, unless the player turned it off. */
+  rumble(effect) {
+    const actuator = this.gamepad?.vibrationActuator;
+    if (!actuator || !this.isVibrationEnabled()) {
+      return;
+    }
+    actuator
+      .playEffect('dual-rumble', { startDelay: 0, ...effect })
+      .catch(() => {});
+  }
+
+  isVibrationEnabled() {
+    const settings = this.settings;
+    if (!settings?.getSetting) {
+      return true;
+    }
+    return (
+      settings.getSetting(CONTROLS_CATEGORY_ID, 'vibration') !== false &&
+      !settings.getSetting('accessibility', 'reducedMotion')
+    );
   }
 
   shouldBlockPasswordManager(event) {
@@ -289,6 +398,7 @@ class InputSystem {
 
     if (key) this.keys[key] = true;
     if (code) this.codes[code] = true;
+    this.setActiveDevice('keyboard');
 
     if (this.isMovementBinding(key) || this.isMovementBinding(code)) {
       event.preventDefault();
@@ -486,7 +596,12 @@ class InputSystem {
 
     const stepField = STEP_PRESS_FIELDS[action];
     if (stepField) {
-      if (this.resolveGameScreen() === 'playing') {
+      // A pad button pressed on the pause screen must not fire on resume.
+      const live =
+        source === 'gamepad'
+          ? this.isGameRunning()
+          : this.resolveGameScreen() === 'playing';
+      if (live) {
         this.pendingStepPresses.add(stepField);
       }
       return;
@@ -523,7 +638,10 @@ class InputSystem {
 
   /** The device input for this step: held movement + presses since last step. */
   sampleInputFrame() {
-    const frame = createInputFrame(this.getMovementBinaryState());
+    const frame = createInputFrame({
+      ...this.getMovementBinaryState(),
+      ...this.padSticks,
+    });
     this.pendingStepPresses.forEach((field) => {
       frame[field] = true;
     });
@@ -602,6 +720,7 @@ class InputSystem {
       }
       this.gamepadConnected = false;
       this.gamepad = null;
+      this.padSticks = CENTRED_STICKS;
       return;
     }
 
@@ -622,11 +741,13 @@ class InputSystem {
       }
 
       if (pressed && !this.previousGamepadButtons[index]) {
+        this.setActiveDevice('gamepad');
         this.emitGamepadDetection({
           type: 'button',
           index,
           value: button?.value ?? 1,
         });
+        this.emitPadNav(GAMEPAD_NAV_BUTTONS[index]);
       }
 
       this.previousGamepadButtons[index] = pressed;
@@ -675,7 +796,31 @@ class InputSystem {
       this.previousGamepadAxes[index] = { positive, negative };
     });
 
+    this.readPadSticks(pad.axes);
     this.syncGamepadActions(activeActions);
+  }
+
+  readPadSticks(axes) {
+    const move = applyStickDeadzone(axes[0], axes[1]);
+    const aim = applyStickDeadzone(axes[2], axes[3]);
+    this.padSticks = { moveX: move.x, moveY: move.y, aimX: aim.x, aimY: aim.y };
+    if (move.x || move.y || aim.x || aim.y) {
+      this.setActiveDevice('gamepad');
+    }
+
+    const direction = stickNavDirection(axes[0], axes[1]);
+    if (direction !== this.padNavDirection) {
+      this.padNavDirection = direction;
+      this.emitPadNav(direction);
+    }
+  }
+
+  /** Menu/overlay navigation (UISystem); nothing to navigate during play. */
+  emitPadNav(action) {
+    if (!action || this.isGameRunning()) {
+      return;
+    }
+    this.getEventBus()?.emit?.('gamepad-ui-nav', { action });
   }
 
   syncGamepadActions(activeActions) {
@@ -705,6 +850,8 @@ class InputSystem {
     this.activeGamepadActions.clear();
     this.previousGamepadButtons = [];
     this.previousGamepadAxes = [];
+    this.padSticks = CENTRED_STICKS;
+    this.padNavDirection = null;
   }
 
   parseGamepadBinding(binding) {
@@ -989,7 +1136,21 @@ class InputSystem {
       left: frame.left,
       right: frame.right,
     };
-    const vector = this.computeMovementVector(binary);
+    const analog = {
+      moveX: frame.moveX,
+      moveY: frame.moveY,
+      aimX: frame.aimX,
+      aimY: frame.aimY,
+    };
+    const stick = Math.hypot(analog.moveX, analog.moveY);
+    const vector =
+      stick > 0
+        ? {
+            axes: { x: analog.moveX, y: analog.moveY },
+            rawMagnitude: stick,
+            normalizedMagnitude: Math.min(1, stick),
+          }
+        : this.computeMovementVector(binary);
     const details = this.collectMovementBindingDetails();
     const timestamp = this.getCurrentTimestamp();
 
@@ -998,6 +1159,7 @@ class InputSystem {
       source: details.source,
       axes: vector.axes,
       binary,
+      analog,
       magnitude: vector.normalizedMagnitude,
       timestamp,
     };
@@ -1176,6 +1338,10 @@ class InputSystem {
   }
 
   destroy() {
+    if (this.menuPollFrame !== null) {
+      window.cancelAnimationFrame?.(this.menuPollFrame);
+      this.menuPollFrame = null;
+    }
     if (this.handleKeyDownCapture) {
       document.removeEventListener('keydown', this.handleKeyDownCapture, true);
     }
