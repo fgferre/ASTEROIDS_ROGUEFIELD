@@ -11,7 +11,6 @@ import {
 } from '../data/shipModels.js';
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
 import {
-  BOSS_RUSH_LAYERS,
   LAYER_MODIFIERS,
   bossRushStage,
   bossRushStageTitle,
@@ -32,7 +31,10 @@ import { controlSchemeFromUrl } from './PlayerSystem.js';
 import { Onboarding, onboardingPrompts } from './ui/onboarding.js';
 import { RunCinematics } from './ui/runCinematics.js';
 import { SettingsPanel } from './ui/SettingsPanel.js';
-import { LevelUpScreen, SCREEN_INPUT_LOCKOUT_MS } from './ui/LevelUpScreen.js';
+import { LevelUpScreen } from './ui/LevelUpScreen.js';
+import { PauseScreen } from './ui/PauseScreen.js';
+import { RunEndScreens } from './ui/RunEndScreens.js';
+import { CreditsOverlay } from './ui/CreditsOverlay.js';
 import {
   TransmissionQueue,
   bossRushTransmission,
@@ -46,18 +48,9 @@ import {
 } from './ui/transmissions.js';
 import { PICKUP_KINDS } from '../data/pickups.js';
 import {
-  buildBlockMarkup,
-  collectBuild,
-  formatRunTime,
-  killerName,
-  runLocationLine,
-  transmissionQuoteMarkup,
-} from './ui/runRecap.js';
-import {
   hangarItemMarkup,
   hullLockText,
   salvageBalanceText,
-  salvageLine,
 } from './ui/hangar.js';
 import { adjacentCodexTab, codexTabView } from './ui/codexTabs.js';
 import {
@@ -65,14 +58,8 @@ import {
   GAMEPAD_NAV_SCREENS,
   pickFocusTarget,
 } from './ui/gamepadNav.js';
-import {
-  bossRushBest,
-  menuStatusItems,
-  menuStatusMarkup,
-} from './ui/menuStatus.js';
+import { menuStatusItems, menuStatusMarkup } from './ui/menuStatus.js';
 import { isBossRushUnlocked, loadRecords } from '../services/runRecords.js';
-
-const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
 class UISystem extends BaseSystem {
   constructor(dependencies = {}) {
@@ -92,7 +79,6 @@ class UISystem extends BaseSystem {
 
   initialize() {
     this.damageFlashTimeout = null;
-    this.currentPauseState = false;
     this.shieldFailTimeout = null;
     this.timePulseTimeout = null;
     this.killsPulseTimeout = null;
@@ -199,14 +185,8 @@ class UISystem extends BaseSystem {
 
     this.settings = this.resolveSettingsService();
     this.liveQualityPreset = null;
-    this.creditsState = {
-      isOpen: false,
-      triggerId: null,
-    };
-    this.handleCreditsKeyDown = this.handleCreditsKeyDown.bind(this);
     this.codexState = { isOpen: false, trigger: null, tab: 'enemies' };
     this.hangarState = { isOpen: false, trigger: null };
-    this.quitConfirm = { button: null, label: '', timeoutId: null };
     this.bossHudState = this.createInitialBossHudState();
 
     this.tacticalState = {
@@ -241,6 +221,34 @@ class UISystem extends BaseSystem {
       prefersReducedMotion: () => this.prefersReducedMotion(),
       colorVision: () => this.settingsPanel.colorVision,
     });
+    this.pauseScreen = new PauseScreen({
+      refs: this.domRefs.pause,
+      gameOverQuitBtn: this.domRefs.gameOver.quitBtn,
+      emit: (name, payload) => this.eventBus?.emit?.(name, payload),
+      showScreen: (name, options) => this.showScreen(name, options),
+      progression: () => this.getService('progression'),
+      combat: () => this.getService('combat'),
+      difficulty: () => this.getService('difficulty'),
+      layer: () => this.transmissionLayer,
+      settingsOpenHere: () => this.settingsPanel.isOpenFrom('pause'),
+      closeSettings: () => this.settingsPanel.closeSettingsPanel(),
+    });
+    this.runEndScreens = new RunEndScreens({
+      refs: { gameOver: this.domRefs.gameOver, victory: this.domRefs.victory },
+      showScreen: (name, options) => this.showScreen(name, options),
+      progression: () => this.getService('progression'),
+      combat: () => this.getService('combat'),
+      difficulty: () => this.getService('difficulty'),
+      hangar: () => this.getService('hangar'),
+      lastTransmission: () => this.lastTransmission,
+    });
+    this.creditsOverlay = new CreditsOverlay({
+      refs: this.domRefs.credits,
+      emit: (name, payload) => this.eventBus?.emit?.(name, payload),
+      showScreen: (name, options) => this.showScreen(name, options),
+      announceVisibility: (isOpen, payload) =>
+        this.emitOverlayVisibilityChanged('credits', isOpen, payload),
+    });
     // The static keyboard hints show the scheme in use (style.css).
     document.body.dataset.controls = controlSchemeFromUrl();
 
@@ -248,11 +256,11 @@ class UISystem extends BaseSystem {
     this.activateAAATacticalHud(this.aaaTacticalHudDefinition);
     this.updateAAATacticalHudFromServices({ force: true });
 
-    this.bindPauseControls();
-    this.bindCopySeedLink();
+    this.pauseScreen.bindPauseControls();
+    this.runEndScreens.bindCopySeedLink();
     this.levelUpScreen.bindLevelUpControls();
     this.settingsPanel.bindSettingsControls();
-    this.bindCreditsControls();
+    this.creditsOverlay.bindCreditsControls();
     this.bindCodexControls();
     this.bindHangarControls();
     this.bindMainMenuControls();
@@ -916,175 +924,6 @@ class UISystem extends BaseSystem {
       });
   }
 
-  // The death recap's "Copy seed link": this run's seed and difficulty as a
-  // `?seed=&difficulty=` link (clipboard may be missing or refused).
-  bindCopySeedLink() {
-    const button = this.domRefs.gameOver?.copySeedBtn;
-    if (!button) return;
-    button.addEventListener('click', () => {
-      const link = this.getService('difficulty').shareLink(
-        window.location.origin,
-        import.meta.env.BASE_URL
-      );
-      const done = (label) => {
-        button.textContent = label;
-      };
-      if (!navigator.clipboard?.writeText) {
-        done('Copy unavailable');
-        return;
-      }
-      navigator.clipboard.writeText(link).then(
-        () => done('Link copied'),
-        () => done('Copy failed')
-      );
-    });
-  }
-
-  bindPauseControls() {
-    const pauseRefs = this.domRefs.pause;
-    if (!pauseRefs) {
-      return;
-    }
-
-    if (pauseRefs.resumeBtn) {
-      pauseRefs.resumeBtn.addEventListener('mouseenter', () => {
-        this.eventBus?.emit?.('ui-hover', {
-          source: 'pause-menu',
-          button: 'resume',
-        });
-      });
-      pauseRefs.resumeBtn.addEventListener('click', () => {
-        if (!this.currentPauseState) {
-          return;
-        }
-
-        this.eventBus?.emit?.('toggle-pause');
-      });
-    }
-
-    if (pauseRefs.settingsBtn) {
-      pauseRefs.settingsBtn.addEventListener('mouseenter', () => {
-        this.eventBus?.emit?.('ui-hover', {
-          source: 'pause-menu',
-          button: 'settings',
-        });
-      });
-      pauseRefs.settingsBtn.addEventListener('click', () => {
-        if (!this.currentPauseState) {
-          return;
-        }
-
-        this.eventBus?.emit?.('settings-menu-requested', { source: 'pause' });
-      });
-    }
-
-    if (pauseRefs.exitBtn) {
-      pauseRefs.exitBtn.addEventListener('mouseenter', () => {
-        this.eventBus?.emit?.('ui-hover', {
-          source: 'pause-menu',
-          button: 'exit',
-        });
-      });
-      pauseRefs.exitBtn.addEventListener('click', () => {
-        if (!this.currentPauseState) {
-          return;
-        }
-
-        if (!this.confirmQuit(pauseRefs.exitBtn)) {
-          return;
-        }
-
-        this.eventBus?.emit?.('exit-to-menu-requested', {
-          source: 'pause-menu',
-        });
-      });
-    }
-
-    const quitBtn = this.domRefs.gameOver?.quitBtn;
-    if (quitBtn) {
-      // Runs before GameSessionService's document-level click handler.
-      quitBtn.addEventListener('click', (event) => {
-        if (!this.confirmQuit(quitBtn)) {
-          event.stopPropagation();
-        }
-      });
-    }
-
-    document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') {
-        this.cancelQuitConfirm();
-      }
-    });
-  }
-
-  confirmQuit(button) {
-    const state = this.quitConfirm;
-    if (state.button === button) {
-      this.cancelQuitConfirm();
-      return true;
-    }
-
-    this.cancelQuitConfirm();
-    state.button = button;
-    state.label = button.textContent;
-    button.textContent = 'Quit? Press again';
-    button.classList.add('is-confirming');
-    button.setAttribute('aria-live', 'polite');
-    state.timeoutId = setTimeout(() => this.cancelQuitConfirm(), 3000);
-    return false;
-  }
-
-  cancelQuitConfirm() {
-    const state = this.quitConfirm;
-    clearTimeout(state.timeoutId);
-    if (state.button) {
-      state.button.textContent = state.label;
-      state.button.classList.remove('is-confirming');
-      state.button.removeAttribute('aria-live');
-    }
-    state.button = null;
-    state.timeoutId = null;
-  }
-
-  bindCreditsControls() {
-    if (typeof document !== 'undefined') {
-      document.addEventListener('keydown', this.handleCreditsKeyDown);
-    }
-
-    const creditsRefs = this.domRefs.credits;
-    if (!creditsRefs) {
-      return;
-    }
-
-    if (creditsRefs.overlay) {
-      creditsRefs.overlay.addEventListener('click', (event) => {
-        if (event.target === creditsRefs.overlay) {
-          this.closeCreditsOverlay({ restoreFocus: true });
-        }
-      });
-    }
-
-    ensureArray(creditsRefs.closeButtons).forEach((button) => {
-      button.addEventListener('mouseenter', () => {
-        // Only emit if credits menu is visible
-        if (
-          creditsRefs.overlay &&
-          creditsRefs.overlay.classList.contains('hidden')
-        ) {
-          return;
-        }
-        this.eventBus?.emit?.('ui-hover', {
-          source: 'credits-menu',
-          element: 'close',
-        });
-      });
-      button.addEventListener('click', (event) => {
-        event.preventDefault();
-        this.closeCreditsOverlay({ restoreFocus: true });
-      });
-    });
-  }
-
   bindMainMenuControls() {
     // Generic UI Hover Sound Delegation
     // Listens for all menu buttons and interactive elements
@@ -1689,7 +1528,7 @@ class UISystem extends BaseSystem {
     });
 
     this.registerEventListener('pause-state-changed', (data) => {
-      this.updatePauseScreen(Boolean(data?.isPaused));
+      this.pauseScreen.updatePauseScreen(Boolean(data?.isPaused));
     });
 
     this.registerEventListener('screen-changed', (payload = {}) => {
@@ -1721,7 +1560,7 @@ class UISystem extends BaseSystem {
     this.registerEventListener('toggle-pause', () => {
       const appState = this.getService('game-state');
       if (appState && typeof appState.isPaused === 'function') {
-        this.updatePauseScreen(Boolean(appState.isPaused()));
+        this.pauseScreen.updatePauseScreen(Boolean(appState.isPaused()));
       }
     });
 
@@ -1798,7 +1637,7 @@ class UISystem extends BaseSystem {
     });
 
     this.registerEventListener('credits-menu-requested', (payload = {}) => {
-      this.handleCreditsMenuRequest(payload);
+      this.creditsOverlay.handleCreditsMenuRequest(payload);
     });
 
     this.registerEventListener('settings-controls-changed', (payload = {}) => {
@@ -1894,7 +1733,7 @@ class UISystem extends BaseSystem {
         else if (id === 'codex') this.closeCodex();
         else if (id === 'hangar') this.closeHangar();
         else if (id === 'credits') {
-          this.closeCreditsOverlay({ restoreFocus: true });
+          this.creditsOverlay.closeCreditsOverlay({ restoreFocus: true });
         } else if (id === 'pause') this.eventBus?.emit?.('toggle-pause');
         break;
       case 'tabPrev':
@@ -1951,25 +1790,6 @@ class UISystem extends BaseSystem {
     }
   }
 
-  handleCreditsMenuRequest(payload = {}) {
-    if (payload && payload.open === false) {
-      const restoreFocus = payload.restoreFocus !== false;
-      this.closeCreditsOverlay({ restoreFocus });
-      return;
-    }
-
-    if (payload && payload.toggle === true) {
-      if (this.creditsState.isOpen) {
-        this.closeCreditsOverlay({ restoreFocus: true });
-      } else {
-        this.openCreditsOverlay(payload.triggerId);
-      }
-      return;
-    }
-
-    this.openCreditsOverlay(payload?.triggerId);
-  }
-
   // The menu strip, the ship selector and the onboarding tips follow a
   // setting change.
   followSettingsChange(change) {
@@ -2009,84 +1829,6 @@ class UISystem extends BaseSystem {
       isOpen: Boolean(isOpen),
       ...payload,
     });
-  }
-
-  openCreditsOverlay(triggerId = null) {
-    const creditsRefs = this.domRefs.credits;
-    const overlay = creditsRefs?.overlay;
-    if (!overlay) {
-      return;
-    }
-
-    let resolvedTriggerId = null;
-    if (typeof triggerId === 'string' && triggerId) {
-      resolvedTriggerId = triggerId;
-    } else if (
-      typeof document !== 'undefined' &&
-      document.activeElement instanceof HTMLElement &&
-      document.activeElement.id
-    ) {
-      resolvedTriggerId = document.activeElement.id;
-    }
-
-    if (resolvedTriggerId) {
-      this.creditsState.triggerId = resolvedTriggerId;
-    }
-
-    this.creditsState.isOpen = true;
-
-    this.showScreen('credits', { overlay: true, show: true });
-    overlay.setAttribute('aria-hidden', 'false');
-    document.body?.classList.add('is-credits-open');
-    this.emitOverlayVisibilityChanged('credits', true, { source: 'menu' });
-
-    const focusTarget =
-      creditsRefs?.primaryAction ||
-      overlay.querySelector('button, [href], [tabindex]:not([tabindex="-1"])');
-    if (focusTarget instanceof HTMLElement) {
-      focusTarget.focus();
-    }
-  }
-
-  closeCreditsOverlay(options = {}) {
-    if (!this.creditsState.isOpen) {
-      this.creditsState.triggerId = null;
-      return;
-    }
-
-    const restoreFocus = Boolean(options?.restoreFocus);
-    const triggerId = this.creditsState.triggerId;
-
-    if (restoreFocus && triggerId) {
-      const trigger = document.getElementById(triggerId);
-      if (trigger instanceof HTMLElement) {
-        trigger.focus();
-      }
-    }
-
-    const overlay = this.domRefs.credits?.overlay;
-
-    this.showScreen('credits', { overlay: true, show: false });
-    if (overlay) {
-      overlay.setAttribute('aria-hidden', 'true');
-    }
-
-    document.body?.classList.remove('is-credits-open');
-    this.emitOverlayVisibilityChanged('credits', false, { source: 'menu' });
-
-    this.creditsState.isOpen = false;
-    this.creditsState.triggerId = null;
-  }
-
-  handleCreditsKeyDown(event) {
-    if (!this.creditsState.isOpen) {
-      return;
-    }
-
-    if (event.key === 'Escape' || event.key === 'Esc') {
-      event.preventDefault();
-      this.closeCreditsOverlay({ restoreFocus: true });
-    }
   }
 
   bindCodexControls() {
@@ -2298,12 +2040,12 @@ class UISystem extends BaseSystem {
     }
 
     if (screenName === 'gameover') {
-      this.showGameOverScreen(payload);
+      this.runEndScreens.showGameOverScreen(payload);
       return;
     }
 
     if (screenName === 'victory') {
-      const show = () => this.showVictoryScreen(payload);
+      const show = () => this.runEndScreens.showVictoryScreen(payload);
       if (!this.cinematics.deferUntilEpilogueEnds(show)) {
         show();
       }
@@ -2370,10 +2112,7 @@ class UISystem extends BaseSystem {
         creditsOverlay.setAttribute('aria-hidden', 'true');
       }
 
-      if (this.creditsState) {
-        this.creditsState.isOpen = false;
-        this.creditsState.triggerId = null;
-      }
+      this.creditsOverlay.markClosed();
 
       this.closeCodex();
       this.closeHangar();
@@ -2400,43 +2139,6 @@ class UISystem extends BaseSystem {
     this.refreshHudFromServices(true);
   }
 
-  updatePauseScreen(isPaused) {
-    const shouldPause = Boolean(isPaused);
-    if (this.currentPauseState === shouldPause) return;
-
-    this.currentPauseState = shouldPause;
-    this.showScreen('pause', { overlay: true, show: shouldPause });
-
-    const resumeBtn = this.domRefs.pause?.resumeBtn;
-    if (shouldPause) {
-      this.renderPauseBuild();
-      resumeBtn?.focus({ preventScroll: true });
-    } else {
-      this.cancelQuitConfirm();
-      resumeBtn?.blur();
-    }
-
-    document.body?.classList.toggle('is-paused', shouldPause);
-
-    if (!shouldPause && this.settingsPanel.isOpenFrom('pause')) {
-      this.settingsPanel.closeSettingsPanel();
-    }
-  }
-
-  // The pause panel: the same build block as the death recap, plus the
-  // level-up tools left and where the run is.
-  renderPauseBuild() {
-    const refs = this.domRefs.pause;
-    const progression = this.getService('progression');
-    if (!refs.build || !progression) return;
-    refs.build.innerHTML = buildBlockMarkup(
-      collectBuild(progression, this.getService('combat'))
-    );
-    refs.location.textContent = runLocationLine(this.transmissionLayer);
-    refs.tools.textContent = `Rerolls ${progression.rerollsLeft} · Banishes ${progression.banishesLeft}`;
-    refs.seed.textContent = this.getService('difficulty').runLabel();
-  }
-
   /** GameSessionService clears the cards when a run starts or ends. */
   resetLevelUpState() {
     this.levelUpScreen.resetLevelUpState();
@@ -2447,147 +2149,6 @@ class UISystem extends BaseSystem {
       document.body.classList.contains('motion-reduced') ||
       window.matchMedia('(prefers-reduced-motion: reduce)').matches
     );
-  }
-
-  showVictoryScreen(payload) {
-    this.showScreen('victory', { overlay: true, show: true });
-
-    const data = payload?.data || {};
-    const refs = this.domRefs.victory;
-    const setText = (node, value) => {
-      if (node) node.textContent = value;
-    };
-
-    const totalSeconds = Math.max(
-      0,
-      Math.floor(Number(data.stats?.timeElapsed) || 0)
-    );
-    const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
-    const seconds = String(totalSeconds % 60).padStart(2, '0');
-    const wave = typeof data.wave === 'number' ? data.wave : data.wave?.current;
-    const level = data.player?.level ?? data.level;
-
-    const rush = data.bossRush;
-    setText(refs.title, rush ? 'BOSS RUSH CLEARED' : 'FIELD CLEARED');
-    setText(refs.time, `${minutes}:${seconds}`);
-    setText(refs.wave, `${wave ?? '—'}`);
-    setText(refs.kills, `${data.stats?.totalKills ?? data.stats?.kills ?? 0}`);
-    setText(refs.combo, `x${data.maxCombo ?? 0}`);
-    setText(refs.level, `${level ?? '—'}`);
-    setText(
-      refs.best,
-      rush
-        ? `Cleared in ${formatRunTime(totalSeconds)} · Best ${bossRushBest(rush.bestStage, rush.bestTime)}`
-        : `Best layer: ${data.bestLayer ?? wave ?? '—'}`
-    );
-    // A Boss Rush ends here: no Deep Field after it.
-    refs.continueBtn?.classList.toggle('hidden', Boolean(rush));
-    setText(refs.salvage, salvageLine(this.getService('hangar').lastAward));
-    if (refs.quote) {
-      refs.quote.innerHTML = transmissionQuoteMarkup(this.lastTransmission);
-    }
-
-    if (refs.build) {
-      refs.build.innerHTML = '';
-      const upgrades = ensureArray(data.upgrades);
-      if (!upgrades.length) {
-        const empty = document.createElement('li');
-        empty.className = 'gameover-build__empty';
-        empty.textContent = 'No upgrades';
-        refs.build.appendChild(empty);
-      }
-      upgrades.forEach(({ name, id, level: rank }) => {
-        const item = document.createElement('li');
-        item.className = 'gameover-build__item';
-        item.append(`${name || id} `);
-        const rankNode = document.createElement('span');
-        rankNode.className = 'gameover-build__rank';
-        rankNode.textContent = `Lv.${rank}`;
-        item.appendChild(rankNode);
-        refs.build.appendChild(item);
-      });
-    }
-
-    if (refs.synergies) {
-      refs.synergies.innerHTML = '';
-      ensureArray(data.synergies).forEach(({ name, family }) => {
-        const item = document.createElement('li');
-        item.className = 'gameover-build__item';
-        item.textContent = name || family;
-        refs.synergies.appendChild(item);
-      });
-    }
-
-    const buttons = [refs.continueBtn, refs.restartBtn, refs.quitBtn];
-    buttons.forEach((button) => {
-      if (button) button.disabled = true;
-    });
-    clearTimeout(this.victoryLockoutTimer);
-    this.victoryLockoutTimer = setTimeout(() => {
-      buttons.forEach((button) => {
-        if (button) button.disabled = false;
-      });
-      (rush ? refs.restartBtn : refs.continueBtn)?.focus({
-        preventScroll: true,
-      });
-    }, SCREEN_INPUT_LOCKOUT_MS);
-  }
-
-  showGameOverScreen(payload) {
-    // Show gameover as overlay so game canvas stays visible with asteroids wandering
-    this.showScreen('gameover', { overlay: true, show: true });
-
-    const data = payload?.data || {};
-    const refs = this.domRefs.gameOver;
-    const setText = (node, value) => {
-      if (node) node.textContent = value;
-    };
-
-    const totalSeconds = Math.max(
-      0,
-      Math.floor(Number(data.stats?.timeElapsed) || 0)
-    );
-    const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
-    const seconds = String(totalSeconds % 60).padStart(2, '0');
-    const wave = typeof data.wave === 'number' ? data.wave : data.wave?.current;
-    const level = data.player?.level ?? data.level;
-
-    setText(refs.time, `${minutes}:${seconds}`);
-    setText(refs.wave, `${wave ?? '—'}`);
-    setText(refs.kills, `${data.stats?.totalKills ?? data.stats?.kills ?? 0}`);
-    setText(refs.combo, `x${data.maxCombo ?? 0}`);
-    setText(refs.level, `${level ?? '—'}`);
-    setText(refs.killer, `Killed by ${killerName(data.killedBy)}`);
-    const rush = data.bossRush;
-    setText(
-      refs.location,
-      rush
-        ? [
-            'Boss Rush',
-            `Warden ${rush.stage} of ${BOSS_RUSH_LAYERS.length}`,
-            formatRunTime(totalSeconds),
-            `BEST ${bossRushBest(rush.bestStage, rush.bestTime).toUpperCase()}`,
-          ].join(' · ')
-        : runLocationLine(wave, totalSeconds, data.bestLayer ?? null)
-    );
-    setText(refs.salvage, salvageLine(this.getService('hangar').lastAward));
-    setText(refs.seed, this.getService('difficulty').runLabel());
-    setText(refs.copySeedBtn, 'Copy seed link');
-    if (refs.quote) {
-      refs.quote.innerHTML = transmissionQuoteMarkup(this.lastTransmission);
-    }
-
-    const progression = this.getService('progression');
-    if (refs.build && progression) {
-      refs.build.innerHTML = buildBlockMarkup(
-        collectBuild(progression, this.getService('combat'))
-      );
-    }
-
-    const focusTarget = refs.retryBtn?.disabled
-      ? refs.restartBtn
-      : refs.retryBtn || refs.restartBtn;
-    focusTarget?.focus({ preventScroll: true });
   }
 
   isOnboardingEnabled() {
