@@ -334,13 +334,17 @@ Qualidade:
 
 - [x] **R11.4 Dash e freio com peso.** Cue de som para `player-dashed` e `player-braked`, pulso de câmera (zoom-out no
       dash, pulso curto no freio), anel do freio visível no 3D. Constantes "proposta 18/10".
-- [ ] **R11.5 Últimas falas ouvidas.** A tela de morte/vitória espera a transmissão terminar (com teto) e o recap mostra
+- [x] **R11.5 Últimas falas ouvidas.** A tela de morte/vitória espera a transmissão terminar (com teto) e o recap mostra
       a fala como citação; hoje ~2 s de cada fala ficam atrás da tela.
 - [x] **R11.6 Som por máquina.** Husk, Ram, Weaver, Bulwark, Caster e Shade com cue próprio de telegrafia/ataque/morte
       (hoje Ram usa o telegrafo do Warden e os outros não têm som próprio).
-- [ ] **R11.7 Caster e Shade com peso certo.** A granada do Caster deixa de disparar o tremor/flash de rocha Volátil
+- [x] **R11.7 Caster e Shade com peso certo.** A granada do Caster deixa de disparar o tremor/flash de rocha Volátil
       (evento próprio, mais leve, sem duck) e não deixa "chamusco" no espaço (não há chão); cues próprios de
       telegrafia/lançamento/impacto do Caster e de fase do Shade.
+- [x] **R11.8 Conquistas do conteúdo novo.** Counter-Battery (20 Casters), Unphased (15 Shades), Iron Escort (vitória
+      com o Bastion), Full Garage (os três cascos).
+- [ ] **R11.9 Números de dano no 3D.** Provar por captura que aparecem e na fonte do jogo (Rajdhani); corrigir a menor
+      causa se assarem na fonte reserva.
 
 ## Fora de escopo deste plano
 
