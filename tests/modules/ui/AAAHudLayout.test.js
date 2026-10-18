@@ -4,6 +4,7 @@ import {
   bossSegments,
   comboTier,
   damageArcAngle,
+  edgeArrow,
   radarGlyph,
 } from '../../../src/modules/ui/AAAHudLayout.js';
 import { PICKUP_KINDS } from '../../../src/data/pickups.js';
@@ -221,6 +222,38 @@ describe('AAAHudLayout off-screen arrows', () => {
     // Back on screen: the arrow goes away.
     hud.updateEdgeArrows([{ kind: 'warden', x: 600, y: 300 }]);
     expect(visible()).toHaveLength(0);
+  });
+});
+
+describe('AAAHudLayout off-screen arrows around the panels', () => {
+  const corners = {
+    topLeft: { w: 220, h: 120 },
+    topRight: { w: 230, h: 240 },
+    bottomLeft: { w: 260, h: 110 },
+    bottomRight: { w: 250, h: 130 },
+  };
+
+  it('slides the arrow along its edge off the corner panels', () => {
+    const upLeft = edgeArrow({ x: -500, y: -400 }, 800, 600, 28, corners);
+    expect(upLeft).toMatchObject({ edge: 'top', x: 248, y: 28 });
+    const right = edgeArrow({ x: 1400, y: 50 }, 800, 600, 28, corners);
+    expect(right).toMatchObject({ edge: 'right', x: 772, y: 268 });
+    // Between the panels it stays where it points.
+    const below = edgeArrow({ x: 400, y: 900 }, 800, 600, 28, corners);
+    expect(below).toMatchObject({ edge: 'bottom', x: 400, y: 572 });
+  });
+});
+
+describe('AAAHudLayout AIM chip', () => {
+  it('reads MANUAL while the right stick aims, AUTO after', () => {
+    const hud = new AAAHudLayout();
+    hud.els = { aimModeIndicator: fakeElement() };
+    hud.setAimStick(true);
+    hud.updateModeIndicators('concentrated', 'auto');
+    expect(hud.els.aimModeIndicator.innerText).toBe('MANUAL');
+    hud.setAimStick(false);
+    hud.updateModeIndicators('concentrated', 'auto');
+    expect(hud.els.aimModeIndicator.innerText).toBe('AUTO');
   });
 });
 

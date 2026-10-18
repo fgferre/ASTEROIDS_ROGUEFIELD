@@ -1505,7 +1505,7 @@ class Renderer3D extends BaseSystem {
 
     if (!alive) return;
     const { x: px, y: py } = player.position;
-    this.mirrorLocks(px, py);
+    this.mirrorLocks(player);
 
     const orbs = this.cachedXPOrbs?.xpOrbs || [];
     let orbActive = false;
@@ -1521,12 +1521,14 @@ class Renderer3D extends BaseSystem {
   }
 
   // Same gating as CombatSystem.render: rank 1 ring + line, rank 2 the
-  // predicted-aim marker, rank 3 every lock; nothing in manual aim.
-  mirrorLocks(px, py) {
+  // predicted-aim marker, rank 3 every lock; nothing in manual aim. The
+  // lock line leaves the turret's muzzle.
+  mirrorLocks(player) {
     const combat = this.cachedCombat;
     if (!combat || combat.aimMode === 'manual') return;
     const rank = combat.targetingUpgradeLevel || 0;
     if (rank < 1) return;
+    const { x: mx, y: my } = player.getMuzzlePoint();
     const t = this.three;
     const { ribbons, accentRgb } = t;
     const multi = rank >= 3;
@@ -1564,8 +1566,8 @@ class Renderer3D extends BaseSystem {
         0.6
       );
       ribbons.segment(
-        px,
-        py,
+        mx,
+        my,
         target.x,
         target.y,
         OVERLAY_H,

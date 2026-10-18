@@ -30,4 +30,11 @@ describe('shipModels', () => {
       expect(hull.visual.source).toBeUndefined();
     });
   });
+
+  it('names every hull short enough for one line on the menu chip', () => {
+    expect(ALL_HULLS.map((hull) => hull.name)).toEqual([
+      'Interceptor',
+      'Solar Slicer',
+    ]);
+  });
 });

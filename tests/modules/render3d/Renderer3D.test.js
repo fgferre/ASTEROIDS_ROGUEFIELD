@@ -53,3 +53,25 @@ describe('Renderer3D shadows', () => {
     expect(key.castShadow).toBe(true);
   });
 });
+
+describe('Renderer3D lock line', () => {
+  it('draws the lock line from the turret muzzle to the target', () => {
+    const renderer = Object.create(Renderer3D.prototype);
+    const segment = vi.fn();
+    renderer.three = { ribbons: { circle: vi.fn(), segment }, accentRgb: 0 };
+    renderer.cachedCombat = {
+      aimMode: 'auto',
+      targetingUpgradeLevel: 1,
+      currentLockAssignments: [],
+      currentTarget: { x: 300, y: 100, radius: 16 },
+      targetIndicatorPulse: 0,
+      targetPulseDuration: 1,
+      usingDynamicPrediction: () => false,
+    };
+    renderer.mirrorLocks({
+      position: { x: 100, y: 100 },
+      getMuzzlePoint: () => ({ x: 122, y: 98 }),
+    });
+    expect(segment.mock.calls[0].slice(0, 4)).toEqual([122, 98, 300, 100]);
+  });
+});

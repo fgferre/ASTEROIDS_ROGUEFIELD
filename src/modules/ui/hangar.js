@@ -7,9 +7,14 @@ export function salvageBalanceText(salvage) {
   return `Salvage ${salvage}`;
 }
 
-/** "SALVAGE +120 (total 340)" under the game over / victory recap. */
+/**
+ * "SALVAGE +120 (total 340)" under the game over / victory recap; off the
+ * Veteran rate it names the difficulty multiplier: "(×1.3 difficulty, …)".
+ */
 export function salvageLine(award) {
-  return `SALVAGE +${award?.amount ?? 0} (total ${award?.total ?? 0})`;
+  const multiplier = award?.multiplier ?? 1;
+  const rate = multiplier === 1 ? '' : `×${multiplier} difficulty, `;
+  return `SALVAGE +${award?.amount ?? 0} (${rate}total ${award?.total ?? 0})`;
 }
 
 /** One upgrade card: name, effect, cost and OWNED or a BUY button. */

@@ -320,17 +320,6 @@ export function createServiceManifest(context = {}) {
         new AchievementService({ eventBus: resolved['event-bus'] }),
     },
     {
-      name: 'hangar',
-      singleton: true,
-      lazy: false,
-      dependencies: ['event-bus', 'difficulty'],
-      factory: ({ resolved }) =>
-        new HangarService({
-          eventBus: resolved['event-bus'],
-          difficulty: resolved['difficulty'],
-        }),
-    },
-    {
       name: 'difficulty',
       singleton: true,
       lazy: false,
@@ -339,6 +328,17 @@ export function createServiceManifest(context = {}) {
         new DifficultyService({
           settings: resolved['settings'],
           bootSeed: manifestContext.seed,
+        }),
+    },
+    {
+      name: 'hangar',
+      singleton: true,
+      lazy: false,
+      dependencies: ['event-bus', 'difficulty'],
+      factory: ({ resolved }) =>
+        new HangarService({
+          eventBus: resolved['event-bus'],
+          difficulty: resolved['difficulty'],
         }),
     },
     {

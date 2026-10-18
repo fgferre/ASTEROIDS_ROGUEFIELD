@@ -121,7 +121,7 @@ const IDLE_THRUST = Object.freeze({ main: 0, aux: 0, sideL: 0, sideR: 0 });
 // 'modern' (NORTE §4b): WASD moves on the screen axes, the hull faces the
 // motion and the turret aims on its own.
 // 'classic' (?controls=classic): A/D rotate, Asteroids-style.
-const controlSchemeFromUrl = () => {
+export const controlSchemeFromUrl = () => {
   try {
     return new URLSearchParams(window.location.search).get('controls') ===
       'classic'

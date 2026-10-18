@@ -17,8 +17,9 @@ const ITEMS_BY_ID = new Map(HANGAR_ITEMS.map((item) => [item.id, item]));
  * gated here by `hullFor()`.
  */
 export default class HangarService {
-  constructor({ eventBus } = {}) {
+  constructor({ eventBus, difficulty } = {}) {
     this.eventBus = eventBus;
+    this.difficulty = difficulty;
     const stored = loadJSON(HANGAR_STORAGE_KEY) ?? {};
     this.salvage = Math.max(0, Math.floor(Number(stored.salvage) || 0));
     this.owned = Object.fromEntries(
@@ -44,18 +45,28 @@ export default class HangarService {
     this.lastAward = null;
   }
 
-  /** Pays what this run is worth beyond what it was already paid. */
+  /**
+   * Pays what this run is worth, scaled by the difficulty's salvage
+   * multiplier, beyond what it was already paid.
+   */
   award(runSummary = {}) {
     const wave = runSummary.wave;
-    const worth = runSalvage({
-      layer: typeof wave === 'number' ? wave : wave?.current,
-      kills: runSummary.stats?.totalKills ?? runSummary.stats?.kills,
-      won: this.won,
-    });
+    const multiplier = this.difficulty.getModifiers().salvage;
+    const worth = Math.round(
+      runSalvage({
+        layer: typeof wave === 'number' ? wave : wave?.current,
+        kills: runSummary.stats?.totalKills ?? runSummary.stats?.kills,
+        won: this.won,
+      }) * multiplier
+    );
     const amount = Math.max(0, worth - this.runAwarded);
     this.runAwarded += amount;
     this.salvage += amount;
-    this.lastAward = { amount: this.runAwarded, total: this.salvage };
+    this.lastAward = {
+      amount: this.runAwarded,
+      total: this.salvage,
+      multiplier,
+    };
     if (amount > 0) {
       this.persist();
       this.eventBus.emit('salvage-awarded', { amount, total: this.salvage });

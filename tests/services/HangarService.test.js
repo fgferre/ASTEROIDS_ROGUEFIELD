@@ -14,6 +14,8 @@ import {
   SOLAR_SLICER_HULL_ID,
 } from '../../src/data/shipModels.js';
 
+const atRate = (salvage) => ({ getModifiers: () => ({ salvage }) });
+
 const summary = (layer, kills) => ({
   wave: { current: layer },
   stats: { totalKills: kills },
@@ -37,22 +39,26 @@ describe('HangarService', () => {
 
   it('pays 10 per layer and 1 per 5 kills, a retried run only its difference', () => {
     const eventBus = new EventBus();
-    const hangar = new HangarService({ eventBus });
+    const hangar = new HangarService({ eventBus, difficulty: atRate(1) });
     const awarded = [];
     eventBus.on('salvage-awarded', ({ amount }) => awarded.push(amount));
 
     eventBus.emit('game-started', {});
     eventBus.emit('player-died', summary(9, 47));
-    expect(hangar.lastAward).toEqual({ amount: 99, total: 99 });
+    expect(hangar.lastAward).toEqual({ amount: 99, total: 99, multiplier: 1 });
 
     eventBus.emit('player-died', summary(11, 60)); // after a retry
-    expect(hangar.lastAward).toEqual({ amount: 122, total: 122 });
+    expect(hangar.lastAward).toEqual({
+      amount: 122,
+      total: 122,
+      multiplier: 1,
+    });
     expect(awarded).toEqual([99, 23]);
   });
 
   it('adds 150 for a victory and 25 per endless layer', () => {
     const eventBus = new EventBus();
-    const hangar = new HangarService({ eventBus });
+    const hangar = new HangarService({ eventBus, difficulty: atRate(1) });
     eventBus.emit('game-started', {});
     eventBus.emit('run-won', { wave: 15 });
     eventBus.emit('screen-changed', {
@@ -63,6 +69,18 @@ describe('HangarService', () => {
 
     eventBus.emit('player-died', summary(18, 0));
     expect(hangar.salvage).toBe(180 + 150 + 3 * 25);
+  });
+
+  it('scales the payout by the difficulty salvage multiplier', () => {
+    const eventBus = new EventBus();
+    const hangar = new HangarService({ eventBus, difficulty: atRate(1.3) });
+    eventBus.emit('game-started', {});
+    eventBus.emit('player-died', summary(9, 47)); // 99 at Veteran
+    expect(hangar.lastAward).toEqual({
+      amount: 129,
+      total: 129,
+      multiplier: 1.3,
+    });
   });
 
   it('buys once with enough Salvage and persists through storage', () => {
