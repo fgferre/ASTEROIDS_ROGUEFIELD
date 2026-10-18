@@ -102,7 +102,14 @@ que não grava o modo, edge cases de pooling/director e arquivos ainda muito gra
         commit. Medição: um ajudante opus por recorte (85 a 120 mil tokens cada); sessão principal em 42% da janela (420 mil
         tokens) ao fim, somando o marco 2; portão passou de primeira em todos; uma chamada órfã escapou dos testes e só
         apareceu no navegador (a sonda é obrigatória).
-  - [ ] **R13.8.4** CombatSystem e enemyMirror. **R13.8.5** autoridade das ondas; depois escopos de random.
+  - [x] **R13.8.4** (18/10, ramo `r13/combate-por-assunto`): CombatSystem 4867 → 655 linhas (Targeting, Projectiles,
+        Weapons, HitResolution, CardEffects e o 2D congelado em `src/modules/combat/`); enemyMirror 2965 → 755 (sete
+        famílias em `src/modules/render3d/enemies/` sobre uma caixa de ferramentas); EffectsSystem 4462 → 612 (GameTime,
+        ScreenFeedback, Particles, BossTransitions, PlayerEffects, EnemyEffects e o 2D congelado em `src/modules/effects/`).
+        A fragmentação do feixe voltou ao domínio de inimigos (`spawnBeamFragments`, mesma contagem). Medição: dez
+        ajudantes (nove opus, um sonnet; 60 a 290 mil tokens cada), três comparações roteirizadas byte a byte (visual,
+        efeitos ×2), portão de primeira em todos os recortes; sessão principal em 59% da janela (590 mil tokens) ao fim.
+  - [ ] **R13.8.5** autoridade das ondas; depois escopos de random. Parar antes de mesclar: o dono joga.
 
 ## Fora de escopo deste plano
 

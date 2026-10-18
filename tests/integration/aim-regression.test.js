@@ -942,14 +942,15 @@ describe('FIX-05 centerline invariant + toggles', () => {
     // CombatSystem to import the gameplay-domain name keeps the domain
     // boundaries clean (CombatSystem is a gameplay module) and exercises the
     // F10-exported alias (no longer dead). Numeric value identical — pinned
-    // to BULLET_SIZE in the F10 test.
-    it('C7b: CombatSystem source imports COMBAT_BULLET_RADIUS from gameplay.js (preferred per plan artifact)', async () => {
+    // to BULLET_SIZE in the F10 test. The clamp math now lives in
+    // combat/Weapons.js (R13.8.4), so that is the file read here.
+    it('C7b: Weapons source imports COMBAT_BULLET_RADIUS from gameplay.js (preferred per plan artifact)', async () => {
       // Read source as text to assert the import statement. Whitespace-tolerant.
       const fs = await import('fs/promises');
       const path = await import('path');
       const filePath = path.resolve(
         process.cwd(),
-        'src/modules/CombatSystem.js'
+        'src/modules/combat/Weapons.js'
       );
       const src = await fs.readFile(filePath, 'utf8');
       // Import should mention COMBAT_BULLET_RADIUS from gameplay.js. Single

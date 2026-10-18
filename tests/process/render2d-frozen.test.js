@@ -18,6 +18,8 @@ const FROZEN = {
   'src/modules/enemies/components/RenderComponent.js': 1745,
   'src/modules/enemies/components/AsteroidRenderer.js': 206,
   'src/modules/enemies/systems/EnemyRenderSystem.js': 79,
+  'src/modules/effects/draw2d.js': 454,
+  'src/modules/combat/draw2d.js': 633,
 };
 
 describe('the Canvas 2D renderer is frozen (easter egg)', () => {
