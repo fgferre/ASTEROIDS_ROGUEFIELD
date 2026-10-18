@@ -144,6 +144,11 @@ export class Ram extends BaseEnemy {
     this.vx = Math.cos(this.chargeAngle) * this.chargeSpeed;
     this.vy = Math.sin(this.chargeAngle) * this.chargeSpeed;
     this.setState('charge', RAM_CHARGE_SECONDS);
+    this.getEventBus()?.emit?.('ram-charged', {
+      enemy: this,
+      enemyId: this.id,
+      position: { x: this.x, y: this.y },
+    });
   }
 
   setState(state, duration) {

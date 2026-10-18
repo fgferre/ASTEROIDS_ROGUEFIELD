@@ -448,6 +448,10 @@ class AudioSystem extends BaseSystem {
           this._duckBigMoment();
         }
       }
+      // A Husk hisses open and its drones pop out over the explosion.
+      if ((data.enemyType || data.enemy?.type) === 'husk') {
+        this.playHuskRelease(this._resolveSourceSpatial(data));
+      }
 
       const fragments = Array.isArray(data.fragments)
         ? data.fragments.length
@@ -533,12 +537,33 @@ class AudioSystem extends BaseSystem {
       this.playTipChime();
     });
 
-    // The Ram shares the Warden's telegraph event; only non-bosses get the
-    // enemy cue (the boss keeps its EffectsSystem/roar handling).
+    // The Ram shares the Warden's telegraph event (its lane) but spins up with
+    // its own cue; other non-bosses get the enemy cue (the boss keeps its
+    // EffectsSystem/roar handling).
     this.registerEventListener('boss-telegraph', (data = {}) => {
-      if (data?.enemy?.type && data.enemy.type !== 'boss') {
+      const type = data?.enemy?.type;
+      if (type === 'ram') {
+        this.playRamSpinUp(this._resolveSourceSpatial(data));
+      } else if (type && type !== 'boss') {
         this.playEnemyTelegraph(this._resolveSourceSpatial(data));
       }
+    });
+
+    // Support machines' own cues, at the machine's position.
+    this.registerEventListener('ram-charged', (data = {}) => {
+      this.playRamCharge(this._resolveSourceSpatial(data));
+    });
+
+    this.registerEventListener('weaver-tether-laid', (data = {}) => {
+      this.playWeaverTether(this._resolveSourceSpatial(data));
+    });
+
+    this.registerEventListener('bulwark-plate-hit', (data = {}) => {
+      this.playBulwarkPlateHit(this._resolveSourceSpatial(data));
+    });
+
+    this.registerEventListener('bulwark-plate-broken', (data = {}) => {
+      this.playBulwarkPlateBreak(this._resolveSourceSpatial(data));
     });
 
     this.registerEventListener('pickup-collected', (data = {}) => {
@@ -1406,6 +1431,30 @@ class AudioSystem extends BaseSystem {
 
   playEnemyTelegraph(options = {}) {
     this.sfxBus.playEnemyTelegraph(options);
+  }
+
+  playRamSpinUp(options = {}) {
+    this.sfxBus.playRamSpinUp(options);
+  }
+
+  playRamCharge(options = {}) {
+    this.sfxBus.playRamCharge(options);
+  }
+
+  playHuskRelease(options = {}) {
+    this.sfxBus.playHuskRelease(options);
+  }
+
+  playWeaverTether(options = {}) {
+    this.sfxBus.playWeaverTether(options);
+  }
+
+  playBulwarkPlateHit(options = {}) {
+    this.sfxBus.playBulwarkPlateHit(options);
+  }
+
+  playBulwarkPlateBreak(options = {}) {
+    this.sfxBus.playBulwarkPlateBreak(options);
   }
 
   playEliteSpawned() {

@@ -6,6 +6,8 @@
   "boss-telegraph",
   "boss-warning",
   "bullet-hit",
+  "bulwark-plate-broken",
+  "bulwark-plate-hit",
   "codex-discovered",
   "combat-target-lock",
   "elite-spawned",
@@ -26,6 +28,7 @@
   "player-health-changed",
   "player-leveled-up",
   "player-took-damage",
+  "ram-charged",
   "run-continued",
   "salvage-awarded",
   "screen-changed",
@@ -48,6 +51,7 @@
   "weapon-beam-fired",
   "weapon-evolved",
   "weapon-fired",
+  "weaver-tether-laid",
   "xp-collected",
   "xp-orb-fused"
 ]
