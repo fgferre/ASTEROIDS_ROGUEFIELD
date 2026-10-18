@@ -38,7 +38,10 @@ do commit — preferir fatias com arquivos disjuntos; `pgrep -f` mata o próprio
 - **(7)** _"Tá ficando muito interessante, mas tá um pouco estranho o background ser essas estrelas como se fosse uma
   textura. Achei que tinha que ser algo mais procedural ali. Além disso, é estranho fazer sombra em cima dessa
   textura. É espaço, é o espaço atrás."_ → Rodada 5, R5.10: fundo procedural (estrelas em pontos 3D com paralaxe
-  real, nebulosa em shader) e fim das sombras projetadas no "chão". Fecha quando ele disser que o fundo lê como espaço.
+  real, nebulosa em shader) e fim das sombras projetadas no "chão". Depois: _"A sombra faz sentido nas coisas que são 3D, né? Se tem uma fonte de luz iluminando, tudo que emite luz fazer
+  sombra é interessante também, mas ter uma sombra refletida embaixo no chão, nas estrelas, como se fosse um chão, é
+  estranho."_ → sombras só entre objetos 3D (shadow map da luz-chave; nave e rochas sombreando rochas), nenhuma num
+  plano de fundo. Fecha quando ele disser que o fundo lê como espaço.
 
 ## Jogabilidade e sensação
 
