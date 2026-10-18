@@ -1959,6 +1959,103 @@ kbd {
   color: var(--text-dim);
 }
 
+/* Hangar */
+.hangar-dialog {
+  width: min(760px, 94vw);
+  max-height: min(680px, 90vh);
+}
+
+.hangar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-3);
+}
+
+.hangar-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel-inset);
+}
+
+.hangar-item.is-owned {
+  border-color: var(--accent-line);
+}
+
+.hangar-item__text {
+  flex: 1;
+}
+
+.hangar-item__name {
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+.hangar-item__effect {
+  font-size: var(--text-sm);
+  color: var(--text-dim);
+}
+
+.hangar-item__action {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.hangar-item__owned {
+  color: var(--accent);
+  letter-spacing: 0.08em;
+}
+
+.hangar-hulls {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.hangar-hull {
+  flex: 1;
+  appearance: none;
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-strong);
+  color: var(--text);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.hangar-hull.is-active {
+  border-color: var(--accent);
+  box-shadow: var(--glow-accent);
+}
+
+.hangar-hull:disabled,
+.menu-ship-selector__option.is-locked {
+  color: var(--text-dim);
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+.run-recap__salvage {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  letter-spacing: 0.08em;
+  color: var(--xp);
+}
+
 @media (max-width: 640px) {
   .gameover-stats {
     grid-template-columns: repeat(3, minmax(0, 1fr));

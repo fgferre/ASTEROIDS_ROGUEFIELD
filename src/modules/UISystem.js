@@ -36,6 +36,11 @@ import {
   pipsMarkup,
   runLocationLine,
 } from './ui/runRecap.js';
+import {
+  hangarItemMarkup,
+  salvageBalanceText,
+  salvageLine,
+} from './ui/hangar.js';
 
 const ensureArray = (value) => (Array.isArray(value) ? value : []);
 
@@ -186,6 +191,7 @@ class UISystem extends BaseSystem {
     };
     this.handleCreditsKeyDown = this.handleCreditsKeyDown.bind(this);
     this.codexState = { isOpen: false, trigger: null };
+    this.hangarState = { isOpen: false, trigger: null };
     this.levelUpState = {
       isVisible: false,
       options: [],
@@ -223,6 +229,7 @@ class UISystem extends BaseSystem {
     this.bindSettingsControls();
     this.bindCreditsControls();
     this.bindCodexControls();
+    this.bindHangarControls();
     this.bindMainMenuControls();
     this.initializeMenuShipSelector();
     this.bootstrapSettingsState();
@@ -267,6 +274,7 @@ class UISystem extends BaseSystem {
         level: document.getElementById('gameover-level') || null,
         killer: document.getElementById('gameover-killer') || null,
         location: document.getElementById('gameover-location') || null,
+        salvage: document.getElementById('gameover-salvage') || null,
         build: document.getElementById('gameover-build') || null,
         retryBtn: document.getElementById('retry-game-btn') || null,
         restartBtn: document.getElementById('restart-game-btn') || null,
@@ -281,6 +289,7 @@ class UISystem extends BaseSystem {
         build: document.getElementById('victory-build') || null,
         synergies: document.getElementById('victory-synergies') || null,
         best: document.getElementById('victory-best') || null,
+        salvage: document.getElementById('victory-salvage') || null,
         continueBtn: document.getElementById('victory-continue-btn') || null,
         restartBtn: document.getElementById('victory-restart-btn') || null,
         quitBtn: document.getElementById('victory-quit-btn') || null,
@@ -301,6 +310,15 @@ class UISystem extends BaseSystem {
         openBtn: document.getElementById('menu-codex-btn') || null,
         backBtn: document.getElementById('codex-back-btn') || null,
         closeBtn: document.getElementById('codex-close-btn') || null,
+      },
+      hangar: {
+        overlay: document.getElementById('hangar-screen') || null,
+        list: document.getElementById('hangar-list') || null,
+        hulls: document.getElementById('hangar-hulls') || null,
+        balance: document.getElementById('hangar-balance') || null,
+        openBtn: document.getElementById('menu-hangar-btn') || null,
+        backBtn: document.getElementById('hangar-back-btn') || null,
+        closeBtn: document.getElementById('hangar-close-btn') || null,
       },
       settings: {
         overlay: document.getElementById('settings-screen') || null,
@@ -727,7 +745,9 @@ class UISystem extends BaseSystem {
         ? this.settings.getCategoryValues('gameplay') || null
         : null;
     const hullDefinition = getShipModelById(gameplayValues?.selectedHull);
-    return hullDefinition?.id || DEFAULT_HULL_ID;
+    return this.getService('hangar').hullFor(
+      hullDefinition?.id || DEFAULT_HULL_ID
+    );
   }
 
   getHullDisplayName(hullDefinition) {
@@ -821,6 +841,7 @@ class UISystem extends BaseSystem {
     }
 
     const selectedHullId = this.getSelectedHullId();
+    const hangar = this.getService('hangar');
     container
       .querySelectorAll('.menu-ship-selector__option')
       .forEach((button) => {
@@ -831,6 +852,10 @@ class UISystem extends BaseSystem {
         const isActive = button.dataset.hullId === selectedHullId;
         button.classList.toggle('is-active', isActive);
         button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+        const locked = !hangar.isHullUnlocked(button.dataset.hullId);
+        button.disabled = locked;
+        button.classList.toggle('is-locked', locked);
+        button.title = locked ? 'Unlock in the Hangar' : '';
       });
 
     this.renderMenuShipSelectorPreviews();
@@ -1853,6 +1878,87 @@ class UISystem extends BaseSystem {
     this.emitOverlayVisibilityChanged('codex', false, { source: 'menu' });
     this.codexState.trigger?.focus?.({ preventScroll: true });
     this.codexState = { isOpen: false, trigger: null };
+  }
+
+  bindHangarControls() {
+    const refs = this.domRefs.hangar;
+    if (!refs.overlay) return;
+    refs.openBtn?.addEventListener('click', () => this.openHangar());
+    [refs.backBtn, refs.closeBtn].forEach((button) =>
+      button?.addEventListener('click', () => this.closeHangar())
+    );
+    refs.overlay.addEventListener('click', (event) => {
+      if (event.target === refs.overlay) {
+        this.closeHangar();
+        return;
+      }
+      const buy = event.target.closest('[data-hangar-buy]');
+      if (buy) {
+        const id = buy.dataset.hangarBuy;
+        this.getService('hangar').buy(id);
+        this.renderHangar();
+        refs.list
+          .querySelector(`[data-hangar-item="${id}"] .hangar-item__action`)
+          ?.focus({ preventScroll: true });
+        return;
+      }
+      const hull = event.target.closest('[data-hangar-hull]');
+      if (hull) {
+        this.settings.setSetting(
+          'gameplay',
+          'selectedHull',
+          hull.dataset.hangarHull,
+          { source: 'ui' }
+        );
+        this.renderHangar();
+      }
+    });
+    document.addEventListener('keydown', (event) => {
+      if (this.hangarState.isOpen && event.key === 'Escape') {
+        event.preventDefault();
+        this.closeHangar();
+      }
+    });
+  }
+
+  renderHangar() {
+    const refs = this.domRefs.hangar;
+    const hangar = this.getService('hangar');
+    refs.balance.textContent = salvageBalanceText(hangar.salvage);
+    refs.list.innerHTML = hangar.getItems().map(hangarItemMarkup).join('');
+    const selected = this.getSelectedHullId();
+    refs.hulls.innerHTML = getAllShipModels()
+      .map((hull) => {
+        const locked = !hangar.isHullUnlocked(hull.id);
+        const active = hull.id === selected;
+        return `<button type="button" class="hangar-hull${
+          active ? ' is-active' : ''
+        }" data-hangar-hull="${hull.id}" aria-pressed="${active}"${
+          locked ? ' disabled' : ''
+        }>${this.getHullDisplayName(hull)}${locked ? ' · Locked' : ''}</button>`;
+      })
+      .join('');
+  }
+
+  openHangar() {
+    const refs = this.domRefs.hangar;
+    this.renderHangar();
+    this.hangarState = { isOpen: true, trigger: document.activeElement };
+    this.showScreen('hangar', { overlay: true, show: true });
+    refs.overlay.setAttribute('aria-hidden', 'false');
+    this.emitOverlayVisibilityChanged('hangar', true, { source: 'menu' });
+    refs.backBtn?.focus({ preventScroll: true });
+  }
+
+  closeHangar() {
+    if (!this.hangarState.isOpen) return;
+    const refs = this.domRefs.hangar;
+    this.showScreen('hangar', { overlay: true, show: false });
+    refs.overlay.setAttribute('aria-hidden', 'true');
+    this.emitOverlayVisibilityChanged('hangar', false, { source: 'menu' });
+    this.requestMenuShipSelectorRefresh();
+    this.hangarState.trigger?.focus?.({ preventScroll: true });
+    this.hangarState = { isOpen: false, trigger: null };
   }
 
   applyAccessibilitySettings(values = {}, derived = null) {
@@ -2893,6 +2999,7 @@ class UISystem extends BaseSystem {
       }
 
       this.closeCodex();
+      this.closeHangar();
 
       document.body?.classList.remove('is-credits-open');
 
@@ -3527,6 +3634,7 @@ class UISystem extends BaseSystem {
     setText(refs.combo, `x${data.maxCombo ?? 0}`);
     setText(refs.level, `${level ?? '—'}`);
     setText(refs.best, `Best layer: ${data.bestLayer ?? wave ?? '—'}`);
+    setText(refs.salvage, salvageLine(this.getService('hangar').lastAward));
 
     if (refs.build) {
       refs.build.innerHTML = '';
@@ -3601,6 +3709,7 @@ class UISystem extends BaseSystem {
       refs.location,
       runLocationLine(wave, totalSeconds, data.bestLayer ?? null)
     );
+    setText(refs.salvage, salvageLine(this.getService('hangar').lastAward));
 
     const progression = this.getService('progression');
     if (refs.build && progression) {

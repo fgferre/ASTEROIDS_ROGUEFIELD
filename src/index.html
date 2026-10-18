@@ -104,6 +104,13 @@
                 Codex
               </button>
               <button
+                id="menu-hangar-btn"
+                class="menu-screen__button"
+                type="button"
+              >
+                Hangar
+              </button>
+              <button
                 id="menu-credits-btn"
                 class="menu-screen__button"
                 type="button"
@@ -368,6 +375,52 @@
         </div>
       </div>
 
+      <div
+        id="hangar-screen"
+        class="screen screen--overlay hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="hangar-title"
+        aria-hidden="true"
+      >
+        <div class="credits-dialog hangar-dialog">
+          <header class="credits-header">
+            <h2 id="hangar-title" class="credits-title">Hangar</h2>
+            <p id="hangar-balance" class="codex-count">—</p>
+            <button
+              id="hangar-close-btn"
+              class="credits-close-btn"
+              type="button"
+              aria-label="Close hangar"
+            >
+              ✕
+            </button>
+          </header>
+          <div class="credits-body">
+            <ul
+              id="hangar-list"
+              class="hangar-list"
+              aria-label="Permanent upgrades"
+            ></ul>
+            <div
+              id="hangar-hulls"
+              class="hangar-hulls"
+              role="group"
+              aria-label="Hull"
+            ></div>
+          </div>
+          <footer class="credits-footer">
+            <button
+              id="hangar-back-btn"
+              class="btn btn--secondary"
+              type="button"
+            >
+              Back to Menu
+            </button>
+          </footer>
+        </div>
+      </div>
+
       <!-- Game Over Overlay -->
       <div id="gameover-screen" class="screen screen--overlay hidden">
         <div class="gameover-content">
@@ -375,6 +428,7 @@
           <section class="run-recap" aria-label="Death recap">
             <p id="gameover-killer" class="run-recap__killer">—</p>
             <p id="gameover-location" class="run-recap__location">—</p>
+            <p id="gameover-salvage" class="run-recap__salvage">—</p>
             <div id="gameover-build" class="run-build"></div>
           </section>
           <dl id="gameover-stats" class="gameover-stats">
@@ -419,6 +473,7 @@
           <h1 class="gameover-title">FIELD CLEARED</h1>
           <p class="victory-subtitle">The Ring is quiet.</p>
           <p id="victory-best" class="victory-subtitle">—</p>
+          <p id="victory-salvage" class="run-recap__salvage">—</p>
           <dl id="victory-stats" class="gameover-stats">
             <div class="gameover-stat">
               <dt>Time</dt>

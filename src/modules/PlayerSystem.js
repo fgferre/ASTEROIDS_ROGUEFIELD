@@ -12,6 +12,7 @@ import {
 import { getRenderScale, resolveDevicePixelRatio } from '../core/viewport.js';
 import { getEmissive } from '../core/bloomLayer.js';
 import { resolveService } from '../core/serviceUtils.js';
+import { BASE_MODIFIERS } from '../data/hangar.js';
 import {
   SHIP_ACCELERATION,
   SHIP_AIM_TURN_RATE,
@@ -419,6 +420,7 @@ class PlayerSystem extends BaseSystem {
     this.damage = 25;
     this.multishot = 1;
     this.magnetismRadius = MAGNETISM_RADIUS;
+    this.dashCooldown = DASH_COOLDOWN;
     this.currentHull = null;
     this._currentHullMetrics = {
       outline: [],
@@ -1015,7 +1017,7 @@ class PlayerSystem extends BaseSystem {
     this.velocity.vx += direction.x * DASH_IMPULSE;
     this.velocity.vy += direction.y * DASH_IMPULSE;
     this.dashTimer = DASH_DURATION;
-    this.dashCooldownTimer = DASH_COOLDOWN;
+    this.dashCooldownTimer = this.dashCooldown;
     this.invulnerableTimer = Math.max(
       this.invulnerableTimer,
       DASH_INVULNERABILITY
@@ -1062,7 +1064,7 @@ class PlayerSystem extends BaseSystem {
 
   /** 0 when the dash is ready, 1 right after dashing. */
   getDashCooldownFraction() {
-    return this.dashCooldownTimer / DASH_COOLDOWN;
+    return this.dashCooldownTimer / this.dashCooldown;
   }
 
   // Cyan rim copies of the hull, fading out where the dash passed.
@@ -1958,11 +1960,16 @@ class PlayerSystem extends BaseSystem {
   }
 
   resetStats() {
-    this.health = 100;
-    this.maxHealth = 100;
+    // The Hangar's permanent upgrades, read once per run.
+    const hangar =
+      resolveService('hangar', this.dependencies)?.getModifiers() ??
+      BASE_MODIFIERS;
+    this.maxHealth = Math.round(100 * hangar.hullMultiplier);
+    this.health = this.maxHealth;
     this.damage = 25;
     this.multishot = 1;
-    this.magnetismRadius = MAGNETISM_RADIUS;
+    this.magnetismRadius = MAGNETISM_RADIUS * hangar.pickupRadiusMultiplier;
+    this.dashCooldown = DASH_COOLDOWN * hangar.dashCooldownMultiplier;
     this.maxSpeed = SHIP_MAX_SPEED;
     this.acceleration = SHIP_ACCELERATION;
     this.rotationSpeed = SHIP_ROTATION_SPEED;

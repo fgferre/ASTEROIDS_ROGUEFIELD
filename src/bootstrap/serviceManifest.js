@@ -24,6 +24,7 @@ import { createServiceResolver } from '../core/serviceUtils.js';
 import GameSessionService from '../services/GameSessionService.js';
 import CommandQueueService from '../services/CommandQueueService.js';
 import CodexService from '../services/CodexService.js';
+import HangarService from '../services/HangarService.js';
 
 export const DEFAULT_POOL_CONFIG = {
   bullets: { initial: 25, max: 120 },
@@ -309,6 +310,14 @@ export function createServiceManifest(context = {}) {
         new CodexService({ eventBus: resolved['event-bus'] }),
     },
     {
+      name: 'hangar',
+      singleton: true,
+      lazy: false,
+      dependencies: ['event-bus'],
+      factory: ({ resolved }) =>
+        new HangarService({ eventBus: resolved['event-bus'] }),
+    },
+    {
       name: 'audio',
       singleton: true,
       lazy: true,
@@ -352,12 +361,13 @@ export function createServiceManifest(context = {}) {
       name: 'player',
       singleton: true,
       lazy: false,
-      dependencies: ['event-bus', 'input', 'command-queue'],
+      dependencies: ['event-bus', 'input', 'command-queue', 'hangar'],
       factory: ({ resolved }) =>
         new PlayerSystem({
           eventBus: resolved['event-bus'],
           input: resolved['input'],
           'command-queue': resolved['command-queue'],
+          hangar: resolved['hangar'],
         }),
     },
     {
@@ -413,7 +423,7 @@ export function createServiceManifest(context = {}) {
       name: 'ui',
       singleton: true,
       lazy: false,
-      dependencies: ['event-bus', 'settings'],
+      dependencies: ['event-bus', 'settings', 'hangar'],
       factory: ({ resolved, container }) => {
         const serviceResolver = createServiceResolver(container);
         return new UISystem({
@@ -450,6 +460,7 @@ export function createServiceManifest(context = {}) {
         'ui',
         'effects',
         'random',
+        'hangar',
       ],
       factory: ({ resolved }) => {
         const progression = new ProgressionSystem({
@@ -459,6 +470,7 @@ export function createServiceManifest(context = {}) {
           ui: resolved['ui'],
           effects: resolved['effects'],
           random: resolved['random'],
+          hangar: resolved['hangar'],
         });
 
         const xpOrbSystem = resolved['xp-orbs'];
@@ -646,6 +658,7 @@ export function createServiceManifest(context = {}) {
         'world',
         'effects',
         'settings',
+        'hangar',
       ],
       factory: ({ resolved, context }) => {
         const instance = new GameSessionService({
@@ -664,6 +677,7 @@ export function createServiceManifest(context = {}) {
             world: resolved['world'],
             effects: resolved['effects'],
             settings: resolved['settings'],
+            hangar: resolved['hangar'],
           },
           gameState: context.gameState,
         });

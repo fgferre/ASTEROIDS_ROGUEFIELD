@@ -1367,9 +1367,12 @@ export default class GameSessionService {
         ? settings.getCategoryValues('gameplay') || null
         : null;
 
-    return typeof gameplaySettings?.selectedHull === 'string'
-      ? gameplaySettings.selectedHull
-      : DEFAULT_HULL_ID;
+    const selected =
+      typeof gameplaySettings?.selectedHull === 'string'
+        ? gameplaySettings.selectedHull
+        : DEFAULT_HULL_ID;
+    // A hull locked in the Hangar flies as the default one.
+    return this.resolveServiceInstance('hangar')?.hullFor(selected) ?? selected;
   }
 
   resolveHullDefinition(hullId) {
