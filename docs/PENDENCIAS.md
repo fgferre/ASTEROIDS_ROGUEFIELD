@@ -2,7 +2,7 @@
 
 Lista viva do que está aberto, nas palavras do dono. Leia só a seção O BASTÃO e o item da vez; o resto, por `grep`.
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
-Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 9.**
+Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 15.**
 
 ## O BASTÃO — onde a sessão parou (18/10, ~16h30) — RODADA 11 MESCLADA NA `main` (PR #259)
 
@@ -63,7 +63,8 @@ reiniciar (trabalho em disco sobrevive); desligar temporizadores antigos; pedir 
   real, nebulosa em shader) e fim das sombras projetadas no "chão". Depois: _"A sombra faz sentido nas coisas que são 3D, né? Se tem uma fonte de luz iluminando, tudo que emite luz fazer
   sombra é interessante também, mas ter uma sombra refletida embaixo no chão, nas estrelas, como se fosse um chão, é
   estranho."_ → sombras só entre objetos 3D (shadow map da luz-chave; nave e rochas sombreando rochas), nenhuma num
-  plano de fundo. Fecha quando ele disser que o fundo lê como espaço.
+  plano de fundo. **Veredito dele (18/10, fim de tarde, no goal novo):** _"fundo espacial que ainda lê como textura
+  (mais volume procedural, sombras só entre objetos 3D)"_ → ainda aberto; Rodada 13.
 - **(3)** O menu (Three.js, bloom) é muito melhor que o jogo (Canvas 800×600 esticado, borrado). O jogo tem de parecer
   continuação do menu — é o que `docs/brand.md` e `docs/NORTE.md` já pedem.
 
@@ -79,7 +80,28 @@ reiniciar (trabalho em disco sobrevive); desligar temporizadores antigos; pedir 
   pilotava a nave independente de onde o tiro ia, como se o tiro saísse de um canhão móvel em volta da nave. O
   movimento fica muito estranho usando o WASD, porque ela vai em direção para onde está atirando."_ → Rodada 5,
   R5.11: casco aponta para onde se move (WASD relativo à tela), arma vira torreta que gira sozinha para o alvo.
-  Fecha quando ele disser que pilotar e atirar voltaram a ser independentes.
+  **Veredito dele (18/10, fim de tarde, no goal novo):** _"controle do casco ainda acoplado demais à mira (torreta
+  independente)"_ → ainda aberto; Rodada 13 (conferir também o esquema de controle gravado nas settings dele).
+
+## Goal novo (palavras dele, 18/10, fim de tarde)
+
+_"iterar continuamente no Asteroid Roguefield existente, usando a essência de Asteroids + Vampire Survivors apenas como
+inspiração e direção, e priorizar os pontos concretos ainda abertos: fundo espacial que ainda lê como textura (mais
+volume procedural, sombras só entre objetos 3D), controle do casco ainda acoplado demais à mira (torreta independente),
+medição real de desempenho na máquina do dono, caminhos de áudio mortos, oddities visuais e de paridade 2D/3D, replay
+que não grava o modo, edge cases de pooling/director e arquivos ainda muito grandes. A cada rodada, melhorar também
+qualidade gráfica, efeitos, câmera, jogabilidade e UX, buscando o polimento de um título AAA de próxima geração no
+browser, sem se limitar às referências."_
+
+- **(9)** medição real de desempenho na máquina dele (ver item 6) — o jogo precisa facilitar: relatório de fps/ms
+  copiável a partir do `?stats=1`/F8.
+- **(10)** caminhos de áudio mortos.
+- **(11)** oddities visuais e de paridade 2D/3D (anel chapado sob o domo do escudo, nave 2D borrada, zoom do dash só no
+  3D, Wardens 2D com o visual do Prime…).
+- **(12)** replay que não grava o modo (Boss Rush/Daily tocam como run normal).
+- **(13)** edge cases de pooling/director (velocidade velha em inimigos reaproveitados, Heralds/Wardens sem pool, seed
+  do director inconsistente, avisos de "accounting discrepancy").
+- **(14)** arquivos ainda muito grandes (UISystem, CombatSystem, PlayerSystem, Renderer3D, SFXBus).
 
 ## Desempenho
 
