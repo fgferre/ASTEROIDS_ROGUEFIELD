@@ -63,7 +63,7 @@ reiniciar (trabalho em disco sobrevive); desligar temporizadores antigos; pedir 
   real, nebulosa em shader) e fim das sombras projetadas no "chão". Depois: _"A sombra faz sentido nas coisas que são 3D, né? Se tem uma fonte de luz iluminando, tudo que emite luz fazer
   sombra é interessante também, mas ter uma sombra refletida embaixo no chão, nas estrelas, como se fosse um chão, é
   estranho."_ → sombras só entre objetos 3D (shadow map da luz-chave; nave e rochas sombreando rochas), nenhuma num
-  plano de fundo. **Veredito dele (18/10, fim de tarde, no goal novo):** _"fundo espacial que ainda lê como textura
+  plano de fundo. **Relistado por ele como aberto no goal novo (18/10, fim de tarde; sem confirmação jogando a R5.10):** _"fundo espacial que ainda lê como textura
   (mais volume procedural, sombras só entre objetos 3D)"_ → ainda aberto; Rodada 13.
 - **(3)** O menu (Three.js, bloom) é muito melhor que o jogo (Canvas 800×600 esticado, borrado). O jogo tem de parecer
   continuação do menu — é o que `docs/brand.md` e `docs/NORTE.md` já pedem.
@@ -80,8 +80,8 @@ reiniciar (trabalho em disco sobrevive); desligar temporizadores antigos; pedir 
   pilotava a nave independente de onde o tiro ia, como se o tiro saísse de um canhão móvel em volta da nave. O
   movimento fica muito estranho usando o WASD, porque ela vai em direção para onde está atirando."_ → Rodada 5,
   R5.11: casco aponta para onde se move (WASD relativo à tela), arma vira torreta que gira sozinha para o alvo.
-  **Veredito dele (18/10, fim de tarde, no goal novo):** _"controle do casco ainda acoplado demais à mira (torreta
-  independente)"_ → ainda aberto; Rodada 13 (conferir também o esquema de controle gravado nas settings dele).
+  **Relistado por ele como aberto no goal novo (18/10, fim de tarde; sem confirmação jogando a R5.11):** _"controle do casco ainda acoplado demais à mira (torreta
+  independente)"_ → Rodada 13: no código nada liga casco à mira (lido 18/10); o esquema clássico (A/D gira, W empurra) só existe por `?controls=classic` e nele a torreta trava no nariz — oferecer em Settings "casco Moderno/Clássico" com torreta automática nos dois.
 
 ## Goal novo (palavras dele, 18/10, fim de tarde)
 
