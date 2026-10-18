@@ -28,6 +28,19 @@ export function wardenTransmission(layer, moment) {
   };
 }
 
+/** `moment` is 'spawned' or 'defeated'; null for an unknown kind. */
+export function heraldTransmission(kind, moment) {
+  const text = STORY.herald[kind]?.[moment];
+  if (!text) {
+    return null;
+  }
+  return {
+    key: `herald:${kind}:${moment}`,
+    speaker: STORY.speaker[kind],
+    text,
+  };
+}
+
 /** A death line picked with the seeded `random`, spoken by the biome's Warden. */
 export function deathTransmission(random, layer) {
   const index = random.int(0, STORY.death.length - 1);

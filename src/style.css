@@ -2011,7 +2011,8 @@ kbd {
   background: var(--panel-inset);
 }
 
-.codex-entry.is-warden {
+.codex-entry.is-warden,
+.codex-entry.is-herald {
   --codex-light: var(--boss);
   border-color: color-mix(in srgb, var(--boss) 45%, transparent);
 }

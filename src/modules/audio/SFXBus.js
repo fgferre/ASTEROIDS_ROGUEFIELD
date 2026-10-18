@@ -1463,8 +1463,9 @@ class SFXBus {
    * Warden transmission voice: TRANSMISSION_VOICE.seconds of short grains
    * (low oscillator through the speaker's formant bandpass; WARDEN NULL
    * alternates its sub with highpassed whisper noise) starting as the squelch
-   * closes, levelDb under the squelch peak, with a reverb send. Seeded onset
-   * jitter and detune.
+   * closes, levelDb (plus the voice's gainDb) under the squelch peak, with a
+   * reverb send. HERALD OF DUST alternates its tone with noise through the
+   * formant (grit). Seeded onset jitter and detune.
    * @param {string} [speaker] - transmission speaker (STORY.speaker value)
    */
   playTransmissionVoice(speaker) {
@@ -1485,7 +1486,9 @@ class SFXBus {
       );
 
       const output = context.createGain();
-      output.gain.value = TRANSMISSION_SQUELCH_PEAK * dbToGain(config.levelDb);
+      output.gain.value =
+        TRANSMISSION_SQUELCH_PEAK *
+        dbToGain(config.levelDb + (voice.gainDb ?? 0));
       output.connect(destination);
       this._sendToReverb(output, config.reverbSendDb);
 
@@ -1495,17 +1498,20 @@ class SFXBus {
       formant.Q.setValueAtTime(voice.formantQ, now);
       formant.connect(output);
 
-      let whisperFilter = null;
-      let whisperBuffer = null;
-      if (voice.whisper) {
-        whisperFilter = context.createBiquadFilter();
-        whisperFilter.type = 'highpass';
-        whisperFilter.frequency.setValueAtTime(config.whisperFilterHz, now);
-        whisperFilter.connect(output);
+      // Noise grains: highpassed whisper, or grit through the formant.
+      let noiseTarget = formant;
+      let noiseBuffer = null;
+      if (voice.whisper || voice.grit) {
+        if (voice.whisper) {
+          noiseTarget = context.createBiquadFilter();
+          noiseTarget.type = 'highpass';
+          noiseTarget.frequency.setValueAtTime(config.whisperFilterHz, now);
+          noiseTarget.connect(output);
+        }
         const rate = context.sampleRate;
         const length = Math.max(1, Math.floor(rate * config.grainSeconds));
-        whisperBuffer = context.createBuffer(1, length, rate);
-        const data = whisperBuffer.getChannelData(0);
+        noiseBuffer = context.createBuffer(1, length, rate);
+        const data = noiseBuffer.getChannelData(0);
         for (let i = 0; i < length; i += 1) {
           data[i] = rng.float() * 2 - 1;
         }
@@ -1526,10 +1532,10 @@ class SFXBus {
         envelope.gain.linearRampToValueAtTime(0.0001, end);
 
         let source;
-        if (whisperBuffer && i % 2 === 1) {
+        if (noiseBuffer && i % 2 === 1) {
           source = context.createBufferSource();
-          source.buffer = whisperBuffer;
-          envelope.connect(whisperFilter);
+          source.buffer = noiseBuffer;
+          envelope.connect(noiseTarget);
         } else {
           source = context.createOscillator();
           source.type = voice.type;

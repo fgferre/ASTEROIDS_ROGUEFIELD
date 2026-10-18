@@ -29,6 +29,7 @@ import {
   TransmissionQueue,
   chapterTransmission,
   deathTransmission,
+  heraldTransmission,
   victoryTransmission,
   wardenTransmission,
 } from './ui/transmissions.js';
@@ -1744,8 +1745,8 @@ class UISystem extends BaseSystem {
       if (payload.id === 'dense-fog') this.aaaTacticalHud?.setRadarRange(1);
     });
 
-    // A Herald arrives under a violet banner; Silence jams the radar while it
-    // lives (a new run clears it).
+    // A Herald arrives under a violet banner, then speaks; Silence jams the
+    // radar while it lives (a new run clears it).
     this.registerEventListener('herald-spawned', ({ kind } = {}) => {
       const herald = HERALD_KINDS[kind];
       if (!herald) return;
@@ -1754,8 +1755,10 @@ class UISystem extends BaseSystem {
         herald.subtitle
       );
       if (herald.jamsRadar) this.aaaTacticalHud?.setRadarJammed(true);
+      this.queueTransmission(heraldTransmission(kind, 'spawned'));
     });
     this.registerEventListener('herald-defeated', ({ kind } = {}) => {
+      this.queueTransmission(heraldTransmission(kind, 'defeated'));
       if (HERALD_KINDS[kind]?.jamsRadar) {
         this.aaaTacticalHud?.setRadarJammed(false);
       }

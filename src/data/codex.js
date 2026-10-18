@@ -71,6 +71,7 @@ const support = (type, lore, hint) => ({
   glyph: GLYPHS[type],
   fromLayer: firstLayerOf(type),
   warden: false,
+  herald: false,
 });
 
 const herald = (kind, lore, hint) => ({
@@ -81,6 +82,7 @@ const herald = (kind, lore, hint) => ({
   glyph: GLYPHS[`herald-${kind}`],
   fromLayer: LAYERS.findIndex((layer) => layer.herald === kind) + 1,
   warden: false,
+  herald: true,
 });
 
 const warden = (kind, lore, hint) => ({
@@ -91,6 +93,7 @@ const warden = (kind, lore, hint) => ({
   glyph: GLYPHS[`warden-${kind}`],
   fromLayer: wardenLayerOf(kind),
   warden: true,
+  herald: false,
 });
 
 export const CODEX_ENTRIES = deepFreeze(
@@ -103,10 +106,11 @@ export const CODEX_ENTRIES = deepFreeze(
       glyph: GLYPHS.asteroid,
       fromLayer: firstLayerOf('asteroid'),
       warden: false,
+      herald: false,
     },
     herald(
       'dust',
-      'We sent the Dust ahead to speak for us. It speaks in walls.',
+      'We sent the Dust ahead to speak for us. It speaks in walls. It counts every stone in the Outer Ring and lays them where a pilot must not pass; what it cannot count, it buries.',
       'Every few seconds it raises a wall of rock. The slits light first.'
     ),
     support(
@@ -116,7 +120,7 @@ export const CODEX_ENTRIES = deepFreeze(
     ),
     warden(
       'prime',
-      'The first gate of the Ring, six plates around a violet core.',
+      'The first gate of the Ring, six plates around a violet core. It keeps the count of everything that enters: stone, light, pilot. Breaking it does not close the ledger; it turns the page.',
       'Each phase breaks a plate. The red band warns of its charge.'
     ),
     support(
@@ -136,12 +140,12 @@ export const CODEX_ENTRIES = deepFreeze(
     ),
     herald(
       'heat',
-      'The Core still burns where we told it to. The Heat carries the flame.',
+      'The Core still burns where we told it to. The Heat carries the flame from rock to rock and knows each one by its temperature. A pilot is one more reading, and the reading is rising.',
       'Its seam brightens, then the rocks nearest it turn Volatile.'
     ),
     warden(
       'choir',
-      'Three cores that once sang the Ring closed. Only three voices remain.',
+      'Three cores that once sang the Ring closed. They were nine; the rest went quiet in the breaking. The hymn was never finished, and what is left still sings it to whoever comes.',
       'Only the singing core can be hurt. The voice moves on.'
     ),
     support(
@@ -161,12 +165,12 @@ export const CODEX_ENTRIES = deepFreeze(
     ),
     herald(
       'silence',
-      'Past this point we do not answer. The Silence makes sure of it.',
+      'Past this point we do not answer. The Silence makes sure of it. It eats every signal in the Reach, yours first, and moves where nothing can hear it go.',
       'Blinds your radar while it lives. A ring marks where it blinks.'
     ),
     warden(
       'null',
-      'The stillness the Ring kept for its ending. It opens the Ring itself.',
+      'The stillness the Ring kept for its ending. It opens the Ring itself. Everything that falls through the Field falls toward it, and for a thousand years nothing has arrived still burning.',
       'Pulls the sparks back. Its plates burn when the shell is open.'
     ),
   ].sort((a, b) => a.fromLayer - b.fromLayer)

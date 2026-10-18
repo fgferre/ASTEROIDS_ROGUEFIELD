@@ -33,6 +33,13 @@ export const ACHIEVEMENTS = deepFreeze([
     glyph: '⊘',
   },
   {
+    id: 'herald-hunter',
+    title: 'Herald Hunter',
+    description: 'Fell all three Heralds. Dust, Heat and Silence.',
+    glyph: '✶',
+    target: 3,
+  },
+  {
     id: 'deep-field',
     title: 'Deep Field',
     description: 'Reach layer 20, past where the Wardens keep count.',

@@ -11,6 +11,9 @@ export const STORY = deepFreeze({
     5: 'WARDEN PRIME',
     10: 'THE CHOIR',
     15: 'WARDEN NULL',
+    dust: 'HERALD OF DUST',
+    heat: 'HERALD OF HEAT',
+    silence: 'HERALD OF SILENCE',
   },
   // Spoken by the Ring as each biome begins.
   chapter: {
@@ -39,6 +42,27 @@ export const STORY = deepFreeze({
     15: {
       warning:
         'I am the stillness the Ring kept for its ending. Come closer, ember. Be still.',
+    },
+  },
+  // Herald lines, keyed by kind: spawned on 'herald-spawned', defeated on
+  // 'herald-defeated'. Dust counts, Heat reads temperatures, Silence barely
+  // finishes a sentence.
+  herald: {
+    dust: {
+      spawned:
+        'Inventory: nine hundred sectors. Stone, metal, one hull. The hull is not on the list.',
+      defeated:
+        'Struck from the record: one Herald. Remaining: stone, metal, one hull. Recounting.',
+    },
+    heat: {
+      spawned:
+        'Core: four thousand kelvin. Your hull: three hundred. The difference will be corrected.',
+      defeated:
+        'Cooling. Twelve hundred. Nine hundred. The Core is still hotter. It is waiting for you.',
+    },
+    silence: {
+      spawned: '...past here... nothing answers. Not the Ring. Not you.',
+      defeated: '...broken... Null hears... still...',
     },
   },
   // One is picked with the seeded random when the pilot dies.

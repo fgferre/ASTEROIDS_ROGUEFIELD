@@ -300,7 +300,7 @@ Qualidade:
 - [ ] **R9.2 Três ajustes.** Drift do Magnetic Storm pela seed de run; flash de borda/wash do boss respeita "reduce
       flashing"; prévia de casco bloqueado no Hangar (silhueta escura + cadeado).
       Conteúdo:
-- [ ] **R9.3 Heralds falam.** Uma linha de transmissão ao surgir e ao cair para cada Herald (voz própria), entradas de
+- [x] **R9.3 Heralds falam.** Uma linha de transmissão ao surgir e ao cair para cada Herald (voz própria), entradas de
       lore no Códice para Heralds e Wardens com "visto em" e "derrotado ×N", conquista "Herald Hunter" (os três).
 
 ## Fora de escopo deste plano

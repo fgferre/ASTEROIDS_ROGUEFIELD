@@ -30,7 +30,7 @@ describe('Codex tabs', () => {
     expect(adjacentCodexTab('achievements', 1)).toBe('enemies');
   });
 
-  it('renders the thirteen achievements, locked ones greyed, with progress or date', () => {
+  it('renders the fourteen achievements, locked ones greyed, with progress or date', () => {
     localStorage.setItem(
       ACHIEVEMENTS_STORAGE_KEY,
       JSON.stringify({
@@ -41,13 +41,33 @@ describe('Codex tabs', () => {
     const view = codexTabView('achievements', entriesOf());
     const cards = view.markup.match(/<li [^>]*>/g);
 
-    expect(cards).toHaveLength(13);
-    expect(cards.filter((card) => card.includes('is-locked'))).toHaveLength(12);
+    expect(cards).toHaveLength(14);
+    expect(cards.filter((card) => card.includes('is-locked'))).toHaveLength(13);
     expect(view.markup).toMatch(
       /is-unlocked" data-achievement="ring-breaker"[\s\S]*?Unlocked 18 Oct 2026/
     );
     expect(view.markup).toContain('7 / 25');
-    expect(view.count).toBe('1 / 13 unlocked');
+    expect(view.count).toBe('1 / 14 unlocked');
+  });
+
+  it('shows first sighting and defeats on Herald and Warden cards', () => {
+    const eventBus = new EventBus();
+    const codex = new CodexService({ eventBus });
+    eventBus.emit('wave-started', { wave: 3 });
+    eventBus.emit('herald-spawned', { kind: 'dust' });
+    eventBus.emit('enemy-destroyed', {
+      enemy: { type: 'herald', heraldKind: 'dust' },
+    });
+    eventBus.emit('enemy-destroyed', { enemy: { type: 'drone' } });
+    const { markup } = codexTabView('enemies', {
+      enemies: codex.getEntries(),
+      achievements: [],
+    });
+
+    expect(markup).toMatch(
+      /is-herald">[\s\S]*?Herald of Dust[\s\S]*?FIRST SEEN · LAYER 3 · DEFEATED ×1/
+    );
+    expect(markup).toContain('First contact: layer 3 · Destroyed: 1');
   });
 
   it('keeps the enemy list on the Enemies tab', () => {

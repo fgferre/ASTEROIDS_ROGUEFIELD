@@ -134,11 +134,13 @@ describe('Herald', () => {
     expect(herald.blinkTarget).toBeNull();
   });
 
-  it('Silence jams the radar while it lives (UISystem)', () => {
+  it('Silence jams the radar while it lives and speaks as it comes and goes (UISystem)', () => {
     const handlers = new Map();
     const hud = { showHeraldBanner: vi.fn(), setRadarJammed: vi.fn() };
+    const queueTransmission = vi.fn();
     UISystem.prototype.setupEventListeners.call({
       aaaTacticalHud: hud,
+      queueTransmission,
       registerEventListener: (name, fn) =>
         handlers.set(name, [...(handlers.get(name) || []), fn]),
     });
@@ -154,6 +156,10 @@ describe('Herald', () => {
 
     emit('herald-defeated', { kind: 'silence', x: 0, y: 0 });
     expect(hud.setRadarJammed).toHaveBeenLastCalledWith(false);
+    expect(queueTransmission.mock.calls.map(([entry]) => entry.key)).toEqual([
+      'herald:silence:spawned',
+      'herald:silence:defeated',
+    ]);
   });
 
   it('Silence steers its shard toward the ship', () => {
