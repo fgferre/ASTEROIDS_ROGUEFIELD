@@ -69,7 +69,11 @@ import { ScorchDecals } from './scorchDecals.js';
 import { ShieldMirror } from './shieldMirror.js';
 import { SpaceField } from './spaceField.js';
 import { TextSprites } from './textSprites.js';
-import { mirrorWeaponEffects, pushLance } from './weaponMirror.js';
+import {
+  mirrorWeaponEffects,
+  pushFlakBolt,
+  pushLance,
+} from './weaponMirror.js';
 import { WEAPONS } from '../../data/weapons.js';
 
 const FOV = 38;
@@ -376,6 +380,14 @@ class Renderer3D extends BaseSystem {
     });
     this.registerEventListener('weapon-beam-fired', () => {
       this.impact.kick(WEAPONS.harmonic.beam.kick);
+    });
+    // Flak shrapnel: a spark cone along the bolt's flight.
+    this.registerEventListener('flak-burst', (data) => {
+      const { position, angle } = data || {};
+      if (!position) return;
+      const dx = Math.cos(angle || 0);
+      const dy = Math.sin(angle || 0);
+      this.hitSparks.emit(position.x, position.y, dx, dy, dx, dy, false);
     });
     // a split asteroid lives on as its fragments: only real deaths burn
     this.registerEventListener('enemy-destroyed', (data) => {
@@ -1276,7 +1288,8 @@ class Renderer3D extends BaseSystem {
     for (let i = 0; i < bullets.length; i += 1) {
       const b = bullets[i];
       if (!b || b.hit) continue;
-      pushLance(t.THREE, t, look, evolved, b, pushTrail);
+      if (b.kind === 'flak') pushFlakBolt(t.THREE, t, b, pushTrail);
+      else pushLance(t.THREE, t, look, evolved, b, pushTrail);
     }
     mirrorWeaponEffects(t.THREE, combat, t, t.flashes);
 

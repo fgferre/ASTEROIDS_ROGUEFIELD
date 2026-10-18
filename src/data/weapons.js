@@ -12,8 +12,15 @@ import { PALETTE } from './constants/palette.js';
 export const WEAPON_COLOR_INCENDIARY = '#ffc98a';
 export const WEAPON_COLOR_GRAVITIC = '#b38cff';
 export const WEAPON_COLOR_BEAM_MID = '#ffe2b0';
+// Scatter Coil: the white-hot core of a flak tracer and the flash of its
+// burst, both warmer than PALETTE.text so they read as the amber family.
+export const WEAPON_COLOR_FLAK_CORE = '#fff3dc';
+export const WEAPON_COLOR_FLAK_BURST = '#ffd28f';
 
-/** The two weapons. `lance` is the default; `harmonic` comes from a card. */
+/**
+ * The three weapons. `lance` is the default; `harmonic` and `scatter` come
+ * from a card each.
+ */
 export const WEAPONS = deepFreeze({
   lance: {
     id: 'lance',
@@ -39,6 +46,30 @@ export const WEAPONS = deepFreeze({
       glow: PALETTE.shot,
       mid: WEAPON_COLOR_BEAM_MID,
       core: PALETTE.text,
+    },
+  },
+  scatter: {
+    id: 'scatter',
+    name: 'Scatter Coil',
+    description: 'A fan of short flak bolts that burst into shrapnel.',
+    // proposta 18/10: the flak volley, for the owner to judge by playing.
+    flak: {
+      bolts: 5, // per volley; each Multishot shot past the first adds one
+      maxBolts: 9,
+      fan: 26, // degrees, edge bolt to edge bolt
+      speedMultiplier: 0.9, // × lance speed
+      range: 180, // logical px from the muzzle, where a bolt that hit nothing bursts
+      damageMultiplier: 0.45, // × lance damage, a bolt's direct hit
+      burstRadius: 40, // logical px, to the enemy's rim
+      burstDamageMultiplier: 0.6, // × lance damage, once per enemy per volley
+      cooldownMultiplier: 1.6, // × the lance's cooldown between volleys
+      burstDuration: 0.22, // seconds on screen
+      trailPoints: 4, // a short tracer, not a lance trail
+    },
+    colors: {
+      tracer: PALETTE.shot,
+      core: WEAPON_COLOR_FLAK_CORE,
+      burst: WEAPON_COLOR_FLAK_BURST,
     },
   },
 });

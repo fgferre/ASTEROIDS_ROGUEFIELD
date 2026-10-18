@@ -10,6 +10,7 @@ import {
 } from '../../../src/modules/ui/AAAHudLayout.js';
 import { PICKUP_KINDS } from '../../../src/data/pickups.js';
 import { bossRushStageTitle } from '../../../src/data/layers.js';
+import { WEAPONS } from '../../../src/data/weapons.js';
 
 describe('AAAHudLayout combo tier', () => {
   it('steps the combo color with the multiplier the progression system produces', () => {
@@ -85,23 +86,36 @@ describe('AAAHudLayout weapon and buff chips', () => {
     hud.els.beamPipEls.filter((pip) => pip.classList.contains('is-filled'))
       .length;
 
+  const weaponState = (weaponId, shotsToBeam = null) => ({
+    weaponId,
+    name: WEAPONS[weaponId].name,
+    shotsToBeam,
+    evolutions: [],
+  });
+
   it('names the weapon and fills a pip per shot toward the Harmonic beam', () => {
-    hud.updateWeapon({ weaponId: 'lance', shotsToBeam: null, evolutions: [] });
-    expect(hud.els.weaponName.textContent).toBe('LANCE');
+    hud.updateWeapon(weaponState('lance'));
+    expect(hud.els.weaponName.textContent).toBe('AMBER LANCE');
     expect(hud.els.beamPips.classList.contains('is-hidden')).toBe(true);
 
     // Beam every 4th shot: shotsToBeam 4 → 1 fills 0 → 3 pips.
     const pipsAt = (shotsToBeam) => {
-      hud.updateWeapon({ weaponId: 'harmonic', shotsToBeam, evolutions: [] });
+      hud.updateWeapon(weaponState('harmonic', shotsToBeam));
       return filledPips();
     };
     expect([4, 3, 2, 1].map(pipsAt)).toEqual([0, 1, 2, 3]);
-    expect(hud.els.weaponName.textContent).toBe('HARMONIC');
+    expect(hud.els.weaponName.textContent).toBe('HARMONIC PLASMA LANCE');
     expect(hud.els.beamPips.classList.contains('is-hidden')).toBe(false);
   });
 
+  it('reads the weapon name from the weapon state: the Scatter Coil has no pips', () => {
+    hud.updateWeapon(weaponState('scatter'));
+    expect(hud.els.weaponName.textContent).toBe('SCATTER COIL');
+    expect(hud.els.beamPips.classList.contains('is-hidden')).toBe(true);
+  });
+
   it('adds a family-coloured chip when the weapon evolves', () => {
-    const state = { weaponId: 'lance', shotsToBeam: null, evolutions: [] };
+    const state = weaponState('lance');
     hud.updateWeapon(state);
     expect(hud.els.evolutions.children).toHaveLength(0);
 
@@ -119,7 +133,7 @@ describe('AAAHudLayout weapon and buff chips', () => {
   });
 
   it('swaps the chip for a brighter APEX chip when the family reaches its Apex', () => {
-    const state = { weaponId: 'lance', shotsToBeam: null, evolutions: [] };
+    const state = weaponState('lance');
     hud.updateWeapon({
       ...state,
       evolutions: [{ family: 'thermal', id: 'incendiary', name: 'x' }],

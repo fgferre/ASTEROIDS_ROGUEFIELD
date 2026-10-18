@@ -65,6 +65,9 @@ const lanceTrailStyles = (color) =>
   Array.from({ length: 8 }, (_, i) => withAlpha(color, (0.65 * i) / 7));
 const HARMONIC_BEAM = WEAPONS.harmonic.beam;
 const BEAM_COLORS = WEAPONS.harmonic.colors;
+const FLAK = WEAPONS.scatter.flak;
+const FLAK_COLORS = WEAPONS.scatter.colors;
+const FLAK_SPARKS = 7; // proposta 18/10: 2D shrapnel streaks per burst
 const ARC_SEGMENTS = 6;
 const ARC_JITTER = 7; // px, perpendicular
 
@@ -255,9 +258,12 @@ class CombatSystem extends BaseSystem {
       this.applyWeaponTuning(data);
     });
 
-    this.registerEventListener('upgrade-weapon-harmonic', (data = {}) => {
-      this.weaponId = WEAPONS[data.weaponId] ? data.weaponId : 'harmonic';
-    });
+    // A weapon card names its weapon (data/weapons.js); an unknown id is ignored.
+    const takeWeapon = (data = {}) => {
+      if (WEAPONS[data.weaponId]) this.weaponId = data.weaponId;
+    };
+    this.registerEventListener('upgrade-weapon-harmonic', takeWeapon);
+    this.registerEventListener('upgrade-weapon-scatter', takeWeapon);
 
     // Cards that add a weapon behaviour keep the payload of their latest rank.
     this.registerEventListener('upgrade-thermal-lens', (data) => {
@@ -603,6 +609,10 @@ class CombatSystem extends BaseSystem {
         this.fireBeam(playerPos, playerStats);
         return;
       }
+    }
+    if (this.weaponId === 'scatter') {
+      this.fireFlak(playerPos, playerStats);
+      return;
     }
 
     // Every shot leaves the turret's muzzle (R5.11). Without a lock the
@@ -2457,7 +2467,8 @@ class CombatSystem extends BaseSystem {
   }
 
   // === SISTEMA DE PROJÉTEIS ===
-  createBullet(fromPos, toPos, damage) {
+  // `volley` (Scatter Coil) makes it a flak bolt of that volley.
+  createBullet(fromPos, toPos, damage, volley = null) {
     const dx = toPos.x - fromPos.x;
     const dy = toPos.y - fromPos.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
@@ -2470,23 +2481,31 @@ class CombatSystem extends BaseSystem {
     // Configure bullet properties
     bullet.x = fromPos.x;
     bullet.y = fromPos.y;
-    bullet.vx = (dx / distance) * this.bulletSpeed;
-    bullet.vy = (dy / distance) * this.bulletSpeed;
+    const speed = volley
+      ? this.bulletSpeed * FLAK.speedMultiplier
+      : this.bulletSpeed;
+    bullet.vx = (dx / distance) * speed;
+    bullet.vy = (dy / distance) * speed;
     // Thermal Lens boosts the lance only while the beam is not there to take it.
     const lens =
       this.weaponId !== 'harmonic' && this.cardEffects.thermalLens
         ? this.cardEffects.thermalLens.lanceDamageMultiplier
         : 1;
-    bullet.damage =
+    const shotDamage =
       damage * this.lanceDamageTuning * lens * this.lanceApexDamage;
-    bullet.life = this.bulletLifetime;
-    bullet.maxLife = this.bulletLifetime;
+    // A flak bolt lives until the end of its range and does not pierce.
+    const life = volley ? FLAK.range / speed : this.bulletLifetime;
+    bullet.damage = volley ? shotDamage * FLAK.damageMultiplier : shotDamage;
+    bullet.shrapnel = volley ? shotDamage * FLAK.burstDamageMultiplier : 0;
+    bullet.volley = volley;
+    bullet.life = life;
+    bullet.maxLife = life;
     bullet.hit = false;
     bullet.active = true;
     bullet.type = 'player';
-    bullet.kind = 'lance';
+    bullet.kind = volley ? 'flak' : 'lance';
     bullet.offscreenTimer = 0;
-    bullet.pierceLeft = this.lancePierce + this.pierceBonus;
+    bullet.pierceLeft = volley ? 0 : this.lancePierce + this.pierceBonus;
     if (!bullet.pierced) {
       bullet.pierced = [];
     } else {
@@ -2990,7 +3009,9 @@ class CombatSystem extends BaseSystem {
 
       // Atualizar trail
       bullet.trail.push({ x: bullet.x, y: bullet.y });
-      if (bullet.trail.length > this.trailLength) {
+      const trailLimit =
+        bullet.kind === 'flak' ? FLAK.trailPoints : this.trailLength;
+      if (bullet.trail.length > trailLimit) {
         bullet.trail.shift();
       }
       trailPoints += bullet.trail.length;
@@ -2999,6 +3020,16 @@ class CombatSystem extends BaseSystem {
       bullet.x += bullet.vx * deltaTime;
       bullet.y += bullet.vy * deltaTime;
       bullet.life -= deltaTime;
+
+      // A flak bolt that reached the end of its range bursts there (backed
+      // up by the overshoot, so the range does not depend on the frame).
+      if (bullet.kind === 'flak' && bullet.life <= 0) {
+        bullet.x += bullet.vx * bullet.life;
+        bullet.y += bullet.vy * bullet.life;
+        bullet.hit = true;
+        this.burstFlak(bullet);
+        return;
+      }
 
       const offscreenGrace = Number.isFinite(PLAYER_BULLET_OFFSCREEN_GRACE)
         ? Math.max(0, PLAYER_BULLET_OFFSCREEN_GRACE)
@@ -3071,7 +3102,7 @@ class CombatSystem extends BaseSystem {
     const capacitor = this.cardEffects.chainCapacitor;
     if (
       capacitor &&
-      bullet.kind === 'lance' &&
+      (bullet.kind === 'lance' || bullet.kind === 'flak') &&
       !this.evolutions.includes('arc') &&
       this.rollCardChance(capacitor.doubleHitChance)
     ) {
@@ -3185,6 +3216,12 @@ class CombatSystem extends BaseSystem {
         this.applyEvolutionHit(enemy, requestedDamage, damageResult, bullet);
       }
     }
+    // A flak bolt bursts on its first hit, blocked or not; its shrapnel
+    // spares the enemy it struck.
+    if (bullet.kind === 'flak') {
+      bullet.volley.struck.push(enemy);
+      this.burstFlak(bullet);
+    }
 
     return damageResult;
   }
@@ -3227,6 +3264,7 @@ class CombatSystem extends BaseSystem {
     this.evolutions = [];
     this.apexes = [];
     this.beams = [];
+    this.flakBursts = [];
     this.arcs = [];
     this.wells = [];
     this.arcSeed = 0;
@@ -3339,19 +3377,24 @@ class CombatSystem extends BaseSystem {
     });
   }
 
+  // Where a beam or a flak volley goes from `origin` (the muzzle): along the
+  // right stick, onto the primary lock's lead point in auto, along the turret
+  // otherwise.
+  getWeaponAngle(origin) {
+    const aim = this.aimMode === 'manual' ? null : this.getPrimaryAimPoint();
+    if (this.stickAim) return Math.atan2(this.stickAim.y, this.stickAim.x);
+    return aim
+      ? Math.atan2(aim.y - origin.y, aim.x - origin.x)
+      : this.cachedPlayer.getTurretAngle();
+  }
+
   // Harmonic beam: damage lands on everything in the segment on the firing
   // frame; the beam stays on screen for HARMONIC_BEAM.duration. Aimed like the
   // lances: from the muzzle onto the primary lock's lead point in auto, along
   // the turret otherwise.
   fireBeam(playerPos, playerStats) {
-    const player = this.cachedPlayer;
-    const aim = this.aimMode === 'manual' ? null : this.getPrimaryAimPoint();
-    const origin = player.getMuzzlePoint();
-    const angle = this.stickAim
-      ? Math.atan2(this.stickAim.y, this.stickAim.x)
-      : aim
-        ? Math.atan2(aim.y - origin.y, aim.x - origin.x)
-        : player.getTurretAngle();
+    const origin = this.cachedPlayer.getMuzzlePoint();
+    const angle = this.getWeaponAngle(origin);
     const dirX = Math.cos(angle);
     const dirY = Math.sin(angle);
     const { width, duration } = HARMONIC_BEAM;
@@ -3430,6 +3473,103 @@ class CombatSystem extends BaseSystem {
         multiLockActive: false,
         predictedPoints: [],
       },
+    });
+  }
+
+  // Scatter Coil: a fan of flak bolts from the muzzle, aimed like the beam.
+  // Multishot adds bolts to the fan; the volley waits FLAK.cooldownMultiplier
+  // × the lance's cooldown.
+  fireFlak(playerPos, playerStats) {
+    const origin = this.cachedPlayer.getMuzzlePoint();
+    const angle = this.getWeaponAngle(origin);
+    const extra = Math.max(0, Math.floor(playerStats?.multishot ?? 1) - 1);
+    const bolts = Math.min(FLAK.maxBolts, FLAK.bolts + extra);
+    const fan = (FLAK.fan * Math.PI) / 180;
+    // Shared by the volley's bolts: who its shrapnel already hit, and how
+    // many bursts it has had (only the first lights the 3D scene).
+    const volley = { struck: [], bursts: 0 };
+    const predictedPoints = [];
+    for (let i = 0; i < bolts; i += 1) {
+      const a = angle + fan * (i / (bolts - 1) - 0.5);
+      const end = {
+        x: origin.x + Math.cos(a) * FLAK.range,
+        y: origin.y + Math.sin(a) * FLAK.range,
+      };
+      this.createBullet(origin, end, playerStats.damage, volley);
+      predictedPoints.push({ enemyId: null, position: end });
+    }
+    this.lastShotTime = -this.shootCooldown * (FLAK.cooldownMultiplier - 1);
+
+    const centre = {
+      x: origin.x + Math.cos(angle) * FLAK.range,
+      y: origin.y + Math.sin(angle) * FLAK.range,
+    };
+    this.eventBus?.emit?.('weapon-fired', {
+      position: playerPos,
+      target: centre,
+      centerlineTarget: centre,
+      weaponType: 'scatter',
+      primaryTargetId: this.currentTarget ? this.currentTarget.id : null,
+      targeting: {
+        dynamicPrediction: this.usingDynamicPrediction(),
+        lockCount: this.currentTargetLocks.length,
+        multiLockActive: false,
+        predictedPoints,
+      },
+    });
+  }
+
+  // A flak burst: shrapnel hits every solid enemy whose rim is within
+  // FLAK.burstRadius, at most once per volley, through the same hit path as
+  // the bolts (so the evolutions apply).
+  burstFlak(bolt) {
+    const { x, y, volley } = bolt;
+    const struck = [];
+    this.forEachSolidEnemy((enemy) => {
+      if (volley.struck.includes(enemy)) return;
+      const reach = FLAK.burstRadius + (enemy.radius || 0);
+      if ((enemy.x - x) ** 2 + (enemy.y - y) ** 2 <= reach * reach) {
+        struck.push(enemy);
+      }
+    });
+    volley.struck.push(...struck);
+    struck.forEach((enemy) => {
+      if (enemy.destroyed) return;
+      const dx = enemy.x - x;
+      const dy = enemy.y - y;
+      const distance = Math.hypot(dx, dy) || 1;
+      const radius = Math.min(enemy.radius || 0, distance);
+      this.processBulletHit(
+        {
+          kind: 'shrapnel',
+          x: enemy.x - (dx / distance) * radius,
+          y: enemy.y - (dy / distance) * radius,
+          vx: (dx / distance) * this.bulletSpeed,
+          vy: (dy / distance) * this.bulletSpeed,
+          damage: bolt.shrapnel,
+          hit: false,
+        },
+        enemy,
+        this.cachedEnemies
+      );
+    });
+
+    const angle = Math.atan2(bolt.vy || 0, bolt.vx || 1);
+    this.flakBursts.push({
+      x,
+      y,
+      angle,
+      life: FLAK.burstDuration,
+      maxLife: FLAK.burstDuration,
+      maxRadius: FLAK.burstRadius,
+      lit: volley.bursts === 0,
+    });
+    volley.bursts += 1;
+    this.eventBus?.emit?.('flak-burst', {
+      position: { x, y },
+      radius: FLAK.burstRadius,
+      angle,
+      hits: struck.length,
     });
   }
 
@@ -3737,6 +3877,7 @@ class CombatSystem extends BaseSystem {
       list.length = kept;
     };
     fade(this.beams);
+    fade(this.flakBursts);
     fade(this.arcs);
     fade(this.cinders);
     fade(this.ions);
@@ -4021,6 +4162,32 @@ class CombatSystem extends BaseSystem {
     }
   }
 
+  // Scatter Coil bolt: a short amber tracer fading in toward a white-hot
+  // head. The emissive (bloom) copy is the core alone.
+  drawFlakBolt(ctx, bolt, coreOnly = false) {
+    const tail = bolt.trail[0] || bolt;
+    const line = (style, lineWidth) => {
+      ctx.strokeStyle = style;
+      ctx.lineWidth = lineWidth;
+      ctx.beginPath();
+      ctx.moveTo(tail.x, tail.y);
+      ctx.lineTo(bolt.x, bolt.y);
+      ctx.stroke();
+    };
+    ctx.lineCap = 'round';
+    if (!coreOnly) {
+      const glow = ctx.createLinearGradient(tail.x, tail.y, bolt.x, bolt.y);
+      glow.addColorStop(0, withAlpha(FLAK_COLORS.tracer, 0));
+      glow.addColorStop(1, withAlpha(FLAK_COLORS.tracer, 0.6));
+      line(glow, 3.4);
+    }
+    line(withAlpha(FLAK_COLORS.core, 0.85), 1.2);
+    ctx.fillStyle = FLAK_COLORS.core;
+    ctx.beginPath();
+    ctx.arc(bolt.x, bolt.y, 1.7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   // Beams, chain arcs and the burn/slow marks, in 'lighter' mode; the white
   // cores also go to the emissive (bloom) layer.
   drawWeaponEffects(ctx, emissive) {
@@ -4118,6 +4285,43 @@ class CombatSystem extends BaseSystem {
       if (emissive) stroke(emissive, withAlpha(PALETTE.text, k), 0.8);
     });
 
+    // Flak bursts: a hot flash, a ring opening to the burst radius and a
+    // spray of shrapnel streaks (angles hashed from the burst's position).
+    this.flakBursts.forEach((burst) => {
+      const k = burst.life / burst.maxLife;
+      const r = FLAK.burstRadius * (0.35 + 0.65 * (1 - k));
+      ctx.fillStyle = withAlpha(FLAK_COLORS.core, 0.6 * k * k);
+      ctx.beginPath();
+      ctx.arc(burst.x, burst.y, 4 + 8 * k, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 0.6 + 2 * k;
+      ctx.strokeStyle = withAlpha(FLAK_COLORS.burst, 0.8 * k);
+      ctx.beginPath();
+      ctx.arc(burst.x, burst.y, r, 0, Math.PI * 2);
+      ctx.stroke();
+      const seed = Math.round(burst.x * 7 + burst.y * 13);
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = withAlpha(FLAK_COLORS.core, 0.9 * k);
+      ctx.beginPath();
+      for (let i = 0; i < FLAK_SPARKS; i += 1) {
+        const a =
+          burst.angle +
+          (Math.PI * 2 * i) / FLAK_SPARKS +
+          hashUnit(seed + i) * 0.4;
+        const cos = Math.cos(a);
+        const sin = Math.sin(a);
+        ctx.moveTo(burst.x + cos * r * 0.55, burst.y + sin * r * 0.55);
+        ctx.lineTo(burst.x + cos * r * 0.95, burst.y + sin * r * 0.95);
+      }
+      ctx.stroke();
+      if (emissive) {
+        emissive.fillStyle = withAlpha(FLAK_COLORS.core, k);
+        emissive.beginPath();
+        emissive.arc(burst.x, burst.y, 3 + 4 * k, 0, Math.PI * 2);
+        emissive.fill();
+      }
+    });
+
     this.beams.forEach((beam) => {
       const k = beam.life / beam.maxLife;
       const ramp = (color, alpha) => {
@@ -4160,6 +4364,12 @@ class CombatSystem extends BaseSystem {
     emissive?.save();
     this.bullets.forEach((bullet) => {
       if (bullet.hit) return;
+
+      if (bullet.kind === 'flak') {
+        this.drawFlakBolt(ctx, bullet);
+        if (emissive) this.drawFlakBolt(emissive, bullet, true);
+        return;
+      }
 
       if (bullet.trail.length > 0) {
         this.drawLanceTrail(ctx, bullet);

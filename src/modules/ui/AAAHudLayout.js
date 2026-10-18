@@ -785,7 +785,7 @@ export class AAAHudLayout {
       return;
     }
     this._lastWeaponKey = key;
-    this.els.weaponName.textContent = harmonic ? 'HARMONIC' : 'LANCE';
+    this.els.weaponName.textContent = state.name.toUpperCase();
     this.els.beamPips.classList.toggle('is-hidden', !harmonic);
     this.els.beamPipEls.forEach((pip, index) =>
       pip.classList.toggle('is-filled', index < filled)
