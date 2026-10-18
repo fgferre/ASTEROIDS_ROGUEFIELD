@@ -48,5 +48,8 @@ describe('Hangar screen', () => {
     expect(salvageLine({ amount: 99, total: 340 })).toBe(
       'SALVAGE +99 (total 340)'
     );
+    expect(salvageLine({ amount: 129, total: 340, multiplier: 1.3 })).toBe(
+      'SALVAGE +129 (×1.3 difficulty, total 340)'
+    );
   });
 });

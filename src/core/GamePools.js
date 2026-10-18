@@ -87,10 +87,10 @@ export class GamePools {
     this.initializeBulletPool(config.bullets);
     this.initializeParticlePool(config.particles);
     this.initializeAsteroidPool(config.asteroids);
-    this.initializeDronePool(config.drones);
-    this.initializeMinePool(config.mines);
-    this.initializeHunterPool(config.hunters);
-    this.initializeBossPool(config.bosses);
+    this.drones = this.createEnemyPool(Drone, config.drones);
+    this.mines = this.createEnemyPool(Mine, config.mines);
+    this.hunters = this.createEnemyPool(Hunter, config.hunters);
+    this.bosses = this.createEnemyPool(BossEnemy, config.bosses);
     this.husks = this.createEnemyPool(Husk, config.husks);
     this.rams = this.createEnemyPool(Ram, config.rams);
     this.weavers = this.createEnemyPool(Weaver, config.weavers);
@@ -271,138 +271,6 @@ export class GamePools {
         asteroid.crackProfile = null;
         asteroid.lastDamageTime = 0;
         asteroid.spawnTime = 0;
-      },
-
-      config.initial,
-      config.max
-    );
-  }
-
-  /**
-   * Initializes drone enemy pool.
-   *
-   * @private
-   * @param {Object} config - Pool configuration
-   */
-  static initializeDronePool(config) {
-    this.drones = new ObjectPool(
-      // Factory function
-      () => {
-        const drone = new Drone();
-        if (typeof drone.resetForPool === 'function') {
-          drone.resetForPool();
-        }
-        return drone;
-      },
-
-      // Reset function
-      (drone) => {
-        if (!drone) return;
-        if (typeof drone.resetForPool === 'function') {
-          drone.resetForPool();
-        } else {
-          drone.alive = false;
-          drone.initialized = false;
-        }
-      },
-
-      config.initial,
-      config.max
-    );
-  }
-
-  /**
-   * Initializes mine enemy pool.
-   *
-   * @private
-   * @param {Object} config - Pool configuration
-   */
-  static initializeMinePool(config) {
-    this.mines = new ObjectPool(
-      // Factory function
-      () => {
-        const mine = new Mine();
-        if (typeof mine.resetForPool === 'function') {
-          mine.resetForPool();
-        }
-        return mine;
-      },
-
-      // Reset function
-      (mine) => {
-        if (!mine) return;
-        if (typeof mine.resetForPool === 'function') {
-          mine.resetForPool();
-        } else {
-          mine.alive = false;
-          mine.initialized = false;
-        }
-      },
-
-      config.initial,
-      config.max
-    );
-  }
-
-  /**
-   * Initializes hunter enemy pool.
-   *
-   * @private
-   * @param {Object} config - Pool configuration
-   */
-  static initializeHunterPool(config) {
-    this.hunters = new ObjectPool(
-      // Factory function
-      () => {
-        const hunter = new Hunter();
-        if (typeof hunter.resetForPool === 'function') {
-          hunter.resetForPool();
-        }
-        return hunter;
-      },
-
-      // Reset function
-      (hunter) => {
-        if (!hunter) return;
-        if (typeof hunter.resetForPool === 'function') {
-          hunter.resetForPool();
-        } else {
-          hunter.alive = false;
-          hunter.initialized = false;
-        }
-      },
-
-      config.initial,
-      config.max
-    );
-  }
-
-  /**
-   * Initializes boss enemy pool.
-   *
-   * @private
-   * @param {Object} config - Pool configuration
-   */
-  static initializeBossPool(config) {
-    this.bosses = new ObjectPool(
-      // Factory function
-      () => {
-        const boss = new BossEnemy();
-        if (typeof boss.resetForPool === 'function') {
-          boss.resetForPool();
-        }
-        return boss;
-      },
-
-      // Reset function
-      (boss) => {
-        if (!boss) return;
-        if (typeof boss.resetForPool === 'function') {
-          boss.resetForPool();
-        } else {
-          boss.alive = false;
-          boss.initialized = false;
-        }
       },
 
       config.initial,

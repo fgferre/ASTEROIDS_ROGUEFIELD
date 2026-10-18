@@ -93,6 +93,21 @@ describe('DissolvePool', () => {
     expect(kill('c')).toBe(twin);
   });
 
+  it('burns a merged machine body through one vertex-coloured twin', () => {
+    const { mirror } = setup();
+    const ram = { ...mote('r'), type: 'ram' };
+    mirror.update([ram], 0, 0);
+    const view = mirror.views.get('r');
+    mirror.markDead(ram);
+    mirror.update([], 0, 0);
+
+    const twin = view.dissolve.twins.get(mirror.machineMaterial);
+    expect(twin.vertexColors).toBe(true);
+    // merged body, lens and core: one twin per material drawn
+    expect(view.dissolve.twins.size).toBe(3);
+    expect(view.dissolve.sources.indexOf(mirror.machineMaterial)).toBe(0);
+  });
+
   it('burns a killed rock as a plain mesh in its look and frees its instance', () => {
     const { mirror } = setup();
     const enemy = {

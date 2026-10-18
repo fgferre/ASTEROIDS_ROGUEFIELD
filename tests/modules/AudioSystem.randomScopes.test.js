@@ -146,7 +146,6 @@ describe('AudioSystem random scope synchronization', () => {
 
     const audio = new AudioSystem({ eventBus, random, settings });
 
-    vi.spyOn(audio, 'initializeMusicController').mockImplementation(() => {});
     vi.spyOn(audio, '_startPerformanceMonitoring').mockImplementation(() => {});
     vi.spyOn(audio, '_startThrusterInactivityChecker').mockImplementation(
       () => {}

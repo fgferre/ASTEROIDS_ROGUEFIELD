@@ -202,7 +202,7 @@ const defaultHullOutline = [
 
 const defaultHull = createHullDefinition({
   id: DEFAULT_HULL_ID,
-  name: 'Default Interceptor Hull',
+  name: 'Interceptor',
   outline: defaultHullOutline,
   shieldPadding: 12,
   thrusterPorts: {

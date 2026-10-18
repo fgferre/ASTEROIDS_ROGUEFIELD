@@ -4,39 +4,34 @@ Lista viva do que está aberto, nas palavras do dono. Leia só a seção O BAST�
 Item resolvido sai da lista e vira commit; a história de cada número fica no git (`git log --all --grep="(NNN)"`).
 Número é identidade, não posição: item novo entra no fim da sua seção. **Próximo número livre: 9.**
 
-## O BASTÃO — onde a rodada parou (18/10, ~09h40) — RODADA 6 COMPLETA E MESCLADA NA `main` (publicado)
+## O BASTÃO — onde a rodada parou (18/10, ~10h50) — RODADA 7 (CONSOLIDAÇÃO) MESCLADA NA `main` (publicado)
 
 **Como retomar (qualquer máquina):** `git clone https://github.com/fgferre/ASTEROIDS_ROGUEFIELD.git`, `git checkout main`
-(PRs #247–#252 e o sétimo). Ler este BASTÃO, `PLAN.md` (Rodadas 2–6) e `docs/NORTE.md` (§7 + regra dos dois eixos);
-`npm ci && npm run done` (938 testes). **Antes de qualquer junção:** `scratchpad/errprobe.mjs` (20 s de cena hero
-headless) deve dar `errors: 0` — o gate não pega erro de runtime no render.
+(PRs #247–#253 e o oitavo). Ler este BASTÃO, `PLAN.md` (Rodadas 2–7) e `docs/NORTE.md` (§7 + regra dos dois eixos);
+`npm ci && npm run done`. **Antes de qualquer junção:** sonda headless `scratchpad/errprobe.mjs` com `errors: 0`.
 
 **Regra dele:** toda rodada melhora também gráficos, efeitos, câmera, jogabilidade e UX, não só conteúdo.
 
-**Vereditos dele até agora (itens 7 e 8):** fundo como textura + sombra no chão → espaço procedural com sombras só
-entre objetos (Rodada 5); nave virando para a mira → casco segue o movimento, arma é torreta (Rodada 5). Sem veredito
-ainda sobre as Rodadas 5 e 6 em si.
+**Vereditos dele (itens 7 e 8):** atendidos na Rodada 5. Sem veredito ainda sobre as Rodadas 5, 6 e 7.
 
-**Rodada 6 (completa):** gamepad twin-stick com rumble e menus pelo controle (replay v4); afixos de Elite (Shielded,
-Swift, Volatile, Splitter, Warded); HUD direcional (arcos de dano, setas de fora de tela, barra de chefe por fase,
-ícones no radar); dificuldade Pilot/Veteran/Warden, seed visível e compartilhável (`?seed=`), Daily Field com recorde
-próprio (replay v5); Solar Slicer como nave de verdade (casco, lâminas, stats); rochas instanciadas + orçamento de
-sombra (205 → ~155 draw calls na cena carregada, meta < 80 ainda aberta); áudio com distância, percussão por bioma e
-voz dos Wardens. Correção importante: erro de render do shadow map (publicado na #251) corrigido em `66cb870`.
+**Rodada 7 (consolidação):** máquinas desenhadas em menos malhas (vertex colors; cena carregada ultra ~155 → ~134
+draw calls; meta < 80 exige decisões listadas no BACKLOG); sete acabamentos de UX (AIM MANUAL, linha de lock da
+torreta, Esc fecha Settings, setas fora dos painéis, chips de casco, dicas do esquema moderno, salvage por
+dificuldade); dívidas do BACKLOG pagas (RenderBatch/GradientCache, music controller morto, teste órfão, cópias de
+resolveRandom, pools duplicados, dois painéis → um `?stats=1`/F8, serviços não usados no manifesto, getBounds real,
+HUD do boss uma vez; CanvasStateManager e ShakePresets ficaram: estavam em uso); modificadores de camada no infinito
+(Dense Fog, Magnetic Storm, Hunters' Moon, Glass Field).
 
-**Tudo visto só em headless sem GPU (2–4 fps).** `?stats=1` mostra fps/ms reais; `graphics.quality` em Settings.
+**Tudo visto só em headless sem GPU (2–4 fps).** `?stats=1` mostra fps/ms reais (monitor interno).
 
-**O que só ele pode responder, jogando:** Rodadas 5 e 6 inteiras — fundo/sombras/torreta; controle twin-stick;
-afixos legíveis?; HUD direcional ajuda ou polui?; dificuldade e Daily Field; Slicer vs Interceptor; som com distância
-e percussão; todas as "propostas" nomeadas no código.
+**O que só ele pode responder, jogando:** Rodadas 5–7 inteiras (fundo, sombras, torreta, twin-stick, afixos, HUD
+direcional, dificuldade/Daily, Slicer, som com distância, modificadores do infinito) e todas as "propostas".
 
-**Próxima rodada (sem veredito dele):** `BACKLOG.md` (30 linhas, triado) — candidatos de maior impacto: fundir/instanciar
-as máquinas para a meta de draw calls; HUD AIM MANUAL; linha de lock 3D a partir da torreta; salvage por dificuldade;
-voz/percussão só ouvidas em teste.
+**Próxima rodada sem veredito dele:** BACKLOG (26 linhas) — decisão de draw calls (batch de rims/olhos), seed do
+wave-manager por run, Dense Fog no render3d, chips de casco no Hangar com prévia, HUD AIM MANUAL feito.
 
-**Avisos de processo (18/10):** o container pode reiniciar e derrubar workers (o trabalho em disco sobrevive;
-relançar com "continue do que está na árvore"); `pgrep -f` mata o próprio shell do worker; dois workers no mesmo
-arquivo exigem separar hunks no commit; desligar temporizadores antigos ao rearmar.
+**Avisos de processo (18/10):** `pgrep -f`/`pkill -f` matam o próprio shell do worker; dois workers no mesmo arquivo
+exigem separar hunks; o container pode reiniciar (trabalho em disco sobrevive); desligar temporizadores antigos.
 
 ## Visual (palavras dele, 18/10, primeira vez jogando a Rodada 4)
 

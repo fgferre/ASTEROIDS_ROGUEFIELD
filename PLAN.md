@@ -255,6 +255,24 @@ Conteúdo:
 - [x] **R6.7 Áudio espacial.** Atenuação por distância + filtro passa-baixa por distância nos cues de inimigo, camada
       de percussão por bioma que entra com a intensidade, voz dos Wardens nas transmissões (síntese granular curta).
 
+## Rodada 7 (18/10, manhã) — consolidação enquanto ele não joga: dívidas do BACKLOG + meta de draw calls
+
+Qualidade:
+
+- [~] **R7.1 Máquinas em menos malhas.** Fundir as partes estáticas de cada máquina (Mote, Seeker, Tether, Husk, Ram,
+  Weaver, Bulwark, Heralds, placas dos Wardens) numa geometria com cor por vértice; só partes animadas separadas;
+  meta < 80 draw calls na cena carregada (40 rochas + 10 máquinas) no ultra.
+- [x] **R7.2 Pequenos acabamentos de UX.** Chip AIM MANUAL, linha de lock 3D a partir da torreta, Esc fecha Settings
+      aberto do menu, setas de fora de tela não caem sobre painéis, chips de casco com nome em uma linha, dicas estáticas
+      de teclado com o esquema moderno, salvage escalado pela dificuldade.
+- [x] **R7.3 Dívidas.** Apagar código morto listado no BACKLOG (initializeMusicController, RenderBatch/GradientCache/
+      CanvasStateManager, teste scope-freeze de `.planning/`, cópias de resolveRandom, pools duplicados), unificar os
+      dois painéis de desempenho, passe de verdade em `docs/plans` e `docs/validation`.
+      Conteúdo:
+- [x] **R7.4 Modificadores de camada no infinito.** A partir da 16, cada camada sorteia um modificador visível
+      ("Dense fog" alcance de radar menor, "Magnetic storm" fagulhas erráticas, "Hunters' moon" só Seekers e Rams,
+      "Glass field" rochas voláteis) com banner e cue.
+
 ## Fora de escopo deste plano
 
 Steam, mobile/touch, multiplayer, narrativa, reescrita do gameplay em WebGL (ver decisão 1), troca do framework de

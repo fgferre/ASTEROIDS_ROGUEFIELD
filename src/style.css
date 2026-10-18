@@ -658,10 +658,14 @@ select {
 }
 
 .menu-ship-selector__name {
+  min-width: 0;
+  overflow: hidden;
   color: var(--text);
   font-family: var(--font-display);
   font-size: var(--text-xs);
   text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -1264,6 +1268,12 @@ select {
 /* Hints for the last device used (UISystem sets data-input-device). */
 body[data-input-device='gamepad'] [data-device='keyboard'],
 body:not([data-input-device='gamepad']) [data-device='gamepad'] {
+  display: none;
+}
+
+/* Keyboard hints for the control scheme (UISystem sets data-controls). */
+body[data-controls='classic'] [data-scheme='modern'],
+body:not([data-controls='classic']) [data-scheme='classic'] {
   display: none;
 }
 

@@ -36,7 +36,11 @@ import {
 } from '../../../data/constants/gameplay.js';
 import { ENEMY_TYPES, BOSS_CONFIG } from '../../../data/constants/visual.js';
 import { IS_DEV } from '../../../core/env.js';
-import { FIELD_EVENTS, directorFor } from '../../../data/layers.js';
+import {
+  FIELD_EVENTS,
+  LAYER_MODIFIERS,
+  directorFor,
+} from '../../../data/layers.js';
 import { scaleDirector } from '../../../data/difficulty.js';
 import { HERALD_SPAWN_AT } from '../../../data/enemies/herald.js';
 import { PALETTE, withAlpha } from '../../../data/constants/palette.js';
@@ -155,6 +159,8 @@ export class WaveManager {
     this.layerSchedule = [];
     this.activeFieldEvents = [];
     this.layerElapsed = 0;
+    // The layer's modifier id (LAYER_MODIFIERS) while it plays, else null.
+    this.layerModifier = null;
 
     this.connectEventListeners();
 
@@ -782,12 +788,14 @@ export class WaveManager {
     const waveNumber = this.currentWave;
     const waveManagerSpawnsAsteroids = this.shouldWaveManagerSpawnAsteroids();
     // Same scaling as EnemySystem.layerDirector (difficulty spawnCount).
-    const director = scaleDirector(
-      directorFor(waveNumber),
-      resolveService(
-        'difficulty',
-        this.enemySystem.dependencies
-      )?.getModifiers().spawnCount ?? 1
+    const director = this.applyHuntersMoon(
+      scaleDirector(
+        directorFor(waveNumber, this.getRandomService().seed),
+        resolveService(
+          'difficulty',
+          this.enemySystem.dependencies
+        )?.getModifiers().spawnCount ?? 1
+      )
     );
     let config;
 
@@ -868,6 +876,9 @@ export class WaveManager {
     };
 
     this.eventBus.emit('wave-started', waveEventPayload);
+    if (director.modifier) {
+      this.startLayerModifier(director.modifier);
+    }
 
     // D-04: pre-boss tension trigger (one wave before a boss)
     if (this.isBossWave(waveNumber + 1)) {
@@ -1386,6 +1397,68 @@ export class WaveManager {
       x: point.x,
       y: point.y,
     });
+  }
+
+  /**
+   * Hunters' Moon: the roster keeps only its kinds, each count scaled;
+   * surges keep their size, spawning only those kinds.
+   */
+  applyHuntersMoon(director) {
+    if (director.modifier !== 'hunters-moon') return director;
+    const { kinds, countScale } = LAYER_MODIFIERS['hunters-moon'];
+    return {
+      ...director,
+      roster: director.roster
+        .filter((entry) => kinds.includes(entry.kind))
+        .map((entry) => ({
+          ...entry,
+          count: Math.round(entry.count * countScale),
+        })),
+      surges: director.surges
+        .map((surge) => ({
+          ...surge,
+          kinds: surge.kinds.filter((kind) => kinds.includes(kind)),
+        }))
+        .filter((surge) => surge.kinds.length > 0),
+    };
+  }
+
+  /**
+   * Starts the layer's modifier and emits 'layer-modifier-started'
+   * {layer, id, label, color}; 'layer-modifier-ended' {id} follows when the
+   * layer ends. Glass Field is read on rock spawn (layerModifier); Magnetic
+   * Storm sets the XP sparks drifting, seeded by run and layer.
+   */
+  startLayerModifier(id) {
+    const { label, color } = LAYER_MODIFIERS[id];
+    this.layerModifier = id;
+    if (id === 'magnetic-storm') {
+      this.enemySystem
+        .getCachedXPOrbs?.()
+        ?.setDrift(
+          LAYER_MODIFIERS[id],
+          new RandomService(
+            `magnetic-storm:${this.getRandomService().seed}:${this.currentWave}`
+          )
+        );
+    }
+    this.eventBus.emit('layer-modifier-started', {
+      layer: this.currentWave,
+      id,
+      label,
+      color,
+    });
+  }
+
+  /** Ends the layer's modifier, if any (layer over, run reset). */
+  endLayerModifier() {
+    const id = this.layerModifier;
+    if (!id) return;
+    this.layerModifier = null;
+    if (id === 'magnetic-storm') {
+      this.enemySystem.getCachedXPOrbs?.()?.setDrift(null);
+    }
+    this.eventBus.emit('layer-modifier-ended', { id });
   }
 
   /** A point at a seeded angle and distance from the ship, inside the field. */
@@ -2408,6 +2481,7 @@ export class WaveManager {
     this._legacyRegisteredEnemies = new WeakSet();
     this._trackedDynamicMinions = new WeakSet();
     this.endFieldEvents();
+    this.endLayerModifier();
 
     // Emit wave complete event
     this.eventBus.emit('wave-complete', {
@@ -2490,6 +2564,7 @@ export class WaveManager {
     this.layerSchedule = [];
     this.layerElapsed = 0;
     this.endFieldEvents();
+    this.endLayerModifier();
     this.spawnTimer = 0;
     this.waveCountdown = 0;
     this.spawnDelayMultiplier = 1;

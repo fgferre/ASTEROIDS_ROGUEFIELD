@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { installDomStubs } from '../../__helpers__/headlessGame.js';
 import UISystem from '../../../src/modules/UISystem.js';
 import SETTINGS_SCHEMA from '../../../src/data/settingsSchema.js';
@@ -104,5 +104,19 @@ describe('Settings panel', () => {
       settingPreview('bloom', true, { postProcessing: false })
     ).toMatchObject({ glow: false });
     expect(settingPreview('masterVolume', 1)).toBeNull();
+  });
+
+  it('closes on Esc when opened from the menu, not over pause or mid-binding', () => {
+    const escFor = (state) => {
+      const ui = Object.assign(Object.create(UISystem.prototype), {
+        settingsState: { isOpen: true, capture: null, ...state },
+        closeSettingsPanel: vi.fn(),
+      });
+      ui.handleSettingsKeyDown({ key: 'Escape', preventDefault() {} });
+      return ui.closeSettingsPanel.mock.calls.length;
+    };
+    expect(escFor({ source: 'menu' })).toBe(1);
+    expect(escFor({ source: 'pause' })).toBe(0);
+    expect(escFor({ source: 'menu', capture: { device: 'keyboard' } })).toBe(0);
   });
 });

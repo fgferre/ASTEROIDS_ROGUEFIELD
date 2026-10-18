@@ -4,6 +4,7 @@ import {
   bossSegments,
   comboTier,
   damageArcAngle,
+  edgeArrow,
   radarGlyph,
 } from '../../../src/modules/ui/AAAHudLayout.js';
 import { PICKUP_KINDS } from '../../../src/data/pickups.js';
@@ -158,6 +159,51 @@ describe('AAAHudLayout radar jam', () => {
   });
 });
 
+describe('AAAHudLayout layer modifier', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'performance'],
+    });
+    vi.stubGlobal('window', {
+      setTimeout: (fn, ms) => setTimeout(fn, ms),
+      clearTimeout: (id) => clearTimeout(id),
+    });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('shows the MODIFIER banner in its colour once the LAYER banner ends', () => {
+    const hud = new AAAHudLayout();
+    hud.els = {
+      layerBanner: fakeElement(),
+      layerBannerTitle: fakeElement(),
+      layerBannerSub: fakeElement(),
+    };
+    hud.showLayerBanner(17);
+    hud.showModifierBanner('Glass Field', '#5eead4');
+    vi.advanceTimersByTime(0);
+    expect(hud.els.layerBannerTitle.textContent).toBe('LAYER 17');
+
+    vi.advanceTimersByTime(1250);
+
+    const banner = hud.els.layerBanner;
+    expect(hud.els.layerBannerTitle.textContent).toBe('MODIFIER');
+    expect(hud.els.layerBannerSub.textContent).toBe('Glass Field');
+    expect(banner.classList.contains('is-modifier')).toBe(true);
+    expect(banner.style['--modifier-color']).toBe('#5eead4');
+  });
+
+  it('scales the radar range for Dense Fog and back', () => {
+    const hud = new AAAHudLayout();
+    hud.setRadarRange(0.5);
+    expect(hud.radarRangeFactor).toBe(0.5);
+    hud.setRadarRange(1);
+    expect(hud.radarRangeFactor).toBe(1);
+  });
+});
+
 describe('AAAHudLayout radar glyphs', () => {
   it('picks the blip glyph by enemy type and elite flag', () => {
     const glyphs = [
@@ -221,6 +267,38 @@ describe('AAAHudLayout off-screen arrows', () => {
     // Back on screen: the arrow goes away.
     hud.updateEdgeArrows([{ kind: 'warden', x: 600, y: 300 }]);
     expect(visible()).toHaveLength(0);
+  });
+});
+
+describe('AAAHudLayout off-screen arrows around the panels', () => {
+  const corners = {
+    topLeft: { w: 220, h: 120 },
+    topRight: { w: 230, h: 240 },
+    bottomLeft: { w: 260, h: 110 },
+    bottomRight: { w: 250, h: 130 },
+  };
+
+  it('slides the arrow along its edge off the corner panels', () => {
+    const upLeft = edgeArrow({ x: -500, y: -400 }, 800, 600, 28, corners);
+    expect(upLeft).toMatchObject({ edge: 'top', x: 248, y: 28 });
+    const right = edgeArrow({ x: 1400, y: 50 }, 800, 600, 28, corners);
+    expect(right).toMatchObject({ edge: 'right', x: 772, y: 268 });
+    // Between the panels it stays where it points.
+    const below = edgeArrow({ x: 400, y: 900 }, 800, 600, 28, corners);
+    expect(below).toMatchObject({ edge: 'bottom', x: 400, y: 572 });
+  });
+});
+
+describe('AAAHudLayout AIM chip', () => {
+  it('reads MANUAL while the right stick aims, AUTO after', () => {
+    const hud = new AAAHudLayout();
+    hud.els = { aimModeIndicator: fakeElement() };
+    hud.setAimStick(true);
+    hud.updateModeIndicators('concentrated', 'auto');
+    expect(hud.els.aimModeIndicator.innerText).toBe('MANUAL');
+    hud.setAimStick(false);
+    hud.updateModeIndicators('concentrated', 'auto');
+    expect(hud.els.aimModeIndicator.innerText).toBe('AUTO');
   });
 });
 

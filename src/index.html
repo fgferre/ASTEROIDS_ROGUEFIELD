@@ -137,14 +137,22 @@
               data-device="keyboard"
               aria-label="Controls"
             >
-              <li><kbd>W</kbd><kbd>↑</kbd> thrust</li>
-              <li><kbd>A</kbd><kbd>D</kbd> turn</li>
+              <li data-scheme="modern"><kbd>WASD</kbd> move</li>
+              <li data-scheme="classic"><kbd>W</kbd><kbd>↑</kbd> thrust</li>
+              <li data-scheme="classic"><kbd>A</kbd><kbd>D</kbd> turn</li>
               <li><kbd>Shift</kbd> dash</li>
               <li><kbd>E</kbd> shield</li>
-              <li><kbd>G</kbd> spread mode</li>
-              <li><kbd>T</kbd> aim mode</li>
+              <li data-scheme="classic"><kbd>G</kbd> spread mode</li>
+              <li data-scheme="classic"><kbd>T</kbd> aim mode</li>
+              <li><kbd>R</kbd> reroll</li>
+              <li><kbd>B</kbd> banish</li>
               <li><kbd>Esc</kbd> pause</li>
-              <li class="controls-hints__note">Shooting is automatic</li>
+              <li class="controls-hints__note" data-scheme="modern">
+                Turret auto-aims
+              </li>
+              <li class="controls-hints__note" data-scheme="classic">
+                Shooting is automatic
+              </li>
             </ul>
             <ul
               class="controls-hints"
@@ -253,13 +261,19 @@
             data-device="keyboard"
             aria-label="Controls"
           >
-            <li><kbd>W</kbd><kbd>↑</kbd> thrust</li>
-            <li><kbd>A</kbd><kbd>D</kbd> turn</li>
+            <li data-scheme="modern"><kbd>WASD</kbd> move</li>
+            <li data-scheme="classic"><kbd>W</kbd><kbd>↑</kbd> thrust</li>
+            <li data-scheme="classic"><kbd>A</kbd><kbd>D</kbd> turn</li>
             <li><kbd>Shift</kbd> dash</li>
             <li><kbd>E</kbd> shield</li>
-            <li><kbd>G</kbd> spread mode</li>
-            <li><kbd>T</kbd> aim mode</li>
+            <li data-scheme="classic"><kbd>G</kbd> spread mode</li>
+            <li data-scheme="classic"><kbd>T</kbd> aim mode</li>
+            <li><kbd>R</kbd> reroll</li>
+            <li><kbd>B</kbd> banish</li>
             <li><kbd>Esc</kbd> resume</li>
+            <li class="controls-hints__note" data-scheme="modern">
+              Turret auto-aims
+            </li>
           </ul>
           <ul
             class="controls-hints"

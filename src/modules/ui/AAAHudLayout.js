@@ -49,16 +49,23 @@ export function damageArcAngle(ship, source) {
   return Math.atan2(dy, dx);
 }
 
+const clampToTrack = (value, min, max) =>
+  min > max ? (min + max) / 2 : Math.min(max, Math.max(min, value));
+
 /**
  * Where an off-screen marker sits for a screen point: null inside the
  * width×height view, else the point on the inset edge toward it, the
  * pointing angle and which edge ('left' | 'right' | 'top' | 'bottom').
+ * `corners` ({ topLeft, topRight, bottomLeft, bottomRight } as { w, h }
+ * boxes from each screen corner) keeps the point off the HUD panels by
+ * sliding it along its edge.
  */
 export function edgeArrow(
   point,
   width = GAME_WIDTH,
   height = GAME_HEIGHT,
-  margin = EDGE_ARROW_MARGIN
+  margin = EDGE_ARROW_MARGIN,
+  corners = null
 ) {
   if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) {
     return null;
@@ -73,12 +80,21 @@ export function edgeArrow(
   const scale = Math.min(sx, sy);
   let edge = dy > 0 ? 'bottom' : 'top';
   if (sx <= sy) edge = dx > 0 ? 'right' : 'left';
-  return {
-    x: width / 2 + dx * scale,
-    y: height / 2 + dy * scale,
-    angle: Math.atan2(dy, dx),
-    edge,
-  };
+  let x = width / 2 + dx * scale;
+  let y = height / 2 + dy * scale;
+  if (corners) {
+    const { topLeft, topRight, bottomLeft, bottomRight } = corners;
+    if (edge === 'left' || edge === 'right') {
+      const top = edge === 'left' ? topLeft : topRight;
+      const bottom = edge === 'left' ? bottomLeft : bottomRight;
+      y = clampToTrack(y, top.h + margin, height - bottom.h - margin);
+    } else {
+      const left = edge === 'top' ? topLeft : bottomLeft;
+      const right = edge === 'top' ? topRight : bottomRight;
+      x = clampToTrack(x, left.w + margin, width - right.w - margin);
+    }
+  }
+  return { x, y, angle: Math.atan2(dy, dx), edge };
 }
 
 /** Radar blip glyph for an enemy: rock, machine, elite, herald or warden. */
@@ -139,11 +155,15 @@ export class AAAHudLayout {
     this._blipPool = [];
     this._arcPool = [];
     this._arrowPool = [];
+    this._panelCorners = null;
+    this._aimStick = false;
     this._radarJammed = false;
     this._radarNoise = new RandomService('radar-jam');
     this._radarNoiseAt = -Infinity;
+    this.radarRangeFactor = 1;
     this._timers = new Set();
     this._bannerTimer = null;
+    this._modifierBannerTimer = null;
     this._bannerEndsAt = 0;
     this._bossIntroEndsAt = 0;
     this._transmissionHideTimer = null;
@@ -234,10 +254,14 @@ export class AAAHudLayout {
     this._blipPool = [];
     this._arcPool = [];
     this._arrowPool = [];
+    this._panelCorners = null;
+    this._aimStick = false;
     this._radarJammed = false;
+    this.radarRangeFactor = 1;
     this._timers.forEach((id) => window.clearTimeout(id));
     this._timers.clear();
     this._bannerTimer = null;
+    this._modifierBannerTimer = null;
     this._bannerEndsAt = 0;
     this._bossIntroEndsAt = 0;
     this._transmissionHideTimer = null;
@@ -293,6 +317,19 @@ export class AAAHudLayout {
     this._showBanner('EVENT', { tone: 'event', subtitle: label });
   }
 
+  /**
+   * "MODIFIER" banner with the layer modifier's label underneath, in its
+   * `color`; it waits for the banner on screen (the LAYER one) to end.
+   */
+  showModifierBanner(label, color) {
+    const delayMs = Math.max(0, this._bannerEndsAt - performance.now());
+    this._modifierBannerTimer = this._later(() => {
+      this._modifierBannerTimer = null;
+      this.els?.layerBanner?.style.setProperty('--modifier-color', color);
+      this._showBanner('MODIFIER', { tone: 'modifier', subtitle: label });
+    }, delayMs);
+  }
+
   /** Violet "HERALD OF …" banner with the Herald's line underneath. */
   showHeraldBanner(name, subtitle) {
     this._showBanner(String(name).toUpperCase(), {
@@ -303,7 +340,8 @@ export class AAAHudLayout {
 
   /**
    * The centered banner, shown for `durationMs`, the last FADE_OUT_MS
-   * fading. `tone` 'boss', 'surge', 'event' or 'herald' recolours it.
+   * fading. `tone` 'boss', 'surge', 'event', 'herald' or 'modifier'
+   * recolours it.
    */
   _showBanner(
     title,
@@ -329,6 +367,7 @@ export class AAAHudLayout {
       banner.classList.toggle('is-surge', tone === 'surge');
       banner.classList.toggle('is-event', tone === 'event');
       banner.classList.toggle('is-herald', tone === 'herald');
+      banner.classList.toggle('is-modifier', tone === 'modifier');
       banner.classList.remove('is-leaving');
       this._replay(banner, 'is-showing');
       this._bannerTimer = this._later(() => {
@@ -346,6 +385,10 @@ export class AAAHudLayout {
     if (this._bannerTimer) {
       this._cancel(this._bannerTimer);
       this._bannerTimer = null;
+    }
+    if (this._modifierBannerTimer) {
+      this._cancel(this._modifierBannerTimer);
+      this._modifierBannerTimer = null;
     }
     this._bannerEndsAt = 0;
     this.els?.layerBanner?.classList.remove('is-showing', 'is-leaving');
@@ -652,9 +695,14 @@ export class AAAHudLayout {
       this.els.spreadModeIndicator.innerText = label;
     }
     if (this.els.aimModeIndicator) {
-      const label = aimMode === 'manual' ? 'MANUAL' : 'AUTO';
+      const label = aimMode === 'manual' || this._aimStick ? 'MANUAL' : 'AUTO';
       this.els.aimModeIndicator.innerText = label;
     }
+  }
+
+  /** The right stick aims by hand while held: the AIM chip reads MANUAL. */
+  setAimStick(active) {
+    this._aimStick = Boolean(active);
   }
 
   /**
@@ -1155,6 +1203,11 @@ export class AAAHudLayout {
     }
   }
 
+  /** Dense Fog: the radar reaches `factor` of its usual range (1 = normal). */
+  setRadarRange(factor) {
+    this.radarRangeFactor = factor;
+  }
+
   /** Sensor Jam: noise instead of blips and a "NO SIGNAL" label while on. */
   setRadarJammed(jammed) {
     this._radarJammed = Boolean(jammed);
@@ -1244,6 +1297,9 @@ export class AAAHudLayout {
    * order; the first EDGE_ARROW_MAX off-screen ones get an arrow.
    */
   updateEdgeArrows(targets) {
+    if (!this._panelCorners) {
+      this._panelCorners = this._measurePanelCorners();
+    }
     let used = 0;
     for (
       let i = 0;
@@ -1251,7 +1307,13 @@ export class AAAHudLayout {
       i += 1
     ) {
       const target = targets[i];
-      const arrow = edgeArrow(target);
+      const arrow = edgeArrow(
+        target,
+        GAME_WIDTH,
+        GAME_HEIGHT,
+        EDGE_ARROW_MARGIN,
+        this._panelCorners
+      );
       if (!arrow) {
         continue;
       }
@@ -1281,6 +1343,45 @@ export class AAAHudLayout {
       const { el } = this._arrowPool[i];
       if (el.style.display !== 'none') el.style.display = 'none';
     }
+  }
+
+  /** The panel layout changed (resize, HUD scale): measure it again. */
+  invalidatePanelCorners() {
+    this._panelCorners = null;
+  }
+
+  /**
+   * The four corner panels as { w, h } boxes from their screen corner, in
+   * 800×600 units; null while the HUD has no layout (hidden).
+   */
+  _measurePanelCorners() {
+    const layer = this.els?.direction;
+    const view = layer?.getBoundingClientRect?.();
+    if (!view || !(view.width > 0) || !(view.height > 0)) {
+      return null;
+    }
+    const sx = GAME_WIDTH / view.width;
+    const sy = GAME_HEIGHT / view.height;
+    // Every element the selector matches, joined into one box.
+    const box = (selector, fromRight, fromBottom) => {
+      const out = { w: 0, h: 0 };
+      this._root.querySelectorAll(selector).forEach((el) => {
+        const rect = el.getBoundingClientRect();
+        if (!(rect.width > 0)) return;
+        const w = fromRight ? view.right - rect.left : rect.right - view.left;
+        const h = fromBottom ? view.bottom - rect.top : rect.bottom - view.top;
+        out.w = Math.max(out.w, w * sx);
+        out.h = Math.max(out.h, h * sy);
+      });
+      return out;
+    };
+    return {
+      topLeft: box('.stats-area', false, false),
+      // The kill feed hangs under the radar (its min-height holds the rows).
+      topRight: box('.radar-area, .hud-feed', true, false),
+      bottomLeft: box('.status-area', false, true),
+      bottomRight: box('.systems-area', true, true),
+    };
   }
 
   _getHTML() {
@@ -1620,6 +1721,9 @@ export class AAAHudLayout {
             .layer-banner.is-event .layer-banner__sub { color: var(--xp); }
             .layer-banner.is-herald .layer-banner__title { color: var(--text); text-shadow: 0 0 18px var(--boss), 0 0 4px var(--boss), 0 2px 0 rgba(0, 0, 0, 0.8); }
             .layer-banner.is-herald .layer-banner__line { background: linear-gradient(90deg, transparent, var(--boss) 20%, var(--boss) 80%, transparent); box-shadow: 0 0 12px var(--boss); }
+            .layer-banner.is-modifier .layer-banner__title { color: var(--modifier-color); text-shadow: 0 0 18px var(--modifier-color), 0 2px 0 rgba(0, 0, 0, 0.8); }
+            .layer-banner.is-modifier .layer-banner__line { background: linear-gradient(90deg, transparent, var(--modifier-color) 20%, var(--modifier-color) 80%, transparent); box-shadow: 0 0 12px var(--modifier-color); }
+            .layer-banner.is-modifier .layer-banner__sub { color: var(--modifier-color); }
             .layer-banner.is-herald .layer-banner__sub { color: color-mix(in srgb, var(--boss) 45%, var(--text)); text-transform: none; letter-spacing: 0.2em; margin-right: -0.2em; }
 
             .cinematic-hint { position: absolute; bottom: 64px; left: 0; width: 100%; text-align: center; font-family: var(--font-mono); font-size: var(--text-xs); letter-spacing: 0.3em; color: var(--text-dim); text-shadow: 0 0 8px rgba(0, 0, 0, 0.9); pointer-events: none; z-index: 90; opacity: 0; visibility: hidden; }
@@ -1651,7 +1755,7 @@ export class AAAHudLayout {
             .onboarding-tip__text { font-family: var(--font-ui); font-size: var(--text-md); font-weight: 600; letter-spacing: 0.04em; color: var(--text); }
 
             /* KILL FEED */
-            .hud-feed { position: absolute; top: calc(220px + var(--space-6)); right: var(--space-4); width: 200px; display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); pointer-events: none; z-index: 30; }
+            .hud-feed { position: absolute; top: calc(220px + var(--space-6)); right: var(--space-4); width: 200px; min-height: calc(${FEED_MAX_ROWS} * (var(--text-md) * 1.25 + 4px + var(--space-1))); display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-1); pointer-events: none; z-index: 30; }
             .feed-row { display: flex; align-items: baseline; gap: var(--space-2); padding: 2px var(--space-2); background: linear-gradient(270deg, var(--surface) 0%, transparent 100%); border-right: 2px solid var(--neutral); font-family: var(--font-ui); font-size: var(--text-md); font-weight: 600; letter-spacing: 1px; color: var(--text); white-space: nowrap; }
             .feed-row.is-leaving { opacity: 0; }
             .feed-value { font-family: var(--font-display); font-size: var(--text-sm); color: var(--text-dim); }

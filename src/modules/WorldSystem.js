@@ -1,4 +1,5 @@
 import { BaseSystem } from '../core/BaseSystem.js';
+import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 
 const WORLD_SERVICE_MAP = {
   player: 'player',
@@ -32,6 +33,10 @@ class WorldSystem extends BaseSystem {
     this.registerEventListener('physics-reset', () => {
       this.resolveCachedServices(WORLD_SERVICE_MAP, { force: true });
     });
+  }
+
+  getBounds() {
+    return { width: GAME_WIDTH, height: GAME_HEIGHT };
   }
 
   update() {

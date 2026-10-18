@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { WaveManager } from '../../src/modules/enemies/managers/WaveManager.js';
+import {
+  LAYER_MODIFIERS,
+  directorFor,
+  modifierFor,
+} from '../../src/data/layers.js';
 import { createDeterministicRandom } from '../__helpers__/stubs.js';
 import { withWaveOverrides } from '../__helpers__/setup.js';
 
@@ -8,7 +13,7 @@ function createField({ player = { x: 400, y: 300 } } = {}) {
   const random = createDeterministicRandom({ floatValue: 0.5 });
   const active = [];
   const emits = [];
-  const xpOrbs = { startGlobalPull: vi.fn() };
+  const xpOrbs = { startGlobalPull: vi.fn(), setDrift: vi.fn() };
   const effects = { addScreenFlash: vi.fn() };
   const eventBus = {
     on: vi.fn(),
@@ -278,6 +283,92 @@ describe('WaveManager field events', () => {
       expect(eventsOf(field, 'field-event-ended')).toEqual([
         { kind: 'sensor-jam' },
       ]);
+    });
+  });
+});
+
+describe('WaveManager layer modifiers', () => {
+  const eventsOf = (field, name) =>
+    field.emits.filter((e) => e.event === name).map((e) => e.payload);
+  // The stub random has no seed: the run seed is 0.
+  const firstFieldLayerWith = (id) => {
+    let n = 16;
+    while (modifierFor(n, 0) !== id || n % 5 === 0) n += 1;
+    return n;
+  };
+
+  it("keeps only Seekers and Rams on a Hunters' Moon, 30 % more of each", async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const field = createField();
+      const layer = firstFieldLayerWith('hunters-moon');
+      startLayer(field, layer);
+
+      const trickled = new Map();
+      for (const entry of field.manager.layerSchedule) {
+        if (entry.surge || entry.event) continue;
+        for (const { kind, count } of entry.groups) {
+          trickled.set(kind, (trickled.get(kind) || 0) + count);
+        }
+      }
+      const base = directorFor(layer).roster;
+      const scaled = (kind) =>
+        Math.round(base.find((e) => e.kind === kind).count * 1.3);
+      expect(Object.fromEntries(trickled)).toEqual({
+        ram: scaled('ram'),
+        hunter: scaled('hunter'),
+      });
+      const surgeKinds = field.manager.layerSchedule
+        .filter((entry) => entry.surge)
+        .flatMap((entry) => entry.groups.map((g) => g.kind));
+      expect(new Set(surgeKinds)).toEqual(new Set(['ram', 'hunter']));
+      expect(eventsOf(field, 'layer-modifier-started')).toEqual([
+        {
+          layer,
+          id: 'hunters-moon',
+          label: "Hunters' Moon",
+          color: LAYER_MODIFIERS['hunters-moon'].color,
+        },
+      ]);
+    });
+  });
+
+  it('flags a Glass Field for the rock spawns until the layer ends', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const field = createField();
+      startLayer(field, firstFieldLayerWith('glass-field'));
+      expect(field.manager.layerModifier).toBe('glass-field');
+
+      field.manager.completeWave();
+
+      expect(field.manager.layerModifier).toBeNull();
+      expect(eventsOf(field, 'layer-modifier-ended')).toEqual([
+        { id: 'glass-field' },
+      ]);
+    });
+  });
+
+  it('sets the XP sparks drifting through a Magnetic Storm, and stops them', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const field = createField();
+      startLayer(field, firstFieldLayerWith('magnetic-storm'));
+
+      expect(field.xpOrbs.setDrift).toHaveBeenCalledWith(
+        LAYER_MODIFIERS['magnetic-storm'],
+        expect.objectContaining({ range: expect.any(Function) })
+      );
+
+      field.manager.completeWave();
+
+      expect(field.xpOrbs.setDrift).toHaveBeenLastCalledWith(null);
+    });
+  });
+
+  it('rolls no modifier inside the 15-layer table', async () => {
+    await withWaveOverrides({ managerHandlesAsteroids: false }, () => {
+      const field = createField();
+      startLayer(field, 14);
+      expect(field.manager.layerModifier).toBeNull();
+      expect(eventsOf(field, 'layer-modifier-started')).toEqual([]);
     });
   });
 });

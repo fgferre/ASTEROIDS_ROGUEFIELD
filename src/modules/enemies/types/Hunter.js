@@ -3,7 +3,6 @@ import {
   HUNTER_CONFIG,
 } from '../../../data/enemies/hunter.js';
 import { ENEMY_EFFECT_COLORS } from '../../../core/GameConstants.js';
-import RandomService from '../../../core/RandomService.js';
 import { BaseEnemy } from '../base/BaseEnemy.js';
 
 const HUNTER_DEFAULTS = HUNTER_CONFIG ?? {};
@@ -112,28 +111,6 @@ export class Hunter extends BaseEnemy {
     this.turretAngle = Number.isFinite(turretAngle) ? turretAngle : 0;
 
     return this;
-  }
-
-  resolveRandom(config = {}) {
-    if (config.random && typeof config.random.float === 'function') {
-      return config.random;
-    }
-
-    if (this.system && typeof this.system.getRandomScope === 'function') {
-      const scope = config.randomScope || 'hunter';
-      const generator = this.system.getRandomScope(scope, {
-        parentScope: config.randomParentScope || 'spawn',
-        label: `enemy:${this.type}:${config.id || this.id || 'spawn'}`,
-      });
-
-      if (generator && typeof generator.fork === 'function') {
-        return generator.fork(`${this.type}:core`);
-      }
-
-      return generator || null;
-    }
-
-    return new RandomService(`enemy:${this.type}`);
   }
 
   randomDirection() {

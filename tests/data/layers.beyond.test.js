@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { MAX_ASTEROIDS_ON_SCREEN } from '../../src/data/constants/gameplay.js';
 import { bossKindForLayer } from '../../src/data/enemies/boss.js';
-import { directorFor } from '../../src/data/layers.js';
+import {
+  LAYER_MODIFIERS,
+  MODIFIER_FROM,
+  directorFor,
+  modifierFor,
+} from '../../src/data/layers.js';
 
 const DEEP = Array.from({ length: 15 }, (_, index) => 16 + index); // 16–30
 const rosterTotal = (layer) =>
@@ -50,5 +55,42 @@ describe('layers past the table (endless run)', () => {
       });
     });
     expect(directorFor(200).roster[0].elite).toBe(0.5);
+  });
+});
+
+describe('layer modifiers (endless run)', () => {
+  it('lists four modifiers, each with a label and a colour', () => {
+    expect(Object.keys(LAYER_MODIFIERS)).toEqual([
+      'dense-fog',
+      'magnetic-storm',
+      'hunters-moon',
+      'glass-field',
+    ]);
+    Object.values(LAYER_MODIFIERS).forEach(({ label, color }) => {
+      expect(label).toEqual(expect.any(String));
+      expect(color).toMatch(/^#[0-9a-f]{6}$/);
+    });
+  });
+
+  it('rolls one from layer 16 on, the same for the same run seed', () => {
+    expect(MODIFIER_FROM).toBe(16);
+    expect(modifierFor(15, 7)).toBeNull();
+    DEEP.forEach((n) => {
+      expect(Object.keys(LAYER_MODIFIERS)).toContain(
+        directorFor(n, 7).modifier
+      );
+      expect(directorFor(n, 7).modifier).toBe(modifierFor(n, 7));
+    });
+    const run = (seed) => DEEP.map((n) => modifierFor(n, seed));
+    expect(run(7)).toEqual(run(7));
+    expect(run(7)).not.toEqual(run(8));
+  });
+
+  it('never repeats a modifier two layers in a row', () => {
+    [0, 7, 12345].forEach((seed) => {
+      for (let n = 17; n <= 60; n += 1) {
+        expect(modifierFor(n, seed)).not.toBe(modifierFor(n - 1, seed));
+      }
+    });
   });
 });

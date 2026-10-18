@@ -64,6 +64,48 @@ const fieldEvent = (kind, at) => ({
   label: FIELD_EVENTS[kind].label,
 });
 
+/**
+ * Layer modifiers (proposta 18/10): from layer MODIFIER_FROM on, every layer
+ * rolls one, announced by a "MODIFIER" banner in its `color`. Dense Fog: the
+ * radar reaches `radarRange` of its usual range. Magnetic Storm: every XP
+ * spark drifts at `driftSpeed` px/s, turning up to `driftTurn` rad/s at
+ * random, and the ship's pull is ×`pullScale`. Hunters' Moon: the roster is
+ * only `kinds` (Seekers and Rams), each count ×`countScale`; surges keep their
+ * size with those kinds. Glass Field: every rock spawns Volatile.
+ */
+export const MODIFIER_FROM = 16;
+export const LAYER_MODIFIERS = deepFreeze({
+  'dense-fog': { label: 'Dense Fog', color: '#818cf8', radarRange: 0.5 },
+  'magnetic-storm': {
+    label: 'Magnetic Storm',
+    color: '#2dd4bf',
+    driftSpeed: 45,
+    driftTurn: 6,
+    pullScale: 0.6,
+  },
+  'hunters-moon': {
+    label: "Hunters' Moon",
+    color: '#a5b4fc',
+    kinds: ['hunter', 'ram'],
+    countScale: 1.3,
+  },
+  'glass-field': { label: 'Glass Field', color: '#5eead4' },
+});
+
+/**
+ * The modifier id of a layer (null before MODIFIER_FROM), rolled from the run
+ * seed and the layer; never the same as the layer before.
+ */
+export function modifierFor(layer, runSeed = 0) {
+  let modifier = null;
+  for (let n = MODIFIER_FROM; n <= layer; n += 1) {
+    modifier = new RandomService(`layer-modifier:${runSeed}:${n}`).pick(
+      Object.keys(LAYER_MODIFIERS).filter((id) => id !== modifier)
+    );
+  }
+  return modifier;
+}
+
 const ROCKFALL = { at: 40, kinds: ['asteroid'], count: 6, label: 'Rockfall' };
 
 export const LAYERS = deepFreeze([
@@ -256,9 +298,10 @@ const BEYOND_EVENT_AT = 30;
  * layer 15's escort, the rest built on layer 14. Counted from 14: rocks +2 per
  * layer (capped at the on-screen limit), roster counts ×1.08 per layer, elite
  * chance +0.03 per layer up to 0.5. Non-Warden layers get one field event at
- * 30 s, its kind rolled from a seed per layer.
+ * 30 s, its kind rolled from a seed per layer. Every layer carries its
+ * modifier id (modifierFor).
  */
-function beyond(layer) {
+function beyond(layer, runSeed) {
   const steps = layer - 14;
   const base = layer % 5 === 0 ? LAYERS[14] : LAYERS[13];
   const elite = Math.min(
@@ -286,11 +329,15 @@ function beyond(layer) {
             BEYOND_EVENT_AT
           ),
         ],
+    modifier: modifierFor(layer, runSeed),
   });
 }
 
-/** The table entry for a layer (1-based); layers past the table use `beyond`. */
-export function directorFor(layer) {
+/**
+ * The table entry for a layer (1-based); layers past the table use `beyond`,
+ * whose modifier rolls from `runSeed`.
+ */
+export function directorFor(layer, runSeed = 0) {
   const n = Math.max(1, Math.floor(Number(layer) || 1));
-  return n <= LAYERS.length ? LAYERS[n - 1] : beyond(n);
+  return n <= LAYERS.length ? LAYERS[n - 1] : beyond(n, runSeed);
 }

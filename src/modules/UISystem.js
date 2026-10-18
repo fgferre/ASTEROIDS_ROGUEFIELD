@@ -10,7 +10,7 @@ import {
   getShipModelById,
 } from '../data/shipModels.js';
 import SETTINGS_SCHEMA from '../data/settingsSchema.js';
-import { directorFor } from '../data/layers.js';
+import { LAYER_MODIFIERS, directorFor } from '../data/layers.js';
 import { HERALD_KINDS } from '../data/enemies/herald.js';
 import { RUN_FINAL_LAYER } from '../data/constants/gameplay.js';
 import { biomeForLayer } from '../data/biomes.js';
@@ -22,6 +22,7 @@ import {
 import { GAME_HEIGHT, GAME_WIDTH } from '../core/GameConstants.js';
 import { resolveService } from '../core/serviceUtils.js';
 import { AAAHudLayout, radarGlyph } from './ui/AAAHudLayout.js';
+import { controlSchemeFromUrl } from './PlayerSystem.js';
 import { Onboarding, onboardingPrompts } from './ui/onboarding.js';
 import { RunCinematics } from './ui/runCinematics.js';
 import {
@@ -240,6 +241,8 @@ class UISystem extends BaseSystem {
     this.initializeSettingsMetadata();
 
     this.domRefs = this.cacheStaticNodes();
+    // The static keyboard hints show the scheme in use (style.css).
+    document.body.dataset.controls = controlSchemeFromUrl();
 
     // Direct AAA HUD Activation
     this.activateAAATacticalHud(this.aaaTacticalHudDefinition);
@@ -598,6 +601,7 @@ class UISystem extends BaseSystem {
   }
 
   handleResize() {
+    this.aaaTacticalHud?.invalidatePanelCorners();
     this.requestViewportScaleUpdate();
   }
 
@@ -733,6 +737,7 @@ class UISystem extends BaseSystem {
       root.style.setProperty('--hud-scale-auto', auto.toFixed(3));
       root.style.setProperty('--hud-scale-effective', effective.toFixed(3));
     }
+    this.aaaTacticalHud?.invalidatePanelCorners();
   }
 
   bootstrapSettingsState() {
@@ -820,6 +825,7 @@ class UISystem extends BaseSystem {
       const label = document.createElement('span');
       label.className = 'menu-ship-selector__name';
       label.textContent = this.getHullDisplayName(hullDefinition);
+      label.title = label.textContent;
       button.appendChild(label);
 
       button.addEventListener('click', () => {
@@ -1136,6 +1142,12 @@ class UISystem extends BaseSystem {
           this.closeSettingsPanel();
         }
       });
+      // Capture phase: before InputSystem's listener commits Esc as a binding.
+      document.addEventListener(
+        'keydown',
+        (event) => this.handleSettingsKeyDown(event),
+        true
+      );
     }
 
     ensureArray(settingsRefs.closeButtons).forEach((button) => {
@@ -1505,7 +1517,10 @@ class UISystem extends BaseSystem {
       (enemies && typeof enemies.getActiveEnemies === 'function' && player)
     ) {
       const pluginConfig = this.aaaTacticalHudDefinition?.plugin || {};
-      const radarRange = Math.max(1, Number(pluginConfig.radarRange) || 1500);
+      const radarRange = Math.max(
+        1,
+        (Number(pluginConfig.radarRange) || 1500) * hud.radarRangeFactor
+      );
 
       let radarEnemies = [];
       if (physics && typeof physics.getNearbyEnemies === 'function') {
@@ -1715,6 +1730,20 @@ class UISystem extends BaseSystem {
       }
     });
 
+    // A layer modifier's banner follows the LAYER one; Dense Fog shortens
+    // the radar until the layer ends.
+    this.registerEventListener('layer-modifier-started', (payload = {}) => {
+      this.aaaTacticalHud?.showModifierBanner(payload.label, payload.color);
+      if (payload.id === 'dense-fog') {
+        this.aaaTacticalHud?.setRadarRange(
+          LAYER_MODIFIERS['dense-fog'].radarRange
+        );
+      }
+    });
+    this.registerEventListener('layer-modifier-ended', (payload = {}) => {
+      if (payload.id === 'dense-fog') this.aaaTacticalHud?.setRadarRange(1);
+    });
+
     // A Herald arrives under a violet banner; Silence jams the radar while it
     // lives (a new run clears it).
     this.registerEventListener('herald-spawned', ({ kind } = {}) => {
@@ -1733,6 +1762,11 @@ class UISystem extends BaseSystem {
     });
     this.registerEventListener('game-started', () => {
       this.aaaTacticalHud?.setRadarJammed(false);
+      this.aaaTacticalHud?.setRadarRange(1);
+      this.aaaTacticalHud?.setAimStick(false);
+    });
+    this.registerEventListener('aim-stick-changed', ({ active } = {}) => {
+      this.aaaTacticalHud?.setAimStick(active);
     });
 
     this.registerEventListener(
@@ -2650,6 +2684,22 @@ class UISystem extends BaseSystem {
     if (activeTab instanceof HTMLElement) {
       activeTab.focus();
     }
+  }
+
+  // Esc closes Settings opened outside the pause screen (there Esc resumes,
+  // and resuming closes it); never while a key binding is being captured.
+  handleSettingsKeyDown(event) {
+    const state = this.settingsState;
+    if (
+      event.key !== 'Escape' ||
+      !state.isOpen ||
+      state.capture ||
+      state.source === 'pause'
+    ) {
+      return;
+    }
+    event.preventDefault();
+    this.closeSettingsPanel();
   }
 
   closeSettingsPanel() {
