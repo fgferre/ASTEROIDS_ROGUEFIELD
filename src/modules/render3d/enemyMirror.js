@@ -10,6 +10,8 @@
 import { IS_DEV } from '../../core/env.js';
 import { PALETTE } from '../../data/constants/palette.js';
 import { BULWARK_SHIELD_HALF_ARC } from '../../data/enemies/bulwark.js';
+import { AFFIX_IDS, ELITE_AFFIXES } from '../../data/enemies/affixes.js';
+import { drawAffixBadge } from '../enemies/components/affixGlyphs.js';
 import { WARDEN_KINDS } from '../../data/enemies/boss.js';
 import { HERALD_KINDS } from '../../data/enemies/herald.js';
 import { createAsteroidGeometry, createSeededRandom } from './asteroidMesh.js';
@@ -36,6 +38,9 @@ const NULL_CLOSED_PX = 70;
 const BREAK_SECONDS = 1.6;
 const WEAVER_ARMS = 3;
 const ELITE_DASHES = 6;
+const BADGE_PX = 13; // world size of an affix badge sprite
+const BADGE_TEXTURE = 64;
+const SWIFT_GHOSTS = [0.05, 0.1, 0.15]; // seconds behind, as in 2D
 const TAU = Math.PI * 2;
 // proposta 18/10: chunks a death throws (machines by radius; final Warden).
 const BURST_MIN = 6;
@@ -725,6 +730,31 @@ export class EnemyMirror {
     // A kind with no look yet: visible, obviously unfinished.
     this.unknownShape = new THREE.OctahedronGeometry(1, 0);
     this.unknownWarned = new Set();
+
+    // Elite affixes: one badge sprite per affix over the enemy (the 2D glyphs
+    // baked once into a texture each), and the live parts — the Shielded
+    // plate, Swift's ghosts, Warded's ring, the Volatile fuse's blast ring.
+    // Badge textures are baked on the first affixed view (badgeMaterials).
+    this.badges = null;
+    const glow = (hex, opacity) =>
+      new THREE.MeshBasicMaterial({
+        color: colorOf(THREE, hex),
+        transparent: true,
+        opacity,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+        toneMapped: false,
+      });
+    this.shieldEdgeMaterial = this.emissive(ELITE_AFFIXES.shielded.color, 1.1);
+    this.ghostDisc = new THREE.CircleGeometry(1, 24);
+    this.ghostDisc.rotateX(-Math.PI / 2);
+    this.ghostMaterials = SWIFT_GHOSTS.map((_, i) =>
+      glow(ELITE_AFFIXES.swift.color, 0.2 * (1 - i / 3))
+    );
+    this.wardMaterial = glow(ELITE_AFFIXES.warded.color, 0.8);
+    this.fuseRing = new THREE.RingGeometry(0.975, 1, 96);
+    this.fuseRing.rotateX(-Math.PI / 2);
   }
 
   // --- pooling ---------------------------------------------------------------
@@ -788,10 +818,19 @@ export class EnemyMirror {
       const view = this.acquire(kind);
       view.seed = i;
       this.bind(view, { variant: look });
-      if (look === true) this.applyElite(view, true);
+      if (look === true) {
+        this.applyElite(view, true);
+        // every affix part on show, so their programs compile now too
+        view.affix ??= this.seeded(() => this.createAffixParts());
+        view.affix.group.visible = true;
+        view.affix.group.children.forEach((part) => (part.visible = true));
+      }
       return view;
     });
     compile();
+    views.forEach((view) => {
+      if (view.affix) view.affix.group.visible = false;
+    });
     views.forEach((view) =>
       this.dissolve.start(view, this.accentOf(view), view.radius || 12)
     );
@@ -826,6 +865,7 @@ export class EnemyMirror {
       id: null,
       elite: false,
       eliteRing: null,
+      affix: null,
       accents: [],
       rims: [],
       ...parts,
@@ -1578,6 +1618,7 @@ export class EnemyMirror {
   die(key, view) {
     this.views.delete(key);
     if (view.telegraph) view.telegraph.group.visible = false;
+    if (view.affix) view.affix.group.visible = false;
     const accent = this.accentOf(view);
     this.dissolve.start(view, accent, view.radius);
     if (view.kind === 'asteroid') return;
@@ -1613,6 +1654,9 @@ export class EnemyMirror {
     object.rotation.y = -(enemy.rotation || 0);
     this.applyElite(view, enemy.elite === true);
     if (view.eliteRing) view.eliteRing.rotation.y = time * 0.5;
+    if (enemy.affixes?.length || view.affix?.group.visible) {
+      this.updateAffixes(view, enemy, time);
+    }
     if (kind === 'hunter') {
       this.setGain(view.lensMaterial, 0.5 + 1.3 * (enemy.telegraphRatio || 0));
     } else if (kind === 'mine') {
@@ -1693,6 +1737,124 @@ export class EnemyMirror {
       view.object.add(view.eliteRing);
     }
     if (view.eliteRing) view.eliteRing.visible = elite;
+  }
+
+  /** affix id → badge sprite material, baked once. */
+  badgeMaterials() {
+    if (this.badges) return this.badges;
+    const { THREE } = this;
+    this.badges = {};
+    AFFIX_IDS.forEach((id) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = BADGE_TEXTURE;
+      canvas.height = BADGE_TEXTURE;
+      const ctx = canvas.getContext('2d');
+      ctx.translate(BADGE_TEXTURE / 2, BADGE_TEXTURE / 2);
+      drawAffixBadge(ctx, ELITE_AFFIXES[id], BADGE_TEXTURE * 0.44, 5);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.encoding = THREE.sRGBEncoding;
+      this.badges[id] = new THREE.SpriteMaterial({
+        map: texture,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+        toneMapped: false,
+      });
+    });
+    return this.badges;
+  }
+
+  // Parts live in their own field-space group (not under the view, which
+  // turns and scales with the hull), built the first time a view needs them.
+  createAffixParts() {
+    const { THREE } = this;
+    const group = new THREE.Group();
+    const badges = [0, 1].map(() => {
+      // its material (badgeMaterials) is set per frame; the program is the
+      // damage numbers' (TextSprites), already compiled
+      const sprite = new THREE.Sprite();
+      sprite.scale.setScalar(BADGE_PX);
+      sprite.renderOrder = 10;
+      return sprite;
+    });
+    const plate = new THREE.Group();
+    plate.add(
+      new THREE.Mesh(this.bulwarkPlate, this.plateMaterial),
+      new THREE.Mesh(this.bulwarkEdge, this.shieldEdgeMaterial)
+    );
+    const ghosts = this.ghostMaterials.map(
+      (material) => new THREE.Mesh(this.ghostDisc, material)
+    );
+    const ward = new THREE.Mesh(this.warnRing, this.wardMaterial);
+    const fuseMaterial = new THREE.MeshBasicMaterial({
+      color: colorOf(THREE, ELITE_AFFIXES.volatile.color),
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+    });
+    const fuse = new THREE.Mesh(this.fuseRing, fuseMaterial);
+    const fuseInner = new THREE.Mesh(this.fuseRing, fuseMaterial);
+    group.add(...badges, plate, ...ghosts, ward, fuse, fuseInner);
+    this.scene.add(group);
+    return { group, badges, plate, ghosts, ward, fuse, fuseInner };
+  }
+
+  updateAffixes(view, enemy, time) {
+    view.affix ??= this.seeded(() => this.createAffixParts());
+    const parts = view.affix;
+    const { affixes } = enemy;
+    parts.group.visible = affixes.length > 0;
+    if (!parts.group.visible) return;
+    const r = enemy.radius || 12;
+    parts.group.position.copy(view.object.position);
+
+    parts.badges.forEach((badge, i) => {
+      badge.visible = i < affixes.length;
+      if (!badge.visible) return;
+      badge.material = this.badgeMaterials()[affixes[i]];
+      const x = (i - (affixes.length - 1) / 2) * BADGE_PX * 1.05;
+      badge.position.set(x, r * 0.8, -(r * 1.25 + BADGE_PX * 0.6));
+    });
+
+    const shielded = enemy.hasAffix('shielded') && !enemy.shieldBroken;
+    parts.plate.visible = shielded;
+    if (shielded) {
+      parts.plate.scale.setScalar(r * 1.08);
+      parts.plate.rotation.y = -(enemy.facing || 0);
+      const ratio = clamp01(enemy.shieldHealth / enemy.maxShieldHealth);
+      this.setGain(this.shieldEdgeMaterial, 0.5 + 0.9 * ratio);
+    }
+
+    const speed = Math.hypot(enemy.vx, enemy.vy);
+    const trail = enemy.hasAffix('swift') && speed >= 20;
+    parts.ghosts.forEach((ghost, i) => {
+      ghost.visible = trail;
+      if (!trail) return;
+      const t = SWIFT_GHOSTS[i];
+      ghost.position.set(-enemy.vx * t, 0, -enemy.vy * t);
+      ghost.scale.setScalar(r * (0.7 - i * 0.15));
+    });
+
+    const warded = enemy.age < enemy.wardedUntil;
+    parts.ward.visible = warded;
+    if (warded) {
+      const pulse = 0.5 + 0.5 * Math.sin(time * 14);
+      parts.ward.scale.setScalar(r * (1.3 + 0.08 * pulse) + 2);
+      this.wardMaterial.opacity = 0.4 + 0.5 * pulse;
+    }
+
+    const lit = enemy.volatileFuse !== null;
+    parts.fuse.visible = lit;
+    parts.fuseInner.visible = lit;
+    if (lit) {
+      const { fuse, radius } = ELITE_AFFIXES.volatile;
+      const progress = clamp01(1 - enemy.volatileFuse / fuse);
+      parts.fuse.scale.setScalar(radius);
+      parts.fuseInner.scale.setScalar(Math.max(1, radius * progress));
+      parts.fuse.material.opacity = 0.3 + 0.5 * progress;
+    }
   }
 
   bind(view, enemy) {
@@ -2047,6 +2209,7 @@ export class EnemyMirror {
   release(key, view) {
     view.object.visible = false;
     if (view.telegraph) view.telegraph.group.visible = false;
+    if (view.affix) view.affix.group.visible = false;
     this.views.delete(key);
     this.pool(view);
   }

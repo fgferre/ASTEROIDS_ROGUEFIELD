@@ -32,6 +32,12 @@ import {
 import { GAME_HEIGHT, GAME_WIDTH } from '../../../core/GameConstants.js';
 import { resolveEventBus } from '../../../core/serviceUtils.js';
 import RandomService from '../../../core/RandomService.js';
+import { ELITE_AFFIXES } from '../../../data/enemies/affixes.js';
+import {
+  absorbFrontalHit,
+  faceTarget,
+  hitsFrontalShield,
+} from './frontalShield.js';
 
 // docs/NORTE.md §2: a white flash on any damage. PROPOSAL 17/10 (was none).
 export const HIT_FLASH_SECONDS = 0.06;
@@ -98,6 +104,23 @@ export class BaseEnemy {
     // Metadata
     this.tags = new Set(); // For categorization: 'boss', 'minion', 'volatile'
     this.spawnedBy = null; // Parent enemy reference
+
+    // Elite affixes (src/data/enemies/affixes.js), set by EnemyFactory.
+    this.resetAffixes([]);
+  }
+
+  /** Affix ids and their live state; every factory spawn sets them anew. */
+  resetAffixes(affixes) {
+    this.affixes = affixes;
+    this.wardedUntil = -Infinity; // age until which Warded takes no damage
+    this.volatileFuse = null; // seconds left once Volatile's fuse is lit
+    this.volatileSpent = false;
+    this.splitSpent = false;
+    this.blastSpent = false;
+  }
+
+  hasAffix(id) {
+    return this.affixes.includes(id);
   }
 
   /**
@@ -160,6 +183,70 @@ export class BaseEnemy {
     // Subclass hook
     this.onUpdate(deltaTime);
     this._componentsInvoked = false;
+
+    if (this.affixes.length) this.updateAffixes(deltaTime);
+  }
+
+  /** Shielded turns its plate to the player; a lit Volatile fuse burns down. */
+  updateAffixes(deltaTime) {
+    if (this.hasAffix('shielded')) faceTarget(this);
+    if (this.volatileFuse === null) return;
+    this.volatileFuse -= deltaTime;
+    if (this.volatileFuse > 0) return;
+    // The kill takes the normal path; onDestroyed sets off the blast.
+    this.volatileFuse = null;
+    this.volatileSpent = true;
+    this.wardedUntil = -Infinity;
+    const lethal = this.health + (this.armor || 0) + (this.shields || 0) + 1;
+    this.system.applyDamage(this, lethal, { cause: 'volatile-fuse' });
+  }
+
+  /** Warded's window is open, or the Volatile fuse is burning. */
+  isDamageBlocked() {
+    return this.volatileFuse !== null || this.age < this.wardedUntil;
+  }
+
+  /**
+   * Damage left after the affixes: none while Warded or while the Volatile
+   * fuse burns; the Shielded plate drains first on frontal hits; a lethal hit
+   * on a Volatile lights its fuse instead of killing.
+   */
+  affixDamage(amount, source) {
+    const hit = source?.hitPosition;
+    if (this.isDamageBlocked()) {
+      if (hit && this.volatileFuse === null) {
+        const angle = Math.atan2(hit.y - this.y, hit.x - this.x);
+        this.getEventBus()?.emit?.('shield-deflected', {
+          position: { x: hit.x, y: hit.y },
+          normal: { x: Math.cos(angle), y: Math.sin(angle) },
+          level: 0,
+          intensity: 0.5,
+        });
+      }
+      return 0;
+    }
+    let left = amount;
+    if (
+      this.hasAffix('shielded') &&
+      hitsFrontalShield(this, hit, ELITE_AFFIXES.shielded.halfArc)
+    ) {
+      left = absorbFrontalHit(this, left, hit);
+    }
+    if (
+      left > 0 &&
+      this.hasAffix('volatile') &&
+      !this.volatileSpent &&
+      left - (this.armor || 0) - (this.shields || 0) >= this.health
+    ) {
+      this.volatileFuse = ELITE_AFFIXES.volatile.fuse;
+      this.markHit(left);
+      this.getEventBus()?.emit?.('asteroid-volatile-armed', {
+        asteroid: this,
+        position: { x: this.x, y: this.y },
+      });
+      return 0;
+    }
+    return left;
   }
 
   /**
@@ -223,6 +310,10 @@ export class BaseEnemy {
    */
   takeDamage(amount, source = null) {
     if (!this.alive) return false;
+    if (this.affixes.length) {
+      amount = this.affixDamage(amount, source);
+      if (!(amount > 0)) return false;
+    }
 
     const healthComponent = this.getComponent('health');
     if (healthComponent && typeof healthComponent.takeDamage === 'function') {
@@ -250,8 +341,12 @@ export class BaseEnemy {
     return false;
   }
 
+  /** Every hit that costs health lands here (flash, and Warded's window). */
   markHit(damage = 0) {
     this.lastHitTime = performance.now();
+    if (this.hasAffix('warded')) {
+      this.wardedUntil = this.age + ELITE_AFFIXES.warded.immuneSeconds;
+    }
     this.hitFlashSeconds =
       HIT_FLASH_SECONDS *
       Math.min(
@@ -314,7 +409,34 @@ export class BaseEnemy {
       eventBus?.emit?.('enemy-destroyed', payload);
     }
 
+    // Volatile blows before Splitter's Motes are out, so it spares them.
+    if (this.hasAffix('volatile') && !this.blastSpent) {
+      this.blastSpent = true;
+      this.system.triggerVolatileExplosion(this, 'volatile-fuse');
+    }
+    if (this.hasAffix('splitter') && !this.splitSpent) {
+      this.splitSpent = true;
+      this.splitIntoMotes();
+    }
+
     // Override in subclasses for death effects
+  }
+
+  /** Splitter: Motes fly out to both sides of the heading. */
+  splitIntoMotes() {
+    const { count, speed } = ELITE_AFFIXES.splitter;
+    const heading = Math.atan2(this.vy, this.vx) || this.rotation || 0;
+    for (let i = 0; i < count; i += 1) {
+      const angle = heading + Math.PI / 2 + (i * Math.PI * 2) / count;
+      const dx = Math.cos(angle);
+      const dy = Math.sin(angle);
+      this.spawnChild('drone', {
+        x: this.x + dx * this.radius * 0.6,
+        y: this.y + dy * this.radius * 0.6,
+        vx: dx * speed,
+        vy: dy * speed,
+      });
+    }
   }
 
   /**
@@ -450,6 +572,7 @@ export class BaseEnemy {
     // Clear metadata
     this.tags.clear();
     this.spawnedBy = null;
+    this.resetAffixes([]);
 
     // Reset components
     for (const component of this.components.values()) {
