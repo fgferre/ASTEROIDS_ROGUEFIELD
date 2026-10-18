@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import MusicMixer, {
   computeRunIntensity,
+  percussionIntensity,
+  percussionMix,
   resolveMusicLevel,
 } from '../../../src/modules/audio/MusicMixer.js';
 import { createServiceManifest } from '../../../src/bootstrap/serviceManifest.js';
@@ -8,7 +10,9 @@ import { createAudioContextStub } from '../../__helpers__/stubs.js';
 import { assertManagerWired } from '../../__helpers__/audio-manifest-wiring.js';
 import {
   MUSIC_LAYER_CONFIG,
+  MUSIC_PERCUSSION,
   MUSIC_THEME_CROSSFADE,
+  MUSIC_THEMES,
 } from '../../../src/core/GameConstants.js';
 
 // ---------------------------------------------------------------------------
@@ -745,5 +749,103 @@ describe('MusicMixer — themes (crossfade between voice banks)', () => {
     expect(harness.pulses().map((osc) => osc._startTimes[0])).toEqual([
       0, 0.25,
     ]);
+  });
+});
+
+describe('MusicMixer — percussion layer (enters with the run intensity)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  it('is silent below 0.45, opens linearly and is full from 0.8', () => {
+    expect(percussionMix(0)).toBe(0);
+    expect(percussionMix(0.45)).toBe(0);
+    expect(percussionMix(0.625)).toBeCloseTo(0.5, 9);
+    expect(percussionMix(0.8)).toBe(1);
+    expect(percussionMix(1)).toBe(1);
+    // A boss floor counts as its level threshold, never lowers the run.
+    expect(percussionIntensity(0.2, 3)).toBe(0.8);
+    expect(percussionIntensity(0.2, 2)).toBe(0.45);
+    expect(percussionIntensity(0.7, 1)).toBe(0.7);
+    expect(percussionIntensity(0.3, null)).toBe(0.3);
+  });
+
+  it('every theme has a percussion loop whose hits fall inside it', () => {
+    Object.entries(MUSIC_THEMES).forEach(([id, theme]) => {
+      expect(theme.percussion, id).toBeDefined();
+      theme.percussion.hits.forEach((hit) => {
+        hit.steps.forEach((step) => {
+          expect(step).toBeLessThan(theme.percussion.steps);
+        });
+      });
+    });
+  });
+
+  it('the layer gain follows the intensity: closed at danger, full at climax', () => {
+    const harness = makeSchedulingContext();
+    const mixer = makeMixer();
+    mixer.init(harness.context, makeSliderNode());
+    const lastValue = () =>
+      mixer.percussionGain.gain.linearRampToValueAtTime.mock.calls.at(-1)?.[0];
+
+    mixer.setIntensityFromBossEvent('boss-spawned'); // floor 0.45
+    expect(lastValue()).toBe(0);
+    mixer.setIntensityFromBossEvent('boss-phase-changed'); // floor 0.8
+    expect(lastValue()).toBeCloseTo(MUSIC_PERCUSSION.gain, 9);
+    mixer.setIntensityFromBossEvent('boss-defeated');
+    expect(lastValue()).toBe(0);
+  });
+
+  it('outer ring at full intensity: hats on the eighths, a thump on 1', () => {
+    const harness = makeSchedulingContext();
+    const mixer = makeMixer();
+    mixer.init(harness.context, makeSliderNode());
+    harness.markBuilt();
+
+    mixer.setIntensityFromBossEvent('boss-phase-changed');
+    harness.advanceTime(1);
+    vi.advanceTimersByTime(25); // horizon 1.1 s → eighths at 0..1.0
+
+    expect(harness.context.createBufferSource).toHaveBeenCalledTimes(5);
+    // 3 pulses (0, 0.5, 1.0) + 1 thump on step 0.
+    expect(harness.pulses()).toHaveLength(4);
+  });
+
+  it('no hits are scheduled while the layer is closed', () => {
+    const harness = makeSchedulingContext();
+    const mixer = makeMixer();
+    mixer.init(harness.context, makeSliderNode());
+    harness.markBuilt();
+
+    mixer.setIntensityFromBossEvent('boss-spawned'); // danger, percussion 0
+    harness.advanceTime(1);
+    vi.advanceTimersByTime(25);
+
+    expect(harness.context.createBufferSource).not.toHaveBeenCalled();
+    expect(harness.pulses()).toHaveLength(3); // the pulse only
+  });
+
+  it('a theme change crossfades the percussion voice with the drones', () => {
+    const harness = makeSchedulingContext();
+    const mixer = makeMixer();
+    mixer.init(harness.context, makeSliderNode());
+    const outgoing = mixer._themeBank.voices.percussion;
+
+    mixer.setTheme('warden');
+    const incoming = mixer._themeBank.voices.percussion;
+    const end = MUSIC_THEME_CROSSFADE.seconds;
+    expect(outgoing.gain.gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(
+      0,
+      end
+    );
+    expect(incoming.gain.gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(
+      1,
+      end
+    );
   });
 });

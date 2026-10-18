@@ -252,7 +252,7 @@ Conteúdo:
       pickups, barra do chefe segmentada por fase, minimapa com ícones por tipo.
 - [ ] **R6.6 Desempenho.** Rochas instanciadas por variante (atributos por instância para rachaduras/veios), orçamento
       do passe de sombra (só casters perto da câmera), meta de < 80 draw calls no ultra com 40 rochas.
-- [ ] **R6.7 Áudio espacial.** Atenuação por distância + filtro passa-baixa por distância nos cues de inimigo, camada
+- [x] **R6.7 Áudio espacial.** Atenuação por distância + filtro passa-baixa por distância nos cues de inimigo, camada
       de percussão por bioma que entra com a intensidade, voz dos Wardens nas transmissões (síntese granular curta).
 
 ## Fora de escopo deste plano

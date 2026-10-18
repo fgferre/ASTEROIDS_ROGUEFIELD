@@ -232,6 +232,10 @@ const MUSIC_SCALES = Object.freeze({
 //   pulse: the danger/climax rhythmic blip — type, octave above root, pattern,
 //     gain.
 //   motif: the chapter stinger's three notes (biome themes only).
+//   percussion: the fifth layer (MUSIC_PERCUSSION gates it by intensity) — a
+//     loop of `steps` steps, `subdivision` steps per barSeconds; each hit lists
+//     its steps and is either a 'tone' (pitch drop startHz → endHz, optional
+//     sub tail) or 'noise' (filtered seeded noise), gain and seconds.
 export const MUSIC_THEMES = Object.freeze({
   // Open, travelling: A dorian, the bright sixth over a calm fifth.
   'outer-ring': Object.freeze({
@@ -273,6 +277,29 @@ export const MUSIC_THEMES = Object.freeze({
       octave: 1,
       pattern: Object.freeze([0, 0, 4, 2]),
       gain: 0.12,
+    }),
+    // Soft noise hats on the eighths, a low thump on 1.
+    percussion: Object.freeze({
+      subdivision: 2,
+      steps: 8,
+      hits: Object.freeze([
+        Object.freeze({
+          kind: 'tone',
+          steps: Object.freeze([0]),
+          type: 'sine',
+          startHz: 120,
+          endHz: 48,
+          seconds: 0.22,
+          gain: 0.5,
+        }),
+        Object.freeze({
+          kind: 'noise',
+          steps: Object.freeze([0, 1, 2, 3, 4, 5, 6, 7]),
+          filter: Object.freeze({ type: 'highpass', frequency: 7000, Q: 0.7 }),
+          seconds: 0.035,
+          gain: 0.12,
+        }),
+      ]),
     }),
     motif: Object.freeze([0, 4, 5]),
   }),
@@ -318,6 +345,34 @@ export const MUSIC_THEMES = Object.freeze({
       pattern: Object.freeze([0, 1, 0, 4]),
       gain: 0.13,
     }),
+    // Slow tom-like sine thumps with a sub tail (half-note feel).
+    percussion: Object.freeze({
+      subdivision: 1,
+      steps: 4,
+      hits: Object.freeze([
+        Object.freeze({
+          kind: 'tone',
+          steps: Object.freeze([0, 2]),
+          type: 'sine',
+          startHz: 150,
+          endHz: 72,
+          seconds: 0.32,
+          gain: 0.45,
+          subHz: 43.65, // F1
+          subSeconds: 0.55,
+          subGain: 0.35,
+        }),
+        Object.freeze({
+          kind: 'tone',
+          steps: Object.freeze([3]),
+          type: 'sine',
+          startHz: 115,
+          endHz: 58,
+          seconds: 0.26,
+          gain: 0.3,
+        }),
+      ]),
+    }),
     motif: Object.freeze([0, 1, 4]),
   }),
   // Cold, vast: E lydian, the raised fourth in high sine partials, slow
@@ -361,6 +416,27 @@ export const MUSIC_THEMES = Object.freeze({
       octave: 2,
       pattern: Object.freeze([0, 4, 3, 6]),
       gain: 0.1,
+    }),
+    // Sparse metallic clicks (very short resonant noise) on a sixteenth grid.
+    percussion: Object.freeze({
+      subdivision: 4,
+      steps: 16,
+      hits: Object.freeze([
+        Object.freeze({
+          kind: 'noise',
+          steps: Object.freeze([0, 7, 10]),
+          filter: Object.freeze({ type: 'bandpass', frequency: 5200, Q: 9 }),
+          seconds: 0.025,
+          gain: 0.3,
+        }),
+        Object.freeze({
+          kind: 'noise',
+          steps: Object.freeze([13]),
+          filter: Object.freeze({ type: 'bandpass', frequency: 3100, Q: 11 }),
+          seconds: 0.03,
+          gain: 0.25,
+        }),
+      ]),
     }),
     motif: Object.freeze([0, 3, 4]),
   }),
@@ -407,7 +483,42 @@ export const MUSIC_THEMES = Object.freeze({
       pattern: Object.freeze([0, 0, 0, 4, 0, 0, 2, 1]),
       gain: 0.14,
     }),
+    // Insistent kick (every beat plus a pickup), snare noise on 2 and 4. One
+    // step = barSeconds (an eighth here).
+    percussion: Object.freeze({
+      subdivision: 1,
+      steps: 8,
+      hits: Object.freeze([
+        Object.freeze({
+          kind: 'tone',
+          steps: Object.freeze([0, 2, 4, 6, 7]),
+          type: 'sine',
+          startHz: 140,
+          endHz: 42,
+          seconds: 0.16,
+          gain: 0.6,
+        }),
+        Object.freeze({
+          kind: 'noise',
+          steps: Object.freeze([2, 6]),
+          filter: Object.freeze({ type: 'bandpass', frequency: 1900, Q: 0.8 }),
+          seconds: 0.14,
+          gain: 0.3,
+        }),
+      ]),
+    }),
   }),
+});
+
+// Percussion layer gate (proposta 18/10): silent below enterIntensity, full
+// at fullIntensity (smoothed run intensity; a boss floor counts as its level
+// threshold), `gain` trim on the layer, seeded noise from its own stream.
+export const MUSIC_PERCUSSION = Object.freeze({
+  enterIntensity: 0.45,
+  fullIntensity: 0.8,
+  gain: 0.6,
+  noiseSeconds: 0.25,
+  noiseSeed: 'audio:music:percussion-noise',
 });
 
 export const MUSIC_DEFAULT_THEME = 'outer-ring';
@@ -491,6 +602,69 @@ export const AUDIO_REVERB_SEND_DB = Object.freeze({
 
 // Enemy-side cues pan by source x relative to the player.
 export const AUDIO_STEREO_PAN_MAX = 0.6;
+
+// ... and fade and darken with distance from the player (proposta 18/10):
+// full level and an open lowpass within nearPx, down to farGain and
+// farCutoffHz at farPx (clamped beyond). Gain follows an inverse-style curve
+// 1 / (1 + k·t), the cutoff moves exponentially (even steps to the ear).
+export const AUDIO_DISTANCE_MIX = Object.freeze({
+  nearPx: 120,
+  farPx: 900,
+  farGain: 0.35,
+  nearCutoffHz: 18000,
+  farCutoffHz: 2200,
+  Q: 0.7071,
+});
+
+// Warden transmission "voice" (proposta 18/10): a short granular burst under
+// the squelch — `grains` short grains spread over `seconds`, each a low
+// oscillator (or whisper noise) through a formant bandpass, levelDb under the
+// squelch peak, with a reverb send. Keyed by the transmission speaker name
+// (STORY.speaker values); unknown speakers use THE RING's neutral voice.
+//   notes: MIDI notes the grains cycle through (a triad for THE CHOIR).
+//   whisper: odd grains are highpassed noise instead of a tone (WARDEN NULL).
+export const TRANSMISSION_VOICE = Object.freeze({
+  delaySeconds: 0.1, // the voice starts as the squelch closes
+  seconds: 0.6,
+  grainSeconds: 0.07,
+  jitterSeconds: 0.012, // seeded onset jitter per grain
+  detuneCents: 18, // seeded detune span per grain
+  levelDb: -14,
+  reverbSendDb: -10,
+  whisperFilterHz: 3200,
+  defaultSpeaker: 'THE RING',
+  speakers: Object.freeze({
+    'WARDEN PRIME': Object.freeze({
+      grains: 10,
+      type: 'sawtooth',
+      notes: Object.freeze([31]), // G1
+      formantHz: 520,
+      formantQ: 4,
+    }),
+    'THE CHOIR': Object.freeze({
+      grains: 12,
+      type: 'sawtooth',
+      notes: Object.freeze([48, 51, 55]), // C3 Eb3 G3
+      formantHz: 1100,
+      formantQ: 5,
+    }),
+    'WARDEN NULL': Object.freeze({
+      grains: 8,
+      type: 'sine',
+      notes: Object.freeze([24]), // C1 sub
+      formantHz: 240,
+      formantQ: 2,
+      whisper: true,
+    }),
+    'THE RING': Object.freeze({
+      grains: 9,
+      type: 'sawtooth',
+      notes: Object.freeze([45]), // A2
+      formantHz: 800,
+      formantQ: 4,
+    }),
+  }),
+});
 
 // Explosions in three sizes: sub thump, mid crack, filtered noise/air tail.
 // Times in seconds. `minIntervalMs` throttles same-size pile-ups.

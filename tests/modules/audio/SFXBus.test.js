@@ -2,8 +2,14 @@ import { describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import SFXBus, {
+  resolveDistanceMix,
   resolveExplosionSize,
 } from '../../../src/modules/audio/SFXBus.js';
+import {
+  AUDIO_DISTANCE_MIX,
+  TRANSMISSION_VOICE,
+} from '../../../src/core/GameConstants.js';
+import { STORY } from '../../../src/data/story.js';
 import AudioSystem from '../../../src/modules/AudioSystem.js';
 import RandomService from '../../../src/core/RandomService.js';
 import {
@@ -380,6 +386,7 @@ const FACADE_PUBLIC_API_BASELINE = Object.freeze([
   'playTipChime',
   'playTargetLock',
   'playTransmission',
+  'playTransmissionVoice',
   'playUIHover',
   'playUISelect',
   'playUIStartGame',
@@ -462,5 +469,112 @@ describe('SFXBus explosion-size routing (enemy-destroyed → small/medium/large)
     expect(route({ enemy: { type: 'mote', elite: true } })).toBe('medium');
     expect(route({ enemyType: 'warden', elite: true })).toBe('large');
     expect(route({ enemyType: 'mine' })).toBeNull();
+  });
+});
+
+describe('SFXBus distance mix (enemy cues fade and darken with distance)', () => {
+  it('gain and cutoff fall monotonically with distance and clamp at both ends', () => {
+    const near = resolveDistanceMix(0, 0);
+    expect(near.gain).toBe(1);
+    expect(near.cutoff).toBeCloseTo(AUDIO_DISTANCE_MIX.nearCutoffHz, 6);
+    expect(resolveDistanceMix(120, 0)).toEqual(near);
+
+    let previous = near;
+    for (let d = 150; d <= 900; d += 50) {
+      const mix = resolveDistanceMix(0, d);
+      expect(mix.gain).toBeLessThan(previous.gain);
+      expect(mix.cutoff).toBeLessThan(previous.cutoff);
+      previous = mix;
+    }
+    const far = resolveDistanceMix(540, 720); // 900 px
+    expect(far.gain).toBeCloseTo(AUDIO_DISTANCE_MIX.farGain, 9);
+    expect(far.cutoff).toBeCloseTo(AUDIO_DISTANCE_MIX.farCutoffHz, 6);
+    expect(resolveDistanceMix(5000, 0)).toEqual(resolveDistanceMix(900, 0));
+    expect(resolveDistanceMix(NaN, 0)).toEqual(near);
+  });
+
+  it('a far enemy cue goes through a lowpass and a gain; a near one does not', () => {
+    const { bus, context } = makeInitializedBus();
+    bus.playEnemyTelegraph({ distance: resolveDistanceMix(0, 0) });
+    const nearFilters = context.createBiquadFilter.mock.results.length;
+    expect(nearFilters).toBe(0);
+
+    const distance = resolveDistanceMix(0, 700);
+    bus.playEnemyTelegraph({ pan: 0.3, distance });
+    const filters = context.createBiquadFilter.mock.results.map((r) => r.value);
+    expect(filters).toHaveLength(1);
+    expect(filters[0].type).toBe('lowpass');
+    expect(filters[0].frequency.value).toBeCloseTo(distance.cutoff, 6);
+    const distanceGain = context.createGain.mock.results
+      .map((r) => r.value)
+      .find((g) => g.gain.value === distance.gain);
+    expect(distanceGain).toBeDefined();
+  });
+});
+
+describe('SFXBus Warden transmission voice (granular)', () => {
+  function playVoice(speaker) {
+    const { bus, context } = makeInitializedBus();
+    const frequencyLog = [];
+    context.createOscillator = vi.fn(() =>
+      createOscillatorStub({ frequencyLog })
+    );
+    const gainsBefore = context.createGain.mock.results.length;
+    bus.playTransmissionVoice(speaker);
+    const gains = context.createGain.mock.results
+      .slice(gainsBefore)
+      .map((r) => r.value);
+    return { context, frequencyLog, gains };
+  }
+  const hz = (midi) => 440 * 2 ** ((midi - 69) / 12);
+
+  it('every story speaker has a voice of 8-12 grains', () => {
+    Object.values(STORY.speaker).forEach((speaker) => {
+      const voice = TRANSMISSION_VOICE.speakers[speaker];
+      expect(voice, speaker).toBeDefined();
+      expect(voice.grains).toBeGreaterThanOrEqual(8);
+      expect(voice.grains).toBeLessThanOrEqual(12);
+    });
+  });
+
+  it('PRIME is low, CHOIR cycles a triad, THE RING is neutral', () => {
+    const prime = playVoice('WARDEN PRIME').frequencyLog;
+    expect(prime).toHaveLength(10);
+    prime.forEach((f) => expect(f).toBeCloseTo(hz(31), 6));
+
+    const choir = playVoice('THE CHOIR').frequencyLog;
+    expect(choir).toHaveLength(12);
+    expect(new Set(choir.map((f) => f.toFixed(3))).size).toBe(3);
+    expect(choir.slice(0, 3)).toEqual([hz(48), hz(51), hz(55)]);
+
+    const ring = playVoice('THE RING').frequencyLog;
+    expect(ring).toHaveLength(9);
+    ring.forEach((f) => expect(f).toBeCloseTo(hz(45), 6));
+    // Unknown speakers fall back to THE RING.
+    expect(playVoice('SOMEONE').frequencyLog).toEqual(ring);
+  });
+
+  it('NULL alternates a sub with whisper-noise grains', () => {
+    const { context, frequencyLog } = playVoice('WARDEN NULL');
+    expect(frequencyLog).toHaveLength(4);
+    frequencyLog.forEach((f) => expect(f).toBeCloseTo(hz(24), 6));
+    expect(context.createBufferSource).toHaveBeenCalledTimes(4);
+  });
+
+  it('sits levelDb under the squelch peak and fits in its window', () => {
+    const { gains } = playVoice('THE RING');
+    const [output, , ...envelopes] = gains; // output, reverb send, grains
+    expect(output.gain.value).toBeCloseTo(
+      0.09 * 10 ** (TRANSMISSION_VOICE.levelDb / 20),
+      9
+    );
+    const last = TRANSMISSION_VOICE.delaySeconds + TRANSMISSION_VOICE.seconds;
+    expect(envelopes).toHaveLength(9);
+    envelopes.forEach((value) => {
+      const times = value.gain.linearRampToValueAtTime.mock.calls.map(
+        (call) => call[1]
+      );
+      times.forEach((t) => expect(t).toBeLessThanOrEqual(last + 1e-9));
+    });
   });
 });

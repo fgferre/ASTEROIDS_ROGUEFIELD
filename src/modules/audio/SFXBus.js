@@ -6,6 +6,7 @@ import { createSfxSynthPort } from './SfxSynthPort.js';
 import RandomService from '../../core/RandomService.js';
 import { requireRandom } from '../../utils/randomHelpers.js';
 import {
+  AUDIO_DISTANCE_MIX,
   AUDIO_REVERB,
   AUDIO_REVERB_SEND_DB,
   AUDIO_STEREO_PAN_MAX,
@@ -15,6 +16,7 @@ import {
   EXPLOSION_SIZE_BY_ENEMY_TYPE,
   GAME_WIDTH,
   MUSIC_THEMES,
+  TRANSMISSION_VOICE,
   WARDEN_STINGER,
 } from '../../core/GameConstants.js';
 import { midiToHz, themeDegreeHz } from './MusicThemes.js';
@@ -73,7 +75,31 @@ export function resolveStereoPan(sourceX, listenerX = GAME_WIDTH / 2) {
   return Math.max(-1, Math.min(1, offset)) * AUDIO_STEREO_PAN_MAX;
 }
 
+/**
+ * Distance mix for a source at (dx, dy) from the player: gain 1 → farGain and
+ * lowpass cutoff nearCutoffHz → farCutoffHz between nearPx and farPx
+ * (AUDIO_DISTANCE_MIX), clamped outside. Unknown offsets count as near.
+ *
+ * @returns {{gain: number, cutoff: number}}
+ */
+export function resolveDistanceMix(dx, dy) {
+  const { nearPx, farPx, farGain, nearCutoffHz, farCutoffHz } =
+    AUDIO_DISTANCE_MIX;
+  const distance = Math.hypot(dx, dy);
+  const t = Number.isFinite(distance)
+    ? Math.min(1, Math.max(0, (distance - nearPx) / (farPx - nearPx)))
+    : 0;
+  return {
+    gain: 1 / (1 + (1 / farGain - 1) * t),
+    cutoff: nearCutoffHz * (farCutoffHz / nearCutoffHz) ** t,
+  };
+}
+
 const dbToGain = (db) => Math.pow(10, db / 20);
+
+// Peak of the transmission squelch; the voice sits TRANSMISSION_VOICE.levelDb
+// under it.
+const TRANSMISSION_SQUELCH_PEAK = 0.09;
 
 /**
  * SFXBus — owns ALL per-event SFX synthesis (INFRA-02).
@@ -346,16 +372,32 @@ class SFXBus {
   }
 
   /**
-   * Ambient destination, through a StereoPanner when `pan` is non-zero.
+   * Ambient destination, through a StereoPanner when `pan` is non-zero and a
+   * distance lowpass + gain when `distance` ({gain, cutoff} from
+   * resolveDistanceMix) is beyond the near radius.
    * @private
    */
-  _ambientInput(pan = 0) {
-    const destination = this.getAmbientDestination();
-    if (!destination || !pan) return destination;
-    const panner = this.context.createStereoPanner();
-    panner.pan.value = pan;
-    panner.connect(destination);
-    return panner;
+  _ambientInput(pan = 0, distance = null) {
+    let destination = this.getAmbientDestination();
+    if (!destination) return destination;
+    if (pan) {
+      const panner = this.context.createStereoPanner();
+      panner.pan.value = pan;
+      panner.connect(destination);
+      destination = panner;
+    }
+    if (distance && distance.gain < 1) {
+      const gain = this.context.createGain();
+      gain.gain.value = distance.gain;
+      gain.connect(destination);
+      const lowpass = this.context.createBiquadFilter();
+      lowpass.type = 'lowpass';
+      lowpass.frequency.value = distance.cutoff;
+      lowpass.Q.value = AUDIO_DISTANCE_MIX.Q;
+      lowpass.connect(gain);
+      destination = lowpass;
+    }
+    return destination;
   }
 
   _resolveRandom(...candidates) {
@@ -429,6 +471,7 @@ class SFXBus {
       intensity,
       wave,
       pan: Number(data?.pan) || 0,
+      distance: data?.distance || null,
       enemyType: (
         data?.enemyType ||
         data?.enemy?.type ||
@@ -472,6 +515,7 @@ class SFXBus {
       gain: 0.13 + speedRatio * 0.06,
       intensity: Math.min(1.2, 0.7 + speedRatio * 0.5),
       pan: Number(data?.pan) || 0,
+      distance: data?.distance || null,
       burstId:
         burst.id !== undefined
           ? `hunter:${burst.id}`
@@ -503,6 +547,7 @@ class SFXBus {
       rumbleGain: 0.2 + intensity * 0.18,
       intensity,
       pan: Number(data?.pan) || 0,
+      distance: data?.distance || null,
       enemyType: (data?.enemyType || data?.enemy?.type || 'mine').toLowerCase(),
     };
   }
@@ -676,12 +721,13 @@ class SFXBus {
   /**
    * Explosion in three sizes (EXPLOSION_PROFILES): sub thump, mid crack and a
    * filtered noise tail, panned, with a size-scaled reverb send. Same-size
-   * pile-ups inside `minIntervalMs` are dropped.
+   * pile-ups inside `minIntervalMs` are dropped. Distance-mixed when
+   * `distance` is given.
    *
    * @param {'small'|'medium'|'large'} [size='large']
-   * @param {{pan?: number}} [options]
+   * @param {{pan?: number, distance?: {gain: number, cutoff: number}}} [options]
    */
-  playExplosion(size = 'large', { pan = 0 } = {}) {
+  playExplosion(size = 'large', { pan = 0, distance = null } = {}) {
     this._trackPerformance('playExplosion');
     const profile = EXPLOSION_PROFILES[size] || EXPLOSION_PROFILES.large;
     const sizeKey = EXPLOSION_PROFILES[size] ? size : 'large';
@@ -696,7 +742,7 @@ class SFXBus {
       }
       this._lastExplosionTime[sizeKey] = now;
 
-      const destination = this._ambientInput(pan);
+      const destination = this._ambientInput(pan, distance);
       if (!destination) {
         return;
       }
@@ -822,14 +868,15 @@ class SFXBus {
   }
 
   /**
-   * Enemy telegraph: short rising tone (an attack is coming), panned.
-   * @param {{pan?: number}} [options]
+   * Enemy telegraph: short rising tone (an attack is coming), panned and
+   * distance-mixed.
+   * @param {{pan?: number, distance?: {gain: number, cutoff: number}}} [options]
    */
-  playEnemyTelegraph({ pan = 0 } = {}) {
+  playEnemyTelegraph({ pan = 0, distance = null } = {}) {
     this._trackPerformance('playEnemyTelegraph');
 
     this._safePlay(() => {
-      const destination = this._ambientInput(pan);
+      const destination = this._ambientInput(pan, distance);
       if (!destination) return;
 
       const now = this.context.currentTime;
@@ -1385,7 +1432,10 @@ class SFXBus {
       band.Q.setValueAtTime(4, now);
       const noiseGain = this.context.createGain();
       noiseGain.gain.setValueAtTime(0.0001, now);
-      noiseGain.gain.exponentialRampToValueAtTime(0.09, now + 0.01);
+      noiseGain.gain.exponentialRampToValueAtTime(
+        TRANSMISSION_SQUELCH_PEAK,
+        now + 0.01
+      );
       noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
       noise.connect(band);
       band.connect(noiseGain);
@@ -1406,6 +1456,97 @@ class SFXBus {
       this._sendToReverb(gain, AUDIO_REVERB_SEND_DB.levelUp);
       osc.start(now + 0.1);
       osc.stop(now + 0.62);
+    });
+  }
+
+  /**
+   * Warden transmission voice: TRANSMISSION_VOICE.seconds of short grains
+   * (low oscillator through the speaker's formant bandpass; WARDEN NULL
+   * alternates its sub with highpassed whisper noise) starting as the squelch
+   * closes, levelDb under the squelch peak, with a reverb send. Seeded onset
+   * jitter and detune.
+   * @param {string} [speaker] - transmission speaker (STORY.speaker value)
+   */
+  playTransmissionVoice(speaker) {
+    this._trackPerformance('playTransmissionVoice');
+
+    this._safePlay(() => {
+      const destination = this.getAmbientDestination();
+      if (!destination) return;
+
+      const config = TRANSMISSION_VOICE;
+      const voice =
+        config.speakers[speaker] || config.speakers[config.defaultSpeaker];
+      const context = this.context;
+      const now = context.currentTime;
+      const rng = this._resolveRandom(
+        this.randomScopes?.families?.explosion,
+        this.randomScopes?.base
+      );
+
+      const output = context.createGain();
+      output.gain.value = TRANSMISSION_SQUELCH_PEAK * dbToGain(config.levelDb);
+      output.connect(destination);
+      this._sendToReverb(output, config.reverbSendDb);
+
+      const formant = context.createBiquadFilter();
+      formant.type = 'bandpass';
+      formant.frequency.setValueAtTime(voice.formantHz, now);
+      formant.Q.setValueAtTime(voice.formantQ, now);
+      formant.connect(output);
+
+      let whisperFilter = null;
+      let whisperBuffer = null;
+      if (voice.whisper) {
+        whisperFilter = context.createBiquadFilter();
+        whisperFilter.type = 'highpass';
+        whisperFilter.frequency.setValueAtTime(config.whisperFilterHz, now);
+        whisperFilter.connect(output);
+        const rate = context.sampleRate;
+        const length = Math.max(1, Math.floor(rate * config.grainSeconds));
+        whisperBuffer = context.createBuffer(1, length, rate);
+        const data = whisperBuffer.getChannelData(0);
+        for (let i = 0; i < length; i += 1) {
+          data[i] = rng.float() * 2 - 1;
+        }
+      }
+
+      const grain = config.grainSeconds;
+      const span = config.seconds - grain - config.jitterSeconds;
+      for (let i = 0; i < voice.grains; i += 1) {
+        const start =
+          now +
+          config.delaySeconds +
+          (span * i) / Math.max(1, voice.grains - 1) +
+          rng.float() * config.jitterSeconds;
+        const end = start + grain;
+        const envelope = context.createGain();
+        envelope.gain.setValueAtTime(0.0001, start);
+        envelope.gain.linearRampToValueAtTime(1, start + grain / 2);
+        envelope.gain.linearRampToValueAtTime(0.0001, end);
+
+        let source;
+        if (whisperBuffer && i % 2 === 1) {
+          source = context.createBufferSource();
+          source.buffer = whisperBuffer;
+          envelope.connect(whisperFilter);
+        } else {
+          source = context.createOscillator();
+          source.type = voice.type;
+          source.frequency.setValueAtTime(
+            midiToHz(voice.notes[i % voice.notes.length]),
+            start
+          );
+          source.detune.setValueAtTime(
+            (rng.float() - 0.5) * config.detuneCents,
+            start
+          );
+          envelope.connect(formant);
+        }
+        source.connect(envelope);
+        source.start(start);
+        source.stop(end + 0.01);
+      }
     });
   }
 
@@ -1636,7 +1777,7 @@ class SFXBus {
       const duration = Math.max(0.06, Number(params.duration) || 0.1);
       const startFrequency = Math.max(520, Number(params.frequency) || 680);
       const now = this.context.currentTime;
-      const output = this._ambientInput(params.pan);
+      const output = this._ambientInput(params.pan, params.distance);
 
       for (let i = 0; i < voices; i += 1) {
         const osc = this.pool
@@ -1703,7 +1844,7 @@ class SFXBus {
       const totalGain = Math.min(0.32, baseGain * concurrency);
       const perShotGain = Math.max(0.04, totalGain / shotCount);
       const now = this.context.currentTime;
-      const output = this._ambientInput(params.pan);
+      const output = this._ambientInput(params.pan, params.distance);
 
       for (let shot = 0; shot < shotCount; shot += 1) {
         const osc = this.pool
@@ -1774,7 +1915,7 @@ class SFXBus {
       );
 
       const now = this.context.currentTime;
-      const destination = this._ambientInput(params.pan);
+      const destination = this._ambientInput(params.pan, params.distance);
       if (!destination) {
         return;
       }
