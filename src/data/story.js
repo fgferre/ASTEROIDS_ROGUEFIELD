@@ -24,6 +24,28 @@ export const STORY = deepFreeze({
     'wardens-reach':
       "Warden's Reach. Structure intact. Law intact. No vessel is logged past this point.",
   },
+  // Spoken by the Ring the first time a support machine is ever seen (the
+  // Codex's first meeting). Machines without a line arrive unannounced.
+  sighting: {
+    husk: 'Dead keeper, still on its route. Its cargo is not dead.',
+    caster:
+      'Beacon keeper, awake. It marks your next position. Choose another.',
+    ram: 'Lane clearer. Its task: remove debris. It has classified you.',
+    leech:
+      'Light keeper, hungry. It eats what you drop. Break it to take it back.',
+    shade:
+      'Phase keeper. Half here, half not. When it returns, it returns close.',
+    bulwark: 'Line keeper. Its face is a wall. Its back is not.',
+    weaver: 'Weaver. It does not fire. It closes the lanes behind you.',
+  },
+  // Warden Prime, as a Boss Rush opens on its gate.
+  bossRush:
+    'Three gates. Nothing between them. You will be counted at every one.',
+  // The Ring logs a Hangar purchase, keyed by item id.
+  hangar: {
+    'bastion-hull':
+      'Escort hull logged: Bastion. Built to bring others home. Carrying one.',
+  },
   // warning: on 'boss-warning', the layer before the Warden. defeated: on its
   // 'boss-defeated' (the last Warden's defeat is the victory line).
   warden: {
