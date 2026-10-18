@@ -5,11 +5,9 @@ import SFXBus, {
   resolveDistanceMix,
   resolveExplosionSize,
 } from '../../../src/modules/audio/SFXBus.js';
-import {
-  AUDIO_DISTANCE_MIX,
-  EXPLOSION_PROFILES,
-  TRANSMISSION_VOICE,
-} from '../../../src/core/GameConstants.js';
+import { TRANSMISSION_VOICE } from '../../../src/data/audio/stingers.js';
+import { AUDIO_DISTANCE_MIX } from '../../../src/data/audio/mix.js';
+import { EXPLOSION_PROFILES } from '../../../src/data/audio/explosions.js';
 import { STORY } from '../../../src/data/story.js';
 import AudioSystem from '../../../src/modules/AudioSystem.js';
 import RandomService from '../../../src/core/RandomService.js';

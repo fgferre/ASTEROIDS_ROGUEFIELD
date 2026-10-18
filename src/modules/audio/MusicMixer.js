@@ -1,3 +1,4 @@
+import { RUN_FINAL_LAYER } from '../../core/GameConstants.js';
 import {
   MUSIC_DEFAULT_THEME,
   MUSIC_LAYER_CONFIG,
@@ -5,8 +6,7 @@ import {
   MUSIC_RUN_INTENSITY,
   MUSIC_THEME_CROSSFADE,
   MUSIC_THEMES,
-  RUN_FINAL_LAYER,
-} from '../../core/GameConstants.js';
+} from '../../data/audio/music.js';
 import { midiToHz, themeDegreeHz } from './MusicThemes.js';
 import RandomService from '../../core/RandomService.js';
 

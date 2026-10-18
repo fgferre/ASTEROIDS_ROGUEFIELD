@@ -1,4 +1,4 @@
-import { MUSIC_THEMES, MUSIC_WARDEN_THEME } from '../../core/GameConstants.js';
+import { MUSIC_THEMES, MUSIC_WARDEN_THEME } from '../../data/audio/music.js';
 import { biomeForLayer } from '../../data/biomes.js';
 import { directorFor } from '../../data/layers.js';
 

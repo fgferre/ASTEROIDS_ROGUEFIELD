@@ -26,3 +26,4 @@
 - Espaço (18/10, R13.1): Dense Core ficou mais apagado (plano distante mais escuro/cinza e levemente suave a 1024² sobre ~10,5k unidades — veios laranja mais marrons; ele julga); nuvens de poeira desenham depois do Anel (renderOrder −9) e velam de leve os detritos à frente; se o WebGL perder o contexto a textura distante assada volta preta (o projeto não trata perda de contexto em lugar nenhum).
 - Scripts Playwright (`scripts/probe.mjs` sonda de erros de runtime, `scripts/capture.mjs` captura) para sessão na nuvem ou automação, onde não há navegador embutido; decisão de 18/10: sem a dependência enquanto a sessão principal captura sozinha.
 - Docs órfãos em `tests/`: `OPTIMIZATION_GUIDE.md` (ninguém referencia) e `__fixtures__/README.md` (diz que fixtures "serão adicionadas"); o lint do `IS_DEV` não pega a forma `const { DEV } = import.meta.env`.
+- Áudio (18/10, R13.8.2): `dbToGain` (uma linha) existe em SFXBus, sfx/stingers e DuckingController.
