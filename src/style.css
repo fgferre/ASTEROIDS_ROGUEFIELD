@@ -2011,7 +2011,8 @@ kbd {
   background: var(--panel-inset);
 }
 
-.codex-entry.is-warden {
+.codex-entry.is-warden,
+.codex-entry.is-herald {
   --codex-light: var(--boss);
   border-color: color-mix(in srgb, var(--boss) 45%, transparent);
 }
@@ -2258,12 +2259,31 @@ kbd {
 }
 
 /* The menu's 3D hull, copied in from the menu canvas (MenuBackgroundSystem) */
-.hangar-hull-stage {
+.hangar-hull-stage-frame {
+  position: relative;
   flex: 2;
   min-width: 0;
+}
+
+.hangar-hull-stage {
+  display: block;
+  width: 100%;
   height: clamp(110px, 18vh, 150px);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
+}
+
+/* A hovered locked hull: its silhouette in the stage, the price over it */
+.hangar-hull-lock {
+  position: absolute;
+  inset: auto 0 var(--space-2);
+  margin: 0;
+  color: var(--text-dim);
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  letter-spacing: 0.08em;
+  text-align: center;
+  pointer-events: none;
 }
 
 .hangar-hulls {

@@ -20,12 +20,22 @@ const MONTHS = [
   'Dec',
 ];
 
+// Wardens and Heralds are met once a run and fall or don't; the rest are
+// counted by the swarm.
+function codexMetaText(entry) {
+  const { firstLayer, kills } = entry.seen;
+  if (entry.warden || entry.herald) {
+    return `FIRST SEEN · LAYER ${firstLayer} · DEFEATED ×${kills}`;
+  }
+  return `From layer ${entry.fromLayer} · First contact: layer ${firstLayer} · Destroyed: ${kills}`;
+}
+
 // One Codex row; an entry never met shows as a dark silhouette, unnamed.
 function codexEntryMarkup(entry) {
   const known = Boolean(entry.seen);
   const classes = `codex-entry${known ? '' : ' is-unknown'}${
     entry.warden ? ' is-warden' : ''
-  }`;
+  }${entry.herald ? ' is-herald' : ''}`;
   const glyph = `<svg class="codex-entry__glyph" viewBox="-16 -16 32 32" aria-hidden="true">${entry.glyph}</svg>`;
   if (!known) {
     return `<li class="${classes}">${glyph}
@@ -38,7 +48,7 @@ function codexEntryMarkup(entry) {
   return `<li class="${classes}">${glyph}
     <div class="codex-entry__text">
       <h3 class="codex-entry__name">${entry.name}</h3>
-      <p class="codex-entry__meta">From layer ${entry.fromLayer} · First contact: layer ${entry.seen.firstLayer} · Destroyed: ${entry.seen.kills}</p>
+      <p class="codex-entry__meta">${codexMetaText(entry)}</p>
       <p class="codex-entry__lore">${entry.lore}</p>
       <p class="codex-entry__hint">${entry.hint}</p>
     </div></li>`;

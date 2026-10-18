@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ENEMY_TYPES } from '../../../src/data/constants/visual.js';
+import { AFFIX_IDS } from '../../../src/data/enemies/affixes.js';
 import { ASTEROID_VARIANTS } from '../../../src/data/enemies/asteroid-configs.js';
 import { DISSOLVE_SECONDS } from '../../../src/modules/render3d/dissolve.js';
 import {
@@ -365,5 +366,43 @@ describe('EnemyMirror', () => {
     const { telegraph } = mirror.views.get('silence');
     expect(telegraph.group.visible).toBe(true);
     expect(telegraph.target.position.x).toBe(200);
+  });
+
+  it('bakes the affix badge textures in warm-up, inside the seeded wrapper', () => {
+    // a canvas whose 2D context accepts every draw call
+    const ctx = new Proxy(
+      {},
+      { get: (target, key) => target[key] ?? (() => {}) }
+    );
+    vi.stubGlobal('document', {
+      createElement: () => ({ getContext: () => ctx }),
+    });
+    let depth = 0;
+    const seeded = (fn) => {
+      depth += 1;
+      try {
+        return fn();
+      } finally {
+        depth -= 1;
+      }
+    };
+    const baked = [];
+    const three = {
+      ...THREE,
+      CanvasTexture: class extends THREE.CanvasTexture {
+        constructor(...args) {
+          super(...args);
+          baked.push(depth);
+        }
+      },
+    };
+    const mirror = new EnemyMirror(three, new three.Scene(), seeded);
+    mirror.warm('drone', () => {});
+    vi.unstubAllGlobals();
+
+    expect(Object.keys(mirror.badges).sort()).toEqual([...AFFIX_IDS].sort());
+    expect(baked).toHaveLength(AFFIX_IDS.length);
+    baked.forEach((level) => expect(level).toBeGreaterThan(0));
+    expect(mirror.badgeMaterials()).toBe(mirror.badges);
   });
 });

@@ -6,6 +6,7 @@ import {
   TRANSMISSION_HOLD_MS,
   TransmissionQueue,
   deathTransmission,
+  heraldTransmission,
   wardenTransmission,
 } from '../../../src/modules/ui/transmissions.js';
 
@@ -81,6 +82,17 @@ describe('TransmissionQueue', () => {
     queue.push(wardenTransmission(15, 'warning'));
     queue.update(0, true);
     expect(hud.text).toBe(STORY.warden[15].warning);
+  });
+});
+
+describe('heraldTransmission', () => {
+  it("keys the line by kind and speaks with the Herald's own label", () => {
+    expect(heraldTransmission('heat', 'defeated')).toEqual({
+      key: 'herald:heat:defeated',
+      speaker: 'HERALD OF HEAT',
+      text: STORY.herald.heat.defeated,
+    });
+    expect(heraldTransmission('nobody', 'spawned')).toBeNull();
   });
 });
 

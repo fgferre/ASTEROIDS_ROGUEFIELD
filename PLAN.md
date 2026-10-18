@@ -259,9 +259,9 @@ Conteúdo:
 
 Qualidade:
 
-- [~] **R7.1 Máquinas em menos malhas.** Fundir as partes estáticas de cada máquina (Mote, Seeker, Tether, Husk, Ram,
-  Weaver, Bulwark, Heralds, placas dos Wardens) numa geometria com cor por vértice; só partes animadas separadas;
-  meta < 80 draw calls na cena carregada (40 rochas + 10 máquinas) no ultra.
+- [x] **R7.1 Máquinas em menos malhas.** Fundir as partes estáticas de cada máquina (Mote, Seeker, Tether, Husk, Ram,
+      Weaver, Bulwark, Heralds, placas dos Wardens) numa geometria com cor por vértice; só partes animadas separadas;
+      meta < 80 draw calls na cena carregada (40 rochas + 10 máquinas) no ultra.
 - [x] **R7.2 Pequenos acabamentos de UX.** Chip AIM MANUAL, linha de lock 3D a partir da torreta, Esc fecha Settings
       aberto do menu, setas de fora de tela não caem sobre painéis, chips de casco com nome em uma linha, dicas estáticas
       de teclado com o esquema moderno, salvage escalado pela dificuldade.
@@ -281,14 +281,27 @@ Conteúdo:
       um segundo estágio visível (Incendiary → Solar Flare Lance; Railshot → Coilgun; Chain → Storm Lance; Gravitic →
       Singularity Lance; Prospector → Motherlode), com look próprio em 3D/2D, chip na HUD e conquista.
       Qualidade:
-- [~] **R8.2 Decisão de draw calls.** Rims de todas as máquinas num LineSegments só, olhos/lentes/esferas emissivas num
-  InstancedMesh, bloom com menos mips no preset alto; Dense Fog escurece rochas distantes no 3D; meta < 100 no
-  ultra na cena carregada.
+- [x] **R8.2 Decisão de draw calls.** Rims de todas as máquinas num LineSegments só, olhos/lentes/esferas emissivas num
+      InstancedMesh, bloom com menos mips no preset alto; Dense Fog escurece rochas distantes no 3D; meta < 100 no
+      ultra na cena carregada.
 - [x] **R8.3 BACKLOG curto.** Seed do wave-manager por run (modificadores variam entre runs); prévia 3D do casco no
       Hangar; dois arrows no mesmo painel não se empilham.
 - [x] **R8.4 Acessibilidade.** Escala de texto da HUD (Settings), modo alto contraste da HUD, redução de flashes
       (Solar Flare/lens-kick/flash de dano respeitam uma opção "reduce flashing"), legendas de transmissão maiores,
       tudo persistido e coberto por teste.
+
+## Rodada 9 (18/10, meio-dia) — pequena, dois eixos, ainda sem veredito dele
+
+Qualidade:
+
+- [x] **R9.1 Nave em menos malhas + badges com seed.** Fundir as placas estáticas do casco (ambos os cascos) numa
+      geometria com cor por vértice (banking/recuo/turret/propulsores continuam separados); `badgeMaterials()` cria
+      texturas pela seed (guard de Math.random limpo); medir draw calls da nave antes/depois.
+- [x] **R9.2 Três ajustes.** Drift do Magnetic Storm pela seed de run; flash de borda/wash do boss respeita "reduce
+      flashing"; prévia de casco bloqueado no Hangar (silhueta escura + cadeado).
+      Conteúdo:
+- [x] **R9.3 Heralds falam.** Uma linha de transmissão ao surgir e ao cair para cada Herald (voz própria), entradas de
+      lore no Códice para Heralds e Wardens com "visto em" e "derrotado ×N", conquista "Herald Hunter" (os três).
 
 ## Fora de escopo deste plano
 

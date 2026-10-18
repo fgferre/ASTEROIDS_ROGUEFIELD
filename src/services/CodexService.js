@@ -11,7 +11,7 @@ const KNOWN_IDS = new Set(CODEX_ENTRIES.map((entry) => entry.id));
  * Enemies met across runs: `seen[id] = { firstLayer, kills }`, kept in
  * localStorage. Support enemies emit no spawn event, so they are met when one
  * dies or when one kills the pilot; rocks on 'enemy-spawned', Wardens on
- * 'boss-spawned'. A first meeting emits 'codex-discovered' { type }.
+ * 'boss-spawned', Heralds (by kind) on 'herald-spawned'. A first meeting emits 'codex-discovered' { type }.
  */
 export default class CodexService {
   constructor({ eventBus } = {}) {
@@ -24,6 +24,9 @@ export default class CodexService {
     });
     eventBus.on('enemy-spawned', (payload = {}) => this.record(payload.enemy));
     eventBus.on('boss-spawned', (payload = {}) => this.record(payload.enemy));
+    eventBus.on('herald-spawned', (payload = {}) =>
+      this.record({ type: 'herald', heraldKind: payload.kind })
+    );
     eventBus.on('enemy-destroyed', (payload = {}) =>
       this.record(payload.enemy, { kill: true })
     );

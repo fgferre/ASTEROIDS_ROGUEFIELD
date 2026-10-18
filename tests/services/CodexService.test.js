@@ -43,6 +43,19 @@ describe('CodexService', () => {
     expect(seenOf(codex, 'warden-prime')).toBeNull();
   });
 
+  it('sees each Herald by its kind when it appears and counts its defeats', () => {
+    const eventBus = new EventBus();
+    const codex = new CodexService({ eventBus });
+    eventBus.emit('wave-started', { wave: 8 });
+    eventBus.emit('herald-spawned', { kind: 'heat' });
+    eventBus.emit('enemy-destroyed', {
+      enemy: { type: 'herald', heraldKind: 'heat' },
+    });
+
+    expect(seenOf(codex, 'herald-heat')).toEqual({ firstLayer: 8, kills: 1 });
+    expect(seenOf(codex, 'herald-dust')).toBeNull();
+  });
+
   it('persists through storage into the next session', () => {
     const eventBus = new EventBus();
     new CodexService({ eventBus });

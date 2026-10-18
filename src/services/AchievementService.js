@@ -21,7 +21,8 @@ const DEEP_FIELD_LAYER = 20;
 
 /**
  * Local achievements: `unlocked[id] = isoDate`, `progress[id] = n` for the
- * countable ones, kept in localStorage. An unlock emits
+ * countable ones, `heraldsFelled` (the Herald kinds already counted), kept in
+ * localStorage. An unlock emits
  * 'achievement-unlocked' { id, title }.
  */
 export default class AchievementService {
@@ -30,6 +31,7 @@ export default class AchievementService {
     const stored = loadJSON(ACHIEVEMENTS_STORAGE_KEY) ?? {};
     this.unlocked = stored.unlocked ?? {};
     this.progress = stored.progress ?? {};
+    this.heraldsFelled = stored.heraldsFelled ?? [];
     this.hullClean = true;
     this.cursedHeld = false;
 
@@ -51,6 +53,11 @@ export default class AchievementService {
       const kind = payload.bossKind ?? payload.enemy?.bossKind;
       if (WARDEN_ACHIEVEMENTS[kind]) this.unlock(WARDEN_ACHIEVEMENTS[kind]);
       if (this.hullClean) this.unlock('untouchable');
+    });
+    eventBus.on('herald-defeated', ({ kind } = {}) => {
+      if (!kind || this.heraldsFelled.includes(kind)) return;
+      this.heraldsFelled.push(kind);
+      this.count('herald-hunter');
     });
     eventBus.on('run-won', () => {
       this.unlock('null-and-void');
@@ -93,6 +100,7 @@ export default class AchievementService {
     saveJSON(ACHIEVEMENTS_STORAGE_KEY, {
       unlocked: this.unlocked,
       progress: this.progress,
+      heraldsFelled: this.heraldsFelled,
     });
   }
 

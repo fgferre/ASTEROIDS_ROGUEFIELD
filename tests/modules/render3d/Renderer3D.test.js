@@ -111,3 +111,47 @@ describe('Renderer3D bloom mips', () => {
     expect(pass.setSize).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('Renderer3D boss flash', () => {
+  const effect = (timer) => ({
+    timer,
+    duration: 1.05,
+    maxAlpha: 0.5,
+    borderWidth: 24,
+    pulseFrequency: 2.4,
+    overlayAlpha: 0.12,
+    fadePower: 1.6,
+  });
+  const washAlpha = (flashScale, effects) => {
+    const renderer = Object.create(Renderer3D.prototype);
+    renderer.flashScale = flashScale;
+    renderer.three = {
+      bossFlash: { style: {} },
+      bossFlashKey: '',
+      canvas: { clientWidth: 800 },
+    };
+    renderer.mirrorBossTransitions(effects);
+    return Number(
+      renderer.three.bossFlash.style.background
+        .match(/[\d.]+\)$/)[0]
+        .slice(0, -1)
+    );
+  };
+
+  it('dims the wash to 30 % with Reduce Flashing, without the pulse', () => {
+    // at timer 0.6 the pulse is in its trough
+    const full = washAlpha(1, [effect(0.6)]);
+    const reduced = washAlpha(0.3, [effect(0.6)]);
+    const fade = 1 - Math.pow(0.6 / 1.05, 1.6);
+    expect(reduced).toBeCloseTo(0.12 * fade * 0.3, 5);
+    expect(reduced).toBeLessThan(full);
+  });
+
+  it('skips a boss flash starting within 0.34 s of another with Reduce Flashing', () => {
+    const alone = washAlpha(0.3, [effect(0.5)]);
+    expect(washAlpha(0.3, [effect(0.5), effect(0.3)])).toBe(alone);
+    expect(washAlpha(1, [effect(0.5), effect(0.3)])).toBeGreaterThan(
+      washAlpha(1, [effect(0.5)])
+    );
+  });
+});

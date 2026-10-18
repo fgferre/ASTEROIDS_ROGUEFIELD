@@ -92,6 +92,23 @@ describe('AchievementService', () => {
     expect(unlocked).toContain('cursed-run');
   });
 
+  it('herald-hunter counts each Herald kind once, across sessions', () => {
+    const { eventBus, service, unlocked } = setup();
+    eventBus.emit('herald-defeated', { kind: 'dust' });
+    eventBus.emit('herald-defeated', { kind: 'dust' });
+    eventBus.emit('herald-defeated', { kind: 'heat' });
+    expect(
+      service.getEntries().find((e) => e.id === 'herald-hunter')
+    ).toMatchObject({ progress: 2, target: 3, unlockedAt: null });
+
+    const next = setup();
+    next.eventBus.emit('herald-defeated', { kind: 'heat' });
+    expect(next.unlocked).toEqual([]);
+    next.eventBus.emit('herald-defeated', { kind: 'silence' });
+    expect(next.unlocked).toEqual(['herald-hunter']);
+    expect(unlocked).toEqual([]);
+  });
+
   it('persists unlocks and counters into the next session, unlocking once', () => {
     const { eventBus } = setup();
     eventBus.emit('wave-complete', { wave: 1 });

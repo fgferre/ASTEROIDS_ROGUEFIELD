@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AFFIX_IDS } from '../../../src/data/enemies/affixes.js';
 import { ALL_HULLS } from '../../../src/data/shipModels.js';
 import PlayerSystem from '../../../src/modules/PlayerSystem.js';
 import Renderer3D from '../../../src/modules/render3d/Renderer3D.js';
@@ -80,8 +81,21 @@ function warmable() {
 }
 
 describe('Renderer3D.warmUp', () => {
-  beforeEach(() => setupGlobalMocks());
-  afterEach(() => cleanupGlobalState());
+  beforeEach(() => {
+    setupGlobalMocks();
+    // the affix badges bake into canvases: a 2D context that takes any draw
+    const ctx = new Proxy(
+      {},
+      { get: (target, key) => target[key] ?? (() => {}) }
+    );
+    vi.stubGlobal('document', {
+      createElement: () => ({ getContext: () => ctx }),
+    });
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    cleanupGlobalState();
+  });
 
   it('compiles every view kind, look, hull and burn, then pools the views', async () => {
     vi.useFakeTimers();
@@ -115,6 +129,8 @@ describe('Renderer3D.warmUp', () => {
     });
     batches.forEach((batch) => expect(compiled.has(batch.material)).toBe(true));
     // the instanced rocks' shared materials, the rim and glow batches
+    // the affix badges, baked before the first Elite shows them
+    expect(Object.keys(enemies.badges).sort()).toEqual([...AFFIX_IDS].sort());
     Object.values(enemies.rockFamilies).forEach((material) =>
       expect(compiled.has(material)).toBe(true)
     );

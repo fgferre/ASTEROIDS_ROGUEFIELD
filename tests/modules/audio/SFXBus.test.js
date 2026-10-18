@@ -560,6 +560,25 @@ describe('SFXBus Warden transmission voice (granular)', () => {
     expect(context.createBufferSource).toHaveBeenCalledTimes(4);
   });
 
+  it('Heralds: DUST grinds noise through its formant, HEAT crackles a semitone, SILENCE barely whispers', () => {
+    const dust = playVoice('HERALD OF DUST');
+    expect(dust.frequencyLog).toHaveLength(5);
+    expect(dust.context.createBufferSource).toHaveBeenCalledTimes(5);
+    // Grit adds no highpass: only the formant filter.
+    expect(dust.context.createBiquadFilter).toHaveBeenCalledTimes(1);
+
+    const heat = playVoice('HERALD OF HEAT').frequencyLog;
+    expect(heat).toHaveLength(12);
+    expect(heat.slice(0, 2)).toEqual([hz(57), hz(58)]);
+
+    const silence = playVoice('HERALD OF SILENCE');
+    expect(silence.frequencyLog).toHaveLength(4);
+    expect(silence.gains[0].gain.value).toBeCloseTo(
+      0.09 * 10 ** ((TRANSMISSION_VOICE.levelDb - 10) / 20),
+      9
+    );
+  });
+
   it('sits levelDb under the squelch peak and fits in its window', () => {
     const { gains } = playVoice('THE RING');
     const [output, , ...envelopes] = gains; // output, reverb send, grains

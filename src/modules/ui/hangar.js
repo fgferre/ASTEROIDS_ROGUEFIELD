@@ -3,6 +3,8 @@
 // The Hangar screen and the Salvage line of the run recaps (docs/NORTE.md §7
 // pillar 7). Markup only; UISystem wires the buttons.
 
+import { HANGAR_ITEMS } from '../../data/hangar.js';
+
 export function salvageBalanceText(salvage) {
   return `Salvage ${salvage}`;
 }
@@ -15,6 +17,12 @@ export function salvageLine(award) {
   const multiplier = award?.multiplier ?? 1;
   const rate = multiplier === 1 ? '' : `×${multiplier} difficulty, `;
   return `SALVAGE +${award?.amount ?? 0} (${rate}total ${award?.total ?? 0})`;
+}
+
+/** Over a hovered locked hull's silhouette: "🔒 LOCKED · 400 SALVAGE". */
+export function hullLockText(hullId) {
+  const item = HANGAR_ITEMS.find((entry) => entry.unlocksHull === hullId);
+  return `🔒 LOCKED · ${item.cost} SALVAGE`;
 }
 
 /** One upgrade card: name, effect, cost and OWNED or a BUY button. */

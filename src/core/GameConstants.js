@@ -623,6 +623,8 @@ export const AUDIO_DISTANCE_MIX = Object.freeze({
 // (STORY.speaker values); unknown speakers use THE RING's neutral voice.
 //   notes: MIDI notes the grains cycle through (a triad for THE CHOIR).
 //   whisper: odd grains are highpassed noise instead of a tone (WARDEN NULL).
+//   grit: odd grains are noise through the formant instead (HERALD OF DUST).
+//   gainDb: offset from levelDb (HERALD OF SILENCE sits near silent).
 export const TRANSMISSION_VOICE = Object.freeze({
   delaySeconds: 0.1, // the voice starts as the squelch closes
   seconds: 0.6,
@@ -662,6 +664,30 @@ export const TRANSMISSION_VOICE = Object.freeze({
       notes: Object.freeze([45]), // A2
       formantHz: 800,
       formantQ: 4,
+    }),
+    'HERALD OF DUST': Object.freeze({
+      grains: 10,
+      type: 'square',
+      notes: Object.freeze([28]), // E1
+      formantHz: 340,
+      formantQ: 3,
+      grit: true,
+    }),
+    'HERALD OF HEAT': Object.freeze({
+      grains: 12,
+      type: 'sawtooth',
+      notes: Object.freeze([57, 58]), // A3 Bb3, a crackling semitone
+      formantHz: 1500,
+      formantQ: 7,
+    }),
+    'HERALD OF SILENCE': Object.freeze({
+      grains: 8,
+      type: 'sine',
+      notes: Object.freeze([84]), // C6
+      formantHz: 2600,
+      formantQ: 3,
+      whisper: true,
+      gainDb: -10,
     }),
   }),
 });

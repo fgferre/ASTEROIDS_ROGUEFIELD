@@ -29,6 +29,7 @@ import {
   TransmissionQueue,
   chapterTransmission,
   deathTransmission,
+  heraldTransmission,
   victoryTransmission,
   wardenTransmission,
 } from './ui/transmissions.js';
@@ -42,6 +43,7 @@ import {
 } from './ui/runRecap.js';
 import {
   hangarItemMarkup,
+  hullLockText,
   salvageBalanceText,
   salvageLine,
 } from './ui/hangar.js';
@@ -345,6 +347,7 @@ class UISystem extends BaseSystem {
         overlay: document.getElementById('hangar-screen') || null,
         list: document.getElementById('hangar-list') || null,
         hulls: document.getElementById('hangar-hulls') || null,
+        hullLock: document.getElementById('hangar-hull-lock') || null,
         balance: document.getElementById('hangar-balance') || null,
         openBtn: document.getElementById('menu-hangar-btn') || null,
         backBtn: document.getElementById('hangar-back-btn') || null,
@@ -1744,8 +1747,8 @@ class UISystem extends BaseSystem {
       if (payload.id === 'dense-fog') this.aaaTacticalHud?.setRadarRange(1);
     });
 
-    // A Herald arrives under a violet banner; Silence jams the radar while it
-    // lives (a new run clears it).
+    // A Herald arrives under a violet banner, then speaks; Silence jams the
+    // radar while it lives (a new run clears it).
     this.registerEventListener('herald-spawned', ({ kind } = {}) => {
       const herald = HERALD_KINDS[kind];
       if (!herald) return;
@@ -1754,8 +1757,10 @@ class UISystem extends BaseSystem {
         herald.subtitle
       );
       if (herald.jamsRadar) this.aaaTacticalHud?.setRadarJammed(true);
+      this.queueTransmission(heraldTransmission(kind, 'spawned'));
     });
     this.registerEventListener('herald-defeated', ({ kind } = {}) => {
+      this.queueTransmission(heraldTransmission(kind, 'defeated'));
       if (HERALD_KINDS[kind]?.jamsRadar) {
         this.aaaTacticalHud?.setRadarJammed(false);
       }
@@ -2364,19 +2369,23 @@ class UISystem extends BaseSystem {
         this.renderHangar();
       }
     });
-    // The 3D hull preview follows the hovered or focused hull button.
+    // The 3D hull preview follows the hovered or focused hull button; a
+    // locked hull shows as a silhouette with its price over the stage.
     const previewHull = (event) => {
-      const hull = event.target.closest?.('[data-hangar-hull]:enabled');
-      this.eventBus.emit('hangar-hull-hovered', {
-        hullId: hull?.dataset.hangarHull ?? null,
-      });
+      const hull = event.target.closest?.('[data-hangar-hull]');
+      const hullId = hull?.dataset.hangarHull ?? null;
+      const locked = Boolean(hull?.disabled);
+      refs.hullLock.hidden = !locked;
+      refs.hullLock.textContent = locked ? hullLockText(hullId) : '';
+      this.eventBus.emit('hangar-hull-hovered', { hullId, locked });
     };
     refs.hulls?.addEventListener('pointerover', previewHull);
     refs.hulls?.addEventListener('focusin', previewHull);
     ['pointerleave', 'focusout'].forEach((type) =>
-      refs.hulls?.addEventListener(type, () =>
-        this.eventBus.emit('hangar-hull-hovered', { hullId: null })
-      )
+      refs.hulls?.addEventListener(type, () => {
+        refs.hullLock.hidden = true;
+        this.eventBus.emit('hangar-hull-hovered', { hullId: null });
+      })
     );
     document.addEventListener('keydown', (event) => {
       if (this.hangarState.isOpen && event.key === 'Escape') {
