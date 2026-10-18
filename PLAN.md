@@ -208,7 +208,7 @@ variedade de evento, de carta e de chefe, e um começo/fim de run com peso. Tudo
 - [x] **R5.3 Eventos de campo** na tabela de camadas: Gravity Well (fagulhas puxadas a um ponto), Solar Flare (flash
       do bioma, inimigos atordoados 1 s), Sensor Jam (radar fora 10 s); banner e cue.
 - [ ] **R5.4 Catálogo 21 → 30.** Duas cartas novas por família + três "cursed" raras (ganho grande com custo).
-- [ ] **R5.5 Warm-up de shaders** na tela de loading (compila todos os materiais, inclusive os gêmeos do dissolve);
+- [x] **R5.5 Warm-up de shaders** na tela de loading (compila todos os materiais, inclusive os gêmeos do dissolve);
       barra de progresso real.
 - [ ] **R5.6 Conquistas locais** numa aba do Códice (12, com toast na hora).
 

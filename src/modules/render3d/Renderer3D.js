@@ -44,7 +44,7 @@ import { BiomeController } from './biomes3d.js';
 import { DebrisChunks } from './debrisChunks.js';
 import { DeathBursts } from './dissolve.js';
 import { DustFloor } from './dustFloor.js';
-import { EnemyMirror } from './enemyMirror.js';
+import { EnemyMirror, VIEW_KINDS } from './enemyMirror.js';
 import { FieldBackdrop } from './fieldBackdrop.js';
 import { FlashLights } from './flashLights.js';
 import { HitSparks, MuzzleFlashes } from './hitSparks.js';
@@ -654,21 +654,91 @@ class Renderer3D extends BaseSystem {
     return texture;
   }
 
+  // The WebGL side, built on first use; false once setup has failed.
+  ready() {
+    if (this.failed) return false;
+    if (this.three) return true;
+    try {
+      this.seeded(() => this.setup());
+      return true;
+    } catch (error) {
+      this.failed = true;
+      console.error('[Renderer3D] WebGL setup failed:', error);
+      return false;
+    }
+  }
+
+  // --- warm-up ---------------------------------------------------------------
+
+  /**
+   * Loading screen (app.js): builds the scene (maps baked) and compiles every
+   * program a run can draw with — each enemy view kind in all its looks and
+   * burning, both hulls, then one frame of everything through the composer
+   * (post passes, texture and buffer uploads). One chunk per task, so the
+   * bar repaints; `onProgress(done)` after each, 0..1.
+   */
+  async warmUp(onProgress) {
+    const compile = () => this.compileScene();
+    const steps = [
+      () => this.ready(),
+      () => this.three.player.warm(this.cachedPlayer, compile),
+      ...VIEW_KINDS.map((kind) => () => this.three.enemies.warm(kind, compile)),
+      () => this.drawEverything(),
+    ];
+    for (let i = 0; i < steps.length; i += 1) {
+      if (!this.failed) steps[i]();
+      onProgress((i + 1) / steps.length);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+  }
+
+  // Programs for the scene's materials (pooled views included) as the
+  // frame draws them: into the composer's target, or the screen without it.
+  compileScene() {
+    const t = this.three;
+    t.renderer.setRenderTarget(
+      this.graphics.postProcessing ? t.composer.readBuffer : null
+    );
+    t.renderer.compile(t.scene, t.camera);
+    t.renderer.setRenderTarget(null);
+    t.renderer.compile(t.overlay, t.camera);
+  }
+
+  // One frame with every object shown and unculled (lights as they are, so
+  // the light count programs are keyed on stays the run's) and every pass on.
+  drawEverything() {
+    const t = this.three;
+    const saved = [];
+    t.scene.traverse((object) => {
+      if (object.isLight) return;
+      saved.push(object, object.visible, object.frustumCulled);
+      object.visible = true;
+      object.frustumCulled = false;
+    });
+    // a damage number: the sprite program takes its map
+    t.texts.begin();
+    t.texts.push('0', 0, 0, 10, PALETTE.text, 1);
+    t.texts.end();
+    t.bloomPass.enabled = true;
+    t.smaaPass.enabled = true;
+    t.impactPass.enabled = true;
+    t.composer.render(0);
+    t.renderer.render(t.overlay, t.camera);
+    t.texts.begin();
+    t.texts.end();
+    for (let i = 0; i < saved.length; i += 3) {
+      saved[i].visible = saved[i + 1];
+      saved[i].frustumCulled = saved[i + 2];
+    }
+    t.impactPass.enabled = false;
+    this.syncPasses();
+  }
+
   // --- frame -----------------------------------------------------------------
 
   /** `alpha`: the fixed stepper's leftover fraction (1 = latest step). */
   render(ctx, alpha = 1) {
-    if (this.failed) return;
-    if (!this.three) {
-      try {
-        this.seeded(() => this.setup());
-      } catch (error) {
-        this.failed = true;
-        console.error('[Renderer3D] WebGL setup failed:', error);
-        return;
-      }
-    }
-
+    if (!this.ready()) return;
     this.applyPoses(alpha);
     try {
       this.drawFrame();

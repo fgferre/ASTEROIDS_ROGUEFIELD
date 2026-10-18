@@ -14,6 +14,7 @@ import {
 } from '../../data/constants/gameplay.js';
 import { PALETTE } from '../../data/constants/palette.js';
 import { SHIP_MAX_SPEED } from '../../data/constants/physics.js';
+import { ALL_HULLS } from '../../data/shipModels.js';
 import { bakeHullMaps } from './bakedMaps.js';
 import { HALF_H, HALF_W, colorOf, rgbOf } from './batches.js';
 
@@ -220,6 +221,19 @@ export class PlayerMirror {
     if (key === this.hullKey) return this.geometry;
     this.hullKey = key;
     return this.seeded(() => this.rebuild(player, hull, levels));
+  }
+
+  /**
+   * Loading-screen warm-up (Renderer3D.warmUp): builds every hull once for
+   * `compile`; the next update() rebuilds the live one.
+   */
+  warm(player, compile) {
+    const levels = player.getHullVisualLevels();
+    ALL_HULLS.forEach((hull) => {
+      this.seeded(() => this.rebuild(player, hull, levels));
+      compile();
+    });
+    this.hullKey = null;
   }
 
   rebuild(player, hull, levels) {

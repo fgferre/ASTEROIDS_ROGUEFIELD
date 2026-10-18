@@ -95,6 +95,31 @@ let servicesCacheInitialized = false;
 
 const DEV_MODE = isDevEnvironment();
 
+// The loading bar's last stretch: the 3D renderer compiles its shaders
+// (Renderer3D.warmUp) after the menu's preload, before the menu shows.
+const WARM_UP_SHARE = 0.4;
+
+function holdLoadingForWarmUp(menu, renderer) {
+  const { onProgress, onComplete } = menu.loadingState;
+  menu.setLoadingCallbacks(
+    (progress, message) => onProgress(progress * (1 - WARM_UP_SHARE), message),
+    async () => {
+      const start = performance.now();
+      try {
+        await renderer.warmUp((done) =>
+          onProgress(
+            1 - WARM_UP_SHARE + done * WARM_UP_SHARE,
+            'Compiling shaders'
+          )
+        );
+        performance.measure('renderer-warm-up', { start });
+      } finally {
+        onComplete();
+      }
+    }
+  );
+}
+
 function initializeDependencyInjection(manifestContext) {
   debugLog('[App] Initializing Dependency Injection system...');
 
@@ -251,6 +276,10 @@ function init(recording = null) {
 
     // Store services for use in game loop
     gameSystemServices = services;
+
+    if (gameState.rendererMode === '3d') {
+      holdLoadingForWarmUp(services['menu-background'], services.renderer);
+    }
 
     // Validate that all required services exist (DEV_MODE only)
     if (DEV_MODE) {

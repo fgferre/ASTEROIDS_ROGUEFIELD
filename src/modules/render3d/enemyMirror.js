@@ -49,6 +49,8 @@ export const KNOWN_KINDS = new Set([
   'bulwark',
   'boss',
 ]);
+// Every view kind create() builds: a Warden's `bossKind` splits 'boss' in three.
+export const VIEW_KINDS = [...KNOWN_KINDS, 'boss-choir', 'boss-null'];
 
 // Variant looks (§3 "Fragmento do Anel"): `base` (sRGB) multiplies the baked
 // rock color; veins are the light inside, glowing between `floor` and
@@ -640,6 +642,35 @@ export class EnemyMirror {
       default:
         return this.createUnknown();
     }
+  }
+
+  /**
+   * Loading-screen warm-up (Renderer3D.warmUp): views of `kind` in every look
+   * a run gives it (each rock variant, machines plain and Elite); `compile`
+   * runs over them as drawn, then burning (dissolve twins in), and the burn's
+   * end pools them, ready for the first spawns.
+   */
+  warm(kind, compile) {
+    const looks =
+      kind === 'asteroid'
+        ? Object.keys(VARIANT_LOOKS)
+        : kind.startsWith('boss')
+          ? [false]
+          : [false, true];
+    const views = looks.map((look, i) => {
+      const view = this.acquire(kind);
+      view.seed = i;
+      this.bind(view, { variant: look });
+      if (look === true) this.applyElite(view, true);
+      return view;
+    });
+    compile();
+    views.forEach((view) =>
+      this.dissolve.start(view, this.accentOf(view), view.radius || 12)
+    );
+    compile();
+    this.dissolve.clear();
+    return views;
   }
 
   kindOf(type, bossKind) {
